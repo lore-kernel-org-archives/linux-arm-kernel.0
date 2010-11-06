@@ -1,61 +1,206 @@
-From: awg@embtoolkit.org (Abdoulaye Walsimou GAYE)
-Date: Sat, 06 Nov 2010 17:09:37 +0100
-Subject: [PATCH v2] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
-In-Reply-To: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
-References: <1285020052-20020-1-git-send-email-lars@metafoo.de>
-	<1289030074-5233-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <4CD57DC1.4050403@embtoolkit.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Sat, 06 Nov 2010 13:08:58 -0400
+Subject: [PATCH v2 1/7] OMAP2: hwmod data: add mailbox data
+In-Reply-To: <1289006244-27147-2-git-send-email-omar.ramirez@ti.com>
+References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
+	<1289006244-27147-2-git-send-email-omar.ramirez@ti.com>
+Message-ID: <4CD58BAA.8020909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2010 08:54 AM, Vasily Khoruzhick wrote:
-> Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default structure
-> are initalized via s3c_gpio_{get,set}pull_1up. This results in a linker
-> error:
->
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
-> `s3c_gpio_getpull_1up'
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
-> `s3c_gpio_setpull_1up'
->
-> The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
-> The method of controlling them is the same though.
-> So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper functions
-> to take an additional parameter deciding whether the pin has a pullup or pulldown.
-> The s3c_gpio_{get,set}pull_1{down,up} functions then wrap that functions passing
-> either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
->
-> Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull fields
-> in the s3c2442 cpu init function to the new pulldown helper functions.
->
-> Based on patch from Lars-Peter Clausen<lars@metafoo.de>
->
-> Signed-off-by: Vasily Khoruzhick<anarsoul@gmail.com>
-> ---
->
->    
+Hi Omar,
 
-[...]
-> diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
-> index 24c6f5a..243b641 100644
-> --- a/arch/arm/plat-s3c24xx/gpiolib.c
-> +++ b/arch/arm/plat-s3c24xx/gpiolib.c
-> @@ -82,8 +82,6 @@ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
->   struct s3c_gpio_cfg s3c24xx_gpiocfg_default = {
->   	.set_config	= s3c_gpio_setcfg_s3c24xx,
->   	.get_config	= s3c_gpio_getcfg_s3c24xx,
-> -	.set_pull	= s3c_gpio_setpull_1up,
-> -	.get_pull	= s3c_gpio_getpull_1up,
+On 11/5/2010 9:17 PM, Ramirez Luna, Omar wrote:
+> hwmod data for omap2430 and 2420.
+>
+> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_2420_data.c |   67 ++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/omap_hwmod_2430_data.c |   66 +++++++++++++++++++++++++++
+>   2 files changed, 133 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> index a1a3dd6..76ad991 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> @@ -557,6 +557,72 @@ static struct omap_hwmod omap2420_i2c2_hwmod = {
+>   	.flags		= HWMOD_16BIT_REG,
 >   };
 >
->    
+> +/* mailbox */
+> +
+> +static struct omap_hwmod_class_sysconfig omap2420_mailbox_sysc = {
+> +	.rev_offs	= 0x000,
+> +	.sysc_offs	= 0x010,
+> +	.syss_offs	= 0x014,
+> +	.sysc_flags	= (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
+> +				SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	=&omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class omap2420_mailbox_hwmod_class = {
+> +	.name = "mailbox",
+> +	.sysc =&omap2420_mailbox_sysc,
+> +};
+> +
+> +static struct omap_hwmod omap2420_mailbox_hwmod;
+> +
+> +static struct omap_hwmod_addr_space omap2420_mailbox_addrs[] = {
+> +	{
+> +		.pa_start	= OMAP24XX_MAILBOX_BASE,
+> +		.pa_end		= OMAP24XX_MAILBOX_BASE + SZ_4K - 1,
+> +		.flags		= ADDR_TYPE_RT,
+> +	},
+> +};
+> +
+> +/* l4_core ->  mailbox */
+> +static struct omap_hwmod_ocp_if omap2420_l4_core__mailbox = {
+> +	.master		=&omap2420_l4_core_hwmod,
+> +	.slave		=&omap2420_mailbox_hwmod,
+> +	.addr		= omap2420_mailbox_addrs,
+> +	.clk		= "mailboxes_ick",
 
-This part of your patch will prevent s3c2440 based boards to boot see [1]
+Could you try to be consistent with the omap4 format? it is easier to 
+diff between Soc version: .clk is before .addr.
 
-[..]
+> +	.addr_cnt	= ARRAY_SIZE(omap2420_mailbox_addrs),
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* mailbox slave ports */
+> +static struct omap_hwmod_ocp_if *omap2420_mailbox_slaves[] = {
+> +	&omap2420_l4_core__mailbox,
+> +};
+> +
+> +static struct omap_hwmod_irq_info omap2420_mailbox_irqs[] = {
+> +	{ .name = "dsp", .irq = INT_24XX_MAIL_U0_MPU, },
+> +	{ .name = "iva", .irq = INT_24XX_MAIL_U3_MPU, },
+> +};
+> +
+> +static struct omap_hwmod omap2420_mailbox_hwmod = {
+> +	.name		= "mailbox",
+> +	.class		=&omap2420_mailbox_hwmod_class,
+> +	.prcm		= {
+> +		.omap2 = {
+> +			.prcm_reg_id = 1,
+> +			.module_bit = OMAP24XX_EN_MAILBOXES_SHIFT,
+> +			.module_offs = CORE_MOD,
+> +			.idlest_reg_id = 1,
+> +			.idlest_idle_bit = OMAP24XX_ST_MAILBOXES_SHIFT,
+> +		},
+> +	},
 
-[1] 
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=bdf5005b738c1542a30b41a83069329313fc61f6
+Same things with the format, put that after irqs_cnt and before slaves.
 
-Best regards,
-AWG
+> +	.mpu_irqs	= omap2420_mailbox_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap2420_mailbox_irqs),
+> +	.slaves		= omap2420_mailbox_slaves,
+> +	.slaves_cnt	= ARRAY_SIZE(omap2420_mailbox_slaves),
+> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
+> +};
+> +
+>   static __initdata struct omap_hwmod *omap2420_hwmods[] = {
+>   	&omap2420_l3_main_hwmod,
+>   	&omap2420_l4_core_hwmod,
+> @@ -569,6 +635,7 @@ static __initdata struct omap_hwmod *omap2420_hwmods[] = {
+>   	&omap2420_uart3_hwmod,
+>   	&omap2420_i2c1_hwmod,
+>   	&omap2420_i2c2_hwmod,
+
+Add a blank line between each class. OK it was not done for i2c, but it 
+should.
+
+All the comments are applicable to the 2430 and 3430 data as well.
+
+Thanks,
+Benoit
+
+> +	&omap2420_mailbox_hwmod,
+>   	NULL,
+>   };
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> index 7cf0d3a..991bd5b 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> @@ -569,6 +569,71 @@ static struct omap_hwmod omap2430_i2c2_hwmod = {
+>   	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
+>   };
+>
+> +/* mailbox */
+> +
+> +static struct omap_hwmod_class_sysconfig omap2430_mailbox_sysc = {
+> +	.rev_offs	= 0x000,
+> +	.sysc_offs	= 0x010,
+> +	.syss_offs	= 0x014,
+> +	.sysc_flags	= (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
+> +				SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	=&omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class omap2430_mailbox_hwmod_class = {
+> +	.name = "mailbox",
+> +	.sysc =&omap2430_mailbox_sysc,
+> +};
+> +
+> +static struct omap_hwmod omap2430_mailbox_hwmod;
+> +
+> +static struct omap_hwmod_addr_space omap2430_mailbox_addrs[] = {
+> +	{
+> +		.pa_start	= OMAP24XX_MAILBOX_BASE,
+> +		.pa_end		= OMAP24XX_MAILBOX_BASE + SZ_4K - 1,
+> +		.flags		= ADDR_TYPE_RT,
+> +	},
+> +};
+> +
+> +/* l4_core ->  mailbox */
+> +static struct omap_hwmod_ocp_if omap2430_l4_core__mailbox = {
+> +	.master		=&omap2430_l4_core_hwmod,
+> +	.slave		=&omap2430_mailbox_hwmod,
+> +	.addr		= omap2430_mailbox_addrs,
+> +	.clk		= "mailboxes_ick",
+> +	.addr_cnt	= ARRAY_SIZE(omap2430_mailbox_addrs),
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* mailbox slave ports */
+> +static struct omap_hwmod_ocp_if *omap2430_mailbox_slaves[] = {
+> +	&omap2430_l4_core__mailbox,
+> +};
+> +
+> +static struct omap_hwmod_irq_info omap2430_mailbox_irqs[] = {
+> +	{ .name = "dsp", .irq = INT_24XX_MAIL_U0_MPU, },
+> +};
+> +
+> +static struct omap_hwmod omap2430_mailbox_hwmod = {
+> +	.name		= "mailbox",
+> +	.class		=&omap2430_mailbox_hwmod_class,
+> +	.prcm		= {
+> +		.omap2 = {
+> +			.prcm_reg_id = 1,
+> +			.module_bit = OMAP24XX_EN_MAILBOXES_SHIFT,
+> +			.module_offs = CORE_MOD,
+> +			.idlest_reg_id = 1,
+> +			.idlest_idle_bit = OMAP24XX_ST_MAILBOXES_SHIFT,
+> +		},
+> +	},
+> +	.mpu_irqs	= omap2430_mailbox_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap2430_mailbox_irqs),
+> +	.slaves		= omap2430_mailbox_slaves,
+> +	.slaves_cnt	= ARRAY_SIZE(omap2430_mailbox_slaves),
+> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
+> +};
+> +
+>   static __initdata struct omap_hwmod *omap2430_hwmods[] = {
+>   	&omap2430_l3_main_hwmod,
+>   	&omap2430_l4_core_hwmod,
+> @@ -581,6 +646,7 @@ static __initdata struct omap_hwmod *omap2430_hwmods[] = {
+>   	&omap2430_uart3_hwmod,
+>   	&omap2430_i2c1_hwmod,
+>   	&omap2430_i2c2_hwmod,
+> +	&omap2430_mailbox_hwmod,
+>   	NULL,
+>   };
+>
