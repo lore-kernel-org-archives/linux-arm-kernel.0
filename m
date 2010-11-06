@@ -1,202 +1,176 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat,  6 Nov 2010 23:55:51 +0530
-Subject: [PATCH 3/6] ARM: ftrace: use gas macros to avoid code duplication
+Date: Sat,  6 Nov 2010 23:55:52 +0530
+Subject: [PATCH 4/6] ARM: ftrace: function graph tracer support
 In-Reply-To: <1289067954-5080-1-git-send-email-rabin@rab.in>
 References: <1289067954-5080-1-git-send-email-rabin@rab.in>
-Message-ID: <1289067954-5080-3-git-send-email-rabin@rab.in>
+Message-ID: <1289067954-5080-4-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use assembler macros to avoid copy/pasting code between the
-implementations of the two variants of the mcount call.
+From: Tim Bird <tim.bird@am.sony.com>
 
+Cc: Tim Bird <tim.bird@am.sony.com>
+[rabin at rab.in: rebase on top of latest code,
+	       keep code in ftrace.c instead of separate file,
+	       check for ftrace_graph_entry also]
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/kernel/entry-common.S |  146 ++++++++++++++++++++++------------------
- 1 files changed, 80 insertions(+), 66 deletions(-)
+ arch/arm/kernel/Makefile       |    3 +-
+ arch/arm/kernel/entry-common.S |   46 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/ftrace.c       |   34 +++++++++++++++++++++++++++++
+ 3 files changed, 82 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 078dd22..b3225d4 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -5,7 +5,7 @@
+ CPPFLAGS_vmlinux.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
+ AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
+ 
+-ifdef CONFIG_DYNAMIC_FTRACE
++ifdef CONFIG_FUNCTION_TRACER
+ CFLAGS_REMOVE_ftrace.o = -pg
+ endif
+ 
+@@ -33,6 +33,7 @@ obj-$(CONFIG_SMP)		+= smp.o
+ obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
+ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
+ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
++obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
+ obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
+ obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-decode.o
+ obj-$(CONFIG_ATAGS_PROC)	+= atags.o
 diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 8bfa987..fe1d586 100644
+index fe1d586..9f17662 100644
 --- a/arch/arm/kernel/entry-common.S
 +++ b/arch/arm/kernel/entry-common.S
-@@ -141,98 +141,112 @@ ENDPROC(ret_from_fork)
- #endif
- #endif
- 
--#ifdef CONFIG_DYNAMIC_FTRACE
--ENTRY(__gnu_mcount_nc)
--	mov	ip, lr
--	ldmia	sp!, {lr}
--	mov	pc, ip
--ENDPROC(__gnu_mcount_nc)
-+.macro __mcount suffix
-+	mcount_enter
-+	ldr	r0, =ftrace_trace_function
-+	ldr	r2, [r0]
-+	adr	r0, .Lftrace_stub
-+	cmp	r0, r2
-+	bne	1f
-+	mcount_exit
- 
--ENTRY(ftrace_caller)
--	stmdb	sp!, {r0-r3, lr}
--	mov	r0, lr
-+1: 	mcount_get_lr	r1			@ lr of instrumented func
-+	mov	r0, lr				@ instrumented function
-+	sub	r0, r0, #MCOUNT_INSN_SIZE
-+	adr	lr, BSYM(2f)
-+	mov	pc, r2
-+2:	mcount_exit
-+.endm
+@@ -148,6 +148,20 @@ ENDPROC(ret_from_fork)
+ 	adr	r0, .Lftrace_stub
+ 	cmp	r0, r2
+ 	bne	1f
 +
-+.macro __ftrace_caller suffix
-+	mcount_enter
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	ldr     r1, =ftrace_graph_return
++	ldr     r2, [r1]
++	cmp     r0, r2
++	bne     ftrace_graph_caller\suffix
 +
-+	mcount_get_lr	r1			@ lr of instrumented func
-+	mov	r0, lr				@ instrumented function
- 	sub	r0, r0, #MCOUNT_INSN_SIZE
--	ldr	r1, [sp, #20]
- 
--	.global	ftrace_call
--ftrace_call:
-+	.globl ftrace_call\suffix
-+ftrace_call\suffix:
- 	bl	ftrace_stub
--	ldmia	sp!, {r0-r3, ip, lr}
--	mov	pc, ip
--ENDPROC(ftrace_caller)
-+
-+	mcount_exit
-+.endm
- 
- #ifdef CONFIG_OLD_MCOUNT
-+/*
-+ * mcount
-+ */
-+
-+.macro mcount_enter
-+	stmdb	sp!, {r0-r3, lr}
-+.endm
-+
-+.macro mcount_get_lr reg
-+	ldr	\reg, [fp, #-4]
-+.endm
-+
-+.macro mcount_exit
-+	ldr	lr, [fp, #-4]
-+	ldmia	sp!, {r0-r3, pc}
-+.endm
-+
- ENTRY(mcount)
-+#ifdef CONFIG_DYNAMIC_FTRACE
- 	stmdb	sp!, {lr}
- 	ldr	lr, [fp, #-4]
- 	ldmia	sp!, {pc}
-+#else
-+	__mcount _old
++	ldr     r1, =ftrace_graph_entry
++	ldr     r2, [r1]
++	ldr     r0, =ftrace_graph_entry_stub
++	cmp     r0, r2
++	bne     ftrace_graph_caller\suffix
 +#endif
- ENDPROC(mcount)
++
+ 	mcount_exit
  
-+#ifdef CONFIG_DYNAMIC_FTRACE
- ENTRY(ftrace_caller_old)
--	stmdb	sp!, {r0-r3, lr}
--	ldr	r1, [fp, #-4]
--	mov	r0, lr
--	sub	r0, r0, #MCOUNT_INSN_SIZE
--
--	.globl ftrace_call_old
--ftrace_call_old:
--	bl	ftrace_stub
--	ldr	lr, [fp, #-4]			@ restore lr
--	ldmia	sp!, {r0-r3, pc}
-+	__ftrace_caller _old
+ 1: 	mcount_get_lr	r1			@ lr of instrumented func
+@@ -172,6 +186,15 @@ ftrace_call\suffix:
+ 	mcount_exit
+ .endm
+ 
++.macro __ftrace_graph_caller
++	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
++	mov	r1, lr			@ instrumented routine (func)
++	sub	r1, r1, #MCOUNT_INSN_SIZE
++	mov	r2, fp			@ frame pointer
++	bl	prepare_ftrace_return
++	mcount_exit
++.endm
++
+ #ifdef CONFIG_OLD_MCOUNT
+ /*
+  * mcount
+@@ -206,6 +229,12 @@ ENTRY(ftrace_caller_old)
  ENDPROC(ftrace_caller_old)
  #endif
  
--#else
-+.purgem mcount_enter
-+.purgem mcount_get_lr
-+.purgem mcount_exit
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++ENTRY(ftrace_graph_caller_old)
++	__ftrace_graph_caller
++ENDPROC(ftrace_graph_caller_old)
 +#endif
- 
--ENTRY(__gnu_mcount_nc)
-+/*
-+ * __gnu_mcount_nc
-+ */
 +
-+.macro mcount_enter
- 	stmdb	sp!, {r0-r3, lr}
--	ldr	r0, =ftrace_trace_function
--	ldr	r2, [r0]
--	adr	r0, .Lftrace_stub
--	cmp	r0, r2
--	bne	gnu_trace
-+.endm
-+
-+.macro mcount_get_lr reg
-+	ldr	\reg, [sp, #20]
-+.endm
-+
-+.macro mcount_exit
- 	ldmia	sp!, {r0-r3, ip, lr}
- 	mov	pc, ip
-+.endm
- 
--gnu_trace:
--	ldr	r1, [sp, #20]			@ lr of instrumented routine
--	mov	r0, lr
--	sub	r0, r0, #MCOUNT_INSN_SIZE
--	adr	lr, BSYM(1f)
--	mov	pc, r2
--1:
--	ldmia	sp!, {r0-r3, ip, lr}
-+ENTRY(__gnu_mcount_nc)
-+#ifdef CONFIG_DYNAMIC_FTRACE
-+	mov	ip, lr
-+	ldmia	sp!, {lr}
- 	mov	pc, ip
-+#else
-+	__mcount
-+#endif
- ENDPROC(__gnu_mcount_nc)
- 
--#ifdef CONFIG_OLD_MCOUNT
--/*
-- * This is under an ifdef in order to force link-time errors for people trying
-- * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
-- * mcount.
-- */
--ENTRY(mcount)
--	stmdb	sp!, {r0-r3, lr}
--	ldr	r0, =ftrace_trace_function
--	ldr	r2, [r0]
--	adr	r0, ftrace_stub
--	cmp	r0, r2
--	bne	trace
--	ldr	lr, [fp, #-4]			@ restore lr
--	ldmia	sp!, {r0-r3, pc}
--
--trace:
--	ldr	r1, [fp, #-4]			@ lr of instrumented routine
--	mov	r0, lr
--	sub	r0, r0, #MCOUNT_INSN_SIZE
--	mov	lr, pc
--	mov	pc, r2
--	ldr	lr, [fp, #-4]			@ restore lr
--	ldmia	sp!, {r0-r3, pc}
--ENDPROC(mcount)
-+#ifdef CONFIG_DYNAMIC_FTRACE
-+ENTRY(ftrace_caller)
-+	__ftrace_caller
-+ENDPROC(ftrace_caller)
+ .purgem mcount_enter
+ .purgem mcount_get_lr
+ .purgem mcount_exit
+@@ -244,10 +273,27 @@ ENTRY(ftrace_caller)
+ ENDPROC(ftrace_caller)
  #endif
  
--#endif /* CONFIG_DYNAMIC_FTRACE */
-+.purgem mcount_enter
-+.purgem mcount_get_lr
-+.purgem mcount_exit
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++ENTRY(ftrace_graph_caller)
++	__ftrace_graph_caller
++ENDPROC(ftrace_graph_caller)
++#endif
++
+ .purgem mcount_enter
+ .purgem mcount_get_lr
+ .purgem mcount_exit
  
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.globl return_to_handler
++return_to_handler:
++	stmdb	sp!, {r0-r3}
++	mov	r0, fp			@ frame pointer
++	bl	ftrace_return_to_handler
++	mov	lr, r0			@ r0 has real ret addr
++	ldmia	sp!, {r0-r3}
++	mov	pc, lr
++#endif
++
  ENTRY(ftrace_stub)
  .Lftrace_stub:
+ 	mov	pc, lr
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index 971ac8c..7a702a5 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -24,6 +24,7 @@
+ #define	NOP		0xe8bd4000	/* pop {lr} */
+ #endif
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE
+ #ifdef CONFIG_OLD_MCOUNT
+ #define OLD_MCOUNT_ADDR	((unsigned long) mcount)
+ #define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+@@ -193,3 +194,36 @@ int __init ftrace_dyn_arch_init(void *data)
+ 
+ 	return 0;
+ }
++#endif /* CONFIG_DYNAMIC_FTRACE */
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
++			   unsigned long frame_pointer)
++{
++	unsigned long return_hooker = (unsigned long) &return_to_handler;
++	struct ftrace_graph_ent trace;
++	unsigned long old;
++	int err;
++
++	if (unlikely(atomic_read(&current->tracing_graph_pause)))
++		return;
++
++	old = *parent;
++	*parent = return_hooker;
++
++	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
++				       frame_pointer);
++	if (err == -EBUSY) {
++		*parent = old;
++		return;
++	}
++
++	trace.func = self_addr;
++
++	/* Only trace if the calling function expects to */
++	if (!ftrace_graph_entry(&trace)) {
++		current->curr_ret_stack--;
++		*parent = old;
++	}
++}
++#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 -- 
 1.7.2.3
