@@ -1,96 +1,29 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Sat, 06 Nov 2010 17:28:46 -0400
-Subject: [PATCH 6/6] omap: iommu: code reorganization and cleanup
-In-Reply-To: <1289006396-27230-7-git-send-email-omar.ramirez@ti.com>
-References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-	<1289006396-27230-7-git-send-email-omar.ramirez@ti.com>
-Message-ID: <4CD5C88E.5050009@ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat,  6 Nov 2010 23:34:03 +0100
+Subject: [PATCH] PalmTX: Fix ifdef around gen_nand driver registration
+Message-ID: <1289082843-9917-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/5/2010 9:19 PM, Ramirez Luna, Omar wrote:
-> Since omap-iommu is now using hwmod, there are structures and
-> arrays that can be cleaned up to increase the readability of
-> the code.
+Reported-by: Rafael Gandolfi <kaillasse91@hotmail.fr>
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/palmtx.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-This patch should be merged with the previous one as well.
-
-I do not see the need to split in 3 patches these changes.
-It will be much readable and will avoid people, like me, doing comment 
-on a piece of code you will remove 2 patches later.
-That cleanup must be done when the hwmod is introduced since that code 
-was already useless at that time.
-
-I can understand the phased approach when you have huge changes to do, 
-but in that case, that does not worth it. It make the review even more 
-painful.
-
-
-> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
-> ---
->   arch/arm/mach-omap2/omap-iommu.c        |   95 +++++++++++--------------------
->   arch/arm/plat-omap/include/plat/iommu.h |    2 +-
->   2 files changed, 34 insertions(+), 63 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
-> index 0a76bce..135474b 100644
-> --- a/arch/arm/mach-omap2/omap-iommu.c
-> +++ b/arch/arm/mach-omap2/omap-iommu.c
-> @@ -17,53 +17,17 @@
->   #include<plat/omap_hwmod.h>
->   #include<plat/omap_device.h>
->
-> -struct iommu_device {
-> -	struct iommu_platform_data pdata;
-> +static char *omap3_devices[] = {
-> +	"isp",
-> +	"iva2",
-> +	NULL,
->   };
-> -static struct iommu_device *devices;
-> -static int num_iommu_devices;
-> -
-> -#ifdef CONFIG_ARCH_OMAP3
-> -static struct iommu_device omap3_devices[] = {
-> -	{
-> -		.pdata = {
-> -			.name = "isp",
-> -		},
-> -	},
-> -#if defined(CONFIG_MPU_BRIDGE_IOMMU)
-> -	{
-> -		.pdata = {
-> -			.name = "iva2",
-> -		},
-> -	},
-> -#endif
-> -};
-> -#define NR_OMAP3_IOMMU_DEVICES ARRAY_SIZE(omap3_devices)
-> -#else
-> -#define omap3_devices		NULL
-> -#define NR_OMAP3_IOMMU_DEVICES	0
-> -#endif
-> -
-> -#ifdef CONFIG_ARCH_OMAP4
-> -static struct iommu_device omap4_devices[] = {
-> -	{
-> -		.pdata = {
-> -			.name = "ducati",
-> -		},
-> -	},
-> -#if defined(CONFIG_MPU_TESLA_IOMMU)
-> -	{
-> -		.pdata = {
-> -			.name = "tesla",
-> -		},
-> -	},
-> -#endif
-> +
-> +static char *omap4_devices[] = {
-> +	"ducati",
-> +	"tesla",
-> +	NULL,
-
-Not needed if you iterate over the class.
-
-Benoit
+diff --git a/arch/arm/mach-pxa/palmtx.c b/arch/arm/mach-pxa/palmtx.c
+index 8943296..595f002 100644
+--- a/arch/arm/mach-pxa/palmtx.c
++++ b/arch/arm/mach-pxa/palmtx.c
+@@ -241,7 +241,8 @@ static inline void palmtx_keys_init(void) {}
+ /******************************************************************************
+  * NAND Flash
+  ******************************************************************************/
+-#if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
++#if defined(CONFIG_MTD_NAND_PLATFORM) || \
++	defined(CONFIG_MTD_NAND_PLATFORM_MODULE)
+ static void palmtx_nand_cmd_ctl(struct mtd_info *mtd, int cmd,
+ 				 unsigned int ctrl)
+ {
+-- 
+1.7.2.3
