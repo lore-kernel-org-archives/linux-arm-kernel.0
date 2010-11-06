@@ -1,173 +1,143 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat,  6 Nov 2010 23:55:49 +0530
-Subject: [PATCH 1/6] ARM: ensure sched_clock() and children are notrace
-Message-ID: <1289067954-5080-1-git-send-email-rabin@rab.in>
+Date: Sat,  6 Nov 2010 23:55:50 +0530
+Subject: [PATCH 2/6] ARM: place C irq handlers in IRQ_ENTRY for ftrace
+In-Reply-To: <1289067954-5080-1-git-send-email-rabin@rab.in>
+References: <1289067954-5080-1-git-send-email-rabin@rab.in>
+Message-ID: <1289067954-5080-2-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include sched.h in the files implementing sched_clock() and ensure that
-any functions called from sched_clock() have the notrace annotation.
+When FUNCTION_GRAPH_TRACER is enabled, place do_IRQ() and friends in the
+IRQ_ENTRY section so that the irq-related features of the function graph
+tracer work.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/mach-tegra/timer.c           |    3 ++-
- arch/arm/mach-u300/timer.c            |    1 +
- arch/arm/plat-iop/time.c              |    3 ++-
- arch/arm/plat-nomadik/timer.c         |    5 +++--
- arch/arm/plat-omap/counter_32k.c      |   11 ++++++-----
- arch/arm/plat-versatile/sched-clock.c |    1 +
- 6 files changed, 15 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/system.h |    5 +++++
+ arch/arm/include/asm/traps.h  |   23 +++++++++++++++++++++--
+ arch/arm/kernel/irq.c         |    4 +++-
+ arch/arm/kernel/smp.c         |    5 +++--
+ arch/arm/kernel/vmlinux.lds.S |    1 +
+ 5 files changed, 33 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-index 9057d6f..88ed925 100644
---- a/arch/arm/mach-tegra/timer.c
-+++ b/arch/arm/mach-tegra/timer.c
-@@ -21,6 +21,7 @@
- #include <linux/time.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/sched.h>
- #include <linux/clockchips.h>
- #include <linux/clocksource.h>
- #include <linux/clk.h>
-@@ -89,7 +90,7 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
- 	}
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 1120f18..ec4327a 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -63,6 +63,11 @@
+ #include <asm/outercache.h>
+ 
+ #define __exception	__attribute__((section(".exception.text")))
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++#define __exception_irq_entry	__irq_entry
++#else
++#define __exception_irq_entry	__exception
++#endif
+ 
+ struct thread_info;
+ struct task_struct;
+diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
+index af5d5d1..1b960d5 100644
+--- a/arch/arm/include/asm/traps.h
++++ b/arch/arm/include/asm/traps.h
+@@ -15,13 +15,32 @@ struct undef_hook {
+ void register_undef_hook(struct undef_hook *hook);
+ void unregister_undef_hook(struct undef_hook *hook);
+ 
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++static inline int __in_irqentry_text(unsigned long ptr)
++{
++	extern char __irqentry_text_start[];
++	extern char __irqentry_text_end[];
++
++	return ptr >= (unsigned long)&__irqentry_text_start &&
++	       ptr < (unsigned long)&__irqentry_text_end;
++}
++#else
++static inline int __in_irqentry_text(unsigned long ptr)
++{
++	return 0;
++}
++#endif
++
+ static inline int in_exception_text(unsigned long ptr)
+ {
+ 	extern char __exception_text_start[];
+ 	extern char __exception_text_end[];
++	int in;
++
++	in = ptr >= (unsigned long)&__exception_text_start &&
++	     ptr < (unsigned long)&__exception_text_end;
+ 
+-	return ptr >= (unsigned long)&__exception_text_start &&
+-	       ptr < (unsigned long)&__exception_text_end;
++	return in ? : __in_irqentry_text(ptr);
  }
  
--static cycle_t tegra_clocksource_read(struct clocksource *cs)
-+static cycle_t notrace tegra_clocksource_read(struct clocksource *cs)
- {
- 	return cnt32_to_63(timer_readl(TIMERUS_CNTR_1US));
- }
-diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
-index 3fc4472..672b28a 100644
---- a/arch/arm/mach-u300/timer.c
-+++ b/arch/arm/mach-u300/timer.c
-@@ -11,6 +11,7 @@
- #include <linux/interrupt.h>
- #include <linux/time.h>
- #include <linux/timex.h>
-+#include <linux/sched.h>
- #include <linux/clockchips.h>
- #include <linux/clocksource.h>
- #include <linux/types.h>
-diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-index 85d3e55..558cdfa 100644
---- a/arch/arm/plat-iop/time.c
-+++ b/arch/arm/plat-iop/time.c
-@@ -18,6 +18,7 @@
- #include <linux/time.h>
- #include <linux/init.h>
- #include <linux/timex.h>
-+#include <linux/sched.h>
- #include <linux/io.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
-@@ -36,7 +37,7 @@
- /*
-  * IOP clocksource (free-running timer 1).
+ extern void __init early_trap_init(void);
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 36ad3be..6d61633 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -35,6 +35,7 @@
+ #include <linux/list.h>
+ #include <linux/kallsyms.h>
+ #include <linux/proc_fs.h>
++#include <linux/ftrace.h>
+ 
+ #include <asm/system.h>
+ #include <asm/mach/irq.h>
+@@ -105,7 +106,8 @@ unlock:
+  * come via this function.  Instead, they should provide their
+  * own 'handler'
   */
--static cycle_t iop_clocksource_read(struct clocksource *unused)
-+static cycle_t notrace iop_clocksource_read(struct clocksource *unused)
+-asmlinkage void __exception asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
++asmlinkage void __exception_irq_entry
++asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
  {
- 	return 0xffffffffu - read_tcr1();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 8c19595..bbca898 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -16,6 +16,7 @@
+ #include <linux/cache.h>
+ #include <linux/profile.h>
+ #include <linux/errno.h>
++#include <linux/ftrace.h>
+ #include <linux/mm.h>
+ #include <linux/err.h>
+ #include <linux/cpu.h>
+@@ -457,7 +458,7 @@ static void ipi_timer(void)
  }
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index aedf9c1..70969a7 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/sched.h>
- #include <linux/io.h>
- #include <linux/clockchips.h>
- #include <linux/clk.h>
-@@ -26,13 +27,13 @@ void __iomem *mtu_base; /* ssigned by machine code */
-  * Kernel assumes that sched_clock can be called early
-  * but the MTU may not yet be initialized.
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+-asmlinkage void __exception do_local_timer(struct pt_regs *regs)
++asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 	int cpu = smp_processor_id();
+@@ -544,7 +545,7 @@ static void ipi_cpu_stop(unsigned int cpu)
+  *
+  *  Bit 0 - Inter-processor function call
   */
--static cycle_t nmdk_read_timer_dummy(struct clocksource *cs)
-+static cycle_t notrace nmdk_read_timer_dummy(struct clocksource *cs)
+-asmlinkage void __exception do_IPI(struct pt_regs *regs)
++asmlinkage void __exception_irq_entry do_IPI(struct pt_regs *regs)
  {
- 	return 0;
- }
- 
- /* clocksource: MTU decrements, so we negate the value being read. */
--static cycle_t nmdk_read_timer(struct clocksource *cs)
-+static cycle_t notrace nmdk_read_timer(struct clocksource *cs)
- {
- 	return -readl(mtu_base + MTU_VAL(0));
- }
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index 155fe43..bc9bc6c 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -13,6 +13,7 @@
-  * NOTE: This timer is not the same timer as the old OMAP1 MPU timer.
-  */
- #include <linux/kernel.h>
-+#include <linux/sched.h>
- #include <linux/init.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-@@ -44,7 +45,7 @@
- static u32 offset_32k __read_mostly;
- 
- #ifdef CONFIG_ARCH_OMAP16XX
--static cycle_t omap16xx_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap16xx_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
- }
-@@ -53,7 +54,7 @@ static cycle_t omap16xx_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP2420
--static cycle_t omap2420_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap2420_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-@@ -62,7 +63,7 @@ static cycle_t omap2420_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP2430
--static cycle_t omap2430_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap2430_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-@@ -71,7 +72,7 @@ static cycle_t omap2430_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP3
--static cycle_t omap34xx_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap34xx_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-@@ -80,7 +81,7 @@ static cycle_t omap34xx_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--static cycle_t omap44xx_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap44xx_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
-index 9768cf7..9696ddc 100644
---- a/arch/arm/plat-versatile/sched-clock.c
-+++ b/arch/arm/plat-versatile/sched-clock.c
-@@ -20,6 +20,7 @@
-  */
- #include <linux/cnt32_to_63.h>
- #include <linux/io.h>
-+#include <linux/sched.h>
- #include <asm/div64.h>
- 
- #include <mach/hardware.h>
+ 	unsigned int cpu = smp_processor_id();
+ 	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index cead889..897c1a8 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -101,6 +101,7 @@ SECTIONS
+ 			__exception_text_start = .;
+ 			*(.exception.text)
+ 			__exception_text_end = .;
++			IRQENTRY_TEXT
+ 			TEXT_TEXT
+ 			SCHED_TEXT
+ 			LOCK_TEXT
 -- 
 1.7.2.3
