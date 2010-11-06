@@ -1,143 +1,202 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat,  6 Nov 2010 23:55:50 +0530
-Subject: [PATCH 2/6] ARM: place C irq handlers in IRQ_ENTRY for ftrace
+Date: Sat,  6 Nov 2010 23:55:51 +0530
+Subject: [PATCH 3/6] ARM: ftrace: use gas macros to avoid code duplication
 In-Reply-To: <1289067954-5080-1-git-send-email-rabin@rab.in>
 References: <1289067954-5080-1-git-send-email-rabin@rab.in>
-Message-ID: <1289067954-5080-2-git-send-email-rabin@rab.in>
+Message-ID: <1289067954-5080-3-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When FUNCTION_GRAPH_TRACER is enabled, place do_IRQ() and friends in the
-IRQ_ENTRY section so that the irq-related features of the function graph
-tracer work.
+Use assembler macros to avoid copy/pasting code between the
+implementations of the two variants of the mcount call.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/include/asm/system.h |    5 +++++
- arch/arm/include/asm/traps.h  |   23 +++++++++++++++++++++--
- arch/arm/kernel/irq.c         |    4 +++-
- arch/arm/kernel/smp.c         |    5 +++--
- arch/arm/kernel/vmlinux.lds.S |    1 +
- 5 files changed, 33 insertions(+), 5 deletions(-)
+ arch/arm/kernel/entry-common.S |  146 ++++++++++++++++++++++------------------
+ 1 files changed, 80 insertions(+), 66 deletions(-)
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 1120f18..ec4327a 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -63,6 +63,11 @@
- #include <asm/outercache.h>
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 8bfa987..fe1d586 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -141,98 +141,112 @@ ENDPROC(ret_from_fork)
+ #endif
+ #endif
  
- #define __exception	__attribute__((section(".exception.text")))
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+#define __exception_irq_entry	__irq_entry
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-ENTRY(__gnu_mcount_nc)
+-	mov	ip, lr
+-	ldmia	sp!, {lr}
+-	mov	pc, ip
+-ENDPROC(__gnu_mcount_nc)
++.macro __mcount suffix
++	mcount_enter
++	ldr	r0, =ftrace_trace_function
++	ldr	r2, [r0]
++	adr	r0, .Lftrace_stub
++	cmp	r0, r2
++	bne	1f
++	mcount_exit
+ 
+-ENTRY(ftrace_caller)
+-	stmdb	sp!, {r0-r3, lr}
+-	mov	r0, lr
++1: 	mcount_get_lr	r1			@ lr of instrumented func
++	mov	r0, lr				@ instrumented function
++	sub	r0, r0, #MCOUNT_INSN_SIZE
++	adr	lr, BSYM(2f)
++	mov	pc, r2
++2:	mcount_exit
++.endm
++
++.macro __ftrace_caller suffix
++	mcount_enter
++
++	mcount_get_lr	r1			@ lr of instrumented func
++	mov	r0, lr				@ instrumented function
+ 	sub	r0, r0, #MCOUNT_INSN_SIZE
+-	ldr	r1, [sp, #20]
+ 
+-	.global	ftrace_call
+-ftrace_call:
++	.globl ftrace_call\suffix
++ftrace_call\suffix:
+ 	bl	ftrace_stub
+-	ldmia	sp!, {r0-r3, ip, lr}
+-	mov	pc, ip
+-ENDPROC(ftrace_caller)
++
++	mcount_exit
++.endm
+ 
+ #ifdef CONFIG_OLD_MCOUNT
++/*
++ * mcount
++ */
++
++.macro mcount_enter
++	stmdb	sp!, {r0-r3, lr}
++.endm
++
++.macro mcount_get_lr reg
++	ldr	\reg, [fp, #-4]
++.endm
++
++.macro mcount_exit
++	ldr	lr, [fp, #-4]
++	ldmia	sp!, {r0-r3, pc}
++.endm
++
+ ENTRY(mcount)
++#ifdef CONFIG_DYNAMIC_FTRACE
+ 	stmdb	sp!, {lr}
+ 	ldr	lr, [fp, #-4]
+ 	ldmia	sp!, {pc}
 +#else
-+#define __exception_irq_entry	__exception
++	__mcount _old
++#endif
+ ENDPROC(mcount)
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE
+ ENTRY(ftrace_caller_old)
+-	stmdb	sp!, {r0-r3, lr}
+-	ldr	r1, [fp, #-4]
+-	mov	r0, lr
+-	sub	r0, r0, #MCOUNT_INSN_SIZE
+-
+-	.globl ftrace_call_old
+-ftrace_call_old:
+-	bl	ftrace_stub
+-	ldr	lr, [fp, #-4]			@ restore lr
+-	ldmia	sp!, {r0-r3, pc}
++	__ftrace_caller _old
+ ENDPROC(ftrace_caller_old)
+ #endif
+ 
+-#else
++.purgem mcount_enter
++.purgem mcount_get_lr
++.purgem mcount_exit
 +#endif
  
- struct thread_info;
- struct task_struct;
-diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
-index af5d5d1..1b960d5 100644
---- a/arch/arm/include/asm/traps.h
-+++ b/arch/arm/include/asm/traps.h
-@@ -15,13 +15,32 @@ struct undef_hook {
- void register_undef_hook(struct undef_hook *hook);
- void unregister_undef_hook(struct undef_hook *hook);
- 
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+static inline int __in_irqentry_text(unsigned long ptr)
-+{
-+	extern char __irqentry_text_start[];
-+	extern char __irqentry_text_end[];
+-ENTRY(__gnu_mcount_nc)
++/*
++ * __gnu_mcount_nc
++ */
 +
-+	return ptr >= (unsigned long)&__irqentry_text_start &&
-+	       ptr < (unsigned long)&__irqentry_text_end;
-+}
++.macro mcount_enter
+ 	stmdb	sp!, {r0-r3, lr}
+-	ldr	r0, =ftrace_trace_function
+-	ldr	r2, [r0]
+-	adr	r0, .Lftrace_stub
+-	cmp	r0, r2
+-	bne	gnu_trace
++.endm
++
++.macro mcount_get_lr reg
++	ldr	\reg, [sp, #20]
++.endm
++
++.macro mcount_exit
+ 	ldmia	sp!, {r0-r3, ip, lr}
+ 	mov	pc, ip
++.endm
+ 
+-gnu_trace:
+-	ldr	r1, [sp, #20]			@ lr of instrumented routine
+-	mov	r0, lr
+-	sub	r0, r0, #MCOUNT_INSN_SIZE
+-	adr	lr, BSYM(1f)
+-	mov	pc, r2
+-1:
+-	ldmia	sp!, {r0-r3, ip, lr}
++ENTRY(__gnu_mcount_nc)
++#ifdef CONFIG_DYNAMIC_FTRACE
++	mov	ip, lr
++	ldmia	sp!, {lr}
+ 	mov	pc, ip
 +#else
-+static inline int __in_irqentry_text(unsigned long ptr)
-+{
-+	return 0;
-+}
++	__mcount
 +#endif
-+
- static inline int in_exception_text(unsigned long ptr)
- {
- 	extern char __exception_text_start[];
- 	extern char __exception_text_end[];
-+	int in;
-+
-+	in = ptr >= (unsigned long)&__exception_text_start &&
-+	     ptr < (unsigned long)&__exception_text_end;
+ ENDPROC(__gnu_mcount_nc)
  
--	return ptr >= (unsigned long)&__exception_text_start &&
--	       ptr < (unsigned long)&__exception_text_end;
-+	return in ? : __in_irqentry_text(ptr);
- }
+-#ifdef CONFIG_OLD_MCOUNT
+-/*
+- * This is under an ifdef in order to force link-time errors for people trying
+- * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
+- * mcount.
+- */
+-ENTRY(mcount)
+-	stmdb	sp!, {r0-r3, lr}
+-	ldr	r0, =ftrace_trace_function
+-	ldr	r2, [r0]
+-	adr	r0, ftrace_stub
+-	cmp	r0, r2
+-	bne	trace
+-	ldr	lr, [fp, #-4]			@ restore lr
+-	ldmia	sp!, {r0-r3, pc}
+-
+-trace:
+-	ldr	r1, [fp, #-4]			@ lr of instrumented routine
+-	mov	r0, lr
+-	sub	r0, r0, #MCOUNT_INSN_SIZE
+-	mov	lr, pc
+-	mov	pc, r2
+-	ldr	lr, [fp, #-4]			@ restore lr
+-	ldmia	sp!, {r0-r3, pc}
+-ENDPROC(mcount)
++#ifdef CONFIG_DYNAMIC_FTRACE
++ENTRY(ftrace_caller)
++	__ftrace_caller
++ENDPROC(ftrace_caller)
+ #endif
  
- extern void __init early_trap_init(void);
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 36ad3be..6d61633 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -35,6 +35,7 @@
- #include <linux/list.h>
- #include <linux/kallsyms.h>
- #include <linux/proc_fs.h>
-+#include <linux/ftrace.h>
+-#endif /* CONFIG_DYNAMIC_FTRACE */
++.purgem mcount_enter
++.purgem mcount_get_lr
++.purgem mcount_exit
  
- #include <asm/system.h>
- #include <asm/mach/irq.h>
-@@ -105,7 +106,8 @@ unlock:
-  * come via this function.  Instead, they should provide their
-  * own 'handler'
-  */
--asmlinkage void __exception asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
-+asmlinkage void __exception_irq_entry
-+asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
- {
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 8c19595..bbca898 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -16,6 +16,7 @@
- #include <linux/cache.h>
- #include <linux/profile.h>
- #include <linux/errno.h>
-+#include <linux/ftrace.h>
- #include <linux/mm.h>
- #include <linux/err.h>
- #include <linux/cpu.h>
-@@ -457,7 +458,7 @@ static void ipi_timer(void)
- }
- 
- #ifdef CONFIG_LOCAL_TIMERS
--asmlinkage void __exception do_local_timer(struct pt_regs *regs)
-+asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
- {
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 	int cpu = smp_processor_id();
-@@ -544,7 +545,7 @@ static void ipi_cpu_stop(unsigned int cpu)
-  *
-  *  Bit 0 - Inter-processor function call
-  */
--asmlinkage void __exception do_IPI(struct pt_regs *regs)
-+asmlinkage void __exception_irq_entry do_IPI(struct pt_regs *regs)
- {
- 	unsigned int cpu = smp_processor_id();
- 	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index cead889..897c1a8 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -101,6 +101,7 @@ SECTIONS
- 			__exception_text_start = .;
- 			*(.exception.text)
- 			__exception_text_end = .;
-+			IRQENTRY_TEXT
- 			TEXT_TEXT
- 			SCHED_TEXT
- 			LOCK_TEXT
+ ENTRY(ftrace_stub)
+ .Lftrace_stub:
 -- 
 1.7.2.3
