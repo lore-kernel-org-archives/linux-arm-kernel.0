@@ -1,17 +1,28 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Fri, 5 Nov 2010 20:32:59 -0500
-Subject: [PATCH 0/6] omap: iommu: hwmod support and code reorganization
-In-Reply-To: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <AANLkTineYg326GM69Swer=hWeCKC7_2qDJJDdg+h6+8-@mail.gmail.com>
+From: tony@bakeyournoodle.com (Tony Breeds)
+Date: Sat, 6 Nov 2010 12:36:36 +1100
+Subject: [PATCH] ARM: fix build error with GCC 4.5.0
+In-Reply-To: <19668.21026.5416.610777@pilspetsen.it.uu.se>
+References: <1288897002-24073-1-git-send-email-rabin@rab.in>
+	<yw1xy698ygbx.fsf@unicorn.mansr.com>
+	<19667.9199.798932.405415@pilspetsen.it.uu.se>
+	<AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
+	<19667.52998.909668.596635@pilspetsen.it.uu.se>
+	<AANLkTimkSxWNL+aCALGsf5prBM_RHz0BMHCeNwKrTnfA@mail.gmail.com>
+	<19668.21026.5416.610777@pilspetsen.it.uu.se>
+Message-ID: <20101106013636.GM24185@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 5, 2010 at 8:19 PM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
-> Boot tested on omap 3430 and 3630, functionality on iva2 only.
+On Fri, Nov 05, 2010 at 07:51:14PM +0100, Mikael Pettersson wrote:
 
-I meant functionally tested on iva2 only.
+> That's an OABI compiler. You want a compiler configured for
+> 
+> 	--target=arm-unknown-linux-gnueabi
+> 
+> and without that --enable-sjlj-exceptions as well.
+> 
+> OABI is super-legacy and essentially unsupported by current gcc.
 
-Regards,
+Thanks.  I'll fix that when I re-spin for gcc-4.5.1 (hopefully late next week.
 
-Omar
+Yours Tony
