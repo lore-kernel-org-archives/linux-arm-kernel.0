@@ -1,48 +1,82 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat,  6 Nov 2010 23:55:54 +0530
-Subject: [PATCH 6/6] ARM: ftrace: enable function graph tracer
-In-Reply-To: <1289067954-5080-1-git-send-email-rabin@rab.in>
-References: <1289067954-5080-1-git-send-email-rabin@rab.in>
-Message-ID: <1289067954-5080-6-git-send-email-rabin@rab.in>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Sat, 06 Nov 2010 14:31:32 -0400
+Subject: [PATCH 0/6] omap: iommu: hwmod support and code reorganization
+In-Reply-To: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
+References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <4CD59F04.2000406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the options to enable the function graph tracer on ARM.  Function
-graph tracer support requires frame pointers, so exclude Thumb-2 and
-also explicitly select FRAME_POINTER in FUNCTION_GRAPH_TRACER since
-FUNCTION_TRACER doesn't select FRAME_POINTER when ARM_UNWIND is used
-Therefore, with GCC 4.4.0+, you get plain function tracing without frame
-pointers, but you'll need them if you want function graph tracing.
+s/ducati/ipu/
+s/tesla/dsp/
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/Kconfig     |    1 +
- kernel/trace/Kconfig |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+Please do not use internal codename for the changelog or even for the code.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a19a526..c5e96ff 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -14,6 +14,7 @@ config ARM
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
-+	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZO
-diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-index e04b8bc..ff23dcf 100644
---- a/kernel/trace/Kconfig
-+++ b/kernel/trace/Kconfig
-@@ -141,6 +141,7 @@ config FUNCTION_TRACER
- 
- config FUNCTION_GRAPH_TRACER
- 	bool "Kernel Function Graph Tracer"
-+	select FRAME_POINTER if ARM_UNWIND
- 	depends on HAVE_FUNCTION_GRAPH_TRACER
- 	depends on FUNCTION_TRACER
- 	depends on !X86_32 || !CC_OPTIMIZE_FOR_SIZE
--- 
-1.7.2.3
+On 11/5/2010 9:19 PM, Ramirez Luna, Omar wrote:
+> Boot tested on omap 3430 and 3630, functionality on iva2 only.
+>
+> Introduced hwmod data and support for omap3 (iva2 mmu&  isp mmu) and
+> omap4 (ducati mmu&  tesla mmu).
+>
+> Minor cleanup due to this changes.
+>
+> There is an issue (present without patches too):
+>
+> Doing a cycle of insmod-rmmod to iommu module and then full
+> insmod of bridgedriver (with all dependencies) causes the next
+> read of iommu registers to dump an unhandled fault log; this,
+> because when rmmod of iommu is called it tries to clean the
+> iommu tables and flush any old entry prior to removing the driver,
+> however these reads/writes are attempted while the MMU is under
+> reset and will timeout on the L3 IVA target agent, which will leave
+> MMU unusable until the proper restore sequence to clear this L3
+> error is executed.
+>
+> Fix would be to move page table allocation to iommu get and its
+> correspondent free to iommu put, however it will fall entirely
+> under iommu user responsibility, as it needs to clear the mmu
+> reset bit, before calling iommu functions that read/write into
+> mmu registers (which should apply only for first boot or on
+> baseimage reload); trading this restriction in order to keep
+> the same generic iommu code for all omap iommu devices.
+>
+> This issue has been seen on omap3 iva2 mmu, same restriction should
+
+I'm still not really understanding that issue.
+In theory, the reset is deasserted when the omap_device is enabled and 
+will be re-asserted when the omap_device will be disable.
+Why is the mmu already under reset when the iommu is trying to clean the 
+tables?
+
+Could please describe the complete sequence?
+
+Benoit
+
+> apply for tesla mmu.
+>
+> For discussion: should iommu handle mmu reset source directly?
+> This register is grouped into an IVA PRM register which handles
+> sequencer, iva2 mmu and dsp resets. As mentioned iommu handles
+> cam, iva2 mmu (OMAP3) and tesla, ducati mmu (OMAP4), only tesla
+> and iva2 should suffer from this restriction and according changes
+> should be needed to handle both cases on mach-omap2 code. This
+> also affects hwmod, since, if defined, it tries to read SYSC
+> registers at boot time when registering the hwmod and causing the
+> same issue.
+>
+> Omar Ramirez Luna (6):
+>    omap: iommu: remove redundant clock usage
+>    OMAP3: hwmod data: Add mmu for iva2 and isp
+>    OMAP4: hwmod data: add mmu hwmod for ducati and tesla
+>    omap: iommu: intial hwmod support
+>    omap: iommu: hwmod device enable/disable routines
+>    omap: iommu: code reorganization and cleanup
+>
+>   arch/arm/mach-omap2/omap-iommu.c           |  168 +++++++++-------------------
+>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  103 +++++++++++++++++
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  105 +++++++++++++++++
+>   arch/arm/plat-omap/include/plat/iommu.h    |   19 +++-
+>   arch/arm/plat-omap/include/plat/omap34xx.h |    2 +
+>   arch/arm/plat-omap/iommu.c                 |   64 ++++-------
+>   6 files changed, 299 insertions(+), 162 deletions(-)
+>
