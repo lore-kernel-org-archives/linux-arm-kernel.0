@@ -1,158 +1,48 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat,  6 Nov 2010 23:55:53 +0530
-Subject: [PATCH 5/6] ARM: ftrace: graph tracer + dynamic ftrace
+Date: Sat,  6 Nov 2010 23:55:54 +0530
+Subject: [PATCH 6/6] ARM: ftrace: enable function graph tracer
 In-Reply-To: <1289067954-5080-1-git-send-email-rabin@rab.in>
 References: <1289067954-5080-1-git-send-email-rabin@rab.in>
-Message-ID: <1289067954-5080-5-git-send-email-rabin@rab.in>
+Message-ID: <1289067954-5080-6-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the graph tracer + dynamic ftrace combination on ARM.
+Add the options to enable the function graph tracer on ARM.  Function
+graph tracer support requires frame pointers, so exclude Thumb-2 and
+also explicitly select FRAME_POINTER in FUNCTION_GRAPH_TRACER since
+FUNCTION_TRACER doesn't select FRAME_POINTER when ARM_UNWIND is used
+Therefore, with GCC 4.4.0+, you get plain function tracing without frame
+pointers, but you'll need them if you want function graph tracing.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/kernel/entry-common.S |   12 +++++++
- arch/arm/kernel/ftrace.c       |   69 +++++++++++++++++++++++++++++++++++++---
- 2 files changed, 76 insertions(+), 5 deletions(-)
+ arch/arm/Kconfig     |    1 +
+ kernel/trace/Kconfig |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 9f17662..aae802e 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -183,12 +183,24 @@ ENDPROC(ret_from_fork)
- ftrace_call\suffix:
- 	bl	ftrace_stub
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a19a526..c5e96ff 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -14,6 +14,7 @@ config ARM
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+ 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
++	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
+diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+index e04b8bc..ff23dcf 100644
+--- a/kernel/trace/Kconfig
++++ b/kernel/trace/Kconfig
+@@ -141,6 +141,7 @@ config FUNCTION_TRACER
  
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	.globl ftrace_graph_call\suffix
-+ftrace_graph_call\suffix:
-+	mov	r0, r0
-+#endif
-+
- 	mcount_exit
- .endm
- 
- .macro __ftrace_graph_caller
- 	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
-+#ifdef CONFIG_DYNAMIC_FTRACE
-+	@ called from __ftrace_caller, saved in mcount_enter
-+	ldr	r1, [sp, #16]		@ instrumented routine (func)
-+#else
-+	@ called from __mcount, untouched in lr
- 	mov	r1, lr			@ instrumented routine (func)
-+#endif
- 	sub	r1, r1, #MCOUNT_INSN_SIZE
- 	mov	r2, fp			@ frame pointer
- 	bl	prepare_ftrace_return
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 7a702a5..c0062ad 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -60,9 +60,9 @@ static unsigned long adjust_address(struct dyn_ftrace *rec, unsigned long addr)
- }
- #endif
- 
--/* construct a branch (BL) instruction to addr */
- #ifdef CONFIG_THUMB2_KERNEL
--static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
-+static unsigned long ftrace_gen_branch(unsigned long pc, unsigned long addr,
-+				       bool link)
- {
- 	unsigned long s, j1, j2, i1, i2, imm10, imm11;
- 	unsigned long first, second;
-@@ -84,15 +84,22 @@ static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
- 	j2 = (!i2) ^ s;
- 
- 	first = 0xf000 | (s << 10) | imm10;
--	second = 0xd000 | (j1 << 13) | (j2 << 11) | imm11;
-+	second = 0x9000 | (j1 << 13) | (j2 << 11) | imm11;
-+	if (link)
-+		second |= 1 << 14;
- 
- 	return (second << 16) | first;
- }
- #else
--static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
-+static unsigned long ftrace_gen_branch(unsigned long pc, unsigned long addr,
-+				       bool link)
- {
-+	unsigned long opcode = 0xea000000;
- 	long offset;
- 
-+	if (link)
-+		opcode |= 1 << 24;
-+
- 	offset = (long)addr - (long)(pc + 8);
- 	if (unlikely(offset < -33554432 || offset > 33554428)) {
- 		/* Can't generate branches that far (from ARM ARM). Ftrace
-@@ -104,10 +111,15 @@ static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
- 
- 	offset = (offset >> 2) & 0x00ffffff;
- 
--	return 0xeb000000 | offset;
-+	return opcode | offset;
- }
- #endif
- 
-+static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
-+{
-+	return ftrace_gen_branch(pc, addr, true);
-+}
-+
- static int ftrace_modify_code(unsigned long pc, unsigned long old,
- 			      unsigned long new)
- {
-@@ -226,4 +238,51 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- 		*parent = old;
- 	}
- }
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE
-+extern unsigned long ftrace_graph_call;
-+extern unsigned long ftrace_graph_call_old;
-+extern void ftrace_graph_caller_old(void);
-+
-+static int __ftrace_modify_caller(unsigned long *callsite,
-+				  void (*func) (void), bool enable)
-+{
-+	unsigned long caller_fn = (unsigned long) func;
-+	unsigned long pc = (unsigned long) callsite;
-+	unsigned long branch = ftrace_gen_branch(pc, caller_fn, false);
-+	unsigned long nop = 0xe1a00000;	/* mov r0, r0 */
-+	unsigned long old = enable ? nop : branch;
-+	unsigned long new = enable ? branch : nop;
-+
-+	return ftrace_modify_code(pc, old, new);
-+}
-+
-+static int ftrace_modify_graph_caller(bool enable)
-+{
-+	int ret;
-+
-+	ret = __ftrace_modify_caller(&ftrace_graph_call,
-+				     ftrace_graph_caller,
-+				     enable);
-+
-+#ifdef CONFIG_OLD_MCOUNT
-+	if (!ret)
-+		ret = __ftrace_modify_caller(&ftrace_graph_call_old,
-+					     ftrace_graph_caller_old,
-+					     enable);
-+#endif
-+
-+	return ret;
-+}
-+
-+int ftrace_enable_ftrace_graph_caller(void)
-+{
-+	return ftrace_modify_graph_caller(true);
-+}
-+
-+int ftrace_disable_ftrace_graph_caller(void)
-+{
-+	return ftrace_modify_graph_caller(false);
-+}
-+#endif /* CONFIG_DYNAMIC_FTRACE */
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+ config FUNCTION_GRAPH_TRACER
+ 	bool "Kernel Function Graph Tracer"
++	select FRAME_POINTER if ARM_UNWIND
+ 	depends on HAVE_FUNCTION_GRAPH_TRACER
+ 	depends on FUNCTION_TRACER
+ 	depends on !X86_32 || !CC_OPTIMIZE_FOR_SIZE
 -- 
 1.7.2.3
