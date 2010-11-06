@@ -1,121 +1,160 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Sat, 06 Nov 2010 13:18:46 -0400
-Subject: [PATCH v2 3/7] OMAP4: hwmod data: add mailbox data
-In-Reply-To: <1289006244-27147-4-git-send-email-omar.ramirez@ti.com>
+Date: Sat, 06 Nov 2010 13:44:25 -0400
+Subject: [PATCH v2 4/7] omap: mailbox: initial hwmod support
+In-Reply-To: <1289006244-27147-5-git-send-email-omar.ramirez@ti.com>
 References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
-	<1289006244-27147-4-git-send-email-omar.ramirez@ti.com>
-Message-ID: <4CD58DF6.6040600@ti.com>
+	<1289006244-27147-5-git-send-email-omar.ramirez@ti.com>
+Message-ID: <4CD593F9.6070200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't know why, but this patch has nothing to do with my original one.
-Can you stick to the original code?
-Of course, if you have valid comments or need to add extra data, you 
-can, but in this case, I do not see any needed change.
+Hi Felipe,
 
 On 11/5/2010 9:17 PM, Ramirez Luna, Omar wrote:
-> From: Benoit Cousson<b-cousson@ti.com>
+> From: Felipe Contreras<felipe.contreras@gmail.com>
 >
-> hwmod data for omap4 mailbox.
+> hwmod support for omap mailbox module.
 >
-> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> Signed-off-by: Felipe Contreras<felipe.contreras@gmail.com>
 > Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
 > ---
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   63 ++++++++++++++++++++++++++++
->   1 files changed, 63 insertions(+), 0 deletions(-)
+>   arch/arm/mach-omap2/devices.c |  100 ++++++----------------------------------
+>   1 files changed, 15 insertions(+), 85 deletions(-)
 >
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 0d5c6eb..f7525e3 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -1043,6 +1043,66 @@ static struct omap_hwmod omap44xx_uart4_hwmod = {
->   	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->   };
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index eaf3799..d977572 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -141,95 +141,25 @@ static inline void omap_init_camera(void)
+>   #endif
 >
-> +/* mailbox */
+>   #if defined(CONFIG_OMAP_MBOX_FWK) || defined(CONFIG_OMAP_MBOX_FWK_MODULE)
+> -
+> -#define MBOX_REG_SIZE   0x120
+> -
+> -#ifdef CONFIG_ARCH_OMAP2
+> -static struct resource omap2_mbox_resources[] = {
+> -	{
+> -		.start		= OMAP24XX_MAILBOX_BASE,
+> -		.end		= OMAP24XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+> -		.flags		= IORESOURCE_MEM,
+> -	},
+> -	{
+> -		.start		= INT_24XX_MAIL_U0_MPU,
+> -		.flags		= IORESOURCE_IRQ,
+> -		.name		= "dsp",
+> -	},
+> -	{
+> -		.start		= INT_24XX_MAIL_U3_MPU,
+> -		.flags		= IORESOURCE_IRQ,
+> -		.name		= "iva",
+> -	},
+> -};
+> -static int omap2_mbox_resources_sz = ARRAY_SIZE(omap2_mbox_resources);
+> -#else
+> -#define omap2_mbox_resources		NULL
+> -#define omap2_mbox_resources_sz		0
+> -#endif
+> -
+> -#ifdef CONFIG_ARCH_OMAP3
+> -static struct resource omap3_mbox_resources[] = {
+> -	{
+> -		.start		= OMAP34XX_MAILBOX_BASE,
+> -		.end		= OMAP34XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+> -		.flags		= IORESOURCE_MEM,
+> -	},
+> -	{
+> -		.start		= INT_24XX_MAIL_U0_MPU,
+> -		.flags		= IORESOURCE_IRQ,
+> -		.name		= "dsp",
+> -	},
+> -};
+> -static int omap3_mbox_resources_sz = ARRAY_SIZE(omap3_mbox_resources);
+> -#else
+> -#define omap3_mbox_resources		NULL
+> -#define omap3_mbox_resources_sz		0
+> -#endif
+> -
+> -#ifdef CONFIG_ARCH_OMAP4
+> -
+> -#define OMAP4_MBOX_REG_SIZE	0x130
+> -static struct resource omap4_mbox_resources[] = {
+> -	{
+> -		.start          = OMAP44XX_MAILBOX_BASE,
+> -		.end            = OMAP44XX_MAILBOX_BASE +
+> -					OMAP4_MBOX_REG_SIZE - 1,
+> -		.flags          = IORESOURCE_MEM,
+> -	},
+> -	{
+> -		.start          = OMAP44XX_IRQ_MAIL_U0,
+> -		.flags          = IORESOURCE_IRQ,
+> -		.name		= "mbox",
+> -	},
+> -};
+> -static int omap4_mbox_resources_sz = ARRAY_SIZE(omap4_mbox_resources);
+> -#else
+> -#define omap4_mbox_resources		NULL
+> -#define omap4_mbox_resources_sz		0
+> -#endif
+> -
+> -static struct platform_device mbox_device = {
+> -	.name		= "omap-mailbox",
+> -	.id		= -1,
+> -};
+> -
+>   static inline void omap_init_mbox(void)
+>   {
+> -	if (cpu_is_omap24xx()) {
+> -		mbox_device.resource = omap2_mbox_resources;
+> -		mbox_device.num_resources = omap2_mbox_resources_sz;
+> -	} else if (cpu_is_omap34xx()) {
+> -		mbox_device.resource = omap3_mbox_resources;
+> -		mbox_device.num_resources = omap3_mbox_resources_sz;
+> -	} else if (cpu_is_omap44xx()) {
+> -		mbox_device.resource = omap4_mbox_resources;
+> -		mbox_device.num_resources = omap4_mbox_resources_sz;
+> -	} else {
+> -		pr_err("%s: platform not supported\n", __func__);
+> +	struct omap_hwmod *oh;
+> +	struct omap_device *od;
+> +
+> +	oh = omap_hwmod_lookup("mailbox");
+> +	if (!oh) {
+> +		pr_err("%s: unable to find hwmod\n", __func__);
+> +		return;
+> +	}
+> +
+> +	od = omap_device_build("omap-mailbox", -1, oh,
 
-The original comment is missing.
+If possible, it will be better to use the "omap_" prefix in order to 
+start having some consitency in the omap devices name.
 
-> +
-> +static struct omap_hwmod_class_sysconfig omap44xx_mailbox_sysc = {
-> +	.rev_offs	= 0x0000,
-> +	.sysc_offs	= 0x0010,
-> +	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-> +			   SYSC_HAS_SOFTRESET),
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-> +	.sysc_fields	=&omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class omap44xx_mailbox_hwmod_class = {
-> +	.name = "mailbox",
-> +	.sysc =&omap44xx_mailbox_sysc,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_mailbox_hwmod;
-> +
-> +static struct omap_hwmod_addr_space omap44xx_mailbox_addrs[] = {
-> +	{
-> +		.pa_start	= OMAP44XX_MAILBOX_BASE,
+Today, we have a little bit of a mess:
 
-If that physical address is not used elsewhere, and it should be the 
-case, there is no need to create a define for it. That's why the 
-physical address was directly used here.
-There is no added value to create a define for that.
+i2c_omap.1
+omap2_mcspi.1
+omap-mcbsp.1
+mmci-omap-hs.0
+musb_hdrc
+omap-aes
+omap-sham
+omap_hdq.0
+omap_rng
+omap_wdt
+omapdss
 
-> +		.pa_end		= OMAP44XX_MAILBOX_BASE + SZ_4K - 1,
-> +		.flags		= ADDR_TYPE_RT,
-> +	},
-> +};
-> +
-> +/* l4_cfg ->  mailbox */
-> +static struct omap_hwmod_ocp_if omap44xx_l4_cfg__mailbox = {
-> +	.master		=&omap44xx_l4_cfg_hwmod,
-> +	.slave		=&omap44xx_mailbox_hwmod,
-> +	.clk		= "l4_div_ck",
-> +	.addr		= omap44xx_mailbox_addrs,
-> +	.addr_cnt	= ARRAY_SIZE(omap44xx_mailbox_addrs),
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* mailbox slave ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_mailbox_slaves[] = {
-> +	&omap44xx_l4_cfg__mailbox,
-> +};
-> +
-> +static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
-> +	{ .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
-> +};
-> +
-> +static struct omap_hwmod omap44xx_mailbox_hwmod = {
-> +	.name		= "mailbox",
-> +	.class		=&omap44xx_mailbox_hwmod_class,
-> +	.prcm		= {
-> +		.omap4 = {
-> +			.clkctrl_reg = OMAP4430_CM_L4CFG_MAILBOX_CLKCTRL,
-> +		},
-> +	},
-> +	.mpu_irqs	= omap44xx_mailbox_irqs,
-> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mailbox_irqs),
 
-The order is different than the previous one.
-
+Thanks,
 Benoit
 
-> +	.slaves		= omap44xx_mailbox_slaves,
-> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_mailbox_slaves),
-> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> +};
-> +
->   static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->   	/* dmm class */
->   	&omap44xx_dmm_hwmod,
-> @@ -1077,6 +1137,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->   	&omap44xx_uart2_hwmod,
->   	&omap44xx_uart3_hwmod,
->   	&omap44xx_uart4_hwmod,
-> +
-> +	/* mailbox */
-> +	&omap44xx_mailbox_hwmod,
->   	NULL,
->   };
->
+> +			NULL, 0,
+> +			NULL, 0,
+> +			0);
+> +	if (!od) {
+> +		pr_err("%s: could not build device\n", __func__);
+>   		return;
+>   	}
+> -	platform_device_register(&mbox_device);
+>   }
+>   #else
+>   static inline void omap_init_mbox(void) { }
