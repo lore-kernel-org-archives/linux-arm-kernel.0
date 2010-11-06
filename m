@@ -1,100 +1,146 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Fri,  5 Nov 2010 19:17:20 -0600
-Subject: [PATCH v2 3/7] OMAP4: hwmod data: add mailbox data
-In-Reply-To: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
-References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1289006244-27147-4-git-send-email-omar.ramirez@ti.com>
+Date: Fri,  5 Nov 2010 19:19:53 -0600
+Subject: [PATCH 3/6] OMAP4: hwmod data: add mmu hwmod for ducati and tesla
+In-Reply-To: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
+References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1289006396-27230-4-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+Add mmu hwmod data for ducati and tesla.
 
-hwmod data for omap4 mailbox.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   63 ++++++++++++++++++++++++++++
- 1 files changed, 63 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  105 ++++++++++++++++++++++++++++
+ 1 files changed, 105 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 0d5c6eb..f7525e3 100644
+index f7525e3..1d5eace 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1043,6 +1043,66 @@ static struct omap_hwmod omap44xx_uart4_hwmod = {
+@@ -22,6 +22,7 @@
+ 
+ #include <plat/omap_hwmod.h>
+ #include <plat/cpu.h>
++#include <plat/iommu.h>
+ 
+ #include "omap_hwmod_common_data.h"
+ 
+@@ -1103,6 +1104,106 @@ static struct omap_hwmod omap44xx_mailbox_hwmod = {
  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
  };
  
-+/* mailbox */
++/* mmu */
 +
-+static struct omap_hwmod_class_sysconfig omap44xx_mailbox_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
++static struct omap_hwmod_class omap44xx_mmu_hwmod_class = {
++	.name = "mmu",
 +};
 +
-+static struct omap_hwmod_class omap44xx_mailbox_hwmod_class = {
-+	.name = "mailbox",
-+	.sysc = &omap44xx_mailbox_sysc,
-+};
++/* ducati mmu */
 +
-+static struct omap_hwmod omap44xx_mailbox_hwmod;
++static struct omap_hwmod omap44xx_ducati_mmu_hwmod;
 +
-+static struct omap_hwmod_addr_space omap44xx_mailbox_addrs[] = {
++static struct omap_hwmod_addr_space omap44xx_ducati_mmu_addrs[] = {
 +	{
-+		.pa_start	= OMAP44XX_MAILBOX_BASE,
-+		.pa_end		= OMAP44XX_MAILBOX_BASE + SZ_4K - 1,
++		.pa_start	= OMAP4_MMU1_BASE,
++		.pa_end		= OMAP4_MMU1_BASE + SZ_4K - 1,
 +		.flags		= ADDR_TYPE_RT,
 +	},
 +};
 +
-+/* l4_cfg -> mailbox */
-+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__mailbox = {
-+	.master		= &omap44xx_l4_cfg_hwmod,
-+	.slave		= &omap44xx_mailbox_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_mailbox_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_mailbox_addrs),
++/* l3_main_1 -> ducati mmu */
++static struct omap_hwmod_ocp_if omap44xx_l3_main_1__ducati_mmu = {
++	.master		= &omap44xx_l3_main_1_hwmod,
++	.slave		= &omap44xx_ducati_mmu_hwmod,
++	.addr		= omap44xx_ducati_mmu_addrs,
++	.clk		= "dpll_mpu_m2_ck",
++	.addr_cnt	= ARRAY_SIZE(omap44xx_ducati_mmu_addrs),
 +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
-+/* mailbox slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_mailbox_slaves[] = {
-+	&omap44xx_l4_cfg__mailbox,
++/* ducati mmu slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_ducati_mmu_slaves[] = {
++	&omap44xx_l3_main_1__ducati_mmu,
 +};
 +
-+static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
-+	{ .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
++static struct omap_hwmod_irq_info omap44xx_ducati_mmu_irqs[] = {
++	{ .name = "ducati", .irq = 100 + OMAP44XX_IRQ_GIC_START, },
 +};
 +
-+static struct omap_hwmod omap44xx_mailbox_hwmod = {
-+	.name		= "mailbox",
-+	.class		= &omap44xx_mailbox_hwmod_class,
-+	.prcm		= {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_L4CFG_MAILBOX_CLKCTRL,
-+		},
-+	},
-+	.mpu_irqs	= omap44xx_mailbox_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mailbox_irqs),
-+	.slaves		= omap44xx_mailbox_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_mailbox_slaves),
++static struct omap_mmu_dev_attr ducati_mmu_dev_attr = {
++	.nr_tlb_entries = 32,
++};
++
++static struct omap_hwmod omap44xx_ducati_mmu_hwmod = {
++	.name		= "ducati",
++	.class		= &omap44xx_mmu_hwmod_class,
++	.mpu_irqs	= omap44xx_ducati_mmu_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_ducati_mmu_irqs),
++	.slaves		= omap44xx_ducati_mmu_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_ducati_mmu_slaves),
++	.dev_attr	= &ducati_mmu_dev_attr,
 +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++	.flags		= HWMOD_NO_IDLEST,
++};
++
++/* tesla mmu */
++
++static struct omap_hwmod omap44xx_tesla_mmu_hwmod;
++
++static struct omap_hwmod_addr_space omap44xx_tesla_mmu_addrs[] = {
++	{
++		.pa_start	= OMAP4_MMU2_BASE,
++		.pa_end		= OMAP4_MMU2_BASE + SZ_4K - 1,
++		.flags		= ADDR_TYPE_RT,
++	},
++};
++
++/* l3_main_1 -> tesla mmu */
++static struct omap_hwmod_ocp_if omap44xx_l3_main_1__tesla_mmu = {
++	.master		= &omap44xx_l3_main_1_hwmod,
++	.slave		= &omap44xx_tesla_mmu_hwmod,
++	.addr		= omap44xx_tesla_mmu_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_tesla_mmu_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* tesla mmu slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_tesla_mmu_slaves[] = {
++	&omap44xx_l3_main_1__tesla_mmu,
++};
++
++static struct omap_hwmod_irq_info omap44xx_tesla_mmu_irqs[] = {
++	{ .name = "tesla", .irq = 28 + OMAP44XX_IRQ_GIC_START, },
++};
++
++static struct omap_mmu_dev_attr tesla_mmu_dev_attr = {
++	.nr_tlb_entries = 32,
++};
++
++static struct omap_hwmod omap44xx_tesla_mmu_hwmod = {
++	.name		= "tesla",
++	.class		= &omap44xx_mmu_hwmod_class,
++	.mpu_irqs	= omap44xx_tesla_mmu_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_tesla_mmu_irqs),
++	.main_clk	= "dsp_fck",
++	.slaves		= omap44xx_tesla_mmu_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_tesla_mmu_slaves),
++	.dev_attr	= &tesla_mmu_dev_attr,
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++	.flags		= HWMOD_NO_IDLEST,
 +};
 +
  static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
  	/* dmm class */
  	&omap44xx_dmm_hwmod,
-@@ -1077,6 +1137,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_uart2_hwmod,
- 	&omap44xx_uart3_hwmod,
- 	&omap44xx_uart4_hwmod,
+@@ -1140,6 +1241,10 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 
+ 	/* mailbox */
+ 	&omap44xx_mailbox_hwmod,
 +
-+	/* mailbox */
-+	&omap44xx_mailbox_hwmod,
++	/* mmu */
++	&omap44xx_ducati_mmu_hwmod,
++	&omap44xx_tesla_mmu_hwmod,
  	NULL,
  };
  
