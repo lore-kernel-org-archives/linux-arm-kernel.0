@@ -1,42 +1,48 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 9 Nov 2010 19:16:45 +0530
-Subject: [PATCH 6/6] ARM: ftrace: enable function graph tracer
-In-Reply-To: <AANLkTinmSn1fqKv8sCCP8d0-_0HsLrhtorXvHCovOYve@mail.gmail.com>
-References: <1289067954-5080-1-git-send-email-rabin@rab.in>
-	<1289067954-5080-6-git-send-email-rabin@rab.in>
-	<AANLkTin8UO9ixVep0jKK8H5roWEVRDJW4khUpT2TpPs+@mail.gmail.com>
-	<20101108091858.GP16938@pengutronix.de>
-	<AANLkTinmSn1fqKv8sCCP8d0-_0HsLrhtorXvHCovOYve@mail.gmail.com>
-Message-ID: <20101109134644.GA3163@debian>
+Date: Sat, 6 Nov 2010 23:03:53 +0530
+Subject: [PATCHv2] ARM: ftrace: enable function graph tracer
+Message-ID: <mailman.14.1289310416.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 08, 2010 at 10:42:57AM +0000, Catalin Marinas wrote:
-> 2010/11/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > On Sat, Nov 06, 2010 at 07:06:28PM +0000, Catalin Marinas wrote:
-> >> On Saturday, November 6, 2010, Rabin Vincent <rabin@rab.in> wrote:
-> >> > --- a/kernel/trace/Kconfig
-> >> > +++ b/kernel/trace/Kconfig
-> >> > @@ -141,6 +141,7 @@ config FUNCTION_TRACER
-> >> >
-> >> > ?config FUNCTION_GRAPH_TRACER
-> >> > ?? ? ? ?bool "Kernel Function Graph Tracer"
-> >> > + ? ? ? select FRAME_POINTER if ARM_UNWIND
-> >>
-> >> Would it be better to modify FRAME_POINTER definition in the ARM
-> >> Kconfig so that it is enabled automatically when FUNCTION_GRAPH_TRACER
-> >> is enabled?
-> > I don't like that suggestion much because it hides the dependency.
-> > Moreover a "default y if FUNCTION_GRAPH_TRACER" doesn't work if a
-> > precondition for FRAME_POINTER isn't true. ?Rabin's approach at least
-> > generates a warning.
-> 
-> If a precondition for FRAME_POINTER isn't true, we should not force it
-> via 'select'. We try to get rid of such warnings in the kernel.
-> 
-> However, on ARM the FRAME_POINTER depends on !THUMB2_KERNEL but for
-> Thumb-2 kernels HAVE_FUNCTION_GRAPH_TRACER is also disabled, so there
-> isn't a dependency issue here. It's more like a personal preference to
-> keep the changes within the arch/arm tree.
+Add the options to enable the function graph tracer on ARM.  Function
+graph tracer support requires frame pointers, so exclude Thumb-2 and
+also make sure FRAME_POINTER gets enabled when FUNCTION_GRAPH_TRACER is
+used, since FUNCTION_TRACER doesn't "select FRAME_POINTER" when
+ARM_UNWIND is used.  Therefore, with GCC 4.4.0+, you get plain function
+tracing without frame pointers, but you'll need them if you want
+function graph tracing.
 
-OK, new patch below.
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/Kconfig       |    1 +
+ arch/arm/Kconfig.debug |    2 +-
+ 2 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a19a526..c5e96ff 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -14,6 +14,7 @@ config ARM
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+ 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
++	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 2fd0b99..eac62085 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -23,7 +23,7 @@ config STRICT_DEVMEM
+ config FRAME_POINTER
+ 	bool
+ 	depends on !THUMB2_KERNEL
+-	default y if !ARM_UNWIND
++	default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
+ 	help
+ 	  If you say N here, the resulting kernel will be slightly smaller and
+ 	  faster. However, if neither FRAME_POINTER nor ARM_UNWIND are enabled,
+-- 
+1.7.2.3
