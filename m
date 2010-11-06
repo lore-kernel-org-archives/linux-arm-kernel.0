@@ -1,185 +1,62 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Fri,  5 Nov 2010 19:19:51 -0600
-Subject: [PATCH 1/6] omap: iommu: remove redundant clock usage
-In-Reply-To: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1289006396-27230-2-git-send-email-omar.ramirez@ti.com>
+Date: Fri,  5 Nov 2010 19:19:50 -0600
+Subject: [PATCH 0/6] omap: iommu: hwmod support and code reorganization
+Message-ID: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iommu driver is meant to provide control of mmu hardware blocks
-its current users (MMUs) are part of larger subsystems and do not
-have a dedicated clock as the one they use is shared with the
-entire subsystem, it doesn't make sense to enable/disable on each
-register read/write operation as the driver using its interface
-should also be handling the same clock.
+Boot tested on omap 3430 and 3630, functionality on iva2 only.
 
-iommu should only enable/disable the clock on mmu request/free from
-the driver wanting to use it.
+Introduced hwmod data and support for omap3 (iva2 mmu & isp mmu) and
+omap4 (ducati mmu & tesla mmu).
 
-Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
----
- arch/arm/plat-omap/iommu.c |   38 +++++---------------------------------
- 1 files changed, 5 insertions(+), 33 deletions(-)
+Minor cleanup due to this changes.
 
-diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-index 6cd151b..de992c8 100644
---- a/arch/arm/plat-omap/iommu.c
-+++ b/arch/arm/plat-omap/iommu.c
-@@ -108,7 +108,6 @@ static int iommu_enable(struct iommu *obj)
- 
- 	err = arch_iommu->enable(obj);
- 
--	clk_disable(obj->clk);
- 	return err;
- }
- 
-@@ -117,8 +116,6 @@ static void iommu_disable(struct iommu *obj)
- 	if (!obj)
- 		return;
- 
--	clk_enable(obj->clk);
--
- 	arch_iommu->disable(obj);
- 
- 	clk_disable(obj->clk);
-@@ -237,20 +234,16 @@ static struct cr_regs __iotlb_read_cr(struct iommu *obj, int n)
-  **/
- int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
- {
--	int err = 0;
- 	struct iotlb_lock l;
- 	struct cr_regs *cr;
- 
- 	if (!obj || !obj->nr_tlb_entries || !e)
- 		return -EINVAL;
- 
--	clk_enable(obj->clk);
--
- 	iotlb_lock_get(obj, &l);
- 	if (l.base == obj->nr_tlb_entries) {
- 		dev_warn(obj->dev, "%s: preserve entries full\n", __func__);
--		err = -EBUSY;
--		goto out;
-+		return -EBUSY;
- 	}
- 	if (!e->prsvd) {
- 		int i;
-@@ -262,8 +255,7 @@ int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
- 
- 		if (i == obj->nr_tlb_entries) {
- 			dev_dbg(obj->dev, "%s: full: no entry\n", __func__);
--			err = -EBUSY;
--			goto out;
-+			return -EBUSY;
- 		}
- 
- 		iotlb_lock_get(obj, &l);
-@@ -273,10 +265,8 @@ int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
- 	}
- 
- 	cr = iotlb_alloc_cr(obj, e);
--	if (IS_ERR(cr)) {
--		clk_disable(obj->clk);
-+	if (IS_ERR(cr))
- 		return PTR_ERR(cr);
--	}
- 
- 	iotlb_load_cr(obj, cr);
- 	kfree(cr);
-@@ -287,9 +277,8 @@ int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
- 	if (++l.vict == obj->nr_tlb_entries)
- 		l.vict = l.base;
- 	iotlb_lock_set(obj, &l);
--out:
--	clk_disable(obj->clk);
--	return err;
-+
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(load_iotlb_entry);
- 
-@@ -305,8 +294,6 @@ void flush_iotlb_page(struct iommu *obj, u32 da)
- 	int i;
- 	struct cr_regs cr;
- 
--	clk_enable(obj->clk);
--
- 	for_each_iotlb_cr(obj, obj->nr_tlb_entries, i, cr) {
- 		u32 start;
- 		size_t bytes;
-@@ -324,7 +311,6 @@ void flush_iotlb_page(struct iommu *obj, u32 da)
- 			iommu_write_reg(obj, 1, MMU_FLUSH_ENTRY);
- 		}
- 	}
--	clk_disable(obj->clk);
- 
- 	if (i == obj->nr_tlb_entries)
- 		dev_dbg(obj->dev, "%s: no page for %08x\n", __func__, da);
-@@ -359,15 +345,11 @@ void flush_iotlb_all(struct iommu *obj)
- {
- 	struct iotlb_lock l;
- 
--	clk_enable(obj->clk);
--
- 	l.base = 0;
- 	l.vict = 0;
- 	iotlb_lock_set(obj, &l);
- 
- 	iommu_write_reg(obj, 1, MMU_GFLUSH);
--
--	clk_disable(obj->clk);
- }
- EXPORT_SYMBOL_GPL(flush_iotlb_all);
- 
-@@ -382,9 +364,7 @@ EXPORT_SYMBOL_GPL(flush_iotlb_all);
-  */
- void iommu_set_twl(struct iommu *obj, bool on)
- {
--	clk_enable(obj->clk);
- 	arch_iommu->set_twl(obj, on);
--	clk_disable(obj->clk);
- }
- EXPORT_SYMBOL_GPL(iommu_set_twl);
- 
-@@ -395,12 +375,8 @@ ssize_t iommu_dump_ctx(struct iommu *obj, char *buf, ssize_t bytes)
- 	if (!obj || !buf)
- 		return -EINVAL;
- 
--	clk_enable(obj->clk);
--
- 	bytes = arch_iommu->dump_ctx(obj, buf, bytes);
- 
--	clk_disable(obj->clk);
--
- 	return bytes;
- }
- EXPORT_SYMBOL_GPL(iommu_dump_ctx);
-@@ -412,7 +388,6 @@ static int __dump_tlb_entries(struct iommu *obj, struct cr_regs *crs, int num)
- 	struct cr_regs tmp;
- 	struct cr_regs *p = crs;
- 
--	clk_enable(obj->clk);
- 	iotlb_lock_get(obj, &saved);
- 
- 	for_each_iotlb_cr(obj, num, i, tmp) {
-@@ -422,7 +397,6 @@ static int __dump_tlb_entries(struct iommu *obj, struct cr_regs *crs, int num)
- 	}
- 
- 	iotlb_lock_set(obj, &saved);
--	clk_disable(obj->clk);
- 
- 	return  p - crs;
- }
-@@ -795,9 +769,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
- 	if (!err)
- 		return IRQ_HANDLED;
- 
--	clk_enable(obj->clk);
- 	stat = iommu_report_fault(obj, &da);
--	clk_disable(obj->clk);
- 	if (!stat)
- 		return IRQ_HANDLED;
- 
--- 
-1.7.1
+There is an issue (present without patches too):
+
+Doing a cycle of insmod-rmmod to iommu module and then full
+insmod of bridgedriver (with all dependencies) causes the next
+read of iommu registers to dump an unhandled fault log; this,
+because when rmmod of iommu is called it tries to clean the
+iommu tables and flush any old entry prior to removing the driver,
+however these reads/writes are attempted while the MMU is under
+reset and will timeout on the L3 IVA target agent, which will leave
+MMU unusable until the proper restore sequence to clear this L3
+error is executed.
+
+Fix would be to move page table allocation to iommu get and its
+correspondent free to iommu put, however it will fall entirely
+under iommu user responsibility, as it needs to clear the mmu
+reset bit, before calling iommu functions that read/write into
+mmu registers (which should apply only for first boot or on
+baseimage reload); trading this restriction in order to keep
+the same generic iommu code for all omap iommu devices.
+
+This issue has been seen on omap3 iva2 mmu, same restriction should
+apply for tesla mmu.
+
+For discussion: should iommu handle mmu reset source directly?
+This register is grouped into an IVA PRM register which handles
+sequencer, iva2 mmu and dsp resets. As mentioned iommu handles
+cam, iva2 mmu (OMAP3) and tesla, ducati mmu (OMAP4), only tesla
+and iva2 should suffer from this restriction and according changes
+should be needed to handle both cases on mach-omap2 code. This
+also affects hwmod, since, if defined, it tries to read SYSC
+registers at boot time when registering the hwmod and causing the
+same issue.
+
+Omar Ramirez Luna (6):
+  omap: iommu: remove redundant clock usage
+  OMAP3: hwmod data: Add mmu for iva2 and isp
+  OMAP4: hwmod data: add mmu hwmod for ducati and tesla
+  omap: iommu: intial hwmod support
+  omap: iommu: hwmod device enable/disable routines
+  omap: iommu: code reorganization and cleanup
+
+ arch/arm/mach-omap2/omap-iommu.c           |  168 +++++++++-------------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  103 +++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  105 +++++++++++++++++
+ arch/arm/plat-omap/include/plat/iommu.h    |   19 +++-
+ arch/arm/plat-omap/include/plat/omap34xx.h |    2 +
+ arch/arm/plat-omap/iommu.c                 |   64 ++++-------
+ 6 files changed, 299 insertions(+), 162 deletions(-)
