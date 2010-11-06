@@ -1,23 +1,31 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 6 Nov 2010 09:28:59 +0900
-Subject: [patch v3 0/2] ARM: mach-shmobile: Add zboot support for
-	SuperH Mobile ARM
-In-Reply-To: <20101014091231.858799238@vergenet.net>
-References: <20101014091231.858799238@vergenet.net>
-Message-ID: <20101106002859.GB22926@verge.net.au>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Fri,  5 Nov 2010 19:17:24 -0600
+Subject: [PATCH v2 7/7] omap: mailbox: remove unreachable return
+In-Reply-To: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
+References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1289006244-27147-8-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 14, 2010 at 06:12:31PM +0900, Simon Horman wrote:
-> Hi,
-> 
-> this short patch series by Kuninori Morimoto and myself adds
-> zboot support to mach-shmobile.
-> 
-> This is v3 of this patch series. It implements Magnus's suggestion
-> of initialising atags directly rather than using assembly.
-> 
-> v2 implemented Magnus's suggestion of setting atags in the framework and
-> passing them to the kernel rather than using a board-specific fixup.
+Remove unreachable return statement.
 
-Russell, do you have any thoughts on this series?
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ arch/arm/mach-omap2/mailbox.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 5e9ea0f..335eb2b 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -434,8 +434,6 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 	return 0;
+-
+-	return ret;
+ }
+ 
+ static int __devexit omap2_mbox_remove(struct platform_device *pdev)
+-- 
+1.7.1
