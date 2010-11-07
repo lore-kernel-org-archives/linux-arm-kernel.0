@@ -1,29 +1,20 @@
 From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Sun, 7 Nov 2010 10:21:54 -0600
-Subject: [PATCH 4/6] omap: iommu: intial hwmod support
-In-Reply-To: <4CD5C333.8090608@ti.com>
+Date: Sun, 7 Nov 2010 10:24:23 -0600
+Subject: [PATCH 5/6] omap: iommu: hwmod device enable/disable routines
+In-Reply-To: <4CD5C5FF.9050804@ti.com>
 References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-	<1289006396-27230-5-git-send-email-omar.ramirez@ti.com>
-	<4CD5C333.8090608@ti.com>
-Message-ID: <AANLkTikMOJkgXvmC4WxPR2iiuJFO_20HjWrr6kgp3SZG@mail.gmail.com>
+	<1289006396-27230-6-git-send-email-omar.ramirez@ti.com>
+	<4CD5C5FF.9050804@ti.com>
+Message-ID: <AANLkTimskJ7qWYE1JsoTuu+=ZJdaKSmAiS_8rx30sq5B@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 6, 2010 at 4:05 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> ?static struct iommu_device omap3_devices[] = {
+On Sat, Nov 6, 2010 at 4:17 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> You should use runtime PM directly. That omap_device step is useless.
 >
-> You should not need that at all, you are just duplicating the data that are
-> already in hwmod, and then you are going to create real platform_device.
+> Moreover, this patch should be merged with the previous one.
 
-ok, will try that.
-
->> ? ? ? ?for (i = 0; i< ?num_iommu_devices; i++) {
->
-> Don't do that, just iterate over the hwmod class using
-> omap_hwmod_for_each_by_class. Please have a look at the drivers with
-> multiple devices that are already using hwmod (i2c, uart...).
-
-And this too.
+Agree, will check on runtime PM.
 
 Regards,
 
