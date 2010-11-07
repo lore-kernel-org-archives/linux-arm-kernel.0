@@ -1,31 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 7 Nov 2010 19:43:45 +0000
-Subject: [RFC] Removal of dead code from arch/arm/*
-In-Reply-To: <AANLkTiniPdzC4YEmq5_kJwv94fGmjE65i=Cjmd9VDMg5@mail.gmail.com>
-References: <AANLkTim+vj_OAd22TdThuC-HSqUiDjguOHQWjyqFaq6N@mail.gmail.com>
-	<AANLkTi=Cpq2_vV2RGcoQhrqk8xpL59AvLFPzfvTBk5Xa@mail.gmail.com>
-	<4CBF8BDB.7090907@gmail.com>
-	<20101021075401.GC22100@n2100.arm.linux.org.uk>
-	<AANLkTikYtxiT+R3eb0N5U1hoDvaP=oevjWjUuAJ453p=@mail.gmail.com>
-	<AANLkTinvz7b7yQ-MP4rZHudNuD-0A+Ag7ut0=ZNaCvyV@mail.gmail.com>
-	<AANLkTiniPdzC4YEmq5_kJwv94fGmjE65i=Cjmd9VDMg5@mail.gmail.com>
-Message-ID: <20101107194345.GD2862@n2100.arm.linux.org.uk>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Sun, 07 Nov 2010 21:58:27 +0200
+Subject: [PATCH] ARM: S3C64XX: fix uart clock setup for mini6410/real6410
+Message-ID: <20101107195738.9835.47554.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 26, 2010 at 01:35:26AM +0200, Zimny Lech wrote:
-> 2010/10/22 Zimny Lech <napohybelskurwysynom2010@gmail.com>:
-> > 2010/10/21 Zimny Lech <napohybelskurwysynom2010@gmail.com>:
-> >> Ok, I dropped this patch. Recreated tree can be found here
-> >> git pull git://github.com/napohybelskurwysynom2010/Linux-2.6-nps.git rodc2
-> >
-> > Sorry, I had to change the username, because some jerk denunciated me
-> > on github ;)
-> > git pull git://github.com/zimnylech/Linux-2.6-nps.git rodc2
-> 
-> Ping?
+Don't rewrite clock config in UCON preconfigured by
+bootloader. No need to set 10th bit in UCON because
+[11:10] 2'b00 means source clock is PCLK too.
+If set, console does not work if bootloader
+has preconfigured [11:10] with 2'b00.
+If not set, console works with any bootloader
+config value (2'bxx).
+More information about clock setup in UCON is available
+in "S3C6410X RISC Microprocessor User's Manual,
+Revision 1.20" p. 31-13 (Chapter 31.6.2
+UART CONTROL REGISTER).
 
-I'm not taking it as a git pull as it seems to contain changes outside
-of ARM.  I think you need to split your patch up, and post it to relevant
-lists as a series of patches, also making sure that you copy the relevant
-people.
+Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+---
+ arch/arm/mach-s3c64xx/mach-mini6410.c |    2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+index 3864afa..5823976 100644
+--- a/arch/arm/mach-s3c64xx/mach-mini6410.c
++++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+@@ -45,7 +45,7 @@
+ 
+ #include <video/platform_lcd.h>
+ 
+-#define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
++#define UCON S3C2410_UCON_DEFAULT
+ #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
+ #define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
+ 
+diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+index f9ef9b5..4957ab0 100644
+--- a/arch/arm/mach-s3c64xx/mach-real6410.c
++++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+@@ -46,7 +46,7 @@
+ 
+ #include <video/platform_lcd.h>
+ 
+-#define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
++#define UCON S3C2410_UCON_DEFAULT
+ #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
+ #define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
+ 
