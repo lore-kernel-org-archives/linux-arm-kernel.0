@@ -1,32 +1,22 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Sun, 7 Nov 2010 23:15:41 +0100 (CET)
-Subject: [PATCH][trivial] ARM, mm: Don't include smp_plat.h twice in
- flush.c
-Message-ID: <alpine.LNX.2.00.1011072312490.26247@swampdragon.chaosbits.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 7 Nov 2010 22:41:16 +0000
+Subject: [PATCH v4 0/2] add support for the Marvell Dove SDHCI controller
+In-Reply-To: <cover.1288293593.git.mike@compulab.co.il>
+References: <cover.1288293593.git.mike@compulab.co.il>
+Message-ID: <20101107224116.GD13608@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's enough to include the asm/smp_plat.h once in arch/arm/mm/flush.c
+Hi Mike,
 
-Signed-off-by: Jesper Juhl <jj@chaosbits.net>
----
- flush.c |    1 -
- 1 file changed, 1 deletion(-)
+On Thu, Oct 28, 2010 at 09:23:51PM +0200, Mike Rapoport wrote:
+> These patches add support for the Marvell Dove SDHCI controller.
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 391ffae..7d6e92b 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -17,7 +17,6 @@
- #include <asm/smp_plat.h>
- #include <asm/system.h>
- #include <asm/tlbflush.h>
--#include <asm/smp_plat.h>
- 
- #include "mm.h"
- 
+Thanks, I've pushed these to mmc-next for the 2.6.38 merge now.
+
+(Applied a minor correction: MMC_SDHCI_DOVE is a bool, not a tristate,
+so I removed the "say Y or M" line.)
 
 -- 
-Jesper Juhl <jj@chaosbits.net>             http://www.chaosbits.net/
-Don't top-post  http://www.catb.org/~esr/jargon/html/T/top-post.html
-Plain text mails only, please.
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
