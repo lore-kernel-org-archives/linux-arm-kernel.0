@@ -1,97 +1,50 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Sun, 7 Nov 2010 21:38:55 +0100 (CET)
-Subject: [PATCH RFC] ARM ETM driver: Do not deref potentially null pointer
-	and don't allocate and free mem while holding lock.
-In-Reply-To: <AANLkTinJF3uYibP9QNXNU3WavThzkZ17w30+6m2DKgjb@mail.gmail.com>
-References: <alpine.LNX.2.00.1011071952510.26247@swampdragon.chaosbits.net>
-	<AANLkTinJF3uYibP9QNXNU3WavThzkZ17w30+6m2DKgjb@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1011072133210.26247@swampdragon.chaosbits.net>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sun, 7 Nov 2010 23:05:10 +0200
+Subject: [PATCH v2 6/7] omap: mailbox: fix detection for previously
+	supported chips
+In-Reply-To: <AANLkTin+oBj6CTpWKB9ZBYRVjR_8_tPcY_Y4+T5PecRA@mail.gmail.com>
+References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
+	<1289006244-27147-7-git-send-email-omar.ramirez@ti.com>
+	<4CD59A56.4070003@ti.com>
+	<AANLkTin+oBj6CTpWKB9ZBYRVjR_8_tPcY_Y4+T5PecRA@mail.gmail.com>
+Message-ID: <AANLkTikw+46=41pn8Tq1pn7C3ESydasmqA9wfk2SSh4L@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 7 Nov 2010, Colin Cross wrote:
+On Sun, Nov 7, 2010 at 5:15 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
+> On Sat, Nov 6, 2010 at 1:11 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>>> -#if defined(CONFIG_ARCH_OMAP3430)
+>>> +#if defined(CONFIG_ARCH_OMAP3)
+>>
+>> Ideally you should get rid of all the CONFIG_ARCH_OMAPXXX or cpu_is_omap in
+>> that code. This is a driver, it should be generic.
+>> If you have to handle differences between OMAP version, please do that in
+>> the devices, not in the driver.
+>>
+>> This patch just contains a few of them, but the original mailbox.c file is
+>> full of that kind of test.
+>> I know that you are not the original writer of this code, but since the
+>> clean it, it will be good to remove all the legacy code.
+>
+> I mentioned it in the cover-letter, I should have put it here too, my bad.
+>
+> <quote>
+> This is meant as a short term solution until proper cleanup is done,
+> as suggested in:
+>
+> http://marc.info/?l=linux-arm-kernel&m=128534253231481&w=2
+> </quote>
+>
+> Does nobody care that the driver is not working right now for some
+> chips (since it was working before!!) and are willing to wait for more
+> time until the proper cleanup is done?
+>
+> For me it is a hassle, because if I need to do something on 3630 I
+> have to merge this patch, then apply what I'm working into, then
+> remove the patch, apply everything again to see no dependencies are
+> there, then send.
 
-> On Sun, Nov 7, 2010 at 11:12 AM, Jesper Juhl <jj@chaosbits.net> wrote:
-> > Hello,
-> >
-> > Looking at etb_read() in arch/arm/kernel/etm.c I noticed two things.
-> >
-> > ?1. We are allocting and freeing 'buf' with vmalloc() while holding a
-> > ? ?mutex locked. I cannot see any reason why we have to hold the mutex
-> > ? ?just to allocate and free a bit of memory, so I moved it outside the
-> > ? ?lock.
-> >
-> > ?2. If the memory allocation fails we'll dereference a null pointer
-> > ? ?further down since we never check the vmalloc() return value.
-> > ? ? ? ?for (i = 0; i < length / 4; i++)
-> > ? ? ? ? ? ? ? ?buf[i] = etb_readl(t, ETBR_READMEM);
-> > ? ?The best way I could find to handle this was to simply return 0 when
-> > ? ?we can't allocate memory, but there might be a better option that I
-> > ? ?just couldn't find - in any case it is better than crashing the
-> > ? ?kernel.
-> >
-> > Please consider merging, but please also review carefully first since I'm
-> > not familliar with this code.
-> >
-> > CC me on replies please.
-> >
-> >
-> > Signed-off-by: Jesper Juhl <jj@chaosbits.net>
-> > ---
-> > ?etm.c | ? ?8 +++++---
-> > ?1 file changed, 5 insertions(+), 3 deletions(-)
-> >
-> > ?note: completely untested patch since I have neither hardware nor
-> > ?toolchain to test it, so please review carefully and test before applying
-> > ?it.
-> >
-> > diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-> > index 11db628..30f845b 100644
-> > --- a/arch/arm/kernel/etm.c
-> > +++ b/arch/arm/kernel/etm.c
-> > @@ -274,7 +274,10 @@ static ssize_t etb_read(struct file *file, char __user *data,
-> > ? ? ? ?long length;
-> > ? ? ? ?struct tracectx *t = file->private_data;
-> > ? ? ? ?u32 first = 0;
-> > - ? ? ? u32 *buf;
-> > + ? ? ? u32 *buf = vmalloc(length);
-> You can't move the vmalloc out of the lock, length is uninitialized here
-> 
-> > +
-> > + ? ? ? if (!buf)
-> > + ? ? ? ? ? ? ? return 0;
-> ssize_t is signed so you can return -ENOMEM
-> 
-
-Ohh crap, you are of course right in both cases. Not being able to build 
-stuff sucks, gcc would have caught this for me :-(
-
-How about this instead?
-
-
-Signed-off-by: Jesper Juhl <jj@chaosbits.net>
----
- etm.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 11db628..41bd60d 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -293,6 +293,10 @@ static ssize_t etb_read(struct file *file, char __user *data,
- 
- 	length = min(total * 4, (int)len);
- 	buf = vmalloc(length);
-+	if (!buf) {
-+		mutex_unlock(&t->mutex);
-+		return -ENOMEM;
-+	}
- 
- 	dev_dbg(t->dev, "ETB buffer length: %d\n", total);
- 	dev_dbg(t->dev, "ETB status reg: %x\n", etb_readl(t, ETBR_STATUS));
-
+Huh? The mailbox is working for me on tidspbridge on 2.6.37-rc1.
 
 -- 
-Jesper Juhl <jj@chaosbits.net>             http://www.chaosbits.net/
-Don't top-post  http://www.catb.org/~esr/jargon/html/T/top-post.html
-Plain text mails only, please.
+Felipe Contreras
