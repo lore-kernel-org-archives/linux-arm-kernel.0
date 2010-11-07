@@ -1,40 +1,36 @@
 From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Sun, 7 Nov 2010 09:55:25 -0600
-Subject: [PATCH 1/6] omap: iommu: remove redundant clock usage
-In-Reply-To: <4CD5A846.4020607@ti.com>
+Date: Sun, 7 Nov 2010 10:00:26 -0600
+Subject: [PATCH 2/6] OMAP3: hwmod data: Add mmu for iva2 and isp
+In-Reply-To: <4CD5A96D.1000806@ti.com>
 References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-	<1289006396-27230-2-git-send-email-omar.ramirez@ti.com>
-	<4CD5A846.4020607@ti.com>
-Message-ID: <AANLkTik3Qkf5cyYq-sP9gq0sG8fnYGHq7zvD7VuB-Vxy@mail.gmail.com>
+	<1289006396-27230-3-git-send-email-omar.ramirez@ti.com>
+	<4CD5A96D.1000806@ti.com>
+Message-ID: <AANLkTinn4_s-PX08H62AL-tn+8wxXXQjhUNq6d+aDOo+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 6, 2010 at 2:11 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+On Sat, Nov 6, 2010 at 2:15 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
 > On 11/5/2010 9:19 PM, Ramirez Luna, Omar wrote:
 >>
->> iommu driver is meant to provide control of mmu hardware blocks
+>> Add mmu hwmod data for iva2 and isp.
 >
-> A dot is missing here, and a capital letter should follow.
+> s/iva2/iva/
 
-Actually it is a comma, it is meant to be part of the same paragraph.
+Where this terminology can be found? I'm basing this naming on what
+was there or TRM. For omap3 there is no such thing as iva, it is iva2.
 
->
->> its current users (MMUs) are part of larger subsystems and do not
->> have a dedicated clock as the one they use is shared with the
->> entire subsystem, it doesn't make sense to enable/disable on each
->> register read/write operation as the driver using its interface
->> should also be handling the same clock.
->>
->> iommu should only enable/disable the clock on mmu request/free from
->> the driver wanting to use it.
->
-> Mmm, I'm not necessarily convinced by that explanation.
-> If in a next revision, we change the clock partitioning and provide a
-> dedicated clock for the mmu, it will not work anymore.
-> I don't thing you should assume anything about the current partitioning.
+I can change it but I just wanted to know.
 
-HW wise, only one clock feeds the mmu, iva2_ck is used to generate
-three clocks but this inside the IVA2 module. I'm assuming omap4 dsp
-is the same.
+> If you do need the version information, you should use the rev field in the
+> hwmod class.
 
-ISP also depends on cam_ick (among others), and mmu is inside ISP module afaik.
+I don't.
+
+> All the comments about the structure fields order I did on your mailbox
+> series will apply here as well.
+
+Same for my comments.
+
+Regards,
+
+Omar
