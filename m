@@ -1,81 +1,29 @@
 From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Sun, 7 Nov 2010 10:18:47 -0600
-Subject: [PATCH 3/6] OMAP4: hwmod data: add mmu hwmod for ducati and tesla
-In-Reply-To: <4CD5BEFF.40301@ti.com>
+Date: Sun, 7 Nov 2010 10:21:54 -0600
+Subject: [PATCH 4/6] omap: iommu: intial hwmod support
+In-Reply-To: <4CD5C333.8090608@ti.com>
 References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-	<1289006396-27230-4-git-send-email-omar.ramirez@ti.com>
-	<4CD5BEFF.40301@ti.com>
-Message-ID: <AANLkTim=5bgGo1cnkWJCPF4HmMnQrBhP_sPCK3rRKUPS@mail.gmail.com>
+	<1289006396-27230-5-git-send-email-omar.ramirez@ti.com>
+	<4CD5C333.8090608@ti.com>
+Message-ID: <AANLkTikMOJkgXvmC4WxPR2iiuJFO_20HjWrr6kgp3SZG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 6, 2010 at 3:47 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> On 11/5/2010 9:19 PM, Ramirez Luna, Omar wrote:
->>
->> Add mmu hwmod data for ducati and tesla.
+On Sat, Nov 6, 2010 at 4:05 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>> ?static struct iommu_device omap3_devices[] = {
 >
-> s/ducati/ipu/
-> s/tesla/dsp/
->
-> Please do not use internal codename.
+> You should not need that at all, you are just duplicating the data that are
+> already in hwmod, and then you are going to create real platform_device.
 
-Tried to avoid confusion with what was originally in the driver, agree
-with the change.
+ok, will try that.
 
-> Here again, you completely changed the omap4 existing data for (almost)
-> nothing.
+>> ? ? ? ?for (i = 0; i< ?num_iommu_devices; i++) {
 >
-> I agree, the original code was not considering the mmu as a hwmod but only
-> the core of the subsystem: mmu + cache.
->
-> But as far as I can see, you just added a new mmu class, a dev_attr, and the
-> hwmod remain almost the same.
-> Otherwise, you replaced the proper names by the bad one, and you removed
-> important data (hw reset for ex).
->
-> Please start from the original code and fix what is missing or wrong but do
-> not re-write everything.
+> Don't do that, just iterate over the hwmod class using
+> omap_hwmod_for_each_by_class. Please have a look at the drivers with
+> multiple devices that are already using hwmod (i2c, uart...).
 
-I wrote this one from scratch, I didn't see that there were pieces to
-handle some stuff since the code is buried in a private tree.
-
-I cared to dug up the mailbox one, but completely missed this one.
-
->> +/* mmu */
->> +
->> +static struct omap_hwmod_class omap44xx_mmu_hwmod_class = {
->> + ? ? ? .name = "mmu",
->> +};
->
-> That change is OK. The remaining part seems to be completely broken.
->
->> +
->> +/* ducati mmu */
->> +
->> +static struct omap_hwmod omap44xx_ducati_mmu_hwmod;
->> +
->> +static struct omap_hwmod_addr_space omap44xx_ducati_mmu_addrs[] = {
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .pa_start ? ? ? = OMAP4_MMU1_BASE,
->> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = OMAP4_MMU1_BASE + SZ_4K - 1,
->> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT,
->> + ? ? ? },
->> +};
->> +
->> +/* l3_main_1 -> ?ducati mmu */
->> +static struct omap_hwmod_ocp_if omap44xx_l3_main_1__ducati_mmu = {
->> + ? ? ? .master ? ? ? ? =&omap44xx_l3_main_1_hwmod,
->> + ? ? ? .slave ? ? ? ? ?=&omap44xx_ducati_mmu_hwmod,
->> + ? ? ? .addr ? ? ? ? ? = omap44xx_ducati_mmu_addrs,
->> + ? ? ? .clk ? ? ? ? ? ?= "dpll_mpu_m2_ck",
->
-> Are you sure of that?
-
-No, this was supposed to be the hwmod main_clk... the ocp_if clk
-should be l3_div.
-
-I will add these changes and the ones you mention as "mmu + cache",
-and see how it goes from there.
+And this too.
 
 Regards,
 
