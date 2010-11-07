@@ -1,50 +1,27 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sun, 7 Nov 2010 23:05:10 +0200
-Subject: [PATCH v2 6/7] omap: mailbox: fix detection for previously
-	supported chips
-In-Reply-To: <AANLkTin+oBj6CTpWKB9ZBYRVjR_8_tPcY_Y4+T5PecRA@mail.gmail.com>
-References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
-	<1289006244-27147-7-git-send-email-omar.ramirez@ti.com>
-	<4CD59A56.4070003@ti.com>
-	<AANLkTin+oBj6CTpWKB9ZBYRVjR_8_tPcY_Y4+T5PecRA@mail.gmail.com>
-Message-ID: <AANLkTikw+46=41pn8Tq1pn7C3ESydasmqA9wfk2SSh4L@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 07 Nov 2010 13:10:15 -0800
+Subject: [PATCH] arch/arm/plat-mxc/cpufreq.c: Fix line continuation defect
+Message-ID: <1289164215.29216.315.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 7, 2010 at 5:15 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-> On Sat, Nov 6, 2010 at 1:11 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->>> -#if defined(CONFIG_ARCH_OMAP3430)
->>> +#if defined(CONFIG_ARCH_OMAP3)
->>
->> Ideally you should get rid of all the CONFIG_ARCH_OMAPXXX or cpu_is_omap in
->> that code. This is a driver, it should be generic.
->> If you have to handle differences between OMAP version, please do that in
->> the devices, not in the driver.
->>
->> This patch just contains a few of them, but the original mailbox.c file is
->> full of that kind of test.
->> I know that you are not the original writer of this code, but since the
->> clean it, it will be good to remove all the legacy code.
->
-> I mentioned it in the cover-letter, I should have put it here too, my bad.
->
-> <quote>
-> This is meant as a short term solution until proper cleanup is done,
-> as suggested in:
->
-> http://marc.info/?l=linux-arm-kernel&m=128534253231481&w=2
-> </quote>
->
-> Does nobody care that the driver is not working right now for some
-> chips (since it was working before!!) and are willing to wait for more
-> time until the proper cleanup is done?
->
-> For me it is a hassle, because if I need to do something on 3630 I
-> have to merge this patch, then apply what I'm working into, then
-> remove the patch, apply everything again to see no dependencies are
-> there, then send.
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/plat-mxc/cpufreq.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Huh? The mailbox is working for me on tidspbridge on 2.6.37-rc1.
-
--- 
-Felipe Contreras
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+index 039538e..9f358af 100644
+--- a/arch/arm/plat-mxc/cpufreq.c
++++ b/arch/arm/plat-mxc/cpufreq.c
+@@ -154,8 +154,8 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
+ 	ret = cpufreq_frequency_table_cpuinfo(policy, imx_freq_table);
+ 
+ 	if (ret < 0) {
+-		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq \
+-				with error code %d\n", __func__, ret);
++		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq with error code %d\n",
++		       __func__, ret);
+ 		goto err;
+ 	}
+ 
