@@ -1,27 +1,32 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 07 Nov 2010 13:10:15 -0800
-Subject: [PATCH] arch/arm/plat-mxc/cpufreq.c: Fix line continuation defect
-Message-ID: <1289164215.29216.315.camel@Joe-Laptop>
+From: jj@chaosbits.net (Jesper Juhl)
+Date: Sun, 7 Nov 2010 23:15:41 +0100 (CET)
+Subject: [PATCH][trivial] ARM, mm: Don't include smp_plat.h twice in
+ flush.c
+Message-ID: <alpine.LNX.2.00.1011072312490.26247@swampdragon.chaosbits.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/plat-mxc/cpufreq.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+It's enough to include the asm/smp_plat.h once in arch/arm/mm/flush.c
 
-diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
-index 039538e..9f358af 100644
---- a/arch/arm/plat-mxc/cpufreq.c
-+++ b/arch/arm/plat-mxc/cpufreq.c
-@@ -154,8 +154,8 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
- 	ret = cpufreq_frequency_table_cpuinfo(policy, imx_freq_table);
+Signed-off-by: Jesper Juhl <jj@chaosbits.net>
+---
+ flush.c |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 391ffae..7d6e92b 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -17,7 +17,6 @@
+ #include <asm/smp_plat.h>
+ #include <asm/system.h>
+ #include <asm/tlbflush.h>
+-#include <asm/smp_plat.h>
  
- 	if (ret < 0) {
--		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq \
--				with error code %d\n", __func__, ret);
-+		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq with error code %d\n",
-+		       __func__, ret);
- 		goto err;
- 	}
+ #include "mm.h"
  
+
+-- 
+Jesper Juhl <jj@chaosbits.net>             http://www.chaosbits.net/
+Don't top-post  http://www.catb.org/~esr/jargon/html/T/top-post.html
+Plain text mails only, please.
