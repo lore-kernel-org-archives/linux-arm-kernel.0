@@ -1,69 +1,33 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 8 Nov 2010 00:49:48 +0200
-Subject: [PATCH 1/2] video: omap: vram: remove from normal memory
-In-Reply-To: <1287489785.2216.10.camel@tubuntu>
-References: <AANLkTik_6byuzkZ+mKunTi6HJTHu49C4XGebfTjCaEeE@mail.gmail.com>
-	<1287146784-5517-1-git-send-email-felipe.contreras@gmail.com>
-	<1287407452.6781.64.camel@tubuntu>
-	<1287410618.6781.110.camel@tubuntu>
-	<20101018225534.GH13341@atomide.com>
-	<1287489785.2216.10.camel@tubuntu>
-Message-ID: <AANLkTin+0B1GbiJkf9X88-08Yc6LROSorPyCyydvCtkK@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 7 Nov 2010 22:51:37 +0000
+Subject: [PATCH 1/2] sdhci-esdhc-imx: fix timeout on i.MX's sdhci
+In-Reply-To: <1287791842-706-1-git-send-email-eric@eukrea.com>
+References: <20101022231203.GA6502@void.printf.net>
+	<1287791842-706-1-git-send-email-eric@eukrea.com>
+Message-ID: <20101107225137.GE13608@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 3:03 PM, Tomi Valkeinen
-<tomi.valkeinen@nokia.com> wrote:
-> On Tue, 2010-10-19 at 00:55 +0200, ext Tony Lindgren wrote:
->> * Tomi Valkeinen <tomi.valkeinen@nokia.com> [101018 06:55]:
->> > On Mon, 2010-10-18 at 16:10 +0300, Tomi Valkeinen wrote:
->> > > Hi,
->> > >
->> > > On Fri, 2010-10-15 at 14:46 +0200, ext Felipe Contreras wrote:
->> > > > So that we can ioremap happily.
->> > > >
->> > > > Cc: Tomi Valkeinen <tomi.valkeinen@nokia.com>
->> > > > Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
->> > > > ---
->> > > > ?drivers/video/omap2/vram.c | ? ?2 ++
->> > > > ?1 files changed, 2 insertions(+), 0 deletions(-)
->> > > >
->> > > > diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
->> > > > index f6fdc20..1a99777 100644
->> > > > --- a/drivers/video/omap2/vram.c
->> > > > +++ b/drivers/video/omap2/vram.c
->> > > > @@ -575,6 +575,8 @@ void __init omap_vram_reserve_sdram_memblock(void)
->> > > > ? ? ? ? ? ? ? ? }
->> > > > ? ? ? ? } else {
->> > > > ? ? ? ? ? ? ? ? paddr = memblock_alloc_base(size, PAGE_SIZE, MEMBLOCK_REAL_LIMIT);
->> > > > + ? ? ? ? ? ? ? memblock_free(paddr, size);
->> > > > + ? ? ? ? ? ? ? memblock_remove(paddr, size);
->> > > > ? ? ? ? }
->> > > >
->> > > > ? ? ? ? omap_vram_add_region(paddr, size);
->> > >
->> > > I tested this on OMAP3 SDP board, on top of my DSS2 tree. I can boot up
->> > > fine, but my test program crashes the kernel (dump below).
->> > >
->> > > This crash doesn't happen if I have the "HACK: OMAP: DSS2: OMAPFB: use
->> > > phys_to_virt for RAM mappings" patch in (I removed that during testing
->> > > this patch).
->> > >
->> > > I don't know yet what is crashing the kernel, but I'd guess it's the
->> > > fact that my test program reallocates the framebuffer memory with
->> > > OMAPFB_SETUP_MEM ioctl.
->> >
->> > Ah, sorry, I was missing the patch from Russel which you mentioned in
->> > another mail (http://article.gmane.org/gmane.linux.kernel/1047146). With
->> > that patch included things seem to work.
->>
->> Tomi, I assume you're queuing these? If so, for both:
->>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> Yes, I can queue them (when the required memblock stuff is in).
+Hi Eric,
 
-Now it's in :) (v2.6.37-rc1)
+On Sat, Oct 23, 2010 at 01:57:21AM +0200, Eric B?nard wrote:
+> this patch fix timeout problems on i.MX's sdhci as suggested by
+> Richard Zhu.
+> 
+> Tested on :
+> - i.MX257 : not needed
+> - i.MX357 : needed
+> - i.MX515 : needed
+> 
+> more details can be found here :
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029748.html
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Tested-by: Shawn Guo <shawn.gsc@gmail.com>
+> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+
+Thanks, I've pushed and queued these two patches for 2.6.37.
 
 -- 
-Felipe Contreras
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
