@@ -1,59 +1,57 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Sun, 7 Nov 2010 20:08:45 +0300
-Subject: [PATCH 1/6 v2] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <20101107165745.GB1759@n2100.arm.linux.org.uk>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<20101107165745.GB1759@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimFJ=Brx4pDiUqZOKDfABaDg0s_yFC7EkZGi7D8@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 7 Nov 2010 17:12:18 +0000
+Subject: ARM stacktrace and SMP
+In-Reply-To: <4CD38343.8080406@codeaurora.org>
+References: <4CD38343.8080406@codeaurora.org>
+Message-ID: <20101107171218.GD1759@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/7 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sun, Nov 07, 2010 at 07:28:52PM +0300, Alexey Charkov wrote:
->> +static inline void preallocate_fb(struct vt8500fb_platform_data *p,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long align) {
->> + ? ? p->video_mem_len = (p->xres_virtual * p->yres_virtual * 4) >>
->> + ? ? ? ? ? ? ? ? ? ? (p->bpp > 16 ? 0 : (p->bpp > 8 ? 1 :
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (8 / p->bpp) + 1));
->> + ? ? p->video_mem_phys = (unsigned long)memblock_alloc(p->video_mem_len,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? align);
->> + ? ? p->video_mem_virt = phys_to_virt(p->video_mem_phys);
->> +}
-> ...
->> +void __init vt8500_map_io(void)
->> +{
->> + ? ? wmt_current_regs = &wmt_regmaps[VT8500_INDEX];
->> + ? ? wmt_current_irqs = &wmt_irqs[VT8500_INDEX];
->> + ? ? set_data();
->> +#ifdef CONFIG_FB_VT8500
->> + ? ? panels[current_panel_idx].bpp = 16; /* Always use RGB565 */
->> + ? ? preallocate_fb(&panels[current_panel_idx], SZ_4M);
->> + ? ? vt8500_device_lcdc.dev.platform_data = &panels[current_panel_idx];
->> +#endif
->> + ? ? iotable_init(vt8500_io_desc, ARRAY_SIZE(vt8500_io_desc));
->> +}
-> ...
->> +void __init wm8505_map_io(void)
->> +{
->> + ? ? wmt_current_regs = &wmt_regmaps[WM8505_INDEX];
->> + ? ? wmt_current_irqs = &wmt_irqs[WM8505_INDEX];
->> + ? ? set_data();
->> +#ifdef CONFIG_FB_WM8505
->> + ? ? panels[current_panel_idx].bpp = 32; /* Always use RGB888 */
->> + ? ? preallocate_fb(&panels[current_panel_idx], 32);
->> + ? ? vt8500_device_wm8505_fb.dev.platform_data = &panels[current_panel_idx];
->> +#endif
->> + ? ? iotable_init(vt8500_io_desc, ARRAY_SIZE(vt8500_io_desc));
->> +}
+On Thu, Nov 04, 2010 at 09:08:35PM -0700, Jeff Ohlstein wrote:
+> I am looking at the stacktrace support on arm, namely with respect to its
+> support for SMP. I'm curious as to what is different between the ARM support
+> and the support on other platforms.
 >
-> I'd much prefer that the allocation of memblock memory is done via the
-> 'reserve' machine callback, rather than trying to group it into the IO
-> mapping callback. ?Is there a reason it can't be?
+> I found this quote from Russell:
+> >This is unsafe on SMP - 'tsk == current' has no meaning where SMP systems
+> >are concerned - the fact that tsk is not current does not mean that it
+> >isn't running on another CPU.
+> >
+> >Basically, if a thread is running on a CPU, thread_saved_fp() is invalid.
+> >
+> >So, the question is: what guarantees do we have here that 'tsk' is not
+> >running on another CPU?
 >
+> What harm can come from using an invalid thread_saved_fp()?
 
-I believe it can. Thanks for the info, I just didn't know about that.
-Will fix this shortly.
+It's not just thread_saved_fp(), but all the other thread saved values.
+Without these being known to be valid, the unwinder can't hope to do any
+unwinding.
 
-Is it OK to leave resources assignment in map_io or is there a better
-place to do that as well?
+> Is there any
+> possibility that attempting to unwind a process stack with an invalid frame
+> pointer could cause a system crash, or will it just return garbage stack
+> frames?
+
+I suspect so - especially as the unwinder needs to be able to retrieve
+values from the stack.
+
+> Do other platforms simply ignore this issue?
+
+Other platforms don't have to walk the Dwarf unwind information.
+
+> We are interested in
+> dumping stack trace data for all processes when our target crashes, so
+> even potentially inaccurate data is better than nothing.
+
+Have you thought of using the existing system debugging options via sysrq?
+
+> As far as actually fixing it is concerned, is there a way to stop a given
+> task from being scheduled, or wait until it is descheduled if it is running?
+> I didn't see anything like that at first glance, other than stop_machine
+> which is rather heavy-handed.
+
+The more complexity you want to do when the system crashes, the more
+probable that you won't be able to get information out of the target
+when it has crashed.  Normally, a crash means something got corrupted,
+and trying to schedule afterwards can cause additional crashes.
