@@ -1,46 +1,39 @@
 From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Sun, 7 Nov 2010 09:15:15 -0600
-Subject: [PATCH v2 6/7] omap: mailbox: fix detection for previously
-	supported chips
-In-Reply-To: <4CD59A56.4070003@ti.com>
+Date: Sun, 7 Nov 2010 09:18:03 -0600
+Subject: [PATCH v2 7/7] omap: mailbox: remove unreachable return
+In-Reply-To: <4CD59CB3.2060306@ti.com>
 References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
-	<1289006244-27147-7-git-send-email-omar.ramirez@ti.com>
-	<4CD59A56.4070003@ti.com>
-Message-ID: <AANLkTin+oBj6CTpWKB9ZBYRVjR_8_tPcY_Y4+T5PecRA@mail.gmail.com>
+	<1289006244-27147-8-git-send-email-omar.ramirez@ti.com>
+	<4CD59CB3.2060306@ti.com>
+Message-ID: <AANLkTi=rCBxRvxP6+6Mn0CmUwSO+uCFqyPDMx+AGnx2-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 6, 2010 at 1:11 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> -#if defined(CONFIG_ARCH_OMAP3430)
->> +#if defined(CONFIG_ARCH_OMAP3)
+On Sat, Nov 6, 2010 at 1:21 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 11/5/2010 9:17 PM, Ramirez Luna, Omar wrote:
+>>
+>> Remove unreachable return statement.
+>>
+>> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/mailbox.c | ? ?2 --
+>> ?1 files changed, 0 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+>> index 5e9ea0f..335eb2b 100644
+>> --- a/arch/arm/mach-omap2/mailbox.c
+>> +++ b/arch/arm/mach-omap2/mailbox.c
+>> @@ -434,8 +434,6 @@ static int __devinit omap2_mbox_probe(struct
+>> platform_device *pdev)
+>> ? ? ? ? ? ? ? ?return ret;
+>> ? ? ? ?}
 >
-> Ideally you should get rid of all the CONFIG_ARCH_OMAPXXX or cpu_is_omap in
-> that code. This is a driver, it should be generic.
-> If you have to handle differences between OMAP version, please do that in
-> the devices, not in the driver.
+> Please add a blank line here.
+
+ok...
+
 >
-> This patch just contains a few of them, but the original mailbox.c file is
-> full of that kind of test.
-> I know that you are not the original writer of this code, but since the
-> clean it, it will be good to remove all the legacy code.
-
-I mentioned it in the cover-letter, I should have put it here too, my bad.
-
-<quote>
-This is meant as a short term solution until proper cleanup is done,
-as suggested in:
-
-http://marc.info/?l=linux-arm-kernel&m=128534253231481&w=2
-</quote>
-
-Does nobody care that the driver is not working right now for some
-chips (since it was working before!!) and are willing to wait for more
-time until the proper cleanup is done?
-
-For me it is a hassle, because if I need to do something on 3630 I
-have to merge this patch, then apply what I'm working into, then
-remove the patch, apply everything again to see no dependencies are
-there, then send.
+> Otherwise you can add: Acked-by: Benoit Cousson <b-cousson@ti.com>
 
 Regards,
 
