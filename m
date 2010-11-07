@@ -1,58 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 7 Nov 2010 12:34:29 +0100
-Subject: Single binary kernel for all i.MX
-In-Reply-To: <AANLkTikKemXjQYZ9axTP-60bu9xjGrmPE9imf+EDB-p_@mail.gmail.com>
-References: <20101105121800.GV6017@pengutronix.de>
-	<20101105122946.GH13530@tarshish>
-	<20101105123144.GW6017@pengutronix.de>
-	<AANLkTikKemXjQYZ9axTP-60bu9xjGrmPE9imf+EDB-p_@mail.gmail.com>
-Message-ID: <20101107113429.GA6017@pengutronix.de>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Sun, 7 Nov 2010 08:27:47 -0600
+Subject: [PATCH v2 1/7] OMAP2: hwmod data: add mailbox data
+In-Reply-To: <4CD58BAA.8020909@ti.com>
+References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
+	<1289006244-27147-2-git-send-email-omar.ramirez@ti.com>
+	<4CD58BAA.8020909@ti.com>
+Message-ID: <AANLkTi=wx-Nr7S1iWK2K__XZtEmE2pKNkejtFbsae+X5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+ Hi Benoit,
 
-On Sat, Nov 06, 2010 at 02:59:02AM +0800, Eric Miao wrote:
-> On Fri, Nov 5, 2010 at 8:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Fri, Nov 05, 2010 at 02:29:46PM +0200, Baruch Siach wrote:
-> >> Hi Sascha,
-> >>
-> >> On Fri, Nov 05, 2010 at 01:18:00PM +0100, Sascha Hauer wrote:
-> >> > We are talking about a single kernel for longer now, here is something
-> >> > to test for the ones interested:
-> >> >
-> >> > git://git.pengutronix.de/git/imx/linux-2.6.git imx-single-kernel
-> >> >
-> >> > Compiling the imx_defconfig will result in a kernel which works
-> >> > i.MX21, i.MX27, i.MX31, i.MX35 and i.MX51 (not tested on i.MX21).
-> >> > i.MX1 does not work mainly because the kernel build will use some ARMv5
-> >> > and later instructions.
-> >>
-> >> What is blocking i.MX25 from being included?
-> >
-> > It is. I just forgot to mention.
-> 
-> Hrm... the imx series is placing all header files in
-> arch/arm/plat-mxc/include/plat
-> instead of within each mach-*. Most other sub-arch doesn't behave like that at
-> this moment and getting them built together ain't easy.
+On Sat, Nov 6, 2010 at 12:08 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>> +/* l4_core -> ?mailbox */
+>> +static struct omap_hwmod_ocp_if omap2420_l4_core__mailbox = {
+>> + ? ? ? .master ? ? ? ? =&omap2420_l4_core_hwmod,
+>> + ? ? ? .slave ? ? ? ? ?=&omap2420_mailbox_hwmod,
+>> + ? ? ? .addr ? ? ? ? ? = omap2420_mailbox_addrs,
+>> + ? ? ? .clk ? ? ? ? ? ?= "mailboxes_ick",
+>
+> Could you try to be consistent with the omap4 format? it is easier to diff
+> between Soc version: .clk is before .addr
 
-Indeed I had to move back one header file under mach-imx/include/mach
-back to plat-mxc/include/mach.
+In all the randomness of how the data files look, I didn't now omap4
+was the standard. For this one, I tried to follow the
+"omap_hwmod_ocp_if" structure definition where 'clk' is the 4th member
+of that structure.
 
-> 
-> BTW, did you get it tested on different boards, I'd be interested to see what
-> could be the potential issues at run-time.
+I'll change it to mimic omap4 looks...
 
-I only booted up a root nfs on different boards and was happy that it
-worked so far. I have no experience with kernels supporting v5/v6/v7 in
-a single binary. Has anybody tried this before? At least the defconfigs
-don't show an example for this.
+>> +static struct omap_hwmod omap2420_mailbox_hwmod = {
+>> + ? ? ? .name ? ? ? ? ? = "mailbox",
+>> + ? ? ? .class ? ? ? ? ?=&omap2420_mailbox_hwmod_class,
+>> + ? ? ? .prcm ? ? ? ? ? = {
+>> + ? ? ? ? ? ? ? .omap2 = {
+>> + ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+>> + ? ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP24XX_EN_MAILBOXES_SHIFT,
+>> + ? ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
+>> + ? ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
+>> + ? ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP24XX_ST_MAILBOXES_SHIFT,
+>> + ? ? ? ? ? ? ? },
+>> + ? ? ? },
+>
+> Same things with the format, put that after irqs_cnt and before slaves.
 
-Sascha
+more or less the same, since 'prcm' was above in the definition order
+I kept it a bit up of where it is supposed to be.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I'll change it too
+
+>> @@ -569,6 +635,7 @@ static __initdata struct omap_hwmod *omap2420_hwmods[]
+>> = {
+>> ? ? ? ?&omap2420_uart3_hwmod,
+>> ? ? ? ?&omap2420_i2c1_hwmod,
+>> ? ? ? ?&omap2420_i2c2_hwmod,
+>
+> Add a blank line between each class. OK it was not done for i2c, but it
+> should.
+>
+> All the comments are applicable to the 2430 and 3430 data as well.
+
+Will do.
+
+Thanks for your comments,
+
+Omar
