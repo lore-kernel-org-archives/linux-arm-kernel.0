@@ -1,67 +1,93 @@
 From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Sun, 7 Nov 2010 08:27:47 -0600
-Subject: [PATCH v2 1/7] OMAP2: hwmod data: add mailbox data
-In-Reply-To: <4CD58BAA.8020909@ti.com>
+Date: Sun, 7 Nov 2010 09:07:45 -0600
+Subject: [PATCH v2 3/7] OMAP4: hwmod data: add mailbox data
+In-Reply-To: <4CD58DF6.6040600@ti.com>
 References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
-	<1289006244-27147-2-git-send-email-omar.ramirez@ti.com>
-	<4CD58BAA.8020909@ti.com>
-Message-ID: <AANLkTi=wx-Nr7S1iWK2K__XZtEmE2pKNkejtFbsae+X5@mail.gmail.com>
+	<1289006244-27147-4-git-send-email-omar.ramirez@ti.com>
+	<4CD58DF6.6040600@ti.com>
+Message-ID: <AANLkTi=mkBROke+4Yf25QndYB=0pE+k0tE2NKxUM5xU_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Benoit,
+On Sat, Nov 6, 2010 at 12:18 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> I don't know why, but this patch has nothing to do with my original one.
+> Can you stick to the original code?
 
-On Sat, Nov 6, 2010 at 12:08 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> +/* l4_core -> ?mailbox */
->> +static struct omap_hwmod_ocp_if omap2420_l4_core__mailbox = {
->> + ? ? ? .master ? ? ? ? =&omap2420_l4_core_hwmod,
->> + ? ? ? .slave ? ? ? ? ?=&omap2420_mailbox_hwmod,
->> + ? ? ? .addr ? ? ? ? ? = omap2420_mailbox_addrs,
->> + ? ? ? .clk ? ? ? ? ? ?= "mailboxes_ick",
+no, apart from the ordering of structure members, that I will change,
+since keeping the order of the original structure doesn't fly, I don't
+see anything that needs to be changed.
+
+- The magic numbers replaced for the defines, afaik it gives more clarity.
+- mailbox irq has a name.
+- overall defining block was improved:
+
+        class
+        ocp_if
+        slave ports
+        hwmod
+
+If you see, each dependent reference is right before the structure
+that is using it, which at least to me establishes some order, as of
+today this ordering doesn't exists.
+
+e.g. you are defining some hwmod and some how you are populating all
+the members, if you are looking at your omap_hwmod struct and want to
+see the irqs defined you need to scroll beyond the supposed first
+reference in omap_hwmod (right now above ocp_if)
+
 >
-> Could you try to be consistent with the omap4 format? it is easier to diff
-> between Soc version: .clk is before .addr
+> On 11/5/2010 9:17 PM, Ramirez Luna, Omar wrote:
+>> +/* mailbox */
+>
+> The original comment is missing.
 
-In all the randomness of how the data files look, I didn't now omap4
-was the standard. For this one, I tried to follow the
-"omap_hwmod_ocp_if" structure definition where 'clk' is the 4th member
-of that structure.
+<quote>
+/*
+ * 'mailbox' class
+ * mailbox module allowing communication between the on-chip processors
+ * useusing a queued mailbox-interrupt mechanism.
+ */
+</quote>
 
-I'll change it to mimic omap4 looks...
+I don't think it adds anything to the patch, should we start
+commenting on the functionality of the drivers for each hwmod?
 
->> +static struct omap_hwmod omap2420_mailbox_hwmod = {
+>> +
+>> +static struct omap_hwmod omap44xx_mailbox_hwmod;
+>> +
+>> +static struct omap_hwmod_addr_space omap44xx_mailbox_addrs[] = {
+>> + ? ? ? {
+>> + ? ? ? ? ? ? ? .pa_start ? ? ? = OMAP44XX_MAILBOX_BASE,
+>
+> If that physical address is not used elsewhere, and it should be the case,
+> there is no need to create a define for it. That's why the physical address
+> was directly used here.
+> There is no added value to create a define for that.
+
+yes there is, apart from readability where '0x4a0f4000' doesn't say much
+
+for me at least, if reviewing I need to open the TRM check if that is
+the address and move on, with the define you know that someone have
+checked the address before (when creating the define)
+
+besides the define was already there
+
+>> +static struct omap_hwmod omap44xx_mailbox_hwmod = {
 >> + ? ? ? .name ? ? ? ? ? = "mailbox",
->> + ? ? ? .class ? ? ? ? ?=&omap2420_mailbox_hwmod_class,
+>> + ? ? ? .class ? ? ? ? ?=&omap44xx_mailbox_hwmod_class,
 >> + ? ? ? .prcm ? ? ? ? ? = {
->> + ? ? ? ? ? ? ? .omap2 = {
->> + ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
->> + ? ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP24XX_EN_MAILBOXES_SHIFT,
->> + ? ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
->> + ? ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
->> + ? ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP24XX_ST_MAILBOXES_SHIFT,
+>> + ? ? ? ? ? ? ? .omap4 = {
+>> + ? ? ? ? ? ? ? ? ? ? ? .clkctrl_reg = OMAP4430_CM_L4CFG_MAILBOX_CLKCTRL,
 >> + ? ? ? ? ? ? ? },
 >> + ? ? ? },
+>> + ? ? ? .mpu_irqs ? ? ? = omap44xx_mailbox_irqs,
+>> + ? ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_mailbox_irqs),
 >
-> Same things with the format, put that after irqs_cnt and before slaves.
+> The order is different than the previous one.
 
-more or less the same, since 'prcm' was above in the definition order
-I kept it a bit up of where it is supposed to be.
+as the order is given by omap4 data, and not the definition of the
+structure, I'll keep the consistency with omap4 then.
 
-I'll change it too
-
->> @@ -569,6 +635,7 @@ static __initdata struct omap_hwmod *omap2420_hwmods[]
->> = {
->> ? ? ? ?&omap2420_uart3_hwmod,
->> ? ? ? ?&omap2420_i2c1_hwmod,
->> ? ? ? ?&omap2420_i2c2_hwmod,
->
-> Add a blank line between each class. OK it was not done for i2c, but it
-> should.
->
-> All the comments are applicable to the 2430 and 3430 data as well.
-
-Will do.
-
-Thanks for your comments,
+Regards,
 
 Omar
