@@ -1,56 +1,105 @@
-From: marek.belisko@gmail.com (Marek Belisko)
-Date: Mon,  8 Nov 2010 13:39:09 +0100
-Subject: [PATCH] ARM: s3c2440: mini2440: Add support for new LCD's.
-Message-ID: <1289219949-19958-1-git-send-email-marek.belisko@gmail.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Mon,  8 Nov 2010 20:37:42 +0800
+Subject: [PATCH 1/9] ARM: pxa: redefine the cpu_is_pxa3xx
+Message-ID: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for new mini2440 board LCD's:
-3.5" TFT + TS (TD035STED4)
-5.6" TFT (Innolux AT056TN52).
+PXA300/PXA310/PXA320/PXA930/PXA935 are sharing one cpu family id.
+It's a little confusion on cpu_is_pxa3xx().
 
-Code overtaken from mini2440 kernel:
-git://repo.or.cz/linux-2.6/mini2440.git
+Now reduce the scope of cpu_is_pxa3xx(). Make it focusing on
+PXA300/PXA310/PXA320. PXA930/PXA935 is coverd by cpu_is_pxa93x().
 
-Signed-off-by: Marek Belisko <marek.belisko@gmail.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-s3c2440/mach-mini2440.c |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/include/mach/hardware.h |   26 +++++++++-----------------
+ 1 files changed, 9 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
-index f62bb4c..4c11699 100644
---- a/arch/arm/mach-s3c2440/mach-mini2440.c
-+++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-@@ -185,6 +185,30 @@ static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
- 		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
- 				   S3C2410_LCDCON5_HWSWP),
- 	},
-+	[3] = {	/* mini2440 + 3.5" TFT + TS -- New model as Nov 2009 "T35" */
-+		_LCD_DECLARE(
-+			7,			/* The 3.5 is quite fast */
-+			240, 21, 25, 6,		/* x timing */
-+			320, 2, 4, 2,		/* y timing */
-+			40),			/* refresh rate */
-+		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-+				   S3C2410_LCDCON5_INVVLINE |
-+				   S3C2410_LCDCON5_INVVFRAME |
-+				   S3C2410_LCDCON5_INVVDEN |
-+				   S3C2410_LCDCON5_PWREN),
-+	},
-+	[4] = { /* mini2440 + 5.6" TFT + touchscreen -- Innolux AT056TN52 */
-+		/* be sure the "power" jumper is set accordingly ! */
-+		_LCD_DECLARE(
-+			10,			/* the 5.3" runs slower */
-+			640, 41, 68, 22,	/* x timing */
-+			480, 26, 6, 2,		/* y timing */
-+			40),			/* refresh rate */
-+		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-+				   S3C2410_LCDCON5_INVVLINE |
-+				   S3C2410_LCDCON5_INVVFRAME |
-+				   S3C2410_LCDCON5_PWREN),
-+	},
- };
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index ca188cd..59f145a 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -145,53 +145,44 @@
+ #define __cpu_is_pxa27x(id)	(0)
+ #endif
  
- /* todo - put into gpio header */
+-#ifdef CONFIG_CPU_PXA300
++#ifdef CONFIG_PXA3xx
+ #define __cpu_is_pxa300(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x688;				\
+ 	 })
+-#else
+-#define __cpu_is_pxa300(id)	(0)
+-#endif
+ 
+-#ifdef CONFIG_CPU_PXA310
+ #define __cpu_is_pxa310(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x689;				\
+ 	 })
+-#else
+-#define __cpu_is_pxa310(id)	(0)
+-#endif
+ 
+-#ifdef CONFIG_CPU_PXA320
+ #define __cpu_is_pxa320(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x603 || _id == 0x682;		\
+ 	 })
+ #else
++#define __cpu_is_pxa300(id)	(0)
++#define __cpu_is_pxa310(id)	(0)
+ #define __cpu_is_pxa320(id)	(0)
+ #endif
+ 
+-#ifdef CONFIG_CPU_PXA930
++#ifdef CONFIG_PXA93x
+ #define __cpu_is_pxa930(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x683;				\
+ 	 })
+-#else
+-#define __cpu_is_pxa930(id)	(0)
+-#endif
+ 
+-#ifdef CONFIG_CPU_PXA935
+ #define __cpu_is_pxa935(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x693;				\
+ 	 })
+ #else
++#define __cpu_is_pxa930(id)	(0)
+ #define __cpu_is_pxa935(id)	(0)
+ #endif
+ 
+@@ -264,7 +255,7 @@
+ /*
+  * CPUID Core Generation Bit
+  * <= 0x2 for pxa21x/pxa25x/pxa26x/pxa27x
+- * == 0x3 for pxa300/pxa310/pxa320
++ * == 0x3 for pxa300/pxa310/pxa320 and pxa930/pxa935
+  */
+ #if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
+ #define __cpu_is_pxa2xx(id)				\
+@@ -279,8 +270,9 @@
+ #ifdef CONFIG_PXA3xx
+ #define __cpu_is_pxa3xx(id)				\
+ 	({						\
+-		unsigned int _id = (id) >> 13 & 0x7;	\
+-		_id == 0x3;				\
++		__cpu_is_pxa300(id)			\
++			|| __cpu_is_pxa310(id)		\
++			|| __cpu_is_pxa320(id);		\
+ 	 })
+ #else
+ #define __cpu_is_pxa3xx(id)	(0)
 -- 
-1.7.1
+1.5.6.5
