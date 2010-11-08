@@ -1,89 +1,16 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 8 Nov 2010 18:21:01 -0500
-Subject: [PATCH 3/6] OMAP4: hwmod data: add mmu hwmod for ducati and tesla
-In-Reply-To: <AANLkTim=5bgGo1cnkWJCPF4HmMnQrBhP_sPCK3rRKUPS@mail.gmail.com>
-References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>	<1289006396-27230-4-git-send-email-omar.ramirez@ti.com>	<4CD5BEFF.40301@ti.com>
-	<AANLkTim=5bgGo1cnkWJCPF4HmMnQrBhP_sPCK3rRKUPS@mail.gmail.com>
-Message-ID: <4CD885DD.7020909@ti.com>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Tue, 9 Nov 2010 02:42:39 +0300
+Subject: [PATCH 6/6 v4] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <20101108213008.GB17708@linux-sh.org>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+	<20101108041721.GA11605@linux-sh.org>
+	<20101108141407.GA25739@alchark-u3s.lan>
+	<20101108204315.GA12050@linux-sh.org>
+	<AANLkTikXffMT9ZiUpm2QAoW+KPJN3MBf55Dgruj1EJN0@mail.gmail.com>
+	<20101108213008.GB17708@linux-sh.org>
+Message-ID: <20101108234239.GA20819@alchark-u3s.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/7/2010 11:18 AM, Ramirez Luna, Omar wrote:
-> On Sat, Nov 6, 2010 at 3:47 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->> On 11/5/2010 9:19 PM, Ramirez Luna, Omar wrote:
->>>
->>> Add mmu hwmod data for ducati and tesla.
->>
->> s/ducati/ipu/
->> s/tesla/dsp/
->>
->> Please do not use internal codename.
->
-> Tried to avoid confusion with what was originally in the driver, agree
-> with the change.
->
->> Here again, you completely changed the omap4 existing data for (almost)
->> nothing.
->>
->> I agree, the original code was not considering the mmu as a hwmod but only
->> the core of the subsystem: mmu + cache.
->>
->> But as far as I can see, you just added a new mmu class, a dev_attr, and the
->> hwmod remain almost the same.
->> Otherwise, you replaced the proper names by the bad one, and you removed
->> important data (hw reset for ex).
->>
->> Please start from the original code and fix what is missing or wrong but do
->> not re-write everything.
->
-> I wrote this one from scratch, I didn't see that there were pieces to
-> handle some stuff since the code is buried in a private tree.
-
-Not true at all... It was sent to l-o:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32854.html
-
-And stored in a supposedly private tree, which appears to be public:
-http://dev.omapzoom.org/?p=swarch/linux-omap-adv.git;a=summary
-
-> I cared to dug up the mailbox one, but completely missed this one.
->
->>> +/* mmu */
->>> +
->>> +static struct omap_hwmod_class omap44xx_mmu_hwmod_class = {
->>> +       .name = "mmu",
->>> +};
->>
->> That change is OK. The remaining part seems to be completely broken.
->>
->>> +
->>> +/* ducati mmu */
->>> +
->>> +static struct omap_hwmod omap44xx_ducati_mmu_hwmod;
->>> +
->>> +static struct omap_hwmod_addr_space omap44xx_ducati_mmu_addrs[] = {
->>> +       {
->>> +               .pa_start       = OMAP4_MMU1_BASE,
->>> +               .pa_end         = OMAP4_MMU1_BASE + SZ_4K - 1,
->>> +               .flags          = ADDR_TYPE_RT,
->>> +       },
->>> +};
->>> +
->>> +/* l3_main_1 ->    ducati mmu */
->>> +static struct omap_hwmod_ocp_if omap44xx_l3_main_1__ducati_mmu = {
->>> +       .master         =&omap44xx_l3_main_1_hwmod,
->>> +       .slave          =&omap44xx_ducati_mmu_hwmod,
->>> +       .addr           = omap44xx_ducati_mmu_addrs,
->>> +       .clk            = "dpll_mpu_m2_ck",
->>
->> Are you sure of that?
->
-> No, this was supposed to be the hwmod main_clk... the ocp_if clk
-> should be l3_div.
->
-> I will add these changes and the ones you mention as "mmu + cache",
-> and see how it goes from there.
-
-Please do not do any change on that code base, just use the original 
-code and update it if needed.
-
-Benoit
