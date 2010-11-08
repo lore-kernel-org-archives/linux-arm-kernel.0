@@ -1,45 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 8 Nov 2010 09:18:08 +0100
-Subject: [PATCH] arch/arm/plat-mxc/cpufreq.c: Fix line continuation defect
-In-Reply-To: <1289164215.29216.315.camel@Joe-Laptop>
-References: <1289164215.29216.315.camel@Joe-Laptop>
-Message-ID: <20101108081808.GN16938@pengutronix.de>
+From: EXT-Eugeny.Kuznetsov@nokia.com (Evgeny Kuznetsov)
+Date: Mon,  8 Nov 2010 11:38:36 +0300
+Subject: [PATCHv3 1/1] omap: Ptr "isr_reg" tracked as NULL was dereferenced
+Message-ID: <cd6fa21776a4564d602cc072358a4bf79a9fe883.1289205105.git.EXT-Eugeny.Kuznetsov@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+From: Evgeny Kuznetsov <ext-eugeny.kuznetsov@nokia.com>
 
-On Sun, Nov 07, 2010 at 01:10:15PM -0800, Joe Perches wrote:
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  arch/arm/plat-mxc/cpufreq.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
-> index 039538e..9f358af 100644
-> --- a/arch/arm/plat-mxc/cpufreq.c
-> +++ b/arch/arm/plat-mxc/cpufreq.c
-> @@ -154,8 +154,8 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
->  	ret = cpufreq_frequency_table_cpuinfo(policy, imx_freq_table);
->  
->  	if (ret < 0) {
-> -		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq \
-> -				with error code %d\n", __func__, ret);
-> +		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq with error code %d\n",
-> +		       __func__, ret);
-I'd prefer
-+		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq "
-+				"with error code %d\n", __func__, ret);
+Value of "isr_reg" pointer is depend on configuration and GPIO method.
+Potentially it may have NULL value and it is dereferenced later
+in code. Warning and exit from function are added in this case.
 
-(actually I'd consider
+Signed-off-by: Evgeny Kuznetsov <EXT-Eugeny.Kuznetsov@nokia.com>
+---
+ arch/arm/plat-omap/gpio.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-+		pr_err("failed to register i.MXC CPUfreq (error: %d)\n", ret)
-
-even better, but this is out of scope for this patch, isn't it?)
-
-Thanks
-Uwe
-
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index c05c653..e0e2fa7 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -1318,6 +1318,10 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	if (bank->method == METHOD_GPIO_44XX)
+ 		isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
+ #endif
++
++	if (WARN_ON(!isr_reg))
++		goto exit;
++
+ 	while(1) {
+ 		u32 isr_saved, level_mask = 0;
+ 		u32 enabled;
+@@ -1377,6 +1381,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	configured, we must unmask the bank interrupt only after
+ 	handler(s) are executed in order to avoid spurious bank
+ 	interrupt */
++exit:
+ 	if (!unmasked)
+ 		desc->chip->unmask(irq);
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.3.3
