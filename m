@@ -1,40 +1,43 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 8 Nov 2010 10:57:14 +0900
-Subject: [patch v3 2/2] ARM: mach-shmobile: Add zboot support for
-	SuperH Mobile ARM
-In-Reply-To: <20101107172310.GG1759@n2100.arm.linux.org.uk>
-References: <20101014091231.858799238@vergenet.net>
-	<20101014091434.501864612@vergenet.net>
-	<20101107172310.GG1759@n2100.arm.linux.org.uk>
-Message-ID: <20101108015714.GB15671@verge.net.au>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Mon, 8 Nov 2010 08:33:55 +0530
+Subject: Machine name/id change request
+In-Reply-To: <20101107181218.GC2862@n2100.arm.linux.org.uk>
+References: <AANLkTikm78_dj03xxaHMi10V+_B9B_8FRg1kRbL2OPBK@mail.gmail.com>
+	<20100920154441.GG30793@n2100.arm.linux.org.uk>
+	<AANLkTinBw_NJj=BcAOq5BzPGqrO8FW7fzmUVK8TGH7A7@mail.gmail.com>
+	<20100920155806.GA5177@n2100.arm.linux.org.uk>
+	<AANLkTin6zJQxOLBuGkYgNp3nLT4viN1bDcLiryUim18h@mail.gmail.com>
+	<20101107181218.GC2862@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikAK_kbZ2_N2L2x++LF2y8Wk4O7V2wLcw6gaABu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 07, 2010 at 05:23:10PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Oct 14, 2010 at 06:12:33PM +0900, Simon Horman wrote:
-> > +LIST "partner-jet-setup.txt"
-> > +LIST "(C) Copyright 2010 Renesas Solutions Corp"
-> > +LIST "Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>"
-> > +
-> > +LIST "RWT Setting"
-> > +EW 0xE6020004, 0xA500
-> > +EW 0xE6030004, 0xA500
-> 
-> Can you explain the necessity of this special scripting language, and
-> where it comes from?
-> 
-> It looks like the file implementing the scripting language comes from
-> something other than Linux, but it isn't clear what the licensing is
-> of that.  Please confirm that it is GPL'd.
+On Sun, Nov 7, 2010 at 11:42 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Oct 12, 2010 at 11:58:39AM +0300, Amit Kucheria wrote:
+>> On Mon, Sep 20, 2010 at 6:58 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > Remind me to fix it up when you submit something to the patch system/
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>> > machine registry. ?Neither Matt nor yourself currently appears in
+> ? ?^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>> > the existing list of people...
+> ? ?^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>
+>> Sascha has now accepted patches to enable the machine (EFIKAMX) in his
+>> imx tree. Could you please add me to the list as maintainer?
+>
+> There are three Amit's registered for the website, none of them are you.
+> I'm not being difficult, I just see nothing has changed since my previous
+> mail, which you apparantly have misunderstood.
+>
+> Please go to the machine registry, click on 'Add new machine' - that
+> will prompt to create an account. ?I'll then be able to link the machines
+> to your account.
 
-Hi Russell,
+I did indeed misunderstand your previous email. I've created the
+account now (amit.kucheria at linaro.org).
 
-The aim is to allow JTAG scripts to be used in-place.
-The script is constructed from ASM macros which are defined
-in arch/arm/mach-shmobile/include/mach/zboot_macros.h which is
-included later on in the patch. The same macros exist in SH assembly
-in arch/sh/include/asm/romimage-macros.h.
+Thanks!
 
-With regards to the license, I have confirmed that it is GPL.
-Would you be more comfortable if that was stated explicitly
-in the new files?
+/Amit
