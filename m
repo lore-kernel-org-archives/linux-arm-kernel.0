@@ -1,37 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Nov 2010 09:08:03 +0000
-Subject: [PATCH] arch/arm/plat-mxc/cpufreq.c: Fix line continuation defect
-In-Reply-To: <20101108081808.GN16938@pengutronix.de>
-References: <1289164215.29216.315.camel@Joe-Laptop>
-	<20101108081808.GN16938@pengutronix.de>
-Message-ID: <20101108090803.GA13157@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 8 Nov 2010 11:08:11 +0200
+Subject: [PATCH v2] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
+In-Reply-To: <4CD57DC1.4050403@embtoolkit.org>
+References: <1285020052-20020-1-git-send-email-lars@metafoo.de>
+	<1289030074-5233-1-git-send-email-anarsoul@gmail.com>
+	<4CD57DC1.4050403@embtoolkit.org>
+Message-ID: <201011081108.12516.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 08, 2010 at 09:18:08AM +0100, Uwe Kleine-K?nig wrote:
-> Hi Joe,
-> 
-> On Sun, Nov 07, 2010 at 01:10:15PM -0800, Joe Perches wrote:
-> > Signed-off-by: Joe Perches <joe@perches.com>
-> > ---
-> >  arch/arm/plat-mxc/cpufreq.c |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
-> > index 039538e..9f358af 100644
-> > --- a/arch/arm/plat-mxc/cpufreq.c
-> > +++ b/arch/arm/plat-mxc/cpufreq.c
-> > @@ -154,8 +154,8 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
-> >  	ret = cpufreq_frequency_table_cpuinfo(policy, imx_freq_table);
-> >  
-> >  	if (ret < 0) {
-> > -		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq \
-> > -				with error code %d\n", __func__, ret);
-> > +		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq with error code %d\n",
-> > +		       __func__, ret);
-> I'd prefer
-> +		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq "
-> +				"with error code %d\n", __func__, ret);
+On Saturday 06 November 2010 18:09:37 Abdoulaye Walsimou GAYE wrote:
 
-No - you don't wrap error messages.  It's the one exception to the 80
-column rule.
+Restored CC list, please don't clean it next time.
+
+> > -	.set_pull	= s3c_gpio_setpull_1up,
+> > -	.get_pull	= s3c_gpio_getpull_1up,
+> > 
+> >   };
+> 
+> This part of your patch will prevent s3c2440 based boards to boot see [1]
+
+Well, your patch breaks compilation for s3c2442 at all (see comment from my 
+patch)
+
+Ben, why machine-specific init is called before cpu init?
+
+Regards
+Vasily
