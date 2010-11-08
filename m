@@ -1,37 +1,68 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Mon, 08 Nov 2010 13:40:55 +0200
-Subject: [PATCH 1/2] video: omap: vram: remove from normal memory
-In-Reply-To: <AANLkTin+0B1GbiJkf9X88-08Yc6LROSorPyCyydvCtkK@mail.gmail.com>
-References: <AANLkTik_6byuzkZ+mKunTi6HJTHu49C4XGebfTjCaEeE@mail.gmail.com>
-	<1287146784-5517-1-git-send-email-felipe.contreras@gmail.com>
-	<1287407452.6781.64.camel@tubuntu>	<1287410618.6781.110.camel@tubuntu>
-	<20101018225534.GH13341@atomide.com>	<1287489785.2216.10.camel@tubuntu>
-	<AANLkTin+0B1GbiJkf9X88-08Yc6LROSorPyCyydvCtkK@mail.gmail.com>
-Message-ID: <1289216455.3297.29.camel@tubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Nov 2010 11:49:48 +0000
+Subject: [RFC PATCH v3] ARM: Introduce patching of phys_to_virt and
+	vice versa
+In-Reply-To: <AANLkTikhcHTRYQki3cCYbWFY_POWX4E26Jau8nYpuDs0@mail.gmail.com>
+References: <AANLkTikhcHTRYQki3cCYbWFY_POWX4E26Jau8nYpuDs0@mail.gmail.com>
+Message-ID: <20101108114948.GC14138@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Nov 06, 2010 at 02:40:46AM +0800, Eric Miao wrote:
+> +__fixup_phys_virt:
+> + 	/*
+> +	 * r0 - PHYS_OFFSET
+> +	 * r6 - bits to set in phys_to_virt stub instructions
+> +	 * r7 - bits to set in virt_to_phys stub instructions
+> +	 */
+> +	ldr	r0, =PHYS_OFFSET
+> +	cmp	r0, #PAGE_OFFSET
+> +	subhi	r1, r0, #PAGE_OFFSET
+> +	rsbls	r1, r0, #PAGE_OFFSET
+> +	lsr	r1, r1, #24
+> +	orr	r1, r1, #0x400
+> +	orrhi	r6, r1, #PATCH_INSTR_SUB
+> +	orrhi	r7, r1, #PATCH_INSTR_ADD
+> +	orrls	r6, r1, #PATCH_INSTR_ADD
+> +	orrls	r7, r1, #PATCH_INSTR_SUB
+> +
+> +	/* r0 - instruction to patch
+> +	 * r1 - address offset
+> +	 * r2 - index into __patch_table
+> +	 * r3 - __patch_table_end
+> +	 */
+> +	adr	r0, 1f
+> +	ldmia	r0, {r1, r2, r3}
+> +	sub	r1, r0, r1
 
-On Sun, 2010-11-07 at 23:49 +0100, ext Felipe Contreras wrote:
-> On Tue, Oct 19, 2010 at 3:03 PM, Tomi Valkeinen
-> <tomi.valkeinen@nokia.com> wrote:
+Also note that r1 here is (PHYS_OFFSET - PAGE_OFFSET) - r0 was the physical
+address of '1f', and the loaded value of r1 is the virtual address of '1f'.
 
-> > Yes, I can queue them (when the required memblock stuff is in).
-> 
-> Now it's in :) (v2.6.37-rc1)
+So, I think the above code can be replaced by:
 
-I pushed vram patches to my DSS tree.
+	adr	r0, 1f
+	ldmia	r0, {r1-r3}
+	sub	r1, r0, r1
+	mov	r4, r1, lsr #24
+	orr	r4, r4, #0x0400
+	orr	r6, r4, #PATCH_INSTR_SUB
+	orr	r7, r4, #PATCH_INSTR_ADD
+	teq	r1, r4, lsl #24
+	bne	error
 
-I combined the patches from Felipe and Namhyung with some changes: 1)
-use memblock_alloc instead of memblock_alloc_base, and 2) use
-memblock_free and memblock_remove for both reserved and allocated
-memory. I hope this is ok for Felipe and Namhyung?
+noting that:
 
-I think there was also a bug in memblock_is_region_memory(), for which I
-sent a patch to memblock people. It's also in my tree.
+	add	rd, rn, #PAGE_OFFSET - PHYS_OFFSET
+	sub	rd, rn, #PHYS_OFFSET - PAGE_OFFSET
 
-Works for me on 3430SDP board, for both reserved and allocated vram, and
-memblock and vram debug output looks sane.
+are equivalent.
 
- Tomi
+We can do better than this - just make sure that all virt_to_phys() are an
+add instruction, and all phys_to_virt() are a sub struction.  Then we only
+need to fixup the constant.  IOW, virt_to_phys() is:
+
+	add	rd, rn, #PHYS_OFFSET - PAGE_OFFSET
+
+and phys_to_virt() is:
+
+	sub	rd, rn, #PHYS_OFFSET - PAGE_OFFSET
