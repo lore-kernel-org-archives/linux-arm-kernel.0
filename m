@@ -1,116 +1,56 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 9 Nov 2010 00:13:42 +0800
-Subject: [PATCH 1/9] ARM: pxa: redefine the cpu_is_pxa3xx
-In-Reply-To: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
+Date: Tue, 9 Nov 2010 00:18:00 +0800
+Subject: [PATCH 3/9] ARM: pxa: fix typo error in pxa3xx
+In-Reply-To: <1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
 References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTikOPoP1fhbW58y+Q9+pu1NDJ8=tcSSG2gT9AwfZ@mail.gmail.com>
+	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTimXLbKftdNpdCOKjKEngPmA1keU_p2gYeX_6PyD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Nov 8, 2010 at 8:37 PM, Haojian Zhuang
 <haojian.zhuang@marvell.com> wrote:
-> PXA300/PXA310/PXA320/PXA930/PXA935 are sharing one cpu family id.
-> It's a little confusion on cpu_is_pxa3xx().
->
-> Now reduce the scope of cpu_is_pxa3xx(). Make it focusing on
-> PXA300/PXA310/PXA320. PXA930/PXA935 is coverd by cpu_is_pxa93x().
+> common_io_desc is already used in generic.c. At here, we should use
+> pxa3xx_io_desc instead.
 >
 
-Will it be OK to treat PXA930/935 as one of the 3xx series? As their APs
-are completely same. So it reads more like PXA930=3xx + CP. But I don't
-mind either way.
+This should have been fixed in the latest branch if you do a fetch again.
 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
 > ---
-> ?arch/arm/mach-pxa/include/mach/hardware.h | ? 26 +++++++++-----------------
-> ?1 files changed, 9 insertions(+), 17 deletions(-)
+> ?arch/arm/mach-pxa/pxa3xx.c | ? ?5 +----
+> ?1 files changed, 1 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
-> index ca188cd..59f145a 100644
-> --- a/arch/arm/mach-pxa/include/mach/hardware.h
-> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
-> @@ -145,53 +145,44 @@
-> ?#define __cpu_is_pxa27x(id) ? ?(0)
-> ?#endif
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index e7942ca..e36d836 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -49,9 +49,6 @@
+> ?#define PECR_IE(n) ? ? ((1 << ((n) * 2)) << 28)
+> ?#define PECR_IS(n) ? ? ((1 << ((n) * 2)) << 29)
 >
-> -#ifdef CONFIG_CPU_PXA300
-> +#ifdef CONFIG_PXA3xx
-> ?#define __cpu_is_pxa300(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?unsigned int _id = (id) >> 4 & 0xfff; ? \
-> ? ? ? ? ? ? ? ?_id == 0x688; ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? })
-> -#else
-> -#define __cpu_is_pxa300(id) ? ?(0)
-> -#endif
+> -/* crystal frequency to static memory controller multiplier (SMCFS) */
+> -static unsigned char smcfs_mult[8] = { 6, 0, 8, 0, 0, 16, };
+> -
+> ?/* crystal frequency to HSIO bus frequency multiplier (HSS) */
+> ?static unsigned char hss_mult[4] = { 8, 12, 16, 24 };
 >
-> -#ifdef CONFIG_CPU_PXA310
-> ?#define __cpu_is_pxa310(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?unsigned int _id = (id) >> 4 & 0xfff; ? \
-> ? ? ? ? ? ? ? ?_id == 0x689; ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? })
-> -#else
-> -#define __cpu_is_pxa310(id) ? ?(0)
-> -#endif
+> @@ -593,7 +590,7 @@ static struct map_desc pxa3xx_io_desc[] __initdata = {
+> ?void __init pxa3xx_map_io(void)
+> ?{
+> ? ? ? ?pxa_map_io();
+> - ? ? ? iotable_init(ARRAY_AND_SIZE(common_io_desc));
+> + ? ? ? iotable_init(ARRAY_AND_SIZE(pxa3xx_io_desc));
+> ? ? ? ?pxa3xx_get_clk_frequency_khz(1);
+> ?}
 >
-> -#ifdef CONFIG_CPU_PXA320
-> ?#define __cpu_is_pxa320(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?unsigned int _id = (id) >> 4 & 0xfff; ? \
-> ? ? ? ? ? ? ? ?_id == 0x603 || _id == 0x682; ? ? ? ? ? \
-> ? ? ? ? })
-> ?#else
-> +#define __cpu_is_pxa300(id) ? ?(0)
-> +#define __cpu_is_pxa310(id) ? ?(0)
-> ?#define __cpu_is_pxa320(id) ? ?(0)
-> ?#endif
->
-> -#ifdef CONFIG_CPU_PXA930
-> +#ifdef CONFIG_PXA93x
-> ?#define __cpu_is_pxa930(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?unsigned int _id = (id) >> 4 & 0xfff; ? \
-> ? ? ? ? ? ? ? ?_id == 0x683; ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? })
-> -#else
-> -#define __cpu_is_pxa930(id) ? ?(0)
-> -#endif
->
-> -#ifdef CONFIG_CPU_PXA935
-> ?#define __cpu_is_pxa935(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?unsigned int _id = (id) >> 4 & 0xfff; ? \
-> ? ? ? ? ? ? ? ?_id == 0x693; ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? })
-> ?#else
-> +#define __cpu_is_pxa930(id) ? ?(0)
-> ?#define __cpu_is_pxa935(id) ? ?(0)
-> ?#endif
->
-> @@ -264,7 +255,7 @@
-> ?/*
-> ?* CPUID Core Generation Bit
-> ?* <= 0x2 for pxa21x/pxa25x/pxa26x/pxa27x
-> - * == 0x3 for pxa300/pxa310/pxa320
-> + * == 0x3 for pxa300/pxa310/pxa320 and pxa930/pxa935
-> ?*/
-> ?#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
-> ?#define __cpu_is_pxa2xx(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> @@ -279,8 +270,9 @@
-> ?#ifdef CONFIG_PXA3xx
-> ?#define __cpu_is_pxa3xx(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> - ? ? ? ? ? ? ? unsigned int _id = (id) >> 13 & 0x7; ? ?\
-> - ? ? ? ? ? ? ? _id == 0x3; ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? __cpu_is_pxa300(id) ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? || __cpu_is_pxa310(id) ? ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? || __cpu_is_pxa320(id); ? ? ? ? \
-> ? ? ? ? })
-> ?#else
-> ?#define __cpu_is_pxa3xx(id) ? ?(0)
 > --
 > 1.5.6.5
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
