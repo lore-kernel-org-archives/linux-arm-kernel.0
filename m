@@ -1,38 +1,49 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 8 Nov 2010 10:18:58 +0100
-Subject: [PATCH 6/6] ARM: ftrace: enable function graph tracer
-In-Reply-To: <AANLkTin8UO9ixVep0jKK8H5roWEVRDJW4khUpT2TpPs+@mail.gmail.com>
-References: <1289067954-5080-1-git-send-email-rabin@rab.in>
-	<1289067954-5080-6-git-send-email-rabin@rab.in>
-	<AANLkTin8UO9ixVep0jKK8H5roWEVRDJW4khUpT2TpPs+@mail.gmail.com>
-Message-ID: <20101108091858.GP16938@pengutronix.de>
+Date: Mon, 8 Nov 2010 10:38:56 +0100
+Subject: linux-next: omap2plus_defconfig not building
+In-Reply-To: <eace9c309e371630528bc9f8fa208705@mail.gmail.com>
+References: <4CBD707F.6050204@ti.com>
+	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
+	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
+Message-ID: <20101108093856.GQ16938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 06, 2010 at 07:06:28PM +0000, Catalin Marinas wrote:
-> On Saturday, November 6, 2010, Rabin Vincent <rabin@rab.in> wrote:
-> > Add the options to enable the function graph tracer on ARM. ?Function
-> > graph tracer support requires frame pointers, so exclude Thumb-2 and
-> > also explicitly select FRAME_POINTER in FUNCTION_GRAPH_TRACER since
-> > FUNCTION_TRACER doesn't select FRAME_POINTER when ARM_UNWIND is used
-> > Therefore, with GCC 4.4.0+, you get plain function tracing without frame
-> > pointers, but you'll need them if you want function graph tracing.
-> .....
-> > --- a/kernel/trace/Kconfig
-> > +++ b/kernel/trace/Kconfig
-> > @@ -141,6 +141,7 @@ config FUNCTION_TRACER
+Hello,
+
+On Mon, Nov 08, 2010 at 11:35:16AM +0530, Anand Gadiyar wrote:
+> Catalin Marinas wrote:
 > >
-> > ?config FUNCTION_GRAPH_TRACER
-> >  ? ? ? ?bool "Kernel Function Graph Tracer"
-> > + ? ? ? select FRAME_POINTER if ARM_UNWIND
+> > On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
+> > > Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
+> > > processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
+> > > gets compiled when the omap2plus_defconfig is built - the
+> > > omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
+> > > image, and has CPU_V6 and CPU_V7 both enabled.
+> >
+> > This patch should fix it:
+> >
+> >
+> > ARM: Do not enable SWP emulation if CPU_V6 && CPU_V7
+> >
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> >
+> > This option uses LDREXB/STREXB to emulate SWPB but these instructions
+> > are not supported on all the ARMv6 processors.
+> >
+> > Reported-by: Anand Gadiyar <gadiyar@ti.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Leif Lindholm <Leif.Lindholm@arm.com>
 > 
-> Would it be better to modify FRAME_POINTER definition in the ARM
-> Kconfig so that it is enabled automatically when FUNCTION_GRAPH_TRACER
-> is enabled?
-I don't like that suggestion much because it hides the dependency.
-Moreover a "default y if FUNCTION_GRAPH_TRACER" doesn't work if a
-precondition for FRAME_POINTER isn't true.  Rabin's approach at least
-generates a warning.
+> Hi Catalin, Leif,
+> 
+> I can't find this patch in linux-next. Hope we haven't missed it.
+> Tony acked this btw.
+> 
+> Strangely, the omap2plus_defconfig in v2.6.37-rc1 no longer gets
+> CONFIG_SWP_EMULATE enabled even without this patch - I can't figure
+> out why.
+I guess that's simply because v2.6.37-rc1 doesn't have ba1b9be5cd.
 
 Best regards
 Uwe
