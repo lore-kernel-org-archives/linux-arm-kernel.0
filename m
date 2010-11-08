@@ -1,39 +1,44 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 8 Nov 2010 17:52:40 -0600
-Subject: [PATCH 2/6] OMAP3: hwmod data: Add mmu for iva2 and isp
-In-Reply-To: <4CD88251.4060400@ti.com>
-References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-	<1289006396-27230-3-git-send-email-omar.ramirez@ti.com>
-	<4CD5A96D.1000806@ti.com>
-	<AANLkTinn4_s-PX08H62AL-tn+8wxXXQjhUNq6d+aDOo+@mail.gmail.com>
-	<4CD88251.4060400@ti.com>
-Message-ID: <AANLkTimexv8gb0HtDKf28w_1GWik6TtZSYZGpWQUVHyk@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 9 Nov 2010 08:54:07 +0900
+Subject: [PATCH 6/6 v4] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <20101108234239.GA20819@alchark-u3s.lan>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+	<20101108041721.GA11605@linux-sh.org>
+	<20101108141407.GA25739@alchark-u3s.lan>
+	<20101108204315.GA12050@linux-sh.org>
+	<AANLkTikXffMT9ZiUpm2QAoW+KPJN3MBf55Dgruj1EJN0@mail.gmail.com>
+	<20101108213008.GB17708@linux-sh.org>
+	<20101108234239.GA20819@alchark-u3s.lan>
+Message-ID: <20101108235407.GB18385@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 8, 2010 at 5:05 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->>>> Add mmu hwmod data for iva2 and isp.
->>>
->>> s/iva2/iva/
->>
->> Where this terminology can be found? I'm basing this naming on what
->> was there or TRM. For omap3 there is no such thing as iva, it is iva2.
->
-> IVA2 means IVA v2, before we had an IVA (v1) then IVA v1.1...
->
-> The goal is to use the same name for the IP with similar functionality
-> across OMAPs version in order to have generic code in the driver.
->
-> IVA, IVA2, IVAHD are all doing similar things, so the only way to identify
-> the same functionality is by using the same name.
-> Thanks to the rev field, you can differentiate the various version during
-> device creation.
-> That will allow you to query the hwmod on every version of OMAPs using the
-> same "iva" name. Otherwise you will have to use the cpu_is_omap_XXX to
-> select iva, iva2 or ivahd depending of the SoC.
->
-> Does that make sense to you?
+On Tue, Nov 09, 2010 at 02:42:39AM +0300, Alexey Charkov wrote:
+> From 95942cc0cd0909d700c236ba63d3488ec9fccf1a Mon Sep 17 00:00:00 2001
+> From: Alexey Charkov <alchark@gmail.com>
+> Date: Tue, 9 Nov 2010 02:25:40 +0300
+> Subject: [PATCH 3/3] ARM: Add support for the display controllers in VT8500 and WM8505
+> 
+> This adds drivers for the LCD controller found in VIA VT8500 SoC,
+> GOVR display controller found in WonderMedia WM8505 SoC and for the
+> Graphics Engine present in both of them that provides hardware
+> accelerated raster operations (used for copyarea and fillrect).
+> 
+> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+> ---
+> 
+> This incorporates fixes to the issues last mentioned by Paul.
+> 
+> I just dropped <asm/irq.h>, as that seems to be not used at all currently
+> (must have been some old cut-and-paste as well). As for the Graphics
+> Engine, I decided not to disable it for now at device exit time, at least
+> until we reach a conclusion on how or whether to implement support for its
+> alpha-mixing capabilities. Unlike with display drivers, this should have no
+> user-visible consequences. This can be changed later, when time comes for
+> device clocks and power management support.
+> 
+Looks good to me!
 
-That makes sense, thanks for the explanation.
-
-Omar
+Reviewed-by: Paul Mundt <lethal@linux-sh.org>
