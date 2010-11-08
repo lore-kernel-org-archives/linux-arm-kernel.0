@@ -1,48 +1,55 @@
-From: awg@embtoolkit.org (Abdoulaye Walsimou GAYE)
-Date: Mon, 08 Nov 2010 22:41:11 +0100
-Subject: [PATCH v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
-In-Reply-To: <1289247983-20747-1-git-send-email-anarsoul@gmail.com>
-References: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
-	<1289247983-20747-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <4CD86E77.9000906@embtoolkit.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 8 Nov 2010 16:43:39 -0500
+Subject: [PATCH v2 6/7] omap: mailbox: fix detection for previously
+	supported chips
+In-Reply-To: <AANLkTin+oBj6CTpWKB9ZBYRVjR_8_tPcY_Y4+T5PecRA@mail.gmail.com>
+References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>	<1289006244-27147-7-git-send-email-omar.ramirez@ti.com>	<4CD59A56.4070003@ti.com>
+	<AANLkTin+oBj6CTpWKB9ZBYRVjR_8_tPcY_Y4+T5PecRA@mail.gmail.com>
+Message-ID: <4CD86F0B.6060402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2010 09:26 PM, Vasily Khoruzhick wrote:
-> Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default structure
-> are initalized via s3c_gpio_{get,set}pull_1up. This results in a linker
-> error when compiling kernel for s3c2442:
+On 11/7/2010 10:15 AM, Ramirez Luna, Omar wrote:
+> On Sat, Nov 6, 2010 at 1:11 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>>> -#if defined(CONFIG_ARCH_OMAP3430)
+>>> +#if defined(CONFIG_ARCH_OMAP3)
+>>
+>> Ideally you should get rid of all the CONFIG_ARCH_OMAPXXX or cpu_is_omap in
+>> that code. This is a driver, it should be generic.
+>> If you have to handle differences between OMAP version, please do that in
+>> the devices, not in the driver.
+>>
+>> This patch just contains a few of them, but the original mailbox.c file is
+>> full of that kind of test.
+>> I know that you are not the original writer of this code, but since the
+>> clean it, it will be good to remove all the legacy code.
 >
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
-> `s3c_gpio_getpull_1up'
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
-> `s3c_gpio_setpull_1up'
+> I mentioned it in the cover-letter, I should have put it here too, my bad.
 >
-> The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
-> The method of controlling them is the same though.
-> So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper functions
-> to take an additional parameter deciding whether the pin has a pullup or pulldown.
-> The s3c_gpio_{get,set}pull_1{down,up} functions then wrap that functions passing
-> either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
+> <quote>
+> This is meant as a short term solution until proper cleanup is done,
+> as suggested in:
 >
-> Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull fields
-> in the s3c2442 cpu init function to the new pulldown helper functions.
->
-> Based on patch from "Lars-Peter Clausen"<lars@metafoo.de>
->
-> Signed-off-by: Vasily Khoruzhick<anarsoul@gmail.com>
-> ---
-> v2: adapt patch for 2.6.37-rc1
-> v3: restore default pull callbacks, add default pull callbacks for s3c2442
->   arch/arm/mach-s3c2440/Kconfig                      |    1 +
->   arch/arm/mach-s3c2440/s3c2442.c                    |    7 +++
->   arch/arm/plat-s3c24xx/gpiolib.c                    |    9 +++-
->   arch/arm/plat-samsung/gpio-config.c                |   44 ++++++++++++++++---
->   .../plat-samsung/include/plat/gpio-cfg-helpers.h   |   11 +++++
->   5 files changed, 63 insertions(+), 9 deletions(-)
->
->    
+> http://marc.info/?l=linux-arm-kernel&m=128534253231481&w=2
+> </quote>
 
-Ackey-by: Abdoulaye Walsimou GAYE <awg@embtoolkit.org>
+OK, sorry I didn't realized that this email thread was about the 
+mailbox. I'm glad to see that both Paul and Nishant are aligned with me.
 
-Thanks
+> Does nobody care that the driver is not working right now for some
+> chips (since it was working before!!) and are willing to wait for more
+> time until the proper cleanup is done?
+
+Sorry again, but removing these tests didn't not seems to be a huge task 
+for my point of view.
+Anyway, if you want to do another phase and if everybody agree on that, 
+that's OK for me as well.
+
+> For me it is a hassle, because if I need to do something on 3630 I
+> have to merge this patch, then apply what I'm working into, then
+> remove the patch, apply everything again to see no dependencies are
+> there, then send.
+
+Yeah, sometime life really sucks :-)
+
+Benoit
