@@ -1,7 +1,7 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon,  8 Nov 2010 20:37:49 +0800
-Subject: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
+Date: Mon,  8 Nov 2010 20:37:50 +0800
+Subject: [PATCH 9/9] ARM: pxa: sanitize IRQ registers access based on offset
+In-Reply-To: <1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
 References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
@@ -9,179 +9,232 @@ References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-5-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1289219870-17807-9-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhou Zhu <zzhu3@marvell.com>
-
-iwmmx instructions are also used in PJ4. Add PJ4 support.
-
-Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/kernel/Makefile     |    3 ++-
- arch/arm/kernel/iwmmxt.S     |   31 +++++++++++++++++++++++++++++--
- arch/arm/kernel/xscale-cp0.c |   21 ++++++++++++++++++++-
- 3 files changed, 51 insertions(+), 4 deletions(-)
+ arch/arm/mach-pxa/include/mach/regs-intc.h |    4 -
+ arch/arm/mach-pxa/irq.c                    |  122 ++++++++++++++++++----------
+ 2 files changed, 80 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5b9b268..7a12cd5 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -50,10 +50,11 @@ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
- obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
- obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
- obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
-+obj-$(CONFIG_CPU_PJ4)		+= xscale-cp0.o
- obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
--AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-+AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt+iwmmxt2
+diff --git a/arch/arm/mach-pxa/include/mach/regs-intc.h b/arch/arm/mach-pxa/include/mach/regs-intc.h
+index 68464ce..662288e 100644
+--- a/arch/arm/mach-pxa/include/mach/regs-intc.h
++++ b/arch/arm/mach-pxa/include/mach/regs-intc.h
+@@ -27,8 +27,4 @@
+ #define ICFP3		__REG(0x40D0013C)  /* Interrupt Controller FIQ Pending Register 3 */
+ #define ICPR3		__REG(0x40D00140)  /* Interrupt Controller Pending Register 3 */
  
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
-diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
-index b63b528..b50d231 100644
---- a/arch/arm/kernel/iwmmxt.S
-+++ b/arch/arm/kernel/iwmmxt.S
-@@ -58,12 +58,19 @@
- 
- ENTRY(iwmmxt_task_enable)
- 
-+#ifdef CONFIG_CPU_PJ4
-+	mrc	p15, 0, r2, c1, c0, 2
-+	tst	r2, #0xf			@ CP0 and CP1 accessible?
-+	movne	pc, lr				@ if so no business here
-+	orr	r2, r2, #0xf			@ enable access to CP0 and CP1
-+	mcr	p15, 0, r2, c1, c0, 2
-+#else
- 	mrc	p15, 0, r2, c15, c1, 0
- 	tst	r2, #0x3			@ CP0 and CP1 accessible?
- 	movne	pc, lr				@ if so no business here
- 	orr	r2, r2, #0x3			@ enable access to CP0 and CP1
- 	mcr	p15, 0, r2, c15, c1, 0
+-#define IPR(x)		__REG(0x40D0001C + (x < 32 ? (x << 2)		\
+-				: (x < 64 ? (0x94 + ((x - 32) << 2))	\
+-				: (0x128 + ((x - 64) << 2)))))
 -
-+#endif
- 	ldr	r3, =concan_owner
- 	add	r0, r10, #TI_IWMMXT_STATE	@ get task Concan save area
- 	ldr	r2, [sp, #60]			@ current task pc value
-@@ -179,17 +186,28 @@ ENTRY(iwmmxt_task_disable)
- 	teqne	r1, r2				@ or specified one?
- 	bne	1f				@ no: quit
+ #endif /* __ASM_MACH_REGS_INTC_H */
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 40b9ee9..b1578f6 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -16,20 +16,31 @@
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/sysdev.h>
++#include <linux/io.h>
++#include <linux/irq.h>
  
-+#ifdef CONFIG_CPU_PJ4
-+	mrc	p15, 0, r4, c1, c0, 2
-+	orr	r4, r4, #0xf			@ enable access to CP0 and CP1
-+	mcr	p15, 0, r4, c1, c0, 2
-+#else
- 	mrc	p15, 0, r4, c15, c1, 0
- 	orr	r4, r4, #0x3			@ enable access to CP0 and CP1
- 	mcr	p15, 0, r4, c15, c1, 0
-+#endif
- 	mov	r0, #0				@ nothing to load
- 	str	r0, [r3]			@ no more current owner
- 	mrc	p15, 0, r2, c2, c0, 0
- 	mov	r2, r2				@ cpwait
- 	bl	concan_save
+ #include <mach/hardware.h>
+-#include <asm/irq.h>
+-#include <asm/mach/irq.h>
++#include <mach/irqs.h>
+ #include <mach/gpio.h>
+-#include <mach/regs-intc.h>
  
-+#ifdef CONFIG_CPU_PJ4
-+	bic	r4, r4, #0xf			@ disable access to CP0 and CP1
-+	mcr	p15, 0, r4, c1, c0, 2
-+#else
- 	bic	r4, r4, #0x3			@ disable access to CP0 and CP1
- 	mcr	p15, 0, r4, c15, c1, 0
-+#endif
- 	mrc	p15, 0, r2, c2, c0, 0
- 	mov	r2, r2				@ cpwait
+ #include "generic.h"
  
-@@ -277,8 +295,13 @@ ENTRY(iwmmxt_task_restore)
-  */
- ENTRY(iwmmxt_task_switch)
+-#define MAX_INTERNAL_IRQS	128
++#define IRQ_BASE		(void __iomem *)io_p2v(0x40d00000)
++
++#define ICIP			(0x000)
++#define ICMR			(0x004)
++#define ICLR			(0x008)
++#define ICFR			(0x00c)
++#define ICPR			(0x010)
++#define ICCR			(0x014)
++#define ICHP			(0x018)
++#define IPR(i)			(((i) < 32) ? (0x01c + ((i) << 2)) :		\
++				((i) < 64) ? (0x0b0 + (((i) - 32) << 2)) :	\
++				      (0x144 + (((i) - 64) << 2)))
++#define IPR_VALID		(1 << 31)
++#define IRQ_BIT(n)		(((n) - PXA_IRQ(0)) & 0x1f)
  
-+#ifdef CONFIG_CPU_PJ4
-+	mrc	p15, 0, r1, c1, c0, 2
-+	tst	r1, #0xf			@ CP0 and CP1 accessible?
-+#else
- 	mrc	p15, 0, r1, c15, c1, 0
- 	tst	r1, #0x3			@ CP0 and CP1 accessible?
-+#endif
- 	bne	1f				@ yes: block them for next task
- 
- 	ldr	r2, =concan_owner
-@@ -287,9 +310,13 @@ ENTRY(iwmmxt_task_switch)
- 	teq	r2, r3				@ next task owns it?
- 	movne	pc, lr				@ no: leave Concan disabled
- 
-+#ifdef CONFIG_CPU_PJ4
-+1:	eor	r1, r1, #0xf			@ flip Concan access
-+	mcr	p15, 0, r1, c1, c0, 2
-+#else
- 1:	eor	r1, r1, #3			@ flip Concan access
- 	mcr	p15, 0, r1, c15, c1, 0
--
-+#endif
- 	mrc	p15, 0, r1, c2, c0, 0
- 	sub	pc, lr, r1, lsr #32		@ cpwait and return
- 
-diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
-index 1796157..9f48ad2 100644
---- a/arch/arm/kernel/xscale-cp0.c
-+++ b/arch/arm/kernel/xscale-cp0.c
-@@ -92,10 +92,15 @@ static u32 __init xscale_cp_access_read(void)
- {
- 	u32 value;
- 
-+#ifdef CONFIG_CPU_PJ4
-+	__asm__ __volatile__ (
-+		"mrc	p15, 0, %0, c1, c0, 2\n\t"
-+		: "=r" (value));
-+#else
- 	__asm__ __volatile__ (
- 		"mrc	p15, 0, %0, c15, c1, 0\n\t"
- 		: "=r" (value));
--
-+#endif
- 	return value;
- }
- 
-@@ -103,12 +108,21 @@ static void __init xscale_cp_access_write(u32 value)
- {
- 	u32 temp;
- 
-+#ifdef CONFIG_CPU_PJ4
-+	__asm__ __volatile__ (
-+		"mcr	p15, 0, %1, c1, c0, 2\n\t"
-+		"mrc	p15, 0, %0, c1, c0, 2\n\t"
-+		"mov	%0, %0\n\t"
-+		"sub	pc, pc, #4\n\t"
-+		: "=r" (temp) : "r" (value));
-+#else
- 	__asm__ __volatile__ (
- 		"mcr	p15, 0, %1, c15, c1, 0\n\t"
- 		"mrc	p15, 0, %0, c15, c1, 0\n\t"
- 		"mov	%0, %0\n\t"
- 		"sub	pc, pc, #4\n\t"
- 		: "=r" (temp) : "r" (value));
-+#endif
- }
+-#define IRQ_BIT(n)	(((n) - PXA_IRQ(0)) & 0x1f)
+-#define _ICMR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICMR2 : &ICMR))
+-#define _ICLR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICLR2 : &ICLR))
++#define MAX_INTERNAL_IRQS	128
  
  /*
-@@ -153,8 +167,13 @@ static int __init xscale_cp0_init(void)
+  * This is for peripheral IRQs internal to the PXA chip.
+@@ -39,12 +50,20 @@ static int pxa_internal_irq_nr;
+ 
+ static void pxa_mask_irq(unsigned int irq)
  {
- 	u32 cp_access;
+-	_ICMR(irq) &= ~(1 << IRQ_BIT(irq));
++	void __iomem *base = get_irq_chip_data(irq);
++	uint32_t icmr = __raw_readl(base + ICMR);
++
++	icmr &= ~(1 << IRQ_BIT(irq));
++	__raw_writel(icmr, base + ICMR);
+ }
  
-+#ifdef CONFIG_CPU_PJ4
-+	cp_access = xscale_cp_access_read() & ~0xf;
-+	xscale_cp_access_write(cp_access | 0xf);
-+#else
- 	cp_access = xscale_cp_access_read() & ~3;
- 	xscale_cp_access_write(cp_access | 1);
-+#endif
+ static void pxa_unmask_irq(unsigned int irq)
+ {
+-	_ICMR(irq) |= 1 << IRQ_BIT(irq);
++	void __iomem *base = get_irq_chip_data(irq);
++	uint32_t icmr = __raw_readl(base + ICMR);
++
++	icmr |= 1 << IRQ_BIT(irq);
++	__raw_writel(icmr, base + ICMR);
+ }
  
- 	if (cpu_has_iwmmxt()) {
- #ifndef CONFIG_IWMMXT
+ static struct irq_chip pxa_internal_irq_chip = {
+@@ -86,12 +105,16 @@ static void pxa_ack_low_gpio(unsigned int irq)
+ 
+ static void pxa_mask_low_gpio(unsigned int irq)
+ {
+-	ICMR &= ~(1 << (irq - PXA_IRQ(0)));
++	struct irq_desc *desc = irq_to_desc(irq);
++
++	desc->chip->mask(irq);
+ }
+ 
+ static void pxa_unmask_low_gpio(unsigned int irq)
+ {
+-	ICMR |= 1 << (irq - PXA_IRQ(0));
++	struct irq_desc *desc = irq_to_desc(irq);
++
++	desc->chip->unmask(irq);
+ }
+ 
+ static struct irq_chip pxa_low_gpio_chip = {
+@@ -120,33 +143,45 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+ 	pxa_low_gpio_chip.set_wake = fn;
+ }
+ 
++static inline void __iomem *irq_base(int i)
++{
++	static unsigned long phys_base[] = {
++		0x40d00000,
++		0x40d0009c,
++		0x40d00130,
++	};
++
++	return (void __iomem *)io_p2v(phys_base[i >> 5]);
++}
++
+ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+ {
+-	int irq, i;
++	int irq, i, n;
+ 
+ 	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
+ 
+ 	pxa_internal_irq_nr = irq_nr;
+ 
+-	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq += 32) {
+-		_ICMR(irq) = 0;	/* disable all IRQs */
+-		_ICLR(irq) = 0;	/* all IRQs are IRQ, not FIQ */
+-	}
+-
+-	/* initialize interrupt priority */
+-	if (!cpu_is_pxa25x()) {
+-		for (i = 0; i < irq_nr; i++)
+-			IPR(i) = i | (1 << 31);
++	for (n = 0; n < irq_nr; n += 32) {
++		void __iomem *base = irq_base(n);
++
++		__raw_writel(0, base + ICMR);	/* disable all IRQs */
++		__raw_writel(0, base + ICLR);	/* all IRQs are IRQ, not FIQ */
++		for (i = n; (i < (n + 32)) && (i < irq_nr); i++) {
++			/* initialize interrupt priority */
++			if (!cpu_is_pxa25x())
++				__raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
++
++			irq = PXA_IRQ(i);
++			set_irq_chip(irq, &pxa_internal_irq_chip);
++			set_irq_chip_data(irq, base);
++			set_irq_handler(irq, handle_level_irq);
++			set_irq_flags(irq, IRQF_VALID);
++		}
+ 	}
+ 
+ 	/* only unmasked interrupts kick us out of idle */
+-	ICCR = 1;
+-
+-	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
+-		set_irq_chip(irq, &pxa_internal_irq_chip);
+-		set_irq_handler(irq, handle_level_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+-	}
++	__raw_writel(1, irq_base(0) + ICCR);
+ 
+ 	pxa_internal_irq_chip.set_wake = fn;
+ 	pxa_init_low_gpio_irq(fn);
+@@ -158,16 +193,18 @@ static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
+ 
+ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+ {
+-	int i, irq = PXA_IRQ(0);
++	int i;
++
++	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
++		void __iomem *base = irq_base(i);
+ 
+-	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
+-		saved_icmr[i] = _ICMR(irq);
+-		_ICMR(irq) = 0;
++		saved_icmr[i] = __raw_readl(base + ICMR);
++		__raw_writel(0, base + ICMR);
+ 	}
+ 
+ 	if (!cpu_is_pxa25x()) {
+ 		for (i = 0; i < pxa_internal_irq_nr; i++)
+-			saved_ipr[i] = IPR(i);
++			saved_ipr[i] = __raw_readl(IRQ_BASE + IPR(i));
+ 	}
+ 
+ 	return 0;
+@@ -175,19 +212,20 @@ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+ 
+ static int pxa_irq_resume(struct sys_device *dev)
+ {
+-	int i, irq = PXA_IRQ(0);
++	int i;
+ 
+-	if (!cpu_is_pxa25x()) {
+-		for (i = 0; i < pxa_internal_irq_nr; i++)
+-			IPR(i) = saved_ipr[i];
+-	}
++	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
++		void __iomem *base = irq_base(i);
+ 
+-	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
+-		_ICMR(irq) = saved_icmr[i];
+-		_ICLR(irq) = 0;
++		__raw_writel(saved_icmr[i], base + ICMR);
++		__raw_writel(0, base + ICLR);
+ 	}
+ 
+-	ICCR = 1;
++	if (!cpu_is_pxa25x())
++		for (i = 0; i < pxa_internal_irq_nr; i++)
++			__raw_writel(saved_ipr[i], IRQ_BASE + IPR(i));
++
++	__raw_writel(1, IRQ_BASE + ICCR);
+ 	return 0;
+ }
+ #else
 -- 
 1.5.6.5
