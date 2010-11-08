@@ -1,39 +1,39 @@
 From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 8 Nov 2010 17:48:42 -0600
-Subject: [PATCH 3/6] OMAP4: hwmod data: add mmu hwmod for ducati and tesla
-In-Reply-To: <4CD885DD.7020909@ti.com>
+Date: Mon, 8 Nov 2010 17:52:40 -0600
+Subject: [PATCH 2/6] OMAP3: hwmod data: Add mmu for iva2 and isp
+In-Reply-To: <4CD88251.4060400@ti.com>
 References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>
-	<1289006396-27230-4-git-send-email-omar.ramirez@ti.com>
-	<4CD5BEFF.40301@ti.com>
-	<AANLkTim=5bgGo1cnkWJCPF4HmMnQrBhP_sPCK3rRKUPS@mail.gmail.com>
-	<4CD885DD.7020909@ti.com>
-Message-ID: <AANLkTi=JhdGqB-mXnvjT_Y4cCOu2i8bwfQyy=FAC1Chh@mail.gmail.com>
+	<1289006396-27230-3-git-send-email-omar.ramirez@ti.com>
+	<4CD5A96D.1000806@ti.com>
+	<AANLkTinn4_s-PX08H62AL-tn+8wxXXQjhUNq6d+aDOo+@mail.gmail.com>
+	<4CD88251.4060400@ti.com>
+Message-ID: <AANLkTimexv8gb0HtDKf28w_1GWik6TtZSYZGpWQUVHyk@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 8, 2010 at 5:21 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> I wrote this one from scratch, I didn't see that there were pieces to
->> handle some stuff since the code is buried in a private tree.
+On Mon, Nov 8, 2010 at 5:05 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>>>> Add mmu hwmod data for iva2 and isp.
+>>>
+>>> s/iva2/iva/
+>>
+>> Where this terminology can be found? I'm basing this naming on what
+>> was there or TRM. For omap3 there is no such thing as iva, it is iva2.
 >
-> Not true at all... It was sent to l-o:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32854.html
+> IVA2 means IVA v2, before we had an IVA (v1) then IVA v1.1...
+>
+> The goal is to use the same name for the IP with similar functionality
+> across OMAPs version in order to have generic code in the driver.
+>
+> IVA, IVA2, IVAHD are all doing similar things, so the only way to identify
+> the same functionality is by using the same name.
+> Thanks to the rev field, you can differentiate the various version during
+> device creation.
+> That will allow you to query the hwmod on every version of OMAPs using the
+> same "iva" name. Otherwise you will have to use the cpu_is_omap_XXX to
+> select iva, iva2 or ivahd depending of the SoC.
+>
+> Does that make sense to you?
 
-I did review v3 of this patch set, care to point the exact place for
-mmu hwmod on this patch set. It seems [v2 5/7] had mailbox, but I
-don't think v3 made it to the list.
-
-> And stored in a supposedly private tree, which appears to be public:
-> http://dev.omapzoom.org/?p=swarch/linux-omap-adv.git;a=summary
-
-I took whatever was in:
-
-http://dev.omapzoom.org/?p=integration/kernel-omap4.git;a=shortlog;h=refs/heads/L24.11
-
-> Please do not do any change on that code base, just use the original code
-> and update it if needed.
-
-Will do, as taken from the tree you mention.
-
-Regards,
+That makes sense, thanks for the explanation.
 
 Omar
