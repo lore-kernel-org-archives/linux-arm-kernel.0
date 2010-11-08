@@ -1,52 +1,108 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 8 Nov 2010 11:33:50 +0800
-Subject: build failure on ARMv7 while CONFIG_AEABI is disabled
-In-Reply-To: <20101105113930.GG13530@tarshish>
-References: <AANLkTimv-bW56P+M9X+Unr4QotCTwhjaw+kOCNP3qbgD@mail.gmail.com>
-	<20101105113930.GG13530@tarshish>
-Message-ID: <AANLkTi=sdLPPi3FZavhcL43caDT6bJrENSCpKYhA5+67@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Mon, 8 Nov 2010 13:17:21 +0900
+Subject: [PATCH 6/6 v2] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <1289147348-31969-6-git-send-email-alchark@gmail.com>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+Message-ID: <20101108041721.GA11605@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 5, 2010 at 7:39 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Haojian,
->
-> On Fri, Nov 05, 2010 at 07:22:09PM +0800, Haojian Zhuang wrote:
->> Hi all,
->>
->> If I disable CONFIG_AEABI, building kernel for ARMv7. There's no issue
->> on ARMv5. Do you have any clue?
->
-> Does the patch in the link below helps?
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-November/030570.html
->
+On Sun, Nov 07, 2010 at 07:28:57PM +0300, Alexey Charkov wrote:
+> +static int __devinit vt8500lcd_probe(struct platform_device *pdev)
+> +{
 
-This patch is helpful. Great thanks!
+...
 
-Best Regards
-Haojian
+> +	addr = fbi;
+> +	addr = addr + sizeof(struct vt8500lcd_info);
+> +	fbi->fb.pseudo_palette	= addr;
+> +
+...
 
->> /tmp/ccaEQuAe.s: Assembler messages:
->> /tmp/ccaEQuAe.s:88: Error: even register required -- `ldrexd r7,r8,[r4]'
->> /tmp/ccaEQuAe.s:104: Error: even register required -- `strexdeq ip,r5,r6,[r4]'
->> /tmp/ccaEQuAe.s:125: Error: even register required -- `ldrexd r1,r2,[r0]'
->> /tmp/ccaEQuAe.s:128: Error: even register required -- `strexd ip,r1,r2,[r0]'
->> /tmp/ccaEQuAe.s:2086: Error: even register required -- `ldrexd r1,r2,[r0]'
->> /tmp/ccaEQuAe.s:2101: Error: even register required -- `ldrexd r3,r4,[r0]'
->> /tmp/ccaEQuAe.s:2102: Error: even register required -- `strexd r3,r5,r6,[r0]'
->> /tmp/ccaEQuAe.s:2135: Error: even register required -- `ldrexd r5,r6,[r2]'
->> /tmp/ccaEQuAe.s:2136: Error: even register required -- `strexd r5,r3,r4,[r2]'
->> /tmp/ccaEQuAe.s:2165: Error: even register required -- `ldrexd r3,r4,[r0]'
->> /tmp/ccaEQuAe.s:2166: Error: even register required -- `strexd r3,r1,r2,[r0]'
->> /tmp/ccaEQuAe.s:3186: Error: even register required -- `ldrexd r3,r4,[r0]'
->> /tmp/ccaEQuAe.s:3187: Error: even register required -- `strexd r3,r1,r2,[r0]'
->> make[2]: *** [arch/arm/kernel/perf_event.o] Error 1
->> make[2]: *** Waiting for unfinished jobs....
->> make[1]: *** [arch/arm/kernel] Error 2
->
-> --
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ~. .~ ? Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
-> ? - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
->
+> +	fbi->palette_size	= PAGE_ALIGN(512);
+> +	fbi->palette_cpu	= dma_alloc_coherent(&pdev->dev,
+> +						     fbi->palette_size,
+> +						     &fbi->palette_phys,
+> +						     GFP_KERNEL);
+> +	if (fbi->fb.pseudo_palette == NULL) {
+> +		dev_err(&pdev->dev, "Failed to allocate palette buffer\n");
+> +		ret = -ENOMEM;
+> +		goto failed_free_io;
+> +	}
+> +
+This looks like a bogus test, you've already allocated enough space for
+the pseudo_palette and will have bailed out on the kmalloc() failing well
+before this. You also don't have any error handling for fbi->palette_cpu,
+which is presumably what you intended to do here.
+
+> +static int __devexit vt8500lcd_remove(struct platform_device *pdev)
+> +{
+> +	struct vt8500lcd_info *fbi = platform_get_drvdata(pdev);
+> +	struct resource *res;
+> +	int irq;
+> +
+> +	if (!fbi)
+> +		return 0;
+> +
+> +	unregister_framebuffer(&fbi->fb);
+> +
+> +	writel(0, fbi->regbase);
+> +
+> +	if (fbi->fb.cmap.len)
+> +		fb_dealloc_cmap(&fbi->fb.cmap);
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	free_irq(irq, fbi);
+> +
+> +	iounmap(fbi->regbase);
+> +
+
+You're also missing a dma_free_coherent() here.
+
+> +static int __devinit wm8505fb_probe(struct platform_device *pdev)
+> +{
+> +	fbi->fb.screen_base	= pdata->video_mem_virt;
+> +	fbi->fb.screen_size	= pdata->video_mem_len;
+> +
+...
+
+> +failed_free_mem:
+> +	free_pages_exact(fbi->fb.screen_base, fbi->fb.screen_size);
+
+...
+
+What in the name of all that is holy are you doing here? If you need to
+have your platform deal with virtual address allocation and freeing then
+you should pass in callbacks for that and hide the instrumentation
+details there. Presently this is tying you down to an alloc_pages_exact()
+interface buried in the board setup, which isn't going to mesh well with
+other platforms that may wish to go about this an alternate way (like
+memblock reservations).
+
+> diff --git a/drivers/video/wmt_ge_rops.c b/drivers/video/wmt_ge_rops.c
+> new file mode 100644
+> index 0000000..c71f97e
+> --- /dev/null
+> +++ b/drivers/video/wmt_ge_rops.c
+> +void __iomem *regbase;
+> +
+Uhm, no. If this is only used in this driver then just make it static.
+Given that you are using the driver model here though and could
+theoretically support multiple rop engines, you're much better off making
+this private data and burying it under the appropriate per-device data
+structures.
+
+> +int wmt_ge_sync(struct fb_info *p)
+> +{
+> +	while (readl(regbase + GE_STATUS_OFF) & 4)
+> +		/* busy wait */;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(wmt_ge_sync);
+> +
+While I admire your optimism in your hardware, experience suggests you
+really want a timeout here. You may also wish to insert a cpu_relax()
+here.
