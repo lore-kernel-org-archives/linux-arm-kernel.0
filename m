@@ -1,166 +1,159 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 9 Nov 2010 01:07:43 +0800
-Subject: [PATCH 2/9] ARM: pxa: redefine irqs.h
-In-Reply-To: <1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
-References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTimN3oweFSJtue_r5ukg8t_HGd+yNUvugJQZaX1L@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 08 Nov 2010 17:13:38 +0000
+Subject: Using non-Global mappings for kernel address space
+In-Reply-To: <AANLkTi=f+s4GAKLSESK=WSjxmUDCCvog21z1XxW73nU3@mail.gmail.com>
+References: <AANLkTi=f+s4GAKLSESK=WSjxmUDCCvog21z1XxW73nU3@mail.gmail.com>
+Message-ID: <1289236418.3541.117.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 8, 2010 at 8:37 PM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> A lot of componets of PXA93x are shared with PXA3xx. From CPUID, they belong
-> to same family. But it's confustion that code of PXA93x is depend on PXA3xx
-> by default.
->
-> Now clean the scope of both PXA3xx and PXA93X. Only PXA300/PXA310/PXA320 is
-> family member of PXA3xx. Only PXA930/PXA935 is family member of PXA93x. Remove
-> the code dependany on IRQ definition.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> ---
-> ?arch/arm/mach-pxa/include/mach/irqs.h | ? 47 ++++++++++-----------------------
-> ?arch/arm/mach-pxa/irq.c ? ? ? ? ? ? ? | ? ?6 ++--
-> ?2 files changed, 17 insertions(+), 36 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-> index d372caa..cb7ee26 100644
-> --- a/arch/arm/mach-pxa/include/mach/irqs.h
-> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
-> @@ -21,16 +21,14 @@
->
-> ?#define PXA_IRQ(x) ? ? (PXA_ISA_IRQ_NUM + (x))
->
-> -#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
-> ?#define IRQ_SSP3 ? ? ? PXA_IRQ(0) ? ? ?/* SSP3 service request */
-> ?#define IRQ_MSL ? ? ? ? ? ? ? ?PXA_IRQ(1) ? ? ?/* MSL Interface interrupt */
-> -#define IRQ_USBH2 ? ? ?PXA_IRQ(2) ? ? ?/* USB Host interrupt 1 (OHCI) */
-> -#define IRQ_USBH1 ? ? ?PXA_IRQ(3) ? ? ?/* USB Host interrupt 2 (non-OHCI) */
-> +#define IRQ_USBH2 ? ? ?PXA_IRQ(2) ? ? ?/* USB Host interrupt 1 (OHCI,PXA27x) */
-> +#define IRQ_USBH1 ? ? ?PXA_IRQ(3) ? ? ?/* USB Host interrupt 2 (non-OHCI,PXA27x) */
-> ?#define IRQ_KEYPAD ? ? PXA_IRQ(4) ? ? ?/* Key pad controller */
-> -#define IRQ_MEMSTK ? ? PXA_IRQ(5) ? ? ?/* Memory Stick interrupt */
-> +#define IRQ_MEMSTK ? ? PXA_IRQ(5) ? ? ?/* Memory Stick interrupt (PXA27x) */
-> +#define IRQ_ACIPC0 ? ? PXA_IRQ(5) ? ? ?/* AP-CP Communication (PXA930) */
-> ?#define IRQ_PWRI2C ? ? PXA_IRQ(6) ? ? ?/* Power I2C interrupt */
-> -#endif
-> -
-> ?#define IRQ_HWUART ? ? PXA_IRQ(7) ? ? ?/* HWUART Transmit/Receive/Error (PXA26x) */
-> ?#define IRQ_OST_4_11 ? PXA_IRQ(7) ? ? ?/* OS timer 4-11 matches (PXA27x) */
-> ?#define ? ? ? ?IRQ_GPIO0 ? ? ? PXA_IRQ(8) ? ? ?/* GPIO0 Edge Detect */
-> @@ -38,7 +36,8 @@
-> ?#define ? ? ? ?IRQ_GPIO_2_x ? ?PXA_IRQ(10) ? ? /* GPIO[2-x] Edge Detect */
-> ?#define ? ? ? ?IRQ_USB ? ? ? ? PXA_IRQ(11) ? ? /* USB Service */
-> ?#define ? ? ? ?IRQ_PMU ? ? ? ? PXA_IRQ(12) ? ? /* Performance Monitoring Unit */
-> -#define ? ? ? ?IRQ_I2S ? ? ? ? PXA_IRQ(13) ? ? /* I2S Interrupt */
-> +#define ? ? ? ?IRQ_I2S ? ? ? ? PXA_IRQ(13) ? ? /* I2S Interrupt (PXA27x) */
-> +#define IRQ_SSP4 ? ? ? PXA_IRQ(13) ? ? /* SSP4 service request (PXA3xx) */
-> ?#define ? ? ? ?IRQ_AC97 ? ? ? ?PXA_IRQ(14) ? ? /* AC97 Interrupt */
-> ?#define IRQ_ASSP ? ? ? PXA_IRQ(15) ? ? /* Audio SSP Service Request (PXA25x) */
-> ?#define IRQ_USIM ? ? ? PXA_IRQ(15) ? ? /* Smart Card interface interrupt (PXA27x) */
-> @@ -47,6 +46,7 @@
-> ?#define ? ? ? ?IRQ_LCD ? ? ? ? PXA_IRQ(17) ? ? /* LCD Controller Service Request */
-> ?#define ? ? ? ?IRQ_I2C ? ? ? ? PXA_IRQ(18) ? ? /* I2C Service Request */
-> ?#define ? ? ? ?IRQ_ICP ? ? ? ? PXA_IRQ(19) ? ? /* ICP Transmit/Receive/Error */
-> +#define IRQ_ACIPC2 ? ? PXA_IRQ(19) ? ? /* AP-CP Communication (PXA930) */
-> ?#define ? ? ? ?IRQ_STUART ? ? ?PXA_IRQ(20) ? ? /* STUART Transmit/Receive/Error */
-> ?#define ? ? ? ?IRQ_BTUART ? ? ?PXA_IRQ(21) ? ? /* BTUART Transmit/Receive/Error */
-> ?#define ? ? ? ?IRQ_FFUART ? ? ?PXA_IRQ(22) ? ? /* FFUART Transmit/Receive/Error*/
-> @@ -60,19 +60,17 @@
-> ?#define ? ? ? ?IRQ_RTC1Hz ? ? ?PXA_IRQ(30) ? ? /* RTC HZ Clock Tick */
-> ?#define ? ? ? ?IRQ_RTCAlrm ? ? PXA_IRQ(31) ? ? /* RTC Alarm */
->
-> -#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
-> ?#define IRQ_TPM ? ? ? ? ? ? ? ?PXA_IRQ(32) ? ? /* TPM interrupt */
-> ?#define IRQ_CAMERA ? ? PXA_IRQ(33) ? ? /* Camera Interface */
-> -#endif
-> -
-> -#ifdef CONFIG_PXA3xx
-> -#define IRQ_SSP4 ? ? ? PXA_IRQ(13) ? ? /* SSP4 service request */
-> ?#define IRQ_CIR ? ? ? ? ? ? ? ?PXA_IRQ(34) ? ? /* Consumer IR */
-> ?#define IRQ_COMM_WDT ? PXA_IRQ(35) ? ? /* Comm WDT interrupt */
-> ?#define IRQ_TSI ? ? ? ? ? ? ? ?PXA_IRQ(36) ? ? /* Touch Screen Interface (PXA320) */
-> +#define IRQ_ENHROT ? ? PXA_IRQ(37) ? ? /* Enhanced Rotary (PXA930) */
-> ?#define IRQ_USIM2 ? ? ?PXA_IRQ(38) ? ? /* USIM2 Controller */
-> -#define IRQ_GCU ? ? ? ? ? ? ? ?PXA_IRQ(39) ? ? /* Graphics Controller */
-> +#define IRQ_GCU ? ? ? ? ? ? ? ?PXA_IRQ(39) ? ? /* Graphics Controller (PXA3xx) */
-> +#define IRQ_ACIPC1 ? ? PXA_IRQ(40) ? ? /* AP-CP Communication (PXA930) */
-> ?#define IRQ_MMC2 ? ? ? PXA_IRQ(41) ? ? /* MMC2 Controller */
-> +#define IRQ_TRKBALL ? ?PXA_IRQ(43) ? ? /* Track Ball (PXA930) */
-> ?#define IRQ_1WIRE ? ? ?PXA_IRQ(44) ? ? /* 1-Wire Controller */
-> ?#define IRQ_NAND ? ? ? PXA_IRQ(45) ? ? /* NAND Controller */
-> ?#define IRQ_USB2 ? ? ? PXA_IRQ(46) ? ? /* USB 2.0 Device Controller */
-> @@ -80,30 +78,13 @@
-> ?#define IRQ_WAKEUP1 ? ?PXA_IRQ(50) ? ? /* EXT_WAKEUP1 */
-> ?#define IRQ_DMEMC ? ? ?PXA_IRQ(51) ? ? /* Dynamic Memory Controller */
-> ?#define IRQ_MMC3 ? ? ? PXA_IRQ(55) ? ? /* MMC3 Controller (PXA310) */
-> -#endif
->
-> -#ifdef CONFIG_CPU_PXA935
-> ?#define IRQ_U2O ? ? ? ? ? ? ? ?PXA_IRQ(64) ? ? /* USB OTG 2.0 Controller (PXA935) */
-> ?#define IRQ_U2H ? ? ? ? ? ? ? ?PXA_IRQ(65) ? ? /* USB Host 2.0 Controller (PXA935) */
-> -
-> -#define IRQ_MMC3_PXA935 ? ? ? ?PXA_IRQ(72) ? ? /* MMC3 Controller (PXA935) */
-> -#define IRQ_MMC4_PXA935 ? ? ? ?PXA_IRQ(73) ? ? /* MMC4 Controller (PXA935) */
-> -#define IRQ_MMC5_PXA935 ? ? ? ?PXA_IRQ(74) ? ? /* MMC5 Controller (PXA935) */
-> -
-> +#define IRQ_PXA935_MMC0 ? ? ? ?PXA_IRQ(72) ? ? /* MMC0 Controller (PXA935) */
-> +#define IRQ_PXA935_MMC1 ? ? ? ?PXA_IRQ(73) ? ? /* MMC1 Controller (PXA935) */
-> +#define IRQ_PXA935_MMC2 ? ? ? ?PXA_IRQ(74) ? ? /* MMC2 Controller (PXA935) */
-> ?#define IRQ_U2P ? ? ? ? ? ? ? ?PXA_IRQ(93) ? ? /* USB PHY D+/D- Lines (PXA935) */
-> -#endif
-> -
-> -#ifdef CONFIG_CPU_PXA930
-> -#define IRQ_ENHROT ? ? PXA_IRQ(37) ? ? /* Enhanced Rotary (PXA930) */
-> -#define IRQ_ACIPC0 ? ? PXA_IRQ(5)
-> -#define IRQ_ACIPC1 ? ? PXA_IRQ(40)
-> -#define IRQ_ACIPC2 ? ? PXA_IRQ(19)
-> -#define IRQ_TRKBALL ? ?PXA_IRQ(43) ? ? /* Track Ball */
-> -#endif
-> -
-> -#ifdef CONFIG_CPU_PXA950
-> -#define IRQ_GC500 ? ? ?PXA_IRQ(70) ? ? /* Graphics Controller (PXA950) */
-> -#endif
->
-> ?#define PXA_GPIO_IRQ_BASE ? ? ?PXA_IRQ(96)
-> ?#define PXA_GPIO_IRQ_NUM ? ? ? (192)
-> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-> index 1beb40f..05df84d 100644
-> --- a/arch/arm/mach-pxa/irq.c
-> +++ b/arch/arm/mach-pxa/irq.c
-> @@ -134,7 +134,7 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
-> ? ? ? ?}
->
-> ? ? ? ?/* initialize interrupt priority */
-> - ? ? ? if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-> + ? ? ? if (cpu_is_pxa27x() || cpu_is_pxa3xx() || cpu_is_pxa93x()) {
-> ? ? ? ? ? ? ? ?for (i = 0; i < irq_nr; i++)
-> ? ? ? ? ? ? ? ? ? ? ? ?IPR(i) = i | (1 << 31);
-> ? ? ? ?}
-> @@ -165,7 +165,7 @@ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
-> ? ? ? ? ? ? ? ?_ICMR(irq) = 0;
-> ? ? ? ?}
->
-> - ? ? ? if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-> + ? ? ? if (cpu_is_pxa27x() || cpu_is_pxa3xx() || cpu_is_pxa93x()) {
-> ? ? ? ? ? ? ? ?for (i = 0; i < pxa_internal_irq_nr; i++)
-> ? ? ? ? ? ? ? ? ? ? ? ?saved_ipr[i] = IPR(i);
-> ? ? ? ?}
-> @@ -177,7 +177,7 @@ static int pxa_irq_resume(struct sys_device *dev)
-> ?{
-> ? ? ? ?int i, irq = PXA_IRQ(0);
->
-> - ? ? ? if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-> + ? ? ? if (cpu_is_pxa27x() || cpu_is_pxa3xx() || cpu_is_pxa93x()) {
+Hi,
 
-Let's introduce cpu_has_ipr() for this, instead of adding cpu_is_*() everywhere.
+On Mon, 2010-11-01 at 14:23 +0000, Christoffer Dall wrote:
+> For the purpose of performance evaluation of our KVM for ARM port, I
+> am interested in avoiding having to flush the TLB every time I switch
+> from the guest kernel to the host kernel and vice-versa. 
 
-> ? ? ? ? ? ? ? ?for (i = 0; i < pxa_internal_irq_nr; i++)
-> ? ? ? ? ? ? ? ? ? ? ? ?IPR(i) = saved_ipr[i];
-> ? ? ? ?}
-> --
-> 1.5.6.5
->
->
+I'm not familiar with the KVM implementation for ARMv6(so it has been on
+my list to look at for some time). Does the guest OS use a full 4GB
+virtual address space? Does it only run in user mode or both
+user/kernel?
+
+Do you target SMP? That may get even trickier with the ASIDs because of
+the roll-over event being broadcast via IPI.
+
+> The only way
+> to accomplish this on ARMv6 would be to have non-Global mappings of
+> the host kernel address space using a separate ASID from that of the
+> guest kernel.
+> 
+> My general approach is outlined as follows:
+>  - Mark all pages and sections (except interrupt vector page) with
+> addr > TASK_SIZE as non-global
+>  - Set a special kernel reserved ASID at the same time of
+> paging_init()
+
+Why do you need a different ASID for the kernel? Can you not use the
+same ASID for both user and kernel (while in the same context) and avoid
+switching the ASID when entering/exiting the kernel? This way you could
+even move the switch_mm() function to the vectors page (global), though
+it may not be a problem.
+
+As I said, this may not apply as I'm not familiar with the ARM KVM
+implementation.
+
+>  - Defer setting the CP15 context id register until return from kernel
+> to userspace in ret_fast_syscall and ret_slow_syscall (ret_to_user)
+>  - Set the kernel reserved ASID as part of the vector_stub (and add a
+> little vector_stub code for the SWI handler for this purpose)
+>  - Modify the tlbflush.h functions so they  invalidate the requested
+> parts of the TLB matching the changes above. (Actually for testing
+> purposes, make all functions invalidate the entire TLB).
+
+There is local_flush_tlb_mm() that uses the ASID as well.
+
+> The problem is that with the above changes, the kernel seems to boot
+> just fine, but when it starts running user space processes, the system
+> eventually crashes with the messages:
+
+I think there is fundamental problem with your approach. Basically the
+kernel always runs with ASID 0 no matter which thread is the active one.
+If it gets a TLB entry for a user page (either because of explicit
+get_user etc. or just speculative access), the TLB will have ASID 0
+associated with a user space address. When you switch tasks, even if
+user space has a new ASID, the kernel would still use ASID 0 when
+accessing the new user space address. If it hits a previously loaded
+TLB, that would have the wrong translation.
+
+So the kernel must use the same ASID as the user space application, or
+at least have a different one for each application rather than the
+common 0 value.
+
+In Linux we use ASID 0 but only for brief periods of time when switching
+the context or at roll-over but there is no active user space access
+with ASID 0.
+
+Some more comments on the patch below:
+ 
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -998,6 +998,12 @@ vector_\name:
+>         mrs     lr, spsr
+>         str     lr, [sp, #8]            @ save spsr
+>  
+> +       @ 
+> +       @ Set kernel reserved ASID
+> +       @
+> +       mov     r0, #0
+> +       mcr     p15, 0, r0, c13, c0, 1
+
+You probably need an ISB after this (at least on ARMv7, not sure whether
+it would work without on ARMv6).
+
+> @@ -1147,6 +1153,12 @@ vector_addrexcptn:
+>   * for CPUs with separate I & D caches.
+>   */
+>         .align  5
+> +__pre_branch_swi_vector:
+> +       sub     sp, sp, #S_FRAME_SIZE
+> +       stmia   sp, {r0 - r12}                  @ Calling r0 - r12
+> +       mov     r8, #0
+> +       mcr     p15, 0, r8, c13, c0, 1
+> +       ldr     pc, __branch_swi_vector
+
+ISB after the ASID setting?
+
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 159d041..2a5472b 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -14,6 +14,12 @@
+>  
+>  #include "entry-header.S"
+>  
+> +.macro set_context_id reg
+> +       ldr     \reg, [tsk, #TSK_ACTIVE_MM]
+> +       cmp     \reg, #0
+> +       ldrne   \reg, [\reg, #MM_CONTEXT_ID]
+> +       mcrne   p15, 0, \reg, c13, c0, 1
+> +.endm
+
+ISB.
+
+> --- a/arch/arm/mm/context.c
+> +++ b/arch/arm/mm/context.c
+> @@ -31,7 +31,6 @@ void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+>  static void flush_context(void)
+>  {
+>         /* set the reserved ASID before flushing the TLB */
+> -       asm("mcr        p15, 0, %0, c13, c0, 1\n" : : "r" (0));
+>         isb();
+>         local_flush_tlb_all();
+>         if (icache_is_vivt_asid_tagged()) {
+> @@ -122,10 +121,6 @@ unsigned int __new_asid(void)
+>          */
+>         if (unlikely((asid & ~ASID_MASK) == 0)) {
+>                 asid = ++cpu_last_asid;
+> -               /* set the reserved ASID before flushing the TLB */
+> -               asm("mcr        p15, 0, %0, c13, c0, 1  @ set reserved context ID\n"
+> -                   :
+> -                   : "r" (0));
+>                 isb();
+>                 flush_tlb_all();
+>                 if (icache_is_vivt_asid_tagged()) {
+
+How do you handle the ASID roll-over since you removed this?
+
+> +void __init kernel_asid_init(void)
+> +{
+> +       /* Set the kernel reserved ASID (= 0) */
+> +       asm("mcr        p15, 0, %0, c13, c0, 1  @ set reserved context ID\n"
+> +           :
+> +           : "r" (0));
+
+isb();
+
+BTW, Cortex-A15 has full hardware virtualisation available, so this way
+you could avoid many of the above problems.
+
+Catalin
