@@ -1,42 +1,48 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 08 Nov 2010 10:31:18 +0000
-Subject: linux-next: omap2plus_defconfig not building
-In-Reply-To: <20101108102525.GB14138@n2100.arm.linux.org.uk>
-References: <4CBD707F.6050204@ti.com>
-	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
-	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
-	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
-	<20101108101452.GA14138@n2100.arm.linux.org.uk>
-	<1289211651.3541.0.camel@e102109-lin.cambridge.arm.com>
-	<20101108102525.GB14138@n2100.arm.linux.org.uk>
-Message-ID: <1289212278.3541.2.camel@e102109-lin.cambridge.arm.com>
+Date: Mon, 8 Nov 2010 10:42:57 +0000
+Subject: [PATCH 6/6] ARM: ftrace: enable function graph tracer
+In-Reply-To: <20101108091858.GP16938@pengutronix.de>
+References: <1289067954-5080-1-git-send-email-rabin@rab.in>
+	<1289067954-5080-6-git-send-email-rabin@rab.in>
+	<AANLkTin8UO9ixVep0jKK8H5roWEVRDJW4khUpT2TpPs+@mail.gmail.com>
+	<20101108091858.GP16938@pengutronix.de>
+Message-ID: <AANLkTinmSn1fqKv8sCCP8d0-_0HsLrhtorXvHCovOYve@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-11-08 at 10:25 +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 08, 2010 at 10:20:51AM +0000, Catalin Marinas wrote:
-> > On Mon, 2010-11-08 at 10:14 +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Nov 08, 2010 at 09:48:13AM +0000, Catalin Marinas wrote:
-> > > > Russell had a better idea for handling this, not sure whether it went
-> > > > into -next. It was basically adding -march=armv7-a to
-> > > > CFLAGS_swp_emulate.o in arch/arm/kernel/Makefile since we can't trigger
-> > > > an undef fault for SWP on ARMv6 anyway.
-> > >
-> > > It's probably not a good idea to override the compiler architecture,
-> > > but just allow the assembler to accept the instruction.  -Wa,-march=armv7-a
-> > > should be good enough.
-> >
-> > Yes, even better via AFLAGS.
-> 
-> Not by AFLAGS unless you want to rewrite swp_emulate entirely in assembler!
-> AFLAGS is used for .S -> .o.  CFLAGS is used for .c -> .o.
+2010/11/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Sat, Nov 06, 2010 at 07:06:28PM +0000, Catalin Marinas wrote:
+>> On Saturday, November 6, 2010, Rabin Vincent <rabin@rab.in> wrote:
+>> > Add the options to enable the function graph tracer on ARM. ?Function
+>> > graph tracer support requires frame pointers, so exclude Thumb-2 and
+>> > also explicitly select FRAME_POINTER in FUNCTION_GRAPH_TRACER since
+>> > FUNCTION_TRACER doesn't select FRAME_POINTER when ARM_UNWIND is used
+>> > Therefore, with GCC 4.4.0+, you get plain function tracing without frame
+>> > pointers, but you'll need them if you want function graph tracing.
+>> .....
+>> > --- a/kernel/trace/Kconfig
+>> > +++ b/kernel/trace/Kconfig
+>> > @@ -141,6 +141,7 @@ config FUNCTION_TRACER
+>> >
+>> > ?config FUNCTION_GRAPH_TRACER
+>> > ?? ? ? ?bool "Kernel Function Graph Tracer"
+>> > + ? ? ? select FRAME_POINTER if ARM_UNWIND
+>>
+>> Would it be better to modify FRAME_POINTER definition in the ARM
+>> Kconfig so that it is enabled automatically when FUNCTION_GRAPH_TRACER
+>> is enabled?
+> I don't like that suggestion much because it hides the dependency.
+> Moreover a "default y if FUNCTION_GRAPH_TRACER" doesn't work if a
+> precondition for FRAME_POINTER isn't true. ?Rabin's approach at least
+> generates a warning.
 
-No, what I meant was via -Wa,
+If a precondition for FRAME_POINTER isn't true, we should not force it
+via 'select'. We try to get rid of such warnings in the kernel.
 
-> > Do you have a patch already or I should push one?
-> 
-> I've already fixed it.
+However, on ARM the FRAME_POINTER depends on !THUMB2_KERNEL but for
+Thumb-2 kernels HAVE_FUNCTION_GRAPH_TRACER is also disabled, so there
+isn't a dependency issue here. It's more like a personal preference to
+keep the changes within the arch/arm tree.
 
-Anyway, good that you've fixed it. Thanks.
-
+-- 
 Catalin
