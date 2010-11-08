@@ -1,69 +1,187 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon,  8 Nov 2010 20:37:48 +0800
-Subject: [PATCH 7/9] ARM: mmp: select CPU_PJ4
-In-Reply-To: <1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
+Date: Mon,  8 Nov 2010 20:37:49 +0800
+Subject: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
 References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-4-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-5-git-send-email-haojian.zhuang@marvell.com>
 	<1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since CPU_PJ4 is shared between PXA95x and MMP2, select CPU_PJ4 in MMP2
-configuration.
+From: Zhou Zhu <zzhu3@marvell.com>
 
+iwmmx instructions are also used in PJ4. Add PJ4 support.
+
+Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-mmp/Kconfig |    5 +++--
- arch/arm/mm/Kconfig       |    2 +-
- 2 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/kernel/Makefile     |    3 ++-
+ arch/arm/kernel/iwmmxt.S     |   31 +++++++++++++++++++++++++++++--
+ arch/arm/kernel/xscale-cp0.c |   21 ++++++++++++++++++++-
+ 3 files changed, 51 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index 0711d3b..8b7a053 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -39,6 +39,7 @@ config MACH_TTC_DKB
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 5b9b268..7a12cd5 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -50,10 +50,11 @@ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+ obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
++obj-$(CONFIG_CPU_PJ4)		+= xscale-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+-AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
++AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt+iwmmxt2
  
- config MACH_FLINT
- 	bool "Marvell's Flint Development Platform"
-+	depends on !(CPU_MOHAWK)
- 	select CPU_MMP2
- 	help
- 	  Say 'Y' here if you want to support the Marvell MMP2-based
-@@ -49,6 +50,7 @@ config MACH_FLINT
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index b63b528..b50d231 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -58,12 +58,19 @@
  
- config MACH_MARVELL_JASPER
- 	bool "Marvell's Jasper Development Platform"
-+	depends on !(CPU_MOHAWK)
- 	select CPU_MMP2
- 	help
- 	  Say 'Y' here if you want to support the Marvell MMP2-base
-@@ -80,8 +82,7 @@ config CPU_PXA910
+ ENTRY(iwmmxt_task_enable)
  
- config CPU_MMP2
- 	bool
--	select CPU_V6
--	select CPU_32v6K
-+	select CPU_PJ4
- 	help
- 	  Select code specific to MMP2. MMP2 is ARMv6 compatible.
- endif
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 674aba5..873f042 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -788,7 +788,7 @@ config CACHE_L2X0
++#ifdef CONFIG_CPU_PJ4
++	mrc	p15, 0, r2, c1, c0, 2
++	tst	r2, #0xf			@ CP0 and CP1 accessible?
++	movne	pc, lr				@ if so no business here
++	orr	r2, r2, #0xf			@ enable access to CP0 and CP1
++	mcr	p15, 0, r2, c1, c0, 2
++#else
+ 	mrc	p15, 0, r2, c15, c1, 0
+ 	tst	r2, #0x3			@ CP0 and CP1 accessible?
+ 	movne	pc, lr				@ if so no business here
+ 	orr	r2, r2, #0x3			@ enable access to CP0 and CP1
+ 	mcr	p15, 0, r2, c15, c1, 0
+-
++#endif
+ 	ldr	r3, =concan_owner
+ 	add	r0, r10, #TI_IWMMXT_STATE	@ get task Concan save area
+ 	ldr	r2, [sp, #60]			@ current task pc value
+@@ -179,17 +186,28 @@ ENTRY(iwmmxt_task_disable)
+ 	teqne	r1, r2				@ or specified one?
+ 	bne	1f				@ no: quit
  
- config CACHE_TAUROS2
- 	bool "Enable the Tauros2 L2 cache controller"
--	depends on (ARCH_DOVE || ARCH_MMP || CPU_PJ4)
-+	depends on (ARCH_DOVE || CPU_PJ4)
- 	default y
- 	select OUTER_CACHE
- 	help
++#ifdef CONFIG_CPU_PJ4
++	mrc	p15, 0, r4, c1, c0, 2
++	orr	r4, r4, #0xf			@ enable access to CP0 and CP1
++	mcr	p15, 0, r4, c1, c0, 2
++#else
+ 	mrc	p15, 0, r4, c15, c1, 0
+ 	orr	r4, r4, #0x3			@ enable access to CP0 and CP1
+ 	mcr	p15, 0, r4, c15, c1, 0
++#endif
+ 	mov	r0, #0				@ nothing to load
+ 	str	r0, [r3]			@ no more current owner
+ 	mrc	p15, 0, r2, c2, c0, 0
+ 	mov	r2, r2				@ cpwait
+ 	bl	concan_save
+ 
++#ifdef CONFIG_CPU_PJ4
++	bic	r4, r4, #0xf			@ disable access to CP0 and CP1
++	mcr	p15, 0, r4, c1, c0, 2
++#else
+ 	bic	r4, r4, #0x3			@ disable access to CP0 and CP1
+ 	mcr	p15, 0, r4, c15, c1, 0
++#endif
+ 	mrc	p15, 0, r2, c2, c0, 0
+ 	mov	r2, r2				@ cpwait
+ 
+@@ -277,8 +295,13 @@ ENTRY(iwmmxt_task_restore)
+  */
+ ENTRY(iwmmxt_task_switch)
+ 
++#ifdef CONFIG_CPU_PJ4
++	mrc	p15, 0, r1, c1, c0, 2
++	tst	r1, #0xf			@ CP0 and CP1 accessible?
++#else
+ 	mrc	p15, 0, r1, c15, c1, 0
+ 	tst	r1, #0x3			@ CP0 and CP1 accessible?
++#endif
+ 	bne	1f				@ yes: block them for next task
+ 
+ 	ldr	r2, =concan_owner
+@@ -287,9 +310,13 @@ ENTRY(iwmmxt_task_switch)
+ 	teq	r2, r3				@ next task owns it?
+ 	movne	pc, lr				@ no: leave Concan disabled
+ 
++#ifdef CONFIG_CPU_PJ4
++1:	eor	r1, r1, #0xf			@ flip Concan access
++	mcr	p15, 0, r1, c1, c0, 2
++#else
+ 1:	eor	r1, r1, #3			@ flip Concan access
+ 	mcr	p15, 0, r1, c15, c1, 0
+-
++#endif
+ 	mrc	p15, 0, r1, c2, c0, 0
+ 	sub	pc, lr, r1, lsr #32		@ cpwait and return
+ 
+diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
+index 1796157..9f48ad2 100644
+--- a/arch/arm/kernel/xscale-cp0.c
++++ b/arch/arm/kernel/xscale-cp0.c
+@@ -92,10 +92,15 @@ static u32 __init xscale_cp_access_read(void)
+ {
+ 	u32 value;
+ 
++#ifdef CONFIG_CPU_PJ4
++	__asm__ __volatile__ (
++		"mrc	p15, 0, %0, c1, c0, 2\n\t"
++		: "=r" (value));
++#else
+ 	__asm__ __volatile__ (
+ 		"mrc	p15, 0, %0, c15, c1, 0\n\t"
+ 		: "=r" (value));
+-
++#endif
+ 	return value;
+ }
+ 
+@@ -103,12 +108,21 @@ static void __init xscale_cp_access_write(u32 value)
+ {
+ 	u32 temp;
+ 
++#ifdef CONFIG_CPU_PJ4
++	__asm__ __volatile__ (
++		"mcr	p15, 0, %1, c1, c0, 2\n\t"
++		"mrc	p15, 0, %0, c1, c0, 2\n\t"
++		"mov	%0, %0\n\t"
++		"sub	pc, pc, #4\n\t"
++		: "=r" (temp) : "r" (value));
++#else
+ 	__asm__ __volatile__ (
+ 		"mcr	p15, 0, %1, c15, c1, 0\n\t"
+ 		"mrc	p15, 0, %0, c15, c1, 0\n\t"
+ 		"mov	%0, %0\n\t"
+ 		"sub	pc, pc, #4\n\t"
+ 		: "=r" (temp) : "r" (value));
++#endif
+ }
+ 
+ /*
+@@ -153,8 +167,13 @@ static int __init xscale_cp0_init(void)
+ {
+ 	u32 cp_access;
+ 
++#ifdef CONFIG_CPU_PJ4
++	cp_access = xscale_cp_access_read() & ~0xf;
++	xscale_cp_access_write(cp_access | 0xf);
++#else
+ 	cp_access = xscale_cp_access_read() & ~3;
+ 	xscale_cp_access_write(cp_access | 1);
++#endif
+ 
+ 	if (cpu_has_iwmmxt()) {
+ #ifndef CONFIG_IWMMXT
 -- 
 1.5.6.5
