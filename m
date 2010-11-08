@@ -1,139 +1,160 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Mon, 8 Nov 2010 12:56:42 +0000
-Subject: [PATCH 6/6 v2] ARM: Add support for the display controllers in
-	VT8500 and WM8505
-In-Reply-To: <20101108041721.GA11605@linux-sh.org>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<1289147348-31969-6-git-send-email-alchark@gmail.com>
-	<20101108041721.GA11605@linux-sh.org>
-Message-ID: <AANLkTimkrK9T7G3=K_Ob1SuK64DrGJD3WNoangPp_ryW@mail.gmail.com>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Mon, 8 Nov 2010 05:05:59 -0800
+Subject: [PATCH 1/2] ARM: mmp2: add mmc resource
+In-Reply-To: <AANLkTimh8=ahG4itkAScyUwVfe0Q0uHS7ssiTVbD9mrq@mail.gmail.com>
+References: <AANLkTimh8=ahG4itkAScyUwVfe0Q0uHS7ssiTVbD9mrq@mail.gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C0598642CE7@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/8 Paul Mundt <lethal@linux-sh.org>:
-> On Sun, Nov 07, 2010 at 07:28:57PM +0300, Alexey Charkov wrote:
->> +static int __devinit vt8500lcd_probe(struct platform_device *pdev)
->> +{
->
-> ...
->
->> + ? ? addr = fbi;
->> + ? ? addr = addr + sizeof(struct vt8500lcd_info);
->> + ? ? fbi->fb.pseudo_palette ?= addr;
->> +
-> ...
->
->> + ? ? fbi->palette_size ? ? ? = PAGE_ALIGN(512);
->> + ? ? fbi->palette_cpu ? ? ? ?= dma_alloc_coherent(&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?fbi->palette_size,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&fbi->palette_phys,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
->> + ? ? if (fbi->fb.pseudo_palette == NULL) {
->> + ? ? ? ? ? ? dev_err(&pdev->dev, "Failed to allocate palette buffer\n");
->> + ? ? ? ? ? ? ret = -ENOMEM;
->> + ? ? ? ? ? ? goto failed_free_io;
->> + ? ? }
->> +
-> This looks like a bogus test, you've already allocated enough space for
-> the pseudo_palette and will have bailed out on the kmalloc() failing well
-> before this. You also don't have any error handling for fbi->palette_cpu,
-> which is presumably what you intended to do here.
->
+Acked by Haojian Zhuang
 
-True, this has to be corrected (old copy-paste error left unnoticed
-somehow). It's also deallocated wrongly in the error path, which I
-have just noticed.
-
->> +static int __devexit vt8500lcd_remove(struct platform_device *pdev)
->> +{
->> + ? ? struct vt8500lcd_info *fbi = platform_get_drvdata(pdev);
->> + ? ? struct resource *res;
->> + ? ? int irq;
->> +
->> + ? ? if (!fbi)
->> + ? ? ? ? ? ? return 0;
->> +
->> + ? ? unregister_framebuffer(&fbi->fb);
->> +
->> + ? ? writel(0, fbi->regbase);
->> +
->> + ? ? if (fbi->fb.cmap.len)
->> + ? ? ? ? ? ? fb_dealloc_cmap(&fbi->fb.cmap);
->> +
->> + ? ? irq = platform_get_irq(pdev, 0);
->> + ? ? free_irq(irq, fbi);
->> +
->> + ? ? iounmap(fbi->regbase);
->> +
+>-----Original Message-----
+>From: zhangfei gao [mailto:zhangfei.gao at gmail.com]
+>Sent: 2010?11?3? 5:06 PM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Eric Miao; Haojian Zhuang; Chris Ball
+>Subject: [PATCH 1/2] ARM: mmp2: add mmc resource
 >
-> You're also missing a dma_free_coherent() here.
+>From ee7c1135164abd1f7652462f17972cad3d96c795 Mon Sep 17 00:00:00 2001
+>From: Zhangfei Gao <zhangfei.gao@marvell.com>
+>Date: Wed, 29 Sep 2010 16:18:51 -0400
+>Subject: [PATCH 1/2] ARM: mmp2: add mmc resource
 >
-
-True, will be fixed.
-
->> +static int __devinit wm8505fb_probe(struct platform_device *pdev)
->> +{
->> + ? ? fbi->fb.screen_base ? ? = pdata->video_mem_virt;
->> + ? ? fbi->fb.screen_size ? ? = pdata->video_mem_len;
->> +
-> ...
+>Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+>---
+> arch/arm/mach-mmp/include/mach/mmp2.h      |   22 +++++++++++++++++
+> arch/arm/mach-mmp/include/mach/regs-apmu.h |    2 +
+> arch/arm/mach-mmp/mmp2.c                   |   35 ++++++++++++++++++++++++++++
+> 3 files changed, 59 insertions(+), 0 deletions(-)
 >
->> +failed_free_mem:
->> + ? ? free_pages_exact(fbi->fb.screen_base, fbi->fb.screen_size);
+>diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h
+>b/arch/arm/mach-mmp/include/mach/mmp2.h
+>index dbba6e8..3c09cfb 100644
+>--- a/arch/arm/mach-mmp/include/mach/mmp2.h
+>+++ b/arch/arm/mach-mmp/include/mach/mmp2.h
+>@@ -1,6 +1,8 @@
+> #ifndef __ASM_MACH_MMP2_H
+> #define __ASM_MACH_MMP2_H
 >
-> ...
+>+#include <plat/sdhci.h>
+>+
+> struct sys_timer;
 >
-> What in the name of all that is holy are you doing here? If you need to
-> have your platform deal with virtual address allocation and freeing then
-> you should pass in callbacks for that and hide the instrumentation
-> details there. Presently this is tying you down to an alloc_pages_exact()
-> interface buried in the board setup, which isn't going to mesh well with
-> other platforms that may wish to go about this an alternate way (like
-> memblock reservations).
+> extern struct sys_timer mmp2_timer;
+>@@ -22,6 +24,10 @@ extern struct pxa_device_desc mmp2_device_twsi3;
+> extern struct pxa_device_desc mmp2_device_twsi4;
+> extern struct pxa_device_desc mmp2_device_twsi5;
+> extern struct pxa_device_desc mmp2_device_twsi6;
+>+extern struct pxa_device_desc mmp2_device_sdh0;
+>+extern struct pxa_device_desc mmp2_device_sdh1;
+>+extern struct pxa_device_desc mmp2_device_sdh2;
+>+extern struct pxa_device_desc mmp2_device_sdh3;
 >
-
-Actually, this is a leftover from a previous implementation with
-alloc_pages_exact(), which could not work for larger screen sizes (due
-to the framebuffer growing over 4MB). Now memory is reserved via
-memblock, so this should have probably been just dropped.
-
->> diff --git a/drivers/video/wmt_ge_rops.c b/drivers/video/wmt_ge_rops.c
->> new file mode 100644
->> index 0000000..c71f97e
->> --- /dev/null
->> +++ b/drivers/video/wmt_ge_rops.c
->> +void __iomem *regbase;
->> +
-> Uhm, no. If this is only used in this driver then just make it static.
-> Given that you are using the driver model here though and could
-> theoretically support multiple rop engines, you're much better off making
-> this private data and burying it under the appropriate per-device data
-> structures.
+> static inline int mmp2_add_uart(int id)
+> {
+>@@ -63,5 +69,21 @@ static inline int mmp2_add_twsi(int id, struct
+>i2c_pxa_platform_data *data,
+> 	return pxa_register_device(d, data, sizeof(*data));
+> }
 >
-
-Is that platform_{set,get}_drvdata() what you are talking about? Using
-multiple engines seems extremely unlikely, though :)
-
->> +int wmt_ge_sync(struct fb_info *p)
->> +{
->> + ? ? while (readl(regbase + GE_STATUS_OFF) & 4)
->> + ? ? ? ? ? ? /* busy wait */;
->> +
->> + ? ? return 0;
->> +}
->> +EXPORT_SYMBOL(wmt_ge_sync);
->> +
-> While I admire your optimism in your hardware, experience suggests you
-> really want a timeout here. You may also wish to insert a cpu_relax()
-> here.
+>+static inline int mmp2_add_sdh(int id, struct sdhci_pxa_platdata *data)
+>+{
+>+	struct pxa_device_desc *d = NULL;
+>+
+>+	switch (id) {
+>+	case 0: d = &mmp2_device_sdh0; break;
+>+	case 1: d = &mmp2_device_sdh1; break;
+>+	case 2: d = &mmp2_device_sdh2; break;
+>+	case 3: d = &mmp2_device_sdh3; break;
+>+	default:
+>+		return -EINVAL;
+>+	}
+>+
+>+	return pxa_register_device(d, data, sizeof(*data));
+>+}
+>+
+> #endif /* __ASM_MACH_MMP2_H */
 >
-
-I wonder if this callback is allowed to sleep? In principle, the
-hardware seems to support interrupt generation on operation
-completion, so maybe wait_event_interruptible_timeout() could be used
-here to remove the busy wait altogether?
-
-Thank you for the comments, Paul!
-
-Best regards,
-Alexey
+>diff --git a/arch/arm/mach-mmp/include/mach/regs-apmu.h
+>b/arch/arm/mach-mmp/include/mach/regs-apmu.h
+>index ac47023..f7011ef 100644
+>--- a/arch/arm/mach-mmp/include/mach/regs-apmu.h
+>+++ b/arch/arm/mach-mmp/include/mach/regs-apmu.h
+>@@ -27,6 +27,8 @@
+> #define APMU_DMA	APMU_REG(0x064)
+> #define APMU_GEU	APMU_REG(0x068)
+> #define APMU_BUS	APMU_REG(0x06c)
+>+#define APMU_SDH2	APMU_REG(0x0e8)
+>+#define APMU_SDH3	APMU_REG(0x0ec)
+>
+> #define APMU_FNCLK_EN	(1 << 4)
+> #define APMU_AXICLK_EN	(1 << 3)
+>diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+>index daf3993..9ed3cd2 100644
+>--- a/arch/arm/mach-mmp/mmp2.c
+>+++ b/arch/arm/mach-mmp/mmp2.c
+>@@ -115,6 +115,29 @@ void __init mmp2_init_irq(void)
+> 	mmp2_init_gpio();
+> }
+>
+>+static void sdhc_clk_enable(struct clk *clk)
+>+{
+>+	uint32_t clk_rst;
+>+
+>+	clk_rst  =  __raw_readl(clk->clk_rst);
+>+	clk_rst |= clk->enable_val;
+>+	__raw_writel(clk_rst, clk->clk_rst);
+>+}
+>+
+>+static void sdhc_clk_disable(struct clk *clk)
+>+{
+>+	uint32_t clk_rst;
+>+
+>+	clk_rst  =  __raw_readl(clk->clk_rst);
+>+	clk_rst &= ~clk->enable_val;
+>+	__raw_writel(clk_rst, clk->clk_rst);
+>+}
+>+
+>+struct clkops sdhc_clk_ops = {
+>+	.enable		= sdhc_clk_enable,
+>+	.disable	= sdhc_clk_disable,
+>+};
+>+
+> /* APB peripheral clocks */
+> static APBC_CLK(uart1, MMP2_UART1, 1, 26000000);
+> static APBC_CLK(uart2, MMP2_UART2, 1, 26000000);
+>@@ -129,6 +152,10 @@ static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
+> static APBC_CLK(rtc, MMP2_RTC, 0, 32768);
+>
+> static APMU_CLK(nand, NAND, 0xbf, 100000000);
+>+static APMU_CLK_OPS(sdh0, SDH0, 0x1b, 200000000, &sdhc_clk_ops);
+>+static APMU_CLK_OPS(sdh1, SDH1, 0x1b, 200000000, &sdhc_clk_ops);
+>+static APMU_CLK_OPS(sdh2, SDH2, 0x1b, 200000000, &sdhc_clk_ops);
+>+static APMU_CLK_OPS(sdh3, SDH3, 0x1b, 200000000, &sdhc_clk_ops);
+>
+> static struct clk_lookup mmp2_clkregs[] = {
+> 	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
+>@@ -142,6 +169,10 @@ static struct clk_lookup mmp2_clkregs[] = {
+> 	INIT_CLKREG(&clk_twsi5, "pxa2xx-i2c.4", NULL),
+> 	INIT_CLKREG(&clk_twsi6, "pxa2xx-i2c.5", NULL),
+> 	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
+>+	INIT_CLKREG(&clk_sdh0, "sdhci-pxa.0", "PXA-SDHCLK"),
+>+	INIT_CLKREG(&clk_sdh1, "sdhci-pxa.1", "PXA-SDHCLK"),
+>+	INIT_CLKREG(&clk_sdh2, "sdhci-pxa.2", "PXA-SDHCLK"),
+>+	INIT_CLKREG(&clk_sdh3, "sdhci-pxa.3", "PXA-SDHCLK"),
+> };
+>
+> static int __init mmp2_init(void)
+>@@ -192,4 +223,8 @@ MMP2_DEVICE(twsi4, "pxa2xx-i2c", 3, TWSI4,
+>0xd4033000, 0x70);
+> MMP2_DEVICE(twsi5, "pxa2xx-i2c", 4, TWSI5, 0xd4033800, 0x70);
+> MMP2_DEVICE(twsi6, "pxa2xx-i2c", 5, TWSI6, 0xd4034000, 0x70);
+> MMP2_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x100, 28, 29);
+>+MMP2_DEVICE(sdh0, "sdhci-pxa", 0, MMC, 0xd4280000, 0x120);
+>+MMP2_DEVICE(sdh1, "sdhci-pxa", 1, MMC2, 0xd4280800, 0x120);
+>+MMP2_DEVICE(sdh2, "sdhci-pxa", 2, MMC3, 0xd4281000, 0x120);
+>+MMP2_DEVICE(sdh3, "sdhci-pxa", 3, MMC4, 0xd4281800, 0x120);
+>
+>--
+>1.7.0.4
