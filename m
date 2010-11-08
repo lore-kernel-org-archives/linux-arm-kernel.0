@@ -1,50 +1,29 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon,  8 Nov 2010 08:56:15 +0200
-Subject: [PATCH 2/2] arm: omap: zoom: substitute gpio number with symbolic name
-In-Reply-To: <1289199375-9001-1-git-send-email-balbi@ti.com>
-References: <1289199375-9001-1-git-send-email-balbi@ti.com>
-Message-ID: <1289199375-9001-3-git-send-email-balbi@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 08 Nov 2010 16:15:55 +0900
+Subject: Build error with s3c2410_defconfig
+Message-ID: <001001cb7f14$cace6af0$606b40d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's easier to understand what that number means and
-also avoids problems if we ever have to change it.
+Hi Vasily,
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap2/board-zoom.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+Now, happens following build error due to commit
+14477095abc661a9f195ca4733bb739c54794b32 'ARM: h1940: Use gpiolib for latch
+access' with s3c2410_defconfig.
 
-diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
-index f10766b..3da69e4 100644
---- a/arch/arm/mach-omap2/board-zoom.c
-+++ b/arch/arm/mach-omap2/board-zoom.c
-@@ -31,6 +31,8 @@
- #include "sdram-micron-mt46h32m32lf-6.h"
- #include "sdram-hynix-h8mbx00u0mer-0em.h"
- 
-+#define ZOOM3_EHCI_RESET_GPIO		64
-+
- static void __init omap_zoom_init_irq(void)
- {
- 	if (machine_is_omap_zoom2())
-@@ -112,7 +114,7 @@ static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
- 	.port_mode[2]		= EHCI_HCD_OMAP_MODE_UNKNOWN,
- 	.phy_reset		= true,
- 	.reset_gpio_port[0]	= -EINVAL,
--	.reset_gpio_port[1]	= 64,
-+	.reset_gpio_port[1]	= ZOOM3_EHCI_RESET_GPIO,
- 	.reset_gpio_port[2]	= -EINVAL,
- };
- 
-@@ -122,7 +124,7 @@ static void __init omap_zoom_init(void)
- 		omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	} else if (machine_is_omap_zoom3()) {
- 		omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
--		omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
-+		omap_mux_init_gpio(ZOOM3_EHCI_RESET_GPIO, OMAP_PIN_OUTPUT);
- 		usb_ehci_init(&ehci_pdata);
- 	}
- 
--- 
-1.7.3.2.146.gca209
+drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
+drivers/leds/leds-h1940.c:33: error: implicit declaration of function
+'h1940_latch_control'
+
+The h1940_greenled_set(), h1940_redled_set(), and h1940_blueled_set() in
+drivers/leds/leds-h1940.c call h1940_latch_control()...
+
+Need to fix it up.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
