@@ -1,132 +1,51 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 8 Nov 2010 03:56:31 -0500
-Subject: [PATCH v2 3/7] OMAP4: hwmod data: add mailbox data
-In-Reply-To: <AANLkTi=mkBROke+4Yf25QndYB=0pE+k0tE2NKxUM5xU_@mail.gmail.com>
-References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>	<1289006244-27147-4-git-send-email-omar.ramirez@ti.com>	<4CD58DF6.6040600@ti.com>
-	<AANLkTi=mkBROke+4Yf25QndYB=0pE+k0tE2NKxUM5xU_@mail.gmail.com>
-Message-ID: <4CD7BB3F.1010304@ti.com>
+From: bill_carson@126.com (rocky)
+Date: Mon, 8 Nov 2010 16:56:37 +0800 (CST)
+Subject: One quick quenstion about PXA sched_clock resolution?
+Message-ID: <3f0ffa72.f9b4.12c2ab386e4.Coremail.bill_carson@126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+Hi
 
-On 11/7/2010 10:07 AM, Ramirez Luna, Omar wrote:
-> On Sat, Nov 6, 2010 at 12:18 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->> I don't know why, but this patch has nothing to do with my original one.
->> Can you stick to the original code?
->
-> no, apart from the ordering of structure members, that I will change,
+I'am working on an ARM linux porting project, which need to implement sched_clock of our own.
+have a glance at PXA sched_clock timplementation, puzzled about the following notes.
 
-If you do want to change a patch already submitted to loml, the least 
-you can do is to comment on the mailing list, and afaik, you didn't 
-provide any comment on this code.
-So do not change it without any explanation or any rational.
-That's the most basic rule of the patch submission / review process in 
-Linux.
 
-> since keeping the order of the original structure doesn't fly, I don't
-> see anything that needs to be changed.
->
-> - The magic numbers replaced for the defines, afaik it gives more clarity.
+/*
+ * This is PXA's sched_clock implementation. This has a resolution
+ * of at least 308 ns and a maximum value of 208 days.
+ *
+ * The return value is guaranteed to be monotonic in that range as
+ * long as there is always less than 582 seconds between successive
+ * calls to sched_clock() which should always be the case in practice.
+ */
 
-No, since these are not magic numbers but physical address or dma number 
-or irq channel.
-That does not give any more clarity to add a define, and in fact it adds 
-an extra level of indirection for nothing.
-The hwmod file is "the" unique HW definition files. So all the 
-information that used to be scattered all over various header files will 
-have to be there.
-You should considered this file as a global SoC HW definition file.
 
-> - mailbox irq has a name.
 
-Which is in the structure anyway, so again no need to add a define.
-All the structure that are populated hrer are all unique to every IP, so 
-having that kind of assignment does not seems very useful to me.
 
-omap44xx_mailbox_irq = OMAP44XX_MAILBOX_IRQ;
+PXA series chips have system clock in 3250000/3249600/3686400 HZ.
+I do the math like this:
 
-whereas that:
-omap44xx_mailbox_irq = 20;
+####Where does 308 ns come from?
 
-Give you a little be more information, because you do not have have to 
-read the TRM or another header file to get the real number.
 
-FYI, that was discussed at least 6 months ago during the submission of 
-the early hwmod series.
+ns of one clcok cycle:
+307.69     (10^9/3250000);
+307.73     (10^9/3249600);
+271.26     (10^9/3686400 )
+this is the highest resolution mentioned in above notes;
 
-> - overall defining block was improved:
->
->          class
->          ocp_if
->          slave ports
->          hwmod
->
-> If you see, each dependent reference is right before the structure
-> that is using it, which at least to me establishes some order, as of
-> today this ordering doesn't exists.
->
-> e.g. you are defining some hwmod and some how you are populating all
-> the members, if you are looking at your omap_hwmod struct and want to
-> see the irqs defined you need to scroll beyond the supposed first
-> reference in omap_hwmod (right now above ocp_if)
 
-So what? If you have any issue with the original order, please feel free 
-to comment on the original patch.
-In case you didn't notice, all the OMAP4 data are following the same 
-pattern. So any change to the structure should be applied everywhere.
+####Where does 582 seconds come from?
 
-I do not have any issue to improve the overall readability if that make 
-sense for everybody, but again, please comment first.
+660.76(0x80000000/3250000);
+660.84(0x80000000/3249600); 
+582.54(0x80000000/3686400 );
 
->>
->> On 11/5/2010 9:17 PM, Ramirez Luna, Omar wrote:
->>> +/* mailbox */
->>
->> The original comment is missing.
->
-> <quote>
-> /*
->   * 'mailbox' class
->   * mailbox module allowing communication between the on-chip processors
->   * useusing a queued mailbox-interrupt mechanism.
->   */
-> </quote>
->
-> I don't think it adds anything to the patch, should we start
-> commenting on the functionality of the drivers for each hwmod?
 
-In that case, it does not hurt since this file is the C file version of 
-the TRM. You might not care because you know what that module is doing, 
-but most people don't.
+Question is how does 208 days pop out?
+Can anyone give me some hints?
+thanks
 
->
->>> +
->>> +static struct omap_hwmod omap44xx_mailbox_hwmod;
->>> +
->>> +static struct omap_hwmod_addr_space omap44xx_mailbox_addrs[] = {
->>> +       {
->>> +               .pa_start       = OMAP44XX_MAILBOX_BASE,
->>
->> If that physical address is not used elsewhere, and it should be the case,
->> there is no need to create a define for it. That's why the physical address
->> was directly used here.
->> There is no added value to create a define for that.
->
-> yes there is, apart from readability where '0x4a0f4000' doesn't say much
 
-It says everything... when you use a debugger, what kind of information 
-OMAP44XX_MAILBOX_BASE will give you? Nothing, you will have to check 
-again the TRM or the define to get the real useful information.
-
-> for me at least, if reviewing I need to open the TRM check if that is
-> the address and move on, with the define you know that someone have
-> checked the address before (when creating the define)
-
-And what if the define is wrong??? You have as well to check the TRM... 
-FYI, that file is automatically generated from the HW data, so it has a 
-much lower probably to contain wrong data. Especially compared to a 
-manually written header file done from a buggy TRM.
-
-Regards,
-Benoit
+bill
