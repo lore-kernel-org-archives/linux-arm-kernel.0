@@ -1,87 +1,205 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 8 Nov 2010 14:49:41 -0500
-Subject: [PATCH 1/3] OMAP: use generic panel data in board files
-In-Reply-To: <1289218763.3297.47.camel@tubuntu>
-References: <1288986236-30210-1-git-send-email-bryan.wu@canonical.com>
-	<1288986236-30210-2-git-send-email-bryan.wu@canonical.com>
-	<FCCFB4CDC6E5564B9182F639FC356087034BF2D67E@dbde02.ent.ti.com>
-	<1289218763.3297.47.camel@tubuntu>
-Message-ID: <AANLkTi=oTeqzSpAq6CXKTbmWCQ99HZcOx=o0QVK6-UoO@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon,  8 Nov 2010 22:26:23 +0200
+Subject: [PATCH v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
+In-Reply-To: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
+References: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1289247983-20747-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 8, 2010 at 7:19 AM, Tomi Valkeinen <tomi.valkeinen@nokia.com> wrote:
-> Hi,
->
-> On Fri, 2010-11-05 at 22:17 +0100, ext Taneja, Archit wrote:
->> Hi,
->>
->> linux-omap-owner at vger.kernel.org wrote:
->> > Introduce struct panel config data in panel.h, which will be
->> > used to match the right panel configurations in generic DPI
->> > panel driver and other future dsi panel drivers.
->> >
->> > Still keep sharp_ls_panel, since the sharp_ls_panel driver
->> > contains blacklight control driver code which will be moved
->> > out later. Then we can use generic DPI driver for sharp_ls_panel.
->> >
->> > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
->> > ---
->> > ?arch/arm/mach-omap2/board-3430sdp.c ? ? ? ? ? ? ? | ? 10 +++-
->> > ?arch/arm/mach-omap2/board-am3517evm.c ? ? ? ? ? ? | ? 19 +++++--
->> > ?arch/arm/mach-omap2/board-cm-t35.c ? ? ? ? ? ? ? ?| ? 19 +++++--
->> > ?arch/arm/mach-omap2/board-devkit8000.c ? ? ? ? ? ?| ? 22 +++++---
->> > ?arch/arm/mach-omap2/board-igep0020.c ? ? ? ? ? ? ?| ? 10 +++-
->> > ?arch/arm/mach-omap2/board-omap3beagle.c ? ? ? ? ? | ? 10 +++-
->> > ?arch/arm/mach-omap2/board-omap3evm.c ? ? ? ? ? ? ?| ? 10 +++-
->> > ?arch/arm/mach-omap2/board-omap3stalker.c ? ? ? ? ?| ? 19 +++++--
->> > ?arch/arm/plat-omap/include/plat/nokia-dsi-panel.h | ? 31 -----------
->> > ?arch/arm/plat-omap/include/plat/panel.h ? ? ? ? ? | ? 57
->> > ?+++++++++++++++++++++ drivers/video/omap2/displays/panel-taal.c ? ? ? ? |
->> > ?26 ++++------ 11 files changed, 148 insertions(+), 85 deletions(-) ?delete
->> > mode 100644 arch/arm/plat-omap/include/plat/nokia-dsi-panel.h
->> > ?create mode 100644 arch/arm/plat-omap/include/plat/panel.h
->>
->> I am not totally sure about the need of removal of nokia-dsi-panel.h
->> and the addition of a generic panel.h.
->>
->> I guess the reason why nokia-dsi-panel.h was introduced (and others that
->> will be introduced in future) was to easily represent panel-specific data
->> across different boards that use the same panel.
->
-> Right. Don't touch panel-taal.c or nokia-dsi-panel.h, they are not
-> related to this DPI panel stuff.
->
->> For example, if there is a new panel which for some reson uses 2 pins, one
->> for switching off and one for switching on the panel, then it would make sense
->> to introduce a structure for this panel having members on_gpio and off_gpio, this
->> struct could then be passed and accessed through dssdev->data in the panel's probe
->> giving us the option to have different gpio numbers for different boards but finally
->> being accessed in the same way by the driver.
->>
->> So, there isn't a need to generalize this struct and the corresponding header file
->> for all panels and make it available for all board files.
->>
->> As far as the dummy panels are concerned, since the "name" is the only criteria to
->> differentiate the panel, I think passing the name to the data member of omap_dss_device
->> should itself be enough for the generic dpi driver to handle things.
->
-> I think it's a bit confusing to just put a string to the void *data
-> member, but fortunately we don't need to ponder about that: the generic
-> DPI panel should be told about reset_gpio, max_backlight_level,
-> platform_enable/disable and set/get_backlight, which need to be passed
-> in a struct. So a header and a struct is needed for this generic DPI
-> driver.
->
+Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default structure
+are initalized via s3c_gpio_{get,set}pull_1up. This results in a linker
+error when compiling kernel for s3c2442:
 
-Yeah, so we just put  a name field in a struct such as
-generic-dpi-panel-data in generic-dpi-panel.h
-And our driver file will be panel-generic-dpi.c?
+arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
+`s3c_gpio_getpull_1up'
+arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
+`s3c_gpio_setpull_1up'
 
-Thanks,
+The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
+The method of controlling them is the same though.
+So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper functions
+to take an additional parameter deciding whether the pin has a pullup or pulldown.
+The s3c_gpio_{get,set}pull_1{down,up} functions then wrap that functions passing
+either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
+
+Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull fields
+in the s3c2442 cpu init function to the new pulldown helper functions.
+
+Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
+
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+v2: adapt patch for 2.6.37-rc1
+v3: restore default pull callbacks, add default pull callbacks for s3c2442
+ arch/arm/mach-s3c2440/Kconfig                      |    1 +
+ arch/arm/mach-s3c2440/s3c2442.c                    |    7 +++
+ arch/arm/plat-s3c24xx/gpiolib.c                    |    9 +++-
+ arch/arm/plat-samsung/gpio-config.c                |   44 ++++++++++++++++---
+ .../plat-samsung/include/plat/gpio-cfg-helpers.h   |   11 +++++
+ 5 files changed, 63 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index ff024a6..478fae0 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -18,6 +18,7 @@ config CPU_S3C2440
+ config CPU_S3C2442
+ 	bool
+ 	select CPU_ARM920T
++	select S3C_GPIO_PULL_DOWN
+ 	select S3C2410_CLOCK
+ 	select S3C2410_GPIO
+ 	select S3C2410_PM if PM
+diff --git a/arch/arm/mach-s3c2440/s3c2442.c b/arch/arm/mach-s3c2440/s3c2442.c
+index 188ad1e..0dbc91c 100644
+--- a/arch/arm/mach-s3c2440/s3c2442.c
++++ b/arch/arm/mach-s3c2440/s3c2442.c
+@@ -32,6 +32,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
+ #include <linux/mutex.h>
++#include <linux/gpio.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+@@ -44,6 +45,10 @@
+ #include <plat/clock.h>
+ #include <plat/cpu.h>
+ 
++#include <plat/gpio-core.h>
++#include <plat/gpio-cfg.h>
++#include <plat/gpio-cfg-helpers.h>
++
+ /* S3C2442 extended clock support */
+ 
+ static unsigned long s3c2442_camif_upll_round(struct clk *clk,
+@@ -160,6 +165,8 @@ static struct sys_device s3c2442_sysdev = {
+ int __init s3c2442_init(void)
+ {
+ 	printk("S3C2442: Initialising architecture\n");
++	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_1down;
++	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_1down;
+ 
+ 	return sysdev_register(&s3c2442_sysdev);
+ }
+diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
+index 24c6f5a..b805dab 100644
+--- a/arch/arm/plat-s3c24xx/gpiolib.c
++++ b/arch/arm/plat-s3c24xx/gpiolib.c
+@@ -82,8 +82,13 @@ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
+ struct s3c_gpio_cfg s3c24xx_gpiocfg_default = {
+ 	.set_config	= s3c_gpio_setcfg_s3c24xx,
+ 	.get_config	= s3c_gpio_getcfg_s3c24xx,
+-	.set_pull	= s3c_gpio_setpull_1up,
+-	.get_pull	= s3c_gpio_getpull_1up,
++#if defined(CONFIG_S3C_GPIO_PULL_UP)
++	.set_pull       = s3c_gpio_setpull_1up,
++	.get_pull       = s3c_gpio_getpull_1up,
++#elif defined(CONFIG_S3C_GPIO_PULL_DOWN)
++	.set_pull	= s3c_gpio_setpull_1down,
++	.get_pull	= s3c_gpio_getpull_1down,
++#endif
+ };
+ 
+ struct s3c_gpio_chip s3c24xx_gpios[] = {
+diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
+index b732b77..ac7f13f 100644
+--- a/arch/arm/plat-samsung/gpio-config.c
++++ b/arch/arm/plat-samsung/gpio-config.c
+@@ -280,16 +280,17 @@ s3c_gpio_pull_t s3c_gpio_getpull_updown(struct s3c_gpio_chip *chip,
+ }
+ #endif
+ 
+-#ifdef CONFIG_S3C_GPIO_PULL_UP
+-int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
+-			 unsigned int off, s3c_gpio_pull_t pull)
++#if defined(CONFIG_S3C_GPIO_PULL_UP) || defined(CONFIG_S3C_GPIO_PULL_DOWN)
++static int s3c_gpio_setpull_1(struct s3c_gpio_chip *chip,
++			 unsigned int off, s3c_gpio_pull_t pull,
++			 s3c_gpio_pull_t updown)
+ {
+ 	void __iomem *reg = chip->base + 0x08;
+ 	u32 pup = __raw_readl(reg);
+ 
+ 	pup = __raw_readl(reg);
+ 
+-	if (pup == S3C_GPIO_PULL_UP)
++	if (pup == updown)
+ 		pup &= ~(1 << off);
+ 	else if (pup == S3C_GPIO_PULL_NONE)
+ 		pup |= (1 << off);
+@@ -300,17 +301,46 @@ int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
+ 	return 0;
+ }
+ 
+-s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
+-				     unsigned int off)
++static s3c_gpio_pull_t s3c_gpio_getpull_1(struct s3c_gpio_chip *chip,
++				     unsigned int off, s3c_gpio_pull_t updown)
+ {
+ 	void __iomem *reg = chip->base + 0x08;
+ 	u32 pup = __raw_readl(reg);
+ 
+ 	pup &= (1 << off);
+-	return pup ? S3C_GPIO_PULL_NONE : S3C_GPIO_PULL_UP;
++	return pup ? S3C_GPIO_PULL_NONE : updown;
++}
++#endif /* CONFIG_S3C_GPIO_PULL_UP || CONFIG_S3C_GPIO_PULL_DOWN */
++
++#ifdef CONFIG_S3C_GPIO_PULL_UP
++s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
++				     unsigned int off)
++{
++	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_UP);
++}
++
++int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
++			 unsigned int off, s3c_gpio_pull_t pull)
++{
++	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_UP);
+ }
+ #endif /* CONFIG_S3C_GPIO_PULL_UP */
+ 
++#ifdef CONFIG_S3C_GPIO_PULL_DOWN
++s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
++				     unsigned int off)
++{
++	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_DOWN);
++}
++
++int s3c_gpio_setpull_1down(struct s3c_gpio_chip *chip,
++			 unsigned int off, s3c_gpio_pull_t pull)
++{
++	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_DOWN);
++}
++#endif /* CONFIG_S3C_GPIO_PULL_DOWN */
++
++
+ #ifdef CONFIG_S5P_GPIO_DRVSTR
+ s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin)
+ {
+diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+index 8fd65d8..0d2c570 100644
+--- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
++++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+@@ -210,6 +210,17 @@ extern s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
+ 					    unsigned int off);
+ 
+ /**
++ * s3c_gpio_getpull_1down() - Get configuration for choice of down or none
++ * @chip: The gpio chip that the GPIO pin belongs to
++ * @off: The offset to the pin to get the configuration of.
++ *
++ * This helper function reads the state of the pull-down resistor for the
++ * given GPIO in the same case as s3c_gpio_setpull_1down.
++*/
++extern s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
++					    unsigned int off);
++
++/**
+  * s3c_gpio_setpull_s3c2443() - Pull configuration for s3c2443.
+  * @chip: The gpio chip that is being configured.
+  * @off: The offset for the GPIO being configured.
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+1.7.3.2
