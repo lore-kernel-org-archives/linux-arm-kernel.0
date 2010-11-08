@@ -1,56 +1,148 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 9 Nov 2010 00:18:00 +0800
-Subject: [PATCH 3/9] ARM: pxa: fix typo error in pxa3xx
-In-Reply-To: <1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
-References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTimXLbKftdNpdCOKjKEngPmA1keU_p2gYeX_6PyD@mail.gmail.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 8 Nov 2010 10:55:50 -0600
+Subject: [PATCH v2 3/7] OMAP4: hwmod data: add mailbox data
+In-Reply-To: <4CD7BB3F.1010304@ti.com>
+References: <1289006244-27147-1-git-send-email-omar.ramirez@ti.com>
+	<1289006244-27147-4-git-send-email-omar.ramirez@ti.com>
+	<4CD58DF6.6040600@ti.com>
+	<AANLkTi=mkBROke+4Yf25QndYB=0pE+k0tE2NKxUM5xU_@mail.gmail.com>
+	<4CD7BB3F.1010304@ti.com>
+Message-ID: <AANLkTim2_CaznLkjMDgH5jBxPJhCrD3Vjx8D44F7+COm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 8, 2010 at 8:37 PM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> common_io_desc is already used in generic.c. At here, we should use
-> pxa3xx_io_desc instead.
->
+Hi Benoit,
 
-This should have been fixed in the latest branch if you do a fetch again.
+On Mon, Nov 8, 2010 at 2:56 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>> no, apart from the ordering of structure members, that I will change,
+>
+> If you do want to change a patch already submitted to loml, the least you
+> can do is to comment on the mailing list, and afaik, you didn't provide any
+> comment on this code.
+> So do not change it without any explanation or any rational.
+> That's the most basic rule of the patch submission / review process in
+> Linux.
 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
-> ?arch/arm/mach-pxa/pxa3xx.c | ? ?5 +----
-> ?1 files changed, 1 insertions(+), 4 deletions(-)
+I'm submitting my changes to review, I accept that I should have put
+loudly an clear the reasons why the ordering was changing. I guess you
+are the maintainer of the code, right? so if you say the ordering
+standard is omap4 then I'm fine with such triviality.
+
+>> since keeping the order of the original structure doesn't fly, I don't
+>> see anything that needs to be changed.
+>>
+>> - The magic numbers replaced for the defines, afaik it gives more clarity.
 >
-> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-> index e7942ca..e36d836 100644
-> --- a/arch/arm/mach-pxa/pxa3xx.c
-> +++ b/arch/arm/mach-pxa/pxa3xx.c
-> @@ -49,9 +49,6 @@
-> ?#define PECR_IE(n) ? ? ((1 << ((n) * 2)) << 28)
-> ?#define PECR_IS(n) ? ? ((1 << ((n) * 2)) << 29)
+> No, since these are not magic numbers but physical address or dma number or
+> irq channel.
+> That does not give any more clarity to add a define, and in fact it adds an
+> extra level of indirection for nothing.
+> The hwmod file is "the" unique HW definition files. So all the information
+> that used to be scattered all over various header files will have to be
+> there.
+> You should considered this file as a global SoC HW definition file.
+
+Ok, I don't mind changing this too, I'm glad you clarify/review this
+before more hwmods make it to the tree, following the same style I'm
+using which is the one already there.
+
+>> - mailbox irq has a name.
 >
-> -/* crystal frequency to static memory controller multiplier (SMCFS) */
-> -static unsigned char smcfs_mult[8] = { 6, 0, 8, 0, 0, 16, };
-> -
-> ?/* crystal frequency to HSIO bus frequency multiplier (HSS) */
-> ?static unsigned char hss_mult[4] = { 8, 12, 16, 24 };
+> Which is in the structure anyway, so again no need to add a define.
+
+I didn't add a define for the irq name, I put the irq name because it
+wasn't there.
+
+> All the structure that are populated hrer are all unique to every IP, so
+> having that kind of assignment does not seems very useful to me.
 >
-> @@ -593,7 +590,7 @@ static struct map_desc pxa3xx_io_desc[] __initdata = {
-> ?void __init pxa3xx_map_io(void)
-> ?{
-> ? ? ? ?pxa_map_io();
-> - ? ? ? iotable_init(ARRAY_AND_SIZE(common_io_desc));
-> + ? ? ? iotable_init(ARRAY_AND_SIZE(pxa3xx_io_desc));
-> ? ? ? ?pxa3xx_get_clk_frequency_khz(1);
-> ?}
+> omap44xx_mailbox_irq = OMAP44XX_MAILBOX_IRQ;
 >
-> --
-> 1.5.6.5
+> whereas that:
+> omap44xx_mailbox_irq = 20;
 >
+> Give you a little be more information, because you do not have have to read
+> the TRM or another header file to get the real number.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> FYI, that was discussed at least 6 months ago during the submission of the
+> early hwmod series.
 >
+>> - overall defining block was improved:
+>>
+>> ? ? ? ? class
+>> ? ? ? ? ocp_if
+>> ? ? ? ? slave ports
+>> ? ? ? ? hwmod
+>>
+>> If you see, each dependent reference is right before the structure
+>> that is using it, which at least to me establishes some order, as of
+>> today this ordering doesn't exists.
+>>
+>> e.g. you are defining some hwmod and some how you are populating all
+>> the members, if you are looking at your omap_hwmod struct and want to
+>> see the irqs defined you need to scroll beyond the supposed first
+>> reference in omap_hwmod (right now above ocp_if)
+>
+> So what? If you have any issue with the original order, please feel free to
+> comment on the original patch.
+> In case you didn't notice, all the OMAP4 data are following the same
+> pattern. So any change to the structure should be applied everywhere.
+>
+> I do not have any issue to improve the overall readability if that make
+> sense for everybody, but again, please comment first.
+
+Again, I should have sent an RFC explaining such changes. will do.
+
+I feel commenting in the original patch is useless because this code
+is already in-tree, it might have already changed.
+
+>> <quote>
+>> /*
+>> ?* 'mailbox' class
+>> ?* mailbox module allowing communication between the on-chip processors
+>> ?* useusing a queued mailbox-interrupt mechanism.
+>> ?*/
+>> </quote>
+>>
+>> I don't think it adds anything to the patch, should we start
+>> commenting on the functionality of the drivers for each hwmod?
+>
+> In that case, it does not hurt since this file is the C file version of the
+> TRM. You might not care because you know what that module is doing, but most
+> people don't.
+
+Ok, then.
+
+>>>> +static struct omap_hwmod omap44xx_mailbox_hwmod;
+>>>> +
+>>>> +static struct omap_hwmod_addr_space omap44xx_mailbox_addrs[] = {
+>>>> + ? ? ? {
+>>>> + ? ? ? ? ? ? ? .pa_start ? ? ? = OMAP44XX_MAILBOX_BASE,
+>>>
+>>> If that physical address is not used elsewhere, and it should be the
+>>> case,
+>>> there is no need to create a define for it. That's why the physical
+>>> address
+>>> was directly used here.
+>>> There is no added value to create a define for that.
+>>
+>> yes there is, apart from readability where '0x4a0f4000' doesn't say much
+>
+> It says everything... when you use a debugger, what kind of information
+> OMAP44XX_MAILBOX_BASE will give you? Nothing, you will have to check again
+> the TRM or the define to get the real useful information.
+
+Why is that? if you use a debugger you will see the address, if you
+use an objdump you can easily traverse to the definition (with cscope,
+ctags...). Again, I don't mind placing the hex number there, now that
+there is an explanation for doing so.
+
+Overall, I feel the lack of information made the code look as it is
+right now for the existing LO hwmods, given that it is also a matter
+of ordering stuff it should be pretty straight forward. I'll give you
+my proposal offline, if you think it makes sense we can send it to LO
+and avoid traffic of non-technical stuff.
+
+Regards,
+
+Omar
