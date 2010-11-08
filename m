@@ -1,195 +1,117 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 9 Nov 2010 05:21:02 +0800
-Subject: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
-References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-5-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTikk334vRT3HE9bQWc3u_jyLJckAY9AW=pVUQNbq@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 9 Nov 2010 06:30:08 +0900
+Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <AANLkTikXffMT9ZiUpm2QAoW+KPJN3MBf55Dgruj1EJN0@mail.gmail.com>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+	<20101108041721.GA11605@linux-sh.org>
+	<20101108141407.GA25739@alchark-u3s.lan>
+	<20101108204315.GA12050@linux-sh.org>
+	<AANLkTikXffMT9ZiUpm2QAoW+KPJN3MBf55Dgruj1EJN0@mail.gmail.com>
+Message-ID: <20101108213008.GB17708@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 8, 2010 at 8:37 PM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> From: Zhou Zhu <zzhu3@marvell.com>
->
-> iwmmx instructions are also used in PJ4. Add PJ4 support.
->
-> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> ---
-> ?arch/arm/kernel/Makefile ? ? | ? ?3 ++-
-> ?arch/arm/kernel/iwmmxt.S ? ? | ? 31 +++++++++++++++++++++++++++++--
-> ?arch/arm/kernel/xscale-cp0.c | ? 21 ++++++++++++++++++++-
-> ?3 files changed, 51 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 5b9b268..7a12cd5 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -50,10 +50,11 @@ AFLAGS_crunch-bits.o ? ? ? ? ? ? ? ?:= -Wa,-mcpu=ep9312
-> ?obj-$(CONFIG_CPU_XSCALE) ? ? ? += xscale-cp0.o
-> ?obj-$(CONFIG_CPU_XSC3) ? ? ? ? += xscale-cp0.o
-> ?obj-$(CONFIG_CPU_MOHAWK) ? ? ? += xscale-cp0.o
-> +obj-$(CONFIG_CPU_PJ4) ? ? ? ? ?+= xscale-cp0.o
-> ?obj-$(CONFIG_IWMMXT) ? ? ? ? ? += iwmmxt.o
-> ?obj-$(CONFIG_CPU_HAS_PMU) ? ? ?+= pmu.o
-> ?obj-$(CONFIG_HW_PERF_EVENTS) ? += perf_event.o
-> -AFLAGS_iwmmxt.o ? ? ? ? ? ? ? ? ? ? ? ?:= -Wa,-mcpu=iwmmxt
-> +AFLAGS_iwmmxt.o ? ? ? ? ? ? ? ? ? ? ? ?:= -Wa,-mcpu=iwmmxt+iwmmxt2
->
-> ?ifneq ($(CONFIG_ARCH_EBSA110),y)
-> ? obj-y ? ? ? ? ? ? ? ?+= io.o
-> diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
-> index b63b528..b50d231 100644
-> --- a/arch/arm/kernel/iwmmxt.S
-> +++ b/arch/arm/kernel/iwmmxt.S
-> @@ -58,12 +58,19 @@
->
-> ?ENTRY(iwmmxt_task_enable)
->
-> +#ifdef CONFIG_CPU_PJ4
-> + ? ? ? mrc ? ? p15, 0, r2, c1, c0, 2
-> + ? ? ? tst ? ? r2, #0xf ? ? ? ? ? ? ? ? ? ? ? ?@ CP0 and CP1 accessible?
-> + ? ? ? movne ? pc, lr ? ? ? ? ? ? ? ? ? ? ? ? ?@ if so no business here
-> + ? ? ? orr ? ? r2, r2, #0xf ? ? ? ? ? ? ? ? ? ?@ enable access to CP0 and CP1
-> + ? ? ? mcr ? ? p15, 0, r2, c1, c0, 2
-> +#else
+On Tue, Nov 09, 2010 at 12:15:19AM +0300, Alexey Charkov wrote:
+> 2010/11/8 Paul Mundt <lethal@linux-sh.org>:
+> >> + ?? ?? if (!fbi)
+> >> + ?? ?? ?? ?? ?? ?? return 0;
+> >> +
+> > I would kill this test as well. If this ever triggers, something horribly
+> > wrong has happened and you likely have bigger things to worry about.
+> 
+> But a couple of extra instructions for error handling to hold in the
+> kernel binary should not hurt, should they? Are there benefits aside
+> from code compaction?
+> 
+It's not a realistic situation. The only way this would trigger is if the
+pointer you got handed is one that didn't go through the probe path or
+was otherwise corrupted. If it was corrupted, you're going to notice
+regardless. The driver core does sensible refcounting already, there's no
+need to second guess it.
 
-This isn't good. Have to figure out a clean way for this.
+> >> diff --git a/drivers/video/wmt_ge_rops.c b/drivers/video/wmt_ge_rops.c
+> >> new file mode 100644
+> >> index 0000000..b201a60
+> >> --- /dev/null
+> >> +++ b/drivers/video/wmt_ge_rops.c
+> >> +EXPORT_SYMBOL(wmt_ge_fillrect);
+> >> +EXPORT_SYMBOL(wmt_ge_copyarea);
+> >> +EXPORT_SYMBOL(wmt_ge_sync);
+> >> +
+> > ...
+> >
+> > Is there a particular reason why you are favouring EXPORT_SYMBOL? In
+> > general we prefer that new infrastructure patches and the like stick with
+> > EXPORT_SYMBOL_GPL, as this discourages use by non-GPLed modules going
+> > forward.
+> >
+> 
+> Well, I have no personal preference towards these, so I just took what
+> was in cfb*.c as a guidance. If the *_GPL variant is more welcome, it
+> can be changed.
+> 
+Those exports go back a ways. The idea with the _GPL exports was not to
+change symbol export behaviour retroactively, so the old ones stay the
+way they were and newer stuff can choose which way it wants to go. If you
+are not using this driver with an out-of-tree non-GPLed module then you
+are advised to use the GPL variants so others don't either.
 
-> ? ? ? ?mrc ? ? p15, 0, r2, c15, c1, 0
-> ? ? ? ?tst ? ? r2, #0x3 ? ? ? ? ? ? ? ? ? ? ? ?@ CP0 and CP1 accessible?
-> ? ? ? ?movne ? pc, lr ? ? ? ? ? ? ? ? ? ? ? ? ?@ if so no business here
-> ? ? ? ?orr ? ? r2, r2, #0x3 ? ? ? ? ? ? ? ? ? ?@ enable access to CP0 and CP1
-> ? ? ? ?mcr ? ? p15, 0, r2, c15, c1, 0
-> -
-> +#endif
-> ? ? ? ?ldr ? ? r3, =concan_owner
-> ? ? ? ?add ? ? r0, r10, #TI_IWMMXT_STATE ? ? ? @ get task Concan save area
-> ? ? ? ?ldr ? ? r2, [sp, #60] ? ? ? ? ? ? ? ? ? @ current task pc value
-> @@ -179,17 +186,28 @@ ENTRY(iwmmxt_task_disable)
-> ? ? ? ?teqne ? r1, r2 ? ? ? ? ? ? ? ? ? ? ? ? ?@ or specified one?
-> ? ? ? ?bne ? ? 1f ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ no: quit
->
-> +#ifdef CONFIG_CPU_PJ4
-> + ? ? ? mrc ? ? p15, 0, r4, c1, c0, 2
-> + ? ? ? orr ? ? r4, r4, #0xf ? ? ? ? ? ? ? ? ? ?@ enable access to CP0 and CP1
-> + ? ? ? mcr ? ? p15, 0, r4, c1, c0, 2
-> +#else
-> ? ? ? ?mrc ? ? p15, 0, r4, c15, c1, 0
-> ? ? ? ?orr ? ? r4, r4, #0x3 ? ? ? ? ? ? ? ? ? ?@ enable access to CP0 and CP1
-> ? ? ? ?mcr ? ? p15, 0, r4, c15, c1, 0
-> +#endif
-> ? ? ? ?mov ? ? r0, #0 ? ? ? ? ? ? ? ? ? ? ? ? ?@ nothing to load
-> ? ? ? ?str ? ? r0, [r3] ? ? ? ? ? ? ? ? ? ? ? ?@ no more current owner
-> ? ? ? ?mrc ? ? p15, 0, r2, c2, c0, 0
-> ? ? ? ?mov ? ? r2, r2 ? ? ? ? ? ? ? ? ? ? ? ? ?@ cpwait
-> ? ? ? ?bl ? ? ?concan_save
->
-> +#ifdef CONFIG_CPU_PJ4
-> + ? ? ? bic ? ? r4, r4, #0xf ? ? ? ? ? ? ? ? ? ?@ disable access to CP0 and CP1
-> + ? ? ? mcr ? ? p15, 0, r4, c1, c0, 2
-> +#else
-> ? ? ? ?bic ? ? r4, r4, #0x3 ? ? ? ? ? ? ? ? ? ?@ disable access to CP0 and CP1
-> ? ? ? ?mcr ? ? p15, 0, r4, c15, c1, 0
-> +#endif
-> ? ? ? ?mrc ? ? p15, 0, r2, c2, c0, 0
-> ? ? ? ?mov ? ? r2, r2 ? ? ? ? ? ? ? ? ? ? ? ? ?@ cpwait
->
-> @@ -277,8 +295,13 @@ ENTRY(iwmmxt_task_restore)
-> ?*/
-> ?ENTRY(iwmmxt_task_switch)
->
-> +#ifdef CONFIG_CPU_PJ4
-> + ? ? ? mrc ? ? p15, 0, r1, c1, c0, 2
-> + ? ? ? tst ? ? r1, #0xf ? ? ? ? ? ? ? ? ? ? ? ?@ CP0 and CP1 accessible?
-> +#else
-> ? ? ? ?mrc ? ? p15, 0, r1, c15, c1, 0
-> ? ? ? ?tst ? ? r1, #0x3 ? ? ? ? ? ? ? ? ? ? ? ?@ CP0 and CP1 accessible?
-> +#endif
-> ? ? ? ?bne ? ? 1f ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ yes: block them for next task
->
-> ? ? ? ?ldr ? ? r2, =concan_owner
-> @@ -287,9 +310,13 @@ ENTRY(iwmmxt_task_switch)
-> ? ? ? ?teq ? ? r2, r3 ? ? ? ? ? ? ? ? ? ? ? ? ?@ next task owns it?
-> ? ? ? ?movne ? pc, lr ? ? ? ? ? ? ? ? ? ? ? ? ?@ no: leave Concan disabled
->
-> +#ifdef CONFIG_CPU_PJ4
-> +1: ? ? eor ? ? r1, r1, #0xf ? ? ? ? ? ? ? ? ? ?@ flip Concan access
-> + ? ? ? mcr ? ? p15, 0, r1, c1, c0, 2
-> +#else
-> ?1: ? ? eor ? ? r1, r1, #3 ? ? ? ? ? ? ? ? ? ? ?@ flip Concan access
-> ? ? ? ?mcr ? ? p15, 0, r1, c15, c1, 0
-> -
-> +#endif
-> ? ? ? ?mrc ? ? p15, 0, r1, c2, c0, 0
-> ? ? ? ?sub ? ? pc, lr, r1, lsr #32 ? ? ? ? ? ? @ cpwait and return
->
-> diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
-> index 1796157..9f48ad2 100644
-> --- a/arch/arm/kernel/xscale-cp0.c
-> +++ b/arch/arm/kernel/xscale-cp0.c
-> @@ -92,10 +92,15 @@ static u32 __init xscale_cp_access_read(void)
-> ?{
-> ? ? ? ?u32 value;
->
-> +#ifdef CONFIG_CPU_PJ4
-> + ? ? ? __asm__ __volatile__ (
-> + ? ? ? ? ? ? ? "mrc ? ?p15, 0, %0, c1, c0, 2\n\t"
-> + ? ? ? ? ? ? ? : "=r" (value));
-> +#else
-> ? ? ? ?__asm__ __volatile__ (
-> ? ? ? ? ? ? ? ?"mrc ? ?p15, 0, %0, c15, c1, 0\n\t"
-> ? ? ? ? ? ? ? ?: "=r" (value));
-> -
-> +#endif
-> ? ? ? ?return value;
-> ?}
->
-> @@ -103,12 +108,21 @@ static void __init xscale_cp_access_write(u32 value)
-> ?{
-> ? ? ? ?u32 temp;
->
-> +#ifdef CONFIG_CPU_PJ4
-> + ? ? ? __asm__ __volatile__ (
-> + ? ? ? ? ? ? ? "mcr ? ?p15, 0, %1, c1, c0, 2\n\t"
-> + ? ? ? ? ? ? ? "mrc ? ?p15, 0, %0, c1, c0, 2\n\t"
-> + ? ? ? ? ? ? ? "mov ? ?%0, %0\n\t"
-> + ? ? ? ? ? ? ? "sub ? ?pc, pc, #4\n\t"
-> + ? ? ? ? ? ? ? : "=r" (temp) : "r" (value));
-> +#else
-> ? ? ? ?__asm__ __volatile__ (
-> ? ? ? ? ? ? ? ?"mcr ? ?p15, 0, %1, c15, c1, 0\n\t"
-> ? ? ? ? ? ? ? ?"mrc ? ?p15, 0, %0, c15, c1, 0\n\t"
-> ? ? ? ? ? ? ? ?"mov ? ?%0, %0\n\t"
-> ? ? ? ? ? ? ? ?"sub ? ?pc, pc, #4\n\t"
-> ? ? ? ? ? ? ? ?: "=r" (temp) : "r" (value));
-> +#endif
-> ?}
->
-> ?/*
-> @@ -153,8 +167,13 @@ static int __init xscale_cp0_init(void)
-> ?{
-> ? ? ? ?u32 cp_access;
->
-> +#ifdef CONFIG_CPU_PJ4
-> + ? ? ? cp_access = xscale_cp_access_read() & ~0xf;
-> + ? ? ? xscale_cp_access_write(cp_access | 0xf);
-> +#else
-> ? ? ? ?cp_access = xscale_cp_access_read() & ~3;
-> ? ? ? ?xscale_cp_access_write(cp_access | 1);
-> +#endif
->
-> ? ? ? ?if (cpu_has_iwmmxt()) {
-> ?#ifndef CONFIG_IWMMXT
-> --
-> 1.5.6.5
->
->
+> >> +static int __devinit wmt_ge_rops_probe(struct platform_device *pdev)
+> >> +{
+> > ...
+> >> + ?? ?? regbase = ioremap(res->start, resource_size(res));
+> >> + ?? ?? if (regbase == NULL) {
+> >> + ?? ?? ?? ?? ?? ?? dev_err(&pdev->dev, "failed to map I/O memory\n");
+> >> + ?? ?? ?? ?? ?? ?? ret = -EBUSY;
+> >> + ?? ?? ?? ?? ?? ?? goto error;
+> >> + ?? ?? }
+> >> +
+> > You might also want to do something like:
+> >
+> > ?? ?? ?? ??/* Only one ROP engine is presently supported. */
+> > ?? ?? ?? ??if (unlikely(regbase)) {
+> > ?? ?? ?? ?? ?? ?? ?? ??WARN_ON(1);
+> > ?? ?? ?? ?? ?? ?? ?? ??return -EBUSY;
+> > ?? ?? ?? ??}
+> >
+> > ?? ?? ?? ??regbase = ioremap(...);
+> > ?? ?? ?? ??...
+> >
+> 
+> But for that I'd have to initialize regbase to NULL (so as not to use
+> an uninitialized variable), wouldn't I? checkpatch.pl complains on
+> that...
+> 
+No, regbase is BSS initialized, so it will already be cleared.
+
+> >> +static int __devexit wmt_ge_rops_remove(struct platform_device *pdev)
+> >> +{
+> >> + ?? ?? iounmap(regbase);
+> >> + ?? ?? return 0;
+> >> +}
+> >> +
+> > You're missing a:
+> >
+> > ?? ?? ?? ??writel(0, regbase + GE_ENABLE_OFF);
+> >
+> > here?
+> >
+> 
+> In fact, this module only uses a subset of GE functions, so I'm
+> somewhat reluctant to disable the hardware altogether when unloading
+> the module. And should the hardware really be disabled when the driver
+> is removed?
+> 
+You're the only one who can answer that. I just noticed in your other
+drivers that this is the pattern that you opted for, so I thought
+that perhaps this was an oversight in the rop engine code.
+
+Having said that, the general expectation is that a remove will balance
+out the probe. If the probe is enabling random blocks then the remove
+should be disabling them. If this driver is primarily used as a client by
+the other drivers and you're concerned from it being ripped out
+underneath them, then a bit more thinking and refcounting is needed. This
+is however something that can be done later if its a direction you wish
+to head in.
