@@ -1,43 +1,52 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon, 8 Nov 2010 08:33:55 +0530
-Subject: Machine name/id change request
-In-Reply-To: <20101107181218.GC2862@n2100.arm.linux.org.uk>
-References: <AANLkTikm78_dj03xxaHMi10V+_B9B_8FRg1kRbL2OPBK@mail.gmail.com>
-	<20100920154441.GG30793@n2100.arm.linux.org.uk>
-	<AANLkTinBw_NJj=BcAOq5BzPGqrO8FW7fzmUVK8TGH7A7@mail.gmail.com>
-	<20100920155806.GA5177@n2100.arm.linux.org.uk>
-	<AANLkTin6zJQxOLBuGkYgNp3nLT4viN1bDcLiryUim18h@mail.gmail.com>
-	<20101107181218.GC2862@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikAK_kbZ2_N2L2x++LF2y8Wk4O7V2wLcw6gaABu@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 8 Nov 2010 11:33:50 +0800
+Subject: build failure on ARMv7 while CONFIG_AEABI is disabled
+In-Reply-To: <20101105113930.GG13530@tarshish>
+References: <AANLkTimv-bW56P+M9X+Unr4QotCTwhjaw+kOCNP3qbgD@mail.gmail.com>
+	<20101105113930.GG13530@tarshish>
+Message-ID: <AANLkTi=sdLPPi3FZavhcL43caDT6bJrENSCpKYhA5+67@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 7, 2010 at 11:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Oct 12, 2010 at 11:58:39AM +0300, Amit Kucheria wrote:
->> On Mon, Sep 20, 2010 at 6:58 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > Remind me to fix it up when you submit something to the patch system/
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->> > machine registry. ?Neither Matt nor yourself currently appears in
-> ? ?^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->> > the existing list of people...
-> ? ?^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+On Fri, Nov 5, 2010 at 7:39 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Haojian,
 >
->> Sascha has now accepted patches to enable the machine (EFIKAMX) in his
->> imx tree. Could you please add me to the list as maintainer?
+> On Fri, Nov 05, 2010 at 07:22:09PM +0800, Haojian Zhuang wrote:
+>> Hi all,
+>>
+>> If I disable CONFIG_AEABI, building kernel for ARMv7. There's no issue
+>> on ARMv5. Do you have any clue?
 >
-> There are three Amit's registered for the website, none of them are you.
-> I'm not being difficult, I just see nothing has changed since my previous
-> mail, which you apparantly have misunderstood.
+> Does the patch in the link below helps?
 >
-> Please go to the machine registry, click on 'Add new machine' - that
-> will prompt to create an account. ?I'll then be able to link the machines
-> to your account.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-November/030570.html
+>
 
-I did indeed misunderstand your previous email. I've created the
-account now (amit.kucheria at linaro.org).
+This patch is helpful. Great thanks!
 
-Thanks!
+Best Regards
+Haojian
 
-/Amit
+>> /tmp/ccaEQuAe.s: Assembler messages:
+>> /tmp/ccaEQuAe.s:88: Error: even register required -- `ldrexd r7,r8,[r4]'
+>> /tmp/ccaEQuAe.s:104: Error: even register required -- `strexdeq ip,r5,r6,[r4]'
+>> /tmp/ccaEQuAe.s:125: Error: even register required -- `ldrexd r1,r2,[r0]'
+>> /tmp/ccaEQuAe.s:128: Error: even register required -- `strexd ip,r1,r2,[r0]'
+>> /tmp/ccaEQuAe.s:2086: Error: even register required -- `ldrexd r1,r2,[r0]'
+>> /tmp/ccaEQuAe.s:2101: Error: even register required -- `ldrexd r3,r4,[r0]'
+>> /tmp/ccaEQuAe.s:2102: Error: even register required -- `strexd r3,r5,r6,[r0]'
+>> /tmp/ccaEQuAe.s:2135: Error: even register required -- `ldrexd r5,r6,[r2]'
+>> /tmp/ccaEQuAe.s:2136: Error: even register required -- `strexd r5,r3,r4,[r2]'
+>> /tmp/ccaEQuAe.s:2165: Error: even register required -- `ldrexd r3,r4,[r0]'
+>> /tmp/ccaEQuAe.s:2166: Error: even register required -- `strexd r3,r1,r2,[r0]'
+>> /tmp/ccaEQuAe.s:3186: Error: even register required -- `ldrexd r3,r4,[r0]'
+>> /tmp/ccaEQuAe.s:3187: Error: even register required -- `strexd r3,r1,r2,[r0]'
+>> make[2]: *** [arch/arm/kernel/perf_event.o] Error 1
+>> make[2]: *** Waiting for unfinished jobs....
+>> make[1]: *** [arch/arm/kernel] Error 2
+>
+> --
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ~. .~ ? Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+> ? - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>
