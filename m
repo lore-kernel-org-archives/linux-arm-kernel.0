@@ -1,103 +1,74 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Mon, 8 Nov 2010 05:06:07 -0800
-Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
-In-Reply-To: <AANLkTik8D8E+BkqWbvgTvaJyKHb0d1=cTJf2wfOmfBVx@mail.gmail.com>
-References: <AANLkTik8D8E+BkqWbvgTvaJyKHb0d1=cTJf2wfOmfBVx@mail.gmail.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C0598642CE8@SC-VEXCH1.marvell.com>
+From: marek.belisko@gmail.com (Marek Belisko)
+Date: Mon,  8 Nov 2010 14:27:50 +0100
+Subject: [PATCH] ARM: s3c2440: mini2440: Add touchscreen support for mini2440.
+Message-ID: <1289222870-22580-1-git-send-email-marek.belisko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked
+Patch add support for mini2440 touchscreen.
+Some code borrowed from:
+git://repo.or.cz/linux-2.6/mini2440.git
 
->-----Original Message-----
->From: zhangfei gao [mailto:zhangfei.gao at gmail.com]
->Sent: 2010?11?3? 5:07 PM
->To: linux-arm-kernel at lists.infradead.org
->Cc: Eric Miao; Haojian Zhuang; Chris Ball
->Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
->
->From 43ad4ff49d6e94e32468776a278baabc463a613f Mon Sep 17 00:00:00 2001
->From: Zhangfei Gao <zhangfei.gao@marvell.com>
->Date: Wed, 3 Nov 2010 01:15:32 -0400
->Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
->
->Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
->---
-> arch/arm/mach-mmp/jasper.c |   47
->++++++++++++++++++++++++++++++++++++++++++++
-> 1 files changed, 47 insertions(+), 0 deletions(-)
->
->diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
->index 2a684fa..757f251 100644
->--- a/arch/arm/mach-mmp/jasper.c
->+++ b/arch/arm/mach-mmp/jasper.c
->@@ -67,6 +67,36 @@ static unsigned long jasper_pin_config[] __initdata = {
->
-> 	/* PMIC */
-> 	PMIC_PMIC_INT | MFP_LPM_EDGE_FALL,
->+
->+	/* MMC1 */
->+	GPIO131_MMC1_DAT3,
->+	GPIO132_MMC1_DAT2,
->+	GPIO133_MMC1_DAT1,
->+	GPIO134_MMC1_DAT0,
->+	GPIO136_MMC1_CMD,
->+	GPIO139_MMC1_CLK,
->+	GPIO140_MMC1_CD,
->+	GPIO141_MMC1_WP,
->+
->+	/* MMC2 */
->+	GPIO37_MMC2_DAT3,
->+	GPIO38_MMC2_DAT2,
->+	GPIO39_MMC2_DAT1,
->+	GPIO40_MMC2_DAT0,
->+	GPIO41_MMC2_CMD,
->+	GPIO42_MMC2_CLK,
->+
->+	/* MMC3 */
->+	GPIO165_MMC3_DAT7,
->+	GPIO162_MMC3_DAT6,
->+	GPIO166_MMC3_DAT5,
->+	GPIO163_MMC3_DAT4,
->+	GPIO167_MMC3_DAT3,
->+	GPIO164_MMC3_DAT2,
->+	GPIO168_MMC3_DAT1,
->+	GPIO111_MMC3_DAT0,
->+	GPIO112_MMC3_CMD,
->+	GPIO151_MMC3_CLK,
-> };
->
-> static struct regulator_consumer_supply max8649_supply[] = {
->@@ -123,6 +153,19 @@ static struct i2c_board_info jasper_twsi1_info[] = {
-> 	},
-> };
->
->+#if defined(CONFIG_MMC_SDHCI_PXA)
->+
->+static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
->+	.max_speed	= 25000000,
->+};
->+
->+static void __init mmp2_init_mmc(void)
->+{
->+	mmp2_add_sdh(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
->+}
->+
->+#endif
->+
-> static void __init jasper_init(void)
-> {
-> 	mfp_config(ARRAY_AND_SIZE(jasper_pin_config));
->@@ -132,6 +175,10 @@ static void __init jasper_init(void)
-> 	mmp2_add_uart(3);
-> 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(jasper_twsi1_info));
->
->+#if defined(CONFIG_MMC_SDHCI_PXA)
->+	mmp2_init_mmc();
->+#endif
->+
-> 	regulator_has_full_constraints();
-> }
->
->--
->1.7.0.4
+Signed-off-by: Marek Belisko <marek.belisko@gmail.com>
+---
+ arch/arm/mach-s3c2440/mach-mini2440.c |   17 +++++++++++++++--
+ 1 files changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index f62bb4c..766d9f4 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -47,6 +47,7 @@
+ #include <plat/iic.h>
+ #include <plat/mci.h>
+ #include <plat/udc.h>
++#include <plat/ts.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+@@ -506,6 +507,11 @@ static struct i2c_board_info mini2440_i2c_devs[] __initdata = {
+ 	},
+ };
+ 
++static struct s3c2410_ts_mach_info mini2440_ts_cfg __initdata = {
++	.delay = 10000,
++	.presc = 0xff, /* slow as we can go */
++};
++
+ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&s3c_device_ohci,
+ 	&s3c_device_wdt,
+@@ -522,6 +528,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&s3c_device_sdi,
+ 	&s3c_device_iis,
+ 	&mini2440_audio,
++	&s3c_device_adc,
+ };
+ 
+ static void __init mini2440_map_io(void)
+@@ -605,8 +612,13 @@ static void mini2440_parse_features(
+ 			features->done |= FEATURE_BACKLIGHT;
+ 			break;
+ 		case 't':
+-			printk(KERN_INFO "MINI2440: '%c' ignored, "
+-				"touchscreen not compiled in\n", f);
++			if (features->done & FEATURE_TOUCH)
++				printk(KERN_INFO "MINI2440: '%c' ignored, "
++					"touchscreen already set\n", f);
++			else
++				features->optional[features->count++] =
++						&s3c_device_ts;
++			features->done |= FEATURE_TOUCH;
+ 			break;
+ 		case 'c':
+ 			if (features->done & FEATURE_CAMERA)
+@@ -677,6 +689,7 @@ static void __init mini2440_init(void)
+ 	s3c24xx_mci_set_platdata(&mini2440_mmc_cfg);
+ 	s3c_nand_set_platdata(&mini2440_nand_info);
+ 	s3c_i2c0_set_platdata(NULL);
++	s3c24xx_ts_set_platdata(&mini2440_ts_cfg);
+ 
+ 	i2c_register_board_info(0, mini2440_i2c_devs,
+ 				ARRAY_SIZE(mini2440_i2c_devs));
+-- 
+1.7.1
