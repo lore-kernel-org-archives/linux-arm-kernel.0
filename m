@@ -1,150 +1,167 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon,  8 Nov 2010 22:31:48 +0200
-Subject: [PATCH 2/2] h1940-leds: Fix compile issue introduced by latch-related
-	changes
-In-Reply-To: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
-References: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1289248308-21272-2-git-send-email-anarsoul@gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 9 Nov 2010 05:43:16 +0900
+Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <20101108141407.GA25739@alchark-u3s.lan>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+	<20101108041721.GA11605@linux-sh.org>
+	<20101108141407.GA25739@alchark-u3s.lan>
+Message-ID: <20101108204315.GA12050@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Latch API was converted to gpiolib API as result we got this compile
-error:
+On Mon, Nov 08, 2010 at 05:14:07PM +0300, Alexey Charkov wrote:
+> This incorporates fixes to the issues that Paul has identified.
+> MMIO register pointer in wmt_ge_rops was just made static, as I
+> could not find any immediately obvious way to pass drvdata around
+> (the whole functionality of this driver is in exported functions
+> that are called from a display driver context, which does not know
+> about the rop engine specific data structures).
+> 
+Looking better.. just a few minor things left.
 
-drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
-drivers/leds/leds-h1940.c:33: error: implicit declaration of function
-'h1940_latch_control
+> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+> new file mode 100644
+> index 0000000..640d8a3
+> --- /dev/null
+> +++ b/drivers/video/vt8500lcdfb.c
+> +#include <asm/irq.h>
+> +
+linux/irq.h is preferred here.
 
-Adapt h1940-leds driver to new changes and fix compile issue.
+> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+> new file mode 100644
+> index 0000000..560c926
+> --- /dev/null
+> +++ b/drivers/video/wm8505fb.c
+> +#include <asm/irq.h>
+> +
+Likewise.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/leds/leds-h1940.c |   67 ++++++++++++++++++++++++++++++++-------------
- 1 files changed, 48 insertions(+), 19 deletions(-)
+> +static int wm8505fb_pan_display(struct fb_var_screeninfo *var,
+> +				struct fb_info *info)
+> +{
+> +	struct wm8505fb_info *fbi = container_of(info,
+> +						  struct wm8505fb_info,
+> +						  fb);
+> +
+Sice you are open-coding this container_of() all over the place you may
+simply want to make a wrapper for this. ie,
 
-diff --git a/drivers/leds/leds-h1940.c b/drivers/leds/leds-h1940.c
-index 173d104..d9c2729 100644
---- a/drivers/leds/leds-h1940.c
-+++ b/drivers/leds/leds-h1940.c
-@@ -30,18 +30,18 @@ static void h1940_greenled_set(struct led_classdev *led_dev,
- {
- 	switch (value) {
- 	case LED_HALF:
--		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
--		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
-+		gpio_set_value(S3C2410_GPA(7), 1);
- 		break;
- 	case LED_FULL:
--		h1940_latch_control(0, H1940_LATCH_LED_GREEN);
--		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
-+		gpio_set_value(H1940_LATCH_LED_GREEN, 1);
-+		gpio_set_value(S3C2410_GPA(7), 1);
- 		break;
- 	default:
- 	case LED_OFF:
--		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
--		h1940_latch_control(H1940_LATCH_LED_GREEN, 0);
--		s3c2410_gpio_setpin(S3C2410_GPA7, 0);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-+		gpio_set_value(H1940_LATCH_LED_GREEN, 0);
-+		gpio_set_value(S3C2410_GPA(7), 0);
- 		break;
- 	}
- }
-@@ -60,18 +60,18 @@ static void h1940_redled_set(struct led_classdev *led_dev,
- {
- 	switch (value) {
- 	case LED_HALF:
--		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
--		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
-+		gpio_set_value(S3C2410_GPA(1), 1);
- 		break;
- 	case LED_FULL:
--		h1940_latch_control(0, H1940_LATCH_LED_RED);
--		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
-+		gpio_set_value(H1940_LATCH_LED_RED, 1);
-+		gpio_set_value(S3C2410_GPA(1), 1);
- 		break;
- 	default:
- 	case LED_OFF:
--		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
--		h1940_latch_control(H1940_LATCH_LED_RED, 0);
--		s3c2410_gpio_setpin(S3C2410_GPA1, 0);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-+		gpio_set_value(H1940_LATCH_LED_RED, 0);
-+		gpio_set_value(S3C2410_GPA(1), 0);
- 		break;
- 	}
- }
-@@ -91,11 +91,11 @@ static void h1940_blueled_set(struct led_classdev *led_dev,
- {
- 	if (value) {
- 		/* flashing Blue */
--		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
--		s3c2410_gpio_setpin(S3C2410_GPA3, 1);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
-+		gpio_set_value(S3C2410_GPA(3), 1);
- 	} else {
--		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
--		s3c2410_gpio_setpin(S3C2410_GPA3, 0);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-+		gpio_set_value(S3C2410_GPA(3), 0);
- 	}
- 
- }
-@@ -108,7 +108,24 @@ static struct led_classdev h1940_blueled = {
- 
- static int __devinit h1940leds_probe(struct platform_device *pdev)
- {
--	int ret;
-+	int ret, gpioidx = 0;
-+	int led_gpios[] = {
-+		H1940_LATCH_LED_GREEN,
-+		H1940_LATCH_LED_RED,
-+		H1940_LATCH_LED_FLASH,
-+		S3C2410_GPA(1),
-+		S3C2410_GPA(3),
-+		S3C2410_GPA(7),
-+	};
-+
-+	for (gpioidx = 0; gpioidx < ARRAY_SIZE(led_gpios); gpioidx++) {
-+		ret = gpio_request(led_gpios[gpioidx], "h1940 leds");
-+		if (ret < 0)
-+			goto err_gpio;
-+		ret = gpio_direction_output(led_gpios[gpioidx], 0);
-+		if (ret < 0)
-+			goto err_gpio;
-+	}
- 
- 	ret = led_classdev_register(&pdev->dev, &h1940_greenled);
- 	if (ret)
-@@ -129,6 +146,10 @@ err_blue:
- err_red:
- 	led_classdev_unregister(&h1940_greenled);
- err_green:
-+err_gpio:
-+	while (--gpioidx >= 0)
-+		gpio_free(led_gpios[gpioidx]);
-+
- 	return ret;
- }
- 
-@@ -137,6 +158,14 @@ static int h1940leds_remove(struct platform_device *pdev)
- 	led_classdev_unregister(&h1940_greenled);
- 	led_classdev_unregister(&h1940_redled);
- 	led_classdev_unregister(&h1940_blueled);
-+
-+	gpio_free(H1940_LATCH_LED_GREEN);
-+	gpio_free(H1940_LATCH_LED_RED);
-+	gpio_free(H1940_LATCH_LED_FLASH);
-+	gpio_free(S3C2410_GPA(1));
-+	gpio_free(S3C2410_GPA(3));
-+	gpio_free(S3C2410_GPA(7));
-+
- 	return 0;
- }
- 
--- 
-1.7.3.2
+#define to_wm8505fb_info(info)	container_of(info, struct wm8505fb_info, fb)
+
+and then just doing struct wm855fb_info *fbi = to_wm8505fb_info(info);
+
+This wiwll also save you from having that ugly multi-line split in the
+container_of() and keep you well within 80 characters.
+
+> +static int __devinit wm8505fb_probe(struct platform_device *pdev)
+> +{
+...
+
+> +	ret = register_framebuffer(&fbi->fb);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to register framebuffer device: %d\n", ret);
+> +		goto failed_free_cmap;
+> +	}
+> +
+> +	ret = device_create_file(&pdev->dev, &dev_attr_contrast);
+> +	if (ret < 0) {
+> +		printk(KERN_WARNING "fb%d: failed to register attributes (%d)\n",
+> +			fbi->fb.node, ret);
+> +	}
+> +
+...
+> +}
+> +
+> +static int __devexit wm8505fb_remove(struct platform_device *pdev)
+> +{
+> +	struct wm8505fb_info *fbi = platform_get_drvdata(pdev);
+> +	struct resource *res;
+> +
+> +	if (!fbi)
+> +		return 0;
+> +
+I would kill this test as well. If this ever triggers, something horribly
+wrong has happened and you likely have bigger things to worry about.
+
+> +	unregister_framebuffer(&fbi->fb);
+> +
+You're missing a device_remove_file().
+
+> +static struct platform_driver wm8505fb_driver = {
+> +	.probe		= wm8505fb_probe,
+> +	.remove		= wm8505fb_remove,
+
+As your remove function is flagged devexit, this ought to be wrapped with
+__devexit_p(). This will save you a bit of space as the kernel will
+discard the remove function outright if you're not using this as a module
+or with hotplug. The same applies to your other remove functions too.
+
+> diff --git a/drivers/video/wmt_ge_rops.c b/drivers/video/wmt_ge_rops.c
+> new file mode 100644
+> index 0000000..b201a60
+> --- /dev/null
+> +++ b/drivers/video/wmt_ge_rops.c
+> +EXPORT_SYMBOL(wmt_ge_fillrect);
+> +EXPORT_SYMBOL(wmt_ge_copyarea);
+> +EXPORT_SYMBOL(wmt_ge_sync);
+> +
+...
+
+Is there a particular reason why you are favouring EXPORT_SYMBOL? In
+general we prefer that new infrastructure patches and the like stick with
+EXPORT_SYMBOL_GPL, as this discourages use by non-GPLed modules going
+forward.
+
+> +static int __devinit wmt_ge_rops_probe(struct platform_device *pdev)
+> +{
+...
+> +	regbase = ioremap(res->start, resource_size(res));
+> +	if (regbase == NULL) {
+> +		dev_err(&pdev->dev, "failed to map I/O memory\n");
+> +		ret = -EBUSY;
+> +		goto error;
+> +	}
+> +
+You might also want to do something like:
+
+	/* Only one ROP engine is presently supported. */
+	if (unlikely(regbase)) {
+		WARN_ON(1);
+		return -EBUSY;
+	}
+
+	regbase = ioremap(...);
+	...
+
+> +	writel(1, regbase + GE_ENABLE_OFF);
+> +	printk(KERN_INFO "Enabled support for WMT GE raster acceleration\n");
+> +
+> +	return 0;
+> +
+> +error:
+> +	return ret;
+> +}
+> +
+> +static int __devexit wmt_ge_rops_remove(struct platform_device *pdev)
+> +{
+> +	iounmap(regbase);
+> +	return 0;
+> +}
+> +
+You're missing a:
+
+	writel(0, regbase + GE_ENABLE_OFF);
+
+here?
+
+> +MODULE_AUTHOR("Alexey Charkov <alchark@gmail.com");
+> +MODULE_DESCRIPTION("Accelerators for raster operations using "
+> +		   "WonderMedia Graphics Engine");
+> +MODULE_LICENSE("GPL");
+
+Your other drivers appear to be lacking AUTHOR and DESCRIPTION
+definitions.
