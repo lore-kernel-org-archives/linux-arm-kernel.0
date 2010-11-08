@@ -1,603 +1,97 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon,  8 Nov 2010 16:45:00 -0500
-Subject: [PATCH 3/3] OMAP: DSS2: remove generic DPI panel driver duplicated
-	panel drivers
-In-Reply-To: <1289252700-3482-1-git-send-email-bryan.wu@canonical.com>
-References: <1289252700-3482-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1289252700-3482-4-git-send-email-bryan.wu@canonical.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 8 Nov 2010 16:56:35 -0500
+Subject: [PATCH 0/6] omap: iommu: hwmod support and code reorganization
+In-Reply-To: <AANLkTinzR9uj816_o+j-1121Aw8Qc_p4uBGHRA31LU7f@mail.gmail.com>
+References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>	<4CD59F04.2000406@ti.com>
+	<AANLkTinzR9uj816_o+j-1121Aw8Qc_p4uBGHRA31LU7f@mail.gmail.com>
+Message-ID: <4CD87213.7050509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Still keep sharp_ls_panel driver, because it contains blacklight control driver.
+On 11/7/2010 10:43 AM, Ramirez Luna, Omar wrote:
+> On Sat, Nov 6, 2010 at 1:31 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>> s/ducati/ipu/
+>> s/tesla/dsp/
+>>
+>> Please do not use internal codename for the changelog or even for the code.
+>
+> I picked this terminology from the driver, I didn't want to cause
+> confusion, agree to the change.
+>
+>> On 11/5/2010 9:19 PM, Ramirez Luna, Omar wrote:
+>>>
+>>> Boot tested on omap 3430 and 3630, functionality on iva2 only.
+>>>
+>>> Introduced hwmod data and support for omap3 (iva2 mmu&    isp mmu) and
+>>> omap4 (ducati mmu&    tesla mmu).
+>>>
+>>> Minor cleanup due to this changes.
+>>>
+>>> There is an issue (present without patches too):
+>>>
+>>> Doing a cycle of insmod-rmmod to iommu module and then full
+>>> insmod of bridgedriver (with all dependencies) causes the next
+>>> read of iommu registers to dump an unhandled fault log; this,
+>>> because when rmmod of iommu is called it tries to clean the
+>>> iommu tables and flush any old entry prior to removing the driver,
+>>> however these reads/writes are attempted while the MMU is under
+>>> reset and will timeout on the L3 IVA target agent, which will leave
+>>> MMU unusable until the proper restore sequence to clear this L3
+>>> error is executed.
+>>>
+>>> Fix would be to move page table allocation to iommu get and its
+>>> correspondent free to iommu put, however it will fall entirely
+>>> under iommu user responsibility, as it needs to clear the mmu
+>>> reset bit, before calling iommu functions that read/write into
+>>> mmu registers (which should apply only for first boot or on
+>>> baseimage reload); trading this restriction in order to keep
+>>> the same generic iommu code for all omap iommu devices.
+>>>
+>>> This issue has been seen on omap3 iva2 mmu, same restriction should
+>>
+>> I'm still not really understanding that issue.
+>> In theory, the reset is deasserted when the omap_device is enabled and will
+>> be re-asserted when the omap_device will be disable.
+>
+> Probably I'm missing the bits telling hwmod to handle its reset bit, I
+> will recheck.
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- drivers/video/omap2/displays/Kconfig               |   18 --
- drivers/video/omap2/displays/Makefile              |    3 -
- drivers/video/omap2/displays/panel-generic.c       |  174 --------------------
- .../video/omap2/displays/panel-sharp-lq043t1dg01.c |  165 -------------------
- .../video/omap2/displays/panel-toppoly-tdo35s.c    |  164 ------------------
- 5 files changed, 0 insertions(+), 524 deletions(-)
- delete mode 100644 drivers/video/omap2/displays/panel-generic.c
- delete mode 100644 drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
- delete mode 100644 drivers/video/omap2/displays/panel-toppoly-tdo35s.c
+After reading the other patches of that series, this is what I realized 
+as well. You need the entries with hw reset information to make that works.
 
-diff --git a/drivers/video/omap2/displays/Kconfig b/drivers/video/omap2/displays/Kconfig
-index cb3e339..9c09afd 100644
---- a/drivers/video/omap2/displays/Kconfig
-+++ b/drivers/video/omap2/displays/Kconfig
-@@ -9,12 +9,6 @@ config PANEL_GENERIC_DPI
- 	  Supports LCD Panel used in TI SDP3430 and EVM boards,
- 	  OMAP3517 EVM boards and CM-T35.
- 
--config PANEL_GENERIC
--        tristate "Generic Panel"
--        help
--	  Generic panel driver.
--	  Used for DVI output for Beagle and OMAP3 SDP.
--
- config PANEL_SHARP_LS037V7DW01
-         tristate "Sharp LS037V7DW01 LCD Panel"
-         depends on OMAP2_DSS
-@@ -22,24 +16,12 @@ config PANEL_SHARP_LS037V7DW01
-         help
-           LCD Panel used in TI's SDP3430 and EVM boards
- 
--config PANEL_SHARP_LQ043T1DG01
--        tristate "Sharp LQ043T1DG01 LCD Panel"
--        depends on OMAP2_DSS
--        help
--          LCD Panel used in TI's OMAP3517 EVM boards
--
- config PANEL_TAAL
-         tristate "Taal DSI Panel"
-         depends on OMAP2_DSS_DSI
-         help
-           Taal DSI command mode panel from TPO.
- 
--config PANEL_TOPPOLY_TDO35S
--        tristate "Toppoly TDO35S LCD Panel support"
--        depends on OMAP2_DSS
--        help
--          LCD Panel used in CM-T35
--
- config PANEL_TPO_TD043MTEA1
-         tristate "TPO TD043MTEA1 LCD Panel"
-         depends on OMAP2_DSS && SPI
-diff --git a/drivers/video/omap2/displays/Makefile b/drivers/video/omap2/displays/Makefile
-index 022058c..3bebe4d 100644
---- a/drivers/video/omap2/displays/Makefile
-+++ b/drivers/video/omap2/displays/Makefile
-@@ -1,9 +1,6 @@
- obj-$(CONFIG_PANEL_GENERIC_DPI) += panel-generic-dpi.o
--obj-$(CONFIG_PANEL_GENERIC) += panel-generic.o
- obj-$(CONFIG_PANEL_SHARP_LS037V7DW01) += panel-sharp-ls037v7dw01.o
--obj-$(CONFIG_PANEL_SHARP_LQ043T1DG01) += panel-sharp-lq043t1dg01.o
- 
- obj-$(CONFIG_PANEL_TAAL) += panel-taal.o
--obj-$(CONFIG_PANEL_TOPPOLY_TDO35S) += panel-toppoly-tdo35s.o
- obj-$(CONFIG_PANEL_TPO_TD043MTEA1) += panel-tpo-td043mtea1.o
- obj-$(CONFIG_PANEL_ACX565AKM) += panel-acx565akm.o
-diff --git a/drivers/video/omap2/displays/panel-generic.c b/drivers/video/omap2/displays/panel-generic.c
-deleted file mode 100644
-index 395a68d..0000000
---- a/drivers/video/omap2/displays/panel-generic.c
-+++ /dev/null
-@@ -1,174 +0,0 @@
--/*
-- * Generic panel support
-- *
-- * Copyright (C) 2008 Nokia Corporation
-- * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/module.h>
--#include <linux/delay.h>
--
--#include <plat/display.h>
--
--static struct omap_video_timings generic_panel_timings = {
--	/* 640 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
--	.x_res		= 640,
--	.y_res		= 480,
--	.pixel_clock	= 23500,
--	.hfp		= 48,
--	.hsw		= 32,
--	.hbp		= 80,
--	.vfp		= 3,
--	.vsw		= 4,
--	.vbp		= 7,
--};
--
--static int generic_panel_power_on(struct omap_dss_device *dssdev)
--{
--	int r;
--
--	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
--		return 0;
--
--	r = omapdss_dpi_display_enable(dssdev);
--	if (r)
--		goto err0;
--
--	if (dssdev->platform_enable) {
--		r = dssdev->platform_enable(dssdev);
--		if (r)
--			goto err1;
--	}
--
--	return 0;
--err1:
--	omapdss_dpi_display_disable(dssdev);
--err0:
--	return r;
--}
--
--static void generic_panel_power_off(struct omap_dss_device *dssdev)
--{
--	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
--		return;
--
--	if (dssdev->platform_disable)
--		dssdev->platform_disable(dssdev);
--
--	omapdss_dpi_display_disable(dssdev);
--}
--
--static int generic_panel_probe(struct omap_dss_device *dssdev)
--{
--	dssdev->panel.config = OMAP_DSS_LCD_TFT;
--	dssdev->panel.timings = generic_panel_timings;
--
--	return 0;
--}
--
--static void generic_panel_remove(struct omap_dss_device *dssdev)
--{
--}
--
--static int generic_panel_enable(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = generic_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void generic_panel_disable(struct omap_dss_device *dssdev)
--{
--	generic_panel_power_off(dssdev);
--
--	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
--}
--
--static int generic_panel_suspend(struct omap_dss_device *dssdev)
--{
--	generic_panel_power_off(dssdev);
--	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
--	return 0;
--}
--
--static int generic_panel_resume(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = generic_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void generic_panel_set_timings(struct omap_dss_device *dssdev,
--		struct omap_video_timings *timings)
--{
--	dpi_set_timings(dssdev, timings);
--}
--
--static void generic_panel_get_timings(struct omap_dss_device *dssdev,
--		struct omap_video_timings *timings)
--{
--	*timings = dssdev->panel.timings;
--}
--
--static int generic_panel_check_timings(struct omap_dss_device *dssdev,
--		struct omap_video_timings *timings)
--{
--	return dpi_check_timings(dssdev, timings);
--}
--
--static struct omap_dss_driver generic_driver = {
--	.probe		= generic_panel_probe,
--	.remove		= generic_panel_remove,
--
--	.enable		= generic_panel_enable,
--	.disable	= generic_panel_disable,
--	.suspend	= generic_panel_suspend,
--	.resume		= generic_panel_resume,
--
--	.set_timings	= generic_panel_set_timings,
--	.get_timings	= generic_panel_get_timings,
--	.check_timings	= generic_panel_check_timings,
--
--	.driver         = {
--		.name   = "generic_panel",
--		.owner  = THIS_MODULE,
--	},
--};
--
--static int __init generic_panel_drv_init(void)
--{
--	return omap_dss_register_driver(&generic_driver);
--}
--
--static void __exit generic_panel_drv_exit(void)
--{
--	omap_dss_unregister_driver(&generic_driver);
--}
--
--module_init(generic_panel_drv_init);
--module_exit(generic_panel_drv_exit);
--MODULE_LICENSE("GPL");
-diff --git a/drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c b/drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
-deleted file mode 100644
-index 0c6896c..0000000
---- a/drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
-+++ /dev/null
-@@ -1,165 +0,0 @@
--/*
-- * LCD panel driver for Sharp LQ043T1DG01
-- *
-- * Copyright (C) 2009 Texas Instruments Inc
-- * Author: Vaibhav Hiremath <hvaibhav@ti.com>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/module.h>
--#include <linux/delay.h>
--#include <linux/device.h>
--#include <linux/err.h>
--
--#include <plat/display.h>
--
--static struct omap_video_timings sharp_lq_timings = {
--	.x_res = 480,
--	.y_res = 272,
--
--	.pixel_clock	= 9000,
--
--	.hsw		= 42,
--	.hfp		= 3,
--	.hbp		= 2,
--
--	.vsw		= 11,
--	.vfp		= 3,
--	.vbp		= 2,
--};
--
--static int sharp_lq_panel_power_on(struct omap_dss_device *dssdev)
--{
--	int r;
--
--	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
--		return 0;
--
--	r = omapdss_dpi_display_enable(dssdev);
--	if (r)
--		goto err0;
--
--	/* wait couple of vsyncs until enabling the LCD */
--	msleep(50);
--
--	if (dssdev->platform_enable) {
--		r = dssdev->platform_enable(dssdev);
--		if (r)
--			goto err1;
--	}
--
--	return 0;
--err1:
--	omapdss_dpi_display_disable(dssdev);
--err0:
--	return r;
--}
--
--static void sharp_lq_panel_power_off(struct omap_dss_device *dssdev)
--{
--	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
--		return;
--
--	if (dssdev->platform_disable)
--		dssdev->platform_disable(dssdev);
--
--	/* wait at least 5 vsyncs after disabling the LCD */
--	msleep(100);
--
--	omapdss_dpi_display_disable(dssdev);
--}
--
--static int sharp_lq_panel_probe(struct omap_dss_device *dssdev)
--{
--
--	dssdev->panel.config = OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
--		OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IEO;
--	dssdev->panel.acb = 0x0;
--	dssdev->panel.timings = sharp_lq_timings;
--
--	return 0;
--}
--
--static void sharp_lq_panel_remove(struct omap_dss_device *dssdev)
--{
--}
--
--static int sharp_lq_panel_enable(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = sharp_lq_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void sharp_lq_panel_disable(struct omap_dss_device *dssdev)
--{
--	sharp_lq_panel_power_off(dssdev);
--
--	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
--}
--
--static int sharp_lq_panel_suspend(struct omap_dss_device *dssdev)
--{
--	sharp_lq_panel_power_off(dssdev);
--	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
--	return 0;
--}
--
--static int sharp_lq_panel_resume(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = sharp_lq_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static struct omap_dss_driver sharp_lq_driver = {
--	.probe		= sharp_lq_panel_probe,
--	.remove		= sharp_lq_panel_remove,
--
--	.enable		= sharp_lq_panel_enable,
--	.disable	= sharp_lq_panel_disable,
--	.suspend	= sharp_lq_panel_suspend,
--	.resume		= sharp_lq_panel_resume,
--
--	.driver         = {
--		.name   = "sharp_lq_panel",
--		.owner  = THIS_MODULE,
--	},
--};
--
--static int __init sharp_lq_panel_drv_init(void)
--{
--	return omap_dss_register_driver(&sharp_lq_driver);
--}
--
--static void __exit sharp_lq_panel_drv_exit(void)
--{
--	omap_dss_unregister_driver(&sharp_lq_driver);
--}
--
--module_init(sharp_lq_panel_drv_init);
--module_exit(sharp_lq_panel_drv_exit);
--MODULE_LICENSE("GPL");
-diff --git a/drivers/video/omap2/displays/panel-toppoly-tdo35s.c b/drivers/video/omap2/displays/panel-toppoly-tdo35s.c
-deleted file mode 100644
-index 526e906..0000000
---- a/drivers/video/omap2/displays/panel-toppoly-tdo35s.c
-+++ /dev/null
-@@ -1,164 +0,0 @@
--/*
-- * LCD panel driver for Toppoly TDO35S
-- *
-- * Copyright (C) 2009 CompuLab, Ltd.
-- * Author: Mike Rapoport <mike@compulab.co.il>
-- *
-- * Based on generic panel support
-- * Copyright (C) 2008 Nokia Corporation
-- * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/module.h>
--#include <linux/delay.h>
--
--#include <plat/display.h>
--
--static struct omap_video_timings toppoly_tdo_panel_timings = {
--	/* 640 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
--	.x_res		= 480,
--	.y_res		= 640,
--
--	.pixel_clock	= 26000,
--
--	.hfp		= 104,
--	.hsw		= 8,
--	.hbp		= 8,
--
--	.vfp		= 4,
--	.vsw		= 2,
--	.vbp		= 2,
--};
--
--static int toppoly_tdo_panel_power_on(struct omap_dss_device *dssdev)
--{
--	int r;
--
--	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
--		return 0;
--
--	r = omapdss_dpi_display_enable(dssdev);
--	if (r)
--		goto err0;
--
--	if (dssdev->platform_enable) {
--		r = dssdev->platform_enable(dssdev);
--		if (r)
--			goto err1;
--	}
--
--	return 0;
--err1:
--	omapdss_dpi_display_disable(dssdev);
--err0:
--	return r;
--}
--
--static void toppoly_tdo_panel_power_off(struct omap_dss_device *dssdev)
--{
--	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
--		return;
--
--	if (dssdev->platform_disable)
--		dssdev->platform_disable(dssdev);
--
--	omapdss_dpi_display_disable(dssdev);
--}
--
--static int toppoly_tdo_panel_probe(struct omap_dss_device *dssdev)
--{
--	dssdev->panel.config = OMAP_DSS_LCD_TFT |
--			       OMAP_DSS_LCD_IVS |
--			       OMAP_DSS_LCD_IHS |
--			       OMAP_DSS_LCD_IPC |
--			       OMAP_DSS_LCD_ONOFF;
--
--	dssdev->panel.timings = toppoly_tdo_panel_timings;
--
--	return 0;
--}
--
--static void toppoly_tdo_panel_remove(struct omap_dss_device *dssdev)
--{
--}
--
--static int toppoly_tdo_panel_enable(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = toppoly_tdo_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void toppoly_tdo_panel_disable(struct omap_dss_device *dssdev)
--{
--	toppoly_tdo_panel_power_off(dssdev);
--
--	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
--}
--
--static int toppoly_tdo_panel_suspend(struct omap_dss_device *dssdev)
--{
--	toppoly_tdo_panel_power_off(dssdev);
--	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
--	return 0;
--}
--
--static int toppoly_tdo_panel_resume(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = toppoly_tdo_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static struct omap_dss_driver generic_driver = {
--	.probe		= toppoly_tdo_panel_probe,
--	.remove		= toppoly_tdo_panel_remove,
--
--	.enable		= toppoly_tdo_panel_enable,
--	.disable	= toppoly_tdo_panel_disable,
--	.suspend	= toppoly_tdo_panel_suspend,
--	.resume		= toppoly_tdo_panel_resume,
--
--	.driver         = {
--		.name   = "toppoly_tdo35s_panel",
--		.owner  = THIS_MODULE,
--	},
--};
--
--static int __init toppoly_tdo_panel_drv_init(void)
--{
--	return omap_dss_register_driver(&generic_driver);
--}
--
--static void __exit toppoly_tdo_panel_drv_exit(void)
--{
--	omap_dss_unregister_driver(&generic_driver);
--}
--
--module_init(toppoly_tdo_panel_drv_init);
--module_exit(toppoly_tdo_panel_drv_exit);
--MODULE_LICENSE("GPL");
--- 
-1.7.1
+>
+>> Why is the mmu already under reset when the iommu is trying to clean the
+>> tables?
+>
+> However, the driver disables the device on a call named iommu_put
+> (where, from your comment, reset should be re-asserted ), and cleans
+> the TLBs and page tables on removal of the driver (after iommu_put).
+>
+>> Could please describe the complete sequence?
+>
+> I'm assuming the dependencies are installed.
+>
+> on boot up:
+> 1. insmod iommu.ko
+> - device_enable is not called, unless a call to iommu_get is given,
+> this will mean that the driver has one user and thus device_enable is
+> called (however right now it doesn't matter if you call iommu_get or
+> not)
+>
+> 2. rmmod iommu.ko
+> - remove function will try to cleanup the TLBs writing into MMU
+> registers, since MMU is on reset it will trigger a timeout on its TA.
+>
+> 3. insmod bridgedriver.ko
+> - it is dependent on iommu.ko so it should have been installed before.
+> Whenever bridge calls iommu_get, the external abort will be caused due
+> to a read to MMU.
+>
+> As I commented, cleaning the page tables could be moved from driver's
+> remove function to iommu_put, if omap device enable/disable is
+> handling the reset bit probably this issue shouldn't be hit.
+
+Yep, I think so as well.
+
+Regards,
+Benoit
