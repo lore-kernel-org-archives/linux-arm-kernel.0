@@ -1,48 +1,23 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon,  8 Nov 2010 08:48:00 +0200
-Subject: [PATCH] arm: omap1: devices: need to return with a value
-In-Reply-To: <20101105213106.GV9264@atomide.com>
-References: <20101105213106.GV9264@atomide.com>
-Message-ID: <1289198880-8302-1-git-send-email-balbi@ti.com>
+Date: Mon,  8 Nov 2010 08:56:13 +0200
+Subject: [PATCH 0/2] combine zoom board-files
+Message-ID: <1289199375-9001-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of the following warning:
+Those boards are so similar they don't deserve
+separate board files.
 
-arch/arm/mach-omap1/devices.c: In function 'omap_init_wdt':
-arch/arm/mach-omap1/devices.c:298: warning: 'return' with
-no value, in function returning non-void
+Felipe Balbi (2):
+  arm: omap: combine zoom2 and zoom3 board-files
+  arm: omap: zoom: substitute gpio number with symbolic name
 
-while at that, also change:
+ arch/arm/mach-omap2/Makefile                       |    4 +-
+ .../arm/mach-omap2/{board-zoom3.c => board-zoom.c} |  104 ++++++++++-------
+ arch/arm/mach-omap2/board-zoom2.c                  |  117 --------------------
+ 3 files changed, 64 insertions(+), 161 deletions(-)
+ rename arch/arm/mach-omap2/{board-zoom3.c => board-zoom.c} (75%)
+ delete mode 100644 arch/arm/mach-omap2/board-zoom2.c
 
-platform_device_register();
-return 0;
-
-into:
-
-return platform_device_register();
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap1/devices.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index ea0d80a..e7f9ee6 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -321,10 +321,9 @@ static struct platform_device omap_wdt_device = {
- static int __init omap_init_wdt(void)
- {
- 	if (!cpu_is_omap16xx())
--		return;
-+		return -ENODEV;
- 
--	platform_device_register(&omap_wdt_device);
--	return 0;
-+	return platform_device_register(&omap_wdt_device);
- }
- subsys_initcall(omap_init_wdt);
- #endif
 -- 
 1.7.3.2.146.gca209
