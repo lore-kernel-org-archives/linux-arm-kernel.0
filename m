@@ -1,42 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Nov 2010 14:21:01 -0000
-Subject: recent ARM Erratas 742231 & 742230 broken.
-In-Reply-To: <AANLkTik3ipJHcPtsy5cTuO1PhmAbKwGfSqAE_gUKjhiG@mail.gmail.com>
-References: <AANLkTim6LRZQhW6R83P0n70GdqEwFnFvb55KC8459KwY@mail.gmail.com>	<-5088739724674874052@unknownmsgid>
-	<AANLkTik3ipJHcPtsy5cTuO1PhmAbKwGfSqAE_gUKjhiG@mail.gmail.com>
-Message-ID: <000101cb7f50$2bc086a0$834193e0$@deacon@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 8 Nov 2010 09:42:56 -0500 (EST)
+Subject: One quick quenstion about PXA sched_clock resolution?
+In-Reply-To: <20101108100119.GR16938@pengutronix.de>
+References: <3f0ffa72.f9b4.12c2ab386e4.Coremail.bill_carson@126.com>
+	<20101108100119.GR16938@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1011080930280.18581@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Linus,
+On Mon, 8 Nov 2010, Uwe Kleine-K?nig wrote:
 
-> 2010/10/20 Will Deacon <will.deacon@arm.com>:
+> [added Nico to Cc:]
 > 
-> > The diagnostic register is only writable from secure mode so you'll need to
-> > look at what these patches do (they perform simple read-modify-writes) and
-> > incorporate that code into your secure software.
-> > (...)
-> > I doubt that your secure monitor exposes the diagnostic register through an
-> > SMC interface so you'll need to change the secure boot code to enable these
-> > workarounds when the system comes out of reset.
+> On Mon, Nov 08, 2010 at 04:56:37PM +0800, rocky wrote:
+> > Hi
+> > 
+> > I'am working on an ARM linux porting project, which need to implement sched_clock of our own.
+> > have a glance at PXA sched_clock timplementation, puzzled about the following notes.
+> > 
+> > 
+> > /*
+> >  * This is PXA's sched_clock implementation. This has a resolution
+> >  * of at least 308 ns and a maximum value of 208 days.
+> >  *
+> >  * The return value is guaranteed to be monotonic in that range as
+> >  * long as there is always less than 582 seconds between successive
+> >  * calls to sched_clock() which should always be the case in practice.
+> >  */
+> > 
+> > 
+> > 
+> > 
+> > PXA series chips have system clock in 3250000/3249600/3686400 HZ.
+> > I do the math like this:
+> > 
+> > ####Where does 308 ns come from?
+> > 
+> > 
+> > ns of one clcok cycle:
+> > 307.69     (10^9/3250000);
+> > 307.73     (10^9/3249600);
+> > 271.26     (10^9/3686400 )
+> > this is the highest resolution mentioned in above notes;
+> Seems correct.  I think "at least" above means 308 ns or better (i.e.
+> shorter).
+> > 
+> > 
+> > ####Where does 582 seconds come from?
+> > 
+> > 660.76(0x80000000/3250000);
+> > 660.84(0x80000000/3249600); 
+> > 582.54(0x80000000/3686400 );
+> Seems correct, too.
 > 
-> These SMC:s (System Management Call?) are getting hairier now.
+> > Question is how does 208 days pop out?
+> > Can anyone give me some hints?
+> > thanks
+> I didn't check it, but I guess after 208 days sched_clock overflows.
 
-Secure Monitor Call :)
+Yes.  And the maximum range is bounded by OSCR2NS_SCALE_FACTOR limiting 
+the returned ns value to 64 - OSCR2NS_SCALE_FACTOR = 54 bits.  Hence:
 
-What I was eluding to above is that exposing things like the diagnostic
-register via an SMC is a *really* bad idea.  It's much better to set /clear
-any necessary bits in the secure boot code and then be done with it.
-If that's not possible, you could have a bunch of per-erratum SMCs
-but if you can modify the monitor in such a way then you should be able
-to modify the boot code too.
- 
-> Can't you add an abstraction for the stuff we need to poke into
-> diagnostics registers, enabling platform-specific overrides, like
-> we do for l2x0 in mm/cache-l2x0.c?
+	2^54 / 10^9 / 60 / 60 / 24 = 208 days
 
-I think Russell addressed this point.
+This means that, once every 208 days, you may experience a slight hickup 
+in process scheduling which no one is likely to notice.
 
-Cheers,
 
-Will
+Nicolas
