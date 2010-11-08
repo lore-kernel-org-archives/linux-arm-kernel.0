@@ -1,29 +1,37 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 8 Nov 2010 10:59:02 +0200
-Subject: Build error with s3c2410_defconfig
-In-Reply-To: <001001cb7f14$cace6af0$606b40d0$%kim@samsung.com>
-References: <001001cb7f14$cace6af0$606b40d0$%kim@samsung.com>
-Message-ID: <201011081059.03095.anarsoul@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Nov 2010 09:08:03 +0000
+Subject: [PATCH] arch/arm/plat-mxc/cpufreq.c: Fix line continuation defect
+In-Reply-To: <20101108081808.GN16938@pengutronix.de>
+References: <1289164215.29216.315.camel@Joe-Laptop>
+	<20101108081808.GN16938@pengutronix.de>
+Message-ID: <20101108090803.GA13157@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 November 2010 09:15:55 Kukjin Kim wrote:
-> Hi Vasily,
+On Mon, Nov 08, 2010 at 09:18:08AM +0100, Uwe Kleine-K?nig wrote:
+> Hi Joe,
 > 
-> Now, happens following build error due to commit
-> 14477095abc661a9f195ca4733bb739c54794b32 'ARM: h1940: Use gpiolib for latch
-> access' with s3c2410_defconfig.
-> 
-> drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
-> drivers/leds/leds-h1940.c:33: error: implicit declaration of function
-> 'h1940_latch_control'
-> 
-> The h1940_greenled_set(), h1940_redled_set(), and h1940_blueled_set() in
-> drivers/leds/leds-h1940.c call h1940_latch_control()...
-> 
-> Need to fix it up.
-> 
-> Thanks.
+> On Sun, Nov 07, 2010 at 01:10:15PM -0800, Joe Perches wrote:
+> > Signed-off-by: Joe Perches <joe@perches.com>
+> > ---
+> >  arch/arm/plat-mxc/cpufreq.c |    4 ++--
+> >  1 files changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+> > index 039538e..9f358af 100644
+> > --- a/arch/arm/plat-mxc/cpufreq.c
+> > +++ b/arch/arm/plat-mxc/cpufreq.c
+> > @@ -154,8 +154,8 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
+> >  	ret = cpufreq_frequency_table_cpuinfo(policy, imx_freq_table);
+> >  
+> >  	if (ret < 0) {
+> > -		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq \
+> > -				with error code %d\n", __func__, ret);
+> > +		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq with error code %d\n",
+> > +		       __func__, ret);
+> I'd prefer
+> +		printk(KERN_ERR "%s: failed to register i.MXC CPUfreq "
+> +				"with error code %d\n", __func__, ret);
 
-Hi, I'm aware of a problem, will fix and send patch tonight (however, 
-h1940_leds driver should be marked as deprecated)
+No - you don't wrap error messages.  It's the one exception to the 80
+column rule.
