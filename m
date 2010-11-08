@@ -1,82 +1,56 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Mon, 08 Nov 2010 14:26:03 +0200
-Subject: [PATCH 1/3] OMAP: use generic panel data in board files
-In-Reply-To: <1288986236-30210-2-git-send-email-bryan.wu@canonical.com>
-References: <1288986236-30210-1-git-send-email-bryan.wu@canonical.com>
-	<1288986236-30210-2-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1289219163.3297.54.camel@tubuntu>
+From: marek.belisko@gmail.com (Marek Belisko)
+Date: Mon,  8 Nov 2010 13:39:09 +0100
+Subject: [PATCH] ARM: s3c2440: mini2440: Add support for new LCD's.
+Message-ID: <1289219949-19958-1-git-send-email-marek.belisko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch add support for new mini2440 board LCD's:
+3.5" TFT + TS (TD035STED4)
+5.6" TFT (Innolux AT056TN52).
 
-On Fri, 2010-11-05 at 20:43 +0100, ext Bryan Wu wrote:
-> Introduce struct panel config data in panel.h, which will be used to match
-> the right panel configurations in generic DPI panel driver and other future
-> dsi panel drivers.
-> 
-> Still keep sharp_ls_panel, since the sharp_ls_panel driver contains blacklight
-> control driver code which will be moved out later. Then we can use generic DPI
-> driver for sharp_ls_panel.
+Code overtaken from mini2440 kernel:
+git://repo.or.cz/linux-2.6/mini2440.git
 
-As mentioned in the other mail, don't touch panel-taal or
-nokia-dsi-panel.h. They are not related to this change.
+Signed-off-by: Marek Belisko <marek.belisko@gmail.com>
+---
+ arch/arm/mach-s3c2440/mach-mini2440.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
-The panel.h file should be spesific for the generic panel driver, so
-name the .c and .h files similarly. (yes, panel-taal.c and
-nokia-dsi-panel.h are not good examples for this, but I have a patch
-fixing it, I just haven't had time to push it forward =).
-
-And remember that the kernel should compile and work after each
-individual patch in the patch set. In this patch you set the boards to
-use dvi_panel driver, but there is no dvi_panel driver yet.
-
-Also some comments inline.
-
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
->  arch/arm/mach-omap2/board-3430sdp.c               |   10 +++-
->  arch/arm/mach-omap2/board-am3517evm.c             |   19 +++++--
->  arch/arm/mach-omap2/board-cm-t35.c                |   19 +++++--
->  arch/arm/mach-omap2/board-devkit8000.c            |   22 +++++---
->  arch/arm/mach-omap2/board-igep0020.c              |   10 +++-
->  arch/arm/mach-omap2/board-omap3beagle.c           |   10 +++-
->  arch/arm/mach-omap2/board-omap3evm.c              |   10 +++-
->  arch/arm/mach-omap2/board-omap3stalker.c          |   19 +++++--
->  arch/arm/plat-omap/include/plat/nokia-dsi-panel.h |   31 -----------
->  arch/arm/plat-omap/include/plat/panel.h           |   57 +++++++++++++++++++++
->  drivers/video/omap2/displays/panel-taal.c         |   26 ++++------
->  11 files changed, 148 insertions(+), 85 deletions(-)
->  delete mode 100644 arch/arm/plat-omap/include/plat/nokia-dsi-panel.h
->  create mode 100644 arch/arm/plat-omap/include/plat/panel.h
-> 
-> diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-> index 4e3742c..859b4e5 100644
-> --- a/arch/arm/mach-omap2/board-3430sdp.c
-> +++ b/arch/arm/mach-omap2/board-3430sdp.c
-> @@ -38,6 +38,7 @@
->  #include <plat/dma.h>
->  #include <plat/gpmc.h>
->  #include <plat/display.h>
-> +#include <plat/panel.h>
-> 
->  #include <plat/gpmc-smc91x.h>
-> 
-> @@ -270,11 +271,14 @@ static struct omap_dss_device sdp3430_lcd_device = {
->         .platform_disable       = sdp3430_panel_disable_lcd,
->  };
-> 
-> +static struct panel_data dvi_panel = {
-> +       .name           = "generic",
-> +};
-> +
->  static struct omap_dss_device sdp3430_dvi_device = {
->         .name                   = "dvi",
-> -       .driver_name            = "generic_panel",
-> -       .type                   = OMAP_DISPLAY_TYPE_DPI,
-> -       .phy.dpi.data_lines     = 24,
-
-Why do you remove type and datalines configuration? You do this for the
-other panels also.
-
- Tomi
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index f62bb4c..4c11699 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -185,6 +185,30 @@ static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
+ 		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
+ 				   S3C2410_LCDCON5_HWSWP),
+ 	},
++	[3] = {	/* mini2440 + 3.5" TFT + TS -- New model as Nov 2009 "T35" */
++		_LCD_DECLARE(
++			7,			/* The 3.5 is quite fast */
++			240, 21, 25, 6,		/* x timing */
++			320, 2, 4, 2,		/* y timing */
++			40),			/* refresh rate */
++		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
++				   S3C2410_LCDCON5_INVVLINE |
++				   S3C2410_LCDCON5_INVVFRAME |
++				   S3C2410_LCDCON5_INVVDEN |
++				   S3C2410_LCDCON5_PWREN),
++	},
++	[4] = { /* mini2440 + 5.6" TFT + touchscreen -- Innolux AT056TN52 */
++		/* be sure the "power" jumper is set accordingly ! */
++		_LCD_DECLARE(
++			10,			/* the 5.3" runs slower */
++			640, 41, 68, 22,	/* x timing */
++			480, 26, 6, 2,		/* y timing */
++			40),			/* refresh rate */
++		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
++				   S3C2410_LCDCON5_INVVLINE |
++				   S3C2410_LCDCON5_INVVFRAME |
++				   S3C2410_LCDCON5_PWREN),
++	},
+ };
+ 
+ /* todo - put into gpio header */
+-- 
+1.7.1
