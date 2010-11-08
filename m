@@ -1,48 +1,49 @@
-From: timo.lindfors@iki.fi (Timo Juhani Lindfors)
-Date: Mon,  8 Nov 2010 11:44:12 +0200
-Subject: [PATCH] ptrace: make PTRACE_SINGLESTEP work with user helpers
-In-Reply-To: <20101107180523.GB2862@n2100.arm.linux.org.uk>
-References: <20101107180523.GB2862@n2100.arm.linux.org.uk>
-Message-ID: <1289209452-23920-1-git-send-email-timo.lindfors@iki.fi>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 08 Nov 2010 09:48:13 +0000
+Subject: linux-next: omap2plus_defconfig not building
+In-Reply-To: <eace9c309e371630528bc9f8fa208705@mail.gmail.com>
+References: <4CBD707F.6050204@ti.com>
+	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
+	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
+Message-ID: <1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userland jumps to the kernel provided user helper page to perform
-operations like __kernel_cmpxchg trace_set_bpt() is unable to add
-breakpoints. Since single stepping is implemented with breakpoints on
-ARM this means that a process can effectively escape tracing
-completely. This patch treats jumps to user helper page as
-instructions that branch to LR since all user helpers return to LR.
+On Mon, 2010-11-08 at 06:05 +0000, Anand Gadiyar wrote:
+> Catalin Marinas wrote:
+> > On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
+> > > Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
+> > > processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
+> > > gets compiled when the omap2plus_defconfig is built - the
+> > > omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
+> > > image, and has CPU_V6 and CPU_V7 both enabled.
+> >
+> > This patch should fix it:
+> >
+> >
+> > ARM: Do not enable SWP emulation if CPU_V6 && CPU_V7
+> >
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> >
+> > This option uses LDREXB/STREXB to emulate SWPB but these instructions
+> > are not supported on all the ARMv6 processors.
+> >
+> > Reported-by: Anand Gadiyar <gadiyar@ti.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Leif Lindholm <Leif.Lindholm@arm.com>
+> 
+> I can't find this patch in linux-next. Hope we haven't missed it.
+> Tony acked this btw.
+> 
+> Strangely, the omap2plus_defconfig in v2.6.37-rc1 no longer gets
+> CONFIG_SWP_EMULATE enabled even without this patch - I can't figure
+> out why.
 
-Tested on S3C2410 (ARM920T, ARMv4T) with 2.6.34.
+Russell had a better idea for handling this, not sure whether it went
+into -next. It was basically adding -march=armv7-a to
+CFLAGS_swp_emulate.o in arch/arm/kernel/Makefile since we can't trigger
+an undef fault for SWP on ARMv6 anyway.
 
-Reference: https://bugzilla.kernel.org/show_bug.cgi?id=20412
-Signed-off-by: Timo Juhani Lindfors <timo.lindfors@iki.fi>
----
- arch/arm/kernel/ptrace.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+If it's not in yet, I can submit a patch.
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 3e97483..383a4a3 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -28,6 +28,7 @@
- 
- #include "ptrace.h"
- 
-+#define REG_LR	14
- #define REG_PC	15
- #define REG_PSR	16
- /*
-@@ -427,6 +428,9 @@ get_branch_address(struct task_struct *child, unsigned long pc, unsigned long in
- 	    break;
- 	}
- 
-+	if (alt >= CONFIG_VECTORS_BASE && alt < CONFIG_VECTORS_BASE + PAGE_SIZE)
-+	    alt = get_user_reg(child, REG_LR);
-+
- 	return alt;
- }
- 
--- 
-1.7.2.3
+Catalin
