@@ -1,23 +1,29 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon, 08 Nov 2010 12:53:13 +0100
-Subject: [patch 1/1] Fix ixp4xx build failure of some modules
-In-Reply-To: <20101108104355.430478108@rtp-net.org>
-References: <20101108104355.430478108@rtp-net.org>
-Message-ID: <op.vluomzwl2s3iss@ecaz>
+From: marco.stornelli@gmail.com (Marco Stornelli)
+Date: Mon, 8 Nov 2010 12:59:06 +0100
+Subject: [PATCH] arm: fix compilation warning during compilation
+In-Reply-To: <20101108091302.GO16938@pengutronix.de>
+References: <4CD51A9B.7010806@gmail.com>
+	<20101108091302.GO16938@pengutronix.de>
+Message-ID: <AANLkTinmQtrLJcjxRSwbHARrgE-4FEaJeDt4R8C2tLHY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 08 Nov 2010 11:43:26 +0100, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-
-> Commit 710224fa2750cf449c02dd115548acebfdd2c86a adds dma_set_coherent_mask()
-> back but doesn't export the symbol, leading to build failures of modules
-> like this :
+2010/11/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
 >
-> ERROR: "dma_set_coherent_mask" [drivers/usb/host/ehci-hcd.ko] undefined!
+> On Sat, Nov 06, 2010 at 10:06:35AM +0100, Marco Stornelli wrote:
+>> From: Marco Stornelli <marco.stornelli@gmail.com>
+>>
+>> During compilation of 2.6.36 for Beagle board, there a are a couple of warnings. This patch fix them.
+> Please break lines for commit logs at around 76 chars and mention the
+> exact compiler warning being fixed.
+>
 
-<snip>
+My compiler version is gcc 4.4.1. Two warning: variable gpio_mux may
+be used not initialized (false positive, I agree); second: compiler
+fix the void lack in the inline function with an int. Obviously there
+is a lack of return type that it must be void.
 
-http://lists.arm.linux.org.uk/lurker/message/20101102.114433.8822afb6.en.html
+Regards,
 
-
-Imre
+Marco
