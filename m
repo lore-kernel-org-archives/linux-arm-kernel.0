@@ -1,43 +1,55 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 09 Nov 2010 12:13:11 +0200
-Subject: [PATCH 1/3] OMAP: use generic panel data in board files
-In-Reply-To: <AANLkTin7XOPyupobBehHc+hdJbGVJWFPRPYf03BwuDcZ@mail.gmail.com>
-References: <1288986236-30210-1-git-send-email-bryan.wu@canonical.com>
-	<1288986236-30210-2-git-send-email-bryan.wu@canonical.com>
-	<1289219163.3297.54.camel@tubuntu>
-	<AANLkTin7XOPyupobBehHc+hdJbGVJWFPRPYf03BwuDcZ@mail.gmail.com>
-Message-ID: <1289297591.3297.146.camel@tubuntu>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 9 Nov 2010 13:14:33 +0300
+Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
+In-Reply-To: <AANLkTimH0JVcB31usN5srPNYCR8sR75J23FtTPQK1Chf@mail.gmail.com>
+References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
+	<20101105074418.GA5864@oksana.dev.rtsoft.ru>
+	<AANLkTimH0JVcB31usN5srPNYCR8sR75J23FtTPQK1Chf@mail.gmail.com>
+Message-ID: <20101109101433.GA17423@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-11-08 at 20:43 +0100, ext Bryan Wu wrote:
-> On Mon, Nov 8, 2010 at 7:26 AM, Tomi Valkeinen <tomi.valkeinen@nokia.com> wrote:
-> > Hi,
-> >
-> > On Fri, 2010-11-05 at 20:43 +0100, ext Bryan Wu wrote:
-
-> >>  static struct omap_dss_device sdp3430_dvi_device = {
-> >>         .name                   = "dvi",
-> >> -       .driver_name            = "generic_panel",
-> >> -       .type                   = OMAP_DISPLAY_TYPE_DPI,
-> >> -       .phy.dpi.data_lines     = 24,
-> >
-> > Why do you remove type and datalines configuration? You do this for the
-> > other panels also.
-> >
+On Tue, Nov 09, 2010 at 03:12:25PM +0800, Lin Mac wrote:
+> > So, you need to build the kernel with the following command:
+> > make LOADADDR=0x200000 uImage
+> > And boot with these commands:
+> > setenv machid ad8
 > 
-> I found this is common in all the generic dpi panel, but the value
-> depends on the specific panel. I move this to the panel configuration
-> data and will set this value in panel-dpi driver. Do you think need I
-> keep them here? Actually I found all of them are 24 for generic one.
-> 16 or 18 for others.
+> Thanks for the useful suggestions. Now it booted.
 
-Both type and .phy.dpi.data_lines tell about the connection to the
-panel, not about the panel itself. Thus I think it's more consistent to
-have them defined in the board file.
+Great!
 
-Also, it's really up to the board HW design how many lines are connected
-from OMAP to the panel. You could connect only 16, for example, so it's
-something that has to be defined in the board file.
+> > setenv bootargs console=ttyS0,38400 ip=on
+> Changing this doesn't take effect. I was trying console=ttyS0,115200
+> and root=/dev/ram0, but it just boot with the configured parameter
+> instead of the given one.
+> 
+> Is it also the issue of u-boot?
 
- Tomi
+Nope. Just remove CONFIG_CMDLINE from your kernel .config file. ;-)
+
+> > tftp 100000 uImage
+> > bootm 100000
+> 
+> BTW, the default boot command includes root=/dev/mmcblk0p1, but
+> CONFIG_MMC_SDHCI_CNS3XXX is not enabled.
+> Even if it is enabled, I got a crash once mounted. It works fine
+> without L1 cache enabled (CONFIG_CPU_ICACHE_DISABLE,
+> CONFIG_CPU_DCACHE_DISABLE). So it seems there are some cache coherency
+> issue on the SDHC device.
+
+I recalling I observed something like this, and it was somehow
+related to the memory setup. The old (Jan 20 2010) U-Boot that
+I used was configuring RAM incorrectly, and caches were just
+unveiling the problem.
+
+But, I see that you use quite new build of the U-Boot (Sep 2010),
+so I'm not sure if that's the same problem as I had. Can you try
+booting with something simple, e.g. init=/bin/sh?
+
+Thanks,
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
