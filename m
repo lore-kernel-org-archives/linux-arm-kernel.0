@@ -1,24 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Nov 2010 14:33:45 +0100
-Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
-	VT8500 and WM8505
-In-Reply-To: <AANLkTinWNoGJoDu6Ok8Ni5OuAXN29H7Bd3YMyUq6qfFq@mail.gmail.com>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<20101109110407.GE2869@n2100.arm.linux.org.uk>
-	<AANLkTinWNoGJoDu6Ok8Ni5OuAXN29H7Bd3YMyUq6qfFq@mail.gmail.com>
-Message-ID: <201011091433.45387.arnd@arndb.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 9 Nov 2010 21:37:15 +0800
+Subject: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <AANLkTikk334vRT3HE9bQWc3u_jyLJckAY9AW=pVUQNbq@mail.gmail.com>
+References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
+	<AANLkTikk334vRT3HE9bQWc3u_jyLJckAY9AW=pVUQNbq@mail.gmail.com>
+Message-ID: <AANLkTimn2b6b8r8au48LWk4G4tNfbbR=TypAC1f3=e3e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 November 2010, Geert Uytterhoeven wrote:
-> >
-> > It looks to me like the only arch in the kernel which doesn't support
-> > generic irq is sh.
-> 
-> IIRC, m68k, sparc32, and s390.
+On Tue, Nov 9, 2010 at 5:21 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Mon, Nov 8, 2010 at 8:37 PM, Haojian Zhuang
+> <haojian.zhuang@marvell.com> wrote:
+>> From: Zhou Zhu <zzhu3@marvell.com>
+>>
+>> iwmmx instructions are also used in PJ4. Add PJ4 support.
+>>
+>> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+> This isn't good. Have to figure out a clean way for this.
+>
 
-Yes, and among those, no driver in s390 should need asm/irq.h either because
-they do not have interrupt numbers -- every device on s390 has an implicit
-interrupt.
-
-	Arnd
+How about create new iwmmx.S and pj4-cp0.c? Since it can avoid macro.
