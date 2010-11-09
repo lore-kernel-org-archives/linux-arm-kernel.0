@@ -1,45 +1,75 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue,  9 Nov 2010 11:06:12 +0200
-Subject: [PATCH 3/4] ARM: add CONFIG_CRASH_DUMP to Kconfig
+Date: Tue,  9 Nov 2010 11:06:13 +0200
+Subject: [PATCH 4/4] ARM: memblock: convert reserve_crashkernel() to use
+	memblock
 In-Reply-To: <cover.1289292124.git.mika.westerberg@iki.fi>
 References: <cover.1289292124.git.mika.westerberg@iki.fi>
-Message-ID: <3cae99ef4ab792c1e7c632dcfa6a2c16e5d2a190.1289292124.git.mika.westerberg@iki.fi>
+Message-ID: <07f23b6e32b1ee64287dc53803890052df6546f3.1289292124.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+Since we now use memblock we can convert reserve_crashkernel() to
+take advantage of the memblock API.
 
-Add CONFIG_CRASH_DUMP configuration option which is used by dump
-capture kernels.
+While we are at it, fix the typo in the function kerneldoc as well.
 
-Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 ---
- arch/arm/Kconfig |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/kernel/setup.c |   21 +++++++--------------
+ 1 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a19a526..78774d9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1650,6 +1650,19 @@ config ATAGS_PROC
- 	  Should the atags used to boot the kernel be exported in an "atags"
- 	  file in procfs. Useful with kexec.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..c477a2e 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -720,16 +720,8 @@ static int __init customize_machine(void)
+ arch_initcall(customize_machine);
  
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel (EXPERIMENTAL)"
-+	depends on EXPERIMENTAL
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec. The crash dump kernel must be compiled to a
-+	  memory address not used by the main kernel
+ #ifdef CONFIG_KEXEC
+-static inline unsigned long long get_total_mem(void)
+-{
+-	unsigned long total;
+-
+-	total = max_low_pfn - min_low_pfn;
+-	return total << PAGE_SHIFT;
+-}
+-
+ /**
+- * reserve_crashkernel() - reserves memory are for crash kernel
++ * reserve_crashkernel() - reserves memory area for crash kernel
+  *
+  * This function reserves memory area given in "crashkernel=" kernel command
+  * line parameter. The memory reserved is used by a dump capture kernel when
+@@ -738,16 +730,17 @@ static inline unsigned long long get_total_mem(void)
+ static void __init reserve_crashkernel(void)
+ {
+ 	unsigned long long crash_size, crash_base;
+-	unsigned long long total_mem;
+ 	int ret;
+ 
+-	total_mem = get_total_mem();
+-	ret = parse_crashkernel(boot_command_line, total_mem,
++	/* this is necessary because of memblock_phys_mem_size() */
++	memblock_analyze();
 +
-+	  For more details see Documentation/kdump/kdump.txt
-+
- config AUTO_ZRELADDR
- 	bool "Auto calculation of the decompressed kernel image address"
- 	depends on !ZBOOT_ROM && !ARCH_U300
++	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
+ 				&crash_size, &crash_base);
+ 	if (ret)
+ 		return;
+ 
+-	ret = reserve_bootmem(crash_base, crash_size, BOOTMEM_EXCLUSIVE);
++	ret = memblock_reserve(crash_base, crash_size);
+ 	if (ret < 0) {
+ 		printk(KERN_WARNING "crashkernel reservation failed - "
+ 		       "memory is in use (0x%lx)\n", (unsigned long)crash_base);
+@@ -758,7 +751,7 @@ static void __init reserve_crashkernel(void)
+ 	       "for crashkernel (System RAM: %ldMB)\n",
+ 	       (unsigned long)(crash_size >> 20),
+ 	       (unsigned long)(crash_base >> 20),
+-	       (unsigned long)(total_mem >> 20));
++	       (unsigned long)(memblock_phys_mem_size() >> 20));
+ 
+ 	crashk_res.start = crash_base;
+ 	crashk_res.end = crash_base + crash_size - 1;
 -- 
 1.7.2.3
