@@ -1,86 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 09 Nov 2010 10:17:50 +0000
-Subject: [PATCH 1/2] Fix the I-cache invalidation on ARMv6 and later CPUs
-In-Reply-To: <AANLkTim3O9HaOZp7VD3s1+FRU0KmPUrDei9NFDoXWK3y@mail.gmail.com>
-References: <20080606114622.15520.49929.stgit@pc1117.cambridge.arm.com>
-	<AANLkTik0_0Eb8G5hEb+DGvE2BDM_mJwwF-Pt1ErTz=Lr@mail.gmail.com>
-	<AANLkTim3O9HaOZp7VD3s1+FRU0KmPUrDei9NFDoXWK3y@mail.gmail.com>
-Message-ID: <1289297870.11461.7.camel@e102109-lin.cambridge.arm.com>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Tue, 09 Nov 2010 12:23:03 +0200
+Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
+In-Reply-To: <1289252700-3482-2-git-send-email-bryan.wu@canonical.com>
+References: <1289252700-3482-1-git-send-email-bryan.wu@canonical.com>
+	<1289252700-3482-2-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1289298183.3297.154.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, Nov 9, 2010 at 2:03 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
-> > On Fri, Jun 6, 2008 at 8:46 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> This patch adds the I-cache invalidation in update_mmu_cache if the
-> >> corresponding vma is marked as executable. It also invalidates the
-> >> I-cache if a thread migrates to a CPU it never ran on.
-> >
-> > The description says just two place in update_mmu_cache and CPU
-> > migration point.
-> > I agree on it.
-> >
-> >>
-> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> ---
-> >>
-> >>  arch/arm/mm/fault-armv.c      |    4 ++++
-> >>  arch/arm/mm/flush.c           |    2 ++
-> >>  include/asm-arm/cacheflush.h  |    7 +++++++
-> >>  include/asm-arm/mmu_context.h |    5 +++++
-> >>  4 files changed, 18 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-> >> index 44558d5..fbfa260 100644
-> >> --- a/arch/arm/mm/fault-armv.c
-> >> +++ b/arch/arm/mm/fault-armv.c
-> >> @@ -144,13 +144,17 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
-> >>        page = pfn_to_page(pfn);
-> >>        mapping = page_mapping(page);
-> >>        if (mapping) {
-> >> +#ifndef CONFIG_SMP
-> >>                int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
-> >>
-> >>                if (dirty)
-> >>                        __flush_dcache_page(mapping, page);
-> >> +#endif
-> >>
-> >>                if (cache_is_vivt())
-> >>                        make_coherent(mapping, vma, addr, pfn);
-> >> +               else if (vma->vm_flags & VM_EXEC)
-> >> +                       __flush_icache_all();
-> >>        }
-> >>  }
-> >>
-> >> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> >> index 9df507d..029ee65 100644
-> >> --- a/arch/arm/mm/flush.c
-> >> +++ b/arch/arm/mm/flush.c
-> >> @@ -199,6 +199,8 @@ void flush_dcache_page(struct page *page)
-> >>                __flush_dcache_page(mapping, page);
-> >>                if (mapping && cache_is_vivt())
-> >>                        __flush_dcache_aliases(mapping, page);
-> >> +               else if (mapping)
-> >> +                       __flush_icache_all();
-> >>        }
-> >
-> > Here, let me ask questions.
-> > 1. Why do we flush icache in  flush_dcache_page? Does it really needed?
+Hi,
 
-Note that these functions are changed slightly in 2.6.37-rc1, but we
-still do the I-cache flushing.
+On Mon, 2010-11-08 at 22:44 +0100, ext Bryan Wu wrote:
+> Generic DPI panel driver includes the driver and 4 similar panel configurations. It
+> will match the panel name which is passed from platform data and setup the
+> right configurations.
+> 
+> With generic DPI panel driver, we can remove those 4 duplicated panel display
+> drivers. In the future, it is simple for us just add new panel configuration
+> date in panel-generic-dpi.c to support new display panel.
+> 
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> ---
+>  .../arm/plat-omap/include/plat/panel-generic-dpi.h |   31 ++
+>  drivers/video/omap2/displays/Kconfig               |    8 +
+>  drivers/video/omap2/displays/Makefile              |    1 +
+>  drivers/video/omap2/displays/panel-generic-dpi.c   |  314 ++++++++++++++++++++
+>  4 files changed, 354 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+>  create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
+> 
+> diff --git a/arch/arm/plat-omap/include/plat/panel-generic-dpi.h b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+> new file mode 100644
+> index 0000000..da50756
+> --- /dev/null
+> +++ b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Header for generic DPI panel driver
+> + *
+> + * Copyright (C) 2010 Canonical Ltd.
+> + * Author: Bryan Wu <bryan.wu@canonical.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ARCH_ARM_PLAT_OMAP_GENERIC_DPI_PANEL_H
+> +#define __ARCH_ARM_PLAT_OMAP_GENERIC_DPI_PANEL_H
 
-There reason is that the page being modified may already be mapped in
-user space and may be a code page as well. The kernel may call this
-function after it modified the page and therefore we need to ensure the
-I-D cache coherency.
+Should be __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H
 
-IMHO, the API could be slightly improved since the kernel calls this
-function even before reading a page cache page but we don't really need
-to invalidate the I-cache at that point.
+> +
+> +/**
+> + * struct panel_data - panel driver configuration
+> + * @name: panel name
+> + */
+> +struct generic_dpi_panel_data {
 
-> > 2. If we really need it, should we even flush it in !VM_EXEC?
+I think the struct name should be panel_generic_dpi_data.
 
-We don't have the vma in flush_dcache_page to be able to check for
-VM_EXEC.
+> +	const char *name;
+> +};
 
-Catalin
+Please add here also the fields platform_enable/disable and use them
+instead of the ones in dssdev.
+
+ Tomi
