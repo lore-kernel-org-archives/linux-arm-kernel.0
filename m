@@ -1,26 +1,74 @@
-From: mattias@vmlinux.org (Mattias Walstrom)
-Date: Tue, 09 Nov 2010 20:37:12 +0100
-Subject: imx27: I2C clock frequency
-Message-ID: <4CD9A2E8.2040002@vmlinux.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 09 Nov 2010 13:37:53 -0800
+Subject: [PATCH v3 01/13] OMAP: DMA: Replace read/write macros with
+	functions
+In-Reply-To: <1288099513-1854-2-git-send-email-manjugk@ti.com> (Manjunath
+	Kondaiah G.'s message of "Tue, 26 Oct 2010 18:55:01 +0530")
+References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
+	<1288099513-1854-2-git-send-email-manjugk@ti.com>
+Message-ID: <87y692mb4e.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-When investigating the i2c clock frequency on our custom imx27-board (running 2.6.32) we discovered that it was not correct, instead of 100khz we got 40khz. When looking at the code we noticed a possible problem with get_rate_ipg. With the following patch we get an i2c clock at 100khz (as expected).
+"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 
-Is this the right way to solve the problem? I am unsure if I can use the AHB divider directly for the ipgclock-rate.
+> The low level read/write macros are replaced with static inline functions
+> and register offsets are handled through static register offset tables
+> mapped through enumeration constants.
+>
+> The objective of this patch is to prepare for omap dma driver cleanup
+> and dma hwmod implementation. The code optimization and moving machine
+> specific code to respective mach-omapx dma file will be handled in the
+> rest of this patch series.
 
---- linux-2.6.32.23.orig/arch/arm/mach-mx2/clock_imx27.c
-+++ linux-2.6.32.23/arch/arm/mach-mx2/clock_imx27.c
-@@ -401,7 +401,7 @@ static unsigned long get_rate_ipg(struct
- 	unsigned long rate, ipg_pdf;
- 
- 	if (mx27_revision() >= CHIP_REV_2_0)
--		return clk_get_rate(clk->parent);
-+		ipg_pdf = (__raw_readl(CCM_CSCR) >> 8) & 3;
- 	else
- 		ipg_pdf = (__raw_readl(CCM_CSCR) >> 8) & 1;
+[...]
 
-Best regards
+> -#define dma_write(val, reg)						\
+> -({									\
+> -	if (cpu_class_is_omap1())					\
+> -		__raw_writew((u16)(val), omap_dma_base + OMAP1_DMA_##reg); \
+> -	else								\
+> -		__raw_writel((val), omap_dma_base + OMAP_DMA4_##reg);	\
+> -})
+> +static inline void dma_write(u32 val, int reg, int lch)
+> +{
+> +	if (cpu_class_is_omap1()) {
 
-Mattias Walstr?m
+Reminder: any use of cpu_is_* checks outside of init code will be NAK'd.
+
+cpu_is_* check do not belong at runtime, especially in a crucial path
+like this.  
+
+> +		if (reg > OMAP1_CH_COMMON_START)
+> +			__raw_writew(val, dma_base +
+> +				(reg_map_omap1[reg] + 0x40 * lch));
+> +		else
+> +			__raw_writew(val, dma_base + reg_map_omap1[reg]);
+> +	} else {
+> +		if (reg > OMAP2_CH_COMMON_START)
+> +			__raw_writel(val, dma_base +
+> +				(reg_map_omap2[reg] + 0x60 * lch));
+> +		else
+> +			__raw_writel(val, dma_base + reg_map_omap2[reg]);
+> +	}
+> +}
+
+The register base offset, register array and the stride (offset between
+instances: 0x40 or 0x60) are detectable at init time, and there's no
+reason to have conditional code for them.  IOW, they should be init time
+constants.  Doing so would greatly simply these functions.  In fact the
+CH_COMMON_START could also be an init time constant as well.  So, given
+the following init_time constants: dma_ch_common_start, dma_stride,
+reg_map, the above would be reduced to something actually worth
+inlining, for example (not actually tested):
+
+static inline void dma_write(u32 val, int reg, int lch)
+{
+        u8 stride = (reg > dma_ch_common_start) ? dma_stride : 0;
+
+        __raw_writel(val, dma_base + (reg_map[reg] + stride * lch));
+}
+
+Same applies to dma_read().
+
+Kevin
