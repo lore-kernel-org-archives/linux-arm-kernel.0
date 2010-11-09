@@ -1,25 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Nov 2010 10:35:50 +0000
-Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
-In-Reply-To: <20101109101433.GA17423@oksana.dev.rtsoft.ru>
-References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
-	<20101105074418.GA5864@oksana.dev.rtsoft.ru>
-	<AANLkTimH0JVcB31usN5srPNYCR8sR75J23FtTPQK1Chf@mail.gmail.com>
-	<20101109101433.GA17423@oksana.dev.rtsoft.ru>
-Message-ID: <20101109103550.GB2869@n2100.arm.linux.org.uk>
+Date: Tue, 9 Nov 2010 10:38:36 +0000
+Subject: [PATCH 1/2] Fix the I-cache invalidation on ARMv6 and later CPUs
+In-Reply-To: <AANLkTikhi3znQs32Qc=ACuH0Kz-WV0xmD-4-JjQv8OqZ@mail.gmail.com>
+References: <20080606114622.15520.49929.stgit@pc1117.cambridge.arm.com>
+	<AANLkTik0_0Eb8G5hEb+DGvE2BDM_mJwwF-Pt1ErTz=Lr@mail.gmail.com>
+	<AANLkTim3O9HaOZp7VD3s1+FRU0KmPUrDei9NFDoXWK3y@mail.gmail.com>
+	<1289297870.11461.7.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTikhi3znQs32Qc=ACuH0Kz-WV0xmD-4-JjQv8OqZ@mail.gmail.com>
+Message-ID: <20101109103836.GC2869@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 09, 2010 at 01:14:33PM +0300, Anton Vorontsov wrote:
-> On Tue, Nov 09, 2010 at 03:12:25PM +0800, Lin Mac wrote:
-> > > setenv bootargs console=ttyS0,38400 ip=on
-> > Changing this doesn't take effect. I was trying console=ttyS0,115200
-> > and root=/dev/ram0, but it just boot with the configured parameter
-> > instead of the given one.
-> > 
-> > Is it also the issue of u-boot?
+On Tue, Nov 09, 2010 at 07:34:45PM +0900, Minchan Kim wrote:
+> On Tue, Nov 9, 2010 at 7:17 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > Note that these functions are changed slightly in 2.6.37-rc1, but we
+> > still do the I-cache flushing.
+> >
+> > There reason is that the page being modified may already be mapped in
+> > user space and may be a code page as well. The kernel may call this
 > 
-> Nope. Just remove CONFIG_CMDLINE from your kernel .config file. ;-)
+> Yes. That's my point. We can't know code or not in that context(ie,
+> flush_dcache_page).
 
-No.  The external command line overrides the built-in one unless
-CMDLINE_FORCE is set.
+And because we don't know, we have to assume that the page does contain
+code, so we have to flush the I cache.
+
+> In 2.6.37-rc1, we flushes icache without VM_EXEC check in set_pte_at
+> which doesn't have VMA, either.
+> Could we move the icache flush to update_mmu_cache again?
+
+No.  We moved it to fix a race on SMP - between the PTE being established
+and the caches being coherent.  Moving it later reintroduces that race
+again.
