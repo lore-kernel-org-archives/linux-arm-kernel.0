@@ -1,44 +1,61 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue,  9 Nov 2010 11:06:09 +0200
-Subject: [PATCH 0/4] ARM kdump fixes
-Message-ID: <cover.1289292124.git.mika.westerberg@iki.fi>
+Date: Tue,  9 Nov 2010 11:06:10 +0200
+Subject: [PATCH 1/4] proc/vmcore: allow archs to override
+	vmcore_elf_check_arch()
+In-Reply-To: <cover.1289292124.git.mika.westerberg@iki.fi>
+References: <cover.1289292124.git.mika.westerberg@iki.fi>
+Message-ID: <df680f67f33d8b0ef815045b53f205b3ff35de63.1289292124.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+From: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 
-Here is a set of patches which I hope allows us to build
-crashkernels on ARM platforms. The first patch is needed so that we
-can get rid of a compiler warning when building /proc/vmcore on
-32-bit only platform. I think it should go via Andrew's tree (if
-accepted, that is).
+Allow architectures to redefine this macro if needed. This is useful for
+example in architectures where 64-bit ELF vmcores are not supported.
+Specifying zero vmcore_elf64_check_arch() allows compiler to optimize
+away unnecessary parts of parse_crash_elf64_headers().
 
-Patches 2 and 3 should replace following patches which are in
-Russell's patch tracker:
+We also rename the macro to vmcore_elf64_check_arch() to reflect that it
+is used for 64-bit vmcores only.
 
-	6121/1 allow passing an ELF64 header to elf_check_arch()
-	-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6121/1
-
-	6123/1 kdump: add CONFIG_CRASH_DUMP Kconfig option
-	-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6123/1
-
-The last patch converts reserve_crashkernel() to use memblock.
-
-Thanks,
-MW
-
-Mika Westerberg (4):
-  proc/vmcore: allow archs to override vmcore_elf_check_arch()
-  ARM: provide zero vmcore_elf64_check_arch()
-  ARM: add CONFIG_CRASH_DUMP to Kconfig
-  ARM: memblock: convert reserve_crashkernel() to use memblock
-
- arch/arm/Kconfig           |   13 +++++++++++++
- arch/arm/include/asm/elf.h |    2 ++
- arch/arm/kernel/setup.c    |   21 +++++++--------------
+Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+---
  fs/proc/vmcore.c           |    2 +-
  include/linux/crash_dump.h |    9 ++++++++-
- 5 files changed, 31 insertions(+), 16 deletions(-)
+ 2 files changed, 9 insertions(+), 2 deletions(-)
 
+diff --git a/fs/proc/vmcore.c b/fs/proc/vmcore.c
+index 2367fb3..74802bc5 100644
+--- a/fs/proc/vmcore.c
++++ b/fs/proc/vmcore.c
+@@ -499,7 +499,7 @@ static int __init parse_crash_elf64_headers(void)
+ 	/* Do some basic Verification. */
+ 	if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG) != 0 ||
+ 		(ehdr.e_type != ET_CORE) ||
+-		!vmcore_elf_check_arch(&ehdr) ||
++		!vmcore_elf64_check_arch(&ehdr) ||
+ 		ehdr.e_ident[EI_CLASS] != ELFCLASS64 ||
+ 		ehdr.e_ident[EI_VERSION] != EV_CURRENT ||
+ 		ehdr.e_version != EV_CURRENT ||
+diff --git a/include/linux/crash_dump.h b/include/linux/crash_dump.h
+index 0026f26..088cd4a 100644
+--- a/include/linux/crash_dump.h
++++ b/include/linux/crash_dump.h
+@@ -20,7 +20,14 @@ extern ssize_t copy_oldmem_page(unsigned long, char *, size_t,
+ #define vmcore_elf_check_arch_cross(x) 0
+ #endif
+ 
+-#define vmcore_elf_check_arch(x) (elf_check_arch(x) || vmcore_elf_check_arch_cross(x))
++/*
++ * Architecture code can redefine this if there are any special checks
++ * needed for 64-bit ELF vmcores. In case of 32-bit only architecture,
++ * this can be set to zero.
++ */
++#ifndef vmcore_elf64_check_arch
++#define vmcore_elf64_check_arch(x) (elf_check_arch(x) || vmcore_elf_check_arch_cross(x))
++#endif
+ 
+ /*
+  * is_kdump_kernel() checks whether this kernel is booting after a panic of
 -- 
 1.7.2.3
