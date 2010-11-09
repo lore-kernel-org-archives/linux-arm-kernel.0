@@ -1,26 +1,43 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Nov 2010 10:53:31 +0000
-Subject: [PATCH 1/2] Fix the I-cache invalidation on ARMv6 and later CPUs
-In-Reply-To: <AANLkTinL_quoDUL=_aT9d-Tdi4wEFPf59JLCBH-Ybc7h@mail.gmail.com>
-References: <20080606114622.15520.49929.stgit@pc1117.cambridge.arm.com>
-	<AANLkTik0_0Eb8G5hEb+DGvE2BDM_mJwwF-Pt1ErTz=Lr@mail.gmail.com>
-	<AANLkTim3O9HaOZp7VD3s1+FRU0KmPUrDei9NFDoXWK3y@mail.gmail.com>
-	<1289297870.11461.7.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTikhi3znQs32Qc=ACuH0Kz-WV0xmD-4-JjQv8OqZ@mail.gmail.com>
-	<20101109103836.GC2869@n2100.arm.linux.org.uk>
-	<AANLkTinL_quoDUL=_aT9d-Tdi4wEFPf59JLCBH-Ybc7h@mail.gmail.com>
-Message-ID: <20101109105331.GD2869@n2100.arm.linux.org.uk>
+Date: Tue, 9 Nov 2010 11:04:07 +0000
+Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <20101109105144.GA22389@linux-sh.org>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+	<20101108041721.GA11605@linux-sh.org>
+	<20101108141407.GA25739@alchark-u3s.lan>
+	<20101108204315.GA12050@linux-sh.org>
+	<20101109103312.GA2869@n2100.arm.linux.org.uk>
+	<20101109105144.GA22389@linux-sh.org>
+Message-ID: <20101109110407.GE2869@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 09, 2010 at 07:52:15PM +0900, Minchan Kim wrote:
-> Thanks, I understand the problem by your kind explanation.
-> So, why don't we use flush_icache_page?
+On Tue, Nov 09, 2010 at 07:51:45PM +0900, Paul Mundt wrote:
+> On Tue, Nov 09, 2010 at 10:33:12AM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Nov 09, 2010 at 05:43:16AM +0900, Paul Mundt wrote:
+> > > > diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+> > > > new file mode 100644
+> > > > index 0000000..640d8a3
+> > > > --- /dev/null
+> > > > +++ b/drivers/video/vt8500lcdfb.c
+> > > > +#include <asm/irq.h>
+> > > > +
+> > > linux/irq.h is preferred here.
+> > 
+> > I assume you've read the comment at the top of linux/irq.h ?
 > 
-> page fault
-> read
-> flush_icache_page <------ here
-> set_pte_at
-> update_mmu_cache
+> I had forgotten about that. This comment predates git, so I'm unaware of
+> what the context is, could you elaborate on it?
 
-Have you read Documentation/cachetlb.txt ?
+It's from a time when we didn't have generic irq (and as I understand,
+generic irq is still optional.)
+
+When you didn't have generic irq support for an arch, having drivers
+include linux/irq.h resulted in build errors, caused by nothing more
+than "use linux/foo.h rather than asm/foo.h" - as those architectures
+won't provide an asm/hw_irq.h.
+
+It looks to me like the only arch in the kernel which doesn't support
+generic irq is sh.
