@@ -1,59 +1,54 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 9 Nov 2010 01:03:15 +0100
-Subject: [PATCH 3/6] OMAP4: hwmod data: add mmu hwmod for ducati and tesla
-In-Reply-To: <AANLkTi=JhdGqB-mXnvjT_Y4cCOu2i8bwfQyy=FAC1Chh@mail.gmail.com>
-References: <1289006396-27230-1-git-send-email-omar.ramirez@ti.com>	<1289006396-27230-4-git-send-email-omar.ramirez@ti.com>	<4CD5BEFF.40301@ti.com>	<AANLkTim=5bgGo1cnkWJCPF4HmMnQrBhP_sPCK3rRKUPS@mail.gmail.com>	<4CD885DD.7020909@ti.com>
-	<AANLkTi=JhdGqB-mXnvjT_Y4cCOu2i8bwfQyy=FAC1Chh@mail.gmail.com>
-Message-ID: <4CD88FC3.9050205@ti.com>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Tue, 9 Nov 2010 03:03:01 +0300
+Subject: [PATCH 6/6 v4] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <20101108235407.GB18385@linux-sh.org>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+	<20101108041721.GA11605@linux-sh.org>
+	<20101108141407.GA25739@alchark-u3s.lan>
+	<20101108204315.GA12050@linux-sh.org>
+	<AANLkTikXffMT9ZiUpm2QAoW+KPJN3MBf55Dgruj1EJN0@mail.gmail.com>
+	<20101108213008.GB17708@linux-sh.org>
+	<20101108234239.GA20819@alchark-u3s.lan>
+	<20101108235407.GB18385@linux-sh.org>
+Message-ID: <AANLkTim047K-RjLLcz3124Wm+-he8s5AirAsD6R_kitN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/2010 12:48 AM, Ramirez Luna, Omar wrote:
-> On Mon, Nov 8, 2010 at 5:21 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->>> I wrote this one from scratch, I didn't see that there were pieces to
->>> handle some stuff since the code is buried in a private tree.
+2010/11/8 Paul Mundt <lethal@linux-sh.org>:
+> On Tue, Nov 09, 2010 at 02:42:39AM +0300, Alexey Charkov wrote:
+>> From 95942cc0cd0909d700c236ba63d3488ec9fccf1a Mon Sep 17 00:00:00 2001
+>> From: Alexey Charkov <alchark@gmail.com>
+>> Date: Tue, 9 Nov 2010 02:25:40 +0300
+>> Subject: [PATCH 3/3] ARM: Add support for the display controllers in VT8500 and WM8505
 >>
->> Not true at all... It was sent to l-o:
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32854.html
+>> This adds drivers for the LCD controller found in VIA VT8500 SoC,
+>> GOVR display controller found in WonderMedia WM8505 SoC and for the
+>> Graphics Engine present in both of them that provides hardware
+>> accelerated raster operations (used for copyarea and fillrect).
+>>
+>> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+>> ---
+>>
+>> This incorporates fixes to the issues last mentioned by Paul.
+>>
+>> I just dropped <asm/irq.h>, as that seems to be not used at all currently
+>> (must have been some old cut-and-paste as well). As for the Graphics
+>> Engine, I decided not to disable it for now at device exit time, at least
+>> until we reach a conclusion on how or whether to implement support for its
+>> alpha-mixing capabilities. Unlike with display drivers, this should have no
+>> user-visible consequences. This can be changed later, when time comes for
+>> device clocks and power management support.
+>>
+> Looks good to me!
 >
-> I did review v3 of this patch set, care to point the exact place for
-> mmu hwmod on this patch set. It seems [v2 5/7] had mailbox, but I
-> don't think v3 made it to the list.
-
-The patch itself may did not reach the list due to his size, that's why 
-I added the link to the GIT.
-
-Both dsp and ipu contain the mmu + cache related information.
-
-static struct omap_hwmod omap44xx_dsp_hwmod
-static struct omap_hwmod omap44xx_ipu_hwmod
-
-At that time I didn't know how that stuff was supposed to be used by the 
-driver. I already changed the structure a little bit based on Hari's 
-comment, so if you do need mmu entry only, since that structure seems to 
-handle only that, it might makes sense to rename them in order to 
-consider them part of the mmu class.
-It should be then mmu_dsp and mmu_ipu, because in that case, it will 
-represent the mmu class instances for the dsp and the ipu.
-
-I'm perfectly fine to update that part if needed.
-
-Regards,
-Benoit
-
->> And stored in a supposedly private tree, which appears to be public:
->> http://dev.omapzoom.org/?p=swarch/linux-omap-adv.git;a=summary
+> Reviewed-by: Paul Mundt <lethal@linux-sh.org>
 >
-> I took whatever was in:
->
-> http://dev.omapzoom.org/?p=integration/kernel-omap4.git;a=shortlog;h=refs/heads/L24.11
 
->
->> Please do not do any change on that code base, just use the original code
->> and update it if needed.
->
-> Will do, as taken from the tree you mention.
->
-> Regards,
->
-> Omar
+Thanks, Paul!
+
+Is there anybody I should address specifically to get this merged?
+
+Best regards,
+Alexey
