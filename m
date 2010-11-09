@@ -1,75 +1,47 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue,  9 Nov 2010 11:06:13 +0200
-Subject: [PATCH 4/4] ARM: memblock: convert reserve_crashkernel() to use
-	memblock
-In-Reply-To: <cover.1289292124.git.mika.westerberg@iki.fi>
-References: <cover.1289292124.git.mika.westerberg@iki.fi>
-Message-ID: <07f23b6e32b1ee64287dc53803890052df6546f3.1289292124.git.mika.westerberg@iki.fi>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 9 Nov 2010 10:34:44 +0100
+Subject: [PATCH 1/2] mx25: fix spi device registration typo
+In-Reply-To: <6c16c084bfda41cd104613bed66bbad7b5433c6d.1289285160.git.baruch@tkos.co.il>
+References: <6c16c084bfda41cd104613bed66bbad7b5433c6d.1289285160.git.baruch@tkos.co.il>
+Message-ID: <20101109093444.GT16938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we now use memblock we can convert reserve_crashkernel() to
-take advantage of the memblock API.
+On Tue, Nov 09, 2010 at 08:47:54AM +0200, Baruch Siach wrote:
+> Commit 35bab0589b9a71533b37280eefa430c21dc102fe (ARM: imx: change the way
+> spi-imx devices are registered) contained a typo in mx25, leading to link time
+> failure.
+> 
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+s/Cc/Acked-by/
 
-While we are at it, fix the typo in the function kerneldoc as well.
+hm, and I thought my testing strategy was good (enough). :-/
 
-Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
----
- arch/arm/kernel/setup.c |   21 +++++++--------------
- 1 files changed, 7 insertions(+), 14 deletions(-)
+Thanks
+Uwe
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 336f14e..c477a2e 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -720,16 +720,8 @@ static int __init customize_machine(void)
- arch_initcall(customize_machine);
- 
- #ifdef CONFIG_KEXEC
--static inline unsigned long long get_total_mem(void)
--{
--	unsigned long total;
--
--	total = max_low_pfn - min_low_pfn;
--	return total << PAGE_SHIFT;
--}
--
- /**
-- * reserve_crashkernel() - reserves memory are for crash kernel
-+ * reserve_crashkernel() - reserves memory area for crash kernel
-  *
-  * This function reserves memory area given in "crashkernel=" kernel command
-  * line parameter. The memory reserved is used by a dump capture kernel when
-@@ -738,16 +730,17 @@ static inline unsigned long long get_total_mem(void)
- static void __init reserve_crashkernel(void)
- {
- 	unsigned long long crash_size, crash_base;
--	unsigned long long total_mem;
- 	int ret;
- 
--	total_mem = get_total_mem();
--	ret = parse_crashkernel(boot_command_line, total_mem,
-+	/* this is necessary because of memblock_phys_mem_size() */
-+	memblock_analyze();
-+
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
- 				&crash_size, &crash_base);
- 	if (ret)
- 		return;
- 
--	ret = reserve_bootmem(crash_base, crash_size, BOOTMEM_EXCLUSIVE);
-+	ret = memblock_reserve(crash_base, crash_size);
- 	if (ret < 0) {
- 		printk(KERN_WARNING "crashkernel reservation failed - "
- 		       "memory is in use (0x%lx)\n", (unsigned long)crash_base);
-@@ -758,7 +751,7 @@ static void __init reserve_crashkernel(void)
- 	       "for crashkernel (System RAM: %ldMB)\n",
- 	       (unsigned long)(crash_size >> 20),
- 	       (unsigned long)(crash_base >> 20),
--	       (unsigned long)(total_mem >> 20));
-+	       (unsigned long)(memblock_phys_mem_size() >> 20));
- 
- 	crashk_res.start = crash_base;
- 	crashk_res.end = crash_base + crash_size - 1;
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  arch/arm/mach-mx25/devices-imx25.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx25/devices-imx25.h b/arch/arm/mach-mx25/devices-imx25.h
+> index 93afa10..d94d282 100644
+> --- a/arch/arm/mach-mx25/devices-imx25.h
+> +++ b/arch/arm/mach-mx25/devices-imx25.h
+> @@ -42,9 +42,9 @@ extern const struct imx_mxc_nand_data imx25_mxc_nand_data __initconst;
+>  #define imx25_add_mxc_nand(pdata)	\
+>  	imx_add_mxc_nand(&imx25_mxc_nand_data, pdata)
+>  
+> -extern const struct imx_spi_imx_data imx25_spi_imx_data[] __initconst;
+> +extern const struct imx_spi_imx_data imx25_cspi_data[] __initconst;
+>  #define imx25_add_spi_imx(id, pdata)	\
+> -	imx_add_spi_imx(&imx25_spi_imx_data[id], pdata)
+> +	imx_add_spi_imx(&imx25_cspi_data[id], pdata)
+>  #define imx25_add_spi_imx0(pdata)	imx25_add_spi_imx(0, pdata)
+>  #define imx25_add_spi_imx1(pdata)	imx25_add_spi_imx(1, pdata)
+>  #define imx25_add_spi_imx2(pdata)	imx25_add_spi_imx(2, pdata)
+
 -- 
-1.7.2.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
