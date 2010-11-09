@@ -1,49 +1,42 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 9 Nov 2010 19:36:13 +0100
-Subject: hi marek
-In-Reply-To: <20101109184220.00003433@unknown>
-References: <20101109184220.00003433@unknown>
-Message-ID: <201011091936.13781.marek.vasut@gmail.com>
+From: dushistov@mail.ru (Evgeniy Dushistov)
+Date: Tue, 9 Nov 2010 22:46:18 +0300
+Subject: [PATCH] mv78xx: wrong cpu1 window base register address
+Message-ID: <20101109194617.GA14544@maclin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 November 2010 18:42:20 dylan cristiani wrote:
-> We heard some month ago, about ucb1400 irq passing, via
-> ucb1400_platform_data; then you wrote the patch, that is currently into
-> mainline; i've a little problem, probably due to my infinite ignorance:
-> i'm writing a sort of my_pm.c driver to check whether the ac line is
-> plugged or not, check the main battery voltage and so on (similar to
-> arch/arm/mach-pxa/sharpsl_pm.c and corgi_pm.c if you know it); the
-> problem is that the battery voltages are tied to the ucb1400 ADC
-> inputs, and in my_pm.c driver i don't know how to find the ucb1400_ts
-> structure address to call the functions i need to read these ADC input
-> i.e.:
+The constant DDR_WINDOW_CPU1_BASE has wrong value.
+Because of that mv78xx0_mbus_dram_info is not filled properly on
+start, and in its turn drivers, that used mv78xx0_mbus_dram_info,
+in my case mv643xx_eth.c, not work on second core.
+According to
 
-1) CC lists
+MV76100, MV78100, and MV78200 DiscoveryTM Innovation Series
+CPU Family
+Functional Specifications
 
-2) Can you post the driver source you have ?
+address should be 0x1570.
 
-without seeing the source, I can't help you
+Signed-off-by: Evgeniy Dushistov <dushistov@mail.ru>
+---
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> unsigned long read_mainbattery_value(void){
-> 	....
-> 	ucb1400_adc_enable(ucb->ac97);
-> 	return ucb1400_adc_read(ucb->ac97, UCB_ADC_INP_AD0, adcsync);
-> 	ucb1400_adc_disable(ucb->ac97);
-> 	....
-> }
-> 
-> 
-> Wwhere can i find info to set (into my_pm.c module) the
-> 	struct ucb1400_ts *ucb = ???
-> 
-> to be passed to the above function read_mainbattery_value()? the fact
-> is that the "ucb1400_ts" device platform is already allocked, added and
-> the driver registred by the driver/mfd/ucb1400_core.c module so i don't
-> know how to find this structure...
-> 
-> if it's too stupid question please sorry for the noise...
-> 
-> thanks a million
-> 
-> dylan
+diff --git a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+index 788bdac..3eff399 100644
+--- a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
++++ b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+@@ -65,7 +65,7 @@
+  */
+ #define DDR_VIRT_BASE		(MV78XX0_REGS_VIRT_BASE | 0x00000)
+ #define  DDR_WINDOW_CPU0_BASE	(DDR_VIRT_BASE | 0x1500)
+-#define  DDR_WINDOW_CPU1_BASE	(DDR_VIRT_BASE | 0x1700)
++#define  DDR_WINDOW_CPU1_BASE	(DDR_VIRT_BASE | 0x1570)
+ 
+ #define DEV_BUS_PHYS_BASE	(MV78XX0_REGS_PHYS_BASE | 0x10000)
+ #define DEV_BUS_VIRT_BASE	(MV78XX0_REGS_VIRT_BASE | 0x10000)
+-- 
+1.7.2.2
+
+-- 
+/Evgeniy
