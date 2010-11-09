@@ -1,42 +1,54 @@
-From: alandpearson@gmail.com (Alan Pearson)
-Date: Tue, 9 Nov 2010 16:52:31 +0000
-Subject: w1-gpio oops
-In-Reply-To: <87lj524hrt.fsf@lechat.rtp-net.org>
-References: <E0675DE1-DC0C-40AE-947B-D4BD96C18993@gmail.com>
-	<86F2C9C455334D048B154F93A214DF12@wipblrx0099946>
-	<BFBAEA51-E7E6-4960-848D-5904BB209102@gmail.com>
-	<AAD30849854E4B829FAF535B604B1B34@wipblrx0099946>
-	<8D0E58DD-1923-4321-A0B3-9FBD2DDA3529@gmail.com>
-	<87lj524hrt.fsf@lechat.rtp-net.org>
-Message-ID: <F67FCEAB-7AD7-4920-969C-124C4C172DBC@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 09 Nov 2010 17:05:16 +0000
+Subject: Using non-Global mappings for kernel address space
+In-Reply-To: <AANLkTikA2QOaxpc_m3n4aeESno-E63=522=QevTJtCCM@mail.gmail.com>
+References: <AANLkTi=f+s4GAKLSESK=WSjxmUDCCvog21z1XxW73nU3@mail.gmail.com>
+	<1289236418.3541.117.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTi=JDTvMgJZWLiE31=PhOS0D+m+SAFU5mxAR6ZJV@mail.gmail.com>
+	<1289252283.26399.45.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTikA2QOaxpc_m3n4aeESno-E63=522=QevTJtCCM@mail.gmail.com>
+Message-ID: <1289322316.11461.33.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->>> P. So u might need to define those
->>> in your board file.
->>> 
->> 
->> OK, I've modified my board file like so (guruplug-setup.c) :
->> 
->> 
->> static struct w1_gpio_platform_data guru_gpio_platform_data = {
->>        .pin                    = MPP38_GPIO,
+On Mon, 2010-11-08 at 22:39 +0000, Christoffer Dall wrote:
+> On Mon, Nov 8, 2010 at 10:38 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > C-A15 has several features that help with getting full virtualisation.
+> > Access to several system registers is trapped in the hypervisor and you
+> > can even emulate several CPUs on a single one (or more). There are
+> > virtual timers as well.
 > 
-> It's 38 not MPP38_GPIO. MPP38_GPIO is for the guruplug_mpp_config[]
-> stuff (looks at how the leds are configured for instance)
+> Nice. On an SMP system, the virtualization features would be supported
+> for each core?
+
+Yes, each core has virtualisation features but the hypervisor needs to
+be SMP-aware.
+
+> > At every context switch, Linux checks the ASID of the newly switched in
+> > context. If it is from an older generation (top 24 bits of context.id),
+> > it allocates a new ASID from the global cpu_last_asid variable. When
+> > Linux runs out of ASIDs (bottom 8 bits of cpu_last_asid become 0), it
+> > sends an IPI to all the CPUs to reset the ASID counting and flushes the
+> > full TLB.
 > 
-> 
-> Arnaud
-> 
-> 
+> I still don't see the need for the reserved ASID. Isn't all of this
+> taking place in global mappings anyway (without any of my hacks of
+> course)? If this is only an SMP issue, I will probably find out once I
+> start playing with that. So far my work is based strictly on UP.
 
+On UP, the reserved ASID is used during context switching (switch_mm)
+because you cannot set the ASID and TTBR0 at the same time. There is a
+small risk of speculative TLB loads and assigning the wrong ASID to
+TTBR0. That's why we set the ASID to 0, change TTBR0 and then set the
+new ASID.
 
-Guys, thanks. I've now got the module loading and utilising the GPIO pin.
-I know it is, because I cannot now grab the GPIO pin for normal GPIO as the w1_gpio driver has claimed ownership.
+On SMP, we have a few more reserved ASIDs, one for each CPU. But these
+are used only during roll-over event when resetting the ASIDs on all the
+active CPUs. We use some reserved number to avoid extra locking on the
+global ASID variable.
 
-I can't get it to see my device yet, but I'll get that figured out soon I hope.
+On C-A15 (with LPAE), the ASID is stored in TTBR0 so we wouldn't need a
+reserved ASID for the first case above.
 
-Many thanks for all your help, it is really appreciated here.
-
-Alan
+Catalin
