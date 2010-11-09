@@ -1,30 +1,28 @@
-From: alandpearson@gmail.com (Alan Pearson)
-Date: Tue, 9 Nov 2010 14:56:33 +0000
-Subject: w1-gpio oops
-In-Reply-To: <AAD30849854E4B829FAF535B604B1B34@wipblrx0099946>
-References: <E0675DE1-DC0C-40AE-947B-D4BD96C18993@gmail.com>
-	<86F2C9C455334D048B154F93A214DF12@wipblrx0099946>
-	<BFBAEA51-E7E6-4960-848D-5904BB209102@gmail.com>
-	<AAD30849854E4B829FAF535B604B1B34@wipblrx0099946>
-Message-ID: <41F19AF6-B2CE-4BE1-83D8-C607CE5AD3F1@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 9 Nov 2010 15:57:56 +0100
+Subject: [PATCH] ARM: add support for uncompressed uImage kernel
+In-Reply-To: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
+References: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <20101109145756.GZ16938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> 
-> 
-> <CHOP>
-> 
-> Ok, I had understood the platform data was being set in the w1_gpio_custom module by the loadable options.
-> Is this not the case, or does it also need defined in the board file, which I presume is guruplug_setup.c ?
-> It's currently not defined there. But as I said I expected the other module to do this, am I wrong ?
-> 
-> 
-> Looking at the function w1_gpio_probe, it doesnot seem to be using module params. So u might need to define those
-> in your board file.
-> 
+On Tue, Nov 09, 2010 at 02:50:56PM +0100, Alexander Stein wrote:
+> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+Quite some time ago I suggested something similar.  I'm sure you can
+find the mail in the archives.  The result of my patch was the
+introduction of a few more Make-targets:
 
-But the w1_gpio_custom module does. Anyhow, I'm trying it out in the board file now.
-I'll post back shortly.
+	uImage -> uimage(Image)
+	uzImage -> uimage(zImage) (== today's uImage)
+	uImagegz -> uimage(gzip(Image))
 
-Tnx
-Alan
+Russell objected that though.
+Today I don't use the kernel Makefile anymore to build uImages, but let
+ptxdist do that for me.
+
+Best regards
+Uwe
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
