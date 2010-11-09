@@ -1,41 +1,33 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 09 Nov 2010 14:26:08 -0800
-Subject: [PATCH v3 10/13] OMAP: DMA: Convert DMA library into DMA platform
-	Driver
-In-Reply-To: <1288099513-1854-11-git-send-email-manjugk@ti.com> (Manjunath
-	Kondaiah G.'s message of "Tue, 26 Oct 2010 18:55:10 +0530")
-References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-11-git-send-email-manjugk@ti.com>
-Message-ID: <8739rakubj.fsf@deeprootsystems.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 9 Nov 2010 23:26:45 +0100
+Subject: [PATCHv3 2/2] ARM: imx: Add mx53 support to common msl functions.
+In-Reply-To: <20101109221213.GC16938@pengutronix.de>
+References: <1288972551-21877-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1288972551-21877-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<20101109220207.GH6017@pengutronix.de>
+	<20101109221213.GC16938@pengutronix.de>
+Message-ID: <20101109222645.GJ6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+On Tue, Nov 09, 2010 at 11:12:13PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> > > -	if (!cpu_is_mx51())
+> > > +	if (!cpu_is_mx51() || !cpu_is_mx53())
+> > >  		return 0;
+> > 
+> > The code below runs for every SoC except i.MX51 and i.MX53. This is
+> > surely not what you want.
+> Hmm, for i.MX51 !cpu_is_mx53() is true, so the return 0 is always taken,
+> isn't it? :-)
 
-> Convert DMA library into DMA platform driver and make use
-> of platform data provided by HWMOD data base for OMAP2PLUS onwards.
-> For OMAP1 processors, the DMA driver in mach-omap uses resource
-> structures for getting platform data.
->
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Gna, I remember I ran in this trap not so long time ago ;)
 
-[...]
+Sascha
 
-> diff --git a/arch/arm/mach-omap2/include/mach/dma.h b/arch/arm/mach-omap2/include/mach/dma.h
-> index d0a7d5b..d13c5c0 100644
-> --- a/arch/arm/mach-omap2/include/mach/dma.h
-> +++ b/arch/arm/mach-omap2/include/mach/dma.h
-> @@ -29,4 +29,7 @@
->  #ifndef __ASM_ARCH_OMAP2_DMA_H
->  #define __ASM_ARCH_OMAP2_DMA_H
->  
-> +/* Should be part of hwmod data base ? */
-> +#define OMAP_DMA4_LOGICAL_DMA_CH_COUNT	32	/* REVISIT: Is this 32 + 2? */
-> +
-
-There are no users of this in this patch, all users are removed.
-
-Kevin
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
