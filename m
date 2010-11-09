@@ -1,77 +1,37 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 09 Nov 2010 12:23:03 +0200
-Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
-In-Reply-To: <1289252700-3482-2-git-send-email-bryan.wu@canonical.com>
-References: <1289252700-3482-1-git-send-email-bryan.wu@canonical.com>
-	<1289252700-3482-2-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1289298183.3297.154.camel@tubuntu>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Tue, 9 Nov 2010 13:23:29 +0300
+Subject: [PATCH 6/6 v2] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <201011080947.37522.arnd@arndb.de>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<1289147348-31969-6-git-send-email-alchark@gmail.com>
+	<201011080947.37522.arnd@arndb.de>
+Message-ID: <AANLkTikC9j2U3VUbEmfgH555Zq1sSO-hVtpg_k7hLFPS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2010/11/8 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 07 November 2010, Alexey Charkov wrote:
+>> ?drivers/video/Kconfig ? ? ? ? | ? 26 +++
+>> ?drivers/video/Makefile ? ? ? ?| ? ?3 +
+>> ?drivers/video/vt8500lcdfb.c ? | ?452 +++++++++++++++++++++++++++++++++++++++++
+>> ?drivers/video/vt8500lcdfb.h ? | ? 34 +++
+>> ?drivers/video/wm8505fb.c ? ? ?| ?438 +++++++++++++++++++++++++++++++++++++++
+>> ?drivers/video/wm8505fb_regs.h | ? 76 +++++++
+>> ?drivers/video/wmt_ge_rops.c ? | ?186 +++++++++++++++++
+>> ?drivers/video/wmt_ge_rops.h ? | ? ?5 +
+>
+> From a very brief look, the two drivers look rather similar. What is the
+> reason to have separate drivers instead of just one?
+>
+> Could you perhaps take the common parts and move them into a third module
+> that exports symbols to be used by the two drivers?
+>
 
-On Mon, 2010-11-08 at 22:44 +0100, ext Bryan Wu wrote:
-> Generic DPI panel driver includes the driver and 4 similar panel configurations. It
-> will match the panel name which is passed from platform data and setup the
-> right configurations.
-> 
-> With generic DPI panel driver, we can remove those 4 duplicated panel display
-> drivers. In the future, it is simple for us just add new panel configuration
-> date in panel-generic-dpi.c to support new display panel.
-> 
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
->  .../arm/plat-omap/include/plat/panel-generic-dpi.h |   31 ++
->  drivers/video/omap2/displays/Kconfig               |    8 +
->  drivers/video/omap2/displays/Makefile              |    1 +
->  drivers/video/omap2/displays/panel-generic-dpi.c   |  314 ++++++++++++++++++++
->  4 files changed, 354 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-omap/include/plat/panel-generic-dpi.h
->  create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/panel-generic-dpi.h b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
-> new file mode 100644
-> index 0000000..da50756
-> --- /dev/null
-> +++ b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
-> @@ -0,0 +1,31 @@
-> +/*
-> + * Header for generic DPI panel driver
-> + *
-> + * Copyright (C) 2010 Canonical Ltd.
-> + * Author: Bryan Wu <bryan.wu@canonical.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ARCH_ARM_PLAT_OMAP_GENERIC_DPI_PANEL_H
-> +#define __ARCH_ARM_PLAT_OMAP_GENERIC_DPI_PANEL_H
+Quite frankly, I would say that all SoC framebuffer drivers are quite
+similar ;-) Register offsets, timing formats, accepted pixel formats,
+buffer alignment requirements are all different, so I do not really
+believe that there'd be much benefit from introducing another
+abstraction level. This is open to debate, of course.
 
-Should be __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H
-
-> +
-> +/**
-> + * struct panel_data - panel driver configuration
-> + * @name: panel name
-> + */
-> +struct generic_dpi_panel_data {
-
-I think the struct name should be panel_generic_dpi_data.
-
-> +	const char *name;
-> +};
-
-Please add here also the fields platform_enable/disable and use them
-instead of the ones in dssdev.
-
- Tomi
+Alexey
