@@ -1,28 +1,21 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Nov 2010 23:26:45 +0100
-Subject: [PATCHv3 2/2] ARM: imx: Add mx53 support to common msl functions.
-In-Reply-To: <20101109221213.GC16938@pengutronix.de>
-References: <1288972551-21877-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1288972551-21877-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101109220207.GH6017@pengutronix.de>
-	<20101109221213.GC16938@pengutronix.de>
-Message-ID: <20101109222645.GJ6017@pengutronix.de>
+Date: Tue, 9 Nov 2010 23:38:03 +0100
+Subject: [PATCH] ARM: add support for uncompressed uImage kernel
+In-Reply-To: <20101109140455.GA6680@n2100.arm.linux.org.uk>
+References: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
+	<20101109140455.GA6680@n2100.arm.linux.org.uk>
+Message-ID: <20101109223803.GA8950@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 09, 2010 at 11:12:13PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+On Tue, Nov 09, 2010 at 02:04:55PM +0000, Russell King - ARM Linux wrote:
+> Is it really faster to copy an uncompressed image than it is to
+> decompress using LZMA with caches on?
 > 
-> > > -	if (!cpu_is_mx51())
-> > > +	if (!cpu_is_mx51() || !cpu_is_mx53())
-> > >  		return 0;
-> > 
-> > The code below runs for every SoC except i.MX51 and i.MX53. This is
-> > surely not what you want.
-> Hmm, for i.MX51 !cpu_is_mx53() is true, so the return 0 is always taken,
-> isn't it? :-)
 
-Gna, I remember I ran in this trap not so long time ago ;)
+At least on an i.MX35 I can read a bigger image from NAND faster than I
+can read + uncompress a smaller image. ZBOOT_ROM is no option for NAND.
+Reading from NAND is done with mmu/dcache on in this case.
 
 Sascha
 
