@@ -1,39 +1,26 @@
-From: alandpearson@gmail.com (Alan Pearson)
-Date: Tue, 9 Nov 2010 14:44:13 +0000
-Subject: w1-gpio oops
-In-Reply-To: <86F2C9C455334D048B154F93A214DF12@wipblrx0099946>
-References: <E0675DE1-DC0C-40AE-947B-D4BD96C18993@gmail.com>
-	<86F2C9C455334D048B154F93A214DF12@wipblrx0099946>
-Message-ID: <BFBAEA51-E7E6-4960-848D-5904BB209102@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 9 Nov 2010 15:51:31 +0100
+Subject: [PATCH] ARM: add support for uncompressed uImage kernel
+In-Reply-To: <20101109140455.GA6680@n2100.arm.linux.org.uk>
+References: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
+	<20101109140455.GA6680@n2100.arm.linux.org.uk>
+Message-ID: <20101109145131.GY16938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 9 Nov 2010, at 14:29, Hemanth V wrote:
-
-> ----- Original Message ----- From: "Alan Pearson" <alandpearson@gmail.com>
-> To: <linux-arm-kernel@lists.infradead.org>
-> Sent: Tuesday, November 09, 2010 7:29 PM
-> Subject: w1-gpio oops
+On Tue, Nov 09, 2010 at 02:04:55PM +0000, Russell King - ARM Linux wrote:
+> Is it really faster to copy an uncompressed image than it is to
+> decompress using LZMA with caches on?
 > 
-> 
->> Hi Guys,
->> 
->> First post to list, so be kind :)
->> 
->> I'm trying to get w1 (one wire) working over GPIO and despite my best efforts this results in a nasty oops.
->> Firstly, I'd like to say I'm no kernel hacker and my knowledge of Ooops and kernel debugging is limited, but I'm willing to learn:)
-> 
-> Common cause for these errors could be nonexistent or incorrect platform data. Might be worth checking if w1_gpio_platform_data
-> is proper in your board file. You could look for examples in other board files like arch/arm/mach-pxa/raumfeld.c
-> 
+> Remember that in terms of fast boot, uboot sucks - it's way over the
+> top of what you need.  Eg, it always copies the image to RAM before
+> executing it.  That gives two problems:
+Last time I checked (which is a few years ago) U-Boot was well able to
+start a ZBOOT_ROM image.  I'd be surprised if U-Boot lost that ability.
 
-<CHOP>
+Best regards
+Uwe
 
-Ok, I had understood the platform data was being set in the w1_gpio_custom module by the loadable options.
-Is this not the case, or does it also need defined in the board file, which I presume is guruplug_setup.c ?
-It's currently not defined there. But as I said I expected the other module to do this, am I wrong ?
-
-
-Thanks again,
-Alan
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
