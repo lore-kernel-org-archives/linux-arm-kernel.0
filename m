@@ -1,59 +1,65 @@
-From: svalentine@concentris-systems.com (Scott Valentine)
-Date: Tue, 9 Nov 2010 13:33:20 -1000
-Subject: arm smp support patch
-Message-ID: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>
+From: poorarm@shoreis.com (Rob Emanuele)
+Date: Tue, 9 Nov 2010 15:59:39 -0800
+Subject: USB Serial Gadget was Re: at91sam9g45 USB OTG support?
+Message-ID: <AANLkTimK_UEnFOJh54qtVY97EGTaUY5v6FTs6mhO9_Kd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm multi-core platforms that have a gic, the secondary cores fail to
-wake if they are booted in WFI mode, as the gic_dist_init disables all
-interrupts including IPI. I've included a simple patch to the
-gic_dist_init function that enables interrupts 0-15 on SMP enabled
-systems. This patch was made against linux-2.6-HEAD-151f52f.
+Nicolas et al,
 
+Thank you for the information.  For the moment I have a boot option to
+use either 2 host ports or a host and a device port.  That would seem
+to fit my needs except for the case that I'm loading the usb serial
+gadget as a module and then specifying in the inittab that getty use
+it as ttyGS0.  In that case connecting the device port to a host does
+not seem to ever register on the host.  If I remove the getty line
+from inittab and then run getty manually after it boots, it works
+fine.  To add insult to injury, then it will work after reboot also
+until a hard power down.
 
-diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
---- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
-+++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
-@@ -262,6 +262,13 @@
-        for (i = 0; i < max_irq; i += 32)
-                writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 /
-32);
+Anyone experience this?
 
-+#ifdef CONFIG_SMP
-+       /*
-+        * Enable IPI interrupts on SMP systems so we can wake secondary
-cores
-+        */
-+       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET);
-+#endif
-+
-        /*
-         * Setup the Linux IRQ subsystem.
-         */
+Thank you,
 
+Rob
 
-
-
-
-NOTES:
-
-After browsing through the Kconfigs, I am confident that this will only
-affect the following platforms (which have ARM_GIC and SMP):
-MACH_REALVIEW, ARCH_OMAP4, ARCH_S5PV310, ARCH_VEXPRESS_CA9X4, ARCH_U8500,
-and ARCH_TEGRA_2x_SOC. The TEGRA_2x appears to use a diffent smp-boot
-mechanism, however. The patch was tested successfully on MACH_CNS3XXX
-using the bsp for the gateworks laguna platform
-(http://svn.gateworks.com/bsp/laguna/trunk/openwrt_patches).
-
-
-Scott Valentine
-
-Concentris Systems LLC
-Manoa Innovation Center, Suite #238
-2800 Woodlawn Drive
-Honolulu, HI  96822
-
-http://www.Concentris-Systems.com
-
-(808) 988-6100
+On Tue, Nov 9, 2010 at 9:46 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Le 05/11/2010 22:09, Rob Emanuele :
+>> Greetings,
+>>
+>> We've been developing a at91sam9g45 product and it is finally available at:
+>> https://www.crystalfontz.com/product/CFA910.html
+>
+> Very nice platform!
+>
+>> We are looking into supporting USB OTG on this device as the 'g45 has
+>> the USB host/device port. ?As far at I can tell Atmel or anyone else
+>> working on this platform has not made full use of this as an OTG
+>> device.
+>
+> Indeed, it is not done for the moment...
+>
+>> ?I haven't found support in the USB or the OTG code for
+>> reading the USB ID line to determine host or device mode.
+>
+> I am not sure USB ID is well supported by consumer cable providers and
+> is a reliable way to determine host or device mode.
+>
+>> Am I missing something or is that an area that needs some code written for it?
+>
+> Anyway, using this port as host or device is a matter of
+> 1/ driving or not VBUS pin
+> 2/ dealing with loading the gadget driver (as the "Enable" of the usba
+> IP is responsible for swithing to device mode).
+>
+> I think that determining if the port shall be used in host or device
+> mode can be asked through the GUI... But note that I am not an USB expert...
+> --
+> Nicolas Ferre
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
