@@ -1,88 +1,35 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Tue, 9 Nov 2010 14:08:46 +0900
-Subject: [PATCH 1/2] Fix the I-cache invalidation on ARMv6 and later CPUs
-In-Reply-To: <AANLkTik0_0Eb8G5hEb+DGvE2BDM_mJwwF-Pt1ErTz=Lr@mail.gmail.com>
-References: <20080606114622.15520.49929.stgit@pc1117.cambridge.arm.com>
-	<AANLkTik0_0Eb8G5hEb+DGvE2BDM_mJwwF-Pt1ErTz=Lr@mail.gmail.com>
-Message-ID: <AANLkTim3O9HaOZp7VD3s1+FRU0KmPUrDei9NFDoXWK3y@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue,  9 Nov 2010 08:47:54 +0200
+Subject: [PATCH 1/2] mx25: fix spi device registration typo
+Message-ID: <6c16c084bfda41cd104613bed66bbad7b5433c6d.1289285160.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the noise by old mailing list address.
-Fix and resend.
-Thanks.
+Commit 35bab0589b9a71533b37280eefa430c21dc102fe (ARM: imx: change the way
+spi-imx devices are registered) contained a typo in mx25, leading to link time
+failure.
 
-On Tue, Nov 9, 2010 at 2:03 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
-> It's too old story.
-> Sorry for the late question.
->
-> On Fri, Jun 6, 2008 at 8:46 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> This patch adds the I-cache invalidation in update_mmu_cache if the
->> corresponding vma is marked as executable. It also invalidates the
->> I-cache if a thread migrates to a CPU it never ran on.
->
-> The description says just two place in update_mmu_cache and CPU
-> migration point.
-> I agree on it.
->
->>
->> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->>
->> ?arch/arm/mm/fault-armv.c ? ? ?| ? ?4 ++++
->> ?arch/arm/mm/flush.c ? ? ? ? ? | ? ?2 ++
->> ?include/asm-arm/cacheflush.h ?| ? ?7 +++++++
->> ?include/asm-arm/mmu_context.h | ? ?5 +++++
->> ?4 files changed, 18 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
->> index 44558d5..fbfa260 100644
->> --- a/arch/arm/mm/fault-armv.c
->> +++ b/arch/arm/mm/fault-armv.c
->> @@ -144,13 +144,17 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
->> ? ? ? ?page = pfn_to_page(pfn);
->> ? ? ? ?mapping = page_mapping(page);
->> ? ? ? ?if (mapping) {
->> +#ifndef CONFIG_SMP
->> ? ? ? ? ? ? ? ?int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
->>
->> ? ? ? ? ? ? ? ?if (dirty)
->> ? ? ? ? ? ? ? ? ? ? ? ?__flush_dcache_page(mapping, page);
->> +#endif
->>
->> ? ? ? ? ? ? ? ?if (cache_is_vivt())
->> ? ? ? ? ? ? ? ? ? ? ? ?make_coherent(mapping, vma, addr, pfn);
->> + ? ? ? ? ? ? ? else if (vma->vm_flags & VM_EXEC)
->> + ? ? ? ? ? ? ? ? ? ? ? __flush_icache_all();
->> ? ? ? ?}
->> ?}
->>
->> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
->> index 9df507d..029ee65 100644
->> --- a/arch/arm/mm/flush.c
->> +++ b/arch/arm/mm/flush.c
->> @@ -199,6 +199,8 @@ void flush_dcache_page(struct page *page)
->> ? ? ? ? ? ? ? ?__flush_dcache_page(mapping, page);
->> ? ? ? ? ? ? ? ?if (mapping && cache_is_vivt())
->> ? ? ? ? ? ? ? ? ? ? ? ?__flush_dcache_aliases(mapping, page);
->> + ? ? ? ? ? ? ? else if (mapping)
->> + ? ? ? ? ? ? ? ? ? ? ? __flush_icache_all();
->> ? ? ? ?}
->
-> Here, let me ask questions.
-> 1. Why do we flush icache in ?flush_dcache_page? Does it really needed?
-> 2. If we really need it, should we even flush it in !VM_EXEC?
->
-> It was rather changed in 2.6.27-rc series. But still it flushes icache
-> in flush_dcache_page regardless of executable permission.
->
-> --
-> Kind regards,
-> Minchan Kim
->
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/mach-mx25/devices-imx25.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-
-
+diff --git a/arch/arm/mach-mx25/devices-imx25.h b/arch/arm/mach-mx25/devices-imx25.h
+index 93afa10..d94d282 100644
+--- a/arch/arm/mach-mx25/devices-imx25.h
++++ b/arch/arm/mach-mx25/devices-imx25.h
+@@ -42,9 +42,9 @@ extern const struct imx_mxc_nand_data imx25_mxc_nand_data __initconst;
+ #define imx25_add_mxc_nand(pdata)	\
+ 	imx_add_mxc_nand(&imx25_mxc_nand_data, pdata)
+ 
+-extern const struct imx_spi_imx_data imx25_spi_imx_data[] __initconst;
++extern const struct imx_spi_imx_data imx25_cspi_data[] __initconst;
+ #define imx25_add_spi_imx(id, pdata)	\
+-	imx_add_spi_imx(&imx25_spi_imx_data[id], pdata)
++	imx_add_spi_imx(&imx25_cspi_data[id], pdata)
+ #define imx25_add_spi_imx0(pdata)	imx25_add_spi_imx(0, pdata)
+ #define imx25_add_spi_imx1(pdata)	imx25_add_spi_imx(1, pdata)
+ #define imx25_add_spi_imx2(pdata)	imx25_add_spi_imx(2, pdata)
 -- 
-Kind regards,
-Minchan Kim
+1.7.2.3
