@@ -1,24 +1,45 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 9 Nov 2010 14:40:12 -0800
-Subject: [PATCH] pl011: added clock management feature
-In-Reply-To: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
-References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20101109224012.GA21992@kroah.com>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Tue, 9 Nov 2010 18:11:12 -0500
+Subject: Patch IMX audmux debugfs.
+Message-ID: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
-> From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
-> 
-> This patch allows to control the pl011 clock using set_termios
-> callback. Any positive baudrate passed enables clock, otherwise
-> disables. This saves a lot of power on submicron designs since
-> we can clock off and disable unused UARTs.
 
-That's nice, but it seems like an overload of what people traditionally
-think of when it comes to baud rates.  Why not just power down ports
-that are not open instead?
+$ mount -t debugfs debugfs /sys/kernel/debug
+$ cd /sys/kernel/debug/audmux
+$ cat *
+[crashes when accessing ssi7]
 
-thanks,
+The index is one based, but the register map is zero based.  So the
+ssi1 is actually sending info for ssi2.  Also, the ssi7 touches
+non-existent data and can cause an exception (only registers sets 1-6
+exist).
 
-greg k-h
+Alternatively, the MX31_AUDMUX_PORT6_SSI_PINS_6 and
+MX27_AUDMUX_PPCR3_SSI_PINS_3 constants could be used for the loop
+termination, but maybe that means conditionalization (and there are no
+MX25 constants).
+
+diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
+index f9e7cdb..0547145 100644
+--- a/arch/arm/plat-mxc/audmux-v2.c
++++ b/arch/arm/plat-mxc/audmux-v2.c
+@@ -66,7 +66,7 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
+ {
+        ssize_t ret;
+        char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+-       int port = (int)file->private_data;
++       int port = ((int)file->private_data) - 1;
+        u32 pdcr, ptcr;
+ 
+        if (!buf)
+@@ -150,7 +150,7 @@ static void audmux_debugfs_init(void)
+                return;
+        }
+ 
+-       for (i = 1; i < 8; i++) {
++       for (i = 1; i < 7; i++) {
+                snprintf(buf, sizeof(buf), "ssi%d", i);
+                if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
+                                         (void *)i, &audmux_debugfs_fops))
