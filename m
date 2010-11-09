@@ -1,36 +1,25 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 9 Nov 2010 18:40:39 +0530
-Subject: [PATCH] ARM: Temporary fix for broken arch reboot  
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Nov 2010 13:18:38 +0000
+Subject: [PATCH] ARM: Temporary fix for broken arch reboot
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+Message-ID: <20101109131838.GF2869@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 3d3f78d752bf, reboot seems to broken on ARM
-machines. CPU dies while doing flush_pmd_entry() as part of
-setup_mm_for_reboot()
+On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh wrote:
+> With commit 3d3f78d752bf, reboot seems to broken on ARM
+> machines. CPU dies while doing flush_pmd_entry() as part of
+> setup_mm_for_reboot()
+> 
+> I know this is not the fix but intention is to report the
+> issue and also provide temporary fix till it get fixed correctly
 
-I know this is not the fix but intention is to report the
-issue and also provide temporary fix till it get fixed correctly
+So you're now rebooting with the secondary CPUs still running.  I guess
+that the secondary CPUs end up crashing and don't restart.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reported-by: Anand Gadiyar <gadiyar@ti.com>
----
-Tested with OMAP4 device.
+I think more the question is why the CP15 cache clean/flush is hanging
+with the other CPUs taken down.  All the other CPUs will be doing is
+sitting in a loop doing nothing.
 
- arch/arm/kernel/process.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index e76fcaa..ac370b2 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -247,7 +247,6 @@ void machine_power_off(void)
- 
- void machine_restart(char *cmd)
- {
--	machine_shutdown();
- 	arm_pm_restart(reboot_mode, cmd);
- }
- 
--- 
-1.6.0.4
+Catalin?
