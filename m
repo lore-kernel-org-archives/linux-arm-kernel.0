@@ -1,29 +1,37 @@
-From: marek.belisko@gmail.com (Marek Belisko)
-Date: Tue,  9 Nov 2010 14:22:47 +0100
-Subject: [PATCH] ARM: s3c2440: mini2440: Add selection of touchscreen.
-Message-ID: <1289308967-14520-1-git-send-email-marek.belisko@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 9 Nov 2010 18:55:04 +0530
+Subject: [PATCH] ARM: Temporary fix for broken arch reboot
+In-Reply-To: <20101109131838.GF2869@n2100.arm.linux.org.uk>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+	<20101109131838.GF2869@n2100.arm.linux.org.uk>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FABB4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add selection of touchscreen driver by default
-when use mini2440 board.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, November 09, 2010 6:49 PM
+> To: Shilimkar, Santosh; Catalin Marinas
+> Cc: linux-arm-kernel at lists.infradead.org; Gadiyar, Anand
+> Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
+> 
+> On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh wrote:
+> > With commit 3d3f78d752bf, reboot seems to broken on ARM
+> > machines. CPU dies while doing flush_pmd_entry() as part of
+> > setup_mm_for_reboot()
+> >
+> > I know this is not the fix but intention is to report the
+> > issue and also provide temporary fix till it get fixed correctly
+> 
+> So you're now rebooting with the secondary CPUs still running.  I guess
+> that the secondary CPUs end up crashing and don't restart.
+> 
+This behaviour depends on the reset mechanism implemented. On OMAP,
+we have a way to do a reset on all the CPUs with single register bit,
+like a global warm/cold reset. 
 
-Signed-off-by: Marek Belisko <marek.belisko@gmail.com>
----
- arch/arm/mach-s3c2440/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index ff024a6..d4a33fb 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -181,6 +181,7 @@ config MACH_MINI2440
- 	select LEDS_TRIGGER_BACKLIGHT
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
-+	select TOUCHSCREEN_S3C2410
- 	help
- 	  Say Y here to select support for the MINI2440. Is a 10cm x 10cm board
- 	  available via various sources. It can come with a 3.5" or 7" touch LCD.
--- 
-1.7.1
+> I think more the question is why the CP15 cache clean/flush is hanging
+> with the other CPUs taken down.  All the other CPUs will be doing is
+> sitting in a loop doing nothing.
+> 
+> Catalin?
