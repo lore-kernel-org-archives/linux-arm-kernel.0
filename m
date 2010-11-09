@@ -1,165 +1,112 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 9 Nov 2010 11:25:18 +0800
-Subject: [PATCH 1/2] ARM: mmp2: add mmc resource
-In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C0598642CE7@SC-VEXCH1.marvell.com>
-References: <AANLkTimh8=ahG4itkAScyUwVfe0Q0uHS7ssiTVbD9mrq@mail.gmail.com>
-	<25B60CDC2F704E4E9D88FFD52780CB4C0598642CE7@SC-VEXCH1.marvell.com>
-Message-ID: <AANLkTi=9MPmKx4HRHpa9bbGFiqTO+ZNqqSxNKjtzFg44@mail.gmail.com>
+Date: Tue, 9 Nov 2010 11:30:43 +0800
+Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
+In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C0598642CE8@SC-VEXCH1.marvell.com>
+References: <AANLkTik8D8E+BkqWbvgTvaJyKHb0d1=cTJf2wfOmfBVx@mail.gmail.com>
+	<25B60CDC2F704E4E9D88FFD52780CB4C0598642CE8@SC-VEXCH1.marvell.com>
+Message-ID: <AANLkTimN0idvSC5DhLgys_q-qAbcJJNQh5VpwAD0tTe7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2010/11/8 Haojian Zhuang <hzhuang1@marvell.com>:
-> Acked by Haojian Zhuang
+> Acked
 >
 
-Applied with Haojian's Ack, thanks.
+I've removed those un-necessary #if .., and moved the mmp2_add_sdh
+to jasper_init, and changed to mmp2_add_sdhost, add_sdh doesn't
+read very well.
+
+And applied. Please have a check in my devel branch.
 
 >>-----Original Message-----
 >>From: zhangfei gao [mailto:zhangfei.gao at gmail.com]
->>Sent: 2010?11?3? 5:06 PM
+>>Sent: 2010?11?3? 5:07 PM
 >>To: linux-arm-kernel at lists.infradead.org
 >>Cc: Eric Miao; Haojian Zhuang; Chris Ball
->>Subject: [PATCH 1/2] ARM: mmp2: add mmc resource
+>>Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
 >>
-> >From ee7c1135164abd1f7652462f17972cad3d96c795 Mon Sep 17 00:00:00 2001
+> >From 43ad4ff49d6e94e32468776a278baabc463a613f Mon Sep 17 00:00:00 2001
 >>From: Zhangfei Gao <zhangfei.gao@marvell.com>
->>Date: Wed, 29 Sep 2010 16:18:51 -0400
->>Subject: [PATCH 1/2] ARM: mmp2: add mmc resource
+>>Date: Wed, 3 Nov 2010 01:15:32 -0400
+>>Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
 >>
 >>Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
 >>---
->> arch/arm/mach-mmp/include/mach/mmp2.h ? ? ?| ? 22 +++++++++++++++++
->> arch/arm/mach-mmp/include/mach/regs-apmu.h | ? ?2 +
->> arch/arm/mach-mmp/mmp2.c ? ? ? ? ? ? ? ? ? | ? 35 ++++++++++++++++++++++++++++
->> 3 files changed, 59 insertions(+), 0 deletions(-)
+>> arch/arm/mach-mmp/jasper.c | ? 47
+>>++++++++++++++++++++++++++++++++++++++++++++
+>> 1 files changed, 47 insertions(+), 0 deletions(-)
 >>
->>diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h
->>b/arch/arm/mach-mmp/include/mach/mmp2.h
->>index dbba6e8..3c09cfb 100644
->>--- a/arch/arm/mach-mmp/include/mach/mmp2.h
->>+++ b/arch/arm/mach-mmp/include/mach/mmp2.h
->>@@ -1,6 +1,8 @@
->> #ifndef __ASM_MACH_MMP2_H
->> #define __ASM_MACH_MMP2_H
+>>diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
+>>index 2a684fa..757f251 100644
+>>--- a/arch/arm/mach-mmp/jasper.c
+>>+++ b/arch/arm/mach-mmp/jasper.c
+>>@@ -67,6 +67,36 @@ static unsigned long jasper_pin_config[] __initdata = {
 >>
->>+#include <plat/sdhci.h>
+>> ? ? ? /* PMIC */
+>> ? ? ? PMIC_PMIC_INT | MFP_LPM_EDGE_FALL,
 >>+
->> struct sys_timer;
->>
->> extern struct sys_timer mmp2_timer;
->>@@ -22,6 +24,10 @@ extern struct pxa_device_desc mmp2_device_twsi3;
->> extern struct pxa_device_desc mmp2_device_twsi4;
->> extern struct pxa_device_desc mmp2_device_twsi5;
->> extern struct pxa_device_desc mmp2_device_twsi6;
->>+extern struct pxa_device_desc mmp2_device_sdh0;
->>+extern struct pxa_device_desc mmp2_device_sdh1;
->>+extern struct pxa_device_desc mmp2_device_sdh2;
->>+extern struct pxa_device_desc mmp2_device_sdh3;
->>
->> static inline int mmp2_add_uart(int id)
->> {
->>@@ -63,5 +69,21 @@ static inline int mmp2_add_twsi(int id, struct
->>i2c_pxa_platform_data *data,
->> ? ? ? return pxa_register_device(d, data, sizeof(*data));
->> }
->>
->>+static inline int mmp2_add_sdh(int id, struct sdhci_pxa_platdata *data)
->>+{
->>+ ? ? ?struct pxa_device_desc *d = NULL;
+>>+ ? ? ?/* MMC1 */
+>>+ ? ? ?GPIO131_MMC1_DAT3,
+>>+ ? ? ?GPIO132_MMC1_DAT2,
+>>+ ? ? ?GPIO133_MMC1_DAT1,
+>>+ ? ? ?GPIO134_MMC1_DAT0,
+>>+ ? ? ?GPIO136_MMC1_CMD,
+>>+ ? ? ?GPIO139_MMC1_CLK,
+>>+ ? ? ?GPIO140_MMC1_CD,
+>>+ ? ? ?GPIO141_MMC1_WP,
 >>+
->>+ ? ? ?switch (id) {
->>+ ? ? ?case 0: d = &mmp2_device_sdh0; break;
->>+ ? ? ?case 1: d = &mmp2_device_sdh1; break;
->>+ ? ? ?case 2: d = &mmp2_device_sdh2; break;
->>+ ? ? ?case 3: d = &mmp2_device_sdh3; break;
->>+ ? ? ?default:
->>+ ? ? ? ? ? ? ?return -EINVAL;
->>+ ? ? ?}
+>>+ ? ? ?/* MMC2 */
+>>+ ? ? ?GPIO37_MMC2_DAT3,
+>>+ ? ? ?GPIO38_MMC2_DAT2,
+>>+ ? ? ?GPIO39_MMC2_DAT1,
+>>+ ? ? ?GPIO40_MMC2_DAT0,
+>>+ ? ? ?GPIO41_MMC2_CMD,
+>>+ ? ? ?GPIO42_MMC2_CLK,
 >>+
->>+ ? ? ?return pxa_register_device(d, data, sizeof(*data));
->>+}
->>+
->> #endif /* __ASM_MACH_MMP2_H */
->>
->>diff --git a/arch/arm/mach-mmp/include/mach/regs-apmu.h
->>b/arch/arm/mach-mmp/include/mach/regs-apmu.h
->>index ac47023..f7011ef 100644
->>--- a/arch/arm/mach-mmp/include/mach/regs-apmu.h
->>+++ b/arch/arm/mach-mmp/include/mach/regs-apmu.h
->>@@ -27,6 +27,8 @@
->> #define APMU_DMA ? ? ?APMU_REG(0x064)
->> #define APMU_GEU ? ? ?APMU_REG(0x068)
->> #define APMU_BUS ? ? ?APMU_REG(0x06c)
->>+#define APMU_SDH2 ? ? APMU_REG(0x0e8)
->>+#define APMU_SDH3 ? ? APMU_REG(0x0ec)
->>
->> #define APMU_FNCLK_EN (1 << 4)
->> #define APMU_AXICLK_EN ? ? ? ?(1 << 3)
->>diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
->>index daf3993..9ed3cd2 100644
->>--- a/arch/arm/mach-mmp/mmp2.c
->>+++ b/arch/arm/mach-mmp/mmp2.c
->>@@ -115,6 +115,29 @@ void __init mmp2_init_irq(void)
->> ? ? ? mmp2_init_gpio();
->> }
->>
->>+static void sdhc_clk_enable(struct clk *clk)
->>+{
->>+ ? ? ?uint32_t clk_rst;
->>+
->>+ ? ? ?clk_rst ?= ?__raw_readl(clk->clk_rst);
->>+ ? ? ?clk_rst |= clk->enable_val;
->>+ ? ? ?__raw_writel(clk_rst, clk->clk_rst);
->>+}
->>+
->>+static void sdhc_clk_disable(struct clk *clk)
->>+{
->>+ ? ? ?uint32_t clk_rst;
->>+
->>+ ? ? ?clk_rst ?= ?__raw_readl(clk->clk_rst);
->>+ ? ? ?clk_rst &= ~clk->enable_val;
->>+ ? ? ?__raw_writel(clk_rst, clk->clk_rst);
->>+}
->>+
->>+struct clkops sdhc_clk_ops = {
->>+ ? ? ?.enable ? ? ? ? = sdhc_clk_enable,
->>+ ? ? ?.disable ? ? ? ?= sdhc_clk_disable,
->>+};
->>+
->> /* APB peripheral clocks */
->> static APBC_CLK(uart1, MMP2_UART1, 1, 26000000);
->> static APBC_CLK(uart2, MMP2_UART2, 1, 26000000);
->>@@ -129,6 +152,10 @@ static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
->> static APBC_CLK(rtc, MMP2_RTC, 0, 32768);
->>
->> static APMU_CLK(nand, NAND, 0xbf, 100000000);
->>+static APMU_CLK_OPS(sdh0, SDH0, 0x1b, 200000000, &sdhc_clk_ops);
->>+static APMU_CLK_OPS(sdh1, SDH1, 0x1b, 200000000, &sdhc_clk_ops);
->>+static APMU_CLK_OPS(sdh2, SDH2, 0x1b, 200000000, &sdhc_clk_ops);
->>+static APMU_CLK_OPS(sdh3, SDH3, 0x1b, 200000000, &sdhc_clk_ops);
->>
->> static struct clk_lookup mmp2_clkregs[] = {
->> ? ? ? INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
->>@@ -142,6 +169,10 @@ static struct clk_lookup mmp2_clkregs[] = {
->> ? ? ? INIT_CLKREG(&clk_twsi5, "pxa2xx-i2c.4", NULL),
->> ? ? ? INIT_CLKREG(&clk_twsi6, "pxa2xx-i2c.5", NULL),
->> ? ? ? INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
->>+ ? ? ?INIT_CLKREG(&clk_sdh0, "sdhci-pxa.0", "PXA-SDHCLK"),
->>+ ? ? ?INIT_CLKREG(&clk_sdh1, "sdhci-pxa.1", "PXA-SDHCLK"),
->>+ ? ? ?INIT_CLKREG(&clk_sdh2, "sdhci-pxa.2", "PXA-SDHCLK"),
->>+ ? ? ?INIT_CLKREG(&clk_sdh3, "sdhci-pxa.3", "PXA-SDHCLK"),
+>>+ ? ? ?/* MMC3 */
+>>+ ? ? ?GPIO165_MMC3_DAT7,
+>>+ ? ? ?GPIO162_MMC3_DAT6,
+>>+ ? ? ?GPIO166_MMC3_DAT5,
+>>+ ? ? ?GPIO163_MMC3_DAT4,
+>>+ ? ? ?GPIO167_MMC3_DAT3,
+>>+ ? ? ?GPIO164_MMC3_DAT2,
+>>+ ? ? ?GPIO168_MMC3_DAT1,
+>>+ ? ? ?GPIO111_MMC3_DAT0,
+>>+ ? ? ?GPIO112_MMC3_CMD,
+>>+ ? ? ?GPIO151_MMC3_CLK,
 >> };
 >>
->> static int __init mmp2_init(void)
->>@@ -192,4 +223,8 @@ MMP2_DEVICE(twsi4, "pxa2xx-i2c", 3, TWSI4,
->>0xd4033000, 0x70);
->> MMP2_DEVICE(twsi5, "pxa2xx-i2c", 4, TWSI5, 0xd4033800, 0x70);
->> MMP2_DEVICE(twsi6, "pxa2xx-i2c", 5, TWSI6, 0xd4034000, 0x70);
->> MMP2_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x100, 28, 29);
->>+MMP2_DEVICE(sdh0, "sdhci-pxa", 0, MMC, 0xd4280000, 0x120);
->>+MMP2_DEVICE(sdh1, "sdhci-pxa", 1, MMC2, 0xd4280800, 0x120);
->>+MMP2_DEVICE(sdh2, "sdhci-pxa", 2, MMC3, 0xd4281000, 0x120);
->>+MMP2_DEVICE(sdh3, "sdhci-pxa", 3, MMC4, 0xd4281800, 0x120);
+>> static struct regulator_consumer_supply max8649_supply[] = {
+>>@@ -123,6 +153,19 @@ static struct i2c_board_info jasper_twsi1_info[] = {
+>> ? ? ? },
+>> };
+>>
+>>+#if defined(CONFIG_MMC_SDHCI_PXA)
+>>+
+>>+static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+>>+ ? ? ?.max_speed ? ? ?= 25000000,
+>>+};
+>>+
+>>+static void __init mmp2_init_mmc(void)
+>>+{
+>>+ ? ? ?mmp2_add_sdh(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
+>>+}
+>>+
+>>+#endif
+>>+
+>> static void __init jasper_init(void)
+>> {
+>> ? ? ? mfp_config(ARRAY_AND_SIZE(jasper_pin_config));
+>>@@ -132,6 +175,10 @@ static void __init jasper_init(void)
+>> ? ? ? mmp2_add_uart(3);
+>> ? ? ? mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(jasper_twsi1_info));
+>>
+>>+#if defined(CONFIG_MMC_SDHCI_PXA)
+>>+ ? ? ?mmp2_init_mmc();
+>>+#endif
+>>+
+>> ? ? ? regulator_has_full_constraints();
+>> }
 >>
 >>--
 >>1.7.0.4
