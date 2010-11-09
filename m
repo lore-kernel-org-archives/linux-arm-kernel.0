@@ -1,148 +1,39 @@
-From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
-Date: Tue,  9 Nov 2010 19:43:52 +0530
-Subject: [Patch v5] OMAP: AM3517/05: Add craneboard support
-In-Reply-To: <[PATCH] OMAP: AM3517/05: Add craneboard support>
-References: <[PATCH] OMAP: AM3517/05: Add craneboard support>
-Message-ID: <1289312032-16574-1-git-send-email-srinath@mistralsolutions.com>
+From: alandpearson@gmail.com (Alan Pearson)
+Date: Tue, 9 Nov 2010 14:44:13 +0000
+Subject: w1-gpio oops
+In-Reply-To: <86F2C9C455334D048B154F93A214DF12@wipblrx0099946>
+References: <E0675DE1-DC0C-40AE-947B-D4BD96C18993@gmail.com>
+	<86F2C9C455334D048B154F93A214DF12@wipblrx0099946>
+Message-ID: <BFBAEA51-E7E6-4960-848D-5904BB209102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath <srinath@mistralsolutions.com>
 
-Craneboard is a hardware development platform based on the
-Sitara AM3517 ARM Cortex - A8 microprocessor device. This is a
-low cost reference design.
+On 9 Nov 2010, at 14:29, Hemanth V wrote:
 
-This patch adds basic board file. Detailed support will follow in
-subsequent patches.
+> ----- Original Message ----- From: "Alan Pearson" <alandpearson@gmail.com>
+> To: <linux-arm-kernel@lists.infradead.org>
+> Sent: Tuesday, November 09, 2010 7:29 PM
+> Subject: w1-gpio oops
+> 
+> 
+>> Hi Guys,
+>> 
+>> First post to list, so be kind :)
+>> 
+>> I'm trying to get w1 (one wire) working over GPIO and despite my best efforts this results in a nasty oops.
+>> Firstly, I'd like to say I'm no kernel hacker and my knowledge of Ooops and kernel debugging is limited, but I'm willing to learn:)
+> 
+> Common cause for these errors could be nonexistent or incorrect platform data. Might be worth checking if w1_gpio_platform_data
+> is proper in your board file. You could look for examples in other board files like arch/arm/mach-pxa/raumfeld.c
+> 
 
-  [1] http://www.ti.com/arm
-  [2] http://www.mistralsolutions.com/products/craneboard.php
+<CHOP>
 
-Signed-off-by: Srinath <srinath@mistralsolutions.com>
----
- arch/arm/mach-omap2/Kconfig                  |    5 ++
- arch/arm/mach-omap2/Makefile                 |    2 +
- arch/arm/mach-omap2/board-am3517crane.c      |   69 ++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/uncompress.h |    1 +
- 4 files changed, 77 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/board-am3517crane.c
+Ok, I had understood the platform data was being set in the w1_gpio_custom module by the loadable options.
+Is this not the case, or does it also need defined in the board file, which I presume is guruplug_setup.c ?
+It's currently not defined there. But as I said I expected the other module to do this, am I wrong ?
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index ab784bf..3688515 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -174,6 +174,11 @@ config MACH_OMAP3517EVM
- 	default y
- 	select OMAP_PACKAGE_CBB
- 
-+config MACH_CRANEBOARD
-+	bool "AM3517/05 CRANE board"
-+	depends on ARCH_OMAP3
-+	select OMAP_PACKAGE_CBB
-+
- config MACH_OMAP3_PANDORA
- 	bool "OMAP3 Pandora"
- 	depends on ARCH_OMAP3
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index b0810b9..d43bd33 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -174,6 +174,8 @@ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
- 
- obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
- 
-+obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
-+
- obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o \
- 					   hsmmc.o
- # Platform specific device init code
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-new file mode 100644
-index 0000000..13ead33
---- /dev/null
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Support for AM3517/05 Craneboard
-+ * http://www.mistralsolutions.com/products/craneboard.php
-+ *
-+ * Copyright (C) 2010 Mistral Solutions Pvt Ltd. <www.mistralsolutions.com>
-+ * Author: R.Srinath <srinath@mistralsolutions.com>
-+ *
-+ * Based on mach-omap2/board-am3517evm.c
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as  published by the
-+ * Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
-+ * whether express or implied; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/gpio.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+
-+#include <plat/board.h>
-+#include <plat/common.h>
-+
-+#include "mux.h"
-+
-+/* Board initialization */
-+static struct omap_board_config_kernel am3517_crane_config[] __initdata = {
-+};
-+
-+#ifdef CONFIG_OMAP_MUX
-+static struct omap_board_mux board_mux[] __initdata = {
-+	{ .reg_offset = OMAP_MUX_TERMINATOR },
-+};
-+#else
-+#define board_mux	NULL
-+#endif
-+
-+static void __init am3517_crane_init_irq(void)
-+{
-+	omap_board_config = am3517_crane_config;
-+	omap_board_config_size = ARRAY_SIZE(am3517_crane_config);
-+
-+	omap2_init_common_hw(NULL, NULL);
-+	omap_init_irq();
-+	omap_gpio_init();
-+}
-+
-+static void __init am3517_crane_init(void)
-+{
-+	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_serial_init();
-+}
-+
-+MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
-+	.boot_params	= 0x80000100,
-+	.map_io		= omap3_map_io,
-+	.reserve	= omap_reserve,
-+	.init_irq	= am3517_crane_init_irq,
-+	.init_machine	= am3517_crane_init,
-+	.timer		= &omap_timer,
-+MACHINE_END
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index 9036e37..229fbf2 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -145,6 +145,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* omap3 based boards using UART3 */
- 		DEBUG_LL_OMAP3(3, cm_t35);
- 		DEBUG_LL_OMAP3(3, cm_t3517);
-+		DEBUG_LL_OMAP3(3, craneboard);
- 		DEBUG_LL_OMAP3(3, igep0020);
- 		DEBUG_LL_OMAP3(3, igep0030);
- 		DEBUG_LL_OMAP3(3, nokia_rx51);
--- 
-1.7.1.226.g770c5
+
+Thanks again,
+Alan
