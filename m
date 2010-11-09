@@ -1,189 +1,239 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Tue,  9 Nov 2010 21:27:18 +0800
-Subject: [PATCH 6/8] ARM: pxa: support saarb platform
-In-Reply-To: <1289309240-21687-5-git-send-email-haojian.zhuang@marvell.com>
+Date: Tue,  9 Nov 2010 21:27:20 +0800
+Subject: [PATCH 8/8] ARM: pxa: sanitize IRQ registers access based on offset
+In-Reply-To: <1289309240-21687-7-git-send-email-haojian.zhuang@marvell.com>
 References: <1289309240-21687-1-git-send-email-haojian.zhuang@marvell.com>
 	<1289309240-21687-2-git-send-email-haojian.zhuang@marvell.com>
 	<1289309240-21687-3-git-send-email-haojian.zhuang@marvell.com>
 	<1289309240-21687-4-git-send-email-haojian.zhuang@marvell.com>
 	<1289309240-21687-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1289309240-21687-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289309240-21687-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289309240-21687-7-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1289309240-21687-8-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Saarb platform is a handheld platform that supports Marvell PXA955 silicon.
-
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig  |    5 ++
- arch/arm/mach-pxa/Makefile |    1 +
- arch/arm/mach-pxa/pxa95x.c |    3 -
- arch/arm/mach-pxa/saarb.c  |  114 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 120 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-pxa/saarb.c
+ arch/arm/mach-pxa/include/mach/regs-intc.h |    4 -
+ arch/arm/mach-pxa/irq.c                    |  122 ++++++++++++++++++----------
+ 2 files changed, 80 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index d9424ff..d972a2c 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -50,6 +50,11 @@ config MACH_SAAR
- 	select CPU_PXA930
- 	select CPU_PXA935
+diff --git a/arch/arm/mach-pxa/include/mach/regs-intc.h b/arch/arm/mach-pxa/include/mach/regs-intc.h
+index 68464ce..662288e 100644
+--- a/arch/arm/mach-pxa/include/mach/regs-intc.h
++++ b/arch/arm/mach-pxa/include/mach/regs-intc.h
+@@ -27,8 +27,4 @@
+ #define ICFP3		__REG(0x40D0013C)  /* Interrupt Controller FIQ Pending Register 3 */
+ #define ICPR3		__REG(0x40D00140)  /* Interrupt Controller Pending Register 3 */
  
-+config MACH_SAARB
-+	bool "PXA955 Handheld Platform (aka SAARB)"
-+	depends on !(CPU_XSCALE || CPU_XSC3)
-+	select CPU_PXA955
-+
- comment "Third Party Dev Platforms (sorted by vendor name)"
- 
- config ARCH_PXA_IDP
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index 1642f6c..ba83cfb 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -35,6 +35,7 @@ obj-$(CONFIG_MACH_LITTLETON)	+= littleton.o
- obj-$(CONFIG_MACH_TAVOREVB)	+= tavorevb.o
- obj-$(CONFIG_MACH_TAVOREVB3)	+= tavorevb3.o
- obj-$(CONFIG_MACH_SAAR)		+= saar.o
-+obj-$(CONFIG_MACH_SAARB)	+= saarb.o
- 
- # 3rd Party Dev Platforms
- obj-$(CONFIG_ARCH_PXA_IDP)	+= idp.o
-diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
-index b540280..af4e40f 100644
---- a/arch/arm/mach-pxa/pxa95x.c
-+++ b/arch/arm/mach-pxa/pxa95x.c
-@@ -45,9 +45,6 @@
- #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
- #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
- 
--/* crystal frequency to static memory controller multiplier (SMCFS) */
--static unsigned char smcfs_mult[8] = { 6, 0, 8, 0, 0, 16, };
+-#define IPR(x)		__REG(0x40D0001C + (x < 32 ? (x << 2)		\
+-				: (x < 64 ? (0x94 + ((x - 32) << 2))	\
+-				: (0x128 + ((x - 64) << 2)))))
 -
- /* crystal frequency to HSIO bus frequency multiplier (HSS) */
- static unsigned char hss_mult[4] = { 8, 12, 16, 24 };
+ #endif /* __ASM_MACH_REGS_INTC_H */
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index b5cafe2..54e91c9 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -16,20 +16,31 @@
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/sysdev.h>
++#include <linux/io.h>
++#include <linux/irq.h>
  
-diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
-new file mode 100644
-index 0000000..e497922
---- /dev/null
-+++ b/arch/arm/mach-pxa/saarb.c
-@@ -0,0 +1,114 @@
-+/*
-+ *  linux/arch/arm/mach-pxa/saarb.c
-+ *
-+ *  Support for the Marvell Handheld Platform (aka SAARB)
-+ *
-+ *  Copyright (C) 2007-2010 Marvell International Ltd.
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/i2c.h>
-+#include <linux/mfd/88pm860x.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
+ #include <mach/hardware.h>
+-#include <asm/irq.h>
+-#include <asm/mach/irq.h>
 +#include <mach/irqs.h>
-+#include <mach/hardware.h>
-+#include <mach/mfp.h>
-+#include <mach/mfp-pxa930.h>
-+#include <mach/gpio.h>
+ #include <mach/gpio.h>
+-#include <mach/regs-intc.h>
+ 
+ #include "generic.h"
+ 
+-#define MAX_INTERNAL_IRQS	128
++#define IRQ_BASE		(void __iomem *)io_p2v(0x40d00000)
 +
-+#include <plat/i2c.h>
++#define ICIP			(0x000)
++#define ICMR			(0x004)
++#define ICLR			(0x008)
++#define ICFR			(0x00c)
++#define ICPR			(0x010)
++#define ICCR			(0x014)
++#define ICHP			(0x018)
++#define IPR(i)			(((i) < 32) ? (0x01c + ((i) << 2)) :		\
++				((i) < 64) ? (0x0b0 + (((i) - 32) << 2)) :	\
++				      (0x144 + (((i) - 64) << 2)))
++#define IPR_VALID		(1 << 31)
++#define IRQ_BIT(n)		(((n) - PXA_IRQ(0)) & 0x1f)
+ 
+-#define IRQ_BIT(n)	(((n) - PXA_IRQ(0)) & 0x1f)
+-#define _ICMR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICMR2 : &ICMR))
+-#define _ICLR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICLR2 : &ICLR))
++#define MAX_INTERNAL_IRQS	128
+ 
+ /*
+  * This is for peripheral IRQs internal to the PXA chip.
+@@ -44,12 +55,20 @@ static inline int cpu_has_ipr(void)
+ 
+ static void pxa_mask_irq(unsigned int irq)
+ {
+-	_ICMR(irq) &= ~(1 << IRQ_BIT(irq));
++	void __iomem *base = get_irq_chip_data(irq);
++	uint32_t icmr = __raw_readl(base + ICMR);
 +
-+#include "generic.h"
++	icmr &= ~(1 << IRQ_BIT(irq));
++	__raw_writel(icmr, base + ICMR);
+ }
+ 
+ static void pxa_unmask_irq(unsigned int irq)
+ {
+-	_ICMR(irq) |= 1 << IRQ_BIT(irq);
++	void __iomem *base = get_irq_chip_data(irq);
++	uint32_t icmr = __raw_readl(base + ICMR);
 +
-+#define SAARB_NR_IRQS	(IRQ_BOARD_START + 40)
++	icmr |= 1 << IRQ_BIT(irq);
++	__raw_writel(icmr, base + ICMR);
+ }
+ 
+ static struct irq_chip pxa_internal_irq_chip = {
+@@ -91,12 +110,16 @@ static void pxa_ack_low_gpio(unsigned int irq)
+ 
+ static void pxa_mask_low_gpio(unsigned int irq)
+ {
+-	ICMR &= ~(1 << (irq - PXA_IRQ(0)));
++	struct irq_desc *desc = irq_to_desc(irq);
 +
-+static struct pm860x_touch_pdata saarb_touch = {
-+	.gpadc_prebias	= 1,
-+	.slot_cycle	= 1,
-+	.tsi_prebias	= 6,
-+	.pen_prebias	= 16,
-+	.pen_prechg	= 2,
-+	.res_x		= 300,
-+};
++	desc->chip->mask(irq);
+ }
+ 
+ static void pxa_unmask_low_gpio(unsigned int irq)
+ {
+-	ICMR |= 1 << (irq - PXA_IRQ(0));
++	struct irq_desc *desc = irq_to_desc(irq);
 +
-+static struct pm860x_backlight_pdata saarb_backlight[] = {
-+	{
-+		.id	= PM8606_ID_BACKLIGHT,
-+		.iset	= PM8606_WLED_CURRENT(24),
-+		.flags	= PM8606_BACKLIGHT1,
-+	},
-+	{},
-+};
-+
-+static struct pm860x_led_pdata saarb_led[] = {
-+	{
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_RED,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_GREEN,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_BLUE,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_RED,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_GREEN,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_BLUE,
-+	},
-+};
-+
-+static struct pm860x_platform_data saarb_pm8607_info = {
-+	.touch		= &saarb_touch,
-+	.backlight	= &saarb_backlight[0],
-+	.led		= &saarb_led[0],
-+	.companion_addr	= 0x10,
-+	.irq_mode	= 0,
-+	.irq_base	= IRQ_BOARD_START,
-+
-+	.i2c_port	= GI2C_PORT,
-+};
-+
-+static struct i2c_board_info saarb_i2c_info[] = {
-+	{
-+		.type		= "88PM860x",
-+		.addr		= 0x34,
-+		.platform_data	= &saarb_pm8607_info,
-+		.irq		= gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO83)),
-+	},
-+};
-+
-+static void __init saarb_init(void)
++	desc->chip->unmask(irq);
+ }
+ 
+ static struct irq_chip pxa_low_gpio_chip = {
+@@ -125,33 +148,45 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+ 	pxa_low_gpio_chip.set_wake = fn;
+ }
+ 
++static inline void __iomem *irq_base(int i)
 +{
-+	pxa_set_ffuart_info(NULL);
-+	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(saarb_i2c_info));
++	static unsigned long phys_base[] = {
++		0x40d00000,
++		0x40d0009c,
++		0x40d00130,
++	};
++
++	return (void __iomem *)io_p2v(phys_base[i >> 5]);
 +}
 +
-+MACHINE_START(SAARB, "PXA955 Handheld Platform (aka SAARB)")
-+	.boot_params    = 0xa0000100,
-+	.map_io         = pxa_map_io,
-+	.nr_irqs	= SAARB_NR_IRQS,
-+	.init_irq       = pxa95x_init_irq,
-+	.timer          = &pxa_timer,
-+	.init_machine   = saarb_init,
-+MACHINE_END
+ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+ {
+-	int irq, i;
++	int irq, i, n;
+ 
+ 	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
+ 
+ 	pxa_internal_irq_nr = irq_nr;
+ 
+-	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq += 32) {
+-		_ICMR(irq) = 0;	/* disable all IRQs */
+-		_ICLR(irq) = 0;	/* all IRQs are IRQ, not FIQ */
+-	}
+-
+-	/* initialize interrupt priority */
+-	if (cpu_has_ipr()) {
+-		for (i = 0; i < irq_nr; i++)
+-			IPR(i) = i | (1 << 31);
++	for (n = 0; n < irq_nr; n += 32) {
++		void __iomem *base = irq_base(n);
 +
++		__raw_writel(0, base + ICMR);	/* disable all IRQs */
++		__raw_writel(0, base + ICLR);	/* all IRQs are IRQ, not FIQ */
++		for (i = n; (i < (n + 32)) && (i < irq_nr); i++) {
++			/* initialize interrupt priority */
++			if (cpu_has_ipr())
++				__raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
++
++			irq = PXA_IRQ(i);
++			set_irq_chip(irq, &pxa_internal_irq_chip);
++			set_irq_chip_data(irq, base);
++			set_irq_handler(irq, handle_level_irq);
++			set_irq_flags(irq, IRQF_VALID);
++		}
+ 	}
+ 
+ 	/* only unmasked interrupts kick us out of idle */
+-	ICCR = 1;
+-
+-	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
+-		set_irq_chip(irq, &pxa_internal_irq_chip);
+-		set_irq_handler(irq, handle_level_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+-	}
++	__raw_writel(1, irq_base(0) + ICCR);
+ 
+ 	pxa_internal_irq_chip.set_wake = fn;
+ 	pxa_init_low_gpio_irq(fn);
+@@ -163,16 +198,18 @@ static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
+ 
+ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+ {
+-	int i, irq = PXA_IRQ(0);
++	int i;
++
++	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
++		void __iomem *base = irq_base(i);
+ 
+-	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
+-		saved_icmr[i] = _ICMR(irq);
+-		_ICMR(irq) = 0;
++		saved_icmr[i] = __raw_readl(base + ICMR);
++		__raw_writel(0, base + ICMR);
+ 	}
+ 
+ 	if (cpu_has_ipr()) {
+ 		for (i = 0; i < pxa_internal_irq_nr; i++)
+-			saved_ipr[i] = IPR(i);
++			saved_ipr[i] = __raw_readl(IRQ_BASE + IPR(i));
+ 	}
+ 
+ 	return 0;
+@@ -180,19 +217,20 @@ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+ 
+ static int pxa_irq_resume(struct sys_device *dev)
+ {
+-	int i, irq = PXA_IRQ(0);
++	int i;
+ 
+-	if (cpu_has_ipr()) {
+-		for (i = 0; i < pxa_internal_irq_nr; i++)
+-			IPR(i) = saved_ipr[i];
+-	}
++	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
++		void __iomem *base = irq_base(i);
+ 
+-	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
+-		_ICMR(irq) = saved_icmr[i];
+-		_ICLR(irq) = 0;
++		__raw_writel(saved_icmr[i], base + ICMR);
++		__raw_writel(0, base + ICLR);
+ 	}
+ 
+-	ICCR = 1;
++	if (!cpu_is_pxa25x())
++		for (i = 0; i < pxa_internal_irq_nr; i++)
++			__raw_writel(saved_ipr[i], IRQ_BASE + IPR(i));
++
++	__raw_writel(1, IRQ_BASE + ICCR);
+ 	return 0;
+ }
+ #else
 -- 
 1.5.6.5
