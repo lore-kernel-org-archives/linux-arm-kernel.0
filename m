@@ -1,41 +1,47 @@
-From: gadiyar@ti.com (Anand Gadiyar)
-Date: Tue, 9 Nov 2010 22:35:52 +0530
-Subject: [PATCH] ARM: Temporary fix for broken arch reboot
-In-Reply-To: <1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
-	<20101109131838.GF2869@n2100.arm.linux.org.uk>
-	<1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <a7f88dd9dbdcdd5b9cea30646ae9d120@mail.gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue,  9 Nov 2010 12:12:01 -0500
+Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver (try
+	#5)
+Message-ID: <1289322724-20998-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> On Tue, 2010-11-09 at 13:18 +0000, Russell King - ARM Linux wrote:
-> > On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh wrote:
-> > > With commit 3d3f78d752bf, reboot seems to broken on ARM
-> > > machines. CPU dies while doing flush_pmd_entry() as part of
-> > > setup_mm_for_reboot()
->
-> What do you mean by 'dies'? Can you still connect with a debugger or it
-> got to some weird state?
->
+There are 4 duplicated DPI panel drivers in DSS2 display driver. They are
+similar and a generic DPI panel driver can support all them with specific
+panel configuration. And new DPI panel driver can be easily supported
+by adding panel configurations into generic panel DPI driver.
 
-I didn't try connecting with a debugger - will try this.
+This patchset introduces a generic panel DPI driver, remove 3 panel drivers and enable
+generic panel DPI driver in board files. And it is based on 2.6.37-rc1.
 
-> > > I know this is not the fix but intention is to report the
-> > > issue and also provide temporary fix till it get fixed correctly
-> >
-> > So you're now rebooting with the secondary CPUs still running.  I guess
-> > that the secondary CPUs end up crashing and don't restart.
-> >
-> > I think more the question is why the CP15 cache clean/flush is hanging
-> > with the other CPUs taken down.  All the other CPUs will be doing is
-> > sitting in a loop doing nothing.
->
-> I can't think of anything. Did the other CPUs print 'stopping'?
->
+Building with omap2plus_defconfig is successful.
 
-I'm fairly certain the other CPUs did not print 'stopping'. Will double
-check.
+Keep sharp_ls_panel, since it contains blacklight control code which will be
+moved out later.
 
-- Anand
+Bryan Wu (3):
+  OMAP: DSS2: Add generic DPI panel display driver
+  OMAP: use generic DPI panel driver in board files
+  OMAP: DSS2: remove generic DPI panel driver duplicated panel drivers
+
+ arch/arm/mach-omap2/board-3430sdp.c                |   13 +-
+ arch/arm/mach-omap2/board-am3517evm.c              |   25 +-
+ arch/arm/mach-omap2/board-cm-t35.c                 |   25 +-
+ arch/arm/mach-omap2/board-devkit8000.c             |   28 ++-
+ arch/arm/mach-omap2/board-igep0020.c               |   13 +-
+ arch/arm/mach-omap2/board-omap3beagle.c            |   13 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |   13 +-
+ arch/arm/mach-omap2/board-omap3stalker.c           |   25 +-
+ .../arm/plat-omap/include/plat/panel-generic-dpi.h |   37 +++
+ drivers/video/omap2/displays/Kconfig               |   22 +-
+ drivers/video/omap2/displays/Makefile              |    4 +-
+ drivers/video/omap2/displays/panel-generic-dpi.c   |  309 ++++++++++++++++++++
+ drivers/video/omap2/displays/panel-generic.c       |  174 -----------
+ .../video/omap2/displays/panel-sharp-lq043t1dg01.c |  165 -----------
+ .../video/omap2/displays/panel-toppoly-tdo35s.c    |  164 -----------
+ 15 files changed, 458 insertions(+), 572 deletions(-)
+ create mode 100644 arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+ create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
+ delete mode 100644 drivers/video/omap2/displays/panel-generic.c
+ delete mode 100644 drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
+ delete mode 100644 drivers/video/omap2/displays/panel-toppoly-tdo35s.c
