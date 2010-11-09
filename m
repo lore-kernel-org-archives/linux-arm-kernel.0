@@ -1,47 +1,27 @@
-From: slapin@ossfans.org (Sergey Lapin)
-Date: Tue, 9 Nov 2010 11:14:13 -0500
-Subject: S3C2416 clock tree
-In-Reply-To: <AANLkTi=H7n5tfPQkPvOhD4sUvHWYLuQBnhe64o=tkz+t@mail.gmail.com>
-References: <AANLkTi=H7n5tfPQkPvOhD4sUvHWYLuQBnhe64o=tkz+t@mail.gmail.com>
-Message-ID: <20101109161413.GA25138@build.ihdev.net>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 10 Nov 2010 01:20:55 +0900
+Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <201011091433.45387.arnd@arndb.de>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<20101109110407.GE2869@n2100.arm.linux.org.uk>
+	<AANLkTinWNoGJoDu6Ok8Ni5OuAXN29H7Bd3YMyUq6qfFq@mail.gmail.com>
+	<201011091433.45387.arnd@arndb.de>
+Message-ID: <20101109162055.GA22740@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 09, 2010 at 06:57:02PM +0300, Dron Gus wrote:
-
-Added Ben Dooks and Kukjin Kim to Cc:
-> Hi!
+On Tue, Nov 09, 2010 at 02:33:45PM +0100, Arnd Bergmann wrote:
+> On Tuesday 09 November 2010, Geert Uytterhoeven wrote:
+> > >
+> > > It looks to me like the only arch in the kernel which doesn't support
+> > > generic irq is sh.
+> > 
+> > IIRC, m68k, sparc32, and s390.
 > 
-> I work with custom board based on s3c2416 SoC. I'm trying to make
-> cpufreq work. I wrote the driver based on cpu-freq.c from
-> mach-s3c2410.
-> On kernel start i get error message:
-> cpufreq: failed to get clock 'armclk'
-> s3c2416_cpufreq_add: failed to get clocks
-> So i have to add dummy 'armclk' and some dummy clk_ops functions.
-> Now cpufreq starts, and tries to change freqs, calling to my
-> s3c2416_cpufreq_calcdivs. But the problem is that it passes wrong fclk
-> value. Pll rums on 800 MHz, armclk = 400 MHz, hclk = 133, pclk = 66. I
-> get fclk = 400 MHz. It is two time smaller than mpll.
-> I can not understood is value of fclk the same as armclk or as mpll?
-> To count correct armclk divider i must know mpll freq. But as i see in
-> s3c2443_common_setup_clocks and in s3c24xx_setup_clocks, mpll rate is
-> set the same as fclk, but fclk = pll / get_fdiv(clkdiv0);
-> So there is three ways to solve this problem, as i see:
-> 1) pass one more argument to s3c24xx_setup_clocks with value of mpll.
-> This will break to many mach-s3c****
-> 2) write get_rate for mpll clock and set mpll as a parent for fclk.
-> Problem is that PLLs are diferent on diferent s3c SoCs.
-> 3) the same as 2, but use function get_mpll, wich is passed to
-> s3c2443_common_setup_clocks.
+> Yes, and among those, no driver in s390 should need asm/irq.h either because
+> they do not have interrupt numbers -- every device on s390 has an implicit
+> interrupt.
 > 
-> Witch way is preferred?
-> 
-> Thanks.
-> 
-> Andrey.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Which is exactly what I stated in my original response. Moving along
+then..
