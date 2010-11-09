@@ -1,163 +1,273 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Nov 2010 23:22:39 +0100
-Subject: [PATCHv2] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <1288975772-6382-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1288975772-6382-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101109222239.GI6017@pengutronix.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 09 Nov 2010 14:23:47 -0800
+Subject: [PATCH v3 08/13] OMAP1: DMA: Introduce DMA driver as platform
+	device
+In-Reply-To: <1288099513-1854-9-git-send-email-manjugk@ti.com> (Manjunath
+	Kondaiah G.'s message of "Tue, 26 Oct 2010 18:55:08 +0530")
+References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
+	<1288099513-1854-9-git-send-email-manjugk@ti.com>
+Message-ID: <87bp5ykufg.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 05, 2010 at 11:49:32AM -0500, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Adds initial low power suspend functionality to MX51.
-> Supports "mem" and "standby" modes.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+
+> Register OMAP1 DMA driver as platform device and add support
+> for registering through platform device layer using resource
+> structures.
+>
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  arch/arm/mach-mx5/Makefile           |    1 +
->  arch/arm/mach-mx5/pm.c               |   86 ++++++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/mxc.h |    1 +
->  3 files changed, 88 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/pm.c
-> 
-> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> index 462f177..25b44d1 100644
-> --- a/arch/arm/mach-mx5/Makefile
-> +++ b/arch/arm/mach-mx5/Makefile
-> @@ -5,6 +5,7 @@
->  # Object file lists.
->  obj-y   := cpu.o mm.o clock-mx51.o devices.o
->  
-> +obj-$(CONFIG_PM) += pm.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
->  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
->  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-> diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
+>  arch/arm/mach-omap1/dma.c              |  182 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap1/include/mach/dma.h |   29 +++++
+>  2 files changed, 211 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-omap1/dma.c
+>  create mode 100644 arch/arm/mach-omap1/include/mach/dma.h
+>
+> diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
 > new file mode 100644
-> index 0000000..2639125
+> index 0000000..e756069
 > --- /dev/null
-> +++ b/arch/arm/mach-mx5/pm.c
-> @@ -0,0 +1,86 @@
+> +++ b/arch/arm/mach-omap1/dma.c
+> @@ -0,0 +1,182 @@
 > +/*
-> + *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + * dma.c - OMAP1/OMAP7xx-specific DMA code
 > + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
+> + * Copyright (C) 2003 - 2008 Nokia Corporation
+> + * Author: Juha Yrj?l? <juha.yrjola@nokia.com>
+> + * DMA channel linking for 1610 by Samuel Ortiz <samuel.ortiz@nokia.com>
+> + * Graphics DMA and LCD DMA graphics tranformations
+> + * by Imre Deak <imre.deak@nokia.com>
+> + * OMAP2/3 support Copyright (C) 2004-2007 Texas Instruments, Inc.
+> + * Some functions based on earlier dma-omap.c Copyright (C) 2001 RidgeRun, Inc.
 > + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
+> + * Copyright (C) 2010 Texas Instruments, Inc.
+> + * Converted DMA library into platform driver
+> + *                   - G, Manjunath Kondaiah <manjugk@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + */
-> +#include <linux/suspend.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/system.h>
-> +#include "crm_regs.h"
 > +
-> +/* set cpu low power mode before WFI instruction */
-> +static void mxc_cpu_lp_set(suspend_state_t state)
-> +{
-> +	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
-> +
-> +	/* always allow platform to issue a deep sleep mode request */
-> +	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
-> +		~(MXC_CORTEXA8_PLAT_LPC_DSM);
+> +#include <linux/err.h>
+> +#include <linux/slab.h>
+> +#include <linux/pm_runtime.h>
 
-You clear this bit unconditionally here...
+no pm_runtime API usage in this patch.    Please add only when needed.
 
-> +	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-> +	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
-> +
-> +	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-> +		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/init.h>
+> +#include <linux/sched.h>
 
-...and set the same bit here again.
+why is sched.h needed?
 
-> +
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
-> +		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-> +		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-> +		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-> +		break;
-> +	case PM_SUSPEND_STANDBY:
-> +		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-> +		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-> +		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-> +		break;
-> +	}
-> +
-> +	arm_srpgcr |= MXC_SRPGCR_PCR;
+> +#include <linux/spinlock.h>
 
-The same with this bit.
+ditto
 
-> +
-> +	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-> +	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-> +	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-> +}
-> +
-> +static int mx5_suspend_enter(suspend_state_t state)
-> +{
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		mxc_cpu_lp_set(state);
-> +		break;
-> +	case PM_SUSPEND_STANDBY:
-> +		mxc_cpu_lp_set(state);
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
+> +#include <linux/errno.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/device.h>
 
-Can you inline the code of mxc_cpu_lp_set() here? This duplicate
-switch/case really does not look good.
+When creating a new file like this, it's important to only include
+headers that are actually used/needed.
 
+> +#include <plat/dma.h>
+> +#include <plat/tc.h>
 > +
-> +	if (tzic_enable_wake(0) != 0)
-> +		return -EAGAIN;
-> +	cpu_do_idle();
-> +	return 0;
-> +}
+> +#define OMAP1_DMA_BASE			(0xfffed800)
 > +
-> +static int mx5_pm_valid(suspend_state_t state)
-> +{
-> +	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-> +}
-> +
-> +static const struct platform_suspend_ops mx5_suspend_ops = {
-> +	.valid = mx5_pm_valid,
-> +	.enter = mx5_suspend_enter,
+> +static struct resource res[] __initdata = {
+> +	[0] = {
+> +		.start	= OMAP1_DMA_BASE,
+> +		.end	= OMAP1_DMA_BASE + SZ_2K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.name   = "0",
+> +		.start  = INT_DMA_CH0_6,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[2] = {
+> +		.name   = "1",
+> +		.start  = INT_DMA_CH1_7,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[3] = {
+> +		.name   = "2",
+> +		.start  = INT_DMA_CH2_8,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[4] = {
+> +		.name   = "3",
+> +		.start  = INT_DMA_CH3,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[5] = {
+> +		.name   = "4",
+> +		.start  = INT_DMA_CH4,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[6] = {
+> +		.name   = "5",
+> +		.start  = INT_DMA_CH5,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[7] = {
+> +		.name   = "6",
+> +		.start  = INT_DMA_LCD,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	/* irq's for omap16xx and omap7xx */
+> +	[8] = {
+> +		.name   = "7",
+> +		.start  = 53 + IH2_BASE,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[9] = {
+> +		.name   = "8",
+> +		.start  = 54 + IH2_BASE,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[10] = {
+> +		.name  = "9",
+> +		.start = 55 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[11] = {
+> +		.name  = "10",
+> +		.start = 56 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[12] = {
+> +		.name  = "11",
+> +		.start = 57 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[13] = {
+> +		.name  = "12",
+> +		.start = 58 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[14] = {
+> +		.name  = "13",
+> +		.start = 59 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[15] = {
+> +		.name  = "14",
+> +		.start = 60 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[16] = {
+> +		.name  = "15",
+> +		.start = 61 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[17] = {
+> +		.name  = "16",
+> +		.start = 62 + IH2_BASE,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
 > +};
 > +
-> +static int __init mx5_pm_init(void)
+> +static int __init omap1_system_dma_init(void)
 > +{
-> +	if (cpu_is_mx51())
-> +		suspend_set_ops(&mx5_suspend_ops);
-> +	return 0;
+> +	struct omap_system_dma_plat_info	*p;
+> +	struct platform_device			*pdev;
+> +	int ret;
+> +
+> +	pdev = platform_device_alloc("omap_dma_system", 0);
+> +	if (!pdev) {
+> +		pr_err("%s: Unable to device alloc for dma\n",
+> +			__func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+> +	if (ret) {
+> +		pr_err("%s: Unable to add resources for %s%d\n",
+> +			__func__, pdev->name, pdev->id);
+> +		goto exit_device_del;
+> +	}
+> +
+> +	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
+> +	if (!p) {
+> +		dev_err(&pdev->dev, "%s: Unable to allocate 'p' for %s\n",
+> +			__func__, pdev->name);
+> +		ret = -ENOMEM;
+> +		goto exit_device_put;
+> +	}
+> +
+> +	ret = platform_device_add_data(pdev, p, sizeof(*p));
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
+> +			__func__, pdev->name, pdev->id);
+> +		goto exit_device_put;
+> +	}
+> +	ret = platform_device_add(pdev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
+> +			__func__, pdev->name, pdev->id);
+> +		goto exit_device_put;
+> +	}
+> +	return ret;
+> +
+> +exit_device_put:
+> +	platform_device_put(pdev);
+> +exit_device_del:
+> +	platform_device_del(pdev);
+> +
+> +	return ret;
 > +}
-> +device_initcall(mx5_pm_init);
-> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-> index a42c720..dafacfd 100644
-> --- a/arch/arm/plat-mxc/include/mach/mxc.h
-> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
-> @@ -37,6 +37,7 @@
->  
->  #ifndef __ASSEMBLY__
->  extern unsigned int __mxc_cpu_type;
-> +int tzic_enable_wake(int is_idle);
->  #endif
->  
->  #ifdef CONFIG_ARCH_MX1
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
+> +arch_initcall(omap1_system_dma_init);
+> diff --git a/arch/arm/mach-omap1/include/mach/dma.h b/arch/arm/mach-omap1/include/mach/dma.h
+> new file mode 100644
+> index 0000000..7949e3f
+> --- /dev/null
+> +++ b/arch/arm/mach-omap1/include/mach/dma.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + *  OMAP DMA controller register offsets.
+> + *
+> + *  Copyright (C) 2003 Nokia Corporation
+> + *  Author: Juha Yrj?l? <juha.yrjola@nokia.com>
+> + *
+> + *  Copyright (C) 2010 Texas Instruments
+> + *  Converted DMA library into platform driver
+> + *       by G, Manjunath Kondaiah <manjugk@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> + */
+> +
+> +#ifndef __ASM_ARCH_OMAP1_DMA_H
+> +#define __ASM_ARCH_OMAP1_DMA_H
+> +
+> +#endif /* __ASM_ARCH_OMAP1_DMA_H */
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Please don't create an empty header.  Just create it in the series when
+(if) it's needed.  Same goes for next patch.
+
+I see you populate mach/dma.h later in the series, but I don't
+understand why those values need to be in the header.   More comments on
+those patches...
+
+Kevin
