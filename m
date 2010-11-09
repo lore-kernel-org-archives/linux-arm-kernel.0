@@ -1,37 +1,43 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Tue, 9 Nov 2010 12:49:25 +0300
-Subject: [PATCH 6/6 v4] ARM: Add support for the display controllers in
-	VT8500 and WM8505
-In-Reply-To: <20101109093925.GA21814@linux-sh.org>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<1289147348-31969-6-git-send-email-alchark@gmail.com>
-	<20101108041721.GA11605@linux-sh.org>
-	<20101108141407.GA25739@alchark-u3s.lan>
-	<20101108204315.GA12050@linux-sh.org>
-	<AANLkTikXffMT9ZiUpm2QAoW+KPJN3MBf55Dgruj1EJN0@mail.gmail.com>
-	<20101108213008.GB17708@linux-sh.org>
-	<20101108234239.GA20819@alchark-u3s.lan>
-	<20101108235407.GB18385@linux-sh.org>
-	<AANLkTim047K-RjLLcz3124Wm+-he8s5AirAsD6R_kitN@mail.gmail.com>
-	<20101109093925.GA21814@linux-sh.org>
-Message-ID: <AANLkTi=es0vAWeNjWMDEi8Es97uxsgb9A2aNovp7z8Uh@mail.gmail.com>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Tue, 09 Nov 2010 12:13:11 +0200
+Subject: [PATCH 1/3] OMAP: use generic panel data in board files
+In-Reply-To: <AANLkTin7XOPyupobBehHc+hdJbGVJWFPRPYf03BwuDcZ@mail.gmail.com>
+References: <1288986236-30210-1-git-send-email-bryan.wu@canonical.com>
+	<1288986236-30210-2-git-send-email-bryan.wu@canonical.com>
+	<1289219163.3297.54.camel@tubuntu>
+	<AANLkTin7XOPyupobBehHc+hdJbGVJWFPRPYf03BwuDcZ@mail.gmail.com>
+Message-ID: <1289297591.3297.146.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/9 Paul Mundt <lethal@linux-sh.org>:
-> On Tue, Nov 09, 2010 at 03:03:01AM +0300, Alexey Charkov wrote:
->> Is there anybody I should address specifically to get this merged?
->>
-> I've set up an fbdev tree now, so I'll just take this through there. It
-> looks like the ordering shouldn't be important, so this can be applied
-> independent of the rest, and it simply won't show up until the other bits
-> have settled in .38.
->
+On Mon, 2010-11-08 at 20:43 +0100, ext Bryan Wu wrote:
+> On Mon, Nov 8, 2010 at 7:26 AM, Tomi Valkeinen <tomi.valkeinen@nokia.com> wrote:
+> > Hi,
+> >
+> > On Fri, 2010-11-05 at 20:43 +0100, ext Bryan Wu wrote:
 
-Yes, the different parts of the patch series are completely
-independent, apart from the corresponding platform definitions and
-memblock reservations that take place in PATCH 1/6 (which contains
-basic board code).
+> >>  static struct omap_dss_device sdp3430_dvi_device = {
+> >>         .name                   = "dvi",
+> >> -       .driver_name            = "generic_panel",
+> >> -       .type                   = OMAP_DISPLAY_TYPE_DPI,
+> >> -       .phy.dpi.data_lines     = 24,
+> >
+> > Why do you remove type and datalines configuration? You do this for the
+> > other panels also.
+> >
+> 
+> I found this is common in all the generic dpi panel, but the value
+> depends on the specific panel. I move this to the panel configuration
+> data and will set this value in panel-dpi driver. Do you think need I
+> keep them here? Actually I found all of them are 24 for generic one.
+> 16 or 18 for others.
 
-Thanks,
-Alexey
+Both type and .phy.dpi.data_lines tell about the connection to the
+panel, not about the panel itself. Thus I think it's more consistent to
+have them defined in the board file.
+
+Also, it's really up to the board HW design how many lines are connected
+from OMAP to the panel. You could connect only 16, for example, so it's
+something that has to be defined in the board file.
+
+ Tomi
