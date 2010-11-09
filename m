@@ -1,49 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 09 Nov 2010 09:41:26 -0800
-Subject: [PATCH v3 5/5] OMAP: I2C: Convert i2c driver to use PM runtime
-	api's
-In-Reply-To: <20101027073501.GK21564@trinity.fluff.org> (Ben Dooks's message
-	of "Wed, 27 Oct 2010 08:35:01 +0100")
-References: <1285078036-12789-2-git-send-email-rnayak@ti.com>
-	<1285078036-12789-3-git-send-email-rnayak@ti.com>
-	<1285078036-12789-4-git-send-email-rnayak@ti.com>
-	<1285078036-12789-5-git-send-email-rnayak@ti.com>
-	<1285078036-12789-6-git-send-email-rnayak@ti.com>
-	<20100927223645.GJ21564@trinity.fluff.org>
-	<0680EC522D0CC943BC586913CF3768C003FF05981F@dbde02.ent.ti.com>
-	<0680EC522D0CC943BC586913CF3768C003FF05988F@dbde02.ent.ti.com>
-	<20100928233334.GS21564@trinity.fluff.org>
-	<87vd5d9a68.fsf@deeprootsystems.com>
-	<20101027073501.GK21564@trinity.fluff.org>
-Message-ID: <87tyjqqtrt.fsf@deeprootsystems.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 09 Nov 2010 18:46:47 +0100
+Subject: at91sam9g45 USB OTG support?
+In-Reply-To: <AANLkTi=8-nOGxLOw-Thvc7WaKwMg2cyC3h01SF0kZFL7@mail.gmail.com>
+References: <AANLkTi=8-nOGxLOw-Thvc7WaKwMg2cyC3h01SF0kZFL7@mail.gmail.com>
+Message-ID: <4CD98907.1060709@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks <ben-i2c@fluff.org> writes:
+Le 05/11/2010 22:09, Rob Emanuele :
+> Greetings,
+> 
+> We've been developing a at91sam9g45 product and it is finally available at:
+> https://www.crystalfontz.com/product/CFA910.html
 
-> On Thu, Oct 07, 2010 at 10:37:03AM -0700, Kevin Hilman wrote:
->> Ben Dooks <ben-i2c@fluff.org> writes:
->> 
->> [...]
->> 
->> > As such, I should really go and read up all about this new runtime-pm
->> > and hwmod stuff before further commentign on the changes.
->> 
->> ping
->> 
->> >From the drivers perspective, you don't neet to know anything about
->> omap_hwmod.  You can think of this change as simply using the runtime PM
->> API instead of the clock API for enabling and idling the device.
->> 
->> With your ack (on this patch only) we'd like to merge this along with
->> the rest of the series for 2.6.37.
->
-> Acked-by: Ben Dooks <ben-linux@fluff.org>
->
-> please post via your tree.
+Very nice platform!
 
-Thanks Ben,
+> We are looking into supporting USB OTG on this device as the 'g45 has
+> the USB host/device port.  As far at I can tell Atmel or anyone else
+> working on this platform has not made full use of this as an OTG
+> device.
 
-Will queue up for 2.6.38.
+Indeed, it is not done for the moment...
 
-Kevin
+>  I haven't found support in the USB or the OTG code for
+> reading the USB ID line to determine host or device mode.
+
+I am not sure USB ID is well supported by consumer cable providers and
+is a reliable way to determine host or device mode.
+
+> Am I missing something or is that an area that needs some code written for it?
+
+Anyway, using this port as host or device is a matter of
+1/ driving or not VBUS pin
+2/ dealing with loading the gadget driver (as the "Enable" of the usba
+IP is responsible for swithing to device mode).
+
+I think that determining if the port shall be used in host or device
+mode can be asked through the GUI... But note that I am not an USB expert...
+-- 
+Nicolas Ferre
