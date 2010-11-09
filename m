@@ -1,37 +1,24 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 9 Nov 2010 18:55:04 +0530
-Subject: [PATCH] ARM: Temporary fix for broken arch reboot
-In-Reply-To: <20101109131838.GF2869@n2100.arm.linux.org.uk>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
-	<20101109131838.GF2869@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FABB4@dbde02.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Nov 2010 14:33:45 +0100
+Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
+	VT8500 and WM8505
+In-Reply-To: <AANLkTinWNoGJoDu6Ok8Ni5OuAXN29H7Bd3YMyUq6qfFq@mail.gmail.com>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<20101109110407.GE2869@n2100.arm.linux.org.uk>
+	<AANLkTinWNoGJoDu6Ok8Ni5OuAXN29H7Bd3YMyUq6qfFq@mail.gmail.com>
+Message-ID: <201011091433.45387.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Tuesday, November 09, 2010 6:49 PM
-> To: Shilimkar, Santosh; Catalin Marinas
-> Cc: linux-arm-kernel at lists.infradead.org; Gadiyar, Anand
-> Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
-> 
-> On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh wrote:
-> > With commit 3d3f78d752bf, reboot seems to broken on ARM
-> > machines. CPU dies while doing flush_pmd_entry() as part of
-> > setup_mm_for_reboot()
+On Tuesday 09 November 2010, Geert Uytterhoeven wrote:
 > >
-> > I know this is not the fix but intention is to report the
-> > issue and also provide temporary fix till it get fixed correctly
+> > It looks to me like the only arch in the kernel which doesn't support
+> > generic irq is sh.
 > 
-> So you're now rebooting with the secondary CPUs still running.  I guess
-> that the secondary CPUs end up crashing and don't restart.
-> 
-This behaviour depends on the reset mechanism implemented. On OMAP,
-we have a way to do a reset on all the CPUs with single register bit,
-like a global warm/cold reset. 
+> IIRC, m68k, sparc32, and s390.
 
-> I think more the question is why the CP15 cache clean/flush is hanging
-> with the other CPUs taken down.  All the other CPUs will be doing is
-> sitting in a loop doing nothing.
-> 
-> Catalin?
+Yes, and among those, no driver in s390 should need asm/irq.h either because
+they do not have interrupt numbers -- every device on s390 has an implicit
+interrupt.
+
+	Arnd
