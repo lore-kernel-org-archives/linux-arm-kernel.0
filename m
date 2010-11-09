@@ -1,54 +1,132 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Tue, 9 Nov 2010 03:03:01 +0300
-Subject: [PATCH 6/6 v4] ARM: Add support for the display controllers in
-	VT8500 and WM8505
-In-Reply-To: <20101108235407.GB18385@linux-sh.org>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<1289147348-31969-6-git-send-email-alchark@gmail.com>
-	<20101108041721.GA11605@linux-sh.org>
-	<20101108141407.GA25739@alchark-u3s.lan>
-	<20101108204315.GA12050@linux-sh.org>
-	<AANLkTikXffMT9ZiUpm2QAoW+KPJN3MBf55Dgruj1EJN0@mail.gmail.com>
-	<20101108213008.GB17708@linux-sh.org>
-	<20101108234239.GA20819@alchark-u3s.lan>
-	<20101108235407.GB18385@linux-sh.org>
-Message-ID: <AANLkTim047K-RjLLcz3124Wm+-he8s5AirAsD6R_kitN@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Nov 2010 16:40:45 -0800
+Subject: [PATCH v4 01/13] OMAP: DMA: Replace read/write macros with
+	functions
+In-Reply-To: <1289225272-9767-2-git-send-email-manjugk@ti.com>
+References: <1289225272-9767-1-git-send-email-manjugk@ti.com>
+	<1289225272-9767-2-git-send-email-manjugk@ti.com>
+Message-ID: <20101109004045.GU9264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/8 Paul Mundt <lethal@linux-sh.org>:
-> On Tue, Nov 09, 2010 at 02:42:39AM +0300, Alexey Charkov wrote:
->> From 95942cc0cd0909d700c236ba63d3488ec9fccf1a Mon Sep 17 00:00:00 2001
->> From: Alexey Charkov <alchark@gmail.com>
->> Date: Tue, 9 Nov 2010 02:25:40 +0300
->> Subject: [PATCH 3/3] ARM: Add support for the display controllers in VT8500 and WM8505
->>
->> This adds drivers for the LCD controller found in VIA VT8500 SoC,
->> GOVR display controller found in WonderMedia WM8505 SoC and for the
->> Graphics Engine present in both of them that provides hardware
->> accelerated raster operations (used for copyarea and fillrect).
->>
->> Signed-off-by: Alexey Charkov <alchark@gmail.com>
->> ---
->>
->> This incorporates fixes to the issues last mentioned by Paul.
->>
->> I just dropped <asm/irq.h>, as that seems to be not used at all currently
->> (must have been some old cut-and-paste as well). As for the Graphics
->> Engine, I decided not to disable it for now at device exit time, at least
->> until we reach a conclusion on how or whether to implement support for its
->> alpha-mixing capabilities. Unlike with display drivers, this should have no
->> user-visible consequences. This can be changed later, when time comes for
->> device clocks and power management support.
->>
-> Looks good to me!
->
-> Reviewed-by: Paul Mundt <lethal@linux-sh.org>
->
+Hi,
 
-Thanks, Paul!
+* G, Manjunath Kondaiah <manjugk@ti.com> [101108 05:58]:
 
-Is there anybody I should address specifically to get this merged?
+> +static u16 reg_map_omap1[] = {
+> +	[GCR1]		= 0x400,
+> +	[GSCR]		= 0x404,
+> +	[GRST]		= 0x408,
+...
+> +};
 
-Best regards,
-Alexey
+The above you should move to mach-omap1/dma.c and pass it in the init
+function to plat-omap/dma.c. Let's try to make the common code clean
+of omap1/2/3/4 specific data.
+
+> +static u16 reg_map_omap2[] = {
+> +	[REVISION]		= 0x00,
+> +	[GCR2]			= 0x78,
+> +	[IRQSTATUS_L0]		= 0x08,
+...
+> +};
+
+And the above you should move to mach-omap2/dma.c.
+
+It's OK to do it in a later patch if you prefer that, but in that case
+the patch description here should mention it.
+
+>  	if (cpu_class_is_omap2() && dma_trigger) {
+>  		u32 val;
+>  
+> -		val = dma_read(CCR(lch));
+> +		l = dma_read(CSDP2, lch);
+> +		l &= ~0x03;
+> +		l |= data_type;
+> +		dma_write(l, CSDP2, lch);
+> +
+> +		val = dma_read(CCR2, lch);
+
+This seems to be doing more than just change the read function?
+
+Please keep any functional changes separate. Let's first get the
+hwmod based initialization done without any functional changes
+to avoid breaking things.
+  
+> @@ -475,11 +654,19 @@ void omap_set_dma_src_data_pack(int lch, int enable)
+>  {
+>  	u32 l;
+>  
+> -	l = dma_read(CSDP(lch));
+> +	if (cpu_class_is_omap1())
+> +		l = dma_read(CSDP1, lch);
+> +	else
+> +		l = dma_read(CSDP2, lch);
+> +
+>  	l &= ~(1 << 6);
+>  	if (enable)
+>  		l |= (1 << 6);
+> -	dma_write(l, CSDP(lch));
+> +
+> +	if (cpu_class_is_omap1())
+> +		dma_write(l, CSDP1, lch);
+> +	else
+> +		dma_write(l, CSDP2, lch);
+>  }
+
+Since you now have the register mapping table, why do you still need
+to separate between CSDP1 and CSDP2 registers?
+
+You should now be able to call them just CSDP, and then the register
+can be mapped to the right offset for omap1 and omap2+.
+
+So this should be just:
+
+void omap_set_dma_src_data_pack(int lch, int enable)
+{
+	u32 l;
+
+	l = p->dma_read(CSDP, lch);
+	l &= ~(1 << 6);
+	if (enable)
+		l |= (1 << 6);
+	p->dma_write(l, CSDP, lch);
+}
+
+Please check the other functions for this too, that should
+leave out quite a bit of if cpu_class_is_omap1 clutter.
+
+And looking at it more, you should only have one enum for the
+registers, not separate enum for both omap1 and omap2+. The
+enum should be common for all of them. If needed, the enum
+should be separate for common register and channel specific
+registers.
+
+Some 32-bit registers for omap1 have the lower and upper registers,
+because of the 16-bit register access. So those still need to be
+handled separately for omap1. That can be handled automatically
+for omap1 (untested):
+
+static inline u32 omap1_dma_read(int reg, int lch)
+{
+	u32 va, val, ch_offset = 0;
+
+	if (reg > OMAP1_CH_COMMON_START)
+		ch_offset = 0x40 * lch;
+
+	va = dma_base + reg_map_omap1[reg] + ch_offset;
+	val = __raw_readw(va);
+
+	/* Some channel registers also have an associated upper register */
+	if (reg >= CSSA) {
+		16 upper = __raw_readw(va + 2);
+		val |= (upper << 16);
+	}
+
+	return val;
+}
+...
+
+Regards,
+
+Tony
