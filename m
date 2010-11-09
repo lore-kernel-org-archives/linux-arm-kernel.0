@@ -1,28 +1,44 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Tue, 9 Nov 2010 09:48:41 +0100
-Subject: [PATCH 2/2] imx: fix USB build when USB gadget is selected
-In-Reply-To: <00929d858b30cf10e8a9e6a9dffd27d36b1abda4.1289285160.git.baruch@tkos.co.il>
-References: <6c16c084bfda41cd104613bed66bbad7b5433c6d.1289285160.git.baruch@tkos.co.il>
-	<00929d858b30cf10e8a9e6a9dffd27d36b1abda4.1289285160.git.baruch@tkos.co.il>
-Message-ID: <20101109094841.4979d434@wker>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue,  9 Nov 2010 11:06:09 +0200
+Subject: [PATCH 0/4] ARM kdump fixes
+Message-ID: <cover.1289292124.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  9 Nov 2010 08:47:55 +0200
-Baruch Siach <baruch@tkos.co.il> wrote:
+Hello all,
 
-> Commit 126512e3f274802ca65ebeca8660237f0361ad48 (USB: add platform glue driver
-> for FSL USB DR controller) broke i.MX build by selecting USB_FSL_MPH_DR_OF.
-> 
-> Cc: Anatolij Gustschin <agust@denx.de>
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  drivers/usb/gadget/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+Here is a set of patches which I hope allows us to build
+crashkernels on ARM platforms. The first patch is needed so that we
+can get rid of a compiler warning when building /proc/vmcore on
+32-bit only platform. I think it should go via Andrew's tree (if
+accepted, that is).
 
-Thanks. But another patch fixing this has already been posted
-to the linux usb devel list:
+Patches 2 and 3 should replace following patches which are in
+Russell's patch tracker:
 
-http://thread.gmane.org/gmane.linux.kernel/1052648/focus=38156
+	6121/1 allow passing an ELF64 header to elf_check_arch()
+	-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6121/1
 
-Anatolij
+	6123/1 kdump: add CONFIG_CRASH_DUMP Kconfig option
+	-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6123/1
+
+The last patch converts reserve_crashkernel() to use memblock.
+
+Thanks,
+MW
+
+Mika Westerberg (4):
+  proc/vmcore: allow archs to override vmcore_elf_check_arch()
+  ARM: provide zero vmcore_elf64_check_arch()
+  ARM: add CONFIG_CRASH_DUMP to Kconfig
+  ARM: memblock: convert reserve_crashkernel() to use memblock
+
+ arch/arm/Kconfig           |   13 +++++++++++++
+ arch/arm/include/asm/elf.h |    2 ++
+ arch/arm/kernel/setup.c    |   21 +++++++--------------
+ fs/proc/vmcore.c           |    2 +-
+ include/linux/crash_dump.h |    9 ++++++++-
+ 5 files changed, 31 insertions(+), 16 deletions(-)
+
+-- 
+1.7.2.3
