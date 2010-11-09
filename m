@@ -1,28 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Nov 2010 09:47:37 +0100
-Subject: [PATCH 6/6 v2] ARM: Add support for the display controllers in
-	VT8500 and WM8505
-In-Reply-To: <1289147348-31969-6-git-send-email-alchark@gmail.com>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<1289147348-31969-6-git-send-email-alchark@gmail.com>
-Message-ID: <201011080947.37522.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 09 Nov 2010 10:17:50 +0000
+Subject: [PATCH 1/2] Fix the I-cache invalidation on ARMv6 and later CPUs
+In-Reply-To: <AANLkTim3O9HaOZp7VD3s1+FRU0KmPUrDei9NFDoXWK3y@mail.gmail.com>
+References: <20080606114622.15520.49929.stgit@pc1117.cambridge.arm.com>
+	<AANLkTik0_0Eb8G5hEb+DGvE2BDM_mJwwF-Pt1ErTz=Lr@mail.gmail.com>
+	<AANLkTim3O9HaOZp7VD3s1+FRU0KmPUrDei9NFDoXWK3y@mail.gmail.com>
+Message-ID: <1289297870.11461.7.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 07 November 2010, Alexey Charkov wrote:
->  drivers/video/Kconfig         |   26 +++
->  drivers/video/Makefile        |    3 +
->  drivers/video/vt8500lcdfb.c   |  452 +++++++++++++++++++++++++++++++++++++++++
->  drivers/video/vt8500lcdfb.h   |   34 +++
->  drivers/video/wm8505fb.c      |  438 +++++++++++++++++++++++++++++++++++++++
->  drivers/video/wm8505fb_regs.h |   76 +++++++
->  drivers/video/wmt_ge_rops.c   |  186 +++++++++++++++++
->  drivers/video/wmt_ge_rops.h   |    5 +
+> On Tue, Nov 9, 2010 at 2:03 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
+> > On Fri, Jun 6, 2008 at 8:46 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> This patch adds the I-cache invalidation in update_mmu_cache if the
+> >> corresponding vma is marked as executable. It also invalidates the
+> >> I-cache if a thread migrates to a CPU it never ran on.
+> >
+> > The description says just two place in update_mmu_cache and CPU
+> > migration point.
+> > I agree on it.
+> >
+> >>
+> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> ---
+> >>
+> >>  arch/arm/mm/fault-armv.c      |    4 ++++
+> >>  arch/arm/mm/flush.c           |    2 ++
+> >>  include/asm-arm/cacheflush.h  |    7 +++++++
+> >>  include/asm-arm/mmu_context.h |    5 +++++
+> >>  4 files changed, 18 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+> >> index 44558d5..fbfa260 100644
+> >> --- a/arch/arm/mm/fault-armv.c
+> >> +++ b/arch/arm/mm/fault-armv.c
+> >> @@ -144,13 +144,17 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
+> >>        page = pfn_to_page(pfn);
+> >>        mapping = page_mapping(page);
+> >>        if (mapping) {
+> >> +#ifndef CONFIG_SMP
+> >>                int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
+> >>
+> >>                if (dirty)
+> >>                        __flush_dcache_page(mapping, page);
+> >> +#endif
+> >>
+> >>                if (cache_is_vivt())
+> >>                        make_coherent(mapping, vma, addr, pfn);
+> >> +               else if (vma->vm_flags & VM_EXEC)
+> >> +                       __flush_icache_all();
+> >>        }
+> >>  }
+> >>
+> >> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> >> index 9df507d..029ee65 100644
+> >> --- a/arch/arm/mm/flush.c
+> >> +++ b/arch/arm/mm/flush.c
+> >> @@ -199,6 +199,8 @@ void flush_dcache_page(struct page *page)
+> >>                __flush_dcache_page(mapping, page);
+> >>                if (mapping && cache_is_vivt())
+> >>                        __flush_dcache_aliases(mapping, page);
+> >> +               else if (mapping)
+> >> +                       __flush_icache_all();
+> >>        }
+> >
+> > Here, let me ask questions.
+> > 1. Why do we flush icache in  flush_dcache_page? Does it really needed?
 
->From a very brief look, the two drivers look rather similar. What is the
-reason to have separate drivers instead of just one?
+Note that these functions are changed slightly in 2.6.37-rc1, but we
+still do the I-cache flushing.
 
-Could you perhaps take the common parts and move them into a third module
-that exports symbols to be used by the two drivers?
+There reason is that the page being modified may already be mapped in
+user space and may be a code page as well. The kernel may call this
+function after it modified the page and therefore we need to ensure the
+I-D cache coherency.
 
-	Arnd
+IMHO, the API could be slightly improved since the kernel calls this
+function even before reading a page cache page but we don't really need
+to invalidate the I-cache at that point.
+
+> > 2. If we really need it, should we even flush it in !VM_EXEC?
+
+We don't have the vma in flush_dcache_page to be able to check for
+VM_EXEC.
+
+Catalin
