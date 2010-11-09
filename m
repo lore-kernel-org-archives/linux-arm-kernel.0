@@ -1,8 +1,8 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 9 Nov 2010 18:39:25 +0900
+From: alchark@gmail.com (Alexey Charkov)
+Date: Tue, 9 Nov 2010 12:49:25 +0300
 Subject: [PATCH 6/6 v4] ARM: Add support for the display controllers in
 	VT8500 and WM8505
-In-Reply-To: <AANLkTim047K-RjLLcz3124Wm+-he8s5AirAsD6R_kitN@mail.gmail.com>
+In-Reply-To: <20101109093925.GA21814@linux-sh.org>
 References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
 	<1289147348-31969-6-git-send-email-alchark@gmail.com>
 	<20101108041721.GA11605@linux-sh.org>
@@ -13,14 +13,25 @@ References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
 	<20101108234239.GA20819@alchark-u3s.lan>
 	<20101108235407.GB18385@linux-sh.org>
 	<AANLkTim047K-RjLLcz3124Wm+-he8s5AirAsD6R_kitN@mail.gmail.com>
-Message-ID: <20101109093925.GA21814@linux-sh.org>
+	<20101109093925.GA21814@linux-sh.org>
+Message-ID: <AANLkTi=es0vAWeNjWMDEi8Es97uxsgb9A2aNovp7z8Uh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 09, 2010 at 03:03:01AM +0300, Alexey Charkov wrote:
-> Is there anybody I should address specifically to get this merged?
-> 
-I've set up an fbdev tree now, so I'll just take this through there. It
-looks like the ordering shouldn't be important, so this can be applied
-independent of the rest, and it simply won't show up until the other bits
-have settled in .38.
+2010/11/9 Paul Mundt <lethal@linux-sh.org>:
+> On Tue, Nov 09, 2010 at 03:03:01AM +0300, Alexey Charkov wrote:
+>> Is there anybody I should address specifically to get this merged?
+>>
+> I've set up an fbdev tree now, so I'll just take this through there. It
+> looks like the ordering shouldn't be important, so this can be applied
+> independent of the rest, and it simply won't show up until the other bits
+> have settled in .38.
+>
+
+Yes, the different parts of the patch series are completely
+independent, apart from the corresponding platform definitions and
+memblock reservations that take place in PATCH 1/6 (which contains
+basic board code).
+
+Thanks,
+Alexey
