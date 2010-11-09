@@ -1,122 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 09 Nov 2010 17:36:29 +0000
-Subject: Cache clean of page table entries
-In-Reply-To: <AANLkTimwhczn7nP1ys+iq-hv3Dh0pto+GsWc2fX=-WMg@mail.gmail.com>
-References: <AANLkTinB8=fF7XiMvhEfPoBHh9A9qeHM-ZDP1UxxEyqY@mail.gmail.com>
-	<1289240048.3541.153.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTimwhczn7nP1ys+iq-hv3Dh0pto+GsWc2fX=-WMg@mail.gmail.com>
-Message-ID: <1289324189.11461.64.camel@e102109-lin.cambridge.arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 09 Nov 2010 09:41:26 -0800
+Subject: [PATCH v3 5/5] OMAP: I2C: Convert i2c driver to use PM runtime
+	api's
+In-Reply-To: <20101027073501.GK21564@trinity.fluff.org> (Ben Dooks's message
+	of "Wed, 27 Oct 2010 08:35:01 +0100")
+References: <1285078036-12789-2-git-send-email-rnayak@ti.com>
+	<1285078036-12789-3-git-send-email-rnayak@ti.com>
+	<1285078036-12789-4-git-send-email-rnayak@ti.com>
+	<1285078036-12789-5-git-send-email-rnayak@ti.com>
+	<1285078036-12789-6-git-send-email-rnayak@ti.com>
+	<20100927223645.GJ21564@trinity.fluff.org>
+	<0680EC522D0CC943BC586913CF3768C003FF05981F@dbde02.ent.ti.com>
+	<0680EC522D0CC943BC586913CF3768C003FF05988F@dbde02.ent.ti.com>
+	<20100928233334.GS21564@trinity.fluff.org>
+	<87vd5d9a68.fsf@deeprootsystems.com>
+	<20101027073501.GK21564@trinity.fluff.org>
+Message-ID: <87tyjqqtrt.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-11-08 at 18:33 +0000, Christoffer Dall wrote:
-> On Mon, Nov 8, 2010 at 7:14 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, 2010-11-05 at 19:30 +0000, Christoffer Dall wrote:
-> >> What happens is this:
-> >>  - The guest kernel allocates memory and writes a guest page table entry.
-> >
-> > Which address does it use to write the page table entry?
-> 
-> It uses "it's own" virtual address. The guest has no knowledge of a
-> host or qemu and acts as if it runs natively. Therefore, if a standard
-> kernel maps its page tables at 0xc0002000, then the guest will write
-> the entries using 0xc0002000. It's up to KVM to create a mapping from
-> 0xc0002000 to a physical address. There will also be a mapping from
-> the Qemu process' address space to that same physical address and
-> possibly in the host kernel address space as well.
+Ben Dooks <ben-i2c@fluff.org> writes:
 
-OK, so it may be more efficient on ARMv7 (or ARMv6 with non-aliasing
-VIPT caches) to avoid extra flushing for aliases.
+> On Thu, Oct 07, 2010 at 10:37:03AM -0700, Kevin Hilman wrote:
+>> Ben Dooks <ben-i2c@fluff.org> writes:
+>> 
+>> [...]
+>> 
+>> > As such, I should really go and read up all about this new runtime-pm
+>> > and hwmod stuff before further commentign on the changes.
+>> 
+>> ping
+>> 
+>> >From the drivers perspective, you don't neet to know anything about
+>> omap_hwmod.  You can think of this change as simply using the runtime PM
+>> API instead of the clock API for enabling and idling the device.
+>> 
+>> With your ack (on this patch only) we'd like to merge this along with
+>> the rest of the series for 2.6.37.
+>
+> Acked-by: Ben Dooks <ben-linux@fluff.org>
+>
+> please post via your tree.
 
-> > I assume at
-> > this stage is the one that Qemu uses in the host OS. Does the OS make
-> > any assumptions that the caches are disabled (Linux does this when
-> > setting up the initial page tables)? But the memory accesses are
-> > probably cacheable from the Qemu space.
-> 
-> Yes, the entries are always marked as cacheable. The assumptions that
-> the MMU is turned off is only in the inital assembly code in head.S
-> right? Once we're in start_kernel(...) and subsequently
-> paging_init(...) the MMU is on and the kernel must clean the caches
-> right?
+Thanks Ben,
 
-Does KVM trap the cache maintenance operations that the guest kernel
-does and emulate them? There is even a full D-cache flushing before the
-MMU is enabled in the guest OS.
+Will queue up for 2.6.38.
 
-> >>  - Later, the guest tries to access the virtual address mapped through
-> >> the above entry
-> >>  - The driver (KVM) will have to create a corresponding mapping in
-> >> it's shadow page tables (which are the ones used by the MMU). To do
-> >> so, it must read the guest page table.
-> >>  - Before reading the data, the user space address (which is passed to
-> >> copy_from_user) is invalidated on the cache.
-> >>  - From time to time, however the read returns incorrect
-> >> (uninitialized or stale) data.
-> >
-> > This happens usually because you may have invalidated a valid cache line
-> > which didn't make to RAM. You either use a flush (clean+invalidate) or
-> > make sure that the corresponding cache line has been flushed by whoever
-> > wrote that address. I think the former is safer.
-> 
-> Yes, I learned that recently by spending a lot of time debugging
-> seemingly spurious bugs on the host. However, do you know how much of
-> a performance difference there is between flushing and invalidating a
-> clean line?
-
-Flushing is more expensive if there are dirty cache lines since they
-need to be written back and that depends on the bus and RAM speeds. But
-flushing and invalidating are operations to be used in different
-situations.
-
-If cache maintenance in the guest OS for page tables is done properly
-(i.e. cleaning or flushing is handled by KVM and emulated), in general
-you can only do an invalidation in the host kernel before reading. If
-you have non-aliasing VIPT caches, you don't even need to do this
-invalidation.
-
-But on the cache maintenance emulation part, is KVM switching the TTBR
-to the host OS when emulating the operations? If yes, the original
-virtual address is no longer present so you need to create the same
-alias before flushing (need to look at the KVM patches at some point).
-
-> > As long as you use copy_from_user which gets the same user virtual
-> > address, there is no need for any cache maintenance, you read it via the
-> > same alias so you hit the same cache lines anyway.
-> 
-> I hope I explained this reasonably above. To clarify, the only time
-> Qemu writes to guest memory (ignoring i/o) is before initial boot when
-> it writes the bootloader and the kernel image to memory.
-
-That's clear now.
-
-Can you not force the ARMv6 to run in non-aliasing mode? I think there
-is a bit in some CP15 register (depending on the implementation) but it
-would limit the amount of cache to 16K (or 4K be way). Overall, it may
-be cheaper than all the cache maintenance that you have to do.
-
-> > In general, yes. But a guest OS may assume that the D-cache is disabled
-> > (especially during booting) and not do any cache maintenance.
-> >
-> > There is another situation where a page is allocated by Qemu and zero'ed
-> > by the kernel while the guest kernel tries to write it via a different
-> > mapping created by KVM. It only flushes the latter while the former may
-> > have some dirty cache lines being evicted (only if there is D-cache
-> > aliasing on ARMv6).
-> 
-> I'm not sure what you mean here. Can you clarify a little?
-
-It may not be clear enough to me how kvm works. So Qemu has a virtual
-address space in the host OS. The guest OS has yet another virtual
-address space inside the virtual space of Qemu.
-
-The Qemu virtual space is allocated by the host kernel. The anonymous
-pages are zero'ed or copied-on-write by the kernel before being mapped
-into user space. But cache flushing takes place already (at least in
-newer kernels), so that's not an issue.
-
-When creating a virtual mapping, does KVM pin the Qemu pages in memory
-using something like get_user_pages or does KVM allocates the pages
-itself?
-
-Catalin
+Kevin
