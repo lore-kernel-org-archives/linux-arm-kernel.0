@@ -1,48 +1,57 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 6 Nov 2010 23:03:53 +0530
-Subject: [PATCHv2] ARM: ftrace: enable function graph tracer
-Message-ID: <mailman.14.1289310416.1530.linux-arm-kernel@lists.infradead.org>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue,  9 Nov 2010 14:50:56 +0100
+Subject: [PATCH] ARM: add support for uncompressed uImage kernel
+Message-ID: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the options to enable the function graph tracer on ARM.  Function
-graph tracer support requires frame pointers, so exclude Thumb-2 and
-also make sure FRAME_POINTER gets enabled when FUNCTION_GRAPH_TRACER is
-used, since FUNCTION_TRACER doesn't "select FRAME_POINTER" when
-ARM_UNWIND is used.  Therefore, with GCC 4.4.0+, you get plain function
-tracing without frame pointers, but you'll need them if you want
-function graph tracing.
-
-Signed-off-by: Rabin Vincent <rabin@rab.in>
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
 ---
- arch/arm/Kconfig       |    1 +
- arch/arm/Kconfig.debug |    2 +-
- 2 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/boot/Makefile |   10 ++++++++--
+ init/Kconfig           |    7 +++++++
+ 2 files changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a19a526..c5e96ff 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -14,6 +14,7 @@ config ARM
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
-+	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZO
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 2fd0b99..eac62085 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -23,7 +23,7 @@ config STRICT_DEVMEM
- config FRAME_POINTER
- 	bool
- 	depends on !THUMB2_KERNEL
--	default y if !ARM_UNWIND
-+	default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
- 	help
- 	  If you say N here, the resulting kernel will be slightly smaller and
- 	  faster. However, if neither FRAME_POINTER nor ARM_UNWIND are enabled,
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index 4a590f4..37618b8 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -77,11 +77,17 @@ else
+ $(obj)/uImage: STARTADDR=$(LOADADDR)
+ endif
+ 
+-$(obj)/uImage:	$(obj)/zImage FORCE
++ifeq ($(CONFIG_KERNEL_NONE),y)
++ARM_IMAGE := Image
++else
++ARM_IMAGE := zImage
++endif
++
++$(obj)/uImage:	$(obj)/$(ARM_IMAGE) FORCE
+ 	$(call if_changed,uimage)
+ 	@echo '  Image $@ is ready'
+ 
+-$(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
++$(obj)/bootp/bootp: $(obj)/$(ARM_IMAGE) initrd FORCE
+ 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
+ 	@:
+ 
+diff --git a/init/Kconfig b/init/Kconfig
+index 88c1046..355d7a5 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -155,6 +155,13 @@ choice
+ 
+ 	  If in doubt, select 'gzip'
+ 
++config KERNEL_NONE
++	bool "None"
++	depends on ARM
++	help
++	  If you want to use get a fast startup at the cost of kernel size
++	  you can use an uncompressed kernel.
++
+ config KERNEL_GZIP
+ 	bool "Gzip"
+ 	depends on HAVE_KERNEL_GZIP
 -- 
-1.7.2.3
+1.7.2.2
