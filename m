@@ -1,100 +1,24 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 09 Nov 2010 14:48:25 -0800
-Subject: [PATCH v3 13/13] OMAP: PM: DMA: Enable runtime pm
-In-Reply-To: <1288099513-1854-14-git-send-email-manjugk@ti.com> (Manjunath
-	Kondaiah G.'s message of "Tue, 26 Oct 2010 18:55:13 +0530")
-References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-14-git-send-email-manjugk@ti.com>
-Message-ID: <87fwvajepy.fsf@deeprootsystems.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 9 Nov 2010 14:40:12 -0800
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101109224012.GA21992@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
+> From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
+> 
+> This patch allows to control the pl011 clock using set_termios
+> callback. Any positive baudrate passed enables clock, otherwise
+> disables. This saves a lot of power on submicron designs since
+> we can clock off and disable unused UARTs.
 
-> Enable runtime pm and use pm_runtime_get and pm_runtime_put
-> for OMAP DMA driver.
->
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/plat-omap/dma.c |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> index 41b14b0..feac7ee 100644
-> --- a/arch/arm/plat-omap/dma.c
-> +++ b/arch/arm/plat-omap/dma.c
-> @@ -35,6 +35,7 @@
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
-> +#include <linux/pm_runtime.h>
->  
->  #include <asm/system.h>
->  #include <mach/hardware.h>
-> @@ -367,6 +368,8 @@ int omap_request_dma(int dev_id, const char *dev_name,
->  	chan = dma_chan + free_ch;
->  	chan->dev_id = dev_id;
->  
-> +	pm_runtime_get(&pd->dev);
+That's nice, but it seems like an overload of what people traditionally
+think of when it comes to baud rates.  Why not just power down ports
+that are not open instead?
 
-The _get() call is asynchronous.  So if the device was actually
-idled/disabled, immediately after this call it may still be
-idle/disabled.   When using the asynchronous versions of the API, the
-device should not be touched until the driver's ->runtime_resume()
-callback is called.
+thanks,
 
->  	if (d->dev_caps & IS_WORD_16)
->  		p->clear_lch_regs(free_ch);
->  	else
-> @@ -452,6 +455,7 @@ void omap_free_dma(int lch)
->  		omap_clear_dma(lch);
->  		p->clear_dma_sglist_mode(lch);
->  	}
-> +	pm_runtime_put(&pd->dev);
->  	spin_lock_irqsave(&dma_chan_lock, flags);
->  	dma_chan[lch].dev_id = -1;
->  	dma_chan[lch].next_lch = -1;
-> @@ -819,6 +823,11 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  	dma_chan_count		= d->chan_count;
->  	dma_chan		= d->chan;
->  
-> +	/* Enable run time PM */
-
-comment is redundant
-
-> +	pm_runtime_enable(&pd->dev);
-> +
-> +	/* Accessing hw registers, get clock */
-
-comment is wrong, driver doesn't know anything about clocks.
-Just drop comment as it doesn't tell you anything that the following
-'get' doesn't.
-
-> +	pm_runtime_get(&pd->dev);
-
-see above Re: async calls.
-
->  	for (ch = 0; ch < dma_chan_count; ch++) {
->  		unsigned long flags;
->  		omap_clear_dma(ch);
-> @@ -846,6 +855,10 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  		dma_chan[0].dev_id = 0;
->  		dma_chan[1].dev_id = 1;
->  	}
-> +
-> +	if (!omap_dma_reserve_channels)
-> +		pm_runtime_put(&pd->dev);
-> +
-
-So if the reserve channels feature is used, PM is essentially disabled
-for sDMA.  You should add a warning here to that effect as well.
-
-
->  	return 0;
->  
->  exit_release_region:
-
-Kevin
+greg k-h
