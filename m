@@ -1,43 +1,28 @@
-From: marco.stornelli@gmail.com (Marco Stornelli)
-Date: Tue, 9 Nov 2010 09:07:03 +0100
-Subject: [PATCH] arm: fix compilation warning during compilation
-In-Reply-To: <AANLkTi=YjrnD6owL-xv41XYaDFwy+K9SyymnoNuKhAzN@mail.gmail.com>
-References: <4CD51A9B.7010806@gmail.com>
-	<20101108091302.GO16938@pengutronix.de>
-	<AANLkTinmQtrLJcjxRSwbHARrgE-4FEaJeDt4R8C2tLHY@mail.gmail.com>
-	<AANLkTi=YjrnD6owL-xv41XYaDFwy+K9SyymnoNuKhAzN@mail.gmail.com>
-Message-ID: <AANLkTim8++gbgfnUpEM=cbdRcLxttEhqccHC5_COz-LK@mail.gmail.com>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Tue, 9 Nov 2010 09:48:41 +0100
+Subject: [PATCH 2/2] imx: fix USB build when USB gadget is selected
+In-Reply-To: <00929d858b30cf10e8a9e6a9dffd27d36b1abda4.1289285160.git.baruch@tkos.co.il>
+References: <6c16c084bfda41cd104613bed66bbad7b5433c6d.1289285160.git.baruch@tkos.co.il>
+	<00929d858b30cf10e8a9e6a9dffd27d36b1abda4.1289285160.git.baruch@tkos.co.il>
+Message-ID: <20101109094841.4979d434@wker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/8 Gadiyar, Anand <gadiyar@ti.com>:
-> 2010/11/8 Marco Stornelli <marco.stornelli@gmail.com>:
->> 2010/11/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->>> Hello,
->>>
->>> On Sat, Nov 06, 2010 at 10:06:35AM +0100, Marco Stornelli wrote:
->>>> From: Marco Stornelli <marco.stornelli@gmail.com>
->>>>
->>>> During compilation of 2.6.36 for Beagle board, there a are a couple of warnings. This patch fix them.
->>> Please break lines for commit logs at around 76 chars and mention the
->>> exact compiler warning being fixed.
->>>
->>
->> My compiler version is gcc 4.4.1. Two warning: variable gpio_mux may
->> be used not initialized (false positive, I agree); second: compiler
->> fix the void lack in the inline function with an int. Obviously there
->> is a lack of return type that it must be void.
->>
->
-> Marco,
->
-> Both of these are fixed in 2.6.37-rc1.
->
-> Commits afc28bc0ec and ca828760f9 respectively.
->
-> - Anand
->
+On Tue,  9 Nov 2010 08:47:55 +0200
+Baruch Siach <baruch@tkos.co.il> wrote:
 
-Very good. Thanks.
+> Commit 126512e3f274802ca65ebeca8660237f0361ad48 (USB: add platform glue driver
+> for FSL USB DR controller) broke i.MX build by selecting USB_FSL_MPH_DR_OF.
+> 
+> Cc: Anatolij Gustschin <agust@denx.de>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/usb/gadget/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 
-Marco
+Thanks. But another patch fixing this has already been posted
+to the linux usb devel list:
+
+http://thread.gmane.org/gmane.linux.kernel/1052648/focus=38156
+
+Anatolij
