@@ -1,37 +1,25 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Tue, 9 Nov 2010 13:23:29 +0300
-Subject: [PATCH 6/6 v2] ARM: Add support for the display controllers in
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Nov 2010 10:33:12 +0000
+Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
 	VT8500 and WM8505
-In-Reply-To: <201011080947.37522.arnd@arndb.de>
+In-Reply-To: <20101108204315.GA12050@linux-sh.org>
 References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
 	<1289147348-31969-6-git-send-email-alchark@gmail.com>
-	<201011080947.37522.arnd@arndb.de>
-Message-ID: <AANLkTikC9j2U3VUbEmfgH555Zq1sSO-hVtpg_k7hLFPS@mail.gmail.com>
+	<20101108041721.GA11605@linux-sh.org>
+	<20101108141407.GA25739@alchark-u3s.lan>
+	<20101108204315.GA12050@linux-sh.org>
+Message-ID: <20101109103312.GA2869@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/8 Arnd Bergmann <arnd@arndb.de>:
-> On Sunday 07 November 2010, Alexey Charkov wrote:
->> ?drivers/video/Kconfig ? ? ? ? | ? 26 +++
->> ?drivers/video/Makefile ? ? ? ?| ? ?3 +
->> ?drivers/video/vt8500lcdfb.c ? | ?452 +++++++++++++++++++++++++++++++++++++++++
->> ?drivers/video/vt8500lcdfb.h ? | ? 34 +++
->> ?drivers/video/wm8505fb.c ? ? ?| ?438 +++++++++++++++++++++++++++++++++++++++
->> ?drivers/video/wm8505fb_regs.h | ? 76 +++++++
->> ?drivers/video/wmt_ge_rops.c ? | ?186 +++++++++++++++++
->> ?drivers/video/wmt_ge_rops.h ? | ? ?5 +
->
-> From a very brief look, the two drivers look rather similar. What is the
-> reason to have separate drivers instead of just one?
->
-> Could you perhaps take the common parts and move them into a third module
-> that exports symbols to be used by the two drivers?
->
+On Tue, Nov 09, 2010 at 05:43:16AM +0900, Paul Mundt wrote:
+> > diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+> > new file mode 100644
+> > index 0000000..640d8a3
+> > --- /dev/null
+> > +++ b/drivers/video/vt8500lcdfb.c
+> > +#include <asm/irq.h>
+> > +
+> linux/irq.h is preferred here.
 
-Quite frankly, I would say that all SoC framebuffer drivers are quite
-similar ;-) Register offsets, timing formats, accepted pixel formats,
-buffer alignment requirements are all different, so I do not really
-believe that there'd be much benefit from introducing another
-abstraction level. This is open to debate, of course.
-
-Alexey
+I assume you've read the comment at the top of linux/irq.h ?
