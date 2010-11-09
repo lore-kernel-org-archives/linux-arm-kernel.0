@@ -1,32 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 09 Nov 2010 16:38:12 +0000
-Subject: [PATCH] ARM: Temporary fix for broken arch reboot
-In-Reply-To: <20101109131838.GF2869@n2100.arm.linux.org.uk>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
-	<20101109131838.GF2869@n2100.arm.linux.org.uk>
-Message-ID: <1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
+From: bpringle@sympatico.ca (bpringle at sympatico.ca)
+Date: Tue, 9 Nov 2010 11:42:17 -0500
+Subject: IMX Spi and 24bit data.
+Message-ID: <BLU0-SMTP84E35E9219EF44BAE164F4B8300@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-11-09 at 13:18 +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh wrote:
-> > With commit 3d3f78d752bf, reboot seems to broken on ARM
-> > machines. CPU dies while doing flush_pmd_entry() as part of
-> > setup_mm_for_reboot()
+Below is a 'example' patch to the imx SPI driver.  The issue is that
+soc-cache.c for 24bit SPI values only creates byte arrays of size
+three.  The IMX SPI driver examines memory that is 32 bits for this
+case and could possibly cause a trap if the final byte of the array is
+at a unmapped location.  (also, the data is possibly not aligned).
 
-What do you mean by 'dies'? Can you still connect with a debugger or it
-got to some weird state?
+I guess the main question is the 'spi.h' interface expecting a padding
+to 32bits for 24bit values.  In this case, soc-cache is wrong.  But I
+suspect that the spi systems is expecting packed data.
 
-> > I know this is not the fix but intention is to report the
-> > issue and also provide temporary fix till it get fixed correctly
-> 
-> So you're now rebooting with the secondary CPUs still running.  I guess
-> that the secondary CPUs end up crashing and don't restart.
-> 
-> I think more the question is why the CP15 cache clean/flush is hanging
-> with the other CPUs taken down.  All the other CPUs will be doing is
-> sitting in a loop doing nothing.
+Also, I looked in little_endian.h for some thing appropriate.  Do we
+have a 24bit extraction macro somewhere?.  I guess soc-core would be
+using this if we did.
 
-I can't think of anything. Did the other CPUs print 'stopping'?
+Sorry, if this is a known issue.
 
-Catalin
+Regards,
+Bill Pringlemeir.
+
+I see my tabs are all messed up too.  I just want to know if this is
+the approriate way to handle this.  My byte order may be messed up as
+I haven't tested this...  I have just padded soc-core.c for now.
+
+diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+index 7972e90..54c6a5a 100644
+--- a/drivers/spi/spi_imx.c
++++ b/drivers/spi/spi_imx.c
+@@ -116,6 +116,31 @@ MXC_SPI_BUF_TX(u16)
+ MXC_SPI_BUF_RX(u32)
+ MXC_SPI_BUF_TX(u32)
+ 
++static void spi_imx_buf_rx_u24(struct spi_imx_data *spi_imx)
++{
++       unsigned int val = readl(spi_imx->base + MXC_CSPIRXDATA);
++       if (spi_imx->rx_buf) {
++        u8 *data = (u8 *)spi_imx->rx_buf;
++        data[0] = (val >> 16) & 0xff;
++        data[1] = (val >> 8) & 0xff;
++        data[2] = val & 0xff;
++               spi_imx->rx_buf += 3;
++       }
++}
++
++static void spi_imx_buf_tx_u24(struct spi_imx_data *spi_imx)
++{
++       u32 val = 0;
++
++       if (spi_imx->tx_buf) {
++        u8 *data = (u8 *)spi_imx->rx_buf;
++               val = data[0] << 16 | data[1] << 8 | data[0];
++               spi_imx->tx_buf += 3;
++       }
++       spi_imx->count -= 3;
++       writel(val, spi_imx->base + MXC_CSPITXDATA);
++}
++
+ /* First entry is reserved, second entry is valid only if SDHC_SPIEN is set
+  * (which is currently not the case in this driver)
+  */
+@@ -433,6 +458,11 @@ static int spi_imx_setupxfer(struct spi_device *spi,
+        } else if (config.bpw <= 16) {
+                spi_imx->rx = spi_imx_buf_rx_u16;
+                spi_imx->tx = spi_imx_buf_tx_u16;
++#if 0
++       } else if (config.bpw <= 24) {
++               spi_imx->rx = spi_imx_buf_rx_u24;
++               spi_imx->tx = spi_imx_buf_tx_u24;
++#endif
+        } else if (config.bpw <= 32) {
+                spi_imx->rx = spi_imx_buf_rx_u32;
+                spi_imx->tx = spi_imx_buf_tx_u32;
