@@ -1,27 +1,32 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 10 Nov 2010 01:20:55 +0900
-Subject: [PATCH 6/6 v3] ARM: Add support for the display controllers in
-	VT8500 and WM8505
-In-Reply-To: <201011091433.45387.arnd@arndb.de>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<20101109110407.GE2869@n2100.arm.linux.org.uk>
-	<AANLkTinWNoGJoDu6Ok8Ni5OuAXN29H7Bd3YMyUq6qfFq@mail.gmail.com>
-	<201011091433.45387.arnd@arndb.de>
-Message-ID: <20101109162055.GA22740@linux-sh.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 09 Nov 2010 16:38:12 +0000
+Subject: [PATCH] ARM: Temporary fix for broken arch reboot
+In-Reply-To: <20101109131838.GF2869@n2100.arm.linux.org.uk>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+	<20101109131838.GF2869@n2100.arm.linux.org.uk>
+Message-ID: <1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 09, 2010 at 02:33:45PM +0100, Arnd Bergmann wrote:
-> On Tuesday 09 November 2010, Geert Uytterhoeven wrote:
-> > >
-> > > It looks to me like the only arch in the kernel which doesn't support
-> > > generic irq is sh.
-> > 
-> > IIRC, m68k, sparc32, and s390.
+On Tue, 2010-11-09 at 13:18 +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh wrote:
+> > With commit 3d3f78d752bf, reboot seems to broken on ARM
+> > machines. CPU dies while doing flush_pmd_entry() as part of
+> > setup_mm_for_reboot()
+
+What do you mean by 'dies'? Can you still connect with a debugger or it
+got to some weird state?
+
+> > I know this is not the fix but intention is to report the
+> > issue and also provide temporary fix till it get fixed correctly
 > 
-> Yes, and among those, no driver in s390 should need asm/irq.h either because
-> they do not have interrupt numbers -- every device on s390 has an implicit
-> interrupt.
+> So you're now rebooting with the secondary CPUs still running.  I guess
+> that the secondary CPUs end up crashing and don't restart.
 > 
-Which is exactly what I stated in my original response. Moving along
-then..
+> I think more the question is why the CP15 cache clean/flush is hanging
+> with the other CPUs taken down.  All the other CPUs will be doing is
+> sitting in a loop doing nothing.
+
+I can't think of anything. Did the other CPUs print 'stopping'?
+
+Catalin
