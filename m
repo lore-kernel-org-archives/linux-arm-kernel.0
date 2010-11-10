@@ -1,63 +1,81 @@
-From: swetland@google.com (Brian Swetland)
-Date: Wed, 10 Nov 2010 10:34:25 -0800
-Subject: [PATCH v3] msm: smd: Reduce driver log chatter
-In-Reply-To: <1289413457.15905.95.camel@Joe-Laptop>
-References: <1289349036-16941-1-git-send-email-davidb@codeaurora.org>
-	<1289411969-24650-1-git-send-email-davidb@codeaurora.org>
-	<1289413457.15905.95.camel@Joe-Laptop>
-Message-ID: <AANLkTi=fBhqvo+xuAMPdkiO0z+K-R5vfS6+P8cf=Yws5@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 10 Nov 2010 19:58:36 +0100
+Subject: [PATCH 0/6] [v2] omap:mailbox-enhancements and fixes
+In-Reply-To: <AANLkTi=jL-aV0Xn3rcnZwaYLz9nY5QwXbGPHsdq1R2Gz@mail.gmail.com>
+References: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>	<4CDACB0E.3050403@ti.com>
+	<AANLkTi=jL-aV0Xn3rcnZwaYLz9nY5QwXbGPHsdq1R2Gz@mail.gmail.com>
+Message-ID: <4CDAEB5C.6000703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At this point, I think we could just drop the printk()s on the init
-functions.  They date back from when we first brought up the driver
-and I'm not sure they're of much value at all any more.
-
-Brian
-
-On Wed, Nov 10, 2010 at 10:24 AM, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2010-11-10 at 09:59 -0800, David Brown wrote:
->> ?arch/arm/mach-msm/smd.c | ? 18 ++++++++++--------
+On 11/10/2010 5:56 PM, Hari Kanigeri wrote:
+> Benoit,
 >
-> Hi again David. ?More trivia. Ignore at your pleasure.
+> Thanks for your comments.
 >
->> ?1 files changed, 10 insertions(+), 8 deletions(-)
->> diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
->
-> A moderately common kernel style uses macros like:
->
-> #define FUNC_ENTER() ? ?pr_debug("--> %s\n", __func__);
-> #define FUNC_EXIT() ? ? pr_debug("<-- %s\n", __func__);
-> or
-> #define FUNC_ENTER() ? ?pr_debug("Enter %s\n", __func__);
-> #define FUNC_EXIT() ? ? pr_debug("Exit ?%s\n", __func__);
->
-> The macro names vary.
-> I've seen enter, _enter, kenter, func_enter, etc.
->
->> @@ -939,7 +941,7 @@ int smsm_set_sleep_duration(uint32_t delay)
->> ?int smd_core_init(void)
->> ?{
->> ? ? ? int r;
->> - ? ? pr_info("smd_core_init()\n");
->> + ? ? pr_debug("smd_core_init()\n");
->
-> ? ? ? ?FUNC_ENTER();
->
->> @@ -992,14 +994,14 @@ int smd_core_init(void)
->> ? ? ? smsm_change_state(SMSM_STATE_APPS_DEM, ~0, 0);
->> ?#endif
+> On Wed, Nov 10, 2010 at 10:40 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>> Hi Hari,
 >>
->> - ? ? pr_info("smd_core_init() done\n");
->> + ? ? pr_debug("smd_core_init() done\n");
+>> On 11/10/2010 1:45 PM, Hari Kanigeri wrote:
+>>>
+>>> Thanks to Rene Sapiens and Omar Ramirez for their inputs on initial patch
+>>> set.
+>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37278.html
+>>>
+>>> The patch set addresses the following review comments from Rene and Omar.
+>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37626.html
+>>> https://patchwork.kernel.org/patch/255091/
+>>> https://patchwork.kernel.org/patch/255081/
+>>>
+>>> Following patches are changed because of above review comments:
+>>> omap:mailbox-send message in process context
+>>> omap:mailbox-add notification support for multiple readers
+>>>
+>>> Following patch is dropped from initial patch set
+>>> omap:mailbox-resolve multiple receiver problem
+>>>
+>>> The patch set is tested on omap4 SDP board.
+>>>
+>>> Fernando Guzman Lugo (1):
+>>>    mailbox: change full flag per mailbox queue instead of global
+>>>
+>>> Hari Kanigeri (5):
+>>>    omap:mailbox: fix rx interrupt disable in omap4
+>>>    omap:mailbox-fix checkpatch warnings
+>>
+>> That one is weird? How can you submit a patch that fix checkpatch?
 >
-> ? ? ? ?FUNC_EXIT();
+> Why weird if the patch is fixing the checkpatch warnings that were
+> already present in the code ?
+
+OK, so you meant that this is fixing some already existing warnings in 
+mainline code?
+My point was that checkpatch is supposed to check patch... but it's true 
+that is can check the code as well. I was assuming that all the code in 
+mainline is supposed to be already checkpatch proof :-)
+It seems that this is not the case.
+
+It might be interesting to run it on every plat-omap / mach-omap files...
+
+Thanks,
+Benoit
+
+> The other option is to leave the checkpatch warnings in the code :)
 >
->> ?static int __devinit msm_smd_probe(struct platform_device *pdev)
->> ?{
->> - ? ? pr_info("smd_init()\n");
->> + ? ? pr_debug("smd_init()\n");
+>> In theory you should not send any patch that generate checkpatch error or
+>> warning.
+>>
+>>>    omap:mailbox-send message in process context
+>>>    omap:mailbox-add notification support for multiple readers
+>>>    omap:clocks44x-add dummy clock for mailbox
+>>
+>> We are trying to enforce some consistency in the subjects name so you should
+>> name your patches like that:
 >
-> wrong function name? FUNC_ENTER();
+> Good point, thanks for pointing about consistency. I wasn't aware
+> about the rule to use OMAP in caps.
+> I will fix it.
 >
->
+> Thank you,
+> Best regards,
+> Hari
