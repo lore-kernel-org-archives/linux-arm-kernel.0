@@ -1,56 +1,31 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Tue, 9 Nov 2010 19:55:38 -0800
-Subject: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <alpine.LFD.2.00.1011092149190.13911@xanadu.home>
-References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-5-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
-	<AANLkTikk334vRT3HE9bQWc3u_jyLJckAY9AW=pVUQNbq@mail.gmail.com>
-	<AANLkTimn2b6b8r8au48LWk4G4tNfbbR=TypAC1f3=e3e@mail.gmail.com>
-	<alpine.LFD.2.00.1011092149190.13911@xanadu.home>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C059864312A@SC-VEXCH1.marvell.com>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Wed, 10 Nov 2010 12:00:36 +0800
+Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
+In-Reply-To: <20101109101433.GA17423@oksana.dev.rtsoft.ru>
+References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
+	<20101105074418.GA5864@oksana.dev.rtsoft.ru>
+	<AANLkTimH0JVcB31usN5srPNYCR8sR75J23FtTPQK1Chf@mail.gmail.com>
+	<20101109101433.GA17423@oksana.dev.rtsoft.ru>
+Message-ID: <AANLkTikF+QMcm0cnn0QUOMJaLb=BTbQZA2oCVas4-71q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2010/11/9 Anton Vorontsov <cbouatmailru@gmail.com>:
+>> BTW, the default boot command includes root=/dev/mmcblk0p1, but
+>> CONFIG_MMC_SDHCI_CNS3XXX is not enabled.
+>> Even if it is enabled, I got a crash once mounted. It works fine
+>> without L1 cache enabled (CONFIG_CPU_ICACHE_DISABLE,
+>> CONFIG_CPU_DCACHE_DISABLE). So it seems there are some cache coherency
+>> issue on the SDHC device.
+> I recalling I observed something like this, and it was somehow
+> related to the memory setup. The old (Jan 20 2010) U-Boot that
+> I used was configuring RAM incorrectly, and caches were just
+> unveiling the problem.
 
+I was using vanilla kernel. And I just found that Catalin's patches
+for cache maintenance changes is not in vanilla kernel. Using
+Catalin's kernel fixed this issue. It is due to the SDHCI driver is in
+PIO mode, and hit the cache coherency issue with PIO mode.
 
->-----Original Message-----
->From: Nicolas Pitre [mailto:nico at fluxnic.net]
->Sent: 2010?11?10? 10:51 AM
->To: Haojian Zhuang
->Cc: Eric Miao; Haojian Zhuang; linux-arm-kernel; Zhou Zhu
->Subject: Re: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
->
->On Tue, 9 Nov 2010, Haojian Zhuang wrote:
->
->> On Tue, Nov 9, 2010 at 5:21 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> > On Mon, Nov 8, 2010 at 8:37 PM, Haojian Zhuang
->> > <haojian.zhuang@marvell.com> wrote:
->> >> From: Zhou Zhu <zzhu3@marvell.com>
->> >>
->> >> iwmmx instructions are also used in PJ4. Add PJ4 support.
->> >>
->> >> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
->> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->> >> Cc: Eric Miao <eric.y.miao@gmail.com>
->> > This isn't good. Have to figure out a clean way for this.
->> >
->>
->> How about create new iwmmx.S and pj4-cp0.c? Since it can avoid macro.
->
->Could you first explain why the CP15 reg number is different?  The
->commit message for the proposed patch does not give any explanation for
->the difference.
->
->
->Nicolas
-
-Because PJ4 is different from XSC3. "cp 15.0.R15.c1.0" is used for specific control configuration.
-
-Thanks
-Haojian
+Best Regards,
+Mac Lin.
