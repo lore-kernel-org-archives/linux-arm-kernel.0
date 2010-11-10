@@ -1,36 +1,47 @@
 From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Wed, 10 Nov 2010 06:45:17 -0600
-Subject: [PATCH 2/6] omap:mailbox: fix rx interrupt disable in omap4
+Date: Wed, 10 Nov 2010 06:45:18 -0600
+Subject: [PATCH 3/6] omap:mailbox-fix checkpatch warnings
 In-Reply-To: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
 References: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <1289393121-7911-3-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <1289393121-7911-4-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-disabling rx interrupt on omap4 is different than its pre-decessors.
-The bit in OMAP4_MAILBOX_IRQENABLE_CLR should be set to disable the
-interrupts instead of clearing the bit.
+Fix the checkpatch warnings observed in mailbox module
 
 Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 ---
- arch/arm/mach-omap2/mailbox.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/mailbox.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 42dbfa4..82b5ced 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -195,7 +195,10 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
- 	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
- 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
- 	l = mbox_read_reg(p->irqdisable);
--	l &= ~bit;
-+	if (cpu_is_omap44xx())
-+		l |= bit;
-+	else
-+		l &= ~bit;
- 	mbox_write_reg(l, p->irqdisable);
- }
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 9ce3570..ed960c1 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -279,11 +279,11 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
  
+ 	return 0;
+ 
+- fail_alloc_rxq:
++fail_alloc_rxq:
+ 	mbox_queue_free(mbox->txq);
+- fail_alloc_txq:
++fail_alloc_txq:
+ 	free_irq(mbox->irq, mbox);
+- fail_request_irq:
++fail_request_irq:
+ 	if (mbox->ops->shutdown)
+ 		mbox->ops->shutdown(mbox);
+ 
+@@ -394,7 +394,8 @@ static int __init omap_mbox_init(void)
+ 
+ 	/* kfifo size sanity check: alignment and minimal size */
+ 	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(mbox_msg_t));
+-	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size, sizeof(mbox_msg_t));
++	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size,
++						sizeof(mbox_msg_t));
+ 
+ 	return 0;
+ }
 -- 
 1.7.0
