@@ -1,35 +1,48 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 10 Nov 2010 08:32:20 -0500
-Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
-In-Reply-To: <20101110131838.GA25666@n2100.arm.linux.org.uk>
-References: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
-	<4CB5629A.8040306@compulab.co.il>
-	<20101110131838.GA25666@n2100.arm.linux.org.uk>
-Message-ID: <C5433CFE-B56B-43F4-AE6E-442C80C580CE@gmail.com>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Wed, 10 Nov 2010 14:36:57 +0100
+Subject: [RFC] PCMCIA bugfixes
+Message-ID: <20101110133657.GA22986@comet.dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Saeed?
+Hey,
 
-Sent from my iPhone
+in order to address a few -- mostly minor -- issues, I intend to push these
+changes shortly. They're available at
 
-On Nov 10, 2010, at 8:18 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+git://git.kernel.org/pub/scm/linux/kernel/git/brodo/pcmcia-2.6.git urgent
 
-> On Wed, Oct 13, 2010 at 09:41:14AM +0200, Mike Rapoport wrote:
->> Hi Russell,
->> Shell we send it to your patch system?
-> 
-> I've no idea what to do about this.  I can find no entry in MAINTAINERS
-> for anyone who looks after Marvell Dove, so I assume it's another bit
-> of orphaned code.
-> 
-> It seems that it started off being looked after by Nico, and now that
-> Nico has moved on to pastures new, it's (presumably) maintainer-less.
-> 
-> Is there someone out there who'd be willing to look after this class of
-> platforms and put their name in MAINTAINERS for it?
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+As usual, I'm interested in your input to this patch series. The individual
+patches will be sent out (at least) to the PCMCIA list in a few moments.
+
+Best,
+        Dominik
+
+Andres Salomon (1):
+      pcmcia: fix warning in synclink driver
+
+Joe Perches (1):
+      drivers/pcmcia/soc_common.c: Use printf extension %pV
+
+Komuro (1):
+      pd6729: Coding Style fixes
+
+Nicolas Kaiser (1):
+      pcmcia/cm4000: fix error code
+
+Uwe Kleine-K?nig (1):
+      pcmcia/sa1100: don't put machine specific init functions in .init.text
+
+ drivers/char/pcmcia/cm4000_cs.c   |    3 ++-
+ drivers/char/pcmcia/synclink_cs.c |    1 +
+ drivers/pcmcia/pd6729.c           |    8 ++++----
+ drivers/pcmcia/pd6729.h           |    2 +-
+ drivers/pcmcia/pxa2xx_sharpsl.c   |    2 +-
+ drivers/pcmcia/sa1100_assabet.c   |    2 +-
+ drivers/pcmcia/sa1100_cerf.c      |    2 +-
+ drivers/pcmcia/sa1100_generic.c   |    2 +-
+ drivers/pcmcia/sa1100_h3600.c     |    2 +-
+ drivers/pcmcia/sa1100_shannon.c   |    2 +-
+ drivers/pcmcia/sa1100_simpad.c    |    2 +-
+ drivers/pcmcia/soc_common.c       |    9 +++++++--
+ 12 files changed, 22 insertions(+), 15 deletions(-)
