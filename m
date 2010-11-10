@@ -1,41 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Nov 2010 15:46:04 +0000
-Subject: [PATCH] ARM: Temporary fix for broken arch reboot
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030D58A400@dbde02.ent.ti.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
-	<20101109131838.GF2869@n2100.arm.linux.org.uk>
-	<1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030D4FAE5C@dbde02.ent.ti.com>
-	<20101110100617.GA23244@n2100.arm.linux.org.uk>
-	<1289397874.4513.54.camel@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030D58A400@dbde02.ent.ti.com>
-Message-ID: <20101110154604.GA27571@n2100.arm.linux.org.uk>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Wed, 10 Nov 2010 08:51:19 -0700
+Subject: [PATCHv3 1/2] ARM: imx: Add core definitions for MX53
+In-Reply-To: <20101109214607.GG6017@pengutronix.de>
+References: <1288972551-21877-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20101109214607.GG6017@pengutronix.de>
+Message-ID: <86A0E76937111F4C92FABEC0A20988510523D224@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 09:13:21PM +0530, Shilimkar, Santosh wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> > Sent: Wednesday, November 10, 2010 7:35 PM
-> > To: Russell King - ARM Linux
-> > Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; Gadiyar,
-> > Anand
-> > Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
-> > 
-> > The printing only happens for SYSTEM_BOOTING or SYSTEM_RUNNING. I
-> > suspect in this case we have SYSTEM_RESTARTING and the condition in
-> > ipi_cpu_stop() is false, therefore no printing. It may be worth putting
-> > some printks outside the 'if' to see whether the secondary CPUs get
-> > there.
-> > 
-> While doing some experiments on this issue, one interesting
-> observation I made. Looks like there is race between two
-> Cores which makes system behave badly in reboot path.
-> 
-> Just adding a delay in the ipi_cpu_stop() makes the reboot work
-> as well
+Hi Sascha,
 
-That could just be that it's taking longer than 500us for the reboot CPU
-to get through setup_mm_for_reboot().
+>-----Original Message-----
+>From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+>Sent: Tuesday, November 09, 2010 3:46 PM
+>To: Nguyen Dinh-R00091
+>Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+linux at arm.linux.org.uk;
+>u.kleine-koenig at pengutronix.de; amit.kucheria at canonical.com;
+eric at eukrea.com
+>Subject: Re: [PATCHv3 1/2] ARM: imx: Add core definitions for MX53
+>
+>Hi Dinh,
+>
+>On Fri, Nov 05, 2010 at 10:55:50AM -0500, Dinh.Nguyen at freescale.com
+wrote:
+>> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+>>
+>> Add iomux, clocks,  and memory map for Freescale's MX53 SoC.
+>> Add cpu_is_mx53 function to common.h.
+>> Add 3 more banks of gpio's to mxc_gpio_ports.
+>> Add MX53 phys offset address.
+>>
+>> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+>> ---
+>>  arch/arm/mach-mx5/clock-mx53.c              |  857
++++++++++++++++++++++++++++
+>>  arch/arm/mach-mx5/devices.c                 |   27 +
+>>  arch/arm/plat-mxc/include/mach/common.h     |    4 +
+>>  arch/arm/plat-mxc/include/mach/iomux-mx53.h |  303 ++++++++++
+>>  arch/arm/plat-mxc/include/mach/memory.h     |    1 +
+>>  arch/arm/plat-mxc/include/mach/mx53.h       |  406 +++++++++++++
+>>  6 files changed, 1598 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/mach-mx5/clock-mx53.c
+>>  create mode 100644 arch/arm/plat-mxc/include/mach/iomux-mx53.h
+>>  create mode 100644 arch/arm/plat-mxc/include/mach/mx53.h
+>>
+>> diff --git a/arch/arm/mach-mx5/clock-mx53.c
+b/arch/arm/mach-mx5/clock-mx53.c
+>> new file mode 100644
+>> index 0000000..d547cb8
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mx5/clock-mx53.c
+>
+>Most of this code looks like it could be shared with clock-mx51.c
+
+Agreed, but I was unsure how to proceed with adding clock code for mx53.
+Should I merge mx53 clock code into clock-mx51 and rename clock-mx51? 
+
+>
+>> +extern int mx53_revision(void);
+>> +#endif
+>> +
+>> +#endif	/* ifndef __MACH_H__ */
+>
+>__MACH_MX53_H__
+>
+>> --
+>> 1.6.0.4
+>>
+>>
+>>
+>
+>--
+>Pengutronix e.K.                           |
+|
+>Industrial Linux Solutions                 | http://www.pengutronix.de/
+|
+>Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+|
+>Amtsgericht Hildesheim, HRA 2686           | Fax:
++49-5121-206917-5555 |
+
+Thanks for the review,
+
+Dinh
