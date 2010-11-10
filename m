@@ -1,40 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Nov 2010 18:09:12 +0100
-Subject: [PATCHv3 1/2] ARM: imx: Add core definitions for MX53
-In-Reply-To: <AANLkTinmXin65ReWsUf02ia7FMvHfeqkVeaGu6Usmdw5@mail.gmail.com>
-References: <1288972551-21877-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101109214607.GG6017@pengutronix.de>
-	<86A0E76937111F4C92FABEC0A20988510523D224@az33exm21>
-	<20101110164640.GV6017@pengutronix.de>
-	<AANLkTinmXin65ReWsUf02ia7FMvHfeqkVeaGu6Usmdw5@mail.gmail.com>
-Message-ID: <20101110170912.GC8950@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Nov 2010 17:11:04 +0000
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+	<20101109224012.GA21992@kroah.com>
+	<20101110000152.GA8993@n2100.arm.linux.org.uk>
+	<0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
+Message-ID: <20101110171104.GC27571@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 03:04:27PM -0200, Fabio Estevam wrote:
-> On Wed, Nov 10, 2010 at 2:46 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> ...
-> 
-> >> Agreed, but I was unsure how to proceed with adding clock code for mx53.
-> >> Should I merge mx53 clock code into clock-mx51 and rename clock-mx51?
-> >
-> > Yes, to something like clock-mx51-mx53.c
-> >
-> 
-> Or maybe clock-mx5x.c would be more generic.
-> 
-> This way when any other MX5x processor gets added we don't need to
-> change the file name again.
+On Wed, Nov 10, 2010 at 10:15:53AM +0200, Grzegorz.Sygieda at tieto.com wrote:
+> The main goal was to disable/enable clock while port open. This is usefull
+> for scenario, where some higher level driver wants to control the power
+> consumption (using set_termios). In the same time a user-space app (eg.
+> hciattach) is still bounded to the specific /dev/tty* device associated
+> with particular uart. From user POV device is always open, and app does
+> not have to respawn, and we can save power.
 
-This can happen with mx5x also when the next MX5x is incompatible like
-we had with i.MX2x when i.MX25 came out. Anyway, in this case I don't
-care much.
+If a port is open, and bound (eg to a bluetooth hci), how does the higher
+level decide whether to place the port in low power mode?  How does it
+know that there isn't going to be characters sent to the port?
 
-Sascha
+When the port is in this low power mode, it's as good as closed from the
+external world point of view.
 
+I don't like this idea because I really can't see how it could be used
+effectively - there isn't really any way for a bound protocol to know
+whether there's characters expected to be received or not.  Either the
+port is open and in use, or it isn't.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Let's take an example of a modem waiting for an incoming call.  It spends
+most of its time waiting for the call.  You could argue that you could
+shut the clock off to the port to save power - but then how do you receive
+the "RING" message from the modem?  As you've shut the clock off, you're
+not going to detect the activity on the receive line.
+
+I'm sure that also applies to bluetooth as well, especially if you're a
+'client' device - as long as the port is attached, bluetooth probably
+expects to be able to listen to what's going on so the device can be
+discovered.
+
+It's all very well adding hooks to the transmit path to ensure that there
+clock is on while there's characters to be sent, but this really doesn't
+help you on the receive side.
+
+I'm worried...
