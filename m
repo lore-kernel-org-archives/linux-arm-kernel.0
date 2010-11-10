@@ -1,55 +1,57 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Wed, 10 Nov 2010 12:28:00 -0800
-Subject: [PATCH] ARM: Common GIC entry macro code
-In-Reply-To: <20101110070043.18735.53764.sendpatchset@t400s>
-References: <20101110070043.18735.53764.sendpatchset@t400s>
-Message-ID: <4CDB0050.3090509@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Nov 2010 20:37:44 +0000
+Subject: [RFC PATCH v3] ARM: Introduce patching of phys_to_virt and
+	vice versa
+In-Reply-To: <alpine.LFD.2.00.1011101327520.13911@xanadu.home>
+References: <AANLkTikhcHTRYQki3cCYbWFY_POWX4E26Jau8nYpuDs0@mail.gmail.com>
+	<20101108114948.GC14138@n2100.arm.linux.org.uk>
+	<20101110164508.GB27571@n2100.arm.linux.org.uk>
+	<20101110175549.GD27571@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1011101327520.13911@xanadu.home>
+Message-ID: <20101110203744.GE27571@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Magnus,
+On Wed, Nov 10, 2010 at 03:23:50PM -0500, Nicolas Pitre wrote:
+> > 	add	rd, rn, #PHYS_OFFSET - PAGE_OFFSET
+> > 
+> > and phys_to_virt() is:
+> > 
+> > 	sub	rd, rn, #PHYS_OFFSET - PAGE_OFFSET
+> 
+> Does this work even if PHYS_OFFSET - PAGE_OFFSET goes negative? 
 
-   The patch assumes that PPI's could be nothing but timers. On msm we 
-have other interrupts which are PPI's.
+Yes.
 
-   I have tested this and doesn't work for msm. The reason being we treat
-PPI timer interrupts as usual interrupts, meaning use do_asm_IRQ() 
-instead of do_local_timer(). Besides there are other non timer 
-interrupts that are PPIs and we need do_asm_IRQ() to be called for them.
+	add	rd, rn, #0xc0000000
+	sub	rd, rn, #0x40000000
 
-   You might want to exclude msm from this patch.
+are identical operations.  The operand is an 8 bit constant, zero padded,
+rotated right by (in this case) 8 bits - there can be no sign extension.
 
-> +++ work/arch/arm/include/asm/hardware/entry-macro-gic.S	2010-11-10 15:20:15.000000000 +0900
+> On Wed, 10 Nov 2010, Russell King - ARM Linux wrote:
+> > Here's something which uses the above ideas (untested).  I think this is
+> > something we can (and should) do unconditionally for the !XIP cases.
+> 
+> What do you mean by "unconditionally"?
 
-> +	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-> +
-> +	ldr     \irqstat, [\base, #GIC_CPU_INTACK]
-> +	/* bits 12-10 = src CPU, 9-0 = int # */
-> +
-> +	ldr	\tmp, =1021
-> +	bic     \irqnr, \irqstat, #0x1c00
-> +	cmp     \irqnr, #29
+For any machine where the v:p offset is respresentable.  It means that
+we increase the amount of testing, and actually this becomes the
+standard way.
 
-Not all the PPI's are timer interrupts on MSM. MSM would need this to be 
-compared to 15 rather than 29.
+> > +2:	cmp	r4, r5
+> > +	ldrlo	r7, [r4], #4
+> > +	ldrlo	ip, [r7, r3]
+> > +	bic	ip, ip, #0x000000ff
+> > +	bic	ip, ip, #0x00000f00
+> > +	orr	ip, ip, r6
+> 
+> The above 3 insns could be replaced with:
+> 
+> 	mov	ip, ip, lsr #12
+> 	orr	ip, r6, ip, lsl #12
 
-> --- 0001/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
-> +++ work/arch/arm/mach-msm/include/mach/entry-macro-qgic.S	2010-11-10 15:27:06.000000000 +0900
-> -	 */
-> -
-> -	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-> -
-> -	ldr  \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 =srcCPU,
-> -						   9-0 =int # */
-> -
-> -	bic     \irqnr, \irqstat, #0x1c00	@mask src
-> -	cmp     \irqnr, #15
-See above line
-
-Thanks,
-Abhijeet
-
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
---
+They could be, but it's not worth optimizing to that extent - we're
+already hitting load delays for both of those ldr instructions that
+this isn't going to be blindingly fast... at least there aren't
+thousands of them to fixup.
