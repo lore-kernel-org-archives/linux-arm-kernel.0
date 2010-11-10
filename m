@@ -1,74 +1,81 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 10 Nov 2010 16:43:31 -0500 (EST)
-Subject: [RFC PATCH v3] ARM: Introduce patching of phys_to_virt and vice
-	versa
-In-Reply-To: <20101110203744.GE27571@n2100.arm.linux.org.uk>
-References: <AANLkTikhcHTRYQki3cCYbWFY_POWX4E26Jau8nYpuDs0@mail.gmail.com>
-	<20101108114948.GC14138@n2100.arm.linux.org.uk>
-	<20101110164508.GB27571@n2100.arm.linux.org.uk>
-	<20101110175549.GD27571@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1011101327520.13911@xanadu.home>
-	<20101110203744.GE27571@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1011101632220.13911@xanadu.home>
+From: svalentine@concentris-systems.com (Scott Valentine)
+Date: Wed, 10 Nov 2010 10:37:33 -1000
+Subject: arm smp support patch
+In-Reply-To: <4CDA803D.8090403@ru.mvista.com>
+References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>
+	<4CDA803D.8090403@ru.mvista.com>
+Message-ID: <7BA88774597D409F9906A67003273689@KroffDinna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Nov 2010, Russell King - ARM Linux wrote:
-
-> On Wed, Nov 10, 2010 at 03:23:50PM -0500, Nicolas Pitre wrote:
-> > > 	add	rd, rn, #PHYS_OFFSET - PAGE_OFFSET
-> > > 
-> > > and phys_to_virt() is:
-> > > 
-> > > 	sub	rd, rn, #PHYS_OFFSET - PAGE_OFFSET
-> > 
-> > Does this work even if PHYS_OFFSET - PAGE_OFFSET goes negative? 
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com] 
+> Sent: Wednesday, November 10, 2010 1:22 AM
+> To: svalentine at concentris-systems.com
+> Cc: linux at arm.linux.org.uk; laguna at lists.gateworks.com; 
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: arm smp support patch
 > 
-> Yes.
+> Hello.
 > 
-> 	add	rd, rn, #0xc0000000
-> 	sub	rd, rn, #0x40000000
+> On 10-11-2010 2:33, Scott Valentine wrote:
 > 
-> are identical operations.  The operand is an 8 bit constant, zero padded,
-> rotated right by (in this case) 8 bits - there can be no sign extension.
-
-OK.
-
-> > On Wed, 10 Nov 2010, Russell King - ARM Linux wrote:
-> > > Here's something which uses the above ideas (untested).  I think this is
-> > > something we can (and should) do unconditionally for the !XIP cases.
-> > 
-> > What do you mean by "unconditionally"?
+> > On arm multi-core platforms that have a gic, the secondary 
+> cores fail 
+> > to wake if they are booted in WFI mode, as the 
+> gic_dist_init disables 
+> > all interrupts including IPI. I've included a simple patch to the 
+> > gic_dist_init function that enables interrupts 0-15 on SMP enabled 
+> > systems. This patch was made against linux-2.6-HEAD-151f52f.
 > 
-> For any machine where the v:p offset is respresentable.  It means that
-> we increase the amount of testing, and actually this becomes the
-> standard way.
-
-Well, sure.  This can become the default, but I wouldn't remove the 
-ability to optimize everything at compile time for those who prefer the 
-tightest kernel possible.
-
-> > > +2:	cmp	r4, r5
-> > > +	ldrlo	r7, [r4], #4
-> > > +	ldrlo	ip, [r7, r3]
-> > > +	bic	ip, ip, #0x000000ff
-> > > +	bic	ip, ip, #0x00000f00
-> > > +	orr	ip, ip, r6
-> > 
-> > The above 3 insns could be replaced with:
-> > 
-> > 	mov	ip, ip, lsr #12
-> > 	orr	ip, r6, ip, lsl #12
+>     Your signoff is necessary for the patch to be applied.
 > 
-> They could be, but it's not worth optimizing to that extent - we're
-> already hitting load delays for both of those ldr instructions that
-> this isn't going to be blindingly fast... at least there aren't
-> thousands of them to fixup.
+> > diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> > --- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
+> > +++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
+> > @@ -262,6 +262,13 @@
+> >          for (i = 0; i<  max_irq; i += 32)
+> >                  writel(0xffffffff, base + 
+> GIC_DIST_ENABLE_CLEAR + i * 
+> > 4 / 32);
+> >
+> > +#ifdef CONFIG_SMP
+> > +       /*
+> > +        * Enable IPI interrupts on SMP systems so we can wake 
+> > +secondary
+> > cores
+> 
+>    Your patch is line wrapped.
+> 
+> > +        */
+> > +       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET); #endif
+> > +
+> >          /*
+> >           * Setup the Linux IRQ subsystem.
+> >           */
+> 
+> > Scott Valentine
+> 
+> WBR, Sergei
 
-Sure.  This is not critical, but even worse is the fact that this is all 
-running with all caches off.  So having one less insn in the loop may 
-help, even if only to serve as a good ARM coding example (will be more 
-significant with thumb2).
+Sorry, bad mail-client settings. Also, I'm not really a maintainer, but I will signoff as requested. Below is the non-wrapped patch:
 
+Signed-off-by: Scott Valentine <svalentine@concentris-systems.com>
 
-Nicolas
+diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+--- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
++++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
+@@ -262,6 +262,13 @@
+        for (i = 0; i < max_irq; i += 32)
+                writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+
++#ifdef CONFIG_SMP
++       /*
++        * Enable IPI interrupts on SMP systems so we can wake secondary cores
++        */
++       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET);
++#endif
++
+        /*
+         * Setup the Linux IRQ subsystem.
+         */
