@@ -1,88 +1,65 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 10 Nov 2010 08:03:11 -0800
-Subject: [PATCH v3 01/13] OMAP: DMA: Replace read/write macros with
-	functions
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBD@dbde02.ent.ti.com>
-	(Manjunath Kondaiah G.'s message of "Wed, 10 Nov 2010 19:31:52 +0530")
+Date: Wed, 10 Nov 2010 08:14:30 -0800
+Subject: [PATCH v3 13/13] OMAP: PM: DMA: Enable runtime pm
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CC1@dbde02.ent.ti.com>
+	(Manjunath Kondaiah G.'s message of "Wed, 10 Nov 2010 19:32:19 +0530")
 References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-2-git-send-email-manjugk@ti.com>
-	<87y692mb4e.fsf@deeprootsystems.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBD@dbde02.ent.ti.com>
-Message-ID: <877hgldv40.fsf@deeprootsystems.com>
+	<1288099513-1854-14-git-send-email-manjugk@ti.com>
+	<87fwvajepy.fsf@deeprootsystems.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CC1@dbde02.ent.ti.com>
+Message-ID: <871v6tdul5.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 
-[...]
-
->> > +		if (reg > OMAP1_CH_COMMON_START)
->> > +			__raw_writew(val, dma_base +
->> > +				(reg_map_omap1[reg] + 0x40 * lch));
->> > +		else
->> > +			__raw_writew(val, dma_base + 
->> reg_map_omap1[reg]);
->> > +	} else {
->> > +		if (reg > OMAP2_CH_COMMON_START)
->> > +			__raw_writel(val, dma_base +
->> > +				(reg_map_omap2[reg] + 0x60 * lch));
->> > +		else
->> > +			__raw_writel(val, dma_base + 
->> reg_map_omap2[reg]);
->> > +	}
->> > +}
+>> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 >> 
->> The register base offset, register array and the stride (offset
->> between instances: 0x40 or 0x60) are detectable at init time, and
->> there's no reason to have conditional code for them.  IOW, they
->> should be init time constants.  Doing so would greatly simply these
->> functions.  In fact the CH_COMMON_START could also be an init time
->> constant as well.  So, given the following init_time constants:
->> dma_ch_common_start, dma_stride, reg_map, the above would be reduced
->> to something actually worth inlining, for example (not actually
->> tested):
+>> > Enable runtime pm and use pm_runtime_get and pm_runtime_put
+>> > for OMAP DMA driver.
+>> >
+>> > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+>> > Cc: Benoit Cousson <b-cousson@ti.com>
+>> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> > ---
+>> >  arch/arm/plat-omap/dma.c |   13 +++++++++++++
+>> >  1 files changed, 13 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+>> > index 41b14b0..feac7ee 100644
+>> > --- a/arch/arm/plat-omap/dma.c
+>> > +++ b/arch/arm/plat-omap/dma.c
+>> > @@ -35,6 +35,7 @@
+>> >  #include <linux/io.h>
+>> >  #include <linux/slab.h>
+>> >  #include <linux/delay.h>
+>> > +#include <linux/pm_runtime.h>
+>> >  
+>> >  #include <asm/system.h>
+>> >  #include <mach/hardware.h>
+>> > @@ -367,6 +368,8 @@ int omap_request_dma(int dev_id, const 
+>> char *dev_name,
+>> >  	chan = dma_chan + free_ch;
+>> >  	chan->dev_id = dev_id;
+>> >  
+>> > +	pm_runtime_get(&pd->dev);
 >> 
->> static inline void dma_write(u32 val, int reg, int lch)
->> {
->>         u8 stride = (reg > dma_ch_common_start) ? dma_stride : 0;
->> 
->>         __raw_writel(val, dma_base + (reg_map[reg] + stride * lch));
->> }
->> 
->> Same applies to dma_read().
+>> The _get() call is asynchronous.  So if the device was actually
+>> idled/disabled, immediately after this call it may still be
+>> idle/disabled.   When using the asynchronous versions of the API, the
+>> device should not be touched until the driver's ->runtime_resume()
+>> callback is called.
 >
-> Thanks for the suggestion. It is taken care along with Tony's comment
-> for handling these read/write's between omap1 and omap2+.
->
-> Here is code snippet for handling both omap1(includes 16 bit
-> registers) and omap2+ 
->
-> static inline void dma_write(u32 val, int reg, int lch)
-> {
->         u8  stride;
->         u32 offset;
->
->         stride = (reg >= dma_common_ch_start) ? dma_stride : 0;
->         offset = reg_map[reg] + (stride * lch);
->
->         if (dma_stride  == 0x40) {
+> driver runtime_resume will call omap_device_enable. How do we make 
+> we check from driver side, whether omap_device_enable execution is complete
+> or not.
 
-The use of hard-coded constants still isn't right here.    This is
-bascally the same as a cpu_is_omap1 check.  After you separate out the
-device files, I thought you had separate omap1 and omap2+ versions of
-these, so I don't follow the need for this.
+It is complete when the driver's runtime_resume hook is called.  The
+OMAP runtime PM core calls omap_device_enable() before calling the
+driver's callback.  See arch/arm/mach-omap2/pm_bus.c for details.
 
->                 __raw_writew(val, omap_dma_base + offset);
-
-This could be moved before the 'if' and the 'else' clause removed.
-
->                 if ((reg > CLNK_CTRL && reg < CCR2) ||
->                                 (reg > PCHD_ID && reg < CAPS_2)) {
->                         u32 offset2 = reg_map[reg] + 2 + (stride * lch);
->                         __raw_writew(val >> 16, omap_dma_base + offset2);
->                 }
->         } else
->                 __raw_writel(val, omap_dma_base + offset);
-> }
+Alternatively, just use _get_sync() which doesn't return until the
+device is ready.
 
 Kevin
