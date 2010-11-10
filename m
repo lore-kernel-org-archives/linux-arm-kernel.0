@@ -1,7 +1,7 @@
 From: saeed@marvell.com (Saeed Bishara)
-Date: Wed, 10 Nov 2010 16:48:57 +0200
+Date: Wed, 10 Nov 2010 16:57:23 +0200
 Subject: [PATCH] ARM: add MAINTAINERS entry for Marvell Dove SoC
-Message-ID: <1289400537-23131-1-git-send-email-saeed@marvell.com>
+Message-ID: <1289401043-31019-1-git-send-email-saeed@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
