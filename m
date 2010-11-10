@@ -1,22 +1,37 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 10 Nov 2010 16:27:39 -0700 (MST)
-Subject: [PATCH 6/6] omap:clocks44x-add dummy clock for mailbox
-In-Reply-To: <1289393121-7911-7-git-send-email-h-kanigeri2@ti.com>
-References: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
-	<1289393121-7911-7-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <alpine.DEB.2.00.1011101626570.28301@utopia.booyaka.com>
+Date: Wed, 10 Nov 2010 16:30:53 -0700 (MST)
+Subject: [PATCH v5 2/3] OMAP3: DMA: Errata i541: sDMA FIFO draining does
+	not finish
+In-Reply-To: <4CDAA3AA.7070003@nokia.com>
+References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
+	<1286261141-1039-3-git-send-email-peter.ujfalusi@nokia.com>
+	<4CDAA3AA.7070003@nokia.com>
+Message-ID: <alpine.DEB.2.00.1011101628410.28301@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hari
+Hello Adrian,
 
-On Wed, 10 Nov 2010, Hari Kanigeri wrote:
+On Wed, 10 Nov 2010, Adrian Hunter wrote:
 
-> In omap4, there is no explicit configuration register to enable mailbox clocks.
-> Defining dummy clock for mailbox clock module to keep the mailbox driver
-> backward compatible with previous omaps.
+> On 05/10/10 09:45, Peter Ujfalusi wrote:
+> 
+> > +	if (cpu_is_omap34xx()&&  (l&  OMAP_DMA_CCR_SEL_SRC_DST_SYNC)) {
+> > +		int i = 0;
+> > +		u32 sys_cf;
+> > +
+> > +		/* Configure No-Standby */
+> > +		l = dma_read(OCP_SYSCONFIG);
+> > +		sys_cf = l;
+> > +		l&= ~DMA_SYSCONFIG_MIDLEMODE_MASK;
+> > +		l |= DMA_SYSCONFIG_MIDLEMODE(DMA_IDLEMODE_NO_IDLE);
+> > +		dma_write(l , OCP_SYSCONFIG);
+> 
+> Are accesses of OCP_SYSCONFIG synchronised?
 
-If you split this off from the rest of your series, I'll queue it for .38.
+Do you mean, with respect to later reads and writes from the SDMA device?  
+If so, then yes, later reads and writes to the SDMA are guaranteed to 
+complete in order.  But perhaps I am misunderstanding what you mean?
 
 
 - Paul
