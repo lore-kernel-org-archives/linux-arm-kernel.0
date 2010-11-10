@@ -1,35 +1,62 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Wed, 10 Nov 2010 17:20:45 +0200
-Subject: [PATCH 1/6 v4] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <20101110151801.GC24305@n2100.arm.linux.org.uk>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<20101107165745.GB1759@n2100.arm.linux.org.uk>
-	<AANLkTimFJ=Brx4pDiUqZOKDfABaDg0s_yFC7EkZGi7D8@mail.gmail.com>
-	<20101107171726.GF1759@n2100.arm.linux.org.uk>
-	<20101108171930.GA1471@alchark-u3s.lan>
-	<AANLkTinqpP8WN2h-kR7svZ6GZxi+0RMPBfPyMnzCpAuO@mail.gmail.com>
-	<20101110151801.GC24305@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimBG91U8yqVpi=X0iu0ibbJihBMQYSA-y+WNqoW@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 10 Nov 2010 16:26:19 +0100
+Subject: Patch IMX audmux debugfs.
+In-Reply-To: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
+References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
+Message-ID: <20101110152619.GB8950@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 5:18 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Nov 10, 2010 at 05:16:17PM +0200, saeed bishara wrote:
->> > diff --git a/arch/arm/mach-vt8500/include/mach/uncompress.h b/arch/arm/mach-vt8500/include/mach/uncompress.h
->> > new file mode 100644
->> > index 0000000..bb9e2d2
->> > --- /dev/null
->> > +++ b/arch/arm/mach-vt8500/include/mach/uncompress.h
->> > @@ -0,0 +1,37 @@
->> > +/* arch/arm/mach-vt8500/include/mach/uncompress.h
->> > + *
->> > + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
->> > + *
->> > + * Based on arch/arm/mach-dove/include/mach/uncompress.h
->> please ?replace dove with vt8500
->
-> That doesn't make sense - how can a file be created, based upon itself?
-your are right, please ignore my comment.
-saeed
+Hi Bill,
+
+On Tue, Nov 09, 2010 at 06:11:12PM -0500, Bill Pringlemeir wrote:
+> 
+> $ mount -t debugfs debugfs /sys/kernel/debug
+> $ cd /sys/kernel/debug/audmux
+> $ cat *
+> [crashes when accessing ssi7]
+> 
+> The index is one based, but the register map is zero based.  So the
+> ssi1 is actually sending info for ssi2.  Also, the ssi7 touches
+> non-existent data and can cause an exception (only registers sets 1-6
+> exist).
+> 
+> Alternatively, the MX31_AUDMUX_PORT6_SSI_PINS_6 and
+> MX27_AUDMUX_PPCR3_SSI_PINS_3 constants could be used for the loop
+> termination, but maybe that means conditionalization (and there are no
+> MX25 constants).
+> 
+> diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
+> index f9e7cdb..0547145 100644
+> --- a/arch/arm/plat-mxc/audmux-v2.c
+> +++ b/arch/arm/plat-mxc/audmux-v2.c
+> @@ -66,7 +66,7 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
+>  {
+>         ssize_t ret;
+>         char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+> -       int port = (int)file->private_data;
+> +       int port = ((int)file->private_data) - 1;
+>         u32 pdcr, ptcr;
+>  
+>         if (!buf)
+> @@ -150,7 +150,7 @@ static void audmux_debugfs_init(void)
+>                 return;
+>         }
+>  
+> -       for (i = 1; i < 8; i++) {
+> +       for (i = 1; i < 7; i++) {
+>                 snprintf(buf, sizeof(buf), "ssi%d", i);
+>                 if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
+>                                          (void *)i, &audmux_debugfs_fops))
+
+I prefer passing (void *)(i - 1) here and skipping the first hunk.
+Please add your Signed-off-by next time you send a patch.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
