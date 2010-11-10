@@ -1,81 +1,22 @@
-From: svalentine@concentris-systems.com (Scott Valentine)
-Date: Wed, 10 Nov 2010 10:37:33 -1000
-Subject: arm smp support patch
-In-Reply-To: <4CDA803D.8090403@ru.mvista.com>
-References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>
-	<4CDA803D.8090403@ru.mvista.com>
-Message-ID: <7BA88774597D409F9906A67003273689@KroffDinna>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 10 Nov 2010 16:27:39 -0700 (MST)
+Subject: [PATCH 6/6] omap:clocks44x-add dummy clock for mailbox
+In-Reply-To: <1289393121-7911-7-git-send-email-h-kanigeri2@ti.com>
+References: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
+	<1289393121-7911-7-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <alpine.DEB.2.00.1011101626570.28301@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com] 
-> Sent: Wednesday, November 10, 2010 1:22 AM
-> To: svalentine at concentris-systems.com
-> Cc: linux at arm.linux.org.uk; laguna at lists.gateworks.com; 
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: arm smp support patch
-> 
-> Hello.
-> 
-> On 10-11-2010 2:33, Scott Valentine wrote:
-> 
-> > On arm multi-core platforms that have a gic, the secondary 
-> cores fail 
-> > to wake if they are booted in WFI mode, as the 
-> gic_dist_init disables 
-> > all interrupts including IPI. I've included a simple patch to the 
-> > gic_dist_init function that enables interrupts 0-15 on SMP enabled 
-> > systems. This patch was made against linux-2.6-HEAD-151f52f.
-> 
->     Your signoff is necessary for the patch to be applied.
-> 
-> > diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> > --- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
-> > +++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
-> > @@ -262,6 +262,13 @@
-> >          for (i = 0; i<  max_irq; i += 32)
-> >                  writel(0xffffffff, base + 
-> GIC_DIST_ENABLE_CLEAR + i * 
-> > 4 / 32);
-> >
-> > +#ifdef CONFIG_SMP
-> > +       /*
-> > +        * Enable IPI interrupts on SMP systems so we can wake 
-> > +secondary
-> > cores
-> 
->    Your patch is line wrapped.
-> 
-> > +        */
-> > +       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET); #endif
-> > +
-> >          /*
-> >           * Setup the Linux IRQ subsystem.
-> >           */
-> 
-> > Scott Valentine
-> 
-> WBR, Sergei
+Hello Hari
 
-Sorry, bad mail-client settings. Also, I'm not really a maintainer, but I will signoff as requested. Below is the non-wrapped patch:
+On Wed, 10 Nov 2010, Hari Kanigeri wrote:
 
-Signed-off-by: Scott Valentine <svalentine@concentris-systems.com>
+> In omap4, there is no explicit configuration register to enable mailbox clocks.
+> Defining dummy clock for mailbox clock module to keep the mailbox driver
+> backward compatible with previous omaps.
 
-diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
---- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
-+++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
-@@ -262,6 +262,13 @@
-        for (i = 0; i < max_irq; i += 32)
-                writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+If you split this off from the rest of your series, I'll queue it for .38.
 
-+#ifdef CONFIG_SMP
-+       /*
-+        * Enable IPI interrupts on SMP systems so we can wake secondary cores
-+        */
-+       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET);
-+#endif
-+
-        /*
-         * Setup the Linux IRQ subsystem.
-         */
+
+- Paul
