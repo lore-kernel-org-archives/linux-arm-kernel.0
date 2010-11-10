@@ -1,513 +1,190 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Wed, 10 Nov 2010 19:42:43 +0200
-Subject: [PATCH v3 2/2] [ARM] Dove: add support for multi-purpose pins
-	configuration
-In-Reply-To: <e664f9e2cd2b1d1664cfc6d988b0eb93bcbf7325.1288272054.git.mike@compulab.co.il>
-References: <cover.1288272054.git.mike@compulab.co.il>
-	<e664f9e2cd2b1d1664cfc6d988b0eb93bcbf7325.1288272054.git.mike@compulab.co.il>
-Message-ID: <AANLkTi=9-aep5Eu5KZpQ3T4Db6Mq7hV0wMaPPdUUdX-G@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Nov 2010 17:55:49 +0000
+Subject: [RFC PATCH v3] ARM: Introduce patching of phys_to_virt and
+	vice versa
+In-Reply-To: <20101110164508.GB27571@n2100.arm.linux.org.uk>
+References: <AANLkTikhcHTRYQki3cCYbWFY_POWX4E26Jau8nYpuDs0@mail.gmail.com>
+	<20101108114948.GC14138@n2100.arm.linux.org.uk>
+	<20101110164508.GB27571@n2100.arm.linux.org.uk>
+Message-ID: <20101110175549.GD27571@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 28, 2010 at 3:24 PM, Mike Rapoport <mike@compulab.co.il> wrote:
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> ---
-> ?arch/arm/mach-dove/Makefile ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-dove/include/mach/dove.h | ? ?8 +-
-> ?arch/arm/mach-dove/mpp.c ? ? ? ? ? ? ? | ?215 +++++++++++++++++++++++++++++++
-> ?arch/arm/mach-dove/mpp.h ? ? ? ? ? ? ? | ?220 ++++++++++++++++++++++++++++++++
-> ?4 files changed, 443 insertions(+), 2 deletions(-)
-> ?create mode 100644 arch/arm/mach-dove/mpp.c
-> ?create mode 100644 arch/arm/mach-dove/mpp.h
->
-> diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
-> index 7ab3be5..1515f61 100644
-> --- a/arch/arm/mach-dove/Makefile
-> +++ b/arch/arm/mach-dove/Makefile
-> @@ -1,3 +1,3 @@
-> -obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?+= common.o addr-map.o irq.o pcie.o
-> +obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?+= common.o addr-map.o irq.o pcie.o mpp.o
->
-> ?obj-$(CONFIG_MACH_DOVE_DB) ? ? += dove-db-setup.o
-> diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
-> index 148f4f0..27b4145 100644
-> --- a/arch/arm/mach-dove/include/mach/dove.h
-> +++ b/arch/arm/mach-dove/include/mach/dove.h
-> @@ -136,10 +136,16 @@
-> ?#define ?DOVE_AU1_SPDIFO_GPIO_EN ? ? ? (1 << 1)
-> ?#define ?DOVE_NAND_GPIO_EN ? ? ? ? ? ? (1 << 0)
-> ?#define DOVE_MPP_CTRL4_VIRT_BASE ? ? ? (DOVE_GPIO_VIRT_BASE + 0x40)
-> -
-> +#define ?DOVE_SPI_GPIO_SEL ? ? ? ? ? ? (1 << 5)
-> +#define ?DOVE_UART1_GPIO_SEL ? ? ? ? ? (1 << 4)
-> +#define ?DOVE_AU1_GPIO_SEL ? ? ? ? ? ? (1 << 3)
-> +#define ?DOVE_CAM_GPIO_SEL ? ? ? ? ? ? (1 << 2)
-> +#define ?DOVE_SD1_GPIO_SEL ? ? ? ? ? ? (1 << 1)
-> +#define ?DOVE_SD0_GPIO_SEL ? ? ? ? ? ? (1 << 0)
->
-> ?/* Power Management */
-> ?#define DOVE_PMU_VIRT_BASE ? ? (DOVE_SB_REGS_VIRT_BASE | 0xd0000)
-> +#define DOVE_PMU_SIG_CTRL ? ? ?(DOVE_PMU_VIRT_BASE + 0x802c)
->
-> ?/* Real Time Clock */
-> ?#define DOVE_RTC_PHYS_BASE ? ? (DOVE_SB_REGS_PHYS_BASE | 0xd8500)
-> diff --git a/arch/arm/mach-dove/mpp.c b/arch/arm/mach-dove/mpp.c
-> new file mode 100644
-> index 0000000..2857d4b
-> --- /dev/null
-> +++ b/arch/arm/mach-dove/mpp.c
-> @@ -0,0 +1,215 @@
-> +/*
-> + * arch/arm/mach-dove/mpp.c
-> + *
-> + * MPP functions for Marvell Dove SoCs
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. ?This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/gpio.h>
-> +#include <linux/io.h>
-> +
-> +#include <mach/dove.h>
-> +
-> +#include "mpp.h"
-> +
-> +#define MPP_NR_REGS 4
-> +#define MPP_CTRL(i) ? ?((i) == 3 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ?DOVE_MPP_CTRL4_VIRT_BASE : ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ?DOVE_MPP_VIRT_BASE + (i) * 4)
-> +#define PMU_SIG_REGS 2
-> +#define PMU_SIG_CTRL(i) ? ? ? ?(DOVE_PMU_SIG_CTRL + (i) * 4)
-> +
-> +struct dove_mpp_grp {
-> + ? ? ? int start;
-> + ? ? ? int end;
-> +};
-> +
-> +static struct dove_mpp_grp dove_mpp_grp[] = {
-> + ? ? ? [MPP_24_39] = {
-> + ? ? ? ? ? ? ? .start ?= 24,
-> + ? ? ? ? ? ? ? .end ? ?= 39,
-> + ? ? ? },
-> + ? ? ? [MPP_40_45] = {
-> + ? ? ? ? ? ? ? .start ?= 40,
-> + ? ? ? ? ? ? ? .end ? ?= 45,
-> + ? ? ? },
-> + ? ? ? [MPP_46_51] = {
-> + ? ? ? ? ? ? ? .start ?= 40,
-> + ? ? ? ? ? ? ? .end ? ?= 45,
-> + ? ? ? },
-> + ? ? ? [MPP_58_61] = {
-> + ? ? ? ? ? ? ? .start ?= 58,
-> + ? ? ? ? ? ? ? .end ? ?= 61,
-> + ? ? ? },
-> + ? ? ? [MPP_62_63] = {
-> + ? ? ? ? ? ? ? .start ?= 62,
-> + ? ? ? ? ? ? ? .end ? ?= 63,
-> + ? ? ? },
-> +};
-> +
-> +static void dove_mpp_gpio_mode(int start, int end, int gpio_mode)
-> +{
-> + ? ? ? int i;
-> +
-> + ? ? ? for (i = start; i <= end; i++)
-> + ? ? ? ? ? ? ? orion_gpio_set_valid(i, gpio_mode);
-> +}
-> +
-> +static void dove_mpp_dump_regs(void)
-> +{
-> +#ifdef DEBUG
-> + ? ? ? int i;
-> +
-> + ? ? ? pr_debug("MPP_CTRL regs:");
-> + ? ? ? for (i = 0; i < MPP_NR_REGS; i++)
-> + ? ? ? ? ? ? ? printk(" %08x", readl(MPP_CTRL(i)));
-please fix checkpatch warning: WARNING: printk() should include KERN_
-facility level
-> + ? ? ? printk("\n");
-> +
-> + ? ? ? pr_debug("PMU_SIG_CTRL regs:");
-> + ? ? ? for (i = 0; i < PMU_SIG_REGS; i++)
-> + ? ? ? ? ? ? ? printk(" %08x", readl(PMU_SIG_CTRL(i)));
-and here
-> + ? ? ? printk("\n");
-> +
-> + ? ? ? pr_debug("PMU_MPP_GENERAL_CTRL: %08x\n", readl(DOVE_PMU_MPP_GENERAL_CTRL));
-> + ? ? ? pr_debug("MPP_GENERAL: %08x\n", readl(DOVE_MPP_GENERAL_VIRT_BASE));
-> +#endif
-> +}
-> +
-> +static void dove_mpp_cfg_nfc(int sel)
-> +{
-> + ? ? ? u32 mpp_gen_cfg = readl(DOVE_MPP_GENERAL_VIRT_BASE);
-> +
-> + ? ? ? mpp_gen_cfg &= ~0x1;
-> + ? ? ? mpp_gen_cfg |= sel;
-> + ? ? ? writel(mpp_gen_cfg, DOVE_MPP_GENERAL_VIRT_BASE);
-> +
-> + ? ? ? dove_mpp_gpio_mode(64, 71, GPIO_OUTPUT_OK);
-> +}
-> +
-> +static void dove_mpp_cfg_au1(int sel)
-> +{
-> + ? ? ? u32 mpp_ctrl4 ? ? ? ? ? = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-> + ? ? ? u32 ssp_ctrl1 = readl(DOVE_SSP_CTRL_STATUS_1);
-> + ? ? ? u32 mpp_gen_ctrl = readl(DOVE_MPP_GENERAL_VIRT_BASE);
-> + ? ? ? u32 global_cfg_2 = readl(DOVE_GLOBAL_CONFIG_2);
-> +
-> + ? ? ? mpp_ctrl4 &= ~(DOVE_AU1_GPIO_SEL);
-> + ? ? ? ssp_ctrl1 &= ~(DOVE_SSP_ON_AU1);
-> + ? ? ? mpp_gen_ctrl &= ~(DOVE_AU1_SPDIFO_GPIO_EN);
-> + ? ? ? global_cfg_2 &= ~(DOVE_TWSI_OPTION3_GPIO);
-> +
-> + ? ? ? if (!sel || sel == 0x2)
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(52, 57, 0);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(52, 57, GPIO_OUTPUT_OK | GPIO_INPUT_OK);
-> +
-> + ? ? ? if (sel & 0x1) {
-> + ? ? ? ? ? ? ? global_cfg_2 |= DOVE_TWSI_OPTION3_GPIO;
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(56, 57, 0);
-> + ? ? ? }
-> + ? ? ? if (sel & 0x2) {
-> + ? ? ? ? ? ? ? mpp_gen_ctrl |= DOVE_AU1_SPDIFO_GPIO_EN;
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(57, 57, GPIO_OUTPUT_OK | GPIO_INPUT_OK);
-> + ? ? ? }
-> + ? ? ? if (sel & 0x4) {
-> + ? ? ? ? ? ? ? ssp_ctrl1 |= DOVE_SSP_ON_AU1;
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(52, 55, 0);
-> + ? ? ? }
-> + ? ? ? if (sel & 0x8)
-> + ? ? ? ? ? ? ? mpp_ctrl4 |= DOVE_AU1_GPIO_SEL;
-> +
-> + ? ? ? writel(mpp_ctrl4, DOVE_MPP_CTRL4_VIRT_BASE);
-> + ? ? ? writel(ssp_ctrl1, DOVE_SSP_CTRL_STATUS_1);
-> + ? ? ? writel(mpp_gen_ctrl, DOVE_MPP_GENERAL_VIRT_BASE);
-> + ? ? ? writel(global_cfg_2, DOVE_GLOBAL_CONFIG_2);
-> +}
-> +
-> +static void dove_mpp_conf_grp(int num, int sel, u32 *mpp_ctrl)
-> +{
-> + ? ? ? int start = dove_mpp_grp[num].start;
-> + ? ? ? int end = dove_mpp_grp[num].end;
-> + ? ? ? int gpio_mode = sel ? GPIO_OUTPUT_OK | GPIO_INPUT_OK : 0;
-> +
-> + ? ? ? *mpp_ctrl &= ~(0x1 << num);
-> + ? ? ? *mpp_ctrl |= sel << num;
-> +
-> + ? ? ? dove_mpp_gpio_mode(start, end, gpio_mode);
-> +}
-> +
-> +void __init dove_mpp_conf(unsigned int *mpp_list)
-> +{
-> + ? ? ? u32 mpp_ctrl[MPP_NR_REGS];
-> + ? ? ? u32 pmu_mpp_ctrl = 0;
-> + ? ? ? u32 pmu_sig_ctrl[PMU_SIG_REGS];
-> + ? ? ? int i;
-> +
-> + ? ? ? /* Initialize gpiolib. */
-> + ? ? ? orion_gpio_init();
-> +
-> + ? ? ? for (i = 0; i < MPP_NR_REGS; i++)
-> + ? ? ? ? ? ? ? mpp_ctrl[i] = readl(MPP_CTRL(i));
-> +
-> + ? ? ? for (i = 0; i < PMU_SIG_REGS; i++)
-> + ? ? ? ? ? ? ? pmu_sig_ctrl[i] = readl(PMU_SIG_CTRL(i));
-> +
-> + ? ? ? pmu_mpp_ctrl = readl(DOVE_PMU_MPP_GENERAL_CTRL);
-> +
-> + ? ? ? dove_mpp_dump_regs();
-> +
-> + ? ? ? while (*mpp_list != MPP_END) {
-> + ? ? ? ? ? ? ? unsigned int num = MPP_NUM(*mpp_list);
-> + ? ? ? ? ? ? ? unsigned int sel = MPP_SEL(*mpp_list);
-> + ? ? ? ? ? ? ? int shift, gpio_mode;
-> +
-> + ? ? ? ? ? ? ? if (num > MPP_MAX) {
-> + ? ? ? ? ? ? ? ? ? ? ? pr_err("dove: invalid MPP number (%u)\n", num);
-> + ? ? ? ? ? ? ? ? ? ? ? goto next_pin;
-please use for loop and remove the goto.
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_NFC_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? dove_mpp_cfg_nfc(sel);
-> + ? ? ? ? ? ? ? ? ? ? ? goto next_pin;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_AU1_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? dove_mpp_cfg_au1(sel);
-> + ? ? ? ? ? ? ? ? ? ? ? goto next_pin;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_GRP_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? dove_mpp_conf_grp(num, sel, &mpp_ctrl[3]);
-> + ? ? ? ? ? ? ? ? ? ? ? goto next_pin;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? shift = (num & 7) << 2;
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_PMU_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? pmu_mpp_ctrl |= (0x1 << num);
-> + ? ? ? ? ? ? ? ? ? ? ? pmu_sig_ctrl[num / 8] &= ~(0xf << shift);
-> + ? ? ? ? ? ? ? ? ? ? ? pmu_sig_ctrl[num / 8] |= 0xf << shift;
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_mode = 0;
-> + ? ? ? ? ? ? ? } else {
-> + ? ? ? ? ? ? ? ? ? ? ? mpp_ctrl[num / 8] &= ~(0xf << shift);
-> + ? ? ? ? ? ? ? ? ? ? ? mpp_ctrl[num / 8] |= sel << shift;
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_mode = GPIO_OUTPUT_OK | GPIO_INPUT_OK;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? orion_gpio_set_valid(num, gpio_mode);
-> +
-> +next_pin:
-> + ? ? ? ? ? ? ? mpp_list++;
-> + ? ? ? }
-> +
-> + ? ? ? for (i = 0; i < MPP_NR_REGS; i++)
-> + ? ? ? ? ? ? ? writel(mpp_ctrl[i], MPP_CTRL(i));
-> +
-> + ? ? ? for (i = 0; i < PMU_SIG_REGS; i++)
-> + ? ? ? ? ? ? ? writel(pmu_sig_ctrl[i], PMU_SIG_CTRL(i));
-> +
-> + ? ? ? writel(pmu_mpp_ctrl, DOVE_PMU_MPP_GENERAL_CTRL);
-> +
-> + ? ? ? dove_mpp_dump_regs();
-> +}
-> diff --git a/arch/arm/mach-dove/mpp.h b/arch/arm/mach-dove/mpp.h
-> new file mode 100644
-> index 0000000..2a43ce4
-> --- /dev/null
-> +++ b/arch/arm/mach-dove/mpp.h
-> @@ -0,0 +1,220 @@
-> +#ifndef __ARCH_DOVE_MPP_CODED_H
-> +#define __ARCH_DOVE_MPP_CODED_H
-> +
-> +#define MPP(_num, _mode, _pmu, _grp, _au1, _nfc) ( ? ? \
-> +/* MPP/group number */ ? ? ? ? ((_num) & 0xff) | ? ? ? ? ? ? ? \
-> +/* MPP select value */ ? ? ? ? (((_mode) & 0xf) << 8) | ? ? ? ?\
-> +/* MPP PMU */ ? ? ? ? ? ? ? ? ?((!!(_pmu)) << 12) | ? ? ? ? ? ?\
-> +/* group flag */ ? ? ? ? ? ? ? ((!!(_grp)) << 13) | ? ? ? ? ? ?\
-> +/* AU1 flag */ ? ? ? ? ? ? ? ? ((!!(_au1)) << 14) | ? ? ? ? ? ?\
-> +/* NFCE flag */ ? ? ? ? ? ? ? ? ? ? ? ?((!!(_nfc)) << 15))
-> +
-> +#define MPP_MAX ? ? ? ?71
-> +
-> +#define MPP_NUM(x) ? ?((x) & 0xff)
-> +#define MPP_SEL(x) ? ?(((x) >> 8) & 0xf)
-> +
-> +#define MPP_PMU_MASK ? ? ? ? ? MPP(0, 0x0, 1, 0, 0, 0)
-> +#define MPP_GRP_MASK ? ? ? ? ? MPP(0, 0x0, 0, 1, 0, 0)
-> +#define MPP_AU1_MASK ? ? ? ? ? MPP(0, 0x0, 0, 0, 1, 0)
-> +#define MPP_NFC_MASK ? ? ? ? ? MPP(0, 0x0, 0, 0, 0, 1)
-> +
-> +#define MPP_END ? ? ? ? ? ? ? ? ? ? ? ?MPP(0xff, 0xf, 1, 1, 1, 1)
-> +
-> +#define MPP_PMU_DRIVE_0 ? ? ? ? ? ? ? ?0x1
-> +#define MPP_PMU_DRIVE_1 ? ? ? ? ? ? ? ?0x2
-> +#define MPP_PMU_SDI ? ? ? ? ? ?0x3
-> +#define MPP_PMU_CPU_PWRDWN ? ? 0x4
-> +#define MPP_PMU_STBY_PWRDWN ? ?0x5
-> +#define MPP_PMU_CORE_PWR_GOOD ?0x8
-> +#define MPP_PMU_BAT_FAULT ? ? ?0xa
-> +#define MPP_PMU_EXT0_WU ? ? ? ? ? ? ? ?0xb
-> +#define MPP_PMU_EXT1_WU ? ? ? ? ? ? ? ?0xc
-> +#define MPP_PMU_EXT2_WU ? ? ? ? ? ? ? ?0xd
-> +#define MPP_PMU_BLINK ? ? ? ? ?0xe
-> +#define MPP_PMU(_num, _mode) ? MPP((_num), MPP_PMU_##_mode, 1, 0, 0, 0)
-> +
-> +#define MPP_PIN(_num, _mode) ? MPP((_num), (_mode), 0, 0, 0, 0)
-> +#define MPP_GRP(_grp, _mode) ? MPP((_grp), (_mode), 0, 1, 0, 0)
-> +#define MPP_GRP_AU1(_mode) ? ? MPP(0, (_mode), 0, 0, 1, 0)
-> +#define MPP_GRP_NFC(_mode) ? ? MPP(0, (_mode), 0, 0, 0, 1)
-> +
-> +#define MPP0_GPIO0 ? ? ? ? ? ? MPP_PIN(0, 0x0)
-> +#define MPP0_UA2_RTSn ? ? ? ? ?MPP_PIN(0, 0x2)
-> +#define MPP0_SDIO0_CD ? ? ? ? ?MPP_PIN(0, 0x3)
-> +#define MPP0_LCD0_PWM ? ? ? ? ?MPP_PIN(0, 0xf)
-> +
-> +#define MPP1_GPIO1 ? ? ? ? ? ? MPP_PIN(1, 0x0)
-> +#define MPP1_UA2_CTSn ? ? ? ? ?MPP_PIN(1, 0x2)
-> +#define MPP1_SDIO0_WP ? ? ? ? ?MPP_PIN(1, 0x3)
-> +#define MPP1_LCD1_PWM ? ? ? ? ?MPP_PIN(1, 0xf)
-> +
-> +#define MPP2_GPIO2 ? ? ? ? ? ? MPP_PIN(2, 0x0)
-> +#define MPP2_SATA_PRESENT ? ? ?MPP_PIN(2, 0x1)
-> +#define MPP2_UA2_TXD ? ? ? ? ? MPP_PIN(2, 0x2)
-> +#define MPP2_SDIO0_BUS_POWER ? MPP_PIN(2, 0x3)
-> +#define MPP2_UA_RTSn1 ? ? ? ? ?MPP_PIN(2, 0x4)
-> +
-> +#define MPP3_GPIO3 ? ? ? ? ? ? MPP_PIN(3, 0x0)
-> +#define MPP3_SATA_ACT ? ? ? ? ?MPP_PIN(3, 0x1)
-> +#define MPP3_UA2_RXD ? ? ? ? ? MPP_PIN(3, 0x2)
-> +#define MPP3_SDIO0_LED_CTRL ? ?MPP_PIN(3, 0x3)
-> +#define MPP3_UA_CTSn1 ? ? ? ? ?MPP_PIN(3, 0x4)
-> +#define MPP3_SPI_LCD_CS1 ? ? ? MPP_PIN(3, 0xf)
-> +
-> +#define MPP4_GPIO4 ? ? ? ? ? ? MPP_PIN(4, 0x0)
-> +#define MPP4_UA3_RTSn ? ? ? ? ?MPP_PIN(4, 0x2)
-> +#define MPP4_SDIO1_CD ? ? ? ? ?MPP_PIN(4, 0x3)
-> +#define MPP4_SPI_1_MISO ? ? ? ? ? ? ? ?MPP_PIN(4, 0x4)
-> +
-> +#define MPP5_GPIO5 ? ? ? ? ? ? MPP_PIN(5, 0x0)
-> +#define MPP5_UA3_CTSn ? ? ? ? ?MPP_PIN(5, 0x2)
-> +#define MPP5_SDIO1_WP ? ? ? ? ?MPP_PIN(5, 0x3)
-> +#define MPP5_SPI_1_CS ? ? ? ? ?MPP_PIN(5, 0x4)
-> +
-> +#define MPP6_GPIO6 ? ? ? ? ? ? MPP_PIN(6, 0x0)
-> +#define MPP6_UA3_TXD ? ? ? ? ? MPP_PIN(6, 0x2)
-> +#define MPP6_SDIO1_BUS_POWER ? MPP_PIN(6, 0x3)
-> +#define MPP6_SPI_1_MOSI ? ? ? ? ? ? ? ?MPP_PIN(6, 0x4)
-> +
-> +#define MPP7_GPIO7 ? ? ? ? ? ? MPP_PIN(7, 0x0)
-> +#define MPP7_UA3_RXD ? ? ? ? ? MPP_PIN(7, 0x2)
-> +#define MPP7_SDIO1_LED_CTRL ? ?MPP_PIN(7, 0x3)
-> +#define MPP7_SPI_1_SCK ? ? ? ? MPP_PIN(7, 0x4)
-> +
-> +#define MPP8_GPIO8 ? ? ? ? ? ? MPP_PIN(8, 0x0)
-> +#define MPP8_WD_RST_OUT ? ? ? ? ? ? ? ?MPP_PIN(8, 0x1)
-> +
-> +#define MPP9_GPIO9 ? ? ? ? ? ? MPP_PIN(9, 0x0)
-> +#define MPP9_PEX1_CLKREQn ? ? ?MPP_PIN(9, 0x5)
-> +
-> +#define MPP10_GPIO10 ? ? ? ? ? MPP_PIN(10, 0x0)
-> +#define MPP10_SSP_SCLK ? ? ? ? MPP_PIN(10, 0x5)
-> +
-> +#define MPP11_GPIO11 ? ? ? ? ? MPP_PIN(11, 0x0)
-> +#define MPP11_SATA_PRESENT ? ? MPP_PIN(11, 0x1)
-> +#define MPP11_SATA_ACT ? ? ? ? MPP_PIN(11, 0x2)
-> +#define MPP11_SDIO0_LED_CTRL ? MPP_PIN(11, 0x3)
-> +#define MPP11_SDIO1_LED_CTRL ? MPP_PIN(11, 0x4)
-> +#define MPP11_PEX0_CLKREQn ? ? MPP_PIN(11, 0x5)
-> +
-> +#define MPP12_GPIO12 ? ? ? ? ? MPP_PIN(12, 0x0)
-> +#define MPP12_SATA_ACT ? ? ? ? MPP_PIN(12, 0x1)
-> +#define MPP12_UA2_RTSn ? ? ? ? MPP_PIN(12, 0x2)
-> +#define MPP12_AD0_I2S_EXT_MCLK MPP_PIN(12, 0x3)
-> +#define MPP12_SDIO1_CD ? ? ? ? MPP_PIN(12, 0x4)
-> +
-> +#define MPP13_GPIO13 ? ? ? ? ? MPP_PIN(13, 0x0)
-> +#define MPP13_UA2_CTSn ? ? ? ? MPP_PIN(13, 0x2)
-> +#define MPP13_AD1_I2S_EXT_MCLK MPP_PIN(13, 0x3)
-> +#define MPP13_SDIO1WP ? ? ? ? ?MPP_PIN(13, 0x4)
-> +#define MPP13_SSP_EXTCLK ? ? ? MPP_PIN(13, 0x5)
-> +
-> +#define MPP14_GPIO14 ? ? ? ? ? MPP_PIN(14, 0x0)
-> +#define MPP14_UA2_TXD ? ? ? ? ?MPP_PIN(14, 0x2)
-> +#define MPP14_SDIO1_BUS_POWER ?MPP_PIN(14, 0x4)
-> +#define MPP14_SSP_RXD ? ? ? ? ?MPP_PIN(14, 0x5)
-> +
-> +#define MPP15_GPIO15 ? ? ? ? ? MPP_PIN(15, 0x0)
-> +#define MPP15_UA2_RXD ? ? ? ? ?MPP_PIN(15, 0x2)
-> +#define MPP15_SDIO1_LED_CTRL ? MPP_PIN(15, 0x4)
-> +#define MPP15_SSP_SFRM ? ? ? ? MPP_PIN(15, 0x5)
-> +
-> +#define MPP16_GPIO16 ? ? ? ? ? MPP_PIN(16, 0x0)
-> +#define MPP16_UA3_RTSn ? ? ? ? MPP_PIN(16, 0x2)
-> +#define MPP16_SDIO0_CD ? ? ? ? MPP_PIN(16, 0x3)
-> +#define MPP16_SPI_LCD_CS1 ? ? ?MPP_PIN(16, 0x4)
-> +#define MPP16_AC97_SDATA_IN1 ? MPP_PIN(16, 0x5)
-> +
-> +#define MPP17_GPIO17 ? ? ? ? ? MPP_PIN(17, 0x0)
-> +#define MPP17_AC97_SYSCLK_OUT ?MPP_PIN(17, 0x1)
-> +#define MPP17_UA3_CTSn ? ? ? ? MPP_PIN(17, 0x2)
-> +#define MPP17_SDIO0_WP ? ? ? ? MPP_PIN(17, 0x3)
-> +#define MPP17_TW_SDA2 ? ? ? ? ?MPP_PIN(17, 0x4)
-> +#define MPP17_AC97_SDATA_IN2 ? MPP_PIN(17, 0x5)
-> +
-> +#define MPP18_GPIO18 ? ? ? ? ? MPP_PIN(18, 0x0)
-> +#define MPP18_UA3_TXD ? ? ? ? ?MPP_PIN(18, 0x2)
-> +#define MPP18_SDIO0_BUS_POWER ?MPP_PIN(18, 0x3)
-> +#define MPP18_LCD0_PWM ? ? ? ? MPP_PIN(18, 0x4)
-> +#define MPP18_AC_SDATA_IN3 ? ? MPP_PIN(18, 0x5)
-> +
-> +#define MPP19_GPIO19 ? ? ? ? ? MPP_PIN(19, 0x0)
-> +#define MPP19_UA3_RXD ? ? ? ? ?MPP_PIN(19, 0x2)
-> +#define MPP19_SDIO0_LED_CTRL ? MPP_PIN(19, 0x3)
-> +#define MPP19_TW_SCK2 ? ? ? ? ?MPP_PIN(19, 0x4)
-> +
-> +#define MPP20_GPIO20 ? ? ? ? ? MPP_PIN(20, 0x0)
-> +#define MPP20_AC97_SYSCLK_OUT ?MPP_PIN(20, 0x1)
-> +#define MPP20_SPI_LCD_MISO ? ? MPP_PIN(20, 0x2)
-> +#define MPP20_SDIO1_CD ? ? ? ? MPP_PIN(20, 0x3)
-> +#define MPP20_SDIO0_CD ? ? ? ? MPP_PIN(20, 0x5)
-> +#define MPP20_SPI_1_MISO ? ? ? MPP_PIN(20, 0x6)
-> +
-> +#define MPP21_GPIO21 ? ? ? ? ? MPP_PIN(21, 0x0)
-> +#define MPP21_UA1_RTSn ? ? ? ? MPP_PIN(21, 0x1)
-> +#define MPP21_SPI_LCD_CS0 ? ? ?MPP_PIN(21, 0x2)
-> +#define MPP21_SDIO1_WP ? ? ? ? MPP_PIN(21, 0x3)
-> +#define MPP21_SSP_SFRM ? ? ? ? MPP_PIN(21, 0x4)
-> +#define MPP21_SDIO0_WP ? ? ? ? MPP_PIN(21, 0x5)
-> +#define MPP21_SPI_1_CS ? ? ? ? MPP_PIN(21, 0x6)
-> +
-> +#define MPP22_GPIO22 ? ? ? ? ? MPP_PIN(22, 0x0)
-> +#define MPP22_UA1_CTSn ? ? ? ? MPP_PIN(22, 0x1)
-> +#define MPP22_SPI_LCD_MOSI ? ? MPP_PIN(22, 0x2)
-> +#define MPP22_SDIO1_BUS_POWER ?MPP_PIN(22, 0x3)
-> +#define MPP22_SSP_TXD ? ? ? ? ?MPP_PIN(22, 0x4)
-> +#define MPP22_SDIO0_BUS_POWER ?MPP_PIN(22, 0x5)
-> +#define MPP22_SPI_1_MOSI ? ? ? MPP_PIN(22, 0x6)
-> +
-> +#define MPP23_GPIO23 ? ? ? ? ? MPP_PIN(23, 0x0)
-> +#define MPP23_SPI_LCD_SCK ? ? ?MPP_PIN(23, 0x2)
-> +#define MPP23_SDIO1_LED_CTRL ? MPP_PIN(23, 0x3)
-> +#define MPP23_SSP_SCLK ? ? ? ? MPP_PIN(23, 0x4)
-> +#define MPP23_SDIO0_LED_CTRL ? MPP_PIN(23, 0x5)
-> +#define MPP23_SPI_1_SCK ? ? ? ? ? ? ? ?MPP_PIN(23, 0x6)
-> +
-> +/* for MPP groups _num is a group index */
-> +enum dove_mpp_grp_idx {
-> + ? ? ? MPP_24_39 = 2,
-> + ? ? ? MPP_40_45 = 0,
-> + ? ? ? MPP_46_51 = 1,
-> + ? ? ? MPP_58_61 = 5,
-> + ? ? ? MPP_62_63 = 4,
-> +};
-> +
-> +#define MPP24_39_GPIO ? ? ? ? ?MPP_GRP(MPP_24_39, 0x1)
-> +#define MPP24_39_CAM ? ? ? ? ? MPP_GRP(MPP_24_39, 0x0)
-> +
-> +#define MPP40_45_GPIO ? ? ? ? ?MPP_GRP(MPP_40_45, 0x1)
-> +#define MPP40_45_SD0 ? ? ? ? ? MPP_GRP(MPP_40_45, 0x0)
-> +
-> +#define MPP46_51_GPIO ? ? ? ? ?MPP_GRP(MPP_46_51, 0x1)
-> +#define MPP46_51_SD1 ? ? ? ? ? MPP_GRP(MPP_46_51, 0x0)
-> +
-> +#define MPP58_61_GPIO ? ? ? ? ?MPP_GRP(MPP_58_61, 0x1)
-> +#define MPP58_61_SPI ? ? ? ? ? MPP_GRP(MPP_58_61, 0x0)
-> +
-> +#define MPP62_63_GPIO ? ? ? ? ?MPP_GRP(MPP_62_63, 0x1)
-> +#define MPP62_63_UA1 ? ? ? ? ? MPP_GRP(MPP_62_63, 0x0)
-> +
-> +/* The MPP[64:71] control differs from other groups */
-> +#define MPP64_71_GPO ? ? ? ? ? MPP_GRP_NFC(0x1)
-> +#define MPP64_71_NFC ? ? ? ? ? MPP_GRP_NFC(0x0)
-> +
-> +/*
-> + * The MPP[52:57] functionality is encoded by 4 bits in different
-> + * registers. The _num field in this case encodes those bits in
-> + * correspodence with Table 135 of 88AP510 Functional specification
-> + */
-> +#define MPP52_57_AU1 ? ? ? ? ? MPP_GRP_AU1(0x0)
-> +#define MPP52_57_AU1_GPIO57 ? ?MPP_GRP_AU1(0x2)
-> +#define MPP52_57_GPIO ? ? ? ? ?MPP_GRP_AU1(0xa)
-> +#define MPP52_57_TW_GPIO ? ? ? MPP_GRP_AU1(0xb)
-> +#define MPP52_57_AU1_SSP ? ? ? MPP_GRP_AU1(0xc)
-> +#define MPP52_57_SSP_GPIO ? ? ?MPP_GRP_AU1(0xe)
-> +#define MPP52_57_SSP_TW ? ? ? ? ? ? ? ?MPP_GRP_AU1(0xf)
-> +
-> +void dove_mpp_conf(unsigned int *mpp_list);
-> +
-> +#endif /* __ARCH_DOVE_MPP_CODED_H */
-> --
-> 1.7.3.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+On Wed, Nov 10, 2010 at 04:45:08PM +0000, Russell King - ARM Linux wrote:
+> Here's something which uses the above ideas (untested).  I think this is
+> something we can (and should) do unconditionally for the !XIP cases.
+
+Second version - let's get _all_ v:p translations, not just virt_to_phys
+and phys_to_virt (iow, __phys_to_virt/__virt_to_phys/__pa/__va) which will
+include all the page table manipulations, default bus<->virt translations.
+This results in a _much_ bigger fixup table.
+
+It also results in no fixup table being generated for platforms which
+have complex v:p translations (cns3xxx, iop13xx, ixp2xxx, ks8695,
+realview, s3c24a0).
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8ae3d48..6758df1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -187,6 +187,18 @@ config VECTORS_BASE
+ 	help
+ 	  The base address of exception vectors.
+ 
++config ARM_PATCH_PHYS_VIRT
++	bool
++	depends on EXPERIMENTAL
++	depends on !XIP && !THUMB2_KERNEL
++	help
++	  Note this is only for non-XIP and non-Thumb2 kernels. And there
++	  is CPU support which needs to read data in order to writeback
++	  dirty entries in the cache. (e.g. StrongARM, ebsa110, footbridge,
++	  rpc, sa1100, and shark). The mappings in the above cases do not
++	  exist before paging_init() has completed. Thus this option does
++	  not support these CPUs at this moment.
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+@@ -590,6 +602,7 @@ config ARCH_PXA
+ 	select TICK_ONESHOT
+ 	select PLAT_PXA
+ 	select SPARSE_IRQ
++	select ARM_PATCH_PHYS_VIRT
+ 	help
+ 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
+ 
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 23c2e8e..219d125 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -133,16 +133,6 @@
+ #endif
+ 
+ /*
+- * Physical vs virtual RAM address space conversion.  These are
+- * private definitions which should NOT be used outside memory.h
+- * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+- */
+-#ifndef __virt_to_phys
+-#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+-#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
+-#endif
+-
+-/*
+  * Convert a physical address to a Page Frame Number and back
+  */
+ #define	__phys_to_pfn(paddr)	((paddr) >> PAGE_SHIFT)
+@@ -157,6 +147,45 @@
+ #ifndef __ASSEMBLY__
+ 
+ /*
++ * Physical vs virtual RAM address space conversion.  These are
++ * private definitions which should NOT be used outside memory.h
++ * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
++ */
++#ifndef __virt_to_phys
++#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
++
++#define __pv_stub(from,to,instr)			\
++	__asm__(					\
++	"1:	" instr "	%0, %1, %2\n"		\
++	"\n"						\
++	"	.pushsection .pv_table,\"a\"\n"		\
++	"	.long	1b\n"				\
++	"	.popsection\n"				\
++	: "=r" (to)					\
++	: "r" (from), "I" (1))
++
++static inline unsigned long __virt_to_phys(unsigned long x)
++{
++	unsigned long t;
++
++	__pv_stub(x, t, "add");
++	return t;
++}
++
++static inline unsigned long __phys_to_virt(unsigned long x)
++{
++	unsigned long t;
++
++	__pv_stub(x, t, "sub");
++	return t;
++}
++#else
++#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
++#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
++#endif
++#endif
++
++/*
+  * The DMA mask corresponding to the maximum bus address allocatable
+  * using GFP_DMA.  The default here places no restriction on DMA
+  * allocations.  This must be the smallest DMA mask in the system,
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index dd6b369..bcc502f 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -93,6 +93,9 @@ ENTRY(stext)
+ #ifdef CONFIG_SMP_ON_UP
+ 	bl	__fixup_smp
+ #endif
++#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
++	bl	__fixup_pv_table
++#endif
+ 	bl	__create_page_tables
+ 
+ 	/*
+@@ -426,4 +429,37 @@ smp_on_up:
+ 
+ #endif
+ 
++#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
++
++/* __fixup_pv_table - patch the stub instructions with the delta between
++ * PHYS_OFFSET and PAGE_OFFSET, which is assumed to be 16MiB aligned and
++ * can be expressed by an immediate shifter operand. The stub instruction
++ * has a form of '(add|sub) rd, rn, #imm'.
++ */
++__fixup_pv_table:
++	adr	r0, 1f
++	ldmia	r0, {r3-r5}
++	sub	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
++	mov	r6, r3, lsr #24	@ constant for add/sub instructions
++	teq	r3, r6, lsl #24 @ must be 16MiB aligned
++	bne	__error
++	orr	r6, r6, #0x400	@ mask in rotate right 8 bits
++	add	r4, r4, r3
++	add	r5, r5, r3
++2:	cmp	r4, r5
++	ldrlo	r7, [r4], #4
++	ldrlo	ip, [r7, r3]
++	bic	ip, ip, #0x000000ff
++	bic	ip, ip, #0x00000f00
++	orr	ip, ip, r6
++	strlo	ip, [r7, r3]
++	blo	2b
++	mov	pc, lr
++ENDPROC(__fixup_phys_virt)
++
++1:	.word	.
++	.word	__pv_table_begin
++	.word	__pv_table_end
++#endif
++
+ #include "head-common.S"
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index cead889..fb32c9d 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -57,6 +57,10 @@ SECTIONS
+ 		__smpalt_end = .;
+ #endif
+ 
++		__pv_table_begin = .;
++			*(.pv_table)
++		__pv_table_end = .;
++
+ 		INIT_SETUP(16)
+ 
+ 		INIT_CALLS
