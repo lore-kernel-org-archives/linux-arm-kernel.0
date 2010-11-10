@@ -1,42 +1,41 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 09 Nov 2010 16:56:29 -0800
-Subject: [PATCH v2] msm: smd: Reduce driver log chatter
-In-Reply-To: <1289350168-20034-1-git-send-email-davidb@codeaurora.org>
-References: <1289349036-16941-1-git-send-email-davidb@codeaurora.org>
-	<1289350168-20034-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1289350589.28590.74.camel@Joe-Laptop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 09 Nov 2010 21:51:01 -0500 (EST)
+Subject: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <AANLkTimn2b6b8r8au48LWk4G4tNfbbR=TypAC1f3=e3e@mail.gmail.com>
+References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
+	<AANLkTikk334vRT3HE9bQWc3u_jyLJckAY9AW=pVUQNbq@mail.gmail.com>
+	<AANLkTimn2b6b8r8au48LWk4G4tNfbbR=TypAC1f3=e3e@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1011092149190.13911@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-11-09 at 16:49 -0800, David Brown wrote:
-> The MSM smd driver logs numerous messages during startup that are
-> useful for debug purposes.  Change these to pr_debug() to match their
-> purpose.
-> diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
-[]
-> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+On Tue, 9 Nov 2010, Haojian Zhuang wrote:
 
-If you add this, you probably want to strip
-a few prefixes from the formats.
+> On Tue, Nov 9, 2010 at 5:21 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> > On Mon, Nov 8, 2010 at 8:37 PM, Haojian Zhuang
+> > <haojian.zhuang@marvell.com> wrote:
+> >> From: Zhou Zhu <zzhu3@marvell.com>
+> >>
+> >> iwmmx instructions are also used in PJ4. Add PJ4 support.
+> >>
+> >> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >> Cc: Eric Miao <eric.y.miao@gmail.com>
+> > This isn't good. Have to figure out a clean way for this.
+> >
+> 
+> How about create new iwmmx.S and pj4-cp0.c? Since it can avoid macro.
 
-> +
->  #include <linux/platform_device.h>
->  #include <linux/module.h>
->  #include <linux/fs.h>
-> @@ -89,7 +91,7 @@ static void smd_diag(void)
-[]
-> -		pr_info("smem: DIAG '%s'\n", x);
-> +		pr_debug("smem: DIAG '%s'\n", x);
+Could you first explain why the CP15 reg number is different?  The 
+commit message for the proposed patch does not give any explanation for 
+the difference.
 
-probably just
-		pr_debug("DIAG '%s'\n", x);
 
->  	}
->  }
->  
-> @@ -312,7 +314,7 @@ static void smd_state_change(struct smd_channel *ch,
-[]
-> -	pr_info("SMD: ch %d %d -> %d\n", ch->n, last, next);
-> +	pr_debug("SMD: ch %d %d -> %d\n", ch->n, last, next);
-
-	pr_debug("ch %d %d -> %d\n", ch->n, last, next);
+Nicolas
