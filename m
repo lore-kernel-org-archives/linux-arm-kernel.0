@@ -1,67 +1,46 @@
-From: hari.kanigeri@gmail.com (Hari Kanigeri)
-Date: Wed, 10 Nov 2010 10:56:23 -0600
-Subject: [PATCH 0/6] [v2] omap:mailbox-enhancements and fixes
-In-Reply-To: <4CDACB0E.3050403@ti.com>
-References: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
-	<4CDACB0E.3050403@ti.com>
-Message-ID: <AANLkTi=jL-aV0Xn3rcnZwaYLz9nY5QwXbGPHsdq1R2Gz@mail.gmail.com>
+From: gregkh@suse.de (Greg KH)
+Date: Wed, 10 Nov 2010 09:00:58 -0800
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+	<20101109224012.GA21992@kroah.com>
+	<20101110000152.GA8993@n2100.arm.linux.org.uk>
+	<0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
+Message-ID: <20101110170058.GB11947@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Wed, Nov 10, 2010 at 10:15:53AM +0200, Grzegorz.Sygieda at tieto.com wrote:
+> >On Tue, Nov 09, 2010 at 02:40:12PM -0800, Greg KH wrote:
+> >> On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
+> >> > From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
+> >> > 
+> >> > This patch allows to control the pl011 clock using set_termios 
+> >> > callback. Any positive baudrate passed enables clock, otherwise 
+> >> > disables. This saves a lot of power on submicron designs since we 
+> >> > can clock off and disable unused UARTs.
+> >> 
+> >> That's nice, but it seems like an overload of what people 
+> >> traditionally think of when it comes to baud rates.  Why not just 
+> >> power down ports that are not open instead?
+> >
+> >We already do.  My question to Linus (in a previous message) is why this isn't sufficient.
+> 
+> The main goal was to disable/enable clock while port open. This is
+> usefull for scenario, where some higher level driver wants to control
+> the power consumption (using set_termios). In the same time a
+> user-space app (eg. hciattach) is still bounded to the specific
+> /dev/tty* device associated with particular uart. From user POV device
+> is always open, and app does not have to respawn, and we can save
+> power.
 
-Thanks for your comments.
+That is nice, but again, you are overloading a common interface (one
+defined by POSIX I think) to do something else at the same time.  That
+might cause problems with some users that expect you to be able to use a
+baud rate of 0 :)
 
-On Wed, Nov 10, 2010 at 10:40 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> Hi Hari,
->
-> On 11/10/2010 1:45 PM, Hari Kanigeri wrote:
->>
->> Thanks to Rene Sapiens and Omar Ramirez for their inputs on initial patch
->> set.
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37278.html
->>
->> The patch set addresses the following review comments from Rene and Omar.
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37626.html
->> https://patchwork.kernel.org/patch/255091/
->> https://patchwork.kernel.org/patch/255081/
->>
->> Following patches are changed because of above review comments:
->> omap:mailbox-send message in process context
->> omap:mailbox-add notification support for multiple readers
->>
->> Following patch is dropped from initial patch set
->> omap:mailbox-resolve multiple receiver problem
->>
->> The patch set is tested on omap4 SDP board.
->>
->> Fernando Guzman Lugo (1):
->> ? mailbox: change full flag per mailbox queue instead of global
->>
->> Hari Kanigeri (5):
->> ? omap:mailbox: fix rx interrupt disable in omap4
->> ? omap:mailbox-fix checkpatch warnings
->
-> That one is weird? How can you submit a patch that fix checkpatch?
+I like the idea, but not the overloading, sorry.
 
-Why weird if the patch is fixing the checkpatch warnings that were
-already present in the code ?
-The other option is to leave the checkpatch warnings in the code :)
+thanks,
 
-> In theory you should not send any patch that generate checkpatch error or
-> warning.
->
->> ? omap:mailbox-send message in process context
->> ? omap:mailbox-add notification support for multiple readers
->> ? omap:clocks44x-add dummy clock for mailbox
->
-> We are trying to enforce some consistency in the subjects name so you should
-> name your patches like that:
-
-Good point, thanks for pointing about consistency. I wasn't aware
-about the rule to use OMAP in caps.
-I will fix it.
-
-Thank you,
-Best regards,
-Hari
+greg k-h
