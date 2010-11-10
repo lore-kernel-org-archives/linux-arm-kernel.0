@@ -1,39 +1,158 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 10 Nov 2010 14:54:23 +0100
-Subject: PXA270 Random Hangs at Low Core Freq
-In-Reply-To: <AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
-References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
-	<201010220222.36285.marek.vasut@gmail.com>
-	<AANLkTim0yMQbMkP7eke3A18TqwuyFz2DvaYoO8bN7o-9@mail.gmail.com>
-	<A257B8DC-1E93-4888-AA57-AB9A41AF11AA@prograde.net>
-	<AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
-Message-ID: <20101110135422.GA1553@ucw.cz>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 10 Nov 2010 19:31:46 +0530
+Subject: [PATCH v4 01/13] OMAP: DMA: Replace read/write macros with
+	functions
+In-Reply-To: <20101109004045.GU9264@atomide.com>
+References: <1289225272-9767-1-git-send-email-manjugk@ti.com>
+	<1289225272-9767-2-git-send-email-manjugk@ti.com>
+	<20101109004045.GU9264@atomide.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-> > The best I've been able to do is two alternate cases (stock high-freq u-boot + a current Linux with CPUfreq enabled so that it lowers the speed; and my custom u-boot that runs only at low speed + a current Linux with CPUfreq disabled so linux just uses what u-boot sets). Both of these hang as described.
-> >
-> > Meaningfully rolling back to the Gumstix's vendor-supplied Linux distro is more difficult. It's running a 3+ year old 2.6.21 kernel variant that lacks support for recent MTD FLASH parts and features like UBIFS. I used that version on an OMAP and recall its MMC support was rather sketchy and since writing to a uSD card is my test case I'm somewhat doubtful that the results from such testing would mean much.
-> >
-> > Lastly, I've run Charles Cazabon's memtester (c. 2006 v 4.0.6) over 99% of the free SDRAM for days at a time and have seen no problems at all. If it were an outright SDRAM init/timing/refresh issue I'd expect something that strenuous to report an error.
-> >
-> >> Suggest to check errata first. Maybe we need some special code sequence.
-> >
-> > I agree that it has the feel of a CPU errata. (What else would hang the core so badly that JTAG would disconnect?) So I've re-read the Rev E (April 3rd 2009) errata docs from Marvell from start to finish but nothing jumps out at me. The problem is not knowing where to focus. Having eliminated the CPU-freq code itself (which relies on CPU features with many errata) I'm left rather empty handed.
-> >
-> > My only idea is that some kernel code path (likely interacting with an integrated peripheral) is too slow at low core frequencies and is either violating the hardware spec outright or is hitting an errata.
-> >
-> > My testing to date (and that I'm on commercial hardware) makes me think that others should be seeing the same problem. It won't occur out-of-the-box because normally people want highest performance (high core CPU frequencies). With the default u-boot and without CPU-freq to lower it the hang doesn't happen.
-> >
-> > But perhaps someone has prioritized power savings as I'm trying to do and then they should see it.
-> >
 
-ZAurus Spitz (pxa270) has always had problems -- inside suspend memory
-is corrupted fairly often, and MMC produces high number of bit errors
--- like one in 20MB.
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com] 
+> Sent: Tuesday, November 09, 2010 6:11 AM
+> To: G, Manjunath Kondaiah
+> Cc: linux-omap at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; Cousson, Benoit; Kevin 
+> Hilman; Shilimkar, Santosh
+> Subject: Re: [PATCH v4 01/13] OMAP: DMA: Replace read/write 
+> macros with functions
+> 
+> Hi,
+> 
+> * G, Manjunath Kondaiah <manjugk@ti.com> [101108 05:58]:
+> 
+> > +static u16 reg_map_omap1[] = {
+> > +	[GCR1]		= 0x400,
+> > +	[GSCR]		= 0x404,
+> > +	[GRST]		= 0x408,
+> ...
+> > +};
+> 
+> The above you should move to mach-omap1/dma.c and pass it in the init
+> function to plat-omap/dma.c. Let's try to make the common code clean
+> of omap1/2/3/4 specific data.
+> 
+> > +static u16 reg_map_omap2[] = {
+> > +	[REVISION]		= 0x00,
+> > +	[GCR2]			= 0x78,
+> > +	[IRQSTATUS_L0]		= 0x08,
+> ...
+> > +};
+> 
+> And the above you should move to mach-omap2/dma.c.
+> 
+> It's OK to do it in a later patch if you prefer that, but in that case
+> the patch description here should mention it.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+It's already taken care in the later patches. I will update the patch
+description accordingly.
+
+> 
+> >  	if (cpu_class_is_omap2() && dma_trigger) {
+> >  		u32 val;
+> >  
+> > -		val = dma_read(CCR(lch));
+> > +		l = dma_read(CSDP2, lch);
+> > +		l &= ~0x03;
+> > +		l |= data_type;
+> > +		dma_write(l, CSDP2, lch);
+> > +
+> > +		val = dma_read(CCR2, lch);
+> 
+> This seems to be doing more than just change the read function?
+> 
+> Please keep any functional changes separate. Let's first get the
+> hwmod based initialization done without any functional changes
+> to avoid breaking things.
+>   
+> > @@ -475,11 +654,19 @@ void omap_set_dma_src_data_pack(int 
+> lch, int enable)
+> >  {
+> >  	u32 l;
+> >  
+> > -	l = dma_read(CSDP(lch));
+> > +	if (cpu_class_is_omap1())
+> > +		l = dma_read(CSDP1, lch);
+> > +	else
+> > +		l = dma_read(CSDP2, lch);
+> > +
+> >  	l &= ~(1 << 6);
+> >  	if (enable)
+> >  		l |= (1 << 6);
+> > -	dma_write(l, CSDP(lch));
+> > +
+> > +	if (cpu_class_is_omap1())
+> > +		dma_write(l, CSDP1, lch);
+> > +	else
+> > +		dma_write(l, CSDP2, lch);
+> >  }
+> 
+> Since you now have the register mapping table, why do you still need
+> to separate between CSDP1 and CSDP2 registers?
+> 
+> You should now be able to call them just CSDP, and then the register
+> can be mapped to the right offset for omap1 and omap2+.
+> 
+> So this should be just:
+> 
+> void omap_set_dma_src_data_pack(int lch, int enable)
+> {
+> 	u32 l;
+> 
+> 	l = p->dma_read(CSDP, lch);
+> 	l &= ~(1 << 6);
+> 	if (enable)
+> 		l |= (1 << 6);
+> 	p->dma_write(l, CSDP, lch);
+> }
+> 
+> Please check the other functions for this too, that should
+> leave out quite a bit of if cpu_class_is_omap1 clutter.
+> 
+> And looking at it more, you should only have one enum for the
+> registers, not separate enum for both omap1 and omap2+. The
+> enum should be common for all of them. If needed, the enum
+> should be separate for common register and channel specific
+> registers.
+
+ok. I will use single enum for all omap's in plat/dma.h which
+can be accessed by both mach-omap1/dma.c and mach-omap2/dma.c
+in later patches.
+
+> 
+> Some 32-bit registers for omap1 have the lower and upper registers,
+> because of the 16-bit register access. So those still need to be
+> handled separately for omap1. That can be handled automatically
+> for omap1 (untested):
+> 
+> static inline u32 omap1_dma_read(int reg, int lch)
+> {
+> 	u32 va, val, ch_offset = 0;
+> 
+> 	if (reg > OMAP1_CH_COMMON_START)
+> 		ch_offset = 0x40 * lch;
+> 
+> 	va = dma_base + reg_map_omap1[reg] + ch_offset;
+> 	val = __raw_readw(va);
+> 
+> 	/* Some channel registers also have an associated upper 
+> register */
+> 	if (reg >= CSSA) {
+> 		16 upper = __raw_readw(va + 2);
+> 		val |= (upper << 16);
+> 	}
+> 
+> 	return val;
+> }
+
+Thanks for the suggestion. It will be taken care with next version 
+with some more optimizations such as determining ch_offset between
+omap1 and omap2+, reg_map, ch_common_start at init time as suggested
+by kevin.
+
+-Manjunath
