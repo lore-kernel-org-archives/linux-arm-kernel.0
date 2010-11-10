@@ -1,127 +1,39 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Wed, 10 Nov 2010 15:52:42 +0200
-Subject: [PATCH v5 2/3] OMAP3: DMA: Errata i541: sDMA FIFO draining does
-	not finish
-In-Reply-To: <1286261141-1039-3-git-send-email-peter.ujfalusi@nokia.com>
-References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
-	<1286261141-1039-3-git-send-email-peter.ujfalusi@nokia.com>
-Message-ID: <4CDAA3AA.7070003@nokia.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 10 Nov 2010 14:54:23 +0100
+Subject: PXA270 Random Hangs at Low Core Freq
+In-Reply-To: <AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
+References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
+	<201010220222.36285.marek.vasut@gmail.com>
+	<AANLkTim0yMQbMkP7eke3A18TqwuyFz2DvaYoO8bN7o-9@mail.gmail.com>
+	<A257B8DC-1E93-4888-AA57-AB9A41AF11AA@prograde.net>
+	<AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
+Message-ID: <20101110135422.GA1553@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/10 09:45, Peter Ujfalusi wrote:
-> Implement the suggested workaround for OMAP3 regarding to sDMA draining
-> issue, when the channel is disabled on the fly.
-> This errata affects the following configuration:
-> sDMA transfer is source synchronized
-> Buffering is enabled
-> SmartStandby is selected.
->
-> The issue can be easily reproduced by creating overrun situation while
-> recording audio.
-> Either introduce load to the CPU:
-> nice -19 arecord -D hw:0 -M -B 10000 -F 5000 -f dat>  /dev/null&  \
-> dd if=/dev/urandom of=/dev/null
->
-> or suspending the arecord, and resuming it:
-> arecord -D hw:0 -M -B 10000 -F 5000 -f dat>  /dev/null
-> CTRL+Z; fg; CTRL+Z; fg; ...
->
-> In case of overrun audio stops DMA, and restarts it (without reseting
-> the sDMA channel). When we hit this errata in stop case (sDMA drain did
-> not complete), at the coming start the sDMA will not going to be
-> operational (it is still draining).
-> This leads to DMA stall condition.
-> On OMAP3 we can recover with sDMA channel reset, it has been observed
-> that by introducing unrelated sDMA activity might also help (reading
-> from MMC for example).
->
-> The same errata exists for OMAP2, where the suggestion is to disable the
-> buffering to avoid this type of error.
-> On OMAP3 the suggestion is to set sDMA to NoStandby before disabling
-> the channel, and wait for the drain to finish, than configure sDMA to
-> SmartStandby again.
->
-> Signed-off-by: Peter Ujfalusi<peter.ujfalusi@nokia.com>
-> Acked-by: Jarkko Nikula<jhnikula@gmail.com>
-> Acked-by : Santosh Shilimkar<santosh.shilimkar@ti.com>
-> Acked-by : G, Manjunath Kondaiah<manjugk@ti.com>
-> ---
->   arch/arm/plat-omap/dma.c              |   36 +++++++++++++++++++++++++++++++-
->   arch/arm/plat-omap/include/plat/dma.h |    3 ++
->   2 files changed, 37 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> index 420cef3..f5c5b8d 100644
-> --- a/arch/arm/plat-omap/dma.c
-> +++ b/arch/arm/plat-omap/dma.c
-> @@ -30,6 +30,7 @@
->   #include<linux/irq.h>
->   #include<linux/io.h>
->   #include<linux/slab.h>
-> +#include<linux/delay.h>
->
->   #include<asm/system.h>
->   #include<mach/hardware.h>
-> @@ -1024,8 +1025,39 @@ void omap_stop_dma(int lch)
->   		dma_write(0, CICR(lch));
->
->   	l = dma_read(CCR(lch));
-> -	l&= ~OMAP_DMA_CCR_EN;
-> -	dma_write(l, CCR(lch));
-> +	/* OMAP3 Errata i541: sDMA FIFO draining does not finish */
+Hi!
 
-Is this also needed in omap_free_dma or omap_clear_dma?
+> > The best I've been able to do is two alternate cases (stock high-freq u-boot + a current Linux with CPUfreq enabled so that it lowers the speed; and my custom u-boot that runs only at low speed + a current Linux with CPUfreq disabled so linux just uses what u-boot sets). Both of these hang as described.
+> >
+> > Meaningfully rolling back to the Gumstix's vendor-supplied Linux distro is more difficult. It's running a 3+ year old 2.6.21 kernel variant that lacks support for recent MTD FLASH parts and features like UBIFS. I used that version on an OMAP and recall its MMC support was rather sketchy and since writing to a uSD card is my test case I'm somewhat doubtful that the results from such testing would mean much.
+> >
+> > Lastly, I've run Charles Cazabon's memtester (c. 2006 v 4.0.6) over 99% of the free SDRAM for days at a time and have seen no problems at all. If it were an outright SDRAM init/timing/refresh issue I'd expect something that strenuous to report an error.
+> >
+> >> Suggest to check errata first. Maybe we need some special code sequence.
+> >
+> > I agree that it has the feel of a CPU errata. (What else would hang the core so badly that JTAG would disconnect?) So I've re-read the Rev E (April 3rd 2009) errata docs from Marvell from start to finish but nothing jumps out at me. The problem is not knowing where to focus. Having eliminated the CPU-freq code itself (which relies on CPU features with many errata) I'm left rather empty handed.
+> >
+> > My only idea is that some kernel code path (likely interacting with an integrated peripheral) is too slow at low core frequencies and is either violating the hardware spec outright or is hitting an errata.
+> >
+> > My testing to date (and that I'm on commercial hardware) makes me think that others should be seeing the same problem. It won't occur out-of-the-box because normally people want highest performance (high core CPU frequencies). With the default u-boot and without CPU-freq to lower it the hang doesn't happen.
+> >
+> > But perhaps someone has prioritized power savings as I'm trying to do and then they should see it.
+> >
 
-> +	if (cpu_is_omap34xx()&&  (l&  OMAP_DMA_CCR_SEL_SRC_DST_SYNC)) {
-> +		int i = 0;
-> +		u32 sys_cf;
-> +
-> +		/* Configure No-Standby */
-> +		l = dma_read(OCP_SYSCONFIG);
-> +		sys_cf = l;
-> +		l&= ~DMA_SYSCONFIG_MIDLEMODE_MASK;
-> +		l |= DMA_SYSCONFIG_MIDLEMODE(DMA_IDLEMODE_NO_IDLE);
-> +		dma_write(l , OCP_SYSCONFIG);
+ZAurus Spitz (pxa270) has always had problems -- inside suspend memory
+is corrupted fairly often, and MMC produces high number of bit errors
+-- like one in 20MB.
 
-Are accesses of OCP_SYSCONFIG synchronised?
-
-> +
-> +		l = dma_read(CCR(lch));
-> +		l&= ~OMAP_DMA_CCR_EN;
-> +		dma_write(l, CCR(lch));
-> +
-> +		/* Wait for sDMA FIFO drain */
-> +		l = dma_read(CCR(lch));
-> +		while (i<  100&&  (l&  (OMAP_DMA_CCR_RD_ACTIVE |
-> +					OMAP_DMA_CCR_WR_ACTIVE))) {
-> +			udelay(5);
-> +			i++;
-> +			l = dma_read(CCR(lch));
-> +		}
-> +		if (i>= 100)
-> +			printk(KERN_ERR "DMA drain did not complete on "
-> +					"lch %d\n", lch);
-> +		/* Restore OCP_SYSCONFIG */
-> +		dma_write(sys_cf, OCP_SYSCONFIG);
-> +	} else {
-> +		l&= ~OMAP_DMA_CCR_EN;
-> +		dma_write(l, CCR(lch));
-> +	}
->
->   	if (!omap_dma_in_1510_mode()&&  dma_chan[lch].next_lch != -1) {
->   		int next_lch, cur_lch = lch;
-> diff --git a/arch/arm/plat-omap/include/plat/dma.h b/arch/arm/plat-omap/include/plat/dma.h
-> index 6f70f7c..0cce4ca 100644
-> --- a/arch/arm/plat-omap/include/plat/dma.h
-> +++ b/arch/arm/plat-omap/include/plat/dma.h
-> @@ -337,6 +337,9 @@
->   #define OMAP2_DMA_MISALIGNED_ERR_IRQ	(1<<  11)
->
->   #define OMAP_DMA_CCR_EN			(1<<  7)
-> +#define OMAP_DMA_CCR_RD_ACTIVE		(1<<  9)
-> +#define OMAP_DMA_CCR_WR_ACTIVE		(1<<  10)
-> +#define OMAP_DMA_CCR_SEL_SRC_DST_SYNC	(1<<  24)
->   #define OMAP_DMA_CCR_BUFFERING_DISABLE	(1<<  25)
->
->   #define OMAP_DMA_DATA_TYPE_S8		0x00
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
