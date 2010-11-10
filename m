@@ -1,795 +1,1519 @@
 From: jimmy.rubin@stericsson.com (Jimmy Rubin)
-Date: Wed, 10 Nov 2010 13:04:11 +0100
-Subject: [PATCH 08/10] MCDE: Add frame buffer device
-In-Reply-To: <1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
+Date: Wed, 10 Nov 2010 13:04:08 +0100
+Subject: [PATCH 05/10] MCDE: Add dsi link registers
+In-Reply-To: <1289390653-6111-5-git-send-email-jimmy.rubin@stericsson.com>
 References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-3-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-4-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-5-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-6-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-7-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
-Message-ID: <1289390653-6111-9-git-send-email-jimmy.rubin@stericsson.com>
+Message-ID: <1289390653-6111-6-git-send-email-jimmy.rubin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the MCDE, Memory-to-display controller,
+This patch adds support for MCDE, Memory-to-display controller
 found in the ST-Ericsson ux500 products.
 
-This patch adds a frame buffer device driver that uses the DSS.
+This patch adds the dsi link registers found in MCDE.
 
 Signed-off-by: Jimmy Rubin <jimmy.rubin@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij.stericsson.com>
 ---
- drivers/video/mcde/mcde_fb.c |  697 ++++++++++++++++++++++++++++++++++++++++++
- include/video/mcde/mcde_fb.h |   54 ++++
- 2 files changed, 751 insertions(+), 0 deletions(-)
- create mode 100644 drivers/video/mcde/mcde_fb.c
- create mode 100644 include/video/mcde/mcde_fb.h
+ drivers/video/mcde/dsi_link_config.h | 1486 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 1486 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/video/mcde/dsi_link_config.h
 
-diff --git a/drivers/video/mcde/mcde_fb.c b/drivers/video/mcde/mcde_fb.c
+diff --git a/drivers/video/mcde/dsi_link_config.h b/drivers/video/mcde/dsi_link_config.h
 new file mode 100644
-index 0000000..9486e33
+index 0000000..f57738b
 --- /dev/null
-+++ b/drivers/video/mcde/mcde_fb.c
-@@ -0,0 +1,697 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * ST-Ericsson MCDE frame buffer driver
-+ *
-+ * Author: Marcus Lorentzon <marcus.xm.lorentzon@stericsson.com>
-+ * for ST-Ericsson.
-+ *
-+ * License terms: GNU General Public License (GPL), version 2.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/fb.h>
-+#include <linux/mm.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <video/mcde/mcde_fb.h>
-+
-+#define MCDE_FB_BPP_MAX		16
-+#define MCDE_FB_VXRES_MAX	1920
-+#define MCDE_FB_VYRES_MAX	2160
-+
-+static struct fb_ops fb_ops;
-+
-+struct pix_fmt_info {
-+	enum mcde_ovly_pix_fmt pix_fmt;
-+
-+	u32		   bpp;
-+	struct fb_bitfield r;
-+	struct fb_bitfield g;
-+	struct fb_bitfield b;
-+	struct fb_bitfield a;
-+	u32                nonstd;
-+};
-+
-+struct pix_fmt_info pix_fmt_map[] = {
-+	{
-+		.pix_fmt = MCDE_OVLYPIXFMT_RGB565,
-+		.bpp = 16,
-+		.r = { .offset = 11, .length = 5 },
-+		.g = { .offset =  5, .length = 6 },
-+		.b = { .offset =  0, .length = 5 },
-+	}, {
-+		.pix_fmt = MCDE_OVLYPIXFMT_RGBA5551,
-+		.bpp = 16,
-+		.r = { .offset = 11, .length = 5 },
-+		.g = { .offset =  6, .length = 5 },
-+		.b = { .offset =  1, .length = 5 },
-+		.a = { .offset =  0, .length = 1 },
-+	}, {
-+		.pix_fmt = MCDE_OVLYPIXFMT_RGBA4444,
-+		.bpp = 16,
-+		.r = { .offset = 12, .length = 4 },
-+		.g = { .offset =  8, .length = 4 },
-+		.b = { .offset =  4, .length = 4 },
-+		.a = { .offset =  0, .length = 4 },
-+	}, {
-+		.pix_fmt = MCDE_OVLYPIXFMT_YCbCr422,
-+		.bpp = 16,
-+		.nonstd = MCDE_OVLYPIXFMT_YCbCr422,
-+	}, {
-+		.pix_fmt = MCDE_OVLYPIXFMT_RGB888,
-+		.bpp = 24,
-+		.r = { .offset = 16, .length = 8 },
-+		.g = { .offset =  8, .length = 8 },
-+		.b = { .offset =  0, .length = 8 },
-+	}, {
-+		.pix_fmt = MCDE_OVLYPIXFMT_RGBA8888,
-+		.bpp = 32,
-+		.r = { .offset = 16, .length = 8 },
-+		.g = { .offset =  8, .length = 8 },
-+		.b = { .offset =  0, .length = 8 },
-+		.a = { .offset = 24, .length = 8 },
-+	}, {
-+		.pix_fmt = MCDE_OVLYPIXFMT_RGBX8888,
-+		.bpp = 32,
-+		.r = { .offset = 16, .length = 8 },
-+		.g = { .offset =  8, .length = 8 },
-+		.b = { .offset =  0, .length = 8 },
-+	}
-+
-+};
-+
-+static struct platform_device mcde_fb_device = {
-+	.name = "mcde_fb",
-+	.id = -1,
-+};
-+
-+/* Helpers */
-+
-+static struct pix_fmt_info *find_pix_fmt_info(enum mcde_ovly_pix_fmt pix_fmt)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(pix_fmt_map); i++) {
-+		if (pix_fmt_map[i].pix_fmt == pix_fmt)
-+			return &pix_fmt_map[i];
-+	}
-+	return NULL;
-+}
-+
-+static bool bitfield_cmp(struct fb_bitfield *bf1, struct fb_bitfield *bf2)
-+{
-+	return bf1->offset == bf2->offset &&
-+		bf1->length == bf2->length &&
-+		bf1->msb_right == bf2->msb_right;
-+}
-+
-+static struct pix_fmt_info *var_to_pix_fmt_info(struct fb_var_screeninfo *var)
-+{
-+	int i;
-+	struct pix_fmt_info *info;
-+
-+	if (var->nonstd)
-+		return find_pix_fmt_info(var->nonstd);
-+
-+	for (i = 0; i < ARRAY_SIZE(pix_fmt_map); i++) {
-+		info = &pix_fmt_map[i];
-+		if (info->bpp == var->bits_per_pixel &&
-+					bitfield_cmp(&info->r, &var->red) &&
-+					bitfield_cmp(&info->g, &var->green) &&
-+					bitfield_cmp(&info->b, &var->blue) &&
-+					bitfield_cmp(&info->a, &var->transp))
-+			return info;
-+	}
-+
-+	for (i = 0; i < ARRAY_SIZE(pix_fmt_map); i++) {
-+		info = &pix_fmt_map[i];
-+		if (var->bits_per_pixel == info->bpp)
-+			return info;
-+	}
-+
-+	return NULL;
-+}
-+
-+static void pix_fmt_info_to_var(struct pix_fmt_info *pix_fmt_info,
-+	struct fb_var_screeninfo *var)
-+{
-+	var->bits_per_pixel = pix_fmt_info->bpp;
-+	var->nonstd = pix_fmt_info->nonstd;
-+	var->red = pix_fmt_info->r;
-+	var->green = pix_fmt_info->g;
-+	var->blue = pix_fmt_info->b;
-+	var->transp = pix_fmt_info->a;
-+}
-+
-+static int init_var_fmt(struct fb_var_screeninfo *var,
-+	u16 w, u16 h, u16 vw, u16 vh, enum mcde_ovly_pix_fmt pix_fmt,
-+	u32 rotate)
-+{
-+	struct pix_fmt_info *info;
-+
-+	info = find_pix_fmt_info(pix_fmt);
-+	if (!info)
-+		return -EINVAL;
-+
-+	var->bits_per_pixel = info->bpp;
-+	var->nonstd         = info->nonstd;
-+	var->red            = info->r;
-+	var->green          = info->g;
-+	var->blue           = info->b;
-+	var->transp         = info->a;
-+	var->grayscale      = false;
-+
-+	var->xres = w;
-+	var->yres = h;
-+	var->xres_virtual = vw;
-+	var->yres_virtual = vh;
-+	var->xoffset = 0;
-+	var->yoffset = 0;
-+	var->activate = FB_ACTIVATE_NOW;
-+	var->rotate = rotate;
-+	return 0;
-+};
-+
-+static int reallocate_fb_mem(struct fb_info *fbi, u32 size)
-+{
-+	dma_addr_t paddr;
-+	void __iomem *vaddr;
-+#ifdef CONFIG_MCDE_FB_AVOID_REALLOC
-+	u32 size_max;
-+#endif
-+
-+	size = PAGE_ALIGN(size);
-+
-+	if (size == fbi->screen_size)
-+		return 0;
-+
-+	/* TODO: hwmem */
-+#ifdef CONFIG_MCDE_FB_AVOID_REALLOC
-+	size_max = MCDE_FB_BPP_MAX / 8 * MCDE_FB_VXRES_MAX *
-+				MCDE_FB_VYRES_MAX;
-+	if (!fbi->screen_base) {
-+		vaddr = dma_alloc_coherent(fbi->dev, size_max, &paddr,
-+				GFP_KERNEL|GFP_DMA);
-+		if (!vaddr)
-+			return -ENOMEM;
-+
-+		fbi->screen_base = vaddr;
-+		fbi->fix.smem_start = paddr;
-+	} else if (size_max < size)
-+		return -ENOMEM;
-+#else
-+	vaddr = dma_alloc_coherent(fbi->dev, size, &paddr, GFP_KERNEL|GFP_DMA);
-+	if (!vaddr)
-+		return -ENOMEM;
-+#endif
-+
-+#ifndef CONFIG_MCDE_FB_AVOID_REALLOC
-+	if (fbi->screen_base)
-+		dma_free_coherent(fbi->dev, fbi->screen_size,
-+			fbi->screen_base, fbi->fix.smem_start);
-+#endif
-+
-+#ifndef CONFIG_MCDE_FB_AVOID_REALLOC
-+	fbi->screen_base = vaddr;
-+	fbi->fix.smem_start = paddr;
-+#endif
-+	fbi->screen_size = size;
-+	fbi->fix.smem_len = size;
-+
-+	return 0;
-+}
-+
-+static void free_fb_mem(struct fb_info *fbi)
-+{
-+	if (fbi->fix.smem_start) {
-+		dma_free_coherent(fbi->dev, fbi->screen_size,
-+			fbi->screen_base, fbi->fix.smem_start);
-+		fbi->fix.smem_start = 0;
-+		fbi->fix.smem_len = 0;
-+		fbi->screen_base = 0;
-+		fbi->screen_size = 0;
-+	}
-+}
-+
-+static void init_fb(struct fb_info *fbi)
-+{
-+	struct mcde_fb *mfb = to_mcde_fb(fbi);
-+
-+	strlcpy(fbi->fix.id, "mcde_fb", sizeof(fbi->fix.id));
-+	fbi->fix.type = FB_TYPE_PACKED_PIXELS;
-+	fbi->fix.visual = FB_VISUAL_TRUECOLOR;
-+	fbi->fix.xpanstep = 1;
-+	fbi->fix.ypanstep = 1;
-+	fbi->flags = FBINFO_HWACCEL_DISABLED;
-+	fbi->fbops = &fb_ops;
-+	fbi->pseudo_palette = &mfb->pseudo_palette[0];
-+}
-+
-+static void get_ovly_info(struct fb_info *fbi, struct mcde_overlay *ovly,
-+	struct mcde_overlay_info *info)
-+{
-+	struct mcde_fb *mfb = to_mcde_fb(fbi);
-+
-+	memset(info, 0, sizeof(*info));
-+	info->paddr = fbi->fix.smem_start +
-+		fbi->fix.line_length * fbi->var.yoffset;
-+	/* TODO: move mem check to check_var/pan_display */
-+	if (info->paddr + fbi->fix.line_length * fbi->var.yres >
-+		fbi->fix.smem_start + fbi->fix.smem_len)
-+		info->paddr = fbi->fix.smem_start;
-+	info->fmt = mfb->pix_fmt;
-+	info->stride = fbi->fix.line_length;
-+	if (ovly) {
-+		info->src_x = ovly->info.src_x;
-+		info->src_y = ovly->info.src_y;
-+		info->dst_x = ovly->info.dst_x;
-+		info->dst_y = ovly->info.dst_y;
-+		info->dst_z = ovly->info.dst_z;
-+	} else {
-+		info->src_x = 0;
-+		info->src_y = 0;
-+		info->dst_x = 0;
-+		info->dst_y = 0;
-+		info->dst_z = 0;
-+	}
-+	info->w = fbi->var.xres;
-+	info->h = fbi->var.yres;
-+	info->dirty.x = 0;
-+	info->dirty.y = 0;
-+	info->dirty.w = fbi->var.xres;
-+	info->dirty.h = fbi->var.yres;
-+}
-+
-+void vmode_to_var(struct mcde_video_mode *video_mode,
-+	struct fb_var_screeninfo *var)
-+{
-+	/* TODO: use only 1 vbp and 1 vfp */
-+	var->xres           = video_mode->xres;
-+	var->yres           = video_mode->yres;
-+	var->pixclock       = video_mode->pixclock;
-+	var->upper_margin   = video_mode->vbp1 + video_mode->vbp2;
-+	var->lower_margin   = video_mode->vfp1 + video_mode->vfp2;
-+	var->left_margin    = video_mode->hbp;
-+	var->right_margin   = video_mode->hfp;
-+	var->vmode         |= video_mode->interlaced ?
-+				FB_VMODE_INTERLACED : FB_VMODE_NONINTERLACED;
-+}
-+
-+void var_to_vmode(struct fb_var_screeninfo *var,
-+	struct mcde_video_mode *video_mode)
-+{
-+	video_mode->xres       = var->xres;
-+	video_mode->yres       = var->yres;
-+	video_mode->pixclock   = var->pixclock;
-+	video_mode->vbp1       = var->upper_margin / 2;
-+	video_mode->vfp1       = var->lower_margin / 2;
-+	video_mode->vbp2       = video_mode->vbp1 + var->upper_margin % 2;
-+	video_mode->vfp2       = video_mode->vfp1 + var->lower_margin % 2;
-+	video_mode->hbp        = var->left_margin;
-+	video_mode->hfp        = var->right_margin;
-+	video_mode->interlaced = (var->vmode & FB_VMODE_INTERLACED) ==
-+							FB_VMODE_INTERLACED;
-+}
-+
-+enum mcde_display_rotation var_to_rotation(struct fb_var_screeninfo *var)
-+{
-+	enum mcde_display_rotation rot;
-+
-+	switch (var->rotate) {
-+	case FB_ROTATE_UR:
-+		rot = MCDE_DISPLAY_ROT_0;
-+		break;
-+	case FB_ROTATE_CW:
-+		rot = MCDE_DISPLAY_ROT_90_CW;
-+		break;
-+	case FB_ROTATE_UD:
-+		rot = MCDE_DISPLAY_ROT_180_CW;
-+		break;
-+	case FB_ROTATE_CCW:
-+		rot = MCDE_DISPLAY_ROT_90_CCW;
-+		break;
-+	default:
-+		rot = MCDE_DISPLAY_ROT_0;
-+		break;
-+	}
-+	dev_vdbg(&mcde_fb_device.dev, "var_rot: %d -> mcde_rot: %d\n",
-+							var->rotate, rot);
-+	return rot;
-+}
-+
-+static struct mcde_display_device *fb_to_display(struct fb_info *fbi)
-+{
-+	int i;
-+	struct mcde_fb *mfb = to_mcde_fb(fbi);
-+
-+	for (i = 0; i < mfb->num_ovlys; i++) {
-+		if (mfb->ovlys[i])
-+			return mfb->ovlys[i]->ddev;
-+	}
-+	return NULL;
-+}
-+
-+static int check_var(struct fb_var_screeninfo *var, struct fb_info *fbi,
-+	struct mcde_display_device *ddev)
-+{
-+	int ret;
-+	u16 w = -1, h = -1;
-+	struct mcde_video_mode vmode;
-+	struct pix_fmt_info *fmtinfo;
-+
-+	/* TODO: check sizes/offsets/memory validity */
-+
-+	/* Device physical size */
-+	mcde_dss_get_physical_size(ddev, &w, &h);
-+	var->width  = w;
-+	var->height = h;
-+
-+	/* Rotation */
-+	if (var->rotate > 3) {
-+		dev_info(&(ddev->dev), "check_var failed var->rotate\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Video mode */
-+	var_to_vmode(var, &vmode);
-+	ret = mcde_dss_try_video_mode(ddev, &vmode);
-+	if (ret < 0) {
-+		dev_vdbg(&(ddev->dev), "check_var failed "
-+			"mcde_dss_try_video_mode with size = %x\n", ret);
-+		return ret;
-+	}
-+	vmode_to_var(&vmode, var);
-+
-+	/* Pixel format */
-+	fmtinfo = var_to_pix_fmt_info(var);
-+	if (!fmtinfo) {
-+		dev_vdbg(&(ddev->dev), "check_var failed fmtinfo\n");
-+		return -EINVAL;
-+	}
-+	pix_fmt_info_to_var(fmtinfo, var);
-+
-+	/* Not used */
-+	var->grayscale = 0;
-+	var->sync = 0;
-+
-+	return 0;
-+}
-+
-+static int apply_var(struct fb_info *fbi, struct mcde_display_device *ddev)
-+{
-+	int ret, i;
-+	struct mcde_fb *mfb = to_mcde_fb(fbi);
-+	struct fb_var_screeninfo *var;
-+	struct mcde_video_mode vmode;
-+	struct pix_fmt_info *fmt;
-+	u32 line_len, size;
-+
-+	dev_vdbg(&(ddev->dev), "%s\n", __func__);
-+
-+	var = &fbi->var;
-+
-+	/* Reallocate memory */
-+	line_len = (fbi->var.bits_per_pixel * var->xres_virtual) / 8;
-+	line_len = ALIGN(line_len, MCDE_BUF_LINE_ALIGMENT);
-+	size = line_len * var->yres_virtual;
-+	ret = reallocate_fb_mem(fbi, size);
-+	if (ret) {
-+		dev_vdbg(&(ddev->dev), "apply_var failed with"
-+				"reallocate mem with size = %d\n", size);
-+		return ret;
-+	}
-+	fbi->fix.line_length = line_len;
-+
-+	if (ddev) {
-+		/* Apply pixel format */
-+		fmt = var_to_pix_fmt_info(var);
-+		mfb->pix_fmt = fmt->pix_fmt;
-+		mcde_dss_set_pixel_format(ddev, mfb->pix_fmt);
-+
-+		/* Apply rotation */
-+		mcde_dss_set_rotation(ddev, var_to_rotation(var));
-+		/* Apply video mode */
-+		memset(&vmode, 0, sizeof(struct mcde_video_mode));
-+		var_to_vmode(var, &vmode);
-+		mcde_dss_set_video_mode(ddev, &vmode);
-+		mcde_dss_apply_channel(ddev);
-+	}
-+
-+	/* Apply overlay info */
-+	for (i = 0; i < mfb->num_ovlys; i++) {
-+		struct mcde_overlay *ovly = mfb->ovlys[i];
-+		struct mcde_overlay_info info;
-+
-+		get_ovly_info(fbi, ovly, &info);
-+		(void) mcde_dss_apply_overlay(ovly, &info);
-+		ret = mcde_dss_update_overlay(ovly);
-+	}
-+
-+	return 0;
-+}
-+
-+/* FB ops */
-+
-+static int mcde_fb_open(struct fb_info *fbi, int user)
-+{
-+	dev_vdbg(fbi->dev, "%s\n", __func__);
-+	return 0;
-+}
-+
-+static int mcde_fb_release(struct fb_info *fbi, int user)
-+{
-+	dev_vdbg(fbi->dev, "%s\n", __func__);
-+	return 0;
-+}
-+
-+static int mcde_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *fbi)
-+{
-+	struct mcde_display_device *ddev = fb_to_display(fbi);
-+
-+	dev_vdbg(fbi->dev, "%s\n", __func__);
-+
-+	if (!ddev) {
-+		printk(KERN_ERR "mcde_fb_check_var failed !ddev\n");
-+		return -ENODEV;
-+	}
-+
-+	return check_var(var, fbi, ddev);
-+}
-+
-+static int mcde_fb_set_par(struct fb_info *fbi)
-+{
-+	dev_vdbg(fbi->dev, "%s\n", __func__);
-+
-+	return apply_var(fbi, fb_to_display(fbi));
-+}
-+
-+static int mcde_fb_blank(int blank, struct fb_info *fbi)
-+{
-+	int ret = 0;
-+	int i;
-+	struct mcde_display_device *ddev = fb_to_display(fbi);
-+	struct mcde_fb *mfb = to_mcde_fb(fbi);
-+
-+	dev_vdbg(fbi->dev, "%s\n", __func__);
-+
-+	switch (blank) {
-+	case FB_BLANK_NORMAL:
-+	case FB_BLANK_VSYNC_SUSPEND:
-+	case FB_BLANK_HSYNC_SUSPEND:
-+	case FB_BLANK_POWERDOWN:
-+		for (i = 0; i < mfb->num_ovlys; i++) {
-+			struct mcde_overlay *ovly = mfb->ovlys[i];
-+			mcde_dss_disable_overlay(ovly);
-+		}
-+		mcde_dss_disable_display(ddev);
-+	break;
-+	case FB_BLANK_UNBLANK:
-+		ret = mcde_dss_enable_display(ddev);
-+		for (i = 0; i < mfb->num_ovlys; i++) {
-+			struct mcde_overlay *ovly = mfb->ovlys[i];
-+			ret = mcde_dss_enable_overlay(ovly);
-+			ret = mcde_dss_update_overlay(ovly);
-+		}
-+	break;
-+	default:
-+		ret = -EINVAL;
-+	}
-+	return ret;
-+}
-+
-+static int mcde_fb_pan_display(struct fb_var_screeninfo *var,
-+	struct fb_info *fbi)
-+{
-+	dev_vdbg(fbi->dev, "%s\n", __func__);
-+
-+	if (var->xoffset == fbi->var.xoffset &&
-+					var->yoffset == fbi->var.yoffset)
-+		return 0;
-+
-+	fbi->var.xoffset = var->xoffset;
-+	fbi->var.yoffset = var->yoffset;
-+	return apply_var(fbi, fb_to_display(fbi));
-+}
-+
-+static void mcde_fb_rotate(struct fb_info *fbi, int rotate)
-+{
-+	dev_vdbg(fbi->dev, "%s\n", __func__);
-+}
-+
-+static struct fb_ops fb_ops = {
-+	/* creg, cmap */
-+	.owner          = THIS_MODULE,
-+	.fb_open        = mcde_fb_open,
-+	.fb_release     = mcde_fb_release,
-+	.fb_read        = fb_sys_read,
-+	.fb_write       = fb_sys_write,
-+	.fb_fillrect    = sys_fillrect,
-+	.fb_copyarea    = sys_copyarea,
-+	.fb_imageblit   = sys_imageblit,
-+	.fb_check_var   = mcde_fb_check_var,
-+	.fb_set_par     = mcde_fb_set_par,
-+	.fb_blank       = mcde_fb_blank,
-+	.fb_pan_display = mcde_fb_pan_display,
-+	.fb_rotate      = mcde_fb_rotate,
-+};
-+
-+/* FB driver */
-+
-+struct fb_info *mcde_fb_create(struct mcde_display_device *ddev,
-+	u16 w, u16 h, u16 vw, u16 vh, enum mcde_ovly_pix_fmt pix_fmt,
-+	u32 rotate)
-+{
-+	int ret = 0;
-+	struct fb_info *fbi;
-+	struct mcde_fb *mfb;
-+	struct mcde_overlay *ovly = NULL;
-+	struct mcde_overlay_info ovly_info;
-+
-+	dev_vdbg(&ddev->dev, "%s\n", __func__);
-+	if (!ddev->initialized) {
-+		dev_warn(&ddev->dev, "%s: Device not initialized\n", __func__);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	/* Init fb */
-+	fbi = framebuffer_alloc(sizeof(struct mcde_fb), &mcde_fb_device.dev);
-+	if (fbi == NULL) {
-+		ret = -ENOMEM;
-+		goto fb_alloc_failed;
-+	}
-+	init_fb(fbi);
-+	mfb = to_mcde_fb(fbi);
-+
-+	ret = mcde_dss_enable_display(ddev);
-+	if (ret)
-+		goto display_enable_failed;
-+
-+	/* Prepare var and allocate frame buffer memory */
-+	init_var_fmt(&fbi->var, w, h, vw, vh, pix_fmt, rotate);
-+	check_var(&fbi->var, fbi, ddev);
-+	ret = apply_var(fbi, ddev);
-+	if (ret)
-+		goto apply_var_failed;
-+
-+	/* Setup overlay */
-+	get_ovly_info(fbi, NULL, &ovly_info);
-+	ovly = mcde_dss_create_overlay(ddev, &ovly_info);
-+	if (!ovly) {
-+		ret = PTR_ERR(ovly);
-+		goto ovly_alloc_failed;
-+	}
-+	mfb->ovlys[0] = ovly;
-+	mfb->num_ovlys = 1;
-+
-+	ret = mcde_dss_enable_overlay(ovly);
-+	if (ret)
-+		goto ovly_enable_failed;
-+
-+	mfb->id = ddev->id;
-+
-+	mcde_dss_update_overlay(ovly);
-+
-+	/* Register framebuffer */
-+	ret = register_framebuffer(fbi);
-+	if (ret)
-+		goto fb_register_failed;
-+
-+	goto out;
-+fb_register_failed:
-+	mcde_dss_disable_overlay(ovly);
-+ovly_enable_failed:
-+	mcde_dss_destroy_overlay(ovly);
-+ovly_alloc_failed:
-+	free_fb_mem(fbi);
-+apply_var_failed:
-+	mcde_dss_disable_display(ddev);
-+display_enable_failed:
-+	framebuffer_release(fbi);
-+	fbi = NULL;
-+fb_alloc_failed:
-+out:
-+	return ret ? ERR_PTR(ret) : fbi;
-+}
-+EXPORT_SYMBOL(mcde_fb_create);
-+
-+int mcde_fb_attach_overlay(struct fb_info *fb_info, struct mcde_overlay *ovl)
-+{
-+	/* TODO: Attach extra overlay targets */
-+	return -EINVAL;
-+}
-+
-+void mcde_fb_destroy(struct fb_info *fb_info)
-+{
-+	/* TODO: clean up */
-+}
-+
-+/* Overlay fbs' platform device */
-+static int mcde_fb_probe(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+
-+static int mcde_fb_remove(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+
-+static struct platform_driver mcde_fb_driver = {
-+	.probe  = mcde_fb_probe,
-+	.remove = mcde_fb_remove,
-+	.driver = {
-+		.name  = "mcde_fb",
-+		.owner = THIS_MODULE,
-+	},
-+};
-+
-+/* MCDE fb init */
-+
-+int __init mcde_fb_init(void)
-+{
-+	int ret;
-+
-+	ret = platform_driver_register(&mcde_fb_driver);
-+	if (ret)
-+		goto fb_driver_failed;
-+	ret = platform_device_register(&mcde_fb_device);
-+	if (ret)
-+		goto fb_device_failed;
-+
-+	goto out;
-+fb_device_failed:
-+	platform_driver_unregister(&mcde_fb_driver);
-+fb_driver_failed:
-+out:
-+	return ret;
-+}
-+
-+void mcde_fb_exit(void)
-+{
-+	platform_device_unregister(&mcde_fb_device);
-+	platform_driver_unregister(&mcde_fb_driver);
-+}
-+
-diff --git a/include/video/mcde/mcde_fb.h b/include/video/mcde/mcde_fb.h
-new file mode 100644
-index 0000000..8aa3d13
---- /dev/null
-+++ b/include/video/mcde/mcde_fb.h
-@@ -0,0 +1,54 @@
-+/*
-+ * Copyright (C) ST-Ericsson AB 2010
-+ *
-+ * ST-Ericsson MCDE display sub system frame buffer driver
-+ *
-+ * Author: Marcus Lorentzon <marcus.xm.lorentzon@stericsson.com>
-+ * for ST-Ericsson.
-+ *
-+ * License terms: GNU General Public License (GPL), version 2.
-+ */
-+#ifndef __MCDE_FB__H__
-+#define __MCDE_FB__H__
-+
-+#include <linux/fb.h>
-+#include <linux/ioctl.h>
-+#if !defined(__KERNEL__) && !defined(_KERNEL)
-+#include <stdint.h>
-+#else
-+#include <linux/types.h>
-+#endif
-+
-+#ifdef __KERNEL__
-+#include "mcde_dss.h"
-+#endif
-+
-+#ifdef __KERNEL__
-+#define to_mcde_fb(x) ((struct mcde_fb *)(x)->par)
-+
-+#define MCDE_FB_MAX_NUM_OVERLAYS 3
-+
-+struct mcde_fb {
-+	int num_ovlys;
-+	struct mcde_overlay *ovlys[MCDE_FB_MAX_NUM_OVERLAYS];
-+	u32 pseudo_palette[17];
-+	enum mcde_ovly_pix_fmt pix_fmt;
-+	int id;
-+};
-+
-+/* MCDE fbdev API */
-+struct fb_info *mcde_fb_create(struct mcde_display_device *ddev,
-+		uint16_t w, uint16_t h, uint16_t vw, uint16_t vh,
-+		enum mcde_ovly_pix_fmt pix_fmt,	uint32_t rotate);
-+
-+int mcde_fb_attach_overlay(struct fb_info *fb_info,
-+	struct mcde_overlay *ovl);
-+void mcde_fb_destroy(struct fb_info *fb_info);
-+
-+/* MCDE fb driver */
-+int mcde_fb_init(void);
-+void mcde_fb_exit(void);
-+#endif
-+
-+#endif /* __MCDE_FB__H__ */
-+
++++ b/drivers/video/mcde/dsi_link_config.h
+@@ -0,0 +1,1486 @@
++
++#define DSI_VAL2REG(__reg, __fld, __val) \
++	(((__val) << __reg##_##__fld##_SHIFT) & __reg##_##__fld##_MASK)
++#define DSI_REG2VAL(__reg, __fld, __val) \
++	(((__val) & __reg##_##__fld##_MASK) >> __reg##_##__fld##_SHIFT)
++
++#define DSI_MCTL_MAIN_DATA_CTL 0x00000004
++#define DSI_MCTL_MAIN_DATA_CTL_LINK_EN_SHIFT 0
++#define DSI_MCTL_MAIN_DATA_CTL_LINK_EN_MASK 0x00000001
++#define DSI_MCTL_MAIN_DATA_CTL_LINK_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, LINK_EN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_MODE_SHIFT 1
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_MODE_MASK 0x00000002
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_MODE_CMD 0
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_MODE_VID 1
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_MODE_ENUM(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, IF1_MODE, \
++	DSI_MCTL_MAIN_DATA_CTL_IF1_MODE_##__x)
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_MODE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, IF1_MODE, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_VID_EN_SHIFT 2
++#define DSI_MCTL_MAIN_DATA_CTL_VID_EN_MASK 0x00000004
++#define DSI_MCTL_MAIN_DATA_CTL_VID_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, VID_EN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_TVG_SEL_SHIFT 3
++#define DSI_MCTL_MAIN_DATA_CTL_TVG_SEL_MASK 0x00000008
++#define DSI_MCTL_MAIN_DATA_CTL_TVG_SEL(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, TVG_SEL, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_TBG_SEL_SHIFT 4
++#define DSI_MCTL_MAIN_DATA_CTL_TBG_SEL_MASK 0x00000010
++#define DSI_MCTL_MAIN_DATA_CTL_TBG_SEL(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, TBG_SEL, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_TE_EN_SHIFT 5
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_TE_EN_MASK 0x00000020
++#define DSI_MCTL_MAIN_DATA_CTL_IF1_TE_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, IF1_TE_EN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_IF2_TE_EN_SHIFT 6
++#define DSI_MCTL_MAIN_DATA_CTL_IF2_TE_EN_MASK 0x00000040
++#define DSI_MCTL_MAIN_DATA_CTL_IF2_TE_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, IF2_TE_EN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_REG_TE_EN_SHIFT 7
++#define DSI_MCTL_MAIN_DATA_CTL_REG_TE_EN_MASK 0x00000080
++#define DSI_MCTL_MAIN_DATA_CTL_REG_TE_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, REG_TE_EN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_READ_EN_SHIFT 8
++#define DSI_MCTL_MAIN_DATA_CTL_READ_EN_MASK 0x00000100
++#define DSI_MCTL_MAIN_DATA_CTL_READ_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, READ_EN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_BTA_EN_SHIFT 9
++#define DSI_MCTL_MAIN_DATA_CTL_BTA_EN_MASK 0x00000200
++#define DSI_MCTL_MAIN_DATA_CTL_BTA_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, BTA_EN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_GEN_ECC_SHIFT 10
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_GEN_ECC_MASK 0x00000400
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_GEN_ECC(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, DISP_GEN_ECC, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_GEN_CHECKSUM_SHIFT 11
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_GEN_CHECKSUM_MASK 0x00000800
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_GEN_CHECKSUM(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, DISP_GEN_CHECKSUM, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_HOST_EOT_GEN_SHIFT 12
++#define DSI_MCTL_MAIN_DATA_CTL_HOST_EOT_GEN_MASK 0x00001000
++#define DSI_MCTL_MAIN_DATA_CTL_HOST_EOT_GEN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, HOST_EOT_GEN, __x)
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_EOT_GEN_SHIFT 13
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_EOT_GEN_MASK 0x00002000
++#define DSI_MCTL_MAIN_DATA_CTL_DISP_EOT_GEN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_DATA_CTL, DISP_EOT_GEN, __x)
++#define DSI_MCTL_MAIN_PHY_CTL 0x00000008
++#define DSI_MCTL_MAIN_PHY_CTL_LANE2_EN_SHIFT 0
++#define DSI_MCTL_MAIN_PHY_CTL_LANE2_EN_MASK 0x00000001
++#define DSI_MCTL_MAIN_PHY_CTL_LANE2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_PHY_CTL, LANE2_EN, __x)
++#define DSI_MCTL_MAIN_PHY_CTL_FORCE_STOP_MODE_SHIFT 1
++#define DSI_MCTL_MAIN_PHY_CTL_FORCE_STOP_MODE_MASK 0x00000002
++#define DSI_MCTL_MAIN_PHY_CTL_FORCE_STOP_MODE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_PHY_CTL, FORCE_STOP_MODE, __x)
++#define DSI_MCTL_MAIN_PHY_CTL_CLK_CONTINUOUS_SHIFT 2
++#define DSI_MCTL_MAIN_PHY_CTL_CLK_CONTINUOUS_MASK 0x00000004
++#define DSI_MCTL_MAIN_PHY_CTL_CLK_CONTINUOUS(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_PHY_CTL, CLK_CONTINUOUS, __x)
++#define DSI_MCTL_MAIN_PHY_CTL_CLK_ULPM_EN_SHIFT 3
++#define DSI_MCTL_MAIN_PHY_CTL_CLK_ULPM_EN_MASK 0x00000008
++#define DSI_MCTL_MAIN_PHY_CTL_CLK_ULPM_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_PHY_CTL, CLK_ULPM_EN, __x)
++#define DSI_MCTL_MAIN_PHY_CTL_DAT1_ULPM_EN_SHIFT 4
++#define DSI_MCTL_MAIN_PHY_CTL_DAT1_ULPM_EN_MASK 0x00000010
++#define DSI_MCTL_MAIN_PHY_CTL_DAT1_ULPM_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_PHY_CTL, DAT1_ULPM_EN, __x)
++#define DSI_MCTL_MAIN_PHY_CTL_DAT2_ULPM_EN_SHIFT 5
++#define DSI_MCTL_MAIN_PHY_CTL_DAT2_ULPM_EN_MASK 0x00000020
++#define DSI_MCTL_MAIN_PHY_CTL_DAT2_ULPM_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_PHY_CTL, DAT2_ULPM_EN, __x)
++#define DSI_MCTL_MAIN_PHY_CTL_WAIT_BURST_TIME_SHIFT 6
++#define DSI_MCTL_MAIN_PHY_CTL_WAIT_BURST_TIME_MASK 0x000003C0
++#define DSI_MCTL_MAIN_PHY_CTL_WAIT_BURST_TIME(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_PHY_CTL, WAIT_BURST_TIME, __x)
++#define DSI_MCTL_PLL_CTL 0x0000000C
++#define DSI_MCTL_PLL_CTL_PLL_MULT_SHIFT 0
++#define DSI_MCTL_PLL_CTL_PLL_MULT_MASK 0x000000FF
++#define DSI_MCTL_PLL_CTL_PLL_MULT(__x) \
++	DSI_VAL2REG(DSI_MCTL_PLL_CTL, PLL_MULT, __x)
++#define DSI_MCTL_PLL_CTL_PLL_OUT_DIV_SHIFT 8
++#define DSI_MCTL_PLL_CTL_PLL_OUT_DIV_MASK 0x00003F00
++#define DSI_MCTL_PLL_CTL_PLL_OUT_DIV(__x) \
++	DSI_VAL2REG(DSI_MCTL_PLL_CTL, PLL_OUT_DIV, __x)
++#define DSI_MCTL_PLL_CTL_PLL_IN_DIV_SHIFT 14
++#define DSI_MCTL_PLL_CTL_PLL_IN_DIV_MASK 0x0001C000
++#define DSI_MCTL_PLL_CTL_PLL_IN_DIV(__x) \
++	DSI_VAL2REG(DSI_MCTL_PLL_CTL, PLL_IN_DIV, __x)
++#define DSI_MCTL_PLL_CTL_PLL_SEL_DIV2_SHIFT 17
++#define DSI_MCTL_PLL_CTL_PLL_SEL_DIV2_MASK 0x00020000
++#define DSI_MCTL_PLL_CTL_PLL_SEL_DIV2(__x) \
++	DSI_VAL2REG(DSI_MCTL_PLL_CTL, PLL_SEL_DIV2, __x)
++#define DSI_MCTL_PLL_CTL_PLL_OUT_SEL_SHIFT 18
++#define DSI_MCTL_PLL_CTL_PLL_OUT_SEL_MASK 0x00040000
++#define DSI_MCTL_PLL_CTL_PLL_OUT_SEL_INT_PLL 0
++#define DSI_MCTL_PLL_CTL_PLL_OUT_SEL_SYS_PLL 1
++#define DSI_MCTL_PLL_CTL_PLL_OUT_SEL_ENUM(__x) \
++	DSI_VAL2REG(DSI_MCTL_PLL_CTL, PLL_OUT_SEL, \
++	DSI_MCTL_PLL_CTL_PLL_OUT_SEL_##__x)
++#define DSI_MCTL_PLL_CTL_PLL_OUT_SEL(__x) \
++	DSI_VAL2REG(DSI_MCTL_PLL_CTL, PLL_OUT_SEL, __x)
++#define DSI_MCTL_PLL_CTL_PLL_MASTER_SHIFT 31
++#define DSI_MCTL_PLL_CTL_PLL_MASTER_MASK 0x80000000
++#define DSI_MCTL_PLL_CTL_PLL_MASTER(__x) \
++	DSI_VAL2REG(DSI_MCTL_PLL_CTL, PLL_MASTER, __x)
++#define DSI_MCTL_LANE_STS 0x00000010
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE_SHIFT 0
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE_MASK 0x00000003
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE_START 0
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE_IDLE 1
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE_HS 2
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE_ULPM 3
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE_ENUM(__x) \
++	DSI_VAL2REG(DSI_MCTL_LANE_STS, CLKLANE_STATE, \
++	DSI_MCTL_LANE_STS_CLKLANE_STATE_##__x)
++#define DSI_MCTL_LANE_STS_CLKLANE_STATE(__x) \
++	DSI_VAL2REG(DSI_MCTL_LANE_STS, CLKLANE_STATE, __x)
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_SHIFT 2
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_MASK 0x0000001C
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_START 0
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_IDLE 1
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_WRITE 2
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_ULPM 3
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_READ 4
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE_ENUM(__x) \
++	DSI_VAL2REG(DSI_MCTL_LANE_STS, DATLANE1_STATE, \
++	DSI_MCTL_LANE_STS_DATLANE1_STATE_##__x)
++#define DSI_MCTL_LANE_STS_DATLANE1_STATE(__x) \
++	DSI_VAL2REG(DSI_MCTL_LANE_STS, DATLANE1_STATE, __x)
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE_SHIFT 5
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE_MASK 0x00000060
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE_START 0
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE_IDLE 1
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE_WRITE 2
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE_ULPM 3
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE_ENUM(__x) \
++	DSI_VAL2REG(DSI_MCTL_LANE_STS, DATLANE2_STATE, \
++	DSI_MCTL_LANE_STS_DATLANE2_STATE_##__x)
++#define DSI_MCTL_LANE_STS_DATLANE2_STATE(__x) \
++	DSI_VAL2REG(DSI_MCTL_LANE_STS, DATLANE2_STATE, __x)
++#define DSI_MCTL_DPHY_TIMEOUT 0x00000014
++#define DSI_MCTL_DPHY_TIMEOUT_CLK_DIV_SHIFT 0
++#define DSI_MCTL_DPHY_TIMEOUT_CLK_DIV_MASK 0x0000000F
++#define DSI_MCTL_DPHY_TIMEOUT_CLK_DIV(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_TIMEOUT, CLK_DIV, __x)
++#define DSI_MCTL_DPHY_TIMEOUT_HSTX_TO_VAL_SHIFT 4
++#define DSI_MCTL_DPHY_TIMEOUT_HSTX_TO_VAL_MASK 0x0003FFF0
++#define DSI_MCTL_DPHY_TIMEOUT_HSTX_TO_VAL(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_TIMEOUT, HSTX_TO_VAL, __x)
++#define DSI_MCTL_DPHY_TIMEOUT_LPRX_TO_VAL_SHIFT 18
++#define DSI_MCTL_DPHY_TIMEOUT_LPRX_TO_VAL_MASK 0xFFFC0000
++#define DSI_MCTL_DPHY_TIMEOUT_LPRX_TO_VAL(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_TIMEOUT, LPRX_TO_VAL, __x)
++#define DSI_MCTL_ULPOUT_TIME 0x00000018
++#define DSI_MCTL_ULPOUT_TIME_CKLANE_ULPOUT_TIME_SHIFT 0
++#define DSI_MCTL_ULPOUT_TIME_CKLANE_ULPOUT_TIME_MASK 0x000001FF
++#define DSI_MCTL_ULPOUT_TIME_CKLANE_ULPOUT_TIME(__x) \
++	DSI_VAL2REG(DSI_MCTL_ULPOUT_TIME, CKLANE_ULPOUT_TIME, __x)
++#define DSI_MCTL_ULPOUT_TIME_DATA_ULPOUT_TIME_SHIFT 9
++#define DSI_MCTL_ULPOUT_TIME_DATA_ULPOUT_TIME_MASK 0x0003FE00
++#define DSI_MCTL_ULPOUT_TIME_DATA_ULPOUT_TIME(__x) \
++	DSI_VAL2REG(DSI_MCTL_ULPOUT_TIME, DATA_ULPOUT_TIME, __x)
++#define DSI_MCTL_DPHY_STATIC 0x0000001C
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_CLK_SHIFT 0
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_CLK_MASK 0x00000001
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_CLK(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_STATIC, SWAP_PINS_CLK, __x)
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_CLK_SHIFT 1
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_CLK_MASK 0x00000002
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_CLK(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_STATIC, HS_INVERT_CLK, __x)
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_DAT1_SHIFT 2
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_DAT1_MASK 0x00000004
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_DAT1(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_STATIC, SWAP_PINS_DAT1, __x)
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_DAT1_SHIFT 3
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_DAT1_MASK 0x00000008
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_DAT1(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_STATIC, HS_INVERT_DAT1, __x)
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_DAT2_SHIFT 4
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_DAT2_MASK 0x00000010
++#define DSI_MCTL_DPHY_STATIC_SWAP_PINS_DAT2(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_STATIC, SWAP_PINS_DAT2, __x)
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_DAT2_SHIFT 5
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_DAT2_MASK 0x00000020
++#define DSI_MCTL_DPHY_STATIC_HS_INVERT_DAT2(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_STATIC, HS_INVERT_DAT2, __x)
++#define DSI_MCTL_DPHY_STATIC_UI_X4_SHIFT 6
++#define DSI_MCTL_DPHY_STATIC_UI_X4_MASK 0x00000FC0
++#define DSI_MCTL_DPHY_STATIC_UI_X4(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_STATIC, UI_X4, __x)
++#define DSI_MCTL_MAIN_EN 0x00000020
++#define DSI_MCTL_MAIN_EN_PLL_START_SHIFT 0
++#define DSI_MCTL_MAIN_EN_PLL_START_MASK 0x00000001
++#define DSI_MCTL_MAIN_EN_PLL_START(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, PLL_START, __x)
++#define DSI_MCTL_MAIN_EN_CKLANE_EN_SHIFT 3
++#define DSI_MCTL_MAIN_EN_CKLANE_EN_MASK 0x00000008
++#define DSI_MCTL_MAIN_EN_CKLANE_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, CKLANE_EN, __x)
++#define DSI_MCTL_MAIN_EN_DAT1_EN_SHIFT 4
++#define DSI_MCTL_MAIN_EN_DAT1_EN_MASK 0x00000010
++#define DSI_MCTL_MAIN_EN_DAT1_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, DAT1_EN, __x)
++#define DSI_MCTL_MAIN_EN_DAT2_EN_SHIFT 5
++#define DSI_MCTL_MAIN_EN_DAT2_EN_MASK 0x00000020
++#define DSI_MCTL_MAIN_EN_DAT2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, DAT2_EN, __x)
++#define DSI_MCTL_MAIN_EN_CLKLANE_ULPM_REQ_SHIFT 6
++#define DSI_MCTL_MAIN_EN_CLKLANE_ULPM_REQ_MASK 0x00000040
++#define DSI_MCTL_MAIN_EN_CLKLANE_ULPM_REQ(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, CLKLANE_ULPM_REQ, __x)
++#define DSI_MCTL_MAIN_EN_DAT1_ULPM_REQ_SHIFT 7
++#define DSI_MCTL_MAIN_EN_DAT1_ULPM_REQ_MASK 0x00000080
++#define DSI_MCTL_MAIN_EN_DAT1_ULPM_REQ(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, DAT1_ULPM_REQ, __x)
++#define DSI_MCTL_MAIN_EN_DAT2_ULPM_REQ_SHIFT 8
++#define DSI_MCTL_MAIN_EN_DAT2_ULPM_REQ_MASK 0x00000100
++#define DSI_MCTL_MAIN_EN_DAT2_ULPM_REQ(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, DAT2_ULPM_REQ, __x)
++#define DSI_MCTL_MAIN_EN_IF1_EN_SHIFT 9
++#define DSI_MCTL_MAIN_EN_IF1_EN_MASK 0x00000200
++#define DSI_MCTL_MAIN_EN_IF1_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, IF1_EN, __x)
++#define DSI_MCTL_MAIN_EN_IF2_EN_SHIFT 10
++#define DSI_MCTL_MAIN_EN_IF2_EN_MASK 0x00000400
++#define DSI_MCTL_MAIN_EN_IF2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_EN, IF2_EN, __x)
++#define DSI_MCTL_MAIN_STS 0x00000024
++#define DSI_MCTL_MAIN_STS_PLL_LOCK_SHIFT 0
++#define DSI_MCTL_MAIN_STS_PLL_LOCK_MASK 0x00000001
++#define DSI_MCTL_MAIN_STS_PLL_LOCK(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, PLL_LOCK, __x)
++#define DSI_MCTL_MAIN_STS_CLKLANE_READY_SHIFT 1
++#define DSI_MCTL_MAIN_STS_CLKLANE_READY_MASK 0x00000002
++#define DSI_MCTL_MAIN_STS_CLKLANE_READY(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, CLKLANE_READY, __x)
++#define DSI_MCTL_MAIN_STS_DAT1_READY_SHIFT 2
++#define DSI_MCTL_MAIN_STS_DAT1_READY_MASK 0x00000004
++#define DSI_MCTL_MAIN_STS_DAT1_READY(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, DAT1_READY, __x)
++#define DSI_MCTL_MAIN_STS_DAT2_READY_SHIFT 3
++#define DSI_MCTL_MAIN_STS_DAT2_READY_MASK 0x00000008
++#define DSI_MCTL_MAIN_STS_DAT2_READY(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, DAT2_READY, __x)
++#define DSI_MCTL_MAIN_STS_HSTX_TO_ERR_SHIFT 4
++#define DSI_MCTL_MAIN_STS_HSTX_TO_ERR_MASK 0x00000010
++#define DSI_MCTL_MAIN_STS_HSTX_TO_ERR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, HSTX_TO_ERR, __x)
++#define DSI_MCTL_MAIN_STS_LPRX_TO_ERR_SHIFT 5
++#define DSI_MCTL_MAIN_STS_LPRX_TO_ERR_MASK 0x00000020
++#define DSI_MCTL_MAIN_STS_LPRX_TO_ERR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, LPRX_TO_ERR, __x)
++#define DSI_MCTL_MAIN_STS_CRS_UNTERM_PCK_SHIFT 6
++#define DSI_MCTL_MAIN_STS_CRS_UNTERM_PCK_MASK 0x00000040
++#define DSI_MCTL_MAIN_STS_CRS_UNTERM_PCK(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, CRS_UNTERM_PCK, __x)
++#define DSI_MCTL_MAIN_STS_VRS_UNTERM_PCK_SHIFT 7
++#define DSI_MCTL_MAIN_STS_VRS_UNTERM_PCK_MASK 0x00000080
++#define DSI_MCTL_MAIN_STS_VRS_UNTERM_PCK(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS, VRS_UNTERM_PCK, __x)
++#define DSI_MCTL_DPHY_ERR 0x00000028
++#define DSI_MCTL_DPHY_ERR_ERR_ESC_1_SHIFT 6
++#define DSI_MCTL_DPHY_ERR_ERR_ESC_1_MASK 0x00000040
++#define DSI_MCTL_DPHY_ERR_ERR_ESC_1(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_ESC_1, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_ESC_2_SHIFT 7
++#define DSI_MCTL_DPHY_ERR_ERR_ESC_2_MASK 0x00000080
++#define DSI_MCTL_DPHY_ERR_ERR_ESC_2(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_ESC_2, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_SYNCESC_1_SHIFT 8
++#define DSI_MCTL_DPHY_ERR_ERR_SYNCESC_1_MASK 0x00000100
++#define DSI_MCTL_DPHY_ERR_ERR_SYNCESC_1(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_SYNCESC_1, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_SYNCESC_2_SHIFT 9
++#define DSI_MCTL_DPHY_ERR_ERR_SYNCESC_2_MASK 0x00000200
++#define DSI_MCTL_DPHY_ERR_ERR_SYNCESC_2(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_SYNCESC_2, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_CONTROL_1_SHIFT 10
++#define DSI_MCTL_DPHY_ERR_ERR_CONTROL_1_MASK 0x00000400
++#define DSI_MCTL_DPHY_ERR_ERR_CONTROL_1(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_CONTROL_1, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_CONTROL_2_SHIFT 11
++#define DSI_MCTL_DPHY_ERR_ERR_CONTROL_2_MASK 0x00000800
++#define DSI_MCTL_DPHY_ERR_ERR_CONTROL_2(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_CONTROL_2, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP0_1_SHIFT 12
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP0_1_MASK 0x00001000
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP0_1(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_CONT_LP0_1, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP0_2_SHIFT 13
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP0_2_MASK 0x00002000
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP0_2(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_CONT_LP0_2, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP1_1_SHIFT 14
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP1_1_MASK 0x00004000
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP1_1(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_CONT_LP1_1, __x)
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP1_2_SHIFT 15
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP1_2_MASK 0x00008000
++#define DSI_MCTL_DPHY_ERR_ERR_CONT_LP1_2(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR, ERR_CONT_LP1_2, __x)
++#define DSI_CMD_MODE_CTL 0x00000050
++#define DSI_CMD_MODE_CTL_IF1_ID_SHIFT 0
++#define DSI_CMD_MODE_CTL_IF1_ID_MASK 0x00000003
++#define DSI_CMD_MODE_CTL_IF1_ID(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, IF1_ID, __x)
++#define DSI_CMD_MODE_CTL_IF2_ID_SHIFT 2
++#define DSI_CMD_MODE_CTL_IF2_ID_MASK 0x0000000C
++#define DSI_CMD_MODE_CTL_IF2_ID(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, IF2_ID, __x)
++#define DSI_CMD_MODE_CTL_IF1_LP_EN_SHIFT 4
++#define DSI_CMD_MODE_CTL_IF1_LP_EN_MASK 0x00000010
++#define DSI_CMD_MODE_CTL_IF1_LP_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, IF1_LP_EN, __x)
++#define DSI_CMD_MODE_CTL_IF2_LP_EN_SHIFT 5
++#define DSI_CMD_MODE_CTL_IF2_LP_EN_MASK 0x00000020
++#define DSI_CMD_MODE_CTL_IF2_LP_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, IF2_LP_EN, __x)
++#define DSI_CMD_MODE_CTL_ARB_MODE_SHIFT 6
++#define DSI_CMD_MODE_CTL_ARB_MODE_MASK 0x00000040
++#define DSI_CMD_MODE_CTL_ARB_MODE_FIXED 0
++#define DSI_CMD_MODE_CTL_ARB_MODE_ROUND_ROBIN 1
++#define DSI_CMD_MODE_CTL_ARB_MODE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, ARB_MODE, __x)
++#define DSI_CMD_MODE_CTL_ARB_PRI_SHIFT 7
++#define DSI_CMD_MODE_CTL_ARB_PRI_MASK 0x00000080
++#define DSI_CMD_MODE_CTL_ARB_PRI(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, ARB_PRI, __x)
++#define DSI_CMD_MODE_CTL_FIL_VALUE_SHIFT 8
++#define DSI_CMD_MODE_CTL_FIL_VALUE_MASK 0x0000FF00
++#define DSI_CMD_MODE_CTL_FIL_VALUE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, FIL_VALUE, __x)
++#define DSI_CMD_MODE_CTL_TE_TIMEOUT_SHIFT 16
++#define DSI_CMD_MODE_CTL_TE_TIMEOUT_MASK 0x03FF0000
++#define DSI_CMD_MODE_CTL_TE_TIMEOUT(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_CTL, TE_TIMEOUT, __x)
++#define DSI_CMD_MODE_STS 0x00000054
++#define DSI_CMD_MODE_STS_ERR_NO_TE_SHIFT 0
++#define DSI_CMD_MODE_STS_ERR_NO_TE_MASK 0x00000001
++#define DSI_CMD_MODE_STS_ERR_NO_TE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS, ERR_NO_TE, __x)
++#define DSI_CMD_MODE_STS_ERR_TE_MISS_SHIFT 1
++#define DSI_CMD_MODE_STS_ERR_TE_MISS_MASK 0x00000002
++#define DSI_CMD_MODE_STS_ERR_TE_MISS(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS, ERR_TE_MISS, __x)
++#define DSI_CMD_MODE_STS_ERR_SDI1_UNDERRUN_SHIFT 2
++#define DSI_CMD_MODE_STS_ERR_SDI1_UNDERRUN_MASK 0x00000004
++#define DSI_CMD_MODE_STS_ERR_SDI1_UNDERRUN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS, ERR_SDI1_UNDERRUN, __x)
++#define DSI_CMD_MODE_STS_ERR_SDI2_UNDERRUN_SHIFT 3
++#define DSI_CMD_MODE_STS_ERR_SDI2_UNDERRUN_MASK 0x00000008
++#define DSI_CMD_MODE_STS_ERR_SDI2_UNDERRUN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS, ERR_SDI2_UNDERRUN, __x)
++#define DSI_CMD_MODE_STS_ERR_UNWANTED_RD_SHIFT 4
++#define DSI_CMD_MODE_STS_ERR_UNWANTED_RD_MASK 0x00000010
++#define DSI_CMD_MODE_STS_ERR_UNWANTED_RD(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS, ERR_UNWANTED_RD, __x)
++#define DSI_CMD_MODE_STS_CSM_RUNNING_SHIFT 5
++#define DSI_CMD_MODE_STS_CSM_RUNNING_MASK 0x00000020
++#define DSI_CMD_MODE_STS_CSM_RUNNING(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS, CSM_RUNNING, __x)
++#define DSI_DIRECT_CMD_SEND 0x00000060
++#define DSI_DIRECT_CMD_SEND_START_SHIFT 0
++#define DSI_DIRECT_CMD_SEND_START_MASK 0xFFFFFFFF
++#define DSI_DIRECT_CMD_SEND_START(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_SEND, START, __x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS 0x00000064
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_SHIFT 0
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_MASK 0x00000007
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_WRITE 0
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_READ 1
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_TE_REQ 4
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_TRIG_REQ 5
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_BTA_REQ 6
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_ENUM(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_NAT, \
++	DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_##__x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_NAT, __x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT_SHIFT 3
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT_MASK 0x00000008
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_LONGNOTSHORT, __x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_SHIFT 8
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_MASK 0x00003F00
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_DCS_SHORT_WRITE_0 5
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_DCS_SHORT_WRITE_1 21
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_DCS_LONG_WRITE 57
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_DCS_READ 6
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_ENUM(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_HEAD, \
++	DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_##__x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_HEAD, __x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_SHIFT 14
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_MASK 0x0000C000
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_ID, __x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_SHIFT 16
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_MASK 0x001F0000
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_SIZE, __x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN_SHIFT 21
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN_MASK 0x00200000
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, CMD_LP_EN, __x)
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_TRIGGER_VAL_SHIFT 24
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_TRIGGER_VAL_MASK 0x0F000000
++#define DSI_DIRECT_CMD_MAIN_SETTINGS_TRIGGER_VAL(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_MAIN_SETTINGS, TRIGGER_VAL, __x)
++#define DSI_DIRECT_CMD_STS 0x00000068
++#define DSI_DIRECT_CMD_STS_CMD_TRANSMISSION_SHIFT 0
++#define DSI_DIRECT_CMD_STS_CMD_TRANSMISSION_MASK 0x00000001
++#define DSI_DIRECT_CMD_STS_CMD_TRANSMISSION(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, CMD_TRANSMISSION, __x)
++#define DSI_DIRECT_CMD_STS_WRITE_COMPLETED_SHIFT 1
++#define DSI_DIRECT_CMD_STS_WRITE_COMPLETED_MASK 0x00000002
++#define DSI_DIRECT_CMD_STS_WRITE_COMPLETED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, WRITE_COMPLETED, __x)
++#define DSI_DIRECT_CMD_STS_TRIGGER_COMPLETED_SHIFT 2
++#define DSI_DIRECT_CMD_STS_TRIGGER_COMPLETED_MASK 0x00000004
++#define DSI_DIRECT_CMD_STS_TRIGGER_COMPLETED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, TRIGGER_COMPLETED, __x)
++#define DSI_DIRECT_CMD_STS_READ_COMPLETED_SHIFT 3
++#define DSI_DIRECT_CMD_STS_READ_COMPLETED_MASK 0x00000008
++#define DSI_DIRECT_CMD_STS_READ_COMPLETED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, READ_COMPLETED, __x)
++#define DSI_DIRECT_CMD_STS_ACKNOWLEDGE_RECEIVED_SHIFT 4
++#define DSI_DIRECT_CMD_STS_ACKNOWLEDGE_RECEIVED_MASK 0x00000010
++#define DSI_DIRECT_CMD_STS_ACKNOWLEDGE_RECEIVED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, ACKNOWLEDGE_RECEIVED, __x)
++#define DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED_SHIFT 5
++#define DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED_MASK 0x00000020
++#define DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, ACKNOWLEDGE_WITH_ERR_RECEIVED, __x)
++#define DSI_DIRECT_CMD_STS_TRIGGER_RECEIVED_SHIFT 6
++#define DSI_DIRECT_CMD_STS_TRIGGER_RECEIVED_MASK 0x00000040
++#define DSI_DIRECT_CMD_STS_TRIGGER_RECEIVED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, TRIGGER_RECEIVED, __x)
++#define DSI_DIRECT_CMD_STS_TE_RECEIVED_SHIFT 7
++#define DSI_DIRECT_CMD_STS_TE_RECEIVED_MASK 0x00000080
++#define DSI_DIRECT_CMD_STS_TE_RECEIVED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, TE_RECEIVED, __x)
++#define DSI_DIRECT_CMD_STS_BTA_COMPLETED_SHIFT 8
++#define DSI_DIRECT_CMD_STS_BTA_COMPLETED_MASK 0x00000100
++#define DSI_DIRECT_CMD_STS_BTA_COMPLETED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, BTA_COMPLETED, __x)
++#define DSI_DIRECT_CMD_STS_BTA_FINISHED_SHIFT 9
++#define DSI_DIRECT_CMD_STS_BTA_FINISHED_MASK 0x00000200
++#define DSI_DIRECT_CMD_STS_BTA_FINISHED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, BTA_FINISHED, __x)
++#define DSI_DIRECT_CMD_STS_READ_COMPLETED_WITH_ERR_SHIFT 10
++#define DSI_DIRECT_CMD_STS_READ_COMPLETED_WITH_ERR_MASK 0x00000400
++#define DSI_DIRECT_CMD_STS_READ_COMPLETED_WITH_ERR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, READ_COMPLETED_WITH_ERR, __x)
++#define DSI_DIRECT_CMD_STS_TRIGGER_VAL_SHIFT 11
++#define DSI_DIRECT_CMD_STS_TRIGGER_VAL_MASK 0x00007800
++#define DSI_DIRECT_CMD_STS_TRIGGER_VAL(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, TRIGGER_VAL, __x)
++#define DSI_DIRECT_CMD_STS_ACK_VAL_SHIFT 16
++#define DSI_DIRECT_CMD_STS_ACK_VAL_MASK 0xFFFF0000
++#define DSI_DIRECT_CMD_STS_ACK_VAL(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS, ACK_VAL, __x)
++#define DSI_DIRECT_CMD_RD_INIT 0x0000006C
++#define DSI_DIRECT_CMD_RD_INIT_RESET_SHIFT 0
++#define DSI_DIRECT_CMD_RD_INIT_RESET_MASK 0xFFFFFFFF
++#define DSI_DIRECT_CMD_RD_INIT_RESET(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_INIT, RESET, __x)
++#define DSI_DIRECT_CMD_WRDAT0 0x00000070
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT0_SHIFT 0
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT0_MASK 0x000000FF
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT0(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT0, WRDAT0, __x)
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT1_SHIFT 8
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT1_MASK 0x0000FF00
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT1(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT0, WRDAT1, __x)
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT2_SHIFT 16
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT2_MASK 0x00FF0000
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT2(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT0, WRDAT2, __x)
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT3_SHIFT 24
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT3_MASK 0xFF000000
++#define DSI_DIRECT_CMD_WRDAT0_WRDAT3(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT0, WRDAT3, __x)
++#define DSI_DIRECT_CMD_WRDAT1 0x00000074
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT4_SHIFT 0
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT4_MASK 0x000000FF
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT4(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT1, WRDAT4, __x)
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT5_SHIFT 8
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT5_MASK 0x0000FF00
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT5(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT1, WRDAT5, __x)
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT6_SHIFT 16
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT6_MASK 0x00FF0000
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT6(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT1, WRDAT6, __x)
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT7_SHIFT 24
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT7_MASK 0xFF000000
++#define DSI_DIRECT_CMD_WRDAT1_WRDAT7(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT1, WRDAT7, __x)
++#define DSI_DIRECT_CMD_WRDAT2 0x00000078
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT8_SHIFT 0
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT8_MASK 0x000000FF
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT8(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT2, WRDAT8, __x)
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT9_SHIFT 8
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT9_MASK 0x0000FF00
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT9(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT2, WRDAT9, __x)
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT10_SHIFT 16
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT10_MASK 0x00FF0000
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT10(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT2, WRDAT10, __x)
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT11_SHIFT 24
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT11_MASK 0xFF000000
++#define DSI_DIRECT_CMD_WRDAT2_WRDAT11(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT2, WRDAT11, __x)
++#define DSI_DIRECT_CMD_WRDAT3 0x0000007C
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT12_SHIFT 0
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT12_MASK 0x000000FF
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT12(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT3, WRDAT12, __x)
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT13_SHIFT 8
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT13_MASK 0x0000FF00
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT13(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT3, WRDAT13, __x)
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT14_SHIFT 16
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT14_MASK 0x00FF0000
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT14(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT3, WRDAT14, __x)
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT15_SHIFT 24
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT15_MASK 0xFF000000
++#define DSI_DIRECT_CMD_WRDAT3_WRDAT15(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_WRDAT3, WRDAT15, __x)
++#define DSI_DIRECT_CMD_RDDAT 0x00000080
++#define DSI_DIRECT_CMD_RDDAT_RDDAT0_SHIFT 0
++#define DSI_DIRECT_CMD_RDDAT_RDDAT0_MASK 0x000000FF
++#define DSI_DIRECT_CMD_RDDAT_RDDAT0(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RDDAT, RDDAT0, __x)
++#define DSI_DIRECT_CMD_RDDAT_RDDAT1_SHIFT 8
++#define DSI_DIRECT_CMD_RDDAT_RDDAT1_MASK 0x0000FF00
++#define DSI_DIRECT_CMD_RDDAT_RDDAT1(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RDDAT, RDDAT1, __x)
++#define DSI_DIRECT_CMD_RDDAT_RDDAT2_SHIFT 16
++#define DSI_DIRECT_CMD_RDDAT_RDDAT2_MASK 0x00FF0000
++#define DSI_DIRECT_CMD_RDDAT_RDDAT2(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RDDAT, RDDAT2, __x)
++#define DSI_DIRECT_CMD_RDDAT_RDDAT3_SHIFT 24
++#define DSI_DIRECT_CMD_RDDAT_RDDAT3_MASK 0xFF000000
++#define DSI_DIRECT_CMD_RDDAT_RDDAT3(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RDDAT, RDDAT3, __x)
++#define DSI_DIRECT_CMD_RD_PROPERTY 0x00000084
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE_SHIFT 0
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE_MASK 0x0000FFFF
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_PROPERTY, RD_SIZE, __x)
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_ID_SHIFT 16
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_ID_MASK 0x00030000
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_ID(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_PROPERTY, RD_ID, __x)
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_DCSNOTGENERIC_SHIFT 18
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_DCSNOTGENERIC_MASK 0x00040000
++#define DSI_DIRECT_CMD_RD_PROPERTY_RD_DCSNOTGENERIC(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_PROPERTY, RD_DCSNOTGENERIC, __x)
++#define DSI_DIRECT_CMD_RD_STS 0x00000088
++#define DSI_DIRECT_CMD_RD_STS_ERR_FIXED_SHIFT 0
++#define DSI_DIRECT_CMD_RD_STS_ERR_FIXED_MASK 0x00000001
++#define DSI_DIRECT_CMD_RD_STS_ERR_FIXED(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_FIXED, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_UNCORRECTABLE_SHIFT 1
++#define DSI_DIRECT_CMD_RD_STS_ERR_UNCORRECTABLE_MASK 0x00000002
++#define DSI_DIRECT_CMD_RD_STS_ERR_UNCORRECTABLE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_UNCORRECTABLE, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_CHECKSUM_SHIFT 2
++#define DSI_DIRECT_CMD_RD_STS_ERR_CHECKSUM_MASK 0x00000004
++#define DSI_DIRECT_CMD_RD_STS_ERR_CHECKSUM(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_CHECKSUM, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_UNDECODABLE_SHIFT 3
++#define DSI_DIRECT_CMD_RD_STS_ERR_UNDECODABLE_MASK 0x00000008
++#define DSI_DIRECT_CMD_RD_STS_ERR_UNDECODABLE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_UNDECODABLE, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_RECEIVE_SHIFT 4
++#define DSI_DIRECT_CMD_RD_STS_ERR_RECEIVE_MASK 0x00000010
++#define DSI_DIRECT_CMD_RD_STS_ERR_RECEIVE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_RECEIVE, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_OVERSIZE_SHIFT 5
++#define DSI_DIRECT_CMD_RD_STS_ERR_OVERSIZE_MASK 0x00000020
++#define DSI_DIRECT_CMD_RD_STS_ERR_OVERSIZE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_OVERSIZE, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_WRONG_LENGTH_SHIFT 6
++#define DSI_DIRECT_CMD_RD_STS_ERR_WRONG_LENGTH_MASK 0x00000040
++#define DSI_DIRECT_CMD_RD_STS_ERR_WRONG_LENGTH(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_WRONG_LENGTH, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_MISSING_EOT_SHIFT 7
++#define DSI_DIRECT_CMD_RD_STS_ERR_MISSING_EOT_MASK 0x00000080
++#define DSI_DIRECT_CMD_RD_STS_ERR_MISSING_EOT(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_MISSING_EOT, __x)
++#define DSI_DIRECT_CMD_RD_STS_ERR_EOT_WITH_ERR_SHIFT 8
++#define DSI_DIRECT_CMD_RD_STS_ERR_EOT_WITH_ERR_MASK 0x00000100
++#define DSI_DIRECT_CMD_RD_STS_ERR_EOT_WITH_ERR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS, ERR_EOT_WITH_ERR, __x)
++#define DSI_MCTL_MAIN_STS_CTL 0x000000F0
++#define DSI_MCTL_MAIN_STS_CTL_PLL_LOCK_EN_SHIFT 0
++#define DSI_MCTL_MAIN_STS_CTL_PLL_LOCK_EN_MASK 0x00000001
++#define DSI_MCTL_MAIN_STS_CTL_PLL_LOCK_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, PLL_LOCK_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_CLKLANE_READY_EN_SHIFT 1
++#define DSI_MCTL_MAIN_STS_CTL_CLKLANE_READY_EN_MASK 0x00000002
++#define DSI_MCTL_MAIN_STS_CTL_CLKLANE_READY_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, CLKLANE_READY_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_DAT1_READY_EN_SHIFT 2
++#define DSI_MCTL_MAIN_STS_CTL_DAT1_READY_EN_MASK 0x00000004
++#define DSI_MCTL_MAIN_STS_CTL_DAT1_READY_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, DAT1_READY_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_DAT2_READY_EN_SHIFT 3
++#define DSI_MCTL_MAIN_STS_CTL_DAT2_READY_EN_MASK 0x00000008
++#define DSI_MCTL_MAIN_STS_CTL_DAT2_READY_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, DAT2_READY_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_HSTX_TO_ERR_EN_SHIFT 4
++#define DSI_MCTL_MAIN_STS_CTL_HSTX_TO_ERR_EN_MASK 0x00000010
++#define DSI_MCTL_MAIN_STS_CTL_HSTX_TO_ERR_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, HSTX_TO_ERR_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_LPRX_TO_ERR_EN_SHIFT 5
++#define DSI_MCTL_MAIN_STS_CTL_LPRX_TO_ERR_EN_MASK 0x00000020
++#define DSI_MCTL_MAIN_STS_CTL_LPRX_TO_ERR_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, LPRX_TO_ERR_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_CRS_UNTERM_PCK_ERR_EN_SHIFT 6
++#define DSI_MCTL_MAIN_STS_CTL_CRS_UNTERM_PCK_ERR_EN_MASK 0x00000040
++#define DSI_MCTL_MAIN_STS_CTL_CRS_UNTERM_PCK_ERR_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, CRS_UNTERM_PCK_ERR_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_VRS_UNTERM_PCK_ERR_EN_SHIFT 7
++#define DSI_MCTL_MAIN_STS_CTL_VRS_UNTERM_PCK_ERR_EN_MASK 0x00000080
++#define DSI_MCTL_MAIN_STS_CTL_VRS_UNTERM_PCK_ERR_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, VRS_UNTERM_PCK_ERR_EN, __x)
++#define DSI_MCTL_MAIN_STS_CTL_PLL_LOCK_EDGE_SHIFT 16
++#define DSI_MCTL_MAIN_STS_CTL_PLL_LOCK_EDGE_MASK 0x00010000
++#define DSI_MCTL_MAIN_STS_CTL_PLL_LOCK_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, PLL_LOCK_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CTL_CLKLANE_READY_EDGE_SHIFT 17
++#define DSI_MCTL_MAIN_STS_CTL_CLKLANE_READY_EDGE_MASK 0x00020000
++#define DSI_MCTL_MAIN_STS_CTL_CLKLANE_READY_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, CLKLANE_READY_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CTL_DAT1_READY_EDGE_SHIFT 18
++#define DSI_MCTL_MAIN_STS_CTL_DAT1_READY_EDGE_MASK 0x00040000
++#define DSI_MCTL_MAIN_STS_CTL_DAT1_READY_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, DAT1_READY_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CTL_DAT2_READY_EDGE_SHIFT 19
++#define DSI_MCTL_MAIN_STS_CTL_DAT2_READY_EDGE_MASK 0x00080000
++#define DSI_MCTL_MAIN_STS_CTL_DAT2_READY_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, DAT2_READY_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CTL_HSTX_TO_ERR_EDGE_SHIFT 20
++#define DSI_MCTL_MAIN_STS_CTL_HSTX_TO_ERR_EDGE_MASK 0x00100000
++#define DSI_MCTL_MAIN_STS_CTL_HSTX_TO_ERR_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, HSTX_TO_ERR_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CTL_LPRX_TO_ERR_EDGE_SHIFT 21
++#define DSI_MCTL_MAIN_STS_CTL_LPRX_TO_ERR_EDGE_MASK 0x00200000
++#define DSI_MCTL_MAIN_STS_CTL_LPRX_TO_ERR_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, LPRX_TO_ERR_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CTL_CRS_UNTERM_PCK_ERR_EDGE_SHIFT 22
++#define DSI_MCTL_MAIN_STS_CTL_CRS_UNTERM_PCK_ERR_EDGE_MASK 0x00400000
++#define DSI_MCTL_MAIN_STS_CTL_CRS_UNTERM_PCK_ERR_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, CRS_UNTERM_PCK_ERR_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CTL_VRS_UNTERM_PCK_ERR_EDGE_SHIFT 23
++#define DSI_MCTL_MAIN_STS_CTL_VRS_UNTERM_PCK_ERR_EDGE_MASK 0x00800000
++#define DSI_MCTL_MAIN_STS_CTL_VRS_UNTERM_PCK_ERR_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CTL, VRS_UNTERM_PCK_ERR_EDGE, __x)
++#define DSI_CMD_MODE_STS_CTL 0x000000F4
++#define DSI_CMD_MODE_STS_CTL_ERR_NO_TE_EN_SHIFT 0
++#define DSI_CMD_MODE_STS_CTL_ERR_NO_TE_EN_MASK 0x00000001
++#define DSI_CMD_MODE_STS_CTL_ERR_NO_TE_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_NO_TE_EN, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_TE_MISS_EN_SHIFT 1
++#define DSI_CMD_MODE_STS_CTL_ERR_TE_MISS_EN_MASK 0x00000002
++#define DSI_CMD_MODE_STS_CTL_ERR_TE_MISS_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_TE_MISS_EN, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI1_UNDERRUN_EN_SHIFT 2
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI1_UNDERRUN_EN_MASK 0x00000004
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI1_UNDERRUN_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_SDI1_UNDERRUN_EN, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI2_UNDERRUN_EN_SHIFT 3
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI2_UNDERRUN_EN_MASK 0x00000008
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI2_UNDERRUN_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_SDI2_UNDERRUN_EN, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_UNWANTED_RD_EN_SHIFT 4
++#define DSI_CMD_MODE_STS_CTL_ERR_UNWANTED_RD_EN_MASK 0x00000010
++#define DSI_CMD_MODE_STS_CTL_ERR_UNWANTED_RD_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_UNWANTED_RD_EN, __x)
++#define DSI_CMD_MODE_STS_CTL_CSM_RUNNING_EN_SHIFT 5
++#define DSI_CMD_MODE_STS_CTL_CSM_RUNNING_EN_MASK 0x00000020
++#define DSI_CMD_MODE_STS_CTL_CSM_RUNNING_EN(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, CSM_RUNNING_EN, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_NO_TE_EDGE_SHIFT 16
++#define DSI_CMD_MODE_STS_CTL_ERR_NO_TE_EDGE_MASK 0x00010000
++#define DSI_CMD_MODE_STS_CTL_ERR_NO_TE_EDGE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_NO_TE_EDGE, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_TE_MISS_EDGE_SHIFT 17
++#define DSI_CMD_MODE_STS_CTL_ERR_TE_MISS_EDGE_MASK 0x00020000
++#define DSI_CMD_MODE_STS_CTL_ERR_TE_MISS_EDGE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_TE_MISS_EDGE, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI1_UNDERRUN_EDGE_SHIFT 18
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI1_UNDERRUN_EDGE_MASK 0x00040000
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI1_UNDERRUN_EDGE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_SDI1_UNDERRUN_EDGE, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI2_UNDERRUN_EDGE_SHIFT 19
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI2_UNDERRUN_EDGE_MASK 0x00080000
++#define DSI_CMD_MODE_STS_CTL_ERR_SDI2_UNDERRUN_EDGE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_SDI2_UNDERRUN_EDGE, __x)
++#define DSI_CMD_MODE_STS_CTL_ERR_UNWANTED_RD_EDGE_SHIFT 20
++#define DSI_CMD_MODE_STS_CTL_ERR_UNWANTED_RD_EDGE_MASK 0x00100000
++#define DSI_CMD_MODE_STS_CTL_ERR_UNWANTED_RD_EDGE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, ERR_UNWANTED_RD_EDGE, __x)
++#define DSI_CMD_MODE_STS_CTL_CSM_RUNNING_EDGE_SHIFT 21
++#define DSI_CMD_MODE_STS_CTL_CSM_RUNNING_EDGE_MASK 0x00200000
++#define DSI_CMD_MODE_STS_CTL_CSM_RUNNING_EDGE(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CTL, CSM_RUNNING_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL 0x000000F8
++#define DSI_DIRECT_CMD_STS_CTL_CMD_TRANSMISSION_EN_SHIFT 0
++#define DSI_DIRECT_CMD_STS_CTL_CMD_TRANSMISSION_EN_MASK 0x00000001
++#define DSI_DIRECT_CMD_STS_CTL_CMD_TRANSMISSION_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, CMD_TRANSMISSION_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_WRITE_COMPLETED_EN_SHIFT 1
++#define DSI_DIRECT_CMD_STS_CTL_WRITE_COMPLETED_EN_MASK 0x00000002
++#define DSI_DIRECT_CMD_STS_CTL_WRITE_COMPLETED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, WRITE_COMPLETED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_COMPLETED_EN_SHIFT 2
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_COMPLETED_EN_MASK 0x00000004
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_COMPLETED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, TRIGGER_COMPLETED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_EN_SHIFT 3
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_EN_MASK 0x00000008
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, READ_COMPLETED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_RECEIVED_EN_SHIFT 4
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_RECEIVED_EN_MASK 0x00000010
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_RECEIVED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, ACKNOWLEDGE_RECEIVED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_WITH_ERR_EN_SHIFT 5
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_WITH_ERR_EN_MASK 0x00000020
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_WITH_ERR_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, ACKNOWLEDGE_WITH_ERR_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_RECEIVED_EN_SHIFT 6
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_RECEIVED_EN_MASK 0x00000040
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_RECEIVED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, TRIGGER_RECEIVED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_TE_RECEIVED_EN_SHIFT 7
++#define DSI_DIRECT_CMD_STS_CTL_TE_RECEIVED_EN_MASK 0x00000080
++#define DSI_DIRECT_CMD_STS_CTL_TE_RECEIVED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, TE_RECEIVED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_BTA_COMPLETED_EN_SHIFT 8
++#define DSI_DIRECT_CMD_STS_CTL_BTA_COMPLETED_EN_MASK 0x00000100
++#define DSI_DIRECT_CMD_STS_CTL_BTA_COMPLETED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, BTA_COMPLETED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_BTA_FINISHED_EN_SHIFT 9
++#define DSI_DIRECT_CMD_STS_CTL_BTA_FINISHED_EN_MASK 0x00000200
++#define DSI_DIRECT_CMD_STS_CTL_BTA_FINISHED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, BTA_FINISHED_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_WITH_ERR_EN_SHIFT 10
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_WITH_ERR_EN_MASK 0x00000400
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_WITH_ERR_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, READ_COMPLETED_WITH_ERR_EN, __x)
++#define DSI_DIRECT_CMD_STS_CTL_CMD_TRANSMISSION_EDGE_SHIFT 16
++#define DSI_DIRECT_CMD_STS_CTL_CMD_TRANSMISSION_EDGE_MASK 0x00010000
++#define DSI_DIRECT_CMD_STS_CTL_CMD_TRANSMISSION_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, CMD_TRANSMISSION_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_WRITE_COMPLETED_EDGE_SHIFT 17
++#define DSI_DIRECT_CMD_STS_CTL_WRITE_COMPLETED_EDGE_MASK 0x00020000
++#define DSI_DIRECT_CMD_STS_CTL_WRITE_COMPLETED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, WRITE_COMPLETED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_COMPLETED_EDGE_SHIFT 18
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_COMPLETED_EDGE_MASK 0x00040000
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_COMPLETED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, TRIGGER_COMPLETED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_EDGE_SHIFT 19
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_EDGE_MASK 0x00080000
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, READ_COMPLETED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_RECEIVED_EDGE_SHIFT 20
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_RECEIVED_EDGE_MASK 0x00100000
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_RECEIVED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, ACKNOWLEDGE_RECEIVED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_WITH_ERR_EDGE_SHIFT 21
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_WITH_ERR_EDGE_MASK 0x00200000
++#define DSI_DIRECT_CMD_STS_CTL_ACKNOWLEDGE_WITH_ERR_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, ACKNOWLEDGE_WITH_ERR_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_RECEIVED_EDGE_SHIFT 22
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_RECEIVED_EDGE_MASK 0x00400000
++#define DSI_DIRECT_CMD_STS_CTL_TRIGGER_RECEIVED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, TRIGGER_RECEIVED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_TE_RECEIVED_EDGE_SHIFT 23
++#define DSI_DIRECT_CMD_STS_CTL_TE_RECEIVED_EDGE_MASK 0x00800000
++#define DSI_DIRECT_CMD_STS_CTL_TE_RECEIVED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, TE_RECEIVED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_BTA_COMPLETED_EDGE_SHIFT 24
++#define DSI_DIRECT_CMD_STS_CTL_BTA_COMPLETED_EDGE_MASK 0x01000000
++#define DSI_DIRECT_CMD_STS_CTL_BTA_COMPLETED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, BTA_COMPLETED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_BTA_FINISHED_EDGE_SHIFT 25
++#define DSI_DIRECT_CMD_STS_CTL_BTA_FINISHED_EDGE_MASK 0x02000000
++#define DSI_DIRECT_CMD_STS_CTL_BTA_FINISHED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, BTA_FINISHED_EDGE, __x)
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_WITH_ERR_EDGE_SHIFT 26
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_WITH_ERR_EDGE_MASK 0x04000000
++#define DSI_DIRECT_CMD_STS_CTL_READ_COMPLETED_WITH_ERR_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CTL, READ_COMPLETED_WITH_ERR_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL 0x000000FC
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_FIXED_EN_SHIFT 0
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_FIXED_EN_MASK 0x00000001
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_FIXED_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_FIXED_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNCORRECTABLE_EN_SHIFT 1
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNCORRECTABLE_EN_MASK 0x00000002
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNCORRECTABLE_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_UNCORRECTABLE_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_CHECKSUM_EN_SHIFT 2
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_CHECKSUM_EN_MASK 0x00000004
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_CHECKSUM_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_CHECKSUM_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNDECODABLE_EN_SHIFT 3
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNDECODABLE_EN_MASK 0x00000008
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNDECODABLE_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_UNDECODABLE_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_RECEIVE_EN_SHIFT 4
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_RECEIVE_EN_MASK 0x00000010
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_RECEIVE_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_RECEIVE_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_OVERSIZE_EN_SHIFT 5
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_OVERSIZE_EN_MASK 0x00000020
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_OVERSIZE_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_OVERSIZE_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_WRONG_LENGTH_EN_SHIFT 6
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_WRONG_LENGTH_EN_MASK 0x00000040
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_WRONG_LENGTH_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_WRONG_LENGTH_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_MISSING_EOT_EN_SHIFT 7
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_MISSING_EOT_EN_MASK 0x00000080
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_MISSING_EOT_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_MISSING_EOT_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_EOT_WITH_ERR_EN_SHIFT 8
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_EOT_WITH_ERR_EN_MASK 0x00000100
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_EOT_WITH_ERR_EN(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_EOT_WITH_ERR_EN, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_FIXED_EDGE_SHIFT 16
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_FIXED_EDGE_MASK 0x00010000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_FIXED_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_FIXED_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNCORRECTABLE_EDGE_SHIFT 17
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNCORRECTABLE_EDGE_MASK 0x00020000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNCORRECTABLE_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_UNCORRECTABLE_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_CHECKSUM_EDGE_SHIFT 18
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_CHECKSUM_EDGE_MASK 0x00040000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_CHECKSUM_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_CHECKSUM_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNDECODABLE_EDGE_SHIFT 19
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNDECODABLE_EDGE_MASK 0x00080000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_UNDECODABLE_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_UNDECODABLE_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_RECEIVE_EDGE_SHIFT 20
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_RECEIVE_EDGE_MASK 0x00100000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_RECEIVE_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_RECEIVE_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_OVERSIZE_EDGE_SHIFT 21
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_OVERSIZE_EDGE_MASK 0x00200000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_OVERSIZE_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_OVERSIZE_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_WRONG_LENGTH_EDGE_SHIFT 22
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_WRONG_LENGTH_EDGE_MASK 0x00400000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_WRONG_LENGTH_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_WRONG_LENGTH_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_MISSING_EOT_EDGE_SHIFT 23
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_MISSING_EOT_EDGE_MASK 0x00800000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_MISSING_EOT_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_MISSING_EOT_EDGE, __x)
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_EOT_WITH_ERR_EDGE_SHIFT 24
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_EOT_WITH_ERR_EDGE_MASK 0x01000000
++#define DSI_DIRECT_CMD_RD_STS_CTL_ERR_EOT_WITH_ERR_EDGE(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CTL, ERR_EOT_WITH_ERR_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL 0x00000108
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_1_EN_SHIFT 6
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_1_EN_MASK 0x00000040
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_1_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_ESC_1_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_2_EN_SHIFT 7
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_2_EN_MASK 0x00000080
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_ESC_2_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_1_EN_SHIFT 8
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_1_EN_MASK 0x00000100
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_1_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_SYNCESC_1_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_2_EN_SHIFT 9
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_2_EN_MASK 0x00000200
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_SYNCESC_2_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_1_EN_SHIFT 10
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_1_EN_MASK 0x00000400
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_1_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONTROL_1_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_2_EN_SHIFT 11
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_2_EN_MASK 0x00000800
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONTROL_2_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_1_EN_SHIFT 12
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_1_EN_MASK 0x00001000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_1_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP0_1_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_2_EN_SHIFT 13
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_2_EN_MASK 0x00002000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP0_2_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_1_EN_SHIFT 14
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_1_EN_MASK 0x00004000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_1_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP1_1_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_2_EN_SHIFT 15
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_2_EN_MASK 0x00008000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_2_EN(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP1_2_EN, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_1_EDGE_SHIFT 22
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_1_EDGE_MASK 0x00400000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_1_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_ESC_1_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_2_EDGE_SHIFT 23
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_2_EDGE_MASK 0x00800000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_ESC_2_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_ESC_2_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_1_EDGE_SHIFT 24
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_1_EDGE_MASK 0x01000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_1_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_SYNCESC_1_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_2_EDGE_SHIFT 25
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_2_EDGE_MASK 0x02000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_SYNCESC_2_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_SYNCESC_2_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_1_EDGE_SHIFT 26
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_1_EDGE_MASK 0x04000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_1_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONTROL_1_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_2_EDGE_SHIFT 27
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_2_EDGE_MASK 0x08000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONTROL_2_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONTROL_2_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_1_EDGE_SHIFT 28
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_1_EDGE_MASK 0x10000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_1_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP0_1_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_2_EDGE_SHIFT 29
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_2_EDGE_MASK 0x20000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP0_2_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP0_2_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_1_EDGE_SHIFT 30
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_1_EDGE_MASK 0x40000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_1_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP1_1_EDGE, __x)
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_2_EDGE_SHIFT 31
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_2_EDGE_MASK 0x80000000
++#define DSI_MCTL_DHPY_ERR_CTL_ERR_CONT_LP1_2_EDGE(__x) \
++	DSI_VAL2REG(DSI_MCTL_DHPY_ERR_CTL, ERR_CONT_LP1_2_EDGE, __x)
++#define DSI_MCTL_MAIN_STS_CLR 0x00000110
++#define DSI_MCTL_MAIN_STS_CLR_PLL_LOCK_CLR_SHIFT 0
++#define DSI_MCTL_MAIN_STS_CLR_PLL_LOCK_CLR_MASK 0x00000001
++#define DSI_MCTL_MAIN_STS_CLR_PLL_LOCK_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, PLL_LOCK_CLR, __x)
++#define DSI_MCTL_MAIN_STS_CLR_CLKLANE_READY_CLR_SHIFT 1
++#define DSI_MCTL_MAIN_STS_CLR_CLKLANE_READY_CLR_MASK 0x00000002
++#define DSI_MCTL_MAIN_STS_CLR_CLKLANE_READY_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, CLKLANE_READY_CLR, __x)
++#define DSI_MCTL_MAIN_STS_CLR_DAT1_READY_CLR_SHIFT 2
++#define DSI_MCTL_MAIN_STS_CLR_DAT1_READY_CLR_MASK 0x00000004
++#define DSI_MCTL_MAIN_STS_CLR_DAT1_READY_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, DAT1_READY_CLR, __x)
++#define DSI_MCTL_MAIN_STS_CLR_DAT2_READY_CLR_SHIFT 3
++#define DSI_MCTL_MAIN_STS_CLR_DAT2_READY_CLR_MASK 0x00000008
++#define DSI_MCTL_MAIN_STS_CLR_DAT2_READY_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, DAT2_READY_CLR, __x)
++#define DSI_MCTL_MAIN_STS_CLR_HSTX_TO_ERR_CLR_SHIFT 4
++#define DSI_MCTL_MAIN_STS_CLR_HSTX_TO_ERR_CLR_MASK 0x00000010
++#define DSI_MCTL_MAIN_STS_CLR_HSTX_TO_ERR_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, HSTX_TO_ERR_CLR, __x)
++#define DSI_MCTL_MAIN_STS_CLR_LPRX_TO_ERR_CLR_SHIFT 5
++#define DSI_MCTL_MAIN_STS_CLR_LPRX_TO_ERR_CLR_MASK 0x00000020
++#define DSI_MCTL_MAIN_STS_CLR_LPRX_TO_ERR_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, LPRX_TO_ERR_CLR, __x)
++#define DSI_MCTL_MAIN_STS_CLR_CRS_UNTERM_PCK_CLR_SHIFT 6
++#define DSI_MCTL_MAIN_STS_CLR_CRS_UNTERM_PCK_CLR_MASK 0x00000040
++#define DSI_MCTL_MAIN_STS_CLR_CRS_UNTERM_PCK_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, CRS_UNTERM_PCK_CLR, __x)
++#define DSI_MCTL_MAIN_STS_CLR_VRS_UNTERM_PCK_CLR_SHIFT 7
++#define DSI_MCTL_MAIN_STS_CLR_VRS_UNTERM_PCK_CLR_MASK 0x00000080
++#define DSI_MCTL_MAIN_STS_CLR_VRS_UNTERM_PCK_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_CLR, VRS_UNTERM_PCK_CLR, __x)
++#define DSI_CMD_MODE_STS_CLR 0x00000114
++#define DSI_CMD_MODE_STS_CLR_ERR_NO_TE_CLR_SHIFT 0
++#define DSI_CMD_MODE_STS_CLR_ERR_NO_TE_CLR_MASK 0x00000001
++#define DSI_CMD_MODE_STS_CLR_ERR_NO_TE_CLR(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CLR, ERR_NO_TE_CLR, __x)
++#define DSI_CMD_MODE_STS_CLR_ERR_TE_MISS_CLR_SHIFT 1
++#define DSI_CMD_MODE_STS_CLR_ERR_TE_MISS_CLR_MASK 0x00000002
++#define DSI_CMD_MODE_STS_CLR_ERR_TE_MISS_CLR(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CLR, ERR_TE_MISS_CLR, __x)
++#define DSI_CMD_MODE_STS_CLR_ERR_SDI1_UNDERRUN_CLR_SHIFT 2
++#define DSI_CMD_MODE_STS_CLR_ERR_SDI1_UNDERRUN_CLR_MASK 0x00000004
++#define DSI_CMD_MODE_STS_CLR_ERR_SDI1_UNDERRUN_CLR(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CLR, ERR_SDI1_UNDERRUN_CLR, __x)
++#define DSI_CMD_MODE_STS_CLR_ERR_SDI2_UNDERRUN_CLR_SHIFT 3
++#define DSI_CMD_MODE_STS_CLR_ERR_SDI2_UNDERRUN_CLR_MASK 0x00000008
++#define DSI_CMD_MODE_STS_CLR_ERR_SDI2_UNDERRUN_CLR(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CLR, ERR_SDI2_UNDERRUN_CLR, __x)
++#define DSI_CMD_MODE_STS_CLR_ERR_UNWANTED_RD_CLR_SHIFT 4
++#define DSI_CMD_MODE_STS_CLR_ERR_UNWANTED_RD_CLR_MASK 0x00000010
++#define DSI_CMD_MODE_STS_CLR_ERR_UNWANTED_RD_CLR(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CLR, ERR_UNWANTED_RD_CLR, __x)
++#define DSI_CMD_MODE_STS_CLR_CSM_RUNNING_CLR_SHIFT 5
++#define DSI_CMD_MODE_STS_CLR_CSM_RUNNING_CLR_MASK 0x00000020
++#define DSI_CMD_MODE_STS_CLR_CSM_RUNNING_CLR(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_CLR, CSM_RUNNING_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR 0x00000118
++#define DSI_DIRECT_CMD_STS_CLR_CMD_TRANSMISSION_CLR_SHIFT 0
++#define DSI_DIRECT_CMD_STS_CLR_CMD_TRANSMISSION_CLR_MASK 0x00000001
++#define DSI_DIRECT_CMD_STS_CLR_CMD_TRANSMISSION_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, CMD_TRANSMISSION_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_WRITE_COMPLETED_CLR_SHIFT 1
++#define DSI_DIRECT_CMD_STS_CLR_WRITE_COMPLETED_CLR_MASK 0x00000002
++#define DSI_DIRECT_CMD_STS_CLR_WRITE_COMPLETED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, WRITE_COMPLETED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_TRIGGER_COMPLETED_CLR_SHIFT 2
++#define DSI_DIRECT_CMD_STS_CLR_TRIGGER_COMPLETED_CLR_MASK 0x00000004
++#define DSI_DIRECT_CMD_STS_CLR_TRIGGER_COMPLETED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, TRIGGER_COMPLETED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_READ_COMPLETED_CLR_SHIFT 3
++#define DSI_DIRECT_CMD_STS_CLR_READ_COMPLETED_CLR_MASK 0x00000008
++#define DSI_DIRECT_CMD_STS_CLR_READ_COMPLETED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, READ_COMPLETED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_ACKNOWLEDGE_RECEIVED_CLR_SHIFT 4
++#define DSI_DIRECT_CMD_STS_CLR_ACKNOWLEDGE_RECEIVED_CLR_MASK 0x00000010
++#define DSI_DIRECT_CMD_STS_CLR_ACKNOWLEDGE_RECEIVED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, ACKNOWLEDGE_RECEIVED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_ACKNOWLEDGE_WITH_ERR_RECEIVED_CLR_SHIFT 5
++#define DSI_DIRECT_CMD_STS_CLR_ACKNOWLEDGE_WITH_ERR_RECEIVED_CLR_MASK 0x00000020
++#define DSI_DIRECT_CMD_STS_CLR_ACKNOWLEDGE_WITH_ERR_RECEIVED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, ACKNOWLEDGE_WITH_ERR_RECEIVED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_TRIGGER_RECEIVED_CLR_SHIFT 6
++#define DSI_DIRECT_CMD_STS_CLR_TRIGGER_RECEIVED_CLR_MASK 0x00000040
++#define DSI_DIRECT_CMD_STS_CLR_TRIGGER_RECEIVED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, TRIGGER_RECEIVED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_TE_RECEIVED_CLR_SHIFT 7
++#define DSI_DIRECT_CMD_STS_CLR_TE_RECEIVED_CLR_MASK 0x00000080
++#define DSI_DIRECT_CMD_STS_CLR_TE_RECEIVED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, TE_RECEIVED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_BTA_COMPLETED_CLR_SHIFT 8
++#define DSI_DIRECT_CMD_STS_CLR_BTA_COMPLETED_CLR_MASK 0x00000100
++#define DSI_DIRECT_CMD_STS_CLR_BTA_COMPLETED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, BTA_COMPLETED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_BTA_FINISHED_CLR_SHIFT 9
++#define DSI_DIRECT_CMD_STS_CLR_BTA_FINISHED_CLR_MASK 0x00000200
++#define DSI_DIRECT_CMD_STS_CLR_BTA_FINISHED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, BTA_FINISHED_CLR, __x)
++#define DSI_DIRECT_CMD_STS_CLR_READ_COMPLETED_WITH_ERR_CLR_SHIFT 10
++#define DSI_DIRECT_CMD_STS_CLR_READ_COMPLETED_WITH_ERR_CLR_MASK 0x00000400
++#define DSI_DIRECT_CMD_STS_CLR_READ_COMPLETED_WITH_ERR_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_CLR, READ_COMPLETED_WITH_ERR_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR 0x0000011C
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_FIXED_CLR_SHIFT 0
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_FIXED_CLR_MASK 0x00000001
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_FIXED_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_FIXED_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_UNCORRECTABLE_CLR_SHIFT 1
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_UNCORRECTABLE_CLR_MASK 0x00000002
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_UNCORRECTABLE_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_UNCORRECTABLE_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_CHECKSUM_CLR_SHIFT 2
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_CHECKSUM_CLR_MASK 0x00000004
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_CHECKSUM_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_CHECKSUM_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_UNDECODABLE_CLR_SHIFT 3
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_UNDECODABLE_CLR_MASK 0x00000008
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_UNDECODABLE_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_UNDECODABLE_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_RECEIVE_CLR_SHIFT 4
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_RECEIVE_CLR_MASK 0x00000010
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_RECEIVE_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_RECEIVE_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_OVERSIZE_CLR_SHIFT 5
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_OVERSIZE_CLR_MASK 0x00000020
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_OVERSIZE_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_OVERSIZE_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_WRONG_LENGTH_CLR_SHIFT 6
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_WRONG_LENGTH_CLR_MASK 0x00000040
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_WRONG_LENGTH_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_WRONG_LENGTH_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_MISSING_EOT_CLR_SHIFT 7
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_MISSING_EOT_CLR_MASK 0x00000080
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_MISSING_EOT_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_MISSING_EOT_CLR, __x)
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_EOT_WITH_ERR_CLR_SHIFT 8
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_EOT_WITH_ERR_CLR_MASK 0x00000100
++#define DSI_DIRECT_CMD_RD_STS_CLR_ERR_EOT_WITH_ERR_CLR(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_CLR, ERR_EOT_WITH_ERR_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR 0x00000128
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_ESC_1_CLR_SHIFT 6
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_ESC_1_CLR_MASK 0x00000040
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_ESC_1_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_ESC_1_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_ESC_2_CLR_SHIFT 7
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_ESC_2_CLR_MASK 0x00000080
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_ESC_2_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_ESC_2_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_SYNCESC_1_CLR_SHIFT 8
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_SYNCESC_1_CLR_MASK 0x00000100
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_SYNCESC_1_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_SYNCESC_1_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_SYNCESC_2_CLR_SHIFT 9
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_SYNCESC_2_CLR_MASK 0x00000200
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_SYNCESC_2_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_SYNCESC_2_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONTROL_1_CLR_SHIFT 10
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONTROL_1_CLR_MASK 0x00000400
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONTROL_1_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_CONTROL_1_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONTROL_2_CLR_SHIFT 11
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONTROL_2_CLR_MASK 0x00000800
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONTROL_2_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_CONTROL_2_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP0_1_CLR_SHIFT 12
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP0_1_CLR_MASK 0x00001000
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP0_1_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_CONT_LP0_1_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP0_2_CLR_SHIFT 13
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP0_2_CLR_MASK 0x00002000
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP0_2_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_CONT_LP0_2_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP1_1_CLR_SHIFT 14
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP1_1_CLR_MASK 0x00004000
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP1_1_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_CONT_LP1_1_CLR, __x)
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP1_2_CLR_SHIFT 15
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP1_2_CLR_MASK 0x00008000
++#define DSI_MCTL_DPHY_ERR_CLR_ERR_CONT_LP1_2_CLR(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_CLR, ERR_CONT_LP1_2_CLR, __x)
++#define DSI_MCTL_MAIN_STS_FLAG 0x00000130
++#define DSI_MCTL_MAIN_STS_FLAG_PLL_LOCK_FLAG_SHIFT 0
++#define DSI_MCTL_MAIN_STS_FLAG_PLL_LOCK_FLAG_MASK 0x00000001
++#define DSI_MCTL_MAIN_STS_FLAG_PLL_LOCK_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, PLL_LOCK_FLAG, __x)
++#define DSI_MCTL_MAIN_STS_FLAG_CLKLANE_READY_FLAG_SHIFT 1
++#define DSI_MCTL_MAIN_STS_FLAG_CLKLANE_READY_FLAG_MASK 0x00000002
++#define DSI_MCTL_MAIN_STS_FLAG_CLKLANE_READY_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, CLKLANE_READY_FLAG, __x)
++#define DSI_MCTL_MAIN_STS_FLAG_DAT1_READY_FLAG_SHIFT 2
++#define DSI_MCTL_MAIN_STS_FLAG_DAT1_READY_FLAG_MASK 0x00000004
++#define DSI_MCTL_MAIN_STS_FLAG_DAT1_READY_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, DAT1_READY_FLAG, __x)
++#define DSI_MCTL_MAIN_STS_FLAG_DAT2_READY_FLAG_SHIFT 3
++#define DSI_MCTL_MAIN_STS_FLAG_DAT2_READY_FLAG_MASK 0x00000008
++#define DSI_MCTL_MAIN_STS_FLAG_DAT2_READY_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, DAT2_READY_FLAG, __x)
++#define DSI_MCTL_MAIN_STS_FLAG_HSTX_TO_ERR_FLAG_SHIFT 4
++#define DSI_MCTL_MAIN_STS_FLAG_HSTX_TO_ERR_FLAG_MASK 0x00000010
++#define DSI_MCTL_MAIN_STS_FLAG_HSTX_TO_ERR_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, HSTX_TO_ERR_FLAG, __x)
++#define DSI_MCTL_MAIN_STS_FLAG_LPRX_TO_ERR_FLAG_SHIFT 5
++#define DSI_MCTL_MAIN_STS_FLAG_LPRX_TO_ERR_FLAG_MASK 0x00000020
++#define DSI_MCTL_MAIN_STS_FLAG_LPRX_TO_ERR_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, LPRX_TO_ERR_FLAG, __x)
++#define DSI_MCTL_MAIN_STS_FLAG_CRS_UNTERM_PCK_FLAG_SHIFT 6
++#define DSI_MCTL_MAIN_STS_FLAG_CRS_UNTERM_PCK_FLAG_MASK 0x00000040
++#define DSI_MCTL_MAIN_STS_FLAG_CRS_UNTERM_PCK_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, CRS_UNTERM_PCK_FLAG, __x)
++#define DSI_MCTL_MAIN_STS_FLAG_VRS_UNTERM_PCK_FLAG_SHIFT 7
++#define DSI_MCTL_MAIN_STS_FLAG_VRS_UNTERM_PCK_FLAG_MASK 0x00000080
++#define DSI_MCTL_MAIN_STS_FLAG_VRS_UNTERM_PCK_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_MAIN_STS_FLAG, VRS_UNTERM_PCK_FLAG, __x)
++#define DSI_CMD_MODE_STS_FLAG 0x00000134
++#define DSI_CMD_MODE_STS_FLAG_ERR_NO_TE_FLAG_SHIFT 0
++#define DSI_CMD_MODE_STS_FLAG_ERR_NO_TE_FLAG_MASK 0x00000001
++#define DSI_CMD_MODE_STS_FLAG_ERR_NO_TE_FLAG(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_FLAG, ERR_NO_TE_FLAG, __x)
++#define DSI_CMD_MODE_STS_FLAG_ERR_TE_MISS_FLAG_SHIFT 1
++#define DSI_CMD_MODE_STS_FLAG_ERR_TE_MISS_FLAG_MASK 0x00000002
++#define DSI_CMD_MODE_STS_FLAG_ERR_TE_MISS_FLAG(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_FLAG, ERR_TE_MISS_FLAG, __x)
++#define DSI_CMD_MODE_STS_FLAG_ERR_SDI1_UNDERRUN_FLAG_SHIFT 2
++#define DSI_CMD_MODE_STS_FLAG_ERR_SDI1_UNDERRUN_FLAG_MASK 0x00000004
++#define DSI_CMD_MODE_STS_FLAG_ERR_SDI1_UNDERRUN_FLAG(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_FLAG, ERR_SDI1_UNDERRUN_FLAG, __x)
++#define DSI_CMD_MODE_STS_FLAG_ERR_SDI2_UNDERRUN_FLAG_SHIFT 3
++#define DSI_CMD_MODE_STS_FLAG_ERR_SDI2_UNDERRUN_FLAG_MASK 0x00000008
++#define DSI_CMD_MODE_STS_FLAG_ERR_SDI2_UNDERRUN_FLAG(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_FLAG, ERR_SDI2_UNDERRUN_FLAG, __x)
++#define DSI_CMD_MODE_STS_FLAG_ERR_UNWANTED_RD_FLAG_SHIFT 4
++#define DSI_CMD_MODE_STS_FLAG_ERR_UNWANTED_RD_FLAG_MASK 0x00000010
++#define DSI_CMD_MODE_STS_FLAG_ERR_UNWANTED_RD_FLAG(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_FLAG, ERR_UNWANTED_RD_FLAG, __x)
++#define DSI_CMD_MODE_STS_FLAG_CSM_RUNNING_FLAG_SHIFT 5
++#define DSI_CMD_MODE_STS_FLAG_CSM_RUNNING_FLAG_MASK 0x00000020
++#define DSI_CMD_MODE_STS_FLAG_CSM_RUNNING_FLAG(__x) \
++	DSI_VAL2REG(DSI_CMD_MODE_STS_FLAG, CSM_RUNNING_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG 0x00000138
++#define DSI_DIRECT_CMD_STS_FLAG_CMD_TRANSMISSION_FLAG_SHIFT 0
++#define DSI_DIRECT_CMD_STS_FLAG_CMD_TRANSMISSION_FLAG_MASK 0x00000001
++#define DSI_DIRECT_CMD_STS_FLAG_CMD_TRANSMISSION_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, CMD_TRANSMISSION_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_WRITE_COMPLETED_FLAG_SHIFT 1
++#define DSI_DIRECT_CMD_STS_FLAG_WRITE_COMPLETED_FLAG_MASK 0x00000002
++#define DSI_DIRECT_CMD_STS_FLAG_WRITE_COMPLETED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, WRITE_COMPLETED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_TRIGGER_COMPLETED_FLAG_SHIFT 2
++#define DSI_DIRECT_CMD_STS_FLAG_TRIGGER_COMPLETED_FLAG_MASK 0x00000004
++#define DSI_DIRECT_CMD_STS_FLAG_TRIGGER_COMPLETED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, TRIGGER_COMPLETED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_READ_COMPLETED_FLAG_SHIFT 3
++#define DSI_DIRECT_CMD_STS_FLAG_READ_COMPLETED_FLAG_MASK 0x00000008
++#define DSI_DIRECT_CMD_STS_FLAG_READ_COMPLETED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, READ_COMPLETED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_ACKNOWLEDGE_RECEIVED_FLAG_SHIFT 4
++#define DSI_DIRECT_CMD_STS_FLAG_ACKNOWLEDGE_RECEIVED_FLAG_MASK 0x00000010
++#define DSI_DIRECT_CMD_STS_FLAG_ACKNOWLEDGE_RECEIVED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, ACKNOWLEDGE_RECEIVED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_ACKNOWLEDGE_WITH_ERR_RECEIVED_FLAG_SHIFT 5
++#define DSI_DIRECT_CMD_STS_FLAG_ACKNOWLEDGE_WITH_ERR_RECEIVED_FLAG_MASK 0x00000020
++#define DSI_DIRECT_CMD_STS_FLAG_ACKNOWLEDGE_WITH_ERR_RECEIVED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, ACKNOWLEDGE_WITH_ERR_RECEIVED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_TRIGGER_RECEIVED_FLAG_SHIFT 6
++#define DSI_DIRECT_CMD_STS_FLAG_TRIGGER_RECEIVED_FLAG_MASK 0x00000040
++#define DSI_DIRECT_CMD_STS_FLAG_TRIGGER_RECEIVED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, TRIGGER_RECEIVED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_TE_RECEIVED_FLAG_SHIFT 7
++#define DSI_DIRECT_CMD_STS_FLAG_TE_RECEIVED_FLAG_MASK 0x00000080
++#define DSI_DIRECT_CMD_STS_FLAG_TE_RECEIVED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, TE_RECEIVED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_BTA_COMPLETED_FLAG_SHIFT 8
++#define DSI_DIRECT_CMD_STS_FLAG_BTA_COMPLETED_FLAG_MASK 0x00000100
++#define DSI_DIRECT_CMD_STS_FLAG_BTA_COMPLETED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, BTA_COMPLETED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_BTA_FINISHED_FLAG_SHIFT 9
++#define DSI_DIRECT_CMD_STS_FLAG_BTA_FINISHED_FLAG_MASK 0x00000200
++#define DSI_DIRECT_CMD_STS_FLAG_BTA_FINISHED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, BTA_FINISHED_FLAG, __x)
++#define DSI_DIRECT_CMD_STS_FLAG_READ_COMPLETED_WITH_ERR_FLAG_SHIFT 10
++#define DSI_DIRECT_CMD_STS_FLAG_READ_COMPLETED_WITH_ERR_FLAG_MASK 0x00000400
++#define DSI_DIRECT_CMD_STS_FLAG_READ_COMPLETED_WITH_ERR_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_STS_FLAG, READ_COMPLETED_WITH_ERR_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG 0x0000013C
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_FIXED_FLAG_SHIFT 0
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_FIXED_FLAG_MASK 0x00000001
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_FIXED_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_FIXED_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_UNCORRECTABLE_FLAG_SHIFT 1
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_UNCORRECTABLE_FLAG_MASK 0x00000002
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_UNCORRECTABLE_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_UNCORRECTABLE_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_CHECKSUM_FLAG_SHIFT 2
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_CHECKSUM_FLAG_MASK 0x00000004
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_CHECKSUM_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_CHECKSUM_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_UNDECODABLE_FLAG_SHIFT 3
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_UNDECODABLE_FLAG_MASK 0x00000008
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_UNDECODABLE_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_UNDECODABLE_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_RECEIVE_FLAG_SHIFT 4
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_RECEIVE_FLAG_MASK 0x00000010
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_RECEIVE_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_RECEIVE_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_OVERSIZE_FLAG_SHIFT 5
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_OVERSIZE_FLAG_MASK 0x00000020
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_OVERSIZE_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_OVERSIZE_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_WRONG_LENGTH_FLAG_SHIFT 6
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_WRONG_LENGTH_FLAG_MASK 0x00000040
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_WRONG_LENGTH_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_WRONG_LENGTH_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_MISSING_EOT_FLAG_SHIFT 7
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_MISSING_EOT_FLAG_MASK 0x00000080
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_MISSING_EOT_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_MISSING_EOT_FLAG, __x)
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_EOT_WITH_ERR_FLAG_SHIFT 8
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_EOT_WITH_ERR_FLAG_MASK 0x00000100
++#define DSI_DIRECT_CMD_RD_STS_FLAG_ERR_EOT_WITH_ERR_FLAG(__x) \
++	DSI_VAL2REG(DSI_DIRECT_CMD_RD_STS_FLAG, ERR_EOT_WITH_ERR_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG 0x00000140
++#define DSI_VID_MODE_STS_FLAG_VSG_STS_FLAG_SHIFT 0
++#define DSI_VID_MODE_STS_FLAG_VSG_STS_FLAG_MASK 0x00000001
++#define DSI_VID_MODE_STS_FLAG_VSG_STS_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, VSG_STS_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_DATA_FLAG_SHIFT 1
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_DATA_FLAG_MASK 0x00000002
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_DATA_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, ERR_MISSING_DATA_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_HSYNC_FLAG_SHIFT 2
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_HSYNC_FLAG_MASK 0x00000004
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_HSYNC_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, ERR_MISSING_HSYNC_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_VSYNC_FLAG_SHIFT 3
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_VSYNC_FLAG_MASK 0x00000008
++#define DSI_VID_MODE_STS_FLAG_ERR_MISSING_VSYNC_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, ERR_MISSING_VSYNC_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_REG_ERR_SMALL_LENGTH_FLAG_SHIFT 4
++#define DSI_VID_MODE_STS_FLAG_REG_ERR_SMALL_LENGTH_FLAG_MASK 0x00000010
++#define DSI_VID_MODE_STS_FLAG_REG_ERR_SMALL_LENGTH_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, REG_ERR_SMALL_LENGTH_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_REG_ERR_SMALL_HEIGHT_FLAG_SHIFT 5
++#define DSI_VID_MODE_STS_FLAG_REG_ERR_SMALL_HEIGHT_FLAG_MASK 0x00000020
++#define DSI_VID_MODE_STS_FLAG_REG_ERR_SMALL_HEIGHT_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, REG_ERR_SMALL_HEIGHT_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_ERR_BURSTWRITE_FLAG_SHIFT 6
++#define DSI_VID_MODE_STS_FLAG_ERR_BURSTWRITE_FLAG_MASK 0x00000040
++#define DSI_VID_MODE_STS_FLAG_ERR_BURSTWRITE_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, ERR_BURSTWRITE_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_ERR_LONGWRITE_FLAG_SHIFT 7
++#define DSI_VID_MODE_STS_FLAG_ERR_LONGWRITE_FLAG_MASK 0x00000080
++#define DSI_VID_MODE_STS_FLAG_ERR_LONGWRITE_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, ERR_LONGWRITE_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_ERR_LONGREAD_FLAG_SHIFT 8
++#define DSI_VID_MODE_STS_FLAG_ERR_LONGREAD_FLAG_MASK 0x00000100
++#define DSI_VID_MODE_STS_FLAG_ERR_LONGREAD_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, ERR_LONGREAD_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_ERR_VRS_WRONG_LENGTH_FLAG_SHIFT 9
++#define DSI_VID_MODE_STS_FLAG_ERR_VRS_WRONG_LENGTH_FLAG_MASK 0x00000200
++#define DSI_VID_MODE_STS_FLAG_ERR_VRS_WRONG_LENGTH_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, ERR_VRS_WRONG_LENGTH_FLAG, __x)
++#define DSI_VID_MODE_STS_FLAG_VSG_RECOVERY_FLAG_SHIFT 10
++#define DSI_VID_MODE_STS_FLAG_VSG_RECOVERY_FLAG_MASK 0x00000400
++#define DSI_VID_MODE_STS_FLAG_VSG_RECOVERY_FLAG(__x) \
++	DSI_VAL2REG(DSI_VID_MODE_STS_FLAG, VSG_RECOVERY_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG 0x00000148
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_ESC_1_FLAG_SHIFT 6
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_ESC_1_FLAG_MASK 0x00000040
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_ESC_1_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_ESC_1_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_ESC_2_FLAG_SHIFT 7
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_ESC_2_FLAG_MASK 0x00000080
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_ESC_2_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_ESC_2_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_SYNCESC_1_FLAG_SHIFT 8
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_SYNCESC_1_FLAG_MASK 0x00000100
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_SYNCESC_1_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_SYNCESC_1_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_SYNCESC_2_FLAG_SHIFT 9
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_SYNCESC_2_FLAG_MASK 0x00000200
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_SYNCESC_2_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_SYNCESC_2_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONTROL_1_FLAG_SHIFT 10
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONTROL_1_FLAG_MASK 0x00000400
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONTROL_1_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_CONTROL_1_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONTROL_2_FLAG_SHIFT 11
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONTROL_2_FLAG_MASK 0x00000800
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONTROL_2_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_CONTROL_2_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP0_1_FLAG_SHIFT 12
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP0_1_FLAG_MASK 0x00001000
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP0_1_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_CONT_LP0_1_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP0_2_FLAG_SHIFT 13
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP0_2_FLAG_MASK 0x00002000
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP0_2_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_CONT_LP0_2_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP1_1_FLAG_SHIFT 14
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP1_1_FLAG_MASK 0x00004000
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP1_1_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_CONT_LP1_1_FLAG, __x)
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP1_2_FLAG_SHIFT 15
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP1_2_FLAG_MASK 0x00008000
++#define DSI_MCTL_DPHY_ERR_FLAG_ERR_CONT_LP1_2_FLAG(__x) \
++	DSI_VAL2REG(DSI_MCTL_DPHY_ERR_FLAG, ERR_CONT_LP1_2_FLAG, __x)
++#define DSI_DPHY_LANES_TRIM 0x00000150
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_DAT1_SHIFT 0
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_DAT1_MASK 0x00000003
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_DAT1(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_SKEW_DAT1, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_CD_OFF_DAT1_SHIFT 2
++#define DSI_DPHY_LANES_TRIM_DPHY_CD_OFF_DAT1_MASK 0x00000004
++#define DSI_DPHY_LANES_TRIM_DPHY_CD_OFF_DAT1(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_CD_OFF_DAT1, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_DAT1_SHIFT 3
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_DAT1_MASK 0x00000008
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_DAT1(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_HSTX_SLEWRATE_UP_DAT1, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_DAT1_SHIFT 4
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_DAT1_MASK 0x00000010
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_DAT1(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_HSTX_SLEWRATE_DOWN_DAT1, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_DAT1_SHIFT 5
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_DAT1_MASK 0x00000020
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_DAT1(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_TEST_RESERVED_1_DAT1, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_CLK_SHIFT 6
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_CLK_MASK 0x000000C0
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_CLK(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_SKEW_CLK, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_LP_RX_VIL_CLK_SHIFT 8
++#define DSI_DPHY_LANES_TRIM_DPHY_LP_RX_VIL_CLK_MASK 0x00000300
++#define DSI_DPHY_LANES_TRIM_DPHY_LP_RX_VIL_CLK(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_LP_RX_VIL_CLK, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_LP_TX_SLEWRATE_CLK_SHIFT 10
++#define DSI_DPHY_LANES_TRIM_DPHY_LP_TX_SLEWRATE_CLK_MASK 0x00000C00
++#define DSI_DPHY_LANES_TRIM_DPHY_LP_TX_SLEWRATE_CLK(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_LP_TX_SLEWRATE_CLK, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_SPECS_90_81B_SHIFT 12
++#define DSI_DPHY_LANES_TRIM_DPHY_SPECS_90_81B_MASK 0x00001000
++#define DSI_DPHY_LANES_TRIM_DPHY_SPECS_90_81B_0_81 0
++#define DSI_DPHY_LANES_TRIM_DPHY_SPECS_90_81B_0_90 1
++#define DSI_DPHY_LANES_TRIM_DPHY_SPECS_90_81B_ENUM(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_SPECS_90_81B, \
++	DSI_DPHY_LANES_TRIM_DPHY_SPECS_90_81B_##__x)
++#define DSI_DPHY_LANES_TRIM_DPHY_SPECS_90_81B(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_SPECS_90_81B, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_CLK_SHIFT 13
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_CLK_MASK 0x00002000
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_CLK(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_HSTX_SLEWRATE_UP_CLK, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_CLK_SHIFT 14
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_CLK_MASK 0x00004000
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_CLK(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_HSTX_SLEWRATE_DOWN_CLK, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_CLK_SHIFT 15
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_CLK_MASK 0x00008000
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_CLK(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_TEST_RESERVED_1_CLK, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_DAT2_SHIFT 16
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_DAT2_MASK 0x00030000
++#define DSI_DPHY_LANES_TRIM_DPHY_SKEW_DAT2(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_SKEW_DAT2, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_DAT2_SHIFT 18
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_DAT2_MASK 0x00040000
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_UP_DAT2(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_HSTX_SLEWRATE_UP_DAT2, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_DAT2_SHIFT 19
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_DAT2_MASK 0x00080000
++#define DSI_DPHY_LANES_TRIM_DPHY_HSTX_SLEWRATE_DOWN_DAT2(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_HSTX_SLEWRATE_DOWN_DAT2, __x)
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_DAT2_SHIFT 20
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_DAT2_MASK 0x00100000
++#define DSI_DPHY_LANES_TRIM_DPHY_TEST_RESERVED_1_DAT2(__x) \
++	DSI_VAL2REG(DSI_DPHY_LANES_TRIM, DPHY_TEST_RESERVED_1_DAT2, __x)
++#define DSI_ID_REG 0x00000FF0
++#define DSI_ID_REG_Y_SHIFT 0
++#define DSI_ID_REG_Y_MASK 0x0000000F
++#define DSI_ID_REG_Y(__x) \
++	DSI_VAL2REG(DSI_ID_REG, Y, __x)
++#define DSI_ID_REG_X_SHIFT 4
++#define DSI_ID_REG_X_MASK 0x000000F0
++#define DSI_ID_REG_X(__x) \
++	DSI_VAL2REG(DSI_ID_REG, X, __x)
++#define DSI_ID_REG_H_SHIFT 8
++#define DSI_ID_REG_H_MASK 0x00000300
++#define DSI_ID_REG_H(__x) \
++	DSI_VAL2REG(DSI_ID_REG, H, __x)
++#define DSI_ID_REG_PRODUCT_ID_SHIFT 10
++#define DSI_ID_REG_PRODUCT_ID_MASK 0x0003FC00
++#define DSI_ID_REG_PRODUCT_ID(__x) \
++	DSI_VAL2REG(DSI_ID_REG, PRODUCT_ID, __x)
++#define DSI_ID_REG_VENDOR_ID_SHIFT 18
++#define DSI_ID_REG_VENDOR_ID_MASK 0xFFFC0000
++#define DSI_ID_REG_VENDOR_ID(__x) \
++	DSI_VAL2REG(DSI_ID_REG, VENDOR_ID, __x)
++#define DSI_IP_CONF 0x00000FF4
++#define DSI_IP_CONF_FIFO_SIZE_SHIFT 0
++#define DSI_IP_CONF_FIFO_SIZE_MASK 0x0000003F
++#define DSI_IP_CONF_FIFO_SIZE(__x) \
++	DSI_VAL2REG(DSI_IP_CONF, FIFO_SIZE, __x)
 -- 
 1.6.3.3
