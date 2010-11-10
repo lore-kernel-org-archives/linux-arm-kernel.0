@@ -1,50 +1,43 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 10 Nov 2010 09:56:46 -0800
-Subject: [PATCH v3 10/13] OMAP: DMA: Convert DMA library into DMA platform
-	Driver
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7D81@dbde02.ent.ti.com>
-	(Manjunath Kondaiah G.'s message of "Wed, 10 Nov 2010 22:53:16 +0530")
-References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-11-git-send-email-manjugk@ti.com>
-	<8739rakubj.fsf@deeprootsystems.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CC0@dbde02.ent.ti.com>
-	<87sjz9cfkv.fsf@deeprootsystems.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7D81@dbde02.ent.ti.com>
-Message-ID: <878w11awpt.fsf@deeprootsystems.com>
+From: h-kanigeri2@ti.com (Hari Kanigeri)
+Date: Wed, 10 Nov 2010 12:00:12 -0600
+Subject: [PATCH 0/6] [v2] OMAP: mailbox: enhancements and fixes
+Message-ID: <1289412018-18860-1-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+Resending correcting the subject format based on Benoit's comment and
+fixing the over-indentation pointed out by Sergei.
+ 
+Thanks to Rene Sapiens and Omar Ramirez for their inputs on initial patch
+set.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37278.html
 
->> >> > +#define OMAP_DMA4_LOGICAL_DMA_CH_COUNT	32	/* 
->> >> REVISIT: Is this 32 + 2? */
->> >> > +
->> >> 
->> >> There are no users of this in this patch, all users are removed.
->> >
->> > This macro is used in hwmod data base. Do you mean hard coding this
->> > value in hwmod db and remove header?
->> 
->> What I mean is that from a reviewers perspective of this patch, you
->> added a new #define that is not used anywhere in this patch.  
->> a #define
->> should be added along with any users of it.
->
-> No. This macro is used in omap2+ hwmod db through plat/dma.h which includes
-> mach/dma.h
+The patch set addresses the following review comments from Rene and Omar.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37626.html
+https://patchwork.kernel.org/patch/255091/
+https://patchwork.kernel.org/patch/255081/
 
-Which is not part of this patch.
+Following patches are changed because of above review comments:
+omap:mailbox-send message in process context
+omap:mailbox-add notification support for multiple readers
 
-Again, as a general rule, don't introduce code (#defines, headers,
-functions, anything) in a patch if it is not used.
+Following patch is dropped from initial patch set
+omap:mailbox-resolve multiple receiver problem
 
->> 
->> That being said, the number of channels of the DMA IP sounds like
->> something that should indeed be associated with the hwmod as it is a
->> fixed HW feature.
->>
-> If so, I can remove this  macro and hard code in hwmod db.
+The patch set is tested on omap4 SDP board.
 
-OK, good.
+Fernando Guzman Lugo (1):
+  OMAP: mailbox: change full flag per mailbox queue instead of global
 
-Kevin
+Hari Kanigeri (5):
+  OMAP: mailbox: fix rx interrupt disable in omap4
+  OMAP: mailbox: fix checkpatch warnings
+  OMAP: mailbox: send message in process context
+  OMAP: mailbox: add notification support for multiple readers
+  OMAP4: clocks: add dummy clock for mailbox
+
+ arch/arm/mach-omap2/clock44xx_data.c      |    1 +
+ arch/arm/mach-omap2/mailbox.c             |    5 +-
+ arch/arm/plat-omap/include/plat/mailbox.h |    8 +-
+ arch/arm/plat-omap/mailbox.c              |  127 +++++++++++++++++------------
+ 4 files changed, 83 insertions(+), 58 deletions(-)
