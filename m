@@ -1,154 +1,127 @@
 From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 10 Nov 2010 19:31:52 +0530
-Subject: [PATCH v3 01/13] OMAP: DMA: Replace read/write macros with
-	functions
-In-Reply-To: <87y692mb4e.fsf@deeprootsystems.com>
+Date: Wed, 10 Nov 2010 19:32:03 +0530
+Subject: [PATCH v3 02/13] OMAP: DMA: Introduce errata handling feature
+In-Reply-To: <87sjzakuxp.fsf@deeprootsystems.com>
 References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-2-git-send-email-manjugk@ti.com>
-	<87y692mb4e.fsf@deeprootsystems.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBD@dbde02.ent.ti.com>
+	<1288099513-1854-3-git-send-email-manjugk@ti.com>
+	<87sjzakuxp.fsf@deeprootsystems.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+
 
 > -----Original Message-----
 > From: Kevin Hilman [mailto:khilman at deeprootsystems.com] 
-> Sent: Wednesday, November 10, 2010 3:08 AM
+> Sent: Wednesday, November 10, 2010 3:43 AM
 > To: G, Manjunath Kondaiah
 > Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Cousson, Benoit; 
-> Shilimkar, Santosh
-> Subject: Re: [PATCH v3 01/13] OMAP: DMA: Replace read/write 
-> macros with functions
+> linux-arm-kernel at lists.infradead.org; Peter Ujfalusi; 
+> Cousson, Benoit; Shilimkar, Santosh
+> Subject: Re: [PATCH v3 02/13] OMAP: DMA: Introduce errata 
+> handling feature
 > 
 > "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 > 
-> > The low level read/write macros are replaced with static 
-> inline functions
-> > and register offsets are handled through static register 
-> offset tables
-> > mapped through enumeration constants.
+> > Implement errata handling to use flags instead of cpu_is_*
+> > and cpu_class_* in the code.
 > >
-> > The objective of this patch is to prepare for omap dma 
-> driver cleanup
-> > and dma hwmod implementation. The code optimization and 
-> moving machine
-> > specific code to respective mach-omapx dma file will be 
-> handled in the
-> > rest of this patch series.
+> > The errata flags are initialized at init time and during runtime
+> > we are using the errata variable (via the IS_DMA_ERRATA macro)
+> > to execute the required errata workaround.
+> >
+> > Reused errata handling patch from Peter Ujfalusi 
+> <peter.ujfalusi@nokia.com>
+> > https://patchwork.kernel.org/patch/231191/
 > 
-> [...]
-> 
-> > -#define dma_write(val, reg)				
-> 		\
-> > -({								
-> 	\
-> > -	if (cpu_class_is_omap1())				
-> 	\
-> > -		__raw_writew((u16)(val), omap_dma_base + 
-> OMAP1_DMA_##reg); \
-> > -	else							
-> 	\
-> > -		__raw_writel((val), omap_dma_base + 
-> OMAP_DMA4_##reg);	\
-> > -})
-> > +static inline void dma_write(u32 val, int reg, int lch)
-> > +{
-> > +	if (cpu_class_is_omap1()) {
-> 
-> Reminder: any use of cpu_is_* checks outside of init code 
-> will be NAK'd.
-> 
-> cpu_is_* check do not belong at runtime, especially in a crucial path
-> like this.  
+> When starting from someone else's work, would be very helpful to
+> reviewers (and original authors) if you summarized what you
+> changed/fixed/updated etc.
 
-ok. removed cpu_is_* checks and taken care in init.
+ok. I will update patch summary.
 
 > 
-> > +		if (reg > OMAP1_CH_COMMON_START)
-> > +			__raw_writew(val, dma_base +
-> > +				(reg_map_omap1[reg] + 0x40 * lch));
-> > +		else
-> > +			__raw_writew(val, dma_base + 
-> reg_map_omap1[reg]);
-> > +	} else {
-> > +		if (reg > OMAP2_CH_COMMON_START)
-> > +			__raw_writel(val, dma_base +
-> > +				(reg_map_omap2[reg] + 0x60 * lch));
-> > +		else
-> > +			__raw_writel(val, dma_base + 
-> reg_map_omap2[reg]);
-> > +	}
+> > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> > Cc: Peter Ujfalusi <peter.ujfalusi@nokia.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> >  arch/arm/plat-omap/dma.c              |  134 
+> ++++++++++++++++++++++----------
+[...]
+> > +	if (omap_type() == OMAP3430_REV_ES1_0)
+> > +		SET_DMA_ERRATA(DMA_ERRATA_i88);
+> > +
+> > +	/*
+> > +	 * Errata 3.2/3.3: sometimes 0 is returned if CSAC/CDAC is
+> 
+> This doesn't look like a unique errata identifier.  Chapter 3 
+> is usually
+> the 'Cautions' section, and I don't listed in either the 34xx (v5.9),
+> 36xx (v1.3) or 44xx (v1.3) errata docs under this number, and 
+> don't see
+> that number in either of the 24xx errata docs either.   
+> Please clarify.
+
+Even I tried to find this info from errata docs prior to migrating
+all errata's to generic errata handling. This code was exising earlier,
+hence I retained it "as is", no documentation exists for this errata.
+
+> 
+> > +	 * read before the DMA controller finished disabling 
+> the channel.
+> > +	 */
+> > +	if (!cpu_is_omap15xx())
+> > +		SET_DMA_ERRATA(DMA_ERRATA_3_3);
 > > +}
+> > +
+> >  
+> /*------------------------------------------------------------
+> ----------------*/
+> >  
+> >  static int __init omap_init_dma(void)
+> > @@ -2481,6 +2528,9 @@ static int __init omap_init_dma(void)
+> >  		}
+> >  	}
+> >  
+> > +	/* Configure errata handling for all omap's */
+> > +	configure_dma_errata();
+> > +
+> >  	return 0;
+> >  
+> >  out_free:
+> > diff --git a/arch/arm/plat-omap/include/plat/dma.h 
+> b/arch/arm/plat-omap/include/plat/dma.h
+> > index 27578f3..5e28d26 100644
+> > --- a/arch/arm/plat-omap/include/plat/dma.h
+> > +++ b/arch/arm/plat-omap/include/plat/dma.h
+> > @@ -285,6 +285,17 @@
+> >  #define DMA_CH_PRIO_HIGH		0x1
+> >  #define DMA_CH_PRIO_LOW			0x0 /* Def */
+> >  
+> > +/* Errata handling */
+> > +#define IS_DMA_ERRATA(id)		(errata &= (id))
 > 
-> The register base offset, register array and the stride 
-> (offset between
-> instances: 0x40 or 0x60) are detectable at init time, and there's no
-> reason to have conditional code for them.  IOW, they should 
-> be init time
-> constants.  Doing so would greatly simply these functions.  
-> In fact the
-> CH_COMMON_START could also be an init time constant as well.  
-> So, given
-> the following init_time constants: dma_ch_common_start, dma_stride,
-> reg_map, the above would be reduced to something actually worth
-> inlining, for example (not actually tested):
+> Why the '&=' here?  I guess it should just be a '&'  The '=' 
+> was not in
+> Peter's original.
+
+correct. There was bug in peter's original patch for SET_DMA_ERRATA(id)
+it was | instead |=, while fixing set_dma_errata, accidentally, I have
+changed is_dma_errata also. Will fix it.
+
 > 
-> static inline void dma_write(u32 val, int reg, int lch)
-> {
->         u8 stride = (reg > dma_ch_common_start) ? dma_stride : 0;
+> > +#define SET_DMA_ERRATA(id)		(errata |= (id))
+> > +
+> > +#define DMA_ERRATA_IFRAME_BUFFERING	(1 << 0)
+> > +#define DMA_ERRATA_PARALLEL_CHANNELS	(1 << 1)
+> > +#define DMA_ERRATA_i378			(1 << 2)
+> > +#define DMA_ERRATA_i541			(1 << 3)
+> > +#define DMA_ERRATA_i88			(1 << 4)
+> > +#define DMA_ERRATA_3_3			(1 << 5)
 > 
->         __raw_writel(val, dma_base + (reg_map[reg] + stride * lch));
-> }
-> 
-> Same applies to dma_read().
-
-Thanks for the suggestion. It is taken care along with Tony's comment
-for handling these read/write's between omap1 and omap2+.
-
-Here is code snippet for handling both omap1(includes 16 bit
-registers) and omap2+ 
-
-static inline void dma_write(u32 val, int reg, int lch)
-{
-        u8  stride;
-        u32 offset;
-
-        stride = (reg >= dma_common_ch_start) ? dma_stride : 0;
-        offset = reg_map[reg] + (stride * lch);
-
-        if (dma_stride  == 0x40) {
-                __raw_writew(val, omap_dma_base + offset);
-                if ((reg > CLNK_CTRL && reg < CCR2) ||
-                                (reg > PCHD_ID && reg < CAPS_2)) {
-                        u32 offset2 = reg_map[reg] + 2 + (stride * lch);
-                        __raw_writew(val >> 16, omap_dma_base + offset2);
-                }
-        } else
-                __raw_writel(val, omap_dma_base + offset);
-}
-
-static inline u32 dma_read(int reg, int lch)
-{
-        u8 stride;
-        u32 offset, val;
-
-        stride = (reg >= dma_common_ch_start) ? dma_stride : 0;
-        offset = reg_map[reg] + (stride * lch);
-
-        if (dma_stride  == 0x40) {
-                val = __raw_readw(omap_dma_base + offset);
-                if ((reg > CLNK_CTRL && reg < CCR2) ||
-                                (reg > PCHD_ID && reg < CAPS_2)) {
-                        u16 upper;
-                        u32 offset2 = reg_map[reg] + 2 + (stride * lch);
-                        upper = __raw_readw(omap_dma_base + offset2);
-                        val |= (upper << 16);
-                }
-        } else
-                val = __raw_readl(omap_dma_base + offset);
-        return val;
-}
+> Please use BIT()
+ok.
 
 -Manjunath
