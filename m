@@ -1,290 +1,53 @@
-From: marek.vasut.n900@gmail.com (Marek Vasut)
-Date: Wed, 10 Nov 2010 10:52:31 +0100
-Subject: hi marek
-In-Reply-To: <AANLkTi=TupY6Equaifzs6qX8_1y-tNrPFtVB+0=k_Xyh@mail.gmail.com>
-References: <20101109184220.00003433@unknown>
-	<201011091936.13781.marek.vasut@gmail.com>
-	<20101110100709.00003d84@unknown>
-	<AANLkTi=TupY6Equaifzs6qX8_1y-tNrPFtVB+0=k_Xyh@mail.gmail.com>
-Message-ID: <1289382751.16575.2.camel@konomi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Nov 2010 10:06:17 +0000
+Subject: [PATCH] ARM: Temporary fix for broken arch reboot
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAE5C@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+	<20101109131838.GF2869@n2100.arm.linux.org.uk>
+	<1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D4FAE5C@dbde02.ent.ti.com>
+Message-ID: <20101110100617.GA23244@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, Nov 10, 2010 at 5:07 PM, dylan cristiani
-> <d.cristiani@idem-tech.it> wrote:
-> > On Tue, 9 Nov 2010 19:36:13 +0100
-> > Marek Vasut <marek.vasut@gmail.com> wrote:
+On Wed, Nov 10, 2010 at 11:25:21AM +0530, Shilimkar, Santosh wrote:
+> > -----Original Message-----
+> > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> > Sent: Tuesday, November 09, 2010 10:08 PM
+> > To: Russell King - ARM Linux
+> > Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; Gadiyar,
+> > Anand
+> > Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
 > > 
-> > > On Tuesday 09 November 2010 18:42:20 dylan cristiani wrote:
-> > > > We heard some month ago, about ucb1400 irq passing, via
-> > > > ucb1400_platform_data; then you wrote the patch, that is currently
-> > > > into mainline; i've a little problem, probably due to my infinite
-> > > > ignorance: i'm writing a sort of my_pm.c driver to check whether
-> > > > the ac line is plugged or not, check the main battery voltage and
-> > > > so on (similar to arch/arm/mach-pxa/sharpsl_pm.c and corgi_pm.c if
-> > > > you know it); the problem is that the battery voltages are tied to
-> > > > the ucb1400 ADC inputs, and in my_pm.c driver i don't know how to
-> > > > find the ucb1400_ts structure address to call the functions i need
-> > > > to read these ADC input i.e.:
-> > > 
-> > > 1) CC lists
-> > > 
-> > > 2) Can you post the driver source you have ?
-> > > 
-> > > without seeing the source, I can't help you
-> > here it comes but please close your nose before reading....;-)
+> > On Tue, 2010-11-09 at 13:18 +0000, Russell King - ARM Linux wrote:
+> > > On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh wrote:
+> > > > With commit 3d3f78d752bf, reboot seems to broken on ARM
+> > > > machines. CPU dies while doing flush_pmd_entry() as part of
+> > > > setup_mm_for_reboot()
 > > 
-> > arch/arm/mach-pxa/nilux_pm.c
+> > What do you mean by 'dies'? Can you still connect with a debugger or it
+> > got to some weird state?
 > > 
-> > /*
-> > ?* Based on spitz_pm.c and sharp code.
-> > ?*
-> > ?* Distributed under term of GPLv2.
-> > ?*
-> > ?*/
-> > 
-> > #include <linux/module.h>
-> > #include <linux/stat.h>
-> > #include <linux/init.h>
-> > #include <linux/completion.h>
-> > #include <linux/kernel.h>
-> > #include <linux/delay.h>
-> > #include <linux/gpio.h>
-> > //#include <linux/input.h>
-> > #include <linux/device.h>
-> > #include <linux/interrupt.h>
-> > #include <linux/suspend.h>
-> > #include <linux/apm-emulation.h>
-> > #include <linux/platform_device.h>
-> > #include <linux/ucb1400.h>
-> > 
-> > #include <asm/irq.h>
-> > #include <asm/mach-types.h>
-> > #include <mach/hardware.h>
-> > 
-> > #include <mach/pm.h>
-> > #include <mach/pxa2xx-regs.h>
-> > #include <mach/regs-rtc.h>
-> > #include <mach/sharpsl_pm.h>
-> > 
-> > 
-> > #define AC_IN_INT ? ? ? ? ? ? ? 17
-> > #define NYLUX_BATT_VOLT ? ? ? ? 1
-> > #define NYLUX_STATUS_ACIN ? ? ? 4
-> > #define NYLUX_BKUPBATT_TEMP ? ? 2
-> > #define NYLUX_CHARGE_STATUS ? ? 3
-> > 
-> > 
-> > static struct ucb1400_ts *ucb;
-> > 
-> > static void nylux_charger_init(void)
-> > {
-> > }
-> > 
-> > static void nylux_charger_exit(void)
-> > {
-> > }
-> > 
-> > unsigned long nylux_read_main_battery(void)
-> > {
-> > // ? ? ?struct ucb1400_ts *ucb;
-> > ? ? ? ?unsigned int voltage = 0;
-> > 
-> > ? ? ? ?printk(KERN_INFO "Reading_Main_Battery\n");
-> > 
-> > ? ? ? ?ucb1400_adc_enable(ucb->ac97);
-> > 
-> > // ? ? ?printk(KERN_INFO "Post adc_enable\n");
-> > 
-> > ? ? ? ?mdelay(1);
-> > ? ? ? ?voltage = ucb1400_adc_read(ucb->ac97, UCB_ADC_INP_AD0, 0);
-> > ? ? ? ?printk(KERN_INFO "\nVVVVVVvoltage %d\n", voltage);
-> > 
-> > ? ? ? ?ucb1400_adc_disable(ucb->ac97);
-> > 
-> > ? ? ? ?return voltage;
-> > }
-> > 
-> > unsigned long nylux_read_bkup_battery(void)
-> > {
-> > // ? ? ?struct ucb1400_ts *ucb;
-> > ? ? ? ?unsigned int voltage;
-> > 
-> > ? ? ? ?ucb1400_adc_enable(ucb->ac97);
-> > 
-> > ? ? ? ?mdelay(1);
-> > ? ? ? ?voltage = ucb1400_adc_read(ucb->ac97, UCB_ADC_INP_AD1, 0);
-> > 
-> > ? ? ? ?ucb1400_adc_disable(ucb->ac97);
-> > ? ? ? ?//printk(KERN_INFO "Battery_bkup value = %d\n", voltage);
-> > 
-> > ? ? ? ?return voltage;
-> > }
-> > 
-> > unsigned long nylux_charge_status(void)
-> > {
-> > // ? ? ?struct ucb1400_ts *ucb;
-> > ? ? ? ?unsigned int status;
-> > 
-> > ? ? ? ?//printk(KERN_INFO "Charge_status\n");
-> > ? ? ? ?ucb1400_adc_enable(ucb->ac97);
-> > ? ? ? ?mdelay(1);
-> > ? ? ? ?status = ucb1400_adc_read(ucb->ac97, UCB_ADC_INP_AD2, 0);
-> > ? ? ? ?//printk(KERN_INFO "Charge status= %d\n", status);
-> > ? ? ? ?ucb1400_adc_disable(ucb->ac97);
-> > 
-> > ? ? ? ?return status;
-> > 
-> > }
-> > 
-> > static unsigned long nylux_read_devdata(int which)
-> > {
-> > ? ? ? ?unsigned long ret = ~0;
-> > 
-> > ? ? ? ?switch (which) {
-> > ? ? ? ?case NYLUX_BATT_VOLT:
-> > ? ? ? ? ? ? ? ?ret = nylux_read_main_battery();
-> > ? ? ? ? ? ? ? ?//printk(KERN_INFO "read_main_battery: %d\n", ret);
-> > ? ? ? ? ? ? ? ?break;
-> > ? ? ? ?//case NYLUX_BKUPBATT_TEMP:
-> > ? ? ? ? ? ? ? ?//ret = nylux_read_bkup_battery();
-> > ? ? ? ? ? ? ? ?//break;
-> > ? ? ? ?//case NYLUX_CHARGE_STATUS:
-> > ? ? ? ? ? ? ? ?//ret = nylux_charge_status();
-> > ? ? ? ? ? ? ? ?//break;
-> > ? ? ? ?case NYLUX_STATUS_ACIN: {
-> > ? ? ? ? ? ? ? ?ret = GPLR(AC_IN_INT) & GPIO_bit(AC_IN_INT);
-> > ? ? ? ? ? ? ? ?//printk(KERN_INFO "AC_IN = %d\n", ret);
-> > ? ? ? ? ? ? ? ?//ret = read_ac_status();
-> > ? ? ? ? ? ? ? ?//printk(KERN_INFO "read_ac_status: %d\n", ret);
-> > ? ? ? ? ? ? ? ?break;
-> > ? ? ? ?}
-> > 
-> > ? ? ? ?default:
-> > ? ? ? ? ? ? ? ?ret = ~0;
-> > ? ? ? ?}
-> > 
-> > ? ? ? ?return ret;
-> > 
-> > }
-> > 
-> > //******
-> > struct battery_thresh battery_levels[] = {
-> > ? ? ? ?{ 550, 100},
-> > ? ? ? ?{ 544, ?97},
-> > ? ? ? ?{ 541, ?93},
-> > ? ? ? ?{ 536, ?88},
-> > ? ? ? ?{ 531, ?83},
-> > ? ? ? ?{ 526, ?78},
-> > ? ? ? ?{ 522, ?73},
-> > ? ? ? ?{ 517, ?68},
-> > ? ? ? ?{ 514, ?63},
-> > ? ? ? ?{ 510, ?58},
-> > ? ? ? ?{ 506, ?53},
-> > ? ? ? ?{ 503, ?48},
-> > ? ? ? ?{ 499, ?43},
-> > ? ? ? ?{ 497, ?38},
-> > ? ? ? ?{ 495, ?33},
-> > ? ? ? ?{ 493, ?28},
-> > ? ? ? ?{ 492, ?23},
-> > ? ? ? ?{ 491, ?18},
-> > ? ? ? ?{ 489, ?13},
-> > ? ? ? ?{ 488, ? 8},
-> > ? ? ? ?{ 484, ? 3},
-> > ? ? ? ?{ 478, ? 0}
-> > };
-> > 
-> > struct sharpsl_charger_machinfo nylux_pm_machinfo = {
-> > ? ? ? ?.init ? ? ? ? ? ? = nylux_charger_init,
-> > ? ? ? ?.exit ? ? ? ? ? ? = nylux_charger_exit,
-> > ? ? ? ?.gpio_acin ? ? ? ?= AC_IN_INT,
-> > ? ? ? ?.read_devdata ? ? = nylux_read_devdata,
-> > ? ? ? ?.discharge ? ? ? ?= 0,
-> > ? ? ? ?.discharge1 ? ? ? = 0,
-> > ? ? ? ?.charge ? ? ? ? ? = 0,
-> > ? ? ? ?.measure_temp ? ? = 0,
-> > ? ? ? ?.presuspend ? ? ? = 0,
-> > ? ? ? ?.postsuspend ? ? ?= 0,
-> > ? ? ? ?.charger_wakeup ? = 0,
-> > ? ? ? ?.should_wakeup ? ?= 0,
-> > ? ? ? ?.bat_levels ? ? ? = 22,
-> > ? ? ? ?.bat_levels_noac ?= battery_levels,
-> > ? ? ? ?.bat_levels_acin ?= 0,
-> > ? ? ? ?.status_high_acin = 510,
-> > ? ? ? ?.status_low_acin ?= 490,
-> > ? ? ? ?.status_high_noac = 510,
-> > ? ? ? ?.status_low_noac ?= 490,
-> > ? ? ? ?.charge_on_volt ? = 0,
-> > ? ? ? ?.charge_on_temp ? = 0,
-> > ? ? ? ?.charge_acin_high = 0,
-> > ? ? ? ?.charge_acin_low ?= 0,
-> > ? ? ? ?.fatal_acin_volt ?= 0,
-> > ? ? ? ?.fatal_noacin_volt = 0,
-> > 
-> > ? ? ? ?.batfull_irq ? ? ?= 1
-> > };
-> > 
-> > 
-> > /*
-> > static int __init collie_pm_ucb_add(struct ucb1x00_dev *pdev)
-> > {
-> > ? ? ? ?sharpsl_pm.machinfo = &nylux_pm_machinfo;
-> > ? ? ? ?ucb = pdev->ucb;
-> > ? ? ? ?return 0;
-> > }
-> > 
-> > static struct ucb1x00_driver collie_pm_ucb_driver = {
-> > ? ? ? ?.add ? ? ? ? ? ?= collie_pm_ucb_add,
-> > };
-> > */
-> > 
-> > static struct platform_device *nyluxpm_device;
-> > 
-> > static int __devinit nyluxpm_init(void)
-> > {
-> > ? ? ? ?int ret;
-> > 
-> > ? ? ? ?nyluxpm_device = platform_device_alloc("sharpsl-pm", -1);
-> > ? ? ? ?if (!nyluxpm_device)
-> > ? ? ? ? ? ? ? ?return -ENOMEM;
-> > 
-> > ? ? ? ?nyluxpm_device->dev.platform_data = &nylux_pm_machinfo;
-> > ? ? ? ?ret = platform_device_add(nyluxpm_device);
-> > 
-> > ? ? ? ?if (ret)
-> > ? ? ? ? ? ? ? ?platform_device_put(nyluxpm_device);
-> > 
-> > // ? ? ?if (!ret)
-> > // ? ? ? ? ? ? ?ret = ucb1x00_register_driver(&collie_pm_ucb_driver);
-> > 
-> > ? ? ? ?return ret;
-> > }
-> > 
-> > static void nyluxpm_exit(void)
-> > {
-> > // ? ? ?ucb1x00_unregister_driver(&collie_pm_ucb_driver);
-> > ? ? ? ?platform_device_unregister(nyluxpm_device);
-> > }
-> > 
-> > module_init(nyluxpm_init);
-> > module_exit(nyluxpm_exit);
-> > 
-> > 
-> > thanks
-> > dylan
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+> It goes to some weird state. Basically the emulation connection dies,
+> and debugger gets disconnected.
 > 
-> You should append your power driver into drivers/power directory.
-> There's an example of colie_battery.c. It's also based on udc.
+> > > > I know this is not the fix but intention is to report the
+> > > > issue and also provide temporary fix till it get fixed correctly
+> > >
+> > > So you're now rebooting with the secondary CPUs still running.  I guess
+> > > that the secondary CPUs end up crashing and don't restart.
+> > >
+> > > I think more the question is why the CP15 cache clean/flush is hanging
+> > > with the other CPUs taken down.  All the other CPUs will be doing is
+> > > sitting in a loop doing nothing.
+> > 
+> > I can't think of anything. Did the other CPUs print 'stopping'?
+> No it doesn't not print anything.
 
-That's basically what I said a few lines above ;-)
+The processing of the IPI is asynchronous to the CPU which is rebooting
+continuing - which means that if there is some kind of bus lockup, you
+won't get anything from any of the CPUs.
 
-btw I think he's also intermixing ucb1x00 (ucb < 1400) and ucb1400
-> 
-> Thanks
-> Haojian
+You might be able to get something from the other CPUs by inserting a
+mdelay(100) after the call to machine_shutdown(), to give the other CPUs
+time to respond.
