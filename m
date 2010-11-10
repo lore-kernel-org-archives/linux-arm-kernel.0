@@ -1,10 +1,11 @@
 From: Grzegorz.Sygieda@tieto.com (Grzegorz.Sygieda at tieto.com)
-Date: Wed, 10 Nov 2010 10:15:53 +0200
+Date: Wed, 10 Nov 2010 09:54:18 +0200
 Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <20101110000152.GA8993@n2100.arm.linux.org.uk>
 References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
 	<20101109224012.GA21992@kroah.com>
 	<20101110000152.GA8993@n2100.arm.linux.org.uk>
-Message-ID: <0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
+Message-ID: <0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D88A@EXMB01.eu.tieto.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
