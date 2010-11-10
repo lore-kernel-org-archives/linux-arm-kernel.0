@@ -1,811 +1,650 @@
 From: jimmy.rubin@stericsson.com (Jimmy Rubin)
-Date: Wed, 10 Nov 2010 13:04:09 +0100
-Subject: [PATCH 06/10] MCDE: Add generic display
-In-Reply-To: <1289390653-6111-6-git-send-email-jimmy.rubin@stericsson.com>
+Date: Wed, 10 Nov 2010 13:04:13 +0100
+Subject: [PATCH 10/10] ux500: MCDE: Add platform specific data
+In-Reply-To: <1289390653-6111-10-git-send-email-jimmy.rubin@stericsson.com>
 References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-3-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-4-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-5-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-6-git-send-email-jimmy.rubin@stericsson.com>
-Message-ID: <1289390653-6111-7-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-7-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-9-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-10-git-send-email-jimmy.rubin@stericsson.com>
+Message-ID: <1289390653-6111-11-git-send-email-jimmy.rubin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for MCDE, Memory-to-display controller
+This patch adds support for the MCDE, Memory-to-display controller,
 found in the ST-Ericsson ux500 products.
 
-This patchs adds a generic DSI command display and a display framework
-that can be used to add support for new types of displays.
+The configuration of the MCDE hardware, the MCDE framebuffer device
+and the display that is connected to ux500 is managed in this patch.
 
 Signed-off-by: Jimmy Rubin <jimmy.rubin@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij.stericsson.com>
 ---
- drivers/video/mcde/display-generic_dsi.c      |  152 +++++++++
- drivers/video/mcde/mcde_display.c             |  427 +++++++++++++++++++++++++
- include/video/mcde/mcde_display-generic_dsi.h |   34 ++
- include/video/mcde/mcde_display.h             |  139 ++++++++
- 4 files changed, 752 insertions(+), 0 deletions(-)
- create mode 100644 drivers/video/mcde/display-generic_dsi.c
- create mode 100644 drivers/video/mcde/mcde_display.c
- create mode 100644 include/video/mcde/mcde_display-generic_dsi.h
- create mode 100644 include/video/mcde/mcde_display.h
+ arch/arm/mach-ux500/Kconfig                    |    8 +
+ arch/arm/mach-ux500/Makefile                   |    1 +
+ arch/arm/mach-ux500/board-mop500-mcde.c        |  209 ++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500-regulators.c  |   28 +++
+ arch/arm/mach-ux500/board-mop500.c             |    3 +
+ arch/arm/mach-ux500/devices-db8500.c           |   68 ++++++++
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    7 +
+ arch/arm/mach-ux500/include/mach/devices.h     |    1 +
+ arch/arm/mach-ux500/include/mach/prcmu-regs.h  |    1 +
+ arch/arm/mach-ux500/include/mach/prcmu.h       |    3 +
+ arch/arm/mach-ux500/prcmu.c                    |  129 +++++++++++++++
+ 11 files changed, 458 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-mop500-mcde.c
 
-diff --git a/drivers/video/mcde/display-generic_dsi.c b/drivers/video/mcde/display-generic_dsi.c
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 2dd44a0..a868629 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -50,5 +50,13 @@ config U5500_MBOX
+ 	default y
+ 	help
+ 	  Add support for U5500 mailbox communication with modem side
++#Configuration for MCDE setup
+ 
++config DISPLAY_GENERIC_DSI_PRIMARY
++        bool "Main display support"
++	depends on MACH_U8500_MOP && FB_MCDE && REGULATOR
++	select MCDE_DISPLAY_GENERIC_DSI
++        default y
++	help
++	  Say yes here if main display exists
+ endif
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 9e27a84..5562c85 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -13,3 +13,4 @@ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
+ obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem_irq.o
+ obj-$(CONFIG_U5500_MBOX)	+= mbox.o
++obj-$(CONFIG_FB_MCDE)		+= board-mop500-mcde.o
+diff --git a/arch/arm/mach-ux500/board-mop500-mcde.c b/arch/arm/mach-ux500/board-mop500-mcde.c
 new file mode 100644
-index 0000000..1c1d266
+index 0000000..3695746
 --- /dev/null
-+++ b/drivers/video/mcde/display-generic_dsi.c
-@@ -0,0 +1,152 @@
++++ b/arch/arm/mach-ux500/board-mop500-mcde.c
+@@ -0,0 +1,209 @@
 +/*
 + * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * ST-Ericsson MCDE generic DCS display driver
 + *
 + * Author: Marcus Lorentzon <marcus.xm.lorentzon@stericsson.com>
 + * for ST-Ericsson.
 + *
 + * License terms: GNU General Public License (GPL), version 2.
 + */
-+
++#include <linux/platform_device.h>
 +#include <linux/kernel.h>
-+#include <linux/device.h>
-+#include <linux/delay.h>
 +#include <linux/gpio.h>
-+#include <linux/err.h>
++#include <linux/delay.h>
 +
 +#include <video/mcde/mcde_display.h>
 +#include <video/mcde/mcde_display-generic_dsi.h>
++#include <video/mcde/mcde_fb.h>
++#include <video/mcde/mcde_dss.h>
 +
-+static int __devinit generic_probe(struct mcde_display_device *dev)
-+{
-+	int ret = 0;
-+	struct mcde_display_generic_platform_data *pdata =
-+		dev->dev.platform_data;
++#include <mach/db8500-regs.h>
 +
-+	if (pdata == NULL) {
-+		dev_err(&dev->dev, "%s:Platform data missing\n", __func__);
-+		return -EINVAL;
-+	}
++#include "board-mop500.h"
 +
-+	if (dev->port->type != MCDE_PORTTYPE_DSI) {
-+		dev_err(&dev->dev,
-+			"%s:Invalid port type %d\n",
-+			__func__, dev->port->type);
-+		return -EINVAL;
-+	}
++#define DSI_UNIT_INTERVAL_0	0x9
++#define DSI_UNIT_INTERVAL_1	0x9
++#define DSI_UNIT_INTERVAL_2	0x6
 +
-+	if (!dev->platform_enable && !dev->platform_disable) {
-+		pdata->generic_platform_enable = true;
-+		if (pdata->reset_gpio) {
-+			ret = gpio_request(pdata->reset_gpio, NULL);
-+			if (ret) {
-+				dev_warn(&dev->dev,
-+					"%s:Failed to request gpio %d\n",
-+					__func__, pdata->reset_gpio);
-+				return ret;
-+			}
-+		}
-+		if (pdata->regulator_id) {
-+			pdata->regulator = regulator_get(NULL,
-+				pdata->regulator_id);
-+			if (IS_ERR(pdata->regulator)) {
-+				ret = PTR_ERR(pdata->regulator);
-+				dev_warn(&dev->dev,
-+					"%s:Failed to get regulator '%s'\n",
-+					__func__, pdata->regulator_id);
-+				pdata->regulator = NULL;
-+				goto regulator_get_failed;
-+			}
-+			regulator_set_voltage(pdata->regulator,
-+					pdata->min_supply_voltage,
-+					pdata->max_supply_voltage);
-+		}
-+	}
++#define PRIMARY_DISPLAY_ID	0
++#define SECONDARY_DISPLAY_ID	1
++#define TERTIARY_DISPLAY_ID	2
 +
-+	/* TODO: Remove when DSI send command uses interrupts */
-+	dev->prepare_for_update = NULL;
-+	dev_info(&dev->dev, "Generic display probed\n");
++static bool rotate_main = true;
 +
-+	return 0;
-+
-+regulator_get_failed:
-+	if (pdata->generic_platform_enable && pdata->reset_gpio)
-+		gpio_free(pdata->reset_gpio);
-+	return ret;
-+}
-+
-+static int __devexit generic_remove(struct mcde_display_device *dev)
++static int generic_platform_enable(struct mcde_display_device *dev)
 +{
 +	struct mcde_display_generic_platform_data *pdata =
 +		dev->dev.platform_data;
 +
-+	dev->set_power_mode(dev, MCDE_DISPLAY_PM_OFF);
++	dev_dbg(&dev->dev, "%s: Reset & power on generic display\n", __func__);
 +
-+	if (!pdata->generic_platform_enable)
-+		return 0;
-+
-+	if (pdata->regulator)
-+		regulator_put(pdata->regulator);
-+	if (pdata->reset_gpio) {
-+		gpio_direction_input(pdata->reset_gpio);
-+		gpio_free(pdata->reset_gpio);
++	if (pdata->regulator) {
++		if (regulator_enable(pdata->regulator) < 0) {
++			dev_err(&dev->dev, "%s:Failed to enable regulator\n"
++				, __func__);
++			return -EINVAL;
++		}
 +	}
++
++	gpio_direction_output(pdata->reset_gpio,
++				!pdata->reset_high);
++	if (pdata->reset_gpio)
++		gpio_set_value(pdata->reset_gpio, pdata->reset_high);
++	mdelay(pdata->reset_delay);
++	if (pdata->reset_gpio)
++		gpio_set_value(pdata->reset_gpio, !pdata->reset_high);
 +
 +	return 0;
 +}
 +
-+static int generic_resume(struct mcde_display_device *ddev)
++static int generic_platform_disable(struct mcde_display_device *dev)
 +{
-+	int ret;
++	struct mcde_display_generic_platform_data *pdata =
++		dev->dev.platform_data;
 +
-+	/* set_power_mode will handle call platform_enable */
-+	ret = ddev->set_power_mode(ddev, MCDE_DISPLAY_PM_STANDBY);
-+	if (ret < 0)
-+		dev_warn(&ddev->dev, "%s:Failed to resume display\n"
-+			, __func__);
-+	return ret;
++	dev_dbg(&dev->dev, "%s:Reset & power off generic display\n", __func__);
++
++	if (pdata->regulator) {
++		if (regulator_disable(pdata->regulator) < 0) {
++			dev_err(&dev->dev, "%s:Failed to disable regulator\n"
++				, __func__);
++			return -EINVAL;
++		}
++	}
++	return 0;
 +}
 +
-+static int generic_suspend(struct mcde_display_device *ddev, pm_message_t state)
-+{
-+	int ret;
-+
-+	/* set_power_mode will handle call platform_disable */
-+	ret = ddev->set_power_mode(ddev, MCDE_DISPLAY_PM_OFF);
-+	if (ret < 0)
-+		dev_warn(&ddev->dev, "%s:Failed to suspend display\n"
-+			, __func__);
-+	return ret;
-+}
-+
-+static struct mcde_display_driver generic_driver = {
-+	.probe	= generic_probe,
-+	.remove = generic_remove,
-+	.suspend = generic_suspend,
-+	.resume = generic_resume,
-+	.driver = {
-+		.name	= "mcde_disp_generic",
++#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY
++static struct mcde_port port0 = {
++	.type = MCDE_PORTTYPE_DSI,
++	.mode = MCDE_PORTMODE_CMD,
++	.pixel_format = MCDE_PORTPIXFMT_DSI_24BPP,
++	.ifc = 1,
++	.link = 0,
++#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_AUTO_SYNC
++	.sync_src = MCDE_SYNCSRC_OFF,
++	.update_auto_trig = true,
++#else
++	.sync_src = MCDE_SYNCSRC_BTA,
++	.update_auto_trig = false,
++#endif
++	.phy = {
++		.dsi = {
++			.virt_id = 0,
++			.num_data_lanes = 2,
++			.ui = DSI_UNIT_INTERVAL_0,
++			.clk_cont = false,
++		},
 +	},
 +};
 +
-+/* Module init */
-+static int __init mcde_display_generic_init(void)
-+{
-+	pr_info("%s\n", __func__);
++struct mcde_display_generic_platform_data generic_display0_pdata = {
++	.reset_gpio = MOP500_EGPIO(15),
++	.reset_delay = 1,
++	.regulator_id = "v-display",
++	.min_supply_voltage = 2500000, /* 2.5V */
++	.max_supply_voltage = 2700000 /* 2.7V */
++};
 +
-+	return mcde_display_driver_register(&generic_driver);
-+}
-+module_init(mcde_display_generic_init);
++struct mcde_display_device generic_display0 = {
++	.name = "mcde_disp_generic",
++	.id = PRIMARY_DISPLAY_ID,
++	.port = &port0,
++	.chnl_id = MCDE_CHNL_A,
++	.fifo = MCDE_FIFO_C0,
++	.default_pixel_format = MCDE_OVLYPIXFMT_RGB565,
++	.native_x_res = 864,
++	.native_y_res = 480,
++#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_VSYNC
++	.synchronized_update = true,
++#else
++	.synchronized_update = false,
++#endif
++	/* TODO: Remove rotation buffers once ESRAM driver is completed */
++	.rotbuf1 = U8500_ESRAM_BASE + 0x20000 * 4,
++	.rotbuf2 = U8500_ESRAM_BASE + 0x20000 * 4 + 0x10000,
++	.dev = {
++		.platform_data = &generic_display0_pdata,
++	},
++	.platform_enable = generic_platform_enable,
++	.platform_disable = generic_platform_disable,
++};
++#endif /* CONFIG_DISPLAY_GENERIC_DSI_PRIMARY */
 +
-+static void __exit mcde_display_generic_exit(void)
-+{
-+	pr_info("%s\n", __func__);
 +
-+	mcde_display_driver_unregister(&generic_driver);
-+}
-+module_exit(mcde_display_generic_exit);
-+
-+MODULE_AUTHOR("Marcus Lorentzon <marcus.xm.lorentzon@stericsson.com>");
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("ST-Ericsson MCDE generic DCS display driver");
-diff --git a/drivers/video/mcde/mcde_display.c b/drivers/video/mcde/mcde_display.c
-new file mode 100644
-index 0000000..25f5ff3
---- /dev/null
-+++ b/drivers/video/mcde/mcde_display.c
-@@ -0,0 +1,427 @@
++static struct fb_info *fbs[1] = { NULL};
++static struct mcde_display_device *displays[1] = { NULL};
 +/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * ST-Ericsson MCDE display driver
-+ *
-+ * Author: Marcus Lorentzon <marcus.xm.lorentzon@stericsson.com>
-+ * for ST-Ericsson.
-+ *
-+ * License terms: GNU General Public License (GPL), version 2.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/device.h>
-+
-+#include <video/mcde/mcde_display.h>
-+
-+/*temp*/
-+#include <linux/delay.h>
-+
-+static void mcde_display_get_native_resolution_default(
-+	struct mcde_display_device *ddev, u16 *x_res, u16 *y_res)
++* This function will create the framebuffer for the display that is registered.
++*/
++static int display_postregistered_callback(struct notifier_block *nb,
++	unsigned long event, void *dev)
 +{
-+	if (x_res)
-+		*x_res = ddev->native_x_res;
-+	if (y_res)
-+		*y_res = ddev->native_y_res;
-+}
++	struct mcde_display_device *ddev = dev;
++	u16 width, height;
++	u16 virtual_width, virtual_height;
++	u32 rotate = FB_ROTATE_UR;
 +
-+static enum mcde_ovly_pix_fmt mcde_display_get_default_pixel_format_default(
-+	struct mcde_display_device *ddev)
-+{
-+	return ddev->default_pixel_format;
-+}
-+
-+static void mcde_display_get_physical_size_default(
-+	struct mcde_display_device *ddev, u16 *width, u16 *height)
-+{
-+	if (width)
-+		*width = ddev->physical_width;
-+	if (height)
-+		*height = ddev->physical_height;
-+}
-+
-+static int mcde_display_set_power_mode_default(struct mcde_display_device *ddev,
-+	enum mcde_display_power_mode power_mode)
-+{
-+	int ret = 0;
-+
-+	/* OFF -> STANDBY */
-+	if (ddev->power_mode == MCDE_DISPLAY_PM_OFF &&
-+		power_mode != MCDE_DISPLAY_PM_OFF) {
-+		if (ddev->platform_enable) {
-+			ret = ddev->platform_enable(ddev);
-+			if (ret)
-+				return ret;
-+		}
-+		ddev->power_mode = MCDE_DISPLAY_PM_STANDBY;
-+	}
-+
-+	if (ddev->port->type == MCDE_PORTTYPE_DSI) {
-+		/* STANDBY -> ON */
-+		if (ddev->power_mode == MCDE_DISPLAY_PM_STANDBY &&
-+			power_mode == MCDE_DISPLAY_PM_ON) {
-+			ret = mcde_dsi_dcs_write(ddev->chnl_state,
-+				DCS_CMD_EXIT_SLEEP_MODE, NULL, 0);
-+			if (ret)
-+				return ret;
-+
-+			ret = mcde_dsi_dcs_write(ddev->chnl_state,
-+				DCS_CMD_SET_DISPLAY_ON, NULL, 0);
-+			if (ret)
-+				return ret;
-+
-+			ddev->power_mode = MCDE_DISPLAY_PM_ON;
-+			goto set_power_and_exit;
-+		}
-+		/* ON -> STANDBY */
-+		else if (ddev->power_mode == MCDE_DISPLAY_PM_ON &&
-+			power_mode <= MCDE_DISPLAY_PM_STANDBY) {
-+			ret = mcde_dsi_dcs_write(ddev->chnl_state,
-+				DCS_CMD_SET_DISPLAY_OFF, NULL, 0);
-+			if (ret)
-+				return ret;
-+
-+			ret = mcde_dsi_dcs_write(ddev->chnl_state,
-+				DCS_CMD_ENTER_SLEEP_MODE, NULL, 0);
-+			if (ret)
-+				return ret;
-+
-+			ddev->power_mode = MCDE_DISPLAY_PM_STANDBY;
-+			goto set_power_and_exit;
-+		}
-+	} else if (ddev->port->type == MCDE_PORTTYPE_DPI)
-+		ddev->power_mode = power_mode;
-+	else if (ddev->power_mode != power_mode)
-+		return -EINVAL;
-+
-+	/* SLEEP -> OFF */
-+	if (ddev->power_mode == MCDE_DISPLAY_PM_STANDBY &&
-+		power_mode == MCDE_DISPLAY_PM_OFF) {
-+		if (ddev->platform_disable) {
-+			ret = ddev->platform_disable(ddev);
-+			if (ret)
-+				return ret;
-+		}
-+		ddev->power_mode = MCDE_DISPLAY_PM_OFF;
-+	}
-+
-+set_power_and_exit:
-+	mcde_chnl_set_power_mode(ddev->chnl_state, ddev->power_mode);
-+
-+	return ret;
-+}
-+
-+static inline enum mcde_display_power_mode mcde_display_get_power_mode_default(
-+	struct mcde_display_device *ddev)
-+{
-+	return ddev->power_mode;
-+}
-+
-+static inline int mcde_display_try_video_mode_default(
-+	struct mcde_display_device *ddev,
-+	struct mcde_video_mode *video_mode)
-+{
-+	/* TODO Check if inside native_xres and native_yres */
-+	return 0;
-+}
-+
-+static int mcde_display_set_video_mode_default(struct mcde_display_device *ddev,
-+	struct mcde_video_mode *video_mode)
-+{
-+	int ret;
-+	struct mcde_video_mode channel_video_mode;
-+
-+	if (!video_mode)
-+		return -EINVAL;
-+
-+	ddev->video_mode = *video_mode;
-+	channel_video_mode = ddev->video_mode;
-+	/* Dependant on if display should rotate or MCDE should rotate */
-+	if (ddev->rotation == MCDE_DISPLAY_ROT_90_CCW ||
-+				ddev->rotation == MCDE_DISPLAY_ROT_90_CW) {
-+		channel_video_mode.xres = ddev->native_x_res;
-+		channel_video_mode.yres = ddev->native_y_res;
-+	}
-+	ret = mcde_chnl_set_video_mode(ddev->chnl_state, &channel_video_mode);
-+	if (ret < 0) {
-+		dev_warn(&ddev->dev, "%s:Failed to set video mode\n", __func__);
-+		return ret;
-+	}
-+
-+	ddev->update_flags |= UPDATE_FLAG_VIDEO_MODE;
-+
-+	return 0;
-+}
-+
-+static inline void mcde_display_get_video_mode_default(
-+	struct mcde_display_device *ddev, struct mcde_video_mode *video_mode)
-+{
-+	if (video_mode)
-+		*video_mode = ddev->video_mode;
-+}
-+
-+static int mcde_display_set_pixel_format_default(
-+	struct mcde_display_device *ddev, enum mcde_ovly_pix_fmt format)
-+{
-+	int ret;
-+
-+	ddev->pixel_format = format;
-+	ret = mcde_chnl_set_pixel_format(ddev->chnl_state,
-+						ddev->port->pixel_format);
-+	if (ret < 0) {
-+		dev_warn(&ddev->dev, "%s:Failed to set pixel format = %d\n",
-+							__func__, format);
-+		return ret;
-+	}
-+
-+	ddev->update_flags |= UPDATE_FLAG_PIXEL_FORMAT;
-+
-+	return 0;
-+}
-+
-+static inline enum mcde_ovly_pix_fmt mcde_display_get_pixel_format_default(
-+	struct mcde_display_device *ddev)
-+{
-+	return ddev->pixel_format;
-+}
-+
-+static inline enum mcde_port_pix_fmt mcde_display_get_port_pixel_format_default(
-+	struct mcde_display_device *ddev)
-+{
-+	return ddev->port->pixel_format;
-+}
-+
-+static int mcde_display_set_rotation_default(struct mcde_display_device *ddev,
-+	enum mcde_display_rotation rotation)
-+{
-+	int ret;
-+
-+	ret = mcde_chnl_set_rotation(ddev->chnl_state, rotation,
-+		ddev->rotbuf1, ddev->rotbuf2);
-+	if (ret < 0) {
-+		dev_warn(&ddev->dev, "%s:Failed to set rotation = %d\n",
-+							__func__, rotation);
-+		return ret;
-+	}
-+
-+	ddev->rotation = rotation;
-+	ddev->update_flags |= UPDATE_FLAG_ROTATION;
-+
-+	return 0;
-+}
-+
-+static inline enum mcde_display_rotation mcde_display_get_rotation_default(
-+	struct mcde_display_device *ddev)
-+{
-+	return ddev->rotation;
-+}
-+
-+static int mcde_display_set_synchronized_update_default(
-+	struct mcde_display_device *ddev, bool enable)
-+{
-+	if (ddev->port->type == MCDE_PORTTYPE_DSI && enable) {
-+		int ret;
-+		u8 m = 0;
-+
-+		if (ddev->port->sync_src == MCDE_SYNCSRC_OFF)
-+			return -EINVAL;
-+
-+		ret = mcde_dsi_dcs_write(ddev->chnl_state,
-+						DCS_CMD_SET_TEAR_ON, &m, 1);
-+		if (ret < 0) {
-+			dev_warn(&ddev->dev,
-+				"%s:Failed to set synchornized update = %d\n",
-+				__func__, enable);
-+			return ret;
-+		}
-+	}
-+	ddev->synchronized_update = enable;
-+	return 0;
-+}
-+
-+static inline bool mcde_display_get_synchronized_update_default(
-+	struct mcde_display_device *ddev)
-+{
-+	return ddev->synchronized_update;
-+}
-+
-+static int mcde_display_apply_config_default(struct mcde_display_device *ddev)
-+{
-+	int ret;
-+
-+	ret = mcde_chnl_enable_synchronized_update(ddev->chnl_state,
-+		ddev->synchronized_update);
-+
-+	if (ret < 0) {
-+		dev_warn(&ddev->dev,
-+			"%s:Failed to enable synchronized update\n",
-+			__func__);
-+		return ret;
-+	}
-+
-+	if (!ddev->update_flags)
++	if (event != MCDE_DSS_EVENT_DISPLAY_REGISTERED)
 +		return 0;
 +
-+	if ((ddev->update_flags & UPDATE_FLAG_VIDEO_MODE) ||
-+		(ddev->update_flags & UPDATE_FLAG_PIXEL_FORMAT))
-+		mcde_chnl_stop_flow(ddev->chnl_state);
++	if (ddev->id < PRIMARY_DISPLAY_ID || ddev->id >= ARRAY_SIZE(fbs))
++		return 0;
 +
-+	ret = mcde_chnl_apply(ddev->chnl_state);
-+	if (ret < 0) {
-+		dev_warn(&ddev->dev, "%s:Failed to apply to channel\n",
-+							__func__);
-+		return ret;
++	mcde_dss_get_native_resolution(ddev, &width, &height);
++
++	if (ddev->id == PRIMARY_DISPLAY_ID && rotate_main) {
++		swap(width, height);
++#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_ROTATE_180_DEGREES
++		rotate = FB_ROTATE_CCW;
++#else
++		rotate = FB_ROTATE_CW;
++#endif
 +	}
-+	ddev->update_flags = 0;
-+	ddev->first_update = true;
++
++	virtual_width = width;
++	virtual_height = height * 2;
++#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_AUTO_SYNC
++	if (ddev->id == PRIMARY_DISPLAY_ID)
++		virtual_height = height;
++#endif
++
++	/* Create frame buffer */
++	fbs[ddev->id] = mcde_fb_create(ddev,
++		width, height,
++		virtual_width, virtual_height,
++		ddev->default_pixel_format,
++		rotate);
++
++	if (IS_ERR(fbs[ddev->id]))
++		pr_warning("Failed to create fb for display %s\n", ddev->name);
++	else
++		pr_info("Framebuffer created (%s)\n", ddev->name);
 +
 +	return 0;
 +}
 +
-+static int mcde_display_invalidate_area_default(
-+					struct mcde_display_device *ddev,
-+					struct mcde_rectangle *area)
-+{
-+	dev_vdbg(&ddev->dev, "%s\n", __func__);
-+	if (area) {
-+		/* take union of rects */
-+		u16 t;
-+		t = min(ddev->update_area.x, area->x);
-+		/* note should be > 0 */
-+		ddev->update_area.w = max(ddev->update_area.x +
-+							ddev->update_area.w,
-+							area->x + area->w) - t;
-+		ddev->update_area.x = t;
-+		t = min(ddev->update_area.y, area->y);
-+		ddev->update_area.h = max(ddev->update_area.y +
-+							ddev->update_area.h,
-+							area->y + area->h) - t;
-+		ddev->update_area.y = t;
-+		/* TODO: Implement real clipping when partial refresh is
-+		activated.*/
-+		ddev->update_area.w = min((u16) ddev->video_mode.xres,
-+					(u16) ddev->update_area.w);
-+		ddev->update_area.h = min((u16) ddev->video_mode.yres,
-+					(u16) ddev->update_area.h);
-+	} else {
-+		ddev->update_area.x = 0;
-+		ddev->update_area.y = 0;
-+		ddev->update_area.w = ddev->video_mode.xres;
-+		ddev->update_area.h = ddev->video_mode.yres;
-+		/* Invalidate_area(ddev, NULL) means reset area to empty
-+		 * rectangle really. After that the rectangle should grow by
-+		 * taking an union (above). This means that the code should
-+		 * really look like below, however the code above is a temp fix
-+		 * for rotation.
-+		 * TODO: fix
-+		 * ddev->update_area.x = ddev->video_mode.xres;
-+		 * ddev->update_area.y = ddev->video_mode.yres;
-+		 * ddev->update_area.w = 0;
-+		 * ddev->update_area.h = 0;
-+		 */
-+	}
++static struct notifier_block display_nb = {
++	.notifier_call = display_postregistered_callback,
++};
 +
-+	return 0;
-+}
 +
-+static int mcde_display_update_default(struct mcde_display_device *ddev)
++int __init init_display_devices(void)
 +{
 +	int ret;
 +
-+	/* TODO: Dirty */
-+	if (ddev->prepare_for_update) {
-+		/* TODO: Send dirty rectangle */
-+		ret = ddev->prepare_for_update(ddev, 0, 0,
-+			ddev->native_x_res, ddev->native_y_res);
-+		if (ret < 0) {
-+			dev_warn(&ddev->dev,
-+				"%s:Failed to prepare for update\n", __func__);
-+			return ret;
-+		}
-+	}
-+	/* TODO: Calculate & set update rect */
-+	ret = mcde_chnl_update(ddev->chnl_state, &ddev->update_area);
-+	if (ret < 0) {
-+		dev_warn(&ddev->dev, "%s:Failed to update channel\n", __func__);
-+		return ret;
-+	}
-+	if (ddev->first_update && ddev->on_first_update)
-+		ddev->on_first_update(ddev);
-+
-+	if (ddev->power_mode != MCDE_DISPLAY_PM_ON && ddev->set_power_mode) {
-+		ret = ddev->set_power_mode(ddev, MCDE_DISPLAY_PM_ON);
-+		if (ret < 0) {
-+			dev_warn(&ddev->dev,
-+				"%s:Failed to set power mode to on\n",
-+				__func__);
-+			return ret;
-+		}
-+	}
-+
-+	dev_vdbg(&ddev->dev, "Overlay updated, chnl=%d\n", ddev->chnl_id);
-+
-+	return 0;
-+}
-+
-+static int mcde_display_prepare_for_update_default(
-+					struct mcde_display_device *ddev,
-+					u16 x, u16 y, u16 w, u16 h)
-+{
-+	int ret;
-+	u8 params[8] = { x >> 8, x & 0xff,
-+			(x + w - 1) >> 8, (x + w - 1) & 0xff,
-+			 y >> 8, y & 0xff,
-+			(y + h - 1) >> 8, (y + h - 1) & 0xff };
-+
-+	if (ddev->port->type != MCDE_PORTTYPE_DSI)
-+		return -EINVAL;
-+
-+	ret = mcde_dsi_dcs_write(ddev->chnl_state,
-+		DCS_CMD_SET_COLUMN_ADDRESS, &params[0], 4);
++	ret = mcde_dss_register_notifier(&display_nb);
 +	if (ret)
-+		return ret;
++		pr_warning("Failed to register dss notifier\n");
 +
-+	ret = mcde_dsi_dcs_write(ddev->chnl_state,
-+		DCS_CMD_SET_PAGE_ADDRESS, &params[4], 4);
++#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY
++	ret = mcde_display_device_register(&generic_display0);
++	if (ret)
++		pr_warning("Failed to register generic display device 0\n");
++	displays[0] = &generic_display0;
++#endif
 +
 +	return ret;
 +}
 +
-+static inline int mcde_display_on_first_update_default(
-+					struct mcde_display_device *ddev)
++module_init(init_display_devices);
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 1187f1f..8b1ecee 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -9,6 +9,20 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/regulator/machine.h>
++#include <linux/platform_device.h>
++
++#include <mach/devices.h>
++
++
++#define AB8500_VAUXN_LDO_MIN_VOLTAGE    (1100000)
++#define AB8500_VAUXN_LDO_MAX_VOLTAGE    (3300000)
++
++static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
++	{
++		.dev = NULL,
++		.supply = "v-display",
++	},
++};
+ 
+ /* supplies to the display/camera */
+ static struct regulator_init_data ab8500_vaux1_regulator = {
+@@ -19,6 +33,8 @@ static struct regulator_init_data ab8500_vaux1_regulator = {
+ 		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
+ 					REGULATOR_CHANGE_STATUS,
+ 	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux1_consumers),
++	.consumer_supplies = ab8500_vaux1_consumers,
+ };
+ 
+ /* supplies to the on-board eMMC */
+@@ -92,10 +108,22 @@ static struct regulator_init_data ab8500_vintcore_init = {
+ };
+ 
+ /* supply for U8500 CSI/DSI, VANA LDO */
++#define AB8500_VANA_REGULATOR_MIN_VOLTAGE      (0)
++#define AB8500_VANA_REGULATOR_MAX_VOLTAGE      (1200000)
++
++static struct regulator_consumer_supply ab8500_vana_consumers[] = {
++	{
++		.dev_name = "mcde",
++		.supply = "v-ana",
++	},
++};
++
+ static struct regulator_init_data ab8500_vana_init = {
+ 	.constraints = {
+ 		.name = "V-CSI/DSI",
+ 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
++	.consumer_supplies = ab8500_vana_consumers,
+ };
+ 
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index e6e3e82..7c90a50 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -303,6 +303,9 @@ static struct platform_device *platform_devs[] __initdata = {
+ 	&ux500_i2c2_device,
+ 	&ux500_i2c3_device,
+ 	&ux500_ske_keypad_device,
++#ifdef CONFIG_FB_MCDE
++	&ux500_mcde_device,
++#endif
+ };
+ 
+ static void __init u8500_init_machine(void)
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index a090208..1017fdc 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -12,11 +12,15 @@
+ #include <linux/gpio.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl022.h>
++#include <linux/delay.h>
++
++#include <video/mcde/mcde.h>
+ 
+ #include <plat/ste_dma40.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
++#include <mach/prcmu.h>
+ 
+ #include "ste-dma40-db8500.h"
+ 
+@@ -379,3 +383,67 @@ struct platform_device ux500_ske_keypad_device = {
+ 	.num_resources = ARRAY_SIZE(keypad_resources),
+ 	.resource = keypad_resources,
+ };
++static struct resource mcde_resources[] = {
++	[0] = {
++		.name  = MCDE_IO_AREA,
++		.start = U8500_MCDE_BASE,
++		.end   = U8500_MCDE_BASE + 0x1000 - 1, /*TODO: Fix size*/
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.name  = MCDE_IO_AREA,
++		.start = U8500_DSI_LINK1_BASE,
++		.end   = U8500_DSI_LINK1_BASE + U8500_DSI_LINK_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[2] = {
++		.name  = MCDE_IO_AREA,
++		.start = U8500_DSI_LINK2_BASE,
++		.end   = U8500_DSI_LINK2_BASE + U8500_DSI_LINK_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[3] = {
++		.name  = MCDE_IO_AREA,
++		.start = U8500_DSI_LINK3_BASE,
++		.end   = U8500_DSI_LINK3_BASE + U8500_DSI_LINK_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[4] = {
++		.name  = MCDE_IRQ,
++		.start = IRQ_DISP,
++		.end   = IRQ_DISP,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static int mcde_platform_enable(void)
 +{
-+	ddev->first_update = false;
++	return prcmu_mcde_enable();
++}
++
++static int mcde_platform_disable(void)
++{
++	return prcmu_mcde_disable();
++}
++
++static struct mcde_platform_data mcde_pdata = {
++	.num_dsilinks = 3,
++	.outmux = { 0, 3, 0, 0, 0 },
++	.syncmux = 0x01,
++	.regulator_id = "v-ana",
++	.clock_dsi_id = "hdmi",
++	.clock_dsi_lp_id = "tv",
++	.clock_mcde_id = "mcde",
++	.platform_enable = mcde_platform_enable,
++	.platform_disable = mcde_platform_disable,
++};
++
++struct platform_device ux500_mcde_device = {
++	.name = "mcde",
++	.id = -1,
++	.dev = {
++		.platform_data = &mcde_pdata,
++	},
++	.num_resources = ARRAY_SIZE(mcde_resources),
++	.resource = mcde_resources,
++};
+diff --git a/arch/arm/mach-ux500/include/mach/db8500-regs.h b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+index f07d098..4acb632 100644
+--- a/arch/arm/mach-ux500/include/mach/db8500-regs.h
++++ b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+@@ -142,4 +142,11 @@
+ #define U8500_GPIOBANK7_BASE	(U8500_GPIO2_BASE + 0x80)
+ #define U8500_GPIOBANK8_BASE	U8500_GPIO3_BASE
+ 
++#define U8500_DSI_LINK_SIZE	0x1000
++#define U8500_DSI_LINK1_BASE	U8500_MCDE_BASE
++#define U8500_DSI_LINK2_BASE	(U8500_DSI_LINK1_BASE + U8500_DSI_LINK_SIZE)
++#define U8500_DSI_LINK3_BASE	(U8500_DSI_LINK2_BASE + U8500_DSI_LINK_SIZE)
++#define U8500_DSI_LINK_COUNT	0x3
++
++
+ #endif
+diff --git a/arch/arm/mach-ux500/include/mach/devices.h b/arch/arm/mach-ux500/include/mach/devices.h
+index b91a4d1..58fbb34 100644
+--- a/arch/arm/mach-ux500/include/mach/devices.h
++++ b/arch/arm/mach-ux500/include/mach/devices.h
+@@ -19,6 +19,7 @@ extern struct amba_device ux500_uart0_device;
+ extern struct amba_device ux500_uart1_device;
+ extern struct amba_device ux500_uart2_device;
+ 
++extern struct platform_device ux500_mcde_device;
+ extern struct platform_device ux500_i2c1_device;
+ extern struct platform_device ux500_i2c2_device;
+ extern struct platform_device ux500_i2c3_device;
+diff --git a/arch/arm/mach-ux500/include/mach/prcmu-regs.h b/arch/arm/mach-ux500/include/mach/prcmu-regs.h
+index 8885f39..1fc419e 100644
+--- a/arch/arm/mach-ux500/include/mach/prcmu-regs.h
++++ b/arch/arm/mach-ux500/include/mach/prcmu-regs.h
+@@ -80,6 +80,7 @@
+ 
+ /* ePOD and memory power signal control registers */
+ #define PRCM_EPOD_C_SET            (_PRCMU_BASE + 0x410)
++#define PRCM_EPOD_C_CLR            (_PRCMU_BASE + 0x414)
+ #define PRCM_SRAM_LS_SLEEP         (_PRCMU_BASE + 0x304)
+ 
+ /* Debug power control unit registers */
+diff --git a/arch/arm/mach-ux500/include/mach/prcmu.h b/arch/arm/mach-ux500/include/mach/prcmu.h
+index 549843f..ee00a9c 100644
+--- a/arch/arm/mach-ux500/include/mach/prcmu.h
++++ b/arch/arm/mach-ux500/include/mach/prcmu.h
+@@ -12,4 +12,7 @@
+ int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
+ int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
+ 
++int prcmu_mcde_enable(void);
++int prcmu_mcde_disable(void);
++
+ #endif /* __MACH_PRCMU_H */
+diff --git a/arch/arm/mach-ux500/prcmu.c b/arch/arm/mach-ux500/prcmu.c
+index 293274d..33b7827 100644
+--- a/arch/arm/mach-ux500/prcmu.c
++++ b/arch/arm/mach-ux500/prcmu.c
+@@ -11,6 +11,7 @@
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/delay.h>
+ #include <linux/mutex.h>
+ #include <linux/completion.h>
+ #include <linux/jiffies.h>
+@@ -37,6 +38,34 @@
+ #define I2C_READ(slave) (((slave) << 1) | BIT(0))
+ #define I2C_STOP_EN BIT(3)
+ 
++/*
++* Used by MCDE to setup all necessary PRCMU registers
++*/
++#define PRCMU_CLAMP_DSS_DSIPLL		0x00600C00
++#define PRCMU_CLAMP_DSIPLL		0x00400800
++#define PRCMU_RESET_DSS_DSIPLL		0x0000400C
++#define PRCMU_RESET_DSIPLL		0x00004000
++#define PRCMU_ENABLE_DSS_MEM		0x00200000
++#define PRCMU_ENABLE_DSS_LOGIC		0x00100000
++#define PRCMU_DSS_SLEEP_OUTPUT_MASK	0x400
++#define PRCMU_UNCLAMP_DSS_DSIPLL	0x00600C00
++#define PRCMU_UNCLAMP_DSIPLL		0x00400800
++#define PRCMU_POWER_ON_DSI		0x00008000
++
++#define PRCMU_DSI_CLOCK_SETTING		0x00000148
++#define PRCMU_DSI_LP_CLOCK_SETTING	0x00000F00
++#define PRCMU_PLLDSI_FREQ_SETTING	0x00020123
++
++#define PRCMU_ENABLE_PLLDSI		0x00000001
++#define PRCMU_DISABLE_PLLDSI		0x00000000
++#define PRCMU_RELEASE_RESET_DSS		0x0000400C
++#define PRCMU_RELEASE_RESET_DSI		0x00004000
++#define PRCMU_DSI_PLLOUT_SEL_SETTING	0x00000202
++#define PRCMU_ENABLE_ESCAPE_CLOCK	0x07010101
++#define PRCMU_DSI_RESET_SW		0x00000007
++
++#define PRCMU_MCDE_DELAY			10
++
+ enum ack_mb5_status {
+ 	I2C_WR_OK = 0x01,
+ 	I2C_RD_OK = 0x02,
+@@ -145,6 +174,106 @@ unlock_and_return:
+ }
+ EXPORT_SYMBOL(prcmu_abb_write);
+ 
++static void mcde_epod_enable(void)
++{
++	/* Power on DSS mem */
++	writel(PRCMU_ENABLE_DSS_MEM, PRCM_EPOD_C_SET);
++	mdelay(PRCMU_MCDE_DELAY);
++	/* Power on DSS logic */
++	writel(PRCMU_ENABLE_DSS_LOGIC, PRCM_EPOD_C_SET);
++	mdelay(PRCMU_MCDE_DELAY);
++}
++
++static void mcde_epod_disable(void)
++{
++	/* Power off DSS mem */
++	writel(PRCMU_ENABLE_DSS_MEM, PRCM_EPOD_C_CLR);
++	mdelay(PRCMU_MCDE_DELAY);
++	/* Power off DSS logic */
++	writel(PRCMU_ENABLE_DSS_LOGIC, PRCM_EPOD_C_CLR);
++	mdelay(PRCMU_MCDE_DELAY);
++}
++
++int prcmu_mcde_enable(void)
++{
++	u32 temp;
++
++	/* Clamp DSS out, DSIPLL in/out, (why not DSS input?) */
++	writel(PRCMU_CLAMP_DSS_DSIPLL, PRCM_MMIP_LS_CLAMP_SET);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	/* Enable DSS_M_INITN, DSS_L_RESETN, DSIPLL_RESETN resets */
++	writel(PRCMU_RESET_DSS_DSIPLL, PRCM_APE_RESETN_CLR);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	mcde_epod_enable();
++
++	/* Release DSS_SLEEP */
++	temp = readl(PRCM_SRAM_LS_SLEEP);
++	writel(temp & ~PRCMU_DSS_SLEEP_OUTPUT_MASK, PRCM_SRAM_LS_SLEEP);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	/* Unclamp DSS out, DSIPLL in/out, (why not DSS input?) */
++	writel(PRCMU_UNCLAMP_DSS_DSIPLL, PRCM_MMIP_LS_CLAMP_CLR);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	/* HDMI and TVCLK Should be handled somewhere else */
++	writel(PRCMU_DSI_CLOCK_SETTING, PRCM_HDMICLK_MGT);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	writel(PRCMU_DSI_LP_CLOCK_SETTING, PRCM_TVCLK_MGT);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	writel(PRCMU_PLLDSI_FREQ_SETTING, PRCM_PLLDSI_FREQ);
++	mdelay(PRCMU_MCDE_DELAY);
++	/* Start DSI PLL */
++	writel(PRCMU_ENABLE_PLLDSI, PRCM_PLLDSI_ENABLE);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	/* Release DSS_M_INITN, DSS_L_RESETN, DSIPLL_RESETN */
++	writel(PRCMU_RELEASE_RESET_DSS, PRCM_APE_RESETN_SET);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	writel(PRCMU_DSI_PLLOUT_SEL_SETTING, PRCM_DSI_PLLOUT_SEL);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	writel(PRCMU_ENABLE_ESCAPE_CLOCK, PRCM_DSITVCLK_DIV);
++	mdelay(PRCMU_MCDE_DELAY);
++	/* Release DSI reset 0/1/2 */
++	writel(PRCMU_DSI_RESET_SW, PRCM_DSI_SW_RESET);
++	mdelay(PRCMU_MCDE_DELAY);
 +	return 0;
 +}
 +
-+void mcde_display_init_device(struct mcde_display_device *ddev)
++int prcmu_mcde_disable(void)
 +{
-+	/* Setup default callbacks */
-+	ddev->get_native_resolution =
-+				mcde_display_get_native_resolution_default;
-+	ddev->get_default_pixel_format =
-+				mcde_display_get_default_pixel_format_default;
-+	ddev->get_physical_size = mcde_display_get_physical_size_default;
-+	ddev->set_power_mode = mcde_display_set_power_mode_default;
-+	ddev->get_power_mode = mcde_display_get_power_mode_default;
-+	ddev->try_video_mode = mcde_display_try_video_mode_default;
-+	ddev->set_video_mode = mcde_display_set_video_mode_default;
-+	ddev->get_video_mode = mcde_display_get_video_mode_default;
-+	ddev->set_pixel_format = mcde_display_set_pixel_format_default;
-+	ddev->get_pixel_format = mcde_display_get_pixel_format_default;
-+	ddev->get_port_pixel_format =
-+				mcde_display_get_port_pixel_format_default;
-+	ddev->set_rotation = mcde_display_set_rotation_default;
-+	ddev->get_rotation = mcde_display_get_rotation_default;
-+	ddev->set_synchronized_update =
-+				mcde_display_set_synchronized_update_default;
-+	ddev->get_synchronized_update =
-+				mcde_display_get_synchronized_update_default;
-+	ddev->apply_config = mcde_display_apply_config_default;
-+	ddev->invalidate_area = mcde_display_invalidate_area_default;
-+	ddev->update = mcde_display_update_default;
-+	ddev->prepare_for_update = mcde_display_prepare_for_update_default;
-+	ddev->on_first_update = mcde_display_on_first_update_default;
++	u32 temp;
++
++	writel(PRCMU_DISABLE_PLLDSI, PRCM_PLLDSI_ENABLE);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	/* Clamp DSS out, DSIPLL in/out, (why not DSS input?) */
++	writel(PRCMU_CLAMP_DSS_DSIPLL, PRCM_MMIP_LS_CLAMP_SET);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	/* Release DSS_SLEEP */
++	temp = readl(PRCM_SRAM_LS_SLEEP);
++	writel(temp & ~PRCMU_DSS_SLEEP_OUTPUT_MASK, PRCM_SRAM_LS_SLEEP);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	/* Disable DSS_M_INITN, DSS_L_RESETN, DSIPLL_RESETN resets */
++	writel(PRCMU_RESET_DSS_DSIPLL, PRCM_APE_RESETN_CLR);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	mcde_epod_disable();
++
++	/* Unclamp DSS out, DSIPLL in/out, (why not DSS input?) */
++	writel(PRCMU_UNCLAMP_DSS_DSIPLL, PRCM_MMIP_LS_CLAMP_CLR);
++	mdelay(PRCMU_MCDE_DELAY);
++
++	return 0;
 +}
 +
-diff --git a/include/video/mcde/mcde_display-generic_dsi.h b/include/video/mcde/mcde_display-generic_dsi.h
-new file mode 100644
-index 0000000..4879061
---- /dev/null
-+++ b/include/video/mcde/mcde_display-generic_dsi.h
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * ST-Ericsson MCDE generic DCS display driver
-+ *
-+ * Author: Marcus Lorentzon <marcus.xm.lorentzon@stericsson.com>
-+ * for ST-Ericsson.
-+ *
-+ * License terms: GNU General Public License (GPL), version 2.
-+ */
-+#ifndef __MCDE_DISPLAY_GENERIC__H__
-+#define __MCDE_DISPLAY_GENERIC__H__
-+
-+#include <linux/regulator/consumer.h>
-+
-+#include "mcde_display.h"
-+
-+struct mcde_display_generic_platform_data {
-+	/* Platform info */
-+	int reset_gpio;
-+	bool reset_high;
-+	const char *regulator_id;
-+	int reset_delay; /* ms */
-+	u32 ddb_id;
-+
-+	/* Driver data */
-+	bool generic_platform_enable;
-+	struct regulator *regulator;
-+	int max_supply_voltage;
-+	int min_supply_voltage;
-+};
-+
-+#endif /* __MCDE_DISPLAY_GENERIC__H__ */
-+
-diff --git a/include/video/mcde/mcde_display.h b/include/video/mcde/mcde_display.h
-new file mode 100644
-index 0000000..8dfdbb5
---- /dev/null
-+++ b/include/video/mcde/mcde_display.h
-@@ -0,0 +1,139 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * ST-Ericsson MCDE display driver
-+ *
-+ * Author: Marcus Lorentzon <marcus.xm.lorentzon@stericsson.com>
-+ * for ST-Ericsson.
-+ *
-+ * License terms: GNU General Public License (GPL), version 2.
-+ */
-+#ifndef __MCDE_DISPLAY__H__
-+#define __MCDE_DISPLAY__H__
-+
-+#include <linux/device.h>
-+#include <linux/pm.h>
-+
-+#include <video/mcde/mcde.h>
-+
-+#define UPDATE_FLAG_PIXEL_FORMAT	0x1
-+#define UPDATE_FLAG_VIDEO_MODE		0x2
-+#define UPDATE_FLAG_ROTATION		0x4
-+
-+#define to_mcde_display_device(__dev) \
-+	container_of((__dev), struct mcde_display_device, dev)
-+
-+struct mcde_display_device {
-+	/* MCDE driver static */
-+	struct device     dev;
-+	const char       *name;
-+	int               id;
-+	struct mcde_port *port;
-+
-+	/* MCDE dss driver internal */
-+	bool initialized;
-+	enum mcde_chnl chnl_id;
-+	enum mcde_fifo fifo;
-+	bool first_update;
-+
-+	bool enabled;
-+	struct mcde_chnl_state *chnl_state;
-+	struct list_head ovlys;
-+	struct mcde_rectangle update_area;
-+	/* TODO: Remove once ESRAM allocator is done */
-+	u32 rotbuf1;
-+	u32 rotbuf2;
-+
-+	/* Display driver internal */
-+	u16 native_x_res;
-+	u16 native_y_res;
-+	u16 physical_width;
-+	u16 physical_height;
-+	enum mcde_display_power_mode power_mode;
-+	enum mcde_ovly_pix_fmt default_pixel_format;
-+	enum mcde_ovly_pix_fmt pixel_format;
-+	enum mcde_display_rotation rotation;
-+	bool synchronized_update;
-+	struct mcde_video_mode video_mode;
-+	int update_flags;
-+
-+	/* Driver API */
-+	void (*get_native_resolution)(struct mcde_display_device *dev,
-+		u16 *x_res, u16 *y_res);
-+	enum mcde_ovly_pix_fmt (*get_default_pixel_format)(
-+		struct mcde_display_device *dev);
-+	void (*get_physical_size)(struct mcde_display_device *dev,
-+		u16 *x_size, u16 *y_size);
-+
-+	int (*set_power_mode)(struct mcde_display_device *dev,
-+		enum mcde_display_power_mode power_mode);
-+	enum mcde_display_power_mode (*get_power_mode)(
-+		struct mcde_display_device *dev);
-+
-+	int (*try_video_mode)(struct mcde_display_device *dev,
-+		struct mcde_video_mode *video_mode);
-+	int (*set_video_mode)(struct mcde_display_device *dev,
-+		struct mcde_video_mode *video_mode);
-+	void (*get_video_mode)(struct mcde_display_device *dev,
-+		struct mcde_video_mode *video_mode);
-+
-+	int (*set_pixel_format)(struct mcde_display_device *dev,
-+		enum mcde_ovly_pix_fmt pix_fmt);
-+	enum mcde_ovly_pix_fmt (*get_pixel_format)(
-+		struct mcde_display_device *dev);
-+	enum mcde_port_pix_fmt (*get_port_pixel_format)(
-+		struct mcde_display_device *dev);
-+
-+	int (*set_rotation)(struct mcde_display_device *dev,
-+		enum mcde_display_rotation rotation);
-+	enum mcde_display_rotation (*get_rotation)(
-+		struct mcde_display_device *dev);
-+
-+	int (*set_synchronized_update)(struct mcde_display_device *dev,
-+		bool enable);
-+	bool (*get_synchronized_update)(struct mcde_display_device *dev);
-+
-+	int (*apply_config)(struct mcde_display_device *dev);
-+	int (*invalidate_area)(struct mcde_display_device *dev,
-+						struct mcde_rectangle *area);
-+	int (*update)(struct mcde_display_device *dev);
-+	int (*prepare_for_update)(struct mcde_display_device *dev,
-+		u16 x, u16 y, u16 w, u16 h);
-+	int (*on_first_update)(struct mcde_display_device *dev);
-+	int (*platform_enable)(struct mcde_display_device *dev);
-+	int (*platform_disable)(struct mcde_display_device *dev);
-+};
-+
-+struct mcde_display_driver {
-+	int (*probe)(struct mcde_display_device *dev);
-+	int (*remove)(struct mcde_display_device *dev);
-+	void (*shutdown)(struct mcde_display_device *dev);
-+	int (*suspend)(struct mcde_display_device *dev,
-+		pm_message_t state);
-+	int (*resume)(struct mcde_display_device *dev);
-+
-+	struct device_driver driver;
-+};
-+
-+/* MCDE dsi (Used by MCDE display drivers) */
-+
-+int mcde_display_dsi_dcs_write(struct mcde_display_device *dev,
-+	u8 cmd, u8 *data, int len);
-+int mcde_display_dsi_dcs_read(struct mcde_display_device *dev,
-+	u8 cmd, u8 *data, int *len);
-+int mcde_display_dsi_bta_sync(struct mcde_display_device *dev);
-+
-+/* MCDE display bus */
-+
-+int mcde_display_driver_register(struct mcde_display_driver *drv);
-+void mcde_display_driver_unregister(struct mcde_display_driver *drv);
-+int mcde_display_device_register(struct mcde_display_device *dev);
-+void mcde_display_device_unregister(struct mcde_display_device *dev);
-+
-+void mcde_display_init_device(struct mcde_display_device *dev);
-+
-+int mcde_display_init(void);
-+void mcde_display_exit(void);
-+
-+#endif /* __MCDE_DISPLAY__H__ */
-+
+ static void read_mailbox_0(void)
+ {
+ 	writel(MBOX_BIT(0), PRCM_ARM_IT1_CLEAR);
 -- 
 1.6.3.3
