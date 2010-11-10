@@ -1,19 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Nov 2010 13:49:13 +0000
-Subject: Size of dma_alloc_writecombine.
-In-Reply-To: <AANLkTi=287gpR8eeQH-p5ZHEW5GtFQoqHa-TA_-NW1ZN@mail.gmail.com>
-References: <AANLkTi=287gpR8eeQH-p5ZHEW5GtFQoqHa-TA_-NW1ZN@mail.gmail.com>
-Message-ID: <20101110134913.GB24305@n2100.arm.linux.org.uk>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Wed, 10 Nov 2010 15:51:25 +0200
+Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
+In-Reply-To: <20101110134531.GA24305@n2100.arm.linux.org.uk>
+References: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
+	<4CB5629A.8040306@compulab.co.il>
+	<20101110131838.GA25666@n2100.arm.linux.org.uk>
+	<AANLkTimNu1=L1qoQXdeiLbShQZuOPew_VCLwf7LZb5N5@mail.gmail.com>
+	<20101110134531.GA24305@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikFq3HcN1kk8Oy94cxFTiW7x7R-BfH_eeDk41Sy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 02:35:09PM +0530, vipul samar wrote:
-> Hello,
-> 
-> I am working on LCD module of resolution size 1024X768. When i am allocating
-> memory for frame buffer using dma_alloc_writecombine call its not able to
-> allocate memory more then 2MB memory. The Reason is the maximum size
-> allocated by  dma_alloc_writecombine is 2 MB.
-
-In your mach/memory.h, define CONSISTENT_DMA_SIZE to be a multiple of 2MB.
-This sets the size of the DMA area.
+>> > Is there someone out there who'd be willing to look after this class of
+>> > platforms and put their name in MAINTAINERS for it?
+>> yes, I'ld. should I send a ?patch to update the MAINTAINERS file?
+>
+> Yes, and does the CM-A510 patch get your ack, and/or are you going to
+> deal with it?
+I reviewed it, it looks fine to me.
+saeed
