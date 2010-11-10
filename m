@@ -1,62 +1,98 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Nov 2010 16:26:19 +0100
-Subject: Patch IMX audmux debugfs.
-In-Reply-To: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-Message-ID: <20101110152619.GB8950@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 10 Nov 2010 21:13:21 +0530
+Subject: [PATCH] ARM: Temporary fix for broken arch reboot
+In-Reply-To: <1289397874.4513.54.camel@e102109-lin.cambridge.arm.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+	<20101109131838.GF2869@n2100.arm.linux.org.uk>
+	<1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D4FAE5C@dbde02.ent.ti.com>
+	<20101110100617.GA23244@n2100.arm.linux.org.uk>
+	<1289397874.4513.54.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030D58A400@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill,
 
-On Tue, Nov 09, 2010 at 06:11:12PM -0500, Bill Pringlemeir wrote:
+
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Wednesday, November 10, 2010 7:35 PM
+> To: Russell King - ARM Linux
+> Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; Gadiyar,
+> Anand
+> Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
 > 
-> $ mount -t debugfs debugfs /sys/kernel/debug
-> $ cd /sys/kernel/debug/audmux
-> $ cat *
-> [crashes when accessing ssi7]
+> On Wed, 2010-11-10 at 10:06 +0000, Russell King - ARM Linux wrote:
+> > On Wed, Nov 10, 2010 at 11:25:21AM +0530, Shilimkar, Santosh wrote:
+> > > > -----Original Message-----
+> > > > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> > > > Sent: Tuesday, November 09, 2010 10:08 PM
+> > > > To: Russell King - ARM Linux
+> > > > Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org;
+> Gadiyar,
+> > > > Anand
+> > > > Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
+> > > >
+> > > > On Tue, 2010-11-09 at 13:18 +0000, Russell King - ARM Linux wrote:
+> > > > > On Tue, Nov 09, 2010 at 06:40:39PM +0530, Shilimkar, Santosh
+> wrote:
+> > > > > > With commit 3d3f78d752bf, reboot seems to broken on ARM
+> > > > > > machines. CPU dies while doing flush_pmd_entry() as part of
+> > > > > > setup_mm_for_reboot()
+> > > >
+> > > > What do you mean by 'dies'? Can you still connect with a debugger or
+> it
+> > > > got to some weird state?
+> > > >
+> > > It goes to some weird state. Basically the emulation connection dies,
+> > > and debugger gets disconnected.
+> > >
+> > > > > > I know this is not the fix but intention is to report the
+> > > > > > issue and also provide temporary fix till it get fixed correctly
+> > > > >
+> > > > > So you're now rebooting with the secondary CPUs still running.  I
+> guess
+> > > > > that the secondary CPUs end up crashing and don't restart.
+> > > > >
+> > > > > I think more the question is why the CP15 cache clean/flush is
+> hanging
+> > > > > with the other CPUs taken down.  All the other CPUs will be doing
+> is
+> > > > > sitting in a loop doing nothing.
+> > > >
+> > > > I can't think of anything. Did the other CPUs print 'stopping'?
+> > > No it doesn't not print anything.
+> >
+> > The processing of the IPI is asynchronous to the CPU which is rebooting
+> > continuing - which means that if there is some kind of bus lockup, you
+> > won't get anything from any of the CPUs.
 > 
-> The index is one based, but the register map is zero based.  So the
-> ssi1 is actually sending info for ssi2.  Also, the ssi7 touches
-> non-existent data and can cause an exception (only registers sets 1-6
-> exist).
+> The printing only happens for SYSTEM_BOOTING or SYSTEM_RUNNING. I
+> suspect in this case we have SYSTEM_RESTARTING and the condition in
+> ipi_cpu_stop() is false, therefore no printing. It may be worth putting
+> some printks outside the 'if' to see whether the secondary CPUs get
+> there.
 > 
-> Alternatively, the MX31_AUDMUX_PORT6_SSI_PINS_6 and
-> MX27_AUDMUX_PPCR3_SSI_PINS_3 constants could be used for the loop
-> termination, but maybe that means conditionalization (and there are no
-> MX25 constants).
-> 
-> diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
-> index f9e7cdb..0547145 100644
-> --- a/arch/arm/plat-mxc/audmux-v2.c
-> +++ b/arch/arm/plat-mxc/audmux-v2.c
-> @@ -66,7 +66,7 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
->  {
->         ssize_t ret;
->         char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-> -       int port = (int)file->private_data;
-> +       int port = ((int)file->private_data) - 1;
->         u32 pdcr, ptcr;
->  
->         if (!buf)
-> @@ -150,7 +150,7 @@ static void audmux_debugfs_init(void)
->                 return;
->         }
->  
-> -       for (i = 1; i < 8; i++) {
-> +       for (i = 1; i < 7; i++) {
->                 snprintf(buf, sizeof(buf), "ssi%d", i);
->                 if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
->                                          (void *)i, &audmux_debugfs_fops))
+While doing some experiments on this issue, one interesting
+observation I made. Looks like there is race between two
+Cores which makes system behave badly in reboot path.
 
-I prefer passing (void *)(i - 1) here and skipping the first hunk.
-Please add your Signed-off-by next time you send a patch.
+Just adding a delay in the ipi_cpu_stop() makes the reboot work
+as well
 
-Sascha
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 8c19595..f7dadbf 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -526,6 +526,8 @@ static void ipi_cpu_stop(unsigned int cpu)
+                spin_unlock(&stop_lock);
+        }
 
++       udelay(500);
++
+        set_cpu_online(cpu, false);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+        local_fiq_disable();
+
+Regards,
+Santosh
