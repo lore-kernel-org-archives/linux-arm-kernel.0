@@ -1,33 +1,27 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Wed, 10 Nov 2010 16:57:23 +0200
-Subject: [PATCH] ARM: add MAINTAINERS entry for Marvell Dove SoC
-Message-ID: <1289401043-31019-1-git-send-email-saeed@marvell.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 10 Nov 2010 16:04:28 +0100
+Subject: [PATCH] mx51_babbage: Add SPI flash support
+In-Reply-To: <762576.24799.qm@web51006.mail.re2.yahoo.com>
+References: <762576.24799.qm@web51006.mail.re2.yahoo.com>
+Message-ID: <20101110150428.GI16938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Fabio,
 
-Signed-off-by: Saeed Bishara <saeed@marvell.com>
----
- MAINTAINERS |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+On Wed, Nov 10, 2010 at 07:00:02AM -0800, Fabio Estevam wrote:
+> MX51 Babbage has an AT45DB321 SPI Flash connected to eCSPI1.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Great you restore the ordering of selects.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0094224..39d9575 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -769,6 +769,13 @@ ARM/MAGICIAN MACHINE SUPPORT
- M:	Philipp Zabel <philipp.zabel@gmail.com>
- S:	Maintained
- 
-+ARM/Marvell Dove SoC support
-+M:	Saeed Bishara <saeed@marvell.com>
-+M:	Mike Rapoport <mike@compulab.co.il>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+F:	arch/arm/mach-dove/
-+S:	Maintained
-+
- ARM/Marvell Loki/Kirkwood/MV78xx0/Orion SOC support
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- M:	Nicolas Pitre <nico@fluxnic.net>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Best regards
+Uwe
+
 -- 
-1.6.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
