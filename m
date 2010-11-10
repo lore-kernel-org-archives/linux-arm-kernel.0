@@ -1,48 +1,125 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Nov 2010 17:11:04 +0000
-Subject: [PATCH] pl011: added clock management feature
-In-Reply-To: <0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
-References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
-	<20101109224012.GA21992@kroah.com>
-	<20101110000152.GA8993@n2100.arm.linux.org.uk>
-	<0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
-Message-ID: <20101110171104.GC27571@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 10 Nov 2010 09:14:36 -0800
+Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
+In-Reply-To: <1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
+Message-ID: <1289409276.15905.65.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 10:15:53AM +0200, Grzegorz.Sygieda at tieto.com wrote:
-> The main goal was to disable/enable clock while port open. This is usefull
-> for scenario, where some higher level driver wants to control the power
-> consumption (using set_termios). In the same time a user-space app (eg.
-> hciattach) is still bounded to the specific /dev/tty* device associated
-> with particular uart. From user POV device is always open, and app does
-> not have to respawn, and we can save power.
+On Wed, 2010-11-10 at 13:04 +0100, Jimmy Rubin wrote:
+> This patch adds support for MCDE, Memory-to-display controller
+> found in the ST-Ericsson ux500 products.
 
-If a port is open, and bound (eg to a bluetooth hci), how does the higher
-level decide whether to place the port in low power mode?  How does it
-know that there isn't going to be characters sent to the port?
+Just trivia:
 
-When the port is in this low power mode, it's as good as closed from the
-external world point of view.
+> diff --git a/drivers/video/mcde/mcde_hw.c b/drivers/video/mcde/mcde_hw.c
 
-I don't like this idea because I really can't see how it could be used
-effectively - there isn't really any way for a bound protocol to know
-whether there's characters expected to be received or not.  Either the
-port is open and in use, or it isn't.
+[]
 
-Let's take an example of a modem waiting for an incoming call.  It spends
-most of its time waiting for the call.  You could argue that you could
-shut the clock off to the port to save power - but then how do you receive
-the "RING" message from the modem?  As you've shut the clock off, you're
-not going to detect the activity on the receive line.
+> +#define dsi_rfld(__i, __reg, __fld) \
+> +	((dsi_rreg(__i, __reg) & __reg##_##__fld##_MASK) >> \
+> +		__reg##_##__fld##_SHIFT)
+> +#define dsi_wfld(__i, __reg, __fld, __val) \
+> +	dsi_wreg(__i, __reg, (dsi_rreg(__i, __reg) & \
+> +	~__reg##_##__fld##_MASK) | (((__val) << __reg##_##__fld##_SHIFT) & \
+> +		 __reg##_##__fld##_MASK))
 
-I'm sure that also applies to bluetooth as well, especially if you're a
-'client' device - as long as the port is attached, bluetooth probably
-expects to be able to listen to what's going on so the device can be
-discovered.
+These macros are not particularly readable.
+Perhaps use statement expression macros like:
 
-It's all very well adding hooks to the transmit path to ensure that there
-clock is on while there's characters to be sent, but this really doesn't
-help you on the receive side.
+#define dsi_rfld(__i, __reg, __fld) 					\
+({									\
+	const u32 mask = __reg##_#__fld##_MASK;				\
+	const u32 shift = __reg##_##__fld##_SHIFT;			\
+	((dsi_rreg(__i, __reg) & mask) >> shift;			\
+})
 
-I'm worried...
+#define dsi_wfld(__i, __reg, __fld, __val)				\
+({									\
+	const u32 mask = __reg##_#__fld##_MASK;				\
+	const u32 shift = __reg##_##__fld##_SHIFT;			\
+	dsi_wreg(__i, __reg,						\
+		 (dsi_rreg(__i, __reg) & ~mask) | (((__val) << shift) & mask));\
+})
+
+> +static struct mcde_chnl_state channels[] = {
+
+Should more static structs be static const?
+
+[]
+
+> +	dev_vdbg(&mcde_dev->dev, "%s\n", __func__);
+
+If your dev_<level> logging messages use "%s", __func__
+I suggest you use a set of local macros to preface this.
+
+I don't generally find the function name useful.
+
+Maybe only use the %s __func__ pair when you are also
+setting verbose debugging.
+
+#ifdef VERBOSE_DEBUG
+#define mcde_printk(level, dev, fmt, args) \
+	dev_printk(level, dev, "%s: " fmt, __func__, ##args)
+#else
+#define mcde_printk(level, dev, fmt, args) \
+	dev_printk(level, dev, fmt, args)
+#endif
+
+#ifdef VERBOSE_DEBUG
+#define mcde_vdbg(dev, fmt, args) \
+	mcde_printk(KERN_DEBUG, dev, fmt, ##args)
+#else
+#define mcde_vdbg(dev, fmt, args) \
+	do { if (0) mcde_printk(KERN_DEBUG, dev, fmt, ##args); } while (0)
+#endif
+
+#ifdef DEBUG
+#define mcde_dbg(dev, fmt, args) \
+	mcde_printk(KERN_DEBUG, dev, fmt, ##args)
+#else
+#define mcde_dbg(dev, fmt, args) \
+	do { if (0) mcde_printk(KERN_DEBUG, dev, fmt, ##args); } while (0)
+#endif
+
+#define mcde_ERR(dev, fmt, args) \
+	mcde_printk(KERN_ERR, dev, fmt, ##args)
+#define mcde_warn(dev, fmt, args) \
+	mcde_printk(KERN_WARNING, dev, fmt, ##args)
+#define mcde_info(dev, fmt, args) \
+	mcde_printk(KERN_INFO, dev, fmt, ##args)
+
+> +static void disable_channel(struct mcde_chnl_state *chnl)
+> +{
+> +	int i;
+> +	const struct mcde_port *port = &chnl->port;
+> +
+> +	dev_vdbg(&mcde_dev->dev, "%s\n", __func__);
+> +
+> +	if (hardware_version == MCDE_CHIP_VERSION_3_0_8 &&
+> +				!is_channel_enabled(chnl)) {
+> +		chnl->continous_running = false;
+
+It'd be nice to change to continuous_running
+
+> +int mcde_dsi_dcs_write(struct mcde_chnl_state *chnl, u8 cmd, u8* data, int len)
+> +{
+> +	int i;
+> +	u32 wrdat[4] = { 0, 0, 0, 0 };
+> +	u32 settings;
+> +	u8 link = chnl->port.link;
+> +	u8 virt_id = chnl->port.phy.dsi.virt_id;
+> +
+> +	/* REVIEW: One command at a time */
+> +	/* REVIEW: Allow read/write on unreserved ports */
+> +	if (len > MCDE_MAX_DCS_WRITE || chnl->port.type != MCDE_PORTTYPE_DSI)
+> +		return -EINVAL;
+> +
+> +	wrdat[0] = cmd;
+> +	for (i = 1; i <= len; i++)
+> +		wrdat[i>>2] |= ((u32)data[i-1] << ((i & 3) * 8));
+
+Ever overrun wrdat?
+Maybe WARN_ON(len > 16, "oops?")
