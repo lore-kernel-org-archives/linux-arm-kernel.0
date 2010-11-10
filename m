@@ -1,46 +1,29 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 10 Nov 2010 09:00:58 -0800
-Subject: [PATCH] pl011: added clock management feature
-In-Reply-To: <0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
-References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
-	<20101109224012.GA21992@kroah.com>
-	<20101110000152.GA8993@n2100.arm.linux.org.uk>
-	<0CBD3CD1188FB94093DB405A20CBCFBE06C5C4D8D2@EXMB01.eu.tieto.com>
-Message-ID: <20101110170058.GB11947@suse.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Nov 2010 15:04:27 -0200
+Subject: [PATCHv3 1/2] ARM: imx: Add core definitions for MX53
+In-Reply-To: <20101110164640.GV6017@pengutronix.de>
+References: <1288972551-21877-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20101109214607.GG6017@pengutronix.de>
+	<86A0E76937111F4C92FABEC0A20988510523D224@az33exm21>
+	<20101110164640.GV6017@pengutronix.de>
+Message-ID: <AANLkTinmXin65ReWsUf02ia7FMvHfeqkVeaGu6Usmdw5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 10:15:53AM +0200, Grzegorz.Sygieda at tieto.com wrote:
-> >On Tue, Nov 09, 2010 at 02:40:12PM -0800, Greg KH wrote:
-> >> On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
-> >> > From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
-> >> > 
-> >> > This patch allows to control the pl011 clock using set_termios 
-> >> > callback. Any positive baudrate passed enables clock, otherwise 
-> >> > disables. This saves a lot of power on submicron designs since we 
-> >> > can clock off and disable unused UARTs.
-> >> 
-> >> That's nice, but it seems like an overload of what people 
-> >> traditionally think of when it comes to baud rates.  Why not just 
-> >> power down ports that are not open instead?
-> >
-> >We already do.  My question to Linus (in a previous message) is why this isn't sufficient.
-> 
-> The main goal was to disable/enable clock while port open. This is
-> usefull for scenario, where some higher level driver wants to control
-> the power consumption (using set_termios). In the same time a
-> user-space app (eg. hciattach) is still bounded to the specific
-> /dev/tty* device associated with particular uart. From user POV device
-> is always open, and app does not have to respawn, and we can save
-> power.
+On Wed, Nov 10, 2010 at 2:46 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+...
 
-That is nice, but again, you are overloading a common interface (one
-defined by POSIX I think) to do something else at the same time.  That
-might cause problems with some users that expect you to be able to use a
-baud rate of 0 :)
+>> Agreed, but I was unsure how to proceed with adding clock code for mx53.
+>> Should I merge mx53 clock code into clock-mx51 and rename clock-mx51?
+>
+> Yes, to something like clock-mx51-mx53.c
+>
 
-I like the idea, but not the overloading, sorry.
+Or maybe clock-mx5x.c would be more generic.
 
-thanks,
+This way when any other MX5x processor gets added we don't need to
+change the file name again.
 
-greg k-h
+Regards,
+
+Fabio Estevam
