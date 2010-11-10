@@ -1,11 +1,12 @@
 From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 10 Nov 2010 19:32:03 +0530
-Subject: [PATCH v3 02/13] OMAP: DMA: Introduce errata handling feature
-In-Reply-To: <87sjzakuxp.fsf@deeprootsystems.com>
+Date: Wed, 10 Nov 2010 19:32:08 +0530
+Subject: [PATCH v3 08/13] OMAP1: DMA: Introduce DMA driver as platform
+	device
+In-Reply-To: <87bp5ykufg.fsf@deeprootsystems.com>
 References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-3-git-send-email-manjugk@ti.com>
-	<87sjzakuxp.fsf@deeprootsystems.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBE@dbde02.ent.ti.com>
+	<1288099513-1854-9-git-send-email-manjugk@ti.com>
+	<87bp5ykufg.fsf@deeprootsystems.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBF@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,115 +14,151 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Kevin Hilman [mailto:khilman at deeprootsystems.com] 
-> Sent: Wednesday, November 10, 2010 3:43 AM
+> Sent: Wednesday, November 10, 2010 3:54 AM
 > To: G, Manjunath Kondaiah
 > Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Peter Ujfalusi; 
-> Cousson, Benoit; Shilimkar, Santosh
-> Subject: Re: [PATCH v3 02/13] OMAP: DMA: Introduce errata 
-> handling feature
+> linux-arm-kernel at lists.infradead.org; Cousson, Benoit; 
+> Shilimkar, Santosh
+> Subject: Re: [PATCH v3 08/13] OMAP1: DMA: Introduce DMA 
+> driver as platform device
 > 
 > "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 > 
-> > Implement errata handling to use flags instead of cpu_is_*
-> > and cpu_class_* in the code.
+> > Register OMAP1 DMA driver as platform device and add support
+> > for registering through platform device layer using resource
+> > structures.
 > >
-> > The errata flags are initialized at init time and during runtime
-> > we are using the errata variable (via the IS_DMA_ERRATA macro)
-> > to execute the required errata workaround.
-> >
-> > Reused errata handling patch from Peter Ujfalusi 
-> <peter.ujfalusi@nokia.com>
-> > https://patchwork.kernel.org/patch/231191/
-> 
-> When starting from someone else's work, would be very helpful to
-> reviewers (and original authors) if you summarized what you
-> changed/fixed/updated etc.
-
-ok. I will update patch summary.
-
-> 
 > > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> > Cc: Peter Ujfalusi <peter.ujfalusi@nokia.com>
 > > Cc: Benoit Cousson <b-cousson@ti.com>
 > > Cc: Kevin Hilman <khilman@deeprootsystems.com>
 > > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > > ---
-> >  arch/arm/plat-omap/dma.c              |  134 
-> ++++++++++++++++++++++----------
+> >  arch/arm/mach-omap1/dma.c              |  182 
+> ++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-omap1/include/mach/dma.h |   29 +++++
+> >  2 files changed, 211 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-omap1/dma.c
+> >  create mode 100644 arch/arm/mach-omap1/include/mach/dma.h
+> >
+> > diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+> > new file mode 100644
+> > index 0000000..e756069
+> > --- /dev/null
+> > +++ b/arch/arm/mach-omap1/dma.c
+> > @@ -0,0 +1,182 @@
+> > +/*
+> > + * dma.c - OMAP1/OMAP7xx-specific DMA code
+> > + *
+> > + * Copyright (C) 2003 - 2008 Nokia Corporation
+> > + * Author: Juha Yrj?l? <juha.yrjola@nokia.com>
+> > + * DMA channel linking for 1610 by Samuel Ortiz 
+> <samuel.ortiz@nokia.com>
+> > + * Graphics DMA and LCD DMA graphics tranformations
+> > + * by Imre Deak <imre.deak@nokia.com>
+> > + * OMAP2/3 support Copyright (C) 2004-2007 Texas Instruments, Inc.
+> > + * Some functions based on earlier dma-omap.c Copyright 
+> (C) 2001 RidgeRun, Inc.
+> > + *
+> > + * Copyright (C) 2010 Texas Instruments, Inc.
+> > + * Converted DMA library into platform driver
+> > + *                   - G, Manjunath Kondaiah <manjugk@ti.com>
+> > + *
+> > + * This program is free software; you can redistribute it 
+> and/or modify
+> > + * it under the terms of the GNU General Public License 
+> version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/err.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/pm_runtime.h>
+> 
+> no pm_runtime API usage in this patch.    Please add only when needed.
+> 
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/init.h>
+> > +#include <linux/sched.h>
+> 
+> why is sched.h needed?
+> 
+> > +#include <linux/spinlock.h>
+> 
+> ditto
+> 
+> > +#include <linux/errno.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/irq.h>
+> > +#include <linux/device.h>
+> 
+> When creating a new file like this, it's important to only include
+> headers that are actually used/needed.
+
+Ok. I will check these headers. It was copy paste from old dma driver.
+
+> 
+> > +#include <plat/dma.h>
+> > +#include <plat/tc.h>
+> > +
 [...]
-> > +	if (omap_type() == OMAP3430_REV_ES1_0)
-> > +		SET_DMA_ERRATA(DMA_ERRATA_i88);
+> > diff --git a/arch/arm/mach-omap1/include/mach/dma.h 
+> b/arch/arm/mach-omap1/include/mach/dma.h
+> > new file mode 100644
+> > index 0000000..7949e3f
+> > --- /dev/null
+> > +++ b/arch/arm/mach-omap1/include/mach/dma.h
+> > @@ -0,0 +1,29 @@
+> > +/*
+> > + *  OMAP DMA controller register offsets.
+> > + *
+> > + *  Copyright (C) 2003 Nokia Corporation
+> > + *  Author: Juha Yrj?l? <juha.yrjola@nokia.com>
+> > + *
+> > + *  Copyright (C) 2010 Texas Instruments
+> > + *  Converted DMA library into platform driver
+> > + *       by G, Manjunath Kondaiah <manjugk@ti.com>
+> > + *
+> > + * This program is free software; you can redistribute it 
+> and/or modify
+> > + * it under the terms of the GNU General Public License as 
+> published by
+> > + * the Free Software Foundation; either version 2 of the 
+> License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General 
+> Public License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, 
+> MA 02111-1307 USA
+> > + */
 > > +
-> > +	/*
-> > +	 * Errata 3.2/3.3: sometimes 0 is returned if CSAC/CDAC is
-> 
-> This doesn't look like a unique errata identifier.  Chapter 3 
-> is usually
-> the 'Cautions' section, and I don't listed in either the 34xx (v5.9),
-> 36xx (v1.3) or 44xx (v1.3) errata docs under this number, and 
-> don't see
-> that number in either of the 24xx errata docs either.   
-> Please clarify.
-
-Even I tried to find this info from errata docs prior to migrating
-all errata's to generic errata handling. This code was exising earlier,
-hence I retained it "as is", no documentation exists for this errata.
-
-> 
-> > +	 * read before the DMA controller finished disabling 
-> the channel.
-> > +	 */
-> > +	if (!cpu_is_omap15xx())
-> > +		SET_DMA_ERRATA(DMA_ERRATA_3_3);
-> > +}
+> > +#ifndef __ASM_ARCH_OMAP1_DMA_H
+> > +#define __ASM_ARCH_OMAP1_DMA_H
 > > +
-> >  
-> /*------------------------------------------------------------
-> ----------------*/
-> >  
-> >  static int __init omap_init_dma(void)
-> > @@ -2481,6 +2528,9 @@ static int __init omap_init_dma(void)
-> >  		}
-> >  	}
-> >  
-> > +	/* Configure errata handling for all omap's */
-> > +	configure_dma_errata();
-> > +
-> >  	return 0;
-> >  
-> >  out_free:
-> > diff --git a/arch/arm/plat-omap/include/plat/dma.h 
-> b/arch/arm/plat-omap/include/plat/dma.h
-> > index 27578f3..5e28d26 100644
-> > --- a/arch/arm/plat-omap/include/plat/dma.h
-> > +++ b/arch/arm/plat-omap/include/plat/dma.h
-> > @@ -285,6 +285,17 @@
-> >  #define DMA_CH_PRIO_HIGH		0x1
-> >  #define DMA_CH_PRIO_LOW			0x0 /* Def */
-> >  
-> > +/* Errata handling */
-> > +#define IS_DMA_ERRATA(id)		(errata &= (id))
+> > +#endif /* __ASM_ARCH_OMAP1_DMA_H */
 > 
-> Why the '&=' here?  I guess it should just be a '&'  The '=' 
-> was not in
-> Peter's original.
+> Please don't create an empty header.  Just create it in the 
+> series when
+> (if) it's needed.  Same goes for next patch.
 
-correct. There was bug in peter's original patch for SET_DMA_ERRATA(id)
-it was | instead |=, while fixing set_dma_errata, accidentally, I have
-changed is_dma_errata also. Will fix it.
-
-> 
-> > +#define SET_DMA_ERRATA(id)		(errata |= (id))
-> > +
-> > +#define DMA_ERRATA_IFRAME_BUFFERING	(1 << 0)
-> > +#define DMA_ERRATA_PARALLEL_CHANNELS	(1 << 1)
-> > +#define DMA_ERRATA_i378			(1 << 2)
-> > +#define DMA_ERRATA_i541			(1 << 3)
-> > +#define DMA_ERRATA_i88			(1 << 4)
-> > +#define DMA_ERRATA_3_3			(1 << 5)
-> 
-> Please use BIT()
 ok.
 
 -Manjunath
+
+> 
+> I see you populate mach/dma.h later in the series, but I don't
+> understand why those values need to be in the header.   More 
+> comments on
+> those patches...
+> 
+> Kevin
+> 
+> 
+> 
