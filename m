@@ -1,111 +1,53 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 10 Nov 2010 09:59:29 -0800
+From: joe@perches.com (Joe Perches)
+Date: Wed, 10 Nov 2010 10:24:17 -0800
 Subject: [PATCH v3] msm: smd: Reduce driver log chatter
-In-Reply-To: <1289349036-16941-1-git-send-email-davidb@codeaurora.org>
+In-Reply-To: <1289411969-24650-1-git-send-email-davidb@codeaurora.org>
 References: <1289349036-16941-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1289411969-24650-1-git-send-email-davidb@codeaurora.org>
+	<1289411969-24650-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1289413457.15905.95.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM smd driver logs numerous messages during startup that are
-useful for debug purposes.  Change these to pr_debug() to match their
-purpose.
+On Wed, 2010-11-10 at 09:59 -0800, David Brown wrote:
+>  arch/arm/mach-msm/smd.c |   18 ++++++++++--------
 
-Cc: Brian Swetland <swetland@google.com>
-Cc: Arve Hj?nnev?g <arve@android.com>
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
-This addresses all of the feedback I've gotten so far.
+Hi again David.  More trivia. Ignore at your pleasure.
 
- arch/arm/mach-msm/smd.c |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+>  1 files changed, 10 insertions(+), 8 deletions(-)
+> diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
 
-diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
-index f07dc7c..2673527 100644
---- a/arch/arm/mach-msm/smd.c
-+++ b/arch/arm/mach-msm/smd.c
-@@ -14,6 +14,8 @@
-  *
-  */
- 
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
- #include <linux/platform_device.h>
- #include <linux/module.h>
- #include <linux/fs.h>
-@@ -89,7 +91,7 @@ static void smd_diag(void)
- 	x = smem_find(ID_DIAG_ERR_MSG, SZ_DIAG_ERR_MSG);
- 	if (x != 0) {
- 		x[SZ_DIAG_ERR_MSG - 1] = 0;
--		pr_info("smem: DIAG '%s'\n", x);
-+		pr_debug("DIAG '%s'\n", x);
- 	}
- }
- 
-@@ -312,7 +314,7 @@ static void smd_state_change(struct smd_channel *ch,
- {
- 	ch->last_state = next;
- 
--	pr_info("SMD: ch %d %d -> %d\n", ch->n, last, next);
-+	pr_debug("ch %d %d -> %d\n", ch->n, last, next);
- 
- 	switch (next) {
- 	case SMD_SS_OPENING:
-@@ -601,7 +603,7 @@ static int smd_alloc_channel(const char *name, uint32_t cid, uint32_t type)
- 	ch->pdev.name = ch->name;
- 	ch->pdev.id = -1;
- 
--	pr_info("smd_alloc_channel() cid=%02d size=%05d '%s'\n",
-+	pr_debug("smd_alloc_channel() cid=%02d size=%05d '%s'\n",
- 		ch->n, ch->fifo_size, ch->name);
- 
- 	mutex_lock(&smd_creation_mutex);
-@@ -621,7 +623,7 @@ static void smd_channel_probe_worker(struct work_struct *work)
- 
- 	shared = smem_find(ID_CH_ALLOC_TBL, sizeof(*shared) * 64);
- 	if (!shared) {
--		pr_err("smd: cannot find allocation table\n");
-+		pr_err("cannot find allocation table\n");
- 		return;
- 	}
- 	for (n = 0; n < 64; n++) {
-@@ -725,7 +727,7 @@ int smd_close(smd_channel_t *ch)
- {
- 	unsigned long flags;
- 
--	pr_info("smd_close(%p)\n", ch);
-+	pr_debug("smd_close(%p)\n", ch);
- 
- 	if (ch == 0)
- 		return -1;
-@@ -939,7 +941,7 @@ int smsm_set_sleep_duration(uint32_t delay)
- int smd_core_init(void)
- {
- 	int r;
--	pr_info("smd_core_init()\n");
-+	pr_debug("smd_core_init()\n");
- 
- 	/* wait for essential items to be initialized */
- 	for (;;) {
-@@ -992,14 +994,14 @@ int smd_core_init(void)
- 	smsm_change_state(SMSM_STATE_APPS_DEM, ~0, 0);
- #endif
- 
--	pr_info("smd_core_init() done\n");
-+	pr_debug("smd_core_init() done\n");
- 
- 	return 0;
- }
- 
- static int __devinit msm_smd_probe(struct platform_device *pdev)
- {
--	pr_info("smd_init()\n");
-+	pr_debug("smd_init()\n");
- 
- 	/*
- 	 * If we haven't waited for the ARM9 to boot up till now,
--- 
-1.7.3.2
+A moderately common kernel style uses macros like:
 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+#define FUNC_ENTER()	pr_debug("--> %s\n", __func__);
+#define FUNC_EXIT()	pr_debug("<-- %s\n", __func__);
+or
+#define FUNC_ENTER()	pr_debug("Enter %s\n", __func__);
+#define FUNC_EXIT()	pr_debug("Exit  %s\n", __func__);
+
+The macro names vary.
+I've seen enter, _enter, kenter, func_enter, etc.
+
+> @@ -939,7 +941,7 @@ int smsm_set_sleep_duration(uint32_t delay)
+>  int smd_core_init(void)
+>  {
+>  	int r;
+> -	pr_info("smd_core_init()\n");
+> +	pr_debug("smd_core_init()\n");
+
+	FUNC_ENTER();
+
+> @@ -992,14 +994,14 @@ int smd_core_init(void)
+>  	smsm_change_state(SMSM_STATE_APPS_DEM, ~0, 0);
+>  #endif
+>  
+> -	pr_info("smd_core_init() done\n");
+> +	pr_debug("smd_core_init() done\n");
+
+	FUNC_EXIT();
+
+>  static int __devinit msm_smd_probe(struct platform_device *pdev)
+>  {
+> -	pr_info("smd_init()\n");
+> +	pr_debug("smd_init()\n");
+
+wrong function name? FUNC_ENTER();
