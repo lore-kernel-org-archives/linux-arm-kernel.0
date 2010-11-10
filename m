@@ -1,49 +1,136 @@
 From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Wed, 10 Nov 2010 14:37:46 +0100
-Subject: [PATCH 5/5] drivers/pcmcia/soc_common.c: Use printf extension %pV
+Date: Wed, 10 Nov 2010 14:37:44 +0100
+Subject: [PATCH 3/5] pcmcia/sa1100: don't put machine specific init functions
+	in .init.text
 In-Reply-To: <20101110133657.GA22986@comet.dominikbrodowski.net>
 References: <20101110133657.GA22986@comet.dominikbrodowski.net>
-Message-ID: <1289396266-23098-5-git-send-email-linux@dominikbrodowski.net>
+Message-ID: <1289396266-23098-3-git-send-email-linux@dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joe Perches <joe@perches.com>
+From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Using %pV reduces the number of printk calls and
-eliminates any possible message interleaving from
-other printk calls.
+These are called by sa11x0_drv_pcmcia_probe (which is marked now with
+__devinit) so they can go to .devinit.text now, too.
 
-Signed-off-by: Joe Perches <joe@perches.com>
+This fixes:
+
+	WARNING: drivers/pcmcia/sa1100_cs.o(.text+0x10): Section mismatch in reference from the function sa11x0_drv_pcmcia_probe() to the function .init.text:pcmcia_simpad_init()
+	The function sa11x0_drv_pcmcia_probe() references
+	the function __init pcmcia_simpad_init().
+	This is often because sa11x0_drv_pcmcia_probe lacks a __init
+	annotation or the annotation of pcmcia_simpad_init is wrong.
+
+and a similar warning for pcmcia_collie_init, pcmcia_cerf_init,
+pcmcia_h3600_init and pcmcia_shannon_init.
+
+While at it mark pcmcia_assabet_init with __devinit, too.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 CC: Russell King <linux@arm.linux.org.uk>
 CC: Eric Miao <eric.y.miao@gmail.com>
 CC: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Dominik Brodowski <linux@dominikbrodowski.net>
 ---
- drivers/pcmcia/soc_common.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
+ drivers/pcmcia/pxa2xx_sharpsl.c |    2 +-
+ drivers/pcmcia/sa1100_assabet.c |    2 +-
+ drivers/pcmcia/sa1100_cerf.c    |    2 +-
+ drivers/pcmcia/sa1100_generic.c |    2 +-
+ drivers/pcmcia/sa1100_h3600.c   |    2 +-
+ drivers/pcmcia/sa1100_shannon.c |    2 +-
+ drivers/pcmcia/sa1100_simpad.c  |    2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index 689e3c0..3753fd0 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -57,11 +57,16 @@ module_param(pc_debug, int, 0644);
- void soc_pcmcia_debug(struct soc_pcmcia_socket *skt, const char *func,
- 		      int lvl, const char *fmt, ...)
+diff --git a/drivers/pcmcia/pxa2xx_sharpsl.c b/drivers/pcmcia/pxa2xx_sharpsl.c
+index 0ea3b29..81af2b3 100644
+--- a/drivers/pcmcia/pxa2xx_sharpsl.c
++++ b/drivers/pcmcia/pxa2xx_sharpsl.c
+@@ -237,7 +237,7 @@ static struct pcmcia_low_level sharpsl_pcmcia_ops __initdata = {
+ #ifdef CONFIG_SA1100_COLLIE
+ #include "sa11xx_base.h"
+ 
+-int __init pcmcia_collie_init(struct device *dev)
++int __devinit pcmcia_collie_init(struct device *dev)
  {
-+	struct va_format vaf;
- 	va_list args;
- 	if (pc_debug > lvl) {
--		printk(KERN_DEBUG "skt%u: %s: ", skt->nr, func);
- 		va_start(args, fmt);
--		vprintk(fmt, args);
-+
-+		vaf.fmt = fmt;
-+		vaf.va = &args;
-+
-+		printk(KERN_DEBUG "skt%u: %s: %pV", skt->nr, func, &vaf);
-+
- 		va_end(args);
- 	}
- }
+        int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_assabet.c b/drivers/pcmcia/sa1100_assabet.c
+index fd013a1..f1e8822 100644
+--- a/drivers/pcmcia/sa1100_assabet.c
++++ b/drivers/pcmcia/sa1100_assabet.c
+@@ -130,7 +130,7 @@ static struct pcmcia_low_level assabet_pcmcia_ops = {
+ 	.socket_suspend		= assabet_pcmcia_socket_suspend,
+ };
+ 
+-int pcmcia_assabet_init(struct device *dev)
++int __devinit pcmcia_assabet_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_cerf.c b/drivers/pcmcia/sa1100_cerf.c
+index 9bf088b..30560df 100644
+--- a/drivers/pcmcia/sa1100_cerf.c
++++ b/drivers/pcmcia/sa1100_cerf.c
+@@ -97,7 +97,7 @@ static struct pcmcia_low_level cerf_pcmcia_ops = {
+ 	.socket_suspend		= cerf_pcmcia_socket_suspend,
+ };
+ 
+-int __init pcmcia_cerf_init(struct device *dev)
++int __devinit pcmcia_cerf_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
+index 945857f..6b22859 100644
+--- a/drivers/pcmcia/sa1100_generic.c
++++ b/drivers/pcmcia/sa1100_generic.c
+@@ -64,7 +64,7 @@ static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) = {
+ #endif
+ };
+ 
+-static int sa11x0_drv_pcmcia_probe(struct platform_device *dev)
++static int __devinit sa11x0_drv_pcmcia_probe(struct platform_device *dev)
+ {
+ 	int i, ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_h3600.c b/drivers/pcmcia/sa1100_h3600.c
+index 56329ad..edf8f00 100644
+--- a/drivers/pcmcia/sa1100_h3600.c
++++ b/drivers/pcmcia/sa1100_h3600.c
+@@ -219,7 +219,7 @@ struct pcmcia_low_level h3600_pcmcia_ops = {
+ 	.socket_suspend		= h3600_pcmcia_socket_suspend,
+ };
+ 
+-int __init pcmcia_h3600_init(struct device *dev)
++int __devinit pcmcia_h3600_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_shannon.c b/drivers/pcmcia/sa1100_shannon.c
+index c4d5186..7ff1b43 100644
+--- a/drivers/pcmcia/sa1100_shannon.c
++++ b/drivers/pcmcia/sa1100_shannon.c
+@@ -113,7 +113,7 @@ static struct pcmcia_low_level shannon_pcmcia_ops = {
+ 	.socket_suspend		= shannon_pcmcia_socket_suspend,
+ };
+ 
+-int __init pcmcia_shannon_init(struct device *dev)
++int __devinit pcmcia_shannon_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_simpad.c b/drivers/pcmcia/sa1100_simpad.c
+index 05bd504..c998f7a 100644
+--- a/drivers/pcmcia/sa1100_simpad.c
++++ b/drivers/pcmcia/sa1100_simpad.c
+@@ -123,7 +123,7 @@ static struct pcmcia_low_level simpad_pcmcia_ops = {
+ 	.socket_suspend		= simpad_pcmcia_socket_suspend,
+ };
+ 
+-int __init pcmcia_simpad_init(struct device *dev)
++int __devinit pcmcia_simpad_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
 -- 
 1.7.1
