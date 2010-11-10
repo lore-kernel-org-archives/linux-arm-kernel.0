@@ -1,48 +1,49 @@
 From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Wed, 10 Nov 2010 14:36:57 +0100
-Subject: [RFC] PCMCIA bugfixes
-Message-ID: <20101110133657.GA22986@comet.dominikbrodowski.net>
+Date: Wed, 10 Nov 2010 14:37:46 +0100
+Subject: [PATCH 5/5] drivers/pcmcia/soc_common.c: Use printf extension %pV
+In-Reply-To: <20101110133657.GA22986@comet.dominikbrodowski.net>
+References: <20101110133657.GA22986@comet.dominikbrodowski.net>
+Message-ID: <1289396266-23098-5-git-send-email-linux@dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+From: Joe Perches <joe@perches.com>
 
-in order to address a few -- mostly minor -- issues, I intend to push these
-changes shortly. They're available at
+Using %pV reduces the number of printk calls and
+eliminates any possible message interleaving from
+other printk calls.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/brodo/pcmcia-2.6.git urgent
+Signed-off-by: Joe Perches <joe@perches.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Eric Miao <eric.y.miao@gmail.com>
+CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Dominik Brodowski <linux@dominikbrodowski.net>
+---
+ drivers/pcmcia/soc_common.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-As usual, I'm interested in your input to this patch series. The individual
-patches will be sent out (at least) to the PCMCIA list in a few moments.
-
-Best,
-        Dominik
-
-Andres Salomon (1):
-      pcmcia: fix warning in synclink driver
-
-Joe Perches (1):
-      drivers/pcmcia/soc_common.c: Use printf extension %pV
-
-Komuro (1):
-      pd6729: Coding Style fixes
-
-Nicolas Kaiser (1):
-      pcmcia/cm4000: fix error code
-
-Uwe Kleine-K?nig (1):
-      pcmcia/sa1100: don't put machine specific init functions in .init.text
-
- drivers/char/pcmcia/cm4000_cs.c   |    3 ++-
- drivers/char/pcmcia/synclink_cs.c |    1 +
- drivers/pcmcia/pd6729.c           |    8 ++++----
- drivers/pcmcia/pd6729.h           |    2 +-
- drivers/pcmcia/pxa2xx_sharpsl.c   |    2 +-
- drivers/pcmcia/sa1100_assabet.c   |    2 +-
- drivers/pcmcia/sa1100_cerf.c      |    2 +-
- drivers/pcmcia/sa1100_generic.c   |    2 +-
- drivers/pcmcia/sa1100_h3600.c     |    2 +-
- drivers/pcmcia/sa1100_shannon.c   |    2 +-
- drivers/pcmcia/sa1100_simpad.c    |    2 +-
- drivers/pcmcia/soc_common.c       |    9 +++++++--
- 12 files changed, 22 insertions(+), 15 deletions(-)
+diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+index 689e3c0..3753fd0 100644
+--- a/drivers/pcmcia/soc_common.c
++++ b/drivers/pcmcia/soc_common.c
+@@ -57,11 +57,16 @@ module_param(pc_debug, int, 0644);
+ void soc_pcmcia_debug(struct soc_pcmcia_socket *skt, const char *func,
+ 		      int lvl, const char *fmt, ...)
+ {
++	struct va_format vaf;
+ 	va_list args;
+ 	if (pc_debug > lvl) {
+-		printk(KERN_DEBUG "skt%u: %s: ", skt->nr, func);
+ 		va_start(args, fmt);
+-		vprintk(fmt, args);
++
++		vaf.fmt = fmt;
++		vaf.va = &args;
++
++		printk(KERN_DEBUG "skt%u: %s: %pV", skt->nr, func, &vaf);
++
+ 		va_end(args);
+ 	}
+ }
+-- 
+1.7.1
