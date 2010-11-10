@@ -1,125 +1,101 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 10 Nov 2010 09:14:36 -0800
-Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
-In-Reply-To: <1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
-Message-ID: <1289409276.15905.65.camel@Joe-Laptop>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 10 Nov 2010 22:46:04 +0530
+Subject: [PATCH v3 01/13] OMAP: DMA: Replace read/write macros with
+	functions
+In-Reply-To: <877hgldv40.fsf@deeprootsystems.com>
+References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
+	<1288099513-1854-2-git-send-email-manjugk@ti.com>
+	<87y692mb4e.fsf@deeprootsystems.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7CBD@dbde02.ent.ti.com>
+	<877hgldv40.fsf@deeprootsystems.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC1A7D7B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-11-10 at 13:04 +0100, Jimmy Rubin wrote:
-> This patch adds support for MCDE, Memory-to-display controller
-> found in the ST-Ericsson ux500 products.
 
-Just trivia:
 
-> diff --git a/drivers/video/mcde/mcde_hw.c b/drivers/video/mcde/mcde_hw.c
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at deeprootsystems.com] 
+> Sent: Wednesday, November 10, 2010 9:33 PM
+> To: G, Manjunath Kondaiah
+> Cc: linux-omap at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; Cousson, Benoit; 
+> Shilimkar, Santosh
+> Subject: Re: [PATCH v3 01/13] OMAP: DMA: Replace read/write 
+> macros with functions
+> 
+> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> 
+> [...]
+> 
+> >> > +		if (reg > OMAP1_CH_COMMON_START)
+> >> > +			__raw_writew(val, dma_base +
+> >> > +				(reg_map_omap1[reg] + 
+> 0x40 * lch));
+> >> > +		else
+> >> > +			__raw_writew(val, dma_base + 
+> >> reg_map_omap1[reg]);
+> >> > +	} else {
+> >> > +		if (reg > OMAP2_CH_COMMON_START)
+> >> > +			__raw_writel(val, dma_base +
+> >> > +				(reg_map_omap2[reg] + 
+> 0x60 * lch));
+> >> > +		else
+> >> > +			__raw_writel(val, dma_base + 
+> >> reg_map_omap2[reg]);
+> >> > +	}
+> >> > +}
+> >> 
+> >> The register base offset, register array and the stride (offset
+> >> between instances: 0x40 or 0x60) are detectable at init time, and
+> >> there's no reason to have conditional code for them.  IOW, they
+> >> should be init time constants.  Doing so would greatly simply these
+> >> functions.  In fact the CH_COMMON_START could also be an init time
+> >> constant as well.  So, given the following init_time constants:
+> >> dma_ch_common_start, dma_stride, reg_map, the above would 
+> be reduced
+> >> to something actually worth inlining, for example (not actually
+> >> tested):
+> >> 
+> >> static inline void dma_write(u32 val, int reg, int lch)
+> >> {
+> >>         u8 stride = (reg > dma_ch_common_start) ? dma_stride : 0;
+> >> 
+> >>         __raw_writel(val, dma_base + (reg_map[reg] + 
+> stride * lch));
+> >> }
+> >> 
+> >> Same applies to dma_read().
+> >
+> > Thanks for the suggestion. It is taken care along with 
+> Tony's comment
+> > for handling these read/write's between omap1 and omap2+.
+> >
+> > Here is code snippet for handling both omap1(includes 16 bit
+> > registers) and omap2+ 
+> >
+> > static inline void dma_write(u32 val, int reg, int lch)
+> > {
+> >         u8  stride;
+> >         u32 offset;
+> >
+> >         stride = (reg >= dma_common_ch_start) ? dma_stride : 0;
+> >         offset = reg_map[reg] + (stride * lch);
+> >
+> >         if (dma_stride  == 0x40) {
+> 
+> The use of hard-coded constants still isn't right here.    This is
+> bascally the same as a cpu_is_omap1 check.  After you separate out the
+> device files, I thought you had separate omap1 and omap2+ versions of
+> these, so I don't follow the need for this.
 
-[]
+This code will be moved to respective mach-omapx dma files and this 
+conditional check vanishes automatically in PATCH 10/13. Since this patch
+targets  replacing read/write macros with inline functions, no functionality
+changes(except change in logic for handling  16bit registers for omap1) 
+are done with new patch hence handling omap1 and omap2+ is 
+done this way.
 
-> +#define dsi_rfld(__i, __reg, __fld) \
-> +	((dsi_rreg(__i, __reg) & __reg##_##__fld##_MASK) >> \
-> +		__reg##_##__fld##_SHIFT)
-> +#define dsi_wfld(__i, __reg, __fld, __val) \
-> +	dsi_wreg(__i, __reg, (dsi_rreg(__i, __reg) & \
-> +	~__reg##_##__fld##_MASK) | (((__val) << __reg##_##__fld##_SHIFT) & \
-> +		 __reg##_##__fld##_MASK))
+I hope having the conditional check in this interim patch is ok.
 
-These macros are not particularly readable.
-Perhaps use statement expression macros like:
-
-#define dsi_rfld(__i, __reg, __fld) 					\
-({									\
-	const u32 mask = __reg##_#__fld##_MASK;				\
-	const u32 shift = __reg##_##__fld##_SHIFT;			\
-	((dsi_rreg(__i, __reg) & mask) >> shift;			\
-})
-
-#define dsi_wfld(__i, __reg, __fld, __val)				\
-({									\
-	const u32 mask = __reg##_#__fld##_MASK;				\
-	const u32 shift = __reg##_##__fld##_SHIFT;			\
-	dsi_wreg(__i, __reg,						\
-		 (dsi_rreg(__i, __reg) & ~mask) | (((__val) << shift) & mask));\
-})
-
-> +static struct mcde_chnl_state channels[] = {
-
-Should more static structs be static const?
-
-[]
-
-> +	dev_vdbg(&mcde_dev->dev, "%s\n", __func__);
-
-If your dev_<level> logging messages use "%s", __func__
-I suggest you use a set of local macros to preface this.
-
-I don't generally find the function name useful.
-
-Maybe only use the %s __func__ pair when you are also
-setting verbose debugging.
-
-#ifdef VERBOSE_DEBUG
-#define mcde_printk(level, dev, fmt, args) \
-	dev_printk(level, dev, "%s: " fmt, __func__, ##args)
-#else
-#define mcde_printk(level, dev, fmt, args) \
-	dev_printk(level, dev, fmt, args)
-#endif
-
-#ifdef VERBOSE_DEBUG
-#define mcde_vdbg(dev, fmt, args) \
-	mcde_printk(KERN_DEBUG, dev, fmt, ##args)
-#else
-#define mcde_vdbg(dev, fmt, args) \
-	do { if (0) mcde_printk(KERN_DEBUG, dev, fmt, ##args); } while (0)
-#endif
-
-#ifdef DEBUG
-#define mcde_dbg(dev, fmt, args) \
-	mcde_printk(KERN_DEBUG, dev, fmt, ##args)
-#else
-#define mcde_dbg(dev, fmt, args) \
-	do { if (0) mcde_printk(KERN_DEBUG, dev, fmt, ##args); } while (0)
-#endif
-
-#define mcde_ERR(dev, fmt, args) \
-	mcde_printk(KERN_ERR, dev, fmt, ##args)
-#define mcde_warn(dev, fmt, args) \
-	mcde_printk(KERN_WARNING, dev, fmt, ##args)
-#define mcde_info(dev, fmt, args) \
-	mcde_printk(KERN_INFO, dev, fmt, ##args)
-
-> +static void disable_channel(struct mcde_chnl_state *chnl)
-> +{
-> +	int i;
-> +	const struct mcde_port *port = &chnl->port;
-> +
-> +	dev_vdbg(&mcde_dev->dev, "%s\n", __func__);
-> +
-> +	if (hardware_version == MCDE_CHIP_VERSION_3_0_8 &&
-> +				!is_channel_enabled(chnl)) {
-> +		chnl->continous_running = false;
-
-It'd be nice to change to continuous_running
-
-> +int mcde_dsi_dcs_write(struct mcde_chnl_state *chnl, u8 cmd, u8* data, int len)
-> +{
-> +	int i;
-> +	u32 wrdat[4] = { 0, 0, 0, 0 };
-> +	u32 settings;
-> +	u8 link = chnl->port.link;
-> +	u8 virt_id = chnl->port.phy.dsi.virt_id;
-> +
-> +	/* REVIEW: One command at a time */
-> +	/* REVIEW: Allow read/write on unreserved ports */
-> +	if (len > MCDE_MAX_DCS_WRITE || chnl->port.type != MCDE_PORTTYPE_DSI)
-> +		return -EINVAL;
-> +
-> +	wrdat[0] = cmd;
-> +	for (i = 1; i <= len; i++)
-> +		wrdat[i>>2] |= ((u32)data[i-1] << ((i & 3) * 8));
-
-Ever overrun wrdat?
-Maybe WARN_ON(len > 16, "oops?")
+-Manjunath 
