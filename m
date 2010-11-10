@@ -1,122 +1,30 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Wed, 10 Nov 2010 14:06:44 -0600
-Subject: [PATCHv3] ARM: imx: Add support for low power suspend on MX51.
-Message-ID: <1289419604-4103-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: hari.kanigeri@gmail.com (Hari Kanigeri)
+Date: Wed, 10 Nov 2010 14:16:24 -0600
+Subject: [PATCH 0/6] [v2] OMAP: mailbox: enhancements and fixes
+In-Reply-To: <4CDAEF66.50003@ti.com>
+References: <1289412018-18860-1-git-send-email-h-kanigeri2@ti.com>
+	<4CDAEF66.50003@ti.com>
+Message-ID: <AANLkTim1txF9OjZ1vs7Sp3V0maG0o4AL+XhA21zUUm22@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Benoit,
 
-Adds initial low power suspend functionality to MX51.
-Supports "mem" and "standby" modes.
+>> Resending correcting the subject format based on Benoit's comment and
+>> fixing the over-indentation pointed out by Sergei.
+>
+> Pure nitpicking:
+> That's a pretty fast update... but then it should be a v3 :-)
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/mach-mx5/Makefile           |    1 +
- arch/arm/mach-mx5/pm.c               |   70 ++++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mxc.h |    1 +
- 3 files changed, 72 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mx5/pm.c
+Have to do it fast to keep your attention :). Since you are saying it
+is pure nitpicking I will leave it at v2 unless you insist.
 
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 462f177..25b44d1 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -5,6 +5,7 @@
- # Object file lists.
- obj-y   := cpu.o mm.o clock-mx51.o devices.o
- 
-+obj-$(CONFIG_PM) += pm.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
- obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
-new file mode 100644
-index 0000000..417cce1
---- /dev/null
-+++ b/arch/arm/mach-mx5/pm.c
-@@ -0,0 +1,70 @@
-+/*
-+ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#include <linux/suspend.h>
-+#include <asm/mach/map.h>
-+#include <mach/system.h>
-+#include "crm_regs.h"
-+
-+static int mx5_suspend_enter(suspend_state_t state)
-+{
-+	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
-+
-+	/* always allow platform to issue a deep sleep mode request */
-+	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-+
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
-+		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-+		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-+		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-+		break;
-+	case PM_SUSPEND_STANDBY:
-+		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-+		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-+		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-+		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
-+	arm_srpgcr |= MXC_SRPGCR_PCR;
-+
-+	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-+	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-+	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-+
-+	if (tzic_enable_wake(0) != 0)
-+		return -EAGAIN;
-+
-+	cpu_do_idle();
-+	return 0;
-+}
-+
-+static int mx5_pm_valid(suspend_state_t state)
-+{
-+	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-+}
-+
-+static const struct platform_suspend_ops mx5_suspend_ops = {
-+	.valid = mx5_pm_valid,
-+	.enter = mx5_suspend_enter,
-+};
-+
-+static int __init mx5_pm_init(void)
-+{
-+	if (cpu_is_mx51())
-+		suspend_set_ops(&mx5_suspend_ops);
-+	return 0;
-+}
-+device_initcall(mx5_pm_init);
-diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-index a42c720..dafacfd 100644
---- a/arch/arm/plat-mxc/include/mach/mxc.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc.h
-@@ -37,6 +37,7 @@
- 
- #ifndef __ASSEMBLY__
- extern unsigned int __mxc_cpu_type;
-+int tzic_enable_wake(int is_idle);
- #endif
- 
- #ifdef CONFIG_ARCH_MX1
--- 
-1.6.0.4
+>
+> Why does the cover letter not use the same format?
+> [PATCH 0/6] [v2] instead of ?[PATCH v2 0/6]
+>
+Will take care of in this next revisions.
+
+Thank you,
+Best regards,
+Hari
