@@ -1,270 +1,190 @@
-From: d.cristiani@idem-tech.it (dylan cristiani)
-Date: Wed, 10 Nov 2010 10:07:09 +0100
-Subject: hi marek
-In-Reply-To: <201011091936.13781.marek.vasut@gmail.com>
-References: <20101109184220.00003433@unknown>
-	<201011091936.13781.marek.vasut@gmail.com>
-Message-ID: <20101110100709.00003d84@unknown>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 10 Nov 2010 10:17:03 +0100
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <4CC418A9.6090602@evidence.eu.com>
+References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4CBD8EE4.5040808@evidence.eu.com>
+	<i9ka0s$4ua$1@dough.gmane.org>	<201010191727.53314.alexander.stein@systec-electronic.com>
+	<i9kk4o$svc$1@dough.gmane.org> <4CC418A9.6090602@evidence.eu.com>
+Message-ID: <4CDA630F.4060903@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Nov 2010 19:36:13 +0100
-Marek Vasut <marek.vasut@gmail.com> wrote:
+Le 24/10/2010 13:29, Claudio Scordino :
 
-> On Tuesday 09 November 2010 18:42:20 dylan cristiani wrote:
-> > We heard some month ago, about ucb1400 irq passing, via
-> > ucb1400_platform_data; then you wrote the patch, that is currently
-> > into mainline; i've a little problem, probably due to my infinite
-> > ignorance: i'm writing a sort of my_pm.c driver to check whether
-> > the ac line is plugged or not, check the main battery voltage and
-> > so on (similar to arch/arm/mach-pxa/sharpsl_pm.c and corgi_pm.c if
-> > you know it); the problem is that the battery voltages are tied to
-> > the ucb1400 ADC inputs, and in my_pm.c driver i don't know how to
-> > find the ucb1400_ts structure address to call the functions i need
-> > to read these ADC input i.e.:
+[..]
+
+> Hi all,
 > 
-> 1) CC lists
+> 	sorry for the misuse of the term "transceiver", and thank you
+> for your corrections.
 > 
-> 2) Can you post the driver source you have ?
+> Hopefully, this new version of the document is slightly better.
+
+Hi all,
+
+This documentation is floating around for some time now. Claudio has
+enhanced it and it is maybe time to merge it in mainline...
+
+So, can serial people include it in their tree (Greg?) or should it go
+through another path?
+
+Thanks to all of you.
+
+Best regards,
+
+> Many thanks,
 > 
-> without seeing the source, I can't help you
-here it comes but please close your nose before reading....;-)
-
-arch/arm/mach-pxa/nilux_pm.c
-
-/*
- * Based on spitz_pm.c and sharp code.
- *
- * Distributed under term of GPLv2.
- *
- */
-
-#include <linux/module.h>
-#include <linux/stat.h>
-#include <linux/init.h>
-#include <linux/completion.h>
-#include <linux/kernel.h>
-#include <linux/delay.h>
-#include <linux/gpio.h>
-//#include <linux/input.h>
-#include <linux/device.h>
-#include <linux/interrupt.h>
-#include <linux/suspend.h>
-#include <linux/apm-emulation.h>
-#include <linux/platform_device.h>
-#include <linux/ucb1400.h>
-
-#include <asm/irq.h>
-#include <asm/mach-types.h>
-#include <mach/hardware.h>
-
-#include <mach/pm.h>
-#include <mach/pxa2xx-regs.h>
-#include <mach/regs-rtc.h>
-#include <mach/sharpsl_pm.h>
-
-
-#define AC_IN_INT		17
-#define NYLUX_BATT_VOLT		1
-#define NYLUX_STATUS_ACIN	4
-#define NYLUX_BKUPBATT_TEMP	2
-#define NYLUX_CHARGE_STATUS	3
-
-
-static struct ucb1400_ts *ucb;
-
-static void nylux_charger_init(void)
-{
-}
-
-static void nylux_charger_exit(void)
-{
-}
-
-unsigned long nylux_read_main_battery(void)
-{
-//	struct ucb1400_ts *ucb;
-	unsigned int voltage = 0;
-
-	printk(KERN_INFO "Reading_Main_Battery\n");
-
-	ucb1400_adc_enable(ucb->ac97);
-
-//	printk(KERN_INFO "Post adc_enable\n");
-
-	mdelay(1);
-	voltage = ucb1400_adc_read(ucb->ac97, UCB_ADC_INP_AD0, 0);
-	printk(KERN_INFO "\nVVVVVVvoltage %d\n", voltage);
-
-	ucb1400_adc_disable(ucb->ac97);
-
-	return voltage;
-}
-
-unsigned long nylux_read_bkup_battery(void)
-{
-//	struct ucb1400_ts *ucb;
-	unsigned int voltage;
-
-	ucb1400_adc_enable(ucb->ac97);
-
-	mdelay(1);
-	voltage = ucb1400_adc_read(ucb->ac97, UCB_ADC_INP_AD1, 0);
-
-	ucb1400_adc_disable(ucb->ac97);
-	//printk(KERN_INFO "Battery_bkup value = %d\n", voltage);
-
-	return voltage;
-}
-
-unsigned long nylux_charge_status(void)
-{
-//	struct ucb1400_ts *ucb;
-	unsigned int status;
-
-	//printk(KERN_INFO "Charge_status\n");
-	ucb1400_adc_enable(ucb->ac97);
-	mdelay(1);
-	status = ucb1400_adc_read(ucb->ac97, UCB_ADC_INP_AD2, 0);
-	//printk(KERN_INFO "Charge status= %d\n", status);
-	ucb1400_adc_disable(ucb->ac97);
-
-	return status;
-
-}
-
-static unsigned long nylux_read_devdata(int which)
-{
-	unsigned long ret = ~0;
-
-	switch (which) {
-	case NYLUX_BATT_VOLT:
-		ret = nylux_read_main_battery();
-		//printk(KERN_INFO "read_main_battery: %d\n", ret);
-		break;
-	//case NYLUX_BKUPBATT_TEMP:
-		//ret = nylux_read_bkup_battery();
-		//break;
-	//case NYLUX_CHARGE_STATUS:
-		//ret = nylux_charge_status();
-		//break;
-	case NYLUX_STATUS_ACIN: {
-		ret = GPLR(AC_IN_INT) & GPIO_bit(AC_IN_INT);
-		//printk(KERN_INFO "AC_IN = %d\n", ret);
-		//ret = read_ac_status();
-		//printk(KERN_INFO "read_ac_status: %d\n", ret);
-		break;
-	}
-
-	default:
-		ret = ~0;
-	}
-
-	return ret;
-
-}
-
-//******
-struct battery_thresh battery_levels[] = {
-	{ 550, 100},
-	{ 544,  97},
-	{ 541,  93},
-	{ 536,  88},
-	{ 531,  83},
-	{ 526,  78},
-	{ 522,  73},
-	{ 517,  68},
-	{ 514,  63},
-	{ 510,  58},
-	{ 506,  53},
-	{ 503,  48},
-	{ 499,  43},
-	{ 497,  38},
-	{ 495,  33},
-	{ 493,  28},
-	{ 492,  23},
-	{ 491,  18},
-	{ 489,  13},
-	{ 488,   8},
-	{ 484,   3},
-	{ 478,   0}
-};
-
-struct sharpsl_charger_machinfo nylux_pm_machinfo = {
-	.init             = nylux_charger_init,
-	.exit		  = nylux_charger_exit,
-	.gpio_acin	  = AC_IN_INT,
-	.read_devdata	  = nylux_read_devdata,
-	.discharge        = 0,
-	.discharge1       = 0,
-	.charge           = 0,
-	.measure_temp     = 0,
-	.presuspend       = 0,
-	.postsuspend      = 0,
-	.charger_wakeup   = 0,
-	.should_wakeup    = 0,
-	.bat_levels       = 22,
-	.bat_levels_noac  = battery_levels,
-	.bat_levels_acin  = 0,
-	.status_high_acin = 510,
-	.status_low_acin  = 490,
-	.status_high_noac = 510,
-	.status_low_noac  = 490,
-	.charge_on_volt	  = 0,
-	.charge_on_temp   = 0,
-	.charge_acin_high = 0,
-	.charge_acin_low  = 0,
-	.fatal_acin_volt  = 0,
-	.fatal_noacin_volt = 0,
-
-	.batfull_irq	  = 1
-};
+> 	Claudio	
+> 
+> 
+> Documentation about RS485 serial communications
+> 
+> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+> ---
+>  Documentation/serial/00-INDEX         |    2 +
+>  Documentation/serial/serial-rs485.txt |  119 +++++++++++++++++++++++++++++++++
+>  2 files changed, 121 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/serial/serial-rs485.txt
+> 
+> diff --git a/Documentation/serial/00-INDEX b/Documentation/serial/00-INDEX
+> index 07dcdb0..e09468a 100644
+> --- a/Documentation/serial/00-INDEX
+> +++ b/Documentation/serial/00-INDEX
+> @@ -14,6 +14,8 @@ riscom8.txt
+>  	- notes on using the RISCom/8 multi-port serial driver.
+>  rocket.txt
+>  	- info on the Comtrol RocketPort multiport serial driver.
+> +serial-rs485.txt
+> +	- info about RS485 structures and support in the kernel.
+>  specialix.txt
+>  	- info on hardware/driver for specialix IO8+ multiport serial card.
+>  stallion.txt
+> diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
+> new file mode 100644
+> index 0000000..40f09c6
+> --- /dev/null
+> +++ b/Documentation/serial/serial-rs485.txt
+> @@ -0,0 +1,119 @@
+> +                        RS485 SERIAL COMMUNICATIONS
+> +
+> +1. INTRODUCTION
+> +
+> +   EIA-485, also known as TIA/EIA-485 or RS-485, is a standard defining the
+> +   electrical characteristics of drivers and receivers for use in balanced
+> +   digital multipoint systems.
+> +   This standard is widely used for communications in industrial automation
+> +   because it can be used effectively over long distances and in electrically
+> +   noisy environments.
+> +
+> +2. HARDWARE-RELATED CONSIDERATIONS
+> +
+> +   Some CPUs (e.g., Atmel AT91) contain a built-in half-duplex mode capable of
+> +   automatically controlling line direction by toggling RTS. That can used to
+> +   control external half-duplex hardware like an RS485 transceiver or any
+> +   RS232-connected half-duplex device like some modems.
+> +
+> +   For these microcontrollers, the Linux driver should be made capable of
+> +   working in both modes, and proper ioctls (see later) should be made
+> +   available at user-level to allow switching from one mode to the other, and
+> +   vice versa.
+> +
+> +3. DATA STRUCTURES ALREADY AVAILABLE IN THE KERNEL
+> +
+> +   The Linux kernel provides the serial_rs485 structure (see [1]) to handle
+> +   RS485 communications. This data structure is used to set and configure RS485
+> +   parameters in the platform data and in ioctls.
+> +
+> +   Any driver for devices capable of working both as RS232 and RS485 should
+> +   provide at least the following ioctls:
+> +
+> +    - TIOCSRS485 (typically associated with number 0x542F). This ioctl is used
+> +      to enable/disable RS485 mode from user-space
+> +
+> +    - TIOCGRS485 (typically associated with number 0x542E). This ioctl is used
+> +      to get RS485 mode from kernel-space (i.e., driver) to user-space.
+> +
+> +   In other words, the serial driver should contain a code similar to the next
+> +   one:
+> +
+> +	static struct uart_ops atmel_pops = {
+> +		/* ... */
+> +		.ioctl		= handle_ioctl,
+> +	};
+> +
+> +	static int handle_ioctl(struct uart_port *port,
+> +		unsigned int cmd,
+> +		unsigned long arg)
+> +	{
+> +		struct serial_rs485 rs485conf;
+> +
+> +		switch (cmd) {
+> +		case TIOCSRS485:
+> +			if (copy_from_user(&rs485conf,
+> +				(struct serial_rs485 *) arg,
+> +				sizeof(rs485conf)))
+> +					return -EFAULT;
+> +
+> +			/* ... */
+> +			break;
+> +
+> +		case TIOCGRS485:
+> +			if (copy_to_user((struct serial_rs485 *) arg,
+> +				...,
+> +				sizeof(rs485conf)))
+> +					return -EFAULT;
+> +			/* ... */
+> +			break;
+> +
+> +		/* ... */
+> +		}
+> +	}
+> +
+> +
+> +4. USAGE FROM USER-LEVEL
+> +
+> +   From user-level, RS485 configuration can be get/set using the previous
+> +   ioctls. For instance, to set RS485 you can use the following code:
+> +
+> +	#include <linux/serial.h>
+> +
+> +	/* Driver-specific ioctls: */
+> +	#define TIOCGRS485      0x542E
+> +	#define TIOCSRS485      0x542F
+> +
+> +	/* Open your specific device (e.g., /dev/mydevice): */
+> +	int fd = open ("/dev/mydevice", O_RDWR);
+> +	if (fd < 0) {
+> +		/* Error handling. See errno. */
+> +	}
+> +
+> +	struct serial_rs485 rs485conf;
+> +
+> +	/* Set RS485 mode: */
+> +	rs485conf.flags |= SER_RS485_ENABLED;
+> +
+> +	/* Set rts delay before send, if needed: */
+> +	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
+> +	rs485conf.delay_rts_before_send = ...;
+> +
+> +	/* Set rts delay after send, if needed: */
+> +	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
+> +	rs485conf.delay_rts_after_send = ...;
+> +
+> +	if (ioctl (fd, TIOCSRS485, &rs485conf) < 0) {
+> +		/* Error handling. See errno. */
+> +	}
+> +
+> +	/* Use read() and write() syscalls here... */
+> +
+> +	/* Close the device when finished: */
+> +	if (close (fd) < 0) {
+> +		/* Error handling. See errno. */
+> +	}
+> +
+> +5. REFERENCES
+> +
+> + [1]	include/linux/serial.h
 
 
-/*
-static int __init collie_pm_ucb_add(struct ucb1x00_dev *pdev)
-{
-	sharpsl_pm.machinfo = &nylux_pm_machinfo;
-	ucb = pdev->ucb;
-	return 0;
-}
-
-static struct ucb1x00_driver collie_pm_ucb_driver = {
-	.add            = collie_pm_ucb_add,
-};
-*/
-
-static struct platform_device *nyluxpm_device;
-
-static int __devinit nyluxpm_init(void)
-{
-        int ret;
-
-        nyluxpm_device = platform_device_alloc("sharpsl-pm", -1);
-        if (!nyluxpm_device)
-                return -ENOMEM;
-
-        nyluxpm_device->dev.platform_data = &nylux_pm_machinfo;
-        ret = platform_device_add(nyluxpm_device);
-
-        if (ret)
-                platform_device_put(nyluxpm_device);
-
-//	if (!ret)
-//		ret = ucb1x00_register_driver(&collie_pm_ucb_driver);
-
-	return ret;
-}
-
-static void nyluxpm_exit(void)
-{
-//	ucb1x00_unregister_driver(&collie_pm_ucb_driver);
-        platform_device_unregister(nyluxpm_device);
-}
-
-module_init(nyluxpm_init);
-module_exit(nyluxpm_exit);
-
-
-thanks
-dylan
+-- 
+Nicolas Ferre
