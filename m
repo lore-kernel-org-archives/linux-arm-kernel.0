@@ -1,40 +1,79 @@
 From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Wed, 10 Nov 2010 06:45:15 -0600
-Subject: [PATCH 0/6] [v2] omap:mailbox-enhancements and fixes
-Message-ID: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
+Date: Wed, 10 Nov 2010 06:45:16 -0600
+Subject: [PATCH 1/6] mailbox: change full flag per mailbox queue instead of
+	global
+In-Reply-To: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
+References: <1289393121-7911-1-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <1289393121-7911-2-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to Rene Sapiens and Omar Ramirez for their inputs on initial patch
-set.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37278.html
+From: Fernando Guzman Lugo <x0095840@ti.com>
 
-The patch set addresses the following review comments from Rene and Omar.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37626.html
-https://patchwork.kernel.org/patch/255091/
-https://patchwork.kernel.org/patch/255081/
+As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
+global variable, so if there are multiple mailbox users
+there will be conflics. Now there is a full flag per
+mailbox queue.
 
-Following patches are changed because of above review comments:
-omap:mailbox-send message in process context
-omap:mailbox-add notification support for multiple readers
+Version 2:
+- Rebase to the latest.
+Version 3:
+- Remove spin_lock protection. When the full flag is
+true the interrupt for that mailbox is disabled. So there
+is no race condition if full flag is modified before
+calling omap_mbox_enable_irq.
 
-Following patch is dropped from initial patch set
-omap:mailbox-resolve multiple receiver problem
+Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+---
+ arch/arm/plat-omap/include/plat/mailbox.h |    1 +
+ arch/arm/plat-omap/mailbox.c              |    7 +++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-The patch set is tested on omap4 SDP board.
-
-Fernando Guzman Lugo (1):
-  mailbox: change full flag per mailbox queue instead of global
-
-Hari Kanigeri (5):
-  omap:mailbox: fix rx interrupt disable in omap4
-  omap:mailbox-fix checkpatch warnings
-  omap:mailbox-send message in process context
-  omap:mailbox-add notification support for multiple readers
-  omap:clocks44x-add dummy clock for mailbox
-
- arch/arm/mach-omap2/clock44xx_data.c      |    1 +
- arch/arm/mach-omap2/mailbox.c             |    5 +-
- arch/arm/plat-omap/include/plat/mailbox.h |    8 +-
- arch/arm/plat-omap/mailbox.c              |  127 +++++++++++++++++------------
- 4 files changed, 83 insertions(+), 58 deletions(-)
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 9976565..13f2ef3 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -48,6 +48,7 @@ struct omap_mbox_queue {
+ 	struct tasklet_struct	tasklet;
+ 	int	(*callback)(void *);
+ 	struct omap_mbox	*mbox;
++	bool full;
+ };
+ 
+ struct omap_mbox {
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index d2fafb8..9ce3570 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -33,7 +33,6 @@
+ 
+ static struct workqueue_struct *mboxd;
+ static struct omap_mbox **mboxes;
+-static bool rq_full;
+ 
+ static int mbox_configured;
+ static DEFINE_MUTEX(mbox_configured_lock);
+@@ -148,6 +147,10 @@ static void mbox_rx_work(struct work_struct *work)
+ 
+ 		if (mq->callback)
+ 			mq->callback((void *)msg);
++		if (mq->full) {
++			mq->full = false;
++			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
++		}
+ 	}
+ }
+ 
+@@ -170,7 +173,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+ 	while (!mbox_fifo_empty(mbox)) {
+ 		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+ 			omap_mbox_disable_irq(mbox, IRQ_RX);
+-			rq_full = true;
++			mq->full = true;
+ 			goto nomem;
+ 		}
+ 
+-- 
+1.7.0
