@@ -1,46 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 11 Nov 2010 14:03:29 -0600
-Subject: arm smp support patch
-In-Reply-To: <20101111044125.GA5850@mvista.com>
-References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>
-	<20101111044125.GA5850@mvista.com>
-Message-ID: <4CDC4C11.7090003@gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 11 Nov 2010 12:24:16 -0800
+Subject: [PATCH] ARM: Common GIC entry macro code V2
+In-Reply-To: <20101111074955.29633.80160.sendpatchset@t400s>
+References: <20101111074955.29633.80160.sendpatchset@t400s>
+Message-ID: <1289507056.18994.13.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2010 10:41 PM, George G. Davis wrote:
-> On Tue, Nov 09, 2010 at 01:33:20PM -1000, Scott Valentine wrote:
->> On arm multi-core platforms that have a gic, the secondary cores fail to
->> wake if they are booted in WFI mode, as the gic_dist_init disables all
->> interrupts including IPI. I've included a simple patch to the
->> gic_dist_init function that enables interrupts 0-15 on SMP enabled
->> systems. This patch was made against linux-2.6-HEAD-151f52f.
->>
->>
->> diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->> --- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
->> +++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
->> @@ -262,6 +262,13 @@
->>          for (i = 0; i<  max_irq; i += 32)
->>                  writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 /
->> 32);
->>
->> +#ifdef CONFIG_SMP
->> +       /*
->> +        * Enable IPI interrupts on SMP systems so we can wake secondary
->> cores
->> +        */
->> +       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET);
->
-> The ARM11 MPCore TRM [1] states "Interrupts 0-15 fields are read as one,
-> that is, always enabled, and write to these fields have no effect."  So
-> it seems odd that this is needed.  Errata?  FWIW, I've peeked and poked
-> at GIC_DIST_ENABLE_SET and GIC_DIST_ENABLE_CLEAR via a debugger and the
-> 16 LSBs of both of these registers are stuck-at-one on my ARM11 MPCore
-> r1p0.
->
-The GIC arch spec states these bits are implementation defined. However, 
-this register is also banked for SMP. So you cannot enable the interrupt 
-for other cores from the primary core.
+On Thu, 2010-11-11 at 16:49 +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> This patch is the identical GIC demux implementation
+> merge V2. Instead of implementing same code over and
+> over simply share it in entry-macro-gic.S. The shared
+> code is based on the realview implementation.
+> 
+> Each GIC demux instance still has to setup the base address
+> of the controller using the get_irqnr_preamble macro. The
+> rest of the GIC specific code can be shared.
+> 
+> The omap code is excluded due to complexity and lack of
+> hardware - the CONFIG_SMP macros are used for multi-omap
+> and the omap4 case - this makes is difficult to share code.
+> 
+> The s5pv310 subarch is excluded due to the special "addne"
+> instruction in the get_irqnr_and_base macro.
+> 
+> The msm subarch is excluded as well since it treats PPIs
+> differently than other platforms and needs a different
+> version of the get_irqnr_and_base macro.
 
-Rob
+I'm a little disappoint you didn't CC someone MSM related on this. Your
+patch is small enough that you can CC everyone effected. Here's
+get_maintainer.pl output on it,
+
+Russell King <linux@arm.linux.org.uk>
+Anton Vorontsov <avorontsov@mvista.com>
+Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Linus Walleij <linus.walleij@stericsson.com>
+Alessandro Rubini <rubini@unipv.it>
+linux-arm-kernel at lists.infradead.org
+linux-kernel at vger.kernel.org
+
+At least those people should be getting this. Also, why can't you break
+this up per sub-architecture ?
+
+Daniel
+
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
