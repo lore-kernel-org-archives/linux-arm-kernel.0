@@ -1,34 +1,47 @@
-From: mkl0301@gmail.com (Lin Mac)
-Date: Thu, 11 Nov 2010 09:55:05 +0800
-Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
-In-Reply-To: <AANLkTikDEq=5ULX-sxaN95GaW9sQHX8qrCBwmcA6FD1E@mail.gmail.com>
-References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
-	<20101105074418.GA5864@oksana.dev.rtsoft.ru>
-	<AANLkTimH0JVcB31usN5srPNYCR8sR75J23FtTPQK1Chf@mail.gmail.com>
-	<20101109101433.GA17423@oksana.dev.rtsoft.ru>
-	<20101109103550.GB2869@n2100.arm.linux.org.uk>
-	<AANLkTikDEq=5ULX-sxaN95GaW9sQHX8qrCBwmcA6FD1E@mail.gmail.com>
-Message-ID: <AANLkTikt6aArfocc0aVfAXDczTmzURuwAit6GNRr8+PM@mail.gmail.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Wed, 10 Nov 2010 19:50:24 -0600
+Subject: [PATCH 01/02] omap: dsp: remove shm from normal memory
+In-Reply-To: <1289440225-27221-1-git-send-email-omar.ramirez@ti.com>
+References: <1289440225-27221-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1289440225-27221-2-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/10 Lin Mac <mkl0301@gmail.com>:
-> 2010/11/9 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> On Tue, Nov 09, 2010 at 01:14:33PM +0300, Anton Vorontsov wrote:
->>> On Tue, Nov 09, 2010 at 03:12:25PM +0800, Lin Mac wrote:
->>> > > setenv bootargs console=ttyS0,38400 ip=on
->>> > Changing this doesn't take effect. I was trying console=ttyS0,115200
->>> > and root=/dev/ram0, but it just boot with the configured parameter
->>> > instead of the given one.
->>> > Is it also the issue of u-boot?
->>> Nope. Just remove CONFIG_CMDLINE from your kernel .config file. ;-)
->> No. ?The external command line overrides the built-in one unless
->> CMDLINE_FORCE is set.
-> I have confirmed that CONFIG_CMDLINE_FORCE is not set.
-> Removing the CONFIG_CMDLINE caused linux boot fails:
-It is fixed by enabling u-boot config CONFIG_CMDLINE_TAG,
-CONFIG_SETUP_MEMORY_TAGS, CONFIG_MISC_INIT_R. Now it works just fine.
-Thanks.
+From: Felipe Contreras <felipe.contreras@gmail.com>
 
-Best Regards,
-Mac Lin
+Also, don't be picky about the location, which incidentally fixes the
+build since MEMBLOCK_REAL_LIMIT is gone on 2.6.37.
+
+arch/arm/plat-omap/devices.c: In function 'omap_dsp_reserve_sdram_memblock':
+arch/arm/plat-omap/devices.c:287: error: 'MEMBLOCK_REAL_LIMIT'
+    undeclared (first use in this function)
+
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ arch/arm/plat-omap/devices.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
+index 6f42a18..fc81912 100644
+--- a/arch/arm/plat-omap/devices.c
++++ b/arch/arm/plat-omap/devices.c
+@@ -284,12 +284,14 @@ void __init omap_dsp_reserve_sdram_memblock(void)
+ 	if (!size)
+ 		return;
+ 
+-	paddr = __memblock_alloc_base(size, SZ_1M, MEMBLOCK_REAL_LIMIT);
++	paddr = memblock_alloc(size, SZ_1M);
+ 	if (!paddr) {
+ 		pr_err("%s: failed to reserve %x bytes\n",
+ 				__func__, size);
+ 		return;
+ 	}
++	memblock_free(paddr, size);
++	memblock_remove(paddr, size);
+ 
+ 	omap_dsp_phys_mempool_base = paddr;
+ }
+-- 
+1.7.1
