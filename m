@@ -1,35 +1,29 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 11 Nov 2010 12:47:03 -0500 (EST)
-Subject: [PATCH] ARM: add MAINTAINERS entry for Marvell Dove SoC
-In-Reply-To: <AANLkTinxMvDhG9a8UQjV8FODqEaWB54tZ+KGU9uek=Oa@mail.gmail.com>
-References: <1289400537-23131-1-git-send-email-saeed@marvell.com>
-	<alpine.LFD.2.00.1011101615230.13911@xanadu.home>
-	<AANLkTinxMvDhG9a8UQjV8FODqEaWB54tZ+KGU9uek=Oa@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1011111239140.13911@xanadu.home>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 11 Nov 2010 20:00:26 +0100 (CET)
+Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
+In-Reply-To: <alpine.LFD.2.00.1011111330170.13911@xanadu.home>
+References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.00.1011111054010.2900@localhost6.localdomain6>
+	<4CDBC60F.8070905@stericsson.com>
+	<alpine.LFD.2.00.1011111203140.2900@localhost6.localdomain6>
+	<alpine.LFD.2.00.1011111330170.13911@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1011111958460.2900@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Nov 2010, saeed bishara wrote:
+On Thu, 11 Nov 2010, Nicolas Pitre wrote:
+> On Thu, 11 Nov 2010, Thomas Gleixner wrote:
+> > Well, you don't need the keepwarm() timer, if you just call
+> > sched_clock() in the idle wakeup path, so the magic in the NOHZ code
+> > will ensure that you reread the thing timely.
+> 
+> You still have to make sure you get out of idle before 16 secs has 
+> passed.
 
-> On Wed, Nov 10, 2010 at 11:18 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Wed, 10 Nov 2010, Saeed Bishara wrote:
-> >
-> >>
-> >> Signed-off-by: Saeed Bishara <saeed@marvell.com>
-> >
-> > Given that Loki/Kirkwood/MV78xx0/Orion are all sharing common support
-> > with Dove, are you willing to take over maintenance of those as well?
-> Nico, I'll be very thank full if you keep collecting patches for those
-> devices. I need to check if I can take over that.
+No, I meant to put it into the idle loop, right after mach_idle() or
+whatever is called to put the CPU into deep power sleep. The
+clockevents core code makes sure that you get interrupted in time.
 
-OK..The Orion/Kirkwood and friends are in deep maintenance mode and 
-nothing too exciting is happening there. So I may continue to collect 
-those patches.
+Thanks,
 
-I can collect patches for Dove as well as I've been doing so far, but 
-I'd appreciate if someone was reviewing them as I won't be able to 
-perform that review thoroughly since my brain is not really into Dove 
-anymore.
-
-
-Nicolas
+	tglx
