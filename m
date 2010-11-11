@@ -1,31 +1,56 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 11 Nov 2010 18:03:35 +0800
-Subject: [Questions] How to run 'perf top' on ARM to profile kernel
-	functions with modules loaded
-In-Reply-To: <AANLkTimXfstwyBzoXjY=iX+QBQSswy4_Rq5TjApqkYqJ@mail.gmail.com>
-References: <AANLkTinwAL8dFsDbd-ZTQEcEziq6jZk82KPzNqMVxnOx@mail.gmail.com>
-	<AANLkTim+BAYKWqiJzSQQLc4e_yNkMsNNnEp5u8YgC2Fk@mail.gmail.com>
-	<AANLkTimXfstwyBzoXjY=iX+QBQSswy4_Rq5TjApqkYqJ@mail.gmail.com>
-Message-ID: <AANLkTin7SxDU0c6yWWfR8yF2dUmM7NE9EViPXA03a0Cs@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 11 Nov 2010 11:16:32 +0100 (CET)
+Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
+In-Reply-To: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <alpine.LFD.2.00.1011111054010.2900@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->2010/11/11 Ingo Molnar <mingo@elte.hu>:
-> Must be some bug in the ELF symbol handling code - we've had many cases of quirks
-> and special cases there. Please run 'perf archive' and send the resulting
-> perf.data.tar.bz2 to Arnaldo in private mail. (the file will be big)
+On Thu, 11 Nov 2010, Linus Walleij wrote:
 
-Sent to Arnaldo already.
+> After wraparound-problems in sched_clock() we expand the 32bit
+> timer in the MTU from 32 to 63 bits so the scheduling and
+> timeline is more stable. At current max operating frequency for
+> the MTU, 133 MHz, this should be sufficient for rougly 2200
+> years.
+> 
+> Cc: Colin Cross <ccross@google.com>
+> Cc: Rabin Vincent <rabin.vincent@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+> tglx, nico: can you help out on reviewing this?
+> 
+> The solution in this patch is based on the similar approach
+> taken by the Tegra platform in arch/arm/mach-tegra/timer.c.
+> 
+> Orion on the other hand will only expand the timer to 63
+> bits in the sched_clock() function in arch/arm/plat-orion/time.c
+> 
+> What we need to know is whether it's OK to simply blow up
+> clocksource to 63 bits like this. In that case this
+> simplification should also apply to Orion, meaning that it
+> would base it's sched_clock() on the clocksource, using
+> simply clocksource_cyc2ns() cutting down the code
+> significantly.
+> 
+> My main obstacle is that I cannot really determine whether
+> clocksource.read() will be called often enough for the
+> cnt32_to_63 algorithm.
 
-2010/11/11 Kyungmin Park <kmpark@infradead.org>:
->
-> I tried to build the perf as static and build success on ARM. But
-> there's no display and no top results also.
-> How do you build the perf on ARM? any hints or clues?
+We talk about 16 seconds here. If we wouldn't read out the 32bit
+clocksource at least once in that time we'd run into wrap issues as
+well.
 
-Cross-compiling perf tool is very painful, so I choose to compile
-perf in Angstom on beagle-xm(ARM) directly, isn't it fun? :-)
+There is only one caveat. When nohz is on and you sleep longer than 16
+seconds then the limitation we have in place does not work anymore, as
+it would say that the long sleep time is less than the 63bit
+wraparound time. With 32bit clocksource it limits the sleep correclty
+to avoid the clocksource wrap issue.
 
-thanks,
--- 
-Lei Ming
+Aside of that you are trading a bit less source code with extra code
+in the clock read() function, which is called pretty frequently.
+
+Thanks,
+
+	tglx
