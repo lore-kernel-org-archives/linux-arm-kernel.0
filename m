@@ -1,60 +1,86 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Thu, 11 Nov 2010 13:30:26 +0100
-Subject: [Questions] How to run 'perf top' on ARM to profile kernel
-	functions with modules loaded
-In-Reply-To: <20101111122143.GF2929@pulham.picochip.com>
-References: <AANLkTinwAL8dFsDbd-ZTQEcEziq6jZk82KPzNqMVxnOx@mail.gmail.com>
-	<AANLkTim+BAYKWqiJzSQQLc4e_yNkMsNNnEp5u8YgC2Fk@mail.gmail.com>
-	<20101111091733.GA2929@pulham.picochip.com>
-	<1289477176.2084.64.camel@laptop>
-	<20101111122143.GF2929@pulham.picochip.com>
-Message-ID: <1289478626.2084.73.camel@laptop>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Thu, 11 Nov 2010 04:42:40 -0800 (PST)
+Subject: [PATCH] mx51_babbage: Add initial PMIC support
+Message-ID: <86142.50086.qm@web51008.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-11-11 at 12:21 +0000, Jamie Iles wrote:
-> On Thu, Nov 11, 2010 at 01:06:16PM +0100, Peter Zijlstra wrote:
-> > On Thu, 2010-11-11 at 09:17 +0000, Jamie Iles wrote:
-> > > On Thu, Nov 11, 2010 at 03:52:07PM +0800, Ming Lei wrote:
-> > > > 2010/11/11 Ming Lei <tom.leiming@gmail.com>:
-> > > > > Hi,
-> > > > >
-> > > > > 'perf top' can't display any functions when modules are loaded on ARM.
-> > > > 
-> > > > Sorry, should be can't display any kernel functions when modules are loaded
-> > > > on ARM.
-> > > I've noticed this myself and I spent a bit of time looking into it last week 
-> > > but didn't get too far. I did wonder if it was something to do with the map 
-> > > fixups after loading the modules. If you look at the raw events after a perf 
-> > > record with 'perf report -D' then the last module has a size that takes it to 
-> > > 0xFFFFFFFF which overlaps with the rest of the kernel symbols.
-> > > 
-> > > On x86 it looks like the modules are loaded after the kernel image in VM 
-> > > unlike ARM.
-> > 
-> > Order shouldn't matter, but that overlap is very likely what kills it.
-> > That module size is buggy.
-> I'm guessing that its in util/symbol.c:__map_groups__fixup_end():
-> 
-> 	for (nd = rb_next(prevnd); nd; nd = rb_next(nd)) {
->                 prev = curr;
->                 curr = rb_entry(nd, struct map, rb_node);
->                 prev->end = curr->start - 1;
->         }
-> 
->         /*
->          * We still haven't the actual symbols, so guess the
->          * last map final address.
->          */
->         curr->end = ~0UL;
-> 
-> I've noticed that if I change the symbol_conf.{use_modules,try_vmlinux_path} 
-> then I can get perf events for kernel symbols from /proc/kallsyms but nothing 
-> for the modules.
+MX51 Babbage board has a MC13892 PMIC.
 
-Hrm,.. depending on how we load things this might be easy or hard to
-fix. If we load the module symbols after having loaded the kernel
-symbols we can replace ~0ULL with the address before the next symbol.
+Add the initial support for it.
 
-If however we load modules first we're in a bind and should look at
-changing the load order to make the first suggestion work.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index 66b07d8..a48f7c4 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -22,6 +22,8 @@
+ #include <linux/input.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
++#include <linux/mfd/mc13xxx.h>
++#include <linux/regulator/machine.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+@@ -45,6 +47,8 @@
+ #define BABBAGE_POWER_KEY	(1*32 + 21)	/* GPIO_2_21 */
+ #define BABBAGE_ECSPI1_CS0	(3*32 + 24)	/* GPIO_4_24 */
+ #define BABBAGE_ECSPI1_CS1	(3*32 + 25)	/* GPIO_4_25 */
++#define BABBAGE_PMIC_GPIO	(0*32 + 8)	/* GPIO_1_8 */
++#define BABBAGE_PMIC_IRQ	(MXC_INTERNAL_IRQS + BABBAGE_PMIC_GPIO)
+ 
+ /* USB_CTRL_1 */
+ #define MX51_USB_CTRL_1_OFFSET			0x10
+@@ -158,6 +162,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+ 	MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
+ 	MX51_PAD_CSPI1_SS0__GPIO_4_24,
+ 	MX51_PAD_CSPI1_SS1__GPIO_4_25,
++
++	/* PMIC Interrupt */
++	MX51_PAD_GPIO_1_8__GPIO_1_8,
+ };
+ 
+ /* Serial ports */
+@@ -321,6 +328,17 @@ static int __init babbage_otg_mode(char *options)
+ }
+ __setup("otg_mode=", babbage_otg_mode);
+ 
++static struct mc13xxx_regulator_init_data mx51_babbage_regulators[] = {
++
++/*TODO: Add regulator list */
++
++};
++
++static struct mc13xxx_platform_data mc13xxx_pdata __initdata = {
++	.regulators = mx51_babbage_regulators,
++	.num_regulators = ARRAY_SIZE(mx51_babbage_regulators),
++	.flags  = MC13XXX_USE_REGULATOR,
++};
+ static struct spi_board_info mx51_babbage_spi_board_info[] __initdata = {
+ 	{
+ 		.modalias = "mtd_dataflash",
+@@ -329,6 +347,13 @@ static struct spi_board_info mx51_babbage_spi_board_info[] __initdata = {
+ 		.chip_select = 1,
+ 		.mode = SPI_MODE_0,
+ 		.platform_data = NULL,
++	}, {
++		.modalias = "mc13892",
++		.max_speed_hz = 6000000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.irq = BABBAGE_PMIC_IRQ,
++		.platform_data = &mc13xxx_pdata,
+ 	},
+ };
+ 
+-- 
+1.6.0.4
+
+
+
+      
