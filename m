@@ -1,39 +1,497 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu, 11 Nov 2010 09:17:18 +0200
-Subject: [PATCH v5 2/3] OMAP3: DMA: Errata i541: sDMA FIFO draining does
-	not finish
-In-Reply-To: <alpine.DEB.2.00.1011101628410.28301@utopia.booyaka.com>
-References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
-	<1286261141-1039-3-git-send-email-peter.ujfalusi@nokia.com>
-	<4CDAA3AA.7070003@nokia.com>
-	<alpine.DEB.2.00.1011101628410.28301@utopia.booyaka.com>
-Message-ID: <4CDB987E.2020806@nokia.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 11 Nov 2010 16:49:55 +0900
+Subject: [PATCH] ARM: Common GIC entry macro code V2
+Message-ID: <20101111074955.29633.80160.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/10 01:30, ext Paul Walmsley wrote:
-> Hello Adrian,
->
-> On Wed, 10 Nov 2010, Adrian Hunter wrote:
->
->> On 05/10/10 09:45, Peter Ujfalusi wrote:
->>
->>> +	if (cpu_is_omap34xx()&&   (l&   OMAP_DMA_CCR_SEL_SRC_DST_SYNC)) {
->>> +		int i = 0;
->>> +		u32 sys_cf;
->>> +
->>> +		/* Configure No-Standby */
->>> +		l = dma_read(OCP_SYSCONFIG);
->>> +		sys_cf = l;
->>> +		l&= ~DMA_SYSCONFIG_MIDLEMODE_MASK;
->>> +		l |= DMA_SYSCONFIG_MIDLEMODE(DMA_IDLEMODE_NO_IDLE);
->>> +		dma_write(l , OCP_SYSCONFIG);
->>
->> Are accesses of OCP_SYSCONFIG synchronised?
->
-> Do you mean, with respect to later reads and writes from the SDMA device?
-> If so, then yes, later reads and writes to the SDMA are guaranteed to
-> complete in order.  But perhaps I am misunderstanding what you mean?
+From: Magnus Damm <damm@opensource.se>
 
-I just meant it looks racy e.g.  two threads call omap_dma_stop() (or
-another function that changes OCP_SYSCONFIG) at the same time
+This patch is the identical GIC demux implementation
+merge V2. Instead of implementing same code over and
+over simply share it in entry-macro-gic.S. The shared
+code is based on the realview implementation.
+
+Each GIC demux instance still has to setup the base address
+of the controller using the get_irqnr_preamble macro. The
+rest of the GIC specific code can be shared.
+
+The omap code is excluded due to complexity and lack of
+hardware - the CONFIG_SMP macros are used for multi-omap
+and the omap4 case - this makes is difficult to share code.
+
+The s5pv310 subarch is excluded due to the special "addne"
+instruction in the get_irqnr_and_base macro.
+
+The msm subarch is excluded as well since it treats PPIs
+differently than other platforms and needs a different
+version of the get_irqnr_and_base macro.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Srinidhi Kasagar<srinidhi.kasagar@stericsson.com>
+---
+
+ Changes since V1:
+ - dropped msm as requested by Abhijeet, thank you.
+ 
+ This patch is almost identical to 6284/1 in the RMKs patch
+ tracker. The main difference is that this patch requires
+ each platform to specify base address using the macro
+ get_irqnr_preable. This patch includes tegra, but drops
+ omap support due to multi-omap complexity.
+
+ Thanks to Shilimkar, Santosh and Srinidhi Kasagar for feedback.
+
+ arch/arm/include/asm/hardware/entry-macro-gic.S   |   68 +++++++++++++++++++++
+ arch/arm/mach-cns3xxx/include/mach/entry-macro.S  |   61 ------------------
+ arch/arm/mach-realview/include/mach/entry-macro.S |   60 ------------------
+ arch/arm/mach-tegra/include/mach/entry-macro.S    |   64 -------------------
+ arch/arm/mach-ux500/include/mach/entry-macro.S    |   67 --------------------
+ arch/arm/mach-vexpress/include/mach/entry-macro.S |   57 -----------------
+ 6 files changed, 73 insertions(+), 304 deletions(-)
+
+--- /dev/null
++++ work/arch/arm/include/asm/hardware/entry-macro-gic.S	2010-11-10 16:06:26.000000000 +0900
+@@ -0,0 +1,68 @@
++/*
++ * arch/arm/include/asm/hardware/entry-macro-gic.S
++ *
++ * Low-level IRQ helper macros for GIC
++ *
++ * This file is licensed under  the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <asm/hardware/gic.h>
++
++/*
++ * The interrupt numbering scheme is defined in the
++ * interrupt controller spec.  To wit:
++ *
++ * Interrupts 0-15 are IPI
++ * 16-28 are reserved
++ * 29-31 are local.  We allow 30 to be used for the watchdog.
++ * 32-1020 are global
++ * 1021-1022 are reserved
++ * 1023 is "spurious" (no interrupt)
++ *
++ * For now, we ignore all local interrupts so only return an interrupt if it's
++ * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
++ *
++ * A simple read from the controller will tell us the number of the highest
++ * priority enabled interrupt.  We then just need to check whether it is in the
++ * valid range for an IRQ (30-1020 inclusive).
++ */
++
++	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
++
++	ldr     \irqstat, [\base, #GIC_CPU_INTACK]
++	/* bits 12-10 = src CPU, 9-0 = int # */
++
++	ldr	\tmp, =1021
++	bic     \irqnr, \irqstat, #0x1c00
++	cmp     \irqnr, #29
++	cmpcc	\irqnr, \irqnr
++	cmpne	\irqnr, \tmp
++	cmpcs	\irqnr, \irqnr
++	.endm
++
++/* We assume that irqstat (the raw value of the IRQ acknowledge
++ * register) is preserved from the macro above.
++ * If there is an IPI, we immediately signal end of interrupt on the
++ * controller, since this requires the original irqstat value which
++ * we won't easily be able to recreate later.
++ */
++
++	.macro test_for_ipi, irqnr, irqstat, base, tmp
++	bic	\irqnr, \irqstat, #0x1c00
++	cmp	\irqnr, #16
++	strcc	\irqstat, [\base, #GIC_CPU_EOI]
++	cmpcs	\irqnr, \irqnr
++	.endm
++
++/* As above, this assumes that irqstat and base are preserved.. */
++
++	.macro test_for_ltirq, irqnr, irqstat, base, tmp
++	bic	\irqnr, \irqstat, #0x1c00
++	mov 	\tmp, #0
++	cmp	\irqnr, #29
++	moveq	\tmp, #1
++	streq	\irqstat, [\base, #GIC_CPU_EOI]
++	cmp	\tmp, #0
++	.endm
+--- 0001/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
++++ work/arch/arm/mach-cns3xxx/include/mach/entry-macro.S	2010-11-10 16:06:25.000000000 +0900
+@@ -9,7 +9,7 @@
+  */
+ 
+ #include <mach/hardware.h>
+-#include <asm/hardware/gic.h>
++#include <asm/hardware/entry-macro-gic.S>
+ 
+ 		.macro	disable_fiq
+ 		.endm
+@@ -21,62 +21,3 @@
+ 
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+-
+-		/*
+-		 * The interrupt numbering scheme is defined in the
+-		 * interrupt controller spec.  To wit:
+-		 *
+-		 * Interrupts 0-15 are IPI
+-		 * 16-28 are reserved
+-		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-		 * 32-1020 are global
+-		 * 1021-1022 are reserved
+-		 * 1023 is "spurious" (no interrupt)
+-		 *
+-		 * For now, we ignore all local interrupts so only return an interrupt if it's
+-		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
+-		 *
+-		 * A simple read from the controller will tell us the number of the highest
+-                 * priority enabled interrupt.  We then just need to check whether it is in the
+-		 * valid range for an IRQ (30-1020 inclusive).
+-		 */
+-
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
+-
+-		ldr	\tmp, =1021
+-
+-		bic     \irqnr, \irqstat, #0x1c00
+-
+-		cmp     \irqnr, #29
+-		cmpcc	\irqnr, \irqnr
+-		cmpne	\irqnr, \tmp
+-		cmpcs	\irqnr, \irqnr
+-
+-		.endm
+-
+-		/* We assume that irqstat (the raw value of the IRQ acknowledge
+-		 * register) is preserved from the macro above.
+-		 * If there is an IPI, we immediately signal end of interrupt on the
+-		 * controller, since this requires the original irqstat value which
+-		 * we won't easily be able to recreate later.
+-		 */
+-
+-		.macro test_for_ipi, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		cmp	\irqnr, #16
+-		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmpcs	\irqnr, \irqnr
+-		.endm
+-
+-		/* As above, this assumes that irqstat and base are preserved.. */
+-
+-		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		mov 	\tmp, #0
+-		cmp	\irqnr, #29
+-		moveq	\tmp, #1
+-		streq	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmp	\tmp, #0
+-		.endm
+--- 0001/arch/arm/mach-realview/include/mach/entry-macro.S
++++ work/arch/arm/mach-realview/include/mach/entry-macro.S	2010-11-10 16:06:25.000000000 +0900
+@@ -8,7 +8,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ #include <mach/hardware.h>
+-#include <asm/hardware/gic.h>
++#include <asm/hardware/entry-macro-gic.S>
+ 
+ 		.macro	disable_fiq
+ 		.endm
+@@ -21,61 +21,3 @@
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+ 
+-		/*
+-		 * The interrupt numbering scheme is defined in the
+-		 * interrupt controller spec.  To wit:
+-		 *
+-		 * Interrupts 0-15 are IPI
+-		 * 16-28 are reserved
+-		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-		 * 32-1020 are global
+-		 * 1021-1022 are reserved
+-		 * 1023 is "spurious" (no interrupt)
+-		 *
+-		 * For now, we ignore all local interrupts so only return an interrupt if it's
+-		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
+-		 *
+-		 * A simple read from the controller will tell us the number of the highest
+-                 * priority enabled interrupt.  We then just need to check whether it is in the
+-		 * valid range for an IRQ (30-1020 inclusive).
+-		 */
+-
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
+-
+-		ldr	\tmp, =1021
+-
+-		bic     \irqnr, \irqstat, #0x1c00
+-
+-		cmp     \irqnr, #29
+-		cmpcc	\irqnr, \irqnr
+-		cmpne	\irqnr, \tmp
+-		cmpcs	\irqnr, \irqnr
+-
+-		.endm
+-
+-		/* We assume that irqstat (the raw value of the IRQ acknowledge
+-		 * register) is preserved from the macro above.
+-		 * If there is an IPI, we immediately signal end of interrupt on the
+-		 * controller, since this requires the original irqstat value which
+-		 * we won't easily be able to recreate later.
+-		 */
+-
+-		.macro test_for_ipi, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		cmp	\irqnr, #16
+-		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmpcs	\irqnr, \irqnr
+-		.endm
+-
+-		/* As above, this assumes that irqstat and base are preserved.. */
+-
+-		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		mov 	\tmp, #0
+-		cmp	\irqnr, #29
+-		moveq	\tmp, #1
+-		streq	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmp	\tmp, #0
+-		.endm
+--- 0001/arch/arm/mach-tegra/include/mach/entry-macro.S
++++ work/arch/arm/mach-tegra/include/mach/entry-macro.S	2010-11-10 16:06:25.000000000 +0900
+@@ -17,7 +17,7 @@
+ 
+ #if defined(CONFIG_ARM_GIC)
+ 
+-#include <asm/hardware/gic.h>
++#include <asm/hardware/entry-macro-gic.S>
+ 
+ 	/* Uses the GIC interrupt controller built into the cpu */
+ #define ICTRL_BASE (IO_CPU_VIRT + 0x100)
+@@ -32,68 +32,6 @@
+ 
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
+-
+-	/*
+-	 * The interrupt numbering scheme is defined in the
+-	 * interrupt controller spec.  To wit:
+-	 *
+-	 * Interrupts 0-15 are IPI
+-	 * 16-28 are reserved
+-	 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-	 * 32-1020 are global
+-	 * 1021-1022 are reserved
+-	 * 1023 is "spurious" (no interrupt)
+-	 *
+-	 * For now, we ignore all local interrupts so only return an interrupt
+-	 * if it's between 30 and 1020.  The test_for_ipi routine below will
+-	 * pick up on IPIs.
+-	 *
+-	 * A simple read from the controller will tell us the number of the
+-	 * highest priority enabled interrupt.  We then just need to check
+-	 * whether it is in the valid range for an IRQ (30-1020 inclusive).
+-	 */
+-
+-	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-	/* bits 12-10 = src CPU, 9-0 = int # */
+-	ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+-
+-	ldr		\tmp, =1021
+-
+-	bic     \irqnr, \irqstat, #0x1c00
+-
+-	cmp     \irqnr, #29
+-	cmpcc	\irqnr, \irqnr
+-	cmpne	\irqnr, \tmp
+-	cmpcs	\irqnr, \irqnr
+-
+-	.endm
+-
+-	/* We assume that irqstat (the raw value of the IRQ acknowledge
+-	 * register) is preserved from the macro above.
+-	 * If there is an IPI, we immediately signal end of interrupt on the
+-	 * controller, since this requires the original irqstat value which
+-	 * we won't easily be able to recreate later.
+-	 */
+-
+-	.macro test_for_ipi, irqnr, irqstat, base, tmp
+-	bic	\irqnr, \irqstat, #0x1c00
+-	cmp	\irqnr, #16
+-	strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-	cmpcs	\irqnr, \irqnr
+-	.endm
+-
+-	/* As above, this assumes that irqstat and base are preserved.. */
+-
+-	.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-	bic	\irqnr, \irqstat, #0x1c00
+-	mov 	\tmp, #0
+-	cmp	\irqnr, #29
+-	moveq	\tmp, #1
+-	streq	\irqstat, [\base, #GIC_CPU_EOI]
+-	cmp	\tmp, #0
+-	.endm
+-
+ #else
+ 	/* legacy interrupt controller for AP16 */
+ 	.macro	disable_fiq
+--- 0001/arch/arm/mach-ux500/include/mach/entry-macro.S
++++ work/arch/arm/mach-ux500/include/mach/entry-macro.S	2010-11-10 16:06:25.000000000 +0900
+@@ -11,7 +11,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ #include <mach/hardware.h>
+-#include <asm/hardware/gic.h>
++#include <asm/hardware/entry-macro-gic.S>
+ 
+ 		.macro	disable_fiq
+ 		.endm
+@@ -22,68 +22,3 @@
+ 
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+-
+-		/*
+-		 * The interrupt numbering scheme is defined in the
+-		 * interrupt controller spec.  To wit:
+-		 *
+-		 * Interrupts 0-15 are IPI
+-		 * 16-28 are reserved
+-		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-		 * 32-1020 are global
+-		 * 1021-1022 are reserved
+-		 * 1023 is "spurious" (no interrupt)
+-		 *
+-		 * For now, we ignore all local interrupts so only return an
+-		 * interrupt if it's between 30 and 1020. The test_for_ipi
+-		 * routine below will pick up on IPIs.
+-		 *
+-		 * A simple read from the controller will tell us the number
+-		 * of the highest priority enabled interrupt. We then just
+-		 * need to check whether it is in the valid range for an
+-		 * IRQ (30-1020 inclusive).
+-		 */
+-
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-		/* bits 12-10 = src CPU, 9-0 = int # */
+-		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+-
+-		ldr	\tmp, =1021
+-
+-		bic     \irqnr, \irqstat, #0x1c00
+-
+-		cmp     \irqnr, #29
+-		cmpcc	\irqnr, \irqnr
+-		cmpne	\irqnr, \tmp
+-		cmpcs	\irqnr, \irqnr
+-
+-		.endm
+-
+-		/* We assume that irqstat (the raw value of the IRQ
+-		 * acknowledge register) is preserved from the macro above.
+-		 * If there is an IPI, we immediately signal end of
+-		 * interrupt on the controller, since this requires the
+-		 * original irqstat value which we won't easily be able
+-		 * to recreate later.
+-		 */
+-
+-		.macro test_for_ipi, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		cmp	\irqnr, #16
+-		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmpcs	\irqnr, \irqnr
+-		.endm
+-
+-		/* As above, this assumes that irqstat and base
+-		 * are preserved..
+-		 */
+-
+-		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		mov 	\tmp, #0
+-		cmp	\irqnr, #29
+-		moveq	\tmp, #1
+-		streq	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmp	\tmp, #0
+-		.endm
+--- 0001/arch/arm/mach-vexpress/include/mach/entry-macro.S
++++ work/arch/arm/mach-vexpress/include/mach/entry-macro.S	2010-11-10 16:06:25.000000000 +0900
+@@ -1,4 +1,4 @@
+-#include <asm/hardware/gic.h>
++#include <asm/hardware/entry-macro-gic.S>
+ 
+ 	.macro	disable_fiq
+ 	.endm
+@@ -10,58 +10,3 @@
+ 
+ 	.macro	arch_ret_to_user, tmp1, tmp2
+ 	.endm
+-
+-	/*
+-	 * The interrupt numbering scheme is defined in the
+-	 * interrupt controller spec.  To wit:
+-	 *
+-	 * Interrupts 0-15 are IPI
+-	 * 16-28 are reserved
+-	 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-	 * 32-1020 are global
+-	 * 1021-1022 are reserved
+-	 * 1023 is "spurious" (no interrupt)
+-	 *
+-	 * For now, we ignore all local interrupts so only return an interrupt if it's
+-	 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
+-	 *
+-	 * A simple read from the controller will tell us the number of the highest
+-	 * priority enabled interrupt.  We then just need to check whether it is in the
+-	 * valid range for an IRQ (30-1020 inclusive).
+-	 */
+-
+-	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
+-	ldr	\tmp, =1021
+-	bic     \irqnr, \irqstat, #0x1c00
+-	cmp     \irqnr, #29
+-	cmpcc	\irqnr, \irqnr
+-	cmpne	\irqnr, \tmp
+-	cmpcs	\irqnr, \irqnr
+-	.endm
+-
+-	/* We assume that irqstat (the raw value of the IRQ acknowledge
+-	 * register) is preserved from the macro above.
+-	 * If there is an IPI, we immediately signal end of interrupt on the
+-	 * controller, since this requires the original irqstat value which
+-	 * we won't easily be able to recreate later.
+-	 */
+-
+-	.macro test_for_ipi, irqnr, irqstat, base, tmp
+-	bic	\irqnr, \irqstat, #0x1c00
+-	cmp	\irqnr, #16
+-	strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-	cmpcs	\irqnr, \irqnr
+-	.endm
+-
+-	/* As above, this assumes that irqstat and base are preserved.. */
+-
+-	.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-	bic	\irqnr, \irqstat, #0x1c00
+-	mov 	\tmp, #0
+-	cmp	\irqnr, #29
+-	moveq	\tmp, #1
+-	streq	\irqstat, [\base, #GIC_CPU_EOI]
+-	cmp	\tmp, #0
+-	.endm
+-
