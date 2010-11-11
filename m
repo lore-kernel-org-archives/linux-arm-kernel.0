@@ -1,22 +1,41 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Thu, 11 Nov 2010 19:18:00 +0200
-Subject: [PATCH] ARM: add MAINTAINERS entry for Marvell Dove SoC
-In-Reply-To: <alpine.LFD.2.00.1011101615230.13911@xanadu.home>
-References: <1289400537-23131-1-git-send-email-saeed@marvell.com>
-	<alpine.LFD.2.00.1011101615230.13911@xanadu.home>
-Message-ID: <AANLkTinxMvDhG9a8UQjV8FODqEaWB54tZ+KGU9uek=Oa@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 11 Nov 2010 13:31:52 -0500 (EST)
+Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
+In-Reply-To: <alpine.LFD.2.00.1011111203140.2900@localhost6.localdomain6>
+References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.00.1011111054010.2900@localhost6.localdomain6>
+	<4CDBC60F.8070905@stericsson.com>
+	<alpine.LFD.2.00.1011111203140.2900@localhost6.localdomain6>
+Message-ID: <alpine.LFD.2.00.1011111330170.13911@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 11:18 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 10 Nov 2010, Saeed Bishara wrote:
->
->>
->> Signed-off-by: Saeed Bishara <saeed@marvell.com>
->
-> Given that Loki/Kirkwood/MV78xx0/Orion are all sharing common support
-> with Dove, are you willing to take over maintenance of those as well?
-Nico, I'll be very thank full if you keep collecting patches for those
-devices. I need to check if I can take over that.
+On Thu, 11 Nov 2010, Thomas Gleixner wrote:
 
-saeed
+> On Thu, 11 Nov 2010, Linus Walleij wrote:
+> 
+> > Thomas Gleixner wrote:
+> > 
+> > > There is only one caveat. When nohz is on and you sleep longer than 16
+> > > seconds then the limitation we have in place does not work anymore, as
+> > > it would say that the long sleep time is less than the 63bit
+> > > wraparound time. With 32bit clocksource it limits the sleep correclty
+> > > to avoid the clocksource wrap issue.
+> > 
+> > Hm! So the .mask has that side effect (as I suspected), and with
+> > this the sleep will be limited to what time you can get into 63 bits
+> > (2200 years). And we sure want NOHZ...
+> > 
+> > But if I complement the solution with the keepwarm() timer from
+> > Orion doing just a dummy read() on the clocksource every say 15 secs
+> > it will work even if the system sleeps for so long.
+> 
+> Well, you don't need the keepwarm() timer, if you just call
+> sched_clock() in the idle wakeup path, so the magic in the NOHZ code
+> will ensure that you reread the thing timely.
+
+You still have to make sure you get out of idle before 16 secs has 
+passed.
+
+
+Nicolas
