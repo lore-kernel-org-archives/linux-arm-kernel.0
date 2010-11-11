@@ -1,76 +1,182 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 11 Nov 2010 10:05:56 +0100
-Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
-Message-ID: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 11 Nov 2010 18:51:31 +0900
+Subject: [PATCH] ARM: Common GIC entry macro code V2
+In-Reply-To: <04d401cb8183$e0921500$a1b63f00$%kim@samsung.com>
+References: <20101111074955.29633.80160.sendpatchset@t400s>
+	<AANLkTimJfZwRx_H4KC+WfXeYONiUMN39VfnT9R54Sh4c@mail.gmail.com>
+	<04d401cb8183$e0921500$a1b63f00$%kim@samsung.com>
+Message-ID: <AANLkTinXXUxFsS7LttQSJ_AOf2=8+_phSfmW5tyc5GD=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After wraparound-problems in sched_clock() we expand the 32bit
-timer in the MTU from 32 to 63 bits so the scheduling and
-timeline is more stable. At current max operating frequency for
-the MTU, 133 MHz, this should be sufficient for rougly 2200
-years.
+On Thu, Nov 11, 2010 at 6:36 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kyungmin Park wrote:
+>>
+>> Hi,
+>>
+> Hi,
+>
+>> Can you include the "arch/arm/mach-s5pv310/include/mach/entry-macro.S"
+> also?
+>>
+> In conclusion, can't it now.
+> Because according to current interrupt number structure of Samsung SoCs,
+> irqnr macro need to add S5P_IRQ_OFFSET, 32.
+>
+> Or have to add #ifdef in there...But don't like it.
 
-Cc: Colin Cross <ccross@google.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-tglx, nico: can you help out on reviewing this?
+I wonder why Samsung goes another way, use the common codes. if
+required, modify to use the common codes.
 
-The solution in this patch is based on the similar approach
-taken by the Tegra platform in arch/arm/mach-tegra/timer.c.
+Thank you,
+Kyungmin Park
 
-Orion on the other hand will only expand the timer to 63
-bits in the sched_clock() function in arch/arm/plat-orion/time.c
-
-What we need to know is whether it's OK to simply blow up
-clocksource to 63 bits like this. In that case this
-simplification should also apply to Orion, meaning that it
-would base it's sched_clock() on the clocksource, using
-simply clocksource_cyc2ns() cutting down the code
-significantly.
-
-My main obstacle is that I cannot really determine whether
-clocksource.read() will be called often enough for the
-cnt32_to_63 algorithm.
-
-If this won't work the Tegra platform probably needs fixing
-too.
-
-We had a rather heated debate about this internally already
-so I'm seeking the advice of the elders.
----
- arch/arm/plat-nomadik/timer.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index aedf9c1..e887bf8 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -16,6 +16,7 @@
- #include <linux/clk.h>
- #include <linux/jiffies.h>
- #include <linux/err.h>
-+#include <linux/cnt32_to_63.h>
- #include <asm/mach/time.h>
- 
- #include <plat/mtu.h>
-@@ -34,14 +35,14 @@ static cycle_t nmdk_read_timer_dummy(struct clocksource *cs)
- /* clocksource: MTU decrements, so we negate the value being read. */
- static cycle_t nmdk_read_timer(struct clocksource *cs)
- {
--	return -readl(mtu_base + MTU_VAL(0));
-+	return cnt32_to_63(-readl(mtu_base + MTU_VAL(0)));
- }
- 
- static struct clocksource nmdk_clksrc = {
- 	.name		= "mtu_0",
- 	.rating		= 200,
- 	.read		= nmdk_read_timer_dummy,
--	.mask		= CLOCKSOURCE_MASK(32),
-+	.mask		= CLOCKSOURCE_MASK(63),
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
--- 
-1.6.3.3
+>
+>> On Thu, Nov 11, 2010 at 4:49 PM, Magnus Damm <magnus.damm@gmail.com>
+> wrote:
+>> > From: Magnus Damm <damm@opensource.se>
+>> >
+>> > This patch is the identical GIC demux implementation
+>> > merge V2. Instead of implementing same code over and
+>> > over simply share it in entry-macro-gic.S. The shared
+>> > code is based on the realview implementation.
+>> >
+>> > Each GIC demux instance still has to setup the base address
+>> > of the controller using the get_irqnr_preamble macro. The
+>> > rest of the GIC specific code can be shared.
+>> >
+>> > The omap code is excluded due to complexity and lack of
+>> > hardware - the CONFIG_SMP macros are used for multi-omap
+>> > and the omap4 case - this makes is difficult to share code.
+>> >
+>> > The s5pv310 subarch is excluded due to the special "addne"
+>> > instruction in the get_irqnr_and_base macro.
+>> >
+>> > The msm subarch is excluded as well since it treats PPIs
+>> > differently than other platforms and needs a different
+>> > version of the get_irqnr_and_base macro.
+>> >
+>> > Signed-off-by: Magnus Damm <damm@opensource.se>
+>> > Acked-by: Srinidhi Kasagar<srinidhi.kasagar@stericsson.com>
+>> > ---
+>> >
+>> > ?Changes since V1:
+>> > ?- dropped msm as requested by Abhijeet, thank you.
+>> >
+>> > ?This patch is almost identical to 6284/1 in the RMKs patch
+>> > ?tracker. The main difference is that this patch requires
+>> > ?each platform to specify base address using the macro
+>> > ?get_irqnr_preable. This patch includes tegra, but drops
+>> > ?omap support due to multi-omap complexity.
+>> >
+>> > ?Thanks to Shilimkar, Santosh and Srinidhi Kasagar for feedback.
+>> >
+>> > ?arch/arm/include/asm/hardware/entry-macro-gic.S ? | ? 68
+>> +++++++++++++++++++++
+>> > ?arch/arm/mach-cns3xxx/include/mach/entry-macro.S ?| ? 61
+> -----------------
+>> -
+>> > ?arch/arm/mach-realview/include/mach/entry-macro.S | ? 60
+> -----------------
+>> -
+>> > ?arch/arm/mach-tegra/include/mach/entry-macro.S ? ?| ? 64
+> -----------------
+>> --
+>> > ?arch/arm/mach-ux500/include/mach/entry-macro.S ? ?| ? 67
+> -----------------
+>> ---
+>> > ?arch/arm/mach-vexpress/include/mach/entry-macro.S | ? 57
+> -----------------
+>> > ?6 files changed, 73 insertions(+), 304 deletions(-)
+>> >
+>> > --- /dev/null
+>> > +++ work/arch/arm/include/asm/hardware/entry-macro-gic.S
+> ?2010-11-10
+>> 16:06:26.000000000 +0900
+>> > @@ -0,0 +1,68 @@
+>> > +/*
+>> > + * arch/arm/include/asm/hardware/entry-macro-gic.S
+>> > + *
+>> > + * Low-level IRQ helper macros for GIC
+>> > + *
+>> > + * This file is licensed under ?the terms of the GNU General Public
+>> > + * License version 2. This program is licensed "as is" without any
+>> > + * warranty of any kind, whether express or implied.
+>> > + */
+>> > +
+>> > +#include <asm/hardware/gic.h>
+>> > +
+>> > +/*
+>> > + * The interrupt numbering scheme is defined in the
+>> > + * interrupt controller spec. ?To wit:
+>> > + *
+>> > + * Interrupts 0-15 are IPI
+>> > + * 16-28 are reserved
+>> > + * 29-31 are local. ?We allow 30 to be used for the watchdog.
+>> > + * 32-1020 are global
+>> > + * 1021-1022 are reserved
+>> > + * 1023 is "spurious" (no interrupt)
+>> > + *
+>> > + * For now, we ignore all local interrupts so only return an interrupt
+> if
+>> it's
+>> > + * between 30 and 1020. ?The test_for_ipi routine below will pick up on
+>> IPIs.
+>> > + *
+>> > + * A simple read from the controller will tell us the number of the
+>> highest
+>> > + * priority enabled interrupt. ?We then just need to check whether it
+> is
+>> in the
+>> > + * valid range for an IRQ (30-1020 inclusive).
+>> > + */
+>> > +
+>> > + ? ? ? .macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
+>> > +
+>> > + ? ? ? ldr ? ? \irqstat, [\base, #GIC_CPU_INTACK]
+>> > + ? ? ? /* bits 12-10 = src CPU, 9-0 = int # */
+>> > +
+>> > + ? ? ? ldr ? ? \tmp, =1021
+>> > + ? ? ? bic ? ? \irqnr, \irqstat, #0x1c00
+>> > + ? ? ? cmp ? ? \irqnr, #29
+>> > + ? ? ? cmpcc ? \irqnr, \irqnr
+>> > + ? ? ? cmpne ? \irqnr, \tmp
+>> > + ? ? ? cmpcs ? \irqnr, \irqnr
+>> > + ? ? ? .endm
+>> > +
+>> > +/* We assume that irqstat (the raw value of the IRQ acknowledge
+>> > + * register) is preserved from the macro above.
+>> > + * If there is an IPI, we immediately signal end of interrupt on the
+>> > + * controller, since this requires the original irqstat value which
+>> > + * we won't easily be able to recreate later.
+>> > + */
+>> > +
+>> > + ? ? ? .macro test_for_ipi, irqnr, irqstat, base, tmp
+>> > + ? ? ? bic ? ? \irqnr, \irqstat, #0x1c00
+>> > + ? ? ? cmp ? ? \irqnr, #16
+>> > + ? ? ? strcc ? \irqstat, [\base, #GIC_CPU_EOI]
+>> > + ? ? ? cmpcs ? \irqnr, \irqnr
+>> > + ? ? ? .endm
+>> > +
+>> > +/* As above, this assumes that irqstat and base are preserved.. */
+>> > +
+>> > + ? ? ? .macro test_for_ltirq, irqnr, irqstat, base, tmp
+>> > + ? ? ? bic ? ? \irqnr, \irqstat, #0x1c00
+>> > + ? ? ? mov ? ? \tmp, #0
+>> > + ? ? ? cmp ? ? \irqnr, #29
+>> > + ? ? ? moveq ? \tmp, #1
+>> > + ? ? ? streq ? \irqstat, [\base, #GIC_CPU_EOI]
+>> > + ? ? ? cmp ? ? \tmp, #0
+>> > + ? ? ? .endm
+>
+> (snip)
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
