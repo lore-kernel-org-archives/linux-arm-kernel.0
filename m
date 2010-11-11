@@ -1,93 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Nov 2010 23:06:52 +0000
-Subject: arm smp support patch
-In-Reply-To: <4CDC63A9.9090606@codeaurora.org>
-References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>
-	<20101111044125.GA5850@mvista.com>
-	<52622063180ba1627bf98811e4f56a05.squirrel@www.concentris-systems.com>
-	<4CDC63A9.9090606@codeaurora.org>
-Message-ID: <20101111230652.GC23785@n2100.arm.linux.org.uk>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Thu, 11 Nov 2010 17:30:16 -0600
+Subject: [PATCHv4 2/3] ARM: imx: Add mx53 support to common msl functions.
+In-Reply-To: <1289518217-26716-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1289518217-26716-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1289518217-26716-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 11, 2010 at 01:44:09PM -0800, Abhijeet Dharmapurikar wrote:
-> Scott Valentine wrote:
->>> On Tue, Nov 09, 2010 at 01:33:20PM -1000, Scott Valentine wrote:
->>>> On arm multi-core platforms that have a gic, the secondary cores fail to
->>>> wake if they are booted in WFI mode, as the gic_dist_init disables all
->>>> interrupts including IPI. I've included a simple patch to the
->>>> gic_dist_init function that enables interrupts 0-15 on SMP enabled
->>>> systems. This patch was made against linux-2.6-HEAD-151f52f.
->>>>
->>>>
->>>> diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->>>> --- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
->>>> +++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
->>>> @@ -262,6 +262,13 @@
->>>>         for (i = 0; i < max_irq; i += 32)
->>>>                 writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4
->>>> /
->>>> 32);
->>>>
->>>> +#ifdef CONFIG_SMP
->>>> +       /*
->>>> +        * Enable IPI interrupts on SMP systems so we can wake secondary
->>>> cores
->>>> +        */
->>>> +       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET);
->
-> Scott, you might want to try doing this first thing in gic_cpu_init.  
-> That seems to be the right place since the ENABLE_SET is banked per
-> cpu.
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Secondary CPUs are placed into WFI mode by whatever preceeds the kernel
-as part of the boot protocol, and it is expected that they are sent some
-kind of interrupt to wake them from WFI mode.  While they are in this
-state, they have no knowledge of the kernel, so they haven't run any
-kernel code.
+Add mx53 support to cpu.c and mm.c.
 
-The GIC TRM does imply that these bits are banked - the upper 16 bits
-are used for PPIs (private peripheral interrupts, private to the CPU)
-while the lower 16 bits are used for the SGI (software generated
-interrupts.)  According to the online docs, ARM IHI 0048A (Generic
-Interrupt Controller Architecture Specification) it is _implementation
-defined_ whether the SGI enable bits are implemented.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/cpu.c |   19 ++++++++++++++++++-
+ arch/arm/mach-mx5/mm.c  |   19 ++++++++++++++++++-
+ 2 files changed, 36 insertions(+), 2 deletions(-)
 
-If your pre-kernel boot software places your secondary CPUs into WFI
-mode with all sources of software interrupts disabled, then it's fairly
-clear that there's no way to wake them from WFI mode via software
-generated GIC interrupts.
-
-The only way to do it is to route a real hardware IRQ to your desired
-secondary CPU, and provoke the hardware into generating an IRQ.  That's
-hardly a good way to go about bringing secondary CPUs online.
-
-It seems that we have one of the first implementations which has enable
-register bits provided for the SGIs.  As the enable register bits are
-banked on a per-CPU basis, there's nothing that the boot CPU can do to
-set those enable bits - the only thing that can enable those is the
-pre-kernel boot software.
-
-However, we also need to ensure that the kernel doesn't clear those
-bits.  So:
-
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index ada6359..a333811 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -257,9 +257,10 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
- 		writel(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index 8c9a29e..a00d2bc 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -92,6 +92,23 @@ static int __init mx51_neon_fixup(void)
+ late_initcall(mx51_neon_fixup);
+ #endif
  
- 	/*
--	 * Disable all interrupts.
-+	 * Disable all interrupts, except the software generated interrupts.
- 	 */
--	for (i = 0; i < max_irq; i += 32)
-+	writel(0xffff0000, base + GIC_DIST_ENABLE_CLEAR);
-+	for (i = 32; i < max_irq; i += 32)
- 		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
++/*
++ * Returns:
++ *	the silicon revision of the cpu
++ *	-EINVAL - not a mx53
++ */
++int mx53_revision(void)
++{
++	if (!cpu_is_mx53())
++		return -EINVAL;
++
++	if (cpu_silicon_rev == -1)
++		query_silicon_parameter();
++
++	return cpu_silicon_rev;
++}
++EXPORT_SYMBOL(mx53_revision);
++
+ static int __init post_cpu_init(void)
+ {
+ 	unsigned int reg;
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index 2822d0e..cbaf282 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License.  You may obtain a copy of the GNU General Public License
+@@ -32,6 +32,15 @@ static struct map_desc mx51_io_desc[] __initdata = {
+ };
  
- 	/*
-
-and we need to have the boot software on this platform to set the
-enable bits.
+ /*
++ * Define the MX53 memory map.
++ */
++static struct map_desc mx53_io_desc[] __initdata = {
++	imx_map_entry(MX53, AIPS1, MT_DEVICE),
++	imx_map_entry(MX53, SPBA0, MT_DEVICE),
++	imx_map_entry(MX53, AIPS2, MT_DEVICE),
++};
++
++/*
+  * This function initializes the memory map. It is called during the
+  * system startup to create static physical to virtual memory mappings
+  * for the IO modules.
+@@ -44,6 +53,14 @@ void __init mx51_map_io(void)
+ 	iotable_init(mx51_io_desc, ARRAY_SIZE(mx51_io_desc));
+ }
+ 
++void __init mx53_map_io(void)
++{
++	mxc_set_cpu_type(MXC_CPU_MX53);
++	mxc_iomux_v3_init(MX53_IO_ADDRESS(MX53_IOMUXC_BASE_ADDR));
++	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG_BASE_ADDR));
++	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
++}
++
+ int imx51_register_gpios(void);
+ 
+ void __init mx51_init_irq(void)
+-- 
+1.6.0.4
