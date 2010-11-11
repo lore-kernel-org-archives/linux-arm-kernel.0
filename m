@@ -1,40 +1,36 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 11 Nov 2010 12:59:04 +0200
-Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
-In-Reply-To: <alpine.LFD.2.00.1011101611110.13911@xanadu.home>
-References: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
-	<4CB5629A.8040306@compulab.co.il>
-	<20101110131838.GA25666@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1011101611110.13911@xanadu.home>
-Message-ID: <4CDBCC78.20003@compulab.co.il>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 11 Nov 2010 12:05:03 +0100 (CET)
+Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
+In-Reply-To: <4CDBC60F.8070905@stericsson.com>
+References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.00.1011111054010.2900@localhost6.localdomain6>
+	<4CDBC60F.8070905@stericsson.com>
+Message-ID: <alpine.LFD.2.00.1011111203140.2900@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/10 23:12, Nicolas Pitre wrote:
-> On Wed, 10 Nov 2010, Russell King - ARM Linux wrote:
+On Thu, 11 Nov 2010, Linus Walleij wrote:
+
+> Thomas Gleixner wrote:
 > 
->> On Wed, Oct 13, 2010 at 09:41:14AM +0200, Mike Rapoport wrote:
->>> Hi Russell,
->>> Shell we send it to your patch system?
->>
->> I've no idea what to do about this.  I can find no entry in MAINTAINERS
->> for anyone who looks after Marvell Dove, so I assume it's another bit
->> of orphaned code.
->>
->> It seems that it started off being looked after by Nico, and now that
->> Nico has moved on to pastures new, it's (presumably) maintainer-less.
+> > There is only one caveat. When nohz is on and you sleep longer than 16
+> > seconds then the limitation we have in place does not work anymore, as
+> > it would say that the long sleep time is less than the 63bit
+> > wraparound time. With 32bit clocksource it limits the sleep correclty
+> > to avoid the clocksource wrap issue.
 > 
-> I still gather Orion/Kirkwood/Dove patches sent my way and give them a 
-> quick sanity check.
-
-Russell, Nicolas,
-I'm little bit confused now. Should the Dove patches go to the patch tracking
-system or through Nicolas orion tree?
-
+> Hm! So the .mask has that side effect (as I suspected), and with
+> this the sleep will be limited to what time you can get into 63 bits
+> (2200 years). And we sure want NOHZ...
 > 
-> Nicolas
+> But if I complement the solution with the keepwarm() timer from
+> Orion doing just a dummy read() on the clocksource every say 15 secs
+> it will work even if the system sleeps for so long.
 
+Well, you don't need the keepwarm() timer, if you just call
+sched_clock() in the idle wakeup path, so the magic in the NOHZ code
+will ensure that you reread the thing timely.
 
--- 
-Sincerely yours,
-Mike.
+Thanks,
+
+	tglx
