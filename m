@@ -1,40 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 10 Nov 2010 20:51:51 -0500 (EST)
-Subject: [PATCH 8/9] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <AANLkTinYJkngB3fEZoOvB6L+cDSJ0HekbR3eAryPQb6m@mail.gmail.com>
-References: <1289219870-17807-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-3-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-5-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-6-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-7-git-send-email-haojian.zhuang@marvell.com>
-	<1289219870-17807-8-git-send-email-haojian.zhuang@marvell.com>
-	<AANLkTikk334vRT3HE9bQWc3u_jyLJckAY9AW=pVUQNbq@mail.gmail.com>
-	<AANLkTimn2b6b8r8au48LWk4G4tNfbbR=TypAC1f3=e3e@mail.gmail.com>
-	<alpine.LFD.2.00.1011092149190.13911@xanadu.home>
-	<25B60CDC2F704E4E9D88FFD52780CB4C059864312A@SC-VEXCH1.marvell.com>
-	<AANLkTinYJkngB3fEZoOvB6L+cDSJ0HekbR3eAryPQb6m@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1011102036270.13911@xanadu.home>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Thu, 11 Nov 2010 09:55:05 +0800
+Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
+In-Reply-To: <AANLkTikDEq=5ULX-sxaN95GaW9sQHX8qrCBwmcA6FD1E@mail.gmail.com>
+References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
+	<20101105074418.GA5864@oksana.dev.rtsoft.ru>
+	<AANLkTimH0JVcB31usN5srPNYCR8sR75J23FtTPQK1Chf@mail.gmail.com>
+	<20101109101433.GA17423@oksana.dev.rtsoft.ru>
+	<20101109103550.GB2869@n2100.arm.linux.org.uk>
+	<AANLkTikDEq=5ULX-sxaN95GaW9sQHX8qrCBwmcA6FD1E@mail.gmail.com>
+Message-ID: <AANLkTikt6aArfocc0aVfAXDczTmzURuwAit6GNRr8+PM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Nov 2010, Eric Miao wrote:
+2010/11/10 Lin Mac <mkl0301@gmail.com>:
+> 2010/11/9 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> On Tue, Nov 09, 2010 at 01:14:33PM +0300, Anton Vorontsov wrote:
+>>> On Tue, Nov 09, 2010 at 03:12:25PM +0800, Lin Mac wrote:
+>>> > > setenv bootargs console=ttyS0,38400 ip=on
+>>> > Changing this doesn't take effect. I was trying console=ttyS0,115200
+>>> > and root=/dev/ram0, but it just boot with the configured parameter
+>>> > instead of the given one.
+>>> > Is it also the issue of u-boot?
+>>> Nope. Just remove CONFIG_CMDLINE from your kernel .config file. ;-)
+>> No. ?The external command line overrides the built-in one unless
+>> CMDLINE_FORCE is set.
+> I have confirmed that CONFIG_CMDLINE_FORCE is not set.
+> Removing the CONFIG_CMDLINE caused linux boot fails:
+It is fixed by enabling u-boot config CONFIG_CMDLINE_TAG,
+CONFIG_SETUP_MEMORY_TAGS, CONFIG_MISC_INIT_R. Now it works just fine.
+Thanks.
 
-> A run-time check of the core will be quicker, but doesn't look like a clean
-> solution.
-
-Runtime checks should be avoided if possible, especially in the task 
-switching path.  That would be appropriate, though, in setup code such 
-as it is done in xscale_cp0_init().
-
-> A better way to go maybe introducing different function entries
-> which call the common iwmmx handling code.
-
-Right.  And in this case it is probably a good idea to clone the content 
-of linux/arch/arm/kernel/xscale-cp0.c into a separate file, say 
-mvpj4-cp0.c, and adapt it accordingly as the core of it will be 
-different anyway.
-
-
-Nicolas
+Best Regards,
+Mac Lin
