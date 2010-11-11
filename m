@@ -1,107 +1,26 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 11 Nov 2010 14:54:39 -0800
-Subject: [PATCH v4] msm: smd: Reduce driver log chatter
-In-Reply-To: <1289349036-16941-1-git-send-email-davidb@codeaurora.org>
-References: <1289349036-16941-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1289516079-24632-1-git-send-email-davidb@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Nov 2010 23:02:41 +0000
+Subject: arm smp support patch
+In-Reply-To: <4CDC7326.2080407@gmail.com>
+References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>
+	<20101111044125.GA5850@mvista.com> <4CDC4C11.7090003@gmail.com>
+	<20101111224656.GA23785@n2100.arm.linux.org.uk>
+	<4CDC7326.2080407@gmail.com>
+Message-ID: <20101111230241.GB23785@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM smd driver logs numerous messages during startup that are
-useful for debug purposes.  Change some of these to pr_debug() to
-match their purpose, and remove others that aren't really useful.
+On Thu, Nov 11, 2010 at 04:50:14PM -0600, Rob Herring wrote:
+> On 11/11/2010 04:46 PM, Russell King - ARM Linux wrote:
+>> Can you point out the ARM doc number/section which specifies that.
+>>
+>> My GIC TRM (which may be outdated) shows that although the SGI interrupt
+>> (0:15) enable register is banked, it goes on to say "The distributor does
+>> not provide registers for INTIDs<  16 because SGIs are always enabled".
+>>
+>
+> Section 4.3.5:
+>
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ihi0048a/index.html
 
-Cc: Brian Swetland <swetland@google.com>
-Cc: Arve Hj?nnev?g <arve@android.com>
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- arch/arm/mach-msm/smd.c |   17 +++++++----------
- 1 files changed, 7 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
-index f07dc7c..eec464f 100644
---- a/arch/arm/mach-msm/smd.c
-+++ b/arch/arm/mach-msm/smd.c
-@@ -14,6 +14,8 @@
-  *
-  */
- 
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
- #include <linux/platform_device.h>
- #include <linux/module.h>
- #include <linux/fs.h>
-@@ -89,7 +91,7 @@ static void smd_diag(void)
- 	x = smem_find(ID_DIAG_ERR_MSG, SZ_DIAG_ERR_MSG);
- 	if (x != 0) {
- 		x[SZ_DIAG_ERR_MSG - 1] = 0;
--		pr_info("smem: DIAG '%s'\n", x);
-+		pr_debug("DIAG '%s'\n", x);
- 	}
- }
- 
-@@ -312,7 +314,7 @@ static void smd_state_change(struct smd_channel *ch,
- {
- 	ch->last_state = next;
- 
--	pr_info("SMD: ch %d %d -> %d\n", ch->n, last, next);
-+	pr_debug("ch %d %d -> %d\n", ch->n, last, next);
- 
- 	switch (next) {
- 	case SMD_SS_OPENING:
-@@ -601,7 +603,7 @@ static int smd_alloc_channel(const char *name, uint32_t cid, uint32_t type)
- 	ch->pdev.name = ch->name;
- 	ch->pdev.id = -1;
- 
--	pr_info("smd_alloc_channel() cid=%02d size=%05d '%s'\n",
-+	pr_debug("smd_alloc_channel() cid=%02d size=%05d '%s'\n",
- 		ch->n, ch->fifo_size, ch->name);
- 
- 	mutex_lock(&smd_creation_mutex);
-@@ -621,7 +623,7 @@ static void smd_channel_probe_worker(struct work_struct *work)
- 
- 	shared = smem_find(ID_CH_ALLOC_TBL, sizeof(*shared) * 64);
- 	if (!shared) {
--		pr_err("smd: cannot find allocation table\n");
-+		pr_err("cannot find allocation table\n");
- 		return;
- 	}
- 	for (n = 0; n < 64; n++) {
-@@ -725,7 +727,7 @@ int smd_close(smd_channel_t *ch)
- {
- 	unsigned long flags;
- 
--	pr_info("smd_close(%p)\n", ch);
-+	pr_debug("smd_close(%p)\n", ch);
- 
- 	if (ch == 0)
- 		return -1;
-@@ -939,7 +941,6 @@ int smsm_set_sleep_duration(uint32_t delay)
- int smd_core_init(void)
- {
- 	int r;
--	pr_info("smd_core_init()\n");
- 
- 	/* wait for essential items to be initialized */
- 	for (;;) {
-@@ -992,15 +993,11 @@ int smd_core_init(void)
- 	smsm_change_state(SMSM_STATE_APPS_DEM, ~0, 0);
- #endif
- 
--	pr_info("smd_core_init() done\n");
--
- 	return 0;
- }
- 
- static int __devinit msm_smd_probe(struct platform_device *pdev)
- {
--	pr_info("smd_init()\n");
--
- 	/*
- 	 * If we haven't waited for the ARM9 to boot up till now,
- 	 * then we need to wait here. Otherwise this should just
--- 
-1.7.3.2
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Yea, just found that... ;)
