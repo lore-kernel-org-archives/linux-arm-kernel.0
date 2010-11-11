@@ -1,36 +1,62 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 11 Nov 2010 12:05:03 +0100 (CET)
-Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
-In-Reply-To: <4CDBC60F.8070905@stericsson.com>
-References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.00.1011111054010.2900@localhost6.localdomain6>
-	<4CDBC60F.8070905@stericsson.com>
-Message-ID: <alpine.LFD.2.00.1011111203140.2900@localhost6.localdomain6>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 11 Nov 2010 14:36:13 +0300
+Subject: arm smp support patch
+In-Reply-To: <7BA88774597D409F9906A67003273689@KroffDinna>
+References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>
+	<4CDA803D.8090403@ru.mvista.com>
+	<7BA88774597D409F9906A67003273689@KroffDinna>
+Message-ID: <4CDBD52D.2020605@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Nov 2010, Linus Walleij wrote:
+Hello.
 
-> Thomas Gleixner wrote:
-> 
-> > There is only one caveat. When nohz is on and you sleep longer than 16
-> > seconds then the limitation we have in place does not work anymore, as
-> > it would say that the long sleep time is less than the 63bit
-> > wraparound time. With 32bit clocksource it limits the sleep correclty
-> > to avoid the clocksource wrap issue.
-> 
-> Hm! So the .mask has that side effect (as I suspected), and with
-> this the sleep will be limited to what time you can get into 63 bits
-> (2200 years). And we sure want NOHZ...
-> 
-> But if I complement the solution with the keepwarm() timer from
-> Orion doing just a dummy read() on the clocksource every say 15 secs
-> it will work even if the system sleeps for so long.
+On 10-11-2010 23:37, Scott Valentine wrote:
 
-Well, you don't need the keepwarm() timer, if you just call
-sched_clock() in the idle wakeup path, so the magic in the NOHZ code
-will ensure that you reread the thing timely.
+>>> On arm multi-core platforms that have a gic, the secondary cores fail
+>>> to wake if they are booted in WFI mode, as the gic_dist_init disables
+>>> all interrupts including IPI. I've included a simple patch to the
+>>> gic_dist_init function that enables interrupts 0-15 on SMP enabled
+>>> systems. This patch was made against linux-2.6-HEAD-151f52f.
 
-Thanks,
+>>      Your signoff is necessary for the patch to be applied.
 
-	tglx
+>>> diff -uNr a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>>> --- a/arch/arm/common/gic.c     2010-11-05 15:57:04.000000000 -1000
+>>> +++ b/arch/arm/common/gic.c     2010-11-09 13:08:33.000000000 -1000
+>>> @@ -262,6 +262,13 @@
+>>>           for (i = 0; i<   max_irq; i += 32)
+>>>                   writel(0xffffffff, base +
+>> GIC_DIST_ENABLE_CLEAR + i *
+>>> 4 / 32);
+>>>
+>>> +#ifdef CONFIG_SMP
+>>> +       /*
+>>> +        * Enable IPI interrupts on SMP systems so we can wake
+>>> +secondary
+>>> cores
+
+>>     Your patch is line wrapped.
+
+>>> +        */
+>>> +       writel(0x0000ffff, base + GIC_DIST_ENABLE_SET); #endif
+>>> +
+>>>           /*
+>>>            * Setup the Linux IRQ subsystem.
+>>>            */
+
+>>> Scott Valentine
+
+>> WBR, Sergei
+
+> Sorry, bad mail-client settings. Also, I'm not really a maintainer, but I will signoff as requested.
+
+    You don't need to be a maintainer to sign off on your own patches. :-)
+
+> Below is the non-wrapped patch:
+
+    You didn't provide the patch summary this time.
+
+> Signed-off-by: Scott Valentine<svalentine@concentris-systems.com>
+
+WBR, Sergei
