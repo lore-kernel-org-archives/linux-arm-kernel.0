@@ -1,86 +1,45 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Thu, 11 Nov 2010 04:42:40 -0800 (PST)
-Subject: [PATCH] mx51_babbage: Add initial PMIC support
-Message-ID: <86142.50086.qm@web51008.mail.re2.yahoo.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Thu, 11 Nov 2010 13:44:54 +0100
+Subject: [AT91SAM9260] kernel hang in at91sam926x_pit_reset()
+In-Reply-To: <AANLkTik1P9CNYu93ZDc3PU6e=17O8XBg=DdPo1a9VW6c@mail.gmail.com>
+References: <AANLkTik1P9CNYu93ZDc3PU6e=17O8XBg=DdPo1a9VW6c@mail.gmail.com>
+Message-ID: <201011111345.42080.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX51 Babbage board has a MC13892 PMIC.
+On Thursday 11 November 2010, 12:41:48 Vitja Makarov wrote:
+> Hi!
+> 
+> I've recently found that our new AT91SAM9260 boards does not work with
+> linux out of the box.
+> The only thing changed is CPU revision now it is "Rev. B' (old boards
+> used "Rev. A" CPUs)
+> 
+> 
+> So after uncompressing kernel it writes. "Booting kernel..." that's
+> all. Kernel hangs.
+> 
+> I found that it hangs in  at91sam926x_time.c:at91sam926x_pit_reset():
+> 
+> Bit in AT91_PIT_PIVR register never clears... so I add timeout for
+> this loop and kernel boots as expected.
+> 
+> static void at91sam926x_pit_reset(void)
+> {
+> <------>/* Disable timer and irqs */
+> <------>at91_sys_write(AT91_PIT_MR, 0);
+> 
+> <------>/* Clear any pending interrupts, wait for PIT to stop counting */
+> <------>while (PIT_CPIV(at91_sys_read(AT91_PIT_PIVR)) != 0)
+> <------><------>cpu_relax();
+> 
+> <------>/* Start PIT but don't enable IRQ */
+> <------>at91_sys_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
+> }
 
-Add the initial support for it.
+This won't work as you cannot set PIT_PITEN until the PIT has stopped 
+(UserManuel 17.3), read as CPIV is 0. You should check if and why CPIV isn't 
+increasing.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/board-mx51_babbage.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 66b07d8..a48f7c4 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -22,6 +22,8 @@
- #include <linux/input.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/spi.h>
-+#include <linux/mfd/mc13xxx.h>
-+#include <linux/regulator/machine.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
-@@ -45,6 +47,8 @@
- #define BABBAGE_POWER_KEY	(1*32 + 21)	/* GPIO_2_21 */
- #define BABBAGE_ECSPI1_CS0	(3*32 + 24)	/* GPIO_4_24 */
- #define BABBAGE_ECSPI1_CS1	(3*32 + 25)	/* GPIO_4_25 */
-+#define BABBAGE_PMIC_GPIO	(0*32 + 8)	/* GPIO_1_8 */
-+#define BABBAGE_PMIC_IRQ	(MXC_INTERNAL_IRQS + BABBAGE_PMIC_GPIO)
- 
- /* USB_CTRL_1 */
- #define MX51_USB_CTRL_1_OFFSET			0x10
-@@ -158,6 +162,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
- 	MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
- 	MX51_PAD_CSPI1_SS0__GPIO_4_24,
- 	MX51_PAD_CSPI1_SS1__GPIO_4_25,
-+
-+	/* PMIC Interrupt */
-+	MX51_PAD_GPIO_1_8__GPIO_1_8,
- };
- 
- /* Serial ports */
-@@ -321,6 +328,17 @@ static int __init babbage_otg_mode(char *options)
- }
- __setup("otg_mode=", babbage_otg_mode);
- 
-+static struct mc13xxx_regulator_init_data mx51_babbage_regulators[] = {
-+
-+/*TODO: Add regulator list */
-+
-+};
-+
-+static struct mc13xxx_platform_data mc13xxx_pdata __initdata = {
-+	.regulators = mx51_babbage_regulators,
-+	.num_regulators = ARRAY_SIZE(mx51_babbage_regulators),
-+	.flags  = MC13XXX_USE_REGULATOR,
-+};
- static struct spi_board_info mx51_babbage_spi_board_info[] __initdata = {
- 	{
- 		.modalias = "mtd_dataflash",
-@@ -329,6 +347,13 @@ static struct spi_board_info mx51_babbage_spi_board_info[] __initdata = {
- 		.chip_select = 1,
- 		.mode = SPI_MODE_0,
- 		.platform_data = NULL,
-+	}, {
-+		.modalias = "mc13892",
-+		.max_speed_hz = 6000000,
-+		.bus_num = 0,
-+		.chip_select = 0,
-+		.irq = BABBAGE_PMIC_IRQ,
-+		.platform_data = &mc13xxx_pdata,
- 	},
- };
- 
--- 
-1.6.0.4
-
-
-
-      
+Best regards
+Alexander
