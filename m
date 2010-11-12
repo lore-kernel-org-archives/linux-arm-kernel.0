@@ -1,39 +1,38 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 12 Nov 2010 17:21:20 +0900
-Subject: [PATCH 02/07] ARM: Use shared GIC entry macros on CNS3XXX
+Date: Fri, 12 Nov 2010 17:21:31 +0900
+Subject: [PATCH 03/07] ARM: Use shared GIC entry macros on Realview
 In-Reply-To: <20101112082059.27221.52879.sendpatchset@t400s>
 References: <20101112082059.27221.52879.sendpatchset@t400s>
-Message-ID: <20101112082120.27221.84245.sendpatchset@t400s>
+Message-ID: <20101112082131.27221.51642.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
 Use the GIC demux code in asm/hardware/entry-macro-gic.S
-on the CNS3XXX subarchitecture.
+on the Realview subarchitecture.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-cns3xxx/include/mach/entry-macro.S |   61 ----------------------
- 1 file changed, 1 insertion(+), 60 deletions(-)
+ arch/arm/mach-realview/include/mach/entry-macro.S |   60 ---------------------
+ 1 file changed, 1 insertion(+), 59 deletions(-)
 
---- 0001/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-+++ work/arch/arm/mach-cns3xxx/include/mach/entry-macro.S	2010-11-12 15:58:46.000000000 +0900
-@@ -9,7 +9,7 @@
+--- 0001/arch/arm/mach-realview/include/mach/entry-macro.S
++++ work/arch/arm/mach-realview/include/mach/entry-macro.S	2010-11-12 15:59:57.000000000 +0900
+@@ -8,7 +8,7 @@
+  * warranty of any kind, whether express or implied.
   */
- 
  #include <mach/hardware.h>
 -#include <asm/hardware/gic.h>
 +#include <asm/hardware/entry-macro-gic.S>
  
  		.macro	disable_fiq
  		.endm
-@@ -21,62 +21,3 @@
- 
+@@ -21,61 +21,3 @@
  		.macro  arch_ret_to_user, tmp1, tmp2
  		.endm
--
+ 
 -		/*
 -		 * The interrupt numbering scheme is defined in the
 -		 * interrupt controller spec.  To wit:
