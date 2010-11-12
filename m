@@ -1,58 +1,154 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 12 Nov 2010 17:22:04 +0900
-Subject: ARM: fix compile warning in mm/init.c
-In-Reply-To: <20101112074032.GF18358@pengutronix.de>
-References: <1289542753-30185-1-git-send-email-gadiyar@ti.com>
-	<20101112074032.GF18358@pengutronix.de>
-Message-ID: <AANLkTikLAbsMvov8BuJ=95R4z=4M=Hjr6DaPGuwbuSqw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 12 Nov 2010 13:55:25 +0530
+Subject: [PATCH 07/07] ARM: Use shared GIC entry macros on OMAP
+In-Reply-To: <20101112082211.27221.47096.sendpatchset@t400s>
+References: <20101112082059.27221.52879.sendpatchset@t400s>
+	<20101112082211.27221.47096.sendpatchset@t400s>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030D58AE84@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Fri, Nov 12, 2010 at 11:49:13AM +0530, Anand Gadiyar wrote:
->> Commit 7c63984b86 (ARM: do not define VMALLOC_END relative to PAGE_OFFSET)
->> changed VMALLOC_END to be an explicit value. Before this, it was
->> relative to PAGE_OFFSET and therefore automatically upgraded to
->> unsigned long as PAGE_OFFSET was an unsigned long. This introduced
->> the following build warning. Fix this.
->>
->> ? CC ? ? ?arch/arm/mm/init.o
->> arch/arm/mm/init.c: In function 'mem_init':
->> arch/arm/mm/init.c:606: warning: format '%08lx' expects type 'long unsigned int', but argument 12 has type 'unsigned int'
->>
->> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
->> Cc: Nicolas Pitre <nico@fluxnic.net>
->> ---
->> ?arch/arm/mm/init.c | ? ?2 +-
->> ?1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> Index: ehci/arch/arm/mm/init.c
->> ===================================================================
->> --- ehci.orig/arch/arm/mm/init.c
->> +++ ehci/arch/arm/mm/init.c
->> @@ -593,7 +593,7 @@ void __init mem_init(void)
->> ?#ifdef CONFIG_MMU
->> ? ? ? ? ? ? ? ? ? ? ? MLM(CONSISTENT_BASE, CONSISTENT_END),
->> ?#endif
->> - ? ? ? ? ? ? ? ? ? ? MLM(VMALLOC_START, VMALLOC_END),
->> + ? ? ? ? ? ? ? ? ? ? MLM(VMALLOC_START, (unsigned long)VMALLOC_END),
-> I wonder if this is the only place where this is a problem. ?Maybe it's
-> better to make the defined value of all VMALLOC_END an unsigned long as
-> some already are?
-Right, Samsung SoCs change it to UL to fix this issue.
-
-Thank you,
-Kyungmin Park
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> _______________________________________________
-> linux-arm-kernel mailing list
+> -----Original Message-----
+> From: Magnus Damm [mailto:magnus.damm at gmail.com]
+> Sent: Friday, November 12, 2010 1:52 PM
+> To: linux at arm.linux.org.uk
+> Cc: kgene.kim at samsung.com; kmpark at infradead.org; konkers at android.com;
+> tony at atomide.com; adharmap at codeaurora.org; avorontsov at mvista.com; linux-
+> kernel at vger.kernel.org; srinidhikasagar at gmail.com; dwalker at codeaurora.org;
+> Shilimkar, Santosh; ccross at android.com; olof at lixom.net; Magnus Damm;
 > linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> Subject: [PATCH 07/07] ARM: Use shared GIC entry macros on OMAP
+> 
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Common GIC entry macro for omap
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> 
+>  arch/arm/mach-omap2/include/mach/entry-macro.S |   92 ++++++++-----------
+> -----
+>  1 file changed, 31 insertions(+), 61 deletions(-)
+> 
+> --- 0001/arch/arm/mach-omap2/include/mach/entry-macro.S
+> +++ work/arch/arm/mach-omap2/include/mach/entry-macro.S	2010-11-12
+> 16:10:51.000000000 +0900
+> @@ -105,6 +105,35 @@ omap_irq_base:	.word	0
+>  9999:
+>  		.endm
+> 
+> +#ifdef CONFIG_SMP
+> +		/* We assume that irqstat (the raw value of the IRQ
+> acknowledge
+> +		 * register) is preserved from the macro above.
+> +		 * If there is an IPI, we immediately signal end of interrupt
+> +		 * on the controller, since this requires the original irqstat
+> +		 * value which we won't easily be able to recreate later.
+> +		 */
+> +
+> +		.macro test_for_ipi, irqnr, irqstat, base, tmp
+> +		bic	\irqnr, \irqstat, #0x1c00
+> +		cmp	\irqnr, #16
+> +		it	cc
+> +		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+> +		it	cs
+> +		cmpcs	\irqnr, \irqnr
+> +		.endm
+> +
+> +		/* As above, this assumes that irqstat and base are preserved
+> */
+> +
+> +		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+> +		bic	\irqnr, \irqstat, #0x1c00
+> +		mov 	\tmp, #0
+> +		cmp	\irqnr, #29
+> +		itt	eq
+> +		moveq	\tmp, #1
+> +		streq	\irqstat, [\base, #GIC_CPU_EOI]
+> +		cmp	\tmp, #0
+> +		.endm
+> +#endif	/* CONFIG_SMP */
+> 
+>  #else	/* MULTI_OMAP2 */
+> 
+> @@ -141,74 +170,15 @@ omap_irq_base:	.word	0
+> 
+> 
+>  #ifdef CONFIG_ARCH_OMAP4
+> +#include <asm/hardware/entry-macro-gic.S>
+> 
+>  		.macro  get_irqnr_preamble, base, tmp
+>  		ldr     \base, =OMAP4_IRQ_BASE
+>  		.endm
+> 
+> -		/*
+> -		 * The interrupt numbering scheme is defined in the
+> -		 * interrupt controller spec.  To wit:
+> -		 *
+> -		 * Interrupts 0-15 are IPI
+> -		 * 16-28 are reserved
+> -		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+> -		 * 32-1020 are global
+> -		 * 1021-1022 are reserved
+> -		 * 1023 is "spurious" (no interrupt)
+> -		 *
+> -		 * For now, we ignore all local interrupts so only return an
+> -		 * interrupt if it's between 30 and 1020.  The test_for_ipi
+> -		 * routine below will pick up on IPIs.
+> -		 * A simple read from the controller will tell us the number
+> -		 * of the highest priority enabled interrupt.
+> -		 * We then just need to check whether it is in the
+> -		 * valid range for an IRQ (30-1020 inclusive).
+> -		 */
+> -		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+> -		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+> -
+> -		ldr     \tmp, =1021
+> -
+> -		bic     \irqnr, \irqstat, #0x1c00
+> -
+> -		cmp     \irqnr, #29
+> -		cmpcc   \irqnr, \irqnr
+> -		cmpne   \irqnr, \tmp
+> -		cmpcs   \irqnr, \irqnr
+> -		.endm
+>  #endif
+> -#endif	/* MULTI_OMAP2 */
+> -
+> -#ifdef CONFIG_SMP
+> -		/* We assume that irqstat (the raw value of the IRQ
+> acknowledge
+> -		 * register) is preserved from the macro above.
+> -		 * If there is an IPI, we immediately signal end of interrupt
+> -		 * on the controller, since this requires the original irqstat
+> -		 * value which we won't easily be able to recreate later.
+> -		 */
+> -
+> -		.macro test_for_ipi, irqnr, irqstat, base, tmp
+> -		bic	\irqnr, \irqstat, #0x1c00
+> -		cmp	\irqnr, #16
+> -		it	cc
+> -		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+> -		it	cs
+> -		cmpcs	\irqnr, \irqnr
+> -		.endm
+> -
+> -		/* As above, this assumes that irqstat and base are preserved
+> */
+> 
+> -		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+> -		bic	\irqnr, \irqstat, #0x1c00
+> -		mov 	\tmp, #0
+> -		cmp	\irqnr, #29
+> -		itt	eq
+> -		moveq	\tmp, #1
+> -		streq	\irqstat, [\base, #GIC_CPU_EOI]
+> -		cmp	\tmp, #0
+> -		.endm
+> -#endif	/* CONFIG_SMP */
+> +#endif	/* MULTI_OMAP2 */
+> 
+>  		.macro	irq_prio_table
+>  		.endm
