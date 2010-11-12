@@ -1,67 +1,49 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 12 Nov 2010 08:34:34 -0800
-Subject: [PATCH V2] arch/arm/kernel/smp_twd.c: Correct local timer printk
-	decimal output
-In-Reply-To: <1289244455.29216.348.camel@Joe-Laptop>
-References: <1289244455.29216.348.camel@Joe-Laptop>
-Message-ID: <1289579674.6519.76.camel@Joe-Laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Nov 2010 17:38:53 +0100
+Subject: [PATCH 07/10] MCDE: Add display subsystem framework
+In-Reply-To: <1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-7-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
+Message-ID: <201011121738.53536.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer decimal place is shown incorrectly.
-The %100 divisor needs to have 1 fewer 0.
+On Wednesday 10 November 2010, Jimmy Rubin wrote:
+> This patch adds support for the MCDE, Memory-to-display controller,
+> found in the ST-Ericsson ux500 products.
+> 
+> This patch adds a display subsystem framework that can be used
+> by a frame buffer device driver to control a display and MCDE.
 
-Convert to unprefixed pr_<level>/pr_cont while at it.
+Like "hardware abstraction layer", "framework" is another term that
+we do not like to hear. We write drivers that drive specific hardware,
+so better name it after the exact part of the chip that it is driving.
 
-Uncompiled/untested.
+Other terms to avoid include "middleware", "generic subsystem" and
+"wrapper".
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
-V2:
+> +struct kobj_type ovly_type = {
+> +	.release = overlay_release,
+> +};
 
-On Fri, 2010-11-12 at 16:12 +0000, Russell King - ARM Linux wrote:
-> I'd rather avoid core code having KBUILD_MODNAME prefix it.
-> The message is unique enough as is.
+You certainly should not define a new kobj_type for use in a device driver.
+This is an internal data structure of the linux core code. It might make
+sense if you were trying to become the new frame buffer layer maintainer
+and rewrite all the existing drivers to be based on the concept of
+overlays, but even then there is probably a better way.
 
-Use a local #define pr_fmt(fmt) fmt so if ever
-a global change for pr_fmt is made, this won't
-need to be changed.
+Maybe you were thinking of using kref instead of kobj?
 
- arch/arm/kernel/smp_twd.c |   10 +++++++---
- 1 files changed, 7 insertions(+), 3 deletions(-)
+> +int __init mcde_dss_init(void)
+> +{
+> +	return 0;
+> +}
+> +
+> +void mcde_dss_exit(void)
+> +{
+> +}
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 35882fb..4f90183 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -8,6 +8,9 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+
-+#define pr_fmt(fmt) fmt
-+
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/delay.h>
-@@ -89,7 +92,7 @@ static void __cpuinit twd_calibrate_rate(void)
- 	 * the timer ticks
- 	 */
- 	if (twd_timer_rate == 0) {
--		printk(KERN_INFO "Calibrating local timer... ");
-+		pr_info("Calibrating local timer... ");
- 
- 		/* Wait for a tick to start */
- 		waitjiffies = get_jiffies_64() + 1;
-@@ -113,8 +116,9 @@ static void __cpuinit twd_calibrate_rate(void)
- 
- 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
- 
--		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
--			(twd_timer_rate / 100000) % 100);
-+		pr_cont("%lu.%02luMHz\n",
-+			twd_timer_rate / 1000000,
-+			(twd_timer_rate / 10000) % 100);
- 	}
- 
- 	load = twd_timer_rate / HZ;
+If they don't do anything, don't define them.
+
+	Arnd
