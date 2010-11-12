@@ -1,388 +1,533 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Nov 2010 18:00:26 +0000
-Subject: [PATCH v2 06/20] ARM: LPAE: Introduce the 3-level page table format
-	definitions
+Date: Fri, 12 Nov 2010 18:00:28 +0000
+Subject: [PATCH v2 08/20] ARM: LPAE: MMU setup for the 3-level page table
+	format
 In-Reply-To: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
 References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289584840-18097-7-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1289584840-18097-9-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the pgtable-3level*.h files with definitions
-specific to the LPAE page table format (3 levels of page tables).
-
-Each table is 4KB and has 512 64-bit entries. An entry can point to a
-40-bit physical address. The young, write and exec software bits share
-the corresponding hardware bits (negated). Other software bits use spare
-bits in the PTE.
-
-The patch also changes some variable types from unsigned long or int to
-pteval_t or pgprot_t.
+This patch adds the MMU initialisation for the LPAE page table format.
+The swapper_pg_dir size with LPAE is 5 rather than 4 pages. The
+__v7_setup function configures the TTBRx split based on the PAGE_OFFSET
+and sets the corresponding TTB control and MAIRx bits (similar to
+PRRR/NMRR for TEX remapping). The 36-bit mappings (supersections) and
+a few other memory types in mmu.c are conditionally compiled.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/page.h                 |    4 +
- arch/arm/include/asm/pgtable-3level-hwdef.h |   78 ++++++++++++++++++
- arch/arm/include/asm/pgtable-3level-types.h |   55 +++++++++++++
- arch/arm/include/asm/pgtable-3level.h       |  113 +++++++++++++++++++++++++++
- arch/arm/include/asm/pgtable-hwdef.h        |    4 +
- arch/arm/include/asm/pgtable.h              |    6 +-
- arch/arm/mm/mm.h                            |    8 +-
- arch/arm/mm/mmu.c                           |    2 +-
- 8 files changed, 264 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-3level.h
+ arch/arm/kernel/head.S    |   96 +++++++++++++++++++++++++++++++------------
+ arch/arm/mm/mmu.c         |   32 ++++++++++++++-
+ arch/arm/mm/proc-macros.S |    5 +-
+ arch/arm/mm/proc-v7.S     |   99 ++++++++++++++++++++++++++++++++++++++++----
+ 4 files changed, 193 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index 3848105..e5124db 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -151,7 +151,11 @@ extern void __cpu_copy_user_highpage(struct page *to, struct page *from,
- #define clear_page(page)	memset((void *)(page), 0, PAGE_SIZE)
- extern void copy_page(void *to, const void *from);
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index dd6b369..fd8a29e 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -21,6 +21,7 @@
+ #include <asm/memory.h>
+ #include <asm/thread_info.h>
+ #include <asm/system.h>
++#include <asm/pgtable.h>
  
-+#ifdef CONFIG_ARM_LPAE
-+#include <asm/pgtable-3level-types.h>
-+#else
- #include <asm/pgtable-2level-types.h>
-+#endif
- 
- #endif /* CONFIG_MMU */
- 
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-new file mode 100644
-index 0000000..2f99c3c
---- /dev/null
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -0,0 +1,78 @@
-+/*
-+ * arch/arm/include/asm/pgtable-3level-hwdef.h
-+ *
-+ * Copyright (C) 2010 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+#ifndef _ASM_PGTABLE_3LEVEL_HWDEF_H
-+#define _ASM_PGTABLE_3LEVEL_HWDEF_H
-+
-+#include <linux/const.h>
-+#include <asm/pgtable-3level-types.h>
-+
-+/*
-+ * Hardware page table definitions.
-+ *
-+ * + Level 1/2 descriptor
-+ *   - common
-+ */
-+#define PMD_TYPE_MASK		(_AT(pmd_t, 3) << 0)
-+#define PMD_TYPE_FAULT		(_AT(pmd_t, 0) << 0)
-+#define PMD_TYPE_TABLE		(_AT(pmd_t, 3) << 0)
-+#define PMD_TYPE_SECT		(_AT(pmd_t, 1) << 0)
-+#define PMD_BIT4		(_AT(pmd_t, 0))
-+#define PMD_DOMAIN(x)		(_AT(pmd_t, 0))
-+
-+/*
-+ *   - section
-+ */
-+#define PMD_SECT_BUFFERABLE	(_AT(pmd_t, 1) << 2)
-+#define PMD_SECT_CACHEABLE	(_AT(pmd_t, 1) << 3)
-+#define PMD_SECT_S		(_AT(pmd_t, 3) << 8)
-+#define PMD_SECT_AF		(_AT(pmd_t, 1) << 10)
-+#define PMD_SECT_nG		(_AT(pmd_t, 1) << 11)
-+#ifdef __ASSEMBLY__
-+/* avoid 'shift count out of range' warning */
-+#define PMD_SECT_XN		(0)
-+#else
-+#define PMD_SECT_XN		((pmd_t)1 << 54)
-+#endif
-+#define PMD_SECT_AP_WRITE	(_AT(pmd_t, 0))
-+#define PMD_SECT_AP_READ	(_AT(pmd_t, 0))
-+#define PMD_SECT_TEX(x)		(_AT(pmd_t, 0))
-+
-+/*
-+ * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
-+ */
-+#define PMD_SECT_UNCACHED	(_AT(pteval_t, 0) << 2)	/* strongly ordered */
-+#define PMD_SECT_BUFFERED	(_AT(pteval_t, 1) << 2)	/* normal non-cacheable */
-+#define PMD_SECT_WT		(_AT(pteval_t, 2) << 2)	/* normal inner write-through */
-+#define PMD_SECT_WB		(_AT(pteval_t, 3) << 2)	/* normal inner write-back */
-+#define PMD_SECT_WBWA		(_AT(pteval_t, 7) << 2)	/* normal inner write-alloc */
-+
-+/*
-+ * + Level 3 descriptor (PTE)
-+ */
-+#define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
-+#define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
-+#define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
-+#define PTE_BUFFERABLE		(_AT(pteval_t, 1) << 2)		/* AttrIndx[0] */
-+#define PTE_CACHEABLE		(_AT(pteval_t, 1) << 3)		/* AttrIndx[1] */
-+#define PTE_EXT_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
-+#define PTE_EXT_AF		(_AT(pteval_t, 1) << 10)	/* Access Flag */
-+#define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* nG */
-+#define PTE_EXT_XN		(_AT(pteval_t, 1) << 54)	/* XN */
-+
-+#endif
-diff --git a/arch/arm/include/asm/pgtable-3level-types.h b/arch/arm/include/asm/pgtable-3level-types.h
-new file mode 100644
-index 0000000..c9aca5b
---- /dev/null
-+++ b/arch/arm/include/asm/pgtable-3level-types.h
-@@ -0,0 +1,55 @@
-+/*
-+ * arch/arm/include/asm/pgtable-3level-types.h
-+ *
-+ * Copyright (C) 2010 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+#ifndef _ASM_PGTABLE_3LEVEL_TYPES_H
-+#define _ASM_PGTABLE_3LEVEL_TYPES_H
-+
-+#ifndef __ASSEMBLY__
-+
-+typedef u64 pteval_t;
-+typedef u64 pte_t;
-+typedef u64 pmd_t;
-+typedef u64 pgd_t;
-+typedef u64 pgprot_t;
-+
-+#define pte_val(x)	(x)
-+#define pmd_val(x)	(x)
-+#define pgd_val(x)	(x)
-+#define pgprot_val(x)	(x)
-+
-+#define __pte(x)	(x)
-+#define __pmd(x)	(x)
-+#define __pgd(x)	(x)
-+#define __pgprot(x)	(x)
-+
-+/*
-+ * 40-bit physical address supported.
-+ */
-+#define __PHYSICAL_MASK_SHIFT	(40)
-+#define __PHYSICAL_MASK		((1ULL << __PHYSICAL_MASK_SHIFT) - 1)
-+
-+/*
-+ * Mask for extracting the PFN from a PTE value. The PAGE_MASK is
-+ * sign-extended to 64-bit because the physical range is larger than the
-+ * virtual one.
-+ */
-+#define PTE_PFN_MASK	((u64)((s32)PAGE_MASK & __PHYSICAL_MASK))
-+
-+#endif	/* __ASSEMBLY__ */
-+
-+#endif	/* _ASM_PGTABLE_3LEVEL_TYPES_H */
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-new file mode 100644
-index 0000000..5b1482d
---- /dev/null
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -0,0 +1,113 @@
-+/*
-+ * arch/arm/include/asm/pgtable-3level.h
-+ *
-+ * Copyright (C) 2010 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+#ifndef _ASM_PGTABLE_3LEVEL_H
-+#define _ASM_PGTABLE_3LEVEL_H
-+
-+#include <linux/const.h>
-+#include <asm/pgtable-3level-types.h>
-+
-+/*
-+ * With LPAE, there are 3 levels of page tables. Each level has 512 entries of
-+ * 8 bytes each, occupying a 4K page. The first level table covers a range of
-+ * 512GB, each entry representing 1GB. Since we are limited to 4GB input
-+ * address range, only 4 entries in the PGD are used.
-+ *
-+ * There are enough spare bits in a page table entry for the kernel specific
-+ * state.
-+ */
-+#define PTRS_PER_PTE		512
-+#define PTRS_PER_PMD		512
-+#define PTRS_PER_PGD		4
-+#define LINUX_PTE_OFFSET	0
-+
-+/*
-+ * PGDIR_SHIFT determines the size a top-level page table entry can map.
-+ */
-+#define PGDIR_SHIFT		30
-+
-+/*
-+ * PMD_SHIFT determines the size a middle-level page table entry can map.
-+ */
-+#define PMD_SHIFT		21
-+
-+#define PMD_SIZE		(1UL << PMD_SHIFT)
-+#define PMD_MASK		(~(PMD_SIZE-1))
-+#define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
-+#define PGDIR_MASK		(~(PGDIR_SIZE-1))
-+
-+/*
-+ * This is the lowest virtual address we can permit any user space
-+ * mapping to be mapped at.  This is particularly important for
-+ * non-high vector CPUs.
-+ */
-+#define FIRST_USER_ADDRESS	PAGE_SIZE
-+
-+#define FIRST_USER_PGD_NR	1
-+#define USER_PTRS_PER_PGD	((TASK_SIZE/PGDIR_SIZE) - FIRST_USER_PGD_NR)
-+
-+/*
-+ * section address mask and size definitions.
-+ */
-+#define SECTION_SHIFT		21
-+#define SECTION_SIZE		(1UL << SECTION_SHIFT)
-+#define SECTION_MASK		(~(SECTION_SIZE-1))
-+
-+/*
-+ * "Linux" PTE definitions for LPAE.
-+ *
-+ * These bits overlap with the hardware bits but the naming is preserved for
-+ * consistency with the classic page table format.
-+ */
-+#define L_PTE_PRESENT		(_AT(pteval_t, 3) << 0)		/* Valid */
-+#define L_PTE_FILE		(_AT(pteval_t, 1) << 2)		/* only when !PRESENT */
-+#define L_PTE_BUFFERABLE	(_AT(pteval_t, 1) << 2)		/* AttrIndx[0] */
-+#define L_PTE_CACHEABLE		(_AT(pteval_t, 1) << 3)		/* AttrIndx[1] */
-+#define L_PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
-+#define L_PTE_NOWRITE		(_AT(pteval_t, 1) << 7)		/* AP[2] */
-+#define L_PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
-+#define L_PTE_YOUNG		(_AT(pteval_t, 1) << 10)	/* AF */
-+#define L_PTE_NOEXEC		(_AT(pteval_t, 1) << 54)	/* XN */
-+#define L_PTE_DIRTY		(_AT(pteval_t, 1) << 55)	/* unused */
-+#define L_PTE_SPECIAL		(_AT(pteval_t, 1) << 56)	/* unused */
-+#define L_PTE_EXEC		(_AT(pteval_t, 0))
-+#define L_PTE_WRITE		(_AT(pteval_t, 0))
-+
-+/*
-+ * To be used in assembly code with the upper page attributes.
-+ */
-+#define L_PTE_NOEXEC_HIGH	(1 << (54 - 32))
-+#define L_PTE_DIRTY_HIGH	(1 << (55 - 32))
-+
-+#define L_PTE_SWP_SHIFT		2	/* shift for the swap or file PTE */
-+
-+/*
-+ * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
-+ */
-+#define L_PTE_MT_UNCACHED	(_AT(pteval_t, 0) << 2)	/* strongly ordered */
-+#define L_PTE_MT_BUFFERABLE	(_AT(pteval_t, 1) << 2)	/* normal non-cacheable */
-+#define L_PTE_MT_WRITETHROUGH	(_AT(pteval_t, 2) << 2)	/* normal inner write-through */
-+#define L_PTE_MT_WRITEBACK	(_AT(pteval_t, 3) << 2)	/* normal inner write-back */
-+#define L_PTE_MT_WRITEALLOC	(_AT(pteval_t, 7) << 2)	/* normal inner write-alloc */
-+#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 4) << 2)	/* device */
-+#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 4) << 2)	/* device */
-+#define L_PTE_MT_DEV_WC		(_AT(pteval_t, 1) << 2)	/* normal non-cacheable */
-+#define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 3) << 2)	/* normal inner write-back */
-+#define L_PTE_MT_MASK		(_AT(pteval_t, 7) << 2)
-+
-+#endif /* _ASM_PGTABLE_3LEVEL_H */
-diff --git a/arch/arm/include/asm/pgtable-hwdef.h b/arch/arm/include/asm/pgtable-hwdef.h
-index 1831111..8426229 100644
---- a/arch/arm/include/asm/pgtable-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-hwdef.h
-@@ -10,6 +10,10 @@
- #ifndef _ASMARM_PGTABLE_HWDEF_H
- #define _ASMARM_PGTABLE_HWDEF_H
- 
-+#ifdef CONFIG_ARM_LPAE
-+#include <asm/pgtable-3level-hwdef.h>
-+#else
- #include <asm/pgtable-2level-hwdef.h>
-+#endif
- 
+ #ifdef CONFIG_DEBUG_LL
+ #include <mach/debug-macro.S>
+@@ -45,11 +46,20 @@
+ #error KERNEL_RAM_VADDR must start at 0xXXXX8000
  #endif
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 5bd0e64..97a5de3 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -23,7 +23,11 @@
- #include <mach/vmalloc.h>
- #include <asm/pgtable-hwdef.h>
  
 +#ifdef CONFIG_ARM_LPAE
-+#include <asm/pgtable-3level.h>
++	/* LPAE requires an additional page for the PGD */
++#define PG_DIR_SIZE	0x5000
++#define PTE_WORDS	3
 +#else
- #include <asm/pgtable-2level.h>
++#define PG_DIR_SIZE	0x4000
++#define PTE_WORDS	2
 +#endif
++
+ 	.globl	swapper_pg_dir
+-	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - 0x4000
++	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
  
- /*
-  * Just any arbitrary offset to the start of the vmalloc VM area: the
-@@ -283,7 +287,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 	.macro	pgtbl, rd
+-	ldr	\rd, =(KERNEL_RAM_PADDR - 0x4000)
++	ldr	\rd, =(KERNEL_RAM_PADDR - PG_DIR_SIZE)
+ 	.endm
  
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
- {
--	const unsigned long mask = L_PTE_EXEC | L_PTE_WRITE | L_PTE_USER |
-+	const pteval_t mask = L_PTE_EXEC | L_PTE_WRITE | L_PTE_USER |
- 		L_PTE_NOEXEC | L_PTE_NOWRITE;
- 	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
- 	return pte;
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index 6630620..a62f093 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -16,10 +16,10 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
- }
+ #ifdef CONFIG_XIP_KERNEL
+@@ -129,11 +139,11 @@ __create_page_tables:
+ 	pgtbl	r4				@ page table address
  
- struct mem_type {
--	unsigned int prot_pte;
--	unsigned int prot_l1;
--	unsigned int prot_sect;
--	unsigned int domain;
-+	pgprot_t prot_pte;
-+	pgprot_t prot_l1;
-+	pgprot_t prot_sect;
-+	pgprot_t domain;
- };
+ 	/*
+-	 * Clear the 16K level 1 swapper page table
++	 * Clear the swapper page table
+ 	 */
+ 	mov	r0, r4
+ 	mov	r3, #0
+-	add	r6, r0, #0x4000
++	add	r6, r0, #PG_DIR_SIZE
+ 1:	str	r3, [r0], #4
+ 	str	r3, [r0], #4
+ 	str	r3, [r0], #4
+@@ -141,6 +151,23 @@ __create_page_tables:
+ 	teq	r0, r6
+ 	bne	1b
  
- const struct mem_type *get_mem_type(unsigned int type);
++#ifdef CONFIG_ARM_LPAE
++	/*
++	 * Build the PGD table (first level) to point to the PMD table. A PGD
++	 * entry is 64-bit wide and the top 32 bits are 0.
++	 */
++	mov	r0, r4
++	add	r3, r4, #0x1000			@ first PMD table address
++	orr	r3, r3, #3			@ PGD block type
++	mov	r6, #4				@ PTRS_PER_PGD
++1:	str	r3, [r0], #8			@ set PGD entry
++	add	r3, r3, #0x1000			@ next PMD table
++	subs	r6, r6, #1
++	bne	1b
++
++	add	r4, r4, #0x1000			@ point to the PMD tables
++#endif
++
+ 	ldr	r7, [r10, #PROCINFO_MM_MMUFLAGS] @ mm_mmuflags
+ 
+ 	/*
+@@ -152,30 +179,30 @@ __create_page_tables:
+ 	sub	r0, r0, r3			@ virt->phys offset
+ 	add	r5, r5, r0			@ phys __enable_mmu
+ 	add	r6, r6, r0			@ phys __enable_mmu_end
+-	mov	r5, r5, lsr #20
+-	mov	r6, r6, lsr #20
++	mov	r5, r5, lsr #SECTION_SHIFT
++	mov	r6, r6, lsr #SECTION_SHIFT
+ 
+-1:	orr	r3, r7, r5, lsl #20		@ flags + kernel base
+-	str	r3, [r4, r5, lsl #2]		@ identity mapping
+-	teq	r5, r6
+-	addne	r5, r5, #1			@ next section
+-	bne	1b
++1:	orr	r3, r7, r5, lsl #SECTION_SHIFT	@ flags + kernel base
++	str	r3, [r4, r5, lsl #PTE_WORDS]	@ identity mapping
++	cmp	r5, r6
++	addlo	r5, r5, #SECTION_SHIFT >> 20	@ next section
++	blo	1b
+ 
+ 	/*
+ 	 * Now setup the pagetables for our kernel direct
+ 	 * mapped region.
+ 	 */
+ 	mov	r3, pc
+-	mov	r3, r3, lsr #20
+-	orr	r3, r7, r3, lsl #20
++	mov	r3, r3, lsr #SECTION_SHIFT
++	orr	r3, r7, r3, lsl #SECTION_SHIFT
+ 	add	r0, r4,  #(KERNEL_START & 0xff000000) >> 18
+-	str	r3, [r0, #(KERNEL_START & 0x00f00000) >> 18]!
++	str	r3, [r0, #(KERNEL_START & 0x00e00000) >> 18]!
+ 	ldr	r6, =(KERNEL_END - 1)
+-	add	r0, r0, #4
++	add	r0, r0, #1 << PTE_WORDS
+ 	add	r6, r4, r6, lsr #18
+ 1:	cmp	r0, r6
+-	add	r3, r3, #1 << 20
+-	strls	r3, [r0], #4
++	add	r3, r3, #1 << SECTION_SHIFT
++	strls	r3, [r0], #1 << PTE_WORDS
+ 	bls	1b
+ 
+ #ifdef CONFIG_XIP_KERNEL
+@@ -198,12 +225,13 @@ __create_page_tables:
+ #endif
+ 
+ 	/*
+-	 * Then map first 1MB of ram in case it contains our boot params.
++	 * Then map first section of RAM in case it contains our boot params.
++	 * It assumes that PAGE_OFFSET is 2MB-aligned.
+ 	 */
+ 	add	r0, r4, #PAGE_OFFSET >> 18
+ 	orr	r6, r7, #(PHYS_OFFSET & 0xff000000)
+-	.if	(PHYS_OFFSET & 0x00f00000)
+-	orr	r6, r6, #(PHYS_OFFSET & 0x00f00000)
++	.if	(PHYS_OFFSET & 0x00e00000)
++	orr	r6, r6, #(PHYS_OFFSET & 0x00e00000)
+ 	.endif
+ 	str	r6, [r0]
+ 
+@@ -216,21 +244,27 @@ __create_page_tables:
+ 	 */
+ 	addruart r7, r3
+ 
+-	mov	r3, r3, lsr #20
+-	mov	r3, r3, lsl #2
++	mov	r3, r3, lsr #SECTION_SHIFT
++	mov	r3, r3, lsl #PTE_WORDS
+ 
+ 	add	r0, r4, r3
+ 	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
+ 	cmp	r3, #0x0800			@ limit to 512MB
+ 	movhi	r3, #0x0800
+ 	add	r6, r0, r3
+-	mov	r3, r7, lsr #20
++	mov	r3, r7, lsr #SECTION_SHIFT
+ 	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
+-	orr	r3, r7, r3, lsl #20
++	orr	r3, r7, r3, lsl #SECTION_SHIFT
++#ifdef CONFIG_ARM_LPAE
++	mov	r7, #1 << (54 - 32)		@ XN
++#endif
+ 1:	str	r3, [r0], #4
+-	add	r3, r3, #1 << 20
+-	teq	r0, r6
+-	bne	1b
++#ifdef CONFIG_ARM_LPAE
++	str	r7, [r0], #4
++#endif
++	add	r3, r3, #1 << SECTION_SHIFT
++	cmp	r0, r6
++	blo	1b
+ 
+ #else /* CONFIG_DEBUG_ICEDCC */
+ 	/* we don't need any serial debugging mappings for ICEDCC */
+@@ -259,6 +293,9 @@ __create_page_tables:
+ 	str	r3, [r0]
+ #endif
+ #endif
++#ifdef CONFIG_ARM_LPAE
++	sub	r4, r4, #0x1000		@ point to the PGD table
++#endif
+ 	mov	pc, lr
+ ENDPROC(__create_page_tables)
+ 	.ltorg
+@@ -344,12 +381,17 @@ __enable_mmu:
+ #ifdef CONFIG_CPU_ICACHE_DISABLE
+ 	bic	r0, r0, #CR_I
+ #endif
++#ifdef CONFIG_ARM_LPAE
++	mov	r5, #0
++	mcrr	p15, 0, r4, r5, c2		@ load TTBR0
++#else
+ 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+ 	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
+ 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
++#endif
+ 	b	__turn_mmu_on
+ ENDPROC(__enable_mmu)
+ 
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 0ca33dd..7c803c4 100644
+index 7c803c4..4147cc6 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -292,7 +292,7 @@ static void __init build_mem_type_table(void)
- {
- 	struct cachepolicy *cp;
- 	unsigned int cr = get_cr();
--	unsigned int user_pgprot, kern_pgprot, vecs_pgprot;
-+	pgprot_t user_pgprot, kern_pgprot, vecs_pgprot;
- 	int cpu_arch = cpu_architecture();
- 	int i;
+@@ -152,6 +152,7 @@ static int __init early_nowrite(char *__unused)
+ }
+ early_param("nowb", early_nowrite);
  
++#ifndef CONFIG_ARM_LPAE
+ static int __init early_ecc(char *p)
+ {
+ 	if (memcmp(p, "on", 2) == 0)
+@@ -161,6 +162,7 @@ static int __init early_ecc(char *p)
+ 	return 0;
+ }
+ early_param("ecc", early_ecc);
++#endif
+ 
+ static int __init noalign_setup(char *__unused)
+ {
+@@ -230,10 +232,12 @@ static struct mem_type mem_types[] = {
+ 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN,
+ 		.domain    = DOMAIN_KERNEL,
+ 	},
++#ifndef CONFIG_ARM_LPAE
+ 	[MT_MINICLEAN] = {
+ 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_MINICACHE,
+ 		.domain    = DOMAIN_KERNEL,
+ 	},
++#endif
+ 	[MT_LOW_VECTORS] = {
+ 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+ 				L_PTE_EXEC | L_PTE_NOWRITE,
+@@ -425,6 +429,7 @@ static void __init build_mem_type_table(void)
+ 	 * ARMv6 and above have extended page tables.
+ 	 */
+ 	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) {
++#ifndef CONFIG_ARM_LPAE
+ 		/*
+ 		 * Mark cache clean areas and XIP ROM read only
+ 		 * from SVC mode and no access from userspace.
+@@ -432,6 +437,7 @@ static void __init build_mem_type_table(void)
+ 		mem_types[MT_ROM].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
+ 		mem_types[MT_MINICLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
+ 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
++#endif
+ 
+ 		if (is_smp()) {
+ 			/*
+@@ -470,6 +476,18 @@ static void __init build_mem_type_table(void)
+ 		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_BUFFERABLE;
+ 	}
+ 
++#ifdef CONFIG_ARM_LPAE
++	/*
++	 * Do not generate access flag faults for the kernel mappings.
++	 */
++	for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
++		mem_types[i].prot_pte |= PTE_EXT_AF;
++		mem_types[i].prot_sect |= PMD_SECT_AF;
++	}
++	kern_pgprot |= PTE_EXT_AF;
++	vecs_pgprot |= PTE_EXT_AF;
++#endif
++
+ 	for (i = 0; i < 16; i++) {
+ 		unsigned long v = pgprot_val(protection_map[i]);
+ 		protection_map[i] = __pgprot(v | user_pgprot);
+@@ -587,6 +605,7 @@ static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
+ 	}
+ }
+ 
++#ifndef CONFIG_ARM_LPAE
+ static void __init create_36bit_mapping(struct map_desc *md,
+ 					const struct mem_type *type)
+ {
+@@ -644,6 +663,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ 		pgd += SUPERSECTION_SIZE >> PGDIR_SHIFT;
+ 	} while (addr != end);
+ }
++#endif	/* !CONFIG_ARM_LPAE */
+ 
+ /*
+  * Create the page directory entries and any necessary
+@@ -674,6 +694,7 @@ static void __init create_mapping(struct map_desc *md)
+ 
+ 	type = &mem_types[md->type];
+ 
++#ifndef CONFIG_ARM_LPAE
+ 	/*
+ 	 * Catch 36-bit addresses
+ 	 */
+@@ -681,6 +702,7 @@ static void __init create_mapping(struct map_desc *md)
+ 		create_36bit_mapping(md, type);
+ 		return;
+ 	}
++#endif
+ 
+ 	addr = md->virtual & PAGE_MASK;
+ 	phys = (unsigned long)__pfn_to_phys(md->pfn);
+@@ -885,6 +907,14 @@ static inline void prepare_page_table(void)
+ 		pmd_clear(pmd_off_k(addr));
+ }
+ 
++#ifdef CONFIG_ARM_LPAE
++/* the first page is reserved for pgd */
++#define SWAPPER_PG_DIR_SIZE	(PAGE_SIZE + \
++				 PTRS_PER_PGD * PTRS_PER_PMD * sizeof(pmd_t))
++#else
++#define SWAPPER_PG_DIR_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
++#endif
++
+ /*
+  * Reserve the special regions of memory
+  */
+@@ -894,7 +924,7 @@ void __init arm_mm_memblock_reserve(void)
+ 	 * Reserve the page tables.  These are already in use,
+ 	 * and can only be in node 0.
+ 	 */
+-	memblock_reserve(__pa(swapper_pg_dir), PTRS_PER_PGD * sizeof(pgd_t));
++	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
+ 
+ #ifdef CONFIG_SA1111
+ 	/*
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index 337f102..fed053c 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -81,8 +81,9 @@
+ #if L_PTE_SHARED != PTE_EXT_SHARED
+ #error PTE shared bit mismatch
+ #endif
+-#if (L_PTE_EXEC+L_PTE_USER+L_PTE_WRITE+L_PTE_DIRTY+L_PTE_YOUNG+\
+-     L_PTE_FILE+L_PTE_PRESENT) > L_PTE_SHARED
++#if !defined(CONFIG_ARM_LPAE) && \
++		(L_PTE_EXEC+L_PTE_USER+L_PTE_WRITE+L_PTE_DIRTY+L_PTE_YOUNG+ \
++		 L_PTE_FILE+L_PTE_PRESENT) > L_PTE_SHARED
+ #error Invalid Linux PTE bit settings
+ #endif
+ #endif	/* CONFIG_MMU */
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 1098a49..33a8c82 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -19,6 +19,19 @@
+ 
+ #include "proc-macros.S"
+ 
++#ifdef CONFIG_ARM_LPAE
++#define TTB_IRGN_NC	(0 << 8)
++#define TTB_IRGN_WBWA	(1 << 8)
++#define TTB_IRGN_WT	(2 << 8)
++#define TTB_IRGN_WB	(3 << 8)
++#define TTB_RGN_NC	(0 << 10)
++#define TTB_RGN_OC_WBWA	(1 << 10)
++#define TTB_RGN_OC_WT	(2 << 10)
++#define TTB_RGN_OC_WB	(3 << 10)
++#define TTB_S		(3 << 12)
++#define TTB_NOS		(0)
++#define TTB_EAE		(1 << 31)
++#else
+ #define TTB_S		(1 << 1)
+ #define TTB_RGN_NC	(0 << 3)
+ #define TTB_RGN_OC_WBWA	(1 << 3)
+@@ -29,14 +42,15 @@
+ #define TTB_IRGN_WBWA	((0 << 0) | (1 << 6))
+ #define TTB_IRGN_WT	((1 << 0) | (0 << 6))
+ #define TTB_IRGN_WB	((1 << 0) | (1 << 6))
++#endif
+ 
+ /* PTWs cacheable, inner WB not shareable, outer WB not shareable */
+-#define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_RGN_OC_WB
+-#define PMD_FLAGS_UP	PMD_SECT_WB
++#define TTB_FLAGS_UP	(TTB_IRGN_WB|TTB_RGN_OC_WB)
++#define PMD_FLAGS_UP	(PMD_SECT_WB)
+ 
+ /* PTWs cacheable, inner WBWA shareable, outer WBWA not shareable */
+-#define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
+-#define PMD_FLAGS_SMP	PMD_SECT_WBWA|PMD_SECT_S
++#define TTB_FLAGS_SMP	(TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA)
++#define PMD_FLAGS_SMP	(PMD_SECT_WBWA|PMD_SECT_S)
+ 
+ ENTRY(cpu_v7_proc_init)
+ 	mov	pc, lr
+@@ -280,10 +294,46 @@ __v7_setup:
+ 	dsb
+ #ifdef CONFIG_MMU
+ 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
++#ifdef CONFIG_ARM_LPAE
++	mov	r5, #TTB_EAE
++	ALT_SMP(orr	r5, r5, #TTB_FLAGS_SMP)
++	ALT_SMP(orr	r5, r5, #TTB_FLAGS_SMP << 16)
++	ALT_UP(orr	r5, r5, #TTB_FLAGS_UP)
++	ALT_UP(orr	r5, r5, #TTB_FLAGS_UP << 16)
++	mrc	p15, 0, r10, c2, c0, 2
++	orr	r10, r10, r5
++#if PHYS_OFFSET <= PAGE_OFFSET
++	/*
++	 * TTBR0/TTBR1 split (PAGE_OFFSET):
++	 *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
++	 *   0x80000000: T0SZ = 0, T1SZ = 1
++	 *   0xc0000000: T0SZ = 0, T1SZ = 2
++	 *
++	 * Only use this feature if PAGE_OFFSET <=  PAGE_OFFSET, otherwise
++	 * booting secondary CPUs would end up using TTBR1 for the identity
++	 * mapping set up in TTBR0.
++	 */
++	orr	r10, r10, #(((PAGE_OFFSET >> 30) - 1) << 16)	@ TTBCR.T1SZ
++#endif
++#endif
+ 	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
++#ifdef CONFIG_ARM_LPAE
++	mov	r5, #0
++#if defined CONFIG_VMSPLIT_2G
++	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
++	add	r6, r4, #1 << 4			@ skip two L1 entries
++#elif defined CONFIG_VMSPLIT_3G
++	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
++	add	r6, r4, #4096 * (1 + 3)		@ only L2 used, skip pgd+3*pmd
++#else
++	mov	r6, r4
++#endif
++	mcrr	p15, 1, r6, r5, c2		@ load TTBR1
++#else	/* !CONFIG_ARM_LPAE */
+ 	ALT_SMP(orr	r4, r4, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	r4, r4, #TTB_FLAGS_UP)
+ 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
++#endif	/* CONFIG_ARM_LPAE */
+ 	/*
+ 	 * Memory region attributes with SCTLR.TRE=1
+ 	 *
+@@ -311,11 +361,33 @@ __v7_setup:
+ 	 *   NS0 = PRRR[18] = 0		- normal shareable property
+ 	 *   NS1 = PRRR[19] = 1		- normal shareable property
+ 	 *   NOS = PRRR[24+n] = 1	- not outer shareable
++	 *
++	 * Memory region attributes for LPAE (defined in pgtable-3level.h):
++	 *
++	 *   n = AttrIndx[2:0]
++	 *
++	 *			n	MAIR
++	 *   UNCACHED		000	00000000
++	 *   BUFFERABLE		001	01000100
++	 *   DEV_WC		001	01000100
++	 *   WRITETHROUGH	010	10101010
++	 *   WRITEBACK		011	11101110
++	 *   DEV_CACHED		011	11101110
++	 *   DEV_SHARED		100	00000100
++	 *   DEV_NONSHARED	100	00000100
++	 *   unused		101
++	 *   unused		110
++	 *   WRITEALLOC		111	11111111
+ 	 */
++#ifdef CONFIG_ARM_LPAE
++	ldr	r5, =0xeeaa4400			@ MAIR0
++	ldr	r6, =0xff000004			@ MAIR1
++#else
+ 	ldr	r5, =0xff0a81a8			@ PRRR
+ 	ldr	r6, =0x40e040e0			@ NMRR
+-	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
+-	mcr	p15, 0, r6, c10, c2, 1		@ write NMRR
++#endif
++	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR/MAIR0
++	mcr	p15, 0, r6, c10, c2, 1		@ write NMRR/MAIR1
+ #endif
+ 	adr	r5, v7_crval
+ 	ldmia	r5, {r5, r6}
+@@ -334,14 +406,19 @@ __v7_setup:
+ ENDPROC(__v7_setup)
+ 
+ 	/*   AT
+-	 *  TFR   EV X F   I D LR    S
+-	 * .EEE ..EE PUI. .T.T 4RVI ZWRS BLDP WCAM
++	 *  TFR   EV X F   IHD LR    S
++	 * .EEE ..EE PUI. .TAT 4RVI ZWRS BLDP WCAM
+ 	 * rxxx rrxx xxx0 0101 xxxx xxxx x111 xxxx < forced
+ 	 *    1    0 110       0011 1100 .111 1101 < we want
++	 *   11    0 110    1  0011 1100 .111 1101 < we want (LPAE)
+ 	 */
+ 	.type	v7_crval, #object
+ v7_crval:
++#ifdef CONFIG_ARM_LPAE
++	crval	clear=0x0120c302, mmuset=0x30c23c7d, ucset=0x00c01c7c
++#else
+ 	crval	clear=0x0120c302, mmuset=0x10c03c7d, ucset=0x00c01c7c
++#endif
+ 
+ __v7_setup_stack:
+ 	.space	4 * 11				@ 11 registers
+@@ -416,16 +493,20 @@ __v7_proc_info:
+ 		PMD_TYPE_SECT | \
+ 		PMD_SECT_AP_WRITE | \
+ 		PMD_SECT_AP_READ | \
++		PMD_SECT_AF | \
+ 		PMD_FLAGS_SMP)
+ 	ALT_UP(.long \
+ 		PMD_TYPE_SECT | \
+ 		PMD_SECT_AP_WRITE | \
+ 		PMD_SECT_AP_READ | \
++		PMD_SECT_AF | \
+ 		PMD_FLAGS_UP)
++		/* PMD_SECT_XN is set explicitly in head.S for LPAE */
+ 	.long   PMD_TYPE_SECT | \
+ 		PMD_SECT_XN | \
+ 		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
++		PMD_SECT_AP_READ | \
++		PMD_SECT_AF
+ 	b	__v7_setup
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
