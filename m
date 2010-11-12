@@ -1,34 +1,39 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 12 Nov 2010 13:49:51 -0800
-Subject: [PATCH 1/3] msm: sirc: warning fix
-Message-ID: <1289598593-8974-1-git-send-email-davidb@codeaurora.org>
+Date: Fri, 12 Nov 2010 13:49:52 -0800
+Subject: [PATCH 2/3] msm: smd: Warning cleanup
+In-Reply-To: <1289598593-8974-1-git-send-email-davidb@codeaurora.org>
+References: <1289598593-8974-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1289598593-8974-2-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eliminate some unreferenced variables.
+Put some variables inside of the same ifdef as the code that uses
+them.
 
-arch/arm/mach-msm/sirc.c:43: warning: 'save_type' defined but not used
-arch/arm/mach-msm/sirc.c:44: warning: 'save_polarity' defined but not used
+arch/arm/mach-msm/smd_debug.c: In function 'smsm_print_sleep_info':
+arch/arm/mach-msm/smd_debug.c:274: warning: unused variable 'int_info'
+arch/arm/mach-msm/smd_debug.c:273: warning: unused variable 'gpio'
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-msm/sirc.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ arch/arm/mach-msm/smd_debug.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/sirc.c b/arch/arm/mach-msm/sirc.c
-index b079452..152eefd 100644
---- a/arch/arm/mach-msm/sirc.c
-+++ b/arch/arm/mach-msm/sirc.c
-@@ -40,9 +40,6 @@ static struct sirc_cascade_regs sirc_reg_table[] = {
- 	}
- };
+diff --git a/arch/arm/mach-msm/smd_debug.c b/arch/arm/mach-msm/smd_debug.c
+index f91c3b7..8736aff 100644
+--- a/arch/arm/mach-msm/smd_debug.c
++++ b/arch/arm/mach-msm/smd_debug.c
+@@ -270,8 +270,10 @@ void smsm_print_sleep_info(void)
+ {
+ 	unsigned long flags;
+ 	uint32_t *ptr;
++#ifndef CONFIG_ARCH_MSM_SCORPION
+ 	struct tramp_gpio_smem *gpio;
+ 	struct smsm_interrupt_info *int_info;
++#endif
  
--static unsigned int save_type;
--static unsigned int save_polarity;
--
- /* Mask off the given interrupt. Keep the int_enable mask in sync with
-    the enable reg, so it can be restored after power collapse. */
- static void sirc_irq_mask(unsigned int irq)
+ 
+ 	spin_lock_irqsave(&smem_lock, flags);
 -- 
 1.7.3.2
 
