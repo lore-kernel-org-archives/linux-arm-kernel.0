@@ -1,46 +1,35 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Fri, 12 Nov 2010 22:59:33 +0530
-Subject: Single binary kernel for all i.MX
-In-Reply-To: <20101112155342.GJ18358@pengutronix.de>
-References: <20101105121800.GV6017@pengutronix.de>
-	<AANLkTim7znztJgGvZ5ZsV=ei=_W4YpjU3-5zWonrQ9ME@mail.gmail.com>
-	<20101112155342.GJ18358@pengutronix.de>
-Message-ID: <AANLkTim0eNvEhiy7YL7YMCsJ9Ou_byyZ7hwSdy2ocsyF@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Nov 2010 09:45:17 -0800
+Subject: [PATCH 07/07] ARM: Use shared GIC entry macros on OMAP
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030D58AE84@dbde02.ent.ti.com>
+References: <20101112082059.27221.52879.sendpatchset@t400s>
+	<20101112082211.27221.47096.sendpatchset@t400s>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D58AE84@dbde02.ent.ti.com>
+Message-ID: <20101112174517.GE9264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hi Shawn,
->
-> On Fri, Nov 12, 2010 at 11:40:41PM +0800, Shawn Guo wrote:
->> I'm studying at the implementation. ?Can you please help me understand
->> how "addruart" in plat-mxc/include/mach/debug-macro.S works for single
->> image?
->>
->> ? ? ? ? .macro ?addruart, rp, rv
->> ? ? ? ? ldr ? ? \rp, =UART_PADDR ? ? ? ?@ physical
->> ? ? ? ? ldr ? ? \rv, =UART_VADDR ? ? ? ?@ virtual
->> ? ? ? ? .endm
->>
->> We have this macro to get physical base address of UART. ?However
->> UART_PADDR is defined as MX?_UART1_BASE_ADDR depending on
->> CONFIG_ARCH_MX*. ?When all CONFIG_ARCH_MX* get defined in single image
->> case, how does UART_PADDR work for all CONFIG_ARCH_MX*?
-> In a kernel that supports more than one SoC, DEBUG_LL won't work. ?This
-> is generally OK, because DEBUG_LL is only needed when bringing up a
-> machine. ?Therefor you can use a tailored kernel that only supports your
-> shiny new machine.
->
-> Uwe
->
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [101112 00:16]:
+> > -----Original Message-----
+> > From: Magnus Damm [mailto:magnus.damm at gmail.com]
+> > Sent: Friday, November 12, 2010 1:52 PM
+> > To: linux at arm.linux.org.uk
+> > Cc: kgene.kim at samsung.com; kmpark at infradead.org; konkers at android.com;
+> > tony at atomide.com; adharmap at codeaurora.org; avorontsov at mvista.com; linux-
+> > kernel at vger.kernel.org; srinidhikasagar at gmail.com; dwalker at codeaurora.org;
+> > Shilimkar, Santosh; ccross at android.com; olof at lixom.net; Magnus Damm;
+> > linux-arm-kernel at lists.infradead.org
+> > Subject: [PATCH 07/07] ARM: Use shared GIC entry macros on OMAP
+> > 
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > Common GIC entry macro for omap
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Hi Uwe,
+Looks like the From: field got trashed on this one assuming you're
+using the patch I posted earlier :)
 
-OMAP does have this working. For example, we can boot a single kernel image
-on OMAP2, OMAP3 and OMAP4 today, and we have DEBUG_LL working for
-sure on the last two - probably also on OMAP2.
-
-I'm not exactly sure how this mechanism works, but for every new machine we
-add, we usually add an entry in arch/arm/plat-omap/include/plat/uncompress.h
-
-- Anand
+Tony
