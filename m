@@ -1,19 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 12 Nov 2010 11:49:42 +0000
-Subject: Patch IMX audmux debugfs.
-In-Reply-To: <20101112071706.GF6017@pengutronix.de>
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-	<20101110152619.GB8950@pengutronix.de>
-	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-	<20101112071706.GF6017@pengutronix.de>
-Message-ID: <20101112114942.GA28804@sirena.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 12 Nov 2010 13:39:50 +0100
+Subject: [PATCH] [ARM] twd: Allow twd rescaling to match cpu frequency
+In-Reply-To: <1283396674-4865-1-git-send-email-ccross@android.com>
+References: <1283396674-4865-1-git-send-email-ccross@android.com>
+Message-ID: <AANLkTinsRCinLdhq1xj0tx09Jb=Tohdbd7PUD=ae1q3m@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 08:17:06AM +0100, Sascha Hauer wrote:
+Hi Colin,
 
-> Ok, looks sensible to me. I added Mark Brown to Cc as he added the
-> debugfs support in the first place. Maybe he has some comment to add.
+2010/9/2 Colin Cross <ccross@android.com>:
 
-Not really, except that the numbers used correspond to the numbers used
-by the audmux APIs in the kernel IIRC.
+> The clock to the ARM TWD local timer scales with the cpu
+> frequency. ?To allow the cpu frequency to change while
+> maintaining a constant TWD frequency, pick a lower target
+> frequency for the TWD and use the prescaler to divide down
+> to the closest lower frequency.
+>
+> This patch provides a new initialization function that takes
+> a target TWD frequency and the relation between the cpu
+> clock and the TWD clock, required to be an integer divider
+>>= 2 by the ARM spec. ?It also provides a function to be
+> called from cpufreq drivers to set the prescaler whenever
+> the cpu frequency changes.
+
+What's the status of this patch?
+
+We have basically the same problem so we'd really like
+a generic solution to this problem.
+
+Our only comment is that we cannot see the reason for
+not using the CPUfreq notifiers as most scaling code
+is, but I assume there is some specific reason for this?
+
+Unless something holds this back, could you post it to
+Russells patch tracker, we might have an add-on patch
+for the U8500 later.
+
+Yours,
+Linus Walleij
