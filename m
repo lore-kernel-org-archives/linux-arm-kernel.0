@@ -1,95 +1,223 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Nov 2010 18:00:38 +0000
-Subject: [PATCH v2 18/20] ARM: LPAE: add support for ATAG_MEM64
-In-Reply-To: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289584840-18097-19-git-send-email-catalin.marinas@arm.com>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Fri, 12 Nov 2010 10:09:01 -0800
+Subject: [PATCH 1/2] msm: gpio: Add v2 gpio support to MSM SoCs.
+Message-ID: <1289585342-21341-1-git-send-email-gbean@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Beginning with the MSM8x60, the hardware block responsible for gpio
+support changes.  Provide gpiolib support for the new v2 architecture.
 
-LPAE provides support for memory banks with physical addresses of up
-to 40 bits.
-
-This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
-informed about memory that exists above the 4GB boundary.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 ---
- arch/arm/include/asm/setup.h |   10 +++++++++-
- arch/arm/kernel/compat.c     |    4 ++--
- arch/arm/kernel/setup.c      |   12 +++++++++++-
- 3 files changed, 22 insertions(+), 4 deletions(-)
+ arch/arm/mach-msm/Makefile  |    4 +-
+ arch/arm/mach-msm/gpio-v2.c |  180 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 183 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/gpio-v2.c
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 5092118..fab849f 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -43,6 +43,13 @@ struct tag_mem32 {
- 	__u32	start;	/* physical start address */
- };
- 
-+#define ATAG_MEM64	0x54420002
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index b5a7b07..4a1a7ea 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -28,6 +28,8 @@ obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
+-ifndef CONFIG_MSM_V2_TLMM
++ifdef CONFIG_MSM_V2_TLMM
++obj-y	+= gpio-v2.o
++else
+ obj-y	+= gpio.o
+ endif
+diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+new file mode 100644
+index 0000000..5d31a7c
+--- /dev/null
++++ b/arch/arm/mach-msm/gpio-v2.c
+@@ -0,0 +1,180 @@
++/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ */
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++#include <mach/msm_iomap.h>
++#include "gpiomux.h"
 +
-+struct tag_mem64 {
-+	__u64	size;
-+	__u64	start;	/* physical start address */
++/* Bits of interest in the GPIO_IN_OUT register.
++ */
++enum {
++	GPIO_IN_BIT  = 0,
++	GPIO_OUT_BIT = 1
 +};
 +
- /* VGA text type displays */
- #define ATAG_VIDEOTEXT	0x54410003
- 
-@@ -147,7 +154,8 @@ struct tag {
- 	struct tag_header hdr;
- 	union {
- 		struct tag_core		core;
--		struct tag_mem32	mem;
-+		struct tag_mem32	mem32;
-+		struct tag_mem64	mem64;
- 		struct tag_videotext	videotext;
- 		struct tag_ramdisk	ramdisk;
- 		struct tag_initrd	initrd;
-diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
-index 9256523..f224d95 100644
---- a/arch/arm/kernel/compat.c
-+++ b/arch/arm/kernel/compat.c
-@@ -86,8 +86,8 @@ static struct tag * __init memtag(struct tag *tag, unsigned long start, unsigned
- 	tag = tag_next(tag);
- 	tag->hdr.tag = ATAG_MEM;
- 	tag->hdr.size = tag_size(tag_mem32);
--	tag->u.mem.size = size;
--	tag->u.mem.start = start;
-+	tag->u.mem32.size = size;
-+	tag->u.mem32.start = start;
- 
- 	return tag;
- }
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 751ac80..0128db2 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -591,11 +591,21 @@ __tagtable(ATAG_CORE, parse_tag_core);
- 
- static int __init parse_tag_mem32(const struct tag *tag)
- {
--	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
-+	return arm_add_memory(tag->u.mem32.start, tag->u.mem32.size);
- }
- 
- __tagtable(ATAG_MEM, parse_tag_mem32);
- 
-+#ifdef CONFIG_PHYS_ADDR_T_64BIT
-+static int __init parse_tag_mem64(const struct tag *tag)
++/* Bits of interest in the GPIO_CFG register.
++ */
++enum {
++	GPIO_OE_BIT = 9,
++};
++
++#define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
++#define GPIO_IN_OUT(gpio)         (MSM_TLMM_BASE + 0x1004 + (0x10 * (gpio)))
++
++struct msm_gpio_dev {
++	struct gpio_chip gpio_chip;
++};
++
++static DEFINE_SPINLOCK(tlmm_lock);
++
++static inline struct msm_gpio_dev *to_msm_gpio_dev(struct gpio_chip *chip)
 +{
-+	/* We only use 32-bits for the size. */
-+	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
++	return container_of(chip, struct msm_gpio_dev, gpio_chip);
 +}
 +
-+__tagtable(ATAG_MEM64, parse_tag_mem64);
-+#endif /* CONFIG_PHYS_ADDR_T_64BIT */
++static inline void set_gpio_bits(unsigned n, void __iomem *reg)
++{
++	writel(readl(reg) | n, reg);
++}
 +
- #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
- struct screen_info screen_info = {
-  .orig_video_lines	= 30,
++static inline void clr_gpio_bits(unsigned n, void __iomem *reg)
++{
++	writel(readl(reg) & ~n, reg);
++}
++
++static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	return readl(GPIO_IN_OUT(offset)) & BIT(GPIO_IN_BIT);
++}
++
++static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
++{
++	writel(val ? BIT(GPIO_OUT_BIT) : 0, GPIO_IN_OUT(offset));
++}
++
++static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	clr_gpio_bits(BIT(GPIO_OE_BIT), GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_direction_output(struct gpio_chip *chip,
++				unsigned offset,
++				int val)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	msm_gpio_set(chip, offset, val);
++	set_gpio_bits(BIT(GPIO_OE_BIT), GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	return msm_gpiomux_get(chip->base + offset);
++}
++
++static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	msm_gpiomux_put(chip->base + offset);
++}
++
++static struct msm_gpio_dev msm_gpio = {
++	.gpio_chip = {
++		.base             = 0,
++		.ngpio            = NR_GPIO_IRQS,
++		.direction_input  = msm_gpio_direction_input,
++		.direction_output = msm_gpio_direction_output,
++		.get              = msm_gpio_get,
++		.set              = msm_gpio_set,
++		.request          = msm_gpio_request,
++		.free             = msm_gpio_free,
++	},
++};
++
++static int __devinit msm_gpio_probe(struct platform_device *dev)
++{
++	int ret;
++
++	spin_lock_init(&tlmm_lock);
++	msm_gpio.gpio_chip.label = dev->name;
++	ret = gpiochip_add(&msm_gpio.gpio_chip);
++
++	return ret;
++}
++
++static int __devexit msm_gpio_remove(struct platform_device *dev)
++{
++	int ret = gpiochip_remove(&msm_gpio.gpio_chip);
++
++	if (ret < 0)
++		return ret;
++
++	set_irq_handler(TLMM_SCSS_SUMMARY_IRQ, NULL);
++
++	return 0;
++}
++
++static struct platform_driver msm_gpio_driver = {
++	.probe = msm_gpio_probe,
++	.remove = __devexit_p(msm_gpio_remove),
++	.driver = {
++		.name = "msmgpio",
++		.owner = THIS_MODULE,
++	},
++};
++
++static struct platform_device msm_device_gpio = {
++	.name = "msmgpio",
++	.id   = 0,
++};
++
++static int __init msm_gpio_init(void)
++{
++	int rc;
++
++	rc = platform_driver_register(&msm_gpio_driver);
++	if (rc == 0)
++		rc = platform_device_register(&msm_device_gpio);
++
++	return rc;
++}
++
++static void __exit msm_gpio_exit(void)
++{
++	platform_device_unregister(&msm_device_gpio);
++	platform_driver_unregister(&msm_gpio_driver);
++}
++
++postcore_initcall(msm_gpio_init);
++module_exit(msm_gpio_exit);
++
++MODULE_AUTHOR("Gregory Bean <gbean@codeaurora.org>");
++MODULE_DESCRIPTION("Driver for Qualcomm MSM TLMMv2 SoC GPIOs");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:msmgpio");
+-- 
+1.7.0.4
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
