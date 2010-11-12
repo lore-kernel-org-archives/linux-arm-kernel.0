@@ -1,44 +1,45 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 12 Nov 2010 09:15:58 +0100
-Subject: [PATCH] ARM: fix build error with GCC 4.5.0
-In-Reply-To: <20101112044548.GA19615@ozlabs.org>
-References: <1288897002-24073-1-git-send-email-rabin@rab.in>
-	<yw1xy698ygbx.fsf@unicorn.mansr.com>
-	<19667.9199.798932.405415@pilspetsen.it.uu.se>
-	<AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
-	<19667.52998.909668.596635@pilspetsen.it.uu.se>
-	<AANLkTimkSxWNL+aCALGsf5prBM_RHz0BMHCeNwKrTnfA@mail.gmail.com>
-	<19668.21026.5416.610777@pilspetsen.it.uu.se>
-	<20101112044548.GA19615@ozlabs.org>
-Message-ID: <19676.63422.614246.989202@pilspetsen.it.uu.se>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 12 Nov 2010 17:20:59 +0900
+Subject: [PATCH 00/07] ARM: Common GIC entry macro code V3
+Message-ID: <20101112082059.27221.52879.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Breeds writes:
- > On Fri, Nov 05, 2010 at 07:51:14PM +0100, Mikael Pettersson wrote:
- >  
- > > That's an OABI compiler. You want a compiler configured for
- > > 
- > > 	--target=arm-unknown-linux-gnueabi
- > > 
- > > and without that --enable-sjlj-exceptions as well.
- > > 
- > > OABI is super-legacy and essentially unsupported by current gcc.
- > 
- > The previous compiler was the results of configuring for arm-linux now I have:
- > 
- > $ ./buildall/cross.x86_64/gcc-4.4.5-nolibc/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-gcc -v
- > Using built-in specs.
- > Target: arm-unknown-linux-gnueabi
- > Configured with: /home/tony/buildall/src/gcc/configure --target=arm-unknown-linux-gnueabi --enable-targets=all --prefix=/home/tony/buildall/cross.x86_64/gcc-4.4.5-nolibc/arm-unknown-linux-gnueabi/ --enable-languages=c --with-newlib --without-headers --with-system-libunwind --disable-nls --disable-threads --disable-shared --disable-libmudflap --disable-libssp --disable-libgomp --disable-decimal-float --enable-checking=release --with-mpfr=/home/tony/buildall/src/sys-x86_64 --with-gmp=/home/tony/buildall/src/sys-x86_64 --disable-bootstrap
- > Thread model: single
- > gcc version 4.4.5 (GCC) 
- > 
- > Is that correct?
+ARM: Common GIC entry macro code V3
 
-Drop --with-system-libunwind.  OABI was sjlj while EABI uses an ARM EABI
-specific unwinder implemented in gcc.  This may or may not matter if you
-only want to compile the kernel.
+[PATCH 01/07] ARM: Introduce asm/hardware/entry-macro-gic.S
+[PATCH 02/07] ARM: Use shared GIC entry macros on CNS3XXX
+[PATCH 03/07] ARM: Use shared GIC entry macros on Realview
+[PATCH 04/07] ARM: Use shared GIC entry macros on Tegra
+[PATCH 05/07] ARM: Use shared GIC entry macros on UX500
+[PATCH 06/07] ARM: Use shared GIC entry macros on Vexpress
+[PATCH 07/07] ARM: Use shared GIC entry macros on OMAP
 
-The other options should be ok, though I personally wouldn't pass
---disable-threads, --disable-decimal-float, or --disable-bootstrap.
+Put GIC demux code in a common place to avoid duplicated code.
+
+These patches are almost identical to 6284/1 in the RMKs
+patch tracker. The main difference is that these ones require
+each platform to specify base address using the macro
+get_irqnr_preable. Both Tegra and OMAP are supported in V3.
+
+The s5pv310 subarch is excluded due to the special "addne"
+instruction in the get_irqnr_and_base macro.
+
+The msm subarch is excluded as well since it treats PPIs
+differently than other platforms and needs a different
+version of the get_irqnr_and_base macro.
+
+I intend to submit these patches to the RMK patch tracker
+unless I hear any objections.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ arch/arm/include/asm/hardware/entry-macro-gic.S   |   68 +++++++++++++++
+ arch/arm/mach-cns3xxx/include/mach/entry-macro.S  |   61 -------------
+ arch/arm/mach-omap2/include/mach/entry-macro.S    |   92 +++++++--------------
+ arch/arm/mach-realview/include/mach/entry-macro.S |   60 -------------
+ arch/arm/mach-tegra/include/mach/entry-macro.S    |   64 --------------
+ arch/arm/mach-ux500/include/mach/entry-macro.S    |   67 ---------------
+ arch/arm/mach-vexpress/include/mach/entry-macro.S |   57 -------------
+ 7 files changed, 104 insertions(+), 365 deletions(-)
