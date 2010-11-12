@@ -1,61 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Nov 2010 17:03:52 +0100
-Subject: [PATCH 10/10] ux500: MCDE: Add platform specific data
-In-Reply-To: <1289390653-6111-11-git-send-email-jimmy.rubin@stericsson.com>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-10-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-11-git-send-email-jimmy.rubin@stericsson.com>
-Message-ID: <201011121703.52422.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Nov 2010 16:12:10 +0000
+Subject: [PATCH] arch/arm/kernel/smp_twd.c: Correct local timer printk
+	decimal output
+In-Reply-To: <1289244455.29216.348.camel@Joe-Laptop>
+References: <1289244455.29216.348.camel@Joe-Laptop>
+Message-ID: <20101112161210.GA10125@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 November 2010, Jimmy Rubin wrote:
-> +
-> +	if (ddev->id == PRIMARY_DISPLAY_ID && rotate_main) {
-> +		swap(width, height);
-> +#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_ROTATE_180_DEGREES
-> +		rotate = FB_ROTATE_CCW;
-> +#else
-> +		rotate = FB_ROTATE_CW;
-> +#endif
-> +	}
-> +
-> +	virtual_width = width;
-> +	virtual_height = height * 2;
-> +#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_AUTO_SYNC
-> +	if (ddev->id == PRIMARY_DISPLAY_ID)
-> +		virtual_height = height;
-> +#endif
-> +
+On Mon, Nov 08, 2010 at 11:27:35AM -0800, Joe Perches wrote:
+> The timer decimal place is shown incorrectly.
+> The %100 divisor needs to have 1 fewer 0.
+> 
+> Convert to pr_<level> while at it.
 
-The contents of the hardware description should really not
-be configuration dependent, because that breaks booting the same
-kernel on machines that have different requirements.
-
-This is something that should be passed down from the boot loader.
-
-> +static void mcde_epod_enable(void)
-> +{
-> +	/* Power on DSS mem */
-> +	writel(PRCMU_ENABLE_DSS_MEM, PRCM_EPOD_C_SET);
-> +	mdelay(PRCMU_MCDE_DELAY);
-> +	/* Power on DSS logic */
-> +	writel(PRCMU_ENABLE_DSS_LOGIC, PRCM_EPOD_C_SET);
-> +	mdelay(PRCMU_MCDE_DELAY);
-> +}
-
-In general, try to avoid using mdelay. Keeping the CPU busy for miliseconds
-or even microseconds for no reason is just wrong.
-
-Reasonable hardware will not require this and do the right thing anyway.
-multiple writel calls are by design strictly ordered on the bus. If that is
-not the case on your hardware, you should find a proper way to ensure
-ordering and create a small wrapper for it with a comment that explains
-the breakage. Better get the hardware designers to fix their crap before
-releasing a product ;-)
-
-If there is not even a way to reorder I/O by accessing other registers,
-use msleep() to let the CPU do something useful in the meantime and complain
-even more to the HW people.
-
-	Arnd
+I'd rather avoid core code having KBUILD_MODNAME prefix it.  The message
+is unique enough as is.
