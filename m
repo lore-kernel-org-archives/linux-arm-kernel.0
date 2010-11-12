@@ -1,150 +1,58 @@
-From: jimmy.rubin@stericsson.com (Jimmy RUBIN)
-Date: Fri, 12 Nov 2010 14:18:42 +0100
-Subject: [PATCH 00/10] MCDE: Add frame buffer device driver
-In-Reply-To: <AANLkTinCDFuPpx+OKYRuHbdnL5FBgCTPpUf2xYNJQC0u@mail.gmail.com>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<AANLkTinCDFuPpx+OKYRuHbdnL5FBgCTPpUf2xYNJQC0u@mail.gmail.com>
-Message-ID: <F45880696056844FA6A73F415B568C69536047701B@EXDCVYMBSTM006.EQ1STM.local>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Fri, 12 Nov 2010 15:28:12 +0200
+Subject: [PATCH 2/2] omap: rx51: mark reserved memory earlier
+In-Reply-To: <1287146784-5517-2-git-send-email-felipe.contreras@gmail.com>
+References: <AANLkTik_6byuzkZ+mKunTi6HJTHu49C4XGebfTjCaEeE@mail.gmail.com>
+	<1287146784-5517-2-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1289568492.3297.277.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hi,
 
-Good point, we are looking at this for possible future improvements but for the moment we feel like 
-the structure of drm does not add any simplifications for our driver. We have the display manager (MCDE DSS = KMS) and the memory manager (HWMEM = GEM) that could be migrated to drm framework. But we do not have drm drivers for 3D hw and this also makes drm a less obvious choice at the moment.
- 
-Jimmy
+On Fri, 2010-10-15 at 14:46 +0200, ext Felipe Contreras wrote:
+> So that omap_vram_set_sdram_vram() is called before
+> omap_vram_reserve_sdram_memblock().
 
------Original Message-----
-From: Alex Deucher [mailto:alexdeucher at gmail.com] 
-Sent: den 10 november 2010 15:43
-To: Jimmy RUBIN
-Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org; Linus WALLEIJ; Dan JOHANSSON
-Subject: Re: [PATCH 00/10] MCDE: Add frame buffer device driver
+Is this still valid after the latest memblock stuff? I presume it is.
+I'm not able to test this, and you said you didn't test it, so I'm a bit
+uneasy about applying =).
 
-On Wed, Nov 10, 2010 at 7:04 AM, Jimmy Rubin <jimmy.rubin@stericsson.com> wrote:
-> These set of patches contains a display sub system framework (DSS) which is used to
-> implement the frame buffer device interface and a display device
-> framework that is used to add support for different type of displays
-> such as LCD, HDMI and so on.
+ Tomi
 
-For complex display hardware, you may want to consider using the drm
-kms infrastructure rather than the kernel fb interface.  It provides
-an API for complex display hardware (multiple encoders, display
-controllers, etc.) and also provides a legacy kernel fb interface for
-compatibility.  See:
-Documentation/DocBook/drm.tmpl
-drivers/gpu/drm/
-in the kernel tree.
 
-Alex
-
->
-> The current implementation supports DSI command mode displays.
->
-> Below is a short summary of the files in this patchset:
->
-> mcde_fb.c
-> Implements the frame buffer device driver.
->
-> mcde_dss.c
-> Contains the implementation of the display sub system framework (DSS).
-> This API is used by the frame buffer device driver.
->
-> mcde_display.c
-> Contains default implementations of the functions in the display driver
-> API. A display driver may override the necessary functions to function
-> properly. A simple display driver is implemented in display-generic_dsi.c.
->
-> display-generic_dsi.c
-> Sample driver for a DSI command mode display.
->
-> mcde_bus.c
-> Implementation of the display bus. A display device is probed when both
-> the display driver and display configuration have been registered with
-> the display bus.
->
-> mcde_hw.c
-> Hardware abstraction layer of MCDE. All code that communicates directly
-> with the hardware resides in this file.
->
-> board-mop500-mcde.c
-> The configuration of the display and the frame buffer device is handled
-> in this file
->
-> NOTE: These set of patches replaces the patches already sent out for review.
->
-> RFC:[PATCH 1/2] Video: Add support for MCDE frame buffer driver
-> RFC:[PATCH 2/2] Ux500: Add support for MCDE frame buffer driver
->
-> The old patchset was to large to be handled by the mailing lists.
->
-> Jimmy Rubin (10):
-> ?MCDE: Add hardware abstraction layer
-> ?MCDE: Add configuration registers
-> ?MCDE: Add pixel processing registers
-> ?MCDE: Add formatter registers
-> ?MCDE: Add dsi link registers
-> ?MCDE: Add generic display
-> ?MCDE: Add display subsystem framework
-> ?MCDE: Add frame buffer device driver
-> ?MCDE: Add build files and bus
-> ?ux500: MCDE: Add platform specific data
->
-> ?arch/arm/mach-ux500/Kconfig ? ? ? ? ? ? ? ? ? ?| ? ?8 +
-> ?arch/arm/mach-ux500/Makefile ? ? ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-ux500/board-mop500-mcde.c ? ? ? ?| ?209 ++
-> ?arch/arm/mach-ux500/board-mop500-regulators.c ?| ? 28 +
-> ?arch/arm/mach-ux500/board-mop500.c ? ? ? ? ? ? | ? ?3 +
-> ?arch/arm/mach-ux500/devices-db8500.c ? ? ? ? ? | ? 68 +
-> ?arch/arm/mach-ux500/include/mach/db8500-regs.h | ? ?7 +
-> ?arch/arm/mach-ux500/include/mach/devices.h ? ? | ? ?1 +
-> ?arch/arm/mach-ux500/include/mach/prcmu-regs.h ?| ? ?1 +
-> ?arch/arm/mach-ux500/include/mach/prcmu.h ? ? ? | ? ?3 +
-> ?arch/arm/mach-ux500/prcmu.c ? ? ? ? ? ? ? ? ? ?| ?129 ++
-> ?drivers/video/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?drivers/video/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
-> ?drivers/video/mcde/Kconfig ? ? ? ? ? ? ? ? ? ? | ? 39 +
-> ?drivers/video/mcde/Makefile ? ? ? ? ? ? ? ? ? ?| ? 12 +
-> ?drivers/video/mcde/display-generic_dsi.c ? ? ? | ?152 ++
-> ?drivers/video/mcde/dsi_link_config.h ? ? ? ? ? | 1486 ++++++++++++++
-> ?drivers/video/mcde/mcde_bus.c ? ? ? ? ? ? ? ? ?| ?259 +++
-> ?drivers/video/mcde/mcde_config.h ? ? ? ? ? ? ? | 2156 ++++++++++++++++++++
-> ?drivers/video/mcde/mcde_display.c ? ? ? ? ? ? ?| ?427 ++++
-> ?drivers/video/mcde/mcde_dss.c ? ? ? ? ? ? ? ? ?| ?353 ++++
-> ?drivers/video/mcde/mcde_fb.c ? ? ? ? ? ? ? ? ? | ?697 +++++++
-> ?drivers/video/mcde/mcde_formatter.h ? ? ? ? ? ?| ?782 ++++++++
-> ?drivers/video/mcde/mcde_hw.c ? ? ? ? ? ? ? ? ? | 2528 ++++++++++++++++++++++++
-> ?drivers/video/mcde/mcde_mod.c ? ? ? ? ? ? ? ? ?| ? 67 +
-> ?drivers/video/mcde/mcde_pixelprocess.h ? ? ? ? | 1137 +++++++++++
-> ?include/video/mcde/mcde.h ? ? ? ? ? ? ? ? ? ? ?| ?387 ++++
-> ?include/video/mcde/mcde_display-generic_dsi.h ?| ? 34 +
-> ?include/video/mcde/mcde_display.h ? ? ? ? ? ? ?| ?139 ++
-> ?include/video/mcde/mcde_dss.h ? ? ? ? ? ? ? ? ?| ? 78 +
-> ?include/video/mcde/mcde_fb.h ? ? ? ? ? ? ? ? ? | ? 54 +
-> ?31 files changed, 11248 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-ux500/board-mop500-mcde.c
-> ?create mode 100644 drivers/video/mcde/Kconfig
-> ?create mode 100644 drivers/video/mcde/Makefile
-> ?create mode 100644 drivers/video/mcde/display-generic_dsi.c
-> ?create mode 100644 drivers/video/mcde/dsi_link_config.h
-> ?create mode 100644 drivers/video/mcde/mcde_bus.c
-> ?create mode 100644 drivers/video/mcde/mcde_config.h
-> ?create mode 100644 drivers/video/mcde/mcde_display.c
-> ?create mode 100644 drivers/video/mcde/mcde_dss.c
-> ?create mode 100644 drivers/video/mcde/mcde_fb.c
-> ?create mode 100644 drivers/video/mcde/mcde_formatter.h
-> ?create mode 100644 drivers/video/mcde/mcde_hw.c
-> ?create mode 100644 drivers/video/mcde/mcde_mod.c
-> ?create mode 100644 drivers/video/mcde/mcde_pixelprocess.h
-> ?create mode 100644 include/video/mcde/mcde.h
-> ?create mode 100644 include/video/mcde/mcde_display-generic_dsi.h
-> ?create mode 100644 include/video/mcde/mcde_display.h
-> ?create mode 100644 include/video/mcde/mcde_dss.h
-> ?create mode 100644 include/video/mcde/mcde_fb.h
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> 
+> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-rx51.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+> index a58e8cb..861079b 100644
+> --- a/arch/arm/mach-omap2/board-rx51.c
+> +++ b/arch/arm/mach-omap2/board-rx51.c
+> @@ -144,17 +144,22 @@ static void __init rx51_init(void)
+>  static void __init rx51_map_io(void)
+>  {
+>  	omap2_set_globals_3xxx();
+> -	rx51_video_mem_init();
+>  	omap34xx_map_common_io();
+>  }
+>  
+> +static void __init rx51_reserve(void)
+> +{
+> +	rx51_video_mem_init();
+> +	omap_reserve();
+> +}
+> +
+>  MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
+>  	/* Maintainer: Lauri Leukkunen <lauri.leukkunen@nokia.com> */
+>  	.phys_io	= 0x48000000,
+>  	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
+>  	.boot_params	= 0x80000100,
+>  	.map_io		= rx51_map_io,
+> -	.reserve	= omap_reserve,
+> +	.reserve	= rx51_reserve,
+>  	.init_irq	= rx51_init_irq,
+>  	.init_machine	= rx51_init,
+>  	.timer		= &omap_timer,
