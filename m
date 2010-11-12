@@ -1,23 +1,150 @@
-From: vipulsamar87@gmail.com (vipul samar)
-Date: Wed, 10 Nov 2010 14:35:09 +0530
-Subject: Size of dma_alloc_writecombine.
-Message-ID: <AANLkTi=287gpR8eeQH-p5ZHEW5GtFQoqHa-TA_-NW1ZN@mail.gmail.com>
+From: jimmy.rubin@stericsson.com (Jimmy RUBIN)
+Date: Fri, 12 Nov 2010 14:18:42 +0100
+Subject: [PATCH 00/10] MCDE: Add frame buffer device driver
+In-Reply-To: <AANLkTinCDFuPpx+OKYRuHbdnL5FBgCTPpUf2xYNJQC0u@mail.gmail.com>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<AANLkTinCDFuPpx+OKYRuHbdnL5FBgCTPpUf2xYNJQC0u@mail.gmail.com>
+Message-ID: <F45880696056844FA6A73F415B568C69536047701B@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Alex,
 
-I am working on LCD module of resolution size 1024X768. When i am allocating
-memory for frame buffer using dma_alloc_writecombine call its not able to
-allocate memory more then 2MB memory. The Reason is the maximum size
-allocated by  dma_alloc_writecombine is 2 MB.
-Can i make changes in arm files and extend maximum size to 4MB?? or should i
-go for other options??
+Good point, we are looking at this for possible future improvements but for the moment we feel like 
+the structure of drm does not add any simplifications for our driver. We have the display manager (MCDE DSS = KMS) and the memory manager (HWMEM = GEM) that could be migrated to drm framework. But we do not have drm drivers for 3D hw and this also makes drm a less obvious choice at the moment.
+ 
+Jimmy
 
-Please suggest me the best way to allocate memory more then 2MB.
+-----Original Message-----
+From: Alex Deucher [mailto:alexdeucher at gmail.com] 
+Sent: den 10 november 2010 15:43
+To: Jimmy RUBIN
+Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org; Linus WALLEIJ; Dan JOHANSSON
+Subject: Re: [PATCH 00/10] MCDE: Add frame buffer device driver
 
-Regards
-Vipul Samar
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101110/dbdaf020/attachment.html>
+On Wed, Nov 10, 2010 at 7:04 AM, Jimmy Rubin <jimmy.rubin@stericsson.com> wrote:
+> These set of patches contains a display sub system framework (DSS) which is used to
+> implement the frame buffer device interface and a display device
+> framework that is used to add support for different type of displays
+> such as LCD, HDMI and so on.
+
+For complex display hardware, you may want to consider using the drm
+kms infrastructure rather than the kernel fb interface.  It provides
+an API for complex display hardware (multiple encoders, display
+controllers, etc.) and also provides a legacy kernel fb interface for
+compatibility.  See:
+Documentation/DocBook/drm.tmpl
+drivers/gpu/drm/
+in the kernel tree.
+
+Alex
+
+>
+> The current implementation supports DSI command mode displays.
+>
+> Below is a short summary of the files in this patchset:
+>
+> mcde_fb.c
+> Implements the frame buffer device driver.
+>
+> mcde_dss.c
+> Contains the implementation of the display sub system framework (DSS).
+> This API is used by the frame buffer device driver.
+>
+> mcde_display.c
+> Contains default implementations of the functions in the display driver
+> API. A display driver may override the necessary functions to function
+> properly. A simple display driver is implemented in display-generic_dsi.c.
+>
+> display-generic_dsi.c
+> Sample driver for a DSI command mode display.
+>
+> mcde_bus.c
+> Implementation of the display bus. A display device is probed when both
+> the display driver and display configuration have been registered with
+> the display bus.
+>
+> mcde_hw.c
+> Hardware abstraction layer of MCDE. All code that communicates directly
+> with the hardware resides in this file.
+>
+> board-mop500-mcde.c
+> The configuration of the display and the frame buffer device is handled
+> in this file
+>
+> NOTE: These set of patches replaces the patches already sent out for review.
+>
+> RFC:[PATCH 1/2] Video: Add support for MCDE frame buffer driver
+> RFC:[PATCH 2/2] Ux500: Add support for MCDE frame buffer driver
+>
+> The old patchset was to large to be handled by the mailing lists.
+>
+> Jimmy Rubin (10):
+> ?MCDE: Add hardware abstraction layer
+> ?MCDE: Add configuration registers
+> ?MCDE: Add pixel processing registers
+> ?MCDE: Add formatter registers
+> ?MCDE: Add dsi link registers
+> ?MCDE: Add generic display
+> ?MCDE: Add display subsystem framework
+> ?MCDE: Add frame buffer device driver
+> ?MCDE: Add build files and bus
+> ?ux500: MCDE: Add platform specific data
+>
+> ?arch/arm/mach-ux500/Kconfig ? ? ? ? ? ? ? ? ? ?| ? ?8 +
+> ?arch/arm/mach-ux500/Makefile ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-ux500/board-mop500-mcde.c ? ? ? ?| ?209 ++
+> ?arch/arm/mach-ux500/board-mop500-regulators.c ?| ? 28 +
+> ?arch/arm/mach-ux500/board-mop500.c ? ? ? ? ? ? | ? ?3 +
+> ?arch/arm/mach-ux500/devices-db8500.c ? ? ? ? ? | ? 68 +
+> ?arch/arm/mach-ux500/include/mach/db8500-regs.h | ? ?7 +
+> ?arch/arm/mach-ux500/include/mach/devices.h ? ? | ? ?1 +
+> ?arch/arm/mach-ux500/include/mach/prcmu-regs.h ?| ? ?1 +
+> ?arch/arm/mach-ux500/include/mach/prcmu.h ? ? ? | ? ?3 +
+> ?arch/arm/mach-ux500/prcmu.c ? ? ? ? ? ? ? ? ? ?| ?129 ++
+> ?drivers/video/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+> ?drivers/video/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?drivers/video/mcde/Kconfig ? ? ? ? ? ? ? ? ? ? | ? 39 +
+> ?drivers/video/mcde/Makefile ? ? ? ? ? ? ? ? ? ?| ? 12 +
+> ?drivers/video/mcde/display-generic_dsi.c ? ? ? | ?152 ++
+> ?drivers/video/mcde/dsi_link_config.h ? ? ? ? ? | 1486 ++++++++++++++
+> ?drivers/video/mcde/mcde_bus.c ? ? ? ? ? ? ? ? ?| ?259 +++
+> ?drivers/video/mcde/mcde_config.h ? ? ? ? ? ? ? | 2156 ++++++++++++++++++++
+> ?drivers/video/mcde/mcde_display.c ? ? ? ? ? ? ?| ?427 ++++
+> ?drivers/video/mcde/mcde_dss.c ? ? ? ? ? ? ? ? ?| ?353 ++++
+> ?drivers/video/mcde/mcde_fb.c ? ? ? ? ? ? ? ? ? | ?697 +++++++
+> ?drivers/video/mcde/mcde_formatter.h ? ? ? ? ? ?| ?782 ++++++++
+> ?drivers/video/mcde/mcde_hw.c ? ? ? ? ? ? ? ? ? | 2528 ++++++++++++++++++++++++
+> ?drivers/video/mcde/mcde_mod.c ? ? ? ? ? ? ? ? ?| ? 67 +
+> ?drivers/video/mcde/mcde_pixelprocess.h ? ? ? ? | 1137 +++++++++++
+> ?include/video/mcde/mcde.h ? ? ? ? ? ? ? ? ? ? ?| ?387 ++++
+> ?include/video/mcde/mcde_display-generic_dsi.h ?| ? 34 +
+> ?include/video/mcde/mcde_display.h ? ? ? ? ? ? ?| ?139 ++
+> ?include/video/mcde/mcde_dss.h ? ? ? ? ? ? ? ? ?| ? 78 +
+> ?include/video/mcde/mcde_fb.h ? ? ? ? ? ? ? ? ? | ? 54 +
+> ?31 files changed, 11248 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/mach-ux500/board-mop500-mcde.c
+> ?create mode 100644 drivers/video/mcde/Kconfig
+> ?create mode 100644 drivers/video/mcde/Makefile
+> ?create mode 100644 drivers/video/mcde/display-generic_dsi.c
+> ?create mode 100644 drivers/video/mcde/dsi_link_config.h
+> ?create mode 100644 drivers/video/mcde/mcde_bus.c
+> ?create mode 100644 drivers/video/mcde/mcde_config.h
+> ?create mode 100644 drivers/video/mcde/mcde_display.c
+> ?create mode 100644 drivers/video/mcde/mcde_dss.c
+> ?create mode 100644 drivers/video/mcde/mcde_fb.c
+> ?create mode 100644 drivers/video/mcde/mcde_formatter.h
+> ?create mode 100644 drivers/video/mcde/mcde_hw.c
+> ?create mode 100644 drivers/video/mcde/mcde_mod.c
+> ?create mode 100644 drivers/video/mcde/mcde_pixelprocess.h
+> ?create mode 100644 include/video/mcde/mcde.h
+> ?create mode 100644 include/video/mcde/mcde_display-generic_dsi.h
+> ?create mode 100644 include/video/mcde/mcde_display.h
+> ?create mode 100644 include/video/mcde/mcde_dss.h
+> ?create mode 100644 include/video/mcde/mcde_fb.h
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
