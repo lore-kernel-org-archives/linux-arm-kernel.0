@@ -1,40 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Nov 2010 14:32:30 +0000
-Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
-In-Reply-To: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
-References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
-Message-ID: <20101112143230.GA8197@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Nov 2010 16:14:51 +0100
+Subject: [PATCH 02/10] MCDE: Add configuration registers
+In-Reply-To: <1289390653-6111-3-git-send-email-jimmy.rubin@stericsson.com>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-3-git-send-email-jimmy.rubin@stericsson.com>
+Message-ID: <201011121614.51528.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 05, 2010 at 11:08:25AM +0800, Lin Mac wrote:
-> So I tried to enable DEBUG in head.S with following patch:
-> ----
-> diff --git a/arch/arm/boot/compressed/head.S
-> b/arch/arm/boot/compressed/head.S
-> index c5191b1..fbd04c1 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -17,6 +17,7 @@
->   * 100% relocatable.  Any attempt to do so will result in a crash.
->   * Please select one of the following when turning on debugging.
->   */
-> +#define DEBUG
->  #ifdef DEBUG
+On Wednesday 10 November 2010, Jimmy Rubin wrote:
+> This patch adds support for MCDE, Memory-to-display controller
+> found in the ST-Ericsson ux500 products.
 > 
->  #if defined(CONFIG_DEBUG_ICEDCC)
-> ----
-> 
-> Then it failed at building:
-> ----
->   AS      arch/arm/boot/compressed/lib1funcs.o
-> arch/arm/boot/compressed/head.S: Assembler messages:
-> arch/arm/boot/compressed/head.S:1019: Error: too many positional arguments
-> arch/arm/boot/compressed/head.S:1036: Error: too many positional arguments
-> make[3]: *** [arch/arm/boot/compressed/head.o] Error 1
+> This patch adds the configuration registers found in MCDE.
 
-Please do:
+> +
+> +#define MCDE_VAL2REG(__reg, __fld, __val) \
+> +	(((__val) << __reg##_##__fld##_SHIFT) & __reg##_##__fld##_MASK)
+> +#define MCDE_REG2VAL(__reg, __fld, __val) \
+> +	(((__val) & __reg##_##__fld##_MASK) >> __reg##_##__fld##_SHIFT)
+> +
+> +#define MCDE_CR 0x00000000
+> +#define MCDE_CR_DSICMD2_EN_V1_SHIFT 0
+> +#define MCDE_CR_DSICMD2_EN_V1_MASK 0x00000001
+> +#define MCDE_CR_DSICMD2_EN_V1(__x) \
+> +	MCDE_VAL2REG(MCDE_CR, DSICMD2_EN_V1, __x)
+> +#define MCDE_CR_DSICMD1_EN_V1_SHIFT 1
+> +#define MCDE_CR_DSICMD1_EN_V1_MASK 0x00000002
+> +#define MCDE_CR_DSICMD1_EN_V1(__x) \
+> +	MCDE_VAL2REG(MCDE_CR, DSICMD1_EN_V1, __x)
+> +#define MCDE_CR_DSI0_EN_V3_SHIFT 0
+> +#define MCDE_CR_DSI0_EN_V3_MASK 0x00000001
+> +#define MCDE_CR_DSI0_EN_V3(__x) \
+> +	MCDE_VAL2REG(MCDE_CR, DSI0_EN_V3, __x)
 
-make ARCH=arm CROSS_COMPILE=... arch/arm/boot/compressed/head.s
+This looks all rather unreadable. The easiest way is usually to just
+define the bit mask, i.e. the second line of each register definition,
+which you can use to mask the bits. It's also useful to indent the lines
+so you can easily tell the register offsets apart from the contents:
 
-and send me (in private mail) a copy of head.s.  Thanks.
+#define MCDE_CR 0x00000000
+#define		MCDE_CR_DSICMD2_EN_V1 0x00000001
+#define		MCDE_CR_DSICMD1_EN_V1 0x00000002
+
+Some people prefer to express all this in C instead of macros:
+
+struct mcde_registers {
+	enum {
+		mcde_cr_dsicmd2_en = 0x00000001,
+		mcde_cr_dsicmd1_en = 0x00000002,
+		...
+	} cr;
+	enum {
+		mcde_conf0_syncmux0 = 0x00000001,
+		...
+	} conf0;
+	...
+};
+
+This gives you better type safety, but which one you choose is your decision.
+
+	Arnd
