@@ -1,55 +1,153 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Nov 2010 18:00:40 +0000
-Subject: [PATCH v2 20/20] ARM: LPAE: Add the Kconfig entries
+Date: Fri, 12 Nov 2010 18:00:39 +0000
+Subject: [PATCH v2 19/20] ARM: LPAE: define printk format for physical
+	addresses and page table entries
 In-Reply-To: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
 References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289584840-18097-21-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1289584840-18097-20-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the ARM_LPAE and ARCH_PHYS_ADDR_T_64BIT Kconfig entries
-allowing LPAE support to be compiled into the kernel.
+From: Will Deacon <will.deacon@arm.com>
 
+Now that the Kernel supports 2 level and 3 level page tables, physical
+addresses (and also page table entries) may be 32 or 64-bits depending
+upon the configuration.
+
+This patch adds a conversion specifier (PHYS_ADDR_FMT) which represents
+a u32 or u64 depending on the width of a physical address.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/Kconfig    |    2 +-
- arch/arm/mm/Kconfig |   13 +++++++++++++
- 2 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/types.h |    6 ++++++
+ arch/arm/kernel/setup.c      |    2 +-
+ arch/arm/mm/fault.c          |    8 ++++----
+ arch/arm/mm/mmu.c            |   18 +++++++++---------
+ 4 files changed, 20 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f35fe82..e376b7b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1599,7 +1599,7 @@ config CMDLINE_FORCE
+diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+index dc1bdbb..b740539 100644
+--- a/arch/arm/include/asm/types.h
++++ b/arch/arm/include/asm/types.h
+@@ -7,6 +7,12 @@
  
- config XIP_KERNEL
- 	bool "Kernel Execute-In-Place from ROM"
--	depends on !ZBOOT_ROM
-+	depends on !ZBOOT_ROM && !ARM_LPAE
- 	help
- 	  Execute-In-Place allows the kernel to run from non-volatile storage
- 	  directly addressable by the CPU, such as NOR flash. This saves RAM
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 8493ed0..3ca2d15 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -615,6 +615,19 @@ config IO_36
+ #define BITS_PER_LONG 32
  
- comment "Processor Features"
++#ifdef CONFIG_PHYS_ADDR_T_64BIT
++#define PHYS_ADDR_FMT	"%016llx"
++#else
++#define PHYS_ADDR_FMT	"%08x"
++#endif
++
+ #endif /* __KERNEL__ */
  
-+config ARM_LPAE
-+	bool "Support for the Large Physical Address Extension"
-+	depends on MMU && CPU_V7
-+	help
-+	  Say Y if you have an ARMv7 processor supporting the LPAE page table
-+	  format and you would like access memory beyond the 4GB limit.
-+
-+config ARCH_PHYS_ADDR_T_64BIT
-+	def_bool ARM_LPAE
-+
-+config ARCH_DMA_ADDR_T_64BIT
-+	def_bool ARM_LPAE
-+
- config ARM_THUMB
- 	bool "Support Thumb user binaries"
- 	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V7 || CPU_FEROCEON
+ #endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 0128db2..d143241 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -448,7 +448,7 @@ static int __init arm_add_memory(phys_addr_t start, unsigned long size)
+ 
+ 	if (meminfo.nr_banks >= NR_BANKS) {
+ 		printk(KERN_CRIT "NR_BANKS too low, "
+-			"ignoring memory at %#lx\n", start);
++			"ignoring memory at " PHYS_ADDR_FMT "\n", start);
+ 		return -EINVAL;
+ 	}
+ 
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 2dde9cd..8112f77 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -81,7 +81,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 
+ 	printk(KERN_ALERT "pgd = %p\n", mm->pgd);
+ 	pgd = pgd_offset(mm, addr);
+-	printk(KERN_ALERT "[%08lx] *pgd=%08lx", addr, pgd_val(*pgd));
++	printk(KERN_ALERT "[%08lx] *pgd=" PHYS_ADDR_FMT, addr, pgd_val(*pgd));
+ 
+ 	do {
+ 		pmd_t *pmd;
+@@ -97,7 +97,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 
+ 		pmd = pmd_offset(pgd, addr);
+ 		if (PTRS_PER_PMD != 1)
+-			printk(", *pmd=%08lx", pmd_val(*pmd));
++			printk(", *pmd=" PHYS_ADDR_FMT, pmd_val(*pmd));
+ 
+ 		if (pmd_none(*pmd))
+ 			break;
+@@ -112,9 +112,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 			break;
+ 
+ 		pte = pte_offset_map(pmd, addr);
+-		printk(", *pte=%08lx", pte_val(*pte));
++		printk(", *pte=" PHYS_ADDR_FMT, pte_val(*pte));
+ #ifndef CONFIG_ARM_LPAE
+-		printk(", *ppte=%08lx", pte_val(pte[-LINUX_PTE_OFFSET]));
++		printk(", *ppte=" PHYS_ADDR_FMT, pte_val(pte[-LINUX_PTE_OFFSET]));
+ #endif
+ 		pte_unmap(pte);
+ 	} while(0);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 787a409..f05f8ed 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -619,7 +619,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ 
+ 	if (!(cpu_architecture() >= CPU_ARCH_ARMv6 || cpu_is_xsc3())) {
+ 		printk(KERN_ERR "MM: CPU does not support supersection "
+-		       "mapping for 0x%08llx at 0x%08lx\n",
++		       "mapping for 0x" PHYS_ADDR_FMT " at 0x%08lx\n",
+ 		       __pfn_to_phys((u64)md->pfn), addr);
+ 		return;
+ 	}
+@@ -632,14 +632,14 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ 	 */
+ 	if (type->domain) {
+ 		printk(KERN_ERR "MM: invalid domain in supersection "
+-		       "mapping for 0x%08llx at 0x%08lx\n",
++		       "mapping for 0x" PHYS_ADDR_FMT " at 0x%08lx\n",
+ 		       __pfn_to_phys((u64)md->pfn), addr);
+ 		return;
+ 	}
+ 
+ 	if ((addr | length | __pfn_to_phys(md->pfn)) & ~SUPERSECTION_MASK) {
+-		printk(KERN_ERR "MM: cannot create mapping for "
+-		       "0x%08llx at 0x%08lx invalid alignment\n",
++		printk(KERN_ERR "MM: cannot create mapping for 0x" PHYS_ADDR_FMT
++		       " at 0x%08lx invalid alignment\n",
+ 		       __pfn_to_phys((u64)md->pfn), addr);
+ 		return;
+ 	}
+@@ -681,16 +681,16 @@ static void __init create_mapping(struct map_desc *md)
+ 	pgd_t *pgd;
+ 
+ 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
+-		printk(KERN_WARNING "BUG: not creating mapping for "
+-		       "0x%08llx at 0x%08lx in user region\n",
++		printk(KERN_WARNING "BUG: not creating mapping for 0x"
++		       PHYS_ADDR_FMT "@0x%08lx in user region\n",
+ 		       __pfn_to_phys((u64)md->pfn), md->virtual);
+ 		return;
+ 	}
+ 
+ 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+ 	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
+-		printk(KERN_WARNING "BUG: mapping for 0x%08llx at 0x%08lx "
+-		       "overlaps vmalloc space\n",
++		printk(KERN_WARNING "BUG: mapping for 0x" PHYS_ADDR_FMT
++		       "@0x%08lx overlaps vmalloc space\n",
+ 		       __pfn_to_phys((u64)md->pfn), md->virtual);
+ 	}
+ 
+@@ -711,7 +711,7 @@ static void __init create_mapping(struct map_desc *md)
+ 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+ 
+ 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
+-		printk(KERN_WARNING "BUG: map for 0x%08lx at 0x%08lx can not "
++		printk(KERN_WARNING "BUG: map for 0x" PHYS_ADDR_FMT " at 0x%08lx can not "
+ 		       "be mapped using pages, ignoring.\n",
+ 		       __pfn_to_phys(md->pfn), addr);
+ 		return;
