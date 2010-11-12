@@ -1,63 +1,55 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Nov 2010 18:00:30 +0000
-Subject: [PATCH v2 10/20] ARM: LPAE: Remove the FIRST_USER_PGD_NR and
-	USER_PTRS_PER_PGD definitions
+Date: Fri, 12 Nov 2010 18:00:40 +0000
+Subject: [PATCH v2 20/20] ARM: LPAE: Add the Kconfig entries
 In-Reply-To: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
 References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289584840-18097-11-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1289584840-18097-21-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros were only used in setup_mm_for_reboot and get_pgd_slow.
-Both have been modified to no longer use these definitions. One of the
-reasons is the different meaning that PGD has with the 2-level and
-3-level page tables.
+This patch adds the ARM_LPAE and ARCH_PHYS_ADDR_T_64BIT Kconfig entries
+allowing LPAE support to be compiled into the kernel.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/pgtable-2level.h |    3 ---
- arch/arm/include/asm/pgtable-3level.h |    3 ---
- arch/arm/mm/pgd.c                     |    2 +-
- 3 files changed, 1 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig    |    2 +-
+ arch/arm/mm/Kconfig |   13 +++++++++++++
+ 2 files changed, 14 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 4e21166..a0548b6 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -92,9 +92,6 @@
-  */
- #define FIRST_USER_ADDRESS	PAGE_SIZE
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f35fe82..e376b7b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1599,7 +1599,7 @@ config CMDLINE_FORCE
  
--#define FIRST_USER_PGD_NR	1
--#define USER_PTRS_PER_PGD	((TASK_SIZE/PGDIR_SIZE) - FIRST_USER_PGD_NR)
--
- /*
-  * section address mask and size definitions.
-  */
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 5b1482d..381b04b 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -58,9 +58,6 @@
-  */
- #define FIRST_USER_ADDRESS	PAGE_SIZE
+ config XIP_KERNEL
+ 	bool "Kernel Execute-In-Place from ROM"
+-	depends on !ZBOOT_ROM
++	depends on !ZBOOT_ROM && !ARM_LPAE
+ 	help
+ 	  Execute-In-Place allows the kernel to run from non-volatile storage
+ 	  directly addressable by the CPU, such as NOR flash. This saves RAM
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 8493ed0..3ca2d15 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -615,6 +615,19 @@ config IO_36
  
--#define FIRST_USER_PGD_NR	1
--#define USER_PTRS_PER_PGD	((TASK_SIZE/PGDIR_SIZE) - FIRST_USER_PGD_NR)
--
- /*
-  * section address mask and size definitions.
-  */
-diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
-index e7c149b..09238fa 100644
---- a/arch/arm/mm/pgd.c
-+++ b/arch/arm/mm/pgd.c
-@@ -25,7 +25,7 @@
- #else
- #define alloc_pgd()	(pgd_t *)__get_free_pages(GFP_KERNEL, 2)
- #define free_pgd(pgd)	free_pages((unsigned long)pgd, 2)
--#define FIRST_KERNEL_PGD_NR	(FIRST_USER_PGD_NR + USER_PTRS_PER_PGD)
-+#define FIRST_KERNEL_PGD_NR	(TASK_SIZE >> PGDIR_SHIFT)
- #endif
+ comment "Processor Features"
  
- /*
++config ARM_LPAE
++	bool "Support for the Large Physical Address Extension"
++	depends on MMU && CPU_V7
++	help
++	  Say Y if you have an ARMv7 processor supporting the LPAE page table
++	  format and you would like access memory beyond the 4GB limit.
++
++config ARCH_PHYS_ADDR_T_64BIT
++	def_bool ARM_LPAE
++
++config ARCH_DMA_ADDR_T_64BIT
++	def_bool ARM_LPAE
++
+ config ARM_THUMB
+ 	bool "Support Thumb user binaries"
+ 	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V7 || CPU_FEROCEON
