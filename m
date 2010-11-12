@@ -1,91 +1,152 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Thu, 11 Nov 2010 16:13:01 -0800
-Subject: arm smp support patch
-In-Reply-To: <20101111232954.GD23785@n2100.arm.linux.org.uk>
-References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>	<20101111044125.GA5850@mvista.com>	<52622063180ba1627bf98811e4f56a05.squirrel@www.concentris-systems.com>	<4CDC63A9.9090606@codeaurora.org>	<20101111230652.GC23785@n2100.arm.linux.org.uk>
-	<20101111232954.GD23785@n2100.arm.linux.org.uk>
-Message-ID: <4CDC868D.7060100@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Nov 2010 16:42:12 -0800
+Subject: [PATCH] ARM: Common GIC entry macro code V2
+In-Reply-To: <20101111074955.29633.80160.sendpatchset@t400s>
+References: <20101111074955.29633.80160.sendpatchset@t400s>
+Message-ID: <20101112004212.GZ9264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> 
-> ARM: GIC: don't disable software generated interrupts
-> 
-> Software generated interrupts (SGI) are used for IPIs by the kernel.
-> While previous revisions of the GIC hardware were specified not to
-> implement enable bits for SGIs, more recent hardware is now permitted
-> to implement these bits in a per-CPU banked register.
-> 
-> The priority registers for the PPI and SGIs are also per-CPU banked
-> registers, so ensure that these are also appropriately initialized.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/common/gic.c |   28 ++++++++++++++++++++++++----
->  1 files changed, 24 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index ada6359..772f95f 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -251,15 +251,16 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
->  		writel(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
->  
->  	/*
-> -	 * Set priority on all interrupts.
-> +	 * Set priority on all global interrupts.
->  	 */
-> -	for (i = 0; i < max_irq; i += 4)
-> +	for (i = 32; i < max_irq; i += 4)
->  		writel(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
->  
->  	/*
-> -	 * Disable all interrupts.
-> +	 * Disable all interrupts.  Leave the PPI and SGIs alone
-> +	 * as these enables are banked registers.
->  	 */
-> -	for (i = 0; i < max_irq; i += 32)
-> +	for (i = 32; i < max_irq; i += 32)
->  		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
->  
->  	/*
-> @@ -277,11 +278,30 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
->  
->  void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
->  {
-> +	void __iomem *dist_base;
-> +	int i;
-> +
->  	if (gic_nr >= MAX_GIC_NR)
->  		BUG();
->  
-> +	dist_base = gic_data[gic_nr].dist_base;
-> +	BUG_ON(!dist_base);
-> +
->  	gic_data[gic_nr].cpu_base = base;
->  
-> +	/*
-> +	 * Deal with the banked PPI and SGI interrupts - disable all
-> +	 * PPI interrupts, ensure all SGI interrupts are enabled.
-> +	 */
-> +	writel(0xffff0000, dist_base + GIC_DIST_ENABLE_CLEAR);
-> +	writel(0x0000ffff, dist_base + GIC_DIST_ENABLE_SET);
-> +
-> +	/*
-> +	 * Set priority on PPI and SGI interrupts
-> +	 */
-> +	for (i = 0; i < 32; i += 4)
-> +		writel(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
-> +
->  	writel(0xf0, base + GIC_CPU_PRIMASK);
->  	writel(1, base + GIC_CPU_CTRL);
->  }
+Hi Magnus,
 
-Tested on msm 8660.
+* Magnus Damm <magnus.damm@gmail.com> [101110 23:37]:
+> 
+> The omap code is excluded due to complexity and lack of
+> hardware - the CONFIG_SMP macros are used for multi-omap
+> and the omap4 case - this makes is difficult to share code.
 
-Acked-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Hmm test_for_ipi and test_for_ltirq are needed for the
+SMP_ON_UP case, so I've moved those in to the MULTI_OMAP2
+section.
 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Maybe merge the following into your original patch?
+
+Regards,
+
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 11 Nov 2010 16:19:44 -0800
+Subject: [PATCH] ARM: Common GIC entry macro for omap
+
+Common GIC entry macro for omap
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
+index 06e64e1..2e358df 100644
+--- a/arch/arm/mach-omap2/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+@@ -105,6 +105,35 @@ omap_irq_base:	.word	0
+ 9999:
+ 		.endm
+ 
++#ifdef CONFIG_SMP
++		/* We assume that irqstat (the raw value of the IRQ acknowledge
++		 * register) is preserved from the macro above.
++		 * If there is an IPI, we immediately signal end of interrupt
++		 * on the controller, since this requires the original irqstat
++		 * value which we won't easily be able to recreate later.
++		 */
++
++		.macro test_for_ipi, irqnr, irqstat, base, tmp
++		bic	\irqnr, \irqstat, #0x1c00
++		cmp	\irqnr, #16
++		it	cc
++		strcc	\irqstat, [\base, #GIC_CPU_EOI]
++		it	cs
++		cmpcs	\irqnr, \irqnr
++		.endm
++
++		/* As above, this assumes that irqstat and base are preserved */
++
++		.macro test_for_ltirq, irqnr, irqstat, base, tmp
++		bic	\irqnr, \irqstat, #0x1c00
++		mov 	\tmp, #0
++		cmp	\irqnr, #29
++		itt	eq
++		moveq	\tmp, #1
++		streq	\irqstat, [\base, #GIC_CPU_EOI]
++		cmp	\tmp, #0
++		.endm
++#endif	/* CONFIG_SMP */
+ 
+ #else	/* MULTI_OMAP2 */
+ 
+@@ -141,74 +170,15 @@ omap_irq_base:	.word	0
+ 
+ 
+ #ifdef CONFIG_ARCH_OMAP4
++#include <asm/hardware/entry-macro-gic.S>
+ 
+ 		.macro  get_irqnr_preamble, base, tmp
+ 		ldr     \base, =OMAP4_IRQ_BASE
+ 		.endm
+ 
+-		/*
+-		 * The interrupt numbering scheme is defined in the
+-		 * interrupt controller spec.  To wit:
+-		 *
+-		 * Interrupts 0-15 are IPI
+-		 * 16-28 are reserved
+-		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-		 * 32-1020 are global
+-		 * 1021-1022 are reserved
+-		 * 1023 is "spurious" (no interrupt)
+-		 *
+-		 * For now, we ignore all local interrupts so only return an
+-		 * interrupt if it's between 30 and 1020.  The test_for_ipi
+-		 * routine below will pick up on IPIs.
+-		 * A simple read from the controller will tell us the number
+-		 * of the highest priority enabled interrupt.
+-		 * We then just need to check whether it is in the
+-		 * valid range for an IRQ (30-1020 inclusive).
+-		 */
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+-
+-		ldr     \tmp, =1021
+-
+-		bic     \irqnr, \irqstat, #0x1c00
+-
+-		cmp     \irqnr, #29
+-		cmpcc   \irqnr, \irqnr
+-		cmpne   \irqnr, \tmp
+-		cmpcs   \irqnr, \irqnr
+-		.endm
+ #endif
+-#endif	/* MULTI_OMAP2 */
+-
+-#ifdef CONFIG_SMP
+-		/* We assume that irqstat (the raw value of the IRQ acknowledge
+-		 * register) is preserved from the macro above.
+-		 * If there is an IPI, we immediately signal end of interrupt
+-		 * on the controller, since this requires the original irqstat
+-		 * value which we won't easily be able to recreate later.
+-		 */
+ 
+-		.macro test_for_ipi, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		cmp	\irqnr, #16
+-		it	cc
+-		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-		it	cs
+-		cmpcs	\irqnr, \irqnr
+-		.endm
+-
+-		/* As above, this assumes that irqstat and base are preserved */
+-
+-		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		mov 	\tmp, #0
+-		cmp	\irqnr, #29
+-		itt	eq
+-		moveq	\tmp, #1
+-		streq	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmp	\tmp, #0
+-		.endm
+-#endif	/* CONFIG_SMP */
++#endif	/* MULTI_OMAP2 */
+ 
+ 		.macro	irq_prio_table
+ 		.endm
