@@ -1,87 +1,100 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Nov 2010 17:23:25 +0100
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <1289390653-6111-10-git-send-email-jimmy.rubin@stericsson.com>
+Date: Fri, 12 Nov 2010 17:29:28 +0100
+Subject: [PATCH 08/10] MCDE: Add frame buffer device
+In-Reply-To: <1289390653-6111-9-git-send-email-jimmy.rubin@stericsson.com>
 References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
 	<1289390653-6111-9-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-10-git-send-email-jimmy.rubin@stericsson.com>
-Message-ID: <201011121723.25978.arnd@arndb.de>
+Message-ID: <201011121729.28354.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 10 November 2010, Jimmy Rubin wrote:
-> This patch adds support for the MCDE, Memory-to-display controller,
-> found in the ST-Ericsson ux500 products.
-> 
-> This patch adds the necessary build files for MCDE and the bus that
-> all displays are connected to.
-> 
+> +
+> +static struct platform_device mcde_fb_device = {
+> +	.name = "mcde_fb",
+> +	.id = -1,
+> +};
 
-Can you explain why you need a bus for this?
+Do not introduce new static devices. We are trying to remove them and
+they will stop working. Why do you even need a device here if there is
+only one of them?
 
-With the code you currently have, there is only a single driver associated
-with this bus type, and also just a single device that gets registered here!
+> +struct fb_info *mcde_fb_create(struct mcde_display_device *ddev,
+> +	u16 w, u16 h, u16 vw, u16 vh, enum mcde_ovly_pix_fmt pix_fmt,
+> +	u32 rotate)
+> +{
 
->+static int __init mcde_subsystem_init(void)
->+{
->+       int ret;
->+       pr_info("MCDE subsystem init begin\n");
->+
->+       /* MCDE module init sequence */
->+       ret = mcde_init();
->+       if (ret)
->+               return ret;
->+       ret = mcde_display_init();
->+       if (ret)
->+               goto mcde_display_failed;
->+       ret = mcde_dss_init();
->+       if (ret)
->+               goto mcde_dss_failed;
->+       ret = mcde_fb_init();
->+       if (ret)
->+               goto mcde_fb_failed;
->+       pr_info("MCDE subsystem init done\n");
->+
->+       return 0;
->+mcde_fb_failed:
->+       mcde_dss_exit();
->+mcde_dss_failed:
->+       mcde_display_exit();
->+mcde_display_failed:
->+       mcde_exit();
->+       return ret;
->+}
+Here you have another device, which you could just use!
 
-Splitting up the module into four sub-modules and then initializing
-everything from one place indicates that something is done wrong
-on a global scale.
+> +/* Overlay fbs' platform device */
+> +static int mcde_fb_probe(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int mcde_fb_remove(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver mcde_fb_driver = {
+> +	.probe  = mcde_fb_probe,
+> +	.remove = mcde_fb_remove,
+> +	.driver = {
+> +		.name  = "mcde_fb",
+> +		.owner = THIS_MODULE,
+> +	},
+> +};
+> +
+> +/* MCDE fb init */
+> +
+> +int __init mcde_fb_init(void)
+> +{
+> +	int ret;
+> +
+> +	ret = platform_driver_register(&mcde_fb_driver);
+> +	if (ret)
+> +		goto fb_driver_failed;
+> +	ret = platform_device_register(&mcde_fb_device);
+> +	if (ret)
+> +		goto fb_device_failed;
+> +
+> +	goto out;
+> +fb_device_failed:
+> +	platform_driver_unregister(&mcde_fb_driver);
+> +fb_driver_failed:
+> +out:
+> +	return ret;
+> +}
+> +
+> +void mcde_fb_exit(void)
+> +{
+> +	platform_device_unregister(&mcde_fb_device);
+> +	platform_driver_unregister(&mcde_fb_driver);
+> +}
 
-If you indeed need a bus, that should be a separate module that gets
-loaded first and then has the other modules build on top of.
+This appears to be an entirely useless registration for something that
+does not exist and that you are not using anywhere ...
 
-I'm not sure how the other parts layer on top of one another, can you
-provide some more insight?
+> +
+> +#include <linux/fb.h>
+> +#include <linux/ioctl.h>
+> +#if !defined(__KERNEL__) && !defined(_KERNEL)
+> +#include <stdint.h>
+> +#else
+> +#include <linux/types.h>
+> +#endif
+> +
+> +#ifdef __KERNEL__
+> +#include "mcde_dss.h"
+> +#endif
+> +
+> +#ifdef __KERNEL__
+> +#define to_mcde_fb(x) ((struct mcde_fb *)(x)->par)
 
->From what I understood so far, you have a single multi-channel display
-controller (mcde_hw.c) that drives the hardware.
-Each controller can have multiple frame buffers attached to it, which
-in turn can have multiple displays attached to each of them, but your
-current configuration only has one of each, right?
-
-Right now you have a single top-level bus device for the displays,
-maybe that can be integrated into the controller so the displays are
-properly rooted below the hardware that drives them.
-
-The frame buffer device also looks weird. Right now you only seem
-to have a single frame buffer registered to a driver in the same
-module. Is that frame buffer not dependent on a controller?
-
->+#ifdef MODULE
->+module_init(mcde_subsystem_init);
->+#else
->+fs_initcall(mcde_subsystem_init);
->+#endif
-
-This is not a file system ;-)
+Everything in this file is enclosed in #ifdef __KERNEL__, and the file
+is not even exported. You can remove the #ifdef and the #else path
+everywhere AFAICT.
 
 	Arnd
