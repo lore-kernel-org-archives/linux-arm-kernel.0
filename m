@@ -1,384 +1,133 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Fri, 12 Nov 2010 10:09:02 -0800
-Subject: [PATCH 2/2] msm: gpio: Add irq support to v2 gpiolib.
-In-Reply-To: <1289585342-21341-1-git-send-email-gbean@codeaurora.org>
-References: <1289585342-21341-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1289585342-21341-2-git-send-email-gbean@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 12 Nov 2010 13:43:55 -0500 (EST)
+Subject: [PATCH 11/11] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <1289546260-6208-11-git-send-email-haojian.zhuang@marvell.com>
+References: <1289546260-6208-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-8-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-9-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-10-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-11-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <alpine.LFD.2.00.1011121257540.13911@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Complete the MSM v2 gpio subsystem by adding irq_chip.
+On Fri, 12 Nov 2010, Haojian Zhuang wrote:
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- arch/arm/mach-msm/gpio-v2.c |  293 ++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 291 insertions(+), 2 deletions(-)
+> iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
+> of accessing CP0 and CP1 is changed in PJ4. Append more files to support
+> iwmmxt in PJ4 core.
+> 
+> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
 
-diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-index 5d31a7c..aa3e9ec 100644
---- a/arch/arm/mach-msm/gpio-v2.c
-+++ b/arch/arm/mach-msm/gpio-v2.c
-@@ -15,7 +15,11 @@
-  * 02110-1301, USA.
-  *
-  */
-+#include <linux/bitmap.h>
-+#include <linux/bitops.h>
- #include <linux/gpio.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/module.h>
-@@ -31,17 +35,78 @@ enum {
- 	GPIO_OUT_BIT = 1
- };
- 
-+/* Bits of interest in the GPIO_INTR_STATUS register.
-+ */
-+enum {
-+	INTR_STATUS_BIT = 0,
-+};
-+
- /* Bits of interest in the GPIO_CFG register.
-  */
- enum {
- 	GPIO_OE_BIT = 9,
- };
- 
-+/* Bits of interest in the GPIO_INTR_CFG register.
-+ */
-+enum {
-+	INTR_ENABLE_BIT        = 0,
-+	INTR_POL_CTL_BIT       = 1,
-+	INTR_DECT_CTL_BIT      = 2,
-+	INTR_RAW_STATUS_EN_BIT = 3,
-+};
-+
-+/* Codes of interest in GPIO_INTR_CFG_SU.
-+ */
-+enum {
-+	TARGET_PROC_SCORPION = 4,
-+	TARGET_PROC_NONE     = 7,
-+};
-+
-+/*
-+ * When a GPIO triggers, two separate decisions are made, controlled
-+ * by two separate flags.
-+ *
-+ * - First, INTR_RAW_STATUS_EN controls whether or not the GPIO_INTR_STATUS
-+ * register for that GPIO will be updated to reflect the triggering of that
-+ * gpio.  If this bit is 0, this register will not be updated.
-+ * - Second, INTR_ENABLE controls whether an interrupt is triggered.
-+ *
-+ * If INTR_ENABLE is set and INTR_RAW_STATUS_EN is NOT set, an interrupt
-+ * can be triggered but the status register will not reflect it.
-+ */
-+#define INTR_RAW_STATUS_EN BIT(INTR_RAW_STATUS_EN_BIT)
-+#define INTR_ENABLE        BIT(INTR_ENABLE_BIT)
-+#define INTR_DECT_CTL_EDGE BIT(INTR_DECT_CTL_BIT)
-+#define INTR_POL_CTL_HI    BIT(INTR_POL_CTL_BIT)
-+
-+#define GPIO_INTR_CFG_SU(gpio)    (MSM_TLMM_BASE + 0x0400 + (0x04 * (gpio)))
- #define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
- #define GPIO_IN_OUT(gpio)         (MSM_TLMM_BASE + 0x1004 + (0x10 * (gpio)))
-+#define GPIO_INTR_CFG(gpio)       (MSM_TLMM_BASE + 0x1008 + (0x10 * (gpio)))
-+#define GPIO_INTR_STATUS(gpio)    (MSM_TLMM_BASE + 0x100c + (0x10 * (gpio)))
- 
-+/**
-+ * struct msm_gpio_dev: the MSM8660 SoC GPIO device structure
-+ *
-+ * @enabled_irqs: a bitmap used to optimize the summary-irq handler.  By
-+ * keeping track of which gpios are unmasked as irq sources, we avoid
-+ * having to do readl calls on hundreds of iomapped registers each time
-+ * the summary interrupt fires in order to locate the active interrupts.
-+ *
-+ * @wake_irqs: a bitmap for tracking which interrupt lines are enabled
-+ * as wakeup sources.  When the device is suspended, interrupts which are
-+ * not wakeup sources are disabled.
-+ *
-+ * @dual_edge_irqs: a bitmap used to track which irqs are configured
-+ * as dual-edge, as this is not supported by the hardware and requires
-+ * some special handling in the driver.
-+ */
- struct msm_gpio_dev {
- 	struct gpio_chip gpio_chip;
-+	DECLARE_BITMAP(enabled_irqs, NR_GPIO_IRQS);
-+	DECLARE_BITMAP(wake_irqs, NR_GPIO_IRQS);
-+	DECLARE_BITMAP(dual_edge_irqs, NR_GPIO_IRQS);
- };
- 
- static DEFINE_SPINLOCK(tlmm_lock);
-@@ -104,6 +169,16 @@ static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
- 	msm_gpiomux_put(chip->base + offset);
- }
- 
-+static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	return MSM_GPIO_TO_INT(offset - chip->base);
-+}
-+
-+static inline int msm_irq_to_gpio(struct gpio_chip *chip, unsigned irq)
-+{
-+	return irq - MSM_GPIO_TO_INT(chip->base);
-+}
-+
- static struct msm_gpio_dev msm_gpio = {
- 	.gpio_chip = {
- 		.base             = 0,
-@@ -112,20 +187,193 @@ static struct msm_gpio_dev msm_gpio = {
- 		.direction_output = msm_gpio_direction_output,
- 		.get              = msm_gpio_get,
- 		.set              = msm_gpio_set,
-+		.to_irq           = msm_gpio_to_irq,
- 		.request          = msm_gpio_request,
- 		.free             = msm_gpio_free,
- 	},
- };
- 
-+/* For dual-edge interrupts in software, since the hardware has no
-+ * such support:
-+ *
-+ * At appropriate moments, this function may be called to flip the polarity
-+ * settings of both-edge irq lines to try and catch the next edge.
-+ *
-+ * The attempt is considered successful if:
-+ * - the status bit goes high, indicating that an edge was caught, or
-+ * - the input value of the gpio doesn't change during the attempt.
-+ * If the value changes twice during the process, that would cause the first
-+ * test to fail but would force the second, as two opposite
-+ * transitions would cause a detection no matter the polarity setting.
-+ *
-+ * The do-loop tries to sledge-hammer closed the timing hole between
-+ * the initial value-read and the polarity-write - if the line value changes
-+ * during that window, an interrupt is lost, the new polarity setting is
-+ * incorrect, and the first success test will fail, causing a retry.
-+ *
-+ * Algorithm comes from Google's msmgpio driver, see mach-msm/gpio.c.
-+ */
-+static void msm_gpio_update_dual_edge_pos(unsigned gpio)
-+{
-+	int loop_limit = 100;
-+	unsigned val, val2, intstat;
-+
-+	do {
-+		val = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN_BIT);
-+		if (val)
-+			clr_gpio_bits(INTR_POL_CTL_HI, GPIO_INTR_CFG(gpio));
-+		else
-+			set_gpio_bits(INTR_POL_CTL_HI, GPIO_INTR_CFG(gpio));
-+		val2 = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN_BIT);
-+		intstat = readl(GPIO_INTR_STATUS(gpio)) & BIT(INTR_STATUS_BIT);
-+		if (intstat || val == val2)
-+			return;
-+	} while (loop_limit-- > 0);
-+	pr_err("%s: dual-edge irq failed to stabilize, "
-+	       "interrupts dropped. %#08x != %#08x\n",
-+	       __func__, val, val2);
-+}
-+
-+static void msm_gpio_irq_ack(unsigned int irq)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+
-+	writel(BIT(INTR_STATUS_BIT), GPIO_INTR_STATUS(gpio));
-+	if (test_bit(gpio, msm_gpio.dual_edge_irqs))
-+		msm_gpio_update_dual_edge_pos(gpio);
-+}
-+
-+static void msm_gpio_irq_mask(unsigned int irq)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+	unsigned long irq_flags;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+	writel(TARGET_PROC_NONE, GPIO_INTR_CFG_SU(gpio));
-+	clr_gpio_bits(INTR_RAW_STATUS_EN | INTR_ENABLE, GPIO_INTR_CFG(gpio));
-+	__clear_bit(gpio, msm_gpio.enabled_irqs);
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+}
-+
-+static void msm_gpio_irq_unmask(unsigned int irq)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+	unsigned long irq_flags;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+	__set_bit(gpio, msm_gpio.enabled_irqs);
-+	set_gpio_bits(INTR_RAW_STATUS_EN | INTR_ENABLE, GPIO_INTR_CFG(gpio));
-+	writel(TARGET_PROC_SCORPION, GPIO_INTR_CFG_SU(gpio));
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+}
-+
-+static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+	unsigned long irq_flags;
-+	uint32_t bits;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+
-+	bits = readl(GPIO_INTR_CFG(gpio));
-+
-+	if (flow_type & IRQ_TYPE_EDGE_BOTH) {
-+		bits |= INTR_DECT_CTL_EDGE;
-+		irq_desc[irq].handle_irq = handle_edge_irq;
-+		if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
-+			__set_bit(gpio, msm_gpio.dual_edge_irqs);
-+		else
-+			__clear_bit(gpio, msm_gpio.dual_edge_irqs);
-+	} else {
-+		bits &= ~INTR_DECT_CTL_EDGE;
-+		irq_desc[irq].handle_irq = handle_level_irq;
-+		__clear_bit(gpio, msm_gpio.dual_edge_irqs);
-+	}
-+
-+	if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH))
-+		bits |= INTR_POL_CTL_HI;
-+	else
-+		bits &= ~INTR_POL_CTL_HI;
-+
-+	writel(bits, GPIO_INTR_CFG(gpio));
-+
-+	if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
-+		msm_gpio_update_dual_edge_pos(gpio);
-+
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+
-+	return 0;
-+}
-+
-+/*
-+ * When the summary IRQ is raised, any number of GPIO lines may be high.
-+ * It is the job of the summary handler to find all those GPIO lines
-+ * which have been set as summary IRQ lines and which are triggered,
-+ * and to call their interrupt handlers.
-+ */
-+static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	unsigned long i;
-+
-+	for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
-+	     i < NR_GPIO_IRQS;
-+	     i = find_next_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS, i + 1)) {
-+		if (readl(GPIO_INTR_STATUS(i)) & BIT(INTR_STATUS_BIT))
-+			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
-+							   i));
-+	}
-+	desc->chip->ack(irq);
-+}
-+
-+static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+
-+	if (on) {
-+		if (bitmap_empty(msm_gpio.wake_irqs, NR_GPIO_IRQS))
-+			set_irq_wake(TLMM_SCSS_SUMMARY_IRQ, 1);
-+		set_bit(gpio, msm_gpio.wake_irqs);
-+	} else {
-+		clear_bit(gpio, msm_gpio.wake_irqs);
-+		if (bitmap_empty(msm_gpio.wake_irqs, NR_GPIO_IRQS))
-+			set_irq_wake(TLMM_SCSS_SUMMARY_IRQ, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+static struct irq_chip msm_gpio_irq_chip = {
-+	.name		= "msmgpio",
-+	.mask		= msm_gpio_irq_mask,
-+	.unmask		= msm_gpio_irq_unmask,
-+	.ack		= msm_gpio_irq_ack,
-+	.set_type	= msm_gpio_irq_set_type,
-+	.set_wake	= msm_gpio_irq_set_wake,
-+};
-+
- static int __devinit msm_gpio_probe(struct platform_device *dev)
- {
--	int ret;
-+	int i, irq, ret;
- 
- 	spin_lock_init(&tlmm_lock);
-+	bitmap_zero(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
-+	bitmap_zero(msm_gpio.wake_irqs, NR_GPIO_IRQS);
-+	bitmap_zero(msm_gpio.dual_edge_irqs, NR_GPIO_IRQS);
- 	msm_gpio.gpio_chip.label = dev->name;
- 	ret = gpiochip_add(&msm_gpio.gpio_chip);
-+	if (ret < 0)
-+		return ret;
-+
-+	for (i = 0; i < msm_gpio.gpio_chip.ngpio; ++i) {
-+		irq = msm_gpio_to_irq(&msm_gpio.gpio_chip, i);
-+		set_irq_chip(irq, &msm_gpio_irq_chip);
-+		set_irq_handler(irq, handle_level_irq);
-+		set_irq_flags(irq, IRQF_VALID);
-+	}
- 
--	return ret;
-+	set_irq_chained_handler(TLMM_SCSS_SUMMARY_IRQ,
-+				msm_summary_irq_handler);
-+	return 0;
- }
- 
- static int __devexit msm_gpio_remove(struct platform_device *dev)
-@@ -140,12 +388,53 @@ static int __devexit msm_gpio_remove(struct platform_device *dev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int msm_gpio_suspend_noirq(struct device *dev)
-+{
-+	unsigned long irq_flags;
-+	unsigned long i;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+	for_each_set_bit(i, msm_gpio.enabled_irqs, NR_GPIO_IRQS) {
-+		if (!test_bit(i, msm_gpio.wake_irqs))
-+			writel(TARGET_PROC_NONE, GPIO_INTR_CFG_SU(i));
-+	}
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+	return 0;
-+}
-+
-+static int msm_gpio_resume_noirq(struct device *dev)
-+{
-+	unsigned long irq_flags;
-+	unsigned long i;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+	for_each_set_bit(i, msm_gpio.enabled_irqs, NR_GPIO_IRQS)
-+		writel(TARGET_PROC_SCORPION, GPIO_INTR_CFG_SU(i));
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+	return 0;
-+}
-+#else
-+#define msm_gpio_suspend_noirq NULL
-+#define msm_gpio_resume_noirq NULL
-+#endif
-+
-+static const struct dev_pm_ops msm_gpio_dev_pm_ops = {
-+	.suspend_noirq  = msm_gpio_suspend_noirq,
-+	.resume_noirq   = msm_gpio_resume_noirq,
-+	.freeze_noirq   = msm_gpio_suspend_noirq,
-+	.thaw_noirq     = msm_gpio_resume_noirq,
-+	.poweroff_noirq = msm_gpio_suspend_noirq,
-+	.restore_noirq  = msm_gpio_resume_noirq,
-+};
-+
- static struct platform_driver msm_gpio_driver = {
- 	.probe = msm_gpio_probe,
- 	.remove = __devexit_p(msm_gpio_remove),
- 	.driver = {
- 		.name = "msmgpio",
- 		.owner = THIS_MODULE,
-+		.pm = &msm_gpio_dev_pm_ops,
- 	},
- };
- 
--- 
-1.7.0.4
+Comments below.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>  delete mode 100644 arch/arm/kernel/iwmmxt.S
+>  create mode 100644 arch/arm/kernel/pj4-iwmmxt.S
+>  create mode 100644 arch/arm/kernel/xscale-iwmmxt.S
+
+According to your previous patch, the changes needed to iwmmxt.S were 
+minimal.  Please don't duplicate the whole file just for this.
+
+In retrospective I think I still prefer the #ifdef's for this file.  
+Eventually we could use some dynamic kernel patching (we're getting 
+good at it) when we'll want to support XScale and PJ4 with the same 
+kernel binary.
+
+So what you could do to make the code cleaner in iwmmxt.S is:
+
+[...]
+#if defined(CONFIG_CPU_PJ4)
+#define PJ4(code...) code
+#define XSC(code...)
+#else
+#define PJ4(code...)
+#define XSC(code...) code
+#endif
+
+[...]
+
+ENTRY(iwmmxt_task_switch)
+
+   XSC(	mrc	p15, 0, r1, c15, c1, 0	)
+   PJ4(	mrc	p15, 0, r1, c1, c0, 2	)
+	@ CP0 and CP1 accessible?
+   XSC(	tst	r1, #0x3		)
+   PJ4(	tst	r1, #0xf		)	
+        bne     1f                              @ yes: block them for next task
+[...]
+
+This way the code is pretty readable, and that paves the way for a 
+future dynamic patching capability.
+
+> --- /dev/null
+> +++ b/arch/arm/kernel/pj4-cp0.c
+> @@ -0,0 +1,180 @@
+> +/*
+> + * linux/arch/arm/kernel/pj4-cp0.c
+> + *
+> + * XScale DSP and iWMMXt coprocessor context switching and handling
+> + *
+> + * Copyright (c) 2010 Marvell International Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
+> +#include <linux/signal.h>
+> +#include <linux/sched.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <asm/thread_notify.h>
+> +
+> +static inline void dsp_save_state(u32 *state)
+> +{
+
+Do you really need this?  The "dsp" stuff was to support early XScale 
+versions which had only an accumulator and not the full iwmmx support.  
+Therefore you should only keep the appropriate iwmmxt notifier block and 
+get 
+rid of the "dsp" one.
+
+[...]
+> +/*
+> + * Detect whether we have a MAC coprocessor (40 bit register) or an
+> + * iWMMXt coprocessor (64 bit registers) by loading 00000100:00000000
+> + * into a coprocessor register and reading it back, and checking
+> + * whether the upper word survived intact.
+> + */
+> +static int __init cpu_has_iwmmxt(void)
+> +{
+
+And obviously you don't need this anymore either.
+
+> +/*
+> + * If we detect that the CPU has iWMMXt (and CONFIG_IWMMXT=y), we
+> + * disable CP0/CP1 on boot, and let call_fpe() and the iWMMXt lazy
+> + * switch code handle iWMMXt context switching.  If on the other
+> + * hand the CPU has a DSP coprocessor, we keep access to CP0 enabled
+> + * all the time, and save/restore acc0 on context switch in non-lazy
+> + * fashion.
+> + */
+> +static int __init pj4_cp0_init(void)
+> +{
+
+The first case described in the comment above should be unconditional 
+with a 
+PJ4, obviously.  Therefore this code and comment need to be reworked as 
+well.
+
+
+Nicolas
