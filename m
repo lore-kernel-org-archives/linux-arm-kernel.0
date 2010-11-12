@@ -1,133 +1,182 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 12 Nov 2010 13:43:55 -0500 (EST)
-Subject: [PATCH 11/11] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <1289546260-6208-11-git-send-email-haojian.zhuang@marvell.com>
-References: <1289546260-6208-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-3-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-5-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-6-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-7-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-8-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-9-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-10-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-11-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <alpine.LFD.2.00.1011121257540.13911@xanadu.home>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 13 Nov 2010 00:14:51 +0530
+Subject: [PATCH 1/6] ARM: ensure sched_clock() and children are notrace
+In-Reply-To: <1289067954-5080-1-git-send-email-rabin@rab.in>
+References: <1289067954-5080-1-git-send-email-rabin@rab.in>
+Message-ID: <AANLkTik9Wv2p9-=X3roJut3A3KLD1D7UWOB795edjHAX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Nov 2010, Haojian Zhuang wrote:
+CC'd some mach maintainers.  I can split this up if needed,
+since these bits can be applied independently from the rest
+of the patches in the series.
 
-> iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
-> of accessing CP0 and CP1 is changed in PJ4. Append more files to support
-> iwmmxt in PJ4 core.
-> 
-> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-
-Comments below.
-
->  delete mode 100644 arch/arm/kernel/iwmmxt.S
->  create mode 100644 arch/arm/kernel/pj4-iwmmxt.S
->  create mode 100644 arch/arm/kernel/xscale-iwmmxt.S
-
-According to your previous patch, the changes needed to iwmmxt.S were 
-minimal.  Please don't duplicate the whole file just for this.
-
-In retrospective I think I still prefer the #ifdef's for this file.  
-Eventually we could use some dynamic kernel patching (we're getting 
-good at it) when we'll want to support XScale and PJ4 with the same 
-kernel binary.
-
-So what you could do to make the code cleaner in iwmmxt.S is:
-
-[...]
-#if defined(CONFIG_CPU_PJ4)
-#define PJ4(code...) code
-#define XSC(code...)
-#else
-#define PJ4(code...)
-#define XSC(code...) code
-#endif
-
-[...]
-
-ENTRY(iwmmxt_task_switch)
-
-   XSC(	mrc	p15, 0, r1, c15, c1, 0	)
-   PJ4(	mrc	p15, 0, r1, c1, c0, 2	)
-	@ CP0 and CP1 accessible?
-   XSC(	tst	r1, #0x3		)
-   PJ4(	tst	r1, #0xf		)	
-        bne     1f                              @ yes: block them for next task
-[...]
-
-This way the code is pretty readable, and that paves the way for a 
-future dynamic patching capability.
-
-> --- /dev/null
-> +++ b/arch/arm/kernel/pj4-cp0.c
-> @@ -0,0 +1,180 @@
-> +/*
-> + * linux/arch/arm/kernel/pj4-cp0.c
-> + *
-> + * XScale DSP and iWMMXt coprocessor context switching and handling
-> + *
-> + * Copyright (c) 2010 Marvell International Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/signal.h>
+On Sat, Nov 6, 2010 at 11:55 PM, Rabin Vincent <rabin@rab.in> wrote:
+> Include sched.h in the files implementing sched_clock() and ensure that
+> any functions called from sched_clock() have the notrace annotation.
+>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+> ?arch/arm/mach-tegra/timer.c ? ? ? ? ? | ? ?3 ++-
+> ?arch/arm/mach-u300/timer.c ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/plat-iop/time.c ? ? ? ? ? ? ?| ? ?3 ++-
+> ?arch/arm/plat-nomadik/timer.c ? ? ? ? | ? ?5 +++--
+> ?arch/arm/plat-omap/counter_32k.c ? ? ?| ? 11 ++++++-----
+> ?arch/arm/plat-versatile/sched-clock.c | ? ?1 +
+> ?6 files changed, 15 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+> index 9057d6f..88ed925 100644
+> --- a/arch/arm/mach-tegra/timer.c
+> +++ b/arch/arm/mach-tegra/timer.c
+> @@ -21,6 +21,7 @@
+> ?#include <linux/time.h>
+> ?#include <linux/interrupt.h>
+> ?#include <linux/irq.h>
 > +#include <linux/sched.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <asm/thread_notify.h>
-> +
-> +static inline void dsp_save_state(u32 *state)
-> +{
-
-Do you really need this?  The "dsp" stuff was to support early XScale 
-versions which had only an accumulator and not the full iwmmx support.  
-Therefore you should only keep the appropriate iwmmxt notifier block and 
-get 
-rid of the "dsp" one.
-
-[...]
-> +/*
-> + * Detect whether we have a MAC coprocessor (40 bit register) or an
-> + * iWMMXt coprocessor (64 bit registers) by loading 00000100:00000000
-> + * into a coprocessor register and reading it back, and checking
-> + * whether the upper word survived intact.
-> + */
-> +static int __init cpu_has_iwmmxt(void)
-> +{
-
-And obviously you don't need this anymore either.
-
-> +/*
-> + * If we detect that the CPU has iWMMXt (and CONFIG_IWMMXT=y), we
-> + * disable CP0/CP1 on boot, and let call_fpe() and the iWMMXt lazy
-> + * switch code handle iWMMXt context switching.  If on the other
-> + * hand the CPU has a DSP coprocessor, we keep access to CP0 enabled
-> + * all the time, and save/restore acc0 on context switch in non-lazy
-> + * fashion.
-> + */
-> +static int __init pj4_cp0_init(void)
-> +{
-
-The first case described in the comment above should be unconditional 
-with a 
-PJ4, obviously.  Therefore this code and comment need to be reworked as 
-well.
-
-
-Nicolas
+> ?#include <linux/clockchips.h>
+> ?#include <linux/clocksource.h>
+> ?#include <linux/clk.h>
+> @@ -89,7 +90,7 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
+> ? ? ? ?}
+> ?}
+>
+> -static cycle_t tegra_clocksource_read(struct clocksource *cs)
+> +static cycle_t notrace tegra_clocksource_read(struct clocksource *cs)
+> ?{
+> ? ? ? ?return cnt32_to_63(timer_readl(TIMERUS_CNTR_1US));
+> ?}
+> diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
+> index 3fc4472..672b28a 100644
+> --- a/arch/arm/mach-u300/timer.c
+> +++ b/arch/arm/mach-u300/timer.c
+> @@ -11,6 +11,7 @@
+> ?#include <linux/interrupt.h>
+> ?#include <linux/time.h>
+> ?#include <linux/timex.h>
+> +#include <linux/sched.h>
+> ?#include <linux/clockchips.h>
+> ?#include <linux/clocksource.h>
+> ?#include <linux/types.h>
+> diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
+> index 85d3e55..558cdfa 100644
+> --- a/arch/arm/plat-iop/time.c
+> +++ b/arch/arm/plat-iop/time.c
+> @@ -18,6 +18,7 @@
+> ?#include <linux/time.h>
+> ?#include <linux/init.h>
+> ?#include <linux/timex.h>
+> +#include <linux/sched.h>
+> ?#include <linux/io.h>
+> ?#include <linux/clocksource.h>
+> ?#include <linux/clockchips.h>
+> @@ -36,7 +37,7 @@
+> ?/*
+> ?* IOP clocksource (free-running timer 1).
+> ?*/
+> -static cycle_t iop_clocksource_read(struct clocksource *unused)
+> +static cycle_t notrace iop_clocksource_read(struct clocksource *unused)
+> ?{
+> ? ? ? ?return 0xffffffffu - read_tcr1();
+> ?}
+> diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
+> index aedf9c1..70969a7 100644
+> --- a/arch/arm/plat-nomadik/timer.c
+> +++ b/arch/arm/plat-nomadik/timer.c
+> @@ -11,6 +11,7 @@
+> ?#include <linux/init.h>
+> ?#include <linux/interrupt.h>
+> ?#include <linux/irq.h>
+> +#include <linux/sched.h>
+> ?#include <linux/io.h>
+> ?#include <linux/clockchips.h>
+> ?#include <linux/clk.h>
+> @@ -26,13 +27,13 @@ void __iomem *mtu_base; /* ssigned by machine code */
+> ?* Kernel assumes that sched_clock can be called early
+> ?* but the MTU may not yet be initialized.
+> ?*/
+> -static cycle_t nmdk_read_timer_dummy(struct clocksource *cs)
+> +static cycle_t notrace nmdk_read_timer_dummy(struct clocksource *cs)
+> ?{
+> ? ? ? ?return 0;
+> ?}
+>
+> ?/* clocksource: MTU decrements, so we negate the value being read. */
+> -static cycle_t nmdk_read_timer(struct clocksource *cs)
+> +static cycle_t notrace nmdk_read_timer(struct clocksource *cs)
+> ?{
+> ? ? ? ?return -readl(mtu_base + MTU_VAL(0));
+> ?}
+> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+> index 155fe43..bc9bc6c 100644
+> --- a/arch/arm/plat-omap/counter_32k.c
+> +++ b/arch/arm/plat-omap/counter_32k.c
+> @@ -13,6 +13,7 @@
+> ?* NOTE: This timer is not the same timer as the old OMAP1 MPU timer.
+> ?*/
+> ?#include <linux/kernel.h>
+> +#include <linux/sched.h>
+> ?#include <linux/init.h>
+> ?#include <linux/clk.h>
+> ?#include <linux/io.h>
+> @@ -44,7 +45,7 @@
+> ?static u32 offset_32k __read_mostly;
+>
+> ?#ifdef CONFIG_ARCH_OMAP16XX
+> -static cycle_t omap16xx_32k_read(struct clocksource *cs)
+> +static cycle_t notrace omap16xx_32k_read(struct clocksource *cs)
+> ?{
+> ? ? ? ?return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
+> ?}
+> @@ -53,7 +54,7 @@ static cycle_t omap16xx_32k_read(struct clocksource *cs)
+> ?#endif
+>
+> ?#ifdef CONFIG_ARCH_OMAP2420
+> -static cycle_t omap2420_32k_read(struct clocksource *cs)
+> +static cycle_t notrace omap2420_32k_read(struct clocksource *cs)
+> ?{
+> ? ? ? ?return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
+> ?}
+> @@ -62,7 +63,7 @@ static cycle_t omap2420_32k_read(struct clocksource *cs)
+> ?#endif
+>
+> ?#ifdef CONFIG_ARCH_OMAP2430
+> -static cycle_t omap2430_32k_read(struct clocksource *cs)
+> +static cycle_t notrace omap2430_32k_read(struct clocksource *cs)
+> ?{
+> ? ? ? ?return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
+> ?}
+> @@ -71,7 +72,7 @@ static cycle_t omap2430_32k_read(struct clocksource *cs)
+> ?#endif
+>
+> ?#ifdef CONFIG_ARCH_OMAP3
+> -static cycle_t omap34xx_32k_read(struct clocksource *cs)
+> +static cycle_t notrace omap34xx_32k_read(struct clocksource *cs)
+> ?{
+> ? ? ? ?return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
+> ?}
+> @@ -80,7 +81,7 @@ static cycle_t omap34xx_32k_read(struct clocksource *cs)
+> ?#endif
+>
+> ?#ifdef CONFIG_ARCH_OMAP4
+> -static cycle_t omap44xx_32k_read(struct clocksource *cs)
+> +static cycle_t notrace omap44xx_32k_read(struct clocksource *cs)
+> ?{
+> ? ? ? ?return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
+> ?}
+> diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
+> index 9768cf7..9696ddc 100644
+> --- a/arch/arm/plat-versatile/sched-clock.c
+> +++ b/arch/arm/plat-versatile/sched-clock.c
+> @@ -20,6 +20,7 @@
+> ?*/
+> ?#include <linux/cnt32_to_63.h>
+> ?#include <linux/io.h>
+> +#include <linux/sched.h>
+> ?#include <asm/div64.h>
+>
+> ?#include <mach/hardware.h>
+> --
+> 1.7.2.3
+>
+>
