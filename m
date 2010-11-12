@@ -1,73 +1,105 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 12 Nov 2010 08:17:06 +0100
-Subject: Patch IMX audmux debugfs.
-In-Reply-To: <BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-	<20101110152619.GB8950@pengutronix.de>
-	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-Message-ID: <20101112071706.GF6017@pengutronix.de>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Fri, 12 Nov 2010 15:17:30 +0800
+Subject: [PATCH 01/11] ARM: pxa: redefine the cpu_is_pxa3xx
+Message-ID: <1289546260-6208-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 11, 2010 at 11:38:48AM -0500, Bill Pringlemeir wrote:
-> On 10 Nov 2010, s.hauer at pengutronix.de wrote:
-> 
-> > On Tue, Nov 09, 2010 at 06:11:12PM -0500, Bill Pringlemeir wrote:
-> 
-> >> $ mount -t debugfs debugfs /sys/kernel/debug
-> >> $ cd /sys/kernel/debug/audmux
-> >> $ cat *
-> >> [crashes when accessing ssi7]
-> 
-> >> The index is one based, but the register map is zero based.  So the
-> >> ssi1 is actually sending info for ssi2.  Also, the ssi7 touches
-> >> non-existent data and can cause an exception (only registers sets 1-6
-> >> exist).
-> 
-> > I prefer passing (void *)(i - 1) here and skipping the first hunk.
-> > Please add your Signed-off-by next time you send a patch.
-> 
-> Something similar occured in to me after reading Sergei message.  This
-> patch treats i as the port instead of the file name.  The file name is
-> generated from audmux_port_string making the filenames and file
-> content the same.
+PXA300/PXA310/PXA320/PXA930/PXA935 are sharing one cpu family id.
+It's a little confusion on cpu_is_pxa3xx().
 
-Ok, looks sensible to me. I added Mark Brown to Cc as he added the
-debugfs support in the first place. Maybe he has some comment to add.
+Now reduce the scope of cpu_is_pxa3xx(). Make it focusing on
+PXA300/PXA310/PXA320. PXA930/PXA935 is coverd by cpu_is_pxa93x().
 
-Sascha
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-pxa/include/mach/hardware.h |   26 +++++++++-----------------
+ 1 files changed, 9 insertions(+), 17 deletions(-)
 
-> 
-> Signed-off-by: Bill Pringlemeir <bpringle@sympatico.ca>
-> diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
-> index f9e7cdb..ac30fdc 100644
-> --- a/arch/arm/plat-mxc/audmux-v2.c
-> +++ b/arch/arm/plat-mxc/audmux-v2.c
-> @@ -142,7 +142,6 @@ static const struct file_operations audmux_debugfs_fops = {
->  static void audmux_debugfs_init(void)
->  {
->         int i;
-> -       char buf[20];
->  
->         audmux_debugfs_root = debugfs_create_dir("audmux", NULL);
->         if (!audmux_debugfs_root) {
-> @@ -150,9 +149,9 @@ static void audmux_debugfs_init(void)
->                 return;
->         }
->  
-> -       for (i = 1; i < 8; i++) {
-> -               snprintf(buf, sizeof(buf), "ssi%d", i);
-> -               if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
-> +       for (i = 0; i < 6; i++) {
-> +               if (!debugfs_create_file(audmux_port_string(i), 0444,
-> +                                        audmux_debugfs_root,
->                                          (void *)i, &audmux_debugfs_fops))
->                         pr_warning("Failed to create AUDMUX port %d debugfs file\n",
->                                    i);
-> 
-
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index ca188cd..59f145a 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -145,53 +145,44 @@
+ #define __cpu_is_pxa27x(id)	(0)
+ #endif
+ 
+-#ifdef CONFIG_CPU_PXA300
++#ifdef CONFIG_PXA3xx
+ #define __cpu_is_pxa300(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x688;				\
+ 	 })
+-#else
+-#define __cpu_is_pxa300(id)	(0)
+-#endif
+ 
+-#ifdef CONFIG_CPU_PXA310
+ #define __cpu_is_pxa310(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x689;				\
+ 	 })
+-#else
+-#define __cpu_is_pxa310(id)	(0)
+-#endif
+ 
+-#ifdef CONFIG_CPU_PXA320
+ #define __cpu_is_pxa320(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x603 || _id == 0x682;		\
+ 	 })
+ #else
++#define __cpu_is_pxa300(id)	(0)
++#define __cpu_is_pxa310(id)	(0)
+ #define __cpu_is_pxa320(id)	(0)
+ #endif
+ 
+-#ifdef CONFIG_CPU_PXA930
++#ifdef CONFIG_PXA93x
+ #define __cpu_is_pxa930(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x683;				\
+ 	 })
+-#else
+-#define __cpu_is_pxa930(id)	(0)
+-#endif
+ 
+-#ifdef CONFIG_CPU_PXA935
+ #define __cpu_is_pxa935(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x693;				\
+ 	 })
+ #else
++#define __cpu_is_pxa930(id)	(0)
+ #define __cpu_is_pxa935(id)	(0)
+ #endif
+ 
+@@ -264,7 +255,7 @@
+ /*
+  * CPUID Core Generation Bit
+  * <= 0x2 for pxa21x/pxa25x/pxa26x/pxa27x
+- * == 0x3 for pxa300/pxa310/pxa320
++ * == 0x3 for pxa300/pxa310/pxa320 and pxa930/pxa935
+  */
+ #if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
+ #define __cpu_is_pxa2xx(id)				\
+@@ -279,8 +270,9 @@
+ #ifdef CONFIG_PXA3xx
+ #define __cpu_is_pxa3xx(id)				\
+ 	({						\
+-		unsigned int _id = (id) >> 13 & 0x7;	\
+-		_id == 0x3;				\
++		__cpu_is_pxa300(id)			\
++			|| __cpu_is_pxa310(id)		\
++			|| __cpu_is_pxa320(id);		\
+ 	 })
+ #else
+ #define __cpu_is_pxa3xx(id)	(0)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.5.6.5
