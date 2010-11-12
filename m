@@ -1,39 +1,37 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 12 Nov 2010 13:49:52 -0800
-Subject: [PATCH 2/3] msm: smd: Warning cleanup
+Date: Fri, 12 Nov 2010 13:49:53 -0800
+Subject: [PATCH 3/3] msm: Warning cleanup
 In-Reply-To: <1289598593-8974-1-git-send-email-davidb@codeaurora.org>
 References: <1289598593-8974-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1289598593-8974-2-git-send-email-davidb@codeaurora.org>
+Message-ID: <1289598593-8974-3-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put some variables inside of the same ifdef as the code that uses
-them.
+Define VMALLOC_END as an unsigned long to match expected type.
+Eliminates a warning:
 
-arch/arm/mach-msm/smd_debug.c: In function 'smsm_print_sleep_info':
-arch/arm/mach-msm/smd_debug.c:274: warning: unused variable 'int_info'
-arch/arm/mach-msm/smd_debug.c:273: warning: unused variable 'gpio'
+arch/arm/mm/init.c: In function 'mem_init':
+arch/arm/mm/init.c:606: warning: format '%08lx' expects type
+   'long unsigned int', but argument 12 has type 'unsigned int'
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-msm/smd_debug.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-msm/include/mach/vmalloc.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-msm/smd_debug.c b/arch/arm/mach-msm/smd_debug.c
-index f91c3b7..8736aff 100644
---- a/arch/arm/mach-msm/smd_debug.c
-+++ b/arch/arm/mach-msm/smd_debug.c
-@@ -270,8 +270,10 @@ void smsm_print_sleep_info(void)
- {
- 	unsigned long flags;
- 	uint32_t *ptr;
-+#ifndef CONFIG_ARCH_MSM_SCORPION
- 	struct tramp_gpio_smem *gpio;
- 	struct smsm_interrupt_info *int_info;
-+#endif
+diff --git a/arch/arm/mach-msm/include/mach/vmalloc.h b/arch/arm/mach-msm/include/mach/vmalloc.h
+index 31a32ad..d138448 100644
+--- a/arch/arm/mach-msm/include/mach/vmalloc.h
++++ b/arch/arm/mach-msm/include/mach/vmalloc.h
+@@ -16,7 +16,7 @@
+ #ifndef __ASM_ARCH_MSM_VMALLOC_H
+ #define __ASM_ARCH_MSM_VMALLOC_H
  
+-#define VMALLOC_END	  0xd0000000
++#define VMALLOC_END	  0xd0000000UL
  
- 	spin_lock_irqsave(&smem_lock, flags);
+ #endif
+ 
 -- 
 1.7.3.2
 
