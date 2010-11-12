@@ -1,42 +1,52 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Fri, 12 Nov 2010 23:14:12 +0300
-Subject: [PATCH 1/6 v6] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <20101112165420.GA6928@alchark-u3s.lan>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<20101107165745.GB1759@n2100.arm.linux.org.uk>
-	<AANLkTimFJ=Brx4pDiUqZOKDfABaDg0s_yFC7EkZGi7D8@mail.gmail.com>
-	<20101107171726.GF1759@n2100.arm.linux.org.uk>
-	<20101108171930.GA1471@alchark-u3s.lan>
-	<20101111212322.GA15533@alchark-u3s.lan>
-	<20101111234957.GA28735@n2100.arm.linux.org.uk>
-	<20101112165420.GA6928@alchark-u3s.lan>
-Message-ID: <AANLkTimvMz6EJcCPjhVq5u8x3BWjCCgspbjfa0DQXJr-@mail.gmail.com>
+From: johnstul@us.ibm.com (john stultz)
+Date: Fri, 12 Nov 2010 12:22:42 -0800
+Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
+In-Reply-To: <4CDD18F9.5090005@stericsson.com>
+References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTi=ysONhPQBTbVNRgTOx5PGEM=STaUYY6RnUpfES@mail.gmail.com>
+	<20101112095739.GH18358@pengutronix.de>
+	<4CDD120A.2050401@stericsson.com>
+	<alpine.LFD.2.00.1011121130350.2900@localhost6.localdomain6>
+	<4CDD18F9.5090005@stericsson.com>
+Message-ID: <1289593362.3292.14.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Russell, could you please elaborate on your comment regarding spinlocks
-> and irq handlers? I always compile my kernel with all kinds of lock
-> debugging, and have not run into any associated warnings. Is there
-> anything suspicious specifically?
+On Fri, 2010-11-12 at 11:37 +0100, Linus Walleij wrote:
+> Incidentally the dual use of a single free-running timer as both
+> single clocksource and sched_clock() baseline seem to creep up in
+> a lot of embedded platforms...
 
-My fault: actually, those were not all lock debugging functions. It
-really prints errors when lock correctness proving is enabled. I thus
-decided to just assign the callback functions directly to irq_desc
-struct fields, as it is done in mach-msm.
+And really, using the same underlying hardware for both isn't a bad
+thing. The main issue is that the product of the clocksource code and
+the sched_clock code have different requirements.
 
-There is, however, another error showing up: it complains about my use
-of ioremap inside arch_reset(). Is it fine to just hardcode the
-virtual address of the respective register and use that directly in
-this case? Something along the lines of:
+1) sched_clock needs to be a fast lightweight ns value, that wraps on
+64bit boundaries. Performance is very critical. Transient consistency
+errors are acceptable.
 
-/* PM Software Reset request register */
-#define VT8500_PMSR_VIRT	0xf8130060
+2) clocksources care most about correctness, so that the counter is
+never mis-read, and that its is accumulated from once every wrap period.
+Ideally fine adjustment granularity is desired as well (which
+sched_clock doesn't require). Performance is important, but secondary to
+correctness.
 
-static inline void arch_reset(char mode, const char *cmd)
-{
-	writel(1, VT8500_PMSR_VIRT);
-}
+So there isn't a problem with the same hardware being used for both, but
+there is an issue trying to base one implementation off of the other.
 
-Thanks,
-Alexey
+I do think a generic sched_clock implementation could be useful,
+specifically if it added an accumulation hook so we can more easily and
+generically deal with using 32bit counters. I don't think it should try
+to re-use the clocksource infrastructure code, as I think that may
+stretch that infrastructure too far (ie: having to deal with the
+conflicting assumptions of both interfaces). 
+
+But having arches register a similar read() and cyc2ns conversion hook
+(or freq values to generate such conversion) would probably be a good
+approach.
+
+That said, I don't have the space on my plate to look at this in the
+near term, but I'd be happy to review code.
+
+thanks
+-john
