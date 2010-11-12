@@ -1,42 +1,61 @@
 From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Fri, 12 Nov 2010 00:50:37 -0800
-Subject: [PATCH 05/11] ARM: pxa: support pxa95x
-In-Reply-To: <1289546260-6208-5-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri, 12 Nov 2010 00:53:33 -0800
+Subject: [PATCH 04/11] ARM: pxa: update to read ICHP
+In-Reply-To: <AANLkTinn2=G35motQoQhGbw+rk7cQ9trBxqPQKBcj+af@mail.gmail.com>
 References: <1289546260-6208-1-git-send-email-haojian.zhuang@marvell.com>
 	<1289546260-6208-2-git-send-email-haojian.zhuang@marvell.com>
 	<1289546260-6208-3-git-send-email-haojian.zhuang@marvell.com>
 	<1289546260-6208-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289546260-6208-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05986C7027@SC-VEXCH1.marvell.com>
+	<AANLkTinn2=G35motQoQhGbw+rk7cQ9trBxqPQKBcj+af@mail.gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05986C7028@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 >-----Original Message-----
->From: Haojian Zhuang [mailto:haojian.zhuang at marvell.com]
->Sent: 2010?11?12? 3:18 PM
->To: linux-arm-kernel at lists.infradead.org
->Cc: Haojian Zhuang; Eric Miao
->Subject: [PATCH 05/11] ARM: pxa: support pxa95x
+>From: Eric Miao [mailto:eric.y.miao at gmail.com]
+>Sent: 2010?11?12? 4:35 PM
+>To: Haojian Zhuang
+>Cc: linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH 04/11] ARM: pxa: update to read ICHP
 >
->The core of PXA955 is PJ4. Add new PJ4 support. And add new macro
->CONFIG_PXA95x.
+>On Fri, Nov 12, 2010 at 3:17 PM, Haojian Zhuang
+><haojian.zhuang@marvell.com> wrote:
+>> ICHP records the highest priority interrupt occured. In PXA27x/PXA3xx, we
+>> can read ICHP via cooprocessor. In PJ4, we can only read ICHP via bus
+>> register. So use the same method to read ICHP via bus register.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> ---
+>> ?arch/arm/mach-pxa/include/mach/entry-macro.S | ? ?6 +++++-
+>> ?1 files changed, 5 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S b/arch/arm/mach-
+>pxa/include/mach/entry-macro.S
+>> index a73bc86..91457dd 100644
+>> --- a/arch/arm/mach-pxa/include/mach/entry-macro.S
+>> +++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
+>> @@ -41,11 +41,15 @@
+>> ? ? ? ? ? ? ? ?b ? ? ? 1001f
+>> ?1002:
+>> ? ? ? ? ? ? ? ?@ Core Generation 2 (PXA27x) or Core Generation 3 (PXA3xx)
+>> - ? ? ? ? ? ? ? mrc ? ? p6, 0, \irqstat, c5, c0, 0 ? ? ?@ ICHP
+>> + ? ? ? ? ? ? ? @ or Core PJ4
+>> + ? ? ? ? ? ? ? mov ? ? \base, #io_p2v(0x40000000) ? ? ?@ IIR Ctl = 0x40d00000
+>> + ? ? ? ? ? ? ? add ? ? \base, \base, #0x00d00000
+>> + ? ? ? ? ? ? ? ldr ? ? \irqstat, [\base, #0x18] ? ? ? ?@ ICHP offset
 >
->Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->Cc: Eric Miao <eric.y.miao@gmail.com>
->---
-
-Changelog:
-1. Remove pxa95x_clear_reset_status() in pxa95x.c
-2. Remove pxa95x_clear_reset_status() definition in generic.h
+>Accessing from co-processor is supposed to be faster than MMIO.
+>
+>BTW, this could be addressed by MULTI_IRQ_HANDLER as in patch:
+>
+>http://www.spinics.net/lists/arm-kernel/msg88817.html
+>
+>Once it gets merged.
+>
+No problem. I can reformat this patch for MULTI_IRQ_HANDLER after it merged. You can skip this patch from current patch series since it won't impact old silicons.
 
 Thanks
 Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0005-ARM-pxa-support-pxa95x.patch
-Type: application/octet-stream
-Size: 28875 bytes
-Desc: 0005-ARM-pxa-support-pxa95x.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101112/b430ec9b/attachment-0001.obj>
