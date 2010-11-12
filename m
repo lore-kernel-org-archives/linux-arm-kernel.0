@@ -1,57 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Nov 2010 15:34:23 +0000
-Subject: [PATCH 02/10] MCDE: Add configuration registers
-In-Reply-To: <201011121614.51528.arnd@arndb.de>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-3-git-send-email-jimmy.rubin@stericsson.com>
-	<201011121614.51528.arnd@arndb.de>
-Message-ID: <20101112153423.GC3619@n2100.arm.linux.org.uk>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Fri, 12 Nov 2010 23:40:41 +0800
+Subject: Single binary kernel for all i.MX
+In-Reply-To: <20101105121800.GV6017@pengutronix.de>
+References: <20101105121800.GV6017@pengutronix.de>
+Message-ID: <AANLkTim7znztJgGvZ5ZsV=ei=_W4YpjU3-5zWonrQ9ME@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 04:14:51PM +0100, Arnd Bergmann wrote:
-> Some people prefer to express all this in C instead of macros:
-> 
-> struct mcde_registers {
-> 	enum {
-> 		mcde_cr_dsicmd2_en = 0x00000001,
-> 		mcde_cr_dsicmd1_en = 0x00000002,
-> 		...
-> 	} cr;
-> 	enum {
-> 		mcde_conf0_syncmux0 = 0x00000001,
-> 		...
-> 	} conf0;
-> 	...
-> };
-> 
-> This gives you better type safety, but which one you choose is your decision.
+Hi Sascha,
 
-It is a bad idea to describe device registers using C structures, and
-especially enums.
+I'm studying at the implementation.  Can you please help me understand
+how "addruart" in plat-mxc/include/mach/debug-macro.S works for single
+image?
 
-The only thing C guarantees about structure layout is that the elements
-are arranged in the same order which you specify them in your definition.
-It doesn't make any guarantees about placement of those elements within
-the structure.
+        .macro  addruart, rp, rv
+        ldr     \rp, =UART_PADDR        @ physical
+        ldr     \rv, =UART_VADDR        @ virtual
+        .endm
 
-As far as enums go, which type they correspond with is not really
-predictable in portable code:
+We have this macro to get physical base address of UART.  However
+UART_PADDR is defined as MX?_UART1_BASE_ADDR depending on
+CONFIG_ARCH_MX*.  When all CONFIG_ARCH_MX* get defined in single image
+case, how does UART_PADDR work for all CONFIG_ARCH_MX*?
 
-      6.7.2.2 Enumeration specifiers
+Thanks.
 
-     Constraints
 
-4    Each enumerated type shall be compatible with char, a signed integer
-     type, or an unsigned integer type. The choice of type is implementation-
-     defined,108) but shall be capable of representing the values of all
-     the members of the enumeration. The enumerated type is incomplete
-     until after the } that terminates the list of enumerator declarations.
+On Fri, Nov 5, 2010 at 8:18 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi all,
+>
+> We are talking about a single kernel for longer now, here is something
+> to test for the ones interested:
+>
+> git://git.pengutronix.de/git/imx/linux-2.6.git imx-single-kernel
+>
+> Compiling the imx_defconfig will result in a kernel which works
+> i.MX21, i.MX27, i.MX31, i.MX35 and i.MX51 (not tested on i.MX21).
+> i.MX1 does not work mainly because the kernel build will use some ARMv5
+> and later instructions.
+> The branch is based on the patches recently posted. It contains some
+> hacks, so it still needs to be worked on.
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-     108) An implementation may delay the choice of which integer type
-          until all enumeration constants have been seen.
 
-So, given your example above, an implementation (or architecture) may
-decide that 'cr' is a 'char' represented by 8 bits, while another
-implementation may decide that it is an 'int' of 32 bits.
+
+-- 
+Regards,
+Shawn
