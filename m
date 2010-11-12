@@ -1,38 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Nov 2010 17:03:20 -0800
-Subject: [PATCH 0/4] omap fixes for v2.6.37-rc1
-Message-ID: <20101112010245.3827.75329.stgit@baageli.muru.com>
+Date: Thu, 11 Nov 2010 17:03:23 -0800
+Subject: [PATCH 1/4] OMAP2: Devkit8000: Fix mmc regulator failure
+In-Reply-To: <20101112010245.3827.75329.stgit@baageli.muru.com>
+References: <20101112010245.3827.75329.stgit@baageli.muru.com>
+Message-ID: <20101112010323.3827.47103.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Thomas Weber <weber@corscience.de>
 
-Here are few fixes for review.
+This patch fixes the following error:
 
-Regards,
+>regulator: VMMC1: 1850 <--> 3150 mV at 3000 mV normal standby
+>twl_reg twl_reg.6: can't register VMMC1, -22
+>twl_reg: probe of twl_reg.6 failed with error -22
 
-Tony
-
+Signed-off-by: Thomas Weber <weber@corscience.de>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/mach-omap2/board-devkit8000.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-Felipe Balbi (1):
-      arm: omap1: devices: need to return with a value
-
-Janusz Krzysztofik (1):
-      OMAP1: camera.h: add missing include
-
-Mathias Nyman (1):
-      omap: dma: Add read-back to DMA interrupt handler to avoid spuriousinterrupts
-
-Thomas Weber (1):
-      OMAP2: Devkit8000: Fix mmc regulator failure
-
-
- arch/arm/mach-omap1/devices.c             |    5 ++---
- arch/arm/mach-omap1/include/mach/camera.h |    2 ++
- arch/arm/mach-omap2/board-devkit8000.c    |    3 ---
- arch/arm/plat-omap/dma.c                  |    2 ++
- 4 files changed, 6 insertions(+), 6 deletions(-)
-
--- 
-Signature
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+index 067f437..53ac762 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -242,9 +242,6 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
+ 	mmc[0].gpio_cd = gpio + 0;
+ 	omap2_hsmmc_init(mmc);
+ 
+-	/* link regulators to MMC adapters */
+-	devkit8000_vmmc1_supply.dev = mmc[0].dev;
+-
+ 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+ 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+ 
