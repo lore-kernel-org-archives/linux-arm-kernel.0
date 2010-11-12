@@ -1,36 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 Nov 2010 16:53:42 +0100
-Subject: Single binary kernel for all i.MX
-In-Reply-To: <AANLkTim7znztJgGvZ5ZsV=ei=_W4YpjU3-5zWonrQ9ME@mail.gmail.com>
-References: <20101105121800.GV6017@pengutronix.de>
-	<AANLkTim7znztJgGvZ5ZsV=ei=_W4YpjU3-5zWonrQ9ME@mail.gmail.com>
-Message-ID: <20101112155342.GJ18358@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Nov 2010 17:03:52 +0100
+Subject: [PATCH 10/10] ux500: MCDE: Add platform specific data
+In-Reply-To: <1289390653-6111-11-git-send-email-jimmy.rubin@stericsson.com>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-10-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-11-git-send-email-jimmy.rubin@stericsson.com>
+Message-ID: <201011121703.52422.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wednesday 10 November 2010, Jimmy Rubin wrote:
+> +
+> +	if (ddev->id == PRIMARY_DISPLAY_ID && rotate_main) {
+> +		swap(width, height);
+> +#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_ROTATE_180_DEGREES
+> +		rotate = FB_ROTATE_CCW;
+> +#else
+> +		rotate = FB_ROTATE_CW;
+> +#endif
+> +	}
+> +
+> +	virtual_width = width;
+> +	virtual_height = height * 2;
+> +#ifdef CONFIG_DISPLAY_GENERIC_DSI_PRIMARY_AUTO_SYNC
+> +	if (ddev->id == PRIMARY_DISPLAY_ID)
+> +		virtual_height = height;
+> +#endif
+> +
 
-On Fri, Nov 12, 2010 at 11:40:41PM +0800, Shawn Guo wrote:
-> I'm studying at the implementation.  Can you please help me understand
-> how "addruart" in plat-mxc/include/mach/debug-macro.S works for single
-> image?
-> 
->         .macro  addruart, rp, rv
->         ldr     \rp, =UART_PADDR        @ physical
->         ldr     \rv, =UART_VADDR        @ virtual
->         .endm
-> 
-> We have this macro to get physical base address of UART.  However
-> UART_PADDR is defined as MX?_UART1_BASE_ADDR depending on
-> CONFIG_ARCH_MX*.  When all CONFIG_ARCH_MX* get defined in single image
-> case, how does UART_PADDR work for all CONFIG_ARCH_MX*?
-In a kernel that supports more than one SoC, DEBUG_LL won't work.  This
-is generally OK, because DEBUG_LL is only needed when bringing up a
-machine.  Therefor you can use a tailored kernel that only supports your
-shiny new machine.
+The contents of the hardware description should really not
+be configuration dependent, because that breaks booting the same
+kernel on machines that have different requirements.
 
-Uwe
+This is something that should be passed down from the boot loader.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> +static void mcde_epod_enable(void)
+> +{
+> +	/* Power on DSS mem */
+> +	writel(PRCMU_ENABLE_DSS_MEM, PRCM_EPOD_C_SET);
+> +	mdelay(PRCMU_MCDE_DELAY);
+> +	/* Power on DSS logic */
+> +	writel(PRCMU_ENABLE_DSS_LOGIC, PRCM_EPOD_C_SET);
+> +	mdelay(PRCMU_MCDE_DELAY);
+> +}
+
+In general, try to avoid using mdelay. Keeping the CPU busy for miliseconds
+or even microseconds for no reason is just wrong.
+
+Reasonable hardware will not require this and do the right thing anyway.
+multiple writel calls are by design strictly ordered on the bus. If that is
+not the case on your hardware, you should find a proper way to ensure
+ordering and create a small wrapper for it with a comment that explains
+the breakage. Better get the hardware designers to fix their crap before
+releasing a product ;-)
+
+If there is not even a way to reorder I/O by accessing other registers,
+use msleep() to let the CPU do something useful in the meantime and complain
+even more to the HW people.
+
+	Arnd
