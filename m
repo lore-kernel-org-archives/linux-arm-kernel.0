@@ -1,34 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Nov 2010 17:03:30 -0800
-Subject: [PATCH 3/4] OMAP1: camera.h: add missing include
+Date: Thu, 11 Nov 2010 17:03:34 -0800
+Subject: [PATCH 4/4] arm: omap1: devices: need to return with a value
 In-Reply-To: <20101112010245.3827.75329.stgit@baageli.muru.com>
 References: <20101112010245.3827.75329.stgit@baageli.muru.com>
-Message-ID: <20101112010330.3827.16286.stgit@baageli.muru.com>
+Message-ID: <20101112010334.3827.77064.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+From: Felipe Balbi <balbi@ti.com>
 
-#include <media/omap1_camera.h> directive is required to
-compile the dependant boards (board-ams-delta for now).
+Get rid of the following warning:
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-[tony at atomide.com: updated comments]
+arch/arm/mach-omap1/devices.c: In function 'omap_init_wdt':
+arch/arm/mach-omap1/devices.c:298: warning: 'return' with
+no value, in function returning non-void
+
+while at that, also change:
+
+platform_device_register();
+return 0;
+
+into:
+
+return platform_device_register();
+
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/include/mach/camera.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap1/devices.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/include/mach/camera.h b/arch/arm/mach-omap1/include/mach/camera.h
-index fd54b45..847d00f 100644
---- a/arch/arm/mach-omap1/include/mach/camera.h
-+++ b/arch/arm/mach-omap1/include/mach/camera.h
-@@ -1,6 +1,8 @@
- #ifndef __ASM_ARCH_CAMERA_H_
- #define __ASM_ARCH_CAMERA_H_
+diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
+index ea0d80a..e7f9ee6 100644
+--- a/arch/arm/mach-omap1/devices.c
++++ b/arch/arm/mach-omap1/devices.c
+@@ -321,10 +321,9 @@ static struct platform_device omap_wdt_device = {
+ static int __init omap_init_wdt(void)
+ {
+ 	if (!cpu_is_omap16xx())
+-		return;
++		return -ENODEV;
  
-+#include <media/omap1_camera.h>
-+
- void omap1_camera_init(void *);
- 
- static inline void omap1_set_camera_info(struct omap1_cam_platform_data *info)
+-	platform_device_register(&omap_wdt_device);
+-	return 0;
++	return platform_device_register(&omap_wdt_device);
+ }
+ subsys_initcall(omap_init_wdt);
+ #endif
