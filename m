@@ -1,115 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Nov 2010 23:49:58 +0000
-Subject: [PATCH 1/6 v5] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <20101111212322.GA15533@alchark-u3s.lan>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<20101107165745.GB1759@n2100.arm.linux.org.uk>
-	<AANLkTimFJ=Brx4pDiUqZOKDfABaDg0s_yFC7EkZGi7D8@mail.gmail.com>
-	<20101107171726.GF1759@n2100.arm.linux.org.uk>
-	<20101108171930.GA1471@alchark-u3s.lan>
-	<20101111212322.GA15533@alchark-u3s.lan>
-Message-ID: <20101111234957.GA28735@n2100.arm.linux.org.uk>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Thu, 11 Nov 2010 16:13:01 -0800
+Subject: arm smp support patch
+In-Reply-To: <20101111232954.GD23785@n2100.arm.linux.org.uk>
+References: <73a3b42c84eb2bfde0f861d1e53042cd.squirrel@www.concentris-systems.com>	<20101111044125.GA5850@mvista.com>	<52622063180ba1627bf98811e4f56a05.squirrel@www.concentris-systems.com>	<4CDC63A9.9090606@codeaurora.org>	<20101111230652.GC23785@n2100.arm.linux.org.uk>
+	<20101111232954.GD23785@n2100.arm.linux.org.uk>
+Message-ID: <4CDC868D.7060100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The good news is that it's getting harder to find things wrong...
-Only three points follow below.
-
-On Fri, Nov 12, 2010 at 12:23:22AM +0300, Alexey Charkov wrote:
-> diff --git a/arch/arm/mach-vt8500/bv07.c b/arch/arm/mach-vt8500/bv07.c
-> new file mode 100644
-> index 0000000..25aea3d
-> --- /dev/null
-> +++ b/arch/arm/mach-vt8500/bv07.c
-> @@ -0,0 +1,81 @@
-> +/*
-> + *  arch/arm/mach-vt8500/bv07.c
-> + *
-> + *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> 
+> ARM: GIC: don't disable software generated interrupts
+> 
+> Software generated interrupts (SGI) are used for IPIs by the kernel.
+> While previous revisions of the GIC hardware were specified not to
+> implement enable bits for SGIs, more recent hardware is now permitted
+> to implement these bits in a per-CPU banked register.
+> 
+> The priority registers for the PPI and SGIs are also per-CPU banked
+> registers, so ensure that these are also appropriately initialized.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/common/gic.c |   28 ++++++++++++++++++++++++----
+>  1 files changed, 24 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index ada6359..772f95f 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -251,15 +251,16 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+>  		writel(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+>  
+>  	/*
+> -	 * Set priority on all interrupts.
+> +	 * Set priority on all global interrupts.
+>  	 */
+> -	for (i = 0; i < max_irq; i += 4)
+> +	for (i = 32; i < max_irq; i += 4)
+>  		writel(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
+>  
+>  	/*
+> -	 * Disable all interrupts.
+> +	 * Disable all interrupts.  Leave the PPI and SGIs alone
+> +	 * as these enables are banked registers.
+>  	 */
+> -	for (i = 0; i < max_irq; i += 32)
+> +	for (i = 32; i < max_irq; i += 32)
+>  		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+>  
+>  	/*
+> @@ -277,11 +278,30 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+>  
+>  void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
+>  {
+> +	void __iomem *dist_base;
+> +	int i;
 > +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <linux/io.h>
-> +#include <linux/pm.h>
-
-asm/ includes after linux/ includes please (applies to multiple files).
-
-> diff --git a/arch/arm/mach-vt8500/gpio.c b/arch/arm/mach-vt8500/gpio.c
-> new file mode 100644
-> index 0000000..f533ff0
-> --- /dev/null
-> +++ b/arch/arm/mach-vt8500/gpio.c
-> @@ -0,0 +1,230 @@
-> +/* linux/arch/arm/mach-vt8500/gpio.c
-> + *
-> + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
+>  	if (gic_nr >= MAX_GIC_NR)
+>  		BUG();
+>  
+> +	dist_base = gic_data[gic_nr].dist_base;
+> +	BUG_ON(!dist_base);
 > +
-> +#include <linux/init.h>
-> +#include <linux/irq.h>
-> +#include <linux/io.h>
+>  	gic_data[gic_nr].cpu_base = base;
+>  
+> +	/*
+> +	 * Deal with the banked PPI and SGI interrupts - disable all
+> +	 * PPI interrupts, ensure all SGI interrupts are enabled.
+> +	 */
+> +	writel(0xffff0000, dist_base + GIC_DIST_ENABLE_CLEAR);
+> +	writel(0x0000ffff, dist_base + GIC_DIST_ENABLE_SET);
 > +
-> +#include <mach/gpio.h>
+> +	/*
+> +	 * Set priority on PPI and SGI interrupts
+> +	 */
+> +	for (i = 0; i < 32; i += 4)
+> +		writel(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+> +
+>  	writel(0xf0, base + GIC_CPU_PRIMASK);
+>  	writel(1, base + GIC_CPU_CTRL);
+>  }
 
-linux/gpio.h please.
+Tested on msm 8660.
 
-> +static int vt8500_irq_set_type(unsigned int irq, unsigned int flow_type)
-> +{
-> +	void __iomem *base = ic_regbase;
-> +	unsigned int orig_irq = irq;
-> +	if (irq >= 64) {
-> +		base = sic_regbase;
-> +		irq -= 64;
-> +	}
-> +	switch (flow_type) {
-> +	case IRQF_TRIGGER_LOW:
-> +		return -EINVAL;
-> +	case IRQF_TRIGGER_HIGH:
-> +		writeb((readb(base
-> +			+ VT8500_IC_DCTR + irq) & ~(3 << 4))
-> +			| VT8500_TRIGGER_HIGH, base
-> +			+ VT8500_IC_DCTR + irq);
-> +		set_irq_handler(orig_irq, handle_level_irq);
-> +		break;
-> +	case IRQF_TRIGGER_FALLING:
-> +		writeb((readb(base
-> +			+ VT8500_IC_DCTR + irq) & ~(3 << 4))
-> +			| VT8500_TRIGGER_FALLING, base
-> +			+ VT8500_IC_DCTR + irq);
-> +		set_irq_handler(orig_irq, handle_edge_irq);
-> +		break;
-> +	case IRQF_TRIGGER_RISING:
-> +		writeb((readb(base
-> +			+ VT8500_IC_DCTR + irq) & ~(3 << 4))
-> +			| VT8500_TRIGGER_RISING, base
-> +			+ VT8500_IC_DCTR + irq);
-> +		set_irq_handler(orig_irq, handle_edge_irq);
+Acked-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
-These set_irq_handler's probably warn if you have spinlock debugging
-enabled.
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
