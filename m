@@ -1,35 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Nov 2010 17:03:27 -0800
-Subject: [PATCH 2/4] omap: dma: Add read-back to DMA interrupt handler to
-	avoid spuriousinterrupts
+Date: Thu, 11 Nov 2010 17:03:30 -0800
+Subject: [PATCH 3/4] OMAP1: camera.h: add missing include
 In-Reply-To: <20101112010245.3827.75329.stgit@baageli.muru.com>
 References: <20101112010245.3827.75329.stgit@baageli.muru.com>
-Message-ID: <20101112010327.3827.3366.stgit@baageli.muru.com>
+Message-ID: <20101112010330.3827.16286.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathias Nyman <mathias.nyman@nokia.com>
+From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Flush the writes to IRQSTATUS_L0 register in the DMA interrupt handler by reading the register
-directly after write. This prevents the spurious DMA interrupts noted when using VDD_OPP 1
+#include <media/omap1_camera.h> directive is required to
+compile the dependant boards (board-ams-delta for now).
 
-Signed-off-by: Mathias Nyman <mathias.nyman@nokia.com>
-Acked-by: Santosh Shilimkar <Santosh.shilimkar@ti.com>
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+[tony at atomide.com: updated comments]
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/dma.c |    2 ++
+ arch/arm/mach-omap1/include/mach/camera.h |    2 ++
  1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index f5c5b8d..2c28265 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -1983,6 +1983,8 @@ static int omap2_dma_handle_ch(int ch)
+diff --git a/arch/arm/mach-omap1/include/mach/camera.h b/arch/arm/mach-omap1/include/mach/camera.h
+index fd54b45..847d00f 100644
+--- a/arch/arm/mach-omap1/include/mach/camera.h
++++ b/arch/arm/mach-omap1/include/mach/camera.h
+@@ -1,6 +1,8 @@
+ #ifndef __ASM_ARCH_CAMERA_H_
+ #define __ASM_ARCH_CAMERA_H_
  
- 	dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR(ch));
- 	dma_write(1 << ch, IRQSTATUS_L0);
-+	/* read back the register to flush the write */
-+	dma_read(IRQSTATUS_L0);
++#include <media/omap1_camera.h>
++
+ void omap1_camera_init(void *);
  
- 	/* If the ch is not chained then chain_id will be -1 */
- 	if (dma_chan[ch].chain_id != -1) {
+ static inline void omap1_set_camera_info(struct omap1_cam_platform_data *info)
