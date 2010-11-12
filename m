@@ -1,36 +1,53 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 12 Nov 2010 12:26:24 +0900
+Date: Fri, 12 Nov 2010 12:34:21 +0900
 Subject: [PATCH] ARM: Common GIC entry macro code V2
-In-Reply-To: <AANLkTinXXUxFsS7LttQSJ_AOf2=8+_phSfmW5tyc5GD=@mail.gmail.com>
+In-Reply-To: <1289507056.18994.13.camel@c-dwalke-linux.qualcomm.com>
 References: <20101111074955.29633.80160.sendpatchset@t400s>
-	<AANLkTimJfZwRx_H4KC+WfXeYONiUMN39VfnT9R54Sh4c@mail.gmail.com>
-	<04d401cb8183$e0921500$a1b63f00$%kim@samsung.com>
-	<AANLkTinXXUxFsS7LttQSJ_AOf2=8+_phSfmW5tyc5GD=@mail.gmail.com>
-Message-ID: <AANLkTimVRqJO6C6XLXeYFz8Eg6J6kq_Dzem76YyYbRce@mail.gmail.com>
+	<1289507056.18994.13.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <AANLkTimWSN4EBcD-AXoVhLyGMD7P=C9WOW4ses2XEo2q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 11, 2010 at 6:51 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Thu, Nov 11, 2010 at 6:36 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Kyungmin Park wrote:
->>>
->>> Can you include the "arch/arm/mach-s5pv310/include/mach/entry-macro.S"
->> also?
->>>
->> In conclusion, can't it now.
->> Because according to current interrupt number structure of Samsung SoCs,
->> irqnr macro need to add S5P_IRQ_OFFSET, 32.
+On Fri, Nov 12, 2010 at 5:24 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> On Thu, 2010-11-11 at 16:49 +0900, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
 >>
->> Or have to add #ifdef in there...But don't like it.
+>> This patch is the identical GIC demux implementation
+>> merge V2. Instead of implementing same code over and
+>> over simply share it in entry-macro-gic.S. The shared
+>> code is based on the realview implementation.
+>>
+>> Each GIC demux instance still has to setup the base address
+>> of the controller using the get_irqnr_preamble macro. The
+>> rest of the GIC specific code can be shared.
+>>
+>> The omap code is excluded due to complexity and lack of
+>> hardware - the CONFIG_SMP macros are used for multi-omap
+>> and the omap4 case - this makes is difficult to share code.
+>>
+>> The s5pv310 subarch is excluded due to the special "addne"
+>> instruction in the get_irqnr_and_base macro.
+>>
+>> The msm subarch is excluded as well since it treats PPIs
+>> differently than other platforms and needs a different
+>> version of the get_irqnr_and_base macro.
 >
-> I wonder why Samsung goes another way, use the common codes. if
-> required, modify to use the common codes.
+> I'm a little disappoint you didn't CC someone MSM related on this. Your
+> patch is small enough that you can CC everyone effected. Here's
+> get_maintainer.pl output on it,
+>
+> Russell King <linux@arm.linux.org.uk>
+> Anton Vorontsov <avorontsov@mvista.com>
+> Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Linus Walleij <linus.walleij@stericsson.com>
+> Alessandro Rubini <rubini@unipv.it>
+> linux-arm-kernel at lists.infradead.org
+> linux-kernel at vger.kernel.org
 
-Yes, it would be nice if Samsung could use the common code as well. I
-will however ignore this for now to focus on getting something merged
-that most people can use. The Samsung bits can be dealt with
-incrementally.
+Hi Daniel,
 
-Thanks,
+Sorry to disappoint you, will use get_maintainer.pl and include people
+from former versions when I send out next version.
 
-/ magnus
+> At least those people should be getting this. Also, why can't you break
+> this up per sub-architecture ?
