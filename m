@@ -1,49 +1,55 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 12 Nov 2010 19:43:28 +0900
-Subject: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
-In-Reply-To: <000001cb8255$feb050b0$fc10f210$%dae@samsung.com>
-References: <1287406528-15324-1-git-send-email-sbkim73@samsung.com>
-	<1287406528-15324-4-git-send-email-sbkim73@samsung.com>
-	<053f01cb822a$2758a7f0$7609f7d0$%kim@samsung.com>
-	<00a501cb824f$9942f300$cbc8d900$%dae@samsung.com>
-	<20101112100851.GA18511@linux-sh.org>
-	<000001cb8255$feb050b0$fc10f210$%dae@samsung.com>
-Message-ID: <20101112104327.GB18511@linux-sh.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 12 Nov 2010 12:08:52 +0100 (CET)
+Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
+In-Reply-To: <4CDD18F9.5090005@stericsson.com>
+References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTi=ysONhPQBTbVNRgTOx5PGEM=STaUYY6RnUpfES@mail.gmail.com>
+	<20101112095739.GH18358@pengutronix.de>
+	<4CDD120A.2050401@stericsson.com>
+	<alpine.LFD.2.00.1011121130350.2900@localhost6.localdomain6>
+	<4CDD18F9.5090005@stericsson.com>
+Message-ID: <alpine.LFD.2.00.1011121141040.2900@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 07:40:16PM +0900, Inki Dae wrote:
-> 
-> > -----Original Message-----
-> > From: Paul Mundt [mailto:lethal at linux-sh.org]
-> > Sent: Friday, November 12, 2010 7:09 PM
-> > To: Inki Dae
-> > Cc: 'Kukjin Kim'; 'Sangbeom Kim'; linux-arm-kernel at lists.infradead.org;
-> > linux-samsung-soc at vger.kernel.org; linux-fbdev at vger.kernel.org; ben-
-> > linux at fluff.org; akpm at linux-foundation.org; 'Jonghun Han'
-> > Subject: Re: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
+On Fri, 12 Nov 2010, Linus Walleij wrote:
+
+> Thomas Gleixner wrote:
+> > On Fri, 12 Nov 2010, Linus Walleij wrote:
+> >> Uwe Kleine-K?nig wrote:
+> >>
+> >>> Instead of implementing sched_clock for each architecture seperatly,
+> >>> wouldn't it be nice to have a generic sched_clock that uses the
+> >>> architecture's clocksource?  I tried to implement that some time ago,
+> >>> but tglx shoot it down because of locking problems.
+> >> I was and still am a big fan of this approach, I am willing to help
+> >> testing it if you want to dust off this patch set...
 > > 
-> > On Fri, Nov 12, 2010 at 06:54:29PM +0900, Inki Dae wrote:
-> > > @@ -1314,13 +1319,22 @@ static int __devinit s3c_fb_probe(struct
-> > > platform_device *pdev)
-> > >  	sfb->pdata = pd;
-> > >  	sfb->variant = fbdrv->variant;
-> > >
-> > > -	sfb->bus_clk = clk_get(dev, "lcd");
-> > > -	if (IS_ERR(sfb->bus_clk)) {
-> > > -		dev_err(dev, "failed to get bus clock\n");
-> > > +	/* if sclk_name is NULL then it would use bus clock as default. */
-> > > +	if (!pd->sclk_name)
-> > > +		sfb->lcd_clk = clk_get(dev, "lcd");
-> > > +	else
-> > > +		sfb->lcd_clk = clk_get(dev, pd->sclk_name);
-> > > +
-> > No, this is totally pointless. Simply establish a clk lookup for the
-> > configuration you are running on in your board code
-> You mean, call the function at s3c_fb_probe() establishing clk lookup in
-> board code?
-> Sorry but I could understand. Please give me more detail.
+> > sched_clock is not necessarily the same as the current clocksource.
 > 
-I mean use a clkdev lookup for resolving the clock instead of passing
-around a string via platform data. Look at the asm/clkdev.h API and all
-of the boards that are using it.
+> IIRC Uwe:s approach was that if and only if you would want to use
+> the clocksource for sched_clock() you provide a special flag on
+> the clocksource, and it will be attempted to be used for sched_clock().
+
+I still don't like the special flag approach. It's mixing
+concepts. clock->read() != sched_clock().
+
+I can understand that you want to reuse the conversion factors etc in
+struct clocksource, but we have to be more clever than special flags
+and magic functions to install sched_clock.
+
+I could accept a solution where we have generic infrastructure which
+uses clock->read() and does the magic 63 bit expansion and you'd
+simply do sched_clock_install(struct clocksource *) to explicitely
+assign that clocksource as sched_clock. No magic, straight forward and
+simple.
+
+> Incidentally the dual use of a single free-running timer as both
+> single clocksource and sched_clock() baseline seem to creep up in
+> a lot of embedded platforms...
+
+No argument about that.
+
+Thanks,
+
+	tglx
