@@ -1,154 +1,58 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 12 Nov 2010 13:55:25 +0530
-Subject: [PATCH 07/07] ARM: Use shared GIC entry macros on OMAP
-In-Reply-To: <20101112082211.27221.47096.sendpatchset@t400s>
-References: <20101112082059.27221.52879.sendpatchset@t400s>
-	<20101112082211.27221.47096.sendpatchset@t400s>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030D58AE84@dbde02.ent.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 12 Nov 2010 16:34:56 +0800
+Subject: [PATCH 04/11] ARM: pxa: update to read ICHP
+In-Reply-To: <1289546260-6208-4-git-send-email-haojian.zhuang@marvell.com>
+References: <1289546260-6208-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289546260-6208-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTinn2=G35motQoQhGbw+rk7cQ9trBxqPQKBcj+af@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Magnus Damm [mailto:magnus.damm at gmail.com]
-> Sent: Friday, November 12, 2010 1:52 PM
-> To: linux at arm.linux.org.uk
-> Cc: kgene.kim at samsung.com; kmpark at infradead.org; konkers at android.com;
-> tony at atomide.com; adharmap at codeaurora.org; avorontsov at mvista.com; linux-
-> kernel at vger.kernel.org; srinidhikasagar at gmail.com; dwalker at codeaurora.org;
-> Shilimkar, Santosh; ccross at android.com; olof at lixom.net; Magnus Damm;
-> linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH 07/07] ARM: Use shared GIC entry macros on OMAP
-> 
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Common GIC entry macro for omap
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Fri, Nov 12, 2010 at 3:17 PM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> ICHP records the highest priority interrupt occured. In PXA27x/PXA3xx, we
+> can read ICHP via cooprocessor. In PJ4, we can only read ICHP via bus
+> register. So use the same method to read ICHP via bus register.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
 > ---
-> 
->  arch/arm/mach-omap2/include/mach/entry-macro.S |   92 ++++++++-----------
-> -----
->  1 file changed, 31 insertions(+), 61 deletions(-)
-> 
-> --- 0001/arch/arm/mach-omap2/include/mach/entry-macro.S
-> +++ work/arch/arm/mach-omap2/include/mach/entry-macro.S	2010-11-12
-> 16:10:51.000000000 +0900
-> @@ -105,6 +105,35 @@ omap_irq_base:	.word	0
->  9999:
->  		.endm
-> 
-> +#ifdef CONFIG_SMP
-> +		/* We assume that irqstat (the raw value of the IRQ
-> acknowledge
-> +		 * register) is preserved from the macro above.
-> +		 * If there is an IPI, we immediately signal end of interrupt
-> +		 * on the controller, since this requires the original irqstat
-> +		 * value which we won't easily be able to recreate later.
-> +		 */
+> ?arch/arm/mach-pxa/include/mach/entry-macro.S | ? ?6 +++++-
+> ?1 files changed, 5 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S b/arch/arm/mach-pxa/include/mach/entry-macro.S
+> index a73bc86..91457dd 100644
+> --- a/arch/arm/mach-pxa/include/mach/entry-macro.S
+> +++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
+> @@ -41,11 +41,15 @@
+> ? ? ? ? ? ? ? ?b ? ? ? 1001f
+> ?1002:
+> ? ? ? ? ? ? ? ?@ Core Generation 2 (PXA27x) or Core Generation 3 (PXA3xx)
+> - ? ? ? ? ? ? ? mrc ? ? p6, 0, \irqstat, c5, c0, 0 ? ? ?@ ICHP
+> + ? ? ? ? ? ? ? @ or Core PJ4
+> + ? ? ? ? ? ? ? mov ? ? \base, #io_p2v(0x40000000) ? ? ?@ IIR Ctl = 0x40d00000
+> + ? ? ? ? ? ? ? add ? ? \base, \base, #0x00d00000
+> + ? ? ? ? ? ? ? ldr ? ? \irqstat, [\base, #0x18] ? ? ? ?@ ICHP offset
+
+Accessing from co-processor is supposed to be faster than MMIO.
+
+BTW, this could be addressed by MULTI_IRQ_HANDLER as in patch:
+
+http://www.spinics.net/lists/arm-kernel/msg88817.html
+
+Once it gets merged.
+
+> ? ? ? ? ? ? ? ?tst ? ? \irqstat, #0x80000000
+> ? ? ? ? ? ? ? ?beq ? ? 1001f
+> ? ? ? ? ? ? ? ?bic ? ? \irqstat, \irqstat, #0x80000000
+> ? ? ? ? ? ? ? ?mov ? ? \irqnr, \irqstat, lsr #16
+> ? ? ? ? ? ? ? ?add ? ? \irqnr, \irqnr, #(PXA_IRQ(0))
 > +
-> +		.macro test_for_ipi, irqnr, irqstat, base, tmp
-> +		bic	\irqnr, \irqstat, #0x1c00
-> +		cmp	\irqnr, #16
-> +		it	cc
-> +		strcc	\irqstat, [\base, #GIC_CPU_EOI]
-> +		it	cs
-> +		cmpcs	\irqnr, \irqnr
-> +		.endm
-> +
-> +		/* As above, this assumes that irqstat and base are preserved
-> */
-> +
-> +		.macro test_for_ltirq, irqnr, irqstat, base, tmp
-> +		bic	\irqnr, \irqstat, #0x1c00
-> +		mov 	\tmp, #0
-> +		cmp	\irqnr, #29
-> +		itt	eq
-> +		moveq	\tmp, #1
-> +		streq	\irqstat, [\base, #GIC_CPU_EOI]
-> +		cmp	\tmp, #0
-> +		.endm
-> +#endif	/* CONFIG_SMP */
-> 
->  #else	/* MULTI_OMAP2 */
-> 
-> @@ -141,74 +170,15 @@ omap_irq_base:	.word	0
-> 
-> 
->  #ifdef CONFIG_ARCH_OMAP4
-> +#include <asm/hardware/entry-macro-gic.S>
-> 
->  		.macro  get_irqnr_preamble, base, tmp
->  		ldr     \base, =OMAP4_IRQ_BASE
->  		.endm
-> 
-> -		/*
-> -		 * The interrupt numbering scheme is defined in the
-> -		 * interrupt controller spec.  To wit:
-> -		 *
-> -		 * Interrupts 0-15 are IPI
-> -		 * 16-28 are reserved
-> -		 * 29-31 are local.  We allow 30 to be used for the watchdog.
-> -		 * 32-1020 are global
-> -		 * 1021-1022 are reserved
-> -		 * 1023 is "spurious" (no interrupt)
-> -		 *
-> -		 * For now, we ignore all local interrupts so only return an
-> -		 * interrupt if it's between 30 and 1020.  The test_for_ipi
-> -		 * routine below will pick up on IPIs.
-> -		 * A simple read from the controller will tell us the number
-> -		 * of the highest priority enabled interrupt.
-> -		 * We then just need to check whether it is in the
-> -		 * valid range for an IRQ (30-1020 inclusive).
-> -		 */
-> -		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-> -		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
-> -
-> -		ldr     \tmp, =1021
-> -
-> -		bic     \irqnr, \irqstat, #0x1c00
-> -
-> -		cmp     \irqnr, #29
-> -		cmpcc   \irqnr, \irqnr
-> -		cmpne   \irqnr, \tmp
-> -		cmpcs   \irqnr, \irqnr
-> -		.endm
->  #endif
-> -#endif	/* MULTI_OMAP2 */
-> -
-> -#ifdef CONFIG_SMP
-> -		/* We assume that irqstat (the raw value of the IRQ
-> acknowledge
-> -		 * register) is preserved from the macro above.
-> -		 * If there is an IPI, we immediately signal end of interrupt
-> -		 * on the controller, since this requires the original irqstat
-> -		 * value which we won't easily be able to recreate later.
-> -		 */
-> -
-> -		.macro test_for_ipi, irqnr, irqstat, base, tmp
-> -		bic	\irqnr, \irqstat, #0x1c00
-> -		cmp	\irqnr, #16
-> -		it	cc
-> -		strcc	\irqstat, [\base, #GIC_CPU_EOI]
-> -		it	cs
-> -		cmpcs	\irqnr, \irqnr
-> -		.endm
-> -
-> -		/* As above, this assumes that irqstat and base are preserved
-> */
-> 
-> -		.macro test_for_ltirq, irqnr, irqstat, base, tmp
-> -		bic	\irqnr, \irqstat, #0x1c00
-> -		mov 	\tmp, #0
-> -		cmp	\irqnr, #29
-> -		itt	eq
-> -		moveq	\tmp, #1
-> -		streq	\irqstat, [\base, #GIC_CPU_EOI]
-> -		cmp	\tmp, #0
-> -		.endm
-> -#endif	/* CONFIG_SMP */
-> +#endif	/* MULTI_OMAP2 */
-> 
->  		.macro	irq_prio_table
->  		.endm
+> ?1001:
+> ? ? ? ? ? ? ? ?.endm
+> --
+> 1.5.6.5
+>
+>
