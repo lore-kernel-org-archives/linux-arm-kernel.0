@@ -1,32 +1,23 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 12 Nov 2010 19:08:52 +0900
-Subject: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
-In-Reply-To: <00a501cb824f$9942f300$cbc8d900$%dae@samsung.com>
-References: <1287406528-15324-1-git-send-email-sbkim73@samsung.com>
-	<1287406528-15324-4-git-send-email-sbkim73@samsung.com>
-	<053f01cb822a$2758a7f0$7609f7d0$%kim@samsung.com>
-	<00a501cb824f$9942f300$cbc8d900$%dae@samsung.com>
-Message-ID: <20101112100851.GA18511@linux-sh.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 12 Nov 2010 11:08:10 +0100
+Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
+In-Reply-To: <20101112095739.GH18358@pengutronix.de>
+References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTi=ysONhPQBTbVNRgTOx5PGEM=STaUYY6RnUpfES@mail.gmail.com>
+	<20101112095739.GH18358@pengutronix.de>
+Message-ID: <4CDD120A.2050401@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 06:54:29PM +0900, Inki Dae wrote:
-> @@ -1314,13 +1319,22 @@ static int __devinit s3c_fb_probe(struct
-> platform_device *pdev)
->  	sfb->pdata = pd;
->  	sfb->variant = fbdrv->variant;
->  
-> -	sfb->bus_clk = clk_get(dev, "lcd");
-> -	if (IS_ERR(sfb->bus_clk)) {
-> -		dev_err(dev, "failed to get bus clock\n");
-> +	/* if sclk_name is NULL then it would use bus clock as default. */
-> +	if (!pd->sclk_name)
-> +		sfb->lcd_clk = clk_get(dev, "lcd");
-> +	else
-> +		sfb->lcd_clk = clk_get(dev, pd->sclk_name);
-> +
-No, this is totally pointless. Simply establish a clk lookup for the
-configuration you are running on in your board code and always have
-clk_get() operate on a fixed id. You can use this same scheme with any
-optional clocks you have too, and reconfigure according to whether the
-lookups for optional clocks succeeded or not.
+Uwe Kleine-K?nig wrote:
+
+> Instead of implementing sched_clock for each architecture seperatly,
+> wouldn't it be nice to have a generic sched_clock that uses the
+> architecture's clocksource?  I tried to implement that some time ago,
+> but tglx shoot it down because of locking problems.
+
+I was and still am a big fan of this approach, I am willing to help
+testing it if you want to dust off this patch set...
+
+Yours,
+Linus Walleij
