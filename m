@@ -1,204 +1,60 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 12 Nov 2010 13:46:07 -0500 (EST)
-Subject: [PATCH v2] ARM: fix compile warning in mm/init.c
-In-Reply-To: <1289552567-14005-1-git-send-email-gadiyar@ti.com>
-References: <1289552567-14005-1-git-send-email-gadiyar@ti.com>
-Message-ID: <alpine.LFD.2.00.1011121345040.13911@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 12 Nov 2010 19:50:57 +0100
+Subject: Single binary kernel for all i.MX
+In-Reply-To: <AANLkTim0eNvEhiy7YL7YMCsJ9Ou_byyZ7hwSdy2ocsyF@mail.gmail.com>
+References: <20101105121800.GV6017@pengutronix.de>
+	<AANLkTim7znztJgGvZ5ZsV=ei=_W4YpjU3-5zWonrQ9ME@mail.gmail.com>
+	<20101112155342.GJ18358@pengutronix.de>
+	<AANLkTim0eNvEhiy7YL7YMCsJ9Ou_byyZ7hwSdy2ocsyF@mail.gmail.com>
+Message-ID: <20101112185057.GK18358@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Nov 2010, Anand Gadiyar wrote:
+Hi Anand,
 
-> Commit 7c63984b86 (ARM: do not define VMALLOC_END relative to PAGE_OFFSET)
-> changed VMALLOC_END to be an explicit value. Before this, it was
-> relative to PAGE_OFFSET and therefore automatically upgraded to
-> unsigned long as PAGE_OFFSET was an unsigned long. This introduced
-> the following build warning. Fix this by changing the explicit
-> defines of VMALLOC_END to be unsigned long.
+On Fri, Nov 12, 2010 at 10:59:33PM +0530, Gadiyar, Anand wrote:
+> 2010/11/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > Hi Shawn,
+> >
+> > On Fri, Nov 12, 2010 at 11:40:41PM +0800, Shawn Guo wrote:
+> >> I'm studying at the implementation. ?Can you please help me understand
+> >> how "addruart" in plat-mxc/include/mach/debug-macro.S works for single
+> >> image?
+> >>
+> >> ? ? ? ? .macro ?addruart, rp, rv
+> >> ? ? ? ? ldr ? ? \rp, =UART_PADDR ? ? ? ?@ physical
+> >> ? ? ? ? ldr ? ? \rv, =UART_VADDR ? ? ? ?@ virtual
+> >> ? ? ? ? .endm
+> >>
+> >> We have this macro to get physical base address of UART. ?However
+> >> UART_PADDR is defined as MX?_UART1_BASE_ADDR depending on
+> >> CONFIG_ARCH_MX*. ?When all CONFIG_ARCH_MX* get defined in single image
+> >> case, how does UART_PADDR work for all CONFIG_ARCH_MX*?
+> > In a kernel that supports more than one SoC, DEBUG_LL won't work. ?This
+> > is generally OK, because DEBUG_LL is only needed when bringing up a
+> > machine. ?Therefor you can use a tailored kernel that only supports your
+> > shiny new machine.
+> >
+> > Uwe
+> >
 > 
->   CC      arch/arm/mm/init.o
-> arch/arm/mm/init.c: In function 'mem_init':
-> arch/arm/mm/init.c:606: warning: format '%08lx' expects type 'long unsigned int', but argument 12 has type 'unsigned int'
+> Hi Uwe,
 > 
-> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
+> OMAP does have this working. For example, we can boot a single kernel image
+> on OMAP2, OMAP3 and OMAP4 today, and we have DEBUG_LL working for
+> sure on the last two - probably also on OMAP2.
+> 
+> I'm not exactly sure how this mechanism works, but for every new machine we
+> add, we usually add an entry in arch/arm/plat-omap/include/plat/uncompress.h
+You're mixing things up, mach/uncompress.h is for the Uncompressing
+Linux message when booting a zImage, mach/debug-macro.S is for DEBUG_LL
+and used to get debug messages out of the serial interface (usually).
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+The former will work for a multi-soc-imx-image, the latter probably not.
 
+Best regards
+Uwe
 
-> ---
->  arch/arm/mach-aaec2000/include/mach/vmalloc.h   |    2 +-
->  arch/arm/mach-bcmring/include/mach/vmalloc.h    |    2 +-
->  arch/arm/mach-clps711x/include/mach/vmalloc.h   |    2 +-
->  arch/arm/mach-ebsa110/include/mach/vmalloc.h    |    2 +-
->  arch/arm/mach-footbridge/include/mach/vmalloc.h |    2 +-
->  arch/arm/mach-h720x/include/mach/vmalloc.h      |    2 +-
->  arch/arm/mach-integrator/include/mach/vmalloc.h |    2 +-
->  arch/arm/mach-msm/include/mach/vmalloc.h        |    2 +-
->  arch/arm/mach-netx/include/mach/vmalloc.h       |    2 +-
->  arch/arm/mach-omap1/include/mach/vmalloc.h      |    2 +-
->  arch/arm/mach-omap2/include/mach/vmalloc.h      |    2 +-
->  arch/arm/mach-pnx4008/include/mach/vmalloc.h    |    2 +-
->  arch/arm/mach-rpc/include/mach/vmalloc.h        |    2 +-
->  arch/arm/mach-shark/include/mach/vmalloc.h      |    2 +-
->  arch/arm/mach-versatile/include/mach/vmalloc.h  |    2 +-
->  15 files changed, 15 insertions(+), 15 deletions(-)
-> 
-> Index: ehci/arch/arm/mach-aaec2000/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-aaec2000/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-aaec2000/include/mach/vmalloc.h
-> @@ -11,6 +11,6 @@
->  #ifndef __ASM_ARCH_VMALLOC_H
->  #define __ASM_ARCH_VMALLOC_H
->  
-> -#define VMALLOC_END		0xd0000000
-> +#define VMALLOC_END		0xd0000000UL
->  
->  #endif /* __ASM_ARCH_VMALLOC_H */
-> Index: ehci/arch/arm/mach-bcmring/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-bcmring/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-bcmring/include/mach/vmalloc.h
-> @@ -22,4 +22,4 @@
->   * 0xe0000000 to 0xefffffff. This gives us 256 MB of vm space and handles
->   * larger physical memory designs better.
->   */
-> -#define VMALLOC_END       0xf0000000
-> +#define VMALLOC_END       0xf0000000UL
-> Index: ehci/arch/arm/mach-clps711x/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-clps711x/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-clps711x/include/mach/vmalloc.h
-> @@ -17,4 +17,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
->   */
-> -#define VMALLOC_END       0xd0000000
-> +#define VMALLOC_END       0xd0000000UL
-> Index: ehci/arch/arm/mach-ebsa110/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-ebsa110/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-ebsa110/include/mach/vmalloc.h
-> @@ -7,4 +7,4 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> -#define VMALLOC_END       0xdf000000
-> +#define VMALLOC_END       0xdf000000UL
-> Index: ehci/arch/arm/mach-footbridge/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-footbridge/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-footbridge/include/mach/vmalloc.h
-> @@ -7,4 +7,4 @@
->   */
->  
->  
-> -#define VMALLOC_END       0xf0000000
-> +#define VMALLOC_END       0xf0000000UL
-> Index: ehci/arch/arm/mach-h720x/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-h720x/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-h720x/include/mach/vmalloc.h
-> @@ -5,6 +5,6 @@
->  #ifndef __ARCH_ARM_VMALLOC_H
->  #define __ARCH_ARM_VMALLOC_H
->  
-> -#define VMALLOC_END       0xd0000000
-> +#define VMALLOC_END       0xd0000000UL
->  
->  #endif
-> Index: ehci/arch/arm/mach-integrator/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-integrator/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-integrator/include/mach/vmalloc.h
-> @@ -17,4 +17,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
->   */
-> -#define VMALLOC_END       0xd0000000
-> +#define VMALLOC_END       0xd0000000UL
-> Index: ehci/arch/arm/mach-msm/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-msm/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-msm/include/mach/vmalloc.h
-> @@ -16,7 +16,7 @@
->  #ifndef __ASM_ARCH_MSM_VMALLOC_H
->  #define __ASM_ARCH_MSM_VMALLOC_H
->  
-> -#define VMALLOC_END	  0xd0000000
-> +#define VMALLOC_END	  0xd0000000UL
->  
->  #endif
->  
-> Index: ehci/arch/arm/mach-netx/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-netx/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-netx/include/mach/vmalloc.h
-> @@ -16,4 +16,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
->   */
-> -#define VMALLOC_END       0xd0000000
-> +#define VMALLOC_END       0xd0000000UL
-> Index: ehci/arch/arm/mach-omap1/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-omap1/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-omap1/include/mach/vmalloc.h
-> @@ -17,4 +17,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
->   */
-> -#define VMALLOC_END	0xd8000000
-> +#define VMALLOC_END	0xd8000000UL
-> Index: ehci/arch/arm/mach-omap2/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-omap2/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-omap2/include/mach/vmalloc.h
-> @@ -17,4 +17,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
->   */
-> -#define VMALLOC_END	  0xf8000000
-> +#define VMALLOC_END	  0xf8000000UL
-> Index: ehci/arch/arm/mach-pnx4008/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-pnx4008/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-pnx4008/include/mach/vmalloc.h
-> @@ -17,4 +17,4 @@
->   * The vmalloc() routines leaves a hole of 4kB between each vmalloced
->   * area for the same reason. ;)
->   */
-> -#define VMALLOC_END       0xd0000000
-> +#define VMALLOC_END       0xd0000000UL
-> Index: ehci/arch/arm/mach-rpc/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-rpc/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-rpc/include/mach/vmalloc.h
-> @@ -7,4 +7,4 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> -#define VMALLOC_END       0xdc000000
-> +#define VMALLOC_END       0xdc000000UL
-> Index: ehci/arch/arm/mach-shark/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-shark/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-shark/include/mach/vmalloc.h
-> @@ -1,4 +1,4 @@
->  /*
->   * arch/arm/mach-shark/include/mach/vmalloc.h
->   */
-> -#define VMALLOC_END       0xd0000000
-> +#define VMALLOC_END       0xd0000000UL
-> Index: ehci/arch/arm/mach-versatile/include/mach/vmalloc.h
-> ===================================================================
-> --- ehci.orig/arch/arm/mach-versatile/include/mach/vmalloc.h
-> +++ ehci/arch/arm/mach-versatile/include/mach/vmalloc.h
-> @@ -18,4 +18,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
->   */
-> -#define VMALLOC_END		0xd8000000
-> +#define VMALLOC_END		0xd8000000UL
-> 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
