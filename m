@@ -1,182 +1,204 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 13 Nov 2010 00:14:51 +0530
-Subject: [PATCH 1/6] ARM: ensure sched_clock() and children are notrace
-In-Reply-To: <1289067954-5080-1-git-send-email-rabin@rab.in>
-References: <1289067954-5080-1-git-send-email-rabin@rab.in>
-Message-ID: <AANLkTik9Wv2p9-=X3roJut3A3KLD1D7UWOB795edjHAX@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 12 Nov 2010 13:46:07 -0500 (EST)
+Subject: [PATCH v2] ARM: fix compile warning in mm/init.c
+In-Reply-To: <1289552567-14005-1-git-send-email-gadiyar@ti.com>
+References: <1289552567-14005-1-git-send-email-gadiyar@ti.com>
+Message-ID: <alpine.LFD.2.00.1011121345040.13911@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC'd some mach maintainers.  I can split this up if needed,
-since these bits can be applied independently from the rest
-of the patches in the series.
+On Fri, 12 Nov 2010, Anand Gadiyar wrote:
 
-On Sat, Nov 6, 2010 at 11:55 PM, Rabin Vincent <rabin@rab.in> wrote:
-> Include sched.h in the files implementing sched_clock() and ensure that
-> any functions called from sched_clock() have the notrace annotation.
->
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> Commit 7c63984b86 (ARM: do not define VMALLOC_END relative to PAGE_OFFSET)
+> changed VMALLOC_END to be an explicit value. Before this, it was
+> relative to PAGE_OFFSET and therefore automatically upgraded to
+> unsigned long as PAGE_OFFSET was an unsigned long. This introduced
+> the following build warning. Fix this by changing the explicit
+> defines of VMALLOC_END to be unsigned long.
+> 
+>   CC      arch/arm/mm/init.o
+> arch/arm/mm/init.c: In function 'mem_init':
+> arch/arm/mm/init.c:606: warning: format '%08lx' expects type 'long unsigned int', but argument 12 has type 'unsigned int'
+> 
+> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+
 > ---
-> ?arch/arm/mach-tegra/timer.c ? ? ? ? ? | ? ?3 ++-
-> ?arch/arm/mach-u300/timer.c ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/plat-iop/time.c ? ? ? ? ? ? ?| ? ?3 ++-
-> ?arch/arm/plat-nomadik/timer.c ? ? ? ? | ? ?5 +++--
-> ?arch/arm/plat-omap/counter_32k.c ? ? ?| ? 11 ++++++-----
-> ?arch/arm/plat-versatile/sched-clock.c | ? ?1 +
-> ?6 files changed, 15 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-> index 9057d6f..88ed925 100644
-> --- a/arch/arm/mach-tegra/timer.c
-> +++ b/arch/arm/mach-tegra/timer.c
-> @@ -21,6 +21,7 @@
-> ?#include <linux/time.h>
-> ?#include <linux/interrupt.h>
-> ?#include <linux/irq.h>
-> +#include <linux/sched.h>
-> ?#include <linux/clockchips.h>
-> ?#include <linux/clocksource.h>
-> ?#include <linux/clk.h>
-> @@ -89,7 +90,7 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
-> ? ? ? ?}
-> ?}
->
-> -static cycle_t tegra_clocksource_read(struct clocksource *cs)
-> +static cycle_t notrace tegra_clocksource_read(struct clocksource *cs)
-> ?{
-> ? ? ? ?return cnt32_to_63(timer_readl(TIMERUS_CNTR_1US));
-> ?}
-> diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
-> index 3fc4472..672b28a 100644
-> --- a/arch/arm/mach-u300/timer.c
-> +++ b/arch/arm/mach-u300/timer.c
-> @@ -11,6 +11,7 @@
-> ?#include <linux/interrupt.h>
-> ?#include <linux/time.h>
-> ?#include <linux/timex.h>
-> +#include <linux/sched.h>
-> ?#include <linux/clockchips.h>
-> ?#include <linux/clocksource.h>
-> ?#include <linux/types.h>
-> diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-> index 85d3e55..558cdfa 100644
-> --- a/arch/arm/plat-iop/time.c
-> +++ b/arch/arm/plat-iop/time.c
-> @@ -18,6 +18,7 @@
-> ?#include <linux/time.h>
-> ?#include <linux/init.h>
-> ?#include <linux/timex.h>
-> +#include <linux/sched.h>
-> ?#include <linux/io.h>
-> ?#include <linux/clocksource.h>
-> ?#include <linux/clockchips.h>
-> @@ -36,7 +37,7 @@
-> ?/*
-> ?* IOP clocksource (free-running timer 1).
-> ?*/
-> -static cycle_t iop_clocksource_read(struct clocksource *unused)
-> +static cycle_t notrace iop_clocksource_read(struct clocksource *unused)
-> ?{
-> ? ? ? ?return 0xffffffffu - read_tcr1();
-> ?}
-> diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-> index aedf9c1..70969a7 100644
-> --- a/arch/arm/plat-nomadik/timer.c
-> +++ b/arch/arm/plat-nomadik/timer.c
-> @@ -11,6 +11,7 @@
-> ?#include <linux/init.h>
-> ?#include <linux/interrupt.h>
-> ?#include <linux/irq.h>
-> +#include <linux/sched.h>
-> ?#include <linux/io.h>
-> ?#include <linux/clockchips.h>
-> ?#include <linux/clk.h>
-> @@ -26,13 +27,13 @@ void __iomem *mtu_base; /* ssigned by machine code */
-> ?* Kernel assumes that sched_clock can be called early
-> ?* but the MTU may not yet be initialized.
-> ?*/
-> -static cycle_t nmdk_read_timer_dummy(struct clocksource *cs)
-> +static cycle_t notrace nmdk_read_timer_dummy(struct clocksource *cs)
-> ?{
-> ? ? ? ?return 0;
-> ?}
->
-> ?/* clocksource: MTU decrements, so we negate the value being read. */
-> -static cycle_t nmdk_read_timer(struct clocksource *cs)
-> +static cycle_t notrace nmdk_read_timer(struct clocksource *cs)
-> ?{
-> ? ? ? ?return -readl(mtu_base + MTU_VAL(0));
-> ?}
-> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-> index 155fe43..bc9bc6c 100644
-> --- a/arch/arm/plat-omap/counter_32k.c
-> +++ b/arch/arm/plat-omap/counter_32k.c
-> @@ -13,6 +13,7 @@
-> ?* NOTE: This timer is not the same timer as the old OMAP1 MPU timer.
-> ?*/
-> ?#include <linux/kernel.h>
-> +#include <linux/sched.h>
-> ?#include <linux/init.h>
-> ?#include <linux/clk.h>
-> ?#include <linux/io.h>
-> @@ -44,7 +45,7 @@
-> ?static u32 offset_32k __read_mostly;
->
-> ?#ifdef CONFIG_ARCH_OMAP16XX
-> -static cycle_t omap16xx_32k_read(struct clocksource *cs)
-> +static cycle_t notrace omap16xx_32k_read(struct clocksource *cs)
-> ?{
-> ? ? ? ?return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
-> ?}
-> @@ -53,7 +54,7 @@ static cycle_t omap16xx_32k_read(struct clocksource *cs)
-> ?#endif
->
-> ?#ifdef CONFIG_ARCH_OMAP2420
-> -static cycle_t omap2420_32k_read(struct clocksource *cs)
-> +static cycle_t notrace omap2420_32k_read(struct clocksource *cs)
-> ?{
-> ? ? ? ?return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
-> ?}
-> @@ -62,7 +63,7 @@ static cycle_t omap2420_32k_read(struct clocksource *cs)
-> ?#endif
->
-> ?#ifdef CONFIG_ARCH_OMAP2430
-> -static cycle_t omap2430_32k_read(struct clocksource *cs)
-> +static cycle_t notrace omap2430_32k_read(struct clocksource *cs)
-> ?{
-> ? ? ? ?return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
-> ?}
-> @@ -71,7 +72,7 @@ static cycle_t omap2430_32k_read(struct clocksource *cs)
-> ?#endif
->
-> ?#ifdef CONFIG_ARCH_OMAP3
-> -static cycle_t omap34xx_32k_read(struct clocksource *cs)
-> +static cycle_t notrace omap34xx_32k_read(struct clocksource *cs)
-> ?{
-> ? ? ? ?return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
-> ?}
-> @@ -80,7 +81,7 @@ static cycle_t omap34xx_32k_read(struct clocksource *cs)
-> ?#endif
->
-> ?#ifdef CONFIG_ARCH_OMAP4
-> -static cycle_t omap44xx_32k_read(struct clocksource *cs)
-> +static cycle_t notrace omap44xx_32k_read(struct clocksource *cs)
-> ?{
-> ? ? ? ?return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
-> ?}
-> diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
-> index 9768cf7..9696ddc 100644
-> --- a/arch/arm/plat-versatile/sched-clock.c
-> +++ b/arch/arm/plat-versatile/sched-clock.c
-> @@ -20,6 +20,7 @@
-> ?*/
-> ?#include <linux/cnt32_to_63.h>
-> ?#include <linux/io.h>
-> +#include <linux/sched.h>
-> ?#include <asm/div64.h>
->
-> ?#include <mach/hardware.h>
-> --
-> 1.7.2.3
->
->
+>  arch/arm/mach-aaec2000/include/mach/vmalloc.h   |    2 +-
+>  arch/arm/mach-bcmring/include/mach/vmalloc.h    |    2 +-
+>  arch/arm/mach-clps711x/include/mach/vmalloc.h   |    2 +-
+>  arch/arm/mach-ebsa110/include/mach/vmalloc.h    |    2 +-
+>  arch/arm/mach-footbridge/include/mach/vmalloc.h |    2 +-
+>  arch/arm/mach-h720x/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-integrator/include/mach/vmalloc.h |    2 +-
+>  arch/arm/mach-msm/include/mach/vmalloc.h        |    2 +-
+>  arch/arm/mach-netx/include/mach/vmalloc.h       |    2 +-
+>  arch/arm/mach-omap1/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-omap2/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-pnx4008/include/mach/vmalloc.h    |    2 +-
+>  arch/arm/mach-rpc/include/mach/vmalloc.h        |    2 +-
+>  arch/arm/mach-shark/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-versatile/include/mach/vmalloc.h  |    2 +-
+>  15 files changed, 15 insertions(+), 15 deletions(-)
+> 
+> Index: ehci/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+> @@ -11,6 +11,6 @@
+>  #ifndef __ASM_ARCH_VMALLOC_H
+>  #define __ASM_ARCH_VMALLOC_H
+>  
+> -#define VMALLOC_END		0xd0000000
+> +#define VMALLOC_END		0xd0000000UL
+>  
+>  #endif /* __ASM_ARCH_VMALLOC_H */
+> Index: ehci/arch/arm/mach-bcmring/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-bcmring/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-bcmring/include/mach/vmalloc.h
+> @@ -22,4 +22,4 @@
+>   * 0xe0000000 to 0xefffffff. This gives us 256 MB of vm space and handles
+>   * larger physical memory designs better.
+>   */
+> -#define VMALLOC_END       0xf0000000
+> +#define VMALLOC_END       0xf0000000UL
+> Index: ehci/arch/arm/mach-clps711x/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-clps711x/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-clps711x/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+> @@ -7,4 +7,4 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> -#define VMALLOC_END       0xdf000000
+> +#define VMALLOC_END       0xdf000000UL
+> Index: ehci/arch/arm/mach-footbridge/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-footbridge/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-footbridge/include/mach/vmalloc.h
+> @@ -7,4 +7,4 @@
+>   */
+>  
+>  
+> -#define VMALLOC_END       0xf0000000
+> +#define VMALLOC_END       0xf0000000UL
+> Index: ehci/arch/arm/mach-h720x/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-h720x/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-h720x/include/mach/vmalloc.h
+> @@ -5,6 +5,6 @@
+>  #ifndef __ARCH_ARM_VMALLOC_H
+>  #define __ARCH_ARM_VMALLOC_H
+>  
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+>  
+>  #endif
+> Index: ehci/arch/arm/mach-integrator/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-integrator/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-integrator/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-msm/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-msm/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-msm/include/mach/vmalloc.h
+> @@ -16,7 +16,7 @@
+>  #ifndef __ASM_ARCH_MSM_VMALLOC_H
+>  #define __ASM_ARCH_MSM_VMALLOC_H
+>  
+> -#define VMALLOC_END	  0xd0000000
+> +#define VMALLOC_END	  0xd0000000UL
+>  
+>  #endif
+>  
+> Index: ehci/arch/arm/mach-netx/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-netx/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-netx/include/mach/vmalloc.h
+> @@ -16,4 +16,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-omap1/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-omap1/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-omap1/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+>   */
+> -#define VMALLOC_END	0xd8000000
+> +#define VMALLOC_END	0xd8000000UL
+> Index: ehci/arch/arm/mach-omap2/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-omap2/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-omap2/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+>   */
+> -#define VMALLOC_END	  0xf8000000
+> +#define VMALLOC_END	  0xf8000000UL
+> Index: ehci/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * The vmalloc() routines leaves a hole of 4kB between each vmalloced
+>   * area for the same reason. ;)
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-rpc/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-rpc/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-rpc/include/mach/vmalloc.h
+> @@ -7,4 +7,4 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> -#define VMALLOC_END       0xdc000000
+> +#define VMALLOC_END       0xdc000000UL
+> Index: ehci/arch/arm/mach-shark/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-shark/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-shark/include/mach/vmalloc.h
+> @@ -1,4 +1,4 @@
+>  /*
+>   * arch/arm/mach-shark/include/mach/vmalloc.h
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-versatile/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-versatile/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-versatile/include/mach/vmalloc.h
+> @@ -18,4 +18,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END		0xd8000000
+> +#define VMALLOC_END		0xd8000000UL
+> 
