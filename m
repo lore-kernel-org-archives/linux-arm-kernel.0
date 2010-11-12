@@ -1,55 +1,19 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 12 Nov 2010 12:08:52 +0100 (CET)
-Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
-In-Reply-To: <4CDD18F9.5090005@stericsson.com>
-References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTi=ysONhPQBTbVNRgTOx5PGEM=STaUYY6RnUpfES@mail.gmail.com>
-	<20101112095739.GH18358@pengutronix.de>
-	<4CDD120A.2050401@stericsson.com>
-	<alpine.LFD.2.00.1011121130350.2900@localhost6.localdomain6>
-	<4CDD18F9.5090005@stericsson.com>
-Message-ID: <alpine.LFD.2.00.1011121141040.2900@localhost6.localdomain6>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 12 Nov 2010 11:49:42 +0000
+Subject: Patch IMX audmux debugfs.
+In-Reply-To: <20101112071706.GF6017@pengutronix.de>
+References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
+	<20101110152619.GB8950@pengutronix.de>
+	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
+	<20101112071706.GF6017@pengutronix.de>
+Message-ID: <20101112114942.GA28804@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Nov 2010, Linus Walleij wrote:
+On Fri, Nov 12, 2010 at 08:17:06AM +0100, Sascha Hauer wrote:
 
-> Thomas Gleixner wrote:
-> > On Fri, 12 Nov 2010, Linus Walleij wrote:
-> >> Uwe Kleine-K?nig wrote:
-> >>
-> >>> Instead of implementing sched_clock for each architecture seperatly,
-> >>> wouldn't it be nice to have a generic sched_clock that uses the
-> >>> architecture's clocksource?  I tried to implement that some time ago,
-> >>> but tglx shoot it down because of locking problems.
-> >> I was and still am a big fan of this approach, I am willing to help
-> >> testing it if you want to dust off this patch set...
-> > 
-> > sched_clock is not necessarily the same as the current clocksource.
-> 
-> IIRC Uwe:s approach was that if and only if you would want to use
-> the clocksource for sched_clock() you provide a special flag on
-> the clocksource, and it will be attempted to be used for sched_clock().
+> Ok, looks sensible to me. I added Mark Brown to Cc as he added the
+> debugfs support in the first place. Maybe he has some comment to add.
 
-I still don't like the special flag approach. It's mixing
-concepts. clock->read() != sched_clock().
-
-I can understand that you want to reuse the conversion factors etc in
-struct clocksource, but we have to be more clever than special flags
-and magic functions to install sched_clock.
-
-I could accept a solution where we have generic infrastructure which
-uses clock->read() and does the magic 63 bit expansion and you'd
-simply do sched_clock_install(struct clocksource *) to explicitely
-assign that clocksource as sched_clock. No magic, straight forward and
-simple.
-
-> Incidentally the dual use of a single free-running timer as both
-> single clocksource and sched_clock() baseline seem to creep up in
-> a lot of embedded platforms...
-
-No argument about that.
-
-Thanks,
-
-	tglx
+Not really, except that the numbers used correspond to the numbers used
+by the audmux APIs in the kernel IIRC.
