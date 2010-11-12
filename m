@@ -1,34 +1,27 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 12 Nov 2010 12:36:32 +0900
-Subject: [PATCH] ARM: Common GIC entry macro code V2
-In-Reply-To: <20101112004212.GZ9264@atomide.com>
-References: <20101111074955.29633.80160.sendpatchset@t400s>
-	<20101112004212.GZ9264@atomide.com>
-Message-ID: <AANLkTim=imRKsewon5NJoDe3=4s-OhuhmxbAvN1ALhSH@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 11 Nov 2010 20:22:54 -0800
+Subject: [PATCH v4] msm: smd: Reduce driver log chatter
+In-Reply-To: <1289516079-24632-1-git-send-email-davidb@codeaurora.org>
+References: <1289349036-16941-1-git-send-email-davidb@codeaurora.org>
+	<1289516079-24632-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1289535774.6519.54.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, 2010-11-11 at 14:54 -0800, David Brown wrote:
+> The MSM smd driver logs numerous messages during startup that are
+> useful for debug purposes.  Change some of these to pr_debug() to
+> match their purpose, and remove others that aren't really useful.
 
-On Fri, Nov 12, 2010 at 9:42 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Magnus,
->
-> * Magnus Damm <magnus.damm@gmail.com> [101110 23:37]:
->>
->> The omap code is excluded due to complexity and lack of
->> hardware - the CONFIG_SMP macros are used for multi-omap
->> and the omap4 case - this makes is difficult to share code.
->
-> Hmm test_for_ipi and test_for_ltirq are needed for the
-> SMP_ON_UP case, so I've moved those in to the MULTI_OMAP2
-> section.
+Hi David.
 
-Looking good!
+>  arch/arm/mach-msm/smd.c |   17 +++++++----------
+> @@ -725,7 +727,7 @@ int smd_close(smd_channel_t *ch)
+>  {
+>  	unsigned long flags;
+>  
+> -	pr_info("smd_close(%p)\n", ch);
+> +	pr_debug("smd_close(%p)\n", ch);
 
-> Maybe merge the following into your original patch?
-
-Sure, I'll include your code as a broken out patch in V3.
-
-Thank you!
-
-/ magnus
+Why keep a printk for close without a printk for open?
+I suggest removing this one too.
