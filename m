@@ -1,23 +1,211 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 12 Nov 2010 11:08:10 +0100
-Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
-In-Reply-To: <20101112095739.GH18358@pengutronix.de>
-References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTi=ysONhPQBTbVNRgTOx5PGEM=STaUYY6RnUpfES@mail.gmail.com>
-	<20101112095739.GH18358@pengutronix.de>
-Message-ID: <4CDD120A.2050401@stericsson.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 12 Nov 2010 11:29:09 +0100
+Subject: [PATCH v3] ARM: fix compile warning in mm/init.c
+In-Reply-To: <1289556483-2388-1-git-send-email-gadiyar@ti.com>
+References: <1289556483-2388-1-git-send-email-gadiyar@ti.com>
+Message-ID: <20101112102909.GI18358@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote:
+On Fri, Nov 12, 2010 at 03:38:03PM +0530, Anand Gadiyar wrote:
+> Commit 7c63984b86 (ARM: do not define VMALLOC_END relative to PAGE_OFFSET)
+> changed VMALLOC_END to be an explicit value. Before this, it was
+> relative to PAGE_OFFSET and therefore converted to unsigned long
+> as PAGE_OFFSET is an unsigned long. This introduced the following
+> build warning. Fix this by changing the explicit defines of
+> VMALLOC_END to be unsigned long.
+> 
+>   CC      arch/arm/mm/init.o
+> arch/arm/mm/init.c: In function 'mem_init':
+> arch/arm/mm/init.c:606: warning: format '%08lx' expects type 'long unsigned int', but argument 12 has type 'unsigned int'
+> 
+> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> V3: Updated patch description per Uwe's comments
+> 
+>  arch/arm/mach-aaec2000/include/mach/vmalloc.h   |    2 +-
+>  arch/arm/mach-bcmring/include/mach/vmalloc.h    |    2 +-
+>  arch/arm/mach-clps711x/include/mach/vmalloc.h   |    2 +-
+>  arch/arm/mach-ebsa110/include/mach/vmalloc.h    |    2 +-
+>  arch/arm/mach-footbridge/include/mach/vmalloc.h |    2 +-
+>  arch/arm/mach-h720x/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-integrator/include/mach/vmalloc.h |    2 +-
+>  arch/arm/mach-msm/include/mach/vmalloc.h        |    2 +-
+>  arch/arm/mach-netx/include/mach/vmalloc.h       |    2 +-
+>  arch/arm/mach-omap1/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-omap2/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-pnx4008/include/mach/vmalloc.h    |    2 +-
+>  arch/arm/mach-rpc/include/mach/vmalloc.h        |    2 +-
+>  arch/arm/mach-shark/include/mach/vmalloc.h      |    2 +-
+>  arch/arm/mach-versatile/include/mach/vmalloc.h  |    2 +-
+>  15 files changed, 15 insertions(+), 15 deletions(-)
+> 
+> Index: ehci/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+> @@ -11,6 +11,6 @@
+>  #ifndef __ASM_ARCH_VMALLOC_H
+>  #define __ASM_ARCH_VMALLOC_H
+>  
+> -#define VMALLOC_END		0xd0000000
+> +#define VMALLOC_END		0xd0000000UL
+>  
+>  #endif /* __ASM_ARCH_VMALLOC_H */
+> Index: ehci/arch/arm/mach-bcmring/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-bcmring/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-bcmring/include/mach/vmalloc.h
+> @@ -22,4 +22,4 @@
+>   * 0xe0000000 to 0xefffffff. This gives us 256 MB of vm space and handles
+>   * larger physical memory designs better.
+>   */
+> -#define VMALLOC_END       0xf0000000
+> +#define VMALLOC_END       0xf0000000UL
+> Index: ehci/arch/arm/mach-clps711x/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-clps711x/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-clps711x/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+> @@ -7,4 +7,4 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> -#define VMALLOC_END       0xdf000000
+> +#define VMALLOC_END       0xdf000000UL
+> Index: ehci/arch/arm/mach-footbridge/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-footbridge/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-footbridge/include/mach/vmalloc.h
+> @@ -7,4 +7,4 @@
+>   */
+>  
+>  
+> -#define VMALLOC_END       0xf0000000
+> +#define VMALLOC_END       0xf0000000UL
+> Index: ehci/arch/arm/mach-h720x/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-h720x/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-h720x/include/mach/vmalloc.h
+> @@ -5,6 +5,6 @@
+>  #ifndef __ARCH_ARM_VMALLOC_H
+>  #define __ARCH_ARM_VMALLOC_H
+>  
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+>  
+>  #endif
+> Index: ehci/arch/arm/mach-integrator/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-integrator/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-integrator/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-msm/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-msm/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-msm/include/mach/vmalloc.h
+> @@ -16,7 +16,7 @@
+>  #ifndef __ASM_ARCH_MSM_VMALLOC_H
+>  #define __ASM_ARCH_MSM_VMALLOC_H
+>  
+> -#define VMALLOC_END	  0xd0000000
+> +#define VMALLOC_END	  0xd0000000UL
+>  
+>  #endif
+>  
+> Index: ehci/arch/arm/mach-netx/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-netx/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-netx/include/mach/vmalloc.h
+> @@ -16,4 +16,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-omap1/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-omap1/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-omap1/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+>   */
+> -#define VMALLOC_END	0xd8000000
+> +#define VMALLOC_END	0xd8000000UL
+> Index: ehci/arch/arm/mach-omap2/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-omap2/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-omap2/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+>   */
+> -#define VMALLOC_END	  0xf8000000
+> +#define VMALLOC_END	  0xf8000000UL
+> Index: ehci/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+> @@ -17,4 +17,4 @@
+>   * The vmalloc() routines leaves a hole of 4kB between each vmalloced
+>   * area for the same reason. ;)
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-rpc/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-rpc/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-rpc/include/mach/vmalloc.h
+> @@ -7,4 +7,4 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> -#define VMALLOC_END       0xdc000000
+> +#define VMALLOC_END       0xdc000000UL
+> Index: ehci/arch/arm/mach-shark/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-shark/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-shark/include/mach/vmalloc.h
+> @@ -1,4 +1,4 @@
+>  /*
+>   * arch/arm/mach-shark/include/mach/vmalloc.h
+>   */
+> -#define VMALLOC_END       0xd0000000
+> +#define VMALLOC_END       0xd0000000UL
+> Index: ehci/arch/arm/mach-versatile/include/mach/vmalloc.h
+> ===================================================================
+> --- ehci.orig/arch/arm/mach-versatile/include/mach/vmalloc.h
+> +++ ehci/arch/arm/mach-versatile/include/mach/vmalloc.h
+> @@ -18,4 +18,4 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+> -#define VMALLOC_END		0xd8000000
+> +#define VMALLOC_END		0xd8000000UL
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-> Instead of implementing sched_clock for each architecture seperatly,
-> wouldn't it be nice to have a generic sched_clock that uses the
-> architecture's clocksource?  I tried to implement that some time ago,
-> but tglx shoot it down because of locking problems.
-
-I was and still am a big fan of this approach, I am willing to help
-testing it if you want to dust off this patch set...
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
