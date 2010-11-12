@@ -1,32 +1,35 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 12 Nov 2010 10:43:25 +0100
-Subject: [PATCH] RFC: nomadik: expand timesource to 63 bits
-In-Reply-To: <AANLkTi=ysONhPQBTbVNRgTOx5PGEM=STaUYY6RnUpfES@mail.gmail.com>
-References: <1289466356-16697-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTi=ysONhPQBTbVNRgTOx5PGEM=STaUYY6RnUpfES@mail.gmail.com>
-Message-ID: <4CDD0C3D.5070309@stericsson.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 12 Nov 2010 10:53:45 +0100
+Subject: [PATCH v2] ARM: fix compile warning in mm/init.c
+In-Reply-To: <1289552567-14005-1-git-send-email-gadiyar@ti.com>
+References: <1289552567-14005-1-git-send-email-gadiyar@ti.com>
+Message-ID: <20101112095345.GG18358@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-john stultz wrote:
+Hello Anand,
 
-> I would advise against expanding the hardware counter to 63bits via
-> software at the clocksource layer. This breaks the
-> CLOCK_SOURCE_IS_CONTINUOUS flag rule (since the hardware will wrap
-> below the mask value if not updated in the software layer). And as
-> Thomas said, this will cause problems in the nohz idle limiting code
-> (which makes sure we wake up before the clocksource wraps).
+On Fri, Nov 12, 2010 at 02:32:47PM +0530, Anand Gadiyar wrote:
+> Commit 7c63984b86 (ARM: do not define VMALLOC_END relative to PAGE_OFFSET)
+> changed VMALLOC_END to be an explicit value. Before this, it was
+> relative to PAGE_OFFSET and therefore automatically upgraded to
+The correct term here is "converted".
 
-Hm, yeah that's probably the wisest thing to do right now..
+> unsigned long as PAGE_OFFSET was an unsigned long. This introduced
+s/was/is/
 
-Then the Tegra code is not quite sound. It will probably experience
-bad stuff like shaky clocksource when idling too long.
+> the following build warning. Fix this by changing the explicit
+> defines of VMALLOC_END to be unsigned long.
+> 
+>   CC      arch/arm/mm/init.o
+> arch/arm/mm/init.c: In function 'mem_init':
+> arch/arm/mm/init.c:606: warning: format '%08lx' expects type 'long unsigned int', but argument 12 has type 'unsigned int'
+> 
+> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+Thanks
+Uwe
 
-> Instead, I'd use this extension at the sched_clock level, where it
-> seems reasonable that it will be called frequently enough to not brake
-> the cnt32_to_63 magic.
-
-Yeah we will do it like the Orion does.
-
-Thanks!
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
