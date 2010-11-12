@@ -1,100 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Nov 2010 17:29:28 +0100
-Subject: [PATCH 08/10] MCDE: Add frame buffer device
-In-Reply-To: <1289390653-6111-9-git-send-email-jimmy.rubin@stericsson.com>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-9-git-send-email-jimmy.rubin@stericsson.com>
-Message-ID: <201011121729.28354.arnd@arndb.de>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 12 Nov 2010 08:34:34 -0800
+Subject: [PATCH V2] arch/arm/kernel/smp_twd.c: Correct local timer printk
+	decimal output
+In-Reply-To: <1289244455.29216.348.camel@Joe-Laptop>
+References: <1289244455.29216.348.camel@Joe-Laptop>
+Message-ID: <1289579674.6519.76.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 November 2010, Jimmy Rubin wrote:
-> +
-> +static struct platform_device mcde_fb_device = {
-> +	.name = "mcde_fb",
-> +	.id = -1,
-> +};
+The timer decimal place is shown incorrectly.
+The %100 divisor needs to have 1 fewer 0.
 
-Do not introduce new static devices. We are trying to remove them and
-they will stop working. Why do you even need a device here if there is
-only one of them?
+Convert to unprefixed pr_<level>/pr_cont while at it.
 
-> +struct fb_info *mcde_fb_create(struct mcde_display_device *ddev,
-> +	u16 w, u16 h, u16 vw, u16 vh, enum mcde_ovly_pix_fmt pix_fmt,
-> +	u32 rotate)
-> +{
+Uncompiled/untested.
 
-Here you have another device, which you could just use!
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+V2:
 
-> +/* Overlay fbs' platform device */
-> +static int mcde_fb_probe(struct platform_device *pdev)
-> +{
-> +	return 0;
-> +}
-> +
-> +static int mcde_fb_remove(struct platform_device *pdev)
-> +{
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver mcde_fb_driver = {
-> +	.probe  = mcde_fb_probe,
-> +	.remove = mcde_fb_remove,
-> +	.driver = {
-> +		.name  = "mcde_fb",
-> +		.owner = THIS_MODULE,
-> +	},
-> +};
-> +
-> +/* MCDE fb init */
-> +
-> +int __init mcde_fb_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = platform_driver_register(&mcde_fb_driver);
-> +	if (ret)
-> +		goto fb_driver_failed;
-> +	ret = platform_device_register(&mcde_fb_device);
-> +	if (ret)
-> +		goto fb_device_failed;
-> +
-> +	goto out;
-> +fb_device_failed:
-> +	platform_driver_unregister(&mcde_fb_driver);
-> +fb_driver_failed:
-> +out:
-> +	return ret;
-> +}
-> +
-> +void mcde_fb_exit(void)
-> +{
-> +	platform_device_unregister(&mcde_fb_device);
-> +	platform_driver_unregister(&mcde_fb_driver);
-> +}
+On Fri, 2010-11-12 at 16:12 +0000, Russell King - ARM Linux wrote:
+> I'd rather avoid core code having KBUILD_MODNAME prefix it.
+> The message is unique enough as is.
 
-This appears to be an entirely useless registration for something that
-does not exist and that you are not using anywhere ...
+Use a local #define pr_fmt(fmt) fmt so if ever
+a global change for pr_fmt is made, this won't
+need to be changed.
 
-> +
-> +#include <linux/fb.h>
-> +#include <linux/ioctl.h>
-> +#if !defined(__KERNEL__) && !defined(_KERNEL)
-> +#include <stdint.h>
-> +#else
-> +#include <linux/types.h>
-> +#endif
-> +
-> +#ifdef __KERNEL__
-> +#include "mcde_dss.h"
-> +#endif
-> +
-> +#ifdef __KERNEL__
-> +#define to_mcde_fb(x) ((struct mcde_fb *)(x)->par)
+ arch/arm/kernel/smp_twd.c |   10 +++++++---
+ 1 files changed, 7 insertions(+), 3 deletions(-)
 
-Everything in this file is enclosed in #ifdef __KERNEL__, and the file
-is not even exported. You can remove the #ifdef and the #else path
-everywhere AFAICT.
-
-	Arnd
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 35882fb..4f90183 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -8,6 +8,9 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++
++#define pr_fmt(fmt) fmt
++
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
+@@ -89,7 +92,7 @@ static void __cpuinit twd_calibrate_rate(void)
+ 	 * the timer ticks
+ 	 */
+ 	if (twd_timer_rate == 0) {
+-		printk(KERN_INFO "Calibrating local timer... ");
++		pr_info("Calibrating local timer... ");
+ 
+ 		/* Wait for a tick to start */
+ 		waitjiffies = get_jiffies_64() + 1;
+@@ -113,8 +116,9 @@ static void __cpuinit twd_calibrate_rate(void)
+ 
+ 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+ 
+-		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+-			(twd_timer_rate / 100000) % 100);
++		pr_cont("%lu.%02luMHz\n",
++			twd_timer_rate / 1000000,
++			(twd_timer_rate / 10000) % 100);
+ 	}
+ 
+ 	load = twd_timer_rate / HZ;
