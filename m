@@ -1,87 +1,42 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Nov 2010 18:00:23 +0000
-Subject: [PATCH v2 03/20] ARM: LPAE: use u32 instead of unsigned long for
-	32-bit ptes
+Date: Fri, 12 Nov 2010 18:00:29 +0000
+Subject: [PATCH v2 09/20] ARM: LPAE: Change setup_mm_for_reboot() to work with
+	LPAE
 In-Reply-To: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
 References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289584840-18097-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1289584840-18097-10-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+This function was assuming that there are only two levels of page
+tables. The patch changes looping over the PMD entries to make it
+compatible with LPAE.
 
-When using 2-level paging, pte_t and pmd_t are typedefs for
-unsigned long but phys_addr_t is a typedef for u32.
-
-This patch uses u32 for the page table entry types when
-phys_addr_t is not 64-bit, allowing the same conversion
-specifier to be used for physical addresses and page table
-entries regardless of LPAE.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/page-nommu.h           |    8 ++++----
- arch/arm/include/asm/pgtable-2level-types.h |   18 +++++++++---------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/mm/mmu.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-index d1b162a..a20641a 100644
---- a/arch/arm/include/asm/page-nommu.h
-+++ b/arch/arm/include/asm/page-nommu.h
-@@ -29,10 +29,10 @@
- /*
-  * These are used to make use of C type-checking..
-  */
--typedef unsigned long pte_t;
--typedef unsigned long pmd_t;
--typedef unsigned long pgd_t[2];
--typedef unsigned long pgprot_t;
-+typedef u32 pte_t;
-+typedef u32 pmd_t;
-+typedef u32 pgd_t[2];
-+typedef u32 pgprot_t;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4147cc6..3784acc 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1098,13 +1098,16 @@ void setup_mm_for_reboot(char mode)
+ 	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+ 		base_pmdval |= PMD_BIT4;
  
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
-diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
-index 30f6741..adc4928 100644
---- a/arch/arm/include/asm/pgtable-2level-types.h
-+++ b/arch/arm/include/asm/pgtable-2level-types.h
-@@ -21,16 +21,16 @@
+-	for (i = 0; i < FIRST_USER_PGD_NR + USER_PTRS_PER_PGD; i++, pgd++) {
++	for (i = 0; i < TASK_SIZE >> PMD_SHIFT; i++) {
+ 		unsigned long pmdval = (i << PMD_SHIFT) | base_pmdval;
+ 		pmd_t *pmd;
++		unsigned long addr = i << PMD_SHIFT;
  
- #undef STRICT_MM_TYPECHECKS
+-		pmd = pmd_off(pgd, i << PMD_SHIFT);
++		pmd = pmd_off(pgd + pgd_index(addr), addr);
+ 		pmd[0] = __pmd(pmdval);
++#ifndef CONFIG_ARM_LPAE
+ 		pmd[1] = __pmd(pmdval + (1 << (PMD_SHIFT - 1)));
++#endif
+ 		flush_pmd_entry(pmd);
+ 	}
  
--typedef unsigned long pteval_t;
-+typedef u32 pteval_t;
- 
- #ifdef STRICT_MM_TYPECHECKS
- /*
-  * These are used to make use of C type-checking..
-  */
--typedef struct { unsigned long pte; } pte_t;
--typedef struct { unsigned long pmd; } pmd_t;
--typedef struct { unsigned long pgd[2]; } pgd_t;
--typedef struct { unsigned long pgprot; } pgprot_t;
-+typedef struct { u32 pte; } pte_t;
-+typedef struct { u32 pmd; } pmd_t;
-+typedef struct { u32 pgd[2]; } pgd_t;
-+typedef struct { u32 pgprot; } pgprot_t;
- 
- #define pte_val(x)      ((x).pte)
- #define pmd_val(x)      ((x).pmd)
-@@ -45,10 +45,10 @@ typedef struct { unsigned long pgprot; } pgprot_t;
- /*
-  * .. while these make it easier on the compiler
-  */
--typedef unsigned long pte_t;
--typedef unsigned long pmd_t;
--typedef unsigned long pgd_t[2];
--typedef unsigned long pgprot_t;
-+typedef u32 pte_t;
-+typedef u32 pmd_t;
-+typedef u32 pgd_t[2];
-+typedef u32 pgprot_t;
- 
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
