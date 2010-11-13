@@ -1,38 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 13 Nov 2010 15:38:27 +0300
-Subject: [PATCH v2 20/20] ARM: LPAE: Add the Kconfig entries
-In-Reply-To: <1289584840-18097-21-git-send-email-catalin.marinas@arm.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-21-git-send-email-catalin.marinas@arm.com>
-Message-ID: <4CDE86C3.9080407@ru.mvista.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 13 Nov 2010 13:07:00 +0000
+Subject: [PATCH 4/4] ARM: memblock: convert reserve_crashkernel() to
+	use memblock
+In-Reply-To: <07f23b6e32b1ee64287dc53803890052df6546f3.1289292124.git.mika.westerberg@iki.fi>
+References: <cover.1289292124.git.mika.westerberg@iki.fi>
+	<07f23b6e32b1ee64287dc53803890052df6546f3.1289292124.git.mika.westerberg@iki.fi>
+Message-ID: <20101113130700.GA26105@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Nov 09, 2010 at 11:06:13AM +0200, Mika Westerberg wrote:
+>  static void __init reserve_crashkernel(void)
+>  {
+>  	unsigned long long crash_size, crash_base;
+> -	unsigned long long total_mem;
+>  	int ret;
+>  
+> -	total_mem = get_total_mem();
+> -	ret = parse_crashkernel(boot_command_line, total_mem,
+> +	/* this is necessary because of memblock_phys_mem_size() */
+> +	memblock_analyze();
 
-On 12-11-2010 21:00, Catalin Marinas wrote:
+I think you need to check with the memblock people whether its legal to
+call memblock_analyze() multiple times.  What do other arches do for
+this?
 
-> This patch adds the ARM_LPAE and ARCH_PHYS_ADDR_T_64BIT Kconfig entries
-> allowing LPAE support to be compiled into the kernel.
+Secondly, when paging_init() returns, bootmem has been initialized, and
+memory taken from bootmem to feed the zone allocators.  This memory is
+not registered back into memblock.  Allocations from memblock after
+paging_init() has returned will lead to overlaps with bootmem, and
+therefore corruption.
 
-> Signed-off-by: Catalin Marinas<catalin.marinas@arm.com>
-[...]
-
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 8493ed0..3ca2d15 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -615,6 +615,19 @@ config IO_36
->
->   comment "Processor Features"
->
-> +config ARM_LPAE
-> +	bool "Support for the Large Physical Address Extension"
-> +	depends on MMU&&  CPU_V7
-> +	help
-> +	  Say Y if you have an ARMv7 processor supporting the LPAE page table
-> +	  format and you would like access memory beyond the 4GB limit.
-
-    Maybe "like to access"?
-
-WBR, Sergei
+So, this code is better off left as-is, rather than trying to convert it
+to what mistakenly appears "the latest thing".
