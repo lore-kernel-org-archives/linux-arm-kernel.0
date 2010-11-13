@@ -1,126 +1,141 @@
 From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 12 Nov 2010 19:29:50 -0800
-Subject: [PATCH 04/14] msm: iommu: Revise GFX3D IOMMU contexts and M2V mappings
+Date: Fri, 12 Nov 2010 19:29:52 -0800
+Subject: [PATCH 06/14] msm: iommu: Support for the 2nd GFX core's IOMMU
 In-Reply-To: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
 References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1289619000-13167-5-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1289619000-13167-7-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the platform data for the 3D core's IOMMU based on
-the revised usage model. Remove unused contexts and rename
-the remaining contexts based on their new function. Add the
-new M2VCBMT mappings for the updated contexts.
+Add the platform data and resources needed for the second
+2D graphics core's IOMMU.
 
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/devices-msm8x60-iommu.c |   45 +++++++++-------------------
- 1 files changed, 15 insertions(+), 30 deletions(-)
+ arch/arm/mach-msm/devices-msm8x60-iommu.c |   54 +++++++++++++++++++++++++++++
+ 1 files changed, 54 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-msm/devices-msm8x60-iommu.c b/arch/arm/mach-msm/devices-msm8x60-iommu.c
-index 9e657e0..22d0c7c 100644
+index 8cccb26..a6ecd39 100644
 --- a/arch/arm/mach-msm/devices-msm8x60-iommu.c
 +++ b/arch/arm/mach-msm/devices-msm8x60-iommu.c
-@@ -519,22 +519,17 @@ static struct msm_iommu_ctx_dev vcodec_b_mm2_ctx = {
- 	.mids = {0, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, -1}
+@@ -254,6 +254,27 @@ static struct resource msm_iommu_gfx2d0_resources[] = {
+ 	},
  };
  
--static struct msm_iommu_ctx_dev gfx3d_rbpa_ctx = {
--	.name = "gfx3d_rbpa",
-+static struct msm_iommu_ctx_dev gfx3d_user_ctx = {
-+	.name = "gfx3d_user",
++static struct resource msm_iommu_gfx2d1_resources[] = {
++	{
++		.start = MSM_IOMMU_GFX2D1_PHYS,
++		.end   = MSM_IOMMU_GFX2D1_PHYS + MSM_IOMMU_GFX2D1_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_GFX2D1_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_GFX2D1_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_GFX2D1_CB_SC_SECURE_IRQ,
++		.end   = SMMU_GFX2D1_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
+ static struct platform_device msm_root_iommu_dev = {
+ 	.name = "msm_iommu",
+ 	.id = -1,
+@@ -307,6 +328,11 @@ static struct msm_iommu_dev gfx2d0_iommu = {
+ 	.clk_rate = 27000000
+ };
+ 
++static struct msm_iommu_dev gfx2d1_iommu = {
++	.name = "gfx2d1",
++	.clk_rate = 27000000
++};
++
+ static struct platform_device msm_device_iommu_jpegd = {
+ 	.name = "msm_iommu",
+ 	.id = 0,
+@@ -417,6 +443,16 @@ static struct platform_device msm_device_iommu_gfx2d0 = {
+ 	.resource = msm_iommu_gfx2d0_resources,
+ };
+ 
++struct platform_device msm_device_iommu_gfx2d1 = {
++	.name = "msm_iommu",
++	.id = 11,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_iommu_gfx2d1_resources),
++	.resource = msm_iommu_gfx2d1_resources,
++};
++
+ static struct msm_iommu_ctx_dev jpegd_src_ctx = {
+ 	.name = "jpegd_src",
  	.num = 0,
--	.mids = {-1}
-+	.mids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, -1}
+@@ -538,6 +574,12 @@ static struct msm_iommu_ctx_dev gfx2d0_2d0_ctx = {
+ 	.mids = {0, 1, 2, 3, 4, 5, 6, 7, -1}
  };
  
--static struct msm_iommu_ctx_dev gfx3d_cpvgttc_ctx = {
--	.name = "gfx3d_cpvgttc",
-+static struct msm_iommu_ctx_dev gfx3d_priv_ctx = {
-+	.name = "gfx3d_priv",
- 	.num = 1,
--	.mids = {0, 1, 2, 3, 4, 5, 6, 7, -1}
--};
--
--static struct msm_iommu_ctx_dev gfx3d_smmu_ctx = {
--	.name = "gfx3d_smmu",
--	.num = 2,
--	.mids = {8, 9, 10, 11, 12, -1}
-+	.mids = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-+		 31, -1}
- };
- 
- static struct msm_iommu_ctx_dev gfx2d0_pixv1_ctx = {
-@@ -685,7 +680,7 @@ static struct platform_device msm_device_vcodec_b_mm2_ctx = {
++static struct msm_iommu_ctx_dev gfx2d1_2d1_ctx = {
++	.name = "gfx2d1_2d1",
++	.num = 0,
++	.mids = {0, 1, 2, 3, 4, 5, 6, 7, -1}
++};
++
+ static struct platform_device msm_device_jpegd_src_ctx = {
+ 	.name = "msm_iommu_ctx",
+ 	.id = 0,
+@@ -698,6 +740,14 @@ static struct platform_device msm_device_gfx2d0_2d0_ctx = {
  	},
  };
  
--static struct platform_device msm_device_gfx3d_rbpa_ctx = {
-+static struct platform_device msm_device_gfx3d_user_ctx = {
- 	.name = "msm_iommu_ctx",
- 	.id = 17,
- 	.dev = {
-@@ -693,7 +688,7 @@ static struct platform_device msm_device_gfx3d_rbpa_ctx = {
- 	},
- };
- 
--static struct platform_device msm_device_gfx3d_cpvgttc_ctx = {
-+static struct platform_device msm_device_gfx3d_priv_ctx = {
- 	.name = "msm_iommu_ctx",
- 	.id = 18,
- 	.dev = {
-@@ -701,17 +696,9 @@ static struct platform_device msm_device_gfx3d_cpvgttc_ctx = {
- 	},
- };
- 
--static struct platform_device msm_device_gfx3d_smmu_ctx = {
--	.name = "msm_iommu_ctx",
--	.id = 19,
--	.dev = {
--		.parent = &msm_device_iommu_gfx3d.dev,
--	},
--};
--
- static struct platform_device msm_device_gfx2d0_pixv1_ctx = {
- 	.name = "msm_iommu_ctx",
--	.id = 20,
-+	.id = 19,
- 	.dev = {
- 		.parent = &msm_device_iommu_gfx2d0.dev,
- 	},
-@@ -719,7 +706,7 @@ static struct platform_device msm_device_gfx2d0_pixv1_ctx = {
- 
- static struct platform_device msm_device_gfx2d0_texv3_ctx = {
- 	.name = "msm_iommu_ctx",
--	.id = 21,
++static struct platform_device msm_device_gfx2d1_2d1_ctx = {
++	.name = "msm_iommu_ctx",
 +	.id = 20,
- 	.dev = {
- 		.parent = &msm_device_iommu_gfx2d0.dev,
- 	},
-@@ -771,9 +758,8 @@ static struct platform_device *msm_iommu_ctx_devs[] = {
- 	&msm_device_vcodec_a_stream_ctx,
- 	&msm_device_vcodec_a_mm1_ctx,
- 	&msm_device_vcodec_b_mm2_ctx,
--	&msm_device_gfx3d_rbpa_ctx,
--	&msm_device_gfx3d_cpvgttc_ctx,
--	&msm_device_gfx3d_smmu_ctx,
-+	&msm_device_gfx3d_user_ctx,
-+	&msm_device_gfx3d_priv_ctx,
- 	&msm_device_gfx2d0_pixv1_ctx,
- 	&msm_device_gfx2d0_texv3_ctx,
++	.dev = {
++		.parent = &msm_device_iommu_gfx2d1.dev,
++	},
++};
++
+ static struct platform_device *msm_iommu_devs[] = {
+ 	&msm_device_iommu_jpegd,
+ 	&msm_device_iommu_vpe,
+@@ -710,6 +760,7 @@ static struct platform_device *msm_iommu_devs[] = {
+ 	&msm_device_iommu_vcodec_b,
+ 	&msm_device_iommu_gfx3d,
+ 	&msm_device_iommu_gfx2d0,
++	&msm_device_iommu_gfx2d1,
  };
-@@ -796,9 +782,8 @@ static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
- 	&vcodec_a_stream_ctx,
- 	&vcodec_a_mm1_ctx,
- 	&vcodec_b_mm2_ctx,
--	&gfx3d_rbpa_ctx,
--	&gfx3d_cpvgttc_ctx,
--	&gfx3d_smmu_ctx,
-+	&gfx3d_user_ctx,
-+	&gfx3d_priv_ctx,
- 	&gfx2d0_pixv1_ctx,
- 	&gfx2d0_texv3_ctx,
+ 
+ static struct msm_iommu_dev *msm_iommu_data[] = {
+@@ -724,6 +775,7 @@ static struct msm_iommu_dev *msm_iommu_data[] = {
+ 	&vcodec_b_iommu,
+ 	&gfx3d_iommu,
+ 	&gfx2d0_iommu,
++	&gfx2d1_iommu,
  };
+ 
+ static struct platform_device *msm_iommu_ctx_devs[] = {
+@@ -747,6 +799,7 @@ static struct platform_device *msm_iommu_ctx_devs[] = {
+ 	&msm_device_gfx3d_user_ctx,
+ 	&msm_device_gfx3d_priv_ctx,
+ 	&msm_device_gfx2d0_2d0_ctx,
++	&msm_device_gfx2d1_2d1_ctx,
+ };
+ 
+ static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
+@@ -770,6 +823,7 @@ static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
+ 	&gfx3d_user_ctx,
+ 	&gfx3d_priv_ctx,
+ 	&gfx2d0_2d0_ctx,
++	&gfx2d1_2d1_ctx,
+ };
+ 
+ static int msm8x60_iommu_init(void)
 -- 
 1.7.0.2
 
