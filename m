@@ -1,96 +1,64 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 13 Nov 2010 17:02:16 +0900
-Subject: [PATCH] arm: Fix HAVE_S3C2410_WATCHDOG warnings
-In-Reply-To: <20101104081633.GA27129@july>
-References: <20101104081633.GA27129@july>
-Message-ID: <000101cb8309$18eb28c0$4ac17a40$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 13 Nov 2010 08:48:02 +0000
+Subject: [PATCH] ARM: Stop irqsoff tracing if return to user with
+	interrupts enabled
+In-Reply-To: <1289619648-8690-1-git-send-email-toddpoynor@google.com>
+References: <1289619648-8690-1-git-send-email-toddpoynor@google.com>
+Message-ID: <20101113084802.GB10125@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> Fix build warnings
-> warning: (ARCH_S3C64XX && <choice> && WATCHDOG || ARCH_S5P64X0 && <choice>
-&&
-> WATCHDOG || ARCH_S5P6442 && <choice> && WATCHDOG || ARCH_S5PC100 &&
-<choice>
-> || ARCH_S5PV210 && <choice> || ARCH_S5PV310 && <choice> || MACH_SMDK6410
-&&
-> ARCH_S3C64XX) selects HAVE_S3C2410_WATCHDOG which has unmet direct
-> dependencies (WATCHDOG)
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Fri, Nov 12, 2010 at 07:40:48PM -0800, Todd Poynor wrote:
+> Signed-off-by: Todd Poynor <toddpoynor@google.com>
+
+NAK.  Firstly, you're not explaining why.  Secondly, we purposely leave
+IRQs off when returning to userspace to avoid race conditions.  Thirdly,
+we purposely leave lockdep believing that IRQs are off while userspace
+is running, even though IRQs are not.
+
+I've explained why this is in the past - please search the mailing list.
+
 > ---
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a19a526..a302713 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -677,7 +677,7 @@ config ARCH_S3C64XX
->  	select USB_ARCH_HAS_OHCI
->  	select SAMSUNG_GPIOLIB_4BIT
->  	select HAVE_S3C2410_I2C
-> -	select HAVE_S3C2410_WATCHDOG
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
->  	help
->  	  Samsung S3C64XX series based systems
+>  arch/arm/kernel/entry-common.S |   14 ++++++++++++++
+>  1 files changed, 14 insertions(+), 0 deletions(-)
 > 
-> @@ -686,7 +686,7 @@ config ARCH_S5P64X0
->  	select CPU_V6
->  	select GENERIC_GPIO
->  	select HAVE_CLK
-> -	select HAVE_S3C2410_WATCHDOG
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_S3C2410_I2C
->  	select HAVE_S3C_RTC
-> @@ -700,7 +700,7 @@ config ARCH_S5P6442
->  	select GENERIC_GPIO
->  	select HAVE_CLK
->  	select ARCH_USES_GETTIMEOFFSET
-> -	select HAVE_S3C2410_WATCHDOG
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
->  	help
->  	  Samsung S5P6442 CPU based systems
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 8bfa987..b81d270 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -29,6 +29,13 @@ ret_fast_syscall:
+>  	ldr	r1, [tsk, #TI_FLAGS]
+>  	tst	r1, #_TIF_WORK_MASK
+>  	bne	fast_work_pending
+> +#if defined(CONFIG_TRACE_IRQFLAGS)
+> +	ldr     r1, [sp, #S_OFF + S_PSR]	@ get calling cpsr
+> +	tst	r1, #PSR_I_BIT
+> +	bne	1f
+> +	asm_trace_hardirqs_on
+> +1:
+> +#endif
+>  
+>  	/* perform architecture specific actions before user return */
+>  	arch_ret_to_user r1, lr
+> @@ -65,6 +72,13 @@ ret_slow_syscall:
+>  	tst	r1, #_TIF_WORK_MASK
+>  	bne	work_pending
+>  no_work_pending:
+> +#if defined(CONFIG_TRACE_IRQFLAGS)
+> +	ldr     r1, [sp, #S_PSR]		@ get calling cpsr
+> +	tst	r1, #PSR_I_BIT
+> +	bne	2f
+> +	asm_trace_hardirqs_on
+> +2:
+> +#endif
+>  	/* perform architecture specific actions before user return */
+>  	arch_ret_to_user r1, lr
+>  
+> -- 
+> 1.7.3.1
 > 
-> @@ -713,7 +713,7 @@ config ARCH_S5PC100
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_S3C2410_I2C
->  	select HAVE_S3C_RTC
-> -	select HAVE_S3C2410_WATCHDOG
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
->  	help
->  	  Samsung S5PC100 series based systems
 > 
-> @@ -728,7 +728,7 @@ config ARCH_S5PV210
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_S3C2410_I2C
->  	select HAVE_S3C_RTC
-> -	select HAVE_S3C2410_WATCHDOG
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
->  	help
->  	  Samsung S5PV210/S5PC110 series based systems
-> 
-> @@ -741,7 +741,7 @@ config ARCH_S5PV310
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_S3C_RTC
->  	select HAVE_S3C2410_I2C
-> -	select HAVE_S3C2410_WATCHDOG
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
->  	help
->  	  Samsung S5PV310 series based systems
-
-Ok, will apply...
-And will sort out other similar configure warning such as I2C and RTC.
-
-As a note, in your patch, my e-mail address was wrong :-(
-
-Anyway,
-Thanks.
-
-Have a nice weekend.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
