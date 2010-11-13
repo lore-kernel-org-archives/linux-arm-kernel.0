@@ -1,91 +1,79 @@
 From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 12 Nov 2010 19:29:51 -0800
-Subject: [PATCH 05/14] msm: iommu: Revise GFX2D0 IOMMU contexts and M2V
-	mappings
+Date: Fri, 12 Nov 2010 19:29:53 -0800
+Subject: [PATCH 07/14] msm: iommu: Mark functions with the right section names
 In-Reply-To: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
 References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1289619000-13167-6-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1289619000-13167-8-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the platform data for the 2D core's IOMMU based on
-the revised usage model. Merge the two contexts and their
-M2VCBMT mappings, adding the previously-missing mappings to
-the newly-formed context.
+Mark the init and exit functions as __init and __exit where
+appropriate.
 
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/devices-msm8x60-iommu.c |   28 ++++++----------------------
- 1 files changed, 6 insertions(+), 22 deletions(-)
+ arch/arm/mach-msm/devices-msm8x60-iommu.c |    4 ++--
+ arch/arm/mach-msm/iommu.c                 |    2 +-
+ arch/arm/mach-msm/iommu_dev.c             |    4 ++--
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-msm/devices-msm8x60-iommu.c b/arch/arm/mach-msm/devices-msm8x60-iommu.c
-index 22d0c7c..8cccb26 100644
+index a6ecd39..f9e7bd3 100644
 --- a/arch/arm/mach-msm/devices-msm8x60-iommu.c
 +++ b/arch/arm/mach-msm/devices-msm8x60-iommu.c
-@@ -532,16 +532,10 @@ static struct msm_iommu_ctx_dev gfx3d_priv_ctx = {
- 		 31, -1}
+@@ -826,7 +826,7 @@ static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
+ 	&gfx2d1_2d1_ctx,
  };
  
--static struct msm_iommu_ctx_dev gfx2d0_pixv1_ctx = {
--	.name = "gfx2d0_pixv1_smmu",
-+static struct msm_iommu_ctx_dev gfx2d0_2d0_ctx = {
-+	.name = "gfx2d0_2d0",
- 	.num = 0,
--	.mids = {0, 3, 4, -1}
--};
--
--static struct msm_iommu_ctx_dev gfx2d0_texv3_ctx = {
--	.name = "gfx2d0_texv3_smmu",
--	.num = 1,
--	.mids = {1, 6, 7, -1}
-+	.mids = {0, 1, 2, 3, 4, 5, 6, 7, -1}
+-static int msm8x60_iommu_init(void)
++static int __init msm8x60_iommu_init(void)
+ {
+ 	int ret, i;
+ 
+@@ -886,7 +886,7 @@ failure:
+ 	return ret;
+ }
+ 
+-static void msm8x60_iommu_exit(void)
++static void __exit msm8x60_iommu_exit(void)
+ {
+ 	int i;
+ 
+diff --git a/arch/arm/mach-msm/iommu.c b/arch/arm/mach-msm/iommu.c
+index f71747d..134add7 100644
+--- a/arch/arm/mach-msm/iommu.c
++++ b/arch/arm/mach-msm/iommu.c
+@@ -585,7 +585,7 @@ static struct iommu_ops msm_iommu_ops = {
+ 	.domain_has_cap = msm_iommu_domain_has_cap
  };
  
- static struct platform_device msm_device_jpegd_src_ctx = {
-@@ -696,7 +690,7 @@ static struct platform_device msm_device_gfx3d_priv_ctx = {
- 	},
+-static int msm_iommu_init(void)
++static int __init msm_iommu_init(void)
+ {
+ 	register_iommu(&msm_iommu_ops);
+ 	return 0;
+diff --git a/arch/arm/mach-msm/iommu_dev.c b/arch/arm/mach-msm/iommu_dev.c
+index 9019cee..b83c73b 100644
+--- a/arch/arm/mach-msm/iommu_dev.c
++++ b/arch/arm/mach-msm/iommu_dev.c
+@@ -346,7 +346,7 @@ static struct platform_driver msm_iommu_ctx_driver = {
+ 	.remove		= msm_iommu_ctx_remove,
  };
  
--static struct platform_device msm_device_gfx2d0_pixv1_ctx = {
-+static struct platform_device msm_device_gfx2d0_2d0_ctx = {
- 	.name = "msm_iommu_ctx",
- 	.id = 19,
- 	.dev = {
-@@ -704,14 +698,6 @@ static struct platform_device msm_device_gfx2d0_pixv1_ctx = {
- 	},
- };
+-static int msm_iommu_driver_init(void)
++static int __init msm_iommu_driver_init(void)
+ {
+ 	int ret;
+ 	ret = platform_driver_register(&msm_iommu_driver);
+@@ -365,7 +365,7 @@ error:
+ 	return ret;
+ }
  
--static struct platform_device msm_device_gfx2d0_texv3_ctx = {
--	.name = "msm_iommu_ctx",
--	.id = 20,
--	.dev = {
--		.parent = &msm_device_iommu_gfx2d0.dev,
--	},
--};
--
- static struct platform_device *msm_iommu_devs[] = {
- 	&msm_device_iommu_jpegd,
- 	&msm_device_iommu_vpe,
-@@ -760,8 +746,7 @@ static struct platform_device *msm_iommu_ctx_devs[] = {
- 	&msm_device_vcodec_b_mm2_ctx,
- 	&msm_device_gfx3d_user_ctx,
- 	&msm_device_gfx3d_priv_ctx,
--	&msm_device_gfx2d0_pixv1_ctx,
--	&msm_device_gfx2d0_texv3_ctx,
-+	&msm_device_gfx2d0_2d0_ctx,
- };
- 
- static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
-@@ -784,8 +769,7 @@ static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
- 	&vcodec_b_mm2_ctx,
- 	&gfx3d_user_ctx,
- 	&gfx3d_priv_ctx,
--	&gfx2d0_pixv1_ctx,
--	&gfx2d0_texv3_ctx,
-+	&gfx2d0_2d0_ctx,
- };
- 
- static int msm8x60_iommu_init(void)
+-static void msm_iommu_driver_exit(void)
++static void __exit msm_iommu_driver_exit(void)
+ {
+ 	platform_driver_unregister(&msm_iommu_ctx_driver);
+ 	platform_driver_unregister(&msm_iommu_driver);
 -- 
 1.7.0.2
 
