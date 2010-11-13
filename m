@@ -1,25 +1,41 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Sat, 13 Nov 2010 03:00:47 +0300
-Subject: [PATCH 3/6 v2] input: Add support for VIA VT8500 and compatibles
-	in i8042
-In-Reply-To: <20101112233013.GA30946@core.coreip.homeip.net>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<1289147348-31969-3-git-send-email-alchark@gmail.com>
-	<AANLkTi=zvGxpukjAv-XFAMLpKYiqqKD=p9S5FtGowdDu@mail.gmail.com>
-	<20101112233013.GA30946@core.coreip.homeip.net>
-Message-ID: <AANLkTikK5L=pEgWpsFH4GUG9dO79ZpLViHbPTc+TzA9Y@mail.gmail.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Fri, 12 Nov 2010 19:29:46 -0800
+Subject: [PATCH 00/14] Improvements to the MSM IOMMU driver
+Message-ID: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/13 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
-> Looks good to me (ignoring the fact that whole i8042 initialization
-> needs to be reworked and pushed into arch/board code which is out of
-> scope of these series).
->
-> I expect it will be merged with the rest of VT8500 patches through
-> whatever tree takes them.
+Update IOMMU M2VCBMT assignments based on new analysis, add
+support for the IOMMU for the second 2D graphics core,
+improve performance under certain situations, add support
+for cache-coherent operations, and generally clean up the
+code.
 
-Thanks, Dmitry!
+Stepan Moskovchenko (14):
+  msm: iommu: Increase maximum MID size to 5 bits
+  msm: iomap: Addresses and IRQs for 2nd GFX core IOMMU
+  msm: iommu: Use more consistent naming in platform data
+  msm: iommu: Revise GFX3D IOMMU contexts and M2V mappings
+  msm: iommu: Revise GFX2D0 IOMMU contexts and M2V mappings
+  msm: iommu: Support for the 2nd gfx core's IOMMU
+  msm: iommu: Mark functions with the right section names
+  msm: iommu: Don't flush page tables if no devices attached
+  msm: iommu: Kconfig option for cacheable page tables
+  msm: iommu: Check if device is already attached
+  msm: iommu: Kconfig dependency for the IOMMU API
+  msm: iommu: Definitions for extended memory attributes
+  msm: iommu: Support cache-coherent memory access
+  msm: iommu: Miscellaneous code cleanup
 
-Best regards,
-Alexey
+ arch/arm/mach-msm/Kconfig                       |   19 ++
+ arch/arm/mach-msm/devices-msm8x60-iommu.c       |  243 +++++++++++++----------
+ arch/arm/mach-msm/include/mach/iommu.h          |   13 ++-
+ arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h  |   22 ++-
+ arch/arm/mach-msm/include/mach/irqs-8x60.h      |    7 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    3 +
+ arch/arm/mach-msm/iommu.c                       |  144 +++++++++++---
+ arch/arm/mach-msm/iommu_dev.c                   |    4 +-
+ 8 files changed, 310 insertions(+), 145 deletions(-)
+
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
