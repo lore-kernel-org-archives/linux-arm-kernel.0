@@ -1,135 +1,91 @@
 From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 12 Nov 2010 19:30:00 -0800
-Subject: [PATCH 14/14] msm: iommu: Miscellaneous code cleanup
+Date: Fri, 12 Nov 2010 19:29:51 -0800
+Subject: [PATCH 05/14] msm: iommu: Revise GFX2D0 IOMMU contexts and M2V
+	mappings
 In-Reply-To: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
 References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1289619000-13167-15-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1289619000-13167-6-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove some unneeded assignments and messages, restructure
-a failure path in iova_to_phys, and make __flush_iotlb
-return int in preparation for adding IOMMU clock control.
+Update the platform data for the 2D core's IOMMU based on
+the revised usage model. Merge the two contexts and their
+M2VCBMT mappings, adding the previously-missing mappings to
+the newly-formed context.
 
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/iommu.c |   29 +++++++++++++++++------------
- 1 files changed, 17 insertions(+), 12 deletions(-)
+ arch/arm/mach-msm/devices-msm8x60-iommu.c |   28 ++++++----------------------
+ 1 files changed, 6 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-msm/iommu.c b/arch/arm/mach-msm/iommu.c
-index 935025e..932728c 100644
---- a/arch/arm/mach-msm/iommu.c
-+++ b/arch/arm/mach-msm/iommu.c
-@@ -50,12 +50,12 @@ struct msm_priv {
- 	struct list_head list_attached;
+diff --git a/arch/arm/mach-msm/devices-msm8x60-iommu.c b/arch/arm/mach-msm/devices-msm8x60-iommu.c
+index 22d0c7c..8cccb26 100644
+--- a/arch/arm/mach-msm/devices-msm8x60-iommu.c
++++ b/arch/arm/mach-msm/devices-msm8x60-iommu.c
+@@ -532,16 +532,10 @@ static struct msm_iommu_ctx_dev gfx3d_priv_ctx = {
+ 		 31, -1}
  };
  
--static void __flush_iotlb(struct iommu_domain *domain)
-+static int __flush_iotlb(struct iommu_domain *domain)
- {
- 	struct msm_priv *priv = domain->priv;
- 	struct msm_iommu_drvdata *iommu_drvdata;
- 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
+-static struct msm_iommu_ctx_dev gfx2d0_pixv1_ctx = {
+-	.name = "gfx2d0_pixv1_smmu",
++static struct msm_iommu_ctx_dev gfx2d0_2d0_ctx = {
++	.name = "gfx2d0_2d0",
+ 	.num = 0,
+-	.mids = {0, 3, 4, -1}
+-};
 -
-+	int ret = 0;
- #ifndef CONFIG_IOMMU_PGTABLES_L2
- 	unsigned long *fl_table = priv->pgtable;
- 	int i;
-@@ -79,6 +79,8 @@ static void __flush_iotlb(struct iommu_domain *domain)
- 		iommu_drvdata = dev_get_drvdata(ctx_drvdata->pdev->dev.parent);
- 		SET_CTX_TLBIALL(iommu_drvdata->base, ctx_drvdata->num, 0);
- 	}
-+
-+	return ret;
- }
+-static struct msm_iommu_ctx_dev gfx2d0_texv3_ctx = {
+-	.name = "gfx2d0_texv3_smmu",
+-	.num = 1,
+-	.mids = {1, 6, 7, -1}
++	.mids = {0, 1, 2, 3, 4, 5, 6, 7, -1}
+ };
  
- static void __reset_context(void __iomem *base, int ctx)
-@@ -267,7 +269,7 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 			  __pa(priv->pgtable));
+ static struct platform_device msm_device_jpegd_src_ctx = {
+@@ -696,7 +690,7 @@ static struct platform_device msm_device_gfx3d_priv_ctx = {
+ 	},
+ };
  
- 	list_add(&(ctx_drvdata->attached_elm), &priv->list_attached);
--	__flush_iotlb(domain);
-+	ret = __flush_iotlb(domain);
+-static struct platform_device msm_device_gfx2d0_pixv1_ctx = {
++static struct platform_device msm_device_gfx2d0_2d0_ctx = {
+ 	.name = "msm_iommu_ctx",
+ 	.id = 19,
+ 	.dev = {
+@@ -704,14 +698,6 @@ static struct platform_device msm_device_gfx2d0_pixv1_ctx = {
+ 	},
+ };
  
- fail:
- 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
-@@ -282,6 +284,7 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
- 	struct msm_iommu_drvdata *iommu_drvdata;
- 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
- 	unsigned long flags;
-+	int ret;
- 
- 	spin_lock_irqsave(&msm_iommu_lock, flags);
- 	priv = domain->priv;
-@@ -296,7 +299,10 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
- 	if (!iommu_drvdata || !ctx_drvdata || !ctx_dev)
- 		goto fail;
- 
--	__flush_iotlb(domain);
-+	ret = __flush_iotlb(domain);
-+	if (ret)
-+		goto fail;
-+
- 	__reset_context(iommu_drvdata->base, ctx_dev->num);
- 	list_del_init(&ctx_drvdata->attached_elm);
- 
-@@ -410,7 +416,7 @@ static int msm_iommu_map(struct iommu_domain *domain, unsigned long va,
- 				SL_AP1 | SL_SHARED | SL_TYPE_LARGE | pgprot;
- 	}
- 
--	__flush_iotlb(domain);
-+	ret = __flush_iotlb(domain);
- fail:
- 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
- 	return ret;
-@@ -495,7 +501,7 @@ static int msm_iommu_unmap(struct iommu_domain *domain, unsigned long va,
- 		}
- 	}
- 
--	__flush_iotlb(domain);
-+	ret = __flush_iotlb(domain);
- fail:
- 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
- 	return ret;
-@@ -530,9 +536,6 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
- 	SET_CTX_TLBIALL(base, ctx, 0);
- 	SET_V2PPR_VA(base, ctx, va >> V2Pxx_VA_SHIFT);
- 
--	if (GET_FAULT(base, ctx))
--		goto fail;
+-static struct platform_device msm_device_gfx2d0_texv3_ctx = {
+-	.name = "msm_iommu_ctx",
+-	.id = 20,
+-	.dev = {
+-		.parent = &msm_device_iommu_gfx2d0.dev,
+-	},
+-};
 -
- 	par = GET_PAR(base, ctx);
+ static struct platform_device *msm_iommu_devs[] = {
+ 	&msm_device_iommu_jpegd,
+ 	&msm_device_iommu_vpe,
+@@ -760,8 +746,7 @@ static struct platform_device *msm_iommu_ctx_devs[] = {
+ 	&msm_device_vcodec_b_mm2_ctx,
+ 	&msm_device_gfx3d_user_ctx,
+ 	&msm_device_gfx3d_priv_ctx,
+-	&msm_device_gfx2d0_pixv1_ctx,
+-	&msm_device_gfx2d0_texv3_ctx,
++	&msm_device_gfx2d0_2d0_ctx,
+ };
  
- 	/* We are dealing with a supersection */
-@@ -541,6 +544,9 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
- 	else	/* Upper 20 bits from PAR, lower 12 from VA */
- 		ret = (par & 0xFFFFF000) | (va & 0x00000FFF);
+ static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
+@@ -784,8 +769,7 @@ static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
+ 	&vcodec_b_mm2_ctx,
+ 	&gfx3d_user_ctx,
+ 	&gfx3d_priv_ctx,
+-	&gfx2d0_pixv1_ctx,
+-	&gfx2d0_texv3_ctx,
++	&gfx2d0_2d0_ctx,
+ };
  
-+	if (GET_FAULT(base, ctx))
-+		ret = 0;
-+
- fail:
- 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
- 	return ret;
-@@ -583,8 +589,8 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
- {
- 	struct msm_iommu_drvdata *drvdata = dev_id;
- 	void __iomem *base;
--	unsigned int fsr = 0;
--	int ncb = 0, i = 0;
-+	unsigned int fsr;
-+	int ncb, i;
- 
- 	spin_lock(&msm_iommu_lock);
- 
-@@ -595,7 +601,6 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
- 
- 	base = drvdata->base;
- 
--	pr_err("===== WOAH! =====\n");
- 	pr_err("Unexpected IOMMU page fault!\n");
- 	pr_err("base = %08x\n", (unsigned int) base);
- 
+ static int msm8x60_iommu_init(void)
 -- 
 1.7.0.2
 
