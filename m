@@ -1,34 +1,51 @@
 From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 12 Nov 2010 19:29:47 -0800
-Subject: [PATCH 01/14] msm: iommu: Increase maximum MID size to 5 bits
+Date: Fri, 12 Nov 2010 19:29:54 -0800
+Subject: [PATCH 08/14] msm: iommu: Don't flush page tables if no devices
+	attached
 In-Reply-To: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
 References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1289619000-13167-2-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1289619000-13167-9-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On msm8x60, the MID field on the AXI connection to the
-IOMMU can be up to five bits wide. Thus, allow the IOMMU
-context platform data to map up to 32 MIDs.
+Don't flush the page tables on an IOMMU domain if there are
+no IOMMU devices attached to the domain. The act of
+attaching to the domain will cause an implicit flush of
+those areas if the page tables are configured to not be L2
+cacheable.
 
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/include/mach/iommu.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-msm/iommu.c |   15 +++++++++------
+ 1 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-msm/include/mach/iommu.h b/arch/arm/mach-msm/include/mach/iommu.h
-index 218ef57..17fc79f 100644
---- a/arch/arm/mach-msm/include/mach/iommu.h
-+++ b/arch/arm/mach-msm/include/mach/iommu.h
-@@ -26,7 +26,7 @@
-  * be present. These mappings are typically determined at design time and are
-  * not expected to change at run time.
-  */
--#define MAX_NUM_MIDS	16
-+#define MAX_NUM_MIDS	32
+diff --git a/arch/arm/mach-msm/iommu.c b/arch/arm/mach-msm/iommu.c
+index 134add7..74f2157 100644
+--- a/arch/arm/mach-msm/iommu.c
++++ b/arch/arm/mach-msm/iommu.c
+@@ -50,13 +50,16 @@ static void __flush_iotlb(struct iommu_domain *domain)
+ 	unsigned long *fl_table = priv->pgtable;
+ 	int i;
  
- /**
-  * struct msm_iommu_dev - a single IOMMU hardware instance
+-	dmac_flush_range(fl_table, fl_table + SZ_16K);
++	if (!list_empty(&priv->list_attached)) {
++		dmac_flush_range(fl_table, fl_table + SZ_16K);
+ 
+-	for (i = 0; i < NUM_FL_PTE; i++)
+-		if ((fl_table[i] & 0x03) == FL_TYPE_TABLE) {
+-			void *sl_table = __va(fl_table[i] & FL_BASE_MASK);
+-			dmac_flush_range(sl_table, sl_table + SZ_4K);
+-		}
++		for (i = 0; i < NUM_FL_PTE; i++)
++			if ((fl_table[i] & 0x03) == FL_TYPE_TABLE) {
++				void *sl_table = __va(fl_table[i] &
++								FL_BASE_MASK);
++				dmac_flush_range(sl_table, sl_table + SZ_4K);
++			}
++	}
+ #endif
+ 
+ 	list_for_each_entry(ctx_drvdata, &priv->list_attached, attached_elm) {
 -- 
 1.7.0.2
 
