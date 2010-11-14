@@ -1,38 +1,48 @@
-From: mkl0301@gmail.com (mkl0301 at gmail.com)
-Date: Mon, 15 Nov 2010 06:01:54 +0800
-Subject: [PATCH 1/1] ARM: cns3xxx: Fixup the missing second parameter to
-	addruart macro to allow them to build.
-Message-ID: <1289772114-7343-1-git-send-email-mkl0301@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 15 Nov 2010 08:22:55 +0900
+Subject: [patch v3 2/2] ARM: mach-shmobile: Add zboot support for
+	SuperH Mobile ARM
+In-Reply-To: <20101108015714.GB15671@verge.net.au>
+References: <20101014091231.858799238@vergenet.net>
+	<20101014091434.501864612@vergenet.net>
+	<20101107172310.GG1759@n2100.arm.linux.org.uk>
+	<20101108015714.GB15671@verge.net.au>
+Message-ID: <20101114232255.GA19510@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mac Lin <mkl0301@gmail.com>
+On Mon, Nov 08, 2010 at 10:57:14AM +0900, Simon Horman wrote:
+> On Sun, Nov 07, 2010 at 05:23:10PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Oct 14, 2010 at 06:12:33PM +0900, Simon Horman wrote:
+> > > +LIST "partner-jet-setup.txt"
+> > > +LIST "(C) Copyright 2010 Renesas Solutions Corp"
+> > > +LIST "Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>"
+> > > +
+> > > +LIST "RWT Setting"
+> > > +EW 0xE6020004, 0xA500
+> > > +EW 0xE6030004, 0xA500
+> > 
+> > Can you explain the necessity of this special scripting language, and
+> > where it comes from?
+> > 
+> > It looks like the file implementing the scripting language comes from
+> > something other than Linux, but it isn't clear what the licensing is
+> > of that.  Please confirm that it is GPL'd.
+> 
+> Hi Russell,
+> 
+> The aim is to allow JTAG scripts to be used in-place.
+> The script is constructed from ASM macros which are defined
+> in arch/arm/mach-shmobile/include/mach/zboot_macros.h which is
+> included later on in the patch. The same macros exist in SH assembly
+> in arch/sh/include/asm/romimage-macros.h.
+> 
+> With regards to the license, I have confirmed that it is GPL.
+> Would you be more comfortable if that was stated explicitly
+> in the new files?
 
-Fixup the missing second parameter to addruart macro to allow them to build,
-according to to commit 0e17226f7cd289504724466f4298abc9bdfca3fe.
+Hi Russell,
 
-Enabling DEBUG in head.S would cause:
-rch/arm/boot/compressed/head.S: Assembler messages:
-arch/arm/boot/compressed/head.S:1037: Error: too many positional arguments
-arch/arm/boot/compressed/head.S:1055: Error: too many positional arguments
+I'm wondering if you have had any time to consider this series again.
 
-Signed-off-by: Mac Lin <mkl0301@gmail.com>
----
- arch/arm/mach-cns3xxx/include/mach/debug-macro.S |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-index d16ce7e..9b50442 100644
---- a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-@@ -10,7 +10,7 @@
-  * published by the Free Software Foundation.
-  */
- 
--		.macro	addruart,rx
-+		.macro	addruart,rx,rtmp
- 		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx,      #0x10000000
--- 
-1.7.3
+Thanks
