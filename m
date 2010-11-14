@@ -1,27 +1,38 @@
-From: mkl0301@gmail.com (Lin Mac)
-Date: Mon, 15 Nov 2010 05:58:42 +0800
-Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
-In-Reply-To: <20101112143230.GA8197@n2100.arm.linux.org.uk>
-References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
-	<20101112143230.GA8197@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimK_MzQCXTwvyFE8sPA=gfz822FN_h4UF5RbnqR@mail.gmail.com>
+From: mkl0301@gmail.com (mkl0301 at gmail.com)
+Date: Mon, 15 Nov 2010 06:01:54 +0800
+Subject: [PATCH 1/1] ARM: cns3xxx: Fixup the missing second parameter to
+	addruart macro to allow them to build.
+Message-ID: <1289772114-7343-1-git-send-email-mkl0301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/12 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Nov 05, 2010 at 11:08:25AM +0800, Lin Mac wrote:
->> So I tried to enable DEBUG in head.S with following patch:
->> Then it failed at building:
->> ----
->> ? AS ? ? ?arch/arm/boot/compressed/lib1funcs.o
->> arch/arm/boot/compressed/head.S: Assembler messages:
->> arch/arm/boot/compressed/head.S:1019: Error: too many positional arguments
->> arch/arm/boot/compressed/head.S:1036: Error: too many positional arguments
->> make[3]: *** [arch/arm/boot/compressed/head.o] Error 1
-> Please do:
-> make ARCH=arm CROSS_COMPILE=... arch/arm/boot/compressed/head.s
-> and send me (in private mail) a copy of head.s. ?Thanks.
-It is fixed. I'll send the patch.
+From: Mac Lin <mkl0301@gmail.com>
 
-Best Regards,
-Mac Lin.
+Fixup the missing second parameter to addruart macro to allow them to build,
+according to to commit 0e17226f7cd289504724466f4298abc9bdfca3fe.
+
+Enabling DEBUG in head.S would cause:
+rch/arm/boot/compressed/head.S: Assembler messages:
+arch/arm/boot/compressed/head.S:1037: Error: too many positional arguments
+arch/arm/boot/compressed/head.S:1055: Error: too many positional arguments
+
+Signed-off-by: Mac Lin <mkl0301@gmail.com>
+---
+ arch/arm/mach-cns3xxx/include/mach/debug-macro.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
+index d16ce7e..9b50442 100644
+--- a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
++++ b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
+@@ -10,7 +10,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-		.macro	addruart,rx
++		.macro	addruart,rx,rtmp
+ 		mrc	p15, 0, \rx, c1, c0
+ 		tst	\rx, #1			@ MMU enabled?
+ 		moveq	\rx,      #0x10000000
+-- 
+1.7.3
