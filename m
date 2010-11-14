@@ -1,38 +1,27 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Sun, 14 Nov 2010 12:17:38 -0800
-Subject: [PATCH 09/14] msm: iommu: Kconfig option for cacheable page tables
-In-Reply-To: <1289619000-13167-10-git-send-email-stepanm@codeaurora.org>
-References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
-	<1289619000-13167-10-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1289765858.24270.240.camel@m0nster>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Mon, 15 Nov 2010 05:58:42 +0800
+Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
+In-Reply-To: <20101112143230.GA8197@n2100.arm.linux.org.uk>
+References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
+	<20101112143230.GA8197@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimK_MzQCXTwvyFE8sPA=gfz822FN_h4UF5RbnqR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-11-12 at 19:29 -0800, Stepan Moskovchenko wrote:
->  
-> +config IOMMU_PGTABLES_L2
-> +	depends on ARCH_MSM8X60
-> +	depends on MMU
-> +	depends on CPU_DCACHE_DISABLE=n
-> +	depends on SMP
-> +	bool "Cacheable IOMMU page tables"
-> +	default y
-> +	help
-> +	  Allows the IOMMU page tables to be brought into the L2 cache. This
-> +	  improves the TLB miss latency at the expense of potential pollution
-> +	  of the L2 cache. This option has been shown to improve multimedia
-> +	  performance in some cases.
-> +
-> +	  If unsure, say Y here.
+2010/11/12 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Fri, Nov 05, 2010 at 11:08:25AM +0800, Lin Mac wrote:
+>> So I tried to enable DEBUG in head.S with following patch:
+>> Then it failed at building:
+>> ----
+>> ? AS ? ? ?arch/arm/boot/compressed/lib1funcs.o
+>> arch/arm/boot/compressed/head.S: Assembler messages:
+>> arch/arm/boot/compressed/head.S:1019: Error: too many positional arguments
+>> arch/arm/boot/compressed/head.S:1036: Error: too many positional arguments
+>> make[3]: *** [arch/arm/boot/compressed/head.o] Error 1
+> Please do:
+> make ARCH=arm CROSS_COMPILE=... arch/arm/boot/compressed/head.s
+> and send me (in private mail) a copy of head.s. ?Thanks.
+It is fixed. I'll send the patch.
 
-Why would someone want this off?
-
-The other thing is that you usually want this included with the code
-that uses the option.
-
-Daniel
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Best Regards,
+Mac Lin.
