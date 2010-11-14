@@ -1,27 +1,38 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 14 Nov 2010 10:11:26 +0000
-Subject: [PATCH v2 20/20] ARM: LPAE: Add the Kconfig entries
-In-Reply-To: <4CDE86C3.9080407@ru.mvista.com>
+Date: Sun, 14 Nov 2010 10:13:38 +0000
+Subject: [PATCH v2 08/20] ARM: LPAE: MMU setup for the 3-level page table
+	format
+In-Reply-To: <1289584840-18097-9-git-send-email-catalin.marinas@arm.com>
 References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-21-git-send-email-catalin.marinas@arm.com>
-	<4CDE86C3.9080407@ru.mvista.com>
-Message-ID: <AANLkTing1GK9F3rCYUn3sPjxyy0s8nNpFg7yaULn3kCh@mail.gmail.com>
+	<1289584840-18097-9-git-send-email-catalin.marinas@arm.com>
+Message-ID: <AANLkTinnJZwiiuX4747WSmrjm7j9JhG_CGugqnK1jWEF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 November 2010 12:38, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> On 12-11-2010 21:00, Catalin Marinas wrote:
->> +config ARM_LPAE
->> + ? ? ? bool "Support for the Large Physical Address Extension"
->> + ? ? ? depends on MMU&& ?CPU_V7
->> + ? ? ? help
->> + ? ? ? ? Say Y if you have an ARMv7 processor supporting the LPAE page
->> table
->> + ? ? ? ? format and you would like access memory beyond the 4GB limit.
+On 12 November 2010 18:00, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> This patch adds the MMU initialisation for the LPAE page table format.
+> The swapper_pg_dir size with LPAE is 5 rather than 4 pages. The
+> __v7_setup function configures the TTBRx split based on the PAGE_OFFSET
+> and sets the corresponding TTB control and MAIRx bits (similar to
+> PRRR/NMRR for TEX remapping). The 36-bit mappings (supersections) and
+> a few other memory types in mmu.c are conditionally compiled.
+[...]
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -45,11 +46,20 @@
+> ?#error KERNEL_RAM_VADDR must start at 0xXXXX8000
+> ?#endif
 >
-> ? Maybe "like to access"?
+> +#ifdef CONFIG_ARM_LPAE
+> + ? ? ? /* LPAE requires an additional page for the PGD */
+> +#define PG_DIR_SIZE ? ?0x5000
+> +#define PTE_WORDS ? ? ?3
+> +#else
+> +#define PG_DIR_SIZE ? ?0x4000
+> +#define PTE_WORDS ? ? ?2
+> +#endif
 
-Yes, thanks.
+This should have been called PTE_ORDER, the PTE_WORDS naming is misleading.
 
 -- 
 Catalin
