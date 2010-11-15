@@ -1,159 +1,113 @@
 From: joe@perches.com (Joe Perches)
-Date: Sun, 14 Nov 2010 19:04:19 -0800
-Subject: [PATCH 00/44] remove unnecessary semicolons
-Message-ID: <cover.1289789604.git.joe@perches.com>
+Date: Sun, 14 Nov 2010 19:04:20 -0800
+Subject: [PATCH 01/44] arch/arm: Remove unnecessary semicolons
+In-Reply-To: <cover.1289789604.git.joe@perches.com>
+References: <cover.1289789604.git.joe@perches.com>
+Message-ID: <b6d517c8da3ca0d50c836736e76059c89d692b6e.1289789604.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ya trivial series...
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/mach-at91/at91cap9_devices.c    |    2 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c |    2 +-
+ arch/arm/mach-at91/at91sam9rl_devices.c  |    2 +-
+ arch/arm/mach-nuc93x/time.c              |    2 +-
+ arch/arm/mach-tegra/tegra2_clocks.c      |    2 +-
+ arch/arm/mach-w90x900/cpu.c              |    2 +-
+ arch/arm/plat-mxc/irq.c                  |    2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
 
-Joe Perches (44):
-  arch/arm: Remove unnecessary semicolons
-  arch/microblaze: Remove unnecessary semicolons
-  arch/um: Remove unnecessary semicolons
-  drivers/cpufreq: Remove unnecessary semicolons
-  drivers/gpio: Remove unnecessary semicolons
-  drivers/i2c: Remove unnecessary semicolons
-  drivers/isdn: Remove unnecessary semicolons
-  drivers/leds: Remove unnecessary semicolons
-  drivers/media/video: Remove unnecessary semicolons
-  drivers/misc: Remove unnecessary semicolons
-  drivers/mmc: Remove unnecessary semicolons
-  drivers/net/bnx2x: Remove unnecessary semicolons
-  drivers/net/e1000e: Remove unnecessary semicolons
-  drivers/net/ixgbe: Remove unnecessary semicolons
-  drivers/net/vxge: Remove unnecessary semicolons
-  drivers/net/wireless/ath: Remove unnecessary semicolons
-  drivers/net/wireless/iwlwifi: Remove unnecessary semicolons
-  drivers/net/cnic.c: Remove unnecessary semicolons
-  drivers/platform/x86: Remove unnecessary semicolons
-  drivers/power: Remove unnecessary semicolons
-  drivers/s390/net: Remove unnecessary semicolons
-  drivers/scsi/be2iscsi: Remove unnecessary semicolons
-  drivers/scsi/bfa: Remove unnecessary semicolons
-  drivers/scsi/lpfc: Remove unnecessary semicolons
-  drivers/scsi/pm8001: Remove unnecessary semicolons
-  drivers/scsi/qla2xxx: Remove unnecessary semicolons
-  drivers/serial: Remove unnecessary semicolons
-  drivers/spi: Remove unnecessary semicolons
-  drivers/staging: Remove unnecessary semicolons
-  drivers/usb/gadget: Remove unnecessary semicolons
-  drivers/xen: Remove unnecessary semicolons
-  fs/9p: Remove unnecessary semicolons
-  fs/ceph: Remove unnecessary semicolons
-  fs/logfs: Remove unnecessary semicolons
-  fs/nfs: Remove unnecessary semicolons
-  fs/ocfs2: Remove unnecessary semicolons
-  fs/ubifs: Remove unnecessary semicolons
-  include/linux/if_macvlan.h: Remove unnecessary semicolons
-  include/net/caif/cfctrl.h: Remove unnecessary semicolons
-  mm/hugetlb.c: Remove unnecessary semicolons
-  net/ipv6/mcast.c: Remove unnecessary semicolons
-  net/sunrpc/addr.c: Remove unnecessary semicolons
-  sound/core/pcm_lib.c: Remove unnecessary semicolons
-  sound/soc/codecs: Remove unnecessary semicolons
-
- arch/arm/mach-at91/at91cap9_devices.c              |    2 +-
- arch/arm/mach-at91/at91sam9g45_devices.c           |    2 +-
- arch/arm/mach-at91/at91sam9rl_devices.c            |    2 +-
- arch/arm/mach-nuc93x/time.c                        |    2 +-
- arch/arm/mach-tegra/tegra2_clocks.c                |    2 +-
- arch/arm/mach-w90x900/cpu.c                        |    2 +-
- arch/arm/plat-mxc/irq.c                            |    2 +-
- arch/microblaze/lib/memmove.c                      |    2 +-
- arch/um/drivers/mmapper_kern.c                     |    2 +-
- drivers/cpufreq/cpufreq_conservative.c             |    2 +-
- drivers/gpio/langwell_gpio.c                       |    2 +-
- drivers/i2c/busses/i2c-designware.c                |    2 +-
- drivers/isdn/hardware/mISDN/mISDNinfineon.c        |    4 ++--
- drivers/isdn/hardware/mISDN/mISDNisar.c            |    2 +-
- drivers/leds/leds-mc13783.c                        |    2 +-
- drivers/media/video/cx88/cx88-blackbird.c          |    2 +-
- drivers/media/video/davinci/vpfe_capture.c         |    2 +-
- drivers/media/video/em28xx/em28xx-cards.c          |    2 +-
- drivers/misc/bmp085.c                              |    2 +-
- drivers/misc/isl29020.c                            |    2 +-
- drivers/mmc/host/davinci_mmc.c                     |    2 +-
- drivers/net/bnx2x/bnx2x_link.c                     |    4 ++--
- drivers/net/bnx2x/bnx2x_main.c                     |    2 +-
- drivers/net/cnic.c                                 |    2 +-
- drivers/net/e1000e/netdev.c                        |    2 +-
- drivers/net/ixgbe/ixgbe_sriov.c                    |    2 +-
- drivers/net/vxge/vxge-main.c                       |    2 +-
- drivers/net/wireless/ath/ath9k/htc.h               |    2 +-
- drivers/net/wireless/iwlwifi/iwl-agn.c             |    2 +-
- drivers/platform/x86/classmate-laptop.c            |    2 +-
- drivers/platform/x86/thinkpad_acpi.c               |    2 +-
- drivers/power/intel_mid_battery.c                  |    2 +-
- drivers/s390/net/qeth_core_sys.c                   |    2 +-
- drivers/scsi/be2iscsi/be_main.c                    |    4 ++--
- drivers/scsi/bfa/bfa_fcs_lport.c                   |    2 +-
- drivers/scsi/lpfc/lpfc_bsg.c                       |    2 +-
- drivers/scsi/pm8001/pm8001_init.c                  |    2 +-
- drivers/scsi/qla2xxx/qla_isr.c                     |    4 ++--
- drivers/scsi/qla2xxx/qla_nx.c                      |    2 +-
- drivers/serial/mrst_max3110.c                      |    2 +-
- drivers/spi/amba-pl022.c                           |    2 +-
- drivers/spi/spi_nuc900.c                           |    2 +-
- .../staging/ath6kl/hif/sdio/linux_sdio/src/hif.c   |    2 +-
- drivers/staging/ath6kl/os/linux/ar6000_drv.c       |    2 +-
- drivers/staging/bcm/InterfaceInit.c                |    2 +-
- drivers/staging/bcm/InterfaceIsr.c                 |    2 +-
- drivers/staging/bcm/Misc.c                         |    4 ++--
- .../comedi/drivers/addi-data/APCI1710_Tor.c        |    2 +-
- .../comedi/drivers/addi-data/hwdrv_apci1500.c      |    2 +-
- .../comedi/drivers/addi-data/hwdrv_apci1516.c      |    2 +-
- .../comedi/drivers/addi-data/hwdrv_apci3501.c      |    2 +-
- drivers/staging/comedi/drivers/amplc_pci230.c      |    2 +-
- drivers/staging/comedi/drivers/cb_das16_cs.c       |    2 +-
- drivers/staging/comedi/drivers/comedi_bond.c       |    2 +-
- drivers/staging/crystalhd/crystalhd_hw.c           |    2 +-
- drivers/staging/go7007/go7007-driver.c             |    2 +-
- drivers/staging/iio/accel/lis3l02dq_ring.c         |    2 +-
- .../staging/intel_sst/intel_sst_drv_interface.c    |    4 ++--
- drivers/staging/keucr/smilmain.c                   |    4 ++--
- drivers/staging/keucr/smilsub.c                    |    4 ++--
- drivers/staging/msm/lcdc_toshiba_wvga_pt.c         |    2 +-
- drivers/staging/rt2860/common/cmm_data_pci.c       |    4 ++--
- drivers/staging/rt2860/rt_linux.c                  |    2 +-
- drivers/staging/rt2860/rtmp.h                      |    2 +-
- drivers/staging/rtl8192e/ieee80211/ieee80211_tx.c  |    2 +-
- drivers/staging/rtl8192e/r819xE_phy.c              |    2 +-
- drivers/staging/rtl8192u/ieee80211/ieee80211_tx.c  |    2 +-
- drivers/staging/rtl8192u/r8192U_core.c             |    2 +-
- drivers/staging/rtl8192u/r819xU_phy.c              |    2 +-
- drivers/staging/rtl8712/rtl8712_efuse.c            |    2 +-
- drivers/staging/rtl8712/rtl8712_xmit.c             |    2 +-
- drivers/staging/rtl8712/rtl871x_xmit.c             |    2 +-
- drivers/staging/tidspbridge/core/tiomap3430.c      |    4 ++--
- drivers/staging/tidspbridge/rmgr/nldr.c            |    2 +-
- drivers/staging/vt6655/card.c                      |    2 +-
- drivers/staging/vt6655/iwctl.c                     |    2 +-
- drivers/staging/vt6655/wpa2.c                      |    4 ++--
- drivers/staging/vt6656/baseband.c                  |    2 +-
- drivers/staging/vt6656/iwctl.c                     |    2 +-
- drivers/staging/vt6656/power.c                     |    2 +-
- drivers/staging/vt6656/wpa2.c                      |    4 ++--
- drivers/usb/gadget/f_fs.c                          |    2 +-
- drivers/xen/swiotlb-xen.c                          |    2 +-
- fs/9p/acl.c                                        |    2 +-
- fs/9p/xattr.c                                      |    2 +-
- fs/ceph/mds_client.c                               |    2 +-
- fs/logfs/readwrite.c                               |    2 +-
- fs/nfs/getroot.c                                   |    2 +-
- fs/ocfs2/refcounttree.c                            |    2 +-
- fs/ubifs/scan.c                                    |    2 +-
- include/linux/if_macvlan.h                         |    2 +-
- include/net/caif/cfctrl.h                          |    2 +-
- mm/hugetlb.c                                       |    2 +-
- net/ipv6/mcast.c                                   |    2 +-
- net/sunrpc/addr.c                                  |    2 +-
- sound/core/pcm_lib.c                               |    2 +-
- sound/soc/codecs/wm8904.c                          |    2 +-
- sound/soc/codecs/wm8940.c                          |    1 -
- sound/soc/codecs/wm8993.c                          |    2 +-
- sound/soc/codecs/wm_hubs.c                         |    2 +-
- 100 files changed, 111 insertions(+), 112 deletions(-)
-
+diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+index d1f775e..308ce7a 100644
+--- a/arch/arm/mach-at91/at91cap9_devices.c
++++ b/arch/arm/mach-at91/at91cap9_devices.c
+@@ -171,7 +171,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 	 */
+ 	usba_udc_data.pdata.vbus_pin = -EINVAL;
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
++	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+ 	if (data && data->vbus_pin > 0) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 1e8f275..5e9f8a4 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -256,7 +256,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ {
+ 	usba_udc_data.pdata.vbus_pin = -EINVAL;
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
++	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+ 	if (data && data->vbus_pin > 0) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index 53aaa94..c49262b 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -145,7 +145,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 	 */
+ 	usba_udc_data.pdata.vbus_pin = -EINVAL;
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
++	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+ 	if (data && data->vbus_pin > 0) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+diff --git a/arch/arm/mach-nuc93x/time.c b/arch/arm/mach-nuc93x/time.c
+index 2f90f9d..f9807c0 100644
+--- a/arch/arm/mach-nuc93x/time.c
++++ b/arch/arm/mach-nuc93x/time.c
+@@ -82,7 +82,7 @@ static void nuc93x_timer_setup(void)
+ 	timer0_load = (rate / TICKS_PER_SEC);
+ 	__raw_writel(timer0_load, REG_TICR0);
+ 
+-	val |= (PERIOD | COUNTEN | INTEN | PRESCALE);;
++	val |= (PERIOD | COUNTEN | INTEN | PRESCALE);
+ 	__raw_writel(val, REG_TCSR0);
+ 
+ }
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index ae3b308..7f9d2252 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -293,7 +293,7 @@ static int tegra2_super_clk_set_parent(struct clk *c, struct clk *p)
+ 	const struct clk_mux_sel *sel;
+ 	int shift;
+ 
+-	val = clk_readl(c->reg + SUPER_CLK_MUX);;
++	val = clk_readl(c->reg + SUPER_CLK_MUX);
+ 	BUG_ON(((val & SUPER_STATE_MASK) != SUPER_STATE_RUN) &&
+ 		((val & SUPER_STATE_MASK) != SUPER_STATE_IDLE));
+ 	shift = ((val & SUPER_STATE_MASK) == SUPER_STATE_IDLE) ?
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 83c5632..0a235e5 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -60,7 +60,7 @@ static DEFINE_CLK(emc, 7);
+ static DEFINE_SUBCLK(rmii, 2);
+ static DEFINE_CLK(usbd, 8);
+ static DEFINE_CLK(usbh, 9);
+-static DEFINE_CLK(g2d, 10);;
++static DEFINE_CLK(g2d, 10);
+ static DEFINE_CLK(pwm, 18);
+ static DEFINE_CLK(ps2, 24);
+ static DEFINE_CLK(kpi, 25);
+diff --git a/arch/arm/plat-mxc/irq.c b/arch/arm/plat-mxc/irq.c
+index 7331f2a..d7809d0 100644
+--- a/arch/arm/plat-mxc/irq.c
++++ b/arch/arm/plat-mxc/irq.c
+@@ -53,7 +53,7 @@ int imx_irq_set_priority(unsigned char irq, unsigned char prio)
+ 	unsigned int mask = 0x0F << irq % 8 * 4;
+ 
+ 	if (irq >= MXC_INTERNAL_IRQS)
+-		return -EINVAL;;
++		return -EINVAL;
+ 
+ 	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
+ 	temp &= ~mask;
 -- 
 1.7.3.1.g432b3.dirty
