@@ -1,280 +1,232 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 15 Nov 2010 22:36:30 +0800
-Subject: [PATCH 06/11] ARM: imx: Add IOMUX support for i.MX28
+Date: Mon, 15 Nov 2010 22:36:28 +0800
+Subject: [PATCH 04/11] ARM: imx: Add timer support for i.MX28
 In-Reply-To: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
 References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1289831795-4373-7-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1289831795-4373-5-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Soc i.MX28 supports IOMUX function in block PINCTRL. Comparing
-to the naming of iomux-v1 and iomux-v3, it uses iomux-pinctrl,
-since PINCTRL is a totally different IP block from IOMUX and it's
-not reasonable to name it iomux-v2 or iomux-v4, which is used to
-distinguish the different revision of same IP block.
+SoC i.MX28 implements the timer in block TIMROT. It adds the
+support in the same file with GPT, and uses timer_is_timrot()
+to distinguish the IP block.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/plat-mxc/include/mach/iomux-mx28.h    |   50 +++++++++++++
- arch/arm/plat-mxc/include/mach/iomux-pinctrl.h |   91 +++++++++++++++++++++++
- arch/arm/plat-mxc/iomux-pinctrl.c              |   94 ++++++++++++++++++++++++
- 3 files changed, 235 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/include/mach/iomux-mx28.h
- create mode 100644 arch/arm/plat-mxc/include/mach/iomux-pinctrl.h
- create mode 100644 arch/arm/plat-mxc/iomux-pinctrl.c
+ arch/arm/plat-mxc/time.c |  120 ++++++++++++++++++++++++++++++++++++++--------
+ 1 files changed, 100 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx28.h b/arch/arm/plat-mxc/include/mach/iomux-mx28.h
-new file mode 100644
-index 0000000..8c68bd6
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx28.h
-@@ -0,0 +1,50 @@
-+/*
-+ * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index f9a1b05..3e1f09d 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -5,6 +5,7 @@
+  *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
+  *  Copyright (C) 2006-2007 Pavel Pisa (ppisa at pikron.com)
+  *  Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
++ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -63,8 +64,22 @@
+ #define V2_TCN			0x24
+ #define V2_TCMP			0x10
+ 
+-#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
+-#define timer_is_v2()	(!timer_is_v1())
++/* TIMROT */
++#define HW_TIMROT_ROTCTRL			0x00
++#define HW_TIMROT_TIMCTRL0			0x20
++#define HW_TIMROT_TIMCTRL0_SET			0x24
++#define HW_TIMROT_TIMCTRL0_CLR			0x28
++#define HW_TIMROT_RUNNING_COUNT0		0x30
++#define HW_TIMROT_MATCH_COUNT0			0x50
++#define BM_TIMROT_TIMCTRL0_IRQ_EN		0x00004000
++#define BM_TIMROT_TIMCTRL0_IRQ			0x00008000
++#define BM_TIMROT_TIMCTRL0_MATCH_MODE		0x00000800
++#define BP_TIMROT_TIMCTRL0_SELECT		0
++#define BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL	0xb
 +
-+#ifndef __MACH_IOMUX_MX28_H__
-+#define __MACH_IOMUX_MX28_H__
-+
-+#include <mach/iomux-pinctrl.h>
-+
-+/*
-+ * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
-+ * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-+ * See also iomux-pinctrl.h
-+ *
-+ *					 		BANK PIN     MUX            VOL          MA            PULL
-+ */
-+/* DUART */
-+#define MX28_PAD_PWM0__DUART_RX			IOMUX_PAD(3, 16, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+#define MX28_PAD_PWM1__DUART_TX			IOMUX_PAD(3, 17, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+
-+/* FEC */
-+#define MX28_PAD_ENET0_MDC__ENET0_MDC		IOMUX_PAD(4, 0,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_MDIO__ENET0_MDIO		IOMUX_PAD(4, 1,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN	IOMUX_PAD(4, 2,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_RXD0__ENET0_RXD0		IOMUX_PAD(4, 3,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_RXD1__ENET0_RXD1		IOMUX_PAD(4, 4,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN	IOMUX_PAD(4, 6,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_TXD0__ENET0_TXD0		IOMUX_PAD(4, 7,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_TXD1__ENET0_TXD1		IOMUX_PAD(4, 8,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET_CLK__ENET_CLK		IOMUX_PAD(4, 16, PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+
-+/* GPIO */
-+#define MX28_PAD_SSP1_DATA3__GPIO_2_15		IOMUX_PAD(2, 15, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13	IOMUX_PAD(4, 13, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+
-+#endif /* __MACH_IOMUX_MX28_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-pinctrl.h b/arch/arm/plat-mxc/include/mach/iomux-pinctrl.h
-new file mode 100644
-index 0000000..c2fdb33
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/iomux-pinctrl.h
-@@ -0,0 +1,91 @@
-+/*
-+ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-+ *			<armlinux@phytec.de>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#ifndef __MACH_IOMUX_PINCTRL_H__
-+#define __MACH_IOMUX_PINCTRL_H__
-+
-+typedef struct deprecated_pad_desc {
-+	unsigned bank:3;
-+	unsigned pin:5;
-+	unsigned muxsel:2;
-+	unsigned ma:3;
-+	unsigned vol:2;
-+	unsigned pull:1;
-+} iomux_pinctrl_cfg_t;
-+
-+#define IOMUX_PAD(_bank, _pin, _muxsel, _vol, _ma, _pull)	\
-+		{						\
-+			.bank	= _bank,			\
-+			.pin	= _pin,				\
-+			.muxsel	= _muxsel,			\
-+			.vol	= _vol,				\
-+			.ma	= _ma,				\
-+			.pull	= _pull,			\
-+		}
-+
-+#define PAD_MUXSEL_0		0
-+#define PAD_MUXSEL_1		1
-+#define PAD_MUXSEL_2		2
-+#define PAD_MUXSEL_GPIO		3
-+
-+#define PAD_1V8			0
-+#define PAD_3V3			1
-+#define PAD_VOL_NONE		2
-+
-+#define PAD_4MA			0
-+#define PAD_8MA			1
-+#define PAD_12MA		2
-+#define PAD_16MA		3
-+#define PAD_MA_NONE		4
-+
-+#define PAD_NOPULL		0
-+#define PAD_PULL		1
-+
-+#define MX51_NUM_GPIO_PORT	4
-+
-+#define GPIO_PIN_MASK 0x1f
-+
-+#define GPIO_PORT_SHIFT 5
-+#define GPIO_PORT_MASK (0x7 << GPIO_PORT_SHIFT)
-+
-+#define GPIO_PORTA	(0 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTB	(1 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTC	(2 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTD	(3 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTE	(4 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTF	(5 << GPIO_PORT_SHIFT)
-+
-+/*
-+ * setups a single pad in the iomuxer
-+ */
-+int mxc_iomux_pinctrl_setup_pad(iomux_pinctrl_cfg_t *pad);
-+
-+/*
-+ * setups mutliple pads
-+ * convenient way to call the above function with tables
-+ */
-+int mxc_iomux_pinctrl_setup_multiple_pads(iomux_pinctrl_cfg_t *pad_list, unsigned count);
-+
-+/*
-+ * Initialise the iomux controller
-+ */
-+void mxc_iomux_pinctrl_init(void __iomem *iomux_pinctrl_base);
-+
-+#endif /* __MACH_IOMUX_PINCTRL_H__*/
-diff --git a/arch/arm/plat-mxc/iomux-pinctrl.c b/arch/arm/plat-mxc/iomux-pinctrl.c
-new file mode 100644
-index 0000000..5f5b5ac
---- /dev/null
-+++ b/arch/arm/plat-mxc/iomux-pinctrl.c
-@@ -0,0 +1,94 @@
-+/*
-+ * Copyright 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
-+ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-+ *                       <armlinux@phytec.de>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/string.h>
-+#include <linux/gpio.h>
-+#include <asm/mach/map.h>
-+#include <mach/hardware.h>
-+#include <mach/iomux-pinctrl.h>
-+
-+static void __iomem *base;
-+
-+/*
-+ * configures a single pad in the iomuxer
-+ */
-+int mxc_iomux_pinctrl_setup_pad(iomux_pinctrl_cfg_t *pad)
++#define timer_is_v1()		(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
++#define timer_is_v2()		(!timer_is_v1())
++#define timer_is_timrot()	(cpu_is_mx28())
+ 
+ static struct clock_event_device clockevent_mxc;
+ static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
+@@ -105,6 +120,24 @@ static void gpt_irq_acknowledge(void)
+ 		__raw_writel(V2_TSTAT_OF1, timer_base + V2_TSTAT);
+ }
+ 
++static inline void timrot_irq_disable(void)
 +{
-+	u32 reg, ofs, bp, bm;
++	__raw_writel(BM_TIMROT_TIMCTRL0_IRQ_EN,
++			timer_base + HW_TIMROT_TIMCTRL0_CLR);
++}
 +
-+	/* MUXSEL */
-+	ofs = pad->bank * 0x20 + pad->pin / 16 * 0x10;
-+	bp = pad->pin % 16 * 2;
-+	bm = 0x3 << bp;
-+	reg = __raw_readl(base + ofs);
-+	reg &= ~bm;
-+	reg |= pad->muxsel << bp;
-+	__raw_writel(reg, base + ofs);
++static inline void timrot_irq_enable(void)
++{
++	__raw_writel(BM_TIMROT_TIMCTRL0_IRQ_EN,
++			timer_base + HW_TIMROT_TIMCTRL0_SET);
++}
 +
-+	/* DRIVE */
-+	if (pad->ma != PAD_MA_NONE && pad->vol != PAD_VOL_NONE)
-+	{
-+		ofs = 0x300 + pad->bank * 0x40 + pad->pin / 8 * 0x10;
-+		bp = pad->pin % 8 * 4;
-+		bm = 0x7 << bp;
-+		reg = __raw_readl(base + ofs);
-+		reg &= ~bm;
-+		reg |= pad->ma << bp | pad->vol << (bp + 2);
-+		__raw_writel(reg, base + ofs);
++static void timrot_irq_acknowledge(void)
++{
++	__raw_writel(BM_TIMROT_TIMCTRL0_IRQ,
++			timer_base + HW_TIMROT_TIMCTRL0_CLR);
++}
++
+ static cycle_t mx1_2_get_cycles(struct clocksource *cs)
+ {
+ 	return __raw_readl(timer_base + MX1_2_TCN);
+@@ -115,6 +148,11 @@ static cycle_t v2_get_cycles(struct clocksource *cs)
+ 	return __raw_readl(timer_base + V2_TCN);
+ }
+ 
++static cycle_t timrot_get_cycles(struct clocksource *cs)
++{
++	return ~__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNT0);
++}
++
+ static struct clocksource clocksource_mxc = {
+ 	.name 		= "mxc_timer1",
+ 	.rating		= 200,
+@@ -128,8 +166,12 @@ static int __init mxc_clocksource_init(struct clk *timer_clk)
+ {
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+-	if (timer_is_v2())
++	if (timer_is_timrot()) {
++		clocksource_mxc.read = timrot_get_cycles;
++		clocksource_mxc.shift = 10;
++	} else if (timer_is_v2()) {
+ 		clocksource_mxc.read = v2_get_cycles;
 +	}
-+
-+	/* PULL */
-+	ofs = 0x600 + pad->bank * 0x10;
-+	bp = pad->pin;
-+	bm = 0x1 << bp;
-+	reg = __raw_readl(base + ofs);
-+	reg &= ~bm;
-+	reg |= pad->pull << bp;
-+	__raw_writel(reg, base + ofs);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(mxc_iomux_pinctrl_setup_pad);
-+
-+int mxc_iomux_pinctrl_setup_multiple_pads(iomux_pinctrl_cfg_t *pad_list, unsigned count)
+ 
+ 	clocksource_mxc.mult = clocksource_hz2mult(c,
+ 					clocksource_mxc.shift);
+@@ -166,6 +208,18 @@ static int v2_set_next_event(unsigned long evt,
+ 				-ETIME : 0;
+ }
+ 
++static int timrot_set_next_event(unsigned long evt,
++					struct clock_event_device *dev)
 +{
-+	iomux_pinctrl_cfg_t *p = pad_list;
-+	int i;
-+	int ret;
++	unsigned long match;
 +
-+	for (i = 0; i < count; i++) {
-+		ret = mxc_iomux_pinctrl_setup_pad(p);
-+		if (ret)
-+			return ret;
-+		p++;
++	match = __raw_readl(timer_base + HW_TIMROT_MATCH_COUNT0) - evt;
++	__raw_writel(match, timer_base + HW_TIMROT_MATCH_COUNT0);
++
++	return (int)(match - __raw_readl(timer_base +
++			HW_TIMROT_RUNNING_COUNT0)) > 0 ? -ETIME : 0;
++}
++
+ #ifdef DEBUG
+ static const char *clock_event_mode_label[] = {
+ 	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
+@@ -186,12 +240,19 @@ static void mxc_set_mode(enum clock_event_mode mode,
+ 	 */
+ 	local_irq_save(flags);
+ 
+-	/* Disable interrupt in GPT module */
+-	gpt_irq_disable();
++	/* Disable interrupt in timer module */
++	if (timer_is_timrot())
++		timrot_irq_disable();
++	else
++		gpt_irq_disable();
+ 
+ 	if (mode != clockevent_mode) {
+ 		/* Set event time into far-far future */
+-		if (timer_is_v2())
++		if (timer_is_timrot())
++			__raw_writel(__raw_readl(timer_base +
++					HW_TIMROT_RUNNING_COUNT0) + 3,
++					timer_base + HW_TIMROT_MATCH_COUNT0);
++		else if (timer_is_v2())
+ 			__raw_writel(__raw_readl(timer_base + V2_TCN) - 3,
+ 					timer_base + V2_TCMP);
+ 		else
+@@ -199,7 +260,10 @@ static void mxc_set_mode(enum clock_event_mode mode,
+ 					timer_base + MX1_2_TCMP);
+ 
+ 		/* Clear pending interrupt */
+-		gpt_irq_acknowledge();
++		if (timer_is_timrot())
++			timrot_irq_acknowledge();
++		else
++			gpt_irq_acknowledge();
+ 	}
+ 
+ #ifdef DEBUG
+@@ -225,7 +289,10 @@ static void mxc_set_mode(enum clock_event_mode mode,
+ 	 * mode switching
+ 	 */
+ 		local_irq_save(flags);
+-		gpt_irq_enable();
++		if (timer_is_timrot())
++			timrot_irq_enable();
++		else
++			gpt_irq_enable();
+ 		local_irq_restore(flags);
+ 		break;
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+@@ -249,7 +316,10 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
+ 	else
+ 		tstat = __raw_readl(timer_base + MX1_2_TSTAT);
+ 
+-	gpt_irq_acknowledge();
++	if (timer_is_timrot())
++		timrot_irq_acknowledge();
++	else
++		gpt_irq_acknowledge();
+ 
+ 	evt->event_handler(evt);
+ 
+@@ -275,7 +345,9 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
+ {
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+-	if (timer_is_v2())
++	if (timer_is_timrot())
++		clockevent_mxc.set_next_event = timrot_set_next_event;
++	else if (timer_is_v2())
+ 		clockevent_mxc.set_next_event = v2_set_next_event;
+ 
+ 	clockevent_mxc.mult = div_sc(c, NSEC_PER_SEC,
+@@ -303,16 +375,24 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+ 	/*
+ 	 * Initialise to a known state (all timers off, and timing reset)
+ 	 */
+-
+-	__raw_writel(0, timer_base + MXC_TCTL);
+-	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+-
+-	if (timer_is_v2())
+-		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+-	else
+-		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+-
+-	__raw_writel(tctl_val, timer_base + MXC_TCTL);
++	if (timer_is_timrot()) {
++		mxc_reset_block(base + HW_TIMROT_ROTCTRL);
++		__raw_writel(
++			BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL |
++			BM_TIMROT_TIMCTRL0_IRQ_EN |
++			BM_TIMROT_TIMCTRL0_MATCH_MODE,
++			timer_base + HW_TIMROT_TIMCTRL0); /* timer0*/
++	} else {
++		__raw_writel(0, timer_base + MXC_TCTL);
++		__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
++		if (timer_is_v2())
++			tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR |
++					V2_TCTL_WAITEN | MXC_TCTL_TEN;
++		else
++			tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 |
++					MXC_TCTL_TEN;
++		__raw_writel(tctl_val, timer_base + MXC_TCTL);
 +	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(mxc_iomux_pinctrl_setup_multiple_pads);
-+
-+void mxc_iomux_pinctrl_init(void __iomem *iomux_pinctrl_base)
-+{
-+	base = iomux_pinctrl_base;
-+}
+ 
+ 	/* init and register the timer to the framework */
+ 	mxc_clocksource_init(timer_clk);
 -- 
 1.7.1
