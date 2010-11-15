@@ -1,42 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Nov 2010 13:06:13 -0800
-Subject: [GIT PULL] omap fixes for 2.6.37-rc1
-Message-ID: <20101115210613.GM9264@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Nov 2010 21:46:14 +0000
+Subject: [PATCH v2 04/20] ARM: LPAE: Do not assume Linux PTEs are always
+	at PTRS_PER_PTE offset
+In-Reply-To: <20101115174251.GB31421@n2100.arm.linux.org.uk>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-5-git-send-email-catalin.marinas@arm.com>
+	<20101115174251.GB31421@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinej2U_tEWM25m7VW7=PndxVPohaKjJ=10wn+C1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 15 November 2010 17:42, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 12, 2010 at 06:00:24PM +0000, Catalin Marinas wrote:
+>> Placing the Linux PTEs at a 2KB offset inside a page is a workaround for
+>> the 2-level page table format where not enough spare bits are available.
+>> With LPAE this is no longer required. This patch changes such assumption
+>> by using a different macro, LINUX_PTE_OFFSET, which is defined to
+>> PTRS_PER_PTE for the 2-level page tables.
+>
+> Hmm. ?I think we should be doing this a different way - in fact, I think
+> we should switch the order of the linux vs hardware page tables. ?This
+> actually simplifies the code a bit too - notice that we lose the arith.
+> in __pte_map, __pte_unmap, pmd_page_vaddr, which is all page table
+> walking stuff.
 
-Please pull some trivial omap fixes from:
+It looks like a good clean-up to me (though I need some refactoring on
+my LPAE patches). Do you plan to push this upstream? If you add a
+comment and a signed-off line, I can carry it in my LPAE branch until
+it appears in mainline.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+Thanks.
 
-Regards,
-
-Tony
-
-
-The following changes since commit c8ddb2713c624f432fa5fe3c7ecffcdda46ea0d4:
-
-  Linux 2.6.37-rc1 (2010-11-01 07:54:12 -0400)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Felipe Balbi (1):
-      arm: omap1: devices: need to return with a value
-
-Janusz Krzysztofik (1):
-      OMAP1: camera.h: add missing include
-
-Mathias Nyman (1):
-      omap: dma: Add read-back to DMA interrupt handler to avoid spuriousinterrupts
-
-Thomas Weber (1):
-      OMAP2: Devkit8000: Fix mmc regulator failure
-
- arch/arm/mach-omap1/devices.c             |    5 ++---
- arch/arm/mach-omap1/include/mach/camera.h |    2 ++
- arch/arm/mach-omap2/board-devkit8000.c    |    3 ---
- arch/arm/plat-omap/dma.c                  |    2 ++
- 4 files changed, 6 insertions(+), 6 deletions(-)
+-- 
+Catalin
