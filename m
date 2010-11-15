@@ -1,298 +1,315 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Nov 2010 17:42:51 +0000
-Subject: [PATCH v2 04/20] ARM: LPAE: Do not assume Linux PTEs are
-	always at PTRS_PER_PTE offset
-In-Reply-To: <1289584840-18097-5-git-send-email-catalin.marinas@arm.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-5-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20101115174251.GB31421@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Nov 2010 17:54:53 +0000
+Subject: [PATCH v2] ARM: vexpress: add support for multiple core tiles
+Message-ID: <1289843693-21823-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 06:00:24PM +0000, Catalin Marinas wrote:
-> Placing the Linux PTEs at a 2KB offset inside a page is a workaround for
-> the 2-level page table format where not enough spare bits are available.
-> With LPAE this is no longer required. This patch changes such assumption
-> by using a different macro, LINUX_PTE_OFFSET, which is defined to
-> PTRS_PER_PTE for the 2-level page tables.
+The current Versatile Express BSP defines the MACHINE_START macro
+in the core tile code.
 
-Hmm.  I think we should be doing this a different way - in fact, I think
-we should switch the order of the linux vs hardware page tables.  This
-actually simplifies the code a bit too - notice that we lose the arith.
-in __pte_map, __pte_unmap, pmd_page_vaddr, which is all page table
-walking stuff.
+This patch moves this into the generic board code and introduces
+a method for determining the current tile at runtime, allowing
+the Kernel to have support for multiple tiles compiled in.
+Tile-specific functions are executed via a descriptor struct containing
+the correct implementations for the current tile.
 
- arch/arm/include/asm/pgalloc.h |   34 +++++++++++++++-------------------
- arch/arm/include/asm/pgtable.h |   30 +++++++++++++++---------------
- arch/arm/mm/fault.c            |    2 +-
- arch/arm/mm/mmu.c              |    2 +-
- arch/arm/mm/proc-macros.S      |   10 +++++-----
- arch/arm/mm/proc-v7.S          |    8 +++-----
- 6 files changed, 40 insertions(+), 46 deletions(-)
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index b12cc98..e2a6613 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -38,6 +38,11 @@ extern void free_pgd_slow(struct mm_struct *mm, pgd_t *pgd);
+Note: This was originally posted in September as part of the series entitled:
+`CPU hotplug support for Versatile platforms'. I have since separated this
+patch out as I believe it is useful for situations outside of hotplug.
+
+ arch/arm/mach-vexpress/core.h                     |    5 --
+ arch/arm/mach-vexpress/ct-ca9x4.c                 |   34 +++++++----
+ arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |    2 +
+ arch/arm/mach-vexpress/include/mach/motherboard.h |   21 +++++++
+ arch/arm/mach-vexpress/platsmp.c                  |   12 +---
+ arch/arm/mach-vexpress/v2m.c                      |   64 +++++++++++++++++----
+ 6 files changed, 100 insertions(+), 38 deletions(-)
+
+diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+index 57dd95c..c55feff 100644
+--- a/arch/arm/mach-vexpress/core.h
++++ b/arch/arm/mach-vexpress/core.h
+@@ -18,9 +18,4 @@ struct amba_device name##_device = {		\
+ 	/* .dma		= DMA_##base,*/		\
+ }
  
- #define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
+-struct map_desc;
+-
+-void v2m_map_io(struct map_desc *tile, size_t num);
+-extern struct sys_timer v2m_timer;
+-
+ extern void __iomem *gic_cpu_base_addr;
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index c2e405a..89ecac4 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -10,12 +10,11 @@
+ #include <linux/amba/clcd.h>
  
-+static inline void clean_pte_table(void *ptr)
+ #include <asm/clkdev.h>
+-#include <asm/pgtable.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+-#include <asm/mach-types.h>
+ #include <asm/pmu.h>
++#include <asm/smp_scu.h>
+ #include <asm/smp_twd.h>
+ 
+ #include <mach/clkdev.h>
+@@ -23,7 +22,6 @@
+ 
+ #include <plat/timer-sp.h>
+ 
+-#include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
+@@ -55,7 +53,7 @@ static struct map_desc ct_ca9x4_io_desc[] __initdata = {
+ static void __init ct_ca9x4_map_io(void)
+ {
+ 	twd_base = MMIO_P2V(A9_MPCORE_TWD);
+-	v2m_map_io(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
++	iotable_init(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
+ }
+ 
+ void __iomem *gic_cpu_base_addr;
+@@ -244,14 +242,26 @@ static void __init ct_ca9x4_init(void)
+ 	platform_device_register(&pmu_device);
+ }
+ 
+-MACHINE_START(VEXPRESS, "ARM-Versatile Express CA9x4")
+-	.boot_params	= PHYS_OFFSET + 0x00000100,
++#ifdef CONFIG_SMP
++static unsigned int ct_ca9x4_get_core_count(void)
 +{
-+	clean_dcache_area(ptr + PTE_HWTABLE_OFF, PTE_HWTABLE_SIZE);
++	return scu_get_core_count(MMIO_P2V(A9_MPCORE_SCU));
 +}
 +
- /*
-  * Allocate one PTE table.
-  *
-@@ -60,10 +65,8 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
- 	pte_t *pte;
- 
- 	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
--	if (pte) {
--		clean_dcache_area(pte, sizeof(pte_t) * PTRS_PER_PTE);
--		pte += PTRS_PER_PTE;
--	}
-+	if (pte)
-+		clean_pte_table(pte);
- 
- 	return pte;
- }
-@@ -79,10 +82,8 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
- 	pte = alloc_pages(PGALLOC_GFP, 0);
- #endif
- 	if (pte) {
--		if (!PageHighMem(pte)) {
--			void *page = page_address(pte);
--			clean_dcache_area(page, sizeof(pte_t) * PTRS_PER_PTE);
--		}
-+		if (!PageHighMem(pte))
-+			clean_pte_table(page_address(pte));
- 		pgtable_page_ctor(pte);
- 	}
- 
-@@ -94,10 +95,8 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
-  */
- static inline void pte_free_kernel(struct mm_struct *mm, pte_t *pte)
- {
--	if (pte) {
--		pte -= PTRS_PER_PTE;
-+	if (pte)
- 		free_page((unsigned long)pte);
--	}
- }
- 
- static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
-@@ -106,8 +105,9 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
- 	__free_page(pte);
- }
- 
--static inline void __pmd_populate(pmd_t *pmdp, unsigned long pmdval)
-+static inline void __pmd_populate(pmd_t *pmdp, unsigned long pte, unsigned long prot)
- {
-+	unsigned long pmdval = (pte + PTE_HWTABLE_OFF) | prot;
- 	pmdp[0] = __pmd(pmdval);
- 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
- 	flush_pmd_entry(pmdp);
-@@ -122,20 +122,16 @@ static inline void __pmd_populate(pmd_t *pmdp, unsigned long pmdval)
- static inline void
- pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- {
--	unsigned long pte_ptr = (unsigned long)ptep;
--
- 	/*
--	 * The pmd must be loaded with the physical
--	 * address of the PTE table
-+	 * The pmd must be loaded with the physical address of the PTE table
- 	 */
--	pte_ptr -= PTRS_PER_PTE * sizeof(void *);
--	__pmd_populate(pmdp, __pa(pte_ptr) | _PAGE_KERNEL_TABLE);
-+	__pmd_populate(pmdp, __pa(ptep), _PAGE_KERNEL_TABLE);
- }
- 
- static inline void
- pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
- {
--	__pmd_populate(pmdp, page_to_pfn(ptep) << PAGE_SHIFT | _PAGE_USER_TABLE);
-+	__pmd_populate(pmdp, page_to_pfn(ptep) << PAGE_SHIFT, _PAGE_USER_TABLE);
- }
- #define pmd_pgtable(pmd) pmd_page(pmd)
- 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index b155414..d9f1bfa 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -54,7 +54,7 @@
-  * Therefore, we tweak the implementation slightly - we tell Linux that we
-  * have 2048 entries in the first level, each of which is 8 bytes (iow, two
-  * hardware pointers to the second level.)  The second level contains two
-- * hardware PTE tables arranged contiguously, followed by Linux versions
-+ * hardware PTE tables arranged contiguously, preceded by Linux versions
-  * which contain the state information Linux needs.  We, therefore, end up
-  * with 512 entries in the "PTE" level.
-  *
-@@ -62,15 +62,15 @@
-  *
-  *    pgd             pte
-  * |        |
-- * +--------+ +0
-- * |        |-----> +------------+ +0
-+ * +--------+
-+ * |        |       +------------+ +0
-+ * +- - - - +       | Linux pt 0 |
-+ * |        |       +------------+ +1024
-+ * +--------+ +0    | Linux pt 1 |
-+ * |        |-----> +------------+ +2048
-  * +- - - - + +4    |  h/w pt 0  |
-- * |        |-----> +------------+ +1024
-+ * |        |-----> +------------+ +3072
-  * +--------+ +8    |  h/w pt 1  |
-- * |        |       +------------+ +2048
-- * +- - - - +       | Linux pt 0 |
-- * |        |       +------------+ +3072
-- * +--------+       | Linux pt 1 |
-  * |        |       +------------+ +4096
-  *
-  * See L_PTE_xxx below for definitions of bits in the "Linux pt", and
-@@ -102,6 +102,10 @@
- #define PTRS_PER_PMD		1
- #define PTRS_PER_PGD		2048
- 
-+#define PTE_HWTABLE_PTRS	(PTRS_PER_PTE)
-+#define PTE_HWTABLE_OFF		(PTE_HWTABLE_PTRS * sizeof(pte_t))
-+#define PTE_HWTABLE_SIZE	(PTRS_PER_PTE * sizeof(u32))
++static void ct_ca9x4_smp_enable(void)
++{
++	scu_enable(MMIO_P2V(A9_MPCORE_SCU));
++}
++#endif
 +
- /*
-  * PMD_SHIFT determines the size of the area a second-level page table can map
-  * PGDIR_SHIFT determines what a third-level page table entry can map
-@@ -270,8 +274,8 @@ extern struct page *empty_zero_page;
- #define __pte_map(dir)		pmd_page_vaddr(*(dir))
- #define __pte_unmap(pte)	do { } while (0)
- #else
--#define __pte_map(dir)		((pte_t *)kmap_atomic(pmd_page(*(dir))) + PTRS_PER_PTE)
--#define __pte_unmap(pte)	kunmap_atomic((pte - PTRS_PER_PTE))
-+#define __pte_map(dir)		(pte_t *)kmap_atomic(pmd_page(*(dir)))
-+#define __pte_unmap(pte)	kunmap_atomic(pte)
++struct ct_desc ct_ca9x4_desc = {
++	.id		= V2M_CT_ID_CA9,
++	.name		= "CA9x4",
+ 	.map_io		= ct_ca9x4_map_io,
+ 	.init_irq	= ct_ca9x4_init_irq,
+-#if 0
+-	.timer		= &ct_ca9x4_timer,
+-#else
+-	.timer		= &v2m_timer,
++	.init_tile	= ct_ca9x4_init,
++#ifdef CONFIG_SMP
++	.get_core_count	= ct_ca9x4_get_core_count,
++	.smp_enable	= ct_ca9x4_smp_enable,
  #endif
+-	.init_machine	= ct_ca9x4_init,
+-MACHINE_END
++};
+diff --git a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+index f9e2f8d..a34d3d4 100644
+--- a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
++++ b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+@@ -45,4 +45,6 @@
+ #define IRQ_CT_CA9X4_PMU_CPU2	94
+ #define IRQ_CT_CA9X4_PMU_CPU3	95
  
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
-@@ -364,11 +368,7 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++extern struct ct_desc ct_ca9x4_desc;
++
+ #endif
+diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
+index 98a8ded..6433ae5 100644
+--- a/arch/arm/mach-vexpress/include/mach/motherboard.h
++++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
+@@ -118,4 +118,25 @@
+ int v2m_cfg_write(u32 devfn, u32 data);
+ int v2m_cfg_read(u32 devfn, u32 *data);
  
- static inline pte_t *pmd_page_vaddr(pmd_t pmd)
++/*
++ * Core tile IDs
++ */
++#define V2M_CT_ID_CA9		0x0c000191
++#define V2M_CT_ID_UNSUPPORTED	0xff000191
++#define V2M_CT_ID_MASK		0xff000fff
++
++struct ct_desc {
++	u32			id;
++	const char		*name;
++	void			(*map_io)(void);
++	void			(*init_irq)(void);
++	void			(*init_tile)(void);
++#ifdef CONFIG_SMP
++	unsigned int		(*get_core_count)(void);
++	void			(*smp_enable)(void);
++#endif
++};
++
++extern struct ct_desc *ct_desc;
++
+ #endif
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index 6709706..b2d1e29 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -18,10 +18,8 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/localtimer.h>
+-#include <asm/smp_scu.h>
+ #include <asm/unified.h>
+ 
+-#include <mach/ct-ca9x4.h>
+ #include <mach/motherboard.h>
+ #define V2M_PA_CS7 0x10000000
+ 
+@@ -35,11 +33,6 @@ extern void vexpress_secondary_startup(void);
+  */
+ volatile int __cpuinitdata pen_release = -1;
+ 
+-static void __iomem *scu_base_addr(void)
+-{
+-	return MMIO_P2V(A9_MPCORE_SCU);
+-}
+-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -118,10 +111,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  */
+ void __init smp_init_cpus(void)
  {
--	unsigned long ptr;
+-	void __iomem *scu_base = scu_base_addr();
+ 	unsigned int i, ncores;
+ 
+-	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
++	ncores = ct_desc->get_core_count();
+ 
+ 	/* sanity check */
+ 	if (ncores == 0) {
+@@ -175,7 +167,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		 */
+ 		percpu_timer_setup();
+ 
+-		scu_enable(scu_base_addr());
++		ct_desc->smp_enable();
+ 
+ 		/*
+ 		 * Write the address of secondary startup into the
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 7eaa232..4b5af01 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -13,13 +13,17 @@
+ #include <linux/usb/isp1760.h>
+ 
+ #include <asm/clkdev.h>
++#include <asm/mach-types.h>
++#include <asm/pgtable.h>
+ #include <asm/sizes.h>
++#include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/hardware/arm_timer.h>
+ 
+ #include <mach/clkdev.h>
++#include <mach/ct-ca9x4.h>
+ #include <mach/motherboard.h>
+ 
+ #include <plat/timer-sp.h>
+@@ -41,13 +45,6 @@ static struct map_desc v2m_io_desc[] __initdata = {
+ 	},
+ };
+ 
+-void __init v2m_map_io(struct map_desc *tile, size_t num)
+-{
+-	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
+-	iotable_init(tile, num);
+-}
 -
--	ptr = pmd_val(pmd) & ~(PTRS_PER_PTE * sizeof(void *) - 1);
--	ptr += PTRS_PER_PTE * sizeof(void *);
 -
-+	unsigned long ptr = pmd_val(pmd) & PAGE_MASK;
- 	return __va(ptr);
+ static void __init v2m_timer_init(void)
+ {
+ 	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
+@@ -57,7 +54,7 @@ static void __init v2m_timer_init(void)
+ 	sp804_clockevents_init(MMIO_P2V(V2M_TIMER0), IRQ_V2M_TIMER0);
  }
  
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 1e21e12..f10f9ba 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -108,7 +108,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+-struct sys_timer v2m_timer = {
++static struct sys_timer v2m_timer = {
+ 	.init	= v2m_timer_init,
+ };
  
- 		pte = pte_offset_map(pmd, addr);
- 		printk(", *pte=%08lx", pte_val(*pte));
--		printk(", *ppte=%08lx", pte_val(pte[-PTRS_PER_PTE]));
-+		printk(", *ppte=%08lx", pte_val(pte[PTE_HWTABLE_PTRS]));
- 		pte_unmap(pte);
- 	} while(0);
+@@ -343,7 +340,43 @@ static void v2m_restart(char str, const char *cmd)
+ 		printk(KERN_EMERG "Unable to reboot\n");
+ }
  
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 72ad3e1..9963189 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -535,7 +535,7 @@ static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned l
+-static int __init v2m_init(void)
++struct ct_desc *ct_desc;
++
++static struct ct_desc *ct_descs[] __initdata = {
++#ifdef CONFIG_ARCH_VEXPRESS_CA9X4
++	&ct_ca9x4_desc,
++#endif
++};
++
++static void __init v2m_populate_ct_desc(void)
++{
++	int i;
++	u32 current_tile_id;
++
++	current_tile_id = readl(MMIO_P2V(V2M_SYS_PROCID0)) & V2M_CT_ID_MASK;
++	for (i = 0; i < ARRAY_SIZE(ct_descs) && !ct_desc; ++i)
++		if (ct_descs[i]->id == current_tile_id)
++			ct_desc = ct_descs[i];
++
++	if (!ct_desc)
++		panic("Versatile Express: failed to populate core tile "
++			"description for tile ID 0x%.8x\n", current_tile_id);
++
++}
++
++static void __init v2m_map_io(void)
++{
++	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
++	v2m_populate_ct_desc();
++	ct_desc->map_io();
++}
++
++static void __init v2m_init_irq(void)
++{
++	ct_desc->init_irq();
++}
++
++static void __init v2m_init(void)
  {
- 	if (pmd_none(*pmd)) {
- 		pte_t *pte = early_alloc(2 * PTRS_PER_PTE * sizeof(pte_t));
--		__pmd_populate(pmd, __pa(pte) | prot);
-+		__pmd_populate(pmd, __pa(pte), prot);
- 	}
- 	BUG_ON(pmd_bad(*pmd));
- 	return pte_offset_kernel(pmd, addr);
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 7d63bea..cbedf9c 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -121,7 +121,7 @@
- 	.endm
+ 	int i;
  
- 	.macro	armv6_set_pte_ext pfx
--	str	r1, [r0], #-2048		@ linux version
-+	str	r1, [r0], #2048			@ linux version
+@@ -361,6 +394,15 @@ static int __init v2m_init(void)
+ 	pm_power_off = v2m_power_off;
+ 	arm_pm_restart = v2m_restart;
  
- 	bic	r3, r1, #0x000003fc
- 	bic	r3, r3, #PTE_TYPE_MASK
-@@ -170,7 +170,7 @@
-  *  1111  0xff	r/w	r/w
-  */
- 	.macro	armv3_set_pte_ext wc_disable=1
--	str	r1, [r0], #-2048		@ linux version
-+	str	r1, [r0], #2048			@ linux version
- 
- 	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
- 
-@@ -193,7 +193,7 @@
- 	bicne	r2, r2, #PTE_BUFFERABLE
- #endif
- 	.endif
--	str	r2, [r0]			@ hardware version
-+	str	r2, [r0]		@ hardware version
- 	.endm
- 
- 
-@@ -213,7 +213,7 @@
-  *  1111  11	r/w	r/w
-  */
- 	.macro	xscale_set_pte_ext_prologue
--	str	r1, [r0], #-2048		@ linux version
-+	str	r1, [r0]			@ linux version
- 
- 	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
- 
-@@ -232,7 +232,7 @@
- 	tst	r3, #L_PTE_PRESENT | L_PTE_YOUNG	@ present and young?
- 	movne	r2, #0				@ no -> fault
- 
--	str	r2, [r0]			@ hardware version
-+	str	r2, [r0, #2048]!		@ hardware version
- 	mov	ip, #0
- 	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
- 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 53cbe22..89c31a6 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -124,15 +124,13 @@ ENDPROC(cpu_v7_switch_mm)
-  *	Set a level 2 translation table entry.
-  *
-  *	- ptep  - pointer to level 2 translation table entry
-- *		  (hardware version is stored at -1024 bytes)
-+ *		  (hardware version is stored at +2048 bytes)
-  *	- pte   - PTE value to store
-  *	- ext	- value for extended PTE bits
-  */
- ENTRY(cpu_v7_set_pte_ext)
- #ifdef CONFIG_MMU
-- ARM(	str	r1, [r0], #-2048	)	@ linux version
-- THUMB(	str	r1, [r0]		)	@ linux version
-- THUMB(	sub	r0, r0, #2048		)
-+	str	r1, [r0]			@ linux version
- 
- 	bic	r3, r1, #0x000003f0
- 	bic	r3, r3, #PTE_TYPE_MASK
-@@ -158,7 +156,7 @@ ENTRY(cpu_v7_set_pte_ext)
- 	tstne	r1, #L_PTE_PRESENT
- 	moveq	r3, #0
- 
--	str	r3, [r0]
-+	str	r3, [r0, #2048]!
- 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
- #endif
- 	mov	pc, lr
+-	return 0;
++	ct_desc->init_tile();
+ }
+-arch_initcall(v2m_init);
++
++MACHINE_START(VEXPRESS, "ARM-Versatile Express")
++	.phys_io	= V2M_UART0 & SECTION_MASK,
++	.io_pg_offst	= (__MMIO_P2V(V2M_UART0) >> 18) & 0xfffc,
++	.boot_params	= PHYS_OFFSET + 0x00000100,
++	.map_io		= v2m_map_io,
++	.init_irq	= v2m_init_irq,
++	.timer		= &v2m_timer,
++	.init_machine	= v2m_init,
++MACHINE_END
+-- 
+1.7.0.4
