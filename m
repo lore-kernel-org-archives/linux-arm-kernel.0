@@ -1,115 +1,65 @@
-From: bpringle@sympatico.ca (Bill Pringlemeir)
-Date: Mon, 15 Nov 2010 13:17:17 -0500
-Subject: [Patch v3] Fix audmuxv2 debugfs indexing.
-In-Reply-To: <20101115162636.GH12986@rakim.wolfsonmicro.main> (Mark Brown's
-	message of "Mon, 15 Nov 2010 16:26:36 +0000")
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-	<20101110152619.GB8950@pengutronix.de>
-	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-	<20101112071706.GF6017@pengutronix.de>
-	<20101112114942.GA28804@sirena.org.uk> <87oc9rk6fe.fsf@sympatico.ca>
-	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
-	<20101115153058.GG12986@rakim.wolfsonmicro.main>
-	<87oc9qeg75.fsf@sympatico.ca>
-	<BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
-	<20101115162636.GH12986@rakim.wolfsonmicro.main>
-Message-ID: <BLU0-SMTP34594F9F26E8EBD100C9CAB8360@phx.gbl>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 15 Nov 2010 10:20:36 -0800
+Subject: [PATCH 09/14] msm: iommu: Kconfig option for cacheable page
+	tables
+In-Reply-To: <8bd62d321211c93af883cd2ad404e802.squirrel@www.codeaurora.org>
+References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
+	<1289619000-13167-10-git-send-email-stepanm@codeaurora.org>
+	<1289765858.24270.240.camel@m0nster>
+	<8bd62d321211c93af883cd2ad404e802.squirrel@www.codeaurora.org>
+Message-ID: <1289845236.4050.25.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 Nov 2010, broonie at opensource.wolfsonmicro.com wrote:
-On Mon, Nov 15, 2010 at 11:10:31AM -0500, Bill Pringlemeir wrote:
+On Sun, 2010-11-14 at 18:56 -0800, Stepan Moskovchenko wrote:
+> > On Fri, 2010-11-12 at 19:29 -0800, Stepan Moskovchenko wrote:
+> >>
+> >> +config IOMMU_PGTABLES_L2
+> >> +	depends on ARCH_MSM8X60
+> >> +	depends on MMU
+> >> +	depends on CPU_DCACHE_DISABLE=n
+> >> +	depends on SMP
+> >> +	bool "Cacheable IOMMU page tables"
+> >> +	default y
+> >> +	help
+> >> +	  Allows the IOMMU page tables to be brought into the L2 cache. This
+> >> +	  improves the TLB miss latency at the expense of potential pollution
+> >> +	  of the L2 cache. This option has been shown to improve multimedia
+> >> +	  performance in some cases.
+> >> +
+> >> +	  If unsure, say Y here.
+> >
+> > Why would someone want this off?
+> >
+> > The other thing is that you usually want this included with the code
+> > that uses the option.
+> 
+> The code that uses it had gone in during a previous patch series, but I
+> didn't want to meddle in the Kconfig just yet, especially since the option
+> only improves performance and does not add new functionality at a high
+> level. This patch should be the last of what is needed for this feature.
+> 
+> You would want to turn this off if you wanted more deterministic behavior
+> from the multimedia subsystem, such as when trying to run benchmarks for
+> the worst-case behavior in terms of memory latency and TLB misses. You
+> might also want to turn it off if you are debugging memory problems that
+> you suspect might be related to the cache maintenance code, in which case
+> turning this off would give an idea as to whether that is the problem.
+> Similarly, this needs to be off (and will be, due to the dependencies) if
+> certain required things (like the Dcache, MMU, etc) have been disabled.
+> Finally, if you are doing things with the MMSS that you know will not
+> result in many TLB misses, (or if you know that you can tolerate high miss
+> latency) you may as well turn this off to avoid the (small) bit of cache
+> pollution.
 
->> Sorry, I should have waited to email.  audmux_port_string() only
->> handles six values (not seven).  Also, the audmux.h only has six
->> defines for both MX31 and MX27.  There isn't an SSI7 that is being
->> reported by the debugfs.  However, a user of the audmux-v2.c code can
->> call mxc_audmux_v2_configure_port() with a port value of '6' to
->> configure audmux pin set 7 ;-)
+It sounds like you don't really want it off unless your a developer (or
+you turn one of the dependencies) .. I think this might be better as a
+hidden option just cause of the developer centric nature of it.
 
-> SSI7 is an internal network connection thing of some kind.
+Daniel
 
-On pg 4-60 of the IMX 25 reference manual, the IOMUX configuration for
-ALT3 is AUD7_TXFS.  This makes me think it is a 'physical' pin after
-the IOMUX routing.
-
- $ grep AUD7 arch/arm/plat-mxc/include/mach/iomux-mx25.h
-    364:#define MX25_PAD_SD1_DATA1__AUD7_RXD  
-    469:#define MX25_PAD_GPIO_E__AUD7_TXD     
-    472:#define MX25_PAD_GPIO_F__AUD7_TXC     
-    481:#define MX25_PAD_VSTBY_REQ__AUD7_TXFS 
-    487:#define MX25_PAD_POWER_FAIL__AUD7_RXD 
-
-Oddly, the iomux-mx25.h is the only 'iomux-mx[1235]*.h' one with this
-audmux 7 configuration, but some of the ALT configuration values are
-missing from these files.  Maybe the MX25 is different.  It is the
-only IMX processor that I am familar with.
-
-'iomux-mx25.h' has
-
-     77:#define MX25_PAD_EB0__AUD4_TXD         
-     81:#define MX25_PAD_EB1__AUD4_RXD         
-     85:#define MX25_PAD_OE__AUD4_TXC          
-    117:#define MX25_PAD_RW__AUD4_TXFS         
-    364:#define MX25_PAD_SD1_DATA1__AUD7_RXD   
-    394:#define MX25_PAD_KPP_COL0__AUD5_TXD    
-    399:#define MX25_PAD_KPP_COL1__AUD5_RXD    
-    404:#define MX25_PAD_KPP_COL2__AUD5_TXC    
-    409:#define MX25_PAD_KPP_COL3__AUD5_TXFS   
-    413:#define MX25_PAD_FEC_MDC__AUD4_TXD     
-    417:#define MX25_PAD_FEC_MDIO__AUD4_RXD    
-    424:#define MX25_PAD_FEC_TDATA1__AUD4_TXFS 
-    469:#define MX25_PAD_GPIO_E__AUD7_TXD      
-    472:#define MX25_PAD_GPIO_F__AUD7_TXC      
-    481:#define MX25_PAD_VSTBY_REQ__AUD7_TXFS  
-    487:#define MX25_PAD_POWER_FAIL__AUD7_RXD  
-
-As well, chapter 4 (IOMUX) of the IMX25 RM has,
-
-  LD8, ALT4  -> AUD3_TXD
-  LD9, ALT4  -> AUD3_RXD
-  LD10, ALT4 -> AUD3_TXC
-  LD11, ALT4 -> AUD3_TXFS
-  LD14, ALT6 -> AUD3_RXC
-  LD15, ALT6 -> AUD3_RXFS
-
-  CSID8, ALT2 -> AUD6_RXC
-... etc.
-
->> The documentation we are working with isn't that helpful.  For the iMx
->> 25 pg 13-4, it says there are "Three internal ports", but I can only
->> find two ssi devices (with two channels of audio each)...
-
-> It's not an SSI port.
-
-No, I don't think it is an SSI protocol device either.  I think there
-are two internal ports and five external ports, at least on the IMX
-25.  Maybe the documentation is cut and paste from another processor?
-
-There is this cryptic section of the on pg 13-4,
-
-   13.2      External Signal Description
-
-   Table 13-2 lists AUDMUX pin-level signals for the external ports,
-   where:
-
-      ? Pn is P4, through P7
-      ? m = n ? 3.
-
-   The port is configured as an external port by a static system-level
-   signal input pn_int_ext_select.
-
-I guess they could be 'internal' if you didn't configure an external
-pin with the iomux module.  Register
-IOMUXC_AUDMUX_P4_INPUT_DA_AMX_SELECT_INPUT (offset 0x460) might be
-what the above section refers to, but this involves 'daisy chaining'
-and only AUDMUX_P4 and AUDMUX_P7 are listed here (No P3,P5,P6).
-
-Thanks for you help.  I *think* I am getting closer to understanding
-this now.
-
-Regards,
-Bill Pringlemeir.
 
 -- 
-Someday we'll look back on all this and plow into a parked car.
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
