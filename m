@@ -1,75 +1,171 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Nov 2010 17:58:54 +0000
-Subject: [PATCH 6/9] ARM: smp: move ipi_count into irq_stat structure
+Date: Mon, 15 Nov 2010 17:59:05 +0000
+Subject: [PATCH 7/9] ARM: fix /proc/interrupts formatting
 In-Reply-To: <20101115175553.GC31421@n2100.arm.linux.org.uk>
 References: <20101115175553.GC31421@n2100.arm.linux.org.uk>
-Message-ID: <E1PI3KQ-00029q-W8@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PI3Kb-00029u-3U@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the ipi_count into irq_stat, which allows the ipi_data structure
-to be entirely removed.
+As per x86, align the initial column according to how many IRQs we
+have.  Also, provide an english explaination for the 'LOC:' and
+'IPI:' lines.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/hardirq.h |    3 +++
- arch/arm/kernel/smp.c          |   14 ++------------
- 2 files changed, 5 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/mach/irq.h |    2 +-
+ arch/arm/include/asm/smp.h      |    4 ++--
+ arch/arm/kernel/fiq.c           |    5 +++--
+ arch/arm/kernel/irq.c           |   16 ++++++++++------
+ arch/arm/kernel/smp.c           |   14 +++++++-------
+ 5 files changed, 23 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index 923eaa1..824b08a 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -10,6 +10,9 @@ typedef struct {
- #ifdef CONFIG_LOCAL_TIMERS
- 	unsigned int local_timer_irqs;
- #endif
-+#ifdef CONFIG_SMP
-+	unsigned int ipi_irqs;
-+#endif
- } ____cacheline_aligned irq_cpustat_t;
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index ce3eee9..2bc47fb 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -20,7 +20,7 @@ struct seq_file;
+ extern unsigned int arch_nr_irqs;
+ extern void (*init_arch_irq)(void);
+ extern void init_FIQ(void);
+-extern int show_fiq_list(struct seq_file *, void *);
++extern int show_fiq_list(struct seq_file *, int);
  
- #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
+ /*
+  * This is for easy migration, but should be changed in the source
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index da7e7ca..f93d0a6 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -33,7 +33,7 @@ struct seq_file;
+ /*
+  * generate IPI list text
+  */
+-extern void show_ipi_list(struct seq_file *p);
++extern void show_ipi_list(struct seq_file *, int);
+ 
+ /*
+  * Called from assembly code, this handles an IPI.
+@@ -97,6 +97,6 @@ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+ /*
+  * show local interrupt info
+  */
+-extern void show_local_irqs(struct seq_file *);
++extern void show_local_irqs(struct seq_file *, int);
+ 
+ #endif /* ifndef __ASM_ARM_SMP_H */
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 6ff7919..47837b8 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -67,10 +67,11 @@ static struct fiq_handler default_owner = {
+ 
+ static struct fiq_handler *current_fiq = &default_owner;
+ 
+-int show_fiq_list(struct seq_file *p, void *v)
++int show_fiq_list(struct seq_file *p, int prec)
+ {
+ 	if (current_fiq != &default_owner)
+-		seq_printf(p, "FIQ:              %s\n", current_fiq->name);
++		seq_printf(p, "%*s:              %s\n", prec, "FIQ",
++			current_fiq->name);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index ea29721..4e7a7d2 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -57,11 +57,15 @@ int show_interrupts(struct seq_file *p, void *v)
+ 	struct irq_desc *desc;
+ 	struct irqaction * action;
+ 	unsigned long flags;
++	int prec, n;
++
++	for (prec = 3, n = 1000; prec < 10 && n <= nr_irqs; prec++)
++		n *= 10;
+ 
+ 	if (i == 0) {
+ 		char cpuname[12];
+ 
+-		seq_printf(p, "    ");
++		seq_printf(p, "%*s ", prec, "");
+ 		for_each_present_cpu(cpu) {
+ 			sprintf(cpuname, "CPU%d", cpu);
+ 			seq_printf(p, " %10s", cpuname);
+@@ -76,7 +80,7 @@ int show_interrupts(struct seq_file *p, void *v)
+ 		if (!action)
+ 			goto unlock;
+ 
+-		seq_printf(p, "%3d: ", i);
++		seq_printf(p, "%*d: ", prec, i);
+ 		for_each_present_cpu(cpu)
+ 			seq_printf(p, "%10u ", kstat_irqs_cpu(i, cpu));
+ 		seq_printf(p, " %10s", desc->chip->name ? : "-");
+@@ -89,15 +93,15 @@ unlock:
+ 		raw_spin_unlock_irqrestore(&desc->lock, flags);
+ 	} else if (i == nr_irqs) {
+ #ifdef CONFIG_FIQ
+-		show_fiq_list(p, v);
++		show_fiq_list(p, prec);
+ #endif
+ #ifdef CONFIG_SMP
+-		show_ipi_list(p);
++		show_ipi_list(p, prec);
+ #endif
+ #ifdef CONFIG_LOCAL_TIMERS
+-		show_local_irqs(p);
++		show_local_irqs(p, prec);
+ #endif
+-		seq_printf(p, "Err: %10lu\n", irq_err_count);
++		seq_printf(p, "%*s: %10lu\n", prec, "Err", irq_err_count);
+ 	}
+ 	return 0;
+ }
 diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index f276336..edb8fd5 100644
+index edb8fd5..d0e36e3 100644
 --- a/arch/arm/kernel/smp.c
 +++ b/arch/arm/kernel/smp.c
-@@ -46,15 +46,6 @@
-  */
- struct secondary_data secondary_data;
+@@ -396,16 +396,16 @@ void arch_send_call_function_single_ipi(int cpu)
+ 	send_ipi_message(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+ }
  
--/*
-- * structures for inter-processor calls
-- */
--struct ipi_data {
--	unsigned long ipi_count;
--};
--
--static DEFINE_PER_CPU(struct ipi_data, ipi_data);
--
- enum ipi_msg_type {
- 	IPI_TIMER = 2,
- 	IPI_RESCHEDULE,
-@@ -412,7 +403,7 @@ void show_ipi_list(struct seq_file *p)
- 	seq_puts(p, "IPI:");
+-void show_ipi_list(struct seq_file *p)
++void show_ipi_list(struct seq_file *p, int prec)
+ {
+ 	unsigned int cpu;
+ 
+-	seq_puts(p, "IPI:");
++	seq_printf(p, "%*s: ", prec, "IPI");
  
  	for_each_present_cpu(cpu)
--		seq_printf(p, " %10lu", per_cpu(ipi_data, cpu).ipi_count);
-+		seq_printf(p, " %10u", __get_irq_stat(cpu, ipi_irqs));
+-		seq_printf(p, " %10u", __get_irq_stat(cpu, ipi_irqs));
++		seq_printf(p, "%10u ", __get_irq_stat(cpu, ipi_irqs));
  
- 	seq_putc(p, '\n');
+-	seq_putc(p, '\n');
++	seq_printf(p, " Inter-processor interrupts\n");
  }
-@@ -527,10 +518,9 @@ static void ipi_cpu_stop(unsigned int cpu)
- asmlinkage void __exception do_IPI(int ipinr, struct pt_regs *regs)
+ 
+ /*
+@@ -435,16 +435,16 @@ asmlinkage void __exception do_local_timer(struct pt_regs *regs)
+ 	set_irq_regs(old_regs);
+ }
+ 
+-void show_local_irqs(struct seq_file *p)
++void show_local_irqs(struct seq_file *p, int prec)
  {
- 	unsigned int cpu = smp_processor_id();
--	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
- 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 	unsigned int cpu;
  
--	ipi->ipi_count++;
-+	__inc_irq_stat(cpu, ipi_irqs);
+-	seq_printf(p, "LOC: ");
++	seq_printf(p, "%*s: ", prec, "LOC");
  
- 	switch (ipinr) {
- 	case IPI_TIMER:
+ 	for_each_present_cpu(cpu)
+ 		seq_printf(p, "%10u ", __get_irq_stat(cpu, local_timer_irqs));
+ 
+-	seq_putc(p, '\n');
++	seq_printf(p, " Local timer interrupts\n");
+ }
+ #endif
+ 
 -- 
 1.6.2.5
