@@ -1,50 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 Nov 2010 10:01:46 +0100
-Subject: [PATCH 1/1] ARM: cns3xxx: Fixup the missing second parameter
-	to addruart macro to allow them to build.
-In-Reply-To: <1289772114-7343-1-git-send-email-mkl0301@gmail.com>
-References: <1289772114-7343-1-git-send-email-mkl0301@gmail.com>
-Message-ID: <20101115090146.GB8942@pengutronix.de>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Mon, 15 Nov 2010 11:16:43 +0200
+Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
+In-Reply-To: <AANLkTimt+rZ3nTHK01VciYyh-pKMiCmLZYcJjqz6OTY8@mail.gmail.com>
+References: <1289322724-20998-1-git-send-email-bryan.wu@canonical.com>
+	<1289322724-20998-2-git-send-email-bryan.wu@canonical.com>
+	<1289399707.3297.250.camel@tubuntu>
+	<AANLkTimt+rZ3nTHK01VciYyh-pKMiCmLZYcJjqz6OTY8@mail.gmail.com>
+Message-ID: <1289812603.2668.5.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sun, 2010-11-14 at 02:42 +0100, ext Bryan Wu wrote:
+> On Wed, Nov 10, 2010 at 10:35 PM, Tomi Valkeinen
+> <tomi.valkeinen@nokia.com> wrote:
+> > Hi,
+> >
+> > On Tue, 2010-11-09 at 18:12 +0100, ext Bryan Wu wrote:
+> >> Generic DPI panel driver includes the driver and 4 similar panel configurations. It
+> >> will match the panel name which is passed from platform data and setup the
+> >> right configurations.
+> >>
+> >> With generic DPI panel driver, we can remove those 4 duplicated panel display
+> >> drivers. In the future, it is simple for us just add new panel configuration
+> >> date in panel-generic-dpi.c to support new display panel.
+> >
+> > This is looking good, but still a couple of comments inline:
+> >
 
-On Mon, Nov 15, 2010 at 06:01:54AM +0800, mkl0301 at gmail.com wrote:
-> From: Mac Lin <mkl0301@gmail.com>
-> 
-> Fixup the missing second parameter to addruart macro to allow them to build,
-> according to to commit 0e17226f7cd289504724466f4298abc9bdfca3fe.
-> 
-> Enabling DEBUG in head.S would cause:
-> rch/arm/boot/compressed/head.S: Assembler messages:
-> arch/arm/boot/compressed/head.S:1037: Error: too many positional arguments
-> arch/arm/boot/compressed/head.S:1055: Error: too many positional arguments
-> 
-> Signed-off-by: Mac Lin <mkl0301@gmail.com>
-> ---
->  arch/arm/mach-cns3xxx/include/mach/debug-macro.S |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-> index d16ce7e..9b50442 100644
-> --- a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-> +++ b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-> @@ -10,7 +10,7 @@
->   * published by the Free Software Foundation.
->   */
->  
-> -		.macro	addruart,rx
-> +		.macro	addruart,rx,rtmp
->  		mrc	p15, 0, \rx, c1, c0
->  		tst	\rx, #1			@ MMU enabled?
->  		moveq	\rx,      #0x10000000
-This doesn't apply to current Russell's (or Linus') tree.  (And is wrong
-there BTW.)  Which version does your patch apply to?
+<snip>
 
-Best regards
-Uwe
+> > I think otherwise the patches look good. At some point we should add
+> > backlight support also, so that we can remove a few drivers more (and
+> > get rid of the extra backlight stuff in omap_dss_device struct).
+> >
+> 
+> Yeah, I plan to do that. But IMHO, how about just move those backlight
+> support as backlight drivers and only remain display control in this
+> directory.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Hmm, yes, perhaps that would work for these DPI panels.
+
+The reason I originally put the backlight driver inside the panel driver
+is that there are many panels for which the backlight is a part of the
+panel, in the sense that the backlight is controlled by sending messages
+to the panel. For these the backlight needs to be somewhat integrated
+into the panel driver.
+
+ Tomi
