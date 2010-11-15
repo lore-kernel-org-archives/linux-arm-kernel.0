@@ -1,25 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 15 Nov 2010 15:30:59 +0000
-Subject: [Patch v3] Fix audmuxv2 debugfs indexing. [was: Patch IMX
-	audmux debugfs.]
-In-Reply-To: <BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-	<20101110152619.GB8950@pengutronix.de>
-	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-	<20101112071706.GF6017@pengutronix.de>
-	<20101112114942.GA28804@sirena.org.uk>
-	<87oc9rk6fe.fsf@sympatico.ca>
-	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
-Message-ID: <20101115153058.GG12986@rakim.wolfsonmicro.main>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Mon, 15 Nov 2010 17:32:53 +0200
+Subject: [GIT PULL] Samsung fixes for 2.6.37-rc2
+In-Reply-To: <007901cb84c2$7f465a30$7dd30e90$%kim@samsung.com>
+References: <007901cb84c2$7f465a30$7dd30e90$%kim@samsung.com>
+Message-ID: <4CE152A5.9050408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 10:09:12AM -0500, Bill Pringlemeir wrote:
+Hi Kukjin,
 
-> -       for (i = 1; i < 8; i++) {
-> +       for (i = 0; i < 6; i++) {
->                 snprintf(buf, sizeof(buf), "ssi%d", i);
->                 if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
->                                          (void *)i, &audmux_debugfs_fops))
+you have missed "serial: samsung: fix device name" which is hanging here 
+for a long time and was decided to merge in 2.6.37-rc1.
+Please, pick it up.
 
-We appear to have misplaced a SSI port here...
+thanks,
+Darius
+
+
+On 11/15/2010 02:41 PM, Kukjin Kim wrote:
+> Hi Linus,
+>
+> Please pull Samsung fixes from:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> s5p-fixes-for-linus
+>
+> These things are for fix build warnings on 2.6.37-rc2.
+> If any problems, please let me know.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim<kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+> The following changes since commit c8ddb2713c624f432fa5fe3c7ecffcdda46ea0d4:
+>
+>    Linux 2.6.37-rc1 (2010-11-01 07:54:12 -0400)
+>
+> are available in the git repository at:
+>     git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> s5p-fixes-for-linus
+>
+> Kukjin Kim (2):
+>        ARM: SAMSUNG: Fix HAVE_S3C2410_I2C warnings
+>        ARM: SAMSUNG: Fix HAVE_S3C_RTC warnings
+>
+> Kyungmin Park (1):
+>        ARM: SAMSUNG: Fix HAVE_S3C2410_WATCHDOG warnings
+>
+>   arch/arm/Kconfig              |   32 ++++++++++++++++----------------
+>   arch/arm/mach-s3c64xx/Kconfig |    2 +-
+>   2 files changed, 17 insertions(+), 17 deletions(-)
+>
