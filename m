@@ -1,270 +1,156 @@
-From: michel@daenzer.net (Michel =?ISO-8859-1?Q?D=E4nzer?=)
-Date: Mon, 15 Nov 2010 12:05:57 +0100
-Subject: [PATCH 00/10] MCDE: Add frame buffer device driver
-In-Reply-To: <AANLkTi=z4g9XKyzhRP+3TQ2s_uKL_OZHL5YyFV7EGiSu@mail.gmail.com>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<AANLkTinCDFuPpx+OKYRuHbdnL5FBgCTPpUf2xYNJQC0u@mail.gmail.com>
-	<F45880696056844FA6A73F415B568C69536047701B@EXDCVYMBSTM006.EQ1STM.local>
-	<AANLkTi=aasEoC5ja=gHpzNjyA1h00wuJd-tWVkRaaHNd@mail.gmail.com>
-	<C832F8F5D375BD43BFA11E82E0FE9FE0081BDCB183@EXDCVYMBSTM005.EQ1STM.local>
-	<AANLkTi=z4g9XKyzhRP+3TQ2s_uKL_OZHL5YyFV7EGiSu@mail.gmail.com>
-Message-ID: <1289819158.6227.144.camel@thor.local>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 15 Nov 2010 13:22:34 +0200
+Subject: [PATCH v2] [ARM] Dove: add support for CM-A510 machine.
+Message-ID: <1289820154-7135-1-git-send-email-mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fre, 2010-11-12 at 12:22 -0500, Alex Deucher wrote: 
-> On Fri, Nov 12, 2010 at 11:46 AM, Marcus LORENTZON
-> <marcus.xm.lorentzon@stericsson.com> wrote:
-> > Hi Alex,
-> > Do you have any idea of how we should use KMS without being a "real" drm 3D device? Do you mean that we should use the KMS ioctls on for display driver? Or do you mean that we should expose a /dev/drmX device only capable of KMS and no GEM?
-> >
-> 
-> In this case I was only speaking of using the kms icotls and fbdev
-> emulation for modesetting as your device seems to have a fairly
-> complex display engine.  As for 2D/3D/video accel, that's up to you.
-> Each drm driver does it differently depending on how they handle
-> command buffers.  Intel and AMD have different sets of ioctls for
-> submitting 2D/3D/video commands from userspace acceleration drivers
-> and a different set of ioctls for memory management.
-> 
-> > What if we were to add a drm driver for 3D later on. Is it possible to have a separate drm device for display and one for 3D, but still share "GEM" like buffers between these devices? It look like GEM handles are device relative. This is a vital use case for us. And we really don't like to entangle our MCDE display driver, memory manager and 3D driver without a good reason. Today they are maintained as independent drivers without code dependencies. Would this still be possible using drm? Or does drm require memory manager, 3D and display to be one driver? I can see the drm=graphics card on desktop machines. But embedded UMA systems doesn't really have this dependency. You can switch memory mamanger, 3D driver, display manager in menuconfig independently of the other drivers. Not that it's used like that on one particular HW, but for different HW you can use different parts. In drm it looks like all these pieces belong together.
-> >
-> 
-> No one has done anything like that, but I don't think it would be an
-> issue, you'd just need some sort of way to get buffers in your display
-> driver or your 3D driver, so I'd assume they would depend on your
-> memory manager.  Right now the userspace 2D/3D accel drivers all talk
-> to the drm independently depending on what they need to do.  Whatever
-> your userspace stack looks like could do something similar, call into
-> one set of ioctls for memory, another set for modesetting, and another
-> for accel.  As long as the kernel memory manager is common, you should
-> be able to pass buffer handles between all of them.  If you wanted
-> separate memory managers for each, things get a bit trickier, but
-> that's up to you.
-> 
-> > Do you think the driver should live in the "gpu/drm" folder, even though it's not a gpu driver?
-> >
-> 
-> gpu is kind of a broad term.  It encompasses, 3D, display, video, etc.
->  I don't think it really matters.
-> 
-> > Do you know of any other driver that use DRM/KMS API but not being a PC-style graphics card that we could look at for inspiration?
-> 
-> Jordan Crouse submitted some patches for Qualcomm snapdragon a while
-> back although it was mostly a shim for a userspace accel driver.  He
-> did implement platform support in the drm however:
-> http://git.kernel.org/?p=linux/kernel/git/airlied/drm-2.6.git;a=commit;h=dcdb167402cbdca1d021bdfa5f63995ee0a79317
-> 
-> >
-> > And GEM, is that the only way of exposing graphics buffers to user space in drm? Or is it possible (is it ok) to expose another similar API? You mentioned that there are TTM and GEM, do both expose user space APIs for things like sharing buffers between processes, security, cache management, defragmentation? Or are these type of features defined by DRM and not TTM/GEM?
-> 
-> GEM is not a requirement, it just happens that all the current drm
-> drivers use variants of it for their external memory management
-> interface.  However, they are free to implement the memory manager
-> however they like.
+From: Konstantin Sinyuk <kostyas@compulab.co.il>
 
-Actually, to reinforce your point, the vmwgfx driver doesn't use GEM at
-all but a TTM based userspace API.
+Hi Nicolas,
+Can you please add the below patch to your orion tree?
+Saeed has already reviewed and approved the prevoius version.
 
+v2 changes:
+* rebase on top of current Linus tree
+* remove .phys_io and .io_pg_offst from machine description
 
-> >> -----Original Message-----
-> >> From: Alex Deucher [mailto:alexdeucher at gmail.com]
-> >> Sent: den 12 november 2010 16:53
-> >> To: Jimmy RUBIN
-> >> Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >> linux-media at vger.kernel.org; Linus WALLEIJ; Dan JOHANSSON; Marcus
-> >> LORENTZON
-> >> Subject: Re: [PATCH 00/10] MCDE: Add frame buffer device driver
-> >>
-> >> On Fri, Nov 12, 2010 at 8:18 AM, Jimmy RUBIN
-> >> <jimmy.rubin@stericsson.com> wrote:
-> >> > Hi Alex,
-> >> >
-> >> > Good point, we are looking at this for possible future improvements
-> >> but for the moment we feel like
-> >> > the structure of drm does not add any simplifications for our driver.
-> >> We have the display manager (MCDE DSS = KMS) and the memory manager
-> >> (HWMEM = GEM) that could be migrated to drm framework. But we do not
-> >> have drm drivers for 3D hw and this also makes drm a less obvious
-> >> choice at the moment.
-> >> >
-> >>
-> >> You don't have to use the drm strictly for 3D hardware.  historically
-> >> that's why it was written, but with kms, it also provides an interface
-> >> for complex display systems.  fbdev doesn't really deal properly with
-> >> multiple display controllers or connectors that are dynamically
-> >> re-routeable at runtime.  I've seen a lot of gross hacks to fbdev to
-> >> support this kind of stuff in the past, so it'd be nice to use the
-> >> interface we now have for it if you need that functionality.
-> >> Additionally, you can use the shared memory manager to both the
-> >> display side and v4l side.  While the current drm drivers use GEM
-> >> externally, there's no requirement that a kms driver has to use GEM.
-> >> radeon and nouveau use ttm internally for example.  Something to
-> >> consider.  I just want to make sure people are aware of the interface
-> >> and what it's capable of.
-> >>
-> >> Alex
-> >>
-> >> > Jimmy
-> >> >
-> >> > -----Original Message-----
-> >> > From: Alex Deucher [mailto:alexdeucher at gmail.com]
-> >> > Sent: den 10 november 2010 15:43
-> >> > To: Jimmy RUBIN
-> >> > Cc: linux-fbdev at vger.kernel.org; linux-arm-
-> >> kernel at lists.infradead.org; linux-media at vger.kernel.org; Linus WALLEIJ;
-> >> Dan JOHANSSON
-> >> > Subject: Re: [PATCH 00/10] MCDE: Add frame buffer device driver
-> >> >
-> >> > On Wed, Nov 10, 2010 at 7:04 AM, Jimmy Rubin
-> >> <jimmy.rubin@stericsson.com> wrote:
-> >> >> These set of patches contains a display sub system framework (DSS)
-> >> which is used to
-> >> >> implement the frame buffer device interface and a display device
-> >> >> framework that is used to add support for different type of displays
-> >> >> such as LCD, HDMI and so on.
-> >> >
-> >> > For complex display hardware, you may want to consider using the drm
-> >> > kms infrastructure rather than the kernel fb interface.  It provides
-> >> > an API for complex display hardware (multiple encoders, display
-> >> > controllers, etc.) and also provides a legacy kernel fb interface for
-> >> > compatibility.  See:
-> >> > Documentation/DocBook/drm.tmpl
-> >> > drivers/gpu/drm/
-> >> > in the kernel tree.
-> >> >
-> >> > Alex
-> >> >
-> >> >>
-> >> >> The current implementation supports DSI command mode displays.
-> >> >>
-> >> >> Below is a short summary of the files in this patchset:
-> >> >>
-> >> >> mcde_fb.c
-> >> >> Implements the frame buffer device driver.
-> >> >>
-> >> >> mcde_dss.c
-> >> >> Contains the implementation of the display sub system framework
-> >> (DSS).
-> >> >> This API is used by the frame buffer device driver.
-> >> >>
-> >> >> mcde_display.c
-> >> >> Contains default implementations of the functions in the display
-> >> driver
-> >> >> API. A display driver may override the necessary functions to
-> >> function
-> >> >> properly. A simple display driver is implemented in display-
-> >> generic_dsi.c.
-> >> >>
-> >> >> display-generic_dsi.c
-> >> >> Sample driver for a DSI command mode display.
-> >> >>
-> >> >> mcde_bus.c
-> >> >> Implementation of the display bus. A display device is probed when
-> >> both
-> >> >> the display driver and display configuration have been registered
-> >> with
-> >> >> the display bus.
-> >> >>
-> >> >> mcde_hw.c
-> >> >> Hardware abstraction layer of MCDE. All code that communicates
-> >> directly
-> >> >> with the hardware resides in this file.
-> >> >>
-> >> >> board-mop500-mcde.c
-> >> >> The configuration of the display and the frame buffer device is
-> >> handled
-> >> >> in this file
-> >> >>
-> >> >> NOTE: These set of patches replaces the patches already sent out for
-> >> review.
-> >> >>
-> >> >> RFC:[PATCH 1/2] Video: Add support for MCDE frame buffer driver
-> >> >> RFC:[PATCH 2/2] Ux500: Add support for MCDE frame buffer driver
-> >> >>
-> >> >> The old patchset was to large to be handled by the mailing lists.
-> >> >>
-> >> >> Jimmy Rubin (10):
-> >> >>  MCDE: Add hardware abstraction layer
-> >> >>  MCDE: Add configuration registers
-> >> >>  MCDE: Add pixel processing registers
-> >> >>  MCDE: Add formatter registers
-> >> >>  MCDE: Add dsi link registers
-> >> >>  MCDE: Add generic display
-> >> >>  MCDE: Add display subsystem framework
-> >> >>  MCDE: Add frame buffer device driver
-> >> >>  MCDE: Add build files and bus
-> >> >>  ux500: MCDE: Add platform specific data
-> >> >>
-> >> >>  arch/arm/mach-ux500/Kconfig                    |    8 +
-> >> >>  arch/arm/mach-ux500/Makefile                   |    1 +
-> >> >>  arch/arm/mach-ux500/board-mop500-mcde.c        |  209 ++
-> >> >>  arch/arm/mach-ux500/board-mop500-regulators.c  |   28 +
-> >> >>  arch/arm/mach-ux500/board-mop500.c             |    3 +
-> >> >>  arch/arm/mach-ux500/devices-db8500.c           |   68 +
-> >> >>  arch/arm/mach-ux500/include/mach/db8500-regs.h |    7 +
-> >> >>  arch/arm/mach-ux500/include/mach/devices.h     |    1 +
-> >> >>  arch/arm/mach-ux500/include/mach/prcmu-regs.h  |    1 +
-> >> >>  arch/arm/mach-ux500/include/mach/prcmu.h       |    3 +
-> >> >>  arch/arm/mach-ux500/prcmu.c                    |  129 ++
-> >> >>  drivers/video/Kconfig                          |    2 +
-> >> >>  drivers/video/Makefile                         |    1 +
-> >> >>  drivers/video/mcde/Kconfig                     |   39 +
-> >> >>  drivers/video/mcde/Makefile                    |   12 +
-> >> >>  drivers/video/mcde/display-generic_dsi.c       |  152 ++
-> >> >>  drivers/video/mcde/dsi_link_config.h           | 1486
-> >> ++++++++++++++
-> >> >>  drivers/video/mcde/mcde_bus.c                  |  259 +++
-> >> >>  drivers/video/mcde/mcde_config.h               | 2156
-> >> ++++++++++++++++++++
-> >> >>  drivers/video/mcde/mcde_display.c              |  427 ++++
-> >> >>  drivers/video/mcde/mcde_dss.c                  |  353 ++++
-> >> >>  drivers/video/mcde/mcde_fb.c                   |  697 +++++++
-> >> >>  drivers/video/mcde/mcde_formatter.h            |  782 ++++++++
-> >> >>  drivers/video/mcde/mcde_hw.c                   | 2528
-> >> ++++++++++++++++++++++++
-> >> >>  drivers/video/mcde/mcde_mod.c                  |   67 +
-> >> >>  drivers/video/mcde/mcde_pixelprocess.h         | 1137 +++++++++++
-> >> >>  include/video/mcde/mcde.h                      |  387 ++++
-> >> >>  include/video/mcde/mcde_display-generic_dsi.h  |   34 +
-> >> >>  include/video/mcde/mcde_display.h              |  139 ++
-> >> >>  include/video/mcde/mcde_dss.h                  |   78 +
-> >> >>  include/video/mcde/mcde_fb.h                   |   54 +
-> >> >>  31 files changed, 11248 insertions(+), 0 deletions(-)
-> >> >>  create mode 100644 arch/arm/mach-ux500/board-mop500-mcde.c
-> >> >>  create mode 100644 drivers/video/mcde/Kconfig
-> >> >>  create mode 100644 drivers/video/mcde/Makefile
-> >> >>  create mode 100644 drivers/video/mcde/display-generic_dsi.c
-> >> >>  create mode 100644 drivers/video/mcde/dsi_link_config.h
-> >> >>  create mode 100644 drivers/video/mcde/mcde_bus.c
-> >> >>  create mode 100644 drivers/video/mcde/mcde_config.h
-> >> >>  create mode 100644 drivers/video/mcde/mcde_display.c
-> >> >>  create mode 100644 drivers/video/mcde/mcde_dss.c
-> >> >>  create mode 100644 drivers/video/mcde/mcde_fb.c
-> >> >>  create mode 100644 drivers/video/mcde/mcde_formatter.h
-> >> >>  create mode 100644 drivers/video/mcde/mcde_hw.c
-> >> >>  create mode 100644 drivers/video/mcde/mcde_mod.c
-> >> >>  create mode 100644 drivers/video/mcde/mcde_pixelprocess.h
-> >> >>  create mode 100644 include/video/mcde/mcde.h
-> >> >>  create mode 100644 include/video/mcde/mcde_display-generic_dsi.h
-> >> >>  create mode 100644 include/video/mcde/mcde_display.h
-> >> >>  create mode 100644 include/video/mcde/mcde_dss.h
-> >> >>  create mode 100644 include/video/mcde/mcde_fb.h
-> >> >>
-> >> >> --
-> >> >> To unsubscribe from this list: send the line "unsubscribe linux-
-> >> media" in
-> >> >> the body of a message to majordomo at vger.kernel.org
-> >> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >> >>
-> >> >
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+---
+Signed-off-by: Konstantin Sinyuk <kostyas@compulab.co.il>
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ arch/arm/mach-dove/Kconfig   |    6 +++
+ arch/arm/mach-dove/Makefile  |    1 +
+ arch/arm/mach-dove/cm-a510.c |   95 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 102 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-dove/cm-a510.c
 
-
+diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+index 3b9a32a..a4ed390 100644
+--- a/arch/arm/mach-dove/Kconfig
++++ b/arch/arm/mach-dove/Kconfig
+@@ -9,6 +9,12 @@ config MACH_DOVE_DB
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell DB-MV88AP510 Development Board.
+ 
++ config MACH_CM_A510
++	bool "CompuLab CM-A510 Board"
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  CompuLab CM-A510 Board.
++
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
+index 7ab3be5..f74f549 100644
+--- a/arch/arm/mach-dove/Makefile
++++ b/arch/arm/mach-dove/Makefile
+@@ -1,3 +1,4 @@
+ obj-y				+= common.o addr-map.o irq.o pcie.o
+ 
+ obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
++obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
+diff --git a/arch/arm/mach-dove/cm-a510.c b/arch/arm/mach-dove/cm-a510.c
+new file mode 100644
+index 0000000..96e0e94
+--- /dev/null
++++ b/arch/arm/mach-dove/cm-a510.c
+@@ -0,0 +1,95 @@
++/*
++ * arch/arm/mach-dove/cm-a510.c
++ *
++ * Copyright (C) 2010 CompuLab, Ltd.
++ * Konstantin Sinyuk <kostyas@compulab.co.il>
++ *
++ * Based on Marvell DB-MV88AP510-BP Development Board Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/ata_platform.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/flash.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++#include <mach/dove.h>
++
++#include "common.h"
++
++static struct mv643xx_eth_platform_data cm_a510_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR_DEFAULT,
++};
++
++static struct mv_sata_platform_data cm_a510_sata_data = {
++	.n_ports        = 1,
++};
++
++/*
++ * SPI Devices:
++ * SPI0: 1M Flash Winbond w25q32bv
++ */
++static const struct flash_platform_data cm_a510_spi_flash_data = {
++	.type		= "w25q32bv",
++};
++
++static struct spi_board_info __initdata cm_a510_spi_flash_info[] = {
++	{
++		.modalias       = "m25p80",
++		.platform_data  = &cm_a510_spi_flash_data,
++		.irq            = -1,
++		.max_speed_hz   = 20000000,
++		.bus_num        = 0,
++		.chip_select    = 0,
++	},
++};
++
++static int __init cm_a510_pci_init(void)
++{
++	if (machine_is_cm_a510())
++		dove_pcie_init(1, 1);
++
++	return 0;
++}
++
++subsys_initcall(cm_a510_pci_init);
++
++/* Board Init */
++static void __init cm_a510_init(void)
++{
++	/*
++	 * Basic Dove setup. Needs to be called early.
++	 */
++	dove_init();
++
++	dove_ge00_init(&cm_a510_ge00_data);
++	dove_ehci0_init();
++	dove_ehci1_init();
++	dove_sata_init(&cm_a510_sata_data);
++	dove_sdio0_init();
++	dove_sdio1_init();
++	dove_spi0_init();
++	dove_spi1_init();
++	dove_uart0_init();
++	dove_uart1_init();
++	dove_i2c_init();
++	spi_register_board_info(cm_a510_spi_flash_info,
++				ARRAY_SIZE(cm_a510_spi_flash_info));
++}
++
++MACHINE_START(CM_A510, "Compulab CM-A510 Board")
++	.boot_params	= 0x00000100,
++	.init_machine	= cm_a510_init,
++	.map_io		= dove_map_io,
++	.init_irq	= dove_init_irq,
++	.timer		= &dove_timer,
++MACHINE_END
 -- 
-Earthling Michel D?nzer           |                http://www.vmware.com
-Libre software enthusiast         |          Debian, X and DRI developer
+1.7.3.1
