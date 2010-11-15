@@ -1,249 +1,273 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Nov 2010 17:40:24 +0000
-Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned long
-	for physical addresses
-In-Reply-To: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289842829-3027-16-git-send-email-catalin.marinas@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Nov 2010 17:58:14 +0000
+Subject: [PATCH 2/9] ARM: smp: pass an ipi number to smp_cross_call()
+In-Reply-To: <20101115175553.GC31421@n2100.arm.linux.org.uk>
+References: <20101115175553.GC31421@n2100.arm.linux.org.uk>
+Message-ID: <E1PI3Jm-00029a-GK@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+This allows us to use smp_cross_call() to trigger a number of different
+software generated interrupts, rather than combining them all on one
+SGI.  Recover the SGI number via do_IPI.
 
-The unsigned long datatype is not sufficient for mapping physical addresses
->= 4GB.
-
-This patch ensures that the phys_addr_t datatype is used to represent
-physical addresses which may be beyond the range of an unsigned long.
-The virt <-> phys macros are updated accordingly to ensure that virtual
-addresses can remain as they are.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/memory.h     |   17 +++++++++--------
- arch/arm/include/asm/outercache.h |   14 ++++++++------
- arch/arm/include/asm/pgalloc.h    |    2 +-
- arch/arm/include/asm/pgtable.h    |    2 +-
- arch/arm/include/asm/setup.h      |    2 +-
- arch/arm/mm/init.c                |    6 +++---
- arch/arm/mm/mmu.c                 |   12 +++++++-----
- 7 files changed, 30 insertions(+), 25 deletions(-)
+ arch/arm/include/asm/smp.h                |    4 ++--
+ arch/arm/kernel/entry-armv.S              |    2 +-
+ arch/arm/kernel/smp.c                     |   10 ++--------
+ arch/arm/mach-msm/include/mach/smp.h      |    4 ++--
+ arch/arm/mach-omap2/omap-smp.c            |    2 +-
+ arch/arm/mach-realview/include/mach/smp.h |    4 ++--
+ arch/arm/mach-realview/platsmp.c          |    2 +-
+ arch/arm/mach-s5pv310/include/mach/smp.h  |    4 ++--
+ arch/arm/mach-s5pv310/platsmp.c           |    2 +-
+ arch/arm/mach-tegra/include/mach/smp.h    |    4 ++--
+ arch/arm/mach-ux500/include/mach/smp.h    |    4 ++--
+ arch/arm/mach-ux500/platsmp.c             |    2 +-
+ arch/arm/mach-vexpress/include/mach/smp.h |    4 ++--
+ arch/arm/mach-vexpress/platsmp.c          |    2 +-
+ arch/arm/plat-omap/include/plat/smp.h     |    4 ++--
+ 15 files changed, 24 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 23c2e8e..756252b 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -15,6 +15,7 @@
- 
- #include <linux/compiler.h>
- #include <linux/const.h>
-+#include <linux/types.h>
- #include <mach/memory.h>
- #include <asm/sizes.h>
- 
-@@ -138,15 +139,15 @@
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 3d05190..da7e7ca 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -38,7 +38,7 @@ extern void show_ipi_list(struct seq_file *p);
+ /*
+  * Called from assembly code, this handles an IPI.
   */
- #ifndef __virt_to_phys
--#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
--#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-+#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-+#define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
- #endif
+-asmlinkage void do_IPI(struct pt_regs *regs);
++asmlinkage void do_IPI(int ipinr, struct pt_regs *regs);
  
  /*
-  * Convert a physical address to a Page Frame Number and back
+  * Setup the set of possible CPUs (via set_cpu_possible)
+@@ -53,7 +53,7 @@ extern void smp_store_cpu_info(unsigned int cpuid);
+ /*
+  * Raise an IPI cross call on CPUs in callmap.
   */
--#define	__phys_to_pfn(paddr)	((paddr) >> PAGE_SHIFT)
--#define	__pfn_to_phys(pfn)	((pfn) << PAGE_SHIFT)
-+#define	__phys_to_pfn(paddr)	((unsigned long)((paddr) >> PAGE_SHIFT))
-+#define	__pfn_to_phys(pfn)	((phys_addr_t)(pfn) << PAGE_SHIFT)
+-extern void smp_cross_call(const struct cpumask *mask);
++extern void smp_cross_call(const struct cpumask *mask, int ipi);
  
  /*
-  * Convert a page to/from a physical address
-@@ -188,21 +189,21 @@
-  * translation for translating DMA addresses.  Use the driver
-  * DMA support - see dma-mapping.h.
-  */
--static inline unsigned long virt_to_phys(void *x)
-+static inline phys_addr_t virt_to_phys(void *x)
- {
- 	return __virt_to_phys((unsigned long)(x));
- }
- 
--static inline void *phys_to_virt(unsigned long x)
-+static inline void *phys_to_virt(phys_addr_t x)
- {
--	return (void *)(__phys_to_virt((unsigned long)(x)));
-+	return (void *)(__phys_to_virt(x));
- }
- 
- /*
-  * Drivers should NOT use these either.
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
--#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-+#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- 
- /*
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index fc19009..88ad892 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -21,6 +21,8 @@
- #ifndef __ASM_OUTERCACHE_H
- #define __ASM_OUTERCACHE_H
- 
-+#include <linux/types.h>
-+
- struct outer_cache_fns {
- 	void (*inv_range)(unsigned long, unsigned long);
- 	void (*clean_range)(unsigned long, unsigned long);
-@@ -37,17 +39,17 @@ struct outer_cache_fns {
- 
- extern struct outer_cache_fns outer_cache;
- 
--static inline void outer_inv_range(unsigned long start, unsigned long end)
-+static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.inv_range)
- 		outer_cache.inv_range(start, end);
- }
--static inline void outer_clean_range(unsigned long start, unsigned long end)
-+static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.clean_range)
- 		outer_cache.clean_range(start, end);
- }
--static inline void outer_flush_range(unsigned long start, unsigned long end)
-+static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.flush_range)
- 		outer_cache.flush_range(start, end);
-@@ -73,11 +75,11 @@ static inline void outer_disable(void)
- 
- #else
- 
--static inline void outer_inv_range(unsigned long start, unsigned long end)
-+static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
- { }
--static inline void outer_clean_range(unsigned long start, unsigned long end)
-+static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
- { }
--static inline void outer_flush_range(unsigned long start, unsigned long end)
-+static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
- { }
- static inline void outer_flush_all(void) { }
- static inline void outer_inv_all(void) { }
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 64a303d..33761b8 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -159,7 +159,7 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- static inline void
- pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
- {
--	__pmd_populate(pmdp, page_to_pfn(ptep) << PAGE_SHIFT | _PAGE_USER_TABLE);
-+	__pmd_populate(pmdp, page_to_phys(ptep) | _PAGE_USER_TABLE);
- }
- #define pmd_pgtable(pmd) pmd_page(pmd)
- 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 318b1b7..b9abef7 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -130,7 +130,7 @@ extern struct page *empty_zero_page;
- #define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)
- #endif
- 
--#define pfn_pte(pfn,prot)	(__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot)))
-+#define pfn_pte(pfn,prot)	(__pte(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
- 
- #define pte_none(pte)		(!pte_val(pte))
- #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index f1e5a9b..5092118 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -199,7 +199,7 @@ static struct tagtable __tagtable_##fn __tag = { tag, fn }
- #endif
- 
- struct membank {
--	unsigned long start;
-+	phys_addr_t start;
- 	unsigned long size;
- 	unsigned int highmem;
- };
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 5164069..14a00a1 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -344,7 +344,7 @@ void __init bootmem_init(void)
+  * Boot a secondary CPU, and assign it the specified idle task.
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index c09e357..955cf5f 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -48,7 +48,7 @@
  	 */
- 	arm_bootmem_free(min, max_low, max_high);
+ 	ALT_SMP(test_for_ipi r0, r6, r5, lr)
+ 	ALT_UP_B(9997f)
+-	movne	r0, sp
++	movne	r1, sp
+ 	adrne	lr, BSYM(1b)
+ 	bne	do_IPI
  
--	high_memory = __va((max_low << PAGE_SHIFT) - 1) + 1;
-+	high_memory = __va(((phys_addr_t)max_low << PAGE_SHIFT) - 1) + 1;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 8c19595..7a236db 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -404,7 +404,7 @@ static void send_ipi_message(const struct cpumask *mask, enum ipi_msg_type msg)
+ 	/*
+ 	 * Call the platform specific cross-CPU call function.
+ 	 */
+-	smp_cross_call(mask);
++	smp_cross_call(mask, 1);
+ 
+ 	local_irq_restore(flags);
+ }
+@@ -537,14 +537,8 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 
+ /*
+  * Main handler for inter-processor interrupts
+- *
+- * For ARM, the ipimask now only identifies a single
+- * category of IPI (Bit 1 IPIs have been replaced by a
+- * different mechanism):
+- *
+- *  Bit 0 - Inter-processor function call
+  */
+-asmlinkage void __exception do_IPI(struct pt_regs *regs)
++asmlinkage void __exception do_IPI(int ipinr, struct pt_regs *regs)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
+diff --git a/arch/arm/mach-msm/include/mach/smp.h b/arch/arm/mach-msm/include/mach/smp.h
+index 3ff7bf5..a95f7b9 100644
+--- a/arch/arm/mach-msm/include/mach/smp.h
++++ b/arch/arm/mach-msm/include/mach/smp.h
+@@ -31,9 +31,9 @@
+ 
+ #include <asm/hardware/gic.h>
+ 
+-static inline void smp_cross_call(const struct cpumask *mask)
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+ {
+-	gic_raise_softirq(mask, 1);
++	gic_raise_softirq(mask, ipi);
+ }
+ 
+ #endif
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 9e9f70e..56a8bce 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -76,7 +76,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	omap_modify_auxcoreboot0(0x200, 0xfffffdff);
+ 	flush_cache_all();
+ 	smp_wmb();
+-	smp_cross_call(cpumask_of(cpu));
++	smp_cross_call(cpumask_of(cpu), 1);
  
  	/*
- 	 * This doesn't seem to be used by the Linux memory manager any
-@@ -392,8 +392,8 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- 	 * Convert to physical addresses, and
- 	 * round start upwards and end downwards.
- 	 */
--	pg = PAGE_ALIGN(__pa(start_pg));
--	pgend = __pa(end_pg) & PAGE_MASK;
-+	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
-+	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
- 
- 	/*
- 	 * If there are free pages between these,
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e238340..5e035e0 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -573,7 +573,7 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	 * Now the secondary core is starting up let it run its
+diff --git a/arch/arm/mach-realview/include/mach/smp.h b/arch/arm/mach-realview/include/mach/smp.h
+index d3cd265..d1aa704 100644
+--- a/arch/arm/mach-realview/include/mach/smp.h
++++ b/arch/arm/mach-realview/include/mach/smp.h
+@@ -7,9 +7,9 @@
+ /*
+  * We use IRQ1 as the IPI
+  */
+-static inline void smp_cross_call(const struct cpumask *mask)
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+ {
+-	gic_raise_softirq(mask, 1);
++	gic_raise_softirq(mask, ipi);
  }
  
- static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
--				      unsigned long end, unsigned long phys,
-+				      unsigned long end, phys_addr_t phys,
- 				      const struct mem_type *type)
- {
- 	pmd_t *pmd = pmd_offset(pgd, addr);
-@@ -609,11 +609,12 @@ static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
- static void __init create_36bit_mapping(struct map_desc *md,
- 					const struct mem_type *type)
- {
--	unsigned long phys, addr, length, end;
-+	unsigned long addr, length, end;
-+	phys_addr_t phys;
- 	pgd_t *pgd;
- 
- 	addr = md->virtual;
--	phys = (unsigned long)__pfn_to_phys(md->pfn);
-+	phys = __pfn_to_phys(md->pfn);
- 	length = PAGE_ALIGN(md->length);
- 
- 	if (!(cpu_architecture() >= CPU_ARCH_ARMv6 || cpu_is_xsc3())) {
-@@ -674,7 +675,8 @@ static void __init create_36bit_mapping(struct map_desc *md,
-  */
- static void __init create_mapping(struct map_desc *md)
- {
--	unsigned long phys, addr, length, end;
-+	unsigned long addr, length, end;
-+	phys_addr_t phys;
- 	const struct mem_type *type;
- 	pgd_t *pgd;
- 
-@@ -705,7 +707,7 @@ static void __init create_mapping(struct map_desc *md)
  #endif
+diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+index 0092658..af3d909 100644
+--- a/arch/arm/mach-realview/platsmp.c
++++ b/arch/arm/mach-realview/platsmp.c
+@@ -116,7 +116,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * Use smp_cross_call() for this, since there's little
+ 	 * point duplicating the code here
+ 	 */
+-	smp_cross_call(cpumask_of(cpu));
++	smp_cross_call(cpumask_of(cpu), 1);
  
- 	addr = md->virtual & PAGE_MASK;
--	phys = (unsigned long)__pfn_to_phys(md->pfn);
-+	phys = __pfn_to_phys(md->pfn);
- 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+diff --git a/arch/arm/mach-s5pv310/include/mach/smp.h b/arch/arm/mach-s5pv310/include/mach/smp.h
+index b7ec252..2897747 100644
+--- a/arch/arm/mach-s5pv310/include/mach/smp.h
++++ b/arch/arm/mach-s5pv310/include/mach/smp.h
+@@ -14,9 +14,9 @@ extern void __iomem *gic_cpu_base_addr;
+ /*
+  * We use IRQ1 as the IPI
+  */
+-static inline void smp_cross_call(const struct cpumask *mask)
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+ {
+-	gic_raise_softirq(mask, 1);
++	gic_raise_softirq(mask, ipi);
+ }
  
- 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
+ #endif
+diff --git a/arch/arm/mach-s5pv310/platsmp.c b/arch/arm/mach-s5pv310/platsmp.c
+index d357c19..d474426 100644
+--- a/arch/arm/mach-s5pv310/platsmp.c
++++ b/arch/arm/mach-s5pv310/platsmp.c
+@@ -97,7 +97,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * the boot monitor to read the system wide flags register,
+ 	 * and branch to the address found there.
+ 	 */
+-	smp_cross_call(cpumask_of(cpu));
++	smp_cross_call(cpumask_of(cpu), 1);
+ 
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+diff --git a/arch/arm/mach-tegra/include/mach/smp.h b/arch/arm/mach-tegra/include/mach/smp.h
+index d3cd265..d1aa704 100644
+--- a/arch/arm/mach-tegra/include/mach/smp.h
++++ b/arch/arm/mach-tegra/include/mach/smp.h
+@@ -7,9 +7,9 @@
+ /*
+  * We use IRQ1 as the IPI
+  */
+-static inline void smp_cross_call(const struct cpumask *mask)
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+ {
+-	gic_raise_softirq(mask, 1);
++	gic_raise_softirq(mask, ipi);
+ }
+ 
+ #endif
+diff --git a/arch/arm/mach-ux500/include/mach/smp.h b/arch/arm/mach-ux500/include/mach/smp.h
+index 197e841..bd57c50 100644
+--- a/arch/arm/mach-ux500/include/mach/smp.h
++++ b/arch/arm/mach-ux500/include/mach/smp.h
+@@ -18,8 +18,8 @@ extern void u8500_secondary_startup(void);
+ /*
+  * We use IRQ1 as the IPI
+  */
+-static inline void smp_cross_call(const struct cpumask *mask)
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+ {
+-	gic_raise_softirq(mask, 1);
++	gic_raise_softirq(mask, ipi);
+ }
+ #endif
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 9e4c678..b8987bd 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -78,7 +78,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
+ 	outer_clean_range(__pa(&pen_release), __pa(&pen_release) + 1);
+ 
+-	smp_cross_call(cpumask_of(cpu));
++	smp_cross_call(cpumask_of(cpu), 1);
+ 
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+diff --git a/arch/arm/mach-vexpress/include/mach/smp.h b/arch/arm/mach-vexpress/include/mach/smp.h
+index 5a6da4f..721be0f 100644
+--- a/arch/arm/mach-vexpress/include/mach/smp.h
++++ b/arch/arm/mach-vexpress/include/mach/smp.h
+@@ -7,8 +7,8 @@
+ /*
+  * We use IRQ1 as the IPI
+  */
+-static inline void smp_cross_call(const struct cpumask *mask)
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+ {
+-	gic_raise_softirq(mask, 1);
++	gic_raise_softirq(mask, ipi);
+ }
+ #endif
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index 6709706..276f916 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -92,7 +92,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * the boot monitor to read the system wide flags register,
+ 	 * and branch to the address found there.
+ 	 */
+-	smp_cross_call(cpumask_of(cpu));
++	smp_cross_call(cpumask_of(cpu), 1);
+ 
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+diff --git a/arch/arm/plat-omap/include/plat/smp.h b/arch/arm/plat-omap/include/plat/smp.h
+index ecd6a48..e5541e5 100644
+--- a/arch/arm/plat-omap/include/plat/smp.h
++++ b/arch/arm/plat-omap/include/plat/smp.h
+@@ -29,9 +29,9 @@ extern u32 omap_read_auxcoreboot0(void);
+ /*
+  * We use Soft IRQ1 as the IPI
+  */
+-static inline void smp_cross_call(const struct cpumask *mask)
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
+ {
+-	gic_raise_softirq(mask, 1);
++	gic_raise_softirq(mask, ipi);
+ }
+ 
+ #endif
+-- 
+1.6.2.5
