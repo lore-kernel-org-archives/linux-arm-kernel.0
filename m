@@ -1,36 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Nov 2010 21:46:14 +0000
-Subject: [PATCH v2 04/20] ARM: LPAE: Do not assume Linux PTEs are always
-	at PTRS_PER_PTE offset
-In-Reply-To: <20101115174251.GB31421@n2100.arm.linux.org.uk>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-5-git-send-email-catalin.marinas@arm.com>
-	<20101115174251.GB31421@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinej2U_tEWM25m7VW7=PndxVPohaKjJ=10wn+C1@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 16 Nov 2010 10:59:59 +1300
+Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
+In-Reply-To: <1289848334-8695-5-git-send-email-cyril@ti.com>
+References: <1289848334-8695-1-git-send-email-cyril@ti.com>
+	<1289848334-8695-5-git-send-email-cyril@ti.com>
+Message-ID: <4CE1AD5F.4020401@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2010 17:42, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 12, 2010 at 06:00:24PM +0000, Catalin Marinas wrote:
->> Placing the Linux PTEs at a 2KB offset inside a page is a workaround for
->> the 2-level page table format where not enough spare bits are available.
->> With LPAE this is no longer required. This patch changes such assumption
->> by using a different macro, LINUX_PTE_OFFSET, which is defined to
->> PTRS_PER_PTE for the 2-level page tables.
->
-> Hmm. ?I think we should be doing this a different way - in fact, I think
-> we should switch the order of the linux vs hardware page tables. ?This
-> actually simplifies the code a bit too - notice that we lose the arith.
-> in __pte_map, __pte_unmap, pmd_page_vaddr, which is all page table
-> walking stuff.
+On 11/16/2010 08:12 AM, Cyril Chemparathy wrote:
+> This patch adds an SPI master implementation that operates on top of an
+> underlying TI-SSP port.
+> 
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> ---
+>  drivers/mfd/Kconfig        |   10 +
+>  drivers/mfd/Makefile       |    1 +
+>  drivers/mfd/ti-ssp-spi.c   |  402 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/ti_ssp.h |    6 +
+>  4 files changed, 419 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/mfd/ti-ssp-spi.c
 
-It looks like a good clean-up to me (though I need some refactoring on
-my LPAE patches). Do you plan to push this upstream? If you add a
-comment and a signed-off line, I can carry it in my LPAE branch until
-it appears in mainline.
+This should live in drivers/spi rather than drivers/mfd. Each of the
+drivers which use the TI-SSP core are single function drivers and having
+them in the appropriate directory makes them easier to find.
 
-Thanks.
+The SSP core driver could either live in drivers/mfd or drivers/misc
+atmel-ssc.c is in drivers/misc for example.
+
+~Ryan
 
 -- 
-Catalin
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
