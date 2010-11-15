@@ -1,55 +1,173 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 15 Nov 2010 08:30:18 -0800
-Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
-In-Reply-To: <F45880696056844FA6A73F415B568C6953604E7105@EXDCVYMBSTM006.EQ1STM.local>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
-	<1289409276.15905.65.camel@Joe-Laptop>
-	<F45880696056844FA6A73F415B568C6953604E7105@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <1289838618.16461.132.camel@Joe-Laptop>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 15 Nov 2010 17:33:46 +0100
+Subject: [PATCH 02/11] ARM: imx: Add support of interrupt controller ICOLL
+In-Reply-To: <1289831795-4373-3-git-send-email-shawn.guo@freescale.com>
+References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
+	<1289831795-4373-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101115163346.GJ8942@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-11-15 at 10:52 +0100, Jimmy RUBIN wrote:
-> > Just trivia:
-[]
-> > It'd be nice to change to continuous_running
-> Continous_running [...]
-
-It was just a spelling comment.
-continous
-continuous
-
+On Mon, Nov 15, 2010 at 10:36:26PM +0800, Shawn Guo wrote:
+> MX28 uses Interrupt Collector (ICOLL) as the interrupt
+> controller. So ICOLL becomes the third interrupt controller
+> for MXC besides AVIC and TZIC.
 > 
-> > > +int mcde_dsi_dcs_write(struct mcde_chnl_state *chnl, u8 cmd, u8*
-> > data, int len)
-> > > +{
-> > > +	int i;
-> > > +	u32 wrdat[4] = { 0, 0, 0, 0 };
-> > > +	u32 settings;
-> > > +	u8 link = chnl->port.link;
-> > > +	u8 virt_id = chnl->port.phy.dsi.virt_id;
-> > > +
-> > > +	/* REVIEW: One command at a time */
-> > > +	/* REVIEW: Allow read/write on unreserved ports */
-> > > +	if (len > MCDE_MAX_DCS_WRITE || chnl->port.type !=
-> > MCDE_PORTTYPE_DSI)
-> > > +		return -EINVAL;
-> > > +
-> > > +	wrdat[0] = cmd;
-> > > +	for (i = 1; i <= len; i++)
-> > > +		wrdat[i>>2] |= ((u32)data[i-1] << ((i & 3) * 8));
-> > 
-> > Ever overrun wrdat?
-> > Maybe WARN_ON(len > 16, "oops?")
-> > 
-> MCDE_MAX_DCS_WRITE is 15 so it will be an early return in that case.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/plat-mxc/icoll.c                    |   79 ++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/entry-macro.S |   22 ++++++-
+>  2 files changed, 97 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/icoll.c
+> 
+> diff --git a/arch/arm/plat-mxc/icoll.c b/arch/arm/plat-mxc/icoll.c
+> new file mode 100644
+> index 0000000..e9a9e42
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/icoll.c
+> @@ -0,0 +1,79 @@
+> +/*
+> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/irq.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/common.h>
+> +
+> +#define HW_ICOLL_VECTOR				0x0000
+> +#define HW_ICOLL_LEVELACK			0x0010
+> +#define HW_ICOLL_CTRL				0x0020
+> +#define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
+> +#define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
+> +#define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
+> +#define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
+> +
+> +void __iomem *icoll_base;
+> +
+> +static void icoll_ack_irq(unsigned int irq)
+> +{
+> +	__raw_writel(0, icoll_base + HW_ICOLL_VECTOR);
+> +
+> +	/* ACK current interrupt (level 0) */
+> +	__raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
+> +			icoll_base + HW_ICOLL_LEVELACK);
+> +}
+> +
+> +static void icoll_mask_irq(unsigned int irq)
+> +{
+> +	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+> +			icoll_base + HW_ICOLL_INTERRUPTn_CLR(irq));
+> +}
+> +
+> +static void icoll_unmask_irq(unsigned int irq)
+> +{
+> +	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+> +			icoll_base + HW_ICOLL_INTERRUPTn_SET(irq));
+> +}
+> +
+> +static struct irq_chip mxc_icoll_chip = {
+> +	.ack = icoll_ack_irq,
+> +	.mask = icoll_mask_irq,
+> +	.unmask = icoll_unmask_irq,
+> +};
+> +
+> +void __init icoll_init_irq(void __iomem *irqbase)
+> +{
+> +	int i;
+> +
+> +	icoll_base = irqbase;
+> +	mxc_irq_base = irqbase;
+> +	mxc_irq_controller_type = MXC_IRQ_TYPE_ICOLL;
+> +
+> +	/* Reset icoll */
+> +	mxc_reset_block(irqbase + HW_ICOLL_CTRL);
+mxc_reset_block is only defined in patch 3, so you must not use it in
+patch 2.
 
-Perhaps it'd be better to use
+> +
+> +	for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
+> +		set_irq_chip(i, &mxc_icoll_chip);
+> +		set_irq_handler(i, handle_level_irq);
+> +		set_irq_flags(i, IRQF_VALID);
+> +	}
+> +}
+> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> index a7dd008..a66e804 100644
+> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> @@ -1,6 +1,6 @@
+>  /*
+>   *  Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
+> - *  Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *  Copyright 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+>   */
+>  
+>  /*
+> @@ -73,25 +73,39 @@
+>  #endif
+>  	.endm
+>  
+> +	.macro	icoll_get_irqnr_and_base, irqnr, irqstat, base, tmp
+> +	ldr \irqnr, [\base, #0x70]
+> +	cmp \irqnr, #0x7F
+> +	moveqs \irqnr, #0
+> +	.endm
+> +
+>  	.macro get_irqnr_and_base, irqnr, irqstat, base, tmp
+> -#if defined CONFIG_MXC_TZIC && defined CONFIG_MXC_AVIC
+> +#if defined CONFIG_MXC_TZIC && defined CONFIG_MXC_AVIC && defined CONFIG_MXC_ICOLL
+>  	ldr	\tmp, =mxc_irq_controller_type
+>  	ldr	\tmp, [\tmp]
+>  	cmp	\tmp, #MXC_IRQ_TYPE_AVIC
+>  	beq	3001f
+> +	cmp	\tmp, #MXC_IRQ_TYPE_ICOLL
+> +	beq	3002f
+>  
+>  	tzic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
+> -	b	3002f
+> +	b	3003f
+>  3001:
+>  	avic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
+> +	b	3003f
+>  3002:
+> +	icoll_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
+> +	b	3003f
+> +3003:
+>  
+>  #elif defined CONFIG_MXC_TZIC
+>  	tzic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
+>  #elif defined CONFIG_MXC_AVIC
+>  	avic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
+> +#elif defined CONFIG_MXC_ICOLL
+> +	icoll_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
+>  #else
+> -#error no tzic and no avic?
+> +#error none of tzic, avic, icoll?
+>  #endif
+>  	.endm
+I wonder if it's sensible to integrate mx28 (and mx23) support into
+mach-imx/plat-mxc.  They seem to better fit into mach-stmp378x?!
 
-DECLARE_BITMAP(wrdat, MCDE_MAX_DCS_WRITE);
+Best regards
+Uwe
 
-or some other mechanism to link the array
-size to the #define. 
-
-> /Jimmy
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
