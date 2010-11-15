@@ -1,291 +1,83 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 Nov 2010 17:46:31 +0100
-Subject: [PATCH 06/11] ARM: imx: Add IOMUX support for i.MX28
-In-Reply-To: <1289831795-4373-7-git-send-email-shawn.guo@freescale.com>
+Date: Mon, 15 Nov 2010 17:47:27 +0100
+Subject: [PATCH 07/11] ARM: imx: Add support of uncompress print for i.MX28
+In-Reply-To: <1289831795-4373-8-git-send-email-shawn.guo@freescale.com>
 References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
-	<1289831795-4373-7-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101115164631.GN8942@pengutronix.de>
+	<1289831795-4373-8-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101115164727.GO8942@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 10:36:30PM +0800, Shawn Guo wrote:
-> Soc i.MX28 supports IOMUX function in block PINCTRL. Comparing
-> to the naming of iomux-v1 and iomux-v3, it uses iomux-pinctrl,
-> since PINCTRL is a totally different IP block from IOMUX and it's
-> not reasonable to name it iomux-v2 or iomux-v4, which is used to
-iomux v2 is already taken (by mx31) it just doesn't have this name (yet)
-in the code.
-
-> distinguish the different revision of same IP block.
-Sounds more like something complet
+On Mon, Nov 15, 2010 at 10:36:31PM +0800, Shawn Guo wrote:
+> SoC i.MX28 uses DUART IP block as the debug serial. It adds the
+> support in the same file used by other i.MX SoC UART, and uses
+> variable is_duart to distinguish.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
->  arch/arm/plat-mxc/include/mach/iomux-mx28.h    |   50 +++++++++++++
->  arch/arm/plat-mxc/include/mach/iomux-pinctrl.h |   91 +++++++++++++++++++++++
->  arch/arm/plat-mxc/iomux-pinctrl.c              |   94 ++++++++++++++++++++++++
->  3 files changed, 235 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/include/mach/iomux-mx28.h
->  create mode 100644 arch/arm/plat-mxc/include/mach/iomux-pinctrl.h
->  create mode 100644 arch/arm/plat-mxc/iomux-pinctrl.c
+>  arch/arm/plat-mxc/include/mach/uncompress.h |   20 ++++++++++++++------
+>  1 files changed, 14 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx28.h b/arch/arm/plat-mxc/include/mach/iomux-mx28.h
-> new file mode 100644
-> index 0000000..8c68bd6
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx28.h
-> @@ -0,0 +1,50 @@
-> +/*
-> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#ifndef __MACH_IOMUX_MX28_H__
-> +#define __MACH_IOMUX_MX28_H__
-> +
-> +#include <mach/iomux-pinctrl.h>
-> +
-> +/*
-> + * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
-> + * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-> + * See also iomux-pinctrl.h
-> + *
-> + *					 		BANK PIN     MUX            VOL          MA            PULL
-> + */
-> +/* DUART */
-> +#define MX28_PAD_PWM0__DUART_RX			IOMUX_PAD(3, 16, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +#define MX28_PAD_PWM1__DUART_TX			IOMUX_PAD(3, 17, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +
-> +/* FEC */
-> +#define MX28_PAD_ENET0_MDC__ENET0_MDC		IOMUX_PAD(4, 0,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_MDIO__ENET0_MDIO		IOMUX_PAD(4, 1,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN	IOMUX_PAD(4, 2,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_RXD0__ENET0_RXD0		IOMUX_PAD(4, 3,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_RXD1__ENET0_RXD1		IOMUX_PAD(4, 4,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN	IOMUX_PAD(4, 6,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_TXD0__ENET0_TXD0		IOMUX_PAD(4, 7,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_TXD1__ENET0_TXD1		IOMUX_PAD(4, 8,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET_CLK__ENET_CLK		IOMUX_PAD(4, 16, PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +
-> +/* GPIO */
-> +#define MX28_PAD_SSP1_DATA3__GPIO_2_15		IOMUX_PAD(2, 15, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13	IOMUX_PAD(4, 13, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +
-> +#endif /* __MACH_IOMUX_MX28_H__ */
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-pinctrl.h b/arch/arm/plat-mxc/include/mach/iomux-pinctrl.h
-> new file mode 100644
-> index 0000000..c2fdb33
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-pinctrl.h
-> @@ -0,0 +1,91 @@
-> +/*
-> + * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-> + *			<armlinux@phytec.de>
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +
-> +#ifndef __MACH_IOMUX_PINCTRL_H__
-> +#define __MACH_IOMUX_PINCTRL_H__
-> +
-> +typedef struct deprecated_pad_desc {
-> +	unsigned bank:3;
-> +	unsigned pin:5;
-> +	unsigned muxsel:2;
-> +	unsigned ma:3;
-> +	unsigned vol:2;
-> +	unsigned pull:1;
-> +} iomux_pinctrl_cfg_t;
-Oh, you start with things that are already now deprecated?
+> diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+> index 9dd9c20..adb617f 100644
+> --- a/arch/arm/plat-mxc/include/mach/uncompress.h
+> +++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+> @@ -1,8 +1,9 @@
+>  /*
+> - *  arch/arm/plat-mxc/include/mach/uncompress.h
+> + *  rch/arm/plat-mxc/include/mach/uncompress.h
+???
 
-> +
-> +#define IOMUX_PAD(_bank, _pin, _muxsel, _vol, _ma, _pull)	\
-> +		{						\
-> +			.bank	= _bank,			\
-> +			.pin	= _pin,				\
-> +			.muxsel	= _muxsel,			\
-> +			.vol	= _vol,				\
-> +			.ma	= _ma,				\
-> +			.pull	= _pull,			\
-> +		}
-> +
-> +#define PAD_MUXSEL_0		0
-> +#define PAD_MUXSEL_1		1
-> +#define PAD_MUXSEL_2		2
-> +#define PAD_MUXSEL_GPIO		3
-> +
-> +#define PAD_1V8			0
-> +#define PAD_3V3			1
-> +#define PAD_VOL_NONE		2
-> +
-> +#define PAD_4MA			0
-> +#define PAD_8MA			1
-> +#define PAD_12MA		2
-> +#define PAD_16MA		3
-> +#define PAD_MA_NONE		4
-> +
-> +#define PAD_NOPULL		0
-> +#define PAD_PULL		1
-> +
-> +#define MX51_NUM_GPIO_PORT	4
-> +
-> +#define GPIO_PIN_MASK 0x1f
-> +
-> +#define GPIO_PORT_SHIFT 5
-> +#define GPIO_PORT_MASK (0x7 << GPIO_PORT_SHIFT)
-> +
-> +#define GPIO_PORTA	(0 << GPIO_PORT_SHIFT)
-> +#define GPIO_PORTB	(1 << GPIO_PORT_SHIFT)
-> +#define GPIO_PORTC	(2 << GPIO_PORT_SHIFT)
-> +#define GPIO_PORTD	(3 << GPIO_PORT_SHIFT)
-> +#define GPIO_PORTE	(4 << GPIO_PORT_SHIFT)
-> +#define GPIO_PORTF	(5 << GPIO_PORT_SHIFT)
-> +
-> +/*
-> + * setups a single pad in the iomuxer
-> + */
-> +int mxc_iomux_pinctrl_setup_pad(iomux_pinctrl_cfg_t *pad);
-> +
-> +/*
-> + * setups mutliple pads
-s/mutliple/multiple/
+>   *
+>   *  Copyright (C) 1999 ARM Limited
+>   *  Copyright (C) Shane Nay (shane at minirl.com)
+> + *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License as published by
+> @@ -22,14 +23,16 @@
+>  #include <asm/mach-types.h>
+>  
+>  static unsigned long uart_base;
+> +static unsigned short is_duart = 0;
+don't initialize static variables to 0.
 
-> + * convenient way to call the above function with tables
-> + */
-> +int mxc_iomux_pinctrl_setup_multiple_pads(iomux_pinctrl_cfg_t *pad_list, unsigned count);
-> +
-> +/*
-> + * Initialise the iomux controller
-> + */
-> +void mxc_iomux_pinctrl_init(void __iomem *iomux_pinctrl_base);
-> +
-> +#endif /* __MACH_IOMUX_PINCTRL_H__*/
-> diff --git a/arch/arm/plat-mxc/iomux-pinctrl.c b/arch/arm/plat-mxc/iomux-pinctrl.c
-> new file mode 100644
-> index 0000000..5f5b5ac
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/iomux-pinctrl.c
-> @@ -0,0 +1,94 @@
-> +/*
-> + * Copyright 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
-> + * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-> + *                       <armlinux@phytec.de>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +#include <linux/errno.h>
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/string.h>
-> +#include <linux/gpio.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/hardware.h>
-> +#include <mach/iomux-pinctrl.h>
-> +
-> +static void __iomem *base;
-> +
-> +/*
-> + * configures a single pad in the iomuxer
-> + */
-> +int mxc_iomux_pinctrl_setup_pad(iomux_pinctrl_cfg_t *pad)
-> +{
-> +	u32 reg, ofs, bp, bm;
-> +
-> +	/* MUXSEL */
-> +	ofs = pad->bank * 0x20 + pad->pin / 16 * 0x10;
-> +	bp = pad->pin % 16 * 2;
-> +	bm = 0x3 << bp;
-> +	reg = __raw_readl(base + ofs);
-> +	reg &= ~bm;
-> +	reg |= pad->muxsel << bp;
-> +	__raw_writel(reg, base + ofs);
-> +
-> +	/* DRIVE */
-> +	if (pad->ma != PAD_MA_NONE && pad->vol != PAD_VOL_NONE)
-> +	{
-> +		ofs = 0x300 + pad->bank * 0x40 + pad->pin / 8 * 0x10;
-> +		bp = pad->pin % 8 * 4;
-> +		bm = 0x7 << bp;
-> +		reg = __raw_readl(base + ofs);
-> +		reg &= ~bm;
-> +		reg |= pad->ma << bp | pad->vol << (bp + 2);
-> +		__raw_writel(reg, base + ofs);
-> +	}
-> +
-> +	/* PULL */
-> +	ofs = 0x600 + pad->bank * 0x10;
-> +	bp = pad->pin;
-> +	bm = 0x1 << bp;
-> +	reg = __raw_readl(base + ofs);
-> +	reg &= ~bm;
-> +	reg |= pad->pull << bp;
-> +	__raw_writel(reg, base + ofs);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(mxc_iomux_pinctrl_setup_pad);
-> +
-> +int mxc_iomux_pinctrl_setup_multiple_pads(iomux_pinctrl_cfg_t *pad_list, unsigned count)
-> +{
-> +	iomux_pinctrl_cfg_t *p = pad_list;
-> +	int i;
-> +	int ret;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		ret = mxc_iomux_pinctrl_setup_pad(p);
-> +		if (ret)
-> +			return ret;
-> +		p++;
-> +	}
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(mxc_iomux_pinctrl_setup_multiple_pads);
-> +
-> +void mxc_iomux_pinctrl_init(void __iomem *iomux_pinctrl_base)
-> +{
-> +	base = iomux_pinctrl_base;
-> +}
+>  
+>  #define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
+>  
+> -#define USR2 0x98
+> -#define USR2_TXFE (1<<14)
+> -#define TXR  0x40
+> -#define UCR1 0x80
+> -#define UCR1_UARTEN 1
+> +#define USR2		(is_duart ? 0x18 : 0x98)
+> +#define USR2_TXFE	(is_duart ? 1<<7 : 1<<14)
+> +#define USR2_BUSY	(1 << 3)
+> +#define TXR		(is_duart ? 0x00 : 0x40)
+> +#define UCR1		(is_duart ? 0x30 : 0x80)
+> +#define UCR1_UARTEN	1
+>  
+>  /*
+>   * The following code assumes the serial port has already been
+> @@ -59,6 +62,7 @@ static inline void flush(void)
+>  
+>  #define MX1_UART1_BASE_ADDR	0x00206000
+>  #define MX25_UART1_BASE_ADDR	0x43f90000
+> +#define MX28_DUART_BASE_ADDR	0x80074000
+>  #define MX2X_UART1_BASE_ADDR	0x1000a000
+>  #define MX3X_UART1_BASE_ADDR	0x43F90000
+>  #define MX3X_UART2_BASE_ADDR	0x43F94000
+> @@ -83,6 +87,10 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+>  	case MACH_TYPE_MXT_TD60:
+>  		uart_base = MX2X_UART1_BASE_ADDR;
+>  		break;
+> +	case MACH_TYPE_MX28EVK:
+> +		uart_base = MX28_DUART_BASE_ADDR;
+> +		is_duart = 1;
+> +		break;
+>  	case MACH_TYPE_MX31LITE:
+>  	case MACH_TYPE_ARMADILLO5X0:
+>  	case MACH_TYPE_MX31MOBOARD:
 > -- 
 > 1.7.1
 > 
