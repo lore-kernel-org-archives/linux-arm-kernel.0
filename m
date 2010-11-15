@@ -1,43 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Nov 2010 18:30:14 +0000
-Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
-	L_PTE_NOWRITE
-In-Reply-To: <1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20101115183014.GD31421@n2100.arm.linux.org.uk>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Mon, 15 Nov 2010 10:33:07 -0800 (PST)
+Subject: [PATCH] mx51_babbage: Register audio codec in the I2C bus
+Message-ID: <64705.71981.qm@web51005.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 06:00:25PM +0000, Catalin Marinas wrote:
-> The LPAE page table format needs to explicitly disable execution or
-> write permissions on a page by setting the corresponding bits (similar
-> to the classic page table format with Access Flag enabled). This patch
-> introduces null definitions for the 2-level format and the actual noexec
-> and nowrite bits for the LPAE format. It also changes several PTE
-> maintenance macros and masks.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/include/asm/pgtable-2level.h |    2 +
->  arch/arm/include/asm/pgtable.h        |   44 +++++++++++++++++++++------------
->  arch/arm/mm/mmu.c                     |    6 ++--
->  3 files changed, 33 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-> index 36bdef7..4e21166 100644
-> --- a/arch/arm/include/asm/pgtable-2level.h
-> +++ b/arch/arm/include/asm/pgtable-2level.h
-> @@ -128,6 +128,8 @@
->  #define L_PTE_USER		(1 << 8)
->  #define L_PTE_EXEC		(1 << 9)
->  #define L_PTE_SHARED		(1 << 10)	/* shared(v6), coherent(xsc3) */
-> +#define L_PTE_NOEXEC		(0)
-> +#define L_PTE_NOWRITE		(0)
+MX51 Babbage has a SGTL5000 codec connected to I2C2.
 
-Let's not make this more complicated than it has to be.  If we need the
-inverse of WRITE and EXEC, then that's what we should change everyone to,
-not invent a new system to work along side the old system.
+Register the codec.
 
-We're already inverting the write bit for the vast majority of processors,
-and exec has always been inverted by the ARMv6 and v7 code.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index 66b07d8..a0e5a3e 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -342,6 +342,12 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
+ 	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
+ };
+ 
++static struct i2c_board_info mx51_babbage_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO("sgtl5000-i2c", 0x0a),
++	},
++};
++
+ /*
+  * Board specific initialization.
+  */
+@@ -365,6 +371,8 @@ static void __init mxc_board_init(void)
+ 	imx51_add_gpio_keys(&imx_button_data);
+ 
+ 	imx51_add_imx_i2c(0, &babbage_i2c_data);
++	i2c_register_board_info(1, mx51_babbage_i2c_devices,
++		ARRAY_SIZE(mx51_babbage_i2c_devices));
+ 	imx51_add_imx_i2c(1, &babbage_i2c_data);
+ 	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
+ 
+-- 
+1.6.0.4
+
+
+
+      
