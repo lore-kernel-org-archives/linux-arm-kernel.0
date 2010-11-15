@@ -1,34 +1,55 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 15 Nov 2010 16:26:36 +0000
-Subject: [Patch v3] Fix audmuxv2 debugfs indexing.
-In-Reply-To: <BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-	<20101110152619.GB8950@pengutronix.de>
-	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-	<20101112071706.GF6017@pengutronix.de>
-	<20101112114942.GA28804@sirena.org.uk>
-	<87oc9rk6fe.fsf@sympatico.ca>
-	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
-	<20101115153058.GG12986@rakim.wolfsonmicro.main>
-	<87oc9qeg75.fsf@sympatico.ca>
-	<BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
-Message-ID: <20101115162636.GH12986@rakim.wolfsonmicro.main>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 15 Nov 2010 08:30:18 -0800
+Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
+In-Reply-To: <F45880696056844FA6A73F415B568C6953604E7105@EXDCVYMBSTM006.EQ1STM.local>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
+	<1289409276.15905.65.camel@Joe-Laptop>
+	<F45880696056844FA6A73F415B568C6953604E7105@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <1289838618.16461.132.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 11:10:31AM -0500, Bill Pringlemeir wrote:
+On Mon, 2010-11-15 at 10:52 +0100, Jimmy RUBIN wrote:
+> > Just trivia:
+[]
+> > It'd be nice to change to continuous_running
+> Continous_running [...]
 
-> Sorry, I should have waited to email.  audmux_port_string() only
-> handles six values (not seven).  Also, the audmux.h only has six
-> defines for both MX31 and MX27.  There isn't an SSI7 that is being
-> reported by the debugfs.  However, a user of the audmux-v2.c code can
-> call mxc_audmux_v2_configure_port() with a port value of '6' to
-> configure audmux pin set 7 ;-)
+It was just a spelling comment.
+continous
+continuous
 
-SSI7 is an internal network connection thing of some kind.
+> 
+> > > +int mcde_dsi_dcs_write(struct mcde_chnl_state *chnl, u8 cmd, u8*
+> > data, int len)
+> > > +{
+> > > +	int i;
+> > > +	u32 wrdat[4] = { 0, 0, 0, 0 };
+> > > +	u32 settings;
+> > > +	u8 link = chnl->port.link;
+> > > +	u8 virt_id = chnl->port.phy.dsi.virt_id;
+> > > +
+> > > +	/* REVIEW: One command at a time */
+> > > +	/* REVIEW: Allow read/write on unreserved ports */
+> > > +	if (len > MCDE_MAX_DCS_WRITE || chnl->port.type !=
+> > MCDE_PORTTYPE_DSI)
+> > > +		return -EINVAL;
+> > > +
+> > > +	wrdat[0] = cmd;
+> > > +	for (i = 1; i <= len; i++)
+> > > +		wrdat[i>>2] |= ((u32)data[i-1] << ((i & 3) * 8));
+> > 
+> > Ever overrun wrdat?
+> > Maybe WARN_ON(len > 16, "oops?")
+> > 
+> MCDE_MAX_DCS_WRITE is 15 so it will be an early return in that case.
 
-> The documentation we are working with isn't that helpful.  For the iMx
-> 25 pg 13-4, it says there are "Three internal ports", but I can only
-> find two ssi devices (with two channels of audio each)...
+Perhaps it'd be better to use
 
-It's not an SSI port.
+DECLARE_BITMAP(wrdat, MCDE_MAX_DCS_WRITE);
+
+or some other mechanism to link the array
+size to the #define. 
+
+> /Jimmy
