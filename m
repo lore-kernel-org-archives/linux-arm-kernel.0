@@ -1,41 +1,34 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Nov 2010 17:30:58 +0000
-Subject: [PATCH 0/5] ARM: perf: split up perf_event.c by architecture
-Message-ID: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 15 Nov 2010 17:31:00 +0000
+Subject: [PATCH 2/5] ARM: perf: avoid exposing internal stop function for v6
+	PMU
+In-Reply-To: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
+References: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1289842263-21241-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean - is this a sensible email address to contact you with? Your old
-       mvista one has stopped working.
-
-Our perf_event.c is becoming rather cumbersome as more PMUs are added.
-I know of at least two more (v7-based) PMUs that will be added in the
-coming months which will push this file to the ~4KLOC region.
-
-Since most updates to this file are to do with changes to the generic
-Linux perf API, let's do what x86 does and split out the separate PMU
-implementations into their own files. I've chosen to split it by
-architecture revision: xscale, v6 and v7. Since the v7 PMU registers
-are architected, this means that new v7 implementations just need to
-describe their event mappings.
-
-Comments welcome.
+Unlike other pmu functions, armv6pmu_pmu_stop is not declared static.
+This patch adds the missing keyword.
 
 Cc: Jamie Iles <jamie.iles@picochip.com>
-Cc: Jean Pihet <jean.pihet@newoldbits.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Will Deacon (5):
-  ARM: perf: consolidate common PMU behaviour
-  ARM: perf: avoid exposing internal stop function for v6 PMU
-  ARM: perf: add _init() functions to PMUs
-  ARM: perf: encode PMU name in arm_pmu structure
-  ARM: perf: separate PMU backends into multiple files
-
- arch/arm/kernel/perf_event.c        | 2448 +----------------------------------
- arch/arm/kernel/perf_event_v6.c     |  674 ++++++++++
- arch/arm/kernel/perf_event_v7.c     |  906 +++++++++++++
- arch/arm/kernel/perf_event_xscale.c |  809 ++++++++++++
- 4 files changed, 2423 insertions(+), 2414 deletions(-)
- create mode 100644 arch/arm/kernel/perf_event_v6.c
- create mode 100644 arch/arm/kernel/perf_event_v7.c
- create mode 100644 arch/arm/kernel/perf_event_xscale.c
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index c49e170..35319b8 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -1121,7 +1121,7 @@ armv6pmu_start(void)
+ 	spin_unlock_irqrestore(&pmu_lock, flags);
+ }
+ 
+-void
++static void
+ armv6pmu_stop(void)
+ {
+ 	unsigned long flags, val;
+-- 
+1.7.0.4
