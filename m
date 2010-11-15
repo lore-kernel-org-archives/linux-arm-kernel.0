@@ -1,153 +1,107 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Nov 2010 17:58:24 +0000
-Subject: [PATCH 3/9] ARM: smp: avoid using bitmasks and locks for IPIs,
-	use hardware instead
+Date: Mon, 15 Nov 2010 17:59:15 +0000
+Subject: [PATCH 8/9] ARM: smp: provide individual IPI interrupt statistics
 In-Reply-To: <20101115175553.GC31421@n2100.arm.linux.org.uk>
 References: <20101115175553.GC31421@n2100.arm.linux.org.uk>
-Message-ID: <E1PI3Jw-00029e-Kh@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PI3Kl-00029y-6h@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid using bitmasks and locks in the percpu area for IPIs, and instead
-use individual software generated interrupts to identify the reason for
-the IPI.  This avoids the problems of having spinlocks in the percpu
-area.
+This separates out the individual IPI interrupt counts from the
+total IPI count, which allows better visibility of what IPIs are
+being used for.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/smp.c |   87 ++++++++++++++----------------------------------
- 1 files changed, 26 insertions(+), 61 deletions(-)
+ arch/arm/include/asm/hardirq.h |    4 +++-
+ arch/arm/kernel/irq.c          |    5 +++++
+ arch/arm/kernel/smp.c          |   25 +++++++++++++++++++------
+ 3 files changed, 27 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 824b08a..c52e250 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,13 +5,15 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
++#define NR_IPI	5
++
+ typedef struct {
+ 	unsigned int __softirq_pending;
+ #ifdef CONFIG_LOCAL_TIMERS
+ 	unsigned int local_timer_irqs;
+ #endif
+ #ifdef CONFIG_SMP
+-	unsigned int ipi_irqs;
++	unsigned int ipi_irqs[NR_IPI];
+ #endif
+ } ____cacheline_aligned irq_cpustat_t;
+ 
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 4e7a7d2..6276f01 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -62,6 +62,11 @@ int show_interrupts(struct seq_file *p, void *v)
+ 	for (prec = 3, n = 1000; prec < 10 && n <= nr_irqs; prec++)
+ 		n *= 10;
+ 
++#ifdef CONFIG_SMP
++	if (prec < 4)
++		prec = 4;
++#endif
++
+ 	if (i == 0) {
+ 		char cpuname[12];
+ 
 diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 7a236db..78d55c6 100644
+index d0e36e3..c088485 100644
 --- a/arch/arm/kernel/smp.c
 +++ b/arch/arm/kernel/smp.c
-@@ -48,20 +48,15 @@ struct secondary_data secondary_data;
+@@ -396,16 +396,28 @@ void arch_send_call_function_single_ipi(int cpu)
+ 	send_ipi_message(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+ }
+ 
++static const char *ipi_types[NR_IPI] = {
++#define S(x,s)	[x - IPI_TIMER] = s
++	S(IPI_TIMER, "Timer broadcast interrupts"),
++	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
++	S(IPI_CALL_FUNC, "Function call interrupts"),
++	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
++	S(IPI_CPU_STOP, "CPU stop interrupts"),
++};
++
+ void show_ipi_list(struct seq_file *p, int prec)
+ {
+-	unsigned int cpu;
++	unsigned int cpu, i;
+ 
+-	seq_printf(p, "%*s: ", prec, "IPI");
++	for (i = 0; i < NR_IPI; i++) {
++		seq_printf(p, "%*s%u: ", prec - 1, "IPI", i);
+ 
+-	for_each_present_cpu(cpu)
+-		seq_printf(p, "%10u ", __get_irq_stat(cpu, ipi_irqs));
++		for_each_present_cpu(cpu)
++			seq_printf(p, "%10u ",
++				   __get_irq_stat(cpu, ipi_irqs[i]));
+ 
+-	seq_printf(p, " Inter-processor interrupts\n");
++		seq_printf(p, " %s\n", ipi_types[i]);
++	}
+ }
  
  /*
-  * structures for inter-processor calls
-- * - A collection of single bit ipi messages.
-  */
- struct ipi_data {
--	spinlock_t lock;
- 	unsigned long ipi_count;
--	unsigned long bits;
- };
+@@ -520,7 +532,8 @@ asmlinkage void __exception do_IPI(int ipinr, struct pt_regs *regs)
+ 	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
  
--static DEFINE_PER_CPU(struct ipi_data, ipi_data) = {
--	.lock	= SPIN_LOCK_UNLOCKED,
--};
-+static DEFINE_PER_CPU(struct ipi_data, ipi_data);
+-	__inc_irq_stat(cpu, ipi_irqs);
++	if (ipinr >= IPI_TIMER && ipinr < IPI_TIMER + NR_IPI)
++		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
  
- enum ipi_msg_type {
--	IPI_TIMER,
-+	IPI_TIMER = 2,
- 	IPI_RESCHEDULE,
- 	IPI_CALL_FUNC,
- 	IPI_CALL_FUNC_SINGLE,
-@@ -389,22 +384,13 @@ void __init smp_prepare_boot_cpu(void)
- static void send_ipi_message(const struct cpumask *mask, enum ipi_msg_type msg)
- {
- 	unsigned long flags;
--	unsigned int cpu;
- 
- 	local_irq_save(flags);
- 
--	for_each_cpu(cpu, mask) {
--		struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
--
--		spin_lock(&ipi->lock);
--		ipi->bits |= 1 << msg;
--		spin_unlock(&ipi->lock);
--	}
--
- 	/*
- 	 * Call the platform specific cross-CPU call function.
- 	 */
--	smp_cross_call(mask, 1);
-+	smp_cross_call(mask, msg);
- 
- 	local_irq_restore(flags);
- }
-@@ -546,56 +532,35 @@ asmlinkage void __exception do_IPI(int ipinr, struct pt_regs *regs)
- 
- 	ipi->ipi_count++;
- 
--	for (;;) {
--		unsigned long msgs;
--
--		spin_lock(&ipi->lock);
--		msgs = ipi->bits;
--		ipi->bits = 0;
--		spin_unlock(&ipi->lock);
--
--		if (!msgs)
--			break;
--
--		do {
--			unsigned nextmsg;
--
--			nextmsg = msgs & -msgs;
--			msgs &= ~nextmsg;
--			nextmsg = ffz(~nextmsg);
--
--			switch (nextmsg) {
--			case IPI_TIMER:
--				ipi_timer();
--				break;
-+	switch (ipinr) {
-+	case IPI_TIMER:
-+		ipi_timer();
-+		break;
- 
--			case IPI_RESCHEDULE:
--				/*
--				 * nothing more to do - eveything is
--				 * done on the interrupt return path
--				 */
--				break;
-+	case IPI_RESCHEDULE:
-+		/*
-+		 * nothing more to do - eveything is
-+		 * done on the interrupt return path
-+		 */
-+		break;
- 
--			case IPI_CALL_FUNC:
--				generic_smp_call_function_interrupt();
--				break;
-+	case IPI_CALL_FUNC:
-+		generic_smp_call_function_interrupt();
-+		break;
- 
--			case IPI_CALL_FUNC_SINGLE:
--				generic_smp_call_function_single_interrupt();
--				break;
-+	case IPI_CALL_FUNC_SINGLE:
-+		generic_smp_call_function_single_interrupt();
-+		break;
- 
--			case IPI_CPU_STOP:
--				ipi_cpu_stop(cpu);
--				break;
-+	case IPI_CPU_STOP:
-+		ipi_cpu_stop(cpu);
-+		break;
- 
--			default:
--				printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
--				       cpu, nextmsg);
--				break;
--			}
--		} while (msgs);
-+	default:
-+		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
-+		       cpu, ipinr);
-+		break;
- 	}
--
- 	set_irq_regs(old_regs);
- }
- 
+ 	switch (ipinr) {
+ 	case IPI_TIMER:
 -- 
 1.6.2.5
