@@ -1,171 +1,115 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Nov 2010 17:59:05 +0000
-Subject: [PATCH 7/9] ARM: fix /proc/interrupts formatting
-In-Reply-To: <20101115175553.GC31421@n2100.arm.linux.org.uk>
-References: <20101115175553.GC31421@n2100.arm.linux.org.uk>
-Message-ID: <E1PI3Kb-00029u-3U@rmk-PC.arm.linux.org.uk>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Mon, 15 Nov 2010 13:17:17 -0500
+Subject: [Patch v3] Fix audmuxv2 debugfs indexing.
+In-Reply-To: <20101115162636.GH12986@rakim.wolfsonmicro.main> (Mark Brown's
+	message of "Mon, 15 Nov 2010 16:26:36 +0000")
+References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
+	<20101110152619.GB8950@pengutronix.de>
+	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
+	<20101112071706.GF6017@pengutronix.de>
+	<20101112114942.GA28804@sirena.org.uk> <87oc9rk6fe.fsf@sympatico.ca>
+	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
+	<20101115153058.GG12986@rakim.wolfsonmicro.main>
+	<87oc9qeg75.fsf@sympatico.ca>
+	<BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
+	<20101115162636.GH12986@rakim.wolfsonmicro.main>
+Message-ID: <BLU0-SMTP34594F9F26E8EBD100C9CAB8360@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per x86, align the initial column according to how many IRQs we
-have.  Also, provide an english explaination for the 'LOC:' and
-'IPI:' lines.
+On 15 Nov 2010, broonie at opensource.wolfsonmicro.com wrote:
+On Mon, Nov 15, 2010 at 11:10:31AM -0500, Bill Pringlemeir wrote:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/mach/irq.h |    2 +-
- arch/arm/include/asm/smp.h      |    4 ++--
- arch/arm/kernel/fiq.c           |    5 +++--
- arch/arm/kernel/irq.c           |   16 ++++++++++------
- arch/arm/kernel/smp.c           |   14 +++++++-------
- 5 files changed, 23 insertions(+), 18 deletions(-)
+>> Sorry, I should have waited to email.  audmux_port_string() only
+>> handles six values (not seven).  Also, the audmux.h only has six
+>> defines for both MX31 and MX27.  There isn't an SSI7 that is being
+>> reported by the debugfs.  However, a user of the audmux-v2.c code can
+>> call mxc_audmux_v2_configure_port() with a port value of '6' to
+>> configure audmux pin set 7 ;-)
 
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index ce3eee9..2bc47fb 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -20,7 +20,7 @@ struct seq_file;
- extern unsigned int arch_nr_irqs;
- extern void (*init_arch_irq)(void);
- extern void init_FIQ(void);
--extern int show_fiq_list(struct seq_file *, void *);
-+extern int show_fiq_list(struct seq_file *, int);
- 
- /*
-  * This is for easy migration, but should be changed in the source
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index da7e7ca..f93d0a6 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -33,7 +33,7 @@ struct seq_file;
- /*
-  * generate IPI list text
-  */
--extern void show_ipi_list(struct seq_file *p);
-+extern void show_ipi_list(struct seq_file *, int);
- 
- /*
-  * Called from assembly code, this handles an IPI.
-@@ -97,6 +97,6 @@ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- /*
-  * show local interrupt info
-  */
--extern void show_local_irqs(struct seq_file *);
-+extern void show_local_irqs(struct seq_file *, int);
- 
- #endif /* ifndef __ASM_ARM_SMP_H */
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 6ff7919..47837b8 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -67,10 +67,11 @@ static struct fiq_handler default_owner = {
- 
- static struct fiq_handler *current_fiq = &default_owner;
- 
--int show_fiq_list(struct seq_file *p, void *v)
-+int show_fiq_list(struct seq_file *p, int prec)
- {
- 	if (current_fiq != &default_owner)
--		seq_printf(p, "FIQ:              %s\n", current_fiq->name);
-+		seq_printf(p, "%*s:              %s\n", prec, "FIQ",
-+			current_fiq->name);
- 
- 	return 0;
- }
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index ea29721..4e7a7d2 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -57,11 +57,15 @@ int show_interrupts(struct seq_file *p, void *v)
- 	struct irq_desc *desc;
- 	struct irqaction * action;
- 	unsigned long flags;
-+	int prec, n;
-+
-+	for (prec = 3, n = 1000; prec < 10 && n <= nr_irqs; prec++)
-+		n *= 10;
- 
- 	if (i == 0) {
- 		char cpuname[12];
- 
--		seq_printf(p, "    ");
-+		seq_printf(p, "%*s ", prec, "");
- 		for_each_present_cpu(cpu) {
- 			sprintf(cpuname, "CPU%d", cpu);
- 			seq_printf(p, " %10s", cpuname);
-@@ -76,7 +80,7 @@ int show_interrupts(struct seq_file *p, void *v)
- 		if (!action)
- 			goto unlock;
- 
--		seq_printf(p, "%3d: ", i);
-+		seq_printf(p, "%*d: ", prec, i);
- 		for_each_present_cpu(cpu)
- 			seq_printf(p, "%10u ", kstat_irqs_cpu(i, cpu));
- 		seq_printf(p, " %10s", desc->chip->name ? : "-");
-@@ -89,15 +93,15 @@ unlock:
- 		raw_spin_unlock_irqrestore(&desc->lock, flags);
- 	} else if (i == nr_irqs) {
- #ifdef CONFIG_FIQ
--		show_fiq_list(p, v);
-+		show_fiq_list(p, prec);
- #endif
- #ifdef CONFIG_SMP
--		show_ipi_list(p);
-+		show_ipi_list(p, prec);
- #endif
- #ifdef CONFIG_LOCAL_TIMERS
--		show_local_irqs(p);
-+		show_local_irqs(p, prec);
- #endif
--		seq_printf(p, "Err: %10lu\n", irq_err_count);
-+		seq_printf(p, "%*s: %10lu\n", prec, "Err", irq_err_count);
- 	}
- 	return 0;
- }
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index edb8fd5..d0e36e3 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -396,16 +396,16 @@ void arch_send_call_function_single_ipi(int cpu)
- 	send_ipi_message(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
- }
- 
--void show_ipi_list(struct seq_file *p)
-+void show_ipi_list(struct seq_file *p, int prec)
- {
- 	unsigned int cpu;
- 
--	seq_puts(p, "IPI:");
-+	seq_printf(p, "%*s: ", prec, "IPI");
- 
- 	for_each_present_cpu(cpu)
--		seq_printf(p, " %10u", __get_irq_stat(cpu, ipi_irqs));
-+		seq_printf(p, "%10u ", __get_irq_stat(cpu, ipi_irqs));
- 
--	seq_putc(p, '\n');
-+	seq_printf(p, " Inter-processor interrupts\n");
- }
- 
- /*
-@@ -435,16 +435,16 @@ asmlinkage void __exception do_local_timer(struct pt_regs *regs)
- 	set_irq_regs(old_regs);
- }
- 
--void show_local_irqs(struct seq_file *p)
-+void show_local_irqs(struct seq_file *p, int prec)
- {
- 	unsigned int cpu;
- 
--	seq_printf(p, "LOC: ");
-+	seq_printf(p, "%*s: ", prec, "LOC");
- 
- 	for_each_present_cpu(cpu)
- 		seq_printf(p, "%10u ", __get_irq_stat(cpu, local_timer_irqs));
- 
--	seq_putc(p, '\n');
-+	seq_printf(p, " Local timer interrupts\n");
- }
- #endif
- 
+> SSI7 is an internal network connection thing of some kind.
+
+On pg 4-60 of the IMX 25 reference manual, the IOMUX configuration for
+ALT3 is AUD7_TXFS.  This makes me think it is a 'physical' pin after
+the IOMUX routing.
+
+ $ grep AUD7 arch/arm/plat-mxc/include/mach/iomux-mx25.h
+    364:#define MX25_PAD_SD1_DATA1__AUD7_RXD  
+    469:#define MX25_PAD_GPIO_E__AUD7_TXD     
+    472:#define MX25_PAD_GPIO_F__AUD7_TXC     
+    481:#define MX25_PAD_VSTBY_REQ__AUD7_TXFS 
+    487:#define MX25_PAD_POWER_FAIL__AUD7_RXD 
+
+Oddly, the iomux-mx25.h is the only 'iomux-mx[1235]*.h' one with this
+audmux 7 configuration, but some of the ALT configuration values are
+missing from these files.  Maybe the MX25 is different.  It is the
+only IMX processor that I am familar with.
+
+'iomux-mx25.h' has
+
+     77:#define MX25_PAD_EB0__AUD4_TXD         
+     81:#define MX25_PAD_EB1__AUD4_RXD         
+     85:#define MX25_PAD_OE__AUD4_TXC          
+    117:#define MX25_PAD_RW__AUD4_TXFS         
+    364:#define MX25_PAD_SD1_DATA1__AUD7_RXD   
+    394:#define MX25_PAD_KPP_COL0__AUD5_TXD    
+    399:#define MX25_PAD_KPP_COL1__AUD5_RXD    
+    404:#define MX25_PAD_KPP_COL2__AUD5_TXC    
+    409:#define MX25_PAD_KPP_COL3__AUD5_TXFS   
+    413:#define MX25_PAD_FEC_MDC__AUD4_TXD     
+    417:#define MX25_PAD_FEC_MDIO__AUD4_RXD    
+    424:#define MX25_PAD_FEC_TDATA1__AUD4_TXFS 
+    469:#define MX25_PAD_GPIO_E__AUD7_TXD      
+    472:#define MX25_PAD_GPIO_F__AUD7_TXC      
+    481:#define MX25_PAD_VSTBY_REQ__AUD7_TXFS  
+    487:#define MX25_PAD_POWER_FAIL__AUD7_RXD  
+
+As well, chapter 4 (IOMUX) of the IMX25 RM has,
+
+  LD8, ALT4  -> AUD3_TXD
+  LD9, ALT4  -> AUD3_RXD
+  LD10, ALT4 -> AUD3_TXC
+  LD11, ALT4 -> AUD3_TXFS
+  LD14, ALT6 -> AUD3_RXC
+  LD15, ALT6 -> AUD3_RXFS
+
+  CSID8, ALT2 -> AUD6_RXC
+... etc.
+
+>> The documentation we are working with isn't that helpful.  For the iMx
+>> 25 pg 13-4, it says there are "Three internal ports", but I can only
+>> find two ssi devices (with two channels of audio each)...
+
+> It's not an SSI port.
+
+No, I don't think it is an SSI protocol device either.  I think there
+are two internal ports and five external ports, at least on the IMX
+25.  Maybe the documentation is cut and paste from another processor?
+
+There is this cryptic section of the on pg 13-4,
+
+   13.2      External Signal Description
+
+   Table 13-2 lists AUDMUX pin-level signals for the external ports,
+   where:
+
+      ? Pn is P4, through P7
+      ? m = n ? 3.
+
+   The port is configured as an external port by a static system-level
+   signal input pn_int_ext_select.
+
+I guess they could be 'internal' if you didn't configure an external
+pin with the iomux module.  Register
+IOMUXC_AUDMUX_P4_INPUT_DA_AMX_SELECT_INPUT (offset 0x460) might be
+what the above section refers to, but this involves 'daisy chaining'
+and only AUDMUX_P4 and AUDMUX_P7 are listed here (No P3,P5,P6).
+
+Thanks for you help.  I *think* I am getting closer to understanding
+this now.
+
+Regards,
+Bill Pringlemeir.
+
 -- 
-1.6.2.5
+Someday we'll look back on all this and plow into a parked car.
