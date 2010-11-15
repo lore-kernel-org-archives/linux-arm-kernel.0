@@ -1,49 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Nov 2010 19:24:00 +0100
-Subject: [PATCH 02/10] MCDE: Add configuration registers
-In-Reply-To: <20101115145918.GD24194@n2100.arm.linux.org.uk>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<201011121614.51528.arnd@arndb.de>
-	<20101112153423.GC3619@n2100.arm.linux.org.uk>
-	<201011151525.54380.arnd@arndb.de>
-	<20101115145918.GD24194@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimXBf0Qii2H7ewar+x2shFifhxcwXosekiV1hiz@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Nov 2010 18:30:14 +0000
+Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
+	L_PTE_NOWRITE
+In-Reply-To: <1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20101115183014.GD31421@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 15:59, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 15, 2010 at 03:25:54PM +0100, Arnd Bergmann wrote:
->> On Friday 12 November 2010, Russell King - ARM Linux wrote:
->> > It is a bad idea to describe device registers using C structures, and
->> > especially enums.
->> >
->> > The only thing C guarantees about structure layout is that the elements
->> > are arranged in the same order which you specify them in your definition.
->> > It doesn't make any guarantees about placement of those elements within
->> > the structure.
->>
->> Right, I got carried away when seeing the macro overload. My example
->> would work on a given architecture since the ABI is not changing, but
->> we should of course not advocate nonportable code.
->
-> That is a mistake. ?You can't rely on architectures not changing their
-> ABIs. ?See ARM as an example where an ABI change has already happened.
->
-> We actually have two ABIs at present - one ('native ARM') where enums
-> are sized according to the size of their values, and the Linux one
-> where we guarantee that enums are always 'int'.
+On Fri, Nov 12, 2010 at 06:00:25PM +0000, Catalin Marinas wrote:
+> The LPAE page table format needs to explicitly disable execution or
+> write permissions on a page by setting the corresponding bits (similar
+> to the classic page table format with Access Flag enabled). This patch
+> introduces null definitions for the 2-level format and the actual noexec
+> and nowrite bits for the LPAE format. It also changes several PTE
+> maintenance macros and masks.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/include/asm/pgtable-2level.h |    2 +
+>  arch/arm/include/asm/pgtable.h        |   44 +++++++++++++++++++++------------
+>  arch/arm/mm/mmu.c                     |    6 ++--
+>  3 files changed, 33 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+> index 36bdef7..4e21166 100644
+> --- a/arch/arm/include/asm/pgtable-2level.h
+> +++ b/arch/arm/include/asm/pgtable-2level.h
+> @@ -128,6 +128,8 @@
+>  #define L_PTE_USER		(1 << 8)
+>  #define L_PTE_EXEC		(1 << 9)
+>  #define L_PTE_SHARED		(1 << 10)	/* shared(v6), coherent(xsc3) */
+> +#define L_PTE_NOEXEC		(0)
+> +#define L_PTE_NOWRITE		(0)
 
-JFYI, on ppc64 there are 64-bit enum values, which sparse complains about.
-But gcc handles them fine.
+Let's not make this more complicated than it has to be.  If we need the
+inverse of WRITE and EXEC, then that's what we should change everyone to,
+not invent a new system to work along side the old system.
 
-Gr{oetje,eeting}s,
-
-? ? ? ? ? ? ? ? ? ? ? ? Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+We're already inverting the write bit for the vast majority of processors,
+and exec has always been inverted by the ARMv6 and v7 code.
