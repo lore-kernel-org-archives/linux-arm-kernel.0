@@ -1,141 +1,57 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 15 Nov 2010 10:07:14 +0800
-Subject: [PATCH] ARM: fix some trivial compiler warnings
-In-Reply-To: <1289627397.2837.44.camel@diamond.house>
-References: <1289627397.2837.44.camel@diamond.house>
-Message-ID: <AANLkTi=j41UA5ZeO8-AVXf53+OD+P2V=mEvZESWdVqka@mail.gmail.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Sun, 14 Nov 2010 18:56:01 -0800 (PST)
+Subject: [PATCH 09/14] msm: iommu: Kconfig option for cacheable page
+	tables
+In-Reply-To: <1289765858.24270.240.camel@m0nster>
+References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>
+	<1289619000-13167-10-git-send-email-stepanm@codeaurora.org>
+	<1289765858.24270.240.camel@m0nster>
+Message-ID: <8bd62d321211c93af883cd2ad404e802.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 13, 2010 at 1:49 PM, Jason Chagas <jason.chagas@gmail.com> wrote:
+
+> On Fri, 2010-11-12 at 19:29 -0800, Stepan Moskovchenko wrote:
+>>
+>> +config IOMMU_PGTABLES_L2
+>> +	depends on ARCH_MSM8X60
+>> +	depends on MMU
+>> +	depends on CPU_DCACHE_DISABLE=n
+>> +	depends on SMP
+>> +	bool "Cacheable IOMMU page tables"
+>> +	default y
+>> +	help
+>> +	  Allows the IOMMU page tables to be brought into the L2 cache. This
+>> +	  improves the TLB miss latency at the expense of potential pollution
+>> +	  of the L2 cache. This option has been shown to improve multimedia
+>> +	  performance in some cases.
+>> +
+>> +	  If unsure, say Y here.
 >
-> From acb6004dae483e61760714286a5e544c4a1d899c Mon Sep 17 00:00:00 2001
-> From: Jason Chagas <jason.chagas@marvell.com>
-> Date: Sat, 13 Nov 2010 00:01:44 -0500
-> Subject: [PATCH] ARM: fix some trivial compiler warnings
+> Why would someone want this off?
 >
-> arch/arm/kernel/ptrace.c: In function 'get_branch_address':
-> arch/arm/kernel/ptrace.c:429: warning: comparison between pointer and
-> integer
-> arch/arm/kernel/ptrace.c:429: warning: comparison between pointer and
-> integer
->
-> arch/arm/mach-mmp/mmp2.c:127: warning: 'clk_rtc' defined but not used
->
-> drivers/i2c/busses/i2c-pxa.c: In function 'i2c_pxa_probe':
-> drivers/i2c/busses/i2c-pxa.c:1004: warning: initialization discards
-> qualifiers from pointer target type
->
-> Signed-off-by: Jason Chagas <jason.chagas@marvell.com>
-> ---
-> ?arch/arm/kernel/ptrace.c ? ? | ? ?2 +-
-> ?arch/arm/mach-mmp/mmp2.c ? ? | ? ?1 -
-> ?drivers/i2c/busses/i2c-pxa.c | ? ?2 +-
-> ?3 files changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-> index cf16bca..7bb9a88 100644
-> --- a/arch/arm/kernel/ptrace.c
-> +++ b/arch/arm/kernel/ptrace.c
-> @@ -426,7 +426,7 @@ get_branch_address(struct task_struct *child,
-> unsigned long pc, unsigned long in
-> ? ? ? ? ? ?break;
-> ? ? ? ?}
->
-> - ? ? ? if (alt >= (void*)CONFIG_VECTORS_BASE && alt <
-> (void*)CONFIG_VECTORS_BASE + PAGE_SIZE)
-> + ? ? ? if (alt >= CONFIG_VECTORS_BASE && alt < CONFIG_VECTORS_BASE +
-> PAGE_SIZE)
-> ? ? ? ? ? ? ? ?alt = get_user_reg(child, REG_LR);
->
-> ? ? ? ?return alt;
-> diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-> index 7f5eb05..3028bb7 100644
-> --- a/arch/arm/mach-mmp/mmp2.c
-> +++ b/arch/arm/mach-mmp/mmp2.c
-> @@ -124,7 +124,6 @@ static APBC_CLK(twsi3, MMP2_TWSI3, 0, 26000000);
-> ?static APBC_CLK(twsi4, MMP2_TWSI4, 0, 26000000);
-> ?static APBC_CLK(twsi5, MMP2_TWSI5, 0, 26000000);
-> ?static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
-> -static APBC_CLK(rtc, MMP2_RTC, 0, 32768);
->
-> ?static APMU_CLK(nand, NAND, 0xbf, 100000000);
->
+> The other thing is that you usually want this included with the code
+> that uses the option.
 
-Jason,
+The code that uses it had gone in during a previous patch series, but I
+didn't want to meddle in the Kconfig just yet, especially since the option
+only improves performance and does not add new functionality at a high
+level. This patch should be the last of what is needed for this feature.
 
-I've separated this into an individual patch with comment as follows:
+You would want to turn this off if you wanted more deterministic behavior
+from the multimedia subsystem, such as when trying to run benchmarks for
+the worst-case behavior in terms of memory latency and TLB misses. You
+might also want to turn it off if you are debugging memory problems that
+you suspect might be related to the cache maintenance code, in which case
+turning this off would give an idea as to whether that is the problem.
+Similarly, this needs to be off (and will be, due to the dependencies) if
+certain required things (like the Dcache, MMU, etc) have been disabled.
+Finally, if you are doing things with the MMSS that you know will not
+result in many TLB misses, (or if you know that you can tolerate high miss
+latency) you may as well turn this off to avoid the (small) bit of cache
+pollution.
 
-commit f1064ce43b6c4e6aa4d122600db2e952c79bec91
-Author: Jason Chagas <jason.chagas@marvell.com>
-Date:   Mon Nov 15 09:50:12 2010 +0800
+Steve
 
-    ARM: mmp2: remove not used clk_rtc
-
-    RTC clock will remain at 32KHz and powered on, there is no need for it
-    at this moment.
-
-    Signed-off-by: Jason Chagas <jason.chagas@marvell.com>
-
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index daf3993..2e3dd08 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -126,7 +126,6 @@ static APBC_CLK(twsi3, MMP2_TWSI3, 0, 26000000);
- static APBC_CLK(twsi4, MMP2_TWSI4, 0, 26000000);
- static APBC_CLK(twsi5, MMP2_TWSI5, 0, 26000000);
- static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
--static APBC_CLK(rtc, MMP2_RTC, 0, 32768);
-
- static APMU_CLK(nand, NAND, 0xbf, 100000000);
-
-
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index 020ff23..c94e51b 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -1001,7 +1001,7 @@ static int i2c_pxa_probe(struct platform_device
-> *dev)
-> ? ? ? ?struct pxa_i2c *i2c;
-> ? ? ? ?struct resource *res;
-> ? ? ? ?struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
-> - ? ? ? struct platform_device_id *id = platform_get_device_id(dev);
-> + ? ? ? const struct platform_device_id *id = platform_get_device_id(dev);
-> ? ? ? ?int ret;
-> ? ? ? ?int irq;
->
-
-This has been fixed in the latest tree by the commit below:
-
-commit 21e2ecfe19df8f28408b5a607fef8704f51fa7f8
-Author: Marc Kleine-Budde <mkl@pengutronix.de>
-Date:   Tue Jun 15 10:56:45 2010 +0200
-
-    i2c-pxa: fix compiler warning, due to missing const
-
-    This patch adds the missing const to "struct platform_device_id" to fix
-    this warning:
-
-    /home/frogger/pengutronix/linux/linux-2.6/drivers/i2c/busses/i2c-pxa.c:
-    In function 'i2c_pxa_probe':
-    /home/frogger/pengutronix/linux/linux-2.6/drivers/i2c/busses/i2c-pxa.c:1004:
-    warning: initialization discards qualifiers from pointer target type
-
-    Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-    Cc: Eric Miao <eric.y.miao@gmail.com>
-    Cc: Roel Kluin <roel.kluin@gmail.com>
-    Cc: Pavel Machek <pavel@ucw.cz>
-    Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 020ff23..c94e51b 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -1001,7 +1001,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
-        struct pxa_i2c *i2c;
-        struct resource *res;
-        struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
--       struct platform_device_id *id = platform_get_device_id(dev);
-+       const struct platform_device_id *id = platform_get_device_id(dev);
-        int ret;
-        int irq;
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
