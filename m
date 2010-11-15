@@ -1,49 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Nov 2010 17:40:26 +0000
-Subject: [PATCH v3 17/20] ARM: LPAE: mark memory banks with start > ULONG_MAX
-	as highmem
+Date: Mon, 15 Nov 2010 17:40:27 +0000
+Subject: [PATCH v3 18/20] ARM: LPAE: use phys_addr_t for physical start
+	address in early_mem
 In-Reply-To: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
 References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289842829-3027-18-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1289842829-3027-19-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-Memory banks living outside of the 32-bit physical address
-space do not have a 1:1 pa <-> va mapping and therefore the
-__va macro may wrap.
+The physical start address of memory may be > 4GB and therefore
+unrepresentable using an unsigned long.
 
-This patch ensures that such banks are marked as highmem so
-that the Kernel doesn't try to split them up when it sees that
-the wrapped virtual address overlaps the vmalloc space.
+This patch changes early_mem and arm_add_memory to use phys_addr_t
+instead of unsigned long for the start address.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/mmu.c |    5 +++--
+ arch/arm/kernel/setup.c |    5 +++--
  1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 5e035e0..794ca48 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -785,7 +785,8 @@ static void __init sanity_check_meminfo(void)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 81ab007..eaa87d4 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -442,7 +442,7 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
+ 	return list;
+ }
  
- #ifdef CONFIG_HIGHMEM
- 		if (__va(bank->start) > vmalloc_min ||
--		    __va(bank->start) < (void *)PAGE_OFFSET)
-+		    __va(bank->start) < (void *)PAGE_OFFSET ||
-+		    bank->start > ULONG_MAX)
- 			highmem = 1;
+-static int __init arm_add_memory(unsigned long start, unsigned long size)
++static int __init arm_add_memory(phys_addr_t start, unsigned long size)
+ {
+ 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
  
- 		bank->highmem = highmem;
-@@ -794,7 +795,7 @@ static void __init sanity_check_meminfo(void)
- 		 * Split those memory banks which are partially overlapping
- 		 * the vmalloc area greatly simplifying things later.
- 		 */
--		if (__va(bank->start) < vmalloc_min &&
-+		if (!highmem && __va(bank->start) < vmalloc_min &&
- 		    bank->size > vmalloc_min - __va(bank->start)) {
- 			if (meminfo.nr_banks >= NR_BANKS) {
- 				printk(KERN_CRIT "NR_BANKS too low, "
+@@ -478,7 +478,8 @@ static int __init arm_add_memory(unsigned long start, unsigned long size)
+ static int __init early_mem(char *p)
+ {
+ 	static int usermem __initdata = 0;
+-	unsigned long size, start;
++	unsigned long size;
++	phys_addr_t start;
+ 	char *endp;
+ 
+ 	/*
