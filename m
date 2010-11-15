@@ -1,37 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Nov 2010 14:59:18 +0000
-Subject: [PATCH 02/10] MCDE: Add configuration registers
-In-Reply-To: <201011151525.54380.arnd@arndb.de>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<201011121614.51528.arnd@arndb.de>
-	<20101112153423.GC3619@n2100.arm.linux.org.uk>
-	<201011151525.54380.arnd@arndb.de>
-Message-ID: <20101115145918.GD24194@n2100.arm.linux.org.uk>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Mon, 15 Nov 2010 10:09:12 -0500
+Subject: [Patch v3] Fix audmuxv2 debugfs indexing. [was: Patch IMX audmux
+	debugfs.]
+In-Reply-To: <87oc9rk6fe.fsf@sympatico.ca> (Bill Pringlemeir's message of
+	"Sun, 14 Nov 2010 15:15:49 -0500")
+References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
+	<20101110152619.GB8950@pengutronix.de>
+	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
+	<20101112071706.GF6017@pengutronix.de>
+	<20101112114942.GA28804@sirena.org.uk> <87oc9rk6fe.fsf@sympatico.ca>
+Message-ID: <BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 03:25:54PM +0100, Arnd Bergmann wrote:
-> On Friday 12 November 2010, Russell King - ARM Linux wrote:
-> > It is a bad idea to describe device registers using C structures, and
-> > especially enums.
-> > 
-> > The only thing C guarantees about structure layout is that the elements
-> > are arranged in the same order which you specify them in your definition.
-> > It doesn't make any guarantees about placement of those elements within
-> > the structure.
-> 
-> Right, I got carried away when seeing the macro overload. My example
-> would work on a given architecture since the ABI is not changing, but
-> we should of course not advocate nonportable code.
+On 14 Nov 2010, bpringle at sympatico.ca wrote:
+On 12 Nov 2010, broonie at opensource.wolfsonmicro.com wrote:
+On Fri, Nov 12, 2010 at 08:17:06AM +0100, Sascha Hauer wrote:
 
-That is a mistake.  You can't rely on architectures not changing their
-ABIs.  See ARM as an example where an ABI change has already happened.
+>>> Ok, looks sensible to me. I added Mark Brown to Cc as he added the
+>>> debugfs support in the first place. Maybe he has some comment to add.
+>>
+>> Not really, except that the numbers used correspond to the numbers used
+>> by the audmux APIs in the kernel IIRC.
 
-We actually have two ABIs at present - one ('native ARM') where enums
-are sized according to the size of their values, and the Linux one
-where we guarantee that enums are always 'int'.
+[snip]
 
-We also have differing struct layouts for EABI vs OABI on ARM.
+> Also, the kernel numbers *can* be referred to by macros and some users
+> might not even realize these numbers exist.  In any case, I would have
+> probably clued in if SSI0 had existed.  So I will fix that if we want
+> to remain with it?  The first patch submitted didn't do this.
 
-So really the assumption that ABIs never change in incompatible ways
-is a false one.
+Following is the simple patch which corrects improper file indexing of
+audmux port numbers.  Ie, ssi6, ssi7.  It also adds the ssi0 file.
+The directory looks like this,
+
+   root at uclibc /sys/kernel/debug/audmux$ ls
+   ssi0  ssi1  ssi2  ssi3  ssi4  ssi5
+
+With the number in ssi[0-5], corresponding to the
+'MX31_AUDMUX_PORT[1-6]_*' and 'MX27_AUDMUX_[PH]PCR[1-3]_*' in audmux.h
+or the raw value of the 'port' parameter of
+mxc_audmux_v2_configure_port().
+
+Signed-off-by: Bill Pringlemeir <bpringle@sympatico.ca>
+diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
+index f9e7cdb..2a1021f 100644
+--- a/arch/arm/plat-mxc/audmux-v2.c
++++ b/arch/arm/plat-mxc/audmux-v2.c
+@@ -150,7 +150,7 @@ static void audmux_debugfs_init(void)
+                return;
+        }
+ 
+-       for (i = 1; i < 8; i++) {
++       for (i = 0; i < 6; i++) {
+                snprintf(buf, sizeof(buf), "ssi%d", i);
+                if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
+                                         (void *)i, &audmux_debugfs_fops))
