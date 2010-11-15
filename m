@@ -1,7 +1,7 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 15 Nov 2010 15:26:58 +0900
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 15 Nov 2010 15:42:05 +0900
 Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
-In-Reply-To: <AANLkTikLhMaM+u9rvdeS3diOyrDSof=t3vpg80BusaJA@mail.gmail.com>
+In-Reply-To: <005d01cb848e$1d4bcb00$57e36100$%kim@samsung.com>
 References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
 	<AANLkTikk_Y-VnNKLVGmVZA4iR0+ZTE0u-Scms0TWMbhq@mail.gmail.com>
 	<20101026030040.GA10200@opensource.wolfsonmicro.com>
@@ -11,40 +11,17 @@ References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
 	<20101028025439.GB23235@opensource.wolfsonmicro.com>
 	<1288256290.18037.394.camel@vega>
 	<AANLkTikLhMaM+u9rvdeS3diOyrDSof=t3vpg80BusaJA@mail.gmail.com>
-Message-ID: <005d01cb848e$1d4bcb00$57e36100$%kim@samsung.com>
+	<005d01cb848e$1d4bcb00$57e36100$%kim@samsung.com>
+Message-ID: <AANLkTik4w4RMT4=xkqKOk_cex_-5dqPi20FQxP0DKpJn@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
-> 
-> On Thu, Oct 28, 2010 at 5:58 PM, Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> > On Wed, 2010-10-27 at 19:54 -0700, Mark Brown wrote:
-> >> On Thu, Oct 28, 2010 at 11:06:13AM +0900, Jassi Brar wrote:
-> >>
-> >> > OK, I think I'll survive one release cycle :)
-> >> > Any action item on my part before you accept the series to for-2.6.38 ?
-> >>
-> >> Not from me - Liam are you OK?  It's possible something crept through
-> >> but we can always fix incrementally.
-> >>
-> >
-> > Fine by me, all
-> >
-> > Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
-> 
-> Hi Mark,
->  Did you miss the ack or want to merge it late ?
-> Thanks.
+On Mon, Nov 15, 2010 at 3:26 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Jassi,
+>
+> I think, need to rebase your patches against latest kernel.
+> Maybe, it would be helpful to me and Mark.
 
-Hi Jassi,
+Sounds good, will do.
 
-I think, need to rebase your patches against latest kernel.
-Maybe, it would be helpful to me and Mark.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks
