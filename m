@@ -1,49 +1,38 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Mon, 15 Nov 2010 11:16:43 +0200
-Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
-In-Reply-To: <AANLkTimt+rZ3nTHK01VciYyh-pKMiCmLZYcJjqz6OTY8@mail.gmail.com>
-References: <1289322724-20998-1-git-send-email-bryan.wu@canonical.com>
-	<1289322724-20998-2-git-send-email-bryan.wu@canonical.com>
-	<1289399707.3297.250.camel@tubuntu>
-	<AANLkTimt+rZ3nTHK01VciYyh-pKMiCmLZYcJjqz6OTY8@mail.gmail.com>
-Message-ID: <1289812603.2668.5.camel@tubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Nov 2010 09:24:04 +0000
+Subject: [PATCH 2.6.36 1/1 RESEND] kernel SPIN_LOCK_UNLOCKED changed to
+	__SPIN_LOCK_UNLOCKED()
+In-Reply-To: <4CDED96A.9080404@gmail.com>
+References: <4CDED96A.9080404@gmail.com>
+Message-ID: <20101115092404.GA24194@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2010-11-14 at 02:42 +0100, ext Bryan Wu wrote:
-> On Wed, Nov 10, 2010 at 10:35 PM, Tomi Valkeinen
-> <tomi.valkeinen@nokia.com> wrote:
-> > Hi,
-> >
-> > On Tue, 2010-11-09 at 18:12 +0100, ext Bryan Wu wrote:
-> >> Generic DPI panel driver includes the driver and 4 similar panel configurations. It
-> >> will match the panel name which is passed from platform data and setup the
-> >> right configurations.
-> >>
-> >> With generic DPI panel driver, we can remove those 4 duplicated panel display
-> >> drivers. In the future, it is simple for us just add new panel configuration
-> >> date in panel-generic-dpi.c to support new display panel.
-> >
-> > This is looking good, but still a couple of comments inline:
-> >
+On Sun, Nov 14, 2010 at 12:01:06AM +0530, Atul Sowani wrote:
+> There are still some files containing .lock = SPIN_LOCK_UNLOCKED type
+> assignments which should be converted to __SPIN_LOCK_UNLOCKED().
+> Corrected spacing between __SPIN_LOCK_UNLOCKED and ( for ARM.
 
-<snip>
+Thinking about the ARM bit, I'll have to NAK this patch.
 
-> > I think otherwise the patches look good. At some point we should add
-> > backlight support also, so that we can remove a few drivers more (and
-> > get rid of the extra backlight stuff in omap_dss_device struct).
-> >
+> diff -uprN a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> --- a/arch/arm/kernel/smp.c	2010-10-21 02:00:22.000000000 +0530
+> +++ b/arch/arm/kernel/smp.c	2010-11-07 00:47:32.000000000 +0530
+> @@ -56,7 +56,7 @@ struct ipi_data {
+>  };
 > 
-> Yeah, I plan to do that. But IMHO, how about just move those backlight
-> support as backlight drivers and only remain display control in this
-> directory.
+>  static DEFINE_PER_CPU(struct ipi_data, ipi_data) = {
+> -	.lock	= SPIN_LOCK_UNLOCKED,
+> +	.lock	= __SPIN_LOCK_UNLOCKED(ipi_data.lock),
+>  };
 
-Hmm, yes, perhaps that would work for these DPI panels.
+This lock is in the percpu data area.  This means that when other CPUs
+are brought online, and therefore other percpu areas are instantiated,
+this lock will be mis-initialized (the pointers et.al. will be pointing
+at the original percpu instance.)
 
-The reason I originally put the backlight driver inside the panel driver
-is that there are many panels for which the backlight is a part of the
-panel, in the sense that the backlight is controlled by sending messages
-to the panel. For these the backlight needs to be somewhat integrated
-into the panel driver.
+So NAK, this will break.
 
- Tomi
+We can either go back to a static array for this, initialize the lock
+manually (though this could be problematical), or we require to go to
+per-ipi type interrupts for all SMP architectures.
