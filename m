@@ -1,34 +1,149 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Nov 2010 17:31:00 +0000
-Subject: [PATCH 2/5] ARM: perf: avoid exposing internal stop function for v6
-	PMU
+Date: Mon, 15 Nov 2010 17:31:01 +0000
+Subject: [PATCH 3/5] ARM: perf: add _init() functions to PMUs
 In-Reply-To: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
 References: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1289842263-21241-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1289842263-21241-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike other pmu functions, armv6pmu_pmu_stop is not declared static.
-This patch adds the missing keyword.
+In preparation for separating the PMU-specific code, this patch adds
+self-contained init functions to each PMU, therefore removing any
+PMU-specific knowledge from the PMU-agnostic init_hw_perf_events
+function.
 
 Cc: Jamie Iles <jamie.iles@picochip.com>
+Cc: Jean Pihet <jean.pihet@newoldbits.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/kernel/perf_event.c |   65 +++++++++++++++++++++++++++++-------------
+ 1 files changed, 45 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index c49e170..35319b8 100644
+index 35319b8..acc4e91 100644
 --- a/arch/arm/kernel/perf_event.c
 +++ b/arch/arm/kernel/perf_event.c
-@@ -1121,7 +1121,7 @@ armv6pmu_start(void)
- 	spin_unlock_irqrestore(&pmu_lock, flags);
+@@ -1240,6 +1240,11 @@ static const struct arm_pmu armv6pmu = {
+ 	.max_period		= (1LLU << 32) - 1,
+ };
+ 
++const struct arm_pmu *__init armv6pmu_init(void)
++{
++	return &armv6pmu;
++}
++
+ /*
+  * ARMv6mpcore is almost identical to single core ARMv6 with the exception
+  * that some of the events have different enumerations and that there is no
+@@ -1264,6 +1269,11 @@ static const struct arm_pmu armv6mpcore_pmu = {
+ 	.max_period		= (1LLU << 32) - 1,
+ };
+ 
++const struct arm_pmu *__init armv6mpcore_pmu_init(void)
++{
++	return &armv6mpcore_pmu;
++}
++
+ /*
+  * ARMv7 Cortex-A8 and Cortex-A9 Performance Events handling code.
+  *
+@@ -2136,6 +2146,25 @@ static u32 __init armv7_reset_read_pmnc(void)
+ 	return nb_cnt + 1;
  }
  
--void
-+static void
- armv6pmu_stop(void)
++const struct arm_pmu *__init armv7_a8_pmu_init(void)
++{
++	armv7pmu.id		= ARM_PERF_PMU_ID_CA8;
++	armv7pmu.cache_map	= &armv7_a8_perf_cache_map;
++	armv7pmu.event_map	= &armv7_a8_perf_map;
++	armv7pmu.num_events	= armv7_reset_read_pmnc();
++	return &armv7pmu;
++}
++
++const struct arm_pmu *__init armv7_a9_pmu_init(void)
++{
++	armv7pmu.id		= ARM_PERF_PMU_ID_CA9;
++	armv7pmu.cache_map	= &armv7_a9_perf_cache_map;
++	armv7pmu.event_map	= &armv7_a9_perf_map;
++	armv7pmu.num_events	= armv7_reset_read_pmnc();
++	return &armv7pmu;
++}
++
++
+ /*
+  * ARMv5 [xscale] Performance counter handling code.
+  *
+@@ -2564,6 +2593,11 @@ static const struct arm_pmu xscale1pmu = {
+ 	.max_period	= (1LLU << 32) - 1,
+ };
+ 
++const struct arm_pmu *__init xscale1pmu_init(void)
++{
++	return &xscale1pmu;
++}
++
+ #define XSCALE2_OVERFLOWED_MASK	0x01f
+ #define XSCALE2_CCOUNT_OVERFLOW	0x001
+ #define XSCALE2_COUNT0_OVERFLOW	0x002
+@@ -2920,6 +2954,11 @@ static const struct arm_pmu xscale2pmu = {
+ 	.max_period	= (1LLU << 32) - 1,
+ };
+ 
++const struct arm_pmu *__init xscale2pmu_init(void)
++{
++	return &xscale2pmu;
++}
++
+ static int __init
+ init_hw_perf_events(void)
  {
- 	unsigned long flags, val;
+@@ -2933,30 +2972,16 @@ init_hw_perf_events(void)
+ 		case 0xB360:	/* ARM1136 */
+ 		case 0xB560:	/* ARM1156 */
+ 		case 0xB760:	/* ARM1176 */
+-			armpmu = &armv6pmu;
++			armpmu = armv6pmu_init();
+ 			break;
+ 		case 0xB020:	/* ARM11mpcore */
+-			armpmu = &armv6mpcore_pmu;
++			armpmu = armv6mpcore_pmu_init();
+ 			break;
+ 		case 0xC080:	/* Cortex-A8 */
+-			armv7pmu.id = ARM_PERF_PMU_ID_CA8;
+-			armv7pmu.cache_map = &armv7_a8_perf_cache_map;
+-			armv7pmu.event_map = &armv7_a8_perf_map;
+-			armpmu = &armv7pmu;
+-
+-			/* Reset PMNC and read the nb of CNTx counters
+-			    supported */
+-			armv7pmu.num_events = armv7_reset_read_pmnc();
++			armpmu = armv7_a8_pmu_init();
+ 			break;
+ 		case 0xC090:	/* Cortex-A9 */
+-			armv7pmu.id = ARM_PERF_PMU_ID_CA9;
+-			armv7pmu.cache_map = &armv7_a9_perf_cache_map;
+-			armv7pmu.event_map = &armv7_a9_perf_map;
+-			armpmu = &armv7pmu;
+-
+-			/* Reset PMNC and read the nb of CNTx counters
+-			    supported */
+-			armv7pmu.num_events = armv7_reset_read_pmnc();
++			armpmu = armv7_a9_pmu_init();
+ 			break;
+ 		}
+ 	/* Intel CPUs [xscale]. */
+@@ -2964,10 +2989,10 @@ init_hw_perf_events(void)
+ 		part_number = (cpuid >> 13) & 0x7;
+ 		switch (part_number) {
+ 		case 1:
+-			armpmu = &xscale1pmu;
++			armpmu = xscale1pmu_init();
+ 			break;
+ 		case 2:
+-			armpmu = &xscale2pmu;
++			armpmu = xscale2pmu_init();
+ 			break;
+ 		}
+ 	}
 -- 
 1.7.0.4
