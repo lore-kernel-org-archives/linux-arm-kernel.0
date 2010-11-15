@@ -1,83 +1,220 @@
-From: mkl0301@gmail.com (Lin Mac)
-Date: Tue, 16 Nov 2010 04:20:16 +0800
-Subject: [PATCH 1/1] ARM: cns3xxx: Fixup the missing second parameter to
-	addruart macro to allow them to build.
-In-Reply-To: <20101115095439.GF8942@pengutronix.de>
-References: <1289772114-7343-1-git-send-email-mkl0301@gmail.com>
-	<20101115090146.GB8942@pengutronix.de>
-	<20101115092728.GB24194@n2100.arm.linux.org.uk>
-	<20101115095439.GF8942@pengutronix.de>
-Message-ID: <AANLkTi=WfFJDtg1ttZa1Vo2zgqpUFMUE7o44MQUis1_i@mail.gmail.com>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Mon, 15 Nov 2010 12:20:18 -0800
+Subject: [PATCH v2 1/2] msm: gpio: Add v2 gpio support to MSM SoCs.
+Message-ID: <1289852419-7122-1-git-send-email-gbean@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/15 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Russell,
->
-> On Mon, Nov 15, 2010 at 09:27:28AM +0000, Russell King - ARM Linux wrote:
->> On Mon, Nov 15, 2010 at 10:01:46AM +0100, Uwe Kleine-K?nig wrote:
->> > Hello,
->> >
->> > On Mon, Nov 15, 2010 at 06:01:54AM +0800, mkl0301 at gmail.com wrote:
->> > > From: Mac Lin <mkl0301@gmail.com>
->> > >
->> > > Fixup the missing second parameter to addruart macro to allow them to build,
->> > > according to to commit 0e17226f7cd289504724466f4298abc9bdfca3fe.
->> > >
->> > > Enabling DEBUG in head.S would cause:
->> > > rch/arm/boot/compressed/head.S: Assembler messages:
->> > > arch/arm/boot/compressed/head.S:1037: Error: too many positional arguments
->> > > arch/arm/boot/compressed/head.S:1055: Error: too many positional arguments
->> > >
->> > > Signed-off-by: Mac Lin <mkl0301@gmail.com>
->> > > ---
->> > > ?arch/arm/mach-cns3xxx/include/mach/debug-macro.S | ? ?2 +-
->> > > ?1 files changed, 1 insertions(+), 1 deletions(-)
->> > >
->> > > diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
->> > > index d16ce7e..9b50442 100644
->> > > --- a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
->> > > +++ b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
->> > > @@ -10,7 +10,7 @@
->> > > ? * published by the Free Software Foundation.
->> > > ? */
->> > >
->> > > - ? ? ? ? .macro ?addruart,rx
->> > > + ? ? ? ? .macro ?addruart,rx,rtmp
->> > > ? ? ? ? ? mrc ? ? p15, 0, \rx, c1, c0
->> > > ? ? ? ? ? tst ? ? \rx, #1 ? ? ? ? ? ? ? ? @ MMU enabled?
->> > > ? ? ? ? ? moveq ? \rx, ? ? ?#0x10000000
->> > This doesn't apply to current Russell's (or Linus') tree. ?(And is wrong
->> > there BTW.) ?Which version does your patch apply to?
->> Uwe,
->>
->> I know you're trying to help by acking all patches you can find, but
-> hmm, do you consider that good or bad? ?Note I don't do this using
-> procmail or such :-)
->
->> you need to think a little deeper first, otherwise you're going to
->> create confusion. ?This is the second instance this morning...
->>
->> For instance, with this patch it isn't applicable to the current -rc -
->> which builds fine. ?This patch is addressing an issue on 2.6.35 and
->> 2.6.36 kernels, and applies fine there. ?I've already forwarded this
->> to the stable kernel maintainers, along with a note explaining why
->> the usual rule of "get it into Linus' tree first" can't apply.
-> That's what I suspected, so I asked about the version the patch applies
-> to. ?IMHO this is a valueable information for the commit log or the
-> patch description that doesn't make it into git.
->
-> My intention was to reduce confusion and I wonder who do you think will
-> be confused by my email?
+Beginning with the MSM8x60, the hardware block responsible for gpio
+support changes.  Provide gpiolib support for the new v2 architecture.
 
-I'm terribly sorry for not adding the kernel source and version information.
+Cc: Baruch Siach <baruch@tkos.co.il>
+Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+---
+ arch/arm/mach-msm/Makefile  |    4 +-
+ arch/arm/mach-msm/gpio-v2.c |  176 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 179 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/gpio-v2.c
 
-The patch is base on Catalin's tree, which based on 2.6.36 of Linus' tree.
-It is tested on 2.6.36 mostly, but should be able to be applied on
-2.6.35 as well.
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index b5a7b07..4a1a7ea 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -28,6 +28,8 @@ obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
+-ifndef CONFIG_MSM_V2_TLMM
++ifdef CONFIG_MSM_V2_TLMM
++obj-y	+= gpio-v2.o
++else
+ obj-y	+= gpio.o
+ endif
+diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+new file mode 100644
+index 0000000..fb64873
+--- /dev/null
++++ b/arch/arm/mach-msm/gpio-v2.c
+@@ -0,0 +1,176 @@
++/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ */
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++#include <mach/msm_iomap.h>
++#include "gpiomux.h"
++
++/* Bits of interest in the GPIO_IN_OUT register.
++ */
++enum {
++	GPIO_IN_BIT  = 0,
++	GPIO_OUT_BIT = 1
++};
++
++/* Bits of interest in the GPIO_CFG register.
++ */
++enum {
++	GPIO_OE_BIT = 9,
++};
++
++#define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
++#define GPIO_IN_OUT(gpio)         (MSM_TLMM_BASE + 0x1004 + (0x10 * (gpio)))
++
++struct msm_gpio_dev {
++	struct gpio_chip gpio_chip;
++};
++
++static DEFINE_SPINLOCK(tlmm_lock);
++
++static inline struct msm_gpio_dev *to_msm_gpio_dev(struct gpio_chip *chip)
++{
++	return container_of(chip, struct msm_gpio_dev, gpio_chip);
++}
++
++static inline void set_gpio_bits(unsigned n, void __iomem *reg)
++{
++	writel(readl(reg) | n, reg);
++}
++
++static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	return readl(GPIO_IN_OUT(offset)) & BIT(GPIO_IN_BIT);
++}
++
++static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
++{
++	writel(val ? BIT(GPIO_OUT_BIT) : 0, GPIO_IN_OUT(offset));
++}
++
++static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	writel(readl(GPIO_CONFIG(offset)) & ~BIT(GPIO_OE_BIT),
++		GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_direction_output(struct gpio_chip *chip,
++				unsigned offset,
++				int val)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	msm_gpio_set(chip, offset, val);
++	set_gpio_bits(BIT(GPIO_OE_BIT), GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	return msm_gpiomux_get(chip->base + offset);
++}
++
++static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	msm_gpiomux_put(chip->base + offset);
++}
++
++static struct msm_gpio_dev msm_gpio = {
++	.gpio_chip = {
++		.base             = 0,
++		.ngpio            = NR_GPIO_IRQS,
++		.direction_input  = msm_gpio_direction_input,
++		.direction_output = msm_gpio_direction_output,
++		.get              = msm_gpio_get,
++		.set              = msm_gpio_set,
++		.request          = msm_gpio_request,
++		.free             = msm_gpio_free,
++	},
++};
++
++static int __devinit msm_gpio_probe(struct platform_device *dev)
++{
++	int ret;
++
++	spin_lock_init(&tlmm_lock);
++	msm_gpio.gpio_chip.label = dev->name;
++	ret = gpiochip_add(&msm_gpio.gpio_chip);
++
++	return ret;
++}
++
++static int __devexit msm_gpio_remove(struct platform_device *dev)
++{
++	int ret = gpiochip_remove(&msm_gpio.gpio_chip);
++
++	if (ret < 0)
++		return ret;
++
++	set_irq_handler(TLMM_SCSS_SUMMARY_IRQ, NULL);
++
++	return 0;
++}
++
++static struct platform_driver msm_gpio_driver = {
++	.probe = msm_gpio_probe,
++	.remove = __devexit_p(msm_gpio_remove),
++	.driver = {
++		.name = "msmgpio",
++		.owner = THIS_MODULE,
++	},
++};
++
++static struct platform_device msm_device_gpio = {
++	.name = "msmgpio",
++	.id   = 0,
++};
++
++static int __init msm_gpio_init(void)
++{
++	int rc;
++
++	rc = platform_driver_register(&msm_gpio_driver);
++	if (rc == 0)
++		rc = platform_device_register(&msm_device_gpio);
++
++	return rc;
++}
++
++static void __exit msm_gpio_exit(void)
++{
++	platform_device_unregister(&msm_device_gpio);
++	platform_driver_unregister(&msm_gpio_driver);
++}
++
++postcore_initcall(msm_gpio_init);
++module_exit(msm_gpio_exit);
++
++MODULE_AUTHOR("Gregory Bean <gbean@codeaurora.org>");
++MODULE_DESCRIPTION("Driver for Qualcomm MSM TLMMv2 SoC GPIOs");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:msmgpio");
+-- 
+1.7.0.4
 
-I was not aware of the changes in 2.6.37-rc1. It seems ok for building
-image with DEBUG enabled.
-
-Best Regards,
-Mac Lin
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
