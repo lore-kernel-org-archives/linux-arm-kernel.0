@@ -1,61 +1,33 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Mon, 15 Nov 2010 09:31:34 -0800 (PST)
-Subject: [PATCH] mx35_3ds: Add watchdog support
-In-Reply-To: <20101115155201.GH8942@pengutronix.de>
-Message-ID: <78127.99191.qm@web51001.mail.re2.yahoo.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Nov 2010 17:36:06 +0000
+Subject: [PATCH v2 03/20] ARM: LPAE: use u32 instead of unsigned long
+	for 32-bit ptes
+In-Reply-To: <AANLkTinuUCYMa8e7=ehhExFzBAhPZBKA16M1GVQ=RMMH@mail.gmail.com>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-4-git-send-email-catalin.marinas@arm.com>
+	<20101114131941.GA10871@n2100.arm.linux.org.uk>
+	<AANLkTimtSUNrO0wZBfyJJ+OJQCDLkXSOiUuzOD+ubv6O@mail.gmail.com>
+	<AANLkTi=U+5uqLRSt9ObFdgTUc-v_+2Y3Qz90FG5aRTyb@mail.gmail.com>
+	<20101114151445.GB10871@n2100.arm.linux.org.uk>
+	<AANLkTinuUCYMa8e7=ehhExFzBAhPZBKA16M1GVQ=RMMH@mail.gmail.com>
+Message-ID: <20101115173606.GA31421@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe and Wolfram,
-
---- On Mon, 11/15/10, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-
-> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Subject: Re: [PATCH] mx35_3ds: Add watchdog support
-> To: "Fabio Estevam" <fabioestevam@yahoo.com>
-> Cc: fabio.estevam at freescale.com, s.hauer at pengutronix.de, linux-arm-kernel at lists.infradead.org
-> Date: Monday, November 15, 2010, 1:52 PM
-> Hi Fabio,
+On Mon, Nov 15, 2010 at 09:39:30AM +0000, Catalin Marinas wrote:
+> On 14 November 2010 15:14, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > There will be compiler warnings because u32 is unsigned int, and we
+> > print it as %08lx. ?Generic code cases pte values to (long long) and
+> > prints them using %08llx. ?We should do the same.
 > 
-> On Mon, Nov 15, 2010 at 06:31:09AM -0800, Fabio Estevam
-> wrote:
-> > mx35_3ds: Add watchdog support.
-> I just converted the mx3 watchdog device to dynamic
-> allocation.? Will
-> take care of mx35_3ds.
+> We still need some kind of macro because with LPAE we need %016llx
+> since the phys address can go to 40-bit and there are some additional
+> bits in the top word. Unless you'd like to always print 16 characters
+> even for 32-bit ptes (or if there is some other printk magic I'm not
+> aware of).
 
-Ok, understood.
-
-I have also started testing watchdog on MX51.
-
-As there is no watchdog clock entry in the CCM block on MX51 I thought on doing the following:
-
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 2ee7dac..63f600c 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -270,10 +270,12 @@ static int __init imx2_wdt_probe(struct
-platform_device *pdev)
-        return -ENOMEM;
-    }
-
--    imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
--    if (IS_ERR(imx2_wdt.clk)) {
--        dev_err(&pdev->dev, "can't get Watchdog clock\n");
--        return PTR_ERR(imx2_wdt.clk);
-+    if (!cpu_is_mx51()) {
-+        imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
-+        if (IS_ERR(imx2_wdt.clk)) {
-+            dev_err(&pdev->dev, "can't get Watchdog clock\n");
-+            return PTR_ERR(imx2_wdt.clk);
-+        }
-    }
-
-Does this look a correct approach?
-
-Regards,
-
-Fabio Estevam 
-
-
-      
+Eeh?  %08llx prints 8 characters _minimum_.  If it needs more to represent
+the number, it will use more characters.  You surely don't think generic
+code is brain dead enough to cast something to a 64-bit long long and
+then only print 32 bits of it???
