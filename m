@@ -1,37 +1,62 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Mon, 22 Nov 2010 15:22:03 +0100
-Subject: [stable] Patch Upstream: oprofile, ARM: Release resources on
-	failure
-In-Reply-To: <20101029205829.GC29104@kroah.com>
-References: <201010212105.o9LL57t9019586@hera.kernel.org>
-	<20101029205829.GC29104@kroah.com>
-Message-ID: <20101122142203.GM5969@erda.amd.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Nov 2010 15:25:34 +0000
+Subject: [PATCH] ARM: Temporary fix for broken arch reboot
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030D58B003@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
+	<20101109131838.GF2869@n2100.arm.linux.org.uk>
+	<1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D4FAE5C@dbde02.ent.ti.com>
+	<20101110100617.GA23244@n2100.arm.linux.org.uk>
+	<1289397874.4513.54.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D58A400@dbde02.ent.ti.com>
+	<20101110154604.GA27571@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D58B003@dbde02.ent.ti.com>
+Message-ID: <20101115152534.GE24194@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.10.10 16:58:29, Greg KH wrote:
+On Fri, Nov 12, 2010 at 04:01:25PM +0530, Shilimkar, Santosh wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Wednesday, November 10, 2010 9:16 PM
+> > To: Shilimkar, Santosh
+> > Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org; Gadiyar, Anand
+> > Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
+> > 
+> > On Wed, Nov 10, 2010 at 09:13:21PM +0530, Shilimkar, Santosh wrote:
+> > >
+> > >
+> > > > -----Original Message-----
+> > > > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> > > > Sent: Wednesday, November 10, 2010 7:35 PM
+> > > > To: Russell King - ARM Linux
+> > > > Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; Gadiyar,
+> > > > Anand
+> > > > Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
+> > > >
+> > > > The printing only happens for SYSTEM_BOOTING or SYSTEM_RUNNING. I
+> > > > suspect in this case we have SYSTEM_RESTARTING and the condition in
+> > > > ipi_cpu_stop() is false, therefore no printing. It may be worth
+> > putting
+> > > > some printks outside the 'if' to see whether the secondary CPUs get
+> > > > there.
+> > > >
+> > > While doing some experiments on this issue, one interesting
+> > > observation I made. Looks like there is race between two
+> > > Cores which makes system behave badly in reboot path.
+> > >
+> > > Just adding a delay in the ipi_cpu_stop() makes the reboot work
+> > > as well
+> > 
+> > That could just be that it's taking longer than 500us for the reboot CPU
+> > to get through setup_mm_for_reboot().
 > 
-> This patch doesn't apply to the .35 or .36 stable tree
-> If someone wants it applied there, please email the backport
-> to stable at kernel.org
-> 
-> thanks,
-> 
-> greg k-h
-> 
-> > commit: 81771974ae49bf79aab60c42eac7a6d730a9ef2b
-> > From: Robert Richter <robert.richter@amd.com>
-> > Date: Wed, 29 Sep 2010 16:52:25 +0200
-> > Subject: [PATCH] oprofile, ARM: Release resources on failure
+> It not seems to be the case otherwise below patch should have worked.
+> Right ? Did I miss your point ?
 
-This patch was accidentally marked as stable. There are already fixes
-in .35 and .36:
+Yes you did.  Maybe all this code completes before your 500us in the
+secondary CPUs complete.  So the delay in the secondary CPU path proves
+nothing.
 
- 98d943b02f6f1b57787ff1aa6f34d019a407e3ee upstream in .36
- 1b6740a13ca9774810edacafc5e12514092651e2 in .35 stable of 98d943b
-
--Robert
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+A delay in the reboot CPU path ensures that the other CPUs have time to
+react to the stop IPI, so we know what state the system is in.
