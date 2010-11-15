@@ -1,56 +1,26 @@
-From: archit@ti.com (Taneja, Archit)
-Date: Mon, 15 Nov 2010 14:13:21 +0530
-Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
-In-Reply-To: <AANLkTikuRUaVRLLSHzgV_neaEwA4=xary=HQz=ax-Ytm@mail.gmail.com>
-References: <1289322724-20998-1-git-send-email-bryan.wu@canonical.com>
-	<1289322724-20998-2-git-send-email-bryan.wu@canonical.com>
-	<1289399707.3297.250.camel@tubuntu>
-	<AANLkTimt+rZ3nTHK01VciYyh-pKMiCmLZYcJjqz6OTY8@mail.gmail.com>
-	<FCCFB4CDC6E5564B9182F639FC356087034C012B11@dbde02.ent.ti.com>
-	<AANLkTikuRUaVRLLSHzgV_neaEwA4=xary=HQz=ax-Ytm@mail.gmail.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC356087034C101A63@dbde02.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 15 Nov 2010 08:52:17 +0000
+Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
+In-Reply-To: <AANLkTikLhMaM+u9rvdeS3diOyrDSof=t3vpg80BusaJA@mail.gmail.com>
+	(sfid-20101115_055140_264370_960654EC)
+References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
+	<AANLkTikk_Y-VnNKLVGmVZA4iR0+ZTE0u-Scms0TWMbhq@mail.gmail.com>
+	<20101026030040.GA10200@opensource.wolfsonmicro.com>
+	<023501cb74bf$c8e61ad0$5ab25070$%kim@samsung.com>
+	<20101026183151.GD11207@opensource.wolfsonmicro.com>
+	<AANLkTiky+NsHwaJr+W4NMKs4gAeh_vHhxzKEzZdzGhNZ@mail.gmail.com>
+	<20101028025439.GB23235@opensource.wolfsonmicro.com>
+	<1288256290.18037.394.camel@vega>
+	<AANLkTikLhMaM+u9rvdeS3diOyrDSof=t3vpg80BusaJA@mail.gmail.com>
+	(sfid-20101115_055140_264370_960654EC)
+Message-ID: <FA927C42-7E58-4CDF-BC6C-A61D7718868F@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 15 Nov 2010, at 05:51, Jassi Brar wrote:
 
-Bryan Wu wrote:
-> On Mon, Nov 15, 2010 at 12:05 PM, Taneja, Archit
-> <archit@ti.com> wrote:
->> Hi,
->> 
->> bryan.wu at canonical.com wrote:
->>> On Wed, Nov 10, 2010 at 10:35 PM, Tomi Valkeinen
->> 
->> [snip]
->> 
->>>> 
->>>> For both panel power on and off some panels require some sleep times:
->>>> when powering on, the video interface has to be enabled for some
->>>> time before the panel can be enabled, and similarly when powering
->>>> off the video interface needs to be on for some time after the panel has
->>>> been disabled. 
->>>> 
->>> 
->>> Actually, in my previous version patches, I introduced
->>> .power_on_delay and .power_off_delay in panel_configs, which contains
->>> the sleep value for msleep(). But Archit told me this is not
->>> necessary, so I removed that.
->> 
->> I had asked you to remove it from omap_dss_device to a more specific
->> struct for the generic dpi driver :)
->> 
-> 
-> Yeah, no problem.
-> 
->> It should be in the 'panel_generic_dpi_data' struct now.
->> 
-> 
-> I think the delay value is related to panel, which can be
-> found in sharp_ls and sharp_lq drivers. So it might be in the "panel_configs"
-> struct?
+> Hi Mark,
+> Did you miss the ack or want to merge it late ?
+> Thanks.
 
-Yes, I think that makes more sense.
-
-Thanks,
-Archit
+I wasn't planning on merging them - Kukjin said he wanted to merge all the arch/arm patches. I was waiting for them to show up in mainline for the ASoC side.
