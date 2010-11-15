@@ -1,103 +1,74 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 15 Nov 2010 10:20:44 -0600
-Subject: [PATCH] omap4: enable L2 prefetching
-Message-ID: <1289838044-32016-1-git-send-email-nm@ti.com>
+From: awg@embtoolkit.org (Abdoulaye Walsimou GAYE)
+Date: Mon, 15 Nov 2010 17:21:20 +0100
+Subject: [GIT PULL] Samsung fixes for 2.6.37-rc2
+In-Reply-To: <4CE152A5.9050408@gmail.com>
+References: <007901cb84c2$7f465a30$7dd30e90$%kim@samsung.com>
+	<4CE152A5.9050408@gmail.com>
+Message-ID: <4CE15E00.7050505@embtoolkit.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mans Rullgard <mans@mansr.com>
+Hello,
+And also this one submitted by Vasily Khoruzhick:
+[PATCH v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks [1]
 
-Enabling L2 prefetching improves performance as shown on Panda
-ES2.1 board with mem test, and it has measurable impact on
-performances. I think we should consider it, even though it damages
-"writes" a bit. (rebased to k.org)
-Usually the prefetch is used at both levels together L1 + L2, however,
-to enable the CP15 prefetch engines, these are under security, and on
-GP devices, we cannot enable it(e.g. on PandaBoard). However, just
-enabling PL310 prefetch seems to provide performance improvement,
-as shown in the data below (from Ubuntu) and would be a great thing
-to pull in.
+[1] 
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg03439.html
 
-Measurement Data:
-==
-STOCK 10.10 WITHOUT PATCH
-========================
-~# ./memspeed
-size    8388608 8192k 8M
-offset  8388608, 0
-buffers 0x2aaad000 0x2b2ad000
-copy  libc          133 MB/s
-copy  Android v5    273 MB/s
-copy  Android NEON  235 MB/s
-copy  INT32         116 MB/s
-copy  ASM ARM       187 MB/s
-copy  ASM VLDM 64   204 MB/s
-copy  ASM VLDM 128  173 MB/s
-copy  ASM VLD1      216 MB/s
-read  ASM ARM       286 MB/s
-read  ASM VLDM      242 MB/s
-read  ASM VLD1      286 MB/s
-write libc         1947 MB/s
-write ASM ARM      1943 MB/s
-write ASM VSTM     1942 MB/s
-write ASM VST1     1935 MB/s
+Thanks,
+AWG
 
-10.10 + PATCH
-=============
-~# ./memspeed
-size    8388608 8192k 8M
-offset  8388608, 0
-buffers 0x2ab17000 0x2b317000
-copy  libc          129 MB/s
-copy  Android v5    256 MB/s
-copy  Android NEON  356 MB/s
-copy  INT32         127 MB/s
-copy  ASM ARM       321 MB/s
-copy  ASM VLDM 64   337 MB/s
-copy  ASM VLDM 128  321 MB/s
-copy  ASM VLD1      350 MB/s
-read  ASM ARM       496 MB/s
-read  ASM VLDM      470 MB/s
-read  ASM VLD1      488 MB/s
-write libc         1701 MB/s
-write ASM ARM      1682 MB/s
-write ASM VSTM     1693 MB/s
-write ASM VST1     1681 MB/s
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-Signed-off-by: Mans Rullgard <mans@mansr.com>
----
-Original:
-http://git.mansr.com/?p=linux-panda;a=commit;h=450b17993ba7c36cea3f2c746ae26c268563ee59
-http://git.tif.ti.com/vstehle/kernel-ubuntu.git?a=shortlog;h=refs/heads/vincent/mans-patches
-
- arch/arm/mach-omap2/omap4-common.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 2f89555..a5e6126 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -64,6 +64,10 @@ static int __init omap_l2_cache_init(void)
- 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
- 	BUG_ON(!l2cache_base);
- 
-+	if (omap_rev() != OMAP4430_REV_ES1_0)
-+		omap_smc1(0x109, 0x7e470000);
-+
-+
- 	/* Enable PL310 L2 Cache controller */
- 	omap_smc1(0x102, 0x1);
- 
-@@ -75,7 +79,7 @@ static int __init omap_l2_cache_init(void)
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
- 		l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
- 	else
--		l2x0_init(l2cache_base, 0x0e070000, 0xc0000fff);
-+		l2x0_init(l2cache_base, 0x7e470000, 0xc0000fff);
- 
- 	/*
- 	 * Override default outer_cache.disable with a OMAP4
--- 
-1.6.3.3
+On 11/15/2010 04:32 PM, Darius Augulis wrote:
+> Hi Kukjin,
+>
+> you have missed "serial: samsung: fix device name" which is hanging 
+> here for a long time and was decided to merge in 2.6.37-rc1.
+> Please, pick it up.
+>
+> thanks,
+> Darius
+>
+>
+> On 11/15/2010 02:41 PM, Kukjin Kim wrote:
+>> Hi Linus,
+>>
+>> Please pull Samsung fixes from:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> s5p-fixes-for-linus
+>>
+>> These things are for fix build warnings on 2.6.37-rc2.
+>> If any problems, please let me know.
+>>
+>> Thanks.
+>>
+>> Best regards,
+>> Kgene.
+>> -- 
+>> Kukjin Kim<kgene.kim@samsung.com>, Senior Engineer,
+>> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>>
+>>
+>> The following changes since commit 
+>> c8ddb2713c624f432fa5fe3c7ecffcdda46ea0d4:
+>>
+>>    Linux 2.6.37-rc1 (2010-11-01 07:54:12 -0400)
+>>
+>> are available in the git repository at:
+>>     
+>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> s5p-fixes-for-linus
+>>
+>> Kukjin Kim (2):
+>>        ARM: SAMSUNG: Fix HAVE_S3C2410_I2C warnings
+>>        ARM: SAMSUNG: Fix HAVE_S3C_RTC warnings
+>>
+>> Kyungmin Park (1):
+>>        ARM: SAMSUNG: Fix HAVE_S3C2410_WATCHDOG warnings
+>>
+>>   arch/arm/Kconfig              |   32 ++++++++++++++++----------------
+>>   arch/arm/mach-s3c64xx/Kconfig |    2 +-
+>>   2 files changed, 17 insertions(+), 17 deletions(-)
+>>
+>
