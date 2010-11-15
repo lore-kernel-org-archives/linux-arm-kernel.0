@@ -1,63 +1,49 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Nov 2010 17:40:20 +0000
-Subject: [PATCH v3 11/20] ARM: LPAE: Remove the FIRST_USER_PGD_NR and
-	USER_PTRS_PER_PGD definitions
+Date: Mon, 15 Nov 2010 17:40:26 +0000
+Subject: [PATCH v3 17/20] ARM: LPAE: mark memory banks with start > ULONG_MAX
+	as highmem
 In-Reply-To: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
 References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1289842829-3027-12-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1289842829-3027-18-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros were only used in setup_mm_for_reboot and get_pgd_slow.
-Both have been modified to no longer use these definitions. One of the
-reasons is the different meaning that PGD has with the 2-level and
-3-level page tables.
+From: Will Deacon <will.deacon@arm.com>
 
+Memory banks living outside of the 32-bit physical address
+space do not have a 1:1 pa <-> va mapping and therefore the
+__va macro may wrap.
+
+This patch ensures that such banks are marked as highmem so
+that the Kernel doesn't try to split them up when it sees that
+the wrapped virtual address overlaps the vmalloc space.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/pgtable-2level.h |    3 ---
- arch/arm/include/asm/pgtable-3level.h |    3 ---
- arch/arm/mm/pgd.c                     |    2 +-
- 3 files changed, 1 insertions(+), 7 deletions(-)
+ arch/arm/mm/mmu.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 4e21166..a0548b6 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -92,9 +92,6 @@
-  */
- #define FIRST_USER_ADDRESS	PAGE_SIZE
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 5e035e0..794ca48 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -785,7 +785,8 @@ static void __init sanity_check_meminfo(void)
  
--#define FIRST_USER_PGD_NR	1
--#define USER_PTRS_PER_PGD	((TASK_SIZE/PGDIR_SIZE) - FIRST_USER_PGD_NR)
--
- /*
-  * section address mask and size definitions.
-  */
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 5b1482d..381b04b 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -58,9 +58,6 @@
-  */
- #define FIRST_USER_ADDRESS	PAGE_SIZE
+ #ifdef CONFIG_HIGHMEM
+ 		if (__va(bank->start) > vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET)
++		    __va(bank->start) < (void *)PAGE_OFFSET ||
++		    bank->start > ULONG_MAX)
+ 			highmem = 1;
  
--#define FIRST_USER_PGD_NR	1
--#define USER_PTRS_PER_PGD	((TASK_SIZE/PGDIR_SIZE) - FIRST_USER_PGD_NR)
--
- /*
-  * section address mask and size definitions.
-  */
-diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
-index e7c149b..09238fa 100644
---- a/arch/arm/mm/pgd.c
-+++ b/arch/arm/mm/pgd.c
-@@ -25,7 +25,7 @@
- #else
- #define alloc_pgd()	(pgd_t *)__get_free_pages(GFP_KERNEL, 2)
- #define free_pgd(pgd)	free_pages((unsigned long)pgd, 2)
--#define FIRST_KERNEL_PGD_NR	(FIRST_USER_PGD_NR + USER_PTRS_PER_PGD)
-+#define FIRST_KERNEL_PGD_NR	(TASK_SIZE >> PGDIR_SHIFT)
- #endif
- 
- /*
+ 		bank->highmem = highmem;
+@@ -794,7 +795,7 @@ static void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (__va(bank->start) < vmalloc_min &&
++		if (!highmem && __va(bank->start) < vmalloc_min &&
+ 		    bank->size > vmalloc_min - __va(bank->start)) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
