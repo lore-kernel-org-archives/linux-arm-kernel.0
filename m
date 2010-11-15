@@ -1,51 +1,39 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 14 Nov 2010 20:57:42 -0700
-Subject: [PATCH 28/44] drivers/spi: Remove unnecessary semicolons
-In-Reply-To: <fe5e5e0efbd97eaa32530eef5ed47efdc3252dad.1289789605.git.joe@perches.com>
-References: <cover.1289789604.git.joe@perches.com>
-	<fe5e5e0efbd97eaa32530eef5ed47efdc3252dad.1289789605.git.joe@perches.com>
-Message-ID: <20101115035742.GA19965@angua.secretlab.ca>
+From: archit@ti.com (Taneja, Archit)
+Date: Mon, 15 Nov 2010 09:35:04 +0530
+Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
+In-Reply-To: <AANLkTimt+rZ3nTHK01VciYyh-pKMiCmLZYcJjqz6OTY8@mail.gmail.com>
+References: <1289322724-20998-1-git-send-email-bryan.wu@canonical.com>
+	<1289322724-20998-2-git-send-email-bryan.wu@canonical.com>
+	<1289399707.3297.250.camel@tubuntu>
+	<AANLkTimt+rZ3nTHK01VciYyh-pKMiCmLZYcJjqz6OTY8@mail.gmail.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC356087034C012B11@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 14, 2010 at 07:04:47PM -0800, Joe Perches wrote:
-> Signed-off-by: Joe Perches <joe@perches.com>
+Hi,
 
-applied, thanks.
+bryan.wu at canonical.com wrote:
+> On Wed, Nov 10, 2010 at 10:35 PM, Tomi Valkeinen
 
-g.
+[snip]
 
-> ---
->  drivers/spi/amba-pl022.c |    2 +-
->  drivers/spi/spi_nuc900.c |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>> 
+>> For both panel power on and off some panels require some sleep times:
+>> when powering on, the video interface has to be enabled for some time
+>> before the panel can be enabled, and similarly when powering off the
+>> video interface needs to be on for some time after the panel has been
+>> disabled. 
+>> 
 > 
-> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-> index fb3d1b3..2e50631 100644
-> --- a/drivers/spi/amba-pl022.c
-> +++ b/drivers/spi/amba-pl022.c
-> @@ -956,7 +956,7 @@ static int configure_dma(struct pl022 *pl022)
->  		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->  		break;
->  	case WRITING_U32:
-> -		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;;
-> +		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
->  		break;
->  	}
->  
-> diff --git a/drivers/spi/spi_nuc900.c b/drivers/spi/spi_nuc900.c
-> index dff63be..d5be18b 100644
-> --- a/drivers/spi/spi_nuc900.c
-> +++ b/drivers/spi/spi_nuc900.c
-> @@ -449,7 +449,7 @@ err_iomap:
->  	release_mem_region(hw->res->start, resource_size(hw->res));
->  	kfree(hw->ioarea);
->  err_pdata:
-> -	spi_master_put(hw->master);;
-> +	spi_master_put(hw->master);
->  
->  err_nomem:
->  	return err;
-> -- 
-> 1.7.3.1.g432b3.dirty
-> 
+> Actually, in my previous version patches, I introduced
+> .power_on_delay and .power_off_delay in panel_configs, which
+> contains the sleep value for msleep(). But Archit told me
+> this is not necessary, so I removed that.
+
+I had asked you to remove it from omap_dss_device to a more
+specific struct for the generic dpi driver :)
+
+It should be in the 'panel_generic_dpi_data' struct now.
+
+Regards,
+Archit
