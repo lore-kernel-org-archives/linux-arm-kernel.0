@@ -1,48 +1,141 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 15 Nov 2010 08:22:55 +0900
-Subject: [patch v3 2/2] ARM: mach-shmobile: Add zboot support for
-	SuperH Mobile ARM
-In-Reply-To: <20101108015714.GB15671@verge.net.au>
-References: <20101014091231.858799238@vergenet.net>
-	<20101014091434.501864612@vergenet.net>
-	<20101107172310.GG1759@n2100.arm.linux.org.uk>
-	<20101108015714.GB15671@verge.net.au>
-Message-ID: <20101114232255.GA19510@verge.net.au>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 15 Nov 2010 10:07:14 +0800
+Subject: [PATCH] ARM: fix some trivial compiler warnings
+In-Reply-To: <1289627397.2837.44.camel@diamond.house>
+References: <1289627397.2837.44.camel@diamond.house>
+Message-ID: <AANLkTi=j41UA5ZeO8-AVXf53+OD+P2V=mEvZESWdVqka@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 08, 2010 at 10:57:14AM +0900, Simon Horman wrote:
-> On Sun, Nov 07, 2010 at 05:23:10PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Oct 14, 2010 at 06:12:33PM +0900, Simon Horman wrote:
-> > > +LIST "partner-jet-setup.txt"
-> > > +LIST "(C) Copyright 2010 Renesas Solutions Corp"
-> > > +LIST "Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>"
-> > > +
-> > > +LIST "RWT Setting"
-> > > +EW 0xE6020004, 0xA500
-> > > +EW 0xE6030004, 0xA500
-> > 
-> > Can you explain the necessity of this special scripting language, and
-> > where it comes from?
-> > 
-> > It looks like the file implementing the scripting language comes from
-> > something other than Linux, but it isn't clear what the licensing is
-> > of that.  Please confirm that it is GPL'd.
-> 
-> Hi Russell,
-> 
-> The aim is to allow JTAG scripts to be used in-place.
-> The script is constructed from ASM macros which are defined
-> in arch/arm/mach-shmobile/include/mach/zboot_macros.h which is
-> included later on in the patch. The same macros exist in SH assembly
-> in arch/sh/include/asm/romimage-macros.h.
-> 
-> With regards to the license, I have confirmed that it is GPL.
-> Would you be more comfortable if that was stated explicitly
-> in the new files?
+On Sat, Nov 13, 2010 at 1:49 PM, Jason Chagas <jason.chagas@gmail.com> wrote:
+>
+> From acb6004dae483e61760714286a5e544c4a1d899c Mon Sep 17 00:00:00 2001
+> From: Jason Chagas <jason.chagas@marvell.com>
+> Date: Sat, 13 Nov 2010 00:01:44 -0500
+> Subject: [PATCH] ARM: fix some trivial compiler warnings
+>
+> arch/arm/kernel/ptrace.c: In function 'get_branch_address':
+> arch/arm/kernel/ptrace.c:429: warning: comparison between pointer and
+> integer
+> arch/arm/kernel/ptrace.c:429: warning: comparison between pointer and
+> integer
+>
+> arch/arm/mach-mmp/mmp2.c:127: warning: 'clk_rtc' defined but not used
+>
+> drivers/i2c/busses/i2c-pxa.c: In function 'i2c_pxa_probe':
+> drivers/i2c/busses/i2c-pxa.c:1004: warning: initialization discards
+> qualifiers from pointer target type
+>
+> Signed-off-by: Jason Chagas <jason.chagas@marvell.com>
+> ---
+> ?arch/arm/kernel/ptrace.c ? ? | ? ?2 +-
+> ?arch/arm/mach-mmp/mmp2.c ? ? | ? ?1 -
+> ?drivers/i2c/busses/i2c-pxa.c | ? ?2 +-
+> ?3 files changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index cf16bca..7bb9a88 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -426,7 +426,7 @@ get_branch_address(struct task_struct *child,
+> unsigned long pc, unsigned long in
+> ? ? ? ? ? ?break;
+> ? ? ? ?}
+>
+> - ? ? ? if (alt >= (void*)CONFIG_VECTORS_BASE && alt <
+> (void*)CONFIG_VECTORS_BASE + PAGE_SIZE)
+> + ? ? ? if (alt >= CONFIG_VECTORS_BASE && alt < CONFIG_VECTORS_BASE +
+> PAGE_SIZE)
+> ? ? ? ? ? ? ? ?alt = get_user_reg(child, REG_LR);
+>
+> ? ? ? ?return alt;
+> diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+> index 7f5eb05..3028bb7 100644
+> --- a/arch/arm/mach-mmp/mmp2.c
+> +++ b/arch/arm/mach-mmp/mmp2.c
+> @@ -124,7 +124,6 @@ static APBC_CLK(twsi3, MMP2_TWSI3, 0, 26000000);
+> ?static APBC_CLK(twsi4, MMP2_TWSI4, 0, 26000000);
+> ?static APBC_CLK(twsi5, MMP2_TWSI5, 0, 26000000);
+> ?static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
+> -static APBC_CLK(rtc, MMP2_RTC, 0, 32768);
+>
+> ?static APMU_CLK(nand, NAND, 0xbf, 100000000);
+>
 
-Hi Russell,
+Jason,
 
-I'm wondering if you have had any time to consider this series again.
+I've separated this into an individual patch with comment as follows:
 
-Thanks
+commit f1064ce43b6c4e6aa4d122600db2e952c79bec91
+Author: Jason Chagas <jason.chagas@marvell.com>
+Date:   Mon Nov 15 09:50:12 2010 +0800
+
+    ARM: mmp2: remove not used clk_rtc
+
+    RTC clock will remain at 32KHz and powered on, there is no need for it
+    at this moment.
+
+    Signed-off-by: Jason Chagas <jason.chagas@marvell.com>
+
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index daf3993..2e3dd08 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -126,7 +126,6 @@ static APBC_CLK(twsi3, MMP2_TWSI3, 0, 26000000);
+ static APBC_CLK(twsi4, MMP2_TWSI4, 0, 26000000);
+ static APBC_CLK(twsi5, MMP2_TWSI5, 0, 26000000);
+ static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
+-static APBC_CLK(rtc, MMP2_RTC, 0, 32768);
+
+ static APMU_CLK(nand, NAND, 0xbf, 100000000);
+
+
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index 020ff23..c94e51b 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -1001,7 +1001,7 @@ static int i2c_pxa_probe(struct platform_device
+> *dev)
+> ? ? ? ?struct pxa_i2c *i2c;
+> ? ? ? ?struct resource *res;
+> ? ? ? ?struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
+> - ? ? ? struct platform_device_id *id = platform_get_device_id(dev);
+> + ? ? ? const struct platform_device_id *id = platform_get_device_id(dev);
+> ? ? ? ?int ret;
+> ? ? ? ?int irq;
+>
+
+This has been fixed in the latest tree by the commit below:
+
+commit 21e2ecfe19df8f28408b5a607fef8704f51fa7f8
+Author: Marc Kleine-Budde <mkl@pengutronix.de>
+Date:   Tue Jun 15 10:56:45 2010 +0200
+
+    i2c-pxa: fix compiler warning, due to missing const
+
+    This patch adds the missing const to "struct platform_device_id" to fix
+    this warning:
+
+    /home/frogger/pengutronix/linux/linux-2.6/drivers/i2c/busses/i2c-pxa.c:
+    In function 'i2c_pxa_probe':
+    /home/frogger/pengutronix/linux/linux-2.6/drivers/i2c/busses/i2c-pxa.c:1004:
+    warning: initialization discards qualifiers from pointer target type
+
+    Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+    Cc: Eric Miao <eric.y.miao@gmail.com>
+    Cc: Roel Kluin <roel.kluin@gmail.com>
+    Cc: Pavel Machek <pavel@ucw.cz>
+    Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index 020ff23..c94e51b 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -1001,7 +1001,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
+        struct pxa_i2c *i2c;
+        struct resource *res;
+        struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
+-       struct platform_device_id *id = platform_get_device_id(dev);
++       const struct platform_device_id *id = platform_get_device_id(dev);
+        int ret;
+        int irq;
