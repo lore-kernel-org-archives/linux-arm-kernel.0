@@ -1,103 +1,282 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Mon, 15 Nov 2010 14:12:07 -0500
-Subject: [PATCH v5 05/12] davinci: add spi devices on tnetv107x evm
+Date: Mon, 15 Nov 2010 14:12:10 -0500
+Subject: [PATCH v5 08/12] gpio: add ti-ssp gpio driver
 In-Reply-To: <1289848334-8695-1-git-send-email-cyril@ti.com>
 References: <1289848334-8695-1-git-send-email-cyril@ti.com>
-Message-ID: <1289848334-8695-6-git-send-email-cyril@ti.com>
+Message-ID: <1289848334-8695-9-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds definitions for spi devices on the tnetv107x evm platform.
+TI's SSP controller pins can be directly read and written to behave like a
+GPIO.  This patch adds a GPIO driver that exposes such functionality.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/mach-davinci/board-tnetv107x-evm.c |   43 +++++++++++++++++++++++++++
- 1 files changed, 43 insertions(+), 0 deletions(-)
+ drivers/mfd/Kconfig        |   10 ++
+ drivers/mfd/Makefile       |    1 +
+ drivers/mfd/ti-ssp-gpio.c  |  205 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/ti_ssp.h |    4 +
+ 4 files changed, 220 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mfd/ti-ssp-gpio.c
 
-diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index ef526b1..1a656e8 100644
---- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
-+++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -25,6 +25,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/input.h>
- #include <linux/input/matrix_keypad.h>
-+#include <linux/spi/spi.h>
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 7dcc03a..b193580 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -102,6 +102,16 @@ config MFD_TI_SSP_SPI
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called ti-ssp-spi.
  
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -37,6 +38,7 @@
++config MFD_TI_SSP_GPIO
++	tristate "TI Sequencer Serial Port - GPIO Support"
++	depends on GPIOLIB && MFD_TI_SSP
++	help
++	  Say yes here to support a GPIO interface on TI SSP port pins.
++	  Each SSP port translates into 4 GPIOs.
++
++	  This driver can also be built as a module. If so, the module
++	  will be called ti-ssp-gpio.
++
+ config HTC_EGPIO
+ 	bool "HTC EGPIO support"
+ 	depends on GENERIC_HARDIRQS && GPIOLIB && ARM
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index ba97f48..87b5de8 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
+ obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
+ obj-$(CONFIG_MFD_TI_SSP)	+= ti-ssp.o
+ obj-$(CONFIG_MFD_TI_SSP_SPI)	+= ti-ssp-spi.o
++obj-$(CONFIG_MFD_TI_SSP_GPIO)	+= ti-ssp-gpio.o
  
- #define EVM_MMC_WP_GPIO		21
- #define EVM_MMC_CD_GPIO		24
-+#define EVM_SPI_CS_GPIO		54
- 
- static int initialize_gpio(int gpio, char *desc)
- {
-@@ -202,9 +204,45 @@ static struct matrix_keypad_platform_data keypad_config = {
- 	.no_autorepeat	= 0,
- };
- 
-+static void spi_select_device(int cs)
+ obj-$(CONFIG_MFD_STMPE)		+= stmpe.o
+ obj-$(CONFIG_MFD_TC35892)	+= tc35892.o
+diff --git a/drivers/mfd/ti-ssp-gpio.c b/drivers/mfd/ti-ssp-gpio.c
+new file mode 100644
+index 0000000..a3e909b
+--- /dev/null
++++ b/drivers/mfd/ti-ssp-gpio.c
+@@ -0,0 +1,205 @@
++/*
++ * Sequencer Serial Port (SSP) based virtual GPIO driver
++ *
++ * Copyright (C) 2010 Texas Instruments Inc
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/slab.h>
++#include <linux/gpio.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/ti_ssp.h>
++
++struct ti_ssp_gpio {
++	struct gpio_chip		chip;
++#define chip2gpio(chip)	container_of(chip, struct ti_ssp_gpio, chip)
++	struct device			*dev;
++	spinlock_t			lock;
++	u8				out;
++	u32				iosel;
++};
++
++static int direction_in(struct gpio_chip *chip, unsigned gpio_num)
 +{
-+	static int gpio;
++	struct ti_ssp_gpio *gpio = chip2gpio(chip);
++	int error = 0;
 +
-+	if (!gpio) {
-+		int ret;
-+		ret = gpio_request(EVM_SPI_CS_GPIO, "spi chipsel");
-+		if (ret < 0) {
-+			pr_err("cannot open spi chipsel gpio\n");
-+			gpio = -ENOSYS;
-+			return;
-+		} else {
-+			gpio = EVM_SPI_CS_GPIO;
-+			gpio_direction_output(gpio, 0);
-+		}
-+	}
++	spin_lock(&gpio->lock);
 +
-+	if (gpio < 0)
-+		return;
++	gpio->iosel &= ~SSP_PIN_MASK(gpio_num);
++	gpio->iosel |=  SSP_PIN_SEL(gpio_num, SSP_IN);
 +
-+	return gpio_set_value(gpio, cs ? 1 : 0);
++	error = ti_ssp_set_iosel(gpio->dev, gpio->iosel);
++
++	spin_unlock(&gpio->lock);
++
++	return error;
 +}
 +
-+static struct ti_ssp_spi_data spi_master_data = {
-+	.num_cs	= 2,
-+	.select	= spi_select_device,
-+	.iosel	= SSP_PIN_SEL(0, SSP_CLOCK)	| SSP_PIN_SEL(1, SSP_DATA) |
-+		  SSP_PIN_SEL(2, SSP_CHIPSEL)	| SSP_PIN_SEL(3, SSP_IN)   |
-+		  SSP_INPUT_SEL(3),
++static int direction_out(struct gpio_chip *chip, unsigned gpio_num, int val)
++{
++	struct ti_ssp_gpio *gpio = chip2gpio(chip);
++	int error;
++
++	spin_lock(&gpio->lock);
++
++	gpio->iosel &= ~SSP_PIN_MASK(gpio_num);
++	gpio->iosel |=  SSP_PIN_SEL(gpio_num, SSP_OUT);
++
++	error = ti_ssp_set_iosel(gpio->dev, gpio->iosel);
++
++	if (error < 0)
++		goto error;
++
++	if (val)
++		gpio->out |= BIT(gpio_num);
++	else
++		gpio->out &= ~BIT(gpio_num);
++
++	error = ti_ssp_raw_write(gpio->dev, gpio->out);
++
++error:
++	spin_unlock(&gpio->lock);
++	return error;
++}
++
++static int value_get(struct gpio_chip *chip, unsigned gpio_num)
++{
++	struct ti_ssp_gpio *gpio = chip2gpio(chip);
++	int ret;
++
++	spin_lock(&gpio->lock);
++
++	ret = ti_ssp_raw_read(gpio->dev);
++	if (ret >= 0)
++		ret = (ret & BIT(gpio_num)) ? 1 : 0;
++
++	spin_unlock(&gpio->lock);
++	return ret;
++}
++
++static void value_set(struct gpio_chip *chip, unsigned gpio_num, int val)
++{
++	struct ti_ssp_gpio *gpio = chip2gpio(chip);
++
++	spin_lock(&gpio->lock);
++
++	if (val)
++		gpio->out |= BIT(gpio_num);
++	else
++		gpio->out &= ~BIT(gpio_num);
++
++	ti_ssp_raw_write(gpio->dev, gpio->out);
++
++	spin_unlock(&gpio->lock);
++}
++
++static int __devinit ti_ssp_gpio_probe(struct platform_device *pdev)
++{
++	const struct ti_ssp_gpio_data *pdata = pdev->dev.platform_data;
++	struct device *dev = &pdev->dev;
++	struct ti_ssp_gpio *gpio;
++	int error;
++
++	if (!pdata) {
++		dev_err(dev, "platform data not found\n");
++		return -EINVAL;
++	}
++
++	gpio = kzalloc(sizeof(*gpio), GFP_KERNEL);
++	if (!gpio) {
++		dev_err(dev, "cannot allocate driver data\n");
++		return -ENOMEM;
++	}
++
++	gpio->dev = dev;
++	gpio->iosel = SSP_PIN_SEL(0, SSP_IN) | SSP_PIN_SEL(1, SSP_IN) |
++		      SSP_PIN_SEL(2, SSP_IN) | SSP_PIN_SEL(3, SSP_IN);
++	error = ti_ssp_set_iosel(gpio->dev, gpio->iosel);
++	if (error < 0) {
++		dev_err(dev, "gpio io setup failed (%d)\n", error);
++		goto error;
++	}
++
++	spin_lock_init(&gpio->lock);
++	platform_set_drvdata(pdev, gpio);
++
++	gpio->chip.base  = pdata->start;
++	gpio->chip.ngpio = 4;
++	gpio->chip.dev   = &pdev->dev;
++	gpio->chip.label = "ti_ssp_gpio";
++	gpio->chip.owner = THIS_MODULE;
++	gpio->chip.get   = value_get;
++	gpio->chip.set   = value_set;
++	gpio->chip.direction_input  = direction_in;
++	gpio->chip.direction_output = direction_out;
++
++	error = gpiochip_add(&gpio->chip);
++	if (error < 0) {
++		dev_err(dev, "gpio chip registration failed (%d)\n", error);
++		goto error;
++	}
++
++	dev_info(dev, "ssp gpio interface registered\n");
++	return 0;
++
++error:
++	kfree(gpio);
++	return error;
++}
++
++static int __devexit ti_ssp_gpio_remove(struct platform_device *pdev)
++{
++	struct ti_ssp_gpio *gpio = platform_get_drvdata(pdev);
++	int error;
++
++	error = gpiochip_remove(&gpio->chip);
++	if (error < 0)
++		return error;
++	kfree(gpio);
++	return 0;
++}
++
++static struct platform_driver ti_ssp_gpio_driver = {
++	.probe		= ti_ssp_gpio_probe,
++	.remove		= __devexit_p(ti_ssp_gpio_remove),
++	.driver		= {
++		.name	= "ti-ssp-gpio",
++		.owner	= THIS_MODULE,
++	},
 +};
 +
- static struct ti_ssp_data ssp_config = {
- 	.out_clock	= 250 * 1000,
- 	.dev_data	= {
-+		[1] = {
-+			.dev_name = "ti-ssp-spi",
-+			.pdata = &spi_master_data,
-+			.pdata_size = sizeof(spi_master_data),
-+		},
- 	},
++static int __init ti_ssp_gpio_init(void)
++{
++	return platform_driver_register(&ti_ssp_gpio_driver);
++}
++subsys_initcall(ti_ssp_gpio_init);
++
++static void __exit ti_ssp_gpio_exit(void)
++{
++	platform_driver_unregister(&ti_ssp_gpio_driver);
++}
++module_exit(ti_ssp_gpio_exit);
++
++MODULE_DESCRIPTION("GPIO interface for TI-SSP");
++MODULE_AUTHOR("Cyril Chemparathy <cyril@ti.com>");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:ti-ssp-gpio");
+diff --git a/include/linux/mfd/ti_ssp.h b/include/linux/mfd/ti_ssp.h
+index dbb4b43..10c65bb 100644
+--- a/include/linux/mfd/ti_ssp.h
++++ b/include/linux/mfd/ti_ssp.h
+@@ -38,6 +38,10 @@ struct ti_ssp_spi_data {
+ 	void		(*select)(int cs);
  };
  
-@@ -216,6 +254,9 @@ static struct tnetv107x_device_info evm_device_info __initconst = {
- 	.ssp_config		= &ssp_config,
- };
- 
-+static struct spi_board_info spi_info[] __initconst = {
++struct ti_ssp_gpio_data {
++	int		start;
 +};
 +
- static __init void tnetv107x_evm_board_init(void)
- {
- 	davinci_cfg_reg_list(sdio1_pins);
-@@ -223,6 +264,8 @@ static __init void tnetv107x_evm_board_init(void)
- 	davinci_cfg_reg_list(ssp_pins);
- 
- 	tnetv107x_devices_init(&evm_device_info);
-+
-+	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
+ /*
+  * Sequencer port IO pin configuration bits.  These do not correlate 1-1 with
+  * the hardware.  The iosel field in the port data combines iosel1 and iosel2,
 -- 
 1.7.1
