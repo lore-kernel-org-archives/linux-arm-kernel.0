@@ -1,153 +1,98 @@
 From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Mon, 15 Nov 2010 11:30:01 -0600
-Subject: [PATCHv5 3/3] ARM: imx: Get the silicon version from the IIM module
-In-Reply-To: <1289842201-3277-2-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Mon, 15 Nov 2010 11:30:00 -0600
+Subject: [PATCHv5 2/3] ARM: imx: Add mx53 support to common msl functions.
+In-Reply-To: <1289842201-3277-1-git-send-email-Dinh.Nguyen@freescale.com>
 References: <1289842201-3277-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1289842201-3277-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1289842201-3277-3-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1289842201-3277-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Instead of reading the silicon version from ROM, we should
-read the SREV register from the IIM.
-
-Freescale has dropped all support for MX51 REV1.0, only MX51
-REV 2.0 and 3.0 are valid.
+Add mx53 support to cpu.c and mm.c.
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/mach-mx5/clock-mx51-mx53.c |   16 ++++++++++
- arch/arm/mach-mx5/cpu.c             |   54 +++++++++++++++++++---------------
- 2 files changed, 46 insertions(+), 24 deletions(-)
+ arch/arm/mach-mx5/cpu.c |   19 ++++++++++++++++++-
+ arch/arm/mach-mx5/mm.c  |   19 ++++++++++++++++++-
+ 2 files changed, 36 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index ca4f9d5..344ee8e 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -780,6 +780,12 @@ static struct clk ahb_clk = {
- 	.round_rate = _clk_ahb_round_rate,
- };
- 
-+static struct clk iim_clk = {
-+	.parent = &ipg_clk,
-+	.enable_reg = MXC_CCM_CCGR0,
-+	.enable_shift = MXC_CCM_CCGRx_CG15_OFFSET,
-+};
-+
- /* Main IP interface clock for access to registers */
- static struct clk ipg_clk = {
- 	.parent = &ahb_clk,
-@@ -1099,6 +1105,7 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
- 	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
- 	_REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk)
-+	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
- };
- 
- static struct clk_lookup mx53_lookups[] = {
-@@ -1107,6 +1114,7 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
- 	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-+	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
- };
- 
- static void clk_tree_init(void)
-@@ -1147,6 +1155,10 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
- 	clk_enable(&cpu_clk);
- 	clk_enable(&main_bus_clk);
- 
-+	clk_enable(&iim_clk);
-+	mx51_revision();
-+	clk_disable(&iim_clk);
-+
- 	/* set the usboh3_clk parent to pll2_sw_clk */
- 	clk_set_parent(&usboh3_clk, &pll2_sw_clk);
- 
-@@ -1182,6 +1194,10 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
- 	clk_enable(&cpu_clk);
- 	clk_enable(&main_bus_clk);
- 
-+	clk_enable(&iim_clk);
-+	mx53_revision();
-+	clk_disable(&iim_clk);
-+
- 	/* System timer */
- 	mxc_timer_init(&gpt_clk, MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR),
- 		MX53_INT_GPT);
 diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-index a00d2bc..cdec6df 100644
+index 8c9a29e..a00d2bc 100644
 --- a/arch/arm/mach-mx5/cpu.c
 +++ b/arch/arm/mach-mx5/cpu.c
-@@ -20,37 +20,43 @@
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -92,6 +92,23 @@ static int __init mx51_neon_fixup(void)
+ late_initcall(mx51_neon_fixup);
+ #endif
  
- static int cpu_silicon_rev = -1;
- 
--#define SI_REV 0x48
-+#define SREV 0x24
-+
-+static int get_mx51_srev(u32 rev)
++/*
++ * Returns:
++ *	the silicon revision of the cpu
++ *	-EINVAL - not a mx53
++ */
++int mx53_revision(void)
 +{
-+	if (rev == 0x0)
-+		cpu_silicon_rev = MX51_CHIP_REV_2_0;
-+	else if (rev == 0x10)
-+		cpu_silicon_rev = MX51_CHIP_REV_3_0;
-+	return 0;
-+}
++	if (!cpu_is_mx53())
++		return -EINVAL;
 +
-+static int get_mx53_srev(u32 rev)
-+{
-+	if (rev == 0x0)
-+		cpu_silicon_rev = MX53_CHIP_REV_1_0;
-+	else if (rev == 0x10)
-+		cpu_silicon_rev = MX51_CHIP_REV_2_0;
-+	return 0;
++	if (cpu_silicon_rev == -1)
++		query_silicon_parameter();
++
++	return cpu_silicon_rev;
 +}
- 
- static void query_silicon_parameter(void)
++EXPORT_SYMBOL(mx53_revision);
++
+ static int __init post_cpu_init(void)
  {
--	void __iomem *rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
-+	void __iomem *iim_base;
- 	u32 rev;
- 
--	if (!rom) {
--		cpu_silicon_rev = -EINVAL;
--		return;
--	}
-+	if (cpu_is_mx51())
-+		iim_base = MX51_IO_ADDRESS(MX51_IIM_BASE_ADDR);
-+	else if (cpu_is_mx53())
-+		iim_base = MX53_IO_ADDRESS(MX53_IIM_BASE_ADDR);
- 
--	rev = readl(rom + SI_REV);
--	switch (rev) {
--	case 0x1:
--		cpu_silicon_rev = MX51_CHIP_REV_1_0;
--		break;
--	case 0x2:
--		cpu_silicon_rev = MX51_CHIP_REV_1_1;
--		break;
--	case 0x10:
--		cpu_silicon_rev = MX51_CHIP_REV_2_0;
--		break;
--	case 0x20:
--		cpu_silicon_rev = MX51_CHIP_REV_3_0;
--		break;
--	default:
--		cpu_silicon_rev = 0;
--	}
-+	rev = readl(iim_base + SREV) & 0xff;
- 
--	iounmap(rom);
-+	cpu_silicon_rev = 0;
-+	if (cpu_is_mx51())
-+		cpu_silicon_rev = get_mx51_srev(rev);
-+	else if(cpu_is_mx53())
-+		cpu_silicon_rev = get_mx53_srev(rev);
- }
+ 	unsigned int reg;
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index 2822d0e..cbaf282 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License.  You may obtain a copy of the GNU General Public License
+@@ -32,6 +32,15 @@ static struct map_desc mx51_io_desc[] __initdata = {
+ };
  
  /*
++ * Define the MX53 memory map.
++ */
++static struct map_desc mx53_io_desc[] __initdata = {
++	imx_map_entry(MX53, AIPS1, MT_DEVICE),
++	imx_map_entry(MX53, SPBA0, MT_DEVICE),
++	imx_map_entry(MX53, AIPS2, MT_DEVICE),
++};
++
++/*
+  * This function initializes the memory map. It is called during the
+  * system startup to create static physical to virtual memory mappings
+  * for the IO modules.
+@@ -44,6 +53,14 @@ void __init mx51_map_io(void)
+ 	iotable_init(mx51_io_desc, ARRAY_SIZE(mx51_io_desc));
+ }
+ 
++void __init mx53_map_io(void)
++{
++	mxc_set_cpu_type(MXC_CPU_MX53);
++	mxc_iomux_v3_init(MX53_IO_ADDRESS(MX53_IOMUXC_BASE_ADDR));
++	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG_BASE_ADDR));
++	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
++}
++
+ int imx51_register_gpios(void);
+ 
+ void __init mx51_init_irq(void)
 -- 
 1.6.0.4
