@@ -1,25 +1,35 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 15 Nov 2010 19:03:35 +0000
-Subject: [PATCH 4/5] ARM: perf: encode PMU name in arm_pmu structure
-In-Reply-To: <1289842263-21241-5-git-send-email-will.deacon@arm.com>
-References: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
-	<1289842263-21241-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20101115190335.GC2764@pulham.picochip.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Nov 2010 19:04:21 +0000
+Subject: [PATCH] mx35_3ds: Add watchdog support
+In-Reply-To: <78127.99191.qm@web51001.mail.re2.yahoo.com>
+References: <20101115155201.GH8942@pengutronix.de>
+	<78127.99191.qm@web51001.mail.re2.yahoo.com>
+Message-ID: <20101115190421.GF31421@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 05:31:02PM +0000, Will Deacon wrote:
-> Currently, perf uses the PMU ID as an index into a string table
-> to look up the name of a given PMU.
+On Mon, Nov 15, 2010 at 09:31:34AM -0800, Fabio Estevam wrote:
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 2ee7dac..63f600c 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -270,10 +270,12 @@ static int __init imx2_wdt_probe(struct
+> platform_device *pdev)
+>         return -ENOMEM;
+>     }
 > 
-> This patch encodes the name of a PMU directly into the arm_pmu
-> structure so that PMU-specific code can be factored out into
-> separate files.
-> 
-> Cc: Jamie Iles <jamie.iles@picochip.com>
-> Cc: Jean Pihet <jean.pihet@newoldbits.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-Looks good.
+> -    imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
+> -    if (IS_ERR(imx2_wdt.clk)) {
+> -        dev_err(&pdev->dev, "can't get Watchdog clock\n");
+> -        return PTR_ERR(imx2_wdt.clk);
+> +    if (!cpu_is_mx51()) {
+> +        imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
+> +        if (IS_ERR(imx2_wdt.clk)) {
+> +            dev_err(&pdev->dev, "can't get Watchdog clock\n");
+> +            return PTR_ERR(imx2_wdt.clk);
+> +        }
+>     }
 
-Acked-by: Jamie Iles <jamie@jamieiles.com>
+Why not do what we do on other platforms (such as omap) and provide a dummy
+imx-wdt.0 clock for non-MX51 CPUs?  Then you don't need to code such stuff
+into drivers.
