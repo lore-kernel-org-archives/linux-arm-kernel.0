@@ -1,45 +1,45 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Mon, 15 Nov 2010 14:53:19 -0800
-Subject: [PATCH] ARM: Stop irqsoff trace on return to user
-Message-ID: <1289861599-26494-1-git-send-email-toddpoynor@google.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Nov 2010 23:31:29 +0000
+Subject: [PATCH v2 02/20] ARM: LPAE: Factor out 2-level page table
+	definitions into separate files
+In-Reply-To: <1289584840-18097-3-git-send-email-catalin.marinas@arm.com>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20101115233129.GG31421@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the irqsoff tracer is in use, stop tracing the interrupt disable
-interval when returning to userspace.  Tracing userspace execution
-time as interrupts disabled time is not helpful for kernel
-performance analysis purposes.  Only do so if the irqsoff tracer
-is enabled, to avoid overhead purely for lockdep, which doesn't
-care.
+On Fri, Nov 12, 2010 at 06:00:22PM +0000, Catalin Marinas wrote:
+> This patch moves page table definitions from asm/page.h, asm/pgtable.h
+> and asm/ptgable-hwdef.h into corresponding *-2level* files.
 
-Signed-off-by: Todd Poynor <toddpoynor@google.com>
----
- arch/arm/kernel/entry-common.S |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+This also introduces pteval_t.  It would be useful to have the
+introduction of pteval_t as a separate patch, which not only
+introduces the typedef, but also makes use of it.
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 8bfa987..80bf8cd 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -29,6 +29,9 @@ ret_fast_syscall:
- 	ldr	r1, [tsk, #TI_FLAGS]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	fast_work_pending
-+#if defined(CONFIG_IRQSOFF_TRACER)
-+	asm_trace_hardirqs_on
-+#endif
- 
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
-@@ -65,6 +68,9 @@ ret_slow_syscall:
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	work_pending
- no_work_pending:
-+#if defined(CONFIG_IRQSOFF_TRACER)
-+	asm_trace_hardirqs_on
-+#endif
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
- 
--- 
-1.7.3.1
+> +#ifndef _ASM_PGTABLE_2LEVEL_TYPES_H
+> +#define _ASM_PGTABLE_2LEVEL_TYPES_H
+> +
+> +#undef STRICT_MM_TYPECHECKS
+> +
+> +typedef unsigned long pteval_t;
+> +
+> +#ifdef STRICT_MM_TYPECHECKS
+> +/*
+> + * These are used to make use of C type-checking..
+> + */
+> +typedef struct { unsigned long pte; } pte_t;
+
+This should become:
+
+typedef struct { pteval_t pte; } pte_t;
+
+L_PTE_* can then be declared using linux/const.h stuff to typedef them
+to pteval_t.  shared_pte_mask also needs to be pteval_t.
+
+As far as the __p*_error() functions, these should probably be passed
+the pte/pmd/pgd value itself, rather than first passing them through
+__pte_val() et.al.
+
+Of couse, I now have patches for this and my other points... will sort
+them out into a series in the next few days.
