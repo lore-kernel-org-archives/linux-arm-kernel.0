@@ -1,46 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 15 Nov 2010 09:29:10 +0100
-Subject: Pull Request i.MX
-Message-ID: <20101115082910.GJ6017@pengutronix.de>
+From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
+Date: Mon, 15 Nov 2010 09:32:22 +0100
+Subject: [PATCH] Fix IGEPv2 second MMC channel power supply
+In-Reply-To: <20101114185207.252e3c1f@taxman.wild-wind.fr.eu.org>
+References: <1289734452-31625-1-git-send-email-maz@misterjones.org>
+	<14a0f1b94e21549cf4ad2f33647364e3@secure211.sgcpanel.com>
+	<AANLkTi=wJ24iqN8+tPw=AOO1H7u0oxaO=SaBh5-Lxr_m@mail.gmail.com>
+	<20101114185207.252e3c1f@taxman.wild-wind.fr.eu.org>
+Message-ID: <AANLkTimuf1khCKLc4Bc23gONxqPGmq1N3j3kSjkzccPu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-Please pull the following patches for -rc.
+2010/11/14 Marc Zyngier <maz@misterjones.org>:
+> On Sun, 14 Nov 2010 19:11:46 +0100
+> Enric Balletb? i Serra <eballetbo@gmail.com> wrote:
+>
+>> Why we need to define an unexistent regulator in board file ? This
+>> should not be done enabling the CONFIG_DUMMY_REGULATOR in your kernel
+>> configuration ??
+>
+> I'm not adding another regulator, but instead simply exposing the fact
+> (or rather my guess) that the same regulator (vmmc1) is powering the
+> two MMC channels. Not having access to the board schematics, I can't
+> tell if that reflects the reality or not.
+>
+> But using CONFIG_DUMMY_REGULATOR seems the wrong idea to me, as it's
+> just papering over the issue. We should be exposing what's really on
+> the board (a fixed regulator if that's the case).
 
-Sascha
+So the DUMMY_REGULATOR is only a workaround when a regulator is not
+defined and shouldn't be used ? Sorry if this is a stupid question but
+regulator interface is not too clear for me.
 
-The following changes since commit 151f52f09c5728ecfdd0c289da1a4b30bb416f2c:
+The reality is this :
 
-  ipw2x00: remove the right /proc/net entry (2010-11-05 18:57:04 -0700)
+ -------     --------
+| 3V3 |   | 1V8 |
+ -------    --------
+    |          |
+ -----------------
+|   WIFI/BT  |
+ -----------------
+        | ( MMC2  at 1V8 )
+ ----------------
+|   OMAP   |
+ ---------------
 
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+3V3 is a fixed regulator
+1V8 is a fixed regulator (VIO from TWL4030)
 
-Alberto Panizzo (1):
-      mach-pcm037_eet: Fix section mismatch for eet_init_devices()
+So, which you think is the right solution ?
 
-Baruch Siach (1):
-      mx25: fix spi device registration typo
-
-Sascha Hauer (5):
-      ARM mx3fb: check for DMA engine type
-      ARM i.MX: sdma is merged, so remove #ifdef SDMA_IS_MERGED
-      ARM i.MX pcm037 eet: compile fixes
-      ARM i.MX spi: fix compilation for i.MX21
-      ARM i.MX27 eukrea: Fix compilation
-
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    6 ------
- arch/arm/mach-mx25/devices-imx25.h           |    4 ++--
- arch/arm/mach-mx3/mach-pcm037_eet.c          |    5 ++---
- arch/arm/plat-mxc/devices/platform-imx-dma.c |    8 --------
- arch/arm/plat-mxc/devices/platform-spi_imx.c |    1 +
- drivers/video/mx3fb.c                        |    4 ++++
- 6 files changed, 9 insertions(+), 19 deletions(-)
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers,
+   Enric
