@@ -1,65 +1,112 @@
 From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Mon, 15 Nov 2010 17:47:54 -0800
-Subject: [PATCH 09/14] msm: iommu: Kconfig option for cacheable page
-	tables
-In-Reply-To: <1289845236.4050.25.camel@c-dwalke-linux.qualcomm.com>
-References: <1289619000-13167-1-git-send-email-stepanm@codeaurora.org>	
-	<1289619000-13167-10-git-send-email-stepanm@codeaurora.org>	
-	<1289765858.24270.240.camel@m0nster>	
-	<8bd62d321211c93af883cd2ad404e802.squirrel@www.codeaurora.org>
-	<1289845236.4050.25.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <4CE1E2CA.30001@codeaurora.org>
+Date: Mon, 15 Nov 2010 18:19:35 -0800
+Subject: [PATCH 12/14 v2] msm: iommu: Definitions for extended memory
+	attributes
+In-Reply-To: <1289619000-13167-13-git-send-email-stepanm@codeaurora.org>
+References: <1289619000-13167-13-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1289873975-23870-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2010 10:20 AM, Daniel Walker wrote:
-> On Sun, 2010-11-14 at 18:56 -0800, Stepan Moskovchenko wrote:
->>> On Fri, 2010-11-12 at 19:29 -0800, Stepan Moskovchenko wrote:
->>>> +config IOMMU_PGTABLES_L2
->>>> +	depends on ARCH_MSM8X60
->>>> +	depends on MMU
->>>> +	depends on CPU_DCACHE_DISABLE=n
->>>> +	depends on SMP
->>>> +	bool "Cacheable IOMMU page tables"
->>>> +	default y
->>>> +	help
->>>> +	  Allows the IOMMU page tables to be brought into the L2 cache. This
->>>> +	  improves the TLB miss latency at the expense of potential pollution
->>>> +	  of the L2 cache. This option has been shown to improve multimedia
->>>> +	  performance in some cases.
->>>> +
->>>> +	  If unsure, say Y here.
->>> Why would someone want this off?
->>>
->>> The other thing is that you usually want this included with the code
->>> that uses the option.
->> The code that uses it had gone in during a previous patch series, but I
->> didn't want to meddle in the Kconfig just yet, especially since the option
->> only improves performance and does not add new functionality at a high
->> level. This patch should be the last of what is needed for this feature.
->>
->> You would want to turn this off if you wanted more deterministic behavior
->> from the multimedia subsystem, such as when trying to run benchmarks for
->> the worst-case behavior in terms of memory latency and TLB misses. You
->> might also want to turn it off if you are debugging memory problems that
->> you suspect might be related to the cache maintenance code, in which case
->> turning this off would give an idea as to whether that is the problem.
->> Similarly, this needs to be off (and will be, due to the dependencies) if
->> certain required things (like the Dcache, MMU, etc) have been disabled.
->> Finally, if you are doing things with the MMSS that you know will not
->> result in many TLB misses, (or if you know that you can tolerate high miss
->> latency) you may as well turn this off to avoid the (small) bit of cache
->> pollution.
-> It sounds like you don't really want it off unless your a developer (or
-> you turn one of the dependencies) .. I think this might be better as a
-> hidden option just cause of the developer centric nature of it.
->
-> Daniel
+Add the register field definitions and memory attribute
+definitions that will be needed to support IOMMU
+transactions with cache-coherent memory access.
 
-Alright. Fixed in v2.
-
-Steve
-
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
+ arch/arm/mach-msm/include/mach/iommu.h         |   13 +++++++++++++
+ arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h |   22 +++++++++++++++++++++-
+ 2 files changed, 34 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-msm/include/mach/iommu.h b/arch/arm/mach-msm/include/mach/iommu.h
+index 17fc79f..296c0f1 100644
+--- a/arch/arm/mach-msm/include/mach/iommu.h
++++ b/arch/arm/mach-msm/include/mach/iommu.h
+@@ -20,6 +20,19 @@
+
+ #include <linux/interrupt.h>
+
++/* Sharability attributes of MSM IOMMU mappings */
++#define MSM_IOMMU_ATTR_NON_SH		0x0
++#define MSM_IOMMU_ATTR_SH		0x4
++
++/* Cacheability attributes of MSM IOMMU mappings */
++#define MSM_IOMMU_ATTR_NONCACHED	0x0
++#define MSM_IOMMU_ATTR_CACHED_WB_WA	0x1
++#define MSM_IOMMU_ATTR_CACHED_WB_NWA	0x2
++#define MSM_IOMMU_ATTR_CACHED_WT	0x3
++
++/* Mask for the cache policy attribute */
++#define MSM_IOMMU_CP_MASK		0x03
++
+ /* Maximum number of Machine IDs that we are allowing to be mapped to the same
+  * context bank. The number of MIDs mapped to the same CB does not affect
+  * performance, but there is a practical limit on how many distinct MIDs may
+diff --git a/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h b/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
+index f9386d3..c2c3da9 100644
+--- a/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
++++ b/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
+@@ -54,6 +54,7 @@ do { \
+
+ #define NUM_FL_PTE	4096
+ #define NUM_SL_PTE	256
++#define NUM_TEX_CLASS	8
+
+ /* First-level page table bits */
+ #define FL_BASE_MASK		0xFFFFFC00
+@@ -63,6 +64,9 @@ do { \
+ #define FL_AP_WRITE		(1 << 10)
+ #define FL_AP_READ		(1 << 11)
+ #define FL_SHARED		(1 << 16)
++#define FL_BUFFERABLE		(1 << 2)
++#define FL_CACHEABLE		(1 << 3)
++#define FL_TEX0			(1 << 12)
+ #define FL_OFFSET(va)		(((va) & 0xFFF00000) >> 20)
+
+ /* Second-level page table bits */
+@@ -73,8 +77,20 @@ do { \
+ #define SL_AP0			(1 << 4)
+ #define SL_AP1			(2 << 4)
+ #define SL_SHARED		(1 << 10)
++#define SL_BUFFERABLE		(1 << 2)
++#define SL_CACHEABLE		(1 << 3)
++#define SL_TEX0			(1 << 6)
+ #define SL_OFFSET(va)		(((va) & 0xFF000) >> 12)
+
++/* Memory type and cache policy attributes */
++#define MT_SO			0
++#define MT_DEV			1
++#define MT_NORMAL		2
++#define CP_NONCACHED		0
++#define CP_WB_WA		1
++#define CP_WT			2
++#define CP_WB_NWA		3
++
+ /* Global register setters / getters */
+ #define SET_M2VCBR_N(b, N, v)	 SET_GLOBAL_REG_N(M2VCBR_N, N, (b), (v))
+ #define SET_CBACR_N(b, N, v)	 SET_GLOBAL_REG_N(CBACR_N, N, (b), (v))
+@@ -706,7 +722,9 @@ do { \
+ #define GET_OCPC5(b, c)		GET_CONTEXT_FIELD(b, c, NMRR, OCPC5)
+ #define GET_OCPC6(b, c)		GET_CONTEXT_FIELD(b, c, NMRR, OCPC6)
+ #define GET_OCPC7(b, c)		GET_CONTEXT_FIELD(b, c, NMRR, OCPC7)
+-
++#define NMRR_ICP(nmrr, n)	(((nmrr) & (3 << ((n) * 2))) >> ((n) * 2))
++#define NMRR_OCP(nmrr, n)	(((nmrr) & (3 << ((n) * 2 + 16))) >> \
++								((n) * 2 + 16))
+
+ /* PAR */
+ #define GET_FAULT(b, c)		GET_CONTEXT_FIELD(b, c, PAR, FAULT)
+@@ -750,6 +768,8 @@ do { \
+ #define GET_NOS5(b, c)		GET_CONTEXT_FIELD(b, c, PRRR, NOS5)
+ #define GET_NOS6(b, c)		GET_CONTEXT_FIELD(b, c, PRRR, NOS6)
+ #define GET_NOS7(b, c)		GET_CONTEXT_FIELD(b, c, PRRR, NOS7)
++#define PRRR_NOS(prrr, n)	 ((prrr) & (1 << ((n) + 24)) ? 1 : 0)
++#define PRRR_MT(prrr, n)	 ((((prrr) & (3 << ((n) * 2))) >> ((n) * 2)))
+
+
+ /* RESUME */
+--
+1.7.0.2
+
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
