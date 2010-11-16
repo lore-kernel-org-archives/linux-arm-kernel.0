@@ -1,53 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Nov 2010 09:57:57 +0000
-Subject: [PATCH v2 06/20] ARM: LPAE: Introduce the 3-level page table
-	format definitions
-In-Reply-To: <20101115183443.GE31421@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Nov 2010 09:59:38 +0000
+Subject: [PATCH v2 02/20] ARM: LPAE: Factor out 2-level page table
+	definitions into separate files
+In-Reply-To: <AANLkTikrz+yM6idm-aij10vsKZMVSOBfZSdeEJbDRwiC@mail.gmail.com>
 References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-7-git-send-email-catalin.marinas@arm.com>
-	<20101115183443.GE31421@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=aWxekxZ-b59JNOjLArygcxOv1o4HwRt4t_xKh@mail.gmail.com>
+	<1289584840-18097-3-git-send-email-catalin.marinas@arm.com>
+	<20101115233129.GG31421@n2100.arm.linux.org.uk>
+	<AANLkTikrz+yM6idm-aij10vsKZMVSOBfZSdeEJbDRwiC@mail.gmail.com>
+Message-ID: <20101116095938.GA12891@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2010 18:34, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 12, 2010 at 06:00:26PM +0000, Catalin Marinas wrote:
->> +#define PMD_TYPE_MASK ? ? ? ? ? ? ? ?(_AT(pmd_t, 3) << 0)
->> +#define PMD_TYPE_FAULT ? ? ? ? ? ? ? (_AT(pmd_t, 0) << 0)
->> +#define PMD_TYPE_TABLE ? ? ? ? ? ? ? (_AT(pmd_t, 3) << 0)
->> +#define PMD_TYPE_SECT ? ? ? ? ? ? ? ?(_AT(pmd_t, 1) << 0)
->> +#define PMD_BIT4 ? ? ? ? ? ? (_AT(pmd_t, 0))
->> +#define PMD_DOMAIN(x) ? ? ? ? ? ? ? ?(_AT(pmd_t, 0))
->
-> It is really not correct to have these constants type'd as pmd_t.
-> The idea behind pmd_t et.al. is to detect when normal arithmetic or
-> logical operations are performed on page table entries when the
-> accessors instead should be used.
+On Tue, Nov 16, 2010 at 09:14:52AM +0000, Catalin Marinas wrote:
+> On 15 November 2010 23:31, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > This should become:
+> >
+> > typedef struct { pteval_t pte; } pte_t;
+> >
+> > L_PTE_* can then be declared using linux/const.h stuff to typedef them
+> > to pteval_t.
+> 
+> I already do this for LPAE but can be done for the 2-level definitions
+> for consistency.
 
-OK, I can add pmdval_t (and pgdval_t) and use it for these definitions.
+No you don't.  You define the 2nd level definitions using pmd_t which
+is _wrong_.  pmd_t is the type of the pmd container, not the pmd value.
 
->> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
->> index 6630620..a62f093 100644
->> --- a/arch/arm/mm/mm.h
->> +++ b/arch/arm/mm/mm.h
->> @@ -16,10 +16,10 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
->> ?}
->>
->> ?struct mem_type {
->> - ? ? unsigned int prot_pte;
->> - ? ? unsigned int prot_l1;
->> - ? ? unsigned int prot_sect;
->> - ? ? unsigned int domain;
->> + ? ? pgprot_t prot_pte;
->> + ? ? pgprot_t prot_l1;
->> + ? ? pgprot_t prot_sect;
->> + ? ? pgprot_t domain;
->
-> Again, this is wrong. ?There's an accessor for pgprot_t typed data. ?This
-> causes code to violate it.
+> BTW, do you think it's worth adding STRICT_MM_TYPECHECKS for LPAE as
+> well? It would probably spot some issues.
 
-OK, I'll define pgprotval_t and accessors.
-
--- 
-Catalin
+Definitely, because it'll throw out warnings for most of your _AT(pmd_t,)
+definitions.
