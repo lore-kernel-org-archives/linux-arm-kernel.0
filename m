@@ -1,55 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 16 Nov 2010 18:20:05 +0900
-Subject: [PATCH 1/2] ARM: S3C2410: H1940: Adapt h1940-bluetooth to gpiolib
-	changes
-In-Reply-To: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
-References: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <010b01cb856f$77c05ab0$67411010$%kim@samsung.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 16 Nov 2010 09:20:22 +0000
+Subject: [PATCH] Fix IGEPv2 second MMC channel power supply
+In-Reply-To: <AANLkTimuf1khCKLc4Bc23gONxqPGmq1N3j3kSjkzccPu@mail.gmail.com>
+References: <1289734452-31625-1-git-send-email-maz@misterjones.org>
+	<14a0f1b94e21549cf4ad2f33647364e3@secure211.sgcpanel.com>
+	<AANLkTi=wJ24iqN8+tPw=AOO1H7u0oxaO=SaBh5-Lxr_m@mail.gmail.com>
+	<20101114185207.252e3c1f@taxman.wild-wind.fr.eu.org>
+	<AANLkTimuf1khCKLc4Bc23gONxqPGmq1N3j3kSjkzccPu@mail.gmail.com>
+Message-ID: <20101116092022.7b4ea99f@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily Khoruzhick wrote:
-> 
-> Replace in s3c_gpio_cfgpull with s3c_gpio_setpull.
-> 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  arch/arm/mach-s3c2410/h1940-bluetooth.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2410/h1940-bluetooth.c b/arch/arm/mach-
-> s3c2410/h1940-bluetooth.c
-> index 8aa2f19..6b86a72 100644
-> --- a/arch/arm/mach-s3c2410/h1940-bluetooth.c
-> +++ b/arch/arm/mach-s3c2410/h1940-bluetooth.c
-> @@ -77,13 +77,13 @@ static int __devinit h1940bt_probe(struct
-platform_device
-> *pdev)
-> 
->  	/* Configures BT serial port GPIOs */
->  	s3c_gpio_cfgpin(S3C2410_GPH(0), S3C2410_GPH0_nCTS0);
-> -	s3c_gpio_cfgpull(S3C2410_GPH(0), S3C_GPIO_PULL_NONE);
-> +	s3c_gpio_setpull(S3C2410_GPH(0), S3C_GPIO_PULL_NONE);
->  	s3c_gpio_cfgpin(S3C2410_GPH(1), S3C2410_GPIO_OUTPUT);
-> -	s3c_gpio_cfgpull(S3C2410_GPH(1), S3C_GPIO_PULL_NONE);
-> +	s3c_gpio_setpull(S3C2410_GPH(1), S3C_GPIO_PULL_NONE);
->  	s3c_gpio_cfgpin(S3C2410_GPH(2), S3C2410_GPH2_TXD0);
-> -	s3c_gpio_cfgpull(S3C2410_GPH(2), S3C_GPIO_PULL_NONE);
-> +	s3c_gpio_setpull(S3C2410_GPH(2), S3C_GPIO_PULL_NONE);
->  	s3c_gpio_cfgpin(S3C2410_GPH(3), S3C2410_GPH3_RXD0);
-> -	s3c_gpio_cfgpull(S3C2410_GPH(3), S3C_GPIO_PULL_NONE);
-> +	s3c_gpio_setpull(S3C2410_GPH(3), S3C_GPIO_PULL_NONE);
-> 
-> 
->  	rfk = rfkill_alloc(DRV_NAME, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
-> --
+On Mon, 15 Nov 2010 09:32:22 +0100
+Enric Balletb? i Serra <eballetbo@gmail.com> wrote:
 
-You're right..will apply.
+Hi Enric,
+> 
+> So the DUMMY_REGULATOR is only a workaround when a regulator is not
+> defined and shouldn't be used ? Sorry if this is a stupid question but
+> regulator interface is not too clear for me.
 
-Thanks.
+My understanding is that DUMMY_REGULATOR kicks in when the regulator
+setup is incomplete, and when it's better to fix things behind the
+user's back rather than leaving him with a broken device.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> The reality is this :
+> 
+>  -------     --------
+> | 3V3 |   | 1V8 |
+>  -------    --------
+>     |          |
+>  -----------------
+> |   WIFI/BT  |
+>  -----------------
+>         | ( MMC2  at 1V8 )
+>  ----------------
+> |   OMAP   |
+>  ---------------
+> 
+> 3V3 is a fixed regulator
+> 1V8 is a fixed regulator (VIO from TWL4030)
+> 
+> So, which you think is the right solution ?
+
+I think we should provide a fixed regulator to the device, wired to
+the .vio field of twl4030_platform_data. I'll submit a patch later
+today, once I get a chance to test it on my board.
+
+Cheers,
+
+	M.
+-- 
+I'm the slime oozin' out from your TV set...
