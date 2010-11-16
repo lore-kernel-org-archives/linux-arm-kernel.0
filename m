@@ -1,26 +1,21 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 16 Nov 2010 11:17:17 +0000
-Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
-	(Action Required)
-In-Reply-To: <213935334.90145.1289905638298.JavaMail.prod@app013.dmz>
-References: <213935334.90145.1289905638298.JavaMail.prod@app013.dmz>
-Message-ID: <20101116111717.GM12986@rakim.wolfsonmicro.main>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue, 16 Nov 2010 12:17:32 +0100
+Subject: clock enable for i.mx35 pwm
+Message-ID: <201011161217.57831.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 03:07:18AM -0800, noreply at boxbe.com wrote:
-> 
-> Hello Mark Brown,
-> 
-> Your message about "Re: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device" 
-> has been waitlisted.  
-> 
-> Please add yourself to my Boxbe Guest List so your messages will 
-> go to my Inbox. 
-> 
-> Click the link below to be added:
-> https://www.boxbe.com/crs?tc=5918369326_224329907
+Hello,
 
-Your software is generating these messages in response to mails posted
-to public mailing lists and not directed specifically at you.  Please
-disable this software, it is generating noise for community members.
+I tried to use the PWM for activating a beeper. I noticed I had to write twice 
+to the input device (pwm-beeper.c) to get a sound. I noticed the clock is 
+enabled after the PWM is configured (or should be configured). So it seems 
+while the clock is disabled, you can't program the PWM unit. So on pwm_request 
+the clock should be enabled immediately and on pwm_enable the MX3_PWMCR_EN bit 
+should be set (at least for i.mx > 2.1). No idea how to do that in the "older" 
+variants.
+
+Any opinions/fix about that?
+
+Best regards,
+Alexander
