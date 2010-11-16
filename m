@@ -1,9 +1,10 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Nov 2010 13:14:32 +0000
-Subject: [PATCH 2/7] ARM: vfp: Correct data alignment for CONFIG_THUMB2_KERNEL
+Date: Tue, 16 Nov 2010 13:14:33 +0000
+Subject: [PATCH 3/7] ARM: Thumb-2: Correct data alignment for
+	CONFIG_THUMB2_KERNEL in bootp/init.S
 In-Reply-To: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
 References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1289913277-8822-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <1289913277-8822-3-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -39,20 +40,21 @@ Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/vfp/vfphw.S |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/boot/bootp/init.S |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index d66cead..9897dcf 100644
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -206,6 +206,7 @@ ENTRY(vfp_save_state)
- 	mov	pc, lr
- ENDPROC(vfp_save_state)
+diff --git a/arch/arm/boot/bootp/init.S b/arch/arm/boot/bootp/init.S
+index 8b0de41..78b5080 100644
+--- a/arch/arm/boot/bootp/init.S
++++ b/arch/arm/boot/bootp/init.S
+@@ -73,6 +73,8 @@ move:		ldmia	r4!, {r7 - r10}		@ move 32-bytes at a time
  
-+	.align
- last_VFP_context_address:
- 	.word	last_VFP_context
+ 		.size	_start, . - _start
  
++		.align
++
+ 		.type	data,#object
+ data:		.word	initrd_start		@ source initrd address
+ 		.word	initrd_phys		@ destination initrd address
 -- 
 1.7.1
