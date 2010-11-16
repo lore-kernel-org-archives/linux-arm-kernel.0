@@ -1,112 +1,86 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 16 Nov 2010 20:45:37 +0100
-Subject: [PATCH 1/5] mx51: Add PWM resources
-In-Reply-To: <544192.7336.qm@web51008.mail.re2.yahoo.com>
-References: <544192.7336.qm@web51008.mail.re2.yahoo.com>
-Message-ID: <20101116194537.GT8942@pengutronix.de>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 16 Nov 2010 11:46:12 -0800
+Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
+In-Reply-To: <F45880696056844FA6A73F415B568C6953604E7D94@EXDCVYMBSTM006.EQ1STM.local>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-2-git-send-email-jimmy.rubin@stericsson.com>
+	<201011121643.52923.arnd@arndb.de>
+	<F45880696056844FA6A73F415B568C6953604E7D94@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <1289936772.28741.188.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+On Tue, 2010-11-16 at 16:29 +0100, Jimmy RUBIN wrote:
+> > > +/* Channel path */
+> > > +#define MCDE_CHNLPATH(__chnl, __fifo, __type, __ifc, __link) \
+> > > +	(((__chnl) << 16) | ((__fifo) << 12) | \
+> > > +	 ((__type) << 8) | ((__ifc) << 4) | ((__link) << 0))
+> > > +enum mcde_chnl_path {
+> > > +	/* Channel A */
+> > > +	MCDE_CHNLPATH_CHNLA_FIFOA_DPI_0 = MCDE_CHNLPATH(MCDE_CHNL_A,
+> > > +		MCDE_FIFO_A, MCDE_PORTTYPE_DPI, 0, 0),
+> > > +	MCDE_CHNLPATH_CHNLA_FIFOA_DSI_IFC0_0 =
+> > MCDE_CHNLPATH(MCDE_CHNL_A,
+> > > +		MCDE_FIFO_A, MCDE_PORTTYPE_DSI, 0, 0),
+> > > +	MCDE_CHNLPATH_CHNLA_FIFOA_DSI_IFC0_1 =
+> > MCDE_CHNLPATH(MCDE_CHNL_A,
+> > > +		MCDE_FIFO_A, MCDE_PORTTYPE_DSI, 0, 1),
+> > 
+> > A table like this would become more readable by making each entry a
+> > single line, even if that goes beyond the 80-character limit.
+> Good point, we will fix this
 
-On Tue, Nov 16, 2010 at 10:36:05AM -0800, Fabio Estevam wrote:
-> Add PWM resources.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> ---
->  arch/arm/mach-mx5/devices.c |???50 +++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.h |? ? 2 +
-I'm currently trying to get rid of the devices.c files and allocate the
-devices dynamically.  Can you please use the same approach?
-I already have plat-mxc/devices/platform-mxc_pwm.c in my tree.  I'm
-trying to post my patches later today and check with Sascha how to
-integrate it (that probably only tomorrow).
+Or the #define could be changed to do something like:
 
->  2 files changed, 52 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index 4c7be87..ec36c3e 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -131,6 +131,56 @@ struct platform_device mxc_keypad_device = {
->  ??? .resource = mxc_kpp_resources,
->  };
->  
-> +static struct resource mxc_pwm0_resources[] = {
-> +??? {
-> +??? ??? .start = MX51_PWM1_BASE_ADDR,
-> +??? ??? .end = MX51_PWM1_BASE_ADDR + 0x14,
-I think you need at least 0x17 here, as the last (32 bit wide) register
-starts at 0x14.  When checking the memory map in the reference manual
-the blocks reserved for pwm have a size of 16 KiB.  So I'd prefer SZ_16K
-here.
+static inline u32 MCDE_channel_path(u32 chnl, u32 fifo, u32 type, u32 ifc, u32 link)
+{
+	return ((chnl << 16) |
+		(fifo << 12) |
+		(type << 8) |
+		(ifc << 4) |
+		(link << 0));
+}
 
-> +??? ??? .flags = IORESOURCE_MEM,
-> +??? },
-> +??? {
-> +??? ??? .start = MX51_MXC_INT_PWM1,
-> +??? ??? .end = MX51_MXC_INT_PWM1,
-> +??? ??? .flags = IORESOURCE_IRQ,
-> +??? },
-> +};
-> +
-> +struct platform_device mxc_pwm0_device = {
-> +??? .name = "mxc_pwm",
-> +??? .id = 0,
-> +??? .num_resources = ARRAY_SIZE(mxc_pwm0_resources),
-> +??? .resource = mxc_pwm0_resources,
-> +};
-> +
-> +static struct resource mxc_pwm1_resources[] = {
-> +??? {
-> +??? ??? .start = MX51_PWM2_BASE_ADDR,
-> +??? ??? .end = MX51_PWM2_BASE_ADDR + 0x14,
-> +??? ??? .flags = IORESOURCE_MEM,
-> +??? },
-> +??? {
-> +??? ??? .start = MX51_MXC_INT_PWM2,
-> +??? ??? .end = MX51_MXC_INT_PWM2,
-> +??? ??? .flags = IORESOURCE_IRQ,
-> +??? },
-> +};
-> +
-> +struct platform_device mxc_pwm1_device = {
-> +??? .name = "mxc_pwm",
-> +??? .id = 1,
-> +??? .num_resources = ARRAY_SIZE(mxc_pwm1_resources),
-> +??? .resource = mxc_pwm1_resources,
-> +};
-> +
-> +struct platform_device mxc_pwm0_backlight_device = {
-> +??? .name = "pwm-backlight",
-> +??? .id = 0,
-> +};
-> +
-> +struct platform_device mxc_pwm1_backlight_device = {
-> +??? .name = "pwm-backlight",
-> +??? .id = 1,
-> +};
-> +
->  static struct mxc_gpio_port mxc_gpio_ports[] = {
->  ??? {
->  ??? ??? .chip.label = "gpio-0",
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-> index af1d07c..71a9fe9 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -4,3 +4,5 @@ extern struct platform_device mxc_usbdr_udc_device;
->  extern struct platform_device mxc_wdt;
->  extern struct platform_device mxc_hsi2c_device;
->  extern struct platform_device mxc_keypad_device;
-> +extern struct platform_device mxc_pwm0_device;
-> +extern struct platform_device mxc_pwm0_backlight_device;
-Not that it matters much because I want these allocated dynamically, but
-you forgot the pwm1 devices here.
+#define SET_ENUM_MCDE_CHNLPATH(chnl, fifo, var, type, ifc, link)	\
+	MCDE_CHNLPATH_CHNL##chnl##_FIFO##fifo##_##var =			\
+		MCDE_channel_path(MCDE_CHNL_##chnl,			\
+				  MCDE_FIFO_##fifo,			\
+				  MCDE_PORTTYPE_##type,			\
+				  ifc,					\
+				  link)
 
-Best regards
-Uwe
+enum mcde_chnl_path {
+	/* Channel A */
+	SET_ENUM_MCDE_CHNLPATH(A, A, DPI_0,		DPI, 0, 0),
+	SET_ENUM_MCDE_CHNLPATH(A, A, DSI_IFC0_0,	DSI, 0, 0),
+	SET_ENUM_MCDE_CHNLPATH(A, A, DSI_IFC0_1,	DSI, 0, 1),
+	SET_ENUM_MCDE_CHNLPATH(A, C, DSI_IFC0_2,	DSI, 0, 2),
+	SET_ENUM_MCDE_CHNLPATH(A, C, DSI_IFC1_0,	DSI, 1, 0),
+	SET_ENUM_MCDE_CHNLPATH(A, C, DSI_IFC1_1,	DSI, 1, 1),
+	SET_ENUM_MCDE_CHNLPATH(A, A, DSI_IFC1_2,	DSI, 1, 2),
+	/* Channel B */
+	SET_ENUM_MCDE_CHNLPATH(B, B, DPI_1,		DPI, 0, 1),
+	SET_ENUM_MCDE_CHNLPATH(B, B, DSI_IFC0_0,	DSI, 0, 0),
+	SET_ENUM_MCDE_CHNLPATH(B, B, DSI_IFC0_1,	DSI, 0, 1),
+	SET_ENUM_MCDE_CHNLPATH(B, C, DSI_IFC0_2,	DSI, 0, 2),
+	SET_ENUM_MCDE_CHNLPATH(B, C, DSI_IFC1_0,	DSI, 1, 0),
+	SET_ENUM_MCDE_CHNLPATH(B, C, DSI_IFC1_1,	DSI, 1, 1),
+	SET_ENUM_MCDE_CHNLPATH(B, B, DSI_IFC1_2,	DSI, 1, 2),
+	/* Channel C0 */
+	SET_ENUM_MCDE_CHNLPATH(C0, A, DSI_IFC0_0,	DSI, 0, 0),
+	SET_ENUM_MCDE_CHNLPATH(C0, A, DSI_IFC0_1,	DSI, 0, 1),
+	SET_ENUM_MCDE_CHNLPATH(C0, C0, DSI_IFC0_2,	DSI, 0, 2),
+	SET_ENUM_MCDE_CHNLPATH(C0, C0, DSI_IFC1_0,	DSI, 1, 0),
+	SET_ENUM_MCDE_CHNLPATH(C0, C0, DSI_IFC1_1,	DSI, 1, 1),
+	SET_ENUM_MCDE_CHNLPATH(C0, A, DSI_IFC1_2,	DSI, 1, 2),
+	/* Channel C1 */
+	SET_ENUM_MCDE_CHNLPATH(C1, B, DSI_IFC0_0,	DSI, 0, 0),
+	SET_ENUM_MCDE_CHNLPATH(C1, B, DSI_IFC0_1,	DSI, 0, 1),
+	SET_ENUM_MCDE_CHNLPATH(C1, C1, DSI_IFC0_2,	DSI, 0, 2),
+	SET_ENUM_MCDE_CHNLPATH(C1, C1, DSI_IFC1_0,	DSI, 1, 0),
+	SET_ENUM_MCDE_CHNLPATH(C1, C1, DSI_IFC1_1,	DSI, 1, 1),
+	SET_ENUM_MCDE_CHNLPATH(C1, B, DSI_IFC1_2,	DSI, 1, 2),
+};
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+It seems that long blocks of upper case make my eyes glaze
+over and that many of your #defines are indistinguishable.
