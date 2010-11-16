@@ -1,52 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Nov 2010 09:47:04 -0000
-Subject: [PATCH 1/5] ARM: perf: consolidate common PMU behaviour
-In-Reply-To: <AANLkTi=mu6iG9Yhhtp31g0aDH7+X0i6G8vZiW5FGmV-C@mail.gmail.com>
-References: <1289842263-21241-1-git-send-email-will.deacon@arm.com>	<1289842263-21241-2-git-send-email-will.deacon@arm.com>
-	<AANLkTi=mu6iG9Yhhtp31g0aDH7+X0i6G8vZiW5FGmV-C@mail.gmail.com>
-Message-ID: <005601cb8573$39cab3f0$ad601bd0$@deacon@arm.com>
+Date: Tue, 16 Nov 2010 09:57:05 -0000
+Subject: [PATCH 2/5] ARM: perf: avoid exposing internal stop function for
+	v6 PMU
+In-Reply-To: <20101115190228.GB2764@pulham.picochip.com>
+References: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
+	<1289842263-21241-3-git-send-email-will.deacon@arm.com>
+	<20101115190228.GB2764@pulham.picochip.com>
+Message-ID: <006001cb8574$a03883f0$e0a98bd0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hi Jamie,
 
-> > diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> > index 07a5035..c49e170 100644
-> > --- a/arch/arm/kernel/perf_event.c
-> > +++ b/arch/arm/kernel/perf_event.c
-> ...
-> 
-> > @@ -166,6 +165,19 @@ armpmu_map_cache_event(u64 config)
-> >  }
+> On Mon, Nov 15, 2010 at 05:31:00PM +0000, Will Deacon wrote:
+> > Unlike other pmu functions, armv6pmu_pmu_stop is not declared static.
+> > This patch adds the missing keyword.
 > >
-> >  static int
-> > +armpmu_map_event(u64 config)
-> > +{
-> > +       int mapping = (*armpmu->event_map)[config];
-> > +       return mapping == HW_OP_UNSUPPORTED ? -EOPNOTSUPP : mapping;
-> > +}
-> > +
-> > +static int
-> > +armpmu_map_raw_event(u64 config)
-> > +{
-> > +       return (int)(config & armpmu->raw_event_mask);
-> > +}
-> > +
-> > +static int
-> >  armpmu_event_set_period(struct perf_event *event,
-> >                        struct hw_perf_event *hwc,
-> >                        int idx)
-> 
-> Those functions could be inlined for performance reason.
+> > Cc: Jamie Iles <jamie.iles@picochip.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> Yep, good spot. Btw, my employer has changed to Exchange for our email and it
+> has a habit of munging patches on the way in so I'll have to switch to my
+> personal email now!
 
-Since these are static functions with no side effects, any half-decent
-compiler should do the inlining for us. I checked the disassembly to be
-sure (GCC based on 4.5.1) and, not only are the above functions inlined,
-but __hw_perf_event_init is inlined into armpmu_event_init too.
+Urgh! We have to use Exchange too and it makes a total mess of patches.
+You can run dos2unix and write a script to fix wrapped lines but you get
+into trouble when there is trailing whitespace in a file and diff uses
+that line for context. Then I usually resort to hexdump, which takes far
+too long to be practical for larger patches.
 
-> Other than that minor remark, I am OK
-> Acked-by: Jean Pihet <j-pihet@ti.com>
+> Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-Thanks,
+Thanks. I'll use this email address in future.
 
 Will
