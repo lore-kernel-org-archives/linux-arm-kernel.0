@@ -1,69 +1,47 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 16 Nov 2010 14:28:50 -0800
-Subject: [PATCH 1/4] proc/vmcore: allow archs to override
-	vmcore_elf_check_arch()
-In-Reply-To: <df680f67f33d8b0ef815045b53f205b3ff35de63.1289292124.git.mika.westerberg@iki.fi>
-References: <cover.1289292124.git.mika.westerberg@iki.fi>
-	<df680f67f33d8b0ef815045b53f205b3ff35de63.1289292124.git.mika.westerberg@iki.fi>
-Message-ID: <20101116142850.df5e9805.akpm@linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Nov 2010 22:31:16 +0000
+Subject: [PATCH] nomadik: prevent sched_clock() wraparound
+In-Reply-To: <AANLkTimvyo-2eHrvU=LNdBjrJfAxv9Jpza8Mh4iG4ts6@mail.gmail.com>
+References: <1289898690-29910-1-git-send-email-linus.walleij@stericsson.com>
+	<1289940829.3860.22.camel@localhost.localdomain>
+	<AANLkTimvyo-2eHrvU=LNdBjrJfAxv9Jpza8Mh4iG4ts6@mail.gmail.com>
+Message-ID: <20101116223116.GG21926@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  9 Nov 2010 11:06:10 +0200
-Mika Westerberg <mika.westerberg@iki.fi> wrote:
-
-> From: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+On Tue, Nov 16, 2010 at 11:15:02PM +0100, Linus Walleij wrote:
+> 2010/11/16 john stultz <johnstul@us.ibm.com>:
+> > On Tue, 2010-11-16 at 10:11 +0100, Linus Walleij wrote:
 > 
-> Allow architectures to redefine this macro if needed. This is useful for
-> example in architectures where 64-bit ELF vmcores are not supported.
-> Specifying zero vmcore_elf64_check_arch() allows compiler to optimize
-> away unnecessary parts of parse_crash_elf64_headers().
+> > The cycle value being passed as v is likely to be large, and the
+> > clocksource mult and shift are calculated to be as large as possible
+> > without overflowing when given only a few seconds worth of cycles.
+> >
+> > So its very likely that after a few seconds of running (or even less,
+> > with the 32_to_63 conversion), the cyc2ns function will overflow, as
+> > v*mult will be greater then 64bits.
 > 
-> We also rename the macro to vmcore_elf64_check_arch() to reflect that it
-> is used for 64-bit vmcores only.
+> Darn you're right of course.
 > 
-> Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
-> ---
->  fs/proc/vmcore.c           |    2 +-
->  include/linux/crash_dump.h |    9 ++++++++-
->  2 files changed, 9 insertions(+), 2 deletions(-)
+> I'll attempt to use
+> clocks_calc_mult_shift(&mult, &shift, rate, NSEC_PER_SEC, 3600*24*365);
 > 
-> diff --git a/fs/proc/vmcore.c b/fs/proc/vmcore.c
-> index 2367fb3..74802bc5 100644
-> --- a/fs/proc/vmcore.c
-> +++ b/fs/proc/vmcore.c
-> @@ -499,7 +499,7 @@ static int __init parse_crash_elf64_headers(void)
->  	/* Do some basic Verification. */
->  	if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG) != 0 ||
->  		(ehdr.e_type != ET_CORE) ||
-> -		!vmcore_elf_check_arch(&ehdr) ||
-> +		!vmcore_elf64_check_arch(&ehdr) ||
->  		ehdr.e_ident[EI_CLASS] != ELFCLASS64 ||
->  		ehdr.e_ident[EI_VERSION] != EV_CURRENT ||
->  		ehdr.e_version != EV_CURRENT ||
-> diff --git a/include/linux/crash_dump.h b/include/linux/crash_dump.h
-> index 0026f26..088cd4a 100644
-> --- a/include/linux/crash_dump.h
-> +++ b/include/linux/crash_dump.h
-> @@ -20,7 +20,14 @@ extern ssize_t copy_oldmem_page(unsigned long, char *, size_t,
->  #define vmcore_elf_check_arch_cross(x) 0
->  #endif
->  
-> -#define vmcore_elf_check_arch(x) (elf_check_arch(x) || vmcore_elf_check_arch_cross(x))
-> +/*
-> + * Architecture code can redefine this if there are any special checks
-> + * needed for 64-bit ELF vmcores. In case of 32-bit only architecture,
-> + * this can be set to zero.
-> + */
-> +#ifndef vmcore_elf64_check_arch
-> +#define vmcore_elf64_check_arch(x) (elf_check_arch(x) || vmcore_elf_check_arch_cross(x))
-> +#endif
->  
+> For getting a somewhat more proper mult+shift for sched_clock().
 
-Looks OK to me.  I'd suggest that this patch be merged along with the
-others, via whatever tree they're taken into.  Russell's ARM tree, I
-assume.
+What kind of mult are you expecting?  Let's look at the code again:
 
-Should elf_check_arch() be renamed to elf64_check_arch()?
+> +     /* The highest bit is not valid */
+> +     v &= 0x7FFFFFFFFFFFFFFFLLU;
+> +     return clocksource_cyc2ns(v, nmdk_clksrc.mult, nmdk_clksrc.shift);
 
-Ditto vmcore_elf_check_arch_cross()?
+v is 63-bit.  Any multiply greater than two will result in an overflow,
+which means the best you can achieve with this is basically a divide by
+a power of two.  So you've lost accuracy in the factor conversion.
+
+You might be better off limiting the size of 'v' to a smaller number of
+bits, and then use clocksource_cyc2ns() with a multiplier which guarantees
+that it won't overflow 64-bit math, but putting up with it wrapping more
+often than a 63-bit value would give you.
+
+I think you have a trade-off to make here, between time between wraps
+and conversion accuracy.
