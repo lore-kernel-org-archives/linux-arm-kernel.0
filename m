@@ -1,54 +1,33 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Tue, 16 Nov 2010 09:20:22 +0000
-Subject: [PATCH] Fix IGEPv2 second MMC channel power supply
-In-Reply-To: <AANLkTimuf1khCKLc4Bc23gONxqPGmq1N3j3kSjkzccPu@mail.gmail.com>
-References: <1289734452-31625-1-git-send-email-maz@misterjones.org>
-	<14a0f1b94e21549cf4ad2f33647364e3@secure211.sgcpanel.com>
-	<AANLkTi=wJ24iqN8+tPw=AOO1H7u0oxaO=SaBh5-Lxr_m@mail.gmail.com>
-	<20101114185207.252e3c1f@taxman.wild-wind.fr.eu.org>
-	<AANLkTimuf1khCKLc4Bc23gONxqPGmq1N3j3kSjkzccPu@mail.gmail.com>
-Message-ID: <20101116092022.7b4ea99f@taxman.wild-wind.fr.eu.org>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Tue, 16 Nov 2010 01:25:33 -0800 (PST)
+Subject: [PATCH] mx35_3ds: Add watchdog support
+In-Reply-To: <20101116063818.GR8942@pengutronix.de>
+Message-ID: <105118.89235.qm@web51004.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Nov 2010 09:32:22 +0100
-Enric Balletb? i Serra <eballetbo@gmail.com> wrote:
+Hi Uwe and Wolfram,
 
-Hi Enric,
+--- On Tue, 11/16/10, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+...
 > 
-> So the DUMMY_REGULATOR is only a workaround when a regulator is not
-> defined and shouldn't be used ? Sorry if this is a stupid question but
-> regulator interface is not too clear for me.
+> I wonder why the driver uses clk_get_sys("imx-wdt.0",
+> NULL).
+> IMHO it should use clk_get(&pdev->dev, NULL).?
+> (For that to work we need
+> to register the clock using "imx2-wdt.0".? (Or even
+> better "imx2-wdt".))
 
-My understanding is that DUMMY_REGULATOR kicks in when the regulator
-setup is incomplete, and when it's better to fix things behind the
-user's back rather than leaving him with a broken device.
+I sent a patch for registering a dummy watchdog clock: http://www.spinics.net/lists/arm-kernel/msg104087.html
 
-> The reality is this :
-> 
->  -------     --------
-> | 3V3 |   | 1V8 |
->  -------    --------
->     |          |
->  -----------------
-> |   WIFI/BT  |
->  -----------------
->         | ( MMC2  at 1V8 )
->  ----------------
-> |   OMAP   |
->  ---------------
-> 
-> 3V3 is a fixed regulator
-> 1V8 is a fixed regulator (VIO from TWL4030)
-> 
-> So, which you think is the right solution ?
+This way we don?t need to change the watchdog driver.
 
-I think we should provide a fixed regulator to the device, wired to
-the .vio field of twl4030_platform_data. I'll submit a patch later
-today, once I get a chance to test it on my board.
+Let me know what you think. 
 
-Cheers,
+Regards,
 
-	M.
--- 
-I'm the slime oozin' out from your TV set...
+Fabio Estevam
+
+
+
+      
