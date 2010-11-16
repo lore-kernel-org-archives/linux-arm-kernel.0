@@ -1,278 +1,419 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 16 Nov 2010 03:18:07 -0700
-Subject: [PATCH 3/8] OMAP2+: hwmod: add postsetup state
+Date: Tue, 16 Nov 2010 03:18:10 -0700
+Subject: [PATCH 6/8] OMAP2+: hwmod: upgrade per-hwmod mutex to a spinlock
 In-Reply-To: <20101116101615.22777.49212.stgit@twilight.localdomain>
 References: <20101116101615.22777.49212.stgit@twilight.localdomain>
-Message-ID: <20101116101806.22777.57408.stgit@twilight.localdomain>
+Message-ID: <20101116101809.22777.92945.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow board files and OMAP core code to control the state that some or
-all of the hwmods end up in at the end of _setup() (called by
-omap_hwmod_late_init() ).  Reimplement the old skip_setup_idle code in
-terms of this new postsetup state code.
+Change the per-hwmod mutex to a spinlock.  (The per-hwmod lock
+serializes most post-initialization hwmod operations such as enable,
+idle, and shutdown.)  Spinlocks are needed, because in some cases,
+hwmods must be enabled from timer interrupt disabled-context, such as
+an ISR.  The current use-case that is driving this is the OMAP GPIO
+block ISR: it can trigger interrupts even with its clocks disabled,
+but these clocks are needed for register accesses in the ISR to succeed.
 
-There are two use-cases for this patch: the !CONFIG_PM_RUNTIME case,
-in which all IP blocks should stay enabled after _setup() finishes;
-and the MPU watchdog case, in which the watchdog IP block should enter
-idle if watchdog coverage of kernel initialization is desired, and
-should be disabled otherwise.
+This patch also effectively reverts commit
+848240223c35fcc71c424ad51a8e8aef42d3879c - this patch makes
+_omap_hwmod_enable() and _omap_hwmod_init() static, renames them back
+to _enable() and _idle(), and changes their callers to call the
+spinlocking versions.  Previously, since omap_hwmod_{enable,init}()
+attempted to take mutexes, these functions could not be called while
+the timer interrupt was disabled; but now that the functions use
+spinlocks and save and restore the IRQ state, it is appropriate to
+call them directly.
+
+Kevin Hilman <khilman@deeprootsystems.com> originally proposed this
+patch - thanks Kevin.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Charulatha Varadarajan <charu@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/io.c                     |   32 ++++++----
- arch/arm/mach-omap2/omap_hwmod.c             |   82 ++++++++++++++++++++------
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++
- 3 files changed, 88 insertions(+), 32 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |  105 +++++++++++++++-----------
+ arch/arm/mach-omap2/serial.c                 |    9 --
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 +
+ 3 files changed, 64 insertions(+), 56 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 90ce77a..39ab1ec 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -311,8 +311,15 @@ static int __init _omap2_init_reprogram_sdrc(void)
- 	return v;
- }
- 
-+static int _set_hwmod_postsetup_state(struct omap_hwmod *oh, void *data)
-+{
-+	return omap_hwmod_set_postsetup_state(oh, *(u8 *)data);
-+}
-+
- void __init omap2_init_common_infrastructure(void)
- {
-+	u8 postsetup_state;
-+
- 	pwrdm_init(powerdomains_omap);
- 	clkdm_init(clockdomains_omap, clkdm_autodeps);
- 	if (cpu_is_omap242x())
-@@ -323,6 +330,16 @@ void __init omap2_init_common_infrastructure(void)
- 		omap3xxx_hwmod_init();
- 	else if (cpu_is_omap44xx())
- 		omap44xx_hwmod_init();
-+	else
-+		pr_err("Could not init hwmod data - unknown SoC\n");
-+
-+	/* Set the default postsetup state for all hwmods */
-+#ifdef CONFIG_PM_RUNTIME
-+	postsetup_state = _HWMOD_STATE_IDLE;
-+#else
-+	postsetup_state = _HWMOD_STATE_ENABLED;
-+#endif
-+	omap_hwmod_for_each(_set_hwmod_postsetup_state, &postsetup_state);
- 
- 	/* The OPP tables have to be registered before a clk init */
- 	omap_pm_if_early_init(mpu_opps, dsp_opps, l3_opps);
-@@ -336,25 +353,16 @@ void __init omap2_init_common_infrastructure(void)
- 	else if (cpu_is_omap44xx())
- 		omap4xxx_clk_init();
- 	else
--		pr_err("Could not init clock framework - unknown CPU\n");
-+		pr_err("Could not init clock framework - unknown SoC\n");
- }
- 
--/*
-- * XXX Ideally, this function will dwindle into nothingness over time;
-- * almost all device init code should be possible through initcalls
-- * and other generalized mechanisms
-- */
- void __init omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,
- 				      struct omap_sdrc_params *sdrc_cs1)
- {
--	u8 skip_setup_idle = 0;
--
- 	omap_serial_early_init();
- 
--#ifndef CONFIG_PM_RUNTIME
--	skip_setup_idle = 1;
--#endif
--	omap_hwmod_late_init(skip_setup_idle);
-+	omap_hwmod_late_init();
-+
- 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
- 		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
- 		_omap2_init_reprogram_sdrc();
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index c051fa4..683428f 100644
+index 0e85278..589c282 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1313,23 +1313,15 @@ static int _shutdown(struct omap_hwmod *oh)
- /**
-  * _setup - do initial configuration of omap_hwmod
-  * @oh: struct omap_hwmod *
-- * @skip_setup_idle_p: do not idle hwmods at the end of the fn if 1
-  *
-  * Writes the CLOCKACTIVITY bits @clockact to the hwmod @oh
-- * OCP_SYSCONFIG register.  @skip_setup_idle is intended to be used on
-- * a system that will not call omap_hwmod_enable() to enable devices
-- * (e.g., a system without PM runtime).  Returns -EINVAL if the hwmod
-- * is in the wrong state or returns 0.
-+ * OCP_SYSCONFIG register.  Returns -EINVAL if the hwmod is in the
-+ * wrong state or returns 0.
-  */
- static int _setup(struct omap_hwmod *oh, void *data)
- {
- 	int i, r;
--	u8 skip_setup_idle;
--
--	if (!oh || !data)
--		return -EINVAL;
--
--	skip_setup_idle = *(u8 *)data;
-+	u8 postsetup_state;
+@@ -135,6 +135,7 @@
+ #include <linux/err.h>
+ #include <linux/list.h>
+ #include <linux/mutex.h>
++#include <linux/spinlock.h>
  
- 	/* Set iclk autoidle mode */
- 	if (oh->slaves_cnt > 0) {
-@@ -1349,7 +1341,6 @@ static int _setup(struct omap_hwmod *oh, void *data)
- 		}
- 	}
- 
--	mutex_init(&oh->_mutex);
- 	oh->_state = _HWMOD_STATE_INITIALIZED;
- 
- 	/*
-@@ -1383,8 +1374,25 @@ static int _setup(struct omap_hwmod *oh, void *data)
- 		}
- 	}
- 
--	if (!(oh->flags & HWMOD_INIT_NO_IDLE) && !skip_setup_idle)
-+	postsetup_state = oh->_postsetup_state;
-+	if (postsetup_state == _HWMOD_STATE_UNKNOWN)
-+		postsetup_state = _HWMOD_STATE_ENABLED;
-+
-+	/*
-+	 * XXX HWMOD_INIT_NO_IDLE does not belong in hwmod data -
-+	 * it should be set by the core code as a runtime flag during startup
-+	 */
-+	if ((oh->flags & HWMOD_INIT_NO_IDLE) &&
-+	    (postsetup_state == _HWMOD_STATE_IDLE))
-+		postsetup_state = _HWMOD_STATE_ENABLED;
-+
-+	if (postsetup_state == _HWMOD_STATE_IDLE)
- 		_omap_hwmod_idle(oh);
-+	else if (postsetup_state == _HWMOD_STATE_DISABLED)
-+		_shutdown(oh);
-+	else if (postsetup_state != _HWMOD_STATE_ENABLED)
-+		WARN(1, "hwmod: %s: unknown postsetup state %d! defaulting to enabled\n",
-+		     oh->name, postsetup_state);
- 
- 	return 0;
+ #include <plat/common.h>
+ #include <plat/cpu.h>
+@@ -1193,17 +1194,14 @@ static int _reset(struct omap_hwmod *oh)
  }
-@@ -1485,6 +1493,8 @@ int omap_hwmod_register(struct omap_hwmod *oh)
- 
- 	list_add_tail(&oh->node, &omap_hwmod_list);
- 
-+	mutex_init(&oh->_mutex);
-+
- 	oh->_state = _HWMOD_STATE_REGISTERED;
- 
- 	ret = 0;
-@@ -1585,13 +1595,12 @@ int omap_hwmod_init(struct omap_hwmod **ohs)
  
  /**
-  * omap_hwmod_late_init - do some post-clock framework initialization
-- * @skip_setup_idle: if 1, do not idle hwmods in _setup()
+- * _omap_hwmod_enable - enable an omap_hwmod
++ * _enable - enable an omap_hwmod
+  * @oh: struct omap_hwmod *
   *
-  * Must be called after omap2_clk_init().  Resolves the struct clk names
-  * to struct clk pointers for each registered omap_hwmod.  Also calls
-  * _setup() on each hwmod.  Returns 0.
+  * Enables an omap_hwmod @oh such that the MPU can access the hwmod's
+- * register target.  (This function has a full name --
+- * _omap_hwmod_enable() rather than simply _enable() -- because it is
+- * currently required by the pm34xx.c idle loop.)  Returns -EINVAL if
+- * the hwmod is in the wrong state or passes along the return value of
+- * _wait_target_ready().
++ * register target.  Returns -EINVAL if the hwmod is in the wrong
++ * state or passes along the return value of _wait_target_ready().
   */
--int omap_hwmod_late_init(u8 skip_setup_idle)
-+int omap_hwmod_late_init(void)
+-int _omap_hwmod_enable(struct omap_hwmod *oh)
++static int _enable(struct omap_hwmod *oh)
  {
  	int r;
  
-@@ -1603,10 +1612,7 @@ int omap_hwmod_late_init(u8 skip_setup_idle)
- 	WARN(!mpu_oh, "omap_hwmod: could not find MPU initiator hwmod %s\n",
- 	     MPU_INITIATOR_NAME);
+@@ -1250,16 +1248,14 @@ int _omap_hwmod_enable(struct omap_hwmod *oh)
+ }
  
--	if (skip_setup_idle)
--		pr_debug("omap_hwmod: will leave hwmods enabled during setup\n");
+ /**
+- * _omap_hwmod_idle - idle an omap_hwmod
++ * _idle - idle an omap_hwmod
+  * @oh: struct omap_hwmod *
+  *
+  * Idles an omap_hwmod @oh.  This should be called once the hwmod has
+- * no further work.  (This function has a full name --
+- * _omap_hwmod_idle() rather than simply _idle() -- because it is
+- * currently required by the pm34xx.c idle loop.)  Returns -EINVAL if
+- * the hwmod is in the wrong state or returns 0.
++ * no further work.  Returns -EINVAL if the hwmod is in the wrong
++ * state or returns 0.
+  */
+-int _omap_hwmod_idle(struct omap_hwmod *oh)
++static int _idle(struct omap_hwmod *oh)
+ {
+ 	if (oh->_state != _HWMOD_STATE_ENABLED) {
+ 		WARN(1, "omap_hwmod: %s: idle state can only be entered from "
+@@ -1305,11 +1301,11 @@ static int _shutdown(struct omap_hwmod *oh)
+ 	if (oh->class->pre_shutdown) {
+ 		prev_state = oh->_state;
+ 		if (oh->_state == _HWMOD_STATE_IDLE)
+-			_omap_hwmod_enable(oh);
++			_enable(oh);
+ 		ret = oh->class->pre_shutdown(oh);
+ 		if (ret) {
+ 			if (prev_state == _HWMOD_STATE_IDLE)
+-				_omap_hwmod_idle(oh);
++				_idle(oh);
+ 			return ret;
+ 		}
+ 	}
+@@ -1382,7 +1378,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
+ 	if ((oh->flags & HWMOD_INIT_NO_RESET) && oh->rst_lines_cnt == 1)
+ 		return 0;
+ 
+-	r = _omap_hwmod_enable(oh);
++	r = _enable(oh);
+ 	if (r) {
+ 		pr_warning("omap_hwmod: %s: cannot be enabled (%d)\n",
+ 			   oh->name, oh->_state);
+@@ -1394,7 +1390,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
+ 
+ 		/*
+ 		 * OCP_SYSCONFIG bits need to be reprogrammed after a softreset.
+-		 * The _omap_hwmod_enable() function should be split to
++		 * The _enable() function should be split to
+ 		 * avoid the rewrite of the OCP_SYSCONFIG register.
+ 		 */
+ 		if (oh->class->sysc) {
+@@ -1416,7 +1412,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
+ 		postsetup_state = _HWMOD_STATE_ENABLED;
+ 
+ 	if (postsetup_state == _HWMOD_STATE_IDLE)
+-		_omap_hwmod_idle(oh);
++		_idle(oh);
+ 	else if (postsetup_state == _HWMOD_STATE_DISABLED)
+ 		_shutdown(oh);
+ 	else if (postsetup_state != _HWMOD_STATE_ENABLED)
+@@ -1522,7 +1518,7 @@ int omap_hwmod_register(struct omap_hwmod *oh)
+ 
+ 	list_add_tail(&oh->node, &omap_hwmod_list);
+ 
+-	mutex_init(&oh->_mutex);
++	spin_lock_init(&oh->_lock);
+ 
+ 	oh->_state = _HWMOD_STATE_REGISTERED;
+ 
+@@ -1682,18 +1678,18 @@ int omap_hwmod_unregister(struct omap_hwmod *oh)
+ int omap_hwmod_enable(struct omap_hwmod *oh)
+ {
+ 	int r;
++	unsigned long flags;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
+-	r = _omap_hwmod_enable(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
++	r = _enable(oh);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return r;
+ }
+ 
 -
--	omap_hwmod_for_each(_setup, &skip_setup_idle);
-+	omap_hwmod_for_each(_setup, NULL);
+ /**
+  * omap_hwmod_idle - idle an omap_hwmod
+  * @oh: struct omap_hwmod *
+@@ -1703,12 +1699,14 @@ int omap_hwmod_enable(struct omap_hwmod *oh)
+  */
+ int omap_hwmod_idle(struct omap_hwmod *oh)
+ {
++	unsigned long flags;
++
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
+-	_omap_hwmod_idle(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
++	_idle(oh);
++	spin_unlock_irqrestore(&oh->_lock, flags);
  
  	return 0;
  }
-@@ -2132,3 +2138,41 @@ int omap_hwmod_for_each_by_class(const char *classname,
+@@ -1723,12 +1721,14 @@ int omap_hwmod_idle(struct omap_hwmod *oh)
+  */
+ int omap_hwmod_shutdown(struct omap_hwmod *oh)
+ {
++	unsigned long flags;
++
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	_shutdown(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -1741,9 +1741,11 @@ int omap_hwmod_shutdown(struct omap_hwmod *oh)
+  */
+ int omap_hwmod_enable_clocks(struct omap_hwmod *oh)
+ {
+-	mutex_lock(&oh->_mutex);
++	unsigned long flags;
++
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	_enable_clocks(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -1756,9 +1758,11 @@ int omap_hwmod_enable_clocks(struct omap_hwmod *oh)
+  */
+ int omap_hwmod_disable_clocks(struct omap_hwmod *oh)
+ {
+-	mutex_lock(&oh->_mutex);
++	unsigned long flags;
++
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	_disable_clocks(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -1802,13 +1806,14 @@ void omap_hwmod_ocp_barrier(struct omap_hwmod *oh)
+ int omap_hwmod_reset(struct omap_hwmod *oh)
+ {
+ 	int r;
++	unsigned long flags;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	r = _reset(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return r;
+ }
+@@ -2005,13 +2010,15 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
+  */
+ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ {
++	unsigned long flags;
++
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	_enable_wakeup(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -2030,13 +2037,15 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+  */
+ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ {
++	unsigned long flags;
++
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	_disable_wakeup(oh);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -2056,13 +2065,14 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ int omap_hwmod_assert_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+ 	int ret;
++	unsigned long flags;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	ret = _assert_hardreset(oh, name);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
  	return ret;
  }
+@@ -2082,13 +2092,14 @@ int omap_hwmod_assert_hardreset(struct omap_hwmod *oh, const char *name)
+ int omap_hwmod_deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+ 	int ret;
++	unsigned long flags;
  
-+/**
-+ * omap_hwmod_set_postsetup_state - set the post-_setup() state for this hwmod
-+ * @oh: struct omap_hwmod *
-+ * @state: state that _setup() should leave the hwmod in
-+ *
-+ * Sets the hwmod state that @oh will enter at the end of _setup() (called by
-+ * omap_hwmod_late_init()).  Only valid to call between calls to
-+ * omap_hwmod_init() and omap_hwmod_late_init().  Returns 0 upon success or
-+ * -EINVAL if there is a problem with the arguments or if the hwmod is
-+ * in the wrong state.
-+ */
-+int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state)
-+{
-+	int ret;
-+
-+	if (!oh)
-+		return -EINVAL;
-+
-+	if (state != _HWMOD_STATE_DISABLED &&
-+	    state != _HWMOD_STATE_ENABLED &&
-+	    state != _HWMOD_STATE_IDLE)
-+		return -EINVAL;
-+
-+	mutex_lock(&oh->_mutex);
-+
-+	if (oh->_state != _HWMOD_STATE_REGISTERED) {
-+		ret = -EINVAL;
-+		goto ohsps_unlock;
-+	}
-+
-+	oh->_postsetup_state = state;
-+	ret = 0;
-+
-+ohsps_unlock:
-+	mutex_unlock(&oh->_mutex);
-+
-+	return ret;
-+}
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	ret = _deassert_hardreset(oh, name);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return ret;
+ }
+@@ -2107,13 +2118,14 @@ int omap_hwmod_deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+ 	int ret;
++	unsigned long flags;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 	ret = _read_hardreset(oh, name);
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return ret;
+ }
+@@ -2181,6 +2193,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
+ int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state)
+ {
+ 	int ret;
++	unsigned long flags;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+@@ -2190,7 +2203,7 @@ int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state)
+ 	    state != _HWMOD_STATE_IDLE)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&oh->_mutex);
++	spin_lock_irqsave(&oh->_lock, flags);
+ 
+ 	if (oh->_state != _HWMOD_STATE_REGISTERED) {
+ 		ret = -EINVAL;
+@@ -2201,7 +2214,7 @@ int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state)
+ 	ret = 0;
+ 
+ ohsps_unlock:
+-	mutex_unlock(&oh->_mutex);
++	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return ret;
+ }
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index becf0e3..1be0031 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -105,21 +105,16 @@ struct omap_uart_state {
+ static LIST_HEAD(uart_list);
+ static u8 num_uarts;
+ 
+-/*
+- * Since these idle/enable hooks are used in the idle path itself
+- * which has interrupts disabled, use the non-locking versions of
+- * the hwmod enable/disable functions.
+- */
+ static int uart_idle_hwmod(struct omap_device *od)
+ {
+-	_omap_hwmod_idle(od->hwmods[0]);
++	omap_hwmod_idle(od->hwmods[0]);
+ 
+ 	return 0;
+ }
+ 
+ static int uart_enable_hwmod(struct omap_device *od)
+ {
+-	_omap_hwmod_enable(od->hwmods[0]);
++	omap_hwmod_enable(od->hwmods[0]);
+ 
+ 	return 0;
+ }
 diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index d1f1265..b445ecd 100644
+index e4c4fd4..b588f47 100644
 --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
 +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -462,6 +462,7 @@ struct omap_hwmod_class {
-  * @response_lat: device OCP response latency (in interface clock cycles)
-  * @_int_flags: internal-use hwmod flags
-  * @_state: internal-use hwmod state
-+ * @_postsetup_state: internal-use state to leave the hwmod in after _setup()
+@@ -32,7 +32,7 @@
+ #include <linux/kernel.h>
+ #include <linux/list.h>
+ #include <linux/ioport.h>
+-#include <linux/mutex.h>
++#include <linux/spinlock.h>
+ #include <plat/cpu.h>
+ 
+ struct omap_device;
+@@ -472,7 +472,7 @@ struct omap_hwmod_class {
+  * @_postsetup_state: internal-use state to leave the hwmod in after _setup()
   * @flags: hwmod flags (documented below)
   * @omap_chip: OMAP chips this hwmod is present on
-  * @_mutex: mutex serializing operations on this hwmod
-@@ -510,6 +511,7 @@ struct omap_hwmod {
- 	u8				hwmods_cnt;
- 	u8				_int_flags;
- 	u8				_state;
-+	u8				_postsetup_state;
- 	const struct omap_chip_id	omap_chip;
- };
- 
-@@ -519,7 +521,7 @@ int omap_hwmod_unregister(struct omap_hwmod *oh);
- struct omap_hwmod *omap_hwmod_lookup(const char *name);
- int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
- 			void *data);
--int omap_hwmod_late_init(u8 skip_setup_idle);
-+int omap_hwmod_late_init(void);
- 
- int omap_hwmod_enable(struct omap_hwmod *oh);
- int _omap_hwmod_enable(struct omap_hwmod *oh);
-@@ -566,6 +568,8 @@ int omap_hwmod_for_each_by_class(const char *classname,
- 					   void *user),
- 				 void *user);
- 
-+int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
-+
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
+- * @_mutex: mutex serializing operations on this hwmod
++ * @_lock: spinlock serializing operations on this hwmod
+  * @node: list node for hwmod list (internal use)
+  *
+  * @main_clk refers to this module's "main clock," which for our
+@@ -502,7 +502,7 @@ struct omap_hwmod {
+ 	void				*dev_attr;
+ 	u32				_sysc_cache;
+ 	void __iomem			*_mpu_rt_va;
+-	struct mutex			_mutex;
++	spinlock_t			_lock;
+ 	struct list_head		node;
+ 	u16				flags;
+ 	u8				_mpu_port_index;
