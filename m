@@ -1,155 +1,25 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 16 Nov 2010 10:00:53 +0100
-Subject: [PATCH 3/5] ARM: perf: add _init() functions to PMUs
-In-Reply-To: <1289842263-21241-4-git-send-email-will.deacon@arm.com>
-References: <1289842263-21241-1-git-send-email-will.deacon@arm.com>
-	<1289842263-21241-4-git-send-email-will.deacon@arm.com>
-Message-ID: <AANLkTi=21oVvV0wiWBjipx1jOxPysEoEMTLhsqFtX3kC@mail.gmail.com>
+From: pma@sysgo.com (Pavel Machek)
+Date: Tue, 16 Nov 2010 10:07:05 +0100
+Subject: suspicious code in linux/arch/arm/common/sa1111.c
+Message-ID: <20101116090705.GA29337@pma.sysgo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 6:31 PM, Will Deacon <will.deacon@arm.com> wrote:
-> In preparation for separating the PMU-specific code, this patch adds
-> self-contained init functions to each PMU, therefore removing any
-> PMU-specific knowledge from the PMU-agnostic init_hw_perf_events
-> function.
->
-> Cc: Jamie Iles <jamie.iles@picochip.com>
-> Cc: Jean Pihet <jean.pihet@newoldbits.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> ?arch/arm/kernel/perf_event.c | ? 65 +++++++++++++++++++++++++++++-------------
-> ?1 files changed, 45 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 35319b8..acc4e91 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -1240,6 +1240,11 @@ static const struct arm_pmu armv6pmu = {
-> ? ? ? ?.max_period ? ? ? ? ? ? = (1LLU << 32) - 1,
-> ?};
->
-> +const struct arm_pmu *__init armv6pmu_init(void)
-> +{
-> + ? ? ? return &armv6pmu;
-> +}
-> +
-> ?/*
-> ?* ARMv6mpcore is almost identical to single core ARMv6 with the exception
-> ?* that some of the events have different enumerations and that there is no
-> @@ -1264,6 +1269,11 @@ static const struct arm_pmu armv6mpcore_pmu = {
-> ? ? ? ?.max_period ? ? ? ? ? ? = (1LLU << 32) - 1,
-> ?};
->
-> +const struct arm_pmu *__init armv6mpcore_pmu_init(void)
-> +{
-> + ? ? ? return &armv6mpcore_pmu;
-> +}
-> +
-> ?/*
-> ?* ARMv7 Cortex-A8 and Cortex-A9 Performance Events handling code.
-> ?*
-> @@ -2136,6 +2146,25 @@ static u32 __init armv7_reset_read_pmnc(void)
-> ? ? ? ?return nb_cnt + 1;
-> ?}
->
-> +const struct arm_pmu *__init armv7_a8_pmu_init(void)
-> +{
-> + ? ? ? armv7pmu.id ? ? ? ? ? ? = ARM_PERF_PMU_ID_CA8;
-> + ? ? ? armv7pmu.cache_map ? ? ?= &armv7_a8_perf_cache_map;
-> + ? ? ? armv7pmu.event_map ? ? ?= &armv7_a8_perf_map;
-> + ? ? ? armv7pmu.num_events ? ? = armv7_reset_read_pmnc();
-> + ? ? ? return &armv7pmu;
-> +}
-> +
-> +const struct arm_pmu *__init armv7_a9_pmu_init(void)
-> +{
-> + ? ? ? armv7pmu.id ? ? ? ? ? ? = ARM_PERF_PMU_ID_CA9;
-> + ? ? ? armv7pmu.cache_map ? ? ?= &armv7_a9_perf_cache_map;
-> + ? ? ? armv7pmu.event_map ? ? ?= &armv7_a9_perf_map;
-> + ? ? ? armv7pmu.num_events ? ? = armv7_reset_read_pmnc();
-> + ? ? ? return &armv7pmu;
-> +}
-> +
-> +
-> ?/*
-> ?* ARMv5 [xscale] Performance counter handling code.
-> ?*
-> @@ -2564,6 +2593,11 @@ static const struct arm_pmu xscale1pmu = {
-> ? ? ? ?.max_period ? ? = (1LLU << 32) - 1,
-> ?};
->
-> +const struct arm_pmu *__init xscale1pmu_init(void)
-> +{
-> + ? ? ? return &xscale1pmu;
-> +}
-> +
-> ?#define XSCALE2_OVERFLOWED_MASK ? ? ? ?0x01f
-> ?#define XSCALE2_CCOUNT_OVERFLOW ? ? ? ?0x001
-> ?#define XSCALE2_COUNT0_OVERFLOW ? ? ? ?0x002
-> @@ -2920,6 +2954,11 @@ static const struct arm_pmu xscale2pmu = {
-> ? ? ? ?.max_period ? ? = (1LLU << 32) - 1,
-> ?};
->
-> +const struct arm_pmu *__init xscale2pmu_init(void)
-> +{
-> + ? ? ? return &xscale2pmu;
-> +}
-> +
-> ?static int __init
-> ?init_hw_perf_events(void)
-> ?{
-> @@ -2933,30 +2972,16 @@ init_hw_perf_events(void)
-> ? ? ? ? ? ? ? ?case 0xB360: ? ?/* ARM1136 */
-> ? ? ? ? ? ? ? ?case 0xB560: ? ?/* ARM1156 */
-> ? ? ? ? ? ? ? ?case 0xB760: ? ?/* ARM1176 */
-> - ? ? ? ? ? ? ? ? ? ? ? armpmu = &armv6pmu;
-> + ? ? ? ? ? ? ? ? ? ? ? armpmu = armv6pmu_init();
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?case 0xB020: ? ?/* ARM11mpcore */
-> - ? ? ? ? ? ? ? ? ? ? ? armpmu = &armv6mpcore_pmu;
-> + ? ? ? ? ? ? ? ? ? ? ? armpmu = armv6mpcore_pmu_init();
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?case 0xC080: ? ?/* Cortex-A8 */
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.id = ARM_PERF_PMU_ID_CA8;
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.cache_map = &armv7_a8_perf_cache_map;
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.event_map = &armv7_a8_perf_map;
-> - ? ? ? ? ? ? ? ? ? ? ? armpmu = &armv7pmu;
-> -
-> - ? ? ? ? ? ? ? ? ? ? ? /* Reset PMNC and read the nb of CNTx counters
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? supported */
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.num_events = armv7_reset_read_pmnc();
-> + ? ? ? ? ? ? ? ? ? ? ? armpmu = armv7_a8_pmu_init();
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?case 0xC090: ? ?/* Cortex-A9 */
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.id = ARM_PERF_PMU_ID_CA9;
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.cache_map = &armv7_a9_perf_cache_map;
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.event_map = &armv7_a9_perf_map;
-> - ? ? ? ? ? ? ? ? ? ? ? armpmu = &armv7pmu;
-> -
-> - ? ? ? ? ? ? ? ? ? ? ? /* Reset PMNC and read the nb of CNTx counters
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? supported */
-> - ? ? ? ? ? ? ? ? ? ? ? armv7pmu.num_events = armv7_reset_read_pmnc();
-> + ? ? ? ? ? ? ? ? ? ? ? armpmu = armv7_a9_pmu_init();
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?/* Intel CPUs [xscale]. */
-> @@ -2964,10 +2989,10 @@ init_hw_perf_events(void)
-> ? ? ? ? ? ? ? ?part_number = (cpuid >> 13) & 0x7;
-> ? ? ? ? ? ? ? ?switch (part_number) {
-> ? ? ? ? ? ? ? ?case 1:
-> - ? ? ? ? ? ? ? ? ? ? ? armpmu = &xscale1pmu;
-> + ? ? ? ? ? ? ? ? ? ? ? armpmu = xscale1pmu_init();
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?case 2:
-> - ? ? ? ? ? ? ? ? ? ? ? armpmu = &xscale2pmu;
-> + ? ? ? ? ? ? ? ? ? ? ? armpmu = xscale2pmu_init();
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?}
-> --
-> 1.7.0.4
->
->
+Hi!
 
-Acked-by: Jean Pihet <j-pihet@ti.com>
+Is this good idea?
+
+Signed-off-by: Pavel Machek <pma@sysgo.com>
+
+diff -ur linux.ofic//arch/arm/common/sa1111.c linux/arch/arm/common/sa1111.c
+--- linux.ofic//arch/arm/common/sa1111.c	2010-10-17 20:31:13.000000000 +0200
++++ linux/arch/arm/common/sa1111.c	2010-11-05 10:44:17.000000000 +0100
+@@ -282,7 +312,7 @@
+ 	for (i = 0; i < 8; i++) {
+ 		sa1111_writel(ip0 ^ mask, mapbase + SA1111_INTPOL0);
+ 		sa1111_writel(ip0, mapbase + SA1111_INTPOL0);
+-		if (sa1111_readl(mapbase + SA1111_INTSTATCLR1) & mask)
++		if (sa1111_readl(mapbase + SA1111_INTSTATCLR0) & mask)
+ 			break;
+ 	}
+ 
