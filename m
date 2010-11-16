@@ -1,26 +1,45 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 16 Nov 2010 22:24:46 +0800
-Subject: [PATCH 01/11] ARM: pxa: redefine the cpu_is_pxa3xx
-In-Reply-To: <AANLkTi=nve_2yF5djAcVVx4SN-fhzjoHUs=+7zqxc7Y_@mail.gmail.com>
-References: <1289546260-6208-1-git-send-email-haojian.zhuang@marvell.com>
-	<AANLkTi=nve_2yF5djAcVVx4SN-fhzjoHUs=+7zqxc7Y_@mail.gmail.com>
-Message-ID: <AANLkTikxVZjKmrqg6euUUMfzNhh2dH9hVCAu1bH5R01a@mail.gmail.com>
+From: gregkh@suse.de (Greg KH)
+Date: Tue, 16 Nov 2010 06:09:47 -0800
+Subject: [PATCH TRIVIAL] AT91: usb: fix typo in atmel_usba_udc driver
+In-Reply-To: <alpine.LNX.2.00.1011161149460.7420@pobox.suse.cz>
+References: <1289902493-1821-1-git-send-email-josh.wu@atmel.com>
+	<alpine.LNX.2.00.1011161149460.7420@pobox.suse.cz>
+Message-ID: <20101116140947.GA15097@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 4:00 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Fri, Nov 12, 2010 at 3:17 PM, Haojian Zhuang
-> <haojian.zhuang@marvell.com> wrote:
->> PXA300/PXA310/PXA320/PXA930/PXA935 are sharing one cpu family id.
->> It's a little confusion on cpu_is_pxa3xx().
->>
->> Now reduce the scope of cpu_is_pxa3xx(). Make it focusing on
->> PXA300/PXA310/PXA320. PXA930/PXA935 is coverd by cpu_is_pxa93x().
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Cc: Eric Miao <eric.y.miao@gmail.com>
->
-> Applied.
->
+On Tue, Nov 16, 2010 at 11:51:32AM +0100, Jiri Kosina wrote:
+> On Tue, 16 Nov 2010, Josh Wu wrote:
+> 
+> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > ---
+> > fix against 2.6.37-rc1
+> > 
+> >  drivers/usb/gadget/atmel_usba_udc.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+> > index b5e20e8..717ff65 100644
+> > --- a/drivers/usb/gadget/atmel_usba_udc.c
+> > +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> > @@ -2017,7 +2017,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+> >  			}
+> >  		} else {
+> >  			/* gpio_request fail so use -EINVAL for gpio_is_valid */
+> > -			ubc->vbus_pin = -EINVAL;
+> > +			udc->vbus_pin = -EINVAL;
+> >  		}
+> >  	}
+> >  
+> 
+> As this is a compile fix (for bug introduced by 969affff547027), I am 
+> adding Greg and linux-usb@ to CC. I usually don't push trivial changes 
+> more than once per release, but this needs to go in faster.
+> 
+> Greg, could you please take it?
 
-Dropped as we discussed. Waiting for your new submission.
+Yes, I will take it.
+
+thanks,
+
+greg k-h
