@@ -1,54 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Nov 2010 09:19:22 +0000
-Subject: [PATCH v2 03/20] ARM: LPAE: use u32 instead of unsigned long for
-	32-bit ptes
-In-Reply-To: <alpine.LFD.2.00.1011151707310.6448@xanadu.home>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<20101114151445.GB10871@n2100.arm.linux.org.uk>
-	<AANLkTinuUCYMa8e7=ehhExFzBAhPZBKA16M1GVQ=RMMH@mail.gmail.com>
-	<201011151047.37103.arnd@arndb.de>
-	<AANLkTi=FFpCwEhSgs-zOh32JQvqQWqnaQVTitwJeDyzj@mail.gmail.com>
-	<alpine.LFD.2.00.1011151707310.6448@xanadu.home>
-Message-ID: <AANLkTikJvcpECTpRU-JA2YX8QFYPHV7PMkN5w49ji2TH@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 16 Nov 2010 18:20:05 +0900
+Subject: [PATCH 1/2] ARM: S3C2410: H1940: Adapt h1940-bluetooth to gpiolib
+	changes
+In-Reply-To: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
+References: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <010b01cb856f$77c05ab0$67411010$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2010 22:11, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Mon, 15 Nov 2010, Catalin Marinas wrote:
->
->> On 15 November 2010 09:47, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 15 November 2010 10:39:30 Catalin Marinas wrote:
->> >> > There will be compiler warnings because u32 is unsigned int, and we
->> >> > print it as %08lx. ?Generic code cases pte values to (long long) and
->> >> > prints them using %08llx. ?We should do the same.
->> >>
->> >> We still need some kind of macro because with LPAE we need %016llx
->> >> since the phys address can go to 40-bit and there are some additional
->> >> bits in the top word. Unless you'd like to always print 16 characters
->> >> even for 32-bit ptes (or if there is some other printk magic I'm not
->> >> aware of).
->> >
->> > Why not just %010llx? That would just be two extra characters.
->>
->> We still have attributes (like XN, bit 54) stored in the top part of
->> the pte. This may be of interest when debugging.
->
-> They will be printed if they exist. The %010 in front of llx only means
-> to have a minimum of 10 zero-paded digits if the value is smaller than
-> that.
->
-> However, not having aligned values will be confusing. ?A macro for the
-> format might be the best compromize.
+Vasily Khoruzhick wrote:
+> 
+> Replace in s3c_gpio_cfgpull with s3c_gpio_setpull.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  arch/arm/mach-s3c2410/h1940-bluetooth.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2410/h1940-bluetooth.c b/arch/arm/mach-
+> s3c2410/h1940-bluetooth.c
+> index 8aa2f19..6b86a72 100644
+> --- a/arch/arm/mach-s3c2410/h1940-bluetooth.c
+> +++ b/arch/arm/mach-s3c2410/h1940-bluetooth.c
+> @@ -77,13 +77,13 @@ static int __devinit h1940bt_probe(struct
+platform_device
+> *pdev)
+> 
+>  	/* Configures BT serial port GPIOs */
+>  	s3c_gpio_cfgpin(S3C2410_GPH(0), S3C2410_GPH0_nCTS0);
+> -	s3c_gpio_cfgpull(S3C2410_GPH(0), S3C_GPIO_PULL_NONE);
+> +	s3c_gpio_setpull(S3C2410_GPH(0), S3C_GPIO_PULL_NONE);
+>  	s3c_gpio_cfgpin(S3C2410_GPH(1), S3C2410_GPIO_OUTPUT);
+> -	s3c_gpio_cfgpull(S3C2410_GPH(1), S3C_GPIO_PULL_NONE);
+> +	s3c_gpio_setpull(S3C2410_GPH(1), S3C_GPIO_PULL_NONE);
+>  	s3c_gpio_cfgpin(S3C2410_GPH(2), S3C2410_GPH2_TXD0);
+> -	s3c_gpio_cfgpull(S3C2410_GPH(2), S3C_GPIO_PULL_NONE);
+> +	s3c_gpio_setpull(S3C2410_GPH(2), S3C_GPIO_PULL_NONE);
+>  	s3c_gpio_cfgpin(S3C2410_GPH(3), S3C2410_GPH3_RXD0);
+> -	s3c_gpio_cfgpull(S3C2410_GPH(3), S3C_GPIO_PULL_NONE);
+> +	s3c_gpio_setpull(S3C2410_GPH(3), S3C_GPIO_PULL_NONE);
+> 
+> 
+>  	rfk = rfkill_alloc(DRV_NAME, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
+> --
 
-We thought about using something like
+You're right..will apply.
 
-printk("%0*llx", sizeof(pteval_t) * 2, (long long)pte_val(pte));
+Thanks.
 
-but it complicates the code.
-
-Anyway, since these are printed for debugging mainline, we can
-probably cope with some lack of alignment (as Russell said, there may
-not be any where it matters).
-
--- 
-Catalin
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
