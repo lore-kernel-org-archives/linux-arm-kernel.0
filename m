@@ -1,21 +1,39 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Tue, 16 Nov 2010 12:17:32 +0100
-Subject: clock enable for i.mx35 pwm
-Message-ID: <201011161217.57831.alexander.stein@systec-electronic.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 16 Nov 2010 11:34:09 +0000
+Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
+In-Reply-To: <AANLkTi=utWumLKo9QVWXpkC8WxpgaNJJs+dj=pa2eq-q@mail.gmail.com>
+References: <1289848334-8695-1-git-send-email-cyril@ti.com>
+	<1289848334-8695-5-git-send-email-cyril@ti.com>
+	<20101116072225.GF4074@angua.secretlab.ca>
+	<AANLkTi=utWumLKo9QVWXpkC8WxpgaNJJs+dj=pa2eq-q@mail.gmail.com>
+Message-ID: <20101116113409.GH3338@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Nov 16, 2010 at 12:47:04AM -0700, Grant Likely wrote:
+> On Tue, Nov 16, 2010 at 12:22 AM, Grant Likely
 
-I tried to use the PWM for activating a beeper. I noticed I had to write twice 
-to the input device (pwm-beeper.c) to get a sound. I noticed the clock is 
-enabled after the PWM is configured (or should be configured). So it seems 
-while the clock is disabled, you can't program the PWM unit. So on pwm_request 
-the clock should be enabled immediately and on pwm_enable the MX3_PWMCR_EN bit 
-should be set (at least for i.mx > 2.1). No idea how to do that in the "older" 
-variants.
+> > Instead, it is now incumbent on the board support code to ensure that
+> > any device that depends on another device (including i2c or spi
+> > regulators) will defer registration until the prerequisite devices are
+> > bound to drivers.
 
-Any opinions/fix about that?
+You did also say you were going to write helpers to make this easier - I
+do fear that we're going to end up with far too much boiler plate code
+in machine drivers if we have to open code this.  I guess device tree is
+going to need the helpers anyway :)
 
-Best regards,
-Alexander
+> > I don't *think* this change will affect anything in this particular
+> > patch series, but if it does then let me know and I'll help you work out
+> > how to fix it using a bus notifier.
+
+> Oh, wait, spoke too soon.  You do add a regulator in this series, so
+> this change will require a fixup.  The solution is to register an
+> bus_notifier to the spi bus type before you start registering devices.
+
+> It also requires deferring the musb_hdrc.1 and tps6116x registrations
+> until the bus_notifier callback gets called with an indication that
+> the regulator is bound.  It will look something like this:
+
+Did you come up with a way of handling situations like cpufreq where we
+have no device to wait for?
