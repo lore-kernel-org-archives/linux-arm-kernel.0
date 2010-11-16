@@ -1,8 +1,8 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Nov 2010 13:13:37 +0000
-Subject: [PATCH] ARM: mxc: Correct data alignment in headsmp.S for
+Date: Tue, 16 Nov 2010 13:14:01 +0000
+Subject: [PATCH] ARM: RealView: Correct data alignment in headsmp.S for
 	CONFIG_THUMB2_KERNEL
-Message-ID: <1289913217-8672-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1289913241-8722-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,22 +35,22 @@ data word declaration directives inside code sections:
 Applies cleanly on v2.6.37-rc1.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/plat-mxc/ssi-fiq.S |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-realview/headsmp.S |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/plat-mxc/ssi-fiq.S
-index 4ddce56..8397a2d 100644
---- a/arch/arm/plat-mxc/ssi-fiq.S
-+++ b/arch/arm/plat-mxc/ssi-fiq.S
-@@ -124,6 +124,8 @@ imx_ssi_fiq_start:
- 1:
- 		@ return from FIQ
- 		subs	pc, lr, #4
-+
-+		.align
- imx_ssi_fiq_base:
- 		.word 0x0
- imx_ssi_fiq_rx_buffer:
+diff --git a/arch/arm/mach-realview/headsmp.S b/arch/arm/mach-realview/headsmp.S
+index 4075473..b34be45 100644
+--- a/arch/arm/mach-realview/headsmp.S
++++ b/arch/arm/mach-realview/headsmp.S
+@@ -35,5 +35,6 @@ pen:	ldr	r7, [r6]
+ 	 */
+ 	b	secondary_startup
+ 
++	.align
+ 1:	.long	.
+ 	.long	pen_release
 -- 
 1.7.1
