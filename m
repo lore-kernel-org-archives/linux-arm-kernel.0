@@ -1,47 +1,65 @@
-From: matts@commtech-fastcom.com (Matt Schulte)
-Date: Tue, 16 Nov 2010 12:41:14 -0600
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <ibubf5$ev$1@dough.gmane.org>
-References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<4CBD8EE4.5040808@evidence.eu.com> <i9ka0s$4ua$1@dough.gmane.org>
-	<201010191727.53314.alexander.stein@systec-electronic.com>
-	<i9kk4o$svc$1@dough.gmane.org> <4CC418A9.6090602@evidence.eu.com>
-	<4CDA630F.4060903@atmel.com> <20101110172842.GC12371@suse.de>
-	<4CDBC3EC.6020707@evidence.eu.com> <20101116143016.GB6527@ucw.cz>
-	<AANLkTi=grehSnfWzCDtSXXmNb=-NAwbHHJ_P1XPyOuw8@mail.gmail.com>
-	<ibubf5$ev$1@dough.gmane.org>
-Message-ID: <AANLkTimio1aBh5w616eSikW+dujV-G8_pu-AT=B5e-7Y@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 16 Nov 2010 10:49:15 -0800
+Subject: [PATCH] omap4: enable L2 prefetching
+In-Reply-To: <1289838044-32016-1-git-send-email-nm@ti.com> (Nishanth Menon's
+	message of "Mon, 15 Nov 2010 10:20:44 -0600")
+References: <1289838044-32016-1-git-send-email-nm@ti.com>
+Message-ID: <878w0tf6j8.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 10:28 AM, Grant Edwards
-<grant.b.edwards@gmail.com> wrote:
-> On 2010-11-16, Matt Schulte <matts@commtech-fastcom.com> wrote:
->> On Tue, Nov 16, 2010 at 8:30 AM, Pavel Machek <pavel@ucw.cz> wrote:
->>> Hi!
->>>
->>>> Documentation about RS485 serial communications
->>>
->>> I have seen hardware (kontron pmc-6l) that was capable of switching
->>> between RS232, RS485 and one other standard by software.
->>>
->>> Is such hw common? If so, should we have standard interface?
->>
->> In my opinion this type of card is not that common. ?Generally
->> speaking the achievable baud rates for this type of multi-protocol
->> card are very limited because of limitations of the transceiver chips.
->
-> I'm curious which selectable interface cards you're talking about that
-> are slow? ?The ones I'm familiar with generally support baud rates up
-> to either 460K bps or 921K bps
->
->> It seems that most of the time people would rather have a faster
->> serial port than one that does several different voltages.
->
-> Where did you find a selectable interface serial card that couldn't
-> support high baud rates?
+Nishanth Menon <nm@ti.com> writes:
 
-In my world 460kbps for an RS422 card is slow.  RS422 cards generally
-push multi megabit/s rates.
+> From: Mans Rullgard <mans@mansr.com>
+>
+> Enabling L2 prefetching improves performance as shown on Panda
+> ES2.1 board with mem test, and it has measurable impact on
+> performances. I think we should consider it, even though it damages
+> "writes" a bit. (rebased to k.org)
+> Usually the prefetch is used at both levels together L1 + L2, however,
+> to enable the CP15 prefetch engines, these are under security, and on
+> GP devices, we cannot enable it(e.g. on PandaBoard). However, just
+> enabling PL310 prefetch seems to provide performance improvement,
+> as shown in the data below (from Ubuntu) and would be a great thing
+> to pull in.
 
-Matt Schulte
+[...]
+
+>  arch/arm/mach-omap2/omap4-common.c |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> index 2f89555..a5e6126 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -64,6 +64,10 @@ static int __init omap_l2_cache_init(void)
+>  	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
+>  	BUG_ON(!l2cache_base);
+>  
+>
+> +	if (omap_rev() != OMAP4430_REV_ES1_0)
+> +		omap_smc1(0x109, 0x7e470000);
+>
+>  	/* Enable PL310 L2 Cache controller */
+>  	omap_smc1(0x102, 0x1);
+>  
+> @@ -75,7 +79,7 @@ static int __init omap_l2_cache_init(void)
+>  	if (omap_rev() == OMAP4430_REV_ES1_0)
+>  		l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
+>  	else
+> -		l2x0_init(l2cache_base, 0x0e070000, 0xc0000fff);
+> +		l2x0_init(l2cache_base, 0x7e470000, 0xc0000fff);
+>  
+>  	/*
+>  	 * Override default outer_cache.disable with a OMAP4
+
+Adding/updaing the in-code comments would be helpful as well.
+
+The exiting use of all the hard-coded constants in this code is rather
+unreadable and would be much more readable with symbolic constants, and
+this change just continues the pattern.
+
+Ideally, switching this code to use symbolic constants and then adding
+the new feature would be a cleaner approach.
+
+Kevin
