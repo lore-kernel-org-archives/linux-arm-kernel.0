@@ -1,69 +1,86 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 16 Nov 2010 03:18:01 -0700
-Subject: [PATCH 0/8] OMAP2+: hwmod core upgrades for 2.6.38: first set
-Message-ID: <20101116101615.22777.49212.stgit@twilight.localdomain>
+Date: Tue, 16 Nov 2010 03:18:06 -0700
+Subject: [PATCH 2/8] OMAP2+: hwmod: allow custom pre-shutdown functions
+In-Reply-To: <20101116101615.22777.49212.stgit@twilight.localdomain>
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+Message-ID: <20101116101805.22777.70795.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains upgrades for the OMAP2+ hwmod core
-code, intended for 2.6.38.  Most of these patches were developed
-in response to use-cases discovered while converting device
-drivers to use the hwmod code.
+Some OMAP IP blocks, such as the watchdog timers, cannot be completely
+shut down via the standard hwmod shutdown mechanism.  This patch
+enables the hwmod data files to supply a pointer to a custom
+pre-shutdown function via the struct omap_hwmod_class.pre_shutdown
+function pointer.  If the struct omap_hwmod_class.pre_shutdown
+function pointer is non-null, the function will be executed before the
+existing hwmod shutdown code runs.
 
-Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c             |   15 +++++++++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   10 ++++++++++
+ 2 files changed, 25 insertions(+), 0 deletions(-)
 
-hwmod_a_2.6.38
-   text	   data	    bss	    dec	    hex	filename
-5708416	 472960	5608992	11790368 b3e820	vmlinux.omap2plus_defconfig.orig
-5709076	 470560	5608992	11788628 b3e154	vmlinux.omap2plus_defconfig.patched
-
-Paul Walmsley (7):
-      OMAP2+: io: split omap2_init_common_hw()
-      OMAP2+: hwmod: allow custom pre-shutdown functions
-      OMAP2+: hwmod: add postsetup state
-      OMAP2+: hwmod: add support for per-class custom device reset functions
-      OMAP2+: hwmod: rename omap_hwmod_mutex to _hwmod_list_mutex
-      OMAP2+: hwmod: upgrade per-hwmod mutex to a spinlock
-      OMAP2+: hwmod: fix a warning, add some docs, remove unused fields
-
-Rajendra Nayak (1):
-      OMAP2+: hwmod: Update the sysc_cache in case module context is lost
-
-
- arch/arm/mach-omap2/board-2430sdp.c          |    3 
- arch/arm/mach-omap2/board-3430sdp.c          |    3 
- arch/arm/mach-omap2/board-3630sdp.c          |    5 
- arch/arm/mach-omap2/board-4430sdp.c          |    3 
- arch/arm/mach-omap2/board-am3517evm.c        |    4 
- arch/arm/mach-omap2/board-apollon.c          |    3 
- arch/arm/mach-omap2/board-cm-t35.c           |    3 
- arch/arm/mach-omap2/board-cm-t3517.c         |    3 
- arch/arm/mach-omap2/board-devkit8000.c       |    5 
- arch/arm/mach-omap2/board-generic.c          |    3 
- arch/arm/mach-omap2/board-h4.c               |    3 
- arch/arm/mach-omap2/board-igep0020.c         |    4 
- arch/arm/mach-omap2/board-igep0030.c         |    4 
- arch/arm/mach-omap2/board-ldp.c              |    3 
- arch/arm/mach-omap2/board-n8x0.c             |    3 
- arch/arm/mach-omap2/board-omap3beagle.c      |    5 
- arch/arm/mach-omap2/board-omap3evm.c         |    3 
- arch/arm/mach-omap2/board-omap3logic.c       |    3 
- arch/arm/mach-omap2/board-omap3pandora.c     |    5 
- arch/arm/mach-omap2/board-omap3stalker.c     |    3 
- arch/arm/mach-omap2/board-omap3touchbook.c   |    5 
- arch/arm/mach-omap2/board-omap4panda.c       |    3 
- arch/arm/mach-omap2/board-overo.c            |    5 
- arch/arm/mach-omap2/board-rx51.c             |    3 
- arch/arm/mach-omap2/board-zoom.c             |    9 -
- arch/arm/mach-omap2/io.c                     |   32 ++-
- arch/arm/mach-omap2/omap_hwmod.c             |  264 ++++++++++++++++++--------
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    2 
- arch/arm/mach-omap2/serial.c                 |    9 -
- arch/arm/plat-omap/include/plat/io.h         |    5 
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   47 +++--
- 31 files changed, 302 insertions(+), 153 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 5a30658..c051fa4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1261,6 +1261,9 @@ int _omap_hwmod_idle(struct omap_hwmod *oh)
+  */
+ static int _shutdown(struct omap_hwmod *oh)
+ {
++	int ret;
++	u8 prev_state;
++
+ 	if (oh->_state != _HWMOD_STATE_IDLE &&
+ 	    oh->_state != _HWMOD_STATE_ENABLED) {
+ 		WARN(1, "omap_hwmod: %s: disabled state can only be entered "
+@@ -1270,6 +1273,18 @@ static int _shutdown(struct omap_hwmod *oh)
+ 
+ 	pr_debug("omap_hwmod: %s: disabling\n", oh->name);
+ 
++	if (oh->class->pre_shutdown) {
++		prev_state = oh->_state;
++		if (oh->_state == _HWMOD_STATE_IDLE)
++			_omap_hwmod_enable(oh);
++		ret = oh->class->pre_shutdown(oh);
++		if (ret) {
++			if (prev_state == _HWMOD_STATE_IDLE)
++				_omap_hwmod_idle(oh);
++			return ret;
++		}
++	}
++
+ 	if (oh->class->sysc)
+ 		_shutdown_sysc(oh);
+ 
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 7eaa8ed..d1f1265 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -415,14 +415,24 @@ struct omap_hwmod_omap4_prcm {
+  * @name: name of the hwmod_class
+  * @sysc: device SYSCONFIG/SYSSTATUS register data
+  * @rev: revision of the IP class
++ * @pre_shutdown: ptr to fn to be executed immediately prior to device shutdown
+  *
+  * Represent the class of a OMAP hardware "modules" (e.g. timer,
+  * smartreflex, gpio, uart...)
++ *
++ * @pre_shutdown is a function that will be run immediately before
++ * hwmod clocks are disabled, etc.  It is intended for use for hwmods
++ * like the MPU watchdog, which cannot be disabled with the standard
++ * omap_hwmod_shutdown().  The function should return 0 upon success,
++ * or some negative error upon failure.  Returning an error will cause
++ * omap_hwmod_shutdown() to abort the device shutdown and return an
++ * error.
+  */
+ struct omap_hwmod_class {
+ 	const char				*name;
+ 	struct omap_hwmod_class_sysconfig	*sysc;
+ 	u32					rev;
++	int					(*pre_shutdown)(struct omap_hwmod *oh);
+ };
+ 
+ /**
