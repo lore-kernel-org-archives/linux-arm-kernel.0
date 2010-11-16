@@ -1,8 +1,8 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Nov 2010 13:14:01 +0000
-Subject: [PATCH] ARM: RealView: Correct data alignment in headsmp.S for
+Date: Tue, 16 Nov 2010 13:14:20 +0000
+Subject: [PATCH] ARM: s5pv310: Correct data alignment in headsmp.S for
 	CONFIG_THUMB2_KERNEL
-Message-ID: <1289913241-8722-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1289913260-8772-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,17 +35,15 @@ data word declaration directives inside code sections:
 Applies cleanly on v2.6.37-rc1.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-realview/headsmp.S |    1 +
+ arch/arm/mach-s5pv310/headsmp.S |    1 +
  1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-realview/headsmp.S b/arch/arm/mach-realview/headsmp.S
-index 4075473..b34be45 100644
---- a/arch/arm/mach-realview/headsmp.S
-+++ b/arch/arm/mach-realview/headsmp.S
-@@ -35,5 +35,6 @@ pen:	ldr	r7, [r6]
+diff --git a/arch/arm/mach-s5pv310/headsmp.S b/arch/arm/mach-s5pv310/headsmp.S
+index 164b7b0..65f8574 100644
+--- a/arch/arm/mach-s5pv310/headsmp.S
++++ b/arch/arm/mach-s5pv310/headsmp.S
+@@ -37,5 +37,6 @@ pen:	ldr	r7, [r6]
  	 */
  	b	secondary_startup
  
