@@ -1,34 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Nov 2010 17:16:44 +0100
-Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
-In-Reply-To: <201011161712.31703.arnd@arndb.de>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<F45880696056844FA6A73F415B568C6953604E7D94@EXDCVYMBSTM006.EQ1STM.local>
-	<201011161712.31703.arnd@arndb.de>
-Message-ID: <201011161716.44542.arnd@arndb.de>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 16 Nov 2010 11:15:56 -0500
+Subject: [PATCH v5 01/12] misc: add driver for sequencer serial port
+In-Reply-To: <20101116071047.GE4074@angua.secretlab.ca>
+References: <1289848334-8695-1-git-send-email-cyril@ti.com>
+	<1289848334-8695-2-git-send-email-cyril@ti.com>
+	<20101116071047.GE4074@angua.secretlab.ca>
+Message-ID: <4CE2AE3C.4040805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sent out too early...
-
-On Tuesday 16 November 2010, Arnd Bergmann wrote:
-> > > This looks a bit like you actually have multiple interrupt lines
-> > > multiplexed
-> > > through a private interrupt controller. Have you considered making this
-> > > controller
-> > > a separate device to multiplex the interrupt numbers?
-> > 
-> > MCDE contains several pipelines, each of them can generate interrupts.
-> > Since each interrupt comes from the same device there is no need for
-> > separate devices for interrupt controller.
+On 11/16/2010 02:10 AM, Grant Likely wrote:
+> On Mon, Nov 15, 2010 at 02:12:03PM -0500, Cyril Chemparathy wrote:
+>> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
+>> device.  It has a built-in programmable execution engine that can be programmed
+>> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
+>>
+>> This patch adds a driver for this controller device.  The driver does not
+>> expose a user-land interface.  Protocol drivers built on top of this layer are
+>> expected to remain in-kernel.
+>>
+[...]
+>> +static inline void ssp_write(struct ti_ssp *ssp, int reg, u32 val)
+>> +{
+>> +     __raw_writel(val, ssp->regs + reg);
+>> +}
 > 
-> Right, so this one and the one above is really a question of how to describe
-> a pipeline:
- 
-It may be good to have a source file that only deals with the pipelines
-and all that they have in common. If you use the same basic pipeline
-logic for doing multiple different things, this can be used to structure
-the code more logically. Not sure if this is worth trying, since it might
-not actually gain all that much in the end
+> I'm pretty sure it was resolved that __raw_ versions should not be
+> used here.
 
-	Arnd
+The endian-swap done by writel/readl are incorrect since these devices
+are meant to be accessed native-endian at all times.
+
+See [1] below for Russell King's earlier response on this.  In this
+case, I don't think memory-device ordering matters, and therefore the
+__raw_ variants should be ok.  Should I just insert barriers into the
+read/write wrappers here?
+
+[...]
+
+Regards
+Cyril.
+
+[1] http://kerneltrap.org/mailarchive/linux-kernel/2010/10/22/4636289
