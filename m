@@ -1,132 +1,171 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 16 Nov 2010 18:24:44 +0100
-Subject: [RFC][PATCH 00/11] ARM: imx: Add initial i.MX28 support
-In-Reply-To: <AANLkTim=ACL-PW-n0MWu_+KD8n19ttq_NfEnRzsMp6SU@mail.gmail.com>
-References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
-	<20101116101508.GK6017@pengutronix.de>
-	<AANLkTim=ACL-PW-n0MWu_+KD8n19ttq_NfEnRzsMp6SU@mail.gmail.com>
-Message-ID: <20101116172444.GS8942@pengutronix.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 16 Nov 2010 18:32:13 +0100
+Subject: [PATCH 5/8] OMAP2+: hwmod: rename omap_hwmod_mutex
+	to	_hwmod_list_mutex
+In-Reply-To: <20101116101808.22777.52852.stgit@twilight.localdomain>
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+	<20101116101808.22777.52852.stgit@twilight.localdomain>
+Message-ID: <4CE2C01D.8010703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+Hi Paul,
 
-On Tue, Nov 16, 2010 at 08:42:29PM +0800, Shawn Guo wrote:
-> On Tue, Nov 16, 2010 at 6:15 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > Hello Shawn,
-> >
-> > On Mon, Nov 15, 2010 at 10:36:24PM +0800, Shawn Guo wrote:
-> >> This patchset adds the initial support of i.MX28, and the target device
-> >> is i.MX28 EVK Rev C. It's based on the imx-single-kernel branch below,
-> >> and adding codes into arch/arm/mxc and arch/arm/mach-imx.
-> >
-> > Without further looking at the patch I agree with Uwe: The i.MX23/28
-> > are totally different from the other i.MX SoCs and should not be
-> > integrated in current i.MX support. And definitely it should not be
-> > integrated by adding cpu_is_* into each and every function.
-> >
-> cpu_is_* is not being added into each and every function. Uwe had this
-> comment on only two files, arch/arm/plat-mxc/gpio.c and
-I consider the irq handling very ugly, but I didn't feel like repeating
-the same argument gives much value.  (And OK, the irq handling was ugly
-already before, that's on my plate to evaluate.)  I didn't recheck where
-I thought the runtime checks were non-optimal, but seeing to much of
-them makes me feel that this is the wrong approach.  This is more a
-subjective thing and for that it's independant if there are one, two or
-five instances.
+Funny, I was about to send you a RFC to get rid of that mutex :-)
 
-> arch/arm/plat-mxc/time.c. As there are big percentage of
-> infrastructural common codes that are IP block independent, I though
-> it's good to use the same file.  But since you are not in this
-> position, I would propose another option. Like what I'm doing with
-> iomux-pinctrl, we can create arch/arm/plat-mxc/gpio-pinctrl.c and
-> arch/arm/plat-mxc/time-timrot.c for PINCTRL based gpio and TIMROT
-> based time implementation.
-> 
-> The philosophy behind this is we treat arch/arm/plat-mxc as the
-> Freescale IP block pool.  The driver in this folder is IP block
-> oriented other than SoC oriented.  And SoC is actually a collection of
-> IP blocks.  MX23/MX28 integrates PINCTRL, TIMROT, ICOLL, and
-> MX21/MX25/MX27/MX31/MX35/MX51 integrates GPIO/IOMUXC, GPT and
-> AVIC/TZIC.  Accordingly, MX23/MX28 builds gpio-pinctrl.c, timrot.c and
-> icoll.c in, and other i.MX builds gpio.c, iomux-v1//v2/v3,
-> avic.c/tzic.c in.  The only thing we need to deal with is picking up
-> the file name to stand for the IP block.
-For me (not having seen mx50) integrating mx28 into mach-imx seems
-wrong.  Currently they are completely orthogonal for the components that
-matter for architecture support (i.e. timer, irq handling, clocks, pin
-muxing, power management and to a slightly lesser degree gpio and memory
-mapping).
+Today that mutex is preventing us to be re-entrant during hwmod lookup 
+and for_each_by_class iteration, and we'd like to in order to manage 
+link between 2 hwmods.
 
-> > Now you have two choices: Add the code to plat-stmp3xxx (for the
-> > interested reader: the i.MX23/28 are based on former Sigmatel SoCs), or
-> > add a new mach-mxs like you did in the Freescale Kernel.
-> > I'm not sure which choice of these two is best. It would be good to get
-> > some other opinions from people who already had the situation that a
-> > vendor got sold and we get the same old metal with new names.
-> >
-> Yes, MX23/28 are based on former Sigmatel SoCs.  The imx-single-kernel
-> demonstrates the possibility of single image for different SoCs from
-> same vendor.  My patchset somehow adds the the possibility for SoCs
-> even from different vendors, even though I'm unsure if single image
-> for SoCs from different vendor is something ARM Kernel will possibly
-> go in the future?
-That's one of the goals of Linaro.  I'd prefer to get an
-"really-all-i.MX" image via this more global approach.
+The context is the link between mcbsp and sidetone on OMAP3. Since this 
+module are tightly coupled, I was suggesting to Kishon to add the 
+sidetone reference directly in the mcbsp hwmod in order to create a 
+omap_device that will handle the 2 hwmods at the same time.
 
-> The plat-stmp3xxx is not an option for me because of the Freescale
-> marketing concern.  For the choice of what Freescale Kernel is doing,
-I prefer technical arguments here.  Just because some guys in the
-marketing department consider giving similar names to completely
-different products *I* don't believe grouping them together in the
-source code makes more sense.  (It just reinforces my opinion about
-marketing guys :-)
+Since we are using the iteration to get all the hwmod that belongs to 
+the mcbsp class we cannot call the lookup function to get the sidetone 
+hwmod at that time.
+For the moment we need to do 2 iteration and use intermediate storage to 
+workaround that.
 
-> there is no mach-mxs.  Instead, there are arch/arm/plat-mxs,
-> arch/arm/mach-mx23 and arch/arm/mach-mx28.  Going this way, MX23/28
-> will be totally separated from i.MX family, though their name tells
-Adding mach-mx23, mach-mx28 and plat-mxs is (IMHO) too much.  mx23 and
-mx28 are similar enough to put both of the two into a single mach
-directory.  So seeing the naming choices Freescale did for their kernel
-mach-mxs looks reasonable to me.
+After checking the purpose of the mutex, I was wondering if this is 
+useful. For the moment the creation of the hwmod list is done only at 
+init time, and nothing is supposed to change that at runtime except the 
+unregister function.
 
-> the relationship with i.MX family.  Also, Freescale is merging the
-This wouldn't be worse than what we had before I merged mach-mx1 and
-mach-mx2 into mach-imx for 2.6.36: mach-mx1, mach-mx2, mach-mx25,
-mach-mx3 and mach-mx5.
+So I've started to get rid of this function, then of the mutex and I 
+added the __init to all these registration functions to avoid the usage 
+at runtime. It will save a little bit of memory as well.
 
-> Sigmatel IP pool into i.MX one and will only maintain the same pool.
-> In another words, Sigmatel IP block are getting consolidated with i.MX
-> ones. You can still say MX28 are former Sigmatel based, but it gets
-> i.MX IP blocks, FEC(ENET), FlexCAN integrated.  If MX28 is not so
-This is natural and OK.  But these components are no reason to put mx28
-into mach-imx.  The respective drivers live in drivers/net and
-drivers/net/can.  So at best they can share the imx_add_device_du_jour
-functions.  Here I'd suggest to make these functions available for all
-ARMs (or even all archs).
+Thanks to that we can now use the omap_hwmod_lookup inside the 
+omap_hwmod_for_each_by_class.
 
-> typical, MX50 can be the one.  It primarily derives from MX51/MX53 and
-> will go into plat-mxc and mach-mx5 in common understanding, but it
-Let's discuss that when you come up with mx50 patches :-)
+Does that make sense to you?
+I can send you the patches if you want.
 
-> gets a lot of MX28 (Sigmatel) based IP blocks integrated, LCDIF, PXP,
-> GPMI, DCP, APHB DMA, and so on.  SoC is merging these two families
-> into one.  It makes no sense for SW to keeps them separated.
-I don't want to separate things artificially that belong together, but I
-don't want to put things together that are really seperate, too.
- 
-> Can you please think about the IP oriented way I mentioned above to
-> see if there is any problem that stops us going?  Also do you want to
-> eventually include MX23/28 into imx-single-kernel image?  If you do,
-> don't you think my proposal will make it a little bit easier?
-It might be easier, yes, but there are also some other criterias that
-matter, like maintainability, efficiency of compiled code etc.  And I
-think when taking these into account using a different machine directory
-is the right choice.
+Regards,
+Benoit
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+On 11/16/2010 11:18 AM, Paul Walmsley wrote:
+> This trivial patch renames omap_hwmod_mutex to _hwmod_list_mutex to indicate
+> clearly that it is only used for hwmod list manipulation operations.
+>
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> Cc: Beno?t Cousson<b-cousson@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod.c |   27 ++++++++++++++-------------
+>   1 files changed, 14 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 12a0b9a..0e85278 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -156,7 +156,8 @@
+>   /* omap_hwmod_list contains all registered struct omap_hwmods */
+>   static LIST_HEAD(omap_hwmod_list);
+>
+> -static DEFINE_MUTEX(omap_hwmod_mutex);
+> +/* _hwmod_list_mutex protects the list of registered hwmods */
+> +static DEFINE_MUTEX(_hwmod_list_mutex);
+>
+>   /* mpu_oh: used to add/remove MPU initiator from sleepdep list */
+>   static struct omap_hwmod *mpu_oh;
+> @@ -874,7 +875,7 @@ static void _shutdown_sysc(struct omap_hwmod *oh)
+>    * @name: find an omap_hwmod by name
+>    *
+>    * Return a pointer to an omap_hwmod by name, or NULL if not found.
+> - * Caller must hold omap_hwmod_mutex.
+> + * Caller must hold _hwmod_list_mutex.
+>    */
+>   static struct omap_hwmod *_lookup(const char *name)
+>   {
+> @@ -1502,7 +1503,7 @@ int omap_hwmod_register(struct omap_hwmod *oh)
+>   	    (oh->_state != _HWMOD_STATE_UNKNOWN))
+>   		return -EINVAL;
+>
+> -	mutex_lock(&omap_hwmod_mutex);
+> +	mutex_lock(&_hwmod_list_mutex);
+>
+>   	pr_debug("omap_hwmod: %s: registering\n", oh->name);
+>
+> @@ -1528,7 +1529,7 @@ int omap_hwmod_register(struct omap_hwmod *oh)
+>   	ret = 0;
+>
+>   ohr_unlock:
+> -	mutex_unlock(&omap_hwmod_mutex);
+> +	mutex_unlock(&_hwmod_list_mutex);
+>   	return ret;
+>   }
+>
+> @@ -1546,9 +1547,9 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
+>   	if (!name)
+>   		return NULL;
+>
+> -	mutex_lock(&omap_hwmod_mutex);
+> +	mutex_lock(&_hwmod_list_mutex);
+>   	oh = _lookup(name);
+> -	mutex_unlock(&omap_hwmod_mutex);
+> +	mutex_unlock(&_hwmod_list_mutex);
+>
+>   	return oh;
+>   }
+> @@ -1574,13 +1575,13 @@ int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
+>   	if (!fn)
+>   		return -EINVAL;
+>
+> -	mutex_lock(&omap_hwmod_mutex);
+> +	mutex_lock(&_hwmod_list_mutex);
+>   	list_for_each_entry(temp_oh,&omap_hwmod_list, node) {
+>   		ret = (*fn)(temp_oh, data);
+>   		if (ret)
+>   			break;
+>   	}
+> -	mutex_unlock(&omap_hwmod_mutex);
+> +	mutex_unlock(&_hwmod_list_mutex);
+>
+>   	return ret;
+>   }
+> @@ -1663,10 +1664,10 @@ int omap_hwmod_unregister(struct omap_hwmod *oh)
+>
+>   	pr_debug("omap_hwmod: %s: unregistering\n", oh->name);
+>
+> -	mutex_lock(&omap_hwmod_mutex);
+> +	mutex_lock(&_hwmod_list_mutex);
+>   	iounmap(oh->_mpu_rt_va);
+>   	list_del(&oh->node);
+> -	mutex_unlock(&omap_hwmod_mutex);
+> +	mutex_unlock(&_hwmod_list_mutex);
+>
+>   	return 0;
+>   }
+> @@ -2125,7 +2126,7 @@ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name)
+>    * @user: arbitrary context data to pass to the callback function
+>    *
+>    * For each omap_hwmod of class @classname, call @fn.  Takes
+> - * omap_hwmod_mutex to prevent the hwmod list from changing during the
+> + * _hwmod_list_mutex to prevent the hwmod list from changing during the
+>    * iteration.  If the callback function returns something other than
+>    * zero, the iterator is terminated, and the callback function's return
+>    * value is passed back to the caller.  Returns 0 upon success, -EINVAL
+> @@ -2145,7 +2146,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
+>   	pr_debug("omap_hwmod: %s: looking for modules of class %s\n",
+>   		 __func__, classname);
+>
+> -	mutex_lock(&omap_hwmod_mutex);
+> +	mutex_lock(&_hwmod_list_mutex);
+>
+>   	list_for_each_entry(temp_oh,&omap_hwmod_list, node) {
+>   		if (!strcmp(temp_oh->class->name, classname)) {
+> @@ -2157,7 +2158,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
+>   		}
+>   	}
+>
+> -	mutex_unlock(&omap_hwmod_mutex);
+> +	mutex_unlock(&_hwmod_list_mutex);
+>
+>   	if (ret)
+>   		pr_debug("omap_hwmod: %s: iterator terminated early: %d\n",
+>
+>
