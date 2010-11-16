@@ -1,62 +1,120 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Nov 2010 15:32:30 +0000
-Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
-	L_PTE_NOWRITE
-In-Reply-To: <AANLkTikCVCuR2mxyoE7e=V_FauTxztLHUJp97+rroUe-@mail.gmail.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
-	<20101115183014.GD31421@n2100.arm.linux.org.uk>
-	<AANLkTikCVCuR2mxyoE7e=V_FauTxztLHUJp97+rroUe-@mail.gmail.com>
-Message-ID: <AANLkTimNiU_d+WEiWCXyMF_cgohCwuyJzqxog+Y+nTmZ@mail.gmail.com>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Tue, 16 Nov 2010 09:58:08 -0600
+Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
+In-Reply-To: <4CE1560F.6080705@mvista.com>
+References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
+	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ABE7@dbde02.ent.ti.com>
+	<4CE124AE.4080301@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ACE1@dbde02.ent.ti.com>
+	<4CE1560F.6080705@mvista.com>
+Message-ID: <AANLkTimDpYrx_OWg7ABXqRJ5JYzhpVbbyzVMhmFD6Wxi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2010 15:18, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On 15 November 2010 18:30, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Nov 12, 2010 at 06:00:25PM +0000, Catalin Marinas wrote:
->>> The LPAE page table format needs to explicitly disable execution or
->>> write permissions on a page by setting the corresponding bits (similar
->>> to the classic page table format with Access Flag enabled). This patch
->>> introduces null definitions for the 2-level format and the actual noexec
->>> and nowrite bits for the LPAE format. It also changes several PTE
->>> maintenance macros and masks.
->>>
->>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>> ---
->>> ?arch/arm/include/asm/pgtable-2level.h | ? ?2 +
->>> ?arch/arm/include/asm/pgtable.h ? ? ? ?| ? 44 +++++++++++++++++++++------------
->>> ?arch/arm/mm/mmu.c ? ? ? ? ? ? ? ? ? ? | ? ?6 ++--
->>> ?3 files changed, 33 insertions(+), 19 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
->>> index 36bdef7..4e21166 100644
->>> --- a/arch/arm/include/asm/pgtable-2level.h
->>> +++ b/arch/arm/include/asm/pgtable-2level.h
->>> @@ -128,6 +128,8 @@
->>> ?#define L_PTE_USER ? ? ? ? ? (1 << 8)
->>> ?#define L_PTE_EXEC ? ? ? ? ? (1 << 9)
->>> ?#define L_PTE_SHARED ? ? ? ? (1 << 10) ? ? ? /* shared(v6), coherent(xsc3) */
->>> +#define L_PTE_NOEXEC ? ? ? ? (0)
->>> +#define L_PTE_NOWRITE ? ? ? ? ? ? ? ?(0)
->>
->> Let's not make this more complicated than it has to be. ?If we need the
->> inverse of WRITE and EXEC, then that's what we should change everyone to,
->> not invent a new system to work along side the old system.
+On Mon, Nov 15, 2010 at 9:47 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
 >
-> This adds an additional instruction in set_pte_ext, unless you can
-> write the bit checking in a better way:
+> Nori, Sekhar wrote:
 >
-> ? ? ? ?tst ? ? r1, #L_PTE_NOWRITE
-> ? ? ? ?orrne ? r3, r3, #PTE_EXT_APX
-> ? ? ? ?tsteq ? r1, #L_PTE_DIRTY
-> ? ? ? ?orreq ? r3, r3, #PTE_EXT_APX
+>>>>> This patch defines Pin Mux configuration for MacASP
+>>>>> used on the Hawkboard-L138 system in order to add Audio support
+>>>>> Signed-off-by: Victor Rodriguez<victor.rodriguez@sasken.com>
+>>>>> Tested-by: Rene Gonzalez<renegs.2378@gmail.com>
+>>>>> diff --git a/arch/arm/mach-davinci/da850.c
+>>>>> b/arch/arm/mach-davinci/da850.c
+>>>>> index 63916b9..f033a0a 100644
+>>>>> --- a/arch/arm/mach-davinci/da850.c
+>>>>> +++ b/arch/arm/mach-davinci/da850.c
+>>>>> @@ -591,7 +591,7 @@ const short da850_cpgmac_pins[] __initdata = {
+>>>>> ?const short da850_mcasp_pins[] __initdata = {
+>>>>> ? ? ? DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+>>>>> ? ? ? DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
+>>>>> - ? ? DA850_AXR_11, DA850_AXR_12,
+>>>>> + ? ? DA850_AXR_11, DA850_AXR_12, DA850_AXR_13, DA850_AXR_14,
+>
+>>>> Looks like I missed pointing this out previously, but extending
+>>>> this list to take care of all boards will not be right since
+>>>> (for example) AXR13 and AXR14 pins could be used for different
+>>>> purpose on different boards.
+>
+>>> ? ?This is correct as the list in da850.c is a *generic* module's pin
+>>> list.
+>>> If the board needs less pins (and the pins it does not use for McASP are
+>>> used
+>>> differently), it should define its own pin list.
+>
+>>>> The right way would be to make this a per-board list. Since it
+>>>> is marked __initdata, that wouldn't lead to bloat.
+>
+>>> ? ?This patch is correct anyway. Unless DA850 EVM board can't use these
+>>> pins
+>>> for McASP -- but in this case the corresponding board file needs the
+>>> specific
+>>> pin list added.
+>
+>> Okay. I guess you are saying we will keep adding pins to the generic list
+>> as long as *all* supported boards don't get a conflict
+>
+> ? No, I don't care about conflicts as long as da850.c is concerned.
+>
+>> and if we run into
+>> a conflict we will spawn separate list for the affected board.
+>
+> ? Yes.
+>
+>> The only issue I see with this approach is it puts too much burden on the
+>> developer to verify that none of the supported boards break.
+>
+> ? That should be verified by the owners of that board. They shouldn't even
+> have used the generic pin lists in the first place. The conception behind
+> pin lists in da850.c was celarly misunderstood when DA850 EVM code was
+> developed.
+>
+>> Since it is highly unlikely that any board will need all the McASP pins,
+>> the generic list will likely remain unused.
+>
+> ? At least for now, Hawkboard will use all the defined pins -- I don't know
+> if there are any more undefined yet...
+>
+>> It might just be easier to
+>> start using board specific lists right away. This is especially true for
+>> McASP where usage of pins across boards will likely vary widely.
+>
+> ? Well, that depends on how complete the new generic McASP pin list is. If
+> it's still not, then board specific pin list looks preferable indeed...
+>
+>> Thanks,
+>> Sekhar
+>
+> WBR, Sergei
+>
 
-I think that would work with 3 instructions:
+HI Sergei and Sekhar
 
-	eor	r1, r1, L_PTE_DIRTY
-	tst	r1, #L_PTE_NOWRITE | L_PTE_DIRTY
-	orrne	r3, r3, #PTE_EXT_APX
+Thanks for check the patch
 
--- 
-Catalin
+What I can do if you agree with this change is to leave da850.c as it
+is, and declare
+
+static short hawk_mcasp_pins[] __initdata = {
+	DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+	DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
+	DA850_AXR_11, DA850_AXR_12, DA850_AXR_13, DA850_AXR_14,
+	-1
+};
+
+on the hawkboard file and call it insted of da850_mcasp_pins.
+
+	ret = davinci_cfg_reg_list(hawk_mcasp_pins);
+	if (ret)
+		pr_warning("%s: mcasp mux setup failed: %d\n", __func__, ret);
+
+Please tell me if you agree with this change, I think is better
+because I do not touch any other file besides my board file.
+
+Thanks
+
+Regards
+
+Victor Rodriguez
