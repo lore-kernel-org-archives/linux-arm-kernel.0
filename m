@@ -1,60 +1,43 @@
-From: johnstul@us.ibm.com (john stultz)
-Date: Tue, 16 Nov 2010 12:53:49 -0800
-Subject: [PATCH] nomadik: prevent sched_clock() wraparound
-In-Reply-To: <1289898690-29910-1-git-send-email-linus.walleij@stericsson.com>
-References: <1289898690-29910-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1289940829.3860.22.camel@localhost.localdomain>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 16 Nov 2010 21:58:05 +0100
+Subject: [PATCH 7/7] ARM: Thumb-2: Restore sensible zImage header
+	layout for CONFIG_THUMB2_KERNEL
+In-Reply-To: <20101116203520.GE21926@n2100.arm.linux.org.uk>
+References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+	<1289913277-8822-7-git-send-email-dave.martin@linaro.org>
+	<20101116182643.GC21926@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1011161517260.6448@xanadu.home>
+	<20101116203520.GE21926@n2100.arm.linux.org.uk>
+Message-ID: <20101116205805.GW8942@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-11-16 at 10:11 +0100, Linus Walleij wrote:
-> +unsigned long long sched_clock(void)
-> +{
-> +	unsigned long long v;
-> +
-> +	if (unlikely(!mtu_base))
-> +		return 0;
-> +
-> +	v = cnt32_to_63(-readl(mtu_base + MTU_VAL(0)));
-> +	/* The highest bit is not valid */
-> +	v &= 0x7FFFFFFFFFFFFFFFLLU;
-> +	return clocksource_cyc2ns(v, nmdk_clksrc.mult, nmdk_clksrc.shift);
+Hi Russell,
 
+On Tue, Nov 16, 2010 at 08:35:20PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 16, 2010 at 03:28:44PM -0500, Nicolas Pitre wrote:
+> > On Tue, 16 Nov 2010, Russell King - ARM Linux wrote:
+> > > Not used anymore - it's practically zero (and unused) for most cases
+> > > now anyway.
+> > 
+> > I think it is worth preserving this layout regardless.  First of all 
+> > this is really cheap to do, and if whatever bootloader out there is 
+> > relying on it, at least the magic number, then better not break it 
+> > freely.
+> 
+> It's already broken by the relocatable format - which has zero as the
+> start address.  That's been in for a few years now, and no one even
+> noticed that this header ended up with zero as the entry address.
+> Therefore, I suggest that no one at all is using it.
+I remember me creating a patch for U-Boot that ignored the uImage
+header's load and entry address if it was an ARM-Linux image and the
+linux header had the right magic and the entry address was zero.  I
+don't know anything about it's current state, but it might still ship
+with Digi's BSP.
 
-I suspect this will still break. 
+Best regards
+Uwe
 
-The cycle value being passed as v is likely to be large, and the
-clocksource mult and shift are calculated to be as large as possible
-without overflowing when given only a few seconds worth of cycles.
-
-So its very likely that after a few seconds of running (or even less,
-with the 32_to_63 conversion), the cyc2ns function will overflow, as
-v*mult will be greater then 64bits.
-
-So I'd advise *not* using the mult/shift pair calculated for
-timekeeping, and possibly not using the clocksource_cyc2ns function (as
-I'm likely to make that private to timekeeping at somepoint in the
-future). Instead calculate a mult/shift pair using a smaller shift
-value, so the overflow point will be much more rare.
-
-For instance, on x86, the TSC based sched_clock uses a shift value of
-10, but the TSC clocksource uses a shift value of ~30.
-
-> +}
-> +
-> +/* Just kick sched_clock every so often */
-> +static void cnt32_to_63_keepwarm(unsigned long data)
->  {
-> -	return clocksource_cyc2ns(nmdk_clksrc.read(
-> -				  &nmdk_clksrc),
-> -				  nmdk_clksrc.mult,
-> -				  nmdk_clksrc.shift);
-> +	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
-> +	(void) sched_clock();
-> +}
-
-Also, just FYI: This can be problematic on PREEMPT_RT systems, where
-timers can be delayed by high priority processes hogging the cpu.
-
-thanks
--john
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
