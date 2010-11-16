@@ -1,142 +1,26 @@
-From: amit.daniel@samsung.com (amit.daniel at samsung.com)
-Date: Tue, 16 Nov 2010 16:24:20 +0530
-Subject: [PATCH] ARM: SAMSUNG: Add support for clock debugging through debug-fs
-	interface
-Message-ID: <1289904860-30951-1-git-send-email-amit.daniel@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 16 Nov 2010 11:17:17 +0000
+Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
+	(Action Required)
+In-Reply-To: <213935334.90145.1289905638298.JavaMail.prod@app013.dmz>
+References: <213935334.90145.1289905638298.JavaMail.prod@app013.dmz>
+Message-ID: <20101116111717.GM12986@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Amit Daniel Kachhap <amit.daniel@samsung.com>
+On Tue, Nov 16, 2010 at 03:07:18AM -0800, noreply at boxbe.com wrote:
+> 
+> Hello Mark Brown,
+> 
+> Your message about "Re: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device" 
+> has been waitlisted.  
+> 
+> Please add yourself to my Boxbe Guest List so your messages will 
+> go to my Inbox. 
+> 
+> Click the link below to be added:
+> https://www.boxbe.com/crs?tc=5918369326_224329907
 
-This patch adds support for clock information exposed to debug-fs
-interface.
-
-Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
----
- arch/arm/plat-samsung/clock.c              |   92 ++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/clock.h |    3 +
- 2 files changed, 95 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-index e8d20b0..0ba209d 100644
---- a/arch/arm/plat-samsung/clock.c
-+++ b/arch/arm/plat-samsung/clock.c
-@@ -39,6 +39,7 @@
- #include <linux/clk.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
-+#include <linux/debugfs.h>
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
-@@ -447,3 +448,94 @@ int __init s3c24xx_register_baseclocks(unsigned long xtal)
- 	return 0;
- }
- 
-+#if defined(CONFIG_DEBUG_FS)
-+/*
-+ *	debugfs support to trace clock tree hierarchy and attributes
-+ */
-+static struct dentry *clk_debugfs_root;
-+
-+static int clk_debugfs_register_one(struct clk *c)
-+{
-+	int err;
-+	struct dentry *d, *child, *child_tmp;
-+	struct clk *pa = c->parent;
-+	char s[255];
-+	char *p = s;
-+
-+	p += sprintf(p, "%s", c->name);
-+#ifdef CONFIG_PLAT_SAMSUNG
-+	/*Append id field with name also*/
-+	if (c->id >= 0)
-+		p += sprintf(p, ":%d", c->id);
-+#endif
-+
-+	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
-+	if (!d)
-+		return -ENOMEM;
-+
-+	c->dent = d;
-+
-+	d = debugfs_create_u8("usecount", S_IRUGO, c->dent, (u8 *)&c->usage);
-+	if (!d) {
-+		err = -ENOMEM;
-+		goto err_out;
-+	}
-+	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
-+	if (!d) {
-+		err = -ENOMEM;
-+		goto err_out;
-+	}
-+	return 0;
-+
-+err_out:
-+	d = c->dent;
-+	list_for_each_entry_safe(child, child_tmp, &d->d_subdirs, d_u.d_child)
-+		debugfs_remove(child);
-+	debugfs_remove(c->dent);
-+	return err;
-+}
-+
-+static int clk_debugfs_register(struct clk *c)
-+{
-+	int err;
-+	struct clk *pa = c->parent;
-+
-+	if (pa && !pa->dent) {
-+		err = clk_debugfs_register(pa);
-+		if (err)
-+			return err;
-+	}
-+
-+	if (!c->dent) {
-+		err = clk_debugfs_register_one(c);
-+		if (err)
-+			return err;
-+	}
-+	return 0;
-+}
-+
-+static int __init clk_debugfs_init(void)
-+{
-+	struct clk *c;
-+	struct dentry *d;
-+	int err;
-+
-+	d = debugfs_create_dir("clock", NULL);
-+	if (!d)
-+		return -ENOMEM;
-+	clk_debugfs_root = d;
-+
-+	list_for_each_entry(c, &clocks, list) {
-+		err = clk_debugfs_register(c);
-+		if (err)
-+			goto err_out;
-+	}
-+	return 0;
-+err_out:
-+	debugfs_remove_recursive(clk_debugfs_root);
-+	return err;
-+}
-+late_initcall(clk_debugfs_init);
-+
-+#endif /* defined(CONFIG_DEBUG_FS) */
-+
-diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-index 0fbcd0e..f6180ab 100644
---- a/arch/arm/plat-samsung/include/plat/clock.h
-+++ b/arch/arm/plat-samsung/include/plat/clock.h
-@@ -47,6 +47,9 @@ struct clk {
- 
- 	struct clk_ops		*ops;
- 	int		    (*enable)(struct clk *, int enable);
-+#if defined(CONFIG_DEBUG_FS)
-+	struct dentry		*dent;	/* For visible tree hierarchy */
-+#endif
- };
- 
- /* other clocks which may be registered by board support */
--- 
-1.6.0.6
+Your software is generating these messages in response to mails posted
+to public mailing lists and not directed specifically at you.  Please
+disable this software, it is generating noise for community members.
