@@ -1,77 +1,47 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Tue, 16 Nov 2010 10:37:00 -0800 (PST)
-Subject: [PATCH 5/5] mx51_babbage: Add PWM support
-Message-ID: <398428.51579.qm@web51003.mail.re2.yahoo.com>
+From: matts@commtech-fastcom.com (Matt Schulte)
+Date: Tue, 16 Nov 2010 12:41:14 -0600
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <ibubf5$ev$1@dough.gmane.org>
+References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
+	<4CBD8EE4.5040808@evidence.eu.com> <i9ka0s$4ua$1@dough.gmane.org>
+	<201010191727.53314.alexander.stein@systec-electronic.com>
+	<i9kk4o$svc$1@dough.gmane.org> <4CC418A9.6090602@evidence.eu.com>
+	<4CDA630F.4060903@atmel.com> <20101110172842.GC12371@suse.de>
+	<4CDBC3EC.6020707@evidence.eu.com> <20101116143016.GB6527@ucw.cz>
+	<AANLkTi=grehSnfWzCDtSXXmNb=-NAwbHHJ_P1XPyOuw8@mail.gmail.com>
+	<ibubf5$ev$1@dough.gmane.org>
+Message-ID: <AANLkTimio1aBh5w616eSikW+dujV-G8_pu-AT=B5e-7Y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PWM support on mx51_babbage board.
+On Tue, Nov 16, 2010 at 10:28 AM, Grant Edwards
+<grant.b.edwards@gmail.com> wrote:
+> On 2010-11-16, Matt Schulte <matts@commtech-fastcom.com> wrote:
+>> On Tue, Nov 16, 2010 at 8:30 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>>> Hi!
+>>>
+>>>> Documentation about RS485 serial communications
+>>>
+>>> I have seen hardware (kontron pmc-6l) that was capable of switching
+>>> between RS232, RS485 and one other standard by software.
+>>>
+>>> Is such hw common? If so, should we have standard interface?
+>>
+>> In my opinion this type of card is not that common. ?Generally
+>> speaking the achievable baud rates for this type of multi-protocol
+>> card are very limited because of limitations of the transceiver chips.
+>
+> I'm curious which selectable interface cards you're talking about that
+> are slow? ?The ones I'm familiar with generally support baud rates up
+> to either 460K bps or 921K bps
+>
+>> It seems that most of the time people would rather have a faster
+>> serial port than one that does several different voltages.
+>
+> Where did you find a selectable interface serial card that couldn't
+> support high baud rates?
 
-PWM1_PWMO output can be used to control WVGA LCD backlight brightness.
+In my world 460kbps for an RS422 card is slow.  RS422 cards generally
+push multi megabit/s rates.
 
-Tested the PWM1_PWMO duty cycle control via:
-
-echo xxx > /sys/class/backlight/pwm-backlight.0/brightness
-
-,where xxx can vary from 0 to 255.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/board-mx51_babbage.c |???14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 66b07d8..4aba07f 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -22,6 +22,7 @@
- #include <linux/input.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/spi.h>
-+#include <linux/pwm_backlight.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
-@@ -158,6 +159,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
- ??? MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
- ??? MX51_PAD_CSPI1_SS0__GPIO_4_24,
- ??? MX51_PAD_CSPI1_SS1__GPIO_4_25,
-+
-+??? /* PWM1 */
-+??? MX51_PAD_GPIO_1_2__PWM1_PWMO,
- };
- 
- /* Serial ports */
-@@ -337,6 +341,13 @@ static int mx51_babbage_spi_cs[] = {
- ??? BABBAGE_ECSPI1_CS1,
- };
- 
-+static struct platform_pwm_backlight_data mxc_pwm_backlight_data = {
-+??? .pwm_id = 0,
-+??? .max_brightness = 255,
-+??? .dft_brightness = 128,
-+??? .pwm_period_ns = 78770,
-+};
-+
- static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
- ??? .chipselect? ???= mx51_babbage_spi_cs,
- ??? .num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
-@@ -386,6 +397,9 @@ static void __init mxc_board_init(void)
- ??? spi_register_board_info(mx51_babbage_spi_board_info,
- ??? ??? ARRAY_SIZE(mx51_babbage_spi_board_info));
- ??? imx51_add_ecspi(0, &mx51_babbage_spi_pdata);
-+??? mxc_register_device(&mxc_pwm0_device, NULL);
-+??? mxc_register_device(&mxc_pwm0_backlight_device,
-+??? ??? &mxc_pwm_backlight_data);
- }
- 
- static void __init mx51_babbage_timer_init(void)
--- 
-1.6.0.4
-
-
-
-
-
-
-      
+Matt Schulte
