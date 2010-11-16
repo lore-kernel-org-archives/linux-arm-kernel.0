@@ -1,185 +1,99 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 16 Nov 2010 18:10:02 +0530
-Subject: [PATCH] ARM: SAMSUNG: Add support for clock debugging through
-	debug-fs interface
-In-Reply-To: <AANLkTi=NtRETnsOp-bRC6SgGsfncTibMOziv54VUDGuo@mail.gmail.com>
-References: <1289904860-30951-1-git-send-email-amit.daniel@samsung.com>
-	<AANLkTi=NtRETnsOp-bRC6SgGsfncTibMOziv54VUDGuo@mail.gmail.com>
-Message-ID: <20101116124002.GE2344@sahyadri-mini10>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Tue, 16 Nov 2010 20:42:29 +0800
+Subject: [RFC][PATCH 00/11] ARM: imx: Add initial i.MX28 support
+In-Reply-To: <20101116101508.GK6017@pengutronix.de>
+References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
+	<20101116101508.GK6017@pengutronix.de>
+Message-ID: <AANLkTim=ACL-PW-n0MWu_+KD8n19ttq_NfEnRzsMp6SU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yong,
+Hi Sascha,
 
-No. The work that you're doing is long-term. It will take time for platforms
-to move to the common struct clk - almost unlikely for the next Linaro release.
+Thanks for the comments.  Please see my comments below.
 
-In the short-term, we still need all partner platforms to expose this debug
-information for our tools in a consistent way - OMAP already does it this
-way.  So we want this patch applied to the Samsung platform after review and
-similar ones for other SoC kernels.
+On Tue, Nov 16, 2010 at 6:15 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hello Shawn,
+>
+> On Mon, Nov 15, 2010 at 10:36:24PM +0800, Shawn Guo wrote:
+>> This patchset adds the initial support of i.MX28, and the target device
+>> is i.MX28 EVK Rev C. It's based on the imx-single-kernel branch below,
+>> and adding codes into arch/arm/mxc and arch/arm/mach-imx.
+>
+> Without further looking at the patch I agree with Uwe: The i.MX23/28
+> are totally different from the other i.MX SoCs and should not be
+> integrated in current i.MX support. And definitely it should not be
+> integrated by adding cpu_is_* into each and every function.
+>
+cpu_is_* is not being added into each and every function. Uwe had this
+comment on only two files, arch/arm/plat-mxc/gpio.c and
+arch/arm/plat-mxc/time.c. As there are big percentage of
+infrastructural common codes that are IP block independent, I though
+it's good to use the same file.  But since you are not in this
+position, I would propose another option. Like what I'm doing with
+iomux-pinctrl, we can create arch/arm/plat-mxc/gpio-pinctrl.c and
+arch/arm/plat-mxc/time-timrot.c for PINCTRL based gpio and TIMROT
+based time implementation.
 
-/Amit
+The philosophy behind this is we treat arch/arm/plat-mxc as the
+Freescale IP block pool.  The driver in this folder is IP block
+oriented other than SoC oriented.  And SoC is actually a collection of
+IP blocks.  MX23/MX28 integrates PINCTRL, TIMROT, ICOLL, and
+MX21/MX25/MX27/MX31/MX35/MX51 integrates GPIO/IOMUXC, GPT and
+AVIC/TZIC.  Accordingly, MX23/MX28 builds gpio-pinctrl.c, timrot.c and
+icoll.c in, and other i.MX builds gpio.c, iomux-v1//v2/v3,
+avic.c/tzic.c in.  The only thing we need to deal with is picking up
+the file name to stand for the IP block.
 
-On 10 Nov 16, Yong Shen wrote:
-> Hi Amit,
-> 
-> We are trying to make this clock debug interface generic, so every platform
-> can benefit from it. Maybe it is better to wait for a while until the common
-> interface comes out.
-> 
-> Yong
-> 
-> On Tue, Nov 16, 2010 at 6:54 PM, <amit.daniel@samsung.com> wrote:
-> 
-> > From: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> >
-> > This patch adds support for clock information exposed to debug-fs
-> > interface.
-> >
-> > Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> > ---
-> >  arch/arm/plat-samsung/clock.c              |   92
-> > ++++++++++++++++++++++++++++
-> >  arch/arm/plat-samsung/include/plat/clock.h |    3 +
-> >  2 files changed, 95 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-> > index e8d20b0..0ba209d 100644
-> > --- a/arch/arm/plat-samsung/clock.c
-> > +++ b/arch/arm/plat-samsung/clock.c
-> > @@ -39,6 +39,7 @@
-> >  #include <linux/clk.h>
-> >  #include <linux/spinlock.h>
-> >  #include <linux/io.h>
-> > +#include <linux/debugfs.h>
-> >
-> >  #include <mach/hardware.h>
-> >  #include <asm/irq.h>
-> > @@ -447,3 +448,94 @@ int __init s3c24xx_register_baseclocks(unsigned long
-> > xtal)
-> >        return 0;
-> >  }
-> >
-> > +#if defined(CONFIG_DEBUG_FS)
-> > +/*
-> > + *     debugfs support to trace clock tree hierarchy and attributes
-> > + */
-> > +static struct dentry *clk_debugfs_root;
-> > +
-> > +static int clk_debugfs_register_one(struct clk *c)
-> > +{
-> > +       int err;
-> > +       struct dentry *d, *child, *child_tmp;
-> > +       struct clk *pa = c->parent;
-> > +       char s[255];
-> > +       char *p = s;
-> > +
-> > +       p += sprintf(p, "%s", c->name);
-> > +#ifdef CONFIG_PLAT_SAMSUNG
-> > +       /*Append id field with name also*/
-> > +       if (c->id >= 0)
-> > +               p += sprintf(p, ":%d", c->id);
-> > +#endif
-> > +
-> > +       d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
-> > +       if (!d)
-> > +               return -ENOMEM;
-> > +
-> > +       c->dent = d;
-> > +
-> > +       d = debugfs_create_u8("usecount", S_IRUGO, c->dent, (u8
-> > *)&c->usage);
-> > +       if (!d) {
-> > +               err = -ENOMEM;
-> > +               goto err_out;
-> > +       }
-> > +       d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
-> > +       if (!d) {
-> > +               err = -ENOMEM;
-> > +               goto err_out;
-> > +       }
-> > +       return 0;
-> > +
-> > +err_out:
-> > +       d = c->dent;
-> > +       list_for_each_entry_safe(child, child_tmp, &d->d_subdirs,
-> > d_u.d_child)
-> > +               debugfs_remove(child);
-> > +       debugfs_remove(c->dent);
-> > +       return err;
-> > +}
-> > +
-> > +static int clk_debugfs_register(struct clk *c)
-> > +{
-> > +       int err;
-> > +       struct clk *pa = c->parent;
-> > +
-> > +       if (pa && !pa->dent) {
-> > +               err = clk_debugfs_register(pa);
-> > +               if (err)
-> > +                       return err;
-> > +       }
-> > +
-> > +       if (!c->dent) {
-> > +               err = clk_debugfs_register_one(c);
-> > +               if (err)
-> > +                       return err;
-> > +       }
-> > +       return 0;
-> > +}
-> > +
-> > +static int __init clk_debugfs_init(void)
-> > +{
-> > +       struct clk *c;
-> > +       struct dentry *d;
-> > +       int err;
-> > +
-> > +       d = debugfs_create_dir("clock", NULL);
-> > +       if (!d)
-> > +               return -ENOMEM;
-> > +       clk_debugfs_root = d;
-> > +
-> > +       list_for_each_entry(c, &clocks, list) {
-> > +               err = clk_debugfs_register(c);
-> > +               if (err)
-> > +                       goto err_out;
-> > +       }
-> > +       return 0;
-> > +err_out:
-> > +       debugfs_remove_recursive(clk_debugfs_root);
-> > +       return err;
-> > +}
-> > +late_initcall(clk_debugfs_init);
-> > +
-> > +#endif /* defined(CONFIG_DEBUG_FS) */
-> > +
-> > diff --git a/arch/arm/plat-samsung/include/plat/clock.h
-> > b/arch/arm/plat-samsung/include/plat/clock.h
-> > index 0fbcd0e..f6180ab 100644
-> > --- a/arch/arm/plat-samsung/include/plat/clock.h
-> > +++ b/arch/arm/plat-samsung/include/plat/clock.h
-> > @@ -47,6 +47,9 @@ struct clk {
-> >
-> >        struct clk_ops          *ops;
-> >        int                 (*enable)(struct clk *, int enable);
-> > +#if defined(CONFIG_DEBUG_FS)
-> > +       struct dentry           *dent;  /* For visible tree hierarchy */
-> > +#endif
-> >  };
-> >
-> >  /* other clocks which may be registered by board support */
-> > --
-> > 1.6.0.6
-> >
-> >
-> > _______________________________________________
-> > linaro-dev mailing list
-> > linaro-dev at lists.linaro.org
-> > http://lists.linaro.org/mailman/listinfo/linaro-dev
-> >
+> Now you have two choices: Add the code to plat-stmp3xxx (for the
+> interested reader: the i.MX23/28 are based on former Sigmatel SoCs), or
+> add a new mach-mxs like you did in the Freescale Kernel.
+> I'm not sure which choice of these two is best. It would be good to get
+> some other opinions from people who already had the situation that a
+> vendor got sold and we get the same old metal with new names.
+>
+Yes, MX23/28 are based on former Sigmatel SoCs.  The imx-single-kernel
+demonstrates the possibility of single image for different SoCs from
+same vendor.  My patchset somehow adds the the possibility for SoCs
+even from different vendors, even though I'm unsure if single image
+for SoCs from different vendor is something ARM Kernel will possibly
+go in the future?
 
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+The plat-stmp3xxx is not an option for me because of the Freescale
+marketing concern.  For the choice of what Freescale Kernel is doing,
+there is no mach-mxs.  Instead, there are arch/arm/plat-mxs,
+arch/arm/mach-mx23 and arch/arm/mach-mx28.  Going this way, MX23/28
+will be totally separated from i.MX family, though their name tells
+the relationship with i.MX family.  Also, Freescale is merging the
+Sigmatel IP pool into i.MX one and will only maintain the same pool.
+In another words, Sigmatel IP block are getting consolidated with i.MX
+ones. You can still say MX28 are former Sigmatel based, but it gets
+i.MX IP blocks, FEC(ENET), FlexCAN integrated.  If MX28 is not so
+typical, MX50 can be the one.  It primarily derives from MX51/MX53 and
+will go into plat-mxc and mach-mx5 in common understanding, but it
+gets a lot of MX28 (Sigmatel) based IP blocks integrated, LCDIF, PXP,
+GPMI, DCP, APHB DMA, and so on.  SoC is merging these two families
+into one.  It makes no sense for SW to keeps them separated.
+
+Can you please think about the IP oriented way I mentioned above to
+see if there is any problem that stops us going?  Also do you want to
+eventually include MX23/28 into imx-single-kernel image?  If you do,
+don't you think my proposal will make it a little bit easier?
+
+> BTW the imx-single-kernel branch is a branch to show where things might
+> or might not go. You should not base your work on this.
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
+
+
+
+-- 
+Regards,
+Shawn
