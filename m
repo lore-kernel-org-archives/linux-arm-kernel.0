@@ -1,40 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Nov 2010 10:11:57 -0800
-Subject: [PATCH] omap4: enable L2 prefetching
-In-Reply-To: <yw1xaala8qex.fsf@unicorn.mansr.com>
-References: <1289838044-32016-1-git-send-email-nm@ti.com>
-	<yw1xaala8qex.fsf@unicorn.mansr.com>
-Message-ID: <20101116181157.GY9264@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Nov 2010 18:19:06 +0000
+Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
+	L_PTE_NOWRITE
+In-Reply-To: <AANLkTikCVCuR2mxyoE7e=V_FauTxztLHUJp97+rroUe-@mail.gmail.com>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
+	<20101115183014.GD31421@n2100.arm.linux.org.uk>
+	<AANLkTikCVCuR2mxyoE7e=V_FauTxztLHUJp97+rroUe-@mail.gmail.com>
+Message-ID: <20101116181906.GA21926@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* M?ns Rullg?rd <mans@mansr.com> [101115 09:01]:
-> Nishanth Menon <nm@ti.com> writes:
+On Tue, Nov 16, 2010 at 03:18:03PM +0000, Catalin Marinas wrote:
+> On 15 November 2010 18:30, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Let's not make this more complicated than it has to be. ?If we need the
+> > inverse of WRITE and EXEC, then that's what we should change everyone to,
+> > not invent a new system to work along side the old system.
 > 
-> > From: Mans Rullgard <mans@mansr.com>
-> >
-> > Enabling L2 prefetching improves performance as shown on Panda
-> > ES2.1 board with mem test, and it has measurable impact on
-> > performances. I think we should consider it, even though it damages
-> > "writes" a bit. (rebased to k.org)
-> > Usually the prefetch is used at both levels together L1 + L2, however,
-> > to enable the CP15 prefetch engines, these are under security, and on
-> > GP devices, we cannot enable it(e.g. on PandaBoard). However, just
-> > enabling PL310 prefetch seems to provide performance improvement,
-> > as shown in the data below (from Ubuntu) and would be a great thing
-> > to pull in.
-> 
-> What this does is enable automatic next line prefetching.  With this
-> enabled, whenever the PL310 receives a cachable read request, it
-> automatically prefetches the following cache line as well.  A larger
-> offset can be programmed in secure mode, but the TI ROM authors
-> neglected to include this.
-> 
-> Testing with FFmpeg showed a speedup of 10% with this patch in some
-> cases.
+> This adds an additional instruction in set_pte_ext, unless you can
+> write the bit checking in a better way:
 
-M?ns and Nishant, care to repost this with the updated comments?
+It actually results in the same number of instructions.  From memory:
 
-Regards,
+ARMv3-ARMv5:
+-	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
+-	tst	r3, #L_PTE_WRITE | L_PTE_DIRTY	@ write and dirty?
+-	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
++	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY
++	tst	r3, #L_PTE_RDONLY | L_PTE_DIRTY	@ write and dirty?
++	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
 
-Tony
+and for ARMv6+:
+
+-	tst	r1, #L_PTE_WRITE
+-	tstne	r1, #L_PTE_DIRTY
+-	orreq	r3, r3, #PTE_EXT_APX
++	eor	r1, r1, #L_PTE_DIRTY
++	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
++	orrne	r3, r3, #PTE_EXT_APX
