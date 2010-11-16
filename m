@@ -1,68 +1,26 @@
-From: vm.rod25@gmail.com (Victor Rodriguez)
-Date: Tue, 16 Nov 2010 10:45:29 -0600
-Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930234ADA4BC@dbde02.ent.ti.com>
-References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
-	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ABE7@dbde02.ent.ti.com>
-	<4CE124AE.4080301@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ACE1@dbde02.ent.ti.com>
-	<4CE1560F.6080705@mvista.com>
-	<AANLkTimDpYrx_OWg7ABXqRJ5JYzhpVbbyzVMhmFD6Wxi@mail.gmail.com>
-	<4CE2AB73.3050109@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234ADA4BC@dbde02.ent.ti.com>
-Message-ID: <AANLkTikevkUqEEpxrA1OmxRktHSGHFmsQ2Dd3Zy9hgAZ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 16 Nov 2010 09:47:26 -0700 (MST)
+Subject: [PATCH 0/8] OMAP2+: hwmod core upgrades for 2.6.38: first set
+In-Reply-To: <20101116101615.22777.49212.stgit@twilight.localdomain>
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+Message-ID: <alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 10:37 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> On Tue, Nov 16, 2010 at 21:34:03, Sergei Shtylyov wrote:
->
->>
->> > HI Sergei and Sekhar
->>
->> > Thanks for check the patch
->>
->> > What I can do if you agree with this change is to leave da850.c as it
->> > is,
->>
->> ? ? No, please don't.
->>
->> > and declare
->>
->> > static short hawk_mcasp_pins[] __initdata = {
->> > ? ? DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
->> > ? ? DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
->> > ? ? DA850_AXR_11, DA850_AXR_12, DA850_AXR_13, DA850_AXR_14,
->> > ? ? -1
->> > };
->>
->> > on the hawkboard file and call it insted of da850_mcasp_pins.
->>
->> > ? ? ret = davinci_cfg_reg_list(hawk_mcasp_pins);
->> > ? ? if (ret)
->> > ? ? ? ? ? ? pr_warning("%s: mcasp mux setup failed: %d\n", __func__, ret);
->>
->> > Please tell me if you agree with this change, I think is better
->> > because I do not touch any other file besides my board file.
->>
->> ? ? No, it's not really better. The generic list in da850.c should be more
->> complete, regardless... Ideally, you should go thru the DA850 manual and put in
->> that list all McASP pins that aren't already there. Then you can use your own
->> pin list if that *complete* pin list can't be used on your board.
->
-> That will cause a bunch of pin conflicts on the EVM so it will need
-> its own list too.
->
-> Thanks,
-> Sekhar
->
->
+On Tue, 16 Nov 2010, Paul Walmsley wrote:
 
-So do you think that the peer-board list (as I am implementing ) would
-be a better idea ?
+> This patch series contains upgrades for the OMAP2+ hwmod core
+> code, intended for 2.6.38.  Most of these patches were developed
+> in response to use-cases discovered while converting device
+> drivers to use the hwmod code.
+> 
+> Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
+
+Just FYI, this branch 'hwmod_a_2.6.38' is available at 
+git://git.pwsan.com/linux-2.6
+
+Warning: it's based on Tony's tree, not the mainline, due to the recent 
+board file changes.
 
 
-Regards
-
-Victor Rodriguez
+- Paul
