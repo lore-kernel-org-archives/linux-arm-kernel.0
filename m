@@ -1,36 +1,29 @@
-From: tony@bakeyournoodle.com (Tony Breeds)
-Date: Tue, 16 Nov 2010 14:17:58 +1100
-Subject: [PATCH] ARM: fix build error with GCC 4.5.0
-In-Reply-To: <19676.63422.614246.989202@pilspetsen.it.uu.se>
-References: <1288897002-24073-1-git-send-email-rabin@rab.in>
-	<yw1xy698ygbx.fsf@unicorn.mansr.com>
-	<19667.9199.798932.405415@pilspetsen.it.uu.se>
-	<AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
-	<19667.52998.909668.596635@pilspetsen.it.uu.se>
-	<AANLkTimkSxWNL+aCALGsf5prBM_RHz0BMHCeNwKrTnfA@mail.gmail.com>
-	<19668.21026.5416.610777@pilspetsen.it.uu.se>
-	<20101112044548.GA19615@ozlabs.org>
-	<19676.63422.614246.989202@pilspetsen.it.uu.se>
-Message-ID: <20101116031758.GB19615@ozlabs.org>
+From: samreen@ti.com (Samreen)
+Date: Tue, 16 Nov 2010 09:23:38 +0530
+Subject: [Repost][PATCH v3 0/2] OMAP3: Display Support
+Message-ID: <1289879620-4696-1-git-send-email-samreen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 09:15:58AM +0100, Mikael Pettersson wrote:
+This patch series adds the Display Support for OMAP3 platforms
+and the corresponding changes in the board files.
 
-> Drop --with-system-libunwind.  OABI was sjlj while EABI uses an ARM EABI
-> specific unwinder implemented in gcc.  This may or may not matter if you
-> only want to compile the kernel.
+Version3:
+   - Rebase to the latest LO
+Version2:
+   - Optimised to configure INTBR from gpio to PWM1 mode setting and 
+   enabling of the PWM1 mode only when its not in PWM1 mode.
 
-I'm not building a libc so the kernel is pretty much all that will be
-compilable with these compilers.
- 
-> The other options should be ok, though I personally wouldn't pass
-> --disable-threads, --disable-decimal-float, or --disable-bootstrap.
+Kishore Y (2):
+  OMAP3: ZOOM2/3/3630SDP: Add display board file for OMAP3
+  OMAP3: Enable display on ZOOM2/3/3630SDP
 
-They're used for other platforms as long as the don't hurt arm I'll leave them
-there to keep the scripts simple.
-
-Thanks for your time.  I hope to have the i386 and x86_64 gcc-4.4.5 tollchains
-on kernel.org tomorrow. 4.5.1 shortly after that.
-
-Yours Tony
+ arch/arm/mach-omap2/Makefile                  |    3 +
+ arch/arm/mach-omap2/board-3630sdp.c           |    1 +
+ arch/arm/mach-omap2/board-zoom-display.c      |  168 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/board-zoom-peripherals.c  |   49 +++++++-
+ arch/arm/mach-omap2/board-zoom2.c             |    1 +
+ arch/arm/mach-omap2/board-zoom3.c             |    1 +
+ arch/arm/mach-omap2/include/mach/board-zoom.h |    3 +
+ 7 files changed, 224 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-zoom-display.c
