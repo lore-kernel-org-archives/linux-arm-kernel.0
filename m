@@ -1,32 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Nov 2010 19:33:35 +0000
-Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of
-	unsigned long for physical addresses
-In-Reply-To: <4CE2D811.50701@codeaurora.org>
-References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-	<1289842829-3027-16-git-send-email-catalin.marinas@arm.com>
-	<4CE2D811.50701@codeaurora.org>
-Message-ID: <20101116193335.GD21926@n2100.arm.linux.org.uk>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 16 Nov 2010 14:38:08 -0500
+Subject: [PATCH v5 08/12] gpio: add ti-ssp gpio driver
+In-Reply-To: <4CE1B651.1060006@bluewatersys.com>
+References: <1289848334-8695-1-git-send-email-cyril@ti.com>
+	<1289848334-8695-9-git-send-email-cyril@ti.com>
+	<4CE1B651.1060006@bluewatersys.com>
+Message-ID: <4CE2DDA0.1030404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 11:14:25AM -0800, Stephen Boyd wrote:
-> On 11/15/2010 09:40 AM, Catalin Marinas wrote:
-> > @@ -188,21 +189,21 @@
-> >   * translation for translating DMA addresses.  Use the driver
-> >   * DMA support - see dma-mapping.h.
-> >   */
-> > -static inline unsigned long virt_to_phys(void *x)
-> > +static inline phys_addr_t virt_to_phys(void *x)
-> >  {
-> >  	return __virt_to_phys((unsigned long)(x));
-> >  }
+On 11/15/2010 05:38 PM, Ryan Mallon wrote:
+> On 11/16/2010 08:12 AM, Cyril Chemparathy wrote:
+>> TI's SSP controller pins can be directly read and written to behave like a
+>> GPIO.  This patch adds a GPIO driver that exposes such functionality.
+>>
+>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>> ---
+[...]
+>> +	spin_lock_init(&gpio->lock);
+>> +	platform_set_drvdata(pdev, gpio);
+>> +
+>> +	gpio->chip.base  = pdata->start;
+>> +	gpio->chip.ngpio = 4;
 > 
-> As you're already in the area can you mark the argument to
-> virt_to_phys() as const? I ran into a compiler warning due to that the
-> other day.
+> Is this always four or can the SSP peripheral be configured to have
+> varying numbers of gpios. Maybe the number of gpios should be passed via
+> platform data?
+> 
 
-It may make sense to mark it const volatile, as that's the most
-permissive set of attributes possible (iow, it'll accept any pointer
-without warning.)  However, might be an idea to check what other
-arches do.
+This can only be 4 (hw defined per-port limit).
+
+I have changed as per your other comments, and will post an update.
+
+Thanks
+Cyril.
