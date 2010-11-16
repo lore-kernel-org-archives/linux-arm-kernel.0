@@ -1,8 +1,9 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Nov 2010 13:14:31 +0000
-Subject: [PATCH 1/7] ARM: kexec: Correct data alignment for
-	CONFIG_THUMB2_KERNEL
-Message-ID: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+Date: Tue, 16 Nov 2010 13:14:32 +0000
+Subject: [PATCH 2/7] ARM: vfp: Correct data alignment for CONFIG_THUMB2_KERNEL
+In-Reply-To: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1289913277-8822-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -38,21 +39,20 @@ Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/relocate_kernel.S |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/vfp/vfphw.S |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
-index fd26f8d..9cf4cbf 100644
---- a/arch/arm/kernel/relocate_kernel.S
-+++ b/arch/arm/kernel/relocate_kernel.S
-@@ -59,6 +59,8 @@ relocate_new_kernel:
- 	ldr r2,kexec_boot_atags
- 	mov pc,lr
+diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+index d66cead..9897dcf 100644
+--- a/arch/arm/vfp/vfphw.S
++++ b/arch/arm/vfp/vfphw.S
+@@ -206,6 +206,7 @@ ENTRY(vfp_save_state)
+ 	mov	pc, lr
+ ENDPROC(vfp_save_state)
  
 +	.align
-+
- 	.globl kexec_start_address
- kexec_start_address:
- 	.long	0x0
+ last_VFP_context_address:
+ 	.word	last_VFP_context
+ 
 -- 
 1.7.1
