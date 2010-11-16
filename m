@@ -1,41 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Nov 2010 18:19:06 +0000
-Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
-	L_PTE_NOWRITE
-In-Reply-To: <AANLkTikCVCuR2mxyoE7e=V_FauTxztLHUJp97+rroUe-@mail.gmail.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
-	<20101115183014.GD31421@n2100.arm.linux.org.uk>
-	<AANLkTikCVCuR2mxyoE7e=V_FauTxztLHUJp97+rroUe-@mail.gmail.com>
-Message-ID: <20101116181906.GA21926@n2100.arm.linux.org.uk>
+Date: Tue, 16 Nov 2010 18:22:57 +0000
+Subject: [PATCH 4/7] ARM: Thumb-2: Correct data alignment for
+	CONFIG_THUMB2_KERNEL in kernel/head.S
+In-Reply-To: <1289913277-8822-4-git-send-email-dave.martin@linaro.org>
+References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+	<1289913277-8822-4-git-send-email-dave.martin@linaro.org>
+Message-ID: <20101116182257.GB21926@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 03:18:03PM +0000, Catalin Marinas wrote:
-> On 15 November 2010 18:30, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Let's not make this more complicated than it has to be. ?If we need the
-> > inverse of WRITE and EXEC, then that's what we should change everyone to,
-> > not invent a new system to work along side the old system.
-> 
-> This adds an additional instruction in set_pte_ext, unless you can
-> write the bit checking in a better way:
+On Tue, Nov 16, 2010 at 01:14:34PM +0000, Dave Martin wrote:
+> Directives such as .long and .word do not magically cause the
+> assembler location counter to become aligned in gas.  As a
+> result, using these directives in code sections can result in
+> misaligned data words when building a Thumb-2 kernel
+> (CONFIG_THUMB2_KERNEL).
 
-It actually results in the same number of instructions.  From memory:
+> @@ -413,6 +416,7 @@ __fixup_smp_on_up:
+>  	mov	pc, lr
+>  ENDPROC(__fixup_smp)
+>  
+> +	.align
+>  1:	.word	.
+>  	.word	__smpalt_begin
+>  	.word	__smpalt_end
 
-ARMv3-ARMv5:
--	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
--	tst	r3, #L_PTE_WRITE | L_PTE_DIRTY	@ write and dirty?
--	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
-+	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY
-+	tst	r3, #L_PTE_RDONLY | L_PTE_DIRTY	@ write and dirty?
-+	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
-
-and for ARMv6+:
-
--	tst	r1, #L_PTE_WRITE
--	tstne	r1, #L_PTE_DIRTY
--	orreq	r3, r3, #PTE_EXT_APX
-+	eor	r1, r1, #L_PTE_DIRTY
-+	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
-+	orrne	r3, r3, #PTE_EXT_APX
+This one is technically bogus because this feature is disabled (and
+incompatible) with Thumb-2 kernels.  So it never gets built for a T2
+kernel.
