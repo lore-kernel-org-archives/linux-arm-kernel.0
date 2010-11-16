@@ -1,31 +1,34 @@
-From: matts@commtech-fastcom.com (Matt Schulte)
-Date: Tue, 16 Nov 2010 10:13:22 -0600
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <20101116143016.GB6527@ucw.cz>
-References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<4CBD8EE4.5040808@evidence.eu.com> <i9ka0s$4ua$1@dough.gmane.org>
-	<201010191727.53314.alexander.stein@systec-electronic.com>
-	<i9kk4o$svc$1@dough.gmane.org> <4CC418A9.6090602@evidence.eu.com>
-	<4CDA630F.4060903@atmel.com> <20101110172842.GC12371@suse.de>
-	<4CDBC3EC.6020707@evidence.eu.com> <20101116143016.GB6527@ucw.cz>
-Message-ID: <AANLkTi=grehSnfWzCDtSXXmNb=-NAwbHHJ_P1XPyOuw8@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Nov 2010 17:16:44 +0100
+Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
+In-Reply-To: <201011161712.31703.arnd@arndb.de>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<F45880696056844FA6A73F415B568C6953604E7D94@EXDCVYMBSTM006.EQ1STM.local>
+	<201011161712.31703.arnd@arndb.de>
+Message-ID: <201011161716.44542.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 8:30 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
->
->> Documentation about RS485 serial communications
->
-> I have seen hardware (kontron pmc-6l) that was capable of switching
-> between RS232, RS485 and one other standard by software.
->
-> Is such hw common? If so, should we have standard interface?
+sent out too early...
 
-In my opinion this type of card is not that common.  Generally
-speaking the achievable baud rates for this type of multi-protocol
-card are very limited because of limitations of the transceiver chips.
- It seems that most of the time people would rather have a faster
-serial port than one that does several different voltages.
+On Tuesday 16 November 2010, Arnd Bergmann wrote:
+> > > This looks a bit like you actually have multiple interrupt lines
+> > > multiplexed
+> > > through a private interrupt controller. Have you considered making this
+> > > controller
+> > > a separate device to multiplex the interrupt numbers?
+> > 
+> > MCDE contains several pipelines, each of them can generate interrupts.
+> > Since each interrupt comes from the same device there is no need for
+> > separate devices for interrupt controller.
+> 
+> Right, so this one and the one above is really a question of how to describe
+> a pipeline:
+ 
+It may be good to have a source file that only deals with the pipelines
+and all that they have in common. If you use the same basic pipeline
+logic for doing multiple different things, this can be used to structure
+the code more logically. Not sure if this is worth trying, since it might
+not actually gain all that much in the end
 
-Matt Schulte
+	Arnd
