@@ -1,24 +1,25 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 16 Nov 2010 23:12:58 +0000
-Subject: [PATCH 2/2] h1940-leds: Fix compile issue introduced by
-	latch-related changes
-In-Reply-To: <1289248308-21272-2-git-send-email-anarsoul@gmail.com>
-References: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
-	<1289248308-21272-2-git-send-email-anarsoul@gmail.com>
-Message-ID: <4CE30FFA.7000204@fluff.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 16 Nov 2010 16:57:59 -0700
+Subject: [PATCH v5 01/12] misc: add driver for sequencer serial port
+In-Reply-To: <20101116222340.GF21926@n2100.arm.linux.org.uk>
+References: <1289848334-8695-1-git-send-email-cyril@ti.com>
+	<1289848334-8695-2-git-send-email-cyril@ti.com>
+	<20101116071047.GE4074@angua.secretlab.ca>
+	<4CE2AE3C.4040805@ti.com>
+	<AANLkTik76EY8Xh01YP2Tep6k1ETPO+3idmNuk3pVikJG@mail.gmail.com>
+	<20101116222340.GF21926@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin9WAisjaKLJ3+u4=tSGseKjBSRWiJZee-AapDj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/10 20:31, Vasily Khoruzhick wrote:
-> Latch API was converted to gpiolib API as result we got this compile
-> error:
-> 
-> drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
-> drivers/leds/leds-h1940.c:33: error: implicit declaration of function
-> 'h1940_latch_control
-> 
-> Adapt h1940-leds driver to new changes and fix compile issue.
-> 
+On Tue, Nov 16, 2010 at 3:23 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Nov 16, 2010 at 01:35:40PM -0700, Grant Likely wrote:
+>> I'll let Russel make the decision here; but I must admit I'm puzzled.
+> ? ? ? ? ? ? ? ? ^
+> Grr.
 
-it's a pitty we can't remove the driver totally and use the
-gpio leds.
+Sorry; typo.  I *do* know how to spell your name.  :-)  I owe you a
+pint and we'll call it even.
+
+g.
