@@ -1,65 +1,29 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 16 Nov 2010 10:49:15 -0800
-Subject: [PATCH] omap4: enable L2 prefetching
-In-Reply-To: <1289838044-32016-1-git-send-email-nm@ti.com> (Nishanth Menon's
-	message of "Mon, 15 Nov 2010 10:20:44 -0600")
-References: <1289838044-32016-1-git-send-email-nm@ti.com>
-Message-ID: <878w0tf6j8.fsf@deeprootsystems.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Nov 2010 11:14:25 -0800
+Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned
+	long	for physical addresses
+In-Reply-To: <1289842829-3027-16-git-send-email-catalin.marinas@arm.com>
+References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
+	<1289842829-3027-16-git-send-email-catalin.marinas@arm.com>
+Message-ID: <4CE2D811.50701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+On 11/15/2010 09:40 AM, Catalin Marinas wrote:
+> @@ -188,21 +189,21 @@
+>   * translation for translating DMA addresses.  Use the driver
+>   * DMA support - see dma-mapping.h.
+>   */
+> -static inline unsigned long virt_to_phys(void *x)
+> +static inline phys_addr_t virt_to_phys(void *x)
+>  {
+>  	return __virt_to_phys((unsigned long)(x));
+>  }
 
-> From: Mans Rullgard <mans@mansr.com>
->
-> Enabling L2 prefetching improves performance as shown on Panda
-> ES2.1 board with mem test, and it has measurable impact on
-> performances. I think we should consider it, even though it damages
-> "writes" a bit. (rebased to k.org)
-> Usually the prefetch is used at both levels together L1 + L2, however,
-> to enable the CP15 prefetch engines, these are under security, and on
-> GP devices, we cannot enable it(e.g. on PandaBoard). However, just
-> enabling PL310 prefetch seems to provide performance improvement,
-> as shown in the data below (from Ubuntu) and would be a great thing
-> to pull in.
+As you're already in the area can you mark the argument to
+virt_to_phys() as const? I ran into a compiler warning due to that the
+other day.
 
-[...]
-
->  arch/arm/mach-omap2/omap4-common.c |    6 +++++-
->  1 files changed, 5 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index 2f89555..a5e6126 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -64,6 +64,10 @@ static int __init omap_l2_cache_init(void)
->  	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
->  	BUG_ON(!l2cache_base);
->  
->
-> +	if (omap_rev() != OMAP4430_REV_ES1_0)
-> +		omap_smc1(0x109, 0x7e470000);
->
->  	/* Enable PL310 L2 Cache controller */
->  	omap_smc1(0x102, 0x1);
->  
-> @@ -75,7 +79,7 @@ static int __init omap_l2_cache_init(void)
->  	if (omap_rev() == OMAP4430_REV_ES1_0)
->  		l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
->  	else
-> -		l2x0_init(l2cache_base, 0x0e070000, 0xc0000fff);
-> +		l2x0_init(l2cache_base, 0x7e470000, 0xc0000fff);
->  
->  	/*
->  	 * Override default outer_cache.disable with a OMAP4
-
-Adding/updaing the in-code comments would be helpful as well.
-
-The exiting use of all the hard-coded constants in this code is rather
-unreadable and would be much more readable with symbolic constants, and
-this change just continues the pattern.
-
-Ideally, switching this code to use symbolic constants and then adding
-the new feature would be a cleaner approach.
-
-Kevin
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
