@@ -1,69 +1,60 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 16 Nov 2010 03:25:21 -0700
-Subject: [PATCH 3/3] OMAP: wd_timer: remove old, dead probing code
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Tue, 16 Nov 2010 16:07:34 +0530
+Subject: [PATCH 0/3] OMAP: wd_timer: update integration code to use new
+	hwmod changes
 In-Reply-To: <20101116102205.27991.37909.stgit@twilight.localdomain>
 References: <20101116102205.27991.37909.stgit@twilight.localdomain>
-Message-ID: <20101116102518.27991.38133.stgit@twilight.localdomain>
+Message-ID: <AANLkTi=nKOL_iojREzfjA-G1hFR1QzTMJ_1WrGR2_FZo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit f2ce62312650211f6cf665cd6dc519c334c4071e, watchdog
-probing is handled by files in mach-omap1/ and mach-omap2/, and the
-plat-omap/devices.c probing code is no longer used.  Remove the dead
-code in plat-omap/devices.c.
+Paul,
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Charulatha Varadarajan <charu@ti.com>
----
- arch/arm/plat-omap/devices.c |   38 --------------------------------------
- 1 files changed, 0 insertions(+), 38 deletions(-)
+Thanks for the series.
 
-diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
-index 6f42a18..f2d6ecc 100644
---- a/arch/arm/plat-omap/devices.c
-+++ b/arch/arm/plat-omap/devices.c
-@@ -234,44 +234,6 @@ static inline void omap_init_uwire(void) {}
- 
- /*-------------------------------------------------------------------------*/
- 
--#if	defined(CONFIG_OMAP_WATCHDOG) || defined(CONFIG_OMAP_WATCHDOG_MODULE)
--
--static struct resource wdt_resources[] = {
--	{
--		.flags		= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device omap_wdt_device = {
--	.name	   = "omap_wdt",
--	.id	     = -1,
--	.num_resources	= ARRAY_SIZE(wdt_resources),
--	.resource	= wdt_resources,
--};
--
--static void omap_init_wdt(void)
--{
--	if (cpu_is_omap16xx())
--		wdt_resources[0].start = 0xfffeb000;
--	else if (cpu_is_omap2420())
--		wdt_resources[0].start = 0x48022000; /* WDT2 */
--	else if (cpu_is_omap2430())
--		wdt_resources[0].start = 0x49016000; /* WDT2 */
--	else if (cpu_is_omap343x())
--		wdt_resources[0].start = 0x48314000; /* WDT2 */
--	else if (cpu_is_omap44xx())
--		wdt_resources[0].start = 0x4a314000;
--	else
--		return;
--
--	wdt_resources[0].end = wdt_resources[0].start + 0x4f;
--
--	(void) platform_device_register(&omap_wdt_device);
--}
--#else
--static inline void omap_init_wdt(void) {}
--#endif
--
- #if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE)
- 
- static phys_addr_t omap_dsp_phys_mempool_base;
+On Tue, Nov 16, 2010 at 15:55, Paul Walmsley <paul@pwsan.com> wrote:
+> Update the OMAP watchdog timer integration code to take advantage of
+> the new hwmod upgrades added by the "OMAP2+: hwmod core upgrades for
+> 2.6.38: first set" series, posted previously. ?So that series needs
+> to be applied before these patches.
+>
+> Charu, it would be great if you could take a look at these.
+
+It looks fine for me.
+
+-V Charulatha
+
+>
+> Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
+>
+>
+> - Paul
+>
+> ---
+>
+> wdt_2.6.38
+> ? text ? ?data ? ? bss ? ? dec ? ? hex filename
+> 5709076 ?470560 5608992 11788628 b3e154 vmlinux.omap2plus_defconfig.orig
+> 5708892 ?470560 5608992 11788444 b3e09c vmlinux.omap2plus_defconfig.patched
+>
+> Paul Walmsley (3):
+> ? ? ?OMAP2+: wd_timer: separate watchdog disable code from the rest of mach-omap2/devices.c
+> ? ? ?OMAP2+: wd_timer: disable on boot via hwmod postsetup mechanism
+> ? ? ?OMAP: wd_timer: remove old, dead probing code
+>
+>
+> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? | ? ?2 -
+> ?arch/arm/mach-omap2/devices.c ? ? ? ? ? ? ?| ? 64 +---------------------------
+> ?arch/arm/mach-omap2/io.c ? ? ? ? ? ? ? ? ? | ? 18 ++++++++
+> ?arch/arm/mach-omap2/omap_hwmod_2420_data.c | ? ?6 ++-
+> ?arch/arm/mach-omap2/omap_hwmod_2430_data.c | ? ?6 ++-
+> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? ?6 ++-
+> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? ?6 ++-
+> ?arch/arm/mach-omap2/wd_timer.c ? ? ? ? ? ? | ? 54 ++++++++++++++++++++++++
+> ?arch/arm/mach-omap2/wd_timer.h ? ? ? ? ? ? | ? 17 +++++++
+> ?arch/arm/plat-omap/devices.c ? ? ? ? ? ? ? | ? 38 -----------------
+> ?10 files changed, 108 insertions(+), 109 deletions(-)
+> ?create mode 100644 arch/arm/mach-omap2/wd_timer.c
+> ?create mode 100644 arch/arm/mach-omap2/wd_timer.h
+>
+>
