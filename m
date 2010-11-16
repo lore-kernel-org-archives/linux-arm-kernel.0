@@ -1,8 +1,8 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Nov 2010 13:16:57 +0000
-Subject: [PATCH] ARM: vexpress: Correct data alignment in headsmp.S for
+Date: Tue, 16 Nov 2010 13:16:33 +0000
+Subject: [PATCH] ARM: ux500: Correct data alignment in headsmp.S for
 	CONFIG_THUMB2_KERNEL
-Message-ID: <1289913417-9027-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1289913393-8975-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,17 +35,15 @@ data word declaration directives inside code sections:
 Applies cleanly on v2.6.37-rc1.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-vexpress/headsmp.S |    1 +
+ arch/arm/mach-ux500/headsmp.S |    1 +
  1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/headsmp.S b/arch/arm/mach-vexpress/headsmp.S
-index 8a78ff6..7a3f063 100644
---- a/arch/arm/mach-vexpress/headsmp.S
-+++ b/arch/arm/mach-vexpress/headsmp.S
-@@ -35,5 +35,6 @@ pen:	ldr	r7, [r6]
+diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
+index a6be2cd..2d723d6 100644
+--- a/arch/arm/mach-ux500/headsmp.S
++++ b/arch/arm/mach-ux500/headsmp.S
+@@ -34,5 +34,6 @@ pen:	ldr	r7, [r6]
  	 */
  	b	secondary_startup
  
