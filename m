@@ -1,43 +1,65 @@
 From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Tue, 16 Nov 2010 10:36:21 -0800 (PST)
-Subject: [PATCH 2/5] mx51: Add PWM clock support
-Message-ID: <942655.99898.qm@web51002.mail.re2.yahoo.com>
+Date: Tue, 16 Nov 2010 10:36:35 -0800 (PST)
+Subject: [PATCH 3/5] mx51: Add mx51 processor to the pwm driver
+Message-ID: <766471.7361.qm@web51008.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mx5/clock-mx51.c |? ? 8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/pwm.c |? ? 8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-index 8ac36d8..0624c4f 100644
---- a/arch/arm/mach-mx5/clock-mx51.c
-+++ b/arch/arm/mach-mx5/clock-mx51.c
-@@ -1046,6 +1046,12 @@ DEFINE_CLOCK_FULL(esdhc2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG2_OFFSET,
- DEFINE_CLOCK_MAX(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
- ??? clk_esdhc2, &pll2_sw_clk, &esdhc2_ipg_clk);
+diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
+index c36f263..c6cdced 100644
+--- a/arch/arm/plat-mxc/pwm.c
++++ b/arch/arm/plat-mxc/pwm.c
+@@ -26,7 +26,7 @@
+ #define MX1_PWMP? ? 0x08???/* PWM Period Register */
  
-+/* PWM */
-+DEFINE_CLOCK(pwm1_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG5_OFFSET,
-+??? NULL, NULL, &ipg_clk, NULL);
-+DEFINE_CLOCK(pwm2_clk, 1, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG7_OFFSET,
-+??? NULL, NULL, &ipg_clk, NULL);
-+
- #define _REGISTER_CLOCK(d, n, c) \
-? ? ? ? { \
- ??? ??? .dev_id = d, \
-@@ -1082,6 +1088,8 @@ static struct clk_lookup lookups[] = {
- ??? _REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
- ??? _REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
- ??? _REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk)
-+??? _REGISTER_CLOCK("mxc_pwm.0", NULL, pwm1_clk)
-+??? _REGISTER_CLOCK("mxc_pwm.1", NULL, pwm2_clk)
- };
  
- static void clk_tree_init(void)
+-/* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
++/* i.MX25/27/31/35/51 share the same PWM function block: */
+ 
+ #define MX3_PWMCR? ? ? ? ? ? ? ???0x00? ? /* PWM Control Register */
+ #define MX3_PWMSAR? ? ? ? ? ? ? ? 0x0C? ? /* PWM Sample Register */
+@@ -57,7 +57,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ ??? if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
+ ??? ??? return -EINVAL;
+ 
+-??? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25()) {
++??? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
+ ??? ??? unsigned long long c;
+ ??? ??? unsigned long period_cycles, duty_cycles, prescale;
+ ??? ??? u32 cr;
+@@ -79,7 +79,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 
+ ??? ??? cr = MX3_PWMCR_PRESCALER(prescale) | MX3_PWMCR_EN;
+ 
+-??? ??? if (cpu_is_mx25())
++??? ??? if (cpu_is_mx25() || cpu_is_mx51())
+ ??? ??? ??? cr |= MX3_PWMCR_CLKSRC_IPG;
+ ??? ??? else
+ ??? ??? ??? cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
+@@ -198,6 +198,7 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
+ 
+ ??? if (IS_ERR(pwm->clk)) {
+ ??? ??? ret = PTR_ERR(pwm->clk);
++??? ??? dev_err(&pdev->dev, "can't get PWM clock\n");
+ ??? ??? goto err_free;
+ ??? }
+ 
+@@ -233,6 +234,7 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
+ ??? mutex_unlock(&pwm_lock);
+ 
+ ??? platform_set_drvdata(pdev, pwm);
++??? dev_info(&pdev->dev, "i.MX PWM Driver Enabled\n");
+ ??? return 0;
+ 
+ err_free_mem:
 -- 
 1.6.0.4
+
 
 
 
