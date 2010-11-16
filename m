@@ -1,35 +1,39 @@
-From: davem@arm.com (Dave P. Martin)
-Date: Wed, 17 Nov 2010 14:01:09 +0000
-Subject: [PATCH 2/2] ARM: kexec: Fix crash_setup_regs() for ARMv7 and
-	CONFIG_THUMB2_KERNEL
-In-Reply-To: <20101117133526.GE19331@gw.healthdatacare.com>
-References: <1289913141-8559-1-git-send-email-dave.martin@linaro.org>
-	<1289913141-8559-2-git-send-email-dave.martin@linaro.org>
-	<20101117131146.GD19331@gw.healthdatacare.com>
-	<AANLkTi=4MLpX7+DoXs4a8Bcx2QrFH5ZVjL8qA5G_smaA@mail.gmail.com>
-	<20101117133526.GE19331@gw.healthdatacare.com>
-Message-ID: <20101117140109.GA8933@arm.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Tue, 16 Nov 2010 06:19:00 -0800
+Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
+In-Reply-To: <20101116072225.GF4074@angua.secretlab.ca>
+References: <1289848334-8695-1-git-send-email-cyril@ti.com>
+	<1289848334-8695-5-git-send-email-cyril@ti.com>
+	<20101116072225.GF4074@angua.secretlab.ca>
+Message-ID: <1289917140.1752.7.camel@helium>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 03:35:26PM +0200, Mika Westerberg wrote:
-> On Wed, Nov 17, 2010 at 01:26:02PM +0000, Catalin Marinas wrote:
-> > On 17 November 2010 13:11, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> [...]
-> > >
-> > > Quickly tested this and seems to work. So FWIW:
-> > >
-> > > Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
-> > 
-> > It's more like Tested-by :)  (unless you reviewed it as well, though
-> > there seems to be some confusion between Reviewed-by and Acked-by).
+On Tue, 2010-11-16 at 00:22 -0700, Grant Likely wrote:
+
 > 
-> Well, I was the original author if this code so I thought that
-> Acked-by was right but Tested-by is fine :)
+> After discussions about device init dependencies at plumbers, and
+> since this is the first SPI device driver I've reviewed since that
+> dicussion, this driver gets to be the first to implement the proposed
+> policy.  :-)
+> 
+> Change this to module_initcall().  Many spi and i2c drivers use
+> module or subsys_initcall to try and influence driver probe order so
+> that certain regulator chips get registered before the devices that
+> try to use them.  This approach is insane.
 
-Well, I don't know either ... so I'll make it Tested-by for now
-if that's OK.
+Last I observed the issue ... the situation was that various core
+drivers were required to be able to say that a key subsystem was
+functional ... with said subsystem required to boot properly.
 
-Thanks for trying it out, anyway.
+The dependency being, that is, driver on subsystem (but that subsystem
+needed a core/bus driver running before it could work.
 
----Dave
+What's insane is that Linux *STILL* has no clean way to express that
+type of system dependency ... where driver dependencies are pure side
+effects.  (Albeit ones that never change on many platforms, but where
+board-specific differences are routine, and have the same kind of
+indirect dependencies.
+
+
+- Dave
