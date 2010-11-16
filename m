@@ -1,33 +1,51 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 16 Nov 2010 20:04:26 +0000
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <ibuh1v$uh6$1@dough.gmane.org>
-References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<4CBD8EE4.5040808@evidence.eu.com> <i9ka0s$4ua$1@dough.gmane.org>
-	<201010191727.53314.alexander.stein@systec-electronic.com>
-	<i9kk4o$svc$1@dough.gmane.org> <4CC418A9.6090602@evidence.eu.com>
-	<4CDA630F.4060903@atmel.com> <20101110172842.GC12371@suse.de>
-	<4CDBC3EC.6020707@evidence.eu.com> <20101116143016.GB6527@ucw.cz>
-	<AANLkTi=grehSnfWzCDtSXXmNb=-NAwbHHJ_P1XPyOuw8@mail.gmail.com>
-	<20101116172013.102e06a6@lxorguk.ukuu.org.uk>
-	<ibuh1v$uh6$1@dough.gmane.org>
-Message-ID: <20101116200426.75085b68@lxorguk.ukuu.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 16 Nov 2010 15:28:44 -0500 (EST)
+Subject: [PATCH 7/7] ARM: Thumb-2: Restore sensible zImage header layout
+	for CONFIG_THUMB2_KERNEL
+In-Reply-To: <20101116182643.GC21926@n2100.arm.linux.org.uk>
+References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+	<1289913277-8822-7-git-send-email-dave.martin@linaro.org>
+	<20101116182643.GC21926@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1011161517260.6448@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Comtrol, Moxa, B&B, Sealevel, and others all sell PCI cards and
-> Ethernet attached serial ports that have selectable interfaces
-> (typically RS-232/422/485).  Comtrol and Moxa have had drivers in the
-> kernel tree for ages, but they've always had to use custom ioctl calls
-> for things like configuring 232/485/422 mode and half/full-duplex
-> mode.
+On Tue, 16 Nov 2010, Russell King - ARM Linux wrote:
 
-Ok so what is needed that isn't covered by the current termiox and
-TIOCG/SRS485 ioctls ?
+> On Tue, Nov 16, 2010 at 01:14:37PM +0000, Dave Martin wrote:
+> > This gets messed up with with CONFIG_THUMB2_KERNEL:
+> > 
+> >     * The NOPs making up the vector table become halfword-
+> >       sized.
+> 
+> Doesn't matter.
+> 
+> >     * The magic number and absolute entry point occur too early
+> >       and become misaligned.
+> 
+> Not used anymore - it's practically zero (and unused) for most cases
+> now anyway.
 
-> Having a standard API for things like interface mode, half-full
-> duplex, inter-character timeout, 9-bit mode, and so on would be life a
-> lot easier for those of us who maintain Linux serial drivers...
+I think it is worth preserving this layout regardless.  First of all 
+this is really cheap to do, and if whatever bootloader out there is 
+relying on it, at least the magic number, then better not break it 
+freely.
 
-9bit mode is a real problem with the tty layer defined in terms of 8bit
-streams but yes.
+> >     * The absolute entry point fails to indicate that the entry
+> >       point is Thumb code, which will cause incorrect execution
+> >       if the bootloader uses this to enter the kernel.
+> 
+> And as such...
+
+On the other hand... we could simply decide _not_ to fix it on the 
+basis that this will create a different header for a pure Thumb2 
+image.
+
+Maybe it is a better idea to preserve the current header as is with the 
+ARM mode nops and perform the switch to Thumb mode using the branch 
+instruction after those 8 nops.  This way the kernel image format will 
+remain compatible with existing bootloaders without a need for 
+bootloaders to know if the image is ARM or Thumb mode.
+
+
+Nicolas
