@@ -1,65 +1,29 @@
 From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Tue, 16 Nov 2010 10:36:35 -0800 (PST)
-Subject: [PATCH 3/5] mx51: Add mx51 processor to the pwm driver
-Message-ID: <766471.7361.qm@web51008.mail.re2.yahoo.com>
+Date: Tue, 16 Nov 2010 10:36:46 -0800 (PST)
+Subject: [PATCH 4/5] mx51: Add IOMUX definition for PWM output pin
+Message-ID: <642950.890.qm@web51002.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/plat-mxc/pwm.c |? ? 8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |? ? 1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-index c36f263..c6cdced 100644
---- a/arch/arm/plat-mxc/pwm.c
-+++ b/arch/arm/plat-mxc/pwm.c
-@@ -26,7 +26,7 @@
- #define MX1_PWMP? ? 0x08???/* PWM Period Register */
- 
- 
--/* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
-+/* i.MX25/27/31/35/51 share the same PWM function block: */
- 
- #define MX3_PWMCR? ? ? ? ? ? ? ???0x00? ? /* PWM Control Register */
- #define MX3_PWMSAR? ? ? ? ? ? ? ? 0x0C? ? /* PWM Sample Register */
-@@ -57,7 +57,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- ??? if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
- ??? ??? return -EINVAL;
- 
--??? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25()) {
-+??? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
- ??? ??? unsigned long long c;
- ??? ??? unsigned long period_cycles, duty_cycles, prescale;
- ??? ??? u32 cr;
-@@ -79,7 +79,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 
- ??? ??? cr = MX3_PWMCR_PRESCALER(prescale) | MX3_PWMCR_EN;
- 
--??? ??? if (cpu_is_mx25())
-+??? ??? if (cpu_is_mx25() || cpu_is_mx51())
- ??? ??? ??? cr |= MX3_PWMCR_CLKSRC_IPG;
- ??? ??? else
- ??? ??? ??? cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
-@@ -198,6 +198,7 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
- 
- ??? if (IS_ERR(pwm->clk)) {
- ??? ??? ret = PTR_ERR(pwm->clk);
-+??? ??? dev_err(&pdev->dev, "can't get PWM clock\n");
- ??? ??? goto err_free;
- ??? }
- 
-@@ -233,6 +234,7 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
- ??? mutex_unlock(&pwm_lock);
- 
- ??? platform_set_drvdata(pdev, pwm);
-+??? dev_info(&pdev->dev, "i.MX PWM Driver Enabled\n");
- ??? return 0;
- 
- err_free_mem:
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index e1600f3..fe249ad 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -379,6 +379,7 @@ typedef enum iomux_config {
+ #define MX51_PAD_GPIO_1_2__GPIO_1_2??? ??? IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,???0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_2__I2C2_SCL??? ??? IOMUX_PAD(0x7D4, 0x3CC, (2 | IOMUX_CONFIG_SION), \
+ ??? ??? ??? ??? ??? ??? ??? 0x9b8,???3, MX51_I2C_PAD_CTRL)
++#define MX51_PAD_GPIO_1_2__PWM1_PWMO??? ??? IOMUX_PAD(0x7D4, 0x3CC, 1, 0x0,???0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_3__GPIO_1_3??? ??? IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,???0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_3__I2C2_SDA??? ??? IOMUX_PAD(0x7D8, 0x3D0, (2 | IOMUX_CONFIG_SION), \
+ ??? ??? ??? ??? ??? ??? ??? 0x9bc,???3, MX51_I2C_PAD_CTRL)
 -- 
 1.6.0.4
-
 
 
 
