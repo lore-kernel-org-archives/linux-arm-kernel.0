@@ -1,34 +1,53 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 17 Nov 2010 10:29:22 -0500 (EST)
-Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
-References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-8-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <alpine.LFD.2.00.1011171026550.6448@xanadu.home>
+From: alexis.rodet@bvs-tech.com (Alexis RODET)
+Date: Wed, 17 Nov 2010 16:40:06 +0100
+Subject: Devel error: redefinition of 'struct flash_platform_data'
+Message-ID: <4CE3F756.6040700@bvs-tech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Nov 2010, Haojian Zhuang wrote:
+Hello,
 
-> iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
-> of accessing CP0 and CP1 is changed in PJ4. Append more files to support
-> iwmmxt in PJ4 core.
-> 
-> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
+I'm making an arm machine with both mtd flash and m25p spi flash and try
+to define partitions for both chips in my code.
 
+But there are 2 definitions of 'struct flash_platform_data' and both
+definition are incompatible:
 
-Did you forget to do "git add pj4-cp0.c"?  It is missing from your 
-patch.
+in <asm/mach/flash.h>:
+struct flash_platform_data {
+    const char    *map_name;
+    const char    *name;
+    unsigned int    width;
+    int        (*init)(void);
+    void        (*exit)(void);
+    void        (*set_vpp)(int on);
+    void        (*mmcontrol)(struct mtd_info *mtd, int sync_read);
+    struct mtd_partition *parts;
+    unsigned int    nr_parts;
+};
 
+in <linux/spi/flash.h>:
+struct flash_platform_data {
+    char        *name;
+    struct mtd_partition *parts;
+    unsigned int    nr_parts;
 
-Nicolas
+    char        *type;
+
+    /* we'll likely add more ... use JEDEC IDs, etc */
+};
+
+Both are included in a lot of machines or driver.
+
+I don't know what to do.
+Which one should I jeopardize or rename ?
+
+Thank for your help,
+Alexis RODET
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: alexis_rodet.vcf
+Type: text/x-vcard
+Size: 315 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101117/80bb9b43/attachment-0001.vcf>
