@@ -1,38 +1,39 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Nov 2010 17:02:37 +0000
-Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
-	L_PTE_NOWRITE
-In-Reply-To: <20101115183014.GD31421@n2100.arm.linux.org.uk>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
-	<20101115183014.GD31421@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTik5FcZ3rNtiwN8kYP0LZh+YqGtKP_RteoFiWa16@mail.gmail.com>
+Date: Wed, 17 Nov 2010 17:06:39 +0000
+Subject: [PATCH 3/9] ARM: smp: avoid using bitmasks and locks for IPIs,
+	use hardware instead
+In-Reply-To: <E1PI3Jw-00029e-Kh@rmk-PC.arm.linux.org.uk>
+References: <20101115175553.GC31421@n2100.arm.linux.org.uk>
+	<E1PI3Jw-00029e-Kh@rmk-PC.arm.linux.org.uk>
+Message-ID: <1290013599.2351.60.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2010 18:30, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 12, 2010 at 06:00:25PM +0000, Catalin Marinas wrote:
->> --- a/arch/arm/include/asm/pgtable-2level.h
->> +++ b/arch/arm/include/asm/pgtable-2level.h
->> @@ -128,6 +128,8 @@
->> ?#define L_PTE_USER ? ? ? ? ? (1 << 8)
->> ?#define L_PTE_EXEC ? ? ? ? ? (1 << 9)
->> ?#define L_PTE_SHARED ? ? ? ? (1 << 10) ? ? ? /* shared(v6), coherent(xsc3) */
->> +#define L_PTE_NOEXEC ? ? ? ? (0)
->> +#define L_PTE_NOWRITE ? ? ? ? ? ? ? ?(0)
->
-> Let's not make this more complicated than it has to be. ?If we need the
-> inverse of WRITE and EXEC, then that's what we should change everyone to,
-> not invent a new system to work along side the old system.
+On Mon, 2010-11-15 at 17:58 +0000, Russell King - ARM Linux wrote:
+> Avoid using bitmasks and locks in the percpu area for IPIs, and instead
+> use individual software generated interrupts to identify the reason for
+> the IPI.  This avoids the problems of having spinlocks in the percpu
+> area.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/kernel/smp.c |   87 ++++++++++++++----------------------------------
+>  1 files changed, 26 insertions(+), 61 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 7a236db..78d55c6 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+[...]
+>  enum ipi_msg_type {
+> -       IPI_TIMER,
+> +       IPI_TIMER = 2,
+>         IPI_RESCHEDULE,
+>         IPI_CALL_FUNC,
+>         IPI_CALL_FUNC_SINGLE,
 
-Question on the pgprot_noncached/writecombine/dmacoherent - in the
-current implementation we pass L_PTE_EXEC on the dmacoherent macro. Do
-we need to pass L_PTE_NOEXEC to the noncached/writecombine ones? I
-don't see a reason for any of these to be executable but maybe we can
-let the code calling them decide.
-
-Thanks.
+Maybe a comment here on why this starts at 2. People may wonder in the
+future.
 
 -- 
 Catalin
