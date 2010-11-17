@@ -1,48 +1,30 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Wed, 17 Nov 2010 19:17:39 +0800
-Subject: [PATCH 03/11] ARM: imx: Add reset routine for i.MX28
-In-Reply-To: <20101115163646.GK8942@pengutronix.de>
-References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
-	<1289831795-4373-4-git-send-email-shawn.guo@freescale.com>
-	<20101115163646.GK8942@pengutronix.de>
-Message-ID: <AANLkTimpvmRLhWuDdZVLGcyro5bfNGEDYx509RLbC_nq@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Nov 2010 12:18:13 +0100
+Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned
+	long for physical addresses
+In-Reply-To: <AANLkTinDGk2HPg7py9nzsqmM3_AbSG_GJJYwsiMr+wQL@mail.gmail.com>
+References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
+	<20101116193335.GD21926@n2100.arm.linux.org.uk>
+	<AANLkTinDGk2HPg7py9nzsqmM3_AbSG_GJJYwsiMr+wQL@mail.gmail.com>
+Message-ID: <201011171218.13910.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Mon, Nov 15, 2010 at 10:36:27PM +0800, Shawn Guo wrote:
->> +#ifdef CONFIG_ARCH_MX28
->> +int mxc_reset_block(void __iomem *reg_addr)
->> +{
->> + ? ? u32 reg;
->> + ? ? int timeout;
->> +
->> + ? ? /*
->> + ? ? ?* The process of software reset of IP block is done
->> + ? ? ?* in several steps:
->> + ? ? ?*
->> + ? ? ?* 1) clear SFTRST and wait it cleared;
->> + ? ? ?* 2) clear CLKGATE, set SFTRST, wait CLKGATE set;
->> + ? ? ?* 3) clear SFTRST and wait it cleared;
->> + ? ? ?* 4) clear CLKGATE and wait it cleared.
->> + ? ? ?*/
->> +
->> + ? ? /* Clear SFTRST */
->> + ? ? reg = __raw_readl(reg_addr);
->> + ? ? reg &= ~(1 << 31);
->> + ? ? __raw_writel(reg, reg_addr);
->> + ? ? /* Wait SFTRST cleared */
->> + ? ? timeout = 1000;
->> + ? ? do {
->> + ? ? ? ? ? ? mdelay(1);
->> + ? ? ? ? ? ? if ((__raw_readl(reg_addr) & (1 << 31)) == 0)
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? } while (--timeout > 0);
-> Does the mdelay make sence here?
->
-i.MX28 Application Processor Reference Manual, Chapter 39.5.10
-"Correct Way to Software Reset a Block".
+On Wednesday 17 November 2010, Catalin Marinas wrote:
+> >
+> > It may make sense to mark it const volatile, as that's the most
+> > permissive set of attributes possible (iow, it'll accept any pointer
+> > without warning.)  However, might be an idea to check what other
+> > arches do.
+> 
+> The majority of architectures use volatile and a few add both const
+> and volatile.
+> 
+> I usually use the generic headers as reference for function prototypes
+> and that's just using volatile without a const (cc'ing Arnd for any
+> view on this).
 
--- 
-Regards,
-Shawn
+const volatile sounds right here, I can also change the generic header
+if we agree to do the same in arm.
+
+	Arnd
