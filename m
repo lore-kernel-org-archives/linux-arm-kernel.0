@@ -1,85 +1,54 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 17 Nov 2010 11:11:34 +0000
-Subject: [PATCH 7/7 v1.1] ARM: Thumb-2: Restore sensible zImage header layout
-	for CONFIG_THUMB2_KERNEL
-In-Reply-To: <1289913277-8822-7-git-send-email-dave.martin@linaro.org>
-References: <1289913277-8822-7-git-send-email-dave.martin@linaro.org>
-Message-ID: <1289992294-7181-1-git-send-email-dave.martin@linaro.org>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Wed, 17 Nov 2010 03:09:10 -0800
+Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
+References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-8-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05986C77F4@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code which makes up the zImage header intends to leave a
-32-byte gap followed by a branch to the real entry point, a
-magic number, and a word containing the absolute entry point
-address.
 
-This gets messed up with with CONFIG_THUMB2_KERNEL, because the
-size of the initial padding NOPs changes.
 
-Instead, the header can be made fully compatible by restoring
-it to ARM.
+>-----Original Message-----
+>From: Haojian Zhuang [mailto:haojian.zhuang at marvell.com]
+>Sent: 2010?11?17? 7:04 PM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Haojian Zhuang; Zhou Zhu; Eric Miao; Nicolas Pitre
+>Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+>
+>iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
+>of accessing CP0 and CP1 is changed in PJ4. Append more files to support
+>iwmmxt in PJ4 core.
+>
+>Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+>Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>Cc: Eric Miao <eric.y.miao@gmail.com>
+>Cc: Nicolas Pitre <nico@fluxnic.net>
+>---
+> arch/arm/Kconfig         |    4 +-
+> arch/arm/kernel/Makefile |    1 +
+> arch/arm/kernel/iwmmxt.S |   55 +++++++++++++++++++++++++++++++++++-------
+>----
+> 3 files changed, 45 insertions(+), 15 deletions(-)
+>
 
-In the Thumb-2 case, we can replace the initial NOPs with a
-sequence which switches to Thumb and jumps to the real entry
-point.
+Changelog:
+1. Append missing pj4-cp0.c.
 
-As a consequence, the zImage entry point is now always ARM, so
-no special magic is needed any more for the uImage rules in the
-Thumb-2 case.
-
-Applies cleanly on v2.6.37-rc2.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/boot/Makefile          |    5 -----
- arch/arm/boot/compressed/head.S |    9 +++++++--
- 2 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index 4a590f4..4d26f2c 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -70,12 +70,7 @@ else
- $(obj)/uImage: LOADADDR=$(ZRELADDR)
- endif
- 
--ifeq ($(CONFIG_THUMB2_KERNEL),y)
--# Set bit 0 to 1 so that "mov pc, rx" switches to Thumb-2 mode
--$(obj)/uImage: STARTADDR=$(shell echo $(LOADADDR) | sed -e "s/.$$/1/")
--else
- $(obj)/uImage: STARTADDR=$(LOADADDR)
--endif
- 
- $(obj)/uImage:	$(obj)/zImage FORCE
- 	$(call if_changed,uimage)
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 1f65080..ab95391 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -125,16 +125,21 @@ wait:		mrc	p14, 0, pc, c0, c1, 0
-  * sort out different calling conventions
-  */
- 		.align
-+ THUMB(		.arm			)
- start:
- 		.type	start,#function
--		.rept	8
-+ THUMB(		adr	r12, BSYM(1f)	)
-+ THUMB(		bx	r12		)
-+ THUMB(		.rept	6		)
-+ ARM(		.rept	8		)
- 		mov	r0, r0
- 		.endr
- 
--		b	1f
-+		nop				@ Pad magic number to 0x24
- 		.word	0x016f2818		@ Magic numbers to help the loader
- 		.word	start			@ absolute load/run zImage address
- 		.word	_edata			@ zImage end address
-+ THUMB(		.thumb			)
- 1:		mov	r7, r1			@ save architecture ID
- 		mov	r8, r2			@ save atags pointer
- 
--- 
-1.7.1
+Thanks
+Haojian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0009-ARM-pxa-add-iwmmx-support-for-PJ4.patch
+Type: application/octet-stream
+Size: 6981 bytes
+Desc: 0009-ARM-pxa-add-iwmmx-support-for-PJ4.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101117/8ddac871/attachment.obj>
