@@ -1,77 +1,55 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 17 Nov 2010 10:55:41 -0500 (EST)
-Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C05986C77F4@SC-VEXCH1.marvell.com>
-References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-8-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
-	<25B60CDC2F704E4E9D88FFD52780CB4C05986C77F4@SC-VEXCH1.marvell.com>
-Message-ID: <alpine.LFD.2.00.1011171047150.6448@xanadu.home>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 17 Nov 2010 08:01:17 -0800
+Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
+In-Reply-To: <201011171055.58201.arnd@arndb.de>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<F45880696056844FA6A73F415B568C6953604E7D94@EXDCVYMBSTM006.EQ1STM.local>
+	<1289936772.28741.188.camel@Joe-Laptop>
+	<201011171055.58201.arnd@arndb.de>
+Message-ID: <1290009677.28741.302.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Nov 2010, Haojian Zhuang wrote:
-
+On Wed, 2010-11-17 at 10:55 +0100, Arnd Bergmann wrote:
+> On Tuesday 16 November 2010, Joe Perches wrote:
+> > static inline u32 MCDE_channel_path(u32 chnl, u32 fifo, u32 type, u32 ifc, u32 link)
+> > {
+> >         return ((chnl << 16) |
+> >                 (fifo << 12) |
+> >                 (type << 8) |
+> >                 (ifc << 4) |
+> >                 (link << 0));
+> > }
+> > 
+> > #define SET_ENUM_MCDE_CHNLPATH(chnl, fifo, var, type, ifc, link)        \
+> >         MCDE_CHNLPATH_CHNL##chnl##_FIFO##fifo##_##var =                 \
+> >                 MCDE_channel_path(MCDE_CHNL_##chnl,                     \
+> >                                   MCDE_FIFO_##fifo,                     \
+> >                                   MCDE_PORTTYPE_##type,                 \
+> >                                   ifc,                                  \
+> >                                   link)
+> > 
+> > enum mcde_chnl_path {
+> >         /* Channel A */
+> >         SET_ENUM_MCDE_CHNLPATH(A, A, DPI_0,             DPI, 0, 0),
+> >         SET_ENUM_MCDE_CHNLPATH(A, A, DSI_IFC0_0,        DSI, 0, 0),
+> >         SET_ENUM_MCDE_CHNLPATH(A, A, DSI_IFC0_1,        DSI, 0, 1),
 > 
+> While more readable, this has two significant problems:
 > 
-> >-----Original Message-----
-> >From: Haojian Zhuang [mailto:haojian.zhuang at marvell.com]
-> >Sent: 2010?11?17? 7:04 PM
-> >To: linux-arm-kernel at lists.infradead.org
-> >Cc: Haojian Zhuang; Zhou Zhu; Eric Miao; Nicolas Pitre
-> >Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
-> >
-> >iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
-> >of accessing CP0 and CP1 is changed in PJ4. Append more files to support
-> >iwmmxt in PJ4 core.
-> >
-> >Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
-> >Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> >Cc: Eric Miao <eric.y.miao@gmail.com>
-> >Cc: Nicolas Pitre <nico@fluxnic.net>
-> >---
-> > arch/arm/Kconfig         |    4 +-
-> > arch/arm/kernel/Makefile |    1 +
-> > arch/arm/kernel/iwmmxt.S |   55 +++++++++++++++++++++++++++++++++++-------
-> >----
-> > 3 files changed, 45 insertions(+), 15 deletions(-)
-> >
-> 
-> Changelog:
-> 1. Append missing pj4-cp0.c.
+> * You cannot use the result of an inline function in an enum definition
+> * It hides the name of the identifier, making it impossible to use grep
+>   or ctags to find the definition when you only know the name
 
-OK... some more comments there:
+True, though I would avoid that problem by using a get function/macro
+and not use an enum at all.
 
-+static int __init pj4_cp0_init(void)
-+{
-+       u32 cp_access;
-+
-+       cp_access = pj4_cp_access_read() & ~0xf;
-+       pj4_cp_access_write(cp_access | 0xf);
+There are just 4 items of interest here.  chan, fifo, #1, #2.
+Encoding those in the variable name is a bit of a visual chase and
+a bit mind numbing to read I think.
+ 
+> The easiest way is probably to get rid of the macros entirely here
+> and just define the values as hex, with a comment exmplaining what the
+> digits mean.
 
-You clear all first 4 bits just to set them all again.  Isn't the first 
-mask redundant?
-
-+       printk(KERN_INFO "XScale iWMMXt coprocessor detected.\n");
-
-You are not really detecting anything here, and this is not for XScale 
-either.  What about ""PJ4 iWMMXt coprocessor enabled.\n" instead?
-
-+       elf_hwcap |= HWCAP_IWMMXT;
-+       thread_register_notifier(&iwmmxt_notifier_block);
-+
-+       pj4_cp_access_write(cp_access);
-
-And here you are clearing access to the coprocessor.  There is nothing 
-that required access to it from the moment it was set at the beginning 
-of the function, so maybe you should have only cleared it at the 
-beginning instead.
-
-
-Nicolas
+That'd be fine too.
