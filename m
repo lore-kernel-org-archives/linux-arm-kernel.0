@@ -1,23 +1,33 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 17 Nov 2010 13:11:06 +0900
-Subject: [PATCH v4] arm & sh: factorised duplicated clkdev.c
-In-Reply-To: <1289919848-23262-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1289919848-23262-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20101117041106.GC2790@linux-sh.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 17 Nov 2010 07:06:14 +0100
+Subject: [RFC][PATCH 00/11] ARM: imx: Add initial i.MX28 support
+In-Reply-To: <AANLkTi=Hws0q8tWi+tkZss2gfYh9om5PZ+TB809_CcjX@mail.gmail.com>
+References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
+	<20101116101508.GK6017@pengutronix.de>
+	<AANLkTim=ACL-PW-n0MWu_+KD8n19ttq_NfEnRzsMp6SU@mail.gmail.com>
+	<20101116172444.GS8942@pengutronix.de>
+	<AANLkTi=Hws0q8tWi+tkZss2gfYh9om5PZ+TB809_CcjX@mail.gmail.com>
+Message-ID: <20101117060614.GY8942@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 04:04:08PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> factorise some generic infrastructure to assist looking up struct clks
-> for the ARM & SH architecture.
-> 
-> as the code is identical at 99%
-> 
-> put the arch specific code for allocation as example in asm/clkdev.h
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Paul Mundt <lethal@linux-sh.org>
+Hi Shawn,
 
-I've you've finally addressed Russell's comments and nothing else has
-changed, then you should just resubmit the updated version to the patch
-tracker.
+> plat-stmp3xxx is not an option for me.  Another reason is it has the
+> support for mach-stmp37xx.  If I change anything in plat-stmp3xxx, I
+> can not even find a board to test mach-stmp37xx.  For me
+> plat-stmp3xxx, mach-stmp37xx and mach-stmp378x seem out of
+> maintaining.  I do not see they are moving.
+> 
+> So at the end of the day, mach-mxs + plat-mxs becomes the option that
+> could work for both of us, right?  Correct me I misunderstood your
+> comments.
+As long as you don't use more than mach directory there is no need to
+populate plat-mxs.  Everything can go into mach-mxs.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
