@@ -1,44 +1,44 @@
-From: fg@emlix.com (Fabian Godehardt)
-Date: Wed, 17 Nov 2010 11:22:23 +0100
-Subject: [PATCH] ARM: s3c2440: fix AC97 and camera clock registration
-Message-ID: <1289989343-28816-1-git-send-email-fg@emlix.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 17 Nov 2010 10:16:42 +0000
+Subject: [PATCH 4/7] ARM: Thumb-2: Correct data alignment for
+	CONFIG_THUMB2_KERNEL in kernel/head.S
+In-Reply-To: <20101116182257.GB21926@n2100.arm.linux.org.uk>
+References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+	<1289913277-8822-4-git-send-email-dave.martin@linaro.org>
+	<20101116182257.GB21926@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinx6-uPV4i0pZOXTrWyfD-enRxbc6BO_cMvJscJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes 2 problems:
- - it sets the correct bitmask of the AC97 flag on the control-bit field
- - it increases the usage counter of both clocks because they get decreased
-   on clock registration (a few lines later)
+On Tue, Nov 16, 2010 at 6:22 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Nov 16, 2010 at 01:14:34PM +0000, Dave Martin wrote:
+>> Directives such as .long and .word do not magically cause the
+>> assembler location counter to become aligned in gas. ?As a
+>> result, using these directives in code sections can result in
+>> misaligned data words when building a Thumb-2 kernel
+>> (CONFIG_THUMB2_KERNEL).
+>
+>> @@ -413,6 +416,7 @@ __fixup_smp_on_up:
+>> ? ? ? mov ? ? pc, lr
+>> ?ENDPROC(__fixup_smp)
+>>
+>> + ? ? .align
+>> ?1: ? .word ? .
+>> ? ? ? .word ? __smpalt_begin
+>> ? ? ? .word ? __smpalt_end
+>
+> This one is technically bogus because this feature is disabled (and
+> incompatible) with Thumb-2 kernels. ?So it never gets built for a T2
+> kernel.
+>
 
-Maybe it is a better idea to check the usage counter on clk_disable() so
-it can not reach values <0.
+For now, this is true -- I'll soon be looking at making SMP_ON_UP work
+for Thumb-2.
 
-Signed-off-by: Fabian Godehardt <fg@emlix.com>
----
- arch/arm/mach-s3c2440/clock.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+When and if that is implemented, I believe this fix will be appropriate.
+Would it be better to hold this patch back and re-propose it with the
+rest of the SMP_ON_UP changes?
 
-diff --git a/arch/arm/mach-s3c2440/clock.c b/arch/arm/mach-s3c2440/clock.c
-index 3dc2426..0fc8461 100644
---- a/arch/arm/mach-s3c2440/clock.c
-+++ b/arch/arm/mach-s3c2440/clock.c
-@@ -93,6 +93,7 @@ static struct clk s3c2440_clk_cam = {
- 	.id		= -1,
- 	.enable		= s3c2410_clkcon_enable,
- 	.ctrlbit	= S3C2440_CLKCON_CAMERA,
-+	.usage		= 1,
- };
- 
- static struct clk s3c2440_clk_cam_upll = {
-@@ -108,7 +109,8 @@ static struct clk s3c2440_clk_ac97 = {
- 	.name		= "ac97",
- 	.id		= -1,
- 	.enable		= s3c2410_clkcon_enable,
--	.ctrlbit	= S3C2440_CLKCON_CAMERA,
-+	.ctrlbit	= S3C2440_CLKCON_AC97,
-+	.usage		= 1,
- };
- 
- static int s3c2440_clk_add(struct sys_device *sysdev)
--- 
-1.6.6.1
+Cheers
+---Dave
