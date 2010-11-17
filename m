@@ -1,47 +1,29 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 17 Nov 2010 21:34:32 +0800
-Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver (try
-	#8)
-Message-ID: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Wed, 17 Nov 2010 15:35:26 +0200
+Subject: [PATCH 2/2] ARM: kexec: Fix crash_setup_regs() for ARMv7 and
+	CONFIG_THUMB2_KERNEL
+In-Reply-To: <AANLkTi=4MLpX7+DoXs4a8Bcx2QrFH5ZVjL8qA5G_smaA@mail.gmail.com>
+References: <1289913141-8559-1-git-send-email-dave.martin@linaro.org>
+	<1289913141-8559-2-git-send-email-dave.martin@linaro.org>
+	<20101117131146.GD19331@gw.healthdatacare.com>
+	<AANLkTi=4MLpX7+DoXs4a8Bcx2QrFH5ZVjL8qA5G_smaA@mail.gmail.com>
+Message-ID: <20101117133526.GE19331@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 4 duplicated DPI panel drivers in DSS2 display driver. They are
-similar and a generic DPI panel driver can support all them with specific
-panel configuration. And new DPI panel driver can be easily supported
-by adding panel configurations into generic panel DPI driver.
+On Wed, Nov 17, 2010 at 01:26:02PM +0000, Catalin Marinas wrote:
+> On 17 November 2010 13:11, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+[...]
+> >
+> > Quickly tested this and seems to work. So FWIW:
+> >
+> > Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
+> 
+> It's more like Tested-by :)  (unless you reviewed it as well, though
+> there seems to be some confusion between Reviewed-by and Acked-by).
 
-This patchset introduces a generic panel DPI driver, remove 3 panel drivers and enable
-generic panel DPI driver in board files. And it is based on 2.6.37-rc2.
+Well, I was the original author if this code so I thought that
+Acked-by was right but Tested-by is fine :)
 
-Building with omap2plus_defconfig is successful.
-
-Keep sharp_ls_panel, since it contains blacklight control code which will be
-moved out later.
-
-Bryan Wu (3):
-  OMAP: DSS2: Add generic DPI panel display driver
-  OMAP: use generic DPI panel driver in board files
-  OMAP: DSS2: remove generic DPI panel driver duplicated panel drivers
-
- arch/arm/mach-omap2/board-3430sdp.c                |   12 +-
- arch/arm/mach-omap2/board-am3517evm.c              |   23 +-
- arch/arm/mach-omap2/board-cm-t35.c                 |   23 +-
- arch/arm/mach-omap2/board-devkit8000.c             |   26 +-
- arch/arm/mach-omap2/board-igep0020.c               |   12 +-
- arch/arm/mach-omap2/board-omap3beagle.c            |   12 +-
- arch/arm/mach-omap2/board-omap3evm.c               |   12 +-
- arch/arm/mach-omap2/board-omap3stalker.c           |   23 +-
- .../arm/plat-omap/include/plat/panel-generic-dpi.h |   37 ++
- drivers/video/omap2/displays/Kconfig               |   22 +-
- drivers/video/omap2/displays/Makefile              |    4 +-
- drivers/video/omap2/displays/panel-generic-dpi.c   |  355 ++++++++++++++++++++
- drivers/video/omap2/displays/panel-generic.c       |  174 ----------
- .../video/omap2/displays/panel-sharp-lq043t1dg01.c |  165 ---------
- .../video/omap2/displays/panel-toppoly-tdo35s.c    |  164 ---------
- 15 files changed, 504 insertions(+), 560 deletions(-)
- create mode 100644 arch/arm/plat-omap/include/plat/panel-generic-dpi.h
- create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
- delete mode 100644 drivers/video/omap2/displays/panel-generic.c
- delete mode 100644 drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
- delete mode 100644 drivers/video/omap2/displays/panel-toppoly-tdo35s.c
+Regards,
+MW
