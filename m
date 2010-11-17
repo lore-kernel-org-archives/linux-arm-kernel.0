@@ -1,38 +1,38 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Nov 2010 10:16:40 +0000
-Subject: [PATCH 4/7] ARM: Thumb-2: Correct data alignment for
-	CONFIG_THUMB2_KERNEL in kernel/head.S
-In-Reply-To: <20101116182257.GB21926@n2100.arm.linux.org.uk>
+Date: Wed, 17 Nov 2010 10:21:03 +0000
+Subject: [PATCH 7/7] ARM: Thumb-2: Restore sensible zImage header
+	layout for CONFIG_THUMB2_KERNEL
+In-Reply-To: <AANLkTim5Nv_oFgpfYL7jtjcMP10ND6wp5B50veURVPcn@mail.gmail.com>
 References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
-	<1289913277-8822-4-git-send-email-dave.martin@linaro.org>
-	<20101116182257.GB21926@n2100.arm.linux.org.uk>
-Message-ID: <1289989000.2351.13.camel@e102109-lin.cambridge.arm.com>
+	<1289913277-8822-7-git-send-email-dave.martin@linaro.org>
+	<20101116182643.GC21926@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1011161517260.6448@xanadu.home>
+	<20101116203520.GE21926@n2100.arm.linux.org.uk>
+	<AANLkTim5Nv_oFgpfYL7jtjcMP10ND6wp5B50veURVPcn@mail.gmail.com>
+Message-ID: <1289989263.2351.15.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-11-16 at 18:22 +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 16, 2010 at 01:14:34PM +0000, Dave Martin wrote:
-> > Directives such as .long and .word do not magically cause the
-> > assembler location counter to become aligned in gas.  As a
-> > result, using these directives in code sections can result in
-> > misaligned data words when building a Thumb-2 kernel
-> > (CONFIG_THUMB2_KERNEL).
+On Wed, 2010-11-17 at 09:16 +0000, Dave Martin wrote:
+> On Tue, Nov 16, 2010 at 6:26 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Nov 16, 2010 at 01:14:37PM +0000, Dave Martin wrote:
+> >> Maybe it is a better idea to preserve the current header as is with the
+> >> ARM mode nops and perform the switch to Thumb mode using the branch
+> >> instruction after those 8 nops.  This way the kernel image format will
+> >> remain compatible with existing bootloaders without a need for
+> >> bootloaders to know if the image is ARM or Thumb mode.
+> >
+> > That is definitely worth doing, and sounds like a better idea.
 > 
-> > @@ -413,6 +416,7 @@ __fixup_smp_on_up:
-> >       mov     pc, lr
-> >  ENDPROC(__fixup_smp)
-> > 
-> > +     .align
-> >  1:   .word   .
-> >       .word   __smpalt_begin
-> >       .word   __smpalt_end
+> OK, that sounds reasonable -- I can try and propose a patch for this.
+> If the contents of the first 32 bytes doesn't matter, we can replace
+> the first two words with something like
 > 
-> This one is technically bogus because this feature is disabled (and
-> incompatible) with Thumb-2 kernels.  So it never gets built for a T2
-> kernel.
+> adr r12, BSYM(real_start)
+> bx r12
 
-Well, I think it doesn't cause any harm to have it in. It's on our to-do
-list to allow T2 support for SMP-on-UP.
+Would these be compiled to ARM or Thumb-2?
 
 -- 
 Catalin
