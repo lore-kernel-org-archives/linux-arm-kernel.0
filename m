@@ -1,51 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 17 Nov 2010 15:55:31 +0900
-Subject: [PATCH] ARM: S5PV310: Set bit 22 in the PL310 (cache controller)
-	AuxCtlr register
-Message-ID: <1289976931-9759-1-git-send-email-kgene.kim@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 17 Nov 2010 09:04:24 +0100
+Subject: [PATCH] ARM: imx: fix ehci-mxc build.
+In-Reply-To: <1289959040-5056-1-git-send-email-jiejing.zhang@freescale.com>
+References: <1289959040-5056-1-git-send-email-jiejing.zhang@freescale.com>
+Message-ID: <20101117080424.GA11542@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changhwan Youn <chaos.youn@samsung.com>
+Hi,
 
-This patch is applied according to the commit 1a8e41cd672f894bbd74874eac601e6cedf838fb
-(ARM: 6395/1: VExpress: Set bit 22 in the PL310 (cache controller) AuxCtlr register).
+> + * Copyright (c) 2010 Freescale Semiconductor, Inc.
 
-Actually, S5PV310 has same cache controller(PL310).
+Copyright additions are usually only added for significant changes.
 
-Following is from Catalin Marinas' commit.
+Regards,
 
-Clearing bit 22 in the PL310 Auxiliary Control register (shared
-attribute override enable) has the side effect of transforming Normal
-Shared Non-cacheable reads into Cacheable no-allocate reads.
+   Wolfram
 
-Coherent DMA buffers in Linux always have a Cacheable alias via the
-kernel linear mapping and the processor can speculatively load cache
-lines into the PL310 controller. With bit 22 cleared, Non-cacheable
-reads would unexpectedly hit such cache lines leading to buffer
-corruption.
-
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-Cc: <stable@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5pv310/cpu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
-index 82ce4aa..b2a37d0 100644
---- a/arch/arm/mach-s5pv310/cpu.c
-+++ b/arch/arm/mach-s5pv310/cpu.c
-@@ -168,7 +168,7 @@ static int __init s5pv310_l2x0_cache_init(void)
- 	__raw_writel(L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN,
- 		     S5P_VA_L2CC + L2X0_POWER_CTRL);
- 
--	l2x0_init(S5P_VA_L2CC, 0x7C070001, 0xC200ffff);
-+	l2x0_init(S5P_VA_L2CC, 0x7C470001, 0xC200ffff);
- 
- 	return 0;
- }
 -- 
-1.6.2.5
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101117/4a705c49/attachment.sig>
