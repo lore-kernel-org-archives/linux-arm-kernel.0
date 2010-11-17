@@ -1,89 +1,178 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 17 Nov 2010 14:44:35 +0100
-Subject: [PATCH 03/11] ARM: imx: Add reset routine for i.MX28
-In-Reply-To: <AANLkTimpvmRLhWuDdZVLGcyro5bfNGEDYx509RLbC_nq@mail.gmail.com>
-References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
-	<1289831795-4373-4-git-send-email-shawn.guo@freescale.com>
-	<20101115163646.GK8942@pengutronix.de>
-	<AANLkTimpvmRLhWuDdZVLGcyro5bfNGEDYx509RLbC_nq@mail.gmail.com>
-Message-ID: <20101117134435.GB8942@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 17 Nov 2010 14:45:17 +0100
+Subject: [PATCH] nomadik: prevent sched_clock() wraparound v3
+Message-ID: <1290001517-17010-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 07:17:39PM +0800, Shawn Guo wrote:
-> 2010/11/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > On Mon, Nov 15, 2010 at 10:36:27PM +0800, Shawn Guo wrote:
-> >> +#ifdef CONFIG_ARCH_MX28
-> >> +int mxc_reset_block(void __iomem *reg_addr)
-> >> +{
-> >> + ? ? u32 reg;
-> >> + ? ? int timeout;
-> >> +
-> >> + ? ? /*
-> >> + ? ? ?* The process of software reset of IP block is done
-> >> + ? ? ?* in several steps:
-> >> + ? ? ?*
-> >> + ? ? ?* 1) clear SFTRST and wait it cleared;
-> >> + ? ? ?* 2) clear CLKGATE, set SFTRST, wait CLKGATE set;
-> >> + ? ? ?* 3) clear SFTRST and wait it cleared;
-> >> + ? ? ?* 4) clear CLKGATE and wait it cleared.
-> >> + ? ? ?*/
-> >> +
-> >> + ? ? /* Clear SFTRST */
-> >> + ? ? reg = __raw_readl(reg_addr);
-> >> + ? ? reg &= ~(1 << 31);
-> >> + ? ? __raw_writel(reg, reg_addr);
-> >> + ? ? /* Wait SFTRST cleared */
-> >> + ? ? timeout = 1000;
-> >> + ? ? do {
-> >> + ? ? ? ? ? ? mdelay(1);
-> >> + ? ? ? ? ? ? if ((__raw_readl(reg_addr) & (1 << 31)) == 0)
-> >> + ? ? ? ? ? ? ? ? ? ? break;
-> >> + ? ? } while (--timeout > 0);
-> > Does the mdelay make sence here?
-> >
-> i.MX28 Application Processor Reference Manual, Chapter 39.5.10
-> "Correct Way to Software Reset a Block".
-Quoting the chapter you pointed out:
+The current implementation of sched_clock() for the Nomadik
+family is based on the clock source that will wrap around without
+any compensation. Currently on the Ux500 after 1030 seconds.
 
-	// Prepare for soft-reset by making sure that SFTRST is not currently
-	// asserted. Also clear CLKGATE so we can wait for its assertion below.
-	HW_GPMI_CTRL0_CLR(BM_GPMI_CTRL0_SFTRST);
-	// Wait at least a microsecond for SFTRST to deassert. In actuality, we
-	// need to wait 3 GPMI clocks, but this is much easier to implement.
-	musecs = hw_profile_GetMicroseconds();
-	while (HW_GPMI_CTRL0.B.SFTRST || (hw_profile_GetMicroseconds() - musecs <
-	DDI_NAND_HAL_GPMI_SOFT_RESET_LATENCY));
-	[...]
+Utilize cnt32_to_63 to expand the sched_clock() counter to 63
+bits and introduce a keepwarm() timer to assure that sched clock
+and this cnt32_to_63 is called atleast once every half period.
 
-This talks about a microsecond, not a millisecond.
+When I print out the actual wrap-around time, and using
+a year (3600*24*365 seconds) as minumum wrap limit I get an
+actual wrap-around of:
+sched_clock: using 55 bits @ 8333125 Hz wrap in 50041 days
+I.e circa 137 years which should be fair enough.
 
-Expecting that most of the time not a whole millisecond is needed, I'd
-do something like that:
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: Colin Cross <ccross@google.com>
+Cc: Rabin Vincent <rabin.vincent@stericsson.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: John Stultz <johnstul@us.ibm.com>
+Cc: Harald Gustafsson <harald.gustafsson@ericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+Version 3:
 
-	val = __raw_readl(reset_addr);
-	val &= ~MX28_MODULERESET_SFTRST;
-	__raw_writel(val, reset_addr);
+In this version of the patch I have taken the approach of making
+sched_clock() based on the clock source timer, calculating mult
+and shift from a minimum of a year. The multing and shifting will
+overflow the 64 bit limit, and this makes a tradeoff similar
+to what is found in the Orion architecture, but a bit more
+explicit and reusing the mult/shift calculation code from the
+clocksource.
 
-	/*
-	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
-         * recommends to wait 1us.
-	 */
-	udelay(1);
+Thanks to the kernel community that has been very helpful in
+guiding this design.
+---
+ arch/arm/plat-nomadik/timer.c |   87 ++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 77 insertions(+), 10 deletions(-)
 
-	timeout = 0x400;
-	while ((__raw_readl(reset_addr) & MX28_MODULERESET_SFTRST) && --timeout)
-		/* nothing /*;
-
-	if (!timeout)
-		goto error;
-
-That is do a busy read and don't busy wait a millisecond between two
-consecutive reads just twiddling thumbs.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
+index aedf9c1..d1eb143 100644
+--- a/arch/arm/plat-nomadik/timer.c
++++ b/arch/arm/plat-nomadik/timer.c
+@@ -3,6 +3,7 @@
+  *
+  * Copyright (C) 2008 STMicroelectronics
+  * Copyright (C) 2010 Alessandro Rubini
++ * Copyright (C) 2010 Linus Walleij
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2, as
+@@ -16,11 +17,13 @@
+ #include <linux/clk.h>
+ #include <linux/jiffies.h>
+ #include <linux/err.h>
++#include <linux/cnt32_to_63.h>
++#include <linux/timer.h>
+ #include <asm/mach/time.h>
+ 
+ #include <plat/mtu.h>
+ 
+-void __iomem *mtu_base; /* ssigned by machine code */
++void __iomem *mtu_base; /* Assigned by machine code */
+ 
+ /*
+  * Kernel assumes that sched_clock can be called early
+@@ -48,16 +51,78 @@ static struct clocksource nmdk_clksrc = {
+ /*
+  * Override the global weak sched_clock symbol with this
+  * local implementation which uses the clocksource to get some
+- * better resolution when scheduling the kernel. We accept that
+- * this wraps around for now, since it is just a relative time
+- * stamp. (Inspired by OMAP implementation.)
++ * better resolution when scheduling the kernel.
++ *
++ * Because the hardware timer period may be quite short
++ * (32.3 secs on the 133 MHz MTU timer selection on ux500)
++ * and because cnt32_to_63() needs to be called at least once per
++ * half period to work properly, a kernel keepwarm() timer is set up
++ * to ensure this requirement is always met.
++ *
++ * Also the sched_clock timer will wrap around at some point,
++ * here we set it to run continously for a year.
++ */
++#define SCHED_CLOCK_MIN_WRAP 3600*24*365
++static struct timer_list cnt32_to_63_keepwarm_timer;
++static u32 sched_mult;
++static u32 sched_shift;
++
++unsigned long long sched_clock(void)
++{
++	u64 cycles;
++
++	if (unlikely(!mtu_base))
++		return 0;
++
++	cycles = cnt32_to_63(-readl(mtu_base + MTU_VAL(0)));
++	cycles &= 0x7FFFFFFFFFFFFFFFLLU;
++	return (cycles * sched_mult) >> sched_shift;
++}
++
++/* Just kick sched_clock every so often */
++static void cnt32_to_63_keepwarm(unsigned long data)
++{
++	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
++	(void) sched_clock();
++}
++
++/*
++ * Set up a timer to keep sched_clock():s 32_to_63 algorithm warm
++ * once in half a 32bit timer wrap interval.
+  */
+-unsigned long long notrace sched_clock(void)
++static void __init nmdk_sched_clock_init(unsigned long rate)
+ {
+-	return clocksource_cyc2ns(nmdk_clksrc.read(
+-				  &nmdk_clksrc),
+-				  nmdk_clksrc.mult,
+-				  nmdk_clksrc.shift);
++	u32 v;
++	unsigned long delta;
++	u64 days;
++
++	/* Find the apropriate mult and shift factors */
++	clocks_calc_mult_shift(&sched_mult, &sched_shift,
++			       rate, NSEC_PER_SEC, SCHED_CLOCK_MIN_WRAP);
++	/* We need to multiply by atleast 2 to get rid of bit 63 */
++	BUG_ON(sched_mult < 2);
++
++	/* Let's see what we get, take max counter and scale it */
++	days = 0xFFFFFFFFFFFFFFFFLLU >> sched_shift;
++	do_div(days, rate);
++	do_div(days, (3600*24));
++
++	pr_debug("sched_clock: using %d bits @ %lu Hz wrap in %lu days\n",
++		(64 - sched_shift), rate, (unsigned long) days);
++
++	/*
++	 * Program a timer to kick us at half 32bit wraparound
++	 * Formula: seconds per wrap = (2^32) / f
++	 */
++	v = 0xFFFFFFFFUL / rate;
++	/* We want half of the wrap time to keep cnt32_to_63 warm */
++	v /= 2;
++	pr_debug("sched_clock: prescaled timer rate: %lu Hz, "
++		 "initialize keepwarm timer every %d seconds\n", rate, v);
++	/* Convert seconds to jiffies */
++	delta = msecs_to_jiffies(v*1000);
++	setup_timer(&cnt32_to_63_keepwarm_timer, cnt32_to_63_keepwarm, delta);
++	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + delta));
+ }
+ 
+ /* Clockevent device: use one-shot mode */
+@@ -161,13 +226,15 @@ void __init nmdk_timer_init(void)
+ 	writel(0, mtu_base + MTU_BGLR(0));
+ 	writel(cr | MTU_CRn_ENA, mtu_base + MTU_CR(0));
+ 
+-	/* Now the scheduling clock is ready */
++	/* Now the clock source is ready */
+ 	nmdk_clksrc.read = nmdk_read_timer;
+ 
+ 	if (clocksource_register(&nmdk_clksrc))
+ 		pr_err("timer: failed to initialize clock source %s\n",
+ 		       nmdk_clksrc.name);
+ 
++	nmdk_sched_clock_init(rate);
++
+ 	/* Timer 1 is used for events */
+ 
+ 	clockevents_calc_mult_shift(&nmdk_clkevt, rate, MTU_MIN_RANGE);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.3.3
