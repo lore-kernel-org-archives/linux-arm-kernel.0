@@ -1,239 +1,218 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Nov 2010 22:29:58 +0100
-Subject: [PATCH 30/51] ARM: mx25: dynamically allocate mxc_pwm devices
+Date: Wed, 17 Nov 2010 22:29:42 +0100
+Subject: [PATCH 14/51] ARM: imx: dynamically allocate mx2-camera device
 In-Reply-To: <20101117212821.GF8942@pengutronix.de>
 References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <1290029419-21435-30-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1290029419-21435-14-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx25/devices.c                    |   76 -----------------------
- arch/arm/mach-mx25/devices.h                    |    4 -
- arch/arm/plat-mxc/devices/platform-mxc_pwm.c    |   29 +++++++--
- arch/arm/plat-mxc/include/mach/devices-common.h |    2 +
- arch/arm/plat-mxc/include/mach/mx25.h           |    8 +++
- 5 files changed, 32 insertions(+), 87 deletions(-)
+ arch/arm/mach-imx/devices-imx27.h               |    4 ++
+ arch/arm/mach-imx/devices.c                     |   32 --------------
+ arch/arm/mach-imx/devices.h                     |    1 -
+ arch/arm/plat-mxc/devices/Kconfig               |    3 +
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-mx2-camera.c |   53 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   13 ++++++
+ arch/arm/plat-mxc/include/mach/mx27.h           |    4 +-
+ 8 files changed, 76 insertions(+), 35 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-mx2-camera.c
 
-diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
-index 27d07ce..13a3c280 100644
---- a/arch/arm/mach-mx25/devices.c
-+++ b/arch/arm/mach-mx25/devices.c
-@@ -22,63 +22,6 @@
- #include <mach/mx25.h>
- #include <mach/irqs.h>
+diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
+index b957e78..84b3405 100644
+--- a/arch/arm/mach-imx/devices-imx27.h
++++ b/arch/arm/mach-imx/devices-imx27.h
+@@ -31,6 +31,10 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[] __initconst;
+ #define imx27_add_imx_uart4(pdata)	imx27_add_imx_uart(4, pdata)
+ #define imx27_add_imx_uart5(pdata)	imx27_add_imx_uart(5, pdata)
  
--static struct resource mxc_pwm_resources0[] = {
--	{
--		.start	= 0x53fe0000,
--		.end	= 0x53fe3fff,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start   = 26,
--		.end     = 26,
--		.flags   = IORESOURCE_IRQ,
--	}
--};
--
--struct platform_device mxc_pwm_device0 = {
--	.name = "mxc_pwm",
--	.id = 0,
--	.num_resources = ARRAY_SIZE(mxc_pwm_resources0),
--	.resource = mxc_pwm_resources0,
--};
--
--static struct resource mxc_pwm_resources1[] = {
--	{
--		.start	= 0x53fa0000,
--		.end	= 0x53fa3fff,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start   = 36,
--		.end     = 36,
--		.flags   = IORESOURCE_IRQ,
--	}
--};
--
--struct platform_device mxc_pwm_device1 = {
--	.name = "mxc_pwm",
--	.id = 1,
--	.num_resources = ARRAY_SIZE(mxc_pwm_resources1),
--	.resource = mxc_pwm_resources1,
--};
--
--static struct resource mxc_pwm_resources2[] = {
--	{
--		.start	= 0x53fa8000,
--		.end	= 0x53fabfff,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start   = 41,
--		.end     = 41,
--		.flags   = IORESOURCE_IRQ,
--	}
--};
--
--struct platform_device mxc_pwm_device2 = {
--	.name = "mxc_pwm",
--	.id = 2,
--	.num_resources = ARRAY_SIZE(mxc_pwm_resources2),
--	.resource = mxc_pwm_resources2,
--};
--
- static struct resource mxc_keypad_resources[] = {
- 	{
- 		.start	= 0x43fa8000,
-@@ -98,25 +41,6 @@ struct platform_device mxc_keypad_device = {
- 	.resource = mxc_keypad_resources,
- };
- 
--static struct resource mxc_pwm_resources3[] = {
--	{
--		.start	= 0x53fc8000,
--		.end	= 0x53fcbfff,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start   = 42,
--		.end     = 42,
--		.flags   = IORESOURCE_IRQ,
--	}
--};
--
--struct platform_device mxc_pwm_device3 = {
--	.name = "mxc_pwm",
--	.id = 3,
--	.num_resources = ARRAY_SIZE(mxc_pwm_resources3),
--	.resource = mxc_pwm_resources3,
--};
--
- static struct mxc_gpio_port imx_gpio_ports[] = {
- 	{
- 		.chip.label = "gpio-0",
-diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
-index 266c305..afc60dd 100644
---- a/arch/arm/mach-mx25/devices.h
-+++ b/arch/arm/mach-mx25/devices.h
-@@ -1,7 +1,3 @@
--extern struct platform_device mxc_pwm_device0;
--extern struct platform_device mxc_pwm_device1;
--extern struct platform_device mxc_pwm_device2;
--extern struct platform_device mxc_pwm_device3;
- extern struct platform_device mxc_keypad_device;
- extern struct platform_device mx25_rtc_device;
- extern struct platform_device mx25_fb_device;
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-index 3ebbc67..5a47d1e 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-+++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-@@ -9,20 +9,35 @@
- #include <mach/hardware.h>
- #include <mach/devices-common.h>
- 
--#define imx_mxc_pwm_data_entry_single(soc)				\
-+#define imx_mxc_pwm_data_entry_single(soc, _id, _hwid, _size)		\
- 	{								\
--		.iobase = soc ## _PWM_BASE_ADDR,			\
--		.irq = soc ## _INT_PWM,					\
-+		.id = _id,						\
-+		.iobase = soc ## _PWM ## _hwid ## _BASE_ADDR,		\
-+		.iosize = _size,					\
-+		.irq = soc ## _INT_PWM ## _hwid,			\
- 	}
-+#define imx_mxc_pwm_data_entry(soc, _id, _hwid, _size)			\
-+	[_id] = imx_mxc_pwm_data_entry_single(soc, _id, _hwid, _size)
- 
- #ifdef CONFIG_SOC_IMX21
- const struct imx_mxc_pwm_data imx21_mxc_pwm_data __initconst =
--	imx_mxc_pwm_data_entry_single(MX21);
-+	imx_mxc_pwm_data_entry_single(MX21, 0, , SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX21 */
- 
-+#ifdef CONFIG_ARCH_MX25
-+const struct imx_mxc_pwm_data imx25_mxc_pwm_data[] __initconst = {
-+#define imx25_mxc_pwm_data_entry(_id, _hwid)				\
-+	imx_mxc_pwm_data_entry(MX25, _id, _hwid, SZ_16K)
-+	imx25_mxc_pwm_data_entry(0, 1),
-+	imx25_mxc_pwm_data_entry(1, 2),
-+	imx25_mxc_pwm_data_entry(2, 3),
-+	imx25_mxc_pwm_data_entry(3, 4),
-+};
-+#endif
++extern const struct imx_mx2_camera_data imx27_mx2_camera_data __initconst;
++#define imx27_add_mx2_camera(pdata)	\
++	imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
 +
- #ifdef CONFIG_SOC_IMX27
- const struct imx_mxc_pwm_data imx27_mxc_pwm_data __initconst =
--	imx_mxc_pwm_data_entry_single(MX27);
-+	imx_mxc_pwm_data_entry_single(MX27, 0, , SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX27 */
+ extern const struct imx_mxc_nand_data imx27_mxc_nand_data __initconst;
+ #define imx27_add_mxc_nand(pdata)	\
+ 	imx_add_mxc_nand(&imx27_mxc_nand_data, pdata)
+diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
+index 31c9d6c..0c5ade4 100644
+--- a/arch/arm/mach-imx/devices.c
++++ b/arch/arm/mach-imx/devices.c
+@@ -77,38 +77,6 @@ int __init imx1_register_gpios(void)
+ #endif
  
- struct platform_device *__init imx_add_mxc_pwm(
-@@ -31,7 +46,7 @@ struct platform_device *__init imx_add_mxc_pwm(
- 	struct resource res[] = {
- 		{
- 			.start = data->iobase,
--			.end = data->iobase + SZ_4K - 1,
-+			.end = data->iobase + data->iosize - 1,
- 			.flags = IORESOURCE_MEM,
- 		}, {
- 			.start = data->irq,
-@@ -40,6 +55,6 @@ struct platform_device *__init imx_add_mxc_pwm(
- 		},
- 	};
+ #if defined(CONFIG_MACH_MX21) || defined(CONFIG_MACH_MX27)
+-
+-#ifdef CONFIG_MACH_MX27
+-static struct resource mx27_camera_resources[] = {
+-	{
+-	       .start = MX27_CSI_BASE_ADDR,
+-	       .end = MX27_CSI_BASE_ADDR + 0x1f,
+-	       .flags = IORESOURCE_MEM,
+-	}, {
+-	       .start = MX27_EMMA_PRP_BASE_ADDR,
+-	       .end = MX27_EMMA_PRP_BASE_ADDR + 0x1f,
+-	       .flags = IORESOURCE_MEM,
+-	}, {
+-	       .start = MX27_INT_CSI,
+-	       .end = MX27_INT_CSI,
+-	       .flags = IORESOURCE_IRQ,
+-	},{
+-	       .start = MX27_INT_EMMAPRP,
+-	       .end = MX27_INT_EMMAPRP,
+-	       .flags = IORESOURCE_IRQ,
+-	},
+-};
+-struct platform_device mx27_camera_device = {
+-	.name = "mx2-camera",
+-	.id = 0,
+-	.num_resources = ARRAY_SIZE(mx27_camera_resources),
+-	.resource = mx27_camera_resources,
+-	.dev = {
+-		.coherent_dma_mask = 0xffffffff,
+-	},
+-};
+-#endif
+-
+ /* Watchdog: i.MX1 has seperate driver, i.MX21 and i.MX27 are equal */
+ static struct resource mxc_wdt_resources[] = {
+ 	{
+diff --git a/arch/arm/mach-imx/devices.h b/arch/arm/mach-imx/devices.h
+index 8f14452..3d020b9 100644
+--- a/arch/arm/mach-imx/devices.h
++++ b/arch/arm/mach-imx/devices.h
+@@ -5,7 +5,6 @@ extern struct platform_device mxc_pwm_device;
+ extern struct platform_device mxc_sdhc_device0;
+ extern struct platform_device mxc_sdhc_device1;
+ extern struct platform_device mxc_otg_udc_device;
+-extern struct platform_device mx27_camera_device;
+ extern struct platform_device mxc_otg_host;
+ extern struct platform_device mxc_usbh1;
+ extern struct platform_device mxc_usbh2;
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index 61a3e25..37d7e00 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -28,6 +28,9 @@ config IMX_HAVE_PLATFORM_IMX_UDC
+ config IMX_HAVE_PLATFORM_MX1_CAMERA
+ 	bool
  
--	return imx_add_platform_device("mxc_pwm", 0,
-+	return imx_add_platform_device("mxc_pwm", data->id,
- 			res, ARRAY_SIZE(res), NULL, 0);
- }
++config IMX_HAVE_PLATFORM_MX2_CAMERA
++	bool
++
+ config IMX_HAVE_PLATFORM_MXC_NAND
+ 	bool
+ 
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 86b47f2..88392fc 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UART) += platform-imx-uart.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UDC) += platform-imx_udc.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MX1_CAMERA) += platform-mx1-camera.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_MX2_CAMERA) += platform-mx2-camera.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
+diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+new file mode 100644
+index 0000000..a18c803
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++
++#define imx_mx2_camera_data_entry_single(soc)				\
++	{								\
++		.iobasecsi = soc ## _CSI_BASE_ADDR,			\
++		.iosizecsi = SZ_32,					\
++		.irqcsi = soc ## _INT_CSI,				\
++		.iobaseemmaprp = soc ## _EMMAPRP_BASE_ADDR,		\
++		.iosizeemmaprp = SZ_32,					\
++		.irqemmaprp = soc ## _INT_EMMAPRP,			\
++	}
++
++#ifdef CONFIG_SOC_IMX27
++const struct imx_mx2_camera_data imx27_mx2_camera_data __initconst =
++	imx_mx2_camera_data_entry_single(MX27);
++#endif /* ifdef CONFIG_SOC_IMX27 */
++
++struct platform_device *__init imx_add_mx2_camera(
++		const struct imx_mx2_camera_data *data,
++		const struct mx2_camera_platform_data *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = data->iobasecsi,
++			.end = data->iobasecsi + data->iosizecsi - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = data->iobaseemmaprp,
++			.end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = data->irqcsi,
++			.end = data->irqcsi,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irqemmaprp,
++			.end = data->irqemmaprp,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++	return imx_add_platform_device_dmamask("mx2-camera", 0,
++			res, ARRAY_SIZE(res),
++			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
++}
 diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index f5d0000..07223b2 100644
+index ab0500a..e31fc50 100644
 --- a/arch/arm/plat-mxc/include/mach/devices-common.h
 +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -217,7 +217,9 @@ struct platform_device *__init imx_add_mxc_nand(
- 		const struct mxc_nand_platform_data *pdata);
+@@ -118,6 +118,19 @@ struct platform_device *__init imx_add_mx1_camera(
+ 		const struct imx_mx1_camera_data *data,
+ 		const struct mx1_camera_pdata *pdata);
  
- struct imx_mxc_pwm_data {
-+	int id;
- 	resource_size_t iobase;
-+	resource_size_t iosize;
- 	resource_size_t irq;
- };
- struct platform_device *__init imx_add_mxc_pwm(
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 0d31f82..cea851f 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -19,10 +19,14 @@
- #define MX25_CRM_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0x80000)
- #define MX25_GPT1_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0x90000)
- #define MX25_GPIO4_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0x9c000)
-+#define MX25_PWM2_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xa0000)
- #define MX25_GPIO3_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xa4000)
-+#define MX25_PWM3_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xa8000)
-+#define MX25_PWM4_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xc8000)
- #define MX25_GPIO1_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xcc000)
- #define MX25_GPIO2_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xd0000)
- #define MX25_WDOG_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xdc000)
-+#define MX25_PWM1_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xe0000)
- 
- #define MX25_UART1_BASE_ADDR		0x43f90000
- #define MX25_UART2_BASE_ADDR		0x43f94000
-@@ -66,13 +70,17 @@
- #define MX25_INT_UART3		18
- #define MX25_INT_KPP		24
- #define MX25_INT_DRYICE		25
-+#define MX25_INT_PWM1		26
- #define MX25_INT_UART2		32
- #define MX25_INT_NFC		33
- #define MX25_INT_SDMA		34
- #define MX25_INT_USB_HS		35
-+#define MX25_INT_PWM2		36
- #define MX25_INT_USB_OTG	37
- #define MX25_INT_LCDC		39
- #define MX25_INT_UART5		40
-+#define MX25_INT_PWM3		41
-+#define MX25_INT_PWM4		42
- #define MX25_INT_CAN1		43
- #define MX25_INT_CAN2		44
- #define MX25_INT_UART1		45
++#include <mach/mx2_cam.h>
++struct imx_mx2_camera_data {
++	resource_size_t iobasecsi;
++	resource_size_t iosizecsi;
++	resource_size_t irqcsi;
++	resource_size_t iobaseemmaprp;
++	resource_size_t iosizeemmaprp;
++	resource_size_t irqemmaprp;
++};
++struct platform_device *__init imx_add_mx2_camera(
++		const struct imx_mx2_camera_data *data,
++		const struct mx2_camera_platform_data *pdata);
++
+ #include <mach/mxc_nand.h>
+ struct imx_mxc_nand_data {
+ 	/*
+diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
+index 3116b3b..2734d24 100644
+--- a/arch/arm/plat-mxc/include/mach/mx27.h
++++ b/arch/arm/plat-mxc/include/mach/mx27.h
+@@ -67,8 +67,8 @@
+ #define MX27_USBOTG_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x24000)
+ #define MX27_OTG_BASE_ADDR			MX27_USBOTG_BASE_ADDR
+ #define MX27_SAHARA_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x25000)
+-#define MX27_EMMA_PP_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x26000)
+-#define MX27_EMMA_PRP_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x26400)
++#define MX27_EMMAPP_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x26000)
++#define MX27_EMMAPRP_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x26400)
+ #define MX27_CCM_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x27000)
+ #define MX27_SYSCTRL_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x27800)
+ #define MX27_IIM_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x28000)
 -- 
 1.7.2.3
