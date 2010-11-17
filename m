@@ -1,54 +1,48 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Wed, 17 Nov 2010 03:09:10 -0800
-Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
-References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-8-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05986C77F4@SC-VEXCH1.marvell.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Wed, 17 Nov 2010 19:17:39 +0800
+Subject: [PATCH 03/11] ARM: imx: Add reset routine for i.MX28
+In-Reply-To: <20101115163646.GK8942@pengutronix.de>
+References: <1289831795-4373-1-git-send-email-shawn.guo@freescale.com>
+	<1289831795-4373-4-git-send-email-shawn.guo@freescale.com>
+	<20101115163646.GK8942@pengutronix.de>
+Message-ID: <AANLkTimpvmRLhWuDdZVLGcyro5bfNGEDYx509RLbC_nq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
->-----Original Message-----
->From: Haojian Zhuang [mailto:haojian.zhuang at marvell.com]
->Sent: 2010?11?17? 7:04 PM
->To: linux-arm-kernel at lists.infradead.org
->Cc: Haojian Zhuang; Zhou Zhu; Eric Miao; Nicolas Pitre
->Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+2010/11/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Mon, Nov 15, 2010 at 10:36:27PM +0800, Shawn Guo wrote:
+>> +#ifdef CONFIG_ARCH_MX28
+>> +int mxc_reset_block(void __iomem *reg_addr)
+>> +{
+>> + ? ? u32 reg;
+>> + ? ? int timeout;
+>> +
+>> + ? ? /*
+>> + ? ? ?* The process of software reset of IP block is done
+>> + ? ? ?* in several steps:
+>> + ? ? ?*
+>> + ? ? ?* 1) clear SFTRST and wait it cleared;
+>> + ? ? ?* 2) clear CLKGATE, set SFTRST, wait CLKGATE set;
+>> + ? ? ?* 3) clear SFTRST and wait it cleared;
+>> + ? ? ?* 4) clear CLKGATE and wait it cleared.
+>> + ? ? ?*/
+>> +
+>> + ? ? /* Clear SFTRST */
+>> + ? ? reg = __raw_readl(reg_addr);
+>> + ? ? reg &= ~(1 << 31);
+>> + ? ? __raw_writel(reg, reg_addr);
+>> + ? ? /* Wait SFTRST cleared */
+>> + ? ? timeout = 1000;
+>> + ? ? do {
+>> + ? ? ? ? ? ? mdelay(1);
+>> + ? ? ? ? ? ? if ((__raw_readl(reg_addr) & (1 << 31)) == 0)
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? } while (--timeout > 0);
+> Does the mdelay make sence here?
 >
->iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
->of accessing CP0 and CP1 is changed in PJ4. Append more files to support
->iwmmxt in PJ4 core.
->
->Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
->Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->Cc: Eric Miao <eric.y.miao@gmail.com>
->Cc: Nicolas Pitre <nico@fluxnic.net>
->---
-> arch/arm/Kconfig         |    4 +-
-> arch/arm/kernel/Makefile |    1 +
-> arch/arm/kernel/iwmmxt.S |   55 +++++++++++++++++++++++++++++++++++-------
->----
-> 3 files changed, 45 insertions(+), 15 deletions(-)
->
+i.MX28 Application Processor Reference Manual, Chapter 39.5.10
+"Correct Way to Software Reset a Block".
 
-Changelog:
-1. Append missing pj4-cp0.c.
-
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0009-ARM-pxa-add-iwmmx-support-for-PJ4.patch
-Type: application/octet-stream
-Size: 6981 bytes
-Desc: 0009-ARM-pxa-add-iwmmx-support-for-PJ4.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101117/8ddac871/attachment.obj>
+-- 
+Regards,
+Shawn
