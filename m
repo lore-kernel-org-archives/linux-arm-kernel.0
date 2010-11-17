@@ -1,215 +1,233 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Nov 2010 22:30:02 +0100
-Subject: [PATCH 34/51] ARM: mx25: dynamically allocatate imx-fb devices
+Date: Wed, 17 Nov 2010 22:29:59 +0100
+Subject: [PATCH 31/51] ARM: mx25: move registration of gpios to plat-mxc/gpio.c
 In-Reply-To: <20101117212821.GF8942@pengutronix.de>
 References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <1290029419-21435-34-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1290029419-21435-31-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+To use common macros to define the gpio ports for imx{1,21,25,27} the
+existing ones had to made more general and a few more base address defines
+were necessary.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx25/Kconfig                      |    2 ++
- arch/arm/mach-mx25/devices-imx25.h              |    4 ++++
- arch/arm/mach-mx25/devices.c                    |   23 -----------------------
- arch/arm/mach-mx25/devices.h                    |    1 -
- arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c   |    5 ++---
- arch/arm/mach-mx25/mach-mx25_3ds.c              |    5 ++---
- arch/arm/plat-mxc/devices/platform-imx-fb.c     |   14 ++++++++++----
- arch/arm/plat-mxc/include/mach/devices-common.h |    1 +
- 8 files changed, 21 insertions(+), 34 deletions(-)
+ arch/arm/mach-mx25/devices.c          |   29 ----------------
+ arch/arm/plat-mxc/gpio.c              |   58 ++++++++++++++++++++-------------
+ arch/arm/plat-mxc/include/mach/mx1.h  |    4 ++
+ arch/arm/plat-mxc/include/mach/mx21.h |    6 +++
+ arch/arm/plat-mxc/include/mach/mx25.h |    4 ++
+ arch/arm/plat-mxc/include/mach/mx27.h |    6 +++
+ 6 files changed, 55 insertions(+), 52 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/Kconfig b/arch/arm/mach-mx25/Kconfig
-index baa75fe..10c0f60 100644
---- a/arch/arm/mach-mx25/Kconfig
-+++ b/arch/arm/mach-mx25/Kconfig
-@@ -6,6 +6,7 @@ config MACH_MX25_3DS
- 	bool "Support MX25PDK (3DS) Platform"
- 	select IMX_HAVE_PLATFORM_ESDHC
- 	select IMX_HAVE_PLATFORM_IMXDI_RTC
-+	select IMX_HAVE_PLATFORM_IMX_FB
- 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
-@@ -17,6 +18,7 @@ config MACH_EUKREA_CPUIMX25
- 	select IMX_HAVE_PLATFORM_FLEXCAN
- 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
- 	select IMX_HAVE_PLATFORM_IMXDI_RTC
-+	select IMX_HAVE_PLATFORM_IMX_FB
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
-diff --git a/arch/arm/mach-mx25/devices-imx25.h b/arch/arm/mach-mx25/devices-imx25.h
-index a4980ec..d80cce0 100644
---- a/arch/arm/mach-mx25/devices-imx25.h
-+++ b/arch/arm/mach-mx25/devices-imx25.h
-@@ -27,6 +27,10 @@ extern struct imx_imxdi_rtc_data imx25_imxdi_rtc_data __initconst;
- #define imx25_add_imxdi_rtc(pdata)	\
- 	imx_add_imxdi_rtc(&imx25_imxdi_rtc_data)
- 
-+extern const struct imx_imx_fb_data imx25_imx_fb_data __initconst;
-+#define imx25_add_imx_fb(pdata)	\
-+	imx_add_imx_fb(&imx25_imx_fb_data, pdata)
-+
- extern const struct imx_imx_i2c_data imx25_imx_i2c_data[] __initconst;
- #define imx25_add_imx_i2c(id, pdata)	\
- 	imx_add_imx_i2c(&imx25_imx_i2c_data[id], pdata)
 diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
-index 1274396..09095e0 100644
+index 13a3c280..1798be9 100644
 --- a/arch/arm/mach-mx25/devices.c
 +++ b/arch/arm/mach-mx25/devices.c
-@@ -22,29 +22,6 @@
- #include <mach/mx25.h>
- #include <mach/irqs.h>
+@@ -41,35 +41,6 @@ struct platform_device mxc_keypad_device = {
+ 	.resource = mxc_keypad_resources,
+ };
  
--static struct resource mx25_fb_resources[] = {
+-static struct mxc_gpio_port imx_gpio_ports[] = {
 -	{
--		.start	= MX25_LCDC_BASE_ADDR,
--		.end	= MX25_LCDC_BASE_ADDR + 0xfff,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		.start	= MX25_INT_LCDC,
--		.end	= MX25_INT_LCDC,
--		.flags	= IORESOURCE_IRQ,
--	},
+-		.chip.label = "gpio-0",
+-		.base = MX25_IO_ADDRESS(MX25_GPIO1_BASE_ADDR),
+-		.irq = 52,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START,
+-	}, {
+-		.chip.label = "gpio-1",
+-		.base = MX25_IO_ADDRESS(MX25_GPIO2_BASE_ADDR),
+-		.irq = 51,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + 32,
+-	}, {
+-		.chip.label = "gpio-2",
+-		.base = MX25_IO_ADDRESS(MX25_GPIO3_BASE_ADDR),
+-		.irq = 16,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + 64,
+-	}, {
+-		.chip.label = "gpio-3",
+-		.base = MX25_IO_ADDRESS(MX25_GPIO4_BASE_ADDR),
+-		.irq = 23,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + 96,
+-	}
 -};
 -
--struct platform_device mx25_fb_device = {
--	.name		= "imx-fb",
--	.id		= 0,
--	.resource	= mx25_fb_resources,
--	.num_resources	= ARRAY_SIZE(mx25_fb_resources),
--	.dev		= {
--		.coherent_dma_mask = 0xFFFFFFFF,
--	},
--};
+-int __init imx25_register_gpios(void)
+-{
+-	return mxc_gpio_init(imx_gpio_ports, ARRAY_SIZE(imx_gpio_ports));
+-}
 -
- static struct resource mxc_wdt_resources[] = {
+ static struct resource mx25_rtc_resources[] = {
  	{
- 		.start = MX25_WDOG_BASE_ADDR,
-diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
-index f37f9a2..11997e2 100644
---- a/arch/arm/mach-mx25/devices.h
-+++ b/arch/arm/mach-mx25/devices.h
-@@ -1,3 +1,2 @@
--extern struct platform_device mx25_fb_device;
- extern struct platform_device mxc_wdt;
- extern struct platform_device mx25_csi_device;
-diff --git a/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
-index e765ac5..d6058e0 100644
---- a/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
-+++ b/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
-@@ -33,7 +33,6 @@
- #include <asm/mach/arch.h>
- #include <mach/mx25.h>
- #include <mach/imx-uart.h>
--#include <mach/imxfb.h>
- #include <mach/audmux.h>
+ 		.start	= MX25_DRYICE_BASE_ADDR,
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index 2c00d9b..e59fb97 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -350,17 +350,17 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+ 	return 0;
+ }
  
- #include "devices-imx25.h"
-@@ -151,7 +150,7 @@ static struct imx_fb_videomode eukrea_mximxsd_modes[] = {
- 	},
- };
- 
--static struct imx_fb_platform_data eukrea_mximxsd_fb_pdata = {
-+static const struct imx_fb_platform_data eukrea_mximxsd_fb_pdata __initconst = {
- 	.mode		= eukrea_mximxsd_modes,
- 	.num_modes	= ARRAY_SIZE(eukrea_mximxsd_modes),
- 	.pwmr		= 0x00A903FF,
-@@ -273,7 +272,7 @@ void __init eukrea_mbimxsd25_baseboard_init(void)
- #endif
- 
- 	imx25_add_imx_uart1(&uart_pdata);
--	mxc_register_device(&mx25_fb_device, &eukrea_mximxsd_fb_pdata);
-+	imx25_add_imx_fb(&eukrea_mximxsd_fb_pdata);
- 	imx25_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
- 
- 	imx25_add_flexcan1(NULL);
-diff --git a/arch/arm/mach-mx25/mach-mx25_3ds.c b/arch/arm/mach-mx25/mach-mx25_3ds.c
-index 0566d3c..34492aa 100644
---- a/arch/arm/mach-mx25/mach-mx25_3ds.c
-+++ b/arch/arm/mach-mx25/mach-mx25_3ds.c
-@@ -39,7 +39,6 @@
- #include <asm/mach/map.h>
- #include <mach/common.h>
- #include <mach/mx25.h>
--#include <mach/imxfb.h>
- #include <mach/iomux-mx25.h>
- 
- #include "devices-imx25.h"
-@@ -154,7 +153,7 @@ static struct imx_fb_videomode mx25pdk_modes[] = {
- 	},
- };
- 
--static struct imx_fb_platform_data mx25pdk_fb_pdata = {
-+static const struct imx_fb_platform_data mx25pdk_fb_pdata __initconst = {
- 	.mode		= mx25pdk_modes,
- 	.num_modes	= ARRAY_SIZE(mx25pdk_modes),
- 	.pwmr		= 0x00A903FF,
-@@ -195,7 +194,7 @@ static void __init mx25pdk_init(void)
- 	imx25_add_mxc_ehci_hs(NULL);
- 	imx25_add_mxc_nand(&mx25pdk_nand_board_info);
- 	imx25_add_imxdi_rtc(NULL);
--	mxc_register_device(&mx25_fb_device, &mx25pdk_fb_pdata);
-+	imx25_add_imx_fb(&mx25pdk_fb_pdata);
- 	mxc_register_device(&mxc_wdt, NULL);
- 
- 	mx25pdk_fec_reset();
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-fb.c b/arch/arm/plat-mxc/devices/platform-imx-fb.c
-index 42ed3be..f228ba6 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-fb.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-fb.c
-@@ -9,20 +9,26 @@
- #include <mach/hardware.h>
- #include <mach/devices-common.h>
- 
--#define imx_imx_fb_data_entry_single(soc)				\
-+#define imx_imx_fb_data_entry_single(soc, _size)			\
+-#define DEFINE_IMX_GPIO_PORT_IRQ(soc, n, _irq)				\
++#define DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, _irq)			\
  	{								\
- 		.iobase = soc ## _LCDC_BASE_ADDR,			\
-+		.iosize = _size,					\
- 		.irq = soc ## _INT_LCDC,				\
+-		.chip.label = "gpio-" #n,				\
++		.chip.label = "gpio-" #_id,				\
+ 		.irq = _irq,						\
+-		.base = soc ## _IO_ADDRESS(soc ## _GPIO_BASE_ADDR +	\
+-				(n) * SZ_256),				\
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + (n) * 32,	\
++		.base = soc ## _IO_ADDRESS(				\
++				soc ## _GPIO ## _hwid ## _BASE_ADDR),	\
++		.virtual_irq_start = MXC_GPIO_IRQ_START + (_id) * 32,	\
  	}
  
- #ifdef CONFIG_SOC_IMX21
- const struct imx_imx_fb_data imx21_imx_fb_data __initconst =
--	imx_imx_fb_data_entry_single(MX21);
-+	imx_imx_fb_data_entry_single(MX21, SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX21 */
+-#define DEFINE_IMX_GPIO_PORT(soc, n)					\
+-	DEFINE_IMX_GPIO_PORT_IRQ(soc, n, 0)
++#define DEFINE_IMX_GPIO_PORT(soc, _id, _hwid)				\
++	DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, 0)
  
-+#ifdef CONFIG_ARCH_MX25
-+const struct imx_imx_fb_data imx25_imx_fb_data __initconst =
-+	imx_imx_fb_data_entry_single(MX25, SZ_16K);
-+#endif
-+
- #ifdef CONFIG_SOC_IMX27
- const struct imx_imx_fb_data imx27_imx_fb_data __initconst =
--	imx_imx_fb_data_entry_single(MX27);
-+	imx_imx_fb_data_entry_single(MX27, SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX27 */
+ #define DEFINE_REGISTER_FUNCTION(prefix)				\
+ int __init prefix ## _register_gpios(void)				\
+@@ -371,10 +371,10 @@ int __init prefix ## _register_gpios(void)				\
  
- struct platform_device *__init imx_add_imx_fb(
-@@ -32,7 +38,7 @@ struct platform_device *__init imx_add_imx_fb(
- 	struct resource res[] = {
- 		{
- 			.start = data->iobase,
--			.end = data->iobase + SZ_4K - 1,
-+			.end = data->iobase + data->iosize - 1,
- 			.flags = IORESOURCE_MEM,
- 		}, {
- 			.start = data->irq,
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 4d4b28b..e28453e 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -82,6 +82,7 @@ struct platform_device *__init imx_add_imxdi_rtc(
- #include <mach/imxfb.h>
- struct imx_imx_fb_data {
- 	resource_size_t iobase;
-+	resource_size_t iosize;
- 	resource_size_t irq;
+ #if defined(CONFIG_SOC_IMX1)
+ static struct mxc_gpio_port imx1_gpio_ports[] = {
+-	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 0, MX1_GPIO_INT_PORTA),
+-	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 1, MX1_GPIO_INT_PORTB),
+-	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 2, MX1_GPIO_INT_PORTC),
+-	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 3, MX1_GPIO_INT_PORTD),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 0, 1, MX1_GPIO_INT_PORTA),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 1, 2, MX1_GPIO_INT_PORTB),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 2, 3, MX1_GPIO_INT_PORTC),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 3, 4, MX1_GPIO_INT_PORTD),
  };
- struct platform_device *__init imx_add_imx_fb(
+ 
+ DEFINE_REGISTER_FUNCTION(imx1)
+@@ -383,26 +383,38 @@ DEFINE_REGISTER_FUNCTION(imx1)
+ 
+ #if defined(CONFIG_SOC_IMX21)
+ static struct mxc_gpio_port imx21_gpio_ports[] = {
+-	DEFINE_IMX_GPIO_PORT_IRQ(MX21, 0, MX21_INT_GPIO),
+-	DEFINE_IMX_GPIO_PORT(MX21, 1),
+-	DEFINE_IMX_GPIO_PORT(MX21, 2),
+-	DEFINE_IMX_GPIO_PORT(MX21, 3),
+-	DEFINE_IMX_GPIO_PORT(MX21, 4),
+-	DEFINE_IMX_GPIO_PORT(MX21, 5),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX21, 0, 1, MX21_INT_GPIO),
++	DEFINE_IMX_GPIO_PORT(MX21, 1, 2),
++	DEFINE_IMX_GPIO_PORT(MX21, 2, 3),
++	DEFINE_IMX_GPIO_PORT(MX21, 3, 4),
++	DEFINE_IMX_GPIO_PORT(MX21, 4, 5),
++	DEFINE_IMX_GPIO_PORT(MX21, 5, 6),
+ };
+ 
+ DEFINE_REGISTER_FUNCTION(imx21)
+ 
+ #endif /* if defined(CONFIG_SOC_IMX21) */
+ 
++#if defined(CONFIG_ARCH_MX25)
++static struct mxc_gpio_port imx25_gpio_ports[] = {
++	DEFINE_IMX_GPIO_PORT_IRQ(MX25, 0, 1, MX25_INT_GPIO1),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX25, 1, 2, MX25_INT_GPIO2),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX25, 2, 3, MX25_INT_GPIO3),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX25, 3, 4, MX25_INT_GPIO4),
++};
++
++DEFINE_REGISTER_FUNCTION(imx25)
++
++#endif /* if defined(CONFIG_ARCH_MX25) */
++
+ #if defined(CONFIG_SOC_IMX27)
+ static struct mxc_gpio_port imx27_gpio_ports[] = {
+-	DEFINE_IMX_GPIO_PORT_IRQ(MX27, 0, MX27_INT_GPIO),
+-	DEFINE_IMX_GPIO_PORT(MX27, 1),
+-	DEFINE_IMX_GPIO_PORT(MX27, 2),
+-	DEFINE_IMX_GPIO_PORT(MX27, 3),
+-	DEFINE_IMX_GPIO_PORT(MX27, 4),
+-	DEFINE_IMX_GPIO_PORT(MX27, 5),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX27, 0, 1, MX27_INT_GPIO),
++	DEFINE_IMX_GPIO_PORT(MX27, 1, 2),
++	DEFINE_IMX_GPIO_PORT(MX27, 2, 3),
++	DEFINE_IMX_GPIO_PORT(MX27, 3, 4),
++	DEFINE_IMX_GPIO_PORT(MX27, 4, 5),
++	DEFINE_IMX_GPIO_PORT(MX27, 5, 6),
+ };
+ 
+ DEFINE_REGISTER_FUNCTION(imx27)
+diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
+index f1e336e..75d9621 100644
+--- a/arch/arm/plat-mxc/include/mach/mx1.h
++++ b/arch/arm/plat-mxc/include/mach/mx1.h
+@@ -65,6 +65,10 @@
+ #define MX1_CCM_BASE_ADDR		(0x1B000 + MX1_IO_BASE_ADDR)
+ #define MX1_SCM_BASE_ADDR		(0x1B804 + MX1_IO_BASE_ADDR)
+ #define MX1_GPIO_BASE_ADDR		(0x1C000 + MX1_IO_BASE_ADDR)
++#define MX1_GPIO1_BASE_ADDR		(0x1C000 + MX1_IO_BASE_ADDR)
++#define MX1_GPIO2_BASE_ADDR		(0x1C100 + MX1_IO_BASE_ADDR)
++#define MX1_GPIO3_BASE_ADDR		(0x1C200 + MX1_IO_BASE_ADDR)
++#define MX1_GPIO4_BASE_ADDR		(0x1C300 + MX1_IO_BASE_ADDR)
+ #define MX1_EIM_BASE_ADDR		(0x20000 + MX1_IO_BASE_ADDR)
+ #define MX1_SDRAMC_BASE_ADDR		(0x21000 + MX1_IO_BASE_ADDR)
+ #define MX1_MMA_BASE_ADDR		(0x22000 + MX1_IO_BASE_ADDR)
+diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
+index a82f590..6cd049e 100644
+--- a/arch/arm/plat-mxc/include/mach/mx21.h
++++ b/arch/arm/plat-mxc/include/mach/mx21.h
+@@ -48,6 +48,12 @@
+ #define MX21_SDHC1_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x13000)
+ #define MX21_SDHC2_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x14000)
+ #define MX21_GPIO_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x15000)
++#define MX21_GPIO1_BASE_ADDR			(MX21_GPIO_BASE_ADDR + 0x000)
++#define MX21_GPIO2_BASE_ADDR			(MX21_GPIO_BASE_ADDR + 0x100)
++#define MX21_GPIO3_BASE_ADDR			(MX21_GPIO_BASE_ADDR + 0x200)
++#define MX21_GPIO4_BASE_ADDR			(MX21_GPIO_BASE_ADDR + 0x300)
++#define MX21_GPIO5_BASE_ADDR			(MX21_GPIO_BASE_ADDR + 0x400)
++#define MX21_GPIO6_BASE_ADDR			(MX21_GPIO_BASE_ADDR + 0x500)
+ #define MX21_AUDMUX_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x16000)
+ #define MX21_CSPI3_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x17000)
+ #define MX21_LCDC_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x21000)
+diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+index cea851f..024bebe 100644
+--- a/arch/arm/plat-mxc/include/mach/mx25.h
++++ b/arch/arm/plat-mxc/include/mach/mx25.h
+@@ -66,8 +66,10 @@
+ #define MX25_INT_SSI1		12
+ #define MX25_INT_CSPI2		13
+ #define MX25_INT_CSPI1		14
++#define MX25_INT_GPIO3		16
+ #define MX25_INT_CSI		17
+ #define MX25_INT_UART3		18
++#define MX25_INT_GPIO4		23
+ #define MX25_INT_KPP		24
+ #define MX25_INT_DRYICE		25
+ #define MX25_INT_PWM1		26
+@@ -84,6 +86,8 @@
+ #define MX25_INT_CAN1		43
+ #define MX25_INT_CAN2		44
+ #define MX25_INT_UART1		45
++#define MX25_INT_GPIO2		51
++#define MX25_INT_GPIO1		52
+ #define MX25_INT_FEC		57
+ 
+ #define MX25_DMA_REQ_SSI2_RX1	22
+diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
+index 45419b3..eb09ec0 100644
+--- a/arch/arm/plat-mxc/include/mach/mx27.h
++++ b/arch/arm/plat-mxc/include/mach/mx27.h
+@@ -51,6 +51,12 @@
+ #define MX27_SDHC1_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x13000)
+ #define MX27_SDHC2_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x14000)
+ #define MX27_GPIO_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x15000)
++#define MX27_GPIO1_BASE_ADDR			(MX27_GPIO_BASE_ADDR + 0x000)
++#define MX27_GPIO2_BASE_ADDR			(MX27_GPIO_BASE_ADDR + 0x100)
++#define MX27_GPIO3_BASE_ADDR			(MX27_GPIO_BASE_ADDR + 0x200)
++#define MX27_GPIO4_BASE_ADDR			(MX27_GPIO_BASE_ADDR + 0x300)
++#define MX27_GPIO5_BASE_ADDR			(MX27_GPIO_BASE_ADDR + 0x400)
++#define MX27_GPIO6_BASE_ADDR			(MX27_GPIO_BASE_ADDR + 0x500)
+ #define MX27_AUDMUX_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x16000)
+ #define MX27_CSPI3_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x17000)
+ #define MX27_MSHC_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x18000)
 -- 
 1.7.2.3
