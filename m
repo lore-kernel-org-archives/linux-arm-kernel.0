@@ -1,34 +1,58 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Wed, 17 Nov 2010 16:18:46 +0200
-Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver
-	(try #8)
-In-Reply-To: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
-References: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1290003526.26444.30.camel@tubuntu>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 17 Nov 2010 10:04:00 -0500 (EST)
+Subject: [PATCH] nomadik: prevent sched_clock() wraparound
+In-Reply-To: <AANLkTi=fespqykXjvgqGusp-4omT0sfUA8Aj4OnT-LNg@mail.gmail.com>
+References: <1289898690-29910-1-git-send-email-linus.walleij@stericsson.com>
+	<1289940829.3860.22.camel@localhost.localdomain>
+	<AANLkTimvyo-2eHrvU=LNdBjrJfAxv9Jpza8Mh4iG4ts6@mail.gmail.com>
+	<20101116223116.GG21926@n2100.arm.linux.org.uk>
+	<AANLkTi=pa+oa3GXr5vfBtdrfnHpRc_2cwgBYQLJRvYXM@mail.gmail.com>
+	<AANLkTi=fespqykXjvgqGusp-4omT0sfUA8Aj4OnT-LNg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1011170957340.6448@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-11-17 at 21:34 +0800, ext Bryan Wu wrote:
-> There are 4 duplicated DPI panel drivers in DSS2 display driver. They are
-> similar and a generic DPI panel driver can support all them with specific
-> panel configuration. And new DPI panel driver can be easily supported
-> by adding panel configurations into generic panel DPI driver.
-> 
-> This patchset introduces a generic panel DPI driver, remove 3 panel drivers and enable
-> generic panel DPI driver in board files. And it is based on 2.6.37-rc2.
-> 
-> Building with omap2plus_defconfig is successful.
-> 
-> Keep sharp_ls_panel, since it contains blacklight control code which will be
-> moved out later.
-> 
-> Bryan Wu (3):
->   OMAP: DSS2: Add generic DPI panel display driver
->   OMAP: use generic DPI panel driver in board files
->   OMAP: DSS2: remove generic DPI panel driver duplicated panel drivers
+On Wed, 17 Nov 2010, Linus Walleij wrote:
 
-Thanks, looks good. This is now applied to my tree.
+> 2010/11/17 Linus Walleij <linus.ml.walleij@gmail.com>:
+> 
+> > Hm! Then in this code in plat-orion/timer.c:
+> >
+> > #define TCLK2NS_SCALE_FACTOR 8
+> > static unsigned long tclk2ns_scale;
+> >
+> > unsigned long long sched_clock(void)
+> > {
+> > ? ? ? ?unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
+> > ? ? ? ?return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
+> > }
+> 
+> Looking at this again it seems the Orion is implicitly
+> loosing bits - so this code will work and multiply out some of the
+> 63 bits so it just wraps around earlier.
 
-Are you also interested in solving the backlight issue? =)
+Exact.  And that's what the comment above it says:
 
- Tomi
+ * Orion's sched_clock implementation. It has a resolution of
+ * at least 7.5ns (133MHz TCLK) and a maximum value of 834 days.
+
+The 834 days comes from the fact that the final shift preserves only 56 
+bits from the result.
+
+On PXA this is even worse:
+
+ * This is PXA's sched_clock implementation. This has a resolution
+ * of at least 308 ns and a maximum value of 208 days.
+
+But again, in the context of sched_clock() this is fine.  We want 
+sched_clock() to be fast, and having a glitch during that jiffy when the 
+clock wraps back every 208 days is perfectly reasonable.
+
+> Would be nice to have these kind of things explicit though,
+> it's a bit hard to determine when this counter will wrap.
+
+It is all commented, at least in those implementations I've written 
+myself.
+
+
+Nicolas
