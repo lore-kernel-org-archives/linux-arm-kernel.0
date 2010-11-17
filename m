@@ -1,68 +1,66 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed, 17 Nov 2010 19:03:39 +0800
-Subject: [PATCH 5/9] ARM: mmp: select CPU_PJ4
-In-Reply-To: <1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
+Date: Wed, 17 Nov 2010 19:03:41 +0800
+Subject: [PATCH 7/9] ARM: pxa: auto compute shift and mult of timer
+In-Reply-To: <1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
 References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
 	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
 	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
 	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since CPU_PJ4 is shared between PXA95x and MMP2, select CPU_PJ4 in MMP2
-configuration.
+Use auto-computed shift and mult of timer with new API
+clocksource_calc_mult_shift()/clockevents_calc_mult_shift().
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Nicolas Pitre <nico@fluxnic.net>
 ---
- arch/arm/mach-mmp/Kconfig |    7 ++++---
- arch/arm/mm/Kconfig       |    2 +-
- 2 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-pxa/time.c |    9 ++-------
+ 1 files changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index 0711d3b..ab39b1e 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -39,6 +39,7 @@ config MACH_TTC_DKB
+diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
+index 293e40a..dd96128 100644
+--- a/arch/arm/mach-pxa/time.c
++++ b/arch/arm/mach-pxa/time.c
+@@ -111,7 +111,6 @@ pxa_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+ static struct clock_event_device ckevt_pxa_osmr0 = {
+ 	.name		= "osmr0",
+ 	.features	= CLOCK_EVT_FEAT_ONESHOT,
+-	.shift		= 32,
+ 	.rating		= 200,
+ 	.set_next_event	= pxa_osmr0_set_next_event,
+ 	.set_mode	= pxa_osmr0_set_mode,
+@@ -127,7 +126,6 @@ static struct clocksource cksrc_pxa_oscr0 = {
+ 	.rating         = 200,
+ 	.read           = pxa_read_oscr,
+ 	.mask           = CLOCKSOURCE_MASK(32),
+-	.shift          = 20,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
  
- config MACH_FLINT
- 	bool "Marvell's Flint Development Platform"
-+	depends on !(CPU_MOHAWK)
- 	select CPU_MMP2
- 	help
- 	  Say 'Y' here if you want to support the Marvell MMP2-based
-@@ -49,6 +50,7 @@ config MACH_FLINT
+@@ -147,17 +145,14 @@ static void __init pxa_timer_init(void)
  
- config MACH_MARVELL_JASPER
- 	bool "Marvell's Jasper Development Platform"
-+	depends on !(CPU_MOHAWK)
- 	select CPU_MMP2
- 	help
- 	  Say 'Y' here if you want to support the Marvell MMP2-base
-@@ -80,8 +82,7 @@ config CPU_PXA910
+ 	set_oscr2ns_scale(clock_tick_rate);
  
- config CPU_MMP2
- 	bool
--	select CPU_V6
--	select CPU_32v6K
-+	select CPU_PJ4
- 	help
--	  Select code specific to MMP2. MMP2 is ARMv6 compatible.
-+	  Select code specific to MMP2. MMP2 is ARMv7 compatible.
- endif
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index ede1763..a099efe 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -795,7 +795,7 @@ config CACHE_PL310
+-	ckevt_pxa_osmr0.mult =
+-		div_sc(clock_tick_rate, NSEC_PER_SEC, ckevt_pxa_osmr0.shift);
++	clocksource_calc_mult_shift(&cksrc_pxa_oscr0, clock_tick_rate, 4);
++	clockevents_calc_mult_shift(&ckevt_pxa_osmr0, clock_tick_rate, 4);
+ 	ckevt_pxa_osmr0.max_delta_ns =
+ 		clockevent_delta2ns(0x7fffffff, &ckevt_pxa_osmr0);
+ 	ckevt_pxa_osmr0.min_delta_ns =
+ 		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_pxa_osmr0) + 1;
+ 	ckevt_pxa_osmr0.cpumask = cpumask_of(0);
  
- config CACHE_TAUROS2
- 	bool "Enable the Tauros2 L2 cache controller"
--	depends on (ARCH_DOVE || ARCH_MMP)
-+	depends on (ARCH_DOVE || ARCH_MMP || CPU_PJ4)
- 	default y
- 	select OUTER_CACHE
- 	help
+-	cksrc_pxa_oscr0.mult =
+-		clocksource_hz2mult(clock_tick_rate, cksrc_pxa_oscr0.shift);
+-
+ 	setup_irq(IRQ_OST0, &pxa_ost0_irq);
+ 
+ 	clocksource_register(&cksrc_pxa_oscr0);
 -- 
 1.5.6.5
