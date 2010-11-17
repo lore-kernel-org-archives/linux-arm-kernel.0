@@ -1,93 +1,590 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Nov 2010 22:29:39 +0100
-Subject: [PATCH 11/51] ARM: imx: allow specifying a dma mask when creating a
-	platform device
+Date: Wed, 17 Nov 2010 22:29:35 +0100
+Subject: [PATCH 07/51] ARM: imx: remove deprecated symbols as all users are
+	gone now
 In-Reply-To: <20101117212821.GF8942@pengutronix.de>
 References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <1290029419-21435-11-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1290029419-21435-7-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/devices.c                     |   23 +++++++++++++++++++++--
- arch/arm/plat-mxc/include/mach/devices-common.h |   14 ++++++++++++--
- 2 files changed, 33 insertions(+), 4 deletions(-)
+ arch/arm/plat-mxc/include/mach/mx1.h  |  127 ---------------------------------
+ arch/arm/plat-mxc/include/mach/mx21.h |   34 ---------
+ arch/arm/plat-mxc/include/mach/mx27.h |   69 ------------------
+ arch/arm/plat-mxc/include/mach/mx2x.h |  112 -----------------------------
+ arch/arm/plat-mxc/include/mach/mx31.h |   32 --------
+ arch/arm/plat-mxc/include/mach/mx35.h |   16 ----
+ arch/arm/plat-mxc/include/mach/mx3x.h |  114 -----------------------------
+ 7 files changed, 0 insertions(+), 504 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/devices.c b/arch/arm/plat-mxc/devices.c
-index 735776d..e9bcefe 100644
---- a/arch/arm/plat-mxc/devices.c
-+++ b/arch/arm/plat-mxc/devices.c
-@@ -17,6 +17,7 @@
+diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
+index b786ae7..b6771f4 100644
+--- a/arch/arm/plat-mxc/include/mach/mx1.h
++++ b/arch/arm/plat-mxc/include/mach/mx1.h
+@@ -165,131 +165,4 @@
   */
+ #define USBD_INT0		MX1_USBD_INT0
  
- #include <linux/kernel.h>
-+#include <linux/slab.h>
- #include <linux/init.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-@@ -36,9 +37,10 @@ int __init mxc_register_device(struct platform_device *pdev, void *data)
- 	return ret;
+-#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+-/* these should go away */
+-#define IMX_IO_PHYS MX1_IO_BASE_ADDR
+-#define IMX_IO_SIZE MX1_IO_SIZE
+-#define IMX_CS0_PHYS MX1_CS0_PHYS
+-#define IMX_CS0_SIZE MX1_CS0_SIZE
+-#define IMX_CS1_PHYS MX1_CS1_PHYS
+-#define IMX_CS1_SIZE MX1_CS1_SIZE
+-#define IMX_CS2_PHYS MX1_CS2_PHYS
+-#define IMX_CS2_SIZE MX1_CS2_SIZE
+-#define IMX_CS3_PHYS MX1_CS3_PHYS
+-#define IMX_CS3_SIZE MX1_CS3_SIZE
+-#define IMX_CS4_PHYS MX1_CS4_PHYS
+-#define IMX_CS4_SIZE MX1_CS4_SIZE
+-#define IMX_CS5_PHYS MX1_CS5_PHYS
+-#define IMX_CS5_SIZE MX1_CS5_SIZE
+-#define AIPI1_BASE_ADDR MX1_AIPI1_BASE_ADDR
+-#define WDT_BASE_ADDR MX1_WDT_BASE_ADDR
+-#define TIM1_BASE_ADDR MX1_TIM1_BASE_ADDR
+-#define TIM2_BASE_ADDR MX1_TIM2_BASE_ADDR
+-#define RTC_BASE_ADDR MX1_RTC_BASE_ADDR
+-#define LCDC_BASE_ADDR MX1_LCDC_BASE_ADDR
+-#define UART1_BASE_ADDR MX1_UART1_BASE_ADDR
+-#define UART2_BASE_ADDR MX1_UART2_BASE_ADDR
+-#define PWM_BASE_ADDR MX1_PWM_BASE_ADDR
+-#define DMA_BASE_ADDR MX1_DMA_BASE_ADDR
+-#define AIPI2_BASE_ADDR MX1_AIPI2_BASE_ADDR
+-#define SIM_BASE_ADDR MX1_SIM_BASE_ADDR
+-#define USBD_BASE_ADDR MX1_USBD_BASE_ADDR
+-#define SPI1_BASE_ADDR MX1_SPI1_BASE_ADDR
+-#define MMC_BASE_ADDR MX1_MMC_BASE_ADDR
+-#define ASP_BASE_ADDR MX1_ASP_BASE_ADDR
+-#define BTA_BASE_ADDR MX1_BTA_BASE_ADDR
+-#define I2C_BASE_ADDR MX1_I2C_BASE_ADDR
+-#define SSI_BASE_ADDR MX1_SSI_BASE_ADDR
+-#define SPI2_BASE_ADDR MX1_SPI2_BASE_ADDR
+-#define MSHC_BASE_ADDR MX1_MSHC_BASE_ADDR
+-#define CCM_BASE_ADDR MX1_CCM_BASE_ADDR
+-#define SCM_BASE_ADDR MX1_SCM_BASE_ADDR
+-#define GPIO_BASE_ADDR MX1_GPIO_BASE_ADDR
+-#define EIM_BASE_ADDR MX1_EIM_BASE_ADDR
+-#define SDRAMC_BASE_ADDR MX1_SDRAMC_BASE_ADDR
+-#define MMA_BASE_ADDR MX1_MMA_BASE_ADDR
+-#define AVIC_BASE_ADDR MX1_AVIC_BASE_ADDR
+-#define CSI_BASE_ADDR MX1_CSI_BASE_ADDR
+-#define IO_ADDRESS(x) MX1_IO_ADDRESS(x)
+-#define AVIC_IO_ADDRESS(x) IO_ADDRESS(x)
+-#define INT_SOFTINT MX1_INT_SOFTINT
+-#define CSI_INT MX1_CSI_INT
+-#define DSPA_MAC_INT MX1_DSPA_MAC_INT
+-#define DSPA_INT MX1_DSPA_INT
+-#define COMP_INT MX1_COMP_INT
+-#define MSHC_XINT MX1_MSHC_XINT
+-#define GPIO_INT_PORTA MX1_GPIO_INT_PORTA
+-#define GPIO_INT_PORTB MX1_GPIO_INT_PORTB
+-#define GPIO_INT_PORTC MX1_GPIO_INT_PORTC
+-#define LCDC_INT MX1_LCDC_INT
+-#define SIM_INT MX1_SIM_INT
+-#define SIM_DATA_INT MX1_SIM_DATA_INT
+-#define RTC_INT MX1_RTC_INT
+-#define RTC_SAMINT MX1_RTC_SAMINT
+-#define UART2_MINT_PFERR MX1_UART2_MINT_PFERR
+-#define UART2_MINT_RTS MX1_UART2_MINT_RTS
+-#define UART2_MINT_DTR MX1_UART2_MINT_DTR
+-#define UART2_MINT_UARTC MX1_UART2_MINT_UARTC
+-#define UART2_MINT_TX MX1_UART2_MINT_TX
+-#define UART2_MINT_RX MX1_UART2_MINT_RX
+-#define UART1_MINT_PFERR MX1_UART1_MINT_PFERR
+-#define UART1_MINT_RTS MX1_UART1_MINT_RTS
+-#define UART1_MINT_DTR MX1_UART1_MINT_DTR
+-#define UART1_MINT_UARTC MX1_UART1_MINT_UARTC
+-#define UART1_MINT_TX MX1_UART1_MINT_TX
+-#define UART1_MINT_RX MX1_UART1_MINT_RX
+-#define VOICE_DAC_INT MX1_VOICE_DAC_INT
+-#define VOICE_ADC_INT MX1_VOICE_ADC_INT
+-#define PEN_DATA_INT MX1_PEN_DATA_INT
+-#define PWM_INT MX1_PWM_INT
+-#define SDHC_INT MX1_SDHC_INT
+-#define I2C_INT MX1_INT_I2C
+-#define CSPI_INT MX1_CSPI_INT
+-#define SSI_TX_INT MX1_SSI_TX_INT
+-#define SSI_TX_ERR_INT MX1_SSI_TX_ERR_INT
+-#define SSI_RX_INT MX1_SSI_RX_INT
+-#define SSI_RX_ERR_INT MX1_SSI_RX_ERR_INT
+-#define TOUCH_INT MX1_TOUCH_INT
+-#define USBD_INT1 MX1_USBD_INT1
+-#define USBD_INT2 MX1_USBD_INT2
+-#define USBD_INT3 MX1_USBD_INT3
+-#define USBD_INT4 MX1_USBD_INT4
+-#define USBD_INT5 MX1_USBD_INT5
+-#define USBD_INT6 MX1_USBD_INT6
+-#define BTSYS_INT MX1_BTSYS_INT
+-#define BTTIM_INT MX1_BTTIM_INT
+-#define BTWUI_INT MX1_BTWUI_INT
+-#define TIM2_INT MX1_TIM2_INT
+-#define TIM1_INT MX1_TIM1_INT
+-#define DMA_ERR MX1_DMA_ERR
+-#define DMA_INT MX1_DMA_INT
+-#define GPIO_INT_PORTD MX1_GPIO_INT_PORTD
+-#define WDT_INT MX1_WDT_INT
+-#define DMA_REQ_UART3_T MX1_DMA_REQ_UART3_T
+-#define DMA_REQ_UART3_R MX1_DMA_REQ_UART3_R
+-#define DMA_REQ_SSI2_T MX1_DMA_REQ_SSI2_T
+-#define DMA_REQ_SSI2_R MX1_DMA_REQ_SSI2_R
+-#define DMA_REQ_CSI_STAT MX1_DMA_REQ_CSI_STAT
+-#define DMA_REQ_CSI_R MX1_DMA_REQ_CSI_R
+-#define DMA_REQ_MSHC MX1_DMA_REQ_MSHC
+-#define DMA_REQ_DSPA_DCT_DOUT MX1_DMA_REQ_DSPA_DCT_DOUT
+-#define DMA_REQ_DSPA_DCT_DIN MX1_DMA_REQ_DSPA_DCT_DIN
+-#define DMA_REQ_DSPA_MAC MX1_DMA_REQ_DSPA_MAC
+-#define DMA_REQ_EXT MX1_DMA_REQ_EXT
+-#define DMA_REQ_SDHC MX1_DMA_REQ_SDHC
+-#define DMA_REQ_SPI1_R MX1_DMA_REQ_SPI1_R
+-#define DMA_REQ_SPI1_T MX1_DMA_REQ_SPI1_T
+-#define DMA_REQ_SSI_T MX1_DMA_REQ_SSI_T
+-#define DMA_REQ_SSI_R MX1_DMA_REQ_SSI_R
+-#define DMA_REQ_ASP_DAC MX1_DMA_REQ_ASP_DAC
+-#define DMA_REQ_ASP_ADC MX1_DMA_REQ_ASP_ADC
+-#define DMA_REQ_USP_EP(x) MX1_DMA_REQ_USP_EP(x)
+-#define DMA_REQ_SPI2_R MX1_DMA_REQ_SPI2_R
+-#define DMA_REQ_SPI2_T MX1_DMA_REQ_SPI2_T
+-#define DMA_REQ_UART2_T MX1_DMA_REQ_UART2_T
+-#define DMA_REQ_UART2_R MX1_DMA_REQ_UART2_R
+-#define DMA_REQ_UART1_T MX1_DMA_REQ_UART1_T
+-#define DMA_REQ_UART1_R MX1_DMA_REQ_UART1_R
+-#endif /* ifdef IMX_NEEDS_DEPRECATED_SYMBOLS */
+-
+ #endif /* ifndef __MACH_MX1_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
+index b417e32..a82f590 100644
+--- a/arch/arm/plat-mxc/include/mach/mx21.h
++++ b/arch/arm/plat-mxc/include/mach/mx21.h
+@@ -179,38 +179,4 @@
+ #define MX21_DMA_REQ_CSI_STAT	30
+ #define MX21_DMA_REQ_CSI_RX	31
+ 
+-#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+-/* these should go away */
+-#define SDRAM_BASE_ADDR MX21_SDRAM_BASE_ADDR
+-#define CSD1_BASE_ADDR MX21_CSD1_BASE_ADDR
+-#define CS0_BASE_ADDR MX21_CS0_BASE_ADDR
+-#define CS1_BASE_ADDR MX21_CS1_BASE_ADDR
+-#define CS2_BASE_ADDR MX21_CS2_BASE_ADDR
+-#define CS3_BASE_ADDR MX21_CS3_BASE_ADDR
+-#define CS4_BASE_ADDR MX21_CS4_BASE_ADDR
+-#define PCMCIA_MEM_BASE_ADDR MX21_PCMCIA_MEM_BASE_ADDR
+-#define CS5_BASE_ADDR MX21_CS5_BASE_ADDR
+-#define X_MEMC_BASE_ADDR MX21_X_MEMC_BASE_ADDR
+-#define X_MEMC_SIZE MX21_X_MEMC_SIZE
+-#define SDRAMC_BASE_ADDR MX21_SDRAMC_BASE_ADDR
+-#define EIM_BASE_ADDR MX21_EIM_BASE_ADDR
+-#define PCMCIA_CTL_BASE_ADDR MX21_PCMCIA_CTL_BASE_ADDR
+-#define NFC_BASE_ADDR MX21_NFC_BASE_ADDR
+-#define IRAM_BASE_ADDR MX21_IRAM_BASE_ADDR
+-#define MXC_INT_FIRI MX21_INT_FIRI
+-#define MXC_INT_BMI MX21_INT_BMI
+-#define MXC_INT_EMMAENC MX21_INT_EMMAENC
+-#define MXC_INT_EMMADEC MX21_INT_EMMADEC
+-#define MXC_INT_USBWKUP MX21_INT_USBWKUP
+-#define MXC_INT_USBDMA MX21_INT_USBDMA
+-#define MXC_INT_USBHOST MX21_INT_USBHOST
+-#define MXC_INT_USBFUNC MX21_INT_USBFUNC
+-#define MXC_INT_USBMNP MX21_INT_USBMNP
+-#define MXC_INT_USBCTRL MX21_INT_USBCTRL
+-#define MXC_INT_USBCTRL MX21_INT_USBCTRL
+-#define DMA_REQ_FIRI_RX MX21_DMA_REQ_FIRI_RX
+-#define DMA_REQ_BMI_TX MX21_DMA_REQ_BMI_TX
+-#define DMA_REQ_BMI_RX MX21_DMA_REQ_BMI_RX
+-#endif
+-
+ #endif /* ifndef __MACH_MX21_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
+index e817289..3116b3b 100644
+--- a/arch/arm/plat-mxc/include/mach/mx27.h
++++ b/arch/arm/plat-mxc/include/mach/mx27.h
+@@ -244,73 +244,4 @@ static inline void mx27_setup_weimcs(size_t cs,
+ extern int mx27_revision(void);
+ #endif
+ 
+-#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+-/* these should go away */
+-#define MSHC_BASE_ADDR MX27_MSHC_BASE_ADDR
+-#define GPT5_BASE_ADDR MX27_GPT5_BASE_ADDR
+-#define GPT4_BASE_ADDR MX27_GPT4_BASE_ADDR
+-#define UART5_BASE_ADDR MX27_UART5_BASE_ADDR
+-#define UART6_BASE_ADDR MX27_UART6_BASE_ADDR
+-#define I2C2_BASE_ADDR MX27_I2C2_BASE_ADDR
+-#define SDHC3_BASE_ADDR MX27_SDHC3_BASE_ADDR
+-#define GPT6_BASE_ADDR MX27_GPT6_BASE_ADDR
+-#define VPU_BASE_ADDR MX27_VPU_BASE_ADDR
+-#define OTG_BASE_ADDR MX27_OTG_BASE_ADDR
+-#define SAHARA_BASE_ADDR MX27_SAHARA_BASE_ADDR
+-#define IIM_BASE_ADDR MX27_IIM_BASE_ADDR
+-#define RTIC_BASE_ADDR MX27_RTIC_BASE_ADDR
+-#define FEC_BASE_ADDR MX27_FEC_BASE_ADDR
+-#define SCC_BASE_ADDR MX27_SCC_BASE_ADDR
+-#define ETB_BASE_ADDR MX27_ETB_BASE_ADDR
+-#define ETB_RAM_BASE_ADDR MX27_ETB_RAM_BASE_ADDR
+-#define ROMP_BASE_ADDR MX27_ROMP_BASE_ADDR
+-#define ATA_BASE_ADDR MX27_ATA_BASE_ADDR
+-#define SDRAM_BASE_ADDR MX27_SDRAM_BASE_ADDR
+-#define CSD1_BASE_ADDR MX27_CSD1_BASE_ADDR
+-#define CS0_BASE_ADDR MX27_CS0_BASE_ADDR
+-#define CS1_BASE_ADDR MX27_CS1_BASE_ADDR
+-#define CS2_BASE_ADDR MX27_CS2_BASE_ADDR
+-#define CS3_BASE_ADDR MX27_CS3_BASE_ADDR
+-#define CS4_BASE_ADDR MX27_CS4_BASE_ADDR
+-#define CS5_BASE_ADDR MX27_CS5_BASE_ADDR
+-#define X_MEMC_BASE_ADDR MX27_X_MEMC_BASE_ADDR
+-#define X_MEMC_SIZE MX27_X_MEMC_SIZE
+-#define NFC_BASE_ADDR MX27_NFC_BASE_ADDR
+-#define SDRAMC_BASE_ADDR MX27_SDRAMC_BASE_ADDR
+-#define WEIM_BASE_ADDR MX27_WEIM_BASE_ADDR
+-#define M3IF_BASE_ADDR MX27_M3IF_BASE_ADDR
+-#define PCMCIA_CTL_BASE_ADDR MX27_PCMCIA_CTL_BASE_ADDR
+-#define PCMCIA_MEM_BASE_ADDR MX27_PCMCIA_MEM_BASE_ADDR
+-#define IRAM_BASE_ADDR MX27_IRAM_BASE_ADDR
+-#define MXC_INT_I2C2 MX27_INT_I2C2
+-#define MXC_INT_GPT6 MX27_INT_GPT6
+-#define MXC_INT_GPT5 MX27_INT_GPT5
+-#define MXC_INT_GPT4 MX27_INT_GPT4
+-#define MXC_INT_RTIC MX27_INT_RTIC
+-#define MXC_INT_SDHC MX27_INT_SDHC
+-#define MXC_INT_SDHC3 MX27_INT_SDHC3
+-#define MXC_INT_ATA MX27_INT_ATA
+-#define MXC_INT_UART6 MX27_INT_UART6
+-#define MXC_INT_UART5 MX27_INT_UART5
+-#define MXC_INT_FEC MX27_INT_FEC
+-#define MXC_INT_VPU MX27_INT_VPU
+-#define MXC_INT_USB1 MX27_INT_USB1
+-#define MXC_INT_USB2 MX27_INT_USB2
+-#define MXC_INT_USB3 MX27_INT_USB3
+-#define MXC_INT_SCC_SMN MX27_INT_SCC_SMN
+-#define MXC_INT_SCC_SCM MX27_INT_SCC_SCM
+-#define MXC_INT_SAHARA MX27_INT_SAHARA
+-#define MXC_INT_IIM MX27_INT_IIM
+-#define MXC_INT_CCM MX27_INT_CCM
+-#define DMA_REQ_MSHC MX27_DMA_REQ_MSHC
+-#define DMA_REQ_ATA_TX MX27_DMA_REQ_ATA_TX
+-#define DMA_REQ_ATA_RCV MX27_DMA_REQ_ATA_RCV
+-#define DMA_REQ_UART5_TX MX27_DMA_REQ_UART5_TX
+-#define DMA_REQ_UART5_RX MX27_DMA_REQ_UART5_RX
+-#define DMA_REQ_UART6_TX MX27_DMA_REQ_UART6_TX
+-#define DMA_REQ_UART6_RX MX27_DMA_REQ_UART6_RX
+-#define DMA_REQ_SDHC3 MX27_DMA_REQ_SDHC3
+-#define DMA_REQ_NFC MX27_DMA_REQ_NFC
+-#endif
+-
+ #endif /* ifndef __MACH_MX27_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/plat-mxc/include/mach/mx2x.h
+index a056948..6d07839 100644
+--- a/arch/arm/plat-mxc/include/mach/mx2x.h
++++ b/arch/arm/plat-mxc/include/mach/mx2x.h
+@@ -141,116 +141,4 @@
+ #define MX2x_DMA_REQ_CSI_STAT	30
+ #define MX2x_DMA_REQ_CSI_RX	31
+ 
+-#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+-/* these should go away */
+-#define AIPI_BASE_ADDR MX2x_AIPI_BASE_ADDR
+-#define AIPI_SIZE MX2x_AIPI_SIZE
+-#define DMA_BASE_ADDR MX2x_DMA_BASE_ADDR
+-#define WDOG_BASE_ADDR MX2x_WDOG_BASE_ADDR
+-#define GPT1_BASE_ADDR MX2x_GPT1_BASE_ADDR
+-#define GPT2_BASE_ADDR MX2x_GPT2_BASE_ADDR
+-#define GPT3_BASE_ADDR MX2x_GPT3_BASE_ADDR
+-#define PWM_BASE_ADDR MX2x_PWM_BASE_ADDR
+-#define RTC_BASE_ADDR MX2x_RTC_BASE_ADDR
+-#define KPP_BASE_ADDR MX2x_KPP_BASE_ADDR
+-#define OWIRE_BASE_ADDR MX2x_OWIRE_BASE_ADDR
+-#define UART1_BASE_ADDR MX2x_UART1_BASE_ADDR
+-#define UART2_BASE_ADDR MX2x_UART2_BASE_ADDR
+-#define UART3_BASE_ADDR MX2x_UART3_BASE_ADDR
+-#define UART4_BASE_ADDR MX2x_UART4_BASE_ADDR
+-#define CSPI1_BASE_ADDR MX2x_CSPI1_BASE_ADDR
+-#define CSPI2_BASE_ADDR MX2x_CSPI2_BASE_ADDR
+-#define SSI1_BASE_ADDR MX2x_SSI1_BASE_ADDR
+-#define SSI2_BASE_ADDR MX2x_SSI2_BASE_ADDR
+-#define I2C_BASE_ADDR MX2x_I2C_BASE_ADDR
+-#define SDHC1_BASE_ADDR MX2x_SDHC1_BASE_ADDR
+-#define SDHC2_BASE_ADDR MX2x_SDHC2_BASE_ADDR
+-#define GPIO_BASE_ADDR MX2x_GPIO_BASE_ADDR
+-#define AUDMUX_BASE_ADDR MX2x_AUDMUX_BASE_ADDR
+-#define CSPI3_BASE_ADDR MX2x_CSPI3_BASE_ADDR
+-#define LCDC_BASE_ADDR MX2x_LCDC_BASE_ADDR
+-#define SLCDC_BASE_ADDR MX2x_SLCDC_BASE_ADDR
+-#define USBOTG_BASE_ADDR MX2x_USBOTG_BASE_ADDR
+-#define EMMA_PP_BASE_ADDR MX2x_EMMA_PP_BASE_ADDR
+-#define EMMA_PRP_BASE_ADDR MX2x_EMMA_PRP_BASE_ADDR
+-#define CCM_BASE_ADDR MX2x_CCM_BASE_ADDR
+-#define SYSCTRL_BASE_ADDR MX2x_SYSCTRL_BASE_ADDR
+-#define JAM_BASE_ADDR MX2x_JAM_BASE_ADDR
+-#define MAX_BASE_ADDR MX2x_MAX_BASE_ADDR
+-#define AVIC_BASE_ADDR MX2x_AVIC_BASE_ADDR
+-#define SAHB1_BASE_ADDR MX2x_SAHB1_BASE_ADDR
+-#define SAHB1_SIZE MX2x_SAHB1_SIZE
+-#define CSI_BASE_ADDR MX2x_CSI_BASE_ADDR
+-#define MXC_INT_CSPI3 MX2x_INT_CSPI3
+-#define MXC_INT_GPIO MX2x_INT_GPIO
+-#define MXC_INT_SDHC2 MX2x_INT_SDHC2
+-#define MXC_INT_SDHC1 MX2x_INT_SDHC1
+-#define MXC_INT_I2C MX2x_INT_I2C
+-#define MXC_INT_SSI2 MX2x_INT_SSI2
+-#define MXC_INT_SSI1 MX2x_INT_SSI1
+-#define MXC_INT_CSPI2 MX2x_INT_CSPI2
+-#define MXC_INT_CSPI1 MX2x_INT_CSPI1
+-#define MXC_INT_UART4 MX2x_INT_UART4
+-#define MXC_INT_UART3 MX2x_INT_UART3
+-#define MXC_INT_UART2 MX2x_INT_UART2
+-#define MXC_INT_UART1 MX2x_INT_UART1
+-#define MXC_INT_KPP MX2x_INT_KPP
+-#define MXC_INT_RTC MX2x_INT_RTC
+-#define MXC_INT_PWM MX2x_INT_PWM
+-#define MXC_INT_GPT3 MX2x_INT_GPT3
+-#define MXC_INT_GPT2 MX2x_INT_GPT2
+-#define MXC_INT_GPT1 MX2x_INT_GPT1
+-#define MXC_INT_WDOG MX2x_INT_WDOG
+-#define MXC_INT_PCMCIA MX2x_INT_PCMCIA
+-#define MXC_INT_NANDFC MX2x_INT_NANDFC
+-#define MXC_INT_CSI MX2x_INT_CSI
+-#define MXC_INT_DMACH0 MX2x_INT_DMACH0
+-#define MXC_INT_DMACH1 MX2x_INT_DMACH1
+-#define MXC_INT_DMACH2 MX2x_INT_DMACH2
+-#define MXC_INT_DMACH3 MX2x_INT_DMACH3
+-#define MXC_INT_DMACH4 MX2x_INT_DMACH4
+-#define MXC_INT_DMACH5 MX2x_INT_DMACH5
+-#define MXC_INT_DMACH6 MX2x_INT_DMACH6
+-#define MXC_INT_DMACH7 MX2x_INT_DMACH7
+-#define MXC_INT_DMACH8 MX2x_INT_DMACH8
+-#define MXC_INT_DMACH9 MX2x_INT_DMACH9
+-#define MXC_INT_DMACH10 MX2x_INT_DMACH10
+-#define MXC_INT_DMACH11 MX2x_INT_DMACH11
+-#define MXC_INT_DMACH12 MX2x_INT_DMACH12
+-#define MXC_INT_DMACH13 MX2x_INT_DMACH13
+-#define MXC_INT_DMACH14 MX2x_INT_DMACH14
+-#define MXC_INT_DMACH15 MX2x_INT_DMACH15
+-#define MXC_INT_EMMAPRP MX2x_INT_EMMAPRP
+-#define MXC_INT_EMMAPP MX2x_INT_EMMAPP
+-#define MXC_INT_SLCDC MX2x_INT_SLCDC
+-#define MXC_INT_LCDC MX2x_INT_LCDC
+-#define DMA_REQ_CSPI3_RX MX2x_DMA_REQ_CSPI3_RX
+-#define DMA_REQ_CSPI3_TX MX2x_DMA_REQ_CSPI3_TX
+-#define DMA_REQ_EXT MX2x_DMA_REQ_EXT
+-#define DMA_REQ_SDHC2 MX2x_DMA_REQ_SDHC2
+-#define DMA_REQ_SDHC1 MX2x_DMA_REQ_SDHC1
+-#define DMA_REQ_SSI2_RX0 MX2x_DMA_REQ_SSI2_RX0
+-#define DMA_REQ_SSI2_TX0 MX2x_DMA_REQ_SSI2_TX0
+-#define DMA_REQ_SSI2_RX1 MX2x_DMA_REQ_SSI2_RX1
+-#define DMA_REQ_SSI2_TX1 MX2x_DMA_REQ_SSI2_TX1
+-#define DMA_REQ_SSI1_RX0 MX2x_DMA_REQ_SSI1_RX0
+-#define DMA_REQ_SSI1_TX0 MX2x_DMA_REQ_SSI1_TX0
+-#define DMA_REQ_SSI1_RX1 MX2x_DMA_REQ_SSI1_RX1
+-#define DMA_REQ_SSI1_TX1 MX2x_DMA_REQ_SSI1_TX1
+-#define DMA_REQ_CSPI2_RX MX2x_DMA_REQ_CSPI2_RX
+-#define DMA_REQ_CSPI2_TX MX2x_DMA_REQ_CSPI2_TX
+-#define DMA_REQ_CSPI1_RX MX2x_DMA_REQ_CSPI1_RX
+-#define DMA_REQ_CSPI1_TX MX2x_DMA_REQ_CSPI1_TX
+-#define DMA_REQ_UART4_RX MX2x_DMA_REQ_UART4_RX
+-#define DMA_REQ_UART4_TX MX2x_DMA_REQ_UART4_TX
+-#define DMA_REQ_UART3_RX MX2x_DMA_REQ_UART3_RX
+-#define DMA_REQ_UART3_TX MX2x_DMA_REQ_UART3_TX
+-#define DMA_REQ_UART2_RX MX2x_DMA_REQ_UART2_RX
+-#define DMA_REQ_UART2_TX MX2x_DMA_REQ_UART2_TX
+-#define DMA_REQ_UART1_RX MX2x_DMA_REQ_UART1_RX
+-#define DMA_REQ_UART1_TX MX2x_DMA_REQ_UART1_TX
+-#define DMA_REQ_CSI_STAT MX2x_DMA_REQ_CSI_STAT
+-#define DMA_REQ_CSI_RX MX2x_DMA_REQ_CSI_RX
+-#endif
+-
+ #endif /* ifndef __MACH_MX2x_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
+index 9ed9975..6d4b98f 100644
+--- a/arch/arm/plat-mxc/include/mach/mx31.h
++++ b/arch/arm/plat-mxc/include/mach/mx31.h
+@@ -215,36 +215,4 @@ static inline void mx31_setup_weimcs(size_t cs,
+ #define MX31_SYSTEM_REV_MIN		MX31_CHIP_REV_1_0
+ #define MX31_SYSTEM_REV_NUM		3
+ 
+-#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+-/* these should go away */
+-#define ATA_BASE_ADDR MX31_ATA_BASE_ADDR
+-#define UART4_BASE_ADDR MX31_UART4_BASE_ADDR
+-#define UART5_BASE_ADDR MX31_UART5_BASE_ADDR
+-#define MMC_SDHC1_BASE_ADDR MX31_MMC_SDHC1_BASE_ADDR
+-#define MMC_SDHC2_BASE_ADDR MX31_MMC_SDHC2_BASE_ADDR
+-#define SIM1_BASE_ADDR MX31_SIM1_BASE_ADDR
+-#define IIM_BASE_ADDR MX31_IIM_BASE_ADDR
+-#define CSPI3_BASE_ADDR MX31_CSPI3_BASE_ADDR
+-#define FIRI_BASE_ADDR MX31_FIRI_BASE_ADDR
+-#define SCM_BASE_ADDR MX31_SCM_BASE_ADDR
+-#define SMN_BASE_ADDR MX31_SMN_BASE_ADDR
+-#define MPEG4_ENC_BASE_ADDR MX31_MPEG4_ENC_BASE_ADDR
+-#define MXC_INT_MPEG4_ENCODER MX31_INT_MPEG4_ENCODER
+-#define MXC_INT_FIRI MX31_INT_FIRI
+-#define MXC_INT_MBX MX31_INT_MBX
+-#define MXC_INT_CSPI3 MX31_INT_CSPI3
+-#define MXC_INT_SIM2 MX31_INT_SIM2
+-#define MXC_INT_SIM1 MX31_INT_SIM1
+-#define MXC_INT_CCM_DVFS MX31_INT_CCM_DVFS
+-#define MXC_INT_USB1 MX31_INT_USB1
+-#define MXC_INT_USB2 MX31_INT_USB2
+-#define MXC_INT_USB3 MX31_INT_USB3
+-#define MXC_INT_USB4 MX31_INT_USB4
+-#define MXC_INT_MSHC2 MX31_INT_MSHC2
+-#define MXC_INT_UART4 MX31_INT_UART4
+-#define MXC_INT_UART5 MX31_INT_UART5
+-#define MXC_INT_CCM MX31_INT_CCM
+-#define MXC_INT_PCMCIA MX31_INT_PCMCIA
+-#endif
+-
+ #endif /* ifndef __MACH_MX31_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
+index 3678ca3..9067225 100644
+--- a/arch/arm/plat-mxc/include/mach/mx35.h
++++ b/arch/arm/plat-mxc/include/mach/mx35.h
+@@ -183,20 +183,4 @@
+ #define MX35_SYSTEM_REV_MIN		MX3x_CHIP_REV_1_0
+ #define MX35_SYSTEM_REV_NUM		3
+ 
+-#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+-/* these should go away */
+-#define MXC_FEC_BASE_ADDR MX35_FEC_BASE_ADDR
+-#define MXC_INT_OWIRE MX35_INT_OWIRE
+-#define MXC_INT_GPU2D MX35_INT_GPU2D
+-#define MXC_INT_ASRC MX35_INT_ASRC
+-#define MXC_INT_USBHS MX35_INT_USBHS
+-#define MXC_INT_USBOTG MX35_INT_USBOTG
+-#define MXC_INT_ESAI MX35_INT_ESAI
+-#define MXC_INT_CAN1 MX35_INT_CAN1
+-#define MXC_INT_CAN2 MX35_INT_CAN2
+-#define MXC_INT_MLB MX35_INT_MLB
+-#define MXC_INT_SPDIF MX35_INT_SPDIF
+-#define MXC_INT_FEC MX35_INT_FEC
+-#endif
+-
+ #endif /* ifndef __MACH_MX35_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
+index 3d6cc45..8c7f34e 100644
+--- a/arch/arm/plat-mxc/include/mach/mx3x.h
++++ b/arch/arm/plat-mxc/include/mach/mx3x.h
+@@ -221,118 +221,4 @@ static inline int mx35_revision(void)
  }
+ #endif
  
--struct platform_device *__init imx_add_platform_device(const char *name, int id,
-+struct platform_device *__init imx_add_platform_device_dmamask(
-+		const char *name, int id,
- 		const struct resource *res, unsigned int num_resources,
--		const void *data, size_t size_data)
-+		const void *data, size_t size_data, u64 dmamask)
- {
- 	int ret = -ENOMEM;
- 	struct platform_device *pdev;
-@@ -47,6 +49,23 @@ struct platform_device *__init imx_add_platform_device(const char *name, int id,
- 	if (!pdev)
- 		goto err;
- 
-+	if (dmamask) {
-+		/*
-+		 * This memory isn't freed when the device is put,
-+		 * I don't have a nice idea for that though.  Conceptually
-+		 * dma_mask in struct device should not be a pointer.
-+		 * See http://thread.gmane.org/gmane.linux.kernel.pci/9081
-+		 */
-+		pdev->dev.dma_mask =
-+			kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-+		if (!pdev->dev.dma_mask)
-+			/* ret is still -ENOMEM; */
-+			goto err;
-+
-+		*pdev->dev.dma_mask = dmamask;
-+		pdev->dev.coherent_dma_mask = dmamask;
-+	}
-+
- 	if (res) {
- 		ret = platform_device_add_resources(pdev, res, num_resources);
- 		if (ret)
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 4eb45fa..a5e97b8 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -10,9 +10,19 @@
- #include <linux/platform_device.h>
- #include <linux/init.h>
- 
--struct platform_device *imx_add_platform_device(const char *name, int id,
-+struct platform_device *imx_add_platform_device_dmamask(
-+		const char *name, int id,
- 		const struct resource *res, unsigned int num_resources,
--		const void *data, size_t size_data);
-+		const void *data, size_t size_data, u64 dmamask);
-+
-+static inline struct platform_device *imx_add_platform_device(
-+		const char *name, int id,
-+		const struct resource *res, unsigned int num_resources,
-+		const void *data, size_t size_data)
-+{
-+	return imx_add_platform_device_dmamask(
-+			name, id, res, num_resources, data, size_data, 0);
-+}
- 
- #include <linux/fec.h>
- struct imx_fec_data {
+-#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+-/* these should go away */
+-#define L2CC_BASE_ADDR MX3x_L2CC_BASE_ADDR
+-#define L2CC_SIZE MX3x_L2CC_SIZE
+-#define AIPS1_BASE_ADDR MX3x_AIPS1_BASE_ADDR
+-#define AIPS1_SIZE MX3x_AIPS1_SIZE
+-#define MAX_BASE_ADDR MX3x_MAX_BASE_ADDR
+-#define EVTMON_BASE_ADDR MX3x_EVTMON_BASE_ADDR
+-#define CLKCTL_BASE_ADDR MX3x_CLKCTL_BASE_ADDR
+-#define ETB_SLOT4_BASE_ADDR MX3x_ETB_SLOT4_BASE_ADDR
+-#define ETB_SLOT5_BASE_ADDR MX3x_ETB_SLOT5_BASE_ADDR
+-#define ECT_CTIO_BASE_ADDR MX3x_ECT_CTIO_BASE_ADDR
+-#define I2C_BASE_ADDR MX3x_I2C_BASE_ADDR
+-#define I2C3_BASE_ADDR MX3x_I2C3_BASE_ADDR
+-#define UART1_BASE_ADDR MX3x_UART1_BASE_ADDR
+-#define UART2_BASE_ADDR MX3x_UART2_BASE_ADDR
+-#define I2C2_BASE_ADDR MX3x_I2C2_BASE_ADDR
+-#define OWIRE_BASE_ADDR MX3x_OWIRE_BASE_ADDR
+-#define SSI1_BASE_ADDR MX3x_SSI1_BASE_ADDR
+-#define CSPI1_BASE_ADDR MX3x_CSPI1_BASE_ADDR
+-#define KPP_BASE_ADDR MX3x_KPP_BASE_ADDR
+-#define IOMUXC_BASE_ADDR MX3x_IOMUXC_BASE_ADDR
+-#define ECT_IP1_BASE_ADDR MX3x_ECT_IP1_BASE_ADDR
+-#define ECT_IP2_BASE_ADDR MX3x_ECT_IP2_BASE_ADDR
+-#define SPBA0_BASE_ADDR MX3x_SPBA0_BASE_ADDR
+-#define SPBA0_SIZE MX3x_SPBA0_SIZE
+-#define UART3_BASE_ADDR MX3x_UART3_BASE_ADDR
+-#define CSPI2_BASE_ADDR MX3x_CSPI2_BASE_ADDR
+-#define SSI2_BASE_ADDR MX3x_SSI2_BASE_ADDR
+-#define ATA_DMA_BASE_ADDR MX3x_ATA_DMA_BASE_ADDR
+-#define MSHC1_BASE_ADDR MX3x_MSHC1_BASE_ADDR
+-#define SPBA_CTRL_BASE_ADDR MX3x_SPBA_CTRL_BASE_ADDR
+-#define AIPS2_BASE_ADDR MX3x_AIPS2_BASE_ADDR
+-#define AIPS2_SIZE MX3x_AIPS2_SIZE
+-#define CCM_BASE_ADDR MX3x_CCM_BASE_ADDR
+-#define GPT1_BASE_ADDR MX3x_GPT1_BASE_ADDR
+-#define EPIT1_BASE_ADDR MX3x_EPIT1_BASE_ADDR
+-#define EPIT2_BASE_ADDR MX3x_EPIT2_BASE_ADDR
+-#define GPIO3_BASE_ADDR MX3x_GPIO3_BASE_ADDR
+-#define SCC_BASE_ADDR MX3x_SCC_BASE_ADDR
+-#define RNGA_BASE_ADDR MX3x_RNGA_BASE_ADDR
+-#define IPU_CTRL_BASE_ADDR MX3x_IPU_CTRL_BASE_ADDR
+-#define AUDMUX_BASE_ADDR MX3x_AUDMUX_BASE_ADDR
+-#define GPIO1_BASE_ADDR MX3x_GPIO1_BASE_ADDR
+-#define GPIO2_BASE_ADDR MX3x_GPIO2_BASE_ADDR
+-#define SDMA_BASE_ADDR MX3x_SDMA_BASE_ADDR
+-#define RTC_BASE_ADDR MX3x_RTC_BASE_ADDR
+-#define WDOG_BASE_ADDR MX3x_WDOG_BASE_ADDR
+-#define PWM_BASE_ADDR MX3x_PWM_BASE_ADDR
+-#define RTIC_BASE_ADDR MX3x_RTIC_BASE_ADDR
+-#define ROMP_BASE_ADDR MX3x_ROMP_BASE_ADDR
+-#define ROMP_SIZE MX3x_ROMP_SIZE
+-#define AVIC_BASE_ADDR MX3x_AVIC_BASE_ADDR
+-#define AVIC_SIZE MX3x_AVIC_SIZE
+-#define IPU_MEM_BASE_ADDR MX3x_IPU_MEM_BASE_ADDR
+-#define CSD0_BASE_ADDR MX3x_CSD0_BASE_ADDR
+-#define CSD1_BASE_ADDR MX3x_CSD1_BASE_ADDR
+-#define CS0_BASE_ADDR MX3x_CS0_BASE_ADDR
+-#define CS1_BASE_ADDR MX3x_CS1_BASE_ADDR
+-#define CS2_BASE_ADDR MX3x_CS2_BASE_ADDR
+-#define CS3_BASE_ADDR MX3x_CS3_BASE_ADDR
+-#define CS4_BASE_ADDR MX3x_CS4_BASE_ADDR
+-#define CS4_SIZE MX3x_CS4_SIZE
+-#define CS5_BASE_ADDR MX3x_CS5_BASE_ADDR
+-#define CS5_SIZE MX3x_CS5_SIZE
+-#define X_MEMC_BASE_ADDR MX3x_X_MEMC_BASE_ADDR
+-#define X_MEMC_SIZE MX3x_X_MEMC_SIZE
+-#define ESDCTL_BASE_ADDR MX3x_ESDCTL_BASE_ADDR
+-#define WEIM_BASE_ADDR MX3x_WEIM_BASE_ADDR
+-#define M3IF_BASE_ADDR MX3x_M3IF_BASE_ADDR
+-#define EMI_CTL_BASE_ADDR MX3x_EMI_CTL_BASE_ADDR
+-#define PCMCIA_CTL_BASE_ADDR MX3x_PCMCIA_CTL_BASE_ADDR
+-#define PCMCIA_MEM_BASE_ADDR MX3x_PCMCIA_MEM_BASE_ADDR
+-#define MXC_INT_I2C3 MX3x_INT_I2C3
+-#define MXC_INT_I2C2 MX3x_INT_I2C2
+-#define MXC_INT_RTIC MX3x_INT_RTIC
+-#define MXC_INT_I2C MX3x_INT_I2C
+-#define MXC_INT_CSPI2 MX3x_INT_CSPI2
+-#define MXC_INT_CSPI1 MX3x_INT_CSPI1
+-#define MXC_INT_ATA MX3x_INT_ATA
+-#define MXC_INT_UART3 MX3x_INT_UART3
+-#define MXC_INT_IIM MX3x_INT_IIM
+-#define MXC_INT_RNGA MX3x_INT_RNGA
+-#define MXC_INT_EVTMON MX3x_INT_EVTMON
+-#define MXC_INT_KPP MX3x_INT_KPP
+-#define MXC_INT_RTC MX3x_INT_RTC
+-#define MXC_INT_PWM MX3x_INT_PWM
+-#define MXC_INT_EPIT2 MX3x_INT_EPIT2
+-#define MXC_INT_EPIT1 MX3x_INT_EPIT1
+-#define MXC_INT_GPT MX3x_INT_GPT
+-#define MXC_INT_POWER_FAIL MX3x_INT_POWER_FAIL
+-#define MXC_INT_UART2 MX3x_INT_UART2
+-#define MXC_INT_NANDFC MX3x_INT_NANDFC
+-#define MXC_INT_SDMA MX3x_INT_SDMA
+-#define MXC_INT_MSHC1 MX3x_INT_MSHC1
+-#define MXC_INT_IPU_ERR MX3x_INT_IPU_ERR
+-#define MXC_INT_IPU_SYN MX3x_INT_IPU_SYN
+-#define MXC_INT_UART1 MX3x_INT_UART1
+-#define MXC_INT_ECT MX3x_INT_ECT
+-#define MXC_INT_SCC_SCM MX3x_INT_SCC_SCM
+-#define MXC_INT_SCC_SMN MX3x_INT_SCC_SMN
+-#define MXC_INT_GPIO2 MX3x_INT_GPIO2
+-#define MXC_INT_GPIO1 MX3x_INT_GPIO1
+-#define MXC_INT_WDOG MX3x_INT_WDOG
+-#define MXC_INT_GPIO3 MX3x_INT_GPIO3
+-#define MXC_INT_EXT_POWER MX3x_INT_EXT_POWER
+-#define MXC_INT_EXT_TEMPER MX3x_INT_EXT_TEMPER
+-#define MXC_INT_EXT_SENSOR60 MX3x_INT_EXT_SENSOR60
+-#define MXC_INT_EXT_SENSOR61 MX3x_INT_EXT_SENSOR61
+-#define MXC_INT_EXT_WDOG MX3x_INT_EXT_WDOG
+-#define MXC_INT_EXT_TV MX3x_INT_EXT_TV
+-#define PROD_SIGNATURE MX3x_PROD_SIGNATURE
+-#endif
+-
+ #endif /* ifndef __MACH_MX3x_H__ */
 -- 
 1.7.2.3
