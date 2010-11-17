@@ -1,44 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 17 Nov 2010 10:16:42 +0000
-Subject: [PATCH 4/7] ARM: Thumb-2: Correct data alignment for
-	CONFIG_THUMB2_KERNEL in kernel/head.S
-In-Reply-To: <20101116182257.GB21926@n2100.arm.linux.org.uk>
-References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
-	<1289913277-8822-4-git-send-email-dave.martin@linaro.org>
-	<20101116182257.GB21926@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinx6-uPV4i0pZOXTrWyfD-enRxbc6BO_cMvJscJ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Nov 2010 10:47:43 +0000
+Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned
+	long for physical addresses
+In-Reply-To: <20101116193335.GD21926@n2100.arm.linux.org.uk>
+References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
+	<1289842829-3027-16-git-send-email-catalin.marinas@arm.com>
+	<4CE2D811.50701@codeaurora.org>
+	<20101116193335.GD21926@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinDGk2HPg7py9nzsqmM3_AbSG_GJJYwsiMr+wQL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 6:22 PM, Russell King - ARM Linux
+On 16 November 2010 19:33, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Tue, Nov 16, 2010 at 01:14:34PM +0000, Dave Martin wrote:
->> Directives such as .long and .word do not magically cause the
->> assembler location counter to become aligned in gas. ?As a
->> result, using these directives in code sections can result in
->> misaligned data words when building a Thumb-2 kernel
->> (CONFIG_THUMB2_KERNEL).
->
->> @@ -413,6 +416,7 @@ __fixup_smp_on_up:
->> ? ? ? mov ? ? pc, lr
->> ?ENDPROC(__fixup_smp)
+> On Tue, Nov 16, 2010 at 11:14:25AM -0800, Stephen Boyd wrote:
+>> On 11/15/2010 09:40 AM, Catalin Marinas wrote:
+>> > @@ -188,21 +189,21 @@
+>> > ? * translation for translating DMA addresses. ?Use the driver
+>> > ? * DMA support - see dma-mapping.h.
+>> > ? */
+>> > -static inline unsigned long virt_to_phys(void *x)
+>> > +static inline phys_addr_t virt_to_phys(void *x)
+>> > ?{
+>> > ? ? return __virt_to_phys((unsigned long)(x));
+>> > ?}
 >>
->> + ? ? .align
->> ?1: ? .word ? .
->> ? ? ? .word ? __smpalt_begin
->> ? ? ? .word ? __smpalt_end
+>> As you're already in the area can you mark the argument to
+>> virt_to_phys() as const? I ran into a compiler warning due to that the
+>> other day.
 >
-> This one is technically bogus because this feature is disabled (and
-> incompatible) with Thumb-2 kernels. ?So it never gets built for a T2
-> kernel.
->
+> It may make sense to mark it const volatile, as that's the most
+> permissive set of attributes possible (iow, it'll accept any pointer
+> without warning.) ?However, might be an idea to check what other
+> arches do.
 
-For now, this is true -- I'll soon be looking at making SMP_ON_UP work
-for Thumb-2.
+The majority of architectures use volatile and a few add both const
+and volatile.
 
-When and if that is implemented, I believe this fix will be appropriate.
-Would it be better to hold this patch back and re-propose it with the
-rest of the SMP_ON_UP changes?
+I usually use the generic headers as reference for function prototypes
+and that's just using volatile without a const (cc'ing Arnd for any
+view on this).
 
-Cheers
----Dave
+-- 
+Catalin
