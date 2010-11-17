@@ -1,28 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Nov 2010 09:07:28 +0000
-Subject: [PATCH] ARM: S5PV310: Set bit 22 in the PL310 (cache
-	controller) AuxCtlr register
-In-Reply-To: <1289976931-9759-1-git-send-email-kgene.kim@samsung.com>
-References: <1289976931-9759-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1289984848.2351.2.camel@e102109-lin.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 17 Nov 2010 09:19:57 +0000
+Subject: [PATCH 7/7] ARM: Thumb-2: Restore sensible zImage header layout
+	for CONFIG_THUMB2_KERNEL
+In-Reply-To: <AANLkTim5Nv_oFgpfYL7jtjcMP10ND6wp5B50veURVPcn@mail.gmail.com>
+References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+	<1289913277-8822-7-git-send-email-dave.martin@linaro.org>
+	<20101116182643.GC21926@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1011161517260.6448@xanadu.home>
+	<20101116203520.GE21926@n2100.arm.linux.org.uk>
+	<AANLkTim5Nv_oFgpfYL7jtjcMP10ND6wp5B50veURVPcn@mail.gmail.com>
+Message-ID: <AANLkTikH=stEpU9DNcW1pYY6M-XYvaxgfyuKoJ73aZmF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-11-17 at 06:55 +0000, Kukjin Kim wrote:
-> --- a/arch/arm/mach-s5pv310/cpu.c
-> +++ b/arch/arm/mach-s5pv310/cpu.c
-> @@ -168,7 +168,7 @@ static int __init s5pv310_l2x0_cache_init(void)
->         __raw_writel(L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN,
->                      S5P_VA_L2CC + L2X0_POWER_CTRL);
-> 
-> -       l2x0_init(S5P_VA_L2CC, 0x7C070001, 0xC200ffff);
-> +       l2x0_init(S5P_VA_L2CC, 0x7C470001, 0xC200ffff);
+On Wed, Nov 17, 2010 at 9:16 AM, Dave Martin <dave.martin@linaro.org> wrote:
 
-The patch is fine.
+[...]
 
-But I think we should also set this bit in the cache-l2x0.c file if
-PL310. That's such a fundamental issue and it's easy to miss in the
-platform code.
+Sorry -- the web is broken (pressing space alone should never _send_ a
+mail :( ... )
 
--- 
-Catalin
+Better than trying to give an example, I'll follow up soon with an
+updated patch.
+
+Cheers
+---Dave
