@@ -1,45 +1,42 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 17 Nov 2010 16:13:56 +0300
-Subject: [PATCH 5/9] ARM: mmp: select CPU_PJ4
-In-Reply-To: <1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
-References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
-	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <4CE3D514.8080404@ru.mvista.com>
+From: catalin.marinas@gmail.com (Catalin Marinas)
+Date: Wed, 17 Nov 2010 13:26:02 +0000
+Subject: [PATCH 2/2] ARM: kexec: Fix crash_setup_regs() for ARMv7 and
+	CONFIG_THUMB2_KERNEL
+In-Reply-To: <20101117131146.GD19331@gw.healthdatacare.com>
+References: <1289913141-8559-1-git-send-email-dave.martin@linaro.org>
+	<1289913141-8559-2-git-send-email-dave.martin@linaro.org>
+	<20101117131146.GD19331@gw.healthdatacare.com>
+Message-ID: <AANLkTi=4MLpX7+DoXs4a8Bcx2QrFH5ZVjL8qA5G_smaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 17-11-2010 14:03, Haojian Zhuang wrote:
-
-> Since CPU_PJ4 is shared between PXA95x and MMP2, select CPU_PJ4 in MMP2
-> configuration.
-
-> Signed-off-by: Haojian Zhuang<haojian.zhuang@marvell.com>
-> Cc: Eric Miao<eric.y.miao@gmail.com>
-[...]
-
-> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-> index 0711d3b..ab39b1e 100644
-> --- a/arch/arm/mach-mmp/Kconfig
-> +++ b/arch/arm/mach-mmp/Kconfig
-> @@ -39,6 +39,7 @@ config MACH_TTC_DKB
+On 17 November 2010 13:11, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> On Tue, Nov 16, 2010 at 01:12:21PM +0000, Dave Martin wrote:
+>> ?* Fix kexec build failure with CONFIG_THUMB2_KERNEL.
+>>
+>> ?* Avoids deprecated/forbidden sp and pc usage in for ARMv7 onwards,
+>> retaining compatibility with older architecture versions.
+>>
+>> ?* The pc value saved to newregs is now aligned on a predictable
+>> instruction boundary.
+>>
+>> (stmia { ... pc } or str pc has implementation-defined results
+>> in most versions of the ARM architecutre, and is prohibited
+>> (unpredictable) in Thumb-2.)
+>>
+>> ?* Switch to named inline asm arguments (else I get readily confused ...)
+>>
+>> The resulting code should be compatible with all architecture versions >= v3,
+>> with or without CONFIG_THUMB2_KERNEL.
+>>
+>> Applies cleanly on v2.6.37-rc1.
 >
->   config MACH_FLINT
->   	bool "Marvell's Flint Development Platform"
-> +	depends on !(CPU_MOHAWK)
-
-    () not needed.
-
->   	select CPU_MMP2
->   	help
->   	  Say 'Y' here if you want to support the Marvell MMP2-based
-> @@ -49,6 +50,7 @@ config MACH_FLINT
+> Quickly tested this and seems to work. So FWIW:
 >
->   config MACH_MARVELL_JASPER
->   	bool "Marvell's Jasper Development Platform"
-> +	depends on !(CPU_MOHAWK)
+> Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
 
-    Likewise...
+It's more like Tested-by :)  (unless you reviewed it as well, though
+there seems to be some confusion between Reviewed-by and Acked-by).
 
-WBR, Sergei
+-- 
+Catalin
