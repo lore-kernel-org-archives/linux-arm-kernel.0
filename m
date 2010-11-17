@@ -1,178 +1,65 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 17 Nov 2010 14:45:17 +0100
-Subject: [PATCH] nomadik: prevent sched_clock() wraparound v3
-Message-ID: <1290001517-17010-1-git-send-email-linus.walleij@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Nov 2010 13:58:57 +0000
+Subject: [PATCH] ARM: Set bit 22 in the PL310 (cache controller) AuxCtlr
+	register
+Message-ID: <1290002337-652-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of sched_clock() for the Nomadik
-family is based on the clock source that will wrap around without
-any compensation. Currently on the Ux500 after 1030 seconds.
+Clearing bit 22 in the PL310 Auxiliary Control register (shared
+attribute override enable) has the side effect of transforming Normal
+Shared Non-cacheable reads into Cacheable no-allocate reads.
 
-Utilize cnt32_to_63 to expand the sched_clock() counter to 63
-bits and introduce a keepwarm() timer to assure that sched clock
-and this cnt32_to_63 is called atleast once every half period.
+Coherent DMA buffers in Linux always have a Cacheable alias via the
+kernel linear mapping and the processor can speculatively load cache
+lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+reads would unexpectedly hit such cache lines leading to buffer
+corruption.
 
-When I print out the actual wrap-around time, and using
-a year (3600*24*365 seconds) as minumum wrap limit I get an
-actual wrap-around of:
-sched_clock: using 55 bits @ 8333125 Hz wrap in 50041 days
-I.e circa 137 years which should be fair enough.
+This patch ensures that bit 22 is set in the l2x0_init() function if
+PL310 and not rely on the platform code to specify it. It also modifies
+the 'aux' variable only if the actual register is written so that the
+final printk displays the real hardware value.
 
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Colin Cross <ccross@google.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: John Stultz <johnstul@us.ibm.com>
-Cc: Harald Gustafsson <harald.gustafsson@ericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
-Version 3:
+ arch/arm/mm/cache-l2x0.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
 
-In this version of the patch I have taken the approach of making
-sched_clock() based on the clock source timer, calculating mult
-and shift from a minimum of a year. The multing and shifting will
-overflow the 64 bit limit, and this makes a tradeoff similar
-to what is found in the Orion architecture, but a bit more
-explicit and reusing the mult/shift calculation code from the
-clocksource.
-
-Thanks to the kernel community that has been very helpful in
-guiding this design.
----
- arch/arm/plat-nomadik/timer.c |   87 ++++++++++++++++++++++++++++++++++++-----
- 1 files changed, 77 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index aedf9c1..d1eb143 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright (C) 2008 STMicroelectronics
-  * Copyright (C) 2010 Alessandro Rubini
-+ * Copyright (C) 2010 Linus Walleij
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2, as
-@@ -16,11 +17,13 @@
- #include <linux/clk.h>
- #include <linux/jiffies.h>
- #include <linux/err.h>
-+#include <linux/cnt32_to_63.h>
-+#include <linux/timer.h>
- #include <asm/mach/time.h>
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 170c9bb..38dfb86 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -274,9 +274,6 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+ 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
  
- #include <plat/mtu.h>
+-	aux &= aux_mask;
+-	aux |= aux_val;
+-
+ 	/* Determine the number of ways */
+ 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	case L2X0_CACHE_ID_PART_L310:
+@@ -285,6 +282,13 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 		else
+ 			ways = 8;
+ 		type = "L310";
++
++		/*
++		 * Set bit 22 in the auxiliary control register. If this bit
++		 * is cleared, PL310 treats Normal Shared Non-cacheable
++		 * accesses as Cacheable no-allocate.
++		 */
++		aux_val |= 1 << 22;
+ 		break;
+ 	case L2X0_CACHE_ID_PART_L210:
+ 		ways = (aux >> 13) & 0xf;
+@@ -312,6 +316,8 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 	 * accessing the below registers will fault.
+ 	 */
+ 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
++		aux &= aux_mask;
++		aux |= aux_val;
  
--void __iomem *mtu_base; /* ssigned by machine code */
-+void __iomem *mtu_base; /* Assigned by machine code */
- 
- /*
-  * Kernel assumes that sched_clock can be called early
-@@ -48,16 +51,78 @@ static struct clocksource nmdk_clksrc = {
- /*
-  * Override the global weak sched_clock symbol with this
-  * local implementation which uses the clocksource to get some
-- * better resolution when scheduling the kernel. We accept that
-- * this wraps around for now, since it is just a relative time
-- * stamp. (Inspired by OMAP implementation.)
-+ * better resolution when scheduling the kernel.
-+ *
-+ * Because the hardware timer period may be quite short
-+ * (32.3 secs on the 133 MHz MTU timer selection on ux500)
-+ * and because cnt32_to_63() needs to be called at least once per
-+ * half period to work properly, a kernel keepwarm() timer is set up
-+ * to ensure this requirement is always met.
-+ *
-+ * Also the sched_clock timer will wrap around at some point,
-+ * here we set it to run continously for a year.
-+ */
-+#define SCHED_CLOCK_MIN_WRAP 3600*24*365
-+static struct timer_list cnt32_to_63_keepwarm_timer;
-+static u32 sched_mult;
-+static u32 sched_shift;
-+
-+unsigned long long sched_clock(void)
-+{
-+	u64 cycles;
-+
-+	if (unlikely(!mtu_base))
-+		return 0;
-+
-+	cycles = cnt32_to_63(-readl(mtu_base + MTU_VAL(0)));
-+	cycles &= 0x7FFFFFFFFFFFFFFFLLU;
-+	return (cycles * sched_mult) >> sched_shift;
-+}
-+
-+/* Just kick sched_clock every so often */
-+static void cnt32_to_63_keepwarm(unsigned long data)
-+{
-+	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
-+	(void) sched_clock();
-+}
-+
-+/*
-+ * Set up a timer to keep sched_clock():s 32_to_63 algorithm warm
-+ * once in half a 32bit timer wrap interval.
-  */
--unsigned long long notrace sched_clock(void)
-+static void __init nmdk_sched_clock_init(unsigned long rate)
- {
--	return clocksource_cyc2ns(nmdk_clksrc.read(
--				  &nmdk_clksrc),
--				  nmdk_clksrc.mult,
--				  nmdk_clksrc.shift);
-+	u32 v;
-+	unsigned long delta;
-+	u64 days;
-+
-+	/* Find the apropriate mult and shift factors */
-+	clocks_calc_mult_shift(&sched_mult, &sched_shift,
-+			       rate, NSEC_PER_SEC, SCHED_CLOCK_MIN_WRAP);
-+	/* We need to multiply by atleast 2 to get rid of bit 63 */
-+	BUG_ON(sched_mult < 2);
-+
-+	/* Let's see what we get, take max counter and scale it */
-+	days = 0xFFFFFFFFFFFFFFFFLLU >> sched_shift;
-+	do_div(days, rate);
-+	do_div(days, (3600*24));
-+
-+	pr_debug("sched_clock: using %d bits @ %lu Hz wrap in %lu days\n",
-+		(64 - sched_shift), rate, (unsigned long) days);
-+
-+	/*
-+	 * Program a timer to kick us at half 32bit wraparound
-+	 * Formula: seconds per wrap = (2^32) / f
-+	 */
-+	v = 0xFFFFFFFFUL / rate;
-+	/* We want half of the wrap time to keep cnt32_to_63 warm */
-+	v /= 2;
-+	pr_debug("sched_clock: prescaled timer rate: %lu Hz, "
-+		 "initialize keepwarm timer every %d seconds\n", rate, v);
-+	/* Convert seconds to jiffies */
-+	delta = msecs_to_jiffies(v*1000);
-+	setup_timer(&cnt32_to_63_keepwarm_timer, cnt32_to_63_keepwarm, delta);
-+	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + delta));
- }
- 
- /* Clockevent device: use one-shot mode */
-@@ -161,13 +226,15 @@ void __init nmdk_timer_init(void)
- 	writel(0, mtu_base + MTU_BGLR(0));
- 	writel(cr | MTU_CRn_ENA, mtu_base + MTU_CR(0));
- 
--	/* Now the scheduling clock is ready */
-+	/* Now the clock source is ready */
- 	nmdk_clksrc.read = nmdk_read_timer;
- 
- 	if (clocksource_register(&nmdk_clksrc))
- 		pr_err("timer: failed to initialize clock source %s\n",
- 		       nmdk_clksrc.name);
- 
-+	nmdk_sched_clock_init(rate);
-+
- 	/* Timer 1 is used for events */
- 
- 	clockevents_calc_mult_shift(&nmdk_clkevt, rate, MTU_MIN_RANGE);
--- 
-1.6.3.3
+ 		/* l2x0 controller is disabled */
+ 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
