@@ -1,155 +1,74 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Wed, 17 Nov 2010 21:43:32 +0530
-Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
-In-Reply-To: <1290000875-11508-2-git-send-email-bryan.wu@canonical.com>
-References: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
-	<1290000875-11508-2-git-send-email-bryan.wu@canonical.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247387FCD@dbde02.ent.ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 17 Nov 2010 11:17:01 -0500 (EST)
+Subject: [PATCH 7/7 v1.1] ARM: Thumb-2: Restore sensible zImage header
+	layout for CONFIG_THUMB2_KERNEL
+In-Reply-To: <1289992294-7181-1-git-send-email-dave.martin@linaro.org>
+References: <1289913277-8822-7-git-send-email-dave.martin@linaro.org>
+	<1289992294-7181-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1011171056540.6448@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Bryan Wu
-> Sent: Wednesday, November 17, 2010 7:05 PM
-> To: tomi.valkeinen at nokia.com; linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Gadiyar, Anand
-> Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
+On Wed, 17 Nov 2010, Dave Martin wrote:
+
+> The code which makes up the zImage header intends to leave a
+> 32-byte gap followed by a branch to the real entry point, a
+> magic number, and a word containing the absolute entry point
+> address.
 > 
-> Generic DPI panel driver includes the driver and 4 similar 
-> panel configurations. It
-> will match the panel name which is passed from platform data 
-> and setup the
-> right configurations.
+> This gets messed up with with CONFIG_THUMB2_KERNEL, because the
+> size of the initial padding NOPs changes.
 > 
-> With generic DPI panel driver, we can remove those 4 
-> duplicated panel display
-> drivers. In the future, it is simple for us just add new 
-> panel configuration
-> date in panel-generic-dpi.c to support new display panel.
+> Instead, the header can be made fully compatible by restoring
+> it to ARM.
 > 
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
->  .../arm/plat-omap/include/plat/panel-generic-dpi.h |   37 ++
->  drivers/video/omap2/displays/Kconfig               |    8 +
->  drivers/video/omap2/displays/Makefile              |    1 +
->  drivers/video/omap2/displays/panel-generic-dpi.c   |  355 
-> ++++++++++++++++++++
->  4 files changed, 401 insertions(+), 0 deletions(-)
->  create mode 100644 
-> arch/arm/plat-omap/include/plat/panel-generic-dpi.h
->  create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
+> In the Thumb-2 case, we can replace the initial NOPs with a
+> sequence which switches to Thumb and jumps to the real entry
+> point.
 > 
-> diff --git 
-> a/arch/arm/plat-omap/include/plat/panel-generic-dpi.h 
-> b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
-> new file mode 100644
-> index 0000000..7906197
-> --- /dev/null
-> +++ b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
-> @@ -0,0 +1,37 @@
-> +/*
-> + * Header for generic DPI panel driver
-> + *
-> + * Copyright (C) 2010 Canonical Ltd.
-> + * Author: Bryan Wu <bryan.wu@canonical.com>
-> + *
-> + * This program is free software; you can redistribute it 
-> and/or modify it
-> + * under the terms of the GNU General Public License version 
-> 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be 
-> useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of 
-> MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General 
-> Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public 
-> License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H
-> +#define __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H
-> +
-> +#include "display.h"
-> +
-> +/**
-> + * struct panel_generic_dpi_data - panel driver configuration data
-> + * @name: panel name
-> + * @platform_enable: platform specific panel enable function
-> + * @platform_disable: platform specific panel disable function
-> + */
-> +struct panel_generic_dpi_data {
-> +	const char *name;
-> +	int (*platform_enable)(struct omap_dss_device *dssdev);
-> +	void (*platform_disable)(struct omap_dss_device *dssdev);
-> +};
-> +
-> +#endif /* __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H */
-> diff --git a/drivers/video/omap2/displays/Kconfig 
-> b/drivers/video/omap2/displays/Kconfig
-> index 12327bb..cb3e339 100644
-> --- a/drivers/video/omap2/displays/Kconfig
-> +++ b/drivers/video/omap2/displays/Kconfig
-> @@ -1,6 +1,14 @@
->  menu "OMAP2/3 Display Device Drivers"
->          depends on OMAP2_DSS
+> As a consequence, the zImage entry point is now always ARM, so
+> no special magic is needed any more for the uImage rules in the
+> Thumb-2 case.
+> 
+> Applies cleanly on v2.6.37-rc2.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+Only a nanonit below that is not that important.
+
+> index 1f65080..ab95391 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -125,16 +125,21 @@ wait:		mrc	p14, 0, pc, c0, c1, 0
+>   * sort out different calling conventions
+>   */
+>  		.align
+> + THUMB(		.arm			)
+
+Maybe the THUMB() can be omitted here and .arm be unconditional?
+
+>  start:
+>  		.type	start,#function
+> -		.rept	8
+> + THUMB(		adr	r12, BSYM(1f)	)
+> + THUMB(		bx	r12		)
+> + THUMB(		.rept	6		)
+> + ARM(		.rept	8		)
+>  		mov	r0, r0
+>  		.endr
 >  
-> +config PANEL_GENERIC_DPI
-> +        tristate "Generic DPI Panel"
-> +        help
-> +	  Generic DPI panel driver.
-> +	  Supports DVI output for Beagle and OMAP3 SDP.
-> +	  Supports LCD Panel used in TI SDP3430 and EVM boards,
-> +	  OMAP3517 EVM boards and CM-T35.
-> +
->  config PANEL_GENERIC
->          tristate "Generic Panel"
->          help
-> diff --git a/drivers/video/omap2/displays/Makefile 
-> b/drivers/video/omap2/displays/Makefile
-> index aa38609..022058c 100644
-> --- a/drivers/video/omap2/displays/Makefile
-> +++ b/drivers/video/omap2/displays/Makefile
-> @@ -1,3 +1,4 @@
-> +obj-$(CONFIG_PANEL_GENERIC_DPI) += panel-generic-dpi.o
->  obj-$(CONFIG_PANEL_GENERIC) += panel-generic.o
->  obj-$(CONFIG_PANEL_SHARP_LS037V7DW01) += panel-sharp-ls037v7dw01.o
->  obj-$(CONFIG_PANEL_SHARP_LQ043T1DG01) += panel-sharp-lq043t1dg01.o
-> diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c 
-> b/drivers/video/omap2/displays/panel-generic-dpi.c
-> new file mode 100644
-> index 0000000..6702cf6
-> --- /dev/null
-> +++ b/drivers/video/omap2/displays/panel-generic-dpi.c
-> @@ -0,0 +1,355 @@
-> +/*
-> + * Generic DPI Panels support
-> + *
-> + * Copyright (C) 2010 Canonical Ltd.
-> + * Author: Bryan Wu <bryan.wu@canonical.com>
-> + *
-> + * Copyright (C) 2008 Nokia Corporation
-> + * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-> + *
-
-[sp] Shouldn't all authors (from the files being coalesced) be
-     listed here.
-
-     I see this missing from PATCH3/3 in your series:
-
-[quote]
-- * LCD panel driver for Sharp LQ043T1DG01
-- *
-- * Copyright (C) 2009 Texas Instruments Inc
-- * Author: Vaibhav Hiremath <hvaibhav@ti.com>
-- *
-[/quote]
-
-
-[snip]...[snip]
+> -		b	1f
+> +		nop				@ Pad magic number to 0x24
+>  		.word	0x016f2818		@ Magic numbers to help the loader
+>  		.word	start			@ absolute load/run zImage address
+>  		.word	_edata			@ zImage end address
+> + THUMB(		.thumb			)
+>  1:		mov	r7, r1			@ save architecture ID
+>  		mov	r8, r2			@ save atags pointer
+>  
+> -- 
+> 1.7.1
+> 
