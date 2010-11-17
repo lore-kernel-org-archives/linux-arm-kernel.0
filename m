@@ -1,31 +1,10 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Nov 2010 17:24:25 +0000
-Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
-	L_PTE_NOWRITE
-In-Reply-To: <AANLkTincmfqXmNQznd1fdSRYd4Vc+p47cgTfEwQoXdFm@mail.gmail.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
-	<20101115183014.GD31421@n2100.arm.linux.org.uk>
-	<AANLkTik5FcZ3rNtiwN8kYP0LZh+YqGtKP_RteoFiWa16@mail.gmail.com>
-	<20101117171613.GB5308@n2100.arm.linux.org.uk>
-	<AANLkTincmfqXmNQznd1fdSRYd4Vc+p47cgTfEwQoXdFm@mail.gmail.com>
-Message-ID: <20101117172425.GE5308@n2100.arm.linux.org.uk>
+Date: Wed, 17 Nov 2010 17:27:17 +0000
+Subject: [PATCH 0/5] Clean up page tables
+Message-ID: <20101117172717.GF5308@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 05:22:12PM +0000, Catalin Marinas wrote:
-> Ah, good point, that was the mask.
-> 
-> So for dmacoherent we make sure that L_PTE_EXEC is cleared. I suspect
-> we should now make sure that L_PTE_NOEXEC is set. For the other two,
-> just leave them as they are.
-
-Already done:
-
- #define pgprot_dmacoherent(prot) \
--       __pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_BUFFERABLE)
-+       __pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_BUFFERABLE|L_PTE_XN)
-...
- #define pgprot_dmacoherent(prot) \
--       __pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_UNCACHED)
-+       __pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_UNCACHED|L_PTE_XN)
+This patch series is preparation for LPAE, allowing a cleaner
+transition from the current methodology to that required for
+LPAE.
