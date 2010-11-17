@@ -1,145 +1,55 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 16 Nov 2010 19:17:18 -0500
-Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
-In-Reply-To: <AANLkTi=utWumLKo9QVWXpkC8WxpgaNJJs+dj=pa2eq-q@mail.gmail.com>
-References: <1289848334-8695-1-git-send-email-cyril@ti.com>
-	<1289848334-8695-5-git-send-email-cyril@ti.com>
-	<20101116072225.GF4074@angua.secretlab.ca>
-	<AANLkTi=utWumLKo9QVWXpkC8WxpgaNJJs+dj=pa2eq-q@mail.gmail.com>
-Message-ID: <4CE31F0E.7050103@ti.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 17 Nov 2010 00:34:29 +0000
+Subject: [PATCH] mmci: handle clock frequency 0 properly
+In-Reply-To: <1289927869-14519-1-git-send-email-linus.walleij@stericsson.com>
+References: <1289927869-14519-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101117003429.GA2578@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2010 02:47 AM, Grant Likely wrote:
-> On Tue, Nov 16, 2010 at 12:22 AM, Grant Likely
-> <grant.likely@secretlab.ca> wrote:
->> On Mon, Nov 15, 2010 at 02:12:06PM -0500, Cyril Chemparathy wrote:
->>> This patch adds an SPI master implementation that operates on top of an
->>> underlying TI-SSP port.
->>>
->>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->> [...]
->>> +static int __init ti_ssp_spi_init(void)
->>> +{
->>> +     return platform_driver_register(&ti_ssp_spi_driver);
->>> +}
->>> +subsys_initcall(ti_ssp_spi_init);
->>
->> After discussions about device init dependencies at plumbers, and
->> since this is the first SPI device driver I've reviewed since that
->> dicussion, this driver gets to be the first to implement the proposed
->> policy.  :-)
->>
->> Change this to module_initcall().  Many spi and i2c drivers use
->> module or subsys_initcall to try and influence driver probe order so
->> that certain regulator chips get registered before the devices that
->> try to use them.  This approach is insane.
->>
->> Instead, it is now incumbent on the board support code to ensure that
->> any device that depends on another device (including i2c or spi
->> regulators) will defer registration until the prerequisite devices are
->> bound to drivers.
->>
->> I don't *think* this change will affect anything in this particular
->> patch series, but if it does then let me know and I'll help you work out
->> how to fix it using a bus notifier.
+Hi Linus,
+
+On Tue, Nov 16, 2010 at 06:17:49PM +0100, Linus Walleij wrote:
+> This removes the default clocking for the MMCI controller so that
+> the external MCI card clock does not activate until the first
+> .set_ios() call is issued. It will further handle the transitions
+> from a clock != 0 to 0 and vice versa by gating/ungating the
+> clock with clk_disable()/clk_enable().
 > 
-> Oh, wait, spoke too soon.  You do add a regulator in this series, so
-> this change will require a fixup.  The solution is to register an
-> bus_notifier to the spi bus type before you start registering devices.
-> It also requires deferring the musb_hdrc.1 and tps6116x registrations
-> until the bus_notifier callback gets called with an indication that
-> the regulator is bound.  It will look something like this:
+> This assures that the MCI clock will not be active unless there
+> is a card in the MMC slot.
 > 
-> static int tnetv107x_spi_notifier_call(struct notifier_block *nb,
-> 				unsigned long event, void *__dev)
-> {
-> 	struct device *dev = __dev;
+> By default the MMC core will not gate off the clock to a card
+> once it's enabled, but with the separate patch for aggressive
+> clocking this can optionally be enabled for the system.
 > 
-> 	if ((event == BUS_NOTIFY_BOUND_DRIVER) && (dev == (the-regulator))) {
-> 		register-the-remaining-devices();
-> 		return NOTIFY_STOP;
-> 	};
-> 	return NOTIFY_DONE;
-> }
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+> Changes since v8:
 > 
-> static struct notifier_block tnetv107x_spi_nb = {
-> 	.notifier_call = tnetv107x_spi_notifier_call,
-> };
+> The frequency registers shall be set with mmci_set_clkreg()
+> no matter whether the clock gets enabled or disabled, systems
+> without a clk framework will need this so that the clock
+> dividers are set to the apropriate values for clock 0 as
+> well, and that will probably mitigate power consumption
+> somewhat on these systems.
 > 
-> and then in the device registration code, before registering the
-> regulator:
-> 
-> 	bus_register_notifier(&spi_bus_type, &tnetv107x_spi_nb);
-> 
-> Let me know if you have any trouble.
+> Chris: this is a new version after Russell found an error in
+> it. Can you please take the old version of this patch out of
+> the MMC tree so I can merge it through Russells ARM tree
+> instead? The patches are perfectly orthogonal so it doesn't
+> need to live in the MMC tree.
 
-The ability to wait on multiple devices may come handy.  In this
-particular case the backlight driver depends on both ssp-gpio and
-regulator devices.  Ideally, boards should be able to do something like...
+Okay, this patch has been removed from mmc-next now.
 
-platform_device_register_after(&backlight_device, "spi1.0");
-platform_device_register_after(&backlight_device, "ti-ssp-gpio.0");
+(I'm holding off on pulling the rest of your latest patchset until
+you reply to David Vrabel's review of [2/3] -- let me know if you
+think it should be pulled now instead.)
 
-... and the device should get automatically registered once its
-dependencies have been met.
+Thanks,
 
-
-Crude and incomplete code follows:
-
-struct platform_device_depend {
-	struct list_head node;
-	const char *dev_name;
-	struct platform_device *pdev;
-};
-
-LIST_HEAD(platform_device_depend);
-
-static int platform_device_register_after(struct platform_device *pdev,
-					  const char *dev_name)
-{
-	struct platform_device_depend *dep;
-
-	dep = kzalloc(sizeof(*dep), GFP_KERNEL);
-	if (!dep)
-		return -ENOMEM;
-	dep->dev_name = dev_name;
-	dep->pdev = pdev;
-	list_add_tail(&dep->node, &platform_device_depend);
-	return 0;
-}
-
-static int platform_device_try_register(struct platform_device *pdev)
-{
-	struct platform_device_depend *dep;
-
-	list_for_each_entry(dep, &platform_device_depend, node) {
-		if (dep->pdev == pdev)
-			return -EBUSY;
-	}
-	return platform_device_register(pdev);
-}
-
-static int bus_notifier_func(struct notifier_block *nb,
-			     unsigned long event, void *__dev)
-{
-	struct platform_device_depend *dep, *tmp;
-	struct device *dev = __dev;
-
-	if (event != BUS_NOTIFY_BOUND_DRIVER)
-		return NOTIFY_DONE;
-
-	list_for_each_entry_safe(dep, tmp, &platform_device_depend,
-				 node) {
-		if (strcmp(dep->dev_name, dev_name(dev)) != 0)
-			continue;
-		list_del(&dep->node);
-		platform_device_try_register(dep->pdev);
-		kfree(dep);
-	}
-
-	return NOTIFY_OK;
-}
-
-Regards
-Cyril.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
