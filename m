@@ -1,222 +1,155 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 17 Nov 2010 09:11:30 -0700
-Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
-In-Reply-To: <4CE31F0E.7050103@ti.com>
-References: <1289848334-8695-1-git-send-email-cyril@ti.com>
-	<1289848334-8695-5-git-send-email-cyril@ti.com>
-	<20101116072225.GF4074@angua.secretlab.ca>
-	<AANLkTi=utWumLKo9QVWXpkC8WxpgaNJJs+dj=pa2eq-q@mail.gmail.com>
-	<4CE31F0E.7050103@ti.com>
-Message-ID: <20101117161130.GC5757@angua.secretlab.ca>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Wed, 17 Nov 2010 21:43:32 +0530
+Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
+In-Reply-To: <1290000875-11508-2-git-send-email-bryan.wu@canonical.com>
+References: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
+	<1290000875-11508-2-git-send-email-bryan.wu@canonical.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247387FCD@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 07:17:18PM -0500, Cyril Chemparathy wrote:
-> On 11/16/2010 02:47 AM, Grant Likely wrote:
-> > On Tue, Nov 16, 2010 at 12:22 AM, Grant Likely
-> > <grant.likely@secretlab.ca> wrote:
-> >> On Mon, Nov 15, 2010 at 02:12:06PM -0500, Cyril Chemparathy wrote:
-> >>> This patch adds an SPI master implementation that operates on top of an
-> >>> underlying TI-SSP port.
-> >>>
-> >>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> >> [...]
-> >>> +static int __init ti_ssp_spi_init(void)
-> >>> +{
-> >>> +     return platform_driver_register(&ti_ssp_spi_driver);
-> >>> +}
-> >>> +subsys_initcall(ti_ssp_spi_init);
-> >>
-> >> After discussions about device init dependencies at plumbers, and
-> >> since this is the first SPI device driver I've reviewed since that
-> >> dicussion, this driver gets to be the first to implement the proposed
-> >> policy.  :-)
-> >>
-> >> Change this to module_initcall().  Many spi and i2c drivers use
-> >> module or subsys_initcall to try and influence driver probe order so
-> >> that certain regulator chips get registered before the devices that
-> >> try to use them.  This approach is insane.
-> >>
-> >> Instead, it is now incumbent on the board support code to ensure that
-> >> any device that depends on another device (including i2c or spi
-> >> regulators) will defer registration until the prerequisite devices are
-> >> bound to drivers.
-> >>
-> >> I don't *think* this change will affect anything in this particular
-> >> patch series, but if it does then let me know and I'll help you work out
-> >> how to fix it using a bus notifier.
-> > 
-> > Oh, wait, spoke too soon.  You do add a regulator in this series, so
-> > this change will require a fixup.  The solution is to register an
-> > bus_notifier to the spi bus type before you start registering devices.
-> > It also requires deferring the musb_hdrc.1 and tps6116x registrations
-> > until the bus_notifier callback gets called with an indication that
-> > the regulator is bound.  It will look something like this:
-> > 
-> > static int tnetv107x_spi_notifier_call(struct notifier_block *nb,
-> > 				unsigned long event, void *__dev)
-> > {
-> > 	struct device *dev = __dev;
-> > 
-> > 	if ((event == BUS_NOTIFY_BOUND_DRIVER) && (dev == (the-regulator))) {
-> > 		register-the-remaining-devices();
-> > 		return NOTIFY_STOP;
-> > 	};
-> > 	return NOTIFY_DONE;
-> > }
-> > 
-> > static struct notifier_block tnetv107x_spi_nb = {
-> > 	.notifier_call = tnetv107x_spi_notifier_call,
-> > };
-> > 
-> > and then in the device registration code, before registering the
-> > regulator:
-> > 
-> > 	bus_register_notifier(&spi_bus_type, &tnetv107x_spi_nb);
-> > 
-> > Let me know if you have any trouble.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Bryan Wu
+> Sent: Wednesday, November 17, 2010 7:05 PM
+> To: tomi.valkeinen at nokia.com; linux-omap at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; Gadiyar, Anand
+> Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
 > 
-> The ability to wait on multiple devices may come handy.  In this
-> particular case the backlight driver depends on both ssp-gpio and
-> regulator devices.  Ideally, boards should be able to do something like...
+> Generic DPI panel driver includes the driver and 4 similar 
+> panel configurations. It
+> will match the panel name which is passed from platform data 
+> and setup the
+> right configurations.
 > 
-> platform_device_register_after(&backlight_device, "spi1.0");
-> platform_device_register_after(&backlight_device, "ti-ssp-gpio.0");
-
-[cc'ing Rafael and Greg since they are certain to be interested in
-this discussion]
-
-It's a good start.  However, I think it can be done more generically
-
-To start, I'm not a fan of matching by name.  It's fragile because it
-makes assumptions about how devices will be names when they actually
-appear (ie. Sometimes .id is dynamically assigned).  Ideally I'd
-prefer to have direct references (ie. pointers) to the devices that
-need to be registered, which *shouldn't* be difficult to handle.  That
-guarantees that the correct device is always referenced.  (aside: the
-device-tree use case provides this information by having direct
-'phandle' references between dependencies.)
-
-Also, any dependency tracking must work across bus_types.  It is not
-sufficient to only handle the platform_devices use-case.  All bus
-types have this need.
-
-I see a few potential approaches.
-
-Option 1: Add a list of prerequisite devices to struct device and
-modify driver core so that it defers binding to a driver until all the
-prerequisites are already bound.  This can probably be implemented
-in a way that works for all bus types transparently.  Before binding
-a driver, the driver core would increase the ref count on each of the
-prereq devices, and decrease it again when the driver is removed.
-
-Option 2: On a per-bus_type basis have a separate registration and the
-bus type code would hold the device unregistered in a pending list.
-This option would also add a prerequisites list to struct device.
-
-Option 3: Don't try to handle it in the bus_type or driver core code
-at all, but rather provide board support code with helpers to make
-waiting for other devices easy.  Even in this case I think it is
-probably still a good idea for the dependant devices to increment
-the refcount of the prereq devices.
-
-Perhaps something that is used like:
-
-void do_second_registration(void)
-{
-	/* register list of dependant devices */
-}
-
-and then in the primary registration function:
-	...
-	device_notify_when_bound(&prereq_pdev->dev,
-				 do_second_registration);
-	platform_device_add(prereq_pdev);
-	...
-
-which would reduce the boilerplate, but remain flexible.  However,
-while flexable, option 3 doesn't solve the dependency tracking
-problem, and it still requires some gymnastics to handle multiple
-dependencies.
-
-On a related issue, it may also be desirable for each device to
-maintain a list of devices that have claimed dependency on it for the
-purpose of debugability.
-
-...
-
-some other random comments below.
-
+> With generic DPI panel driver, we can remove those 4 
+> duplicated panel display
+> drivers. In the future, it is simple for us just add new 
+> panel configuration
+> date in panel-generic-dpi.c to support new display panel.
 > 
-> ... and the device should get automatically registered once its
-> dependencies have been met.
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> ---
+>  .../arm/plat-omap/include/plat/panel-generic-dpi.h |   37 ++
+>  drivers/video/omap2/displays/Kconfig               |    8 +
+>  drivers/video/omap2/displays/Makefile              |    1 +
+>  drivers/video/omap2/displays/panel-generic-dpi.c   |  355 
+> ++++++++++++++++++++
+>  4 files changed, 401 insertions(+), 0 deletions(-)
+>  create mode 100644 
+> arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+>  create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
+> 
+> diff --git 
+> a/arch/arm/plat-omap/include/plat/panel-generic-dpi.h 
+> b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+> new file mode 100644
+> index 0000000..7906197
+> --- /dev/null
+> +++ b/arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+> @@ -0,0 +1,37 @@
+> +/*
+> + * Header for generic DPI panel driver
+> + *
+> + * Copyright (C) 2010 Canonical Ltd.
+> + * Author: Bryan Wu <bryan.wu@canonical.com>
+> + *
+> + * This program is free software; you can redistribute it 
+> and/or modify it
+> + * under the terms of the GNU General Public License version 
+> 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be 
+> useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of 
+> MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General 
+> Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public 
+> License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H
+> +#define __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H
+> +
+> +#include "display.h"
+> +
+> +/**
+> + * struct panel_generic_dpi_data - panel driver configuration data
+> + * @name: panel name
+> + * @platform_enable: platform specific panel enable function
+> + * @platform_disable: platform specific panel disable function
+> + */
+> +struct panel_generic_dpi_data {
+> +	const char *name;
+> +	int (*platform_enable)(struct omap_dss_device *dssdev);
+> +	void (*platform_disable)(struct omap_dss_device *dssdev);
+> +};
+> +
+> +#endif /* __ARCH_ARM_PLAT_OMAP_PANEL_GENERIC_DPI_H */
+> diff --git a/drivers/video/omap2/displays/Kconfig 
+> b/drivers/video/omap2/displays/Kconfig
+> index 12327bb..cb3e339 100644
+> --- a/drivers/video/omap2/displays/Kconfig
+> +++ b/drivers/video/omap2/displays/Kconfig
+> @@ -1,6 +1,14 @@
+>  menu "OMAP2/3 Display Device Drivers"
+>          depends on OMAP2_DSS
+>  
+> +config PANEL_GENERIC_DPI
+> +        tristate "Generic DPI Panel"
+> +        help
+> +	  Generic DPI panel driver.
+> +	  Supports DVI output for Beagle and OMAP3 SDP.
+> +	  Supports LCD Panel used in TI SDP3430 and EVM boards,
+> +	  OMAP3517 EVM boards and CM-T35.
+> +
+>  config PANEL_GENERIC
+>          tristate "Generic Panel"
+>          help
+> diff --git a/drivers/video/omap2/displays/Makefile 
+> b/drivers/video/omap2/displays/Makefile
+> index aa38609..022058c 100644
+> --- a/drivers/video/omap2/displays/Makefile
+> +++ b/drivers/video/omap2/displays/Makefile
+> @@ -1,3 +1,4 @@
+> +obj-$(CONFIG_PANEL_GENERIC_DPI) += panel-generic-dpi.o
+>  obj-$(CONFIG_PANEL_GENERIC) += panel-generic.o
+>  obj-$(CONFIG_PANEL_SHARP_LS037V7DW01) += panel-sharp-ls037v7dw01.o
+>  obj-$(CONFIG_PANEL_SHARP_LQ043T1DG01) += panel-sharp-lq043t1dg01.o
+> diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c 
+> b/drivers/video/omap2/displays/panel-generic-dpi.c
+> new file mode 100644
+> index 0000000..6702cf6
+> --- /dev/null
+> +++ b/drivers/video/omap2/displays/panel-generic-dpi.c
+> @@ -0,0 +1,355 @@
+> +/*
+> + * Generic DPI Panels support
+> + *
+> + * Copyright (C) 2010 Canonical Ltd.
+> + * Author: Bryan Wu <bryan.wu@canonical.com>
+> + *
+> + * Copyright (C) 2008 Nokia Corporation
+> + * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
+> + *
 
-unfortunately it also means that the device is in limbo between when
-it is "registered" by board support code, and when it is actually
-registered.  ie. It won't show up in sysfs.
+[sp] Shouldn't all authors (from the files being coalesced) be
+     listed here.
 
-> 
-> 
-> Crude and incomplete code follows:
-> 
-> struct platform_device_depend {
-> 	struct list_head node;
-> 	const char *dev_name;
-> 	struct platform_device *pdev;
-> };
-> 
-> LIST_HEAD(platform_device_depend);
-> 
-> static int platform_device_register_after(struct platform_device *pdev,
-> 					  const char *dev_name)
-> {
-> 	struct platform_device_depend *dep;
-> 
-> 	dep = kzalloc(sizeof(*dep), GFP_KERNEL);
-> 	if (!dep)
-> 		return -ENOMEM;
-> 	dep->dev_name = dev_name;
-> 	dep->pdev = pdev;
-> 	list_add_tail(&dep->node, &platform_device_depend);
-> 	return 0;
-> }
-> 
-> static int platform_device_try_register(struct platform_device *pdev)
-> {
-> 	struct platform_device_depend *dep;
-> 
-> 	list_for_each_entry(dep, &platform_device_depend, node) {
-> 		if (dep->pdev == pdev)
-> 			return -EBUSY;
-> 	}
-> 	return platform_device_register(pdev);
-> }
-> 
-> static int bus_notifier_func(struct notifier_block *nb,
-> 			     unsigned long event, void *__dev)
-> {
-> 	struct platform_device_depend *dep, *tmp;
-> 	struct device *dev = __dev;
-> 
-> 	if (event != BUS_NOTIFY_BOUND_DRIVER)
-> 		return NOTIFY_DONE;
-> 
-> 	list_for_each_entry_safe(dep, tmp, &platform_device_depend,
-> 				 node) {
-> 		if (strcmp(dep->dev_name, dev_name(dev)) != 0)
-> 			continue;
-> 		list_del(&dep->node);
-> 		platform_device_try_register(dep->pdev);
+     I see this missing from PATCH3/3 in your series:
 
-Unfortunately this approach means the board support code will never
-know if there is a problem with registering the device.
+[quote]
+- * LCD panel driver for Sharp LQ043T1DG01
+- *
+- * Copyright (C) 2009 Texas Instruments Inc
+- * Author: Vaibhav Hiremath <hvaibhav@ti.com>
+- *
+[/quote]
 
-> 		kfree(dep);
-> 	}
-> 
-> 	return NOTIFY_OK;
 
-If it is part of the core platform_bus_type code, then there is no
-need to use a notifier.  The hook can be added directly.
-
-g.
+[snip]...[snip]
