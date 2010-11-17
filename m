@@ -1,30 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Nov 2010 12:18:13 +0100
-Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned
-	long for physical addresses
-In-Reply-To: <AANLkTinDGk2HPg7py9nzsqmM3_AbSG_GJJYwsiMr+wQL@mail.gmail.com>
-References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-	<20101116193335.GD21926@n2100.arm.linux.org.uk>
-	<AANLkTinDGk2HPg7py9nzsqmM3_AbSG_GJJYwsiMr+wQL@mail.gmail.com>
-Message-ID: <201011171218.13910.arnd@arndb.de>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Wed, 17 Nov 2010 14:44:01 +0200
+Subject: [PATCH 1/3] OMAP: DSS2: Add generic DPI panel display driver
+In-Reply-To: <1289960640-8782-2-git-send-email-bryan.wu@canonical.com>
+References: <1289960640-8782-1-git-send-email-bryan.wu@canonical.com>
+	<1289960640-8782-2-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1289997841.26444.21.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 November 2010, Catalin Marinas wrote:
-> >
-> > It may make sense to mark it const volatile, as that's the most
-> > permissive set of attributes possible (iow, it'll accept any pointer
-> > without warning.)  However, might be an idea to check what other
-> > arches do.
+On Wed, 2010-11-17 at 10:23 +0800, ext Bryan Wu wrote:
+> Generic DPI panel driver includes the driver and 4 similar panel configurations. It
+> will match the panel name which is passed from platform data and setup the
+> right configurations.
 > 
-> The majority of architectures use volatile and a few add both const
-> and volatile.
+> With generic DPI panel driver, we can remove those 4 duplicated panel display
+> drivers. In the future, it is simple for us just add new panel configuration
+> date in panel-generic-dpi.c to support new display panel.
 > 
-> I usually use the generic headers as reference for function prototypes
-> and that's just using volatile without a const (cc'ing Arnd for any
-> view on this).
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> ---
+>  .../arm/plat-omap/include/plat/panel-generic-dpi.h |   37 ++
+>  drivers/video/omap2/displays/Kconfig               |    8 +
+>  drivers/video/omap2/displays/Makefile              |    1 +
+>  drivers/video/omap2/displays/panel-generic-dpi.c   |  348 ++++++++++++++++++++
+>  4 files changed, 394 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+>  create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
+> 
 
-const volatile sounds right here, I can also change the generic header
-if we agree to do the same in arm.
+<snip>
 
-	Arnd
+> +static int generic_dpi_panel_probe(struct omap_dss_device *dssdev)
+> +{
+> +	struct panel_generic_dpi_data *panel_data = get_panel_data(dssdev);
+> +	struct panel_config *panel_config = NULL;
+> +	struct panel_drv_data *drv_data = NULL;
+> +	int i;
+> +
+> +	dev_dbg(&dssdev->dev, "probe\n");
+> +
+> +	if (!panel_data || !panel_data->name)
+> +		return -EINVAL;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(generic_dpi_panels); i++) {
+> +		if (strcmp(panel_data->name, generic_dpi_panels[i].name) == 0) {
+> +			panel_config = &generic_dpi_panels[i];
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (!panel_config)
+> +		return -EINVAL;
+> +
+> +	dssdev->panel.config = panel_config->config;
+> +	dssdev->panel.timings = panel_config->timings;
+> +	dssdev->panel.acb = panel_config->acb;
+> +	dssdev->panel.acbi = panel_config->acbi;
+> +
+> +	drv_data = kzalloc(sizeof(*drv_data), GFP_KERNEL);
+> +	if (!drv_data)
+> +		return -ENOMEM;
+> +
+> +	drv_data->dssdev = dssdev;
+> +	drv_data->panel_config = panel_config;
+> +
+> +	dev_set_drvdata(&dssdev->dev, drv_data);
+> +
+> +	return 0;
+> +}
+> +
+> +static void generic_dpi_panel_remove(struct omap_dss_device *dssdev)
+> +{
+> +}
+
+You need to free the drv_data here.
+
+Perhaps this will be the last fix =).
+
+ Tomi
