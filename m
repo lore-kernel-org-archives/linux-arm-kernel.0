@@ -1,33 +1,38 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 17 Nov 2010 16:46:28 +0000
-Subject: [PATCH 7/7 v1.1] ARM: Thumb-2: Restore sensible zImage header
-	layout for CONFIG_THUMB2_KERNEL
-In-Reply-To: <alpine.LFD.2.00.1011171056540.6448@xanadu.home>
-References: <1289913277-8822-7-git-send-email-dave.martin@linaro.org>
-	<1289992294-7181-1-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1011171056540.6448@xanadu.home>
-Message-ID: <AANLkTinF0At5V5R6VoNBkEFQjpY8VA3OZ_j4oC4bPs52@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Nov 2010 17:02:37 +0000
+Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
+	L_PTE_NOWRITE
+In-Reply-To: <20101115183014.GD31421@n2100.arm.linux.org.uk>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
+	<20101115183014.GD31421@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik5FcZ3rNtiwN8kYP0LZh+YqGtKP_RteoFiWa16@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 4:17 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-
-[...]
-
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-Thanks
-
-> Only a nanonit below that is not that important.
-
-[...]
-
->> + THUMB( ? ? ? ? ? ? ?.arm ? ? ? ? ? ? ? ? ? ?)
+On 15 November 2010 18:30, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 12, 2010 at 06:00:25PM +0000, Catalin Marinas wrote:
+>> --- a/arch/arm/include/asm/pgtable-2level.h
+>> +++ b/arch/arm/include/asm/pgtable-2level.h
+>> @@ -128,6 +128,8 @@
+>> ?#define L_PTE_USER ? ? ? ? ? (1 << 8)
+>> ?#define L_PTE_EXEC ? ? ? ? ? (1 << 9)
+>> ?#define L_PTE_SHARED ? ? ? ? (1 << 10) ? ? ? /* shared(v6), coherent(xsc3) */
+>> +#define L_PTE_NOEXEC ? ? ? ? (0)
+>> +#define L_PTE_NOWRITE ? ? ? ? ? ? ? ?(0)
 >
-> Maybe the THUMB() can be omitted here and .arm be unconditional?
+> Let's not make this more complicated than it has to be. ?If we need the
+> inverse of WRITE and EXEC, then that's what we should change everyone to,
+> not invent a new system to work along side the old system.
 
-Agreed, that would be less crufty -- I'll make that change locally for
-now and repost when I have other changes to push.
+Question on the pgprot_noncached/writecombine/dmacoherent - in the
+current implementation we pass L_PTE_EXEC on the dmacoherent macro. Do
+we need to pass L_PTE_NOEXEC to the noncached/writecombine ones? I
+don't see a reason for any of these to be executable but maybe we can
+let the code calling them decide.
 
-Cheers
----Dave
+Thanks.
+
+-- 
+Catalin
