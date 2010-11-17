@@ -1,304 +1,257 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Nov 2010 22:29:29 +0100
-Subject: [PATCH 01/51] ARM: mx3: fix the last users of
-	IMX_NEEDS_DEPRECATED_SYMBOLS
+Date: Wed, 17 Nov 2010 22:29:38 +0100
+Subject: [PATCH 10/51] ARM: imx: dynamically allocate imx_udc device
 In-Reply-To: <20101117212821.GF8942@pengutronix.de>
 References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <1290029419-21435-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1290029419-21435-10-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is only available for mx1 machines with no in-tree user.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx3/Makefile  |    3 --
- arch/arm/mach-mx3/devices.c |   69 +++++++++++++++++++++++--------------------
- arch/arm/mach-mx3/mm.c      |   48 +++++++++++++++---------------
- 3 files changed, 61 insertions(+), 59 deletions(-)
+ arch/arm/mach-imx/devices.c                     |   43 -------------
+ arch/arm/mach-imx/devices.h                     |    1 -
+ arch/arm/plat-mxc/devices/Kconfig               |    3 +
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-imx_udc.c    |   75 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   16 +++++
+ arch/arm/plat-mxc/include/mach/mx1.h            |   16 +++---
+ 7 files changed, 103 insertions(+), 52 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-imx_udc.c
 
-diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
-index 8a182d0a..7feb6c4 100644
---- a/arch/arm/mach-mx3/Makefile
-+++ b/arch/arm/mach-mx3/Makefile
-@@ -5,8 +5,6 @@
- # Object file lists.
+diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
+index cdc6f32..fba6285 100644
+--- a/arch/arm/mach-imx/devices.c
++++ b/arch/arm/mach-imx/devices.c
+@@ -70,49 +70,6 @@ struct platform_device imx1_camera_device = {
+ 	.num_resources  = ARRAY_SIZE(imx1_camera_resources),
+ };
  
- obj-y				:= mm.o devices.o cpu.o
--CFLAGS_mm.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
--CFLAGS_devices.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
- obj-$(CONFIG_ARCH_MX31)		+= clock-imx31.o iomux-imx31.o
- obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
- obj-$(CONFIG_MACH_MX31ADS)	+= mach-mx31ads.o
-@@ -15,7 +13,6 @@ obj-$(CONFIG_MACH_MX31LITE)	+= mach-mx31lite.o mx31lite-db.o
- obj-$(CONFIG_MACH_PCM037)	+= mach-pcm037.o
- obj-$(CONFIG_MACH_PCM037_EET)	+= mach-pcm037_eet.o
- obj-$(CONFIG_MACH_MX31_3DS)	+= mach-mx31_3ds.o
--CFLAGS_mach-mx31_3ds.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
- obj-$(CONFIG_MACH_MX31MOBOARD)	+= mach-mx31moboard.o mx31moboard-devboard.o \
- 				   mx31moboard-marxbot.o mx31moboard-smartbot.o
- obj-$(CONFIG_MACH_QONG)		+= mach-qong.o
-diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-index d4da949..74f74f4 100644
---- a/arch/arm/mach-mx3/devices.c
-+++ b/arch/arm/mach-mx3/devices.c
-@@ -33,18 +33,18 @@
+-static struct resource imx_usb_resources[] = {
+-	{
+-		.start	= 0x00212000,
+-		.end	= 0x00212148,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= MX1_USBD_INT0,
+-		.end	= MX1_USBD_INT0,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= MX1_USBD_INT1,
+-		.end	= MX1_USBD_INT1,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= MX1_USBD_INT2,
+-		.end	= MX1_USBD_INT2,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= MX1_USBD_INT3,
+-		.end	= MX1_USBD_INT3,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= MX1_USBD_INT4,
+-		.end	= MX1_USBD_INT4,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= MX1_USBD_INT5,
+-		.end	= MX1_USBD_INT5,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= MX1_USBD_INT6,
+-		.end	= MX1_USBD_INT6,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device imx_usb_device = {
+-	.name		= "imx_udc",
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(imx_usb_resources),
+-	.resource	= imx_usb_resources,
+-};
+-
+ /* GPIO port description */
  static struct mxc_gpio_port imx_gpio_ports[] = {
  	{
- 		.chip.label = "gpio-0",
--		.base = IO_ADDRESS(GPIO1_BASE_ADDR),
--		.irq = MXC_INT_GPIO1,
-+		.base = MX31_IO_ADDRESS(MX31_GPIO1_BASE_ADDR),
-+		.irq = MX3x_INT_GPIO1,
- 		.virtual_irq_start = MXC_GPIO_IRQ_START,
- 	}, {
- 		.chip.label = "gpio-1",
--		.base = IO_ADDRESS(GPIO2_BASE_ADDR),
--		.irq = MXC_INT_GPIO2,
-+		.base = MX31_IO_ADDRESS(MX31_GPIO2_BASE_ADDR),
-+		.irq = MX3x_INT_GPIO2,
- 		.virtual_irq_start = MXC_GPIO_IRQ_START + 32,
- 	}, {
- 		.chip.label = "gpio-2",
--		.base = IO_ADDRESS(GPIO3_BASE_ADDR),
--		.irq = MXC_INT_GPIO3,
-+		.base = MX31_IO_ADDRESS(MX31_GPIO3_BASE_ADDR),
-+		.irq = MX3x_INT_GPIO3,
- 		.virtual_irq_start = MXC_GPIO_IRQ_START + 64,
- 	}
- };
-@@ -56,8 +56,8 @@ int __init imx3x_register_gpios(void)
- 
- static struct resource mxc_w1_master_resources[] = {
- 	{
--		.start = OWIRE_BASE_ADDR,
--		.end   = OWIRE_BASE_ADDR + SZ_4K - 1,
-+		.start = MX3x_OWIRE_BASE_ADDR,
-+		.end = MX3x_OWIRE_BASE_ADDR + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- };
-@@ -110,8 +110,8 @@ struct platform_device mxcsdhc_device1 = {
- 
- static struct resource rnga_resources[] = {
- 	{
--		.start = RNGA_BASE_ADDR,
--		.end = RNGA_BASE_ADDR + 0x28,
-+		.start = MX3x_RNGA_BASE_ADDR,
-+		.end = MX3x_RNGA_BASE_ADDR + 0x28,
- 		.flags = IORESOURCE_MEM,
- 	},
- };
-@@ -129,20 +129,20 @@ struct platform_device mxc_rnga_device = {
- /* The resource order is important! */
- static struct resource mx3_ipu_rsrc[] = {
- 	{
--		.start = IPU_CTRL_BASE_ADDR,
--		.end = IPU_CTRL_BASE_ADDR + 0x5F,
-+		.start = MX3x_IPU_CTRL_BASE_ADDR,
-+		.end = MX3x_IPU_CTRL_BASE_ADDR + 0x5F,
- 		.flags = IORESOURCE_MEM,
- 	}, {
--		.start = IPU_CTRL_BASE_ADDR + 0x88,
--		.end = IPU_CTRL_BASE_ADDR + 0xB3,
-+		.start = MX3x_IPU_CTRL_BASE_ADDR + 0x88,
-+		.end = MX3x_IPU_CTRL_BASE_ADDR + 0xB3,
- 		.flags = IORESOURCE_MEM,
- 	}, {
--		.start = MXC_INT_IPU_SYN,
--		.end = MXC_INT_IPU_SYN,
-+		.start = MX3x_INT_IPU_SYN,
-+		.end = MX3x_INT_IPU_SYN,
- 		.flags = IORESOURCE_IRQ,
- 	}, {
--		.start = MXC_INT_IPU_ERR,
--		.end = MXC_INT_IPU_ERR,
-+		.start = MX3x_INT_IPU_ERR,
-+		.end = MX3x_INT_IPU_ERR,
- 		.flags = IORESOURCE_IRQ,
- 	},
- };
-@@ -156,8 +156,8 @@ struct platform_device mx3_ipu = {
- 
- static struct resource fb_resources[] = {
- 	{
--		.start	= IPU_CTRL_BASE_ADDR + 0xB4,
--		.end	= IPU_CTRL_BASE_ADDR + 0x1BF,
-+		.start	= MX3x_IPU_CTRL_BASE_ADDR + 0xB4,
-+		.end	= MX3x_IPU_CTRL_BASE_ADDR + 0x1BF,
- 		.flags	= IORESOURCE_MEM,
- 	},
- };
-@@ -174,8 +174,8 @@ struct platform_device mx3_fb = {
- 
- static struct resource camera_resources[] = {
- 	{
--		.start	= IPU_CTRL_BASE_ADDR + 0x60,
--		.end	= IPU_CTRL_BASE_ADDR + 0x87,
-+		.start	= MX3x_IPU_CTRL_BASE_ADDR + 0x60,
-+		.end	= MX3x_IPU_CTRL_BASE_ADDR + 0x87,
- 		.flags	= IORESOURCE_MEM,
- 	},
- };
-@@ -196,8 +196,8 @@ static struct resource otg_resources[] = {
- 		.end	= MX31_OTG_BASE_ADDR + 0x1ff,
- 		.flags	= IORESOURCE_MEM,
- 	}, {
--		.start	= MXC_INT_USB3,
--		.end	= MXC_INT_USB3,
-+		.start	= MX31_INT_USB3,
-+		.end	= MX31_INT_USB3,
- 		.flags	= IORESOURCE_IRQ,
- 	},
- };
-@@ -238,8 +238,8 @@ static struct resource mxc_usbh1_resources[] = {
- 		.end = MX31_OTG_BASE_ADDR + 0x3ff,
- 		.flags = IORESOURCE_MEM,
- 	}, {
--		.start = MXC_INT_USB1,
--		.end = MXC_INT_USB1,
-+		.start = MX31_INT_USB1,
-+		.end = MX31_INT_USB1,
- 		.flags = IORESOURCE_IRQ,
- 	},
- };
-@@ -255,6 +255,7 @@ struct platform_device mxc_usbh1 = {
- 	.num_resources = ARRAY_SIZE(mxc_usbh1_resources),
- };
- 
-+#ifdef CONFIG_ARCH_MX31
- /* USB host 2 */
- static u64 usbh2_dmamask = ~(u32)0;
- 
-@@ -264,8 +265,8 @@ static struct resource mxc_usbh2_resources[] = {
- 		.end = MX31_OTG_BASE_ADDR + 0x5ff,
- 		.flags = IORESOURCE_MEM,
- 	}, {
--		.start = MXC_INT_USB2,
--		.end = MXC_INT_USB2,
-+		.start = MX31_INT_USB2,
-+		.end = MX31_INT_USB2,
- 		.flags = IORESOURCE_IRQ,
- 	},
- };
-@@ -280,6 +281,7 @@ struct platform_device mxc_usbh2 = {
- 	.resource = mxc_usbh2_resources,
- 	.num_resources = ARRAY_SIZE(mxc_usbh2_resources),
- };
-+#endif
- 
- static struct resource imx_wdt_resources[] = {
- 	{
-@@ -343,14 +345,17 @@ static int __init mx3_devices_init(void)
+diff --git a/arch/arm/mach-imx/devices.h b/arch/arm/mach-imx/devices.h
+index a7e47f4..91906ce 100644
+--- a/arch/arm/mach-imx/devices.h
++++ b/arch/arm/mach-imx/devices.h
+@@ -1,6 +1,5 @@
+ #ifdef CONFIG_ARCH_MX1
+ extern struct platform_device imx1_camera_device;
+-extern struct platform_device imx_usb_device;
  #endif
- #if defined(CONFIG_ARCH_MX35)
- 	if (cpu_is_mx35()) {
-+		imx_gpio_ports[0].base = MX35_IO_ADDRESS(MX35_GPIO1_BASE_ADDR),
-+		imx_gpio_ports[1].base = MX35_IO_ADDRESS(MX35_GPIO2_BASE_ADDR),
-+		imx_gpio_ports[2].base = MX35_IO_ADDRESS(MX35_GPIO3_BASE_ADDR),
- 		otg_resources[0].start = MX35_OTG_BASE_ADDR;
- 		otg_resources[0].end = MX35_OTG_BASE_ADDR + 0x1ff;
--		otg_resources[1].start = MXC_INT_USBOTG;
--		otg_resources[1].end = MXC_INT_USBOTG;
-+		otg_resources[1].start = MX35_INT_USBOTG;
-+		otg_resources[1].end = MX35_INT_USBOTG;
- 		mxc_usbh1_resources[0].start = MX35_OTG_BASE_ADDR + 0x400;
- 		mxc_usbh1_resources[0].end = MX35_OTG_BASE_ADDR + 0x5ff;
--		mxc_usbh1_resources[1].start = MXC_INT_USBHS;
--		mxc_usbh1_resources[1].end = MXC_INT_USBHS;
-+		mxc_usbh1_resources[1].start = MX35_INT_USBHS;
-+		mxc_usbh1_resources[1].end = MX35_INT_USBHS;
- 		imx_wdt_resources[0].start = MX35_WDOG_BASE_ADDR;
- 		imx_wdt_resources[0].end = MX35_WDOG_BASE_ADDR + 0x3fff;
- 	}
-diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-index b4ffc53..809ee40 100644
---- a/arch/arm/mach-mx3/mm.c
-+++ b/arch/arm/mach-mx3/mm.c
-@@ -42,29 +42,29 @@
+ 
+ #if defined(CONFIG_MACH_MX21) || defined(CONFIG_MACH_MX27)
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index fb66467..2703f5a 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -22,6 +22,9 @@ config IMX_HAVE_PLATFORM_IMX_SSI
+ config IMX_HAVE_PLATFORM_IMX_UART
+ 	bool
+ 
++config IMX_HAVE_PLATFORM_IMX_UDC
++	bool
++
+ config IMX_HAVE_PLATFORM_MXC_NAND
+ 	bool
+ 
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 1d7d392..7c3eaf1 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -6,6 +6,7 @@ obj-y += platform-imx-dma.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UART) += platform-imx-uart.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UDC) += platform-imx_udc.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
+diff --git a/arch/arm/plat-mxc/devices/platform-imx_udc.c b/arch/arm/plat-mxc/devices/platform-imx_udc.c
+new file mode 100644
+index 0000000..6fd675d
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-imx_udc.c
+@@ -0,0 +1,75 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++
++#define imx_imx_udc_data_entry_single(soc, _size)			\
++	{								\
++		.iobase = soc ## _USBD_BASE_ADDR,			\
++		.iosize = _size,					\
++		.irq0 = soc ## _INT_USBD0,				\
++		.irq1 = soc ## _INT_USBD1,				\
++		.irq2 = soc ## _INT_USBD2,				\
++		.irq3 = soc ## _INT_USBD3,				\
++		.irq4 = soc ## _INT_USBD4,				\
++		.irq5 = soc ## _INT_USBD5,				\
++		.irq6 = soc ## _INT_USBD6,				\
++	}
++
++#define imx_imx_udc_data_entry(soc, _size)				\
++	[_id] = imx_imx_udc_data_entry_single(soc, _size)
++
++#ifdef CONFIG_SOC_IMX1
++const struct imx_imx_udc_data imx1_imx_udc_data __initconst =
++	imx_imx_udc_data_entry_single(MX1, SZ_4K);
++#endif /* ifdef CONFIG_SOC_IMX1 */
++
++struct platform_device *__init imx_add_imx_udc(
++		const struct imx_imx_udc_data *data,
++		const struct imxusb_platform_data *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = data->iobase,
++			.end = data->iobase + data->iosize - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = data->irq0,
++			.end = data->irq0,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq1,
++			.end = data->irq1,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq2,
++			.end = data->irq2,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq3,
++			.end = data->irq3,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq4,
++			.end = data->irq4,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq5,
++			.end = data->irq5,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq6,
++			.end = data->irq6,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
++	return imx_add_platform_device("imx_udc", 0,
++			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
++}
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 431e0ef..4eb45fa 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -82,6 +82,22 @@ struct platform_device *__init imx_add_imx_uart_1irq(
+ 		const struct imx_imx_uart_1irq_data *data,
+ 		const struct imxuart_platform_data *pdata);
+ 
++#include <mach/usb.h>
++struct imx_imx_udc_data {
++	resource_size_t iobase;
++	resource_size_t iosize;
++	resource_size_t irq0;
++	resource_size_t irq1;
++	resource_size_t irq2;
++	resource_size_t irq3;
++	resource_size_t irq4;
++	resource_size_t irq5;
++	resource_size_t irq6;
++};
++struct platform_device *__init imx_add_imx_udc(
++		const struct imx_imx_udc_data *data,
++		const struct imxusb_platform_data *pdata);
++
+ #include <mach/mxc_nand.h>
+ struct imx_mxc_nand_data {
+ 	/*
+diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
+index b6771f4..2cd3fcd 100644
+--- a/arch/arm/plat-mxc/include/mach/mx1.h
++++ b/arch/arm/plat-mxc/include/mach/mx1.h
+@@ -114,13 +114,13 @@
+ #define MX1_SSI_RX_INT		44
+ #define MX1_SSI_RX_ERR_INT	45
+ #define MX1_TOUCH_INT		46
+-#define MX1_USBD_INT0		47
+-#define MX1_USBD_INT1		48
+-#define MX1_USBD_INT2		49
+-#define MX1_USBD_INT3		50
+-#define MX1_USBD_INT4		51
+-#define MX1_USBD_INT5		52
+-#define MX1_USBD_INT6		53
++#define MX1_INT_USBD0		47
++#define MX1_INT_USBD1		48
++#define MX1_INT_USBD2		49
++#define MX1_INT_USBD3		50
++#define MX1_INT_USBD4		51
++#define MX1_INT_USBD5		52
++#define MX1_INT_USBD6		53
+ #define MX1_BTSYS_INT		55
+ #define MX1_BTTIM_INT		56
+ #define MX1_BTWUI_INT		57
+@@ -163,6 +163,6 @@
+  * to not break drivers/usb/gadget/imx_udc.  Should go
+  * away after this driver uses the new name.
   */
- static struct map_desc mxc_io_desc[] __initdata = {
- 	{
--		.virtual	= X_MEMC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(X_MEMC_BASE_ADDR),
--		.length		= X_MEMC_SIZE,
--		.type		= MT_DEVICE
-+		.virtual = MX3x_X_MEMC_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(MX3x_X_MEMC_BASE_ADDR),
-+		.length = MX3x_X_MEMC_SIZE,
-+		.type = MT_DEVICE
- 	}, {
--		.virtual	= AVIC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(AVIC_BASE_ADDR),
--		.length		= AVIC_SIZE,
--		.type		= MT_DEVICE_NONSHARED
-+		.virtual = MX3x_AVIC_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(MX3x_AVIC_BASE_ADDR),
-+		.length = MX3x_AVIC_SIZE,
-+		.type = MT_DEVICE_NONSHARED
- 	}, {
--		.virtual	= AIPS1_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(AIPS1_BASE_ADDR),
--		.length		= AIPS1_SIZE,
--		.type		= MT_DEVICE_NONSHARED
-+		.virtual = MX3x_AIPS1_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(MX3x_AIPS1_BASE_ADDR),
-+		.length = MX3x_AIPS1_SIZE,
-+		.type = MT_DEVICE_NONSHARED
- 	}, {
--		.virtual	= AIPS2_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(AIPS2_BASE_ADDR),
--		.length		= AIPS2_SIZE,
--		.type		= MT_DEVICE_NONSHARED
-+		.virtual = MX3x_AIPS2_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(MX3x_AIPS2_BASE_ADDR),
-+		.length = MX3x_AIPS2_SIZE,
-+		.type = MT_DEVICE_NONSHARED
- 	}, {
--		.virtual = SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
--		.length = SPBA0_SIZE,
-+		.virtual = MX3x_SPBA0_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(MX3x_SPBA0_BASE_ADDR),
-+		.length = MX3x_SPBA0_SIZE,
- 		.type = MT_DEVICE_NONSHARED
- 	},
- };
-@@ -77,7 +77,7 @@ static struct map_desc mxc_io_desc[] __initdata = {
- void __init mx31_map_io(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX31);
--	mxc_arch_reset_init(IO_ADDRESS(WDOG_BASE_ADDR));
-+	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
+-#define USBD_INT0		MX1_USBD_INT0
++#define USBD_INT0		MX1_INT_USBD0
  
- 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
- }
-@@ -86,8 +86,8 @@ void __init mx31_map_io(void)
- void __init mx35_map_io(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX35);
--	mxc_iomux_v3_init(IO_ADDRESS(IOMUXC_BASE_ADDR));
--	mxc_arch_reset_init(IO_ADDRESS(WDOG_BASE_ADDR));
-+	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
-+	mxc_arch_reset_init(MX35_IO_ADDRESS(MX3x_WDOG_BASE_ADDR));
- 
- 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
- }
-@@ -97,7 +97,7 @@ int imx3x_register_gpios(void);
- 
- void __init mx31_init_irq(void)
- {
--	mxc_init_irq(IO_ADDRESS(AVIC_BASE_ADDR));
-+	mxc_init_irq(MX31_IO_ADDRESS(MX3x_AVIC_BASE_ADDR));
- 	imx3x_register_gpios();
- }
- 
-@@ -129,7 +129,7 @@ static int mxc_init_l2x0(void)
- 		pr_err("L2 cache: Cannot fix timing. Trying to continue without\n");
- 	}
- 
--	l2x0_base = ioremap(L2CC_BASE_ADDR, 4096);
-+	l2x0_base = ioremap(MX3x_L2CC_BASE_ADDR, 4096);
- 	if (IS_ERR(l2x0_base)) {
- 		printk(KERN_ERR "remapping L2 cache area failed with %ld\n",
- 				PTR_ERR(l2x0_base));
+ #endif /* ifndef __MACH_MX1_H__ */
 -- 
 1.7.2.3
