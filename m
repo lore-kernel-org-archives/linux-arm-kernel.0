@@ -1,250 +1,198 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Nov 2010 22:29:30 +0100
-Subject: [PATCH 02/51] ARM: imx: refactor the io mapping macro
+Date: Wed, 17 Nov 2010 22:29:34 +0100
+Subject: [PATCH 06/51] ARM: imx/debug-macro: rework using the new io mapping
+	macro
 In-Reply-To: <20101117212821.GF8942@pengutronix.de>
 References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <1290029419-21435-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1290029419-21435-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes it more assembler friendly and allows it to be used in situation
-that need an unsigned long and not a pointer.  Also the naming is
-clearer.  IOMEM is introduced without IMX_ prefix as it is used this way
-in more than one ARM subarch and it might become globally available
-soon.
+This gets rid of the last user of IMX_NEEDS_DEPRECATED_SYMBOLS.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx3/mach-kzm_arm11_01.c     |    6 +++---
- arch/arm/plat-mxc/include/mach/hardware.h |   13 +++++++++----
- arch/arm/plat-mxc/include/mach/mx1.h      |    5 +++--
- arch/arm/plat-mxc/include/mach/mx21.h     |    9 +++++----
- arch/arm/plat-mxc/include/mach/mx25.h     |    9 +++++----
- arch/arm/plat-mxc/include/mach/mx27.h     |    9 +++++----
- arch/arm/plat-mxc/include/mach/mx31.h     |   13 +++++++------
- arch/arm/plat-mxc/include/mach/mx35.h     |   13 +++++++------
- arch/arm/plat-mxc/include/mach/mx51.h     |   13 +++++++------
- arch/arm/plat-mxc/include/mach/mxc91231.h |   19 ++++++++++---------
- 10 files changed, 61 insertions(+), 48 deletions(-)
+ arch/arm/plat-mxc/include/mach/debug-macro.S |   23 +++++++----------------
+ arch/arm/plat-mxc/include/mach/mx25.h        |    4 ----
+ arch/arm/plat-mxc/include/mach/mx2x.h        |    5 -----
+ arch/arm/plat-mxc/include/mach/mx3x.h        |    5 -----
+ arch/arm/plat-mxc/include/mach/mx51.h        |    5 -----
+ 5 files changed, 7 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mach-kzm_arm11_01.c b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
-index 042cd56..a5f3eb2 100644
---- a/arch/arm/mach-mx3/mach-kzm_arm11_01.c
-+++ b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
-@@ -41,9 +41,9 @@
- #include "devices-imx31.h"
- #include "devices.h"
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index d56213f..3b3a37c 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -10,58 +10,49 @@
+  * published by the Free Software Foundation.
+  *
+  */
+-#define IMX_NEEDS_DEPRECATED_SYMBOLS
++#include <mach/hardware.h>
  
--#define KZM_ARM11_IO_ADDRESS(x) (					\
--	IMX_IO_ADDRESS(x, MX31_CS4) ?:					\
--	IMX_IO_ADDRESS(x, MX31_CS5) ?:					\
-+#define KZM_ARM11_IO_ADDRESS(x) (IOMEM(					\
-+	IMX_IO_P2V_MODULE(x, MX31_CS4) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_CS5)) ?:				\
- 	MX31_IO_ADDRESS(x))
+ #ifdef CONFIG_ARCH_MX1
+-#include <mach/mx1.h>
+-#define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_PADDR	MX1_UART1_BASE_ADDR
+ #endif
  
- /*
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index ebadf4a..4bbe506 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -22,10 +22,15 @@
+ #ifdef CONFIG_ARCH_MX25
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx25.h>
+ #define UART_PADDR	MX25_UART1_BASE_ADDR
+-#define UART_VADDR	MX25_AIPS1_IO_ADDRESS(MX25_UART1_BASE_ADDR)
+ #endif
  
- #include <asm/sizes.h>
+ #ifdef CONFIG_ARCH_MX2
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx2x.h>
+-#define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	AIPI_IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_PADDR	MX2x_UART1_BASE_ADDR
+ #endif
  
--#define IMX_IO_ADDRESS(addr, module)					\
--	((void __force __iomem *)					\
--	 (((unsigned long)((addr) - (module ## _BASE_ADDR)) < module ## _SIZE) ?\
--	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0))
-+#ifdef __ASSEMBLER__
-+#define IOMEM(addr)	(addr)
-+#else
-+#define IOMEM(addr)	((void __force __iomem *)(addr))
-+#endif
-+
-+#define IMX_IO_P2V_MODULE(addr, module)					\
-+	(((addr) - module ## _BASE_ADDR) < module ## _SIZE ?		\
-+	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0)
+ #ifdef CONFIG_ARCH_MX3
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx3x.h>
+-#define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	AIPS1_IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_PADDR	MX3x_UART1_BASE_ADDR
+ #endif
  
  #ifdef CONFIG_ARCH_MX5
- #include <mach/mx51.h>
-diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
-index 641b246..b41c288 100644
---- a/arch/arm/plat-mxc/include/mach/mx1.h
-+++ b/arch/arm/plat-mxc/include/mach/mx1.h
-@@ -73,8 +73,9 @@
- #define MX1_CSI_BASE_ADDR		(0x24000 + MX1_IO_BASE_ADDR)
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx51.h>
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+-#define UART_VADDR	MX51_AIPS1_IO_ADDRESS(MX51_UART1_BASE_ADDR)
+ #endif
  
- /* macro to get at IO space when running virtually */
--#define MX1_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX1_IO))
-+#define MX1_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX1_IO))
-+#define MX1_IO_ADDRESS(x)		IOMEM(MX1_IO_P2V(x))
- 
- /* fixed interrput numbers */
- #define MX1_INT_SOFTINT		0
-diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
-index 8bc5972..aed0277 100644
---- a/arch/arm/plat-mxc/include/mach/mx21.h
-+++ b/arch/arm/plat-mxc/include/mach/mx21.h
-@@ -92,10 +92,11 @@
- 
- #define MX21_IRAM_BASE_ADDR		0xffffe800	/* internal ram */
- 
--#define MX21_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX21_AIPI) ?:					\
--	IMX_IO_ADDRESS(x, MX21_SAHB1) ?:				\
--	IMX_IO_ADDRESS(x, MX21_X_MEMC))
-+#define MX21_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX21_AIPI) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX21_SAHB1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX21_X_MEMC))
-+#define MX21_IO_ADDRESS(x)		IOMEM(MX21_IO_P2V(x))
- 
- /* fixed interrupt numbers */
- #define MX21_INT_CSPI3		6
+ #ifdef CONFIG_ARCH_MXC91231
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mxc91231.h>
+ #define UART_PADDR	MXC91231_UART2_BASE_ADDR
+-#define UART_VADDR	MXC91231_IO_ADDRESS(MXC91231_UART2_BASE_ADDR)
+ #endif
++
++#define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
++
+ 		.macro	addruart, rp, rv
+ 		ldr	\rp, =UART_PADDR	@ physical
+ 		ldr	\rv, =UART_VADDR	@ virtual
 diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index cf46a45..6f9e1d4 100644
+index aac6a9c..a2404b0 100644
 --- a/arch/arm/plat-mxc/include/mach/mx25.h
 +++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -28,10 +28,11 @@
- #define MX25_GPIO3_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0xa4000)
- #define MX25_GPIO4_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0x9c000)
+@@ -2,7 +2,6 @@
+ #define __MACH_MX25_H__
  
--#define MX25_IO_ADDRESS(x) (					\
--	IMX_IO_ADDRESS(x, MX25_AIPS1) ?:			\
--	IMX_IO_ADDRESS(x, MX25_AIPS2) ?:			\
--	IMX_IO_ADDRESS(x, MX25_AVIC))
-+#define MX25_IO_P2V(x)	(					\
-+	IMX_IO_P2V_MODULE(x, MX25_AIPS1) ?:			\
-+	IMX_IO_P2V_MODULE(x, MX25_AIPS2) ?:			\
-+	IMX_IO_P2V_MODULE(x, MX25_AVIC))
-+#define MX25_IO_ADDRESS(x)		IOMEM(MX25_IO_P2V(x))
+ #define MX25_AIPS1_BASE_ADDR		0x43f00000
+-#define MX25_AIPS1_BASE_ADDR_VIRT	0xf5300000
+ #define MX25_AIPS1_SIZE			SZ_1M
+ #define MX25_AIPS2_BASE_ADDR		0x53f00000
+ #define MX25_AIPS2_SIZE			SZ_1M
+@@ -25,9 +24,6 @@
+ #define MX25_GPIO2_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xd0000)
+ #define MX25_WDOG_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xdc000)
  
- #define MX25_AIPS1_IO_ADDRESS(x) \
- 	(((x) - MX25_AIPS1_BASE_ADDR) + MX25_AIPS1_BASE_ADDR_VIRT)
-diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index 2237ba2..c769cc8 100644
---- a/arch/arm/plat-mxc/include/mach/mx27.h
-+++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -123,10 +123,11 @@
- /* IRAM */
- #define MX27_IRAM_BASE_ADDR		0xffff4c00	/* internal ram */
+-#define MX25_AIPS1_IO_ADDRESS(x) \
+-	(((x) - MX25_AIPS1_BASE_ADDR) + MX25_AIPS1_BASE_ADDR_VIRT)
+-
+ #define MX25_UART1_BASE_ADDR		0x43f90000
+ #define MX25_UART2_BASE_ADDR		0x43f94000
+ #define MX25_AUDMUX_BASE_ADDR		0x43fb0000
+diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/plat-mxc/include/mach/mx2x.h
+index 46eeeb2..a056948 100644
+--- a/arch/arm/plat-mxc/include/mach/mx2x.h
++++ b/arch/arm/plat-mxc/include/mach/mx2x.h
+@@ -27,7 +27,6 @@
  
--#define MX27_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX27_AIPI) ?:					\
--	IMX_IO_ADDRESS(x, MX27_SAHB1) ?:				\
--	IMX_IO_ADDRESS(x, MX27_X_MEMC))
-+#define MX27_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX27_AIPI) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX27_SAHB1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX27_X_MEMC))
-+#define MX27_IO_ADDRESS(x)		IOMEM(MX27_IO_P2V(x))
+ /* Register offsets */
+ #define MX2x_AIPI_BASE_ADDR		0x10000000
+-#define MX2x_AIPI_BASE_ADDR_VIRT	0xf4400000
+ #define MX2x_AIPI_SIZE			SZ_1M
+ #define MX2x_DMA_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x01000)
+ #define MX2x_WDOG_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x02000)
+@@ -68,9 +67,6 @@
+ #define MX2x_SAHB1_SIZE			SZ_1M
+ #define MX2x_CSI_BASE_ADDR			(MX2x_SAHB1_BASE_ADDR + 0x0000)
  
- #ifndef __ASSEMBLER__
- static inline void mx27_setup_weimcs(size_t cs,
-diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
-index 61cfe82..eb4a28d 100644
---- a/arch/arm/plat-mxc/include/mach/mx31.h
-+++ b/arch/arm/plat-mxc/include/mach/mx31.h
-@@ -121,12 +121,13 @@
+-#define AIPI_IO_ADDRESS(x)	\
+-	(((x) - AIPI_BASE_ADDR) + AIPI_BASE_ADDR_VIRT)
+-
+ /* fixed interrupt numbers */
+ #define MX2x_INT_CSPI3		6
+ #define MX2x_INT_GPIO		8
+@@ -148,7 +144,6 @@
+ #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+ /* these should go away */
+ #define AIPI_BASE_ADDR MX2x_AIPI_BASE_ADDR
+-#define AIPI_BASE_ADDR_VIRT MX2x_AIPI_BASE_ADDR_VIRT
+ #define AIPI_SIZE MX2x_AIPI_SIZE
+ #define DMA_BASE_ADDR MX2x_DMA_BASE_ADDR
+ #define WDOG_BASE_ADDR MX2x_WDOG_BASE_ADDR
+diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
+index da22cd4..3d6cc45 100644
+--- a/arch/arm/plat-mxc/include/mach/mx3x.h
++++ b/arch/arm/plat-mxc/include/mach/mx3x.h
+@@ -44,7 +44,6 @@
+  * AIPS 1
+  */
+ #define MX3x_AIPS1_BASE_ADDR		0x43f00000
+-#define MX3x_AIPS1_BASE_ADDR_VIRT	0xf5300000
+ #define MX3x_AIPS1_SIZE			SZ_1M
+ #define MX3x_MAX_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0x04000)
+ #define MX3x_EVTMON_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0x08000)
+@@ -141,9 +140,6 @@
  
- #define MX31_PCMCIA_MEM_BASE_ADDR	0xbc000000
+ #define MX3x_PCMCIA_MEM_BASE_ADDR	0xbc000000
  
--#define MX31_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX31_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MX31_AIPS2) ?:				\
--	IMX_IO_ADDRESS(x, MX31_AVIC) ?:					\
--	IMX_IO_ADDRESS(x, MX31_X_MEMC) ?:				\
--	IMX_IO_ADDRESS(x, MX31_SPBA0))
-+#define MX31_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX31_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_AIPS2) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_AVIC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_X_MEMC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_SPBA0))
-+#define MX31_IO_ADDRESS(x)		IOMEM(MX31_IO_P2V(x))
- 
- #ifndef __ASSEMBLER__
- static inline void mx31_setup_weimcs(size_t cs,
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index 6267cff..ce1a24b 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -114,12 +114,13 @@
- #define MX35_NFC_BASE_ADDR		0xbb000000
- #define MX35_PCMCIA_MEM_BASE_ADDR	0xbc000000
- 
--#define MX35_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX35_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MX35_AIPS2) ?:				\
--	IMX_IO_ADDRESS(x, MX35_AVIC) ?:					\
--	IMX_IO_ADDRESS(x, MX35_X_MEMC) ?:				\
--	IMX_IO_ADDRESS(x, MX35_SPBA0))
-+#define MX35_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX35_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_AIPS2) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_AVIC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_X_MEMC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_SPBA0))
-+#define MX35_IO_ADDRESS(x)		IOMEM(MX35_IO_P2V(x))
- 
+-#define AIPS1_IO_ADDRESS(x)  \
+-	(((x) - AIPS1_BASE_ADDR) + AIPS1_BASE_ADDR_VIRT)
+-
  /*
   * Interrupt numbers
+  */
+@@ -230,7 +226,6 @@ static inline int mx35_revision(void)
+ #define L2CC_BASE_ADDR MX3x_L2CC_BASE_ADDR
+ #define L2CC_SIZE MX3x_L2CC_SIZE
+ #define AIPS1_BASE_ADDR MX3x_AIPS1_BASE_ADDR
+-#define AIPS1_BASE_ADDR_VIRT MX3x_AIPS1_BASE_ADDR_VIRT
+ #define AIPS1_SIZE MX3x_AIPS1_SIZE
+ #define MAX_BASE_ADDR MX3x_MAX_BASE_ADDR
+ #define EVTMON_BASE_ADDR MX3x_EVTMON_BASE_ADDR
 diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 2af7a10..e93cf5b 100644
+index 1b8715f..636347c 100644
 --- a/arch/arm/plat-mxc/include/mach/mx51.h
 +++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -163,12 +163,13 @@
- #define MX51_GPU2D_BASE_ADDR		0xd0000000
- #define MX51_TZIC_BASE_ADDR		0xe0000000
- 
--#define MX51_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX51_IRAM) ?:					\
--	IMX_IO_ADDRESS(x, MX51_DEBUG) ?:				\
--	IMX_IO_ADDRESS(x, MX51_SPBA0) ?:				\
--	IMX_IO_ADDRESS(x, MX51_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MX51_AIPS2))
-+#define MX51_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX51_IRAM) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_DEBUG) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_SPBA0) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_AIPS2))
-+#define MX51_IO_ADDRESS(x)		IOMEM(MX51_IO_P2V(x))
- 
- /* This is currently used in <mach/debug-macro.S>, but should go away */
- #define MX51_AIPS1_IO_ADDRESS(x)  \
-diff --git a/arch/arm/plat-mxc/include/mach/mxc91231.h b/arch/arm/plat-mxc/include/mach/mxc91231.h
-index 0ca3101..49e5e25 100644
---- a/arch/arm/plat-mxc/include/mach/mxc91231.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc91231.h
-@@ -187,15 +187,16 @@
-  * it returns 0.
+@@ -53,7 +53,6 @@
+  * AIPS 1
   */
+ #define MX51_AIPS1_BASE_ADDR		0x73f00000
+-#define MX51_AIPS1_BASE_ADDR_VIRT	0xf5700000
+ #define MX51_AIPS1_SIZE			SZ_1M
  
--#define MXC91231_IO_ADDRESS(x) (					\
--	IMX_IO_ADDRESS(x, MXC91231_L2CC) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_X_MEMC) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_ROMP) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_AVIC) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_SPBA0) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_SPBA1) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_AIPS2))
-+#define MXC91231_IO_P2V(x)	(					\
-+	IMX_IO_P2V_MODULE(x, MXC91231_L2CC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_X_MEMC) ?:			\
-+	IMX_IO_P2V_MODULE(x, MXC91231_ROMP) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_AVIC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_SPBA0) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_SPBA1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_AIPS2))
-+#define MXC91231_IO_ADDRESS(x)		IOMEM(MXC91231_IO_P2V(x))
+ #define MX51_OTG_BASE_ADDR		(MX51_AIPS1_BASE_ADDR + 0x80000)
+@@ -137,10 +136,6 @@
+ #define MX51_IO_P2V(x)			IMX_IO_P2V(x)
+ #define MX51_IO_ADDRESS(x)		IOMEM(MX51_IO_P2V(x))
  
+-/* This is currently used in <mach/debug-macro.S>, but should go away */
+-#define MX51_AIPS1_IO_ADDRESS(x)  \
+-	(((x) - MX51_AIPS1_BASE_ADDR) + MX51_AIPS1_BASE_ADDR_VIRT)
+-
  /*
-  * Interrupt numbers
+  * defines for SPBA modules
+  */
 -- 
 1.7.2.3
