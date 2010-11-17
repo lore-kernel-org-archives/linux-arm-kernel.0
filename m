@@ -1,81 +1,47 @@
-From: jiejing.zhang@freescale.com (Zhang Jiejing)
-Date: Wed, 17 Nov 2010 09:57:20 +0800
-Subject: [PATCH] ARM: imx: fix ehci-mxc build.
-Message-ID: <1289959040-5056-1-git-send-email-jiejing.zhang@freescale.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 17 Nov 2010 10:23:57 +0800
+Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver (try
+	#7)
+Message-ID: <1289960640-8782-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ehci-mxc.c is broken by commit:
-65fd42724aee31018b0bb53f4cb04971423be664
+There are 4 duplicated DPI panel drivers in DSS2 display driver. They are
+similar and a generic DPI panel driver can support all them with specific
+panel configuration. And new DPI panel driver can be easily supported
+by adding panel configurations into generic panel DPI driver.
 
-  CHK     include/linux/version.h
-  CHK     include/generated/utsrelease.h
-make[1]: `include/generated/mach-types.h' is up to date.
-  CALL    scripts/checksyscalls.sh
-  CHK     include/generated/compile.h
-  CC      drivers/serial/imx.o
-  LD      drivers/serial/built-in.o
-  CC      drivers/usb/host/ehci-hcd.o
-In file included from drivers/usb/host/ehci-hcd.c:1165:
-drivers/usb/host/ehci-mxc.c: In function 'ehci_mxc_drv_probe':
-drivers/usb/host/ehci-mxc.c:192: error: 'ehci' undeclared (first use in this function)
-drivers/usb/host/ehci-mxc.c:192: error: (Each undeclared identifier is reported only once
-drivers/usb/host/ehci-mxc.c:192: error: for each function it appears in.)
-drivers/usb/host/ehci-mxc.c:117: warning: unused variable 'temp'
-make[3]: *** [drivers/usb/host/ehci-hcd.o] Error 1
-make[2]: *** [drivers/usb/host] Error 2
-make[1]: *** [drivers/usb] Error 2
-make: *** [drivers] Error 2
+This patchset introduces a generic panel DPI driver, remove 3 panel drivers and enable
+generic panel DPI driver in board files. And it is based on 2.6.37-rc2.
 
-This patch is fix this by reuse old code.
+Building with omap2plus_defconfig is successful.
 
-Cc: Matthieu CASTET <matthieu.castet@parrot.com>
-Cc: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Liu Hui <b29976@freescale.com>
+Keep sharp_ls_panel, since it contains blacklight control code which will be
+moved out later.
 
-Signed-off-by: Zhang Jiejing <jiejing.zhang@freescale.com>
----
- drivers/usb/host/ehci-mxc.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+Bryan Wu (3):
+  OMAP: DSS2: Add generic DPI panel display driver
+  OMAP: use generic DPI panel driver in board files
+  OMAP: DSS2: remove generic DPI panel driver duplicated panel drivers
 
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index ac9c4d7..3e9ec19 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -1,6 +1,7 @@
- /*
-  * Copyright (c) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
-  * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
-+ * Copyright (c) 2010 Freescale Semiconductor, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify it
-  * under the terms of the GNU General Public License as published by the
-@@ -26,6 +27,7 @@
- #include <mach/mxc_ehci.h>
- 
- #define ULPI_VIEWPORT_OFFSET	0x170
-+#define PORTSC_OFFSET		0x184
- 
- struct ehci_mxc_priv {
- 	struct clk *usbclk, *ahbclk;
-@@ -114,7 +116,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
- 	struct usb_hcd *hcd;
- 	struct resource *res;
--	int irq, ret, temp;
-+	int irq, ret;
- 	struct ehci_mxc_priv *priv;
- 	struct device *dev = &pdev->dev;
- 
-@@ -189,7 +191,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	}
- 
- 	/* set up the PORTSCx register */
--	ehci_writel(ehci, pdata->portsc, &ehci->regs->port_status[0]);
-+	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
- 	mdelay(10);
- 
- 	/* setup specific usb hw */
--- 
-1.6.3.3
+ arch/arm/mach-omap2/board-3430sdp.c                |   12 +-
+ arch/arm/mach-omap2/board-am3517evm.c              |   23 +-
+ arch/arm/mach-omap2/board-cm-t35.c                 |   23 +-
+ arch/arm/mach-omap2/board-devkit8000.c             |   26 +-
+ arch/arm/mach-omap2/board-igep0020.c               |   12 +-
+ arch/arm/mach-omap2/board-omap3beagle.c            |   12 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |   12 +-
+ arch/arm/mach-omap2/board-omap3stalker.c           |   23 +-
+ .../arm/plat-omap/include/plat/panel-generic-dpi.h |   37 ++
+ drivers/video/omap2/displays/Kconfig               |   22 +-
+ drivers/video/omap2/displays/Makefile              |    4 +-
+ drivers/video/omap2/displays/panel-generic-dpi.c   |  348 ++++++++++++++++++++
+ drivers/video/omap2/displays/panel-generic.c       |  174 ----------
+ .../video/omap2/displays/panel-sharp-lq043t1dg01.c |  165 ---------
+ .../video/omap2/displays/panel-toppoly-tdo35s.c    |  164 ---------
+ 15 files changed, 497 insertions(+), 560 deletions(-)
+ create mode 100644 arch/arm/plat-omap/include/plat/panel-generic-dpi.h
+ create mode 100644 drivers/video/omap2/displays/panel-generic-dpi.c
+ delete mode 100644 drivers/video/omap2/displays/panel-generic.c
+ delete mode 100644 drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
+ delete mode 100644 drivers/video/omap2/displays/panel-toppoly-tdo35s.c
