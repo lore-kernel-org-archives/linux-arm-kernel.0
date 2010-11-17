@@ -1,53 +1,34 @@
-From: alexis.rodet@bvs-tech.com (Alexis RODET)
-Date: Wed, 17 Nov 2010 16:40:06 +0100
-Subject: Devel error: redefinition of 'struct flash_platform_data'
-Message-ID: <4CE3F756.6040700@bvs-tech.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Nov 2010 16:40:47 +0100
+Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned
+	long for physical addresses
+In-Reply-To: <AANLkTik39iqXsLJiJ7cWwweO2VBoJ0Y4ymwKqx7X5ziA@mail.gmail.com>
+References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
+	<201011171218.13910.arnd@arndb.de>
+	<AANLkTik39iqXsLJiJ7cWwweO2VBoJ0Y4ymwKqx7X5ziA@mail.gmail.com>
+Message-ID: <201011171640.47639.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wednesday 17 November 2010, Catalin Marinas wrote:
+> That's what I plan to add, though it may be better to push as a
+> separate patch to fix compiler warnings now. I don't know when the
+> LPAE patches would go in.
+> 
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -189,7 +189,7 @@
+>   * translation for translating DMA addresses.  Use the driver
+>   * DMA support - see dma-mapping.h.
+>   */
+> -static inline phys_addr_t virt_to_phys(void *x)
+> +static inline phys_addr_t virt_to_phys(const volatile void *x)
+>  {
+>         return __virt_to_phys((unsigned long)(x));
+>  }
 
-I'm making an arm machine with both mtd flash and m25p spi flash and try
-to define partitions for both chips in my code.
+The only impact of this patch is reducing compiler warnings, it should
+not add any. Since the patch is correct and independent of the other
+changes, it still sounds like a good idea to push it into -next now.
 
-But there are 2 definitions of 'struct flash_platform_data' and both
-definition are incompatible:
-
-in <asm/mach/flash.h>:
-struct flash_platform_data {
-    const char    *map_name;
-    const char    *name;
-    unsigned int    width;
-    int        (*init)(void);
-    void        (*exit)(void);
-    void        (*set_vpp)(int on);
-    void        (*mmcontrol)(struct mtd_info *mtd, int sync_read);
-    struct mtd_partition *parts;
-    unsigned int    nr_parts;
-};
-
-in <linux/spi/flash.h>:
-struct flash_platform_data {
-    char        *name;
-    struct mtd_partition *parts;
-    unsigned int    nr_parts;
-
-    char        *type;
-
-    /* we'll likely add more ... use JEDEC IDs, etc */
-};
-
-Both are included in a lot of machines or driver.
-
-I don't know what to do.
-Which one should I jeopardize or rename ?
-
-Thank for your help,
-Alexis RODET
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: alexis_rodet.vcf
-Type: text/x-vcard
-Size: 315 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101117/80bb9b43/attachment-0001.vcf>
+	Arnd
