@@ -1,76 +1,45 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Wed, 17 Nov 2010 15:11:46 +0200
-Subject: [PATCH 2/2] ARM: kexec: Fix crash_setup_regs() for ARMv7 and
-	CONFIG_THUMB2_KERNEL
-In-Reply-To: <1289913141-8559-2-git-send-email-dave.martin@linaro.org>
-References: <1289913141-8559-1-git-send-email-dave.martin@linaro.org>
-	<1289913141-8559-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <20101117131146.GD19331@gw.healthdatacare.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 17 Nov 2010 16:13:56 +0300
+Subject: [PATCH 5/9] ARM: mmp: select CPU_PJ4
+In-Reply-To: <1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <4CE3D514.8080404@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Tue, Nov 16, 2010 at 01:12:21PM +0000, Dave Martin wrote:
->  * Fix kexec build failure with CONFIG_THUMB2_KERNEL.
-> 
->  * Avoids deprecated/forbidden sp and pc usage in for ARMv7 onwards,
-> retaining compatibility with older architecture versions.
-> 
->  * The pc value saved to newregs is now aligned on a predictable
-> instruction boundary.
-> 
-> (stmia { ... pc } or str pc has implementation-defined results
-> in most versions of the ARM architecutre, and is prohibited
-> (unpredictable) in Thumb-2.)
-> 
->  * Switch to named inline asm arguments (else I get readily confused ...)
-> 
-> The resulting code should be compatible with all architecture versions >= v3,
-> with or without CONFIG_THUMB2_KERNEL.
-> 
-> Applies cleanly on v2.6.37-rc1.
+On 17-11-2010 14:03, Haojian Zhuang wrote:
 
-Quickly tested this and seems to work. So FWIW:
+> Since CPU_PJ4 is shared between PXA95x and MMP2, select CPU_PJ4 in MMP2
+> configuration.
 
-Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
+> Signed-off-by: Haojian Zhuang<haojian.zhuang@marvell.com>
+> Cc: Eric Miao<eric.y.miao@gmail.com>
+[...]
 
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/kexec.h |   18 ++++++++++++++----
->  1 files changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kexec.h b/arch/arm/include/asm/kexec.h
-> index b37e02c..c0094d8 100644
-> --- a/arch/arm/include/asm/kexec.h
-> +++ b/arch/arm/include/asm/kexec.h
-> @@ -33,10 +33,20 @@ static inline void crash_setup_regs(struct pt_regs *newregs,
->  	if (oldregs) {
->  		memcpy(newregs, oldregs, sizeof(*newregs));
->  	} else {
-> -		__asm__ __volatile__ ("stmia %0, {r0 - r15}"
-> -				      : : "r" (&newregs->ARM_r0) : "memory");
-> -		__asm__ __volatile__ ("mrs %0, cpsr"
-> -				      : "=r" (newregs->ARM_cpsr));
-> +		__asm__ __volatile__ (
-> +			"stmia	%[regs_base], {r0-r12}\n\t"
-> +			"mov	%[_ARM_sp], sp\n\t"
-> +			"str	lr, %[_ARM_lr]\n\t"
-> +			"adr	%[_ARM_pc], 1f\n\t"
-> +			"mrs	%[_ARM_cpsr], cpsr\n\t"
-> +		"1:"
-> +			: [_ARM_pc] "=r" (newregs->ARM_pc),
-> +			  [_ARM_cpsr] "=r" (newregs->ARM_cpsr),
-> +			  [_ARM_sp] "=r" (newregs->ARM_sp),
-> +			  [_ARM_lr] "=o" (newregs->ARM_lr)
-> +			: [regs_base] "r" (&newregs->ARM_r0)
-> +			: "memory"
-> +		);
->  	}
->  }
->  
-> -- 
-> 1.7.1
+> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+> index 0711d3b..ab39b1e 100644
+> --- a/arch/arm/mach-mmp/Kconfig
+> +++ b/arch/arm/mach-mmp/Kconfig
+> @@ -39,6 +39,7 @@ config MACH_TTC_DKB
+>
+>   config MACH_FLINT
+>   	bool "Marvell's Flint Development Platform"
+> +	depends on !(CPU_MOHAWK)
+
+    () not needed.
+
+>   	select CPU_MMP2
+>   	help
+>   	  Say 'Y' here if you want to support the Marvell MMP2-based
+> @@ -49,6 +50,7 @@ config MACH_FLINT
+>
+>   config MACH_MARVELL_JASPER
+>   	bool "Marvell's Jasper Development Platform"
+> +	depends on !(CPU_MOHAWK)
+
+    Likewise...
+
+WBR, Sergei
