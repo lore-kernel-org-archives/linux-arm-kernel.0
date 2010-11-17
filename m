@@ -1,155 +1,231 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Nov 2010 22:29:44 +0100
-Subject: [PATCH 16/51] ARM: imx: change the way flexcan devices are registered
+Date: Wed, 17 Nov 2010 22:29:55 +0100
+Subject: [PATCH 27/51] ARM: imx: move registration of gpios to plat-mxc/gpio.c
 In-Reply-To: <20101117212821.GF8942@pengutronix.de>
 References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <1290029419-21435-16-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1290029419-21435-27-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Group soc specific data in a global struct instead of repeating it for each
-call to imxXX_add_flexcanX.  The structs holding the actual data are placed
-in .init.constdata and so don't do much harm.  Compared to the previous
-approach this reduces code size to call imx_add_flexcan.
+This finally gets rid of mach-imx/devices.c.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx25/devices-imx25.h              |    9 ++--
- arch/arm/mach-mx3/devices-imx35.h               |    9 ++--
- arch/arm/plat-mxc/devices/platform-flexcan.c    |   48 ++++++++++++++++++-----
- arch/arm/plat-mxc/include/mach/devices-common.h |   11 ++++-
- 4 files changed, 56 insertions(+), 21 deletions(-)
+ arch/arm/mach-imx/Makefile  |    2 -
+ arch/arm/mach-imx/devices.c |  124 -------------------------------------------
+ arch/arm/plat-mxc/gpio.c    |   59 ++++++++++++++++++++
+ 3 files changed, 59 insertions(+), 126 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/devices.c
 
-diff --git a/arch/arm/mach-mx25/devices-imx25.h b/arch/arm/mach-mx25/devices-imx25.h
-index 93afa10..f62ce93 100644
---- a/arch/arm/mach-mx25/devices-imx25.h
-+++ b/arch/arm/mach-mx25/devices-imx25.h
-@@ -13,10 +13,11 @@ extern const struct imx_fec_data imx25_fec_data __initconst;
- #define imx25_add_fec(pdata)	\
- 	imx_add_fec(&imx25_fec_data, pdata)
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 5582692..d099c4a 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -4,8 +4,6 @@
  
--#define imx25_add_flexcan0(pdata)	\
--	imx_add_flexcan(0, MX25_CAN1_BASE_ADDR, SZ_16K, MX25_INT_CAN1, pdata)
--#define imx25_add_flexcan1(pdata)	\
--	imx_add_flexcan(1, MX25_CAN2_BASE_ADDR, SZ_16K, MX25_INT_CAN2, pdata)
-+extern const struct imx_flexcan_data imx25_flexcan_data[] __initconst;
-+#define imx25_add_flexcan(id, pdata)	\
-+	imx_add_flexcan(&imx25_flexcan_data[id], pdata)
-+#define imx25_add_flexcan0(pdata)	imx25_add_flexcan(0, pdata)
-+#define imx25_add_flexcan1(pdata)	imx25_add_flexcan(1, pdata)
+ # Object file lists.
  
- extern const struct imx_imx_i2c_data imx25_imx_i2c_data[] __initconst;
- #define imx25_add_imx_i2c(id, pdata)	\
-diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
-index 7602cb4..a71ce68 100644
---- a/arch/arm/mach-mx3/devices-imx35.h
-+++ b/arch/arm/mach-mx3/devices-imx35.h
-@@ -13,10 +13,11 @@ extern const struct imx_fec_data imx35_fec_data __initconst;
- #define imx35_add_fec(pdata)	\
- 	imx_add_fec(&imx35_fec_data, pdata)
- 
--#define imx35_add_flexcan0(pdata)	\
--	imx_add_flexcan(0, MX35_CAN1_BASE_ADDR, SZ_16K, MX35_INT_CAN1, pdata)
--#define imx35_add_flexcan1(pdata)	\
--	imx_add_flexcan(1, MX35_CAN2_BASE_ADDR, SZ_16K, MX35_INT_CAN2, pdata)
-+extern const struct imx_flexcan_data imx35_flexcan_data[] __initconst;
-+#define imx35_add_flexcan(id, pdata)	\
-+	imx_add_flexcan(&imx35_flexcan_data[id], pdata)
-+#define imx35_add_flexcan0(pdata)	imx35_add_flexcan(0, pdata)
-+#define imx35_add_flexcan1(pdata)	imx35_add_flexcan(1, pdata)
- 
- extern const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst;
- #define imx35_add_imx_i2c(id, pdata)	\
-diff --git a/arch/arm/plat-mxc/devices/platform-flexcan.c b/arch/arm/plat-mxc/devices/platform-flexcan.c
-index 5e97a01..5189017 100644
---- a/arch/arm/plat-mxc/devices/platform-flexcan.c
-+++ b/arch/arm/plat-mxc/devices/platform-flexcan.c
-@@ -5,26 +5,54 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
+-obj-y	:=  devices.o
 -
-+#include <mach/hardware.h>
- #include <mach/devices-common.h>
+ obj-$(CONFIG_IMX_HAVE_DMA_V1) += dma-v1.o
  
--struct platform_device *__init imx_add_flexcan(int id,
--		resource_size_t iobase, resource_size_t iosize,
--		resource_size_t irq,
-+#define imx_flexcan_data_entry_single(soc, _id, _hwid, _size)		\
+ obj-$(CONFIG_ARCH_MX1) += clock-imx1.o mm-imx1.o
+diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
+deleted file mode 100644
+index cfc6891..0000000
+--- a/arch/arm/mach-imx/devices.c
++++ /dev/null
+@@ -1,124 +0,0 @@
+-/*
+- * Author: MontaVista Software, Inc.
+- *       <source@mvista.com>
+- *
+- * Based on the OMAP devices.c
+- *
+- * 2005 (c) MontaVista Software, Inc. This file is licensed under the
+- * terms of the GNU General Public License version 2. This program is
+- * licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- *
+- * Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+- * Copyright 2008 Sascha Hauer, kernel at pengutronix.de
+- * Copyright (c) 2008 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- * Copyright (c) 2008 Darius Augulis <darius.augulis@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/serial.h>
+-
+-#include <mach/irqs.h>
+-#include <mach/hardware.h>
+-#include <mach/common.h>
+-#include <mach/mmc.h>
+-
+-#if defined(CONFIG_ARCH_MX1)
+-/* GPIO port description */
+-static struct mxc_gpio_port imx_gpio_ports[] = {
+-	{
+-		.chip.label = "gpio-0",
+-		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR),
+-		.irq = MX1_GPIO_INT_PORTA,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START,
+-	}, {
+-		.chip.label = "gpio-1",
+-		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x100),
+-		.irq = MX1_GPIO_INT_PORTB,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + 32,
+-	}, {
+-		.chip.label = "gpio-2",
+-		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x200),
+-		.irq = MX1_GPIO_INT_PORTC,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + 64,
+-	}, {
+-		.chip.label = "gpio-3",
+-		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x300),
+-		.irq = MX1_GPIO_INT_PORTD,
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + 96,
+-	}
+-};
+-
+-int __init imx1_register_gpios(void)
+-{
+-	return mxc_gpio_init(imx_gpio_ports, ARRAY_SIZE(imx_gpio_ports));
+-}
+-#endif
+-
+-#if defined(CONFIG_MACH_MX21) || defined(CONFIG_MACH_MX27)
+-/* GPIO port description */
+-#define DEFINE_MXC_GPIO_PORT_IRQ(SOC, n, _irq)				\
+-	{								\
+-		.chip.label = "gpio-" #n,				\
+-		.irq = _irq,						\
+-		.base = SOC ## _IO_ADDRESS(MX2x_GPIO_BASE_ADDR +	\
+-				n * 0x100),				\
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + n * 32,	\
+-	}
+-
+-#define DEFINE_MXC_GPIO_PORT(SOC, n)					\
+-	{								\
+-		.chip.label = "gpio-" #n,				\
+-		.base = SOC ## _IO_ADDRESS(MX2x_GPIO_BASE_ADDR +	\
+-				n * 0x100),				\
+-		.virtual_irq_start = MXC_GPIO_IRQ_START + n * 32,	\
+-	}
+-
+-#define DEFINE_MXC_GPIO_PORTS(SOC, pfx)					\
+-	static struct mxc_gpio_port pfx ## _gpio_ports[] = {		\
+-		DEFINE_MXC_GPIO_PORT_IRQ(SOC, 0, SOC ## _INT_GPIO),	\
+-		DEFINE_MXC_GPIO_PORT(SOC, 1),				\
+-		DEFINE_MXC_GPIO_PORT(SOC, 2),				\
+-		DEFINE_MXC_GPIO_PORT(SOC, 3),				\
+-		DEFINE_MXC_GPIO_PORT(SOC, 4),				\
+-		DEFINE_MXC_GPIO_PORT(SOC, 5),				\
+-	}
+-
+-#ifdef CONFIG_MACH_MX21
+-DEFINE_MXC_GPIO_PORTS(MX21, imx21);
+-
+-int __init imx21_register_gpios(void)
+-{
+-	return mxc_gpio_init(imx21_gpio_ports, ARRAY_SIZE(imx21_gpio_ports));
+-}
+-#endif
+-
+-#ifdef CONFIG_MACH_MX27
+-DEFINE_MXC_GPIO_PORTS(MX27, imx27);
+-
+-int __init imx27_register_gpios(void)
+-{
+-	return mxc_gpio_init(imx27_gpio_ports, ARRAY_SIZE(imx27_gpio_ports));
+-}
+-#endif
+-
+-#endif
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index a43d9cc..2c00d9b 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -349,3 +349,62 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+ 
+ 	return 0;
+ }
++
++#define DEFINE_IMX_GPIO_PORT_IRQ(soc, n, _irq)				\
 +	{								\
-+		.id = _id,						\
-+		.iobase = soc ## _CAN ## _hwid ## _BASE_ADDR,		\
-+		.iosize = _size,					\
-+		.irq = soc ## _INT_CAN ## _hwid,			\
++		.chip.label = "gpio-" #n,				\
++		.irq = _irq,						\
++		.base = soc ## _IO_ADDRESS(soc ## _GPIO_BASE_ADDR +	\
++				(n) * SZ_256),				\
++		.virtual_irq_start = MXC_GPIO_IRQ_START + (n) * 32,	\
 +	}
 +
-+#define imx_flexcan_data_entry(soc, _id, _hwid, _size)			\
-+	[_id] = imx_flexcan_data_entry_single(soc, _id, _hwid, _size)
++#define DEFINE_IMX_GPIO_PORT(soc, n)					\
++	DEFINE_IMX_GPIO_PORT_IRQ(soc, n, 0)
 +
-+#ifdef CONFIG_ARCH_MX25
-+const struct imx_flexcan_data imx25_flexcan_data[] __initconst = {
-+#define imx25_flexcan_data_entry(_id, _hwid)				\
-+	imx_flexcan_data_entry(MX25, _id, _hwid, SZ_16K)
-+	imx25_flexcan_data_entry(0, 1),
-+	imx25_flexcan_data_entry(1, 2),
-+};
-+#endif /* ifdef CONFIG_ARCH_MX25 */
++#define DEFINE_REGISTER_FUNCTION(prefix)				\
++int __init prefix ## _register_gpios(void)				\
++{									\
++	return mxc_gpio_init(prefix ## _gpio_ports,			\
++			ARRAY_SIZE(prefix ## _gpio_ports));		\
++}
 +
-+#ifdef CONFIG_ARCH_MX35
-+const struct imx_flexcan_data imx35_flexcan_data[] __initconst = {
-+#define imx35_flexcan_data_entry(_id, _hwid)				\
-+	imx_flexcan_data_entry(MX35, _id, _hwid, SZ_16K)
-+	imx35_flexcan_data_entry(0, 1),
-+	imx35_flexcan_data_entry(1, 2),
++#if defined(CONFIG_SOC_IMX1)
++static struct mxc_gpio_port imx1_gpio_ports[] = {
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 0, MX1_GPIO_INT_PORTA),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 1, MX1_GPIO_INT_PORTB),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 2, MX1_GPIO_INT_PORTC),
++	DEFINE_IMX_GPIO_PORT_IRQ(MX1, 3, MX1_GPIO_INT_PORTD),
 +};
-+#endif /* ifdef CONFIG_ARCH_MX35 */
 +
-+struct platform_device *__init imx_add_flexcan(
-+		const struct imx_flexcan_data *data,
- 		const struct flexcan_platform_data *pdata)
- {
- 	struct resource res[] = {
- 		{
--			.start = iobase,
--			.end = iobase + iosize - 1,
-+			.start = data->iobase,
-+			.end = data->iobase + data->iosize - 1,
- 			.flags = IORESOURCE_MEM,
- 		}, {
--			.start = irq,
--			.end = irq,
-+			.start = data->irq,
-+			.end = data->irq,
- 			.flags = IORESOURCE_IRQ,
- 		},
- 	};
- 
--	return imx_add_platform_device("flexcan", id, res, ARRAY_SIZE(res),
--			pdata, sizeof(*pdata));
-+	return imx_add_platform_device("flexcan", data->id,
-+			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
- }
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index a0ac8454..830369e 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -34,9 +34,14 @@ struct platform_device *__init imx_add_fec(
- 		const struct fec_platform_data *pdata);
- 
- #include <linux/can/platform/flexcan.h>
--struct platform_device *__init imx_add_flexcan(int id,
--		resource_size_t iobase, resource_size_t iosize,
--		resource_size_t irq,
-+struct imx_flexcan_data {
-+	int id;
-+	resource_size_t iobase;
-+	resource_size_t iosize;
-+	resource_size_t irq;
++DEFINE_REGISTER_FUNCTION(imx1)
++
++#endif /* if defined(CONFIG_SOC_IMX1) */
++
++#if defined(CONFIG_SOC_IMX21)
++static struct mxc_gpio_port imx21_gpio_ports[] = {
++	DEFINE_IMX_GPIO_PORT_IRQ(MX21, 0, MX21_INT_GPIO),
++	DEFINE_IMX_GPIO_PORT(MX21, 1),
++	DEFINE_IMX_GPIO_PORT(MX21, 2),
++	DEFINE_IMX_GPIO_PORT(MX21, 3),
++	DEFINE_IMX_GPIO_PORT(MX21, 4),
++	DEFINE_IMX_GPIO_PORT(MX21, 5),
 +};
-+struct platform_device *__init imx_add_flexcan(
-+		const struct imx_flexcan_data *data,
- 		const struct flexcan_platform_data *pdata);
- 
- #include <linux/gpio_keys.h>
++
++DEFINE_REGISTER_FUNCTION(imx21)
++
++#endif /* if defined(CONFIG_SOC_IMX21) */
++
++#if defined(CONFIG_SOC_IMX27)
++static struct mxc_gpio_port imx27_gpio_ports[] = {
++	DEFINE_IMX_GPIO_PORT_IRQ(MX27, 0, MX27_INT_GPIO),
++	DEFINE_IMX_GPIO_PORT(MX27, 1),
++	DEFINE_IMX_GPIO_PORT(MX27, 2),
++	DEFINE_IMX_GPIO_PORT(MX27, 3),
++	DEFINE_IMX_GPIO_PORT(MX27, 4),
++	DEFINE_IMX_GPIO_PORT(MX27, 5),
++};
++
++DEFINE_REGISTER_FUNCTION(imx27)
++
++#endif /* if defined(CONFIG_SOC_IMX27) */
 -- 
 1.7.2.3
