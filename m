@@ -1,27 +1,34 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 17 Nov 2010 09:19:57 +0000
-Subject: [PATCH 7/7] ARM: Thumb-2: Restore sensible zImage header layout
-	for CONFIG_THUMB2_KERNEL
-In-Reply-To: <AANLkTim5Nv_oFgpfYL7jtjcMP10ND6wp5B50veURVPcn@mail.gmail.com>
-References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
-	<1289913277-8822-7-git-send-email-dave.martin@linaro.org>
-	<20101116182643.GC21926@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1011161517260.6448@xanadu.home>
-	<20101116203520.GE21926@n2100.arm.linux.org.uk>
-	<AANLkTim5Nv_oFgpfYL7jtjcMP10ND6wp5B50veURVPcn@mail.gmail.com>
-Message-ID: <AANLkTikH=stEpU9DNcW1pYY6M-XYvaxgfyuKoJ73aZmF@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 17 Nov 2010 10:26:53 +0100
+Subject: [PATCH] nomadik: prevent sched_clock() wraparound
+In-Reply-To: <AANLkTi=pa+oa3GXr5vfBtdrfnHpRc_2cwgBYQLJRvYXM@mail.gmail.com>
+References: <1289898690-29910-1-git-send-email-linus.walleij@stericsson.com>
+	<1289940829.3860.22.camel@localhost.localdomain>
+	<AANLkTimvyo-2eHrvU=LNdBjrJfAxv9Jpza8Mh4iG4ts6@mail.gmail.com>
+	<20101116223116.GG21926@n2100.arm.linux.org.uk>
+	<AANLkTi=pa+oa3GXr5vfBtdrfnHpRc_2cwgBYQLJRvYXM@mail.gmail.com>
+Message-ID: <AANLkTi=fespqykXjvgqGusp-4omT0sfUA8Aj4OnT-LNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 9:16 AM, Dave Martin <dave.martin@linaro.org> wrote:
+2010/11/17 Linus Walleij <linus.ml.walleij@gmail.com>:
 
-[...]
+> Hm! Then in this code in plat-orion/timer.c:
+>
+> #define TCLK2NS_SCALE_FACTOR 8
+> static unsigned long tclk2ns_scale;
+>
+> unsigned long long sched_clock(void)
+> {
+> ? ? ? ?unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
+> ? ? ? ?return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
+> }
 
-Sorry -- the web is broken (pressing space alone should never _send_ a
-mail :( ... )
+Looking at this again it seems the Orion is implicitly
+loosing bits - so this code will work and multiply out some of the
+63 bits so it just wraps around earlier.
 
-Better than trying to give an example, I'll follow up soon with an
-updated patch.
+Would be nice to have these kind of things explicit though,
+it's a bit hard to determine when this counter will wrap.
 
-Cheers
----Dave
+Linus Walleij
