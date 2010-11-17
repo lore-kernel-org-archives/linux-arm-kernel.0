@@ -1,39 +1,34 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Tue, 16 Nov 2010 06:19:00 -0800
-Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
-In-Reply-To: <20101116072225.GF4074@angua.secretlab.ca>
-References: <1289848334-8695-1-git-send-email-cyril@ti.com>
-	<1289848334-8695-5-git-send-email-cyril@ti.com>
-	<20101116072225.GF4074@angua.secretlab.ca>
-Message-ID: <1289917140.1752.7.camel@helium>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Wed, 17 Nov 2010 16:18:46 +0200
+Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver
+	(try #8)
+In-Reply-To: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
+References: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1290003526.26444.30.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-11-16 at 00:22 -0700, Grant Likely wrote:
-
+On Wed, 2010-11-17 at 21:34 +0800, ext Bryan Wu wrote:
+> There are 4 duplicated DPI panel drivers in DSS2 display driver. They are
+> similar and a generic DPI panel driver can support all them with specific
+> panel configuration. And new DPI panel driver can be easily supported
+> by adding panel configurations into generic panel DPI driver.
 > 
-> After discussions about device init dependencies at plumbers, and
-> since this is the first SPI device driver I've reviewed since that
-> dicussion, this driver gets to be the first to implement the proposed
-> policy.  :-)
+> This patchset introduces a generic panel DPI driver, remove 3 panel drivers and enable
+> generic panel DPI driver in board files. And it is based on 2.6.37-rc2.
 > 
-> Change this to module_initcall().  Many spi and i2c drivers use
-> module or subsys_initcall to try and influence driver probe order so
-> that certain regulator chips get registered before the devices that
-> try to use them.  This approach is insane.
+> Building with omap2plus_defconfig is successful.
+> 
+> Keep sharp_ls_panel, since it contains blacklight control code which will be
+> moved out later.
+> 
+> Bryan Wu (3):
+>   OMAP: DSS2: Add generic DPI panel display driver
+>   OMAP: use generic DPI panel driver in board files
+>   OMAP: DSS2: remove generic DPI panel driver duplicated panel drivers
 
-Last I observed the issue ... the situation was that various core
-drivers were required to be able to say that a key subsystem was
-functional ... with said subsystem required to boot properly.
+Thanks, looks good. This is now applied to my tree.
 
-The dependency being, that is, driver on subsystem (but that subsystem
-needed a core/bus driver running before it could work.
+Are you also interested in solving the backlight issue? =)
 
-What's insane is that Linux *STILL* has no clean way to express that
-type of system dependency ... where driver dependencies are pure side
-effects.  (Albeit ones that never change on many platforms, but where
-board-specific differences are routine, and have the same kind of
-indirect dependencies.
-
-
-- Dave
+ Tomi
