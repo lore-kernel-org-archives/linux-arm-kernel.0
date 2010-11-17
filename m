@@ -1,138 +1,65 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Wed, 17 Nov 2010 19:08:59 +0000
-Subject: [PATCH v2] Fix IGEPv2 second MMC channel power supply
-Message-ID: <1290020939-408-1-git-send-email-maz@misterjones.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 18 Nov 2010 01:05:10 +0530
+Subject: [PATCH] nomadik: prevent sched_clock() wraparound v3
+In-Reply-To: <1290001517-17010-1-git-send-email-linus.walleij@stericsson.com>
+References: <1290001517-17010-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <AANLkTikk3aiUBbjf6YeXNQqymVmsYfgU4dVmQ2RsSOXx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 72f381ba056 (omap3: Remove VMMC2 regulator on IGEP v2)
-removed an unused regulator entry, but left the second MMC channel
-(used by the Libertas WLAN module) without link to power regulator.
-This causes the SDIO module to fail being detected.
+On Wed, Nov 17, 2010 at 7:15 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> +unsigned long long sched_clock(void)
+> +{
+> + ? ? ? u64 cycles;
+> +
+> + ? ? ? if (unlikely(!mtu_base))
+> + ? ? ? ? ? ? ? return 0;
+> +
+> + ? ? ? cycles = cnt32_to_63(-readl(mtu_base + MTU_VAL(0)));
+> + ? ? ? cycles &= 0x7FFFFFFFFFFFFFFFLLU;
+> + ? ? ? return (cycles * sched_mult) >> sched_shift;
+> +}
+> +
+> +/* Just kick sched_clock every so often */
+> +static void cnt32_to_63_keepwarm(unsigned long data)
+> +{
+> + ? ? ? mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
+> + ? ? ? (void) sched_clock();
+> +}
+> +
+> +/*
+> + * Set up a timer to keep sched_clock():s 32_to_63 algorithm warm
+> + * once in half a 32bit timer wrap interval.
+> ?*/
+> -unsigned long long notrace sched_clock(void)
+> +static void __init nmdk_sched_clock_init(unsigned long rate)
+> ?{
+> - ? ? ? return clocksource_cyc2ns(nmdk_clksrc.read(
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &nmdk_clksrc),
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? nmdk_clksrc.mult,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? nmdk_clksrc.shift);
+> + ? ? ? u32 v;
+> + ? ? ? unsigned long delta;
+> + ? ? ? u64 days;
+> +
+> + ? ? ? /* Find the apropriate mult and shift factors */
+> + ? ? ? clocks_calc_mult_shift(&sched_mult, &sched_shift,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?rate, NSEC_PER_SEC, SCHED_CLOCK_MIN_WRAP);
+> + ? ? ? /* We need to multiply by atleast 2 to get rid of bit 63 */
+> + ? ? ? BUG_ON(sched_mult < 2);
 
-This patch adds the two regulators that actually feed the WLAN module
-(1v8 from the TWL4030 VIO LDO, and a fixed 3v3). With that patch, the
-second channel is properly detected. Details of the power supply
-implementation were kindly provided by Enric Balletbo i Serra.
+No, you want to multiply by an even number, not "atleast 2".  Please
+also drop the "cycles &= 0x7FFFFFFFFFFFFFFFLLU" in sched_clock().
 
-Also change vmmc1 to use symbolic names instead of direct device
-reference.
+> +
+> + ? ? ? /* Let's see what we get, take max counter and scale it */
+> + ? ? ? days = 0xFFFFFFFFFFFFFFFFLLU >> sched_shift;
+> + ? ? ? do_div(days, rate);
+> + ? ? ? do_div(days, (3600*24));
+> +
+> + ? ? ? pr_debug("sched_clock: using %d bits @ %lu Hz wrap in %lu days\n",
+> + ? ? ? ? ? ? ? (64 - sched_shift), rate, (unsigned long) days);
 
-Tested on an IGEPv2 Rev-B.
-
-Signed-off-by: Marc Zyngier <maz@misterjones.org>
-Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-igep0020.c |   61 ++++++++++++++++++++++++++++-----
- 1 files changed, 51 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 5e035a5..9a85e60 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- 
- #include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/i2c/twl.h>
- #include <linux/mmc/host.h>
- 
-@@ -257,9 +258,8 @@ static inline void __init igep2_init_smsc911x(void) { }
- static struct omap_board_config_kernel igep2_config[] __initdata = {
- };
- 
--static struct regulator_consumer_supply igep2_vmmc1_supply = {
--	.supply		= "vmmc",
--};
-+static struct regulator_consumer_supply igep2_vmmc1_supply =
-+	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.0");
- 
- /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
- static struct regulator_init_data igep2_vmmc1 = {
-@@ -276,6 +276,52 @@ static struct regulator_init_data igep2_vmmc1 = {
- 	.consumer_supplies      = &igep2_vmmc1_supply,
- };
- 
-+static struct regulator_consumer_supply igep2_vio_supply =
-+	REGULATOR_SUPPLY("vmmc_aux", "mmci-omap-hs.1");
-+
-+static struct regulator_init_data igep2_vio = {
-+	.constraints = {
-+		.min_uV			= 1800000,
-+		.max_uV			= 1800000,
-+		.apply_uV		= 1,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
-+					| REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies  = 1,
-+	.consumer_supplies      = &igep2_vio_supply,
-+};
-+
-+static struct regulator_consumer_supply igep2_vmmc2_supply =
-+	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.1");
-+
-+static struct regulator_init_data igep2_vmmc2 = {
-+	.constraints		= {
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
-+		.always_on		= 1,
-+	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &igep2_vmmc2_supply,
-+};
-+
-+static struct fixed_voltage_config igep2_vwlan = {
-+	.supply_name		= "vwlan",
-+	.microvolts		= 3300000,
-+	.gpio			= -EINVAL,
-+	.enabled_at_boot	= 1,
-+	.init_data		= &igep2_vmmc2,
-+};
-+
-+static struct platform_device igep2_vwlan_device = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 0,
-+	.dev = {
-+		.platform_data	= &igep2_vwlan,
-+	},
-+};
-+
- static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
-@@ -373,12 +419,6 @@ static int igep2_twl_gpio_setup(struct device *dev,
- 	omap2_hsmmc_init(mmc);
- 
- 	/*
--	 * link regulators to MMC adapters ... we "know" the
--	 * regulators will be set up only *after* we return.
--	 */
--	igep2_vmmc1_supply.dev = mmc[0].dev;
--
--	/*
- 	 * REVISIT: need ehci-omap hooks for external VBUS
- 	 * power switch and overcurrent detect
- 	 */
-@@ -489,6 +529,7 @@ static void __init igep2_display_init(void)
- 
- static struct platform_device *igep2_devices[] __initdata = {
- 	&igep2_dss_device,
-+	&igep2_vwlan_device,
- };
- 
- static void __init igep2_init_irq(void)
-@@ -519,7 +560,7 @@ static struct twl4030_platform_data igep2_twldata = {
- 	.gpio		= &igep2_twl4030_gpio_pdata,
- 	.vmmc1          = &igep2_vmmc1,
- 	.vpll2		= &igep2_vpll2,
--
-+	.vio		= &igep2_vio,
- };
- 
- static struct i2c_board_info __initdata igep2_i2c1_boardinfo[] = {
--- 
-1.7.3.2
+This days calculation is wrong because you need to divide by
+NSECS_PER_SEC, not rate.
