@@ -1,34 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Nov 2010 16:40:47 +0100
-Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned
-	long for physical addresses
-In-Reply-To: <AANLkTik39iqXsLJiJ7cWwweO2VBoJ0Y4ymwKqx7X5ziA@mail.gmail.com>
-References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-	<201011171218.13910.arnd@arndb.de>
-	<AANLkTik39iqXsLJiJ7cWwweO2VBoJ0Y4ymwKqx7X5ziA@mail.gmail.com>
-Message-ID: <201011171640.47639.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 17 Nov 2010 10:55:41 -0500 (EST)
+Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C05986C77F4@SC-VEXCH1.marvell.com>
+References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-8-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
+	<25B60CDC2F704E4E9D88FFD52780CB4C05986C77F4@SC-VEXCH1.marvell.com>
+Message-ID: <alpine.LFD.2.00.1011171047150.6448@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 November 2010, Catalin Marinas wrote:
-> That's what I plan to add, though it may be better to push as a
-> separate patch to fix compiler warnings now. I don't know when the
-> LPAE patches would go in.
+On Wed, 17 Nov 2010, Haojian Zhuang wrote:
+
 > 
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -189,7 +189,7 @@
->   * translation for translating DMA addresses.  Use the driver
->   * DMA support - see dma-mapping.h.
->   */
-> -static inline phys_addr_t virt_to_phys(void *x)
-> +static inline phys_addr_t virt_to_phys(const volatile void *x)
->  {
->         return __virt_to_phys((unsigned long)(x));
->  }
+> 
+> >-----Original Message-----
+> >From: Haojian Zhuang [mailto:haojian.zhuang at marvell.com]
+> >Sent: 2010?11?17? 7:04 PM
+> >To: linux-arm-kernel at lists.infradead.org
+> >Cc: Haojian Zhuang; Zhou Zhu; Eric Miao; Nicolas Pitre
+> >Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+> >
+> >iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
+> >of accessing CP0 and CP1 is changed in PJ4. Append more files to support
+> >iwmmxt in PJ4 core.
+> >
+> >Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+> >Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >Cc: Eric Miao <eric.y.miao@gmail.com>
+> >Cc: Nicolas Pitre <nico@fluxnic.net>
+> >---
+> > arch/arm/Kconfig         |    4 +-
+> > arch/arm/kernel/Makefile |    1 +
+> > arch/arm/kernel/iwmmxt.S |   55 +++++++++++++++++++++++++++++++++++-------
+> >----
+> > 3 files changed, 45 insertions(+), 15 deletions(-)
+> >
+> 
+> Changelog:
+> 1. Append missing pj4-cp0.c.
 
-The only impact of this patch is reducing compiler warnings, it should
-not add any. Since the patch is correct and independent of the other
-changes, it still sounds like a good idea to push it into -next now.
+OK... some more comments there:
 
-	Arnd
++static int __init pj4_cp0_init(void)
++{
++       u32 cp_access;
++
++       cp_access = pj4_cp_access_read() & ~0xf;
++       pj4_cp_access_write(cp_access | 0xf);
+
+You clear all first 4 bits just to set them all again.  Isn't the first 
+mask redundant?
+
++       printk(KERN_INFO "XScale iWMMXt coprocessor detected.\n");
+
+You are not really detecting anything here, and this is not for XScale 
+either.  What about ""PJ4 iWMMXt coprocessor enabled.\n" instead?
+
++       elf_hwcap |= HWCAP_IWMMXT;
++       thread_register_notifier(&iwmmxt_notifier_block);
++
++       pj4_cp_access_write(cp_access);
+
+And here you are clearing access to the coprocessor.  There is nothing 
+that required access to it from the moment it was set at the beginning 
+of the function, so maybe you should have only cleared it at the 
+beginning instead.
+
+
+Nicolas
