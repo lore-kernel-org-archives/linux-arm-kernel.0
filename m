@@ -1,396 +1,204 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Nov 2010 22:29:31 +0100
-Subject: [PATCH 03/51] ARM: imx: use MXxy_IO_P2V macros to setup static
-	mappings
+Date: Wed, 17 Nov 2010 22:30:00 +0100
+Subject: [PATCH 32/51] ARM: mx25: dynamically allocate imx-keypad devices
 In-Reply-To: <20101117212821.GF8942@pengutronix.de>
 References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <1290029419-21435-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1290029419-21435-32-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes less code rely on the virtual constants.
+The mxc-keypad device seems to be the result of an early and partial
+merge of the keypad driver.  It's unused and there is no corresponding
+driver available, so just remove it.
 
-To further simplify code and reduce the needed boilerplate when
-defining the static mappings a new helper macro is defined in
-mach/hardware.h.
-
+Cc: Alberto Panizzo <maramaopercheseimorto@gmail.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-imx/mm-imx1.c               |    7 +---
- arch/arm/mach-imx/mm-imx21.c              |   21 ++----------
- arch/arm/mach-imx/mm-imx27.c              |   21 ++----------
- arch/arm/mach-mx25/mm.c                   |   25 +++----------
- arch/arm/mach-mx3/mm.c                    |   53 ++++++++++------------------
- arch/arm/mach-mx5/mm.c                    |   35 ++++---------------
- arch/arm/mach-mxc91231/mm.c               |   53 +++++-----------------------
- arch/arm/plat-mxc/include/mach/hardware.h |    7 ++++
- 8 files changed, 56 insertions(+), 166 deletions(-)
+ arch/arm/mach-mx25/Kconfig                      |    3 +-
+ arch/arm/mach-mx25/devices-imx25.h              |    4 ++
+ arch/arm/mach-mx25/devices.c                    |   39 -----------------------
+ arch/arm/mach-mx25/devices.h                    |    2 -
+ arch/arm/mach-mx25/mach-mx25_3ds.c              |    4 +-
+ arch/arm/plat-mxc/devices/platform-imx-keypad.c |   14 ++++++--
+ arch/arm/plat-mxc/include/mach/devices-common.h |    1 +
+ 7 files changed, 19 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-index 9be92b9..729ae09 100644
---- a/arch/arm/mach-imx/mm-imx1.c
-+++ b/arch/arm/mach-imx/mm-imx1.c
-@@ -25,12 +25,7 @@
- #include <mach/hardware.h>
+diff --git a/arch/arm/mach-mx25/Kconfig b/arch/arm/mach-mx25/Kconfig
+index 2944bb7..e9d4456 100644
+--- a/arch/arm/mach-mx25/Kconfig
++++ b/arch/arm/mach-mx25/Kconfig
+@@ -4,10 +4,11 @@ comment "MX25 platforms:"
  
- static struct map_desc imx_io_desc[] __initdata = {
+ config MACH_MX25_3DS
+ 	bool "Support MX25PDK (3DS) Platform"
++	select IMX_HAVE_PLATFORM_ESDHC
++	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_MXC_EHCI
+ 	select IMX_HAVE_PLATFORM_MXC_NAND
+-	select IMX_HAVE_PLATFORM_ESDHC
+ 
+ config MACH_EUKREA_CPUIMX25
+ 	bool "Support Eukrea CPUIMX25 Platform"
+diff --git a/arch/arm/mach-mx25/devices-imx25.h b/arch/arm/mach-mx25/devices-imx25.h
+index 448939a..a35123f 100644
+--- a/arch/arm/mach-mx25/devices-imx25.h
++++ b/arch/arm/mach-mx25/devices-imx25.h
+@@ -30,6 +30,10 @@ extern const struct imx_imx_i2c_data imx25_imx_i2c_data[] __initconst;
+ #define imx25_add_imx_i2c1(pdata)	imx25_add_imx_i2c(1, pdata)
+ #define imx25_add_imx_i2c2(pdata)	imx25_add_imx_i2c(2, pdata)
+ 
++extern const struct imx_imx_keypad_data imx25_imx_keypad_data __initconst;
++#define imx25_add_imx_keypad(pdata)	\
++	imx_add_imx_keypad(&imx25_imx_keypad_data, pdata)
++
+ extern const struct imx_imx_ssi_data imx25_imx_ssi_data[] __initconst;
+ #define imx25_add_imx_ssi(id, pdata)	\
+ 	imx_add_imx_ssi(&imx25_imx_ssi_data[id], pdata)
+diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
+index 1798be9..052adbb 100644
+--- a/arch/arm/mach-mx25/devices.c
++++ b/arch/arm/mach-mx25/devices.c
+@@ -22,25 +22,6 @@
+ #include <mach/mx25.h>
+ #include <mach/irqs.h>
+ 
+-static struct resource mxc_keypad_resources[] = {
 -	{
--		.virtual = MX1_IO_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX1_IO_BASE_ADDR),
--		.length = MX1_IO_SIZE,
--		.type = MT_DEVICE
+-		.start	= 0x43fa8000,
+-		.end	= 0x43fabfff,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start   = 24,
+-		.end     = 24,
+-		.flags   = IORESOURCE_IRQ,
 -	}
-+	imx_map_entry(MX1, IO, MT_DEVICE),
+-};
+-
+-struct platform_device mxc_keypad_device = {
+-	.name = "mxc-keypad",
+-	.id = -1,
+-	.num_resources = ARRAY_SIZE(mxc_keypad_resources),
+-	.resource = mxc_keypad_resources,
+-};
+-
+ static struct resource mx25_rtc_resources[] = {
+ 	{
+ 		.start	= MX25_DRYICE_BASE_ADDR,
+@@ -98,26 +79,6 @@ struct platform_device mxc_wdt = {
+ 	.resource = mxc_wdt_resources,
  };
  
- void __init mx1_map_io(void)
-diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-index 12faeeaa..e728af8 100644
---- a/arch/arm/mach-imx/mm-imx21.c
-+++ b/arch/arm/mach-imx/mm-imx21.c
-@@ -35,33 +35,18 @@ static struct map_desc imx21_io_desc[] __initdata = {
- 	 * - ROM Patch
- 	 * - and some reserved space
- 	 */
+-static struct resource mx25_kpp_resources[] = {
 -	{
--		.virtual = MX21_AIPI_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX21_AIPI_BASE_ADDR),
--		.length = MX21_AIPI_SIZE,
--		.type = MT_DEVICE
+-		.start	= MX25_KPP_BASE_ADDR,
+-		.end	= MX25_KPP_BASE_ADDR + 0xf,
+-		.flags	= IORESOURCE_MEM,
 -	},
-+	imx_map_entry(MX21, AIPI, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - CSI
- 	 * - ATA
- 	 */
 -	{
--		.virtual = MX21_SAHB1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX21_SAHB1_BASE_ADDR),
--		.length = MX21_SAHB1_SIZE,
--		.type = MT_DEVICE
+-		.start	= MX25_INT_KPP,
+-		.end	= MX25_INT_KPP,
+-		.flags	= IORESOURCE_IRQ,
 -	},
-+	imx_map_entry(MX21, SAHB1, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - EMI
- 	 */
--	{
--		.virtual = MX21_X_MEMC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX21_X_MEMC_BASE_ADDR),
--		.length = MX21_X_MEMC_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX21, X_MEMC, MT_DEVICE),
+-};
+-
+-struct platform_device mx25_kpp_device = {
+-	.name	= "imx-keypad",
+-	.id	= -1,
+-	.num_resources	= ARRAY_SIZE(mx25_kpp_resources),
+-	.resource	= mx25_kpp_resources,
+-};
+-
+ static struct resource mx25_csi_resources[] = {
+ 	{
+ 		.start	= MX25_CSI_BASE_ADDR,
+diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
+index afc60dd..dd1fded 100644
+--- a/arch/arm/mach-mx25/devices.h
++++ b/arch/arm/mach-mx25/devices.h
+@@ -1,6 +1,4 @@
+-extern struct platform_device mxc_keypad_device;
+ extern struct platform_device mx25_rtc_device;
+ extern struct platform_device mx25_fb_device;
+ extern struct platform_device mxc_wdt;
+-extern struct platform_device mx25_kpp_device;
+ extern struct platform_device mx25_csi_device;
+diff --git a/arch/arm/mach-mx25/mach-mx25_3ds.c b/arch/arm/mach-mx25/mach-mx25_3ds.c
+index 574c41f..1d07cfb 100644
+--- a/arch/arm/mach-mx25/mach-mx25_3ds.c
++++ b/arch/arm/mach-mx25/mach-mx25_3ds.c
+@@ -181,7 +181,7 @@ static const uint32_t mx25pdk_keymap[] = {
+ 	KEY(3, 3, KEY_POWER),
  };
  
- /*
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index a246229..374e48b 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -35,33 +35,18 @@ static struct map_desc imx27_io_desc[] __initdata = {
- 	 * - ROM Patch
- 	 * - and some reserved space
- 	 */
--	{
--		.virtual = MX27_AIPI_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX27_AIPI_BASE_ADDR),
--		.length = MX27_AIPI_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX27, AIPI, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - CSI
- 	 * - ATA
- 	 */
--	{
--		.virtual = MX27_SAHB1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX27_SAHB1_BASE_ADDR),
--		.length = MX27_SAHB1_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX27, SAHB1, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - EMI
- 	 */
--	{
--		.virtual = MX27_X_MEMC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX27_X_MEMC_BASE_ADDR),
--		.length = MX27_X_MEMC_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX27, X_MEMC, MT_DEVICE),
+-static struct matrix_keymap_data mx25pdk_keymap_data = {
++static const struct matrix_keymap_data mx25pdk_keymap_data __initdata = {
+ 	.keymap		= mx25pdk_keymap,
+ 	.keymap_size	= ARRAY_SIZE(mx25pdk_keymap),
  };
+@@ -200,7 +200,7 @@ static void __init mx25pdk_init(void)
  
- /*
-diff --git a/arch/arm/mach-mx25/mm.c b/arch/arm/mach-mx25/mm.c
-index bb67711..11cd335 100644
---- a/arch/arm/mach-mx25/mm.c
-+++ b/arch/arm/mach-mx25/mm.c
-@@ -30,25 +30,12 @@
+ 	mx25pdk_fec_reset();
+ 	imx25_add_fec(&mx25_fec_pdata);
+-	mxc_register_device(&mx25_kpp_device, &mx25pdk_keymap_data);
++	imx25_add_imx_keypad(&mx25pdk_keymap_data);
  
- /*
-  * This table defines static virtual address mappings for I/O regions.
-- * These are the mappings common across all MX3 boards.
-+ * These are the mappings common across all MX25 boards.
-  */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual	= MX25_AVIC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MX25_AVIC_BASE_ADDR),
--		.length		= MX25_AVIC_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	}, {
--		.virtual	= MX25_AIPS1_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MX25_AIPS1_BASE_ADDR),
--		.length		= MX25_AIPS1_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	}, {
--		.virtual	= MX25_AIPS2_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MX25_AIPS2_BASE_ADDR),
--		.length		= MX25_AIPS2_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	},
-+static struct map_desc mx25_io_desc[] __initdata = {
-+	imx_map_entry(MX25, AVIC, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX25, AIPS1, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX25, AIPS2, MT_DEVICE_NONSHARED),
- };
- 
- /*
-@@ -62,7 +49,7 @@ void __init mx25_map_io(void)
- 	mxc_iomux_v3_init(MX25_IO_ADDRESS(MX25_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX25_IO_ADDRESS(MX25_WDOG_BASE_ADDR));
- 
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx25_io_desc, ARRAY_SIZE(mx25_io_desc));
+ 	imx25_add_esdhc(0, NULL);
  }
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-keypad.c b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
+index fdfee55..5995e81 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-keypad.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
+@@ -9,20 +9,26 @@
+ #include <mach/hardware.h>
+ #include <mach/devices-common.h>
  
- int imx25_register_gpios(void);
-diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-index 809ee40..193c18c 100644
---- a/arch/arm/mach-mx3/mm.c
-+++ b/arch/arm/mach-mx3/mm.c
-@@ -36,40 +36,16 @@
-  * @ingroup Memory
-  */
+-#define imx_imx_keypad_data_entry_single(soc)				\
++#define imx_imx_keypad_data_entry_single(soc, _size)			\
+ 	{								\
+ 		.iobase = soc ## _KPP_BASE_ADDR,			\
++		.iosize = _size,					\
+ 		.irq = soc ## _INT_KPP,					\
+ 	}
  
--/*!
-- * This table defines static virtual address mappings for I/O regions.
-- * These are the mappings common across all MX3 boards.
-- */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual = MX3x_X_MEMC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_X_MEMC_BASE_ADDR),
--		.length = MX3x_X_MEMC_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX3x_AVIC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_AVIC_BASE_ADDR),
--		.length = MX3x_AVIC_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
--		.virtual = MX3x_AIPS1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_AIPS1_BASE_ADDR),
--		.length = MX3x_AIPS1_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
--		.virtual = MX3x_AIPS2_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_AIPS2_BASE_ADDR),
--		.length = MX3x_AIPS2_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
--		.virtual = MX3x_SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_SPBA0_BASE_ADDR),
--		.length = MX3x_SPBA0_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	},
-+#ifdef CONFIG_ARCH_MX31
-+static struct map_desc mx31_io_desc[] __initdata = {
-+	imx_map_entry(MX31, X_MEMC, MT_DEVICE),
-+	imx_map_entry(MX31, AVIC, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX31, AIPS1, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX31, AIPS2, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX31, SPBA0, MT_DEVICE_NONSHARED),
- };
+ #ifdef CONFIG_SOC_IMX21
+ const struct imx_imx_keypad_data imx21_imx_keypad_data __initconst =
+-	imx_imx_keypad_data_entry_single(MX21);
++	imx_imx_keypad_data_entry_single(MX21, SZ_16);
+ #endif /* ifdef CONFIG_SOC_IMX21 */
  
--/*!
-+/*
-  * This function initializes the memory map. It is called during the
-  * system startup to create static physical to virtual memory mappings
-  * for the IO modules.
-@@ -79,17 +55,26 @@ void __init mx31_map_io(void)
- 	mxc_set_cpu_type(MXC_CPU_MX31);
- 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
- 
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx31_io_desc, ARRAY_SIZE(mx31_io_desc));
- }
++#ifdef CONFIG_ARCH_MX25
++const struct imx_imx_keypad_data imx25_imx_keypad_data __initconst =
++	imx_imx_keypad_data_entry_single(MX25, SZ_16K);
 +#endif
- 
- #ifdef CONFIG_ARCH_MX35
-+static struct map_desc mx35_io_desc[] __initdata = {
-+	imx_map_entry(MX35, X_MEMC, MT_DEVICE),
-+	imx_map_entry(MX35, AVIC, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX35, AIPS1, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX35, AIPS2, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX35, SPBA0, MT_DEVICE_NONSHARED),
-+};
 +
- void __init mx35_map_io(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX35);
- 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX3x_WDOG_BASE_ADDR));
+ #ifdef CONFIG_SOC_IMX27
+ const struct imx_imx_keypad_data imx27_imx_keypad_data __initconst =
+-	imx_imx_keypad_data_entry_single(MX27);
++	imx_imx_keypad_data_entry_single(MX27, SZ_16);
+ #endif /* ifdef CONFIG_SOC_IMX27 */
  
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx35_io_desc, ARRAY_SIZE(mx35_io_desc));
- }
- #endif
- 
-diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index bc3f30d..01dff26 100644
---- a/arch/arm/mach-mx5/mm.c
-+++ b/arch/arm/mach-mx5/mm.c
-@@ -23,33 +23,12 @@
- /*
-  * Define the MX51 memory map.
-  */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual = MX51_IRAM_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_IRAM_BASE_ADDR),
--		.length = MX51_IRAM_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_DEBUG_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_DEBUG_BASE_ADDR),
--		.length = MX51_DEBUG_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_AIPS1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_AIPS1_BASE_ADDR),
--		.length = MX51_AIPS1_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_SPBA0_BASE_ADDR),
--		.length = MX51_SPBA0_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_AIPS2_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_AIPS2_BASE_ADDR),
--		.length = MX51_AIPS2_SIZE,
--		.type = MT_DEVICE
--	},
-+static struct map_desc mx51_io_desc[] __initdata = {
-+	imx_map_entry(MX51, IRAM, MT_DEVICE),
-+	imx_map_entry(MX51, DEBUG, MT_DEVICE),
-+	imx_map_entry(MX51, AIPS1, MT_DEVICE),
-+	imx_map_entry(MX51, SPBA0, MT_DEVICE),
-+	imx_map_entry(MX51, AIPS2, MT_DEVICE),
+ struct platform_device *__init imx_add_imx_keypad(
+@@ -32,7 +38,7 @@ struct platform_device *__init imx_add_imx_keypad(
+ 	struct resource res[] = {
+ 		{
+ 			.start = data->iobase,
+-			.end = data->iobase + SZ_16 - 1,
++			.end = data->iobase + data->iosize - 1,
+ 			.flags = IORESOURCE_MEM,
+ 		}, {
+ 			.start = data->irq,
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 07223b2..8482613 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -95,6 +95,7 @@ struct platform_device *__init imx_add_imx_i2c(
+ #include <linux/input/matrix_keypad.h>
+ struct imx_imx_keypad_data {
+ 	resource_size_t iobase;
++	resource_size_t iosize;
+ 	resource_size_t irq;
  };
- 
- /*
-@@ -62,7 +41,7 @@ void __init mx51_map_io(void)
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG_BASE_ADDR));
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx51_io_desc, ARRAY_SIZE(mx51_io_desc));
- }
- 
- int imx51_register_gpios(void);
-diff --git a/arch/arm/mach-mxc91231/mm.c b/arch/arm/mach-mxc91231/mm.c
-index aeccfd7..7652c30 100644
---- a/arch/arm/mach-mxc91231/mm.c
-+++ b/arch/arm/mach-mxc91231/mm.c
-@@ -27,48 +27,15 @@
- /*
-  * This structure defines the MXC memory map.
-  */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual	= MXC91231_L2CC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_L2CC_BASE_ADDR),
--		.length		= MXC91231_L2CC_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_X_MEMC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_X_MEMC_BASE_ADDR),
--		.length		= MXC91231_X_MEMC_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_ROMP_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_ROMP_BASE_ADDR),
--		.length		= MXC91231_ROMP_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_AVIC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_AVIC_BASE_ADDR),
--		.length		= MXC91231_AVIC_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_AIPS1_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_AIPS1_BASE_ADDR),
--		.length		= MXC91231_AIPS1_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_SPBA0_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_SPBA0_BASE_ADDR),
--		.length		= MXC91231_SPBA0_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_SPBA1_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_SPBA1_BASE_ADDR),
--		.length		= MXC91231_SPBA1_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_AIPS2_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_AIPS2_BASE_ADDR),
--		.length		= MXC91231_AIPS2_SIZE,
--		.type		= MT_DEVICE,
--	},
-+static struct map_desc mxc91231_io_desc[] __initdata = {
-+	imx_map_entry(MXC91231, L2CC, MT_DEVICE),
-+	imx_map_entry(MXC91231, X_MEMC, MT_DEVICE),
-+	imx_map_entry(MXC91231, ROMP, MT_DEVICE),
-+	imx_map_entry(MXC91231, AVIC, MT_DEVICE),
-+	imx_map_entry(MXC91231, AIPS1, MT_DEVICE),
-+	imx_map_entry(MXC91231, SPBA0, MT_DEVICE),
-+	imx_map_entry(MXC91231, SPBA1, MT_DEVICE),
-+	imx_map_entry(MXC91231, AIPS2, MT_DEVICE),
- };
- 
- /*
-@@ -80,7 +47,7 @@ void __init mxc91231_map_io(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MXC91231);
- 
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mxc91231_io_desc, ARRAY_SIZE(mxc91231_io_desc));
- }
- 
- int mxc91231_register_gpios(void);
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index 4bbe506..409cec6 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -66,4 +66,11 @@
- 
- #include <mach/mxc.h>
- 
-+#define imx_map_entry(soc, name, _type)	{				\
-+	.virtual = soc ## _IO_P2V(soc ## _ ## name ## _BASE_ADDR),	\
-+	.pfn = __phys_to_pfn(soc ## _ ## name ## _BASE_ADDR),		\
-+	.length = soc ## _ ## name ## _SIZE,				\
-+	.type = _type,							\
-+}
-+
- #endif /* __ASM_ARCH_MXC_HARDWARE_H__ */
+ struct platform_device *__init imx_add_imx_keypad(
 -- 
 1.7.2.3
