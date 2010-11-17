@@ -1,65 +1,42 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 18 Nov 2010 01:05:10 +0530
-Subject: [PATCH] nomadik: prevent sched_clock() wraparound v3
-In-Reply-To: <1290001517-17010-1-git-send-email-linus.walleij@stericsson.com>
-References: <1290001517-17010-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTikk3aiUBbjf6YeXNQqymVmsYfgU4dVmQ2RsSOXx@mail.gmail.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Wed, 17 Nov 2010 22:20:15 +0200
+Subject: [PATCH] mini6410: add audio codec support
+Message-ID: <20101117202015.3497.9898.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 7:15 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> +unsigned long long sched_clock(void)
-> +{
-> + ? ? ? u64 cycles;
-> +
-> + ? ? ? if (unlikely(!mtu_base))
-> + ? ? ? ? ? ? ? return 0;
-> +
-> + ? ? ? cycles = cnt32_to_63(-readl(mtu_base + MTU_VAL(0)));
-> + ? ? ? cycles &= 0x7FFFFFFFFFFFFFFFLLU;
-> + ? ? ? return (cycles * sched_mult) >> sched_shift;
-> +}
-> +
-> +/* Just kick sched_clock every so often */
-> +static void cnt32_to_63_keepwarm(unsigned long data)
-> +{
-> + ? ? ? mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
-> + ? ? ? (void) sched_clock();
-> +}
-> +
-> +/*
-> + * Set up a timer to keep sched_clock():s 32_to_63 algorithm warm
-> + * once in half a 32bit timer wrap interval.
-> ?*/
-> -unsigned long long notrace sched_clock(void)
-> +static void __init nmdk_sched_clock_init(unsigned long rate)
-> ?{
-> - ? ? ? return clocksource_cyc2ns(nmdk_clksrc.read(
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &nmdk_clksrc),
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? nmdk_clksrc.mult,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? nmdk_clksrc.shift);
-> + ? ? ? u32 v;
-> + ? ? ? unsigned long delta;
-> + ? ? ? u64 days;
-> +
-> + ? ? ? /* Find the apropriate mult and shift factors */
-> + ? ? ? clocks_calc_mult_shift(&sched_mult, &sched_shift,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?rate, NSEC_PER_SEC, SCHED_CLOCK_MIN_WRAP);
-> + ? ? ? /* We need to multiply by atleast 2 to get rid of bit 63 */
-> + ? ? ? BUG_ON(sched_mult < 2);
+Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+---
 
-No, you want to multiply by an even number, not "atleast 2".  Please
-also drop the "cycles &= 0x7FFFFFFFFFFFFFFFLLU" in sched_clock().
+ arch/arm/mach-s3c64xx/mach-mini6410.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-> +
-> + ? ? ? /* Let's see what we get, take max counter and scale it */
-> + ? ? ? days = 0xFFFFFFFFFFFFFFFFLLU >> sched_shift;
-> + ? ? ? do_div(days, rate);
-> + ? ? ? do_div(days, (3600*24));
-> +
-> + ? ? ? pr_debug("sched_clock: using %d bits @ %lu Hz wrap in %lu days\n",
-> + ? ? ? ? ? ? ? (64 - sched_shift), rate, (unsigned long) days);
-
-This days calculation is wrong because you need to divide by
-NSECS_PER_SEC, not rate.
+diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+index 249c629..dd37f6a 100644
+--- a/arch/arm/mach-s3c64xx/mach-mini6410.c
++++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+@@ -42,6 +42,7 @@
+ #include <plat/nand.h>
+ #include <plat/regs-serial.h>
+ #include <plat/ts.h>
++#include <plat/audio.h>
+ 
+ #include <video/platform_lcd.h>
+ 
+@@ -221,6 +222,8 @@ static struct platform_device *mini6410_devices[] __initdata = {
+ 	&mini6410_lcd_powerdev,
+ 	&s3c_device_adc,
+ 	&s3c_device_ts,
++	&s3c_device_pcm,
++	&s3c64xx_device_ac97,
+ };
+ 
+ static void __init mini6410_map_io(void)
+@@ -320,6 +323,7 @@ static void __init mini6410_machine_init(void)
+ 	s3c_nand_set_platdata(&mini6410_nand_info);
+ 	s3c_fb_set_platdata(&mini6410_lcd_pdata);
+ 	s3c24xx_ts_set_platdata(&s3c_ts_platform);
++	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
+ 
+ 	/* configure nCS1 width to 16 bits */
+ 
