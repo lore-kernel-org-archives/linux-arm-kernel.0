@@ -1,49 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Nov 2010 15:28:33 +0000
-Subject: [PATCH v3 15/20] ARM: LPAE: use phys_addr_t instead of unsigned
-	long for physical addresses
-In-Reply-To: <201011171218.13910.arnd@arndb.de>
-References: <1289842829-3027-1-git-send-email-catalin.marinas@arm.com>
-	<20101116193335.GD21926@n2100.arm.linux.org.uk>
-	<AANLkTinDGk2HPg7py9nzsqmM3_AbSG_GJJYwsiMr+wQL@mail.gmail.com>
-	<201011171218.13910.arnd@arndb.de>
-Message-ID: <AANLkTik39iqXsLJiJ7cWwweO2VBoJ0Y4ymwKqx7X5ziA@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 17 Nov 2010 10:29:22 -0500 (EST)
+Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
+References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-8-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <alpine.LFD.2.00.1011171026550.6448@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 November 2010 11:18, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 17 November 2010, Catalin Marinas wrote:
->> >
->> > It may make sense to mark it const volatile, as that's the most
->> > permissive set of attributes possible (iow, it'll accept any pointer
->> > without warning.) ?However, might be an idea to check what other
->> > arches do.
->>
->> The majority of architectures use volatile and a few add both const
->> and volatile.
->>
->> I usually use the generic headers as reference for function prototypes
->> and that's just using volatile without a const (cc'ing Arnd for any
->> view on this).
->
-> const volatile sounds right here, I can also change the generic header
-> if we agree to do the same in arm.
+On Wed, 17 Nov 2010, Haojian Zhuang wrote:
 
-That's what I plan to add, though it may be better to push as a
-separate patch to fix compiler warnings now. I don't know when the
-LPAE patches would go in.
+> iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
+> of accessing CP0 and CP1 is changed in PJ4. Append more files to support
+> iwmmxt in PJ4 core.
+> 
+> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
 
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -189,7 +189,7 @@
-  * translation for translating DMA addresses.  Use the driver
-  * DMA support - see dma-mapping.h.
-  */
--static inline phys_addr_t virt_to_phys(void *x)
-+static inline phys_addr_t virt_to_phys(const volatile void *x)
- {
- 	return __virt_to_phys((unsigned long)(x));
- }
 
--- 
-Catalin
+Did you forget to do "git add pj4-cp0.c"?  It is missing from your 
+patch.
+
+
+Nicolas
