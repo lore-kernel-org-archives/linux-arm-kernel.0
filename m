@@ -1,22 +1,51 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 17 Nov 2010 08:55:47 +0200
-Subject: [PATCH 2/2] h1940-leds: Fix compile issue introduced by
-	latch-related changes
-In-Reply-To: <4CE30FFA.7000204@fluff.org>
-References: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
-	<1289248308-21272-2-git-send-email-anarsoul@gmail.com>
-	<4CE30FFA.7000204@fluff.org>
-Message-ID: <201011170855.47991.anarsoul@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 17 Nov 2010 15:55:31 +0900
+Subject: [PATCH] ARM: S5PV310: Set bit 22 in the PL310 (cache controller)
+	AuxCtlr register
+Message-ID: <1289976931-9759-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 November 2010 01:12:58 Ben Dooks wrote:
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-> it's a pitty we can't remove the driver totally and use the
-> gpio leds.
+This patch is applied according to the commit 1a8e41cd672f894bbd74874eac601e6cedf838fb
+(ARM: 6395/1: VExpress: Set bit 22 in the PL310 (cache controller) AuxCtlr register).
 
-Why? It's possible to use leds-gpio driver. Additional gpios (blink, etc) can 
-be handled via platform_gpio_blink_set callback.
+Actually, S5PV310 has same cache controller(PL310).
 
-Regards
-Vasily
+Following is from Catalin Marinas' commit.
+
+Clearing bit 22 in the PL310 Auxiliary Control register (shared
+attribute override enable) has the side effect of transforming Normal
+Shared Non-cacheable reads into Cacheable no-allocate reads.
+
+Coherent DMA buffers in Linux always have a Cacheable alias via the
+kernel linear mapping and the processor can speculatively load cache
+lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+reads would unexpectedly hit such cache lines leading to buffer
+corruption.
+
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Cc: <stable@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv310/cpu.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
+index 82ce4aa..b2a37d0 100644
+--- a/arch/arm/mach-s5pv310/cpu.c
++++ b/arch/arm/mach-s5pv310/cpu.c
+@@ -168,7 +168,7 @@ static int __init s5pv310_l2x0_cache_init(void)
+ 	__raw_writel(L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN,
+ 		     S5P_VA_L2CC + L2X0_POWER_CTRL);
+ 
+-	l2x0_init(S5P_VA_L2CC, 0x7C070001, 0xC200ffff);
++	l2x0_init(S5P_VA_L2CC, 0x7C470001, 0xC200ffff);
+ 
+ 	return 0;
+ }
+-- 
+1.6.2.5
