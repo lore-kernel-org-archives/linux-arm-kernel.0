@@ -1,54 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Nov 2010 17:34:42 +0000
-Subject: [PATCH v2 05/20] ARM: LPAE: Introduce L_PTE_NOEXEC and
-	L_PTE_NOWRITE
-In-Reply-To: <20101117173248.GG5308@n2100.arm.linux.org.uk>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-6-git-send-email-catalin.marinas@arm.com>
-	<20101115183014.GD31421@n2100.arm.linux.org.uk>
-	<AANLkTik5FcZ3rNtiwN8kYP0LZh+YqGtKP_RteoFiWa16@mail.gmail.com>
-	<20101117171613.GB5308@n2100.arm.linux.org.uk>
-	<AANLkTincmfqXmNQznd1fdSRYd4Vc+p47cgTfEwQoXdFm@mail.gmail.com>
-	<20101117172425.GE5308@n2100.arm.linux.org.uk>
-	<1290015033.2351.69.camel@e102109-lin.cambridge.arm.com>
-	<20101117173248.GG5308@n2100.arm.linux.org.uk>
-Message-ID: <1290015282.2351.70.camel@e102109-lin.cambridge.arm.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Wed, 17 Nov 2010 12:35:37 -0500
+Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
+In-Reply-To: <20101117161130.GC5757@angua.secretlab.ca>
+References: <1289848334-8695-1-git-send-email-cyril@ti.com>
+	<1289848334-8695-5-git-send-email-cyril@ti.com>
+	<20101116072225.GF4074@angua.secretlab.ca>
+	<AANLkTi=utWumLKo9QVWXpkC8WxpgaNJJs+dj=pa2eq-q@mail.gmail.com>
+	<4CE31F0E.7050103@ti.com>
+	<20101117161130.GC5757@angua.secretlab.ca>
+Message-ID: <4CE41269.2040303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-11-17 at 17:32 +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 17, 2010 at 05:30:33PM +0000, Catalin Marinas wrote:
-> > On Wed, 2010-11-17 at 17:24 +0000, Russell King - ARM Linux wrote:
-> > > On Wed, Nov 17, 2010 at 05:22:12PM +0000, Catalin Marinas wrote:
-> > > > Ah, good point, that was the mask.
-> > > >
-> > > > So for dmacoherent we make sure that L_PTE_EXEC is cleared. I suspect
-> > > > we should now make sure that L_PTE_NOEXEC is set. For the other two,
-> > > > just leave them as they are.
-> > >
-> > > Already done:
-> > >
-> > >  #define pgprot_dmacoherent(prot) \
-> > > -       __pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_BUFFERABLE)
-> > > +       __pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_BUFFERABLE|L_PTE_XN)
-> > > ...
-> > >  #define pgprot_dmacoherent(prot) \
-> > > -       __pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_UNCACHED)
-> > > +       __pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_UNCACHED|L_PTE_XN)
-> >
-> > Are you already doing such changes? Just to avoid duplicating effort
-> > (and use common naming scheme).
-> 
-> I did say that I had patches for all the issues I raised so far...  They're
-> just in the process of being posted (if lists.infradead.org this time can
-> cope with one patch every 20 secs...)
+On 11/17/2010 11:11 AM, Grant Likely wrote:
+[...]
+> To start, I'm not a fan of matching by name.  It's fragile because it
+> makes assumptions about how devices will be names when they actually
+> appear (ie. Sometimes .id is dynamically assigned).  Ideally I'd
+> prefer to have direct references (ie. pointers) to the devices that
+> need to be registered, which *shouldn't* be difficult to handle.  That
+> guarantees that the correct device is always referenced.  (aside: the
+> device-tree use case provides this information by having direct
+> 'phandle' references between dependencies.)
 
-I wasn't sure which patches, so I did the XN/RDONLY as well (not big
-patch though).
+The pointer approach is possibly problematic with devices that get
+registered by other drivers/masters (mfd, spi, i2c, etc.).  With these
+devices the board doesn't really have a reference to the device in question.
 
-I'll rebase my LPAE stuff in the next days and repost.
+Something along the following lines may be better:
 
-Thanks.
+int device_requires(struct device *dev, const char *res);
+int device_provides(struct device *provider, const char *res);
 
--- 
-Catalin
+where res is a string of the form "gpio:25", "regulator:vlcd", or even
+"dev:<dev_name>".
+
+device_requires() would typically be used by board implementations, and
+device_provides() would be called by gpiolib, regulator core, device
+core, etc.
+
+I guess this is somewhat along the lines of an earlier discussion on the
+PPC list ([1] below), except that the drivers don't get probed until
+specified prereqs are available.
+
+Regards
+Cyril.
+
+[1] http://www.spinics.net/lists/linux-embedded/msg02764.html
