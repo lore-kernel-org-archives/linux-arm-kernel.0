@@ -1,46 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Nov 2010 10:55:58 +0100
-Subject: [PATCH 01/10] MCDE: Add hardware abstraction layer
-In-Reply-To: <1289936772.28741.188.camel@Joe-Laptop>
-References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
-	<F45880696056844FA6A73F415B568C6953604E7D94@EXDCVYMBSTM006.EQ1STM.local>
-	<1289936772.28741.188.camel@Joe-Laptop>
-Message-ID: <201011171055.58201.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Nov 2010 10:16:40 +0000
+Subject: [PATCH 4/7] ARM: Thumb-2: Correct data alignment for
+	CONFIG_THUMB2_KERNEL in kernel/head.S
+In-Reply-To: <20101116182257.GB21926@n2100.arm.linux.org.uk>
+References: <1289913277-8822-1-git-send-email-dave.martin@linaro.org>
+	<1289913277-8822-4-git-send-email-dave.martin@linaro.org>
+	<20101116182257.GB21926@n2100.arm.linux.org.uk>
+Message-ID: <1289989000.2351.13.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 November 2010, Joe Perches wrote:
-> static inline u32 MCDE_channel_path(u32 chnl, u32 fifo, u32 type, u32 ifc, u32 link)
-> {
->         return ((chnl << 16) |
->                 (fifo << 12) |
->                 (type << 8) |
->                 (ifc << 4) |
->                 (link << 0));
-> }
+On Tue, 2010-11-16 at 18:22 +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 16, 2010 at 01:14:34PM +0000, Dave Martin wrote:
+> > Directives such as .long and .word do not magically cause the
+> > assembler location counter to become aligned in gas.  As a
+> > result, using these directives in code sections can result in
+> > misaligned data words when building a Thumb-2 kernel
+> > (CONFIG_THUMB2_KERNEL).
 > 
-> #define SET_ENUM_MCDE_CHNLPATH(chnl, fifo, var, type, ifc, link)        \
->         MCDE_CHNLPATH_CHNL##chnl##_FIFO##fifo##_##var =                 \
->                 MCDE_channel_path(MCDE_CHNL_##chnl,                     \
->                                   MCDE_FIFO_##fifo,                     \
->                                   MCDE_PORTTYPE_##type,                 \
->                                   ifc,                                  \
->                                   link)
+> > @@ -413,6 +416,7 @@ __fixup_smp_on_up:
+> >       mov     pc, lr
+> >  ENDPROC(__fixup_smp)
+> > 
+> > +     .align
+> >  1:   .word   .
+> >       .word   __smpalt_begin
+> >       .word   __smpalt_end
 > 
-> enum mcde_chnl_path {
->         /* Channel A */
->         SET_ENUM_MCDE_CHNLPATH(A, A, DPI_0,             DPI, 0, 0),
->         SET_ENUM_MCDE_CHNLPATH(A, A, DSI_IFC0_0,        DSI, 0, 0),
->         SET_ENUM_MCDE_CHNLPATH(A, A, DSI_IFC0_1,        DSI, 0, 1),
+> This one is technically bogus because this feature is disabled (and
+> incompatible) with Thumb-2 kernels.  So it never gets built for a T2
+> kernel.
 
-While more readable, this has two significant problems:
+Well, I think it doesn't cause any harm to have it in. It's on our to-do
+list to allow T2 support for SMP-on-UP.
 
-* You cannot use the result of an inline function in an enum definition
-* It hides the name of the identifier, making it impossible to use grep
-  or ctags to find the definition when you only know the name
-
-The easiest way is probably to get rid of the macros entirely here
-and just define the values as hex, with a comment exmplaining what the
-digits mean.
-
-	Arnd
+-- 
+Catalin
