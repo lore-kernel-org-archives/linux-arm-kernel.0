@@ -1,166 +1,171 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed, 17 Nov 2010 19:03:36 +0800
-Subject: [PATCH 2/9] ARM: pxa: redefine irqs.h
-In-Reply-To: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
+Date: Wed, 17 Nov 2010 19:03:38 +0800
+Subject: [PATCH 4/9] ARM: pxa: support saarb platform
+In-Reply-To: <1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
 References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define all IRQs in irqs.h. If some IRQs are sharing one IRQ number, define
-them together. If some IRQs are sharing same name with different IRQ number,
-define different IRQ.
+Saarb platform is a handheld platform that supports Marvell PXA955 silicon.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-pxa/include/mach/irqs.h |   47 ++++++++++-----------------------
- arch/arm/mach-pxa/irq.c               |   11 +++++--
- 2 files changed, 22 insertions(+), 36 deletions(-)
+ arch/arm/mach-pxa/Kconfig  |    5 ++
+ arch/arm/mach-pxa/Makefile |    1 +
+ arch/arm/mach-pxa/saarb.c  |  114 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 120 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/saarb.c
 
-diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-index d372caa..cb7ee26 100644
---- a/arch/arm/mach-pxa/include/mach/irqs.h
-+++ b/arch/arm/mach-pxa/include/mach/irqs.h
-@@ -21,16 +21,14 @@
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index d407659..34ec1fb 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -50,6 +50,11 @@ config MACH_SAAR
+ 	select PXA3xx
+ 	select CPU_PXA930
  
- #define PXA_IRQ(x)	(PXA_ISA_IRQ_NUM + (x))
++config MACH_SAARB
++	bool "PXA955 Handheld Platform (aka SAARB)"
++	depends on !(CPU_XSCALE || CPU_XSC3)
++	select CPU_PXA955
++
+ comment "Third Party Dev Platforms (sorted by vendor name)"
  
--#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
- #define IRQ_SSP3	PXA_IRQ(0)	/* SSP3 service request */
- #define IRQ_MSL		PXA_IRQ(1)	/* MSL Interface interrupt */
--#define IRQ_USBH2	PXA_IRQ(2)	/* USB Host interrupt 1 (OHCI) */
--#define IRQ_USBH1	PXA_IRQ(3)	/* USB Host interrupt 2 (non-OHCI) */
-+#define IRQ_USBH2	PXA_IRQ(2)	/* USB Host interrupt 1 (OHCI,PXA27x) */
-+#define IRQ_USBH1	PXA_IRQ(3)	/* USB Host interrupt 2 (non-OHCI,PXA27x) */
- #define IRQ_KEYPAD	PXA_IRQ(4)	/* Key pad controller */
--#define IRQ_MEMSTK	PXA_IRQ(5)	/* Memory Stick interrupt */
-+#define IRQ_MEMSTK	PXA_IRQ(5)	/* Memory Stick interrupt (PXA27x) */
-+#define IRQ_ACIPC0	PXA_IRQ(5)	/* AP-CP Communication (PXA930) */
- #define IRQ_PWRI2C	PXA_IRQ(6)	/* Power I2C interrupt */
--#endif
--
- #define IRQ_HWUART	PXA_IRQ(7)	/* HWUART Transmit/Receive/Error (PXA26x) */
- #define IRQ_OST_4_11	PXA_IRQ(7)	/* OS timer 4-11 matches (PXA27x) */
- #define	IRQ_GPIO0	PXA_IRQ(8)	/* GPIO0 Edge Detect */
-@@ -38,7 +36,8 @@
- #define	IRQ_GPIO_2_x	PXA_IRQ(10)	/* GPIO[2-x] Edge Detect */
- #define	IRQ_USB		PXA_IRQ(11)	/* USB Service */
- #define	IRQ_PMU		PXA_IRQ(12)	/* Performance Monitoring Unit */
--#define	IRQ_I2S		PXA_IRQ(13)	/* I2S Interrupt */
-+#define	IRQ_I2S		PXA_IRQ(13)	/* I2S Interrupt (PXA27x) */
-+#define IRQ_SSP4	PXA_IRQ(13)	/* SSP4 service request (PXA3xx) */
- #define	IRQ_AC97	PXA_IRQ(14)	/* AC97 Interrupt */
- #define IRQ_ASSP	PXA_IRQ(15)	/* Audio SSP Service Request (PXA25x) */
- #define IRQ_USIM	PXA_IRQ(15)     /* Smart Card interface interrupt (PXA27x) */
-@@ -47,6 +46,7 @@
- #define	IRQ_LCD		PXA_IRQ(17)	/* LCD Controller Service Request */
- #define	IRQ_I2C		PXA_IRQ(18)	/* I2C Service Request */
- #define	IRQ_ICP		PXA_IRQ(19)	/* ICP Transmit/Receive/Error */
-+#define IRQ_ACIPC2	PXA_IRQ(19)	/* AP-CP Communication (PXA930) */
- #define	IRQ_STUART	PXA_IRQ(20)	/* STUART Transmit/Receive/Error */
- #define	IRQ_BTUART	PXA_IRQ(21)	/* BTUART Transmit/Receive/Error */
- #define	IRQ_FFUART	PXA_IRQ(22)	/* FFUART Transmit/Receive/Error*/
-@@ -60,19 +60,17 @@
- #define	IRQ_RTC1Hz	PXA_IRQ(30)	/* RTC HZ Clock Tick */
- #define	IRQ_RTCAlrm	PXA_IRQ(31)	/* RTC Alarm */
+ config ARCH_PXA_IDP
+diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
+index b8cd0e7..e6b6643 100644
+--- a/arch/arm/mach-pxa/Makefile
++++ b/arch/arm/mach-pxa/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_MACH_LITTLETON)	+= littleton.o
+ obj-$(CONFIG_MACH_TAVOREVB)	+= tavorevb.o
+ obj-$(CONFIG_MACH_TAVOREVB3)	+= tavorevb3.o
+ obj-$(CONFIG_MACH_SAAR)		+= saar.o
++obj-$(CONFIG_MACH_SAARB)	+= saarb.o
  
--#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
- #define IRQ_TPM		PXA_IRQ(32)	/* TPM interrupt */
- #define IRQ_CAMERA	PXA_IRQ(33)	/* Camera Interface */
--#endif
--
--#ifdef CONFIG_PXA3xx
--#define IRQ_SSP4	PXA_IRQ(13)	/* SSP4 service request */
- #define IRQ_CIR		PXA_IRQ(34)	/* Consumer IR */
- #define IRQ_COMM_WDT	PXA_IRQ(35) 	/* Comm WDT interrupt */
- #define IRQ_TSI		PXA_IRQ(36)	/* Touch Screen Interface (PXA320) */
-+#define IRQ_ENHROT	PXA_IRQ(37)	/* Enhanced Rotary (PXA930) */
- #define IRQ_USIM2	PXA_IRQ(38)	/* USIM2 Controller */
--#define IRQ_GCU		PXA_IRQ(39)	/* Graphics Controller */
-+#define IRQ_GCU		PXA_IRQ(39)	/* Graphics Controller (PXA3xx) */
-+#define IRQ_ACIPC1	PXA_IRQ(40)	/* AP-CP Communication (PXA930) */
- #define IRQ_MMC2	PXA_IRQ(41)	/* MMC2 Controller */
-+#define IRQ_TRKBALL	PXA_IRQ(43)	/* Track Ball (PXA930) */
- #define IRQ_1WIRE	PXA_IRQ(44)	/* 1-Wire Controller */
- #define IRQ_NAND	PXA_IRQ(45)	/* NAND Controller */
- #define IRQ_USB2	PXA_IRQ(46)	/* USB 2.0 Device Controller */
-@@ -80,30 +78,13 @@
- #define IRQ_WAKEUP1	PXA_IRQ(50)	/* EXT_WAKEUP1 */
- #define IRQ_DMEMC	PXA_IRQ(51)	/* Dynamic Memory Controller */
- #define IRQ_MMC3	PXA_IRQ(55)	/* MMC3 Controller (PXA310) */
--#endif
- 
--#ifdef CONFIG_CPU_PXA935
- #define IRQ_U2O		PXA_IRQ(64)	/* USB OTG 2.0 Controller (PXA935) */
- #define IRQ_U2H		PXA_IRQ(65)	/* USB Host 2.0 Controller (PXA935) */
--
--#define IRQ_MMC3_PXA935	PXA_IRQ(72)	/* MMC3 Controller (PXA935) */
--#define IRQ_MMC4_PXA935	PXA_IRQ(73)	/* MMC4 Controller (PXA935) */
--#define IRQ_MMC5_PXA935	PXA_IRQ(74)	/* MMC5 Controller (PXA935) */
--
-+#define IRQ_PXA935_MMC0	PXA_IRQ(72)	/* MMC0 Controller (PXA935) */
-+#define IRQ_PXA935_MMC1	PXA_IRQ(73)	/* MMC1 Controller (PXA935) */
-+#define IRQ_PXA935_MMC2	PXA_IRQ(74)	/* MMC2 Controller (PXA935) */
- #define IRQ_U2P		PXA_IRQ(93)	/* USB PHY D+/D- Lines (PXA935) */
--#endif
--
--#ifdef CONFIG_CPU_PXA930
--#define IRQ_ENHROT	PXA_IRQ(37)	/* Enhanced Rotary (PXA930) */
--#define IRQ_ACIPC0	PXA_IRQ(5)
--#define IRQ_ACIPC1	PXA_IRQ(40)
--#define IRQ_ACIPC2	PXA_IRQ(19)
--#define IRQ_TRKBALL	PXA_IRQ(43)	/* Track Ball */
--#endif
--
--#ifdef CONFIG_CPU_PXA950
--#define IRQ_GC500	PXA_IRQ(70)	/* Graphics Controller (PXA950) */
--#endif
- 
- #define PXA_GPIO_IRQ_BASE	PXA_IRQ(96)
- #define PXA_GPIO_IRQ_NUM	(192)
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 1beb40f..b5cafe2 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -37,6 +37,11 @@
- 
- static int pxa_internal_irq_nr;
- 
-+static inline int cpu_has_ipr(void)
+ # 3rd Party Dev Platforms
+ obj-$(CONFIG_ARCH_PXA_IDP)	+= idp.o
+diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
+new file mode 100644
+index 0000000..e497922
+--- /dev/null
++++ b/arch/arm/mach-pxa/saarb.c
+@@ -0,0 +1,114 @@
++/*
++ *  linux/arch/arm/mach-pxa/saarb.c
++ *
++ *  Support for the Marvell Handheld Platform (aka SAARB)
++ *
++ *  Copyright (C) 2007-2010 Marvell International Ltd.
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  publishhed by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/i2c.h>
++#include <linux/mfd/88pm860x.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++#include <mach/irqs.h>
++#include <mach/hardware.h>
++#include <mach/mfp.h>
++#include <mach/mfp-pxa930.h>
++#include <mach/gpio.h>
++
++#include <plat/i2c.h>
++
++#include "generic.h"
++
++#define SAARB_NR_IRQS	(IRQ_BOARD_START + 40)
++
++static struct pm860x_touch_pdata saarb_touch = {
++	.gpadc_prebias	= 1,
++	.slot_cycle	= 1,
++	.tsi_prebias	= 6,
++	.pen_prebias	= 16,
++	.pen_prechg	= 2,
++	.res_x		= 300,
++};
++
++static struct pm860x_backlight_pdata saarb_backlight[] = {
++	{
++		.id	= PM8606_ID_BACKLIGHT,
++		.iset	= PM8606_WLED_CURRENT(24),
++		.flags	= PM8606_BACKLIGHT1,
++	},
++	{},
++};
++
++static struct pm860x_led_pdata saarb_led[] = {
++	{
++		.id	= PM8606_ID_LED,
++		.iset	= PM8606_LED_CURRENT(12),
++		.flags	= PM8606_LED1_RED,
++	}, {
++		.id	= PM8606_ID_LED,
++		.iset	= PM8606_LED_CURRENT(12),
++		.flags	= PM8606_LED1_GREEN,
++	}, {
++		.id	= PM8606_ID_LED,
++		.iset	= PM8606_LED_CURRENT(12),
++		.flags	= PM8606_LED1_BLUE,
++	}, {
++		.id	= PM8606_ID_LED,
++		.iset	= PM8606_LED_CURRENT(12),
++		.flags	= PM8606_LED2_RED,
++	}, {
++		.id	= PM8606_ID_LED,
++		.iset	= PM8606_LED_CURRENT(12),
++		.flags	= PM8606_LED2_GREEN,
++	}, {
++		.id	= PM8606_ID_LED,
++		.iset	= PM8606_LED_CURRENT(12),
++		.flags	= PM8606_LED2_BLUE,
++	},
++};
++
++static struct pm860x_platform_data saarb_pm8607_info = {
++	.touch		= &saarb_touch,
++	.backlight	= &saarb_backlight[0],
++	.led		= &saarb_led[0],
++	.companion_addr	= 0x10,
++	.irq_mode	= 0,
++	.irq_base	= IRQ_BOARD_START,
++
++	.i2c_port	= GI2C_PORT,
++};
++
++static struct i2c_board_info saarb_i2c_info[] = {
++	{
++		.type		= "88PM860x",
++		.addr		= 0x34,
++		.platform_data	= &saarb_pm8607_info,
++		.irq		= gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO83)),
++	},
++};
++
++static void __init saarb_init(void)
 +{
-+	return !cpu_is_pxa25x();
++	pxa_set_ffuart_info(NULL);
++	pxa_set_i2c_info(NULL);
++	i2c_register_board_info(0, ARRAY_AND_SIZE(saarb_i2c_info));
 +}
 +
- static void pxa_mask_irq(unsigned int irq)
- {
- 	_ICMR(irq) &= ~(1 << IRQ_BIT(irq));
-@@ -134,7 +139,7 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
- 	}
- 
- 	/* initialize interrupt priority */
--	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+	if (cpu_has_ipr()) {
- 		for (i = 0; i < irq_nr; i++)
- 			IPR(i) = i | (1 << 31);
- 	}
-@@ -165,7 +170,7 @@ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
- 		_ICMR(irq) = 0;
- 	}
- 
--	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+	if (cpu_has_ipr()) {
- 		for (i = 0; i < pxa_internal_irq_nr; i++)
- 			saved_ipr[i] = IPR(i);
- 	}
-@@ -177,7 +182,7 @@ static int pxa_irq_resume(struct sys_device *dev)
- {
- 	int i, irq = PXA_IRQ(0);
- 
--	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+	if (cpu_has_ipr()) {
- 		for (i = 0; i < pxa_internal_irq_nr; i++)
- 			IPR(i) = saved_ipr[i];
- 	}
++MACHINE_START(SAARB, "PXA955 Handheld Platform (aka SAARB)")
++	.boot_params    = 0xa0000100,
++	.map_io         = pxa_map_io,
++	.nr_irqs	= SAARB_NR_IRQS,
++	.init_irq       = pxa95x_init_irq,
++	.timer          = &pxa_timer,
++	.init_machine   = saarb_init,
++MACHINE_END
++
 -- 
 1.5.6.5
