@@ -1,23 +1,36 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 18 Nov 2010 09:10:48 +0100
-Subject: Calling conventions for IAR
-In-Reply-To: <AANLkTikxL8qhzh=9DMkyJCVtAuWoq9Z__xj3up+KQhXA@mail.gmail.com>
-References: <AANLkTikxL8qhzh=9DMkyJCVtAuWoq9Z__xj3up+KQhXA@mail.gmail.com>
-Message-ID: <20101118081048.GH8942@pengutronix.de>
+Date: Thu, 18 Nov 2010 09:15:28 +0100
+Subject: [PATCH] ARM: add support for uncompressed uImage kernel
+In-Reply-To: <201011180838.26679.alexander.stein@systec-electronic.com>
+References: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
+	<20101109140455.GA6680@n2100.arm.linux.org.uk>
+	<AANLkTi=6OE=50EExgkay2ycuSPFsOp4E-RmxkNktK_Xk@mail.gmail.com>
+	<201011180838.26679.alexander.stein@systec-electronic.com>
+Message-ID: <20101118081528.GI8942@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 04:29:36PM -0500, jonsmirl at gmail.com wrote:
-> Currently we are using the ARM gcc AAPCS calling conventions. I need
-> to call into an older ROM written with an IAR compiler. Can I decorate
-> the function declarations for older calling conventions like I do on
-> x86 (_fastcall, _cdelc, _stdcall, etc)? I can't figure out the right
-> thing to search for, what's a good keyword?
-I don't know if something like this exists and I don't now either which
-calling convention is used by an IAR compiler.
-
-I'd just call the ROM functions using an asm (or inline-asm) stub if
-it's different enough not to be directly callable.
+On Thu, Nov 18, 2010 at 08:38:26AM +0100, Alexander Stein wrote:
+> Soory for late answer,
+> 
+> On Saturday 13 November 2010, 11:47:41 Albin Tonnerre wrote:
+> > <linux@arm.linux.org.uk> wrote:
+> > > Is it really faster to copy an uncompressed image than it is to
+> > > decompress using LZMA with caches on?
+> > 
+> > In my experience, using LZMA is painfully slow on older ARM CPUs.
+> > 
+> > If you really need to boot quickly you might want to try LZO, which
+> > should give you results close to the uncompressed performance. It
+> > might still be slower though, especially if you're able to load your
+> > kernel image to memory fairly quickly
+> 
+> We only have experience with GZIP. Our compressed kernel is ~1,8MB and 
+> uncompressed ~4MB.
+> On an AT91 ARM9 SoC the decompression takes about 1-2s of time. Caches should 
+> be disabled, as far as I could see in decompression code.
+Caches are enabled in line 248 of
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=arch/arm/boot/compressed/head.S;h=6825c34646d4e02f24b0eefe7ab4e012bca05208;hb=HEAD
 
 Best regards
 Uwe
