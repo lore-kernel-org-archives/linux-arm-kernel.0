@@ -1,32 +1,44 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Thu, 18 Nov 2010 13:30:30 +0200
-Subject: [PATCH 0/3] S5PV210: added MIPI-DSI Driver.
-In-Reply-To: <4CE50338.8060000@samsung.com>
-References: <4CE50338.8060000@samsung.com>
-Message-ID: <1290079830.9872.1.camel@tubuntu>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Thu, 18 Nov 2010 19:54:39 +0800
+Subject: [PATCH 0/5] mx51: Add PWM support
+In-Reply-To: <20101118102557.GX6017@pengutronix.de>
+References: <730660.7957.qm@web51005.mail.re2.yahoo.com>
+	<20101118102557.GX6017@pengutronix.de>
+Message-ID: <AANLkTi=p-YDaSXK9G2pcuG1abuptPm=D=Ug9qBmGU8rS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha,
 
-On Thu, 2010-11-18 at 19:43 +0900, ext daeinki wrote:
-> Hello all,
-> 
-> This patch is a MIPI-DSI driver for S5PV210.
-> 
-> PATCH 1/3: add a structure for CPU interface to linux/fb.h
-> - RGB or CPU interfaces could be used as display mode but framebuffer
-> framework doesn't consider CPU interface so I added this structure
-> because fb_cpumode structure could be used commonly.
-> 
-> PATCH 2/3: add parameters for CPU interface to plat-samsung/fb.h
-> - MIPI-DSI driver would use s3c-fb driver so I added some parameters
-> because MIPI-DSI driver supports CPU interface also.
-> 
-> PATCH 3/3: add MIPI-DSI driver for S5PV210.
+Is branch imx-for-2.6.38 the latest branch for arch/arm/mach-mx5? I'm
+preparing mx50 reference design board support.
 
-You have three patches, all with the same subject, and no description.
+Thanks
+Richard
 
-Please check Documentation/SubmittingPatches.
-
- Tomi
+On Thu, Nov 18, 2010 at 6:25 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Fabio,
+>
+> On Tue, Nov 16, 2010 at 10:35:45AM -0800, Fabio Estevam wrote:
+>> This series of patches add PWM support for MX51.
+>>
+>> Tested on a mx51 babbage board
+>
+> The patches have tabs replaced with whitespaces. Also, clock-imx51.c is
+> now clock-mx51-mx53.c. Can you rebase the patches on imx-for-2.6.38
+> please?
+>
+> Sascha
+>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
