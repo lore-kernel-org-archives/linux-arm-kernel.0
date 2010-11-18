@@ -1,9 +1,9 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 18 Nov 2010 11:02:09 +0100
+Date: Thu, 18 Nov 2010 11:03:51 +0100
 Subject: Zipit/uboot mmc driver issue
 In-Reply-To: <AANLkTi=aySbiD=f3f5yHwDr0cNCwbC3M+ThLE-+E1a9a@mail.gmail.com>
 References: <AANLkTi=aySbiD=f3f5yHwDr0cNCwbC3M+ThLE-+E1a9a@mail.gmail.com>
-Message-ID: <201011181102.09286.marek.vasut@gmail.com>
+Message-ID: <201011181103.52108.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
