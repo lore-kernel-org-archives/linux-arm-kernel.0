@@ -1,22 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 18 Nov 2010 11:27:22 +0000
-Subject: [PATCH 1/9] S5PV310: DMA: Add platform devices for PL330 DMACs
-In-Reply-To: <AANLkTinPtkFccbrZ+-2244-=uK-83M_FSB3ZXOTuiNFw@mail.gmail.com>
-References: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
-	<023c01cb74c6$ee6404f0$cb2c0ed0$%kim@samsung.com>
-	<AANLkTinPtkFccbrZ+-2244-=uK-83M_FSB3ZXOTuiNFw@mail.gmail.com>
-Message-ID: <20101118112722.GA22410@sirena.org.uk>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Thu, 18 Nov 2010 13:30:30 +0200
+Subject: [PATCH 0/3] S5PV210: added MIPI-DSI Driver.
+In-Reply-To: <4CE50338.8060000@samsung.com>
+References: <4CE50338.8060000@samsung.com>
+Message-ID: <1290079830.9872.1.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 18, 2010 at 06:24:40PM +0900, Jassi Brar wrote:
+Hi,
 
-> I am re-submitting this 9 patch series after required updates.
+On Thu, 2010-11-18 at 19:43 +0900, ext daeinki wrote:
+> Hello all,
+> 
+> This patch is a MIPI-DSI driver for S5PV210.
+> 
+> PATCH 1/3: add a structure for CPU interface to linux/fb.h
+> - RGB or CPU interfaces could be used as display mode but framebuffer
+> framework doesn't consider CPU interface so I added this structure
+> because fb_cpumode structure could be used commonly.
+> 
+> PATCH 2/3: add parameters for CPU interface to plat-samsung/fb.h
+> - MIPI-DSI driver would use s3c-fb driver so I added some parameters
+> because MIPI-DSI driver supports CPU interface also.
+> 
+> PATCH 3/3: add MIPI-DSI driver for S5PV210.
 
-All
+You have three patches, all with the same subject, and no description.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Please check Documentation/SubmittingPatches.
 
-It'd be good if we could get them into ASoC in some way this release
-(either by cross merging a branch or just applying them there) so we
-could get the rest of Jassi's Samsung cleanup patches in too.
+ Tomi
