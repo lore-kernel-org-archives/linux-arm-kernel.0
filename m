@@ -1,66 +1,33 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 18 Nov 2010 08:28:19 +0200
-Subject: [PATCH 38/51] ARM: imx: move mx25 support to mach-imx
-In-Reply-To: <1290029419-21435-38-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20101117212821.GF8942@pengutronix.de>
-	<1290029419-21435-38-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20101118062819.GA10415@jasper.tkos.co.il>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 18 Nov 2010 15:43:28 +0900
+Subject: [PATCH] ARM: mach-shmobile: Initial AG5 and AG5EVM support
+In-Reply-To: <20101117105931.21300.89918.sendpatchset@t400s>
+References: <20101117105931.21300.89918.sendpatchset@t400s>
+Message-ID: <20101118064328.GA18543@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Wed, Nov 17, 2010 at 07:59:31PM +0900, Magnus Damm wrote:
+> This patch adds initial support for Renesas SH-Mobile AG5.
+> 
+> At this point the AG5 CPU support is limited to the ARM
+> core, SCIF serial and a CMT timer together with L2 cache
+> and the GIC. The AG5EVM board also supports Ethernet.
+> 
+> Future patches will add support for GPIO, INTCS, CPGA
+> and platform data / driver updates for devices such as
+> IIC, LCDC, FSI, KEYSC, CEU and SDHI among others.
+> 
+Looks pretty harmless at first glance.
 
-Tanks for all this work.
+> The code in entry-macro.S will be cleaned up when the
+> ARM IRQ demux code improvements have been merged.
+> 
+The current code is way too ugly to live, I'll split out as per MSM and
+some of the others, which should make it pretty easy to layer on top of
+when your demux changes are merged.
 
-Once this get merged we can get rid of the ugly '#ifdef CONFIG_MACH_MX27' in 
-drivers/media/video/mx2_camera.c. Should such a patch go via Sascha's tree or 
-the V4L tree?
-
-baruch
-
-On Wed, Nov 17, 2010 at 10:30:06PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/Makefile                              |    2 +-
->  arch/arm/mach-imx/Kconfig                      |   85 +++++--
->  arch/arm/mach-imx/Makefile                     |    6 +
->  arch/arm/mach-imx/Makefile.boot                |    4 +
->  arch/arm/mach-imx/clock-imx25.c                |  332 ++++++++++++++++++++++++
->  arch/arm/mach-imx/devices-imx25.h              |   86 ++++++
->  arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |  296 +++++++++++++++++++++
->  arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |  161 ++++++++++++
->  arch/arm/mach-imx/mach-mx25_3ds.c              |  223 ++++++++++++++++
->  arch/arm/mach-imx/mm-imx25.c                   |   62 +++++
->  arch/arm/mach-mx25/Kconfig                     |   43 ---
->  arch/arm/mach-mx25/Makefile                    |    5 -
->  arch/arm/mach-mx25/Makefile.boot               |    3 -
->  arch/arm/mach-mx25/clock.c                     |  332 ------------------------
->  arch/arm/mach-mx25/devices-imx25.h             |   86 ------
->  arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c  |  296 ---------------------
->  arch/arm/mach-mx25/mach-cpuimx25.c             |  161 ------------
->  arch/arm/mach-mx25/mach-mx25_3ds.c             |  223 ----------------
->  arch/arm/mach-mx25/mm.c                        |   62 -----
->  arch/arm/plat-mxc/Kconfig                      |    5 -
->  20 files changed, 1240 insertions(+), 1233 deletions(-)
->  create mode 100644 arch/arm/mach-imx/clock-imx25.c
->  create mode 100644 arch/arm/mach-imx/devices-imx25.h
->  create mode 100644 arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
->  create mode 100644 arch/arm/mach-imx/mach-eukrea_cpuimx25.c
->  create mode 100644 arch/arm/mach-imx/mach-mx25_3ds.c
->  create mode 100644 arch/arm/mach-imx/mm-imx25.c
->  delete mode 100644 arch/arm/mach-mx25/Kconfig
->  delete mode 100644 arch/arm/mach-mx25/Makefile
->  delete mode 100644 arch/arm/mach-mx25/Makefile.boot
->  delete mode 100644 arch/arm/mach-mx25/clock.c
->  delete mode 100644 arch/arm/mach-mx25/devices-imx25.h
->  delete mode 100644 arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
->  delete mode 100644 arch/arm/mach-mx25/mach-cpuimx25.c
->  delete mode 100644 arch/arm/mach-mx25/mach-mx25_3ds.c
->  delete mode 100644 arch/arm/mach-mx25/mm.c
-
-[snip]
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> As the AG5EVM board comes with 512MiB memory it is
+> recommended to turn on HIGHMEM.
+> 
+You're also missing a defconfig. Preferably with HIGHMEM enabled.
