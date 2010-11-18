@@ -1,43 +1,39 @@
 From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Thu, 18 Nov 2010 19:59:50 +0200
-Subject: [PATCH] arm: omap1: board-ams-delta: fix cast
+Date: Thu, 18 Nov 2010 19:59:51 +0200
+Subject: [PATCH] arm: omap2: timer-gp: delete unused variable
 In-Reply-To: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
 References: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1290103191-360-6-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <1290103191-360-7-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use IOMEM() macro to get rid of the following sparse warning:
-
-	arch/arm/mach-omap1/board-ams-delta.c:319:36: warning: incorrect type in initializer (different address spaces)
-	arch/arm/mach-omap1/board-ams-delta.c:319:36:    expected void [noderef] <asn:2>*membase
-	arch/arm/mach-omap1/board-ams-delta.c:319:36:    got void *<noident>
+Delete a redundant local variable.
 
 Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 ---
- arch/arm/mach-omap1/board-ams-delta.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/timer-gp.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 1d4163b..1948cd3 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -28,6 +28,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
+index e13c29e..f9052e1 100644
+--- a/arch/arm/mach-omap2/timer-gp.c
++++ b/arch/arm/mach-omap2/timer-gp.c
+@@ -203,7 +203,7 @@ static struct clocksource clocksource_gpt = {
+ static void __init omap2_gp_clocksource_init(void)
+ {
+ 	static struct omap_dm_timer *gpt;
+-	u32 tick_rate, tick_period;
++	u32 tick_rate;
+ 	static char err1[] __initdata = KERN_ERR
+ 		"%s: failed to request dm-timer\n";
+ 	static char err2[] __initdata = KERN_ERR
+@@ -216,7 +216,6 @@ static void __init omap2_gp_clocksource_init(void)
  
-+#include <plat/io.h>
- #include <plat/board-ams-delta.h>
- #include <mach/gpio.h>
- #include <plat/keypad.h>
-@@ -316,7 +317,7 @@ static void __init ams_delta_init(void)
+ 	omap_dm_timer_set_source(gpt, OMAP_TIMER_SRC_SYS_CLK);
+ 	tick_rate = clk_get_rate(omap_dm_timer_get_fclk(gpt));
+-	tick_period = (tick_rate / HZ) - 1;
  
- static struct plat_serial8250_port ams_delta_modem_ports[] = {
- 	{
--		.membase	= (void *) AMS_DELTA_MODEM_VIRT,
-+		.membase	= IOMEM(AMS_DELTA_MODEM_VIRT),
- 		.mapbase	= AMS_DELTA_MODEM_PHYS,
- 		.irq		= -EINVAL, /* changed later */
- 		.flags		= UPF_BOOT_AUTOCONF,
+ 	omap_dm_timer_set_load_start(gpt, 1, 0);
+ 
 -- 
 1.5.6.5
