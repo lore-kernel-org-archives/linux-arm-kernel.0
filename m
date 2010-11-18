@@ -1,30 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Nov 2010 13:50:26 +0000
-Subject: [PATCH] ARM: Make the argument to virt_to_phys() "const volatile"
-Message-ID: <20101118135026.10541.8683.stgit@e102109-lin.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 18 Nov 2010 22:01:56 +0800
+Subject: [PATCH 1/9] ARM: pxa: redefine the cpu_is_pxa3xx
+In-Reply-To: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTikKWiPDmXtT5b6rgk3ufgRoUsxv+Dr3P29QpXk+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing the virt_to_phys() argument to "const volatile void *" avoids
-compiler warnings in some situations where this function is used.
+On Wed, Nov 17, 2010 at 7:03 PM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> After introducing pxa930/pxa935 and new silicons, original cpuid rules
+> of XScale generation 3 can't fit new silicons. Now redefine the rule
+> of PXA3xx.
+>
+> Only PXA300/PXA310/PXA320/PXA930/PXA935 are family members of PXA3xx.
+> PXA930/PXA935 are family members of PXA93x. PXA93x can be considered
+> as PXA3xx + CP.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/include/asm/memory.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Applied.
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 23c2e8e..d0ee74b 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -188,7 +188,7 @@
-  * translation for translating DMA addresses.  Use the driver
-  * DMA support - see dma-mapping.h.
-  */
--static inline unsigned long virt_to_phys(void *x)
-+static inline unsigned long virt_to_phys(const volatile void *x)
- {
- 	return __virt_to_phys((unsigned long)(x));
- }
+> ---
+> ?arch/arm/mach-pxa/include/mach/hardware.h | ? 11 ++++++-----
+> ?1 files changed, 6 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+> index ca188cd..e480d1e 100644
+> --- a/arch/arm/mach-pxa/include/mach/hardware.h
+> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
+> @@ -264,7 +264,6 @@
+> ?/*
+> ?* CPUID Core Generation Bit
+> ?* <= 0x2 for pxa21x/pxa25x/pxa26x/pxa27x
+> - * == 0x3 for pxa300/pxa310/pxa320
+> ?*/
+> ?#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
+> ?#define __cpu_is_pxa2xx(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> @@ -279,8 +278,10 @@
+> ?#ifdef CONFIG_PXA3xx
+> ?#define __cpu_is_pxa3xx(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> - ? ? ? ? ? ? ? unsigned int _id = (id) >> 13 & 0x7; ? ?\
+> - ? ? ? ? ? ? ? _id == 0x3; ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? __cpu_is_pxa300(id) ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? || __cpu_is_pxa310(id) ? ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? || __cpu_is_pxa320(id) ? ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? || __cpu_is_pxa93x(id); ? ? ? ? \
+> ? ? ? ? })
+> ?#else
+> ?#define __cpu_is_pxa3xx(id) ? ?(0)
+> @@ -289,8 +290,8 @@
+> ?#if defined(CONFIG_CPU_PXA930) || defined(CONFIG_CPU_PXA935)
+> ?#define __cpu_is_pxa93x(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> - ? ? ? ? ? ? ? unsigned int _id = (id) >> 4 & 0xfff; ? \
+> - ? ? ? ? ? ? ? _id == 0x683 || _id == 0x693; ? ? ? ? ? \
+> + ? ? ? ? ? ? ? __cpu_is_pxa930(id) ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? || __cpu_is_pxa935(id); ? ? ? ? \
+> ? ? ? ? })
+> ?#else
+> ?#define __cpu_is_pxa93x(id) ? ?(0)
+> --
+> 1.5.6.5
+>
+>
