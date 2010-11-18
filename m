@@ -1,36 +1,53 @@
 From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Thu, 18 Nov 2010 13:15:39 -0600
-Subject: [PATCH v3 2/5] OMAP: mailbox: fix rx interrupt disable in omap4
+Date: Thu, 18 Nov 2010 13:15:41 -0600
+Subject: [PATCH v3 4/5] OMAP: mailbox: send message in process context
 In-Reply-To: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
 References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <1290107742-16760-3-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <1290107742-16760-5-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-disabling rx interrupt on omap4 is different than its pre-decessors.
-The bit in OMAP4_MAILBOX_IRQENABLE_CLR should be set to disable the
-interrupts instead of clearing the bit.
+Schedule the Tasklet to send only when mailbox fifo is full and there are
+pending messages in kifo, else send the message directly in the Process
+context. This would avoid needless scheduling of Tasklet for every message
+transfer
 
 Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 ---
- arch/arm/mach-omap2/mailbox.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/mailbox.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 42dbfa4..82b5ced 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -195,7 +195,10 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
- 	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
- 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
- 	l = mbox_read_reg(p->irqdisable);
--	l &= ~bit;
-+	if (cpu_is_omap44xx())
-+		l |= bit;
-+	else
-+		l &= ~bit;
- 	mbox_write_reg(l, p->irqdisable);
- }
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index abfc495..b14bc34 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
+ 	struct omap_mbox_queue *mq = mbox->txq;
+ 	int ret = 0, len;
  
+-	spin_lock(&mq->lock);
++	spin_lock_bh(&mq->lock);
+ 
+ 	if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 
++	if (kfifo_is_empty(&mq->fifo) && !__mbox_poll_for_space(mbox)) {
++		mbox_fifo_write(mbox, msg);
++		goto out;
++	}
++
+ 	len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+ 	WARN_ON(len != sizeof(msg));
+ 
+ 	tasklet_schedule(&mbox->txq->tasklet);
+ 
+ out:
+-	spin_unlock(&mq->lock);
++	spin_unlock_bh(&mq->lock);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(omap_mbox_msg_send);
 -- 
 1.7.0
