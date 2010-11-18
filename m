@@ -1,85 +1,11 @@
-From: phiporiphic@gmail.com (Phip)
-Date: Thu, 18 Nov 2010 05:45:16 -0500
-Subject: Zipit/uboot mmc driver issue
-In-Reply-To: <201011181102.09286.marek.vasut@gmail.com>
-References: <AANLkTi=aySbiD=f3f5yHwDr0cNCwbC3M+ThLE-+E1a9a@mail.gmail.com>
-	<201011181102.09286.marek.vasut@gmail.com>
-Message-ID: <AANLkTimx16AFHs81FRYrwYn21-F2dQmxjdRQXsYUsJHo@mail.gmail.com>
+From: JacekBurghardt@caias.us (Jacek Burghardt)
+Date: Thu, 18 Nov 2010 15:10:31 +0000
+Subject: zt-180 tablet iMAPx200 
+Message-ID: <8BC3F8342CE75D4C98368954D3253C183E970D40@cronous.caias.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/18 Marek Vasut <marek.vasut@gmail.com>
-
-> On Thursday 18 November 2010 10:26:49 Phip wrote:
-> > Greetings,
-> >
-> > I am having difficulties with the Zipit mmc driver and my SDHC card. I
-> > realize this may be an imposition; I write to you because I am trying to
-> > determine if the problem is with the mmc driver or elsewhere. I was not
-> > having any problems with SD card I/O under blob; this began when I
-> flashed
-> > to u-boot.
->
-> Blob doesn't support SD/MMC at all. You mean linux kernel ?
->
-Yes; My mistake.
-
-> >
-> > dmesg comes to mounting root:
-> >
-> > pxa-rtc pxa-rtc: setting system clock to 2000-01-01 00:00:18 UTC
-> > Waiting 2sec before mounting root device...
-> > mmc0: host does not support reading read-only switch. assuming
-> > write-enable. mmc0: new SDHC card at address 1234
-> > PM: Adding info for mmc:mmc0:1234
-> > mmcblk0: mmc0:1234 SA04G 2.68 GiB
->
-> The card is mis-detected ?
->
-This was a  typo -- it consistently reads 3.68 GiB.
-
-> >
-> > Then a few cycles of write errors like these:
-> >
-> > mmcblk0: error -84 transferring data, sector 243, r 8, card status 0xe00
-> > end_request: I/O error, dev mmcblk0, sector 243
-> > Buffer I/O error on device mmcblk0p1, logical block 0
-> > lost page write due to I/O error on mmcblk0p1
-> >
-> > And finally EXT3-fs detects a problem with the journal and remounts the
-> > filesystem read-only.
-> >
-> > I do not mean to ask you to troubleshoot me, but it seems like you would
-> be
-> > the best person to ask about this particular combination of hardware and
-> > software. Or perhaps there is a better place for me to ask?
->
-> CCing linux-arm-kernel
-> >
-> > Thank you very much for your time
-> > Phip
-> >
-> > - Zipit running u-boot 8/23/2010; 2.6.35 8/22/2010; both from mozzwald
-> > - SD card is a Kensington 4GB microSD in a miniSD adapter; works
-> flawlessly
-> > on my desktop box.
->
-> Maybe the adapter is faulty, try another one. It happened a lot before.
->
-
-I'll look for another adapter to verify if there are no other leads to try.
-
-Regards
-Phip
-
-"Auto F5 reload window" options Default timeout* Timeout for this page* Add
-random value to timeout between 0 and* Show and hide menu Ignore everything
-after these symbols in URL(separate with spaces)  Include the separators in
-the URL saved Hide menu when clicking outside the menu Prolong timeout on
-mouseclicks or keyboard input Reload all pages with default timeout, which
-has no timeout set
-*Format examples: hh:mm:ss, h:m:ss, m:sss, s etc. like 1:20:30 oder 500 oder
-3:100
+I wonder if anyone had gotten one of those tablets it has imapx200 cpu. Iwonder if there is same cpu. I don't think they would design arm cpu I guess they could but the must be cpu that is the same out ther. I wonder if anyone had played with it and compiled custom kernel. Is there generic arm kernel that could be choosen?
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101118/aae92ee3/attachment.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101118/eb13709b/attachment.html>
