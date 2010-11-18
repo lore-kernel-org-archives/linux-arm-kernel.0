@@ -1,27 +1,31 @@
-From: inki.dae@samsung.com (daeinki)
-Date: Thu, 18 Nov 2010 19:43:04 +0900
-Subject: [PATCH 0/3] S5PV210: added MIPI-DSI Driver.
-Message-ID: <4CE50338.8060000@samsung.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 18 Nov 2010 11:50:38 +0100
+Subject: [PATCH] nomadik: prevent sched_clock() wraparound v4
+In-Reply-To: <20101118082429.GJ8942@pengutronix.de>
+References: <1290067462-26924-1-git-send-email-linus.walleij@stericsson.com>
+	<20101118082429.GJ8942@pengutronix.de>
+Message-ID: <4CE504FE.9050103@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Uwe Kleine-K?nig wrote:
 
-Hello all,
+>> +unsigned long long sched_clock(void)
+>
+> Before your patch sched_clock was marked notrace.  Did you remove that
+> on purpose?
 
-This patch is a MIPI-DSI driver for S5PV210.
+Yes actually, and then the other day I saw Rabins patch adding
+it to each and every machine. And I think Tim put out a similar
+patch not too long ago.
 
-PATCH 1/3: add a structure for CPU interface to linux/fb.h
-- RGB or CPU interfaces could be used as display mode but framebuffer
-framework doesn't consider CPU interface so I added this structure
-because fb_cpumode structure could be used commonly.
+Frederic Weisbecker then remarked that the sched_clock
+prototype in sched.h already includes notrace. So it's
+not strictly required the way I read it.
 
-PATCH 2/3: add parameters for CPU interface to plat-samsung/fb.h
-- MIPI-DSI driver would use s3c-fb driver so I added some parameters
-because MIPI-DSI driver supports CPU interface also.
+So with this in my back head I removed it.
 
-PATCH 3/3: add MIPI-DSI driver for S5PV210.
+But I guess I'll just re-add it for clarity, why not.
 
-thank you.
-
-signed-off-by: Inki Dae <inki.dae@samsung.com>
-signed-off-by: Kyoungmin Park <kyoungmin.park@samsung.com>
+Yours,
+Linus Walleij
