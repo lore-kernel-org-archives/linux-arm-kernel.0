@@ -1,28 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Nov 2010 09:10:46 +0000
-Subject: [PATCH] ARM: add support for uncompressed uImage kernel
-In-Reply-To: <201011180838.26679.alexander.stein@systec-electronic.com>
-References: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
-	<20101109140455.GA6680@n2100.arm.linux.org.uk>
-	<AANLkTi=6OE=50EExgkay2ycuSPFsOp4E-RmxkNktK_Xk@mail.gmail.com>
-	<201011180838.26679.alexander.stein@systec-electronic.com>
-Message-ID: <20101118091046.GA16907@n2100.arm.linux.org.uk>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Thu, 18 Nov 2010 11:11:09 +0200
+Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver
+	(try #8)
+In-Reply-To: <AANLkTinP=xJ66qTZA4JTXFNH+xqvKWgV-XhExoPr6o-C@mail.gmail.com>
+References: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
+	<1290003526.26444.30.camel@tubuntu>
+	<AANLkTinP=xJ66qTZA4JTXFNH+xqvKWgV-XhExoPr6o-C@mail.gmail.com>
+Message-ID: <1290071469.3431.4.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 18, 2010 at 08:38:26AM +0100, Alexander Stein wrote:
-> We only have experience with GZIP. Our compressed kernel is ~1,8MB and 
-> uncompressed ~4MB.
-> On an AT91 ARM9 SoC the decompression takes about 1-2s of time. Caches should 
-> be disabled, as far as I could see in decompression code.
+On Thu, 2010-11-18 at 10:14 +0800, ext Bryan Wu wrote:
+> On Wed, Nov 17, 2010 at 10:18 PM, Tomi Valkeinen
 
-Are you sure?  ARM9 is supposed to be ARMv4T, which is covered by this
-entry in the proc_types table:
+> > Are you also interested in solving the backlight issue? =)
+> 
+> Yeah, can I start with
+> drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c. I plan to move
+> the blacklight code to drivers/video/blacklight/ and let sharp_ls to
+> use panel-generic-dpi.c driver.
 
-                .word   0x00020000              @ ARMv4T
-                .word   0x000f0000
-                W(b)    __armv4_mmu_cache_on
-                W(b)    __armv4_mmu_cache_off
-                W(b)    __armv4_mmu_cache_flush
+Yes, I think that's a good solution for the panels which have a separate
+backlight (ie. all these "dummy" panels"). However, I'm not sure how
+that would work for panels with more integrated backlight, for example
+Taal. But we don't need to worry about that right now.
 
-So caches _should_ be enabled.
+ Tomi
