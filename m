@@ -1,45 +1,100 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 18 Nov 2010 10:14:03 +0800
-Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver
-	(try #8)
-In-Reply-To: <1290003526.26444.30.camel@tubuntu>
-References: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
-	<1290003526.26444.30.camel@tubuntu>
-Message-ID: <AANLkTinP=xJ66qTZA4JTXFNH+xqvKWgV-XhExoPr6o-C@mail.gmail.com>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Wed, 17 Nov 2010 19:09:03 -0800
+Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <alpine.LFD.2.00.1011171047150.6448@xanadu.home>
+References: <1289991823-24677-1-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-2-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-3-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-4-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-5-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-6-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-7-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-8-git-send-email-haojian.zhuang@marvell.com>
+	<1289991823-24677-9-git-send-email-haojian.zhuang@marvell.com>
+	<25B60CDC2F704E4E9D88FFD52780CB4C05986C77F4@SC-VEXCH1.marvell.com>
+	<alpine.LFD.2.00.1011171047150.6448@xanadu.home>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05986C79AA@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 17, 2010 at 10:18 PM, Tomi Valkeinen
-<tomi.valkeinen@nokia.com> wrote:
-> On Wed, 2010-11-17 at 21:34 +0800, ext Bryan Wu wrote:
->> There are 4 duplicated DPI panel drivers in DSS2 display driver. They are
->> similar and a generic DPI panel driver can support all them with specific
->> panel configuration. And new DPI panel driver can be easily supported
->> by adding panel configurations into generic panel DPI driver.
->>
->> This patchset introduces a generic panel DPI driver, remove 3 panel drivers and enable
->> generic panel DPI driver in board files. And it is based on 2.6.37-rc2.
->>
->> Building with omap2plus_defconfig is successful.
->>
->> Keep sharp_ls_panel, since it contains blacklight control code which will be
->> moved out later.
->>
->> Bryan Wu (3):
->> ? OMAP: DSS2: Add generic DPI panel display driver
->> ? OMAP: use generic DPI panel driver in board files
->> ? OMAP: DSS2: remove generic DPI panel driver duplicated panel drivers
+
+
+>-----Original Message-----
+>From: Nicolas Pitre [mailto:nico at fluxnic.net]
+>Sent: 2010?11?17? 11:56 PM
+>To: Haojian Zhuang
+>Cc: linux-arm-kernel at lists.infradead.org; Zhou Zhu; Eric Miao
+>Subject: RE: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
 >
-> Thanks, looks good. This is now applied to my tree.
+>On Wed, 17 Nov 2010, Haojian Zhuang wrote:
 >
+>>
+>>
+>> >-----Original Message-----
+>> >From: Haojian Zhuang [mailto:haojian.zhuang at marvell.com]
+>> >Sent: 2010?11?17? 7:04 PM
+>> >To: linux-arm-kernel at lists.infradead.org
+>> >Cc: Haojian Zhuang; Zhou Zhu; Eric Miao; Nicolas Pitre
+>> >Subject: [PATCH 9/9] ARM: pxa: add iwmmx support for PJ4
+>> >
+>> >iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
+>> >of accessing CP0 and CP1 is changed in PJ4. Append more files to support
+>> >iwmmxt in PJ4 core.
+>> >
+>> >Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+>> >Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> >Cc: Eric Miao <eric.y.miao@gmail.com>
+>> >Cc: Nicolas Pitre <nico@fluxnic.net>
+>> >---
+>> > arch/arm/Kconfig         |    4 +-
+>> > arch/arm/kernel/Makefile |    1 +
+>> > arch/arm/kernel/iwmmxt.S |   55 +++++++++++++++++++++++++++++++++++----
+>---
+>> >----
+>> > 3 files changed, 45 insertions(+), 15 deletions(-)
+>> >
+>>
+>> Changelog:
+>> 1. Append missing pj4-cp0.c.
+>
+>OK... some more comments there:
+>
+>+static int __init pj4_cp0_init(void)
+>+{
+>+       u32 cp_access;
+>+
+>+       cp_access = pj4_cp_access_read() & ~0xf;
+>+       pj4_cp_access_write(cp_access | 0xf);
+>
+>You clear all first 4 bits just to set them all again.  Isn't the first
+>mask redundant?
+>
+>+       printk(KERN_INFO "XScale iWMMXt coprocessor detected.\n");
+>
+>You are not really detecting anything here, and this is not for XScale
+>either.  What about ""PJ4 iWMMXt coprocessor enabled.\n" instead?
+>
+>+       elf_hwcap |= HWCAP_IWMMXT;
+>+       thread_register_notifier(&iwmmxt_notifier_block);
+>+
+>+       pj4_cp_access_write(cp_access);
+>
+>And here you are clearing access to the coprocessor.  There is nothing
+>that required access to it from the moment it was set at the beginning
+>of the function, so maybe you should have only cleared it at the
+>beginning instead.
+>
+>
+>Nicolas
 
-Thanks a lot for making this happen, -:))
+Thanks for your comments. Now it's fixed in attachment.
 
-> Are you also interested in solving the backlight issue? =)
-
-Yeah, can I start with
-drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c. I plan to move
-the blacklight code to drivers/video/blacklight/ and let sharp_ls to
-use panel-generic-dpi.c driver.
-
--Bryan
+Best Regards
+Haojian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0009-ARM-pxa-add-iwmmx-support-for-PJ4.patch
+Type: application/octet-stream
+Size: 6921 bytes
+Desc: 0009-ARM-pxa-add-iwmmx-support-for-PJ4.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101117/2edb37e3/attachment-0001.obj>
