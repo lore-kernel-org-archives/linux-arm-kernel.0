@@ -1,44 +1,93 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu, 18 Nov 2010 19:54:39 +0800
-Subject: [PATCH 0/5] mx51: Add PWM support
-In-Reply-To: <20101118102557.GX6017@pengutronix.de>
-References: <730660.7957.qm@web51005.mail.re2.yahoo.com>
-	<20101118102557.GX6017@pengutronix.de>
-Message-ID: <AANLkTi=p-YDaSXK9G2pcuG1abuptPm=D=Ug9qBmGU8rS@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 18 Nov 2010 13:04:56 +0100
+Subject: Zipit/uboot mmc driver issue
+In-Reply-To: <AANLkTimx16AFHs81FRYrwYn21-F2dQmxjdRQXsYUsJHo@mail.gmail.com>
+References: <AANLkTi=aySbiD=f3f5yHwDr0cNCwbC3M+ThLE-+E1a9a@mail.gmail.com>
+	<201011181102.09286.marek.vasut@gmail.com>
+	<AANLkTimx16AFHs81FRYrwYn21-F2dQmxjdRQXsYUsJHo@mail.gmail.com>
+Message-ID: <201011181304.56657.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Thursday 18 November 2010 11:45:16 Phip wrote:
+> 2010/11/18 Marek Vasut <marek.vasut@gmail.com>
+> 
+> > On Thursday 18 November 2010 10:26:49 Phip wrote:
+> > > Greetings,
+> > > 
+> > > I am having difficulties with the Zipit mmc driver and my SDHC card. I
+> > > realize this may be an imposition; I write to you because I am trying
+> > > to determine if the problem is with the mmc driver or elsewhere. I was
+> > > not having any problems with SD card I/O under blob; this began when I
+> > 
+> > flashed
+> > 
+> > > to u-boot.
+> > 
+> > Blob doesn't support SD/MMC at all. You mean linux kernel ?
+> 
+> Yes; My mistake.
+> 
+> > > dmesg comes to mounting root:
+> > > 
+> > > pxa-rtc pxa-rtc: setting system clock to 2000-01-01 00:00:18 UTC
+> > > Waiting 2sec before mounting root device...
+> > > mmc0: host does not support reading read-only switch. assuming
+> > > write-enable. mmc0: new SDHC card at address 1234
+> > > PM: Adding info for mmc:mmc0:1234
+> > > mmcblk0: mmc0:1234 SA04G 2.68 GiB
+> > 
+> > The card is mis-detected ?
+> 
+> This was a  typo -- it consistently reads 3.68 GiB.
+> 
+> > > Then a few cycles of write errors like these:
+> > > 
+> > > mmcblk0: error -84 transferring data, sector 243, r 8, card status
+> > > 0xe00 end_request: I/O error, dev mmcblk0, sector 243
+> > > Buffer I/O error on device mmcblk0p1, logical block 0
+> > > lost page write due to I/O error on mmcblk0p1
+> > > 
+> > > And finally EXT3-fs detects a problem with the journal and remounts the
+> > > filesystem read-only.
+> > > 
+> > > I do not mean to ask you to troubleshoot me, but it seems like you
+> > > would
+> > 
+> > be
+> > 
+> > > the best person to ask about this particular combination of hardware
+> > > and software. Or perhaps there is a better place for me to ask?
+> > 
+> > CCing linux-arm-kernel
+> > 
+> > > Thank you very much for your time
+> > > Phip
+> > > 
+> > > - Zipit running u-boot 8/23/2010; 2.6.35 8/22/2010; both from mozzwald
+> > > - SD card is a Kensington 4GB microSD in a miniSD adapter; works
+> > 
+> > flawlessly
+> > 
+> > > on my desktop box.
+> > 
+> > Maybe the adapter is faulty, try another one. It happened a lot before.
+> 
+> I'll look for another adapter to verify if there are no other leads to try.
 
-Is branch imx-for-2.6.38 the latest branch for arch/arm/mach-mx5? I'm
-preparing mx50 reference design board support.
+This is very likely the issue, really ... this is where I'd start debuging if I 
+were you.
+> 
+> Regards
+> Phip
+> 
+> "Auto F5 reload window" options Default timeout* Timeout for this page* Add
+> random value to timeout between 0 and* Show and hide menu Ignore everything
+> after these symbols in URL(separate with spaces)  Include the separators in
+> the URL saved Hide menu when clicking outside the menu Prolong timeout on
+> mouseclicks or keyboard input Reload all pages with default timeout, which
+> has no timeout set
+> *Format examples: hh:mm:ss, h:m:ss, m:sss, s etc. like 1:20:30 oder 500
+> oder 3:100
 
-Thanks
-Richard
-
-On Thu, Nov 18, 2010 at 6:25 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Fabio,
->
-> On Tue, Nov 16, 2010 at 10:35:45AM -0800, Fabio Estevam wrote:
->> This series of patches add PWM support for MX51.
->>
->> Tested on a mx51 babbage board
->
-> The patches have tabs replaced with whitespaces. Also, clock-imx51.c is
-> now clock-mx51-mx53.c. Can you rebase the patches on imx-for-2.6.38
-> please?
->
-> Sascha
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+What's this crud ? Can you please avoid sending irelevant stuff ?
