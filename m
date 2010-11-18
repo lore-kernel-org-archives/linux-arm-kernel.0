@@ -1,32 +1,35 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 18 Nov 2010 10:30:00 +0900
-Subject: [PATCH] ASoC: add codec support for mini6410 and real6410 boards
-In-Reply-To: <20101117202131.3540.44215.stgit@localhost.localdomain>
-References: <20101117202131.3540.44215.stgit@localhost.localdomain>
-Message-ID: <AANLkTim1Qwzx3=q3tQmXJNRmb4YkbNJFqjv_JA0MG31z@mail.gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 18 Nov 2010 09:45:59 +0800
+Subject: [PATCH] OMAP: DSS2: Add back authors of panel-generic.c based drivers
+Message-ID: <1290044759-2903-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 18, 2010 at 5:21 AM, Paulius Zaleckas
-<paulius.zaleckas@gmail.com> wrote:
-> Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> ---
->
-> ?sound/soc/s3c24xx/Kconfig | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/sound/soc/s3c24xx/Kconfig b/sound/soc/s3c24xx/Kconfig
-> index 8a6b53c..b1fcbd3 100644
-> --- a/sound/soc/s3c24xx/Kconfig
-> +++ b/sound/soc/s3c24xx/Kconfig
-> @@ -132,7 +132,7 @@ config SND_S3C24XX_SOC_RX1950_UDA1380
->
-> ?config SND_SOC_SMDK_WM9713
-> ? ? ? ?tristate "SoC AC97 Audio support for SMDK with WM9713"
-> - ? ? ? depends on SND_S3C24XX_SOC && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
-> + ? ? ? depends on SND_S3C24XX_SOC && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_MINI6410 || MACH_REAL6410)
-> ? ? ? ?select SND_SOC_WM9713
-> ? ? ? ?select SND_S3C_SOC_AC97
-> ? ? ? ?help
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+---
+ drivers/video/omap2/displays/panel-generic-dpi.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-Acked-by: Jassi Brar <jassi.brar@samsung.com>
+diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c b/drivers/video/omap2/displays/panel-generic-dpi.c
+index 6702cf6..07eb30e 100644
+--- a/drivers/video/omap2/displays/panel-generic-dpi.c
++++ b/drivers/video/omap2/displays/panel-generic-dpi.c
+@@ -4,6 +4,16 @@
+  * Copyright (C) 2010 Canonical Ltd.
+  * Author: Bryan Wu <bryan.wu@canonical.com>
+  *
++ * LCD panel driver for Sharp LQ043T1DG01
++ *
++ * Copyright (C) 2009 Texas Instruments Inc
++ * Author: Vaibhav Hiremath <hvaibhav@ti.com>
++ *
++ * LCD panel driver for Toppoly TDO35S
++ *
++ * Copyright (C) 2009 CompuLab, Ltd.
++ * Author: Mike Rapoport <mike@compulab.co.il>
++ *
+  * Copyright (C) 2008 Nokia Corporation
+  * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
+  *
+-- 
+1.7.1
