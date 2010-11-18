@@ -1,41 +1,32 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 18 Nov 2010 22:42:50 +0100
-Subject: [PATCH] OMAP4: clocks: add dummy clock for mailbox
-In-Reply-To: <1290108000-16835-1-git-send-email-h-kanigeri2@ti.com>
-References: <1290108000-16835-1-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <4CE59DDA.30205@ti.com>
+From: janakiram.sistla@gmail.com (Janakiram Sistla)
+Date: Thu, 18 Nov 2010 14:02:09 -0800
+Subject: [PATCH v4 2/2] msm: gpio: Add irq support to v2 gpiolib.
+In-Reply-To: <alpine.DEB.2.00.1011181256470.29924@gbean-linux.qualcomm.com>
+References: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
+	<1290109970-26752-2-git-send-email-gbean@codeaurora.org>
+	<AANLkTimTsyhjHJZggFO31C-2RswpmKWn-V4pGEiQ3+_2@mail.gmail.com>
+	<alpine.DEB.2.00.1011181229380.26784@gbean-linux.qualcomm.com>
+	<AANLkTi=p02P=-JQ9+FynFyM1yxrAh3utKTD2uzqhnLxK@mail.gmail.com>
+	<alpine.DEB.2.00.1011181256470.29924@gbean-linux.qualcomm.com>
+Message-ID: <AANLkTiknYmWOmiFXGp6h2dT==aMuGs3BtXi82b6Vdq5i@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hari,
-
-On 11/18/2010 8:20 PM, Kanigeri, Hari wrote:
-> In omap4, there is no explicit configuration register to enable mailbox clocks.
-> Defining dummy clock for mailbox clock module to keep the mailbox driver
-> backward compatible with previous omaps.
+On Thu, Nov 18, 2010 at 12:59 PM, Gregory Bean <gbean@codeaurora.org> wrote:
+>>>> Do you mean to MSM have v1 and v2 gpio hardware ??? can not we
+>>>> have one file under mach-msm as gpio.c??
+>>>
+>>> The MSM8x60 is the first MSM chip to carry the second-generation, or v2,
+>>> GPIO hardware block. ?This block is not backward compatible with the
+>>> v1 block found on older MSMs, so the two drivers cannot be elegantly
+>>> merged.
+>>
+>> so this is applicable to 8x60 and coming chip sets.I basically have a
+>> question,How come a a new person under stand the ?chipset uses gpio-v1
+>> or gpiov2??
 >
-> Signed-off-by: Hari Kanigeri<h-kanigeri2@ti.com>
-> ---
->   arch/arm/mach-omap2/clock44xx_data.c |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-> index e10db7a..bdd9b85 100644
-> --- a/arch/arm/mach-omap2/clock44xx_data.c
-> +++ b/arch/arm/mach-omap2/clock44xx_data.c
-> @@ -2687,6 +2687,7 @@ static struct omap_clk omap44xx_clks[] = {
->   	CLK(NULL,	"uart3_ick",			&dummy_ck,	CK_443X),
->   	CLK(NULL,	"uart4_ick",			&dummy_ck,	CK_443X),
->   	CLK("omap_wdt",	"ick",				&dummy_ck,	CK_443X),
-> +	CLK(NULL,	"mailboxes_ick",	&dummy_ck,	CK_443X),
->   };
->
->   int __init omap4xxx_clk_init(void)
-
-OK, that one is easy but... I will still have to update the script to 
-generate it, so:
-
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-
-Regards,
-Benoit
+> Targets with the v2 block define CONFIG_MSM_V2_TLMM.
+So in that case we can name  it as gpio-tlmm.c ??
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
