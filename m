@@ -1,37 +1,64 @@
 From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 18 Nov 2010 17:48:20 +0900
-Subject: [PATCH 0/3] S5PV210: added MIPI-DSI driver.
-Message-ID: <00ae01cb86fd$5a4b4000$0ee1c000$%dae@samsung.com>
+Date: Thu, 18 Nov 2010 17:49:38 +0900
+Subject: [PATCH 1/3] S5PV210: added MIPI-DSI driver.
+Message-ID: <00b301cb86fd$8a461e10$9ed25a30$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+
+---
+
+ include/linux/fb.h |   12 ++++++++++++
+
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
  
 
-This patch is a MIPI-DSI driver for S5PV210.
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+
+index 7fca3dc..9b9842c 100644
+
+--- a/include/linux/fb.h
+
++++ b/include/linux/fb.h
+
+@@ -1147,6 +1147,18 @@ struct fb_videomode {
+
+          u32 flag;
+
+ };
 
  
 
-PATCH 1/3 : add a structure for CPU interface to linux/fb.h
++struct fb_cpumode {
 
-. RGB or CPU interface could be used as display mode but framebuffer
-framework doesn't consider CPU interface
++         const char *name;          /* optional */
 
- So I added this structure because fb_cpumode structure could be used
-commonly.
++         u32 refresh;                 /* optional */
 
-PATCH 2/3 : add parameters for CPU interface to plat-samsung/fb.h
++         u32 xres;
 
-. MIPI-DSI driver would use s3c-fb driver so I added some parameters because
-MIPI-DSI driver supports CPU interface also.
++         u32 yres;
 
-PATCH 3/3 : add MIPI-DSI driver for S5PV210.
++         u32 pixclock;
 
- 
++         u32 cs_setup;
 
-Thank you.
++         u32 wr_setup;
+
++         u32 wr_act;
+
++         u32 wr_hold;
+
++};
+
++
+
+ extern const char *fb_mode_option;
+
+ extern const struct fb_videomode vesa_modes[];
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101118/baadb134/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101118/77182267/attachment-0001.html>
