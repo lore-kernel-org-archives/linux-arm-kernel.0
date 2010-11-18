@@ -1,41 +1,28 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Thu, 18 Nov 2010 11:07:34 +0200
-Subject: [PATCH] OMAP: DSS2: Add back authors of panel-generic.c based
-	drivers
-In-Reply-To: <1290044759-2903-1-git-send-email-bryan.wu@canonical.com>
-References: <1290044759-2903-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1290071254.3431.0.camel@tubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Nov 2010 09:10:46 +0000
+Subject: [PATCH] ARM: add support for uncompressed uImage kernel
+In-Reply-To: <201011180838.26679.alexander.stein@systec-electronic.com>
+References: <1289310656-29502-1-git-send-email-alexander.stein@systec-electronic.com>
+	<20101109140455.GA6680@n2100.arm.linux.org.uk>
+	<AANLkTi=6OE=50EExgkay2ycuSPFsOp4E-RmxkNktK_Xk@mail.gmail.com>
+	<201011180838.26679.alexander.stein@systec-electronic.com>
+Message-ID: <20101118091046.GA16907@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-11-18 at 09:45 +0800, ext Bryan Wu wrote:
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
->  drivers/video/omap2/displays/panel-generic-dpi.c |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c b/drivers/video/omap2/displays/panel-generic-dpi.c
-> index 6702cf6..07eb30e 100644
-> --- a/drivers/video/omap2/displays/panel-generic-dpi.c
-> +++ b/drivers/video/omap2/displays/panel-generic-dpi.c
-> @@ -4,6 +4,16 @@
->   * Copyright (C) 2010 Canonical Ltd.
->   * Author: Bryan Wu <bryan.wu@canonical.com>
->   *
-> + * LCD panel driver for Sharp LQ043T1DG01
-> + *
-> + * Copyright (C) 2009 Texas Instruments Inc
-> + * Author: Vaibhav Hiremath <hvaibhav@ti.com>
-> + *
-> + * LCD panel driver for Toppoly TDO35S
-> + *
-> + * Copyright (C) 2009 CompuLab, Ltd.
-> + * Author: Mike Rapoport <mike@compulab.co.il>
-> + *
->   * Copyright (C) 2008 Nokia Corporation
->   * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
->   *
+On Thu, Nov 18, 2010 at 08:38:26AM +0100, Alexander Stein wrote:
+> We only have experience with GZIP. Our compressed kernel is ~1,8MB and 
+> uncompressed ~4MB.
+> On an AT91 ARM9 SoC the decompression takes about 1-2s of time. Caches should 
+> be disabled, as far as I could see in decompression code.
 
-Thanks, applied.
+Are you sure?  ARM9 is supposed to be ARMv4T, which is covered by this
+entry in the proc_types table:
 
- Tomi
+                .word   0x00020000              @ ARMv4T
+                .word   0x000f0000
+                W(b)    __armv4_mmu_cache_on
+                W(b)    __armv4_mmu_cache_off
+                W(b)    __armv4_mmu_cache_flush
+
+So caches _should_ be enabled.
