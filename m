@@ -1,75 +1,47 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Thu, 18 Nov 2010 19:59:46 +0200
-Subject: [PATCH] arm: omap1: add missing includes
-In-Reply-To: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
-References: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1290103191-360-2-git-send-email-aaro.koskinen@nokia.com>
+From: h-kanigeri2@ti.com (Hari Kanigeri)
+Date: Thu, 18 Nov 2010 13:15:40 -0600
+Subject: [PATCH v3 3/5] OMAP: mailbox: fix checkpatch warnings
+In-Reply-To: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <1290107742-16760-4-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing includes to get rid of the following sparse warnings:
+Fix the checkpatch warnings observed in mailbox module
 
-	arch/arm/mach-omap1/devices.c:225:13: warning: symbol 'omap1_camera_init' was not declared. Should it be static?
-	arch/arm/mach-omap1/flash.c:15:6: warning: symbol 'omap1_set_vpp' was not declared. Should it be static?
-	arch/arm/mach-omap1/serial.c:190:6: warning: symbol 'omap_serial_wake_trigger' was not declared. Should it be static?
-	arch/arm/mach-omap1/time.c:252:18: warning: symbol 'omap_timer' was not declared. Should it be static?
-
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 ---
- arch/arm/mach-omap1/devices.c |    1 +
- arch/arm/mach-omap1/flash.c   |    1 +
- arch/arm/mach-omap1/serial.c  |    2 ++
- arch/arm/mach-omap1/time.c    |    1 +
- 4 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/plat-omap/mailbox.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index e7f9ee6..86ad38a 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/spi/spi.h>
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 9ce3570..abfc495 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -279,11 +279,11 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
  
-+#include <mach/camera.h>
- #include <mach/hardware.h>
- #include <asm/mach/map.h>
+ 	return 0;
  
-diff --git a/arch/arm/mach-omap1/flash.c b/arch/arm/mach-omap1/flash.c
-index 0b07a78..acd1616 100644
---- a/arch/arm/mach-omap1/flash.c
-+++ b/arch/arm/mach-omap1/flash.c
-@@ -11,6 +11,7 @@
+- fail_alloc_rxq:
++fail_alloc_rxq:
+ 	mbox_queue_free(mbox->txq);
+- fail_alloc_txq:
++fail_alloc_txq:
+ 	free_irq(mbox->irq, mbox);
+- fail_request_irq:
++fail_request_irq:
+ 	if (mbox->ops->shutdown)
+ 		mbox->ops->shutdown(mbox);
  
- #include <plat/io.h>
- #include <plat/tc.h>
-+#include <plat/flash.h>
+@@ -394,7 +394,8 @@ static int __init omap_mbox_init(void)
  
- void omap1_set_vpp(struct map_info *map, int enable)
- {
-diff --git a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
-index b78d074..0845fbb 100644
---- a/arch/arm/mach-omap1/serial.c
-+++ b/arch/arm/mach-omap1/serial.c
-@@ -27,6 +27,8 @@
- #include <mach/gpio.h>
- #include <plat/fpga.h>
+ 	/* kfifo size sanity check: alignment and minimal size */
+ 	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(mbox_msg_t));
+-	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size, sizeof(mbox_msg_t));
++	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size,
++							sizeof(mbox_msg_t));
  
-+#include "pm.h"
-+
- static struct clk * uart1_ck;
- static struct clk * uart2_ck;
- static struct clk * uart3_ck;
-diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
-index 1be6a21..7f75bc6 100644
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -52,6 +52,7 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- 
-+#include <plat/common.h>
- 
- #define OMAP_MPU_TIMER_BASE		OMAP_MPU_TIMER1_BASE
- #define OMAP_MPU_TIMER_OFFSET		0x100
+ 	return 0;
+ }
 -- 
-1.5.6.5
+1.7.0
