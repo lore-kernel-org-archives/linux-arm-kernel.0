@@ -1,37 +1,53 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Thu, 18 Nov 2010 08:51:48 +0100
-Subject: [PATCH] arm: ixp4xx export symbol dma_set_coherent_mask
-In-Reply-To: <201011172325.10894.brian@walsh.ws>
-References: <201011172325.10894.brian@walsh.ws>
-Message-ID: <op.vmcv4jpf2s3iss@ecaz>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 18 Nov 2010 08:56:38 +0100
+Subject: [PATCH] nomadik: prevent sched_clock() wraparound v3
+In-Reply-To: <AANLkTikk3aiUBbjf6YeXNQqymVmsYfgU4dVmQ2RsSOXx@mail.gmail.com>
+References: <1290001517-17010-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTikk3aiUBbjf6YeXNQqymVmsYfgU4dVmQ2RsSOXx@mail.gmail.com>
+Message-ID: <AANLkTik4_JB+KpUp9wEDpkASujDnYX16zJzdu0TvbTj4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Nov 2010 05:25:10 +0100, Brian Walsh <brian@walsh.ws> wrote:
+Hm I wonder why this mail doesn't show up on linux-arm-kernel... Probably
+too many CC.
 
-> ARM ixp4xx module building has been broken since commit 710224fa2750.
-> arm: fix "arm: fix pci_set_consistent_dma_mask for dmabounce devices"
+2010/11/17 Rabin Vincent <rabin@rab.in>:
+> On Wed, Nov 17, 2010 at 7:15 PM, Linus Walleij
+>> + ? ? ? /* Find the apropriate mult and shift factors */
+>> + ? ? ? clocks_calc_mult_shift(&sched_mult, &sched_shift,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?rate, NSEC_PER_SEC, SCHED_CLOCK_MIN_WRAP);
+>> + ? ? ? /* We need to multiply by atleast 2 to get rid of bit 63 */
+>> + ? ? ? BUG_ON(sched_mult < 2);
 >
-> Signed-off-by: Brian Walsh <brian@walsh.ws>
+> No, you want to multiply by an even number, not "atleast 2". ?Please
+> also drop the "cycles &= 0x7FFFFFFFFFFFFFFFLLU" in sched_clock().
+
+Ayeah, the Orion trick, that's better what was I thinking of..
+
+>> + ? ? ? /* Let's see what we get, take max counter and scale it */
+>> + ? ? ? days = 0xFFFFFFFFFFFFFFFFLLU >> sched_shift;
+>> + ? ? ? do_div(days, rate);
+>> + ? ? ? do_div(days, (3600*24));
+>> +
+>> + ? ? ? pr_debug("sched_clock: using %d bits @ %lu Hz wrap in %lu days\n",
+>> + ? ? ? ? ? ? ? (64 - sched_shift), rate, (unsigned long) days);
 >
-> diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-> index 24498a9..d54b219 100644
-> --- a/arch/arm/mach-ixp4xx/common-pci.c
-> +++ b/arch/arm/mach-ixp4xx/common-pci.c
-> @@ -513,4 +513,5 @@ int dma_set_coherent_mask(struct device *dev, u64 mask)
-> EXPORT_SYMBOL(ixp4xx_pci_read);
->  EXPORT_SYMBOL(ixp4xx_pci_write);
-> +EXPORT_SYMBOL(dma_set_coherent_mask);
->
+> This days calculation is wrong because you need to divide by
+> NSECS_PER_SEC, not rate.
 
-Same reply as for http://lists.arm.linux.org.uk/lurker/message/20101108.104326.f5a6c7dd.en.html :
+Yes thanks, I was trying to be clever leaving out sched_mult but it doesn't
+loose bits properly. I replaced it with:
 
-http://lists.arm.linux.org.uk/lurker/message/20101102.114433.8822afb6.en.html
+days = (0xFFFFFFFFFFFFFFFFLLU * sched_mult) >> sched_shift;
+do_div(days, NSEC_PER_SEC);
+do_div(days, (3600*24));
 
+And it yields:
+sched_clock: using 55 bits @ 8333125 Hz wrap in 416 days
 
-Russell, could you apply that patch?
+Which is what is to be expected. (I requested a minimum of 365 days)
 
+Thanks a lot Rabin I'll fire off v4...
 
-Thanks,
-
-Imre
+Yours,
+Linus Walleij
