@@ -1,60 +1,57 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 18 Nov 2010 20:15:56 +0900
-Subject: [PATCH 2/3] S5PV210: added MIPI-DSI Driver.
-In-Reply-To: <>
-References: <>
-Message-ID: <1290078956-29076-1-git-send-email-inki.dae@samsung.com>
+From: pkondeti@codeaurora.org (Pavan Kondeti)
+Date: Thu, 18 Nov 2010 16:45:27 +0530
+Subject: [PATCH v3 2/2] msm: gpio: Add irq support to v2 gpiolib.
+In-Reply-To: <1289943516-11367-2-git-send-email-gbean@codeaurora.org>
+References: <1289943516-11367-1-git-send-email-gbean@codeaurora.org>
+	<1289943516-11367-2-git-send-email-gbean@codeaurora.org>
+Message-ID: <20101118111527.GD11700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
-Signed-off-by: Kyoungmin Park <kyoungmin.park@samsung.com>
----
- arch/arm/plat-samsung/include/plat/fb.h |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+Hi Greg,
 
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index cb3ca3a..1ba0ae0 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -22,14 +22,21 @@
-  */
- #define S3C_FB_MAX_WIN	(5)
- 
-+enum {
-+	FIMD_VIDEO_MODE = 0,
-+	FIMD_CPU_MODE
-+};
-+
- /**
-  * struct s3c_fb_pd_win - per window setup data
-- * @win_mode: The display parameters to initialise (not for window 0)
-+ * @win_mode: The display parameters to RGB interface
-+ * @cpu_mode: The display parameters to CPU interface
-  * @virtual_x: The virtual X size.
-  * @virtual_y: The virtual Y size.
-  */
- struct s3c_fb_pd_win {
- 	struct fb_videomode	win_mode;
-+	struct fb_cpumode	cpu_mode;
- 
- 	unsigned short		default_bpp;
- 	unsigned short		max_bpp;
-@@ -43,6 +50,7 @@ struct s3c_fb_pd_win {
-  *		the data from the display system to the connected display
-  *		device.
-  * @default_win: default window layer number to be used for UI layer.
-+ * @interface_mode: cpu mode or rgb mode.
-  * @vidcon0: The base vidcon0 values to control the panel data format.
-  * @vidcon1: The base vidcon1 values to control the panel data output.
-  * @win: The setup data for each hardware window, or NULL for unused.
-@@ -59,6 +67,7 @@ struct s3c_fb_platdata {
- 
- 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
- 
-+	u32			interface_mode;
- 	u32			 default_win;
- 
- 	u32			 vidcon0;
+On Tue, Nov 16, 2010 at 01:38:36PM -0800, Gregory Bean wrote:
+> Complete the MSM v2 gpio subsystem by adding irq_chip.
+> 
+> Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+> ---
+>  arch/arm/mach-msm/gpio-v2.c |  344 ++++++++++++++++++++++++++++++++++++++++---
+>  1 files changed, 326 insertions(+), 18 deletions(-)
+> 
+>  
+> +#ifdef CONFIG_PM
+> +static int msm_gpio_suspend_noirq(struct device *dev)
+> +{
+> +	unsigned long irq_flags;
+> +	unsigned long i;
+> +
+> +	spin_lock_irqsave(&tlmm_lock, irq_flags);
+> +	for_each_set_bit(i, msm_gpio.enabled_irqs, NR_GPIO_IRQS) {
+> +		if (!test_bit(i, msm_gpio.wake_irqs))
+> +			writel(TARGET_PROC_NONE, GPIO_INTR_CFG_SU(i));
+> +	}
+If none of the enabled irqs is configured as a wakeup source, should not we
+disable the summary IRQ?
+> +	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
+> +	return 0;
+> +}
+> +
+> +static int msm_gpio_resume_noirq(struct device *dev)
+> +{
+> +	unsigned long irq_flags;
+> +	unsigned long i;
+> +
+> +	spin_lock_irqsave(&tlmm_lock, irq_flags);
+> +	for_each_set_bit(i, msm_gpio.enabled_irqs, NR_GPIO_IRQS)
+> +		writel(TARGET_PROC_SCORPION, GPIO_INTR_CFG_SU(i));
+> +	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
+> +	return 0;
+> +}
+> +#else
+> +#define msm_gpio_suspend_noirq NULL
+> +#define msm_gpio_resume_noirq NULL
+> +#endif
+> +
 -- 
-1.5.4.3
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
