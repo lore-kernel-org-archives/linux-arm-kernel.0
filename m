@@ -1,163 +1,292 @@
 From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 18 Nov 2010 18:20:50 +0900
-Subject: [PATCH 2/9] ARM: Samsung: Rename s3c64xx I2S platform device
+Date: Thu, 18 Nov 2010 18:20:27 +0900
+Subject: [PATCH 1/9] S5PV310: DMA: Add platform devices for PL330 DMACs
 In-Reply-To: <AANLkTinPtkFccbrZ+-2244-=uK-83M_FSB3ZXOTuiNFw@mail.gmail.com>
 References: <AANLkTinPtkFccbrZ+-2244-=uK-83M_FSB3ZXOTuiNFw@mail.gmail.com>
-Message-ID: <1290072050-17345-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <1290072027-17307-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Since the I2S of S3C64XX and newer SoCs are incremental
-versions of each other with changes managable in a single
-driver, rename the 's3c64xx-iis' -> 'samsung-i2s'
+Samsung's Soc S5PV310 has three PL330 DMACs. First is dedicated for
+Memory->Memory data transfer while the other two meant for data
+transfer with peripherals.
+Define and add latter two PL330 DMACs as platform devices on the
+S5PV310 platform.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s3c64xx/dev-audio.c |    6 +++---
- arch/arm/mach-s5p6442/dev-audio.c |    4 ++--
- arch/arm/mach-s5p64x0/dev-audio.c |    4 ++--
- arch/arm/mach-s5pc100/dev-audio.c |    6 +++---
- arch/arm/mach-s5pv210/dev-audio.c |    6 +++---
- 5 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/mach-s5pv310/Kconfig             |    1 +
+ arch/arm/mach-s5pv310/Makefile            |    2 +-
+ arch/arm/mach-s5pv310/dma.c               |  168 +++++++++++++++++++++++++++++
+ arch/arm/mach-s5pv310/include/mach/dma.h  |   26 +++++
+ arch/arm/mach-s5pv310/include/mach/irqs.h |    3 +
+ arch/arm/mach-s5pv310/include/mach/map.h  |    5 +
+ 6 files changed, 204 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv310/dma.c
+ create mode 100644 arch/arm/mach-s5pv310/include/mach/dma.h
 
-diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
-index 76426a3..447e4e7 100644
---- a/arch/arm/mach-s3c64xx/dev-audio.c
-+++ b/arch/arm/mach-s3c64xx/dev-audio.c
-@@ -77,7 +77,7 @@ static struct s3c_audio_pdata s3c_i2s0_pdata = {
- };
+diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+index 1150b36..d64efe0 100644
+--- a/arch/arm/mach-s5pv310/Kconfig
++++ b/arch/arm/mach-s5pv310/Kconfig
+@@ -11,6 +11,7 @@ if ARCH_S5PV310
  
- struct platform_device s3c64xx_device_iis0 = {
--	.name		  = "s3c64xx-iis",
-+	.name		  = "samsung-i2s",
- 	.id		  = 0,
- 	.num_resources	  = ARRAY_SIZE(s3c64xx_iis0_resource),
- 	.resource	  = s3c64xx_iis0_resource,
-@@ -110,7 +110,7 @@ static struct s3c_audio_pdata s3c_i2s1_pdata = {
- };
+ config CPU_S5PV310
+ 	bool
++	select S3C_PL330_DMA
+ 	help
+ 	  Enable S5PV310 CPU support
  
- struct platform_device s3c64xx_device_iis1 = {
--	.name		  = "s3c64xx-iis",
-+	.name		  = "samsung-i2s",
- 	.id		  = 1,
- 	.num_resources	  = ARRAY_SIZE(s3c64xx_iis1_resource),
- 	.resource	  = s3c64xx_iis1_resource,
-@@ -143,7 +143,7 @@ static struct s3c_audio_pdata s3c_i2sv4_pdata = {
- };
+diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
+index 84afc64..d265adb 100644
+--- a/arch/arm/mach-s5pv310/Makefile
++++ b/arch/arm/mach-s5pv310/Makefile
+@@ -13,7 +13,7 @@ obj-				:=
+ # Core support for S5PV310 system
  
- struct platform_device s3c64xx_device_iisv4 = {
--	.name		  = "s3c64xx-iis-v4",
-+	.name		  = "samsung-i2s-v4",
- 	.id		  = -1,
- 	.num_resources	  = ARRAY_SIZE(s3c64xx_iisv4_resource),
- 	.resource	  = s3c64xx_iisv4_resource,
-diff --git a/arch/arm/mach-s5p6442/dev-audio.c b/arch/arm/mach-s5p6442/dev-audio.c
-index 3462197..d0207b7 100644
---- a/arch/arm/mach-s5p6442/dev-audio.c
-+++ b/arch/arm/mach-s5p6442/dev-audio.c
-@@ -65,7 +65,7 @@ static struct resource s5p6442_iis0_resource[] = {
- };
+ obj-$(CONFIG_CPU_S5PV310)	+= cpu.o init.o clock.o irq-combiner.o
+-obj-$(CONFIG_CPU_S5PV310)	+= setup-i2c0.o time.o gpiolib.o irq-eint.o
++obj-$(CONFIG_CPU_S5PV310)	+= setup-i2c0.o time.o gpiolib.o irq-eint.o dma.o
  
- struct platform_device s5p6442_device_iis0 = {
--	.name		  = "s3c64xx-iis-v4",
-+	.name		  = "samsung-i2s-v4",
- 	.id		  = -1,
- 	.num_resources	  = ARRAY_SIZE(s5p6442_iis0_resource),
- 	.resource	  = s5p6442_iis0_resource,
-@@ -93,7 +93,7 @@ static struct resource s5p6442_iis1_resource[] = {
- };
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+diff --git a/arch/arm/mach-s5pv310/dma.c b/arch/arm/mach-s5pv310/dma.c
+new file mode 100644
+index 0000000..20066c7
+--- /dev/null
++++ b/arch/arm/mach-s5pv310/dma.c
+@@ -0,0 +1,168 @@
++/*
++ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
++
++#include <plat/devs.h>
++#include <plat/irqs.h>
++
++#include <mach/map.h>
++#include <mach/irqs.h>
++
++#include <plat/s3c-pl330-pdata.h>
++
++static u64 dma_dmamask = DMA_BIT_MASK(32);
++
++static struct resource s5pv310_pdma0_resource[] = {
++	[0] = {
++		.start	= S5PV310_PA_PDMA0,
++		.end	= S5PV310_PA_PDMA0 + SZ_4K,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_PDMA0,
++		.end	= IRQ_PDMA0,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c_pl330_platdata s5pv310_pdma0_pdata = {
++	.peri = {
++		[0] = DMACH_PCM0_RX,
++		[1] = DMACH_PCM0_TX,
++		[2] = DMACH_PCM2_RX,
++		[3] = DMACH_PCM2_TX,
++		[4] = DMACH_MSM_REQ0,
++		[5] = DMACH_MSM_REQ2,
++		[6] = DMACH_SPI0_RX,
++		[7] = DMACH_SPI0_TX,
++		[8] = DMACH_SPI2_RX,
++		[9] = DMACH_SPI2_TX,
++		[10] = DMACH_I2S0S_TX,
++		[11] = DMACH_I2S0_RX,
++		[12] = DMACH_I2S0_TX,
++		[13] = DMACH_I2S2_RX,
++		[14] = DMACH_I2S2_TX,
++		[15] = DMACH_UART0_RX,
++		[16] = DMACH_UART0_TX,
++		[17] = DMACH_UART2_RX,
++		[18] = DMACH_UART2_TX,
++		[19] = DMACH_UART4_RX,
++		[20] = DMACH_UART4_TX,
++		[21] = DMACH_SLIMBUS0_RX,
++		[22] = DMACH_SLIMBUS0_TX,
++		[23] = DMACH_SLIMBUS2_RX,
++		[24] = DMACH_SLIMBUS2_TX,
++		[25] = DMACH_SLIMBUS4_RX,
++		[26] = DMACH_SLIMBUS4_TX,
++		[27] = DMACH_AC97_MICIN,
++		[28] = DMACH_AC97_PCMIN,
++		[29] = DMACH_AC97_PCMOUT,
++		[30] = DMACH_MAX,
++		[31] = DMACH_MAX,
++	},
++};
++
++static struct platform_device s5pv310_device_pdma0 = {
++	.name		= "s3c-pl330",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(s5pv310_pdma0_resource),
++	.resource	= s5pv310_pdma0_resource,
++	.dev		= {
++		.dma_mask = &dma_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &s5pv310_pdma0_pdata,
++	},
++};
++
++static struct resource s5pv310_pdma1_resource[] = {
++	[0] = {
++		.start	= S5PV310_PA_PDMA1,
++		.end	= S5PV310_PA_PDMA1 + SZ_4K,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_PDMA1,
++		.end	= IRQ_PDMA1,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c_pl330_platdata s5pv310_pdma1_pdata = {
++	.peri = {
++		[0] = DMACH_PCM0_RX,
++		[1] = DMACH_PCM0_TX,
++		[2] = DMACH_PCM1_RX,
++		[3] = DMACH_PCM1_TX,
++		[4] = DMACH_MSM_REQ1,
++		[5] = DMACH_MSM_REQ3,
++		[6] = DMACH_SPI1_RX,
++		[7] = DMACH_SPI1_TX,
++		[8] = DMACH_I2S0S_TX,
++		[9] = DMACH_I2S0_RX,
++		[10] = DMACH_I2S0_TX,
++		[11] = DMACH_I2S1_RX,
++		[12] = DMACH_I2S1_TX,
++		[13] = DMACH_UART0_RX,
++		[14] = DMACH_UART0_TX,
++		[15] = DMACH_UART1_RX,
++		[16] = DMACH_UART1_TX,
++		[17] = DMACH_UART3_RX,
++		[18] = DMACH_UART3_TX,
++		[19] = DMACH_SLIMBUS1_RX,
++		[20] = DMACH_SLIMBUS1_TX,
++		[21] = DMACH_SLIMBUS3_RX,
++		[22] = DMACH_SLIMBUS3_TX,
++		[23] = DMACH_SLIMBUS5_RX,
++		[24] = DMACH_SLIMBUS5_TX,
++		[25] = DMACH_SLIMBUS0AUX_RX,
++		[26] = DMACH_SLIMBUS0AUX_TX,
++		[27] = DMACH_SPDIF,
++		[28] = DMACH_MAX,
++		[29] = DMACH_MAX,
++		[30] = DMACH_MAX,
++		[31] = DMACH_MAX,
++	},
++};
++
++static struct platform_device s5pv310_device_pdma1 = {
++	.name		= "s3c-pl330",
++	.id		= 1,
++	.num_resources	= ARRAY_SIZE(s5pv310_pdma1_resource),
++	.resource	= s5pv310_pdma1_resource,
++	.dev		= {
++		.dma_mask = &dma_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &s5pv310_pdma1_pdata,
++	},
++};
++
++static struct platform_device *s5pv310_dmacs[] __initdata = {
++	&s5pv310_device_pdma0,
++	&s5pv310_device_pdma1,
++};
++
++static int __init s5pv310_dma_init(void)
++{
++	platform_add_devices(s5pv310_dmacs, ARRAY_SIZE(s5pv310_dmacs));
++
++	return 0;
++}
++arch_initcall(s5pv310_dma_init);
+diff --git a/arch/arm/mach-s5pv310/include/mach/dma.h b/arch/arm/mach-s5pv310/include/mach/dma.h
+new file mode 100644
+index 0000000..81209eb
+--- /dev/null
++++ b/arch/arm/mach-s5pv310/include/mach/dma.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#ifndef __MACH_DMA_H
++#define __MACH_DMA_H
++
++/* This platform uses the common S3C DMA API driver for PL330 */
++#include <plat/s3c-dma-pl330.h>
++
++#endif /* __MACH_DMA_H */
+diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-s5pv310/include/mach/irqs.h
+index 99e7dad..3c05c58 100644
+--- a/arch/arm/mach-s5pv310/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
+@@ -54,6 +54,9 @@
+ #define COMBINER_GROUP(x)	((x) * MAX_IRQ_IN_COMBINER + IRQ_SPI(64))
+ #define COMBINER_IRQ(x, y)	(COMBINER_GROUP(x) + y)
  
- struct platform_device s5p6442_device_iis1 = {
--	.name		  = "s3c64xx-iis",
-+	.name		  = "samsung-i2s",
- 	.id		  = 1,
- 	.num_resources	  = ARRAY_SIZE(s5p6442_iis1_resource),
- 	.resource	  = s5p6442_iis1_resource,
-diff --git a/arch/arm/mach-s5p64x0/dev-audio.c b/arch/arm/mach-s5p64x0/dev-audio.c
-index 396bacc..fb613d0 100644
---- a/arch/arm/mach-s5p64x0/dev-audio.c
-+++ b/arch/arm/mach-s5p64x0/dev-audio.c
-@@ -82,7 +82,7 @@ static struct resource s5p64x0_iis0_resource[] = {
- };
++#define IRQ_PDMA0		COMBINER_IRQ(21, 0)
++#define IRQ_PDMA1		COMBINER_IRQ(21, 1)
++
+ #define IRQ_TIMER0_VIC		COMBINER_IRQ(22, 0)
+ #define IRQ_TIMER1_VIC		COMBINER_IRQ(22, 1)
+ #define IRQ_TIMER2_VIC		COMBINER_IRQ(22, 2)
+diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
+index 7acf4e7..169fac2 100644
+--- a/arch/arm/mach-s5pv310/include/mach/map.h
++++ b/arch/arm/mach-s5pv310/include/mach/map.h
+@@ -52,6 +52,11 @@
+ #define S5PV310_PA_GIC_DIST		(0x10501000)
+ #define S5PV310_PA_L2CC			(0x10502000)
  
- struct platform_device s5p6440_device_iis = {
--	.name		= "s3c64xx-iis-v4",
-+	.name		= "samsung-i2s-v4",
- 	.id		= -1,
- 	.num_resources	= ARRAY_SIZE(s5p64x0_iis0_resource),
- 	.resource	= s5p64x0_iis0_resource,
-@@ -92,7 +92,7 @@ struct platform_device s5p6440_device_iis = {
- };
- 
- struct platform_device s5p6450_device_iis0 = {
--	.name		= "s3c64xx-iis-v4",
-+	.name		= "samsung-i2s-v4",
- 	.id		= -1,
- 	.num_resources	= ARRAY_SIZE(s5p64x0_iis0_resource),
- 	.resource	= s5p64x0_iis0_resource,
-diff --git a/arch/arm/mach-s5pc100/dev-audio.c b/arch/arm/mach-s5pc100/dev-audio.c
-index 564e195..bf0c90f 100644
---- a/arch/arm/mach-s5pc100/dev-audio.c
-+++ b/arch/arm/mach-s5pc100/dev-audio.c
-@@ -65,7 +65,7 @@ static struct resource s5pc100_iis0_resource[] = {
- };
- 
- struct platform_device s5pc100_device_iis0 = {
--	.name		  = "s3c64xx-iis-v4",
-+	.name		  = "samsung-i2s-v4",
- 	.id		  = -1,
- 	.num_resources	  = ARRAY_SIZE(s5pc100_iis0_resource),
- 	.resource	  = s5pc100_iis0_resource,
-@@ -93,7 +93,7 @@ static struct resource s5pc100_iis1_resource[] = {
- };
- 
- struct platform_device s5pc100_device_iis1 = {
--	.name		  = "s3c64xx-iis",
-+	.name		  = "samsung-i2s",
- 	.id		  = 1,
- 	.num_resources	  = ARRAY_SIZE(s5pc100_iis1_resource),
- 	.resource	  = s5pc100_iis1_resource,
-@@ -121,7 +121,7 @@ static struct resource s5pc100_iis2_resource[] = {
- };
- 
- struct platform_device s5pc100_device_iis2 = {
--	.name		  = "s3c64xx-iis",
-+	.name		  = "samsung-i2s",
- 	.id		  = 2,
- 	.num_resources	  = ARRAY_SIZE(s5pc100_iis2_resource),
- 	.resource	  = s5pc100_iis2_resource,
-diff --git a/arch/arm/mach-s5pv210/dev-audio.c b/arch/arm/mach-s5pv210/dev-audio.c
-index 1303fcb..961477a 100644
---- a/arch/arm/mach-s5pv210/dev-audio.c
-+++ b/arch/arm/mach-s5pv210/dev-audio.c
-@@ -66,7 +66,7 @@ static struct resource s5pv210_iis0_resource[] = {
- };
- 
- struct platform_device s5pv210_device_iis0 = {
--	.name		  = "s3c64xx-iis-v4",
-+	.name		  = "samsung-i2s-v4",
- 	.id		  = -1,
- 	.num_resources	  = ARRAY_SIZE(s5pv210_iis0_resource),
- 	.resource	  = s5pv210_iis0_resource,
-@@ -94,7 +94,7 @@ static struct resource s5pv210_iis1_resource[] = {
- };
- 
- struct platform_device s5pv210_device_iis1 = {
--	.name		  = "s3c64xx-iis",
-+	.name		  = "samsung-i2s",
- 	.id		  = 1,
- 	.num_resources	  = ARRAY_SIZE(s5pv210_iis1_resource),
- 	.resource	  = s5pv210_iis1_resource,
-@@ -122,7 +122,7 @@ static struct resource s5pv210_iis2_resource[] = {
- };
- 
- struct platform_device s5pv210_device_iis2 = {
--	.name		  = "s3c64xx-iis",
-+	.name		  = "samsung-i2s",
- 	.id		  = 2,
- 	.num_resources	  = ARRAY_SIZE(s5pv210_iis2_resource),
- 	.resource	  = s5pv210_iis2_resource,
++/* DMA */
++#define S5PV310_PA_MDMA		0x10810000
++#define S5PV310_PA_PDMA0	0x12680000
++#define S5PV310_PA_PDMA1	0x12690000
++
+ #define S5PV310_PA_GPIO1		(0x11400000)
+ #define S5PV310_PA_GPIO2		(0x11000000)
+ #define S5PV310_PA_GPIO3		(0x03860000)
 -- 
 1.6.2.5
