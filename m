@@ -1,30 +1,27 @@
-From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Thu, 18 Nov 2010 13:20:00 -0600
-Subject: [PATCH] OMAP4: clocks: add dummy clock for mailbox
-Message-ID: <1290108000-16835-1-git-send-email-h-kanigeri2@ti.com>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Thu, 18 Nov 2010 11:20:28 -0800 (PST)
+Subject: [PATCH v3 2/2] msm: gpio: Add irq support to v2 gpiolib.
+In-Reply-To: <20101118111527.GD11700@codeaurora.org>
+References: <1289943516-11367-1-git-send-email-gbean@codeaurora.org>
+	<1289943516-11367-2-git-send-email-gbean@codeaurora.org>
+	<20101118111527.GD11700@codeaurora.org>
+Message-ID: <alpine.DEB.2.00.1011181115220.9788@gbean-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In omap4, there is no explicit configuration register to enable mailbox clocks.
-Defining dummy clock for mailbox clock module to keep the mailbox driver
-backward compatible with previous omaps.
+>> +	spin_lock_irqsave(&tlmm_lock, irq_flags);
+>> +	for_each_set_bit(i, msm_gpio.enabled_irqs, NR_GPIO_IRQS) {
+>> +		if (!test_bit(i, msm_gpio.wake_irqs))
+>> +			writel(TARGET_PROC_NONE, GPIO_INTR_CFG_SU(i));
+>> +	}
+> If none of the enabled irqs is configured as a wakeup source, should not we
+> disable the summary IRQ?
 
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
----
- arch/arm/mach-omap2/clock44xx_data.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I do not believe there is a need.  If no irqs are wakeup sources, then
+the summary irq is also not a wakeup source, see msm_gpio_irq_set_wake().
+And if the GIC will mask the TLMM block appropriately during system PM
+without further bit-twiddling from me, why complicate my PM hooks further?
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index e10db7a..bdd9b85 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -2687,6 +2687,7 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"uart3_ick",			&dummy_ck,	CK_443X),
- 	CLK(NULL,	"uart4_ick",			&dummy_ck,	CK_443X),
- 	CLK("omap_wdt",	"ick",				&dummy_ck,	CK_443X),
-+	CLK(NULL,	"mailboxes_ick",	&dummy_ck,	CK_443X),
- };
- 
- int __init omap4xxx_clk_init(void)
 -- 
-1.7.0
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
