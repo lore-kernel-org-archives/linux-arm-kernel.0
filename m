@@ -1,21 +1,41 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Thu, 18 Nov 2010 09:43:06 +0100
-Subject: [PATCH 00/51] some more imx patches for 2.6.38
-In-Reply-To: <20101117212821.GF8942@pengutronix.de>
-References: <20101117212821.GF8942@pengutronix.de>
-Message-ID: <4CE4E71A.2080909@eukrea.com>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Thu, 18 Nov 2010 11:07:34 +0200
+Subject: [PATCH] OMAP: DSS2: Add back authors of panel-generic.c based
+	drivers
+In-Reply-To: <1290044759-2903-1-git-send-email-bryan.wu@canonical.com>
+References: <1290044759-2903-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1290071254.3431.0.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Thu, 2010-11-18 at 09:45 +0800, ext Bryan Wu wrote:
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> ---
+>  drivers/video/omap2/displays/panel-generic-dpi.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c b/drivers/video/omap2/displays/panel-generic-dpi.c
+> index 6702cf6..07eb30e 100644
+> --- a/drivers/video/omap2/displays/panel-generic-dpi.c
+> +++ b/drivers/video/omap2/displays/panel-generic-dpi.c
+> @@ -4,6 +4,16 @@
+>   * Copyright (C) 2010 Canonical Ltd.
+>   * Author: Bryan Wu <bryan.wu@canonical.com>
+>   *
+> + * LCD panel driver for Sharp LQ043T1DG01
+> + *
+> + * Copyright (C) 2009 Texas Instruments Inc
+> + * Author: Vaibhav Hiremath <hvaibhav@ti.com>
+> + *
+> + * LCD panel driver for Toppoly TDO35S
+> + *
+> + * Copyright (C) 2009 CompuLab, Ltd.
+> + * Author: Mike Rapoport <mike@compulab.co.il>
+> + *
+>   * Copyright (C) 2008 Nokia Corporation
+>   * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
+>   *
 
-On 17/11/2010 22:28, Uwe Kleine-K?nig wrote:
-> The highlights are that for most devices for i.MX1, i.MX21, i.MX25 and
-> i.MX27 are allocated dynamically which reduces the memory footprint of
-> the kernel.  Moreover I moved support for i.MX25 to mach-imx targeting a
-> multi-SoC-kernel for i.MX.
->
-do you have numbers concerning the memory footprint savings ?
+Thanks, applied.
 
-Thanks
-Eric
+ Tomi
