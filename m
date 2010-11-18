@@ -1,30 +1,79 @@
 From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Thu, 18 Nov 2010 13:15:37 -0600
-Subject: [PATCH v3 0/5] OMAP: mailbox: enhancements and fixes
-Message-ID: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+Date: Thu, 18 Nov 2010 13:15:38 -0600
+Subject: [PATCH v3 1/5] OMAP: mailbox: change full flag per mailbox queue
+	instead of global
+In-Reply-To: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <1290107742-16760-2-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sending the patch set by seperating the clock related patch seperated
-out based on Paul Walmsey's comment.
-http://www.spinics.net/lists/arm-kernel/msg103692.html
-The clock patch will be sent out as a seperate patch.
+From: Fernando Guzman Lugo <x0095840@ti.com>
 
-The previous versions of this patch set can be found here
-http://www.spinics.net/lists/linux-omap/msg39988.html
-http://www.spinics.net/lists/linux-omap/msg39931.html
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37278.html
+As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
+global variable, so if there are multiple mailbox users
+there will be conflics. Now there is a full flag per
+mailbox queue.
 
-Fernando Guzman Lugo (1):
-  OMAP: mailbox: change full flag per mailbox queue instead of global
+Version 2:
+- Rebase to the latest.
+Version 3:
+- Remove spin_lock protection. When the full flag is
+true the interrupt for that mailbox is disabled. So there
+is no race condition if full flag is modified before
+calling omap_mbox_enable_irq.
 
-Hari Kanigeri (4):
-  OMAP: mailbox: fix rx interrupt disable in omap4
-  OMAP: mailbox: fix checkpatch warnings
-  OMAP: mailbox: send message in process context
-  OMAP: mailbox: add notification support for multiple readers
+Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+---
+ arch/arm/plat-omap/include/plat/mailbox.h |    1 +
+ arch/arm/plat-omap/mailbox.c              |    7 +++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
- arch/arm/mach-omap2/mailbox.c             |    5 +-
- arch/arm/plat-omap/include/plat/mailbox.h |    8 +-
- arch/arm/plat-omap/mailbox.c              |  127 +++++++++++++++++------------
- 3 files changed, 82 insertions(+), 58 deletions(-)
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 9976565..13f2ef3 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -48,6 +48,7 @@ struct omap_mbox_queue {
+ 	struct tasklet_struct	tasklet;
+ 	int	(*callback)(void *);
+ 	struct omap_mbox	*mbox;
++	bool full;
+ };
+ 
+ struct omap_mbox {
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index d2fafb8..9ce3570 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -33,7 +33,6 @@
+ 
+ static struct workqueue_struct *mboxd;
+ static struct omap_mbox **mboxes;
+-static bool rq_full;
+ 
+ static int mbox_configured;
+ static DEFINE_MUTEX(mbox_configured_lock);
+@@ -148,6 +147,10 @@ static void mbox_rx_work(struct work_struct *work)
+ 
+ 		if (mq->callback)
+ 			mq->callback((void *)msg);
++		if (mq->full) {
++			mq->full = false;
++			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
++		}
+ 	}
+ }
+ 
+@@ -170,7 +173,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+ 	while (!mbox_fifo_empty(mbox)) {
+ 		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+ 			omap_mbox_disable_irq(mbox, IRQ_RX);
+-			rq_full = true;
++			mq->full = true;
+ 			goto nomem;
+ 		}
+ 
+-- 
+1.7.0
