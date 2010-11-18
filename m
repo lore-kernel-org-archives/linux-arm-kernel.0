@@ -1,7 +1,7 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 18 Nov 2010 09:02:55 +0100
+Date: Thu, 18 Nov 2010 09:04:22 +0100
 Subject: [PATCH] nomadik: prevent sched_clock() wraparound v4
-Message-ID: <1290067375-26869-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1290067462-26924-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
