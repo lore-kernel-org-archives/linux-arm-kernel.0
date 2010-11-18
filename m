@@ -1,39 +1,75 @@
 From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Thu, 18 Nov 2010 19:59:51 +0200
-Subject: [PATCH] arm: omap2: timer-gp: delete unused variable
+Date: Thu, 18 Nov 2010 19:59:46 +0200
+Subject: [PATCH] arm: omap1: add missing includes
 In-Reply-To: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
 References: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1290103191-360-7-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <1290103191-360-2-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delete a redundant local variable.
+Add missing includes to get rid of the following sparse warnings:
+
+	arch/arm/mach-omap1/devices.c:225:13: warning: symbol 'omap1_camera_init' was not declared. Should it be static?
+	arch/arm/mach-omap1/flash.c:15:6: warning: symbol 'omap1_set_vpp' was not declared. Should it be static?
+	arch/arm/mach-omap1/serial.c:190:6: warning: symbol 'omap_serial_wake_trigger' was not declared. Should it be static?
+	arch/arm/mach-omap1/time.c:252:18: warning: symbol 'omap_timer' was not declared. Should it be static?
 
 Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 ---
- arch/arm/mach-omap2/timer-gp.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap1/devices.c |    1 +
+ arch/arm/mach-omap1/flash.c   |    1 +
+ arch/arm/mach-omap1/serial.c  |    2 ++
+ arch/arm/mach-omap1/time.c    |    1 +
+ 4 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index e13c29e..f9052e1 100644
---- a/arch/arm/mach-omap2/timer-gp.c
-+++ b/arch/arm/mach-omap2/timer-gp.c
-@@ -203,7 +203,7 @@ static struct clocksource clocksource_gpt = {
- static void __init omap2_gp_clocksource_init(void)
+diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
+index e7f9ee6..86ad38a 100644
+--- a/arch/arm/mach-omap1/devices.c
++++ b/arch/arm/mach-omap1/devices.c
+@@ -17,6 +17,7 @@
+ #include <linux/io.h>
+ #include <linux/spi/spi.h>
+ 
++#include <mach/camera.h>
+ #include <mach/hardware.h>
+ #include <asm/mach/map.h>
+ 
+diff --git a/arch/arm/mach-omap1/flash.c b/arch/arm/mach-omap1/flash.c
+index 0b07a78..acd1616 100644
+--- a/arch/arm/mach-omap1/flash.c
++++ b/arch/arm/mach-omap1/flash.c
+@@ -11,6 +11,7 @@
+ 
+ #include <plat/io.h>
+ #include <plat/tc.h>
++#include <plat/flash.h>
+ 
+ void omap1_set_vpp(struct map_info *map, int enable)
  {
- 	static struct omap_dm_timer *gpt;
--	u32 tick_rate, tick_period;
-+	u32 tick_rate;
- 	static char err1[] __initdata = KERN_ERR
- 		"%s: failed to request dm-timer\n";
- 	static char err2[] __initdata = KERN_ERR
-@@ -216,7 +216,6 @@ static void __init omap2_gp_clocksource_init(void)
+diff --git a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
+index b78d074..0845fbb 100644
+--- a/arch/arm/mach-omap1/serial.c
++++ b/arch/arm/mach-omap1/serial.c
+@@ -27,6 +27,8 @@
+ #include <mach/gpio.h>
+ #include <plat/fpga.h>
  
- 	omap_dm_timer_set_source(gpt, OMAP_TIMER_SRC_SYS_CLK);
- 	tick_rate = clk_get_rate(omap_dm_timer_get_fclk(gpt));
--	tick_period = (tick_rate / HZ) - 1;
++#include "pm.h"
++
+ static struct clk * uart1_ck;
+ static struct clk * uart2_ck;
+ static struct clk * uart3_ck;
+diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
+index 1be6a21..7f75bc6 100644
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -52,6 +52,7 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
  
- 	omap_dm_timer_set_load_start(gpt, 1, 0);
++#include <plat/common.h>
  
+ #define OMAP_MPU_TIMER_BASE		OMAP_MPU_TIMER1_BASE
+ #define OMAP_MPU_TIMER_OFFSET		0x100
 -- 
 1.5.6.5
