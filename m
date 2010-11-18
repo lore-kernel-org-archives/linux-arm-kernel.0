@@ -1,30 +1,30 @@
 From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Thu, 18 Nov 2010 19:59:49 +0200
-Subject: [PATCH] arm: omap1: mbox: delete unused variable
-In-Reply-To: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
-References: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1290103191-360-5-git-send-email-aaro.koskinen@nokia.com>
+Date: Thu, 18 Nov 2010 19:59:45 +0200
+Subject: [PATCH 0/6] OMAP cleanups 
+Message-ID: <1290103191-360-1-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delete unused variable from probe().
+Some small OMAP cleanups to eliminate noise from compilation/sparse
+checks:
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
----
- arch/arm/mach-omap1/mailbox.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+Aaro Koskinen (6):
+  arm: omap1: add missing includes
+  arm: omap1: make some functions static
+  arm: omap1: mbox: make variables static
+  arm: omap1: mbox: delete unused variable
+  arm: omap1: board-ams-delta: fix cast
+  arm: omap2: timer-gp: delete unused variable
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index 12d6880..c0e1f48 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -145,7 +145,6 @@ static int __devinit omap1_mbox_probe(struct platform_device *pdev)
- {
- 	struct resource *mem;
- 	int ret;
--	int i;
- 	struct omap_mbox **list;
- 
- 	list = omap1_mboxes;
--- 
-1.5.6.5
+ arch/arm/mach-omap1/board-ams-delta.c |    3 ++-
+ arch/arm/mach-omap1/devices.c         |    1 +
+ arch/arm/mach-omap1/flash.c           |    1 +
+ arch/arm/mach-omap1/mailbox.c         |    5 ++---
+ arch/arm/mach-omap1/mcbsp.c           |    2 +-
+ arch/arm/mach-omap1/mux.c             |    2 +-
+ arch/arm/mach-omap1/serial.c          |    2 ++
+ arch/arm/mach-omap1/time.c            |    1 +
+ arch/arm/mach-omap2/timer-gp.c        |    3 +--
+ arch/arm/plat-omap/dma.c              |    2 +-
+ arch/arm/plat-omap/sram.c             |    2 +-
+ 11 files changed, 14 insertions(+), 10 deletions(-)
