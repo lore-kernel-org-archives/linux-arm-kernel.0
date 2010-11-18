@@ -1,18 +1,17 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Thu, 18 Nov 2010 18:17:35 +0900
-Subject: [PATCH 0/3] S5PV210: added MIPI-DSI driver.
-In-Reply-To: <00ae01cb86fd$5a4b4000$0ee1c000$%dae@samsung.com>
-References: <00ae01cb86fd$5a4b4000$0ee1c000$%dae@samsung.com>
-Message-ID: <20101118091735.GA24131@linux-sh.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 18 Nov 2010 18:24:40 +0900
+Subject: [PATCH 1/9] S5PV310: DMA: Add platform devices for PL330 DMACs
+In-Reply-To: <023c01cb74c6$ee6404f0$cb2c0ed0$%kim@samsung.com>
+References: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
+	<023c01cb74c6$ee6404f0$cb2c0ed0$%kim@samsung.com>
+Message-ID: <AANLkTinPtkFccbrZ+-2244-=uK-83M_FSB3ZXOTuiNFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 18, 2010 at 05:48:20PM +0900, Inki Dae wrote:
-> This patch is a MIPI-DSI driver for S5PV210.
-> 
-For starters, this patch series is horribly line wrapped, even patchwork
-seems to have given up on it on principle.
+On Tue, Oct 26, 2010 at 1:33 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>
+> As you know...maybe need to fix.
 
-Please read through Documentation/email-clients.txt and resubmit
-accordingly. Attachments will suffice if you have no other choice, but
-should be a last resort.
+
+I am re-submitting this 9 patch series after required updates.
+Thanks.
