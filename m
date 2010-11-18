@@ -1,40 +1,60 @@
 From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 18 Nov 2010 20:15:23 +0900
-Subject: [PATCH 1/3] S5PV210: added MIPI-DSI Driver.
+Date: Thu, 18 Nov 2010 20:15:56 +0900
+Subject: [PATCH 2/3] S5PV210: added MIPI-DSI Driver.
 In-Reply-To: <>
 References: <>
-Message-ID: <1290078923-29055-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <1290078956-29076-1-git-send-email-inki.dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Inki Dae <inki.dae@samsung.com>
 Signed-off-by: Kyoungmin Park <kyoungmin.park@samsung.com>
 ---
- include/linux/fb.h |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/include/plat/fb.h |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index 7fca3dc..9b9842c 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -1147,6 +1147,18 @@ struct fb_videomode {
- 	u32 flag;
- };
+diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+index cb3ca3a..1ba0ae0 100644
+--- a/arch/arm/plat-samsung/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -22,14 +22,21 @@
+  */
+ #define S3C_FB_MAX_WIN	(5)
  
-+struct fb_cpumode {
-+	const char *name;	/* optional */
-+	u32 refresh;		/* optional */
-+	u32 xres;
-+	u32 yres;
-+	u32 pixclock;
-+	u32 cs_setup;
-+	u32 wr_setup;
-+	u32 wr_act;
-+	u32 wr_hold;
++enum {
++	FIMD_VIDEO_MODE = 0,
++	FIMD_CPU_MODE
 +};
 +
- extern const char *fb_mode_option;
- extern const struct fb_videomode vesa_modes[];
+ /**
+  * struct s3c_fb_pd_win - per window setup data
+- * @win_mode: The display parameters to initialise (not for window 0)
++ * @win_mode: The display parameters to RGB interface
++ * @cpu_mode: The display parameters to CPU interface
+  * @virtual_x: The virtual X size.
+  * @virtual_y: The virtual Y size.
+  */
+ struct s3c_fb_pd_win {
+ 	struct fb_videomode	win_mode;
++	struct fb_cpumode	cpu_mode;
  
+ 	unsigned short		default_bpp;
+ 	unsigned short		max_bpp;
+@@ -43,6 +50,7 @@ struct s3c_fb_pd_win {
+  *		the data from the display system to the connected display
+  *		device.
+  * @default_win: default window layer number to be used for UI layer.
++ * @interface_mode: cpu mode or rgb mode.
+  * @vidcon0: The base vidcon0 values to control the panel data format.
+  * @vidcon1: The base vidcon1 values to control the panel data output.
+  * @win: The setup data for each hardware window, or NULL for unused.
+@@ -59,6 +67,7 @@ struct s3c_fb_platdata {
+ 
+ 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+ 
++	u32			interface_mode;
+ 	u32			 default_win;
+ 
+ 	u32			 vidcon0;
 -- 
 1.5.4.3
