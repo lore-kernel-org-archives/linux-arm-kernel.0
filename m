@@ -1,35 +1,35 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 18 Nov 2010 09:45:59 +0800
-Subject: [PATCH] OMAP: DSS2: Add back authors of panel-generic.c based drivers
-Message-ID: <1290044759-2903-1-git-send-email-bryan.wu@canonical.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 18 Nov 2010 09:56:20 +0800
+Subject: [PATCH 00/51] some more imx patches for 2.6.38
+In-Reply-To: <20101117212821.GF8942@pengutronix.de>
+References: <20101117212821.GF8942@pengutronix.de>
+Message-ID: <AANLkTi=aPsqn4kj2OTJwOdRCyWUQ3md44MgrzEoGTecq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- drivers/video/omap2/displays/panel-generic-dpi.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Hi Uwe,
 
-diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c b/drivers/video/omap2/displays/panel-generic-dpi.c
-index 6702cf6..07eb30e 100644
---- a/drivers/video/omap2/displays/panel-generic-dpi.c
-+++ b/drivers/video/omap2/displays/panel-generic-dpi.c
-@@ -4,6 +4,16 @@
-  * Copyright (C) 2010 Canonical Ltd.
-  * Author: Bryan Wu <bryan.wu@canonical.com>
-  *
-+ * LCD panel driver for Sharp LQ043T1DG01
-+ *
-+ * Copyright (C) 2009 Texas Instruments Inc
-+ * Author: Vaibhav Hiremath <hvaibhav@ti.com>
-+ *
-+ * LCD panel driver for Toppoly TDO35S
-+ *
-+ * Copyright (C) 2009 CompuLab, Ltd.
-+ * Author: Mike Rapoport <mike@compulab.co.il>
-+ *
-  * Copyright (C) 2008 Nokia Corporation
-  * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-  *
+2010/11/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> Some of the patches in this series are already in Sascha's tree, I
+> resend them because several of them got minor fixes.
+>
+> The highlights are that for most devices for i.MX1, i.MX21, i.MX25 and
+> i.MX27 are allocated dynamically which reduces the memory footprint of
+> the kernel. ?Moreover I moved support for i.MX25 to mach-imx targeting a
+> multi-SoC-kernel for i.MX.
+>
+> Later I want to do the same for mx3. ?I'm not sure about mx5 though.
+> The discussion about integrating support for i.MX28 into mach-imx made
+> me questioning if this is sensible. ?Well, we'll see.
+>
+You are moving mach-mx25 into mach-imx, will do the same for mx3, and
+thinking about the same for mx5. But you are asking me to move mx28
+out of mach-imx.  This only makes sense for me if you think mx28 will
+not go into mach-imx forever.  Are you sure about this? Otherwise we
+are doing something really bothering ourselves.
+
 -- 
-1.7.1
+Regards,
+Shawn
