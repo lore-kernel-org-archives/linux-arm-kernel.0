@@ -1,232 +1,66 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 17 Nov 2010 22:14:59 -0800
-Subject: [PATCH] ARM: twd: Adjust localtimer frequency with cpufreq notifiers
-Message-ID: <1290060899-9786-1-git-send-email-ccross@android.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 18 Nov 2010 08:28:19 +0200
+Subject: [PATCH 38/51] ARM: imx: move mx25 support to mach-imx
+In-Reply-To: <1290029419-21435-38-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20101117212821.GF8942@pengutronix.de>
+	<1290029419-21435-38-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20101118062819.GA10415@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock to the ARM TWD local timer scales with the cpu
-frequency. To allow the cpu frequency to change while
-maintaining a constant TWD frequency, pick a lower target
-frequency for the TWD and use the prescaler to divide down
-to the closest lower frequency.
+Hi Uwe,
 
-This patch provides a new initialization function that takes
-a target TWD frequency and the ratio between the cpu
-clock and the TWD clock, specified as an integer divider >= 2
-in the Cortex A9 MPCore TRM, and 2 in the ARM11 MPCore TRM.
-It also registers a cpufreq notifier that adjusts the
-prescaler when the cpu frequency changes.
+Tanks for all this work.
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/include/asm/smp_twd.h |   11 ++++
- arch/arm/kernel/smp_twd.c      |  106 +++++++++++++++++++++++++++++++++++++---
- 2 files changed, 109 insertions(+), 8 deletions(-)
+Once this get merged we can get rid of the ugly '#ifdef CONFIG_MACH_MX27' in 
+drivers/media/video/mx2_camera.c. Should such a patch go via Sascha's tree or 
+the V4L tree?
 
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 634f357..5119763 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -17,6 +17,7 @@
- #define TWD_TIMER_CONTROL_ONESHOT	(0 << 1)
- #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
- #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
-+#define TWD_TIMER_CONTROL_PRESCALE_MASK	(0xFF << 8)
- 
- struct clock_event_device;
- 
-@@ -26,4 +27,14 @@ void twd_timer_stop(void);
- int twd_timer_ack(void);
- void twd_timer_setup(struct clock_event_device *);
- 
-+/*
-+ * Use this setup function on systems that support cpufreq.
-+ * periphclk_prescaler is the fixed divider value between the cpu
-+ * clock and the PERIPHCLK clock that feeds the TWD.  target_rate should be
-+ * low enough that the prescaler can accurately reach the target rate from the
-+ * lowest cpu frequency, but high enough to give a reasonable timer accuracy.
-+ */
-+void twd_timer_setup_scalable(struct clock_event_device *,
-+	unsigned long target_rate, unsigned int periphclk_prescaler);
-+
- #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 35882fb..e2bc65c 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -17,6 +17,7 @@
- #include <linux/clockchips.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/cpufreq.h>
- 
- #include <asm/smp_twd.h>
- #include <asm/hardware/gic.h>
-@@ -25,11 +26,17 @@
- void __iomem *twd_base;
- 
- static unsigned long twd_timer_rate;
-+static unsigned long twd_periphclk_prescaler;
-+static unsigned long twd_target_rate;
- 
- static void twd_set_mode(enum clock_event_mode mode,
- 			struct clock_event_device *clk)
- {
- 	unsigned long ctrl;
-+	unsigned long prescale;
-+
-+	prescale = __raw_readl(twd_base + TWD_TIMER_CONTROL) &
-+			TWD_TIMER_CONTROL_PRESCALE_MASK;
- 
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
-@@ -47,6 +54,8 @@ static void twd_set_mode(enum clock_event_mode mode,
- 		ctrl = 0;
- 	}
- 
-+	ctrl |= prescale;
-+
- 	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
- }
- 
-@@ -79,9 +88,55 @@ int twd_timer_ack(void)
- 	return 0;
- }
- 
-+/*
-+ * must be called with interrupts disabled and on the cpu that is being changed
-+ */
-+static void twd_update_cpu_frequency(unsigned long new_rate)
-+{
-+	u32 ctrl;
-+	int prescaler;
-+
-+	BUG_ON(twd_periphclk_prescaler == 0 || twd_target_rate == 0);
-+
-+	twd_timer_rate = new_rate / twd_periphclk_prescaler;
-+
-+	prescaler = DIV_ROUND_UP(twd_timer_rate, twd_target_rate);
-+	prescaler = clamp(prescaler - 1, 0, 0xFF);
-+
-+	ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
-+	ctrl &= ~TWD_TIMER_CONTROL_PRESCALE_MASK;
-+	ctrl |= prescaler << 8;
-+	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+}
-+
-+static void twd_update_cpu_frequency_on_cpu(void *data)
-+{
-+	struct cpufreq_freqs *freq = data;
-+
-+	twd_update_cpu_frequency(freq->new * 1000);
-+}
-+
-+static int twd_cpufreq_notifier(struct notifier_block *nb,
-+			unsigned long event, void *data)
-+{
-+	struct cpufreq_freqs *freq = data;
-+
-+	if (event == CPUFREQ_RESUMECHANGE ||
-+	    (event == CPUFREQ_PRECHANGE && freq->new > freq->old) ||
-+	    (event == CPUFREQ_POSTCHANGE && freq->new < freq->old))
-+		smp_call_function_single(freq->cpu,
-+			twd_update_cpu_frequency_on_cpu, freq, 1);
-+
-+	return 0;
-+}
-+
-+static struct notifier_block twd_cpufreq_notifier_block = {
-+	.notifier_call = twd_cpufreq_notifier,
-+};
-+
- static void __cpuinit twd_calibrate_rate(void)
- {
--	unsigned long load, count;
-+	unsigned long count;
- 	u64 waitjiffies;
- 
- 	/*
-@@ -114,23 +169,37 @@ static void __cpuinit twd_calibrate_rate(void)
- 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
- 
- 		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
--			(twd_timer_rate / 100000) % 100);
-+			(twd_timer_rate / 10000) % 100);
- 	}
--
--	load = twd_timer_rate / HZ;
--
--	__raw_writel(load, twd_base + TWD_TIMER_LOAD);
- }
- 
- /*
-  * Setup the local clock events for a CPU.
-  */
--void __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+static void __cpuinit __twd_timer_setup(struct clock_event_device *clk,
-+	unsigned long target_rate, unsigned int periphclk_prescaler)
- {
- 	unsigned long flags;
-+	unsigned long load;
-+	unsigned long cpu_rate;
-+	unsigned long twd_tick_rate;
- 
- 	twd_calibrate_rate();
- 
-+	if (target_rate && periphclk_prescaler) {
-+		cpu_rate = twd_timer_rate * periphclk_prescaler;
-+		twd_target_rate = target_rate;
-+		twd_periphclk_prescaler = periphclk_prescaler;
-+		twd_update_cpu_frequency(cpu_rate);
-+		twd_tick_rate = twd_target_rate;
-+	} else {
-+		twd_tick_rate = twd_timer_rate;
-+	}
-+
-+	load = twd_tick_rate / HZ;
-+
-+	__raw_writel(load, twd_base + TWD_TIMER_LOAD);
-+
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
- 			CLOCK_EVT_FEAT_C3STOP;
-@@ -138,7 +207,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
- 	clk->shift = 20;
--	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
-+	clk->mult = div_sc(twd_tick_rate, NSEC_PER_SEC, clk->shift);
- 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
- 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
- 
-@@ -151,6 +220,27 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clockevents_register_device(clk);
- }
- 
-+void __cpuinit twd_timer_setup_scalable(struct clock_event_device *clk,
-+	unsigned long target_rate, unsigned int periphclk_prescaler)
-+{
-+	__twd_timer_setup(clk, target_rate, periphclk_prescaler);
-+}
-+
-+void __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+{
-+	__twd_timer_setup(clk, 0, 0);
-+}
-+
-+static int twd_timer_setup_cpufreq(void)
-+{
-+	if (twd_periphclk_prescaler)
-+		cpufreq_register_notifier(&twd_cpufreq_notifier_block,
-+			CPUFREQ_TRANSITION_NOTIFIER);
-+
-+	return 0;
-+}
-+arch_initcall(twd_timer_setup_cpufreq);
-+
- #ifdef CONFIG_HOTPLUG_CPU
- /*
-  * take a local timer down
+baruch
+
+On Wed, Nov 17, 2010 at 10:30:06PM +0100, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/Makefile                              |    2 +-
+>  arch/arm/mach-imx/Kconfig                      |   85 +++++--
+>  arch/arm/mach-imx/Makefile                     |    6 +
+>  arch/arm/mach-imx/Makefile.boot                |    4 +
+>  arch/arm/mach-imx/clock-imx25.c                |  332 ++++++++++++++++++++++++
+>  arch/arm/mach-imx/devices-imx25.h              |   86 ++++++
+>  arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |  296 +++++++++++++++++++++
+>  arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |  161 ++++++++++++
+>  arch/arm/mach-imx/mach-mx25_3ds.c              |  223 ++++++++++++++++
+>  arch/arm/mach-imx/mm-imx25.c                   |   62 +++++
+>  arch/arm/mach-mx25/Kconfig                     |   43 ---
+>  arch/arm/mach-mx25/Makefile                    |    5 -
+>  arch/arm/mach-mx25/Makefile.boot               |    3 -
+>  arch/arm/mach-mx25/clock.c                     |  332 ------------------------
+>  arch/arm/mach-mx25/devices-imx25.h             |   86 ------
+>  arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c  |  296 ---------------------
+>  arch/arm/mach-mx25/mach-cpuimx25.c             |  161 ------------
+>  arch/arm/mach-mx25/mach-mx25_3ds.c             |  223 ----------------
+>  arch/arm/mach-mx25/mm.c                        |   62 -----
+>  arch/arm/plat-mxc/Kconfig                      |    5 -
+>  20 files changed, 1240 insertions(+), 1233 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/clock-imx25.c
+>  create mode 100644 arch/arm/mach-imx/devices-imx25.h
+>  create mode 100644 arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+>  create mode 100644 arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+>  create mode 100644 arch/arm/mach-imx/mach-mx25_3ds.c
+>  create mode 100644 arch/arm/mach-imx/mm-imx25.c
+>  delete mode 100644 arch/arm/mach-mx25/Kconfig
+>  delete mode 100644 arch/arm/mach-mx25/Makefile
+>  delete mode 100644 arch/arm/mach-mx25/Makefile.boot
+>  delete mode 100644 arch/arm/mach-mx25/clock.c
+>  delete mode 100644 arch/arm/mach-mx25/devices-imx25.h
+>  delete mode 100644 arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
+>  delete mode 100644 arch/arm/mach-mx25/mach-cpuimx25.c
+>  delete mode 100644 arch/arm/mach-mx25/mach-mx25_3ds.c
+>  delete mode 100644 arch/arm/mach-mx25/mm.c
+
+[snip]
+
 -- 
-1.7.3.1
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
