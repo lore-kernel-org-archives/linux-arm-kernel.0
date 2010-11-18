@@ -1,145 +1,212 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Thu, 18 Nov 2010 12:45:04 -0700
-Subject: [PATCHv3] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <1289419604-4103-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1289419604-4103-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEACBB0@039-SN1MPN1-005.039d.mgd.msft.net>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Thu, 18 Nov 2010 11:52:49 -0800
+Subject: [PATCH v4 1/2] msm: gpio: Add v2 gpio support to MSM SoCs.
+Message-ID: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha/Uwe,
+Beginning with the MSM8x60, the hardware block responsible for gpio
+support changes.  Provide gpiolib support for the new v2 architecture.
 
-I was wondering if you had time to digest this patch?
+Cc: Baruch Siach <baruch@tkos.co.il>
+Cc: Pavan Kondeti <pkondeti@codeaurora.org>
+Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+---
+ v4 - miscellaneous cleanup, per pkondeti at codeaurora.org
+ v3 - miscellaneous cleanup, per baruch at tkos.co.il
+ v2 - miscellaneous cleanup, per baruch at tkos.co.il
 
-Thanks,
-Dinh
+ arch/arm/mach-msm/Makefile  |    4 +-
+ arch/arm/mach-msm/gpio-v2.c |  163 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 166 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/gpio-v2.c
 
->-----Original Message-----
->From: Nguyen Dinh-R00091
->Sent: Wednesday, November 10, 2010 2:07 PM
->To: linux-kernel at vger.kernel.org
->Cc: linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk;
-s.hauer at pengutronix.de; u.kleine-
->koenig at pengutronix.de; amit.kucheria at canonical.com; eric at eukrea.com;
-Nguyen Dinh-R00091
->Subject: [PATCHv3] ARM: imx: Add support for low power suspend on MX51.
->
->From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->
->Adds initial low power suspend functionality to MX51.
->Supports "mem" and "standby" modes.
->
->Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->---
-> arch/arm/mach-mx5/Makefile           |    1 +
-> arch/arm/mach-mx5/pm.c               |   70
-++++++++++++++++++++++++++++++++++
-> arch/arm/plat-mxc/include/mach/mxc.h |    1 +
-> 3 files changed, 72 insertions(+), 0 deletions(-)
-> create mode 100644 arch/arm/mach-mx5/pm.c
->
->diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
->index 462f177..25b44d1 100644
->--- a/arch/arm/mach-mx5/Makefile
->+++ b/arch/arm/mach-mx5/Makefile
->@@ -5,6 +5,7 @@
-> # Object file lists.
-> obj-y   := cpu.o mm.o clock-mx51.o devices.o
->
->+obj-$(CONFIG_PM) += pm.o
-> obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
-> obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
-> obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
->diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
->new file mode 100644
->index 0000000..417cce1
->--- /dev/null
->+++ b/arch/arm/mach-mx5/pm.c
->@@ -0,0 +1,70 @@
->+/*
->+ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights
-Reserved.
->+ *
->+ * The code contained herein is licensed under the GNU General Public
->+ * License. You may obtain a copy of the GNU General Public License
->+ * Version 2 or later at the following locations:
->+ *
->+ * http://www.opensource.org/licenses/gpl-license.html
->+ * http://www.gnu.org/copyleft/gpl.html
->+ */
->+#include <linux/suspend.h>
->+#include <asm/mach/map.h>
->+#include <mach/system.h>
->+#include "crm_regs.h"
->+
->+static int mx5_suspend_enter(suspend_state_t state)
->+{
->+	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
->+
->+	/* always allow platform to issue a deep sleep mode request */
->+	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) &
-~(MXC_CCM_CLPCR_LPM_MASK);
->+
->+	switch (state) {
->+	case PM_SUSPEND_MEM:
->+		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
->+		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
->+		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
->+		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
->+		break;
->+	case PM_SUSPEND_STANDBY:
->+		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
->+		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
->+		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
->+		break;
->+	default:
->+		return -EINVAL;
->+	}
->+
->+	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
->+		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
->+	arm_srpgcr |= MXC_SRPGCR_PCR;
->+
->+	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
->+	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
->+	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
->+
->+	if (tzic_enable_wake(0) != 0)
->+		return -EAGAIN;
->+
->+	cpu_do_idle();
->+	return 0;
->+}
->+
->+static int mx5_pm_valid(suspend_state_t state)
->+{
->+	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
->+}
->+
->+static const struct platform_suspend_ops mx5_suspend_ops = {
->+	.valid = mx5_pm_valid,
->+	.enter = mx5_suspend_enter,
->+};
->+
->+static int __init mx5_pm_init(void)
->+{
->+	if (cpu_is_mx51())
->+		suspend_set_ops(&mx5_suspend_ops);
->+	return 0;
->+}
->+device_initcall(mx5_pm_init);
->diff --git a/arch/arm/plat-mxc/include/mach/mxc.h
-b/arch/arm/plat-mxc/include/mach/mxc.h
->index a42c720..dafacfd 100644
->--- a/arch/arm/plat-mxc/include/mach/mxc.h
->+++ b/arch/arm/plat-mxc/include/mach/mxc.h
->@@ -37,6 +37,7 @@
->
-> #ifndef __ASSEMBLY__
-> extern unsigned int __mxc_cpu_type;
->+int tzic_enable_wake(int is_idle);
-> #endif
->
-> #ifdef CONFIG_ARCH_MX1
->--
->1.6.0.4
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index b5a7b07..4a1a7ea 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -28,6 +28,8 @@ obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
+-ifndef CONFIG_MSM_V2_TLMM
++ifdef CONFIG_MSM_V2_TLMM
++obj-y	+= gpio-v2.o
++else
+ obj-y	+= gpio.o
+ endif
+diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+new file mode 100644
+index 0000000..d907af6
+--- /dev/null
++++ b/arch/arm/mach-msm/gpio-v2.c
+@@ -0,0 +1,163 @@
++/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ */
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++#include <mach/msm_iomap.h>
++#include "gpiomux.h"
++
++/* Bits of interest in the GPIO_IN_OUT register.
++ */
++enum {
++	GPIO_IN_BIT  = 0,
++	GPIO_OUT_BIT = 1
++};
++
++/* Bits of interest in the GPIO_CFG register.
++ */
++enum {
++	GPIO_OE_BIT = 9,
++};
++
++#define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
++#define GPIO_IN_OUT(gpio)         (MSM_TLMM_BASE + 0x1004 + (0x10 * (gpio)))
++
++static DEFINE_SPINLOCK(tlmm_lock);
++
++static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	return readl(GPIO_IN_OUT(offset)) & BIT(GPIO_IN_BIT);
++}
++
++static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
++{
++	writel(val ? BIT(GPIO_OUT_BIT) : 0, GPIO_IN_OUT(offset));
++}
++
++static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	writel(readl(GPIO_CONFIG(offset)) & ~BIT(GPIO_OE_BIT),
++		GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_direction_output(struct gpio_chip *chip,
++				unsigned offset,
++				int val)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	msm_gpio_set(chip, offset, val);
++	writel(readl(GPIO_CONFIG(offset)) | BIT(GPIO_OE_BIT),
++		GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	return msm_gpiomux_get(chip->base + offset);
++}
++
++static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	msm_gpiomux_put(chip->base + offset);
++}
++
++static struct gpio_chip msm_gpio = {
++	.base             = 0,
++	.ngpio            = NR_GPIO_IRQS,
++	.direction_input  = msm_gpio_direction_input,
++	.direction_output = msm_gpio_direction_output,
++	.get              = msm_gpio_get,
++	.set              = msm_gpio_set,
++	.request          = msm_gpio_request,
++	.free             = msm_gpio_free,
++};
++
++static int __devinit msm_gpio_probe(struct platform_device *dev)
++{
++	int ret;
++
++	msm_gpio.label = dev->name;
++	ret = gpiochip_add(&msm_gpio);
++
++	return ret;
++}
++
++static int __devexit msm_gpio_remove(struct platform_device *dev)
++{
++	int ret = gpiochip_remove(&msm_gpio);
++
++	if (ret < 0)
++		return ret;
++
++	set_irq_handler(TLMM_SCSS_SUMMARY_IRQ, NULL);
++
++	return 0;
++}
++
++static struct platform_driver msm_gpio_driver = {
++	.probe = msm_gpio_probe,
++	.remove = __devexit_p(msm_gpio_remove),
++	.driver = {
++		.name = "msmgpio",
++		.owner = THIS_MODULE,
++	},
++};
++
++static struct platform_device msm_device_gpio = {
++	.name = "msmgpio",
++	.id   = -1,
++};
++
++static int __init msm_gpio_init(void)
++{
++	int rc;
++
++	rc = platform_driver_register(&msm_gpio_driver);
++	if (!rc) {
++		rc = platform_device_register(&msm_device_gpio);
++		if (rc)
++			platform_driver_unregister(&msm_gpio_driver);
++	}
++
++	return rc;
++}
++
++static void __exit msm_gpio_exit(void)
++{
++	platform_device_unregister(&msm_device_gpio);
++	platform_driver_unregister(&msm_gpio_driver);
++}
++
++postcore_initcall(msm_gpio_init);
++module_exit(msm_gpio_exit);
++
++MODULE_AUTHOR("Gregory Bean <gbean@codeaurora.org>");
++MODULE_DESCRIPTION("Driver for Qualcomm MSM TLMMv2 SoC GPIOs");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:msmgpio");
+-- 
+1.7.0.4
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
