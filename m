@@ -1,53 +1,37 @@
-From: kzjeef@gmail.com (Zhang Jiejing)
-Date: Wed, 17 Nov 2010 21:33:16 +0800
-Subject: [PATCH] ARM: imx: fix ehci-mxc build.
-In-Reply-To: <20101117080424.GA11542@pengutronix.de>
-References: <1289959040-5056-1-git-send-email-jiejing.zhang@freescale.com>
-	<20101117080424.GA11542@pengutronix.de>
-Message-ID: <AANLkTinDPcqziug+VYoH4c+PL7J9YKMDbsO1QRC=3Pu5@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Thu, 18 Nov 2010 17:48:20 +0900
+Subject: [PATCH 0/3] S5PV210: added MIPI-DSI driver.
+Message-ID: <00ae01cb86fd$5a4b4000$0ee1c000$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello all,
 
-Got it, since Uwe already fixed in a better way, I drop this patch.
+ 
 
-Thanks for your review.
+This patch is a MIPI-DSI driver for S5PV210.
 
-Best regards,
-Zhang Jiejing
+ 
 
+PATCH 1/3 : add a structure for CPU interface to linux/fb.h
 
-2010/11/17 Wolfram Sang <w.sang@pengutronix.de>
+. RGB or CPU interface could be used as display mode but framebuffer
+framework doesn't consider CPU interface
 
-> Hi,
->
-> > + * Copyright (c) 2010 Freescale Semiconductor, Inc.
->
-> Copyright additions are usually only added for significant changes.
->
-> Regards,
->
->   Wolfram
->
-> --
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
->
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.9 (GNU/Linux)
->
-> iEYEARECAAYFAkzjjIgACgkQD27XaX1/VRsjIQCfX4gim+vB83MmQLuBQk4GAkWo
-> FqMAoMQeIHsEwZJae45hvwqSoGQrRBDO
-> =CCHm
-> -----END PGP SIGNATURE-----
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+ So I added this structure because fb_cpumode structure could be used
+commonly.
+
+PATCH 2/3 : add parameters for CPU interface to plat-samsung/fb.h
+
+. MIPI-DSI driver would use s3c-fb driver so I added some parameters because
+MIPI-DSI driver supports CPU interface also.
+
+PATCH 3/3 : add MIPI-DSI driver for S5PV210.
+
+ 
+
+Thank you.
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101117/fc7e2d45/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101118/baadb134/attachment-0001.html>
