@@ -1,46 +1,33 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 18 Nov 2010 22:17:11 +0530
-Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
-In-Reply-To: <AANLkTinu5tNSOhtBLJDMb+yj5ec1MQtEbGan4LZngCZK@mail.gmail.com>
-References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
-	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ABE7@dbde02.ent.ti.com>
-	<4CE124AE.4080301@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ACE1@dbde02.ent.ti.com>
-	<4CE1560F.6080705@mvista.com>
-	<AANLkTimDpYrx_OWg7ABXqRJ5JYzhpVbbyzVMhmFD6Wxi@mail.gmail.com>
-	<4CE2AB73.3050109@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234ADA4BC@dbde02.ent.ti.com>
-	<4CE2ECCD.8090603@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247388682@dbde02.ent.ti.com>
-	<AANLkTinu5tNSOhtBLJDMb+yj5ec1MQtEbGan4LZngCZK@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247388690@dbde02.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Nov 2010 16:59:48 +0000
+Subject: [PATCH 1/5] ARM: pgtable: switch order of Linux vs hardware page
+	tables
+In-Reply-To: <E1PIloA-0007qU-ME@rmk-PC.arm.linux.org.uk>
+References: <20101117172717.GF5308@n2100.arm.linux.org.uk>
+	<E1PIloA-0007qU-ME@rmk-PC.arm.linux.org.uk>
+Message-ID: <AANLkTinn+3TpNrvTwY47npRBwR49dDR6Ny9MAgWdLEOV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Victor,
-
-On Thu, Nov 18, 2010 at 22:08:34, Victor Rodriguez wrote:
-
+On 17 November 2010 17:28, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> This switches the ordering of the Linux vs hardware page tables in
+> each page, thereby eliminating some of the arithmetic in the page
+> table walks. ?As we now place the Linux page table at the beginning
+> of the page, we can deal with the offset in the pgt by simply masking
+> it away, along with the other control bits.
 [...]
+> -static inline void __pmd_populate(pmd_t *pmdp, unsigned long pmdval)
+> +static inline void __pmd_populate(pmd_t *pmdp, unsigned long pte, unsigned long prot)
+> ?{
+> + ? ? ? unsigned long pmdval = (pte + PTE_HWTABLE_OFF) | prot;
 
-> HI Sekhar
->
-> Let me see if I understand, you prefer to remove the unused pin list,
-> but that will produce a lot of changes on each board that used these
-> pin list. I do not have those boards, in order to test if that works
-> :(
->
-> I want to help to fix it and give a complete and right support to the
-> hawk board.
->
-> Please give me a tip of how to do it
+Since I'm introducing pmdval_t with LPAE patches, would it make sense
+in your patch to pass pteval_t or I should just keep it in my patches?
 
-If you make the changes and post the patches,
-we can ack for the EVM. Mike would be able
-to test on the Mity-DSP platform.
+-static inline void __pmd_populate(pmd_t *pmdp, unsigned long pmdval)
++static inline void __pmd_populate(pmd_t *pmdp, pteval_t pte, unsigned
+long prot)
 
-Anyway, I expect the changes to be fairly innocuous.
-
-Thanks,
-Sekhar
+-- 
+Catalin
