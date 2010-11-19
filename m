@@ -1,33 +1,20 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 19 Nov 2010 12:53:58 +0200
-Subject: [PATCH] ARM: s3x24xx: Fix gpiochip_add complaining.
-In-Reply-To: <4CE6547A.9070309@metafoo.de>
-References: <1290158139-16105-1-git-send-email-marek.belisko@open-nandra.com>
-	<201011191123.22255.anarsoul@gmail.com>
-	<4CE6547A.9070309@metafoo.de>
-Message-ID: <201011191253.58812.anarsoul@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Nov 2010 11:08:02 +0000
+Subject: [PATCH] ARM: l2x0: Check the correct address range
+In-Reply-To: <20101119014029.GA26429@july>
+References: <20101119014029.GA26429@july>
+Message-ID: <AANLkTinqvbPB5ijJnMGB1FP08WUMSUKFY_qZhgZaVUci@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 November 2010 12:42:02 Lars-Peter Clausen wrote:
-> Hi
-> 
-> Well it actually causes problems on systems with external gpio expanders,
-> because now the additional banks will take up the space which was meant
-> for the gpio expander chip and peripherals connected to it wont be
-> accessible.
+On 19 November 2010 01:40, Kyungmin Park <kmpark@infradead.org> wrote:
+> From: Boojin Kim <boojin.kim@samsung.com>
+>
+> When flush or clean the 1MiB, it doesn't flush or clean all since it doesn't check the correct address. So Check the correct address range.
 
-Ok, but it would be nice to see some runtime soc-type detection for gpiolib. 
-s3c2410/s3c2440/s3c2442 doesn't differ too much (actually, they're same in 
-gpiopart, s3c2410 lacks some gpiobanks that s3c244[0,2] have, and difference 
-in pull-up/pull-down on s3c2440 and s3c2442).
-I think it's not good to make artificial restrictions for building single 
-binary kernel for these socs.
- 
-> I sent a patch[1] about this some time ago, but I guess it was never
-> applied...
+This line is very long.
 
-Try pinging Ben or Kukjin :)
+The patch looks fine otherwise. I think the optimal value would be
+smaller than the whole cache size but it depends on many things.
 
-Regards
-Vasily
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
