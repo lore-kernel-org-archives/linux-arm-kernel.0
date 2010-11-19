@@ -1,49 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Nov 2010 15:36:58 +0000
-Subject: [PATCH] arm: Fix GIC distributor initialisation
-In-Reply-To: <AANLkTikdQja0u0XEkv2YZ=ez3CgQZg1iVQksGOv_Qg9i@mail.gmail.com>
-References: <1290178210-30791-1-git-send-email-pawel.moll@arm.com>
-	<AANLkTikdQja0u0XEkv2YZ=ez3CgQZg1iVQksGOv_Qg9i@mail.gmail.com>
-Message-ID: <AANLkTim4QTYaPru2b__1KXz0xJoOvRXVwbc-O=9LmbJg@mail.gmail.com>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Fri, 19 Nov 2010 10:47:18 -0500
+Subject: [Patch v3] Fix audmuxv2 debugfs indexing.
+In-Reply-To: <8762vy4fki.fsf@sympatico.ca> (Bill Pringlemeir's message of
+	"Mon, 15 Nov 2010 13:17:17 -0500")
+References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
+	<20101110152619.GB8950@pengutronix.de>
+	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
+	<20101112071706.GF6017@pengutronix.de>
+	<20101112114942.GA28804@sirena.org.uk> <87oc9rk6fe.fsf@sympatico.ca>
+	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
+	<20101115153058.GG12986@rakim.wolfsonmicro.main>
+	<87oc9qeg75.fsf@sympatico.ca>
+	<BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
+	<20101115162636.GH12986@rakim.wolfsonmicro.main>
+	<8762vy4fki.fsf@sympatico.ca>
+Message-ID: <BLU0-SMTP6392EE1086D2AEE817D758B83A0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 November 2010 15:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On 19 November 2010 14:50, Pawel Moll <pawel.moll@arm.com> wrote:
->> The code checking interrupt limits was "slightly" wrong, using
->> max() instead of min() value. This hasn't been noticed before
->> because max_irq was never really higher then NR_IRQS...
->>
->> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
->> ---
->> ?arch/arm/common/gic.c | ? ?4 ++--
->> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->> index 772f95f..35a2a0b 100644
->> --- a/arch/arm/common/gic.c
->> +++ b/arch/arm/common/gic.c
->> @@ -235,8 +235,8 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
->> ? ? ? ? * Limit this to either the architected maximum, or the
->> ? ? ? ? * platform maximum.
->> ? ? ? ? */
->> - ? ? ? if (max_irq > max(1020, NR_IRQS))
->> - ? ? ? ? ? ? ? max_irq = max(1020, NR_IRQS);
->> + ? ? ? if (max_irq > min(1020, NR_IRQS))
->> + ? ? ? ? ? ? ? max_irq = min(1020, NR_IRQS);
->
-> With this change and the GIC supports more than NR_IRQs, we don't
-> disable all the interrupts on the GIC further down in this function.
->
-> We probably need to have separate variables for the number of hardware
-> interrupts and another one based on min(max_hw_irq, NR_IRQS).
+On 15 Nov 2010, bpringle at sympatico.ca wrote:
 
-Or just move this (with your 'min' change as well):
+> No, I don't think it is an SSI protocol device either.  I think there
+> are two internal ports and five external ports, at least on the IMX
+> 25.  Maybe the documentation is cut and paste from another processor?
 
-       if (max_irq > min(1020, NR_IRQS))
-               max_irq = min(1020, NR_IRQS);
+[snip]
 
-before the final 'for' loop.
+> Thanks for you help.  I *think* I am getting closer to understanding
+> this now.
 
--- 
-Catalin
+I sent a service request to Freescale,
+
+[Technical Support Freescale Semiconductor] 
+
+   In reply to your Service Request SR 1-694170620: The i.MX25 AUDMUX
+   Port1 and Port2 are connected to the internal SSI modules, the
+   Port3 to Port7 are connected to external pins through the IOMUX
+   module. The Port7 can be always used as external port, regardless
+   of the CE bus mode. Should you need to contact us with regard to
+   this message, please see the notes below.
+
+It looks like the i.MX25 is a mix of the i.MX31 and i.MX35.  I think
+it makes the most sense to change the audmux_port_string() to return
+"SSI7" instead of "UNKNOWN" for this port and fix the loop indexes.
+
+I will re-submit those patches later.
+
+Regards,
+Bill Pringlemeir.
