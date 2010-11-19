@@ -1,57 +1,44 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 19 Nov 2010 23:01:03 +0530
-Subject: [PATCH 2/5] omap4: l2x0: Construct the AUXCTRL value using defines
-In-Reply-To: <1290187866-26941-2-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 19 Nov 2010 23:01:02 +0530
+Subject: [PATCH 1/5] ARM: l2x0: Add aux control register bitfields
+In-Reply-To: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
-	<1290187866-26941-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1290187866-26941-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1290187866-26941-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the hardcoded value of auxctrl value and
-construct it using bitfields
-
-Bit 25 is reserved and is always set to 1. Same value
-of this bit is retained in this patch
+This patch adds the PL310 Auxiliary Control Register bitfields
+so that SOC's can use these bit fields to construct the AUXCTRL
+value to be passed/programmed instead of hardcoding it.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Nishanth Menon <nm@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mach-omap2/omap4-common.c |   13 +++++++++++--
- 1 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/hardware/cache-l2x0.h |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 2f89555..c814604 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -53,6 +53,8 @@ static void omap4_l2x0_disable(void)
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index cc42d5f..5aeec1e 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -59,7 +59,17 @@
+ #define L2X0_CACHE_ID_PART_MASK		(0xf << 6)
+ #define L2X0_CACHE_ID_PART_L210		(1 << 6)
+ #define L2X0_CACHE_ID_PART_L310		(3 << 6)
+-#define L2X0_AUX_CTRL_WAY_SIZE_MASK	(0x3 << 17)
++
++#define L2X0_AUX_CTRL_MASK			0xc0000fff
++#define L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT	16
++#define L2X0_AUX_CTRL_WAY_SIZE_SHIFT		17
++#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x3 << 17)
++#define L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT	22
++#define L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT		26
++#define L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT		27
++#define L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT	28
++#define L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT	29
++#define L2X0_AUX_CTRL_EARLY_BRESP_SHIFT		30
  
- static int __init omap_l2_cache_init(void)
- {
-+	u32 aux_ctrl = 0;
-+
- 	/*
- 	 * To avoid code running on other OMAPs in
- 	 * multi-omap builds
-@@ -72,10 +74,17 @@ static int __init omap_l2_cache_init(void)
- 	 * Way size - 32KB (es1.0)
- 	 * Way size - 64KB (es2.0 +)
- 	 */
-+	aux_ctrl = ((1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
-+			(0x1 << 25) |
-+			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
-+			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT));
-+
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
--		l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
-+		aux_ctrl |= 0x2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT;
- 	else
--		l2x0_init(l2cache_base, 0x0e070000, 0xc0000fff);
-+		aux_ctrl |= 0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT;
-+
-+	l2x0_init(l2cache_base, aux_ctrl, L2X0_AUX_CTRL_MASK);
- 
- 	/*
- 	 * Override default outer_cache.disable with a OMAP4
+ #ifndef __ASSEMBLY__
+ extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
 -- 
 1.6.0.4
