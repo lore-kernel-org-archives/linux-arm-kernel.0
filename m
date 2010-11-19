@@ -1,43 +1,33 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 19 Nov 2010 11:42:02 +0100
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 19 Nov 2010 12:53:58 +0200
 Subject: [PATCH] ARM: s3x24xx: Fix gpiochip_add complaining.
-In-Reply-To: <201011191123.22255.anarsoul@gmail.com>
+In-Reply-To: <4CE6547A.9070309@metafoo.de>
 References: <1290158139-16105-1-git-send-email-marek.belisko@open-nandra.com>
 	<201011191123.22255.anarsoul@gmail.com>
-Message-ID: <4CE6547A.9070309@metafoo.de>
+	<4CE6547A.9070309@metafoo.de>
+Message-ID: <201011191253.58812.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily Khoruzhick wrote:
-> On Friday 19 November 2010 11:15:39 Marek Belisko wrote:
->> Make mini2440_defconfig. During kernel startup there is:
->> gpiochip_add: gpios 288..303 (GPIOK) failed to register
->> gpiochip_add: gpios 320..334 (GPIOL) failed to register
->> gpiochip_add: gpios 352..353 (GPIOM) failed to register
->>
->> because s3c2440 doesn't have following gpios. Gpios are
->> available only at upper cpu version (s3c2443).
+On Friday 19 November 2010 12:42:02 Lars-Peter Clausen wrote:
+> Hi
 > 
-> These warnings are harmless, and your patch prevents building single binary 
-> kernel for all s3c24xx socs (however, it's already broken by latest pull-
-> up/pull-down changes)
-> 
-> Regards
-> Vasily
-> 
+> Well it actually causes problems on systems with external gpio expanders,
+> because now the additional banks will take up the space which was meant
+> for the gpio expander chip and peripherals connected to it wont be
+> accessible.
 
-Hi
+Ok, but it would be nice to see some runtime soc-type detection for gpiolib. 
+s3c2410/s3c2440/s3c2442 doesn't differ too much (actually, they're same in 
+gpiopart, s3c2410 lacks some gpiobanks that s3c244[0,2] have, and difference 
+in pull-up/pull-down on s3c2440 and s3c2442).
+I think it's not good to make artificial restrictions for building single 
+binary kernel for these socs.
+ 
+> I sent a patch[1] about this some time ago, but I guess it was never
+> applied...
 
-Well it actually causes problems on systems with external gpio expanders, because now
-the additional banks will take up the space which was meant for the gpio expander
-chip and peripherals connected to it wont be accessible.
+Try pinging Ben or Kukjin :)
 
-I sent a patch[1] about this some time ago, but I guess it was never applied...
-
-- Lars
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-September/026382.html
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards
+Vasily
