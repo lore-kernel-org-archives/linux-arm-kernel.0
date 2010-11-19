@@ -1,130 +1,49 @@
-From: vm.rod25@gmail.com (Victor Rodriguez)
-Date: Thu, 18 Nov 2010 18:17:14 -0600
-Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
-In-Reply-To: <87fwuyfanl.fsf@deeprootsystems.com>
-References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
-	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ABE7@dbde02.ent.ti.com>
-	<4CE124AE.4080301@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ACE1@dbde02.ent.ti.com>
-	<4CE1560F.6080705@mvista.com>
-	<AANLkTimDpYrx_OWg7ABXqRJ5JYzhpVbbyzVMhmFD6Wxi@mail.gmail.com>
-	<4CE2AB73.3050109@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234ADA4BC@dbde02.ent.ti.com>
-	<4CE2ECCD.8090603@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247388682@dbde02.ent.ti.com>
-	<87fwuyfanl.fsf@deeprootsystems.com>
-Message-ID: <AANLkTimfu9-p6C8jZ1gZZvmw3tE0E7jGZkWGjDhnLfAR@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 19 Nov 2010 09:55:23 +0900
+Subject: [PATCH 1/9] S5PV310: DMA: Add platform devices for PL330 DMACs
+In-Reply-To: <20101118112722.GA22410@sirena.org.uk>
+References: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
+	<023c01cb74c6$ee6404f0$cb2c0ed0$%kim@samsung.com>
+	<AANLkTinPtkFccbrZ+-2244-=uK-83M_FSB3ZXOTuiNFw@mail.gmail.com>
+	<20101118112722.GA22410@sirena.org.uk>
+Message-ID: <006a01cb8784$7494e920$5dbebb60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 18, 2010 at 5:57 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> "Nori, Sekhar" <nsekhar@ti.com> writes:
->
->> Hi Michael,
->>
->> On Wed, Nov 17, 2010 at 02:12:53, Michael Williamson wrote:
->>>
->>> Help me out. ?Why do we need generic pin lists?
->>>
->>
->> They might help in cases where all boards will use the same set of
->> pins. For example, every one who uses I2C will most likely both the
->> clock and data pins from the IP. For more complex peripherals with
->> different pins options they serve a documentation purpose at best.
->>
->>> It seems to me that the "generic pin list" for da850.c isn't practical for most
->>> (if not all) of the peripherals. ?They should be done using __initdata in
->>> each board file.
->>
->> Yes, agreed.
->>
->>>
->>> Just a cursory glance at what's in da850.c highlights several items being set
->>> up for the EVM and not generically. ?For example:
->>>
->>> - da850_uart1_pins and da850_uart2_pins: I believe both have RTS/CTS pins which
->>> ? for a generic definition should be included as for UART0, but would then
->>> ? be unused as the EVM doesn't use these pins in this function.
->>
->> Yes, the generic pin list should have RTS and CTS pins defined for UART1
->> and UART2. This needs fixing.
->>
->>>
->>> - da850_mcasp_pins: if generic, must include all 16 AXR pins. ?I think you'd
->>> ? be hard pressed to find a board configuration that would use all 16 AXR pins
->>> ? for the McASP. ?I'm fairly sure the EVM uses the pins called out, and uses
->>> ? other pins for other functions. ?So it's likely this structure wouldn't get used.
->>
->> Yes, the generic pin list should either be completed or removed
->> altogether and the existing pin list da850_mcasp_pins should be
->> copied into the board file and called da850_evm_mcasp_pins.
->>
->>>
->>> - da850_mmcsd0_pins : includes 2 GPIO pins (specific to the EVM, though possible for
->>> ? other boards) for the card detect and write protect signals. ?These pins are
->>> ? completely arbitrary for that particular board design. I also believe that
->>> ? the complete mmcsd0 port has 4 more data lines as part of it's peripheral, although
->>> ? the driver doesn't support using them.
->>
->> This is incorrect again. The generic pin list should be completed
->> (or removed) and the existing list should be copied into the EVM board
->> file as da850_evm_mmcsd0_pins.
->>
->>>
->>> - da850_emif25_pins interface doesn't include the generic pins for some of
->>> ? the SDRAM functions.
->>
->> Yes, this should be completed (or removed). This list is unused anyway.
->>
->>>
->>> - da850_cpgmac_pins defines both RMII and MII pins. ?I don't think any board
->>> ? would want to configure both sets at the same time. ?Seems like this should
->>> ? never get used...
->>
->> Agreed.
->>
->>>
->>> It's also incomplete. ?What about the uPP pin list? ?Or the VPIF? ?Etc.
->>
->> These should be added as the drivers for these devices are
->> supported.
->>
->>>
->>> I think a board file author should be familiar enough with the SoC to understand
->>> what peripheral pins he should be configuring for his/her particular hardware setup
->>> and explicitly specify them in the board file.
->>
->> Agree.
->>
->>>
->>> If you remove the common pin-mux lists and move them to a board file, then once you
->>> configure your specific platform, is there any more memory used than with
->>> the common scheme? ?Of course, there would be replication of pin-mux code in the board
->>
->> There is no memory wastage. All the pin lists are init data.
->>
->> I too prefer all generic pin lists which are most likely not
->> going to be used at all to be removed. Unused stuff like this
->> will only make code difficult to read.
->
-> FWIW, I agree.
->
-> Now, who wants to tackle it?
->
-> Kevin
->
+Mark Brown wrote:
+> 
+> On Thu, Nov 18, 2010 at 06:24:40PM +0900, Jassi Brar wrote:
+> 
+> > I am re-submitting this 9 patch series after required updates.
+> 
+> All
+> 
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> 
+> It'd be good if we could get them into ASoC in some way this release
+> (either by cross merging a branch or just applying them there) so we
+> could get the rest of Jassi's Samsung cleanup patches in too.
 
-I could but I will need a little help and from all of you. :)
+Hi :-)
 
-Regards
+Yeah, I agree with you...I applied them into next-samsung-asoc and
+for-broonie.
 
-Victor Rodriguez
+So you can get/merge them from:
 
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+next-samsung-asoc
 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
->
+As a note, following is merge commit of it in my for-next.
+commit 5cb0bfd842fd2d5095a09de9548aeee287addcd0(Merge branch
+'next-samsung-asoc' into for-next)
+
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
