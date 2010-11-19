@@ -1,102 +1,87 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 19 Nov 2010 10:55:46 -0500
-Subject: [PATCH v6 02/12] davinci: add tnetv107x ssp platform device
+Date: Fri, 19 Nov 2010 10:55:56 -0500
+Subject: [PATCH v6 12/12] davinci: add tnetv107x evm i2c eeprom device
 In-Reply-To: <1290182156-20104-1-git-send-email-cyril@ti.com>
 References: <1290182156-20104-1-git-send-email-cyril@ti.com>
-Message-ID: <1290182156-20104-3-git-send-email-cyril@ti.com>
+Message-ID: <1290182156-20104-13-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an SSP platform device definition for the tnetv107x soc family.
-The clock lookup entry has also been updated to match.
+The tnetv107x evm board has an I2C device connected on one of the SSP ports.
+This patch adds board definitions for a GPIO based I2C master, as well as
+definitions for the eeprom device on these boards.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/mach-davinci/devices-tnetv107x.c      |   25 ++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +
- arch/arm/mach-davinci/tnetv107x.c              |    2 +-
- 3 files changed, 28 insertions(+), 1 deletions(-)
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |   30 +++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices-tnetv107x.c b/arch/arm/mach-davinci/devices-tnetv107x.c
-index 85503de..6162cae 100644
---- a/arch/arm/mach-davinci/devices-tnetv107x.c
-+++ b/arch/arm/mach-davinci/devices-tnetv107x.c
-@@ -35,6 +35,7 @@
- #define TNETV107X_SDIO0_BASE			0x08088700
- #define TNETV107X_SDIO1_BASE			0x08088800
- #define TNETV107X_KEYPAD_BASE			0x08088a00
-+#define TNETV107X_SSP_BASE			0x08088c00
- #define TNETV107X_ASYNC_EMIF_CNTRL_BASE		0x08200000
- #define TNETV107X_ASYNC_EMIF_DATA_CE0_BASE	0x30000000
- #define TNETV107X_ASYNC_EMIF_DATA_CE1_BASE	0x40000000
-@@ -342,6 +343,25 @@ static struct platform_device tsc_device = {
- 	.resource	= tsc_resources,
+diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
+index ac62de2..869af15 100644
+--- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
++++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
+@@ -29,6 +29,9 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/regulator/driver.h>
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
++#include <linux/i2c-gpio.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -44,6 +47,8 @@
+ #define EVM_MMC_WP_GPIO		21
+ #define EVM_MMC_CD_GPIO		24
+ #define EVM_SPI_CS_GPIO		54
++#define EVM_I2C_SDA_GPIO	(SSP_GPIO_START + 0)
++#define EVM_I2C_SCL_GPIO	(SSP_GPIO_START + 1)
+ #define EVM_BACKLIGHT_GPIO	(SSP_GPIO_START + 2)
+ 
+ static int initialize_gpio(int gpio, char *desc)
+@@ -360,6 +365,29 @@ static struct platform_device backlight_device = {
+ 	.dev.platform_data = (void *)EVM_BACKLIGHT_GPIO,
  };
  
-+static struct resource ssp_resources[] = {
++struct i2c_gpio_platform_data i2c_data = {
++	.sda_pin	= EVM_I2C_SDA_GPIO,
++	.scl_pin	= EVM_I2C_SCL_GPIO,
++};
++
++static struct platform_device i2c_device = {
++	.name		= "i2c-gpio",
++	.id		= 0,
++	.dev.platform_data = &i2c_data,
++};
++
++static struct at24_platform_data at24_config = {
++	.byte_len	= SZ_16K / 8,
++	.page_size	= 16,
++};
++
++static struct i2c_board_info i2c_info[] __initconst =  {
 +	{
-+		.start	= TNETV107X_SSP_BASE,
-+		.end	= TNETV107X_SSP_BASE + 0x1ff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= IRQ_TNETV107X_SSP,
-+		.flags	= IORESOURCE_IRQ,
++		I2C_BOARD_INFO("24c16", 0x50),
++		.platform_data	= &at24_config,
 +	},
 +};
 +
-+static struct platform_device ssp_device = {
-+	.name		= "ti-ssp",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(ssp_resources),
-+	.resource	= ssp_resources,
-+};
-+
- void __init tnetv107x_devices_init(struct tnetv107x_device_info *info)
+ static __init void tnetv107x_evm_board_init(void)
  {
- 	int i, error;
-@@ -380,4 +400,9 @@ void __init tnetv107x_devices_init(struct tnetv107x_device_info *info)
- 		keypad_device.dev.platform_data = info->keypad_config;
- 		platform_device_register(&keypad_device);
- 	}
-+
-+	if (info->ssp_config) {
-+		ssp_device.dev.platform_data = info->ssp_config;
-+		platform_device_register(&ssp_device);
-+	}
+ 	davinci_cfg_reg_list(sdio1_pins);
+@@ -369,11 +397,13 @@ static __init void tnetv107x_evm_board_init(void)
+ 	tnetv107x_devices_init(&evm_device_info);
+ 
+ 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
++	i2c_register_board_info(0, i2c_info, ARRAY_SIZE(i2c_info));
  }
-diff --git a/arch/arm/mach-davinci/include/mach/tnetv107x.h b/arch/arm/mach-davinci/include/mach/tnetv107x.h
-index 5a681d8..89c1fdc 100644
---- a/arch/arm/mach-davinci/include/mach/tnetv107x.h
-+++ b/arch/arm/mach-davinci/include/mach/tnetv107x.h
-@@ -34,6 +34,7 @@
  
- #include <linux/serial_8250.h>
- #include <linux/input/matrix_keypad.h>
-+#include <linux/mfd/ti_ssp.h>
- 
- #include <mach/mmc.h>
- #include <mach/nand.h>
-@@ -44,6 +45,7 @@ struct tnetv107x_device_info {
- 	struct davinci_mmc_config	*mmc_config[2];  /* 2 controllers */
- 	struct davinci_nand_pdata	*nand_config[4]; /* 4 chipsels */
- 	struct matrix_keypad_platform_data *keypad_config;
-+	struct ti_ssp_data		*ssp_config;
- };
- 
- extern struct platform_device tnetv107x_wdt_device;
-diff --git a/arch/arm/mach-davinci/tnetv107x.c b/arch/arm/mach-davinci/tnetv107x.c
-index 6fcdece..1b28fdd 100644
---- a/arch/arm/mach-davinci/tnetv107x.c
-+++ b/arch/arm/mach-davinci/tnetv107x.c
-@@ -278,7 +278,7 @@ static struct clk_lookup clks[] = {
- 	CLK(NULL,		"timer1",		&clk_timer1),
- 	CLK("tnetv107x_wdt.0",	NULL,			&clk_wdt_arm),
- 	CLK(NULL,		"clk_wdt_dsp",		&clk_wdt_dsp),
--	CLK("ti-ssp.0",		NULL,			&clk_ssp),
-+	CLK("ti-ssp",		NULL,			&clk_ssp),
- 	CLK(NULL,		"clk_tdm0",		&clk_tdm0),
- 	CLK(NULL,		"clk_vlynq",		&clk_vlynq),
- 	CLK(NULL,		"clk_mcdma",		&clk_mcdma),
+ static int __init tnetv107x_evm_late_init(void)
+ {
+ 	platform_device_register(&backlight_device);
++	platform_device_register(&i2c_device);
+ 	return 0;
+ }
+ late_initcall(tnetv107x_evm_late_init);
 -- 
 1.7.1
