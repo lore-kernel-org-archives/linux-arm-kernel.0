@@ -1,163 +1,122 @@
 From: m.nazarewicz@samsung.com (Michal Nazarewicz)
-Date: Fri, 19 Nov 2010 16:58:11 +0100
-Subject: [RFCv6 13/13] ARM: cma: Added CMA to Aquila,
-	Goni and c210 universal boards
+Date: Fri, 19 Nov 2010 16:58:00 +0100
+Subject: [RFCv6 02/13] lib: bitmap: Added alignment offset for
+	bitmap_find_next_zero_area()
 In-Reply-To: <cover.1290172312.git.m.nazarewicz@samsung.com>
 References: <cover.1290172312.git.m.nazarewicz@samsung.com>
-Message-ID: <c5e5580e35e1a8edf211228c4b5aea83830a7ee6.1290172312.git.m.nazarewicz@samsung.com>
+Message-ID: <23036a00743a5d45d435b32803463ec70041fc5a.1290172312.git.m.nazarewicz@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds CMA memory reservation code to Aquila, Goni and c210
-universal boards.
+This commit adds a bitmap_find_next_zero_area_off() function which
+works like bitmap_find_next_zero_area() function expect it allows an
+offset to be specified when alignment is checked.  This lets caller
+request a bit such that its number plus the offset is aligned
+according to the mask.
 
 Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/mach-aquila.c         |   26 ++++++++++++++++++++++++++
- arch/arm/mach-s5pv210/mach-goni.c           |   26 ++++++++++++++++++++++++++
- arch/arm/mach-s5pv310/mach-universal_c210.c |   17 +++++++++++++++++
- 3 files changed, 69 insertions(+), 0 deletions(-)
+ include/linux/bitmap.h |   24 +++++++++++++++++++-----
+ lib/bitmap.c           |   22 ++++++++++++----------
+ 2 files changed, 31 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 28677ca..f1feb73 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -21,6 +21,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
-+#include <linux/cma.h>
+diff --git a/include/linux/bitmap.h b/include/linux/bitmap.h
+index daf8c48..c0528d1 100644
+--- a/include/linux/bitmap.h
++++ b/include/linux/bitmap.h
+@@ -45,6 +45,7 @@
+  * bitmap_set(dst, pos, nbits)			Set specified bit area
+  * bitmap_clear(dst, pos, nbits)		Clear specified bit area
+  * bitmap_find_next_zero_area(buf, len, pos, n, mask)	Find bit free area
++ * bitmap_find_next_zero_area_off(buf, len, pos, n, mask)	as above
+  * bitmap_shift_right(dst, src, n, nbits)	*dst = *src >> n
+  * bitmap_shift_left(dst, src, n, nbits)	*dst = *src << n
+  * bitmap_remap(dst, src, old, new, nbits)	*dst = map(old, new)(src)
+@@ -113,11 +114,24 @@ extern int __bitmap_weight(const unsigned long *bitmap, int bits);
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -650,6 +651,30 @@ static void __init aquila_sound_init(void)
- 	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
- }
- 
-+#ifdef CONFIG_CMA
+ extern void bitmap_set(unsigned long *map, int i, int len);
+ extern void bitmap_clear(unsigned long *map, int start, int nr);
+-extern unsigned long bitmap_find_next_zero_area(unsigned long *map,
+-					 unsigned long size,
+-					 unsigned long start,
+-					 unsigned int nr,
+-					 unsigned long align_mask);
 +
-+static void __init aquila_reserve(void)
++extern unsigned long bitmap_find_next_zero_area_off(unsigned long *map,
++						    unsigned long size,
++						    unsigned long start,
++						    unsigned int nr,
++						    unsigned long align_mask,
++						    unsigned long align_offset);
++
++static inline unsigned long
++bitmap_find_next_zero_area(unsigned long *map,
++			   unsigned long size,
++			   unsigned long start,
++			   unsigned int nr,
++			   unsigned long align_mask)
 +{
-+	static struct cma_region regions[] = {
-+		CMA_REGION("fw",  1 << 20, 128 << 10, 0x32000000),
-+		CMA_REGION("b1", 32 << 20,         0, 0x33000000),
-+		CMA_REGION("b2", 16 << 20,         0, 0x44000000),
-+		{ }
-+	};
-+
-+	static const char map[] __initconst =
-+		"s5p-mfc5/f=fw;s5p-mfc5/a=b1;s5p-mfc5/b=b2;*=b1,b2";
-+
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
++	return bitmap_find_next_zero_area_off(map, size, start, nr,
++					      align_mask, 0);
 +}
-+
-+#else
-+
-+#define aquila_reserve NULL
-+
-+#endif
-+
- static void __init aquila_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -690,4 +715,5 @@ MACHINE_START(AQUILA, "Aquila")
- 	.map_io		= aquila_map_io,
- 	.init_machine	= aquila_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.reserve	= aquila_reserve,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index b1dcf96..0bda14f 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -25,6 +25,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
-+#include <linux/cma.h>
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -809,6 +810,30 @@ static void __init goni_sound_init(void)
- 	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
+ extern int bitmap_scnprintf(char *buf, unsigned int len,
+ 			const unsigned long *src, int nbits);
+diff --git a/lib/bitmap.c b/lib/bitmap.c
+index 741fae9..8e75a6f 100644
+--- a/lib/bitmap.c
++++ b/lib/bitmap.c
+@@ -315,30 +315,32 @@ void bitmap_clear(unsigned long *map, int start, int nr)
  }
+ EXPORT_SYMBOL(bitmap_clear);
  
-+#ifdef CONFIG_CMA
-+
-+static void __init goni_reserve(void)
-+{
-+	static struct cma_region regions[] = {
-+		CMA_REGION("fw",  1 << 20, 128 << 10, 0x32000000),
-+		CMA_REGION("b1", 32 << 20,         0, 0x33000000),
-+		CMA_REGION("b2", 16 << 20,         0, 0x44000000),
-+		{ }
-+	};
-+
-+	static const char map[] __initconst =
-+		"s5p-mfc5/f=fw;s5p-mfc5/a=b1;s5p-mfc5/b=b2;*=b1,b2";
-+
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
-+}
-+
-+#else
-+
-+#define goni_reserve NULL
-+
-+#endif
-+
- static void __init goni_map_io(void)
+-/*
++/**
+  * bitmap_find_next_zero_area - find a contiguous aligned zero area
+  * @map: The address to base the search on
+  * @size: The bitmap size in bits
+  * @start: The bitnumber to start searching at
+  * @nr: The number of zeroed bits we're looking for
+  * @align_mask: Alignment mask for zero area
++ * @align_offset: Alignment offset for zero area.
+  *
+  * The @align_mask should be one less than a power of 2; the effect is that
+- * the bit offset of all zero areas this function finds is multiples of that
+- * power of 2. A @align_mask of 0 means no alignment is required.
++ * the bit offset of all zero areas this function finds plus @align_offset
++ * is multiple of that power of 2.
+  */
+-unsigned long bitmap_find_next_zero_area(unsigned long *map,
+-					 unsigned long size,
+-					 unsigned long start,
+-					 unsigned int nr,
+-					 unsigned long align_mask)
++unsigned long bitmap_find_next_zero_area_off(unsigned long *map,
++					     unsigned long size,
++					     unsigned long start,
++					     unsigned int nr,
++					     unsigned long align_mask,
++					     unsigned long align_offset)
  {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -865,4 +890,5 @@ MACHINE_START(GONI, "GONI")
- 	.map_io		= goni_map_io,
- 	.init_machine	= goni_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.reserve	= goni_reserve,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
-index 16d8fc0..90a2296 100644
---- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-+++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-@@ -13,6 +13,7 @@
- #include <linux/i2c.h>
- #include <linux/gpio_keys.h>
- #include <linux/gpio.h>
-+#include <linux/cma.h>
+ 	unsigned long index, end, i;
+ again:
+ 	index = find_next_zero_bit(map, size, start);
  
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -138,6 +139,21 @@ static void __init universal_map_io(void)
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
+ 	/* Align allocation */
+-	index = __ALIGN_MASK(index, align_mask);
++	index = __ALIGN_MASK(index + align_offset, align_mask) - align_offset;
+ 
+ 	end = index + nr;
+ 	if (end > size)
+@@ -350,7 +352,7 @@ again:
+ 	}
+ 	return index;
  }
+-EXPORT_SYMBOL(bitmap_find_next_zero_area);
++EXPORT_SYMBOL(bitmap_find_next_zero_area_off);
  
-+static void __init universal_reserve(void)
-+{
-+	static struct cma_region regions[] = {
-+		CMA_REGION("r" , 64 << 20, 0, 0),
-+		CMA_REGION("fw",  1 << 20, 128 << 10),
-+		{ }
-+	};
-+
-+	static const char map[] __initconst =
-+		"s3c-mfc5/f=fw;*=r";
-+
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
-+}
-+
- static void __init universal_machine_init(void)
- {
- 	i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
-@@ -152,6 +168,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
- 	.boot_params	= S5P_PA_SDRAM + 0x100,
- 	.init_irq	= s5pv310_init_irq,
- 	.map_io		= universal_map_io,
-+	.reserve	= universal_reserve,
- 	.init_machine	= universal_machine_init,
- 	.timer		= &s5pv310_timer,
- MACHINE_END
+ /*
+  * Bitmap printing & parsing functions: first version by Bill Irwin,
 -- 
 1.7.2.3
