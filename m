@@ -1,38 +1,46 @@
-From: inki.dae@samsung.com (daeinki)
-Date: Fri, 19 Nov 2010 10:28:27 +0900
-Subject: [PATCH 0/3] S5PV210: added MIPI-DSI Driver.
-Message-ID: <4CE5D2BB.2060308@samsung.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Fri, 19 Nov 2010 10:29:24 +0900
+Subject: [PATCH 1/3] FB: added a structure for CPU interface to linux/fb.h
+In-Reply-To: <>
+References: <>
+Message-ID: <1290130164-7835-1-git-send-email-inki.dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+FB: added a structure for CPU interface to linux/fb.h
 
-This patch is a MIPI-DSI driver for S5PV210.
-
-PATCH 1/3: add a structure for CPU interface to linux/fb.h
-- RGB or CPU interfaces could be used as display mode but framebuffer
+RGB or CPU interfaces could be used as display mode but framebuffer
 framework doesn't consider CPU interface so I added this structure
 because fb_cpumode structure could be used commonly.
 
-PATCH 2/3: add parameters for CPU interface to plat-samsung/fb.h
-- MIPI-DSI driver would use s3c-fb driver so I added some parameters
-because MIPI-DSI driver supports CPU interface also.
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ include/linux/fb.h |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-PATCH 3/3: add MIPI-DSI driver for S5PV210.
-
-driver features:
-. Maximum resolution ranges up to XGA (1024x760)
-. CSIS0 supports 1,2,3 or 4 data lanes
-. CSIS1 supports 1 or 2 data lanes
-. supports pixel format : 16bpp, 18bpp packed,
-    18bpp loosely packed (3 byte format), and 24bpp
-. supports RGB interface for video image from display controller
-. support I80 interface for command mode image input from display controller
-. supports PMS control inteerface for PLL to configure byte clock frequency
-. supports Prescaler to generate escape clock from byte clock
-
-
-thank you.
-
-signed-off-by: Inki Dae <inki.dae@samsung.com>
-signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+index 7fca3dc..9b9842c 100644
+--- a/include/linux/fb.h
++++ b/include/linux/fb.h
+@@ -1147,6 +1147,18 @@ struct fb_videomode {
+ 	u32 flag;
+ };
+ 
++struct fb_cpumode {
++	const char *name;	/* optional */
++	u32 refresh;		/* optional */
++	u32 xres;
++	u32 yres;
++	u32 pixclock;
++	u32 cs_setup;
++	u32 wr_setup;
++	u32 wr_act;
++	u32 wr_hold;
++};
++
+ extern const char *fb_mode_option;
+ extern const struct fb_videomode vesa_modes[];
+ 
+-- 
+1.5.4.3
