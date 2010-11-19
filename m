@@ -1,35 +1,55 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Fri, 19 Nov 2010 12:42:47 +0800
-Subject: [PATCH V3 0/6] pxa3xx_nand update series set
-In-Reply-To: <AANLkTikVAU5KAN072O7xp=A3meFTw5AadUSoqbzEGofO@mail.gmail.com>
-References: <1287742484-4276-1-git-send-email-leiwen@marvell.com>
-	<AANLkTikVAU5KAN072O7xp=A3meFTw5AadUSoqbzEGofO@mail.gmail.com>
-Message-ID: <AANLkTin2O-mQi9jxnJsgBr82T1FRrRavMA5MMnvzueJ7@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 18 Nov 2010 22:29:20 -0700 (MST)
+Subject: [PATCH 5/8] OMAP2+: hwmod: rename omap_hwmod_mutex to
+	_hwmod_list_mutex
+In-Reply-To: <4CE2C01D.8010703@ti.com>
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+	<20101116101808.22777.52852.stgit@twilight.localdomain>
+	<4CE2C01D.8010703@ti.com>
+Message-ID: <alpine.DEB.2.00.1011182225480.7544@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Beno?t,
 
-Would you mind check whether those patches need any fix, or could be merged now?
+On Tue, 16 Nov 2010, Cousson, Benoit wrote:
 
-Thanks,
-Lei
+> Funny, I was about to send you a RFC to get rid of that mutex :-)
+> 
+> Today that mutex is preventing us to be re-entrant during hwmod lookup and
+> for_each_by_class iteration, and we'd like to in order to manage link between
+> 2 hwmods.
+> 
+> The context is the link between mcbsp and sidetone on OMAP3. Since this module
+> are tightly coupled, I was suggesting to Kishon to add the sidetone reference
+> directly in the mcbsp hwmod in order to create a omap_device that will handle
+> the 2 hwmods at the same time.
+> 
+> Since we are using the iteration to get all the hwmod that belongs to the
+> mcbsp class we cannot call the lookup function to get the sidetone hwmod at
+> that time.
+> For the moment we need to do 2 iteration and use intermediate storage to
+> workaround that.
+> 
+> After checking the purpose of the mutex, I was wondering if this is useful.
+> For the moment the creation of the hwmod list is done only at init time, and
+> nothing is supposed to change that at runtime except the unregister function.
+> 
+> So I've started to get rid of this function, then of the mutex and I added the
+> __init to all these registration functions to avoid the usage at runtime. It
+> will save a little bit of memory as well.
+> 
+> Thanks to that we can now use the omap_hwmod_lookup inside the
+> omap_hwmod_for_each_by_class.
+> 
+> Does that make sense to you?
+> I can send you the patches if you want.
 
-On Fri, Oct 22, 2010 at 6:15 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Fri, Oct 22, 2010 at 6:14 PM, Lei Wen <leiwen@marvell.com> wrote:
->> [PATCH V3 1/6] pxa3xx_nand: make scan procedure more clear
->> [PATCH V3 2/6] pxa3xx_nand: rework irq logic
->> [PATCH V3 3/6] pxa3xx_nand: discard wait_for_event,write_cmd,__readid function
->> [PATCH V3 4/6] pxa3xx_nand: unify prepare command
->> [PATCH V3 5/6] pxa3xx_nand: mtd scan id process could be defined by driver itself
->> [PATCH V3 6/6] pxa3xx_nand: clean the keep configure code
->>
->
-> Hi Eric and all,
->
-> Patches are refreshed. Please help to review.
->
-> Best Regards
-> Haojian
->
+Yep, that sounds fine to me.  I'll plan to drop the mutex rename patch 
+once you send your patch to avoid the noise.  I guess that 
+omap_hwmod_register() can become static also, and can be renamed to 
+_register(), and we'll just use omap_hwmod_init() as the entry point to 
+register hwmods.
+
+
+- Paul
