@@ -1,49 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Nov 2010 09:55:23 +0900
-Subject: [PATCH 1/9] S5PV310: DMA: Add platform devices for PL330 DMACs
-In-Reply-To: <20101118112722.GA22410@sirena.org.uk>
-References: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
-	<023c01cb74c6$ee6404f0$cb2c0ed0$%kim@samsung.com>
-	<AANLkTinPtkFccbrZ+-2244-=uK-83M_FSB3ZXOTuiNFw@mail.gmail.com>
-	<20101118112722.GA22410@sirena.org.uk>
-Message-ID: <006a01cb8784$7494e920$5dbebb60$%kim@samsung.com>
+From: inki.dae@samsung.com (daeinki)
+Date: Fri, 19 Nov 2010 10:28:27 +0900
+Subject: [PATCH 0/3] S5PV210: added MIPI-DSI Driver.
+Message-ID: <4CE5D2BB.2060308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Thu, Nov 18, 2010 at 06:24:40PM +0900, Jassi Brar wrote:
-> 
-> > I am re-submitting this 9 patch series after required updates.
-> 
-> All
-> 
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> 
-> It'd be good if we could get them into ASoC in some way this release
-> (either by cross merging a branch or just applying them there) so we
-> could get the rest of Jassi's Samsung cleanup patches in too.
+Hello all,
 
-Hi :-)
+This patch is a MIPI-DSI driver for S5PV210.
 
-Yeah, I agree with you...I applied them into next-samsung-asoc and
-for-broonie.
+PATCH 1/3: add a structure for CPU interface to linux/fb.h
+- RGB or CPU interfaces could be used as display mode but framebuffer
+framework doesn't consider CPU interface so I added this structure
+because fb_cpumode structure could be used commonly.
 
-So you can get/merge them from:
+PATCH 2/3: add parameters for CPU interface to plat-samsung/fb.h
+- MIPI-DSI driver would use s3c-fb driver so I added some parameters
+because MIPI-DSI driver supports CPU interface also.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next-samsung-asoc
+PATCH 3/3: add MIPI-DSI driver for S5PV210.
 
-As a note, following is merge commit of it in my for-next.
-commit 5cb0bfd842fd2d5095a09de9548aeee287addcd0(Merge branch
-'next-samsung-asoc' into for-next)
+driver features:
+. Maximum resolution ranges up to XGA (1024x760)
+. CSIS0 supports 1,2,3 or 4 data lanes
+. CSIS1 supports 1 or 2 data lanes
+. supports pixel format : 16bpp, 18bpp packed,
+    18bpp loosely packed (3 byte format), and 24bpp
+. supports RGB interface for video image from display controller
+. support I80 interface for command mode image input from display controller
+. supports PMS control inteerface for PLL to configure byte clock frequency
+. supports Prescaler to generate escape clock from byte clock
 
-If any problems, please let me know.
 
-Thanks.
+thank you.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+signed-off-by: Inki Dae <inki.dae@samsung.com>
+signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
