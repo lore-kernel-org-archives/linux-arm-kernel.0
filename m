@@ -1,76 +1,54 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Fri, 19 Nov 2010 08:22:10 -0600
-Subject: [PATCH v3 2/5] OMAP: mailbox: fix rx interrupt disable in omap4
-In-Reply-To: <20101119083250.GH6446@legolas.emea.dhcp.ti.com>
-References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
-	<1290107742-16760-3-git-send-email-h-kanigeri2@ti.com>
-	<4CE5B68F.8000502@ti.com>
-	<AANLkTinVOKZoSRkXyfzUap5mOmRE5nNsvCiw_QDUxb85@mail.gmail.com>
-	<20101119083250.GH6446@legolas.emea.dhcp.ti.com>
-Message-ID: <AANLkTimzaB6aFo2=iEpR=2a3T_3oWQa6iBxQxWhBBCiw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Nov 2010 14:23:06 +0000
+Subject: [PATCH 3/5] ARM: pgtable: introduce pteval_t to represent a pte
+	value
+In-Reply-To: <E1PIlop-0007qc-1e@rmk-PC.arm.linux.org.uk>
+References: <20101117172717.GF5308@n2100.arm.linux.org.uk>
+	<E1PIlop-0007qc-1e@rmk-PC.arm.linux.org.uk>
+Message-ID: <AANLkTi=iT_wG22WTax=2TUz7OPqgqvbFaqcz22h+c7=y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
-
-On Fri, Nov 19, 2010 at 2:32 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Thu, Nov 18, 2010 at 06:07:40PM -0600, Kanigeri, Hari wrote:
->>
->> Benoit,
->>
->> On Thu, Nov 18, 2010 at 5:28 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->>>
->>> On 11/18/2010 8:15 PM, Hari Kanigeri wrote:
->>>>
->>>> disabling rx interrupt on omap4 is different than its pre-decessors.
->>>> The bit in OMAP4_MAILBOX_IRQENABLE_CLR should be set to disable the
->>>> interrupts instead of clearing the bit.
->>>>
->>>> Signed-off-by: Hari Kanigeri<h-kanigeri2@ti.com>
->>>> ---
->>>> ?arch/arm/mach-omap2/mailbox.c | ? ?5 ++++-
->>>> ?1 files changed, 4 insertions(+), 1 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/mailbox.c
->>>> b/arch/arm/mach-omap2/mailbox.c
->>>> index 42dbfa4..82b5ced 100644
->>>> --- a/arch/arm/mach-omap2/mailbox.c
->>>> +++ b/arch/arm/mach-omap2/mailbox.c
->>>> @@ -195,7 +195,10 @@ static void omap2_mbox_disable_irq(struct omap_mbox
->>>> *mbox,
->>>> ? ? ? ?struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
->>>> ? ? ? ?u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
->>>> ? ? ? ?l = mbox_read_reg(p->irqdisable);
->>>> - ? ? ? l&= ~bit;
->>>> + ? ? ? if (cpu_is_omap44xx())
->>>
->>> Since it is not omap version specific but IP version specific, you should
->>> not use cpu_is_ to do that. Moreover cpu_is calls should be used during
->>> init
->>> only.
->>> You can use the rev field in hwmod_class in order to detect the IP
->>> version.
->>> Smartreflex series for 3630 is already using that kind of mechanism.
->>> You will have to copy that revision information into pdata struct and
->>> then
->>> use that here.
->>
->> I see your point, but since mailbox hwmod patches from Omar are still
->> under review I didn't find any other option than to enable this
->> This is critical functionality that I want to include in and not wait
->> till the hwmod patches are accepted.
->> Please let me know if there is any other way of approaching this problem ?
+On 17 November 2010 17:29, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -10,6 +10,7 @@
+> ?#ifndef _ASMARM_PGTABLE_H
+> ?#define _ASMARM_PGTABLE_H
 >
-> how about you read the IP revision yourself during probe ? Or pass in a
-> flag like I said on the other email ?
+> +#include <linux/const.h>
+> ?#include <asm-generic/4level-fixup.h>
+> ?#include <asm/proc-fns.h>
 >
+> @@ -165,30 +166,30 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+> ?* The PTE table pointer refers to the hardware entries; the "Linux"
+> ?* entries are stored 1024 bytes below.
+> ?*/
+> -#define L_PTE_PRESENT ? ? ? ? ?(1 << 0)
+> -#define L_PTE_YOUNG ? ? ? ? ? ?(1 << 1)
+> -#define L_PTE_FILE ? ? ? ? ? ? (1 << 2) ? ? ? ?/* only when !PRESENT */
+> -#define L_PTE_DIRTY ? ? ? ? ? ?(1 << 6)
+> -#define L_PTE_WRITE ? ? ? ? ? ?(1 << 7)
+> -#define L_PTE_USER ? ? ? ? ? ? (1 << 8)
+> -#define L_PTE_EXEC ? ? ? ? ? ? (1 << 9)
+> -#define L_PTE_SHARED ? ? ? ? ? (1 << 10) ? ? ? /* shared(v6), coherent(xsc3) */
+> +#define L_PTE_PRESENT ? ? ? ? ?(_AT(pteval_t, 1) << 0)
+> +#define L_PTE_YOUNG ? ? ? ? ? ?(_AT(pteval_t, 1) << 1)
+> +#define L_PTE_FILE ? ? ? ? ? ? (_AT(pteval_t, 1) << 2) /* only when !PRESENT */
+> +#define L_PTE_DIRTY ? ? ? ? ? ?(_AT(pteval_t, 1) << 6)
+> +#define L_PTE_WRITE ? ? ? ? ? ?(_AT(pteval_t, 1) << 7)
+> +#define L_PTE_USER ? ? ? ? ? ? (_AT(pteval_t, 1) << 8)
+> +#define L_PTE_EXEC ? ? ? ? ? ? (_AT(pteval_t, 1) << 9)
+> +#define L_PTE_SHARED ? ? ? ? ? (_AT(pteval_t, 1) << 10) ? ? ? ?/* shared(v6), coherent(xsc3) */
 
-I like your proposal of reading the IP revision in probe. I will send
-a revised patch for this.
+One of my patches which adds pmdval_t etc. also defines the PMD_SECT_*
+macros with _AT(pmdval_t...). For consistency in the same file, I
+defined the PTE_* as _AT(pteval_t), though the latter are only used in
+.S files. Note that 64-bit values aren't handled by .S anyway.
 
-Benoit, is this ok until we move to hwmod implemenation ?
+Should your patch use _AT() for PTE_* macros as well or we just leave
+them as they are?
 
-
-Thank you,
-Best regards,
-Hari Kanigeri
+-- 
+Catalin
