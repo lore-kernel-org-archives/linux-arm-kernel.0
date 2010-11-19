@@ -1,444 +1,297 @@
 From: m.nazarewicz@samsung.com (Michal Nazarewicz)
-Date: Fri, 19 Nov 2010 16:58:04 +0100
-Subject: [RFCv6 06/13] mm: cma: Best-fit algorithm added
+Date: Fri, 19 Nov 2010 16:58:06 +0100
+Subject: [RFCv6 08/13] mm: move some functions to page_isolation.c
 In-Reply-To: <cover.1290172312.git.m.nazarewicz@samsung.com>
 References: <cover.1290172312.git.m.nazarewicz@samsung.com>
-Message-ID: <b82ec382957f8846aedcb83f650aa1b48e5b87a8.1290172312.git.m.nazarewicz@samsung.com>
+Message-ID: <1460279e4d5bc268225a9970402fe248baa0227c.1290172312.git.m.nazarewicz@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commits adds a best-fit algorithm to the set of
-algorithms supported by the CMA.
+From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 
+Memory hotplug is a logic for making pages unused in the specified range
+of pfn. So, some of core logics can be used for other purpose as
+allocating a very large contigous memory block.
+
+This patch moves some functions from mm/memory_hotplug.c to
+mm/page_isolation.c. This helps adding a function for large-alloc in
+page_isolation.c with memory-unplug technique.
+
+Changelog: 2010/10/26
+ - adjusted to mmotm-1024 + Bob's 3 clean ups.
+Changelog: 2010/10/21
+ - adjusted to mmotm-1020
+
+Signed-off-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- mm/Kconfig        |   16 ++-
- mm/Makefile       |    1 +
- mm/cma-best-fit.c |  372 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 388 insertions(+), 1 deletions(-)
- create mode 100644 mm/cma-best-fit.c
+ include/linux/page-isolation.h |    7 +++
+ mm/memory_hotplug.c            |  108 --------------------------------------
+ mm/page_isolation.c            |  111 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 118 insertions(+), 108 deletions(-)
 
-diff --git a/mm/Kconfig b/mm/Kconfig
-index a5480ea..5ad2471 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -332,10 +332,13 @@ config CLEANCACHE
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index 051c1b1..58cdbac 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -33,5 +33,12 @@ test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
+ extern int set_migratetype_isolate(struct page *page);
+ extern void unset_migratetype_isolate(struct page *page);
  
- 	  If unsure, say Y to enable cleancache
- 
-+config CMA_HAS_ALLOCATOR
-+	bool
-+
- config CMA
- 	bool "Contiguous Memory Allocator framework"
- 	# Currently there is only one allocator so force it on
--	select CMA_GENERIC_ALLOCATOR
-+	select CMA_GENERIC_ALLOCATOR if !CMA_HAS_ALLOCATOR
- 	help
- 	  This enables the Contiguous Memory Allocator framework which
- 	  allows drivers to allocate big physically-contiguous blocks of
-@@ -391,3 +394,14 @@ config CMA_GENERIC_ALLOCATOR
- 	  implementations: the first-fit, bitmap-based algorithm or
- 	  a best-fit, red-black tree-based algorithm.  The algorithm can
- 	  be changed under "Library routines".
-+
-+config CMA_BEST_FIT
-+	bool "CMA best-fit allocator"
-+	depends on CMA
-+	select CMA_HAS_ALLOCATOR
-+	help
-+	  This is a best-fit algorithm running in O(n log n) time where
-+	  n is the number of existing holes (which is never greater then
-+	  the number of allocated regions and usually much smaller).  It
-+	  allocates area from the smallest hole that is big enough for
-+	  allocation in question.
-diff --git a/mm/Makefile b/mm/Makefile
-index c6a84f1..2cb2569 100644
---- a/mm/Makefile
-+++ b/mm/Makefile
-@@ -44,3 +44,4 @@ obj-$(CONFIG_DEBUG_KMEMLEAK) += kmemleak.o
- obj-$(CONFIG_DEBUG_KMEMLEAK_TEST) += kmemleak-test.o
- obj-$(CONFIG_CLEANCACHE) += cleancache.o
- obj-$(CONFIG_CMA) += cma.o
-+obj-$(CONFIG_CMA_BEST_FIT) += cma-best-fit.o
-diff --git a/mm/cma-best-fit.c b/mm/cma-best-fit.c
-new file mode 100644
-index 0000000..5ed1168
---- /dev/null
-+++ b/mm/cma-best-fit.c
-@@ -0,0 +1,372 @@
 +/*
-+ * Contiguous Memory Allocator framework: Best Fit allocator
-+ * Copyright (c) 2010 by Samsung Electronics.
-+ * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License or (at your optional) any later version of the license.
++ * For migration.
 + */
 +
-+#define pr_fmt(fmt) "cma: bf: " fmt
++int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn);
++unsigned long scan_lru_pages(unsigned long start, unsigned long end);
++int do_migrate_range(unsigned long start_pfn, unsigned long end_pfn);
+ 
+ #endif
+diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
+index 9260314..23f4e36 100644
+--- a/mm/memory_hotplug.c
++++ b/mm/memory_hotplug.c
+@@ -617,114 +617,6 @@ int is_mem_section_removable(unsigned long start_pfn, unsigned long nr_pages)
+ }
+ 
+ /*
+- * Confirm all pages in a range [start, end) is belongs to the same zone.
+- */
+-static int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn)
+-{
+-	unsigned long pfn;
+-	struct zone *zone = NULL;
+-	struct page *page;
+-	int i;
+-	for (pfn = start_pfn;
+-	     pfn < end_pfn;
+-	     pfn += MAX_ORDER_NR_PAGES) {
+-		i = 0;
+-		/* This is just a CONFIG_HOLES_IN_ZONE check.*/
+-		while ((i < MAX_ORDER_NR_PAGES) && !pfn_valid_within(pfn + i))
+-			i++;
+-		if (i == MAX_ORDER_NR_PAGES)
+-			continue;
+-		page = pfn_to_page(pfn + i);
+-		if (zone && page_zone(page) != zone)
+-			return 0;
+-		zone = page_zone(page);
+-	}
+-	return 1;
+-}
+-
+-/*
+- * Scanning pfn is much easier than scanning lru list.
+- * Scan pfn from start to end and Find LRU page.
+- */
+-static unsigned long scan_lru_pages(unsigned long start, unsigned long end)
+-{
+-	unsigned long pfn;
+-	struct page *page;
+-	for (pfn = start; pfn < end; pfn++) {
+-		if (pfn_valid(pfn)) {
+-			page = pfn_to_page(pfn);
+-			if (PageLRU(page))
+-				return pfn;
+-		}
+-	}
+-	return 0;
+-}
+-
+-static struct page *
+-hotremove_migrate_alloc(struct page *page, unsigned long private, int **x)
+-{
+-	/* This should be improooooved!! */
+-	return alloc_page(GFP_HIGHUSER_MOVABLE);
+-}
+-
+-#define NR_OFFLINE_AT_ONCE_PAGES	(256)
+-static int
+-do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
+-{
+-	unsigned long pfn;
+-	struct page *page;
+-	int move_pages = NR_OFFLINE_AT_ONCE_PAGES;
+-	int not_managed = 0;
+-	int ret = 0;
+-	LIST_HEAD(source);
+-
+-	for (pfn = start_pfn; pfn < end_pfn && move_pages > 0; pfn++) {
+-		if (!pfn_valid(pfn))
+-			continue;
+-		page = pfn_to_page(pfn);
+-		if (!page_count(page))
+-			continue;
+-		/*
+-		 * We can skip free pages. And we can only deal with pages on
+-		 * LRU.
+-		 */
+-		ret = isolate_lru_page(page);
+-		if (!ret) { /* Success */
+-			list_add_tail(&page->lru, &source);
+-			move_pages--;
+-			inc_zone_page_state(page, NR_ISOLATED_ANON +
+-					    page_is_file_cache(page));
+-
+-		} else {
+-#ifdef CONFIG_DEBUG_VM
+-			printk(KERN_ALERT "removing pfn %lx from LRU failed\n",
+-			       pfn);
+-			dump_page(page);
+-#endif
+-			/* Becasue we don't have big zone->lock. we should
+-			   check this again here. */
+-			if (page_count(page)) {
+-				not_managed++;
+-				ret = -EBUSY;
+-				break;
+-			}
+-		}
+-	}
+-	if (!list_empty(&source)) {
+-		if (not_managed) {
+-			putback_lru_pages(&source);
+-			goto out;
+-		}
+-		/* this function returns # of failed pages */
+-		ret = migrate_pages(&source, hotremove_migrate_alloc, 0, 1);
+-		if (ret)
+-			putback_lru_pages(&source);
+-	}
+-out:
+-	return ret;
+-}
+-
+-/*
+  * remove from free_area[] and mark all as Reserved.
+  */
+ static int
+diff --git a/mm/page_isolation.c b/mm/page_isolation.c
+index 4ae42bb..077cf19 100644
+--- a/mm/page_isolation.c
++++ b/mm/page_isolation.c
+@@ -5,6 +5,9 @@
+ #include <linux/mm.h>
+ #include <linux/page-isolation.h>
+ #include <linux/pageblock-flags.h>
++#include <linux/memcontrol.h>
++#include <linux/migrate.h>
++#include <linux/mm_inline.h>
+ #include "internal.h"
+ 
+ static inline struct page *
+@@ -139,3 +142,111 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn)
+ 	spin_unlock_irqrestore(&zone->lock, flags);
+ 	return ret ? 0 : -EBUSY;
+ }
 +
-+#ifdef CONFIG_CMA_DEBUG
-+#  define DEBUG
-+#endif
 +
-+#include <linux/errno.h>       /* Error numbers */
-+#include <linux/slab.h>        /* kmalloc() */
-+
-+#include <linux/cma.h>         /* CMA structures */
-+
-+
-+/************************* Data Types *************************/
-+
-+struct cma_bf_node {
-+	unsigned long v;
-+	struct rb_node n;
-+};
-+
-+union cma_bf_item {
-+	struct cma chunk;
-+	struct {
-+		struct cma_bf_node start, size;
-+	};
-+};
-+
-+struct cma_bf_private {
-+	struct rb_root by_start_root;
-+	struct rb_root by_size_root;
-+	bool warned;
-+};
-+
-+
-+/************************* Basic Tree Manipulation *************************/
-+
-+static int  cma_bf_node_add(struct cma_bf_node *node, struct rb_root *root,
-+			    bool unique)
++/*
++ * Confirm all pages in a range [start, end) is belongs to the same zone.
++ */
++int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn)
 +{
-+	struct rb_node **link = &root->rb_node, *parent = NULL;
-+	const unsigned long v = node->v;
-+
-+	while (*link) {
-+		struct cma_bf_node *n;
-+		parent = *link;
-+		n = rb_entry(parent, struct cma_bf_node, n);
-+
-+		if (unlikely(unique && v == n->v))
-+			return -EBUSY;
-+
-+		link = v <= n->v ? &parent->rb_left : &parent->rb_right;
++	unsigned long pfn;
++	struct zone *zone = NULL;
++	struct page *page;
++	int i;
++	for (pfn = start_pfn;
++	     pfn < end_pfn;
++	     pfn += MAX_ORDER_NR_PAGES) {
++		i = 0;
++		/* This is just a CONFIG_HOLES_IN_ZONE check.*/
++		while ((i < MAX_ORDER_NR_PAGES) && !pfn_valid_within(pfn + i))
++			i++;
++		if (i == MAX_ORDER_NR_PAGES)
++			continue;
++		page = pfn_to_page(pfn + i);
++		if (zone && page_zone(page) != zone)
++			return 0;
++		zone = page_zone(page);
 +	}
++	return 1;
++}
 +
-+	rb_link_node(&node->n, parent, link);
-+	rb_insert_color(&node->n, root);
-+
++/*
++ * Scanning pfn is much easier than scanning lru list.
++ * Scan pfn from start to end and Find LRU page.
++ */
++unsigned long scan_lru_pages(unsigned long start, unsigned long end)
++{
++	unsigned long pfn;
++	struct page *page;
++	for (pfn = start; pfn < end; pfn++) {
++		if (pfn_valid(pfn)) {
++			page = pfn_to_page(pfn);
++			if (PageLRU(page))
++				return pfn;
++		}
++	}
 +	return 0;
 +}
 +
-+static void cma_bf_node_del(struct cma_bf_node *node, struct rb_root *root)
++struct page *
++hotremove_migrate_alloc(struct page *page, unsigned long private, int **x)
 +{
-+	rb_erase(&node->n, root);
++	/* This should be improooooved!! */
++	return alloc_page(GFP_HIGHUSER_MOVABLE);
 +}
 +
-+static int  cma_bf_item_add_by_start(union cma_bf_item *item,
-+				     struct cma_bf_private *prv)
++#define NR_OFFLINE_AT_ONCE_PAGES	(256)
++int do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 +{
-+	int ret = cma_bf_node_add(&item->start, &prv->by_start_root, true);
-+	if (WARN_ON(ret && !prv->warned))
-+		prv->warned = true;
++	unsigned long pfn;
++	struct page *page;
++	int move_pages = NR_OFFLINE_AT_ONCE_PAGES;
++	int not_managed = 0;
++	int ret = 0;
++	LIST_HEAD(source);
++
++	for (pfn = start_pfn; pfn < end_pfn && move_pages > 0; pfn++) {
++		if (!pfn_valid(pfn))
++			continue;
++		page = pfn_to_page(pfn);
++		if (!page_count(page))
++			continue;
++		/*
++		 * We can skip free pages. And we can only deal with pages on
++		 * LRU.
++		 */
++		ret = isolate_lru_page(page);
++		if (!ret) { /* Success */
++			list_add_tail(&page->lru, &source);
++			move_pages--;
++			inc_zone_page_state(page, NR_ISOLATED_ANON +
++					    page_is_file_cache(page));
++
++		} else {
++#ifdef CONFIG_DEBUG_VM
++			printk(KERN_ALERT "removing pfn %lx from LRU failed\n",
++			       pfn);
++			dump_page(page);
++#endif
++			/* Because we don't have big zone->lock. we should
++			   check this again here. */
++			if (page_count(page)) {
++				not_managed++;
++				ret = -EBUSY;
++				break;
++			}
++		}
++	}
++	if (!list_empty(&source)) {
++		if (not_managed) {
++			putback_lru_pages(&source);
++			goto out;
++		}
++		/* this function returns # of failed pages */
++		ret = migrate_pages(&source, hotremove_migrate_alloc, 0, 1);
++		if (ret)
++			putback_lru_pages(&source);
++	}
++out:
 +	return ret;
 +}
-+
-+static void cma_bf_item_del_by_start(union cma_bf_item *item,
-+				     struct cma_bf_private *prv)
-+{
-+	cma_bf_node_del(&item->start, &prv->by_start_root);
-+}
-+
-+static void cma_bf_item_add_by_size(union cma_bf_item *item,
-+				    struct cma_bf_private *prv)
-+{
-+	cma_bf_node_add(&item->size, &prv->by_size_root, false);
-+}
-+
-+static void cma_bf_item_del_by_size(union cma_bf_item *item,
-+				    struct cma_bf_private *prv)
-+{
-+	cma_bf_node_del(&item->size, &prv->by_size_root);
-+}
-+
-+
-+/************************* Device API *************************/
-+
-+static int cma_bf_init(struct cma_region *reg)
-+{
-+	struct cma_bf_private *prv;
-+	union cma_bf_item *item;
-+
-+	prv = kzalloc(sizeof *prv, GFP_KERNEL);
-+	if (unlikely(!prv))
-+		return -ENOMEM;
-+
-+	item = kzalloc(sizeof *item, GFP_KERNEL);
-+	if (unlikely(!item)) {
-+		kfree(prv);
-+		return -ENOMEM;
-+	}
-+
-+	item->start.v = reg->start;
-+	item->size.v  = reg->size;
-+
-+	rb_root_init(&prv->by_start_root, &item->start.n);
-+	rb_root_init(&prv->by_size_root, &item->size.n);
-+	prv->warned = false;
-+
-+	reg->private_data = prv;
-+	return 0;
-+}
-+
-+static void cma_bf_cleanup(struct cma_region *reg)
-+{
-+	struct cma_bf_private *prv = reg->private_data;
-+	union cma_bf_item *item =
-+		rb_entry(prv->by_start_root.rb_node,
-+			 union cma_bf_item, start.n);
-+
-+	/* There should be only one item. */
-+	WARN_ON(!prv->warned &&
-+		(!item ||
-+		 item->start.n.rb_left || item->start.n.rb_right ||
-+		 item->size.n.rb_left || item->size.n.rb_right));
-+
-+	kfree(item);
-+	kfree(prv);
-+}
-+
-+struct cma *cma_bf_alloc(struct cma_region *reg,
-+			 size_t size, unsigned long alignment)
-+{
-+	struct cma_bf_private *prv = reg->private_data;
-+	struct rb_node *node = prv->by_size_root.rb_node;
-+	union cma_bf_item *hole = NULL, *item;
-+	unsigned long start;
-+	int ret;
-+
-+	/* First find hole that is large enough */
-+	while (node) {
-+		union cma_bf_item *item =
-+			rb_entry(node, union cma_bf_item, size.n);
-+
-+		if (item->size.v < size) {
-+			node = node->rb_right;
-+		} else if (item->size.v >= size) {
-+			node = node->rb_left;
-+			hole = item;
-+		}
-+	}
-+	if (!hole)
-+		return ERR_PTR(-ENOMEM);
-+
-+	/* Now look for items which can satisfy alignment requirements */
-+	for (;;) {
-+		unsigned long end = hole->start.v + hole->size.v;
-+		start = ALIGN(hole->start.v, alignment);
-+		if (start < end && end - start >= size)
-+			break;
-+
-+		node = rb_next(node);
-+		if (!node)
-+			return ERR_PTR(-ENOMEM);
-+
-+		hole = rb_entry(node, union cma_bf_item, size.n);
-+	}
-+
-+	/* And finally, take part of the hole */
-+
-+	/*
-+	 * There are three cases:
-+	 * 1. the chunk takes the whole hole,
-+	 * 2. the chunk is at the beginning or at the end of the hole, or
-+	 * 3. the chunk is in the middle of the hole.
-+	 */
-+
-+	/* Case 1, the whole hole */
-+	if (size == hole->size.v) {
-+		ret = __cma_grab(reg, start, size);
-+		if (ret)
-+			return ERR_PTR(ret);
-+
-+		cma_bf_item_del_by_start(hole, prv);
-+		cma_bf_item_del_by_size(hole, prv);
-+
-+		hole->chunk.phys = start;
-+		hole->chunk.size = size;
-+		return &hole->chunk;
-+	}
-+
-+	/* Allocate (so we can test early if ther's enough memory) */
-+	item = kmalloc(sizeof *item, GFP_KERNEL);
-+	if (unlikely(!item))
-+		return ERR_PTR(-ENOMEM);
-+
-+	/* Case 3, in the middle */
-+	if (start != hole->start.v &&
-+	    start + size != hole->start.v + hole->size.v) {
-+		union cma_bf_item *tail;
-+
-+		/*
-+		 * Space between the end of the chunk and the end of
-+		 * the region, ie. space left after the end of the
-+		 * chunk.  If this is dividable by alignment we can
-+		 * move the chunk to the end of the hole.
-+		 */
-+		unsigned long left =
-+			hole->start.v + hole->size.v - (start + size);
-+		if ((left & (alignment - 1)) == 0) {
-+			start += left;
-+			/* And so, we have reduced problem to case 2. */
-+			goto case_2;
-+		}
-+
-+		/*
-+		 * We are going to add a hole at the end.  This way,
-+		 * we will reduce the problem to case 2 -- the chunk
-+		 * will be at the end of a reduced hole.
-+		 */
-+		tail = kmalloc(sizeof *tail, GFP_KERNEL);
-+		if (unlikely(!tail)) {
-+			kfree(item);
-+			return ERR_PTR(-ENOMEM);
-+		}
-+
-+		tail->start.v = start + size;
-+		tail->size.v  =
-+			hole->start.v + hole->size.v - tail->start.v;
-+
-+		if (cma_bf_item_add_by_start(tail, prv))
-+			/*
-+			 * Things are broken beyond repair...  Abort
-+			 * inserting the hole but continue with the
-+			 * item.  We will loose some memory but we're
-+			 * screwed anyway.
-+			 */
-+			kfree(tail);
-+		else
-+			cma_bf_item_add_by_size(tail, prv);
-+
-+		/*
-+		 * It's important that we first insert the new hole in
-+		 * the tree sorted by size and later reduce the size
-+		 * of the old hole.  We will update the position of
-+		 * the old hole in the rb tree in code that handles
-+		 * case 2.
-+		 */
-+		hole->size.v = tail->start.v - hole->start.v;
-+
-+		/* Go to case 2 */
-+	}
-+
-+	/* Case 2, at the beginning or at the end */
-+case_2:
-+	/* No need to update the tree; order preserved. */
-+	if (start == hole->start.v)
-+		hole->start.v += size;
-+
-+	/* Alter hole's size */
-+	hole->size.v -= size;
-+	cma_bf_item_del_by_size(hole, prv);
-+	cma_bf_item_add_by_size(hole, prv);
-+
-+	item->chunk.phys = start;
-+	item->chunk.size = size;
-+	return &item->chunk;
-+}
-+
-+static void cma_bf_free(struct cma_chunk *chunk)
-+{
-+	struct cma_bf_private *prv = reg->private_data;
-+	union cma_bf_item *prev;
-+	struct rb_node *node;
-+	int twice;
-+
-+	{
-+		unsigned long start = item->chunk.phys;
-+		unsigned long size  = item->chunk.size;
-+		item->start.v = start;
-+		item->size.v = size;
-+	}
-+
-+	/* Add new hole */
-+	if (cma_bf_item_add_by_start(item, prv)) {
-+		/*
-+		 * We're screwed...  Just free the item and forget
-+		 * about it.  Things are broken beyond repair so no
-+		 * sense in trying to recover.
-+		 */
-+		kfree(item);
-+		return;
-+	}
-+
-+	cma_bf_item_add_by_size(item, prv);
-+
-+	/* Merge with prev or next sibling */
-+	twice = 2;
-+	node = rb_prev(&item->start.n);
-+	if (unlikely(!node))
-+		goto next;
-+	prev = rb_entry(node, union cma_bf_item, start.n);
-+
-+	for (;;) {
-+		if (prev->start.v + prev->size.v == item->start.v) {
-+			/* Remove previous hole from trees */
-+			cma_bf_item_del_by_start(prev, prv);
-+			cma_bf_item_del_by_size(prev, prv);
-+
-+			/* Alter this hole */
-+			item->start.v  = prev->start.v;
-+			item->size.v += prev->size.v;
-+			cma_bf_item_del_by_size(item, prv);
-+			cma_bf_item_del_by_size(item, prv);
-+			/*
-+			 * No need to update the by start trees as we
-+			 * do not break sequence order.
-+			 */
-+
-+			/* Free prev hole */
-+			kfree(prev);
-+		}
-+
-+next:
-+		if (!--twice)
-+			break;
-+
-+		node = rb_next(&item->start.n);
-+		if (unlikely(!node))
-+			break;
-+		prev = item;
-+		item = rb_entry(node, union cma_bf_item, start.n);
-+	}
-+}
-+
-+{
-+	__cma_ungrab(chunk->reg, chunk->phys, chunk->size);
-+	__cma_bf_free(chunk->reg, 
-+		      container_of(chunk, union cma_bf_item, chunk));
-+}
-+
-+/************************* Register *************************/
-+
-+static int cma_bf_module_init(void)
-+{
-+	static struct cma_allocator alloc = {
-+		.name    = "bf",
-+		.init    = cma_bf_init,
-+		.cleanup = cma_bf_cleanup,
-+		.alloc   = cma_bf_alloc,
-+		.free    = cma_bf_free,
-+	};
-+	return cma_allocator_register(&alloc);
-+}
-+module_init(cma_bf_module_init);
 -- 
 1.7.2.3
