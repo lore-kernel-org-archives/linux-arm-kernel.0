@@ -1,53 +1,62 @@
-From: AMartin@nvidia.com (Allen Martin)
-Date: Fri, 19 Nov 2010 14:50:50 -0800
-Subject: [PATCH] ARM: tegra: irq: protect irq suspend with CONFIG_PM
-Message-ID: <3C7A7ACA8617D24290826EC008B5CD0817D747F9E6@HQMAIL03.nvidia.com>
+From: me@felipebalbi.com (Felipe Balbi)
+Date: Sat, 20 Nov 2010 01:07:16 +0200
+Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+In-Reply-To: <AANLkTi=EMBrb0eHZyzPen2DHGR4ARh1T8ojT7jOVQ67u@mail.gmail.com>
+References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+	<1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
+	<20101119085007.GK6446@legolas.emea.dhcp.ti.com>
+	<AANLkTimSxGZufLk1RzQuBSg2vBF1p9BXFP8abVZVoLFs@mail.gmail.com>
+	<20101119120938.GN2329@legolas.emea.dhcp.ti.com>
+	<AANLkTinVf8--zmGa7svapcVpEp2BPXf33DtdruLtoJx5@mail.gmail.com>
+	<20101119125353.GB5818@legolas.emea.dhcp.ti.com>
+	<AANLkTi=VoUixouRAz-a+y9Jf6z94OtLe9UzWjnod743s@mail.gmail.com>
+	<1290176736.15533.17.camel@eowin>
+	<AANLkTi=EMBrb0eHZyzPen2DHGR4ARh1T8ojT7jOVQ67u@mail.gmail.com>
+Message-ID: <1290208036.15533.24.camel@eowin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Protect irq suspend/resume functions behind #ifdef CONFIG_PM.
-This prevents a link error if CONFIG_PM is turned off.
+Hi Hari,
 
-Signed-off-by: Allen Martin <amartin@nvidia.com>
----
- arch/arm/mach-tegra/irq.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+On Fri, 2010-11-19 at 08:44 -0600, Kanigeri, Hari wrote:
+> Not really :). Please let me know if if I am wrong, what you
+> addressing is getting the confirmation that a message is sent and what
+> I am addressing with the patch is that a response is received from
+> M3/DSP.
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 458f9c8..47b7064 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -146,6 +146,7 @@ void tegra_set_lp0_wake_pads(u32 wake_enb, u32 wake_level, u32 wake_any)
-        writel(wake_enb, pmc + PMC_WAKE_MASK);
- }
+You got it wrong. My proposal addresses the same what you say, but in a
+different and, IMO, better fashion. There's no need to add a blocking
+notifier which you can't be sure when that'll be scheduled. Have you
+measured possible worst case scenario of this patch ? What's the latency
+added by the blocking notifier ? Imagine user cpu is highly busy, and it
+takes a long time to call the blocking notifier, is that acceptable ?
 
-+#ifdef CONFIG_PM
- static void tegra_irq_handle_wake(void)
- {
-        int wake;
-@@ -174,6 +175,7 @@ static void tegra_irq_handle_wake(void)
-                generic_handle_irq(irq);
-        }
- }
-+#endif
+> > Then you kick the transfers which will:
+> >
+> > request = list_first_entry(mbox->req_list);
+> > setup_correct_registers();
+> > enable_irq();
+> > kick_transfer();
+> 
+> Writing to the mailbox fifo delivers the message to other side, and if
+> the fifo is full the messages are queued up in mbox kfifo, which are
+> then deliverd in the order they are received.
 
- static void tegra_mask(unsigned int irq)
- {
-@@ -251,6 +253,7 @@ void __init tegra_init_irq(void)
-        }
- }
+isn't that the same as what I suggested ? Messages are queued in the
+ordered they are received and sent to BIOS at the same order.
 
-+#ifdef CONFIG_PM
- void tegra_irq_suspend(void)
- {
-        tegra_legacy_irq_suspend();
-@@ -261,6 +264,7 @@ void tegra_irq_resume(void)
-        tegra_legacy_irq_resume();
-        tegra_irq_handle_wake();
- }
-+#endif
+> I don't see a use case where the senders need to know that their
+> message is actually written to mbox fifo, if there is one we can look
+> into it.
 
- #ifdef CONFIG_DEBUG_FS
- static int tegra_wake_irq_debug_show(struct seq_file *s, void *data)
---
-1.7.2.3
+I never said there's such usecase :-)
+
+> That's not true. Even if BIOS doesn't respond to a request, you could
+> still keep sending the messages.
+
+but then when do you consider a message "completed" ? When it gets sent
+or when you receive a response from BIOS ?
+
+-- 
+balbi
