@@ -1,50 +1,123 @@
-From: bpringle@sympatico.ca (Bill Pringlemeir)
-Date: Fri, 19 Nov 2010 10:47:18 -0500
-Subject: [Patch v3] Fix audmuxv2 debugfs indexing.
-In-Reply-To: <8762vy4fki.fsf@sympatico.ca> (Bill Pringlemeir's message of
-	"Mon, 15 Nov 2010 13:17:17 -0500")
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-	<20101110152619.GB8950@pengutronix.de>
-	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-	<20101112071706.GF6017@pengutronix.de>
-	<20101112114942.GA28804@sirena.org.uk> <87oc9rk6fe.fsf@sympatico.ca>
-	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
-	<20101115153058.GG12986@rakim.wolfsonmicro.main>
-	<87oc9qeg75.fsf@sympatico.ca>
-	<BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
-	<20101115162636.GH12986@rakim.wolfsonmicro.main>
-	<8762vy4fki.fsf@sympatico.ca>
-Message-ID: <BLU0-SMTP6392EE1086D2AEE817D758B83A0@phx.gbl>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Fri, 19 Nov 2010 10:55:51 -0500
+Subject: [PATCH v6 07/12] davinci: add tnetv107x evm regulators
+In-Reply-To: <1290182156-20104-1-git-send-email-cyril@ti.com>
+References: <1290182156-20104-1-git-send-email-cyril@ti.com>
+Message-ID: <1290182156-20104-8-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 Nov 2010, bpringle at sympatico.ca wrote:
+This patch adds regulator and spi board info definitions for the tps6524x
+power management IC found on tnetv107x evm boards.
 
-> No, I don't think it is an SSI protocol device either.  I think there
-> are two internal ports and five external ports, at least on the IMX
-> 25.  Maybe the documentation is cut and paste from another processor?
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+---
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |   85 +++++++++++++++++++++++++++
+ 1 files changed, 85 insertions(+), 0 deletions(-)
 
-[snip]
-
-> Thanks for you help.  I *think* I am getting closer to understanding
-> this now.
-
-I sent a service request to Freescale,
-
-[Technical Support Freescale Semiconductor] 
-
-   In reply to your Service Request SR 1-694170620: The i.MX25 AUDMUX
-   Port1 and Port2 are connected to the internal SSI modules, the
-   Port3 to Port7 are connected to external pins through the IOMUX
-   module. The Port7 can be always used as external port, regardless
-   of the CE bus mode. Should you need to contact us with regard to
-   this message, please see the notes below.
-
-It looks like the i.MX25 is a mix of the i.MX31 and i.MX35.  I think
-it makes the most sense to change the audmux_port_string() to return
-"SSI7" instead of "UNKNOWN" for this port and fix the loop indexes.
-
-I will re-submit those patches later.
-
-Regards,
-Bill Pringlemeir.
+diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
+index 1a656e8..ca23516 100644
+--- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
++++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
+@@ -26,6 +26,9 @@
+ #include <linux/input.h>
+ #include <linux/input/matrix_keypad.h>
+ #include <linux/spi/spi.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/consumer.h>
++#include <linux/regulator/driver.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -254,7 +257,89 @@ static struct tnetv107x_device_info evm_device_info __initconst = {
+ 	.ssp_config		= &ssp_config,
+ };
+ 
++static struct regulator_consumer_supply usb_consumers[] = {
++	REGULATOR_SUPPLY("vbus", "musb_hdrc.1"),
++};
++
++static struct regulator_consumer_supply lcd_consumers[] = {
++	REGULATOR_SUPPLY("vlcd", "tps6116x"),
++};
++
++static struct regulator_init_data regulators[] = {
++	{
++		.constraints		= {
++			.name		= "DCDC1",
++			.min_uV		= 1000000,
++			.max_uV		= 1000000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "DCDC2",
++			.min_uV		= 1800000,
++			.max_uV		= 1800000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "DCDC3",
++			.min_uV		= 3300000,
++			.max_uV		= 3300000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "LDO1",
++			.min_uV		= 4800000,
++			.max_uV		= 4800000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "LDO1",
++			.min_uV		= 3300000,
++			.max_uV		= 3300000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.num_consumer_supplies	= ARRAY_SIZE(usb_consumers),
++		.consumer_supplies	= usb_consumers,
++		.constraints		= {
++			.name		= "USB",
++			.min_uA		= 200000,
++			.max_uA		= 1000000,
++			.valid_ops_mask	= REGULATOR_CHANGE_CURRENT |
++					  REGULATOR_CHANGE_STATUS,
++		},
++	},
++	{
++		.num_consumer_supplies	= ARRAY_SIZE(lcd_consumers),
++		.consumer_supplies	= lcd_consumers,
++		.constraints		= {
++			.name		= "LCD",
++			.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		},
++	},
++};
++
+ static struct spi_board_info spi_info[] __initconst = {
++	{
++		.modalias	= "tps6524x",
++		.bus_num	= 1,
++		.chip_select	= 0,
++		.mode		= SPI_MODE_0,
++		.platform_data	= regulators,
++	},
+ };
+ 
+ static __init void tnetv107x_evm_board_init(void)
+-- 
+1.7.1
