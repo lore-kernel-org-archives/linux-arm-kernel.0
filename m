@@ -1,41 +1,36 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 19 Nov 2010 12:04:25 -0500
-Subject: [PATCH v6 11/12] davinci: add tnetv107x evm backlight device
-In-Reply-To: <4CE6A950.8040704@mvista.com>
+Date: Fri, 19 Nov 2010 12:11:57 -0500
+Subject: [PATCH v6 05/12] davinci: add spi devices on tnetv107x evm
+In-Reply-To: <4CE6A516.402@mvista.com>
 References: <1290182156-20104-1-git-send-email-cyril@ti.com>
-	<1290182156-20104-12-git-send-email-cyril@ti.com>
-	<4CE6A950.8040704@mvista.com>
-Message-ID: <4CE6AE19.6090600@ti.com>
+	<1290182156-20104-6-git-send-email-cyril@ti.com>
+	<4CE6A516.402@mvista.com>
+Message-ID: <4CE6AFDD.50806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2010 11:44 AM, Sergei Shtylyov wrote:
-> Hello.
+On 11/19/2010 11:25 AM, Sergei Shtylyov wrote:
+[...]
+>> +		ret = gpio_request(EVM_SPI_CS_GPIO, "spi chipsel");
 > 
-> Cyril Chemparathy wrote:
+>     Why not just:
 > 
->> The tnetv107x evm board has a backlight device that is connected on one of the
->> SSP ports.  This patch adds the board definitions necessary to plug the
->> backlight driver to the GPIO corresponding to this SSP pin.
+> 		int ret = gpio_request(EVM_SPI_CS_GPIO, "spi chipsel");
 > 
->> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->> ---
->>  arch/arm/mach-davinci/board-tnetv107x-evm.c |   14 ++++++++++++++
->>  1 files changed, 14 insertions(+), 0 deletions(-)
+>     Also, and empty line after declaration wouldn't hurt.
 > 
->> diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
->> index e3863dd..ac62de2 100644
->> --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
->> +++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
->> @@ -44,6 +44,7 @@
->>  #define EVM_MMC_WP_GPIO		21
->>  #define EVM_MMC_CD_GPIO		24
->>  #define EVM_SPI_CS_GPIO		54
->> +#define EVM_BACKLIGHT_GPIO	(SSP_GPIO_START + 2)
+[...]
+>> +	return gpio_set_value(gpio, cs ? 1 : 0);
 > 
->     Why it's not aligned with others?
+>     Why not do it right with gpio_direction_output() call?
 
-It actually is aligned if you remove the leading space/+.
+Sure.  I might as well change to use gpio_request_one() while I'm at it.
+
+If I get enough comments to warrant another revision of this series, I
+will put in this change at the time.  Otherwise, I'd rather roll this in
+with other patches on my pending list.  Is that ok?
+
+Thanks for taking a look, Sergei.
 
 Regards
-Cyril.
+- Cyril.
