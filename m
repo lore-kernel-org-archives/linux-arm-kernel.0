@@ -1,107 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 19 Nov 2010 10:50:07 +0200
-Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
-	multiple readers
-In-Reply-To: <1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
-References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
-	<1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <20101119085007.GK6446@legolas.emea.dhcp.ti.com>
+From: marek.belisko@open-nandra.com (Marek Belisko)
+Date: Fri, 19 Nov 2010 10:15:39 +0100
+Subject: [PATCH] ARM: s3x24xx: Fix gpiochip_add complaining.
+Message-ID: <1290158139-16105-1-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Make mini2440_defconfig. During kernel startup there is:
+gpiochip_add: gpios 288..303 (GPIOK) failed to register
+gpiochip_add: gpios 320..334 (GPIOL) failed to register
+gpiochip_add: gpios 352..353 (GPIOM) failed to register
 
-On Thu, Nov 18, 2010 at 01:15:42PM -0600, Hari Kanigeri wrote:
->In the current mailbox driver, the mailbox internal pointer for
->callback can be directly manipulated by the Users, so a second
->User can easily corrupt the first user's callback pointer.
->The initial effort to correct this issue can be referred here:
->https://patchwork.kernel.org/patch/107520/
->
->Along with fixing the above stated issue, this patch  adds the
->flexibility option to register notifications from
->multiple readers to the events received on a mailbox instance.
->The discussion regarding this can be referred here.
->http://www.mail-archive.com/linux-omap at vger.kernel.org/msg30671.html
->
->Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
->Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+because s3c2440 doesn't have following gpios. Gpios are
+available only at upper cpu version (s3c2443).
 
-Personally, I don't like this patch. I think it's much better to have a
-per-message callback then a "global" notification which all users will
-listen to.
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+---
+ arch/arm/plat-s3c24xx/gpiolib.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-What will happen is that every user will have to check if every message
-belongs to them based on the notifications.
-
-Imagine a hypothetical situation where you have 100 users each with 100
-messages. You will have 100 * 100 (10.000)
-"does-this-message-belongs-to-me" checks.
-
-Rather than doing it this way, I would, as the easiest path, add a
-"callback" parameter to omap_mbox_request_send() and then, internally,
-allocate a e.g. struct omap_mbox_request and add that to a list of pending
-messages. Something like:
-
-struct omap_mbox_request {
-	struct omap_mbox	*mbox;
-	int			(*complete)(void *context);
-	void			*context;
-	void			*buf;
-	unsigned		len;
-	struct list_head	list;
-};
-
-[...]
-
-int omap_mbox_request_send(struct omap_mbox *mbox, mbox_msg_t msg, int
-		(*complete)(void *context), void *context, gfp_t flags)
-{
-	struct omap_mbox_queue	*mq = mbox->txq;
-	struct omap_mbox_request	*req;
-	int			ret = 0;
-	int			len;
-
-	req = kzalloc(sizeof(*req), flags);
-	if (!req) {
-		[...]
-	}
-
-	memcpy(req->buf, &msg, sizeof(msg));
-	req->len = sizeof(msg));
-	req->mbox = msg;
-	req->complete = complete;
-	req->context = context;
-	INIT_LIST_HEAD(&req->list);
-
-	list_add_tail(&req->list, &mq->req_list);
-
-	/* kick the tasklet here */
-
-	return 0;
-}
-
-then on your tasklet, you simply iterate over the list and start sending
-one by one and calling callback when it completes. You would be giving
-your users a more asynchronous API and you wouldn't need this notifier
-which, IMO, isn't a good solution at all.
-
-But hey, since you'd be doing so many changes, you might as well provide
-a:
-
-omap_mbox_alloc_req();
-
-to allocate a struct omap_mbox_request and a
-
-omap_mbox_queue();
-
-to add a request to the list (simply rename omap_mbox_send to
-omap_mbox_queue() and make the necessary changes, like changing the
-prototype to omap_mbox_queue(struct omap_mbux *mbox, struct
-omap_mbox_request *req);)
-
-In any case, even though I don't like the solution, it's Hiroshi's
-decision to take or not this patch :-p
-
+diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
+index 24c6f5a..0428a92 100644
+--- a/arch/arm/plat-s3c24xx/gpiolib.c
++++ b/arch/arm/plat-s3c24xx/gpiolib.c
+@@ -182,7 +182,9 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
+ 			.label			= "GPIOJ",
+ 			.ngpio			= 16,
+ 		},
+-	}, {
++	},
++#ifdef CONFIG_CPU_S3C2443
++	{
+ 		.base	= S3C2443_GPKCON,
+ 		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
+ 		.chip	= {
+@@ -210,6 +212,7 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
+ 			.ngpio			= 2,
+ 		},
+ 	},
++#endif
+ };
+ 
+ 
 -- 
-balbi
+1.7.1
