@@ -1,35 +1,43 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Fri, 19 Nov 2010 12:27:26 -0800 (PST)
-Subject: [PATCH v4 2/2] msm: gpio: Add irq support to v2 gpiolib.
-In-Reply-To: <AANLkTi=VGx1xR3f7_8-cMQAmaz6PQ-t=Xubk_Jtp911V@mail.gmail.com>
-References: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
-	<1290109970-26752-2-git-send-email-gbean@codeaurora.org>
-	<AANLkTimTsyhjHJZggFO31C-2RswpmKWn-V4pGEiQ3+_2@mail.gmail.com>
-	<alpine.DEB.2.00.1011181229380.26784@gbean-linux.qualcomm.com>
-	<AANLkTi=p02P=-JQ9+FynFyM1yxrAh3utKTD2uzqhnLxK@mail.gmail.com>
-	<alpine.DEB.2.00.1011181256470.29924@gbean-linux.qualcomm.com>
-	<AANLkTiknYmWOmiFXGp6h2dT==aMuGs3BtXi82b6Vdq5i@mail.gmail.com>
-	<alpine.DEB.2.00.1011191035210.10052@gbean-linux.qualcomm.com>
-	<AANLkTiknSudbo_j+nqBqmds49CWyqXf0jpvz+DTYH-zg@mail.gmail.com>
-	<alpine.DEB.2.00.1011191053040.10560@gbean-linux.qualcomm.com>
-	<AANLkTi=VGx1xR3f7_8-cMQAmaz6PQ-t=Xubk_Jtp911V@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1011191223570.10560@gbean-linux.qualcomm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 19 Nov 2010 21:31:04 +0100
+Subject: [PATCH 35/51] ARM: mx25: dynamically allocate imx2-wdt devices
+In-Reply-To: <1290029419-21435-35-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20101117212821.GF8942@pengutronix.de>
+	<1290029419-21435-35-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20101119203103.GX8942@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Since gpio.c is v1, we used gpio-v2.c for v2.
->
-> Greg, i agree your point ,but i think v2 differs from v1 with a new
-> features distinguished.Also there might be a intention behind going
-> for v2 that might resolve some hardware erratas in v1.
+Hello,
 
-V2 is not an extension to or erratas to v1, it is almost
-completely different.  Any erratas to v1 would be released as v1.1 (I suspect).
+just a minor nit I'm going to fix in my tree
 
-> what if again a new generation comes then we will name it gpio-v3.c ??
+On Wed, Nov 17, 2010 at 10:30:03PM +0100, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-mx25/Kconfig                      |    1 +
+>  arch/arm/mach-mx25/devices-imx25.h              |    4 ++++
+>  arch/arm/mach-mx25/devices.c                    |   15 ---------------
+>  arch/arm/mach-mx25/devices.h                    |    1 -
+>  arch/arm/mach-mx25/mach-mx25_3ds.c              |    2 +-
+>  arch/arm/plat-mxc/devices/platform-imx2-wdt.c   |   14 ++++++++++----
+>  arch/arm/plat-mxc/include/mach/devices-common.h |    1 +
+>  7 files changed, 17 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx25/Kconfig b/arch/arm/mach-mx25/Kconfig
+> index 10c0f60..d152af2 100644
+> --- a/arch/arm/mach-mx25/Kconfig
+> +++ b/arch/arm/mach-mx25/Kconfig
+> @@ -6,6 +6,7 @@ config MACH_MX25_3DS
+>  	bool "Support MX25PDK (3DS) Platform"
+>  	select IMX_HAVE_PLATFORM_ESDHC
+>  	select IMX_HAVE_PLATFORM_IMXDI_RTC
+> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+IMX_HAVE_PLATFORM_IMX2_WDT sorts before IMX_HAVE_PLATFORM_IMXDI_RTC.
 
-I assume so.
+Best regards
+Uwe 
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
