@@ -1,62 +1,51 @@
-From: me@felipebalbi.com (Felipe Balbi)
-Date: Sat, 20 Nov 2010 01:07:16 +0200
-Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
-	multiple readers
-In-Reply-To: <AANLkTi=EMBrb0eHZyzPen2DHGR4ARh1T8ojT7jOVQ67u@mail.gmail.com>
-References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
-	<1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
-	<20101119085007.GK6446@legolas.emea.dhcp.ti.com>
-	<AANLkTimSxGZufLk1RzQuBSg2vBF1p9BXFP8abVZVoLFs@mail.gmail.com>
-	<20101119120938.GN2329@legolas.emea.dhcp.ti.com>
-	<AANLkTinVf8--zmGa7svapcVpEp2BPXf33DtdruLtoJx5@mail.gmail.com>
-	<20101119125353.GB5818@legolas.emea.dhcp.ti.com>
-	<AANLkTi=VoUixouRAz-a+y9Jf6z94OtLe9UzWjnod743s@mail.gmail.com>
-	<1290176736.15533.17.camel@eowin>
-	<AANLkTi=EMBrb0eHZyzPen2DHGR4ARh1T8ojT7jOVQ67u@mail.gmail.com>
-Message-ID: <1290208036.15533.24.camel@eowin>
+From: AMartin@nvidia.com (Allen Martin)
+Date: Fri, 19 Nov 2010 15:51:50 -0800
+Subject: [PATCH] ARM: tegra: suspend: protect suspend functions with CONFIG_PM
+Message-ID: <3C7A7ACA8617D24290826EC008B5CD0817D747F9EA@HQMAIL03.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hari,
+Protect suspend/resume functions behind #ifdef CONFIG_PM.  This
+prevents a compile error with CONFIG_PM turned off.
 
-On Fri, 2010-11-19 at 08:44 -0600, Kanigeri, Hari wrote:
-> Not really :). Please let me know if if I am wrong, what you
-> addressing is getting the confirmation that a message is sent and what
-> I am addressing with the patch is that a response is received from
-> M3/DSP.
+Signed-off-by: Allen Martin <amartin@nvidia.com>
+---
+ arch/arm/mach-tegra/suspend.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-You got it wrong. My proposal addresses the same what you say, but in a
-different and, IMO, better fashion. There's no need to add a blocking
-notifier which you can't be sure when that'll be scheduled. Have you
-measured possible worst case scenario of this patch ? What's the latency
-added by the blocking notifier ? Imagine user cpu is highly busy, and it
-takes a long time to call the blocking notifier, is that acceptable ?
+diff --git a/arch/arm/mach-tegra/suspend.c b/arch/arm/mach-tegra/suspend.c
+index f691e90..ead053e 100644
+--- a/arch/arm/mach-tegra/suspend.c
++++ b/arch/arm/mach-tegra/suspend.c
+@@ -79,10 +79,12 @@ struct suspend_context {
+ volatile struct suspend_context tegra_sctx;
 
-> > Then you kick the transfers which will:
-> >
-> > request = list_first_entry(mbox->req_list);
-> > setup_correct_registers();
-> > enable_irq();
-> > kick_transfer();
-> 
-> Writing to the mailbox fifo delivers the message to other side, and if
-> the fifo is full the messages are queued up in mbox kfifo, which are
-> then deliverd in the order they are received.
+ static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
++#ifdef CONFIG_PM
+ static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+ static void __iomem *flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
+ static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE)+0x100;
+ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
++#endif
 
-isn't that the same as what I suggested ? Messages are queued in the
-ordered they are received and sent to BIOS at the same order.
+ #define PMC_CTRL               0x0
+ #define PMC_CTRL_LATCH_WAKEUPS (1 << 5)
+@@ -251,6 +253,7 @@ static int create_suspend_pgtable(void)
 
-> I don't see a use case where the senders need to know that their
-> message is actually written to mbox fifo, if there is one we can look
-> into it.
 
-I never said there's such usecase :-)
 
-> That's not true. Even if BIOS doesn't respond to a request, you could
-> still keep sending the messages.
++#ifdef CONFIG_PM
+ /*
+  * suspend_cpu_complex
+  *
+@@ -387,8 +390,6 @@ unsigned int tegra_suspend_lp2(unsigned int us)
+        return remain;
+ }
 
-but then when do you consider a message "completed" ? When it gets sent
-or when you receive a response from BIOS ?
-
--- 
-balbi
+-#ifdef CONFIG_PM
+-
+ /* ensures that sufficient time is passed for a register write to
+  * serialize into the 32KHz domain */
+ static void pmc_32kwritel(u32 val, unsigned long offs)
+--
+1.7.2.3
