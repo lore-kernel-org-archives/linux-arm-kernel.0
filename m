@@ -1,43 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 19 Nov 2010 21:31:04 +0100
-Subject: [PATCH 35/51] ARM: mx25: dynamically allocate imx2-wdt devices
-In-Reply-To: <1290029419-21435-35-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20101117212821.GF8942@pengutronix.de>
-	<1290029419-21435-35-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20101119203103.GX8942@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 19 Nov 2010 18:34:14 -0200
+Subject: [PATCH 1/2] ARM: mx5: introduce SOC_IMX51
+In-Reply-To: <20101119192846.GW8942@pengutronix.de>
+References: <1290193589-17633-1-git-send-email-fabio.estevam@freescale.com>
+	<20101119192846.GW8942@pengutronix.de>
+Message-ID: <AANLkTimxVg3o2U=gr5g-aaBFH+-FNzaCgJPC6ugqPcpi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Uwe,
 
-just a minor nit I'm going to fix in my tree
+2010/11/19 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+...
+>> ?config ARCH_MX51
+>> ? ? ? bool
+>> +
+>> +config SOC_IMX51
+>> + ? ? bool
+>> ? ? ? default y
+> Can you please remove this default y and let all MACH_XYZ select it?
 
-On Wed, Nov 17, 2010 at 10:30:03PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-mx25/Kconfig                      |    1 +
->  arch/arm/mach-mx25/devices-imx25.h              |    4 ++++
->  arch/arm/mach-mx25/devices.c                    |   15 ---------------
->  arch/arm/mach-mx25/devices.h                    |    1 -
->  arch/arm/mach-mx25/mach-mx25_3ds.c              |    2 +-
->  arch/arm/plat-mxc/devices/platform-imx2-wdt.c   |   14 ++++++++++----
->  arch/arm/plat-mxc/include/mach/devices-common.h |    1 +
->  7 files changed, 17 insertions(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx25/Kconfig b/arch/arm/mach-mx25/Kconfig
-> index 10c0f60..d152af2 100644
-> --- a/arch/arm/mach-mx25/Kconfig
-> +++ b/arch/arm/mach-mx25/Kconfig
-> @@ -6,6 +6,7 @@ config MACH_MX25_3DS
->  	bool "Support MX25PDK (3DS) Platform"
->  	select IMX_HAVE_PLATFORM_ESDHC
->  	select IMX_HAVE_PLATFORM_IMXDI_RTC
-> +	select IMX_HAVE_PLATFORM_IMX2_WDT
-IMX_HAVE_PLATFORM_IMX2_WDT sorts before IMX_HAVE_PLATFORM_IMXDI_RTC.
+Ok, will do as suggested and will send the v2 of this patch after your
+patch series hits Sascha?s tree.
 
-Best regards
-Uwe 
+I noticed that arch/arm/mach-mx5/Kconfig will conflict later if I base
+my patch on top of your tree.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+
+Fabio Estevam
