@@ -1,62 +1,92 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 19 Nov 2010 10:55:47 -0500
-Subject: [PATCH v6 03/12] davinci: add ssp config for tnetv107x evm board
-In-Reply-To: <1290182156-20104-1-git-send-email-cyril@ti.com>
-References: <1290182156-20104-1-git-send-email-cyril@ti.com>
-Message-ID: <1290182156-20104-4-git-send-email-cyril@ti.com>
+Date: Fri, 19 Nov 2010 10:55:44 -0500
+Subject: [PATCH v6 00/12] tnetv107x ssp drivers
+Message-ID: <1290182156-20104-1-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SSP configuration and pin muxing info for tnetv107x
-evm boards.
+TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
+device.  It has a built-in programmable execution engine that can be programmed
+to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
 
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
----
- arch/arm/mach-davinci/board-tnetv107x-evm.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+This patch series implements a driver stack that looks like the following:
 
-diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index a6db854..ef526b1 100644
---- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
-+++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -99,6 +99,12 @@ static const short uart1_pins[] __initdata = {
- 	-1
- };
- 
-+static const short ssp_pins[] __initdata = {
-+	TNETV107X_SSP0_0, TNETV107X_SSP0_1, TNETV107X_SSP0_2,
-+	TNETV107X_SSP1_0, TNETV107X_SSP1_1, TNETV107X_SSP1_2,
-+	TNETV107X_SSP1_3, -1
-+};
-+
- static struct mtd_partition nand_partitions[] = {
- 	/* bootloader (U-Boot, etc) in first 12 sectors */
- 	{
-@@ -196,17 +202,25 @@ static struct matrix_keypad_platform_data keypad_config = {
- 	.no_autorepeat	= 0,
- };
- 
-+static struct ti_ssp_data ssp_config = {
-+	.out_clock	= 250 * 1000,
-+	.dev_data	= {
-+	},
-+};
-+
- static struct tnetv107x_device_info evm_device_info __initconst = {
- 	.serial_config		= &serial_config,
- 	.mmc_config[1]		= &mmc_config,	/* controller 1 */
- 	.nand_config[0]		= &nand_config,	/* chip select 0 */
- 	.keypad_config		= &keypad_config,
-+	.ssp_config		= &ssp_config,
- };
- 
- static __init void tnetv107x_evm_board_init(void)
- {
- 	davinci_cfg_reg_list(sdio1_pins);
- 	davinci_cfg_reg_list(uart1_pins);
-+	davinci_cfg_reg_list(ssp_pins);
- 
- 	tnetv107x_devices_init(&evm_device_info);
- }
--- 
-1.7.1
+                             +--------+
+                             | eeprom | . . .
+                             +--------+
+   +-----------+             +--------------+ +---------+
+   | regulator | . . .       |   i2c-gpio   | | 1-wire  | . . .
+   +-----------+             +--------------+ +---------+
+   +----------------------+  +--------------------------------+
+   |       ssp-spi        |  |           ssp-gpio             |
+   +----------------------+  +--------------------------------+
+   +----------------------------------------------------------+
+   |                            ssp                           |
+   +----------------------------------------------------------+
+
+Changes between v6 and v5 of this series:
+  - Changed initcalls to module_init() across all drivers.  This series now
+    uses a late_initcall() in the board to delay initialization of gpio and
+    regulator dependent devices.
+
+Changes between v5 and v4 of this series:
+  - Moved drivers from misc/gpio/spi to mfd
+  - Removed implicit init-time iosel setup
+  - Minor cleanups in backlight driver
+
+Changes between v3 and v4 of this series:
+  - Replaced polled wait for sequence termination with interrupt
+  - Improved locking within SSP driver
+  - Other minor cleanups
+
+Changes between v2 and v3 of this series:
+  - Minor cleanups in Kconfig and Makefile ordering
+
+Changes between v1 and v2 of this series:
+  - Replaced open()/close() semantics with dynamic platform_device
+    registration on SSP probe.
+  - Removed user-land interface to regulator registers
+  - More sensible regulator constraints
+  - Other minor cleanups
+
+Cyril Chemparathy (12):
+  misc: add driver for sequencer serial port
+  davinci: add tnetv107x ssp platform device
+  davinci: add ssp config for tnetv107x evm board
+  spi: add ti-ssp spi master driver
+  davinci: add spi devices on tnetv107x evm
+  regulator: add driver for tps6524x regulator
+  davinci: add tnetv107x evm regulators
+  gpio: add ti-ssp gpio driver
+  davinci: add tnetv107x evm ti-ssp gpio device
+  backlight: add support for tps6116x controller
+  davinci: add tnetv107x evm backlight device
+  davinci: add tnetv107x evm i2c eeprom device
+
+ arch/arm/mach-davinci/board-tnetv107x-evm.c    |  197 +++++++
+ arch/arm/mach-davinci/devices-tnetv107x.c      |   25 +
+ arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +
+ arch/arm/mach-davinci/tnetv107x.c              |    2 +-
+ drivers/gpio/Kconfig                           |   10 +
+ drivers/gpio/Makefile                          |    1 +
+ drivers/gpio/ti-ssp-gpio.c                     |  206 +++++++
+ drivers/mfd/Kconfig                            |   11 +
+ drivers/mfd/Makefile                           |    1 +
+ drivers/mfd/ti-ssp.c                           |  472 ++++++++++++++++
+ drivers/regulator/Kconfig                      |   10 +
+ drivers/regulator/Makefile                     |    1 +
+ drivers/regulator/tps6524x-regulator.c         |  692 ++++++++++++++++++++++++
+ drivers/spi/Kconfig                            |   10 +
+ drivers/spi/Makefile                           |    1 +
+ drivers/spi/ti-ssp-spi.c                       |  402 ++++++++++++++
+ drivers/video/backlight/Kconfig                |    7 +
+ drivers/video/backlight/Makefile               |    2 +-
+ drivers/video/backlight/tps6116x.c             |  298 ++++++++++
+ include/linux/mfd/ti_ssp.h                     |   97 ++++
+ 20 files changed, 2445 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/gpio/ti-ssp-gpio.c
+ create mode 100644 drivers/mfd/ti-ssp.c
+ create mode 100644 drivers/regulator/tps6524x-regulator.c
+ create mode 100644 drivers/spi/ti-ssp-spi.c
+ create mode 100644 drivers/video/backlight/tps6116x.c
+ create mode 100644 include/linux/mfd/ti_ssp.h
