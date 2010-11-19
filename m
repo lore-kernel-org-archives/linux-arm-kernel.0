@@ -1,97 +1,163 @@
-From: phiporiphic@gmail.com (Phip)
-Date: Thu, 18 Nov 2010 12:59:53 -0500
-Subject: Zipit/uboot mmc driver issue
-In-Reply-To: <201011181304.56657.marek.vasut@gmail.com>
-References: <AANLkTi=aySbiD=f3f5yHwDr0cNCwbC3M+ThLE-+E1a9a@mail.gmail.com>
-	<201011181102.09286.marek.vasut@gmail.com>
-	<AANLkTimx16AFHs81FRYrwYn21-F2dQmxjdRQXsYUsJHo@mail.gmail.com>
-	<201011181304.56657.marek.vasut@gmail.com>
-Message-ID: <AANLkTi=cvG3WnA3TaKqtMgPqiPxxzq46M521635j7vrK@mail.gmail.com>
+From: m.nazarewicz@samsung.com (Michal Nazarewicz)
+Date: Fri, 19 Nov 2010 16:58:11 +0100
+Subject: [RFCv6 13/13] ARM: cma: Added CMA to Aquila,
+	Goni and c210 universal boards
+In-Reply-To: <cover.1290172312.git.m.nazarewicz@samsung.com>
+References: <cover.1290172312.git.m.nazarewicz@samsung.com>
+Message-ID: <c5e5580e35e1a8edf211228c4b5aea83830a7ee6.1290172312.git.m.nazarewicz@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/18 Marek Vasut <marek.vasut@gmail.com>
+This commit adds CMA memory reservation code to Aquila, Goni and c210
+universal boards.
 
-> On Thursday 18 November 2010 11:45:16 Phip wrote:
-> > 2010/11/18 Marek Vasut <marek.vasut@gmail.com>
-> >
-> > > On Thursday 18 November 2010 10:26:49 Phip wrote:
-> > > > Greetings,
-> > > >
-> > > > I am having difficulties with the Zipit mmc driver and my SDHC card.
-> I
-> > > > realize this may be an imposition; I write to you because I am trying
-> > > > to determine if the problem is with the mmc driver or elsewhere. I
-> was
-> > > > not having any problems with SD card I/O under blob; this began when
-> I
-> > >
-> > > flashed
-> > >
-> > > > to u-boot.
-> > >
-> > > Blob doesn't support SD/MMC at all. You mean linux kernel ?
-> >
-> > Yes; My mistake.
-> >
-> > > > dmesg comes to mounting root:
-> > > >
-> > > > pxa-rtc pxa-rtc: setting system clock to 2000-01-01 00:00:18 UTC
-> > > > Waiting 2sec before mounting root device...
-> > > > mmc0: host does not support reading read-only switch. assuming
-> > > > write-enable. mmc0: new SDHC card at address 1234
-> > > > PM: Adding info for mmc:mmc0:1234
-> > > > mmcblk0: mmc0:1234 SA04G 2.68 GiB
-> > >
-> > > The card is mis-detected ?
-> >
-> > This was a  typo -- it consistently reads 3.68 GiB.
-> >
-> > > > Then a few cycles of write errors like these:
-> > > >
-> > > > mmcblk0: error -84 transferring data, sector 243, r 8, card status
-> > > > 0xe00 end_request: I/O error, dev mmcblk0, sector 243
-> > > > Buffer I/O error on device mmcblk0p1, logical block 0
-> > > > lost page write due to I/O error on mmcblk0p1
-> > > >
-> > > > And finally EXT3-fs detects a problem with the journal and remounts
-> the
-> > > > filesystem read-only.
-> > > >
-> > > > I do not mean to ask you to troubleshoot me, but it seems like you
-> > > > would
-> > >
-> > > be
-> > >
-> > > > the best person to ask about this particular combination of hardware
-> > > > and software. Or perhaps there is a better place for me to ask?
-> > >
-> > > CCing linux-arm-kernel
-> > >
-> > > > Thank you very much for your time
-> > > > Phip
-> > > >
-> > > > - Zipit running u-boot 8/23/2010; 2.6.35 8/22/2010; both from
-> mozzwald
-> > > > - SD card is a Kensington 4GB microSD in a miniSD adapter; works
-> > >
-> > > flawlessly
-> > >
-> > > > on my desktop box.
-> > >
-> > > Maybe the adapter is faulty, try another one. It happened a lot before.
-> >
-> > I'll look for another adapter to verify if there are no other leads to
-> try.
->
-> This is very likely the issue, really ... this is where I'd start debuging
-> if I
-> were you.
->
-> I will. I have second thoughts though because when the zipit was flashed
-with the 2.6.29 kernel, I was able to write to the SD card and everything
-worked as expected. When I flashed to u-boot is when this problem began, and
-that makes me suspect u-boot over the card adapter.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101118/0c4d6750/attachment.html>
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/mach-aquila.c         |   26 ++++++++++++++++++++++++++
+ arch/arm/mach-s5pv210/mach-goni.c           |   26 ++++++++++++++++++++++++++
+ arch/arm/mach-s5pv310/mach-universal_c210.c |   17 +++++++++++++++++
+ 3 files changed, 69 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index 28677ca..f1feb73 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -21,6 +21,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
++#include <linux/cma.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -650,6 +651,30 @@ static void __init aquila_sound_init(void)
+ 	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
+ }
+ 
++#ifdef CONFIG_CMA
++
++static void __init aquila_reserve(void)
++{
++	static struct cma_region regions[] = {
++		CMA_REGION("fw",  1 << 20, 128 << 10, 0x32000000),
++		CMA_REGION("b1", 32 << 20,         0, 0x33000000),
++		CMA_REGION("b2", 16 << 20,         0, 0x44000000),
++		{ }
++	};
++
++	static const char map[] __initconst =
++		"s5p-mfc5/f=fw;s5p-mfc5/a=b1;s5p-mfc5/b=b2;*=b1,b2";
++
++	cma_set_defaults(regions, map);
++	cma_early_regions_reserve(NULL);
++}
++
++#else
++
++#define aquila_reserve NULL
++
++#endif
++
+ static void __init aquila_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -690,4 +715,5 @@ MACHINE_START(AQUILA, "Aquila")
+ 	.map_io		= aquila_map_io,
+ 	.init_machine	= aquila_machine_init,
+ 	.timer		= &s3c24xx_timer,
++	.reserve	= aquila_reserve,
+ MACHINE_END
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index b1dcf96..0bda14f 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -25,6 +25,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
++#include <linux/cma.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -809,6 +810,30 @@ static void __init goni_sound_init(void)
+ 	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
+ }
+ 
++#ifdef CONFIG_CMA
++
++static void __init goni_reserve(void)
++{
++	static struct cma_region regions[] = {
++		CMA_REGION("fw",  1 << 20, 128 << 10, 0x32000000),
++		CMA_REGION("b1", 32 << 20,         0, 0x33000000),
++		CMA_REGION("b2", 16 << 20,         0, 0x44000000),
++		{ }
++	};
++
++	static const char map[] __initconst =
++		"s5p-mfc5/f=fw;s5p-mfc5/a=b1;s5p-mfc5/b=b2;*=b1,b2";
++
++	cma_set_defaults(regions, map);
++	cma_early_regions_reserve(NULL);
++}
++
++#else
++
++#define goni_reserve NULL
++
++#endif
++
+ static void __init goni_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -865,4 +890,5 @@ MACHINE_START(GONI, "GONI")
+ 	.map_io		= goni_map_io,
+ 	.init_machine	= goni_machine_init,
+ 	.timer		= &s3c24xx_timer,
++	.reserve	= goni_reserve,
+ MACHINE_END
+diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
+index 16d8fc0..90a2296 100644
+--- a/arch/arm/mach-s5pv310/mach-universal_c210.c
++++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
+@@ -13,6 +13,7 @@
+ #include <linux/i2c.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/gpio.h>
++#include <linux/cma.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -138,6 +139,21 @@ static void __init universal_map_io(void)
+ 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
+ }
+ 
++static void __init universal_reserve(void)
++{
++	static struct cma_region regions[] = {
++		CMA_REGION("r" , 64 << 20, 0, 0),
++		CMA_REGION("fw",  1 << 20, 128 << 10),
++		{ }
++	};
++
++	static const char map[] __initconst =
++		"s3c-mfc5/f=fw;*=r";
++
++	cma_set_defaults(regions, map);
++	cma_early_regions_reserve(NULL);
++}
++
+ static void __init universal_machine_init(void)
+ {
+ 	i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
+@@ -152,6 +168,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	.boot_params	= S5P_PA_SDRAM + 0x100,
+ 	.init_irq	= s5pv310_init_irq,
+ 	.map_io		= universal_map_io,
++	.reserve	= universal_reserve,
+ 	.init_machine	= universal_machine_init,
+ 	.timer		= &s5pv310_timer,
+ MACHINE_END
+-- 
+1.7.2.3
