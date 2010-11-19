@@ -1,31 +1,29 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 19 Nov 2010 18:32:27 +0000
-Subject: [PATCH 5/5] omap4: l2x0: Enable early BRESP bit
-In-Reply-To: <1290187866-26941-6-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Fri, 19 Nov 2010 23:01:06 +0530")
-References: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
-	<1290187866-26941-2-git-send-email-santosh.shilimkar@ti.com>
-	<1290187866-26941-3-git-send-email-santosh.shilimkar@ti.com>
-	<1290187866-26941-4-git-send-email-santosh.shilimkar@ti.com>
-	<1290187866-26941-5-git-send-email-santosh.shilimkar@ti.com>
-	<1290187866-26941-6-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <yw1xfwux411g.fsf@unicorn.mansr.com>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Fri, 19 Nov 2010 10:37:45 -0800 (PST)
+Subject: [PATCH v4 2/2] msm: gpio: Add irq support to v2 gpiolib.
+In-Reply-To: <AANLkTiknYmWOmiFXGp6h2dT==aMuGs3BtXi82b6Vdq5i@mail.gmail.com>
+References: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
+	<1290109970-26752-2-git-send-email-gbean@codeaurora.org>
+	<AANLkTimTsyhjHJZggFO31C-2RswpmKWn-V4pGEiQ3+_2@mail.gmail.com>
+	<alpine.DEB.2.00.1011181229380.26784@gbean-linux.qualcomm.com>
+	<AANLkTi=p02P=-JQ9+FynFyM1yxrAh3utKTD2uzqhnLxK@mail.gmail.com>
+	<alpine.DEB.2.00.1011181256470.29924@gbean-linux.qualcomm.com>
+	<AANLkTiknYmWOmiFXGp6h2dT==aMuGs3BtXi82b6Vdq5i@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1011191035210.10052@gbean-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Thu, 18 Nov 2010, Janakiram Sistla wrote:
 
-> The AXI protocol specifies that the write response can only
-> be sent back to an AXI master when the last write data has been
-> accepted. This optimization enables the PL310 to send the write
-> response of certain write transactions as soon as the store buffer
-> accepts the write address. This behavior is not compatible with
-> the AXI protocol and is disabled by default. You enable this
-> optimization by setting the Early BRESP Enable bit in the
-> Auxiliary Control Register (bit [30]).
+>> Targets with the v2 block define CONFIG_MSM_V2_TLMM.
+>
+> So in that case we can name  it as gpio-tlmm.c ??
 
-Did you measure the performance difference this makes, if any?
+No, not and have things be any clearer.
+
+All MSM chips have a TLMM block.  The older chips have
+version 1 (v1) of the TLMM block.  The newer chips have v2.
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
