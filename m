@@ -1,29 +1,27 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Fri, 19 Nov 2010 05:52:42 -0600
-Subject: [PATCH v3 3/5] OMAP: mailbox: fix checkpatch warnings
-In-Reply-To: <20101119083321.GI6446@legolas.emea.dhcp.ti.com>
-References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
-	<1290107742-16760-4-git-send-email-h-kanigeri2@ti.com>
-	<20101119083321.GI6446@legolas.emea.dhcp.ti.com>
-Message-ID: <AANLkTimF0L2ObvPM=2wJET9A3i1dtp+qOdmCdYf-w35w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Nov 2010 12:00:32 +0000
+Subject: [PATCH 0/5] Clean up page tables
+In-Reply-To: <20101117172717.GF5308@n2100.arm.linux.org.uk>
+References: <20101117172717.GF5308@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimOgLU+F5JLWU=Tbm3KM-snPeCEB5WLWPZ-b3v6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
+On 17 November 2010 17:27, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> This patch series is preparation for LPAE, allowing a cleaner
+> transition from the current methodology to that required for
+> LPAE.
 
-On Fri, Nov 19, 2010 at 2:33 AM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Thu, Nov 18, 2010 at 01:15:40PM -0600, Hari Kanigeri wrote:
->>
->> Fix the checkpatch warnings observed in mailbox module
->
-> you should put which warnings are those here :-)
->
+Apart from a few things I raised (after which you can even add my ack
+for all of them), the LPAE patches work fine on top of your series.
 
-Sure, will add some descriptions in next patch revision.
+What are your plans for upstream? It looks like stuff for 2.6.38 but
+it would be good if in the meantime you make them available on some
+branch (just these patches) so that I can rebase my LPAE work on top
+without carrying your patches.
 
+Thanks.
 
-Thank you,
-Best regards,
-Hari Kanigeri
+-- 
+Catalin
