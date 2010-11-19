@@ -1,38 +1,37 @@
-From: linus.walleij@stericsson.com (Linus WALLEIJ)
-Date: Fri, 19 Nov 2010 22:49:50 +0100
-Subject: [PATCH] ARM: l2x0: Check the correct address range
-In-Reply-To: <AANLkTinqvbPB5ijJnMGB1FP08WUMSUKFY_qZhgZaVUci@mail.gmail.com>
-References: <20101119014029.GA26429@july>
-	<AANLkTinqvbPB5ijJnMGB1FP08WUMSUKFY_qZhgZaVUci@mail.gmail.com>
-Message-ID: <CEE6BB42CAD6E947908279175AF8470A074DE04727@EXDCVYMBSTM006.EQ1STM.local>
+From: AMartin@nvidia.com (Allen Martin)
+Date: Fri, 19 Nov 2010 14:15:34 -0800
+Subject: [PATCH] usb: host: tegra: protect bus suspend with CONFIG_PM
+Message-ID: <3C7A7ACA8617D24290826EC008B5CD0817D747F9E5@HQMAIL03.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-11-19 at 11:08 +0000, Catalin Marinas wrote:
-> On 19 November 2010 01:40, Kyungmin Park <kmpark@infradead.org> wrote:
-> > From: Boojin Kim <boojin.kim@samsung.com>
-> >
-> > When flush or clean the 1MiB, it doesn't flush or clean all since it doesn't check the correct address. So Check the correct address range.
-> 
-> This line is very long.
-> 
-> The patch looks fine otherwise. I think the optimal value would be
-> smaller than the whole cache size but it depends on many things.
+Protect the bus suspend/resume functions behind #ifdef CONFIG_PM.
+This prevents a compile error if CONFIG_PM is turned off.
 
-Would it be a good idea to kick in a per-SoC threshold value into
-the l2x0 range clean function, such that if the range exceed this
-specific threshold it cleans all of it? That way it'd be possible
-to optimize for each SoC quite easily.
+Signed-off-by: Allen Martin <amartin@nvidia.com>
+---
+ drivers/usb/host/ehci-tegra.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-I've heard that these things may even depend on OPPs etc so it may
-even be some dynamic value...
+diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+index e566a97..02087c8 100644
+--- a/drivers/usb/host/ehci-tegra.c
++++ b/drivers/usb/host/ehci-tegra.c
+@@ -334,6 +334,7 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
+        return retval;
+ }
 
-Yours,
-Linus Walleij
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: winmail.dat
-Type: application/ms-tnef
-Size: 3547 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101119/0e0c8bc6/attachment-0001.bin>
++#ifdef CONFIG_PM
+ static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
+ {
+        struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
+@@ -359,6 +360,7 @@ static int tegra_ehci_bus_resume(struct usb_hcd *hcd)
+
+        return ehci_bus_resume(hcd);
+ }
++#endif
+
+ static const struct hc_driver tegra_ehci_hc_driver = {
+        .description            = hcd_name,
+--
+1.7.2.3
