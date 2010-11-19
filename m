@@ -1,753 +1,271 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 19 Nov 2010 10:55:50 -0500
-Subject: [PATCH v6 06/12] regulator: add driver for tps6524x regulator
-In-Reply-To: <1290182156-20104-1-git-send-email-cyril@ti.com>
-References: <1290182156-20104-1-git-send-email-cyril@ti.com>
-Message-ID: <1290182156-20104-7-git-send-email-cyril@ti.com>
+From: m.nazarewicz@samsung.com (Michal Nazarewicz)
+Date: Fri, 19 Nov 2010 16:57:58 +0100
+Subject: [RFCv6 00/13] The Contiguous Memory Allocator framework
+Message-ID: <cover.1290172312.git.m.nazarewicz@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPS6524X provides three step-down converters and two general-purpose LDO
-voltage regulators.  This device is interfaced using SPI.
+Hello everyone,
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
----
- drivers/regulator/Kconfig              |   10 +
- drivers/regulator/Makefile             |    1 +
- drivers/regulator/tps6524x-regulator.c |  692 ++++++++++++++++++++++++++++++++
- 3 files changed, 703 insertions(+), 0 deletions(-)
- create mode 100644 drivers/regulator/tps6524x-regulator.c
+A few people asked about CMA at the LPC, so even though the I have not
+yet finished working on the new CMA here it is so that all
+interested parties can take a look and decide if it can be used for
+their use case.
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index dd30e88..da34981 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -250,5 +250,15 @@ config REGULATOR_TPS6586X
- 	help
- 	  This driver supports TPS6586X voltage regulator chips.
+In particular, this version adds not yet completed support for memory
+migration and cma_pin()/cma_unpin() calls.
+
+
+For those who have not yet stumbled across CMA an excerpt from
+documentation:
  
-+config REGULATOR_TPS6524X
-+	tristate "TI TPS6524X Power regulators"
-+	depends on SPI
-+	help
-+	  This driver supports TPS6524X voltage regulator chips. TPS6524X
-+	  provides three step-down converters and two general-purpose LDO
-+	  voltage regulators.  This device is interfaced using a customized
-+	  serial interface currently supported on the sequencer serial
-+	  port controller.
-+
- endif
+   The Contiguous Memory Allocator (CMA) is a framework, which allows
+   setting up a machine-specific configuration for physically-contiguous
+   memory management. Memory for devices is then allocated according
+   to that configuration.
  
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index bff8157..cf71df7 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -34,6 +34,7 @@ obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+   The main role of the framework is not to allocate memory, but to
+   parse and manage memory configurations, as well as to act as an
+   in-between between device drivers and pluggable allocators. It is
+   thus not tied to any memory allocation method or strategy.
  
- obj-$(CONFIG_REGULATOR_TPS65023) += tps65023-regulator.o
- obj-$(CONFIG_REGULATOR_TPS6507X) += tps6507x-regulator.o
-+obj-$(CONFIG_REGULATOR_TPS6524X) += tps6524x-regulator.o
- obj-$(CONFIG_REGULATOR_88PM8607) += 88pm8607.o
- obj-$(CONFIG_REGULATOR_ISL6271A) += isl6271a-regulator.o
- obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
-diff --git a/drivers/regulator/tps6524x-regulator.c b/drivers/regulator/tps6524x-regulator.c
-new file mode 100644
-index 0000000..dea1260
---- /dev/null
-+++ b/drivers/regulator/tps6524x-regulator.c
-@@ -0,0 +1,692 @@
-+/*
-+ * Regulator driver for TPS6524x PMIC
-+ *
-+ * Copyright (C) 2010 Texas Instruments
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
-+ * whether express or implied; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/slab.h>
-+#include <linux/spi/spi.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+
-+#define REG_LDO_SET		0x0
-+#define LDO_ILIM_MASK		1	/* 0 = 400-800, 1 = 900-1500 */
-+#define LDO_VSEL_MASK		0x0f
-+#define LDO2_ILIM_SHIFT		12
-+#define LDO2_VSEL_SHIFT		4
-+#define LDO1_ILIM_SHIFT		8
-+#define LDO1_VSEL_SHIFT		0
-+
-+#define REG_BLOCK_EN		0x1
-+#define BLOCK_MASK		1
-+#define BLOCK_LDO1_SHIFT	0
-+#define BLOCK_LDO2_SHIFT	1
-+#define BLOCK_LCD_SHIFT		2
-+#define BLOCK_USB_SHIFT		3
-+
-+#define REG_DCDC_SET		0x2
-+#define DCDC_VDCDC_MASK		0x1f
-+#define DCDC_VDCDC1_SHIFT	0
-+#define DCDC_VDCDC2_SHIFT	5
-+#define DCDC_VDCDC3_SHIFT	10
-+
-+#define REG_DCDC_EN		0x3
-+#define DCDCDCDC_EN_MASK	0x1
-+#define DCDCDCDC1_EN_SHIFT	0
-+#define DCDCDCDC1_PG_MSK	BIT(1)
-+#define DCDCDCDC2_EN_SHIFT	2
-+#define DCDCDCDC2_PG_MSK	BIT(3)
-+#define DCDCDCDC3_EN_SHIFT	4
-+#define DCDCDCDC3_PG_MSK	BIT(5)
-+
-+#define REG_USB			0x4
-+#define USB_ILIM_SHIFT		0
-+#define USB_ILIM_MASK		0x3
-+#define USB_TSD_SHIFT		2
-+#define USB_TSD_MASK		0x3
-+#define USB_TWARN_SHIFT		4
-+#define USB_TWARN_MASK		0x3
-+#define USB_IWARN_SD		BIT(6)
-+#define USB_FAST_LOOP		BIT(7)
-+
-+#define REG_ALARM		0x5
-+#define ALARM_LDO1		BIT(0)
-+#define ALARM_DCDC1		BIT(1)
-+#define ALARM_DCDC2		BIT(2)
-+#define ALARM_DCDC3		BIT(3)
-+#define ALARM_LDO2		BIT(4)
-+#define ALARM_USB_WARN		BIT(5)
-+#define ALARM_USB_ALARM		BIT(6)
-+#define ALARM_LCD		BIT(9)
-+#define ALARM_TEMP_WARM		BIT(10)
-+#define ALARM_TEMP_HOT		BIT(11)
-+#define ALARM_NRST		BIT(14)
-+#define ALARM_POWERUP		BIT(15)
-+
-+#define REG_INT_ENABLE		0x6
-+#define INT_LDO1		BIT(0)
-+#define INT_DCDC1		BIT(1)
-+#define INT_DCDC2		BIT(2)
-+#define INT_DCDC3		BIT(3)
-+#define INT_LDO2		BIT(4)
-+#define INT_USB_WARN		BIT(5)
-+#define INT_USB_ALARM		BIT(6)
-+#define INT_LCD			BIT(9)
-+#define INT_TEMP_WARM		BIT(10)
-+#define INT_TEMP_HOT		BIT(11)
-+#define INT_GLOBAL_EN		BIT(15)
-+
-+#define REG_INT_STATUS		0x7
-+#define STATUS_LDO1		BIT(0)
-+#define STATUS_DCDC1		BIT(1)
-+#define STATUS_DCDC2		BIT(2)
-+#define STATUS_DCDC3		BIT(3)
-+#define STATUS_LDO2		BIT(4)
-+#define STATUS_USB_WARN		BIT(5)
-+#define STATUS_USB_ALARM	BIT(6)
-+#define STATUS_LCD		BIT(9)
-+#define STATUS_TEMP_WARM	BIT(10)
-+#define STATUS_TEMP_HOT		BIT(11)
-+
-+#define REG_SOFTWARE_RESET	0xb
-+#define REG_WRITE_ENABLE	0xd
-+#define REG_REV_ID		0xf
-+
-+#define N_DCDC			3
-+#define N_LDO			2
-+#define N_SWITCH		2
-+#define N_REGULATORS		(3 /* DCDC */ + \
-+				 2 /* LDO */  + \
-+				 2 /* switch */)
-+
-+#define FIXED_ILIMSEL		BIT(0)
-+#define FIXED_VOLTAGE		BIT(1)
-+
-+#define CMD_READ(reg)		((reg) << 6)
-+#define CMD_WRITE(reg)		(BIT(5) | (reg) << 6)
-+#define STAT_CLK		BIT(3)
-+#define STAT_WRITE		BIT(2)
-+#define STAT_INVALID		BIT(1)
-+#define STAT_WP			BIT(0)
-+
-+struct field {
-+	int		reg;
-+	int		shift;
-+	int		mask;
-+};
-+
-+struct supply_info {
-+	const char	*name;
-+	int		n_voltages;
-+	const int	*voltages;
-+	int		fixed_voltage;
-+	int		n_ilimsels;
-+	const int	*ilimsels;
-+	int		fixed_ilimsel;
-+	int		flags;
-+	struct field	enable, voltage, ilimsel;
-+};
-+
-+struct tps6524x {
-+	struct device		*dev;
-+	struct spi_device	*spi;
-+	struct mutex		lock;
-+	struct regulator_desc	desc[N_REGULATORS];
-+	struct regulator_dev	*rdev[N_REGULATORS];
-+};
-+
-+static int __read_reg(struct tps6524x *hw, int reg)
-+{
-+	int error = 0;
-+	u16 cmd = CMD_READ(reg), in;
-+	u8 status;
-+	struct spi_message m;
-+	struct spi_transfer t[3];
-+
-+	spi_message_init(&m);
-+	memset(t, 0, sizeof(t));
-+
-+	t[0].tx_buf = &cmd;
-+	t[0].len = 2;
-+	t[0].bits_per_word = 12;
-+	spi_message_add_tail(&t[0], &m);
-+
-+	t[1].rx_buf = &in;
-+	t[1].len = 2;
-+	t[1].bits_per_word = 16;
-+	spi_message_add_tail(&t[1], &m);
-+
-+	t[2].rx_buf = &status;
-+	t[2].len = 1;
-+	t[2].bits_per_word = 4;
-+	spi_message_add_tail(&t[2], &m);
-+
-+	error = spi_sync(hw->spi, &m);
-+	if (error < 0)
-+		return error;
-+
-+	dev_dbg(hw->dev, "read reg %d, data %x, status %x\n",
-+		reg, in, status);
-+
-+	if (!(status & STAT_CLK) || (status & STAT_WRITE))
-+		return -EIO;
-+
-+	if (status & STAT_INVALID)
-+		return -EINVAL;
-+
-+	return in;
-+}
-+
-+static int read_reg(struct tps6524x *hw, int reg)
-+{
-+	int ret;
-+
-+	mutex_lock(&hw->lock);
-+	ret = __read_reg(hw, reg);
-+	mutex_unlock(&hw->lock);
-+
-+	return ret;
-+}
-+
-+static int __write_reg(struct tps6524x *hw, int reg, int val)
-+{
-+	int error = 0;
-+	u16 cmd = CMD_WRITE(reg), out = val;
-+	u8 status;
-+	struct spi_message m;
-+	struct spi_transfer t[3];
-+
-+	spi_message_init(&m);
-+	memset(t, 0, sizeof(t));
-+
-+	t[0].tx_buf = &cmd;
-+	t[0].len = 2;
-+	t[0].bits_per_word = 12;
-+	spi_message_add_tail(&t[0], &m);
-+
-+	t[1].tx_buf = &out;
-+	t[1].len = 2;
-+	t[1].bits_per_word = 16;
-+	spi_message_add_tail(&t[1], &m);
-+
-+	t[2].rx_buf = &status;
-+	t[2].len = 1;
-+	t[2].bits_per_word = 4;
-+	spi_message_add_tail(&t[2], &m);
-+
-+	error = spi_sync(hw->spi, &m);
-+	if (error < 0)
-+		return error;
-+
-+	dev_dbg(hw->dev, "wrote reg %d, data %x, status %x\n",
-+		reg, out, status);
-+
-+	if (!(status & STAT_CLK) || !(status & STAT_WRITE))
-+		return -EIO;
-+
-+	if (status & (STAT_INVALID | STAT_WP))
-+		return -EINVAL;
-+
-+	return error;
-+}
-+
-+static int __rmw_reg(struct tps6524x *hw, int reg, int mask, int val)
-+{
-+	int ret;
-+
-+	ret = __read_reg(hw, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret &= ~mask;
-+	ret |= val;
-+
-+	ret = __write_reg(hw, reg, ret);
-+
-+	return (ret < 0) ? ret : 0;
-+}
-+
-+static int rmw_protect(struct tps6524x *hw, int reg, int mask, int val)
-+{
-+	int ret;
-+
-+	mutex_lock(&hw->lock);
-+
-+	ret = __write_reg(hw, REG_WRITE_ENABLE, 1);
-+	if (ret) {
-+		dev_err(hw->dev, "failed to set write enable\n");
-+		goto error;
-+	}
-+
-+	ret = __rmw_reg(hw, reg, mask, val);
-+	if (ret)
-+		dev_err(hw->dev, "failed to rmw register %d\n", reg);
-+
-+	ret = __write_reg(hw, REG_WRITE_ENABLE, 0);
-+	if (ret) {
-+		dev_err(hw->dev, "failed to clear write enable\n");
-+		goto error;
-+	}
-+
-+error:
-+	mutex_unlock(&hw->lock);
-+
-+	return ret;
-+}
-+
-+static int read_field(struct tps6524x *hw, const struct field *field)
-+{
-+	int tmp;
-+
-+	tmp = read_reg(hw, field->reg);
-+	if (tmp < 0)
-+		return tmp;
-+
-+	return (tmp >> field->shift) & field->mask;
-+}
-+
-+static int write_field(struct tps6524x *hw, const struct field *field,
-+		       int val)
-+{
-+	if (val & ~field->mask)
-+		return -EOVERFLOW;
-+
-+	return rmw_protect(hw, field->reg,
-+				    field->mask << field->shift,
-+				    val << field->shift);
-+}
-+
-+static const int dcdc1_voltages[] = {
-+	 800000,  825000,  850000,  875000,
-+	 900000,  925000,  950000,  975000,
-+	1000000, 1025000, 1050000, 1075000,
-+	1100000, 1125000, 1150000, 1175000,
-+	1200000, 1225000, 1250000, 1275000,
-+	1300000, 1325000, 1350000, 1375000,
-+	1400000, 1425000, 1450000, 1475000,
-+	1500000, 1525000, 1550000, 1575000,
-+};
-+
-+static const int dcdc2_voltages[] = {
-+	1400000, 1450000, 1500000, 1550000,
-+	1600000, 1650000, 1700000, 1750000,
-+	1800000, 1850000, 1900000, 1950000,
-+	2000000, 2050000, 2100000, 2150000,
-+	2200000, 2250000, 2300000, 2350000,
-+	2400000, 2450000, 2500000, 2550000,
-+	2600000, 2650000, 2700000, 2750000,
-+	2800000, 2850000, 2900000, 2950000,
-+};
-+
-+static const int dcdc3_voltages[] = {
-+	2400000, 2450000, 2500000, 2550000, 2600000,
-+	2650000, 2700000, 2750000, 2800000, 2850000,
-+	2900000, 2950000, 3000000, 3050000, 3100000,
-+	3150000, 3200000, 3250000, 3300000, 3350000,
-+	3400000, 3450000, 3500000, 3550000, 3600000,
-+};
-+
-+static const int ldo1_voltages[] = {
-+	4300000, 4350000, 4400000, 4450000,
-+	4500000, 4550000, 4600000, 4650000,
-+	4700000, 4750000, 4800000, 4850000,
-+	4900000, 4950000, 5000000, 5050000,
-+};
-+
-+static const int ldo2_voltages[] = {
-+	1100000, 1150000, 1200000, 1250000,
-+	1300000, 1700000, 1750000, 1800000,
-+	1850000, 1900000, 3150000, 3200000,
-+	3250000, 3300000, 3350000, 3400000,
-+};
-+
-+static const int ldo_ilimsel[] = {
-+	400000, 1500000
-+};
-+
-+static const int usb_ilimsel[] = {
-+	200000, 400000, 800000, 1000000
-+};
-+
-+#define __MK_FIELD(_reg, _mask, _shift) \
-+	{ .reg = (_reg), .mask = (_mask), .shift = (_shift), }
-+
-+static const struct supply_info supply_info[N_REGULATORS] = {
-+	{
-+		.name		= "DCDC1",
-+		.flags		= FIXED_ILIMSEL,
-+		.n_voltages	= ARRAY_SIZE(dcdc1_voltages),
-+		.voltages	= dcdc1_voltages,
-+		.fixed_ilimsel	= 2400000,
-+		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
-+					     DCDCDCDC1_EN_SHIFT),
-+		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
-+					     DCDC_VDCDC1_SHIFT),
-+	},
-+	{
-+		.name		= "DCDC2",
-+		.flags		= FIXED_ILIMSEL,
-+		.n_voltages	= ARRAY_SIZE(dcdc2_voltages),
-+		.voltages	= dcdc2_voltages,
-+		.fixed_ilimsel	= 1200000,
-+		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
-+					     DCDCDCDC2_EN_SHIFT),
-+		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
-+					     DCDC_VDCDC2_SHIFT),
-+	},
-+	{
-+		.name		= "DCDC3",
-+		.flags		= FIXED_ILIMSEL,
-+		.n_voltages	= ARRAY_SIZE(dcdc3_voltages),
-+		.voltages	= dcdc3_voltages,
-+		.fixed_ilimsel	= 1200000,
-+		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
-+					DCDCDCDC3_EN_SHIFT),
-+		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
-+					     DCDC_VDCDC3_SHIFT),
-+	},
-+	{
-+		.name		= "LDO1",
-+		.n_voltages	= ARRAY_SIZE(ldo1_voltages),
-+		.voltages	= ldo1_voltages,
-+		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
-+		.ilimsels	= ldo_ilimsel,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_LDO1_SHIFT),
-+		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
-+					     LDO1_VSEL_SHIFT),
-+		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
-+					     LDO1_ILIM_SHIFT),
-+	},
-+	{
-+		.name		= "LDO2",
-+		.n_voltages	= ARRAY_SIZE(ldo2_voltages),
-+		.voltages	= ldo2_voltages,
-+		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
-+		.ilimsels	= ldo_ilimsel,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_LDO2_SHIFT),
-+		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
-+					     LDO2_VSEL_SHIFT),
-+		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
-+					     LDO2_ILIM_SHIFT),
-+	},
-+	{
-+		.name		= "USB",
-+		.flags		= FIXED_VOLTAGE,
-+		.fixed_voltage	= 5000000,
-+		.n_ilimsels	= ARRAY_SIZE(usb_ilimsel),
-+		.ilimsels	= usb_ilimsel,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_USB_SHIFT),
-+		.ilimsel	= __MK_FIELD(REG_USB, USB_ILIM_MASK,
-+					     USB_ILIM_SHIFT),
-+	},
-+	{
-+		.name		= "LCD",
-+		.flags		= FIXED_VOLTAGE | FIXED_ILIMSEL,
-+		.fixed_voltage	= 5000000,
-+		.fixed_ilimsel	=  400000,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_LCD_SHIFT),
-+	},
-+};
-+
-+static int list_voltage(struct regulator_dev *rdev, unsigned selector)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_VOLTAGE)
-+		return selector ? -EINVAL : info->fixed_voltage;
-+
-+	if (selector < 0 || selector >= info->n_voltages)
-+		return -EINVAL;
-+
-+	return info->voltages[selector];
-+}
-+
-+static int set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int i;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_VOLTAGE)
-+		return -EINVAL;
-+
-+	for (i = 0; i < info->n_voltages; i++)
-+		if (min_uV <= info->voltages[i] &&
-+		    max_uV >= info->voltages[i])
-+			break;
-+
-+	if (i >= info->n_voltages)
-+		return -EINVAL;
-+
-+	return write_field(hw, &info->voltage, i);
-+}
-+
-+static int get_voltage(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int ret;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_VOLTAGE)
-+		return info->fixed_voltage;
-+
-+	ret = read_field(hw, &info->voltage);
-+	if (ret < 0)
-+		return ret;
-+	if (WARN_ON(ret >= info->n_voltages))
-+		return -EIO;
-+
-+	return info->voltages[ret];
-+}
-+
-+static int set_current_limit(struct regulator_dev *rdev, int min_uA,
-+			     int max_uA)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int i;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_ILIMSEL)
-+		return -EINVAL;
-+
-+	for (i = 0; i < info->n_ilimsels; i++)
-+		if (min_uA <= info->ilimsels[i] &&
-+		    max_uA >= info->ilimsels[i])
-+			break;
-+
-+	if (i >= info->n_ilimsels)
-+		return -EINVAL;
-+
-+	return write_field(hw, &info->ilimsel, i);
-+}
-+
-+static int get_current_limit(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int ret;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_ILIMSEL)
-+		return info->fixed_ilimsel;
-+
-+	ret = read_field(hw, &info->ilimsel);
-+	if (ret < 0)
-+		return ret;
-+	if (WARN_ON(ret >= info->n_ilimsels))
-+		return -EIO;
-+
-+	return info->ilimsels[ret];
-+}
-+
-+static int enable_supply(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	return write_field(hw, &info->enable, 1);
-+}
-+
-+static int disable_supply(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	return write_field(hw, &info->enable, 0);
-+}
-+
-+static int is_supply_enabled(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	return read_field(hw, &info->enable);
-+}
-+
-+static struct regulator_ops regulator_ops = {
-+	.is_enabled		= is_supply_enabled,
-+	.enable			= enable_supply,
-+	.disable		= disable_supply,
-+	.get_voltage		= get_voltage,
-+	.set_voltage		= set_voltage,
-+	.list_voltage		= list_voltage,
-+	.set_current_limit	= set_current_limit,
-+	.get_current_limit	= get_current_limit,
-+};
-+
-+static int __devexit pmic_remove(struct spi_device *spi)
-+{
-+	struct tps6524x *hw = spi_get_drvdata(spi);
-+	int i;
-+
-+	if (!hw)
-+		return 0;
-+	for (i = 0; i < N_REGULATORS; i++) {
-+		if (hw->rdev[i])
-+			regulator_unregister(hw->rdev[i]);
-+		hw->rdev[i] = NULL;
-+	}
-+	spi_set_drvdata(spi, NULL);
-+	kfree(hw);
-+	return 0;
-+}
-+
-+static int __devinit pmic_probe(struct spi_device *spi)
-+{
-+	struct tps6524x *hw;
-+	struct device *dev = &spi->dev;
-+	const struct supply_info *info = supply_info;
-+	struct regulator_init_data *init_data;
-+	int ret = 0, i;
-+
-+	init_data = dev->platform_data;
-+	if (!init_data) {
-+		dev_err(dev, "could not find regulator platform data\n");
-+		return -EINVAL;
-+	}
-+
-+	hw = kzalloc(sizeof(struct tps6524x), GFP_KERNEL);
-+	if (!hw) {
-+		dev_err(dev, "cannot allocate regulator private data\n");
-+		return -ENOMEM;
-+	}
-+	spi_set_drvdata(spi, hw);
-+
-+	memset(hw, 0, sizeof(struct tps6524x));
-+	hw->dev = dev;
-+	hw->spi = spi_dev_get(spi);
-+	mutex_init(&hw->lock);
-+
-+	for (i = 0; i < N_REGULATORS; i++, info++, init_data++) {
-+		hw->desc[i].name	= info->name;
-+		hw->desc[i].id		= i;
-+		hw->desc[i].n_voltages	= info->n_voltages;
-+		hw->desc[i].ops		= &regulator_ops;
-+		hw->desc[i].type	= REGULATOR_VOLTAGE;
-+		hw->desc[i].owner	= THIS_MODULE;
-+
-+		if (info->flags & FIXED_VOLTAGE)
-+			hw->desc[i].n_voltages = 1;
-+
-+		hw->rdev[i] = regulator_register(&hw->desc[i], dev,
-+						 init_data, hw);
-+		if (IS_ERR(hw->rdev[i])) {
-+			ret = PTR_ERR(hw->rdev[i]);
-+			hw->rdev[i] = NULL;
-+			goto fail;
-+		}
-+	}
-+
-+	return 0;
-+
-+fail:
-+	pmic_remove(spi);
-+	return ret;
-+}
-+
-+static struct spi_driver pmic_driver = {
-+	.probe		= pmic_probe,
-+	.remove		= __devexit_p(pmic_remove),
-+	.driver		= {
-+		.name	= "tps6524x",
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+static int __init pmic_driver_init(void)
-+{
-+	return spi_register_driver(&pmic_driver);
-+}
-+module_init(pmic_driver_init);
-+
-+static void __exit pmic_driver_exit(void)
-+{
-+	spi_unregister_driver(&pmic_driver);
-+}
-+module_exit(pmic_driver_exit);
-+
-+MODULE_DESCRIPTION("TPS6524X PMIC Driver");
-+MODULE_AUTHOR("Cyril Chemparathy");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("spi:tps6524x");
+For more information please refer to the fourth patch from the
+patchset which contains the documentation. 
+
+
+Links to the previous versions of the patch set:
+v5: (intentionally left out as CMA v5 was identical to CMA v4)
+v4: <http://article.gmane.org/gmane.linux.kernel.mm/52010/>
+v3: <http://article.gmane.org/gmane.linux.kernel.mm/51573/>
+v2: <http://article.gmane.org/gmane.linux.kernel.mm/50986/>
+v1: <http://article.gmane.org/gmane.linux.kernel.mm/50669/>
+
+
+Changelog:
+
+v6: 1. Most importantly, v6 introduces support for memory migration.
+       The implementation is not yet complete though.
+
+       Migration support means that when CMA is not using memory
+       reserved for it, page allocator can allocate pages from it.
+       When CMA wants to use the memory, the pages have to be moved
+       and/or evicted as to make room for CMA.
+
+       To make it possible it must be guaranteed that only movable and
+       reclaimable pages are allocated in CMA controlled regions.
+       This is done by introducing a MIGRATE_CMA migrate type that
+       guarantees exactly that.
+
+       Some of the migration code is "borrowed" from Kamezawa
+       Hiroyuki's alloc_contig_pages() implementation.  The main
+       difference is that thanks to MIGRATE_CMA migrate type CMA
+       assumes that memory controlled by CMA are is always movable or
+       reclaimable so that it makes allocation decisions regardless of
+       the whether some pages are actually allocated and migrates them
+       if needed.
+
+       The most interesting patches from the patchset that implement
+       the functionality are:
+
+         09/13: mm: alloc_contig_free_pages() added
+         10/13: mm: MIGRATE_CMA migration type added
+         11/13: mm: MIGRATE_CMA isolation functions added
+         12/13: mm: cma: Migration support added [wip]
+
+       Currently, kernel panics in some situations which I am trying
+       to investigate.
+
+    2. cma_pin() and cma_unpin() functions has been added (after
+       a conversation with Johan Mossberg).  The idea is that whenever
+       hardware does not use the memory (no transaction is on) the
+       chunk can be moved around.  This would allow defragmentation to
+       be implemented if desired.  No defragmentation algorithm is
+       provided at this time.
+
+    3. Sysfs support has been replaced with debugfs.  I always felt
+       unsure about the sysfs interface and when Greg KH pointed it
+       out I finally got to rewrite it to debugfs.
+    
+
+v5: (intentionally left out as CMA v5 was identical to CMA v4)
+
+
+v4: 1. The "asterisk" flag has been removed in favour of requiring
+       that platform will provide a "*=<regions>" rule in the map
+       attribute.
+ 
+    2. The terminology has been changed slightly renaming "kind" to
+       "type" of memory.  In the previous revisions, the documentation
+       indicated that device drivers define memory kinds and now,
+ 
+v3: 1. The command line parameters have been removed (and moved to
+       a separate patch, the fourth one).  As a consequence, the
+       cma_set_defaults() function has been changed -- it no longer
+       accepts a string with list of regions but an array of regions.
+ 
+    2. The "asterisk" attribute has been removed.  Now, each region
+       has an "asterisk" flag which lets one specify whether this
+       region should by considered "asterisk" region.
+ 
+    3. SysFS support has been moved to a separate patch (the third one
+       in the series) and now also includes list of regions.
+ 
+v2: 1. The "cma_map" command line have been removed.  In exchange,
+       a SysFS entry has been created under kernel/mm/contiguous.
+ 
+       The intended way of specifying the attributes is
+       a cma_set_defaults() function called by platform initialisation
+       code.  "regions" attribute (the string specified by "cma"
+       command line parameter) can be overwritten with command line
+       parameter; the other attributes can be changed during run-time
+       using the SysFS entries.
+ 
+    2. The behaviour of the "map" attribute has been modified
+       slightly.  Currently, if no rule matches given device it is
+       assigned regions specified by the "asterisk" attribute.  It is
+       by default built from the region names given in "regions"
+       attribute.
+ 
+    3. Devices can register private regions as well as regions that
+       can be shared but are not reserved using standard CMA
+       mechanisms.  A private region has no name and can be accessed
+       only by devices that have the pointer to it.
+ 
+    4. The way allocators are registered has changed.  Currently,
+       a cma_allocator_register() function is used for that purpose.
+       Moreover, allocators are attached to regions the first time
+       memory is registered from the region or when allocator is
+       registered which means that allocators can be dynamic modules
+       that are loaded after the kernel booted (of course, it won't be
+       possible to allocate a chunk of memory from a region if
+       allocator is not loaded).
+ 
+    5. Index of new functions:
+ 
+    +static inline dma_addr_t __must_check
+    +cma_alloc_from(const char *regions, size_t size,
+    +               dma_addr_t alignment)
+ 
+    +static inline int
+    +cma_info_about(struct cma_info *info, const const char *regions)
+ 
+    +int __must_check cma_region_register(struct cma_region *reg);
+ 
+    +dma_addr_t __must_check
+    +cma_alloc_from_region(struct cma_region *reg,
+    +                      size_t size, dma_addr_t alignment);
+ 
+    +static inline dma_addr_t __must_check
+    +cma_alloc_from(const char *regions,
+    +               size_t size, dma_addr_t alignment);
+ 
+    +int cma_allocator_register(struct cma_allocator *alloc);
+
+
+The whole patch set includes the following patches:
+
+  lib: rbtree: rb_root_init() function added
+  lib: bitmap: Added alignment offset for bitmap_find_next_zero_area()
+  lib: genalloc: Generic allocator improvements
+
+    The above three are not really related to the CMA as such, they
+    only modify various library routines which are then used by CMA.
+
+  mm: cma: Contiguous Memory Allocator added
+
+    This is the main file implementing CMA.  No migration support
+    here.  Half of the patch is documentation and header file with
+    kernel-doc so it may be worth a while reading if you're
+    interested.
+
+  mm: cma: debugfs support added
+
+    This adds debugfs support to CMA.  This patch is not really
+    important so you can safely skip it if you are in a hurry. ;)
+
+  mm: cma: Best-fit algorithm added
+
+    This adds a best-fit allocator.  Again, this patch is not that
+    important even though it shows how a custom allocator can be
+    implemented and added to the CMA framework.
+
+  mm: cma: Test device and application added
+
+    A simple "testing" device and application.  This lets allocate
+    chunks form user space as to test basic functionality.  Once
+    again, you may safely ignore this patch.
+
+  mm: move some functions to page_isolation.c
+
+    This is Kamezawa Hiroyuki's patch.  It moves some code migration
+    related code from mm/memory_hotplug.c to mm/page_isolation.c so
+    that it can be used even if memory hotplug is not enabled.
+
+  mm: alloc_contig_free_pages() added
+
+    This is taken from KAMEZAWA Hiroyuki's patch.  It implements an
+    alloc_contig_free_pages() and free_contig_pages() functions.  The
+    first one allocates a range of pages and the second frees them.
+    The pages that are allocated must be in buddy system.
+
+  mm: MIGRATE_CMA migration type added
+
+    This patch adds a new migration type: MIGRATE_CMA.  It's
+    characteristics is that only movable and reclaimable pages can be
+    allocated from MIGRATE_CMA marked pageblock and once pageblokc's
+    migrate type is set to MIGRATE_CMA it is never changed by page
+    allocator to anything else.
+
+  mm: MIGRATE_CMA isolation functions added
+
+    This changes several functions that change pageblock migrate type
+    to MIGRATE_MOVABLE to take an argument which specifies what type
+    to change pageblock's migrate type to.  This is then used with
+    MIGRATE_CMA pageblocks.
+
+  mm: cma: Migration support added [wip]
+
+    This adds support for migrating pages from CMA managed regions.
+    This means, that when CMA is not using part of the region it is
+    given to the page allocator to use.
+
+  ARM: cma: Added CMA to Aquila, Goni and c210 universal boards
+
+    This commit adds support for CMA to three ARM boards.
+
+ Documentation/00-INDEX                      |    2 +
+ Documentation/contiguous-memory.txt         |  577 +++++++++
+ arch/arm/mach-s5pv210/mach-aquila.c         |   26 +
+ arch/arm/mach-s5pv210/mach-goni.c           |   26 +
+ arch/arm/mach-s5pv310/mach-universal_c210.c |   17 +
+ drivers/misc/Kconfig                        |    8 +
+ drivers/misc/Makefile                       |    1 +
+ drivers/misc/cma-dev.c                      |  263 +++++
+ include/linux/bitmap.h                      |   24 +-
+ include/linux/cma.h                         |  569 +++++++++
+ include/linux/genalloc.h                    |   46 +-
+ include/linux/mmzone.h                      |   30 +-
+ include/linux/page-isolation.h              |   47 +-
+ include/linux/rbtree.h                      |   11 +
+ lib/bitmap.c                                |   22 +-
+ lib/genalloc.c                              |  182 ++--
+ mm/Kconfig                                  |   98 ++
+ mm/Makefile                                 |    2 +
+ mm/cma-best-fit.c                           |  382 ++++++
+ mm/cma.c                                    | 1671 +++++++++++++++++++++++++++
+ mm/compaction.c                             |   10 +
+ mm/internal.h                               |    3 +
+ mm/memory_hotplug.c                         |  108 --
+ mm/page_alloc.c                             |  131 ++-
+ mm/page_isolation.c                         |  126 ++-
+ tools/cma/cma-test.c                        |  459 ++++++++
+ 26 files changed, 4575 insertions(+), 266 deletions(-)
+ create mode 100644 Documentation/contiguous-memory.txt
+ create mode 100644 drivers/misc/cma-dev.c
+ create mode 100644 include/linux/cma.h
+ create mode 100644 mm/cma-best-fit.c
+ create mode 100644 mm/cma.c
+ create mode 100644 tools/cma/cma-test.c
+
 -- 
-1.7.1
+1.7.2.3
