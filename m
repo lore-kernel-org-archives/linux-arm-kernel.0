@@ -1,75 +1,140 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 19 Nov 2010 08:11:31 -0800
-Subject: [PATCH] davinci: kconfig: select at24 eeprom for selected boards
-Message-ID: <1290183091-25956-1-git-send-email-khilman@deeprootsystems.com>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Fri, 19 Nov 2010 10:23:31 -0600
+Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
+In-Reply-To: <AANLkTimfu9-p6C8jZ1gZZvmw3tE0E7jGZkWGjDhnLfAR@mail.gmail.com>
+References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
+	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ABE7@dbde02.ent.ti.com>
+	<4CE124AE.4080301@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930234A2ACE1@dbde02.ent.ti.com>
+	<4CE1560F.6080705@mvista.com>
+	<AANLkTimDpYrx_OWg7ABXqRJ5JYzhpVbbyzVMhmFD6Wxi@mail.gmail.com>
+	<4CE2AB73.3050109@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930234ADA4BC@dbde02.ent.ti.com>
+	<4CE2ECCD.8090603@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247388682@dbde02.ent.ti.com>
+	<87fwuyfanl.fsf@deeprootsystems.com>
+	<AANLkTimfu9-p6C8jZ1gZZvmw3tE0E7jGZkWGjDhnLfAR@mail.gmail.com>
+Message-ID: <AANLkTimqiEjjJSRegjw8MsimoiPsaWRahVaN2NcUKk+m@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that the at24 eeprom driver is selected for certain boards that
-need boot data (e.g. MAC address) from EEPROM.
+On Thu, Nov 18, 2010 at 6:17 PM, Victor Rodriguez <vm.rod25@gmail.com> wrote:
+> On Thu, Nov 18, 2010 at 5:57 PM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> "Nori, Sekhar" <nsekhar@ti.com> writes:
+>>
+>>> Hi Michael,
+>>>
+>>> On Wed, Nov 17, 2010 at 02:12:53, Michael Williamson wrote:
+>>>>
+>>>> Help me out. ?Why do we need generic pin lists?
+>>>>
+>>>
+>>> They might help in cases where all boards will use the same set of
+>>> pins. For example, every one who uses I2C will most likely both the
+>>> clock and data pins from the IP. For more complex peripherals with
+>>> different pins options they serve a documentation purpose at best.
+>>>
+>>>> It seems to me that the "generic pin list" for da850.c isn't practical for most
+>>>> (if not all) of the peripherals. ?They should be done using __initdata in
+>>>> each board file.
+>>>
+>>> Yes, agreed.
+>>>
+>>>>
+>>>> Just a cursory glance at what's in da850.c highlights several items being set
+>>>> up for the EVM and not generically. ?For example:
+>>>>
+>>>> - da850_uart1_pins and da850_uart2_pins: I believe both have RTS/CTS pins which
+>>>> ? for a generic definition should be included as for UART0, but would then
+>>>> ? be unused as the EVM doesn't use these pins in this function.
+>>>
+>>> Yes, the generic pin list should have RTS and CTS pins defined for UART1
+>>> and UART2. This needs fixing.
+>>>
+>>>>
+>>>> - da850_mcasp_pins: if generic, must include all 16 AXR pins. ?I think you'd
+>>>> ? be hard pressed to find a board configuration that would use all 16 AXR pins
+>>>> ? for the McASP. ?I'm fairly sure the EVM uses the pins called out, and uses
+>>>> ? other pins for other functions. ?So it's likely this structure wouldn't get used.
+>>>
+>>> Yes, the generic pin list should either be completed or removed
+>>> altogether and the existing pin list da850_mcasp_pins should be
+>>> copied into the board file and called da850_evm_mcasp_pins.
+>>>
+>>>>
+>>>> - da850_mmcsd0_pins : includes 2 GPIO pins (specific to the EVM, though possible for
+>>>> ? other boards) for the card detect and write protect signals. ?These pins are
+>>>> ? completely arbitrary for that particular board design. I also believe that
+>>>> ? the complete mmcsd0 port has 4 more data lines as part of it's peripheral, although
+>>>> ? the driver doesn't support using them.
+>>>
+>>> This is incorrect again. The generic pin list should be completed
+>>> (or removed) and the existing list should be copied into the EVM board
+>>> file as da850_evm_mmcsd0_pins.
+>>>
+>>>>
+>>>> - da850_emif25_pins interface doesn't include the generic pins for some of
+>>>> ? the SDRAM functions.
+>>>
+>>> Yes, this should be completed (or removed). This list is unused anyway.
+>>>
+>>>>
+>>>> - da850_cpgmac_pins defines both RMII and MII pins. ?I don't think any board
+>>>> ? would want to configure both sets at the same time. ?Seems like this should
+>>>> ? never get used...
+>>>
+>>> Agreed.
+>>>
+>>>>
+>>>> It's also incomplete. ?What about the uPP pin list? ?Or the VPIF? ?Etc.
+>>>
+>>> These should be added as the drivers for these devices are
+>>> supported.
+>>>
+>>>>
+>>>> I think a board file author should be familiar enough with the SoC to understand
+>>>> what peripheral pins he should be configuring for his/her particular hardware setup
+>>>> and explicitly specify them in the board file.
+>>>
+>>> Agree.
+>>>
+>>>>
+>>>> If you remove the common pin-mux lists and move them to a board file, then once you
+>>>> configure your specific platform, is there any more memory used than with
+>>>> the common scheme? ?Of course, there would be replication of pin-mux code in the board
+>>>
+>>> There is no memory wastage. All the pin lists are init data.
+>>>
+>>> I too prefer all generic pin lists which are most likely not
+>>> going to be used at all to be removed. Unused stuff like this
+>>> will only make code difficult to read.
+>>
+>> FWIW, I agree.
+>>
+>> Now, who wants to tackle it?
+>>
+>> Kevin
+>>
+>
+> I could but I will need a little help and from all of you. :)
+>
+> Regards
+>
+> Victor Rodriguez
+>
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-davinci/Kconfig |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+Hey I have sent the first patch in order to fix UARTs on da850. please
+check if this is right
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 84066e8..77671b7 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -61,6 +61,8 @@ config MACH_DAVINCI_EVM
- 	bool "TI DM644x EVM"
- 	default ARCH_DAVINCI_DM644x
- 	depends on ARCH_DAVINCI_DM644x
-+	select MISC_DEVICES
-+	select EEPROM_AT24
- 	help
- 	  Configure this option to specify the whether the board used
- 	  for development is a DM644x EVM
-@@ -68,6 +70,8 @@ config MACH_DAVINCI_EVM
- config MACH_SFFSDR
- 	bool "Lyrtech SFFSDR"
- 	depends on ARCH_DAVINCI_DM644x
-+	select MISC_DEVICES
-+	select EEPROM_AT24
- 	help
- 	  Say Y here to select the Lyrtech Small Form Factor
- 	  Software Defined Radio (SFFSDR) board.
-@@ -99,6 +103,8 @@ config MACH_DAVINCI_DM6467_EVM
- 	default ARCH_DAVINCI_DM646x
- 	depends on ARCH_DAVINCI_DM646x
- 	select MACH_DAVINCI_DM6467TEVM
-+	select MISC_DEVICES
-+	select EEPROM_AT24
- 	help
- 	  Configure this option to specify the whether the board used
- 	  for development is a DM6467 EVM
-@@ -110,6 +116,8 @@ config MACH_DAVINCI_DM365_EVM
- 	bool "TI DM365 EVM"
- 	default ARCH_DAVINCI_DM365
- 	depends on ARCH_DAVINCI_DM365
-+	select MISC_DEVICES
-+	select EEPROM_AT24
- 	help
- 	  Configure this option to specify whether the board used
- 	  for development is a DM365 EVM
-@@ -119,6 +127,8 @@ config MACH_DAVINCI_DA830_EVM
- 	default ARCH_DAVINCI_DA830
- 	depends on ARCH_DAVINCI_DA830
- 	select GPIO_PCF857X
-+	select MISC_DEVICES
-+	select EEPROM_AT24
- 	help
- 	  Say Y here to select the TI DA830/OMAP-L137/AM17x Evaluation Module.
- 
-@@ -190,6 +200,8 @@ config MACH_TNETV107X
- config MACH_MITYOMAPL138
- 	bool "Critical Link MityDSP-L138/MityARM-1808 SoM"
- 	depends on ARCH_DAVINCI_DA850
-+	select MISC_DEVICES
-+	select EEPROM_AT24
- 	help
- 	  Say Y here to select the Critical Link MityDSP-L138/MityARM-1808
- 	  System on Module.  Information on this SoM may be found at
--- 
-1.7.2.1
+Regards
+
+Victor Rodriguez
+
+>> _______________________________________________
+>> Davinci-linux-open-source mailing list
+>> Davinci-linux-open-source at linux.davincidsp.com
+>> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+>>
+>
