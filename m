@@ -1,47 +1,38 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 19 Nov 2010 22:12:23 +0100
-Subject: [PATCH 4/4] mtd: FSMC NAND fix obvious speling errors
-Message-ID: <1290201143-15332-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Fri, 19 Nov 2010 22:49:50 +0100
+Subject: [PATCH] ARM: l2x0: Check the correct address range
+In-Reply-To: <AANLkTinqvbPB5ijJnMGB1FP08WUMSUKFY_qZhgZaVUci@mail.gmail.com>
+References: <20101119014029.GA26429@july>
+	<AANLkTinqvbPB5ijJnMGB1FP08WUMSUKFY_qZhgZaVUci@mail.gmail.com>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A074DE04727@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix spelling in the interface file.
+On Fri, 2010-11-19 at 11:08 +0000, Catalin Marinas wrote:
+> On 19 November 2010 01:40, Kyungmin Park <kmpark@infradead.org> wrote:
+> > From: Boojin Kim <boojin.kim@samsung.com>
+> >
+> > When flush or clean the 1MiB, it doesn't flush or clean all since it doesn't check the correct address. So Check the correct address range.
+> 
+> This line is very long.
+> 
+> The patch looks fine otherwise. I think the optimal value would be
+> smaller than the whole cache size but it depends on many things.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- include/linux/mtd/fsmc.h |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+Would it be a good idea to kick in a per-SoC threshold value into
+the l2x0 range clean function, such that if the range exceed this
+specific threshold it cleans all of it? That way it'd be possible
+to optimize for each SoC quite easily.
 
-diff --git a/include/linux/mtd/fsmc.h b/include/linux/mtd/fsmc.h
-index 91f5e6f..4dd8114 100644
---- a/include/linux/mtd/fsmc.h
-+++ b/include/linux/mtd/fsmc.h
-@@ -27,7 +27,7 @@
- 
- /*
-  * The placement of the Command Latch Enable (CLE) and
-- * Address Latch Enable (ALE) is twised around in the
-+ * Address Latch Enable (ALE) is twisted around in the
-  * SPEAR310 implementation.
-  */
- #if defined(CONFIG_MACH_SPEAR310)
-@@ -62,7 +62,7 @@ struct fsmc_nor_bank_regs {
- 
- /* ctrl_tim register definitions */
- 
--struct fsms_nand_bank_regs {
-+struct fsmc_nand_bank_regs {
- 	u32 pc;
- 	u32 sts;
- 	u32 comm;
-@@ -78,7 +78,7 @@ struct fsms_nand_bank_regs {
- struct fsmc_regs {
- 	struct fsmc_nor_bank_regs nor_bank_regs[FSMC_MAX_NOR_BANKS];
- 	u8 reserved_1[0x40 - 0x20];
--	struct fsms_nand_bank_regs bank_regs[FSMC_MAX_NAND_BANKS];
-+	struct fsmc_nand_bank_regs bank_regs[FSMC_MAX_NAND_BANKS];
- 	u8 reserved_2[0xfe0 - 0xc0];
- 	u32 peripid0;			/* 0xfe0 */
- 	u32 peripid1;			/* 0xfe4 */
--- 
-1.7.3.2
+I've heard that these things may even depend on OPPs etc so it may
+even be some dynamic value...
+
+Yours,
+Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: winmail.dat
+Type: application/ms-tnef
+Size: 3547 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101119/0e0c8bc6/attachment-0001.bin>
