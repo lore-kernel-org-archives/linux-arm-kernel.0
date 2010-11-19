@@ -1,43 +1,85 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Fri, 19 Nov 2010 11:00:32 -0800 (PST)
-Subject: [PATCH v4 2/2] msm: gpio: Add irq support to v2 gpiolib.
-In-Reply-To: <AANLkTiknSudbo_j+nqBqmds49CWyqXf0jpvz+DTYH-zg@mail.gmail.com>
-References: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
-	<1290109970-26752-2-git-send-email-gbean@codeaurora.org>
-	<AANLkTimTsyhjHJZggFO31C-2RswpmKWn-V4pGEiQ3+_2@mail.gmail.com>
-	<alpine.DEB.2.00.1011181229380.26784@gbean-linux.qualcomm.com>
-	<AANLkTi=p02P=-JQ9+FynFyM1yxrAh3utKTD2uzqhnLxK@mail.gmail.com>
-	<alpine.DEB.2.00.1011181256470.29924@gbean-linux.qualcomm.com>
-	<AANLkTiknYmWOmiFXGp6h2dT==aMuGs3BtXi82b6Vdq5i@mail.gmail.com>
-	<alpine.DEB.2.00.1011191035210.10052@gbean-linux.qualcomm.com>
-	<AANLkTiknSudbo_j+nqBqmds49CWyqXf0jpvz+DTYH-zg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1011191053040.10560@gbean-linux.qualcomm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 19 Nov 2010 17:06:29 -0200
+Subject: [PATCH 2/2] ARM: mx5: dynamically allocate imx2-wdt devices
+In-Reply-To: <1290193589-17633-1-git-send-email-fabio.estevam@freescale.com>
+References: <1290193589-17633-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1290193589-17633-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>> Targets with the v2 block define CONFIG_MSM_V2_TLMM.
->>>
->>> So in that case we can name ?it as gpio-tlmm.c ??
->>
->> No, not and have things be any clearer.
->>
->> All MSM chips have a TLMM block. ?The older chips have
->> version 1 (v1) of the TLMM block. ?The newer chips have v2.
->
-> I think that we should differentiate the new gpio infrastructure with
-> appropriate naming that makes the diff between v1 and v2
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/devices-imx51.h             |    5 +++++
+ arch/arm/mach-mx5/devices.c                   |   15 ---------------
+ arch/arm/mach-mx5/devices.h                   |    1 -
+ arch/arm/plat-mxc/devices/platform-imx2-wdt.c |    5 +++++
+ 4 files changed, 10 insertions(+), 16 deletions(-)
 
-What do you suggest?  All MSM SoCs have a TLMM block.  The block itself
-carries no model or revision name, and is not tied specifically to any
-particular SoC, except for the fact that the second generation of this block
-happened to appear at the same time as the MSM8x60.
-
-gpio.c is already in wide use for v1 systems, and is well-establised
-in the android mainlines.  Changing without extremely good cause would not
-go pleasantly.
-
-Since gpio.c is v1, we used gpio-v2.c for v2.
-
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+index 8c50cb5..dbf070e 100644
+--- a/arch/arm/mach-mx5/devices-imx51.h
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -42,3 +42,8 @@ extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
+ extern const struct imx_esdhc_imx_data imx51_esdhc_data[] __initconst;
+ #define imx51_add_esdhc(id, pdata)	\
+ 	imx_add_esdhc(&imx51_esdhc_data[id], pdata)
++
++extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data __initconst;
++#define imx51_add_imx2_wdt(pdata)	\
++	imx_add_imx2_wdt(&imx51_imx2_wdt_data)
++
+diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+index 4c7be87..620d0ac 100644
+--- a/arch/arm/mach-mx5/devices.c
++++ b/arch/arm/mach-mx5/devices.c
+@@ -97,21 +97,6 @@ struct platform_device mxc_usbh1_device = {
+ 	},
+ };
+ 
+-static struct resource mxc_wdt_resources[] = {
+-	{
+-		.start = MX51_WDOG_BASE_ADDR,
+-		.end = MX51_WDOG_BASE_ADDR + SZ_16K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-};
+-
+-struct platform_device mxc_wdt = {
+-	.name = "imx2-wdt",
+-	.id = 0,
+-	.num_resources = ARRAY_SIZE(mxc_wdt_resources),
+-	.resource = mxc_wdt_resources,
+-};
+-
+ static struct resource mxc_kpp_resources[] = {
+ 	{
+ 		.start = MX51_MXC_INT_KPP,
+diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+index af1d07c..ccb7cdc 100644
+--- a/arch/arm/mach-mx5/devices.h
++++ b/arch/arm/mach-mx5/devices.h
+@@ -1,6 +1,5 @@
+ extern struct platform_device mxc_usbdr_host_device;
+ extern struct platform_device mxc_usbh1_device;
+ extern struct platform_device mxc_usbdr_udc_device;
+-extern struct platform_device mxc_wdt;
+ extern struct platform_device mxc_hsi2c_device;
+ extern struct platform_device mxc_keypad_device;
+diff --git a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c b/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
+index e64d474..c8e2d55 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
++++ b/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
+@@ -41,6 +41,11 @@ const struct imx_imx2_wdt_data imx35_imx2_wdt_data __initconst =
+ 	imx_imx2_wdt_data_entry_single(MX35, SZ_16K);
+ #endif /* ifdef CONFIG_SOC_IMX35 */
+ 
++#ifdef CONFIG_SOC_IMX51
++const struct imx_imx2_wdt_data imx35_imx2_wdt_data __initconst =
++	imx_imx2_wdt_data_entry_single(MX51, SZ_16K);
++#endif /* ifdef CONFIG_SOC_IMX51 */
++
+ struct platform_device *__init imx_add_imx2_wdt(
+ 		const struct imx_imx2_wdt_data *data)
+ {
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.6.0.4
