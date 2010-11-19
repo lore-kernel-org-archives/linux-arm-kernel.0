@@ -1,89 +1,46 @@
-From: pma@sysgo.com (Pavel Machek)
-Date: Fri, 19 Nov 2010 13:54:05 +0100
-Subject: 19851c58e68 breaks spacecom1 board
-In-Reply-To: <20101116080311.GA17397@pma.sysgo.com>
-References: <20101116080311.GA17397@pma.sysgo.com>
-Message-ID: <20101119125405.GA29158@pma.sysgo.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 19 Nov 2010 14:53:53 +0200
+Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+In-Reply-To: <AANLkTinVf8--zmGa7svapcVpEp2BPXf33DtdruLtoJx5@mail.gmail.com>
+References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+	<1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
+	<20101119085007.GK6446@legolas.emea.dhcp.ti.com>
+	<AANLkTimSxGZufLk1RzQuBSg2vBF1p9BXFP8abVZVoLFs@mail.gmail.com>
+	<20101119120938.GN2329@legolas.emea.dhcp.ti.com>
+	<AANLkTinVf8--zmGa7svapcVpEp2BPXf33DtdruLtoJx5@mail.gmail.com>
+Message-ID: <20101119125353.GB5818@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Hari,
 
-Fix up interrupt numbers on SA1111 companion chip.
+On Fri, Nov 19, 2010 at 06:29:39AM -0600, Kanigeri, Hari wrote:
+>How do you know that a response is received for a particular sender ?
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+think of it as FIFO. So the first completed message is the first in your
+list of requests. Ain't that easy ? :-)
 
----
+>By reading mailbox payload or by reading some shared memory ? I think
+>this itself would constitute building up protocol in mailbox driver.
 
-This seems to fix the interrupt issue for me... USB now gets some
-interrupts. But some SA1111 expert should take a look at this.
+I believe you're thinking too complicated :-p
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index a52a27c..e47a474 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -448,6 +454,7 @@ static struct irq_chip sa1111_high_chip = {
- static void sa1111_setup_irq(struct sa1111 *sachip)
- {
- 	void __iomem *irqbase = sachip->base + SA1111_INTC;
-+	int irq_base = sachip->irq_base; 
- 	unsigned int irq;
- 
- 	/*
-@@ -475,19 +482,19 @@ static void sa1111_setup_irq(struct sa1111 *sachip)
- 	sa1111_writel(~0, irqbase + SA1111_INTSTATCLR1);
- 
- 	for (irq = IRQ_GPAIN0; irq <= SSPROR; irq++) {
--		set_irq_chip(irq, &sa1111_low_chip);
--		set_irq_chip_data(irq, sachip);
--		set_irq_handler(irq, handle_edge_irq);
--		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+		set_irq_chip(irq + irq_base, &sa1111_low_chip);
-+		set_irq_chip_data(irq + irq_base, sachip);
-+		set_irq_handler(irq + irq_base, handle_edge_irq);
-+		set_irq_flags(irq + irq_base, IRQF_VALID | IRQF_PROBE);
- 	}
- 
- 	for (irq = AUDXMTDMADONEA; irq <= IRQ_S1_BVD1_STSCHG; irq++) {
--		set_irq_chip(irq, &sa1111_high_chip);
--		set_irq_chip_data(irq, sachip);
--		set_irq_handler(irq, handle_edge_irq);
--		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+		set_irq_chip(irq + irq_base, &sa1111_high_chip);
-+		set_irq_chip_data(irq + irq_base, sachip);
-+		set_irq_handler(irq + irq_base, handle_edge_irq);
-+		set_irq_flags(irq + irq_base, IRQF_VALID | IRQF_PROBE);
- 	}
- 
- 	/*
- 	 * Register SA1111 interrupt
- 	 */
-@@ -782,6 +839,15 @@ __sa1111_probe(struct device *me, struct resource *mem, int irq)
- 	else
- 		has_devs &= ~(1 << 1);
- 
-+	for (i = 0; i < ARRAY_SIZE(sa1111_devices); i++) {
-+		int j;
-+		for (j = 0; j < 6; j++)			
-+			if (sa1111_devices[i].irq[j]) {
-+				sa1111_devices[i].irq[j] += sachip->irq_base;
-+				printk("Adjusting interrupt %d\n", sa1111_devices[i].irq[j]);
-+			}
-+	}
-+
- 	for (i = 0; i < ARRAY_SIZE(sa1111_devices); i++)
- 		if (has_devs & (1 << i))
- 			sa1111_init_one_child(sachip, mem, &sa1111_devices[i]);
-@@ -853,8 +919,13 @@ int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
- 	 * SDRAM bank 1 on Neponset). The default configuration selects
- 	 * Assabet, so any address in bank 1 is necessarily invalid.
- 	 */
-+#ifdef CONFIG_MACH_SPACECOM1
-+	return ((machine_is_spacecom1()) &&
-+		(addr >= 0xa0100000 || (addr + size) >= 0xa0100000));
-+#else
- 	return ((machine_is_assabet() || machine_is_pfs168()) &&
- 		(addr >= 0xc8000000 || (addr + size) >= 0xc8000000));
-+#endif
- }
- 
- struct sa1111_save_data {
+>I fully agree with you about common framework, and the proposed
+>solution for the common IPC framework is Syslink. This was discussed
+>during the recent LPC meeting to come up with a common IPC framework
+>that is currently missing in Kernel.
+>I can share with you the details if you are interested.
+
+Don't bother, I know all I wanted to know so far :-p
+
+>As I said if some one does that then it is a misuse on their part :).
+>The messages should be routed through IPC driver. And let's not forget
+>the main motivation of this patch as well.
+
+Still it doesn't the fact that currently you allow for that. There are
+malware writers everywhere. But hey, it would be cool to have mailbox
+appear on securityfocus.com :-p
+
+-- 
+balbi
