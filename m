@@ -1,120 +1,42 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 19 Nov 2010 23:01:04 +0530
-Subject: [PATCH 3/5] omap4: l2x0: enable instruction and data prefetching
-In-Reply-To: <1290187866-26941-3-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 19 Nov 2010 23:01:05 +0530
+Subject: [PATCH 4/5] omap4: l2x0: Set share override bit
+In-Reply-To: <1290187866-26941-4-git-send-email-santosh.shilimkar@ti.com>
 References: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
 	<1290187866-26941-2-git-send-email-santosh.shilimkar@ti.com>
 	<1290187866-26941-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1290187866-26941-4-git-send-email-santosh.shilimkar@ti.com>
+	<1290187866-26941-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1290187866-26941-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mans Rullgard <mans@mansr.com>
+Clearing bit 22 in the PL310 Auxiliary Control register (shared
+attribute override enable) has the side effect of transforming Normal
+Shared Non-cacheable reads into Cacheable no-allocate reads.
 
-Enabling L2 prefetching improves performance as shown on Panda
-ES2.1 board with mem test, and it has measurable impact on
-performances. I think we should consider it, even though it damages
-"writes" a bit. (rebased to k.org)
-Usually the prefetch is used at both levels together L1 + L2, however,
-to enable the CP15 prefetch engines, these are under security, and on
-GP devices, we cannot enable it(e.g. on PandaBoard). However, just
-enabling PL310 prefetch seems to provide performance improvement,
-as shown in the data below (from Ubuntu) and would be a great thing
-to pull in.
+Coherent DMA buffers in Linux always have a Cacheable alias via the
+kernel linear mapping and the processor can speculatively load cache
+lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+reads would unexpectedly hit such cache lines leading to buffer
+corruption
 
-What prefetch does is enable automatic next line prefetching. With this
-enabled, whenever the PL310 receives a cachable read request, it
-automatically prefetches the following cache line as well.
-
-Measurement Data:
-==
-STOCK 10.10 WITHOUT PATCH
-
-========================
-~# ./memspeed
-size    8388608 8192k 8M
-offset  8388608, 0
-buffers 0x2aaad000 0x2b2ad000
-copy  libc          133 MB/s
-copy  Android v5    273 MB/s
-copy  Android NEON  235 MB/s
-copy  INT32         116 MB/s
-copy  ASM ARM       187 MB/s
-copy  ASM VLDM 64   204 MB/s
-copy  ASM VLDM 128  173 MB/s
-copy  ASM VLD1      216 MB/s
-read  ASM ARM       286 MB/s
-read  ASM VLDM      242 MB/s
-read  ASM VLD1      286 MB/s
-write libc         1947 MB/s
-write ASM ARM      1943 MB/s
-write ASM VSTM     1942 MB/s
-write ASM VST1     1935 MB/s
-
-10.10 + PATCH
-=============
-~# ./memspeed
-size    8388608 8192k 8M
-offset  8388608, 0
-buffers 0x2ab17000 0x2b317000
-copy  libc          129 MB/s
-copy  Android v5    256 MB/s
-copy  Android NEON  356 MB/s
-copy  INT32         127 MB/s
-copy  ASM ARM       321 MB/s
-copy  ASM VLDM 64   337 MB/s
-copy  ASM VLDM 128  321 MB/s
-copy  ASM VLD1      350 MB/s
-read  ASM ARM       496 MB/s
-read  ASM VLDM      470 MB/s
-read  ASM VLD1      488 MB/s
-write libc         1701 MB/s
-write ASM ARM      1682 MB/s
-write ASM VSTM     1693 MB/s
-write ASM VST1     1681 MB/s
-
-Signed-off-by: Mans Rullgard <mans@mansr.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Tested-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/omap4-common.c |   17 +++++++++++------
- 1 files changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/omap4-common.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index c814604..b3cea78 100644
+index b3cea78..2006da1 100644
 --- a/arch/arm/mach-omap2/omap4-common.c
 +++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -66,9 +66,6 @@ static int __init omap_l2_cache_init(void)
- 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
- 	BUG_ON(!l2cache_base);
- 
--	/* Enable PL310 L2 Cache controller */
--	omap_smc1(0x102, 0x1);
--
- 	/*
- 	 * 16-way associativity, parity disabled
- 	 * Way size - 32KB (es1.0)
-@@ -79,10 +76,18 @@ static int __init omap_l2_cache_init(void)
- 			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
- 			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT));
- 
--	if (omap_rev() == OMAP4430_REV_ES1_0)
-+	if (omap_rev() == OMAP4430_REV_ES1_0) {
+@@ -80,6 +80,7 @@ static int __init omap_l2_cache_init(void)
  		aux_ctrl |= 0x2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT;
--	else
--		aux_ctrl |= 0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT;
-+	} else {
-+		aux_ctrl |= ((0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-+			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
-+			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT));
-+	}
-+	if (omap_rev() != OMAP4430_REV_ES1_0)
-+		omap_smc1(0x109, aux_ctrl);
-+
-+	/* Enable PL310 L2 Cache controller */
-+	omap_smc1(0x102, 0x1);
- 
- 	l2x0_init(l2cache_base, aux_ctrl, L2X0_AUX_CTRL_MASK);
- 
+ 	} else {
+ 		aux_ctrl |= ((0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
++			(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
+ 			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
+ 			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT));
+ 	}
 -- 
 1.6.0.4
