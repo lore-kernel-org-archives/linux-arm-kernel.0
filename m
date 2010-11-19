@@ -1,19 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Nov 2010 18:13:22 +0000
-Subject: [PATCH 1/5] ARM: l2x0: Add aux control register bitfields
-In-Reply-To: <1290187866-26941-2-git-send-email-santosh.shilimkar@ti.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 19 Nov 2010 18:32:27 +0000
+Subject: [PATCH 5/5] omap4: l2x0: Enable early BRESP bit
+In-Reply-To: <1290187866-26941-6-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Fri, 19 Nov 2010 23:01:06 +0530")
 References: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
 	<1290187866-26941-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1290190402.14953.10.camel@e102109-lin.cambridge.arm.com>
+	<1290187866-26941-3-git-send-email-santosh.shilimkar@ti.com>
+	<1290187866-26941-4-git-send-email-santosh.shilimkar@ti.com>
+	<1290187866-26941-5-git-send-email-santosh.shilimkar@ti.com>
+	<1290187866-26941-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <yw1xfwux411g.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-11-19 at 17:31 +0000, Santosh Shilimkar wrote:
-> This patch adds the PL310 Auxiliary Control Register bitfields
-> so that SOC's can use these bit fields to construct the AUXCTRL
-> value to be passed/programmed instead of hardcoding it.
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> The AXI protocol specifies that the write response can only
+> be sent back to an AXI master when the last write data has been
+> accepted. This optimization enables the PL310 to send the write
+> response of certain write transactions as soon as the store buffer
+> accepts the write address. This behavior is not compatible with
+> the AXI protocol and is disabled by default. You enable this
+> optimization by setting the Early BRESP Enable bit in the
+> Auxiliary Control Register (bit [30]).
+
+Did you measure the performance difference this makes, if any?
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
