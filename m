@@ -1,46 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Nov 2010 19:56:35 +0000
-Subject: [PATCH] ARM: l2x0: Check the correct address range
-In-Reply-To: <AANLkTikpAPLSTAzm2iPSV1_LL=B+zPbWzTPdhne3XFVc@mail.gmail.com>
-References: <20101119014029.GA26429@july>
-	<AANLkTikpAPLSTAzm2iPSV1_LL=B+zPbWzTPdhne3XFVc@mail.gmail.com>
-Message-ID: <20101119195635.GB10722@n2100.arm.linux.org.uk>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Fri, 19 Nov 2010 12:27:26 -0800 (PST)
+Subject: [PATCH v4 2/2] msm: gpio: Add irq support to v2 gpiolib.
+In-Reply-To: <AANLkTi=VGx1xR3f7_8-cMQAmaz6PQ-t=Xubk_Jtp911V@mail.gmail.com>
+References: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
+	<1290109970-26752-2-git-send-email-gbean@codeaurora.org>
+	<AANLkTimTsyhjHJZggFO31C-2RswpmKWn-V4pGEiQ3+_2@mail.gmail.com>
+	<alpine.DEB.2.00.1011181229380.26784@gbean-linux.qualcomm.com>
+	<AANLkTi=p02P=-JQ9+FynFyM1yxrAh3utKTD2uzqhnLxK@mail.gmail.com>
+	<alpine.DEB.2.00.1011181256470.29924@gbean-linux.qualcomm.com>
+	<AANLkTiknYmWOmiFXGp6h2dT==aMuGs3BtXi82b6Vdq5i@mail.gmail.com>
+	<alpine.DEB.2.00.1011191035210.10052@gbean-linux.qualcomm.com>
+	<AANLkTiknSudbo_j+nqBqmds49CWyqXf0jpvz+DTYH-zg@mail.gmail.com>
+	<alpine.DEB.2.00.1011191053040.10560@gbean-linux.qualcomm.com>
+	<AANLkTi=VGx1xR3f7_8-cMQAmaz6PQ-t=Xubk_Jtp911V@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1011191223570.10560@gbean-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 19, 2010 at 05:30:14AM -0600, Kanigeri, Hari wrote:
-> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> > index 170c9bb..50599d9 100644
-> > --- a/arch/arm/mm/cache-l2x0.c
-> > +++ b/arch/arm/mm/cache-l2x0.c
-> > @@ -195,7 +195,7 @@ static void l2x0_clean_range(unsigned long start, unsigned long end)
-> > ? ? ? ?void __iomem *base = l2x0_base;
-> > ? ? ? ?unsigned long flags;
-> >
-> > - ? ? ? if ((end - start) >= l2x0_size) {
-> > + ? ? ? if ((end - start + 1) >= l2x0_size) {
-> 
-> nitpick: probably will look more obvious if it is coded as  if ((end +
-> 1) - start) >= l2x0_size)
+>> Since gpio.c is v1, we used gpio-v2.c for v2.
+>
+> Greg, i agree your point ,but i think v2 differs from v1 with a new
+> features distinguished.Also there might be a intention behind going
+> for v2 that might resolve some hardware erratas in v1.
 
-Start defines the first byte of the object to perform the cache
-maintainence on.  End defines the first subsequent byte not in the
-object.  So, (end - start) is the number of bytes in the object,
-and therefore the original code _is_ correct.
+V2 is not an extension to or erratas to v1, it is almost
+completely different.  Any erratas to v1 would be released as v1.1 (I suspect).
 
-If you have an object which is 1MB in size, then (end - start) will
-be 1048576 bytes.  If your cache is 1MB, then we'll use the xxx_all()
-version of the function.
+> what if again a new generation comes then we will name it gpio-v3.c ??
 
-However, things get more murky when you consider that we have the
-granularity of cache lines to deal with.
+I assume so.
 
-If start is mid-way in a cache line, then that cache line has to be
-operated on.  If end is mid-way or at the end of a cache line, that
-cache line also has to be operated on.  However, if end is at the
-very first byte of the cache line, it must not be operated on.
-
-So, it is possible for start = mid-cache line, end = start + 1048575,
-that you will end up not doing the xxx_all() optimization, despite
-operating on over 1MB of cached data - but this is only true for the
-corner case up to 1MB + cache line size - 1.
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
