@@ -1,50 +1,44 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Fri, 19 Nov 2010 05:30:14 -0600
-Subject: [PATCH] ARM: l2x0: Check the correct address range
-In-Reply-To: <20101119014029.GA26429@july>
-References: <20101119014029.GA26429@july>
-Message-ID: <AANLkTikpAPLSTAzm2iPSV1_LL=B+zPbWzTPdhne3XFVc@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Nov 2010 11:48:31 +0000
+Subject: [PATCH 1/5] ARM: pgtable: switch order of Linux vs hardware page
+	tables
+In-Reply-To: <E1PIloA-0007qU-ME@rmk-PC.arm.linux.org.uk>
+References: <20101117172717.GF5308@n2100.arm.linux.org.uk>
+	<E1PIloA-0007qU-ME@rmk-PC.arm.linux.org.uk>
+Message-ID: <AANLkTik043UX-cXyriVAwzFTNNTtCTcxYd6VN_gYqCFe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Boojin Kim <boojin.kim@samsung.com>
+On 17 November 2010 17:28, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -158,7 +156,7 @@ ENTRY(cpu_v7_set_pte_ext)
+> ? ? ? ?tstne ? r1, #L_PTE_PRESENT
+> ? ? ? ?moveq ? r3, #0
 >
-> When flush or clean the 1MiB, it doesn't flush or clean all since it doesn't check the correct address. So Check the correct address range.
+> - ? ? ? str ? ? r3, [r0]
+> + ? ? ? str ? ? r3, [r0, #2048]!
 
-I saw this before but then I thought that the individual callers of
-cache functions have to call with  +1 to the end address.
+Thumb-2 build gives "offset out of range".  We need to do a separate
+ADD for this case.
 
->
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 170c9bb..50599d9 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -195,7 +195,7 @@ static void l2x0_clean_range(unsigned long start, unsigned long end)
-> ? ? ? ?void __iomem *base = l2x0_base;
-> ? ? ? ?unsigned long flags;
->
-> - ? ? ? if ((end - start) >= l2x0_size) {
-> + ? ? ? if ((end - start + 1) >= l2x0_size) {
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 688deda..9aba33c 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -186,7 +186,9 @@ ENTRY(cpu_v7_set_pte_ext)
+ 	tstne	r1, #L_PTE_PRESENT
+ 	moveq	r3, #0
 
-nitpick: probably will look more obvious if it is coded as  if ((end +
-1) - start) >= l2x0_size)
-
-> ? ? ? ? ? ? ? ?l2x0_clean_all();
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> @@ -225,7 +225,7 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
-> ? ? ? ?void __iomem *base = l2x0_base;
-> ? ? ? ?unsigned long flags;
->
-> - ? ? ? if ((end - start) >= l2x0_size) {
-> + ? ? ? if ((end - start + 1) >= l2x0_size) {
-
-same as above.
+-	str	r3, [r0, #2048]!
++ ARM(	str	r3, [r0, #2048]!	)
++ THUMB(	str	r3, [r0, #2048]		)
++ THUMB(	add	r0, r0, #2048		)
+ #endif	/* CONFIG_ARM_LPAE */
+ 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+ #endif
 
 
-Thank you,
-Best regards,
-Hari Kanigeri
+-- 
+Catalin
