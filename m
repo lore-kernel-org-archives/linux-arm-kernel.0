@@ -1,27 +1,58 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 26 Nov 2010 11:50:28 +0100
-Subject: [sodaville] [PATCH 1/9] spi/pxa2xx: don't use subys initcall for
-	driver	init
-In-Reply-To: <20101125235415.GA9310@n2100.arm.linux.org.uk>
-References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
-	<1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
-	<AANLkTin4vh85XRkEd7YocCmKngViR_qZDe7z1b4JXyd-@mail.gmail.com>
-	<4CED1C95.8070300@linutronix.de>
-	<20101124141623.GH24970@rakim.wolfsonmicro.main>
-	<4CED3199.2040700@linutronix.de>
-	<20101125235415.GA9310@n2100.arm.linux.org.uk>
-Message-ID: <20101126105028.GA24010@www.tglx.de>
+Date: Fri, 19 Nov 2010 09:00:11 -0800
+Subject: [PATCH] spi/pxa2xx: register driver properly
+Message-ID: <mailman.27.1290768644.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux | 2010-11-25 23:54:15 [+0000]:
+use platform_driver_register instead of platform_driver_probe. The
+latter only checks available devices at the time of calling. So if a
+device gets inserter at a later point in time then the driver will never
+play with it.
 
->Why should the PXA code change when you haven't explained _why_ you want
->to change the SPI driver to conform to your idea?
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
+---
+ drivers/spi/pxa2xx_spi.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-The problem was, that the platform driver never got probed after I
-registered the PCI driver. For that reason I made the patch attached. It
-got lost while moving the tree forward and I did not notice it earlier.
-While at it, I changed the subsys_init to module_init because it looked
-wrong. At this time I was also thinking about using one module for the
-platform and PCI code but never got to it.
+diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+index e76b1af..4e169b5 100644
+--- a/drivers/spi/pxa2xx_spi.c
++++ b/drivers/spi/pxa2xx_spi.c
+@@ -1366,7 +1366,7 @@ static void cleanup(struct spi_device *spi)
+ 	kfree(chip);
+ }
+ 
+-static int __init init_queue(struct driver_data *drv_data)
++static int __devinit init_queue(struct driver_data *drv_data)
+ {
+ 	INIT_LIST_HEAD(&drv_data->queue);
+ 	spin_lock_init(&drv_data->lock);
+@@ -1454,7 +1454,7 @@ static int destroy_queue(struct driver_data *drv_data)
+ 	return 0;
+ }
+ 
+-static int __init pxa2xx_spi_probe(struct platform_device *pdev)
++static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct pxa2xx_spi_master *platform_info;
+@@ -1723,13 +1723,14 @@ static struct platform_driver driver = {
+ 		.pm	= &pxa2xx_spi_pm_ops,
+ #endif
+ 	},
++	.probe = pxa2xx_spi_probe,
+ 	.remove = pxa2xx_spi_remove,
+ 	.shutdown = pxa2xx_spi_shutdown,
+ };
+ 
+ static int __init pxa2xx_spi_init(void)
+ {
+-	return platform_driver_probe(&driver, pxa2xx_spi_probe);
++	return platform_driver_register(&driver);
+ }
+ subsys_initcall(pxa2xx_spi_init);
+ 
+-- 
+1.7.3.2
