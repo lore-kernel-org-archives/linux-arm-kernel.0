@@ -1,159 +1,89 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Fri, 19 Nov 2010 06:29:39 -0600
-Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
-	multiple readers
-In-Reply-To: <20101119120938.GN2329@legolas.emea.dhcp.ti.com>
-References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
-	<1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
-	<20101119085007.GK6446@legolas.emea.dhcp.ti.com>
-	<AANLkTimSxGZufLk1RzQuBSg2vBF1p9BXFP8abVZVoLFs@mail.gmail.com>
-	<20101119120938.GN2329@legolas.emea.dhcp.ti.com>
-Message-ID: <AANLkTinVf8--zmGa7svapcVpEp2BPXf33DtdruLtoJx5@mail.gmail.com>
+From: pma@sysgo.com (Pavel Machek)
+Date: Fri, 19 Nov 2010 13:54:05 +0100
+Subject: 19851c58e68 breaks spacecom1 board
+In-Reply-To: <20101116080311.GA17397@pma.sysgo.com>
+References: <20101116080311.GA17397@pma.sysgo.com>
+Message-ID: <20101119125405.GA29158@pma.sysgo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
 
->
->> I think handling of per-message callback should be handled at one
->> level above mailbox, like in IPC modules such as dspbridge,
->> syslink..etc.
->
-> then you'll have duplication of functionality :-)
->
-yes in mailbox :). One solution doesn't fit all and this should be
-handled at IPC driver.
+Fix up interrupt numbers on SA1111 companion chip.
 
->> Mailbox module should be free of any protocols and should take care of
->
-> it's not a protocol that I'm proposing. It's just one way to give
-> mailbox users a more async API.
->
->> just writing to the mailbox fifo and delivering the message to the
->> interested listener(s).
->
-> exactly. Only to the interested listener. With your patch, you'll be
-> delivering the message to all listeners and listeners have to check if
-> that particular message belongs to them.
->
->>> What will happen is that every user will have to check if every message
->>> belongs to them based on the notifications.
->>>
->>> Imagine a hypothetical situation where you have 100 users each with 100
->>> messages. You will have 100 * 100 (10.000)
->>> "does-this-message-belongs-to-me" checks.
->>>
->>
->> Ideally one shouldn't design their IPC this way. They should have a
->> IPC driver and the knowledge of notification to multiple users should
->> be routed from there.
->
-> only if the message is interesting for N listeners. But if each
-> listeners will have its own message towards the other side of the link,
-> then mailbox should only give the result to one listener.
->
->> What my patch is addressing is ensure that the users of mailbox don't
->> mess with the mailbox's internal pointer, and also provide the
->> flexibility of multiple listeners. Designers of IPC should make their
->> own judgment whether to use the flexibility option based on their use
->> cases.
-> but with your patch, you are delivering the same message to all
-> listeners. You give the oportunity even for some attacks. I could fiddle
-> with other listeners' message just by attaching a notifier_block and
-> checking what's the content of every message.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-IMHO, an kernel API have a scope to be misused if the Users misuse it,
-and I think the users of the Kernel APIs should know what they are
-doing before using an API.
+---
 
->
->>> Rather than doing it this way, I would, as the easiest path, add a
->>> "callback" parameter to omap_mbox_request_send() and then, internally,
->>> allocate a e.g. struct omap_mbox_request and add that to a list of
->>> pending
->>> messages. Something like:
->>>
->>> struct omap_mbox_request {
->>> ? ? ? ?struct omap_mbox ? ? ? ?*mbox;
->>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? (*complete)(void *context);
->>> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?*context;
->>> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?*buf;
->>> ? ? ? ?unsigned ? ? ? ? ? ? ? ?len;
->>> ? ? ? ?struct list_head ? ? ? ?list;
->>> };
->>>
->>> [...]
->>>
->>> int omap_mbox_request_send(struct omap_mbox *mbox, mbox_msg_t msg, int
->>> ? ? ? ? ? ? ? ?(*complete)(void *context), void *context, gfp_t flags)
->>> {
->>> ? ? ? ?struct omap_mbox_queue ?*mq = mbox->txq;
->>> ? ? ? ?struct omap_mbox_request ? ? ? ?*req;
->>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? ret = 0;
->>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? len;
->>>
->>> ? ? ? ?req = kzalloc(sizeof(*req), flags);
->>> ? ? ? ?if (!req) {
->>> ? ? ? ? ? ? ? ?[...]
->>> ? ? ? ?}
->>>
->>> ? ? ? ?memcpy(req->buf, &msg, sizeof(msg));
->>> ? ? ? ?req->len = sizeof(msg));
->>> ? ? ? ?req->mbox = msg;
->>> ? ? ? ?req->complete = complete;
->>> ? ? ? ?req->context = context;
->>> ? ? ? ?INIT_LIST_HEAD(&req->list);
->>>
->>> ? ? ? ?list_add_tail(&req->list, &mq->req_list);
->>>
->>> ? ? ? ?/* kick the tasklet here */
->>>
->>> ? ? ? ?return 0;
->>> }
->>>
->>> then on your tasklet, you simply iterate over the list and start sending
->>> one by one and calling callback when it completes. You would be giving
+This seems to fix the interrupt issue for me... USB now gets some
+interrupts. But some SA1111 expert should take a look at this.
 
-How do you know that a response is received for a particular sender ?
-By reading mailbox payload or by reading some shared memory ? I think
-this itself would constitute building up protocol in mailbox driver.
-
->>> your users a more asynchronous API and you wouldn't need this notifier
->>> which, IMO, isn't a good solution at all.
->>>
->>
->> Your ideas are good. But this type of intelligence is already inbuilt
->> in IPC drivers such as dspbridge and syslink. And I think mailbox
->> driver should be free of protocols.
->
-> Like I said before, this is not a protocol. And if both dspbridge and
-> syslink have the same kind of thing, don't you think it's a duplication?
-> Don't you, also, think common features should be done at framework
-> levels ? Since we don't have an IPC framework, we consider the mailbox
-> driver a framework for using the OMAP mailbox, then the API I proposed
-> is just one way to address the problem you described. There's nothing
-> like a protocol here.
-
-I fully agree with you about common framework, and the proposed
-solution for the common IPC framework is Syslink. This was discussed
-during the recent LPC meeting to come up with a common IPC framework
-that is currently missing in Kernel.
-I can share with you the details if you are interested.
-
->
-> In any case, you are the one taking care of those drivers and it's your
-> call how to handle multiple users, but keep in mind you'll be allowing
-> anyone to see all messages that are going through mailbox just by
-> attaching a notifier block :-) If that's ok for you, if you don't see
-> any troubles with that, go for it. If you also don't see any troubles
-> with having hundreds of users each with hundreds of messages and you
-> notifying all of them about all messages as a problem, go for it :-p
-
-As I said if some one does that then it is a misuse on their part :).
-The messages should be routed through IPC driver. And let's not forget
-the main motivation of this patch as well.
-
-
-Thank you,
-Best regards,
-Hari Kanigeri
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index a52a27c..e47a474 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -448,6 +454,7 @@ static struct irq_chip sa1111_high_chip = {
+ static void sa1111_setup_irq(struct sa1111 *sachip)
+ {
+ 	void __iomem *irqbase = sachip->base + SA1111_INTC;
++	int irq_base = sachip->irq_base; 
+ 	unsigned int irq;
+ 
+ 	/*
+@@ -475,19 +482,19 @@ static void sa1111_setup_irq(struct sa1111 *sachip)
+ 	sa1111_writel(~0, irqbase + SA1111_INTSTATCLR1);
+ 
+ 	for (irq = IRQ_GPAIN0; irq <= SSPROR; irq++) {
+-		set_irq_chip(irq, &sa1111_low_chip);
+-		set_irq_chip_data(irq, sachip);
+-		set_irq_handler(irq, handle_edge_irq);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++		set_irq_chip(irq + irq_base, &sa1111_low_chip);
++		set_irq_chip_data(irq + irq_base, sachip);
++		set_irq_handler(irq + irq_base, handle_edge_irq);
++		set_irq_flags(irq + irq_base, IRQF_VALID | IRQF_PROBE);
+ 	}
+ 
+ 	for (irq = AUDXMTDMADONEA; irq <= IRQ_S1_BVD1_STSCHG; irq++) {
+-		set_irq_chip(irq, &sa1111_high_chip);
+-		set_irq_chip_data(irq, sachip);
+-		set_irq_handler(irq, handle_edge_irq);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++		set_irq_chip(irq + irq_base, &sa1111_high_chip);
++		set_irq_chip_data(irq + irq_base, sachip);
++		set_irq_handler(irq + irq_base, handle_edge_irq);
++		set_irq_flags(irq + irq_base, IRQF_VALID | IRQF_PROBE);
+ 	}
+ 
+ 	/*
+ 	 * Register SA1111 interrupt
+ 	 */
+@@ -782,6 +839,15 @@ __sa1111_probe(struct device *me, struct resource *mem, int irq)
+ 	else
+ 		has_devs &= ~(1 << 1);
+ 
++	for (i = 0; i < ARRAY_SIZE(sa1111_devices); i++) {
++		int j;
++		for (j = 0; j < 6; j++)			
++			if (sa1111_devices[i].irq[j]) {
++				sa1111_devices[i].irq[j] += sachip->irq_base;
++				printk("Adjusting interrupt %d\n", sa1111_devices[i].irq[j]);
++			}
++	}
++
+ 	for (i = 0; i < ARRAY_SIZE(sa1111_devices); i++)
+ 		if (has_devs & (1 << i))
+ 			sa1111_init_one_child(sachip, mem, &sa1111_devices[i]);
+@@ -853,8 +919,13 @@ int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
+ 	 * SDRAM bank 1 on Neponset). The default configuration selects
+ 	 * Assabet, so any address in bank 1 is necessarily invalid.
+ 	 */
++#ifdef CONFIG_MACH_SPACECOM1
++	return ((machine_is_spacecom1()) &&
++		(addr >= 0xa0100000 || (addr + size) >= 0xa0100000));
++#else
+ 	return ((machine_is_assabet() || machine_is_pfs168()) &&
+ 		(addr >= 0xc8000000 || (addr + size) >= 0xc8000000));
++#endif
+ }
+ 
+ struct sa1111_save_data {
