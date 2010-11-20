@@ -1,88 +1,40 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sat, 20 Nov 2010 15:59:24 +0300
-Subject: [PATCH 3/3] pxa/hx4700: add I2C board info for AK4641 codec
-In-Reply-To: <1290257964-17435-1-git-send-email-mad_soft@inbox.ru>
-References: <1290257964-17435-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1290257964-17435-4-git-send-email-mad_soft@inbox.ru>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Sat, 20 Nov 2010 07:26:20 -0600
+Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+In-Reply-To: <1290252669.15533.28.camel@eowin>
+References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+	<1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
+	<20101119085007.GK6446@legolas.emea.dhcp.ti.com>
+	<AANLkTimSxGZufLk1RzQuBSg2vBF1p9BXFP8abVZVoLFs@mail.gmail.com>
+	<20101119120938.GN2329@legolas.emea.dhcp.ti.com>
+	<AANLkTinVf8--zmGa7svapcVpEp2BPXf33DtdruLtoJx5@mail.gmail.com>
+	<20101119125353.GB5818@legolas.emea.dhcp.ti.com>
+	<AANLkTi=VoUixouRAz-a+y9Jf6z94OtLe9UzWjnod743s@mail.gmail.com>
+	<1290176736.15533.17.camel@eowin>
+	<AANLkTi=EMBrb0eHZyzPen2DHGR4ARh1T8ojT7jOVQ67u@mail.gmail.com>
+	<1290208036.15533.24.camel@eowin>
+	<AANLkTi=OH1y=Q39yqd5m+PXEvM1pX6p_SmH_HFYDHHsK@mail.gmail.com>
+	<1290252669.15533.28.camel@eowin>
+Message-ID: <AANLkTimUD8Yi8KK_tsjm4CQPtp6VdYr51K4L=9MkNcOZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <philipp.zabel@gmail.com>
+Felipe,
 
-From: Philipp Zabel <philipp.zabel@gmail.com>
+On Sat, Nov 20, 2010 at 5:31 AM, Felipe Balbi <me@felipebalbi.com> wrote:
+> Hi Hari,
+>
+> On Fri, 2010-11-19 at 22:01 -0600, Kanigeri, Hari wrote:
+>> Of course :), profiling was done before releasing this code and no
+>> difference observed with or without blocking notifier. All the OMAP4
+>
+> would you share some numbers ?
 
-Also rename AK4641 power GPIOs to document the codec chip.
+Sure. On an average, 135 us for round trip message from A9 userspace
+Process to a thread running on M3 that handles this message.
+The test is with the entire IPC stack on both ends.
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
----
- arch/arm/mach-pxa/hx4700.c              |   18 ++++++++++++++++++
- arch/arm/mach-pxa/include/mach/hx4700.h |    4 ++--
- 2 files changed, 20 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 76d93a2..da9ebd1 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -45,6 +45,7 @@
- #include <mach/irda.h>
- #include <mach/pxa2xx_spi.h>
- 
-+#include <sound/ak4641.h>
- #include <video/platform_lcd.h>
- #include <video/w100fb.h>
- 
-@@ -801,6 +802,22 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
- };
- 
- /*
-+ * Asahi Kasei AK4641 on I2C
-+ */
-+
-+static struct ak4641_platform_data ak4641_info = {
-+	.gpio_power = GPIO27_HX4700_AK4641_POWER,
-+	.gpio_npdn  = GPIO109_HX4700_AK4641_nPDN,
-+};
-+
-+static struct i2c_board_info i2c_board_info[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("ak4641", 0x12),
-+		.platform_data = &ak4641_info,
-+	},
-+};
-+
-+/*
-  * PCMCIA
-  */
- 
-@@ -859,6 +876,7 @@ static void __init hx4700_init(void)
- 	pxa_set_ficp_info(&ficp_info);
- 	pxa27x_set_i2c_power_info(NULL);
- 	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
- 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
- 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
- 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
-diff --git a/arch/arm/mach-pxa/include/mach/hx4700.h b/arch/arm/mach-pxa/include/mach/hx4700.h
-index 3740844..73cd586 100644
---- a/arch/arm/mach-pxa/include/mach/hx4700.h
-+++ b/arch/arm/mach-pxa/include/mach/hx4700.h
-@@ -29,7 +29,7 @@
- #define GPIO14_HX4700_nWLAN_IRQ			14
- #define GPIO18_HX4700_RDY			18
- #define GPIO22_HX4700_LCD_RL			22
--#define GPIO27_HX4700_CODEC_ON			27
-+#define GPIO27_HX4700_AK4641_POWER		27
- #define GPIO32_HX4700_RS232_ON			32
- #define GPIO52_HX4700_CPU_nBATT_FAULT		52
- #define GPIO58_HX4700_TSC2046_nPENIRQ		58
-@@ -67,7 +67,7 @@
- #define GPIO105_HX4700_nIR_ON			105
- #define GPIO106_HX4700_CPU_BT_nRESET		106
- #define GPIO107_HX4700_SPK_nSD			107
--#define GPIO109_HX4700_CODEC_nPDN		109
-+#define GPIO109_HX4700_AK4641_nPDN		109
- #define GPIO110_HX4700_LCD_LVDD_3V3_ON		110
- #define GPIO111_HX4700_LCD_AVDD_3V3_ON		111
- #define GPIO112_HX4700_LCD_N2V7_7V3_ON		112
--- 
-1.7.0.4
+Thank you,
+Best regards,
+Hari
