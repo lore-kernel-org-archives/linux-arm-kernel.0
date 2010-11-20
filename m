@@ -1,61 +1,43 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 20 Nov 2010 14:39:11 +0300
-Subject: [Patch v1] AM35xx: Craneboard: Add USB EHCI support
-In-Reply-To: <1290182862-21837-1-git-send-email-srinath@mistralsolutions.com>
-References: <[PATCH] AM35xx-Craneboard-Add-USB-EHCI-support>
-	<1290182862-21837-1-git-send-email-srinath@mistralsolutions.com>
-Message-ID: <4CE7B35F.6000704@ru.mvista.com>
+Date: Sat, 20 Nov 2010 14:54:31 +0300
+Subject: [PATCH 6/6] atmel_spi: fix warning In function
+	'atmel_spi_dma_map_xfer'
+In-Reply-To: <1290247733-17834-6-git-send-email-plagnioj@jcrosoft.com>
+References: <20101120095906.GD4216@game.jcrosoft.org>
+	<1290247733-17834-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4CE7B6F7.7080108@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 19-11-2010 19:07, srinath at mistralsolutions.com wrote:
+On 20-11-2010 13:08, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-> From: Srinath<srinath@mistralsolutions.com>
+> passing argument 2 of 'dma_map_single' discards qualifiers from pointer target type
 
-> AM3517/05 Craneboard has one EHCI interface on board using port1.
-
-> GPIO35 is used as power enable.
-> GPIO38 is used as port1 PHY reset.
-
-> Signed-off-by: Srinath<srinath@mistralsolutions.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
 > ---
->   arch/arm/mach-omap2/board-am3517crane.c |   21 +++++++++++++++++++++
->   1 files changed, 21 insertions(+), 0 deletions(-)
+>   drivers/spi/atmel_spi.c |    4 +++-
+>   1 files changed, 3 insertions(+), 1 deletions(-)
 
-> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-> index 13ead33..0e1a806 100644
-> --- a/arch/arm/mach-omap2/board-am3517crane.c
-> +++ b/arch/arm/mach-omap2/board-am3517crane.c
-[...]
-> @@ -53,10 +55,29 @@ static void __init am3517_crane_init_irq(void)
->   	omap_gpio_init();
->   }
+> diff --git a/drivers/spi/atmel_spi.c b/drivers/spi/atmel_spi.c
+> index 154529a..2cf6abd 100644
+> --- a/drivers/spi/atmel_spi.c
+> +++ b/drivers/spi/atmel_spi.c
+> @@ -352,8 +352,10 @@ atmel_spi_dma_map_xfer(struct atmel_spi *as, struct spi_transfer *xfer)
 >
-> +static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
-> +	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-> +	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-> +	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+>   	xfer->tx_dma = xfer->rx_dma = INVALID_DMA_ADDRESS;
+>   	if (xfer->tx_buf) {
+> +		void *nonconst_tx = (void *)xfer->tx_buf; /* shut up gcc */
 > +
-> +	.phy_reset  = true,
-> +	.reset_gpio_port[0]  = 38,
-> +	.reset_gpio_port[1]  = -EINVAL,
-> +	.reset_gpio_port[2]  = -EINVAL
-> +};
-> +
->   static void __init am3517_crane_init(void)
->   {
->   	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->   	omap_serial_init();
-> +
-> +	/* Configure GPIO for EHCI port */
-> +	omap_mux_init_gpio(35, OMAP_PIN_OUTPUT);
-> +	gpio_request(35, "usb_ehci_enable");
-> +	gpio_direction_output(35, 1);
-> +	gpio_set_value(35, 1);
 
-    There's no need to call gpio_set_value(), as gpio_direction_output() has 
-already set the GPIO's value.
+    Aren't casts to 'void *' automatic?
+
+>   		xfer->tx_dma = dma_map_single(dev,
+> -				(void *) xfer->tx_buf, xfer->len,
+> +				nonconst_tx, xfer->len,
+>   				DMA_TO_DEVICE);
+>   		if (dma_mapping_error(dev, xfer->tx_dma))
+>   			return -ENOMEM;
 
 WBR, Sergei
