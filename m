@@ -1,36 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 20 Nov 2010 11:08:50 +0100
-Subject: [PATCH 3/6] at91rm9200ek: fix warning: 'ek_mmc_data' defined but not
-	used
-In-Reply-To: <20101120095906.GD4216@game.jcrosoft.org>
-References: <20101120095906.GD4216@game.jcrosoft.org>
-Message-ID: <1290247733-17834-3-git-send-email-plagnioj@jcrosoft.com>
+From: me@felipebalbi.com (Felipe Balbi)
+Date: Sat, 20 Nov 2010 13:31:09 +0200
+Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+In-Reply-To: <AANLkTi=OH1y=Q39yqd5m+PXEvM1pX6p_SmH_HFYDHHsK@mail.gmail.com>
+References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
+	<1290107742-16760-6-git-send-email-h-kanigeri2@ti.com>
+	<20101119085007.GK6446@legolas.emea.dhcp.ti.com>
+	<AANLkTimSxGZufLk1RzQuBSg2vBF1p9BXFP8abVZVoLFs@mail.gmail.com>
+	<20101119120938.GN2329@legolas.emea.dhcp.ti.com>
+	<AANLkTinVf8--zmGa7svapcVpEp2BPXf33DtdruLtoJx5@mail.gmail.com>
+	<20101119125353.GB5818@legolas.emea.dhcp.ti.com>
+	<AANLkTi=VoUixouRAz-a+y9Jf6z94OtLe9UzWjnod743s@mail.gmail.com>
+	<1290176736.15533.17.camel@eowin>
+	<AANLkTi=EMBrb0eHZyzPen2DHGR4ARh1T8ojT7jOVQ67u@mail.gmail.com>
+	<1290208036.15533.24.camel@eowin>
+	<AANLkTi=OH1y=Q39yqd5m+PXEvM1pX6p_SmH_HFYDHHsK@mail.gmail.com>
+Message-ID: <1290252669.15533.28.camel@eowin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- arch/arm/mach-at91/board-ek.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Hi Hari,
 
-diff --git a/arch/arm/mach-at91/board-ek.c b/arch/arm/mach-at91/board-ek.c
-index 56e92c4..6203cdf 100644
---- a/arch/arm/mach-at91/board-ek.c
-+++ b/arch/arm/mach-at91/board-ek.c
-@@ -84,12 +84,14 @@ static struct at91_udc_data __initdata ek_udc_data = {
- 	.pullup_pin	= AT91_PIN_PD5,
- };
- 
-+#ifndef CONFIG_MTD_AT91_DATAFLASH_CARD
- static struct at91_mmc_data __initdata ek_mmc_data = {
- 	.det_pin	= AT91_PIN_PB27,
- 	.slot_b		= 0,
- 	.wire4		= 1,
- 	.wp_pin		= AT91_PIN_PA17,
- };
-+#endif
- 
- static struct spi_board_info ek_spi_devices[] = {
- 	{	/* DataFlash chip */
+On Fri, 2010-11-19 at 22:01 -0600, Kanigeri, Hari wrote:
+> Of course :), profiling was done before releasing this code and no
+> difference observed with or without blocking notifier. All the OMAP4
+
+would you share some numbers ?
+
+> use cases are exercising this code. Just curious , are you doubting
+> the blocking notifier mechanism ?
+
+a little bit. Yeah. It added about 600ms of time spent on musb's probe
+when we were using blocking notifier for charger detection. When we
+moved to atomic notifier, that was solved. Anyway, you can never be sure
+when that will be scheduled and if cpu is really busy, it might pose a
+great deal.
+
 -- 
-1.7.1
+balbi
