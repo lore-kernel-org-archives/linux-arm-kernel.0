@@ -1,37 +1,27 @@
-From: bill_carson@126.com (rocky)
-Date: Sat, 20 Nov 2010 12:17:02 +0800 (CST)
-Subject: Query about cplusplus in linkage.h
-Message-ID: <13701df.df91.12c677fe0fd.Coremail.bill_carson@126.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 20 Nov 2010 08:18:21 +0000
+Subject: [PATCH] ARM: Fix spinlock bad magic on disabling nonboot cpu
+In-Reply-To: <AANLkTi=d2xL_ZDhQtTE9Vt8SQkHGSM5oespHGT4m6Fav@mail.gmail.com>
+References: <1290219413-21026-1-git-send-email-ccross@android.com>
+	<AANLkTi=d2xL_ZDhQtTE9Vt8SQkHGSM5oespHGT4m6Fav@mail.gmail.com>
+Message-ID: <AANLkTinasmWjczUuJ+pg9zZW5uU8qfxr1pQE9zSc0E_b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
+On Saturday, November 20, 2010, Kyungmin Park <kmpark@infradead.org> wrote:
+> Hi,b
+>
+> I wonder why this patch is not merged previous rc cycles.
+>
+> it's already reported by Mr. Ham (a month or more ago) and get some
+> acked for merge.
+>
+> To Rusell, Catalin,
+> How to include or commit the latest kernel?
 
-I am a little confused about the following definition :
-
---------------include/linux/linkage.h-----------
-#ifdef __cplusplus
-#define CPP_ASMLINKAGE extern "C"
-#else
-#define CPP_ASMLINKAGE
-#endif
-
-#ifndef asmlinkage
-#define asmlinkage CPP_ASMLINKAGE
-#endif
-
-all system call functions are marked with asmlinkage, as well as other kernel function like printk/schedule/do_softirq
+Just send the patch to Russell's patch system and Russell will pick it
+up. I recall I already acked this patch.
 
 
-so every asmlinkage function has extern "C"  attribute if cplusplus is defined, which definitely happens  when compiling C++ code.
-
-I dont get it when cplusplus is needed when compiling kernel?
-
-Can anyone help me out of this little misunderstanding?
-
-Thansk
-
-
-
-
-		
+-- 
+Catalin
