@@ -1,43 +1,43 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 20 Nov 2010 14:54:31 +0300
-Subject: [PATCH 6/6] atmel_spi: fix warning In function
-	'atmel_spi_dma_map_xfer'
-In-Reply-To: <1290247733-17834-6-git-send-email-plagnioj@jcrosoft.com>
-References: <20101120095906.GD4216@game.jcrosoft.org>
-	<1290247733-17834-6-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4CE7B6F7.7080108@ru.mvista.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Sat, 20 Nov 2010 15:59:21 +0300
+Subject: [PATCH 0/3] ASoC: add support for audio on iPaq hx4700
+Message-ID: <1290257964-17435-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Here's three patches adding support for audio on iPaq hx4700 PDA.
+AK4641 codec driver was originally written by Harald Welte for 
+gnufiish project [1], then Philipp Zabel adapted it to use on hx4700.
+I picked Philipp's patches from his git repository[2], updated them to
+current kernel and also fixed all the issues I've met while
+using these patches on my hx4700 device. So now I would like to submit
+these patches for review in hope they could be included in 2.6.38.
 
-On 20-11-2010 13:08, Jean-Christophe PLAGNIOL-VILLARD wrote:
+This patchset is based on linux-next-20101119
 
-> passing argument 2 of 'dma_map_single' discards qualifiers from pointer target type
+[1] http://gnufiish.org
+[2] http://git.linuxtogo.org/?p=ph5/kernel.git;a=summary
 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
-> ---
->   drivers/spi/atmel_spi.c |    4 +++-
->   1 files changed, 3 insertions(+), 1 deletions(-)
 
-> diff --git a/drivers/spi/atmel_spi.c b/drivers/spi/atmel_spi.c
-> index 154529a..2cf6abd 100644
-> --- a/drivers/spi/atmel_spi.c
-> +++ b/drivers/spi/atmel_spi.c
-> @@ -352,8 +352,10 @@ atmel_spi_dma_map_xfer(struct atmel_spi *as, struct spi_transfer *xfer)
->
->   	xfer->tx_dma = xfer->rx_dma = INVALID_DMA_ADDRESS;
->   	if (xfer->tx_buf) {
-> +		void *nonconst_tx = (void *)xfer->tx_buf; /* shut up gcc */
-> +
+Dmitry Artamonow (2):
+  ASoC: Asahi Kasei AK4641 codec driver
+  ASoC: add iPAQ hx4700 machine driver
 
-    Aren't casts to 'void *' automatic?
+Philipp Zabel (1):
+  pxa/hx4700: add I2C board info for AK4641 codec
 
->   		xfer->tx_dma = dma_map_single(dev,
-> -				(void *) xfer->tx_buf, xfer->len,
-> +				nonconst_tx, xfer->len,
->   				DMA_TO_DEVICE);
->   		if (dma_mapping_error(dev, xfer->tx_dma))
->   			return -ENOMEM;
-
-WBR, Sergei
+ arch/arm/mach-pxa/hx4700.c              |   18 +
+ arch/arm/mach-pxa/include/mach/hx4700.h |    4 +-
+ include/sound/ak4641.h                  |   26 ++
+ sound/soc/codecs/Kconfig                |    4 +
+ sound/soc/codecs/Makefile               |    2 +
+ sound/soc/codecs/ak4641.c               |  628 +++++++++++++++++++++++++++++++
+ sound/soc/codecs/ak4641.h               |   47 +++
+ sound/soc/pxa/Kconfig                   |    9 +
+ sound/soc/pxa/Makefile                  |    2 +
+ sound/soc/pxa/hx4700.c                  |  253 +++++++++++++
+ 10 files changed, 991 insertions(+), 2 deletions(-)
+ create mode 100644 include/sound/ak4641.h
+ create mode 100644 sound/soc/codecs/ak4641.c
+ create mode 100644 sound/soc/codecs/ak4641.h
+ create mode 100644 sound/soc/pxa/hx4700.c
