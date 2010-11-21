@@ -1,297 +1,38 @@
-From: m.nazarewicz@samsung.com (Michal Nazarewicz)
-Date: Fri, 19 Nov 2010 16:58:06 +0100
-Subject: [RFCv6 08/13] mm: move some functions to page_isolation.c
-In-Reply-To: <cover.1290172312.git.m.nazarewicz@samsung.com>
-References: <cover.1290172312.git.m.nazarewicz@samsung.com>
-Message-ID: <1460279e4d5bc268225a9970402fe248baa0227c.1290172312.git.m.nazarewicz@samsung.com>
+From: JacekBurghardt@caias.us (Jacek Burghardt)
+Date: Sun, 21 Nov 2010 20:03:23 +0000
+Subject: [PATCH v3 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+Message-ID: <3r3uw0pt42hbqvtsfo5996q6.1290369799122@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 
-Memory hotplug is a logic for making pages unused in the specified range
-of pfn. So, some of core logics can be used for other purpose as
-allocating a very large contigous memory block.
 
-This patch moves some functions from mm/memory_hotplug.c to
-mm/page_isolation.c. This helps adding a function for large-alloc in
-page_isolation.c with memory-unplug technique.
+Felipe Balbi <me@felipebalbi.com> wrote:
 
-Changelog: 2010/10/26
- - adjusted to mmotm-1024 + Bob's 3 clean ups.
-Changelog: 2010/10/21
- - adjusted to mmotm-1020
 
-Signed-off-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
-Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- include/linux/page-isolation.h |    7 +++
- mm/memory_hotplug.c            |  108 --------------------------------------
- mm/page_isolation.c            |  111 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 118 insertions(+), 108 deletions(-)
+Hi Hari,
 
-diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
-index 051c1b1..58cdbac 100644
---- a/include/linux/page-isolation.h
-+++ b/include/linux/page-isolation.h
-@@ -33,5 +33,12 @@ test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
- extern int set_migratetype_isolate(struct page *page);
- extern void unset_migratetype_isolate(struct page *page);
- 
-+/*
-+ * For migration.
-+ */
-+
-+int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn);
-+unsigned long scan_lru_pages(unsigned long start, unsigned long end);
-+int do_migrate_range(unsigned long start_pfn, unsigned long end_pfn);
- 
- #endif
-diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
-index 9260314..23f4e36 100644
---- a/mm/memory_hotplug.c
-+++ b/mm/memory_hotplug.c
-@@ -617,114 +617,6 @@ int is_mem_section_removable(unsigned long start_pfn, unsigned long nr_pages)
- }
- 
- /*
-- * Confirm all pages in a range [start, end) is belongs to the same zone.
-- */
--static int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn)
--{
--	unsigned long pfn;
--	struct zone *zone = NULL;
--	struct page *page;
--	int i;
--	for (pfn = start_pfn;
--	     pfn < end_pfn;
--	     pfn += MAX_ORDER_NR_PAGES) {
--		i = 0;
--		/* This is just a CONFIG_HOLES_IN_ZONE check.*/
--		while ((i < MAX_ORDER_NR_PAGES) && !pfn_valid_within(pfn + i))
--			i++;
--		if (i == MAX_ORDER_NR_PAGES)
--			continue;
--		page = pfn_to_page(pfn + i);
--		if (zone && page_zone(page) != zone)
--			return 0;
--		zone = page_zone(page);
--	}
--	return 1;
--}
--
--/*
-- * Scanning pfn is much easier than scanning lru list.
-- * Scan pfn from start to end and Find LRU page.
-- */
--static unsigned long scan_lru_pages(unsigned long start, unsigned long end)
--{
--	unsigned long pfn;
--	struct page *page;
--	for (pfn = start; pfn < end; pfn++) {
--		if (pfn_valid(pfn)) {
--			page = pfn_to_page(pfn);
--			if (PageLRU(page))
--				return pfn;
--		}
--	}
--	return 0;
--}
--
--static struct page *
--hotremove_migrate_alloc(struct page *page, unsigned long private, int **x)
--{
--	/* This should be improooooved!! */
--	return alloc_page(GFP_HIGHUSER_MOVABLE);
--}
--
--#define NR_OFFLINE_AT_ONCE_PAGES	(256)
--static int
--do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
--{
--	unsigned long pfn;
--	struct page *page;
--	int move_pages = NR_OFFLINE_AT_ONCE_PAGES;
--	int not_managed = 0;
--	int ret = 0;
--	LIST_HEAD(source);
--
--	for (pfn = start_pfn; pfn < end_pfn && move_pages > 0; pfn++) {
--		if (!pfn_valid(pfn))
--			continue;
--		page = pfn_to_page(pfn);
--		if (!page_count(page))
--			continue;
--		/*
--		 * We can skip free pages. And we can only deal with pages on
--		 * LRU.
--		 */
--		ret = isolate_lru_page(page);
--		if (!ret) { /* Success */
--			list_add_tail(&page->lru, &source);
--			move_pages--;
--			inc_zone_page_state(page, NR_ISOLATED_ANON +
--					    page_is_file_cache(page));
--
--		} else {
--#ifdef CONFIG_DEBUG_VM
--			printk(KERN_ALERT "removing pfn %lx from LRU failed\n",
--			       pfn);
--			dump_page(page);
--#endif
--			/* Becasue we don't have big zone->lock. we should
--			   check this again here. */
--			if (page_count(page)) {
--				not_managed++;
--				ret = -EBUSY;
--				break;
--			}
--		}
--	}
--	if (!list_empty(&source)) {
--		if (not_managed) {
--			putback_lru_pages(&source);
--			goto out;
--		}
--		/* this function returns # of failed pages */
--		ret = migrate_pages(&source, hotremove_migrate_alloc, 0, 1);
--		if (ret)
--			putback_lru_pages(&source);
--	}
--out:
--	return ret;
--}
--
--/*
-  * remove from free_area[] and mark all as Reserved.
-  */
- static int
-diff --git a/mm/page_isolation.c b/mm/page_isolation.c
-index 4ae42bb..077cf19 100644
---- a/mm/page_isolation.c
-+++ b/mm/page_isolation.c
-@@ -5,6 +5,9 @@
- #include <linux/mm.h>
- #include <linux/page-isolation.h>
- #include <linux/pageblock-flags.h>
-+#include <linux/memcontrol.h>
-+#include <linux/migrate.h>
-+#include <linux/mm_inline.h>
- #include "internal.h"
- 
- static inline struct page *
-@@ -139,3 +142,111 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn)
- 	spin_unlock_irqrestore(&zone->lock, flags);
- 	return ret ? 0 : -EBUSY;
- }
-+
-+
-+/*
-+ * Confirm all pages in a range [start, end) is belongs to the same zone.
-+ */
-+int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn)
-+{
-+	unsigned long pfn;
-+	struct zone *zone = NULL;
-+	struct page *page;
-+	int i;
-+	for (pfn = start_pfn;
-+	     pfn < end_pfn;
-+	     pfn += MAX_ORDER_NR_PAGES) {
-+		i = 0;
-+		/* This is just a CONFIG_HOLES_IN_ZONE check.*/
-+		while ((i < MAX_ORDER_NR_PAGES) && !pfn_valid_within(pfn + i))
-+			i++;
-+		if (i == MAX_ORDER_NR_PAGES)
-+			continue;
-+		page = pfn_to_page(pfn + i);
-+		if (zone && page_zone(page) != zone)
-+			return 0;
-+		zone = page_zone(page);
-+	}
-+	return 1;
-+}
-+
-+/*
-+ * Scanning pfn is much easier than scanning lru list.
-+ * Scan pfn from start to end and Find LRU page.
-+ */
-+unsigned long scan_lru_pages(unsigned long start, unsigned long end)
-+{
-+	unsigned long pfn;
-+	struct page *page;
-+	for (pfn = start; pfn < end; pfn++) {
-+		if (pfn_valid(pfn)) {
-+			page = pfn_to_page(pfn);
-+			if (PageLRU(page))
-+				return pfn;
-+		}
-+	}
-+	return 0;
-+}
-+
-+struct page *
-+hotremove_migrate_alloc(struct page *page, unsigned long private, int **x)
-+{
-+	/* This should be improooooved!! */
-+	return alloc_page(GFP_HIGHUSER_MOVABLE);
-+}
-+
-+#define NR_OFFLINE_AT_ONCE_PAGES	(256)
-+int do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
-+{
-+	unsigned long pfn;
-+	struct page *page;
-+	int move_pages = NR_OFFLINE_AT_ONCE_PAGES;
-+	int not_managed = 0;
-+	int ret = 0;
-+	LIST_HEAD(source);
-+
-+	for (pfn = start_pfn; pfn < end_pfn && move_pages > 0; pfn++) {
-+		if (!pfn_valid(pfn))
-+			continue;
-+		page = pfn_to_page(pfn);
-+		if (!page_count(page))
-+			continue;
-+		/*
-+		 * We can skip free pages. And we can only deal with pages on
-+		 * LRU.
-+		 */
-+		ret = isolate_lru_page(page);
-+		if (!ret) { /* Success */
-+			list_add_tail(&page->lru, &source);
-+			move_pages--;
-+			inc_zone_page_state(page, NR_ISOLATED_ANON +
-+					    page_is_file_cache(page));
-+
-+		} else {
-+#ifdef CONFIG_DEBUG_VM
-+			printk(KERN_ALERT "removing pfn %lx from LRU failed\n",
-+			       pfn);
-+			dump_page(page);
-+#endif
-+			/* Because we don't have big zone->lock. we should
-+			   check this again here. */
-+			if (page_count(page)) {
-+				not_managed++;
-+				ret = -EBUSY;
-+				break;
-+			}
-+		}
-+	}
-+	if (!list_empty(&source)) {
-+		if (not_managed) {
-+			putback_lru_pages(&source);
-+			goto out;
-+		}
-+		/* this function returns # of failed pages */
-+		ret = migrate_pages(&source, hotremove_migrate_alloc, 0, 1);
-+		if (ret)
-+			putback_lru_pages(&source);
-+	}
-+out:
-+	return ret;
-+}
--- 
-1.7.2.3
+On Fri, 2010-11-19 at 22:01 -0600, Kanigeri, Hari wrote:
+> Of course :), profiling was done before releasing this code and no
+> difference observed with or without blocking notifier. All the OMAP4
+
+would you share some numbers ?
+
+> use cases are exercising this code. Just curious , are you doubting
+> the blocking notifier mechanism ?
+
+a little bit. Yeah. It added about 600ms of time spent on musb's probe
+when we were using blocking notifier for charger detection. When we
+moved to atomic notifier, that was solved. Anyway, you can never be sure
+when that will be scheduled and if cpu is really busy, it might pose a
+great deal.
+
+--
+balbi
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
