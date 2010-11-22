@@ -1,67 +1,44 @@
-From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
-Date: Mon, 22 Nov 2010 14:02:16 +0530
-Subject: [Patch v2] AM35xx: Craneboard: Add USB EHCI support
-In-Reply-To: <[PATCH] AM35xx-Craneboard-Add-USB-EHCI-support>
-References: <[PATCH] AM35xx-Craneboard-Add-USB-EHCI-support>
-Message-ID: <1290414736-21973-1-git-send-email-srinath@mistralsolutions.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 22 Nov 2010 17:00:18 +0800
+Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver
+	(try #8)
+In-Reply-To: <1290071469.3431.4.camel@tubuntu>
+References: <1290000875-11508-1-git-send-email-bryan.wu@canonical.com>
+	<1290003526.26444.30.camel@tubuntu>
+	<AANLkTinP=xJ66qTZA4JTXFNH+xqvKWgV-XhExoPr6o-C@mail.gmail.com>
+	<1290071469.3431.4.camel@tubuntu>
+Message-ID: <AANLkTik7Ny+eEPTziqwW0CeV9YO4JHVweQ-Dwi-HBF+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath <srinath@mistralsolutions.com>
+On Thu, Nov 18, 2010 at 5:11 PM, Tomi Valkeinen
+<tomi.valkeinen@nokia.com> wrote:
+> On Thu, 2010-11-18 at 10:14 +0800, ext Bryan Wu wrote:
+>> On Wed, Nov 17, 2010 at 10:18 PM, Tomi Valkeinen
+>
+>> > Are you also interested in solving the backlight issue? =)
+>>
+>> Yeah, can I start with
+>> drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c. I plan to move
+>> the blacklight code to drivers/video/blacklight/ and let sharp_ls to
+>> use panel-generic-dpi.c driver.
+>
+> Yes, I think that's a good solution for the panels which have a separate
+> backlight (ie. all these "dummy" panels"). However, I'm not sure how
+> that would work for panels with more integrated backlight, for example
+> Taal. But we don't need to worry about that right now.
+>
 
-AM3517/05 Craneboard has one EHCI interface on board using port1.
+As I'm working on the sharp-ls panel driver, I just find the backlight
+code is almost dummy functions which will call
+dssdev->set_backlight().
+How about create platform driver for sharp-ls backlight driver? We
+pass those dssdev data from platform data struct.
 
-GPIO35 is used as power enable.
-GPIO38 is used as port1 PHY reset.
-
-Signed-off-by: Srinath <srinath@mistralsolutions.com>
----
- arch/arm/mach-omap2/board-am3517crane.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index 13ead33..91791bc 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -28,8 +28,10 @@
- 
- #include <plat/board.h>
- #include <plat/common.h>
-+#include <plat/usb.h>
- 
- #include "mux.h"
-+#include "control.h"
- 
- /* Board initialization */
- static struct omap_board_config_kernel am3517_crane_config[] __initdata = {
-@@ -53,10 +55,28 @@ static void __init am3517_crane_init_irq(void)
- 	omap_gpio_init();
- }
- 
-+static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
-+	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-+	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-+	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-+
-+	.phy_reset  = true,
-+	.reset_gpio_port[0]  = 38,
-+	.reset_gpio_port[1]  = -EINVAL,
-+	.reset_gpio_port[2]  = -EINVAL
-+};
-+
- static void __init am3517_crane_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_serial_init();
-+
-+	/* Configure GPIO for EHCI port */
-+	omap_mux_init_gpio(35, OMAP_PIN_OUTPUT);
-+	gpio_request(35, "usb_ehci_enable");
-+	gpio_direction_output(35, 1);
-+	omap_mux_init_gpio(38, OMAP_PIN_OUTPUT);
-+	usb_ehci_init(&ehci_pdata);
- }
- 
- MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
+Thanks a lot,
 -- 
-1.7.1.226.g770c5
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
