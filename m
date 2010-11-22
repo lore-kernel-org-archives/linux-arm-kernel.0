@@ -1,47 +1,90 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 22 Nov 2010 09:26:44 +0800
-Subject: [PATCH 2/2] ARM: pxa/raumfeld: enable PXA3XX_GCU driver
-In-Reply-To: <1288896241-8318-3-git-send-email-zonque@gmail.com>
-References: <1288896241-8318-1-git-send-email-zonque@gmail.com>
-	<1288896241-8318-3-git-send-email-zonque@gmail.com>
-Message-ID: <AANLkTimQU9u_KXEPJ7_pGg361Scp80otwe+R8ow3MTfG@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 22 Nov 2010 10:28:49 +0900
+Subject: [PATCH 2/3] S5PV210: added parameters for CPU interface to
+	plat-samsung/fb.h
+In-Reply-To: <1290130171-7856-1-git-send-email-inki.dae@samsung.com>
+References: <1290130171-7856-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <015301cb89e4$a2572500$e7056f00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 5, 2010 at 2:44 AM, Daniel Mack <zonque@gmail.com> wrote:
-> From: Daniel Mack <daniel@caiaq.de>
->
-
-Applied with your SOB.
-
+Inki Dae wrote:
+> 
+> S5PV210: added parameters for CPU interface to plat-samsung/fb.h
+> 
+> MIPI-DSI driver would use s3c-fb driver so I added some parameters
+> because MIPI-DSI driver supports CPU interface also.
+> 
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> ?arch/arm/mach-pxa/raumfeld.c | ? ?5 +++++
-> ?1 files changed, 5 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-> index 67e04f4..bbf0b61 100644
-> --- a/arch/arm/mach-pxa/raumfeld.c
-> +++ b/arch/arm/mach-pxa/raumfeld.c
-> @@ -588,6 +588,9 @@ static struct pxafb_mach_info raumfeld_sharp_lcd_info = {
-> ? ? ? ?.num_modes ? ? ?= 1,
-> ? ? ? ?.video_mem_size = 0x400000,
-> ? ? ? ?.lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
-> +#ifdef CONFIG_PXA3XX_GCU
-> + ? ? ? .acceleration_enabled = 1,
-> +#endif
-> ?};
->
-> ?static void __init raumfeld_lcd_init(void)
-> @@ -616,6 +619,8 @@ static void __init raumfeld_lcd_init(void)
-> ? ? ? ? ? ? ? ?pr_warning("Unable to request GPIO_DISPLAY_ENABLE\n");
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?gpio_direction_output(GPIO_DISPLAY_ENABLE, 1);
+>  arch/arm/plat-samsung/include/plat/fb.h |   11 ++++++++++-
+>  1 files changed, 10 insertions(+), 1 deletions(-)
+> 
+Please add Ben and my e-mail in Cc next time.
+Ben and me are 
+
+> diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-
+> samsung/include/plat/fb.h
+> index cb3ca3a..1ba0ae0 100644
+> --- a/arch/arm/plat-samsung/include/plat/fb.h
+> +++ b/arch/arm/plat-samsung/include/plat/fb.h
+> @@ -22,14 +22,21 @@
+>   */
+>  #define S3C_FB_MAX_WIN	(5)
+> 
+> +enum {
+> +	FIMD_VIDEO_MODE = 0,
+> +	FIMD_CPU_MODE
+> +};
 > +
-> + ? ? ? platform_device_register(&pxa3xx_device_gcu);
-> ?}
->
-> ?/**
+
+Could you please explain about above modes?
+
+>  /**
+>   * struct s3c_fb_pd_win - per window setup data
+> - * @win_mode: The display parameters to initialise (not for window 0)
+> + * @win_mode: The display parameters to RGB interface
+> + * @cpu_mode: The display parameters to CPU interface
+>   * @virtual_x: The virtual X size.
+>   * @virtual_y: The virtual Y size.
+>   */
+>  struct s3c_fb_pd_win {
+>  	struct fb_videomode	win_mode;
+> +	struct fb_cpumode	cpu_mode;
+> 
+What's difference between win_mode and cpu_mode?
+
+>  	unsigned short		default_bpp;
+>  	unsigned short		max_bpp;
+> @@ -43,6 +50,7 @@ struct s3c_fb_pd_win {
+>   *		the data from the display system to the connected display
+>   *		device.
+>   * @default_win: default window layer number to be used for UI layer.
+> + * @interface_mode: cpu mode or rgb mode.
+>   * @vidcon0: The base vidcon0 values to control the panel data format.
+>   * @vidcon1: The base vidcon1 values to control the panel data output.
+>   * @win: The setup data for each hardware window, or NULL for unused.
+> @@ -59,6 +67,7 @@ struct s3c_fb_platdata {
+> 
+>  	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+> 
+> +	u32			interface_mode;
+
+Hmm...mode, mode, mode...:-(
+
+>  	u32			 default_win;
+> 
+>  	u32			 vidcon0;
 > --
-> 1.7.1
->
->
+> 1.5.4.3
+> 
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
