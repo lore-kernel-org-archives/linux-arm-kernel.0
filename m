@@ -1,59 +1,47 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 22 Nov 2010 09:25:53 +0800
-Subject: [PATCH 1/2] video: add driver for PXA3xx 2D graphics accelerator
-In-Reply-To: <1288896241-8318-2-git-send-email-zonque@gmail.com>
+Date: Mon, 22 Nov 2010 09:26:44 +0800
+Subject: [PATCH 2/2] ARM: pxa/raumfeld: enable PXA3XX_GCU driver
+In-Reply-To: <1288896241-8318-3-git-send-email-zonque@gmail.com>
 References: <1288896241-8318-1-git-send-email-zonque@gmail.com>
-	<1288896241-8318-2-git-send-email-zonque@gmail.com>
-Message-ID: <AANLkTi=d3b-OuJOssG9gStkFzX9BFSzP+fYeaOOvhs4G@mail.gmail.com>
+	<1288896241-8318-3-git-send-email-zonque@gmail.com>
+Message-ID: <AANLkTimQU9u_KXEPJ7_pGg361Scp80otwe+R8ow3MTfG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Nov 5, 2010 at 2:44 AM, Daniel Mack <zonque@gmail.com> wrote:
 > From: Daniel Mack <daniel@caiaq.de>
 >
-> This adds a driver for the the 2D graphics accelerator found on PXA3xx
-> processors. Only resource mapping, interrupt handling and a simple ioctl
-> handler is done by the kernel part, the rest of the logic is implemented
-> in DirectFB userspace.
->
-> Graphic applications greatly benefit for line drawing, blend, and
-> rectangle and triangle filling operations.
->
-> Benchmarks done on a PXA303 using the df_dok benchmarking tool follow,
-> where the value in square brackets show the CPU usage during that test.
->
-> Without accelerator (benchmarking 256x252 on 480x262 RGB16 (16bit)):
->
-> ?Anti-aliased Text ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?3.016 secs ( ? 65.649 KChars/sec) [ 99.6%]
-> ?Fill Rectangle ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.021 secs ( ?175.107 MPixel/sec) [ 98.0%]
-> ?Fill Rectangle (blend) ? ? ? ? ? ? ? ? ? ? ? ? 3.582 secs ( ? ?3.602 MPixel/sec) [ 99.7%]
-> ?Fill Rectangles [10] ? ? ? ? ? ? ? ? ? ? ? ? ? 3.177 secs ( ?182.753 MPixel/sec) [ 98.1%]
-> ?Fill Rectangles [10] (blend) ? ? ? ? ? ? ? ? ?18.020 secs ( ? ?3.580 MPixel/sec) [ 98.7%]
-> ?Fill Spans ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.019 secs ( ?145.306 MPixel/sec) [ 98.0%]
-> ?Fill Spans (blend) ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.616 secs ( ? ?3.568 MPixel/sec) [ 99.4%]
-> ?Blit ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.074 secs ( ? 39.874 MPixel/sec) [ 98.0%]
-> ?Blit 180 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.020 secs ( ? 32.042 MPixel/sec) [ 98.0%]
-> ?Blit with format conversion ? ? ? ? ? ? ? ? ? ?3.005 secs ( ? 19.321 MPixel/sec) [ 99.6%]
-> ?Blit from 32bit (blend) ? ? ? ? ? ? ? ? ? ? ? ?4.792 secs ( ? ?2.692 MPixel/sec) [ 98.7%]
->
-> With accelerator:
->
-> ?Anti-aliased Text ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?3.056 secs (* ?36.518 KChars/sec) [ 21.3%]
-> ?Fill Rectangle ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.015 secs (* 115.543 MPixel/sec) [ ?8.9%]
-> ?Fill Rectangle (blend) ? ? ? ? ? ? ? ? ? ? ? ? 3.180 secs (* ?20.286 MPixel/sec) [ ?1.8%]
-> ?Fill Rectangles [10] ? ? ? ? ? ? ? ? ? ? ? ? ? 3.251 secs (* 119.062 MPixel/sec) [ ?1.2%]
-> ?Fill Rectangles [10] (blend) ? ? ? ? ? ? ? ? ? 6.293 secs (* ?20.502 MPixel/sec) [ ?0.3%]
-> ?Fill Spans ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.051 secs (* ?97.264 MPixel/sec) [ 35.7%]
-> ?Fill Spans (blend) ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.377 secs (* ?15.282 MPixel/sec) [ 17.8%]
-> ?Blit ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.046 secs (* ?27.533 MPixel/sec) [ ?2.6%]
-> ?Blit 180 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 3.098 secs (* ?27.070 MPixel/sec) [ ?2.2%]
-> ?Blit with format conversion ? ? ? ? ? ? ? ? ? ?3.131 secs (* ?39.148 MPixel/sec) [ ?2.8%]
-> ?Blit from 32bit (blend) ? ? ? ? ? ? ? ? ? ? ? ?3.346 secs (* ?11.568 MPixel/sec) [ ?0.8%]
->
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> Tested-by: Sven Neumann <s.neumann@raumfeld.com>
 
-This has been around for too much time, and thanks Daniel and Sven for
-the great work. It looks good to me and it's time to get this in.
+Applied with your SOB.
 
-Applied.
+> ---
+> ?arch/arm/mach-pxa/raumfeld.c | ? ?5 +++++
+> ?1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+> index 67e04f4..bbf0b61 100644
+> --- a/arch/arm/mach-pxa/raumfeld.c
+> +++ b/arch/arm/mach-pxa/raumfeld.c
+> @@ -588,6 +588,9 @@ static struct pxafb_mach_info raumfeld_sharp_lcd_info = {
+> ? ? ? ?.num_modes ? ? ?= 1,
+> ? ? ? ?.video_mem_size = 0x400000,
+> ? ? ? ?.lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+> +#ifdef CONFIG_PXA3XX_GCU
+> + ? ? ? .acceleration_enabled = 1,
+> +#endif
+> ?};
+>
+> ?static void __init raumfeld_lcd_init(void)
+> @@ -616,6 +619,8 @@ static void __init raumfeld_lcd_init(void)
+> ? ? ? ? ? ? ? ?pr_warning("Unable to request GPIO_DISPLAY_ENABLE\n");
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?gpio_direction_output(GPIO_DISPLAY_ENABLE, 1);
+> +
+> + ? ? ? platform_device_register(&pxa3xx_device_gcu);
+> ?}
+>
+> ?/**
+> --
+> 1.7.1
+>
+>
