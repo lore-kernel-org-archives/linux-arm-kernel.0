@@ -1,21 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 Nov 2010 13:41:13 +0000
-Subject: [PATCH] arm: GIC: Do not try to register more then NR_IRQS
-	interrupts
-In-Reply-To: <1290431295-16052-1-git-send-email-pawel.moll@arm.com>
-References: <1290431040-15417-1-git-send-email-pawel.moll@arm.com>
-	<1290431295-16052-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <AANLkTikEDb-JCe7zVvF7pt+p=wwP15M5ApTD77dNddZj@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Nov 2010 13:43:25 +0000
+Subject: [PATCH v2 19/20] ARM: LPAE: define printk format for physical
+	addresses and page table entries
+In-Reply-To: <1289584840-18097-20-git-send-email-catalin.marinas@arm.com>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-20-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20101122134325.GK31227@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2010 13:08, Pawel Moll <pawel.moll@arm.com> wrote:
-> This change limits number of GIC-originating interrupts to the
-> platform maximum (defined by NR_IRQS) while still initialising
-> all distributor registers.
->
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+On Fri, Nov 12, 2010 at 06:00:39PM +0000, Catalin Marinas wrote:
+> From: Will Deacon <will.deacon@arm.com>
+> 
+> Now that the Kernel supports 2 level and 3 level page tables, physical
+> addresses (and also page table entries) may be 32 or 64-bits depending
+> upon the configuration.
+> 
+> This patch adds a conversion specifier (PHYS_ADDR_FMT) which represents
+> a u32 or u64 depending on the width of a physical address.
 
-This looks better to me:
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I hope this patch is gone in v3.
