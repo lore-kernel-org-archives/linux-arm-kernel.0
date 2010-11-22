@@ -1,42 +1,23 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 22 Nov 2010 18:04:21 +0000
-Subject: [PATCH v2 5/9] ARM: Thumb-2: Correct data alignment for
-	CONFIG_THUMB2_KERNEL in mm/proc-v7.S
+Date: Mon, 22 Nov 2010 18:04:22 +0000
+Subject: [PATCH v2 6/9] ARM: Thumb-2: Fix CONFIG_THUMB2_KERNEL breakage in
+	compressed/head.S
 In-Reply-To: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
 References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1290449065-28843-6-git-send-email-dave.martin@linaro.org>
+Message-ID: <1290449065-28843-7-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Directives such as .long and .word do not magically cause the
-assembler location counter to become aligned in gas.  As a
-result, using these directives in code sections can result in
-misaligned data words when building a Thumb-2 kernel
-(CONFIG_THUMB2_KERNEL).
+Some instruction operand combinations are used here
+which are nor permitted in Thumb-2.
 
-This is a Bad Thing, since the ABI permits the compiler to
-assume that fundamental types of word size or above are word-
-aligned when accessing them from C.  If the data is not really
-word-aligned, this can cause impaired performance and stray
-alignment faults in some circumstances.
+In particular, most uses of pc as an operand are
+disallowed in Thumb-2, and deprecated in ARM from
+ARMv7 onwards.
 
-In general, the following rules should be applied when using
-data word declaration directives inside code sections:
-
-    * .quad and .double:
-         .align 3
-
-    * .long, .word, .single, .float:
-         .align (or .align 2)
-
-    * .short:
-        No explicit alignment required, since Thumb-2
-        instructions are always 2 or 4 bytes in size.
-        immediately after an instruction.
-
-In this specific case, we can achieve the desired alignment by
-forcing a 32-bit branch instruction using the W() macro,
-since the assembler location counter is already 32-bit aligned in this case.
+The modified code introduced by this patch should be
+compatible with all architecture versions >= v3, with
+or without CONFIG_THUMB2_KERNEL.
 
 Applies cleanly on v2.6.37-rc1.
 
@@ -44,30 +25,32 @@ Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/proc-v7.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/compressed/head.S |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 53cbe22..9b9ff5d 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -381,7 +381,7 @@ __v7_ca9mp_proc_info:
- 		PMD_SECT_XN | \
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ
--	b	__v7_ca9mp_setup
-+	W(b)	__v7_ca9mp_setup
- 	.long	cpu_arch_name
- 	.long	cpu_elf_name
- 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
-@@ -413,7 +413,7 @@ __v7_proc_info:
- 		PMD_SECT_XN | \
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ
--	b	__v7_setup
-+	W(b)	__v7_setup
- 	.long	cpu_arch_name
- 	.long	cpu_elf_name
- 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 6825c34..1f65080 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -174,7 +174,8 @@ not_angel:
+ 		ldr	sp, [r0, #28]
+ #ifdef CONFIG_AUTO_ZRELADDR
+ 		@ determine final kernel image address
+-		and	r4, pc, #0xf8000000
++		mov	r4, pc
++		and	r4, r4, #0xf8000000
+ 		add	r4, r4, #TEXT_OFFSET
+ #else
+ 		ldr	r4, =zreladdr
+@@ -445,7 +446,8 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+  */
+ 		mov	r1, #0x1e
+ 		orr	r1, r1, #3 << 10
+-		mov	r2, pc, lsr #20
++		mov	r2, pc
++		mov	r2, r2, lsr #20
+ 		orr	r1, r1, r2, lsl #20
+ 		add	r0, r3, r2, lsl #2
+ 		str	r1, [r0], #4
 -- 
 1.7.1
