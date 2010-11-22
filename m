@@ -1,51 +1,37 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Nov 2010 15:24:11 -0500 (EST)
-Subject: [PATCH v2 8/9] ARM: Thumb-2: Fix long-distance conditional
-	branches in head.S for Thumb-2.
-In-Reply-To: <20101122191719.GO31227@n2100.arm.linux.org.uk>
-References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
-	<1290449065-28843-9-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1011221346170.9313@xanadu.home>
-	<20101122191719.GO31227@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1011221512460.9313@xanadu.home>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 22 Nov 2010 13:56:54 -0800
+Subject: [PATCH 0/8] OMAP2+: hwmod core upgrades for 2.6.38: first set
+In-Reply-To: <alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com> (Paul
+	Walmsley's message of "Tue, 16 Nov 2010 09:47:26 -0700 (MST)")
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+	<alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com>
+Message-ID: <87y68lnhsp.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Nov 2010, Russell King - ARM Linux wrote:
+Paul Walmsley <paul@pwsan.com> writes:
 
-> On Mon, Nov 22, 2010 at 02:03:51PM -0500, Nicolas Pitre wrote:
-> > On Mon, 22 Nov 2010, Dave Martin wrote:
-> > 
-> > > The 32-bit conditional branches in Thumb-2 have a shorter range (+/-512K)
-> > > than their ARM counterparts (+/-32MB).  The linker does not currently
-> > > generate trampolines to extend the range of these Thumb-2 conditional
-> > > branches, resulting in link errors when vmlinux is sufficiently large, e.g.:
-> > > 
-> > > head.o:(.text+0x464): relocation truncated to fit: R_ARM_THM_JUMP19
-> > > 
-> > > This patch forces the longer-range, unconditional branch encoding by
-> > > use of an explicit IT instruction.  The resulting branches are triggered on
-> > > the same conditions as before.
-> > > 
-> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > 
-> > I'm afraid this patch is only making an actual bug visible.  There is no 
-> > reason why __error_p or __error_a ought to be farther than 512K away 
-> > from their call sites as they are all supposed to live in the __init 
-> > section close together.  It looks like the refactoring done in commit 
-> > 75d90832d5 has dropped the __init attribute from those moved functions, 
-> > and adding it back would be the real fix.
-> 
-> No, you're not thinking right.  It was _intentional_ that __error_p
-> ended up in a different section to __init.  With CPU hotplug, as it
-> is called from the hotplug CPU initialization path, it needs to be
-> available for that path to call.
+> On Tue, 16 Nov 2010, Paul Walmsley wrote:
+>
+>> This patch series contains upgrades for the OMAP2+ hwmod core
+>> code, intended for 2.6.38.  Most of these patches were developed
+>> in response to use-cases discovered while converting device
+>> drivers to use the hwmod code.
+>> 
+>> Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
+>
+> Just FYI, this branch 'hwmod_a_2.6.38' is available at 
+> git://git.pwsan.com/linux-2.6
+>
+> Warning: it's based on Tony's tree, not the mainline, due to the recent 
+> board file changes.
 
-Well... agreed for the hotplug CPU case.  The section selection is good 
-as it is for that.
+Looks like Tony has collected the board file changes into his
+devel-board branch.  Can this rebased there?
 
-However I doubt this was intentional when commit 75d90832d5 was created, 
-which is when the actual section move took place.
+That way, I can included it as part of the PM branch testing without
+having to pull in master.
 
+Thanks,
 
-Nicolas
+Kevin
