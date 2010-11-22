@@ -1,62 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Nov 2010 15:25:34 +0000
-Subject: [PATCH] ARM: Temporary fix for broken arch reboot
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030D58B003@dbde02.ent.ti.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB030D4FAB9E@dbde02.ent.ti.com>
-	<20101109131838.GF2869@n2100.arm.linux.org.uk>
-	<1289320692.11461.21.camel@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030D4FAE5C@dbde02.ent.ti.com>
-	<20101110100617.GA23244@n2100.arm.linux.org.uk>
-	<1289397874.4513.54.camel@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030D58A400@dbde02.ent.ti.com>
-	<20101110154604.GA27571@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030D58B003@dbde02.ent.ti.com>
-Message-ID: <20101115152534.GE24194@n2100.arm.linux.org.uk>
+From: per.fransson.ml@gmail.com (Per Fransson)
+Date: Mon, 22 Nov 2010 15:31:24 +0100
+Subject: [PATCH] Add call to non-crashing cores through IPI
+In-Reply-To: <20101122112759.GA31227@n2100.arm.linux.org.uk>
+References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
+	<20101122072420.GC14080@gw.healthdatacare.com>
+	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
+	<20101122104740.GA30744@n2100.arm.linux.org.uk>
+	<20101122112759.GA31227@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 04:01:25PM +0530, Shilimkar, Santosh wrote:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Sent: Wednesday, November 10, 2010 9:16 PM
-> > To: Shilimkar, Santosh
-> > Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org; Gadiyar, Anand
-> > Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
-> > 
-> > On Wed, Nov 10, 2010 at 09:13:21PM +0530, Shilimkar, Santosh wrote:
-> > >
-> > >
-> > > > -----Original Message-----
-> > > > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> > > > Sent: Wednesday, November 10, 2010 7:35 PM
-> > > > To: Russell King - ARM Linux
-> > > > Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; Gadiyar,
-> > > > Anand
-> > > > Subject: Re: [PATCH] ARM: Temporary fix for broken arch reboot
-> > > >
-> > > > The printing only happens for SYSTEM_BOOTING or SYSTEM_RUNNING. I
-> > > > suspect in this case we have SYSTEM_RESTARTING and the condition in
-> > > > ipi_cpu_stop() is false, therefore no printing. It may be worth
-> > putting
-> > > > some printks outside the 'if' to see whether the secondary CPUs get
-> > > > there.
-> > > >
-> > > While doing some experiments on this issue, one interesting
-> > > observation I made. Looks like there is race between two
-> > > Cores which makes system behave badly in reboot path.
-> > >
-> > > Just adding a delay in the ipi_cpu_stop() makes the reboot work
-> > > as well
-> > 
-> > That could just be that it's taking longer than 500us for the reboot CPU
-> > to get through setup_mm_for_reboot().
-> 
-> It not seems to be the case otherwise below patch should have worked.
-> Right ? Did I miss your point ?
+On Mon, Nov 22, 2010 at 12:27 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 22, 2010 at 10:47:40AM +0000, Russell King - ARM Linux wrote:
+>> However, we do need smp_send_stop() to wait for a limited time for the
+>> other CPUs to respond to the request.
+>
+> ARM: smp: make smp_send_stop() wait for secondary CPUs to stop
+>
+> Wait up to one second for secondary CPUs to respond to a request to
+> stop. ?This avoids the sender CPU continuing and possibly destroying
+> state before the recipients have had a chance to respond to the stop.
+> However, if the recipients have crashed, we won't hang the sender
+> CPU indefinitely.
+>
 
-Yes you did.  Maybe all this code completes before your 500us in the
-secondary CPUs complete.  So the delay in the secondary CPU path proves
-nothing.
+The point of the crash kernel functionality is to make it possible to grab a
+snapshot of the system at the time of the crash. smp_send_stop() will
+take the other cores offline, which makes the snapshot differ from the
+crash state more than it has to. To be more concrete, any core dump
+analysis tool which reads the cpu_online_mask to determine the number
+of cpus in use will get an incorrect picture.
 
-A delay in the reboot CPU path ensures that the other CPUs have time to
-react to the stop IPI, so we know what state the system is in.
+Regards,
+Per
