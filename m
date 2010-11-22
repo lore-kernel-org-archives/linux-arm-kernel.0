@@ -1,39 +1,20 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Nov 2010 13:12:35 -0000
-Subject: Weirdo gcc 4.3.x behaviour
-In-Reply-To: <20101121191148.GA12234@n2100.arm.linux.org.uk>
-References: <20101121191148.GA12234@n2100.arm.linux.org.uk>
-Message-ID: <000201cb8a46$ee3f70f0$cabe52d0$@deacon@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Nov 2010 13:15:46 +0000
+Subject: [PATCH v2 11/20] ARM: LPAE: Add fault handling support
+In-Reply-To: <1289584840-18097-12-git-send-email-catalin.marinas@arm.com>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-12-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20101122131546.GG31227@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, Nov 12, 2010 at 06:00:31PM +0000, Catalin Marinas wrote:
+> @@ -108,7 +113,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+>  
+>  		pte = pte_offset_map(pmd, addr);
+>  		printk(", *pte=%08lx", pte_val(*pte));
+> +#ifndef CONFIG_ARM_LPAE
+>  		printk(", *ppte=%08lx", pte_val(pte[-LINUX_PTE_OFFSET]));
+> +#endif
 
-> Has anyone else seen weird behaviour from the gcc 4.3 branch?
-> 
-> I've tried gcc-4.3.2 + patch and also gcc-4.3.5, both of which behave
-> differently with this change in the kernel:
-> 
-> (asm-generic/pgtable-nopud.h)
-> static inline int pgd_none(pgd_t pgd)           { return 0; }
-> static inline int pgd_bad(pgd_t pgd)            { return 0; }
-> static inline int pgd_present(pgd_t pgd)        { return 1; }
-> 
-> and subsequently adding:
-> +#define pgd_none(pgd)          0
-> +#define pgd_bad(pgd)           0
-> +#define pgd_present(pgd)       1
-> 
-> This causes completely unrelated functions to be optimized differently,
-> as can be seen via the bloat-o-meter:
-
-[...]
-
-If you mail me the smallest diff to the kernel which causes this to
-happen along with the .s/.i files (gcc --save-temps) for the file that
-is changing then I'll pass the information on to the compiler guys at
-ARM.
-
-Thanks,
-
-Will
+This is an unrelated change - should it be in a different patch?
