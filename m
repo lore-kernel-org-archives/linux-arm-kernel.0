@@ -1,63 +1,52 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 22 Nov 2010 18:37:09 +0530
-Subject: [PATCH] Add call to non-crashing cores through IPI
-In-Reply-To: <20101122112759.GA31227@n2100.arm.linux.org.uk>
-References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20101122072420.GC14080@gw.healthdatacare.com>
-	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
-	<20101122104740.GA30744@n2100.arm.linux.org.uk>
-	<20101122112759.GA31227@n2100.arm.linux.org.uk>
-Message-ID: <9d90879f08b3141aa5ce4a0887018de9@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 22 Nov 2010 13:08:15 +0000
+Subject: [PATCH] arm: GIC: Do not try to register more then NR_IRQS interrupts
+In-Reply-To: <1290431040-15417-1-git-send-email-pawel.moll@arm.com>
+References: <1290431040-15417-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1290431295-16052-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Monday, November 22, 2010 4:58 PM
-> To: Per Fransson; Shilimkar, Santosh
-> Cc: Mika Westerberg; kexec at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] Add call to non-crashing cores through IPI
->
-> On Mon, Nov 22, 2010 at 10:47:40AM +0000, Russell King - ARM Linux
-wrote:
-> > However, we do need smp_send_stop() to wait for a limited time for the
-> > other CPUs to respond to the request.
->
-> ARM: smp: make smp_send_stop() wait for secondary CPUs to stop
->
-> Wait up to one second for secondary CPUs to respond to a request to
-> stop.  This avoids the sender CPU continuing and possibly destroying
-> state before the recipients have had a chance to respond to the stop.
-> However, if the recipients have crashed, we won't hang the sender
-> CPU indefinitely.
->
-Just tried this patch thinking it might fix the reboot issue
-reported earlier. But it doesn't help.
+This change limits number of GIC-originating interrupts to the
+platform maximum (defined by NR_IRQS) while still initialising
+all distributor registers.
 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/smp.c |    6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 5d0dc16..32a2158 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -589,10 +589,16 @@ void smp_send_reschedule(int cpu)
->
->  void smp_send_stop(void)
->  {
-> +	unsigned long timeout;
->  	cpumask_t mask = cpu_online_map;
->  	cpu_clear(smp_processor_id(), mask);
->  	if (!cpus_empty(mask))
->  		send_ipi_message(&mask, IPI_CPU_STOP);
-> +
-> +	/* Wait up to one second for other CPUs to stop */
-> +	timeout = USEC_PER_SEC;
-> +	while (num_online_cpus() > 1 && timeout--)
-> +		udelay(1);
->  }
->
->  /*
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/common/gic.c |   14 ++++++--------
+ 1 files changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 772f95f..20e1412 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -231,14 +231,6 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+ 	max_irq = (max_irq + 1) * 32;
+ 
+ 	/*
+-	 * The GIC only supports up to 1020 interrupt sources.
+-	 * Limit this to either the architected maximum, or the
+-	 * platform maximum.
+-	 */
+-	if (max_irq > max(1020, NR_IRQS))
+-		max_irq = max(1020, NR_IRQS);
+-
+-	/*
+ 	 * Set all global interrupts to be level triggered, active low.
+ 	 */
+ 	for (i = 32; i < max_irq; i += 16)
+@@ -264,6 +256,12 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+ 		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+ 
+ 	/*
++	 * Limit number of interrupts registered to the platform maximum
++	 */
++	WARN_ON(max_irq > NR_IRQS);
++	max_irq = min(max_irq, NR_IRQS);
++
++	/*
+ 	 * Setup the Linux IRQ subsystem.
+ 	 */
+ 	for (i = irq_start; i < gic_data[gic_nr].irq_offset + max_irq; i++) {
+-- 
+1.6.3.3
