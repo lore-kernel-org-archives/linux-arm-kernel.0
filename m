@@ -1,37 +1,56 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 22 Nov 2010 13:56:54 -0800
-Subject: [PATCH 0/8] OMAP2+: hwmod core upgrades for 2.6.38: first set
-In-Reply-To: <alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com> (Paul
-	Walmsley's message of "Tue, 16 Nov 2010 09:47:26 -0700 (MST)")
-References: <20101116101615.22777.49212.stgit@twilight.localdomain>
-	<alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com>
-Message-ID: <87y68lnhsp.fsf@deeprootsystems.com>
+From: per.fransson.ml@gmail.com (Per Fransson)
+Date: Mon, 22 Nov 2010 23:14:21 +0100
+Subject: [PATCH] Add call to non-crashing cores through IPI
+In-Reply-To: <AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
+References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
+	<20101122072420.GC14080@gw.healthdatacare.com>
+	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
+	<20101122104740.GA30744@n2100.arm.linux.org.uk>
+	<20101122112759.GA31227@n2100.arm.linux.org.uk>
+	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
+	<20101122144040.GM31227@n2100.arm.linux.org.uk>
+	<AANLkTinj5wnP4823bacK6rs3nQbw3qtqDDjYof2-ALUk@mail.gmail.com>
+	<AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
+	<AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
+Message-ID: <AANLkTikQX9YqR42u6ppzceHL58JqBsVxR3YJr6_BarbY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
-
-> On Tue, 16 Nov 2010, Paul Walmsley wrote:
+>>
+>> That's for the situation when the other core tries to send an IPI at
+>> the same time. Unlikely but both cores may deadlock.
+>>
 >
->> This patch series contains upgrades for the OMAP2+ hwmod core
->> code, intended for 2.6.38.  Most of these patches were developed
->> in response to use-cases discovered while converting device
->> drivers to use the hwmod code.
->> 
->> Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
+> Am I right that deadlock can occur only if the same IPI was sent? And
+> there should
+> be no situation when CRASH_DUMP IPI was sent from different processors at
+> the same time.
 >
-> Just FYI, this branch 'hwmod_a_2.6.38' is available at 
-> git://git.pwsan.com/linux-2.6
+
+I hope you are right, but I can't see why we couldn't get a crash IPI
+from several
+processors at the same time, unfortunately.
+
+Even if such a thing can happen however, the timeout in my original suggestion
+(ignoring the interrupt enabling) should keep us from deadlocking indefinitely.
+
+/Per
+
+>> I actually had a patch to allow this which was really complicated and
+>> it still failed in a real-world scenario which I could foresee.
+>>
+>> --
+>> Catalin
+>>
+>> _______________________________________________
+>> kexec mailing list
+>> kexec at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/kexec
+>>
 >
-> Warning: it's based on Tony's tree, not the mainline, due to the recent 
-> board file changes.
-
-Looks like Tony has collected the board file changes into his
-devel-board branch.  Can this rebased there?
-
-That way, I can included it as part of the PM branch testing without
-having to pull in master.
-
-Thanks,
-
-Kevin
+>
+>
+> --
+> Best regards,
+> Maxim Uvarov
+>
