@@ -1,33 +1,137 @@
-From: avictor.za@gmail.com (avictor.za at gmail.com)
-Date: Mon, 22 Nov 2010 18:08:31 +0200
-Subject: rm9200: update
-In-Reply-To: <20101120095906.GD4216@game.jcrosoft.org>
-References: <20101120095906.GD4216@game.jcrosoft.org>
-Message-ID: <AANLkTim_tA2KHmvmXeaK6oU1Yj-Eak62SBqn4BGo+Dyq@mail.gmail.com>
+From: mkl0301@gmail.com (mkl0301 at gmail.com)
+Date: Tue, 23 Nov 2010 00:32:43 +0800
+Subject: [PATCH v2 1/3] ARM: cns3xxx: Add new and export the old power
+	management functions
+In-Reply-To: <1290443565-20766-1-git-send-email-mkl0301@gmail.com>
+References: <1290443565-20766-1-git-send-email-mkl0301@gmail.com>
+Message-ID: <1290443565-20766-2-git-send-email-mkl0301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Jean-Christophe,
+From: Mac Lin <mkl0301@gmail.com>
 
-> ? ? ? ?this patch update some issues found on rm9200
-> ? ? ? ?during the test of the rm9200 defconfig consolidation
->
->
-> ?git://git.jcrosoft.org/linux-2.6.git rm9200
->
-> Jean-Christophe PLAGNIOL-VILLARD (6):
-> ? ? ?at91: Convert remaining boards to new-style UART initialization
-> ? ? ?at91rm9200dk: fix warning: 'dk_mmc_data' defined but not used
-> ? ? ?at91rm9200ek: fix warning: 'ek_mmc_data' defined but not used
-> ? ? ?at91/picotux200: fix warning: 'picotux200_mmc_data' defined but not used
-> ? ? ?at91: rename rm9200ek and rm9200dk board file name
+This patch add cns3xxx_pwr_clk_dis, and export thoes power management functions
+that may be used by many other device drivers on CNS3XXX.
 
-For patches 1, 2, 3, 4 and 5 you can add a:
-  Signed-off-by: Andrew Victor <linux@maxim.org.za>
+Signed-off-by: Mac Lin <mkl0301@gmail.com>
+---
+ arch/arm/mach-cns3xxx/core.h            |    4 ++--
+ arch/arm/mach-cns3xxx/include/mach/pm.h |   19 +++++++++++++++++++
+ arch/arm/mach-cns3xxx/pm.c              |   17 +++++++++++++++++
+ 3 files changed, 38 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-cns3xxx/include/mach/pm.h
 
-
-> ? ? ?atmel_spi: fix warning In function 'atmel_spi_dma_map_xfer'
-
-
-Regards,
-  Andrew Victor
+diff --git a/arch/arm/mach-cns3xxx/core.h b/arch/arm/mach-cns3xxx/core.h
+index 6b33ec1..c6636bd 100644
+--- a/arch/arm/mach-cns3xxx/core.h
++++ b/arch/arm/mach-cns3xxx/core.h
+@@ -11,13 +11,13 @@
+ #ifndef __CNS3XXX_CORE_H
+ #define __CNS3XXX_CORE_H
+ 
++#include <mach/pm.h>
++
+ extern void __iomem *gic_cpu_base_addr;
+ extern struct sys_timer cns3xxx_timer;
+ 
+ void __init cns3xxx_map_io(void);
+ void __init cns3xxx_init_irq(void);
+ void cns3xxx_power_off(void);
+-void cns3xxx_pwr_power_up(unsigned int block);
+-void cns3xxx_pwr_power_down(unsigned int block);
+ 
+ #endif /* __CNS3XXX_CORE_H */
+diff --git a/arch/arm/mach-cns3xxx/include/mach/pm.h b/arch/arm/mach-cns3xxx/include/mach/pm.h
+new file mode 100644
+index 0000000..102617b
+--- /dev/null
++++ b/arch/arm/mach-cns3xxx/include/mach/pm.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2000 Deep Blue Solutions Ltd
++ * Copyright 2004 ARM Limited
++ * Copyright 2008 Cavium Networks
++ *
++ * This file is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, Version 2, as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __CNS3XXX_PM_H
++#define __CNS3XXX_PM_H
++
++void cns3xxx_pwr_clk_en(unsigned int block);
++void cns3xxx_pwr_clk_dis(unsigned int block);
++void cns3xxx_pwr_power_up(unsigned int block);
++void cns3xxx_pwr_power_down(unsigned int block);
++
++#endif /* __CNS3XXX_PM_H */
+diff --git a/arch/arm/mach-cns3xxx/pm.c b/arch/arm/mach-cns3xxx/pm.c
+index 38e4470..a4495e6 100644
+--- a/arch/arm/mach-cns3xxx/pm.c
++++ b/arch/arm/mach-cns3xxx/pm.c
+@@ -6,6 +6,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/init.h>
++#include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+ #include <mach/system.h>
+@@ -18,6 +20,16 @@ void cns3xxx_pwr_clk_en(unsigned int block)
+ 	reg |= (block & PM_CLK_GATE_REG_MASK);
+ 	__raw_writel(reg, PM_CLK_GATE_REG);
+ }
++EXPORT_SYMBOL(cns3xxx_pwr_clk_en);
++
++void cns3xxx_pwr_clk_dis(unsigned int block)
++{
++	u32 reg = __raw_readl(PM_CLK_GATE_REG);
++
++	reg &= ~(block & PM_CLK_GATE_REG_MASK);
++	__raw_writel(reg, PM_CLK_GATE_REG);
++}
++EXPORT_SYMBOL(cns3xxx_pwr_clk_dis);
+ 
+ void cns3xxx_pwr_power_up(unsigned int block)
+ {
+@@ -29,6 +41,7 @@ void cns3xxx_pwr_power_up(unsigned int block)
+ 	/* Wait for 300us for the PLL output clock locked. */
+ 	udelay(300);
+ };
++EXPORT_SYMBOL(cns3xxx_pwr_power_up);
+ 
+ void cns3xxx_pwr_power_down(unsigned int block)
+ {
+@@ -38,6 +51,7 @@ void cns3xxx_pwr_power_down(unsigned int block)
+ 	reg |= (block & CNS3XXX_PWR_PLL_ALL);
+ 	__raw_writel(reg, PM_PLL_HM_PD_CTRL_REG);
+ };
++EXPORT_SYMBOL(cns3xxx_pwr_power_down);
+ 
+ static void cns3xxx_pwr_soft_rst_force(unsigned int block)
+ {
+@@ -56,6 +70,7 @@ static void cns3xxx_pwr_soft_rst_force(unsigned int block)
+ 
+ 	__raw_writel(reg, PM_SOFT_RST_REG);
+ }
++EXPORT_SYMBOL(cns3xxx_pwr_soft_rst_force);
+ 
+ void cns3xxx_pwr_soft_rst(unsigned int block)
+ {
+@@ -69,6 +84,7 @@ void cns3xxx_pwr_soft_rst(unsigned int block)
+ 	}
+ 	cns3xxx_pwr_soft_rst_force(block);
+ }
++EXPORT_SYMBOL(cns3xxx_pwr_soft_rst);
+ 
+ void arch_reset(char mode, const char *cmd)
+ {
+@@ -99,3 +115,4 @@ int cns3xxx_cpu_clock(void)
+ 
+ 	return cpu;
+ }
++EXPORT_SYMBOL(cns3xxx_cpu_clock);
+-- 
+1.7.3
