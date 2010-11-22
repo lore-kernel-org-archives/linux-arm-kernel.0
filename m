@@ -1,48 +1,142 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Mon, 22 Nov 2010 09:42:52 +0200
-Subject: [PATCH v4 2/2] [ARM] Dove: rename SDHCI devices to "sdhci-dove"
-In-Reply-To: <d0ad0e29e3842b9ab786aad8a6efc15054114331.1288293593.git.mike@compulab.co.il>
-References: <cover.1288293593.git.mike@compulab.co.il>
-	<d0ad0e29e3842b9ab786aad8a6efc15054114331.1288293593.git.mike@compulab.co.il>
-Message-ID: <AANLkTikfh7ngxNKS6nvsSuAWX+Hwv7Fs-phSZb1Jwi+w@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 22 Nov 2010 16:26:50 +0800
+Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
+	run-time
+Message-ID: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 28, 2010 at 9:23 PM, Mike Rapoport <mike@compulab.co.il> wrote:
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> CC: Saeed Bishara <saeed@marvell.com>
-Acked-by: Saeed Bishara <saeed@marvell.com>
-> ---
-> ?arch/arm/mach-dove/common.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index f7a1258..fe627ab 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -770,7 +770,7 @@ static struct resource dove_sdio0_resources[] = {
-> ?};
->
-> ?static struct platform_device dove_sdio0 = {
-> - ? ? ? .name ? ? ? ? ? = "sdhci-mv",
-> + ? ? ? .name ? ? ? ? ? = "sdhci-dove",
-> ? ? ? ?.id ? ? ? ? ? ? = 0,
-> ? ? ? ?.dev ? ? ? ? ? ?= {
-> ? ? ? ? ? ? ? ?.dma_mask ? ? ? ? ? ? ? = &sdio_dmamask,
-> @@ -798,7 +798,7 @@ static struct resource dove_sdio1_resources[] = {
-> ?};
->
-> ?static struct platform_device dove_sdio1 = {
-> - ? ? ? .name ? ? ? ? ? = "sdhci-mv",
-> + ? ? ? .name ? ? ? ? ? = "sdhci-dove",
-> ? ? ? ?.id ? ? ? ? ? ? = 1,
-> ? ? ? ?.dev ? ? ? ? ? ?= {
-> ? ? ? ? ? ? ? ?.dma_mask ? ? ? ? ? ? ? = &sdio_dmamask,
-> --
-> 1.7.3.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Russell,
+
+I wonder if it's still acceptable for a patch like below to have a dynamic IRQ
+handler at run-time. There is some changes to the irq_handler, esp. some
+SMP changes.
+
+Magnus had some similar patches to have a run-time irq_handler, which is
+a bit more complicated, but I'm also very happy with.
+
+commit d57e464929c9b2b50cda07e8683679583adf0fee
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date:   Mon Nov 22 16:13:51 2010 +0800
+
+    ARM: Allow machine to specify it's own IRQ handlers at run-time
+
+    Normally different ARM platform has different way to decode the IRQ
+    hardware status and demultiplex to the corresponding IRQ handler.
+    This is highly optimized by macro irq_handler in entry-armv.S, and
+    each machine class defines their own macro to decode the IRQ number.
+    However, this prevents multiple machine classes to be built into a
+    single kernel.
+
+    By allowing each machine to specify thier own handler, and making
+    function pointer 'handle_arch_irq' to point to it at run time, this
+    can be solved. And introduce CONFIG_MULTI_IRQ_HANDLER to allow both
+    solutions to work.
+
+    Comparing with the highly optimized macro of irq_handler, the new
+    function must be written with care not to lose too much performance.
+    And the IPI stuff on SMP is expected to move to the provided arch
+    IRQ handler as well.
+
+    Signed-off-by: Eric Miao <eric.miao@canonical.com>
+    Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a19a526..c2c9838 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1017,6 +1017,11 @@ config CPU_HAS_PMU
+ 	default y
+ 	bool
+
++config MULTI_IRQ_HANDLER
++	bool
++	help
++	  Allow each machine to specify it's own IRQ handler at run time.
++
+ if !MMU
+ source "arch/arm/Kconfig-nommu"
+ endif
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index d97a964..7d55356 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -40,6 +40,9 @@ struct machine_desc {
+ 	void			(*init_irq)(void);
+ 	struct sys_timer	*timer;		/* system tick timer	*/
+ 	void			(*init_machine)(void);
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	void			(*handle_irq)(struct pt_regs *);
++#endif
+ };
+
+ /*
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index ce3eee9..6ecdad9 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
+ extern void init_FIQ(void);
+ extern int show_fiq_list(struct seq_file *, void *);
+
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++extern void (*handle_arch_irq)(struct pt_regs *);
++#endif
++
+ /*
+  * This is for easy migration, but should be changed in the source
+  */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index c09e357..8ed4f7c 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -29,6 +29,7 @@
+ /*
+  * Interrupt handling.  Preserves r7, r8, r9
+  */
++#ifndef CONFIG_MULTI_IRQ_HANDLER
+ 	.macro	irq_handler
+ 	get_irqnr_preamble r5, lr
+ 1:	get_irqnr_and_base r0, r6, r5, lr
+@@ -62,6 +63,14 @@
+ #endif
+
+ 	.endm
++#else
++	.macro	irq_handler
++	ldr	r4, =handle_arch_irq
++	mov	r0, sp
++	mov	lr, pc
++	ldr	pc, [r4]
++	.endm
++#endif	/* CONFIG_MULTI_IRQ_HANDLER */
+
+ #ifdef CONFIG_KPROBES
+ 	.section	.kprobes.text,"ax",%progbits
+@@ -1245,3 +1254,9 @@ cr_alignment:
+ 	.space	4
+ cr_no_alignment:
+ 	.space	4
++
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	.globl	handle_arch_irq
++handle_arch_irq:
++	.long	0
++#endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..a834c6c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -876,6 +876,12 @@ void __init setup_arch(char **cmdline_p)
+ 	system_timer = mdesc->timer;
+ 	init_machine = mdesc->init_machine;
+
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	handle_arch_irq = class ? class->handle_irq : NULL;
++	if (!handle_arch_irq)
++		panic("No machine class specific IRQ handler defined\n");
++#endif
++
+ #ifdef CONFIG_VT
+ #if defined(CONFIG_VGA_CONSOLE)
+ 	conswitchp = &vga_con;
