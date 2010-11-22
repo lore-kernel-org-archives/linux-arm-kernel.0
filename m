@@ -1,7 +1,7 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 22 Nov 2010 15:55:47 +0100
+Date: Mon, 22 Nov 2010 15:57:18 +0100
 Subject: [PATCH v3 2/5] OMAP: mailbox: fix rx interrupt disable in omap4
-In-Reply-To: <20101122100815.GM2446@legolas.emea.dhcp.ti.com>
+In-Reply-To: <20101122115153.GE2446@legolas.emea.dhcp.ti.com>
 References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
 	<1290107742-16760-3-git-send-email-h-kanigeri2@ti.com>
 	<4CE5B68F.8000502@ti.com>
@@ -10,25 +10,31 @@ References: <1290107742-16760-1-git-send-email-h-kanigeri2@ti.com>
 	<AANLkTimzaB6aFo2=iEpR=2a3T_3oWQa6iBxQxWhBBCiw@mail.gmail.com>
 	<4CE68E9A.5040903@ti.com>
 	<20101122100815.GM2446@legolas.emea.dhcp.ti.com>
-Message-ID: <4CEA8473.3040404@ti.com>
+	<AANLkTim4bHJHFdOEXt-hM7Yt2wGsVTcfJExwzzcUKXmq@mail.gmail.com>
+	<20101122115153.GE2446@legolas.emea.dhcp.ti.com>
+Message-ID: <4CEA84CE.5010708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2010 11:08 AM, Balbi, Felipe wrote:
-> On Fri, Nov 19, 2010 at 03:50:02PM +0100, Cousson, Benoit wrote:
->> Most of the time, we do not want to use the IP revision because it is
->> un-accurate and does not reflect the change we'd like to track.
->> For example some time a minor change in the RTL that will not impact
->> the SW at all might trigger a change in the IP revision, whereas on
->> the other hand a major bug fix that will impact the SW is not capture
->> in the IP revision... yeah, that's bad, but this can happen.
->>
->> That's why we are relying on a rev field in the hwmod.
+On 11/22/2010 12:51 PM, Felipe Balbi wrote:
+> Hi,
 >
-> But then, what's inside this rev field ? Is it some internal revision of
-> hwmod or do you read from the hw ?
+> On Mon, Nov 22, 2010 at 05:46:53AM -0600, Kanigeri, Hari wrote:
+>> > From the dmtimer stuff, it looks like the driver defines the version
+>> types, which hwmod uses to define the rev field.
+>>
+>> /* timer ip constants */
+>> #define OMAP_TIMER_IP_LEGACY			0x1
+>> #define OMAP_TIMER_IP_VERSION_2			0x2
+>
+> in that case, it's the same as if you pass in a flag via platform_data.
+> You might as well call it rev, then the diff when converting to hwmod
+> will be smaller maybe :-p
 
-So far we are using a artificial SW IP revision that reflect the 
-difference we'd like to highlight v1, v2.
+Yes, this is exactly what I was proposing to Hari.
+For the moment create the pdata field that will be populated at init 
+time using the cpu_is.
+During the hwmod migration, the value will be extracted from the hwmod 
+rev field.
 
 Benoit
