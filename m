@@ -1,42 +1,40 @@
-From: per.fransson.ml@gmail.com (Per Fransson)
-Date: Mon, 22 Nov 2010 23:30:32 +0100
-Subject: [PATCH] Add call to non-crashing cores through IPI
-In-Reply-To: <AANLkTikQX9YqR42u6ppzceHL58JqBsVxR3YJr6_BarbY@mail.gmail.com>
-References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20101122072420.GC14080@gw.healthdatacare.com>
-	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
-	<20101122104740.GA30744@n2100.arm.linux.org.uk>
-	<20101122112759.GA31227@n2100.arm.linux.org.uk>
-	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
-	<20101122144040.GM31227@n2100.arm.linux.org.uk>
-	<AANLkTinj5wnP4823bacK6rs3nQbw3qtqDDjYof2-ALUk@mail.gmail.com>
-	<AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
-	<AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
-	<AANLkTikQX9YqR42u6ppzceHL58JqBsVxR3YJr6_BarbY@mail.gmail.com>
-Message-ID: <AANLkTikmq7ykPQ05fAvbpeXN6PZqcNKms8rJvVV0BOqw@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 23 Nov 2010 02:01:53 +0300
+Subject: [PATCH v2 9/9] ARM: kprobes: Don't HAVE_KPROBES
+	when	CONFIG_THUMB2_KERNEL is selected
+In-Reply-To: <1290449065-28843-10-git-send-email-dave.martin@linaro.org>
+References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
+	<1290449065-28843-10-git-send-email-dave.martin@linaro.org>
+Message-ID: <4CEAF661.3000907@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 22, 2010 at 11:14 PM, Per Fransson
-<per.fransson.ml@gmail.com> wrote:
->>>
->>> That's for the situation when the other core tries to send an IPI at
->>> the same time. Unlikely but both cores may deadlock.
->>>
->>
->> Am I right that deadlock can occur only if the same IPI was sent? And
->> there should
->> be no situation when CRASH_DUMP IPI was sent from different processors at
->> the same time.
->>
->
-> I hope you are right, but I can't see why we couldn't get a crash IPI
-> from several
-> processors at the same time, unfortunately.
->
+Hello.
 
-I'll just follow up my own post here. On second thought, crash_kexec()
-takes the kexec_mutex,
-so simultaneous crash IPIs probably couldn't happen.
+On 22-11-2010 21:04, Dave Martin wrote:
 
-/Per
+> Currently, the kprobes implementation for ARM only supports
+> the ARM instruction set, so it only works if
+> CONFIG_THUMB2_KERNEL is not enabled.
+
+> Until kprobes is updated to work with Thumb-2, turning it on
+> will cause horrible things to happen, so this patch disables it
+> for now.
+
+> Signed-off-by: Dave Martin<dave.martin@linaro.org>
+[...]
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index db524e7..f1d9297 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -9,7 +9,7 @@ config ARM
+>   	select GENERIC_ATOMIC64 if (!CPU_32v6K || !AEABI)
+>   	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+>   	select HAVE_ARCH_KGDB
+> -	select HAVE_KPROBES if (!XIP_KERNEL)
+> +	select HAVE_KPROBES if (!XIP_KERNEL && !THUMB2_KERNEL)
+
+    These parens are useless.
+
+WBR, Sergei
