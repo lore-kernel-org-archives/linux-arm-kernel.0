@@ -1,62 +1,35 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 22 Nov 2010 18:39:29 +0000
-Subject: [PATCH v2 7/9] ARM: Thumb-2: Restore sensible zImage header
-	layout for CONFIG_THUMB2_KERNEL
-In-Reply-To: <alpine.LFD.2.00.1011221312500.9313@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 22 Nov 2010 14:03:51 -0500 (EST)
+Subject: [PATCH v2 8/9] ARM: Thumb-2: Fix long-distance conditional
+	branches in head.S for Thumb-2.
+In-Reply-To: <1290449065-28843-9-git-send-email-dave.martin@linaro.org>
 References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
-	<1290449065-28843-8-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1011221312500.9313@xanadu.home>
-Message-ID: <AANLkTik8Ha31Abzgvqp3AiZoKg_L9iqNG-HcoM+L3foR@mail.gmail.com>
+	<1290449065-28843-9-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1011221346170.9313@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 22 Nov 2010, Dave Martin wrote:
 
-On Mon, Nov 22, 2010 at 6:28 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> The 32-bit conditional branches in Thumb-2 have a shorter range (+/-512K)
+> than their ARM counterparts (+/-32MB).  The linker does not currently
+> generate trampolines to extend the range of these Thumb-2 conditional
+> branches, resulting in link errors when vmlinux is sufficiently large, e.g.:
+> 
+> head.o:(.text+0x464): relocation truncated to fit: R_ARM_THM_JUMP19
+> 
+> This patch forces the longer-range, unconditional branch encoding by
+> use of an explicit IT instruction.  The resulting branches are triggered on
+> the same conditions as before.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-[...]
+I'm afraid this patch is only making an actual bug visible.  There is no 
+reason why __error_p or __error_a ought to be farther than 512K away 
+from their call sites as they are all supposed to live in the __init 
+section close together.  It looks like the refactoring done in commit 
+75d90832d5 has dropped the __init attribute from those moved functions, 
+and adding it back would be the real fix.
 
->> Applies on v2.6.37-rc3.
->
-> Ideally you should keep that line above outside of the actual commit log
-> text, as no one will care on what version it applies to once it is
-> merged. ?It is best to put that below the --- line, or omit it entirely
-> if using 'git send-email'.
 
-OK, I'll leave it out in the future...
-
->> Signed-off-by: Dave Martin <dave.martin@linaro.org>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-> Looking at it again there is a problem with the patch as is...
->
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -125,16 +125,21 @@ wait: ? ? ? ? ? mrc ? ? p14, 0, pc, c0, c1, 0
->> ? * sort out different calling conventions
->> ? */
->> ? ? ? ? ? ? ? .align
->> + ? ? ? ? ? ? .arm ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ Always enter in ARM state
->> ?start:
->> ? ? ? ? ? ? ? .type ? start,#function
->> - ? ? ? ? ? ? .rept ? 8
->> + THUMB( ? ? ? ? ? ? ?adr ? ? r12, BSYM(1f) ? )
->> + THUMB( ? ? ? ? ? ? ?bx ? ? ?r12 ? ? ? ? ? ? )
->> + THUMB( ? ? ? ? ? ? ?.rept ? 6 ? ? ? ? ? ? ? )
->> + ARM( ? ? ? ? ? ? ? ?.rept ? 8 ? ? ? ? ? ? ? )
->> ? ? ? ? ? ? ? mov ? ? r0, r0
->> ? ? ? ? ? ? ? .endr
->>
->> - ? ? ? ? ? ? b ? ? ? 1f
->> + ? ? ? ? ? ? nop ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ Pad magic number to 0x24
->
-> Why is this branch removed? ?With an ARM mode kernel this means we'll
-> attempt to execute the magic number that follows.
-
-Hmmm, I think I got confused during a branch merge...
-
-I will retest and repost this patch as appropriate.
-
-Cheers
----Dave
+Nicolas
