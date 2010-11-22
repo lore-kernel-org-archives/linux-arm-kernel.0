@@ -1,44 +1,78 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 22 Nov 2010 22:55:46 +0530
-Subject: [PATCH] Add call to non-crashing cores through IPI
-In-Reply-To: <20101122142101.GL31227@n2100.arm.linux.org.uk>
-References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20101122072420.GC14080@gw.healthdatacare.com>
-	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
-	<20101122104740.GA30744@n2100.arm.linux.org.uk>
-	<20101122112759.GA31227@n2100.arm.linux.org.uk>
-	<9d90879f08b3141aa5ce4a0887018de9@mail.gmail.com>
-	<20101122142101.GL31227@n2100.arm.linux.org.uk>
-Message-ID: <bdbc2959fe609090afc0fb6d656e36de@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 22 Nov 2010 09:56:21 -0800
+Subject: [Patch v2] AM35xx: Craneboard: Add USB EHCI support
+In-Reply-To: <1290414736-21973-1-git-send-email-srinath@mistralsolutions.com>
+	(srinath@mistralsolutions.com's message of "Mon, 22 Nov 2010 14:02:16
+	+0530")
+References: <1290414736-21973-1-git-send-email-srinath@mistralsolutions.com>
+Message-ID: <87oc9hutru.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Monday, November 22, 2010 7:51 PM
-> To: Santosh Shilimkar
-> Cc: Per Fransson; Mika Westerberg; kexec at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] Add call to non-crashing cores through IPI
+srinath at mistralsolutions.com writes:
+
+> From: Srinath <srinath@mistralsolutions.com>
 >
-> On Mon, Nov 22, 2010 at 06:37:09PM +0530, Santosh Shilimkar wrote:
-> > > ARM: smp: make smp_send_stop() wait for secondary CPUs to stop
-> > >
-> > > Wait up to one second for secondary CPUs to respond to a request to
-> > > stop.  This avoids the sender CPU continuing and possibly destroying
-> > > state before the recipients have had a chance to respond to the
-stop.
-> > > However, if the recipients have crashed, we won't hang the sender
-> > > CPU indefinitely.
-> > >
-> > Just tried this patch thinking it might fix the reboot issue
-> > reported earlier. But it doesn't help.
+> AM3517/05 Craneboard has one EHCI interface on board using port1.
 >
-> I was hoping that it might change the behaviour slightly, but if not
-> the patch can't do any harm.
+> GPIO35 is used as power enable.
+> GPIO38 is used as port1 PHY reset.
 >
-> The reboot stuff works fine on Versatile Express with Cortex A9, so
-> I suspect your problem might be specific to OMAP.
-Interesting.
-I thought it's a common issue. Will have a look at it more
-closely
+> Signed-off-by: Srinath <srinath@mistralsolutions.com>
+> ---
+>  arch/arm/mach-omap2/board-am3517crane.c |   20 ++++++++++++++++++++
+>  1 files changed, 20 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+> index 13ead33..91791bc 100644
+> --- a/arch/arm/mach-omap2/board-am3517crane.c
+> +++ b/arch/arm/mach-omap2/board-am3517crane.c
+> @@ -28,8 +28,10 @@
+>  
+>  #include <plat/board.h>
+>  #include <plat/common.h>
+> +#include <plat/usb.h>
+>  
+>  #include "mux.h"
+> +#include "control.h"
+>  
+>  /* Board initialization */
+>  static struct omap_board_config_kernel am3517_crane_config[] __initdata = {
+> @@ -53,10 +55,28 @@ static void __init am3517_crane_init_irq(void)
+>  	omap_gpio_init();
+>  }
+>>  
+> +static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
+> +	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
+> +	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+> +	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+> +
+> +	.phy_reset  = true,
+> +	.reset_gpio_port[0]  = 38,
+> +	.reset_gpio_port[1]  = -EINVAL,
+> +	.reset_gpio_port[2]  = -EINVAL
+> +};
+> +
+>  static void __init am3517_crane_init(void)
+>  {
+>  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+>  	omap_serial_init();
+> +
+> +	/* Configure GPIO for EHCI port */
+> +	omap_mux_init_gpio(35, OMAP_PIN_OUTPUT);
+
+Please define a symbolic constant for these GPIO numbers instead of using
+hard-coded constants.
+
+> +	gpio_request(35, "usb_ehci_enable");
+
+GPIO APIs can fail.  Please check return value and act accordingly.
+
+> +	gpio_direction_output(35, 1);
+> +	omap_mux_init_gpio(38, OMAP_PIN_OUTPUT);
+> +	usb_ehci_init(&ehci_pdata);
+>  }
+>  
+>  MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
+
+Kevin
