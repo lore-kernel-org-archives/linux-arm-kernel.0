@@ -1,71 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Nov 2010 15:08:19 -0500 (EST)
-Subject: [PATCH] ARM: Allow SMP_ON_UP to work with Thumb-2 kernels.
-In-Reply-To: <1290449631-29100-1-git-send-email-dave.martin@linaro.org>
-References: <1290449631-29100-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1011221446260.9313@xanadu.home>
+From: muvarov@gmail.com (Maxim Uvarov)
+Date: Mon, 22 Nov 2010 23:09:51 +0300
+Subject: [PATCH] Add call to non-crashing cores through IPI
+In-Reply-To: <AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
+References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
+	<20101122072420.GC14080@gw.healthdatacare.com>
+	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
+	<20101122104740.GA30744@n2100.arm.linux.org.uk>
+	<20101122112759.GA31227@n2100.arm.linux.org.uk>
+	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
+	<20101122144040.GM31227@n2100.arm.linux.org.uk>
+	<AANLkTinj5wnP4823bacK6rs3nQbw3qtqDDjYof2-ALUk@mail.gmail.com>
+	<AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
+Message-ID: <AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Nov 2010, Dave Martin wrote:
+2010/11/22 Catalin Marinas <catalin.marinas@arm.com>:
+> On 22 November 2010 17:03, Per Fransson <per.fransson.ml@gmail.com> wrote:
+>> On the other hand, do we really need to enable the interrupts before
+>> performing an ipi?
+>> The important thing must be for them to be enabled on the
+>> receiving/callee cores. It's not
+>> as if we want the crashing core to be interruptable, is it?
+>
+> That's for the situation when the other core tries to send an IPI at
+> the same time. Unlikely but both cores may deadlock.
+>
 
->   * __fixup_smp_on_up has been modified with support for the THUMB2_KERNEL
-> 	case.  For THUMB2_KERNEL only, fixups are split into halfwords in
-> 	case of misalignment, since we can't rely on unaligned accesses
-> 	working before turning the MMU on.
-> 
-> 	No attempt is made to optimise the aligned case, since the number
-> 	of fixups is typically small, and it seems best to keep the code
-> 	as simple as possible.
+Am I right that deadlock can occur only if the same IPI was sent? And
+there should
+be no situation when CRASH_DUMP IPI was sent from different processors at
+the same time.
 
-ACK.
-
->   * A "mode" parameter has been added to smp_dmb:
-> 
-> 	smp_dmp arm	@ assumes 4-byte instructions (for ARM code, e.g. kuser)
-> 	smp_dmp		@ uses W() to ensure 4-byte instructions for ALT_SMP()
-> 
-> 	This avoids assembly failures due to use of W() inside smp_dmb,
-> 	when assembling pure-ARM code in the vectors page.
-> 
-> 	There might be a better way to achieve this.
-
-Is the W() sufficient to indicate an ARM encoding?  To me it is meant to 
-specify a wide encoding when using Thumb2 encoding.  And if this is for 
-the kuser code segments (which should always be ARM mode by the way) 
-then this shouldn't make any difference.
-
-And did you mean "smp_dmb" instead of "smp_dmp" above?
-
->   * Kconfig: make SMP_ON_UP depend on (!THUMB2_KERNEL || !BIG_ENDIAN)
-> 	i.e., THUMB2_KERNEL is now supported, but only if !BIG_ENDIAN
-> 	(The fixup code for Thumb-2 currently assumes little-endian order.)
-[...]
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -407,10 +407,14 @@ __fixup_smp_on_up:
->  	add	r6, r6, r3
->  	add	r7, r7, r3
->  2:	cmp	r6, r7
-> +	movhs	pc, lr
->  	ldmia	r6!, {r0, r4}
-> -	strlo	r4, [r0, r3]
-> -	blo	2b
-> -	mov	pc, lr
-> + ARM(	str	r4, [r0, r3]	)
-> + THUMB(	add	r0, r0, r3	)
-> + THUMB(	strh	r4, [r0], #2	)	@ For Thumb-2, store as two halfwords
-> + THUMB(	mov	r4, r4, lsr #16	)	@ to be robust against misaligned r3.
-> + THUMB(	strh	r4, [r0]	)	@ NOTE: currently assumes little-endian.
-> +	b	2b
-
-All you minimally need to support big endian here is to insert:
-
-#ifndef __ARMEB__
-THUMB(	mov	r4, r4, ror #16	)
-#endif
-
-just before the first store.
+> I actually had a patch to allow this which was really complicated and
+> it still failed in a real-world scenario which I could foresee.
+>
+> --
+> Catalin
+>
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
+>
 
 
-Nicolas
+
+-- 
+Best regards,
+Maxim Uvarov
