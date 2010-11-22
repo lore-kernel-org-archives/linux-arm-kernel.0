@@ -1,28 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 22 Nov 2010 11:20:38 +0000
-Subject: [PATCH v6 08/12] gpio: add ti-ssp gpio driver
-In-Reply-To: <AANLkTikYu4H8aWOvK+q6g4YgUZxD_80UKBdr=eB__frF@mail.gmail.com>
-References: <1290182156-20104-1-git-send-email-cyril@ti.com>
-	<1290182156-20104-9-git-send-email-cyril@ti.com>
-	<4CE97AE5.3040801@bluewatersys.com>
-	<AANLkTikYu4H8aWOvK+q6g4YgUZxD_80UKBdr=eB__frF@mail.gmail.com>
-Message-ID: <20101122112038.GD16504@rakim.wolfsonmicro.main>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Nov 2010 11:27:59 +0000
+Subject: [PATCH] Add call to non-crashing cores through IPI
+In-Reply-To: <20101122104740.GA30744@n2100.arm.linux.org.uk>
+References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
+	<20101122072420.GC14080@gw.healthdatacare.com>
+	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
+	<20101122104740.GA30744@n2100.arm.linux.org.uk>
+Message-ID: <20101122112759.GA31227@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 21, 2010 at 02:31:38PM -0700, Grant Likely wrote:
-> On Sun, Nov 21, 2010 at 1:02 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+On Mon, Nov 22, 2010 at 10:47:40AM +0000, Russell King - ARM Linux wrote:
+> However, we do need smp_send_stop() to wait for a limited time for the
+> other CPUs to respond to the request.
 
-> > Currently the code will allow you to install
-> > several peripherals at once, which will lead to odd behaviour at
-> > runtime. Maybe a better approach would be to have something like this in
-> > drivers/mfd/ti-ssp.c:
+ARM: smp: make smp_send_stop() wait for secondary CPUs to stop
 
-> Only the ssp core itself is allowed to register the peripheral
-> devices, and so using the parent pointer is perfectly valid.  I think
-> Cyril's approach is fine.
+Wait up to one second for secondary CPUs to respond to a request to
+stop.  This avoids the sender CPU continuing and possibly destroying
+state before the recipients have had a chance to respond to the stop.
+However, if the recipients have crashed, we won't hang the sender
+CPU indefinitely.
 
-This is very much a standard idiom for MFD children in Linux - if the
-children are entirely reliant on working through a parent-specific API
-anyway there's no issue with making the parent device be part of that
-API.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/smp.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 5d0dc16..32a2158 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -589,10 +589,16 @@ void smp_send_reschedule(int cpu)
+ 
+ void smp_send_stop(void)
+ {
++	unsigned long timeout;
+ 	cpumask_t mask = cpu_online_map;
+ 	cpu_clear(smp_processor_id(), mask);
+ 	if (!cpus_empty(mask))
+ 		send_ipi_message(&mask, IPI_CPU_STOP);
++
++	/* Wait up to one second for other CPUs to stop */
++	timeout = USEC_PER_SEC;
++	while (num_online_cpus() > 1 && timeout--)
++		udelay(1);
+ }
+ 
+ /*
