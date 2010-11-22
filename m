@@ -1,38 +1,28 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 22 Nov 2010 16:37:28 +0530
-Subject: [PATCH 1/3] OMAP2+: wd_timer: separate watchdog disable code
-	from the	rest of mach-omap2/devices.c
-In-Reply-To: <20101116102512.27991.28535.stgit@twilight.localdomain>
-References: <20101116102205.27991.37909.stgit@twilight.localdomain>
-	<20101116102512.27991.28535.stgit@twilight.localdomain>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0372E400F0@dbde02.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 22 Nov 2010 11:20:38 +0000
+Subject: [PATCH v6 08/12] gpio: add ti-ssp gpio driver
+In-Reply-To: <AANLkTikYu4H8aWOvK+q6g4YgUZxD_80UKBdr=eB__frF@mail.gmail.com>
+References: <1290182156-20104-1-git-send-email-cyril@ti.com>
+	<1290182156-20104-9-git-send-email-cyril@ti.com>
+	<4CE97AE5.3040801@bluewatersys.com>
+	<AANLkTikYu4H8aWOvK+q6g4YgUZxD_80UKBdr=eB__frF@mail.gmail.com>
+Message-ID: <20101122112038.GD16504@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Sun, Nov 21, 2010 at 02:31:38PM -0700, Grant Likely wrote:
+> On Sun, Nov 21, 2010 at 1:02 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
 
-<<snip>>
-...
-> +
-> +int omap2_wd_timer_disable(struct omap_hwmod *oh)
-> +{
-> +	void __iomem *base;
-> +	int ret;
-> +
-> +	if (!oh) {
-> +		pr_err("%s: Could not look up wdtimer_hwmod\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-Just a minor observation. I was wondering if we need this check because
-omap_hwmod_for_each_by_class(...) would call this only for valid oh.
+> > Currently the code will allow you to install
+> > several peripherals at once, which will lead to odd behaviour at
+> > runtime. Maybe a better approach would be to have something like this in
+> > drivers/mfd/ti-ssp.c:
 
+> Only the ssp core itself is allowed to register the peripheral
+> devices, and so using the parent pointer is perfectly valid.  I think
+> Cyril's approach is fine.
 
-        list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
-                if (!strcmp(temp_oh->class->name, classname)) {
-                        pr_debug("omap_hwmod: %s: %s: calling callback fn\n",
-                                 __func__, temp_oh->name);
-                        ret = (*fn)(temp_oh, user);
-
---
-Tarun
+This is very much a standard idiom for MFD children in Linux - if the
+children are entirely reliant on working through a parent-specific API
+anyway there's no issue with making the parent device be part of that
+API.
