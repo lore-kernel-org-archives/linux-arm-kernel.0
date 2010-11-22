@@ -1,48 +1,69 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 22 Nov 2010 21:21:02 +0800
-Subject: [PATCH 1/2] pxa: add usb clock for pxa168/pxa910
-In-Reply-To: <1290418347-6861-1-git-send-email-chao.xie@marvell.com>
-References: <1290418347-6861-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <AANLkTimq2--4rXRO9XbL3DnsTQhJmh-A4b3RarMy1xa=@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Nov 2010 13:28:31 +0000
+Subject: [PATCH v2 01/20] ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead
+	of PGDIR_*
+In-Reply-To: <1290430810.29754.9.camel@e102109-lin.cambridge.arm.com>
+References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
+	<1289584840-18097-2-git-send-email-catalin.marinas@arm.com>
+	<20101122124353.GB31227@n2100.arm.linux.org.uk>
+	<1290430810.29754.9.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20101122132831.GH31227@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 22, 2010 at 5:32 PM,  <chao.xie@marvell.com> wrote:
-> From: cxie4 <cxie4@marvell.com>
->
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
-> ?arch/arm/mach-mmp/pxa910.c | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-> index 46f2d69..cf7c71a 100644
-> --- a/arch/arm/mach-mmp/pxa910.c
-> +++ b/arch/arm/mach-mmp/pxa910.c
-> @@ -111,6 +111,7 @@ static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
-> ?static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
->
-> ?static APMU_CLK(nand, NAND, 0x01db, 208000000);
-> +static APMU_CLK(u2o, USB, 0x1b, 480000000);
->
-> ?/* device and clock bindings */
-> ?static struct clk_lookup pxa910_clkregs[] = {
-> @@ -123,6 +124,7 @@ static struct clk_lookup pxa910_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_pwm3, "pxa910-pwm.2", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pwm4, "pxa910-pwm.3", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
-> + ? ? ? INIT_CLKREG(&clk_u2o, NULL, "U2OCLK"),
+On Mon, Nov 22, 2010 at 01:00:10PM +0000, Catalin Marinas wrote:
+> On Mon, 2010-11-22 at 12:43 +0000, Russell King - ARM Linux wrote:
+> > On Fri, Nov 12, 2010 at 06:00:21PM +0000, Catalin Marinas wrote:
+> > > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> > > index 8c19595..40b386c 100644
+> > > --- a/arch/arm/kernel/smp.c
+> > > +++ b/arch/arm/kernel/smp.c
+> > > @@ -78,7 +78,7 @@ static inline void identity_mapping_add(pgd_t *pgd, unsigned long start,
+> > >       if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+> > >               prot |= PMD_BIT4;
+> > > 
+> > > -     for (addr = start & PGDIR_MASK; addr < end;) {
+> > > +     for (addr = start & PMD_MASK; addr < end;) {
+> > >               pmd = pmd_offset(pgd + pgd_index(addr), addr);
+> > >               pmd[0] = __pmd(addr | prot);
+> > >               addr += SECTION_SIZE;
+> > > @@ -95,7 +95,7 @@ static inline void identity_mapping_del(pgd_t *pgd, unsigned long start,
+> > >       unsigned long addr;
+> > >       pmd_t *pmd;
+> > > 
+> > > -     for (addr = start & PGDIR_MASK; addr < end; addr += PGDIR_SIZE) {
+> > > +     for (addr = start & PMD_MASK; addr < end; addr += PMD_SIZE) {
+> > >               pmd = pmd_offset(pgd + pgd_index(addr), addr);
+> > >               pmd[0] = __pmd(0);
+> > >               pmd[1] = __pmd(0);
+> > ...
+> > > @@ -1068,12 +1068,12 @@ void setup_mm_for_reboot(char mode)
+> > >               base_pmdval |= PMD_BIT4;
+> > > 
+> > >       for (i = 0; i < FIRST_USER_PGD_NR + USER_PTRS_PER_PGD; i++, pgd++) {
+> > > -             unsigned long pmdval = (i << PGDIR_SHIFT) | base_pmdval;
+> > > +             unsigned long pmdval = (i << PMD_SHIFT) | base_pmdval;
+> > >               pmd_t *pmd;
+> > > 
+> > > -             pmd = pmd_off(pgd, i << PGDIR_SHIFT);
+> > > +             pmd = pmd_off(pgd, i << PMD_SHIFT);
+> > >               pmd[0] = __pmd(pmdval);
+> > > -             pmd[1] = __pmd(pmdval + (1 << (PGDIR_SHIFT - 1)));
+> > > +             pmd[1] = __pmd(pmdval + (1 << (PMD_SHIFT - 1)));
+> > >               flush_pmd_entry(pmd);
+> > >       }
+> > > 
+> > 
+> > This lot really does need unifying - and in any case this last addition
+> > should be using 'SECTION SIZE' not something related to PMD shifts.
+> 
+> On the classic page tables, the PMD_SHIFT is 21 while the SECTION_SHIFT
+> is 20. They have slightly different meaning.
 
-Normally, device name is more preferred than a name string. In this
-case, it will be 'pxa-u2o'.
+Correct, and if you look at the code again and analyze what it's doing,
+you'll see that it's using the wrong thing.  The code pre-exists the
+SECTION_* macros, and was never fixed up when they were introduced.
 
-PS: the naming is a bit inconsistent in the patch follows, the name of
-the driver file is called mv_udc, but the device name is 'pxa-u2o'?
+SECTION_SIZE is the right thing here - it's setting up sections.
 
-> ?};
->
-> ?static int __init pxa910_init(void)
-> --
-> 1.6.3.3
->
->
+Just look at identity_mapping_add() to see how the code _should_ be.
