@@ -1,65 +1,60 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 22 Nov 2010 18:04:16 +0000
-Subject: [PATCH v2 0/9] ARM: Thumb-2: Various fixes for building Thumb-2
-	kernels
-Message-ID: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
+Date: Mon, 22 Nov 2010 18:04:17 +0000
+Subject: [PATCH v2 1/9] ARM: kexec: Correct data alignment for
+	CONFIG_THUMB2_KERNEL
+In-Reply-To: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
+References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1290449065-28843-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes various minor problems affecting building with
-CONFIG_THUMB2_KERNEL.
+Directives such as .long and .word do not magically cause the
+assembler location counter to become aligned in gas.  As a
+result, using these directives in code sections can result in
+misaligned data words when building a Thumb-2 kernel
+(CONFIG_THUMB2_KERNEL).
 
-v2: 
+This is a Bad Thing, since the ABI permits the compiler to
+assume that fundamental types of word size or above are word-
+aligned when accessing them from C.  If the data is not really
+word-aligned, this can cause impaired performance and stray
+alignment faults in some circumstances.
 
-  * Improve zImage header layout patch based on feedback.
-  * Disable kprobes via Kconfig when using CONFIG_THUMB2_KERNEL (for now)
-  * Force longer-range Thumb-2 branch encoding for some branches in head.S,
-	to avoid fixup errors when vmlinux is large.
+In general, the following rules should be applied when using
+data word declaration directives inside code sections:
 
-Applies to 2.6.37-rc3
+    * .quad and .double:
+         .align 3
 
+    * .long, .word, .single, .float:
+         .align (or .align 2)
 
-v1:
+    * .short:
+        No explicit alignment required, since Thumb-2
+        instructions are always 2 or 4 bytes in size.
+        immediately after an instruction.
 
-Fix misaligned data risks resulting from .long/.word without .align:
- * ARM: kexec: Correct data alignment for CONFIG_THUMB2_KERNEL
- * ARM: vfp: Correct data alignment for CONFIG_THUMB2_KERNEL
- * ARM: Thumb-2: Correct data alignment for CONFIG_THUMB2_KERNEL in bootp/init.S
- * ARM: Thumb-2: Correct data alignment for CONFIG_THUMB2_KERNEL in kernel/head.S
- * ARM: Thumb-2: Correct data alignment for CONFIG_THUMB2_KERNEL in mm/proc-v7.S
+Applies cleanly on v2.6.37-rc1.
 
-Fix Thumb-2 incompatibilities in compressed kernel entry code,
-to avoid build failures:
- * ARM: Thumb-2: Fix CONFIG_THUMB2_KERNEL breakage in compressed/head.S
-
-Fix strange zImage header layout when building Thumb-2 kernels:
- * ARM: Thumb-2: Restore sensible zImage header layout for CONFIG_THUMB2_KERNEL
-
-----
-
-Dave Martin (9):
-  ARM: kexec: Correct data alignment for CONFIG_THUMB2_KERNEL
-  ARM: vfp: Correct data alignment for CONFIG_THUMB2_KERNEL
-  ARM: Thumb-2: Correct data alignment for CONFIG_THUMB2_KERNEL in
-    bootp/init.S
-  ARM: Thumb-2: Correct data alignment for CONFIG_THUMB2_KERNEL in
-    kernel/head.S
-  ARM: Thumb-2: Correct data alignment for CONFIG_THUMB2_KERNEL in
-    mm/proc-v7.S
-  ARM: Thumb-2: Fix CONFIG_THUMB2_KERNEL breakage in compressed/head.S
-  ARM: Thumb-2: Restore sensible zImage header layout for
-    CONFIG_THUMB2_KERNEL
-  ARM: Thumb-2: Fix long-distance conditional branches in head.S for
-    Thumb-2.
-  ARM: kprobes: Don't HAVE_KPROBES when CONFIG_THUMB2_KERNEL is
-    selected
-
- arch/arm/Kconfig                  |    2 +-
- arch/arm/boot/Makefile            |    5 -----
- arch/arm/boot/bootp/init.S        |    2 ++
- arch/arm/boot/compressed/head.S   |   15 +++++++++++----
- arch/arm/kernel/head.S            |    7 +++++++
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
  arch/arm/kernel/relocate_kernel.S |    2 ++
- arch/arm/mm/proc-v7.S             |    4 ++--
- arch/arm/vfp/vfphw.S              |    1 +
- 8 files changed, 26 insertions(+), 12 deletions(-)
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
+index fd26f8d..9cf4cbf 100644
+--- a/arch/arm/kernel/relocate_kernel.S
++++ b/arch/arm/kernel/relocate_kernel.S
+@@ -59,6 +59,8 @@ relocate_new_kernel:
+ 	ldr r2,kexec_boot_atags
+ 	mov pc,lr
+ 
++	.align
++
+ 	.globl kexec_start_address
+ kexec_start_address:
+ 	.long	0x0
+-- 
+1.7.1
