@@ -1,32 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Nov 2010 16:05:46 -0000
-Subject: [PATCH v2] ARM: vexpress: add support for multiple core tiles
-In-Reply-To: <1289843693-21823-1-git-send-email-will.deacon@arm.com>
-References: <1289843693-21823-1-git-send-email-will.deacon@arm.com>
-Message-ID: <000901cb8a5f$1f8dbd20$5ea93760$@deacon@arm.com>
+From: avictor.za@gmail.com (avictor.za at gmail.com)
+Date: Mon, 22 Nov 2010 18:08:31 +0200
+Subject: rm9200: update
+In-Reply-To: <20101120095906.GD4216@game.jcrosoft.org>
+References: <20101120095906.GD4216@game.jcrosoft.org>
+Message-ID: <AANLkTim_tA2KHmvmXeaK6oU1Yj-Eak62SBqn4BGo+Dyq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+hi Jean-Christophe,
 
-> The current Versatile Express BSP defines the MACHINE_START macro
-> in the core tile code.
-> 
-> This patch moves this into the generic board code and introduces
-> a method for determining the current tile at runtime, allowing
-> the Kernel to have support for multiple tiles compiled in.
-> Tile-specific functions are executed via a descriptor struct containing
-> the correct implementations for the current tile.
-> 
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
+> ? ? ? ?this patch update some issues found on rm9200
+> ? ? ? ?during the test of the rm9200 defconfig consolidation
+>
+>
+> ?git://git.jcrosoft.org/linux-2.6.git rm9200
+>
+> Jean-Christophe PLAGNIOL-VILLARD (6):
+> ? ? ?at91: Convert remaining boards to new-style UART initialization
+> ? ? ?at91rm9200dk: fix warning: 'dk_mmc_data' defined but not used
+> ? ? ?at91rm9200ek: fix warning: 'ek_mmc_data' defined but not used
+> ? ? ?at91/picotux200: fix warning: 'picotux200_mmc_data' defined but not used
+> ? ? ?at91: rename rm9200ek and rm9200dk board file name
 
-[...]
+For patches 1, 2, 3, 4 and 5 you can add a:
+  Signed-off-by: Andrew Victor <linux@maxim.org.za>
 
-Do you have any feedback on this patch or can I submit it to the patch
-system please?
 
-Thanks,
+> ? ? ?atmel_spi: fix warning In function 'atmel_spi_dma_map_xfer'
 
-Will
+
+Regards,
+  Andrew Victor
