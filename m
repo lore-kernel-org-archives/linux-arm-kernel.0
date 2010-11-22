@@ -1,63 +1,13 @@
-From: muvarov@gmail.com (Maxim Uvarov)
-Date: Mon, 22 Nov 2010 12:47:28 +0300
+From: per.fransson.ml@gmail.com (Per Fransson)
+Date: Mon, 22 Nov 2010 10:53:00 +0100
 Subject: [PATCH] Add call to non-crashing cores through IPI
 In-Reply-To: <20101122072420.GC14080@gw.healthdatacare.com>
 References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
 	<20101122072420.GC14080@gw.healthdatacare.com>
-Message-ID: <AANLkTi=y0RfRP-C4awkVGfByRYzJYKD_X224GuD0+vOD@mail.gmail.com>
+Message-ID: <AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/22 Mika Westerberg <mika.westerberg@iki.fi>:
-> On Fri, Nov 19, 2010 at 11:08:30AM +0100, Per Fransson wrote:
->> When kexec is used to start a crash kernel the other cores
->> are notified. These non-crashing cores will save their state
->> in the crash notes and then do nothing.
->>
->> Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
->> ---
->> ?arch/arm/kernel/machine_kexec.c | ? 28 ++++++++++++++++++++++++++++
->> ?1 files changed, 28 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
->> index 3a8fd51..56683db 100644
->> --- a/arch/arm/kernel/machine_kexec.c
->> +++ b/arch/arm/kernel/machine_kexec.c
->> @@ -23,6 +23,8 @@ extern unsigned long kexec_indirection_page;
->> ?extern unsigned long kexec_mach_type;
->> ?extern unsigned long kexec_boot_atags;
->>
->> +static atomic_t waiting_for_crash_ipi;
->> +
->> ?/*
->> ? * Provide a dummy crash_notes definition while crash dump arrives to arm.
->> ? * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
->> @@ -37,8 +39,34 @@ void machine_kexec_cleanup(struct kimage *image)
->> ?{
->> ?}
->>
->> +void machine_crash_nonpanic_core(void *unused)
->> +{
->> + ? ? struct pt_regs regs;
->> +
->> + ? ? crash_setup_regs(&regs, NULL);
->> + ? ? printk(KERN_EMERG "CPU %u will stop doing anything useful since another CPU has crashed\n",
->> + ? ? ? ? ? ?smp_processor_id());
->> + ? ? crash_save_cpu(&regs, smp_processor_id());
->> + ? ? flush_cache_all();
->> +
->> + ? ? atomic_dec(&waiting_for_crash_ipi);
->> + ? ? while (1)
->> + ? ? ? ? ? ? cpu_relax();
->> +}
->> +
->> ?void machine_crash_shutdown(struct pt_regs *regs)
->> ?{
->> + ? ? unsigned long msecs;
->> +
->> + ? ? atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
->> +
->> + ? ? local_irq_enable();
 >
 > I wonder whether it is good idea to enable interrupts here? What
 > if we came here from an interrupt handler with interrupts already
@@ -66,6 +16,9 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > I guess you did this because smp_call_function() needs to have
 > interrupts enabled, right?
 >
+
+Yup, that's why I did it.
+
 > As we still need to make sure that all the secondary CPUs are
 > stopped, should we do just something like:
 >
@@ -73,47 +26,9 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >
 > and then in ipi_cpu_stop() we check whether oops_in_progress is set
 > and save the cpu state before entering that never-ending loop?
->
-> Regards,
-> MW
->
 
-This is absolutely true. In kexec case interrupts are enables so you
-can use smp_call_function() but in crash dump case interrupts are
-disables due place where crash was occur (null pointer deference, bad
-memory area or something like that). Enabling interrupts only for
-smp_call_function()  looks ugly and can be the cause of more serious
-bugs. Please add CRASH_DUMP IPI for this,
+But we still need to wait for it to complete, right? Will smp_send_stop()
+handle the requirements of the underlying ipi regardless of the initial state?
 
-Best regards,
-Maxim.
-
->> + ? ? smp_call_function(machine_crash_nonpanic_core, NULL, false);
->> + ? ? msecs = 1000; /* Wait at most a second for the other cpus to stop */
->> + ? ? while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
->> + ? ? ? ? ? ? mdelay(1);
->> + ? ? ? ? ? ? msecs--;
->> + ? ? }
->> ? ? ? local_irq_disable();
->> ? ? ? crash_save_cpu(regs, smp_processor_id());
->>
->> --
->> 1.7.2.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
->
-
-
-
--- 
-Best regards,
-Maxim Uvarov
+Regards,
+Per
