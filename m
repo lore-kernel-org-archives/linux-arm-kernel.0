@@ -1,132 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Nov 2010 12:58:13 +0000
-Subject: [PATCH v2 07/20] ARM: LPAE: Page table maintenance for the
-	3-level format
-In-Reply-To: <1289584840-18097-8-git-send-email-catalin.marinas@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 22 Nov 2010 13:00:10 +0000
+Subject: [PATCH v2 01/20] ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead
+	of PGDIR_*
+In-Reply-To: <20101122124353.GB31227@n2100.arm.linux.org.uk>
 References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-8-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20101122125813.GC31227@n2100.arm.linux.org.uk>
+	<1289584840-18097-2-git-send-email-catalin.marinas@arm.com>
+	<20101122124353.GB31227@n2100.arm.linux.org.uk>
+Message-ID: <1290430810.29754.9.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 06:00:27PM +0000, Catalin Marinas wrote:
-> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-> index 97a5de3..41236f0 100644
-> --- a/arch/arm/include/asm/pgtable.h
-> +++ b/arch/arm/include/asm/pgtable.h
-> @@ -124,7 +124,12 @@ extern pgprot_t		pgprot_kernel;
->  extern struct page *empty_zero_page;
->  #define ZERO_PAGE(vaddr)	(empty_zero_page)
->  
-> +#ifdef CONFIG_ARM_LPAE
-> +#define pte_pfn(pte)		((pte_val(pte) & PTE_PFN_MASK) >> PAGE_SHIFT)
-> +#else
->  #define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)
-> +#endif
+On Mon, 2010-11-22 at 12:43 +0000, Russell King - ARM Linux wrote:
+> On Fri, Nov 12, 2010 at 06:00:21PM +0000, Catalin Marinas wrote:
+> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> > index 8c19595..40b386c 100644
+> > --- a/arch/arm/kernel/smp.c
+> > +++ b/arch/arm/kernel/smp.c
+> > @@ -78,7 +78,7 @@ static inline void identity_mapping_add(pgd_t *pgd, unsigned long start,
+> >       if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+> >               prot |= PMD_BIT4;
+> > 
+> > -     for (addr = start & PGDIR_MASK; addr < end;) {
+> > +     for (addr = start & PMD_MASK; addr < end;) {
+> >               pmd = pmd_offset(pgd + pgd_index(addr), addr);
+> >               pmd[0] = __pmd(addr | prot);
+> >               addr += SECTION_SIZE;
+> > @@ -95,7 +95,7 @@ static inline void identity_mapping_del(pgd_t *pgd, unsigned long start,
+> >       unsigned long addr;
+> >       pmd_t *pmd;
+> > 
+> > -     for (addr = start & PGDIR_MASK; addr < end; addr += PGDIR_SIZE) {
+> > +     for (addr = start & PMD_MASK; addr < end; addr += PMD_SIZE) {
+> >               pmd = pmd_offset(pgd + pgd_index(addr), addr);
+> >               pmd[0] = __pmd(0);
+> >               pmd[1] = __pmd(0);
+> ...
+> > @@ -1068,12 +1068,12 @@ void setup_mm_for_reboot(char mode)
+> >               base_pmdval |= PMD_BIT4;
+> > 
+> >       for (i = 0; i < FIRST_USER_PGD_NR + USER_PTRS_PER_PGD; i++, pgd++) {
+> > -             unsigned long pmdval = (i << PGDIR_SHIFT) | base_pmdval;
+> > +             unsigned long pmdval = (i << PMD_SHIFT) | base_pmdval;
+> >               pmd_t *pmd;
+> > 
+> > -             pmd = pmd_off(pgd, i << PGDIR_SHIFT);
+> > +             pmd = pmd_off(pgd, i << PMD_SHIFT);
+> >               pmd[0] = __pmd(pmdval);
+> > -             pmd[1] = __pmd(pmdval + (1 << (PGDIR_SHIFT - 1)));
+> > +             pmd[1] = __pmd(pmdval + (1 << (PMD_SHIFT - 1)));
+> >               flush_pmd_entry(pmd);
+> >       }
+> > 
+> 
+> This lot really does need unifying - and in any case this last addition
+> should be using 'SECTION SIZE' not something related to PMD shifts.
 
-Just make LPAE and non-LPAE both provide PTE_PFN_MASK - for non-LPAE
-this can be defined as ~0UL to optimize it away.  However, PTE_PFN_MASK
-is the wrong name for this - you're not masking out the PFN, but the
-physical address.  It only becomes a PFN when you shift.
+On the classic page tables, the PMD_SHIFT is 21 while the SECTION_SHIFT
+is 20. They have slightly different meaning.
 
-This is important because...
+But we currently have some hacks to cope with PMD_SHIFT being 21 by
+writing the pmd[0] and pmd[1] in the same call. The way I see to use
+SECTION_SHIFT is to drop the pmd[] array (but haven't looked closely
+enough). With LPAE I have a few #ifndef around pmd[1] setting.
 
-> +static inline pte_t *pmd_page_vaddr(pmd_t pmd)
-> +{
-> +	return __va(pmd_val(pmd) & PTE_PFN_MASK);
+> Strangely, it's something I've done over the weekend...
 
-... here it becomes much more confusing - it suggests that
-"pmd_val(pmd) & PTE_PFN_MASK" gives you a PFN, which you then pass to
-a function which takes a physical address.
+OK, the more clean-up the better.
 
-Also, pmd_page_vaddr() in my patches ends up as:
-
- static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- {
-+       return __va(pmd_val(pmd) & PAGE_MASK);
- }
-
-which is almost the same.  I'd suggest that this becomes for both:
-
- static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- {
-        return __va(pmd_val(pmd) & PTE_PFN_MASK & PAGE_MASK);
- }
-
-but with PTE_PFN_MASK more appropriately named.
-
-> +}
-> +
-> +#else	/* !CONFIG_ARM_LPAE */
-> +
->  #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
->  
->  #define copy_pmd(pmdpd,pmdps)		\
-> @@ -252,7 +285,13 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
->  	return __va(ptr);
->  }
->  
-> +#endif	/* CONFIG_ARM_LPAE */
-> +
-> +#ifdef CONFIG_ARM_LPAE
-> +#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PTE_PFN_MASK))
-> +#else
->  #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd)))
-> +#endif
-
-Ditto.
-
-> diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-> index 8fdae9b..f00ae99 100644
-> --- a/arch/arm/include/asm/proc-fns.h
-> +++ b/arch/arm/include/asm/proc-fns.h
-> @@ -263,6 +263,18 @@
->  
->  #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
->  
-> +#ifdef CONFIG_ARM_LPAE
-> +#define cpu_get_pgd()	\
-> +	({						\
-> +		unsigned long pg, pg2;			\
-> +		__asm__("mrrc	p15, 0, %0, %1, c2"	\
-> +			: "=r" (pg), "=r" (pg2)		\
-> +			:				\
-> +			: "cc");			\
-> +		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
-> +		(pgd_t *)phys_to_virt(pg);		\
-> +	})
-> +#else
->  #define cpu_get_pgd()	\
->  	({						\
->  		unsigned long pg;			\
-> @@ -271,6 +283,7 @@
->  		pg &= ~0x3fff;				\
-
-I think this wants updating to use similar math to the one above.
-
-> @@ -81,7 +90,8 @@ void free_pgd_slow(struct mm_struct *mm, pgd_t *pgd)
->  	if (!pgd)
->  		return;
->  
-> -	/* pgd is always present and good */
-> +	if (pgd_none(*pgd))
-> +		goto free;
-
-This actually wants to become something more like:
-
-+       pgd = pgd_base + pgd_index(0);
-+       if (pgd_none_or_clear_bad(pgd))
-+               goto no_pgd;
-
-+       pmd = pmd_offset(pgd, 0);
-+       if (pmd_none_or_clear_bad(pmd))
-+               goto no_pmd;
-
-        pte = pmd_pgtable(*pmd);
-        pmd_clear(pmd);
-        pte_free(mm, pte);
-+no_pmd:
-+       pgd_clear(pgd);
-        pmd_free(mm, pmd);
-+no_pgd:
-	free_pgd(pgd_base);
+-- 
+Catalin
