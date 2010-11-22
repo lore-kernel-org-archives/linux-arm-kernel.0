@@ -1,42 +1,68 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 22 Nov 2010 10:22:07 -0500 (EST)
-Subject: [PATCH 2/2] USB: pxa: Add USB client support for Marvell
-	PXA9xx/PXA168 chips
-In-Reply-To: <1290418347-6861-2-git-send-email-chao.xie@marvell.com>
-Message-ID: <Pine.LNX.4.44L0.1011221020360.1758-100000@iolanthe.rowland.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 22 Nov 2010 14:51:42 +0000
+Subject: [PATCH] debug-8250: add a 32 bit mode
+Message-ID: <1290437502-2717-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Nov 2010 chao.xie at marvell.com wrote:
+Some platforms such as picoChip picoXCell devices can only do 32 bit
+accesses to APB peripherals. If the platform defines
+DEBUG_8250_ACCESS_32 before including debug-8250.S in debug-macros.S
+then use 32-bit accesses for senduart, busyuart and waituart. If not
+defined, use 8-bit accesses.
 
-> From: cxie4 <cxie4@marvell.com>
-> 
-> This patch add USB client support Marvell PXA9xx/PXA168 chips. The USB
-> controller in PXA9xx/PXA168 is a High-Speed OTG controller. The available
-> endpoints is different between PXA9xx and PXA168.
-> 
-> NOTE:
-> It is the first version of Marvell PXA9xx/PXA168 USB controller driver.
-> The support for OTG mode will be added in later patch.
-> PXA9xx and PXA168 has integrated UTMI PHY in the chips. The initialization
-> for the PHY is a little different between PXA9xx and PXA168.
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
 
-...
+Note: for the TTY support we also need
+[8250: add a UPIO_DWAPB32 for 32 bit accesses (v2)] at
+http://marc.info/?l=linux-serial&m=129043658715199&w=2
 
-> +static struct usb_ep_ops mv_ep_ops = {
-> +	.enable		= mv_ep_enable,
-> +	.disable	= mv_ep_disable,
-> +
-> +	.alloc_request	= mv_alloc_request,
-> +	.free_request	= mv_free_request,
-> +
-> +	.queue		= mv_ep_queue,
-> +	.dequeue	= mv_ep_dequeue,
-> +
-> +	.set_halt	= mv_ep_set_halt,
-> +	.fifo_flush	= mv_ep_fifo_flush,	/* flush fifo */
-> +};
+ arch/arm/include/asm/hardware/debug-8250.S |   21 ++++++++++++++++++---
+ 1 files changed, 18 insertions(+), 3 deletions(-)
 
-What happened to the .set_wedge method?
-
-Alan Stern
+diff --git a/arch/arm/include/asm/hardware/debug-8250.S b/arch/arm/include/asm/hardware/debug-8250.S
+index 22c6892..71f0839 100644
+--- a/arch/arm/include/asm/hardware/debug-8250.S
++++ b/arch/arm/include/asm/hardware/debug-8250.S
+@@ -9,12 +9,26 @@
+  */
+ #include <linux/serial_reg.h>
+ 
++/*
++ * Some platforms may only be able to perform 32-bit accesses to peripherals
++ * on an APB bus. If this is the case, define DEBUG_8250_ACCESS_32 before
++ * including this file.
++ */
++#ifdef DEBUG_8250_ACCESS_32
++# define ldr_uart    ldr
++# define str_uart    str
++#else /* DEBUG_8250_ACCESS_32 */
++# define ldr_uart    ldrb
++# define str_uart    strb
++#endif /* DEBUG_8250_ACCESS_32 */
++
+ 		.macro	senduart,rd,rx
+-		strb	\rd, [\rx, #UART_TX << UART_SHIFT]
++                and     \rd, \rd, #0xff
++		str_uart    \rd, [\rx, #UART_TX << UART_SHIFT]
+ 		.endm
+ 
+ 		.macro	busyuart,rd,rx
+-1002:		ldrb	\rd, [\rx, #UART_LSR << UART_SHIFT]
++1002:		ldr_uart    \rd, [\rx, #UART_LSR << UART_SHIFT]
+ 		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
+ 		teq	\rd, #UART_LSR_TEMT | UART_LSR_THRE
+ 		bne	1002b
+@@ -22,7 +36,8 @@
+ 
+ 		.macro	waituart,rd,rx
+ #ifdef FLOW_CONTROL
+-1001:		ldrb	\rd, [\rx, #UART_MSR << UART_SHIFT]
++1001:		ldr_uart    \rd, [\rx, #UART_MSR << UART_SHIFT]
++                and     \rd, \rd, 0xff
+ 		tst	\rd, #UART_MSR_CTS
+ 		beq	1001b
+ #endif
+-- 
+1.7.2.3
