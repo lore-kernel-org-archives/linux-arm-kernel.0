@@ -1,34 +1,84 @@
-From: per.fransson.ml@gmail.com (Per Fransson)
-Date: Mon, 22 Nov 2010 10:53:00 +0100
-Subject: [PATCH] Add call to non-crashing cores through IPI
-In-Reply-To: <20101122072420.GC14080@gw.healthdatacare.com>
-References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20101122072420.GC14080@gw.healthdatacare.com>
-Message-ID: <AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
+From: alexis.rodet@bvs-tech.com (Alexis RODET)
+Date: Mon, 22 Nov 2010 10:58:06 +0100
+Subject: [PATCH] Renaming 'struct flash_platform_data' into 'struct
+	spi_flash_platform_data' in include/linux/spi/flash.h
+In-Reply-To: <20101121044720.GA6088@tarshish>
+References: <20101117160514.GA5308@n2100.arm.linux.org.uk>
+	<4CE6B27D.2000909@bvs-tech.com> <20101121044720.GA6088@tarshish>
+Message-ID: <4CEA3EAE.4080700@bvs-tech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
+
+As I discussed with Russell King on the list
+linux-arm-kernel at lists.infradead.org, there is a problem with the double
+definition of 'struct flash_platform_data' that are incompatible:
+
+in arch/arm/include/asm/mach/flash.h:
+struct flash_platform_data {
+    const char    *map_name;
+    const char    *name;
+    unsigned int    width;
+    int        (*init)(void);
+    void        (*exit)(void);
+    void        (*set_vpp)(int on);
+    void        (*mmcontrol)(struct mtd_info *mtd, int sync_read);
+    struct mtd_partition *parts;
+    unsigned int    nr_parts;
+};
+
+in include/linux/spi/flash.h:
+struct flash_platform_data {
+    char        *name;
+    struct mtd_partition *parts;
+    unsigned int    nr_parts;
+
+    char        *type;
+
+    /* we'll likely add more ... use JEDEC IDs, etc */
+};
+
+
+Both headers are included in a number of machines or driver.
+They make conflict when one has both spi flash and an other type of mtd flash on the same machine (my case).
+
+I suppose the ARM version has no reason not to be platform independent, but that is an other problem.
+
+I propose to rename SPI version of the structure as it is the younger and it is included in a less number of files.
+The patch (already sent on linux-arm-kernel at lists.infradead.org) is in attachment.
+
+Best regards,
+Alexis RODET
+
+
+Le 21/11/2010 05:47, Baruch Siach a ?crit :
+> Hi Alexis,
 >
-> I wonder whether it is good idea to enable interrupts here? What
-> if we came here from an interrupt handler with interrupts already
-> disabled?
+> On Fri, Nov 19, 2010 at 06:23:09PM +0100, Alexis RODET wrote:
+>>> It would, however, be nice if _someone_ out there could produce a patch
+>> Here is the patch and here is the command line used for doing this:
+> You need to CC the MTD maintainer and mailing list (David Woodhouse 
+> <dwmw2@infradead.org>, and linux-mtd at lists.infradead.org respectively), and 
+> maybe also the SPI subsystem maintainers (David Brownell 
+> <dbrownell@users.sourceforge.net>, Grant Likely <grant.likely@secretlab.ca>, 
+> spi-devel-general at lists.sourceforge.net).
 >
-> I guess you did this because smp_call_function() needs to have
-> interrupts enabled, right?
+> baruch
 >
 
-Yup, that's why I did it.
-
-> As we still need to make sure that all the secondary CPUs are
-> stopped, should we do just something like:
->
-> ? ? ? ?smp_send_stop();
->
-> and then in ipi_cpu_stop() we check whether oops_in_progress is set
-> and save the cpu state before entering that never-ending loop?
-
-But we still need to wait for it to complete, right? Will smp_send_stop()
-handle the requirements of the underlying ipi regardless of the initial state?
-
-Regards,
-Per
+-------------- next part --------------
+An embedded message was scrubbed...
+From: Alexis RODET <alexis.rodet@bvs-tech.com>
+Subject: [PATCH] Renaming 'struct flash_platform_data' into 'struct spi_flash_platform_data'
+ in include/linux/spi/flash.h
+Date: Fri, 19 Nov 2010 18:23:09 +0100
+Size: 25208
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101122/8f4f2919/attachment-0001.mht>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: alexis_rodet.vcf
+Type: text/x-vcard
+Size: 315 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101122/8f4f2919/attachment-0001.vcf>
