@@ -1,507 +1,172 @@
 From: saeed.bishara@gmail.com (saeed bishara)
-Date: Mon, 22 Nov 2010 09:41:26 +0200
-Subject: [PATCH v4 2/2] [ARM] Dove: add support for multi-purpose pins
-	configuration
-In-Reply-To: <83c78b5d3eb550fadde7618436b54a483e180d39.1289814288.git.mike@compulab.co.il>
-References: <cover.1289814287.git.mike@compulab.co.il>
-	<83c78b5d3eb550fadde7618436b54a483e180d39.1289814288.git.mike@compulab.co.il>
-Message-ID: <AANLkTinbT4FKzOn3+DJxTES6RVEMUWdhWO9FT1uLF1iD@mail.gmail.com>
+Date: Mon, 22 Nov 2010 09:42:33 +0200
+Subject: [PATCH v4 1/2] MMC: add support for the Marvell Dove SDHCI
+	controller
+In-Reply-To: <ea487c43c1aff1d07355e0e0699e739c8617b96f.1288293593.git.mike@compulab.co.il>
+References: <cover.1288293593.git.mike@compulab.co.il>
+	<ea487c43c1aff1d07355e0e0699e739c8617b96f.1288293593.git.mike@compulab.co.il>
+Message-ID: <AANLkTimhzUe+qODZYCvvrH6Hi06gV1yHVpS1LRHhXu7o@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 11:48 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+On Thu, Oct 28, 2010 at 9:23 PM, Mike Rapoport <mike@compulab.co.il> wrote:
+> Implement an sdhci-pltfm driver for the controller found on Marvell
+> Dove SoC
+>
 > Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> CC: Saeed Bishara <saeed@marvell.com>
 Acked-by: Saeed Bishara <saeed@marvell.com>
 > ---
-> ?arch/arm/mach-dove/Makefile ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-dove/include/mach/dove.h | ? ?8 +-
-> ?arch/arm/mach-dove/mpp.c ? ? ? ? ? ? ? | ?212 ++++++++++++++++++++++++++++++
-> ?arch/arm/mach-dove/mpp.h ? ? ? ? ? ? ? | ?220 ++++++++++++++++++++++++++++++++
-> ?4 files changed, 440 insertions(+), 2 deletions(-)
-> ?create mode 100644 arch/arm/mach-dove/mpp.c
-> ?create mode 100644 arch/arm/mach-dove/mpp.h
+> ?drivers/mmc/host/Kconfig ? ? ? | ? 13 +++++++
+> ?drivers/mmc/host/Makefile ? ? ?| ? ?1 +
+> ?drivers/mmc/host/sdhci-dove.c ?| ? 70 ++++++++++++++++++++++++++++++++++++++++
+> ?drivers/mmc/host/sdhci-pltfm.c | ? ?3 ++
+> ?drivers/mmc/host/sdhci-pltfm.h | ? ?1 +
+> ?5 files changed, 88 insertions(+), 0 deletions(-)
+> ?create mode 100644 drivers/mmc/host/sdhci-dove.c
 >
-> diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
-> index 7ab3be5..1515f61 100644
-> --- a/arch/arm/mach-dove/Makefile
-> +++ b/arch/arm/mach-dove/Makefile
-> @@ -1,3 +1,3 @@
-> -obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?+= common.o addr-map.o irq.o pcie.o
-> +obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?+= common.o addr-map.o irq.o pcie.o mpp.o
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 68d1279..4958839 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -130,6 +130,19 @@ config MMC_SDHCI_CNS3XXX
 >
-> ?obj-$(CONFIG_MACH_DOVE_DB) ? ? += dove-db-setup.o
-> diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
-> index 148f4f0..27b4145 100644
-> --- a/arch/arm/mach-dove/include/mach/dove.h
-> +++ b/arch/arm/mach-dove/include/mach/dove.h
-> @@ -136,10 +136,16 @@
-> ?#define ?DOVE_AU1_SPDIFO_GPIO_EN ? ? ? (1 << 1)
-> ?#define ?DOVE_NAND_GPIO_EN ? ? ? ? ? ? (1 << 0)
-> ?#define DOVE_MPP_CTRL4_VIRT_BASE ? ? ? (DOVE_GPIO_VIRT_BASE + 0x40)
-> -
-> +#define ?DOVE_SPI_GPIO_SEL ? ? ? ? ? ? (1 << 5)
-> +#define ?DOVE_UART1_GPIO_SEL ? ? ? ? ? (1 << 4)
-> +#define ?DOVE_AU1_GPIO_SEL ? ? ? ? ? ? (1 << 3)
-> +#define ?DOVE_CAM_GPIO_SEL ? ? ? ? ? ? (1 << 2)
-> +#define ?DOVE_SD1_GPIO_SEL ? ? ? ? ? ? (1 << 1)
-> +#define ?DOVE_SD0_GPIO_SEL ? ? ? ? ? ? (1 << 0)
+> ? ? ? ? ?If unsure, say N.
 >
-> ?/* Power Management */
-> ?#define DOVE_PMU_VIRT_BASE ? ? (DOVE_SB_REGS_VIRT_BASE | 0xd0000)
-> +#define DOVE_PMU_SIG_CTRL ? ? ?(DOVE_PMU_VIRT_BASE + 0x802c)
+> +config MMC_SDHCI_DOVE
+> + ? ? ? bool "SDHCI support on Marvell's Dove SoC"
+> + ? ? ? depends on ARCH_DOVE
+> + ? ? ? depends on MMC_SDHCI_PLTFM
+> + ? ? ? select MMC_SDHCI_IO_ACCESSORS
+> + ? ? ? help
+> + ? ? ? ? This selects the Secure Digital Host Controller Interface in
+> + ? ? ? ? Marvell's Dove SoC.
+> +
+> + ? ? ? ? If you have a controller with this interface, say Y or M here.
+> +
+> + ? ? ? ? If unsure, say N.
+> +
+> ?config MMC_SDHCI_S3C
+> ? ? ? ?tristate "SDHCI support on Samsung S3C SoC"
+> ? ? ? ?depends on MMC_SDHCI && PLAT_SAMSUNG
+> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> index 840bcb5..9e1c418 100644
+> --- a/drivers/mmc/host/Makefile
+> +++ b/drivers/mmc/host/Makefile
+> @@ -40,6 +40,7 @@ obj-$(CONFIG_MMC_JZ4740) ? ? ?+= jz4740_mmc.o
+> ?obj-$(CONFIG_MMC_SDHCI_PLTFM) ? ? ? ? ? ? ? ? ?+= sdhci-platform.o
+> ?sdhci-platform-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? := sdhci-pltfm.o
+> ?sdhci-platform-$(CONFIG_MMC_SDHCI_CNS3XXX) ? ? += sdhci-cns3xxx.o
+> +sdhci-platform-$(CONFIG_MMC_SDHCI_DOVE) ? ? ? ? ? ? ? ?+= sdhci-dove.o
 >
-> ?/* Real Time Clock */
-> ?#define DOVE_RTC_PHYS_BASE ? ? (DOVE_SB_REGS_PHYS_BASE | 0xd8500)
-> diff --git a/arch/arm/mach-dove/mpp.c b/arch/arm/mach-dove/mpp.c
+> ?obj-$(CONFIG_MMC_SDHCI_OF) ? ? += sdhci-of.o
+> ?sdhci-of-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? := sdhci-of-core.o
+> diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
 > new file mode 100644
-> index 0000000..71db2bd
+> index 0000000..561167c
 > --- /dev/null
-> +++ b/arch/arm/mach-dove/mpp.c
-> @@ -0,0 +1,212 @@
+> +++ b/drivers/mmc/host/sdhci-dove.c
+> @@ -0,0 +1,70 @@
 > +/*
-> + * arch/arm/mach-dove/mpp.c
+> + * sdhci-dove.c Support for SDHCI on Marvell's Dove SoC
 > + *
-> + * MPP functions for Marvell Dove SoCs
+> + * Author: Saeed Bishara <saeed@marvell.com>
+> + * ? ? ? ?Mike Rapoport <mike@compulab.co.il>
+> + * Based on ?sdhci-cns3xxx.c
 > + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. ?This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 > + */
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/gpio.h>
 > +#include <linux/io.h>
+> +#include <linux/mmc/host.h>
 > +
-> +#include <mach/dove.h>
+> +#include "sdhci.h"
+> +#include "sdhci-pltfm.h"
 > +
-> +#include "mpp.h"
-> +
-> +#define MPP_NR_REGS 4
-> +#define MPP_CTRL(i) ? ?((i) == 3 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ?DOVE_MPP_CTRL4_VIRT_BASE : ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ?DOVE_MPP_VIRT_BASE + (i) * 4)
-> +#define PMU_SIG_REGS 2
-> +#define PMU_SIG_CTRL(i) ? ? ? ?(DOVE_PMU_SIG_CTRL + (i) * 4)
-> +
-> +struct dove_mpp_grp {
-> + ? ? ? int start;
-> + ? ? ? int end;
-> +};
-> +
-> +static struct dove_mpp_grp dove_mpp_grp[] = {
-> + ? ? ? [MPP_24_39] = {
-> + ? ? ? ? ? ? ? .start ?= 24,
-> + ? ? ? ? ? ? ? .end ? ?= 39,
-> + ? ? ? },
-> + ? ? ? [MPP_40_45] = {
-> + ? ? ? ? ? ? ? .start ?= 40,
-> + ? ? ? ? ? ? ? .end ? ?= 45,
-> + ? ? ? },
-> + ? ? ? [MPP_46_51] = {
-> + ? ? ? ? ? ? ? .start ?= 40,
-> + ? ? ? ? ? ? ? .end ? ?= 45,
-> + ? ? ? },
-> + ? ? ? [MPP_58_61] = {
-> + ? ? ? ? ? ? ? .start ?= 58,
-> + ? ? ? ? ? ? ? .end ? ?= 61,
-> + ? ? ? },
-> + ? ? ? [MPP_62_63] = {
-> + ? ? ? ? ? ? ? .start ?= 62,
-> + ? ? ? ? ? ? ? .end ? ?= 63,
-> + ? ? ? },
-> +};
-> +
-> +static void dove_mpp_gpio_mode(int start, int end, int gpio_mode)
+> +static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
 > +{
-> + ? ? ? int i;
+> + ? ? ? u16 ret;
 > +
-> + ? ? ? for (i = start; i <= end; i++)
-> + ? ? ? ? ? ? ? orion_gpio_set_valid(i, gpio_mode);
+> + ? ? ? switch (reg) {
+> + ? ? ? case SDHCI_HOST_VERSION:
+> + ? ? ? case SDHCI_SLOT_INT_STATUS:
+> + ? ? ? ? ? ? ? /* those registers don't exist */
+> + ? ? ? ? ? ? ? return 0;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? ret = readw(host->ioaddr + reg);
+> + ? ? ? }
+> + ? ? ? return ret;
 > +}
 > +
-> +static void dove_mpp_dump_regs(void)
+> +static u32 sdhci_dove_readl(struct sdhci_host *host, int reg)
 > +{
-> +#ifdef DEBUG
-> + ? ? ? int i;
+> + ? ? ? u32 ret;
 > +
-> + ? ? ? pr_debug("MPP_CTRL regs:");
-> + ? ? ? for (i = 0; i < MPP_NR_REGS; i++)
-> + ? ? ? ? ? ? ? printk(" %08x", readl(MPP_CTRL(i)));
-> + ? ? ? printk("\n");
+> + ? ? ? switch (reg) {
+> + ? ? ? case SDHCI_CAPABILITIES:
+> + ? ? ? ? ? ? ? ret = readl(host->ioaddr + reg);
+> + ? ? ? ? ? ? ? /* Mask the support for 3.0V */
+> + ? ? ? ? ? ? ? ret &= ~SDHCI_CAN_VDD_300;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? ret = readl(host->ioaddr + reg);
+> + ? ? ? }
+> + ? ? ? return ret;
+> +}
 > +
-> + ? ? ? pr_debug("PMU_SIG_CTRL regs:");
-> + ? ? ? for (i = 0; i < PMU_SIG_REGS; i++)
-> + ? ? ? ? ? ? ? printk(" %08x", readl(PMU_SIG_CTRL(i)));
-> + ? ? ? printk("\n");
+> +static struct sdhci_ops sdhci_dove_ops = {
+> + ? ? ? .read_w = sdhci_dove_readw,
+> + ? ? ? .read_l = sdhci_dove_readl,
+> +};
 > +
-> + ? ? ? pr_debug("PMU_MPP_GENERAL_CTRL: %08x\n", readl(DOVE_PMU_MPP_GENERAL_CTRL));
-> + ? ? ? pr_debug("MPP_GENERAL: %08x\n", readl(DOVE_MPP_GENERAL_VIRT_BASE));
+> +struct sdhci_pltfm_data sdhci_dove_pdata = {
+> + ? ? ? .ops ? ?= &sdhci_dove_ops,
+> + ? ? ? .quirks = SDHCI_QUIRK_NO_SIMULT_VDD_AND_POWER |
+> + ? ? ? ? ? ? ? ? SDHCI_QUIRK_NO_BUSY_IRQ |
+> + ? ? ? ? ? ? ? ? SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
+> + ? ? ? ? ? ? ? ? SDHCI_QUIRK_FORCE_DMA,
+> +};
+> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+> index e045e3c..28d818e 100644
+> --- a/drivers/mmc/host/sdhci-pltfm.c
+> +++ b/drivers/mmc/host/sdhci-pltfm.c
+> @@ -161,6 +161,9 @@ static const struct platform_device_id sdhci_pltfm_ids[] = {
+> ?#ifdef CONFIG_MMC_SDHCI_CNS3XXX
+> ? ? ? ?{ "sdhci-cns3xxx", (kernel_ulong_t)&sdhci_cns3xxx_pdata },
+> ?#endif
+> +#ifdef CONFIG_MMC_SDHCI_DOVE
+> + ? ? ? { "sdhci-dove", (kernel_ulong_t)&sdhci_dove_pdata },
 > +#endif
-> +}
-> +
-> +static void dove_mpp_cfg_nfc(int sel)
-> +{
-> + ? ? ? u32 mpp_gen_cfg = readl(DOVE_MPP_GENERAL_VIRT_BASE);
-> +
-> + ? ? ? mpp_gen_cfg &= ~0x1;
-> + ? ? ? mpp_gen_cfg |= sel;
-> + ? ? ? writel(mpp_gen_cfg, DOVE_MPP_GENERAL_VIRT_BASE);
-> +
-> + ? ? ? dove_mpp_gpio_mode(64, 71, GPIO_OUTPUT_OK);
-> +}
-> +
-> +static void dove_mpp_cfg_au1(int sel)
-> +{
-> + ? ? ? u32 mpp_ctrl4 ? ? ? ? ? = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-> + ? ? ? u32 ssp_ctrl1 = readl(DOVE_SSP_CTRL_STATUS_1);
-> + ? ? ? u32 mpp_gen_ctrl = readl(DOVE_MPP_GENERAL_VIRT_BASE);
-> + ? ? ? u32 global_cfg_2 = readl(DOVE_GLOBAL_CONFIG_2);
-> +
-> + ? ? ? mpp_ctrl4 &= ~(DOVE_AU1_GPIO_SEL);
-> + ? ? ? ssp_ctrl1 &= ~(DOVE_SSP_ON_AU1);
-> + ? ? ? mpp_gen_ctrl &= ~(DOVE_AU1_SPDIFO_GPIO_EN);
-> + ? ? ? global_cfg_2 &= ~(DOVE_TWSI_OPTION3_GPIO);
-> +
-> + ? ? ? if (!sel || sel == 0x2)
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(52, 57, 0);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(52, 57, GPIO_OUTPUT_OK | GPIO_INPUT_OK);
-> +
-> + ? ? ? if (sel & 0x1) {
-> + ? ? ? ? ? ? ? global_cfg_2 |= DOVE_TWSI_OPTION3_GPIO;
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(56, 57, 0);
-> + ? ? ? }
-> + ? ? ? if (sel & 0x2) {
-> + ? ? ? ? ? ? ? mpp_gen_ctrl |= DOVE_AU1_SPDIFO_GPIO_EN;
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(57, 57, GPIO_OUTPUT_OK | GPIO_INPUT_OK);
-> + ? ? ? }
-> + ? ? ? if (sel & 0x4) {
-> + ? ? ? ? ? ? ? ssp_ctrl1 |= DOVE_SSP_ON_AU1;
-> + ? ? ? ? ? ? ? dove_mpp_gpio_mode(52, 55, 0);
-> + ? ? ? }
-> + ? ? ? if (sel & 0x8)
-> + ? ? ? ? ? ? ? mpp_ctrl4 |= DOVE_AU1_GPIO_SEL;
-> +
-> + ? ? ? writel(mpp_ctrl4, DOVE_MPP_CTRL4_VIRT_BASE);
-> + ? ? ? writel(ssp_ctrl1, DOVE_SSP_CTRL_STATUS_1);
-> + ? ? ? writel(mpp_gen_ctrl, DOVE_MPP_GENERAL_VIRT_BASE);
-> + ? ? ? writel(global_cfg_2, DOVE_GLOBAL_CONFIG_2);
-> +}
-> +
-> +static void dove_mpp_conf_grp(int num, int sel, u32 *mpp_ctrl)
-> +{
-> + ? ? ? int start = dove_mpp_grp[num].start;
-> + ? ? ? int end = dove_mpp_grp[num].end;
-> + ? ? ? int gpio_mode = sel ? GPIO_OUTPUT_OK | GPIO_INPUT_OK : 0;
-> +
-> + ? ? ? *mpp_ctrl &= ~(0x1 << num);
-> + ? ? ? *mpp_ctrl |= sel << num;
-> +
-> + ? ? ? dove_mpp_gpio_mode(start, end, gpio_mode);
-> +}
-> +
-> +void __init dove_mpp_conf(unsigned int *mpp_list)
-> +{
-> + ? ? ? u32 mpp_ctrl[MPP_NR_REGS];
-> + ? ? ? u32 pmu_mpp_ctrl = 0;
-> + ? ? ? u32 pmu_sig_ctrl[PMU_SIG_REGS];
-> + ? ? ? int i;
-> +
-> + ? ? ? /* Initialize gpiolib. */
-> + ? ? ? orion_gpio_init();
-> +
-> + ? ? ? for (i = 0; i < MPP_NR_REGS; i++)
-> + ? ? ? ? ? ? ? mpp_ctrl[i] = readl(MPP_CTRL(i));
-> +
-> + ? ? ? for (i = 0; i < PMU_SIG_REGS; i++)
-> + ? ? ? ? ? ? ? pmu_sig_ctrl[i] = readl(PMU_SIG_CTRL(i));
-> +
-> + ? ? ? pmu_mpp_ctrl = readl(DOVE_PMU_MPP_GENERAL_CTRL);
-> +
-> + ? ? ? dove_mpp_dump_regs();
-> +
-> + ? ? ? for ( ; *mpp_list != MPP_END; mpp_list++) {
-> + ? ? ? ? ? ? ? unsigned int num = MPP_NUM(*mpp_list);
-> + ? ? ? ? ? ? ? unsigned int sel = MPP_SEL(*mpp_list);
-> + ? ? ? ? ? ? ? int shift, gpio_mode;
-> +
-> + ? ? ? ? ? ? ? if (num > MPP_MAX) {
-> + ? ? ? ? ? ? ? ? ? ? ? pr_err("dove: invalid MPP number (%u)\n", num);
-> + ? ? ? ? ? ? ? ? ? ? ? continue;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_NFC_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? dove_mpp_cfg_nfc(sel);
-> + ? ? ? ? ? ? ? ? ? ? ? continue;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_AU1_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? dove_mpp_cfg_au1(sel);
-> + ? ? ? ? ? ? ? ? ? ? ? continue;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_GRP_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? dove_mpp_conf_grp(num, sel, &mpp_ctrl[3]);
-> + ? ? ? ? ? ? ? ? ? ? ? continue;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? shift = (num & 7) << 2;
-> + ? ? ? ? ? ? ? if (*mpp_list & MPP_PMU_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? pmu_mpp_ctrl |= (0x1 << num);
-> + ? ? ? ? ? ? ? ? ? ? ? pmu_sig_ctrl[num / 8] &= ~(0xf << shift);
-> + ? ? ? ? ? ? ? ? ? ? ? pmu_sig_ctrl[num / 8] |= 0xf << shift;
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_mode = 0;
-> + ? ? ? ? ? ? ? } else {
-> + ? ? ? ? ? ? ? ? ? ? ? mpp_ctrl[num / 8] &= ~(0xf << shift);
-> + ? ? ? ? ? ? ? ? ? ? ? mpp_ctrl[num / 8] |= sel << shift;
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_mode = GPIO_OUTPUT_OK | GPIO_INPUT_OK;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? orion_gpio_set_valid(num, gpio_mode);
-> + ? ? ? }
-> +
-> + ? ? ? for (i = 0; i < MPP_NR_REGS; i++)
-> + ? ? ? ? ? ? ? writel(mpp_ctrl[i], MPP_CTRL(i));
-> +
-> + ? ? ? for (i = 0; i < PMU_SIG_REGS; i++)
-> + ? ? ? ? ? ? ? writel(pmu_sig_ctrl[i], PMU_SIG_CTRL(i));
-> +
-> + ? ? ? writel(pmu_mpp_ctrl, DOVE_PMU_MPP_GENERAL_CTRL);
-> +
-> + ? ? ? dove_mpp_dump_regs();
-> +}
-> diff --git a/arch/arm/mach-dove/mpp.h b/arch/arm/mach-dove/mpp.h
-> new file mode 100644
-> index 0000000..2a43ce4
-> --- /dev/null
-> +++ b/arch/arm/mach-dove/mpp.h
-> @@ -0,0 +1,220 @@
-> +#ifndef __ARCH_DOVE_MPP_CODED_H
-> +#define __ARCH_DOVE_MPP_CODED_H
-> +
-> +#define MPP(_num, _mode, _pmu, _grp, _au1, _nfc) ( ? ? \
-> +/* MPP/group number */ ? ? ? ? ((_num) & 0xff) | ? ? ? ? ? ? ? \
-> +/* MPP select value */ ? ? ? ? (((_mode) & 0xf) << 8) | ? ? ? ?\
-> +/* MPP PMU */ ? ? ? ? ? ? ? ? ?((!!(_pmu)) << 12) | ? ? ? ? ? ?\
-> +/* group flag */ ? ? ? ? ? ? ? ((!!(_grp)) << 13) | ? ? ? ? ? ?\
-> +/* AU1 flag */ ? ? ? ? ? ? ? ? ((!!(_au1)) << 14) | ? ? ? ? ? ?\
-> +/* NFCE flag */ ? ? ? ? ? ? ? ? ? ? ? ?((!!(_nfc)) << 15))
-> +
-> +#define MPP_MAX ? ? ? ?71
-> +
-> +#define MPP_NUM(x) ? ?((x) & 0xff)
-> +#define MPP_SEL(x) ? ?(((x) >> 8) & 0xf)
-> +
-> +#define MPP_PMU_MASK ? ? ? ? ? MPP(0, 0x0, 1, 0, 0, 0)
-> +#define MPP_GRP_MASK ? ? ? ? ? MPP(0, 0x0, 0, 1, 0, 0)
-> +#define MPP_AU1_MASK ? ? ? ? ? MPP(0, 0x0, 0, 0, 1, 0)
-> +#define MPP_NFC_MASK ? ? ? ? ? MPP(0, 0x0, 0, 0, 0, 1)
-> +
-> +#define MPP_END ? ? ? ? ? ? ? ? ? ? ? ?MPP(0xff, 0xf, 1, 1, 1, 1)
-> +
-> +#define MPP_PMU_DRIVE_0 ? ? ? ? ? ? ? ?0x1
-> +#define MPP_PMU_DRIVE_1 ? ? ? ? ? ? ? ?0x2
-> +#define MPP_PMU_SDI ? ? ? ? ? ?0x3
-> +#define MPP_PMU_CPU_PWRDWN ? ? 0x4
-> +#define MPP_PMU_STBY_PWRDWN ? ?0x5
-> +#define MPP_PMU_CORE_PWR_GOOD ?0x8
-> +#define MPP_PMU_BAT_FAULT ? ? ?0xa
-> +#define MPP_PMU_EXT0_WU ? ? ? ? ? ? ? ?0xb
-> +#define MPP_PMU_EXT1_WU ? ? ? ? ? ? ? ?0xc
-> +#define MPP_PMU_EXT2_WU ? ? ? ? ? ? ? ?0xd
-> +#define MPP_PMU_BLINK ? ? ? ? ?0xe
-> +#define MPP_PMU(_num, _mode) ? MPP((_num), MPP_PMU_##_mode, 1, 0, 0, 0)
-> +
-> +#define MPP_PIN(_num, _mode) ? MPP((_num), (_mode), 0, 0, 0, 0)
-> +#define MPP_GRP(_grp, _mode) ? MPP((_grp), (_mode), 0, 1, 0, 0)
-> +#define MPP_GRP_AU1(_mode) ? ? MPP(0, (_mode), 0, 0, 1, 0)
-> +#define MPP_GRP_NFC(_mode) ? ? MPP(0, (_mode), 0, 0, 0, 1)
-> +
-> +#define MPP0_GPIO0 ? ? ? ? ? ? MPP_PIN(0, 0x0)
-> +#define MPP0_UA2_RTSn ? ? ? ? ?MPP_PIN(0, 0x2)
-> +#define MPP0_SDIO0_CD ? ? ? ? ?MPP_PIN(0, 0x3)
-> +#define MPP0_LCD0_PWM ? ? ? ? ?MPP_PIN(0, 0xf)
-> +
-> +#define MPP1_GPIO1 ? ? ? ? ? ? MPP_PIN(1, 0x0)
-> +#define MPP1_UA2_CTSn ? ? ? ? ?MPP_PIN(1, 0x2)
-> +#define MPP1_SDIO0_WP ? ? ? ? ?MPP_PIN(1, 0x3)
-> +#define MPP1_LCD1_PWM ? ? ? ? ?MPP_PIN(1, 0xf)
-> +
-> +#define MPP2_GPIO2 ? ? ? ? ? ? MPP_PIN(2, 0x0)
-> +#define MPP2_SATA_PRESENT ? ? ?MPP_PIN(2, 0x1)
-> +#define MPP2_UA2_TXD ? ? ? ? ? MPP_PIN(2, 0x2)
-> +#define MPP2_SDIO0_BUS_POWER ? MPP_PIN(2, 0x3)
-> +#define MPP2_UA_RTSn1 ? ? ? ? ?MPP_PIN(2, 0x4)
-> +
-> +#define MPP3_GPIO3 ? ? ? ? ? ? MPP_PIN(3, 0x0)
-> +#define MPP3_SATA_ACT ? ? ? ? ?MPP_PIN(3, 0x1)
-> +#define MPP3_UA2_RXD ? ? ? ? ? MPP_PIN(3, 0x2)
-> +#define MPP3_SDIO0_LED_CTRL ? ?MPP_PIN(3, 0x3)
-> +#define MPP3_UA_CTSn1 ? ? ? ? ?MPP_PIN(3, 0x4)
-> +#define MPP3_SPI_LCD_CS1 ? ? ? MPP_PIN(3, 0xf)
-> +
-> +#define MPP4_GPIO4 ? ? ? ? ? ? MPP_PIN(4, 0x0)
-> +#define MPP4_UA3_RTSn ? ? ? ? ?MPP_PIN(4, 0x2)
-> +#define MPP4_SDIO1_CD ? ? ? ? ?MPP_PIN(4, 0x3)
-> +#define MPP4_SPI_1_MISO ? ? ? ? ? ? ? ?MPP_PIN(4, 0x4)
-> +
-> +#define MPP5_GPIO5 ? ? ? ? ? ? MPP_PIN(5, 0x0)
-> +#define MPP5_UA3_CTSn ? ? ? ? ?MPP_PIN(5, 0x2)
-> +#define MPP5_SDIO1_WP ? ? ? ? ?MPP_PIN(5, 0x3)
-> +#define MPP5_SPI_1_CS ? ? ? ? ?MPP_PIN(5, 0x4)
-> +
-> +#define MPP6_GPIO6 ? ? ? ? ? ? MPP_PIN(6, 0x0)
-> +#define MPP6_UA3_TXD ? ? ? ? ? MPP_PIN(6, 0x2)
-> +#define MPP6_SDIO1_BUS_POWER ? MPP_PIN(6, 0x3)
-> +#define MPP6_SPI_1_MOSI ? ? ? ? ? ? ? ?MPP_PIN(6, 0x4)
-> +
-> +#define MPP7_GPIO7 ? ? ? ? ? ? MPP_PIN(7, 0x0)
-> +#define MPP7_UA3_RXD ? ? ? ? ? MPP_PIN(7, 0x2)
-> +#define MPP7_SDIO1_LED_CTRL ? ?MPP_PIN(7, 0x3)
-> +#define MPP7_SPI_1_SCK ? ? ? ? MPP_PIN(7, 0x4)
-> +
-> +#define MPP8_GPIO8 ? ? ? ? ? ? MPP_PIN(8, 0x0)
-> +#define MPP8_WD_RST_OUT ? ? ? ? ? ? ? ?MPP_PIN(8, 0x1)
-> +
-> +#define MPP9_GPIO9 ? ? ? ? ? ? MPP_PIN(9, 0x0)
-> +#define MPP9_PEX1_CLKREQn ? ? ?MPP_PIN(9, 0x5)
-> +
-> +#define MPP10_GPIO10 ? ? ? ? ? MPP_PIN(10, 0x0)
-> +#define MPP10_SSP_SCLK ? ? ? ? MPP_PIN(10, 0x5)
-> +
-> +#define MPP11_GPIO11 ? ? ? ? ? MPP_PIN(11, 0x0)
-> +#define MPP11_SATA_PRESENT ? ? MPP_PIN(11, 0x1)
-> +#define MPP11_SATA_ACT ? ? ? ? MPP_PIN(11, 0x2)
-> +#define MPP11_SDIO0_LED_CTRL ? MPP_PIN(11, 0x3)
-> +#define MPP11_SDIO1_LED_CTRL ? MPP_PIN(11, 0x4)
-> +#define MPP11_PEX0_CLKREQn ? ? MPP_PIN(11, 0x5)
-> +
-> +#define MPP12_GPIO12 ? ? ? ? ? MPP_PIN(12, 0x0)
-> +#define MPP12_SATA_ACT ? ? ? ? MPP_PIN(12, 0x1)
-> +#define MPP12_UA2_RTSn ? ? ? ? MPP_PIN(12, 0x2)
-> +#define MPP12_AD0_I2S_EXT_MCLK MPP_PIN(12, 0x3)
-> +#define MPP12_SDIO1_CD ? ? ? ? MPP_PIN(12, 0x4)
-> +
-> +#define MPP13_GPIO13 ? ? ? ? ? MPP_PIN(13, 0x0)
-> +#define MPP13_UA2_CTSn ? ? ? ? MPP_PIN(13, 0x2)
-> +#define MPP13_AD1_I2S_EXT_MCLK MPP_PIN(13, 0x3)
-> +#define MPP13_SDIO1WP ? ? ? ? ?MPP_PIN(13, 0x4)
-> +#define MPP13_SSP_EXTCLK ? ? ? MPP_PIN(13, 0x5)
-> +
-> +#define MPP14_GPIO14 ? ? ? ? ? MPP_PIN(14, 0x0)
-> +#define MPP14_UA2_TXD ? ? ? ? ?MPP_PIN(14, 0x2)
-> +#define MPP14_SDIO1_BUS_POWER ?MPP_PIN(14, 0x4)
-> +#define MPP14_SSP_RXD ? ? ? ? ?MPP_PIN(14, 0x5)
-> +
-> +#define MPP15_GPIO15 ? ? ? ? ? MPP_PIN(15, 0x0)
-> +#define MPP15_UA2_RXD ? ? ? ? ?MPP_PIN(15, 0x2)
-> +#define MPP15_SDIO1_LED_CTRL ? MPP_PIN(15, 0x4)
-> +#define MPP15_SSP_SFRM ? ? ? ? MPP_PIN(15, 0x5)
-> +
-> +#define MPP16_GPIO16 ? ? ? ? ? MPP_PIN(16, 0x0)
-> +#define MPP16_UA3_RTSn ? ? ? ? MPP_PIN(16, 0x2)
-> +#define MPP16_SDIO0_CD ? ? ? ? MPP_PIN(16, 0x3)
-> +#define MPP16_SPI_LCD_CS1 ? ? ?MPP_PIN(16, 0x4)
-> +#define MPP16_AC97_SDATA_IN1 ? MPP_PIN(16, 0x5)
-> +
-> +#define MPP17_GPIO17 ? ? ? ? ? MPP_PIN(17, 0x0)
-> +#define MPP17_AC97_SYSCLK_OUT ?MPP_PIN(17, 0x1)
-> +#define MPP17_UA3_CTSn ? ? ? ? MPP_PIN(17, 0x2)
-> +#define MPP17_SDIO0_WP ? ? ? ? MPP_PIN(17, 0x3)
-> +#define MPP17_TW_SDA2 ? ? ? ? ?MPP_PIN(17, 0x4)
-> +#define MPP17_AC97_SDATA_IN2 ? MPP_PIN(17, 0x5)
-> +
-> +#define MPP18_GPIO18 ? ? ? ? ? MPP_PIN(18, 0x0)
-> +#define MPP18_UA3_TXD ? ? ? ? ?MPP_PIN(18, 0x2)
-> +#define MPP18_SDIO0_BUS_POWER ?MPP_PIN(18, 0x3)
-> +#define MPP18_LCD0_PWM ? ? ? ? MPP_PIN(18, 0x4)
-> +#define MPP18_AC_SDATA_IN3 ? ? MPP_PIN(18, 0x5)
-> +
-> +#define MPP19_GPIO19 ? ? ? ? ? MPP_PIN(19, 0x0)
-> +#define MPP19_UA3_RXD ? ? ? ? ?MPP_PIN(19, 0x2)
-> +#define MPP19_SDIO0_LED_CTRL ? MPP_PIN(19, 0x3)
-> +#define MPP19_TW_SCK2 ? ? ? ? ?MPP_PIN(19, 0x4)
-> +
-> +#define MPP20_GPIO20 ? ? ? ? ? MPP_PIN(20, 0x0)
-> +#define MPP20_AC97_SYSCLK_OUT ?MPP_PIN(20, 0x1)
-> +#define MPP20_SPI_LCD_MISO ? ? MPP_PIN(20, 0x2)
-> +#define MPP20_SDIO1_CD ? ? ? ? MPP_PIN(20, 0x3)
-> +#define MPP20_SDIO0_CD ? ? ? ? MPP_PIN(20, 0x5)
-> +#define MPP20_SPI_1_MISO ? ? ? MPP_PIN(20, 0x6)
-> +
-> +#define MPP21_GPIO21 ? ? ? ? ? MPP_PIN(21, 0x0)
-> +#define MPP21_UA1_RTSn ? ? ? ? MPP_PIN(21, 0x1)
-> +#define MPP21_SPI_LCD_CS0 ? ? ?MPP_PIN(21, 0x2)
-> +#define MPP21_SDIO1_WP ? ? ? ? MPP_PIN(21, 0x3)
-> +#define MPP21_SSP_SFRM ? ? ? ? MPP_PIN(21, 0x4)
-> +#define MPP21_SDIO0_WP ? ? ? ? MPP_PIN(21, 0x5)
-> +#define MPP21_SPI_1_CS ? ? ? ? MPP_PIN(21, 0x6)
-> +
-> +#define MPP22_GPIO22 ? ? ? ? ? MPP_PIN(22, 0x0)
-> +#define MPP22_UA1_CTSn ? ? ? ? MPP_PIN(22, 0x1)
-> +#define MPP22_SPI_LCD_MOSI ? ? MPP_PIN(22, 0x2)
-> +#define MPP22_SDIO1_BUS_POWER ?MPP_PIN(22, 0x3)
-> +#define MPP22_SSP_TXD ? ? ? ? ?MPP_PIN(22, 0x4)
-> +#define MPP22_SDIO0_BUS_POWER ?MPP_PIN(22, 0x5)
-> +#define MPP22_SPI_1_MOSI ? ? ? MPP_PIN(22, 0x6)
-> +
-> +#define MPP23_GPIO23 ? ? ? ? ? MPP_PIN(23, 0x0)
-> +#define MPP23_SPI_LCD_SCK ? ? ?MPP_PIN(23, 0x2)
-> +#define MPP23_SDIO1_LED_CTRL ? MPP_PIN(23, 0x3)
-> +#define MPP23_SSP_SCLK ? ? ? ? MPP_PIN(23, 0x4)
-> +#define MPP23_SDIO0_LED_CTRL ? MPP_PIN(23, 0x5)
-> +#define MPP23_SPI_1_SCK ? ? ? ? ? ? ? ?MPP_PIN(23, 0x6)
-> +
-> +/* for MPP groups _num is a group index */
-> +enum dove_mpp_grp_idx {
-> + ? ? ? MPP_24_39 = 2,
-> + ? ? ? MPP_40_45 = 0,
-> + ? ? ? MPP_46_51 = 1,
-> + ? ? ? MPP_58_61 = 5,
-> + ? ? ? MPP_62_63 = 4,
-> +};
-> +
-> +#define MPP24_39_GPIO ? ? ? ? ?MPP_GRP(MPP_24_39, 0x1)
-> +#define MPP24_39_CAM ? ? ? ? ? MPP_GRP(MPP_24_39, 0x0)
-> +
-> +#define MPP40_45_GPIO ? ? ? ? ?MPP_GRP(MPP_40_45, 0x1)
-> +#define MPP40_45_SD0 ? ? ? ? ? MPP_GRP(MPP_40_45, 0x0)
-> +
-> +#define MPP46_51_GPIO ? ? ? ? ?MPP_GRP(MPP_46_51, 0x1)
-> +#define MPP46_51_SD1 ? ? ? ? ? MPP_GRP(MPP_46_51, 0x0)
-> +
-> +#define MPP58_61_GPIO ? ? ? ? ?MPP_GRP(MPP_58_61, 0x1)
-> +#define MPP58_61_SPI ? ? ? ? ? MPP_GRP(MPP_58_61, 0x0)
-> +
-> +#define MPP62_63_GPIO ? ? ? ? ?MPP_GRP(MPP_62_63, 0x1)
-> +#define MPP62_63_UA1 ? ? ? ? ? MPP_GRP(MPP_62_63, 0x0)
-> +
-> +/* The MPP[64:71] control differs from other groups */
-> +#define MPP64_71_GPO ? ? ? ? ? MPP_GRP_NFC(0x1)
-> +#define MPP64_71_NFC ? ? ? ? ? MPP_GRP_NFC(0x0)
-> +
-> +/*
-> + * The MPP[52:57] functionality is encoded by 4 bits in different
-> + * registers. The _num field in this case encodes those bits in
-> + * correspodence with Table 135 of 88AP510 Functional specification
-> + */
-> +#define MPP52_57_AU1 ? ? ? ? ? MPP_GRP_AU1(0x0)
-> +#define MPP52_57_AU1_GPIO57 ? ?MPP_GRP_AU1(0x2)
-> +#define MPP52_57_GPIO ? ? ? ? ?MPP_GRP_AU1(0xa)
-> +#define MPP52_57_TW_GPIO ? ? ? MPP_GRP_AU1(0xb)
-> +#define MPP52_57_AU1_SSP ? ? ? MPP_GRP_AU1(0xc)
-> +#define MPP52_57_SSP_GPIO ? ? ?MPP_GRP_AU1(0xe)
-> +#define MPP52_57_SSP_TW ? ? ? ? ? ? ? ?MPP_GRP_AU1(0xf)
-> +
-> +void dove_mpp_conf(unsigned int *mpp_list);
-> +
-> +#endif /* __ARCH_DOVE_MPP_CODED_H */
+> ? ? ? ?{ },
+> ?};
+> ?MODULE_DEVICE_TABLE(platform, sdhci_pltfm_ids);
+> diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
+> index 900f329..718d837 100644
+> --- a/drivers/mmc/host/sdhci-pltfm.h
+> +++ b/drivers/mmc/host/sdhci-pltfm.h
+> @@ -14,5 +14,6 @@
+> ?#include <linux/sdhci-pltfm.h>
+>
+> ?extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
+> +extern struct sdhci_pltfm_data sdhci_dove_pdata;
+>
+> ?#endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
 > --
 > 1.7.3.1
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
