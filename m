@@ -1,19 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Nov 2010 13:11:53 +0000
-Subject: [PATCH v2 10/20] ARM: LPAE: Remove the FIRST_USER_PGD_NR and
-	USER_PTRS_PER_PGD definitions
-In-Reply-To: <1289584840-18097-11-git-send-email-catalin.marinas@arm.com>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-11-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20101122131153.GF31227@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Nov 2010 13:12:35 -0000
+Subject: Weirdo gcc 4.3.x behaviour
+In-Reply-To: <20101121191148.GA12234@n2100.arm.linux.org.uk>
+References: <20101121191148.GA12234@n2100.arm.linux.org.uk>
+Message-ID: <000201cb8a46$ee3f70f0$cabe52d0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 12, 2010 at 06:00:30PM +0000, Catalin Marinas wrote:
-> These macros were only used in setup_mm_for_reboot and get_pgd_slow.
-> Both have been modified to no longer use these definitions. One of the
-> reasons is the different meaning that PGD has with the 2-level and
-> 3-level page tables.
+Hi Russell,
 
-We don't actually need this macro anymore, it can be killed (and I've
-already done so.)
+> Has anyone else seen weird behaviour from the gcc 4.3 branch?
+> 
+> I've tried gcc-4.3.2 + patch and also gcc-4.3.5, both of which behave
+> differently with this change in the kernel:
+> 
+> (asm-generic/pgtable-nopud.h)
+> static inline int pgd_none(pgd_t pgd)           { return 0; }
+> static inline int pgd_bad(pgd_t pgd)            { return 0; }
+> static inline int pgd_present(pgd_t pgd)        { return 1; }
+> 
+> and subsequently adding:
+> +#define pgd_none(pgd)          0
+> +#define pgd_bad(pgd)           0
+> +#define pgd_present(pgd)       1
+> 
+> This causes completely unrelated functions to be optimized differently,
+> as can be seen via the bloat-o-meter:
+
+[...]
+
+If you mail me the smallest diff to the kernel which causes this to
+happen along with the .s/.i files (gcc --save-temps) for the file that
+is changing then I'll pass the information on to the compiler guys at
+ARM.
+
+Thanks,
+
+Will
