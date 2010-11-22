@@ -1,52 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Nov 2010 13:38:20 -0500 (EST)
-Subject: [PATCH v2 9/9] ARM: kprobes: Don't HAVE_KPROBES when
-	CONFIG_THUMB2_KERNEL is selected
-In-Reply-To: <1290449065-28843-10-git-send-email-dave.martin@linaro.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 22 Nov 2010 18:39:29 +0000
+Subject: [PATCH v2 7/9] ARM: Thumb-2: Restore sensible zImage header
+	layout for CONFIG_THUMB2_KERNEL
+In-Reply-To: <alpine.LFD.2.00.1011221312500.9313@xanadu.home>
 References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
-	<1290449065-28843-10-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1011221336060.9313@xanadu.home>
+	<1290449065-28843-8-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1011221312500.9313@xanadu.home>
+Message-ID: <AANLkTik8Ha31Abzgvqp3AiZoKg_L9iqNG-HcoM+L3foR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Nov 2010, Dave Martin wrote:
+Hi,
 
-> Currently, the kprobes implementation for ARM only supports
-> the ARM instruction set, so it only works if
-> CONFIG_THUMB2_KERNEL is not enabled.
-> 
-> Until kprobes is updated to work with Thumb-2, turning it on
-> will cause horrible things to happen, so this patch disables it
-> for now.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+On Mon, Nov 22, 2010 at 6:28 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+[...]
 
+>> Applies on v2.6.37-rc3.
+>
+> Ideally you should keep that line above outside of the actual commit log
+> text, as no one will care on what version it applies to once it is
+> merged. ?It is best to put that below the --- line, or omit it entirely
+> if using 'git send-email'.
 
-> ---
->  arch/arm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index db524e7..f1d9297 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -9,7 +9,7 @@ config ARM
->  	select GENERIC_ATOMIC64 if (!CPU_32v6K || !AEABI)
->  	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
->  	select HAVE_ARCH_KGDB
-> -	select HAVE_KPROBES if (!XIP_KERNEL)
-> +	select HAVE_KPROBES if (!XIP_KERNEL && !THUMB2_KERNEL)
->  	select HAVE_KRETPROBES if (HAVE_KPROBES)
->  	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
->  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+OK, I'll leave it out in the future...
+
+>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+>
+> Looking at it again there is a problem with the patch as is...
+>
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -125,16 +125,21 @@ wait: ? ? ? ? ? mrc ? ? p14, 0, pc, c0, c1, 0
+>> ? * sort out different calling conventions
+>> ? */
+>> ? ? ? ? ? ? ? .align
+>> + ? ? ? ? ? ? .arm ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ Always enter in ARM state
+>> ?start:
+>> ? ? ? ? ? ? ? .type ? start,#function
+>> - ? ? ? ? ? ? .rept ? 8
+>> + THUMB( ? ? ? ? ? ? ?adr ? ? r12, BSYM(1f) ? )
+>> + THUMB( ? ? ? ? ? ? ?bx ? ? ?r12 ? ? ? ? ? ? )
+>> + THUMB( ? ? ? ? ? ? ?.rept ? 6 ? ? ? ? ? ? ? )
+>> + ARM( ? ? ? ? ? ? ? ?.rept ? 8 ? ? ? ? ? ? ? )
+>> ? ? ? ? ? ? ? mov ? ? r0, r0
+>> ? ? ? ? ? ? ? .endr
+>>
+>> - ? ? ? ? ? ? b ? ? ? 1f
+>> + ? ? ? ? ? ? nop ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ Pad magic number to 0x24
+>
+> Why is this branch removed? ?With an ARM mode kernel this means we'll
+> attempt to execute the magic number that follows.
+
+Hmmm, I think I got confused during a branch merge...
+
+I will retest and repost this patch as appropriate.
+
+Cheers
+---Dave
