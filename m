@@ -1,384 +1,70 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Mon, 22 Nov 2010 19:14:05 -0800
-Subject: [PATCH v2 3/3] msm: iommu: Rework clock logic and add IOMMU bus clock
-	control
-In-Reply-To: <1290222154-11096-3-git-send-email-stepanm@codeaurora.org>
-References: <1290222154-11096-3-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1290482045-6043-2-git-send-email-stepanm@codeaurora.org>
+From: cxie4@marvell.com (Chao Xie)
+Date: Mon, 22 Nov 2010 19:12:52 -0800
+Subject: [PATCH 1/2] pxa: add usb clock for pxa168/pxa910
+In-Reply-To: <AANLkTimq2--4rXRO9XbL3DnsTQhJmh-A4b3RarMy1xa=@mail.gmail.com>
+References: <1290418347-6861-1-git-send-email-chao.xie@marvell.com>
+	<AANLkTimq2--4rXRO9XbL3DnsTQhJmh-A4b3RarMy1xa=@mail.gmail.com>
+Message-ID: <AAD1C6EB06EE3649B35B7E026785068D15054F6FCA@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean up the clock control code in the probe calls, and add
-support for controlling the clock for the IOMMU bus
-interconnect. With the (proper) clock driver in place, the
-clock control logic in the probe function can be made much
-cleaner since it does not have to deal with the placeholder
-driver anymore.
+Hi
+Modified as you suggested. Patch is attached.
+...
+	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
++	INIT_CLKREG(&clk_u2o, "pxa-u2o", "U2OCLK"),
+...
 
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
----
-Please hold off on this until the clock driver is in.
-The patch seems like it is a lot of changes, but a lot of
-it comes from removing one condition, which causes a bunch
-of code to be unindented by one level. This implementation
-is a lot cleaner IMO.
+-----Original Message-----
+From: Eric Miao [mailto:eric.y.miao at gmail.com] 
+Sent: Monday, November 22, 2010 9:21 PM
+To: Chao Xie
+Cc: gregkh at suse.de; linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Chao Xie
+Subject: Re: [PATCH 1/2] pxa: add usb clock for pxa168/pxa910
 
-Changes in v2:
- * Remove two unnecessart memset calls
- * Fix alignment / whitespace
+On Mon, Nov 22, 2010 at 5:32 PM,  <chao.xie@marvell.com> wrote:
+> From: cxie4 <cxie4@marvell.com>
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+> ?arch/arm/mach-mmp/pxa910.c | ? ?2 ++
+> ?1 files changed, 2 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+> index 46f2d69..cf7c71a 100644
+> --- a/arch/arm/mach-mmp/pxa910.c
+> +++ b/arch/arm/mach-mmp/pxa910.c
+> @@ -111,6 +111,7 @@ static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
+> ?static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
+>
+> ?static APMU_CLK(nand, NAND, 0x01db, 208000000);
+> +static APMU_CLK(u2o, USB, 0x1b, 480000000);
+>
+> ?/* device and clock bindings */
+> ?static struct clk_lookup pxa910_clkregs[] = {
+> @@ -123,6 +124,7 @@ static struct clk_lookup pxa910_clkregs[] = {
+> ? ? ? ?INIT_CLKREG(&clk_pwm3, "pxa910-pwm.2", NULL),
+> ? ? ? ?INIT_CLKREG(&clk_pwm4, "pxa910-pwm.3", NULL),
+> ? ? ? ?INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
+> + ? ? ? INIT_CLKREG(&clk_u2o, NULL, "U2OCLK"),
 
- arch/arm/mach-msm/devices-msm8x60-iommu.c |    5 -
- arch/arm/mach-msm/include/mach/iommu.h    |    5 -
- arch/arm/mach-msm/iommu_dev.c             |  204 +++++++++++++++++------------
- 3 files changed, 119 insertions(+), 95 deletions(-)
+Normally, device name is more preferred than a name string. In this
+case, it will be 'pxa-u2o'.
 
-diff --git a/arch/arm/mach-msm/devices-msm8x60-iommu.c b/arch/arm/mach-msm/devices-msm8x60-iommu.c
-index f9e7bd3..e12d7e2 100644
---- a/arch/arm/mach-msm/devices-msm8x60-iommu.c
-+++ b/arch/arm/mach-msm/devices-msm8x60-iommu.c
-@@ -282,7 +282,6 @@ static struct platform_device msm_root_iommu_dev = {
+PS: the naming is a bit inconsistent in the patch follows, the name of
+the driver file is called mv_udc, but the device name is 'pxa-u2o'?
 
- static struct msm_iommu_dev jpegd_iommu = {
- 	.name = "jpegd",
--	.clk_rate = -1
- };
-
- static struct msm_iommu_dev vpe_iommu = {
-@@ -307,7 +306,6 @@ static struct msm_iommu_dev ijpeg_iommu = {
-
- static struct msm_iommu_dev vfe_iommu = {
- 	.name = "vfe",
--	.clk_rate = -1
- };
-
- static struct msm_iommu_dev vcodec_a_iommu = {
-@@ -320,17 +318,14 @@ static struct msm_iommu_dev vcodec_b_iommu = {
-
- static struct msm_iommu_dev gfx3d_iommu = {
- 	.name = "gfx3d",
--	.clk_rate = 27000000
- };
-
- static struct msm_iommu_dev gfx2d0_iommu = {
- 	.name = "gfx2d0",
--	.clk_rate = 27000000
- };
-
- static struct msm_iommu_dev gfx2d1_iommu = {
- 	.name = "gfx2d1",
--	.clk_rate = 27000000
- };
-
- static struct platform_device msm_device_iommu_jpegd = {
-diff --git a/arch/arm/mach-msm/include/mach/iommu.h b/arch/arm/mach-msm/include/mach/iommu.h
-index 62f6699..10811ba 100644
---- a/arch/arm/mach-msm/include/mach/iommu.h
-+++ b/arch/arm/mach-msm/include/mach/iommu.h
-@@ -45,14 +45,9 @@
- /**
-  * struct msm_iommu_dev - a single IOMMU hardware instance
-  * name		Human-readable name given to this IOMMU HW instance
-- * clk_rate	Rate to set for this IOMMU's clock, if applicable to this
-- *		particular IOMMU. 0 means don't set a rate.
-- *		-1 means it is an AXI clock with no valid rate
-- *
-  */
- struct msm_iommu_dev {
- 	const char *name;
--	int clk_rate;
- };
-
- /**
-diff --git a/arch/arm/mach-msm/iommu_dev.c b/arch/arm/mach-msm/iommu_dev.c
-index b83c73b..7819ed2 100644
---- a/arch/arm/mach-msm/iommu_dev.c
-+++ b/arch/arm/mach-msm/iommu_dev.c
-@@ -29,6 +29,7 @@
-
- #include <mach/iommu_hw-8xxx.h>
- #include <mach/iommu.h>
-+#include <mach/clk.h>
-
- struct iommu_ctx_iter_data {
- 	/* input */
-@@ -130,117 +131,134 @@ static int msm_iommu_probe(struct platform_device *pdev)
- {
- 	struct resource *r, *r2;
- 	struct clk *iommu_clk;
-+	struct clk *iommu_pclk;
- 	struct msm_iommu_drvdata *drvdata;
- 	struct msm_iommu_dev *iommu_dev = pdev->dev.platform_data;
- 	void __iomem *regs_base;
- 	resource_size_t	len;
--	int ret = 0, ncb, nm2v, irq;
-+	int ret, ncb, nm2v, irq;
-
--	if (pdev->id != -1) {
--		drvdata = kzalloc(sizeof(*drvdata), GFP_KERNEL);
-+	if (pdev->id == -1) {
-+		msm_iommu_root_dev = pdev;
-+		return 0;
-+	}
-
--		if (!drvdata) {
--			ret = -ENOMEM;
--			goto fail;
--		}
-+	drvdata = kzalloc(sizeof(*drvdata), GFP_KERNEL);
-
--		if (!iommu_dev) {
--			ret = -ENODEV;
--			goto fail;
--		}
-+	if (!drvdata) {
-+		ret = -ENOMEM;
-+		goto fail;
-+	}
-+
-+	if (!iommu_dev) {
-+		ret = -ENODEV;
-+		goto fail;
-+	}
-
--		if (iommu_dev->clk_rate != 0) {
--			iommu_clk = clk_get(&pdev->dev, "iommu_clk");
--
--			if (IS_ERR(iommu_clk)) {
--				ret = -ENODEV;
--				goto fail;
--			}
--
--			if (iommu_dev->clk_rate > 0) {
--				ret = clk_set_rate(iommu_clk,
--							iommu_dev->clk_rate);
--				if (ret) {
--					clk_put(iommu_clk);
--					goto fail;
--				}
--			}
--
--			ret = clk_enable(iommu_clk);
--			if (ret) {
--				clk_put(iommu_clk);
--				goto fail;
--			}
-+	iommu_pclk = clk_get(NULL, "smmu_pclk");
-+	if (IS_ERR(iommu_pclk)) {
-+		ret = -ENODEV;
-+		goto fail;
-+	}
-+
-+	ret = clk_enable(iommu_pclk);
-+	if (ret)
-+		goto fail_enable;
-+
-+	iommu_clk = clk_get(&pdev->dev, "iommu_clk");
-+
-+	if (!IS_ERR(iommu_clk))	{
-+		if (clk_get_rate(iommu_clk) == 0)
-+			clk_set_min_rate(iommu_clk, 1);
-+
-+		ret = clk_enable(iommu_clk);
-+		if (ret) {
- 			clk_put(iommu_clk);
-+			goto fail_pclk;
- 		}
-+	} else
-+		iommu_clk = NULL;
-
--		r = platform_get_resource_byname(pdev, IORESOURCE_MEM,
--						 "physbase");
--		if (!r) {
--			ret = -ENODEV;
--			goto fail;
--		}
-+	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "physbase");
-
--		len = r->end - r->start + 1;
-+	if (!r) {
-+		ret = -ENODEV;
-+		goto fail_clk;
-+	}
-
--		r2 = request_mem_region(r->start, len, r->name);
--		if (!r2) {
--			pr_err("Could not request memory region: "
--			"start=%p, len=%d\n", (void *) r->start, len);
--			ret = -EBUSY;
--			goto fail;
--		}
-+	len = r->end - r->start + 1;
-
--		regs_base = ioremap(r2->start, len);
-+	r2 = request_mem_region(r->start, len, r->name);
-+	if (!r2) {
-+		pr_err("Could not request memory region: start=%p, len=%d\n",
-+			(void *) r->start, len);
-+		ret = -EBUSY;
-+		goto fail_clk;
-+	}
-
--		if (!regs_base) {
--			pr_err("Could not ioremap: start=%p, len=%d\n",
--				 (void *) r2->start, len);
--			ret = -EBUSY;
--			goto fail_mem;
--		}
-+	regs_base = ioremap(r2->start, len);
-
--		irq = platform_get_irq_byname(pdev, "secure_irq");
--		if (irq < 0) {
--			ret = -ENODEV;
--			goto fail_io;
--		}
-+	if (!regs_base) {
-+		pr_err("Could not ioremap: start=%p, len=%d\n",
-+			 (void *) r2->start, len);
-+		ret = -EBUSY;
-+		goto fail_mem;
-+	}
-+
-+	irq = platform_get_irq_byname(pdev, "secure_irq");
-+	if (irq < 0) {
-+		ret = -ENODEV;
-+		goto fail_io;
-+	}
-
--		mb();
-+	mb();
-
--		if (GET_IDR(regs_base) == 0) {
--			pr_err("Invalid IDR value detected\n");
--			ret = -ENODEV;
--			goto fail_io;
--		}
-+	if (GET_IDR(regs_base) == 0) {
-+		pr_err("Invalid IDR value detected\n");
-+		ret = -ENODEV;
-+		goto fail_io;
-+	}
-
--		ret = request_irq(irq, msm_iommu_fault_handler, 0,
--				"msm_iommu_secure_irpt_handler", drvdata);
--		if (ret) {
--			pr_err("Request IRQ %d failed with ret=%d\n", irq, ret);
--			goto fail_io;
--		}
-+	ret = request_irq(irq, msm_iommu_fault_handler, 0,
-+			"msm_iommu_secure_irpt_handler", drvdata);
-+	if (ret) {
-+		pr_err("Request IRQ %d failed with ret=%d\n", irq, ret);
-+		goto fail_io;
-+	}
-
--		msm_iommu_reset(regs_base);
--		drvdata->base = regs_base;
--		drvdata->irq = irq;
-+	msm_iommu_reset(regs_base);
-+	drvdata->pclk = iommu_pclk;
-+	drvdata->clk = iommu_clk;
-+	drvdata->base = regs_base;
-+	drvdata->irq = irq;
-
--		nm2v = GET_NM2VCBMT((unsigned long) regs_base);
--		ncb = GET_NCB((unsigned long) regs_base);
-+	nm2v = GET_NM2VCBMT((unsigned long) regs_base);
-+	ncb = GET_NCB((unsigned long) regs_base);
-
--		pr_info("device %s mapped at %p, irq %d with %d ctx banks\n",
-+	pr_info("device %s mapped at %p, irq %d with %d ctx banks\n",
- 			iommu_dev->name, regs_base, irq, ncb+1);
-
--		platform_set_drvdata(pdev, drvdata);
--	} else
--		msm_iommu_root_dev = pdev;
-+	platform_set_drvdata(pdev, drvdata);
-
--	return 0;
-+	if (iommu_clk)
-+		clk_disable(iommu_clk);
-+
-+	clk_disable(iommu_pclk);
-
-+	return 0;
- fail_io:
- 	iounmap(regs_base);
- fail_mem:
- 	release_mem_region(r->start, len);
-+fail_clk:
-+	if (iommu_clk) {
-+		clk_disable(iommu_clk);
-+		clk_put(iommu_clk);
-+	}
-+fail_pclk:
-+	clk_disable(iommu_pclk);
-+fail_enable:
-+	clk_put(iommu_pclk);
- fail:
- 	kfree(drvdata);
- 	return ret;
-@@ -252,7 +270,9 @@ static int msm_iommu_remove(struct platform_device *pdev)
-
- 	drv = platform_get_drvdata(pdev);
- 	if (drv) {
--		memset(drv, 0, sizeof(struct msm_iommu_drvdata));
-+		if (drv->clk)
-+			clk_put(drv->clk);
-+		clk_put(drv->pclk);
- 		kfree(drv);
- 		platform_set_drvdata(pdev, NULL);
- 	}
-@@ -264,7 +284,7 @@ static int msm_iommu_ctx_probe(struct platform_device *pdev)
- 	struct msm_iommu_ctx_dev *c = pdev->dev.platform_data;
- 	struct msm_iommu_drvdata *drvdata;
- 	struct msm_iommu_ctx_drvdata *ctx_drvdata = NULL;
--	int i, ret = 0;
-+	int i, ret;
- 	if (!c || !pdev->dev.parent) {
- 		ret = -EINVAL;
- 		goto fail;
-@@ -288,6 +308,18 @@ static int msm_iommu_ctx_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&ctx_drvdata->attached_elm);
- 	platform_set_drvdata(pdev, ctx_drvdata);
-
-+	ret = clk_enable(drvdata->pclk);
-+	if (ret)
-+		goto fail;
-+
-+	if (drvdata->clk) {
-+		ret = clk_enable(drvdata->clk);
-+		if (ret) {
-+			clk_disable(drvdata->pclk);
-+			goto fail;
-+		}
-+	}
-+
- 	/* Program the M2V tables for this context */
- 	for (i = 0; i < MAX_NUM_MIDS; i++) {
- 		int mid = c->mids[i];
-@@ -310,8 +342,11 @@ static int msm_iommu_ctx_probe(struct platform_device *pdev)
- 		SET_NSCFG(drvdata->base, mid, 3);
- 	}
-
--	pr_info("context device %s with bank index %d\n", c->name, c->num);
-+	if (drvdata->clk)
-+		clk_disable(drvdata->clk);
-+	clk_disable(drvdata->pclk);
-
-+	dev_info(&pdev->dev, "context %s using bank %d\n", c->name, c->num);
- 	return 0;
- fail:
- 	kfree(ctx_drvdata);
-@@ -323,7 +358,6 @@ static int msm_iommu_ctx_remove(struct platform_device *pdev)
- 	struct msm_iommu_ctx_drvdata *drv = NULL;
- 	drv = platform_get_drvdata(pdev);
- 	if (drv) {
--		memset(drv, 0, sizeof(struct msm_iommu_ctx_drvdata));
- 		kfree(drv);
- 		platform_set_drvdata(pdev, NULL);
- 	}
---
-1.7.0.2
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> ?};
+>
+> ?static int __init pxa910_init(void)
+> --
+> 1.6.3.3
+>
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-pxa-add-usb-clock-for-pxa168-pxa910.patch
+Type: application/octet-stream
+Size: 1119 bytes
+Desc: 0001-ARM-pxa-add-usb-clock-for-pxa168-pxa910.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101122/c6a1f65a/attachment.obj>
