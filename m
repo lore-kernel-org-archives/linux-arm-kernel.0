@@ -1,462 +1,260 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 23 Nov 2010 10:06:05 +0000
-Subject: [RFC PATCH 04/13] picoxcell: add a pin muxing infrastructure
+Date: Tue, 23 Nov 2010 10:06:04 +0000
+Subject: [RFC PATCH 03/13] picoxcell: add support for the system timers
 In-Reply-To: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
 References: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1290506774-17895-5-git-send-email-jamie@jamieiles.com>
+Message-ID: <1290506774-17895-4-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-picoXcell devices have two types of GPIO pins - ARM and SDGPIO (the
-latter are in the picoArray domain) and some of these pins are also
-shared with peripherals. Provide an API for configuring the multiplexing
-of each pin and a userspace sysfs interface so they can be reprogrammed
-at runtime. Some of the peripherals that use the pins are driven by the
-DSP array and so the kernel won't know how to configure these pins so
-this is left to the userspace application.
+The picoXcell devices have 4 timers capable of generating interrupts
+when they reach a predefined value and restarting and a freerunning RTC.
+Use one of the interrupt capable timers as the clockevent_device and the
+RTC for the clocksource and sched_clock().
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
  arch/arm/mach-picoxcell/Makefile         |    3 +-
- arch/arm/mach-picoxcell/mux.c            |  302 ++++++++++++++++++++++++++++++
- arch/arm/mach-picoxcell/mux.h            |   97 ++++++++++
- arch/arm/mach-picoxcell/picoxcell_core.c |    3 +
- 4 files changed, 404 insertions(+), 1 deletions(-)
+ arch/arm/mach-picoxcell/picoxcell_core.h |    2 +
+ arch/arm/mach-picoxcell/time.c           |  206 ++++++++++++++++++++++++++++++
+ 3 files changed, 210 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index 726c61f..5e9a7cd 100644
+index 7246a6a..726c61f 100644
 --- a/arch/arm/mach-picoxcell/Makefile
 +++ b/arch/arm/mach-picoxcell/Makefile
-@@ -1,2 +1,3 @@
- obj-y				:= picoxcell_core.o axi2cfg.o \
--				   time.o
+@@ -1 +1,2 @@
+-obj-y				:= picoxcell_core.o axi2cfg.o
++obj-y				:= picoxcell_core.o axi2cfg.o \
++				   time.o
 \ No newline at end of file
-+				   time.o \
-+				   mux.o
-diff --git a/arch/arm/mach-picoxcell/mux.c b/arch/arm/mach-picoxcell/mux.c
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.h b/arch/arm/mach-picoxcell/picoxcell_core.h
+index 5b27e52..941d1a6 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.h
++++ b/arch/arm/mach-picoxcell/picoxcell_core.h
+@@ -13,9 +13,11 @@
+ #define __ASM_ARCH_PICOXCELL_CORE_H__
+ 
+ struct picoxcell_soc;
++struct sys_timer;
+ 
+ extern void __init picoxcell_core_init(void);
+ extern void __init picoxcell_init_irq(void);
+ extern void __init picoxcell_map_io(void);
++extern struct sys_timer picoxcell_sys_timer;
+ 
+ #endif /* __ASM_ARCH_PICOXCELL_CORE_H__ */
+diff --git a/arch/arm/mach-picoxcell/time.c b/arch/arm/mach-picoxcell/time.c
 new file mode 100644
-index 0000000..a0b1890
+index 0000000..67062cb
 --- /dev/null
-+++ b/arch/arm/mach-picoxcell/mux.c
-@@ -0,0 +1,302 @@
-+/*
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#define pr_fmt(fmt) "picoxcell_mux: " fmt
++++ b/arch/arm/mach-picoxcell/time.c
+@@ -0,0 +1,206 @@
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
 +
-+#include <linux/debugfs.h>
-+#include <linux/seq_file.h>
-+#include <linux/sysdev.h>
++#include <asm/mach/time.h>
 +
-+#include "mux.h"
++#include <mach/hardware.h>
 +
-+static inline struct muxed_pin *
-+to_multiplexed_pin(struct sysdev_attribute *attr)
-+{
-+	return container_of(attr, struct muxed_pin, attr);
-+}
-+
-+static struct {
-+	unsigned	    num_groups;
-+	struct pin_group    **groups;
-+	int		    (*sdgpio_number)(int pin);
-+	int		    (*armgpio_number)(int pin);
-+} mux_info;
-+
-+void picoxcell_mux_register(struct pin_group **groups, int nr_groups,
-+			    int (*armgpio_number)(int pin),
-+			    int (*sdgpio_number)(int pin))
-+{
-+	BUG_ON(!groups || !armgpio_number || !sdgpio_number);
-+	mux_info.num_groups	= nr_groups;
-+	mux_info.groups		= groups;
-+	mux_info.armgpio_number = armgpio_number;
-+	mux_info.sdgpio_number	= sdgpio_number;
-+}
-+
-+int picoxcell_pin_set_mux(int pin_nr, enum mux_setting setting)
-+{
-+	unsigned i, j;
-+	int ret = 0;
-+
-+	/*
-+	 * Don't let users try and trick us - they can't change the hardware
-+	 * that much!
-+	 */
-+	if (MUX_UNMUXED == setting)
-+		return -EINVAL;
-+
-+	for (i = 0; i < mux_info.num_groups; ++i) {
-+		struct pin_group *group = mux_info.groups[i];
-+		for (j = 0; j < group->nr_pins; ++j) {
-+			struct muxed_pin *pin = &group->pins[j];
-+			/*
-+			 * Dedicated GPIO pins aren't shared with a
-+			 * peripheral. This is illegal!
-+			 */
-+			if (pin->is_dedicated_gpio && MUX_PERIPHERAL == setting)
-+				return -EINVAL;
-+			if (pin_nr == pin->arm_pin || pin_nr == pin->sd_pin) {
-+				ret = pin->set_mux(pin, setting);
-+				if (!ret)
-+					goto out;
-+				/*
-+				 * If we failed to set the muxing of this pin,
-+				 * carry on looping as we have some
-+				 * many-to-many pins so we might pick it up
-+				 * again on another output.
-+				 */
-+			}
-+		}
-+	}
-+
-+	/*
-+	 * If we don't have a multiplexed pin entry for the requested pin then
-+	 * we assume that the pin isn't multiplexed so we don't need to do
-+	 * anything.
-+	 */
-+out:
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(picoxcell_pin_set_mux);
-+
-+int picoxcell_group_set_mux(const char *group_name, enum mux_setting setting)
-+{
-+	unsigned i, j;
-+	int err = -ENXIO;
-+
-+	/*
-+	 * Don't let users try and trick us - they can't change the hardware
-+	 * that much!
-+	 */
-+	if (MUX_UNMUXED == setting)
-+		return -EINVAL;
-+
-+	for (i = 0; i < mux_info.num_groups; ++i) {
-+		struct pin_group *group = mux_info.groups[i];
-+		if (strcmp(group->name, group_name))
-+			continue;
-+
-+		for (j = 0; j < group->nr_pins; ++j) {
-+			struct muxed_pin *pin = &group->pins[j];
-+			/*
-+			 * Dedicated GPIO pins aren't shared with a
-+			 * peripheral. This is illegal!
-+			 */
-+			if (pin->is_dedicated_gpio && MUX_PERIPHERAL == setting)
-+				return -EINVAL;
-+			err = pin->set_mux(pin, setting);
-+			if (err)
-+				goto out;
-+		}
-+
-+		break;
-+	}
-+
-+out:
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(picoxcell_group_set_mux);
-+
-+int picoxcell_get_pin_mux(int pin_nr)
-+{
-+	unsigned i, j;
-+	int ret = 0;
-+
-+	for (i = 0; i < mux_info.num_groups; ++i) {
-+		struct pin_group *group = mux_info.groups[i];
-+		for (j = 0; j < group->nr_pins; ++j) {
-+			struct muxed_pin *pin = &group->pins[j];
-+			if (pin_nr == pin->arm_pin || pin_nr == pin->sd_pin) {
-+				int tmp = pin->get_mux(pin);
-+				if (tmp < 0)
-+					return tmp;
-+				ret |= tmp;
-+			}
-+		}
-+	}
-+
-+	/*
-+	 * If we don't have a multiplexed pin entry for the requested pin then
-+	 * we assume that the pin isn't multiplexed.
-+	 */
-+	return ret ? ret : MUX_UNMUXED;
-+}
-+EXPORT_SYMBOL_GPL(picoxcell_get_pin_mux);
-+
-+static const char *group_name(struct muxed_pin *pin)
-+{
-+	int i, j;
-+
-+	for (i = 0; i < mux_info.num_groups; ++i) {
-+		struct pin_group *group = mux_info.groups[i];
-+		for (j = 0; j < group->nr_pins; ++j)
-+			if (pin == &group->pins[j])
-+				return group->name;
-+	}
-+
-+	return "<unknown>";
-+}
-+
-+static const char *pin_setting_name(struct muxed_pin *pin)
-+{
-+	const char *ret;
-+
-+	if (MUX_SD == pin->get_mux(pin))
-+		ret = "sdgpio";
-+	else if (MUX_ARM == pin->get_mux(pin))
-+		ret = "armgpio";
-+	else if (MUX_PERIPHERAL == pin->get_mux(pin))
-+		ret = "peripheral";
-+	else
-+		ret = "<invalid>";
-+
-+	return ret;
-+}
-+
-+ssize_t pin_show(struct sys_device *dev, struct sysdev_attribute *attr,
-+		 char *buf)
-+{
-+	struct muxed_pin *pin = to_multiplexed_pin(attr);
-+	const char *setting = pin_setting_name(pin);
-+	ssize_t ret = snprintf(buf, PAGE_SIZE, "%s\n", setting);
-+
-+	return ret;
-+}
-+
-+ssize_t pin_store(struct sys_device *dev, struct sysdev_attribute *attr,
-+		  const char *buf, size_t len)
-+{
-+	ssize_t ret = -EINVAL;
-+	struct muxed_pin *pin = to_multiplexed_pin(attr);
-+
-+	if (sysfs_streq(buf, "sdgpio"))
-+		ret = pin->set_mux(pin, MUX_SD);
-+	else if (sysfs_streq(buf, "armgpio"))
-+		ret = pin->set_mux(pin, MUX_ARM);
-+	else if (sysfs_streq(buf, "peripheral") ||
-+		 sysfs_streq(buf, group_name(pin)))
-+		ret = pin->set_mux(pin, MUX_PERIPHERAL);
-+
-+	return ret ?: len;
-+}
-+
-+static struct sysdev_class muxing_class = {
-+	.name		= "io_muxing",
-+};
-+
-+static struct sys_device muxing_device = {
-+	.id		= 0,
-+	.cls		= &muxing_class,
-+};
-+
-+static void __init muxing_sysfs_init(void)
-+{
-+	int i, j, err = sysdev_class_register(&muxing_class);
-+
-+	if (err) {
-+		pr_err("unable to register sysdev class (%d)\n", err);
-+		return;
-+	}
-+
-+	err = sysdev_register(&muxing_device);
-+	if (err) {
-+		pr_err("unable to register sysdev device (%d)\n", err);
-+		return;
-+	}
-+
-+	for (i = 0; i < mux_info.num_groups; ++i) {
-+		struct pin_group *group = mux_info.groups[i];
-+		for (j = 0; j < group->nr_pins; ++j) {
-+			struct muxed_pin *pin = &group->pins[j];
-+			err = sysdev_create_file(&muxing_device, &pin->attr);
-+			if (err) {
-+				pr_err("unable to create attr for %s\n",
-+				       pin->name);
-+				return;
-+			}
-+		}
-+	}
-+}
-+
-+static ssize_t io_muxing_show(struct seq_file *s, void *priv)
-+{
-+	unsigned i, j;
-+	ssize_t ret = 0;
-+
-+	ret += seq_printf(s, "%16s%16s%16s%10s%10s\n\n", "group_name",
-+			  "pin_name", "setting", "arm pin", "sd pin");
-+	for (i = 0; i < mux_info.num_groups; ++i) {
-+		struct pin_group *group = mux_info.groups[i];
-+		for (j = 0; j < group->nr_pins; ++j) {
-+			struct muxed_pin *pin = &group->pins[j];
-+			ret += seq_printf(s, "%16s%16s%16s%10d%10d\n",
-+					  group->name, pin->name,
-+					  pin_setting_name(pin),
-+					  mux_info.armgpio_number(pin->arm_pin),
-+					  mux_info.sdgpio_number(pin->sd_pin));
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static int io_muxing_debugfs_open(struct inode *inode, struct file *filp)
-+{
-+	return single_open(filp, io_muxing_show, inode->i_private);
-+}
-+
-+static const struct file_operations io_muxing_debugfs_fops = {
-+	.owner		= THIS_MODULE,
-+	.open		= io_muxing_debugfs_open,
-+	.llseek		= seq_lseek,
-+	.read		= seq_read,
-+	.release	= single_release,
-+};
-+
-+static void __init picoxcell_muxing_debugfs_init(void)
-+{
-+	/* We only get called if debugfs is enabled and configured. */
-+	struct dentry *mux_debugfs_file =
-+		debugfs_create_file("io_muxing", 0444, arch_debugfs_dir, NULL,
-+				    &io_muxing_debugfs_fops);
-+	if (IS_ERR(mux_debugfs_file)) {
-+		pr_err("failed to create io_muxing debugfs entry (%ld)\n",
-+		       PTR_ERR(mux_debugfs_file));
-+	}
-+}
-+
-+void __init picoxcell_muxing_init(struct picoxcell_soc *soc)
-+{
-+	if (soc->init_muxing)
-+		soc->init_muxing();
-+
-+	muxing_sysfs_init();
-+
-+	picoxcell_muxing_debugfs_init();
-+}
-diff --git a/arch/arm/mach-picoxcell/mux.h b/arch/arm/mach-picoxcell/mux.h
-new file mode 100644
-index 0000000..54933e6
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/mux.h
-@@ -0,0 +1,97 @@
-+/*
-+ * linux/arch/arm/mach-picoxcell/mux.h
-+ *
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#ifndef __MUX_H__
-+#define __MUX_H__
-+
-+#include <linux/sysdev.h>
-+
++#include "picoxcell_core.h"
 +#include "soc.h"
 +
-+/*
-+ * Pins can typically be:
-+ *	- a system function such as EBI, SSI etc,
-+ *	- ARM controlled GPIO.
-+ *	- picoArray controlled GPIO.
-+ *	- not multiplexed at all (MUX_UNMUXED).
-+ */
-+enum mux_setting {
-+	MUX_PERIPHERAL	= (1 << 0),
-+	MUX_ARM		= (1 << 1),
-+	MUX_SD		= (1 << 2),
-+	MUX_UNMUXED	= (1 << 3),
++enum timer_id {
++	TIMER_ID_CLOCKEVENT,
++	TIMER_ID_CLOCKSOURCE,
++	NR_TIMERS,
++};
++
++struct timer_instance {
++	void __iomem	    *base;
++	struct irqaction    irqaction;
 +};
 +
 +/*
-+ * A multiplexed pin. This defines the SD and ARM pins that are on the pad. If
-+ * the pin does not have an SD or ARM pin then set the appropriate field to
-+ * -1.
++ * We expect to have 2 timers - a freerunning one for the clock source and a
++ * periodic/oneshot one for the clock_event_device.
 + */
-+struct muxed_pin {
-+	const char		*name;
-+	int			is_dedicated_gpio;
-+	int			sd_pin;
-+	int			arm_pin;
-+	int			(*set_mux)(struct muxed_pin *pin,
-+					   enum mux_setting setting);
-+	int			(*get_mux)(struct muxed_pin *pin);
-+	struct sysdev_attribute	attr;
++static struct timer_instance timers[NR_TIMERS];
++
++static void timer_set_mode(enum clock_event_mode mode,
++			   struct clock_event_device *clk)
++{
++	struct timer_instance *timer = &timers[TIMER_ID_CLOCKEVENT];
++	unsigned long load_count = DIV_ROUND_UP(CLOCK_TICK_RATE, HZ);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/*
++		 * By default, use the kernel tick rate. The reload value can
++		 * be changed with the timer_set_next_event() function.
++		 */
++		writel(load_count, timer->base + TIMER_LOAD_COUNT_REG_OFFSET);
++		writel(TIMER_ENABLE | TIMER_MODE,
++		       timer->base + TIMER_CONTROL_REG_OFFSET);
++		break;
++
++	case CLOCK_EVT_MODE_ONESHOT:
++		writel(TIMER_MODE, timer->base + TIMER_CONTROL_REG_OFFSET);
++		break;
++
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		writel(0, timer->base + TIMER_CONTROL_REG_OFFSET);
++		break;
++	}
++}
++
++static int timer_set_next_event(unsigned long evt,
++				struct clock_event_device *clk)
++{
++	struct timer_instance *timer = &timers[TIMER_ID_CLOCKEVENT];
++
++	/* Disable the timer, write the new event then enable it. */
++	writel(0, timer->base + TIMER_CONTROL_REG_OFFSET);
++	writel(evt, timer->base + TIMER_LOAD_COUNT_REG_OFFSET);
++	writel(TIMER_ENABLE | TIMER_MODE,
++	       timer->base + TIMER_CONTROL_REG_OFFSET);
++
++	return 0;
++}
++
++static irqreturn_t timer_interrupt(int irq, void *dev_id);
++
++static struct clock_event_device clockevent_picoxcell = {
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT,
++	.shift			= 20,
++	.set_next_event		= timer_set_next_event,
++	.set_mode		= timer_set_mode,
 +};
 +
-+/*
-+ * A logical group of multiplexed pins. Typically this is grouped by what the
-+ * pins are multiplexed with e.g. system peripheral.
-+ */
-+struct pin_group {
-+	int		    nr_pins;
-+	const char	    *name;
-+	struct muxed_pin    *pins;
-+};
++static irqreturn_t timer_interrupt(int irq, void *dev_id)
++{
++	struct timer_instance *timer = &timers[TIMER_ID_CLOCKEVENT];
 +
-+extern int picoxcell_pin_set_mux(int pin_nr, enum mux_setting setting);
-+extern int picoxcell_group_set_mux(const char *group_name,
-+				   enum mux_setting setting);
-+extern int picoxcell_get_pin_mux(int pin_nr);
-+extern void picoxcell_mux_register(struct pin_group **groups, int nr_groups,
-+				   int (*arm_number)(int pin),
-+				   int (*sdgpio_number)(int pin));
-+extern void __init picoxcell_muxing_init(struct picoxcell_soc *soc);
++	/* If we are in oneshot mode, we need to stop receiving interrupts. */
++	if (CLOCK_EVT_MODE_ONESHOT == clockevent_picoxcell.mode) {
++		unsigned long val = readl(timer->base +
++					  TIMER_CONTROL_REG_OFFSET);
++		val |= TIMER_INTERRUPT_MASK;
++		writel(val, timer->base + TIMER_CONTROL_REG_OFFSET);
++	}
 +
-+extern ssize_t pin_show(struct sys_device *dev, struct sysdev_attribute *attr,
-+			char *buf);
-+extern ssize_t pin_store(struct sys_device *dev, struct sysdev_attribute *attr,
-+			 const char *buf, size_t len);
++	/* Clear the interrupt. */
++	readl(timer->base + TIMER_EOI_REG_OFFSET);
 +
++	clockevent_picoxcell.event_handler(&clockevent_picoxcell);
 +
-+#define __PIN(_name, _sd, _arm, _set, _get, _dedicated) {		      \
-+	.name		    = __stringify(_name),			      \
-+	.is_dedicated_gpio  = _dedicated,				      \
-+	.sd_pin		    = (_sd),					      \
-+	.arm_pin	    = (_arm),					      \
-+	.set_mux	    = _set,					      \
-+	.get_mux	    = _get,					      \
-+	.attr		    = _SYSDEV_ATTR(_name, 0644, pin_show, pin_store), \
++	return IRQ_HANDLED;
++}
++
++static void picoxcell_clockevent_init(struct picoxcell_soc *soc)
++{
++	struct timer_instance *inst = &timers[TIMER_ID_CLOCKEVENT];
++	const struct picoxcell_timer *timer = NULL;
++	int i;
++
++	for (i = 0; i < soc->nr_timers; ++i)
++		if (soc->timers[i].type == TIMER_TYPE_TIMER) {
++			timer = &soc->timers[i];
++			break;
++		}
++
++	BUG_ON(!timer);
++
++	/* Configure the interrupt for this timer. */
++	inst->irqaction.name	= timer->name;
++	inst->irqaction.handler	= timer_interrupt;
++	inst->irqaction.flags	= IRQF_DISABLED | IRQF_TIMER | IRQF_PROBE;
++	inst->base		= ioremap(timer->base, TIMER_SPACING);
++
++	clockevent_picoxcell.name   = timer->name;
++	clockevent_picoxcell.mult   = div_sc(CLOCK_TICK_RATE, NSEC_PER_SEC,
++					     clockevent_picoxcell.shift);
++	clockevent_picoxcell.max_delta_ns =
++		clockevent_delta2ns(0xfffffffe, &clockevent_picoxcell);
++	clockevent_picoxcell.min_delta_ns = 50000;
++	clockevent_picoxcell.cpumask = cpumask_of(0);
++
++	/* Start with the timer disabled and the interrupt enabled. */
++	writel(0, inst->base + TIMER_CONTROL_REG_OFFSET);
++	setup_irq(timer->irq, &inst->irqaction);
++
++	clockevents_register_device(&clockevent_picoxcell);
++}
++
++static cycle_t picoxcell_rtc_get_cycles(struct clocksource *cs)
++{
++	struct timer_instance *inst = &timers[TIMER_ID_CLOCKSOURCE];
++
++	return readl(inst->base + RTCLK_CCV_REG_OFFSET);
 +}
 +
 +/*
-+ * Declare a function pin that is also multiplexed with GPIO pins.
++ * Kernel assumes that sched_clock can be called early but may not have
++ * things ready yet.
 + */
-+#define PIN(_name, _sd, _arm, _set, _get) \
-+	__PIN(_name, _sd, _arm, _set, _get, 0)
++static cycle_t read_dummy(struct clocksource *cs)
++{
++	return 0;
++}
++
++static struct clocksource clocksource_picoxcell = {
++	.name	    = "rtc",
++	.rating     = 300,
++	.read	    = read_dummy,
++	.mask	    = CLOCKSOURCE_MASK(32),
++	.shift	    = 2,
++	.flags	    = CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static void __init picoxcell_clocksource_init(struct picoxcell_soc *soc)
++{
++	const struct picoxcell_timer *timer = NULL;
++	int i;
++
++	for (i = 0; i < soc->nr_timers; ++i)
++		if (soc->timers[i].type == TIMER_TYPE_RTC) {
++			timer = &soc->timers[i];
++			break;
++		}
++
++	BUG_ON(!timer);
++
++	timers[TIMER_ID_CLOCKSOURCE].base = ioremap(timer->base, SZ_4K);
++
++	/* The RTC is always running. We don't need to do any initialization. */
++	clocksource_picoxcell.mult = clocksource_hz2mult(CLOCK_TICK_RATE,
++						clocksource_picoxcell.shift);
++	clocksource_picoxcell.read = picoxcell_rtc_get_cycles;
++	clocksource_register(&clocksource_picoxcell);
++}
 +
 +/*
-+ * Declare a pure GPIO pin.
++ * Overwrite weak default sched_clock with something more precise
 + */
-+#define GPIO(_name, _sd, _arm, _set, _get) \
-+	__PIN(_name, _sd, _arm, _set, _get, 1)
++unsigned long long notrace sched_clock(void)
++{
++	const cycle_t cyc = clocksource_picoxcell.read(&clocksource_picoxcell);
 +
++	return clocksource_cyc2ns(cyc, clocksource_picoxcell.mult,
++				  clocksource_picoxcell.shift);
++}
 +
-+#endif /* __MUX_H__ */
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index 07eaa9b..8f2cc46 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.c
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -283,6 +283,9 @@ void __init picoxcell_core_init(void)
- 	/* Add the arch debugfs entry. */
- 	picoxcell_debugfs_init();
- 
-+	/* Initialise the pin muxing and gpio infrastructure. */
-+	picoxcell_muxing_init(soc);
++static void __init picoxcell_timer_init(void)
++{
++	struct picoxcell_soc *soc = picoxcell_get_soc();
 +
- 	/* Add handlers for the AXI bus snooping. */
- 	picoxcell_axi_bus_error_init();
- }
++	picoxcell_clocksource_init(soc);
++	picoxcell_clockevent_init(soc);
++}
++
++struct sys_timer picoxcell_sys_timer = {
++	.init	= picoxcell_timer_init,
++};
 -- 
 1.7.2.3
