@@ -1,48 +1,37 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 23 Nov 2010 19:02:14 +0300
-Subject: [PATCH 1/4] FB: added a structure for CPU interface to linux/fb.h
-In-Reply-To: <1290496504-4867-1-git-send-email-inki.dae@samsung.com>
-References: <> <1290496504-4867-1-git-send-email-inki.dae@samsung.com>
-Message-ID: <4CEBE586.8010007@ru.mvista.com>
+From: per.fransson.ml@gmail.com (Per Fransson)
+Date: Tue, 23 Nov 2010 17:31:17 +0100
+Subject: [PATCH] Add call to non-crashing cores through IPI
+In-Reply-To: <AANLkTikoZ+DDj6Fj-+ig=mcNydFzUO1YFZjnMsuEUq7Z@mail.gmail.com>
+References: <20101122104740.GA30744@n2100.arm.linux.org.uk>
+	<20101122112759.GA31227@n2100.arm.linux.org.uk>
+	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
+	<20101122144040.GM31227@n2100.arm.linux.org.uk>
+	<AANLkTinj5wnP4823bacK6rs3nQbw3qtqDDjYof2-ALUk@mail.gmail.com>
+	<AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
+	<AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
+	<AANLkTimC04kAFws0rAyvfARauiNvyYriJnxJ6KH+UHtU@mail.gmail.com>
+	<AANLkTikh11_Mx6Z2po9t3RDp68te5o5LdnR0hYOexF=T@mail.gmail.com>
+	<AANLkTi=u6MPrA4JqJ1C3dAC5FLZCb7vKNtDV4-bOkSBy@mail.gmail.com>
+	<20101123124138.GI14080@gw.healthdatacare.com>
+	<1290516530.6381.18.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTikoZ+DDj6Fj-+ig=mcNydFzUO1YFZjnMsuEUq7Z@mail.gmail.com>
+Message-ID: <AANLkTi=hgMzU7LjahE67Lq2x1rYAS50-k+HYMjiB_VsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+>>> But when we are crashing we have oops_in_progress set:
+>>>
+>>> ? ? ? ? WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
+>>> ? ? ? ? ? ? ? ? ? ? ?&& !oops_in_progress);
+>>>
+>>> so this warning is never printed, right?
+>>
+>> Right. So just make sure the caller doesn't set the 'wait' argument.
+>>
+>
+> Please double check it. In powerpc crashdump ?case ?oops_in_progress is not set.
+>
 
-Inki Dae wrote:
+I tried this. Didn't get the warning.
 
-> RGB or CPU interfaces could be used as display mode but framebuffer
-> framework doesn't consider CPU interface so I added this structure
-> because fb_cpumode structure could be used commonly.
-
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  include/linux/fb.h |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-
-> diff --git a/include/linux/fb.h b/include/linux/fb.h
-> index 7fca3dc..9b9842c 100644
-> --- a/include/linux/fb.h
-> +++ b/include/linux/fb.h
-> @@ -1147,6 +1147,18 @@ struct fb_videomode {
->  	u32 flag;
->  };
->  
-> +struct fb_cpumode {
-> +	const char *name;	/* optional */
-> +	u32 refresh;		/* optional */
-> +	u32 xres;
-> +	u32 yres;
-
-    I think that those two fields should happily fit into 'u16' type.
-
-> +	u32 pixclock;
-> +	u32 cs_setup;
-> +	u32 wr_setup;
-> +	u32 wr_act;
-> +	u32 wr_hold;
-
-    Suspecting the same about the above 4 fields...
-
-WBR, Sergei
+/Per
