@@ -1,112 +1,103 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Tue, 23 Nov 2010 18:49:25 +0530
-Subject: [PATCH] ARM: io: Fix namespace conflicts.
-In-Reply-To: <1286967121-5888-1-git-send-email-charu@ti.com>
-References: <1286967121-5888-1-git-send-email-charu@ti.com>
-Message-ID: <AANLkTin2VPh5ghrKCnjnC3EjwuPZF4O5aqbAjigJaGFm@mail.gmail.com>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Tue, 23 Nov 2010 22:38:06 +0900
+Subject: [PATCH v3 04/22] arm: introduce little-endian bitops
+In-Reply-To: <1290519504-3958-1-git-send-email-akinobu.mita@gmail.com>
+References: <1290519504-3958-1-git-send-email-akinobu.mita@gmail.com>
+Message-ID: <1290519504-3958-5-git-send-email-akinobu.mita@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Having __v as the variable name for the definition of different macros
-> leads to
-> the namespace pollution. For example,
-> readl(p)
-> unrolls to:
-> ({ u32 __v = ({ u32 __v = (( __u32)(__le32)(( __le32) ((void)0,
-> *(volatile unsigned int *)((p))))); __v; }); __asm__ __volatile__ ("mcr
-> p15,
-> , %0, c7, c10, 5" : : "r" (0) : "memory"); __v; });
->
-> ({ u32 __v = ({ u32 __v
-> causes sparse warning: "warning: symbol '__v' shadows an earlier one"
->
-> Using variable names which use the function name prefix across the
-> various macros avoids the namespace pollution.
->
-> With this change, ~200 sparse warnings in omap2plus_defconfig build are
-> fixed.
->
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Reviewed by: Nishanth Menon <nm@ti.com>
-> ---
-> ?Links related to the previous discussions are as follows:
->
-> ?http://www.spinics.net/lists/linux-omap/msg38569.html
-> ?http://marc.info/?t=128506336700011&r=1&w=2
->
-> ?arch/arm/include/asm/io.h | ? 32 +++++++++++++++++++++-----------
-> ?1 files changed, 21 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 1261b1f..01e4a7b 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -131,11 +131,11 @@ static inline void __iomem *__typesafe_io(unsigned
-> long addr)
-> ?#define outl(v,p) ? ? ? ? ? ? ?__raw_writel((__force __u32) \
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cpu_to_le32(v),__io(p))
->
-> -#define inb(p) ({ __u8 __v = __raw_readb(__io(p)); __v; })
-> -#define inw(p) ({ __u16 __v = le16_to_cpu((__force __le16) \
-> - ? ? ? ? ? ? ? ? ? ? ? __raw_readw(__io(p))); __v; })
-> -#define inl(p) ({ __u32 __v = le32_to_cpu((__force __le32) \
-> - ? ? ? ? ? ? ? ? ? ? ? __raw_readl(__io(p))); __v; })
-> +#define inb(p) ({ __u8 __inbv = __raw_readb(__io(p)); __inbv; })
-> +#define inw(p) ({ __u16 __inwv = le16_to_cpu((__force __le16) \
-> + ? ? ? ? ? ? ? ? ? ? ? __raw_readw(__io(p))); __inwv; })
-> +#define inl(p) ({ __u32 __inlv = le32_to_cpu((__force __le32) \
-> + ? ? ? ? ? ? ? ? ? ? ? __raw_readl(__io(p))); __inlv; })
->
-> ?#define outsb(p,d,l) ? ? ? ? ? __raw_writesb(__io(p),d,l)
-> ?#define outsw(p,d,l) ? ? ? ? ? __raw_writesw(__io(p),d,l)
-> @@ -200,9 +200,12 @@ extern void _memset_io(volatile void __iomem *, int,
-> size_t);
-> ?#define __iowmb() ? ? ? ? ? ? ?do { } while (0)
-> ?#endif
->
-> -#define readb(c) ? ? ? ? ? ? ? ({ u8 ?__v = readb_relaxed(c); __iormb();
-> __v; })
-> -#define readw(c) ? ? ? ? ? ? ? ({ u16 __v = readw_relaxed(c); __iormb();
-> __v; })
-> -#define readl(c) ? ? ? ? ? ? ? ({ u32 __v = readl_relaxed(c); __iormb();
-> __v; })
-> +#define readb(c) ? ? ? ? ? ? ? ({ u8 ?__readbv = readb_relaxed(c); \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __readbv; })
-> +#define readw(c) ? ? ? ? ? ? ? ({ u16 __readwv = readw_relaxed(c); \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __readwv; })
-> +#define readl(c) ? ? ? ? ? ? ? ({ u32 __readlv = readl_relaxed(c);\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __readlv; })
->
-> ?#define writeb(v,c) ? ? ? ? ? ?({ __iowmb(); writeb_relaxed(v,c); })
-> ?#define writew(v,c) ? ? ? ? ? ?({ __iowmb(); writew_relaxed(v,c); })
-> @@ -258,9 +261,16 @@ extern void _memset_io(volatile void __iomem *, int,
-> size_t);
-> ?* io{read,write}{8,16,32} macros
-> ?*/
-> ?#ifndef ioread8
-> -#define ioread8(p) ? ? ({ unsigned int __v = __raw_readb(p); __iormb();
-> __v; })
-> -#define ioread16(p) ? ?({ unsigned int __v = le16_to_cpu((__force
-> __le16)__raw_readw(p)); __iormb(); __v; })
-> -#define ioread32(p) ? ?({ unsigned int __v = le32_to_cpu((__force
-> __le32)__raw_readl(p)); __iormb(); __v; })
-> +#define ioread8(p) ? ? ({ unsigned int __ioread8v = __raw_readb(p); \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __ioread8v; })
-> +#define ioread16(p) ? ?({ unsigned int __ioread16v = \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?le16_to_cpu((__force __le16) \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readw(p)); __iormb(); \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__ioread16v; })
-> +#define ioread32(p) ? ?({ unsigned int __ioread32v = \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?le32_to_cpu((__force __le32) \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readl(p)); __iormb(); \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__ioread32v; })
->
-> ?#define iowrite8(v,p) ?({ __iowmb(); (void)__raw_writeb(v, p); })
-> ?#define iowrite16(v,p) ({ __iowmb(); (void)__raw_writew((__force
-> __u16)cpu_to_le16(v), p); })
-> --
-> 1.7.0.4
+Introduce little-endian bit operations by renaming native ext2 bit
+operations. The ext2 bit operations are kept as wrapper macros using
+little-endian bit operations to maintain bisectability until the
+conversions are finished.
 
-> Tony,
-> Can you please ack this,if no comments.
+Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+No change from previous submission
+ arch/arm/include/asm/bitops.h |   46 +++++++++++++++++++++++++++++-----------
+ 1 files changed, 33 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+index 338ff19..29adaca 100644
+--- a/arch/arm/include/asm/bitops.h
++++ b/arch/arm/include/asm/bitops.h
+@@ -303,41 +303,61 @@ static inline int fls(int x)
+ #include <asm-generic/bitops/hweight.h>
+ #include <asm-generic/bitops/lock.h>
+ 
++#define __set_le_bit(nr, p)			\
++	__set_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define __clear_le_bit(nr, p)			\
++	__clear_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define __test_and_set_le_bit(nr, p)			\
++		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define test_and_set_le_bit(nr, p)          \
++		test_and_set_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define __test_and_clear_le_bit(nr, p)			\
++		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define test_and_clear_le_bit(nr, p)	\
++		test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define test_le_bit(nr, p)			\
++		test_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define find_first_zero_le_bit(p, sz)		\
++		_find_first_zero_bit_le(p, sz)
++#define find_next_zero_le_bit(p, sz, off)	\
++		_find_next_zero_bit_le(p, sz, off)
++#define find_next_le_bit(p, sz, off) \
++		_find_next_bit_le(p, sz, off)
+ /*
+  * Ext2 is defined to use little-endian byte ordering.
+  * These do not need to be atomic.
+  */
+ #define ext2_set_bit(nr,p)			\
+-		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_set_le_bit(nr, (unsigned long *)(p))
+ #define ext2_set_bit_atomic(lock,nr,p)          \
+-                test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_and_set_le_bit(nr, (unsigned long *)(p))
+ #define ext2_clear_bit(nr,p)			\
+-		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_clear_le_bit(nr, (unsigned long *)(p))
+ #define ext2_clear_bit_atomic(lock,nr,p)        \
+-                test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_and_clear_le_bit(nr, (unsigned long *)(p))
+ #define ext2_test_bit(nr,p)			\
+-		test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_le_bit(nr, (unsigned long *)(p))
+ #define ext2_find_first_zero_bit(p,sz)		\
+-		_find_first_zero_bit_le(p,sz)
++		find_first_zero_le_bit((unsigned long *)(p), sz)
+ #define ext2_find_next_zero_bit(p,sz,off)	\
+-		_find_next_zero_bit_le(p,sz,off)
++		find_next_zero_le_bit((unsigned long *)(p), sz, off)
+ #define ext2_find_next_bit(p, sz, off) \
+-		_find_next_bit_le(p, sz, off)
++		find_next_le_bit((unsigned long *)(p), sz, off)
+ 
+ /*
+  * Minix is defined to use little-endian byte ordering.
+  * These do not need to be atomic.
+  */
+ #define minix_set_bit(nr,p)			\
+-		__set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__set_le_bit(nr, (unsigned long *)(p))
+ #define minix_test_bit(nr,p)			\
+-		test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_le_bit(nr, (unsigned long *)(p))
+ #define minix_test_and_set_bit(nr,p)		\
+-		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_set_le_bit(nr, (unsigned long *)(p))
+ #define minix_test_and_clear_bit(nr,p)		\
+-		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_clear_le_bit(nr, (unsigned long *)(p))
+ #define minix_find_first_zero_bit(p,sz)		\
+-		_find_first_zero_bit_le(p,sz)
++		find_first_zero_le_bit((unsigned long *)(p), sz)
+ 
+ #endif /* __KERNEL__ */
+ 
+-- 
+1.7.3.2
