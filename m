@@ -1,126 +1,20 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 23 Nov 2010 15:01:17 +0100
-Subject: [PATCH] ARM: io: Fix namespace conflicts.
-In-Reply-To: <1286967121-5888-1-git-send-email-charu@ti.com>
-References: <1286967121-5888-1-git-send-email-charu@ti.com>
-Message-ID: <20101123140116.GP4693@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 23 Nov 2010 22:08:25 +0800
+Subject: [PATCH 1/2] pxa: add usb clock for pxa168/pxa910
+In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D15054F6FCA@SC-VEXCH2.marvell.com>
+References: <1290418347-6861-1-git-send-email-chao.xie@marvell.com>
+	<AANLkTimq2--4rXRO9XbL3DnsTQhJmh-A4b3RarMy1xa=@mail.gmail.com>
+	<AAD1C6EB06EE3649B35B7E026785068D15054F6FCA@SC-VEXCH2.marvell.com>
+Message-ID: <AANLkTinkNOvWd1En4qoaTpebgce40-7A9bPad3Y+Yk82@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Nov 23, 2010 at 11:12 AM, Chao Xie <cxie4@marvell.com> wrote:
+> Hi
+> Modified as you suggested. Patch is attached.
+> ...
+> ? ? ? ?INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
+> + ? ? ? INIT_CLKREG(&clk_u2o, "pxa-u2o", "U2OCLK"),
+> ...
 
-On Wed, Oct 13, 2010 at 04:22:01PM +0530, Varadarajan, Charulatha wrote:
-> From: Sourav Poddar <sourav.poddar@ti.com>
-> 
-> Having __v as the variable name for the definition of different macros leads to
-> the namespace pollution. For example,
-> readl(p)
-> unrolls to:
-> ({ u32 __v = ({ u32 __v = (( __u32)(__le32)(( __le32) ((void)0,
-> *(volatile unsigned int *)((p))))); __v; }); __asm__ __volatile__ ("mcr
-> p15,
-> , %0, c7, c10, 5" : : "r" (0) : "memory"); __v; });
-> 
-> ({ u32 __v = ({ u32 __v
-> causes sparse warning: "warning: symbol '__v' shadows an earlier one"
-> 
-> Using variable names which use the function name prefix across the
-> various macros avoids the namespace pollution.
-> 
-> With this change, ~200 sparse warnings in omap2plus_defconfig build are
-> fixed.
-> 
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Reviewed by: Nishanth Menon <nm@ti.com>
-> ---
->  Links related to the previous discussions are as follows:
->  
->  http://www.spinics.net/lists/linux-omap/msg38569.html
->  http://marc.info/?t=128506336700011&r=1&w=2
-> 
->  arch/arm/include/asm/io.h |   32 +++++++++++++++++++++-----------
->  1 files changed, 21 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 1261b1f..01e4a7b 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -131,11 +131,11 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
->  #define outl(v,p)		__raw_writel((__force __u32) \
->  					cpu_to_le32(v),__io(p))
->  
-> -#define inb(p)	({ __u8 __v = __raw_readb(__io(p)); __v; })
-> -#define inw(p)	({ __u16 __v = le16_to_cpu((__force __le16) \
-> -			__raw_readw(__io(p))); __v; })
-> -#define inl(p)	({ __u32 __v = le32_to_cpu((__force __le32) \
-> -			__raw_readl(__io(p))); __v; })
-> +#define inb(p)	({ __u8 __inbv = __raw_readb(__io(p)); __inbv; })
-> +#define inw(p)	({ __u16 __inwv = le16_to_cpu((__force __le16) \
-> +			__raw_readw(__io(p))); __inwv; })
-> +#define inl(p)	({ __u32 __inlv = le32_to_cpu((__force __le32) \
-> +			__raw_readl(__io(p))); __inlv; })
-I wonder if it's not better to make these static inlines instead.  Then
-no naming conflicts can occur.  And maybe we'd catch some more strange
-things because p gets a proper type.
-
-I don't know how this influences gcc though.
-
-Ah, and maybe some more tricks need to be applied, because at least some
-macros can be overwritten per architecture.
-
-Just my 0.02?
-Uwe
-
->  
->  #define outsb(p,d,l)		__raw_writesb(__io(p),d,l)
->  #define outsw(p,d,l)		__raw_writesw(__io(p),d,l)
-> @@ -200,9 +200,12 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->  #define __iowmb()		do { } while (0)
->  #endif
->  
-> -#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
-> -#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
-> -#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-> +#define readb(c)		({ u8  __readbv = readb_relaxed(c); \
-> +					 __iormb(); __readbv; })
-> +#define readw(c)		({ u16 __readwv = readw_relaxed(c); \
-> +					 __iormb(); __readwv; })
-> +#define readl(c)		({ u32 __readlv = readl_relaxed(c);\
-> +					 __iormb(); __readlv; })
->  
->  #define writeb(v,c)		({ __iowmb(); writeb_relaxed(v,c); })
->  #define writew(v,c)		({ __iowmb(); writew_relaxed(v,c); })
-> @@ -258,9 +261,16 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->   * io{read,write}{8,16,32} macros
->   */
->  #ifndef ioread8
-> -#define ioread8(p)	({ unsigned int __v = __raw_readb(p); __iormb(); __v; })
-> -#define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __v; })
-> -#define ioread32(p)	({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __v; })
-> +#define ioread8(p)	({ unsigned int __ioread8v = __raw_readb(p); \
-> +					 __iormb(); __ioread8v; })
-> +#define ioread16(p)	({ unsigned int __ioread16v = \
-> +					 le16_to_cpu((__force __le16) \
-> +					__raw_readw(p)); __iormb(); \
-> +					 __ioread16v; })
-> +#define ioread32(p)	({ unsigned int __ioread32v = \
-> +					 le32_to_cpu((__force __le32) \
-> +					__raw_readl(p)); __iormb(); \
-> +					 __ioread32v; })
->  
->  #define iowrite8(v,p)	({ __iowmb(); (void)__raw_writeb(v, p); })
->  #define iowrite16(v,p)	({ __iowmb(); (void)__raw_writew((__force __u16)cpu_to_le16(v), p); })
-> -- 
-> 1.7.0.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Applied to 'devel'.
