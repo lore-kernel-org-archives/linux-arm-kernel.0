@@ -1,40 +1,43 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 23 Nov 2010 15:23:27 -0800 (PST)
-Subject: About multi-line printk and the need (not) to repeat loglevel
-	markers [Was: Re: [PATCH] ARM: mx3/pcm037: properly allocate memory for
-	mx3-camera]
-In-Reply-To: <20101123223344.GE26510@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.30.1011231520150.20819-100000@mail.perches.com>
+From: ionut.nicu@mindbit.ro (Ionut Nicu)
+Date: Wed, 24 Nov 2010 01:23:27 +0200
+Subject: [PATCH v2 2/4] drivers: hwspinlock: add OMAP implementation
+In-Reply-To: <1290526740-27624-3-git-send-email-ohad@wizery.com>
+References: <1290526740-27624-1-git-send-email-ohad@wizery.com>
+	<1290526740-27624-3-git-send-email-ohad@wizery.com>
+Message-ID: <1290554607.3647.12.camel@atlantis.mindbit.ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Nov 2010, Russell King - ARM Linux wrote:
+Hi Ohad,
 
-> On Wed, Nov 24, 2010 at 07:16:06AM +0900, Linus Torvalds wrote:
-> > No. The KERN_WARNING in the middle of a string is always totally
-> > bogus. There is no "should be". It's just wrong.
-> Oh dear.
-> Sounds like this is something which needs auditing as a result of your
-> change, and sounds like its something that kernelnewbies people could
-> do.  My own greps haven't revealed any cases though.
+On Tue, 2010-11-23 at 17:38 +0200, Ohad Ben-Cohen wrote:
+> From: Simon Que <sque@ti.com>
+> 
+> Add hwspinlock support for the OMAP4 Hardware Spinlock device.
+> 
 
-They used to.  I tried to fix all of the ones I could find
-about a year ago.
+<snip>
 
-commit ad361c9884e809340f6daca80d56a9e9c871690a
-Author: Joe Perches <joe@perches.com>
-Date:   Mon Jul 6 13:05:40 2009 -0700
+> +
+> +	io_base = ioremap(res->start, resource_size(res));
+> +	if (!io_base) {
+> +		ret = -ENOMEM;
+> +		goto free_state;
+> +	}
+> +
+> +	/* Determine number of locks */
+> +	i = readl(io_base + SYSSTATUS_OFFSET);
+> +	i >>= SPINLOCK_NUMLOCKS_BIT_OFFSET;
+> +
+> +	/* exactly one of the four least significant bits must be 1 */
+> +	if (!i || !is_power_of_2(i) || i > 8) {
+> +		ret = -EINVAL;
+> +		goto iounmap_base;
+> +	}
+> +
 
-    Remove multiple KERN_ prefixes from printk formats
+At iounmap_base you unmap state->io_base, but that's set only after this
+check. You should probably iounmap(io_base).
 
-    Commit 5fd29d6ccbc98884569d6f3105aeca70858b3e0f ("printk: clean up
-    handling of log-levels and newlines") changed printk semantics.  printk
-    lines with multiple KERN_<level> prefixes are no longer emitted as
-    before the patch.
-
-    <level> is now included in the output on each additional use.
-
-    Remove all uses of multiple KERN_<level>s in formats.
-
-    Signed-off-by: Joe Perches <joe@perches.com>
-    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Regards,
+Ionut.
