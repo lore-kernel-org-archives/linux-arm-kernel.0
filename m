@@ -1,64 +1,112 @@
-From: muvarov@gmail.com (Maxim Uvarov)
-Date: Tue, 23 Nov 2010 16:01:33 +0300
-Subject: [PATCH] Add call to non-crashing cores through IPI
-In-Reply-To: <1290516530.6381.18.camel@e102109-lin.cambridge.arm.com>
-References: <20101122104740.GA30744@n2100.arm.linux.org.uk>
-	<20101122112759.GA31227@n2100.arm.linux.org.uk>
-	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
-	<20101122144040.GM31227@n2100.arm.linux.org.uk>
-	<AANLkTinj5wnP4823bacK6rs3nQbw3qtqDDjYof2-ALUk@mail.gmail.com>
-	<AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
-	<AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
-	<AANLkTimC04kAFws0rAyvfARauiNvyYriJnxJ6KH+UHtU@mail.gmail.com>
-	<AANLkTikh11_Mx6Z2po9t3RDp68te5o5LdnR0hYOexF=T@mail.gmail.com>
-	<AANLkTi=u6MPrA4JqJ1C3dAC5FLZCb7vKNtDV4-bOkSBy@mail.gmail.com>
-	<20101123124138.GI14080@gw.healthdatacare.com>
-	<1290516530.6381.18.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTikoZ+DDj6Fj-+ig=mcNydFzUO1YFZjnMsuEUq7Z@mail.gmail.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Tue, 23 Nov 2010 18:49:25 +0530
+Subject: [PATCH] ARM: io: Fix namespace conflicts.
+In-Reply-To: <1286967121-5888-1-git-send-email-charu@ti.com>
+References: <1286967121-5888-1-git-send-email-charu@ti.com>
+Message-ID: <AANLkTin2VPh5ghrKCnjnC3EjwuPZF4O5aqbAjigJaGFm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/23 Catalin Marinas <catalin.marinas@arm.com>:
-> On Tue, 2010-11-23 at 12:41 +0000, Mika Westerberg wrote:
->> On Tue, Nov 23, 2010 at 12:37:04PM +0000, Catalin Marinas wrote:
->> > On 23 November 2010 10:57, Per Fransson <per.fransson.ml@gmail.com> wrote:
->> > >>> Am I right that deadlock can occur only if the same IPI was sent?
->> > >>
->> > >> Not necessarily. It depends on whether the CPU issuing the IPI needs
->> > >> to wait for the completion of the cross-call. If you don't need to
->> > >> wait, you can send the IPI with the interrupts disabled (the platform
->> > >> smp_cross_call is already called with interrupts disabled).
->> > >>
->> > >
->> > > Well, smp_call_function() only optionally waits. As long as we choose not to,
->> > > using that function to ask the other cores to save their states and idle, should
->> > > be ok, right? In that case we don't need another ipi_msg_type and we can do
->> > > it with the interrupts of the ipi caller disabled.
->> >
->> > I think that should work but we still have a WARN_ON_ONCE in the
->> > generic smp_call_function_*() if interrupts are disabled.
->>
->> But when we are crashing we have oops_in_progress set:
->>
->> ? ? ? ? WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
->> ? ? ? ? ? ? ? ? ? ? ?&& !oops_in_progress);
->>
->> so this warning is never printed, right?
+> Having __v as the variable name for the definition of different macros
+> leads to
+> the namespace pollution. For example,
+> readl(p)
+> unrolls to:
+> ({ u32 __v = ({ u32 __v = (( __u32)(__le32)(( __le32) ((void)0,
+> *(volatile unsigned int *)((p))))); __v; }); __asm__ __volatile__ ("mcr
+> p15,
+> , %0, c7, c10, 5" : : "r" (0) : "memory"); __v; });
 >
-> Right. So just make sure the caller doesn't set the 'wait' argument.
+> ({ u32 __v = ({ u32 __v
+> causes sparse warning: "warning: symbol '__v' shadows an earlier one"
 >
-
-Please double check it. In powerpc crashdump  case  oops_in_progress is not set.
-
-Maxim.
+> Using variable names which use the function name prefix across the
+> various macros avoids the namespace pollution.
+>
+> With this change, ~200 sparse warnings in omap2plus_defconfig build are
+> fixed.
+>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Charulatha V <charu@ti.com>
+> Reviewed by: Nishanth Menon <nm@ti.com>
+> ---
+> ?Links related to the previous discussions are as follows:
+>
+> ?http://www.spinics.net/lists/linux-omap/msg38569.html
+> ?http://marc.info/?t=128506336700011&r=1&w=2
+>
+> ?arch/arm/include/asm/io.h | ? 32 +++++++++++++++++++++-----------
+> ?1 files changed, 21 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 1261b1f..01e4a7b 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -131,11 +131,11 @@ static inline void __iomem *__typesafe_io(unsigned
+> long addr)
+> ?#define outl(v,p) ? ? ? ? ? ? ?__raw_writel((__force __u32) \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cpu_to_le32(v),__io(p))
+>
+> -#define inb(p) ({ __u8 __v = __raw_readb(__io(p)); __v; })
+> -#define inw(p) ({ __u16 __v = le16_to_cpu((__force __le16) \
+> - ? ? ? ? ? ? ? ? ? ? ? __raw_readw(__io(p))); __v; })
+> -#define inl(p) ({ __u32 __v = le32_to_cpu((__force __le32) \
+> - ? ? ? ? ? ? ? ? ? ? ? __raw_readl(__io(p))); __v; })
+> +#define inb(p) ({ __u8 __inbv = __raw_readb(__io(p)); __inbv; })
+> +#define inw(p) ({ __u16 __inwv = le16_to_cpu((__force __le16) \
+> + ? ? ? ? ? ? ? ? ? ? ? __raw_readw(__io(p))); __inwv; })
+> +#define inl(p) ({ __u32 __inlv = le32_to_cpu((__force __le32) \
+> + ? ? ? ? ? ? ? ? ? ? ? __raw_readl(__io(p))); __inlv; })
+>
+> ?#define outsb(p,d,l) ? ? ? ? ? __raw_writesb(__io(p),d,l)
+> ?#define outsw(p,d,l) ? ? ? ? ? __raw_writesw(__io(p),d,l)
+> @@ -200,9 +200,12 @@ extern void _memset_io(volatile void __iomem *, int,
+> size_t);
+> ?#define __iowmb() ? ? ? ? ? ? ?do { } while (0)
+> ?#endif
+>
+> -#define readb(c) ? ? ? ? ? ? ? ({ u8 ?__v = readb_relaxed(c); __iormb();
+> __v; })
+> -#define readw(c) ? ? ? ? ? ? ? ({ u16 __v = readw_relaxed(c); __iormb();
+> __v; })
+> -#define readl(c) ? ? ? ? ? ? ? ({ u32 __v = readl_relaxed(c); __iormb();
+> __v; })
+> +#define readb(c) ? ? ? ? ? ? ? ({ u8 ?__readbv = readb_relaxed(c); \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __readbv; })
+> +#define readw(c) ? ? ? ? ? ? ? ({ u16 __readwv = readw_relaxed(c); \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __readwv; })
+> +#define readl(c) ? ? ? ? ? ? ? ({ u32 __readlv = readl_relaxed(c);\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __readlv; })
+>
+> ?#define writeb(v,c) ? ? ? ? ? ?({ __iowmb(); writeb_relaxed(v,c); })
+> ?#define writew(v,c) ? ? ? ? ? ?({ __iowmb(); writew_relaxed(v,c); })
+> @@ -258,9 +261,16 @@ extern void _memset_io(volatile void __iomem *, int,
+> size_t);
+> ?* io{read,write}{8,16,32} macros
+> ?*/
+> ?#ifndef ioread8
+> -#define ioread8(p) ? ? ({ unsigned int __v = __raw_readb(p); __iormb();
+> __v; })
+> -#define ioread16(p) ? ?({ unsigned int __v = le16_to_cpu((__force
+> __le16)__raw_readw(p)); __iormb(); __v; })
+> -#define ioread32(p) ? ?({ unsigned int __v = le32_to_cpu((__force
+> __le32)__raw_readl(p)); __iormb(); __v; })
+> +#define ioread8(p) ? ? ({ unsigned int __ioread8v = __raw_readb(p); \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iormb(); __ioread8v; })
+> +#define ioread16(p) ? ?({ unsigned int __ioread16v = \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?le16_to_cpu((__force __le16) \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readw(p)); __iormb(); \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__ioread16v; })
+> +#define ioread32(p) ? ?({ unsigned int __ioread32v = \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?le32_to_cpu((__force __le32) \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readl(p)); __iormb(); \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__ioread32v; })
+>
+> ?#define iowrite8(v,p) ?({ __iowmb(); (void)__raw_writeb(v, p); })
+> ?#define iowrite16(v,p) ({ __iowmb(); (void)__raw_writew((__force
+> __u16)cpu_to_le16(v), p); })
 > --
-> Catalin
->
->
->
+> 1.7.0.4
 
-
-
--- 
-Best regards,
-Maxim Uvarov
+> Tony,
+> Can you please ack this,if no comments.
