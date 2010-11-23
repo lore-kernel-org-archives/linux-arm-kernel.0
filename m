@@ -1,110 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 23 Nov 2010 10:43:02 +0100
-Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
-In-Reply-To: <20101011152516.GF27153@n2100.arm.linux.org.uk>
-References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
-Message-ID: <1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: cxie4@marvell.com (Chao Xie)
+Date: Tue, 23 Nov 2010 01:42:24 -0800
+Subject: highmem and VMALLOC_END
+Message-ID: <AAD1C6EB06EE3649B35B7E026785068D15054F7060@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to memzero the buffer because dma_alloc_coherent zeros
-the memory for us.
+hi
+in arch/arm/mmu,c, when define CONFIG_HIGHMEM, in sanity_check_meminfo, it will check the memory banks, 
+and if the memory bank is in high memory, it will be marked as highmem.
+	lowmem_limit = __pa(vmalloc_min - 1) + 1;
+	memblock_set_current_limit(lowmem_limit);
 
-This fixes:
+	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+		struct membank *bank = &meminfo.bank[j];
+		*bank = meminfo.bank[i];
 
-	BUG: Your driver calls ioremap() on system memory.  This leads
-	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
-	<4>will fail in the next kernel release.  Please fix your driver.
-
-Tested-by: Michael Grzeschik <mgr@pengutronix.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
-
-it seems to work this way, still I'd like to have some feedback if this
-is done right.  Russell?
-
-I assume sending a patch to remove the <4> is just a waste of time,
-isn't it?
-
-Best regards
-Uwe
-
- arch/arm/mach-mx3/mach-pcm037.c |   36 ++++++++++++++++++++----------------
- 1 files changed, 20 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
-index 2ff3f66..265757f 100644
---- a/arch/arm/mach-mx3/mach-pcm037.c
-+++ b/arch/arm/mach-mx3/mach-pcm037.c
-@@ -32,6 +32,7 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
- #include <linux/gfp.h>
-+#include <linux/memblock.h>
- 
- #include <media/soc_camera.h>
- 
-@@ -413,29 +414,22 @@ struct mx3_camera_pdata camera_pdata = {
- 	.mclk_10khz	= 2000,
- };
- 
-+static phys_addr_t mx3_camera_base __initdata;
-+#define MX3_CAMERA_BUF_SIZE SZ_4M
-+
- static int __init pcm037_camera_alloc_dma(const size_t buf_size)
- {
--	dma_addr_t dma_handle;
--	void *buf;
- 	int dma;
- 
--	if (buf_size < 2 * 1024 * 1024)
--		return -EINVAL;
--
--	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
--	if (!buf) {
--		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
--		return -ENOMEM;
--	}
--
--	memset(buf, 0, buf_size);
--
- 	dma = dma_declare_coherent_memory(&mx3_camera.dev,
--					dma_handle, dma_handle, buf_size,
-+					mx3_camera_base, mx3_camera_base,
-+					MX3_CAMERA_BUF_SIZE,
- 					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
- 
--	/* The way we call dma_declare_coherent_memory only a malloc can fail */
--	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
-+	if (!(dma & DMA_MEMORY_MAP))
-+		return -ENOMEM;
-+
-+	return 0;
- }
- 
- static struct platform_device *devices[] __initdata = {
-@@ -676,6 +670,15 @@ struct sys_timer pcm037_timer = {
- 	.init	= pcm037_timer_init,
- };
- 
-+static void __init pcm037_reserve(void)
-+{
-+	/* reserve 4 MiB for mx3-camera */
-+	mx3_camera_base = memblock_alloc(MX3_CAMERA_BUF_SIZE,
-+			/* ??? */ MX3_CAMERA_BUF_SIZE);
-+	memblock_free(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-+	memblock_remove(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-+}
-+
- MACHINE_START(PCM037, "Phytec Phycore pcm037")
- 	/* Maintainer: Pengutronix */
- 	.boot_params    = MX3x_PHYS_OFFSET + 0x100,
-@@ -683,4 +686,5 @@ MACHINE_START(PCM037, "Phytec Phycore pcm037")
- 	.init_irq       = mx31_init_irq,
- 	.init_machine   = mxc_board_init,
- 	.timer          = &pcm037_timer,
-+	.reserve	= pcm037_reserve,
- MACHINE_END
--- 
-1.7.2.3
+#ifdef CONFIG_HIGHMEM
+		if (__va(bank->start) > vmalloc_min ||
+			__va(bank->start) < (void *)PAGE_OFFSET)
+				highmem = 1;
+if VMALLOC_END is 0xe8000000, and "vmalloc" is 0x18000000, vmalloc_min will be 0xd0000000.
+There are two banks, each bank is 256MB. Based on __phys_to_virt(), __va(first bank start) is 
+0xc0000000, while __va(second bank start) is 0xd0000000. Based on previous if, the second bank 
+is not marked highmem, but in fact it will occupy the virtual address from 0xd0000000 to 0xdfffffff,
+and it should be in high memory.
+It will be fine if change the code as
+--		if (__va(bank->start) > vmalloc_min ||
+++		if (__va(bank->start) >= vmalloc_min ||
+Is it a bug or I understand wrong? Thanks.
