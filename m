@@ -1,212 +1,100 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 23 Nov 2010 10:06:09 +0000
-Subject: [RFC PATCH 08/13] picoxcell: add cpufreq support
+Date: Tue, 23 Nov 2010 10:06:11 +0000
+Subject: [RFC PATCH 10/13] picoxcell: add chained GPIO IRQ handlers
 In-Reply-To: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
 References: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1290506774-17895-9-git-send-email-jamie@jamieiles.com>
+Message-ID: <1290506774-17895-11-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PC3X3 devices have a PLL to control the ARM core speed. Add a cpufreq
-driver so that we can run at optimum speed and power.
+The 8 bits of port A on the ARM GPIO of all devices are capable of
+generating interrupts. Provide chained handlers so that these pins can
+be used as interrupts and the sensitivity and polarity can be set.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/Makefile         |    1 +
- arch/arm/mach-picoxcell/cpufreq.c        |  145 ++++++++++++++++++++++++++++++
- arch/arm/mach-picoxcell/picoxcell_core.c |    3 +
- arch/arm/mach-picoxcell/picoxcell_core.h |    9 ++
- 4 files changed, 158 insertions(+), 0 deletions(-)
+ arch/arm/mach-picoxcell/include/mach/gpio.h |    2 +
+ arch/arm/mach-picoxcell/picoxcell_core.c    |   41 +++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index 371698f..6249ee8 100644
---- a/arch/arm/mach-picoxcell/Makefile
-+++ b/arch/arm/mach-picoxcell/Makefile
-@@ -4,3 +4,4 @@ obj-y				:= picoxcell_core.o axi2cfg.o \
- 				   gpio.o \
- 				   clk.o \
- 				   devices.o
-+obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
-diff --git a/arch/arm/mach-picoxcell/cpufreq.c b/arch/arm/mach-picoxcell/cpufreq.c
-new file mode 100644
-index 0000000..7fa8719
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/cpufreq.c
-@@ -0,0 +1,145 @@
-+/*
-+ * Copyright (c) 2010 picoChip Designs Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#define pr_fmt(fmt) "picoxcell_cpufreq: " fmt
+diff --git a/arch/arm/mach-picoxcell/include/mach/gpio.h b/arch/arm/mach-picoxcell/include/mach/gpio.h
+index ce55c3d..8955e20 100644
+--- a/arch/arm/mach-picoxcell/include/mach/gpio.h
++++ b/arch/arm/mach-picoxcell/include/mach/gpio.h
+@@ -152,6 +152,8 @@ enum {
+ 
+ #ifdef __KERNEL__
+ 
++extern struct irq_chip armgpio_irqchip;
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/cpufreq.h>
-+
-+#include <mach/hardware.h>
-+
-+#include "picoxcell_core.h"
-+
-+static struct {
-+	struct clk  *arm_clk;
-+} cpufreq;
-+
-+/* The minimum frequency that we'll allow the ARM to run at (in KHz). */
-+#define PC3X3_PLL_MIN_KHZ			    140000
-+/* The maximum frequency that we'll allow the ARM to run at (in KHz). */
-+#define PC3X3_PLL_MAX_KHZ			    700000
-+/* The step between frequencies that the PLL can generate. */
-+#define PC3X3_PLL_STEP				    5000
-+
-+/*
-+ * The fuse block contains an 8 bit number which is the maximum clkf value
-+ * that we can program. If this isn't programmed then allow 700Mhz operation.
-+ * If not, limit the maximum speed to whatever this value corresponds to.
-+ */
-+static unsigned int picoxcell_cpufreq_max_clkf(void)
-+{
-+#define MAX_CLKF_FUSE	904
-+#define MAX_CLKF_REG	IO_ADDRESS(PICOXCELL_FUSE_BASE + 904 / 8)
-+	u8 max_clkf = readb(MAX_CLKF_REG);
-+
-+	return max_clkf ? ((max_clkf + 1) * 5) / 1000 : PC3X3_PLL_MAX_KHZ;
-+}
-+
-+/*
-+ * Initialise the new policy. We allow the PLL to go to the minimum speed but
-+ * limit it to either 700Mhz or the frequency that corresponds to the clkf
-+ * value in ARM_PLL_M_NUMBER fuses in the fuse block (if nonzero), whichever
-+ * is smallest.
-+ *
-+ * A change of 20% should take ~2uS so we specify the transition latency as
-+ * 50uS. This should allow jumps from 400MHz->700MHz within this period.
-+ */
-+static int picoxcell_cpufreq_init_policy(struct cpufreq_policy *policy)
-+{
-+	policy->cpuinfo.min_freq		= PC3X3_PLL_MIN_KHZ;
-+	policy->cpuinfo.max_freq		= picoxcell_cpufreq_max_clkf();
-+	policy->cpuinfo.transition_latency	= 50000;
-+	policy->cur				= clk_get_rate(cpufreq.arm_clk);
-+	policy->min				= PC3X3_PLL_MIN_KHZ;
-+	policy->max				= picoxcell_cpufreq_max_clkf();
-+
-+	return 0;
-+}
-+
-+static int picoxcell_cpufreq_verify(struct cpufreq_policy *policy)
-+{
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+				     policy->cpuinfo.max_freq);
-+
-+	policy->min = clk_round_rate(cpufreq.arm_clk, policy->min);
-+	policy->max = clk_round_rate(cpufreq.arm_clk, policy->max);
-+
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+				     policy->cpuinfo.max_freq);
-+
-+	return 0;
-+}
-+
-+static int picoxcell_cpufreq_target(struct cpufreq_policy *policy,
-+				    unsigned int target_freq,
-+				    unsigned int relation)
-+{
-+	int ret = 0;
-+	struct cpufreq_freqs freqs;
-+
-+	if (target_freq > policy->max)
-+		target_freq = policy->max;
-+	if (target_freq < policy->min)
-+		target_freq = policy->min;
-+
-+	target_freq = clk_round_rate(cpufreq.arm_clk, target_freq);
-+
-+	freqs.old = clk_get_rate(cpufreq.arm_clk);
-+	freqs.new = target_freq;
-+	freqs.cpu = policy->cpu;
-+
-+	if (freqs.new == freqs.old)
-+		return 0;
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+
-+	ret = clk_set_rate(cpufreq.arm_clk, target_freq);
-+	if (ret) {
-+		pr_err("unable to set cpufreq rate to %u\n", target_freq);
-+		freqs.new = freqs.old;
-+	}
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+
-+	return ret;
-+}
-+
-+static unsigned int picoxcell_cpufreq_get(unsigned int cpu)
-+{
-+	return (unsigned int)clk_get_rate(cpufreq.arm_clk);
-+}
-+
-+static struct cpufreq_driver picoxcell_cpufreq_driver = {
-+	.owner		= THIS_MODULE,
-+	.flags		= CPUFREQ_STICKY,
-+	.name		= "picoxcell",
-+	.init		= picoxcell_cpufreq_init_policy,
-+	.verify		= picoxcell_cpufreq_verify,
-+	.target		= picoxcell_cpufreq_target,
-+	.get		= picoxcell_cpufreq_get,
-+};
-+
-+int __init picoxcell_cpufreq_init(void)
-+{
-+	cpufreq.arm_clk = clk_get(NULL, "arm");
-+
-+	/*
-+	 * If there isn't a clock then there's nothing to do. Some devices
-+	 * e.g. PC3X2 don't have scalable clocks.
-+	 */
-+	if (IS_ERR_OR_NULL(cpufreq.arm_clk)) {
-+		pr_info("cpufreq: no arm clock available - disabling scaling\n");
-+		return 0;
-+	}
-+
-+	return cpufreq_register_driver(&picoxcell_cpufreq_driver);
-+}
+ static inline int gpio_get_value(unsigned gpio)
+ {
+ 	return __gpio_get_value(gpio);
 diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index 7c51e0f..f3e0279 100644
+index 8c1195b..8386c83 100644
 --- a/arch/arm/mach-picoxcell/picoxcell_core.c
 +++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -300,4 +300,7 @@ void __init picoxcell_core_init(void)
+@@ -25,6 +25,19 @@
+ #include "picoxcell_core.h"
+ #include "soc.h"
  
- 	/* Register the devices. */
- 	picoxcell_add_devices();
-+
-+	if (picoxcell_has_feature(PICOXCELL_FEATURE_CPUFREQ))
-+		WARN_ON(picoxcell_cpufreq_init());
- }
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.h b/arch/arm/mach-picoxcell/picoxcell_core.h
-index 9647b7a..f6d90bf 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.h
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.h
-@@ -21,4 +21,13 @@ extern void __init picoxcell_map_io(void);
- extern struct sys_timer picoxcell_sys_timer;
- extern void __init picoxcell_add_devices(void);
- 
-+# ifdef CONFIG_CPU_FREQ
-+extern int __init picoxcell_cpufreq_init(void);
-+# else /* CONFIG_CPU_FREQ */
-+static inline int picoxcell_cpufreq_init(void)
++static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 +{
-+	return 0;
++	unsigned real_irq = (irq - IRQ_GPIO0 + __IRQ_GPIO0);
++	struct irq_desc *real_desc = irq_desc + real_irq;
++	/*
++	 * We have 8 GPIO pins that can generate interrupts and each one has
++	 * it's own interrupt bit in the VIC. All we need to do is do a
++	 * one-to-one translation from the virtual IRQ number to the real one
++	 * and call the handler.
++	 */
++	desc_handle_irq(real_irq, real_desc);
 +}
-+# endif /* CONFIG_CPU_FREQ */
 +
- #endif /* __ASM_ARCH_PICOXCELL_CORE_H__ */
+ struct picoxcell_soc *picoxcell_get_soc(void)
+ {
+ 	unsigned long device_id = readl(IO_ADDRESS(PICOXCELL_AXI2CFG_BASE +
+@@ -37,6 +50,11 @@ struct picoxcell_soc *picoxcell_get_soc(void)
+ 
+ void __init picoxcell_init_irq(void)
+ {
++#define GPIO_INT_EN_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
++				       GPIO_INT_EN_REG_OFFSET)
++#define GPIO_EOI_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
++				       GPIO_PORT_A_EOI_REG_OFFSET)
++	unsigned i;
+ 	u32 vic0_resume_sources =
+ 		(1 << (IRQ_AXI2PICO8 & 31)) |
+ 		(1 << (IRQ_EMAC & 31)) |
+@@ -45,6 +63,29 @@ void __init picoxcell_init_irq(void)
+ 	vic_init(IO_ADDRESS(PICOXCELL_VIC0_BASE), 32, 0xFFFFFFFE,
+ 		 vic0_resume_sources);
+ 	vic_init(IO_ADDRESS(PICOXCELL_VIC1_BASE), 0, 0x7FF, 0);
++
++	/*
++	 * We want to enable/disable interrupts for the GPIO pins through the
++	 * GPIO block itself. To do this we install a chained handler. If a
++	 * user requests one of the __IRQ_GPIOn interrupts then the GPIO block
++	 * won't get configured.  We provide these interrupts below as virtual
++	 * ones that will configure the GPIO block and enable the source in
++	 * the VIC.
++	 *
++	 * The chained handler simply converts from the virtual IRQ handler to
++	 * the real interrupt source and calls the GPIO IRQ handler.
++	 */
++	writel(0, GPIO_INT_EN_REG);
++	writel(~0, GPIO_EOI_REG);
++	for (i = IRQ_GPIO0; i <= IRQ_GPIO7; ++i) {
++		set_irq_chip(i, &armgpio_irqchip);
++		set_irq_handler(i, handle_level_irq);
++		irq_desc[i].status |= IRQ_LEVEL;
++		set_irq_flags(i, IRQF_VALID);
++	}
++
++	for (i = __IRQ_GPIO0; i <= __IRQ_GPIO7; ++i)
++		set_irq_chained_handler(i, gpio_irq_handler);
+ }
+ 
+ static const char *picoxcell_get_partname(void)
 -- 
 1.7.2.3
