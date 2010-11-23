@@ -1,42 +1,41 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 23 Nov 2010 10:06:07 +0000
-Subject: [RFC PATCH 06/13] picoxcell: add support for system clks
+Date: Tue, 23 Nov 2010 10:06:08 +0000
+Subject: [RFC PATCH 07/13] picoxcell: add common SoC devices
 In-Reply-To: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
 References: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1290506774-17895-7-git-send-email-jamie@jamieiles.com>
+Message-ID: <1290506774-17895-8-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The different picoXcell device variants have different numbers of clocks
-and different capabilities (PC3X2 doesn't have any gateable or
-controllable clocks). Add the infrastructure necessary for device
-variants to provide their own clock implementation.
+Add the devices common to all picoXcell variants (UART and PMU). Other
+peripherals such as DMA, SPI, fuses and EMAC will be added later
+with driver support.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/Makefile              |    3 +-
- arch/arm/mach-picoxcell/clk.c                 |  140 +++++++++++++++++++++++++
- arch/arm/mach-picoxcell/include/mach/clkdev.h |   69 ++++++++++++
- arch/arm/mach-picoxcell/picoxcell_core.c      |    4 +
- 4 files changed, 215 insertions(+), 1 deletions(-)
+ arch/arm/mach-picoxcell/Makefile         |    3 +-
+ arch/arm/mach-picoxcell/devices.c        |   77 ++++++++++++++++++++++++++++++
+ arch/arm/mach-picoxcell/picoxcell_core.c |    3 +
+ arch/arm/mach-picoxcell/picoxcell_core.h |    1 +
+ 4 files changed, 83 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index f6b3765..8d8b4e8 100644
+index 8d8b4e8..371698f 100644
 --- a/arch/arm/mach-picoxcell/Makefile
 +++ b/arch/arm/mach-picoxcell/Makefile
-@@ -1,4 +1,5 @@
- obj-y				:= picoxcell_core.o axi2cfg.o \
+@@ -2,4 +2,5 @@ obj-y				:= picoxcell_core.o axi2cfg.o \
  				   time.o \
  				   mux.o \
--				   gpio.o
-+				   gpio.o \
-+				   clk.o
-diff --git a/arch/arm/mach-picoxcell/clk.c b/arch/arm/mach-picoxcell/clk.c
+ 				   gpio.o \
+-				   clk.o
++				   clk.o \
++				   devices.o
+diff --git a/arch/arm/mach-picoxcell/devices.c b/arch/arm/mach-picoxcell/devices.c
 new file mode 100644
-index 0000000..8bae6df
+index 0000000..6368b92
 --- /dev/null
-+++ b/arch/arm/mach-picoxcell/clk.c
-@@ -0,0 +1,140 @@
++++ b/arch/arm/mach-picoxcell/devices.c
+@@ -0,0 +1,77 @@
 +/*
 + * Copyright (c) 2010 Picochip Ltd., Jamie Iles
 + *
@@ -46,240 +45,96 @@ index 0000000..8bae6df
 + *
 + * All enquiries to support at picochip.com
 + */
-+#include <linux/clk.h>
-+#include <linux/debugfs.h>
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/seq_file.h>
-+#include <linux/spinlock.h>
++#include <linux/serial_8250.h>
++#include <linux/serial_reg.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <mach/hardware.h>
++#include <mach/irqs.h>
 +
-+#include <mach/clkdev.h>
++#include <asm/pmu.h>
 +
-+static DEFINE_SPINLOCK(clk_lock);
-+static LIST_HEAD(picoxcell_clks);
++#include "picoxcell_core.h"
 +
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	return clk->get_rate ? clk->get_rate(clk) : clk->rate;
-+}
-+EXPORT_SYMBOL(clk_get_rate);
-+
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	return clk->round_rate ? clk->round_rate(clk, rate) : -EOPNOTSUPP;
-+}
-+EXPORT_SYMBOL(clk_round_rate);
-+
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	return clk->set_rate ? clk->set_rate(clk, rate) : 0;
-+}
-+EXPORT_SYMBOL(clk_set_rate);
-+
-+int __clk_enable(struct clk *clk)
-+{
-+	if (++clk->enable_count > 0) {
-+		if (clk->enable)
-+			clk->enable(clk);
-+	}
-+
-+	return 0;
-+}
-+
-+int clk_enable(struct clk *clk)
-+{
-+	unsigned long flags;
-+	int ret;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+	ret = __clk_enable(clk);
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_enable);
-+
-+void __clk_disable(struct clk *clk)
-+{
-+	if (--clk->enable_count <= 0) {
-+		if (clk->disable)
-+			clk->disable(clk);
-+	}
-+}
-+
-+void clk_disable(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+	__clk_disable(clk);
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+}
-+EXPORT_SYMBOL(clk_disable);
-+
-+static int clk_is_enabled(struct clk *clk)
-+{
-+	return clk->is_enabled ? clk->is_enabled(clk) : 1;
-+}
-+
-+static ssize_t clocks_show(struct seq_file *s, void *priv)
-+{
-+	struct clk *clk;
-+	ssize_t ret = 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+
-+	ret += seq_printf(s, "%16s%16s%16s\n\n", "name", "enabled", "rate");
-+	list_for_each_entry(clk, &picoxcell_clks, head) {
-+		ret += seq_printf(s, "%16s%16s%16d\n",
-+				  clk->cl_lookup->dev_id ?:
-+					clk->cl_lookup->con_id,
-+				  clk_is_enabled(clk) ? "enabled" : "disabled",
-+				  clk->rate >= 0 ? clk->rate :
-+					clk->get_rate(clk) * 1000);
-+	}
-+
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+
-+	return ret;
-+}
-+
-+static int clocks_debugfs_open(struct inode *inode, struct file *filp)
-+{
-+	return single_open(filp, clocks_show, inode->i_private);
-+}
-+
-+static const struct file_operations clocks_debugfs_fops = {
-+	.owner		= THIS_MODULE,
-+	.open		= clocks_debugfs_open,
-+	.llseek		= seq_lseek,
-+	.read		= seq_read,
-+	.release	= single_release,
++#define UART_USR_REG_OFFSET			0x7C
++static struct plat_serial8250_port serial_platform_data[] = {
++	{
++		.membase	= iomem_ptr(PICOXCELL_UART1_BASE),
++		.mapbase	= PICOXCELL_UART1_BASE,
++		.irq		= IRQ_UART1,
++		.flags		= UPF_BOOT_AUTOCONF,
++		.iotype		= UPIO_DWAPB32,
++		.regshift	= 2,
++		.uartclk	= PICOXCELL_BASE_BAUD,
++		.private_data	= (void *)(PHYS_TO_IO(PICOXCELL_UART1_BASE +
++						      UART_USR_REG_OFFSET)),
++	},
++	{
++		.membase	= iomem_ptr(PICOXCELL_UART2_BASE),
++		.mapbase	= PICOXCELL_UART2_BASE,
++		.irq		= IRQ_UART2,
++		.flags		= UPF_BOOT_AUTOCONF,
++		.iotype		= UPIO_DWAPB32,
++		.regshift	= 2,
++		.uartclk	= PICOXCELL_BASE_BAUD,
++		.private_data	= (void *)(PHYS_TO_IO(PICOXCELL_UART2_BASE +
++						      UART_USR_REG_OFFSET)),
++	},
++	{},
 +};
 +
-+void __init picoxcell_clk_debugfs_init(void)
-+{
-+	/* We only get called if debugfs is enabled and configured. */
-+	struct dentry *clocks_debugfs_file =
-+		debugfs_create_file("clocks", 0444, arch_debugfs_dir, NULL,
-+				    &clocks_debugfs_fops);
-+	if (IS_ERR(clocks_debugfs_file)) {
-+		pr_err("failed to create clocks debugfs entry (%ld)\n",
-+		       PTR_ERR(clocks_debugfs_file));
-+	}
-+}
-+
-+void picoxcell_clk_add(struct clk_lookup *lookup)
-+{
-+	INIT_LIST_HEAD(&lookup->node);
-+	clkdev_add(lookup);
-+	lookup->clk->cl_lookup = lookup;
-+	list_add_tail(&lookup->clk->head, &picoxcell_clks);
-+}
-diff --git a/arch/arm/mach-picoxcell/include/mach/clkdev.h b/arch/arm/mach-picoxcell/include/mach/clkdev.h
-new file mode 100644
-index 0000000..f2e5fb0
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/include/mach/clkdev.h
-@@ -0,0 +1,69 @@
-+/*
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#ifndef __PICOXCELL_CLKDEV_H__
-+#define __PICOXCELL_CLKDEV_H__
-+
-+#include <asm/clkdev.h>
-+
-+struct clk {
-+	struct list_head    head;
-+	struct clk_lookup   *cl_lookup;
-+	int		    rate;
-+	unsigned	    min, max, step; /* min, max and frequency steps for
-+					       variable rate clocks in KHz. */
-+	int		    enable_count;
-+	int		    clk_num;
-+	void		    (*enable)(struct clk *clk);
-+	void		    (*disable)(struct clk *clk);
-+	int		    (*is_enabled)(struct clk *clk);
-+	long		    (*round_rate)(struct clk *clk, unsigned long rate);
-+	int		    (*set_rate)(struct clk *clk, unsigned long rate);
-+	int		    (*get_rate)(struct clk *clk);
++static struct platform_device serial_device = {
++	.name			= "serial8250",
++	.id			= 0,
++	.dev.platform_data	= serial_platform_data,
 +};
 +
-+static inline int __clk_get(struct clk *clk)
++static struct resource pmu_resource = {
++	.start			= IRQ_NPMUIRQ,
++	.end			= IRQ_NPMUIRQ,
++	.flags			= IORESOURCE_IRQ,
++};
++
++static struct platform_device pmu_device = {
++	.name			= "arm-pmu",
++	.id			= ARM_PMU_DEVICE_CPU,
++	.num_resources		= 1,
++	.resource		= &pmu_resource,
++};
++
++static struct __initdata platform_device *common_devices[] = {
++	&serial_device,
++	&pmu_device,
++};
++
++void __init picoxcell_add_devices(void)
 +{
-+	return 1;
++	WARN_ON(platform_add_devices(common_devices,
++				     ARRAY_SIZE(common_devices)));
 +}
-+
-+static inline void __clk_put(struct clk *clk)
-+{
-+}
-+
-+extern void __init picoxcell_clk_debugfs_init(void);
-+extern void picoxcell_clk_add(struct clk_lookup *lookup);
-+extern int __clk_enable(struct clk *clk);
-+extern void __clk_disable(struct clk *clk);
-+
-+/*
-+ * Declare a new clock with a given rate and ID. All clocks are enabled by
-+ * default.
-+ */
-+#define FIXED_CLK(__name, __rate, __id)					\
-+	static struct clk __name ## _clk = {				\
-+		.rate		= __rate,				\
-+		.clk_num	= __id,					\
-+		.enable_count	= 1,					\
-+	}
-+
-+#define VARIABLE_CLK(__name, __id, __min, __max, __step)		\
-+	static struct clk __name ## _clk = {				\
-+		.clk_num	= __id,					\
-+		.enable_count	= 1,					\
-+		.rate		= -1,					\
-+		.min		= __min,				\
-+		.max		= __max,				\
-+		.step		= __step,				\
-+	}
-+
-+#define CLK_LOOKUP(__dev_id, __con_id, __clk) \
-+	{ .dev_id = __dev_id, .con_id = __con_id, .clk = __clk }
-+
-+#endif /* __PICOXCELL_CLKDEV_H__ */
 diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index fe2a147..450b3fad 100644
+index 450b3fad..7c51e0f 100644
 --- a/arch/arm/mach-picoxcell/picoxcell_core.c
 +++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -18,6 +18,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach-types.h>
+@@ -297,4 +297,7 @@ void __init picoxcell_core_init(void)
  
-+#include <mach/clkdev.h>
- #include <mach/hardware.h>
- 
- #include "mux.h"
-@@ -152,6 +153,7 @@ static void __init picoxcell_debugfs_init(void)
- 		arch_debugfs_dir = NULL;
- 		return;
- 	}
-+	picoxcell_clk_debugfs_init();
- }
- 
- static struct map_desc __initdata picoxcell_io_desc[] = {
-@@ -284,6 +286,8 @@ void __init picoxcell_core_init(void)
- 	/* Add the arch debugfs entry. */
- 	picoxcell_debugfs_init();
- 
-+	soc->init_clocks();
+ 	/* Add handlers for the AXI bus snooping. */
+ 	picoxcell_axi_bus_error_init();
 +
- 	/* Initialise the pin muxing and gpio infrastructure. */
- 	picoxcell_muxing_init(soc);
++	/* Register the devices. */
++	picoxcell_add_devices();
+ }
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.h b/arch/arm/mach-picoxcell/picoxcell_core.h
+index 941d1a6..9647b7a 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.h
++++ b/arch/arm/mach-picoxcell/picoxcell_core.h
+@@ -19,5 +19,6 @@ extern void __init picoxcell_core_init(void);
+ extern void __init picoxcell_init_irq(void);
+ extern void __init picoxcell_map_io(void);
+ extern struct sys_timer picoxcell_sys_timer;
++extern void __init picoxcell_add_devices(void);
  
+ #endif /* __ASM_ARCH_PICOXCELL_CORE_H__ */
 -- 
 1.7.2.3
