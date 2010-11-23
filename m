@@ -1,52 +1,69 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 24 Nov 2010 07:16:06 +0900
-Subject: About multi-line printk and the need (not) to repeat loglevel
-	markers [Was: Re: [PATCH] ARM: mx3/pcm037: properly allocate memory for
-	mx3-camera]
-In-Reply-To: <20101123105830.GO4693@pengutronix.de>
-References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
-	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20101123101210.GA18170@n2100.arm.linux.org.uk>
-	<20101123103940.GN4693@pengutronix.de>
-	<20101123105830.GO4693@pengutronix.de>
-Message-ID: <AANLkTinmky17XZZPh7QvcY_r=66f_PwzRYFPUSvhiJGK@mail.gmail.com>
+From: jajones@nvidia.com (James Jones)
+Date: Tue, 23 Nov 2010 15:28:25 -0800
+Subject: [PATCH] ARM: Fix find_next_zero_bit and related assembly
+In-Reply-To: <alpine.LFD.2.00.1011231625380.9313@xanadu.home>
+References: <1289524615-22484-1-git-send-email-jajones@nvidia.com>
+	<alpine.LFD.2.00.1011231625380.9313@xanadu.home>
+Message-ID: <201011231528.25668.jajones@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-10/11/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->
-> BTW, I just noticed that Linus wrote:
->
-> ? ? ? ?Additionally, if no newline existed, one is added (unless the
-> ? ? ? ?log-level is the explicit KERN_CONT marker, to explicitly show
-> ? ? ? ?that it's a continuation of a previous line).
->
-> This seems to be unimplemented, otherwise the output of
->
-> ? ? ? ?printk(KERN_ERR "foo bar baz ");
-> ? ? ? ?printk("buz\n" KERN_WARNING "fiz\n");
->
-> should be
->
-> ? ? ? ?"foo bar baz \n" at error level
-> ? ? ? ?"buz\n<4>fiz\n" at default level
+On Tuesday 23 November 2010 13:26:47 Nicolas Pitre wrote:
+> On Thu, 11 Nov 2010, James Jones wrote:
+> > The find_next_bit, find_first_bit, find_next_zero_bit
+> > and find_first_zero_bit functions were not properly
+> > clamping to the maxbit argument at the bit level. They
+> > were instead only checking maxbit at the byte level.
+> > To fix this, add a compare and a conditional move
+> > instruction to the end of the common bit-within-the-
+> > byte code used by all the functions and be sure not to
+> > clobber the maxbit argument before it is used.
+> > 
+> > Signed-off-by: James Jones <jajones@nvidia.com>
+> > Tested-by: Stephen Warren <swarren@nvidia.com>
+> 
+> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> Please send to RMK's patch system.
 
-No. The KERN_WARNING in the middle of a string is always totally
-bogus. There is no "should be". It's just wrong.
+Thanks for the review.  It's already in the patch system, but I updated the 
+entry to include your reviewed-by line.
 
-The "\n" is added automatically iff there is a log-level marker at the
-beginning of the string (with LOG_CONT being the exception). So
+-James
 
-   printk("foo bar baz ");
-   printk(KERN_WARNING "fiz\n");
-
-should output two lines ("foo bar baz" with the default loglevel, and
-"fiz" with KERN_WARNING). Even though there is no explicit "\n" there
-for the first one.
-
-But KERN_XYZ anywhere but in the beginning of the string do not
-matter. Adding newlines changes none of that. It doesn't make the
-marker beginning of the string, it just makes it beginning of the
-line.
-
-   Linus
+> > ---
+> > 
+> >  arch/arm/lib/findbit.S |    6 ++++--
+> >  1 files changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
+> > index 1e4cbd4..64f6bc1 100644
+> > --- a/arch/arm/lib/findbit.S
+> > +++ b/arch/arm/lib/findbit.S
+> > @@ -174,8 +174,8 @@ ENDPROC(_find_next_bit_be)
+> > 
+> >   */
+> >  
+> >  .L_found:
+> >  #if __LINUX_ARM_ARCH__ >= 5
+> > 
+> > -		rsb	r1, r3, #0
+> > -		and	r3, r3, r1
+> > +		rsb	r0, r3, #0
+> > +		and	r3, r3, r0
+> > 
+> >  		clz	r3, r3
+> >  		rsb	r3, r3, #31
+> >  		add	r0, r2, r3
+> > 
+> > @@ -190,5 +190,7 @@ ENDPROC(_find_next_bit_be)
+> > 
+> >  		addeq	r2, r2, #1
+> >  		mov	r0, r2
+> >  
+> >  #endif
+> > 
+> > +		cmp	r1, r0			@ Clamp to maxbit
+> > +		movlo	r0, r1
+> > 
+> >  		mov	pc, lr
