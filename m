@@ -1,43 +1,173 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 23 Nov 2010 10:06:06 +0000
-Subject: [RFC PATCH 05/13] picoxcell: add gpio infrastructure
+Date: Tue, 23 Nov 2010 10:06:14 +0000
+Subject: [RFC PATCH 13/13] picoxcell: add support for the PC7302 development
+	board
 In-Reply-To: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
 References: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1290506774-17895-6-git-send-email-jamie@jamieiles.com>
+Message-ID: <1290506774-17895-14-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a gpio infrastructure for picoXcell devices. This adds support for
-both the ARM GPIO peripheral and the SDGPIO pins that are in the
-picoArray domain and accessed through the AXI2CFG. This implements a set
-of gpiolib chips and also adds an extension to use the sigma-delta
-capabilities of the SDGPIO pins in kernelspace.
+The PC7302 development board is capable of taking both PC3X2 and PC3X3
+devices and features NOR flash, NAND flash, SPI NOR flash a serial
+console, 100Mb Ethernet and a number of picoArray peripherals.
+
+This patch provides initial support for running on the PC7302 board.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/Makefile            |    3 +-
- arch/arm/mach-picoxcell/gpio.c              |  726 +++++++++++++++++++++++++++
- arch/arm/mach-picoxcell/include/mach/gpio.h |  187 +++++++
- arch/arm/mach-picoxcell/picoxcell_core.c    |    5 +
- 4 files changed, 920 insertions(+), 1 deletions(-)
+ arch/arm/configs/pc7302_defconfig      |  102 ++++++++++++++++++
+ arch/arm/mach-picoxcell/Kconfig        |    9 ++
+ arch/arm/mach-picoxcell/Makefile       |    1 +
+ arch/arm/mach-picoxcell/board_pc7302.c |  184 ++++++++++++++++++++++++++++++++
+ 4 files changed, 296 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/configs/pc7302_defconfig b/arch/arm/configs/pc7302_defconfig
+new file mode 100644
+index 0000000..23a2c72
+--- /dev/null
++++ b/arch/arm/configs/pc7302_defconfig
+@@ -0,0 +1,102 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_RELAY=y
++CONFIG_EMBEDDED=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_KALLSYMS_EXTRA_PASS=y
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_KPROBES=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_MODULE_SRCVERSION_ALL=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_PICOXCELL=y
++CONFIG_CPU_32v6K=y
++CONFIG_ARM_ERRATA_411920=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_UACCESS_WITH_MEMCPY=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_FPE_NWFPE=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/mdev"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_JEDECPROBE=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_GPIO=y
++CONFIG_MTD_UBI=y
++# CONFIG_BLK_DEV is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=32
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_HW_RANDOM is not set
++CONFIG_GPIO_SYSFS=y
++# CONFIG_HWMON is not set
++# CONFIG_MFD_SUPPORT is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++CONFIG_JFFS2_FS=y
++CONFIG_JFFS2_SUMMARY=y
++CONFIG_UBIFS_FS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_STRIP_ASM_SYMS=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_PREEMPT is not set
++# CONFIG_BKL is not set
++CONFIG_DEBUG_INFO=y
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRYPTO_MANAGER=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++CONFIG_CRC_CCITT=y
++CONFIG_LIBCRC32C=y
+diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
+index 671cadc..e00e14b 100644
+--- a/arch/arm/mach-picoxcell/Kconfig
++++ b/arch/arm/mach-picoxcell/Kconfig
+@@ -16,6 +16,15 @@ config PICOXCELL_PC3X3
+ 	  Include support for picoChip PC3x3 family of devices. This includes
+ 	  PC313, PC323 and PC333.
+ 
++config BOARD_PC7302
++	bool "Support PC7302 Board"
++	depends on PICOXCELL_PC3X2 || PICOXCELL_PC3X3
++	default y
++	help
++          Include support for the picoChip PC7302 platform. This platform is
++	  can take any of the PC3X2 or PC3X3 devices and includes SPI NOR
++	  flash, parallel NOR flash and NAND flash.
++
+ config PC3X3_STOP_WDT_IN_SUSPEND
+ 	bool "Stop WDT in PM suspend"
+ 	depends on PICOCHIP_PC3X3
 diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index 5e9a7cd..f6b3765 100644
+index d95b2b2..0138d96 100644
 --- a/arch/arm/mach-picoxcell/Makefile
 +++ b/arch/arm/mach-picoxcell/Makefile
-@@ -1,3 +1,4 @@
- obj-y				:= picoxcell_core.o axi2cfg.o \
- 				   time.o \
--				   mux.o
-+				   mux.o \
-+				   gpio.o
-diff --git a/arch/arm/mach-picoxcell/gpio.c b/arch/arm/mach-picoxcell/gpio.c
+@@ -8,3 +8,4 @@ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ obj-$(CONFIG_PM)		+= pm.o
+ obj-$(CONFIG_PICOXCELL_PC3X2)	+= pc3x2.o
+ obj-$(CONFIG_PICOXCELL_PC3X3)	+= pc3x3.o
++obj-$(CONFIG_BOARD_PC7302)	+= board_pc7302.o
+diff --git a/arch/arm/mach-picoxcell/board_pc7302.c b/arch/arm/mach-picoxcell/board_pc7302.c
 new file mode 100644
-index 0000000..0c32dae
+index 0000000..7250601
 --- /dev/null
-+++ b/arch/arm/mach-picoxcell/gpio.c
-@@ -0,0 +1,726 @@
++++ b/arch/arm/mach-picoxcell/board_pc7302.c
+@@ -0,0 +1,184 @@
 +/*
++ * linux/arch/arm/mach-picoxcell/board_pc7302.c
++ *
 + * Copyright (c) 2010 Picochip Ltd., Jamie Iles
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -46,938 +176,178 @@ index 0000000..0c32dae
 + *
 + * All enquiries to support at picochip.com
 + */
-+#define pr_fmt(fmt) "picoxcellgpio: " fmt
-+
 +#include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
 +#include <linux/interrupt.h>
-+#include <linux/spinlock.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/nand-gpio.h>
++#include <linux/mtd/physmap.h>
++#include <linux/spi/flash.h>
++
 +#include <mach/hardware.h>
++#include <asm/leds.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
 +
 +#include "mux.h"
++#include "picoxcell_core.h"
 +
-+static struct {
-+	void __iomem	*armgpio_virt;
-+	int		armgpio_base;
-+	int		sdgpio_base;
-+	int		nr_sdgpio;
-+} gpio_info;
-+
-+static DECLARE_BITMAP(pin_status, ARCH_NR_GPIOS);
-+static DEFINE_SPINLOCK(armgpio_lock);
-+
-+static int armgpio_request(struct gpio_chip *chip, unsigned offset)
++static long pc7302_panic_blink(int state)
 +{
-+	enum mux_setting mux;
-+
-+	if (test_and_set_bit(offset + chip->base, pin_status))
-+		return -EBUSY;
-+
-+	/* Check the pin has been correctly multiplexed. */
-+	mux = picoxcell_get_pin_mux(offset + chip->base);
-+	if (!(mux & (MUX_ARM | MUX_UNMUXED))) {
-+		/* The pin has an inconsistent mux setting. */
-+		pr_warning("attempt to request armgpio%u which is not correctly multiplexed\n",
-+			   chip->base + offset);
-+		clear_bit(offset + chip->base, pin_status);
-+		return -EIO;
-+	}
-+
++	writel(state ? 0xFF : 0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
++					    GPIO_SW_PORT_C_DR_REG_OFFSET));
 +	return 0;
 +}
 +
-+static void armgpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	clear_bit(offset + chip->base, pin_status);
-+}
-+
-+#define GPIO_SW_PORT_A_EXT_REG_OFFSET	GPIO_EXT_PORT_A_REG_OFFSET
-+#define GPIO_SW_PORT_B_EXT_REG_OFFSET	GPIO_EXT_PORT_B_REG_OFFSET
-+#define GPIO_SW_PORT_D_EXT_REG_OFFSET	GPIO_EXT_PORT_D_REG_OFFSET
-+
-+static inline int armgpio_block_nr(unsigned gpio_nr)
-+{
-+	return gpio_nr - gpio_info.armgpio_base;
-+}
-+
-+#define __ARMGPIO_REG(_gpio_base, _reg)					    \
-+	({								    \
-+		void __iomem *ret = NULL;				    \
-+		int __gpio_nr = armgpio_block_nr(_gpio_base);		    \
-+		if (__gpio_nr < 8)					    \
-+			ret = (gpio_info.armgpio_virt +			    \
-+				GPIO_SW_PORT_A_##_reg##_REG_OFFSET);	    \
-+		else if (__gpio_nr < 24)				    \
-+			ret = (gpio_info.armgpio_virt +			    \
-+				GPIO_SW_PORT_B_##_reg##_REG_OFFSET);	    \
-+		else							    \
-+			ret = (gpio_info.armgpio_virt +			    \
-+				GPIO_SW_PORT_D_##_reg##_REG_OFFSET);	    \
-+		ret;							    \
-+	})
-+
-+#define ARMGPIO_DR(_gpio_base)	    __ARMGPIO_REG(_gpio_base, DR)
-+#define ARMGPIO_DDR(_gpio_base)	    __ARMGPIO_REG(_gpio_base, DDR)
-+#define ARMGPIO_CTL(_gpio_base)	    __ARMGPIO_REG(_gpio_base, CTL)
-+#define ARMGPIO_EXT(_gpio_base)	    __ARMGPIO_REG(_gpio_base, EXT)
-+
-+static inline unsigned armgpio_offset(unsigned offset)
++static void pc7302_panic_init(void)
 +{
 +	/*
-+	 * The arm gpios are controlled via three sets of registers. The
-+	 * register addressing is already taken care of by the __ARMGPIO_REG
-+	 * macro, this takes care of the bit offsets within each register.
++	 * We have a BOOT_ERROR pin on PC7302. Reuse that for signalling when
++	 * the kernel panics. There is only 1 bit wired up to port C but it
++	 * won't hurt to configure all of them.
 +	 */
-+	if (offset < 8) /* GPIO Port A*/
-+		return offset;
-+	else if (offset < 24) /* GPIO Port B */
-+		return offset - 8;
-+	else /* GPIO Port D */
-+		return offset - 24;
++	writel(0xF, IO_ADDRESS(PICOXCELL_GPIO_BASE +
++			       GPIO_SW_PORT_C_DDR_REG_OFFSET));
++	writel(0x0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
++			       GPIO_SW_PORT_C_CTL_REG_OFFSET));
++
++	panic_blink = pc7302_panic_blink;
 +}
 +
-+static int armgpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	void __iomem *ddr = ARMGPIO_DDR(chip->base + offset);
-+	void __iomem *cr = ARMGPIO_CTL(chip->base + offset);
-+	unsigned long flags, val, bit_offset = armgpio_offset(offset);
-+
-+	spin_lock_irqsave(&armgpio_lock, flags);
-+	/* Mark the pin as an output. */
-+	val = readl(ddr);
-+	val &= ~(1 << bit_offset);
-+	writel(val, ddr);
-+
-+	/* Set the pin as software controlled. */
-+	val = readl(cr);
-+	val &= ~(1 << bit_offset);
-+	writel(val, cr);
-+	spin_unlock_irqrestore(&armgpio_lock, flags);
-+
-+	return 0;
-+}
-+
-+static void armgpio_set(struct gpio_chip *chip, unsigned offset, int value);
-+
-+static int armgpio_direction_output(struct gpio_chip *chip, unsigned offset,
-+				    int value)
-+{
-+	void __iomem *ddr = ARMGPIO_DDR(chip->base + offset);
-+	void __iomem *cr = ARMGPIO_CTL(chip->base + offset);
-+	unsigned long flags, val, bit_offset = armgpio_offset(offset);
-+
-+	/* Set the value first so we don't glitch. */
-+	armgpio_set(chip, offset, value);
-+
-+	spin_lock_irqsave(&armgpio_lock, flags);
-+	/* Mark the pin as an output. */
-+	val = readl(ddr);
-+	val |= (1 << bit_offset);
-+	writel(val, ddr);
-+
-+	/* Set the pin as software controlled. */
-+	val = readl(cr);
-+	val &= ~(1 << bit_offset);
-+	writel(val, cr);
-+	spin_unlock_irqrestore(&armgpio_lock, flags);
-+
-+	return 0;
-+}
-+
-+static int armgpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	void __iomem *ext = ARMGPIO_EXT(chip->base + offset);
-+	unsigned long bit_offset = armgpio_offset(offset);
-+
-+	return !!(readl(ext) & (1 << bit_offset));
-+}
-+
-+static void armgpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	void __iomem *dr = ARMGPIO_DR(chip->base + offset);
-+	unsigned long val, flags, bit_offset = armgpio_offset(offset);
-+
-+	spin_lock_irqsave(&armgpio_lock, flags);
-+	val = readl(dr);
-+	val &= ~(1 << bit_offset);
-+	val |= (!!value << bit_offset);
-+	writel(val, dr);
-+	spin_unlock_irqrestore(&armgpio_lock, flags);
-+}
-+
-+static int armgpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	if (offset < gpio_info.armgpio_base + 8)
-+		return IRQ_GPIO0 + offset;
-+	return -EINVAL;
-+}
-+
-+#define INT_EN_REG	    (gpio_info.armgpio_virt + GPIO_INT_EN_REG_OFFSET)
-+#define INT_MASK_REG	    (gpio_info.armgpio_virt + GPIO_INT_MASK_REG_OFFSET)
-+#define INT_TYPE_REG	    (gpio_info.armgpio_virt + \
-+			     GPIO_INT_TYPE_LEVEL_REG_OFFSET)
-+#define INT_POLARITY_REG    (gpio_info.armgpio_virt + \
-+			     GPIO_INT_POLARITY_REG_OFFSET)
-+#define INT_STATUS_REG	    (gpio_info.armgpio_virt + \
-+			     GPIO_INT_STATUS_REG_OFFSET)
-+#define EOI_REG		    (gpio_info.armgpio_virt + \
-+			     GPIO_PORT_A_EOI_REG_OFFSET)
-+
-+static void armgpio_irq_enable(unsigned int irq)
-+{
-+	int gpio = irq_to_gpio(irq);
-+	void __iomem *port_inten = INT_EN_REG;
-+	unsigned long val;
-+
-+	val = readl(port_inten);
-+	val |= (1 << gpio);
-+	writel(val, port_inten);
-+}
-+
-+static void armgpio_irq_disable(unsigned int irq)
-+{
-+	int gpio = irq_to_gpio(irq);
-+	void __iomem *port_inten = INT_EN_REG;
-+	unsigned long val;
-+
-+	val = readl(port_inten);
-+	val &= ~(1 << gpio);
-+	writel(val, port_inten);
-+}
-+
-+static void armgpio_irq_mask(unsigned int irq)
-+{
-+	int gpio = irq_to_gpio(irq);
-+	void __iomem *port_mask = INT_MASK_REG;
-+	unsigned long val;
-+
-+	val = readl(port_mask);
-+	val |= (1 << gpio);
-+	writel(val, port_mask);
-+}
-+
-+static void armgpio_irq_ack(unsigned int irq)
-+{
-+	int gpio = irq_to_gpio(irq);
-+	void __iomem *port_intmask = INT_MASK_REG;
-+	void __iomem *port_eoi = EOI_REG;
-+	void __iomem *port_inttype_level = INT_TYPE_REG;
-+	unsigned long val;
-+
-+	val = readl(port_inttype_level);
-+
-+	if (val & (1 << gpio)) {
-+		/* Edge-sensitive */
-+		val = readl(port_eoi);
-+		val |= (1 << gpio);
-+		writel(val, port_eoi);
-+	} else {
-+		/* Level-sensitive */
-+		val = readl(port_intmask);
-+		val |= (1 << gpio);
-+		writel(val, port_intmask);
-+	}
-+}
-+
-+static void armgpio_irq_unmask(unsigned int irq)
-+{
-+	int gpio = irq_to_gpio(irq);
-+	void __iomem *port_intmask = INT_MASK_REG;
-+	unsigned long val;
-+
-+	val = readl(port_intmask);
-+	val &= ~(1 << gpio);
-+	writel(val, port_intmask);
-+}
-+
-+static int armgpio_irq_set_type(unsigned int irq, unsigned int trigger)
-+{
-+	int gpio = irq_to_gpio(irq);
-+	void __iomem *port_inttype_level = INT_TYPE_REG;
-+	void __iomem *port_int_polarity = INT_POLARITY_REG;
-+	unsigned long level, polarity;
-+	struct irq_desc *desc = irq_desc + irq;
-+
-+	if (trigger & ~(IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING |
-+			IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW))
-+		return -EINVAL;
-+
-+	level = readl(port_inttype_level);
-+	polarity = readl(port_int_polarity);
-+
-+	if (trigger & IRQ_TYPE_EDGE_RISING) {
-+		level	    |= (1 << gpio);
-+		polarity    |= (1 << gpio);
-+	} else if (trigger & IRQ_TYPE_EDGE_FALLING) {
-+		level	    |= (1 << gpio);
-+		polarity    &= ~(1 << gpio);
-+	} else if (trigger & IRQ_TYPE_LEVEL_HIGH) {
-+		level	    &= ~(1 << gpio);
-+		polarity    |= (1 << gpio);
-+	} else if (trigger & IRQ_TYPE_LEVEL_LOW) {
-+		level	    &= ~(1 << gpio);
-+		polarity    &= ~(1 << gpio);
-+	}
-+
-+	writel(level, port_inttype_level);
-+	writel(polarity, port_int_polarity);
-+
-+	if ((trigger & IRQ_TYPE_EDGE_RISING) ||
-+	    (trigger & IRQ_TYPE_EDGE_RISING))
-+		desc->handle_irq = handle_edge_irq;
-+	else
-+		desc->handle_irq = handle_level_irq;
-+
-+	desc->status = (desc->status & ~IRQ_TYPE_SENSE_MASK) | trigger;
-+
-+	return 0;
-+}
-+
-+struct irq_chip armgpio_irqchip = {
-+	.name	  = "armgpio",
-+	.ack	  = armgpio_irq_ack,
-+	.mask	  = armgpio_irq_mask,
-+	.unmask   = armgpio_irq_unmask,
-+	.enable   = armgpio_irq_enable,
-+	.disable  = armgpio_irq_disable,
-+	.set_type = armgpio_irq_set_type,
++static struct mtd_partition pc7302_nor_partitions[] = {
++	{
++		.name		= "Boot",
++		.size		= SZ_128K,
++		.offset		= 0,
++	},
++	{
++		.name		= "Boot Environment",
++		.size		= SZ_128K,
++		.offset		= MTDPART_OFS_APPEND,
++	},
++	{
++		.name		= "Kernel",
++		.size		= SZ_4M,
++		.offset		= MTDPART_OFS_APPEND,
++	},
++	{
++		.name		= "Application",
++		.size		= MTDPART_SIZ_FULL,
++		.offset		= MTDPART_OFS_APPEND,
++	},
 +};
 +
-+static struct gpio_chip armgpio_chip = {
-+	.owner		    = THIS_MODULE,
-+	.label		    = "armgpio",
-+	.request	    = armgpio_request,
-+	.free		    = armgpio_free,
-+	.direction_input    = armgpio_direction_input,
-+	.direction_output   = armgpio_direction_output,
-+	.get		    = armgpio_get,
-+	.set		    = armgpio_set,
-+	.to_irq		    = armgpio_to_irq,
++static struct physmap_flash_data pc7302_nor_flash_data = {
++	.width		= 1,
++	.parts		= pc7302_nor_partitions,
++	.nr_parts	= ARRAY_SIZE(pc7302_nor_partitions)
 +};
 +
-+/* The base address of SD-GPIO config registers in the AXI2Pico. */
-+#define PC3X2_GPIO_SD_PIN_CONFIG_BASE		0x9800
-+/* The base address of SD-GPIO analogue value registers in the AXI2Pico. */
-+#define PC3X2_GPIO_SD_PIN_ANALOGUE_VALUE_BASE	0x9801
-+/* The base address of SD-GPIO analogue rate registers in the AXI2Pico. */
-+#define PC3X2_GPIO_SD_PIN_ANALOGUE_RATE_BASE	0x9802
-+/* The address of the control value register in the AXI2Pico. */
-+#define PC3X2_GPIO_SD_CONTROL_VAL_REG		0x9882
-+/* The address of the control value high register in the AXI2Pico (pc3x3). */
-+#define PC3X2_GPIO_SD_CONTROL_VAL_HI_REG	0x9883
-+/* The address of the output value register in the AXI2Pico. */
-+#define PC3X2_GPIO_SD_OUTPUT_VAL_REG		0x9884
-+/* The address of the output value high register in the AXI2Pico (pc3x3). */
-+#define PC3X2_GPIO_SD_OUTPUT_HI_VAL_REG		0x9885
-+/* The address of the input value register in the AXI2Pico. */
-+#define PC3X2_GPIO_SD_INPUT_VAL_REG		0x9880
-+/* The address of the input value high register in the AXI2Pico (pc3x3). */
-+#define PC3X2_GPIO_SD_INPUT_VAL_HI_REG		0x9880
-+/* The address of the sleep register in the AXI2Pico. */
-+#define PICOXCELL_AXI2PICO_SLEEP_REG		0xA060
-+/* The spacing between SD-GPIO config registers. */
-+#define PC3X2_GPIO_SD_PIN_CONFIG_SPACING	4
-+/* Control source bit. */
-+#define PC3X2_GPIO_SD_CONFIG_CS_MASK		(~(1 << 15))
-+/* Analogue not digital bit. */
-+#define PC3X2_GPIO_SD_CONFIG_AND		(1 << 14)
-+/* The mask for analogue converter size in the config register. */
-+#define PC3X2_GPIO_SD_CONV_SZ_MASK		0xF
-+/* Soft reset lock bit. */
-+#define PC3X2_GPIO_SD_CONFIG_SR_LOCK		(1 << 13)
-+/* PICOXCELL AXI2Pico CAEID. */
-+#define PICOXCELL_AXI2PICO_CAEID		0x9000
-+
-+/*
-+ * Get the address of a config register for a SD-GPIO pin.
-+ *
-+ * @_n The SD-GPIO pin number.
-+ *
-+ * Returns the base address of the register.
-+ */
-+#define PC3X2_GPIO_SD_PIN_CONFIG(_n) \
-+	(PC3X2_GPIO_SD_PIN_CONFIG_BASE + \
-+	 ((_n) * PC3X2_GPIO_SD_PIN_CONFIG_SPACING))
-+
-+/*
-+ * Get the address of a analogue rate register for a SD-GPIO pin.
-+ *
-+ * @_n The SD-GPIO pin number.
-+ *
-+ * Returns the base address of the register.
-+ */
-+#define PC3X2_GPIO_SD_PIN_ANALOGUE_RATE(_n) \
-+	(PC3X2_GPIO_SD_PIN_ANALOGUE_RATE_BASE + \
-+	 ((_n) * PC3X2_GPIO_SD_PIN_CONFIG_SPACING))
-+
-+/*
-+ * Get the address of a analogue value register for a SD-GPIO pin.
-+ *
-+ * @_n The SD-GPIO pin number.
-+ *
-+ * Returns the base address of the register.
-+ */
-+#define PC3X2_GPIO_SD_PIN_ANALOGUE_VAL(_n) \
-+	(PC3X2_GPIO_SD_PIN_ANALOGUE_VALUE_BASE + \
-+	 ((_n) * PC3X2_GPIO_SD_PIN_CONFIG_SPACING))
-+
-+static int sdgpio_reset_config(unsigned block_pin, int value)
-+{
-+	int ret;
-+	u16 data;
-+
-+	ret = axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+				  PC3X2_GPIO_SD_PIN_CONFIG(block_pin),
-+				  &data, 1);
-+	if (1 != ret) {
-+		pr_err("failed to read config register for SDGPIO pin %u\n",
-+		       block_pin);
-+		return -EIO;
-+	}
-+
-+	if (value)
-+		data |= PC3X2_GPIO_SD_CONFIG_SR_LOCK;
-+	else
-+		data &= ~PC3X2_GPIO_SD_CONFIG_SR_LOCK;
-+
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PC3X2_GPIO_SD_PIN_CONFIG(block_pin),
-+			     &data, 1);
-+
-+	return 0;
-+}
-+
-+static inline int sdgpio_block_nr(unsigned gpio_nr)
-+{
-+	return gpio_nr - gpio_info.sdgpio_base;
-+}
-+
-+static int sdgpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	unsigned block_pin = sdgpio_block_nr(chip->base + offset);
-+	enum mux_setting mux;
-+
-+	if (test_and_set_bit(offset + chip->base, pin_status))
-+		return -EBUSY;
-+
-+	if (sdgpio_reset_config(block_pin, 1)) {
-+		clear_bit(offset + chip->base, pin_status);
-+		return -EIO;
-+	}
-+
-+	/* Check the pin has been correctly multiplexed. */
-+	mux = picoxcell_get_pin_mux(offset + chip->base);
-+	if (!(mux & (MUX_SD | MUX_UNMUXED))) {
-+		/* The pin has an inconsistent mux setting. */
-+		pr_warning("attempt to request sdgpio%u which is not correctly multiplexed\n",
-+			   block_pin);
-+		clear_bit(offset + chip->base, pin_status);
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static void sdgpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	clear_bit(offset + chip->base, pin_status);
-+	picoxcell_gpio_configure_dac(chip->base + offset, 0, 0);
-+}
-+
-+/*
-+ * Create a map of which pins are analogue and not digital. We have a separate
-+ * function for configuring pins as analogue. When we set analogue pins, we
-+ * don't treat the int parameter as a boolean anymore.
-+ */
-+static DECLARE_BITMAP(a_not_d_map, ARCH_NR_GPIOS);
-+
-+static int sdgpio_get_digital_out_status(u32 *v)
-+{
-+	u16 data[2] = { 0, 0 };
-+
-+	if (1 != axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+				PC3X2_GPIO_SD_OUTPUT_VAL_REG, &data[0], 1))
-+		return -EIO;
-+
-+	if (gpio_info.nr_sdgpio > 16) {
-+		if (1 != axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+					PC3X2_GPIO_SD_OUTPUT_HI_VAL_REG,
-+					&data[1], 1))
-+			return -EIO;
-+	}
-+
-+	*v = data[0] | (data[1] << 16);
-+
-+	return 0;
-+}
-+
-+static void sdgpio_set_digital_out_status(u32 v)
-+{
-+	u16 data[2] = { (u16)(v & 0xFFFF), (u16)((v >> 16) & 0xFFFF) };
-+
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PC3X2_GPIO_SD_OUTPUT_VAL_REG, &data[0], 1);
-+
-+	if (gpio_info.nr_sdgpio > 16) {
-+		axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+				     PC3X2_GPIO_SD_OUTPUT_HI_VAL_REG,
-+				     &data[1], 1);
-+	}
-+}
-+
-+static void sdgpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	u16 data;
-+	unsigned block_pin = sdgpio_block_nr(chip->base + offset);
-+
-+	if (!test_bit(chip->base + offset, a_not_d_map)) {
-+		u32 status;
-+
-+		if (sdgpio_get_digital_out_status(&status)) {
-+			pr_err("failed to read SDGPIO output value reg\n");
-+			return;
-+		}
-+
-+		status &= ~(1 << block_pin);
-+		status |= (!!value) << block_pin;
-+
-+		sdgpio_set_digital_out_status(status);
-+	} else {
-+		/* Analogue mode */
-+		data = (u16)value;
-+		axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+				     PC3X2_GPIO_SD_PIN_ANALOGUE_VAL(block_pin),
-+				     &data, 1);
-+	}
-+}
-+
-+static int sdgpio_get_digital_in_status(u32 *v)
-+{
-+	u16 data[2] = { 0, 0 };
-+
-+	if (1 != axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+				PC3X2_GPIO_SD_INPUT_VAL_REG, &data[0], 1))
-+		return -EIO;
-+
-+	if (gpio_info.nr_sdgpio > 16) {
-+		if (1 != axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+					PC3X2_GPIO_SD_INPUT_VAL_HI_REG,
-+					&data[1], 1))
-+			return -EIO;
-+	}
-+
-+	*v = data[0] | (data[1] << 16);
-+
-+	return 0;
-+}
-+
-+static int sdgpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	int ret;
-+	u16 data;
-+	unsigned block_pin = sdgpio_block_nr(chip->base + offset);
-+
-+	if (!test_bit(chip->base + offset, a_not_d_map)) {
-+		u32 status;
-+
-+		if (sdgpio_get_digital_in_status(&status))
-+			return -EIO;
-+
-+		return !!(status & (1 << block_pin));
-+	} else {
-+		/* Analogue mode */
-+		ret = axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+				PC3X2_GPIO_SD_PIN_ANALOGUE_VAL(block_pin),
-+				&data, 1);
-+		if (1 != ret) {
-+			pr_err("failed to read the analogue value register for SDGPIO pin %u\n",
-+			       block_pin);
-+			return -EIO;
-+		}
-+
-+		return (int)data;
-+	}
-+}
-+
-+static int sdgpio_set_direction(unsigned block_pin, int input)
-+{
-+	int ret;
-+	u16 data;
-+
-+	ret = axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+			PC3X2_GPIO_SD_PIN_CONFIG(block_pin), &data, 1);
-+	if (1 != ret) {
-+		pr_err("failed to read config register for SDGPIO pin %u\n",
-+		       block_pin);
-+		return -EIO;
-+	}
-+
-+	data &= PC3X2_GPIO_SD_CONFIG_CS_MASK;
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PC3X2_GPIO_SD_PIN_CONFIG(block_pin), &data, 1);
-+
-+	/* Configure the pin to drive or not drive the output as appropriate. */
-+	ret = axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+			PC3X2_GPIO_SD_CONTROL_VAL_REG, &data, 1);
-+	if (1 != ret) {
-+		pr_err("failed to read SDGPIO control value register\n");
-+		return -EIO;
-+	}
-+
-+	if (input)
-+		data &= ~(1 << block_pin);
-+	else
-+		data |= (1 << block_pin);
-+
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PC3X2_GPIO_SD_CONTROL_VAL_REG, &data, 1);
-+
-+	return 0;
-+}
-+
-+static int sdgpio_direction_output(struct gpio_chip *chip, unsigned offset,
-+				   int value)
-+{
-+	unsigned block_pin = sdgpio_block_nr(chip->base + offset);
-+	int ret = sdgpio_set_direction(block_pin, 0);
-+
-+	if (ret)
-+		return ret;
-+
-+	sdgpio_set(chip, offset, value);
-+
-+	return 0;
-+}
-+
-+static int sdgpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	unsigned block_pin = sdgpio_block_nr(chip->base + offset);
-+
-+	return sdgpio_set_direction(block_pin, 1);
-+}
-+
-+int picoxcell_gpio_configure_dac(unsigned gpio, u8 converter_size,
-+				 u16 analogue_rate)
-+{
-+	int ret;
-+	u16 data;
-+	unsigned block_pin = sdgpio_block_nr(gpio);
-+
-+	ret = axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+			PC3X2_GPIO_SD_PIN_CONFIG(block_pin), &data, 1);
-+	if (1 != ret) {
-+		pr_err("failed to read config register for SDGPIO pin %u\n",
-+		       block_pin);
-+		return -EIO;
-+	}
-+
-+	data &= PC3X2_GPIO_SD_CONFIG_CS_MASK;
-+	data &= ~PC3X2_GPIO_SD_CONV_SZ_MASK;
-+	if (!analogue_rate && !converter_size)
-+		data &= ~PC3X2_GPIO_SD_CONFIG_AND;
-+	else
-+		data |= PC3X2_GPIO_SD_CONFIG_AND;
-+	data |= (converter_size & PC3X2_GPIO_SD_CONV_SZ_MASK);
-+
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PC3X2_GPIO_SD_PIN_CONFIG(block_pin), &data, 1);
-+
-+	/* Configure the pin to drive the output. */
-+	ret = axi2cfg_config_read(PICOXCELL_AXI2PICO_CAEID,
-+			PC3X2_GPIO_SD_CONTROL_VAL_REG, &data, 1);
-+	if (1 != ret) {
-+		pr_err("failed to read SDGPIO control value register\n");
-+		return -EIO;
-+	}
-+
-+	data |= (1 << block_pin);
-+
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PC3X2_GPIO_SD_CONTROL_VAL_REG, &data, 1);
-+
-+	/* Write the analogue rate register */
-+	data = analogue_rate;
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PC3X2_GPIO_SD_PIN_ANALOGUE_RATE(block_pin),
-+			     &data, 1);
-+
-+	if (analogue_rate || converter_size)
-+		set_bit(gpio, a_not_d_map);
-+	else
-+		clear_bit(gpio, a_not_d_map);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(picoxcell_gpio_configure_dac);
-+
-+static struct gpio_chip sdgpio_chip = {
-+	.owner		    = THIS_MODULE,
-+	.label		    = "sdgpio",
-+	.request	    = sdgpio_request,
-+	.free		    = sdgpio_free,
-+	.direction_input    = sdgpio_direction_input,
-+	.direction_output   = sdgpio_direction_output,
-+	.get		    = sdgpio_get,
-+	.set		    = sdgpio_set,
++static struct resource pc7302_nor_resource = {
++	.start	= PICOXCELL_FLASH_BASE,
++	.end	= PICOXCELL_FLASH_BASE + SZ_128M - 1,
++	.flags	= IORESOURCE_MEM,
 +};
 +
-+int __init picoxcell_gpio_init(const char * const armgpio_pins[],
-+			       int nr_armgpio, int armgpio_base,
-+			       const char * const sdgpio_pins[],
-+			       int nr_sdgpio, int sdgpio_base)
++static struct platform_device pc7302_nor = {
++	.name		    = "physmap-flash",
++	.id		    = -1,
++	.dev.platform_data  = &pc7302_nor_flash_data,
++	.resource	    = &pc7302_nor_resource,
++	.num_resources	    = 1,
++};
++
++static void __init pc7302_init_nor(void)
 +{
-+	int ret = 0;
-+	u16 data = 0;
++	platform_device_register(&pc7302_nor);
++}
++
++static struct resource pc7302_nand_resource = {
++	.start = EBI_CS2_BASE,
++	.end   = EBI_CS2_BASE + 2 * SZ_1K,
++	.flags = IORESOURCE_MEM,
++};
++
++static struct mtd_partition pc7302_nand_parts[] = {
++	{
++		.name	= "Boot",
++		.size	= 4 * SZ_128K,
++		.offset	= 0,
++	},
++	{
++		.name	= "Redundant Boot",
++		.size	= 4 * SZ_128K,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++	{
++		.name	= "Boot Environment",
++		.size	= SZ_128K,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++	{
++		.name	= "Redundant Boot Environment",
++		.size	= SZ_128K,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++	{
++		.name	= "Kernel",
++		.size	= 8 * SZ_1M,
++		.offset	= (12 * SZ_128K),
++	},
++	{
++		.name	= "File System",
++		.size	= MTDPART_SIZ_FULL,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++};
++
++static struct gpio_nand_platdata pc7302_nand_platdata = {
++	.gpio_rdy   = PC3X2_GPIO_PIN_ARM_1,
++	.gpio_nce   = PC3X2_GPIO_PIN_ARM_2,
++	.gpio_ale   = PC3X2_GPIO_PIN_ARM_3,
++	.gpio_cle   = PC3X2_GPIO_PIN_ARM_4,
++	.gpio_nwp   = -1,
++	.parts	    = pc7302_nand_parts,
++	.num_parts  = ARRAY_SIZE(pc7302_nand_parts),
++};
++
++static struct platform_device pc7302_nand = {
++	.name		    = "gpio-nand",
++	.num_resources	    = 1,
++	.resource	    = &pc7302_nand_resource,
++	.id		    = -1,
++	.dev.platform_data  = &pc7302_nand_platdata,
++};
++
++static void __init pc7302_init_nand(void)
++{
++	platform_device_register(&pc7302_nand);
++}
++
++static void __init pc7302_init(void)
++{
++	picoxcell_core_init();
 +
 +	/*
-+	 * Make sure that the AXI2Pico is awake for the SDGPIO transactions.
++	 * If we haven't booted in parallel mode, then allow ARM.4 GPIO pin to
++	 * be used as GPIO to drive the NAND.
 +	 */
-+	axi2cfg_config_write(PICOXCELL_AXI2PICO_CAEID,
-+			     PICOXCELL_AXI2PICO_SLEEP_REG, &data, 1);
-+
-+	gpio_info.armgpio_virt	= ioremap(PICOXCELL_GPIO_BASE, SZ_4K);
-+	gpio_info.armgpio_base	= armgpio_base;
-+	gpio_info.sdgpio_base	= sdgpio_base;
-+	gpio_info.nr_sdgpio	= nr_sdgpio;
-+
-+	armgpio_chip.ngpio	= nr_armgpio;
-+	armgpio_chip.names	= armgpio_pins;
-+	armgpio_chip.base	= armgpio_base;
-+	sdgpio_chip.ngpio	= nr_sdgpio;
-+	sdgpio_chip.names	= sdgpio_pins;
-+	sdgpio_chip.base	= sdgpio_base;
-+
-+	ret = gpiochip_add(&armgpio_chip);
-+	if (ret) {
-+		pr_err("failed to register %s\n", armgpio_chip.label);
-+		goto out;
++	if (picoxcell_has_feature(PICOXCELL_FEATURE_SW_NAND)) {
++		WARN_ON(picoxcell_pin_set_mux(PC3X2_GPIO_PIN_ARM_4, MUX_ARM));
++		pc7302_init_nand();
++	} else {
++		pc7302_init_nor();
 +	}
 +
-+	ret = gpiochip_add(&sdgpio_chip);
-+	if (ret) {
-+		pr_err("failed to register %s\n", sdgpio_chip.label);
-+		goto out;
-+	}
-+
-+out:
-+	return ret;
-+}
-diff --git a/arch/arm/mach-picoxcell/include/mach/gpio.h b/arch/arm/mach-picoxcell/include/mach/gpio.h
-new file mode 100644
-index 0000000..ce55c3d
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/include/mach/gpio.h
-@@ -0,0 +1,187 @@
-+/*
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+#ifndef __MACH_GPIO_H__
-+#define __MACH_GPIO_H__
-+
-+#ifdef __KERNEL__
-+#include <linux/gpio.h>
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+
-+#include <asm-generic/gpio.h>
-+
-+int __init picoxcell_gpio_init(const char * const armgpio_pins[],
-+			       int nr_armgpio, int armgpio_base,
-+			       const char * const sdgpio_pins[],
-+			       int nr_sdgpio, int sdgpio_base);
-+
-+extern struct irq_chip armgpio_irqchip;
-+
-+#endif /* __KERNEL__ */
-+
-+enum {
-+	PC3X2_GPIO_PIN_ARM_0,
-+	PC3X2_GPIO_PIN_ARM_1,
-+	PC3X2_GPIO_PIN_ARM_2,
-+	PC3X2_GPIO_PIN_ARM_3,
-+	PC3X2_GPIO_PIN_ARM_4,
-+	PC3X2_GPIO_PIN_ARM_5,
-+	PC3X2_GPIO_PIN_ARM_6,
-+	PC3X2_GPIO_PIN_ARM_7,
-+	PC3X2_GPIO_PIN_ARM_8,
-+	PC3X2_GPIO_PIN_ARM_9,
-+	PC3X2_GPIO_PIN_ARM_10,
-+	PC3X2_GPIO_PIN_ARM_11,
-+	PC3X2_GPIO_PIN_ARM_12,
-+	PC3X2_GPIO_PIN_ARM_13,
-+	PC3X2_GPIO_PIN_ARM_14,
-+	PC3X2_GPIO_PIN_ARM_15,
-+	PC3X2_GPIO_PIN_SDGPIO_0,
-+	PC3X2_GPIO_PIN_SDGPIO_1,
-+	PC3X2_GPIO_PIN_SDGPIO_2,
-+	PC3X2_GPIO_PIN_SDGPIO_3,
-+	PC3X2_GPIO_PIN_SDGPIO_4,
-+	PC3X2_GPIO_PIN_SDGPIO_5,
-+	PC3X2_GPIO_PIN_SDGPIO_6,
-+	PC3X2_GPIO_PIN_SDGPIO_7,
-+	PC3X2_GPIO_PIN_SDGPIO_8,
-+	PC3X2_GPIO_PIN_SDGPIO_9,
-+	PC3X2_GPIO_PIN_SDGPIO_10,
-+	PC3X2_GPIO_PIN_SDGPIO_11,
-+	PC3X2_GPIO_PIN_SDGPIO_12,
-+	PC3X2_GPIO_PIN_SDGPIO_13,
-+	PC3X2_GPIO_PIN_SDGPIO_14,
-+	PC3X2_GPIO_PIN_SDGPIO_15,
-+};
-+
-+enum {
-+	PC3X3_GPIO_PIN_ARM_0,
-+	PC3X3_GPIO_PIN_ARM_1,
-+	PC3X3_GPIO_PIN_ARM_2,
-+	PC3X3_GPIO_PIN_ARM_3,
-+	PC3X3_GPIO_PIN_ARM_4,
-+	PC3X3_GPIO_PIN_ARM_5,
-+	PC3X3_GPIO_PIN_ARM_6,
-+	PC3X3_GPIO_PIN_ARM_7,
-+	PC3X3_GPIO_PIN_ARM_8,
-+	PC3X3_GPIO_PIN_ARM_9,
-+	PC3X3_GPIO_PIN_ARM_10,
-+	PC3X3_GPIO_PIN_ARM_11,
-+	PC3X3_GPIO_PIN_ARM_12,
-+	PC3X3_GPIO_PIN_ARM_13,
-+	PC3X3_GPIO_PIN_ARM_14,
-+	PC3X3_GPIO_PIN_ARM_15,
-+	PC3X3_GPIO_PIN_ARM_16,
-+	PC3X3_GPIO_PIN_ARM_17,
-+	PC3X3_GPIO_PIN_ARM_18,
-+	PC3X3_GPIO_PIN_ARM_19,
-+	PC3X3_GPIO_PIN_ARM_20,
-+	PC3X3_GPIO_PIN_ARM_21,
-+	PC3X3_GPIO_PIN_ARM_22,
-+	PC3X3_GPIO_PIN_ARM_23,
-+	PC3X3_GPIO_PIN_ARM_24,
-+	PC3X3_GPIO_PIN_ARM_25,
-+	PC3X3_GPIO_PIN_ARM_26,
-+	PC3X3_GPIO_PIN_ARM_27,
-+	PC3X3_GPIO_PIN_ARM_28,
-+	PC3X3_GPIO_PIN_ARM_29,
-+	PC3X3_GPIO_PIN_ARM_30,
-+	PC3X3_GPIO_PIN_ARM_31,
-+	PC3X3_GPIO_PIN_ARM_32,
-+	PC3X3_GPIO_PIN_ARM_33,
-+	PC3X3_GPIO_PIN_ARM_34,
-+	PC3X3_GPIO_PIN_ARM_35,
-+	PC3X3_GPIO_PIN_ARM_36,
-+	PC3X3_GPIO_PIN_ARM_37,
-+	PC3X3_GPIO_PIN_ARM_38,
-+	PC3X3_GPIO_PIN_ARM_39,
-+	PC3X3_GPIO_PIN_ARM_40,
-+	PC3X3_GPIO_PIN_ARM_41,
-+	PC3X3_GPIO_PIN_ARM_42,
-+	PC3X3_GPIO_PIN_ARM_43,
-+	PC3X3_GPIO_PIN_ARM_44,
-+	PC3X3_GPIO_PIN_ARM_45,
-+	PC3X3_GPIO_PIN_ARM_46,
-+	PC3X3_GPIO_PIN_ARM_47,
-+	PC3X3_GPIO_PIN_ARM_48,
-+	PC3X3_GPIO_PIN_ARM_49,
-+	PC3X3_GPIO_PIN_ARM_50,
-+	PC3X3_GPIO_PIN_ARM_51,
-+	PC3X3_GPIO_PIN_ARM_52,
-+	PC3X3_GPIO_PIN_ARM_53,
-+	PC3X3_GPIO_PIN_SDGPIO_0,
-+	PC3X3_GPIO_PIN_SDGPIO_1,
-+	PC3X3_GPIO_PIN_SDGPIO_2,
-+	PC3X3_GPIO_PIN_SDGPIO_3,
-+	PC3X3_GPIO_PIN_SDGPIO_4,
-+	PC3X3_GPIO_PIN_SDGPIO_5,
-+	PC3X3_GPIO_PIN_SDGPIO_6,
-+	PC3X3_GPIO_PIN_SDGPIO_7,
-+	PC3X3_GPIO_PIN_SDGPIO_8,
-+	PC3X3_GPIO_PIN_SDGPIO_9,
-+	PC3X3_GPIO_PIN_SDGPIO_10,
-+	PC3X3_GPIO_PIN_SDGPIO_11,
-+	PC3X3_GPIO_PIN_SDGPIO_12,
-+	PC3X3_GPIO_PIN_SDGPIO_13,
-+	PC3X3_GPIO_PIN_SDGPIO_14,
-+	PC3X3_GPIO_PIN_SDGPIO_15,
-+	PC3X3_GPIO_PIN_SDGPIO_16,
-+	PC3X3_GPIO_PIN_SDGPIO_17,
-+	PC3X3_GPIO_PIN_SDGPIO_18,
-+	PC3X3_GPIO_PIN_SDGPIO_19,
-+	PC3X3_GPIO_PIN_SDGPIO_20,
-+	PC3X3_GPIO_PIN_SDGPIO_21,
-+	PC3X3_GPIO_PIN_SDGPIO_22,
-+	PC3X3_GPIO_PIN_SDGPIO_23,
-+};
-+
-+#ifdef __KERNEL__
-+
-+static inline int gpio_get_value(unsigned gpio)
-+{
-+	return __gpio_get_value(gpio);
++	pc7302_panic_init();
 +}
 +
-+static inline void gpio_set_value(unsigned gpio, int value)
-+{
-+	__gpio_set_value(gpio, value);
-+}
-+
-+static inline int gpio_cansleep(unsigned gpio)
-+{
-+	return 0;
-+}
-+
-+static inline int gpio_to_irq(unsigned gpio)
-+{
-+	return __gpio_to_irq(gpio);
-+}
-+
-+static inline int irq_to_gpio(unsigned irq)
-+{
-+	if (irq > IRQ_GPIO7)
-+		return -EINVAL;
-+	return irq - IRQ_GPIO0;
-+}
-+
-+extern int picoxcell_gpio_configure_dac(unsigned gpio, u8 converter_size,
-+					u16 analogue_rate);
-+
-+#endif /* __KERNEL__ */
-+
-+#endif /* __MACH_GPIO_H__ */
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index 8f2cc46..fe2a147 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.c
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -8,6 +8,7 @@
-  * All enquiries to support at picochip.com
-  */
- #include <linux/debugfs.h>
-+#include <linux/gpio.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -286,6 +287,10 @@ void __init picoxcell_core_init(void)
- 	/* Initialise the pin muxing and gpio infrastructure. */
- 	picoxcell_muxing_init(soc);
- 
-+	picoxcell_gpio_init(soc->armgpio_pins, soc->nr_armgpio,
-+			    soc->armgpio_base, soc->sdgpio_pins,
-+			    soc->nr_sdgpio, soc->sdgpio_base);
-+
- 	/* Add handlers for the AXI bus snooping. */
- 	picoxcell_axi_bus_error_init();
- }
++MACHINE_START(PC7302, "PC7302")
++	.boot_params	= 0x00000100,
++	.map_io		= picoxcell_map_io,
++	.init_irq	= picoxcell_init_irq,
++	.timer		= &picoxcell_sys_timer,
++	.init_machine	= pc7302_init,
++MACHINE_END
 -- 
 1.7.2.3
