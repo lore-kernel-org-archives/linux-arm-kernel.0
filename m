@@ -1,66 +1,110 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Nov 2010 10:31:58 +0100
-Subject: Pull Request i.MX
-In-Reply-To: <20101115082910.GJ6017@pengutronix.de>
-References: <20101115082910.GJ6017@pengutronix.de>
-Message-ID: <20101123093158.GD8950@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 23 Nov 2010 10:43:02 +0100
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+Message-ID: <1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 15, 2010 at 09:29:10AM +0100, Sascha Hauer wrote:
-> Hi Russell,
-> 
-> Please pull the following patches for -rc.
+There is no need to memzero the buffer because dma_alloc_coherent zeros
+the memory for us.
 
-Ping. Anything wrong with this or have you just overlooked it?
+This fixes:
 
-Sascha
+	BUG: Your driver calls ioremap() on system memory.  This leads
+	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
+	<4>will fail in the next kernel release.  Please fix your driver.
 
-> 
-> Sascha
-> 
-> The following changes since commit 151f52f09c5728ecfdd0c289da1a4b30bb416f2c:
-> 
->   ipw2x00: remove the right /proc/net entry (2010-11-05 18:57:04 -0700)
-> 
-> are available in the git repository at:
->   git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
-> 
-> Alberto Panizzo (1):
->       mach-pcm037_eet: Fix section mismatch for eet_init_devices()
-> 
-> Baruch Siach (1):
->       mx25: fix spi device registration typo
-> 
-> Sascha Hauer (5):
->       ARM mx3fb: check for DMA engine type
->       ARM i.MX: sdma is merged, so remove #ifdef SDMA_IS_MERGED
->       ARM i.MX pcm037 eet: compile fixes
->       ARM i.MX spi: fix compilation for i.MX21
->       ARM i.MX27 eukrea: Fix compilation
-> 
->  arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    6 ------
->  arch/arm/mach-mx25/devices-imx25.h           |    4 ++--
->  arch/arm/mach-mx3/mach-pcm037_eet.c          |    5 ++---
->  arch/arm/plat-mxc/devices/platform-imx-dma.c |    8 --------
->  arch/arm/plat-mxc/devices/platform-spi_imx.c |    1 +
->  drivers/video/mx3fb.c                        |    4 ++++
->  6 files changed, 9 insertions(+), 19 deletions(-)
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Tested-by: Michael Grzeschik <mgr@pengutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
+it seems to work this way, still I'd like to have some feedback if this
+is done right.  Russell?
+
+I assume sending a patch to remove the <4> is just a waste of time,
+isn't it?
+
+Best regards
+Uwe
+
+ arch/arm/mach-mx3/mach-pcm037.c |   36 ++++++++++++++++++++----------------
+ 1 files changed, 20 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
+index 2ff3f66..265757f 100644
+--- a/arch/arm/mach-mx3/mach-pcm037.c
++++ b/arch/arm/mach-mx3/mach-pcm037.c
+@@ -32,6 +32,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/gfp.h>
++#include <linux/memblock.h>
+ 
+ #include <media/soc_camera.h>
+ 
+@@ -413,29 +414,22 @@ struct mx3_camera_pdata camera_pdata = {
+ 	.mclk_10khz	= 2000,
+ };
+ 
++static phys_addr_t mx3_camera_base __initdata;
++#define MX3_CAMERA_BUF_SIZE SZ_4M
++
+ static int __init pcm037_camera_alloc_dma(const size_t buf_size)
+ {
+-	dma_addr_t dma_handle;
+-	void *buf;
+ 	int dma;
+ 
+-	if (buf_size < 2 * 1024 * 1024)
+-		return -EINVAL;
+-
+-	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
+-	if (!buf) {
+-		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
+-		return -ENOMEM;
+-	}
+-
+-	memset(buf, 0, buf_size);
+-
+ 	dma = dma_declare_coherent_memory(&mx3_camera.dev,
+-					dma_handle, dma_handle, buf_size,
++					mx3_camera_base, mx3_camera_base,
++					MX3_CAMERA_BUF_SIZE,
+ 					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+ 
+-	/* The way we call dma_declare_coherent_memory only a malloc can fail */
+-	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
++	if (!(dma & DMA_MEMORY_MAP))
++		return -ENOMEM;
++
++	return 0;
+ }
+ 
+ static struct platform_device *devices[] __initdata = {
+@@ -676,6 +670,15 @@ struct sys_timer pcm037_timer = {
+ 	.init	= pcm037_timer_init,
+ };
+ 
++static void __init pcm037_reserve(void)
++{
++	/* reserve 4 MiB for mx3-camera */
++	mx3_camera_base = memblock_alloc(MX3_CAMERA_BUF_SIZE,
++			/* ??? */ MX3_CAMERA_BUF_SIZE);
++	memblock_free(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
++	memblock_remove(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
++}
++
+ MACHINE_START(PCM037, "Phytec Phycore pcm037")
+ 	/* Maintainer: Pengutronix */
+ 	.boot_params    = MX3x_PHYS_OFFSET + 0x100,
+@@ -683,4 +686,5 @@ MACHINE_START(PCM037, "Phytec Phycore pcm037")
+ 	.init_irq       = mx31_init_irq,
+ 	.init_machine   = mxc_board_init,
+ 	.timer          = &pcm037_timer,
++	.reserve	= pcm037_reserve,
+ MACHINE_END
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.2.3
