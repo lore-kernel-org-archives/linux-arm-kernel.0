@@ -1,40 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Nov 2010 17:15:39 -0700 (MST)
-Subject: [PATCH 0/8] OMAP2+: hwmod core upgrades for 2.6.38: first set
-In-Reply-To: <87y68lnhsp.fsf@deeprootsystems.com>
-References: <20101116101615.22777.49212.stgit@twilight.localdomain>
-	<alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com>
-	<87y68lnhsp.fsf@deeprootsystems.com>
-Message-ID: <alpine.DEB.2.00.1011221715000.20215@utopia.booyaka.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 22 Nov 2010 19:26:51 -0500 (EST)
+Subject: [PATCH v2 8/9] ARM: Thumb-2: Fix long-distance conditional
+	branches in head.S for Thumb-2.
+In-Reply-To: <20101122234427.GP31227@n2100.arm.linux.org.uk>
+References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
+	<1290449065-28843-9-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1011221346170.9313@xanadu.home>
+	<20101122191719.GO31227@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1011221512460.9313@xanadu.home>
+	<20101122234427.GP31227@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1011221918230.9313@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Nov 2010, Kevin Hilman wrote:
+On Mon, 22 Nov 2010, Russell King - ARM Linux wrote:
 
-> Paul Walmsley <paul@pwsan.com> writes:
+> On Mon, Nov 22, 2010 at 03:24:11PM -0500, Nicolas Pitre wrote:
+> > On Mon, 22 Nov 2010, Russell King - ARM Linux wrote:
+> > > No, you're not thinking right.  It was _intentional_ that __error_p
+> > > ended up in a different section to __init.  With CPU hotplug, as it
+> > > is called from the hotplug CPU initialization path, it needs to be
+> > > available for that path to call.
+> > 
+> > Well... agreed for the hotplug CPU case.  The section selection is good 
+> > as it is for that.
+> > 
+> > However I doubt this was intentional when commit 75d90832d5 was created, 
+> > which is when the actual section move took place.
 > 
-> > On Tue, 16 Nov 2010, Paul Walmsley wrote:
-> >
-> >> This patch series contains upgrades for the OMAP2+ hwmod core
-> >> code, intended for 2.6.38.  Most of these patches were developed
-> >> in response to use-cases discovered while converting device
-> >> drivers to use the hwmod code.
-> >> 
-> >> Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
-> >
-> > Just FYI, this branch 'hwmod_a_2.6.38' is available at 
-> > git://git.pwsan.com/linux-2.6
-> >
-> > Warning: it's based on Tony's tree, not the mainline, due to the recent 
-> > board file changes.
-> 
-> Looks like Tony has collected the board file changes into his
-> devel-board branch.  Can this rebased there?
-> 
-> That way, I can included it as part of the PM branch testing without
-> having to pull in master.
+> Well, T2 is not something I particularly test for.  There's already too
+> many combinations to test as it is.
 
-hwmod_a_2.6.38 is now based on devel-board and wdt_2.6.38 is now rebased 
-on the updated hwmod_a_2.6.38.
+Fair enough.  My point was only about the unintentional drop of the 
+__init section attribute for the __error_p and __error_a functions (and 
+probably some others in head-common.S) from commit 75d9083 which is 
+orthogonal to the T2 issue.  It looks that this bug has turned itself 
+into a feature that the CPU hotplug support depends on, although I'd 
+probably prefer if there was a __hotplug_init section that would still 
+be discarded after boot when CPU hotplug support is not configured in.
 
-- Paul
+
+Nicolas
