@@ -1,63 +1,84 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 23 Nov 2010 12:56:18 -0500 (EST)
-Subject: [PATCH v2 8/9] ARM: Thumb-2: Fix long-distance conditional
-	branches in head.S for Thumb-2.
-In-Reply-To: <20101123085649.GA17561@n2100.arm.linux.org.uk>
-References: <1290449065-28843-1-git-send-email-dave.martin@linaro.org>
-	<1290449065-28843-9-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1011221346170.9313@xanadu.home>
-	<20101122191719.GO31227@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1011221512460.9313@xanadu.home>
-	<20101122234427.GP31227@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1011221918230.9313@xanadu.home>
-	<20101123085649.GA17561@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1011231252470.9313@xanadu.home>
+From: acme@ghostprotocols.net (Arnaldo Carvalho de Melo)
+Date: Tue, 23 Nov 2010 16:17:53 -0200
+Subject: 'perf test' failed on ARM
+In-Reply-To: <20101123163106.GA25677@debian>
+References: <AANLkTik4QDCD0rAZ=04Ph23ApZ822BBoOWEiPEp7GBNr@mail.gmail.com>
+	<20101123163106.GA25677@debian>
+Message-ID: <20101123181753.GC11101@ghostprotocols.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Nov 2010, Russell King - ARM Linux wrote:
-
-> On Mon, Nov 22, 2010 at 07:26:51PM -0500, Nicolas Pitre wrote:
-> > On Mon, 22 Nov 2010, Russell King - ARM Linux wrote:
+Em Tue, Nov 23, 2010 at 10:08:18PM +0530, Rabin Vincent escreveu:
+> On Tue, Nov 23, 2010 at 04:07:39PM +0800, Ming Lei wrote:
+> > 'perf test' is failed on linux 2.6.37-rc2/rc3, follows log info:
 > > 
-> > > On Mon, Nov 22, 2010 at 03:24:11PM -0500, Nicolas Pitre wrote:
-> > > > On Mon, 22 Nov 2010, Russell King - ARM Linux wrote:
-> > > > > No, you're not thinking right.  It was _intentional_ that __error_p
-> > > > > ended up in a different section to __init.  With CPU hotplug, as it
-> > > > > is called from the hotplug CPU initialization path, it needs to be
-> > > > > available for that path to call.
-> > > > 
-> > > > Well... agreed for the hotplug CPU case.  The section selection is good 
-> > > > as it is for that.
-> > > > 
-> > > > However I doubt this was intentional when commit 75d90832d5 was created, 
-> > > > which is when the actual section move took place.
-> > > 
-> > > Well, T2 is not something I particularly test for.  There's already too
-> > > many combinations to test as it is.
+> > root at beagleboard:/mnt/omap/linux-2.6-omap/tools/perf# ./perf test -v 3
+> >  1: vmlinux symtab matches kallsyms:
+> > --- start ---
+> > dso__find_symbol_by_name ---- end ----
+> > vmlinux symtab matches kallsyms: FAILED!
 > > 
-> > Fair enough.  My point was only about the unintentional drop of the 
-> > __init section attribute for the __error_p and __error_a functions (and 
-> > probably some others in head-common.S) from commit 75d9083 which is 
-> > orthogonal to the T2 issue.
+> > Any suggestions?
 > 
-> What are you talking about Nicolas?
+> There seems to be a problem with the symbol handling code.  Patch below.
+> With this patch the command executes further, but the test fails because
+> of other reasons:
 > 
-> 75d9083 is about adding nommu support, which was added some 4 years ago
-> well before Thumb 2 was talked about.
+>    1: vmlinux symtab matches kallsyms:
+>   --- start ---
+>   map_groups__set_modules_path_dir: cannot open /lib/modules/2.6.37-rc3-next-20101122+/kernel dir
+>   Problems creating module maps, continuing anyway...
+>   map_groups__set_modules_path_dir: cannot open /lib/modules/2.6.37-rc3-next-20101122+/kernel dir
+>   Problems creating module maps, continuing anyway...
+>   Looking at the vmlinux_path (6 entries long)
+>   Using vmlinux for symbols
+>   0xc011ab68: diff end addr for __kprobes_text_start v: 0xc012b87f k: 0xc011b353
+>   0xc012b880: kallsyms_addresses not on kallsyms
+>   0xc0138c90: kallsyms_num_syms not on kallsyms
+>   0xc0138ca0: kallsyms_names not on kallsyms
+>   0xc015c010: kallsyms_markers not on kallsyms
+>   0xc015c0f0: kallsyms_token_table not on kallsyms
+>   0xc015c490: kallsyms_token_index not on kallsyms
+>   Maps only in vmlinux:
+>    c0014c5c-ffffffff 0 [kernel].init
+>   Maps in vmlinux with a different name in kallsyms:
+>   Maps only in kallsyms:
+>   ---- end ----
+>   vmlinux symtab matches kallsyms: FAILED!
+> 
+> >From e48b8a0dc149e3b8f249f46dc6e9c25e2cc58601 Mon Sep 17 00:00:00 2001
+> From: Rabin Vincent <rabin@rab.in>
+> Date: Tue, 23 Nov 2010 21:35:56 +0530
+> Subject: [PATCH] perf symbols: remove incorrect open-coded container_of()
+> 
+> At least on ARM, padding is inserted between rb_node and sym in struct
+> symbol_name_rb_node, causing "((void *)sym) - sizeof(struct rb_node)" to
+> point inside rb_node rather than to the symbol_name_rb_node.  Fix this
+> by converting the code to use container_of().
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-Exactly my point.
+Ouch, thanks for the patch, container_of is much cleaner.
 
-> It moves some code out of head.S,
-> and creates a new file, head-common.S to contain this code.
+- Arnaldo
 
-So far so good.
-
-> head-common.S is included by head.S, which means the assembler sees it 
-> as a single file.
-
-And that's where I screwed up with my analysis.  I somehow was under the 
-impression this was a separate compilation unit.  Sorry for the noise.
-
-
-Nicolas
+>  tools/perf/util/symbol.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/tools/perf/util/symbol.c b/tools/perf/util/symbol.c
+> index b39f499..0500895 100644
+> --- a/tools/perf/util/symbol.c
+> +++ b/tools/perf/util/symbol.c
+> @@ -295,7 +295,9 @@ static void symbols__insert_by_name(struct rb_root *self, struct symbol *sym)
+>  {
+>  	struct rb_node **p = &self->rb_node;
+>  	struct rb_node *parent = NULL;
+> -	struct symbol_name_rb_node *symn = ((void *)sym) - sizeof(*parent), *s;
+> +	struct symbol_name_rb_node *symn, *s;
+> +
+> +	symn = container_of(sym, struct symbol_name_rb_node, sym);
+>  
+>  	while (*p != NULL) {
+>  		parent = *p;
+> -- 
+> 1.7.2.3
