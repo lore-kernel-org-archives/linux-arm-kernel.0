@@ -1,69 +1,51 @@
-From: jajones@nvidia.com (James Jones)
-Date: Tue, 23 Nov 2010 15:28:25 -0800
-Subject: [PATCH] ARM: Fix find_next_zero_bit and related assembly
-In-Reply-To: <alpine.LFD.2.00.1011231625380.9313@xanadu.home>
-References: <1289524615-22484-1-git-send-email-jajones@nvidia.com>
-	<alpine.LFD.2.00.1011231625380.9313@xanadu.home>
-Message-ID: <201011231528.25668.jajones@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Nov 2010 22:33:44 +0000
+Subject: About multi-line printk and the need (not) to repeat loglevel
+	markers [Was: Re: [PATCH] ARM: mx3/pcm037: properly allocate memory
+	for mx3-camera]
+In-Reply-To: <AANLkTinmky17XZZPh7QvcY_r=66f_PwzRYFPUSvhiJGK@mail.gmail.com>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20101123101210.GA18170@n2100.arm.linux.org.uk>
+	<20101123103940.GN4693@pengutronix.de>
+	<20101123105830.GO4693@pengutronix.de>
+	<AANLkTinmky17XZZPh7QvcY_r=66f_PwzRYFPUSvhiJGK@mail.gmail.com>
+Message-ID: <20101123223344.GE26510@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 November 2010 13:26:47 Nicolas Pitre wrote:
-> On Thu, 11 Nov 2010, James Jones wrote:
-> > The find_next_bit, find_first_bit, find_next_zero_bit
-> > and find_first_zero_bit functions were not properly
-> > clamping to the maxbit argument at the bit level. They
-> > were instead only checking maxbit at the byte level.
-> > To fix this, add a compare and a conditional move
-> > instruction to the end of the common bit-within-the-
-> > byte code used by all the functions and be sure not to
-> > clobber the maxbit argument before it is used.
-> > 
-> > Signed-off-by: James Jones <jajones@nvidia.com>
-> > Tested-by: Stephen Warren <swarren@nvidia.com>
+On Wed, Nov 24, 2010 at 07:16:06AM +0900, Linus Torvalds wrote:
+> No. The KERN_WARNING in the middle of a string is always totally
+> bogus. There is no "should be". It's just wrong.
 > 
-> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> The "\n" is added automatically iff there is a log-level marker at the
+> beginning of the string (with LOG_CONT being the exception). So
 > 
-> Please send to RMK's patch system.
+>    printk("foo bar baz ");
+>    printk(KERN_WARNING "fiz\n");
+> 
+> should output two lines ("foo bar baz" with the default loglevel, and
+> "fiz" with KERN_WARNING). Even though there is no explicit "\n" there
+> for the first one.
+> 
+> But KERN_XYZ anywhere but in the beginning of the string do not
+> matter. Adding newlines changes none of that. It doesn't make the
+> marker beginning of the string, it just makes it beginning of the
+> line.
 
-Thanks for the review.  It's already in the patch system, but I updated the 
-entry to include your reviewed-by line.
+Oh dear.
 
--James
+Note that KERN_foo in the middle of strings, even after a newline are
+preserved in the output.  So:
 
-> > ---
-> > 
-> >  arch/arm/lib/findbit.S |    6 ++++--
-> >  1 files changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
-> > index 1e4cbd4..64f6bc1 100644
-> > --- a/arch/arm/lib/findbit.S
-> > +++ b/arch/arm/lib/findbit.S
-> > @@ -174,8 +174,8 @@ ENDPROC(_find_next_bit_be)
-> > 
-> >   */
-> >  
-> >  .L_found:
-> >  #if __LINUX_ARM_ARCH__ >= 5
-> > 
-> > -		rsb	r1, r3, #0
-> > -		and	r3, r3, r1
-> > +		rsb	r0, r3, #0
-> > +		and	r3, r3, r0
-> > 
-> >  		clz	r3, r3
-> >  		rsb	r3, r3, #31
-> >  		add	r0, r2, r3
-> > 
-> > @@ -190,5 +190,7 @@ ENDPROC(_find_next_bit_be)
-> > 
-> >  		addeq	r2, r2, #1
-> >  		mov	r0, r2
-> >  
-> >  #endif
-> > 
-> > +		cmp	r1, r0			@ Clamp to maxbit
-> > +		movlo	r0, r1
-> > 
-> >  		mov	pc, lr
+                printk(KERN_WARNING "BUG: Your driver calls ioremap() on system memory.  This leads\n"
+                       KERN_WARNING "to architecturally unpredictable behaviour on ARMv6+, and ioremap()\n"
+                       KERN_WARNING "will fail in the next kernel release.  Please fix your driver.\n");
+
+results in <4>'s appearing on the console.  I've always written code
+over the last 15 years assuming that after any newline in printk output,
+the log level gets reset and so needs a new log level specifier.
+
+Sounds like this is something which needs auditing as a result of your
+change, and sounds like its something that kernelnewbies people could
+do.  My own greps haven't revealed any cases though.
