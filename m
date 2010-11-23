@@ -1,131 +1,59 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 23 Nov 2010 23:54:48 +0100 (CET)
-Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
-In-Reply-To: <1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
-	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1011232354180.25676@axis700.grange>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Tue, 23 Nov 2010 15:08:05 -0800 (PST)
+Subject: [PATCH v4 2/2] msm: gpio: Add irq support to v2 gpiolib.
+In-Reply-To: <1290534717.4165.43.camel@m0nster>
+References: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
+	<1290109970-26752-2-git-send-email-gbean@codeaurora.org>
+	<1290534717.4165.43.camel@m0nster>
+Message-ID: <alpine.DEB.2.00.1011231456380.17082@gbean-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Nov 2010, Uwe Kleine-K?nig wrote:
+>> +static inline void set_gpio_bits(unsigned n, void __iomem *reg)
+>> +{
+>> +	writel(readl(reg) | n, reg);
+>> +}
+>> +
+>> +static inline void clr_gpio_bits(unsigned n, void __iomem *reg)
+>> +{
+>> +	writel(readl(reg) & ~n, reg);
+>> +}
+>
+> It seems these functions actually accept output from BIT(). It would be
+> safer to force these to accept the bit number then use BIT() inside this
+> function to translate. That way you wouldn't use "unsigned n" for the
+> argument you would use a named enum for the argument.
 
-> There is no need to memzero the buffer because dma_alloc_coherent zeros
-> the memory for us.
-> 
-> This fixes:
-> 
-> 	BUG: Your driver calls ioremap() on system memory.  This leads
-> 	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
-> 	<4>will fail in the next kernel release.  Please fix your driver.
-> 
-> Tested-by: Michael Grzeschik <mgr@pengutronix.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> it seems to work this way, still I'd like to have some feedback if this
-> is done right.  Russell?
-> 
-> I assume sending a patch to remove the <4> is just a waste of time,
-> isn't it?
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/mach-mx3/mach-pcm037.c |   36 ++++++++++++++++++++----------------
->  1 files changed, 20 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
-> index 2ff3f66..265757f 100644
-> --- a/arch/arm/mach-mx3/mach-pcm037.c
-> +++ b/arch/arm/mach-mx3/mach-pcm037.c
-> @@ -32,6 +32,7 @@
->  #include <linux/usb/otg.h>
->  #include <linux/usb/ulpi.h>
->  #include <linux/gfp.h>
-> +#include <linux/memblock.h>
->  
->  #include <media/soc_camera.h>
->  
-> @@ -413,29 +414,22 @@ struct mx3_camera_pdata camera_pdata = {
->  	.mclk_10khz	= 2000,
->  };
->  
-> +static phys_addr_t mx3_camera_base __initdata;
-> +#define MX3_CAMERA_BUF_SIZE SZ_4M
-> +
->  static int __init pcm037_camera_alloc_dma(const size_t buf_size)
->  {
-> -	dma_addr_t dma_handle;
-> -	void *buf;
->  	int dma;
->  
-> -	if (buf_size < 2 * 1024 * 1024)
-> -		return -EINVAL;
-> -
-> -	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
-> -	if (!buf) {
-> -		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
-> -		return -ENOMEM;
-> -	}
-> -
-> -	memset(buf, 0, buf_size);
-> -
->  	dma = dma_declare_coherent_memory(&mx3_camera.dev,
-> -					dma_handle, dma_handle, buf_size,
-> +					mx3_camera_base, mx3_camera_base,
-> +					MX3_CAMERA_BUF_SIZE,
->  					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
->  
-> -	/* The way we call dma_declare_coherent_memory only a malloc can fail */
-> -	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
+I don't think that will work well, because there are cases where we want
+to set or clear more than one bit at a time.  Making these functions
+take a bit number as an argument would restrict them to setting or clearing
+only one bit at a time, forcing users to call them multiple times to set
+or clear more than one bit, meaning lots of readl & writel calls for
+compount bit-changes.
 
-What was wrong with the original return statement?
+>> +static struct msm_gpio_dev msm_gpio = {
+>> +	.gpio_chip = {
+>> +		.base             = 0,
+>
+> I guess it's fine to do "offset - chip->base" if base is always zero,
+> but why do subtraction at all.
 
-Thanks
-Guennadi
+If the chip is ever moved, not accounting for the base would produce an error.
+I know that 'speculative coding' is frowned upon, but isn't removing an 
+addition (as you pointed out, the subtraction is a bug) because this instance
+of the chip is at offset zero a little over the top?
 
-> +	if (!(dma & DMA_MEMORY_MAP))
-> +		return -ENOMEM;
-> +
-> +	return 0;
->  }
->  
->  static struct platform_device *devices[] __initdata = {
-> @@ -676,6 +670,15 @@ struct sys_timer pcm037_timer = {
->  	.init	= pcm037_timer_init,
->  };
->  
-> +static void __init pcm037_reserve(void)
-> +{
-> +	/* reserve 4 MiB for mx3-camera */
-> +	mx3_camera_base = memblock_alloc(MX3_CAMERA_BUF_SIZE,
-> +			/* ??? */ MX3_CAMERA_BUF_SIZE);
-> +	memblock_free(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-> +	memblock_remove(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-> +}
-> +
->  MACHINE_START(PCM037, "Phytec Phycore pcm037")
->  	/* Maintainer: Pengutronix */
->  	.boot_params    = MX3x_PHYS_OFFSET + 0x100,
-> @@ -683,4 +686,5 @@ MACHINE_START(PCM037, "Phytec Phycore pcm037")
->  	.init_irq       = mx31_init_irq,
->  	.init_machine   = mxc_board_init,
->  	.timer          = &pcm037_timer,
-> +	.reserve	= pcm037_reserve,
->  MACHINE_END
-> -- 
-> 1.7.2.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>> +	set_gpio_bits(INTR_RAW_STATUS_EN | INTR_ENABLE, GPIO_INTR_CFG(gpio));
+>
+> I's just break this into two calls, or make another helper that to set
+> that accepts the mask and have set_gpio_bits call that. This here you
+> would just use the other helper. like set_gpio_bits calls
+> set_gpio_bits_mask() and you call the mask version here.
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Why make two readl/writel call pairs, or have one version of a helper which
+can set a single bit and another version which can set more than one
+at a time?  That seems really complicated.
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
