@@ -1,43 +1,40 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Mon, 22 Nov 2010 15:54:22 -0800
-Subject: [PATCH 2/3] msm: iommu: Clock control for the IOMMU driver
-In-Reply-To: <1290468761.4258.26.camel@m0nster>
-References: <1290222154-11096-1-git-send-email-stepanm@codeaurora.org>	
-	<1290222154-11096-3-git-send-email-stepanm@codeaurora.org>
-	<1290468761.4258.26.camel@m0nster>
-Message-ID: <4CEB02AE.4060509@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Nov 2010 17:15:39 -0700 (MST)
+Subject: [PATCH 0/8] OMAP2+: hwmod core upgrades for 2.6.38: first set
+In-Reply-To: <87y68lnhsp.fsf@deeprootsystems.com>
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+	<alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com>
+	<87y68lnhsp.fsf@deeprootsystems.com>
+Message-ID: <alpine.DEB.2.00.1011221715000.20215@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2010 3:32 PM, Daniel Walker wrote:
-> On Fri, 2010-11-19 at 19:02 -0800, Stepan Moskovchenko wrote:
->> +	int ret;
->> +
->> +	ret = clk_enable(drvdata->pclk);
-> You don't need to check if pclk is null ?
->
-Nope. If we are here, the pclk will always be non-null, which is 
-something that may not necessarily be said for for AXI clock.
+On Mon, 22 Nov 2010, Kevin Hilman wrote:
 
->>   		iommu_drvdata = dev_get_drvdata(ctx_drvdata->pdev->dev.parent);
->> +		if (!iommu_drvdata)
->> +			BUG();
-> Just do,
->
-> BUG_ON(!iommu_drvdata);
-Will fix in v2.
+> Paul Walmsley <paul@pwsan.com> writes:
+> 
+> > On Tue, 16 Nov 2010, Paul Walmsley wrote:
+> >
+> >> This patch series contains upgrades for the OMAP2+ hwmod core
+> >> code, intended for 2.6.38.  Most of these patches were developed
+> >> in response to use-cases discovered while converting device
+> >> drivers to use the hwmod code.
+> >> 
+> >> Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
+> >
+> > Just FYI, this branch 'hwmod_a_2.6.38' is available at 
+> > git://git.pwsan.com/linux-2.6
+> >
+> > Warning: it's based on Tony's tree, not the mainline, due to the recent 
+> > board file changes.
+> 
+> Looks like Tony has collected the board file changes into his
+> devel-board branch.  Can this rebased there?
+> 
+> That way, I can included it as part of the PM branch testing without
+> having to pull in master.
 
->> -	__flush_iotlb(domain);
->> +	ret = __flush_iotlb(domain);
-> What the relationship between this __flush_iotlb() and turning the
-> clocks on/off.
->
-The flush_iotlb function needs to handle clock control as well, which 
-means it can now fail. As a result, we now need to check its return 
-value, instead of assuming it succeeded.
->> -	pr_err("===== WOAH! =====\n");
-> Cleanup right? It doesn't need it's own patch, but you could mention in
-> the description that you've done "minor cleanups" or something to that
-> effect.
->
-Will fix in v2.
+hwmod_a_2.6.38 is now based on devel-board and wdt_2.6.38 is now rebased 
+on the updated hwmod_a_2.6.38.
+
+- Paul
