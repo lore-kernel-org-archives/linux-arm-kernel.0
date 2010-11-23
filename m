@@ -1,442 +1,57 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Tue, 23 Nov 2010 22:17:37 +0300
-Subject: [PATCH 5/6 v4] rtc: Add support for the RTC in VIA VT8500 and
-	compatibles
-In-Reply-To: <20101114170032.GA4094@alchark-u3s.lan>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<1289147348-31969-5-git-send-email-alchark@gmail.com>
-	<4CDE810F.2040400@metafoo.de>
-	<20101113235632.GA20314@alchark-u3s.lan>
-	<4CE00557.8020308@metafoo.de>
-	<20101114170032.GA4094@alchark-u3s.lan>
-Message-ID: <AANLkTinxWLiOhqTO6y2xEXvnfAK8Fe6qLp-du++z91YY@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 23 Nov 2010 14:24:46 -0500 (EST)
+Subject: [PATCH] ARM: Allow SMP_ON_UP to work with Thumb-2 kernels.
+In-Reply-To: <AANLkTinniCQXwZgDxiZo6bfeOxWG51vd=R16E6R0K1sd@mail.gmail.com>
+References: <1290449631-29100-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1011221446260.9313@xanadu.home>
+	<AANLkTinniCQXwZgDxiZo6bfeOxWG51vd=R16E6R0K1sd@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1011231416150.9313@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/14 Alexey Charkov <alchark@gmail.com>:
-> This adds a driver for the RTC devices in VIA and WonderMedia
-> Systems-on-Chip. Alarm, 1Hz interrupts, reading and setting time
-> are supported.
->
-> Signed-off-by: Alexey Charkov <alchark@gmail.com>
-> ---
->
-> Thanks for the comments, Lars! This version implements the latest
-> ones as well.
->
-> Best regards,
-> Alexey
->
-> ?drivers/rtc/Kconfig ? ? ?| ? ?7 +
-> ?drivers/rtc/Makefile ? ? | ? ?1 +
-> ?drivers/rtc/rtc-vt8500.c | ?359 ++++++++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 367 insertions(+), 0 deletions(-)
-> ?create mode 100644 drivers/rtc/rtc-vt8500.c
->
-> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> index 2883428..27ed129 100644
-> --- a/drivers/rtc/Kconfig
-> +++ b/drivers/rtc/Kconfig
-> @@ -865,6 +865,13 @@ config RTC_DRV_PXA
-> ? ? ? ? ?This RTC driver uses PXA RTC registers available since pxa27x
-> ? ? ? ? ?series (RDxR, RYxR) instead of legacy RCNR, RTAR.
->
-> +config RTC_DRV_VT8500
-> + ? ? ? tristate "VIA/WonderMedia 85xx SoC RTC"
-> + ? ? ? depends on ARCH_VT8500
-> + ? ? ? help
-> + ? ? ? ? If you say Y here you will get access to the real time clock
-> + ? ? ? ? built into your VIA VT8500 SoC or its relatives.
-> +
->
-> ?config RTC_DRV_SUN4V
-> ? ? ? ?bool "SUN4V Hypervisor RTC"
-> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-> index 4c2832d..1a354e1 100644
-> --- a/drivers/rtc/Makefile
-> +++ b/drivers/rtc/Makefile
-> @@ -97,6 +97,7 @@ obj-$(CONFIG_RTC_DRV_TWL4030) += rtc-twl.o
-> ?obj-$(CONFIG_RTC_DRV_TX4939) ? += rtc-tx4939.o
-> ?obj-$(CONFIG_RTC_DRV_V3020) ? ?+= rtc-v3020.o
-> ?obj-$(CONFIG_RTC_DRV_VR41XX) ? += rtc-vr41xx.o
-> +obj-$(CONFIG_RTC_DRV_VT8500) ? += rtc-vt8500.o
-> ?obj-$(CONFIG_RTC_DRV_WM831X) ? += rtc-wm831x.o
-> ?obj-$(CONFIG_RTC_DRV_WM8350) ? += rtc-wm8350.o
-> ?obj-$(CONFIG_RTC_DRV_X1205) ? ?+= rtc-x1205.o
-> diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
-> new file mode 100644
-> index 0000000..cdf4f63
-> --- /dev/null
-> +++ b/drivers/rtc/rtc-vt8500.c
-> @@ -0,0 +1,359 @@
-> +/*
-> + * drivers/rtc/rtc-vt8500.c
-> + *
-> + * ?Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-> + *
-> + * Based on rtc-pxa.c
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/rtc.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/bcd.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +/*
-> + * Register definitions
-> + */
-> +#define VT8500_RTC_TS ? ? ? ? ?0x00 ? ?/* Time set */
-> +#define VT8500_RTC_DS ? ? ? ? ?0x04 ? ?/* Date set */
-> +#define VT8500_RTC_AS ? ? ? ? ?0x08 ? ?/* Alarm set */
-> +#define VT8500_RTC_CR ? ? ? ? ?0x0c ? ?/* Control */
-> +#define VT8500_RTC_TR ? ? ? ? ?0x10 ? ?/* Time read */
-> +#define VT8500_RTC_DR ? ? ? ? ?0x14 ? ?/* Date read */
-> +#define VT8500_RTC_WS ? ? ? ? ?0x18 ? ?/* Write status */
-> +#define VT8500_RTC_CL ? ? ? ? ?0x20 ? ?/* Calibration */
-> +#define VT8500_RTC_IS ? ? ? ? ?0x24 ? ?/* Interrupt status */
-> +#define VT8500_RTC_ST ? ? ? ? ?0x28 ? ?/* Status */
-> +
-> +#define INVALID_TIME_BIT ? ? ? (1 << 31)
-> +
-> +#define DATE_CENTURY_S ? ? ? ? 19
-> +#define DATE_YEAR_S ? ? ? ? ? ?11
-> +#define DATE_YEAR_MASK ? ? ? ? (0xff << DATE_YEAR_S)
-> +#define DATE_MONTH_S ? ? ? ? ? 6
-> +#define DATE_MONTH_MASK ? ? ? ? ? ? ? ?(0x1f << DATE_MONTH_S)
-> +#define DATE_DAY_MASK ? ? ? ? ?0x3f
-> +
-> +#define TIME_DOW_S ? ? ? ? ? ? 20
-> +#define TIME_DOW_MASK ? ? ? ? ?(0x07 << TIME_DOW_S)
-> +#define TIME_HOUR_S ? ? ? ? ? ?14
-> +#define TIME_HOUR_MASK ? ? ? ? (0x3f << TIME_HOUR_S)
-> +#define TIME_MIN_S ? ? ? ? ? ? 7
-> +#define TIME_MIN_MASK ? ? ? ? ?(0x7f << TIME_MIN_S)
-> +#define TIME_SEC_MASK ? ? ? ? ?0x7f
-> +
-> +#define ALARM_DAY_S ? ? ? ? ? ?20
-> +#define ALARM_DAY_MASK ? ? ? ? (0x3f << ALARM_DAY_S)
-> +
-> +#define ALARM_DAY_BIT ? ? ? ? ?(1 << 29)
-> +#define ALARM_HOUR_BIT ? ? ? ? (1 << 28)
-> +#define ALARM_MIN_BIT ? ? ? ? ?(1 << 27)
-> +#define ALARM_SEC_BIT ? ? ? ? ?(1 << 26)
-> +
-> +#define ALARM_ENABLE_MASK ? ? ?(ALARM_DAY_BIT \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ALARM_HOUR_BIT \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ALARM_MIN_BIT \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ALARM_SEC_BIT)
-> +
-> +#define VT8500_RTC_CR_ENABLE ? (1 << 0) ? ? ? ?/* Enable RTC */
-> +#define VT8500_RTC_CR_24H ? ? ?(1 << 1) ? ? ? ?/* 24h time format */
-> +#define VT8500_RTC_CR_SM_ENABLE ? ? ? ?(1 << 2) ? ? ? ?/* Enable periodic irqs */
-> +#define VT8500_RTC_CR_SM_SEC ? (1 << 3) ? ? ? ?/* 0: 1Hz/60, 1: 1Hz */
-> +#define VT8500_RTC_CR_CALIB ? ?(1 << 4) ? ? ? ?/* Enable calibration */
-> +
-> +struct vt8500_rtc {
-> + ? ? ? void __iomem ? ? ? ? ? ?*regbase;
-> + ? ? ? int ? ? ? ? ? ? ? ? ? ? irq_alarm;
-> + ? ? ? int ? ? ? ? ? ? ? ? ? ? irq_hz;
-> + ? ? ? struct rtc_device ? ? ? *rtc;
-> + ? ? ? spinlock_t ? ? ? ? ? ? ?lock; ? ? ? ? ? /* Protects this structure */
-> +};
-> +
-> +static irqreturn_t vt8500_rtc_irq(int irq, void *dev_id)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = dev_id;
-> + ? ? ? u32 isr;
-> + ? ? ? unsigned long events = 0;
-> +
-> + ? ? ? spin_lock(&vt8500_rtc->lock);
-> +
-> + ? ? ? /* clear interrupt sources */
-> + ? ? ? isr = readl(vt8500_rtc->regbase + VT8500_RTC_IS);
-> + ? ? ? writel(isr, vt8500_rtc->regbase + VT8500_RTC_IS);
-> +
-> + ? ? ? spin_unlock(&vt8500_rtc->lock);
-> +
-> + ? ? ? if (isr & 1)
-> + ? ? ? ? ? ? ? events |= RTC_AF | RTC_IRQF;
-> +
-> + ? ? ? /* Only second/minute interrupts are supported */
-> + ? ? ? if (isr & 2)
-> + ? ? ? ? ? ? ? events |= RTC_UF | RTC_IRQF;
-> +
-> + ? ? ? rtc_update_irq(vt8500_rtc->rtc, 1, events);
-> +
-> + ? ? ? return IRQ_HANDLED;
-> +}
-> +
-> +static int vt8500_rtc_read_time(struct device *dev, struct rtc_time *tm)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
-> + ? ? ? u32 date, time;
-> +
-> + ? ? ? if (!readl(vt8500_rtc->regbase + VT8500_RTC_ST)) {
-> + ? ? ? ? ? ? ? dev_info(dev, "Clock not set!");
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> + ? ? ? date = readl(vt8500_rtc->regbase + VT8500_RTC_DR);
-> + ? ? ? time = readl(vt8500_rtc->regbase + VT8500_RTC_TR);
-> +
-> + ? ? ? tm->tm_sec = bcd2bin(time & TIME_SEC_MASK);
-> + ? ? ? tm->tm_min = bcd2bin((time & TIME_MIN_MASK) >> TIME_MIN_S);
-> + ? ? ? tm->tm_hour = bcd2bin((time & TIME_HOUR_MASK) >> TIME_HOUR_S);
-> + ? ? ? tm->tm_mday = bcd2bin(date & DATE_DAY_MASK);
-> + ? ? ? tm->tm_mon = bcd2bin((date & DATE_MONTH_MASK) >> DATE_MONTH_S);
-> + ? ? ? tm->tm_year = bcd2bin((date & DATE_YEAR_MASK) >> DATE_YEAR_S);
-> + ? ? ? tm->tm_wday = (time & TIME_DOW_MASK) >> TIME_DOW_S;
-> +
-> + ? ? ? return rtc_valid_tm(tm);
-> +}
-> +
-> +static int vt8500_rtc_set_time(struct device *dev, struct rtc_time *tm)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
-> +
-> + ? ? ? writel((bin2bcd(tm->tm_year) << DATE_YEAR_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(tm->tm_mon) << DATE_MONTH_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(tm->tm_mday)),
-> + ? ? ? ? ? ? ? vt8500_rtc->regbase + VT8500_RTC_DS);
-> + ? ? ? writel((bin2bcd(tm->tm_wday) << TIME_DOW_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(tm->tm_hour) << TIME_HOUR_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(tm->tm_min) << TIME_MIN_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(tm->tm_sec)),
-> + ? ? ? ? ? ? ? vt8500_rtc->regbase + VT8500_RTC_TS);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int vt8500_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
-> + ? ? ? u32 isr, alarm;
-> +
-> + ? ? ? alarm = readl(vt8500_rtc->regbase + VT8500_RTC_AS);
-> + ? ? ? isr = readl(vt8500_rtc->regbase + VT8500_RTC_IS);
-> +
-> + ? ? ? alrm->time.tm_mday = bcd2bin((alarm & ALARM_DAY_MASK) >> ALARM_DAY_S);
-> + ? ? ? alrm->time.tm_hour = bcd2bin((alarm & TIME_HOUR_MASK) >> TIME_HOUR_S);
-> + ? ? ? alrm->time.tm_min = bcd2bin((alarm & TIME_MIN_MASK) >> TIME_MIN_S);
-> + ? ? ? alrm->time.tm_sec = bcd2bin((alarm & TIME_SEC_MASK));
-> +
-> + ? ? ? alrm->enabled = (alarm & ALARM_ENABLE_MASK) ? 1 : 0;
-> +
-> + ? ? ? alrm->pending = (isr & 1) ? 1 : 0;
-> + ? ? ? return rtc_valid_tm(&alrm->time);
-> +}
-> +
-> +static int vt8500_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
-> +
-> + ? ? ? writel((alrm->enabled ? ALARM_ENABLE_MASK : 0)
-> + ? ? ? ? ? ? ? | (bin2bcd(alrm->time.tm_mday) << ALARM_DAY_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(alrm->time.tm_hour) << TIME_HOUR_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(alrm->time.tm_min) << TIME_MIN_S)
-> + ? ? ? ? ? ? ? | (bin2bcd(alrm->time.tm_sec)),
-> + ? ? ? ? ? ? ? vt8500_rtc->regbase + VT8500_RTC_AS);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int vt8500_alarm_irq_enable(struct device *dev, unsigned int enabled)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
-> + ? ? ? unsigned long tmp = readl(vt8500_rtc->regbase + VT8500_RTC_AS);
-> +
-> + ? ? ? if (enabled)
-> + ? ? ? ? ? ? ? tmp |= ALARM_ENABLE_MASK;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? tmp &= ~ALARM_ENABLE_MASK;
-> +
-> + ? ? ? writel(tmp, vt8500_rtc->regbase + VT8500_RTC_AS);
-> + ? ? ? return 0;
-> +}
-> +
-> +static int vt8500_update_irq_enable(struct device *dev, unsigned int enabled)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
-> + ? ? ? unsigned long tmp = readl(vt8500_rtc->regbase + VT8500_RTC_CR);
-> +
-> + ? ? ? if (enabled)
-> + ? ? ? ? ? ? ? tmp |= VT8500_RTC_CR_SM_SEC | VT8500_RTC_CR_SM_ENABLE;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? tmp &= ~VT8500_RTC_CR_SM_ENABLE;
-> +
-> + ? ? ? writel(tmp, vt8500_rtc->regbase + VT8500_RTC_CR);
-> + ? ? ? return 0;
-> +}
-> +
-> +static const struct rtc_class_ops vt8500_rtc_ops = {
-> + ? ? ? .read_time = vt8500_rtc_read_time,
-> + ? ? ? .set_time = vt8500_rtc_set_time,
-> + ? ? ? .read_alarm = vt8500_rtc_read_alarm,
-> + ? ? ? .set_alarm = vt8500_rtc_set_alarm,
-> + ? ? ? .alarm_irq_enable = vt8500_alarm_irq_enable,
-> + ? ? ? .update_irq_enable = vt8500_update_irq_enable,
-> +};
-> +
-> +static int __devinit vt8500_rtc_probe(struct platform_device *pdev)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc;
-> + ? ? ? struct resource *res;
-> + ? ? ? int ret;
-> +
-> + ? ? ? vt8500_rtc = kzalloc(sizeof(struct vt8500_rtc), GFP_KERNEL);
-> + ? ? ? if (!vt8500_rtc)
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> +
-> + ? ? ? spin_lock_init(&vt8500_rtc->lock);
-> + ? ? ? platform_set_drvdata(pdev, vt8500_rtc);
-> +
-> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> + ? ? ? if (!res) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "No I/O memory resource defined\n");
-> + ? ? ? ? ? ? ? ret = -ENXIO;
-> + ? ? ? ? ? ? ? goto err_free;
-> + ? ? ? }
-> +
-> + ? ? ? vt8500_rtc->irq_alarm = platform_get_irq(pdev, 0);
-> + ? ? ? if (vt8500_rtc->irq_alarm < 0) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "No alarm IRQ resource defined\n");
-> + ? ? ? ? ? ? ? ret = -ENXIO;
-> + ? ? ? ? ? ? ? goto err_free;
-> + ? ? ? }
-> +
-> + ? ? ? vt8500_rtc->irq_hz = platform_get_irq(pdev, 1);
-> + ? ? ? if (vt8500_rtc->irq_hz < 0) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "No 1Hz IRQ resource defined\n");
-> + ? ? ? ? ? ? ? ret = -ENXIO;
-> + ? ? ? ? ? ? ? goto err_free;
-> + ? ? ? }
-> +
-> + ? ? ? res = request_mem_region(res->start, resource_size(res), "vt8500-rtc");
-> + ? ? ? if (res == NULL) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to request I/O memory\n");
-> + ? ? ? ? ? ? ? ret = -EBUSY;
-> + ? ? ? ? ? ? ? goto err_free;
-> + ? ? ? }
-> +
-> + ? ? ? vt8500_rtc->regbase = ioremap(res->start, resource_size(res));
-> + ? ? ? if (!vt8500_rtc->regbase) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to map RTC I/O memory\n");
-> + ? ? ? ? ? ? ? ret = -EBUSY;
-> + ? ? ? ? ? ? ? goto err_release;
-> + ? ? ? }
-> +
-> + ? ? ? /* Enable the second/minute interrupt generation and enable RTC */
-> + ? ? ? writel(VT8500_RTC_CR_ENABLE | VT8500_RTC_CR_24H
-> + ? ? ? ? ? ? ? | VT8500_RTC_CR_SM_ENABLE | VT8500_RTC_CR_SM_SEC,
-> + ? ? ? ? ? ? ?vt8500_rtc->regbase + VT8500_RTC_CR);
-> +
-> + ? ? ? vt8500_rtc->rtc = rtc_device_register("vt8500-rtc", &pdev->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &vt8500_rtc_ops, THIS_MODULE);
-> + ? ? ? if (IS_ERR(vt8500_rtc->rtc)) {
-> + ? ? ? ? ? ? ? ret = PTR_ERR(vt8500_rtc->rtc);
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? "Failed to register RTC device -> %d\n", ret);
-> + ? ? ? ? ? ? ? goto err_unmap;
-> + ? ? ? }
-> +
-> + ? ? ? ret = request_irq(vt8500_rtc->irq_hz, vt8500_rtc_irq, 0,
-> + ? ? ? ? ? ? ? ? ? ? ? ? "rtc 1Hz", vt8500_rtc);
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't get irq %i, err %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? vt8500_rtc->irq_hz, ret);
-> + ? ? ? ? ? ? ? goto err_unreg;
-> + ? ? ? }
-> +
-> + ? ? ? ret = request_irq(vt8500_rtc->irq_alarm, vt8500_rtc_irq, 0,
-> + ? ? ? ? ? ? ? ? ? ? ? ? "rtc alarm", vt8500_rtc);
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't get irq %i, err %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? vt8500_rtc->irq_alarm, ret);
-> + ? ? ? ? ? ? ? goto err_free_hz;
-> + ? ? ? }
-> +
-> + ? ? ? return 0;
-> +
-> +err_free_hz:
-> + ? ? ? free_irq(vt8500_rtc->irq_hz, vt8500_rtc);
-> +err_unreg:
-> + ? ? ? rtc_device_unregister(vt8500_rtc->rtc);
-> +err_unmap:
-> + ? ? ? iounmap(vt8500_rtc->regbase);
-> +err_release:
-> + ? ? ? release_mem_region(res->start, resource_size(res));
-> +err_free:
-> + ? ? ? kfree(vt8500_rtc);
-> + ? ? ? return ret;
-> +}
-> +
-> +static int __devexit vt8500_rtc_remove(struct platform_device *pdev)
-> +{
-> + ? ? ? struct vt8500_rtc *vt8500_rtc = platform_get_drvdata(pdev);
-> + ? ? ? struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> + ? ? ? free_irq(vt8500_rtc->irq_alarm, vt8500_rtc);
-> + ? ? ? free_irq(vt8500_rtc->irq_hz, vt8500_rtc);
-> +
-> + ? ? ? rtc_device_unregister(vt8500_rtc->rtc);
-> +
-> + ? ? ? /* Disable alarm matching */
-> + ? ? ? writel(0, vt8500_rtc->regbase + VT8500_RTC_IS);
-> + ? ? ? iounmap(vt8500_rtc->regbase);
-> + ? ? ? release_mem_region(res->start, resource_size(res));
-> +
-> + ? ? ? kfree(vt8500_rtc);
-> + ? ? ? platform_set_drvdata(pdev, NULL);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static struct platform_driver vt8500_rtc_driver = {
-> + ? ? ? .probe ? ? ? ? ?= vt8500_rtc_probe,
-> + ? ? ? .remove ? ? ? ? = __devexit_p(vt8500_rtc_remove),
-> + ? ? ? .driver ? ? ? ? = {
-> + ? ? ? ? ? ? ? .name ? = "vt8500-rtc",
-> + ? ? ? ? ? ? ? .owner ?= THIS_MODULE,
-> + ? ? ? },
-> +};
-> +
-> +static int __init vt8500_rtc_init(void)
-> +{
-> + ? ? ? return platform_driver_register(&vt8500_rtc_driver);
-> +}
-> +module_init(vt8500_rtc_init);
-> +
-> +static void __exit vt8500_rtc_exit(void)
-> +{
-> + ? ? ? platform_driver_unregister(&vt8500_rtc_driver);
-> +}
-> +module_exit(vt8500_rtc_exit);
-> +
-> +MODULE_AUTHOR("Alexey Charkov <alchark@gmail.com>");
-> +MODULE_DESCRIPTION("VIA VT8500 SoC Realtime Clock Driver (RTC)");
-> +MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:vt8500-rtc");
-> --
-> 1.7.3.2
->
->
+On Tue, 23 Nov 2010, Dave Martin wrote:
 
-Any further comments about this code? Could it be merged now?
+> On Mon, Nov 22, 2010 at 8:08 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > Is the W() sufficient to indicate an ARM encoding? ?To me it is meant to
+> > specify a wide encoding when using Thumb2 encoding. ?And if this is for
+> 
+> Your understanding is correct--- for most code we don't want to force
+> an ARM encoding; it's just necessary to have a 32-bit encoding so that
+> the instructions inserted by the fixup code will fit in, and also
+> completely fill the gap.
+> 
+> I did have a previous implementation which inserted a 16-bit nop where
+> necessary, but that was arguably messier.  The principle is the same.
+> 
+> > the kuser code segments (which should always be ARM mode by the way)
+> > then this shouldn't make any difference.
+> 
+> It would be nice to be able to use W() in ARM state (in which case it
+> should simply have no effect).  However, the .w suffix (generated by
+> W()) is invalid syntax in traditional ARM assembler.
 
-Lars, sorry for double-posting this (forgot to CC the lists and others
-last time).
+OK I get the point now.  I think this would be a good idea to stick a 
+short comment above the definition of smp_dmb to indicate that the extra 
+argument is needed only when forcing ARM mode encoding where the .w 
+causes problems.
 
-Thanks,
-Alexey
+> Notwithstanding this, I'm very much open to suggestions about a better
+> solution for this if anyone can think of any ideas.
+
+I've been scratching my head for a while and couldn't come up with 
+something better.
+
+> > All you minimally need to support big endian here is to insert:
+> >
+> > #ifndef __ARMEB__
+> > THUMB( ?mov ? ? r4, r4, ror #16 )
+> > #endif
+> >
+> > just before the first store.
+> 
+> Cool, I'll add that.  (I assume you mean #ifdef, not #ifndef ?)
+
+Indeed.
+
+
+Nicolas
