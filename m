@@ -1,136 +1,39 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Nov 2010 11:38:15 +0000
-Subject: [PATCH v2 08/20] ARM: LPAE: MMU setup for the 3-level page table
-	format
-In-Reply-To: <20101122131010.GD31227@n2100.arm.linux.org.uk>
-References: <1289584840-18097-1-git-send-email-catalin.marinas@arm.com>
-	<1289584840-18097-9-git-send-email-catalin.marinas@arm.com>
-	<20101122131010.GD31227@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikGVZ5Na0GSG5ynO+YM2M6x65yb3dwJeBZjzFMN@mail.gmail.com>
+Date: Tue, 23 Nov 2010 12:37:04 +0000
+Subject: [PATCH] Add call to non-crashing cores through IPI
+In-Reply-To: <AANLkTikh11_Mx6Z2po9t3RDp68te5o5LdnR0hYOexF=T@mail.gmail.com>
+References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
+	<20101122072420.GC14080@gw.healthdatacare.com>
+	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
+	<20101122104740.GA30744@n2100.arm.linux.org.uk>
+	<20101122112759.GA31227@n2100.arm.linux.org.uk>
+	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
+	<20101122144040.GM31227@n2100.arm.linux.org.uk>
+	<AANLkTinj5wnP4823bacK6rs3nQbw3qtqDDjYof2-ALUk@mail.gmail.com>
+	<AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
+	<AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
+	<AANLkTimC04kAFws0rAyvfARauiNvyYriJnxJ6KH+UHtU@mail.gmail.com>
+	<AANLkTikh11_Mx6Z2po9t3RDp68te5o5LdnR0hYOexF=T@mail.gmail.com>
+Message-ID: <AANLkTi=u6MPrA4JqJ1C3dAC5FLZCb7vKNtDV4-bOkSBy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2010 13:10, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 12, 2010 at 06:00:28PM +0000, Catalin Marinas wrote:
->> This patch adds the MMU initialisation for the LPAE page table format.
->> The swapper_pg_dir size with LPAE is 5 rather than 4 pages. The
->> __v7_setup function configures the TTBRx split based on the PAGE_OFFSET
->> and sets the corresponding TTB control and MAIRx bits (similar to
->> PRRR/NMRR for TEX remapping). The 36-bit mappings (supersections) and
->> a few other memory types in mmu.c are conditionally compiled.
-[...]
->> --- a/arch/arm/kernel/head.S
->> +++ b/arch/arm/kernel/head.S
->> @@ -21,6 +21,7 @@
->> ?#include <asm/memory.h>
->> ?#include <asm/thread_info.h>
->> ?#include <asm/system.h>
->> +#include <asm/pgtable.h>
+On 23 November 2010 10:57, Per Fransson <per.fransson.ml@gmail.com> wrote:
+>>> Am I right that deadlock can occur only if the same IPI was sent?
 >>
->> ?#ifdef CONFIG_DEBUG_LL
->> ?#include <mach/debug-macro.S>
->> @@ -45,11 +46,20 @@
->> ?#error KERNEL_RAM_VADDR must start at 0xXXXX8000
->> ?#endif
+>> Not necessarily. It depends on whether the CPU issuing the IPI needs
+>> to wait for the completion of the cross-call. If you don't need to
+>> wait, you can send the IPI with the interrupts disabled (the platform
+>> smp_cross_call is already called with interrupts disabled).
 >>
->> +#ifdef CONFIG_ARM_LPAE
->> + ? ? /* LPAE requires an additional page for the PGD */
->> +#define PG_DIR_SIZE ?0x5000
->> +#define PTE_WORDS ? ?3
->> +#else
->> +#define PG_DIR_SIZE ?0x4000
->> +#define PTE_WORDS ? ?2
 >
-> PTE is not the right prefix here - we don't deal with the lowest level
-> of page tables, which in Linux is called PTE. ?I think you mean PMD_WORDS
-> instead.
+> Well, smp_call_function() only optionally waits. As long as we choose not to,
+> using that function to ask the other cores to save their states and idle, should
+> be ok, right? In that case we don't need another ipi_msg_type and we can do
+> it with the interrupts of the ipi caller disabled.
 
-It should actually be something PMD_ORDER because of the log2 value.
-
->> ?#ifdef CONFIG_XIP_KERNEL
->> @@ -129,11 +139,11 @@ __create_page_tables:
->> ? ? ? pgtbl ? r4 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ page table address
->>
->> ? ? ? /*
->> - ? ? ?* Clear the 16K level 1 swapper page table
->> + ? ? ?* Clear the swapper page table
->> ? ? ? ?*/
->> ? ? ? mov ? ? r0, r4
->> ? ? ? mov ? ? r3, #0
->> - ? ? add ? ? r6, r0, #0x4000
->> + ? ? add ? ? r6, r0, #PG_DIR_SIZE
->> ?1: ? str ? ? r3, [r0], #4
->> ? ? ? str ? ? r3, [r0], #4
->> ? ? ? str ? ? r3, [r0], #4
->> @@ -141,6 +151,23 @@ __create_page_tables:
->> ? ? ? teq ? ? r0, r6
->> ? ? ? bne ? ? 1b
->>
->> +#ifdef CONFIG_ARM_LPAE
->> + ? ? /*
->> + ? ? ?* Build the PGD table (first level) to point to the PMD table. A PGD
->> + ? ? ?* entry is 64-bit wide and the top 32 bits are 0.
->> + ? ? ?*/
->> + ? ? mov ? ? r0, r4
->> + ? ? add ? ? r3, r4, #0x1000 ? ? ? ? ? ? ? ? @ first PMD table address
->> + ? ? orr ? ? r3, r3, #3 ? ? ? ? ? ? ? ? ? ? ?@ PGD block type
->> + ? ? mov ? ? r6, #4 ? ? ? ? ? ? ? ? ? ? ? ? ?@ PTRS_PER_PGD
->> +1: ? str ? ? r3, [r0], #8 ? ? ? ? ? ? ? ? ? ?@ set PGD entry
->> + ? ? add ? ? r3, r3, #0x1000 ? ? ? ? ? ? ? ? @ next PMD table
->> + ? ? subs ? ?r6, r6, #1
->> + ? ? bne ? ? 1b
->> +
->> + ? ? add ? ? r4, r4, #0x1000 ? ? ? ? ? ? ? ? @ point to the PMD tables
->> +#endif
->> +
->> ? ? ? ldr ? ? r7, [r10, #PROCINFO_MM_MMUFLAGS] @ mm_mmuflags
->>
->> ? ? ? /*
->> @@ -152,30 +179,30 @@ __create_page_tables:
->> ? ? ? sub ? ? r0, r0, r3 ? ? ? ? ? ? ? ? ? ? ?@ virt->phys offset
->> ? ? ? add ? ? r5, r5, r0 ? ? ? ? ? ? ? ? ? ? ?@ phys __enable_mmu
->> ? ? ? add ? ? r6, r6, r0 ? ? ? ? ? ? ? ? ? ? ?@ phys __enable_mmu_end
->> - ? ? mov ? ? r5, r5, lsr #20
->> - ? ? mov ? ? r6, r6, lsr #20
->> + ? ? mov ? ? r5, r5, lsr #SECTION_SHIFT
->> + ? ? mov ? ? r6, r6, lsr #SECTION_SHIFT
->>
->> -1: ? orr ? ? r3, r7, r5, lsl #20 ? ? ? ? ? ? @ flags + kernel base
->> - ? ? str ? ? r3, [r4, r5, lsl #2] ? ? ? ? ? ?@ identity mapping
->> - ? ? teq ? ? r5, r6
->> - ? ? addne ? r5, r5, #1 ? ? ? ? ? ? ? ? ? ? ?@ next section
->> - ? ? bne ? ? 1b
->> +1: ? orr ? ? r3, r7, r5, lsl #SECTION_SHIFT ?@ flags + kernel base
->> + ? ? str ? ? r3, [r4, r5, lsl #PTE_WORDS] ? ?@ identity mapping
->> + ? ? cmp ? ? r5, r6
->> + ? ? addlo ? r5, r5, #SECTION_SHIFT >> 20 ? ?@ next section
->> + ? ? blo ? ? 1b
->>
->> ? ? ? /*
->> ? ? ? ?* Now setup the pagetables for our kernel direct
->> ? ? ? ?* mapped region.
->> ? ? ? ?*/
->> ? ? ? mov ? ? r3, pc
->> - ? ? mov ? ? r3, r3, lsr #20
->> - ? ? orr ? ? r3, r7, r3, lsl #20
->> + ? ? mov ? ? r3, r3, lsr #SECTION_SHIFT
->> + ? ? orr ? ? r3, r7, r3, lsl #SECTION_SHIFT
->> ? ? ? add ? ? r0, r4, ?#(KERNEL_START & 0xff000000) >> 18
->> - ? ? str ? ? r3, [r0, #(KERNEL_START & 0x00f00000) >> 18]!
->> + ? ? str ? ? r3, [r0, #(KERNEL_START & 0x00e00000) >> 18]!
->> ? ? ? ldr ? ? r6, =(KERNEL_END - 1)
->> - ? ? add ? ? r0, r0, #4
->> + ? ? add ? ? r0, r0, #1 << PTE_WORDS
->> ? ? ? add ? ? r6, r4, r6, lsr #18
->
-> Are you sure these shifts by 18 places are correct? ?They're actually
-> (val >> SECTION_SHIFT) << 2, so maybe they should be (SECTION_SHIFT -
-> PMD_WORDS) ?
-
-SECTION_SHIFT - PMD_ORDER is (20 - 2) for classic page tables and (21
-- 3) for LPAE. But we could change the 18 to some macros for
-clarification (the line would be long though).
+I think that should work but we still have a WARN_ON_ONCE in the
+generic smp_call_function_*() if interrupts are disabled.
 
 -- 
 Catalin
