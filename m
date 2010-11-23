@@ -1,134 +1,229 @@
-From: cxie4@marvell.com (Chao Xie)
-Date: Mon, 22 Nov 2010 19:11:33 -0800
-Subject: [PATCH 2/2] USB: pxa: Add USB client support for Marvell
-	PXA9xx/PXA168 chips
-In-Reply-To: <Pine.LNX.4.44L0.1011221020360.1758-100000@iolanthe.rowland.org>
-References: <1290418347-6861-2-git-send-email-chao.xie@marvell.com>
-	<Pine.LNX.4.44L0.1011221020360.1758-100000@iolanthe.rowland.org>
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D15054F6FC9@SC-VEXCH2.marvell.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Mon, 22 Nov 2010 19:14:04 -0800
+Subject: [PATCH v2 2/3] msm: iommu: Clock control for the IOMMU driver
+In-Reply-To: <1290222154-11096-3-git-send-email-stepanm@codeaurora.org>
+References: <1290222154-11096-3-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1290482045-6043-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-You are right. I have added source code to fix it. Patch is attached.
+Add clock control to the IOMMU driver. The IOMMU bus clock
+(and potentially an AXI clock) need to be on to gain access
+to IOMMU registers. Actively control these clocks when
+needed instead of leaving them on. Additionally, perform
+minor code cleanups.
 
-+static int mv_ep_set_halt_wedge(struct usb_ep *_ep, int halt, int wedge)
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+---
+Please hold off on this until the clock driver is in.
+Changes in v2:
+ * Two minor cleanups of the form of changing if (..) BUG() to BUG_ON()
+ * Amend the commit text to that effect
+
+ arch/arm/mach-msm/iommu.c |   84 +++++++++++++++++++++++++++++++++++++-------
+ 1 files changed, 70 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-msm/iommu.c b/arch/arm/mach-msm/iommu.c
+index a468ee3..3cdecb9 100644
+--- a/arch/arm/mach-msm/iommu.c
++++ b/arch/arm/mach-msm/iommu.c
+@@ -26,6 +26,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/slab.h>
+ #include <linux/iommu.h>
++#include <linux/clk.h>
+
+ #include <asm/cacheflush.h>
+ #include <asm/sizes.h>
+@@ -50,12 +51,36 @@ struct msm_priv {
+ 	struct list_head list_attached;
+ };
+
+-static void __flush_iotlb(struct iommu_domain *domain)
++static int __enable_clocks(struct msm_iommu_drvdata *drvdata)
 +{
-+	struct mv_ep *ep;
-+	unsigned long flags = 0;
-+	int status = 0;
-+	struct mv_udc *udc;
++	int ret;
 +
-+	ep = container_of(_ep, struct mv_ep, ep);
-+	udc = ep->udc;
-+	if (!_ep || !ep->desc) {
-+		status = -EINVAL;
-+		goto out;
++	ret = clk_enable(drvdata->pclk);
++	if (ret)
++		goto fail;
++
++	if (drvdata->clk) {
++		ret = clk_enable(drvdata->clk);
++		if (ret)
++			clk_disable(drvdata->pclk);
 +	}
-+
-+	if (ep->desc->bmAttributes == USB_ENDPOINT_XFER_ISOC) {
-+		status = -EOPNOTSUPP;
-+		goto out;
-+	}
-+
-+	/* Attempt to halt IN ep will fail if any transfer requests
-+	 * are still queue */
-+	if (halt && (ep_dir(ep) == EP_DIR_IN) && !list_empty(&ep->queue)) {
-+		status = -EAGAIN;
-+		goto out;
-+	}
-+
-+	spin_lock_irqsave(&ep->udc->lock, flags);
-+	ep_set_stall(udc, ep->ep_num, ep_dir(ep), halt);
-+	if (halt && wedge)
-+		ep->wedge = 1;
-+	else if (!halt)
-+		ep->wedge = 0;
-+	spin_unlock_irqrestore(&ep->udc->lock, flags);
-+
-+	if (ep->ep_num == 0) {
-+		udc->ep0_state = WAIT_FOR_SETUP;
-+		udc->ep0_dir = EP_DIR_OUT;
-+	}
-+out:
-+	return status;
++fail:
++	return ret;
 +}
 +
-+static int mv_ep_set_halt(struct usb_ep *_ep, int halt)
++static void __disable_clocks(struct msm_iommu_drvdata *drvdata)
 +{
-+	return mv_ep_set_halt_wedge(_ep, halt, 0);
++	if (drvdata->clk)
++		clk_disable(drvdata->clk);
++	clk_disable(drvdata->pclk);
 +}
 +
-+static int mv_ep_set_wedge(struct usb_ep *_ep)
-+{
-+	return mv_ep_set_halt_wedge(_ep, 1, 1);
-+}
++static int __flush_iotlb(struct iommu_domain *domain)
+ {
+ 	struct msm_priv *priv = domain->priv;
+ 	struct msm_iommu_drvdata *iommu_drvdata;
+ 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
+-
++	int ret = 0;
+ #ifndef CONFIG_IOMMU_PGTABLES_L2
+ 	unsigned long *fl_table = priv->pgtable;
+ 	int i;
+@@ -73,12 +98,20 @@ static void __flush_iotlb(struct iommu_domain *domain)
+ #endif
 
-...
+ 	list_for_each_entry(ctx_drvdata, &priv->list_attached, attached_elm) {
+-		if (!ctx_drvdata->pdev || !ctx_drvdata->pdev->dev.parent)
+-			BUG();
++		BUG_ON(!ctx_drvdata->pdev || !ctx_drvdata->pdev->dev.parent);
+
+ 		iommu_drvdata = dev_get_drvdata(ctx_drvdata->pdev->dev.parent);
++		BUG_ON(!iommu_drvdata);
 +
-+	.set_wedge	= mv_ep_set_wedge,
-+	.set_halt	= mv_ep_set_halt,
-...
-	case USB_ENDPOINT_HALT:
-+			ep_num = setup->wIndex & USB_ENDPOINT_NUMBER_MASK;
-+			direction = (setup->wIndex & USB_ENDPOINT_DIR_MASK)
-+				? EP_DIR_IN : EP_DIR_OUT;
-+			if (setup->wValue != 0 || setup->wLength != 0
-+				|| ep_num > udc->max_eps)
-+				goto out;
-+			ep = &udc->eps[ep_num * 2 + direction];
-+			if (ep->wedge == 1)
-+				break;
-+			spin_unlock(&udc->lock);
-+			ep_set_stall(udc, ep_num, direction, 0);
-+			spin_lock(&udc->lock);
-+			break;
++		ret = __enable_clocks(iommu_drvdata);
++		if (ret)
++			goto fail;
++
+ 		SET_CTX_TLBIALL(iommu_drvdata->base, ctx_drvdata->num, 0);
++		__disable_clocks(iommu_drvdata);
+ 	}
++fail:
++	return ret;
+ }
 
------Original Message-----
-From: Alan Stern [mailto:stern at rowland.harvard.edu] 
-Sent: Monday, November 22, 2010 11:22 PM
-To: Chao Xie
-Cc: gregkh at suse.de; linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org; eric.y.miao at gmail.com; Chao Xie
-Subject: Re: [PATCH 2/2] USB: pxa: Add USB client support for Marvell PXA9xx/PXA168 chips
+ static void __reset_context(void __iomem *base, int ctx)
+@@ -263,11 +296,16 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 			goto fail;
+ 		}
 
-On Mon, 22 Nov 2010 chao.xie at marvell.com wrote:
++	ret = __enable_clocks(iommu_drvdata);
++	if (ret)
++		goto fail;
++
+ 	__program_context(iommu_drvdata->base, ctx_dev->num,
+ 			  __pa(priv->pgtable));
 
-> From: cxie4 <cxie4@marvell.com>
-> 
-> This patch add USB client support Marvell PXA9xx/PXA168 chips. The USB
-> controller in PXA9xx/PXA168 is a High-Speed OTG controller. The available
-> endpoints is different between PXA9xx and PXA168.
-> 
-> NOTE:
-> It is the first version of Marvell PXA9xx/PXA168 USB controller driver.
-> The support for OTG mode will be added in later patch.
-> PXA9xx and PXA168 has integrated UTMI PHY in the chips. The initialization
-> for the PHY is a little different between PXA9xx and PXA168.
++	__disable_clocks(iommu_drvdata);
+ 	list_add(&(ctx_drvdata->attached_elm), &priv->list_attached);
+-	__flush_iotlb(domain);
++	ret = __flush_iotlb(domain);
 
-...
+ fail:
+ 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
+@@ -282,6 +320,7 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
+ 	struct msm_iommu_drvdata *iommu_drvdata;
+ 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
+ 	unsigned long flags;
++	int ret;
 
-> +static struct usb_ep_ops mv_ep_ops = {
-> +	.enable		= mv_ep_enable,
-> +	.disable	= mv_ep_disable,
-> +
-> +	.alloc_request	= mv_alloc_request,
-> +	.free_request	= mv_free_request,
-> +
-> +	.queue		= mv_ep_queue,
-> +	.dequeue	= mv_ep_dequeue,
-> +
-> +	.set_halt	= mv_ep_set_halt,
-> +	.fifo_flush	= mv_ep_fifo_flush,	/* flush fifo */
-> +};
+ 	spin_lock_irqsave(&msm_iommu_lock, flags);
+ 	priv = domain->priv;
+@@ -296,8 +335,16 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
+ 	if (!iommu_drvdata || !ctx_drvdata || !ctx_dev)
+ 		goto fail;
 
-What happened to the .set_wedge method?
+-	__flush_iotlb(domain);
++	ret = __flush_iotlb(domain);
++	if (ret)
++		goto fail;
++
++	ret = __enable_clocks(iommu_drvdata);
++	if (ret)
++		goto fail;
++
+ 	__reset_context(iommu_drvdata->base, ctx_dev->num);
++	__disable_clocks(iommu_drvdata);
+ 	list_del_init(&ctx_drvdata->attached_elm);
 
-Alan Stern
+ fail:
+@@ -410,7 +457,7 @@ static int msm_iommu_map(struct iommu_domain *domain, unsigned long va,
+ 				SL_AP1 | SL_SHARED | SL_TYPE_LARGE | pgprot;
+ 	}
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-USB-pxa-Add-USB-client-support-for-Marvell-PXA9xx-PX.patch
-Type: application/octet-stream
-Size: 72344 bytes
-Desc: 0002-USB-pxa-Add-USB-client-support-for-Marvell-PXA9xx-PX.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101122/b8b5e2a8/attachment-0001.obj>
+-	__flush_iotlb(domain);
++	ret = __flush_iotlb(domain);
+ fail:
+ 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
+ 	return ret;
+@@ -495,7 +542,7 @@ static int msm_iommu_unmap(struct iommu_domain *domain, unsigned long va,
+ 		}
+ 	}
+
+-	__flush_iotlb(domain);
++	ret = __flush_iotlb(domain);
+ fail:
+ 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
+ 	return ret;
+@@ -526,13 +573,14 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	base = iommu_drvdata->base;
+ 	ctx = ctx_drvdata->num;
+
++	ret = __enable_clocks(iommu_drvdata);
++	if (ret)
++		goto fail;
++
+ 	/* Invalidate context TLB */
+ 	SET_CTX_TLBIALL(base, ctx, 0);
+ 	SET_V2PPR_VA(base, ctx, va >> V2Pxx_VA_SHIFT);
+
+-	if (GET_FAULT(base, ctx))
+-		goto fail;
+-
+ 	par = GET_PAR(base, ctx);
+
+ 	/* We are dealing with a supersection */
+@@ -541,6 +589,10 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	else	/* Upper 20 bits from PAR, lower 12 from VA */
+ 		ret = (par & 0xFFFFF000) | (va & 0x00000FFF);
+
++	if (GET_FAULT(base, ctx))
++		ret = 0;
++
++	__disable_clocks(iommu_drvdata);
+ fail:
+ 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
+ 	return ret;
+@@ -583,8 +635,8 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
+ {
+ 	struct msm_iommu_drvdata *drvdata = dev_id;
+ 	void __iomem *base;
+-	unsigned int fsr = 0;
+-	int ncb = 0, i = 0;
++	unsigned int fsr;
++	int ncb, i, ret;
+
+ 	spin_lock(&msm_iommu_lock);
+
+@@ -595,10 +647,13 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
+
+ 	base = drvdata->base;
+
+-	pr_err("===== WOAH! =====\n");
+ 	pr_err("Unexpected IOMMU page fault!\n");
+ 	pr_err("base = %08x\n", (unsigned int) base);
+
++	ret = __enable_clocks(drvdata);
++	if (ret)
++		goto fail;
++
+ 	ncb = GET_NCB(base)+1;
+ 	for (i = 0; i < ncb; i++) {
+ 		fsr = GET_FSR(base, i);
+@@ -609,6 +664,7 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
+ 			SET_FSR(base, i, 0x4000000F);
+ 		}
+ 	}
++	__disable_clocks(drvdata);
+ fail:
+ 	spin_unlock(&msm_iommu_lock);
+ 	return 0;
+--
+1.7.0.2
+
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
