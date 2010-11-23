@@ -1,353 +1,70 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 23 Nov 2010 10:06:14 +0000
-Subject: [RFC PATCH 13/13] picoxcell: add support for the PC7302 development
-	board
-In-Reply-To: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-References: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1290506774-17895-14-git-send-email-jamie@jamieiles.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Nov 2010 10:12:11 +0000
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20101123101210.GA18170@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PC7302 development board is capable of taking both PC3X2 and PC3X3
-devices and features NOR flash, NAND flash, SPI NOR flash a serial
-console, 100Mb Ethernet and a number of picoArray peripherals.
+On Tue, Nov 23, 2010 at 10:43:02AM +0100, Uwe Kleine-K?nig wrote:
+> There is no need to memzero the buffer because dma_alloc_coherent zeros
+> the memory for us.
+> 
+> This fixes:
+> 
+> 	BUG: Your driver calls ioremap() on system memory.  This leads
+> 	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
+> 	<4>will fail in the next kernel release.  Please fix your driver.
+> 
+> Tested-by: Michael Grzeschik <mgr@pengutronix.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> it seems to work this way, still I'd like to have some feedback if this
+> is done right.  Russell?
 
-This patch provides initial support for running on the PC7302 board.
+Yes and probably no.  Yes, it's architecturally correct because the memory
+will be mapped only once, thereby avoiding the aliasing issue.
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/configs/pc7302_defconfig      |  102 ++++++++++++++++++
- arch/arm/mach-picoxcell/Kconfig        |    9 ++
- arch/arm/mach-picoxcell/Makefile       |    1 +
- arch/arm/mach-picoxcell/board_pc7302.c |  184 ++++++++++++++++++++++++++++++++
- 4 files changed, 296 insertions(+), 0 deletions(-)
+Probably no, because the memory is mapped strongly as device memory by
+ioremap.  ISTR whether memory remains accessible when mapped as a device
+is not something covered by the architecture, but I guess is more to do
+with how the interconnect on the SoC is setup.
 
-diff --git a/arch/arm/configs/pc7302_defconfig b/arch/arm/configs/pc7302_defconfig
-new file mode 100644
-index 0000000..23a2c72
---- /dev/null
-+++ b/arch/arm/configs/pc7302_defconfig
-@@ -0,0 +1,102 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_RELAY=y
-+CONFIG_EMBEDDED=y
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_MODULE_SRCVERSION_ALL=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_PICOXCELL=y
-+CONFIG_CPU_32v6K=y
-+CONFIG_ARM_ERRATA_411920=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_UACCESS_WITH_MEMCPY=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_GOV_USERSPACE=y
-+CONFIG_FPE_NWFPE=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/mdev"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_JEDECPROBE=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_GPIO=y
-+CONFIG_MTD_UBI=y
-+# CONFIG_BLK_DEV is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=32
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_GPIO_SYSFS=y
-+# CONFIG_HWMON is not set
-+# CONFIG_MFD_SUPPORT is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+CONFIG_TMPFS=y
-+CONFIG_CONFIGFS_FS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_JFFS2_SUMMARY=y
-+CONFIG_UBIFS_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3=y
-+CONFIG_ROOT_NFS=y
-+# CONFIG_RPCSEC_GSS_KRB5 is not set
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_BKL is not set
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_ERRORS=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_CRYPTO_MANAGER=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
-+CONFIG_CRC_CCITT=y
-+CONFIG_LIBCRC32C=y
-diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
-index 671cadc..e00e14b 100644
---- a/arch/arm/mach-picoxcell/Kconfig
-+++ b/arch/arm/mach-picoxcell/Kconfig
-@@ -16,6 +16,15 @@ config PICOXCELL_PC3X3
- 	  Include support for picoChip PC3x3 family of devices. This includes
- 	  PC313, PC323 and PC333.
- 
-+config BOARD_PC7302
-+	bool "Support PC7302 Board"
-+	depends on PICOXCELL_PC3X2 || PICOXCELL_PC3X3
-+	default y
-+	help
-+          Include support for the picoChip PC7302 platform. This platform is
-+	  can take any of the PC3X2 or PC3X3 devices and includes SPI NOR
-+	  flash, parallel NOR flash and NAND flash.
-+
- config PC3X3_STOP_WDT_IN_SUSPEND
- 	bool "Stop WDT in PM suspend"
- 	depends on PICOCHIP_PC3X3
-diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index d95b2b2..0138d96 100644
---- a/arch/arm/mach-picoxcell/Makefile
-+++ b/arch/arm/mach-picoxcell/Makefile
-@@ -8,3 +8,4 @@ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_PICOXCELL_PC3X2)	+= pc3x2.o
- obj-$(CONFIG_PICOXCELL_PC3X3)	+= pc3x3.o
-+obj-$(CONFIG_BOARD_PC7302)	+= board_pc7302.o
-diff --git a/arch/arm/mach-picoxcell/board_pc7302.c b/arch/arm/mach-picoxcell/board_pc7302.c
-new file mode 100644
-index 0000000..7250601
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/board_pc7302.c
-@@ -0,0 +1,184 @@
-+/*
-+ * linux/arch/arm/mach-picoxcell/board_pc7302.c
-+ *
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#include <linux/gpio.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/nand-gpio.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/spi/flash.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+#include "mux.h"
-+#include "picoxcell_core.h"
-+
-+static long pc7302_panic_blink(int state)
-+{
-+	writel(state ? 0xFF : 0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
-+					    GPIO_SW_PORT_C_DR_REG_OFFSET));
-+	return 0;
-+}
-+
-+static void pc7302_panic_init(void)
-+{
-+	/*
-+	 * We have a BOOT_ERROR pin on PC7302. Reuse that for signalling when
-+	 * the kernel panics. There is only 1 bit wired up to port C but it
-+	 * won't hurt to configure all of them.
-+	 */
-+	writel(0xF, IO_ADDRESS(PICOXCELL_GPIO_BASE +
-+			       GPIO_SW_PORT_C_DDR_REG_OFFSET));
-+	writel(0x0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
-+			       GPIO_SW_PORT_C_CTL_REG_OFFSET));
-+
-+	panic_blink = pc7302_panic_blink;
-+}
-+
-+static struct mtd_partition pc7302_nor_partitions[] = {
-+	{
-+		.name		= "Boot",
-+		.size		= SZ_128K,
-+		.offset		= 0,
-+	},
-+	{
-+		.name		= "Boot Environment",
-+		.size		= SZ_128K,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name		= "Kernel",
-+		.size		= SZ_4M,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name		= "Application",
-+		.size		= MTDPART_SIZ_FULL,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+};
-+
-+static struct physmap_flash_data pc7302_nor_flash_data = {
-+	.width		= 1,
-+	.parts		= pc7302_nor_partitions,
-+	.nr_parts	= ARRAY_SIZE(pc7302_nor_partitions)
-+};
-+
-+static struct resource pc7302_nor_resource = {
-+	.start	= PICOXCELL_FLASH_BASE,
-+	.end	= PICOXCELL_FLASH_BASE + SZ_128M - 1,
-+	.flags	= IORESOURCE_MEM,
-+};
-+
-+static struct platform_device pc7302_nor = {
-+	.name		    = "physmap-flash",
-+	.id		    = -1,
-+	.dev.platform_data  = &pc7302_nor_flash_data,
-+	.resource	    = &pc7302_nor_resource,
-+	.num_resources	    = 1,
-+};
-+
-+static void __init pc7302_init_nor(void)
-+{
-+	platform_device_register(&pc7302_nor);
-+}
-+
-+static struct resource pc7302_nand_resource = {
-+	.start = EBI_CS2_BASE,
-+	.end   = EBI_CS2_BASE + 2 * SZ_1K,
-+	.flags = IORESOURCE_MEM,
-+};
-+
-+static struct mtd_partition pc7302_nand_parts[] = {
-+	{
-+		.name	= "Boot",
-+		.size	= 4 * SZ_128K,
-+		.offset	= 0,
-+	},
-+	{
-+		.name	= "Redundant Boot",
-+		.size	= 4 * SZ_128K,
-+		.offset	= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name	= "Boot Environment",
-+		.size	= SZ_128K,
-+		.offset	= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name	= "Redundant Boot Environment",
-+		.size	= SZ_128K,
-+		.offset	= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name	= "Kernel",
-+		.size	= 8 * SZ_1M,
-+		.offset	= (12 * SZ_128K),
-+	},
-+	{
-+		.name	= "File System",
-+		.size	= MTDPART_SIZ_FULL,
-+		.offset	= MTDPART_OFS_APPEND,
-+	},
-+};
-+
-+static struct gpio_nand_platdata pc7302_nand_platdata = {
-+	.gpio_rdy   = PC3X2_GPIO_PIN_ARM_1,
-+	.gpio_nce   = PC3X2_GPIO_PIN_ARM_2,
-+	.gpio_ale   = PC3X2_GPIO_PIN_ARM_3,
-+	.gpio_cle   = PC3X2_GPIO_PIN_ARM_4,
-+	.gpio_nwp   = -1,
-+	.parts	    = pc7302_nand_parts,
-+	.num_parts  = ARRAY_SIZE(pc7302_nand_parts),
-+};
-+
-+static struct platform_device pc7302_nand = {
-+	.name		    = "gpio-nand",
-+	.num_resources	    = 1,
-+	.resource	    = &pc7302_nand_resource,
-+	.id		    = -1,
-+	.dev.platform_data  = &pc7302_nand_platdata,
-+};
-+
-+static void __init pc7302_init_nand(void)
-+{
-+	platform_device_register(&pc7302_nand);
-+}
-+
-+static void __init pc7302_init(void)
-+{
-+	picoxcell_core_init();
-+
-+	/*
-+	 * If we haven't booted in parallel mode, then allow ARM.4 GPIO pin to
-+	 * be used as GPIO to drive the NAND.
-+	 */
-+	if (picoxcell_has_feature(PICOXCELL_FEATURE_SW_NAND)) {
-+		WARN_ON(picoxcell_pin_set_mux(PC3X2_GPIO_PIN_ARM_4, MUX_ARM));
-+		pc7302_init_nand();
-+	} else {
-+		pc7302_init_nor();
-+	}
-+
-+	pc7302_panic_init();
-+}
-+
-+MACHINE_START(PC7302, "PC7302")
-+	.boot_params	= 0x00000100,
-+	.map_io		= picoxcell_map_io,
-+	.init_irq	= picoxcell_init_irq,
-+	.timer		= &picoxcell_sys_timer,
-+	.init_machine	= pc7302_init,
-+MACHINE_END
--- 
-1.7.2.3
+In other words, we probably have gremlins lurking in
+dma_declare_coherent_memory() which could bite us at a later date.
+
+> I assume sending a patch to remove the <4> is just a waste of time,
+> isn't it?
+
+Hmm, someone changed the behaviour of printk - it used to require the
+tag after each newline.  It seems that it only requires it as the first
+few characters now, which is a pain in the backside if you split
+printk's.
+
+IOW:
+
+	printk(KERN_ERR "foo bar baz ");
+	printk("buz\n" KERN_WARNING "fiz\n");
+
+used to result in "foo bar baz buz" being printed at error level, and
+"fiz" at warning level.  Today, you'll get "foo bar baz buz" at error
+level, and "<4>fiz" at the default level.
+
+Note that it's not as simple as deleting the KERN_WARNING, because:
+	printk(KERN_ERR "foo bar baz ");
+	printk("buz\nfiz\n");
+
+will result in the same as above except for the missing <4> - which means
+"fiz" still ends up at the wrong severity level.
+
+Confusingly:
+
+	printk(KERN_ERR "foo bar baz");
+	printk(KERN_WARNING "buz\nfiz\n");
+
+will do as per the original, but is silly.  Wonder how many other places
+are broken by this change.
