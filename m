@@ -1,76 +1,71 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 23 Nov 2010 19:44:51 +0530
-Subject: [PATCHv2 2/2] ftrace/ARM: add ARM support for C version of
-	recordmcount
-In-Reply-To: <1290454387.30543.304.camel@gandalf.stny.rr.com>
-References: <1290454387.30543.304.camel@gandalf.stny.rr.com>
-Message-ID: <1290521691-5101-2-git-send-email-rabin@rab.in>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 23 Nov 2010 15:17:13 +0100
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <1290521329.3901.14.camel@realization>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20101123101210.GA18170@n2100.arm.linux.org.uk>
+	<20101123102632.GM4693@pengutronix.de>
+	<1290521329.3901.14.camel@realization>
+Message-ID: <20101123141713.GQ4693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depending on the compiler version, ARM GCC calls the mcount function
-either __gnu_mcount_nc or mcount.
+Hello,
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/Kconfig       |    1 +
- scripts/recordmcount.c |    5 ++++-
- scripts/recordmcount.h |    5 +++--
- 3 files changed, 8 insertions(+), 3 deletions(-)
+On Tue, Nov 23, 2010 at 03:08:49PM +0100, Alberto Panizzo wrote:
+> Hi Uwe,
+> On mar, 2010-11-23 at 11:26 +0100, Uwe Kleine-K?nig wrote:
+> > Hello Russell,
+> > 
+> > On Tue, Nov 23, 2010 at 10:12:11AM +0000, Russell King - ARM Linux wrote:
+> > > On Tue, Nov 23, 2010 at 10:43:02AM +0100, Uwe Kleine-K?nig wrote:
+> > > > There is no need to memzero the buffer because dma_alloc_coherent zeros
+> > > > the memory for us.
+> > > > 
+> > > > This fixes:
+> > > > 
+> > > > 	BUG: Your driver calls ioremap() on system memory.  This leads
+> > > > 	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
+> > > > 	<4>will fail in the next kernel release.  Please fix your driver.
+> > > > 
+> > > > Tested-by: Michael Grzeschik <mgr@pengutronix.de>
+> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > ---
+> > > > Hello,
+> > > > 
+> > > > it seems to work this way, still I'd like to have some feedback if this
+> > > > is done right.  Russell?
+> > > 
+> > > Yes and probably no.  Yes, it's architecturally correct because the memory
+> > > will be mapped only once, thereby avoiding the aliasing issue.
+> > > 
+> > > Probably no, because the memory is mapped strongly as device memory by
+> > > ioremap.  ISTR whether memory remains accessible when mapped as a device
+> > > is not something covered by the architecture, but I guess is more to do
+> > > with how the interconnect on the SoC is setup.
+> > > 
+> > > In other words, we probably have gremlins lurking in
+> > > dma_declare_coherent_memory() which could bite us at a later date.
+> > That is, the patch is OK as such, right?
+> > 
+> > Best regards
+> > Uwe
+> > 
+> 
+> I'm trying to achieve the camera support for the i.MX31 3-Stack board.
+> The camera driver is in an early stage and results are not as expected
+> (I have to solve some timing issues). 
+> Adding the dma reservation code as you do in this patch results in 
+> system freeze when the capture chain is activated..
+Hmm, system freeze as is Sysrq doesn't work anymore?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 81c71da..5fdddda 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -23,6 +23,7 @@ config ARM
- 	select PERF_USE_VMALLOC
- 	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
-+	select HAVE_C_RECORDMCOUNT
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
-index ac6e51c..038b3d1 100644
---- a/scripts/recordmcount.c
-+++ b/scripts/recordmcount.c
-@@ -38,6 +38,7 @@ static void *ehdr_curr; /* current ElfXX_Ehdr *  for resource cleanup */
- static char gpfx;	/* prefix for global symbol name (sometimes '_') */
- static struct stat sb;	/* Remember .st_size, etc. */
- static jmp_buf jmpenv;	/* setjmp/longjmp per-file error escape */
-+static const char *altmcount;	/* alternate mcount symbol name */
- 
- /* setjmp() return values */
- enum {
-@@ -299,7 +300,9 @@ do_file(char const *const fname)
- 		fail_file();
- 	} break;
- 	case EM_386:	 reltype = R_386_32;                   break;
--	case EM_ARM:	 reltype = R_ARM_ABS32;                break;
-+	case EM_ARM:	 reltype = R_ARM_ABS32;
-+			 altmcount = "__gnu_mcount_nc";
-+			 break;
- 	case EM_IA_64:	 reltype = R_IA64_IMM64;   gpfx = '_'; break;
- 	case EM_MIPS:	 /* reltype: e_class    */ gpfx = '_'; break;
- 	case EM_PPC:	 reltype = R_PPC_ADDR32;   gpfx = '_'; break;
-diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
-index 58e933a..8087bc8 100644
---- a/scripts/recordmcount.h
-+++ b/scripts/recordmcount.h
-@@ -275,11 +275,12 @@ static uint_t *sift_rel_mcount(uint_t *mlocp,
- 			Elf_Sym const *const symp =
- 				&sym0[Elf_r_sym(relp)];
- 			char const *symname = &str0[w(symp->st_name)];
-+			char const *mcount = '_' == gpfx ? "_mcount" : "mcount";
- 
- 			if ('.' == symname[0])
- 				++symname;  /* ppc64 hack */
--			if (0 == strcmp((('_' == gpfx) ? "_mcount" : "mcount"),
--					symname))
-+			if (0 == strcmp(mcount, symname) ||
-+			    (altmcount && 0 == strcmp(altmcount, symname)))
- 				mcountsym = Elf_r_sym(relp);
- 		}
- 
+Sysrq-L comes to mind, or CONFIG_DETECT_HUNG_TASK=y together with the
+various lock debug options!?
+
+Best regards
+Uwe
+
 -- 
-1.7.2.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
