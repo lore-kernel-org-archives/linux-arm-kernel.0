@@ -1,40 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Nov 2010 09:14:58 +0000
-Subject: [PATCH] Add call to non-crashing cores through IPI
-In-Reply-To: <AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
-References: <1290161310-22808-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20101122072420.GC14080@gw.healthdatacare.com>
-	<AANLkTikJiXFG_kGV4=wTKOzViy-h9VtGRHKVBuh76fE2@mail.gmail.com>
-	<20101122104740.GA30744@n2100.arm.linux.org.uk>
-	<20101122112759.GA31227@n2100.arm.linux.org.uk>
-	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
-	<20101122144040.GM31227@n2100.arm.linux.org.uk>
-	<AANLkTinj5wnP4823bacK6rs3nQbw3qtqDDjYof2-ALUk@mail.gmail.com>
-	<AANLkTi=Ok09NjwZQCb5njqgLfT=K8Zd2fK1VteRb_MNv@mail.gmail.com>
-	<AANLkTimTXfeAiRcO0mUp8DsTB5BSCe+94-QH-Kht0AR6@mail.gmail.com>
-Message-ID: <AANLkTimC04kAFws0rAyvfARauiNvyYriJnxJ6KH+UHtU@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Nov 2010 10:31:58 +0100
+Subject: Pull Request i.MX
+In-Reply-To: <20101115082910.GJ6017@pengutronix.de>
+References: <20101115082910.GJ6017@pengutronix.de>
+Message-ID: <20101123093158.GD8950@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2010 20:09, Maxim Uvarov <muvarov@gmail.com> wrote:
-> 2010/11/22 Catalin Marinas <catalin.marinas@arm.com>:
->> On 22 November 2010 17:03, Per Fransson <per.fransson.ml@gmail.com> wrote:
->>> On the other hand, do we really need to enable the interrupts before
->>> performing an ipi?
->>> The important thing must be for them to be enabled on the
->>> receiving/callee cores. It's not
->>> as if we want the crashing core to be interruptable, is it?
->>
->> That's for the situation when the other core tries to send an IPI at
->> the same time. Unlikely but both cores may deadlock.
->>
->
-> Am I right that deadlock can occur only if the same IPI was sent?
+On Mon, Nov 15, 2010 at 09:29:10AM +0100, Sascha Hauer wrote:
+> Hi Russell,
+> 
+> Please pull the following patches for -rc.
 
-Not necessarily. It depends on whether the CPU issuing the IPI needs
-to wait for the completion of the cross-call. If you don't need to
-wait, you can send the IPI with the interrupts disabled (the platform
-smp_cross_call is already called with interrupts disabled).
+Ping. Anything wrong with this or have you just overlooked it?
+
+Sascha
+
+> 
+> Sascha
+> 
+> The following changes since commit 151f52f09c5728ecfdd0c289da1a4b30bb416f2c:
+> 
+>   ipw2x00: remove the right /proc/net entry (2010-11-05 18:57:04 -0700)
+> 
+> are available in the git repository at:
+>   git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+> 
+> Alberto Panizzo (1):
+>       mach-pcm037_eet: Fix section mismatch for eet_init_devices()
+> 
+> Baruch Siach (1):
+>       mx25: fix spi device registration typo
+> 
+> Sascha Hauer (5):
+>       ARM mx3fb: check for DMA engine type
+>       ARM i.MX: sdma is merged, so remove #ifdef SDMA_IS_MERGED
+>       ARM i.MX pcm037 eet: compile fixes
+>       ARM i.MX spi: fix compilation for i.MX21
+>       ARM i.MX27 eukrea: Fix compilation
+> 
+>  arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    6 ------
+>  arch/arm/mach-mx25/devices-imx25.h           |    4 ++--
+>  arch/arm/mach-mx3/mach-pcm037_eet.c          |    5 ++---
+>  arch/arm/plat-mxc/devices/platform-imx-dma.c |    8 --------
+>  arch/arm/plat-mxc/devices/platform-spi_imx.c |    1 +
+>  drivers/video/mx3fb.c                        |    4 ++++
+>  6 files changed, 9 insertions(+), 19 deletions(-)
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
