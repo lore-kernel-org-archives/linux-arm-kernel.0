@@ -1,20 +1,64 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 23 Nov 2010 22:08:25 +0800
-Subject: [PATCH 1/2] pxa: add usb clock for pxa168/pxa910
-In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D15054F6FCA@SC-VEXCH2.marvell.com>
-References: <1290418347-6861-1-git-send-email-chao.xie@marvell.com>
-	<AANLkTimq2--4rXRO9XbL3DnsTQhJmh-A4b3RarMy1xa=@mail.gmail.com>
-	<AAD1C6EB06EE3649B35B7E026785068D15054F6FCA@SC-VEXCH2.marvell.com>
-Message-ID: <AANLkTinkNOvWd1En4qoaTpebgce40-7A9bPad3Y+Yk82@mail.gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Tue, 23 Nov 2010 15:08:49 +0100
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <20101123102632.GM4693@pengutronix.de>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20101123101210.GA18170@n2100.arm.linux.org.uk>
+	<20101123102632.GM4693@pengutronix.de>
+Message-ID: <1290521329.3901.14.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 23, 2010 at 11:12 AM, Chao Xie <cxie4@marvell.com> wrote:
-> Hi
-> Modified as you suggested. Patch is attached.
-> ...
-> ? ? ? ?INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
-> + ? ? ? INIT_CLKREG(&clk_u2o, "pxa-u2o", "U2OCLK"),
-> ...
+Hi Uwe,
+On mar, 2010-11-23 at 11:26 +0100, Uwe Kleine-K?nig wrote:
+> Hello Russell,
+> 
+> On Tue, Nov 23, 2010 at 10:12:11AM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Nov 23, 2010 at 10:43:02AM +0100, Uwe Kleine-K?nig wrote:
+> > > There is no need to memzero the buffer because dma_alloc_coherent zeros
+> > > the memory for us.
+> > > 
+> > > This fixes:
+> > > 
+> > > 	BUG: Your driver calls ioremap() on system memory.  This leads
+> > > 	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
+> > > 	<4>will fail in the next kernel release.  Please fix your driver.
+> > > 
+> > > Tested-by: Michael Grzeschik <mgr@pengutronix.de>
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > ---
+> > > Hello,
+> > > 
+> > > it seems to work this way, still I'd like to have some feedback if this
+> > > is done right.  Russell?
+> > 
+> > Yes and probably no.  Yes, it's architecturally correct because the memory
+> > will be mapped only once, thereby avoiding the aliasing issue.
+> > 
+> > Probably no, because the memory is mapped strongly as device memory by
+> > ioremap.  ISTR whether memory remains accessible when mapped as a device
+> > is not something covered by the architecture, but I guess is more to do
+> > with how the interconnect on the SoC is setup.
+> > 
+> > In other words, we probably have gremlins lurking in
+> > dma_declare_coherent_memory() which could bite us at a later date.
+> That is, the patch is OK as such, right?
+> 
+> Best regards
+> Uwe
+> 
 
-Applied to 'devel'.
+I'm trying to achieve the camera support for the i.MX31 3-Stack board.
+The camera driver is in an early stage and results are not as expected
+(I have to solve some timing issues). 
+Adding the dma reservation code as you do in this patch results in 
+system freeze when the capture chain is activated..
+
+Best regards,
+
+-- 
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
