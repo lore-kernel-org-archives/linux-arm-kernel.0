@@ -1,7 +1,7 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Nov 2010 12:48:50 +0000
+From: muvarov@gmail.com (Maxim Uvarov)
+Date: Tue, 23 Nov 2010 16:01:33 +0300
 Subject: [PATCH] Add call to non-crashing cores through IPI
-In-Reply-To: <20101123124138.GI14080@gw.healthdatacare.com>
+In-Reply-To: <1290516530.6381.18.camel@e102109-lin.cambridge.arm.com>
 References: <20101122104740.GA30744@n2100.arm.linux.org.uk>
 	<20101122112759.GA31227@n2100.arm.linux.org.uk>
 	<AANLkTi=jXuupD+_t663_8haxgB-7Agf7UVcnjBQk+Z-Y@mail.gmail.com>
@@ -13,37 +13,52 @@ References: <20101122104740.GA30744@n2100.arm.linux.org.uk>
 	<AANLkTikh11_Mx6Z2po9t3RDp68te5o5LdnR0hYOexF=T@mail.gmail.com>
 	<AANLkTi=u6MPrA4JqJ1C3dAC5FLZCb7vKNtDV4-bOkSBy@mail.gmail.com>
 	<20101123124138.GI14080@gw.healthdatacare.com>
-Message-ID: <1290516530.6381.18.camel@e102109-lin.cambridge.arm.com>
+	<1290516530.6381.18.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTikoZ+DDj6Fj-+ig=mcNydFzUO1YFZjnMsuEUq7Z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-11-23 at 12:41 +0000, Mika Westerberg wrote:
-> On Tue, Nov 23, 2010 at 12:37:04PM +0000, Catalin Marinas wrote:
-> > On 23 November 2010 10:57, Per Fransson <per.fransson.ml@gmail.com> wrote:
-> > >>> Am I right that deadlock can occur only if the same IPI was sent?
-> > >>
-> > >> Not necessarily. It depends on whether the CPU issuing the IPI needs
-> > >> to wait for the completion of the cross-call. If you don't need to
-> > >> wait, you can send the IPI with the interrupts disabled (the platform
-> > >> smp_cross_call is already called with interrupts disabled).
-> > >>
-> > >
-> > > Well, smp_call_function() only optionally waits. As long as we choose not to,
-> > > using that function to ask the other cores to save their states and idle, should
-> > > be ok, right? In that case we don't need another ipi_msg_type and we can do
-> > > it with the interrupts of the ipi caller disabled.
-> >
-> > I think that should work but we still have a WARN_ON_ONCE in the
-> > generic smp_call_function_*() if interrupts are disabled.
-> 
-> But when we are crashing we have oops_in_progress set:
-> 
->         WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
->                      && !oops_in_progress);
-> 
-> so this warning is never printed, right?
+2010/11/23 Catalin Marinas <catalin.marinas@arm.com>:
+> On Tue, 2010-11-23 at 12:41 +0000, Mika Westerberg wrote:
+>> On Tue, Nov 23, 2010 at 12:37:04PM +0000, Catalin Marinas wrote:
+>> > On 23 November 2010 10:57, Per Fransson <per.fransson.ml@gmail.com> wrote:
+>> > >>> Am I right that deadlock can occur only if the same IPI was sent?
+>> > >>
+>> > >> Not necessarily. It depends on whether the CPU issuing the IPI needs
+>> > >> to wait for the completion of the cross-call. If you don't need to
+>> > >> wait, you can send the IPI with the interrupts disabled (the platform
+>> > >> smp_cross_call is already called with interrupts disabled).
+>> > >>
+>> > >
+>> > > Well, smp_call_function() only optionally waits. As long as we choose not to,
+>> > > using that function to ask the other cores to save their states and idle, should
+>> > > be ok, right? In that case we don't need another ipi_msg_type and we can do
+>> > > it with the interrupts of the ipi caller disabled.
+>> >
+>> > I think that should work but we still have a WARN_ON_ONCE in the
+>> > generic smp_call_function_*() if interrupts are disabled.
+>>
+>> But when we are crashing we have oops_in_progress set:
+>>
+>> ? ? ? ? WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
+>> ? ? ? ? ? ? ? ? ? ? ?&& !oops_in_progress);
+>>
+>> so this warning is never printed, right?
+>
+> Right. So just make sure the caller doesn't set the 'wait' argument.
+>
 
-Right. So just make sure the caller doesn't set the 'wait' argument.
+Please double check it. In powerpc crashdump  case  oops_in_progress is not set.
+
+Maxim.
+> --
+> Catalin
+>
+>
+>
+
+
 
 -- 
-Catalin
+Best regards,
+Maxim Uvarov
