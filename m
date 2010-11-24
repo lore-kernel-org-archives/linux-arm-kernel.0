@@ -1,71 +1,36 @@
-From: per.xx.fransson@stericsson.com (Per Fransson)
-Date: Wed, 24 Nov 2010 09:28:28 +0100
-Subject: [PATCH v2] Add call to non-crashing cores through IPI
-Message-ID: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Wed, 24 Nov 2010 10:47:15 +0200
+Subject: [PATCH] OMAP: ZOOM2: Change GPIO to enable LCD NEC
+	NL8048HL11-01B on OMAP34x-II MDP
+In-Reply-To: <1290560402-2507-1-git-send-email-omar.ramirez@ti.com>
+References: <1290560402-2507-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1290588435.13243.12.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2 changes:
-* the interrupts of the calling core are no longer disabled
-  before performing the IPI
----
+Hi,
 
-When kexec is used to start a crash kernel the other cores
-are notified. These non-crashing cores will save their state
-in the crash notes and then do nothing.
+On Tue, 2010-11-23 at 19:00 -0600, ext Omar Ramirez Luna wrote:
+> From: Yanick Saugy <yanick.saugy@heig-vd.ch>
+> 
+> The PIN which controls LCD's reset signal (VGA_nRESET/h_GPIO_96) was not
+> configured as a GPIO. We had to modify the OMAP MUX, and select this PIN
+> (CAM_XCLKA) as an output GPIO (OMAP_MUX_MODE4). (kernel 2.6.35)
+> 
+> Be aware of changing this PIN will probably disable the camera, because
+> it was previously configured as a camera clock.
+> 
+> Signed-off-by: Yanick Saugy <yanick.saugy@heig-vd.ch>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+> ---
+> 
+> I'm not sure if this patch was forgotten, hence resending. Without
+> it, a blanks screen is seen on zoom2 board.
 
-Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
----
- arch/arm/kernel/machine_kexec.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+Yes, I seem to have missed this.
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 3a8fd51..57a7f2f 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -23,6 +23,8 @@ extern unsigned long kexec_indirection_page;
- extern unsigned long kexec_mach_type;
- extern unsigned long kexec_boot_atags;
- 
-+static atomic_t waiting_for_crash_ipi;
-+
- /*
-  * Provide a dummy crash_notes definition while crash dump arrives to arm.
-  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
-@@ -37,9 +39,34 @@ void machine_kexec_cleanup(struct kimage *image)
- {
- }
- 
-+void machine_crash_nonpanic_core(void *unused)
-+{
-+	struct pt_regs regs;
-+
-+	crash_setup_regs(&regs, NULL);
-+	printk(KERN_EMERG "CPU %u will stop doing anything useful since another CPU has crashed\n",
-+	       smp_processor_id());
-+	crash_save_cpu(&regs, smp_processor_id());
-+	flush_cache_all();
-+
-+	atomic_dec(&waiting_for_crash_ipi);
-+	while (1)
-+		cpu_relax();
-+}
-+
- void machine_crash_shutdown(struct pt_regs *regs)
- {
-+	unsigned long msecs;
-+
- 	local_irq_disable();
-+
-+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-+	smp_call_function(machine_crash_nonpanic_core, NULL, false);
-+	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-+		mdelay(1);
-+		msecs--;
-+	}
- 	crash_save_cpu(regs, smp_processor_id());
- 
- 	printk(KERN_INFO "Loading crashdump kernel...\n");
--- 
-1.7.2.2
+But I'm a bit confused. You say that this will disable camera. Is there
+a camera connected to the board, and it won't work after this? 
+
+ Tomi
