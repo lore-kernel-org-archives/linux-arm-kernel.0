@@ -1,86 +1,67 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Wed, 24 Nov 2010 18:34:47 +0530
-Subject: [PATCH v4 1/5] OMAP: mailbox: change full flag per mailbox queue
-	instead of global
-In-Reply-To: <AANLkTimQU+wer+mLQPpsaG4r_Jt9HfxKLVVoCpCvpZWG@mail.gmail.com>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Wed, 24 Nov 2010 07:09:16 -0600
+Subject: [PATCH v4 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+In-Reply-To: <AANLkTi=tzuzOMa6kPp-a6+yn6xMLGtdVSvAxPFP5RU5q@mail.gmail.com>
 References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
-	<1290547617-16640-2-git-send-email-h-kanigeri2@ti.com>
-	<AANLkTikORr1tukDhfnJv0XhxCHSzvAP=KqicM5x30HHG@mail.gmail.com>
-	<AANLkTimQU+wer+mLQPpsaG4r_Jt9HfxKLVVoCpCvpZWG@mail.gmail.com>
-Message-ID: <AANLkTimpRk97TksnVkxozJH0Z4kqWk6c5DJ85mKvB1eE@mail.gmail.com>
+	<1290547617-16640-6-git-send-email-h-kanigeri2@ti.com>
+	<AANLkTi=tzuzOMa6kPp-a6+yn6xMLGtdVSvAxPFP5RU5q@mail.gmail.com>
+Message-ID: <AANLkTin8kxk=R5xQyp-ZcKVr-0eiM82L=QcF1PC2g-5n@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 24, 2010 at 18:17, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
-> On Tue, Nov 23, 2010 at 11:21 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
->> On Wed, Nov 24, 2010 at 02:56, Hari Kanigeri <h-kanigeri2@ti.com> wrote:
->>> From: Fernando Guzman Lugo <x0095840@ti.com>
->>>
->>> The variable rq_full flag is a global variable, so if there are multiple
->>> mailbox users there will be conflicts. Now there is a full flag per
->>> mailbox queue.
->>>
->>> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
->>> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
->>> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
->>> ---
->>> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?1 +
->>> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ? ?9 +++++++--
->>> ?2 files changed, 8 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
->>> index 9976565..13f2ef3 100644
->>> --- a/arch/arm/plat-omap/include/plat/mailbox.h
->>> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
->>> @@ -48,6 +48,7 @@ struct omap_mbox_queue {
->>> ? ? ? ?struct tasklet_struct ? tasklet;
->>> ? ? ? ?int ? ? (*callback)(void *);
->>> ? ? ? ?struct omap_mbox ? ? ? ?*mbox;
->>> + ? ? ? bool full;
->>> ?};
->>>
->>> ?struct omap_mbox {
->>> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
->>> index d2fafb8..48e161c 100644
->>> --- a/arch/arm/plat-omap/mailbox.c
->>> +++ b/arch/arm/plat-omap/mailbox.c
->>> @@ -33,7 +33,6 @@
->>>
->>> ?static struct workqueue_struct *mboxd;
->>> ?static struct omap_mbox **mboxes;
->>> -static bool rq_full;
->>>
->>> ?static int mbox_configured;
->>> ?static DEFINE_MUTEX(mbox_configured_lock);
->>> @@ -148,6 +147,12 @@ static void mbox_rx_work(struct work_struct *work)
->>>
->>> ? ? ? ? ? ? ? ?if (mq->callback)
->>> ? ? ? ? ? ? ? ? ? ? ? ?mq->callback((void *)msg);
->>> + ? ? ? ? ? ? ? spin_lock_irq(&mq->lock);
->>> + ? ? ? ? ? ? ? if (mq->full) {
->>> + ? ? ? ? ? ? ? ? ? ? ? mq->full = false;
->>> + ? ? ? ? ? ? ? ? ? ? ? omap_mbox_enable_irq(mq->mbox, IRQ_RX);
->>> + ? ? ? ? ? ? ? }
->>> + ? ? ? ? ? ? ? spin_unlock_irq(&mq->lock);
->>> ? ? ? ?}
->>> ?}
->>>
->>> @@ -170,7 +175,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
->>> ? ? ? ?while (!mbox_fifo_empty(mbox)) {
->>> ? ? ? ? ? ? ? ?if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
->>> ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_disable_irq(mbox, IRQ_RX);
->>> - ? ? ? ? ? ? ? ? ? ? ? rq_full = true;
->>> + ? ? ? ? ? ? ? ? ? ? ? mq->full = true;
+On Tue, Nov 23, 2010 at 11:29 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
+> On Wed, Nov 24, 2010 at 02:56, Hari Kanigeri <h-kanigeri2@ti.com> wrote:
+>> In the current mailbox driver, the mailbox internal pointer for
+>> callback can be directly manipulated by the Users, so a second
+>> User can easily corrupt the first user's callback pointer.
+>> The initial effort to correct this issue can be referred here:
+>> https://patchwork.kernel.org/patch/107520/
 >>
->> Should this also be inside spin_lock_irq?
+>> Along with fixing the above stated issue, this patch ?adds the
+>> flexibility option to register notifications from
+>> multiple readers to the events received on a mailbox instance.
+>> The discussion regarding this can be referred here.
+>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg30671.html
+>>
+>> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+>> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+>> ---
+>> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?7 +-
+>> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ?104 ++++++++++++++++-------------
+>> ?2 files changed, 62 insertions(+), 49 deletions(-)
 >>
 >
-> Not needed. this is already run from interrupt context.
-
-oh ok.
-
+> <<snip>>
 >
-> Thank you,
-> Best regards,
-> Hari
+>> @@ -363,10 +372,13 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
+>> ? ? ? ? ? ? ? ? ? ? ? ?ret = PTR_ERR(mbox->dev);
+>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_out;
+>> ? ? ? ? ? ? ? ?}
+>> +
 >
+> Do this change in the patch where the below code was added.
+
+I am sorry I didn't get you. you mean BLOCKING_INIT_NOTIFIER_HEAD line
+? yes, it is needed for this patch.
+>
+>> ? ? ? ? ? ? ? ?if (cpu_is_omap44xx())
+>> ? ? ? ? ? ? ? ? ? ? ? ?mbox->rev = OMAP_MBOX_IP_VERSION_2;
+>> ? ? ? ? ? ? ? ?else
+>> ? ? ? ? ? ? ? ? ? ? ? ?mbox->rev = OMAP_MBOX_IP_LEGACY;
+>> +
+>> + ? ? ? ? ? ? ? BLOCKING_INIT_NOTIFIER_HEAD(&mbox->notifier);
+>> ? ? ? ?}
+>> ? ? ? ?return 0;
+>>
+>> --
+>> 1.7.0
+>>
+>
+
+
+
+-- 
+Thank you,
+Best regards,
+Hari Kanigeri
