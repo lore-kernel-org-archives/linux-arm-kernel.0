@@ -1,42 +1,74 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 24 Nov 2010 00:34:07 +0000
-Subject: Query abut 2410 LCD configuration
-In-Reply-To: <tencent_2B5575C569651C571622EABD@qq.com>
-References: <tencent_2B5575C569651C571622EABD@qq.com>
-Message-ID: <4CEC5D7F.2040503@fluff.org>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 23 Nov 2010 16:44:31 -0800
+Subject: [PATCH v4 2/2] msm: gpio: Add irq support to v2 gpiolib.
+In-Reply-To: <alpine.DEB.2.00.1011231456380.17082@gbean-linux.qualcomm.com>
+References: <1290109970-26752-1-git-send-email-gbean@codeaurora.org>
+	<1290109970-26752-2-git-send-email-gbean@codeaurora.org>
+	<1290534717.4165.43.camel@m0nster>
+	<alpine.DEB.2.00.1011231456380.17082@gbean-linux.qualcomm.com>
+Message-ID: <1290559471.4165.85.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/10 14:24, ??? wrote:
-> Hi all:)
+On Tue, 2010-11-23 at 15:08 -0800, Gregory Bean wrote:
+> >> +static inline void set_gpio_bits(unsigned n, void __iomem *reg)
+> >> +{
+> >> +	writel(readl(reg) | n, reg);
+> >> +}
+> >> +
+> >> +static inline void clr_gpio_bits(unsigned n, void __iomem *reg)
+> >> +{
+> >> +	writel(readl(reg) & ~n, reg);
+> >> +}
+> >
+> > It seems these functions actually accept output from BIT(). It would be
+> > safer to force these to accept the bit number then use BIT() inside this
+> > function to translate. That way you wouldn't use "unsigned n" for the
+> > argument you would use a named enum for the argument.
 > 
->       In arch/arm/mach-s3c2410/include/mach/fb.h, struct s3c2410fb_display defines lcd configurations, 
->       Can figure out where does these values following pixclock come from?
-> 
-> 
-> /* LCD description */
-> struct s3c2410fb_display {
-> 	/* LCD type */
-> 	unsigned type;
-> 
-> 	/* Screen size */
-> 	unsigned short width;
-> 	unsigned short height;
-> 
-> 	/* Screen info */
-> 	unsigned short xres;
-> 	unsigned short yres;
-> 	unsigned short bpp;
-> 
-> 	unsigned pixclock;		/* pixclock in picoseconds */
-> 	unsigned short left_margin;  /* value in pixels (TFT) or HCLKs (STN) */
-> 	unsigned short right_margin; /* value in pixels (TFT) or HCLKs (STN) */
-> 	unsigned short hsync_len;    /* value in pixels (TFT) or HCLKs (STN) */
-> 	unsigned short upper_margin;	/* value in lines (TFT) or 0 (STN) */
-> 	unsigned short lower_margin;	/* value in lines (TFT) or 0 (STN) */
-> 	unsigned short vsync_len;	/* value in lines (TFT) or 0 (STN) 
+> I don't think that will work well, because there are cases where we want
+> to set or clear more than one bit at a time.  Making these functions
+> take a bit number as an argument would restrict them to setting or clearing
+> only one bit at a time, forcing users to call them multiple times to set
+> or clear more than one bit, meaning lots of readl & writel calls for
+> compount bit-changes.
 
+How often will you do the multiple bit changes tho?
 
-these values are generally found from the panel's data sheet, detailing
-the size of the borders and the length of the sync pulses. These relate
-to the standard framebuffer parameters
+> >> +static struct msm_gpio_dev msm_gpio = {
+> >> +	.gpio_chip = {
+> >> +		.base             = 0,
+> >
+> > I guess it's fine to do "offset - chip->base" if base is always zero,
+> > but why do subtraction at all.
+> 
+> If the chip is ever moved, not accounting for the base would produce an error.
+> I know that 'speculative coding' is frowned upon, but isn't removing an 
+> addition (as you pointed out, the subtraction is a bug) because this instance
+> of the chip is at offset zero a little over the top?
+
+Up to you what to do here ..  I don't care if you have it be redundant
+addition, you might want to comment on it tho.
+
+> >> +	set_gpio_bits(INTR_RAW_STATUS_EN | INTR_ENABLE, GPIO_INTR_CFG(gpio));
+> >
+> > I's just break this into two calls, or make another helper that to set
+> > that accepts the mask and have set_gpio_bits call that. This here you
+> > would just use the other helper. like set_gpio_bits calls
+> > set_gpio_bits_mask() and you call the mask version here.
+> 
+> Why make two readl/writel call pairs, or have one version of a helper which
+> can set a single bit and another version which can set more than one
+> at a time?  That seems really complicated.
+
+The benefit is that you would have type checking on the values sent in.
+You would get that from using the enum to define the argument. With just
+using unsigned int you can send in any value you want (even invalid
+ones).
+
+Daniel
+
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
