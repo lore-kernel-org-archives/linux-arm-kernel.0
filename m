@@ -1,36 +1,41 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Thu, 25 Nov 2010 00:46:15 +0300
-Subject: [PATCH] ASoC: fix SND_PXA2XX_LIB Kconfig warning
-Message-ID: <1290635175-30501-1-git-send-email-mad_soft@inbox.ru>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 24 Nov 2010 22:58:44 +0100
+Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
+In-Reply-To: <AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
+References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+	<20101124194439.GY4693@pengutronix.de>
+	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
+	<20101124201831.GZ4693@pengutronix.de>
+	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
+Message-ID: <20101124215844.GC4693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix following warning observed when SND_PXA2XX_SOC is set and SND_ARM isn't:
+On Wed, Nov 24, 2010 at 07:42:31PM -0200, Fabio Estevam wrote:
+> Hi Uwe,
+> 
+> 2010/11/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> ....
+> > I usually prefer just using DEBUG_LL and put
+> >
+> > ? ? ? ?#ifdef CONFIG_DEBUG_LL
+> > ? ? ? ? ? ? ? ?void printch(char);
+> > ? ? ? ? ? ? ? ?printch(c);
+> > ? ? ? ?#endif
+> >
+> > into emit_log_char. ?But I think that's only because I don't know how to
+> > use early printk properly. ?(You might need an additional kernel
+> > parameter?!)
+> 
+> Thanks. I see that the kernel crashes at sdma_get_firmware.
+> 
+> Will try to build a firmware using Sascha's SDMA utility.
+Maybe there is a fix needed to make the machine boot even if no firmware
+is found?
 
-warning: (SND_PXA2XX_AC97 && SOUND && !M68K && SND && SND_ARM && ARCH_PXA ||
-SND_PXA2XX_SOC && SOUND && !M68K && SND && SND_SOC && ARCH_PXA) selects
-SND_PXA2XX_LIB which has unmet direct dependencies (SOUND && !M68K && SND &&
-SND_ARM)
+Best regards
+Uwe
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
-
-This is fix for 2.6.37-rc3
-
- sound/soc/pxa/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 37f191b..580f485 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -1,6 +1,7 @@
- config SND_PXA2XX_SOC
- 	tristate "SoC Audio for the Intel PXA2xx chip"
- 	depends on ARCH_PXA
-+	select SND_ARM
- 	select SND_PXA2XX_LIB
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
