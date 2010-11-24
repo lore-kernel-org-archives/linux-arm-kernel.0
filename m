@@ -1,53 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 24 Nov 2010 15:35:50 +0000
-Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range RWFO fix
-In-Reply-To: <20101124151015.GE31572@mvista.com>
-References: <20101123222806.GA22936@mvista.com>
-	<20101123224237.GF26510@n2100.arm.linux.org.uk>
-	<1290595333.3056.6.camel@e102109-lin.cambridge.arm.com>
-	<20101124151015.GE31572@mvista.com>
-Message-ID: <AANLkTinrZtoZoA-bLKB4AL1VVVt2wLTPzh0zYAtrPku7@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 24 Nov 2010 16:39:05 +0100
+Subject: [PATCH 1/9] spi/pxa2xx: don't use subys initcall for driver init
+In-Reply-To: <20101124141623.GH24970@rakim.wolfsonmicro.main>
+References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
+	<1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
+	<AANLkTin4vh85XRkEd7YocCmKngViR_qZDe7z1b4JXyd-@mail.gmail.com>
+	<4CED1C95.8070300@linutronix.de>
+	<20101124141623.GH24970@rakim.wolfsonmicro.main>
+Message-ID: <4CED3199.2040700@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2010 15:10, George G. Davis <gdavis@mvista.com> wrote:
-> On Wed, Nov 24, 2010 at 10:42:13AM +0000, Catalin Marinas wrote:
->> On Tue, 2010-11-23 at 22:42 +0000, Russell King - ARM Linux wrote:
->> > On Wed, Nov 24, 2010 at 01:28:06AM +0300, Valentine Barshak wrote:
->> > > Cache ownership must be acqired by reading/writing data from the
->> > > cache line to make cache operation have the desired effect on the
->> > > SMP MPCore CPU. However, the ownership is never aquired in the
->> > > v6_dma_inv_range function when cleaning the first line and
->> > > flushing the last one, in case the address is not aligned
->> > > to D_CACHE_LINE_SIZE boundary.
->> > > Fix this by reading/writing data if needed, before performing
->> > > cache operations.
->> >
->> > You should do this on the data _inside_ the requested buffer. ?We don't
->> > know if the overlapping cache line shares itself with some atomic
->> > variable, and doing a read-write on it could undo other updates to it.
->>
->> We could just use the boundary addresses to avoid writing beyond the
->> buffer. Something like below (pretty much moving the BIC after the RFO,
->> untested):
->>
->>
->> diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
->> index 99fa688..d63bb55 100644
->> --- a/arch/arm/mm/cache-v6.S
->> +++ b/arch/arm/mm/cache-v6.S
->> @@ -204,6 +204,10 @@ ENTRY(v6_flush_kern_dcache_area)
->> ? */
->> ?v6_dma_inv_range:
->> ? ? ? tst ? ? r0, #D_CACHE_LINE_SIZE - 1
->> +#ifdef CONFIG_DMA_CACHE_RWFO
->> + ? ? ldrne ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ read for ownership
->> + ? ? strne ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ write for ownership
->
-> My concern doing RWFO prior to aligning "start" is that it could be
-> non-word-aligned which may result in an alignment fault.
+Mark Brown wrote:
+> On Wed, Nov 24, 2010 at 03:09:25PM +0100, Sebastian Andrzej Siewior wrote:
+> 
+>> I've been pointed out to this commit but I don't understand _why_.
+>> The part I don't get is "so it can be used with cpufreq". Is it
+>> refered to a driver or the subsystem as it?
+> 
+> We need the regulators for the CPU rails to start before the cpufreq
+> driver starts so cpufreq can talk to them, and since the regulators may
+> be SPI attached this means we also need the SPI controller to start
+> before cpufreq.  cpufreq starts at vanilla init time.
 
-True. Maybe you can use ldrbne/strbne.
+After digging through the code I think I've found it. pxa_cpu_init()
+registers a cpufreq client. cpufreq calls init and pxa then
+regulator_get() to get the regulator and I guess this is the problem.
+So I would suggest to defer pxa_cpu_init() via late_initcall().
 
--- 
-Catalin
+The other way around will force you to hack the init code for various
+drivers to make it work.
+
+Sebastian
