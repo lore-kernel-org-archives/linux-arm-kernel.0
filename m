@@ -1,36 +1,41 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Wed, 24 Nov 2010 10:47:15 +0200
-Subject: [PATCH] OMAP: ZOOM2: Change GPIO to enable LCD NEC
-	NL8048HL11-01B on OMAP34x-II MDP
-In-Reply-To: <1290560402-2507-1-git-send-email-omar.ramirez@ti.com>
-References: <1290560402-2507-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1290588435.13243.12.camel@tubuntu>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Wed, 24 Nov 2010 14:20:40 +0530
+Subject: [PATCH v4 2/5] OMAP: mailbox: fix rx interrupt disable in omap4
+In-Reply-To: <20101124082245.GF2468@legolas.emea.dhcp.ti.com>
+References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
+	<1290547617-16640-3-git-send-email-h-kanigeri2@ti.com>
+	<AANLkTimNW8ixBPyuwckZYnijXmT+t-XSY37xMUVvubLB@mail.gmail.com>
+	<20101124082245.GF2468@legolas.emea.dhcp.ti.com>
+Message-ID: <AANLkTimevr4qgRZQW+DOEBND15VxA0MjkW3pkwND92JL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 24, 2010 at 13:52, Felipe Balbi <balbi@ti.com> wrote:
+> On Wed, Nov 24, 2010 at 10:46:04AM +0530, Varadarajan, Charulatha wrote:
+>>>
+>>> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+>>> index 48e161c..a1c6bd9 100644
+>>> --- a/arch/arm/plat-omap/mailbox.c
+>>> +++ b/arch/arm/plat-omap/mailbox.c
+>>> @@ -358,6 +358,10 @@ int omap_mbox_register(struct device *parent, struct
+>>> omap_mbox **list)
+>>> ? ? ? ? ? ? ? ? ? ? ? ?ret = PTR_ERR(mbox->dev);
+>>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_out;
+>>> ? ? ? ? ? ? ? ?}
+>>> + ? ? ? ? ? ? ? if (cpu_is_omap44xx())
+>>
+>> Do not use cpu_is* checks in plat-omap/*
+>
+> see the previous thread.
 
-On Tue, 2010-11-23 at 19:00 -0600, ext Omar Ramirez Luna wrote:
-> From: Yanick Saugy <yanick.saugy@heig-vd.ch>
-> 
-> The PIN which controls LCD's reset signal (VGA_nRESET/h_GPIO_96) was not
-> configured as a GPIO. We had to modify the OMAP MUX, and select this PIN
-> (CAM_XCLKA) as an output GPIO (OMAP_MUX_MODE4). (kernel 2.6.35)
-> 
-> Be aware of changing this PIN will probably disable the camera, because
-> it was previously configured as a camera clock.
-> 
-> Signed-off-by: Yanick Saugy <yanick.saugy@heig-vd.ch>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
-> ---
-> 
-> I'm not sure if this patch was forgotten, hence resending. Without
-> it, a blanks screen is seen on zoom2 board.
+Referring to [1], I do not find why cpu_is* checks is used in plat-omap and
+why it can't be avoided.
 
-Yes, I seem to have missed this.
+In [1], it was suggested to create the pdata field that will be
+populated at init
+time using the cpu_is* check. But in this version, I am finding that
+this is done
+in plat-omap. This can be handled in mach-omap layer itself and can be passed
+as a pdata field which can be extracted during probe.
 
-But I'm a bit confused. You say that this will disable camera. Is there
-a camera connected to the board, and it won't work after this? 
-
- Tomi
+[1] https://patchwork.kernel.org/patch/337131/
