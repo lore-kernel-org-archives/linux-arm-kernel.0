@@ -1,42 +1,71 @@
-From: bengt.g.jonsson@stericsson.com (Bengt Jonsson)
-Date: Wed, 24 Nov 2010 09:24:14 +0100
-Subject: [PATCH 1/3] mfd: Added new regulator_data pointer to ab8500 board
-	configuration
-In-Reply-To: <20101123183037.GA19212@rakim.wolfsonmicro.main>
-References: <1290536754-21775-1-git-send-email-bengt.g.jonsson@stericsson.com>
-	<1290536754-21775-2-git-send-email-bengt.g.jonsson@stericsson.com>
-	<20101123183037.GA19212@rakim.wolfsonmicro.main>
-Message-ID: <4CECCBAE.6080707@stericsson.com>
+From: per.xx.fransson@stericsson.com (Per Fransson)
+Date: Wed, 24 Nov 2010 09:28:28 +0100
+Subject: [PATCH v2] Add call to non-crashing cores through IPI
+Message-ID: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-11-23 19:30, Mark Brown wrote:
-> On Tue, Nov 23, 2010 at 07:25:52PM +0100, Bengt Jonsson wrote:
->
->> The ab8500 regulator board configuration will be better separated
->> from the MFD board configuration. This patch adds a void pointer
->> for this purpose.
->
-> Adding something completely typesafe seems like a real loss - if you
-> want to point to something else at least point to a particular type -
-> eg,
->
-> struct foo;
->
-> struct pdata {
-> 	int other_stuff;
-> 	struct foo *foo;
-> };
->
-I get your point, I'll try this out.
->>   	struct regulator_init_data *regulator[AB8500_NUM_REGULATORS];
->> +	void *regulator_data;
->
-> It'd also help if you could articulate the problem you see with the
-> current approach...
-The problem I see is that ab8500-core defines the number of regulators 
-which I can see no reason for. If someone wants to add or remove a 
-regulator they have to make a change in include/linux/mfd/ab8500.c as 
-well as in the regulator files.
+v2 changes:
+* the interrupts of the calling core are no longer disabled
+  before performing the IPI
+---
 
-I will add a better description in an updated patch.
+When kexec is used to start a crash kernel the other cores
+are notified. These non-crashing cores will save their state
+in the crash notes and then do nothing.
+
+Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+---
+ arch/arm/kernel/machine_kexec.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 3a8fd51..57a7f2f 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -23,6 +23,8 @@ extern unsigned long kexec_indirection_page;
+ extern unsigned long kexec_mach_type;
+ extern unsigned long kexec_boot_atags;
+ 
++static atomic_t waiting_for_crash_ipi;
++
+ /*
+  * Provide a dummy crash_notes definition while crash dump arrives to arm.
+  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
+@@ -37,9 +39,34 @@ void machine_kexec_cleanup(struct kimage *image)
+ {
+ }
+ 
++void machine_crash_nonpanic_core(void *unused)
++{
++	struct pt_regs regs;
++
++	crash_setup_regs(&regs, NULL);
++	printk(KERN_EMERG "CPU %u will stop doing anything useful since another CPU has crashed\n",
++	       smp_processor_id());
++	crash_save_cpu(&regs, smp_processor_id());
++	flush_cache_all();
++
++	atomic_dec(&waiting_for_crash_ipi);
++	while (1)
++		cpu_relax();
++}
++
+ void machine_crash_shutdown(struct pt_regs *regs)
+ {
++	unsigned long msecs;
++
+ 	local_irq_disable();
++
++	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
++	smp_call_function(machine_crash_nonpanic_core, NULL, false);
++	msecs = 1000; /* Wait at most a second for the other cpus to stop */
++	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
++		mdelay(1);
++		msecs--;
++	}
+ 	crash_save_cpu(regs, smp_processor_id());
+ 
+ 	printk(KERN_INFO "Loading crashdump kernel...\n");
+-- 
+1.7.2.2
