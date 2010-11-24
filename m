@@ -1,78 +1,58 @@
 From: charu@ti.com (Varadarajan, Charulatha)
-Date: Wed, 24 Nov 2010 10:51:56 +0530
-Subject: [PATCH v4 1/5] OMAP: mailbox: change full flag per mailbox queue
-	instead of global
-In-Reply-To: <1290547617-16640-2-git-send-email-h-kanigeri2@ti.com>
+Date: Wed, 24 Nov 2010 10:56:54 +0530
+Subject: [PATCH v4 4/5] OMAP: mailbox: send message in process context
+In-Reply-To: <1290547617-16640-5-git-send-email-h-kanigeri2@ti.com>
 References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
-	<1290547617-16640-2-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <AANLkTikORr1tukDhfnJv0XhxCHSzvAP=KqicM5x30HHG@mail.gmail.com>
+	<1290547617-16640-5-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <AANLkTimbXXmPu5KQtpxG6jTxaj18ad+Q5dHSPArEtXgr@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 24, 2010 at 02:56, Hari Kanigeri <h-kanigeri2@ti.com> wrote:
-> From: Fernando Guzman Lugo <x0095840@ti.com>
+> Schedule the Tasklet to send only when mailbox fifo is full and there are
+> pending messages in kifo, else send the message directly in the Process
+
+Typo -> kifo
+
+> context. This would avoid needless scheduling of Tasklet for every message
+> transfer
 >
-> The variable rq_full flag is a global variable, so if there are multiple
-> mailbox users there will be conflicts. Now there is a full flag per
-> mailbox queue.
->
-> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
 > Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 > ---
-> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?1 +
-> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ? ?9 +++++++--
-> ?2 files changed, 8 insertions(+), 2 deletions(-)
+> ?arch/arm/plat-omap/mailbox.c | ? ?9 +++++++--
+> ?1 files changed, 7 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-> index 9976565..13f2ef3 100644
-> --- a/arch/arm/plat-omap/include/plat/mailbox.h
-> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
-> @@ -48,6 +48,7 @@ struct omap_mbox_queue {
-> ? ? ? ?struct tasklet_struct ? tasklet;
-> ? ? ? ?int ? ? (*callback)(void *);
-> ? ? ? ?struct omap_mbox ? ? ? ?*mbox;
-> + ? ? ? bool full;
-> ?};
->
-> ?struct omap_mbox {
 > diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-> index d2fafb8..48e161c 100644
+> index 13698ab..f4177df 100644
 > --- a/arch/arm/plat-omap/mailbox.c
 > +++ b/arch/arm/plat-omap/mailbox.c
-> @@ -33,7 +33,6 @@
+> @@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
+> ? ? ? ?struct omap_mbox_queue *mq = mbox->txq;
+> ? ? ? ?int ret = 0, len;
 >
-> ?static struct workqueue_struct *mboxd;
-> ?static struct omap_mbox **mboxes;
-> -static bool rq_full;
+> - ? ? ? spin_lock(&mq->lock);
+> + ? ? ? spin_lock_bh(&mq->lock);
 >
-> ?static int mbox_configured;
-> ?static DEFINE_MUTEX(mbox_configured_lock);
-> @@ -148,6 +147,12 @@ static void mbox_rx_work(struct work_struct *work)
->
-> ? ? ? ? ? ? ? ?if (mq->callback)
-> ? ? ? ? ? ? ? ? ? ? ? ?mq->callback((void *)msg);
-> + ? ? ? ? ? ? ? spin_lock_irq(&mq->lock);
-> + ? ? ? ? ? ? ? if (mq->full) {
-> + ? ? ? ? ? ? ? ? ? ? ? mq->full = false;
-> + ? ? ? ? ? ? ? ? ? ? ? omap_mbox_enable_irq(mq->mbox, IRQ_RX);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? spin_unlock_irq(&mq->lock);
+> ? ? ? ?if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
+> ? ? ? ? ? ? ? ?ret = -ENOMEM;
+> ? ? ? ? ? ? ? ?goto out;
 > ? ? ? ?}
+>
+> + ? ? ? if (kfifo_is_empty(&mq->fifo) && !__mbox_poll_for_space(mbox)) {
+> + ? ? ? ? ? ? ? mbox_fifo_write(mbox, msg);
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> ? ? ? ?len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+> ? ? ? ?WARN_ON(len != sizeof(msg));
+>
+> ? ? ? ?tasklet_schedule(&mbox->txq->tasklet);
+>
+> ?out:
+> - ? ? ? spin_unlock(&mq->lock);
+> + ? ? ? spin_unlock_bh(&mq->lock);
+> ? ? ? ?return ret;
 > ?}
->
-> @@ -170,7 +175,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
-> ? ? ? ?while (!mbox_fifo_empty(mbox)) {
-> ? ? ? ? ? ? ? ?if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
-> ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_disable_irq(mbox, IRQ_RX);
-> - ? ? ? ? ? ? ? ? ? ? ? rq_full = true;
-> + ? ? ? ? ? ? ? ? ? ? ? mq->full = true;
-
-Should this also be inside spin_lock_irq?
-
-> ? ? ? ? ? ? ? ? ? ? ? ?goto nomem;
-> ? ? ? ? ? ? ? ?}
->
+> ?EXPORT_SYMBOL(omap_mbox_msg_send);
 > --
 > 1.7.0
->
