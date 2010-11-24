@@ -1,48 +1,74 @@
-From: bengt.g.jonsson@stericsson.com (Bengt Jonsson)
-Date: Wed, 24 Nov 2010 08:57:09 +0100
-Subject: [PATCH 2/3] regulators: Update of ab8500 driver
-In-Reply-To: <20101123183833.GB19212@rakim.wolfsonmicro.main>
-References: <1290536754-21775-1-git-send-email-bengt.g.jonsson@stericsson.com>
-	<1290536754-21775-3-git-send-email-bengt.g.jonsson@stericsson.com>
-	<20101123183833.GB19212@rakim.wolfsonmicro.main>
-Message-ID: <4CECC555.8060408@stericsson.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 24 Nov 2010 09:02:14 +0100
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <20101123141713.GQ4693@pengutronix.de>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20101123101210.GA18170@n2100.arm.linux.org.uk>
+	<20101123102632.GM4693@pengutronix.de>
+	<1290521329.3901.14.camel@realization>
+	<20101123141713.GQ4693@pengutronix.de>
+Message-ID: <20101124080214.GU4693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-11-23 19:38, Mark Brown wrote:
-> On Tue, Nov 23, 2010 at 07:25:53PM +0100, Bengt Jonsson wrote:
->> This patch updates the driver with some bug fixes, support
->> for v2 hardware, support for regulator_count_voltages,
->> changes for reading the board config, added indexing of
->> the regulator array and added debug prints.
->
-> This is a whole series of changes which don't seem terribly related to
-> each other and aren't clearly described - please split this out into a
-> patch series which clearly shows each individual change.  For example,
-> one change per bug fix, another adding v2 support, another adding count
-> support and so on.  As things stand it's very difficult to review your
-> patch as it's not clear what each change is supposed to be doing or that
-> bits haven't been missed from changes.
-I will do that.
->
->> -	ret = abx500_get_register_interruptible(info->dev, info->voltage_bank,
->> -		info->voltage_reg,&value);
->> +	ret = abx500_get_register_interruptible(info->dev,
->> +			info->voltage_bank, info->voltage_reg,&regval);
->
-> In addition to what's noted above you also appear to have some renaming
-> of variables and struct members plus some other stylistic changes which
-> adds to the noise, again these should be split out for ease of review.
-I will do that too.
->
->> +	[AB8500_REGULATOR_INTCORE] = {
->> +		.desc = {
->> +			.name		= "intcore",
->
-> The previous way of listing the regulators with a macro seemed more
-> immediately readable?
-Removing the macros is just my suggestion. The disadvantage I see with 
-macros is that I need to read both the macro and the listing to see what 
-it really does. On the other hand, macros are probably more compact. If 
-it is ok, I will break out a patch with this change and put it in the 
-end of the patch stack. Then you can decide if you want it or not.
+Hello Alberto,
+
+On Tue, Nov 23, 2010 at 03:17:13PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Nov 23, 2010 at 03:08:49PM +0100, Alberto Panizzo wrote:
+> > Hi Uwe,
+> > On mar, 2010-11-23 at 11:26 +0100, Uwe Kleine-K?nig wrote:
+> > > Hello Russell,
+> > > 
+> > > On Tue, Nov 23, 2010 at 10:12:11AM +0000, Russell King - ARM Linux wrote:
+> > > > On Tue, Nov 23, 2010 at 10:43:02AM +0100, Uwe Kleine-K?nig wrote:
+> > > > > There is no need to memzero the buffer because dma_alloc_coherent zeros
+> > > > > the memory for us.
+> > > > > 
+> > > > > This fixes:
+> > > > > 
+> > > > > 	BUG: Your driver calls ioremap() on system memory.  This leads
+> > > > > 	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
+> > > > > 	<4>will fail in the next kernel release.  Please fix your driver.
+> > > > > 
+> > > > > Tested-by: Michael Grzeschik <mgr@pengutronix.de>
+> > > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > > ---
+> > > > > Hello,
+> > > > > 
+> > > > > it seems to work this way, still I'd like to have some feedback if this
+> > > > > is done right.  Russell?
+> > > > 
+> > > > Yes and probably no.  Yes, it's architecturally correct because the memory
+> > > > will be mapped only once, thereby avoiding the aliasing issue.
+> > > > 
+> > > > Probably no, because the memory is mapped strongly as device memory by
+> > > > ioremap.  ISTR whether memory remains accessible when mapped as a device
+> > > > is not something covered by the architecture, but I guess is more to do
+> > > > with how the interconnect on the SoC is setup.
+> > > > 
+> > > > In other words, we probably have gremlins lurking in
+> > > > dma_declare_coherent_memory() which could bite us at a later date.
+> > > That is, the patch is OK as such, right?
+> > > 
+> > > Best regards
+> > > Uwe
+> > > 
+> > 
+> > I'm trying to achieve the camera support for the i.MX31 3-Stack board.
+> > The camera driver is in an early stage and results are not as expected
+> > (I have to solve some timing issues). 
+> > Adding the dma reservation code as you do in this patch results in 
+> > system freeze when the capture chain is activated..
+> Hmm, system freeze as is Sysrq doesn't work anymore?
+> 
+> Sysrq-L comes to mind, or CONFIG_DETECT_HUNG_TASK=y together with the
+> various lock debug options!?
+Anything new from your side?  I wonder if this is only a problem in your
+driver.  Can I take a look at your driver?
+
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
