@@ -1,46 +1,26 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 24 Nov 2010 15:23:01 -0800
-Subject: [PATCH] usb: host: tegra: protect bus suspend with CONFIG_PM
-In-Reply-To: <3C7A7ACA8617D24290826EC008B5CD0817D747F9E5@HQMAIL03.nvidia.com>
-References: <3C7A7ACA8617D24290826EC008B5CD0817D747F9E5@HQMAIL03.nvidia.com>
-Message-ID: <AANLkTi=86DuOKWvkgVZ6kmDfeWioPhMbEufPW=JpQOjX@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 24 Nov 2010 14:35:16 -0800
+Subject: [PATCH] OMAP: UART: don't resume UARTs that are not enabled.
+In-Reply-To: <1290631720.15533.30.camel@eowin>
+References: <1290625743-8370-1-git-send-email-khilman@deeprootsystems.com>
+	<1290631720.15533.30.camel@eowin>
+Message-ID: <20101124223516.GX31536@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 19, 2010 at 2:15 PM, Allen Martin <AMartin@nvidia.com> wrote:
-> Protect the bus suspend/resume functions behind #ifdef CONFIG_PM.
-> This prevents a compile error if CONFIG_PM is turned off.
->
-> Signed-off-by: Allen Martin <amartin@nvidia.com>
-> ---
-> ?drivers/usb/host/ehci-tegra.c | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
-> index e566a97..02087c8 100644
-> --- a/drivers/usb/host/ehci-tegra.c
-> +++ b/drivers/usb/host/ehci-tegra.c
-> @@ -334,6 +334,7 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
-> ? ? ? ?return retval;
-> ?}
->
-> +#ifdef CONFIG_PM
-> ?static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
-> ?{
-> ? ? ? ?struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
-> @@ -359,6 +360,7 @@ static int tegra_ehci_bus_resume(struct usb_hcd *hcd)
->
-> ? ? ? ?return ehci_bus_resume(hcd);
-> ?}
-> +#endif
->
-> ?static const struct hc_driver tegra_ehci_hc_driver = {
-> ? ? ? ?.description ? ? ? ? ? ?= hcd_name,
-> --
-> 1.7.2.3
->
->
+* Felipe Balbi <me@felipebalbi.com> [101124 12:39]:
+> Hi,
+> 
+> On Wed, 2010-11-24 at 11:09 -0800, Kevin Hilman wrote:
+> > Add additional check to omap_uart_resume_idle() so that only
+> > enabled (specfically, idle-enabled) UARTs are allowed to resume.
+> 
+> typo: specifically
 
-Ack.  This driver is not in for-next yet, I'll pull this into the tegra tree.
+Also, without this patch, system with PM enabled hangs in
+cases where only one serial port is initialized instead of
+all of them. So I'll queue it as a fix during the -rc cycle.
 
-Your mailer is converting = to =3d, so I had to apply this manually.
+Regards,
+
+Tony
