@@ -1,53 +1,73 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 24 Nov 2010 12:13:20 +0100
-Subject: [PATCH 2/9] spi/pxa2xx: add support for shared IRQ handler
+Date: Wed, 24 Nov 2010 12:13:21 +0100
+Subject: [PATCH 3/9] spi/pxa2xx: Use define for SSSR_TFL_MASK instead of plain
+	numbers
 In-Reply-To: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
 References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1290597207-29838-3-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1290597207-29838-4-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This is required in case the interrupt line is shared with other
-devices.
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
 ---
- drivers/spi/pxa2xx_spi.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/plat-pxa/include/plat/ssp.h |    3 ++-
+ drivers/spi/pxa2xx_spi.c             |    8 ++++----
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/plat-pxa/include/plat/ssp.h b/arch/arm/plat-pxa/include/plat/ssp.h
+index fe43150..21c12ca 100644
+--- a/arch/arm/plat-pxa/include/plat/ssp.h
++++ b/arch/arm/plat-pxa/include/plat/ssp.h
+@@ -82,7 +82,8 @@
+ #define SSSR_TFS	(1 << 5)	/* Transmit FIFO Service Request */
+ #define SSSR_RFS	(1 << 6)	/* Receive FIFO Service Request */
+ #define SSSR_ROR	(1 << 7)	/* Receive FIFO Overrun */
+-
++#define SSSR_TFL_MASK   (0xf << 8)	/* Transmit FIFO Level mask */
++#define SSSR_RFL_MASK   (0xf << 12)	/* Receive FIFO Level mask */
+ 
+ /* extra bits in PXA255, PXA26x and PXA27x SSP ports */
+ #define SSCR0_TISSP		(1 << 4)	/* TI Sync Serial Protocol */
 diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-index 6f2f061..6d40995 100644
+index 6d40995..a4c795c 100644
 --- a/drivers/spi/pxa2xx_spi.c
 +++ b/drivers/spi/pxa2xx_spi.c
-@@ -742,6 +742,18 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
- {
- 	struct driver_data *drv_data = dev_id;
+@@ -224,7 +224,7 @@ static int null_writer(struct driver_data *drv_data)
  	void __iomem *reg = drv_data->ioaddr;
-+	u32 sccr1_reg = read_SSCR1(reg);
-+	u32 mask = drv_data->mask_sr;
-+	u32 status;
-+
-+	status = read_SSSR(reg);
-+
-+	/* Ignore possible writes if we don't need to write */
-+	if (!(sccr1_reg & SSCR1_TIE))
-+		mask &= ~SSSR_TFS;
-+
-+	if (!(status & mask))
-+		return IRQ_NONE;
+ 	u8 n_bytes = drv_data->n_bytes;
  
- 	if (!drv_data->cur_msg) {
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
  
-@@ -1512,7 +1524,8 @@ static int __init pxa2xx_spi_probe(struct platform_device *pdev)
- 		drv_data->mask_sr = SSSR_TINT | SSSR_RFS | SSSR_TFS | SSSR_ROR;
- 	}
+@@ -252,7 +252,7 @@ static int u8_writer(struct driver_data *drv_data)
+ {
+ 	void __iomem *reg = drv_data->ioaddr;
  
--	status = request_irq(ssp->irq, ssp_int, 0, dev_name(dev), drv_data);
-+	status = request_irq(ssp->irq, ssp_int, IRQF_SHARED, dev_name(dev),
-+			drv_data);
- 	if (status < 0) {
- 		dev_err(&pdev->dev, "cannot get IRQ %d\n", ssp->irq);
- 		goto out_error_master_alloc;
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -279,7 +279,7 @@ static int u16_writer(struct driver_data *drv_data)
+ {
+ 	void __iomem *reg = drv_data->ioaddr;
+ 
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -306,7 +306,7 @@ static int u32_writer(struct driver_data *drv_data)
+ {
+ 	void __iomem *reg = drv_data->ioaddr;
+ 
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
 -- 
 1.7.3.2
