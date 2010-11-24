@@ -1,25 +1,213 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 24 Nov 2010 20:44:39 +0100
-Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-In-Reply-To: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
-References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20101124194439.GY4693@pengutronix.de>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Wed, 24 Nov 2010 11:53:51 -0800
+Subject: [PATCH v5 1/2] msm: gpio: Add v2 gpio support to MSM SoCs.
+Message-ID: <1290628432-28765-1-git-send-email-gbean@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Beginning with the MSM8x60, the hardware block responsible for gpio
+support changes.  Provide gpiolib support for the new v2 architecture.
 
-On Wed, Nov 24, 2010 at 05:29:31PM -0200, Fabio Estevam wrote:
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> This allows imx-for-2.6.38 tree to build again.
-The same patch is already in Sascha's imx-for-2.6.37 branch (and so in
-for-next, too).  There are some more fixes in for-.37 so I'd use the
-for-next branch for now.
+Cc: Baruch Siach <baruch@tkos.co.il>
+Cc: Pavan Kondeti <pkondeti@codeaurora.org>
+Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+---
+ v5 - miscellaneous cleanup to patch 2/2, per dwalker at codeaurora.org
+ v4 - miscellaneous cleanup, per pkondeti at codeaurora.org
+ v3 - miscellaneous cleanup, per baruch at tkos.co.il
+ v2 - miscellaneous cleanup, per baruch at tkos.co.il
 
-Best regards
-Uwe
+ arch/arm/mach-msm/Makefile  |    4 +-
+ arch/arm/mach-msm/gpio-v2.c |  163 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 166 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/gpio-v2.c
+
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index b5a7b07..4a1a7ea 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -28,6 +28,8 @@ obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
+-ifndef CONFIG_MSM_V2_TLMM
++ifdef CONFIG_MSM_V2_TLMM
++obj-y	+= gpio-v2.o
++else
+ obj-y	+= gpio.o
+ endif
+diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+new file mode 100644
+index 0000000..d907af6
+--- /dev/null
++++ b/arch/arm/mach-msm/gpio-v2.c
+@@ -0,0 +1,163 @@
++/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ */
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++#include <mach/msm_iomap.h>
++#include "gpiomux.h"
++
++/* Bits of interest in the GPIO_IN_OUT register.
++ */
++enum {
++	GPIO_IN_BIT  = 0,
++	GPIO_OUT_BIT = 1
++};
++
++/* Bits of interest in the GPIO_CFG register.
++ */
++enum {
++	GPIO_OE_BIT = 9,
++};
++
++#define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
++#define GPIO_IN_OUT(gpio)         (MSM_TLMM_BASE + 0x1004 + (0x10 * (gpio)))
++
++static DEFINE_SPINLOCK(tlmm_lock);
++
++static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	return readl(GPIO_IN_OUT(offset)) & BIT(GPIO_IN_BIT);
++}
++
++static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
++{
++	writel(val ? BIT(GPIO_OUT_BIT) : 0, GPIO_IN_OUT(offset));
++}
++
++static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	writel(readl(GPIO_CONFIG(offset)) & ~BIT(GPIO_OE_BIT),
++		GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_direction_output(struct gpio_chip *chip,
++				unsigned offset,
++				int val)
++{
++	unsigned long irq_flags;
++
++	spin_lock_irqsave(&tlmm_lock, irq_flags);
++	msm_gpio_set(chip, offset, val);
++	writel(readl(GPIO_CONFIG(offset)) | BIT(GPIO_OE_BIT),
++		GPIO_CONFIG(offset));
++	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
++	return 0;
++}
++
++static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	return msm_gpiomux_get(chip->base + offset);
++}
++
++static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	msm_gpiomux_put(chip->base + offset);
++}
++
++static struct gpio_chip msm_gpio = {
++	.base             = 0,
++	.ngpio            = NR_GPIO_IRQS,
++	.direction_input  = msm_gpio_direction_input,
++	.direction_output = msm_gpio_direction_output,
++	.get              = msm_gpio_get,
++	.set              = msm_gpio_set,
++	.request          = msm_gpio_request,
++	.free             = msm_gpio_free,
++};
++
++static int __devinit msm_gpio_probe(struct platform_device *dev)
++{
++	int ret;
++
++	msm_gpio.label = dev->name;
++	ret = gpiochip_add(&msm_gpio);
++
++	return ret;
++}
++
++static int __devexit msm_gpio_remove(struct platform_device *dev)
++{
++	int ret = gpiochip_remove(&msm_gpio);
++
++	if (ret < 0)
++		return ret;
++
++	set_irq_handler(TLMM_SCSS_SUMMARY_IRQ, NULL);
++
++	return 0;
++}
++
++static struct platform_driver msm_gpio_driver = {
++	.probe = msm_gpio_probe,
++	.remove = __devexit_p(msm_gpio_remove),
++	.driver = {
++		.name = "msmgpio",
++		.owner = THIS_MODULE,
++	},
++};
++
++static struct platform_device msm_device_gpio = {
++	.name = "msmgpio",
++	.id   = -1,
++};
++
++static int __init msm_gpio_init(void)
++{
++	int rc;
++
++	rc = platform_driver_register(&msm_gpio_driver);
++	if (!rc) {
++		rc = platform_device_register(&msm_device_gpio);
++		if (rc)
++			platform_driver_unregister(&msm_gpio_driver);
++	}
++
++	return rc;
++}
++
++static void __exit msm_gpio_exit(void)
++{
++	platform_device_unregister(&msm_device_gpio);
++	platform_driver_unregister(&msm_gpio_driver);
++}
++
++postcore_initcall(msm_gpio_init);
++module_exit(msm_gpio_exit);
++
++MODULE_AUTHOR("Gregory Bean <gbean@codeaurora.org>");
++MODULE_DESCRIPTION("Driver for Qualcomm MSM TLMMv2 SoC GPIOs");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:msmgpio");
+-- 
+1.7.0.4
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
