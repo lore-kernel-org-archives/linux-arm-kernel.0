@@ -1,28 +1,40 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 24 Nov 2010 15:13:27 +0100
-Subject: [PATCH 4/9] arm/pxa2xx: reorgazine SSP and SPI header files
-In-Reply-To: <AANLkTinBFQZkuH4haeQAZQv8p0WZN5uh4xJj53sjUGTt@mail.gmail.com>
-References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>	<1290597207-29838-5-git-send-email-bigeasy@linutronix.de>
-	<AANLkTinBFQZkuH4haeQAZQv8p0WZN5uh4xJj53sjUGTt@mail.gmail.com>
-Message-ID: <4CED1D87.3000607@linutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 24 Nov 2010 22:14:31 +0800
+Subject: [PATCH 1/9] spi/pxa2xx: don't use subys initcall for driver init
+In-Reply-To: <4CED1C95.8070300@linutronix.de>
+References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
+	<1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
+	<AANLkTin4vh85XRkEd7YocCmKngViR_qZDe7z1b4JXyd-@mail.gmail.com>
+	<4CED1C95.8070300@linutronix.de>
+Message-ID: <AANLkTimxjiYkbaHUzq_V-s9WWytgbpNSo8xe8V_Lm6uF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang wrote:
-> On Wed, Nov 24, 2010 at 7:13 PM, Sebastian Andrzej Siewior
-> <bigeasy@linutronix.de> wrote:
-<snip>
->> diff --git a/arch/arm/plat-pxa/include/plat/ssp.h b/include/linux/pxa2xx_ssp.h
->> similarity index 98%
->> rename from arch/arm/plat-pxa/include/plat/ssp.h
->> rename to include/linux/pxa2xx_ssp.h
->> index 21c12ca..84465d4 100644
->> --- a/arch/arm/plat-pxa/include/plat/ssp.h
->> +++ b/include/linux/pxa2xx_ssp.h
-> Is there any reason to rename ssp.h?
+On Wed, Nov 24, 2010 at 10:09 PM, Sebastian Andrzej Siewior
+<bigeasy@linutronix.de> wrote:
+> Haojian Zhuang wrote:
+>>
+>> Hi Sebastian,
+>
+> Hi Hoajian,
+>
+>> Actually it's added for cpufreq usage. We can check the commit in below.
+>>
+>> ? ?pxa2xx_spi: register earlier
+>>
+>> ? ?Register pxa2xx_spi earlier so it can be used with cpufreq
+>>
+>> So I think that this modifcation may cause others brokne.
+>
+> I've been pointed out to this commit but I don't understand _why_.
+> The part I don't get is "so it can be used with cpufreq". Is it
+> refered to a driver or the subsystem as it?
+>
 
-Yup. It ends up in a global include/linux folder so just ssp may get
-confused with something else. I didn't move it into the spi folder because
-it isn't really spi and it is also used by the sound driver.
+As we know, cpufreq is used to adjust frequency and voltage of CPU. We
+need some interface to access PMIC hardware, such as I2C, SPI, .... So
+I think that they need SPI to initialize first. Otherwise, they may
+meet failure on accessing PMIC hardware.
 
-Sebastian
+Thanks
+Haojian
