@@ -1,29 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Nov 2010 15:53:03 +0000
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Wed, 24 Nov 2010 16:01:42 +0000
 Subject: [PATCH] ARM: Samsung: Make sure ASoC DMA device is prototyped
-Message-ID: <1290613983-1291-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+In-Reply-To: <1290613983-1291-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1290613983-1291-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1290614502.3332.34.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that the prototype agrees with the definition and stop sparse
-complaining when building the file.
+On Wed, 2010-11-24 at 15:53 +0000, Mark Brown wrote:
+> Ensure that the prototype agrees with the definition and stop sparse
+> complaining when building the file.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/plat-samsung/dev-asocdma.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/dev-asocdma.c b/arch/arm/plat-samsung/dev-asocdma.c
-index b7b1fca..a068c4f 100644
---- a/arch/arm/plat-samsung/dev-asocdma.c
-+++ b/arch/arm/plat-samsung/dev-asocdma.c
-@@ -10,6 +10,7 @@
- 
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <plat/devs.h>
- 
- static u64 audio_dmamask = DMA_BIT_MASK(32);
- 
+Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
 -- 
-1.7.1
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
