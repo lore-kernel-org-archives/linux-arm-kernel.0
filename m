@@ -1,34 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 24 Nov 2010 19:42:31 -0200
-Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-In-Reply-To: <20101124201831.GZ4693@pengutronix.de>
-References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
-	<20101124194439.GY4693@pengutronix.de>
-	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
-	<20101124201831.GZ4693@pengutronix.de>
-Message-ID: <AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Thu, 25 Nov 2010 00:46:15 +0300
+Subject: [PATCH] ASoC: fix SND_PXA2XX_LIB Kconfig warning
+Message-ID: <1290635175-30501-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Fix following warning observed when SND_PXA2XX_SOC is set and SND_ARM isn't:
 
-2010/11/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-....
-> I usually prefer just using DEBUG_LL and put
->
-> ? ? ? ?#ifdef CONFIG_DEBUG_LL
-> ? ? ? ? ? ? ? ?void printch(char);
-> ? ? ? ? ? ? ? ?printch(c);
-> ? ? ? ?#endif
->
-> into emit_log_char. ?But I think that's only because I don't know how to
-> use early printk properly. ?(You might need an additional kernel
-> parameter?!)
+warning: (SND_PXA2XX_AC97 && SOUND && !M68K && SND && SND_ARM && ARCH_PXA ||
+SND_PXA2XX_SOC && SOUND && !M68K && SND && SND_SOC && ARCH_PXA) selects
+SND_PXA2XX_LIB which has unmet direct dependencies (SOUND && !M68K && SND &&
+SND_ARM)
 
-Thanks. I see that the kernel crashes at sdma_get_firmware.
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
 
-Will try to build a firmware using Sascha's SDMA utility.
+This is fix for 2.6.37-rc3
 
-Regards,
+ sound/soc/pxa/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Fabio Estevam
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index 37f191b..580f485 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -1,6 +1,7 @@
+ config SND_PXA2XX_SOC
+ 	tristate "SoC Audio for the Intel PXA2xx chip"
+ 	depends on ARCH_PXA
++	select SND_ARM
+ 	select SND_PXA2XX_LIB
+ 	help
+ 	  Say Y or M if you want to add support for codecs attached to
+-- 
+1.7.0.4
