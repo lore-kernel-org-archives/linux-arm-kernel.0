@@ -1,31 +1,66 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Nov 2010 10:12:54 -0800
-Subject: [PATCH] ARM: Fix find_next_zero_bit and related assembly
-In-Reply-To: <201011231528.25668.jajones@nvidia.com>
-References: <1289524615-22484-1-git-send-email-jajones@nvidia.com>	<alpine.LFD.2.00.1011231625380.9313@xanadu.home>
-	<201011231528.25668.jajones@nvidia.com>
-Message-ID: <4CED55A6.5090608@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Nov 2010 18:19:02 +0000
+Subject: [PATCH 2/2] ARM: hw_breakpoint: reset control registers in hotplug
+	path
+In-Reply-To: <1290622742-11097-1-git-send-email-will.deacon@arm.com>
+References: <1290622742-11097-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1290622742-11097-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2010 03:28 PM, James Jones wrote:
-> On Tuesday 23 November 2010 13:26:47 Nicolas Pitre wrote:
->> On Thu, 11 Nov 2010, James Jones wrote:
->>> The find_next_bit, find_first_bit, find_next_zero_bit
->>> and find_first_zero_bit functions were not properly
->>> clamping to the maxbit argument at the bit level. They
->>> were instead only checking maxbit at the byte level.
->>> To fix this, add a compare and a conditional move
->>> instruction to the end of the common bit-within-the-
->>> byte code used by all the functions and be sure not to
->>> clobber the maxbit argument before it is used.
->>>
->>> Signed-off-by: James Jones <jajones@nvidia.com>
->>> Tested-by: Stephen Warren <swarren@nvidia.com>
->> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->>
->> Please send to RMK's patch system.
-> Thanks for the review.  It's already in the patch system, but I updated the 
-> entry to include your reviewed-by line.
+The ARMv7 debug architecture doesn't make any guarantees about the
+contents of debug control registers following a debug logic reset.
 
-Should this be sent to the stable tree too?
+This patch ensures that we reset the control registers when a cpu
+comes ONLINE (for example, with hotplug) so that when we enable
+monitor mode while inserting a breakpoint we won't exhibit random
+behaviour.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 793959e..515a3c4 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -764,7 +764,7 @@ out:
+ /*
+  * One-time initialisation.
+  */
+-static void __init reset_ctrl_regs(void *unused)
++static void reset_ctrl_regs(void *unused)
+ {
+ 	int i;
+ 
+@@ -799,6 +799,18 @@ static void __init reset_ctrl_regs(void *unused)
+ 	}
+ }
+ 
++static int __cpuinit dbg_reset_notify(struct notifier_block *self,
++				      unsigned long action, void *cpu)
++{
++	if (action == CPU_ONLINE)
++		smp_call_function_single((int)cpu, reset_ctrl_regs, NULL, 1);
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata dbg_reset_nb = {
++	.notifier_call = dbg_reset_notify,
++};
++
+ static int __init arch_hw_breakpoint_init(void)
+ {
+ 	int ret = 0;
+@@ -846,6 +858,8 @@ static int __init arch_hw_breakpoint_init(void)
+ 	hook_ifault_code(2, hw_breakpoint_pending, SIGTRAP, TRAP_HWBKPT,
+ 			"breakpoint debug exception");
+ 
++	/* Register hotplug notifier. */
++	register_cpu_notifier(&dbg_reset_nb);
+ out:
+ 	return ret;
+ }
+-- 
+1.7.0.4
