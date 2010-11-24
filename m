@@ -1,404 +1,130 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Wed, 24 Nov 2010 11:53:52 -0800
-Subject: [PATCH v5 2/2] msm: gpio: Add irq support to v2 gpiolib.
-In-Reply-To: <1290628432-28765-1-git-send-email-gbean@codeaurora.org>
-References: <1290628432-28765-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1290628432-28765-2-git-send-email-gbean@codeaurora.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 24 Nov 2010 21:59:15 +0200
+Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302479315FB@dbde02.ent.ti.com>
+References: <1290526740-27624-1-git-send-email-ohad@wizery.com>
+	<1290526740-27624-2-git-send-email-ohad@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302479315FB@dbde02.ent.ti.com>
+Message-ID: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Complete the MSM v2 gpio subsystem by adding irq_chip.
+Hi Mugdha,
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- v5 - miscellaneous cleanup, per dwalker at codeaurora.org
- v4 - miscellaneous cleanup to patch 1/2, per pkondeti at codeaurora.org
- v3 - miscellaneous cleanup to patch 1/2, per baruch at tkos.co.il
- v2 - miscellaneous cleanup to patch 1/2, per baruch at tkos.co.il
+On Wed, Nov 24, 2010 at 9:44 AM, Kamoolkar, Mugdha <mugdha@ti.com> wrote:
+> How do multiple clients get a handle that they can use? Are they expected to
+> share the handle they get from the call above?
 
- arch/arm/mach-msm/gpio-v2.c |  309 +++++++++++++++++++++++++++++++++++++++----
- 1 files changed, 286 insertions(+), 23 deletions(-)
+Currently, yes.
 
-diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-index d907af6..0de19ec 100644
---- a/arch/arm/mach-msm/gpio-v2.c
-+++ b/arch/arm/mach-msm/gpio-v2.c
-@@ -15,7 +15,13 @@
-  * 02110-1301, USA.
-  *
-  */
-+#define pr_fmt(fmt) "%s: " fmt, __func__
-+
-+#include <linux/bitmap.h>
-+#include <linux/bitops.h>
- #include <linux/gpio.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/module.h>
-@@ -27,29 +33,103 @@
- /* Bits of interest in the GPIO_IN_OUT register.
-  */
- enum {
--	GPIO_IN_BIT  = 0,
--	GPIO_OUT_BIT = 1
-+	GPIO_IN  = 0,
-+	GPIO_OUT = 1
-+};
-+
-+/* Bits of interest in the GPIO_INTR_STATUS register.
-+ */
-+enum {
-+	INTR_STATUS = 0,
- };
- 
- /* Bits of interest in the GPIO_CFG register.
-  */
- enum {
--	GPIO_OE_BIT = 9,
-+	GPIO_OE = 9,
-+};
-+
-+/* Bits of interest in the GPIO_INTR_CFG register.
-+ * When a GPIO triggers, two separate decisions are made, controlled
-+ * by two separate flags.
-+ *
-+ * - First, INTR_RAW_STATUS_EN controls whether or not the GPIO_INTR_STATUS
-+ * register for that GPIO will be updated to reflect the triggering of that
-+ * gpio.  If this bit is 0, this register will not be updated.
-+ * - Second, INTR_ENABLE controls whether an interrupt is triggered.
-+ *
-+ * If INTR_ENABLE is set and INTR_RAW_STATUS_EN is NOT set, an interrupt
-+ * can be triggered but the status register will not reflect it.
-+ */
-+enum {
-+	INTR_ENABLE        = 0,
-+	INTR_POL_CTL       = 1,
-+	INTR_DECT_CTL      = 2,
-+	INTR_RAW_STATUS_EN = 3,
-+};
-+
-+/* Codes of interest in GPIO_INTR_CFG_SU.
-+ */
-+enum {
-+	TARGET_PROC_SCORPION = 4,
-+	TARGET_PROC_NONE     = 7,
- };
- 
-+
-+#define GPIO_INTR_CFG_SU(gpio)    (MSM_TLMM_BASE + 0x0400 + (0x04 * (gpio)))
- #define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
- #define GPIO_IN_OUT(gpio)         (MSM_TLMM_BASE + 0x1004 + (0x10 * (gpio)))
-+#define GPIO_INTR_CFG(gpio)       (MSM_TLMM_BASE + 0x1008 + (0x10 * (gpio)))
-+#define GPIO_INTR_STATUS(gpio)    (MSM_TLMM_BASE + 0x100c + (0x10 * (gpio)))
-+
-+/**
-+ * struct msm_gpio_dev: the MSM8660 SoC GPIO device structure
-+ *
-+ * @enabled_irqs: a bitmap used to optimize the summary-irq handler.  By
-+ * keeping track of which gpios are unmasked as irq sources, we avoid
-+ * having to do readl calls on hundreds of iomapped registers each time
-+ * the summary interrupt fires in order to locate the active interrupts.
-+ *
-+ * @wake_irqs: a bitmap for tracking which interrupt lines are enabled
-+ * as wakeup sources.  When the device is suspended, interrupts which are
-+ * not wakeup sources are disabled.
-+ *
-+ * @dual_edge_irqs: a bitmap used to track which irqs are configured
-+ * as dual-edge, as this is not supported by the hardware and requires
-+ * some special handling in the driver.
-+ */
-+struct msm_gpio_dev {
-+	struct gpio_chip gpio_chip;
-+	DECLARE_BITMAP(enabled_irqs, NR_GPIO_IRQS);
-+	DECLARE_BITMAP(wake_irqs, NR_GPIO_IRQS);
-+	DECLARE_BITMAP(dual_edge_irqs, NR_GPIO_IRQS);
-+};
- 
- static DEFINE_SPINLOCK(tlmm_lock);
- 
-+static inline struct msm_gpio_dev *to_msm_gpio_dev(struct gpio_chip *chip)
-+{
-+	return container_of(chip, struct msm_gpio_dev, gpio_chip);
-+}
-+
-+static inline void set_gpio_bits(unsigned n, void __iomem *reg)
-+{
-+	writel(readl(reg) | n, reg);
-+}
-+
-+static inline void clear_gpio_bits(unsigned n, void __iomem *reg)
-+{
-+	writel(readl(reg) & ~n, reg);
-+}
-+
- static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
- {
--	return readl(GPIO_IN_OUT(offset)) & BIT(GPIO_IN_BIT);
-+	return readl(GPIO_IN_OUT(offset)) & BIT(GPIO_IN);
- }
- 
- static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
- {
--	writel(val ? BIT(GPIO_OUT_BIT) : 0, GPIO_IN_OUT(offset));
-+	writel(val ? BIT(GPIO_OUT) : 0, GPIO_IN_OUT(offset));
- }
- 
- static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-@@ -57,8 +137,7 @@ static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
- 	unsigned long irq_flags;
- 
- 	spin_lock_irqsave(&tlmm_lock, irq_flags);
--	writel(readl(GPIO_CONFIG(offset)) & ~BIT(GPIO_OE_BIT),
--		GPIO_CONFIG(offset));
-+	clear_gpio_bits(BIT(GPIO_OE), GPIO_CONFIG(offset));
- 	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
- 	return 0;
- }
-@@ -71,8 +150,7 @@ static int msm_gpio_direction_output(struct gpio_chip *chip,
- 
- 	spin_lock_irqsave(&tlmm_lock, irq_flags);
- 	msm_gpio_set(chip, offset, val);
--	writel(readl(GPIO_CONFIG(offset)) | BIT(GPIO_OE_BIT),
--		GPIO_CONFIG(offset));
-+	set_gpio_bits(BIT(GPIO_OE), GPIO_CONFIG(offset));
- 	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
- 	return 0;
- }
-@@ -87,30 +165,215 @@ static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
- 	msm_gpiomux_put(chip->base + offset);
- }
- 
--static struct gpio_chip msm_gpio = {
--	.base             = 0,
--	.ngpio            = NR_GPIO_IRQS,
--	.direction_input  = msm_gpio_direction_input,
--	.direction_output = msm_gpio_direction_output,
--	.get              = msm_gpio_get,
--	.set              = msm_gpio_set,
--	.request          = msm_gpio_request,
--	.free             = msm_gpio_free,
-+static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	return MSM_GPIO_TO_INT(chip->base + offset);
-+}
-+
-+static inline int msm_irq_to_gpio(struct gpio_chip *chip, unsigned irq)
-+{
-+	return irq - MSM_GPIO_TO_INT(chip->base);
-+}
-+
-+static struct msm_gpio_dev msm_gpio = {
-+	.gpio_chip = {
-+		.base             = 0,
-+		.ngpio            = NR_GPIO_IRQS,
-+		.direction_input  = msm_gpio_direction_input,
-+		.direction_output = msm_gpio_direction_output,
-+		.get              = msm_gpio_get,
-+		.set              = msm_gpio_set,
-+		.to_irq           = msm_gpio_to_irq,
-+		.request          = msm_gpio_request,
-+		.free             = msm_gpio_free,
-+	},
-+};
-+
-+/* For dual-edge interrupts in software, since the hardware has no
-+ * such support:
-+ *
-+ * At appropriate moments, this function may be called to flip the polarity
-+ * settings of both-edge irq lines to try and catch the next edge.
-+ *
-+ * The attempt is considered successful if:
-+ * - the status bit goes high, indicating that an edge was caught, or
-+ * - the input value of the gpio doesn't change during the attempt.
-+ * If the value changes twice during the process, that would cause the first
-+ * test to fail but would force the second, as two opposite
-+ * transitions would cause a detection no matter the polarity setting.
-+ *
-+ * The do-loop tries to sledge-hammer closed the timing hole between
-+ * the initial value-read and the polarity-write - if the line value changes
-+ * during that window, an interrupt is lost, the new polarity setting is
-+ * incorrect, and the first success test will fail, causing a retry.
-+ *
-+ * Algorithm comes from Google's msmgpio driver, see mach-msm/gpio.c.
-+ */
-+static void msm_gpio_update_dual_edge_pos(unsigned gpio)
-+{
-+	int loop_limit = 100;
-+	unsigned val, val2, intstat;
-+
-+	do {
-+		val = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN);
-+		if (val)
-+			clear_gpio_bits(BIT(INTR_POL_CTL), GPIO_INTR_CFG(gpio));
-+		else
-+			set_gpio_bits(BIT(INTR_POL_CTL), GPIO_INTR_CFG(gpio));
-+		val2 = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN);
-+		intstat = readl(GPIO_INTR_STATUS(gpio)) & BIT(INTR_STATUS);
-+		if (intstat || val == val2)
-+			return;
-+	} while (loop_limit-- > 0);
-+	pr_err("dual-edge irq failed to stabilize, "
-+	       "interrupts dropped. %#08x != %#08x\n",
-+	       val, val2);
-+}
-+
-+static void msm_gpio_irq_ack(unsigned int irq)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+
-+	writel(BIT(INTR_STATUS), GPIO_INTR_STATUS(gpio));
-+	if (test_bit(gpio, msm_gpio.dual_edge_irqs))
-+		msm_gpio_update_dual_edge_pos(gpio);
-+}
-+
-+static void msm_gpio_irq_mask(unsigned int irq)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+	unsigned long irq_flags;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+	writel(TARGET_PROC_NONE, GPIO_INTR_CFG_SU(gpio));
-+	clear_gpio_bits(INTR_RAW_STATUS_EN | INTR_ENABLE, GPIO_INTR_CFG(gpio));
-+	__clear_bit(gpio, msm_gpio.enabled_irqs);
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+}
-+
-+static void msm_gpio_irq_unmask(unsigned int irq)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+	unsigned long irq_flags;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+	__set_bit(gpio, msm_gpio.enabled_irqs);
-+	set_gpio_bits(INTR_RAW_STATUS_EN | INTR_ENABLE, GPIO_INTR_CFG(gpio));
-+	writel(TARGET_PROC_SCORPION, GPIO_INTR_CFG_SU(gpio));
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+}
-+
-+static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+	unsigned long irq_flags;
-+	uint32_t bits;
-+
-+	spin_lock_irqsave(&tlmm_lock, irq_flags);
-+
-+	bits = readl(GPIO_INTR_CFG(gpio));
-+
-+	if (flow_type & IRQ_TYPE_EDGE_BOTH) {
-+		bits |= BIT(INTR_DECT_CTL);
-+		irq_desc[irq].handle_irq = handle_edge_irq;
-+		if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
-+			__set_bit(gpio, msm_gpio.dual_edge_irqs);
-+		else
-+			__clear_bit(gpio, msm_gpio.dual_edge_irqs);
-+	} else {
-+		bits &= ~BIT(INTR_DECT_CTL);
-+		irq_desc[irq].handle_irq = handle_level_irq;
-+		__clear_bit(gpio, msm_gpio.dual_edge_irqs);
-+	}
-+
-+	if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH))
-+		bits |= BIT(INTR_POL_CTL);
-+	else
-+		bits &= ~BIT(INTR_POL_CTL);
-+
-+	writel(bits, GPIO_INTR_CFG(gpio));
-+
-+	if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
-+		msm_gpio_update_dual_edge_pos(gpio);
-+
-+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
-+
-+	return 0;
-+}
-+
-+/*
-+ * When the summary IRQ is raised, any number of GPIO lines may be high.
-+ * It is the job of the summary handler to find all those GPIO lines
-+ * which have been set as summary IRQ lines and which are triggered,
-+ * and to call their interrupt handlers.
-+ */
-+static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	unsigned long i;
-+
-+	for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
-+	     i < NR_GPIO_IRQS;
-+	     i = find_next_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS, i + 1)) {
-+		if (readl(GPIO_INTR_STATUS(i)) & BIT(INTR_STATUS))
-+			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
-+							   i));
-+	}
-+	desc->chip->ack(irq);
-+}
-+
-+static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
-+{
-+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
-+
-+	if (on) {
-+		if (bitmap_empty(msm_gpio.wake_irqs, NR_GPIO_IRQS))
-+			set_irq_wake(TLMM_SCSS_SUMMARY_IRQ, 1);
-+		set_bit(gpio, msm_gpio.wake_irqs);
-+	} else {
-+		clear_bit(gpio, msm_gpio.wake_irqs);
-+		if (bitmap_empty(msm_gpio.wake_irqs, NR_GPIO_IRQS))
-+			set_irq_wake(TLMM_SCSS_SUMMARY_IRQ, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+static struct irq_chip msm_gpio_irq_chip = {
-+	.name		= "msmgpio",
-+	.mask		= msm_gpio_irq_mask,
-+	.unmask		= msm_gpio_irq_unmask,
-+	.ack		= msm_gpio_irq_ack,
-+	.set_type	= msm_gpio_irq_set_type,
-+	.set_wake	= msm_gpio_irq_set_wake,
- };
- 
- static int __devinit msm_gpio_probe(struct platform_device *dev)
- {
--	int ret;
-+	int i, irq, ret;
-+
-+	bitmap_zero(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
-+	bitmap_zero(msm_gpio.wake_irqs, NR_GPIO_IRQS);
-+	bitmap_zero(msm_gpio.dual_edge_irqs, NR_GPIO_IRQS);
-+	msm_gpio.gpio_chip.label = dev->name;
-+	ret = gpiochip_add(&msm_gpio.gpio_chip);
-+	if (ret < 0)
-+		return ret;
- 
--	msm_gpio.label = dev->name;
--	ret = gpiochip_add(&msm_gpio);
-+	for (i = 0; i < msm_gpio.gpio_chip.ngpio; ++i) {
-+		irq = msm_gpio_to_irq(&msm_gpio.gpio_chip, i);
-+		set_irq_chip(irq, &msm_gpio_irq_chip);
-+		set_irq_handler(irq, handle_level_irq);
-+		set_irq_flags(irq, IRQF_VALID);
-+	}
- 
--	return ret;
-+	set_irq_chained_handler(TLMM_SCSS_SUMMARY_IRQ,
-+				msm_summary_irq_handler);
-+	return 0;
- }
- 
- static int __devexit msm_gpio_remove(struct platform_device *dev)
- {
--	int ret = gpiochip_remove(&msm_gpio);
-+	int ret = gpiochip_remove(&msm_gpio.gpio_chip);
- 
- 	if (ret < 0)
- 		return ret;
--- 
-1.7.0.4
+> What if they are independent
+> clients with no means of communication between them? There may be a need of
+> an API that returns the handle for a specific ID. For example, a module over
+> the hwspinlock driver that does some level of management of IDs (e.g. name
+> to ID mapping) and enables users to get multi-core as well as multi-client
+> protection on Linux.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I'm not sure I understand the use case. Can you please elaborate ?
+
+> For example:
+> struct hwspinlock *hwspinlock_get_handle(unsigned int id);
+
+I'm afraid such an API will be easily abused, e.g., drivers that will
+try to use a predefined hwspinlock id without taking care of reserving
+it early enough will probably use it to overcome an "oops this
+hwspinlock has already been assigned to someone else".
+
+So let me suggest we should first understand the use case for the API
+you propose, and then see how we solve it ?
+
+> Why are some of the APIs hwspinlock_ and others hwspin_?
+
+I'm following the regular spinlock naming, which nicely avoids having
+the word 'lock' twice in the API. So you get APIs like hwspin_lock,
+hwspin_unlock, hwspin_trylock. In our case we still have stuff like
+hwspinlock_request and hwspinlock_free. I can probably make it
+hwspin_lock_request, does that look nicer ?
+
+>> + ?int hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long timeout);
+>> + ? - lock a previously-assigned hwspinlock with a timeout limit (specified in
+>> + ? ? jiffies). If the hwspinlock is already taken, the function will busy
+>> loop
+>> + ? ? waiting for it to be released, but give up when the timeout meets
+>> jiffies.
+>> + ? ? If timeout is 0, the function will never give up (therefore if a faulty
+>> + ? ? remote core never releases the hwspinlock, it will deadlock).
+> If timeout is 0, shouldn't it rather behave as a trylock? If timeout is
+> MAX_SCHEDULE_TIMEOUT, then it should behave as a wait-forever.
+
+Good point, thanks!
+
+>> + ?int hwspin_trylock(struct hwspinlock *hwlock);
+>> + ? - attempt to lock a previously-assigned hwspinlock, but immediately fail
+>> if
+>> + ? ? it is already taken.
+>> + ? ? Upon a successful return from this function, preemption is disabled so
+>> + ? ? caller must not sleep, and is advised to release the hwspinlock as soon
+>> as
+>> + ? ? possible, in order to minimize remote cores polling on the hardware
+>> + ? ? interconnect.
+>> + ? ? Returns 0 on success and an appropriate error code otherwise (most
+>> + ? ? notably -EBUSY if the hwspinlock was already taken).
+>> + ? ? The function will never sleep.
+> Is this function needed at all if timeout 0 behaves similar to trylock?
+
+Yeah. Drivers should use the _trylock version when applicable because
+it'd make the code more readable, and it's more intuitive (just like
+the spin_trylock API).
+
+>> + ?struct hwspinlock *hwspinlock_unregister(unsigned int id);
+>> + ? - to be called from the underlying vendor-specific implementation, in
+>> order
+>> + ? ? to unregister an existing (and unused) hwspinlock instance.
+>> + ? ? Can be called from an atomic context (will not sleep) but not from
+>> + ? ? within interrupt context.
+>> + ? ? Returns the address of hwspinlock on success, or NULL on error (e.g.
+>> + ? ? if the hwspinlock is sill in use).
+> Does this need to be called for all hwspinlocks?
+
+Currently, yes.
+
+I actually am planning an improvement that would allow registering a
+block of hwspinlocks; I don't think that the multiple calls of
+register/unregister is that bad (it happens only once at boot), but I
+want to allow sharing of the owner, ops and dev members of the
+hwspinlock instances (to save some memory).
+
+Anyway, it's not a big improvement, so I planned first to get things
+merged and then look into stuff like that.
+
+>> +int __hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long to,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int mode, unsigned long *flags)
+>> +{
+>> + ? ? int ret;
+>> +
+>> + ? ? for (;;) {
+>> + ? ? ? ? ? ? /* Try to take the hwspinlock */
+>> + ? ? ? ? ? ? ret = __hwspin_trylock(hwlock, mode, flags);
+>> + ? ? ? ? ? ? if (ret != -EBUSY)
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ?* The lock is already taken, let's check if the user wants
+>> + ? ? ? ? ? ? ?* us to try again
+>> + ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? if (to && time_is_before_eq_jiffies(to))
+>> + ? ? ? ? ? ? ? ? ? ? return -ETIMEDOUT;
+>> +
+>> + ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ?* Allow platform-specific relax handlers to prevent
+>> + ? ? ? ? ? ? ?* hogging the interconnect (no sleeping, though)
+>> + ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? if (hwlock->ops->relax)
+>> + ? ? ? ? ? ? ? ? ? ? hwlock->ops->relax(hwlock);
+> There should be a way to have an escape mechanism for the case where a deadlock
+> has occurred due to remote side taking the spinlock and crashing.
+
+This is exactly what the timeout parameter is for..
+
+Thanks,
+Ohad.
