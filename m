@@ -1,40 +1,138 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu, 25 Nov 2010 06:57:52 +0800
-Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-In-Reply-To: <20101124215844.GC4693@pengutronix.de>
-References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
-	<20101124194439.GY4693@pengutronix.de>
-	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
-	<20101124201831.GZ4693@pengutronix.de>
-	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
-	<20101124215844.GC4693@pengutronix.de>
-Message-ID: <AANLkTimnX_eCdUTdFP0eJ528fYy3_X-Lme+y5ga-a4w7@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 25 Nov 2010 00:00:47 +0100
+Subject: [PATCH v7 09/11] OMAP2+: GPIO: device registration
+In-Reply-To: <1290524213-395-10-git-send-email-charu@ti.com>
+References: <1290524213-395-1-git-send-email-charu@ti.com>
+	<1290524213-395-10-git-send-email-charu@ti.com>
+Message-ID: <4CED991F.6050701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/25 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Wed, Nov 24, 2010 at 07:42:31PM -0200, Fabio Estevam wrote:
->> Hi Uwe,
->>
->> 2010/11/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->> ....
->> > I usually prefer just using DEBUG_LL and put
->> >
->> > ? ? ? ?#ifdef CONFIG_DEBUG_LL
->> > ? ? ? ? ? ? ? ?void printch(char);
->> > ? ? ? ? ? ? ? ?printch(c);
->> > ? ? ? ?#endif
->> >
->> > into emit_log_char. ?But I think that's only because I don't know how to
->> > use early printk properly. ?(You might need an additional kernel
->> > parameter?!)
->>
->> Thanks. I see that the kernel crashes at sdma_get_firmware.
->>
->> Will try to build a firmware using Sascha's SDMA utility.
-> Maybe there is a fix needed to make the machine boot even if no firmware
-> is found?
-Some Freescale guy is preparing sdma patch. Maybe he can fix this.
+On 11/23/2010 3:56 PM, Varadarajan, Charulatha wrote:
+> Use omap_device_build() API to do platform_device_register of
+> GPIO devices. For OMAP2+ chips, the device specific data defined
+> in the centralized hwmod database will be used.
+>
+> gpio_init needs to be done before machine_init functions access
+> gpio APIs. Hence gpio_init is made as a postcore_initcall.
+>
+> Signed-off-by: Charulatha V<charu@ti.com>
+> Reviewed-by: Basak, Partha<p-basak2@ti.com>
 
-Thanks
-Richard
+Acked-by: Benoit Cousson <b-cousson@ti.com>
+
+> ---
+>   arch/arm/mach-omap2/gpio.c |  103 ++++++++++++++++++++++++++++++++++++++++++++
+>   1 files changed, 103 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/mach-omap2/gpio.c
+>
+> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+> new file mode 100644
+> index 0000000..e5c9b6a
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/gpio.c
+> @@ -0,0 +1,104 @@
+> +/*
+> + * OMAP2+ specific gpio initialization
+> + *
+> + * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * Author:
+> + *	Charulatha V<charu@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include<linux/gpio.h>
+> +#include<linux/err.h>
+> +#include<linux/slab.h>
+> +#include<linux/interrupt.h>
+> +
+> +#include<plat/omap_hwmod.h>
+> +#include<plat/omap_device.h>
+> +
+> +static struct omap_device_pm_latency omap_gpio_latency[] = {
+> +	[0] = {
+> +		.deactivate_func = omap_device_idle_hwmods,
+> +		.activate_func   = omap_device_enable_hwmods,
+> +		.flags		 = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+> +	},
+> +};
+> +
+> +static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+> +{
+> +	struct omap_device *od;
+> +	struct omap_gpio_platform_data *pdata;
+> +	struct omap_gpio_dev_attr *dev_attr;
+> +	char *name = "omap_gpio";
+> +	int id;
+> +
+> +	/*
+> +	 * extract the device id from name field available in the
+> +	 * hwmod database and use the same for constructing ids for
+> +	 * gpio devices.
+> +	 * CAUTION: Make sure the name in the hwmod database does
+> +	 * not change. If changed, make corresponding change here
+> +	 * or make use of static variable mechanism to handle this.
+> +	 */
+> +	sscanf(oh->name, "gpio%d",&id);
+> +
+> +	pdata = kzalloc(sizeof(struct omap_gpio_platform_data), GFP_KERNEL);
+> +	if (!pdata) {
+> +		pr_err("gpio%d: Memory allocation failed\n", id);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	dev_attr = (struct omap_gpio_dev_attr *)oh->dev_attr;
+> +	pdata->bank_width = dev_attr->bank_width;
+> +	pdata->dbck_flag = dev_attr->dbck_flag;
+> +	pdata->virtual_irq_start = IH_GPIO_BASE + 32 * (id - 1);
+> +
+> +	switch (oh->class->rev) {
+> +	case 0:
+> +	case 1:
+> +		pdata->bank_type = METHOD_GPIO_24XX;
+> +		break;
+> +	case 2:
+> +		pdata->bank_type = METHOD_GPIO_44XX;
+> +		break;
+> +	default:
+> +		WARN(1, "Invalid gpio bank_type\n");
+> +		kfree(pdata);
+> +		return -EINVAL;
+> +	}
+> +
+> +	od = omap_device_build(name, id - 1, oh, pdata,
+> +				sizeof(*pdata),	omap_gpio_latency,
+> +				ARRAY_SIZE(omap_gpio_latency),
+> +				false);
+> +	kfree(pdata);
+> +
+> +	if (IS_ERR(od)) {
+> +		WARN(1, "Cant build omap_device for %s:%s.\n",
+> +					name, oh->name);
+> +		return PTR_ERR(od);
+> +	}
+> +
+> +	gpio_bank_count++;
+> +	return 0;
+> +}
+> +
+> +/*
+> + * gpio_init needs to be done before
+> + * machine_init functions access gpio APIs.
+> + * Hence gpio_init is a postcore_initcall.
+> + */
+> +static int __init omap2_gpio_init(void)
+> +{
+> +	return omap_hwmod_for_each_by_class("gpio", omap2_gpio_dev_init,
+> +						NULL);
+> +}
+> +postcore_initcall(omap2_gpio_init);
