@@ -1,48 +1,46 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu, 25 Nov 2010 07:06:47 +0800
-Subject: [patch 1/1] iMX51: introduce MX51_GPIO_NR
-In-Reply-To: <87zksywt4l.fsf@lechat.rtp-net.org>
-References: <20101122224526.987309475@rtp-net.org>
-	<AANLkTi=Q=UOSUoJ40ThyyyDqMoC849W-cn36CkVFxKhQ@mail.gmail.com>
-	<87zksywt4l.fsf@lechat.rtp-net.org>
-Message-ID: <AANLkTimS7o+oyBWQ0aL43t-oRABji5ZNyXGijCSV6ECu@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 24 Nov 2010 15:23:01 -0800
+Subject: [PATCH] usb: host: tegra: protect bus suspend with CONFIG_PM
+In-Reply-To: <3C7A7ACA8617D24290826EC008B5CD0817D747F9E5@HQMAIL03.nvidia.com>
+References: <3C7A7ACA8617D24290826EC008B5CD0817D747F9E5@HQMAIL03.nvidia.com>
+Message-ID: <AANLkTi=86DuOKWvkgVZ6kmDfeWioPhMbEufPW=JpQOjX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 1:04 AM, Arnaud Patard
-<arnaud.patard@rtp-net.org> wrote:
-> Fabio Estevam <festevam@gmail.com> writes:
+On Fri, Nov 19, 2010 at 2:15 PM, Allen Martin <AMartin@nvidia.com> wrote:
+> Protect the bus suspend/resume functions behind #ifdef CONFIG_PM.
+> This prevents a compile error if CONFIG_PM is turned off.
 >
-> Hi,
+> Signed-off-by: Allen Martin <amartin@nvidia.com>
+> ---
+> ?drivers/usb/host/ehci-tegra.c | ? ?2 ++
+> ?1 files changed, 2 insertions(+), 0 deletions(-)
 >
->> Hi Arnaud,
->>
->> 2010/11/22 Arnaud Patard <arnaud.patard@rtp-net.org>:
->>> Currently, to define a GPIO number, we're using something like :
->>>
->>> #define EFIKAMX_PCBID0 ? ? ? ? (2*32 + 16)
->>>
->>> to define GPIO 3 16.
->>>
->>> This is not really readable and it's error prone imho (note the 3 vs 2).
->>> So, I'm introducing a new macro to define this in a better way. Now, the
->>> code sample become :
->>>
->>> #define EFIKAMX_PCBID0 ? ? ? ? MX51_GPIO_NR(3, 16)
->>
->> Can you rename the macro to MX5x_GPIO_NR instead of MX51_GPIO_NR?
->>
->> This way we can also use this macro for MX53 and MX508 when they show
->> up in mainline.
+> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+> index e566a97..02087c8 100644
+> --- a/drivers/usb/host/ehci-tegra.c
+> +++ b/drivers/usb/host/ehci-tegra.c
+> @@ -334,6 +334,7 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
+> ? ? ? ?return retval;
+> ?}
 >
-> I've been wondering about to use MX5X instead of MX51 but I kept MX51
-> because I didn't know how the GPIO will work on MX53. If they're
-> compatible, you're right, the name should be MX5X_GPIO_NR and not
-> MX51_GPIO_NR. Assuming you mail means that, I'm going to switch to
-> MX5X_GPIO_NR.
+> +#ifdef CONFIG_PM
+> ?static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
+> ?{
+> ? ? ? ?struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
+> @@ -359,6 +360,7 @@ static int tegra_ehci_bus_resume(struct usb_hcd *hcd)
+>
+> ? ? ? ?return ehci_bus_resume(hcd);
+> ?}
+> +#endif
+>
+> ?static const struct hc_driver tegra_ehci_hc_driver = {
+> ? ? ? ?.description ? ? ? ? ? ?= hcd_name,
+> --
+> 1.7.2.3
+>
+>
 
-For MX5x at lease for now (MX51/53/508), One bank is 32 gpios. But
-bank number is different.
+Ack.  This driver is not in for-next yet, I'll pull this into the tegra tree.
 
-Thanks
-Richard
+Your mailer is converting = to =3d, so I had to apply this manually.
