@@ -1,59 +1,43 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Wed, 24 Nov 2010 07:22:07 -0600
-Subject: [PATCH v4 5/5] OMAP: mailbox: add notification support for
-	multiple readers
-In-Reply-To: <AANLkTikD20HGY+9BqBKX0DwFW7wPDTvt=wZqyAcHwckk@mail.gmail.com>
-References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
-	<1290547617-16640-6-git-send-email-h-kanigeri2@ti.com>
-	<AANLkTi=tzuzOMa6kPp-a6+yn6xMLGtdVSvAxPFP5RU5q@mail.gmail.com>
-	<AANLkTin8kxk=R5xQyp-ZcKVr-0eiM82L=QcF1PC2g-5n@mail.gmail.com>
-	<AANLkTikD20HGY+9BqBKX0DwFW7wPDTvt=wZqyAcHwckk@mail.gmail.com>
-Message-ID: <AANLkTi=d5d5OQEY0AMEvfQh_KOnMsZrHpWizBoa=fBEX@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 24 Nov 2010 21:46:06 +0800
+Subject: [question] NR_IRQS in genirq
+In-Reply-To: <alpine.LFD.2.00.1011241416360.2900@localhost6.localdomain6>
+References: <AANLkTimoBdFyQ6GfS2DKiF0wdRox0x7MfM0_keD9Z1D0@mail.gmail.com>
+	<alpine.LFD.2.00.1011241416360.2900@localhost6.localdomain6>
+Message-ID: <AANLkTik5N0d9wcaiS538UWQ83E_HhXoWC8nMxVY__1+k@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 24, 2010 at 7:12 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
-> On Wed, Nov 24, 2010 at 18:39, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
->> On Tue, Nov 23, 2010 at 11:29 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
->>> On Wed, Nov 24, 2010 at 02:56, Hari Kanigeri <h-kanigeri2@ti.com> wrote:
->>>> In the current mailbox driver, the mailbox internal pointer for
->>>> callback can be directly manipulated by the Users, so a second
->>>> User can easily corrupt the first user's callback pointer.
->>>> The initial effort to correct this issue can be referred here:
->>>> https://patchwork.kernel.org/patch/107520/
->>>>
->>>> Along with fixing the above stated issue, this patch ?adds the
->>>> flexibility option to register notifications from
->>>> multiple readers to the events received on a mailbox instance.
->>>> The discussion regarding this can be referred here.
->>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg30671.html
->>>>
->>>> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
->>>> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
->>>> ---
->>>> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?7 +-
->>>> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ?104 ++++++++++++++++-------------
->>>> ?2 files changed, 62 insertions(+), 49 deletions(-)
->>>>
->>>
->>> <<snip>>
->>>
->>>> @@ -363,10 +372,13 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
->>>> ? ? ? ? ? ? ? ? ? ? ? ?ret = PTR_ERR(mbox->dev);
->>>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_out;
->>>> ? ? ? ? ? ? ? ?}
->>>> +
->>>
->>> Do this change in the patch where the below code was added.
->>
->> I am sorry I didn't get you. you mean BLOCKING_INIT_NOTIFIER_HEAD line
->> ? yes, it is needed for this patch.
+On Wed, Nov 24, 2010 at 9:18 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Wed, 24 Nov 2010, Haojian Zhuang wrote:
 >
-> No. I was saying that adding a new line could be done in the patch where this
-> piece of code (below 4 lines) was introduced. Sorry if that was not clear :-(
+>> Hi all,
+>>
+>> I'm using the latest kernel 2.6.37-rc1. Now I met some issues on genirq.
+>>
+>> 1. While SPARSE IRQ is enabled, nr_irqs may be larger than NR_IRQS.
+>> But the allocated_irqs bitmap (kernel/irq/irqdesc.c) is restricted in
+>> NR_IRQS. Is it an issue?
+>
+> Why can nr_irqs become larger? Is that a theoretical problem or did
+> you run into this ?
+>
+>
 
-Got it. extra line can be removed.
+Hi Thomas,
 
-Thank you,
-Best regards,
-Hari Kanigeri
+My hardware environment is ARM. Each machine description can specify
+nr_irqs. In my implementation of PXA, NR_IRQS is fixed for SoC
+internal IRQs. And there's some additional board IRQs, we arrange them
+between NR_IRQS and nr_irqs. So nr_irqs will be larger than NR_IRQS if
+board IRQs exists.
+
+We use dynamic board IRQs since each machine has different
+requirement. And CONFIG_HARDIRQ_SW_RESEND is occasionally, I actually
+met issue in resend_irqs because of accessing bitmap memory out of
+bound.
+
+Do you mean that we shouldn't use SPARSE IRQ by this way?
+
+Best Regards
+Haojian
