@@ -1,37 +1,86 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 24 Nov 2010 17:08:34 +0900
-Subject: [patch v4 0/2] ARM: mach-shmobile: Add zboot support for SuperH
-	Mobile ARM
-In-Reply-To: <20101122231514.766413220@vergenet.net>
-References: <20101122231514.766413220@vergenet.net>
-Message-ID: <AANLkTin7BdyK-6c-ciC-hW+BRMdK8adAMPxV=s=frhKx@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 24 Nov 2010 09:17:48 +0100
+Subject: About multi-line printk and the need (not) to repeat loglevel
+	markers [Was: Re: [PATCH] ARM: mx3/pcm037: properly allocate memory
+	for mx3-camera]
+In-Reply-To: <AANLkTinmky17XZZPh7QvcY_r=66f_PwzRYFPUSvhiJGK@mail.gmail.com>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20101123101210.GA18170@n2100.arm.linux.org.uk>
+	<20101123103940.GN4693@pengutronix.de>
+	<20101123105830.GO4693@pengutronix.de>
+	<AANLkTinmky17XZZPh7QvcY_r=66f_PwzRYFPUSvhiJGK@mail.gmail.com>
+Message-ID: <20101124081748.GV4693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hello Linus,
 
-On Tue, Nov 23, 2010 at 8:15 AM, Simon Horman <horms@verge.net.au> wrote:
-> this short patch series by Kuninori Morimoto and myself adds
-> zboot support to mach-shmobile.
->
-> This is v4 of the patch series, which includes
-> a minor rediff to apply cleanly against linux-2.6-arm/devel
-> without any fuzz.
->
-> v2 implemented Magnus's suggestion to initialising atags directly rather
-> than using assembly.
->
-> v2 implemented Magnus's suggestion of setting atags in the framework and
-> passing them to the kernel rather than using a board-specific fixup.
+On Wed, Nov 24, 2010 at 07:16:06AM +0900, Linus Torvalds wrote:
+> 10/11/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> >
+> > BTW, I just noticed that Linus wrote:
+> >
+> > ? ? ? ?Additionally, if no newline existed, one is added (unless the
+> > ? ? ? ?log-level is the explicit KERN_CONT marker, to explicitly show
+> > ? ? ? ?that it's a continuation of a previous line).
+> >
+> > This seems to be unimplemented, otherwise the output of
+> >
+> > ? ? ? ?printk(KERN_ERR "foo bar baz ");
+> > ? ? ? ?printk("buz\n" KERN_WARNING "fiz\n");
+> >
+> > should be
+> >
+> > ? ? ? ?"foo bar baz \n" at error level
+> > ? ? ? ?"buz\n<4>fiz\n" at default level
+> 
+> No. The KERN_WARNING in the middle of a string is always totally
+> bogus. There is no "should be". It's just wrong.
+> 
+> The "\n" is added automatically iff there is a log-level marker at the
+> beginning of the string (with LOG_CONT being the exception).
+So
 
-I think V4 of this series looks good, thanks for your work on this!
+	printk("anything that doesn't look like a loglevel marker"); 
 
-Acked-by: Magnus Damm <damm@opensource.se>
+always behaves like
 
-I'd like to see this merged upstream.
+	printk(KERN_CONT "anything that doesn't look like a loglevel marker");
 
-Russell, is there anything I can do to make merging of this series easier?
+so unless someone wants to print a literal kernel marker we can just do
 
-Thanks,
+-#define        KERN_CONT       "<c>"
++#define        KERN_CONT       ""
 
-/ magnus
+without any harm.
+
+I wonder why you implemented "iff there is a log-level marker at the
+beginning ot the string (with KERN_CONT being the exception)." and not
+"unless there is a KERN_CONT marker".
+
+>                                                              So
+> 
+>    printk("foo bar baz ");
+>    printk(KERN_WARNING "fiz\n");
+> 
+> should output two lines ("foo bar baz" with the default loglevel, and
+> "fiz" with KERN_WARNING). Even though there is no explicit "\n" there
+> for the first one.
+> 
+> But KERN_XYZ anywhere but in the beginning of the string do not
+> matter. Adding newlines changes none of that. It doesn't make the
+> marker beginning of the string, it just makes it beginning of the
+> line.
+I see one reason to interpret markers after a newline.  In case
+recursion_bug is true, printk_buf is initialized with recursion_bug_msg
+and my message gets appended.  So currently the marker I pass with my
+message is ignored.
+Maybe wanting to fix that is just my addiction to overengineering :-)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
