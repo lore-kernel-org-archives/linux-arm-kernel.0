@@ -1,97 +1,269 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 24 Nov 2010 15:34:48 +0100
-Subject: rm9200: update
-In-Reply-To: <20101120095906.GD4216@game.jcrosoft.org>
-References: <20101120095906.GD4216@game.jcrosoft.org>
-Message-ID: <20101124143448.GH11909@game.jcrosoft.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 24 Nov 2010 09:52:30 -0500 (EST)
+Subject: [PATCH 8/8] ARM: pxa: add iwmmx support for PJ4
+In-Reply-To: <1290570865-7577-8-git-send-email-haojian.zhuang@marvell.com>
+References: <1290570865-7577-1-git-send-email-haojian.zhuang@marvell.com>
+	<1290570865-7577-2-git-send-email-haojian.zhuang@marvell.com>
+	<1290570865-7577-3-git-send-email-haojian.zhuang@marvell.com>
+	<1290570865-7577-4-git-send-email-haojian.zhuang@marvell.com>
+	<1290570865-7577-5-git-send-email-haojian.zhuang@marvell.com>
+	<1290570865-7577-6-git-send-email-haojian.zhuang@marvell.com>
+	<1290570865-7577-7-git-send-email-haojian.zhuang@marvell.com>
+	<1290570865-7577-8-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <alpine.LFD.2.00.1011240951540.9313@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+On Wed, 24 Nov 2010, Haojian Zhuang wrote:
 
-	version 2
-
-	replace 
-	at91/picotux200: fix warning: 'picotux200_mmc_data' defined but not used
-	by
-	at91/picotux200: remove commenting usb device and dataflash support
-
-	fix comments
-	and add
-	at91/board-yl-9200: fix typo in video support
-
-The following changes since commit b86db4744230c94e480de56f1b7f31117edbf193:
-
-  Merge branch 'for_linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2010-11-19 19:46:45 -0800)
-
-are available in the git repository at:
-
-  git://git.jcrosoft.org/linux-2.6.git rm9200
-
-Jean-Christophe PLAGNIOL-VILLARD (7):
-      at91: Convert remaining boards to new-style UART initialization
-      at91rm9200dk: fix warning: 'dk_mmc_data' defined but not used
-      at91rm9200ek: fix warning: 'ek_mmc_data' defined but not used
-      at91: rename rm9200ek and rm9200dk board file name
-      at91/picotux200: remove commenting usb device and dataflash support
-      atmel_spi: fix warning In function 'atmel_spi_dma_map_xfer'
-      at91/board-yl-9200: fix typo in video support
-
- arch/arm/mach-at91/Makefile                        |    4 +-
- arch/arm/mach-at91/at91rm9200_devices.c            |   45 -----------------
- arch/arm/mach-at91/board-1arm.c                    |   26 +++++-----
- arch/arm/mach-at91/board-kafa.c                    |   21 +++-----
- arch/arm/mach-at91/board-picotux200.c              |   53 ++++----------------
- .../arm/mach-at91/{board-dk.c => board-rm9200dk.c} |    4 +-
- .../arm/mach-at91/{board-ek.c => board-rm9200ek.c} |    4 +-
- arch/arm/mach-at91/board-yl-9200.c                 |    2 +-
- arch/arm/mach-at91/include/mach/board.h            |    6 --
- drivers/spi/atmel_spi.c                            |    6 ++-
- 10 files changed, 45 insertions(+), 126 deletions(-)
- rename arch/arm/mach-at91/{board-dk.c => board-rm9200dk.c} (98%)
- rename arch/arm/mach-at91/{board-ek.c => board-rm9200ek.c} (98%)
-
-Best Regards,
-J.
-On 10:59 Sat 20 Nov     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Hi,
+> iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
+> of accessing CP0 and CP1 is changed in PJ4. Append more files to support
+> iwmmxt in PJ4 core.
 > 
-> 	this patch update some issues found on rm9200
-> 	during the test of the rm9200 defconfig consolidation
+> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
+
+
+> ---
+>  arch/arm/Kconfig          |    4 +-
+>  arch/arm/kernel/Makefile  |    1 +
+>  arch/arm/kernel/iwmmxt.S  |   55 ++++++++++++++++++++------
+>  arch/arm/kernel/pj4-cp0.c |   94 +++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 139 insertions(+), 15 deletions(-)
+>  create mode 100644 arch/arm/kernel/pj4-cp0.c
 > 
-> The following changes since commit b86db4744230c94e480de56f1b7f31117edbf193:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a19a526..b0f25b0 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -999,8 +999,8 @@ source arch/arm/mm/Kconfig
+>  
+>  config IWMMXT
+>  	bool "Enable iWMMXt support"
+> -	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK
+> -	default y if PXA27x || PXA3xx || ARCH_MMP
+> +	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+> +	default y if PXA27x || PXA3xx || PXA95x || ARCH_MMP
+>  	help
+>  	  Enable support for iWMMXt context switching at run time if
+>  	  running on a CPU that supports it.
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 5b9b268..b0f11fa 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -50,6 +50,7 @@ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+>  obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+>  obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+>  obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
+> +obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
+>  obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+>  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+>  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+> diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+> index b63b528..7fa3bb0 100644
+> --- a/arch/arm/kernel/iwmmxt.S
+> +++ b/arch/arm/kernel/iwmmxt.S
+> @@ -19,6 +19,14 @@
+>  #include <asm/thread_info.h>
+>  #include <asm/asm-offsets.h>
+>  
+> +#if defined(CONFIG_CPU_PJ4)
+> +#define PJ4(code...)		code
+> +#define XSC(code...)
+> +#else
+> +#define PJ4(code...)
+> +#define XSC(code...)		code
+> +#endif
+> +
+>  #define MMX_WR0		 	(0x00)
+>  #define MMX_WR1		 	(0x08)
+>  #define MMX_WR2		 	(0x10)
+> @@ -58,11 +66,17 @@
+>  
+>  ENTRY(iwmmxt_task_enable)
+>  
+> -	mrc	p15, 0, r2, c15, c1, 0
+> -	tst	r2, #0x3			@ CP0 and CP1 accessible?
+> +	XSC(mrc	p15, 0, r2, c15, c1, 0)
+> +	PJ4(mrc p15, 0, r2, c1, c0, 2)
+> +	@ CP0 and CP1 accessible?
+> +	XSC(tst	r2, #0x3)
+> +	PJ4(tst	r2, #0xf)
+>  	movne	pc, lr				@ if so no business here
+> -	orr	r2, r2, #0x3			@ enable access to CP0 and CP1
+> -	mcr	p15, 0, r2, c15, c1, 0
+> +	@ enable access to CP0 and CP1
+> +	XSC(orr	r2, r2, #0x3)
+> +	XSC(mcr	p15, 0, r2, c15, c1, 0)
+> +	PJ4(orr	r2, r2, #0xf)
+> +	PJ4(mcr	p15, 0, r2, c1, c0, 2)
+>  
+>  	ldr	r3, =concan_owner
+>  	add	r0, r10, #TI_IWMMXT_STATE	@ get task Concan save area
+> @@ -179,17 +193,26 @@ ENTRY(iwmmxt_task_disable)
+>  	teqne	r1, r2				@ or specified one?
+>  	bne	1f				@ no: quit
+>  
+> -	mrc	p15, 0, r4, c15, c1, 0
+> -	orr	r4, r4, #0x3			@ enable access to CP0 and CP1
+> -	mcr	p15, 0, r4, c15, c1, 0
+> +	@ enable access to CP0 and CP1
+> +	XSC(mrc	p15, 0, r4, c15, c1, 0)
+> +	XSC(orr	r4, r4, #0xf)
+> +	XSC(mcr	p15, 0, r4, c15, c1, 0)
+> +	PJ4(mrc p15, 0, r4, c1, c0, 2)
+> +	PJ4(orr	r4, r4, #0x3)
+> +	PJ4(mcr	p15, 0, r4, c1, c0, 2)
+> +
+>  	mov	r0, #0				@ nothing to load
+>  	str	r0, [r3]			@ no more current owner
+>  	mrc	p15, 0, r2, c2, c0, 0
+>  	mov	r2, r2				@ cpwait
+>  	bl	concan_save
+>  
+> -	bic	r4, r4, #0x3			@ disable access to CP0 and CP1
+> -	mcr	p15, 0, r4, c15, c1, 0
+> +	@ disable access to CP0 and CP1
+> +	XSC(bic	r4, r4, #0x3)
+> +	XSC(mcr	p15, 0, r4, c15, c1, 0)
+> +	PJ4(bic	r4, r4, #0xf)
+> +	PJ4(mcr	p15, 0, r4, c1, c0, 2)
+> +
+>  	mrc	p15, 0, r2, c2, c0, 0
+>  	mov	r2, r2				@ cpwait
+>  
+> @@ -277,8 +300,11 @@ ENTRY(iwmmxt_task_restore)
+>   */
+>  ENTRY(iwmmxt_task_switch)
+>  
+> -	mrc	p15, 0, r1, c15, c1, 0
+> -	tst	r1, #0x3			@ CP0 and CP1 accessible?
+> +	XSC(mrc	p15, 0, r1, c15, c1, 0)
+> +	PJ4(mrc	p15, 0, r1, c1, c0, 2)
+> +	@ CP0 and CP1 accessible?
+> +	XSC(tst	r1, #0x3)
+> +	PJ4(tst	r1, #0xf)
+>  	bne	1f				@ yes: block them for next task
+>  
+>  	ldr	r2, =concan_owner
+> @@ -287,8 +313,11 @@ ENTRY(iwmmxt_task_switch)
+>  	teq	r2, r3				@ next task owns it?
+>  	movne	pc, lr				@ no: leave Concan disabled
+>  
+> -1:	eor	r1, r1, #3			@ flip Concan access
+> -	mcr	p15, 0, r1, c15, c1, 0
+> +1:	@ flip Conan access
+> +	XSC(eor	r1, r1, #0x3)
+> +	XSC(mcr	p15, 0, r1, c15, c1, 0)
+> +	PJ4(eor r1, r1, #0xf)
+> +	PJ4(mcr	p15, 0, r1, c1, c0, 2)
+>  
+>  	mrc	p15, 0, r1, c2, c0, 0
+>  	sub	pc, lr, r1, lsr #32		@ cpwait and return
+> diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
+> new file mode 100644
+> index 0000000..a4b1b07
+> --- /dev/null
+> +++ b/arch/arm/kernel/pj4-cp0.c
+> @@ -0,0 +1,94 @@
+> +/*
+> + * linux/arch/arm/kernel/pj4-cp0.c
+> + *
+> + * PJ4 iWMMXt coprocessor context switching and handling
+> + *
+> + * Copyright (c) 2010 Marvell International Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
+> +#include <linux/signal.h>
+> +#include <linux/sched.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <asm/thread_notify.h>
+> +
+> +static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
+> +{
+> +	struct thread_info *thread = t;
+> +
+> +	switch (cmd) {
+> +	case THREAD_NOTIFY_FLUSH:
+> +		/*
+> +		 * flush_thread() zeroes thread->fpstate, so no need
+> +		 * to do anything here.
+> +		 *
+> +		 * FALLTHROUGH: Ensure we don't try to overwrite our newly
+> +		 * initialised state information on the first fault.
+> +		 */
+> +
+> +	case THREAD_NOTIFY_EXIT:
+> +		iwmmxt_task_release(thread);
+> +		break;
+> +
+> +	case THREAD_NOTIFY_SWITCH:
+> +		iwmmxt_task_switch(thread);
+> +		break;
+> +	}
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block iwmmxt_notifier_block = {
+> +	.notifier_call	= iwmmxt_do,
+> +};
+> +
+> +
+> +static u32 __init pj4_cp_access_read(void)
+> +{
+> +	u32 value;
+> +
+> +	__asm__ __volatile__ (
+> +		"mrc	p15, 0, %0, c1, c0, 2\n\t"
+> +		: "=r" (value));
+> +	return value;
+> +}
+> +
+> +static void __init pj4_cp_access_write(u32 value)
+> +{
+> +	u32 temp;
+> +
+> +	__asm__ __volatile__ (
+> +		"mcr	p15, 0, %1, c1, c0, 2\n\t"
+> +		"mrc	p15, 0, %0, c1, c0, 2\n\t"
+> +		"mov	%0, %0\n\t"
+> +		"sub	pc, pc, #4\n\t"
+> +		: "=r" (temp) : "r" (value));
+> +}
+> +
+> +
+> +/*
+> + * Disable CP0/CP1 on boot, and let call_fpe() and the iWMMXt lazy
+> + * switch code handle iWMMXt context switching.
+> + */
+> +static int __init pj4_cp0_init(void)
+> +{
+> +	u32 cp_access;
+> +
+> +	cp_access = pj4_cp_access_read() & ~0xf;
+> +	pj4_cp_access_write(cp_access);
+> +
+> +	printk(KERN_INFO "PJ4 iWMMXt coprocessor enabled.\n");
+> +	elf_hwcap |= HWCAP_IWMMXT;
+> +	thread_register_notifier(&iwmmxt_notifier_block);
+> +
+> +	return 0;
+> +}
+> +
+> +late_initcall(pj4_cp0_init);
+> -- 
+> 1.5.6.5
 > 
->   Merge branch 'for_linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2010-11-19 19:46:45 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.jcrosoft.org/linux-2.6.git rm9200
-> 
-> Jean-Christophe PLAGNIOL-VILLARD (6):
->       at91: Convert remaining boards to new-style UART initialization
->       at91rm9200dk: fix warning: 'dk_mmc_data' defined but not used
->       at91rm9200ek: fix warning: 'ek_mmc_data' defined but not used
->       at91/picotux200: fix warning: 'picotux200_mmc_data' defined but not used
->       at91: rename rm9200ek and rm9200dk board file name
->       atmel_spi: fix warning In function 'atmel_spi_dma_map_xfer'
-> 
->  arch/arm/mach-at91/Makefile                        |    4 +-
->  arch/arm/mach-at91/at91rm9200_devices.c            |   45 --------------------
->  arch/arm/mach-at91/board-1arm.c                    |   26 ++++++------
->  arch/arm/mach-at91/board-kafa.c                    |   21 ++++------
->  arch/arm/mach-at91/board-picotux200.c              |   25 +++++------
->  .../arm/mach-at91/{board-dk.c => board-rm9200dk.c} |    2 +
->  .../arm/mach-at91/{board-ek.c => board-rm9200ek.c} |    2 +
->  arch/arm/mach-at91/include/mach/board.h            |    6 ---
->  drivers/spi/atmel_spi.c                            |    4 +-
->  9 files changed, 42 insertions(+), 93 deletions(-)
->  rename arch/arm/mach-at91/{board-dk.c => board-rm9200dk.c} (99%)
->  rename arch/arm/mach-at91/{board-ek.c => board-rm9200ek.c} (99%)
-> 
-> Best Regards,
-> J.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
