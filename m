@@ -1,501 +1,421 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 24 Nov 2010 12:13:22 +0100
-Subject: [PATCH 4/9] arm/pxa2xx: reorgazine SSP and SPI header files
+Date: Wed, 24 Nov 2010 12:13:23 +0100
+Subject: [PATCH 5/9] spi/pxa2xx: Add CE4100 support
 In-Reply-To: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
 References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1290597207-29838-5-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1290597207-29838-6-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PXA-SPI driver relies on some files / defines which are arm specific
-and are within the ARM tree. The CE4100 SoC which is x86 has also the
-SPI core.
-This patch moves the ssp and spi files from arm/mach-pxa and plat-pxa to
-include/linux where the CE4100 can access them.
-
-This move got verified by building the following defconfigs:
-   cm_x2xx_defconfig corgi_defconfig em_x270_defconfig ezx_defconfig
-   imote2_defconfig pxa3xx_defconfig spitz_defconfig zeus_defconfig
-   raumfeld_defconfig magician_defconfig
+Sodaville's SPI controller is very much the same as in PXA25x. The
+difference:
+- The RX/TX FIFO is only 4 words deep instead of 16
+- No DMA support
+- The SPI controller offers a CS functionality
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
 ---
- Documentation/spi/pxa2xx                           |    4 ++--
- arch/arm/mach-pxa/cm-x255.c                        |    2 +-
- arch/arm/mach-pxa/cm-x270.c                        |    2 +-
- arch/arm/mach-pxa/corgi.c                          |    2 +-
- arch/arm/mach-pxa/devices.c                        |    2 +-
- arch/arm/mach-pxa/em-x270.c                        |    2 +-
- arch/arm/mach-pxa/hx4700.c                         |    2 +-
- arch/arm/mach-pxa/icontrol.c                       |    2 +-
- arch/arm/mach-pxa/littleton.c                      |    2 +-
- arch/arm/mach-pxa/lubbock.c                        |    2 +-
- arch/arm/mach-pxa/pcm027.c                         |    2 +-
- arch/arm/mach-pxa/poodle.c                         |    2 +-
- arch/arm/mach-pxa/spitz.c                          |    3 +--
- arch/arm/mach-pxa/stargate2.c                      |    2 +-
- arch/arm/mach-pxa/tosa.c                           |    2 +-
- arch/arm/mach-pxa/trizeps4.c                       |    1 -
- arch/arm/mach-pxa/z2.c                             |    2 +-
- arch/arm/mach-pxa/zeus.c                           |    2 +-
- arch/arm/plat-pxa/ssp.c                            |    2 +-
- drivers/spi/pxa2xx_spi.c                           |    4 +---
- .../plat/ssp.h => include/linux/pxa2xx_ssp.h       |    8 ++++----
- .../mach => include/linux/spi}/pxa2xx_spi.h        |    8 +++++---
- sound/soc/pxa/pxa-ssp.c                            |    2 +-
- 23 files changed, 30 insertions(+), 32 deletions(-)
- rename arch/arm/plat-pxa/include/plat/ssp.h => include/linux/pxa2xx_ssp.h (98%)
- rename {arch/arm/mach-pxa/include/mach => include/linux/spi}/pxa2xx_spi.h (92%)
+ arch/x86/include/asm/pxa2xx_spi_ce4100.h |   99 +++++++++++++++
+ drivers/spi/Kconfig                      |   15 ++-
+ drivers/spi/Makefile                     |    1 +
+ drivers/spi/pxa2xx_spi.c                 |    1 -
+ drivers/spi/pxa2xx_spi_pci.c             |  201 ++++++++++++++++++++++++++++++
+ include/linux/spi/pxa2xx_spi.h           |   10 ++-
+ 6 files changed, 320 insertions(+), 7 deletions(-)
+ create mode 100644 arch/x86/include/asm/pxa2xx_spi_ce4100.h
+ create mode 100644 drivers/spi/pxa2xx_spi_pci.c
 
-diff --git a/Documentation/spi/pxa2xx b/Documentation/spi/pxa2xx
-index 6bb916d..68a4fe3 100644
---- a/Documentation/spi/pxa2xx
-+++ b/Documentation/spi/pxa2xx
-@@ -19,7 +19,7 @@ Declaring PXA2xx Master Controllers
- -----------------------------------
- Typically a SPI master is defined in the arch/.../mach-*/board-*.c as a
- "platform device".  The master configuration is passed to the driver via a table
--found in arch/arm/mach-pxa/include/mach/pxa2xx_spi.h:
-+found in include/linux/spi/pxa2xx_spi.h:
+diff --git a/arch/x86/include/asm/pxa2xx_spi_ce4100.h b/arch/x86/include/asm/pxa2xx_spi_ce4100.h
+new file mode 100644
+index 0000000..d86690c
+--- /dev/null
++++ b/arch/x86/include/asm/pxa2xx_spi_ce4100.h
+@@ -0,0 +1,99 @@
++#ifndef __asm_pxa2xx_spi_ce4100_h
++#define __asm_pxa2xx_spi_ce4100_h
++
++/*
++ * The CE4100 does not provide DMA support. This bits are here to let the driver
++ * compile and will never be used. Maybe we get DMA support at a later point in
++ * time.
++ */
++
++#define DCSR(n)         (n)
++#define DSADR(n)        (n)
++#define DTADR(n)        (n)
++#define DCMD(n)         (n)
++#define DRCMR(n)        (n)
++
++#define DCSR_RUN	(1 << 31)	/* Run Bit */
++#define DCSR_NODESC	(1 << 30)	/* No-Descriptor Fetch */
++#define DCSR_STOPIRQEN	(1 << 29)	/* Stop Interrupt Enable */
++#define DCSR_REQPEND	(1 << 8)	/* Request Pending (read-only) */
++#define DCSR_STOPSTATE	(1 << 3)	/* Stop State (read-only) */
++#define DCSR_ENDINTR	(1 << 2)	/* End Interrupt */
++#define DCSR_STARTINTR	(1 << 1)	/* Start Interrupt */
++#define DCSR_BUSERR	(1 << 0)	/* Bus Error Interrupt */
++
++#define DCSR_EORIRQEN	(1 << 28)	/* End of Receive Interrupt Enable */
++#define DCSR_EORJMPEN	(1 << 27)	/* Jump to next descriptor on EOR */
++#define DCSR_EORSTOPEN	(1 << 26)	/* STOP on an EOR */
++#define DCSR_SETCMPST	(1 << 25)	/* Set Descriptor Compare Status */
++#define DCSR_CLRCMPST	(1 << 24)	/* Clear Descriptor Compare Status */
++#define DCSR_CMPST	(1 << 10)	/* The Descriptor Compare Status */
++#define DCSR_EORINTR	(1 << 9)	/* The end of Receive */
++
++#define DRCMR_MAPVLD	(1 << 7)	/* Map Valid */
++#define DRCMR_CHLNUM	0x1f		/* mask for Channel Number */
++
++#define DDADR_DESCADDR	0xfffffff0	/* Address of next descriptor */
++#define DDADR_STOP	(1 << 0)	/* Stop */
++
++#define DCMD_INCSRCADDR	(1 << 31)	/* Source Address Increment Setting. */
++#define DCMD_INCTRGADDR	(1 << 30)	/* Target Address Increment Setting. */
++#define DCMD_FLOWSRC	(1 << 29)	/* Flow Control by the source. */
++#define DCMD_FLOWTRG	(1 << 28)	/* Flow Control by the target. */
++#define DCMD_STARTIRQEN	(1 << 22)	/* Start Interrupt Enable */
++#define DCMD_ENDIRQEN	(1 << 21)	/* End Interrupt Enable */
++#define DCMD_ENDIAN	(1 << 18)	/* Device Endian-ness. */
++#define DCMD_BURST8	(1 << 16)	/* 8 byte burst */
++#define DCMD_BURST16	(2 << 16)	/* 16 byte burst */
++#define DCMD_BURST32	(3 << 16)	/* 32 byte burst */
++#define DCMD_WIDTH1	(1 << 14)	/* 1 byte width */
++#define DCMD_WIDTH2	(2 << 14)	/* 2 byte width (HalfWord) */
++#define DCMD_WIDTH4	(3 << 14)	/* 4 byte width (Word) */
++#define DCMD_LENGTH	0x01fff		/* length mask (max = 8K - 1) */
++
++/*
++ * Descriptor structure for PXA's DMA engine
++ * Note: this structure must always be aligned to a 16-byte boundary.
++ */
++
++typedef enum {
++	DMA_PRIO_HIGH = 0,
++	DMA_PRIO_MEDIUM = 1,
++	DMA_PRIO_LOW = 2
++} pxa_dma_prio;
++
++/*
++ * DMA registration
++ */
++
++static inline int pxa_request_dma(char *name,
++		pxa_dma_prio prio,
++		void (*irq_handler)(int, void *),
++		void *data)
++{
++	return -ENODEV;
++}
++
++static inline void pxa_free_dma(int dma_ch)
++{
++}
++
++/*
++ * The CE4100 does not have the clk framework implemented and SPI clock can
++ * not be switched on/off or the divider changed.
++ */
++static inline void clk_disable(struct clk *clk)
++{
++}
++
++static inline int clk_enable(struct clk *clk)
++{
++	return 0;
++}
++
++static inline unsigned long clk_get_rate(struct clk *clk)
++{
++	return 3686400;
++}
++
++#endif
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 78f9fd0..e43cb30 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -267,12 +267,17 @@ config SPI_PPC4xx
  
- struct pxa2xx_spi_master {
- 	enum pxa_ssp_type ssp_type;
-@@ -94,7 +94,7 @@ using the "spi_board_info" structure found in "linux/spi/spi.h". See
+ config SPI_PXA2XX
+ 	tristate "PXA2xx SSP SPI master"
+-	depends on ARCH_PXA && EXPERIMENTAL
+-	select PXA_SSP
++	depends on (ARCH_PXA || X86_32) && EXPERIMENTAL
++	select PXA_SSP if ARCH_PXA
++	select SPI_PXA2XX_PCI if !ARCH_PXA
+ 	help
+-	  This enables using a PXA2xx SSP port as a SPI master controller.
+-	  The driver can be configured to use any SSP port and additional
+-	  documentation can be found a Documentation/spi/pxa2xx.
++	  This enables using a PXA2xx or Sodaville SSP port as a SPI master
++	  controller. The driver can be configured to use any SSP port and
++	  additional documentation can be found a Documentation/spi/pxa2xx.
++
++config SPI_PXA2XX_PCI
++	bool
++	depends on SPI_PXA2XX && PCI
  
- Each slave device attached to the PXA must provide slave specific configuration
- information via the structure "pxa2xx_spi_chip" found in
--"arch/arm/mach-pxa/include/mach/pxa2xx_spi.h".  The pxa2xx_spi master controller driver
-+"include/linux/spi/pxa2xx_spi.h".  The pxa2xx_spi master controller driver
- will uses the configuration whenever the driver communicates with the slave
- device. All fields are optional.
- 
-diff --git a/arch/arm/mach-pxa/cm-x255.c b/arch/arm/mach-pxa/cm-x255.c
-index f1a7703..93f59f8 100644
---- a/arch/arm/mach-pxa/cm-x255.c
-+++ b/arch/arm/mach-pxa/cm-x255.c
-@@ -17,13 +17,13 @@
- #include <linux/mtd/nand-gpio.h>
- 
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
- 
- #include <mach/pxa25x.h>
--#include <mach/pxa2xx_spi.h>
- 
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-pxa/cm-x270.c b/arch/arm/mach-pxa/cm-x270.c
-index a9926bb..b88d601 100644
---- a/arch/arm/mach-pxa/cm-x270.c
-+++ b/arch/arm/mach-pxa/cm-x270.c
-@@ -19,12 +19,12 @@
- #include <video/mbxfb.h>
- 
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/spi/libertas_spi.h>
- 
- #include <mach/pxa27x.h>
- #include <mach/ohci.h>
- #include <mach/mmc.h>
--#include <mach/pxa2xx_spi.h>
- 
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 821229a..3b8dcac 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -28,6 +28,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
- #include <linux/spi/corgi_lcd.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/mtd/sharpsl.h>
- #include <linux/input/matrix_keypad.h>
- #include <video/w100fb.h>
-@@ -48,7 +49,6 @@
- #include <mach/irda.h>
- #include <mach/mmc.h>
- #include <mach/udc.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/corgi.h>
- #include <mach/sharpsl_pm.h>
- 
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index aaa1166..c4f9c71 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -3,6 +3,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/spi/pxa2xx_spi.h>
- 
- #include <asm/pmu.h>
- #include <mach/udc.h>
-@@ -12,7 +13,6 @@
- #include <mach/irda.h>
- #include <mach/ohci.h>
- #include <plat/pxa27x_keypad.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/camera.h>
- #include <mach/audio.h>
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index ed0dbfdb..b20b944 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -26,6 +26,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/tdo24m.h>
- #include <linux/spi/libertas_spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/power_supply.h>
- #include <linux/apm-emulation.h>
- #include <linux/i2c.h>
-@@ -46,7 +47,6 @@
- #include <plat/pxa27x_keypad.h>
- #include <plat/i2c.h>
- #include <mach/camera.h>
--#include <mach/pxa2xx_spi.h>
- 
- #include "generic.h"
- #include "devices.h"
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 76d93a2..f09526f 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -33,6 +33,7 @@
- #include <linux/regulator/max1586.h>
- #include <linux/spi/ads7846.h>
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/usb/gpio_vbus.h>
- 
- #include <mach/hardware.h>
-@@ -43,7 +44,6 @@
- #include <mach/hx4700.h>
- #include <plat/i2c.h>
- #include <mach/irda.h>
--#include <mach/pxa2xx_spi.h>
- 
- #include <video/platform_lcd.h>
- #include <video/w100fb.h>
-diff --git a/arch/arm/mach-pxa/icontrol.c b/arch/arm/mach-pxa/icontrol.c
-index d51ee3d..3ab6fd3 100644
---- a/arch/arm/mach-pxa/icontrol.c
-+++ b/arch/arm/mach-pxa/icontrol.c
-@@ -24,7 +24,7 @@
- #include <mach/mxm8x10.h>
- 
- #include <linux/spi/spi.h>
--#include <mach/pxa2xx_spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/can/platform/mcp251x.h>
- 
- #include "generic.h"
-diff --git a/arch/arm/mach-pxa/littleton.c b/arch/arm/mach-pxa/littleton.c
-index 41aa89e..8051925 100644
---- a/arch/arm/mach-pxa/littleton.c
-+++ b/arch/arm/mach-pxa/littleton.c
-@@ -22,6 +22,7 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/smc91x.h>
- #include <linux/i2c.h>
- #include <linux/leds.h>
-@@ -42,7 +43,6 @@
- #include <mach/pxa300.h>
- #include <mach/pxafb.h>
- #include <mach/mmc.h>
--#include <mach/pxa2xx_spi.h>
- #include <plat/pxa27x_keypad.h>
- #include <mach/littleton.h>
- #include <plat/i2c.h>
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index 1499493..4a3fe45 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
-@@ -25,7 +25,7 @@
- 
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
--#include <mach/pxa2xx_spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- 
- #include <asm/setup.h>
- #include <asm/memory.h>
-diff --git a/arch/arm/mach-pxa/pcm027.c b/arch/arm/mach-pxa/pcm027.c
-index c77e8f3..a5596f9 100644
---- a/arch/arm/mach-pxa/pcm027.c
-+++ b/arch/arm/mach-pxa/pcm027.c
-@@ -25,12 +25,12 @@
- #include <linux/mtd/physmap.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/max7301.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/leds.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <mach/pxa27x.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/pcm027.h>
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index 93a191c..c05eee3 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -25,6 +25,7 @@
- #include <linux/i2c.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/mtd/sharpsl.h>
- 
- #include <mach/hardware.h>
-@@ -43,7 +44,6 @@
- #include <mach/irda.h>
- #include <mach/poodle.h>
- #include <mach/pxafb.h>
--#include <mach/pxa2xx_spi.h>
- #include <plat/i2c.h>
- 
- #include <asm/hardware/scoop.h>
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index f736119..4fd5572 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -23,7 +23,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
- #include <linux/spi/corgi_lcd.h>
--#include <linux/mtd/physmap.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/mtd/sharpsl.h>
- #include <linux/input/matrix_keypad.h>
- #include <linux/regulator/machine.h>
-@@ -41,7 +41,6 @@
- #include <mach/mmc.h>
- #include <mach/ohci.h>
- #include <mach/pxafb.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/spitz.h>
- #include <mach/sharpsl_pm.h>
- 
-diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-index 738adc1..325f6ac 100644
---- a/arch/arm/mach-pxa/stargate2.c
-+++ b/arch/arm/mach-pxa/stargate2.c
-@@ -46,10 +46,10 @@
- #include <plat/i2c.h>
- #include <mach/mmc.h>
- #include <mach/udc.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/pxa27x-udc.h>
- 
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/mfd/da903x.h>
- #include <linux/sht15.h>
- 
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 0ee1df4..7b5765d 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -32,6 +32,7 @@
- #include <linux/gpio.h>
- #include <linux/pda_power.h>
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/input/matrix_keypad.h>
- 
- #include <asm/setup.h>
-@@ -44,7 +45,6 @@
- #include <mach/mmc.h>
- #include <mach/udc.h>
- #include <mach/tosa_bt.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/audio.h>
- 
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
-index 565d062..bdb02a0 100644
---- a/arch/arm/mach-pxa/trizeps4.c
-+++ b/arch/arm/mach-pxa/trizeps4.c
-@@ -40,7 +40,6 @@
- #include <asm/mach/flash.h>
- 
- #include <mach/pxa27x.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/trizeps4.h>
- #include <mach/audio.h>
- #include <mach/pxafb.h>
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index fefde98..1b8b71b 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -20,6 +20,7 @@
- #include <linux/z2_battery.h>
- #include <linux/dma-mapping.h>
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/spi/libertas_spi.h>
- #include <linux/spi/lms283gf05.h>
- #include <linux/power_supply.h>
-@@ -38,7 +39,6 @@
- #include <mach/pxafb.h>
- #include <mach/mmc.h>
- #include <plat/pxa27x_keypad.h>
--#include <mach/pxa2xx_spi.h>
- 
- #include <plat/i2c.h>
- 
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index dea46a2..f5c9f30 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -20,6 +20,7 @@
- #include <linux/dm9000.h>
- #include <linux/mmc/host.h>
- #include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/physmap.h>
-@@ -41,7 +42,6 @@
- #include <mach/pxa27x-udc.h>
- #include <mach/udc.h>
- #include <mach/pxafb.h>
--#include <mach/pxa2xx_spi.h>
- #include <mach/mfp-pxa27x.h>
- #include <mach/pm.h>
- #include <mach/audio.h>
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index c6357e5..58b7980 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -28,11 +28,11 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/io.h>
- 
- #include <asm/irq.h>
- #include <mach/hardware.h>
--#include <plat/ssp.h>
- 
- static DEFINE_MUTEX(ssp_lock);
- static LIST_HEAD(ssp_list);
+ config SPI_S3C24XX
+ 	tristate "Samsung S3C24XX series SPI"
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index 8bc1a5a..bdc4c40 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -24,6 +24,7 @@ obj-$(CONFIG_SPI_GPIO)			+= spi_gpio.o
+ obj-$(CONFIG_SPI_IMX)			+= spi_imx.o
+ obj-$(CONFIG_SPI_LM70_LLP)		+= spi_lm70llp.o
+ obj-$(CONFIG_SPI_PXA2XX)		+= pxa2xx_spi.o
++obj-$(CONFIG_SPI_PXA2XX_PCI)		+= pxa2xx_spi_pci.o
+ obj-$(CONFIG_SPI_OMAP_UWIRE)		+= omap_uwire.o
+ obj-$(CONFIG_SPI_OMAP24XX)		+= omap2_mcspi.o
+ obj-$(CONFIG_SPI_OMAP_100K)		+= omap_spi_100k.o
 diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-index a4c795c..3802ba6 100644
+index 3802ba6..17c1bfb 100644
 --- a/drivers/spi/pxa2xx_spi.c
 +++ b/drivers/spi/pxa2xx_spi.c
-@@ -23,6 +23,7 @@
- #include <linux/errno.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-+#include <linux/spi/pxa2xx_spi.h>
- #include <linux/dma-mapping.h>
+@@ -28,7 +28,6 @@
  #include <linux/spi/spi.h>
  #include <linux/workqueue.h>
-@@ -35,9 +36,6 @@
- #include <asm/irq.h>
- #include <asm/delay.h>
+ #include <linux/delay.h>
+-#include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/slab.h>
  
--#include <mach/dma.h>
--#include <plat/ssp.h>
--#include <mach/pxa2xx_spi.h>
- 
- MODULE_AUTHOR("Stephen Street");
- MODULE_DESCRIPTION("PXA2xx SSP SPI Controller");
-diff --git a/arch/arm/plat-pxa/include/plat/ssp.h b/include/linux/pxa2xx_ssp.h
-similarity index 98%
-rename from arch/arm/plat-pxa/include/plat/ssp.h
-rename to include/linux/pxa2xx_ssp.h
-index 21c12ca..84465d4 100644
---- a/arch/arm/plat-pxa/include/plat/ssp.h
-+++ b/include/linux/pxa2xx_ssp.h
-@@ -1,5 +1,5 @@
- /*
-- *  ssp.h
-+ *  pxa2xx_ssp.h
-  *
-  *  Copyright (C) 2003 Russell King, All Rights Reserved.
-  *
-@@ -16,8 +16,8 @@
-  *       PXA3xx     SSP1, SSP2, SSP3, SSP4
-  */
- 
--#ifndef __ASM_ARCH_SSP_H
--#define __ASM_ARCH_SSP_H
-+#ifndef __LINUX_SSP_H
-+#define __LINUX_SSP_H
- 
- #include <linux/list.h>
- #include <linux/io.h>
-@@ -184,4 +184,4 @@ static inline u32 pxa_ssp_read_reg(struct ssp_device *dev, u32 reg)
- 
- struct ssp_device *pxa_ssp_request(int port, const char *label);
- void pxa_ssp_free(struct ssp_device *);
--#endif /* __ASM_ARCH_SSP_H */
+diff --git a/drivers/spi/pxa2xx_spi_pci.c b/drivers/spi/pxa2xx_spi_pci.c
+new file mode 100644
+index 0000000..351d8a3
+--- /dev/null
++++ b/drivers/spi/pxa2xx_spi_pci.c
+@@ -0,0 +1,201 @@
++/*
++ * CE4100's SPI device is more or less the same one as found on PXA
++ *
++ */
++#include <linux/pci.h>
++#include <linux/platform_device.h>
++#include <linux/of_device.h>
++#include <linux/spi/pxa2xx_spi.h>
++
++struct awesome_struct {
++	struct ssp_device ssp;
++	struct platform_device spi_pdev;
++	struct pxa2xx_spi_master spi_pdata;
++};
++
++static DEFINE_MUTEX(ssp_lock);
++static LIST_HEAD(ssp_list);
++
++struct ssp_device *pxa_ssp_request(int port, const char *label)
++{
++	struct ssp_device *ssp = NULL;
++
++	mutex_lock(&ssp_lock);
++
++	list_for_each_entry(ssp, &ssp_list, node) {
++		if (ssp->port_id == port && ssp->use_count == 0) {
++			ssp->use_count++;
++			ssp->label = label;
++			break;
++		}
++	}
++
++	mutex_unlock(&ssp_lock);
++
++	if (&ssp->node == &ssp_list)
++		return NULL;
++
++	return ssp;
++}
++EXPORT_SYMBOL_GPL(pxa_ssp_request);
++
++void pxa_ssp_free(struct ssp_device *ssp)
++{
++	mutex_lock(&ssp_lock);
++	if (ssp->use_count) {
++		ssp->use_count--;
++		ssp->label = NULL;
++	} else
++		dev_err(&ssp->pdev->dev, "device already free\n");
++	mutex_unlock(&ssp_lock);
++}
++EXPORT_SYMBOL_GPL(pxa_ssp_free);
++
++static void plat_dev_release(struct device *dev)
++{
++	struct awesome_struct *as = container_of(dev,
++			struct awesome_struct, spi_pdev.dev);
++
++	of_device_node_put(&as->spi_pdev.dev);
++}
++
++static int __devinit ce4100_spi_probe(struct pci_dev *dev,
++		const struct pci_device_id *ent)
++{
++	int ret;
++	resource_size_t phys_beg;
++	resource_size_t phys_len;
++	struct awesome_struct *spi_info;
++	struct platform_device *pdev;
++	struct pxa2xx_spi_master *spi_pdata;
++	struct ssp_device *ssp;
++
++	ret = pci_enable_device(dev);
++	if (ret)
++		return ret;
++
++	phys_beg = pci_resource_start(dev, 0);
++	phys_len = pci_resource_len(dev, 0);
++
++	if (!request_mem_region(phys_beg, phys_len,
++				"CE4100 SPI")) {
++		dev_err(&dev->dev, "Can't request register space.\n");
++		ret = -EBUSY;
++		return ret;
++	}
++
++	spi_info = kzalloc(sizeof(*spi_info), GFP_KERNEL);
++	if (!spi_info) {
++		ret = -ENOMEM;
++		goto err_kz;
++	}
++	ssp = &spi_info->ssp;
++	pdev = &spi_info->spi_pdev;
++	spi_pdata =  &spi_info->spi_pdata;
++
++	pdev->name = "pxa2xx-spi";
++	pdev->id = dev->devfn;
++	pdev->dev.parent = &dev->dev;
++	pdev->dev.platform_data = &spi_info->spi_pdata;
++
++#ifdef CONFIG_OF
++	pdev->dev.of_node = dev->dev.of_node;
 +#endif
-diff --git a/arch/arm/mach-pxa/include/mach/pxa2xx_spi.h b/include/linux/spi/pxa2xx_spi.h
-similarity index 92%
-rename from arch/arm/mach-pxa/include/mach/pxa2xx_spi.h
-rename to include/linux/spi/pxa2xx_spi.h
-index b87cecd..471ed68 100644
---- a/arch/arm/mach-pxa/include/mach/pxa2xx_spi.h
++	pdev->dev.release = plat_dev_release;
++
++	spi_pdata->num_chipselect = dev->devfn;
++
++	ssp->phys_base = pci_resource_start(dev, 0);
++	ssp->mmio_base = ioremap(phys_beg, phys_len);
++	if (!ssp->mmio_base) {
++		dev_err(&pdev->dev, "failed to ioremap() registers\n");
++		ret = -EIO;
++		goto err_remap;
++	}
++	ssp->irq = dev->irq;
++	ssp->port_id = pdev->id;
++	ssp->type = PXA25x_SSP;
++
++	mutex_lock(&ssp_lock);
++	list_add(&ssp->node, &ssp_list);
++	mutex_unlock(&ssp_lock);
++
++	pci_set_drvdata(dev, spi_info);
++
++	ret = platform_device_register(pdev);
++	if (ret)
++		goto err_dev_add;
++
++	return ret;
++
++err_dev_add:
++	pci_set_drvdata(dev, NULL);
++	mutex_lock(&ssp_lock);
++	list_del(&ssp->node);
++	mutex_unlock(&ssp_lock);
++	iounmap(ssp->mmio_base);
++
++err_remap:
++	kfree(spi_info);
++
++err_kz:
++	release_mem_region(phys_beg, phys_len);
++
++	return ret;
++}
++
++static void __devexit ce4100_spi_remove(struct pci_dev *dev)
++{
++	struct awesome_struct *spi_info;
++	struct platform_device *pdev;
++	struct ssp_device *ssp;
++
++	spi_info = pci_get_drvdata(dev);
++
++	ssp = &spi_info->ssp;
++	pdev = &spi_info->spi_pdev;
++
++	platform_device_unregister(pdev);
++
++	iounmap(ssp->mmio_base);
++	release_mem_region(pci_resource_start(dev, 0),
++			pci_resource_len(dev, 0));
++
++	mutex_lock(&ssp_lock);
++	list_del(&ssp->node);
++	mutex_unlock(&ssp_lock);
++
++	pci_set_drvdata(dev, NULL);
++	pci_disable_device(dev);
++	kfree(spi_info);
++}
++
++static struct pci_device_id ce4100_spi_devices[] __devinitdata = {
++
++	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x2e6a) },
++	{ },
++};
++MODULE_DEVICE_TABLE(pci, ce4100_spi_devices);
++
++static struct pci_driver ce4100_spi_driver = {
++	.name           = "ce4100_spi",
++	.id_table       = ce4100_spi_devices,
++	.probe          = ce4100_spi_probe,
++	.remove         = __devexit_p(ce4100_spi_remove),
++};
++
++static int __init ce4100_spi_init(void)
++{
++	return pci_register_driver(&ce4100_spi_driver);
++}
++module_init(ce4100_spi_init);
++
++static void __exit ce4100_spi_exit(void)
++{
++	pci_unregister_driver(&ce4100_spi_driver);
++}
++module_exit(ce4100_spi_exit);
++
++MODULE_DESCRIPTION("CE4100 PCI-SPI glue code for PXA's driver");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Sebastian Andrzej Siewior <bigeasy@linutronix.de>");
+diff --git a/include/linux/spi/pxa2xx_spi.h b/include/linux/spi/pxa2xx_spi.h
+index 471ed68..48b8f6b 100644
+--- a/include/linux/spi/pxa2xx_spi.h
 +++ b/include/linux/spi/pxa2xx_spi.h
-@@ -15,9 +15,11 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-  */
-+#ifndef __linux_pxa2xx_spi_h
-+#define __linux_pxa2xx_spi_h
+@@ -19,7 +19,6 @@
+ #define __linux_pxa2xx_spi_h
  
--#ifndef PXA2XX_SPI_H_
--#define PXA2XX_SPI_H_
-+#include <linux/pxa2xx_ssp.h>
-+#include <mach/dma.h>
+ #include <linux/pxa2xx_ssp.h>
+-#include <mach/dma.h>
  
  #define PXA2XX_CS_ASSERT (0x01)
  #define PXA2XX_CS_DEASSERT (0x02)
-@@ -44,4 +46,4 @@ struct pxa2xx_spi_chip {
+@@ -44,6 +43,15 @@ struct pxa2xx_spi_chip {
+ 	void (*cs_control)(u32 command);
+ };
  
++#ifdef CONFIG_ARCH_PXA
++
++#include <linux/clk.h>
++#include <mach/dma.h>
++
  extern void pxa2xx_set_spi_info(unsigned id, struct pxa2xx_spi_master *info);
  
--#endif /*PXA2XX_SPI_H_*/
++#else
++#include <asm/pxa2xx_spi_ce4100.h>
++
 +#endif
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index b439eee..8ad93ee 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -20,6 +20,7 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/pxa2xx_ssp.h>
- 
- #include <asm/irq.h>
- 
-@@ -33,7 +34,6 @@
- #include <mach/hardware.h>
- #include <mach/dma.h>
- #include <mach/audio.h>
--#include <plat/ssp.h>
- 
- #include "../../arm/pxa2xx-pcm.h"
- #include "pxa-ssp.h"
+ #endif
 -- 
 1.7.3.2
