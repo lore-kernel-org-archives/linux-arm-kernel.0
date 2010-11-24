@@ -1,58 +1,54 @@
 From: charu@ti.com (Varadarajan, Charulatha)
-Date: Wed, 24 Nov 2010 10:56:54 +0530
-Subject: [PATCH v4 4/5] OMAP: mailbox: send message in process context
-In-Reply-To: <1290547617-16640-5-git-send-email-h-kanigeri2@ti.com>
+Date: Wed, 24 Nov 2010 10:59:54 +0530
+Subject: [PATCH v4 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+In-Reply-To: <1290547617-16640-6-git-send-email-h-kanigeri2@ti.com>
 References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
-	<1290547617-16640-5-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <AANLkTimbXXmPu5KQtpxG6jTxaj18ad+Q5dHSPArEtXgr@mail.gmail.com>
+	<1290547617-16640-6-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <AANLkTi=tzuzOMa6kPp-a6+yn6xMLGtdVSvAxPFP5RU5q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 24, 2010 at 02:56, Hari Kanigeri <h-kanigeri2@ti.com> wrote:
-> Schedule the Tasklet to send only when mailbox fifo is full and there are
-> pending messages in kifo, else send the message directly in the Process
-
-Typo -> kifo
-
-> context. This would avoid needless scheduling of Tasklet for every message
-> transfer
+> In the current mailbox driver, the mailbox internal pointer for
+> callback can be directly manipulated by the Users, so a second
+> User can easily corrupt the first user's callback pointer.
+> The initial effort to correct this issue can be referred here:
+> https://patchwork.kernel.org/patch/107520/
+>
+> Along with fixing the above stated issue, this patch ?adds the
+> flexibility option to register notifications from
+> multiple readers to the events received on a mailbox instance.
+> The discussion regarding this can be referred here.
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg30671.html
 >
 > Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
 > ---
-> ?arch/arm/plat-omap/mailbox.c | ? ?9 +++++++--
-> ?1 files changed, 7 insertions(+), 2 deletions(-)
+> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?7 +-
+> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ?104 ++++++++++++++++-------------
+> ?2 files changed, 62 insertions(+), 49 deletions(-)
 >
-> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-> index 13698ab..f4177df 100644
-> --- a/arch/arm/plat-omap/mailbox.c
-> +++ b/arch/arm/plat-omap/mailbox.c
-> @@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
-> ? ? ? ?struct omap_mbox_queue *mq = mbox->txq;
-> ? ? ? ?int ret = 0, len;
->
-> - ? ? ? spin_lock(&mq->lock);
-> + ? ? ? spin_lock_bh(&mq->lock);
->
-> ? ? ? ?if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
-> ? ? ? ? ? ? ? ?ret = -ENOMEM;
-> ? ? ? ? ? ? ? ?goto out;
-> ? ? ? ?}
->
-> + ? ? ? if (kfifo_is_empty(&mq->fifo) && !__mbox_poll_for_space(mbox)) {
-> + ? ? ? ? ? ? ? mbox_fifo_write(mbox, msg);
-> + ? ? ? ? ? ? ? goto out;
-> + ? ? ? }
+
+<<snip>>
+
+> @@ -363,10 +372,13 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
+> ? ? ? ? ? ? ? ? ? ? ? ?ret = PTR_ERR(mbox->dev);
+> ? ? ? ? ? ? ? ? ? ? ? ?goto err_out;
+> ? ? ? ? ? ? ? ?}
 > +
-> ? ? ? ?len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
-> ? ? ? ?WARN_ON(len != sizeof(msg));
+
+Do this change in the patch where the below code was added.
+
+> ? ? ? ? ? ? ? ?if (cpu_is_omap44xx())
+> ? ? ? ? ? ? ? ? ? ? ? ?mbox->rev = OMAP_MBOX_IP_VERSION_2;
+> ? ? ? ? ? ? ? ?else
+> ? ? ? ? ? ? ? ? ? ? ? ?mbox->rev = OMAP_MBOX_IP_LEGACY;
+> +
+> + ? ? ? ? ? ? ? BLOCKING_INIT_NOTIFIER_HEAD(&mbox->notifier);
+> ? ? ? ?}
+> ? ? ? ?return 0;
 >
-> ? ? ? ?tasklet_schedule(&mbox->txq->tasklet);
->
-> ?out:
-> - ? ? ? spin_unlock(&mq->lock);
-> + ? ? ? spin_unlock_bh(&mq->lock);
-> ? ? ? ?return ret;
-> ?}
-> ?EXPORT_SYMBOL(omap_mbox_msg_send);
 > --
 > 1.7.0
+>
