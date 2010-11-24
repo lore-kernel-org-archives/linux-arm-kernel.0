@@ -1,61 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 24 Nov 2010 10:42:13 +0000
-Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range RWFO fix
-In-Reply-To: <20101123224237.GF26510@n2100.arm.linux.org.uk>
-References: <20101123222806.GA22936@mvista.com>
-	<20101123224237.GF26510@n2100.arm.linux.org.uk>
-Message-ID: <1290595333.3056.6.camel@e102109-lin.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 24 Nov 2010 10:48:51 +0000
+Subject: [PATCH 2/3] regulators: Update of ab8500 driver
+In-Reply-To: <4CECC555.8060408@stericsson.com>
+References: <1290536754-21775-1-git-send-email-bengt.g.jonsson@stericsson.com>
+	<1290536754-21775-3-git-send-email-bengt.g.jonsson@stericsson.com>
+	<20101123183833.GB19212@rakim.wolfsonmicro.main>
+	<4CECC555.8060408@stericsson.com>
+Message-ID: <20101124104851.GA24970@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-11-23 at 22:42 +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 24, 2010 at 01:28:06AM +0300, Valentine Barshak wrote:
-> > Cache ownership must be acqired by reading/writing data from the
-> > cache line to make cache operation have the desired effect on the
-> > SMP MPCore CPU. However, the ownership is never aquired in the
-> > v6_dma_inv_range function when cleaning the first line and
-> > flushing the last one, in case the address is not aligned
-> > to D_CACHE_LINE_SIZE boundary.
-> > Fix this by reading/writing data if needed, before performing
-> > cache operations.
-> 
-> You should do this on the data _inside_ the requested buffer.  We don't
-> know if the overlapping cache line shares itself with some atomic
-> variable, and doing a read-write on it could undo other updates to it.
+On Wed, Nov 24, 2010 at 08:57:09AM +0100, Bengt Jonsson wrote:
 
-We could just use the boundary addresses to avoid writing beyond the
-buffer. Something like below (pretty much moving the BIC after the RFO,
-untested):
+> Removing the macros is just my suggestion. The disadvantage I see
+> with macros is that I need to read both the macro and the listing to
+> see what it really does. On the other hand, macros are probably more
 
-
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 99fa688..d63bb55 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -204,6 +204,10 @@ ENTRY(v6_flush_kern_dcache_area)
-  */
- v6_dma_inv_range:
- 	tst	r0, #D_CACHE_LINE_SIZE - 1
-+#ifdef CONFIG_DMA_CACHE_RWFO
-+	ldrne	r2, [r0]			@ read for ownership
-+	strne	r2, [r0]			@ write for ownership
-+#endif
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- #ifdef HARVARD_CACHE
- 	mcrne	p15, 0, r0, c7, c10, 1		@ clean D line
-@@ -211,6 +215,10 @@ v6_dma_inv_range:
- 	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
- #endif
- 	tst	r1, #D_CACHE_LINE_SIZE - 1
-+#ifdef CONFIG_DMA_CACHE_RWFO
-+	ldrne	r2, [r1, #-4]			@ read for ownership
-+	strne	r2, [r1, #-4]			@ write for ownership
-+#endif
- 	bic	r1, r1, #D_CACHE_LINE_SIZE - 1
- #ifdef HARVARD_CACHE
- 	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D line
-
-
-
--- 
-Catalin
+A line of comment at the top of the macro table would probably address
+that?
