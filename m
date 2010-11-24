@@ -1,31 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Nov 2010 15:33:21 +0000 (UTC)
-Subject: [PATCH] Acme Systems FOX Board G20 board files
-References: <1287014786-25543-1-git-send-email-tanzilli@acmesystems.it>
-Message-ID: <loom.20101124T163017-839@post.gmane.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 24 Nov 2010 15:35:50 +0000
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range RWFO fix
+In-Reply-To: <20101124151015.GE31572@mvista.com>
+References: <20101123222806.GA22936@mvista.com>
+	<20101123224237.GF26510@n2100.arm.linux.org.uk>
+	<1290595333.3056.6.camel@e102109-lin.cambridge.arm.com>
+	<20101124151015.GE31572@mvista.com>
+Message-ID: <AANLkTinrZtoZoA-bLKB4AL1VVVt2wLTPzh0zYAtrPku7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One more thing, Sergio,
+On 24 November 2010 15:10, George G. Davis <gdavis@mvista.com> wrote:
+> On Wed, Nov 24, 2010 at 10:42:13AM +0000, Catalin Marinas wrote:
+>> On Tue, 2010-11-23 at 22:42 +0000, Russell King - ARM Linux wrote:
+>> > On Wed, Nov 24, 2010 at 01:28:06AM +0300, Valentine Barshak wrote:
+>> > > Cache ownership must be acqired by reading/writing data from the
+>> > > cache line to make cache operation have the desired effect on the
+>> > > SMP MPCore CPU. However, the ownership is never aquired in the
+>> > > v6_dma_inv_range function when cleaning the first line and
+>> > > flushing the last one, in case the address is not aligned
+>> > > to D_CACHE_LINE_SIZE boundary.
+>> > > Fix this by reading/writing data if needed, before performing
+>> > > cache operations.
+>> >
+>> > You should do this on the data _inside_ the requested buffer. ?We don't
+>> > know if the overlapping cache line shares itself with some atomic
+>> > variable, and doing a read-write on it could undo other updates to it.
+>>
+>> We could just use the boundary addresses to avoid writing beyond the
+>> buffer. Something like below (pretty much moving the BIC after the RFO,
+>> untested):
+>>
+>>
+>> diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+>> index 99fa688..d63bb55 100644
+>> --- a/arch/arm/mm/cache-v6.S
+>> +++ b/arch/arm/mm/cache-v6.S
+>> @@ -204,6 +204,10 @@ ENTRY(v6_flush_kern_dcache_area)
+>> ? */
+>> ?v6_dma_inv_range:
+>> ? ? ? tst ? ? r0, #D_CACHE_LINE_SIZE - 1
+>> +#ifdef CONFIG_DMA_CACHE_RWFO
+>> + ? ? ldrne ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ read for ownership
+>> + ? ? strne ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ write for ownership
+>
+> My concern doing RWFO prior to aligning "start" is that it could be
+> non-word-aligned which may result in an alignment fault.
 
-Sergio Tanzilli <tanzilli <at> acmesystems.it> writes:
+True. Maybe you can use ldrbne/strbne.
 
-> 
-> ---
->  arch/arm/mach-at91/Kconfig        |    7 +
->  arch/arm/mach-at91/Makefile       |    2 +
->  arch/arm/mach-at91/board-foxg20.c |  279 +++++++++++++++++++++++++++++++++++++
-
-[..]
-
-> +MACHINE_START(FOXG20, "Acme Systems srl FOX Board G20")
-
-It seems your machine is not registered with FOXG20 name in Russell's machine
-registry: it is "ACMENETUSFOXG20".
-
-So, tell me which name to use and should I modify your patch to cope with what
-is already in mach-types...
-
-Best regards,
 -- 
-Nicolas Ferre
+Catalin
