@@ -1,130 +1,36 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 24 Nov 2010 21:59:15 +0200
-Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302479315FB@dbde02.ent.ti.com>
-References: <1290526740-27624-1-git-send-email-ohad@wizery.com>
-	<1290526740-27624-2-git-send-email-ohad@wizery.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302479315FB@dbde02.ent.ti.com>
-Message-ID: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 24 Nov 2010 18:07:18 -0200
+Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
+In-Reply-To: <20101124194439.GY4693@pengutronix.de>
+References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+	<20101124194439.GY4693@pengutronix.de>
+Message-ID: <AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mugdha,
+Hi Uwe,
 
-On Wed, Nov 24, 2010 at 9:44 AM, Kamoolkar, Mugdha <mugdha@ti.com> wrote:
-> How do multiple clients get a handle that they can use? Are they expected to
-> share the handle they get from the call above?
+2010/11/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Fabio,
+>
+> On Wed, Nov 24, 2010 at 05:29:31PM -0200, Fabio Estevam wrote:
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> This allows imx-for-2.6.38 tree to build again.
+> The same patch is already in Sascha's imx-for-2.6.37 branch (and so in
+> for-next, too). ?There are some more fixes in for-.37 so I'd use the
+> for-next branch for now.
 
-Currently, yes.
+Thanks, I haven't noticed this. Will use for-next branch for now.
 
-> What if they are independent
-> clients with no means of communication between them? There may be a need of
-> an API that returns the handle for a specific ID. For example, a module over
-> the hwspinlock driver that does some level of management of IDs (e.g. name
-> to ID mapping) and enables users to get multi-core as well as multi-client
-> protection on Linux.
+While at the dma topic: is anyone able to boot a kernel on MX51 with
+IMX_SDMA=y?
 
-I'm not sure I understand the use case. Can you please elaborate ?
+I enabled early printk support, but no kernel messages appear after:
+Uncompressing Linux... done, booting the kernel.
 
-> For example:
-> struct hwspinlock *hwspinlock_get_handle(unsigned int id);
+This also happens on the for-next branch.
 
-I'm afraid such an API will be easily abused, e.g., drivers that will
-try to use a predefined hwspinlock id without taking care of reserving
-it early enough will probably use it to overcome an "oops this
-hwspinlock has already been assigned to someone else".
+Regards,
 
-So let me suggest we should first understand the use case for the API
-you propose, and then see how we solve it ?
-
-> Why are some of the APIs hwspinlock_ and others hwspin_?
-
-I'm following the regular spinlock naming, which nicely avoids having
-the word 'lock' twice in the API. So you get APIs like hwspin_lock,
-hwspin_unlock, hwspin_trylock. In our case we still have stuff like
-hwspinlock_request and hwspinlock_free. I can probably make it
-hwspin_lock_request, does that look nicer ?
-
->> + ?int hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long timeout);
->> + ? - lock a previously-assigned hwspinlock with a timeout limit (specified in
->> + ? ? jiffies). If the hwspinlock is already taken, the function will busy
->> loop
->> + ? ? waiting for it to be released, but give up when the timeout meets
->> jiffies.
->> + ? ? If timeout is 0, the function will never give up (therefore if a faulty
->> + ? ? remote core never releases the hwspinlock, it will deadlock).
-> If timeout is 0, shouldn't it rather behave as a trylock? If timeout is
-> MAX_SCHEDULE_TIMEOUT, then it should behave as a wait-forever.
-
-Good point, thanks!
-
->> + ?int hwspin_trylock(struct hwspinlock *hwlock);
->> + ? - attempt to lock a previously-assigned hwspinlock, but immediately fail
->> if
->> + ? ? it is already taken.
->> + ? ? Upon a successful return from this function, preemption is disabled so
->> + ? ? caller must not sleep, and is advised to release the hwspinlock as soon
->> as
->> + ? ? possible, in order to minimize remote cores polling on the hardware
->> + ? ? interconnect.
->> + ? ? Returns 0 on success and an appropriate error code otherwise (most
->> + ? ? notably -EBUSY if the hwspinlock was already taken).
->> + ? ? The function will never sleep.
-> Is this function needed at all if timeout 0 behaves similar to trylock?
-
-Yeah. Drivers should use the _trylock version when applicable because
-it'd make the code more readable, and it's more intuitive (just like
-the spin_trylock API).
-
->> + ?struct hwspinlock *hwspinlock_unregister(unsigned int id);
->> + ? - to be called from the underlying vendor-specific implementation, in
->> order
->> + ? ? to unregister an existing (and unused) hwspinlock instance.
->> + ? ? Can be called from an atomic context (will not sleep) but not from
->> + ? ? within interrupt context.
->> + ? ? Returns the address of hwspinlock on success, or NULL on error (e.g.
->> + ? ? if the hwspinlock is sill in use).
-> Does this need to be called for all hwspinlocks?
-
-Currently, yes.
-
-I actually am planning an improvement that would allow registering a
-block of hwspinlocks; I don't think that the multiple calls of
-register/unregister is that bad (it happens only once at boot), but I
-want to allow sharing of the owner, ops and dev members of the
-hwspinlock instances (to save some memory).
-
-Anyway, it's not a big improvement, so I planned first to get things
-merged and then look into stuff like that.
-
->> +int __hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long to,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int mode, unsigned long *flags)
->> +{
->> + ? ? int ret;
->> +
->> + ? ? for (;;) {
->> + ? ? ? ? ? ? /* Try to take the hwspinlock */
->> + ? ? ? ? ? ? ret = __hwspin_trylock(hwlock, mode, flags);
->> + ? ? ? ? ? ? if (ret != -EBUSY)
->> + ? ? ? ? ? ? ? ? ? ? break;
->> +
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* The lock is already taken, let's check if the user wants
->> + ? ? ? ? ? ? ?* us to try again
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? if (to && time_is_before_eq_jiffies(to))
->> + ? ? ? ? ? ? ? ? ? ? return -ETIMEDOUT;
->> +
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* Allow platform-specific relax handlers to prevent
->> + ? ? ? ? ? ? ?* hogging the interconnect (no sleeping, though)
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? if (hwlock->ops->relax)
->> + ? ? ? ? ? ? ? ? ? ? hwlock->ops->relax(hwlock);
-> There should be a way to have an escape mechanism for the case where a deadlock
-> has occurred due to remote side taking the spinlock and crashing.
-
-This is exactly what the timeout parameter is for..
-
-Thanks,
-Ohad.
+Fabio Estevam
