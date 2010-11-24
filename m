@@ -1,55 +1,32 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 24 Nov 2010 21:54:33 +0800
-Subject: [PATCH 1/9] spi/pxa2xx: don't use subys initcall for driver init
-In-Reply-To: <1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
-References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
-	<1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
-Message-ID: <AANLkTin4vh85XRkEd7YocCmKngViR_qZDe7z1b4JXyd-@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 24 Nov 2010 14:54:38 +0100 (CET)
+Subject: [question] NR_IRQS in genirq
+In-Reply-To: <20101124135048.GC13507@sirena.org.uk>
+References: <AANLkTimoBdFyQ6GfS2DKiF0wdRox0x7MfM0_keD9Z1D0@mail.gmail.com>
+	<alpine.LFD.2.00.1011241416360.2900@localhost6.localdomain6>
+	<AANLkTik5N0d9wcaiS538UWQ83E_HhXoWC8nMxVY__1+k@mail.gmail.com>
+	<20101124135048.GC13507@sirena.org.uk>
+Message-ID: <alpine.LFD.2.00.1011241453330.2900@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 24, 2010 at 7:13 PM, Sebastian Andrzej Siewior
-<bigeasy@linutronix.de> wrote:
-> It is a simple driver and there is no need to call its init function
-> at the level of a subsystem.
->
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
-> ---
-> ?drivers/spi/pxa2xx_spi.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-> index e76b1af..6f2f061 100644
-> --- a/drivers/spi/pxa2xx_spi.c
-> +++ b/drivers/spi/pxa2xx_spi.c
-> @@ -1731,7 +1731,7 @@ static int __init pxa2xx_spi_init(void)
-> ?{
-> ? ? ? ?return platform_driver_probe(&driver, pxa2xx_spi_probe);
-> ?}
-> -subsys_initcall(pxa2xx_spi_init);
-> +module_init(pxa2xx_spi_init);
->
-> ?static void __exit pxa2xx_spi_exit(void)
-> ?{
-> --
+On Wed, 24 Nov 2010, Mark Brown wrote:
 
-Hi Sebastian,
+> On Wed, Nov 24, 2010 at 09:46:06PM +0800, Haojian Zhuang wrote:
+> 
+> > My hardware environment is ARM. Each machine description can specify
+> > nr_irqs. In my implementation of PXA, NR_IRQS is fixed for SoC
+> > internal IRQs. And there's some additional board IRQs, we arrange them
+> > between NR_IRQS and nr_irqs. So nr_irqs will be larger than NR_IRQS if
+> > board IRQs exists.
+> 
+> Most ARM platforms have come up with some Kconfig gunk to allow boards
+> to extend this for off-SoC GPIOs.  It'd be really nice to get rid of
+> NR_IRQS and stop having to worry about this at all :(
 
-Actually it's added for cpufreq usage. We can check the commit in below.
+I mean with sparse_irq you can set NR_IRQS insanely high w/o
+increasing memory consumption. That's the whole point.
 
-commit 5b61a749e8fd0a45a5e37c267d20a43ef0590d68
-Author: Antonio Ospite <ospite@studenti.unina.it>
-Date:   Tue Sep 22 16:46:10 2009 -0700
+Thanks,
 
-    pxa2xx_spi: register earlier
-
-    Register pxa2xx_spi earlier so it can be used with cpufreq
-
-    Signed-off-by: Daniel Ribeiro <drwyrm@gmail.com>
-    Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-So I think that this modifcation may cause others brokne.
-
-Thanks
-Haojian
+	tglx
