@@ -1,35 +1,34 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 24 Nov 2010 22:20:17 +0100
-Subject: [PATCH 7/7] i2c/pxa2xx: pass of_node from platform driver to adapter
-In-Reply-To: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>
-References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1290633617-15311-8-git-send-email-bigeasy@linutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 24 Nov 2010 19:42:31 -0200
+Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
+In-Reply-To: <20101124201831.GZ4693@pengutronix.de>
+References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+	<20101124194439.GY4693@pengutronix.de>
+	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
+	<20101124201831.GZ4693@pengutronix.de>
+Message-ID: <AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the of_node will auto-publish devices which are added to the device
-tree.
+Hi Uwe,
 
-Cc: grant.likely at secretlab.ca
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
----
- drivers/i2c/busses/i2c-pxa.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+2010/11/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+....
+> I usually prefer just using DEBUG_LL and put
+>
+> ? ? ? ?#ifdef CONFIG_DEBUG_LL
+> ? ? ? ? ? ? ? ?void printch(char);
+> ? ? ? ? ? ? ? ?printch(c);
+> ? ? ? ?#endif
+>
+> into emit_log_char. ?But I think that's only because I don't know how to
+> use early printk properly. ?(You might need an additional kernel
+> parameter?!)
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 1a48470..dd6ed77 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -1083,6 +1083,9 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 
- 	i2c->adap.algo_data = i2c;
- 	i2c->adap.dev.parent = &dev->dev;
-+#ifdef CONFIG_OF
-+	i2c->adap.dev.of_node = dev->dev.of_node;
-+#endif
- 
- 	ret = i2c_add_numbered_adapter(&i2c->adap);
- 	if (ret < 0) {
--- 
-1.7.3.2
+Thanks. I see that the kernel crashes at sdma_get_firmware.
+
+Will try to build a firmware using Sascha's SDMA utility.
+
+Regards,
+
+Fabio Estevam
