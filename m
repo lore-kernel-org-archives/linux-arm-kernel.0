@@ -1,89 +1,58 @@
-From: bill_carson@126.com (rocky)
-Date: Tue, 23 Nov 2010 14:06:40 +0800 (CST)
-Subject: Query about cplusplus in linkage.h
-In-Reply-To: <20101123054643.GA6156@jasper.tkos.co.il>
-References: <20101123054643.GA6156@jasper.tkos.co.il>
-	<20101122083009.GB29610@jasper.tkos.co.il>
-	<13701df.df91.12c677fe0fd.Coremail.bill_carson@126.com>
-	<1c8df545.121ab.12c74028c01.Coremail.bill_carson@126.com>
-Message-ID: <4dad73.5ee8.12c77575213.Coremail.bill_carson@126.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Wed, 24 Nov 2010 07:42:37 -0700
+Subject: [PATCHv5 1/3] ARM: imx: Add core definitions for MX53
+In-Reply-To: <AANLkTimN1tQee2PywyphPnAdvC8_ASgZud_F=ma_+Bde@mail.gmail.com>
+References: <1289842201-3277-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<AANLkTimN1tQee2PywyphPnAdvC8_ASgZud_F=ma_+Bde@mail.gmail.com>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA01ED76@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Baruch
+Hi Richard,
 
-Thanks for URL: http://kernelnewbies.org/FAQ/asmlinkage
+ 
 
+From: Richard Zhao [mailto:linuxzsc at gmail.com] 
+Sent: Wednesday, November 24, 2010 7:20 AM
+To: Nguyen Dinh-R00091
+Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com;
+linux at arm.linux.org.uk; s.hauer at pengutronix.de; eric at eukrea.com;
+u.kleine-koenig at pengutronix.de; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCHv5 1/3] ARM: imx: Add core definitions for MX53
 
-Only two arch overide asmlinkage definitions in include/linux/linkage.h
-1:arch/x86/include/asm/linkage.h
-2:arch/ia64/include/asm/linkage.h
-that's what the above URL say about parameter passing using STACK or REGISTER;
+ 
 
-while I must admit  _cplusplus is  a total different story;
+Hi Dinh,
 
-
-BR
-rocky
-
-
-At 2010-11-23 13:46:43?"Baruch Siach" <baruch@tkos.co.il> wrote:
-
->Hi rocky,
+> diff --git a/arch/arm/mach-mx5/crm_regs.h
+b/arch/arm/mach-mx5/crm_regs.h
+> index c776b9a..51ff9bb 100644
+> --- a/arch/arm/mach-mx5/crm_regs.h
+> +++ b/arch/arm/mach-mx5/crm_regs.h
+> @@ -18,6 +18,9 @@
+>  #define MX51_CORTEXA8_BASE     MX51_IO_ADDRESS(MX51_ARM_BASE_ADDR)
+>  #define MX51_GPC_BASE          MX51_IO_ADDRESS(MX51_GPC_BASE_ADDR)
 >
->On Mon, Nov 22, 2010 at 10:35:12PM +0800, rocky wrote:
->> thanks for you kindly replay;
->> I am still lost in this maze, so does extern "C" help user space C++ program to call schedule/printk?
->> sys_xxx functions are called through SWI ,not directly called from user space C++ program;
->
->It seems I was wrong. Userspace programs never call these functions directly.  
->See http://kernelnewbies.org/FAQ/asmlinkage for a better answer.
->
->baruch
->
->> At 2010-11-22 16:30:10?"Baruch Siach" <baruch@tkos.co.il> wrote:
->> 
->> >Hi rocky,
->> >
->> >On Sat, Nov 20, 2010 at 12:17:02PM +0800, rocky wrote:
->> >> I am a little confused about the following definition :
->> >> 
->> >> --------------include/linux/linkage.h-----------
->> >> #ifdef __cplusplus
->> >> #define CPP_ASMLINKAGE extern "C"
->> >> #else
->> >> #define CPP_ASMLINKAGE
->> >> #endif
->> >> 
->> >> #ifndef asmlinkage
->> >> #define asmlinkage CPP_ASMLINKAGE
->> >> #endif
->> >> 
->> >> all system call functions are marked with asmlinkage, as well as other kernel function like printk/schedule/do_softirq
->> >> 
->> >> 
->> >> so every asmlinkage function has extern "C"  attribute if cplusplus is defined, which definitely happens  when compiling C++ code.
->> >> 
->> >> I dont get it when cplusplus is needed when compiling kernel?
->> >
->> >It isn't.
->> >
->> >> Can anyone help me out of this little misunderstanding?
->> >
->> >Userspace C++ code may include kernel header files. Making the exported 
->> >function calls extern "C" makes it easier to build such applications.
->> >
->> >baruch
->
->-- 
->                                                     ~. .~   Tk Open Systems
->=}------------------------------------------------ooO--U--Ooo------------{=
->   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +/*MX53*/
+> +#define MX53_DPLL4_BASE
+MX53_IO_ADDRESS(MX53_PLL3_BASE_ADDR)
+> +
+>  /* PLL Register Offsets */
+>  #define MXC_PLL_DP_CTL                 0x00
+>  #define MXC_PLL_DP_CONFIG              0x04
+
+CCM and PLL base address are different between mx53 and mx51. Why do
+you both use mx51 base address?
+
+
+
+No worries, I have a patch ready for more ugly changes to the crm_regs.h
+which include the new CCM and PLL changes.
+
+
+Thanks
+Richard
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101123/250d9eba/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101124/a6e3dcff/attachment-0001.html>
