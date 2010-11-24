@@ -1,31 +1,59 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Wed, 24 Nov 2010 21:20:26 +0800
-Subject: [PATCHv5 1/3] ARM: imx: Add core definitions for MX53
-In-Reply-To: <1289842201-3277-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1289842201-3277-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <AANLkTimN1tQee2PywyphPnAdvC8_ASgZud_F=ma_+Bde@mail.gmail.com>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Wed, 24 Nov 2010 07:22:07 -0600
+Subject: [PATCH v4 5/5] OMAP: mailbox: add notification support for
+	multiple readers
+In-Reply-To: <AANLkTikD20HGY+9BqBKX0DwFW7wPDTvt=wZqyAcHwckk@mail.gmail.com>
+References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
+	<1290547617-16640-6-git-send-email-h-kanigeri2@ti.com>
+	<AANLkTi=tzuzOMa6kPp-a6+yn6xMLGtdVSvAxPFP5RU5q@mail.gmail.com>
+	<AANLkTin8kxk=R5xQyp-ZcKVr-0eiM82L=QcF1PC2g-5n@mail.gmail.com>
+	<AANLkTikD20HGY+9BqBKX0DwFW7wPDTvt=wZqyAcHwckk@mail.gmail.com>
+Message-ID: <AANLkTi=d5d5OQEY0AMEvfQh_KOnMsZrHpWizBoa=fBEX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
-
-> diff --git a/arch/arm/mach-mx5/crm_regs.h b/arch/arm/mach-mx5/crm_regs.h
-> index c776b9a..51ff9bb 100644
-> --- a/arch/arm/mach-mx5/crm_regs.h
-> +++ b/arch/arm/mach-mx5/crm_regs.h
-> @@ -18,6 +18,9 @@
-> ?#define MX51_CORTEXA8_BASE ? ? MX51_IO_ADDRESS(MX51_ARM_BASE_ADDR)
-> ?#define MX51_GPC_BASE ? ? ? ? ?MX51_IO_ADDRESS(MX51_GPC_BASE_ADDR)
+On Wed, Nov 24, 2010 at 7:12 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
+> On Wed, Nov 24, 2010 at 18:39, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
+>> On Tue, Nov 23, 2010 at 11:29 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
+>>> On Wed, Nov 24, 2010 at 02:56, Hari Kanigeri <h-kanigeri2@ti.com> wrote:
+>>>> In the current mailbox driver, the mailbox internal pointer for
+>>>> callback can be directly manipulated by the Users, so a second
+>>>> User can easily corrupt the first user's callback pointer.
+>>>> The initial effort to correct this issue can be referred here:
+>>>> https://patchwork.kernel.org/patch/107520/
+>>>>
+>>>> Along with fixing the above stated issue, this patch ?adds the
+>>>> flexibility option to register notifications from
+>>>> multiple readers to the events received on a mailbox instance.
+>>>> The discussion regarding this can be referred here.
+>>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg30671.html
+>>>>
+>>>> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+>>>> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+>>>> ---
+>>>> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?7 +-
+>>>> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ?104 ++++++++++++++++-------------
+>>>> ?2 files changed, 62 insertions(+), 49 deletions(-)
+>>>>
+>>>
+>>> <<snip>>
+>>>
+>>>> @@ -363,10 +372,13 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
+>>>> ? ? ? ? ? ? ? ? ? ? ? ?ret = PTR_ERR(mbox->dev);
+>>>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_out;
+>>>> ? ? ? ? ? ? ? ?}
+>>>> +
+>>>
+>>> Do this change in the patch where the below code was added.
+>>
+>> I am sorry I didn't get you. you mean BLOCKING_INIT_NOTIFIER_HEAD line
+>> ? yes, it is needed for this patch.
 >
-> +/*MX53*/
-> +#define MX53_DPLL4_BASE ? ? ? ? ? ? ? ?MX53_IO_ADDRESS(MX53_PLL3_BASE_ADDR)
-> +
-> ?/* PLL Register Offsets */
-> ?#define MXC_PLL_DP_CTL ? ? ? ? ? ? ? ? 0x00
-> ?#define MXC_PLL_DP_CONFIG ? ? ? ? ? ? ?0x04
+> No. I was saying that adding a new line could be done in the patch where this
+> piece of code (below 4 lines) was introduced. Sorry if that was not clear :-(
 
-CCM and PLL base address are different between mx53 and mx51. Why do
-you both use mx51 base address?
+Got it. extra line can be removed.
 
-Thanks
-Richard
+Thank you,
+Best regards,
+Hari Kanigeri
