@@ -1,78 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Nov 2010 18:19:01 +0000
-Subject: [PATCH 1/2] ARM: hw_breakpoint: ensure OS lock is clear before
-	writing to debug registers
-Message-ID: <1290622742-11097-1-git-send-email-will.deacon@arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 24 Nov 2010 14:00:12 -0500 (EST)
+Subject: [PATCH] ARM: Fix find_next_zero_bit and related assembly
+In-Reply-To: <4CED55A6.5090608@codeaurora.org>
+References: <1289524615-22484-1-git-send-email-jajones@nvidia.com>
+	<alpine.LFD.2.00.1011231625380.9313@xanadu.home>
+	<201011231528.25668.jajones@nvidia.com>
+	<4CED55A6.5090608@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1011241357520.9313@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv7 architects a system for saving and restoring the debug registers
-across low-power modes. At the heart of this system is a lock register
-which, when set, forbids writes to the debug registers. While locked,
-writes to debug registers via the co-processor interface will result
-in undefined instruction traps. Linux currently doesn't make use of
-this feature because we update the debug registers on context switch
-anyway, however the status of the lock is IMPLEMENTATION DEFINED on
-reset.
+On Wed, 24 Nov 2010, Stephen Boyd wrote:
 
-This patch ensures that the lock is cleared during boot so that we
-can write to the debug registers safely.
+> On 11/23/2010 03:28 PM, James Jones wrote:
+> > On Tuesday 23 November 2010 13:26:47 Nicolas Pitre wrote:
+> >> On Thu, 11 Nov 2010, James Jones wrote:
+> >>> The find_next_bit, find_first_bit, find_next_zero_bit
+> >>> and find_first_zero_bit functions were not properly
+> >>> clamping to the maxbit argument at the bit level. They
+> >>> were instead only checking maxbit at the byte level.
+> >>> To fix this, add a compare and a conditional move
+> >>> instruction to the end of the common bit-within-the-
+> >>> byte code used by all the functions and be sure not to
+> >>> clobber the maxbit argument before it is used.
+> >>>
+> >>> Signed-off-by: James Jones <jajones@nvidia.com>
+> >>> Tested-by: Stephen Warren <swarren@nvidia.com>
+> >> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> >>
+> >> Please send to RMK's patch system.
+> > Thanks for the review.  It's already in the patch system, but I updated the 
+> > entry to include your reviewed-by line.
+> 
+> Should this be sent to the stable tree too?
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/hw_breakpoint.c |   27 ++++++++++++++++++++++-----
- 1 files changed, 22 insertions(+), 5 deletions(-)
+It could, yes.  This is hardly an urgent fix though, as the bug has been 
+there virtually forever.
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 21e3a4a..793959e 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -768,6 +768,23 @@ static void __init reset_ctrl_regs(void *unused)
- {
- 	int i;
- 
-+	/*
-+	 * v7 debug contains save and restore registers so that debug state
-+	 * can be maintained across low-power modes without leaving
-+	 * the debug logic powered up. It is IMPLEMENTATION DEFINED whether
-+	 * we can write to the debug registers out of reset, so we must
-+	 * unlock the OS Lock Access Register to avoid taking undefined
-+	 * instruction exceptions later on.
-+	 */
-+	if (debug_arch >= ARM_DEBUG_ARCH_V7_ECP14) {
-+		/*
-+		 * Unconditionally clear the lock by writing a value
-+		 * other than 0xC5ACCE55 to the access register.
-+		 */
-+		asm volatile("mcr p14, 0, %0, c1, c0, 4" : : "r" (0));
-+		isb();
-+	}
-+
- 	if (enable_monitor_mode())
- 		return;
- 
-@@ -810,17 +827,17 @@ static int __init arch_hw_breakpoint_init(void)
- 		pr_warning("halting debug mode enabled. Assuming maximum "
- 				"watchpoint size of 4 bytes.");
- 	} else {
--		/* Work out the maximum supported watchpoint length. */
--		max_watchpoint_len = get_max_wp_len();
--		pr_info("maximum watchpoint size is %u bytes.\n",
--				max_watchpoint_len);
--
- 		/*
- 		 * Reset the breakpoint resources. We assume that a halting
- 		 * debugger will leave the world in a nice state for us.
- 		 */
- 		smp_call_function(reset_ctrl_regs, NULL, 1);
- 		reset_ctrl_regs(NULL);
-+
-+		/* Work out the maximum supported watchpoint length. */
-+		max_watchpoint_len = get_max_wp_len();
-+		pr_info("maximum watchpoint size is %u bytes.\n",
-+				max_watchpoint_len);
- 	}
- 
- 	/* Register debug fault handler. */
--- 
-1.7.0.4
+
+Nicolas
