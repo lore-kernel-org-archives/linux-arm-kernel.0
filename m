@@ -1,28 +1,80 @@
-From: bengt.g.jonsson@stericsson.com (Bengt Jonsson)
-Date: Wed, 24 Nov 2010 13:13:45 +0100
-Subject: [PATCH 1/3] mfd: Added new regulator_data pointer to ab8500 board
-	configuration
-In-Reply-To: <20101124113655.GC24970@rakim.wolfsonmicro.main>
-References: <1290536754-21775-1-git-send-email-bengt.g.jonsson@stericsson.com>
-	<1290536754-21775-2-git-send-email-bengt.g.jonsson@stericsson.com>
-	<20101123183037.GA19212@rakim.wolfsonmicro.main>
-	<4CECCBAE.6080707@stericsson.com>
-	<20101124113655.GC24970@rakim.wolfsonmicro.main>
-Message-ID: <4CED0179.9080700@stericsson.com>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Wed, 24 Nov 2010 06:47:25 -0600
+Subject: [PATCH v4 1/5] OMAP: mailbox: change full flag per mailbox queue
+	instead of global
+In-Reply-To: <AANLkTikORr1tukDhfnJv0XhxCHSzvAP=KqicM5x30HHG@mail.gmail.com>
+References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
+	<1290547617-16640-2-git-send-email-h-kanigeri2@ti.com>
+	<AANLkTikORr1tukDhfnJv0XhxCHSzvAP=KqicM5x30HHG@mail.gmail.com>
+Message-ID: <AANLkTimQU+wer+mLQPpsaG4r_Jt9HfxKLVVoCpCvpZWG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-11-24 12:36, Mark Brown wrote:
-> On Wed, Nov 24, 2010 at 09:24:14AM +0100, Bengt Jonsson wrote:
+On Tue, Nov 23, 2010 at 11:21 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
+> On Wed, Nov 24, 2010 at 02:56, Hari Kanigeri <h-kanigeri2@ti.com> wrote:
+>> From: Fernando Guzman Lugo <x0095840@ti.com>
+>>
+>> The variable rq_full flag is a global variable, so if there are multiple
+>> mailbox users there will be conflicts. Now there is a full flag per
+>> mailbox queue.
+>>
+>> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+>> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+>> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+>> ---
+>> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?1 +
+>> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ? ?9 +++++++--
+>> ?2 files changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+>> index 9976565..13f2ef3 100644
+>> --- a/arch/arm/plat-omap/include/plat/mailbox.h
+>> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
+>> @@ -48,6 +48,7 @@ struct omap_mbox_queue {
+>> ? ? ? ?struct tasklet_struct ? tasklet;
+>> ? ? ? ?int ? ? (*callback)(void *);
+>> ? ? ? ?struct omap_mbox ? ? ? ?*mbox;
+>> + ? ? ? bool full;
+>> ?};
+>>
+>> ?struct omap_mbox {
+>> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+>> index d2fafb8..48e161c 100644
+>> --- a/arch/arm/plat-omap/mailbox.c
+>> +++ b/arch/arm/plat-omap/mailbox.c
+>> @@ -33,7 +33,6 @@
+>>
+>> ?static struct workqueue_struct *mboxd;
+>> ?static struct omap_mbox **mboxes;
+>> -static bool rq_full;
+>>
+>> ?static int mbox_configured;
+>> ?static DEFINE_MUTEX(mbox_configured_lock);
+>> @@ -148,6 +147,12 @@ static void mbox_rx_work(struct work_struct *work)
+>>
+>> ? ? ? ? ? ? ? ?if (mq->callback)
+>> ? ? ? ? ? ? ? ? ? ? ? ?mq->callback((void *)msg);
+>> + ? ? ? ? ? ? ? spin_lock_irq(&mq->lock);
+>> + ? ? ? ? ? ? ? if (mq->full) {
+>> + ? ? ? ? ? ? ? ? ? ? ? mq->full = false;
+>> + ? ? ? ? ? ? ? ? ? ? ? omap_mbox_enable_irq(mq->mbox, IRQ_RX);
+>> + ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ? spin_unlock_irq(&mq->lock);
+>> ? ? ? ?}
+>> ?}
+>>
+>> @@ -170,7 +175,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+>> ? ? ? ?while (!mbox_fifo_empty(mbox)) {
+>> ? ? ? ? ? ? ? ?if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+>> ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_disable_irq(mbox, IRQ_RX);
+>> - ? ? ? ? ? ? ? ? ? ? ? rq_full = true;
+>> + ? ? ? ? ? ? ? ? ? ? ? mq->full = true;
 >
->> The problem I see is that ab8500-core defines the number of
->> regulators which I can see no reason for. If someone wants to add or
->> remove a regulator they have to make a change in
->> include/linux/mfd/ab8500.c as well as in the regulator files.
+> Should this also be inside spin_lock_irq?
 >
->> I will add a better description in an updated patch.
->
-> Seems reasonable, though there's now an issue with the platform getting
-> the size of the array wrong - might be worth adding an array size for
-> the platform to initialise to catch that.
-Good idea. I will try it out.
+
+Not needed. this is already run from interrupt context.
+
+Thank you,
+Best regards,
+Hari
