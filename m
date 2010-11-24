@@ -1,36 +1,25 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 24 Nov 2010 17:29:31 -0200
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 24 Nov 2010 20:44:39 +0100
 Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-Message-ID: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+In-Reply-To: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20101124194439.GY4693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-This allows imx-for-2.6.38 tree to build again.
+Hello Fabio,
 
- arch/arm/plat-mxc/devices/platform-imx-dma.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+On Wed, Nov 24, 2010 at 05:29:31PM -0200, Fabio Estevam wrote:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> This allows imx-for-2.6.38 tree to build again.
+The same patch is already in Sascha's imx-for-2.6.37 branch (and so in
+for-next, too).  There are some more fixes in for-.37 so I'd use the
+for-next branch for now.
 
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-index 93e2fdc..89ec637 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-@@ -12,15 +12,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/devices-common.h>
--#ifdef SDMA_IS_MERGED
- #include <mach/sdma.h>
--#else
--struct sdma_platform_data {
--	int sdma_version;
--	char *cpu_name;
--	int to_version;
--};
--#endif
- 
- struct imx_imx_sdma_data {
- 	resource_size_t iobase;
+Best regards
+Uwe
+
 -- 
-1.6.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
