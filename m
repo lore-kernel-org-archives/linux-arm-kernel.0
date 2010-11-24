@@ -1,33 +1,38 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 24 Nov 2010 15:55:41 +0100
-Subject: [PATCH 7/7] at91/board-yl-9200: fix typo in video support
+Date: Wed, 24 Nov 2010 15:55:37 +0100
+Subject: [PATCH 3/7 v2] at91rm9200ek: fix warning: 'ek_mmc_data' defined but
+	not used
 In-Reply-To: <20101124143448.GH11909@game.jcrosoft.org>
 References: <20101124143448.GH11909@game.jcrosoft.org>
-Message-ID: <1290610541-29255-7-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1290610541-29255-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for the epson frambuffer support it's CONFIG_FB_S1D13XXX
-not CONFIG_FB_S1D135XX
-
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Andrew Victor <linux@maxim.org.za>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/board-yl-9200.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-at91/board-ek.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index 89df00a..e0f0080 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -387,7 +387,7 @@ static struct spi_board_info yl9200_spi_devices[] = {
-  * EPSON S1D13806 FB (discontinued chip)
-  * EPSON S1D13506 FB
-  */
--#if defined(CONFIG_FB_S1D135XX) || defined(CONFIG_FB_S1D13XXX_MODULE)
-+#if defined(CONFIG_FB_S1D13XXX) || defined(CONFIG_FB_S1D13XXX_MODULE)
- #include <video/s1d13xxxfb.h>
+diff --git a/arch/arm/mach-at91/board-ek.c b/arch/arm/mach-at91/board-ek.c
+index 56e92c4..6203cdf 100644
+--- a/arch/arm/mach-at91/board-ek.c
++++ b/arch/arm/mach-at91/board-ek.c
+@@ -84,12 +84,14 @@ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.pullup_pin	= AT91_PIN_PD5,
+ };
  
++#ifndef CONFIG_MTD_AT91_DATAFLASH_CARD
+ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.det_pin	= AT91_PIN_PB27,
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
+ 	.wp_pin		= AT91_PIN_PA17,
+ };
++#endif
  
+ static struct spi_board_info ek_spi_devices[] = {
+ 	{	/* DataFlash chip */
 -- 
 1.7.1
