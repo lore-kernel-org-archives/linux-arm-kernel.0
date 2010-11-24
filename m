@@ -1,58 +1,114 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Wed, 24 Nov 2010 07:42:37 -0700
-Subject: [PATCHv5 1/3] ARM: imx: Add core definitions for MX53
-In-Reply-To: <AANLkTimN1tQee2PywyphPnAdvC8_ASgZud_F=ma_+Bde@mail.gmail.com>
-References: <1289842201-3277-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<AANLkTimN1tQee2PywyphPnAdvC8_ASgZud_F=ma_+Bde@mail.gmail.com>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA01ED76@039-SN1MPN1-004.039d.mgd.msft.net>
+From: vbarshak@mvista.com (Valentine Barshak)
+Date: Wed, 24 Nov 2010 21:39:36 +0300
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
+	RWFO fix
+In-Reply-To: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20101124183936.GA18796@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Updated according to the comments to avoid r/w outside the buffer and
+used byte r/w for the possible unaligned data. Seems to work fine.
 
- 
+Cache ownership must be acqired by reading/writing data from the
+cache line to make cache operation have the desired effect on the
+SMP MPCore CPU. However, the ownership is never aquired in the
+v6_dma_inv_range function when cleaning the first line and
+flushing the last one, in case the address is not aligned
+to D_CACHE_LINE_SIZE boundary.
+Fix this by reading/writing data if needed, before performing
+cache operations.
+While at it, fix v6_dma_flush_range to prevent RWFO outside
+the buffer.
 
-From: Richard Zhao [mailto:linuxzsc at gmail.com] 
-Sent: Wednesday, November 24, 2010 7:20 AM
-To: Nguyen Dinh-R00091
-Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com;
-linux at arm.linux.org.uk; s.hauer at pengutronix.de; eric at eukrea.com;
-u.kleine-koenig at pengutronix.de; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCHv5 1/3] ARM: imx: Add core definitions for MX53
+Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+Signed-off-by: George G. Davis <gdavis@mvista.com>
+---
+ arch/arm/mm/cache-v6.S |   40 ++++++++++++++++++++++++++--------------
+ 1 files changed, 26 insertions(+), 14 deletions(-)
 
- 
-
-Hi Dinh,
-
-> diff --git a/arch/arm/mach-mx5/crm_regs.h
-b/arch/arm/mach-mx5/crm_regs.h
-> index c776b9a..51ff9bb 100644
-> --- a/arch/arm/mach-mx5/crm_regs.h
-> +++ b/arch/arm/mach-mx5/crm_regs.h
-> @@ -18,6 +18,9 @@
->  #define MX51_CORTEXA8_BASE     MX51_IO_ADDRESS(MX51_ARM_BASE_ADDR)
->  #define MX51_GPC_BASE          MX51_IO_ADDRESS(MX51_GPC_BASE_ADDR)
->
-> +/*MX53*/
-> +#define MX53_DPLL4_BASE
-MX53_IO_ADDRESS(MX53_PLL3_BASE_ADDR)
-> +
->  /* PLL Register Offsets */
->  #define MXC_PLL_DP_CTL                 0x00
->  #define MXC_PLL_DP_CONFIG              0x04
-
-CCM and PLL base address are different between mx53 and mx51. Why do
-you both use mx51 base address?
-
-
-
-No worries, I have a patch ready for more ugly changes to the crm_regs.h
-which include the new CCM and PLL changes.
-
-
-Thanks
-Richard
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101124/a6e3dcff/attachment-0001.html>
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index 99fa688..622f8a1 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -203,25 +203,29 @@ ENTRY(v6_flush_kern_dcache_area)
+  *	- end     - virtual end address of region
+  */
+ v6_dma_inv_range:
+-	tst	r0, #D_CACHE_LINE_SIZE - 1
+-	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+-#ifdef HARVARD_CACHE
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D line
+-#else
+-	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
+-#endif
+ 	tst	r1, #D_CACHE_LINE_SIZE - 1
++#ifdef CONFIG_DMA_CACHE_RWFO
++	ldrneb	r2, [r1, #-1]			@ read for ownership
++	strneb	r2, [r1, #-1]			@ write for ownership
++#endif
+ 	bic	r1, r1, #D_CACHE_LINE_SIZE - 1
+ #ifdef HARVARD_CACHE
+ 	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D line
+ #else
+ 	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
+ #endif
+-1:
+ #ifdef CONFIG_DMA_CACHE_RWFO
+-	ldr	r2, [r0]			@ read for ownership
+-	str	r2, [r0]			@ write for ownership
++	ldrb	r2, [r0]			@ read for ownership
++	strb	r2, [r0]			@ write for ownership
++#endif
++	tst	r0, #D_CACHE_LINE_SIZE - 1
++	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
++#ifdef HARVARD_CACHE
++	mcrne	p15, 0, r0, c7, c10, 1		@ clean D line
++#else
++	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
+ #endif
++1:
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
+ #else
+@@ -229,6 +233,10 @@ v6_dma_inv_range:
+ #endif
+ 	add	r0, r0, #D_CACHE_LINE_SIZE
+ 	cmp	r0, r1
++#ifdef CONFIG_DMA_CACHE_RWFO
++	ldrlo	r2, [r0]			@ read for ownership
++	strlo	r2, [r0]			@ write for ownership
++#endif
+ 	blo	1b
+ 	mov	r0, #0
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
+@@ -263,12 +271,12 @@ v6_dma_clean_range:
+  *	- end     - virtual end address of region
+  */
+ ENTRY(v6_dma_flush_range)
+-	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+-1:
+ #ifdef CONFIG_DMA_CACHE_RWFO
+-	ldr	r2, [r0]			@ read for ownership
+-	str	r2, [r0]			@ write for ownership
++	ldrb	r2, [r0]		@ read for ownership
++	strb	r2, [r0]		@ write for ownership
+ #endif
++	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
++1:
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
+ #else
+@@ -276,6 +284,10 @@ ENTRY(v6_dma_flush_range)
+ #endif
+ 	add	r0, r0, #D_CACHE_LINE_SIZE
+ 	cmp	r0, r1
++#ifdef CONFIG_DMA_CACHE_RWFO
++	ldrlob	r2, [r0]			@ read for ownership
++	strlob	r2, [r0]			@ write for ownership
++#endif
+ 	blo	1b
+ 	mov	r0, #0
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
+-- 
+1.6.0.6
