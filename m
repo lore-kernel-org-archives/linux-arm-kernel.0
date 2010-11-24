@@ -1,269 +1,225 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 24 Nov 2010 09:52:30 -0500 (EST)
-Subject: [PATCH 8/8] ARM: pxa: add iwmmx support for PJ4
-In-Reply-To: <1290570865-7577-8-git-send-email-haojian.zhuang@marvell.com>
-References: <1290570865-7577-1-git-send-email-haojian.zhuang@marvell.com>
-	<1290570865-7577-2-git-send-email-haojian.zhuang@marvell.com>
-	<1290570865-7577-3-git-send-email-haojian.zhuang@marvell.com>
-	<1290570865-7577-4-git-send-email-haojian.zhuang@marvell.com>
-	<1290570865-7577-5-git-send-email-haojian.zhuang@marvell.com>
-	<1290570865-7577-6-git-send-email-haojian.zhuang@marvell.com>
-	<1290570865-7577-7-git-send-email-haojian.zhuang@marvell.com>
-	<1290570865-7577-8-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <alpine.LFD.2.00.1011240951540.9313@xanadu.home>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 24 Nov 2010 15:55:35 +0100
+Subject: [PATCH 1/7 v2] at91: Convert remaining boards to new-style UART
+	initialization
+In-Reply-To: <20101124143448.GH11909@game.jcrosoft.org>
+References: <20101124143448.GH11909@game.jcrosoft.org>
+Message-ID: <1290610541-29255-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Nov 2010, Haojian Zhuang wrote:
+Convert the following AT91RM9200-based boards to the new-style UART
+initialization:
+  - Ajeco 1ARM Single Board Computer
+  - Sperry-Sun KAFA board
+  - picotux 200
 
-> iwmmxt is used in XScale, XScale3, Mohawk and PJ4 core. But the instructions
-> of accessing CP0 and CP1 is changed in PJ4. Append more files to support
-> iwmmxt in PJ4 core.
-> 
-> Signed-off-by: Zhou Zhu <zzhu3@marvell.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
+Remove the deprecated at91_init_serial
 
-Acked-by: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Andrew Victor <linux@maxim.org.za>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91rm9200_devices.c |   45 -------------------------------
+ arch/arm/mach-at91/board-1arm.c         |   26 +++++++++---------
+ arch/arm/mach-at91/board-kafa.c         |   21 +++++---------
+ arch/arm/mach-at91/board-picotux200.c   |   23 +++++++---------
+ arch/arm/mach-at91/include/mach/board.h |    6 ----
+ 5 files changed, 31 insertions(+), 90 deletions(-)
 
-
-> ---
->  arch/arm/Kconfig          |    4 +-
->  arch/arm/kernel/Makefile  |    1 +
->  arch/arm/kernel/iwmmxt.S  |   55 ++++++++++++++++++++------
->  arch/arm/kernel/pj4-cp0.c |   94 +++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 139 insertions(+), 15 deletions(-)
->  create mode 100644 arch/arm/kernel/pj4-cp0.c
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a19a526..b0f25b0 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -999,8 +999,8 @@ source arch/arm/mm/Kconfig
->  
->  config IWMMXT
->  	bool "Enable iWMMXt support"
-> -	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK
-> -	default y if PXA27x || PXA3xx || ARCH_MMP
-> +	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
-> +	default y if PXA27x || PXA3xx || PXA95x || ARCH_MMP
->  	help
->  	  Enable support for iWMMXt context switching at run time if
->  	  running on a CPU that supports it.
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 5b9b268..b0f11fa 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -50,6 +50,7 @@ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
->  obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
->  obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
->  obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
-> +obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
->  obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
->  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
->  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
-> diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
-> index b63b528..7fa3bb0 100644
-> --- a/arch/arm/kernel/iwmmxt.S
-> +++ b/arch/arm/kernel/iwmmxt.S
-> @@ -19,6 +19,14 @@
->  #include <asm/thread_info.h>
->  #include <asm/asm-offsets.h>
->  
-> +#if defined(CONFIG_CPU_PJ4)
-> +#define PJ4(code...)		code
-> +#define XSC(code...)
-> +#else
-> +#define PJ4(code...)
-> +#define XSC(code...)		code
-> +#endif
-> +
->  #define MMX_WR0		 	(0x00)
->  #define MMX_WR1		 	(0x08)
->  #define MMX_WR2		 	(0x10)
-> @@ -58,11 +66,17 @@
->  
->  ENTRY(iwmmxt_task_enable)
->  
-> -	mrc	p15, 0, r2, c15, c1, 0
-> -	tst	r2, #0x3			@ CP0 and CP1 accessible?
-> +	XSC(mrc	p15, 0, r2, c15, c1, 0)
-> +	PJ4(mrc p15, 0, r2, c1, c0, 2)
-> +	@ CP0 and CP1 accessible?
-> +	XSC(tst	r2, #0x3)
-> +	PJ4(tst	r2, #0xf)
->  	movne	pc, lr				@ if so no business here
-> -	orr	r2, r2, #0x3			@ enable access to CP0 and CP1
-> -	mcr	p15, 0, r2, c15, c1, 0
-> +	@ enable access to CP0 and CP1
-> +	XSC(orr	r2, r2, #0x3)
-> +	XSC(mcr	p15, 0, r2, c15, c1, 0)
-> +	PJ4(orr	r2, r2, #0xf)
-> +	PJ4(mcr	p15, 0, r2, c1, c0, 2)
->  
->  	ldr	r3, =concan_owner
->  	add	r0, r10, #TI_IWMMXT_STATE	@ get task Concan save area
-> @@ -179,17 +193,26 @@ ENTRY(iwmmxt_task_disable)
->  	teqne	r1, r2				@ or specified one?
->  	bne	1f				@ no: quit
->  
-> -	mrc	p15, 0, r4, c15, c1, 0
-> -	orr	r4, r4, #0x3			@ enable access to CP0 and CP1
-> -	mcr	p15, 0, r4, c15, c1, 0
-> +	@ enable access to CP0 and CP1
-> +	XSC(mrc	p15, 0, r4, c15, c1, 0)
-> +	XSC(orr	r4, r4, #0xf)
-> +	XSC(mcr	p15, 0, r4, c15, c1, 0)
-> +	PJ4(mrc p15, 0, r4, c1, c0, 2)
-> +	PJ4(orr	r4, r4, #0x3)
-> +	PJ4(mcr	p15, 0, r4, c1, c0, 2)
-> +
->  	mov	r0, #0				@ nothing to load
->  	str	r0, [r3]			@ no more current owner
->  	mrc	p15, 0, r2, c2, c0, 0
->  	mov	r2, r2				@ cpwait
->  	bl	concan_save
->  
-> -	bic	r4, r4, #0x3			@ disable access to CP0 and CP1
-> -	mcr	p15, 0, r4, c15, c1, 0
-> +	@ disable access to CP0 and CP1
-> +	XSC(bic	r4, r4, #0x3)
-> +	XSC(mcr	p15, 0, r4, c15, c1, 0)
-> +	PJ4(bic	r4, r4, #0xf)
-> +	PJ4(mcr	p15, 0, r4, c1, c0, 2)
-> +
->  	mrc	p15, 0, r2, c2, c0, 0
->  	mov	r2, r2				@ cpwait
->  
-> @@ -277,8 +300,11 @@ ENTRY(iwmmxt_task_restore)
->   */
->  ENTRY(iwmmxt_task_switch)
->  
-> -	mrc	p15, 0, r1, c15, c1, 0
-> -	tst	r1, #0x3			@ CP0 and CP1 accessible?
-> +	XSC(mrc	p15, 0, r1, c15, c1, 0)
-> +	PJ4(mrc	p15, 0, r1, c1, c0, 2)
-> +	@ CP0 and CP1 accessible?
-> +	XSC(tst	r1, #0x3)
-> +	PJ4(tst	r1, #0xf)
->  	bne	1f				@ yes: block them for next task
->  
->  	ldr	r2, =concan_owner
-> @@ -287,8 +313,11 @@ ENTRY(iwmmxt_task_switch)
->  	teq	r2, r3				@ next task owns it?
->  	movne	pc, lr				@ no: leave Concan disabled
->  
-> -1:	eor	r1, r1, #3			@ flip Concan access
-> -	mcr	p15, 0, r1, c15, c1, 0
-> +1:	@ flip Conan access
-> +	XSC(eor	r1, r1, #0x3)
-> +	XSC(mcr	p15, 0, r1, c15, c1, 0)
-> +	PJ4(eor r1, r1, #0xf)
-> +	PJ4(mcr	p15, 0, r1, c1, c0, 2)
->  
->  	mrc	p15, 0, r1, c2, c0, 0
->  	sub	pc, lr, r1, lsr #32		@ cpwait and return
-> diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-> new file mode 100644
-> index 0000000..a4b1b07
-> --- /dev/null
-> +++ b/arch/arm/kernel/pj4-cp0.c
-> @@ -0,0 +1,94 @@
-> +/*
-> + * linux/arch/arm/kernel/pj4-cp0.c
-> + *
-> + * PJ4 iWMMXt coprocessor context switching and handling
-> + *
-> + * Copyright (c) 2010 Marvell International Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/signal.h>
-> +#include <linux/sched.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <asm/thread_notify.h>
-> +
-> +static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
-> +{
-> +	struct thread_info *thread = t;
-> +
-> +	switch (cmd) {
-> +	case THREAD_NOTIFY_FLUSH:
-> +		/*
-> +		 * flush_thread() zeroes thread->fpstate, so no need
-> +		 * to do anything here.
-> +		 *
-> +		 * FALLTHROUGH: Ensure we don't try to overwrite our newly
-> +		 * initialised state information on the first fault.
-> +		 */
-> +
-> +	case THREAD_NOTIFY_EXIT:
-> +		iwmmxt_task_release(thread);
-> +		break;
-> +
-> +	case THREAD_NOTIFY_SWITCH:
-> +		iwmmxt_task_switch(thread);
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block iwmmxt_notifier_block = {
-> +	.notifier_call	= iwmmxt_do,
-> +};
-> +
-> +
-> +static u32 __init pj4_cp_access_read(void)
-> +{
-> +	u32 value;
-> +
-> +	__asm__ __volatile__ (
-> +		"mrc	p15, 0, %0, c1, c0, 2\n\t"
-> +		: "=r" (value));
-> +	return value;
-> +}
-> +
-> +static void __init pj4_cp_access_write(u32 value)
-> +{
-> +	u32 temp;
-> +
-> +	__asm__ __volatile__ (
-> +		"mcr	p15, 0, %1, c1, c0, 2\n\t"
-> +		"mrc	p15, 0, %0, c1, c0, 2\n\t"
-> +		"mov	%0, %0\n\t"
-> +		"sub	pc, pc, #4\n\t"
-> +		: "=r" (temp) : "r" (value));
-> +}
-> +
-> +
-> +/*
-> + * Disable CP0/CP1 on boot, and let call_fpe() and the iWMMXt lazy
-> + * switch code handle iWMMXt context switching.
-> + */
-> +static int __init pj4_cp0_init(void)
-> +{
-> +	u32 cp_access;
-> +
-> +	cp_access = pj4_cp_access_read() & ~0xf;
-> +	pj4_cp_access_write(cp_access);
-> +
-> +	printk(KERN_INFO "PJ4 iWMMXt coprocessor enabled.\n");
-> +	elf_hwcap |= HWCAP_IWMMXT;
-> +	thread_register_notifier(&iwmmxt_notifier_block);
-> +
-> +	return 0;
-> +}
-> +
-> +late_initcall(pj4_cp0_init);
-> -- 
-> 1.5.6.5
-> 
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 9338825..7b53922 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -1106,51 +1106,6 @@ static inline void configure_usart3_pins(unsigned pins)
+ static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
+ struct platform_device *atmel_default_console_device;	/* the serial console device */
+ 
+-void __init __deprecated at91_init_serial(struct at91_uart_config *config)
+-{
+-	int i;
+-
+-	/* Fill in list of supported UARTs */
+-	for (i = 0; i < config->nr_tty; i++) {
+-		switch (config->tty_map[i]) {
+-			case 0:
+-				configure_usart0_pins(ATMEL_UART_CTS | ATMEL_UART_RTS);
+-				at91_uarts[i] = &at91rm9200_uart0_device;
+-				at91_clock_associate("usart0_clk", &at91rm9200_uart0_device.dev, "usart");
+-				break;
+-			case 1:
+-				configure_usart1_pins(ATMEL_UART_CTS | ATMEL_UART_RTS | ATMEL_UART_DSR | ATMEL_UART_DTR | ATMEL_UART_DCD | ATMEL_UART_RI);
+-				at91_uarts[i] = &at91rm9200_uart1_device;
+-				at91_clock_associate("usart1_clk", &at91rm9200_uart1_device.dev, "usart");
+-				break;
+-			case 2:
+-				configure_usart2_pins(0);
+-				at91_uarts[i] = &at91rm9200_uart2_device;
+-				at91_clock_associate("usart2_clk", &at91rm9200_uart2_device.dev, "usart");
+-				break;
+-			case 3:
+-				configure_usart3_pins(0);
+-				at91_uarts[i] = &at91rm9200_uart3_device;
+-				at91_clock_associate("usart3_clk", &at91rm9200_uart3_device.dev, "usart");
+-				break;
+-			case 4:
+-				configure_dbgu_pins();
+-				at91_uarts[i] = &at91rm9200_dbgu_device;
+-				at91_clock_associate("mck", &at91rm9200_dbgu_device.dev, "usart");
+-				break;
+-			default:
+-				continue;
+-		}
+-		at91_uarts[i]->id = i;		/* update ID number to mapped ID */
+-	}
+-
+-	/* Set serial console device */
+-	if (config->console_tty < ATMEL_MAX_UART)
+-		atmel_default_console_device = at91_uarts[config->console_tty];
+-	if (!atmel_default_console_device)
+-		printk(KERN_INFO "AT91: No default serial console defined.\n");
+-}
+-
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ {
+ 	struct platform_device *pdev;
+diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
+index 46bdc82..8a3fc84 100644
+--- a/arch/arm/mach-at91/board-1arm.c
++++ b/arch/arm/mach-at91/board-1arm.c
+@@ -39,24 +39,24 @@
+ #include "generic.h"
+ 
+ 
+-/*
+- * Serial port configuration.
+- *    0 .. 3 = USART0 .. USART3
+- *    4      = DBGU
+- */
+-static struct at91_uart_config __initdata onearm_uart_config = {
+-	.console_tty	= 0,				/* ttyS0 */
+-	.nr_tty		= 3,
+-	.tty_map	= { 4, 0, 1, -1, -1 },		/* ttyS0, ..., ttyS4 */
+-};
+-
+ static void __init onearm_map_io(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
+ 
+-	/* Setup the serial ports and console */
+-	at91_init_serial(&onearm_uart_config);
++	/* DBGU on ttyS0. (Rx & Tx only) */
++	at91_register_uart(0, 0, 0);
++
++	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
++	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
++
++	/* USART1 on ttyS2 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
++	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
++			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
++			   | ATMEL_UART_RI);
++
++	/* set serial console to ttyS0 (ie, DBGU) */
++	at91_set_serial_console(0);
+ }
+ 
+ static void __init onearm_init_irq(void)
+diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
+index c0ce79d..d2e1f4e 100644
+--- a/arch/arm/mach-at91/board-kafa.c
++++ b/arch/arm/mach-at91/board-kafa.c
+@@ -39,17 +39,6 @@
+ #include "generic.h"
+ 
+ 
+-/*
+- * Serial port configuration.
+- *    0 .. 3 = USART0 .. USART3
+- *    4      = DBGU
+- */
+-static struct at91_uart_config __initdata kafa_uart_config = {
+-	.console_tty	= 0,				/* ttyS0 */
+-	.nr_tty		= 2,
+-	.tty_map	= { 4, 0, -1, -1, -1 }		/* ttyS0, ..., ttyS4 */
+-};
+-
+ static void __init kafa_map_io(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+@@ -58,8 +47,14 @@ static void __init kafa_map_io(void)
+ 	/* Set up the LEDs */
+ 	at91_init_leds(AT91_PIN_PB4, AT91_PIN_PB4);
+ 
+-	/* Setup the serial ports and console */
+-	at91_init_serial(&kafa_uart_config);
++	/* DBGU on ttyS0. (Rx & Tx only) */
++	at91_register_uart(0, 0, 0);
++
++	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
++	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
++
++	/* set serial console to ttyS0 (ie, DBGU) */
++	at91_set_serial_console(0);
+ }
+ 
+ static void __init kafa_init_irq(void)
+diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
+index 9d833bb..ac1a3b5 100644
+--- a/arch/arm/mach-at91/board-picotux200.c
++++ b/arch/arm/mach-at91/board-picotux200.c
+@@ -43,24 +43,21 @@
+ #include "generic.h"
+ 
+ 
+-/*
+- * Serial port configuration.
+- *    0 .. 3 = USART0 .. USART3
+- *    4      = DBGU
+- */
+-static struct at91_uart_config __initdata picotux200_uart_config = {
+-	.console_tty	= 0,				/* ttyS0 */
+-	.nr_tty		= 2,
+-	.tty_map	= { 4, 1, -1, -1, -1 }		/* ttyS0, ..., ttyS4 */
+-};
+-
+ static void __init picotux200_map_io(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91rm9200_initialize(18432000, AT91RM9200_BGA);
+ 
+-	/* Setup the serial ports and console */
+-	at91_init_serial(&picotux200_uart_config);
++	/* DBGU on ttyS0. (Rx & Tx only) */
++	at91_register_uart(0, 0, 0);
++
++	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
++	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
++			  | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
++			  | ATMEL_UART_RI);
++
++	/* set serial console to ttyS0 (ie, DBGU) */
++	at91_set_serial_console(0);
+ }
+ 
+ static void __init picotux200_init_irq(void)
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index 58528aa..2b499eb 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -137,13 +137,7 @@ extern void __init at91_add_device_spi(struct spi_board_info *devices, int nr_de
+ extern void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins);
+ extern void __init at91_set_serial_console(unsigned portnr);
+ 
+-struct at91_uart_config {
+-	unsigned short	console_tty;	/* tty number of serial console */
+-	unsigned short	nr_tty;		/* number of serial tty's */
+-	short		tty_map[];	/* map UART to tty number */
+-};
+ extern struct platform_device *atmel_default_console_device;
+-extern void __init __deprecated at91_init_serial(struct at91_uart_config *config);
+ 
+ struct atmel_uart_data {
+ 	short			use_dma_tx;	/* use transmit DMA? */
+-- 
+1.7.1
