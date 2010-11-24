@@ -1,28 +1,29 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Nov 2010 15:43:46 +0000
-Subject: [PATCH 1/9] spi/pxa2xx: don't use subys initcall for driver init
-In-Reply-To: <AANLkTikC+XW7JtJO77vQL99=d9FKpO2tLtkCuxE57j7o@mail.gmail.com>
-References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
-	<1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
-	<AANLkTin4vh85XRkEd7YocCmKngViR_qZDe7z1b4JXyd-@mail.gmail.com>
-	<4CED1C95.8070300@linutronix.de>
-	<20101124141623.GH24970@rakim.wolfsonmicro.main>
-	<AANLkTikC+XW7JtJO77vQL99=d9FKpO2tLtkCuxE57j7o@mail.gmail.com>
-Message-ID: <20101124154346.GJ24970@rakim.wolfsonmicro.main>
+Date: Wed, 24 Nov 2010 15:53:03 +0000
+Subject: [PATCH] ARM: Samsung: Make sure ASoC DMA device is prototyped
+Message-ID: <1290613983-1291-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 24, 2010 at 08:30:37AM -0700, Grant Likely wrote:
+Ensure that the prototype agrees with the definition and stop sparse
+complaining when building the file.
 
-> It would be easy enough to defer cpufreq initialization based on some
-> platform defined criteria.  It's just an initcall.  However, I don't
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/plat-samsung/dev-asocdma.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Though it'd be much better to fix the thing where cpufreq doesn't have a
-device anyway.
-
-> know what the impact area is for subsystems that depend on cpufreq.
-> Are there drivers that depend on cpufreq before initialized?
-
-OMAP?  It'd be fairly surprising if something were to have a strict
-dependency, though - more likely to be notifiers I'd expect.  Usually
-cpufreq comes up fairly late.
+diff --git a/arch/arm/plat-samsung/dev-asocdma.c b/arch/arm/plat-samsung/dev-asocdma.c
+index b7b1fca..a068c4f 100644
+--- a/arch/arm/plat-samsung/dev-asocdma.c
++++ b/arch/arm/plat-samsung/dev-asocdma.c
+@@ -10,6 +10,7 @@
+ 
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <plat/devs.h>
+ 
+ static u64 audio_dmamask = DMA_BIT_MASK(32);
+ 
+-- 
+1.7.1
