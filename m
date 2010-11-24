@@ -1,36 +1,33 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 24 Nov 2010 15:55:36 +0100
-Subject: [PATCH 2/7 v2] at91rm9200dk: fix warning: 'dk_mmc_data' defined but
-	not used
+Date: Wed, 24 Nov 2010 15:55:41 +0100
+Subject: [PATCH 7/7] at91/board-yl-9200: fix typo in video support
 In-Reply-To: <20101124143448.GH11909@game.jcrosoft.org>
 References: <20101124143448.GH11909@game.jcrosoft.org>
-Message-ID: <1290610541-29255-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1290610541-29255-7-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+for the epson frambuffer support it's CONFIG_FB_S1D13XXX
+not CONFIG_FB_S1D135XX
+
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Signed-off-by: Andrew Victor <linux@maxim.org.za>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/board-dk.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-at91/board-yl-9200.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-dk.c b/arch/arm/mach-at91/board-dk.c
-index e14f0e1..16dfd0c 100644
---- a/arch/arm/mach-at91/board-dk.c
-+++ b/arch/arm/mach-at91/board-dk.c
-@@ -91,10 +91,12 @@ static struct at91_cf_data __initdata dk_cf_data = {
- 	// .vcc_pin	= ... always powered
- };
+diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
+index 89df00a..e0f0080 100644
+--- a/arch/arm/mach-at91/board-yl-9200.c
++++ b/arch/arm/mach-at91/board-yl-9200.c
+@@ -387,7 +387,7 @@ static struct spi_board_info yl9200_spi_devices[] = {
+  * EPSON S1D13806 FB (discontinued chip)
+  * EPSON S1D13506 FB
+  */
+-#if defined(CONFIG_FB_S1D135XX) || defined(CONFIG_FB_S1D13XXX_MODULE)
++#if defined(CONFIG_FB_S1D13XXX) || defined(CONFIG_FB_S1D13XXX_MODULE)
+ #include <video/s1d13xxxfb.h>
  
-+#ifndef CONFIG_MTD_AT91_DATAFLASH_CARD
- static struct at91_mmc_data __initdata dk_mmc_data = {
- 	.slot_b		= 0,
- 	.wire4		= 1,
- };
-+#endif
  
- static struct spi_board_info dk_spi_devices[] = {
- 	{	/* DataFlash chip */
 -- 
 1.7.1
