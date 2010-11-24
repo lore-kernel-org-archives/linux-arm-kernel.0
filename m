@@ -1,39 +1,29 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 24 Nov 2010 08:30:37 -0700
-Subject: [PATCH 1/9] spi/pxa2xx: don't use subys initcall for driver init
-In-Reply-To: <20101124141623.GH24970@rakim.wolfsonmicro.main>
-References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
-	<1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
-	<AANLkTin4vh85XRkEd7YocCmKngViR_qZDe7z1b4JXyd-@mail.gmail.com>
-	<4CED1C95.8070300@linutronix.de>
-	<20101124141623.GH24970@rakim.wolfsonmicro.main>
-Message-ID: <AANLkTikC+XW7JtJO77vQL99=d9FKpO2tLtkCuxE57j7o@mail.gmail.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Wed, 24 Nov 2010 16:31:07 +0100
+Subject: rm9200: update
+In-Reply-To: <20101124143448.GH11909@game.jcrosoft.org>
+References: <20101120095906.GD4216@game.jcrosoft.org>
+	<20101124143448.GH11909@game.jcrosoft.org>
+Message-ID: <4CED2FBB.8040702@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 24, 2010 at 7:16 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Nov 24, 2010 at 03:09:25PM +0100, Sebastian Andrzej Siewior wrote:
->
->> I've been pointed out to this commit but I don't understand _why_.
->> The part I don't get is "so it can be used with cpufreq". Is it
->> refered to a driver or the subsystem as it?
->
-> We need the regulators for the CPU rails to start before the cpufreq
-> driver starts so cpufreq can talk to them, and since the regulators may
-> be SPI attached this means we also need the SPI controller to start
-> before cpufreq. ?cpufreq starts at vanilla init time.
->
-> There's an approach being looked at for handling this for devices but
-> for deviceless stuff like cpufreq we've nothing.
+Hi Jean-Christophe,
 
-It would be easy enough to defer cpufreq initialization based on some
-platform defined criteria.  It's just an initcall.  However, I don't
-know what the impact area is for subsystems that depend on cpufreq.
-Are there drivers that depend on cpufreq before initialized?
+On 24/11/2010 15:34, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 	version 2
+>
+> 	replace
+> 	at91/picotux200: fix warning: 'picotux200_mmc_data' defined but not used
+> 	by
+> 	at91/picotux200: remove commenting usb device and dataflash support
+>
+> 	fix comments
+> 	and add
+> 	at91/board-yl-9200: fix typo in video support
+>
+as you seem to have access to several AT91RM9200 based boards, can you test 
+this patch on them : http://www.spinics.net/lists/arm-kernel/msg101658.html ?
 
-g.
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Thanks
+Eric
