@@ -1,46 +1,73 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 23 Nov 2010 19:00:02 -0600
-Subject: [PATCH] OMAP: ZOOM2: Change GPIO to enable LCD NEC NL8048HL11-01B on
-	OMAP34x-II MDP
-Message-ID: <1290560402-2507-1-git-send-email-omar.ramirez@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 24 Nov 2010 10:41:23 +0900
+Subject: [PATCH 1/4] FB: added a structure for CPU interface to linux/fb.h
+In-Reply-To: <4CEBE586.8010007@ru.mvista.com>
+References: <1290496504-4867-1-git-send-email-inki.dae@samsung.com>
+	<4CEBE586.8010007@ru.mvista.com>
+Message-ID: <001501cb8b78$b3c8aa80$1b59ff80$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yanick Saugy <yanick.saugy@heig-vd.ch>
+Hello.
 
-The PIN which controls LCD's reset signal (VGA_nRESET/h_GPIO_96) was not
-configured as a GPIO. We had to modify the OMAP MUX, and select this PIN
-(CAM_XCLKA) as an output GPIO (OMAP_MUX_MODE4). (kernel 2.6.35)
+Below is my comments
+Thank you.
 
-Be aware of changing this PIN will probably disable the camera, because
-it was previously configured as a camera clock.
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
+> Sent: Wednesday, November 24, 2010 1:02 AM
+> To: Inki Dae
+> Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> kyungmin.park at samsung.com; kgene.kim at samsung.com; akpm at linux-
+> foundation.org; lethal at linux-sh.org
+> Subject: Re: [PATCH 1/4] FB: added a structure for CPU interface to
+> linux/fb.h
+> 
+> Hello.
+> 
+> Inki Dae wrote:
+> 
+> > RGB or CPU interfaces could be used as display mode but framebuffer
+> > framework doesn't consider CPU interface so I added this structure
+> > because fb_cpumode structure could be used commonly.
+> 
+> > Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  include/linux/fb.h |   12 ++++++++++++
+> >  1 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> > diff --git a/include/linux/fb.h b/include/linux/fb.h
+> > index 7fca3dc..9b9842c 100644
+> > --- a/include/linux/fb.h
+> > +++ b/include/linux/fb.h
+> > @@ -1147,6 +1147,18 @@ struct fb_videomode {
+> >  	u32 flag;
+> >  };
+> >
+> > +struct fb_cpumode {
+> > +	const char *name;	/* optional */
+> > +	u32 refresh;		/* optional */
+> > +	u32 xres;
+> > +	u32 yres;
+> 
+>     I think that those two fields should happily fit into 'u16' type.
+> 
+I agree to your opinion, but I just followed existing struct fb_videomode.
+Do you or everybody have any idea for whether changing typef('u32' -> 'u16')
+or not?
+if it is more better to modify type then I will correct it.
 
-Signed-off-by: Yanick Saugy <yanick.saugy@heig-vd.ch>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
----
 
-I'm not sure if this patch was forgotten, hence resending. Without
-it, a blanks screen is seen on zoom2 board.
+> > +	u32 pixclock;
+> > +	u32 cs_setup;
+> > +	u32 wr_setup;
+> > +	u32 wr_act;
+> > +	u32 wr_hold;
+> 
+>     Suspecting the same about the above 4 fields...
+> 
 
-Original patch:
-http://patchwork.kernel.org/patch/196922/
+Same.
 
- arch/arm/mach-omap2/board-zoom2.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-zoom2.c b/arch/arm/mach-omap2/board-zoom2.c
-index 1cd6414..8fe578c 100644
---- a/arch/arm/mach-omap2/board-zoom2.c
-+++ b/arch/arm/mach-omap2/board-zoom2.c
-@@ -51,6 +51,8 @@ static struct omap_board_mux board_mux[] __initdata = {
- 	OMAP3_MUX(ETK_D4, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
- 	OMAP3_MUX(ETK_D5, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
- 	OMAP3_MUX(ETK_D6, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
-+	/* LCD Panel reset (PROD) - GPIO 96 */
-+	OMAP3_MUX(CAM_XCLKA, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
- #else
--- 
-1.7.1
+> WBR, Sergei
