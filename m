@@ -1,69 +1,40 @@
-From: darkstar6262@gmail.com (Cory Maccarrone)
-Date: Thu, 25 Nov 2010 08:23:59 -0700
-Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
-In-Reply-To: <20100930221111.GO3117@atomide.com>
-References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
-	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
-	<AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
-	<AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
-	<AANLkTikNLn-VuCQb2q7wZVbYORxV6uhia_oOBsQg3ZiJ@mail.gmail.com>
-	<20100924225254.GK4211@atomide.com>
-	<AANLkTinmfEYq9SRNRWY9xOkwS-FE_LDyBOeGLoyYLNtZ@mail.gmail.com>
-	<20100930184841.GL3117@atomide.com>
-	<AANLkTimsk+vbi15xz5bxJyQrF0yXF3i7Dn=TajjV3tkU@mail.gmail.com>
-	<20100930191535.GM3117@atomide.com> <20100930221111.GO3117@atomide.com>
-Message-ID: <AANLkTinBkwGSVR=YFu1pz4kTrn=d36xFYLxNpyOjpQuw@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 25 Nov 2010 10:37:16 -0500 (EST)
+Subject: [PATCH v2 2/3] ARM: cns3xxx: Add architecture definition for
+	EHCI/OHCI controller
+In-Reply-To: <20101125135614.GA22212@oksana.dev.rtsoft.ru>
+Message-ID: <Pine.LNX.4.44L0.1011251031220.22247-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/30 Tony Lindgren <tony@atomide.com>:
-> * Tony Lindgren <tony@atomide.com> [100930 12:07]:
->> * Micha? Miros?aw <mirqus@gmail.com> [100930 11:57]:
->> > 2010/9/30 Tony Lindgren <tony@atomide.com>:
->> > > * Cory Maccarrone <darkstar6262@gmail.com> [100930 11:34]:
->> > >> > Looks like also board-sx1-mmc.c and board-h[23]-mmc.c have the
->> > >> > same spotty voltage range.
->> > >> > Cory, care to do a patch that fixes it for all of them?
->> > >> Yeah, I can do that. ?I'll resubmit this patch too with the fixed up ranges.
->> > > Turns out I already did it :) Care to test/ack this one?
->> >
->> > [...]
->> > > diff --git a/arch/arm/mach-omap1/board-sx1-mmc.c b/arch/arm/mach-omap1/board-sx1-mmc.c
->> > > index 5b33ae8..be5a365 100644
->> > > --- a/arch/arm/mach-omap1/board-sx1-mmc.c
->> > > +++ b/arch/arm/mach-omap1/board-sx1-mmc.c
->> > > @@ -44,7 +44,8 @@ static struct omap_mmc_platform_data mmc1_data = {
->> > > ? ? ? ?.nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
->> > > ? ? ? ?.slots[0] ? ? ? = {
->> > > ? ? ? ? ? ? ? ?.set_power ? ? ? ? ? ? ?= mmc_set_power,
->> > > - ? ? ? ? ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_28_29 | MMC_VDD_30_31 |
->> > > + ? ? ? ? ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_28_29 | MMC_VDD_29_30 |
->> > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MMC_VDD_30_31 | MMC_VDD_31_32 |
->> > > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MMC_VDD_32_33 | MMC_VDD_33_34,
->> > > ? ? ? ? ? ? ? ?.name ? ? ? ? ? ? ? ? ? = "mmcblk",
->> > > ? ? ? ?},
->> > [...]
->> >
->> > Al least this one seems wrong (haven't checked others) as the
->> > mmc_set_power() ignores vdd parameter. This suggests that the board
->> > supports only one particular voltage, not the whole range.
->>
->> Hmm yeah good catch. With the external power it's board specific.
->
-> Most likely they all support only 3.3V cards except for n8x0. Not changing
-> the n8x0 for what voltages it handles although it may be missing the
-> MMC_VDD_27_28 voltage. Here's the updated patch.
->
-> Regards,
->
-> Tony
->
-> From: Tony Lindgren <tony@atomide.com>
-> Subject: [PATCH] omap: Fix spotty MMC voltages
-> ...
+On Thu, 25 Nov 2010, Anton Vorontsov wrote:
 
-Finally got around to testing this, and it indeed works perfectly for
-me.  I still get a bunch of weird CMD5 and CMD8 errors on init, but no
-ill effects were introduced by it, and the card works fine.
+> On Thu, Nov 25, 2010 at 09:51:23PM +0800, Lin Mac wrote:
+> > 2010/11/25 Anton Vorontsov <cbouatmailru@gmail.com>:
+> > > On Thu, Nov 25, 2010 at 03:25:38PM +0800, Lin Mac wrote:
+> > > [...]
+> > >> > ??#include <linux/module.h>
+> > >> > ??#include <linux/io.h>
+> > >> > ??#include <linux/delay.h>
+> > >> > +#include <asm/atomic.h>
+> > >> It's not necessary for mach/pm.h already included it, right?
+> > >
+> > > Technically, it's not necessary. But in Linux we don't rely on
+> > > headers including other headers.
 
-- Cory
+Just saw this.  Don't be ridiculous -- this happens all over the place.  
+People generally aren't aware of it, because it's next to impossible to
+verify that all the headers needed by a source file are included
+directly.
+
+In fact, there are many cases where it would be considered a _mistake_ 
+not to rely on a nested include.  For example, include/linux/spinlock.h 
+itself includes many other files which should not be included directly.
+
+> > >  Think that someday mach/pm.h
+> > > may not include asm/atomic.h, so the build will break.
+
+Then whoever breaks the build by changing the header file will be
+obliged to fix it.
+
+Alan Stern
