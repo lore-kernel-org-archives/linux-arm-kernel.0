@@ -1,53 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 25 Nov 2010 13:17:09 +0100
-Subject: [PATCH 1/1] arm: imx: share imx5x_register_gpios for mach-mx5
-In-Reply-To: <AANLkTimy3qV+ZXs9urdTX2rq=0XrKEtbt2m8x+eBvMce@mail.gmail.com>
-References: <1290695312-30031-1-git-send-email-linuxzsc@gmail.com>
-	<20101125062924.GD4693@pengutronix.de>
-	<AANLkTimvcAS3BmjtaYCMzHcv=q2znS2zy_Dto_OMJeWh@mail.gmail.com>
-	<20101125074244.GE4693@pengutronix.de>
-	<AANLkTikZkXRmddSYN0-7eSBKO_BpXbz+xuJRhDfKeU02@mail.gmail.com>
-	<20101125081406.GG4693@pengutronix.de>
-	<20101125084302.GN6017@pengutronix.de>
-	<AANLkTimy3qV+ZXs9urdTX2rq=0XrKEtbt2m8x+eBvMce@mail.gmail.com>
-Message-ID: <20101125121709.GH4693@pengutronix.de>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 25 Nov 2010 13:24:39 +0100
+Subject: [PATCH 6/7] i2c/pxa2xx: reset the chip if the bus is not free
+In-Reply-To: <4CEE05A4.6030201@compulab.co.il>
+References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>	<1290633617-15311-7-git-send-email-bigeasy@linutronix.de>	<AANLkTikvN+==eTkoh7CTQyN0mbfvPhH6Uh9NX5QW7WFx@mail.gmail.com>
+	<AANLkTi=8Xy3M7QGO54nt_r0_12z3+o8G5fAqQmxkTH4o@mail.gmail.com>
+	<4CEE05A4.6030201@compulab.co.il>
+Message-ID: <4CEE5587.90109@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Igor Grinberg wrote:
+>  Hi,
+Hi,
 
-On Thu, Nov 25, 2010 at 07:10:27PM +0800, Richard Zhao wrote:
-> Thanks. I go through the code again. Here is mx50 adding plan:
-> 1. basic memory map definitions
-> Add it in individual arch/arm/plat-mxc/include/mach/mx50.h
-I hope the memory map itself goes into arch/arm/mach-mx5/mm-mx50.c or
-similar.  The constants go into include/mach/mx50.h though.
+>>> Even you reset I2C controller, it shouldn't help you since bus isn't
+>>> free. I thinkt that you should reset I2C bus before you reseting I2C
+>>> controller.
 
-> 2. clock.c crm_regs.h
-> clock tree is different. mx50 use arch/arm/mach-mx5/clock-mx50.c.
-> Possibly individual crm_regs.h too.
-Then please use proper prefixes (and maybe make the definitions local to
-a .c file if possible).
-> 3. iomux
-> individual arch/arm/plat-mxc/include/mach/iomux-mx50.h
-is mx50 using iomux-v3?
+According to the register, IBB (bus busy) is cleared at this point. The
+only remaining flag is UB (unit busy) and RW mode.
 
-> 4. gpio
-> Add it in arch/arm/plat-mxc/gpio.c under macro CONFIG_SOC_IMX50.
-yes
+>> Excuse me that my previous comments are for PXA master mode.
+I am in master mode.
 
-> 5. irq
-> Add it in individual arch/arm/plat-mxc/include/mach/mx50.h
-yes, the constants go there
+>> I think that you're focused on pxa working on slave mode. But if pxa
+>> is working in master mode, it seems that we needn't reset I2C
+>> controller since it doesn't help.
+> 
+> As for PXA3xx, the Developer Manual states:
+> "Software must ensure that the TWSI unit is not busy (ISR[UB] = 0)
+> before it asserts a reset. Software must also ensure that the TWSI bus is idle (ISR[IBB] = 0)
+> when the unit is enabled after reset."
 
-> 6. device and resource.
-> Dynamicly add device. SoC level data is in arch/arm/plat-mxc/devices
-> init section, plat data is in board level file.
-most of the time yes.
+My manual says more or less the same thing. It says "unit not busy" but
+quotes the IBB bit in braces. It is probably a typo.
+The register say: ISR=00000005, ICR=000017e0, IBMR=01
+So according to this I am not allowed to reset the I2C unit while it is
+busy.
 
-Best regards
-Uwe
+I tracked it down to the following: i2cdetect tries to read a byte from
+address 47. This fails because there is no device. Then it goes for 48
+which returns 0 (there is a device). The following read always fails. So I
+guess the device at 48 is still sending data. What is general rule of
+thumb in such a case?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>>From my experience, in master mode resetting the controller
+> does not help and if the bus is busy for too much time,
+> there always was a h/w problem involved.
+
+Looks like it.
+
+Sebastian
