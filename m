@@ -1,50 +1,92 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 25 Nov 2010 08:40:27 +0200
-Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
-In-Reply-To: <536589.12568.qm@web180310.mail.gq1.yahoo.com>
-References: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
-	<536589.12568.qm@web180310.mail.gq1.yahoo.com>
-Message-ID: <AANLkTinQdNC0XaOqNyDbdYE6ZcP0QyzpN492j=Kovuea@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 25 Nov 2010 08:43:48 +0200
+Subject: [PATCH 6/7] i2c/pxa2xx: reset the chip if the bus is not free
+In-Reply-To: <AANLkTi=8Xy3M7QGO54nt_r0_12z3+o8G5fAqQmxkTH4o@mail.gmail.com>
+References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>	<1290633617-15311-7-git-send-email-bigeasy@linutronix.de>	<AANLkTikvN+==eTkoh7CTQyN0mbfvPhH6Uh9NX5QW7WFx@mail.gmail.com>
+	<AANLkTi=8Xy3M7QGO54nt_r0_12z3+o8G5fAqQmxkTH4o@mail.gmail.com>
+Message-ID: <4CEE05A4.6030201@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 5:59 AM, David Brownell <david-b@pacbell.net> wrote:
-> My rule of thumb is that nothing is "generic"
-> until at least three whatever-it-is instances
-> plug in to it. ?Sometimes this is called
-> the "Rule of Three".
+ Hi,
+
+On 11/25/10 04:49, Haojian Zhuang wrote:
+> On Thu, Nov 25, 2010 at 10:30 AM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On Thu, Nov 25, 2010 at 5:20 AM, Sebastian Andrzej Siewior
+>> <bigeasy@linutronix.de> wrote:
+>>> I haven't seen this (yet) during a normal transfer but starting
+>>> i2cdetect seems to hang the bus. On my Sodaville board, i2cdetect runs
+>>> fine on bus zero and runs into timeouts on bus one and two. The chip
+>>> never recovers from this condition. The following transfers hang as
+>>> well. The ISR_UB never disappears.
+>>> Issuing a chip reset fixes the timeout and following transfer succeed.
+>>>
+>>> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+>>> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
+>>> ---
+>>>  drivers/i2c/busses/i2c-pxa.c |   35 +++++++++++++++++++----------------
+>>>  1 files changed, 19 insertions(+), 16 deletions(-)
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+>>> index bd4b885..1a48470 100644
+>>> --- a/drivers/i2c/busses/i2c-pxa.c
+>>> +++ b/drivers/i2c/busses/i2c-pxa.c
+>>> @@ -257,23 +257,7 @@ static void i2c_pxa_abort(struct pxa_i2c *i2c)
+>>>               _ICR(i2c));
+>>>  }
+>>>
+>>> -static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
+>>> -{
+>>> -       int timeout = DEF_TIMEOUT;
+>>>
+>>> -       while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
+>>> -               if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
+>>> -                       timeout += 4;
+>>> -
+>>> -               msleep(2);
+>>> -               show_state(i2c);
+>>> -       }
+>>> -
+>>> -       if (timeout < 0)
+>>> -               show_state(i2c);
+>>> -
+>>> -       return timeout < 0 ? I2C_RETRY : 0;
+>>> -}
+>>>
+>>>  static int i2c_pxa_wait_master(struct pxa_i2c *i2c)
+>>>  {
+>>> @@ -425,6 +409,25 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+>>>        udelay(100);
+>>>  }
+>>>
+>>> +static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
+>>> +{
+>>> +       int timeout = DEF_TIMEOUT;
+>>> +
+>>> +       while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
+>>> +               if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
+>>> +                       timeout += 4;
+>>> +
+>>> +               msleep(2);
+>>> +               show_state(i2c);
+>>> +       }
+>>> +
+>>> +       if (timeout < 0) {
+>>> +               show_state(i2c);
+>>> +               i2c_pxa_reset(i2c);
+>>> +       }
+>> Even you reset I2C controller, it shouldn't help you since bus isn't
+>> free. I thinkt that you should reset I2C bus before you reseting I2C
+>> controller.
+>>
+> Excuse me that my previous comments are for PXA master mode.
 >
-> Other than OMAP, what's providing hardware
-> spinlocks that plug into this framework?
+> I think that you're focused on pxa working on slave mode. But if pxa
+> is working in master mode, it seems that we needn't reset I2C
+> controller since it doesn't help.
 
-We are not aware of any.
-
-That's why the first iteration was just an omap-specific misc driver.
-
-But we were asked not to pollute device drivers with omap-specific
-interfaces (see the discussion on [1]). I think it's a good goal (it
-will keep the IPC drivers that will come from TI platform-agnostic),
-so we split the driver into a generic interface plus small
-omap-specific implementation.
-
-This way platforms [2] can easily plug into the framework anything
-they need to achieve multi-core synchronization. E.g., even in case a
-platform doesn't have dedicated silicon, but still need this
-functionality, it can still plug in an implementation which is based
-on Peterson's shared memory mutual exclusion algorithm (see
-http://en.wikipedia.org/wiki/Peterson's_algorithm).
-
-The third alternative is to have this driver completely hidden inside
-the omap folders and deliver pdata func pointer to drivers that use
-it. I am not fond of this, since the driver really only have a tiny
-omap-specific part, and most of it should really sit in drivers/. In
-addition, it will probably kill the chance of others using it too.
-
-[1] http://lkml.org/lkml/2010/10/22/317
-[2] this is mainly aimed at non-coherent heterogeneous processors that
-do not support fancy synchronization primitives
-
->
-> - Dave
->
->
+As for PXA3xx, the Developer Manual states:
+"Software must ensure that the TWSI unit is not busy (ISR[UB] = 0)
+before it asserts a reset. Software must also ensure that the TWSI bus is idle (ISR[IBB] = 0)
+when the unit is enabled after reset."
