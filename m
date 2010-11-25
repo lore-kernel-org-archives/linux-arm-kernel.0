@@ -1,66 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Nov 2010 09:43:02 +0100
-Subject: [PATCH 1/1] arm: imx: share imx5x_register_gpios for mach-mx5
-In-Reply-To: <20101125081406.GG4693@pengutronix.de>
-References: <1290695312-30031-1-git-send-email-linuxzsc@gmail.com>
-	<20101125062924.GD4693@pengutronix.de>
-	<AANLkTimvcAS3BmjtaYCMzHcv=q2znS2zy_Dto_OMJeWh@mail.gmail.com>
-	<20101125074244.GE4693@pengutronix.de>
-	<AANLkTikZkXRmddSYN0-7eSBKO_BpXbz+xuJRhDfKeU02@mail.gmail.com>
-	<20101125081406.GG4693@pengutronix.de>
-Message-ID: <20101125084302.GN6017@pengutronix.de>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 25 Nov 2010 10:51:36 +0200
+Subject: [PATCH v2] Add call to non-crashing cores through IPI
+In-Reply-To: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
+References: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
+Message-ID: <20101125085136.GM14080@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 09:14:06AM +0100, Uwe Kleine-K?nig wrote:
-> On Thu, Nov 25, 2010 at 04:01:04PM +0800, Richard Zhao wrote:
-> > 2010/11/25 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > > Hey Richard,
-> > >
-> > > On Thu, Nov 25, 2010 at 02:44:48PM +0800, Richard Zhao wrote:
-> > >> > IMO the machine files shouldn't need to know how many gpio banks are
-> > >> > available. ?This is a per-SoC thing and so should be set in a SoC function.
-> > >> But we don't have SoC level device file.
-> > > Check how I did it for imx{1,21,27,25} in arch/arm/plat-mxc/gpio.c.
-> > I considered put it there too. but we can not add new defconfig, and
-> > even can not create new items in Kconfig. So we can not use ifdefs.
-> Why not add new Kconfig symbols?  Up to now I was unfettered by scruples
-> adding new ones.
+On Wed, Nov 24, 2010 at 09:28:28AM +0100, Per Fransson wrote:
+> v2 changes:
+> * the interrupts of the calling core are no longer disabled
+>   before performing the IPI
+
+This version information should go after the commit message below
+the '---' line.
+
+> ---
 > 
-> > And per my understanding, mx5x is going to use one zImage, correct?
-> It should be possible to have a single image for more than one SoC, yes.
+> When kexec is used to start a crash kernel the other cores
+> are notified. These non-crashing cores will save their state
+> in the crash notes and then do nothing.
 > 
-> > >> > How do you want to continue this change? ?mx51 and mx53 have the same
-> > >> > number of ports? ?Does mx50 have more or less? ?The addresses are the
-> > >> > same?
-> > >> mx53 and mx50 have similar memory map. but mx51 is different. ?Sorry,
-> > >> I forgot upstream version IO_ADDR can not handler differnt SoC base
-> > >> addr offset.
-> > > It might even work in this case, still I prefer a more explicit way.
-> > >
-> > >> ? ? ? ? ? ? ?It can not be shared with mx51, but it can be shared with
-> > >> mx50/53, correct? May plan is mx53/50 share
-> > >> arch/arm/plat-mxc/include/mach/mx5x.h file.
-> > > mx5x.h is for mx50 and mx53 but not mx51? ?No please.
-> > For memory map, mx51 is a special case. From mx53 on , IC tuned memory
-> > map to support large memory.
-> > If we use things like mx53-50.h, symbols is hard to define.
-> > MX53_50_XXX_XXX is wired. Any possibly, we need to add new SoC with
-> > similar memory map in the future.
-> I still think defining symbols for a single SoC is fine most of the
-> time.
+> Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
 
-+1
+I tested this on UP machine (I don't have access to any SMP hardware) -
+it didn't break anything and the crashdump works perfectly.
 
-MX2X was confusing when the i.MX25 came out and we won't start *any*
-MX5X things when we already know that it's wrong. Go with MX51_ MX53_
-MX50_ or whatever the SoC of the day is. Putting things together to
-share the code is done in the upper layers, *not* the register defines.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+MW
