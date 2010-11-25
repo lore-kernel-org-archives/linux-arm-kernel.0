@@ -1,62 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 25 Nov 2010 16:15:08 +0900
-Subject: [PATCH] ARM: s3x24xx: Fix gpiochip_add complaining.
-In-Reply-To: <201011191253.58812.anarsoul@gmail.com>
-References: <1290158139-16105-1-git-send-email-marek.belisko@open-nandra.com>
-	<201011191123.22255.anarsoul@gmail.com> <4CE6547A.9070309@metafoo.de>
-	<201011191253.58812.anarsoul@gmail.com>
-Message-ID: <00b201cb8c70$7ff96e30$7fec4a90$%kim@samsung.com>
+From: jimmy.rubin@stericsson.com (Jimmy RUBIN)
+Date: Thu, 25 Nov 2010 08:16:38 +0100
+Subject: [PATCH 07/10] MCDE: Add display subsystem framework
+In-Reply-To: <201011121738.53536.arnd@arndb.de>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-7-git-send-email-jimmy.rubin@stericsson.com>
+	<1289390653-6111-8-git-send-email-jimmy.rubin@stericsson.com>
+	<201011121738.53536.arnd@arndb.de>
+Message-ID: <F45880696056844FA6A73F415B568C695365D85C41@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily Khoruzhick wrote:
+Hi,
+
+> > +struct kobj_type ovly_type = {
+> > +	.release = overlay_release,
+> > +};
 > 
-> On Friday 19 November 2010 12:42:02 Lars-Peter Clausen wrote:
-> > Hi
-> >
-Hi all,
-
-> > Well it actually causes problems on systems with external gpio
-expanders,
-> > because now the additional banks will take up the space which was meant
-> > for the gpio expander chip and peripherals connected to it wont be
-> > accessible.
+> You certainly should not define a new kobj_type for use in a device
+> driver.
+> This is an internal data structure of the linux core code. It might
+> make
+> sense if you were trying to become the new frame buffer layer
+> maintainer
+> and rewrite all the existing drivers to be based on the concept of
+> overlays, but even then there is probably a better way.
 > 
-> Ok, but it would be nice to see some runtime soc-type detection for
-gpiolib.
-
-Yeah, I agree. We need to check SoC type for it during booting...
-
-> s3c2410/s3c2440/s3c2442 doesn't differ too much (actually, they're same in
-> gpiopart, s3c2410 lacks some gpiobanks that s3c244[0,2] have, and
-difference
-> in pull-up/pull-down on s3c2440 and s3c2442).
-> I think it's not good to make artificial restrictions for building single
-> binary kernel for these socs.
+> Maybe you were thinking of using kref instead of kobj?
 > 
-> > I sent a patch[1] about this some time ago, but I guess it was never
-> > applied...
 
-Maybe you missed my e-mail...or..I missed?...anyway...
-Could you please re-send it so that can get the patch via e-mail?
+Good point, I looked at kref and that is what we want to do.
 
+> > +int __init mcde_dss_init(void)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +void mcde_dss_exit(void)
+> > +{
+> > +}
 > 
-> Try pinging Ben or Kukjin :)
+> If they don't do anything, don't define them.
 > 
-Thanks...
+Agree, will remove them
 
-Basically, I'd like to keep single binary for S3C24XX, maybe Ben also agree
-with this. But also there is some side effects, i.e., according to
-mach-s3c2410/Makefile.boot, zreladdr is different. But only selected
-0x30108000 as zreladdr when build time because selected CONFIG_PM_H1940 with
-s3c2410_defconfig if there is no changes kernel configuration. This is just
-simple example. Maybe There are many similar examples.
-
-Hmm...anyway, we need to sort it out with keeping S3C24XX single binary.
-Will think some method for this...
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+/Jimmy
