@@ -1,134 +1,94 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 25 Nov 2010 15:04:42 +0800
-Subject: [PATCH 6/7] i2c/pxa2xx: reset the chip if the bus is not free
-In-Reply-To: <4CEE05A4.6030201@compulab.co.il>
-References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>
-	<1290633617-15311-7-git-send-email-bigeasy@linutronix.de>
-	<AANLkTikvN+==eTkoh7CTQyN0mbfvPhH6Uh9NX5QW7WFx@mail.gmail.com>
-	<AANLkTi=8Xy3M7QGO54nt_r0_12z3+o8G5fAqQmxkTH4o@mail.gmail.com>
-	<4CEE05A4.6030201@compulab.co.il>
-Message-ID: <AANLkTi=1CkW=uw8i53kQX8j1Lp5y-cPb72VrYkcTynJ2@mail.gmail.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 25 Nov 2010 12:34:49 +0530
+Subject: [PATCH v4 2/5] OMAP: mailbox: fix rx interrupt disable in omap4
+In-Reply-To: <AANLkTimzufujCiF6focs1KLCgsDYpr9v9_9w1Hj=3aet@mail.gmail.com>
+References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
+	<1290547617-16640-3-git-send-email-h-kanigeri2@ti.com>
+	<AANLkTimNW8ixBPyuwckZYnijXmT+t-XSY37xMUVvubLB@mail.gmail.com>
+	<20101124082245.GF2468@legolas.emea.dhcp.ti.com>
+	<AANLkTimevr4qgRZQW+DOEBND15VxA0MjkW3pkwND92JL@mail.gmail.com>
+	<AANLkTimzufujCiF6focs1KLCgsDYpr9v9_9w1Hj=3aet@mail.gmail.com>
+Message-ID: <AANLkTi=5YHOU9jdxagygijx8xzaR38eTPDXnC-=M_Wb4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 2:43 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> ?Hi,
->
-> On 11/25/10 04:49, Haojian Zhuang wrote:
->> On Thu, Nov 25, 2010 at 10:30 AM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->>> On Thu, Nov 25, 2010 at 5:20 AM, Sebastian Andrzej Siewior
->>> <bigeasy@linutronix.de> wrote:
->>>> I haven't seen this (yet) during a normal transfer but starting
->>>> i2cdetect seems to hang the bus. On my Sodaville board, i2cdetect runs
->>>> fine on bus zero and runs into timeouts on bus one and two. The chip
->>>> never recovers from this condition. The following transfers hang as
->>>> well. The ISR_UB never disappears.
->>>> Issuing a chip reset fixes the timeout and following transfer succeed.
+Hari,
+
+On Wed, Nov 24, 2010 at 18:31, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
+> On Wed, Nov 24, 2010 at 2:50 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
+>> On Wed, Nov 24, 2010 at 13:52, Felipe Balbi <balbi@ti.com> wrote:
+>>> On Wed, Nov 24, 2010 at 10:46:04AM +0530, Varadarajan, Charulatha wrote:
+>>>>>
+>>>>> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+>>>>> index 48e161c..a1c6bd9 100644
+>>>>> --- a/arch/arm/plat-omap/mailbox.c
+>>>>> +++ b/arch/arm/plat-omap/mailbox.c
+>>>>> @@ -358,6 +358,10 @@ int omap_mbox_register(struct device *parent, struct
+>>>>> omap_mbox **list)
+>>>>> ? ? ? ? ? ? ? ? ? ? ? ?ret = PTR_ERR(mbox->dev);
+>>>>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_out;
+>>>>> ? ? ? ? ? ? ? ?}
+>>>>> + ? ? ? ? ? ? ? if (cpu_is_omap44xx())
 >>>>
->>>> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->>>> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
->>>> ---
->>>> ?drivers/i2c/busses/i2c-pxa.c | ? 35 +++++++++++++++++++----------------
->>>> ?1 files changed, 19 insertions(+), 16 deletions(-)
->>>>
->>>> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
->>>> index bd4b885..1a48470 100644
->>>> --- a/drivers/i2c/busses/i2c-pxa.c
->>>> +++ b/drivers/i2c/busses/i2c-pxa.c
->>>> @@ -257,23 +257,7 @@ static void i2c_pxa_abort(struct pxa_i2c *i2c)
->>>> ? ? ? ? ? ? ? _ICR(i2c));
->>>> ?}
->>>>
->>>> -static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
->>>> -{
->>>> - ? ? ? int timeout = DEF_TIMEOUT;
->>>>
->>>> - ? ? ? while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
->>>> - ? ? ? ? ? ? ? if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
->>>> - ? ? ? ? ? ? ? ? ? ? ? timeout += 4;
->>>> -
->>>> - ? ? ? ? ? ? ? msleep(2);
->>>> - ? ? ? ? ? ? ? show_state(i2c);
->>>> - ? ? ? }
->>>> -
->>>> - ? ? ? if (timeout < 0)
->>>> - ? ? ? ? ? ? ? show_state(i2c);
->>>> -
->>>> - ? ? ? return timeout < 0 ? I2C_RETRY : 0;
->>>> -}
->>>>
->>>> ?static int i2c_pxa_wait_master(struct pxa_i2c *i2c)
->>>> ?{
->>>> @@ -425,6 +409,25 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->>>> ? ? ? ?udelay(100);
->>>> ?}
->>>>
->>>> +static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
->>>> +{
->>>> + ? ? ? int timeout = DEF_TIMEOUT;
->>>> +
->>>> + ? ? ? while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
->>>> + ? ? ? ? ? ? ? if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
->>>> + ? ? ? ? ? ? ? ? ? ? ? timeout += 4;
->>>> +
->>>> + ? ? ? ? ? ? ? msleep(2);
->>>> + ? ? ? ? ? ? ? show_state(i2c);
->>>> + ? ? ? }
->>>> +
->>>> + ? ? ? if (timeout < 0) {
->>>> + ? ? ? ? ? ? ? show_state(i2c);
->>>> + ? ? ? ? ? ? ? i2c_pxa_reset(i2c);
->>>> + ? ? ? }
->>> Even you reset I2C controller, it shouldn't help you since bus isn't
->>> free. I thinkt that you should reset I2C bus before you reseting I2C
->>> controller.
+>>>> Do not use cpu_is* checks in plat-omap/*
 >>>
->> Excuse me that my previous comments are for PXA master mode.
+>>> see the previous thread.
 >>
->> I think that you're focused on pxa working on slave mode. But if pxa
->> is working in master mode, it seems that we needn't reset I2C
->> controller since it doesn't help.
->
-> As for PXA3xx, the Developer Manual states:
-> "Software must ensure that the TWSI unit is not busy (ISR[UB] = 0)
-> before it asserts a reset. Software must also ensure that the TWSI bus is idle (ISR[IBB] = 0)
-> when the unit is enabled after reset."
->
-> From my experience, in master mode resetting the controller
-> does not help and if the bus is busy for too much time,
-> there always was a h/w problem involved.
->
-
-Yes, it's true. Actually there's some not smart firmware on some I2C
-client devices that they may fetch wrong data as slave address and
-command. There're two solutions for this bus busy issue. One is _not_
-using this kind of client device. The other one is sending enough dump
-clock to push these client device back to idle state.
-
->>>> +
->>>> + ? ? ? return timeout < 0 ? I2C_RETRY : 0;
->>>> +}
->>>>
->>>> ?#ifdef CONFIG_I2C_PXA_SLAVE
->>>> ?/*
->>>> --
->>>> 1.7.3.2
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> Referring to [1], I do not find why cpu_is* checks is used in plat-omap and
+>> why it can't be avoided.
+>>
+>> In [1], it was suggested to create the pdata field that will be
+>> populated at init
+>> time using the cpu_is* check. But in this version, I am finding that
+>> this is done
+>> in plat-omap. This can be handled in mach-omap layer itself and can be passed
+>> as a pdata field which can be extracted during probe.
+>>
+>> [1] https://patchwork.kernel.org/patch/337131/
 >>
 >
-> --
-> Regards,
-> Igor.
+> Here are these ?reasons why I did this way.
 >
+> - The function omap_mbox_register is called only once during probe
+> time, and I thought it was ok to call cpu check once during probe
+> time.
+
+AFAIK it is not okay. Patches are not accepted by maintainers if cpu_is*
+checks are newly added in plat-omap/*
+Moreover, the plat-omap is for common code between omap1 and omap2+
+If any specific info is required due to unavoidable reasons, they should be
+managed using pdata fld/ by some other means.
+
+> Since each mbox instance needs to be aware of the rev field this
+> was the right place to add since this function iterates through the
+> list during probe time. There are already calls to cpu_is_omap44xx in
+> mailbox probe function.
+
+Infact , there are some more drivers like that. But some of them are getting
+cleaned up slowly (work under progress). But old code having cpu_is* checks
+does not justify adding a new cpu_is* check. As I mentioned, it is repeatedly
+being insisted in LO mailing list to avoid cpu_is* checks in plat-omap and to
+clean up the drivers to avoid these checks.
+
+>
+> - platform data is not present for mailbox module. I could add it for
+> revision sake but I would prefer not to do that since this will be a
+> throw away code once the hwmod infrastructure is ready (note: mailbox
+> hwmod patches are under review), and amount of mailbox driver rework
+> might be considerable.
+
+I would leave this to Tony/ Felipe/ Benoit to decide on this. If agreed, I don't
+see any issue. But there should be atleast a "TODO" mentioning that this
+needs to be cleaned up.
+
+>
+> - I could wait till the hwmod patches are ready to include this
+> change, but don't want to put the dependency with hwmod since this is
+> a critical fix and want to make it available in the mainline kernel.
+>
+> Please let me know what you suggest.
+>
+> Thank you,
+> Best regards,
+> Hari Kanigeri
 >
