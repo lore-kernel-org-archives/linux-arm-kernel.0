@@ -1,42 +1,72 @@
-From: gregkh@suse.de (Greg KH)
-Date: Thu, 25 Nov 2010 09:15:41 -0800
-Subject: [PATCH v3 1/1] USB: cns3xxx: Add EHCI and OHCI bus glue for
-	cns3xxx SOCs
-In-Reply-To: <20101125162158.GB2580@oksana.dev.rtsoft.ru>
-References: <1290700680-20066-1-git-send-email-mkl0301@gmail.com>
-	<20101125162158.GB2580@oksana.dev.rtsoft.ru>
-Message-ID: <20101125171541.GA18152@suse.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 25 Nov 2010 10:35:17 -0700 (MST)
+Subject: OMAP2+: PM/serial: hold console semaphore while OMAP UARTs are
+	disabled
+In-Reply-To: <AANLkTina+O1GgMgS0qDKix=d4HOtT1fFrCotTuCCxACv@mail.gmail.com>
+References: <alpine.DEB.2.00.1011241646310.20215@utopia.booyaka.com>
+	<AANLkTina+O1GgMgS0qDKix=d4HOtT1fFrCotTuCCxACv@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1011251017390.20215@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 07:21:58PM +0300, Anton Vorontsov wrote:
-> On Thu, Nov 25, 2010 at 11:58:00PM +0800, mkl0301 at gmail.com wrote:
-> > From: Mac Lin <mkl0301@gmail.com>
-> > 
-> > The CNS3XXX SOC has include USB EHCI and OHCI compatible controllers. This
-> > patch adds the necessary glue logic to allow ehci-hcd and ohci-hcd drivers to
-> > work on CNS3XXX
-> > 
-> > The EHCI and OHCI controllers share a common clock control and reset bit,
-> > therefore additional check for the timming of enabling and disabling is
-> > required. The USB bit of PLL Power Down Control is also shared by OTG, 24MHz
-> > UART clock, Crypto clock, PCIe reference clock, and Clock Scale Generator.
-> > Therefore we only ensure it is enabled, while not disabling it.
-> > 
-> > Signed-off-by: Mac Lin <mkl0301@gmail.com>
-> 
-> Thanks for the patch!
-> 
-> Cc'ing Greg.
-> 
-> Greg, the patch doesn't touch any sensitive parts of EHCI and OHCI
-> drivers, can I take it via ARM subtree? This is to not introduce
-> cross-tree dependencies (the patch depends on some arch-specific
-> changes).
+Hello Jean
 
-Please get Alan Stern to ack it as well, as he knows the proper
-callbacks that you need to ensure are present.
+On Thu, 25 Nov 2010, Jean Pihet wrote:
 
-thanks,
+> On Thu, Nov 25, 2010 at 12:49 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> >
+> > The console semaphore must be held while the OMAP UART devices are
+> > disabled, lest a console write cause an ARM abort (and a kernel crash)
+> > when the underlying console device is inaccessible. ?These crashes
+> > only occur when the console is on one of the OMAP internal serial
+> > ports.
+> This does not fix the issue for me on Beagle (console on ttyO2).
+> 
+> Doing:
+>   / # echo 5 > /sys/devices/platform/omap/omap-hsuart.0/sleep_timeout
+>   / # echo 5 > /sys/devices/platform/omap/omap-hsuart.1/sleep_timeout
+>   / # echo 5 > /sys/devices/platform/omap/omap-hsuart.2/sleep_timeout
+> and waiting 5 seconds hangs the console.
 
-greg k-h
+If this is without sleep_while_idle enabled, then you're seeing an 
+unrelated bug that is not related to this patch.  That's because, when 
+/debug/pm_debug/sleep_while_idle is 0, the pm34xx.c code that this patch 
+touches won't be reached.
+
+By the way, you write that the above situation "hangs the console."  Is it 
+just the case that the console dies and the rest of the system is still 
+alive, or does the whole system crash?
+
+> However enabling sleep_while_idle before configuring the UART2 timeout
+> makes it work ok:
+>   / # echo 5 > /sys/devices/platform/omap/omap-hsuart.0/sleep_timeout
+>   / # echo 5 > /sys/devices/platform/omap/omap-hsuart.1/sleep_timeout
+>   / # echo 1 > /debug/pm_debug/sleep_while_idle
+>   / # echo 5 > /sys/devices/platform/omap/omap-hsuart.2/sleep_timeout
+> 
+> This result is similar to what I tested on a recent l-o master w/o the fix.
+> Am I missing something?
+
+It may depend on your loglevel settings.  If warning messages aren't 
+emitted to the console, then you won't see this crash.
+
+Whether the system crashes also depends on whether you happen to get a new 
+worst-case deactivation latency from your console serial port during PM 
+idle.  If not, and there are no other console writes after the UART is 
+disabled, then this patch won't affect anything.
+
+Just FYI, without this patch, Tony's N810 crashed reliably upon entering 
+dynamic idle. 
+
+> One more remark. With OFF mode enabled I noticed that PER can go OFF
+> without CORE going OFF, which could trigger the errata i582. I think
+> this is another latent problem.
+
+This appears to be unrelated to the patch under discussion.  Maybe you 
+should start a separate list thread on this issue?  We do not appear to 
+have the suggested workaround sequence in the TRM in the current code.  
+This workaround is quite complex.  Someone from TI should definitely put 
+together some patches to implement it.
+
+
+- Paul
