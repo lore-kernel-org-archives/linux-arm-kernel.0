@@ -1,43 +1,42 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 25 Nov 2010 10:28:41 +0000
-Subject: [alsa-devel] [PATCH] ASoC: fix SND_PXA2XX_LIB Kconfig warning
-In-Reply-To: <1290635175-30501-1-git-send-email-mad_soft@inbox.ru>
-References: <1290635175-30501-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1290680921.3302.7.camel@odin>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Thu, 25 Nov 2010 13:48:17 +0300
+Subject: [PATCH v2 2/3] ARM: cns3xxx: Add architecture definition for
+	EHCI/OHCI controller
+In-Reply-To: <AANLkTimMEALmH08RKQet_MGiyEFYpD2kVtPtmKJpmhtZ@mail.gmail.com>
+References: <1290443565-20766-1-git-send-email-mkl0301@gmail.com>
+	<1290443565-20766-3-git-send-email-mkl0301@gmail.com>
+	<20101124161122.GA15902@oksana.dev.rtsoft.ru>
+	<AANLkTimMEALmH08RKQet_MGiyEFYpD2kVtPtmKJpmhtZ@mail.gmail.com>
+Message-ID: <20101125104817.GA31779@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-11-25 at 00:46 +0300, Dmitry Artamonow wrote:
-> Fix following warning observed when SND_PXA2XX_SOC is set and SND_ARM isn't:
-> 
-> warning: (SND_PXA2XX_AC97 && SOUND && !M68K && SND && SND_ARM && ARCH_PXA ||
-> SND_PXA2XX_SOC && SOUND && !M68K && SND && SND_SOC && ARCH_PXA) selects
-> SND_PXA2XX_LIB which has unmet direct dependencies (SOUND && !M68K && SND &&
-> SND_ARM)
-> 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> ---
-> 
-> This is fix for 2.6.37-rc3
-> 
->  sound/soc/pxa/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-> index 37f191b..580f485 100644
-> --- a/sound/soc/pxa/Kconfig
-> +++ b/sound/soc/pxa/Kconfig
-> @@ -1,6 +1,7 @@
->  config SND_PXA2XX_SOC
->  	tristate "SoC Audio for the Intel PXA2xx chip"
->  	depends on ARCH_PXA
-> +	select SND_ARM
->  	select SND_PXA2XX_LIB
->  	help
->  	  Say Y or M if you want to add support for codecs attached to
+On Thu, Nov 25, 2010 at 03:25:38PM +0800, Lin Mac wrote:
+[...]
+> > ?#include <linux/module.h>
+> > ?#include <linux/io.h>
+> > ?#include <linux/delay.h>
+> > +#include <asm/atomic.h>
+> It's not necessary for mach/pm.h already included it, right?
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+Technically, it's not necessary. But in Linux we don't rely on
+headers including other headers. Think that someday mach/pm.h
+may not include asm/atomic.h, so the build will break.
+
+Thanks,
+
+> 
+> > ?#include <mach/system.h>
+> > ?#include <mach/cns3xxx.h>
+> > ?#include <mach/pm.h>
+> > @@ -117,3 +118,6 @@ int cns3xxx_cpu_clock(void)
+> > ? ? ? ?return cpu;
+> > ?}
+> > ?EXPORT_SYMBOL(cns3xxx_cpu_clock);
+> > +
+> > +atomic_t usb_pwr_ref = ATOMIC_INIT(0);
+> > +EXPORT_SYMBOL(usb_pwr_ref);
+
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
