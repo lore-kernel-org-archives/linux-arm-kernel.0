@@ -1,196 +1,151 @@
-From: mugdha@ti.com (Kamoolkar, Mugdha)
-Date: Thu, 25 Nov 2010 11:35:02 +0530
-Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
-In-Reply-To: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
-References: <1290526740-27624-1-git-send-email-ohad@wizery.com>
-	<1290526740-27624-2-git-send-email-ohad@wizery.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302479315FB@dbde02.ent.ti.com>
-	<AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247931C4B@dbde02.ent.ti.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Thu, 25 Nov 2010 22:28:32 +0800
+Subject: [PATCH 1/1] arm: imx: share imx5x_register_gpios for mach-mx5
+Message-ID: <1290695312-30031-1-git-send-email-linuxzsc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ohad,
+From: Richard Zhao <richard.zhao@freescale.com>
 
-> -----Original Message-----
-> From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
-> Sent: Thursday, November 25, 2010 1:29 AM
-> To: Kamoolkar, Mugdha
-> Cc: linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; akpm at linux-foundation.org; Greg KH; Tony
-> Lindgren; Cousson, Benoit; Grant Likely; Kanigeri, Hari; Anna, Suman;
-> Kevin Hilman; Arnd Bergmann
-> Subject: Re: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
-> 
-> Hi Mugdha,
-> 
-> On Wed, Nov 24, 2010 at 9:44 AM, Kamoolkar, Mugdha <mugdha@ti.com> wrote:
-> > How do multiple clients get a handle that they can use? Are they
-> expected to
-> > share the handle they get from the call above?
-> 
-> Currently, yes.
-> 
-> > What if they are independent
-> > clients with no means of communication between them? There may be a need
-> of
-> > an API that returns the handle for a specific ID. For example, a module
-> over
-> > the hwspinlock driver that does some level of management of IDs (e.g.
-> name
-> > to ID mapping) and enables users to get multi-core as well as multi-
-> client
-> > protection on Linux.
-> 
-> I'm not sure I understand the use case. Can you please elaborate ?
-> 
-Consider a software module on top of the hwspinlock, which provides a 
-generic way for multi-core critical section, say GateMP. This module enables 
-users to create critical section objects by name. Any other client can open 
-the critical section by name and get a handle to it. I would expect this 
-module to make a call to request a resource when creating the GateMP object. 
-Suppose that the object is actually created by the remote core, and the call 
-comes to Linux on the host processor to allocate the system resource (as the 
-owner of the system resources). It will call hwspinlock_request, get a 
-handle, get the ID from it, and return the ID to the remote processor. There 
-is no point in the remote processor holding the handle that's not valid in 
-its virtual space. The ID, in this case, is the single portable value that 
-every processor understands in a different way. When this object were being 
-deleted, the ID would be passed to Linux, and a corresponding Linux entity 
-would then have to get the handle from the ID and call _free.
+Add variable mx5x_gpio_port_cnt, and init in machine init function.
+It can be share by mx51, mx53 and coming mx50.
 
-Similarly, suppose the creation is happening from user-space, the user-space 
-object should store the ID in the user object, and get the handle from the 
-ID when performing any actions on the lock from kernel-side.
+Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
 
-> > For example:
-> > struct hwspinlock *hwspinlock_get_handle(unsigned int id);
-> 
-> I'm afraid such an API will be easily abused, e.g., drivers that will
-> try to use a predefined hwspinlock id without taking care of reserving
-> it early enough will probably use it to overcome an "oops this
-> hwspinlock has already been assigned to someone else".
-> 
-Really? Why would they intentionally destabilize the system like this???
-
-> So let me suggest we should first understand the use case for the API
-> you propose, and then see how we solve it ?
-> 
-> > Why are some of the APIs hwspinlock_ and others hwspin_?
-> 
-> I'm following the regular spinlock naming, which nicely avoids having
-> the word 'lock' twice in the API. So you get APIs like hwspin_lock,
-> hwspin_unlock, hwspin_trylock. In our case we still have stuff like
-> hwspinlock_request and hwspinlock_free. I can probably make it
-> hwspin_lock_request, does that look nicer ?
-> 
-No real issues with this, just seems less intuitive. I just expected all the 
-module APIs to follow same convention <module>_API to make them more 
-intuitive.
-
-> >> + ?int hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long
-> timeout);
-> >> + ? - lock a previously-assigned hwspinlock with a timeout limit
-> (specified in
-> >> + ? ? jiffies). If the hwspinlock is already taken, the function will
-> busy
-> >> loop
-> >> + ? ? waiting for it to be released, but give up when the timeout meets
-> >> jiffies.
-> >> + ? ? If timeout is 0, the function will never give up (therefore if a
-> faulty
-> >> + ? ? remote core never releases the hwspinlock, it will deadlock).
-> > If timeout is 0, shouldn't it rather behave as a trylock? If timeout is
-> > MAX_SCHEDULE_TIMEOUT, then it should behave as a wait-forever.
-> 
-> Good point, thanks!
-> 
-> >> + ?int hwspin_trylock(struct hwspinlock *hwlock);
-> >> + ? - attempt to lock a previously-assigned hwspinlock, but immediately
-> fail
-> >> if
-> >> + ? ? it is already taken.
-> >> + ? ? Upon a successful return from this function, preemption is
-> disabled so
-> >> + ? ? caller must not sleep, and is advised to release the hwspinlock
-> as soon
-> >> as
-> >> + ? ? possible, in order to minimize remote cores polling on the
-> hardware
-> >> + ? ? interconnect.
-> >> + ? ? Returns 0 on success and an appropriate error code otherwise
-> (most
-> >> + ? ? notably -EBUSY if the hwspinlock was already taken).
-> >> + ? ? The function will never sleep.
-> > Is this function needed at all if timeout 0 behaves similar to trylock?
-> 
-> Yeah. Drivers should use the _trylock version when applicable because
-> it'd make the code more readable, and it's more intuitive (just like
-> the spin_trylock API).
-Agreed.
-
-> 
-> >> + ?struct hwspinlock *hwspinlock_unregister(unsigned int id);
-> >> + ? - to be called from the underlying vendor-specific implementation,
-> in
-> >> order
-> >> + ? ? to unregister an existing (and unused) hwspinlock instance.
-> >> + ? ? Can be called from an atomic context (will not sleep) but not
-> from
-> >> + ? ? within interrupt context.
-> >> + ? ? Returns the address of hwspinlock on success, or NULL on error
-> (e.g.
-> >> + ? ? if the hwspinlock is sill in use).
-> > Does this need to be called for all hwspinlocks?
-> 
-> Currently, yes.
-> 
-Ok, that should be fine.
-
-> I actually am planning an improvement that would allow registering a
-> block of hwspinlocks; I don't think that the multiple calls of
-> register/unregister is that bad (it happens only once at boot), but I
-> want to allow sharing of the owner, ops and dev members of the
-> hwspinlock instances (to save some memory).
-> 
-> Anyway, it's not a big improvement, so I planned first to get things
-> merged and then look into stuff like that.
-> 
-> >> +int __hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long to,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int mode, unsigned long *flags)
-> >> +{
-> >> + ? ? int ret;
-> >> +
-> >> + ? ? for (;;) {
-> >> + ? ? ? ? ? ? /* Try to take the hwspinlock */
-> >> + ? ? ? ? ? ? ret = __hwspin_trylock(hwlock, mode, flags);
-> >> + ? ? ? ? ? ? if (ret != -EBUSY)
-> >> + ? ? ? ? ? ? ? ? ? ? break;
-> >> +
-> >> + ? ? ? ? ? ? /*
-> >> + ? ? ? ? ? ? ?* The lock is already taken, let's check if the user
-> wants
-> >> + ? ? ? ? ? ? ?* us to try again
-> >> + ? ? ? ? ? ? ?*/
-> >> + ? ? ? ? ? ? if (to && time_is_before_eq_jiffies(to))
-> >> + ? ? ? ? ? ? ? ? ? ? return -ETIMEDOUT;
-> >> +
-> >> + ? ? ? ? ? ? /*
-> >> + ? ? ? ? ? ? ?* Allow platform-specific relax handlers to prevent
-> >> + ? ? ? ? ? ? ?* hogging the interconnect (no sleeping, though)
-> >> + ? ? ? ? ? ? ?*/
-> >> + ? ? ? ? ? ? if (hwlock->ops->relax)
-> >> + ? ? ? ? ? ? ? ? ? ? hwlock->ops->relax(hwlock);
-> > There should be a way to have an escape mechanism for the case where a
-> deadlock
-> > has occurred due to remote side taking the spinlock and crashing.
-> 
-> This is exactly what the timeout parameter is for..
-> 
-I was looking at the situation where someone does not use the lock with 
-timeout. In that case, do we say that there's no way out? And the system 
-will hang and need a re-boot? Or do we still want to enable some way to 
-forcibly break the wait after it has happened for an unreasonably long time?
-
-> Thanks,
-> Ohad.
+diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+index 5ff5522..cd7bd4c 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51.c
++++ b/arch/arm/mach-mx5/board-cpuimx51.c
+@@ -242,6 +242,8 @@ __setup("otg_mode=", eukrea_cpuimx51_otg_mode);
+  */
+ static void __init eukrea_cpuimx51_init(void)
+ {
++	mx5x_gpio_port_cnt = 4;
++
+ 	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51_pads,
+ 					ARRAY_SIZE(eukrea_cpuimx51_pads));
+ 
+diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
+index ff1f45e..e47345a 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51sd.c
++++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
+@@ -262,6 +262,8 @@ static struct platform_device *platform_devices[] __initdata = {
+ 
+ static void __init eukrea_cpuimx51sd_init(void)
+ {
++	mx5x_gpio_port_cnt = 4;
++
+ 	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51sd_pads,
+ 					ARRAY_SIZE(eukrea_cpuimx51sd_pads));
+ 
+diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+index 6cc2805..cb22fc3 100644
+--- a/arch/arm/mach-mx5/board-mx51_3ds.c
++++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+@@ -160,6 +160,8 @@ static struct spi_board_info mx51_3ds_spi_nor_device[] = {
+  */
+ static void __init mxc_board_init(void)
+ {
++	mx5x_gpio_port_cnt = 4;
++
+ 	mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
+ 					ARRAY_SIZE(mx51_3ds_pads));
+ 	mxc_init_imx_uart();
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index ef32843..8054c09 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -347,9 +347,12 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
+  */
+ static void __init mxc_board_init(void)
+ {
++	mx5x_gpio_port_cnt = 4;
++
+ 	iomux_v3_cfg_t usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
+ 	iomux_v3_cfg_t power_key = MX51_PAD_EIM_A27__GPIO_2_21;
+ 
++	mx5x_gpio_port_cnt = 4;
+ #if defined(CONFIG_CPU_FREQ_IMX)
+ 	get_cpu_op = mx51_get_cpu_op;
+ #endif
+diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+index 4b2718b..cf315cb 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikamx.c
++++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+@@ -314,6 +314,8 @@ void mx51_efikamx_reset(void)
+ 
+ static void __init mxc_board_init(void)
+ {
++	mx5x_gpio_port_cnt = 4;
++
+ 	mxc_iomux_v3_setup_multiple_pads(mx51efikamx_pads,
+ 					ARRAY_SIZE(mx51efikamx_pads));
+ 	mx51_efikamx_board_id();
+diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+index d926203..b8371d2 100644
+--- a/arch/arm/mach-mx5/devices.c
++++ b/arch/arm/mach-mx5/devices.c
+@@ -183,13 +183,11 @@ static struct mxc_gpio_port mxc_gpio_ports[] = {
+ 	},
+ };
+ 
+-int __init imx51_register_gpios(void)
+-{
+-	return mxc_gpio_init(mxc_gpio_ports, 4);
+-}
++int mx5x_gpio_port_cnt;
+ 
+-int __init imx53_register_gpios(void)
++int __init imx5x_register_gpios(void)
+ {
+-	return mxc_gpio_init(mxc_gpio_ports, ARRAY_SIZE(mxc_gpio_ports));
++	if (mx5x_gpio_port_cnt)
++		return mxc_gpio_init(mxc_gpio_ports, mx5x_gpio_port_cnt);
++	return -EINVAL;
+ }
+-
+diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+index af1d07c..d3411dc 100644
+--- a/arch/arm/mach-mx5/devices.h
++++ b/arch/arm/mach-mx5/devices.h
+@@ -4,3 +4,5 @@ extern struct platform_device mxc_usbdr_udc_device;
+ extern struct platform_device mxc_wdt;
+ extern struct platform_device mxc_hsi2c_device;
+ extern struct platform_device mxc_keypad_device;
++
++extern int mx5x_gpio_port_cnt;
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index e57f968..b0ea57b 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -61,7 +61,7 @@ void __init mx53_map_io(void)
+ 	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
+ }
+ 
+-int imx51_register_gpios(void);
++int imx5x_register_gpios(void);
+ 
+ void __init mx51_init_irq(void)
+ {
+@@ -78,11 +78,9 @@ void __init mx51_init_irq(void)
+ 		panic("unable to map TZIC interrupt controller\n");
+ 
+ 	tzic_init_irq(tzic_virt);
+-	imx51_register_gpios();
++	imx5x_register_gpios();
+ }
+ 
+-int imx53_register_gpios(void);
+-
+ void __init mx53_init_irq(void)
+ {
+ 	unsigned long tzic_addr;
+@@ -95,5 +93,5 @@ void __init mx53_init_irq(void)
+ 		panic("unable to map TZIC interrupt controller\n");
+ 
+ 	tzic_init_irq(tzic_virt);
+-	imx53_register_gpios();
++	imx5x_register_gpios();
+ }
+-- 
+1.7.1
