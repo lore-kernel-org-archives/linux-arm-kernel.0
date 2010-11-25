@@ -1,52 +1,108 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Thu, 25 Nov 2010 12:22:28 -0800
-Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
-In-Reply-To: <AANLkTinQdNC0XaOqNyDbdYE6ZcP0QyzpN492j=Kovuea@mail.gmail.com>
-References: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
-	<536589.12568.qm@web180310.mail.gq1.yahoo.com>
-	<AANLkTinQdNC0XaOqNyDbdYE6ZcP0QyzpN492j=Kovuea@mail.gmail.com>
-Message-ID: <1290716548.2529.136.camel@helium>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 25 Nov 2010 21:38:19 +0100
+Subject: MX51: add FIQ support for TZIC
+In-Reply-To: <20101125151909.GB19343@numbat.localnet>
+References: <20101125151909.GB19343@numbat.localnet>
+Message-ID: <20101125203819.GK4693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-11-25 at 08:40 +0200, Ohad Ben-Cohen wrote:
-> On Thu, Nov 25, 2010 at 5:59 AM, David Brownell <david-b@pacbell.net> wrote:
-> > My rule of thumb is that nothing is "generic"
-> > until at least three whatever-it-is instances
-> > plug in to it.  Sometimes this is called
-> > the "Rule of Three".
-> >
-> > Other than OMAP, what's providing hardware
-> > spinlocks that plug into this framework?
+Hello,
+
+On Thu, Nov 25, 2010 at 03:19:09PM +0000, Peter Horton wrote:
+> Add support for FIQ on MX51 TZIC.
 > 
-> We are not aware of any.
+> (patch is against Sascha's "imx-for-2.6.38" branch)
+<nitpick>The comment about which tree this applies to isn't of interest
+anymore when the patch is applied, so better write it after the triple
+(eww, double?) dash below.  Then it won't make it into git.</nitpick>
+ 
+> Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
+> 
+> --
+> 
+Back some time I tried to achieve something similar.  IIRC my patch was
+easier.  I definitly didn't patch entry-macro.S.  But OTOH I had some
+problems with it so this might have been my problem.  I cannot find it
+at the moment, will talk to Sascha tomorrow about it.
 
-So there's no strong reason to think this is
-actually "ggeneric".  Function names no longer
-specify OMAP, but without other hardware under
-the interface, calling it "generic" reflects
-more optimism than reality.  (That was the
-implication of my observations...)
+> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> index aeb0869..c7dd4a9 100644
+> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> @@ -54,8 +54,18 @@
+>  #elif defined CONFIG_MXC_TZIC
+>  	@ Load offset & priority of the highest priority
+>  	@ interrupt pending.
+> +	@ 0x080 is INTSEC0 register
+>  	@ 0xD80 is HIPND0 register
+>  	mov     \irqnr, #0
+> +#ifdef CONFIG_FIQ
+> +1000:
+> +	add	\irqstat, \base, \irqnr, lsr #3
+> +	ldr	\tmp, [\irqstat, #0xd80]
+> +	ldr	\irqstat, [\irqstat, #0x080]
+> +	ands	\tmp, \tmp, \irqstat
+> +	bne	1001f
+> +	add	\irqnr, \irqnr, #32
+> +#else
+>  	mov     \irqstat, #0x0D80
+>  1000:
+>  	ldr     \tmp,   [\irqstat, \base]
+> @@ -63,6 +73,7 @@
+>  	bne     1001f
+>  	addeq   \irqnr, \irqnr, #32
+>  	addeq   \irqstat, \irqstat, #4
+> +#endif
+>  	cmp     \irqnr, #128
+>  	blo     1000b
+>  	b       2001f
+> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+> index 3703ab2..b648a76 100644
+> --- a/arch/arm/plat-mxc/tzic.c
+> +++ b/arch/arm/plat-mxc/tzic.c
+> @@ -47,6 +47,33 @@
+>  
+>  void __iomem *tzic_base; /* Used as irq controller base in entry-macro.S */
+>  
+> +#ifdef CONFIG_FIQ
+> +
+> +/*
+> + * switch interrupt between IRQ and FIQ mode.
+> + *
+> + * 'type' is true for FIQ mode and false for IRQ mode.
+> + */
+> +int mxc_set_irq_fiq(unsigned int irq, unsigned int type)
+> +{
+> +	unsigned int index, mask, value;
+> +
+> +	index = irq >> 5;
+> +	if (unlikely(index >= 4))
+> +		return -EBUSY;
+> +	mask = 1U << (irq & 0x1F);
+> +
+> +	value = __raw_readl(tzic_base + TZIC_INTSEC0(index));
+> +	value = (value | mask) ^ (type ? mask : 0);
+> +	__raw_writel(value, tzic_base + TZIC_INTSEC0(index));
+Does this result in better code than the straigt forward
 
-To find other hardware spinlocks, you might be
-able to look at fault tolerant multiprocessors.
-Ages ago I worked with one of those, where any
-spinlock failures integrated with CPU/OS fault
-detection; HW cwould yank (checkpointed) CPU boards
-off the bus so they could be recovered (some
-might continue later from checkpoints, etc.)...
+	value = __raw_readl(...) & ~mask;
+	if (type)
+		vale |= mask
+	__raw_writel(...);
 
-> This way platforms [2] can easily plug into the framework anything
-> they need to achieve multi-core synchronization. E.g., even in case a
-> platform doesn't have dedicated silicon, but still need this
-> functionality, it can still plug in an implementation which is based
-> on Peterson's shared memory mutual exclusion algorithm 
+If not, what is the idea to write it this way?
+> +
+> +	return 0;
+> +}
+> +
+> +EXPORT_SYMBOL(mxc_set_irq_fiq);
+Hmm, I guess this makes it impossible to compile avic.c and tzic.c with
+FIQ=y into a single binary.
 
-And maybe also standard Linux spinlocks?
+Best regards
+Uwe
 
-I seem to recall some iterations of the real-time patches doing a lot of
-work to generalize spinlocks, since they needed multiple variants.  It
-might be worth following in those footsteps.  (Though I'm not sure they
-were thinking much about hardware support .
-
-- Dave
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
