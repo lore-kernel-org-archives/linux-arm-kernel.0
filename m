@@ -1,173 +1,258 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 25 Nov 2010 07:29:24 +0100
-Subject: [PATCH 1/1] arm: imx: share imx5x_register_gpios for mach-mx5
-In-Reply-To: <1290695312-30031-1-git-send-email-linuxzsc@gmail.com>
-References: <1290695312-30031-1-git-send-email-linuxzsc@gmail.com>
-Message-ID: <20101125062924.GD4693@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 25 Nov 2010 14:32:57 +0800
+Subject: [PATCH] ARM: mmp: append brownstone support
+In-Reply-To: <1290655993-27748-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1290655993-27748-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTimwJjKTkHk53R3si8K9KMsGfBhZGjvQO2BKLvWL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Richard,
+On Thu, Nov 25, 2010 at 11:33 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> ---
+> ?arch/arm/mach-mmp/Kconfig ? ? ?| ? 15 +++-
+> ?arch/arm/mach-mmp/Makefile ? ? | ? ?1 +
+> ?arch/arm/mach-mmp/brownstone.c | ?167 ++++++++++++++++++++++++++++++++++++++++
+> ?3 files changed, 181 insertions(+), 2 deletions(-)
+> ?create mode 100644 arch/arm/mach-mmp/brownstone.c
+>
+> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+> index fd18d33..67793a6 100644
+> --- a/arch/arm/mach-mmp/Kconfig
+> +++ b/arch/arm/mach-mmp/Kconfig
+> @@ -37,6 +37,17 @@ config MACH_TTC_DKB
+> ? ? ? ? ?Say 'Y' here if you want to support the Marvell PXA910-based
+> ? ? ? ? ?TTC_DKB Development Board.
+>
+> +config MACH_BROWNSTONE
+> + ? ? ? bool "Marvell's Brownstone Development Platform"
+> + ? ? ? depends on !CPU_MOHAWK
+> + ? ? ? select CPU_MMP2
+> + ? ? ? help
+> + ? ? ? ? Say 'Y' here if you want to support the Marvell MMP2-based
+> + ? ? ? ? Brown Development Platform.
+> + ? ? ? ? MMP2-based board can't be co-existed with PXA168-based &
+> + ? ? ? ? PXA910-based development board. Since MMP2 is compatible to
+> + ? ? ? ? ARMv7 architecture.
+> +
+> ?config MACH_FLINT
+> ? ? ? ?bool "Marvell's Flint Development Platform"
+> ? ? ? ?depends on !CPU_MOHAWK
+> @@ -46,7 +57,7 @@ config MACH_FLINT
+> ? ? ? ? ?Flint Development Platform.
+> ? ? ? ? ?MMP2-based board can't be co-existed with PXA168-based &
+> ? ? ? ? ?PXA910-based development board. Since MMP2 is compatible to
+> - ? ? ? ? ARMv6 architecture.
+> + ? ? ? ? ARMv7 architecture.
 
-On Thu, Nov 25, 2010 at 10:28:32PM +0800, Richard Zhao wrote:
-> From: Richard Zhao <richard.zhao@freescale.com>
-> 
-> Add variable mx5x_gpio_port_cnt, and init in machine init function.
-> It can be share by mx51, mx53 and coming mx50.
-> 
-> Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
-> 
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> index 5ff5522..cd7bd4c 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> @@ -242,6 +242,8 @@ __setup("otg_mode=", eukrea_cpuimx51_otg_mode);
->   */
->  static void __init eukrea_cpuimx51_init(void)
->  {
-> +	mx5x_gpio_port_cnt = 4;
-> +
-IMO the machine files shouldn't need to know how many gpio banks are
-available.  This is a per-SoC thing and so should be set in a SoC function.
+Not relevant.
 
-How do you want to continue this change?  mx51 and mx53 have the same
-number of ports?  Does mx50 have more or less?  The addresses are the
-same?
+>
+> ?config MACH_MARVELL_JASPER
+> ? ? ? ?bool "Marvell's Jasper Development Platform"
+> @@ -57,7 +68,7 @@ config MACH_MARVELL_JASPER
+> ? ? ? ? ?Jasper Development Platform.
+> ? ? ? ? ?MMP2-based board can't be co-existed with PXA168-based &
+> ? ? ? ? ?PXA910-based development board. Since MMP2 is compatible to
+> - ? ? ? ? ARMv6 architecture.
+> + ? ? ? ? ARMv7 architecture.
 
-Best regards
-Uwe
+Not relevant.
 
->  	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51_pads,
->  					ARRAY_SIZE(eukrea_cpuimx51_pads));
->  
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> index ff1f45e..e47345a 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51sd.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> @@ -262,6 +262,8 @@ static struct platform_device *platform_devices[] __initdata = {
->  
->  static void __init eukrea_cpuimx51sd_init(void)
->  {
-> +	mx5x_gpio_port_cnt = 4;
+>
+> ?config MACH_TETON_BGA
+> ? ? ? ?bool "Marvell's PXA168 Teton BGA Development Board"
+> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+> index 751cdbf..5c68382 100644
+> --- a/arch/arm/mach-mmp/Makefile
+> +++ b/arch/arm/mach-mmp/Makefile
+> @@ -15,6 +15,7 @@ obj-$(CONFIG_MACH_ZYLONITE2) ?+= aspenite.o
+> ?obj-$(CONFIG_MACH_AVENGERS_LITE)+= avengers_lite.o
+> ?obj-$(CONFIG_MACH_TAVOREVB) ? ?+= tavorevb.o
+> ?obj-$(CONFIG_MACH_TTC_DKB) ? ? += ttc_dkb.o
+> +obj-$(CONFIG_MACH_BROWNSTONE) ?+= brownstone.o
+> ?obj-$(CONFIG_MACH_FLINT) ? ? ? += flint.o
+> ?obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
+> ?obj-$(CONFIG_MACH_TETON_BGA) ? += teton_bga.o
+> diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+> new file mode 100644
+> index 0000000..ae7daab
+> --- /dev/null
+> +++ b/arch/arm/mach-mmp/brownstone.c
+> @@ -0,0 +1,167 @@
+> +/*
+> + * ?linux/arch/arm/mach-mmp/brownstone.c
+> + *
+> + * ?Support for the Marvell Brownstone Development Platform.
+> + *
+> + * ?Copyright (C) 2009-2010 Marvell International Ltd.
+> + *
+> + * ?This program is free software; you can redistribute it and/or modify
+> + * ?it under the terms of the GNU General Public License version 2 as
+> + * ?publishhed by the Free Software Foundation.
+> + */
 > +
->  	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51sd_pads,
->  					ARRAY_SIZE(eukrea_cpuimx51sd_pads));
->  
-> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-> index 6cc2805..cb22fc3 100644
-> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
-> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-> @@ -160,6 +160,8 @@ static struct spi_board_info mx51_3ds_spi_nor_device[] = {
->   */
->  static void __init mxc_board_init(void)
->  {
-> +	mx5x_gpio_port_cnt = 4;
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/gpio.h>
+> +#include <linux/regulator/machine.h>
+> +#include <linux/regulator/max8649.h>
+> +#include <linux/mfd/max8925.h>
 > +
->  	mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
->  					ARRAY_SIZE(mx51_3ds_pads));
->  	mxc_init_imx_uart();
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index ef32843..8054c09 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -347,9 +347,12 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
->   */
->  static void __init mxc_board_init(void)
->  {
-> +	mx5x_gpio_port_cnt = 4;
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <mach/addr-map.h>
+> +#include <mach/mfp-mmp2.h>
+> +#include <mach/mmp2.h>
+> +#include <mach/irqs.h>
 > +
->  	iomux_v3_cfg_t usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
->  	iomux_v3_cfg_t power_key = MX51_PAD_EIM_A27__GPIO_2_21;
->  
-> +	mx5x_gpio_port_cnt = 4;
->  #if defined(CONFIG_CPU_FREQ_IMX)
->  	get_cpu_op = mx51_get_cpu_op;
->  #endif
-> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> index 4b2718b..cf315cb 100644
-> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
-> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> @@ -314,6 +314,8 @@ void mx51_efikamx_reset(void)
->  
->  static void __init mxc_board_init(void)
->  {
-> +	mx5x_gpio_port_cnt = 4;
+> +#include "common.h"
 > +
->  	mxc_iomux_v3_setup_multiple_pads(mx51efikamx_pads,
->  					ARRAY_SIZE(mx51efikamx_pads));
->  	mx51_efikamx_board_id();
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index d926203..b8371d2 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -183,13 +183,11 @@ static struct mxc_gpio_port mxc_gpio_ports[] = {
->  	},
->  };
->  
-> -int __init imx51_register_gpios(void)
-> -{
-> -	return mxc_gpio_init(mxc_gpio_ports, 4);
-> -}
-> +int mx5x_gpio_port_cnt;
->  
-> -int __init imx53_register_gpios(void)
-> +int __init imx5x_register_gpios(void)
->  {
-> -	return mxc_gpio_init(mxc_gpio_ports, ARRAY_SIZE(mxc_gpio_ports));
-> +	if (mx5x_gpio_port_cnt)
-> +		return mxc_gpio_init(mxc_gpio_ports, mx5x_gpio_port_cnt);
-> +	return -EINVAL;
->  }
-> -
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-> index af1d07c..d3411dc 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -4,3 +4,5 @@ extern struct platform_device mxc_usbdr_udc_device;
->  extern struct platform_device mxc_wdt;
->  extern struct platform_device mxc_hsi2c_device;
->  extern struct platform_device mxc_keypad_device;
+> +#define BROWNSTONE_NR_IRQS ? ? (IRQ_BOARD_START + 40)
 > +
-> +extern int mx5x_gpio_port_cnt;
-> diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-> index e57f968..b0ea57b 100644
-> --- a/arch/arm/mach-mx5/mm.c
-> +++ b/arch/arm/mach-mx5/mm.c
-> @@ -61,7 +61,7 @@ void __init mx53_map_io(void)
->  	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
->  }
->  
-> -int imx51_register_gpios(void);
-> +int imx5x_register_gpios(void);
->  
->  void __init mx51_init_irq(void)
->  {
-> @@ -78,11 +78,9 @@ void __init mx51_init_irq(void)
->  		panic("unable to map TZIC interrupt controller\n");
->  
->  	tzic_init_irq(tzic_virt);
-> -	imx51_register_gpios();
-> +	imx5x_register_gpios();
->  }
->  
-> -int imx53_register_gpios(void);
-> -
->  void __init mx53_init_irq(void)
->  {
->  	unsigned long tzic_addr;
-> @@ -95,5 +93,5 @@ void __init mx53_init_irq(void)
->  		panic("unable to map TZIC interrupt controller\n");
->  
->  	tzic_init_irq(tzic_virt);
-> -	imx53_register_gpios();
-> +	imx5x_register_gpios();
->  }
-> -- 
-> 1.7.1
-> 
-> 
-> 
+> +static unsigned long brownstone_pin_config[] __initdata = {
+> + ? ? ? /* UART1 */
+> + ? ? ? GPIO29_UART1_RXD,
+> + ? ? ? GPIO30_UART1_TXD,
+> +
+> + ? ? ? /* UART3 */
+> + ? ? ? GPIO51_UART3_RXD,
+> + ? ? ? GPIO52_UART3_TXD,
+> +
+> + ? ? ? /* DFI */
+> + ? ? ? GPIO168_DFI_D0,
+> + ? ? ? GPIO167_DFI_D1,
+> + ? ? ? GPIO166_DFI_D2,
+> + ? ? ? GPIO165_DFI_D3,
+> + ? ? ? GPIO107_DFI_D4,
+> + ? ? ? GPIO106_DFI_D5,
+> + ? ? ? GPIO105_DFI_D6,
+> + ? ? ? GPIO104_DFI_D7,
+> + ? ? ? GPIO111_DFI_D8,
+> + ? ? ? GPIO164_DFI_D9,
+> + ? ? ? GPIO163_DFI_D10,
+> + ? ? ? GPIO162_DFI_D11,
+> + ? ? ? GPIO161_DFI_D12,
+> + ? ? ? GPIO110_DFI_D13,
+> + ? ? ? GPIO109_DFI_D14,
+> + ? ? ? GPIO108_DFI_D15,
+> + ? ? ? GPIO143_ND_nCS0,
+> + ? ? ? GPIO144_ND_nCS1,
+> + ? ? ? GPIO147_ND_nWE,
+> + ? ? ? GPIO148_ND_nRE,
+> + ? ? ? GPIO150_ND_ALE,
+> + ? ? ? GPIO149_ND_CLE,
+> + ? ? ? GPIO112_ND_RDY0,
+> + ? ? ? GPIO160_ND_RDY1,
+> +
+> + ? ? ? /* PMIC */
+> + ? ? ? PMIC_PMIC_INT | MFP_LPM_EDGE_FALL,
+> +
+> + ? ? ? /* MMC0 */
+> + ? ? ? GPIO131_MMC1_DAT3 | MFP_PULL_HIGH,
+> + ? ? ? GPIO132_MMC1_DAT2 | MFP_PULL_HIGH,
+> + ? ? ? GPIO133_MMC1_DAT1 | MFP_PULL_HIGH,
+> + ? ? ? GPIO134_MMC1_DAT0 | MFP_PULL_HIGH,
+> + ? ? ? GPIO136_MMC1_CMD | MFP_PULL_HIGH,
+> + ? ? ? GPIO139_MMC1_CLK,
+> + ? ? ? GPIO140_MMC1_CD | MFP_PULL_LOW,
+> + ? ? ? GPIO141_MMC1_WP | MFP_PULL_LOW,
+> +
+> + ? ? ? /* MMC1 */
+> + ? ? ? GPIO37_MMC2_DAT3 | MFP_PULL_HIGH,
+> + ? ? ? GPIO38_MMC2_DAT2 | MFP_PULL_HIGH,
+> + ? ? ? GPIO39_MMC2_DAT1 | MFP_PULL_HIGH,
+> + ? ? ? GPIO40_MMC2_DAT0 | MFP_PULL_HIGH,
+> + ? ? ? GPIO41_MMC2_CMD | MFP_PULL_HIGH,
+> + ? ? ? GPIO42_MMC2_CLK,
+> +
+> + ? ? ? /* MMC2 */
+> + ? ? ? GPIO165_MMC3_DAT7 | MFP_PULL_HIGH,
+> + ? ? ? GPIO162_MMC3_DAT6 | MFP_PULL_HIGH,
+> + ? ? ? GPIO166_MMC3_DAT5 | MFP_PULL_HIGH,
+> + ? ? ? GPIO163_MMC3_DAT4 | MFP_PULL_HIGH,
+> + ? ? ? GPIO167_MMC3_DAT3 | MFP_PULL_HIGH,
+> + ? ? ? GPIO164_MMC3_DAT2 | MFP_PULL_HIGH,
+> + ? ? ? GPIO168_MMC3_DAT1 | MFP_PULL_HIGH,
+> + ? ? ? GPIO111_MMC3_DAT0 | MFP_PULL_HIGH,
+> + ? ? ? GPIO112_MMC3_CMD | MFP_PULL_HIGH,
+> + ? ? ? GPIO151_MMC3_CLK,
+> +};
+> +
+> +static struct regulator_consumer_supply max8649_supply[] = {
+> + ? ? ? REGULATOR_SUPPLY("vcc_core", NULL),
+> +};
+> +
+> +static struct regulator_init_data max8649_init_data = {
+> + ? ? ? .constraints ? ?= {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "vcc_core range",
+> + ? ? ? ? ? ? ? .min_uV ? ? ? ? = 1150000,
+> + ? ? ? ? ? ? ? .max_uV ? ? ? ? = 1280000,
+> + ? ? ? ? ? ? ? .always_on ? ? ?= 1,
+> + ? ? ? ? ? ? ? .boot_on ? ? ? ?= 1,
+> + ? ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+> + ? ? ? },
+> + ? ? ? .num_consumer_supplies ?= 1,
+> + ? ? ? .consumer_supplies ? ? ?= &max8649_supply[0],
+> +};
+> +
+> +static struct max8649_platform_data brownstone_max8649_info = {
+> + ? ? ? .mode ? ? ? ? ? = 2, ? ?/* VID1 = 1, VID0 = 0 */
+> + ? ? ? .extclk ? ? ? ? = 0,
+> + ? ? ? .ramp_timing ? ?= MAX8649_RAMP_32MV,
+> + ? ? ? .regulator ? ? ?= &max8649_init_data,
+> +};
+> +
+> +static struct max8925_platform_data brownstone_max8925_info = {
+> + ? ? ? .irq_base ? ? ? ? ? ? ? = IRQ_BOARD_START,
+> +};
+> +
+> +static struct i2c_board_info brownstone_twsi1_info[] = {
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = "max8649",
+> + ? ? ? ? ? ? ? .addr ? ? ? ? ? = 0x60,
+> + ? ? ? ? ? ? ? .platform_data ?= &brownstone_max8649_info,
+> + ? ? ? },
+> + ? ? ? [1] = {
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = "max8925",
+> + ? ? ? ? ? ? ? .addr ? ? ? ? ? = 0x3c,
+> + ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= IRQ_MMP2_PMIC,
+> + ? ? ? ? ? ? ? .platform_data ?= &brownstone_max8925_info,
+> + ? ? ? },
+> +};
+> +
+> +static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+> + ? ? ? .max_speed ? ? ?= 25000000,
+> +};
+> +
+> +static void __init brownstone_init(void)
+> +{
+> + ? ? ? mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
+> +
+> + ? ? ? /* on-chip devices */
+> + ? ? ? mmp2_add_uart(1);
+> + ? ? ? mmp2_add_uart(3);
+> + ? ? ? mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
+> + ? ? ? mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
+> +}
+> +
+> +MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
+> + ? ? ? /* Maintainer: Haojian Zhuang <haojian.zhuang@marvell.com> */
+> + ? ? ? .map_io ? ? ? ? = mmp_map_io,
+> + ? ? ? .nr_irqs ? ? ? ?= BROWNSTONE_NR_IRQS,
+> + ? ? ? .init_irq ? ? ? = mmp2_init_irq,
+> + ? ? ? .timer ? ? ? ? ?= &mmp2_timer,
+> + ? ? ? .init_machine ? = brownstone_init,
+> +MACHINE_END
+> +
+> --
+> 1.5.6.5
+>
+>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The above looks good. I've separate them into two patches
+and they are now applied.
