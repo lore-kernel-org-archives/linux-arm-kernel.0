@@ -1,30 +1,60 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 25 Nov 2010 10:51:36 +0200
-Subject: [PATCH v2] Add call to non-crashing cores through IPI
-In-Reply-To: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
-References: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
-Message-ID: <20101125085136.GM14080@gw.healthdatacare.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 25 Nov 2010 09:52:19 +0100
+Subject: [patch 1/1] iMX51: introduce MX51_GPIO_NR
+In-Reply-To: <20101125082456.GL6017@pengutronix.de>
+References: <20101122224526.987309475@rtp-net.org>
+	<AANLkTi=Q=UOSUoJ40ThyyyDqMoC849W-cn36CkVFxKhQ@mail.gmail.com>
+	<87zksywt4l.fsf@lechat.rtp-net.org>
+	<20101125082456.GL6017@pengutronix.de>
+Message-ID: <20101125085219.GE8950@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 24, 2010 at 09:28:28AM +0100, Per Fransson wrote:
-> v2 changes:
-> * the interrupts of the calling core are no longer disabled
->   before performing the IPI
-
-This version information should go after the commit message below
-the '---' line.
-
-> ---
+On Thu, Nov 25, 2010 at 09:24:56AM +0100, Sascha Hauer wrote:
+> On Wed, Nov 24, 2010 at 06:04:09PM +0100, Arnaud Patard wrote:
+> > Fabio Estevam <festevam@gmail.com> writes:
+> > 
+> > Hi,
+> > 
+> > > Hi Arnaud,
+> > >
+> > > 2010/11/22 Arnaud Patard <arnaud.patard@rtp-net.org>:
+> > >> Currently, to define a GPIO number, we're using something like :
+> > >>
+> > >> #define EFIKAMX_PCBID0 ? ? ? ? (2*32 + 16)
+> > >>
+> > >> to define GPIO 3 16.
+> > >>
+> > >> This is not really readable and it's error prone imho (note the 3 vs 2).
+> > >> So, I'm introducing a new macro to define this in a better way. Now, the
+> > >> code sample become :
+> > >>
+> > >> #define EFIKAMX_PCBID0 ? ? ? ? MX51_GPIO_NR(3, 16)
+> > >
+> > > Can you rename the macro to MX5x_GPIO_NR instead of MX51_GPIO_NR?
+> > >
+> > > This way we can also use this macro for MX53 and MX508 when they show
+> > > up in mainline.
+> > 
+> > I've been wondering about to use MX5X instead of MX51 but I kept MX51
+> > because I didn't know how the GPIO will work on MX53. If they're
+> > compatible, you're right, the name should be MX5X_GPIO_NR and not
+> > MX51_GPIO_NR. Assuming you mail means that, I'm going to switch to
+> > MX5X_GPIO_NR.
 > 
-> When kexec is used to start a crash kernel the other cores
-> are notified. These non-crashing cores will save their state
-> in the crash notes and then do nothing.
-> 
-> Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+> So far all i.MX use the same gpio numbering and I see no reason why this
+> should be changed in future SoCs, so I would go for a IMX_GPIO_NR
+> instead of SoC specific variants.
 
-I tested this on UP machine (I don't have access to any SMP hardware) -
-it didn't break anything and the crashdump works perfectly.
+Ok, we are talking about Freescale here, but in this very special case I'm
+confident they won't change it. I hope none of the hardware engineers
+reads this, I'm sure they are always looking for good ideas to make
+the life of the software developers harder.
 
-Regards,
-MW
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
