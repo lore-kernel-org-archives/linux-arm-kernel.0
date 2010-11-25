@@ -1,36 +1,42 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 25 Nov 2010 14:39:01 +0100
-Subject: [PATCH 6/7] i2c/pxa2xx: reset the chip if the bus is not free
-In-Reply-To: <4CEE602D.5090501@compulab.co.il>
-References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>	<1290633617-15311-7-git-send-email-bigeasy@linutronix.de>	<AANLkTikvN+==eTkoh7CTQyN0mbfvPhH6Uh9NX5QW7WFx@mail.gmail.com>
-	<AANLkTi=8Xy3M7QGO54nt_r0_12z3+o8G5fAqQmxkTH4o@mail.gmail.com>
-	<4CEE05A4.6030201@compulab.co.il> <4CEE5587.90109@linutronix.de>
-	<4CEE602D.5090501@compulab.co.il>
-Message-ID: <4CEE66F5.30705@linutronix.de>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Thu, 25 Nov 2010 21:51:23 +0800
+Subject: [PATCH v2 2/3] ARM: cns3xxx: Add architecture definition for
+	EHCI/OHCI controller
+In-Reply-To: <20101125104817.GA31779@oksana.dev.rtsoft.ru>
+References: <1290443565-20766-1-git-send-email-mkl0301@gmail.com>
+	<1290443565-20766-3-git-send-email-mkl0301@gmail.com>
+	<20101124161122.GA15902@oksana.dev.rtsoft.ru>
+	<AANLkTimMEALmH08RKQet_MGiyEFYpD2kVtPtmKJpmhtZ@mail.gmail.com>
+	<20101125104817.GA31779@oksana.dev.rtsoft.ru>
+Message-ID: <AANLkTikDFe55ksjia85WSecsUw+VQpYnVO-xCkhdmcYO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg wrote:
-> I don't think there is such a rule for this case, as if we "believe" the
-> Developer Manual, but do the opposite - we can get into trouble...
-> IMHO, at least we need to report a problem.
+2010/11/25 Anton Vorontsov <cbouatmailru@gmail.com>:
+> On Thu, Nov 25, 2010 at 03:25:38PM +0800, Lin Mac wrote:
+> [...]
+>> > ?#include <linux/module.h>
+>> > ?#include <linux/io.h>
+>> > ?#include <linux/delay.h>
+>> > +#include <asm/atomic.h>
+>> It's not necessary for mach/pm.h already included it, right?
 >
-> Or may be in some way reset the slave device,
-> if there is such an option available outside the i2c scope...
-> (Yeah, I know this is a crazy idea...)
+> Technically, it's not necessary. But in Linux we don't rely on
+> headers including other headers. Think that someday mach/pm.h
+> may not include asm/atomic.h, so the build will break.
+>
+> Thanks,
 
-Doing the oposite what the manual says is not a good idea. Let's discard 
-the patch for now.
+Get it. So should I re-submit all 3 patches, or just the last one?
 
->>>> From my experience, in master mode resetting the controller
->>> does not help and if the bus is busy for too much time,
->>> there always was a h/w problem involved.
->> Looks like it.
-> 
-> 1) Well, you should check if you have a pull-up resistors on that bus.
-> 2) Or if the slave device chip is broken, then it should be replaced.
-
-Thanks for the hint. I try to check the HW and see if there can be done
-something about it.
-
-Sebastian
+>>
+>> > ?#include <mach/system.h>
+>> > ?#include <mach/cns3xxx.h>
+>> > ?#include <mach/pm.h>
+>> > @@ -117,3 +118,6 @@ int cns3xxx_cpu_clock(void)
+>> > ? ? ? ?return cpu;
+>> > ?}
+>> > ?EXPORT_SYMBOL(cns3xxx_cpu_clock);
+>> > +
+>> > +atomic_t usb_pwr_ref = ATOMIC_INIT(0);
+>> > +EXPORT_SYMBOL(usb_pwr_ref);
