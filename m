@@ -1,41 +1,72 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 25 Nov 2010 19:15:50 +0300
-Subject: [PATCH v2 2/3] ARM: cns3xxx: Add architecture definition for
-	EHCI/OHCI controller
-In-Reply-To: <Pine.LNX.4.44L0.1011251031220.22247-100000@netrider.rowland.org>
-References: <20101125135614.GA22212@oksana.dev.rtsoft.ru>
-	<Pine.LNX.4.44L0.1011251031220.22247-100000@netrider.rowland.org>
-Message-ID: <20101125161550.GA2580@oksana.dev.rtsoft.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Nov 2010 17:21:12 +0100
+Subject: [PATCH 02/10] MCDE: Add configuration registers
+In-Reply-To: <F45880696056844FA6A73F415B568C695365E671B7@EXDCVYMBSTM006.EQ1STM.local>
+References: <1289390653-6111-1-git-send-email-jimmy.rubin@stericsson.com>
+	<201011121614.51528.arnd@arndb.de>
+	<F45880696056844FA6A73F415B568C695365E671B7@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <201011251721.12315.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 10:37:16AM -0500, Alan Stern wrote:
-> > > 2010/11/25 Anton Vorontsov <cbouatmailru@gmail.com>:
-> > > > On Thu, Nov 25, 2010 at 03:25:38PM +0800, Lin Mac wrote:
-> > > > [...]
-> > > >> > ??#include <linux/module.h>
-> > > >> > ??#include <linux/io.h>
-> > > >> > ??#include <linux/delay.h>
-> > > >> > +#include <asm/atomic.h>
-> > > >> It's not necessary for mach/pm.h already included it, right?
-> > > >
-> > > > Technically, it's not necessary. But in Linux we don't rely on
-> > > > headers including other headers.
+On Thursday 25 November 2010, Jimmy RUBIN wrote:
 > 
-> Just saw this.  Don't be ridiculous -- this happens all over the place.
-> People generally aren't aware of it, because it's next to impossible to
-> verify that all the headers needed by a source file are included
-> directly.
+> All these header files,
+> Configuration, pixel processing, formatter, dsi link registers are auto generated from an xml file.
 
-Sure. But that doesn't mean we shouldn't try to keep these things
-sane enough.
+This actually may or may not be a legal problem, because it means that the
+distributed source code is not the preferred form for making modifications
+as the GPL intends, you might want to ask a lawyer. Distributing the XML
+file and the script with the kernel would solve that, but people might
+consider that ugly ;-).
 
-I just noticed that the patch introduced atomic_t usage, but didn't
-include asm/atomic.h, so I corrected this before applying that patch.
-So I don't see what's the fuss is about. :-)
+> This is made because there are many registers which a prone to change for new hardware revisions and there is a possibility to exclude registers that are not used.
+> The chance of manual errors are less this way.
+> 
+> I also believe that these helper macros makes the source code easier to read.
+> For example.
+> #define MCDE_CR_DSICMD2_EN_V1_SHIFT 0
+> #define MCDE_CR_DSICMD2_EN_V1_MASK 0x00000001
+> #define MCDE_CR_DSICMD2_EN_V1(__x) \
+> 	MCDE_VAL2REG(MCDE_CR, DSICMD2_EN_V1, __x)
+> 
+> Writing a single field in the register MCDE_CR can e.g. be done like this:
+> mcde_wfld(MCDE_CR, DSICMD1_EN_V1, true);
+> 
+> and for a whole register (a totally other register but just to show):
+> 		mcde_wreg(MCDE_ROTACONF + chnl_id * MCDE_ROTACONF_GROUPOFFSET,
+> 			MCDE_ROTACONF_ROTBURSTSIZE_ENUM(8W) |
+> 			MCDE_ROTACONF_ROTBURSTSIZE_HW(1) |
+> 			MCDE_ROTACONF_ROTDIR(regs->rotdir) |
+> 			MCDE_ROTACONF_STRIP_WIDTH_ENUM(16PIX) |
+> 			MCDE_ROTACONF_RD_MAXOUT_ENUM(4_REQ) |
+> 			MCDE_ROTACONF_WR_MAXOUT_ENUM(8_REQ));
 
-Thanks,
+I see what you mean, though I would probably still prefer an inline
+function for doing the same:
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+static inline void mcde_write_rotaconf(struct mcde_chnl *chnl, unsigned burstsize,
+				unsigned rotdir, unsigned strip_width,
+				unsigned rd_maxout, wr_maxout)
+{
+	unsigned __iomem *reg = chnl->base + MCDE_ROTACONF +
+				chnl->id * MCDE_ROTACONF_GROUPOFFSET;
+
+	writel(reg, burstsize << 20 | rotdir << 12 | strip_width << 8 |
+		rd_maxout << 4 | wr_maxout);
+}
+
+Anyway, it's not really important how you do it, this is mostly a matter
+of personal preference. If you can find a way to make it more readable,
+that would be really good, but it's really a minor issue compared to
+getting the overall layering inside the driver right.
+
+> I agree that the header files looks a bit unreadable I will try indent as you
+> suggested I am just worried about the file size. (Patch limit 100kbyte)
+
+Don't worry about the patch size limit too much, that is not the real
+problem here ;-). For review, you can always cut parts of these files
+since nobody will notice a problem in the middle of 2000 almost identical
+source lines. When you ask for a git pull, the size no longer matters.
+
+	Arnd
