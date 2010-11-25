@@ -1,28 +1,27 @@
-From: tony@bakeyournoodle.com (Tony Breeds)
-Date: Thu, 25 Nov 2010 11:02:04 +1100
-Subject: Cross compilers available on kernel.org
-In-Reply-To: <19676.63422.614246.989202@pilspetsen.it.uu.se>
-References: <1288897002-24073-1-git-send-email-rabin@rab.in>
-	<yw1xy698ygbx.fsf@unicorn.mansr.com>
-	<19667.9199.798932.405415@pilspetsen.it.uu.se>
-	<AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
-	<19667.52998.909668.596635@pilspetsen.it.uu.se>
-	<AANLkTimkSxWNL+aCALGsf5prBM_RHz0BMHCeNwKrTnfA@mail.gmail.com>
-	<19668.21026.5416.610777@pilspetsen.it.uu.se>
-	<20101112044548.GA19615@ozlabs.org>
-	<19676.63422.614246.989202@pilspetsen.it.uu.se>
-Message-ID: <20101125000204.GI19615@ozlabs.org>
+From: zhang.zhilong@gmail.com (Zhilong zhang)
+Date: Thu, 25 Nov 2010 16:26:24 +0800
+Subject: composite gadget driver want use 8 endpoints ,but my mcu only has 6
+	endpoints include control ep0
+Message-ID: <AANLkTim1UdMV4+0y5Rk-1yz+zRJPsWG1kB2tDUzBj4cm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All, 
-        I've just added 4.4.5 and 4.5.1 hosted on i686 and x86_64 to:
-http://kernel.org/pub/tools/crosstool/files/bin/
+Hi,everyone.
 
-These compilers do not have libc support so they're pretty much only useful
-for building the kernel.
+I want to write a composite gadget driver which can supply 3
+functions:printer, scanner, modem communication . The mcu is at91sam9263
+which has 6 endpoints.
+and my printer interface use 2 endpoints , scanner use 3 endpoints and modem
+comm use 2 endpoints and a control endpoint. And the endpoints are more than
+6 endpoints include ep0.
 
-If you'd like to see other platforms there or have feature requests don't
-hesitate to poke me.
+How can I do? Can I alloc 2 endpoints for both printer and modem comm?
 
-Yours Tony
+regard your reply.
+Thank you .
+
+-- 
+Zhang Zhilong
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101125/b84fa9c3/attachment-0001.html>
