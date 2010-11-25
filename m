@@ -1,17 +1,19 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 25 Nov 2010 19:38:07 +0100
+Date: Thu, 25 Nov 2010 19:38:59 +0100
 Subject: OMAP2+: PM/serial: hold console semaphore while OMAP UARTs are
 	disabled
-In-Reply-To: <alpine.DEB.2.00.1011251017390.20215@utopia.booyaka.com>
+In-Reply-To: <alpine.DEB.2.00.1011251103480.20215@utopia.booyaka.com>
 References: <alpine.DEB.2.00.1011241646310.20215@utopia.booyaka.com>
 	<AANLkTina+O1GgMgS0qDKix=d4HOtT1fFrCotTuCCxACv@mail.gmail.com>
-	<alpine.DEB.2.00.1011251017390.20215@utopia.booyaka.com>
-Message-ID: <AANLkTik5cRQPodAYtacTD5EdQYnDbvGgOoNfNfHuW+fq@mail.gmail.com>
+	<alpine.DEB.2.00.1011251103480.20215@utopia.booyaka.com>
+Message-ID: <AANLkTi=L7COp0gxEG_ECabfa=eA7FU2W8-2zqqydV+Hi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 6:35 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hello Jean
+Paul,
+
+On Thu, Nov 25, 2010 at 7:15 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi
 >
 > On Thu, 25 Nov 2010, Jean Pihet wrote:
 >
@@ -30,55 +32,13 @@ On Thu, Nov 25, 2010 at 6:35 PM, Paul Walmsley <paul@pwsan.com> wrote:
 >> ? / # echo 5 > /sys/devices/platform/omap/omap-hsuart.2/sleep_timeout
 >> and waiting 5 seconds hangs the console.
 >
-> If this is without sleep_while_idle enabled, then you're seeing an
-> unrelated bug that is not related to this patch. ?That's because, when
-> /debug/pm_debug/sleep_while_idle is 0, the pm34xx.c code that this patch
-> touches won't be reached.
-Ok so we still have a problem. I understood the correct fix is to
-migrate the UART code to hwmod.
-
-> By the way, you write that the above situation "hangs the console." ?Is it
-> just the case that the console dies and the rest of the system is still
-> alive, or does the whole system crash?
-The console hangs, the rest of the system still runs.
-
->> However enabling sleep_while_idle before configuring the UART2 timeout
->> makes it work ok:
->> ? / # echo 5 > /sys/devices/platform/omap/omap-hsuart.0/sleep_timeout
->> ? / # echo 5 > /sys/devices/platform/omap/omap-hsuart.1/sleep_timeout
->> ? / # echo 1 > /debug/pm_debug/sleep_while_idle
->> ? / # echo 5 > /sys/devices/platform/omap/omap-hsuart.2/sleep_timeout
->>
->> This result is similar to what I tested on a recent l-o master w/o the fix.
->> Am I missing something?
->
-> It may depend on your loglevel settings. ?If warning messages aren't
-> emitted to the console, then you won't see this crash.
->
-> Whether the system crashes also depends on whether you happen to get a new
-> worst-case deactivation latency from your console serial port during PM
-> idle. ?If not, and there are no other console writes after the UART is
-> disabled, then this patch won't affect anything.
->
-> Just FYI, without this patch, Tony's N810 crashed reliably upon entering
-> dynamic idle.
-'crashed reliably' ;p
-
->
->> One more remark. With OFF mode enabled I noticed that PER can go OFF
->> without CORE going OFF, which could trigger the errata i582. I think
->> this is another latent problem.
->
-> This appears to be unrelated to the patch under discussion. ?Maybe you
-> should start a separate list thread on this issue? ?We do not appear to
-> have the suggested workaround sequence in the TRM in the current code.
-> This workaround is quite complex. ?Someone from TI should definitely put
-> together some patches to implement it.
-Yes this is unrelated, let's discuss this separately.
+> By the way, I just tried this on a Beagle 35xx rev C2, with Tony's commit
+> 063d907edaf3fbf9776c189c3e02f2c7a129d18c, and did not see any hang. ? Are
+> you using a linux-omap kernel?
+Yes this is using l-o master on Beagle B5.
 
 >
 >
 > - Paul
 
-Thanks,
 Jean
