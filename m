@@ -1,69 +1,196 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 25 Nov 2010 10:07:45 +0530
-Subject: [PATCH v7 07/11] OMAP3: hwmod data: Add GPIO
-In-Reply-To: <4CED96EC.1040608@ti.com>
-References: <1290524213-395-1-git-send-email-charu@ti.com>
-	<1290524213-395-8-git-send-email-charu@ti.com>
-	<4CED96EC.1040608@ti.com>
-Message-ID: <AANLkTik4dtCv9uVbL4dJgw+mpK-WWGZykUHSsKv4zvEZ@mail.gmail.com>
+From: mugdha@ti.com (Kamoolkar, Mugdha)
+Date: Thu, 25 Nov 2010 11:35:02 +0530
+Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
+In-Reply-To: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
+References: <1290526740-27624-1-git-send-email-ohad@wizery.com>
+	<1290526740-27624-2-git-send-email-ohad@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302479315FB@dbde02.ent.ti.com>
+	<AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247931C4B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+Ohad,
 
-On Thu, Nov 25, 2010 at 04:21, Cousson, Benoit <b-cousson@ti.com> wrote:
-> On 11/23/2010 3:56 PM, Varadarajan, Charulatha wrote:
->>
->> Add GPIO hwmod data for OMAP3
->>
->> Signed-off-by: Charulatha V<charu@ti.com>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
+> -----Original Message-----
+> From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
+> Sent: Thursday, November 25, 2010 1:29 AM
+> To: Kamoolkar, Mugdha
+> Cc: linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; akpm at linux-foundation.org; Greg KH; Tony
+> Lindgren; Cousson, Benoit; Grant Likely; Kanigeri, Hari; Anna, Suman;
+> Kevin Hilman; Arnd Bergmann
+> Subject: Re: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
+> 
+> Hi Mugdha,
+> 
+> On Wed, Nov 24, 2010 at 9:44 AM, Kamoolkar, Mugdha <mugdha@ti.com> wrote:
+> > How do multiple clients get a handle that they can use? Are they
+> expected to
+> > share the handle they get from the call above?
+> 
+> Currently, yes.
+> 
+> > What if they are independent
+> > clients with no means of communication between them? There may be a need
+> of
+> > an API that returns the handle for a specific ID. For example, a module
+> over
+> > the hwspinlock driver that does some level of management of IDs (e.g.
+> name
+> > to ID mapping) and enables users to get multi-core as well as multi-
+> client
+> > protection on Linux.
+> 
+> I'm not sure I understand the use case. Can you please elaborate ?
+> 
+Consider a software module on top of the hwspinlock, which provides a 
+generic way for multi-core critical section, say GateMP. This module enables 
+users to create critical section objects by name. Any other client can open 
+the critical section by name and get a handle to it. I would expect this 
+module to make a call to request a resource when creating the GateMP object. 
+Suppose that the object is actually created by the remote core, and the call 
+comes to Linux on the host processor to allocate the system resource (as the 
+owner of the system resources). It will call hwspinlock_request, get a 
+handle, get the ID from it, and return the ID to the remote processor. There 
+is no point in the remote processor holding the handle that's not valid in 
+its virtual space. The ID, in this case, is the single portable value that 
+every processor understands in a different way. When this object were being 
+deleted, the ID would be passed to Linux, and a corresponding Linux entity 
+would then have to get the handle from the ID and call _free.
 
-Thanks.
+Similarly, suppose the creation is happening from user-space, the user-space 
+object should store the ID in the user object, and get the handle from the 
+ID when performing any actions on the lock from kernel-side.
 
->
->> ---
->> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ?360
->> ++++++++++++++++++++++++++++
->> ?1 files changed, 360 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> index a8bed84..9ca2206 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> @@ -20,6 +20,7 @@
->> ?#include<plat/serial.h>
->> ?#include<plat/l4_3xxx.h>
->> ?#include<plat/i2c.h>
->> +#include<plat/gpio.h>
->> ?#include<plat/omap34xx.h>
->>
->> ?#include "omap_hwmod_common_data.h"
->> @@ -45,6 +46,12 @@ static struct omap_hwmod omap3xxx_wd_timer2_hwmod;
->> ?static struct omap_hwmod omap3xxx_i2c1_hwmod;
->> ?static struct omap_hwmod omap3xxx_i2c2_hwmod;
+> > For example:
+> > struct hwspinlock *hwspinlock_get_handle(unsigned int id);
+> 
+> I'm afraid such an API will be easily abused, e.g., drivers that will
+> try to use a predefined hwspinlock id without taking care of reserving
+> it early enough will probably use it to overcome an "oops this
+> hwspinlock has already been assigned to someone else".
+> 
+Really? Why would they intentionally destabilize the system like this???
 
-<<snip>>
+> So let me suggest we should first understand the use case for the API
+> you propose, and then see how we solve it ?
+> 
+> > Why are some of the APIs hwspinlock_ and others hwspin_?
+> 
+> I'm following the regular spinlock naming, which nicely avoids having
+> the word 'lock' twice in the API. So you get APIs like hwspin_lock,
+> hwspin_unlock, hwspin_trylock. In our case we still have stuff like
+> hwspinlock_request and hwspinlock_free. I can probably make it
+> hwspin_lock_request, does that look nicer ?
+> 
+No real issues with this, just seems less intuitive. I just expected all the 
+module APIs to follow same convention <module>_API to make them more 
+intuitive.
 
->> +};
->> +
->> +/* gpio1 */
->> +static struct omap_hwmod_irq_info omap3xxx_gpio1_irqs[] = {
->> + ? ? ? { .name = "gpio_mpu_irq", .irq = 29 }, /* INT_34XX_GPIO_BANK1 */
->
-> In this case the name is not necessarily needed since there is only one irq
-> line.
-> You can save some memory by just adding the .irq field.
+> >> + ?int hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long
+> timeout);
+> >> + ? - lock a previously-assigned hwspinlock with a timeout limit
+> (specified in
+> >> + ? ? jiffies). If the hwspinlock is already taken, the function will
+> busy
+> >> loop
+> >> + ? ? waiting for it to be released, but give up when the timeout meets
+> >> jiffies.
+> >> + ? ? If timeout is 0, the function will never give up (therefore if a
+> faulty
+> >> + ? ? remote core never releases the hwspinlock, it will deadlock).
+> > If timeout is 0, shouldn't it rather behave as a trylock? If timeout is
+> > MAX_SCHEDULE_TIMEOUT, then it should behave as a wait-forever.
+> 
+> Good point, thanks!
+> 
+> >> + ?int hwspin_trylock(struct hwspinlock *hwlock);
+> >> + ? - attempt to lock a previously-assigned hwspinlock, but immediately
+> fail
+> >> if
+> >> + ? ? it is already taken.
+> >> + ? ? Upon a successful return from this function, preemption is
+> disabled so
+> >> + ? ? caller must not sleep, and is advised to release the hwspinlock
+> as soon
+> >> as
+> >> + ? ? possible, in order to minimize remote cores polling on the
+> hardware
+> >> + ? ? interconnect.
+> >> + ? ? Returns 0 on success and an appropriate error code otherwise
+> (most
+> >> + ? ? notably -EBUSY if the hwspinlock was already taken).
+> >> + ? ? The function will never sleep.
+> > Is this function needed at all if timeout 0 behaves similar to trylock?
+> 
+> Yeah. Drivers should use the _trylock version when applicable because
+> it'd make the code more readable, and it's more intuitive (just like
+> the spin_trylock API).
+Agreed.
 
-Yes, I too thought about it. But to be consistent with other devices,
-I included it here
-as I did not receive any comments before on this. Anyways, will remove
-them while
-re-sending patches as per Kevin's suggestions to rebase them on pm-core branch.
+> 
+> >> + ?struct hwspinlock *hwspinlock_unregister(unsigned int id);
+> >> + ? - to be called from the underlying vendor-specific implementation,
+> in
+> >> order
+> >> + ? ? to unregister an existing (and unused) hwspinlock instance.
+> >> + ? ? Can be called from an atomic context (will not sleep) but not
+> from
+> >> + ? ? within interrupt context.
+> >> + ? ? Returns the address of hwspinlock on success, or NULL on error
+> (e.g.
+> >> + ? ? if the hwspinlock is sill in use).
+> > Does this need to be called for all hwspinlocks?
+> 
+> Currently, yes.
+> 
+Ok, that should be fine.
 
->
-> Benoit
->
+> I actually am planning an improvement that would allow registering a
+> block of hwspinlocks; I don't think that the multiple calls of
+> register/unregister is that bad (it happens only once at boot), but I
+> want to allow sharing of the owner, ops and dev members of the
+> hwspinlock instances (to save some memory).
+> 
+> Anyway, it's not a big improvement, so I planned first to get things
+> merged and then look into stuff like that.
+> 
+> >> +int __hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long to,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int mode, unsigned long *flags)
+> >> +{
+> >> + ? ? int ret;
+> >> +
+> >> + ? ? for (;;) {
+> >> + ? ? ? ? ? ? /* Try to take the hwspinlock */
+> >> + ? ? ? ? ? ? ret = __hwspin_trylock(hwlock, mode, flags);
+> >> + ? ? ? ? ? ? if (ret != -EBUSY)
+> >> + ? ? ? ? ? ? ? ? ? ? break;
+> >> +
+> >> + ? ? ? ? ? ? /*
+> >> + ? ? ? ? ? ? ?* The lock is already taken, let's check if the user
+> wants
+> >> + ? ? ? ? ? ? ?* us to try again
+> >> + ? ? ? ? ? ? ?*/
+> >> + ? ? ? ? ? ? if (to && time_is_before_eq_jiffies(to))
+> >> + ? ? ? ? ? ? ? ? ? ? return -ETIMEDOUT;
+> >> +
+> >> + ? ? ? ? ? ? /*
+> >> + ? ? ? ? ? ? ?* Allow platform-specific relax handlers to prevent
+> >> + ? ? ? ? ? ? ?* hogging the interconnect (no sleeping, though)
+> >> + ? ? ? ? ? ? ?*/
+> >> + ? ? ? ? ? ? if (hwlock->ops->relax)
+> >> + ? ? ? ? ? ? ? ? ? ? hwlock->ops->relax(hwlock);
+> > There should be a way to have an escape mechanism for the case where a
+> deadlock
+> > has occurred due to remote side taking the spinlock and crashing.
+> 
+> This is exactly what the timeout parameter is for..
+> 
+I was looking at the situation where someone does not use the lock with 
+timeout. In that case, do we say that there's no way out? And the system 
+will hang and need a re-boot? Or do we still want to enable some way to 
+forcibly break the wait after it has happened for an unreasonably long time?
+
+> Thanks,
+> Ohad.
