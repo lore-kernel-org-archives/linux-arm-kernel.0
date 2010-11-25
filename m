@@ -1,42 +1,52 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 25 Nov 2010 15:22:06 -0500 (EST)
-Subject: [PATCH v3 1/1] USB: cns3xxx: Add EHCI and OHCI bus glue for
-	cns3xxx SOCs
-In-Reply-To: <20101125171541.GA18152@suse.de>
-Message-ID: <Pine.LNX.4.44L0.1011251521310.26094-100000@netrider.rowland.org>
+From: david-b@pacbell.net (David Brownell)
+Date: Thu, 25 Nov 2010 12:22:28 -0800
+Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
+In-Reply-To: <AANLkTinQdNC0XaOqNyDbdYE6ZcP0QyzpN492j=Kovuea@mail.gmail.com>
+References: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
+	<536589.12568.qm@web180310.mail.gq1.yahoo.com>
+	<AANLkTinQdNC0XaOqNyDbdYE6ZcP0QyzpN492j=Kovuea@mail.gmail.com>
+Message-ID: <1290716548.2529.136.camel@helium>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Nov 2010, Greg KH wrote:
-
-> On Thu, Nov 25, 2010 at 07:21:58PM +0300, Anton Vorontsov wrote:
-> > On Thu, Nov 25, 2010 at 11:58:00PM +0800, mkl0301 at gmail.com wrote:
-> > > From: Mac Lin <mkl0301@gmail.com>
-> > > 
-> > > The CNS3XXX SOC has include USB EHCI and OHCI compatible controllers. This
-> > > patch adds the necessary glue logic to allow ehci-hcd and ohci-hcd drivers to
-> > > work on CNS3XXX
-> > > 
-> > > The EHCI and OHCI controllers share a common clock control and reset bit,
-> > > therefore additional check for the timming of enabling and disabling is
-> > > required. The USB bit of PLL Power Down Control is also shared by OTG, 24MHz
-> > > UART clock, Crypto clock, PCIe reference clock, and Clock Scale Generator.
-> > > Therefore we only ensure it is enabled, while not disabling it.
-> > > 
-> > > Signed-off-by: Mac Lin <mkl0301@gmail.com>
-> > 
-> > Thanks for the patch!
-> > 
-> > Cc'ing Greg.
-> > 
-> > Greg, the patch doesn't touch any sensitive parts of EHCI and OHCI
-> > drivers, can I take it via ARM subtree? This is to not introduce
-> > cross-tree dependencies (the patch depends on some arch-specific
-> > changes).
+On Thu, 2010-11-25 at 08:40 +0200, Ohad Ben-Cohen wrote:
+> On Thu, Nov 25, 2010 at 5:59 AM, David Brownell <david-b@pacbell.net> wrote:
+> > My rule of thumb is that nothing is "generic"
+> > until at least three whatever-it-is instances
+> > plug in to it.  Sometimes this is called
+> > the "Rule of Three".
+> >
+> > Other than OMAP, what's providing hardware
+> > spinlocks that plug into this framework?
 > 
-> Please get Alan Stern to ack it as well, as he knows the proper
-> callbacks that you need to ensure are present.
+> We are not aware of any.
 
-As far as the callbacks are concerned, this looks fine.
+So there's no strong reason to think this is
+actually "ggeneric".  Function names no longer
+specify OMAP, but without other hardware under
+the interface, calling it "generic" reflects
+more optimism than reality.  (That was the
+implication of my observations...)
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+To find other hardware spinlocks, you might be
+able to look at fault tolerant multiprocessors.
+Ages ago I worked with one of those, where any
+spinlock failures integrated with CPU/OS fault
+detection; HW cwould yank (checkpointed) CPU boards
+off the bus so they could be recovered (some
+might continue later from checkpoints, etc.)...
+
+> This way platforms [2] can easily plug into the framework anything
+> they need to achieve multi-core synchronization. E.g., even in case a
+> platform doesn't have dedicated silicon, but still need this
+> functionality, it can still plug in an implementation which is based
+> on Peterson's shared memory mutual exclusion algorithm 
+
+And maybe also standard Linux spinlocks?
+
+I seem to recall some iterations of the real-time patches doing a lot of
+work to generalize spinlocks, since they needed multiple variants.  It
+might be worth following in those footsteps.  (Though I'm not sure they
+were thinking much about hardware support .
+
+- Dave
