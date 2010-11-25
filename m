@@ -1,27 +1,17 @@
-From: zhang.zhilong@gmail.com (Zhilong zhang)
-Date: Thu, 25 Nov 2010 16:26:24 +0800
-Subject: composite gadget driver want use 8 endpoints ,but my mcu only has 6
-	endpoints include control ep0
-Message-ID: <AANLkTim1UdMV4+0y5Rk-1yz+zRJPsWG1kB2tDUzBj4cm@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Thu, 25 Nov 2010 18:04:38 +0800
+Subject: [PATCH] mc13892 regulator enable on mx51 babbage board
+In-Reply-To: <AANLkTinZM=hxidn1gcwxA4yFaO2QjdjDdoF-tZRJuP0n@mail.gmail.com>
+References: <AANLkTinZM=hxidn1gcwxA4yFaO2QjdjDdoF-tZRJuP0n@mail.gmail.com>
+Message-ID: <AANLkTinV3EUwfiFHz6KmMAYfmMEH21mAX6R8pCFLTdee@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,everyone.
+Hi there,
 
-I want to write a composite gadget driver which can supply 3
-functions:printer, scanner, modem communication . The mcu is at91sam9263
-which has 6 endpoints.
-and my printer interface use 2 endpoints , scanner use 3 endpoints and modem
-comm use 2 endpoints and a control endpoint. And the endpoints are more than
-6 endpoints include ep0.
+This is the draft patch for mc13892 regulator.
+I send out this patch by copy and paste, since I can not use git
+send-email due to the firewall. sorry for inconvenient.
 
-How can I do? Can I alloc 2 endpoints for both printer and modem comm?
-
-regard your reply.
-Thank you .
-
--- 
-Zhang Zhilong
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101125/b84fa9c3/attachment-0001.html>
+Cheers
+Yong
