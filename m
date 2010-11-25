@@ -1,69 +1,87 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 25 Nov 2010 10:26:28 +0800
-Subject: [PATCH 4/7] i2c/pxa2xx: add support for shared IRQ handler
-In-Reply-To: <1290633617-15311-5-git-send-email-bigeasy@linutronix.de>
+Date: Thu, 25 Nov 2010 10:30:04 +0800
+Subject: [PATCH 6/7] i2c/pxa2xx: reset the chip if the bus is not free
+In-Reply-To: <1290633617-15311-7-git-send-email-bigeasy@linutronix.de>
 References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>
-	<1290633617-15311-5-git-send-email-bigeasy@linutronix.de>
-Message-ID: <AANLkTik11gr1fg=vht2FYBpDZBBhxLXezS8ih752xj=5@mail.gmail.com>
+	<1290633617-15311-7-git-send-email-bigeasy@linutronix.de>
+Message-ID: <AANLkTikvN+==eTkoh7CTQyN0mbfvPhH6Uh9NX5QW7WFx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Nov 25, 2010 at 5:20 AM, Sebastian Andrzej Siewior
 <bigeasy@linutronix.de> wrote:
-> Sodaville has three of them on a single IRQ. IRQF_DISABLED is removed
-> because it is a NOP allready and scheduled for removal.
+> I haven't seen this (yet) during a normal transfer but starting
+> i2cdetect seems to hang the bus. On my Sodaville board, i2cdetect runs
+> fine on bus zero and runs into timeouts on bus one and two. The chip
+> never recovers from this condition. The following transfers hang as
+> well. The ISR_UB never disappears.
+> Issuing a chip reset fixes the timeout and following transfer succeed.
 >
 > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 > Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
 > ---
-> ?drivers/i2c/busses/i2c-pxa.c | ? 10 ++++++++--
-> ?1 files changed, 8 insertions(+), 2 deletions(-)
+> ?drivers/i2c/busses/i2c-pxa.c | ? 35 +++++++++++++++++++----------------
+> ?1 files changed, 19 insertions(+), 16 deletions(-)
 >
 > diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index dc66fde..7647361 100644
+> index bd4b885..1a48470 100644
 > --- a/drivers/i2c/busses/i2c-pxa.c
 > +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -905,11 +905,17 @@ static void i2c_pxa_irq_rxfull(struct pxa_i2c *i2c, u32 isr)
-> ? ? ? ?writel(icr, _ICR(i2c));
+> @@ -257,23 +257,7 @@ static void i2c_pxa_abort(struct pxa_i2c *i2c)
+> ? ? ? ? ? ? ? _ICR(i2c));
 > ?}
 >
-> +#define VALID_INT_SOURCE ? ? ? (ISR_SSD | ISR_ALD | ISR_ITE | ISR_IRF | \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ISR_SAD | ISR_BED)
-> ?static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
+> -static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
+> -{
+> - ? ? ? int timeout = DEF_TIMEOUT;
+>
+> - ? ? ? while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
+> - ? ? ? ? ? ? ? if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
+> - ? ? ? ? ? ? ? ? ? ? ? timeout += 4;
+> -
+> - ? ? ? ? ? ? ? msleep(2);
+> - ? ? ? ? ? ? ? show_state(i2c);
+> - ? ? ? }
+> -
+> - ? ? ? if (timeout < 0)
+> - ? ? ? ? ? ? ? show_state(i2c);
+> -
+> - ? ? ? return timeout < 0 ? I2C_RETRY : 0;
+> -}
+>
+> ?static int i2c_pxa_wait_master(struct pxa_i2c *i2c)
 > ?{
-> ? ? ? ?struct pxa_i2c *i2c = dev_id;
-> ? ? ? ?u32 isr = readl(_ISR(i2c));
+> @@ -425,6 +409,25 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+> ? ? ? ?udelay(100);
+> ?}
 >
-> + ? ? ? isr &= VALID_INT_SOURCE;
-> + ? ? ? if (!isr)
-> + ? ? ? ? ? ? ? return IRQ_NONE;
+> +static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
+> +{
+> + ? ? ? int timeout = DEF_TIMEOUT;
 > +
+> + ? ? ? while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
+> + ? ? ? ? ? ? ? if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
+> + ? ? ? ? ? ? ? ? ? ? ? timeout += 4;
+> +
+> + ? ? ? ? ? ? ? msleep(2);
+> + ? ? ? ? ? ? ? show_state(i2c);
+> + ? ? ? }
+> +
+> + ? ? ? if (timeout < 0) {
+> + ? ? ? ? ? ? ? show_state(i2c);
+> + ? ? ? ? ? ? ? i2c_pxa_reset(i2c);
+> + ? ? ? }
 
-If you return at here, the valid interrupt status event won't be
-cleared in IRQ handler. So I2C interrupt handler will be triggered at
-next time.
+Even you reset I2C controller, it shouldn't help you since bus isn't
+free. I thinkt that you should reset I2C bus before you reseting I2C
+controller.
 
-> ? ? ? ?if (i2c_debug > 2 && 0) {
-> ? ? ? ? ? ? ? ?dev_dbg(&i2c->adap.dev, "%s: ISR=%08x, ICR=%08x, IBMR=%02x\n",
-> ? ? ? ? ? ? ? ? ? ? ? ?__func__, isr, readl(_ICR(i2c)), readl(_IBMR(i2c)));
-> @@ -924,7 +930,7 @@ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
-> ? ? ? ?/*
-> ? ? ? ? * Always clear all pending IRQs.
-> ? ? ? ? */
-> - ? ? ? writel(isr & (ISR_SSD|ISR_ALD|ISR_ITE|ISR_IRF|ISR_SAD|ISR_BED), _ISR(i2c));
-> + ? ? ? writel(isr, _ISR(i2c));
+> +
+> + ? ? ? return timeout < 0 ? I2C_RETRY : 0;
+> +}
 >
-> ? ? ? ?if (isr & ISR_SAD)
-> ? ? ? ? ? ? ? ?i2c_pxa_slave_start(i2c, isr);
-> @@ -1062,7 +1068,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
-> ? ? ? ? ? ? ? ?i2c->adap.algo = &i2c_pxa_pio_algorithm;
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?i2c->adap.algo = &i2c_pxa_algorithm;
-> - ? ? ? ? ? ? ? ret = request_irq(irq, i2c_pxa_handler, IRQF_DISABLED,
-> + ? ? ? ? ? ? ? ret = request_irq(irq, i2c_pxa_handler, IRQF_SHARED,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?i2c->adap.name, i2c);
-> ? ? ? ? ? ? ? ?if (ret)
-> ? ? ? ? ? ? ? ? ? ? ? ?goto ereqirq;
+> ?#ifdef CONFIG_I2C_PXA_SLAVE
+> ?/*
 > --
 > 1.7.3.2
 >
