@@ -1,109 +1,44 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 26 Nov 2010 00:32:37 +0100
-Subject: [PATCH v5 04/12] spi: add ti-ssp spi master driver
-In-Reply-To: <20101118054611.GB13567@suse.de>
-References: <1289848334-8695-1-git-send-email-cyril@ti.com>
-	<20101117161130.GC5757@angua.secretlab.ca>
-	<20101118054611.GB13567@suse.de>
-Message-ID: <201011260032.38154.rjw@sisk.pl>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Thu, 25 Nov 2010 23:52:56 +0000
+Subject: [PATCH 1/7] i2c/pxa2xx: Don't touch ISAR if not in slave mode
+In-Reply-To: <1290633617-15311-2-git-send-email-bigeasy@linutronix.de>
+References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>
+	<1290633617-15311-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20101125235255.GB15948@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 18, 2010, Greg KH wrote:
-> On Wed, Nov 17, 2010 at 09:11:30AM -0700, Grant Likely wrote:
-> > Also, any dependency tracking must work across bus_types.  It is not
-> > sufficient to only handle the platform_devices use-case.  All bus
-> > types have this need.
+On Wed, Nov 24, 2010 at 10:20:11PM +0100, Sebastian Andrzej Siewior wrote:
+> The reset functions sets writes the slave address even in not slave
+> mode. I don't see any reason in writting it if slave mode is not
+> enabled.
+> I have here a PXA-I2C variant where this register is not availbale and
+> as such can not be touched.
 > 
-> Agreed.
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
+> ---
+>  drivers/i2c/busses/i2c-pxa.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> > I see a few potential approaches.
-> > 
-> > Option 1: Add a list of prerequisite devices to struct device and
-> > modify driver core so that it defers binding to a driver until all the
-> > prerequisites are already bound.  This can probably be implemented
-> > in a way that works for all bus types transparently.  Before binding
-> > a driver, the driver core would increase the ref count on each of the
-> > prereq devices, and decrease it again when the driver is removed.
-> 
-> I see loops happening easily that prevent any device from being bound.
-> That could get tricky to debug :(
-> 
-> > Option 2: On a per-bus_type basis have a separate registration and the
-> > bus type code would hold the device unregistered in a pending list.
-> > This option would also add a prerequisites list to struct device.
-> 
-> When would we process the "pending list"?
-> 
-> I can see something like this working, up to a point.  Once device (or
-> driver) registration is complete, we would walk the lists of busses and
-> see if anything new wants to be bound again, now that something new has
-> shown up, instead of just walking the single bus.
-> 
-> But then we have the issue of devices that never are bound to anything,
-> it could get a little "noisy" with them never binding, but we can't rely
-> on the fact that not all devices are not bound to know when to stop
-> trying.
-> 
-> This might be the simplest to try out as we do almost all of this today
-> in the driver core (walk the list and try to bind all unbound devices to
-> a new driver.)  Just extend that walking to walk all other busses as
-> well.  But this would require that the drivers know when they can't bind
-> to a device due to something not being set up properly, which I don't
-> know if is always true.
-> 
-> > Option 3: Don't try to handle it in the bus_type or driver core code
-> > at all, but rather provide board support code with helpers to make
-> > waiting for other devices easy.  Even in this case I think it is
-> > probably still a good idea for the dependant devices to increment
-> > the refcount of the prereq devices.
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index f4c19a9..579c8a8 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -418,7 +418,9 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+>  	writel(I2C_ISR_INIT, _ISR(i2c));
+>  	writel(readl(_ICR(i2c)) & ~ICR_UR, _ICR(i2c));
+>  
+> +#ifdef CONFIG_I2C_PXA_SLAVE
+>  	writel(i2c->slave_addr, _ISAR(i2c));
+> +#endif
 
-That's necessary IMO.
+I was thinking about whether to add a flag to this to say whether the
+slave_addr field is valid, but to keep full compatiblity with the existing
+pxa users, we'd have to go and change every board using it.
 
-> > Perhaps something that is used like:
-> > 
-> > void do_second_registration(void)
-> > {
-> > 	/* register list of dependant devices */
-> > }
-> > 
-> > and then in the primary registration function:
-> > 	...
-> > 	device_notify_when_bound(&prereq_pdev->dev,
-> > 				 do_second_registration);
-> > 	platform_device_add(prereq_pdev);
-> > 	...
-> > 
-> > which would reduce the boilerplate, but remain flexible.  However,
-> > while flexable, option 3 doesn't solve the dependency tracking
-> > problem, and it still requires some gymnastics to handle multiple
-> > dependencies.
-> > 
-> > On a related issue, it may also be desirable for each device to
-> > maintain a list of devices that have claimed dependency on it for the
-> > purpose of debugability.
-> 
-> That might be the simplest as each "board type" knows which devices it
-> wants to register and in what order, right?
+-- 
+Ben
 
-Ironically enough, we also have this problem in ACPI where there are power
-resources that "regular" devices may depend on in pretty much the same way
-as discussed here.  Those power resources are represented as devices, so the
-problem is really analogous.
-
-In ACPI, though, basically all devices are registered by the same routine that
-walks the namespace (which is a tree-like structure) and registers all devices
-it finds there.  Before registering a device it examines its properties and,
-among other things, it finds what power resources the device depends on.  Then,
-it may invoke itself in a recursive way to register those power resources before
-registering the device (the recurrence is one-level only, because power
-resources cannot depend on anything else).  Since the driver for power
-resources has been already registered at that point, we know it will bind to
-the power resource device objects as soon as they are registered.  This is done
-in a patch series I posted yesterday, actaully.
-
-I'm not sure if this approach can be generalized somehow, but in the ACPI
-case it works just fine.
-
-Thanks,
-Rafael
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
