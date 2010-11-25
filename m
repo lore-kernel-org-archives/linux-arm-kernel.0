@@ -1,52 +1,91 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu, 25 Nov 2010 16:01:04 +0800
-Subject: [PATCH 1/1] arm: imx: share imx5x_register_gpios for mach-mx5
-In-Reply-To: <20101125074244.GE4693@pengutronix.de>
-References: <1290695312-30031-1-git-send-email-linuxzsc@gmail.com>
-	<20101125062924.GD4693@pengutronix.de>
-	<AANLkTimvcAS3BmjtaYCMzHcv=q2znS2zy_Dto_OMJeWh@mail.gmail.com>
-	<20101125074244.GE4693@pengutronix.de>
-Message-ID: <AANLkTikZkXRmddSYN0-7eSBKO_BpXbz+xuJRhDfKeU02@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 25 Nov 2010 17:01:08 +0900
+Subject: [PATCH] ARM: s3c2440: fix AC97 and camera clock registration
+In-Reply-To: <1289989343-28816-1-git-send-email-fg@emlix.com>
+References: <1289989343-28816-1-git-send-email-fg@emlix.com>
+Message-ID: <00b501cb8c76$edb20e90$c9162bb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/25 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hey Richard,
->
-> On Thu, Nov 25, 2010 at 02:44:48PM +0800, Richard Zhao wrote:
->> > IMO the machine files shouldn't need to know how many gpio banks are
->> > available. ?This is a per-SoC thing and so should be set in a SoC function.
->> But we don't have SoC level device file.
-> Check how I did it for imx{1,21,27,25} in arch/arm/plat-mxc/gpio.c.
-I considered put it there too. but we can not add new defconfig, and
-even can not create new items in Kconfig. So we can not use ifdefs.
-And per my understanding, mx5x is going to use one zImage, correct?
->
->> > How do you want to continue this change? ?mx51 and mx53 have the same
->> > number of ports? ?Does mx50 have more or less? ?The addresses are the
->> > same?
->> mx53 and mx50 have similar memory map. but mx51 is different. ?Sorry,
->> I forgot upstream version IO_ADDR can not handler differnt SoC base
->> addr offset.
-> It might even work in this case, still I prefer a more explicit way.
->
->> ? ? ? ? ? ? ?It can not be shared with mx51, but it can be shared with
->> mx50/53, correct? May plan is mx53/50 share
->> arch/arm/plat-mxc/include/mach/mx5x.h file.
-> mx5x.h is for mx50 and mx53 but not mx51? ?No please.
-For memory map, mx51 is a special case. From mx53 on , IC tuned memory
-map to support large memory.
-If we use things like mx53-50.h, symbols is hard to define.
-MX53_50_XXX_XXX is wired. Any possibly, we need to add new SoC with
-similar memory map in the future.
+Fabian Godehardt wrote:
+> 
+> This patch fixes 2 problems:
+>  - it sets the correct bitmask of the AC97 flag on the control-bit field
+>  - it increases the usage counter of both clocks because they get
+decreased
+>    on clock registration (a few lines later)
+> 
+> Maybe it is a better idea to check the usage counter on clk_disable() so
+> it can not reach values <0.
+> 
+> Signed-off-by: Fabian Godehardt <fg@emlix.com>
+> ---
+>  arch/arm/mach-s3c2440/clock.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2440/clock.c b/arch/arm/mach-s3c2440/clock.c
+> index 3dc2426..0fc8461 100644
+> --- a/arch/arm/mach-s3c2440/clock.c
+> +++ b/arch/arm/mach-s3c2440/clock.c
+> @@ -93,6 +93,7 @@ static struct clk s3c2440_clk_cam = {
+>  	.id		= -1,
+>  	.enable		= s3c2410_clkcon_enable,
+>  	.ctrlbit	= S3C2440_CLKCON_CAMERA,
+> +	.usage		= 1,
+>  };
+> 
+>  static struct clk s3c2440_clk_cam_upll = {
+> @@ -108,7 +109,8 @@ static struct clk s3c2440_clk_ac97 = {
+>  	.name		= "ac97",
+>  	.id		= -1,
+>  	.enable		= s3c2410_clkcon_enable,
+> -	.ctrlbit	= S3C2440_CLKCON_CAMERA,
+> +	.ctrlbit	= S3C2440_CLKCON_AC97,
 
-Thanks
-Richard
->
-> Best regards
-> Uwe
->
+Ok.
+
+> +	.usage		= 1,
+>  };
+> 
+>  static int s3c2440_clk_add(struct sys_device *sysdev)
 > --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+> 1.6.6.1
+
+How about following for fix usage field?
+
+diff --git a/arch/arm/mach-s3c2440/clock.c b/arch/arm/mach-s3c2440/clock.c
+index 3dc2426..2f393cb 100644
+--- a/arch/arm/mach-s3c2440/clock.c
++++ b/arch/arm/mach-s3c2440/clock.c
+@@ -108,11 +108,12 @@ static struct clk s3c2440_clk_ac97 = {
+        .name           = "ac97",
+        .id             = -1,
+        .enable         = s3c2410_clkcon_enable,
+-       .ctrlbit        = S3C2440_CLKCON_CAMERA,
++       .ctrlbit        = S3C2440_CLKCON_AC97,
+ };
+
+ static int s3c2440_clk_add(struct sys_device *sysdev)
+ {
++       unsigned long clkcon  = __raw_readl(S3C2410_CLKCON);
+        struct clk *clock_upll;
+        struct clk *clock_h;
+        struct clk *clock_p;
+@@ -130,6 +131,9 @@ static int s3c2440_clk_add(struct sys_device *sysdev)
+        s3c2440_clk_ac97.parent = clock_p;
+        s3c2440_clk_cam_upll.parent = clock_upll;
+
++       s3c2440_clk_cam.usage = clkcon & s3c2440_clk_cam.ctrlbit ? 1 : 0;
++       s3c2440_clk_ac97.usage = clkcon & s3c2440_clk_ac97.ctrlbit ? 1 : 0;
++
+        s3c24xx_register_clock(&s3c2440_clk_ac97);
+        s3c24xx_register_clock(&s3c2440_clk_cam);
+        s3c24xx_register_clock(&s3c2440_clk_cam_upll);
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
