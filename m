@@ -1,57 +1,45 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Nov 2010 09:52:19 +0100
-Subject: [patch 1/1] iMX51: introduce MX51_GPIO_NR
-In-Reply-To: <20101125082456.GL6017@pengutronix.de>
-References: <20101122224526.987309475@rtp-net.org>
-	<AANLkTi=Q=UOSUoJ40ThyyyDqMoC849W-cn36CkVFxKhQ@mail.gmail.com>
-	<87zksywt4l.fsf@lechat.rtp-net.org>
-	<20101125082456.GL6017@pengutronix.de>
-Message-ID: <20101125085219.GE8950@pengutronix.de>
+Date: Thu, 25 Nov 2010 10:01:19 +0100
+Subject: MX25 patches
+In-Reply-To: <4CEB8EA3.7000608@fqingenieria.es>
+References: <730660.7957.qm@web51005.mail.re2.yahoo.com>
+	<20101118102557.GX6017@pengutronix.de>
+	<AANLkTi=p-YDaSXK9G2pcuG1abuptPm=D=Ug9qBmGU8rS@mail.gmail.com>
+	<20101119083827.GD6017@pengutronix.de>
+	<4CEB8EA3.7000608@fqingenieria.es>
+Message-ID: <20101125090119.GO6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 09:24:56AM +0100, Sascha Hauer wrote:
-> On Wed, Nov 24, 2010 at 06:04:09PM +0100, Arnaud Patard wrote:
-> > Fabio Estevam <festevam@gmail.com> writes:
-> > 
-> > Hi,
-> > 
-> > > Hi Arnaud,
-> > >
-> > > 2010/11/22 Arnaud Patard <arnaud.patard@rtp-net.org>:
-> > >> Currently, to define a GPIO number, we're using something like :
-> > >>
-> > >> #define EFIKAMX_PCBID0 ? ? ? ? (2*32 + 16)
-> > >>
-> > >> to define GPIO 3 16.
-> > >>
-> > >> This is not really readable and it's error prone imho (note the 3 vs 2).
-> > >> So, I'm introducing a new macro to define this in a better way. Now, the
-> > >> code sample become :
-> > >>
-> > >> #define EFIKAMX_PCBID0 ? ? ? ? MX51_GPIO_NR(3, 16)
-> > >
-> > > Can you rename the macro to MX5x_GPIO_NR instead of MX51_GPIO_NR?
-> > >
-> > > This way we can also use this macro for MX53 and MX508 when they show
-> > > up in mainline.
-> > 
-> > I've been wondering about to use MX5X instead of MX51 but I kept MX51
-> > because I didn't know how the GPIO will work on MX53. If they're
-> > compatible, you're right, the name should be MX5X_GPIO_NR and not
-> > MX51_GPIO_NR. Assuming you mail means that, I'm going to switch to
-> > MX5X_GPIO_NR.
-> 
-> So far all i.MX use the same gpio numbering and I see no reason why this
-> should be changed in future SoCs, so I would go for a IMX_GPIO_NR
-> instead of SoC specific variants.
+On Tue, Nov 23, 2010 at 10:51:31AM +0100, Jaume Ribot wrote:
+> Dear Sascha,
+>
+> We are also working on some patches for I.MX25. As we have seen some  
+> significant modifications in Uwe's git (specially regarding file  
+> locations), maybe it's better to wait for this patches when merged with  
+> to your repository?
 
-Ok, we are talking about Freescale here, but in this very special case I'm
-confident they won't change it. I hope none of the hardware engineers
-reads this, I'm sure they are always looking for good ideas to make
-the life of the software developers harder.
+They are now.
 
 Sascha
+
+>
+> Jaume
+>
+> On 19/11/2010 9:38, Sascha Hauer wrote:
+>> On Thu, Nov 18, 2010 at 07:54:39PM +0800, Richard Zhao wrote:
+>>> Hi Sascha,
+>>>
+>>> Is branch imx-for-2.6.38 the latest branch for arch/arm/mach-mx5? I'm
+>>> preparing mx50 reference design board support.
+>> Yes, but there are Uwes latest patches pending. I don't know if they
+>> conflict with what you want to do.
+>>
+>> Sascha
+>>
+>>
+>
+>
 
 -- 
 Pengutronix e.K.                           |                             |
