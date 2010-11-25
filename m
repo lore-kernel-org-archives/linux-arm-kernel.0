@@ -1,92 +1,162 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 25 Nov 2010 08:43:48 +0200
-Subject: [PATCH 6/7] i2c/pxa2xx: reset the chip if the bus is not free
-In-Reply-To: <AANLkTi=8Xy3M7QGO54nt_r0_12z3+o8G5fAqQmxkTH4o@mail.gmail.com>
-References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>	<1290633617-15311-7-git-send-email-bigeasy@linutronix.de>	<AANLkTikvN+==eTkoh7CTQyN0mbfvPhH6Uh9NX5QW7WFx@mail.gmail.com>
-	<AANLkTi=8Xy3M7QGO54nt_r0_12z3+o8G5fAqQmxkTH4o@mail.gmail.com>
-Message-ID: <4CEE05A4.6030201@compulab.co.il>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Thu, 25 Nov 2010 14:44:48 +0800
+Subject: [PATCH 1/1] arm: imx: share imx5x_register_gpios for mach-mx5
+In-Reply-To: <20101125062924.GD4693@pengutronix.de>
+References: <1290695312-30031-1-git-send-email-linuxzsc@gmail.com>
+	<20101125062924.GD4693@pengutronix.de>
+Message-ID: <AANLkTimvcAS3BmjtaYCMzHcv=q2znS2zy_Dto_OMJeWh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi,
-
-On 11/25/10 04:49, Haojian Zhuang wrote:
-> On Thu, Nov 25, 2010 at 10:30 AM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Thu, Nov 25, 2010 at 5:20 AM, Sebastian Andrzej Siewior
->> <bigeasy@linutronix.de> wrote:
->>> I haven't seen this (yet) during a normal transfer but starting
->>> i2cdetect seems to hang the bus. On my Sodaville board, i2cdetect runs
->>> fine on bus zero and runs into timeouts on bus one and two. The chip
->>> never recovers from this condition. The following transfers hang as
->>> well. The ISR_UB never disappears.
->>> Issuing a chip reset fixes the timeout and following transfer succeed.
->>>
->>> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->>> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
->>> ---
->>>  drivers/i2c/busses/i2c-pxa.c |   35 +++++++++++++++++++----------------
->>>  1 files changed, 19 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
->>> index bd4b885..1a48470 100644
->>> --- a/drivers/i2c/busses/i2c-pxa.c
->>> +++ b/drivers/i2c/busses/i2c-pxa.c
->>> @@ -257,23 +257,7 @@ static void i2c_pxa_abort(struct pxa_i2c *i2c)
->>>               _ICR(i2c));
->>>  }
->>>
->>> -static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
->>> -{
->>> -       int timeout = DEF_TIMEOUT;
->>>
->>> -       while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
->>> -               if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
->>> -                       timeout += 4;
->>> -
->>> -               msleep(2);
->>> -               show_state(i2c);
->>> -       }
->>> -
->>> -       if (timeout < 0)
->>> -               show_state(i2c);
->>> -
->>> -       return timeout < 0 ? I2C_RETRY : 0;
->>> -}
->>>
->>>  static int i2c_pxa_wait_master(struct pxa_i2c *i2c)
->>>  {
->>> @@ -425,6 +409,25 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->>>        udelay(100);
->>>  }
->>>
->>> +static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
->>> +{
->>> +       int timeout = DEF_TIMEOUT;
->>> +
->>> +       while (timeout-- && readl(_ISR(i2c)) & (ISR_IBB | ISR_UB)) {
->>> +               if ((readl(_ISR(i2c)) & ISR_SAD) != 0)
->>> +                       timeout += 4;
->>> +
->>> +               msleep(2);
->>> +               show_state(i2c);
->>> +       }
->>> +
->>> +       if (timeout < 0) {
->>> +               show_state(i2c);
->>> +               i2c_pxa_reset(i2c);
->>> +       }
->> Even you reset I2C controller, it shouldn't help you since bus isn't
->> free. I thinkt that you should reset I2C bus before you reseting I2C
->> controller.
->>
-> Excuse me that my previous comments are for PXA master mode.
+> IMO the machine files shouldn't need to know how many gpio banks are
+> available. ?This is a per-SoC thing and so should be set in a SoC function.
+But we don't have SoC level device file.
 >
-> I think that you're focused on pxa working on slave mode. But if pxa
-> is working in master mode, it seems that we needn't reset I2C
-> controller since it doesn't help.
-
-As for PXA3xx, the Developer Manual states:
-"Software must ensure that the TWSI unit is not busy (ISR[UB] = 0)
-before it asserts a reset. Software must also ensure that the TWSI bus is idle (ISR[IBB] = 0)
-when the unit is enabled after reset."
+> How do you want to continue this change? ?mx51 and mx53 have the same
+> number of ports? ?Does mx50 have more or less? ?The addresses are the
+> same?
+mx53 and mx50 have similar memory map. but mx51 is different.  Sorry,
+I forgot upstream version IO_ADDR can not handler differnt SoC base
+addr offset. It can not be shared with mx51, but it can be shared with
+mx50/53, correct? May plan is mx53/50 share
+arch/arm/plat-mxc/include/mach/mx5x.h file.
+It seems mx53 gpio don't work here. It can not share mxc_gpio_ports with mx50.
+>
+> Best regards
+> Uwe
+>
+>> ? ? ? mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51_pads,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(eukrea_cpuimx51_pads));
+>>
+>> diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
+>> index ff1f45e..e47345a 100644
+>> --- a/arch/arm/mach-mx5/board-cpuimx51sd.c
+>> +++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
+>> @@ -262,6 +262,8 @@ static struct platform_device *platform_devices[] __initdata = {
+>>
+>> ?static void __init eukrea_cpuimx51sd_init(void)
+>> ?{
+>> + ? ? mx5x_gpio_port_cnt = 4;
+>> +
+>> ? ? ? mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51sd_pads,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(eukrea_cpuimx51sd_pads));
+>>
+>> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+>> index 6cc2805..cb22fc3 100644
+>> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
+>> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+>> @@ -160,6 +160,8 @@ static struct spi_board_info mx51_3ds_spi_nor_device[] = {
+>> ? */
+>> ?static void __init mxc_board_init(void)
+>> ?{
+>> + ? ? mx5x_gpio_port_cnt = 4;
+>> +
+>> ? ? ? mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(mx51_3ds_pads));
+>> ? ? ? mxc_init_imx_uart();
+>> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+>> index ef32843..8054c09 100644
+>> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+>> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+>> @@ -347,9 +347,12 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
+>> ? */
+>> ?static void __init mxc_board_init(void)
+>> ?{
+>> + ? ? mx5x_gpio_port_cnt = 4;
+>> +
+>> ? ? ? iomux_v3_cfg_t usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
+>> ? ? ? iomux_v3_cfg_t power_key = MX51_PAD_EIM_A27__GPIO_2_21;
+>>
+>> + ? ? mx5x_gpio_port_cnt = 4;
+>> ?#if defined(CONFIG_CPU_FREQ_IMX)
+>> ? ? ? get_cpu_op = mx51_get_cpu_op;
+>> ?#endif
+>> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> index 4b2718b..cf315cb 100644
+>> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> @@ -314,6 +314,8 @@ void mx51_efikamx_reset(void)
+>>
+>> ?static void __init mxc_board_init(void)
+>> ?{
+>> + ? ? mx5x_gpio_port_cnt = 4;
+>> +
+>> ? ? ? mxc_iomux_v3_setup_multiple_pads(mx51efikamx_pads,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(mx51efikamx_pads));
+>> ? ? ? mx51_efikamx_board_id();
+>> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+>> index d926203..b8371d2 100644
+>> --- a/arch/arm/mach-mx5/devices.c
+>> +++ b/arch/arm/mach-mx5/devices.c
+>> @@ -183,13 +183,11 @@ static struct mxc_gpio_port mxc_gpio_ports[] = {
+>> ? ? ? },
+>> ?};
+>>
+>> -int __init imx51_register_gpios(void)
+>> -{
+>> - ? ? return mxc_gpio_init(mxc_gpio_ports, 4);
+>> -}
+>> +int mx5x_gpio_port_cnt;
+>>
+>> -int __init imx53_register_gpios(void)
+>> +int __init imx5x_register_gpios(void)
+>> ?{
+>> - ? ? return mxc_gpio_init(mxc_gpio_ports, ARRAY_SIZE(mxc_gpio_ports));
+>> + ? ? if (mx5x_gpio_port_cnt)
+>> + ? ? ? ? ? ? return mxc_gpio_init(mxc_gpio_ports, mx5x_gpio_port_cnt);
+>> + ? ? return -EINVAL;
+>> ?}
+>> -
+>> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+>> index af1d07c..d3411dc 100644
+>> --- a/arch/arm/mach-mx5/devices.h
+>> +++ b/arch/arm/mach-mx5/devices.h
+>> @@ -4,3 +4,5 @@ extern struct platform_device mxc_usbdr_udc_device;
+>> ?extern struct platform_device mxc_wdt;
+>> ?extern struct platform_device mxc_hsi2c_device;
+>> ?extern struct platform_device mxc_keypad_device;
+>> +
+>> +extern int mx5x_gpio_port_cnt;
+>> diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+>> index e57f968..b0ea57b 100644
+>> --- a/arch/arm/mach-mx5/mm.c
+>> +++ b/arch/arm/mach-mx5/mm.c
+>> @@ -61,7 +61,7 @@ void __init mx53_map_io(void)
+>> ? ? ? iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
+>> ?}
+>>
+>> -int imx51_register_gpios(void);
+>> +int imx5x_register_gpios(void);
+>>
+>> ?void __init mx51_init_irq(void)
+>> ?{
+>> @@ -78,11 +78,9 @@ void __init mx51_init_irq(void)
+>> ? ? ? ? ? ? ? panic("unable to map TZIC interrupt controller\n");
+>>
+>> ? ? ? tzic_init_irq(tzic_virt);
+>> - ? ? imx51_register_gpios();
+>> + ? ? imx5x_register_gpios();
+>> ?}
+>>
+>> -int imx53_register_gpios(void);
+>> -
+>> ?void __init mx53_init_irq(void)
+>> ?{
+>> ? ? ? unsigned long tzic_addr;
+>> @@ -95,5 +93,5 @@ void __init mx53_init_irq(void)
+>> ? ? ? ? ? ? ? panic("unable to map TZIC interrupt controller\n");
+>>
+>> ? ? ? tzic_init_irq(tzic_virt);
+>> - ? ? imx53_register_gpios();
+>> + ? ? imx5x_register_gpios();
+>> ?}
+>> --
+>> 1.7.1
+>>
+>>
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
