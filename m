@@ -1,48 +1,93 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 25 Nov 2010 14:58:09 +0100
-Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-In-Reply-To: <AANLkTi=hwzdkzpZNdi7raXUwAJQB1Apwok-wT04a0EwZ@mail.gmail.com>
-References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
-	<20101124194439.GY4693@pengutronix.de>
-	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
-	<20101124201831.GZ4693@pengutronix.de>
-	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
-	<20101125091346.GS6017@pengutronix.de>
-	<AANLkTi=L_5ib-Kj0fZRci7-bPOpkyojejZ9+jZpmH9aC@mail.gmail.com>
-	<87tyj5wpqt.fsf@lechat.rtp-net.org>
-	<AANLkTi=hwzdkzpZNdi7raXUwAJQB1Apwok-wT04a0EwZ@mail.gmail.com>
-Message-ID: <20101125135809.GI4693@pengutronix.de>
+From: hari.kanigeri@gmail.com (Hari Kanigeri)
+Date: Thu, 25 Nov 2010 08:03:13 -0600
+Subject: [PATCH v4 2/5] OMAP: mailbox: fix rx interrupt disable in omap4
+In-Reply-To: <AANLkTi=5YHOU9jdxagygijx8xzaR38eTPDXnC-=M_Wb4@mail.gmail.com>
+References: <1290547617-16640-1-git-send-email-h-kanigeri2@ti.com>
+	<1290547617-16640-3-git-send-email-h-kanigeri2@ti.com>
+	<AANLkTimNW8ixBPyuwckZYnijXmT+t-XSY37xMUVvubLB@mail.gmail.com>
+	<20101124082245.GF2468@legolas.emea.dhcp.ti.com>
+	<AANLkTimevr4qgRZQW+DOEBND15VxA0MjkW3pkwND92JL@mail.gmail.com>
+	<AANLkTimzufujCiF6focs1KLCgsDYpr9v9_9w1Hj=3aet@mail.gmail.com>
+	<AANLkTi=5YHOU9jdxagygijx8xzaR38eTPDXnC-=M_Wb4@mail.gmail.com>
+Message-ID: <AANLkTimBWyksOaUCRPVKKuzaCiJGi2Er3DUJhEn7Jq6N@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 10:32:59AM -0200, Fabio Estevam wrote:
-> Hi Arnaud,
-> 
-> On Thu, Nov 25, 2010 at 10:29 AM, Arnaud Patard
-> <arnaud.patard@rtp-net.org> wrote:
-> > Fabio Estevam <festevam@gmail.com> writes:
-> ...
-> > I've tried some weeks ago to boot with sdma support enabled and found
-> > out that it was looking for sdma-imx51-to0.bin so I thought it was still
-> > early work and gave up. Maybe it's still not fixed.
-> 
-> Yes, I fixed this by passing the correct tape-out version into the
-> sdma platform, so that it searches for sdma-imx51-to1.bin now.
-> 
-> I can send a patch for this later.
-> ....
-> >> I am trying to fix this, but suggestions are welcome.
-> >
-> > Even if the fw name is bad, it should not crash. Maybe missing some
-> > checks or init code ? Of course, it's only an idea. Your problem may
-> > have nothing to do with missing firmware.
-> 
-> Yes, this crash problem is not related to the missing firmware.
-I think you need to build the firmware in.  When it's requested
-userspace isn't ready yet to serve it.
+On Thu, Nov 25, 2010 at 1:04 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
+> Hari,
+>
+> On Wed, Nov 24, 2010 at 18:31, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
+>> On Wed, Nov 24, 2010 at 2:50 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
+>>> On Wed, Nov 24, 2010 at 13:52, Felipe Balbi <balbi@ti.com> wrote:
+>>>> On Wed, Nov 24, 2010 at 10:46:04AM +0530, Varadarajan, Charulatha wrote:
+>>>>>>
+>>>>>> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+>>>>>> index 48e161c..a1c6bd9 100644
+>>>>>> --- a/arch/arm/plat-omap/mailbox.c
+>>>>>> +++ b/arch/arm/plat-omap/mailbox.c
+>>>>>> @@ -358,6 +358,10 @@ int omap_mbox_register(struct device *parent, struct
+>>>>>> omap_mbox **list)
+>>>>>> ? ? ? ? ? ? ? ? ? ? ? ?ret = PTR_ERR(mbox->dev);
+>>>>>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_out;
+>>>>>> ? ? ? ? ? ? ? ?}
+>>>>>> + ? ? ? ? ? ? ? if (cpu_is_omap44xx())
+>>>>>
+>>>>> Do not use cpu_is* checks in plat-omap/*
+>>>>
+>>>> see the previous thread.
+>>>
+>>> Referring to [1], I do not find why cpu_is* checks is used in plat-omap and
+>>> why it can't be avoided.
+>>>
+>>> In [1], it was suggested to create the pdata field that will be
+>>> populated at init
+>>> time using the cpu_is* check. But in this version, I am finding that
+>>> this is done
+>>> in plat-omap. This can be handled in mach-omap layer itself and can be passed
+>>> as a pdata field which can be extracted during probe.
+>>>
+>>> [1] https://patchwork.kernel.org/patch/337131/
+>>>
+>>
+>> Here are these ?reasons why I did this way.
+>>
+>> - The function omap_mbox_register is called only once during probe
+>> time, and I thought it was ok to call cpu check once during probe
+>> time.
+>
+> AFAIK it is not okay. Patches are not accepted by maintainers if cpu_is*
+> checks are newly added in plat-omap/*
+> Moreover, the plat-omap is for common code between omap1 and omap2+
+> If any specific info is required due to unavoidable reasons, they should be
+> managed using pdata fld/ by some other means.
+>
+>> Since each mbox instance needs to be aware of the rev field this
+>> was the right place to add since this function iterates through the
+>> list during probe time. There are already calls to cpu_is_omap44xx in
+>> mailbox probe function.
+>
+> Infact , there are some more drivers like that. But some of them are getting
+> cleaned up slowly (work under progress). But old code having cpu_is* checks
+> does not justify adding a new cpu_is* check. As I mentioned, it is repeatedly
+> being insisted in LO mailing list to avoid cpu_is* checks in plat-omap and to
+> clean up the drivers to avoid these checks.
+>
+>>
+>> - platform data is not present for mailbox module. I could add it for
+>> revision sake but I would prefer not to do that since this will be a
+>> throw away code once the hwmod infrastructure is ready (note: mailbox
+>> hwmod patches are under review), and amount of mailbox driver rework
+>> might be considerable.
+>
+> I would leave this to Tony/ Felipe/ Benoit to decide on this. If agreed, I don't
+> see any issue. But there should be atleast a "TODO" mentioning that this
+> needs to be cleaned up.
+>
 
-Uwe
+fair enough. I am dropping this patch from the patch set and will send
+it with Omar's hwmod patches.
+I will send the revised patch set excluding this patch.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thank you,
+Best regards,
+Hari
