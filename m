@@ -1,45 +1,52 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Nov 2010 10:01:19 +0100
-Subject: MX25 patches
-In-Reply-To: <4CEB8EA3.7000608@fqingenieria.es>
-References: <730660.7957.qm@web51005.mail.re2.yahoo.com>
-	<20101118102557.GX6017@pengutronix.de>
-	<AANLkTi=p-YDaSXK9G2pcuG1abuptPm=D=Ug9qBmGU8rS@mail.gmail.com>
-	<20101119083827.GD6017@pengutronix.de>
-	<4CEB8EA3.7000608@fqingenieria.es>
-Message-ID: <20101125090119.GO6017@pengutronix.de>
+Date: Thu, 25 Nov 2010 10:07:07 +0100
+Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
+In-Reply-To: <20101124201831.GZ4693@pengutronix.de>
+References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+	<20101124194439.GY4693@pengutronix.de>
+	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
+	<20101124201831.GZ4693@pengutronix.de>
+Message-ID: <20101125090707.GR6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 23, 2010 at 10:51:31AM +0100, Jaume Ribot wrote:
-> Dear Sascha,
->
-> We are also working on some patches for I.MX25. As we have seen some  
-> significant modifications in Uwe's git (specially regarding file  
-> locations), maybe it's better to wait for this patches when merged with  
-> to your repository?
+On Wed, Nov 24, 2010 at 09:18:31PM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Nov 24, 2010 at 06:07:18PM -0200, Fabio Estevam wrote:
+> > Hi Uwe,
+> > 
+> > 2010/11/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > > Hello Fabio,
+> > >
+> > > On Wed, Nov 24, 2010 at 05:29:31PM -0200, Fabio Estevam wrote:
+> > >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > >> ---
+> > >> This allows imx-for-2.6.38 tree to build again.
+> > > The same patch is already in Sascha's imx-for-2.6.37 branch (and so in
+> > > for-next, too). ?There are some more fixes in for-.37 so I'd use the
+> > > for-next branch for now.
+> > 
+> > Thanks, I haven't noticed this. Will use for-next branch for now.
+> > 
+> > While at the dma topic: is anyone able to boot a kernel on MX51 with
+> > IMX_SDMA=y?
+> > 
+> > I enabled early printk support, but no kernel messages appear after:
+> > Uncompressing Linux... done, booting the kernel.
+> > 
+> > This also happens on the for-next branch.
+> I usually prefer just using DEBUG_LL and put
+> 
+> 	#ifdef CONFIG_DEBUG_LL
+> 		void printch(char);
+> 		printch(c);
+> 	#endif
+> 
+> into emit_log_char.  But I think that's only because I don't know how to
+> use early printk properly.  (You might need an additional kernel
+> parameter?!)
 
-They are now.
+Yes, 'earlyprintk'.
 
-Sascha
-
->
-> Jaume
->
-> On 19/11/2010 9:38, Sascha Hauer wrote:
->> On Thu, Nov 18, 2010 at 07:54:39PM +0800, Richard Zhao wrote:
->>> Hi Sascha,
->>>
->>> Is branch imx-for-2.6.38 the latest branch for arch/arm/mach-mx5? I'm
->>> preparing mx50 reference design board support.
->> Yes, but there are Uwes latest patches pending. I don't know if they
->> conflict with what you want to do.
->>
->> Sascha
->>
->>
->
->
 
 -- 
 Pengutronix e.K.                           |                             |
