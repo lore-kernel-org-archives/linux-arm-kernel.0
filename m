@@ -1,121 +1,40 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Nov 2010 14:49:07 +0800
-Subject: [PATCH 08/15] ARM: mxs: Add iomux support
+Date: Fri, 26 Nov 2010 14:49:05 +0800
+Subject: [PATCH 06/15] ARM: mxs: Add timer support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1290754154-9428-9-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1290754154-9428-7-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MXS-based SoCs implements iomux functions in block PINCTRL.
+Freescale MXS-based SoCs implement timer support in block TIMROT.
+There are two versions of TIMROT. The v1 on MX23 only gets 16 bits
+counter and has no match function. The v2 on MX28 extends the
+counter to 32 bits and add the match function.
+
+As the result, we need two instances of timers with v1 for better
+implementation, one for next_event and another for get_cycles.
+Otherwise, get_cycles may get imprecise result after long time
+cumulating. With v2, one instance can serve two purposes well.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/iomux-mx23.h |   29 +++++++
- arch/arm/mach-mxs/include/mach/iomux-mx28.h |   44 +++++++++++
- arch/arm/mach-mxs/include/mach/iomux.h      |   77 +++++++++++++++++++
- arch/arm/mach-mxs/iomux.c                   |  110 +++++++++++++++++++++++++++
- 4 files changed, 260 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx23.h
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx28.h
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux.h
- create mode 100644 arch/arm/mach-mxs/iomux.c
+ arch/arm/mach-mxs/timer.c |  285 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 285 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/timer.c
 
-diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx23.h b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
+diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
 new file mode 100644
-index 0000000..3fc0439
+index 0000000..c52b465
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
-@@ -0,0 +1,29 @@
++++ b/arch/arm/mach-mxs/timer.c
+@@ -0,0 +1,285 @@
 +/*
-+ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#ifndef __MACH_IOMUX_MX23_H__
-+#define __MACH_IOMUX_MX23_H__
-+
-+#include <mach/iomux.h>
-+
-+/*
-+ * The naming convention for the pad modes is MX23_PAD_<padname>__<padmode>
-+ * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-+ * See also iomux.h
-+ *
-+ *					 		BANK PIN     MUX            VOL          MA            PULL
-+ */
-+/* DUART */
-+#define MX23_PAD_PWM0__DUART_RX			IOMUX_PAD(1, 26, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
-+#define MX23_PAD_PWM1__DUART_TX			IOMUX_PAD(1, 27, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
-+
-+#endif /* __MACH_IOMUX_MX23_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-new file mode 100644
-index 0000000..ca37a15
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-@@ -0,0 +1,44 @@
-+/*
-+ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#ifndef __MACH_IOMUX_MX28_H__
-+#define __MACH_IOMUX_MX28_H__
-+
-+#include <mach/iomux.h>
-+
-+/*
-+ * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
-+ * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-+ * See also iomux.h
-+ *
-+ *					 		BANK PIN     MUX            VOL          MA            PULL
-+ */
-+/* DUART */
-+#define MX28_PAD_PWM0__DUART_RX			IOMUX_PAD(3, 16, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+#define MX28_PAD_PWM1__DUART_TX			IOMUX_PAD(3, 17, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+
-+/* FEC */
-+#define MX28_PAD_ENET0_MDC__ENET0_MDC		IOMUX_PAD(4, 0,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_MDIO__ENET0_MDIO		IOMUX_PAD(4, 1,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN	IOMUX_PAD(4, 2,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_RXD0__ENET0_RXD0		IOMUX_PAD(4, 3,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_RXD1__ENET0_RXD1		IOMUX_PAD(4, 4,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN	IOMUX_PAD(4, 6,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_TXD0__ENET0_TXD0		IOMUX_PAD(4, 7,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET0_TXD1__ENET0_TXD1		IOMUX_PAD(4, 8,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+#define MX28_PAD_ENET_CLK__ENET_CLK		IOMUX_PAD(4, 16, PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-+
-+/* GPIO */
-+#define MX28_PAD_SSP1_DATA3__GPIO_2_15		IOMUX_PAD(2, 15, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13	IOMUX_PAD(4, 13, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+
-+#endif /* __MACH_IOMUX_MX28_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
-new file mode 100644
-index 0000000..27bcada
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/iomux.h
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-+ *			<armlinux@phytec.de>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright (C) 2000-2001 Deep Blue Solutions
++ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ *  Copyright (C) 2006-2007 Pavel Pisa (ppisa at pikron.com)
++ *  Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
++ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License
@@ -132,178 +51,268 @@ index 0000000..27bcada
 + * MA 02110-1301, USA.
 + */
 +
-+#ifndef __MACH_MXS_IOMUX_H__
-+#define __MACH_MXS_IOMUX_H__
-+
-+typedef struct pad_desc {
-+	unsigned bank:3;
-+	unsigned pin:5;
-+	unsigned muxsel:2;
-+	unsigned ma:3;
-+	unsigned vol:2;
-+	unsigned pull:1;
-+} iomux_cfg_t;
-+
-+#define IOMUX_PAD(_bank, _pin, _muxsel, _vol, _ma, _pull)	\
-+		{						\
-+			.bank	= _bank,			\
-+			.pin	= _pin,				\
-+			.muxsel	= _muxsel,			\
-+			.vol	= _vol,				\
-+			.ma	= _ma,				\
-+			.pull	= _pull,			\
-+		}
-+
-+#define PAD_MUXSEL_0		0
-+#define PAD_MUXSEL_1		1
-+#define PAD_MUXSEL_2		2
-+#define PAD_MUXSEL_GPIO		3
-+
-+#define PAD_1V8			0
-+#define PAD_3V3			1
-+#define PAD_VOL_NONE		2
-+
-+#define PAD_4MA			0
-+#define PAD_8MA			1
-+#define PAD_12MA		2
-+#define PAD_16MA		3
-+#define PAD_MA_NONE		4
-+
-+#define PAD_NOPULL		0
-+#define PAD_PULL		1
-+
-+/*
-+ * setups a single pad in the iomuxer
-+ */
-+int mxs_iomux_setup_pad(iomux_cfg_t *pad);
-+
-+/*
-+ * setups multiple pads
-+ * convenient way to call the above function with tables
-+ */
-+int mxs_iomux_setup_multiple_pads(iomux_cfg_t *pad_list, unsigned count);
-+
-+/*
-+ * Initialise the iomux controller
-+ */
-+void mxs_iomux_init(void __iomem *iomux_base);
-+
-+#endif /* __MACH_MXS_IOMUX_H__*/
-diff --git a/arch/arm/mach-mxs/iomux.c b/arch/arm/mach-mxs/iomux.c
-new file mode 100644
-index 0000000..803cadf
---- /dev/null
-+++ b/arch/arm/mach-mxs/iomux.c
-@@ -0,0 +1,110 @@
-+/*
-+ * Copyright 2004-2006,2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
-+ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-+ *                       <armlinux@phytec.de>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/string.h>
-+#include <linux/gpio.h>
-+
-+#include <asm/mach/map.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/clockchips.h>
++#include <linux/clk.h>
 +
 +#include <mach/hardware.h>
-+#include <mach/iomux.h>
-+
-+static void __iomem *base;
++#include <asm/mach/time.h>
++#include <mach/common.h>
 +
 +/*
-+ * configures a single pad in the iomuxer
++ * There are 2 versions of the timrot on Freescale MXS-based SoCs.
++ * The v1 on MX23 only gets 16 bits counter and has no match function.
++ * The v2 on MX28 extends the counter to 32 bits and add the match function.
++ *
++ * As the result, we need two instances of timers with v1 for better
++ * implementation, one for next_event and another for get_cycles. Otherwise,
++ * get_cycles may get imprecise result after long time cumulating.
++ * With v2, one instance can serve two purposes well.
 + */
-+int mxs_iomux_setup_pad(iomux_cfg_t *pad)
++#define timrot_is_v1()	(cpu_is_mx23())
++
++#define HW_TIMROT_ROTCTRL			0x00
++#define HW_TIMROT_TIMCTRLn(n)			(0x20 + (n) * 0x40)
++#define HW_TIMROT_RUNNING_COUNTn(n)		(0x30 + (n) * 0x40)
++#define HW_TIMROT_MATCH_COUNTn(n)		(0x50 + (n) * 0x40)
++#define BM_TIMROT_TIMCTRLn_RELOAD		(1 << 6)
++#define BM_TIMROT_TIMCTRLn_UPDATE		(1 << 7)
++#define BM_TIMROT_TIMCTRLn_MATCH_MODE		(1 << 11)
++#define BM_TIMROT_TIMCTRLn_IRQ_EN		(1 << 14)
++#define BM_TIMROT_TIMCTRLn_IRQ			(1 << 15)
++#define BP_TIMROT_TIMCTRLn_SELECT		0
++#define BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL	(timrot_is_v1() ? 0x8 : 0xb)
++
++static struct clock_event_device clockevent_mxs;
++static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
++
++static void __iomem *timer_base;
++
++static inline void timrot_irq_disable(void)
 +{
-+	u32 reg, ofs, bp, bm;
-+
-+	/* muxsel */
-+	ofs = pad->bank * 0x20 + pad->pin / 16 * 0x10;
-+	bp = pad->pin % 16 * 2;
-+	bm = 0x3 << bp;
-+	reg = __raw_readl(base + ofs);
-+	reg &= ~bm;
-+	reg |= pad->muxsel << bp;
-+	__raw_writel(reg, base + ofs);
-+
-+	/* drive */
-+	ofs = cpu_is_mx23() ? 0x200 : 0x300;
-+	ofs += pad->bank * 0x40 + pad->pin / 8 * 0x10;
-+	/* ma */
-+	if (pad->ma != PAD_MA_NONE)
-+	{
-+		bp = pad->pin % 8 * 4;
-+		bm = 0x3 << bp;
-+		reg = __raw_readl(base + ofs);
-+		reg &= ~bm;
-+		reg |= pad->ma << bp;
-+		__raw_writel(reg, base + ofs);
-+	}
-+	/* vol */
-+	if (pad->vol != PAD_VOL_NONE)
-+	{
-+		bp = pad->pin % 8 * 4 + 2;
-+		bm = 0x1 << bp;
-+		reg = __raw_readl(base + ofs);
-+		reg &= ~bm;
-+		reg |= pad->vol << bp;
-+		__raw_writel(reg, base + ofs);
-+	}
-+
-+	/* pull */
-+	ofs = cpu_is_mx23() ? 0x400 : 0x600;
-+	ofs += pad->bank * 0x10;
-+	bp = pad->pin;
-+	bm = 0x1 << bp;
-+	reg = __raw_readl(base + ofs);
-+	reg &= ~bm;
-+	reg |= pad->pull << bp;
-+	__raw_writel(reg, base + ofs);
-+
-+	return 0;
++	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
++			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
 +}
-+EXPORT_SYMBOL(mxs_iomux_setup_pad);
 +
-+int mxs_iomux_setup_multiple_pads(iomux_cfg_t *pad_list, unsigned count)
++static inline void timrot_irq_enable(void)
 +{
-+	iomux_cfg_t *p = pad_list;
-+	int i;
++	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
++			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_SET_ADDR);
++}
++
++static void timrot_irq_acknowledge(void)
++{
++	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ,
++			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
++}
++
++static cycle_t timrot_get_cycles(struct clocksource *cs)
++{
++	if (timrot_is_v1())
++		return ~((__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(1))
++				& 0xffff0000) >> 16);
++	else
++		return ~__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(0));
++}
++
++static int timrot_set_next_event(unsigned long evt,
++					struct clock_event_device *dev)
++{
++	unsigned long match;
 +	int ret;
 +
-+	for (i = 0; i < count; i++) {
-+		ret = mxs_iomux_setup_pad(p);
-+		if (ret)
-+			return ret;
-+		p++;
++	/* timrot decrements the count */
++	if (timrot_is_v1()) {
++		__raw_writel(evt, timer_base + HW_TIMROT_RUNNING_COUNTn(0));
++		ret = 0;
++	} else {
++		match = __raw_readl(timer_base + HW_TIMROT_MATCH_COUNTn(0))
++				- evt;
++		__raw_writel(match, timer_base + HW_TIMROT_MATCH_COUNTn(0));
++		ret = (int)(match - __raw_readl(timer_base +
++				HW_TIMROT_RUNNING_COUNTn(0))) > 0 ? -ETIME : 0;
 +	}
++
++	return ret;
++}
++
++static irqreturn_t mxs_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = &clockevent_mxs;
++
++	timrot_irq_acknowledge();
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction mxs_timer_irq = {
++	.name		= "MXS Timer Tick",
++	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= mxs_timer_interrupt,
++};
++
++#ifdef DEBUG
++static const char *clock_event_mode_label[] = {
++	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
++	[CLOCK_EVT_MODE_ONESHOT]  = "CLOCK_EVT_MODE_ONESHOT",
++	[CLOCK_EVT_MODE_SHUTDOWN] = "CLOCK_EVT_MODE_SHUTDOWN",
++	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED"
++};
++#endif /* DEBUG */
++
++static void mxs_set_mode(enum clock_event_mode mode,
++				struct clock_event_device *evt)
++{
++	unsigned long flags;
++
++	/*
++	 * The timer interrupt generation is disabled at least
++	 * for enough time to call mxs_set_next_event()
++	 */
++	local_irq_save(flags);
++
++	/* Disable interrupt in timer module */
++	timrot_irq_disable();
++
++	if (mode != clockevent_mode) {
++		/* Set event time into far-far future */
++		__raw_writel(__raw_readl(timer_base +
++				HW_TIMROT_RUNNING_COUNTn(0)) + 3,
++				timer_base + HW_TIMROT_MATCH_COUNTn(0));
++
++		/* Clear pending interrupt */
++		timrot_irq_acknowledge();
++	}
++
++#ifdef DEBUG
++	printk(KERN_INFO "mxs_set_mode: changing mode from %s to %s\n",
++		clock_event_mode_label[clockevent_mode],
++		clock_event_mode_label[mode]);
++#endif /* DEBUG */
++
++	/* Remember timer mode */
++	clockevent_mode = mode;
++	local_irq_restore(flags);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		printk(KERN_ERR "mxs_set_mode: Periodic mode is not "
++				"supported for MXS-based\n");
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++	/*
++	 * Do not put overhead of interrupt enable/disable into
++	 * mxs_set_next_event(), the core has about 4 minutes
++	 * to call mxs_set_next_event() or shutdown clock after
++	 * mode switching
++	 */
++		local_irq_save(flags);
++		timrot_irq_enable();
++		local_irq_restore(flags);
++		break;
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_RESUME:
++		/* Left event sources disabled, no more interrupts appear */
++		break;
++	}
++}
++
++static struct clock_event_device clockevent_mxs = {
++	.name		= "mxs_timrot",
++	.features	= CLOCK_EVT_FEAT_ONESHOT,
++	.shift		= 32,
++	.set_mode	= mxs_set_mode,
++	.set_next_event	= timrot_set_next_event,
++	.rating		= 200,
++};
++
++static int __init mxs_clockevent_init(struct clk *timer_clk)
++{
++	unsigned int c = clk_get_rate(timer_clk);
++
++	clockevent_mxs.mult = div_sc(c, NSEC_PER_SEC, clockevent_mxs.shift);
++	clockevent_mxs.cpumask = cpumask_of(0);
++	if (timrot_is_v1()) {
++		clockevent_mxs.max_delta_ns =
++			clockevent_delta2ns(0xfffe, &clockevent_mxs);
++		clockevent_mxs.min_delta_ns =
++			clockevent_delta2ns(0xf, &clockevent_mxs);
++	} else {
++		clockevent_mxs.max_delta_ns =
++			clockevent_delta2ns(0xfffffffe, &clockevent_mxs);
++		clockevent_mxs.min_delta_ns =
++			clockevent_delta2ns(0xff, &clockevent_mxs);
++	}
++
++	clockevents_register_device(&clockevent_mxs);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL(mxs_iomux_setup_multiple_pads);
 +
-+void mxs_iomux_init(void __iomem *iomux_base)
++static struct clocksource clocksource_mxs = {
++	.name 		= "mxs_timer",
++	.rating		= 200,
++	.read		= timrot_get_cycles,
++	.mask		= CLOCKSOURCE_MASK(32),
++	.shift 		= 10,
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static int __init mxs_clocksource_init(struct clk *timer_clk)
 +{
-+	base = iomux_base;
++	unsigned int c = clk_get_rate(timer_clk);
++
++	if (timrot_is_v1())
++		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
++	clocksource_mxs.mult = clocksource_hz2mult(c, clocksource_mxs.shift);
++	clocksource_register(&clocksource_mxs);
++
++	return 0;
++}
++
++void __init mxs_timer_init(struct clk *timer_clk,
++				void __iomem *base, int irq)
++{
++	clk_enable(timer_clk);
++
++	timer_base = base;
++
++	/*
++	 * Initialize timers to a known state
++	 */
++	mxs_reset_block(base + HW_TIMROT_ROTCTRL);
++
++	if (timrot_is_v1()) {
++		/* timer0 is for next_event */
++		__raw_writel(
++			BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL |
++			BM_TIMROT_TIMCTRLn_UPDATE |
++			BM_TIMROT_TIMCTRLn_IRQ_EN,
++			base + HW_TIMROT_TIMCTRLn(0));
++		/* timer1 is for get_cycles */
++		__raw_writel(
++			BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL |
++			BM_TIMROT_TIMCTRLn_RELOAD,
++			base + HW_TIMROT_TIMCTRLn(1));
++		__raw_writel(0xffff, timer_base  + HW_TIMROT_RUNNING_COUNTn(1));
++
++	} else {
++		__raw_writel(
++			BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL |
++			BM_TIMROT_TIMCTRLn_IRQ_EN |
++			BM_TIMROT_TIMCTRLn_MATCH_MODE,
++			timer_base + HW_TIMROT_TIMCTRLn(0));
++	}
++
++	/* init and register the timer to the framework */
++	mxs_clocksource_init(timer_clk);
++	mxs_clockevent_init(timer_clk);
++
++	/* Make irqs happen */
++	setup_irq(irq, &mxs_timer_irq);
 +}
 -- 
 1.7.1
