@@ -1,65 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Nov 2010 13:00:10 +0000
-Subject: linux-next: omap2plus_defconfig not building
-In-Reply-To: <1290775134.15771.42.camel@e102109-lin.cambridge.arm.com>
-References: <1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
-	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
-	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
-	<4CEE6AB1.7090404@ti.com>
-	<20101125165048.GA2367@n2100.arm.linux.org.uk>
-	<4CEF9B8D.3010106@ti.com>
-	<20101126114509.GL9310@n2100.arm.linux.org.uk>
-	<000101cb8d64$8fe819f0$afb84dd0$@deacon@arm.com>
-	<20101126122811.GM9310@n2100.arm.linux.org.uk>
-	<1290775134.15771.42.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20101126130010.GO9310@n2100.arm.linux.org.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 26 Nov 2010 14:29:16 +0100
+Subject: [sodaville] [PATCH 1/9] spi/pxa2xx: don't use subys initcall
+	for driver init
+In-Reply-To: <20101126110605.GI9310@n2100.arm.linux.org.uk>
+References: <1290597207-29838-1-git-send-email-bigeasy@linutronix.de>
+	<1290597207-29838-2-git-send-email-bigeasy@linutronix.de>
+	<AANLkTin4vh85XRkEd7YocCmKngViR_qZDe7z1b4JXyd-@mail.gmail.com>
+	<4CED1C95.8070300@linutronix.de>
+	<20101124141623.GH24970@rakim.wolfsonmicro.main>
+	<4CED3199.2040700@linutronix.de>
+	<20101125235415.GA9310@n2100.arm.linux.org.uk>
+	<20101126105028.GA24010@www.tglx.de>
+	<20101126110605.GI9310@n2100.arm.linux.org.uk>
+Message-ID: <4CEFB62C.6020508@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 26, 2010 at 12:38:54PM +0000, Catalin Marinas wrote:
-> On Fri, 2010-11-26 at 12:28 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Nov 26, 2010 at 12:22:15PM -0000, Will Deacon wrote:
-> > > Hi Russell,
-> > >
-> > > > $ arm-linux-as -v -o /dev/null /dev/null
-> > > > GNU assembler version 2.19.1 (arm-linux) using BFD version (GNU Binutils) 2.19.1
-> > > > $ arm-linux-as -march=armv6 -mfloat-abi=soft -meabi=5 -march=armv7-a -o /dev/null t.s
-> > > > $ arm-linux-as -march=armv6 -mfloat-abi=soft -meabi=5 -o /dev/null t.s
-> > > > t.s: Assembler messages:
-> > > > t.s:1: Error: selected processor does not support `ldrexb r7,[r6]'
-> > > >
-> > > > So it looks like someone's changed the behaviour of the assembler so it's
-> > > > no longer possible to override the -march= argument from the gcc frontend.
-> > > >
-> > > > Maybe Will can shed some light on this?
-> > >
-> > > Well we pass -march=armv6 to GCC and -march=v7-a to the assembler using the -Wa
-> > > option. This means that the compiler generates a .arch armv6 directive in the .s
-> > > file and the assembler barfs.
-> > >
-> > > Please can you try this patch?
-> > 
-> > We can't do this - we'll end up running ARMv7 code on ARMv6 CPUs.
+Russell King - ARM Linux wrote:
+> On Fri, Nov 26, 2010 at 11:50:28AM +0100, Sebastian Andrzej Siewior wrote:
+>> * Russell King - ARM Linux | 2010-11-25 23:54:15 [+0000]:
+>>
+>>> Why should the PXA code change when you haven't explained _why_ you want
+>>> to change the SPI driver to conform to your idea?
+>> The problem was, that the platform driver never got probed after I
+>> registered the PCI driver. For that reason I made the patch attached. It
+>> got lost while moving the tree forward and I did not notice it earlier.
+>> While at it, I changed the subsys_init to module_init because it looked
+>> wrong. At this time I was also thinking about using one module for the
+>> platform and PCI code but never got to it.
 > 
-> An alternative would be to add the '.arch armv7-a' in the inline
-> assembly in swp_emulate.c. But that's an ugly workaround and you can't
-> revert to the previous .arch unless you add another '.arch armv6' at the
-> end of the asm (with lots of #ifdef's).
+> This is one of the problems of the foo_driver_probe() idea - if the
+> device is not present at the time the driver is registered, then the
+> driver loses out completely.
+> 
+> This would seem to be exagerated as you're creating this platform device
+> from a PCI device - who's to say that someone won't unbind the PCI device
+> and re-bind it later, causing the platform device to be deleted and
+> re-created?
 
-Yup, so this won't work either.  Also, as I understand it, I don't think
-you can rely upon the compiler ordering functions wrt. asm() statements
-outside of the function blocks, so I don't think this will work anyway.
+Unbinding a PCI device should call ->remove of the pci driver and this in
+turn will remove the platform device which calls ->remove of the driver.
 
-We could separate out the non-ARMv7 specific code into a separate file
-(maybe called swp_emulate-init.c) and export proc_read_status and swp_hook
-into the global namespace.  These would have to be renamed to avoid any
-possible clashes with other symbols.
+> As such, I think the patch you've shown in this email is more appropriate
+> (getting rid of the platform_driver_probe()) than trying to sort out
+> init-level dependencies.  Really, the init-level dependencies in this case
+> are not the problem - the use of platform_driver_probe() is.
 
-We could just take the view that we don't allow SWP on ARMv7 at all,
-which would make it a pain for userspace people.
+Okay. So I leave as it.
 
-We could also re-enable SWP support on ARMv7 without the emulation code.
-
-Luckily, this is the only place - at present - where we have C code built
-containing instructions (via asm() statements) for higher versions of the
-architecture.
+Sebastian
