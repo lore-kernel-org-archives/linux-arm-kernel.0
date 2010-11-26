@@ -1,5 +1,5 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Nov 2010 12:28:11 +0000
+Date: Fri, 26 Nov 2010 12:33:36 +0000
 Subject: linux-next: omap2plus_defconfig not building
 In-Reply-To: <000101cb8d64$8fe819f0$afb84dd0$@deacon@arm.com>
 References: <4CBD707F.6050204@ti.com>
@@ -11,7 +11,7 @@ References: <4CBD707F.6050204@ti.com>
 	<4CEF9B8D.3010106@ti.com>
 	<20101126114509.GL9310@n2100.arm.linux.org.uk>
 	<000101cb8d64$8fe819f0$afb84dd0$@deacon@arm.com>
-Message-ID: <20101126122811.GM9310@n2100.arm.linux.org.uk>
+Message-ID: <20101126123336.GN9310@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,7 +33,8 @@ On Fri, Nov 26, 2010 at 12:22:15PM -0000, Will Deacon wrote:
 > Well we pass -march=armv6 to GCC and -march=v7-a to the assembler using the -Wa
 > option. This means that the compiler generates a .arch armv6 directive in the .s
 > file and the assembler barfs.
-> 
-> Please can you try this patch?
 
-We can't do this - we'll end up running ARMv7 code on ARMv6 CPUs.
+BTW, what this means is that now, we can't support anything but the
+targetted CPU with the kernel.  We can say goodbye to multiple-CPU
+supporting kernels, and Linaro's idea of having one kernel support
+multiple platforms.
