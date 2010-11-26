@@ -1,96 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 26 Nov 2010 12:37:28 +0100
-Subject: [PATCH v2 2/2] ARM: mx5: dynamically allocate imx2-wdt devices
-In-Reply-To: <1290724946-23516-2-git-send-email-user@fabio-desktop>
-References: <1290724946-23516-1-git-send-email-user@fabio-desktop>
-	<1290724946-23516-2-git-send-email-user@fabio-desktop>
-Message-ID: <20101126113728.GE27637@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Nov 2010 11:38:25 +0000
+Subject: [PATCH 1/5] ARM: pgtable: switch order of Linux vs hardware
+	page tables
+In-Reply-To: <AANLkTik043UX-cXyriVAwzFTNNTtCTcxYd6VN_gYqCFe@mail.gmail.com>
+References: <20101117172717.GF5308@n2100.arm.linux.org.uk>
+	<E1PIloA-0007qU-ME@rmk-PC.arm.linux.org.uk>
+	<AANLkTik043UX-cXyriVAwzFTNNTtCTcxYd6VN_gYqCFe@mail.gmail.com>
+Message-ID: <20101126113825.GK9310@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 08:42:26PM -0200, Fabio Estevam wrote:
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Fri, Nov 19, 2010 at 11:48:31AM +0000, Catalin Marinas wrote:
+> On 17 November 2010 17:28, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > --- a/arch/arm/mm/proc-v7.S
+> > +++ b/arch/arm/mm/proc-v7.S
+> > @@ -158,7 +156,7 @@ ENTRY(cpu_v7_set_pte_ext)
+> > ? ? ? ?tstne ? r1, #L_PTE_PRESENT
+> > ? ? ? ?moveq ? r3, #0
+> >
+> > - ? ? ? str ? ? r3, [r0]
+> > + ? ? ? str ? ? r3, [r0, #2048]!
+> 
+> Thumb-2 build gives "offset out of range".  We need to do a separate
+> ADD for this case.
 
-Thanks
-Uwe
-> ---
->  arch/arm/mach-mx5/devices-imx51.h             |    4 ++++
->  arch/arm/mach-mx5/devices.c                   |   15 ---------------
->  arch/arm/mach-mx5/devices.h                   |    1 -
->  arch/arm/plat-mxc/devices/platform-imx2-wdt.c |    5 +++++
->  4 files changed, 9 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-> index 01b71ef..939d2e8 100644
-> --- a/arch/arm/mach-mx5/devices-imx51.h
-> +++ b/arch/arm/mach-mx5/devices-imx51.h
-> @@ -43,3 +43,7 @@ extern const struct imx_spi_imx_data imx51_cspi_data __initconst;
->  extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
->  #define imx51_add_ecspi(id, pdata)	\
->  	imx_add_spi_imx(&imx51_ecspi_data[id], pdata)
-> +
-> +extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data __initconst;
-> +#define imx51_imx2_wdt_data(pdata)	\
-> +	imx_add_imx2_wdt_data(&imx51_imx2_wdt_data, pdata)
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index d926203..ac55f7f 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -97,21 +97,6 @@ struct platform_device mxc_usbh1_device = {
->  	},
->  };
->  
-> -static struct resource mxc_wdt_resources[] = {
-> -	{
-> -		.start = MX51_WDOG_BASE_ADDR,
-> -		.end = MX51_WDOG_BASE_ADDR + SZ_16K - 1,
-> -		.flags = IORESOURCE_MEM,
-> -	},
-> -};
-> -
-> -struct platform_device mxc_wdt = {
-> -	.name = "imx2-wdt",
-> -	.id = 0,
-> -	.num_resources = ARRAY_SIZE(mxc_wdt_resources),
-> -	.resource = mxc_wdt_resources,
-> -};
-> -
->  static struct resource mxc_kpp_resources[] = {
->  	{
->  		.start = MX51_MXC_INT_KPP,
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-> index af1d07c..ccb7cdc 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -1,6 +1,5 @@
->  extern struct platform_device mxc_usbdr_host_device;
->  extern struct platform_device mxc_usbh1_device;
->  extern struct platform_device mxc_usbdr_udc_device;
-> -extern struct platform_device mxc_wdt;
->  extern struct platform_device mxc_hsi2c_device;
->  extern struct platform_device mxc_keypad_device;
-> diff --git a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c b/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
-> index c61bd4e..8dc19f6 100644
-> --- a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
-> +++ b/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
-> @@ -41,6 +41,11 @@ const struct imx_imx2_wdt_data imx35_imx2_wdt_data __initconst =
->  	imx_imx2_wdt_data_entry_single(MX35, SZ_16K);
->  #endif /* ifdef CONFIG_SOC_IMX35 */
->  
-> +#ifdef CONFIG_SOC_IMX51
-> +const struct imx_imx2_wdt_data imx51_imx2_wdt_data __initconst =
-> +	imx_imx2_wdt_data_entry_single(MX51, SZ_16K);
-> +#endif /* ifdef CONFIG_SOC_IMX51 */
-> +
->  struct platform_device *__init imx_add_imx2_wdt(
->  		const struct imx_imx2_wdt_data *data)
->  {
-> -- 
-> 1.6.0.4
-> 
-> 
+Do we have any clues about the typical timing of:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	str	r3, [r0, #2048]!
+	mcr	p15, 0, r0, c7, c10, 1
+
+vs:
+	add	r0, r0, #2048
+	str	r3, [r0]
+	mcr	p15, 0, r0, c7, c10, 1
+
+or
+	str	r3, [r0, #2048]
+	add	r0, r0, #2048
+	mcr	p15, 0, r0, c7, c10, 1
+
+on ARMv7?
