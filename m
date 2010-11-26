@@ -1,166 +1,168 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Nov 2010 14:49:01 +0800
-Subject: [PATCH 02/15] ARM: mxs: Add helper definition and function
+Date: Fri, 26 Nov 2010 14:49:04 +0800
+Subject: [PATCH 05/15] ARM: mxs: Add low-level debug UART support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1290754154-9428-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1290754154-9428-6-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper definition and function for MXS-based.
+* DEBUG_LL support, which is incompatible with single MXS image
+  because of different DUART base address on MX23 and MX28
+* uncompress message support
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/cpu.c                  |   11 ++++++++++
- arch/arm/mach-mxs/include/mach/common.h  |   33 ++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/io.h      |   22 ++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/timex.h   |   21 +++++++++++++++++++
- arch/arm/mach-mxs/include/mach/vmalloc.h |   22 ++++++++++++++++++++
- 5 files changed, 109 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/cpu.c
- create mode 100644 arch/arm/mach-mxs/include/mach/common.h
- create mode 100644 arch/arm/mach-mxs/include/mach/io.h
- create mode 100644 arch/arm/mach-mxs/include/mach/timex.h
- create mode 100644 arch/arm/mach-mxs/include/mach/vmalloc.h
+ arch/arm/mach-mxs/include/mach/debug-macro.S |   51 ++++++++++++++++
+ arch/arm/mach-mxs/include/mach/uncompress.h  |   82 ++++++++++++++++++++++++++
+ 2 files changed, 133 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
 
-diff --git a/arch/arm/mach-mxs/cpu.c b/arch/arm/mach-mxs/cpu.c
+diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
 new file mode 100644
-index 0000000..764b0d5
+index 0000000..efb3173
 --- /dev/null
-+++ b/arch/arm/mach-mxs/cpu.c
-@@ -0,0 +1,11 @@
++++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+@@ -0,0 +1,51 @@
++/* arch/arm/mach-mxs/include/mach/debug-macro.S
++ *
++ * Debugging macro include header
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
 +
-+#include <linux/module.h>
++#include <mach/hardware.h>
 +
-+unsigned int __mxs_cpu_type;
-+EXPORT_SYMBOL(__mxs_cpu_type);
++#ifdef CONFIG_SOC_IMX23
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX23_DUART_BASE_ADDR
++#endif
 +
-+void mxs_set_cpu_type(unsigned int type)
++#ifdef CONFIG_SOC_IMX28
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX28_DUART_BASE_ADDR
++#endif
++
++#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
++
++		.macro	addruart, rp, rv
++		ldr	\rp, =UART_PADDR	@ physical
++		ldr	\rv, =UART_VADDR	@ virtual
++		.endm
++
++		.macro	senduart, rd, rx
++		str	\rd, [\rx, #0x0]	@ DR
++		.endm
++
++		.macro	waituart, rd, rx
++1001:		ldr	\rd, [\rx, #0x18]	@ FR
++		tst	\rd, #1 << 5		@ FR_TXFF
++		bne	1001b
++		.endm
++
++		.macro	busyuart, rd, rx
++1002:		ldr	\rd, [\rx, #0x18]	@ FR
++		tst	\rd, #1 << 3		@ FR_BUSY
++		beq	1002b
++		.endm
+diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+new file mode 100644
+index 0000000..47e5479
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+@@ -0,0 +1,82 @@
++/*
++ *  arch/arm/mach-mxs/include/mach/uncompress.h
++ *
++ *  Copyright (C) 1999 ARM Limited
++ *  Copyright (C) Shane Nay (shane@minirl.com)
++ *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __MACH_MXS_UNCOMPRESS_H__
++#define __MACH_MXS_UNCOMPRESS_H__
++
++#define __MXS_BOOT_UNCOMPRESS
++
++#include <asm/mach-types.h>
++
++static unsigned long uart_base;
++
++#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
++
++#define DR		0x00
++#define FR		0x18
++#define FR_BUSY		(1 << 3)
++#define FR_TXFE		(1 << 7)
++#define CR		0x30
++#define CR_UARTEN	1
++
++/*
++ * The following code assumes the serial port has already been
++ * initialized by the bootloader.  We search for the first enabled
++ * port in the most probable order.  If you didn't setup a port in
++ * your bootloader then nothing will appear (which might be desired).
++ *
++ * This does not append a newline
++ */
++
++static void putc(int ch)
 +{
-+	__mxs_cpu_type = type;
++	if (!uart_base)
++		return;
++	if (!(UART(CR) & CR_UARTEN))
++		return;
++
++	while (!(UART(FR) & FR_TXFE))
++		barrier();
++
++	UART(DR) = ch;
 +}
 +
-diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-new file mode 100644
-index 0000000..2911057
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/common.h
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
++static inline void flush(void)
++{
++}
 +
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++#define MX23_DUART_BASE_ADDR	0x80070000
++#define MX28_DUART_BASE_ADDR	0x80074000
 +
-+#ifndef __MACH_MXS_COMMON_H__
-+#define __MACH_MXS_COMMON_H__
++static __inline__ void __arch_decomp_setup(unsigned long arch_id)
++{
++	switch (arch_id) {
++	case MACH_TYPE_MX23EVK:
++		uart_base = MX23_DUART_BASE_ADDR;
++		break;
++	case MACH_TYPE_MX28EVK:
++		uart_base = MX28_DUART_BASE_ADDR;
++		break;
++	default:
++		break;
++	}
++}
 +
-+struct clk;
++#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
++#define arch_decomp_wdog()
 +
-+extern int mxs_reset_block(void __iomem *);
-+extern void mxs_arch_reset_init(void __iomem *);
-+extern void mxs_set_cpu_type(unsigned int);
-+extern void mxs_timer_init(struct clk *, void __iomem *, int);
-+
-+extern int mx23_register_gpios(void);
-+extern int mx23_clocks_init(void);
-+extern void mx23_map_io(void);
-+extern void mx23_init_irq(void);
-+
-+extern int mx28_register_gpios(void);
-+extern int mx28_clocks_init(void);
-+extern void mx28_map_io(void);
-+extern void mx28_init_irq(void);
-+
-+extern void icoll_init_irq(void __iomem *);
-+
-+#endif /* __MACH_MXS_COMMON_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/io.h b/arch/arm/mach-mxs/include/mach/io.h
-new file mode 100644
-index 0000000..289b722
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/io.h
-@@ -0,0 +1,22 @@
-+/*
-+ *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
-+
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __MACH_MXS_IO_H__
-+#define __MACH_MXS_IO_H__
-+
-+/* Allow IO space to be anywhere in the memory */
-+#define IO_SPACE_LIMIT 0xffffffff
-+
-+/* io address mapping macro */
-+#define __io(a)		__typesafe_io(a)
-+
-+#define __mem_pci(a)	(a)
-+
-+#endif /* __MACH_MXS_IO_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/timex.h b/arch/arm/mach-mxs/include/mach/timex.h
-new file mode 100644
-index 0000000..734ce89
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/timex.h
-@@ -0,0 +1,21 @@
-+/*
-+ *  Copyright (C) 1999 ARM Limited
-+ * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_MXS_TIMEX_H__
-+#define __MACH_MXS_TIMEX_H__
-+
-+#define CLOCK_TICK_RATE		32000	/* 32K */
-+
-+#endif /* __MACH_MXS_TIMEX_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/vmalloc.h b/arch/arm/mach-mxs/include/mach/vmalloc.h
-new file mode 100644
-index 0000000..103b016
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/vmalloc.h
-@@ -0,0 +1,22 @@
-+/*
-+ *  Copyright (C) 2000 Russell King.
-+ *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_MXS_VMALLOC_H__
-+#define __MACH_MXS_VMALLOC_H__
-+
-+/* vmalloc ending address */
-+#define VMALLOC_END       0xf4000000UL
-+
-+#endif /* __MACH_MXS_VMALLOC_H__ */
++#endif /* __MACH_MXS_UNCOMPRESS_H__ */
 -- 
 1.7.1
