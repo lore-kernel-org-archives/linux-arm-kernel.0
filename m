@@ -1,157 +1,144 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Nov 2010 09:28:02 +0100
-Subject: [PATCH] mc13892 regulator enable on mx51 babbage board
-In-Reply-To: <AANLkTinV3EUwfiFHz6KmMAYfmMEH21mAX6R8pCFLTdee@mail.gmail.com>
-References: <AANLkTinZM=hxidn1gcwxA4yFaO2QjdjDdoF-tZRJuP0n@mail.gmail.com>
-	<AANLkTinV3EUwfiFHz6KmMAYfmMEH21mAX6R8pCFLTdee@mail.gmail.com>
-Message-ID: <20101126082802.GX6017@pengutronix.de>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Fri, 26 Nov 2010 14:19:05 +0600
+Subject: [PATCH V2] ARM: SAMSUNG: Add support for clock debugging through
+	debug-fs interface
+Message-ID: <1290759545-2995-1-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+This patch adds support for clock information exposed to debug-fs interface.
 
-On Thu, Nov 25, 2010 at 06:04:38PM +0800, Yong Shen wrote:
-> Hi there,
-> 
-> This is the draft patch for mc13892 regulator.
-> I send out this patch by copy and paste, since I can not use git
-> send-email due to the firewall. sorry for inconvenient.
-> 
-> Cheers
-> Yong
+Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
+Code modified for V2 version are,
+a)Inserted the debug-fs code inside macro CONFIG_PM_DEBUG as suggested by
+yong.shen at linaro.org.
+b)Removed macro CONFIG_PLAT_SAMSUNG and implemented other coding standards 
+as suggested by kgene.kim at samsung.com
 
-Only a few minor comments inline. My main concern is that the functions
-like mc13892_regulator_enable/disable and so on should be shared with
-the mc13783. This will require some cleanup patches first. The first
-patch could move all functions from mc13783-regulator.c to
-mc13xxx-regulator-core.c leaving only the tables describing the
-regulators in mc13783-regulator.c. Then you can rename the functions to
-mc13xxx-*. The last step would be to actually add mc13892 support in
-mc13892-regulator.c
-The trick doing such work is to cleanup *first* and then add the missing
-functionality and not the other way round. The reviewers then will see
-'Oh, someones cleaning up' and get a warm nice feeling which opens them
-to the changes you really want to do. (I often also work the other way
-round, but git makes it easy to rebase the patches to pretend I cleaned
-up first)
+ arch/arm/plat-samsung/clock.c              |   91 ++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/clock.h |    3 +
+ 2 files changed, 94 insertions(+), 0 deletions(-)
 
-
-> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> index 026cd85..1594c9f 100644
-> --- a/arch/arm/mach-mx5/Makefile
-> +++ b/arch/arm/mach-mx5/Makefile
-> @@ -6,7 +6,7 @@
-> ?obj-y ? := cpu.o mm.o clock-mx51-mx53.o devices.o
-> 
-> ?obj-$(CONFIG_CPU_FREQ_IMX) ? ?+= cpu_op-mx51.o
-> -obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
-> +obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
-> babbage_regulator_mc13892.o
-> ?obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-> ?obj-$(CONFIG_MACH_EUKREA_CPUIMX51) += board-cpuimx51.o
-> ?obj-$(CONFIG_MACH_EUKREA_MBIMX51_BASEBOARD) += eukrea_mbimx51-baseboard.o
-> diff --git a/arch/arm/mach-mx5/babbage_regulator_mc13892.c
-
-This file should be named after the babbage file so that it appears next
-to the babbage board support in ls, so something like
-board-mx51_babbage_regulator.c
-Also, please seperate the patches a bit more. We need at least core
-mc13892 support, regulator support and board support as seperate
-patches.
-
-
-> +
-> +#define MC13892_POWERCTL0 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?13
-> +#define MC13892_POWERCTL0_USEROFFSPI ? ? ? ? ? 3
-> +#define MC13892_POWERCTL0_VCOINCELLVSEL ? ? ? ? ? ? ? ?20
-> +#define MC13892_POWERCTL0_VCOINCELLVSEL_M ? ? ? ? ? ? ?(7<<20)
-> +#define MC13892_POWERCTL0_VCOINCELLEN ? ? ? ? ?(1<<23)
-> +
-> +#define MC13892_SWITCHERS0_SWxHI ? ? ? ? ? ? ? ? ? ? ? (1<<23)
-> +
-> +#define MC13892_SWITCHERS0 ? ? ? ? ? ? ? ? ? ? ? ? ? ? 24
-> +#define MC13892_SWITCHERS0_SW1VSEL ? ? ? ? ? ? ? ? ? ? 0
-> +#define MC13892_SWITCHERS0_SW1VSEL_M ? ? ? ? ? (0x1f<<0)
-> +#define MC13892_SWITCHERS0_SW1HI ? ? ? ? ? ? ? ? ? ? ? (1<<23)
-> +#define MC13892_SWITCHERS0_SW1EN ? ? ? ? ? ? ? 0 /*no use*/
-> +
-> +#define MC13892_SWITCHERS1 ? ? ? ? ? ? ? ? ? ? ? ? ? ? 25
-> +#define MC13892_SWITCHERS1_SW2VSEL ? ? ? ? ? ? ? ? ? ? 0
-> +#define MC13892_SWITCHERS1_SW2VSEL_M ? ? ? ? ? (0x1f<<0)
-> +#define MC13892_SWITCHERS1_SW2HI ? ? ? ? ? ? ? ? ? ? ? (1<<23)
-> +#define MC13892_SWITCHERS1_SW2EN ? ? ? ? ? ? ? 0 /*no use*/
-> +
-> +#define MC13892_SWITCHERS2 ? ? ? ? ? ? ? ? ? ? ? ? ? ? 26
-> +#define MC13892_SWITCHERS2_SW3VSEL ? ? ? ? ? ? ? ? ? ? 0
-> +#define MC13892_SWITCHERS2_SW3VSEL_M ? ? ? ? ? (0x1f<<0)
-> +#define MC13892_SWITCHERS2_SW3HI ? ? ? ? ? ? ? ? ? ? ? (1<<23)
-> +#define MC13892_SWITCHERS2_SW3EN ? ? ? ? ? ? ? 0/*no use*/
-> +
-> +#define MC13892_SWITCHERS3 ? ? ? ? ? ? ? ? ? ? ? ? ? ? 27
-> +#define MC13892_SWITCHERS3_SW4VSEL ? ? ? ? ? ? ? ? ? ? 0
-> +#define MC13892_SWITCHERS3_SW4VSEL_M ? ? ? ? ? (0x1f<<0)
-> +#define MC13892_SWITCHERS3_SW4HI ? ? ? ? ? ? ? ? ? ? ? (1<<23)
-> +#define MC13892_SWITCHERS3_SW4EN ? ? ? ? ? ? ? 0/*no use*/
-> +
-> +#define MC13892_SWITCHERS4 ? ? ? ? ? ? ? ? ? ? ? ? ? ? 28
-> +#define MC13892_SWITCHERS4_SW1MODE ? ? ? ? ? ? ? ? ? ? 0
-> +#define MC13892_SWITCHERS4_SW1MODE_AUTO ? ? ? ? ? ? ? ?(8<<0)
-> +#define MC13892_SWITCHERS4_SW1MODE_M ? ? ? ? ? (0xf<<0)
-> +#define MC13892_SWITCHERS4_SW2MODE ? ? ? ? ? ? ? ? ? ? 10
-> +#define MC13892_SWITCHERS4_SW2MODE_AUTO ? ? ? ? ? ? ? ?(8<<10)
-> +#define MC13892_SWITCHERS4_SW2MODE_M ? ? ? ? ? (0xf<<10)
-> +
-> +#define MC13892_SWITCHERS5 ? ? ? ? ? ? ? ? ? ? ? ? ? ? 29
-> +#define MC13892_SWITCHERS5_SW3MODE ? ? ? ? ? ? ? ? ? ? 0
-> +#define MC13892_SWITCHERS5_SW3MODE_AUTO ? ? ? ? ? ? ? ?(8<<0)
-> +#define MC13892_SWITCHERS5_SW3MODE_M ? ? ? ? ? (0xf<<0)
-> +#define MC13892_SWITCHERS5_SW4MODE ? ? ? ? ? ? ? ? ? ? 8
-> +#define MC13892_SWITCHERS5_SW4MODE_AUTO ? ? ? ? ? ? ? ?(8<<8)
-> +#define MC13892_SWITCHERS5_SW4MODE_M ? ? ? ? ? (0xf<<8)
-> +#define MC13892_SWITCHERS5_SWBSTEN ? ? ? ? ? ? ? ? ? ? (1<<20)
-
-Please add some spaces here. It should be (0xf << 8) and /* comment */.
-
-> +static struct mc13xxx_regulator mc13892_regulators[] = {
-> + ? ? ? MC13892_DEFINE_REGU(VCOINCELL, POWERCTL0, POWERCTL0, ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vcoincell),
-> + ? ? ? MC13892_SW_DEFINE(SW1, SWITCHERS0, SWITCHERS0, mc13892_sw1),
-> + ? ? ? MC13892_SW_DEFINE(SW2, SWITCHERS1, SWITCHERS1, mc13892_sw),
-> + ? ? ? MC13892_SW_DEFINE(SW3, SWITCHERS2, SWITCHERS2, mc13892_sw),
-> + ? ? ? MC13892_SW_DEFINE(SW4, SWITCHERS3, SWITCHERS3, mc13892_sw),
-> + ? ? ? MC13892_FIXED_DEFINE(SWBST, SWITCHERS5, mc13892_swbst),
-> + ? ? ? MC13892_FIXED_DEFINE(VIOHI, REGULATORMODE0, mc13892_viohi),
-> + ? ? ? MC13892_DEFINE_REGU(VPLL, REGULATORMODE0, REGULATORSETTING0, ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vpll),
-> + ? ? ? MC13892_DEFINE_REGU(VDIG, REGULATORMODE0, REGULATORSETTING0, ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vdig),
-> + ? ? ? MC13892_DEFINE_REGU(VSD, REGULATORMODE1, REGULATORSETTING1, ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vsd),
-> + ? ? ? MC13892_DEFINE_REGU(VUSB2, REGULATORMODE0, REGULATORSETTING0, ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vusb2),
-> + ? ? ? MC13892_DEFINE_REGU(VVIDEO, REGULATORMODE1, REGULATORSETTING1, ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vvideo),
-> + ? ? ? MC13892_DEFINE_REGU(VAUDIO, REGULATORMODE1, REGULATORSETTING1, ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vaudio),
-> + ? ? ? MC13892_DEFINE_REGU(VCAM, REGULATORMODE1, REGULATORSETTING0, \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vcam),
-> + ? ? ? MC13892_DEFINE_REGU(VGEN1, REGULATORMODE0, REGULATORSETTING0, ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vgen1),
-> + ? ? ? MC13892_DEFINE_REGU(VGEN2, REGULATORMODE0, REGULATORSETTING0, ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vgen2),
-> + ? ? ? MC13892_DEFINE_REGU(VGEN3, REGULATORMODE1, REGULATORSETTING0, ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_vgen3),
-
-For my taste that's a case where the 80 chars line length limit could be
-a bit stretched. But others may have different opinions.
-
-Most of the code below shouldn't be here.
-
-Sascha
-
-
+diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+index e8d20b0..029a49d 100644
+--- a/arch/arm/plat-samsung/clock.c
++++ b/arch/arm/plat-samsung/clock.c
+@@ -39,6 +39,9 @@
+ #include <linux/clk.h>
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
++#if defined(CONFIG_DEBUG_FS)
++#include <linux/debugfs.h>
++#endif
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+@@ -447,3 +450,91 @@ int __init s3c24xx_register_baseclocks(unsigned long xtal)
+ 	return 0;
+ }
+ 
++#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
++/* debugfs support to trace clock tree hierarchy and attributes */
++
++static struct dentry *clk_debugfs_root;
++
++static int clk_debugfs_register_one(struct clk *c)
++{
++	int err;
++	struct dentry *d, *child, *child_tmp;
++	struct clk *pa = c->parent;
++	char s[255];
++	char *p = s;
++
++	p += sprintf(p, "%s", c->name);
++	/*Append id field with name also*/
++	if (c->id >= 0)
++		sprintf(p, ":%d", c->id);
++
++	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
++	if (!d)
++		return -ENOMEM;
++
++	c->dent = d;
++
++	d = debugfs_create_u8("usecount", S_IRUGO, c->dent, (u8 *)&c->usage);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	return 0;
++
++err_out:
++	d = c->dent;
++	list_for_each_entry_safe(child, child_tmp, &d->d_subdirs, d_u.d_child)
++		debugfs_remove(child);
++	debugfs_remove(c->dent);
++	return err;
++}
++
++static int clk_debugfs_register(struct clk *c)
++{
++	int err;
++	struct clk *pa = c->parent;
++
++	if (pa && !pa->dent) {
++		err = clk_debugfs_register(pa);
++		if (err)
++			return err;
++	}
++
++	if (!c->dent) {
++		err = clk_debugfs_register_one(c);
++		if (err)
++			return err;
++	}
++	return 0;
++}
++
++static int __init clk_debugfs_init(void)
++{
++	struct clk *c;
++	struct dentry *d;
++	int err;
++
++	d = debugfs_create_dir("clock", NULL);
++	if (!d)
++		return -ENOMEM;
++	clk_debugfs_root = d;
++
++	list_for_each_entry(c, &clocks, list) {
++		err = clk_debugfs_register(c);
++		if (err)
++			goto err_out;
++	}
++	return 0;
++err_out:
++	debugfs_remove_recursive(clk_debugfs_root);
++	return err;
++}
++late_initcall(clk_debugfs_init);
++
++#endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
++
+diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+index 0fbcd0e..9a82b88 100644
+--- a/arch/arm/plat-samsung/include/plat/clock.h
++++ b/arch/arm/plat-samsung/include/plat/clock.h
+@@ -47,6 +47,9 @@ struct clk {
+ 
+ 	struct clk_ops		*ops;
+ 	int		    (*enable)(struct clk *, int enable);
++#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
++	struct dentry		*dent;	/* For visible tree hierarchy */
++#endif
+ };
+ 
+ /* other clocks which may be registered by board support */
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.6.2.5
