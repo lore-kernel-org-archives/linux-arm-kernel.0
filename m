@@ -1,34 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 26 Nov 2010 21:07:46 +0100
-Subject: [PATCH 28/51] ARM: mx25: dynamically allocate mxc-ehci devices
-In-Reply-To: <4CEFD139.8090600@gandalf.sssup.it>
-References: <20101117212821.GF8942@pengutronix.de>
-	<1290029419-21435-28-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4CEFCC9A.2020500@fqingenieria.es>
-	<4CEFD139.8090600@gandalf.sssup.it>
-Message-ID: <20101126200746.GB25293@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 26 Nov 2010 15:00:08 -0600
+Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
+In-Reply-To: <AANLkTimkovvHzgdnGtGpTH1pz8QLi9K0-rcWVHCdMJbu@mail.gmail.com>
+References: <1290526740-27624-1-git-send-email-ohad@wizery.com>
+	<1290526740-27624-2-git-send-email-ohad@wizery.com>
+	<20101126045912.GC6598@lixom.net>
+	<AANLkTimkovvHzgdnGtGpTH1pz8QLi9K0-rcWVHCdMJbu@mail.gmail.com>
+Message-ID: <20101126210008.GA27223@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On Fri, Nov 26, 2010 at 12:18:49AM -0700, Grant Likely wrote:
+> On Thu, Nov 25, 2010 at 9:59 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Tue, Nov 23, 2010 at 05:38:57PM +0200, Ohad Ben-Cohen wrote:
+> >> +#define pr_fmt(fmt) ? ?"%s: " fmt, __func__
+> >
+> > Not used.
+> 
+> pr_fmt() is a magic #define that changes the behaviour of the pr_*()
+> macros.  See include/linux/kernel.h
 
-On Fri, Nov 26, 2010 at 04:24:41PM +0100, Michael Trimarchi wrote:
-> On 11/26/2010 04:04 PM, Jaume Ribot wrote:
->> Dear Uwe,
->>
->> I think there is an error in the Freescale documentation, as new 0x200 offset (as it might be according reference manual) makes usbh2 stops working.
->>
->> Other users have experienced simmilar issues:
->> http://forums.freescale.com/t5/i-MX-Microprocessors/i-MX25-USBOH-host-core-port-on-chip-serial-PHY-Control/m-p/59365
->>
->> I think old 0x400 offset value were correct.
->> Anyone can confirm?
-> I can say that I'm using the mainline (814ce2521121c2459e16cea8c7221e157edbeddd) without this patch and the usbhost work
-> on my mx25 board.
-And I assume applying the patch breaks USB for you?
+D'oh, thanks.
 
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-Olof
