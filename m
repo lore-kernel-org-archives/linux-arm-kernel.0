@@ -1,94 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Nov 2010 13:53:46 +0000
-Subject: linux-next: omap2plus_defconfig not building
-In-Reply-To: <AANLkTinOJ9T9_i=Vg6qKhDM8SXgzZYtUBxq0Dx1Pi5Vx@mail.gmail.com>
-References: <eace9c309e371630528bc9f8fa208705@mail.gmail.com>
-	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
-	<4CEE6AB1.7090404@ti.com>
-	<20101125165048.GA2367@n2100.arm.linux.org.uk>
-	<4CEF9B8D.3010106@ti.com>
-	<20101126114509.GL9310@n2100.arm.linux.org.uk>
-	<20101126122811.GM9310@n2100.arm.linux.org.uk>
-	<1290775134.15771.42.camel@e102109-lin.cambridge.arm.com>
-	<20101126130010.GO9310@n2100.arm.linux.org.uk>
-	<AANLkTinOJ9T9_i=Vg6qKhDM8SXgzZYtUBxq0Dx1Pi5Vx@mail.gmail.com>
-Message-ID: <20101126135346.GP9310@n2100.arm.linux.org.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 26 Nov 2010 15:11:49 +0100
+Subject: [PATCH 2/7] arm/pxa2xx: reorganize I2C files
+In-Reply-To: <20101126000341.GB9310@n2100.arm.linux.org.uk>
+References: <1290633617-15311-1-git-send-email-bigeasy@linutronix.de>
+	<1290633617-15311-3-git-send-email-bigeasy@linutronix.de>
+	<20101125235520.GC15948@trinity.fluff.org>
+	<20101126000341.GB9310@n2100.arm.linux.org.uk>
+Message-ID: <4CEFC025.2040804@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 26, 2010 at 01:31:15PM +0000, Dave Martin wrote:
-> On Fri, Nov 26, 2010 at 1:00 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Nov 26, 2010 at 12:38:54PM +0000, Catalin Marinas wrote:
-> >> On Fri, 2010-11-26 at 12:28 +0000, Russell King - ARM Linux wrote:
-> >> > On Fri, Nov 26, 2010 at 12:22:15PM -0000, Will Deacon wrote:
-> >> > > Hi Russell,
-> >> > >
-> >> > > > $ arm-linux-as -v -o /dev/null /dev/null
-> >> > > > GNU assembler version 2.19.1 (arm-linux) using BFD version (GNU Binutils) 2.19.1
-> >> > > > $ arm-linux-as -march=armv6 -mfloat-abi=soft -meabi=5 -march=armv7-a -o /dev/null t.s
-> >> > > > $ arm-linux-as -march=armv6 -mfloat-abi=soft -meabi=5 -o /dev/null t.s
-> >> > > > t.s: Assembler messages:
-> >> > > > t.s:1: Error: selected processor does not support `ldrexb r7,[r6]'
-> >> > > >
-> >> > > > So it looks like someone's changed the behaviour of the assembler so it's
-> >> > > > no longer possible to override the -march= argument from the gcc frontend.
-> >> > > >
-> >> > > > Maybe Will can shed some light on this?
-> >> > >
-> >> > > Well we pass -march=armv6 to GCC and -march=v7-a to the assembler using the -Wa
-> >> > > option. This means that the compiler generates a .arch armv6 directive in the .s
-> >> > > file and the assembler barfs.
-> >> > >
-> >> > > Please can you try this patch?
-> >> >
-> >> > We can't do this - we'll end up running ARMv7 code on ARMv6 CPUs.
-> >>
-> >> An alternative would be to add the '.arch armv7-a' in the inline
-> >> assembly in swp_emulate.c. But that's an ugly workaround and you can't
-> >> revert to the previous .arch unless you add another '.arch armv6' at the
-> >> end of the asm (with lots of #ifdef's).
-> >
-> > Yup, so this won't work either. ?Also, as I understand it, I don't think
-> > you can rely upon the compiler ordering functions wrt. asm() statements
-> > outside of the function blocks, so I don't think this will work anyway.
+Russell King - ARM Linux wrote:
+> On Thu, Nov 25, 2010 at 11:55:20PM +0000, Ben Dooks wrote:
+>>> diff --git a/arch/arm/include/asm/pxa_i2c.h b/arch/arm/include/asm/pxa_i2c.h
+>>> new file mode 100644
+>>> index 0000000..f6da8a1
+>>> --- /dev/null
+>>> +++ b/arch/arm/include/asm/pxa_i2c.h
+>> Anyone an opinion on whther to alter all arch-arm machine includes
+>> or add a re-direct of plat/i2c.h to linux/i2c/pxa-i2c.h
 > 
-> The compiler treats inline asms as solid lumps, so providing that the
-> two .arch directives are inside the affected inline asm block, it
-> should work.
+> We're not going to litter arch/arm/include/asm with SoC specific includes.
+> If we start doing this, we'll end up with thousands of files in
+> arch/arm/include/asm which have no real business being there.
 > 
-> What you presumably can't do reliably is something like
+> So there's not much option but to NAK this patch before it gets out of
+> hand.
 > 
-> #include <...>
-> #include <...>
-> 
-> asm(".arch armv7-a");
-> 
-> ...
-> 
-> {
->     asm( v7-dependent code )
-> }
-> 
-> > We could separate out the non-ARMv7 specific code into a separate file
-> > (maybe called swp_emulate-init.c) and export proc_read_status and swp_hook
-> > into the global namespace. ?These would have to be renamed to avoid any
-> > possible clashes with other symbols.
-> >
-> > We could just take the view that we don't allow SWP on ARMv7 at all,
-> > which would make it a pain for userspace people.
-> >
-> > We could also re-enable SWP support on ARMv7 without the emulation code.
-> >
-> > Luckily, this is the only place - at present - where we have C code built
-> > containing instructions (via asm() statements) for higher versions of the
-> > architecture.
-> 
-> For this case, I agree that separating the affected assembler out into
-> a separate .S file is probably the cleanest and simplest solution...
-> but I guess we should think about whether we're going to need to
-> revisit this in the future.
+> The reason for this change seems to be because x86 has a different register
+> layout, and x86 doesn't have the clk API. 
 
-Maybe we need to make the ability to build for several differing CPU
-architectures a requirement for the toolchain people, and have a more
-official way to do this than hacking around with the assembler.
+And I need to access structs / defines which are defined in arch/arm.
+
+> For the former, that can be
+> dealt with an ifdef along side the register definitions.
+Sure. The register definition was moved outside the driver into
+arch/../include/asm. So I keep them within the driver and ifdef it.
+
+> For the latter, why not just implement a simple clk API implementation
+> which always returns success, rather than requiring special headers
+> for various ARM drivers?
+This has been done. Patch 3/7 creates arch/x86/include/asm/pxa_i2c.h
+which defines clk_get(). So it does not require special header files in 
+regard to the clk api.
+
+So I'm eliminating arch/./arm/inclide/asm/ files which I introduced.
+
+Sebastian
