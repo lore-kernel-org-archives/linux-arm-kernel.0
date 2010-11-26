@@ -1,30 +1,121 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Nov 2010 14:49:03 +0800
-Subject: [PATCH 04/15] ARM: mxs: Add interrupt support
+Date: Fri, 26 Nov 2010 14:49:01 +0800
+Subject: [PATCH 02/15] ARM: mxs: Add helper definition and function
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1290754154-9428-5-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1290754154-9428-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Interrupt Collector (ICOLL) support for MXS-based.
+Add helper definition and function for MXS-based.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/icoll.c                    |   77 ++++++++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/entry-macro.S |   36 ++++++++++++
- 2 files changed, 113 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/icoll.c
- create mode 100644 arch/arm/mach-mxs/include/mach/entry-macro.S
+ arch/arm/mach-mxs/cpu.c                  |   11 ++++++++++
+ arch/arm/mach-mxs/include/mach/common.h  |   33 ++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/io.h      |   22 ++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/timex.h   |   21 +++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/vmalloc.h |   22 ++++++++++++++++++++
+ 5 files changed, 109 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/cpu.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/common.h
+ create mode 100644 arch/arm/mach-mxs/include/mach/io.h
+ create mode 100644 arch/arm/mach-mxs/include/mach/timex.h
+ create mode 100644 arch/arm/mach-mxs/include/mach/vmalloc.h
 
-diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
+diff --git a/arch/arm/mach-mxs/cpu.c b/arch/arm/mach-mxs/cpu.c
 new file mode 100644
-index 0000000..a7a7d4f
+index 0000000..764b0d5
 --- /dev/null
-+++ b/arch/arm/mach-mxs/icoll.c
-@@ -0,0 +1,77 @@
++++ b/arch/arm/mach-mxs/cpu.c
+@@ -0,0 +1,11 @@
++
++#include <linux/module.h>
++
++unsigned int __mxs_cpu_type;
++EXPORT_SYMBOL(__mxs_cpu_type);
++
++void mxs_set_cpu_type(unsigned int type)
++{
++	__mxs_cpu_type = type;
++}
++
+diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+new file mode 100644
+index 0000000..2911057
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/common.h
+@@ -0,0 +1,33 @@
 +/*
-+ * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __MACH_MXS_COMMON_H__
++#define __MACH_MXS_COMMON_H__
++
++struct clk;
++
++extern int mxs_reset_block(void __iomem *);
++extern void mxs_arch_reset_init(void __iomem *);
++extern void mxs_set_cpu_type(unsigned int);
++extern void mxs_timer_init(struct clk *, void __iomem *, int);
++
++extern int mx23_register_gpios(void);
++extern int mx23_clocks_init(void);
++extern void mx23_map_io(void);
++extern void mx23_init_irq(void);
++
++extern int mx28_register_gpios(void);
++extern int mx28_clocks_init(void);
++extern void mx28_map_io(void);
++extern void mx28_init_irq(void);
++
++extern void icoll_init_irq(void __iomem *);
++
++#endif /* __MACH_MXS_COMMON_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/io.h b/arch/arm/mach-mxs/include/mach/io.h
+new file mode 100644
+index 0000000..289b722
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/io.h
+@@ -0,0 +1,22 @@
++/*
++ *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __MACH_MXS_IO_H__
++#define __MACH_MXS_IO_H__
++
++/* Allow IO space to be anywhere in the memory */
++#define IO_SPACE_LIMIT 0xffffffff
++
++/* io address mapping macro */
++#define __io(a)		__typesafe_io(a)
++
++#define __mem_pci(a)	(a)
++
++#endif /* __MACH_MXS_IO_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/timex.h b/arch/arm/mach-mxs/include/mach/timex.h
+new file mode 100644
+index 0000000..734ce89
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/timex.h
+@@ -0,0 +1,21 @@
++/*
++ *  Copyright (C) 1999 ARM Limited
++ * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -35,81 +126,23 @@ index 0000000..a7a7d4f
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/irq.h>
++#ifndef __MACH_MXS_TIMEX_H__
++#define __MACH_MXS_TIMEX_H__
 +
-+#include <mach/hardware.h>
-+#include <mach/common.h>
++#define CLOCK_TICK_RATE		32000	/* 32K */
 +
-+#define HW_ICOLL_VECTOR				0x0000
-+#define HW_ICOLL_LEVELACK			0x0010
-+#define HW_ICOLL_CTRL				0x0020
-+#define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
-+#define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
-+#define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
-+#define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
-+
-+void __iomem *icoll_base;
-+
-+static void icoll_ack_irq(unsigned int irq)
-+{
-+	__raw_writel(0, icoll_base + HW_ICOLL_VECTOR);
-+
-+	/* ACK current interrupt (level 0) */
-+	__raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
-+			icoll_base + HW_ICOLL_LEVELACK);
-+}
-+
-+static void icoll_mask_irq(unsigned int irq)
-+{
-+	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
-+			icoll_base + HW_ICOLL_INTERRUPTn_CLR(irq));
-+}
-+
-+static void icoll_unmask_irq(unsigned int irq)
-+{
-+	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
-+			icoll_base + HW_ICOLL_INTERRUPTn_SET(irq));
-+}
-+
-+static struct irq_chip mxs_icoll_chip = {
-+	.ack = icoll_ack_irq,
-+	.mask = icoll_mask_irq,
-+	.unmask = icoll_unmask_irq,
-+};
-+
-+void __init icoll_init_irq(void __iomem *irqbase)
-+{
-+	int i;
-+
-+	icoll_base = irqbase;
-+
-+	/* Reset icoll */
-+	mxs_reset_block(irqbase + HW_ICOLL_CTRL);
-+
-+	for (i = 0; i < MXS_INTERNAL_IRQS; i++) {
-+		set_irq_chip(i, &mxs_icoll_chip);
-+		set_irq_handler(i, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+	}
-+}
-diff --git a/arch/arm/mach-mxs/include/mach/entry-macro.S b/arch/arm/mach-mxs/include/mach/entry-macro.S
++#endif /* __MACH_MXS_TIMEX_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/vmalloc.h b/arch/arm/mach-mxs/include/mach/vmalloc.h
 new file mode 100644
-index 0000000..597948d
+index 0000000..103b016
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/entry-macro.S
-@@ -0,0 +1,36 @@
++++ b/arch/arm/mach-mxs/include/mach/vmalloc.h
+@@ -0,0 +1,22 @@
 +/*
-+ * Low-level IRQ helper macros for Freescale MXS-based
-+ *
-+ * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright (C) 2000 Russell King.
++ *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -120,27 +153,14 @@ index 0000000..597948d
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
 +
-+	.macro	disable_fiq
-+	.endm
++#ifndef __MACH_MXS_VMALLOC_H__
++#define __MACH_MXS_VMALLOC_H__
 +
-+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-+	ldr	\base, =icoll_base
-+	ldr	\base, [\base]
-+	ldr	\irqnr, [\base, #0x70]
-+	cmp	\irqnr, #0x7F
-+	moveqs	\irqnr, #0
-+	.endm
++/* vmalloc ending address */
++#define VMALLOC_END       0xf4000000UL
 +
-+	.macro  get_irqnr_preamble, base, tmp
-+	.endm
-+
-+	.macro  arch_ret_to_user, tmp1, tmp2
-+	.endm
++#endif /* __MACH_MXS_VMALLOC_H__ */
 -- 
 1.7.1
