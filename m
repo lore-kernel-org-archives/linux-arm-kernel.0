@@ -1,82 +1,92 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 26 Nov 2010 09:34:53 +0200
-Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
-In-Reply-To: <1290716548.2529.136.camel@helium>
-References: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
-	<536589.12568.qm@web180310.mail.gq1.yahoo.com>
-	<AANLkTinQdNC0XaOqNyDbdYE6ZcP0QyzpN492j=Kovuea@mail.gmail.com>
-	<1290716548.2529.136.camel@helium>
-Message-ID: <AANLkTi=sZ-4BBLAJNU5B41cAxtroGkpNomgEYO4vtx8z@mail.gmail.com>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Fri, 26 Nov 2010 16:39:43 +0900
+Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+In-Reply-To: <1277908081-17195-2-git-send-email-Hiroshi.DOYU@nokia.com>
+References: <1277908081-17195-1-git-send-email-Hiroshi.DOYU@nokia.com>
+	<1277908081-17195-2-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTin-ZCb7bdYhtUe00cPMs7m+Kjp0=4EEQ38i0q5Y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 10:22 PM, David Brownell <david-b@pacbell.net> wrote:
-> So there's no strong reason to think this is
-> actually "ggeneric". ?Function names no longer
-> specify OMAP, but without other hardware under
-> the interface, calling it "generic" reflects
-> more optimism than reality. ?(That was the
-> implication of my observations...)
-
-Well, it's not omap-specific anymore. Drivers can stay
-platform-agnostic, and other vendors can plug in anything they need in
-order to use the same drivers (including software implementations as
-mentioned below).
-
-As I mentioned, the other two options are going back to an omap
-specific driver (which will omapify drivers who use it), or putting
-the driver in the omap arch folders (which some people doesn't seem to
-like, e.g. http://www.spinics.net/lists/linux-arm-msm/msg00324.html).
-
-Which one of those would you prefer to see ?
-
-I guess that by now we have all three implementations so it's pretty
-easy to switch :)
-
-> To find other hardware spinlocks, you might be
-> able to look at fault tolerant multiprocessors.
-> Ages ago I worked with one of those, where any
-> spinlock failures integrated with CPU/OS fault
-> detection; HW cwould yank (checkpointed) CPU boards
-> off the bus so they could be recovered (some
-> might continue later from checkpoints, etc.)...
-
-Is that HW supported by Linux today ?
-
-Any chance you can share a link or any other info about it ?
-
->> This way platforms [2] can easily plug into the framework anything
->> they need to achieve multi-core synchronization. E.g., even in case a
->> platform doesn't have dedicated silicon, but still need this
->> functionality, it can still plug in an implementation which is based
->> on Peterson's shared memory mutual exclusion algorithm
+On Wed, Jun 30, 2010 at 11:28 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 >
-> And maybe also standard Linux spinlocks?
-
-Umm, possibly. Though I admit it sounds awkward a bit. It feels like
-platforms, on which a mere spinlock is enough to achieve multi core
-synchronization, will not really need any of the IPC drivers that are
-going to use this hwspinlock framework. But I guess we need to see a
-use case first.
-
+> Hibernation (a.k.a: Suspend-To-Disk) support for ARM
 >
-> I seem to recall some iterations of the real-time patches doing a lot of
-> work to generalize spinlocks, since they needed multiple variants. ?It
-> might be worth following in those footsteps. ?(Though I'm not sure they
-> were thinking much about hardware support .
-
-Any chance you can point me at a specific discussion or patchset that
-you feel may be relevant ?
-
-Thanks!
-Ohad.
-
+> Based on the original work from Romit and Raghu at TI. The original
+> patch(*1) was sent to LOML by Teerth Reddy <teerth@ti.com>
 >
-> - Dave
+> *1: https://patchwork.kernel.org/patch/96442/
 >
+> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+
+(snip)
+
+> +config ARCH_HIBERNATION_POSSIBLE
+> + ? ? ? def_bool y
+> + ? ? ? depends on CPU_V7 && !SMP
+> +
+
+(snip)
+
+> +/*
+> + * FIXME: Only support for Cortex A8 now
+> + */
+
+(snip)
+
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -149,7 +149,6 @@ SECTIONS
+> ? ? ? ? ? ? ? ?__init_end = .;
+> ?#endif
 >
+> - ? ? ? ? ? ? ? NOSAVE_DATA
+> ? ? ? ? ? ? ? ?CACHELINE_ALIGNED_DATA(32)
+>
+> ? ? ? ? ? ? ? ?/*
+> @@ -172,6 +171,8 @@ SECTIONS
+> ? ? ? ?}
+> ? ? ? ?_edata_loc = __data_loc + SIZEOF(.data);
+>
+> + ? ? ? NOSAVE_DATA
+> +
+> ?#ifdef CONFIG_HAVE_TCM
+> ? ? ? ? /*
+> ? ? ? ? * We align everything to a page boundary so we can
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+
+I have been working on the hibernation feature on S5PC210 (ARM Cortex
+A9 MP-Core) based on this patch and it's working find with minor
+modifications. (and will send as soon as clutters are removed and
+tested further)
+
+However, I've got a question on your patch: is it really necessary to
+patch [arch/arm/kernel/vmlinux.lds.S] file? Without patching that
+file, it works fine at my system (although it's based on 2.6.36, not
+37 rc #) and with that patch, the linker spits an error. If it's
+necessary to patch [arch/arm/kernel/vmlinux.lds.S], could you please
+explain a bit about it?
+
+Thank you.
+
+
+- MyungJoo
+
+> 1.7.1.rc2
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
+
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
