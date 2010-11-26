@@ -1,268 +1,186 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 26 Nov 2010 11:11:16 +0000
-Subject: [RFC PATCHv2] picoxcell: add support for the system timers
-In-Reply-To: <1290506774-17895-4-git-send-email-jamie@jamieiles.com>
-References: <1290506774-17895-4-git-send-email-jamie@jamieiles.com>
-Message-ID: <1290769876-26395-1-git-send-email-jamie@jamieiles.com>
+Date: Fri, 26 Nov 2010 11:13:51 +0000
+Subject: [RFC PATCHv2] picoxcell: add common SoC devices
+In-Reply-To: <1290506774-17895-8-git-send-email-jamie@jamieiles.com>
+References: <1290506774-17895-8-git-send-email-jamie@jamieiles.com>
+Message-ID: <1290770031-26506-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The picoXcell devices have 4 timers capable of generating interrupts
-when they reach a predefined value and restarting and a freerunning RTC.
-Use one of the interrupt capable timers as the clockevent_device and the
-RTC for the clocksource and sched_clock().
+Add the devices common to all picoXcell variants (UART and PMU). Other
+peripherals such as DMA, SPI, fuses and EMAC will be added later
+with driver support.
 
 v2:
-	- use clocksource_register_hz() and
-	  clockevents_calc_mult_shift() rather than specifying .mult and
-	  .shift.
-	- extend sched_clock from 32 bits in the RTC to 63 with
-	  cnt32_to_63() to give us a longer period before wrapping.
+	- split the UARTs into two separate platform devices and use
+	  PLAT8250_* as the IDs
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
  arch/arm/mach-picoxcell/Makefile         |    3 +-
- arch/arm/mach-picoxcell/picoxcell_core.h |    2 +
- arch/arm/mach-picoxcell/time.c           |  206 ++++++++++++++++++++++++++++++
- 3 files changed, 210 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-picoxcell/time.c
+ arch/arm/mach-picoxcell/devices.c        |  118 ++++++++++++++++++++++++++++++
+ arch/arm/mach-picoxcell/picoxcell_core.c |    3 +
+ arch/arm/mach-picoxcell/picoxcell_core.h |    1 +
+ 4 files changed, 124 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-picoxcell/devices.c
 
 diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index 7246a6a..726c61f 100644
+index 8d8b4e8..371698f 100644
 --- a/arch/arm/mach-picoxcell/Makefile
 +++ b/arch/arm/mach-picoxcell/Makefile
-@@ -1 +1,2 @@
--obj-y				:= picoxcell_core.o axi2cfg.o
-+obj-y				:= picoxcell_core.o axi2cfg.o \
-+				   time.o
-\ No newline at end of file
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.h b/arch/arm/mach-picoxcell/picoxcell_core.h
-index 5b27e52..941d1a6 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.h
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.h
-@@ -13,9 +13,11 @@
- #define __ASM_ARCH_PICOXCELL_CORE_H__
- 
- struct picoxcell_soc;
-+struct sys_timer;
- 
- extern void __init picoxcell_core_init(void);
- extern void __init picoxcell_init_irq(void);
- extern void __init picoxcell_map_io(void);
-+extern struct sys_timer picoxcell_sys_timer;
- 
- #endif /* __ASM_ARCH_PICOXCELL_CORE_H__ */
-diff --git a/arch/arm/mach-picoxcell/time.c b/arch/arm/mach-picoxcell/time.c
+@@ -2,4 +2,5 @@ obj-y				:= picoxcell_core.o axi2cfg.o \
+ 				   time.o \
+ 				   mux.o \
+ 				   gpio.o \
+-				   clk.o
++				   clk.o \
++				   devices.o
+diff --git a/arch/arm/mach-picoxcell/devices.c b/arch/arm/mach-picoxcell/devices.c
 new file mode 100644
-index 0000000..1ce65f2
+index 0000000..b9b8374
 --- /dev/null
-+++ b/arch/arm/mach-picoxcell/time.c
-@@ -0,0 +1,206 @@
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/cnt32_to_63.h>
++++ b/arch/arm/mach-picoxcell/devices.c
+@@ -0,0 +1,118 @@
++/*
++ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * All enquiries to support at picochip.com
++ */
++#include <linux/serial_8250.h>
++#include <linux/serial_reg.h>
++#include <linux/platform_device.h>
 +#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+
-+#include <asm/mach/time.h>
-+
++#include <linux/io.h>
 +#include <mach/hardware.h>
++#include <mach/irqs.h>
++
++#include <asm/pmu.h>
 +
 +#include "picoxcell_core.h"
-+#include "soc.h"
 +
-+enum timer_id {
-+	TIMER_ID_CLOCKEVENT,
-+	TIMER_ID_CLOCKSOURCE,
-+	NR_TIMERS,
++#define UART_USR_REG_OFFSET			0x7C
++static struct plat_serial8250_port serial1_platform_data[] = {
++	{
++		.membase	= iomem_ptr(PICOXCELL_UART1_BASE),
++		.mapbase	= PICOXCELL_UART1_BASE,
++		.irq		= IRQ_UART1,
++		.flags		= UPF_BOOT_AUTOCONF,
++		.iotype		= UPIO_DWAPB32,
++		.regshift	= 2,
++		.uartclk	= PICOXCELL_BASE_BAUD,
++		.private_data	= (void *)(PHYS_TO_IO(PICOXCELL_UART1_BASE +
++						      UART_USR_REG_OFFSET)),
++	},
++	{},
 +};
 +
-+struct timer_instance {
-+	void __iomem	    *base;
-+	struct irqaction    irqaction;
++static struct resource serial1_resources[] = {
++	{
++		.start		= PICOXCELL_UART1_BASE,
++		.end		= PICOXCELL_UART1_BASE + 0xFFFF,
++		.flags		= IORESOURCE_MEM,
++	},
++	{
++		.start		= IRQ_UART1,
++		.end		= IRQ_UART2,
++		.flags		= IORESOURCE_IRQ,
++	},
 +};
 +
-+/*
-+ * We expect to have 2 timers - a freerunning one for the clock source and a
-+ * periodic/oneshot one for the clock_event_device.
-+ */
-+static struct timer_instance timers[NR_TIMERS];
-+
-+static void timer_set_mode(enum clock_event_mode mode,
-+			   struct clock_event_device *clk)
-+{
-+	struct timer_instance *timer = &timers[TIMER_ID_CLOCKEVENT];
-+	unsigned long load_count = DIV_ROUND_UP(CLOCK_TICK_RATE, HZ);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		/*
-+		 * By default, use the kernel tick rate. The reload value can
-+		 * be changed with the timer_set_next_event() function.
-+		 */
-+		writel(load_count, timer->base + TIMER_LOAD_COUNT_REG_OFFSET);
-+		writel(TIMER_ENABLE | TIMER_MODE,
-+		       timer->base + TIMER_CONTROL_REG_OFFSET);
-+		break;
-+
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		writel(TIMER_MODE, timer->base + TIMER_CONTROL_REG_OFFSET);
-+		break;
-+
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		writel(0, timer->base + TIMER_CONTROL_REG_OFFSET);
-+		break;
-+	}
-+}
-+
-+static int timer_set_next_event(unsigned long evt,
-+				struct clock_event_device *clk)
-+{
-+	struct timer_instance *timer = &timers[TIMER_ID_CLOCKEVENT];
-+
-+	/* Disable the timer, write the new event then enable it. */
-+	writel(0, timer->base + TIMER_CONTROL_REG_OFFSET);
-+	writel(evt, timer->base + TIMER_LOAD_COUNT_REG_OFFSET);
-+	writel(TIMER_ENABLE | TIMER_MODE,
-+	       timer->base + TIMER_CONTROL_REG_OFFSET);
-+
-+	return 0;
-+}
-+
-+static struct clock_event_device clockevent_picoxcell = {
-+	.features		= CLOCK_EVT_FEAT_PERIODIC |
-+				  CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event		= timer_set_next_event,
-+	.set_mode		= timer_set_mode,
++static struct platform_device serial1_device = {
++	.name			= "serial8250",
++	.id			= PLAT8250_DEV_PLATFORM1,
++	.dev.platform_data	= serial1_platform_data,
++	.resource		= serial1_resources,
++	.num_resources		= ARRAY_SIZE(serial1_resources),
 +};
 +
-+static irqreturn_t timer_interrupt(int irq, void *dev_id)
-+{
-+	struct timer_instance *timer = &timers[TIMER_ID_CLOCKEVENT];
-+
-+	/* If we are in oneshot mode, we need to stop receiving interrupts. */
-+	if (CLOCK_EVT_MODE_ONESHOT == clockevent_picoxcell.mode) {
-+		unsigned long val = readl(timer->base +
-+					  TIMER_CONTROL_REG_OFFSET);
-+		val |= TIMER_INTERRUPT_MASK;
-+		writel(val, timer->base + TIMER_CONTROL_REG_OFFSET);
-+	}
-+
-+	/* Clear the interrupt. */
-+	readl(timer->base + TIMER_EOI_REG_OFFSET);
-+
-+	clockevent_picoxcell.event_handler(&clockevent_picoxcell);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+#define PICOXCELL_MIN_RANGE	4
-+
-+static void picoxcell_clockevent_init(struct picoxcell_soc *soc)
-+{
-+	struct timer_instance *inst = &timers[TIMER_ID_CLOCKEVENT];
-+	const struct picoxcell_timer *timer = NULL;
-+	int i;
-+
-+	for (i = 0; i < soc->nr_timers; ++i)
-+		if (soc->timers[i].type == TIMER_TYPE_TIMER) {
-+			timer = &soc->timers[i];
-+			break;
-+		}
-+
-+	BUG_ON(!timer);
-+
-+	/* Configure the interrupt for this timer. */
-+	inst->irqaction.name	= timer->name;
-+	inst->irqaction.handler	= timer_interrupt;
-+	inst->irqaction.flags	= IRQF_DISABLED | IRQF_TIMER | IRQF_PROBE;
-+	inst->base		= ioremap(timer->base, TIMER_SPACING);
-+
-+	clockevent_picoxcell.name = timer->name;
-+	clockevents_calc_mult_shift(&clockevent_picoxcell, CLOCK_TICK_RATE,
-+				    PICOXCELL_MIN_RANGE);
-+	clockevent_picoxcell.max_delta_ns =
-+		clockevent_delta2ns(0xfffffffe, &clockevent_picoxcell);
-+	clockevent_picoxcell.min_delta_ns = 50000;
-+	clockevent_picoxcell.cpumask = cpumask_of(0);
-+
-+	/* Start with the timer disabled and the interrupt enabled. */
-+	writel(0, inst->base + TIMER_CONTROL_REG_OFFSET);
-+	setup_irq(timer->irq, &inst->irqaction);
-+
-+	clockevents_register_device(&clockevent_picoxcell);
-+}
-+
-+static cycle_t picoxcell_rtc_get_cycles(struct clocksource *cs)
-+{
-+	struct timer_instance *inst = &timers[TIMER_ID_CLOCKSOURCE];
-+
-+	return readl(inst->base + RTCLK_CCV_REG_OFFSET);
-+}
-+
-+/*
-+ * Kernel assumes that sched_clock can be called early but may not have
-+ * things ready yet.
-+ */
-+static cycle_t read_dummy(struct clocksource *cs)
-+{
-+	return 0;
-+}
-+
-+static struct clocksource clocksource_picoxcell = {
-+	.name	    = "rtc",
-+	.rating     = 300,
-+	.read	    = read_dummy,
-+	.mask	    = CLOCKSOURCE_MASK(32),
-+	.flags	    = CLOCK_SOURCE_IS_CONTINUOUS,
++static struct plat_serial8250_port serial2_platform_data[] = {
++	{
++		.membase	= iomem_ptr(PICOXCELL_UART2_BASE),
++		.mapbase	= PICOXCELL_UART2_BASE,
++		.irq		= IRQ_UART2,
++		.flags		= UPF_BOOT_AUTOCONF,
++		.iotype		= UPIO_DWAPB32,
++		.regshift	= 2,
++		.uartclk	= PICOXCELL_BASE_BAUD,
++		.private_data	= (void *)(PHYS_TO_IO(PICOXCELL_UART2_BASE +
++						      UART_USR_REG_OFFSET)),
++	},
++	{},
 +};
 +
-+static void __init picoxcell_clocksource_init(struct picoxcell_soc *soc)
-+{
-+	const struct picoxcell_timer *timer = NULL;
-+	int i;
-+
-+	for (i = 0; i < soc->nr_timers; ++i)
-+		if (soc->timers[i].type == TIMER_TYPE_RTC) {
-+			timer = &soc->timers[i];
-+			break;
-+		}
-+
-+	BUG_ON(!timer);
-+
-+	timers[TIMER_ID_CLOCKSOURCE].base = ioremap(timer->base, SZ_4K);
-+
-+	/* The RTC is always running. We don't need to do any initialization. */
-+	clocksource_picoxcell.read = picoxcell_rtc_get_cycles;
-+	clocksource_register_hz(&clocksource_picoxcell, CLOCK_TICK_RATE);
-+}
-+
-+/*
-+ * Overwrite weak default sched_clock with something more precise.
-+ *
-+ * On picoXcell we have a RTC that clocks at 200MHz so a multiply by 5 gives
-+ * us a nanosecond count.
-+ */
-+unsigned long long notrace sched_clock(void)
-+{
-+#define CYCLES_TO_NSEC_MULT	(NSEC_PER_SEC / CLOCK_TICK_RATE)
-+	return cnt32_to_63(readl(IO_ADDRESS(PICOXCELL_RTCLK_BASE) +
-+				 RTCLK_CCV_REG_OFFSET)) * CYCLES_TO_NSEC_MULT;
-+	return 0;
-+}
-+
-+static void __init picoxcell_timer_init(void)
-+{
-+	struct picoxcell_soc *soc = picoxcell_get_soc();
-+
-+	picoxcell_clocksource_init(soc);
-+	picoxcell_clockevent_init(soc);
-+}
-+
-+struct sys_timer picoxcell_sys_timer = {
-+	.init	= picoxcell_timer_init,
++static struct resource serial2_resources[] = {
++	{
++		.start		= PICOXCELL_UART2_BASE,
++		.end		= PICOXCELL_UART2_BASE + 0xFFFF,
++		.flags		= IORESOURCE_MEM,
++	},
++	{
++		.start		= IRQ_UART2,
++		.end		= IRQ_UART2,
++		.flags		= IORESOURCE_IRQ,
++	},
 +};
++
++static struct platform_device serial2_device = {
++	.name			= "serial8250",
++	.id			= PLAT8250_DEV_PLATFORM2,
++	.dev.platform_data	= serial2_platform_data,
++	.resource		= serial2_resources,
++	.num_resources		= ARRAY_SIZE(serial2_resources),
++};
++
++static struct resource pmu_resource = {
++	.start			= IRQ_NPMUIRQ,
++	.end			= IRQ_NPMUIRQ,
++	.flags			= IORESOURCE_IRQ,
++};
++
++static struct platform_device pmu_device = {
++	.name			= "arm-pmu",
++	.id			= ARM_PMU_DEVICE_CPU,
++	.num_resources		= 1,
++	.resource		= &pmu_resource,
++};
++
++static struct __initdata platform_device *common_devices[] = {
++	&serial1_device,
++	&serial2_device,
++	&pmu_device,
++};
++
++void __init picoxcell_add_devices(void)
++{
++	WARN_ON(platform_add_devices(common_devices,
++				     ARRAY_SIZE(common_devices)));
++}
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
+index db79ba7..9f977fa 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.c
++++ b/arch/arm/mach-picoxcell/picoxcell_core.c
+@@ -285,4 +285,7 @@ void __init picoxcell_core_init(void)
+ 
+ 	/* Add handlers for the AXI bus snooping. */
+ 	picoxcell_axi_bus_error_init();
++
++	/* Register the devices. */
++	picoxcell_add_devices();
+ }
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.h b/arch/arm/mach-picoxcell/picoxcell_core.h
+index 941d1a6..9647b7a 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.h
++++ b/arch/arm/mach-picoxcell/picoxcell_core.h
+@@ -19,5 +19,6 @@ extern void __init picoxcell_core_init(void);
+ extern void __init picoxcell_init_irq(void);
+ extern void __init picoxcell_map_io(void);
+ extern struct sys_timer picoxcell_sys_timer;
++extern void __init picoxcell_add_devices(void);
+ 
+ #endif /* __ASM_ARCH_PICOXCELL_CORE_H__ */
 -- 
 1.7.2.3
