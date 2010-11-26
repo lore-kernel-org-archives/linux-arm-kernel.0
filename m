@@ -1,168 +1,446 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Nov 2010 14:49:04 +0800
-Subject: [PATCH 05/15] ARM: mxs: Add low-level debug UART support
+Date: Fri, 26 Nov 2010 14:49:06 +0800
+Subject: [PATCH 07/15] ARM: mxs: Add gpio support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1290754154-9428-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1290754154-9428-8-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* DEBUG_LL support, which is incompatible with single MXS image
-  because of different DUART base address on MX23 and MX28
-* uncompress message support
+MXS-based SoCs implement gpio support in block PINCTRL.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/debug-macro.S |   51 ++++++++++++++++
- arch/arm/mach-mxs/include/mach/uncompress.h  |   82 ++++++++++++++++++++++++++
- 2 files changed, 133 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
+ arch/arm/mach-mxs/gpio.c              |  364 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/gpio.h |   49 +++++
+ 2 files changed, 413 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/gpio.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/gpio.h
 
-diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+diff --git a/arch/arm/mach-mxs/gpio.c b/arch/arm/mach-mxs/gpio.c
 new file mode 100644
-index 0000000..efb3173
+index 0000000..7e3674b
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
-@@ -0,0 +1,51 @@
-+/* arch/arm/mach-mxs/include/mach/debug-macro.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <mach/hardware.h>
-+
-+#ifdef CONFIG_SOC_IMX23
-+#ifdef UART_PADDR
-+#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-+#endif
-+#define UART_PADDR	MX23_DUART_BASE_ADDR
-+#endif
-+
-+#ifdef CONFIG_SOC_IMX28
-+#ifdef UART_PADDR
-+#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-+#endif
-+#define UART_PADDR	MX28_DUART_BASE_ADDR
-+#endif
-+
-+#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
-+
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =UART_PADDR	@ physical
-+		ldr	\rv, =UART_VADDR	@ virtual
-+		.endm
-+
-+		.macro	senduart, rd, rx
-+		str	\rd, [\rx, #0x0]	@ DR
-+		.endm
-+
-+		.macro	waituart, rd, rx
-+1001:		ldr	\rd, [\rx, #0x18]	@ FR
-+		tst	\rd, #1 << 5		@ FR_TXFF
-+		bne	1001b
-+		.endm
-+
-+		.macro	busyuart, rd, rx
-+1002:		ldr	\rd, [\rx, #0x18]	@ FR
-+		tst	\rd, #1 << 3		@ FR_BUSY
-+		beq	1002b
-+		.endm
-diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
-new file mode 100644
-index 0000000..47e5479
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/uncompress.h
-@@ -0,0 +1,82 @@
++++ b/arch/arm/mach-mxs/gpio.c
+@@ -0,0 +1,364 @@
 +/*
-+ *  arch/arm/mach-mxs/include/mach/uncompress.h
++ * MXC GPIO support. (c) 2008 Daniel Mack <daniel@caiaq.de>
++ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
 + *
-+ *  Copyright (C) 1999 ARM Limited
-+ *  Copyright (C) Shane Nay (shane@minirl.com)
-+ *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Based on code from Freescale,
++ * Copyright (C) 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ */
-+#ifndef __MACH_MXS_UNCOMPRESS_H__
-+#define __MACH_MXS_UNCOMPRESS_H__
-+
-+#define __MXS_BOOT_UNCOMPRESS
-+
-+#include <asm/mach-types.h>
-+
-+static unsigned long uart_base;
-+
-+#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
-+
-+#define DR		0x00
-+#define FR		0x18
-+#define FR_BUSY		(1 << 3)
-+#define FR_TXFE		(1 << 7)
-+#define CR		0x30
-+#define CR_UARTEN	1
-+
-+/*
-+ * The following code assumes the serial port has already been
-+ * initialized by the bootloader.  We search for the first enabled
-+ * port in the most probable order.  If you didn't setup a port in
-+ * your bootloader then nothing will appear (which might be desired).
 + *
-+ * This does not append a newline
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 + */
 +
-+static void putc(int ch)
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/gpio.h>
++#include <mach/hardware.h>
++#include <asm-generic/bug.h>
++
++static struct mxs_gpio_port *mxs_gpio_ports;
++static int gpio_table_size;
++
++#define PINCTRL_DOUT(n)		((cpu_is_mx23() ? 0x0500 : 0x0700) + (n) * 0x10)
++#define PINCTRL_DIN(n)		((cpu_is_mx23() ? 0x0600 : 0x0900) + (n) * 0x10)
++#define PINCTRL_DOE(n)		((cpu_is_mx23() ? 0x0700 : 0x0b00) + (n) * 0x10)
++#define PINCTRL_PIN2IRQ(n)	((cpu_is_mx23() ? 0x0800 : 0x1000) + (n) * 0x10)
++#define PINCTRL_IRQEN(n)	((cpu_is_mx23() ? 0x0900 : 0x1100) + (n) * 0x10)
++#define PINCTRL_IRQLEV(n)	((cpu_is_mx23() ? 0x0a00 : 0x1200) + (n) * 0x10)
++#define PINCTRL_IRQPOL(n)	((cpu_is_mx23() ? 0x0b00 : 0x1300) + (n) * 0x10)
++#define PINCTRL_IRQSTAT(n)	((cpu_is_mx23() ? 0x0c00 : 0x1400) + (n) * 0x10)
++
++#define GPIO_INT_FALL_EDGE	0x0
++#define GPIO_INT_LOW_LEV	0x1
++#define GPIO_INT_RISE_EDGE	0x2
++#define GPIO_INT_HIGH_LEV	0x3
++
++/* Note: This driver assumes 32 GPIOs are handled in one register */
++
++static void _clear_gpio_irqstatus(struct mxs_gpio_port *port, u32 index)
 +{
-+	if (!uart_base)
-+		return;
-+	if (!(UART(CR) & CR_UARTEN))
-+		return;
-+
-+	while (!(UART(FR) & FR_TXFE))
-+		barrier();
-+
-+	UART(DR) = ch;
++	__raw_writel(1 << index,
++			port->base + PINCTRL_IRQSTAT(port->id) + MXS_CLR_ADDR);
 +}
 +
-+static inline void flush(void)
++static void _set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
++				int enable)
 +{
-+}
-+
-+#define MX23_DUART_BASE_ADDR	0x80070000
-+#define MX28_DUART_BASE_ADDR	0x80074000
-+
-+static __inline__ void __arch_decomp_setup(unsigned long arch_id)
-+{
-+	switch (arch_id) {
-+	case MACH_TYPE_MX23EVK:
-+		uart_base = MX23_DUART_BASE_ADDR;
-+		break;
-+	case MACH_TYPE_MX28EVK:
-+		uart_base = MX28_DUART_BASE_ADDR;
-+		break;
-+	default:
-+		break;
++	if (enable == 0) {
++		__raw_writel(1 << index,
++			port->base + PINCTRL_PIN2IRQ(port->id) + MXS_CLR_ADDR);
++		__raw_writel(1 << index,
++			port->base + PINCTRL_IRQEN(port->id) + MXS_CLR_ADDR);
++	} else {
++		__raw_writel(1 << index,
++			port->base + PINCTRL_PIN2IRQ(port->id) + MXS_SET_ADDR);
++		__raw_writel(1 << index,
++			port->base + PINCTRL_IRQEN(port->id) + MXS_SET_ADDR);
 +	}
 +}
 +
-+#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
-+#define arch_decomp_wdog()
++static void gpio_ack_irq(u32 irq)
++{
++	u32 gpio = irq_to_gpio(irq);
++	_clear_gpio_irqstatus(&mxs_gpio_ports[gpio / 32], gpio & 0x1f);
++}
 +
-+#endif /* __MACH_MXS_UNCOMPRESS_H__ */
++static void gpio_mask_irq(u32 irq)
++{
++	u32 gpio = irq_to_gpio(irq);
++	_set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 0);
++}
++
++static void gpio_unmask_irq(u32 irq)
++{
++	u32 gpio = irq_to_gpio(irq);
++	_set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 1);
++}
++
++static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
++
++static int gpio_set_irq_type(u32 irq, u32 type)
++{
++	u32 gpio = irq_to_gpio(irq);
++	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
++	u32 val;
++	int edge;
++
++	port->both_edges &= ~(1 << (gpio & 31));
++	switch (type) {
++	case IRQ_TYPE_EDGE_RISING:
++		edge = GPIO_INT_RISE_EDGE;
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		edge = GPIO_INT_FALL_EDGE;
++		break;
++	case IRQ_TYPE_EDGE_BOTH:
++		val = mxs_gpio_get(&port->chip, gpio & 31);
++		if (val) {
++			edge = GPIO_INT_LOW_LEV;
++			pr_debug("mxs: set GPIO %d to low trigger\n", gpio);
++		} else {
++			edge = GPIO_INT_HIGH_LEV;
++			pr_debug("mxs: set GPIO %d to high trigger\n", gpio);
++		}
++		port->both_edges |= 1 << (gpio & 31);
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		edge = GPIO_INT_LOW_LEV;
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		edge = GPIO_INT_HIGH_LEV;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	/* set level or edge */
++	if (edge & 0x1)
++		__raw_writel(1 << (gpio & 31),
++			port->base + PINCTRL_IRQLEV(port->id) + MXS_SET_ADDR);
++	else
++		__raw_writel(1 << (gpio & 31),
++			port->base + PINCTRL_IRQLEV(port->id) + MXS_CLR_ADDR);
++
++	/* set polarity */
++	if ((edge >> 1) & 0x1)
++		__raw_writel(1 << (gpio & 31),
++			port->base + PINCTRL_IRQPOL(port->id) + MXS_SET_ADDR);
++	else
++		__raw_writel(1 << (gpio & 31),
++			port->base + PINCTRL_IRQPOL(port->id) + MXS_CLR_ADDR);
++
++	_clear_gpio_irqstatus(port, gpio & 0x1f);
++
++	return 0;
++}
++
++static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
++{
++	u32 val;
++	int edge;
++
++	edge = 1 << (gpio & 31);
++	val = __raw_readl(port->base + PINCTRL_IRQLEV(port->id));
++	if (val & edge) {
++		/* level is invalid for this function */
++		pr_err("mxs: invalid configuration for GPIO %d: %x\n",
++			gpio, edge);
++		return;
++	}
++	__raw_writel(1 << (gpio & 31),
++			port->base + PINCTRL_IRQPOL(port->id) + MXS_TOG_ADDR);
++}
++
++/* MXS has one interrupt *per* gpio port */
++static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
++{
++	u32 irq_stat;
++	struct mxs_gpio_port *port = (struct mxs_gpio_port *)get_irq_data(irq);
++	u32 gpio_irq_no_base = port->virtual_irq_start;
++
++	irq_stat = __raw_readl(port->base + PINCTRL_IRQSTAT(port->id)) &
++			__raw_readl(port->base + PINCTRL_IRQEN(port->id)) &
++			__raw_readl(port->base + PINCTRL_PIN2IRQ(port->id));
++
++	while (irq_stat != 0) {
++		int irqoffset = fls(irq_stat) - 1;
++
++		if (port->both_edges & (1 << irqoffset))
++			mxs_flip_edge(port, irqoffset);
++
++		generic_handle_irq(gpio_irq_no_base + irqoffset);
++
++		irq_stat &= ~(1 << irqoffset);
++	}
++}
++
++/*
++ * Set interrupt number "irq" in the GPIO as a wake-up source.
++ * While system is running, all registered GPIO interrupts need to have
++ * wake-up enabled. When system is suspended, only selected GPIO interrupts
++ * need to have wake-up enabled.
++ * @param  irq          interrupt source number
++ * @param  enable       enable as wake-up if equal to non-zero
++ * @return       This function returns 0 on success.
++ */
++static int gpio_set_wake_irq(u32 irq, u32 enable)
++{
++	u32 gpio = irq_to_gpio(irq);
++	u32 gpio_idx = gpio & 0x1f;
++	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
++
++	if (enable) {
++		if (port->irq_high && (gpio_idx >= 16))
++			enable_irq_wake(port->irq_high);
++		else
++			enable_irq_wake(port->irq);
++	} else {
++		if (port->irq_high && (gpio_idx >= 16))
++			disable_irq_wake(port->irq_high);
++		else
++			disable_irq_wake(port->irq);
++	}
++
++	return 0;
++}
++
++static struct irq_chip gpio_irq_chip = {
++	.ack = gpio_ack_irq,
++	.mask = gpio_mask_irq,
++	.unmask = gpio_unmask_irq,
++	.set_type = gpio_set_irq_type,
++	.set_wake = gpio_set_wake_irq,
++};
++
++static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
++				int dir)
++{
++	struct mxs_gpio_port *port =
++		container_of(chip, struct mxs_gpio_port, chip);
++	u32 l;
++	unsigned long flags;
++	void __iomem *reg = port->base + PINCTRL_DOE(port->id);
++
++	spin_lock_irqsave(&port->lock, flags);
++	l = __raw_readl(reg);
++	if (dir)
++		l |= 1 << offset;
++	else
++		l &= ~(1 << offset);
++	__raw_writel(l, reg);
++	spin_unlock_irqrestore(&port->lock, flags);
++}
++
++static void mxs_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct mxs_gpio_port *port =
++		container_of(chip, struct mxs_gpio_port, chip);
++	u32 l;
++	unsigned long flags;
++	void __iomem *reg = port->base + PINCTRL_DOUT(port->id);
++
++	spin_lock_irqsave(&port->lock, flags);
++	l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
++	__raw_writel(l, reg);
++	spin_unlock_irqrestore(&port->lock, flags);
++}
++
++static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	struct mxs_gpio_port *port =
++		container_of(chip, struct mxs_gpio_port, chip);
++	void __iomem *reg = port->base + PINCTRL_DIN(port->id);
++
++	return (__raw_readl(reg) >> offset) & 1;
++}
++
++static int mxs_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	_set_gpio_direction(chip, offset, 0);
++	return 0;
++}
++
++static int mxs_gpio_direction_output(struct gpio_chip *chip,
++				     unsigned offset, int value)
++{
++	mxs_gpio_set(chip, offset, value);
++	_set_gpio_direction(chip, offset, 1);
++	return 0;
++}
++
++int __init mxs_gpio_init(struct mxs_gpio_port *port, int cnt)
++{
++	int i, j;
++
++	/* save for local usage */
++	mxs_gpio_ports = port;
++	gpio_table_size = cnt;
++
++	printk(KERN_INFO "MXS GPIO hardware\n");
++
++	for (i = 0; i < cnt; i++) {
++		/* disable the interrupt and clear the status */
++		__raw_writel(0, port[i].base +
++				PINCTRL_PIN2IRQ(i));
++		__raw_writel(0, port[i].base +
++				PINCTRL_IRQEN(i));
++		__raw_writel(~0, port[i].base +
++				PINCTRL_IRQSTAT(i) + MXS_CLR_ADDR);
++
++		for (j = port[i].virtual_irq_start;
++			j < port[i].virtual_irq_start + 32; j++) {
++			set_irq_chip(j, &gpio_irq_chip);
++			set_irq_handler(j, handle_level_irq);
++			set_irq_flags(j, IRQF_VALID);
++		}
++
++		/* register gpio chip */
++		port[i].chip.direction_input = mxs_gpio_direction_input;
++		port[i].chip.direction_output = mxs_gpio_direction_output;
++		port[i].chip.get = mxs_gpio_get;
++		port[i].chip.set = mxs_gpio_set;
++		port[i].chip.base = i * 32;
++		port[i].chip.ngpio = 32;
++
++		spin_lock_init(&port[i].lock);
++
++		/* its a serious configuration bug when it fails */
++		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
++
++		/* setup one handler for each entry */
++		set_irq_chained_handler(port[i].irq, mxs_gpio_irq_handler);
++		set_irq_data(port[i].irq, &port[i]);
++	}
++
++	return 0;
++}
++
++#define DEFINE_MXS_GPIO_PORT(soc, _id)					\
++	{								\
++		.chip.label = "gpio-" #_id,				\
++		.id = _id,						\
++		.irq = soc ## _INT_GPIO ## _id,				\
++		.base = soc ## _IO_ADDRESS(				\
++				soc ## _PINCTRL ## _BASE_ADDR),		\
++		.virtual_irq_start = MXS_GPIO_IRQ_START + (_id) * 32,	\
++	}
++
++#define DEFINE_REGISTER_FUNCTION(prefix)				\
++int __init prefix ## _register_gpios(void)				\
++{									\
++	return mxs_gpio_init(prefix ## _gpio_ports,			\
++			ARRAY_SIZE(prefix ## _gpio_ports));		\
++}
++
++#ifdef CONFIG_SOC_IMX23
++static struct mxs_gpio_port mx23_gpio_ports[] = {
++	DEFINE_MXS_GPIO_PORT(MX23, 0),
++	DEFINE_MXS_GPIO_PORT(MX23, 1),
++	DEFINE_MXS_GPIO_PORT(MX23, 2),
++};
++DEFINE_REGISTER_FUNCTION(mx23)
++#endif
++
++#ifdef CONFIG_SOC_IMX28
++static struct mxs_gpio_port mx28_gpio_ports[] = {
++	DEFINE_MXS_GPIO_PORT(MX28, 0),
++	DEFINE_MXS_GPIO_PORT(MX28, 1),
++	DEFINE_MXS_GPIO_PORT(MX28, 2),
++	DEFINE_MXS_GPIO_PORT(MX28, 3),
++	DEFINE_MXS_GPIO_PORT(MX28, 4),
++};
++DEFINE_REGISTER_FUNCTION(mx28)
++#endif
+diff --git a/arch/arm/mach-mxs/include/mach/gpio.h b/arch/arm/mach-mxs/include/mach/gpio.h
+new file mode 100644
+index 0000000..7692de6
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/gpio.h
+@@ -0,0 +1,49 @@
++/*
++ * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008 Juergen Beisert, kernel@pengutronix.de
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef __MACH_MXS_GPIO_H__
++#define __MACH_MXS_GPIO_H__
++
++#include <linux/spinlock.h>
++#include <mach/hardware.h>
++#include <asm-generic/gpio.h>
++
++#define MXS_GPIO_NR(bank, nr)		((bank) * 32 + (nr))
++
++/* use gpiolib dispatchers */
++#define gpio_get_value		__gpio_get_value
++#define gpio_set_value		__gpio_set_value
++#define gpio_cansleep		__gpio_cansleep
++
++#define gpio_to_irq(gpio)	(MXS_GPIO_IRQ_START + (gpio))
++#define irq_to_gpio(irq)	((irq) - MXS_GPIO_IRQ_START)
++
++struct mxs_gpio_port {
++	void __iomem *base;
++	int id;
++	int irq;
++	int irq_high;
++	int virtual_irq_start;
++	struct gpio_chip chip;
++	u32 both_edges;
++	spinlock_t lock;
++};
++
++int mxs_gpio_init(struct mxs_gpio_port*, int);
++
++#endif /* __MACH_MXS_GPIO_H__ */
 -- 
 1.7.1
