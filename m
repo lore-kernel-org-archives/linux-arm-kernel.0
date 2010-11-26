@@ -1,92 +1,295 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 Nov 2010 22:06:12 -0600
-Subject: [PATCH v2] Add call to non-crashing cores through IPI
-In-Reply-To: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
-References: <1290587308-22038-1-git-send-email-per.xx.fransson@stericsson.com>
-Message-ID: <20101126040612.GA6598@lixom.net>
+Date: Thu, 25 Nov 2010 22:38:29 -0600
+Subject: [PATCH v7 01/11] OMAP: GPIO: prepare for platform driver
+In-Reply-To: <1290524213-395-2-git-send-email-charu@ti.com>
+References: <1290524213-395-1-git-send-email-charu@ti.com>
+	<1290524213-395-2-git-send-email-charu@ti.com>
+Message-ID: <20101126043829.GB6598@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Just a couple of nitpicks below. It's also common to prefix the patch
-subject with the subsystem (i.e. "ARM: kexec: ...")
-
-
--Olof
-
-On Wed, Nov 24, 2010 at 09:28:28AM +0100, Per Fransson wrote:
-> v2 changes:
-> * the interrupts of the calling core are no longer disabled
->   before performing the IPI
-> ---
-> 
-> When kexec is used to start a crash kernel the other cores
-> are notified. These non-crashing cores will save their state
-> in the crash notes and then do nothing.
-> 
-> Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
-> ---
->  arch/arm/kernel/machine_kexec.c |   27 +++++++++++++++++++++++++++
->  1 files changed, 27 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-> index 3a8fd51..57a7f2f 100644
-> --- a/arch/arm/kernel/machine_kexec.c
-> +++ b/arch/arm/kernel/machine_kexec.c
-> @@ -23,6 +23,8 @@ extern unsigned long kexec_indirection_page;
->  extern unsigned long kexec_mach_type;
->  extern unsigned long kexec_boot_atags;
->  
-> +static atomic_t waiting_for_crash_ipi;
-> +
->  /*
->   * Provide a dummy crash_notes definition while crash dump arrives to arm.
->   * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
-> @@ -37,9 +39,34 @@ void machine_kexec_cleanup(struct kimage *image)
->  {
->  }
->  
-> +void machine_crash_nonpanic_core(void *unused)
+On Tue, Nov 23, 2010 at 08:26:43PM +0530, Varadarajan, Charulatha wrote:
+> +static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
 > +{
-> +	struct pt_regs regs;
-> +
-> +	crash_setup_regs(&regs, NULL);
-> +	printk(KERN_EMERG "CPU %u will stop doing anything useful since another CPU has crashed\n",
-> +	       smp_processor_id());
+> +	if (cpu_class_is_omap2()) {
 
-No other architecture has verbose output like this. Maybe lower it to
-KERN_DEBUG if you feel it's needed on a production kernel?
+Why check class when you're checking for all possible variants anyway?
 
-> +	crash_save_cpu(&regs, smp_processor_id());
-> +	flush_cache_all();
+> +		if (cpu_is_omap44xx()) {
+> +			__raw_writel(0xffffffff, bank->base +
+> +					OMAP4_GPIO_IRQSTATUSCLR0);
+> +			__raw_writel(0x00000000, bank->base +
+> +					 OMAP4_GPIO_DEBOUNCENABLE);
+> +			/* Initialize interface clk ungated, module enabled */
+> +			__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
+> +		} else if (cpu_is_omap34xx()) {
+> +			__raw_writel(0x00000000, bank->base +
+> +					OMAP24XX_GPIO_IRQENABLE1);
+> +			__raw_writel(0xffffffff, bank->base +
+> +					OMAP24XX_GPIO_IRQSTATUS1);
+> +			__raw_writel(0x00000000, bank->base +
+> +					OMAP24XX_GPIO_DEBOUNCE_EN);
 > +
-> +	atomic_dec(&waiting_for_crash_ipi);
-> +	while (1)
-> +		cpu_relax();
+> +			/* Initialize interface clk ungated, module enabled */
+> +			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
+> +		} else if (cpu_is_omap24xx()) {
+> +			static const u32 non_wakeup_gpios[] = {
+> +				0xe203ffc0, 0x08700040
+> +			};
+> +			if (id < ARRAY_SIZE(non_wakeup_gpios))
+> +				bank->non_wakeup_gpios = non_wakeup_gpios[id];
+> +		}
+> +	} else if (cpu_class_is_omap1()) {
+> +		if (bank_is_mpuio(bank))
+> +			__raw_writew(0xffff, bank->base
+> +						+ OMAP_MPUIO_GPIO_MASKIT);
+
+Above is using else if, this is using if. I don't see how you can ever
+hit more than one of these anyway.
+
+Besides, why check for both cpu and method? When do they ever
+diverge? (same goes for other places)
+
+The plat-omap/gpio.c driver is pretty hard to read because of all the
+ifdeffing and tests for platforms. It would make sense to abstract out
+some of the operations into separate functions and use function pointers
+for them, IMHO. (Not an issue for this patch, just a reflection).
+
+> +		if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
+> +			__raw_writew(0xffff, bank->base
+> +						+ OMAP1510_GPIO_INT_MASK);
+> +			__raw_writew(0x0000, bank->base
+> +						+ OMAP1510_GPIO_INT_STATUS);
+> +		}
+> +		if (cpu_is_omap16xx() && bank->method == METHOD_GPIO_1610) {
+> +			__raw_writew(0x0000, bank->base
+> +						+ OMAP1610_GPIO_IRQENABLE1);
+> +			__raw_writew(0xffff, bank->base
+> +						+ OMAP1610_GPIO_IRQSTATUS1);
+> +			__raw_writew(0x0014, bank->base
+> +						+ OMAP1610_GPIO_SYSCONFIG);
+> +
+> +			/*
+> +			 * Enable system clock for GPIO module.
+> +			 * The CAM_CLK_CTRL *is* really the right place.
+> +			 */
+> +			omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
+> +						ULPD_CAM_CLK_CTRL);
+> +		}
+> +		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
+> +			__raw_writel(0xffffffff, bank->base
+> +						+ OMAP7XX_GPIO_INT_MASK);
+> +			__raw_writel(0x00000000, bank->base
+> +						+ OMAP7XX_GPIO_INT_STATUS);
+> +		}
+> +	}
 > +}
 > +
->  void machine_crash_shutdown(struct pt_regs *regs)
->  {
-> +	unsigned long msecs;
-
-Int should be enough here? Not that it makes a difference on ARM, but
-anyway. :)
-
+> +static void __init omap_gpio_chip_init(struct gpio_bank *bank)
+> +{
+> +	int j, bank_width = 16;
+> +	static int gpio;
 > +
->  	local_irq_disable();
+> +	if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX)
+> +		bank_width = 32; /* 7xx has 32-bit GPIOs */
 > +
-> +	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-> +	smp_call_function(machine_crash_nonpanic_core, NULL, false);
-> +	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-> +	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-> +		mdelay(1);
-> +		msecs--;
+> +	if ((bank->method == METHOD_GPIO_24XX) ||
+> +			(bank->method == METHOD_GPIO_44XX))
+> +		bank_width = 32;
+> +
+> +	bank->mod_usage = 0;
+> +	/*
+> +	 * REVISIT eventually switch from OMAP-specific gpio structs
+> +	 * over to the generic ones
+> +	 */
+> +	bank->chip.request = omap_gpio_request;
+> +	bank->chip.free = omap_gpio_free;
+> +	bank->chip.direction_input = gpio_input;
+> +	bank->chip.get = gpio_get;
+> +	bank->chip.direction_output = gpio_output;
+> +	bank->chip.set_debounce = gpio_debounce;
+> +	bank->chip.set = gpio_set;
+> +	bank->chip.to_irq = gpio_2irq;
+> +	if (bank_is_mpuio(bank)) {
+> +		bank->chip.label = "mpuio";
+> +#ifdef CONFIG_ARCH_OMAP16XX
+> +		bank->chip.dev = &omap_mpuio_device.dev;
+> +#endif
+> +		bank->chip.base = OMAP_MPUIO(0);
+> +	} else {
+> +		bank->chip.label = "gpio";
+> +		bank->chip.base = gpio;
+> +		gpio += bank_width;
 > +	}
-
-If anything, logging here if not all cpus were stopped would be more
-useful.
-
->  	crash_save_cpu(regs, smp_processor_id());
+> +	bank->chip.ngpio = bank_width;
+> +
+> +	gpiochip_add(&bank->chip);
+> +
+> +	for (j = bank->virtual_irq_start;
+> +		     j < bank->virtual_irq_start + bank_width; j++) {
+> +		lockdep_set_class(&irq_desc[j].lock, &gpio_lock_class);
+> +		set_irq_chip_data(j, bank);
+> +		if (bank_is_mpuio(bank))
+> +			set_irq_chip(j, &mpuio_irq_chip);
+> +		else
+> +			set_irq_chip(j, &gpio_irq_chip);
+> +		set_irq_handler(j, handle_simple_irq);
+> +		set_irq_flags(j, IRQF_VALID);
+> +	}
+> +	set_irq_chained_handler(bank->irq, gpio_irq_handler);
+> +	set_irq_data(bank->irq, bank);
+> +}
+> +
+>  static int __init _omap_gpio_init(void)
+>  {
+>  	int i;
+> -	int gpio = 0;
+>  	struct gpio_bank *bank;
+>  	int bank_size = SZ_8K;	/* Module 4KB + L4 4KB except on omap1 */
+>  	char clk_name[11];
+> @@ -1828,7 +1941,6 @@ static int __init _omap_gpio_init(void)
+>  	}
+>  #endif
+>  	for (i = 0; i < gpio_bank_count; i++) {
+> -		int j, gpio_count = 16;
 >  
->  	printk(KERN_INFO "Loading crashdump kernel...\n");
+>  		bank = &gpio_bank[i];
+>  		spin_lock_init(&bank->lock);
+> @@ -1840,107 +1952,8 @@ static int __init _omap_gpio_init(void)
+>  			continue;
+>  		}
+>  
+> -		if (bank_is_mpuio(bank))
+> -			__raw_writew(0xffff, bank->base + OMAP_MPUIO_GPIO_MASKIT);
+> -		if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
+> -			__raw_writew(0xffff, bank->base + OMAP1510_GPIO_INT_MASK);
+> -			__raw_writew(0x0000, bank->base + OMAP1510_GPIO_INT_STATUS);
+> -		}
+> -		if (cpu_is_omap16xx() && bank->method == METHOD_GPIO_1610) {
+> -			__raw_writew(0x0000, bank->base + OMAP1610_GPIO_IRQENABLE1);
+> -			__raw_writew(0xffff, bank->base + OMAP1610_GPIO_IRQSTATUS1);
+> -			__raw_writew(0x0014, bank->base + OMAP1610_GPIO_SYSCONFIG);
+> -		}
+> -		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
+> -			__raw_writel(0xffffffff, bank->base + OMAP7XX_GPIO_INT_MASK);
+> -			__raw_writel(0x00000000, bank->base + OMAP7XX_GPIO_INT_STATUS);
+> -
+> -			gpio_count = 32; /* 7xx has 32-bit GPIOs */
+> -		}
+> -
+> -#ifdef CONFIG_ARCH_OMAP2PLUS
+> -		if ((bank->method == METHOD_GPIO_24XX) ||
+> -				(bank->method == METHOD_GPIO_44XX)) {
+> -			static const u32 non_wakeup_gpios[] = {
+> -				0xe203ffc0, 0x08700040
+> -			};
+> -
+> -			if (cpu_is_omap44xx()) {
+> -				__raw_writel(0xffffffff, bank->base +
+> -						OMAP4_GPIO_IRQSTATUSCLR0);
+> -				__raw_writew(0x0015, bank->base +
+> -						OMAP4_GPIO_SYSCONFIG);
+> -				__raw_writel(0x00000000, bank->base +
+> -						 OMAP4_GPIO_DEBOUNCENABLE);
+> -				/*
+> -				 * Initialize interface clock ungated,
+> -				 * module enabled
+> -				 */
+> -				__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
+> -			} else {
+> -				__raw_writel(0x00000000, bank->base +
+> -						OMAP24XX_GPIO_IRQENABLE1);
+> -				__raw_writel(0xffffffff, bank->base +
+> -						OMAP24XX_GPIO_IRQSTATUS1);
+> -				__raw_writew(0x0015, bank->base +
+> -						OMAP24XX_GPIO_SYSCONFIG);
+> -				__raw_writel(0x00000000, bank->base +
+> -						OMAP24XX_GPIO_DEBOUNCE_EN);
+> -
+> -				/*
+> -				 * Initialize interface clock ungated,
+> -				 * module enabled
+> -				 */
+> -				__raw_writel(0, bank->base +
+> -						OMAP24XX_GPIO_CTRL);
+> -			}
+> -			if (cpu_is_omap24xx() &&
+> -			    i < ARRAY_SIZE(non_wakeup_gpios))
+> -				bank->non_wakeup_gpios = non_wakeup_gpios[i];
+> -			gpio_count = 32;
+> -		}
+> -#endif
+> -
+> -		bank->mod_usage = 0;
+> -		/* REVISIT eventually switch from OMAP-specific gpio structs
+> -		 * over to the generic ones
+> -		 */
+> -		bank->chip.request = omap_gpio_request;
+> -		bank->chip.free = omap_gpio_free;
+> -		bank->chip.direction_input = gpio_input;
+> -		bank->chip.get = gpio_get;
+> -		bank->chip.direction_output = gpio_output;
+> -		bank->chip.set_debounce = gpio_debounce;
+> -		bank->chip.set = gpio_set;
+> -		bank->chip.to_irq = gpio_2irq;
+> -		if (bank_is_mpuio(bank)) {
+> -			bank->chip.label = "mpuio";
+> -#ifdef CONFIG_ARCH_OMAP16XX
+> -			bank->chip.dev = &omap_mpuio_device.dev;
+> -#endif
+> -			bank->chip.base = OMAP_MPUIO(0);
+> -		} else {
+> -			bank->chip.label = "gpio";
+> -			bank->chip.base = gpio;
+> -			gpio += gpio_count;
+> -		}
+> -		bank->chip.ngpio = gpio_count;
+> -
+> -		gpiochip_add(&bank->chip);
+> -
+> -		for (j = bank->virtual_irq_start;
+> -		     j < bank->virtual_irq_start + gpio_count; j++) {
+> -			lockdep_set_class(&irq_desc[j].lock, &gpio_lock_class);
+> -			set_irq_chip_data(j, bank);
+> -			if (bank_is_mpuio(bank))
+> -				set_irq_chip(j, &mpuio_irq_chip);
+> -			else
+> -				set_irq_chip(j, &gpio_irq_chip);
+> -			set_irq_handler(j, handle_simple_irq);
+> -			set_irq_flags(j, IRQF_VALID);
+> -		}
+> -		set_irq_chained_handler(bank->irq, gpio_irq_handler);
+> -		set_irq_data(bank->irq, bank);
+> +		omap_gpio_mod_init(bank, i);
+> +		omap_gpio_chip_init(bank);
+>  
+>  		if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+>  			sprintf(clk_name, "gpio%d_dbck", i + 1);
+> @@ -1950,17 +1963,6 @@ static int __init _omap_gpio_init(void)
+>  		}
+>  	}
+>  
+> -	/* Enable system clock for GPIO module.
+> -	 * The CAM_CLK_CTRL *is* really the right place. */
+> -	if (cpu_is_omap16xx())
+> -		omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04, ULPD_CAM_CLK_CTRL);
+> -
+> -	/* Enable autoidle for the OCP interface */
+> -	if (cpu_is_omap24xx())
+> -		omap_writel(1 << 0, 0x48019010);
+> -	if (cpu_is_omap34xx())
+> -		omap_writel(1 << 0, 0x48306814);
+> -
+>  	omap_gpio_show_rev();
+>  
+>  	return 0;
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
