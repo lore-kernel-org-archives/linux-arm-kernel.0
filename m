@@ -1,26 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 26 Nov 2010 20:46:54 +0100
-Subject: [PATCH] MMC: Fix multiblock SDIO transfers in AT91 MCI
-In-Reply-To: <1290679911-5992-1-git-send-email-yauhen.kharuzhy@promwad.com>
-References: <1290679911-5992-1-git-send-email-yauhen.kharuzhy@promwad.com>
-Message-ID: <20101126194654.GI26540@game.jcrosoft.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 26 Nov 2010 21:07:46 +0100
+Subject: [PATCH 28/51] ARM: mx25: dynamically allocate mxc-ehci devices
+In-Reply-To: <4CEFD139.8090600@gandalf.sssup.it>
+References: <20101117212821.GF8942@pengutronix.de>
+	<1290029419-21435-28-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4CEFCC9A.2020500@fqingenieria.es>
+	<4CEFD139.8090600@gandalf.sssup.it>
+Message-ID: <20101126200746.GB25293@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:11 Thu 25 Nov     , Yauhen Kharuzhy wrote:
-> The AT91 MCI has special SDIO transfer types: SDIO block and SDIO byte
-> transfers, but at91_mci driver doesn't use them and handles all SDIO
-> transfers as ordinary MMC block transfers. This causes problems for
-> multiple-block SDIO transfers (in particular for 256-bytes blocks).
-> 
-> Fix this situation by check opcode for SDIO CMD53 and set transfer
-> type in AT91_MCI_CMDR register properly.
-> 
-> This patch was tested with libertas SDIO driver: problem with TX
-> timeouts on big packets was eliminated.
-> 
-> Signed-off-by: Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Hi Michael,
 
-Best Regards,
-J.
+On Fri, Nov 26, 2010 at 04:24:41PM +0100, Michael Trimarchi wrote:
+> On 11/26/2010 04:04 PM, Jaume Ribot wrote:
+>> Dear Uwe,
+>>
+>> I think there is an error in the Freescale documentation, as new 0x200 offset (as it might be according reference manual) makes usbh2 stops working.
+>>
+>> Other users have experienced simmilar issues:
+>> http://forums.freescale.com/t5/i-MX-Microprocessors/i-MX25-USBOH-host-core-port-on-chip-serial-PHY-Control/m-p/59365
+>>
+>> I think old 0x400 offset value were correct.
+>> Anyone can confirm?
+> I can say that I'm using the mainline (814ce2521121c2459e16cea8c7221e157edbeddd) without this patch and the usbhost work
+> on my mx25 board.
+And I assume applying the patch breaks USB for you?
+
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
