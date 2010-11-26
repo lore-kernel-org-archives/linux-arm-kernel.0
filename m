@@ -1,25 +1,32 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 26 Nov 2010 18:24:55 +0200
-Subject: [PATCH 2/4] mtd: FSMC NAND replace all use of uintNN_t with uN
-In-Reply-To: <1290201121-15263-1-git-send-email-linus.walleij@stericsson.com>
-References: <1290201121-15263-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1290788695.2552.35.camel@localhost>
+From: segoon@openwall.com (Vasiliy Kulikov)
+Date: Fri, 26 Nov 2010 20:05:55 +0300
+Subject: [PATCH] arm: dma: check clk_get() result
+Message-ID: <1290791157-21096-1-git-send-email-segoon@openwall.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-11-19 at 22:12 +0100, Linus Walleij wrote:
-> The short kernel versions of the basic types makes the world more
-> readable.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+clk_get() may return ERR_PTR(), if so propagate return code as
+imx_dma_init() return code.
 
-I do not think dwmw2 will merge this one because he often claimed that
-u32 cannot be better than uint32_t, because the latter is C99 standard,
-but the former is not. So I'd not do this, at least not at the area he
-looks after.
+Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+---
+ Cannot compile this driver, so it is not tested at all.
 
-:-)
+ arch/arm/mach-imx/dma-v1.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-imx/dma-v1.c b/arch/arm/mach-imx/dma-v1.c
+index dcb24a9..e9f1769 100644
+--- a/arch/arm/mach-imx/dma-v1.c
++++ b/arch/arm/mach-imx/dma-v1.c
+@@ -821,6 +821,8 @@ static int __init imx_dma_init(void)
+ 		return 0;
+ 
+ 	dma_clk = clk_get(NULL, "dma");
++	if (IS_ERR(dma_clk))
++		return PTR_ERR(dma_clk);
+ 	clk_enable(dma_clk);
+ 
+ 	/* reset DMA module */
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+1.7.0.4
