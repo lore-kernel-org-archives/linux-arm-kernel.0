@@ -1,654 +1,121 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 26 Nov 2010 12:30:03 +0100
-Subject: [PATCH 01/15] ARM: mxs: Add core definitions
-In-Reply-To: <1290754154-9428-2-git-send-email-shawn.guo@freescale.com>
+Date: Fri, 26 Nov 2010 12:32:55 +0100
+Subject: [PATCH 03/15] ARM: mxs: Add reset routines
+In-Reply-To: <19695.36407.793411.550458@ipc1.ka-ro>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101126113003.GB27637@pengutronix.de>
+	<1290754154-9428-4-git-send-email-shawn.guo@freescale.com>
+	<19695.32386.279224.624305@ipc1.ka-ro>
+	<20101126095733.GA27637@pengutronix.de>
+	<19695.36407.793411.550458@ipc1.ka-ro>
+Message-ID: <20101126113255.GC27637@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+Hello Lothar,
 
-On Fri, Nov 26, 2010 at 02:49:00PM +0800, Shawn Guo wrote:
-> Add core definitions for MXS-based SoC MX23 and MX28.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/mach-mxs/include/mach/hardware.h |   66 +++++++++
->  arch/arm/mach-mxs/include/mach/irqs.h     |   32 ++++
->  arch/arm/mach-mxs/include/mach/memory.h   |   24 +++
->  arch/arm/mach-mxs/include/mach/mx23.h     |  147 +++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/mx28.h     |  227 +++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/mxs.h      |   60 ++++++++
->  6 files changed, 556 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/hardware.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/irqs.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/memory.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/mx23.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/mx28.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/mxs.h
-> 
-> diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
-> new file mode 100644
-> index 0000000..5edccd5
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/hardware.h
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA  02110-1301, USA.
-> + */
-> +
-> +#ifndef __MACH_MXS_HARDWARE_H__
-> +#define __MACH_MXS_HARDWARE_H__
-> +
-> +#include <asm/sizes.h>
-> +
-> +#ifdef __ASSEMBLER__
-> +#define IOMEM(addr)	(addr)
-> +#else
-> +#define IOMEM(addr)	((void __force __iomem *)(addr))
-> +#endif
-> +
-> +#define MXS_IO_P2V_MODULE(addr, module)					\
-> +	(((addr) - module ## _BASE_ADDR) < module ## _SIZE ?		\
-> +	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0)
-Do you need this?  On imx this is only used in
-arch/arm/mach-mx3/mach-kzm_arm11_01.c that uses it to map chip selects.
-IMHO it should better use a dynamic mapping for that which would allow
-to let IMX_IO_P2V_MODULE die.
-
-> +/*
-> + * It maps the whole address space to [0xf4000000, 0xf5ffffff].
-> + *
-> + *	OCRAM	0x00000000+0x020000	->	0xf4000000+0x020000
-> + *	IO	0x80000000+0x100000	->	0xf4400000+0x100000
-> + */
-> +#define MXS_IO_P2V(x)	(						\
-> +			0xf4000000 + 					\
-> +			(((x) & 0x50000000) >> 6) +			\
-> +			(((x) & 0x0b000000) >> 4) +			\
-> +			(((x) & 0x000fffff)))
-Did you test this?  For me MXS_IO_P2V(0x80000000) ==
-MXS_IO_P2V(0x00000000).  You should be able to choose a much simpler
-function, e.g.
-
-		(0xf4000000 + (((x) & 0x80000000) >> 6) + (((x) & 0x000fffff))))
-
-should work for the two areas above
-
-> +
-> +#define MXS_IO_ADDRESS(x)	IOMEM(MXS_IO_P2V(x))
-> +
-> +#ifdef CONFIG_SOC_IMX23
-You don't need to protect inclusion of mach/mx23 if all symbols defined
-in it are properly namespaced.
-
-> +# include <mach/mx23.h>
-> +#endif
-> +
-> +#ifdef CONFIG_SOC_IMX28
-> +# include <mach/mx28.h>
-> +#endif
-> +
-> +#include <mach/mxs.h>
-> +
-> +#define mxs_map_entry(soc, name, _type)	{				\
-> +	.virtual = soc ## _IO_P2V(soc ## _ ## name ## _BASE_ADDR),	\
-> +	.pfn = __phys_to_pfn(soc ## _ ## name ## _BASE_ADDR),		\
-> +	.length = soc ## _ ## name ## _SIZE,				\
-> +	.type = _type,							\
-> +}
-> +
-> +#endif /* __MACH_MXS_HARDWARE_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/irqs.h b/arch/arm/mach-mxs/include/mach/irqs.h
-> new file mode 100644
-> index 0000000..f771039
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/irqs.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-> + */
-> +
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __MACH_MXS_IRQS_H__
-> +#define __MACH_MXS_IRQS_H__
-> +
-> +#define MXS_INTERNAL_IRQS	128
-> +
-> +#define MXS_GPIO_IRQ_START	MXS_INTERNAL_IRQS
-> +
-> +/* the maximum for MXS-based */
-> +#define MXS_GPIO_IRQS		(32 * 5)
-> +
-> +/*
-> + * The next 16 interrupts are for board specific purposes.  Since
-> + * the kernel can only run on one machine at a time, we can re-use
-> + * these.  If you need more, increase MXS_BOARD_IRQS, but keep it
-> + * within sensible limits.
-> + */
-> +#define MXS_BOARD_IRQ_START	(MXS_GPIO_IRQ_START + MXS_GPIO_IRQS)
-> +#define MXS_BOARD_IRQS		16
-> +
-> +#define NR_IRQS			(MXS_BOARD_IRQ_START + MXS_BOARD_IRQS)
-> +
-> +#endif /* __MACH_MXS_IRQS_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/memory.h b/arch/arm/mach-mxs/include/mach/memory.h
-> new file mode 100644
-> index 0000000..b5420a5
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/memory.h
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#ifndef __MACH_MXS_MEMORY_H__
-> +#define __MACH_MXS_MEMORY_H__
-> +
-> +#define PHYS_OFFSET		UL(0x40000000)
-> +
-> +#endif /* __MACH_MXS_MEMORY_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
-> new file mode 100644
-> index 0000000..27a11ee
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/mx23.h
-> @@ -0,0 +1,147 @@
-> +/*
-> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#ifndef __MACH_MX23_H__
-> +#define __MACH_MX23_H__
-> +
-> +#ifndef __ASSEMBLER__
-> +#include <linux/io.h>
-> +#endif
-> +
-> +/*
-> + * OCRAM
-> + */
-> +#define MX23_OCRAM_BASE_ADDR		0x00000000
-> +#define MX23_OCRAM_SIZE			SZ_32K
-> +
-> +/*
-> + * IO
-> + */
-> +#define MX23_IO_BASE_ADDR		0x80000000
-> +#define MX23_IO_SIZE			SZ_1M
-> +
-> +#define MX23_ICOLL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x000000)
-> +#define MX23_APBH_DMA_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x004000)
-> +#define MX23_BCH_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x00a000)
-> +#define MX23_GPMI_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x00c000)
-> +#define MX23_SSP1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x010000)
-> +#define MX23_SSP2_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x034000)
-> +#define MX23_PINCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x018000)
-> +#define MX23_DIGCTL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x01c000)
-> +#define MX23_ETM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x020000)
-> +#define MX23_APBX_DMA_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x024000)
-> +#define MX23_DCP_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x028000)
-> +#define MX23_PXP_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x02a000)
-> +#define MX23_OCOTP_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x02c000)
-> +#define MX23_AXI_AHB0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x02e000)
-> +#define MX23_LCDIF_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x030000)
-> +#define MX23_TVENC_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x038000)
-> +#define MX23_CLKCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x040000)
-> +#define MX23_SAIF0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x042000)
-> +#define MX23_POWER_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x044000)
-> +#define MX23_SAIF1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x046000)
-> +#define MX23_AUDIOOUT_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x048000)
-> +#define MX23_AUDIOIN_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x04c000)
-> +#define MX23_LRADC_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x050000)
-> +#define MX23_SPDIF_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x054000)
-> +#define MX23_RTC_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x05c000)
-> +#define MX23_I2C0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x058000)
-> +#define MX23_PWM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x064000)
-> +#define MX23_TIMROT_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x068000)
-> +#define MX23_AUART1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06c000)
-> +#define MX23_AUART2_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06e000)
-> +#define MX23_DUART_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x070000)
-> +#define MX23_USBPHY_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
-> +#define MX23_USBCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
-> +#define MX23_DRAM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x0e0000)
-> +
-> +#define MX23_IO_P2V(x)			MXS_IO_P2V(x)
-> +#define MX23_IO_ADDRESS(x)		IOMEM(MX23_IO_P2V(x))
-> +
-> +/*
-> + * IRQ
-> + */
-> +#define MX23_INT_DUART			0
-> +#define MX23_INT_COMMS_RX		1
-> +#define MX23_INT_COMMS_TX		1
-really two names for irq 1?
-
-> +#define MX23_INT_SSP2_ERROR		2
-> +#define MX23_INT_VDD5V			3
-> +#define MX23_INT_HEADPHONE_SHORT	4
-> +#define MX23_INT_DAC_DMA		5
-> +#define MX23_INT_DAC_ERROR		6
-> +#define MX23_INT_ADC_DMA		7
-> +#define MX23_INT_ADC_ERROR		8
-> +#define MX23_INT_SPDIF_DMA		9
-> +#define MX23_INT_SAIF2_DMA		9
-ditto
-
-> +#define MX23_INT_SPDIF_ERROR		10
-> +#define MX23_INT_SAIF1_IRQ		10
-> +#define MX23_INT_SAIF2_IRQ		10
-ditto (3 that is)
-> +#define MX23_INT_USB_CTRL		11
-> +#define MX23_INT_USB_WAKEUP		12
-> +#define MX23_INT_GPMI_DMA		13
-> +#define MX23_INT_SSP1_DMA		14
-> +#define MX23_INT_SSP_ERROR		15
-> +#define MX23_INT_GPIO0			16
-> +#define MX23_INT_GPIO1			17
-> +#define MX23_INT_GPIO2			18
-> +#define MX23_INT_SAIF1_DMA		19
-> +#define MX23_INT_SSP2_DMA		20
-> +#define MX23_INT_ECC8_IRQ		21
-> +#define MX23_INT_RTC_ALARM		22
-> +#define MX23_INT_UARTAPP_TX_DMA		23
-> +#define MX23_INT_UARTAPP_INTERNAL	24
-> +#define MX23_INT_UARTAPP_RX_DMA		25
-> +#define MX23_INT_I2C_DMA		26
-> +#define MX23_INT_I2C_ERROR		27
-> +#define MX23_INT_TIMER0			28
-> +#define MX23_INT_TIMER1			29
-> +#define MX23_INT_TIMER2			30
-> +#define MX23_INT_TIMER3			31
-> +#define MX23_INT_BATT_BRNOUT		32
-> +#define MX23_INT_VDDD_BRNOUT		33
-> +#define MX23_INT_VDDIO_BRNOUT		34
-> +#define MX23_INT_VDD18_BRNOUT		35
-> +#define MX23_INT_TOUCH_DETECT		36
-> +#define MX23_INT_LRADC_CH0		37
-> +#define MX23_INT_LRADC_CH1		38
-> +#define MX23_INT_LRADC_CH2		39
-> +#define MX23_INT_LRADC_CH3		40
-> +#define MX23_INT_LRADC_CH4		41
-> +#define MX23_INT_LRADC_CH5		42
-> +#define MX23_INT_LRADC_CH6		43
-> +#define MX23_INT_LRADC_CH7		44
-> +#define MX23_INT_LCDIF_DMA		45
-> +#define MX23_INT_LCDIF_ERROR		46
-> +#define MX23_INT_DIGCTL_DEBUG_TRAP	47
-> +#define MX23_INT_RTC_1MSEC		48
-> +#define MX23_INT_DRI_DMA		49
-> +#define MX23_INT_DRI_ATTENTION		50
-> +#define MX23_INT_GPMI_ATTENTION		51
-> +#define MX23_INT_IR			52
-> +#define MX23_INT_DCP_VMI		53
-> +#define MX23_INT_DCP			54
-> +#define MX23_INT_BCH			56
-> +#define MX23_INT_PXP			57
-> +#define MX23_INT_UARTAPP2_TX_DMA	58
-> +#define MX23_INT_UARTAPP2_INTERNAL	59
-> +#define MX23_INT_UARTAPP2_RX_DMA	60
-> +#define MX23_INT_VDAC_DETECT		61
-> +#define MX23_INT_VDD5V_DROOP		64
-> +#define MX23_INT_DCDC4P2_BO		65
-> +
-> +#endif /* __MACH_MX23_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/mx28.h b/arch/arm/mach-mxs/include/mach/mx28.h
-> new file mode 100644
-> index 0000000..836d807
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/mx28.h
-> @@ -0,0 +1,227 @@
-> +/*
-> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#ifndef __MACH_MX28_H__
-> +#define __MACH_MX28_H__
-> +
-> +#ifndef __ASSEMBLER__
-> +#include <linux/io.h>
-> +#endif
-> +
-> +/*
-> + * OCRAM
-> + */
-> +#define MX28_OCRAM_BASE_ADDR		0x00000000
-> +#define MX28_OCRAM_SIZE			SZ_128K
-> +
-> +/*
-> + * IO
-> + */
-> +#define MX28_IO_BASE_ADDR		0x80000000
-> +#define MX28_IO_SIZE			SZ_1M
-> +
-> +#define MX28_ICOLL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x000000)
-> +#define MX28_HSADC_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x002000)
-> +#define MX28_APBH_DMA_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x004000)
-> +#define MX28_PERFMON_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x006000)
-> +#define MX28_BCH_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x00a000)
-> +#define MX28_GPMI_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x00c000)
-> +#define MX28_SSP0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x010000)
-> +#define MX28_SSP1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x012000)
-> +#define MX28_SSP2_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x014000)
-> +#define MX28_SSP3_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x016000)
-> +#define MX28_PINCTRL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x018000)
-> +#define MX28_DIGCTL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x01c000)
-> +#define MX28_ETM_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x022000)
-> +#define MX28_APBX_DMA_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x024000)
-> +#define MX28_DCP_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x028000)
-> +#define MX28_PXP_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x02a000)
-> +#define MX28_OCOTP_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x02c000)
-> +#define MX28_AXI_AHB0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x02e000)
-> +#define MX28_LCDIF_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x030000)
-> +#define MX28_CAN0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x032000)
-> +#define MX28_CAN1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x034000)
-> +#define MX28_SIMDBG_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c000)
-> +#define MX28_SIMGPMISEL_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x03c200)
-> +#define MX28_SIMSSPSEL_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x03c300)
-> +#define MX28_SIMMEMSEL_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x03c400)
-> +#define MX28_GPIOMON_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c500)
-> +#define MX28_SIMENET_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c700)
-> +#define MX28_ARMJTAG_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c800)
-> +#define MX28_CLKCTRL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x040000)
-> +#define MX28_SAIF0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x042000)
-> +#define MX28_POWER_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x044000)
-> +#define MX28_SAIF1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x046000)
-> +#define MX28_LRADC_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x050000)
-> +#define MX28_SPDIF_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x054000)
-> +#define MX28_RTC_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x056000)
-> +#define MX28_I2C0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x058000)
-> +#define MX28_I2C1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x05a000)
-> +#define MX28_PWM_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x064000)
-> +#define MX28_TIMROT_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x068000)
-> +#define MX28_AUART0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x06a000)
-> +#define MX28_AUART1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x06c000)
-> +#define MX28_AUART2_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x06e000)
-> +#define MX28_AUART3_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x070000)
-> +#define MX28_AUART4_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x072000)
-> +#define MX28_DUART_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x074000)
-> +#define MX28_USBPHY0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x07C000)
-> +#define MX28_USBPHY1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x07e000)
-> +#define MX28_USBCTRL0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x080000)
-> +#define MX28_USBCTRL1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x090000)
-> +#define MX28_DFLPT_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x0c0000)
-> +#define MX28_DRAM_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x0e0000)
-> +#define MX28_ENET_MAC0_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x0f0000)
-> +#define MX28_ENET_MAC1_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x0f4000)
-> +
-> +#define MX28_IO_P2V(x)			MXS_IO_P2V(x)
-> +#define MX28_IO_ADDRESS(x)		IOMEM(MX28_IO_P2V(x))
-> +
-> +/*
-> + * IRQ
-> + */
-> +#define MX28_INT_BATT_BRNOUT		0
-> +#define MX28_INT_VDDD_BRNOUT		1
-> +#define MX28_INT_VDDIO_BRNOUT		2
-> +#define MX28_INT_VDDA_BRNOUT		3
-> +#define MX28_INT_VDD5V_DROOP		4
-> +#define MX28_INT_DCDC4P2_BRNOUT		5
-> +#define MX28_INT_VDD5V			6
-> +#define MX28_INT_RESV7			7
-> +#define MX28_INT_CAN0			8
-> +#define MX28_INT_CAN1			9
-> +#define MX28_INT_LRADC_TOUCH		10
-> +#define MX28_INT_RESV11			11
-> +#define MX28_INT_RESV12			12
-> +#define MX28_INT_HSADC			13
-> +#define MX28_INT_IRADC_THRESH0		14
-> +#define MX28_INT_IRADC_THRESH1		15
-> +#define MX28_INT_LRADC_CH0		16
-> +#define MX28_INT_LRADC_CH1		17
-> +#define MX28_INT_LRADC_CH2		18
-> +#define MX28_INT_LRADC_CH3		19
-> +#define MX28_INT_LRADC_CH4		20
-> +#define MX28_INT_LRADC_CH5		21
-> +#define MX28_INT_LRADC_CH6		22
-> +#define MX28_INT_LRADC_CH7		23
-> +#define MX28_INT_LRADC_BUTTON0		24
-> +#define MX28_INT_LRADC_BUTTON1		25
-> +#define MX28_INT_RESV26			26
-> +#define MX28_INT_PERFMON		27
-> +#define MX28_INT_RTC_1MSEC		28
-> +#define MX28_INT_RTC_ALARM		29
-> +#define MX28_INT_RESV30			30
-> +#define MX28_INT_COMMS			31
-> +#define MX28_INT_EMI_ERR		32
-> +#define MX28_INT_RESV33			33
-> +#define MX28_INT_RESV34			34
-> +#define MX28_INT_RESV35			35
-> +#define MX28_INT_RESV36			36
-> +#define MX28_INT_RESV37			37
-> +#define MX28_INT_LCDIF			38
-> +#define MX28_INT_PXP			39
-> +#define MX28_INT_RESV40			40
-> +#define MX28_INT_BCH			41
-> +#define MX28_INT_GPMI			42
-> +#define MX28_INT_RESV43			43
-> +#define MX28_INT_RESV44			44
-> +#define MX28_INT_SPDIF_ERROR		45
-> +#define MX28_INT_RESV46			46
-> +#define MX28_INT_DUART			47
-> +#define MX28_INT_TIMER0			48
-> +#define MX28_INT_TIMER1			49
-> +#define MX28_INT_TIMER2			50
-> +#define MX28_INT_TIMER3			51
-> +#define MX28_INT_DCP_VMI		52
-> +#define MX28_INT_DCP			53
-> +#define MX28_INT_DCP_SECURE		54
-> +#define MX28_INT_RESV55			55
-> +#define MX28_INT_RESV56			56
-> +#define MX28_INT_RESV57			57
-> +#define MX28_INT_SAIF1			58
-> +#define MX28_INT_SAIF0			59
-> +#define MX28_INT_RESV60			60
-> +#define MX28_INT_RESV61			61
-> +#define MX28_INT_RESV62			62
-> +#define MX28_INT_RESV63			63
-> +#define MX28_INT_RESV64			64
-> +#define MX28_INT_RESV65			65
-> +#define MX28_INT_SPDIF_DMA		66
-> +#define MX28_INT_RESV67			67
-> +#define MX28_INT_I2C0_DMA		68
-> +#define MX28_INT_I2C1_DMA		69
-> +#define MX28_INT_AUART0_RX_DMA		70
-> +#define MX28_INT_AUART0_TX_DMA		71
-> +#define MX28_INT_AUART1_RX_DMA		72
-> +#define MX28_INT_AUART1_TX_DMA		73
-> +#define MX28_INT_AUART2_RX_DMA		74
-> +#define MX28_INT_AUART2_TX_DMA		75
-> +#define MX28_INT_AUART3_RX_DMA		76
-> +#define MX28_INT_AUART3_TX_DMA		77
-> +#define MX28_INT_AUART4_RX_DMA		78
-> +#define MX28_INT_AUART4_TX_DMA		79
-> +#define MX28_INT_SAIF0_DMA		80
-> +#define MX28_INT_SAIF1_DMA		81
-> +#define MX28_INT_SSP0_DMA		82
-> +#define MX28_INT_SSP1_DMA		83
-> +#define MX28_INT_SSP2_DMA		84
-> +#define MX28_INT_SSP3_DMA		85
-> +#define MX28_INT_LCDIF_DMA		86
-> +#define MX28_INT_HSADC_DMA		87
-> +#define MX28_INT_GPMI_DMA		88
-> +#define MX28_INT_DIGCTL_DEBUG_TRAP	89
-> +#define MX28_INT_RESV90			90
-> +#define MX28_INT_RESV91			91
-> +#define MX28_INT_USB1			92
-> +#define MX28_INT_USB0			93
-> +#define MX28_INT_USB1_WAKEUP		94
-> +#define MX28_INT_USB0_WAKEUP		95
-> +#define MX28_INT_SSP0			96
-> +#define MX28_INT_SSP1			97
-> +#define MX28_INT_SSP2			98
-> +#define MX28_INT_SSP3			99
-> +#define MX28_INT_ENET_SWI		100
-> +#define MX28_INT_ENET_MAC0		101
-> +#define MX28_INT_ENET_MAC1		102
-> +#define MX28_INT_ENET_MAC0_1588		103
-> +#define MX28_INT_ENET_MAC1_1588		104
-> +#define MX28_INT_RESV105		105
-> +#define MX28_INT_RESV106		106
-> +#define MX28_INT_RESV107		107
-> +#define MX28_INT_RESV108		108
-> +#define MX28_INT_RESV109		109
-> +#define MX28_INT_I2C1_ERROR		110
-> +#define MX28_INT_I2C0_ERROR		111
-> +#define MX28_INT_AUART0			112
-> +#define MX28_INT_AUART1			113
-> +#define MX28_INT_AUART2			114
-> +#define MX28_INT_AUART3			115
-> +#define MX28_INT_AUART4			116
-> +#define MX28_INT_RESV117		117
-> +#define MX28_INT_RESV118		118
-> +#define MX28_INT_RESV119		119
-> +#define MX28_INT_RESV120		120
-> +#define MX28_INT_RESV121		121
-> +#define MX28_INT_RESV122		122
-> +#define MX28_INT_GPIO4			123
-> +#define MX28_INT_GPIO3			124
-> +#define MX28_INT_GPIO2			125
-> +#define MX28_INT_GPIO1			126
-> +#define MX28_INT_GPIO0			127
-> +
-> +#endif /* __MACH_MX28_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-> new file mode 100644
-> index 0000000..128c114
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
-> @@ -0,0 +1,60 @@
-> +/*
-> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#ifndef __MACH_MXS_H__
-> +#define __MACH_MXS_H__
-> +
-> +#define MXS_SET_ADDR		0x4
-> +#define MXS_CLR_ADDR		0x8
-> +#define MXS_TOG_ADDR		0xc
-> +
-> +/*
-> + * MXS CPU types
-> + */
-> +#define MXS_CPU_MX23		23
-> +#define MXS_CPU_MX28		28
-> +
-> +#ifndef __ASSEMBLY__
-> +extern unsigned int __mxs_cpu_type;
-> +#endif
-> +
-> +#ifdef CONFIG_SOC_IMX23
-> +# ifdef mxs_cpu_type
-> +#  undef mxs_cpu_type
-> +#  define mxs_cpu_type __mxs_cpu_type
-> +# else
-> +#  define mxs_cpu_type MXS_CPU_MX23
-> +# endif
-> +# define cpu_is_mx23()		(mxs_cpu_type == MXS_CPU_MX23)
-> +#else
-> +# define cpu_is_mx23()		(0)
-> +#endif
-> +
-> +#ifdef CONFIG_SOC_IMX28
-> +# ifdef mxs_cpu_type
-> +#  undef mxs_cpu_type
-> +#  define mxs_cpu_type __mxs_cpu_type
-> +# else
-> +#  define mxs_cpu_type MXS_CPU_MX28
-> +# endif
-> +# define cpu_is_mx28()		(mxs_cpu_type == MXS_CPU_MX28)
-> +#else
-> +# define cpu_is_mx28()		(0)
-> +#endif
-For imx I wondered if this is overkill.  When I started mainlining
-ns9xxx I just did:
-
-	#define cpu_is_xyz() (machine_is_abc() || ...)
-
-It's much easier and the generated code probably is not much worse.
-(Better try to reduce the number of usages of these macros.)
-
-(Note, if you're convinced this is good, go ahead, just my personal
-opinion.)
+On Fri, Nov 26, 2010 at 11:38:47AM +0100, Lothar Wa?mann wrote:
+> Uwe Kleine-K?nig writes:
+> > On Fri, Nov 26, 2010 at 10:31:46AM +0100, Lothar Wa?mann wrote:
+> > > Since arch_reset() may be called from interrupt context (e.g. due to
+> > > SYSRQ-B) it must not call any functions that may sleep like clk_get*()
+> > > or clk_enable(). The clock should be acquired and enabled in the init
+> > > routine.
+> > This is a problem that also exist in arch/arm/plat-mxc/system.c's
+> > arch_reset.
+> > 
+> > Did you already verify that this is indeed a problem?  I guess there are
+> > more architectures that use clk_get in arch_reset, aren't there?
+> > 
+> If you consider this a problem:
+> BUG: sleeping function called from invalid context at /usr/local/src/arm-linux/kernel/mutex.c:
+> 280
+> in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper
+> 2 locks held by swapper/0:
+>  #0:  (&port_lock_key){-.-...}, at: [<c01aed10>] imx_rxint+0x24/0x20c
+>  #1:  (sysrq_key_table_lock){-.....}, at: [<c01a8e14>] __handle_sysrq+0x20/0x170
+> irq event stamp: 130658
+> hardirqs last  enabled at (130657): [<c0027f80>] default_idle+0x2c/0x3c
+> hardirqs last disabled at (130658): [<c0026a74>] __irq_svc+0x34/0xa8
+> softirqs last  enabled at (130648): [<c004bc1c>] __do_softirq+0x144/0x164
+> softirqs last disabled at (130637): [<c004bc9c>] irq_exit+0x60/0xb4
+> Backtrace: 
+> [<c002aee0>] (dump_backtrace+0x0/0x114) from [<c0260240>] (dump_stack+0x18/0x1c)
+>  r7:00000000 r6:c0326000 r5:00000000 r4:c0326000
+> [<c0260228>] (dump_stack+0x0/0x1c) from [<c0041930>] (__might_sleep+0x11c/0x13c)
+> [<c0041814>] (__might_sleep+0x0/0x13c) from [<c026181c>] (mutex_lock_nested+0x34/0x31c)
+>  r4:c032afd4
+> [<c02617e8>] (mutex_lock_nested+0x0/0x31c) from [<c003097c>] (clk_get_sys+0x30/0xe8)
+> [<c003094c>] (clk_get_sys+0x0/0xe8) from [<c00338c8>] (arch_reset+0x18/0x8c)
+> [<c00338b0>] (arch_reset+0x0/0x8c) from [<c0028564>] (arm_machine_restart+0x2c/0x5c)
+>  r5:00000000 r4:00000068
+> [<c0028538>] (arm_machine_restart+0x0/0x5c) from [<c0027f3c>] (machine_restart+0x20/0x28)
+>  r5:d186b9c0 r4:00000062
+> [<c0027f1c>] (machine_restart+0x0/0x28) from [<c0056db8>] (emergency_restart+0x14/0x18)
+> [<c0056da4>] (emergency_restart+0x0/0x18) from [<c01a9220>] (sysrq_handle_reboot+0x24/0x28)
+> [<c01a91fc>] (sysrq_handle_reboot+0x0/0x28) from [<c01a8eb4>] (__handle_sysrq+0xc0/0x170)
+> [<c01a8df4>] (__handle_sysrq+0x0/0x170) from [<c01a8fd4>] (handle_sysrq+0x34/0x40)
+> [<c01a8fa0>] (handle_sysrq+0x0/0x40) from [<c01aedd8>] (imx_rxint+0xec/0x20c)
+> [<c01aecec>] (imx_rxint+0x0/0x20c) from [<c01aef20>] (imx_int+0x28/0x68)
+> [<c01aeef8>] (imx_int+0x0/0x68) from [<c007a794>] (handle_IRQ_event+0x2c/0x100)
+>  r7:0000002d r6:00000000 r5:00000000 r4:d1eab800
+> [<c007a768>] (handle_IRQ_event+0x0/0x100) from [<c007c4fc>] (handle_level_irq+0xbc/0x120)
+>  r7:d1eab800 r6:c03340b8 r5:0000002d r4:c033407c
+> [<c007c440>] (handle_level_irq+0x0/0x120) from [<c0026070>] (_text+0x70/0x8c)
+>  r7:00000002 r6:002d0000 r5:00000000 r4:0000002d
+> [<c0026000>] (_text+0x0/0x8c) from [<c0026a94>] (__irq_svc+0x54/0xa8)
+> Exception stack(0xc0327f48 to 0xc0327f90)
+> 7f40:                   00000001 0016e240 20000093 20000013 c0326000 c032aaa8 
+> 7f60: c03541e4 c032aaa0 8001ecc4 41069264 8001ec90 c0327f9c c0327f68 c0327f90 
+> 7f80: c006c620 c0027f8c 20000013 ffffffff                                     
+>  r5:fc400000 r4:0000001f
+> [<c0027f54>] (default_idle+0x0/0x3c) from [<c00284dc>] (cpu_idle+0x70/0xcc)
+> [<c002846c>] (cpu_idle+0x0/0xcc) from [<c025d338>] (rest_init+0x70/0x84)
+>  r7:c032aaa0 r6:c0020e14 r5:c0020e18 r4:c0853ad8
+> [<c025d2c8>] (rest_init+0x0/0x84) from [<c00089a4>] (start_kernel+0x280/0x2d8)
+> [<c0008724>] (start_kernel+0x0/0x2d8) from [<80008034>] (0x80008034)
+>  r5:c0354284 r4:00053175
+> ------------[ cut here ]------------
+> WARNING: at /usr/local/src/arm-linux/kernel/mutex.c:207 mutex_lock_nested+0xb4/0x31c()
+> Modules linked in:
+> Backtrace: 
+> [<c002aee0>] (dump_backtrace+0x0/0x114) from [<c0260240>] (dump_stack+0x18/0x1c)
+>  r7:c02e09d3 r6:000000cf r5:c026189c r4:00000000
+> [<c0260228>] (dump_stack+0x0/0x1c) from [<c004682c>] (warn_slowpath_common+0x50/0x68)
+> [<c00467dc>] (warn_slowpath_common+0x0/0x68) from [<c004685c>] (warn_slowpath_null+0x18/0x1c)
+>  r7:00000000 r6:c0326000 r5:c0329868 r4:c032afd4
+> [<c0046844>] (warn_slowpath_null+0x0/0x1c) from [<c026189c>] (mutex_lock_nested+0xb4/0x31c)
+> [<c02617e8>] (mutex_lock_nested+0x0/0x31c) from [<c003097c>] (clk_get_sys+0x30/0xe8)
+> [<c003094c>] (clk_get_sys+0x0/0xe8) from [<c00338c8>] (arch_reset+0x18/0x8c)
+> [<c00338b0>] (arch_reset+0x0/0x8c) from [<c0028564>] (arm_machine_restart+0x2c/0x5c)
+>  r5:00000000 r4:00000068
+> [<c0028538>] (arm_machine_restart+0x0/0x5c) from [<c0027f3c>] (machine_restart+0x20/0x28)
+>  r5:d186b9c0 r4:00000062
+> [<c0027f1c>] (machine_restart+0x0/0x28) from [<c0056db8>] (emergency_restart+0x14/0x18)
+> [<c0056da4>] (emergency_restart+0x0/0x18) from [<c01a9220>] (sysrq_handle_reboot+0x24/0x28)
+> [<c01a91fc>] (sysrq_handle_reboot+0x0/0x28) from [<c01a8eb4>] (__handle_sysrq+0xc0/0x170)
+> [<c01a8df4>] (__handle_sysrq+0x0/0x170) from [<c01a8fd4>] (handle_sysrq+0x34/0x40)
+> [<c01a8fa0>] (handle_sysrq+0x0/0x40) from [<c01aedd8>] (imx_rxint+0xec/0x20c)
+> [<c01aecec>] (imx_rxint+0x0/0x20c) from [<c01aef20>] (imx_int+0x28/0x68)
+> [<c01aeef8>] (imx_int+0x0/0x68) from [<c007a794>] (handle_IRQ_event+0x2c/0x100)
+>  r7:0000002d r6:00000000 r5:00000000 r4:d1eab800
+> [<c007a768>] (handle_IRQ_event+0x0/0x100) from [<c007c4fc>] (handle_level_irq+0xbc/0x120)
+>  r7:d1eab800 r6:c03340b8 r5:0000002d r4:c033407c
+> [<c007c440>] (handle_level_irq+0x0/0x120) from [<c0026070>] (_text+0x70/0x8c)
+>  r7:00000002 r6:002d0000 r5:00000000 r4:0000002d
+> [<c0026000>] (_text+0x0/0x8c) from [<c0026a94>] (__irq_svc+0x54/0xa8)
+> Exception stack(0xc0327f48 to 0xc0327f90)
+> 7f40:                   00000001 0016e240 20000093 20000013 c0326000 c032aaa8 
+> 7f60: c03541e4 c032aaa0 8001ecc4 41069264 8001ec90 c0327f9c c0327f68 c0327f90 
+> 7f80: c006c620 c0027f8c 20000013 ffffffff                                     
+>  r5:fc400000 r4:0000001f
+> [<c0027f54>] (default_idle+0x0/0x3c) from [<c00284dc>] (cpu_idle+0x70/0xcc)
+> [<c002846c>] (cpu_idle+0x0/0xcc) from [<c025d338>] (rest_init+0x70/0x84)
+>  r7:c032aaa0 r6:c0020e14 r5:c0020e18 r4:c0853ad8
+> [<c025d2c8>] (rest_init+0x0/0x84) from [<c00089a4>] (start_kernel+0x280/0x2d8)
+> [<c0008724>] (start_kernel+0x0/0x2d8) from [<80008034>] (0x80008034)
+>  r5:c0354284 r4:00053175
+> ---[ end trace b484fc13651ee6f1 ]---
+do you care enough to send a patch?  If not I can set it on my agenda.
 
 Best regards
 Uwe
