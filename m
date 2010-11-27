@@ -1,36 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 27 Nov 2010 16:39:21 +0100
-Subject: [PATCH] ARM: Gemini: Add support for PCI Bus
-In-Reply-To: <AANLkTinbAVFE+HZrx+9KUwx8=MKFHPqrhpOpAWAEQFv-@mail.gmail.com>
-References: <1290263224-16965-1-git-send-email-ulli.kroll@googlemail.com>
-	<alpine.LNX.2.00.1011271306420.7659@localhost.localdomain>
-	<AANLkTinbAVFE+HZrx+9KUwx8=MKFHPqrhpOpAWAEQFv-@mail.gmail.com>
-Message-ID: <201011271639.21694.arnd@arndb.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sun, 28 Nov 2010 00:56:13 +0900
+Subject: [PATCH 1/3] Add a common struct clk
+In-Reply-To: <1284522014.517347.33297989274.1.gpush@pororo>
+References: <1284522014.516876.675872472687.0.gpush@pororo>
+	<1284522014.517347.33297989274.1.gpush@pororo>
+Message-ID: <AANLkTimuw=FfHn7KtbkNSgwqAkS-6CKA4Rx=-dac-dhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 November 2010 14:01:20 Micha? Miros?aw wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index db524e7..74ea522 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1164,7 +1164,7 @@ config ISA_DMA_API
->         bool
-> 
->  config PCI
-> -       bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
-> ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
-> +       bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
-> ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX ||
-> ARCH_GEMINI
->         help
->           Find out whether you have a PCI motherboard. PCI is the name of a
->           bus system, i.e. the way the CPU talks to the other stuff inside
-> 
+On Wed, Sep 15, 2010 at 12:40 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+> We currently have 21 definitions of struct clk in the ARM architecture,
+> each defined on a per-platform basis. This makes it difficult to define
+> platform- (or architecture-) independent clock sources without making
+> assumptions about struct clk, and impossible to compile two
+> platforms with different struct clks into a single image.
+>
+> This change is an effort to unify struct clk where possible, by defining
+> a common struct clk, containing a set of clock operations. Different
+> clock implementations can set their own operations, and have a standard
+> interface for generic code. The callback interface is exposed to the
+> kernel proper, while the clock implementations only need to be seen by
+> the platform internals.
+>
+> This allows us to share clock code among platforms, and makes it
+> possible to dynamically create clock devices in platform-independent
+> code.
+>
+> Platforms can enable the generic struct clock through
+> CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
+> consists of a common struct clk:
+>
+> struct clk {
+> ? ? ? ?const struct clk_ops ? ?*ops;
+> ? ? ? ?unsigned int ? ? ? ? ? ?enable_count;
+> ? ? ? ?struct mutex ? ? ? ? ? ?mutex;
+> };
+>
+> And a set of clock operations (defined per type of clock):
+>
+> struct clk_ops {
+> ? ? ? int ? ? ? ? ? ? (*enable)(struct clk *);
+> ? ? ? void ? ? ? ? ? ?(*disable)(struct clk *);
+> ? ? ? unsigned long ? (*get_rate)(struct clk *);
+> ? ? ? [...]
+> };
+>
+> To define a hardware-specific clock, machine code can "subclass" the
+> struct clock into a new struct (adding any device-specific data), and
+> provide a set of operations:
+>
+> struct clk_foo {
+> ? ? ? ?struct clk ? ? ?clk;
+> ? ? ? ?void __iomem ? ?*some_register;
+> };
+>
+> struct clk_ops clk_foo_ops = {
+> ? ? ? ?.get_rate = clk_foo_get_rate,
+> };
+>
+> The common clock definitions are based on a development patch from Ben
+> Herrenschmidt <benh@kernel.crashing.org>.
+>
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-This approach really does not scale as we add more boards to the list.
+Hi Jeremy,
 
-Better make a new CONFIG_HAVE_PCI option that you can select from the
-individual boards, and make that the only dependency that CONFIG_PCI has.
+  Are you planning to revise the patch-set or just taking time to
+resubmit as such?
 
-	Arnd
+Thanks.
