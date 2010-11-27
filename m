@@ -1,64 +1,102 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Sat, 27 Nov 2010 14:01:20 +0100
-Subject: [PATCH] ARM: Gemini: Add support for PCI Bus
-In-Reply-To: <alpine.LNX.2.00.1011271306420.7659@localhost.localdomain>
-References: <1290263224-16965-1-git-send-email-ulli.kroll@googlemail.com>
-	<AANLkTikkVqWgpYEg505DwQ+pSegQv1g-Q8cDEpE-JCrV@mail.gmail.com>
-	<alpine.LNX.2.00.1011271306420.7659@localhost.localdomain>
-Message-ID: <AANLkTinbAVFE+HZrx+9KUwx8=MKFHPqrhpOpAWAEQFv-@mail.gmail.com>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Sat, 27 Nov 2010 23:02:37 +0800
+Subject: [PATCH v3 1/1] USB: cns3xxx: Add EHCI and OHCI bus glue for
+	cns3xxx SOCs
+In-Reply-To: <20101126182328.GA20923@oksana.dev.rtsoft.ru>
+References: <20101125171541.GA18152@suse.de>
+	<Pine.LNX.4.44L0.1011251521310.26094-100000@netrider.rowland.org>
+	<20101126151131.GA26602@oksana.dev.rtsoft.ru>
+	<20101126170348.GA3331@suse.de>
+	<20101126182328.GA20923@oksana.dev.rtsoft.ru>
+Message-ID: <AANLkTinocHZBS4O7A2vhc-p6qX0wt04EfAi5Q2xgxSJW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 27 listopada 2010 13:16 u?ytkownik Hans Ulli Kroll
-<ulli.kroll@googlemail.com> napisa?:
-> On Fri, 26 Nov 2010, Micha? Miros?aw wrote:
->> 2010/11/20 Hans Ulli Kroll <ulli.kroll@googlemail.com>:
->> > Add support for PCI Bus on Gemini Devices SL3516
+2010/11/27 Anton Vorontsov <cbouatmailru@gmail.com>:
+> On Fri, Nov 26, 2010 at 09:03:48AM -0800, Greg KH wrote:
+> [...]
+>> > > As far as the callbacks are concerned, this looks fine.
+>> > >
+>> > > Acked-by: Alan Stern <stern@rowland.harvard.edu>
 >> >
->> > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
->> > ---
->> [...]
->> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> > index a19a526..5d4b398 100644
->> > --- a/arch/arm/Kconfig
->> > +++ b/arch/arm/Kconfig
->> > @@ -307,6 +307,7 @@ config ARCH_GEMINI
->> > ? ? ? ?select CPU_FA526
->> > ? ? ? ?select ARCH_REQUIRE_GPIOLIB
->> > ? ? ? ?select ARCH_USES_GETTIMEOFFSET
->> > + ? ? ? select PCI
->> > ? ? ? ?help
->> > ? ? ? ? ?Support for the Cortina Systems Gemini family SoCs
+>> > Thanks Alan!
 >> >
->> [...]
->> I think it's better to add ARCH_GEMINI to CONFIG_PCI dependencies.
->> AFAIK IB-4220B NAS does not use PCI and doesn't need all that code.
->> Board support entries could select PCI if the board is useless without
->> it.
-> I know this, I have some.
+>> > Greg, should I treat your 'to ack it as well' as 'Acked-by'? :-)
+>>
+>> Yes please:
+>> ? ? ? Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
 >
-> There are many boards with PCI i.e WBD 222.
-> Other ARM devices uses the same select inside ARCH_*
-> I don't want to pollute drivers/pci/Kconfig.
+> Thanks!
+>
+>
+> Lin,
+>
+> Now that I tried these patches on the real hardware (EV1.3,
+> silicon ver. 0xA), USB doesn't seem to work for me. FWIW,
+> I use U-Boot from BSP release 1.0.
+>
+> Here is how it looks:
+>
+> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> cns3xxx-ehci cns3xxx-ehci.0: CNS3XXX EHCI Host Controller
+> cns3xxx-ehci cns3xxx-ehci.0: new USB bus registered, assigned bus number 1
+> cns3xxx-ehci cns3xxx-ehci.0: irq 64, io mem 0x82000000
+> cns3xxx-ehci cns3xxx-ehci.0: USB 0.0 started, EHCI 0.00
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 0 ports detected
+> ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+> cns3xxx-ohci cns3xxx-ohci.0: CNS3XXX OHCI Host controller
+> cns3xxx-ohci cns3xxx-ohci.0: new USB bus registered, assigned bus number 2
+> cns3xxx-ohci cns3xxx-ohci.0: irq 91, io mem 0x88000000
+> cns3xxx-ohci cns3xxx-ohci.0: init err (00000000 0000)
+> ohci_hcd: can't start cns3xxx-ohci.0
+> cns3xxx-ohci cns3xxx-ohci.0: startup error -75
+> cns3xxx-ohci cns3xxx-ohci.0: USB bus 2 deregistered
+> cns3xxx-ohci: probe of cns3xxx-ohci.0 failed with error -75
+>
+> I assume this is somehow related to the old hardware I use,
+> but please take a look.
+>
+> I tried this on both 2.6.36 and 2.6.37-rc3. You can find your
+> patches in this tree
+>
+> ?git://git.infradead.org/users/cbou/linux-cns3xxx.git master
+>
+> I'll try to investigate (found a small issue already, patch
+> down below), but if you beat me to it, please send a patch
+> agaist the cns3xxx tree.
+> Thanks,
+I saw this issue on EVB v1.3 chip rev B, with your tree.
+I'll do more test and see what I can do there.
+Sorry that I didn't notice it more earlier.
 
-I meant 'config PCI' entry in arch/arm/Kconfig, see following diff.
-
-Best Regards,
-Micha? Miros?aw
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index db524e7..74ea522 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1164,7 +1164,7 @@ config ISA_DMA_API
- 	bool
-
- config PCI
--	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
-ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
-+	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
-ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX ||
-ARCH_GEMINI
- 	help
- 	  Find out whether you have a PCI motherboard. PCI is the name of a
- 	  bus system, i.e. the way the CPU talks to the other stuff inside
+> - - - -
+> ARM: cns3xxx: Make cns3xxx_pwr_soft_rst_force() to actually reset blocks
+>
+> commit 6eb5d146d4535 ("ARM: cns3xxx: Use IO memory accessors everywhere")
+> breaks cns3xxx_pwr_soft_rst_force() function, so that it doesn't write
+> cleared bit into the register.
+>
+> This patch fixes the issue by adding the necessary __raw_writel().
+>
+> Signed-off-by: Anton Vorontsov <cbouatmailru@gmail.com>
+> ---
+> ?arch/arm/mach-cns3xxx/pm.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-cns3xxx/pm.c b/arch/arm/mach-cns3xxx/pm.c
+> index 78fbaba..5e57955 100644
+> --- a/arch/arm/mach-cns3xxx/pm.c
+> +++ b/arch/arm/mach-cns3xxx/pm.c
+> @@ -67,6 +67,7 @@ static void cns3xxx_pwr_soft_rst_force(unsigned int block)
+> ? ? ? ? ? ? ? ?reg &= ~(block & PM_SOFT_RST_REG_MASK);
+> ? ? ? ?} else {
+> ? ? ? ? ? ? ? ?reg &= ~(block & PM_SOFT_RST_REG_MASK);
+> + ? ? ? ? ? ? ? __raw_writel(reg, PM_SOFT_RST_REG);
+> ? ? ? ? ? ? ? ?reg |= (block & PM_SOFT_RST_REG_MASK);
+> ? ? ? ?}
+>
+> --
+> 1.7.0.5
+>
+>
