@@ -1,36 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 27 Nov 2010 21:12:11 +0000
-Subject: [PATCH 0/4] ARM: hw_breakpoint: fixes and improvements
-In-Reply-To: <20101127123939.GA5998@n2100.arm.linux.org.uk>
-References: <1290704899-13051-1-git-send-email-will.deacon@arm.com>
-	<20101127123939.GA5998@n2100.arm.linux.org.uk>
-Message-ID: <1290892331.30176.4.camel@jazzbox>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sat, 27 Nov 2010 22:14:03 +0000
+Subject: [PATCH] arm: Export dma_set_coherent_mask() implementations
+Message-ID: <1290896043.3292.52.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Commit 710224fa2750cf449c02dd115548acebfdd2c86a 'arm: fix "arm: fix
+pci_set_consistent_dma_mask for dmabounce devices"' made
+dma_set_coherent_mask() an extern function for some ARM platforms.
+Since this function is called from many drivers, it must be exported.
 
-On Sat, 2010-11-27 at 12:39 +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 25, 2010 at 05:08:15PM +0000, Will Deacon wrote:
-> > All feedback welcome!
-> 
-> While in the subject of fixes, sparse seems to have a problem with
-> hw_breakpoint's usage of percpu stuff:
-> 
-[...]
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+Cc: stable at kernel.org [2.6.36]
+---
+This is not even compile-tested yet, as I don't have a readily available
+ARM build system.  Should be obvious though, right?
 
-This appears to be because I access something declared as perf_event *[]
-using something of type perf_event **. I plan on re-rolling these fixes
-anyway as I found a problem with CONFIG_PREEMPT, so I'll add the
-necessary casts to silence sparse to the series.
+Ben.
 
-> perf_event.c seems to also have problems too:
-> 
-I don't think you've pulled my perf-split branch yet, so if you hold
-fire on that I'll add some fixes to get rid of these warnings [I think I
-noticed one of the issues before] and send another pull request in the
-week.
+ arch/arm/common/it8152.c          |    1 +
+ arch/arm/mach-ixp4xx/common-pci.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-Thanks!
-
-Will
+diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
+index 60dc077..665708c 100644
+--- a/arch/arm/common/it8152.c
++++ b/arch/arm/common/it8152.c
+@@ -278,6 +278,7 @@ int dma_set_coherent_mask(struct device *dev, u64 mask)
+ 
+ 	return -EIO;
+ }
++EXPORT_SYMBOL(dma_set_coherent_mask);
+ 
+ int __init it8152_pci_setup(int nr, struct pci_sys_data *sys)
+ {
+diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+index 24498a9..c3d3d86 100644
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -510,6 +510,7 @@ int dma_set_coherent_mask(struct device *dev, u64 mask)
+ 
+ 	return -EIO;
+ }
++EXPORT_SYMBOL(dma_set_coherent_mask);
+ 
+ EXPORT_SYMBOL(ixp4xx_pci_read);
+ EXPORT_SYMBOL(ixp4xx_pci_write);
+-- 
+1.7.2.3
