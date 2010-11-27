@@ -1,48 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Nov 2010 12:39:39 +0000
-Subject: [PATCH 0/4] ARM: hw_breakpoint: fixes and improvements
-In-Reply-To: <1290704899-13051-1-git-send-email-will.deacon@arm.com>
-References: <1290704899-13051-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20101127123939.GA5998@n2100.arm.linux.org.uk>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Sat, 27 Nov 2010 14:01:20 +0100
+Subject: [PATCH] ARM: Gemini: Add support for PCI Bus
+In-Reply-To: <alpine.LNX.2.00.1011271306420.7659@localhost.localdomain>
+References: <1290263224-16965-1-git-send-email-ulli.kroll@googlemail.com>
+	<AANLkTikkVqWgpYEg505DwQ+pSegQv1g-Q8cDEpE-JCrV@mail.gmail.com>
+	<alpine.LNX.2.00.1011271306420.7659@localhost.localdomain>
+Message-ID: <AANLkTinbAVFE+HZrx+9KUwx8=MKFHPqrhpOpAWAEQFv-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 25, 2010 at 05:08:15PM +0000, Will Deacon wrote:
-> All feedback welcome!
+W dniu 27 listopada 2010 13:16 u?ytkownik Hans Ulli Kroll
+<ulli.kroll@googlemail.com> napisa?:
+> On Fri, 26 Nov 2010, Micha? Miros?aw wrote:
+>> 2010/11/20 Hans Ulli Kroll <ulli.kroll@googlemail.com>:
+>> > Add support for PCI Bus on Gemini Devices SL3516
+>> >
+>> > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+>> > ---
+>> [...]
+>> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> > index a19a526..5d4b398 100644
+>> > --- a/arch/arm/Kconfig
+>> > +++ b/arch/arm/Kconfig
+>> > @@ -307,6 +307,7 @@ config ARCH_GEMINI
+>> > ? ? ? ?select CPU_FA526
+>> > ? ? ? ?select ARCH_REQUIRE_GPIOLIB
+>> > ? ? ? ?select ARCH_USES_GETTIMEOFFSET
+>> > + ? ? ? select PCI
+>> > ? ? ? ?help
+>> > ? ? ? ? ?Support for the Cortina Systems Gemini family SoCs
+>> >
+>> [...]
+>> I think it's better to add ARCH_GEMINI to CONFIG_PCI dependencies.
+>> AFAIK IB-4220B NAS does not use PCI and doesn't need all that code.
+>> Board support entries could select PCI if the board is useless without
+>> it.
+> I know this, I have some.
+>
+> There are many boards with PCI i.e WBD 222.
+> Other ARM devices uses the same select inside ARCH_*
+> I don't want to pollute drivers/pci/Kconfig.
 
-While in the subject of fixes, sparse seems to have a problem with
-hw_breakpoint's usage of percpu stuff:
+I meant 'config PCI' entry in arch/arm/Kconfig, see following diff.
 
-  CHECK   arch/arm/kernel/hw_breakpoint.c
-arch/arm/kernel/hw_breakpoint.c:326:23: warning: incorrect type in assignment (different modifiers)
-arch/arm/kernel/hw_breakpoint.c:326:23:    expected struct perf_event **slots
-arch/arm/kernel/hw_breakpoint.c:326:23:    got struct perf_event *[noderef] *<noident>
-arch/arm/kernel/hw_breakpoint.c:339:23: warning: incorrect type in assignment (different modifiers)
-arch/arm/kernel/hw_breakpoint.c:339:23:    expected struct perf_event **slots
-arch/arm/kernel/hw_breakpoint.c:339:23:    got struct perf_event *[noderef] *<noident>
-arch/arm/kernel/hw_breakpoint.c:377:23: warning: incorrect type in assignment (different modifiers)
-arch/arm/kernel/hw_breakpoint.c:377:23:    expected struct perf_event **slots
-arch/arm/kernel/hw_breakpoint.c:377:23:    got struct perf_event *[noderef] *<noident>
-arch/arm/kernel/hw_breakpoint.c:388:23: warning: incorrect type in assignment (different modifiers)
-arch/arm/kernel/hw_breakpoint.c:388:23:    expected struct perf_event **slots t perf_event *[noderef] *<noident>
-arch/arm/kernel/hw_breakpoint.c:635:42: warning: incorrect type in initializer (different modifiers)
-arch/arm/kernel/hw_breakpoint.c:635:42:    expected struct perf_event **slots
-arch/arm/kernel/hw_breakpoint.c:635:42:    got struct perf_event *[noderef] *<noident>
-arch/arm/kernel/hw_breakpoint.c:687:42: warning: incorrect type in initializer (different modifiers)
-arch/arm/kernel/hw_breakpoint.c:687:42:    expected struct perf_event **slots
-arch/arm/kernel/hw_breakpoint.c:687:42:    got struct perf_event *[noderef] *<noident>
+Best Regards,
+Micha? Miros?aw
 
-perf_event.c seems to also have problems too:
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index db524e7..74ea522 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1164,7 +1164,7 @@ config ISA_DMA_API
+ 	bool
 
-  CHECK   arch/arm/kernel/perf_event.c
-arch/arm/kernel/perf_event.c:37:1: warning: symbol 'pmu_lock' was not declared. Should it be static?
-arch/arm/kernel/perf_event.c:70:1: warning: symbol 'cpu_hw_events' was not declared. Should it be static?
-arch/arm/kernel/perf_event.c:1006:1: warning: symbol 'armv6pmu_enable_event' was not declared. Should it be static?
-arch/arm/kernel/perf_event.c:1113:1: warning: symbol 'armv6pmu_stop' was not declared. Should it be static?
-arch/arm/kernel/perf_event.c:1956:6: warning: symbol 'armv7pmu_enable_event' was not declared. Should it be static?
-arch/arm/kernel/perf_event.c:3072:14: warning: incorrect type in argument 1 (different address spaces)
-arch/arm/kernel/perf_event.c:3072:14:    expected void const volatile [noderef] <asn:1>*<noident>
-arch/arm/kernel/perf_event.c:3072:14:    got struct frame_tail *tail
-arch/arm/kernel/perf_event.c:3074:49: warning: incorrect type in argument 2 (different address spaces)
-arch/arm/kernel/perf_event.c:3074:49:    expected void const [noderef] <asn:1>*from
-arch/arm/kernel/perf_event.c:3074:49:    got struct frame_tail *tail
+ config PCI
+-	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
+ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
++	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
+ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX ||
+ARCH_GEMINI
+ 	help
+ 	  Find out whether you have a PCI motherboard. PCI is the name of a
+ 	  bus system, i.e. the way the CPU talks to the other stuff inside
