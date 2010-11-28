@@ -1,33 +1,35 @@
 From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Sun, 28 Nov 2010 20:30:27 +0200
-Subject: [PATCH 09/10] ARM S3C2412: Fix typo in CONFIG_CPU_S3C2412_ONLY
-	definition
-In-Reply-To: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
-References: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
-Message-ID: <1290969027-10178-9-git-send-email-jekhor@gmail.com>
+Date: Sun, 28 Nov 2010 20:30:19 +0200
+Subject: [PATCH 01/10] SMDK2416: Select MACH_SMDK, S3C_DEV_NAND,
+	S3C_DEV_USB_HOST
+Message-ID: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dependency on (CPU_S3C2416 is not selected) was defined as "!CPU_2416",
-instead of "!CPU_S3C2416". Fix it.
+Enable compilation of platform devices and initialization code used in
+SMDK2416 board file.
 
 Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
 ---
- arch/arm/mach-s3c2412/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-s3c2416/Kconfig |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2412/Kconfig b/arch/arm/mach-s3c2412/Kconfig
-index cef6a65..fa2e5bf 100644
---- a/arch/arm/mach-s3c2412/Kconfig
-+++ b/arch/arm/mach-s3c2412/Kconfig
-@@ -16,7 +16,7 @@ config CPU_S3C2412
- config CPU_S3C2412_ONLY
- 	bool
- 	depends on ARCH_S3C2410 && !CPU_S3C2400 && !CPU_S3C2410 && \
--		   !CPU_2416 && !CPU_S3C2440 && !CPU_S3C2442 && \
-+		   !CPU_S3C2416 && !CPU_S3C2440 && !CPU_S3C2442 && \
- 		   !CPU_S3C2443 && CPU_S3C2412
- 	default y if CPU_S3C2412
- 
+diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
+index 87b9c9f..27b3e7c 100644
+--- a/arch/arm/mach-s3c2416/Kconfig
++++ b/arch/arm/mach-s3c2416/Kconfig
+@@ -35,9 +35,12 @@ menu "S3C2416 Machines"
+ config MACH_SMDK2416
+ 	bool "SMDK2416"
+ 	select CPU_S3C2416
++	select MACH_SMDK
+ 	select S3C_DEV_FB
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC1
++	select S3C_DEV_NAND
++	select S3C_DEV_USB_HOST
+ 	select S3C2416_PM if PM
+ 	help
+ 	  Say Y here if you are using an SMDK2416
 -- 
 1.7.2.3
