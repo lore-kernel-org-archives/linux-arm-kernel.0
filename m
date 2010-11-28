@@ -1,107 +1,61 @@
 From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Sun, 28 Nov 2010 20:31:55 +0200
-Subject: [PATCH 10/10] RTC S3C: Fix type of s3c_rtc_setaie()
-Message-ID: <1290969115-10291-1-git-send-email-jekhor@gmail.com>
+Date: Sun, 28 Nov 2010 20:30:22 +0200
+Subject: [PATCH 04/10] ARM: S3C2416: Add support of SD/MMC card detect on
+	SMDK2416
+In-Reply-To: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
+References: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
+Message-ID: <1290969027-10178-4-git-send-email-jekhor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change s3c_rtc_setaie() declaration in accordance with rtc_class_ops
-structure declaration.
+Enable card detect by GPIO pin on hsmmc1 device (SD0 on SMDK2416
+board) and enable card polling on hsmmc0 (SD1).
 
 Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
 ---
- arch/arm/mach-s3c2412/Kconfig  |    7 +++++++
- arch/arm/mach-s3c2412/Makefile |    3 ++-
- arch/arm/mach-s3c2416/Kconfig  |    1 +
- drivers/rtc/rtc-s3c.c          |    8 +++++---
- 4 files changed, 15 insertions(+), 4 deletions(-)
+ arch/arm/mach-s3c2416/mach-smdk2416.c |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2412/Kconfig b/arch/arm/mach-s3c2412/Kconfig
-index fa2e5bf..6983cb4 100644
---- a/arch/arm/mach-s3c2412/Kconfig
-+++ b/arch/arm/mach-s3c2412/Kconfig
-@@ -28,9 +28,16 @@ config S3C2412_DMA
+diff --git a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-smdk2416.c
+index 7fc3664..ad2497c 100644
+--- a/arch/arm/mach-s3c2416/mach-smdk2416.c
++++ b/arch/arm/mach-s3c2416/mach-smdk2416.c
+@@ -46,6 +46,7 @@
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <plat/nand.h>
++#include <plat/sdhci.h>
  
- config S3C2412_PM
- 	bool
-+	select S3C2412_PM_SLEEP
- 	help
- 	  Internal config node to apply S3C2412 power management
+ #include <plat/regs-fb-v4.h>
+ #include <plat/fb.h>
+@@ -159,6 +160,18 @@ static struct s3c_fb_platdata smdk2416_fb_platdata = {
+ 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+ };
  
-+config S3C2412_PM_SLEEP
-+	bool
-+	help
-+	  Internal config node to apply sleep for S3C2412 power management.
-+	  Can be selected by another SoCs with similar sleep procedure.
++static struct s3c_sdhci_platdata smdk2416_hsmmc0_pdata __initdata = {
++	.max_width		= 4,
++	.cd_type		= S3C_SDHCI_CD_GPIO,
++	.ext_cd_gpio		= S3C2410_GPF(1),
++	.ext_cd_gpio_invert	= 1,
++};
 +
- # Note, the S3C2412 IOtiming support is in plat-s3c24xx
- 
- config S3C2412_CPUFREQ
-diff --git a/arch/arm/mach-s3c2412/Makefile b/arch/arm/mach-s3c2412/Makefile
-index 530ec46..6c48a91 100644
---- a/arch/arm/mach-s3c2412/Makefile
-+++ b/arch/arm/mach-s3c2412/Makefile
-@@ -14,7 +14,8 @@ obj-$(CONFIG_CPU_S3C2412)	+= irq.o
- obj-$(CONFIG_CPU_S3C2412)	+= clock.o
- obj-$(CONFIG_CPU_S3C2412)	+= gpio.o
- obj-$(CONFIG_S3C2412_DMA)	+= dma.o
--obj-$(CONFIG_S3C2412_PM)	+= pm.o sleep.o
-+obj-$(CONFIG_S3C2412_PM)	+= pm.o
-+obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep.o
- obj-$(CONFIG_S3C2412_CPUFREQ)	+= cpu-freq.o
- 
- # Machine support
-diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
-index 2eaadcf..69b48a7 100644
---- a/arch/arm/mach-s3c2416/Kconfig
-+++ b/arch/arm/mach-s3c2416/Kconfig
-@@ -27,6 +27,7 @@ config S3C2416_DMA
- 
- config S3C2416_PM
- 	bool
-+	select S3C2412_PM_SLEEP
- 	help
- 	  Internal config node to apply S3C2416 power management
- 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index cf953ec..4101522 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -77,7 +77,7 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
- }
- 
- /* Update control registers */
--static void s3c_rtc_setaie(int to)
-+static int s3c_rtc_setaie(struct device *dev, unsigned int to)
- {
- 	unsigned int tmp;
- 
-@@ -89,6 +89,8 @@ static void s3c_rtc_setaie(int to)
- 		tmp |= S3C2410_RTCALM_ALMEN;
- 
- 	writeb(tmp, s3c_rtc_base + S3C2410_RTCALM);
++static struct s3c_sdhci_platdata smdk2416_hsmmc1_pdata __initdata = {
++	.max_width		= 4,
++	.cd_type		= S3C_SDHCI_CD_NONE,
++};
 +
-+	return 0;
- }
+ static struct platform_device *smdk2416_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_wdt,
+@@ -180,6 +193,9 @@ static void __init smdk2416_machine_init(void)
+ 	s3c_i2c0_set_platdata(NULL);
+ 	s3c_fb_set_platdata(&smdk2416_fb_platdata);
  
- static int s3c_rtc_setpie(struct device *dev, int enabled)
-@@ -308,7 +310,7 @@ static int s3c_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
++	s3c_sdhci0_set_platdata(&smdk2416_hsmmc0_pdata);
++	s3c_sdhci1_set_platdata(&smdk2416_hsmmc1_pdata);
++
+ 	gpio_request(S3C2410_GPB(4), "USBHost Power");
+ 	gpio_direction_output(S3C2410_GPB(4), 1);
  
- 	writeb(alrm_en, base + S3C2410_RTCALM);
- 
--	s3c_rtc_setaie(alrm->enabled);
-+	s3c_rtc_setaie(dev, alrm->enabled);
- 
- 	return 0;
- }
-@@ -440,7 +442,7 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
- 	rtc_device_unregister(rtc);
- 
- 	s3c_rtc_setpie(&dev->dev, 0);
--	s3c_rtc_setaie(0);
-+	s3c_rtc_setaie(&dev->dev, 0);
- 
- 	clk_disable(rtc_clk);
- 	clk_put(rtc_clk);
 -- 
 1.7.2.3
