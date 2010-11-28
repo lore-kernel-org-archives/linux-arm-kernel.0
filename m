@@ -1,43 +1,70 @@
-From: blaterblater@hotmail.com (Frank)
-Date: Sun, 28 Nov 2010 13:43:46 +0100
-Subject: memory allocation errors on Marvell Kirkwood
-In-Reply-To: <20101128120857.GB23772@n2100.arm.linux.org.uk>
-References: <BLU0-SMTP90312A69589CE7FD162BA4CF230@phx.gbl>
-	<20101128120857.GB23772@n2100.arm.linux.org.uk>
-Message-ID: <BLU0-SMTP32593CEE5C8F556A931E3BCF230@phx.gbl>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sun, 28 Nov 2010 15:11:16 +0000
+Subject: [PATCH] econet: Move to staging; remove from defconfig
+In-Reply-To: <20101127.223845.189711153.davem@davemloft.net>
+References: <20101128002135.GA4562@suse.de>
+	<20101127.172644.226781076.davem@davemloft.net>
+	<1290909215.3292.230.camel@localhost>
+	<20101127.223845.189711153.davem@davemloft.net>
+Message-ID: <1290957076.3292.277.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Sunday, November 28, 2010 13:09
-> To: Frank
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: memory allocation errors on Marvell Kirkwood
+On Sat, 2010-11-27 at 22:38 -0800, David Miller wrote:
+> From: Ben Hutchings <ben@decadent.org.uk>
+> Date: Sun, 28 Nov 2010 01:53:35 +0000
 > 
-> On Sun, Nov 28, 2010 at 12:44:56PM +0100, Frank wrote:
-> > [323570.011580] swapper: page allocation failure. order:3,
-> mode:0x4020
+> > On Sat, 2010-11-27 at 17:26 -0800, David Miller wrote:
+> >> From: Greg KH <gregkh@suse.de>
+> >> Date: Sat, 27 Nov 2010 16:21:35 -0800
+> >> 
+> >> > And I need an ack from the networking maintainer to be able to accept
+> >> > this also.
+> >> 
+> >> I'm not applying this, nor do I want anyone else to.
+> >> 
+> >> If people think this protocol is not maintained adequately
+> >> right now, wait until you push it into staging.
+> >> 
+> >> Furthermore, once Phil Blundell was made aware of security
+> >> holes in econet he fixed them within a few days.  Which is
+> >> much better than I can say for some of the other protocols
+> >> and filesystems in the tree.
+> > 
+> > Those bugs were present for years and would have been obvious to anyone
+> > who cared to read the code.  While I very much appreciate Phil's quick
+> > response, I don't think this reactive maintenance is enough.
 > 
-> Order 3.  That's wanting 4K << 3, or 32K.
-> 
-> > [323570.289988] Normal: 1057*4kB 3870*8kB 99*16kB 0*32kB 0*64kB
-> 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB = 36772kB
-> 
-> And from this line, we see that we have no pages larger than 16K
-> available
-> in the system, despite having 36MB of free memory.  IOW, your memory
-> has
-> become extremely fragmented.
-> 
-> We don't guaranttee that this doesn't happen - in fact, we explicitly
-> tell
-> people that memory fragmentation _does_ happen and we do _not_
-> guarantee
-> that allocations > order-0 will succeed.
-> 
-> From the backtrace, I guess you're using a network interface with a MTU
-> larger than about 16K ?
-<cut>
+> These same arguments could for be made for RDS.  Look at all the
+> hellacious awful obvious crap we've discovered in that code recently.
+> A simple read would have caught those too, and I don't see it's
+> maintainer doing such things.
 
-Physical network interface uses a MTU value of 1500. The ppp0 tunnel uses an MTU of 1400. Further note that I cannot reproduce this problem when transferring data with ftp directly over the physical network interface, nor when using cifs/smb over the ppp0 interface.
+Indeed, hence the change I made for the upcoming Debian release was:
+
+  * af_802154,decnet,econet,rds,x25: Disable auto-loading as mitigation
+    against local exploits.  These protocol modules are not widely used
+    and can be explicitly loaded or aliased on systems where they are
+    wanted.
+
+(While decnet may be in better shape than the others, auto-loading is
+unnecessary for us as the userland support package explicitly loads
+it..)
+
+> So, you're very much still not convincing Ben, but feel free to keep
+> trying.
+
+I'm not going to try any more.
+
+Ben.
+
+-- 
+Ben Hutchings
+Once a job is fouled up, anything done to improve it makes it worse.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101128/ecd46179/attachment.sig>
