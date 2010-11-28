@@ -1,204 +1,155 @@
 From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Sun, 28 Nov 2010 20:30:20 +0200
-Subject: [PATCH 02/10] ARM S3C2416: Add address map and clock definitions for
-	HSMMC0
+Date: Sun, 28 Nov 2010 20:30:25 +0200
+Subject: [PATCH 07/10] ARM S3C2443: Implement GPIO pull-up/down configuration
+	methods
 In-Reply-To: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
 References: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
-Message-ID: <1290969027-10178-2-git-send-email-jekhor@gmail.com>
+Message-ID: <1290969027-10178-7-git-send-email-jekhor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define maps for HSMMC devices.
+From: Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
 
-S3C2443 has one HSMMC device with base address 0x4A800000.
-S3C2416 has HSMMC0 at 0x4AC00000 and HSMMC1 at 0x4A800000.
+S3C2443 has two-bits pull-up/pull-down configuration fields in GPIO
+registers, but values are differ from other SoCs with two-bits
+configuration. gpio-cfg-helpers.h already has prototypes for
+s3c2443-style pull-up/down methods, so implement them.
 
-So suppose that S3C2443 has only HSMMC1.
-
-Define clock for hsmmc0 device and register it.
-
-Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+Signed-off-by: Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
 ---
- arch/arm/mach-s3c2410/include/mach/irqs.h          |    4 ++--
- arch/arm/mach-s3c2410/include/mach/map.h           |    4 ++--
- .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
- arch/arm/mach-s3c2416/clock.c                      |   18 +++++++++++++-----
- arch/arm/mach-s3c2443/Kconfig                      |    2 +-
- arch/arm/mach-s3c2443/clock.c                      |    4 ++--
- arch/arm/mach-s3c2443/mach-smdk2443.c              |    2 +-
- arch/arm/plat-s3c24xx/s3c2443-clock.c              |    2 +-
- 8 files changed, 23 insertions(+), 14 deletions(-)
+ arch/arm/mach-s3c2443/Kconfig                      |    1 +
+ arch/arm/mach-s3c2443/s3c2443.c                    |    7 +++
+ arch/arm/plat-samsung/Kconfig                      |    6 +++
+ arch/arm/plat-samsung/gpio-config.c                |   42 ++++++++++++++++++++
+ .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    2 +-
+ 5 files changed, 57 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/irqs.h b/arch/arm/mach-s3c2410/include/mach/irqs.h
-index 11bb0f0..e5a68ea 100644
---- a/arch/arm/mach-s3c2410/include/mach/irqs.h
-+++ b/arch/arm/mach-s3c2410/include/mach/irqs.h
-@@ -152,8 +152,8 @@
- 
- #define IRQ_S3C2416_HSMMC0	S3C2410_IRQ(21)		/* S3C2416/S3C2450 */
- 
--#define IRQ_HSMMC0		IRQ_S3C2443_HSMMC
--#define IRQ_HSMMC1		IRQ_S3C2416_HSMMC0
-+#define IRQ_HSMMC0		IRQ_S3C2416_HSMMC0
-+#define IRQ_HSMMC1		IRQ_S3C2443_HSMMC
- 
- #define IRQ_S3C2443_LCD1	S3C2410_IRQSUB(14)
- #define IRQ_S3C2443_LCD2	S3C2410_IRQSUB(15)
-diff --git a/arch/arm/mach-s3c2410/include/mach/map.h b/arch/arm/mach-s3c2410/include/mach/map.h
-index cd3983a..25bbf5a 100644
---- a/arch/arm/mach-s3c2410/include/mach/map.h
-+++ b/arch/arm/mach-s3c2410/include/mach/map.h
-@@ -112,8 +112,8 @@
- #define S3C_PA_IIC          S3C2410_PA_IIC
- #define S3C_PA_UART	    S3C24XX_PA_UART
- #define S3C_PA_USBHOST	S3C2410_PA_USBHOST
--#define S3C_PA_HSMMC0	    S3C2443_PA_HSMMC
--#define S3C_PA_HSMMC1	    S3C2416_PA_HSMMC0
-+#define S3C_PA_HSMMC0	    S3C2416_PA_HSMMC0
-+#define S3C_PA_HSMMC1	    S3C2443_PA_HSMMC
- #define S3C_PA_WDT	    S3C2410_PA_WATCHDOG
- #define S3C_PA_NAND	    S3C24XX_PA_NAND
- 
-diff --git a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-index 101aeea..44494a5 100644
---- a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-+++ b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-@@ -86,6 +86,7 @@
- #define S3C2443_HCLKCON_LCDC		(1<<9)
- #define S3C2443_HCLKCON_USBH		(1<<11)
- #define S3C2443_HCLKCON_USBD		(1<<12)
-+#define S3C2416_HCLKCON_HSMMC0		(1<<15)
- #define S3C2443_HCLKCON_HSMMC		(1<<16)
- #define S3C2443_HCLKCON_CFC		(1<<17)
- #define S3C2443_HCLKCON_SSMC		(1<<18)
-diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
-index 7ccf5a2..3b02d85 100644
---- a/arch/arm/mach-s3c2416/clock.c
-+++ b/arch/arm/mach-s3c2416/clock.c
-@@ -38,12 +38,11 @@ static unsigned int armdiv[8] = {
- 	[7] = 8,
- };
- 
--/* ID to hardware numbering, 0 is HSMMC1, 1 is HSMMC0 */
- static struct clksrc_clk hsmmc_div[] = {
- 	[0] = {
- 		.clk = {
- 			.name	= "hsmmc-div",
--			.id	= 1,
-+			.id	= 0,
- 			.parent	= &clk_esysclk.clk,
- 		},
- 		.reg_div = { .reg = S3C2416_CLKDIV2, .size = 2, .shift = 6 },
-@@ -51,7 +50,7 @@ static struct clksrc_clk hsmmc_div[] = {
- 	[1] = {
- 		.clk = {
- 			.name	= "hsmmc-div",
--			.id	= 0,
-+			.id	= 1,
- 			.parent	= &clk_esysclk.clk,
- 		},
- 		.reg_div = { .reg = S3C2443_CLKDIV1, .size = 2, .shift = 6 },
-@@ -61,7 +60,7 @@ static struct clksrc_clk hsmmc_div[] = {
- static struct clksrc_clk hsmmc_mux[] = {
- 	[0] = {
- 		.clk	= {
--			.id	= 1,
-+			.id	= 0,
- 			.name	= "hsmmc-if",
- 			.ctrlbit = (1 << 6),
- 			.enable = s3c2443_clkcon_enable_s,
-@@ -77,7 +76,7 @@ static struct clksrc_clk hsmmc_mux[] = {
- 	},
- 	[1] = {
- 		.clk	= {
--			.id	= 0,
-+			.id	= 1,
- 			.name	= "hsmmc-if",
- 			.ctrlbit = (1 << 12),
- 			.enable = s3c2443_clkcon_enable_s,
-@@ -93,6 +92,13 @@ static struct clksrc_clk hsmmc_mux[] = {
- 	},
- };
- 
-+static struct clk hsmmc0_clk = {
-+	.name		= "hsmmc",
-+	.id		= 0,
-+	.parent		= &clk_h,
-+	.enable		= s3c2443_clkcon_enable_h,
-+	.ctrlbit	= S3C2416_HCLKCON_HSMMC0,
-+};
- 
- static inline unsigned int s3c2416_fclk_div(unsigned long clkcon0)
- {
-@@ -130,6 +136,8 @@ void __init s3c2416_init_clocks(int xtal)
- 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
- 		s3c_register_clksrc(clksrcs[ptr], 1);
- 
-+	s3c24xx_register_clock(&hsmmc0_clk);
-+
- 	s3c_pwmclk_init();
- 
- }
 diff --git a/arch/arm/mach-s3c2443/Kconfig b/arch/arm/mach-s3c2443/Kconfig
-index 4fef723..0b7f0d6 100644
+index 8814031..d8eb868 100644
 --- a/arch/arm/mach-s3c2443/Kconfig
 +++ b/arch/arm/mach-s3c2443/Kconfig
-@@ -24,7 +24,7 @@ config MACH_SMDK2443
- 	bool "SMDK2443"
- 	select CPU_S3C2443
- 	select MACH_SMDK
--	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
+@@ -10,6 +10,7 @@ config CPU_S3C2443
+ 	select CPU_LLSERIAL_S3C2440
+ 	select SAMSUNG_CLKSRC
+ 	select S3C2443_CLOCK
++	select S3C_GPIO_PULL_S3C2443
  	help
- 	  Say Y here if you are using an SMDK2443
+ 	  Support for the S3C2443 SoC from the S3C24XX line
  
-diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
-index 0c3c0c8..f4ec6d5 100644
---- a/arch/arm/mach-s3c2443/clock.c
-+++ b/arch/arm/mach-s3c2443/clock.c
-@@ -196,7 +196,7 @@ static struct clksrc_clk clk_hsspi = {
- static struct clksrc_clk clk_hsmmc_div = {
- 	.clk	= {
- 		.name		= "hsmmc-div",
--		.id		= -1,
-+		.id		= 1,
- 		.parent		= &clk_esysclk.clk,
- 	},
- 	.reg_div = { .reg = S3C2443_CLKDIV1, .size = 2, .shift = 6 },
-@@ -231,7 +231,7 @@ static int s3c2443_enable_hsmmc(struct clk *clk, int enable)
+diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c2443/s3c2443.c
+index 33d18dd..e6a28ba 100644
+--- a/arch/arm/mach-s3c2443/s3c2443.c
++++ b/arch/arm/mach-s3c2443/s3c2443.c
+@@ -16,6 +16,7 @@
+ #include <linux/list.h>
+ #include <linux/timer.h>
+ #include <linux/init.h>
++#include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/serial_core.h>
+ #include <linux/sysdev.h>
+@@ -32,6 +33,9 @@
+ #include <mach/regs-s3c2443-clock.h>
+ #include <mach/reset.h>
  
- static struct clk clk_hsmmc = {
- 	.name		= "hsmmc-if",
--	.id		= -1,
-+	.id		= 1,
- 	.parent		= &clk_hsmmc_div.clk,
- 	.enable		= s3c2443_enable_hsmmc,
- 	.ops		= &(struct clk_ops) {
-diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
-index 4337f0a..d3b2922 100644
---- a/arch/arm/mach-s3c2443/mach-smdk2443.c
-+++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
-@@ -105,7 +105,7 @@ static struct s3c2410_uartcfg smdk2443_uartcfgs[] __initdata = {
- static struct platform_device *smdk2443_devices[] __initdata = {
- 	&s3c_device_wdt,
- 	&s3c_device_i2c0,
--	&s3c_device_hsmmc0,
-+	&s3c_device_hsmmc1,
- #ifdef CONFIG_SND_SOC_SMDK2443_WM9710
- 	&s3c_device_ac97,
++#include <plat/gpio-core.h>
++#include <plat/gpio-cfg.h>
++#include <plat/gpio-cfg-helpers.h>
+ #include <plat/s3c2443.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+@@ -86,6 +90,9 @@ void __init s3c2443_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ 
+ void __init s3c2443_map_io(void)
+ {
++	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_s3c2443;
++	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_s3c2443;
++
+ 	iotable_init(s3c2443_iodesc, ARRAY_SIZE(s3c2443_iodesc));
+ }
+ 
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index dcd6eff..4ecb155 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -95,6 +95,12 @@ config S3C_GPIO_PULL_UPDOWN
+ 	help
+ 	  Internal configuration to enable the correct GPIO pull helper
+ 
++config S3C_GPIO_PULL_S3C2443
++	bool
++	select S3C_GPIO_PULL_UPDOWN
++	help
++	  Internal configuration to enable the correct GPIO pull helper for S3C2443-style GPIO
++
+ config S3C_GPIO_PULL_DOWN
+ 	bool
+ 	help
+diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
+index b732b77..6eeb20b 100644
+--- a/arch/arm/plat-samsung/gpio-config.c
++++ b/arch/arm/plat-samsung/gpio-config.c
+@@ -278,6 +278,48 @@ s3c_gpio_pull_t s3c_gpio_getpull_updown(struct s3c_gpio_chip *chip,
+ 	pup &= 0x3;
+ 	return (__force s3c_gpio_pull_t)pup;
+ }
++
++#ifdef CONFIG_S3C_GPIO_PULL_S3C2443
++int s3c_gpio_setpull_s3c2443(struct s3c_gpio_chip *chip,
++				unsigned int off, s3c_gpio_pull_t pull)
++{
++	switch (pull) {
++	case S3C_GPIO_PULL_NONE:
++		pull = 0x01;
++		break;
++	case S3C_GPIO_PULL_UP:
++		pull = 0x00;
++		break;
++	case S3C_GPIO_PULL_DOWN:
++		pull = 0x02;
++		break;
++	}
++	return s3c_gpio_setpull_updown(chip, off, pull);
++}
++
++s3c_gpio_pull_t s3c_gpio_getpull_s3c2443(struct s3c_gpio_chip *chip,
++					unsigned int off)
++{
++	s3c_gpio_pull_t pull;
++
++	pull = s3c_gpio_getpull_updown(chip, off);
++
++	switch (pull) {
++	case 0x00:
++		pull = S3C_GPIO_PULL_UP;
++		break;
++	case 0x01:
++	case 0x03:
++		pull = S3C_GPIO_PULL_NONE;
++		break;
++	case 0x02:
++		pull = S3C_GPIO_PULL_DOWN;
++		break;
++	}
++
++	return pull;
++}
++#endif
  #endif
-diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-s3c24xx/s3c2443-clock.c
-index 461f070..82f2d4a 100644
---- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
-+++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
-@@ -271,7 +271,7 @@ static struct clk init_clocks[] = {
- 		.ctrlbit	= S3C2443_HCLKCON_DMA5,
- 	}, {
- 		.name		= "hsmmc",
--		.id		= 0,
-+		.id		= 1,
- 		.parent		= &clk_h,
- 		.enable		= s3c2443_clkcon_enable_h,
- 		.ctrlbit	= S3C2443_HCLKCON_HSMMC,
+ 
+ #ifdef CONFIG_S3C_GPIO_PULL_UP
+diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+index 8fd65d8..b3bd3e8 100644
+--- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
++++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+@@ -233,7 +233,7 @@ extern int s3c_gpio_setpull_s3c2443(struct s3c_gpio_chip *chip,
+  * This helper function reads the state of the pull-{up,down} resistor for the
+  * given GPIO in the same case as s3c_gpio_setpull_upown.
+ */
+-extern s3c_gpio_pull_t s3c_gpio_getpull_s3c24xx(struct s3c_gpio_chip *chip,
++extern s3c_gpio_pull_t s3c_gpio_getpull_s3c2443(struct s3c_gpio_chip *chip,
+ 						unsigned int off);
+ 
+ #endif /* __PLAT_GPIO_CFG_HELPERS_H */
 -- 
 1.7.2.3
