@@ -1,97 +1,27 @@
-From: gregkh@suse.de (Greg KH)
-Date: Sat, 27 Nov 2010 16:21:35 -0800
+From: davem@davemloft.net (David Miller)
+Date: Sat, 27 Nov 2010 17:26:44 -0800 (PST)
 Subject: [PATCH] econet: Move to staging; remove from defconfig
-In-Reply-To: <1290897868.3292.59.camel@localhost>
+In-Reply-To: <20101128002135.GA4562@suse.de>
 References: <1290897868.3292.59.camel@localhost>
-Message-ID: <20101128002135.GA4562@suse.de>
+	<20101128002135.GA4562@suse.de>
+Message-ID: <20101127.172644.226781076.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 27, 2010 at 10:44:28PM +0000, Ben Hutchings wrote:
-> Recent review has revealed several bugs in econet and other obscure
-> protocol implementations that can be exploited by local users for
-> denial of service or privilege escalation.
-> 
-> The econet protocol (PF_ECONET) is unmaintained.  There appear to be
-> no published applications for it, and it has never progressed beyond
-> 'experimental' status.
-> 
-> This protocol generally should not be enabled by distributions, since
-> the cost of a security flaw affecting all installed systems presumably
-> outweighs the benefit to the few (if any) legitimate users.
-> 
-> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> ---
-> As requested, I'm actually renaming the directory this time.  I also
-> noticed that ECONET was enabled in a couple of ARM defconfigs and
-> explicitly disabled in various other defconfigs, so I've removed those
-> lines as well.
-> 
-> This is based on linux-next; I hope it applies to staging.
-> 
-> Ben.
-> 
->  arch/arm/configs/ixp4xx_defconfig           |    3 ---
->  arch/arm/configs/pnx4008_defconfig          |    3 ---
->  arch/mips/configs/gpr_defconfig             |    3 ---
->  arch/mips/configs/mtx1_defconfig            |    3 ---
->  arch/um/defconfig                           |    1 -
->  arch/xtensa/configs/common_defconfig        |    1 -
->  arch/xtensa/configs/iss_defconfig           |    1 -
->  arch/xtensa/configs/s6105_defconfig         |    1 -
+From: Greg KH <gregkh@suse.de>
+Date: Sat, 27 Nov 2010 16:21:35 -0800
 
-No need to change the defconfigs, they will get updated on their own if
-they need to be.
+> And I need an ack from the networking maintainer to be able to accept
+> this also.
 
->  drivers/staging/Kconfig                     |    2 ++
->  drivers/staging/Makefile                    |    1 +
->  {net => drivers/staging}/econet/Kconfig     |    0
->  {net => drivers/staging}/econet/Makefile    |    0
->  {net => drivers/staging}/econet/af_econet.c |    0
->  net/Kconfig                                 |    1 -
->  net/Makefile                                |    1 -
->  15 files changed, 3 insertions(+), 18 deletions(-)
->  rename {net => drivers/staging}/econet/Kconfig (100%)
->  rename {net => drivers/staging}/econet/Makefile (100%)
->  rename {net => drivers/staging}/econet/af_econet.c (100%)
-> 
-> diff --git a/arch/arm/configs/ixp4xx_defconfig b/arch/arm/configs/ixp4xx_defconfig
-> index 5c50239..bd85c32 100644
-> --- a/arch/arm/configs/ixp4xx_defconfig
-> +++ b/arch/arm/configs/ixp4xx_defconfig
-> @@ -88,9 +88,6 @@ CONFIG_IPDDP_ENCAP=y
->  CONFIG_IPDDP_DECAP=y
->  CONFIG_X25=m
->  CONFIG_LAPB=m
-> -CONFIG_ECONET=m
-> -CONFIG_ECONET_AUNUDP=y
-> -CONFIG_ECONET_NATIVE=y
+I'm not applying this, nor do I want anyone else to.
 
-Doesn't this imply that someone is actually using this?
+If people think this protocol is not maintained adequately
+right now, wait until you push it into staging.
 
->  CONFIG_WAN_ROUTER=m
->  CONFIG_NET_SCHED=y
->  CONFIG_NET_SCH_CBQ=m
-> diff --git a/arch/arm/configs/pnx4008_defconfig b/arch/arm/configs/pnx4008_defconfig
-> index bd481f0..8301e4a 100644
-> --- a/arch/arm/configs/pnx4008_defconfig
-> +++ b/arch/arm/configs/pnx4008_defconfig
-> @@ -101,9 +101,6 @@ CONFIG_IPDDP_ENCAP=y
->  CONFIG_IPDDP_DECAP=y
->  CONFIG_X25=m
->  CONFIG_LAPB=m
-> -CONFIG_ECONET=m
-> -CONFIG_ECONET_AUNUDP=y
-> -CONFIG_ECONET_NATIVE=y
+Furthermore, once Phil Blundell was made aware of security
+holes in econet he fixed them within a few days.  Which is
+much better than I can say for some of the other protocols
+and filesystems in the tree.
 
-Same here and for the others.
-
-I also need a TODO file for the staging directory location (see the
-others for drivers that are going away as an example.)
-
-And I need an ack from the networking maintainer to be able to accept
-this also.
-
-thanks,
-
-greg k-h
+Moving this into staging, is therefore not appropriate.
