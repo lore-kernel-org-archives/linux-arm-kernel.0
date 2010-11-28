@@ -1,42 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 27 Nov 2010 22:38:45 -0800 (PST)
-Subject: [PATCH] econet: Move to staging; remove from defconfig
-In-Reply-To: <1290909215.3292.230.camel@localhost>
-References: <20101128002135.GA4562@suse.de>
-	<20101127.172644.226781076.davem@davemloft.net>
-	<1290909215.3292.230.camel@localhost>
-Message-ID: <20101127.223845.189711153.davem@davemloft.net>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sun, 28 Nov 2010 11:20:08 +0100
+Subject: [PATCH 2/4] mtd: FSMC NAND replace all use of uintNN_t with uN
+In-Reply-To: <1290788695.2552.35.camel@localhost>
+References: <1290201121-15263-1-git-send-email-linus.walleij@stericsson.com>
+	<1290788695.2552.35.camel@localhost>
+Message-ID: <AANLkTi=ks+ekjgJnb2pv0LaDzPZike+M+QLeOZKkb3iW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Hutchings <ben@decadent.org.uk>
-Date: Sun, 28 Nov 2010 01:53:35 +0000
+2010/11/26 Artem Bityutskiy <dedekind1@gmail.com>:
 
-> On Sat, 2010-11-27 at 17:26 -0800, David Miller wrote:
->> From: Greg KH <gregkh@suse.de>
->> Date: Sat, 27 Nov 2010 16:21:35 -0800
->> 
->> > And I need an ack from the networking maintainer to be able to accept
->> > this also.
->> 
->> I'm not applying this, nor do I want anyone else to.
->> 
->> If people think this protocol is not maintained adequately
->> right now, wait until you push it into staging.
->> 
->> Furthermore, once Phil Blundell was made aware of security
->> holes in econet he fixed them within a few days.  Which is
->> much better than I can say for some of the other protocols
->> and filesystems in the tree.
-> 
-> Those bugs were present for years and would have been obvious to anyone
-> who cared to read the code.  While I very much appreciate Phil's quick
-> response, I don't think this reactive maintenance is enough.
+> On Fri, 2010-11-19 at 22:12 +0100, Linus Walleij wrote:
+>> The short kernel versions of the basic types makes the world more
+>> readable.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+>
+> I do not think dwmw2 will merge this one because he often claimed that
+> u32 cannot be better than uint32_t, because the latter is C99 standard,
+> but the former is not. So I'd not do this, at least not at the area he
+> looks after.
 
-These same arguments could for be made for RDS.  Look at all the
-hellacious awful obvious crap we've discovered in that code recently.
-A simple read would have caught those too, and I don't see it's
-maintainer doing such things.
+Oh man. Whatever, David shall I respin the patch series without
+this one? The latter patches will surely clash so an early indication
+is appreciated.
 
-So, you're very much still not convincing Ben, but feel free to keep
-trying.
+Yours,
+Linus Walleij
