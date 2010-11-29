@@ -1,69 +1,67 @@
-From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Mon, 29 Nov 2010 15:09:40 +0200
-Subject: [PATCH] ARM S3C24XX: Fix compilation of PM code for S3C2416
-Message-ID: <1291036180-8274-1-git-send-email-jekhor@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 29 Nov 2010 14:20:34 +0100
+Subject: [PATCH 3/3] mtd: FSMC NAND fix obvious speling errors
+In-Reply-To: <1291035147-17840-1-git-send-email-linus.walleij@stericsson.com>
+References: <1291035147-17840-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101129132033.GE20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S3C2416 PM code uses low-level sleep routines from S3C2412 code,
-but these routines are compiled only for S3C2412 SoC.
+Hi Linus,
 
-Split S3C2412_PM to two parts: S3C2412_PM, S3C2412_PM_SLEEP and
-select last in S3C2416's Kconfig.
+$SUBJECT ~= s/speling/spelling/ :-)
 
-Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
----
- arch/arm/mach-s3c2412/Kconfig  |    7 +++++++
- arch/arm/mach-s3c2412/Makefile |    3 ++-
- arch/arm/mach-s3c2416/Kconfig  |    1 +
- 3 files changed, 10 insertions(+), 1 deletions(-)
+Uwe
 
-diff --git a/arch/arm/mach-s3c2412/Kconfig b/arch/arm/mach-s3c2412/Kconfig
-index fa2e5bf..6983cb4 100644
---- a/arch/arm/mach-s3c2412/Kconfig
-+++ b/arch/arm/mach-s3c2412/Kconfig
-@@ -28,9 +28,16 @@ config S3C2412_DMA
- 
- config S3C2412_PM
- 	bool
-+	select S3C2412_PM_SLEEP
- 	help
- 	  Internal config node to apply S3C2412 power management
- 
-+config S3C2412_PM_SLEEP
-+	bool
-+	help
-+	  Internal config node to apply sleep for S3C2412 power management.
-+	  Can be selected by another SoCs with similar sleep procedure.
-+
- # Note, the S3C2412 IOtiming support is in plat-s3c24xx
- 
- config S3C2412_CPUFREQ
-diff --git a/arch/arm/mach-s3c2412/Makefile b/arch/arm/mach-s3c2412/Makefile
-index 530ec46..6c48a91 100644
---- a/arch/arm/mach-s3c2412/Makefile
-+++ b/arch/arm/mach-s3c2412/Makefile
-@@ -14,7 +14,8 @@ obj-$(CONFIG_CPU_S3C2412)	+= irq.o
- obj-$(CONFIG_CPU_S3C2412)	+= clock.o
- obj-$(CONFIG_CPU_S3C2412)	+= gpio.o
- obj-$(CONFIG_S3C2412_DMA)	+= dma.o
--obj-$(CONFIG_S3C2412_PM)	+= pm.o sleep.o
-+obj-$(CONFIG_S3C2412_PM)	+= pm.o
-+obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep.o
- obj-$(CONFIG_S3C2412_CPUFREQ)	+= cpu-freq.o
- 
- # Machine support
-diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
-index 2eaadcf..69b48a7 100644
---- a/arch/arm/mach-s3c2416/Kconfig
-+++ b/arch/arm/mach-s3c2416/Kconfig
-@@ -27,6 +27,7 @@ config S3C2416_DMA
- 
- config S3C2416_PM
- 	bool
-+	select S3C2412_PM_SLEEP
- 	help
- 	  Internal config node to apply S3C2416 power management
- 
+On Mon, Nov 29, 2010 at 01:52:27PM +0100, Linus Walleij wrote:
+> Fix spelling in the interface file.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  include/linux/mtd/fsmc.h |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/linux/mtd/fsmc.h b/include/linux/mtd/fsmc.h
+> index f589f29..8a2b75e 100644
+> --- a/include/linux/mtd/fsmc.h
+> +++ b/include/linux/mtd/fsmc.h
+> @@ -27,7 +27,7 @@
+>  
+>  /*
+>   * The placement of the Command Latch Enable (CLE) and
+> - * Address Latch Enable (ALE) is twised around in the
+> + * Address Latch Enable (ALE) is twisted around in the
+>   * SPEAR310 implementation.
+>   */
+>  #if defined(CONFIG_MACH_SPEAR310)
+> @@ -62,7 +62,7 @@ struct fsmc_nor_bank_regs {
+>  
+>  /* ctrl_tim register definitions */
+>  
+> -struct fsms_nand_bank_regs {
+> +struct fsmc_nand_bank_regs {
+>  	uint32_t pc;
+>  	uint32_t sts;
+>  	uint32_t comm;
+> @@ -78,7 +78,7 @@ struct fsms_nand_bank_regs {
+>  struct fsmc_regs {
+>  	struct fsmc_nor_bank_regs nor_bank_regs[FSMC_MAX_NOR_BANKS];
+>  	uint8_t reserved_1[0x40 - 0x20];
+> -	struct fsms_nand_bank_regs bank_regs[FSMC_MAX_NAND_BANKS];
+> +	struct fsmc_nand_bank_regs bank_regs[FSMC_MAX_NAND_BANKS];
+>  	uint8_t reserved_2[0xfe0 - 0xc0];
+>  	uint32_t peripid0;			/* 0xfe0 */
+>  	uint32_t peripid1;			/* 0xfe4 */
+> -- 
+> 1.7.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.2.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
