@@ -1,84 +1,61 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Mon, 29 Nov 2010 18:05:07 +0200
-Subject: [PATCH] ARM: Gemini: Add support for PCI BUS
-In-Reply-To: <201011282056.17389.arnd@arndb.de>
-References: <1290860675-15453-1-git-send-email-ulli.kroll@googlemail.com>
-	<201011282056.17389.arnd@arndb.de>
-Message-ID: <4CF3CF33.20407@gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Mon, 29 Nov 2010 19:25:37 +0300
+Subject: [GIT PULL] ARM: CNS3xxx fixes for 2.6.37
+Message-ID: <20101129162537.GA26916@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2010 09:56 PM, Arnd Bergmann wrote:
-> On Saturday 27 November 2010 13:24:35 Hans Ulli Kroll wrote:
->> +#define PCI_IOSIZE_REG         (IO_ADDRESS(GEMINI_PCI_IO_BASE))
->> +#define PCI_PROT_REG           (IO_ADDRESS(GEMINI_PCI_IO_BASE) + 0x04)
->> +#define PCI_CTRL_REG           (IO_ADDRESS(GEMINI_PCI_IO_BASE) + 0x08)
->> +#define PCI_SOFTRST_REG                (IO_ADDRESS(GEMINI_PCI_IO_BASE) + 0x10)
->> +#define PCI_CONFIG_REG         (IO_ADDRESS(GEMINI_PCI_IO_BASE) + 0x28)
->> +#define PCI_DATA_REG           (IO_ADDRESS(GEMINI_PCI_IO_BASE) + 0x2C)
->
-> If you use the virtual address of the mapping instead of
-> GEMINI_PCI_IO_BASE, you don't need to repeat the IO_ADDRESS()
-> macro everywhere. I have a patch that gets rid of all the
-> conflicting definitions of this macro because it breaks
-> a multi-platform build once we get there.
->
->> +static DEFINE_SPINLOCK(gemini_pci_lock);
->> +
->> +static struct resource gemini_pci_resource_io = {
->> +       .name   = "PCI I/O Space",
->> +       .start  = IO_ADDRESS(GEMINI_PCI_IO_BASE),
->> +       .end    = IO_ADDRESS(GEMINI_PCI_IO_BASE) + SZ_1M - 1,
->> +       .flags  = IORESOURCE_IO,
->> +};
->> +
->
-> This looks wrong in multiple ways:
->
-> * resources are physical addresses, not virtual addresses
-> * GEMINI_PCI_IO_BASE is an address in memory space, so it
->    needs to be IORESOURCE_MEM, not IORESOURCE_IO. You can
->    also register the IORESOURCE_IO resource, but that would
->    be .start=PCIBIOS_MIN_IO, .end=IO_SPACE_LIMIT.
-> * IO_SPACE_LIMIT is larger than the I/O window, which can
->    cause overflows. Setting it to 0xffff is generally enough.
->
->> +       spin_lock_irqsave(&gemini_pci_lock, irq_flags);
->> +
->> +       __raw_writel(PCI_CONF_BUS(bus->number) |
->> +                       PCI_CONF_DEVICE(PCI_SLOT(fn)) |
->> +                       PCI_CONF_FUNCTION(PCI_FUNC(fn)) |
->> +                       PCI_CONF_WHERE(config) |
->> +                       PCI_CONF_ENABLE,
->> +                       PCI_CONFIG_REG);
->> +
->> +       switch (size) {
->> +       case 4:
->> +               __raw_writel(value, PCI_DATA_REG);
->> +               break;
->> +       case 2:
->> +               __raw_writew(value, PCI_DATA_REG + (config&  3));
->> +               break;
->> +       case 1:
->> +               __raw_writeb(value, PCI_DATA_REG + (config&  3));
->> +               break;
->> +       default:
->> +               ret = PCIBIOS_BAD_REGISTER_NUMBER;
->> +       }
->> +
->> +       spin_unlock_irqrestore(&gemini_pci_lock, irq_flags);
->
-> The I/O ordering is probably not what you think it is.
-> There is no ordering guarantee between __raw_writel and
-> spin_lock/spin_unlock, so you really should be using
-> readl/writel.
+Hi Russell,
 
-No he really should NOT use readl/writel. The ONLY difference
-between readl/writel and __raw_readl/__raw_writel is endianess
-conversion. __raw_*l is not doing it. Which to use depend only
-on HW.
+It's actually just a fix, not fixes. I don't seem to have anything
+urgent for 2.6.37 except a small fixup for PCI=y builds.
 
-> Note that the pci_ops are called under another spinlock, so
-> you also don't need to take gemini_pci_lock here.
->
-> 	Arnd
+Thanks!
+
+The following changes since commit 3561d43fd289f590fdae672e5eb831b8d5cf0bf6:
+  Linus Torvalds (1):
+        Linux 2.6.37-rc3
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/cbou/linux-cns3xxx.git for-rmk-fixes
+
+Anton Vorontsov (1):
+      ARM: cns3xxx: Fix build with CONFIG_PCI=y
+
+ arch/arm/mach-cns3xxx/pcie.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+
+commit 44266416f786514ec43a0d15ad951c34566b99c9
+Author: Anton Vorontsov <cbouatmailru@gmail.com>
+Date:   Mon Nov 29 18:46:22 2010 +0300
+
+    ARM: cns3xxx: Fix build with CONFIG_PCI=y
+    
+    commit 6338a6aa7c082f11d55712251e14178c68bf5869 ("ARM: 6269/1: Add 'code'
+    parameter for hook_fault_code()") breaks CNS3xxx build:
+    
+      CC      arch/arm/mach-cns3xxx/pcie.o
+    pcie.c: In function 'cns3xxx_pcie_init':
+    pcie.c:373: warning: passing argument 4 of 'hook_fault_code' makes integer from pointer without a cast
+    pcie.c:373: error: too few arguments to function 'hook_fault_code'
+    
+    This commit fixes the small issue.
+    
+    Cc: stable at kernel.org [36]
+    Signed-off-by: Anton Vorontsov <cbouatmailru@gmail.com>
+
+diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+index 38088c3..78defd7 100644
+--- a/arch/arm/mach-cns3xxx/pcie.c
++++ b/arch/arm/mach-cns3xxx/pcie.c
+@@ -369,7 +369,7 @@ static int __init cns3xxx_pcie_init(void)
+ {
+ 	int i;
+ 
+-	hook_fault_code(16 + 6, cns3xxx_pcie_abort_handler, SIGBUS,
++	hook_fault_code(16 + 6, cns3xxx_pcie_abort_handler, SIGBUS, 0,
+ 			"imprecise external abort");
+ 
+ 	for (i = 0; i < ARRAY_SIZE(cns3xxx_pcie); i++) {
