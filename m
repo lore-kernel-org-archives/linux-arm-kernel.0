@@ -1,43 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 29 Nov 2010 08:58:14 +0100
-Subject: [PATCH] ARM: mx25: fix offset for usb host controller
-In-Reply-To: <AANLkTik53KX4Ni3Vd7MNpXnxp_c6U=CD_tzJ+7ycEsQ5@mail.gmail.com>
-References: <AANLkTik53KX4Ni3Vd7MNpXnxp_c6U=CD_tzJ+7ycEsQ5@mail.gmail.com>
-Message-ID: <1291017494-9685-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 29 Nov 2010 15:59:21 +0800
+Subject: [PATCH 1/3] Add a common struct clk
+In-Reply-To: <AANLkTimuw=FfHn7KtbkNSgwqAkS-6CKA4Rx=-dac-dhg@mail.gmail.com>
+References: <1284522014.516876.675872472687.0.gpush@pororo>
+	<1284522014.517347.33297989274.1.gpush@pororo>
+	<AANLkTimuw=FfHn7KtbkNSgwqAkS-6CKA4Rx=-dac-dhg@mail.gmail.com>
+Message-ID: <201011291559.21928.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 2c20b9f (ARM: mx25: dynamically allocate mxc-ehci devices) I
-changed the offset to the value specified in the reference manual
-intending to test this change on hardware.  This slipped through and now
-prooved to be wrong.  So fix it and add a comment about the
-documentation being wrong.
+Hi Jassi,
 
-Reported-by: Jaume Ribot <jaume@fqingenieria.es>
-Cc: Michael Trimarchi <trimarchi@gandalf.sssup.it>
-Cc: Shawn Guo <shawn.gsc@gmail.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/plat-mxc/include/mach/mx25.h |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+>   Are you planning to revise the patch-set or just taking time to
+> resubmit as such?
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 024bebe..087cd7a 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -49,7 +49,12 @@
- #define MX25_SDMA_BASE_ADDR		0x53fd4000
- #define MX25_USB_BASE_ADDR		0x53ff4000
- #define MX25_USB_OTG_BASE_ADDR			(MX25_USB_BASE_ADDR + 0x0000)
--#define MX25_USB_HS_BASE_ADDR			(MX25_USB_BASE_ADDR + 0x0200)
-+/*
-+ * The reference manual (IMX25RM, Rev. 1, 06/2009) specifies an offset of 0x200
-+ * for the host controller.  Early documentation drafts specified 0x400 and
-+ * Freescale internal sources confirm only the latter value to work.
-+ */
-+#define MX25_USB_HS_BASE_ADDR			(MX25_USB_BASE_ADDR + 0x0400)
- #define MX25_CSI_BASE_ADDR		0x53ff8000
- 
- #define MX25_IO_P2V(x)			IMX_IO_P2V(x)
--- 
-1.7.2.3
+I've reworked this patch to allow clocks that are enabled/disabled in atomic 
+contexts, it's here if you'd like a preview:
+
+http://kernel.ubuntu.com/git?p=jk/dt/linux-2.6.git;a=commitdiff;h=33220e119d3213282d4234fec7438baa6d04b5f0
+
+I'm just waiting on some initial feedback, will post to l-a-k once that's in.
+
+Regards,
+
+
+Jeremy
