@@ -1,50 +1,39 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 29 Nov 2010 14:16:07 -0800
-Subject: [GIT PULL] Kconfig changes for MSM to enable SMP
-In-Reply-To: <20101129221115.GC20761@n2100.arm.linux.org.uk>
-References: <1290531015.4165.19.camel@m0nster>
-	<1291065170.30902.22.camel@c-dwalke-linux.qualcomm.com>
-	<20101129221115.GC20761@n2100.arm.linux.org.uk>
-Message-ID: <1291068967.30902.23.camel@c-dwalke-linux.qualcomm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 Nov 2010 20:27:21 -0200
+Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
+In-Reply-To: <20101129212446.GB6017@pengutronix.de>
+References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
+	<20101124194439.GY4693@pengutronix.de>
+	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
+	<20101124201831.GZ4693@pengutronix.de>
+	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
+	<20101125091346.GS6017@pengutronix.de>
+	<AANLkTi=L_5ib-Kj0fZRci7-bPOpkyojejZ9+jZpmH9aC@mail.gmail.com>
+	<20101129212446.GB6017@pengutronix.de>
+Message-ID: <AANLkTik6CScZ5uL2s_qf9q5w6i13mBk_0CLkLZHCKwSm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-11-29 at 22:11 +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 29, 2010 at 01:12:50PM -0800, Daniel Walker wrote:
-> > On Tue, 2010-11-23 at 08:50 -0800, Daniel Walker wrote:
-> > > Russell,
-> > > 
-> > > I've been trying to get these in for a while now. They're just Kconfig
-> > > changes that allow MSM to use SMP. One of the patch does have a slight
-> > > clean up where it moves the "\" out one space under "config SMP". I
-> > > think that was the product of some feedback I received.
-> > > 
-> > > Please pull, or let me know if you want them done differently.
-> > 
-> > Could you give me some feedback on why your not pulling this? I need
-> > these changes to go in in order to add SMP support, which I have planned
-> > to add this coming merge window.
-> > 
-> > Do you want these going into you patch system? Do you not like the lack
-> > of TWD and SCU support or the way I accomplished the removal of them?
-> > 
-> > Gimme some hints please ..
-> 
-> commit 612275ad3966dd7ba491d5fe94e894a3861c9062
-> Merge: 698fd6a2 176bfc4
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date:   Fri Nov 26 10:26:10 2010 +0000
-> 
->     Merge branch 'for-russell' of git://codeaurora.org/quic/kernel/dwalker/linux-msm into devel-stable
-> 
-> 
-> ?
+Hi Sascha,
 
-Great! Thanks.
+On Mon, Nov 29, 2010 at 7:24 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+....
+>> I also generated the SDMA firmware (sdma-imx51-to1.bin) via your sdma
+>> tool and placed it under /lib/firmware, but the result is the same
+>> with or without a valid firmware: when request_firmware is called the
+>> following crash happens:
+>
+> I tried to reproduce this today. Instead of crashing my kernel simply
+> hangs. This seems to be because request_firmware waits till the firmware
+> appears which never happens. I remember a crash like this though, I
+> think it has something to do with the firmware related kconfig options.
+> I hope to find a time slot later this week to track this down.
 
-Daniel
+Could you please share your .config?
 
--- 
+I would like to compare what may be causing the different behaviours
+we are seeing.
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+
+Fabio Estevam
