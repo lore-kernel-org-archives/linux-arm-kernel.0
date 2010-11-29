@@ -1,38 +1,35 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 29 Nov 2010 16:29:22 +0100
-Subject: [PATCH] arm: plat-omap: counter_32k: use IS_ERR() instead of NULL
-	check
-In-Reply-To: <1290791163-21190-1-git-send-email-segoon@openwall.com> (Vasiliy
-	Kulikov's message of "Fri, 26 Nov 2010 20:06:02 +0300")
-References: <1290791163-21190-1-git-send-email-segoon@openwall.com>
-Message-ID: <87tyj0ywq5.fsf@deeprootsystems.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Mon, 29 Nov 2010 18:32:32 +0300
+Subject: [PATCH v3 1/1] USB: cns3xxx: Add EHCI and OHCI bus glue for
+	cns3xxx SOCs
+In-Reply-To: <AANLkTik7tZen0R51tvjhGamp_e9ue_Xh09S-EGsoWPUT@mail.gmail.com>
+References: <20101125171541.GA18152@suse.de>
+	<Pine.LNX.4.44L0.1011251521310.26094-100000@netrider.rowland.org>
+	<20101126151131.GA26602@oksana.dev.rtsoft.ru>
+	<20101126170348.GA3331@suse.de>
+	<20101126182328.GA20923@oksana.dev.rtsoft.ru>
+	<AANLkTinocHZBS4O7A2vhc-p6qX0wt04EfAi5Q2xgxSJW@mail.gmail.com>
+	<AANLkTik7tZen0R51tvjhGamp_e9ue_Xh09S-EGsoWPUT@mail.gmail.com>
+Message-ID: <20101129153232.GA5161@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasiliy Kulikov <segoon@openwall.com> writes:
+On Mon, Nov 29, 2010 at 11:58:15AM +0800, Lin Mac wrote:
+[...]
+> > +        * Set USB AHB INCR length to 16
+> > +        */
+> > +       if (atomic_inc_return(&usb_pwr_ref) == 0) {
+> There's a typo here, the 0 should be 1 instead.
 
-> clk_get() returns ERR_PTR() on error, not NULL.
->
-> Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+That was it. It works now.
 
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+[...]
+> Should I resend the patch?
 
-> ---
->  Cannot compile this driver, so it is not tested at all.
->
->  arch/arm/plat-omap/counter_32k.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-> index 155fe43..c1e0d00 100644
-> --- a/arch/arm/plat-omap/counter_32k.c
-> +++ b/arch/arm/plat-omap/counter_32k.c
-> @@ -164,7 +164,7 @@ static int __init omap_init_clocksource_32k(void)
->  			return -ENODEV;
->  
->  		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
-> -		if (sync_32k_ick)
-> +		if (!IS_ERR(sync_32k_ick))
->  			clk_enable(sync_32k_ick);
->  
->  		clocksource_32k.mult = clocksource_hz2mult(32768,
+No need to, I've fixed the original commit.
+
+Thanks!
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
