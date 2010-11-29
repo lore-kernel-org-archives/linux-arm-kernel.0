@@ -1,46 +1,51 @@
-From: sunder.svit@gmail.com (Sundar)
-Date: Mon, 29 Nov 2010 19:31:00 +0530
-Subject: [PATCH][ ARM cpu hotplug 2/2 ] Use common cpu hotplug code for
-	UX500
-In-Reply-To: <AANLkTinmnN+Ta3LCpmL6kfjYLyY8eA8GspEmqEaaS8-p@mail.gmail.com>
-References: <AANLkTinOdaYoztaHCkbFhfRtuo4XEVaC+K_7aAB0N28N@mail.gmail.com>
-	<AANLkTinmnN+Ta3LCpmL6kfjYLyY8eA8GspEmqEaaS8-p@mail.gmail.com>
-Message-ID: <AANLkTi=o=vAHY+ixcRgt7kfqsLP=NsiO6JPwF=+ADbJ9@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Nov 2010 14:22:00 +0000
+Subject: [PATCH] ARM: Gemini: Add support for PCI Bus
+In-Reply-To: <201011271639.21694.arnd@arndb.de>
+References: <1290263224-16965-1-git-send-email-ulli.kroll@googlemail.com>
+	<alpine.LNX.2.00.1011271306420.7659@localhost.localdomain>
+	<AANLkTinbAVFE+HZrx+9KUwx8=MKFHPqrhpOpAWAEQFv-@mail.gmail.com>
+	<201011271639.21694.arnd@arndb.de>
+Message-ID: <20101129142200.GA14941@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+On Sat, Nov 27, 2010 at 04:39:21PM +0100, Arnd Bergmann wrote:
+> On Saturday 27 November 2010 14:01:20 Micha? Miros?aw wrote:
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index db524e7..74ea522 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1164,7 +1164,7 @@ config ISA_DMA_API
+> >         bool
+> > 
+> >  config PCI
+> > -       bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
+> > ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
+> > +       bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
+> > ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX ||
+> > ARCH_GEMINI
+> >         help
+> >           Find out whether you have a PCI motherboard. PCI is the name of a
+> >           bus system, i.e. the way the CPU talks to the other stuff inside
+> > 
+> 
+> This approach really does not scale as we add more boards to the list.
+> 
+> Better make a new CONFIG_HAVE_PCI option that you can select from the
+> individual boards, and make that the only dependency that CONFIG_PCI has.
 
-> On Mon, Nov 29, 2010 at 3:19 PM, Vincent Guittot <vincent.guittot@linaro.org> wrote:
->>
->> This patch extracts the common code of the cpu hotplug feature across
->> arm platforms. The goal is to only keep the specific stuff of the
->> platform in the sub-architecture. I have created a hotplug.c file in
->> the ?arm/common directory after studying the cpu hotplug code of
->> omap2, realview, s5pv310, ux500 and tegra. I have extracted 3 main
->> platform dependent functions:
->> ?-platform_enter_lowpower which prepares the platform for low power.
->> ?-platform_do_lowpower on which the cpu will loop until it becomes
->> really plugged (spurious wake up). This function must returned the cpu
->> Id in order to leave the unplug state.
->> ?-platform_leave_lowpower which restore the platform context.
->> ?An ux500 patch is available which uses the common/hotplug.c code.
->> This patch is quite short because the idle / power down functions are
->> not yet upstreamed
->>
->
+Be careful.  There are two things going on here:
 
-I had posted a patch which does exactly the same thing sometime ago,
-but it got dropped
-off from the radar.?The patch set can be referenced
-@?http://www.spinics.net/lists/arm-kernel/msg97600.html
-I remember getting it Acked by most of the platform maintainers, but
-Russell?had some
-reservations on that.
+1. those which PCI support is configurable
+2. those which always have PCI support
 
-Cheers!
+Making PCI "depend on HAVE_PCI" is wrong, and will throw up lots of
+Kconfig warnings, as those platforms which always have PCI support
+won't select HAVE_PCI - and making them do so such that "PCI support"
+gets offered to them - with the only possible value being 'Y' is
+silly.
 
---
----------
-The views expressed in this email are my personal ones and do not
-necessarily echo my employers.
+So, rather than HAVE_PCI, it should be MIGHT_HAVE_PCI, and that
+symbol needs to control whether the "PCI support" prompt is offered
+to the user, not whether PCI is available or not.
