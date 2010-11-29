@@ -1,48 +1,38 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 29 Nov 2010 11:56:09 +0200
-Subject: [PATCH v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
-In-Reply-To: <1289247983-20747-1-git-send-email-anarsoul@gmail.com>
-References: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
-	<1289247983-20747-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201011291156.09784.anarsoul@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 29 Nov 2010 11:57:58 +0200
+Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
+In-Reply-To: <1290821087.2529.252.camel@helium>
+References: <AANLkTi=JSuJCqceJ3iw3TnV5OeJd+e5T3CyHtWVzBRu_@mail.gmail.com>
+	<536589.12568.qm@web180310.mail.gq1.yahoo.com>
+	<AANLkTinQdNC0XaOqNyDbdYE6ZcP0QyzpN492j=Kovuea@mail.gmail.com>
+	<1290716548.2529.136.camel@helium>
+	<AANLkTi=sZ-4BBLAJNU5B41cAxtroGkpNomgEYO4vtx8z@mail.gmail.com>
+	<1290821087.2529.252.camel@helium>
+Message-ID: <AANLkTimxP0ejc5i8cbEmdFidvCgH1pk5-Vc_WEGM2Hwa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 November 2010 22:26:23 Vasily Khoruzhick wrote:
-> Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default
-> structure are initalized via s3c_gpio_{get,set}pull_1up. This results in a
-> linker error when compiling kernel for s3c2442:
-> 
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
-> `s3c_gpio_getpull_1up'
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
-> `s3c_gpio_setpull_1up'
-> 
-> The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
-> The method of controlling them is the same though.
-> So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper
-> functions to take an additional parameter deciding whether the pin has a
-> pullup or pulldown. The s3c_gpio_{get,set}pull_1{down,up} functions then
-> wrap that functions passing either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
-> 
-> Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull
-> fields in the s3c2442 cpu init function to the new pulldown helper
-> functions.
-> 
-> Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
+On Sat, Nov 27, 2010 at 3:24 AM, David Brownell <david-b@pacbell.net> wrote:
+> Your intent "generic" is fine, but you've not achieved it and thus I
+> think you shouldn't imply that you have. ? Dropping the word "generic"
+> should ?suffice; it _is_ a framework, and maybe the next person working
+> with hardware spinlocks can finish generalizing (and add use cases).
 
-Hi there,
+Sure, I can drop the word "generic".
 
-Can any samsung-soc maintainer review/merge this patch?
+> Haven't looked at RT in a long time. ?Just look at the current RT
+> patchset to see if it still has several spinlock variants. ?ISTR the
+> "raw" spinlock stuff came from there not long ago. ?Much compile-time
+> magic was involved in switching between variants.
 
-I should admit that merging patches through samsung maintainers became pretty 
-impossible - response latency is about 1 month, some patches (not mine) are 
-still pending. I've sent first version of this patch on 6th of November, few 
-weeks of standby - and we'll get 2.6.37 with broken s3c2442 support. Yeah, I 
-know that maintainers are living people too, and they need to pay attention to 
-real life, work, family, etc, but now merging some samsung-soc-related patch 
-is really painfull and slow proccess, and it would be nice if it could be 
-somehow improved.
+I'll take a look there and see if I catch anything relevant.
 
-Regards
-Vasily
+Thanks,
+Ohad.
+
+
+>
+> - Dave
+>
+>
+>
