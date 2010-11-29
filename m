@@ -1,174 +1,48 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 29 Nov 2010 10:55:14 +0100
-Subject: [PATCH][ ARM cpu hotplug 2/2 ] Use common cpu hotplug code for UX500
-In-Reply-To: <AANLkTinOdaYoztaHCkbFhfRtuo4XEVaC+K_7aAB0N28N@mail.gmail.com>
-References: <AANLkTinOdaYoztaHCkbFhfRtuo4XEVaC+K_7aAB0N28N@mail.gmail.com>
-Message-ID: <AANLkTi=fYYZTYz4uQZfbNBd057AbP4LVS_fYvp4+pMwZ@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 29 Nov 2010 11:56:09 +0200
+Subject: [PATCH v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
+In-Reply-To: <1289247983-20747-1-git-send-email-anarsoul@gmail.com>
+References: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
+	<1289247983-20747-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201011291156.09784.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extracts the common code of the cpu hotplug feature across
-arm platforms. The goal is to only keep the specific stuff of the
-platform in the sub-architecture. I have created a hotplug.c file in
-the ?arm/common directory after studying the cpu hotplug code of
-omap2, realview, s5pv310, ux500 and tegra. I have extracted 3 main
-platform dependent functions:
-?-platform_enter_lowpower which prepares the platform for low power.
-?-platform_do_lowpower on which the cpu will loop until it becomes
-really plugged (spurious wake up). This function must returned the cpu
-Id in order to leave the unplug state.
-?-platform_leave_lowpower which restore the platform context.
+On Monday 08 November 2010 22:26:23 Vasily Khoruzhick wrote:
+> Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default
+> structure are initalized via s3c_gpio_{get,set}pull_1up. This results in a
+> linker error when compiling kernel for s3c2442:
+> 
+> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
+> `s3c_gpio_getpull_1up'
+> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
+> `s3c_gpio_setpull_1up'
+> 
+> The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
+> The method of controlling them is the same though.
+> So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper
+> functions to take an additional parameter deciding whether the pin has a
+> pullup or pulldown. The s3c_gpio_{get,set}pull_1{down,up} functions then
+> wrap that functions passing either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
+> 
+> Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull
+> fields in the s3c2442 cpu init function to the new pulldown helper
+> functions.
+> 
+> Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
 
-?An ux500 patch is available which uses the common/hotplug.c code.
-This patch is quite short because the idle / power down functions are
-not yet upstreamed
+Hi there,
 
-Signed-off-by: Vincent Guittot <vincent.guittot@stericsson.com>
----
-?arch/arm/Kconfig ? ? ? ? ? ? ?| ? ?1 +
-?arch/arm/mach-ux500/Makefile ?| ? ?2 +-
-?arch/arm/mach-ux500/hotplug.c | ? 68 +++++++++-------------------------------
-?arch/arm/mach-ux500/platsmp.c | ? ?2 +
-?4 files changed, 20 insertions(+), 53 deletions(-)
+Can any samsung-soc maintainer review/merge this patch?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ca96a44..ee74cf9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -797,6 +797,7 @@ config ARCH_U8500
-? ? ? ?select GENERIC_CLOCKEVENTS
-? ? ? ?select COMMON_CLKDEV
-? ? ? ?select ARCH_REQUIRE_GPIOLIB
-+ ? ? ? select USE_COMMON_ARM_HOTPLUG if HOTPLUG_CPU
-? ? ? ?help
-? ? ? ? ?Support for ST-Ericsson's Ux500 architecture
+I should admit that merging patches through samsung maintainers became pretty 
+impossible - response latency is about 1 month, some patches (not mine) are 
+still pending. I've sent first version of this patch on 6th of November, few 
+weeks of standby - and we'll get 2.6.37 with broken s3c2442 support. Yeah, I 
+know that maintainers are living people too, and they need to pay attention to 
+real life, work, family, etc, but now merging some samsung-soc-related patch 
+is really painfull and slow proccess, and it would be nice if it could be 
+somehow improved.
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 0612013..cb86197 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -8,7 +8,7 @@ obj-$(CONFIG_UX500_SOC_DB8500) ?+= cpu-db8500.o
-devices-db8500.o prcmu.o
-?obj-$(CONFIG_MACH_U8500_MOP) ? += board-mop500.o board-mop500-sdi.o
-?obj-$(CONFIG_MACH_U5500) ? ? ? += board-u5500.o
-?obj-$(CONFIG_SMP) ? ? ? ? ? ? ?+= platsmp.o headsmp.o
--obj-$(CONFIG_HOTPLUG_CPU) ? ? ?+= hotplug.o
-+obj-$(CONFIG_USE_COMMON_ARM_HOTPLUG) ? += hotplug.o
-?obj-$(CONFIG_LOCAL_TIMERS) ? ? += localtimer.o
-?obj-$(CONFIG_REGULATOR_AB8500) += board-mop500-regulators.o
-?obj-$(CONFIG_U5500_MODEM_IRQ) ?+= modem_irq.o
-diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
-index b782a03..14a614f 100644
---- a/arch/arm/mach-ux500/hotplug.c
-+++ b/arch/arm/mach-ux500/hotplug.c
-@@ -6,70 +6,34 @@
-?* ? ? Based on ARM realview platform
-?*
-?* Author: Sundar Iyer <sundar.iyer@stericsson.com>
-+ * Author: Vincent Guittot <vincent.guittot@stericsson.com>
-?*
-+ * We only keep platform related code in the subarchitecture directory.
-+ * The common code across platform has been moved into kernel/common directory
-?*/
--#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/smp.h>
--#include <linux/completion.h>
-
--#include <asm/cacheflush.h>
-+#include <asm/hotplug.h>
-
-?extern volatile int pen_release;
-
--static DECLARE_COMPLETION(cpu_killed);
--
--static inline void platform_do_lowpower(unsigned int cpu)
--{
-- ? ? ? flush_cache_all();
--
-- ? ? ? /* we put the platform to just WFI */
-- ? ? ? for (;;) {
-- ? ? ? ? ? ? ? __asm__ __volatile__("dsb\n\t" "wfi\n\t"
-- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? : : : "memory");
-- ? ? ? ? ? ? ? if (pen_release == cpu) {
-- ? ? ? ? ? ? ? ? ? ? ? /*
-- ? ? ? ? ? ? ? ? ? ? ? ?* OK, proper wakeup, we're done
-- ? ? ? ? ? ? ? ? ? ? ? ?*/
-- ? ? ? ? ? ? ? ? ? ? ? break;
-- ? ? ? ? ? ? ? }
-- ? ? ? }
--}
--
--int platform_cpu_kill(unsigned int cpu)
-+/* Default implementation that will be used if not override
-+ * by power specific implementation
-+ */
-+void __attribute__((weak)) platform_enter_lowpower(unsigned int cpu)
-?{
-- ? ? ? return wait_for_completion_timeout(&cpu_killed, 5000);
-+ ? ? ? return;
-?}
-
--/*
-- * platform-specific code to shutdown a CPU
-- *
-- * Called with IRQs disabled
-- */
--void platform_cpu_die(unsigned int cpu)
-+int __attribute__((weak)) platform_do_lowpower(unsigned int cpu)
-?{
--#ifdef DEBUG
-- ? ? ? unsigned int this_cpu = hard_smp_processor_id();
--
-- ? ? ? if (cpu != this_cpu) {
-- ? ? ? ? ? ? ? printk(KERN_CRIT "Eek! platform_cpu_die running on %u,
-should be %u\n",
-- ? ? ? ? ? ? ? ? ? ? ? ? ?this_cpu, cpu);
-- ? ? ? ? ? ? ? BUG();
-- ? ? ? }
--#endif
--
-- ? ? ? printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
-- ? ? ? complete(&cpu_killed);
-+ ? ? ? __asm__ __volatile__("dsb\n\t" "wfi\n\t"
-+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? : : : "memory");
-
-- ? ? ? /* directly enter low power state, skipping secure registers */
-- ? ? ? platform_do_lowpower(cpu);
-+ ? ? ? return pen_release;
-?}
-
--int platform_cpu_disable(unsigned int cpu)
-+void __attribute__((weak)) platform_leave_lowpower(unsigned int cpu)
-?{
-- ? ? ? /*
-- ? ? ? ?* we don't allow CPU 0 to be shutdown (it is still too special
-- ? ? ? ?* e.g. clock tick interrupts)
-- ? ? ? ?*/
-- ? ? ? return cpu == 0 ? -EPERM : 0;
-+ ? ? ? return;
-?}
-+
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 9e4c678..3074260 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -51,6 +51,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
-? ? ? ? * pen, then head off into the C entry point
-? ? ? ? */
-? ? ? ?pen_release = -1;
-+ ? ? ? smp_wmb();
-
-? ? ? ?/*
-? ? ? ? * Synchronise with the boot thread.
-@@ -82,6 +83,7 @@ int __cpuinit boot_secondary(unsigned int cpu,
-struct task_struct *idle)
-
-? ? ? ?timeout = jiffies + (1 * HZ);
-? ? ? ?while (time_before(jiffies, timeout)) {
-+ ? ? ? ? ? ? ? smp_rmb();
-? ? ? ? ? ? ? ?if (pen_release == -1)
-? ? ? ? ? ? ? ? ? ? ? ?break;
-? ? ? ?}
---
-1.7.0.4
+Regards
+Vasily
