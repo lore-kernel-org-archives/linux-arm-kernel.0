@@ -1,184 +1,47 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 29 Nov 2010 18:39:34 +0000
-Subject: [PATCH v2] ARM: Allow SMP_ON_UP to work with Thumb-2 kernels.
-Message-ID: <1291055974-2090-1-git-send-email-dave.martin@linaro.org>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Mon, 29 Nov 2010 20:52:55 +0200
+Subject: [PATCH] ARM: Gemini: Add support for PCI BUS
+In-Reply-To: <201011291745.22566.arnd@arndb.de>
+References: <1290860675-15453-1-git-send-email-ulli.kroll@googlemail.com>
+	<201011282056.17389.arnd@arndb.de> <4CF3CF33.20407@gmail.com>
+	<201011291745.22566.arnd@arndb.de>
+Message-ID: <4CF3F687.6040801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2:
+On 11/29/2010 06:45 PM, Arnd Bergmann wrote:
+> On Monday 29 November 2010, Paulius Zaleckas wrote:
+>>> The I/O ordering is probably not what you think it is.
+>>> There is no ordering guarantee between __raw_writel and
+>>> spin_lock/spin_unlock, so you really should be using
+>>> readl/writel.
+>>
+>> No he really should NOT use readl/writel. The ONLY difference
+>> between readl/writel and __raw_readl/__raw_writel is endianess
+>> conversion. __raw_*l is not doing it. Which to use depend only
+>> on HW.
+>
+> There are many differences between readl and __raw_readl, including
+>
+> * __raw_readl does not have barriers and does not serialize with
+>    spinlocks, so it breaks on out-of-order CPUs.
+> * __raw_readl does not have a specific endianess, while readl is
+>    fixed little-endian, just as the hardware is in this case.
+>    The endian-conversion is a NOP on little-endian ARM, but required
+>    if you actually run on a big-endian ARM (you don't).
+> * __raw_readl may not be atomic, gcc is free to split the access
+>    into byte wise reads (it normally does not, unless you mark
+>    the pointer __attribute__((packed))).
+>
+> In essence, it is almost never a good idea to use __raw_readl, and
+> the double underscores should tell you so.
 
-  * In smp_mpidr.h, don't use W(mov) to enture a 32-bit mov
-    instruction.  This doesn't work in inline asm.  Since this mov
-    instruction has no 16-bit encoding, there is no need to force
-    it to 32-bit explicitly.
+You are wrong:
 
-  * Add a rotate in the fixup_smp code in order to support
-    CPU_BIG_ENDIAN, as suggested by Nicolas Pitre.
-
-v1:
-
-  * __fixup_smp_on_up has been modified with support for the
-    THUMB2_KERNEL case.  For THUMB2_KERNEL only, fixups are split
-    into halfwords in case of misalignment, since we can't rely on
-    unaligned accesses working before turning the MMU on.
-
-    No attempt is made to optimise the aligned case, since the
-    number of fixups is typically small, and it seems best to keep
-    the code as simple as possible.
-
-  * Add an assembly-time sanity-check to ALT_UP() to ensure that
-    the content really is the right size (4 bytes).
-
-    (No check is done for ALT_SMP().  Possibly, this could be fixed
-    by splitting the two uses ot ALT_SMP() (ALT_SMP...SMP_UP versus
-    ALT_SMP...SMP_UP_B) into two macros.  In the first case,
-    ALT_SMP needs to expand to >= 4 bytes, not == 4.)
-
-  * A "mode" parameter has been added to smp_dmb:
-
-    smp_dmb arm @ assumes 4-byte instructions (for ARM code, e.g. kuser)
-    smp_dmb     @ uses W() to ensure 4-byte instructions for ALT_SMP()
-
-    This avoids assembly failures due to use of W() inside smp_dmb,
-    when assembling pure-ARM code in the vectors page.
-
-    There might be a better way to achieve this.
-
-  * Kconfig: make SMP_ON_UP depend on
-    (!THUMB2_KERNEL || !BIG_ENDIAN) i.e., THUMB2_KERNEL is now
-    supported, but only if !BIG_ENDIAN (The fixup code for Thumb-2
-    currently assumes little-endian order.)
-
-Tested using a single generic realview kernel on:
-	ARM RealView PB-A8 (CONFIG_THUMB2_KERNEL={n,y})
-	ARM RealView PBX-A9 (SMP)
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-KernelVersion: 2.6.37-rc3
-
- arch/arm/Kconfig                 |    2 +-
- arch/arm/include/asm/assembler.h |   22 +++++++++++++++++++---
- arch/arm/kernel/entry-armv.S     |    4 ++--
- arch/arm/kernel/head.S           |   13 ++++++++++---
- 4 files changed, 32 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index db524e7..290a4b5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1229,7 +1229,7 @@ config SMP
- config SMP_ON_UP
- 	bool "Allow booting SMP kernel on uniprocessor systems (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL
--	depends on SMP && !XIP && !THUMB2_KERNEL
-+	depends on SMP && !XIP
- 	default y
- 	help
- 	  SMP kernels contain instructions which fail on non-SMP processors.
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 062b58c..cb5eed4 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -157,16 +157,24 @@
- #ifdef CONFIG_SMP
- #define ALT_SMP(instr...)					\
- 9998:	instr
-+/*
-+ * Note: if you get assembler errors from ALT_UP() when building with
-+ * CONFIG_THUMB2_KERNEL, you almost certainly need to use
-+ * ALT_SMP( W(instr) ... )
-+ */
- #define ALT_UP(instr...)					\
- 	.pushsection ".alt.smp.init", "a"			;\
- 	.long	9998b						;\
--	instr							;\
-+9997:	instr							;\
-+	.if . - 9997b != 4					;\
-+		.error "ALT_UP() content must assemble to exactly 4 bytes";\
-+	.endif							;\
- 	.popsection
- #define ALT_UP_B(label)					\
- 	.equ	up_b_offset, label - 9998b			;\
- 	.pushsection ".alt.smp.init", "a"			;\
- 	.long	9998b						;\
--	b	. + up_b_offset					;\
-+	W(b)	. + up_b_offset					;\
- 	.popsection
- #else
- #define ALT_SMP(instr...)
-@@ -177,16 +185,24 @@
- /*
-  * SMP data memory barrier
-  */
--	.macro	smp_dmb
-+	.macro	smp_dmb mode
- #ifdef CONFIG_SMP
- #if __LINUX_ARM_ARCH__ >= 7
-+	.ifeqs "\mode","arm"
- 	ALT_SMP(dmb)
-+	.else
-+	ALT_SMP(W(dmb))
-+	.endif
- #elif __LINUX_ARM_ARCH__ == 6
- 	ALT_SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb
- #else
- #error Incompatible SMP platform
- #endif
-+	.ifeqs "\mode","arm"
- 	ALT_UP(nop)
-+	.else
-+	ALT_UP(W(nop))
-+	.endif
- #endif
- 	.endm
- 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index c09e357..7a8f70d 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -842,7 +842,7 @@ __kuser_helper_start:
-  */
- 
- __kuser_memory_barrier:				@ 0xffff0fa0
--	smp_dmb
-+	smp_dmb	arm
- 	usr_ret	lr
- 
- 	.align	5
-@@ -959,7 +959,7 @@ kuser_cmpxchg_fixup:
- 
- #else
- 
--	smp_dmb
-+	smp_dmb	arm
- 1:	ldrex	r3, [r2]
- 	subs	r3, r3, r0
- 	strexeq	r3, r1, [r2]
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index dd6b369..eaef15a 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -407,10 +407,17 @@ __fixup_smp_on_up:
- 	add	r6, r6, r3
- 	add	r7, r7, r3
- 2:	cmp	r6, r7
-+	movhs	pc, lr
- 	ldmia	r6!, {r0, r4}
--	strlo	r4, [r0, r3]
--	blo	2b
--	mov	pc, lr
-+ ARM(	str	r4, [r0, r3]	)
-+ THUMB(	add	r0, r0, r3	)
-+#ifdef __ARMEB__
-+ THUMB(	mov	r4, r4, ror #16	)	@ Convert word order for big-endian.
-+#endif
-+ THUMB(	strh	r4, [r0], #2	)	@ For Thumb-2, store as two halfwords
-+ THUMB(	mov	r4, r4, lsr #16	)	@ to be robust against misaligned r3.
-+ THUMB(	strh	r4, [r0]	)	@ NOTE: currently assumes little-endian.
-+	b	2b
- ENDPROC(__fixup_smp)
- 
- 1:	.word	.
--- 
-1.7.1
+Since CONFIG_ARM_DMA_MEM_BUFFERABLE is NOT defined for FA526 core,
+no barriers are in use when using readl. It just translates into
+le32_to_cpu(__raw_readl(x)). Now this CPU has physical pin for endianess
+configuration and if you will chose big-endian you will fail to read
+internal registers, because they ALSO change endianess and le32_to_cpu()
+will screw it. However it is different when accessing registers through
+PCI bus, then you need to use readl().
