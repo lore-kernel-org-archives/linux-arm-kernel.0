@@ -1,205 +1,131 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 29 Nov 2010 12:26:39 +0200
-Subject: [PATCH RESEND v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
-In-Reply-To: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
-References: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
-Message-ID: <1291026399-14873-1-git-send-email-anarsoul@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 29 Nov 2010 19:36:31 +0900
+Subject: [PATCH 10/10] RTC S3C: Fix type of s3c_rtc_setaie()
+In-Reply-To: <1290969115-10291-1-git-send-email-jekhor@gmail.com>
+References: <1290969115-10291-1-git-send-email-jekhor@gmail.com>
+Message-ID: <000c01cb8fb1$4b569560$e203c020$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default structure
-are initalized via s3c_gpio_{get,set}pull_1up. This results in a linker
-error when compiling kernel for s3c2442:
+Yauhen Kharuzhy wrote:
+> 
+> Change s3c_rtc_setaie() declaration in accordance with rtc_class_ops
+> structure declaration.
+> 
+Hi,
 
-arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
-`s3c_gpio_getpull_1up'
-arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
-`s3c_gpio_setpull_1up'
+According to your patch description, this should be regarding fix
+s3c_rtc_setaie().
+But includes others :-(
 
-The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
-The method of controlling them is the same though.
-So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper functions
-to take an additional parameter deciding whether the pin has a pullup or pulldown.
-The s3c_gpio_{get,set}pull_1{down,up} functions then wrap that functions passing
-either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
+Please make sure your patch has no problem before submitting.
+As a note, already has been submitted about fix s3c_rtc_setaie().
 
-Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull fields
-in the s3c2442 cpu init function to the new pulldown helper functions.
+> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+> ---
+>  arch/arm/mach-s3c2412/Kconfig  |    7 +++++++
+>  arch/arm/mach-s3c2412/Makefile |    3 ++-
+>  arch/arm/mach-s3c2416/Kconfig  |    1 +
+>  drivers/rtc/rtc-s3c.c          |    8 +++++---
+>  4 files changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2412/Kconfig b/arch/arm/mach-s3c2412/Kconfig
+> index fa2e5bf..6983cb4 100644
+> --- a/arch/arm/mach-s3c2412/Kconfig
+> +++ b/arch/arm/mach-s3c2412/Kconfig
+> @@ -28,9 +28,16 @@ config S3C2412_DMA
+> 
+>  config S3C2412_PM
+>  	bool
+> +	select S3C2412_PM_SLEEP
+>  	help
+>  	  Internal config node to apply S3C2412 power management
+> 
+> +config S3C2412_PM_SLEEP
+> +	bool
+> +	help
+> +	  Internal config node to apply sleep for S3C2412 power management.
+> +	  Can be selected by another SoCs with similar sleep procedure.
+> +
+>  # Note, the S3C2412 IOtiming support is in plat-s3c24xx
+> 
+>  config S3C2412_CPUFREQ
+> diff --git a/arch/arm/mach-s3c2412/Makefile
+b/arch/arm/mach-s3c2412/Makefile
+> index 530ec46..6c48a91 100644
+> --- a/arch/arm/mach-s3c2412/Makefile
+> +++ b/arch/arm/mach-s3c2412/Makefile
+> @@ -14,7 +14,8 @@ obj-$(CONFIG_CPU_S3C2412)	+= irq.o
+>  obj-$(CONFIG_CPU_S3C2412)	+= clock.o
+>  obj-$(CONFIG_CPU_S3C2412)	+= gpio.o
+>  obj-$(CONFIG_S3C2412_DMA)	+= dma.o
+> -obj-$(CONFIG_S3C2412_PM)	+= pm.o sleep.o
+> +obj-$(CONFIG_S3C2412_PM)	+= pm.o
+> +obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep.o
+>  obj-$(CONFIG_S3C2412_CPUFREQ)	+= cpu-freq.o
+> 
+>  # Machine support
+> diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
+> index 2eaadcf..69b48a7 100644
+> --- a/arch/arm/mach-s3c2416/Kconfig
+> +++ b/arch/arm/mach-s3c2416/Kconfig
+> @@ -27,6 +27,7 @@ config S3C2416_DMA
+> 
+>  config S3C2416_PM
+>  	bool
+> +	select S3C2412_PM_SLEEP
+>  	help
+>  	  Internal config node to apply S3C2416 power management
+> 
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index cf953ec..4101522 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -77,7 +77,7 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
+>  }
+> 
+>  /* Update control registers */
+> -static void s3c_rtc_setaie(int to)
+> +static int s3c_rtc_setaie(struct device *dev, unsigned int to)
+>  {
+>  	unsigned int tmp;
+> 
+> @@ -89,6 +89,8 @@ static void s3c_rtc_setaie(int to)
+>  		tmp |= S3C2410_RTCALM_ALMEN;
+> 
+>  	writeb(tmp, s3c_rtc_base + S3C2410_RTCALM);
+> +
+> +	return 0;
+>  }
+> 
+>  static int s3c_rtc_setpie(struct device *dev, int enabled)
+> @@ -308,7 +310,7 @@ static int s3c_rtc_setalarm(struct device *dev, struct
+> rtc_wkalrm *alrm)
+> 
+>  	writeb(alrm_en, base + S3C2410_RTCALM);
+> 
+> -	s3c_rtc_setaie(alrm->enabled);
+> +	s3c_rtc_setaie(dev, alrm->enabled);
+> 
+>  	return 0;
+>  }
+> @@ -440,7 +442,7 @@ static int __devexit s3c_rtc_remove(struct
+> platform_device *dev)
+>  	rtc_device_unregister(rtc);
+> 
+>  	s3c_rtc_setpie(&dev->dev, 0);
+> -	s3c_rtc_setaie(0);
+> +	s3c_rtc_setaie(&dev->dev, 0);
+> 
+>  	clk_disable(rtc_clk);
+>  	clk_put(rtc_clk);
+> --
 
-Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
-v2: adapt patch for 2.6.37-rc1
-v3: restore default pull callbacks, add default pull callbacks for s3c2442
- arch/arm/mach-s3c2440/Kconfig                      |    1 +
- arch/arm/mach-s3c2440/s3c2442.c                    |    7 +++
- arch/arm/plat-s3c24xx/gpiolib.c                    |    9 +++-
- arch/arm/plat-samsung/gpio-config.c                |   44 ++++++++++++++++---
- .../plat-samsung/include/plat/gpio-cfg-helpers.h   |   11 +++++
- 5 files changed, 63 insertions(+), 9 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index ff024a6..478fae0 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -18,6 +18,7 @@ config CPU_S3C2440
- config CPU_S3C2442
- 	bool
- 	select CPU_ARM920T
-+	select S3C_GPIO_PULL_DOWN
- 	select S3C2410_CLOCK
- 	select S3C2410_GPIO
- 	select S3C2410_PM if PM
-diff --git a/arch/arm/mach-s3c2440/s3c2442.c b/arch/arm/mach-s3c2440/s3c2442.c
-index 188ad1e..0dbc91c 100644
---- a/arch/arm/mach-s3c2440/s3c2442.c
-+++ b/arch/arm/mach-s3c2440/s3c2442.c
-@@ -32,6 +32,7 @@
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
- #include <linux/mutex.h>
-+#include <linux/gpio.h>
- #include <linux/clk.h>
- #include <linux/io.h>
- 
-@@ -44,6 +45,10 @@
- #include <plat/clock.h>
- #include <plat/cpu.h>
- 
-+#include <plat/gpio-core.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/gpio-cfg-helpers.h>
-+
- /* S3C2442 extended clock support */
- 
- static unsigned long s3c2442_camif_upll_round(struct clk *clk,
-@@ -160,6 +165,8 @@ static struct sys_device s3c2442_sysdev = {
- int __init s3c2442_init(void)
- {
- 	printk("S3C2442: Initialising architecture\n");
-+	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_1down;
-+	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_1down;
- 
- 	return sysdev_register(&s3c2442_sysdev);
- }
-diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
-index 24c6f5a..b805dab 100644
---- a/arch/arm/plat-s3c24xx/gpiolib.c
-+++ b/arch/arm/plat-s3c24xx/gpiolib.c
-@@ -82,8 +82,13 @@ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
- struct s3c_gpio_cfg s3c24xx_gpiocfg_default = {
- 	.set_config	= s3c_gpio_setcfg_s3c24xx,
- 	.get_config	= s3c_gpio_getcfg_s3c24xx,
--	.set_pull	= s3c_gpio_setpull_1up,
--	.get_pull	= s3c_gpio_getpull_1up,
-+#if defined(CONFIG_S3C_GPIO_PULL_UP)
-+	.set_pull       = s3c_gpio_setpull_1up,
-+	.get_pull       = s3c_gpio_getpull_1up,
-+#elif defined(CONFIG_S3C_GPIO_PULL_DOWN)
-+	.set_pull	= s3c_gpio_setpull_1down,
-+	.get_pull	= s3c_gpio_getpull_1down,
-+#endif
- };
- 
- struct s3c_gpio_chip s3c24xx_gpios[] = {
-diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-index b732b77..ac7f13f 100644
---- a/arch/arm/plat-samsung/gpio-config.c
-+++ b/arch/arm/plat-samsung/gpio-config.c
-@@ -280,16 +280,17 @@ s3c_gpio_pull_t s3c_gpio_getpull_updown(struct s3c_gpio_chip *chip,
- }
- #endif
- 
--#ifdef CONFIG_S3C_GPIO_PULL_UP
--int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
--			 unsigned int off, s3c_gpio_pull_t pull)
-+#if defined(CONFIG_S3C_GPIO_PULL_UP) || defined(CONFIG_S3C_GPIO_PULL_DOWN)
-+static int s3c_gpio_setpull_1(struct s3c_gpio_chip *chip,
-+			 unsigned int off, s3c_gpio_pull_t pull,
-+			 s3c_gpio_pull_t updown)
- {
- 	void __iomem *reg = chip->base + 0x08;
- 	u32 pup = __raw_readl(reg);
- 
- 	pup = __raw_readl(reg);
- 
--	if (pup == S3C_GPIO_PULL_UP)
-+	if (pup == updown)
- 		pup &= ~(1 << off);
- 	else if (pup == S3C_GPIO_PULL_NONE)
- 		pup |= (1 << off);
-@@ -300,17 +301,46 @@ int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
- 	return 0;
- }
- 
--s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
--				     unsigned int off)
-+static s3c_gpio_pull_t s3c_gpio_getpull_1(struct s3c_gpio_chip *chip,
-+				     unsigned int off, s3c_gpio_pull_t updown)
- {
- 	void __iomem *reg = chip->base + 0x08;
- 	u32 pup = __raw_readl(reg);
- 
- 	pup &= (1 << off);
--	return pup ? S3C_GPIO_PULL_NONE : S3C_GPIO_PULL_UP;
-+	return pup ? S3C_GPIO_PULL_NONE : updown;
-+}
-+#endif /* CONFIG_S3C_GPIO_PULL_UP || CONFIG_S3C_GPIO_PULL_DOWN */
-+
-+#ifdef CONFIG_S3C_GPIO_PULL_UP
-+s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
-+				     unsigned int off)
-+{
-+	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_UP);
-+}
-+
-+int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
-+			 unsigned int off, s3c_gpio_pull_t pull)
-+{
-+	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_UP);
- }
- #endif /* CONFIG_S3C_GPIO_PULL_UP */
- 
-+#ifdef CONFIG_S3C_GPIO_PULL_DOWN
-+s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
-+				     unsigned int off)
-+{
-+	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_DOWN);
-+}
-+
-+int s3c_gpio_setpull_1down(struct s3c_gpio_chip *chip,
-+			 unsigned int off, s3c_gpio_pull_t pull)
-+{
-+	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_DOWN);
-+}
-+#endif /* CONFIG_S3C_GPIO_PULL_DOWN */
-+
-+
- #ifdef CONFIG_S5P_GPIO_DRVSTR
- s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin)
- {
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-index 8fd65d8..0d2c570 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-@@ -210,6 +210,17 @@ extern s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
- 					    unsigned int off);
- 
- /**
-+ * s3c_gpio_getpull_1down() - Get configuration for choice of down or none
-+ * @chip: The gpio chip that the GPIO pin belongs to
-+ * @off: The offset to the pin to get the configuration of.
-+ *
-+ * This helper function reads the state of the pull-down resistor for the
-+ * given GPIO in the same case as s3c_gpio_setpull_1down.
-+*/
-+extern s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
-+					    unsigned int off);
-+
-+/**
-  * s3c_gpio_setpull_s3c2443() - Pull configuration for s3c2443.
-  * @chip: The gpio chip that is being configured.
-  * @off: The offset for the GPIO being configured.
--- 
-1.7.3.2
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
