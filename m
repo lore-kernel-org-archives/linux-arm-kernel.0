@@ -1,68 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 29 Nov 2010 10:58:33 +0100
-Subject: [PATCH] prevent 'BUG: sleeping function called from invalid
-	context' in arch_reset()
-In-Reply-To: <19699.29070.822244.938508@ipc1.ka-ro>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-4-git-send-email-shawn.guo@freescale.com>
-	<19695.32386.279224.624305@ipc1.ka-ro>
-	<20101126095733.GA27637@pengutronix.de>
-	<19695.36407.793411.550458@ipc1.ka-ro>
-	<20101126113255.GC27637@pengutronix.de>
-	<19699.29070.822244.938508@ipc1.ka-ro>
-Message-ID: <20101129095833.GB20449@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 29 Nov 2010 19:15:03 +0900
+Subject: [PATCH v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
+In-Reply-To: <201011291156.09784.anarsoul@gmail.com>
+References: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
+	<1289247983-20747-1-git-send-email-anarsoul@gmail.com>
+	<201011291156.09784.anarsoul@gmail.com>
+Message-ID: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lothar,
+Vasily Khoruzhick wrote:
+> 
+> On Monday 08 November 2010 22:26:23 Vasily Khoruzhick wrote:
+> > Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default
+> > structure are initalized via s3c_gpio_{get,set}pull_1up. This results in a
+> > linker error when compiling kernel for s3c2442:
+> >
+> > arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
+> > `s3c_gpio_getpull_1up'
+> > arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
+> > `s3c_gpio_setpull_1up'
+> >
+> > The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
+> > The method of controlling them is the same though.
+> > So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper
+> > functions to take an additional parameter deciding whether the pin has a
+> > pullup or pulldown. The s3c_gpio_{get,set}pull_1{down,up} functions then
+> > wrap that functions passing either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
+> >
+> > Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull
+> > fields in the s3c2442 cpu init function to the new pulldown helper
+> > functions.
+> >
+> > Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
+> 
+> Hi there,
+> 
+> Can any samsung-soc maintainer review/merge this patch?
+> 
+> I should admit that merging patches through samsung maintainers became pretty
+> impossible - response latency is about 1 month, some patches (not mine) are
+> still pending. I've sent first version of this patch on 6th of November, few
+> weeks of standby - and we'll get 2.6.37 with broken s3c2442 support. Yeah, I
+> know that maintainers are living people too, and they need to pay attention
+> to
+> real life, work, family, etc, but now merging some samsung-soc-related patch
+> is really painfull and slow proccess, and it would be nice if it could be
+> somehow improved.
+> 
+Hi,
 
-On Mon, Nov 29, 2010 at 10:25:34AM +0100, Lothar Wa?mann wrote:
-> arch_reset() may be called from interrupt context (e.g. induced by
-> SYSRQ-B), thus clk_get() and clk_enable() must not be called from
-> within arch_reset(). Move these calls to mxc_arch_reset_init().
-I wonder if SYSRQ-B is the only way to trigger that.  And if yes if that
-could be "fixed" to allow sleeping?!
+Actually, I didn't get your patch through my e-mail.
+Maybe you missed my e-mail in Cc at that time and I missed your patch in mailing list.
+Could you please re-send it so that can get the patch via e-mail?
 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
-> diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
-> index c3972c5..9b02251 100644
-> --- a/arch/arm/plat-mxc/system.c
-> +++ b/arch/arm/plat-mxc/system.c
-> @@ -53,11 +53,6 @@ void arch_reset(char mode, const char *cmd)
->  	if (cpu_is_mx1()) {
->  		wcr_enable = (1 << 0);
->  	} else {
-> -		struct clk *clk;
-> -
-> -		clk = clk_get_sys("imx-wdt.0", NULL);
-> -		if (!IS_ERR(clk))
-> -			clk_enable(clk);
->  		wcr_enable = (1 << 2);
->  	}
->  
-> @@ -78,5 +73,14 @@ void arch_reset(char mode, const char *cmd)
->  
->  void mxc_arch_reset_init(void __iomem *base)
->  {
-> +	struct clk *clk;
-> +
->  	wdog_base = base;
-> +
-> +	if (cpu_is_mx1())
-> +		return;
-> +
-> +	clk = clk_get_sys("imx-wdt.0", NULL);
-> +	if (!IS_ERR(clk))
-> +		clk_enable(clk);
->  }
-Unrelated to this patch, I wonder why this isn't named "imx2-wdt.0".  I
-just checked, the driver (drivers/watchdog/imx2_wdt.c) uses clk_get_sys,
-too.  IMHO we should rename that.
+Now, thanks for adding me, will review...
 
-Best regards
-Uwe
+I think, we have some time to fix it for 37, so don't worry about broken 37-stable.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
