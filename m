@@ -1,117 +1,292 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Nov 2010 17:34:43 +0000
-Subject: [PATCH 3/8] ARM: hw_breakpoint: correct and simplify alignment fixup
-	code
+Date: Mon, 29 Nov 2010 17:34:46 +0000
+Subject: [PATCH 6/8] ARM: hw_breakpoint: do not allocate new breakpoints with
+	rcu_read_lock held
 In-Reply-To: <1291052088-17243-1-git-send-email-will.deacon@arm.com>
 References: <1291052088-17243-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1291052088-17243-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1291052088-17243-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current hw_breakpoint code tries to fix up the alignment of
-breakpoints so that we can make use of sparse byte-address-select
-bits in the control register and give the illusion that we can
-set breakpoints on unaligned addresses.
+The watchpoint single-stepping code calls register_user_hw_breakpoint to
+register a mismatch breakpoint for stepping over the watchpoint. This is
+performed while the rcu_read_lock is held and is therefore unsafe.
 
-Although this works on v6 cores, v7 forbids this behaviour, instead
-requiring breakpoints to be set on aligned addresses and have contiguous
-byte-address-select ranges depending on the instruction set in use.
-For ARM the only supported size is 4 bytes, whilst Thumb-2 also permits
-2 byte breakpoints (watchpoints can be of 1, 2, 4 or 8 bytes long).
-
-This patch simplifies the alignment fixup code so that we require
-addresses to be aligned to the size of the corresponding breakpoint.
-This allows us to handle the common case of breaking on a half-word
-aligned Thumb-2 instruction and also allows us to set byte watchpoints
-on arbitrary addresses.
+This patch reworks the watchpoint stepping code so that we don't require
+another perf_event for the mismatch breakpoint. Instead, we hold a separate
+arch_hw_breakpoint_ctrl struct inside the watchpoint which is used exclusively
+for stepping. We can check whether or not stepping is enabled when installing
+or uninstalling the watchpoint and operate on the breakpoint accordingly.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c |   56 +++++++++++++++++++++-----------------
- 1 files changed, 31 insertions(+), 25 deletions(-)
+ arch/arm/include/asm/hw_breakpoint.h |    2 +-
+ arch/arm/kernel/hw_breakpoint.c      |  134 +++++++++++++++++++--------------
+ 2 files changed, 78 insertions(+), 58 deletions(-)
 
+diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+index 4d8ae9d..881429d 100644
+--- a/arch/arm/include/asm/hw_breakpoint.h
++++ b/arch/arm/include/asm/hw_breakpoint.h
+@@ -20,7 +20,7 @@ struct arch_hw_breakpoint_ctrl {
+ struct arch_hw_breakpoint {
+ 	u32	address;
+ 	u32	trigger;
+-	struct perf_event *suspended_wp;
++	struct arch_hw_breakpoint_ctrl step_ctrl;
+ 	struct arch_hw_breakpoint_ctrl ctrl;
+ };
+ 
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 515a3c4..550d949 100644
+index b8acfbc..4ee9a7d 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -537,6 +537,17 @@ static int arch_build_bp_info(struct perf_event *bp)
- 		return -EINVAL;
- 	}
+@@ -314,23 +314,6 @@ u8 arch_get_max_wp_len(void)
+ }
  
-+	/*
-+	 * Breakpoints must be of length 2 (thumb) or 4 (ARM) bytes.
-+	 * Watchpoints can be of length 1, 2, 4 or 8 bytes if supported
-+	 * by the hardware and must be aligned to the appropriate number of
-+	 * bytes.
-+	 */
-+	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE &&
-+	    info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
-+	    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
-+		return -EINVAL;
-+
- 	/* Address */
- 	info->address = bp->attr.bp_addr;
- 
-@@ -561,7 +572,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- {
+ /*
+- * Handler for reactivating a suspended watchpoint when the single
+- * step `mismatch' breakpoint is triggered.
+- */
+-static void wp_single_step_handler(struct perf_event *bp, int unused,
+-				   struct perf_sample_data *data,
+-				   struct pt_regs *regs)
+-{
+-	perf_event_enable(counter_arch_bp(bp)->suspended_wp);
+-	unregister_hw_breakpoint(bp);
+-}
+-
+-static int bp_is_single_step(struct perf_event *bp)
+-{
+-	return bp->overflow_handler == wp_single_step_handler;
+-}
+-
+-/*
+  * Install a perf counter breakpoint.
+  */
+ int arch_install_hw_breakpoint(struct perf_event *bp)
+@@ -338,29 +321,35 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
  	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
- 	int ret = 0;
--	u32 bytelen, max_len, offset, alignment_mask = 0x3;
-+	u32 offset, alignment_mask = 0x3;
+ 	struct perf_event **slot, **slots;
+ 	int i, max_slots, ctrl_base, val_base, ret = 0;
++	u32 addr, ctrl;
  
- 	/* Build the arch_hw_breakpoint. */
- 	ret = arch_build_bp_info(bp);
-@@ -571,32 +582,27 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	/* Check address alignment. */
- 	if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
- 		alignment_mask = 0x7;
--	if (info->address & alignment_mask) {
--		/*
--		 * Try to fix the alignment. This may result in a length
--		 * that is too large, so we must check for that.
--		 */
--		bytelen = get_hbp_len(info->ctrl.len);
--		max_len = info->ctrl.type == ARM_BREAKPOINT_EXECUTE ? 4 :
--				max_watchpoint_len;
+ 	/* Ensure that we are in monitor mode and halting mode is disabled. */
+ 	ret = enable_monitor_mode();
+ 	if (ret)
+ 		goto out;
+ 
++	addr = info->address;
++	ctrl = encode_ctrl_reg(info->ctrl) | 0x1;
++
+ 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
+ 		/* Breakpoint */
+ 		ctrl_base = ARM_BASE_BCR;
+ 		val_base = ARM_BASE_BVR;
+ 		slots = __get_cpu_var(bp_on_reg);
+ 		max_slots = core_num_brps;
 -
--		if (max_len >= 8)
--			offset = info->address & 0x7;
--		else
--			offset = info->address & 0x3;
--
--		if (bytelen > (1 << ((max_len - (offset + 1)) >> 1))) {
--			ret = -EFBIG;
--			goto out;
+-		if (bp_is_single_step(bp)) {
+-			info->ctrl.mismatch = 1;
+-			i = max_slots;
+-			slots[i] = bp;
+-			goto setup;
 -		}
--
--		info->ctrl.len <<= offset;
--		info->address &= ~offset;
--
--		pr_debug("breakpoint alignment fixup: length = 0x%x, "
--			"address = 0x%x\n", info->ctrl.len, info->address);
-+	offset = info->address & alignment_mask;
-+	switch (offset) {
-+	case 0:
-+		/* Aligned */
-+		break;
-+	case 1:
-+		/* Allow single byte watchpoint. */
-+		if (info->ctrl.len == ARM_BREAKPOINT_LEN_1)
-+			break;
-+	case 2:
-+		/* Allow halfword watchpoints and breakpoints. */
-+		if (info->ctrl.len == ARM_BREAKPOINT_LEN_2)
-+			break;
-+	default:
-+		ret = -EINVAL;
-+		goto out;
+ 	} else {
+ 		/* Watchpoint */
+-		ctrl_base = ARM_BASE_WCR;
+-		val_base = ARM_BASE_WVR;
++		if (info->step_ctrl.enabled) {
++			/* Install into the reserved breakpoint region. */
++			ctrl_base = ARM_BASE_BCR + core_num_brps;
++			val_base = ARM_BASE_BVR + core_num_brps;
++			/* Override the watchpoint data with the step data. */
++			addr = info->trigger & ~0x3;
++			ctrl = encode_ctrl_reg(info->step_ctrl);
++		} else {
++			ctrl_base = ARM_BASE_WCR;
++			val_base = ARM_BASE_WVR;
++		}
+ 		slots = __get_cpu_var(wp_on_reg);
+ 		max_slots = core_num_wrps;
+ 	}
+@@ -379,12 +368,11 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
+ 		goto out;
  	}
  
-+	info->address &= ~alignment_mask;
-+	info->ctrl.len <<= offset;
+-setup:
+ 	/* Setup the address register. */
+-	write_wb_reg(val_base + i, info->address);
++	write_wb_reg(val_base + i, addr);
+ 
+ 	/* Setup the control register. */
+-	write_wb_reg(ctrl_base + i, encode_ctrl_reg(info->ctrl) | 0x1);
++	write_wb_reg(ctrl_base + i, ctrl);
+ 
+ out:
+ 	return ret;
+@@ -401,15 +389,12 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
+ 		base = ARM_BASE_BCR;
+ 		slots = __get_cpu_var(bp_on_reg);
+ 		max_slots = core_num_brps;
+-
+-		if (bp_is_single_step(bp)) {
+-			i = max_slots;
+-			slots[i] = NULL;
+-			goto reset;
+-		}
+ 	} else {
+ 		/* Watchpoint */
+-		base = ARM_BASE_WCR;
++		if (info->step_ctrl.enabled)
++			base = ARM_BASE_BCR + core_num_brps;
++		else
++			base = ARM_BASE_WCR;
+ 		slots = __get_cpu_var(wp_on_reg);
+ 		max_slots = core_num_wrps;
+ 	}
+@@ -427,7 +412,6 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
+ 	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot"))
+ 		return;
+ 
+-reset:
+ 	/* Reset the control register. */
+ 	write_wb_reg(base + i, 0);
+ }
+@@ -577,7 +561,7 @@ static int arch_build_bp_info(struct perf_event *bp)
+ 
+ 	/* Privilege */
+ 	info->ctrl.privilege = ARM_BREAKPOINT_USER;
+-	if (arch_check_bp_in_kernelspace(bp) && !bp_is_single_step(bp))
++	if (arch_check_bp_in_kernelspace(bp))
+ 		info->ctrl.privilege |= ARM_BREAKPOINT_PRIV;
+ 
+ 	/* Enabled? */
+@@ -663,22 +647,18 @@ static void update_mismatch_flag(int idx, int flag)
+ static void watchpoint_handler(unsigned long unknown, struct pt_regs *regs)
+ {
+ 	int i;
+-	struct perf_event *bp, **slots = __get_cpu_var(wp_on_reg);
++	struct perf_event *wp, **slots = __get_cpu_var(wp_on_reg);
+ 	struct arch_hw_breakpoint *info;
+-	struct perf_event_attr attr;
+ 
+ 	/* Without a disassembler, we can only handle 1 watchpoint. */
+ 	BUG_ON(core_num_wrps > 1);
+ 
+-	hw_breakpoint_init(&attr);
+-	attr.bp_addr	= regs->ARM_pc & ~0x3;
+-	attr.bp_len	= HW_BREAKPOINT_LEN_4;
+-	attr.bp_type	= HW_BREAKPOINT_X;
+-
+ 	for (i = 0; i < core_num_wrps; ++i) {
+ 		rcu_read_lock();
+ 
+-		if (slots[i] == NULL) {
++		wp = slots[i];
 +
- 	/*
- 	 * Currently we rely on an overflow handler to take
- 	 * care of single-stepping the breakpoint when it fires.
++		if (wp == NULL) {
+ 			rcu_read_unlock();
+ 			continue;
+ 		}
+@@ -688,24 +668,60 @@ static void watchpoint_handler(unsigned long unknown, struct pt_regs *regs)
+ 		 * single watchpoint, we can set the trigger to the lowest
+ 		 * possible faulting address.
+ 		 */
+-		info = counter_arch_bp(slots[i]);
+-		info->trigger = slots[i]->attr.bp_addr;
++		info = counter_arch_bp(wp);
++		info->trigger = wp->attr.bp_addr;
+ 		pr_debug("watchpoint fired: address = 0x%x\n", info->trigger);
+-		perf_bp_event(slots[i], regs);
++		perf_bp_event(wp, regs);
+ 
+ 		/*
+ 		 * If no overflow handler is present, insert a temporary
+ 		 * mismatch breakpoint so we can single-step over the
+ 		 * watchpoint trigger.
+ 		 */
+-		if (!slots[i]->overflow_handler) {
+-			bp = register_user_hw_breakpoint(&attr,
+-							 wp_single_step_handler,
+-							 current);
+-			counter_arch_bp(bp)->suspended_wp = slots[i];
+-			perf_event_disable(slots[i]);
++		if (!wp->overflow_handler) {
++			arch_uninstall_hw_breakpoint(wp);
++			info->step_ctrl.mismatch  = 1;
++			info->step_ctrl.len	  = ARM_BREAKPOINT_LEN_4;
++			info->step_ctrl.type	  = ARM_BREAKPOINT_EXECUTE;
++			info->step_ctrl.privilege = info->ctrl.privilege;
++			info->step_ctrl.enabled	  = 1;
++			info->trigger		  = regs->ARM_pc;
++			arch_install_hw_breakpoint(wp);
++		}
++
++		rcu_read_unlock();
++	}
++}
++
++static void watchpoint_single_step_handler(unsigned long pc)
++{
++	int i;
++	struct perf_event *wp, **slots = __get_cpu_var(wp_on_reg);
++	struct arch_hw_breakpoint *info;
++
++	for (i = 0; i < core_num_reserved_brps; ++i) {
++		rcu_read_lock();
++
++		wp = slots[i];
++
++		if (wp == NULL)
++			goto unlock;
++
++		info = counter_arch_bp(wp);
++		if (!info->step_ctrl.enabled)
++			goto unlock;
++
++		/*
++		 * Restore the original watchpoint if we've completed the
++		 * single-step.
++		 */
++		if (info->trigger != pc) {
++			arch_uninstall_hw_breakpoint(wp);
++			info->step_ctrl.enabled = 0;
++			arch_install_hw_breakpoint(wp);
+ 		}
+ 
++unlock:
+ 		rcu_read_unlock();
+ 	}
+ }
+@@ -722,7 +738,8 @@ static void breakpoint_handler(unsigned long unknown, struct pt_regs *regs)
+ 	/* The exception entry code places the amended lr in the PC. */
+ 	addr = regs->ARM_pc;
+ 
+-	for (i = 0; i < core_num_brps + core_num_reserved_brps; ++i) {
++	/* Check the currently installed breakpoints first. */
++	for (i = 0; i < core_num_brps; ++i) {
+ 		rcu_read_lock();
+ 
+ 		bp = slots[i];
+@@ -749,7 +766,7 @@ static void breakpoint_handler(unsigned long unknown, struct pt_regs *regs)
+ 		}
+ 
+ unlock:
+-		if ((mismatch && !info->ctrl.mismatch) || bp_is_single_step(bp)) {
++		if (mismatch && !info->ctrl.mismatch) {
+ 			pr_debug("breakpoint fired: address = 0x%x\n", addr);
+ 			perf_bp_event(bp, regs);
+ 		}
+@@ -757,6 +774,9 @@ unlock:
+ 		update_mismatch_flag(i, mismatch);
+ 		rcu_read_unlock();
+ 	}
++
++	/* Handle any pending watchpoint single-step breakpoints. */
++	watchpoint_single_step_handler(addr);
+ }
+ 
+ /*
 -- 
 1.7.0.4
