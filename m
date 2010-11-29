@@ -1,130 +1,321 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 29 Nov 2010 19:59:15 +0800
-Subject: [PATCH v2 10/15] ARM: mxs: Add static memory mapping
+Date: Mon, 29 Nov 2010 19:59:14 +0800
+Subject: [PATCH v2 06/15] ARM: mxs: Add timer support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1291031956-30314-5-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1291031956-30314-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create static memory mapping for MX23 and MX28.
+Freescale MXS-based SoCs implement timer support in block TIMROT.
+There are two versions of TIMROT. The v1 on MX23 only gets 16 bits
+counter and has no match function. The v2 on MX28 extends the
+counter to 32 bits and add the match function.
+
+As the result, we need two instances of timers with v1 for better
+implementation, one for next_event and another for get_cycles.
+Otherwise, get_cycles may get imprecise result after long time
+cumulating. With v2, one instance can serve two purposes well.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
-Changes for v2:
- - Remove the calls to mxs_set_cpu_type()
+ - Fix a bug in timrot_set_next_event(). It should read
+   HW_TIMROT_RUNNING_COUNTn to get the current counts.
 
- arch/arm/mach-mxs/mm-mx23.c |   47 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mm-mx28.c |   47 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 94 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/mm-mx23.c
- create mode 100644 arch/arm/mach-mxs/mm-mx28.c
+ arch/arm/mach-mxs/timer.c |  285 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 285 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/timer.c
 
-diff --git a/arch/arm/mach-mxs/mm-mx23.c b/arch/arm/mach-mxs/mm-mx23.c
+diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
 new file mode 100644
-index 0000000..d254064
+index 0000000..b07e2e9
 --- /dev/null
-+++ b/arch/arm/mach-mxs/mm-mx23.c
-@@ -0,0 +1,47 @@
++++ b/arch/arm/mach-mxs/timer.c
+@@ -0,0 +1,285 @@
 +/*
-+ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright (C) 2000-2001 Deep Blue Solutions
++ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ *  Copyright (C) 2006-2007 Pavel Pisa (ppisa at pikron.com)
++ *  Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
++ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License.  You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ *
-+ * Create static mapping between physical to virtual memory.
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
 + */
 +
-+#include <linux/mm.h>
-+#include <linux/init.h>
-+
-+#include <asm/mach/map.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/clockchips.h>
++#include <linux/clk.h>
 +
 +#include <mach/hardware.h>
++#include <asm/mach/time.h>
 +#include <mach/common.h>
-+#include <mach/iomux.h>
 +
 +/*
-+ * Define the MX23 memory map.
++ * There are 2 versions of the timrot on Freescale MXS-based SoCs.
++ * The v1 on MX23 only gets 16 bits counter and has no match function.
++ * The v2 on MX28 extends the counter to 32 bits and add the match function.
++ *
++ * As the result, we need two instances of timers with v1 for better
++ * implementation, one for next_event and another for get_cycles. Otherwise,
++ * get_cycles may get imprecise result after long time cumulating.
++ * With v2, one instance can serve two purposes well.
 + */
-+static struct map_desc mx23_io_desc[] __initdata = {
-+	mxs_map_entry(MX23, OCRAM, MT_DEVICE),
-+	mxs_map_entry(MX23, IO, MT_DEVICE),
++#define timrot_is_v1()	(cpu_is_mx23())
++
++#define HW_TIMROT_ROTCTRL			0x00
++#define HW_TIMROT_TIMCTRLn(n)			(0x20 + (n) * 0x40)
++#define HW_TIMROT_RUNNING_COUNTn(n)		(0x30 + (n) * 0x40)
++#define HW_TIMROT_MATCH_COUNTn(n)		(0x50 + (n) * 0x40)
++#define BM_TIMROT_TIMCTRLn_RELOAD		(1 << 6)
++#define BM_TIMROT_TIMCTRLn_UPDATE		(1 << 7)
++#define BM_TIMROT_TIMCTRLn_MATCH_MODE		(1 << 11)
++#define BM_TIMROT_TIMCTRLn_IRQ_EN		(1 << 14)
++#define BM_TIMROT_TIMCTRLn_IRQ			(1 << 15)
++#define BP_TIMROT_TIMCTRLn_SELECT		0
++#define BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL	(timrot_is_v1() ? 0x8 : 0xb)
++
++static struct clock_event_device clockevent_mxs;
++static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
++
++static void __iomem *timer_base;
++
++static inline void timrot_irq_disable(void)
++{
++	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
++			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
++}
++
++static inline void timrot_irq_enable(void)
++{
++	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
++			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_SET_ADDR);
++}
++
++static void timrot_irq_acknowledge(void)
++{
++	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ,
++			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
++}
++
++static cycle_t timrot_get_cycles(struct clocksource *cs)
++{
++	if (timrot_is_v1())
++		return ~((__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(1))
++				& 0xffff0000) >> 16);
++	else
++		return ~__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(0));
++}
++
++static int timrot_set_next_event(unsigned long evt,
++					struct clock_event_device *dev)
++{
++	unsigned long match;
++	int ret;
++
++	/* timrot decrements the count */
++	if (timrot_is_v1()) {
++		__raw_writel(evt, timer_base + HW_TIMROT_RUNNING_COUNTn(0));
++		ret = 0;
++	} else {
++		match = __raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(0))
++				- evt;
++		__raw_writel(match, timer_base + HW_TIMROT_MATCH_COUNTn(0));
++		ret = (int)(match - __raw_readl(timer_base +
++				HW_TIMROT_RUNNING_COUNTn(0))) > 0 ? -ETIME : 0;
++	}
++
++	return ret;
++}
++
++static irqreturn_t mxs_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = &clockevent_mxs;
++
++	timrot_irq_acknowledge();
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction mxs_timer_irq = {
++	.name		= "MXS Timer Tick",
++	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= mxs_timer_interrupt,
 +};
 +
-+/*
-+ * This function initializes the memory map. It is called during the
-+ * system startup to create static physical to virtual memory mappings
-+ * for the IO modules.
-+ */
-+void __init mx23_map_io(void)
++#ifdef DEBUG
++static const char *clock_event_mode_label[] = {
++	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
++	[CLOCK_EVT_MODE_ONESHOT]  = "CLOCK_EVT_MODE_ONESHOT",
++	[CLOCK_EVT_MODE_SHUTDOWN] = "CLOCK_EVT_MODE_SHUTDOWN",
++	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED"
++};
++#endif /* DEBUG */
++
++static void mxs_set_mode(enum clock_event_mode mode,
++				struct clock_event_device *evt)
 +{
-+	mxs_iomux_init(MX23_IO_ADDRESS(MX23_PINCTRL_BASE_ADDR));
-+	mxs_arch_reset_init(MX23_IO_ADDRESS(MX23_RTC_BASE_ADDR));
-+	iotable_init(mx23_io_desc, ARRAY_SIZE(mx23_io_desc));
++	unsigned long flags;
++
++	/*
++	 * The timer interrupt generation is disabled at least
++	 * for enough time to call mxs_set_next_event()
++	 */
++	local_irq_save(flags);
++
++	/* Disable interrupt in timer module */
++	timrot_irq_disable();
++
++	if (mode != clockevent_mode) {
++		/* Set event time into far-far future */
++		__raw_writel(__raw_readl(timer_base +
++				HW_TIMROT_RUNNING_COUNTn(0)) + 3,
++				timer_base + HW_TIMROT_MATCH_COUNTn(0));
++
++		/* Clear pending interrupt */
++		timrot_irq_acknowledge();
++	}
++
++#ifdef DEBUG
++	printk(KERN_INFO "mxs_set_mode: changing mode from %s to %s\n",
++		clock_event_mode_label[clockevent_mode],
++		clock_event_mode_label[mode]);
++#endif /* DEBUG */
++
++	/* Remember timer mode */
++	clockevent_mode = mode;
++	local_irq_restore(flags);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		printk(KERN_ERR "mxs_set_mode: Periodic mode is not "
++				"supported for MXS-based\n");
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++	/*
++	 * Do not put overhead of interrupt enable/disable into
++	 * mxs_set_next_event(), the core has about 4 minutes
++	 * to call mxs_set_next_event() or shutdown clock after
++	 * mode switching
++	 */
++		local_irq_save(flags);
++		timrot_irq_enable();
++		local_irq_restore(flags);
++		break;
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_RESUME:
++		/* Left event sources disabled, no more interrupts appear */
++		break;
++	}
 +}
 +
-+void __init mx23_init_irq(void)
-+{
-+	icoll_init_irq(MX23_IO_ADDRESS(MX23_ICOLL_BASE_ADDR));
-+	mx23_register_gpios();
-+}
-diff --git a/arch/arm/mach-mxs/mm-mx28.c b/arch/arm/mach-mxs/mm-mx28.c
-new file mode 100644
-index 0000000..38c27bc
---- /dev/null
-+++ b/arch/arm/mach-mxs/mm-mx28.c
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License.  You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ *
-+ * Create static mapping between physical to virtual memory.
-+ */
-+
-+#include <linux/mm.h>
-+#include <linux/init.h>
-+
-+#include <asm/mach/map.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/common.h>
-+#include <mach/iomux.h>
-+
-+/*
-+ * Define the MX28 memory map.
-+ */
-+static struct map_desc mx28_io_desc[] __initdata = {
-+	mxs_map_entry(MX28, OCRAM, MT_DEVICE),
-+	mxs_map_entry(MX28, IO, MT_DEVICE),
++static struct clock_event_device clockevent_mxs = {
++	.name		= "mxs_timrot",
++	.features	= CLOCK_EVT_FEAT_ONESHOT,
++	.shift		= 32,
++	.set_mode	= mxs_set_mode,
++	.set_next_event	= timrot_set_next_event,
++	.rating		= 200,
 +};
 +
-+/*
-+ * This function initializes the memory map. It is called during the
-+ * system startup to create static physical to virtual memory mappings
-+ * for the IO modules.
-+ */
-+void __init mx28_map_io(void)
++static int __init mxs_clockevent_init(struct clk *timer_clk)
 +{
-+	mxs_iomux_init(MX28_IO_ADDRESS(MX28_PINCTRL_BASE_ADDR));
-+	mxs_arch_reset_init(MX28_IO_ADDRESS(MX28_RTC_BASE_ADDR));
-+	iotable_init(mx28_io_desc, ARRAY_SIZE(mx28_io_desc));
++	unsigned int c = clk_get_rate(timer_clk);
++
++	clockevent_mxs.mult = div_sc(c, NSEC_PER_SEC, clockevent_mxs.shift);
++	clockevent_mxs.cpumask = cpumask_of(0);
++	if (timrot_is_v1()) {
++		clockevent_mxs.max_delta_ns =
++			clockevent_delta2ns(0xfffe, &clockevent_mxs);
++		clockevent_mxs.min_delta_ns =
++			clockevent_delta2ns(0xf, &clockevent_mxs);
++	} else {
++		clockevent_mxs.max_delta_ns =
++			clockevent_delta2ns(0xfffffffe, &clockevent_mxs);
++		clockevent_mxs.min_delta_ns =
++			clockevent_delta2ns(0xff, &clockevent_mxs);
++	}
++
++	clockevents_register_device(&clockevent_mxs);
++
++	return 0;
 +}
 +
-+void __init mx28_init_irq(void)
++static struct clocksource clocksource_mxs = {
++	.name 		= "mxs_timer",
++	.rating		= 200,
++	.read		= timrot_get_cycles,
++	.mask		= CLOCKSOURCE_MASK(32),
++	.shift 		= 10,
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static int __init mxs_clocksource_init(struct clk *timer_clk)
 +{
-+	icoll_init_irq(MX28_IO_ADDRESS(MX28_ICOLL_BASE_ADDR));
-+	mx28_register_gpios();
++	unsigned int c = clk_get_rate(timer_clk);
++
++	if (timrot_is_v1())
++		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
++	clocksource_mxs.mult = clocksource_hz2mult(c, clocksource_mxs.shift);
++	clocksource_register(&clocksource_mxs);
++
++	return 0;
++}
++
++void __init mxs_timer_init(struct clk *timer_clk,
++				void __iomem *base, int irq)
++{
++	clk_enable(timer_clk);
++
++	timer_base = base;
++
++	/*
++	 * Initialize timers to a known state
++	 */
++	mxs_reset_block(base + HW_TIMROT_ROTCTRL);
++
++	if (timrot_is_v1()) {
++		/* timer0 is for next_event */
++		__raw_writel(
++			BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL |
++			BM_TIMROT_TIMCTRLn_UPDATE |
++			BM_TIMROT_TIMCTRLn_IRQ_EN,
++			base + HW_TIMROT_TIMCTRLn(0));
++		/* timer1 is for get_cycles */
++		__raw_writel(
++			BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL |
++			BM_TIMROT_TIMCTRLn_RELOAD,
++			base + HW_TIMROT_TIMCTRLn(1));
++		__raw_writel(0xffff, timer_base  + HW_TIMROT_RUNNING_COUNTn(1));
++
++	} else {
++		__raw_writel(
++			BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL |
++			BM_TIMROT_TIMCTRLn_IRQ_EN |
++			BM_TIMROT_TIMCTRLn_MATCH_MODE,
++			timer_base + HW_TIMROT_TIMCTRLn(0));
++	}
++
++	/* init and register the timer to the framework */
++	mxs_clocksource_init(timer_clk);
++	mxs_clockevent_init(timer_clk);
++
++	/* Make irqs happen */
++	setup_irq(irq, &mxs_timer_irq);
 +}
 -- 
 1.7.1
