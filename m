@@ -1,47 +1,57 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Mon, 29 Nov 2010 20:52:55 +0200
-Subject: [PATCH] ARM: Gemini: Add support for PCI BUS
-In-Reply-To: <201011291745.22566.arnd@arndb.de>
-References: <1290860675-15453-1-git-send-email-ulli.kroll@googlemail.com>
-	<201011282056.17389.arnd@arndb.de> <4CF3CF33.20407@gmail.com>
-	<201011291745.22566.arnd@arndb.de>
-Message-ID: <4CF3F687.6040801@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Nov 2010 11:02:44 -0800
+Subject: [GIT PULL] omap serial console with PM fixes
+Message-ID: <20101129190244.GD17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2010 06:45 PM, Arnd Bergmann wrote:
-> On Monday 29 November 2010, Paulius Zaleckas wrote:
->>> The I/O ordering is probably not what you think it is.
->>> There is no ordering guarantee between __raw_writel and
->>> spin_lock/spin_unlock, so you really should be using
->>> readl/writel.
->>
->> No he really should NOT use readl/writel. The ONLY difference
->> between readl/writel and __raw_readl/__raw_writel is endianess
->> conversion. __raw_*l is not doing it. Which to use depend only
->> on HW.
->
-> There are many differences between readl and __raw_readl, including
->
-> * __raw_readl does not have barriers and does not serialize with
->    spinlocks, so it breaks on out-of-order CPUs.
-> * __raw_readl does not have a specific endianess, while readl is
->    fixed little-endian, just as the hardware is in this case.
->    The endian-conversion is a NOP on little-endian ARM, but required
->    if you actually run on a big-endian ARM (you don't).
-> * __raw_readl may not be atomic, gcc is free to split the access
->    into byte wise reads (it normally does not, unless you mark
->    the pointer __attribute__((packed))).
->
-> In essence, it is almost never a good idea to use __raw_readl, and
-> the double underscores should tell you so.
+Hi Linus,
 
-You are wrong:
+Please pull two patches to fix omap serial console with PM enabled:
 
-Since CONFIG_ARM_DMA_MEM_BUFFERABLE is NOT defined for FA526 core,
-no barriers are in use when using readl. It just translates into
-le32_to_cpu(__raw_readl(x)). Now this CPU has physical pin for endianess
-configuration and if you will chose big-endian you will fail to read
-internal registers, because they ALSO change endianess and le32_to_cpu()
-will screw it. However it is different when accessing registers through
-PCI bus, then you need to use readl().
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Both fix issues are related to conversion from 8250 to omap-serial done
+in commit 6f251e9db1093c187addc309b5f2f7fe3efd2995 ("OMAP: UART: omap_device
+conversions, remove implicit 8520 assumptions").
+
+With the commit above, we are now idling devices using omap generic
+code instead of tinkering with the uart registers directly. However,
+we may now have pr_debug and pr_warning in the idle path that we
+did not have earlier.
+
+Without the second patch in this series the system may hang when PM
+is enabled. The first patch in the series fixes a related issue if only
+some of the uarts are enabled.
+
+Apologies for the rather intrusive fix this late. The long term fix
+is to let omap-serial.c manage it's own idle state but that's not ready
+yet and can't be done as a fix.
+
+An alternative fix for the -rc series would be to remove the pr_debug
+and pr_warning from the idle path, but that really only fixes the
+symptoms, not the cause.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 0b9466ccea3c4ec363737288dd9467bf978c9c2d:
+
+  Merge master.kernel.org:/home/rmk/linux-2.6-arm (2010-11-25 07:41:10 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Kevin Hilman (1):
+      OMAP: UART: don't resume UARTs that are not enabled.
+
+Paul Walmsley (1):
+      OMAP2+: PM/serial: hold console semaphore while OMAP UARTs are disabled
+
+ arch/arm/mach-omap2/pm24xx.c |    7 +++++++
+ arch/arm/mach-omap2/pm34xx.c |   10 ++++++++++
+ arch/arm/mach-omap2/serial.c |    7 ++++++-
+ 3 files changed, 23 insertions(+), 1 deletions(-)
