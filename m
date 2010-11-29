@@ -1,43 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 29 Nov 2010 19:25:30 +0900
-Subject: [Question] Local Timer based on SPI
-In-Reply-To: <20101126091004.GD9310@n2100.arm.linux.org.uk>
-References: <000001cb8d0d$dbacd760$93068620$%kim@samsung.com>
-	<20101126091004.GD9310@n2100.arm.linux.org.uk>
-Message-ID: <000b01cb8faf$c1841a20$448c4e60$%kim@samsung.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 29 Nov 2010 12:28:11 +0200
+Subject: [PATCH v3] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
+In-Reply-To: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
+References: <1289030074-5233-1-git-send-email-anarsoul@gmail.com>
+	<201011291156.09784.anarsoul@gmail.com>
+	<000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
+Message-ID: <201011291228.12002.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
+On Monday 29 November 2010 12:15:03 Kukjin Kim wrote:
+
+> Hi,
 > 
-> On Fri, Nov 26, 2010 at 11:01:31AM +0900, Kukjin Kim wrote:
-> > Current ARM Local Timer code is based on PPI using.
-> > If want to use SPI on local timer, what approach is right or better?
-> 
-> SPI interrupts only go to one core at a time.  You can't have local
-> timer support off a targetted interrupt.
+> Actually, I didn't get your patch through my e-mail.
+> Maybe you missed my e-mail in Cc at that time and I missed your patch in
+> mailing list. Could you please re-send it so that can get the patch via
+> e-mail?
 
-Hi Russell,
+Ok, will do in few minutes
 
-Thank you for your reply :-)
+> Now, thanks for adding me, will review...
 
-Yeah, it seems CONFIG_LOCAL_TIMER is just for PPI.
+Thanks
 
-The purpose of my question is for the plan to use different SPIs to support
-each CPU event timer. According to the help message of LOCAL_TIMER in
-Kconfig, it seems better each CPU has a different event timer source clock
-instead of using IPI broadcast method. Current ARM implementation registers
-dummy_timers when CONFIG_LOCAL_TIMERS is not set so, I think need to set
-CONFIG_LOCAL_TIMERS.
+> I think, we have some time to fix it for 37, so don't worry about broken
+> 37-stable.
 
-To support different SPIs for each CPU event timer, should I neglect the
-dummy_timer?
-Or is it not worth to implement?...
+Ok
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Vasily
