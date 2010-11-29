@@ -1,72 +1,74 @@
-From: fg@emlix.com (Fabian Godehardt)
-Date: Mon, 29 Nov 2010 07:39:20 +0100
-Subject: [PATCH] ARM: s3c2440: fix AC97 and camera clock registration
-In-Reply-To: <00b501cb8c76$edb20e90$c9162bb0$%kim@samsung.com>
-References: <1289989343-28816-1-git-send-email-fg@emlix.com>
-	<00b501cb8c76$edb20e90$c9162bb0$%kim@samsung.com>
-Message-ID: <201011290739.20460.fg@emlix.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 29 Nov 2010 14:43:33 +0800
+Subject: [PATCH 1/8] ARM: pxa: append missing class register for clock
+	sysdev
+In-Reply-To: <1290570865-7577-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1290570865-7577-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTi=UivX=0YkK-JevXCH0i3D0xfWzxBqHWEUpXw0H@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 24, 2010 at 11:54 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
 
-> How about following for fix usage field?
-> 
-> diff --git a/arch/arm/mach-s3c2440/clock.c b/arch/arm/mach-s3c2440/clock.c
-> index 3dc2426..2f393cb 100644
-> --- a/arch/arm/mach-s3c2440/clock.c
-> +++ b/arch/arm/mach-s3c2440/clock.c
-> @@ -108,11 +108,12 @@ static struct clk s3c2440_clk_ac97 = {
->         .name           = "ac97",
->         .id             = -1,
->         .enable         = s3c2410_clkcon_enable,
-> -       .ctrlbit        = S3C2440_CLKCON_CAMERA,
-> +       .ctrlbit        = S3C2440_CLKCON_AC97,
->  };
-> 
->  static int s3c2440_clk_add(struct sys_device *sysdev)
->  {
-> +       unsigned long clkcon  = __raw_readl(S3C2410_CLKCON);
+Good catch. Applied into the previous patch with your SOB. Thanks.
 
-Yes, you are right. The clocks should be checked :).
-
->         struct clk *clock_upll;
->         struct clk *clock_h;
->         struct clk *clock_p;
-> @@ -130,6 +131,9 @@ static int s3c2440_clk_add(struct sys_device *sysdev)
->         s3c2440_clk_ac97.parent = clock_p;
->         s3c2440_clk_cam_upll.parent = clock_upll;
-> 
-> +       s3c2440_clk_cam.usage = clkcon & s3c2440_clk_cam.ctrlbit ? 1 : 0;
-> +       s3c2440_clk_ac97.usage = clkcon & s3c2440_clk_ac97.ctrlbit ? 1 : 0;
+> ---
+> ?arch/arm/mach-pxa/clock-pxa2xx.c | ? ?8 ++++++++
+> ?arch/arm/mach-pxa/clock-pxa3xx.c | ? 10 ++++++++++
+> ?2 files changed, 18 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/clock-pxa2xx.c b/arch/arm/mach-pxa/clock-pxa2xx.c
+> index 66eb531..1ce0904 100644
+> --- a/arch/arm/mach-pxa/clock-pxa2xx.c
+> +++ b/arch/arm/mach-pxa/clock-pxa2xx.c
+> @@ -54,3 +54,11 @@ struct sysdev_class pxa2xx_clock_sysclass = {
+> ? ? ? ?.suspend ? ? ? ?= pxa2xx_clock_suspend,
+> ? ? ? ?.resume ? ? ? ? = pxa2xx_clock_resume,
+> ?};
 > +
->         s3c24xx_register_clock(&s3c2440_clk_ac97);
->         s3c24xx_register_clock(&s3c2440_clk_cam);
->         s3c24xx_register_clock(&s3c2440_clk_cam_upll);
-> 
-
-But in the following lines the clocks are disabled again. So if the usage was 
-set to '0' on the check above, we get '-1' again.
-I would prefer to use your code and additionally do the check again before the 
-clocks are disabled. Something like this:
-
--		clk_disable(&s3c2440_clk_ac97);
--		clk_disable(&s3c2440_clk_cam);
-+		if (s3c2440_clk_ac97.usage)
-+			clk_disable(&s3c2440_clk_ac97);
-+
-+		if (s3c2440_clk_cam.usage)
-+			clk_disable(&s3c2440_clk_cam);
-
-
-Mit freundlichen Gr??en/With kind regards
-
-Fabian Godehardt
-
--- 
-Dipl.-Ing. (FH) Fabian Godehardt, emlix GmbH, http://www.emlix.com
-Fon +49 551 30664-0, Fax -11, Bahnhofsallee 1b, 37081 G?ttingen, Germany
-Sitz der Gesellschaft: G?ttingen, Amtsgericht G?ttingen HR B 3160
-Gesch?ftsf?hrer: Dr. Uwe Kracke, Ust-IdNr.: DE 205 198 055
-
-emlix - your embedded linux partner
+> +static int __init pxa2xx_clock_init(void)
+> +{
+> + ? ? ? if (cpu_is_pxa2xx())
+> + ? ? ? ? ? ? ? return sysdev_class_register(&pxa2xx_clock_sysclass);
+> + ? ? ? return 0;
+> +}
+> +postcore_initcall(pxa2xx_clock_init);
+> diff --git a/arch/arm/mach-pxa/clock-pxa3xx.c b/arch/arm/mach-pxa/clock-pxa3xx.c
+> index 16b4c5f..dd122d9 100644
+> --- a/arch/arm/mach-pxa/clock-pxa3xx.c
+> +++ b/arch/arm/mach-pxa/clock-pxa3xx.c
+> @@ -169,6 +169,7 @@ static int pxa3xx_clock_suspend(struct sys_device *d, pm_message_t state)
+> ? ? ? ?cken[0] = CKENA;
+> ? ? ? ?cken[1] = CKENB;
+> ? ? ? ?accr = ACCR;
+> + ? ? ? return 0;
+> ?}
+>
+> ?static int pxa3xx_clock_resume(struct sys_device *d)
+> @@ -176,6 +177,7 @@ static int pxa3xx_clock_resume(struct sys_device *d)
+> ? ? ? ?ACCR = accr;
+> ? ? ? ?CKENA = cken[0];
+> ? ? ? ?CKENB = cken[1];
+> + ? ? ? return 0;
+> ?}
+> ?#else
+> ?#define pxa3xx_clock_suspend ? NULL
+> @@ -187,3 +189,11 @@ struct sysdev_class pxa3xx_clock_sysclass = {
+> ? ? ? ?.suspend ? ? ? ?= pxa3xx_clock_suspend,
+> ? ? ? ?.resume ? ? ? ? = pxa3xx_clock_resume,
+> ?};
+> +
+> +static int __init pxa3xx_clock_init(void)
+> +{
+> + ? ? ? if (cpu_is_pxa3xx())
+> + ? ? ? ? ? ? ? return sysdev_class_register(&pxa3xx_clock_sysclass);
+> + ? ? ? return 0;
+> +}
+> +postcore_initcall(pxa3xx_clock_init);
+> --
+> 1.5.6.5
+>
