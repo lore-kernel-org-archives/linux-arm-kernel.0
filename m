@@ -1,27 +1,46 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 29 Nov 2010 15:59:21 +0800
-Subject: [PATCH 1/3] Add a common struct clk
-In-Reply-To: <AANLkTimuw=FfHn7KtbkNSgwqAkS-6CKA4Rx=-dac-dhg@mail.gmail.com>
-References: <1284522014.516876.675872472687.0.gpush@pororo>
-	<1284522014.517347.33297989274.1.gpush@pororo>
-	<AANLkTimuw=FfHn7KtbkNSgwqAkS-6CKA4Rx=-dac-dhg@mail.gmail.com>
-Message-ID: <201011291559.21928.jeremy.kerr@canonical.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Mon, 29 Nov 2010 09:12:51 +0100 (CET)
+Subject: [PATCH] ARM: Gemini: Add support for PCI Bus
+In-Reply-To: <201011271639.21694.arnd@arndb.de>
+References: <1290263224-16965-1-git-send-email-ulli.kroll@googlemail.com>
+	<alpine.LNX.2.00.1011271306420.7659@localhost.localdomain>
+	<AANLkTinbAVFE+HZrx+9KUwx8=MKFHPqrhpOpAWAEQFv-@mail.gmail.com>
+	<201011271639.21694.arnd@arndb.de>
+Message-ID: <alpine.LNX.2.00.1011290912270.10937@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
->   Are you planning to revise the patch-set or just taking time to
-> resubmit as such?
-
-I've reworked this patch to allow clocks that are enabled/disabled in atomic 
-contexts, it's here if you'd like a preview:
-
-http://kernel.ubuntu.com/git?p=jk/dt/linux-2.6.git;a=commitdiff;h=33220e119d3213282d4234fec7438baa6d04b5f0
-
-I'm just waiting on some initial feedback, will post to l-a-k once that's in.
-
-Regards,
 
 
-Jeremy
+On Sat, 27 Nov 2010, Arnd Bergmann wrote:
+
+> On Saturday 27 November 2010 14:01:20 Micha? Miros?aw wrote:
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index db524e7..74ea522 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1164,7 +1164,7 @@ config ISA_DMA_API
+> >         bool
+> > 
+> >  config PCI
+> > -       bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
+> > ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
+> > +       bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||
+> > ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX ||
+> > ARCH_GEMINI
+> >         help
+> >           Find out whether you have a PCI motherboard. PCI is the name of a
+> >           bus system, i.e. the way the CPU talks to the other stuff inside
+> > 
+> 
+> This approach really does not scale as we add more boards to the list.
+> 
+> Better make a new CONFIG_HAVE_PCI option that you can select from the
+> individual boards, and make that the only dependency that CONFIG_PCI has.
+> 
+> 	Arnd
+> 
+Good idea.
+I write a patch for this.
+
+Ulli
