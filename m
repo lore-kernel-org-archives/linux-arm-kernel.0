@@ -1,131 +1,224 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 29 Nov 2010 19:36:31 +0900
-Subject: [PATCH 10/10] RTC S3C: Fix type of s3c_rtc_setaie()
-In-Reply-To: <1290969115-10291-1-git-send-email-jekhor@gmail.com>
-References: <1290969115-10291-1-git-send-email-jekhor@gmail.com>
-Message-ID: <000c01cb8fb1$4b569560$e203c020$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Nov 2010 10:41:49 +0000
+Subject: [PATCH][ ARM cpu hotplug 1/2 ] extract common code for arm cpu
+	hotplug
+In-Reply-To: <AANLkTimz=xv92c6FN4i4c3Xs-t71L4PHv3SQg0jk-x-r@mail.gmail.com>
+References: <AANLkTi=fJeOUhH0xUJF8qx-fTJ5popE7ZuVxDZXpTH-i@mail.gmail.com>
+	<AANLkTimz=xv92c6FN4i4c3Xs-t71L4PHv3SQg0jk-x-r@mail.gmail.com>
+Message-ID: <20101129104149.GA10703@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yauhen Kharuzhy wrote:
-> 
-> Change s3c_rtc_setaie() declaration in accordance with rtc_class_ops
-> structure declaration.
-> 
-Hi,
+On Mon, Nov 29, 2010 at 10:54:35AM +0100, Vincent Guittot wrote:
+> This patch extracts the common code of the cpu hotplug feature across
+> arm platforms. The goal is to only keep the specific stuff of the
+> platform in the sub-architecture. I have created a hotplug.c file in
+> the ?arm/common directory after studying the cpu hotplug code of
+> omap2, realview, s5pv310, ux500 and tegra. I have extracted 3 main
+> platform dependent functions:
+> ?-platform_enter_lowpower which prepares the platform for low power.
+> ?-platform_do_lowpower on which the cpu will loop until it becomes
+> really plugged (spurious wake up). This function must returned the cpu
+> Id in order to leave the unplug state.
+> ?-platform_leave_lowpower which restore the platform context.
 
-According to your patch description, this should be regarding fix
-s3c_rtc_setaie().
-But includes others :-(
+I still do not like this patch.  The only thing that is worth doing is
+this.  This leaves less than 256 bytes of object code in the Realview
+hotplug.c, most of which is the stuff to handle the low power mode
+which you haven't dealt with in your patch either.
 
-Please make sure your patch has no problem before submitting.
-As a note, already has been submitted about fix s3c_rtc_setaie().
+I see no point in adding another API on top of the already existing
+and simple API.
 
-> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
-> ---
->  arch/arm/mach-s3c2412/Kconfig  |    7 +++++++
->  arch/arm/mach-s3c2412/Makefile |    3 ++-
->  arch/arm/mach-s3c2416/Kconfig  |    1 +
->  drivers/rtc/rtc-s3c.c          |    8 +++++---
->  4 files changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2412/Kconfig b/arch/arm/mach-s3c2412/Kconfig
-> index fa2e5bf..6983cb4 100644
-> --- a/arch/arm/mach-s3c2412/Kconfig
-> +++ b/arch/arm/mach-s3c2412/Kconfig
-> @@ -28,9 +28,16 @@ config S3C2412_DMA
-> 
->  config S3C2412_PM
->  	bool
-> +	select S3C2412_PM_SLEEP
->  	help
->  	  Internal config node to apply S3C2412 power management
-> 
-> +config S3C2412_PM_SLEEP
-> +	bool
-> +	help
-> +	  Internal config node to apply sleep for S3C2412 power management.
-> +	  Can be selected by another SoCs with similar sleep procedure.
-> +
->  # Note, the S3C2412 IOtiming support is in plat-s3c24xx
-> 
->  config S3C2412_CPUFREQ
-> diff --git a/arch/arm/mach-s3c2412/Makefile
-b/arch/arm/mach-s3c2412/Makefile
-> index 530ec46..6c48a91 100644
-> --- a/arch/arm/mach-s3c2412/Makefile
-> +++ b/arch/arm/mach-s3c2412/Makefile
-> @@ -14,7 +14,8 @@ obj-$(CONFIG_CPU_S3C2412)	+= irq.o
->  obj-$(CONFIG_CPU_S3C2412)	+= clock.o
->  obj-$(CONFIG_CPU_S3C2412)	+= gpio.o
->  obj-$(CONFIG_S3C2412_DMA)	+= dma.o
-> -obj-$(CONFIG_S3C2412_PM)	+= pm.o sleep.o
-> +obj-$(CONFIG_S3C2412_PM)	+= pm.o
-> +obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep.o
->  obj-$(CONFIG_S3C2412_CPUFREQ)	+= cpu-freq.o
-> 
->  # Machine support
-> diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
-> index 2eaadcf..69b48a7 100644
-> --- a/arch/arm/mach-s3c2416/Kconfig
-> +++ b/arch/arm/mach-s3c2416/Kconfig
-> @@ -27,6 +27,7 @@ config S3C2416_DMA
-> 
->  config S3C2416_PM
->  	bool
-> +	select S3C2412_PM_SLEEP
->  	help
->  	  Internal config node to apply S3C2416 power management
-> 
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index cf953ec..4101522 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -77,7 +77,7 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
->  }
-> 
->  /* Update control registers */
-> -static void s3c_rtc_setaie(int to)
-> +static int s3c_rtc_setaie(struct device *dev, unsigned int to)
->  {
->  	unsigned int tmp;
-> 
-> @@ -89,6 +89,8 @@ static void s3c_rtc_setaie(int to)
->  		tmp |= S3C2410_RTCALM_ALMEN;
-> 
->  	writeb(tmp, s3c_rtc_base + S3C2410_RTCALM);
-> +
-> +	return 0;
->  }
-> 
->  static int s3c_rtc_setpie(struct device *dev, int enabled)
-> @@ -308,7 +310,7 @@ static int s3c_rtc_setalarm(struct device *dev, struct
-> rtc_wkalrm *alrm)
-> 
->  	writeb(alrm_en, base + S3C2410_RTCALM);
-> 
-> -	s3c_rtc_setaie(alrm->enabled);
-> +	s3c_rtc_setaie(dev, alrm->enabled);
-> 
->  	return 0;
->  }
-> @@ -440,7 +442,7 @@ static int __devexit s3c_rtc_remove(struct
-> platform_device *dev)
->  	rtc_device_unregister(rtc);
-> 
->  	s3c_rtc_setpie(&dev->dev, 0);
-> -	s3c_rtc_setaie(0);
-> +	s3c_rtc_setaie(&dev->dev, 0);
-> 
->  	clk_disable(rtc_clk);
->  	clk_put(rtc_clk);
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 8c19595..e8856aa 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -24,6 +24,7 @@
+ #include <linux/irq.h>
+ #include <linux/percpu.h>
+ #include <linux/clockchips.h>
++#include <linux/completion.h>
+ 
+ #include <asm/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -252,12 +253,19 @@ int __cpu_disable(void)
+ 	return 0;
+ }
+ 
++static DECLARE_COMPLETION(cpu_died);
++
+ /*
+  * called on the thread which is asking for a CPU to be shutdown -
+  * waits until shutdown has completed, or it is timed out.
+  */
+ void __cpu_die(unsigned int cpu)
+ {
++	if (wait_for_completion_timeout(&cpu_died, 5000)) {
++		printk("CPU%u: cpu didn't die\n");
++		return;
++	}
++
+ 	if (!platform_cpu_kill(cpu))
+ 		printk("CPU%u: unable to kill\n", cpu);
+ }
+@@ -277,6 +285,9 @@ void __ref cpu_die(void)
+ 	local_irq_disable();
+ 	idle_task_exit();
+ 
++	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
++	complete(&cpu_died);
++
+ 	/*
+ 	 * actual CPU shutdown procedure is at least platform (if not
+ 	 * CPU) specific
+diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+index f95521a..7d58c16 100644
+--- a/arch/arm/mach-realview/hotplug.c
++++ b/arch/arm/mach-realview/hotplug.c
+@@ -11,14 +11,11 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+-#include <linux/completion.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+ extern volatile int pen_release;
+ 
+-static DECLARE_COMPLETION(cpu_killed);
+-
+ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+@@ -95,7 +92,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 
+ int platform_cpu_kill(unsigned int cpu)
+ {
+-	return wait_for_completion_timeout(&cpu_killed, 5000);
++	return 1;
+ }
+ 
+ /*
+@@ -115,9 +112,6 @@ void platform_cpu_die(unsigned int cpu)
+ 	}
+ #endif
+ 
+-	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+-	complete(&cpu_killed);
+-
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+ 	 */
+diff --git a/arch/arm/mach-s5pv310/hotplug.c b/arch/arm/mach-s5pv310/hotplug.c
+index 03652c3..d7be70a 100644
+--- a/arch/arm/mach-s5pv310/hotplug.c
++++ b/arch/arm/mach-s5pv310/hotplug.c
+@@ -13,14 +13,11 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+-#include <linux/completion.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+ extern volatile int pen_release;
+ 
+-static DECLARE_COMPLETION(cpu_killed);
+-
+ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+@@ -98,7 +95,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 
+ int platform_cpu_kill(unsigned int cpu)
+ {
+-	return wait_for_completion_timeout(&cpu_killed, 5000);
++	return 1;
+ }
+ 
+ /*
+@@ -118,9 +115,6 @@ void platform_cpu_die(unsigned int cpu)
+ 	}
+ #endif
+ 
+-	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+-	complete(&cpu_killed);
+-
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+ 	 */
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index 8e7f115..ecaa41c 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -11,12 +11,9 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+-#include <linux/completion.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+-static DECLARE_COMPLETION(cpu_killed);
+-
+ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+@@ -94,7 +91,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 
+ int platform_cpu_kill(unsigned int cpu)
+ {
+-	return wait_for_completion_timeout(&cpu_killed, 5000);
++	return 1;
+ }
+ 
+ /*
+@@ -114,9 +111,6 @@ void platform_cpu_die(unsigned int cpu)
+ 	}
+ #endif
+ 
+-	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+-	complete(&cpu_killed);
+-
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+ 	 */
+diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+index b782a03..7a4890b 100644
+--- a/arch/arm/mach-ux500/hotplug.c
++++ b/arch/arm/mach-ux500/hotplug.c
+@@ -11,14 +11,11 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+-#include <linux/completion.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+ extern volatile int pen_release;
+ 
+-static DECLARE_COMPLETION(cpu_killed);
+-
+ static inline void platform_do_lowpower(unsigned int cpu)
+ {
+ 	flush_cache_all();
+@@ -38,7 +35,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 
+ int platform_cpu_kill(unsigned int cpu)
+ {
+-	return wait_for_completion_timeout(&cpu_killed, 5000);
++	return 1;
+ }
+ 
+ /*
+@@ -58,9 +55,6 @@ void platform_cpu_die(unsigned int cpu)
+ 	}
+ #endif
+ 
+-	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+-	complete(&cpu_killed);
+-
+ 	/* directly enter low power state, skipping secure registers */
+ 	platform_do_lowpower(cpu);
+ }
