@@ -1,66 +1,137 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Nov 2010 17:34:42 +0000
-Subject: [PATCH 2/8] ARM: hw_breakpoint: reset control registers in hotplug
-	path
+Date: Mon, 29 Nov 2010 17:34:44 +0000
+Subject: [PATCH 4/8] ARM: hw_breakpoint: disable preemption during debug
+	exception handling
 In-Reply-To: <1291052088-17243-1-git-send-email-will.deacon@arm.com>
 References: <1291052088-17243-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1291052088-17243-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1291052088-17243-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv7 debug architecture doesn't make any guarantees about the
-contents of debug control registers following a debug logic reset.
+On ARM, debug exceptions occur in the form of data or prefetch aborts.
+One difference is that debug exceptions require access to per-cpu banked
+registers and data structures which are not saved in the low-level exception
+code. For kernels built with CONFIG_PREEMPT, there is an unlikely scenario
+that the debug handler ends up running on a different CPU from the one
+that originally signalled the event, resulting in random data being read
+from the wrong registers.
 
-This patch ensures that we reset the control registers when a cpu
-comes ONLINE (for example, with hotplug) so that when we enable
-monitor mode while inserting a breakpoint we won't exhibit random
-behaviour.
+This patch adds a debug_entry macro to the low-level exception handling
+code which checks whether the taken exception is a debug exception. If
+it is, the preempt count for the faulting process is incremented. After
+the debug handler has finished, the count is decremented.
 
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c |   16 +++++++++++++++-
- 1 files changed, 15 insertions(+), 1 deletions(-)
+ arch/arm/kernel/entry-armv.S    |    4 ++++
+ arch/arm/kernel/entry-header.S  |   19 +++++++++++++++++++
+ arch/arm/kernel/hw_breakpoint.c |   14 +++++++++-----
+ 3 files changed, 32 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index c09e357..34bbef0 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -198,6 +198,7 @@ __dabt_svc:
+ 	@
+ 	@ set desired IRQ state, then call main handler
+ 	@
++	debug_entry r1
+ 	msr	cpsr_c, r9
+ 	mov	r2, sp
+ 	bl	do_DataAbort
+@@ -324,6 +325,7 @@ __pabt_svc:
+ #else
+ 	bl	CPU_PABORT_HANDLER
+ #endif
++	debug_entry r1
+ 	msr	cpsr_c, r9			@ Maybe enable interrupts
+ 	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
+@@ -439,6 +441,7 @@ __dabt_usr:
+ 	@
+ 	@ IRQs on, then call the main handler
+ 	@
++	debug_entry r1
+ 	enable_irq
+ 	mov	r2, sp
+ 	adr	lr, BSYM(ret_from_exception)
+@@ -703,6 +706,7 @@ __pabt_usr:
+ #else
+ 	bl	CPU_PABORT_HANDLER
+ #endif
++	debug_entry r1
+ 	enable_irq				@ Enable interrupts
+ 	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index d93f976..ae94649 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -165,6 +165,25 @@
+ 	.endm
+ #endif	/* !CONFIG_THUMB2_KERNEL */
+ 
++	@
++	@ Debug exceptions are taken as prefetch or data aborts.
++	@ We must disable preemption during the handler so that
++	@ we can access the debug registers safely.
++	@
++	.macro	debug_entry, fsr
++#if defined(CONFIG_HAVE_HW_BREAKPOINT) && defined(CONFIG_PREEMPT)
++	ldr	r4, =0x40f		@ mask out fsr.fs
++	and	r5, r4, \fsr
++	cmp	r5, #2			@ debug exception
++	bne	1f
++	get_thread_info r10
++	ldr	r6, [r10, #TI_PREEMPT]	@ get preempt count
++	add	r11, r6, #1		@ increment it
++	str	r11, [r10, #TI_PREEMPT]
++1:
++#endif
++	.endm
++
+ /*
+  * These are the registers used in the syscall handler, and allow us to
+  * have in theory up to 7 arguments to a function - r0 to r6.
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 793959e..515a3c4 100644
+index 550d949..61eeb41 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -764,7 +764,7 @@ out:
+@@ -737,12 +737,12 @@ unlock:
+ 
  /*
-  * One-time initialisation.
+  * Called from either the Data Abort Handler [watchpoint] or the
+- * Prefetch Abort Handler [breakpoint].
++ * Prefetch Abort Handler [breakpoint] with preemption disabled.
   */
--static void __init reset_ctrl_regs(void *unused)
-+static void reset_ctrl_regs(void *unused)
+ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
+ 				 struct pt_regs *regs)
  {
- 	int i;
+-	int ret = 1; /* Unhandled fault. */
++	int ret = 0;
+ 	u32 dscr;
  
-@@ -799,6 +799,18 @@ static void __init reset_ctrl_regs(void *unused)
+ 	/* We only handle watchpoints and hardware breakpoints. */
+@@ -759,11 +759,15 @@ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
+ 		watchpoint_handler(addr, regs);
+ 		break;
+ 	default:
+-		goto out;
++		ret = 1; /* Unhandled fault. */
  	}
- }
  
-+static int __cpuinit dbg_reset_notify(struct notifier_block *self,
-+				      unsigned long action, void *cpu)
-+{
-+	if (action == CPU_ONLINE)
-+		smp_call_function_single((int)cpu, reset_ctrl_regs, NULL, 1);
-+	return NOTIFY_OK;
-+}
+-	ret = 0;
+-out:
++	/*
++	 * Re-enable preemption after it was disabled in the
++	 * low-level exception handling code.
++	 */
++	preempt_enable();
 +
-+static struct notifier_block __cpuinitdata dbg_reset_nb = {
-+	.notifier_call = dbg_reset_notify,
-+};
-+
- static int __init arch_hw_breakpoint_init(void)
- {
- 	int ret = 0;
-@@ -846,6 +858,8 @@ static int __init arch_hw_breakpoint_init(void)
- 	hook_ifault_code(2, hw_breakpoint_pending, SIGTRAP, TRAP_HWBKPT,
- 			"breakpoint debug exception");
- 
-+	/* Register hotplug notifier. */
-+	register_cpu_notifier(&dbg_reset_nb);
- out:
  	return ret;
  }
+ 
 -- 
 1.7.0.4
