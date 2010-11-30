@@ -1,298 +1,182 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Nov 2010 17:17:23 +0000
-Subject: [PATCH] ARM: perf: use raw_spinlock_t for pmu_lock
-Message-ID: <1291137443-13821-1-git-send-email-will.deacon@arm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 30 Nov 2010 15:26:15 -0200
+Subject: [PATCH v3 2/2] ARM: mx5: dynamically allocate imx-keypad devices
+In-Reply-To: <1291137975-9069-1-git-send-email-fabio.estevam@freescale.com>
+References: <1291137975-9069-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1291137975-9069-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For kernels built with PREEMPT_RT, critical sections protected
-by standard spinlocks are preemptible. This is not acceptable
-on perf as (a) we may be scheduled onto a different CPU whilst
-reading/writing banked PMU registers and (b) the latency when
-reading the PMU registers becomes unpredictable.
-
-This patch upgrades the pmu_lock spinlock to a raw_spinlock
-instead.
-
-Reported-by: Jamie Iles <jamie@jamieiles.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/kernel/perf_event.c        |    2 +-
- arch/arm/kernel/perf_event_v6.c     |   20 ++++++++++----------
- arch/arm/kernel/perf_event_v7.c     |   16 ++++++++--------
- arch/arm/kernel/perf_event_xscale.c |   32 ++++++++++++++++----------------
- 4 files changed, 35 insertions(+), 35 deletions(-)
+ arch/arm/mach-mx5/Kconfig                       |    2 ++
+ arch/arm/mach-mx5/board-mx51_3ds.c              |    5 ++---
+ arch/arm/mach-mx5/devices-imx51.h               |    4 ++++
+ arch/arm/mach-mx5/devices.c                     |   19 -------------------
+ arch/arm/mach-mx5/devices.h                     |    1 -
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c    |    5 ++---
+ arch/arm/plat-mxc/devices/platform-imx-keypad.c |    5 +++++
+ arch/arm/plat-mxc/include/mach/mx51.h           |    2 +-
+ 8 files changed, 16 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 50c197b..624e2a5 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -32,7 +32,7 @@ static struct platform_device *pmu_device;
-  * Hardware lock to serialize accesses to PMU registers. Needed for the
-  * read/modify/write sequences.
-  */
--static DEFINE_SPINLOCK(pmu_lock);
-+static DEFINE_RAW_SPINLOCK(pmu_lock);
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 7f5a696..9a2450b 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -30,6 +30,7 @@ config MACH_MX51_3DS
+ 	bool "Support MX51PDK (3DS)"
+ 	select SOC_IMX51
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	select IMX_HAVE_PLATFORM_SPI_IMX
+ 	select MXC_DEBUG_BOARD
+@@ -56,6 +57,7 @@ choice
+ config MACH_EUKREA_MBIMX51_BASEBOARD
+ 	prompt "Eukrea MBIMX51 development board"
+ 	bool
++	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	help
+ 	  This adds board specific devices that can be found on Eukrea's
+diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+index 6cc2805..43cd5ab 100644
+--- a/arch/arm/mach-mx5/board-mx51_3ds.c
++++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+@@ -12,7 +12,6 @@
  
- /*
-  * ARMv6 supports a maximum of 3 events, starting from index 1. If we add
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index 3f427aa..c058bfc 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -426,12 +426,12 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
- 	 * Mask out the current event and set the counter to count the event
- 	 * that we're interested in.
- 	 */
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = armv6_pmcr_read();
- 	val &= ~mask;
- 	val |= evt;
- 	armv6_pmcr_write(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
+ #include <linux/irq.h>
+ #include <linux/platform_device.h>
+-#include <linux/input/matrix_keypad.h>
+ #include <linux/spi/spi.h>
  
- static irqreturn_t
-@@ -500,11 +500,11 @@ armv6pmu_start(void)
+ #include <asm/mach-types.h>
+@@ -120,14 +119,14 @@ static int mx51_3ds_board_keymap[] = {
+ 	KEY(3, 5, KEY_BACK)
+ };
+ 
+-static struct matrix_keymap_data mx51_3ds_map_data = {
++static const struct matrix_keymap_data mx51_3ds_map_data __initconst = {
+ 	.keymap		= mx51_3ds_board_keymap,
+ 	.keymap_size	= ARRAY_SIZE(mx51_3ds_board_keymap),
+ };
+ 
+ static void mxc_init_keypad(void)
  {
- 	unsigned long flags, val;
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = armv6_pmcr_read();
- 	val |= ARMV6_PMCR_ENABLE;
- 	armv6_pmcr_write(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
+-	mxc_register_device(&mxc_keypad_device, &mx51_3ds_map_data);
++	imx51_add_imx_keypad(&mx51_3ds_map_data);
  }
+ #else
+ static inline void mxc_init_keypad(void)
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+index 939d2e8..3e31f3e 100644
+--- a/arch/arm/mach-mx5/devices-imx51.h
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -47,3 +47,7 @@ extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
+ extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data __initconst;
+ #define imx51_imx2_wdt_data(pdata)	\
+ 	imx_add_imx2_wdt_data(&imx51_imx2_wdt_data, pdata)
++
++extern const struct imx_imx_keypad_data imx51_imx_keypad_data __initconst;
++#define imx51_add_imx_keypad(pdata)	\
++	imx_add_imx_keypad(&imx51_imx_keypad_data, pdata)
+diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+index ac55f7f..d733a97 100644
+--- a/arch/arm/mach-mx5/devices.c
++++ b/arch/arm/mach-mx5/devices.c
+@@ -97,25 +97,6 @@ struct platform_device mxc_usbh1_device = {
+ 	},
+ };
  
- static void
-@@ -512,11 +512,11 @@ armv6pmu_stop(void)
- {
- 	unsigned long flags, val;
+-static struct resource mxc_kpp_resources[] = {
+-	{
+-		.start = MX51_MXC_INT_KPP,
+-		.end = MX51_MXC_INT_KPP,
+-		.flags = IORESOURCE_IRQ,
+-	} , {
+-		.start = MX51_KPP_BASE_ADDR,
+-		.end = MX51_KPP_BASE_ADDR + 0x8 - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-};
+-
+-struct platform_device mxc_keypad_device = {
+-	.name = "imx-keypad",
+-	.id = 0,
+-	.num_resources = ARRAY_SIZE(mxc_kpp_resources),
+-	.resource = mxc_kpp_resources,
+-};
+-
+ static struct mxc_gpio_port mxc_gpio_ports[] = {
+ 	{
+ 		.chip.label = "gpio-0",
+diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+index ccb7cdc..0905843 100644
+--- a/arch/arm/mach-mx5/devices.h
++++ b/arch/arm/mach-mx5/devices.h
+@@ -2,4 +2,3 @@ extern struct platform_device mxc_usbdr_host_device;
+ extern struct platform_device mxc_usbh1_device;
+ extern struct platform_device mxc_usbdr_udc_device;
+ extern struct platform_device mxc_hsi2c_device;
+-extern struct platform_device mxc_keypad_device;
+diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+index 94c293f..e86ade4 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+@@ -21,7 +21,6 @@
+ #include <linux/fsl_devices.h>
+ #include <linux/i2c/tsc2007.h>
+ #include <linux/leds.h>
+-#include <linux/input/matrix_keypad.h>
  
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = armv6_pmcr_read();
- 	val &= ~ARMV6_PMCR_ENABLE;
- 	armv6_pmcr_write(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+@@ -157,7 +156,7 @@ static int mbimx51_keymap[] = {
+ 	KEY(3, 3, KEY_ENTER),
+ };
  
- static int
-@@ -570,12 +570,12 @@ armv6pmu_disable_event(struct hw_perf_event *hwc,
- 	 * of ETM bus signal assertion cycles. The external reporting should
- 	 * be disabled and so this should never increment.
- 	 */
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = armv6_pmcr_read();
- 	val &= ~mask;
- 	val |= evt;
- 	armv6_pmcr_write(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
+-static struct matrix_keymap_data mbimx51_map_data = {
++static const struct matrix_keymap_data mbimx51_map_data __initconst = {
+ 	.keymap		= mbimx51_keymap,
+ 	.keymap_size	= ARRAY_SIZE(mbimx51_keymap),
+ };
+@@ -209,7 +208,7 @@ void __init eukrea_mbimx51_baseboard_init(void)
  
- static void
-@@ -599,12 +599,12 @@ armv6mpcore_pmu_disable_event(struct hw_perf_event *hwc,
- 	 * Unlike UP ARMv6, we don't have a way of stopping the counters. We
- 	 * simply disable the interrupt reporting.
- 	 */
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = armv6_pmcr_read();
- 	val &= ~mask;
- 	val |= evt;
- 	armv6_pmcr_write(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
  
- static const struct arm_pmu armv6pmu = {
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index a68ff1c..2e14025 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -689,7 +689,7 @@ static void armv7pmu_enable_event(struct hw_perf_event *hwc, int idx)
- 	 * Enable counter and interrupt, and set the counter to count
- 	 * the event that we're interested in.
- 	 */
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
+-	mxc_register_device(&mxc_keypad_device, &mbimx51_map_data);
++	imx51_add_imx_keypad(&mbimx51_map_data);
  
- 	/*
- 	 * Disable counter
-@@ -713,7 +713,7 @@ static void armv7pmu_enable_event(struct hw_perf_event *hwc, int idx)
- 	 */
- 	armv7_pmnc_enable_counter(idx);
+ 	gpio_request(MBIMX51_TSC2007_GPIO, "tsc2007_irq");
+ 	gpio_direction_input(MBIMX51_TSC2007_GPIO);
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-keypad.c b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
+index 40238f0..2636611 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-keypad.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
+@@ -41,6 +41,11 @@ const struct imx_imx_keypad_data imx35_imx_keypad_data __initconst =
+ 	imx_imx_keypad_data_entry_single(MX35, SZ_16);
+ #endif /* ifdef CONFIG_SOC_IMX35 */
  
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static void armv7pmu_disable_event(struct hw_perf_event *hwc, int idx)
-@@ -723,7 +723,7 @@ static void armv7pmu_disable_event(struct hw_perf_event *hwc, int idx)
- 	/*
- 	 * Disable counter and interrupt
- 	 */
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 
- 	/*
- 	 * Disable counter
-@@ -735,7 +735,7 @@ static void armv7pmu_disable_event(struct hw_perf_event *hwc, int idx)
- 	 */
- 	armv7_pmnc_disable_intens(idx);
- 
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
-@@ -805,20 +805,20 @@ static void armv7pmu_start(void)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	/* Enable all counters */
- 	armv7_pmnc_write(armv7_pmnc_read() | ARMV7_PMNC_E);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static void armv7pmu_stop(void)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	/* Disable all counters */
- 	armv7_pmnc_write(armv7_pmnc_read() & ~ARMV7_PMNC_E);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static int armv7pmu_get_event_idx(struct cpu_hw_events *cpuc,
-diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-index f14fbb6..28cd3b0 100644
---- a/arch/arm/kernel/perf_event_xscale.c
-+++ b/arch/arm/kernel/perf_event_xscale.c
-@@ -291,12 +291,12 @@ xscale1pmu_enable_event(struct hw_perf_event *hwc, int idx)
- 		return;
- 	}
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = xscale1pmu_read_pmnc();
- 	val &= ~mask;
- 	val |= evt;
- 	xscale1pmu_write_pmnc(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static void
-@@ -322,12 +322,12 @@ xscale1pmu_disable_event(struct hw_perf_event *hwc, int idx)
- 		return;
- 	}
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = xscale1pmu_read_pmnc();
- 	val &= ~mask;
- 	val |= evt;
- 	xscale1pmu_write_pmnc(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static int
-@@ -355,11 +355,11 @@ xscale1pmu_start(void)
- {
- 	unsigned long flags, val;
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = xscale1pmu_read_pmnc();
- 	val |= XSCALE_PMU_ENABLE;
- 	xscale1pmu_write_pmnc(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static void
-@@ -367,11 +367,11 @@ xscale1pmu_stop(void)
- {
- 	unsigned long flags, val;
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = xscale1pmu_read_pmnc();
- 	val &= ~XSCALE_PMU_ENABLE;
- 	xscale1pmu_write_pmnc(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static inline u32
-@@ -635,10 +635,10 @@ xscale2pmu_enable_event(struct hw_perf_event *hwc, int idx)
- 		return;
- 	}
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	xscale2pmu_write_event_select(evtsel);
- 	xscale2pmu_write_int_enable(ien);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static void
-@@ -678,10 +678,10 @@ xscale2pmu_disable_event(struct hw_perf_event *hwc, int idx)
- 		return;
- 	}
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	xscale2pmu_write_event_select(evtsel);
- 	xscale2pmu_write_int_enable(ien);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static int
-@@ -705,11 +705,11 @@ xscale2pmu_start(void)
- {
- 	unsigned long flags, val;
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = xscale2pmu_read_pmnc() & ~XSCALE_PMU_CNT64;
- 	val |= XSCALE_PMU_ENABLE;
- 	xscale2pmu_write_pmnc(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static void
-@@ -717,11 +717,11 @@ xscale2pmu_stop(void)
- {
- 	unsigned long flags, val;
- 
--	spin_lock_irqsave(&pmu_lock, flags);
-+	raw_spin_lock_irqsave(&pmu_lock, flags);
- 	val = xscale2pmu_read_pmnc();
- 	val &= ~XSCALE_PMU_ENABLE;
- 	xscale2pmu_write_pmnc(val);
--	spin_unlock_irqrestore(&pmu_lock, flags);
-+	raw_spin_unlock_irqrestore(&pmu_lock, flags);
- }
- 
- static inline u32
++#ifdef CONFIG_SOC_IMX51
++const struct imx_imx_keypad_data imx51_imx_keypad_data __initconst =
++	imx_imx_keypad_data_entry_single(MX51, SZ_16);
++#endif /* ifdef CONFIG_SOC_IMX51 */
++
+ struct platform_device *__init imx_add_imx_keypad(
+ 		const struct imx_imx_keypad_data *data,
+ 		const struct matrix_keymap_data *pdata)
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index 8fddfef..a99522f 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -301,7 +301,7 @@
+ #define MX51_MXC_INT_GPIO4_HIGH		57
+ #define MX51_MXC_INT_WDOG1		58
+ #define MX51_MXC_INT_WDOG2		59
+-#define MX51_MXC_INT_KPP		60
++#define MX51_INT_KPP			60
+ #define MX51_MXC_INT_PWM1		61
+ #define MX51_INT_I2C1			62
+ #define MX51_INT_I2C2			63
 -- 
-1.7.0.4
+1.6.0.4
