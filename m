@@ -1,82 +1,161 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:36:50 +0100
-Subject: [PATCH 22/54] ARM: iop33x: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:41:11 +0100
+Subject: [PATCH 39/54] ARM: rpc: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130133650.GW15575@mail.wantstofly.org>
+Message-ID: <20101130134111.GN15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-iop33x/irq.c |   32 ++++++++++++++++----------------
- 1 files changed, 16 insertions(+), 16 deletions(-)
+ arch/arm/mach-rpc/irq.c |   60 +++++++++++++++++++++++-----------------------
+ 1 files changed, 30 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-iop33x/irq.c b/arch/arm/mach-iop33x/irq.c
-index abb4ea2..0ff2f74 100644
---- a/arch/arm/mach-iop33x/irq.c
-+++ b/arch/arm/mach-iop33x/irq.c
-@@ -53,45 +53,45 @@ static void intsize_write(u32 val)
- }
+diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
+index 9dd15d6..d29cd9b 100644
+--- a/arch/arm/mach-rpc/irq.c
++++ b/arch/arm/mach-rpc/irq.c
+@@ -6,110 +6,110 @@
+ #include <asm/hardware/iomd.h>
+ #include <asm/irq.h>
  
- static void
--iop33x_irq_mask1 (unsigned int irq)
-+iop33x_irq_mask1 (struct irq_data *d)
+-static void iomd_ack_irq_a(unsigned int irq)
++static void iomd_ack_irq_a(struct irq_data *d)
  {
--	iop33x_mask0 &= ~(1 << irq);
-+	iop33x_mask0 &= ~(1 << d->irq);
- 	intctl0_write(iop33x_mask0);
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << irq;
++	mask = 1 << d->irq;
+ 	val = iomd_readb(IOMD_IRQMASKA);
+ 	iomd_writeb(val & ~mask, IOMD_IRQMASKA);
+ 	iomd_writeb(mask, IOMD_IRQCLRA);
  }
  
- static void
--iop33x_irq_mask2 (unsigned int irq)
-+iop33x_irq_mask2 (struct irq_data *d)
+-static void iomd_mask_irq_a(unsigned int irq)
++static void iomd_mask_irq_a(struct irq_data *d)
  {
--	iop33x_mask1 &= ~(1 << (irq - 32));
-+	iop33x_mask1 &= ~(1 << (d->irq - 32));
- 	intctl1_write(iop33x_mask1);
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << irq;
++	mask = 1 << d->irq;
+ 	val = iomd_readb(IOMD_IRQMASKA);
+ 	iomd_writeb(val & ~mask, IOMD_IRQMASKA);
  }
  
- static void
--iop33x_irq_unmask1(unsigned int irq)
-+iop33x_irq_unmask1(struct irq_data *d)
+-static void iomd_unmask_irq_a(unsigned int irq)
++static void iomd_unmask_irq_a(struct irq_data *d)
  {
--	iop33x_mask0 |= 1 << irq;
-+	iop33x_mask0 |= 1 << d->irq;
- 	intctl0_write(iop33x_mask0);
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << irq;
++	mask = 1 << d->irq;
+ 	val = iomd_readb(IOMD_IRQMASKA);
+ 	iomd_writeb(val | mask, IOMD_IRQMASKA);
  }
  
- static void
--iop33x_irq_unmask2(unsigned int irq)
-+iop33x_irq_unmask2(struct irq_data *d)
- {
--	iop33x_mask1 |= (1 << (irq - 32));
-+	iop33x_mask1 |= (1 << (d->irq - 32));
- 	intctl1_write(iop33x_mask1);
- }
- 
- struct irq_chip iop33x_irqchip1 = {
--	.name	= "IOP33x-1",
--	.ack	= iop33x_irq_mask1,
--	.mask	= iop33x_irq_mask1,
--	.unmask	= iop33x_irq_unmask1,
-+	.name		= "IOP33x-1",
-+	.irq_ack	= iop33x_irq_mask1,
-+	.irq_mask	= iop33x_irq_mask1,
-+	.irq_unmask	= iop33x_irq_unmask1,
+ static struct irq_chip iomd_a_chip = {
+-	.ack	= iomd_ack_irq_a,
+-	.mask	= iomd_mask_irq_a,
+-	.unmask = iomd_unmask_irq_a,
++	.irq_ack	= iomd_ack_irq_a,
++	.irq_mask	= iomd_mask_irq_a,
++	.irq_unmask	= iomd_unmask_irq_a,
  };
  
- struct irq_chip iop33x_irqchip2 = {
--	.name	= "IOP33x-2",
--	.ack	= iop33x_irq_mask2,
--	.mask	= iop33x_irq_mask2,
--	.unmask	= iop33x_irq_unmask2,
-+	.name		= "IOP33x-2",
-+	.irq_ack	= iop33x_irq_mask2,
-+	.irq_mask	= iop33x_irq_mask2,
-+	.irq_unmask	= iop33x_irq_unmask2,
+-static void iomd_mask_irq_b(unsigned int irq)
++static void iomd_mask_irq_b(struct irq_data *d)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (irq & 7);
++	mask = 1 << (d->irq & 7);
+ 	val = iomd_readb(IOMD_IRQMASKB);
+ 	iomd_writeb(val & ~mask, IOMD_IRQMASKB);
+ }
+ 
+-static void iomd_unmask_irq_b(unsigned int irq)
++static void iomd_unmask_irq_b(struct irq_data *d)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (irq & 7);
++	mask = 1 << (d->irq & 7);
+ 	val = iomd_readb(IOMD_IRQMASKB);
+ 	iomd_writeb(val | mask, IOMD_IRQMASKB);
+ }
+ 
+ static struct irq_chip iomd_b_chip = {
+-	.ack	= iomd_mask_irq_b,
+-	.mask	= iomd_mask_irq_b,
+-	.unmask = iomd_unmask_irq_b,
++	.irq_ack	= iomd_mask_irq_b,
++	.irq_mask	= iomd_mask_irq_b,
++	.irq_unmask	= iomd_unmask_irq_b,
  };
  
- void __init iop33x_init_irq(void)
+-static void iomd_mask_irq_dma(unsigned int irq)
++static void iomd_mask_irq_dma(struct irq_data *d)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (irq & 7);
++	mask = 1 << (d->irq & 7);
+ 	val = iomd_readb(IOMD_DMAMASK);
+ 	iomd_writeb(val & ~mask, IOMD_DMAMASK);
+ }
+ 
+-static void iomd_unmask_irq_dma(unsigned int irq)
++static void iomd_unmask_irq_dma(struct irq_data *d)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (irq & 7);
++	mask = 1 << (d->irq & 7);
+ 	val = iomd_readb(IOMD_DMAMASK);
+ 	iomd_writeb(val | mask, IOMD_DMAMASK);
+ }
+ 
+ static struct irq_chip iomd_dma_chip = {
+-	.ack	= iomd_mask_irq_dma,
+-	.mask	= iomd_mask_irq_dma,
+-	.unmask = iomd_unmask_irq_dma,
++	.irq_ack	= iomd_mask_irq_dma,
++	.irq_mask	= iomd_mask_irq_dma,
++	.irq_unmask	= iomd_unmask_irq_dma,
+ };
+ 
+-static void iomd_mask_irq_fiq(unsigned int irq)
++static void iomd_mask_irq_fiq(struct irq_data *d)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (irq & 7);
++	mask = 1 << (d->irq & 7);
+ 	val = iomd_readb(IOMD_FIQMASK);
+ 	iomd_writeb(val & ~mask, IOMD_FIQMASK);
+ }
+ 
+-static void iomd_unmask_irq_fiq(unsigned int irq)
++static void iomd_unmask_irq_fiq(struct irq_data *d)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (irq & 7);
++	mask = 1 << (d->irq & 7);
+ 	val = iomd_readb(IOMD_FIQMASK);
+ 	iomd_writeb(val | mask, IOMD_FIQMASK);
+ }
+ 
+ static struct irq_chip iomd_fiq_chip = {
+-	.ack	= iomd_mask_irq_fiq,
+-	.mask	= iomd_mask_irq_fiq,
+-	.unmask = iomd_unmask_irq_fiq,
++	.irq_ack	= iomd_mask_irq_fiq,
++	.irq_mask	= iomd_mask_irq_fiq,
++	.irq_unmask	= iomd_unmask_irq_fiq,
+ };
+ 
+ void __init rpc_init_irq(void)
 -- 
 1.7.1
