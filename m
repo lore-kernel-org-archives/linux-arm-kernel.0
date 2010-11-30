@@ -1,68 +1,174 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Tue, 30 Nov 2010 16:38:54 +0100 (CET)
-Subject: [PATCH] ARM: Gemini: Add support for PCI Bus
-In-Reply-To: <201011291657.53316.arnd@arndb.de>
-References: <1290263224-16965-1-git-send-email-ulli.kroll@googlemail.com>
-	<20101129142200.GA14941@n2100.arm.linux.org.uk>
-	<alpine.LNX.2.00.1011291546550.12293@localhost.localdomain>
-	<201011291657.53316.arnd@arndb.de>
-Message-ID: <alpine.LNX.2.00.1011301633040.9052@localhost.localdomain>
+From: scaudle@codeaurora.org (Stephen Caudle)
+Date: Tue, 30 Nov 2010 10:42:18 -0500
+Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores
+	during IRQ enable
+In-Reply-To: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
+References: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
+Message-ID: <4CF51B5A.9040307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Russell,
+
+Can you pull in this patch or let me know if you want something changed 
+with it?
+
+Thanks,
+Stephen
+
+On 11/03/2010 05:46 PM, Stephen Caudle wrote:
+> Some multi-core ARM chips designate a unique IRQ number for each core for
+> private peripheral interrupts (PPIs). Others designate a common IRQ number
+> for all cores. In the latter case, requesting/freeing private peripheral
+> interrupts currently unmasks/masks the interrupt for only the
+> executing core, respectively.
+>
+> With this change, request_irq will unmask a PPI on all cores so a separate
+> call to enable_irq on the other cores is not required. Likewise, free_irq
+> will mask a PPI on the other cores. Also, shutdown is implemented instead
+> of disable to allow for lazy IRQ disabling.
+>
+> Signed-off-by: Stephen Caudle<scaudle@codeaurora.org>
+> ---
+>   arch/arm/Kconfig      |    5 +++
+>   arch/arm/common/gic.c |   86 +++++++++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 91 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 30ddd06..7f11e31 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1153,6 +1153,11 @@ config SMP
+>
+>   	  If you don't know what to do here, say N.
+>
+> +config IRQ_PER_CPU
+> +	bool
+> +	depends on SMP
+> +	default n
+> +
+>   config HAVE_ARM_SCU
+>   	bool
+>   	depends on SMP
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 886daaf..937a33a 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -44,12 +44,25 @@ struct gic_chip_data {
+>   	unsigned int wakeup_irqs[32];
+>   	unsigned int enabled_irqs[32];
+>   #endif
+> +#ifdef CONFIG_IRQ_PER_CPU
+> +	struct call_single_data ppi_data[NR_CPUS];
+> +#endif
+>   };
+>
+>   #ifndef MAX_GIC_NR
+>   #define MAX_GIC_NR	1
+>   #endif
+>
+> +#ifdef CONFIG_IRQ_PER_CPU
+> +#ifndef GIC_PPI_FIRST
+> +#define GIC_PPI_FIRST	16
+> +#endif
+> +
+> +#ifndef GIC_PPI_LAST
+> +#define GIC_PPI_LAST	31
+> +#endif
+> +#endif
+> +
+>   static struct gic_chip_data gic_data[MAX_GIC_NR];
+>
+>   static inline void __iomem *gic_dist_base(unsigned int irq)
+> @@ -272,6 +285,75 @@ static int gic_set_type(unsigned int irq, unsigned int type)
+>   	return 0;
+>   }
+>
+> +#ifdef CONFIG_IRQ_PER_CPU
+> +static inline void gic_smp_call_function(struct call_single_data *data)
+> +{
+> +	int cpu;
+> +
+> +	/* Make sure data is visible */
+> +	smp_mb();
+> +
+> +	/*
+> +	 * Since this function is called with interrupts disabled,
+> +	 * smp_call_function can't be used here because it warns (even
+> +	 * if wait = 0) when interrupts are disabled.
+> +	 *
+> +	 * __smp_call_function_single doesn't warn when interrupts are
+> +	 * disabled and not waiting, so use it instead.
+> +	 */
+> +	for_each_online_cpu(cpu)
+> +		if (cpu != smp_processor_id())
+> +			__smp_call_function_single(cpu, data, 0);
+> +}
+> +
+> +static void gic_mask_ppi(void *info)
+> +{
+> +	struct irq_desc *desc = info;
+> +	gic_mask_irq(desc->irq);
+> +}
+> +
+> +static void gic_unmask_ppi(void *info)
+> +{
+> +	struct irq_desc *desc = info;
+> +	gic_unmask_irq(desc->irq);
+> +}
+> +
+> +static void gic_enable_irq(unsigned int irq)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(irq);
+> +	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
+> +	int cpu = smp_processor_id();
+> +
+> +	if (irq>= GIC_PPI_FIRST&&  irq<= GIC_PPI_LAST) {
+> +		gic_data->ppi_data[cpu].func = gic_unmask_ppi;
+> +		gic_data->ppi_data[cpu].info = desc;
+> +
+> +		/* Unmask PPIs on all cores during enable. */
+> +		gic_smp_call_function(&gic_data->ppi_data[cpu]);
+> +	}
+> +
+> +	desc->chip->unmask(irq);
+> +	desc->status&= ~IRQ_MASKED;
+> +}
+> +
+> +static void gic_shutdown_irq(unsigned int irq)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(irq);
+> +	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
+> +	int cpu = smp_processor_id();
+> +
+> +	if (irq>= GIC_PPI_FIRST&&  irq<= GIC_PPI_LAST) {
+> +		gic_data->ppi_data[cpu].func = gic_mask_ppi;
+> +		gic_data->ppi_data[cpu].info = desc;
+> +
+> +		/* Mask PPIs on all cores during disable. */
+> +		gic_smp_call_function(&gic_data->ppi_data[cpu]);
+> +	}
+> +
+> +	desc->chip->mask(irq);
+> +	desc->status |= IRQ_MASKED;
+> +}
+> +#endif
+>
+>   static struct irq_chip gic_chip = {
+>   	.name		= "GIC",
+> @@ -283,6 +365,10 @@ static struct irq_chip gic_chip = {
+>   #endif
+>   	.set_type	= gic_set_type,
+>   	.set_wake	= gic_set_wake,
+> +#ifdef CONFIG_IRQ_PER_CPU
+> +	.enable		= gic_enable_irq,
+> +	.shutdown	= gic_shutdown_irq,
+> +#endif
+>   };
+>
+>   void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 
 
-On Mon, 29 Nov 2010, Arnd Bergmann wrote:
-
-> On Monday 29 November 2010, Hans Ulli Kroll wrote:
-> > @@ -1164,7 +1169,7 @@ config ISA_DMA_API
-> >         bool
-> >  
-> >  config PCI
-> > -       bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || 
-> > ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
-> > +       bool "PCI support" if MIGHT_HAVE_PCI
-> >         help
-> >           Find out whether you have a PCI motherboard. PCI is the name of 
-> > a
-> >           bus system, i.e. the way the CPU talks to the other stuff inside
-> 
-> This does not solve the problem that Russell mentioned: existing platforms
-> select PCI unconditionally, e.g. Iop13XX, some IXP, Orion, Shark
-> and more. At the very least, these would need to also select MIGHT_HAVE_PCI
-> to avoid the warning.
-> 
-
-so 
-select MIGHT_HAVE_PCI 
-in conjunction of
-select PCI
-on other almost platforms 
-
-> > index fe0c82e..f5c39a8 100644
-> > --- a/arch/arm/mach-ks8695/Kconfig
-> > +++ b/arch/arm/mach-ks8695/Kconfig
-> > @@ -4,6 +4,7 @@ menu "Kendin/Micrel KS8695 Implementations"
-> >  
-> >  config MACH_KS8695
-> >         +++ b/arch/arm/mach-versatile/Kconfig
-> > @@ -4,6 +4,7 @@ menu "Versatile platform type"
-> >  config ARCH_VERSATILE_PB
-> >         bool "Support Versatile/PB platform"
-> >         select CPU_ARM926T
-> > +       select HAVE_PCI
-> >         default y
-> >         help
-> >           Include support for the ARM(R) Versatile/PB platform.bool 
-> 
-> Typo: you certainly meant MIGHT_HAVE_PCI here.
-> 
-
-Damn, I missed this.
-HAVE_PCI was my first approach to do this.
-
-> We still need to agree on what it should be doing, but otherwise this
-> is what I had in mind.
-> 
-> 	Arnd
-> 
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
