@@ -1,40 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 30 Nov 2010 15:32:47 +0100
-Subject: [PATCH] make mc13783 code generic
-In-Reply-To: <1291110118.3235.27.camel@realization>
-References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
-	<1291110118.3235.27.camel@realization>
-Message-ID: <20101130143247.GI20449@pengutronix.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 30 Nov 2010 16:33:04 +0200
+Subject: [PATCH RESEND v3] ARM: s3c2442: Setup gpio {set,
+	get}_pull callbacks
+In-Reply-To: <4CF4F845.7010207@metafoo.de>
+References: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
+	<201011301401.44973.anarsoul@gmail.com>
+	<4CF4F845.7010207@metafoo.de>
+Message-ID: <201011301633.05545.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Yong, hello Alberto,
+On Tuesday 30 November 2010 15:12:37 Lars-Peter Clausen wrote:
 
-On Tue, Nov 30, 2010 at 10:41:58AM +0100, Alberto Panizzo wrote:
-> PS: ./scripts/get_maintainer.pl said to cc all these guys:
+> Hi
 > 
-> Liam Girdwood <lrg@slimlogic.co.uk>
-> Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Samuel Ortiz <sameo@linux.intel.com>
-> Haojian Zhuang <haojian.zhuang@marvell.com>
-> Linus Walleij <linus.walleij@stericsson.com>
-> Alberto Panizzo <maramaopercheseimorto@gmail.com>
-> "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
-> Axel Lin <axel.lin@gmail.com>
-> Andrew Morton <akpm@linux-foundation.org>
-> "Philippe R?tornaz" <philippe.retornaz@epfl.ch>
-> linux-kernel at vger.kernel.org
-> 
-> Please, use always this script to decide who have to be cc'ed by default
-> sending patches.
-No, please don't.  Better use your common sense.  get_maintainer.pl is a
-hint at best.  E.g. Axel Lin only shows up in the list, because he
-touched several other regulator drivers and drivers/regulator/Makefile.
-I doubt that this is enough to imply interest.
+> While this might work for setting the pullup, what to you want to return in
+> get_pull?
 
-Best regards
-Uwe
+Some custom value like S3C_GPIO_PULL_ENABLED?
+ 
+> The reason why s3c24xx_gpiocfg_default needs to have {get,set}_pull set at
+> compile time is that the board init code is called before the cpu init
+> code. Which is in my opinion a bit odd and should be fixed instead.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+That's because cpu init code is arch_initcall. Kernel calls mdesc-
+>init_machine before any arch_initcall function, not sure if it can be fixed 
+without massive rework of existing code.
+
+> If it is not fixed for whatever reason we could fallback to using some sort
+> of "cpu_is_s3c2442() ? S3C_GPIO_PULL_UP : S3C_GPIO_PULL_DOWN"
+
+AFAIK, Ben does not like runtime CPUtype checks
+
+Regards
+Vasily
