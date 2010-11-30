@@ -1,78 +1,768 @@
-From: bpringle@sympatico.ca (Bill Pringlemeir)
-Date: Tue, 30 Nov 2010 16:07:35 -0500
-Subject: [Patch v3] Fix audmuxv2 debugfs indexing.
-In-Reply-To: <87r5ehuxh5.fsf@sympatico.ca> (Bill Pringlemeir's message of
-	"Fri, 19 Nov 2010 10:47:18 -0500")
-References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
-	<20101110152619.GB8950@pengutronix.de>
-	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
-	<20101112071706.GF6017@pengutronix.de>
-	<20101112114942.GA28804@sirena.org.uk> <87oc9rk6fe.fsf@sympatico.ca>
-	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
-	<20101115153058.GG12986@rakim.wolfsonmicro.main>
-	<87oc9qeg75.fsf@sympatico.ca>
-	<BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
-	<20101115162636.GH12986@rakim.wolfsonmicro.main>
-	<8762vy4fki.fsf@sympatico.ca> <87r5ehuxh5.fsf@sympatico.ca>
-Message-ID: <BLU0-SMTP186080C581D16B63C1B06DB8250@phx.gbl>
+From: ashley.hughes@blueyonder.co.uk (Ash Hughes)
+Date: Tue, 30 Nov 2010 21:53:09 -0000
+Subject: [PATCH 1/1] ARM Orion: added Buffalo LS-CHL support
+In-Reply-To: <20101124010442.GA1377@kw.sim.vm.gnt>
+References: <000401cb89d0$8d1927b0$a74b7710$@blueyonder.co.uk>
+	<20101124010442.GA1377@kw.sim.vm.gnt>
+Message-ID: <007301cb90d8$fb633670$f229a350$@blueyonder.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 Nov 2010, bpringle at sympatico.ca wrote:
+Adds support for Buffalo Linkstation Live v3 (LS-CHL) NAS drives. Indentation fixed and fan speeds added
+Signed-off-by: Ash Hughes <ashley.hughes@blueyonder.co.uk>
 
-> I will re-submit those patches later.
+---
 
-Here is the audmux debug directory after this patch,
-
-   root at freescale /sys/kernel/debug/audmux$ ls
-   SSI3       SSI4       SSI5       SSI6       SSI7       imx-ssi.0  imx-ssi.1
-   root at freescale /sys/kernel/debug/audmux$ cat SSI7
-   PDCR: 0000c000
-   PTCR: 00000800
-   TxFS input, TxClk input
-   Port is symmetric
-   Data received from SSI7
-
-The ugly part is 'case 6:'.  However, there currently is no constants
-defined in audmux.h for this port.  Also,
-mxc_audmux_v2_configure_port() isn't protecting against ports out of
-range and there are no constants for the IMX25.  I would need answers
-to what should be done to invent a define for 'port 6 (SSI7)'.  Using
-MX31 constants seems incomplete as this code could be active for an
-MX35 and MX25 as well.
-
-Signed-off-by: Bill Pringlemeir <bpringle@sympatico.ca>
-diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
-index f9e7cdb..205de57 100644
---- a/arch/arm/plat-mxc/audmux-v2.c
-+++ b/arch/arm/plat-mxc/audmux-v2.c
-@@ -56,6 +56,8 @@ static const char *audmux_port_string(int port)
-                return "SSI5";
-        case MX31_AUDMUX_PORT6_SSI_PINS_6:
-                return "SSI6";
-+       case 6: /* internal or pins AUDMUX_PORT7 */
-+               return "SSI7";
-        default:
-                return "UNKNOWN";
-        }
-@@ -142,7 +144,6 @@ static const struct file_operations audmux_debugfs_fops = {
- static void audmux_debugfs_init(void)
- {
-        int i;
--       char buf[20];
+diff -uprN linux-2.6-vanilla//arch/arm/mach-orion5x/Kconfig linux-2.6/arch/arm/mach-orion5x/Kconfig
+--- linux-2.6-vanilla//arch/arm/mach-orion5x/Kconfig	2010-11-14 10:58:39.000000000 +0000
++++ linux-2.6/arch/arm/mach-orion5x/Kconfig	2010-11-14 11:02:42.874582000 +0000
+@@ -51,6 +51,13 @@ config MACH_LINKSTATION_PRO
+ 	  Buffalo Linkstation Pro/Live platform. Both v1 and
+ 	  v2 devices are supported.
  
-        audmux_debugfs_root = debugfs_create_dir("audmux", NULL);
-        if (!audmux_debugfs_root) {
-@@ -150,9 +151,9 @@ static void audmux_debugfs_init(void)
-                return;
-        }
- 
--       for (i = 1; i < 8; i++) {
--               snprintf(buf, sizeof(buf), "ssi%d", i);
--               if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
-+       for (i = 0; i < 7; i++) {
-+               if (!debugfs_create_file(audmux_port_string(i), 0444,
-+                                        audmux_debugfs_root,
-                                         (void *)i, &audmux_debugfs_fops))
-                        pr_warning("Failed to create AUDMUX port %d debugfs file\n",
-                                   i);
++config MACH_LINKSTATION_LSCHL
++	bool "Buffalo Linkstation Live v3 (LS-CHL)"
++	select I2C_BOARDINFO
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Buffalo Linkstation Live v3 (LS-CHL) platform.
++
+ config MACH_LINKSTATION_MINI
+ 	bool "Buffalo Linkstation Mini"
+ 	select I2C_BOARDINFO
+diff -uprN linux-2.6-vanilla//arch/arm/mach-orion5x/ls-chl-setup.c linux-2.6/arch/arm/mach-orion5x/ls-chl-setup.c
+--- linux-2.6-vanilla//arch/arm/mach-orion5x/ls-chl-setup.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-2.6/arch/arm/mach-orion5x/ls-chl-setup.c	2010-11-26 00:07:05.860743000 +0000
+@@ -0,0 +1,328 @@
++/*
++ * arch/arm/mach-orion5x/ls-chl-setup.c
++ *
++ * Maintainer: Ash Hughes <ashley.hughes@blueyonder.co.uk>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/physmap.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/leds.h>
++#include <linux/gpio_keys.h>
++#include <linux/gpio-fan.h>
++#include <linux/input.h>
++#include <linux/i2c.h>
++#include <linux/ata_platform.h>
++#include <linux/gpio.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/system.h>
++#include <mach/orion5x.h>
++#include "common.h"
++#include "mpp.h"
++
++/*****************************************************************************
++ * Linkstation LS-CHL Info
++ ****************************************************************************/
++
++/*
++ * 256K NOR flash Device bus boot chip select
++ */
++
++#define LSCHL_NOR_BOOT_BASE	0xf4000000
++#define LSCHL_NOR_BOOT_SIZE	SZ_256K
++
++/*****************************************************************************
++ * 256KB NOR Flash on BOOT Device
++ ****************************************************************************/
++
++static struct physmap_flash_data lschl_nor_flash_data = {
++	.width = 1,
++};
++
++static struct resource lschl_nor_flash_resource = {
++	.flags	= IORESOURCE_MEM,
++	.start	= LSCHL_NOR_BOOT_BASE,
++	.end	= LSCHL_NOR_BOOT_BASE + LSCHL_NOR_BOOT_SIZE - 1,
++};
++
++static struct platform_device lschl_nor_flash = {
++	.name = "physmap-flash",
++	.id = 0,
++	.dev = {
++		.platform_data	= &lschl_nor_flash_data,
++	},
++	.num_resources = 1,
++	.resource = &lschl_nor_flash_resource,
++};
++
++/*****************************************************************************
++ * Ethernet
++ ****************************************************************************/
++
++static struct mv643xx_eth_platform_data lschl_eth_data = {
++	.phy_addr = MV643XX_ETH_PHY_ADDR(8),
++};
++
++/*****************************************************************************
++ * RTC 5C372a on I2C bus
++ ****************************************************************************/
++
++static struct i2c_board_info __initdata lschl_i2c_rtc = {
++	I2C_BOARD_INFO("rs5c372a", 0x32),
++};
++
++/*****************************************************************************
++ * LEDs attached to GPIO
++ ****************************************************************************/
++
++#define LSCHL_GPIO_LED_ALARM	2
++#define LSCHL_GPIO_LED_INFO	3
++#define LSCHL_GPIO_LED_FUNC	17
++#define LSCHL_GPIO_LED_PWR	0
++
++static struct gpio_led lschl_led_pins[] = {
++	{
++		.name = "alarm:red",
++		.gpio = LSCHL_GPIO_LED_ALARM,
++		.active_low = 1,
++	}, {
++		.name = "info:amber",
++		.gpio = LSCHL_GPIO_LED_INFO,
++		.active_low = 1,
++	}, {
++		.name = "func:blue:top",
++		.gpio = LSCHL_GPIO_LED_FUNC,
++		.active_low = 1,
++	}, {
++		.name = "power:blue:bottom",
++		.gpio = LSCHL_GPIO_LED_PWR,
++	},
++};
++
++static struct gpio_led_platform_data lschl_led_data = {
++	.leds = lschl_led_pins,
++	.num_leds = ARRAY_SIZE(lschl_led_pins),
++};
++
++static struct platform_device lschl_leds = {
++	.name = "leds-gpio",
++	.id = -1,
++	.dev = {
++		.platform_data = &lschl_led_data,
++	},
++};
++
++/*****************************************************************************
++ * SATA
++ ****************************************************************************/
++static struct mv_sata_platform_data lschl_sata_data = {
++	.n_ports = 2,
++};
++
++/*****************************************************************************
++ * LS-CHL specific power off method: reboot
++ ****************************************************************************/
++/*
++ * On the LS-CHL, the shutdown process is following:
++ * - Userland monitors key events until the power switch goes to off position
++ * - The board reboots
++ * - U-boot starts and goes into an idle mode waiting for the user
++ *   to move the switch to ON position
++ *
++ */
++
++static void lschl_power_off(void)
++{
++	arm_machine_restart('h', NULL);
++}
++
++/*****************************************************************************
++ * General Setup
++ ****************************************************************************/
++#define LSCHL_GPIO_USB_POWER	9
++#define LSCHL_GPIO_AUTO_POWER	17
++#define LSCHL_GPIO_POWER	18
++
++/****************************************************************************
++ * GPIO Attached Keys
++ ****************************************************************************/
++#define LSCHL_GPIO_KEY_FUNC		15
++#define LSCHL_GPIO_KEY_POWER		8
++#define LSCHL_GPIO_KEY_AUTOPOWER	10
++#define LSCHL_SW_POWER		0x00
++#define LSCHL_SW_AUTOPOWER	0x01
++#define LSCHL_SW_FUNC		0x02
++
++static struct gpio_keys_button lschl_buttons[] = {
++	{
++		.type = EV_SW,
++		.code = LSCHL_SW_POWER,
++		.gpio = LSCHL_GPIO_KEY_POWER,
++		.desc = "Power-on Switch",
++		.active_low = 1,
++	}, {
++		.type = EV_SW,
++		.code = LSCHL_SW_AUTOPOWER,
++		.gpio = LSCHL_GPIO_KEY_AUTOPOWER,
++		.desc = "Power-auto Switch",
++		.active_low = 1,
++	}, {
++		.type = EV_SW,
++		.code = LSCHL_SW_FUNC,
++		.gpio = LSCHL_GPIO_KEY_FUNC,
++		.desc = "Function Switch",
++		.active_low = 1,
++	},
++};
++
++static struct gpio_keys_platform_data lschl_button_data = {
++	.buttons = lschl_buttons,
++	.nbuttons = ARRAY_SIZE(lschl_buttons),
++};
++
++static struct platform_device lschl_button_device = {
++	.name = "gpio-keys",
++	.id = -1,
++	.num_resources = 0,
++	.dev = {
++		.platform_data = &lschl_button_data,
++	},
++};
++
++#define LSCHL_GPIO_HDD_POWER	1
++
++/****************************************************************************
++ * GPIO Fan
++ ****************************************************************************/
++
++#define LSCHL_GPIO_FAN_LOW	16
++#define LSCHL_GPIO_FAN_HIGH	14
++#define LSCHL_GPIO_FAN_LOCK	6
++
++static struct gpio_fan_alarm lschl_alarm = {
++	.gpio = LSCHL_GPIO_FAN_LOCK,
++};
++
++static struct gpio_fan_speed lschl_speeds[] = {
++	{
++		.rpm = 0,
++		.ctrl_val = 3,
++	}, {
++		.rpm = 1500,
++		.ctrl_val = 2,
++	}, {
++		.rpm = 3250,
++		.ctrl_val = 1,
++	}, {
++		.rpm = 5000,
++		.ctrl_val = 0,
++	},
++};
++
++static int lschl_gpio_list[] = {
++	LSCHL_GPIO_FAN_HIGH, LSCHL_GPIO_FAN_LOW,
++};
++
++static struct gpio_fan_platform_data lschl_fan_data = {
++	.num_ctrl = ARRAY_SIZE(lschl_gpio_list),
++	.ctrl = lschl_gpio_list,
++	.alarm = &lschl_alarm,
++	.num_speed = ARRAY_SIZE(lschl_speeds),
++	.speed = lschl_speeds,
++};
++
++static struct platform_device lschl_fan_device = {
++	.name = "gpio-fan",
++	.id = -1,
++	.num_resources = 0,
++	.dev = {
++		.platform_data = &lschl_fan_data,
++	},
++};
++
++/****************************************************************************
++ * GPIO Data
++ ****************************************************************************/
++
++static struct orion5x_mpp_mode lschl_mpp_modes[] __initdata = {
++	{  0, MPP_GPIO }, /* LED POWER */
++	{  1, MPP_GPIO }, /* HDD POWER */
++	{  2, MPP_GPIO }, /* LED ALARM */
++	{  3, MPP_GPIO }, /* LED INFO */
++	{  4, MPP_UNUSED },
++	{  5, MPP_UNUSED },
++	{  6, MPP_GPIO }, /* FAN LOCK */
++	{  7, MPP_GPIO }, /* SW INIT */
++	{  8, MPP_GPIO }, /* SW POWER */
++	{  9, MPP_GPIO }, /* USB POWER */
++	{ 10, MPP_GPIO }, /* SW AUTO POWER */
++	{ 11, MPP_UNUSED },
++	{ 12, MPP_UNUSED },
++	{ 13, MPP_UNUSED },
++	{ 14, MPP_GPIO }, /* FAN HIGH */
++	{ 15, MPP_GPIO }, /* SW FUNC */
++	{ 16, MPP_GPIO }, /* FAN LOW */
++	{ 17, MPP_GPIO }, /* LED FUNC */
++	{ 18, MPP_UNUSED },
++	{ 19, MPP_UNUSED },
++	{ -1 },
++};
++
++static void __init lschl_init(void)
++{
++	/*
++	 * Setup basic Orion functions. Needs to be called early.
++	 */
++	orion5x_init();
++
++	orion5x_mpp_conf(lschl_mpp_modes);
++
++	/*
++	 * Configure peripherals.
++	 */
++	orion5x_ehci0_init();
++	orion5x_ehci1_init();
++	orion5x_eth_init(&lschl_eth_data);
++	orion5x_i2c_init();
++	orion5x_sata_init(&lschl_sata_data);
++	orion5x_uart0_init();
++	orion5x_xor_init();
++
++	orion5x_setup_dev_boot_win(LSCHL_NOR_BOOT_BASE,
++				   LSCHL_NOR_BOOT_SIZE);
++	platform_device_register(&lschl_nor_flash);
++
++	platform_device_register(&lschl_leds);
++
++	platform_device_register(&lschl_button_device);
++
++	platform_device_register(&lschl_fan_device);
++
++	i2c_register_board_info(0, &lschl_i2c_rtc, 1);
++
++	/* usb power on */
++	gpio_set_value(LSCHL_GPIO_USB_POWER, 1);
++
++	/* register power-off method */
++	pm_power_off = lschl_power_off;
++
++	pr_info("%s: finished\n", __func__);
++}
++
++MACHINE_START(LINKSTATION_LSCHL, "Buffalo Linkstation LiveV3 (LS-CHL)")
++	/* Maintainer: Ash Hughes <ashley.hughes@blueyonder.co.uk> */
++	.boot_params	= 0x00000100,
++	.init_machine	= lschl_init,
++	.map_io		= orion5x_map_io,
++	.init_irq	= orion5x_init_irq,
++	.timer		= &orion5x_timer,
++	.fixup		= tag_fixup_mem32,
++MACHINE_END
++
+diff -uprN linux-2.6-vanilla//arch/arm/mach-orion5x/Makefile linux-2.6/arch/arm/mach-orion5x/Makefile
+--- linux-2.6-vanilla//arch/arm/mach-orion5x/Makefile	2010-11-14 10:58:39.000000000 +0000
++++ linux-2.6/arch/arm/mach-orion5x/Makefile	2010-11-24 19:36:07.868220002 +0000
+@@ -21,3 +21,4 @@ obj-$(CONFIG_MACH_WNR854T)	+= wnr854t-se
+ obj-$(CONFIG_MACH_RD88F5181L_GE)	+= rd88f5181l-ge-setup.o
+ obj-$(CONFIG_MACH_RD88F5181L_FXO)	+= rd88f5181l-fxo-setup.o
+ obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
++obj-$(CONFIG_MACH_LINKSTATION_LSCHL)	+= ls-chl-setup.o
+
+-----Original Message-----
+From: Simon Guinot [mailto:simon at sequanux.org] 
+Sent: 24 November 2010 01:05
+To: Ash Hughes
+Cc: nico at fluxnic.net; kernel at wantstofly.org; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
+linux-kernel at vger.kernel.org
+Subject: Re: [PATCH 1/1] ARM Orion: added Buffalo LS-CHL support
+
+Hi Ashley,
+
+On Sun, Nov 21, 2010 at 11:05:10PM -0000, Ash Hughes wrote:
+> Adds support for Buffalo Linkstation Live v3 (LS-CHL) NAS drives.
+> Signed-off-by: Ash Hughes <ashley.hughes@blueyonder.co.uk>
+> 
+> ---
+> 
+> 
+> diff -uprN linux-2.6-vanilla//arch/arm/mach-orion5x/Kconfig linux-2.6/arch/arm/mach-orion5x/Kconfig
+> --- linux-2.6-vanilla//arch/arm/mach-orion5x/Kconfig	2010-11-14 10:58:39.000000000 +0000
+> +++ linux-2.6/arch/arm/mach-orion5x/Kconfig	2010-11-14 11:02:42.874582000 +0000
+> @@ -51,6 +51,13 @@ config MACH_LINKSTATION_PRO
+>  	  Buffalo Linkstation Pro/Live platform. Both v1 and
+>  	  v2 devices are supported.
+>  
+> +config MACH_LINKSTATION_LSCHL
+> +	bool "Buffalo Linkstation Live v3 (LS-CHL)"
+> +	select I2C_BOARDINFO
+> +	help
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  Buffalo Linkstation Live v3 (LS-CHL) platform.
+> +
+>  config MACH_LINKSTATION_MINI
+>  	bool "Buffalo Linkstation Mini"
+>  	select I2C_BOARDINFO
+> diff -uprN linux-2.6-vanilla//arch/arm/mach-orion5x/ls-chl-setup.c linux-2.6/arch/arm/mach-orion5x/ls-chl-setup.c
+> --- linux-2.6-vanilla//arch/arm/mach-orion5x/ls-chl-setup.c	1970-01-01 01:00:00.000000000 +0100
+> +++ linux-2.6/arch/arm/mach-orion5x/ls-chl-setup.c	2010-11-21 15:33:43.910827481 +0000
+> @@ -0,0 +1,329 @@
+> +/*
+> + * arch/arm/mach-orion5x/ls-chl-setup.c
+> + *
+> + * Maintainer: Ash Hughes <ashley.hughes@blueyonder.co.uk>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/mv643xx_eth.h>
+> +#include <linux/leds.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/gpio-fan.h>
+> +#include <linux/input.h>
+> +#include <linux/i2c.h>
+> +#include <linux/ata_platform.h>
+> +#include <linux/gpio.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/system.h>
+> +#include <mach/orion5x.h>
+> +#include "common.h"
+> +#include "mpp.h"
+> +
+> +/*****************************************************************************
+> + * Linkstation LS-CHL Info
+> + ****************************************************************************/
+> +
+> +/*
+> + * 256K NOR flash Device bus boot chip select
+> + */
+> +
+> +#define LSCHL_NOR_BOOT_BASE	0xf4000000
+> +#define LSCHL_NOR_BOOT_SIZE	SZ_256K
+> +
+> +/*****************************************************************************
+> + * 256KB NOR Flash on BOOT Device
+> + ****************************************************************************/
+> +
+> +static struct physmap_flash_data lschl_nor_flash_data = {
+> +	.width		= 1,
+> +};
+> +
+> +static struct resource lschl_nor_flash_resource = {
+> +	.flags	= IORESOURCE_MEM,
+> +	.start	= LSCHL_NOR_BOOT_BASE,
+> +	.end	= LSCHL_NOR_BOOT_BASE + LSCHL_NOR_BOOT_SIZE - 1,
+> +};
+> +
+> +static struct platform_device lschl_nor_flash = {
+> +	.name			= "physmap-flash",
+> +	.id			= 0,
+> +	.dev		= {
+> +		.platform_data	= &lschl_nor_flash_data,
+> +	},
+> +	.num_resources		= 1,
+> +	.resource		= &lschl_nor_flash_resource,
+> +};
+> +
+> +/*****************************************************************************
+> + * Ethernet
+> + ****************************************************************************/
+> +
+> +static struct mv643xx_eth_platform_data lschl_eth_data = {
+> +	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+> +};
+> +
+> +/*****************************************************************************
+> + * RTC 5C372a on I2C bus
+> + ****************************************************************************/
+> +
+> +static struct i2c_board_info __initdata lschl_i2c_rtc = {
+> +	I2C_BOARD_INFO("rs5c372a", 0x32),
+> +};
+> +
+> +/*****************************************************************************
+> + * LEDs attached to GPIO
+> + ****************************************************************************/
+> +
+> +#define LSCHL_GPIO_LED_ALARM	2
+> +#define LSCHL_GPIO_LED_INFO	3
+> +#define LSCHL_GPIO_LED_FUNC	17
+> +#define LSCHL_GPIO_LED_PWR	0
+> +
+> +static struct gpio_led lschl_led_pins[] = {
+> +	{
+> +		.name	   = "alarm:red",
+> +		.gpio	   = LSCHL_GPIO_LED_ALARM,
+> +		.active_low     = 1,
+> +	}, {
+> +		.name	   = "info:amber",
+> +		.gpio	   = LSCHL_GPIO_LED_INFO,
+> +		.active_low     = 1,
+> +	}, {
+> +		.name	   = "func:blue:top",
+> +		.gpio	   = LSCHL_GPIO_LED_FUNC,
+> +		.active_low     = 1,
+> +	}, {
+> +		.name	   = "power:blue:bottom",
+> +		.gpio	   = LSCHL_GPIO_LED_PWR,
+> +	},
+> +};
+
+You should use tabs instead of spaces for indentation.
+The same comment apply to some other places in this file.
+
+> +
+> +static struct gpio_led_platform_data lschl_led_data = {
+> +	.leds	   = lschl_led_pins,
+> +	.num_leds       = ARRAY_SIZE(lschl_led_pins),
+> +};
+> +
+> +static struct platform_device lschl_leds = {
+> +	.name   = "leds-gpio",
+> +	.id     = -1,
+> +	.dev    = {
+> +		.platform_data  = &lschl_led_data,
+> +	},
+> +};
+> +
+> +/*****************************************************************************
+> + * SATA
+> + ****************************************************************************/
+> +static struct mv_sata_platform_data lschl_sata_data = {
+> +	.n_ports	= 2,
+> +};
+> +
+> +/*****************************************************************************
+> + * LS-CHL specific power off method: reboot
+> + ****************************************************************************/
+> +/*
+> + * On the LS-CHL, the shutdown process is following:
+> + * - Userland monitors key events until the power switch goes to off position
+> + * - The board reboots
+> + * - U-boot starts and goes into an idle mode waiting for the user
+> + *   to move the switch to ON position
+> + *
+> + */
+> +
+> +static void lschl_power_off(void)
+> +{
+> +	arm_machine_restart('h', NULL);
+> +}
+
+Maybe that userland could just call "reboot" when a switch "power-off"
+event happen ?
+Is it possible to power-off the Linkstation device ?
+
+> +
+> +/*****************************************************************************
+> + * General Setup
+> + ****************************************************************************/
+> +#define LSCHL_GPIO_USB_POWER	9
+> +#define LSCHL_GPIO_AUTO_POWER	17
+> +#define LSCHL_GPIO_POWER	18
+> +
+> +/****************************************************************************
+> + * GPIO Attached Keys
+> + ****************************************************************************/
+> +#define LSCHL_GPIO_KEY_FUNC		15
+> +#define LSCHL_GPIO_KEY_POWER		8
+> +#define LSCHL_GPIO_KEY_AUTOPOWER	10
+> +#define LSCHL_SW_POWER		0x00
+> +#define LSCHL_SW_AUTOPOWER	0x01
+> +#define LSCHL_SW_FUNC		0x02
+> +
+> +static struct gpio_keys_button lschl_buttons[] = {
+> +	{
+> +		.type		= EV_SW,
+> +		.code	   = LSCHL_SW_POWER,
+> +		.gpio	   = LSCHL_GPIO_KEY_POWER,
+> +		.desc	   = "Power-on Switch",
+> +		.active_low     = 1,
+> +	}, {
+> +		.type		= EV_SW,
+> +		.code	   = LSCHL_SW_AUTOPOWER,
+> +		.gpio	   = LSCHL_GPIO_KEY_AUTOPOWER,
+> +		.desc	   = "Power-auto Switch",
+> +		.active_low     = 1,
+> +	}, {
+> +		.type		= EV_SW,
+> +		.code	   = LSCHL_SW_FUNC,
+> +		.gpio	   = LSCHL_GPIO_KEY_FUNC,
+> +		.desc	   = "Function Switch",
+> +		.active_low     = 1,
+> +	},
+> +};
+> +
+> +static struct gpio_keys_platform_data lschl_button_data = {
+> +	.buttons	= lschl_buttons,
+> +	.nbuttons       = ARRAY_SIZE(lschl_buttons),
+> +};
+> +
+> +static struct platform_device lschl_button_device = {
+> +	.name		= "gpio-keys",
+> +	.id		= -1,
+> +	.num_resources	= 0,
+> +	.dev		= {
+> +		.platform_data  = &lschl_button_data,
+> +	},
+> +};
+> +
+> +#define LSCHL_GPIO_HDD_POWER	1
+> +
+> +/****************************************************************************
+> + * GPIO Fan
+> + ****************************************************************************/
+> +
+> +#define LSCHL_GPIO_FAN_LOW	16
+> +#define LSCHL_GPIO_FAN_HIGH	14
+> +#define LSCHL_GPIO_FAN_LOCK	6
+> +
+> +static struct gpio_fan_alarm lschl_alarm = {
+> +	.gpio = LSCHL_GPIO_FAN_LOCK,
+> +	.active_low = 0,
+
+You don't need to set active_low to 0.
+
+> +};
+> +
+> +static struct gpio_fan_speed lschl_speeds[] = {
+> +	{
+> +		.rpm = 0,
+> +		.ctrl_val = 3,
+> +	}, {
+> +		.rpm = 1,
+> +		.ctrl_val = 2,
+> +	}, {
+> +		.rpm = 2,
+> +		.ctrl_val = 1,
+> +	}, {
+> +		.rpm = 3,
+> +		.ctrl_val = 0,
+> +	},
+> +};
+
+The rpm values are rather surprising. Can you either measure or estimate
+the fan speed ?
+
+> +
+> +static int lschl_gpio_list[] = {
+> +	LSCHL_GPIO_FAN_HIGH, LSCHL_GPIO_FAN_LOW,
+> +};
+> +
+> +static struct gpio_fan_platform_data lschl_fan_data = {
+> +	.num_ctrl = 2,
+> +	.ctrl = lschl_gpio_list,
+> +	.alarm = &lschl_alarm,
+> +	.num_speed = 4,
+> +	.speed = lschl_speeds,
+> +};
+> +
+> +static struct platform_device lschl_fan_device = {
+> +	.name		= "gpio-fan",
+> +	.id		= -1,
+> +	.num_resources	= 0,
+> +	.dev		= {
+> +		.platform_data  = &lschl_fan_data,
+> +	},
+> +};
+> +
+> +/****************************************************************************
+> + * GPIO Data
+> + ****************************************************************************/
+> +
+> +static struct orion5x_mpp_mode lschl_mpp_modes[] __initdata = {
+> +	{  0, MPP_GPIO }, /* LED POWER */
+> +	{  1, MPP_GPIO }, /* HDD POWER */
+> +	{  2, MPP_GPIO }, /* LED ALARM */
+> +	{  3, MPP_GPIO }, /* LED INFO */
+> +	{  4, MPP_UNUSED },
+> +	{  5, MPP_UNUSED },
+> +	{  6, MPP_GPIO }, /* FAN LOCK */
+> +	{  7, MPP_GPIO }, /* SW INIT */
+> +	{  8, MPP_GPIO }, /* SW POWER */
+> +	{  9, MPP_GPIO }, /* USB POWER */
+> +	{ 10, MPP_GPIO }, /* SW AUTO POWER */
+> +	{ 11, MPP_UNUSED },
+> +	{ 12, MPP_UNUSED },
+> +	{ 13, MPP_UNUSED },
+> +	{ 14, MPP_GPIO }, /* FAN HIGH */
+> +	{ 15, MPP_GPIO }, /* SW FUNC */
+> +	{ 16, MPP_GPIO }, /* FAN LOW */
+> +	{ 17, MPP_GPIO }, /* LED FUNC */
+> +	{ 18, MPP_UNUSED },
+> +	{ 19, MPP_UNUSED },
+> +	{ -1 },
+> +};
+> +
+> +static void __init lschl_init(void)
+> +{
+> +	/*
+> +	 * Setup basic Orion functions. Needs to be called early.
+> +	 */
+> +	orion5x_init();
+> +
+> +	orion5x_mpp_conf(lschl_mpp_modes);
+> +
+> +	/*
+> +	 * Configure peripherals.
+> +	 */
+> +	orion5x_ehci0_init();
+> +	orion5x_ehci1_init();
+> +	orion5x_eth_init(&lschl_eth_data);
+> +	orion5x_i2c_init();
+> +	orion5x_sata_init(&lschl_sata_data);
+> +	orion5x_uart0_init();
+> +	orion5x_xor_init();
+> +
+> +	orion5x_setup_dev_boot_win(LSCHL_NOR_BOOT_BASE,
+> +				   LSCHL_NOR_BOOT_SIZE);
+> +	platform_device_register(&lschl_nor_flash);
+> +
+> +	platform_device_register(&lschl_leds);
+> +
+> +	platform_device_register(&lschl_button_device);
+> +
+> +	platform_device_register(&lschl_fan_device);
+> +
+> +	i2c_register_board_info(0, &lschl_i2c_rtc, 1);
+> +
+> +	/* usb power on */
+> +	gpio_set_value(LSCHL_GPIO_USB_POWER, 1);
+> +
+> +	/* register power-off method */
+> +	pm_power_off = lschl_power_off;
+> +
+> +	pr_info("%s: finished\n", __func__);
+> +}
+> +
+> +MACHINE_START(LINKSTATION_LSCHL, "Buffalo Linkstation LiveV3 (LS-CHL)")
+> +	/* Maintainer: Ash Hughes <ashley.hughes@blueyonder.co.uk> */
+> +	.boot_params	= 0x00000100,
+> +	.init_machine	= lschl_init,
+> +	.map_io		= orion5x_map_io,
+> +	.init_irq	= orion5x_init_irq,
+> +	.timer		= &orion5x_timer,
+> +	.fixup		= tag_fixup_mem32,
+> +MACHINE_END
+> +
+> diff -uprN linux-2.6-vanilla//arch/arm/mach-orion5x/Makefile linux-2.6/arch/arm/mach-orion5x/Makefile
+> --- linux-2.6-vanilla//arch/arm/mach-orion5x/Makefile	2010-11-14 10:58:39.000000000 +0000
+> +++ linux-2.6/arch/arm/mach-orion5x/Makefile	2010-11-14 11:03:34.444582001 +0000
+> @@ -21,3 +21,4 @@ obj-$(CONFIG_MACH_WNR854T)	+= wnr854t-se
+>  obj-$(CONFIG_MACH_RD88F5181L_GE)	+= rd88f5181l-ge-setup.o
+>  obj-$(CONFIG_MACH_RD88F5181L_FXO)	+= rd88f5181l-fxo-setup.o
+>  obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
+> +obj-$(CONFIG_MACH_LINKSTATION_LSCHL)   += ls-chl-setup.o
+
+You should replace spaces with tab here too.
+
+Simon
