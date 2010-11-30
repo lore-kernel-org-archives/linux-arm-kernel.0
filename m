@@ -1,57 +1,99 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:25:38 +0100
-Subject: [PATCH 04/54] ARM: ITE 8152: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:25:34 +0100
+Subject: [PATCH 02/54] ARM: ecard: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130132538.GE15575@mail.wantstofly.org>
+Message-ID: <20101130132534.GC15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/common/it8152.c |   14 +++++++++-----
- 1 files changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/kernel/ecard.c |   28 ++++++++++++++--------------
+ 1 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
-index 1bec96e..fa708f7 100644
---- a/arch/arm/common/it8152.c
-+++ b/arch/arm/common/it8152.c
-@@ -31,8 +31,10 @@
- 
- #define MAX_SLOTS		21
- 
--static void it8152_mask_irq(unsigned int irq)
-+static void it8152_mask_irq(struct irq_data *d)
+diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
+index eed2f79..2ad62df 100644
+--- a/arch/arm/kernel/ecard.c
++++ b/arch/arm/kernel/ecard.c
+@@ -443,40 +443,40 @@ static expansioncard_ops_t ecard_default_ops = {
+  *
+  * They are not meant to be called directly, but via enable/disable_irq.
+  */
+-static void ecard_irq_unmask(unsigned int irqnr)
++static void ecard_irq_unmask(struct irq_data *d)
  {
-+	unsigned int irq = d->irq;
-+
-        if (irq >= IT8152_LD_IRQ(0)) {
- 	       __raw_writel((__raw_readl(IT8152_INTC_LDCNIMR) |
- 			    (1 << (irq - IT8152_LD_IRQ(0)))),
-@@ -48,8 +50,10 @@ static void it8152_mask_irq(unsigned int irq)
-        }
+-	ecard_t *ec = slot_to_ecard(irqnr - 32);
++	ecard_t *ec = slot_to_ecard(d->irq - 32);
+ 
+ 	if (ec) {
+ 		if (!ec->ops)
+ 			ec->ops = &ecard_default_ops;
+ 
+ 		if (ec->claimed && ec->ops->irqenable)
+-			ec->ops->irqenable(ec, irqnr);
++			ec->ops->irqenable(ec, d->irq);
+ 		else
+ 			printk(KERN_ERR "ecard: rejecting request to "
+-				"enable IRQs for %d\n", irqnr);
++				"enable IRQs for %d\n", d->irq);
+ 	}
  }
  
--static void it8152_unmask_irq(unsigned int irq)
-+static void it8152_unmask_irq(struct irq_data *d)
+-static void ecard_irq_mask(unsigned int irqnr)
++static void ecard_irq_mask(struct irq_data *d)
  {
-+	unsigned int irq = d->irq;
-+
-        if (irq >= IT8152_LD_IRQ(0)) {
- 	       __raw_writel((__raw_readl(IT8152_INTC_LDCNIMR) &
- 			     ~(1 << (irq - IT8152_LD_IRQ(0)))),
-@@ -67,9 +71,9 @@ static void it8152_unmask_irq(unsigned int irq)
+-	ecard_t *ec = slot_to_ecard(irqnr - 32);
++	ecard_t *ec = slot_to_ecard(d->irq - 32);
  
- static struct irq_chip it8152_irq_chip = {
- 	.name		= "it8152",
--	.ack		= it8152_mask_irq,
--	.mask		= it8152_mask_irq,
--	.unmask		= it8152_unmask_irq,
-+	.irq_ack	= it8152_mask_irq,
-+	.irq_mask	= it8152_mask_irq,
-+	.irq_unmask	= it8152_unmask_irq,
+ 	if (ec) {
+ 		if (!ec->ops)
+ 			ec->ops = &ecard_default_ops;
+ 
+ 		if (ec->ops && ec->ops->irqdisable)
+-			ec->ops->irqdisable(ec, irqnr);
++			ec->ops->irqdisable(ec, d->irq);
+ 	}
+ }
+ 
+ static struct irq_chip ecard_chip = {
+-	.name	= "ECARD",
+-	.ack	= ecard_irq_mask,
+-	.mask	= ecard_irq_mask,
+-	.unmask = ecard_irq_unmask,
++	.name		= "ECARD",
++	.irq_ack	= ecard_irq_mask,
++	.irq_mask	= ecard_irq_mask,
++	.irq_unmask	= ecard_irq_unmask,
  };
  
- void it8152_init_irq(void)
+ void ecard_enablefiq(unsigned int fiqnr)
+@@ -551,7 +551,7 @@ static void ecard_check_lockup(struct irq_desc *desc)
+ 			printk(KERN_ERR "\nInterrupt lockup detected - "
+ 			       "disabling all expansion card interrupts\n");
+ 
+-			desc->chip->mask(IRQ_EXPANSIONCARD);
++			desc->irq_data.chip->irq_mask(&desc->irq_data);
+ 			ecard_dump_irq_state();
+ 		}
+ 	} else
+@@ -574,7 +574,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	ecard_t *ec;
+ 	int called = 0;
+ 
+-	desc->chip->mask(irq);
++	desc->irq_data.chip->irq_mask(&desc->irq_data);
+ 	for (ec = cards; ec; ec = ec->next) {
+ 		int pending;
+ 
+@@ -591,7 +591,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 			called ++;
+ 		}
+ 	}
+-	desc->chip->unmask(irq);
++	desc->irq_data.chip->irq_unmask(&desc->irq_data);
+ 
+ 	if (called == 0)
+ 		ecard_check_lockup(desc);
 -- 
 1.7.1
