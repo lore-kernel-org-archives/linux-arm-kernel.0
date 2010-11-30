@@ -1,26 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 30 Nov 2010 15:17:25 +0000
-Subject: [PATCH] make mc13783 code generic
-In-Reply-To: <20101130151540.GN20449@pengutronix.de>
-References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
-	<1291110118.3235.27.camel@realization>
-	<20101130143247.GI20449@pengutronix.de>
-	<20101130145517.GF32368@sirena.org.uk>
-	<20101130151540.GN20449@pengutronix.de>
-Message-ID: <20101130151725.GN7403@rakim.wolfsonmicro.main>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Nov 2010 16:21:47 +0100
+Subject: [PATCH 09/10] MCDE: Add build files and bus
+In-Reply-To: <AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
+References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
+	<201011261224.59490.arnd@arndb.de>
+	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
+Message-ID: <201011301621.48140.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 04:15:40PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Nov 30, 2010 at 02:55:17PM +0000, Mark Brown wrote:
+On Tuesday 30 November 2010, Linus Walleij wrote:
+> 2010/11/26 Arnd Bergmann <arnd@arndb.de>:
+> 
+> > * When you say that the devices are static, I hope you do not mean
+> >  static in the C language sense. We used to allow devices to be
+> >  declared as "static struct" and registered using
+> >  platform_device_register (or other bus specific functions). This
+> >  is no longer valid and we are removing the existing users, do not
+> >  add new ones. When creating a platform device, use
+> >  platform_device_register_simple or platform_device_register_resndata.
+> 
+> Is this part of the generic ARM runtime multi-platform kernel
+> and device trees shebang?
+> 
+> The Ux500 still isn't in that sector, it needs extensive rewriting
+> of arch/arm/mach-ux500 to be done first, so as to support e.g.
+> U8500 and U5500 with a single kernel image.
+> 
+> Trying to skin that cat that as part of this review is a bit too
+> much to ask IMO, I'd rather have the author of this driver
+> adapt to whatever platform data registration mechanism is
+> in place for the merge window. Else it needs fixing as part
+> of a bigger endavour to root out compile-time platform
+> configuration.
 
-> > interest in most of the code he's touching.  If you use the --nogit
-> > option (which is the default with current -next) get_maintainer.pl is a
-> > bit safer but you then need to think about people who might be actively
+The 'no static devices' rule is something that Greg brought up
+at the embedded developer session during PlumbersConf this year,
+I wasn't aware of the problem before that either.
 
-> I tried --nogit some time ago, but it still used git.  After looking
-> again I probably should have passed --nogit-fallback, too.
+It is not related to the multi-platform kernel work and it's
+not ARM specific.
 
-Oh, erk - hadn't noticed the fallback stuff.  The general point we're
-both making does still stand, get_maintainer is a useful starting point
-but should never be considered gospel.
+Maybe Greg can give a short explanation of the impact of this.
+AFAIR, static device definitions still work, but there are
+plans to remove that capability in the future.
+
+	Arnd
