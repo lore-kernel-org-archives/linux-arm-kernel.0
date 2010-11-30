@@ -1,163 +1,299 @@
-From: davidsin@ti.com (David Sin)
-Date: Tue, 30 Nov 2010 13:58:51 -0600
-Subject: [RFC v2 0/8] TI DMM-TILER driver
-Message-ID: <1291147139-23472-1-git-send-email-davidsin@ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 30 Nov 2010 21:46:23 +0200
+Subject: [PATCH v4] ARM: s3c244x: Fix mess with gpio {set,get}_pull callbacks
+In-Reply-To: <201011301701.03443.anarsoul@gmail.com>
+References: <201011301701.03443.anarsoul@gmail.com>
+Message-ID: <1291146383-16215-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tiling and Isometric Lightweight Engine for Rotation (TILER) driver
+Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default structure
+are initalized via s3c_gpio_{get,set}pull_1up. This results in a linker
+error when only CONFIG_CPU_S3C2442 is selected:
 
-Dynamic Memory Manager (DMM) is a hardware block made by Texas Instruments.
-Within the DMM exists at least one TILER hardware component.  Its purpose is to
-organize video/image memory in a 2-dimensional fashion to limit memory
-bandwidth and facilitate 0 effort rotation and mirroring.  The TILER driver
-facilitates allocating, freeing, as well as mapping 2D blocks (areas) in the
-TILER container(s).  It also facilitates rotating and mirroring the allocated
-blocks or its rectangular subsections.
+arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
+`s3c_gpio_getpull_1up'
+arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
+`s3c_gpio_setpull_1up'
 
-TERMINOLOGY
+The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
+The method of controlling them is the same though.
+So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper functions
+to take an additional parameter deciding whether the pin has a pullup or pulldown.
+The s3c_gpio_{get,set}pull_1{down,up} functions then wrap that functions passing
+either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
 
-"slot"
+Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull fields
+in the s3c244{0,2}_map_io function to the new pulldown helper functions.
 
-The basic TILER driver operates on blocks of slots.  A slot is the granularity
-of the TILER hardware device.  For all current uses it is 4K, but could also be
-16 or 64K.  The DMM-TILER TRM refers to this as "page" but we want to separate
-this concept from the MMU pages.
+Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
 
-"page"
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+v2: adapt patch for 2.6.37-rc1
+v3: restore default pull callbacks, add default pull callbacks for s3c2442
+v4: remove default pull callbacks, set them in per-soc map_io function instead.
+ arch/arm/mach-s3c2440/Kconfig                      |    1 +
+ arch/arm/mach-s3c2440/s3c2440.c                    |   11 ++++-
+ arch/arm/mach-s3c2440/s3c2442.c                    |   14 ++++++
+ arch/arm/plat-s3c24xx/cpu.c                        |    8 ++--
+ arch/arm/plat-s3c24xx/gpiolib.c                    |    2 -
+ arch/arm/plat-s3c24xx/include/plat/s3c244x.h       |    7 +++-
+ arch/arm/plat-samsung/gpio-config.c                |   45 ++++++++++++++++----
+ .../plat-samsung/include/plat/gpio-cfg-helpers.h   |   11 +++++
+ 8 files changed, 80 insertions(+), 19 deletions(-)
 
-The granularity of the MMU, used by the kernel.  This is 4K.
-
-"block"
-
-The TILER hardware component supports 1D and 2D blocks.  A 2D block is a
-rectangular arrangement of slots with arbitrary width and height in a 2D 
-container.  A 1D block is a linear arrangement of slots with arbitrary length
- in a 1D container.  This TILER driver only supports 2D blocks.
-
-"container"
-
-The TILER driver supports an arbitrary TILER container size.  However, for
-all current implementations it is 256 by 128 slots.  The container currently can
-only be used as a 2D container.
-
-"reserved area"
-
-Each block resides within a reserved area in the container.  This area may
-be larger than the actual set of slots that a block occupies.  The reason for
-this is to protect access from one block into another.  Since TILER container is
-mmap-ped into user space as individual pages, all slots that are spanned by
-that page become visible to the user.  The tiler driver allows restricting the
-granularity of the reserved area (default alignment) as well as the mapped
-area (granularity).
-
-Changes made from RFC v1: http://www.spinics.net/lists/linux-omap/msg33867.html
-
-Santosh Shilimkar:
-1) Correct documentation location
-2) Remove ioremap of RAM
-3) Implement probe function and hwmod
-4) Correct commenting style
-5) Reduce use of barrier instances
-
-Linus Walleij:
-1) Define TCM acryonym  
-
-Russell King:
-1) Implement probe function
-2) Fix spelling mistake
-3) Remove GFP_ATOMIC flag when calling dma_alloc_coherent for PAT array mem
-4) Replace alloc_page and flush range calls with dma_alloc_coherent
-
-Nishanth Menon:
-1) Address infinite while loop when reading dmm register
-
-Benoit Cousson:
-1) Fix source file headers
-2) Correct logical errors in device file
-
-Kevin Hilman:
-1) Move DMM/TILER source code into driver/misc/tiler until a recommendation 
-is made as to where it should go
-
-List of pending items in proposed order:
-
-* Determine driver source code location
-  (Currently, resides in drivers/misc/tiler)
-* Add area packing support (multiple blocks can reside in the same band/area)
- to optimize area use
-* Add group-ID support (to specify which blocks can reside together in the
- same area)
-* Add multiple search directions to TCM-SiTA
-* Add 1D block support (including adding 1D search algo to TCM-SiTA)
-* Optimize mutex handling (don.t hold mutex during memory
- allocation/mapping/cache flushing)
-* Add block reference counting, support for sharing blocks
-* Move all kernel-API-s to tiler-iface.c
-* Support orphaned block support (in preparation for process cleanup support)
-* Change block identification from physical address to key-ID pair
- (in preparation for user space support, and process security)
-* Add support for process security (blocks from separate processes never
- reside in the same band)
-* Support file interface (ioctl and mmap)
-* Support for buffers (ordered list of blocks that are mapped to userspace
- together, such as YUV420sp)
-* Support 1D user buffer mapping into TILER container
-* Support for block pre-reservation (to further optimize area use)
-
-David Sin (1):
-  TILER-DMM: DMM-PAT driver for TI TILER
-
-Lajos Molnar (6):
-  TILER-DMM: Container manager interface and utility definitons
-  TILER-DMM: TILER Memory Manager interface and implementation
-  TILER-DMM: TILER interface file and documentation
-  TILER-DMM: Geometry and view manipulation functions
-  TILER-DMM: Main TILER driver implementation
-  TILER-DMM: Linking TILER driver into the Linux kernel build
-
-Ravi Ramachandra (1):
-  TILER-DMM: Sample TCM implementation: Simple TILER Allocator (SiTA)
-
- Documentation/arm/OMAP/TILER             |  126 +++++++++
- arch/arm/mach-omap2/Makefile             |    1 +
- arch/arm/mach-omap2/dmm-omap44xx.c       |   81 ++++++
- arch/arm/mach-omap2/include/mach/dmm.h   |   92 +++++++
- arch/arm/mach-omap2/include/mach/tiler.h |  173 ++++++++++++
- drivers/misc/Kconfig                     |    5 +
- drivers/misc/Makefile                    |    1 +
- drivers/misc/tiler/Kconfig               |   72 +++++
- drivers/misc/tiler/Makefile              |    7 +
- drivers/misc/tiler/_tiler.h              |   48 ++++
- drivers/misc/tiler/dmm-main.c            |  187 +++++++++++++
- drivers/misc/tiler/tcm.h                 |  171 ++++++++++++
- drivers/misc/tiler/tcm/Makefile          |    1 +
- drivers/misc/tiler/tcm/_tcm-sita.h       |   61 +++++
- drivers/misc/tiler/tcm/tcm-sita.c        |  422 ++++++++++++++++++++++++++++++
- drivers/misc/tiler/tcm/tcm-sita.h        |   28 ++
- drivers/misc/tiler/tcm/tcm-utils.h       |   51 ++++
- drivers/misc/tiler/tiler-geom.c          |  362 +++++++++++++++++++++++++
- drivers/misc/tiler/tiler-iface.c         |   66 +++++
- drivers/misc/tiler/tiler-main.c          |  405 ++++++++++++++++++++++++++++
- drivers/misc/tiler/tmm-pat.c             |  266 +++++++++++++++++++
- drivers/misc/tiler/tmm.h                 |  103 ++++++++
- 22 files changed, 2729 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/arm/OMAP/TILER
- create mode 100644 arch/arm/mach-omap2/dmm-omap44xx.c
- create mode 100644 arch/arm/mach-omap2/include/mach/dmm.h
- create mode 100644 arch/arm/mach-omap2/include/mach/tiler.h
- create mode 100644 drivers/misc/tiler/Kconfig
- create mode 100644 drivers/misc/tiler/Makefile
- create mode 100644 drivers/misc/tiler/_tiler.h
- create mode 100644 drivers/misc/tiler/dmm-main.c
- create mode 100644 drivers/misc/tiler/tcm.h
- create mode 100644 drivers/misc/tiler/tcm/Makefile
- create mode 100644 drivers/misc/tiler/tcm/_tcm-sita.h
- create mode 100644 drivers/misc/tiler/tcm/tcm-sita.c
- create mode 100644 drivers/misc/tiler/tcm/tcm-sita.h
- create mode 100644 drivers/misc/tiler/tcm/tcm-utils.h
- create mode 100644 drivers/misc/tiler/tiler-geom.c
- create mode 100644 drivers/misc/tiler/tiler-iface.c
- create mode 100644 drivers/misc/tiler/tiler-main.c
- create mode 100644 drivers/misc/tiler/tmm-pat.c
- create mode 100644 drivers/misc/tiler/tmm.h
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index ff024a6..478fae0 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -18,6 +18,7 @@ config CPU_S3C2440
+ config CPU_S3C2442
+ 	bool
+ 	select CPU_ARM920T
++	select S3C_GPIO_PULL_DOWN
+ 	select S3C2410_CLOCK
+ 	select S3C2410_GPIO
+ 	select S3C2410_PM if PM
+diff --git a/arch/arm/mach-s3c2440/s3c2440.c b/arch/arm/mach-s3c2440/s3c2440.c
+index d50f3ae..f7663f7 100644
+--- a/arch/arm/mach-s3c2440/s3c2440.c
++++ b/arch/arm/mach-s3c2440/s3c2440.c
+@@ -46,9 +46,6 @@ int __init s3c2440_init(void)
+ {
+ 	printk("S3C2440: Initialising architecture\n");
+ 
+-	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_1up;
+-	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_1up;
+-
+ 	/* change irq for watchdog */
+ 
+ 	s3c_device_wdt.resource[1].start = IRQ_S3C2440_WDT;
+@@ -58,3 +55,11 @@ int __init s3c2440_init(void)
+ 
+ 	return sysdev_register(&s3c2440_sysdev);
+ }
++
++void __init s3c2440_map_io(void)
++{
++	s3c244x_map_io();
++
++	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_1up;
++	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_1up;
++}
+diff --git a/arch/arm/mach-s3c2440/s3c2442.c b/arch/arm/mach-s3c2440/s3c2442.c
+index 188ad1e..ecf8135 100644
+--- a/arch/arm/mach-s3c2440/s3c2442.c
++++ b/arch/arm/mach-s3c2440/s3c2442.c
+@@ -32,6 +32,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
+ #include <linux/mutex.h>
++#include <linux/gpio.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+@@ -43,6 +44,11 @@
+ 
+ #include <plat/clock.h>
+ #include <plat/cpu.h>
++#include <plat/s3c244x.h>
++
++#include <plat/gpio-core.h>
++#include <plat/gpio-cfg.h>
++#include <plat/gpio-cfg-helpers.h>
+ 
+ /* S3C2442 extended clock support */
+ 
+@@ -163,3 +169,11 @@ int __init s3c2442_init(void)
+ 
+ 	return sysdev_register(&s3c2442_sysdev);
+ }
++
++void __init s3c2442_map_io(void)
++{
++	s3c244x_map_io();
++
++	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_1down;
++	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_1down;
++}
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index 76d0858..4a10c0f 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -88,7 +88,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+ 		.idcode		= 0x32440000,
+ 		.idmask		= 0xffffffff,
+-		.map_io		= s3c244x_map_io,
++		.map_io		= s3c2440_map_io,
+ 		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2440_init,
+@@ -97,7 +97,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+ 		.idcode		= 0x32440001,
+ 		.idmask		= 0xffffffff,
+-		.map_io		= s3c244x_map_io,
++		.map_io		= s3c2440_map_io,
+ 		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2440_init,
+@@ -106,7 +106,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+ 		.idcode		= 0x32440aaa,
+ 		.idmask		= 0xffffffff,
+-		.map_io		= s3c244x_map_io,
++		.map_io		= s3c2442_map_io,
+ 		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2442_init,
+@@ -115,7 +115,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+ 		.idcode		= 0x32440aab,
+ 		.idmask		= 0xffffffff,
+-		.map_io		= s3c244x_map_io,
++		.map_io		= s3c2442_map_io,
+ 		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2442_init,
+diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
+index 24c6f5a..243b641 100644
+--- a/arch/arm/plat-s3c24xx/gpiolib.c
++++ b/arch/arm/plat-s3c24xx/gpiolib.c
+@@ -82,8 +82,6 @@ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
+ struct s3c_gpio_cfg s3c24xx_gpiocfg_default = {
+ 	.set_config	= s3c_gpio_setcfg_s3c24xx,
+ 	.get_config	= s3c_gpio_getcfg_s3c24xx,
+-	.set_pull	= s3c_gpio_setpull_1up,
+-	.get_pull	= s3c_gpio_getpull_1up,
+ };
+ 
+ struct s3c_gpio_chip s3c24xx_gpios[] = {
+diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c244x.h b/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
+index 307248d..89e8d0a 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
++++ b/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
+@@ -21,17 +21,22 @@ extern void s3c244x_init_clocks(int xtal);
+ #else
+ #define s3c244x_init_clocks NULL
+ #define s3c244x_init_uarts NULL
+-#define s3c244x_map_io NULL
+ #endif
+ 
+ #ifdef CONFIG_CPU_S3C2440
+ extern  int s3c2440_init(void);
++
++extern void s3c2440_map_io(void);
+ #else
+ #define s3c2440_init NULL
++#define s3c2440_map_io NULL
+ #endif
+ 
+ #ifdef CONFIG_CPU_S3C2442
+ extern  int s3c2442_init(void);
++
++extern void s3c2442_map_io(void);
+ #else
+ #define s3c2442_init NULL
++#define s3c2442_map_io NULL
+ #endif
+diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
+index b732b77..b39e05b 100644
+--- a/arch/arm/plat-samsung/gpio-config.c
++++ b/arch/arm/plat-samsung/gpio-config.c
+@@ -280,16 +280,15 @@ s3c_gpio_pull_t s3c_gpio_getpull_updown(struct s3c_gpio_chip *chip,
+ }
+ #endif
+ 
+-#ifdef CONFIG_S3C_GPIO_PULL_UP
+-int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
+-			 unsigned int off, s3c_gpio_pull_t pull)
++#if defined(CONFIG_S3C_GPIO_PULL_UP) || defined(CONFIG_S3C_GPIO_PULL_DOWN)
++static int s3c_gpio_setpull_1(struct s3c_gpio_chip *chip,
++			 unsigned int off, s3c_gpio_pull_t pull,
++			 s3c_gpio_pull_t updown)
+ {
+ 	void __iomem *reg = chip->base + 0x08;
+ 	u32 pup = __raw_readl(reg);
+ 
+-	pup = __raw_readl(reg);
+-
+-	if (pup == S3C_GPIO_PULL_UP)
++	if (pup == updown)
+ 		pup &= ~(1 << off);
+ 	else if (pup == S3C_GPIO_PULL_NONE)
+ 		pup |= (1 << off);
+@@ -300,17 +299,45 @@ int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
+ 	return 0;
+ }
+ 
+-s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
+-				     unsigned int off)
++static s3c_gpio_pull_t s3c_gpio_getpull_1(struct s3c_gpio_chip *chip,
++				     unsigned int off, s3c_gpio_pull_t updown)
+ {
+ 	void __iomem *reg = chip->base + 0x08;
+ 	u32 pup = __raw_readl(reg);
+ 
+ 	pup &= (1 << off);
+-	return pup ? S3C_GPIO_PULL_NONE : S3C_GPIO_PULL_UP;
++	return pup ? S3C_GPIO_PULL_NONE : updown;
++}
++#endif /* CONFIG_S3C_GPIO_PULL_UP || CONFIG_S3C_GPIO_PULL_DOWN */
++
++#ifdef CONFIG_S3C_GPIO_PULL_UP
++s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
++				     unsigned int off)
++{
++	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_UP);
++}
++
++int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
++			 unsigned int off, s3c_gpio_pull_t pull)
++{
++	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_UP);
+ }
+ #endif /* CONFIG_S3C_GPIO_PULL_UP */
+ 
++#ifdef CONFIG_S3C_GPIO_PULL_DOWN
++s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
++				     unsigned int off)
++{
++	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_DOWN);
++}
++
++int s3c_gpio_setpull_1down(struct s3c_gpio_chip *chip,
++			 unsigned int off, s3c_gpio_pull_t pull)
++{
++	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_DOWN);
++}
++#endif /* CONFIG_S3C_GPIO_PULL_DOWN */
++
+ #ifdef CONFIG_S5P_GPIO_DRVSTR
+ s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin)
+ {
+diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+index 8fd65d8..0d2c570 100644
+--- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
++++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+@@ -210,6 +210,17 @@ extern s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
+ 					    unsigned int off);
+ 
+ /**
++ * s3c_gpio_getpull_1down() - Get configuration for choice of down or none
++ * @chip: The gpio chip that the GPIO pin belongs to
++ * @off: The offset to the pin to get the configuration of.
++ *
++ * This helper function reads the state of the pull-down resistor for the
++ * given GPIO in the same case as s3c_gpio_setpull_1down.
++*/
++extern s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
++					    unsigned int off);
++
++/**
+  * s3c_gpio_setpull_s3c2443() - Pull configuration for s3c2443.
+  * @chip: The gpio chip that is being configured.
+  * @off: The offset for the GPIO being configured.
+-- 
+1.7.3.2
