@@ -1,290 +1,156 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:41:21 +0100
-Subject: [PATCH 49/54] ARM: plat-mxc: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:41:22 +0100
+Subject: [PATCH 50/54] ARM: plat-nomadik: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130134121.GX15575@mail.wantstofly.org>
+Message-ID: <20101130134122.GY15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/plat-mxc/3ds_debugboard.c |   28 +++++++++++++-------------
- arch/arm/plat-mxc/gpio.c           |   30 ++++++++++++++--------------
- arch/arm/plat-mxc/irq.c            |   14 ++++++------
- arch/arm/plat-mxc/tzic.c           |   38 ++++++++++++++++++------------------
- 4 files changed, 55 insertions(+), 55 deletions(-)
+ arch/arm/plat-nomadik/gpio.c |   56 +++++++++++++++++++++---------------------
+ 1 files changed, 28 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
-index 639c54a..c856fa3 100644
---- a/arch/arm/plat-mxc/3ds_debugboard.c
-+++ b/arch/arm/plat-mxc/3ds_debugboard.c
-@@ -60,7 +60,6 @@
- #define EXPIO_INT_BUTTON_B	(MXC_BOARD_IRQ_START + 4)
+diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+index 85e6fd2..2edc841 100644
+--- a/arch/arm/plat-nomadik/gpio.c
++++ b/arch/arm/plat-nomadik/gpio.c
+@@ -318,13 +318,13 @@ static inline int nmk_gpio_get_bitmask(int gpio)
+ 	return 1 << (gpio % 32);
+ }
  
- static void __iomem *brd_io;
--static void expio_ack_irq(u32 irq);
+-static void nmk_gpio_irq_ack(unsigned int irq)
++static void nmk_gpio_irq_ack(struct irq_data *d)
+ {
+ 	int gpio;
+ 	struct nmk_gpio_chip *nmk_chip;
  
- static struct resource smsc911x_resources[] = {
- 	{
-@@ -93,7 +92,8 @@ static void mxc_expio_irq_handler(u32 irq, struct irq_desc *desc)
- 	u32 int_valid;
- 	u32 expio_irq;
+-	gpio = NOMADIK_IRQ_TO_GPIO(irq);
+-	nmk_chip = get_irq_chip_data(irq);
++	gpio = NOMADIK_IRQ_TO_GPIO(d->irq);
++	nmk_chip = irq_data_get_irq_chip_data(d);
+ 	if (!nmk_chip)
+ 		return;
+ 	writel(nmk_gpio_get_bitmask(gpio), nmk_chip->addr + NMK_GPIO_IC);
+@@ -363,7 +363,7 @@ static void __nmk_gpio_irq_modify(struct nmk_gpio_chip *nmk_chip,
+ 	}
+ }
  
--	desc->chip->mask(irq);	/* irq = gpio irq number */
-+	/* irq = gpio irq number */
-+	desc->irq_data.chip->irq_mask(&desc->irq_data);
+-static int nmk_gpio_irq_modify(unsigned int irq, enum nmk_gpio_irq_type which,
++static int nmk_gpio_irq_modify(struct irq_data *d, enum nmk_gpio_irq_type which,
+ 			       bool enable)
+ {
+ 	int gpio;
+@@ -371,8 +371,8 @@ static int nmk_gpio_irq_modify(unsigned int irq, enum nmk_gpio_irq_type which,
+ 	unsigned long flags;
+ 	u32 bitmask;
  
- 	imr_val = __raw_readw(brd_io + INTR_MASK_REG);
- 	int_valid = __raw_readw(brd_io + INTR_STATUS_REG) & ~imr_val;
-@@ -110,37 +110,37 @@ static void mxc_expio_irq_handler(u32 irq, struct irq_desc *desc)
- 			d->handle_irq(expio_irq, d);
+-	gpio = NOMADIK_IRQ_TO_GPIO(irq);
+-	nmk_chip = get_irq_chip_data(irq);
++	gpio = NOMADIK_IRQ_TO_GPIO(d->irq);
++	nmk_chip = irq_data_get_irq_chip_data(d);
+ 	bitmask = nmk_gpio_get_bitmask(gpio);
+ 	if (!nmk_chip)
+ 		return -EINVAL;
+@@ -384,24 +384,24 @@ static int nmk_gpio_irq_modify(unsigned int irq, enum nmk_gpio_irq_type which,
+ 	return 0;
+ }
+ 
+-static void nmk_gpio_irq_mask(unsigned int irq)
++static void nmk_gpio_irq_mask(struct irq_data *d)
+ {
+-	nmk_gpio_irq_modify(irq, NORMAL, false);
++	nmk_gpio_irq_modify(d, NORMAL, false);
+ }
+ 
+-static void nmk_gpio_irq_unmask(unsigned int irq)
++static void nmk_gpio_irq_unmask(struct irq_data *d)
+ {
+-	nmk_gpio_irq_modify(irq, NORMAL, true);
++	nmk_gpio_irq_modify(d, NORMAL, true);
+ }
+ 
+-static int nmk_gpio_irq_set_wake(unsigned int irq, unsigned int on)
++static int nmk_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
+ {
+ 	struct nmk_gpio_chip *nmk_chip;
+ 	unsigned long flags;
+ 	int gpio;
+ 
+-	gpio = NOMADIK_IRQ_TO_GPIO(irq);
+-	nmk_chip = get_irq_chip_data(irq);
++	gpio = NOMADIK_IRQ_TO_GPIO(d->irq);
++	nmk_chip = irq_data_get_irq_chip_data(d);
+ 	if (!nmk_chip)
+ 		return -EINVAL;
+ 
+@@ -419,9 +419,9 @@ static int nmk_gpio_irq_set_wake(unsigned int irq, unsigned int on)
+ 	return 0;
+ }
+ 
+-static int nmk_gpio_irq_set_type(unsigned int irq, unsigned int type)
++static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ {
+-	struct irq_desc *desc = irq_to_desc(irq);
++	struct irq_desc *desc = irq_to_desc(d->irq);
+ 	bool enabled = !(desc->status & IRQ_DISABLED);
+ 	bool wake = desc->wake_depth;
+ 	int gpio;
+@@ -429,8 +429,8 @@ static int nmk_gpio_irq_set_type(unsigned int irq, unsigned int type)
+ 	unsigned long flags;
+ 	u32 bitmask;
+ 
+-	gpio = NOMADIK_IRQ_TO_GPIO(irq);
+-	nmk_chip = get_irq_chip_data(irq);
++	gpio = NOMADIK_IRQ_TO_GPIO(d->irq);
++	nmk_chip = irq_data_get_irq_chip_data(d);
+ 	bitmask = nmk_gpio_get_bitmask(gpio);
+ 	if (!nmk_chip)
+ 		return -EINVAL;
+@@ -469,11 +469,11 @@ static int nmk_gpio_irq_set_type(unsigned int irq, unsigned int type)
+ 
+ static struct irq_chip nmk_gpio_irq_chip = {
+ 	.name		= "Nomadik-GPIO",
+-	.ack		= nmk_gpio_irq_ack,
+-	.mask		= nmk_gpio_irq_mask,
+-	.unmask		= nmk_gpio_irq_unmask,
+-	.set_type	= nmk_gpio_irq_set_type,
+-	.set_wake	= nmk_gpio_irq_set_wake,
++	.irq_ack	= nmk_gpio_irq_ack,
++	.irq_mask	= nmk_gpio_irq_mask,
++	.irq_unmask	= nmk_gpio_irq_unmask,
++	.irq_set_type	= nmk_gpio_irq_set_type,
++	.irq_set_wake	= nmk_gpio_irq_set_wake,
+ };
+ 
+ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+@@ -484,12 +484,12 @@ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	u32 pending;
+ 	unsigned int first_irq;
+ 
+-	if (host_chip->mask_ack)
+-		host_chip->mask_ack(irq);
++	if (host_chip->irq_mask_ack)
++		host_chip->irq_mask_ack(&desc->irq_data);
+ 	else {
+-		host_chip->mask(irq);
+-		if (host_chip->ack)
+-			host_chip->ack(irq);
++		host_chip->irq_mask(&desc->irq_data);
++		if (host_chip->irq_ack)
++			host_chip->irq_ack(&desc->irq_data);
  	}
  
--	desc->chip->ack(irq);
--	desc->chip->unmask(irq);
-+	desc->irq_data.chip->irq_ack(&desc->irq_data);
-+	desc->irq_data.chip->irq_unmask(&desc->irq_data);
+ 	nmk_chip = get_irq_data(irq);
+@@ -499,7 +499,7 @@ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		generic_handle_irq(gpio_irq);
+ 	}
+ 
+-	host_chip->unmask(irq);
++	host_chip->irq_unmask(&desc->irq_data);
  }
  
- /*
-  * Disable an expio pin's interrupt by setting the bit in the imr.
-  * Irq is an expio virtual irq number
-  */
--static void expio_mask_irq(u32 irq)
-+static void expio_mask_irq(struct irq_data *d)
- {
- 	u16 reg;
--	u32 expio = MXC_IRQ_TO_EXPIO(irq);
-+	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
- 
- 	reg = __raw_readw(brd_io + INTR_MASK_REG);
- 	reg |= (1 << expio);
- 	__raw_writew(reg, brd_io + INTR_MASK_REG);
- }
- 
--static void expio_ack_irq(u32 irq)
-+static void expio_ack_irq(struct irq_data *d)
- {
--	u32 expio = MXC_IRQ_TO_EXPIO(irq);
-+	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
- 
- 	__raw_writew(1 << expio, brd_io + INTR_RESET_REG);
- 	__raw_writew(0, brd_io + INTR_RESET_REG);
--	expio_mask_irq(irq);
-+	expio_mask_irq(d);
- }
- 
--static void expio_unmask_irq(u32 irq)
-+static void expio_unmask_irq(struct irq_data *d)
- {
- 	u16 reg;
--	u32 expio = MXC_IRQ_TO_EXPIO(irq);
-+	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
- 
- 	reg = __raw_readw(brd_io + INTR_MASK_REG);
- 	reg &= ~(1 << expio);
-@@ -148,9 +148,9 @@ static void expio_unmask_irq(u32 irq)
- }
- 
- static struct irq_chip expio_irq_chip = {
--	.ack = expio_ack_irq,
--	.mask = expio_mask_irq,
--	.unmask = expio_unmask_irq,
-+	.irq_ack = expio_ack_irq,
-+	.irq_mask = expio_mask_irq,
-+	.irq_unmask = expio_unmask_irq,
- };
- 
- int __init mxc_expio_init(u32 base, u32 p_irq)
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 9c3e362..679ca48 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -63,29 +63,29 @@ static void _set_gpio_irqenable(struct mxc_gpio_port *port, u32 index,
- 	__raw_writel(l, port->base + GPIO_IMR);
- }
- 
--static void gpio_ack_irq(u32 irq)
-+static void gpio_ack_irq(struct irq_data *d)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	_clear_gpio_irqstatus(&mxc_gpio_ports[gpio / 32], gpio & 0x1f);
- }
- 
--static void gpio_mask_irq(u32 irq)
-+static void gpio_mask_irq(struct irq_data *d)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	_set_gpio_irqenable(&mxc_gpio_ports[gpio / 32], gpio & 0x1f, 0);
- }
- 
--static void gpio_unmask_irq(u32 irq)
-+static void gpio_unmask_irq(struct irq_data *d)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	_set_gpio_irqenable(&mxc_gpio_ports[gpio / 32], gpio & 0x1f, 1);
- }
- 
- static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset);
- 
--static int gpio_set_irq_type(u32 irq, u32 type)
-+static int gpio_set_irq_type(struct irq_data *d, u32 type)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
- 	u32 bit, val;
- 	int edge;
-@@ -211,9 +211,9 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-  * @param  enable       enable as wake-up if equal to non-zero
-  * @return       This function returns 0 on success.
-  */
--static int gpio_set_wake_irq(u32 irq, u32 enable)
-+static int gpio_set_wake_irq(struct irq_data *d, u32 enable)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	u32 gpio_idx = gpio & 0x1F;
- 	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
- 
-@@ -233,11 +233,11 @@ static int gpio_set_wake_irq(u32 irq, u32 enable)
- }
- 
- static struct irq_chip gpio_irq_chip = {
--	.ack = gpio_ack_irq,
--	.mask = gpio_mask_irq,
--	.unmask = gpio_unmask_irq,
--	.set_type = gpio_set_irq_type,
--	.set_wake = gpio_set_wake_irq,
-+	.irq_ack = gpio_ack_irq,
-+	.irq_mask = gpio_mask_irq,
-+	.irq_unmask = gpio_unmask_irq,
-+	.irq_set_type = gpio_set_irq_type,
-+	.irq_set_wake = gpio_set_wake_irq,
- };
- 
- static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
-diff --git a/arch/arm/plat-mxc/irq.c b/arch/arm/plat-mxc/irq.c
-index 7331f2a..d1f250c 100644
---- a/arch/arm/plat-mxc/irq.c
-+++ b/arch/arm/plat-mxc/irq.c
-@@ -91,21 +91,21 @@ EXPORT_SYMBOL(mxc_set_irq_fiq);
- #endif /* CONFIG_FIQ */
- 
- /* Disable interrupt number "irq" in the AVIC */
--static void mxc_mask_irq(unsigned int irq)
-+static void mxc_mask_irq(struct irq_data *d)
- {
--	__raw_writel(irq, avic_base + AVIC_INTDISNUM);
-+	__raw_writel(d->irq, avic_base + AVIC_INTDISNUM);
- }
- 
- /* Enable interrupt number "irq" in the AVIC */
--static void mxc_unmask_irq(unsigned int irq)
-+static void mxc_unmask_irq(struct irq_data *d)
- {
--	__raw_writel(irq, avic_base + AVIC_INTENNUM);
-+	__raw_writel(d->irq, avic_base + AVIC_INTENNUM);
- }
- 
- static struct irq_chip mxc_avic_chip = {
--	.ack = mxc_mask_irq,
--	.mask = mxc_mask_irq,
--	.unmask = mxc_unmask_irq,
-+	.irq_ack = mxc_mask_irq,
-+	.irq_mask = mxc_mask_irq,
-+	.irq_unmask = mxc_unmask_irq,
- };
- 
- /*
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index 3703ab2..6456fa4 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -48,50 +48,50 @@
- void __iomem *tzic_base; /* Used as irq controller base in entry-macro.S */
- 
- /**
-- * tzic_mask_irq() - Disable interrupt number "irq" in the TZIC
-+ * tzic_mask_irq() - Disable interrupt source "d" in the TZIC
-  *
-- * @param  irq          interrupt source number
-+ * @param  d            interrupt source
-  */
--static void tzic_mask_irq(unsigned int irq)
-+static void tzic_mask_irq(struct irq_data *d)
- {
- 	int index, off;
- 
--	index = irq >> 5;
--	off = irq & 0x1F;
-+	index = d->irq >> 5;
-+	off = d->irq & 0x1F;
- 	__raw_writel(1 << off, tzic_base + TZIC_ENCLEAR0(index));
- }
- 
- /**
-- * tzic_unmask_irq() - Enable interrupt number "irq" in the TZIC
-+ * tzic_unmask_irq() - Enable interrupt source "d" in the TZIC
-  *
-- * @param  irq          interrupt source number
-+ * @param  d            interrupt source
-  */
--static void tzic_unmask_irq(unsigned int irq)
-+static void tzic_unmask_irq(struct irq_data *d)
- {
- 	int index, off;
- 
--	index = irq >> 5;
--	off = irq & 0x1F;
-+	index = d->irq >> 5;
-+	off = d->irq & 0x1F;
- 	__raw_writel(1 << off, tzic_base + TZIC_ENSET0(index));
- }
- 
- static unsigned int wakeup_intr[4];
- 
- /**
-- * tzic_set_wake_irq() - Set interrupt number "irq" in the TZIC as a wake-up source.
-+ * tzic_set_wake_irq() - Set interrupt source "d" in the TZIC as a wake-up source.
-  *
-- * @param  irq          interrupt source number
-+ * @param  d            interrupt source
-  * @param  enable       enable as wake-up if equal to non-zero
-  * 			disble as wake-up if equal to zero
-  *
-  * @return       This function returns 0 on success.
-  */
--static int tzic_set_wake_irq(unsigned int irq, unsigned int enable)
-+static int tzic_set_wake_irq(struct irq_data *d, unsigned int enable)
- {
- 	unsigned int index, off;
- 
--	index = irq >> 5;
--	off = irq & 0x1F;
-+	index = d->irq >> 5;
-+	off = d->irq & 0x1F;
- 
- 	if (index > 3)
- 		return -EINVAL;
-@@ -106,10 +106,10 @@ static int tzic_set_wake_irq(unsigned int irq, unsigned int enable)
- 
- static struct irq_chip mxc_tzic_chip = {
- 	.name = "MXC_TZIC",
--	.ack = tzic_mask_irq,
--	.mask = tzic_mask_irq,
--	.unmask = tzic_unmask_irq,
--	.set_wake = tzic_set_wake_irq,
-+	.irq_ack = tzic_mask_irq,
-+	.irq_mask = tzic_mask_irq,
-+	.irq_unmask = tzic_unmask_irq,
-+	.irq_set_wake = tzic_set_wake_irq,
- };
- 
- /*
+ static int nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
 -- 
 1.7.1
