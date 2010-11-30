@@ -1,31 +1,33 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 30 Nov 2010 14:01:43 +0200
-Subject: [PATCH RESEND v3] ARM: s3c2442: Setup gpio {set,
-	get}_pull callbacks
-In-Reply-To: <4CF4E5C7.5020600@metafoo.de>
-References: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
-	<001801cb9056$65296530$2f7c2f90$%kim@samsung.com>
-	<4CF4E5C7.5020600@metafoo.de>
-Message-ID: <201011301401.44973.anarsoul@gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 30 Nov 2010 20:07:37 +0800
+Subject: [PATCH 0/3] OMAP: Introduce Backlight driver for Sharp LS037V7DW01
+	LCD panel
+Message-ID: <1291118860-10325-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 November 2010 13:53:43 Lars-Peter Clausen wrote:
+After instroducing generic DPI panel driver for OMAP DSS2 system, we need to
+split out backlight driver from Sharp LS037V7DW01 panel driver before we move
+to the generic DPI panel driver.
 
-> > Hmm...how about s3c_gpio_setpull_1updown(...)?
-> > And actually, not used 3rd argument, "pull" now.
-> > I prefer follwoing.
-> 
-> You need the 4th arguemnt, because the s3c2440 only supports pullups and
-> the s3c2442 only supports pulldowns. So you want to return -EINVAL if
-> somebody tries to set a pullup on a s3c2442 based board.
-> Your proposed solution would return 0 and set a pulldown instead.
+This patchset introcuded backlight driver and cleanup the old Sharp LS037V7DW01
+panel driver related code.
 
-Well, at least it allows single-binary kernel for s3c24xx to exist. I think 
-it's OK, as setting pull{up,down} bit for any non S3C_GPIO_PULL_NONE arg 
-preserves semantics for all SoCs (s3c2410/s3c2440/s3c2442) by cost of not 
-handling errors. Anyway, who wants to call cfgpull with S3C_GPIO_PULL_DOWN on 
-s3c2410/s3c2440 or with S3C_GPIO_PULL_UP on s3c2442?
- 
-Regards
-Vasily
+It's built on mainline 2.6.37-rc4
+
+Bryan Wu (3):
+  Backlight: driver for Sharp LS037V7DW01 panel on OMAP machine
+  OMAP: move Sharp LS LCD panel device to generic DPI panel driver and new backlight driver
+  OMAP: DSS2: remove Sharp LS037V7DW01 panel driver
+
+ arch/arm/mach-omap2/board-3430sdp.c                |   18 ++-
+ arch/arm/mach-omap2/board-omap3evm.c               |   20 ++-
+ drivers/video/backlight/Kconfig                    |   10 +
+ drivers/video/backlight/Makefile                   |    1 +
+ drivers/video/backlight/sharp_ls037v7dw01.c        |  144 ++++++++++++
+ drivers/video/omap2/displays/Kconfig               |    7 -
+ drivers/video/omap2/displays/Makefile              |    1 -
+ .../video/omap2/displays/panel-sharp-ls037v7dw01.c |  232 --------------------
+ 8 files changed, 187 insertions(+), 246 deletions(-)
+ create mode 100644 drivers/video/backlight/sharp_ls037v7dw01.c
+ delete mode 100644 drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c
