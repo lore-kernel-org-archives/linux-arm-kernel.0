@@ -1,59 +1,402 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Tue, 30 Nov 2010 09:33:54 -0700
-Subject: [PATCH] ARM: imx: Add mx53 changes to crm_regs
-In-Reply-To: <AANLkTikbroTO6A=1_nBrO=y-O-MiGgtZAN5tg32+4-c=@mail.gmail.com>
-References: <1291071265-4238-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<AANLkTikbroTO6A=1_nBrO=y-O-MiGgtZAN5tg32+4-c=@mail.gmail.com>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA027763@039-SN1MPN1-004.039d.mgd.msft.net>
+From: davidsin@ti.com (David Sin)
+Date: Tue, 30 Nov 2010 13:58:52 -0600
+Subject: [RFC v2 1/8] TILER-DMM: DMM-PAT driver for TI TILER
+In-Reply-To: <1291147139-23472-1-git-send-email-davidsin@ti.com>
+References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
+Message-ID: <1291147139-23472-2-git-send-email-davidsin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+This patch adds support for DMM-PAT initialization and programming.
 
- 
+Signed-off-by: David Sin <davidsin@ti.com>
+Signed-off-by: Lajos Molnar <molnar@ti.com>
+---
+ arch/arm/mach-omap2/dmm-omap44xx.c     |   81 ++++++++++++++
+ arch/arm/mach-omap2/include/mach/dmm.h |   92 ++++++++++++++++
+ drivers/misc/tiler/dmm-main.c          |  187 ++++++++++++++++++++++++++++++++
+ 3 files changed, 360 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/dmm-omap44xx.c
+ create mode 100644 arch/arm/mach-omap2/include/mach/dmm.h
+ create mode 100644 drivers/misc/tiler/dmm-main.c
 
-From: Fabio Estevam [mailto:festevam at gmail.com] 
-Sent: Monday, November 29, 2010 6:11 PM
-To: Nguyen Dinh-R00091
-Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com; linux at arm.linux.org.uk; s.hauer at pengutronix.de; eric at eukrea.com; u.kleine-koenig at pengutronix.de; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] ARM: imx: Add mx53 changes to crm_regs
-
- 
-
-Hi Dinh,
-
-On Mon, Nov 29, 2010 at 8:54 PM,  <Dinh.Nguyen@freescale.com> wrote:
-...
->
->  /* eSDHC */
-> -CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC1)
-> -CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC1)
-> -CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC1)
-> +CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC2)
-> +CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC2)
-> +CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC2)
->
-> -CLK_GET_RATE(esdhc2, 1, ESDHC2_MSHC2)
-> -CLK_SET_PARENT(esdhc2, 1, ESDHC2_MSHC2)
-> -CLK_SET_RATE(esdhc2, 1, ESDHC2_MSHC2)
-> +CLK_GET_RATE(esdhc2, 1, ESDHC2_3_MSHC2)
-> +CLK_SET_PARENT(esdhc2, 1, ESDHC2_3_MSHC2)
-> +CLK_SET_RATE(esdhc2, 1, ESDHC2_3_MSHC2)
-
-Shouldn?t this be part of another patch?
-
-I needed these changes because the patch would break the build if these changes are made? Are you referring to the change from ESDHC1_MSHC1 -> ESDHC1_MSHC2, or ESDHC2_MSHC2 -> ESDCH2_3_MSHC2? 
-
-For the case of ESDHC1_MSHC1 -> ESDHC1_MSHC2, it just a matter of semantics fix(there is no MSHC1 in MX51 or MX53). But for the ESDHC2_MSHC2 -> ESDCH2_3_MSHC2 change, its because for MX53, ESDHC2(which was getting the clocks from the PLLs and feeding them to ESDHC3) is now reversed(ESDHC3 is getting clocks from the PLL and feeding it to ESDHC2). 
-
-Dinh
-
-
-
-Regards,
-
-Fabio Estevam
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101130/f670941f/attachment-0001.html>
+diff --git a/arch/arm/mach-omap2/dmm-omap44xx.c b/arch/arm/mach-omap2/dmm-omap44xx.c
+new file mode 100644
+index 0000000..2919d8e
+--- /dev/null
++++ b/arch/arm/mach-omap2/dmm-omap44xx.c
+@@ -0,0 +1,81 @@
++/*
++ * DMM driver support functions for TI OMAP processors.
++ *
++ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <mach/dmm.h>
++#include <plat/omap_device.h>
++#include <plat/omap_hwmod.h>
++#include <linux/errno.h>
++#include <linux/err.h>
++
++static struct dmm *plat_data;
++static int pdata;
++
++#ifdef CONFIG_ARCH_OMAP4
++static struct dmm omap4_plat_data[] = {
++	{
++		.oh_name = "dmm",
++	},
++};
++#define NUM_PDATA ARRAY_SIZE(omap4_plat_data)
++#else
++#define omap4_plat_data NULL
++#define NUM_PDATA 0
++#endif
++
++static struct omap_device_pm_latency omap_dmm_latency[] = {
++	[0] = {
++		.deactivate_func = omap_device_idle_hwmods,
++		.activate_func = omap_device_enable_hwmods,
++		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
++	},
++};
++
++static s32 __init dmm_omap_init(void)
++{
++	struct omap_hwmod *oh = NULL;
++	struct omap_device *od = NULL;
++	struct omap_device_pm_latency *ohl = NULL;
++	int ohlc = 0, i = 0;
++
++	plat_data = omap4_plat_data;
++	pdata = NUM_PDATA;
++
++	for (i = 0; i < pdata; i++) {
++		struct dmm *data = &plat_data[i];
++
++		oh = omap_hwmod_lookup(data->oh_name);
++		if (!oh)
++			goto error;
++
++		data->base = oh->_mpu_rt_va;
++		ohl = omap_dmm_latency;
++		ohlc = ARRAY_SIZE(omap_dmm_latency);
++
++		od = omap_device_build(data->oh_name, i, oh, data,
++					 sizeof(*data), ohl, ohlc, false);
++		if (IS_ERR(od))
++			goto error;
++	}
++	return 0;
++error:
++	return -ENODEV;
++}
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("David Sin <davidsin@ti.com>");
++MODULE_AUTHOR("Lajos Molnar <molnar@ti.com>");
++device_initcall(dmm_omap_init);
+diff --git a/arch/arm/mach-omap2/include/mach/dmm.h b/arch/arm/mach-omap2/include/mach/dmm.h
+new file mode 100644
+index 0000000..33a1215
+--- /dev/null
++++ b/arch/arm/mach-omap2/include/mach/dmm.h
+@@ -0,0 +1,92 @@
++/*
++ * Dynamic Memory Manager (DMM) driver support functions for
++ * TI DMM-TILER hardware block.
++ *
++ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef DMM_H
++#define DMM_H
++
++#define DMM_TILER_OR__0       0x220
++#define DMM_TILER_OR__1       0x224
++#define DMM_PAT_VIEW__0       0x420
++#define DMM_PAT_VIEW__1       0x424
++#define DMM_PAT_VIEW_MAP__0   0x440
++#define DMM_PAT_VIEW_MAP_BASE 0x460
++#define DMM_PAT_IRQSTATUS_RAW 0x480
++#define DMM_PAT_IRQSTATUS     0x490
++#define DMM_PAT_STATUS__0     0x4C0
++#define DMM_PAT_DESCR__0      0x500
++#define DMM_PAT_AREA__0       0x504
++#define DMM_PAT_CTRL__0       0x508
++#define DMM_PAT_DATA__0       0x50C
++
++/*
++ * Physical Address Translator (PAT) refill programming mode
++ */
++enum pat_mode {
++	MANUAL,
++	AUTO
++};
++
++/*
++ * Area definition for DMM physical address translator
++ */
++struct pat_area {
++	s8 x0:8;
++	s8 y0:8;
++	s8 x1:8;
++	s8 y1:8;
++};
++
++/*
++ * DMM physical address translator control
++ */
++struct pat_ctrl {
++	s32 start:4;
++	s32 dir:4;
++	s32 lut_id:8;
++	s32 sync:12;
++	s32 ini:4;
++};
++
++/*
++ * Physical Address Translator (PAT) descriptor
++ */
++struct pat {
++	struct pat *next;
++	struct pat_area area;
++	struct pat_ctrl ctrl;
++	u32 data;
++};
++
++/*
++ * DMM device data
++ */
++struct dmm {
++	const char *oh_name;
++	void __iomem *base;
++	int irq;
++};
++
++/*
++ * Create and initialize the physical address translator
++ */
++struct dmm *dmm_pat_init(u32 id);
++
++/*
++ * Program the physical address translator
++ */
++int dmm_pat_refill(struct dmm *dmm, struct pat *desc, enum pat_mode mode);
++
++#endif
+diff --git a/drivers/misc/tiler/dmm-main.c b/drivers/misc/tiler/dmm-main.c
+new file mode 100644
+index 0000000..412f592
+--- /dev/null
++++ b/drivers/misc/tiler/dmm-main.c
+@@ -0,0 +1,187 @@
++/*
++ * DMM driver support functions for TI OMAP processors.
++ *
++ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/errno.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++
++#include <mach/dmm.h>
++
++#define MASK(msb, lsb) (((1 << ((msb) + 1 - (lsb))) - 1) << (lsb))
++#define SET_FLD(reg, msb, lsb, val) \
++(((reg) & ~MASK((msb), (lsb))) | (((val) << (lsb)) & MASK((msb), (lsb))))
++#define MAX_RETRY_MS	1000
++
++static struct dmm *dmm;
++
++static int dmm_probe(struct platform_device *dev)
++{
++	if (dev)
++		dmm = dev->dev.platform_data;
++
++	if (dmm && dmm->base) {
++		writel(0x88888888, dmm->base + DMM_TILER_OR__0);
++		writel(0x88888888, dmm->base + DMM_TILER_OR__1);
++		return 0;
++	}
++	return -EFAULT;
++}
++
++static int dmm_remove(struct platform_device *dev)
++{
++	return 0;
++}
++
++static struct platform_driver dmm_driver = {
++	.probe = dmm_probe,
++	.remove = dmm_remove,
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "dmm",
++	},
++};
++
++int dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
++{
++	void __iomem *r;
++	u32 v, i;
++
++	if (!dmm || !dmm->base || !pd)
++		return -EFAULT;
++
++	/* Only manual refill supported */
++	if (mode != MANUAL)
++		return -EFAULT;
++
++	/* Check that the DMM_PAT_STATUS register has not reported an error */
++	r = dmm->base + DMM_PAT_STATUS__0;
++	v = readl(r);
++	if (WARN(v & 0xFC00, KERN_ERR "dmm_pat_refill() error.\n"))
++		return -EIO;
++
++	/* Set "next" register to NULL */
++	r = dmm->base + DMM_PAT_DESCR__0;
++	v = readl(r);
++	v = SET_FLD(v, 31, 4, (u32) NULL);
++	writel(v, r);
++
++	/* Set area to be refilled */
++	r = dmm->base + DMM_PAT_AREA__0;
++	v = readl(r);
++	v = SET_FLD(v, 30, 24, pd->area.y1);
++	v = SET_FLD(v, 23, 16, pd->area.x1);
++	v = SET_FLD(v, 14, 8, pd->area.y0);
++	v = SET_FLD(v, 7, 0, pd->area.x0);
++	writel(v, r);
++
++	/* First, clear the DMM_PAT_IRQSTATUS register */
++	writel(0xFFFFFFFF, dmm->base + DMM_PAT_IRQSTATUS);
++
++	i = 1000;
++	while (readl(dmm->base + DMM_PAT_IRQSTATUS_RAW) != 0) {
++		if (--i == 0)
++			return -EFAULT;
++		udelay(1);
++	}
++
++	/* Fill data register */
++	v = readl(dmm->base + DMM_PAT_DATA__0);
++
++	v = SET_FLD(v, 31, 4, pd->data >> 4);
++	writel(v, r);
++
++	/* Read back PAT_DATA__0 to see if write was successful */
++	i = 1000;
++	while (readl(r) != pd->data) {
++		if (--i == 0)
++			return -EFAULT;
++		udelay(1);
++	}
++
++	v = readl(dmm->base + DMM_PAT_CTRL__0);
++	v = SET_FLD(v, 31, 28, pd->ctrl.ini);
++	v = SET_FLD(v, 16, 16, pd->ctrl.sync);
++	v = SET_FLD(v, 9, 8, pd->ctrl.lut_id);
++	v = SET_FLD(v, 6, 4, pd->ctrl.dir);
++	v = SET_FLD(v, 0, 0, pd->ctrl.start);
++	writel(v, r);
++
++	/* Check if PAT_IRQSTATUS_RAW is set after the PAT has been refilled */
++	i = 1000;
++	while ((readl(dmm->base + DMM_PAT_IRQSTATUS_RAW) & 0x3) != 0x3) {
++		if (--i == 0)
++			return -EFAULT;
++		udelay(1);
++	}
++
++	/* Again, clear the DMM_PAT_IRQSTATUS register */
++	writel(0xFFFFFFFF, dmm->base + DMM_PAT_IRQSTATUS);
++
++	i = 1000;
++	while (readl(dmm->base + DMM_PAT_IRQSTATUS_RAW) != 0) {
++		if (--i == 0)
++			return -EFAULT;
++		udelay(1);
++	}
++
++	/* Again, set "next" register to NULL to clear any PAT STATUS errors */
++	v = readl(dmm->base + DMM_PAT_DESCR__0);
++	v = SET_FLD(v, 31, 4, (u32) NULL);
++	writel(v, r);
++
++	/*
++	 * Now, check that the DMM_PAT_STATUS register
++	 * has not reported an error before exiting.
++	 */
++	v = readl(dmm->base + DMM_PAT_STATUS__0);
++	if (WARN(v & 0xFC00, KERN_ERR "dmm_pat_refill() error.\n"))
++		return -EIO;
++
++	return 0;
++}
++EXPORT_SYMBOL(dmm_pat_refill);
++
++struct dmm *dmm_pat_init(u32 id)
++{
++	if (dmm && dmm->base) {
++		writel(0x88888888, dmm->base + DMM_PAT_VIEW__0);
++		writel(0x88888888, dmm->base + DMM_PAT_VIEW__1);
++		writel(0x80808080, dmm->base + DMM_PAT_VIEW_MAP__0);
++		writel(0x80000000, dmm->base + DMM_PAT_VIEW_MAP_BASE);
++	}
++
++	return dmm;
++}
++EXPORT_SYMBOL(dmm_pat_init);
++
++static s32 __init dmm_init(void)
++{
++	return platform_driver_register(&dmm_driver);
++}
++
++static void __exit dmm_exit(void)
++{
++	platform_driver_unregister(&dmm_driver);
++}
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("David Sin <davidsin@ti.com>");
++MODULE_AUTHOR("Lajos Molnar <molnar@ti.com>");
++module_init(dmm_init);
++module_exit(dmm_exit);
+-- 
+1.7.0.4
