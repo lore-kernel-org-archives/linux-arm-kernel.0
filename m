@@ -1,248 +1,78 @@
-From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Tue, 30 Nov 2010 21:52:52 +0100
-Subject: [PATCH 06/54] ARM: sa1111: irq_data conversion.
-In-Reply-To: <20101130132546.GG15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130132546.GG15575@mail.wantstofly.org>
-Message-ID: <20101130205252.GB818@boggieman>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Tue, 30 Nov 2010 16:07:35 -0500
+Subject: [Patch v3] Fix audmuxv2 debugfs indexing.
+In-Reply-To: <87r5ehuxh5.fsf@sympatico.ca> (Bill Pringlemeir's message of
+	"Fri, 19 Nov 2010 10:47:18 -0500")
+References: <BLU0-SMTP14C9A6CEFEB68711495B30B8300@phx.gbl>
+	<20101110152619.GB8950@pengutronix.de>
+	<BLU0-SMTP84DA72E534B9B3F1DCEA5BB8320@phx.gbl>
+	<20101112071706.GF6017@pengutronix.de>
+	<20101112114942.GA28804@sirena.org.uk> <87oc9rk6fe.fsf@sympatico.ca>
+	<BLU0-SMTP271B3B53A7BF23C621F315B8360@phx.gbl>
+	<20101115153058.GG12986@rakim.wolfsonmicro.main>
+	<87oc9qeg75.fsf@sympatico.ca>
+	<BLU0-SMTP55EFC1F097F339783A2A30B8360@phx.gbl>
+	<20101115162636.GH12986@rakim.wolfsonmicro.main>
+	<8762vy4fki.fsf@sympatico.ca> <87r5ehuxh5.fsf@sympatico.ca>
+Message-ID: <BLU0-SMTP186080C581D16B63C1B06DB8250@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 02:25:46PM +0100, Lennert Buytenhek wrote:
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-> ---
+On 15 Nov 2010, bpringle at sympatico.ca wrote:
 
-It applies cleanly and builds without issues. Its hard to test
-since sa1111 isnt working properly (which I will need to fix at later date), 
-but I dont have any issues with this patch.
-So, 
+> I will re-submit those patches later.
 
-Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+Here is the audmux debug directory after this patch,
 
->  arch/arm/common/sa1111.c |   94 +++++++++++++++++++++++-----------------------
->  1 files changed, 47 insertions(+), 47 deletions(-)
-> 
-> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-> index c0258a8..d6c784e 100644
-> --- a/arch/arm/common/sa1111.c
-> +++ b/arch/arm/common/sa1111.c
-> @@ -210,7 +210,7 @@ sa1111_irq_handler(unsigned int irq, struct irq_desc *desc)
->  
->  	sa1111_writel(stat0, mapbase + SA1111_INTSTATCLR0);
->  
-> -	desc->chip->ack(irq);
-> +	desc->irq_data.chip->irq_ack(&desc->irq_data);
->  
->  	sa1111_writel(stat1, mapbase + SA1111_INTSTATCLR1);
->  
-> @@ -228,35 +228,35 @@ sa1111_irq_handler(unsigned int irq, struct irq_desc *desc)
->  			generic_handle_irq(i + sachip->irq_base);
->  
->  	/* For level-based interrupts */
-> -	desc->chip->unmask(irq);
-> +	desc->irq_data.chip->irq_unmask(&desc->irq_data);
->  }
->  
->  #define SA1111_IRQMASK_LO(x)	(1 << (x - sachip->irq_base))
->  #define SA1111_IRQMASK_HI(x)	(1 << (x - sachip->irq_base - 32))
->  
-> -static void sa1111_ack_irq(unsigned int irq)
-> +static void sa1111_ack_irq(struct irq_data *d)
->  {
->  }
->  
-> -static void sa1111_mask_lowirq(unsigned int irq)
-> +static void sa1111_mask_lowirq(struct irq_data *d)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
->  	unsigned long ie0;
->  
->  	ie0 = sa1111_readl(mapbase + SA1111_INTEN0);
-> -	ie0 &= ~SA1111_IRQMASK_LO(irq);
-> +	ie0 &= ~SA1111_IRQMASK_LO(d->irq);
->  	writel(ie0, mapbase + SA1111_INTEN0);
->  }
->  
-> -static void sa1111_unmask_lowirq(unsigned int irq)
-> +static void sa1111_unmask_lowirq(struct irq_data *d)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
->  	unsigned long ie0;
->  
->  	ie0 = sa1111_readl(mapbase + SA1111_INTEN0);
-> -	ie0 |= SA1111_IRQMASK_LO(irq);
-> +	ie0 |= SA1111_IRQMASK_LO(d->irq);
->  	sa1111_writel(ie0, mapbase + SA1111_INTEN0);
->  }
->  
-> @@ -267,11 +267,11 @@ static void sa1111_unmask_lowirq(unsigned int irq)
->   * be triggered.  In fact, its very difficult, if not impossible to get
->   * INTSET to re-trigger the interrupt.
->   */
-> -static int sa1111_retrigger_lowirq(unsigned int irq)
-> +static int sa1111_retrigger_lowirq(struct irq_data *d)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
-> -	unsigned int mask = SA1111_IRQMASK_LO(irq);
-> +	unsigned int mask = SA1111_IRQMASK_LO(d->irq);
->  	unsigned long ip0;
->  	int i;
->  
-> @@ -285,15 +285,15 @@ static int sa1111_retrigger_lowirq(unsigned int irq)
->  
->  	if (i == 8)
->  		printk(KERN_ERR "Danger Will Robinson: failed to "
-> -			"re-trigger IRQ%d\n", irq);
-> +			"re-trigger IRQ%d\n", d->irq);
->  	return i == 8 ? -1 : 0;
->  }
->  
-> -static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
-> +static int sa1111_type_lowirq(struct irq_data *d, unsigned int flags)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
-> -	unsigned int mask = SA1111_IRQMASK_LO(irq);
-> +	unsigned int mask = SA1111_IRQMASK_LO(d->irq);
->  	unsigned long ip0;
->  
->  	if (flags == IRQ_TYPE_PROBE)
-> @@ -313,11 +313,11 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
->  	return 0;
->  }
->  
-> -static int sa1111_wake_lowirq(unsigned int irq, unsigned int on)
-> +static int sa1111_wake_lowirq(struct irq_data *d, unsigned int on)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
-> -	unsigned int mask = SA1111_IRQMASK_LO(irq);
-> +	unsigned int mask = SA1111_IRQMASK_LO(d->irq);
->  	unsigned long we0;
->  
->  	we0 = sa1111_readl(mapbase + SA1111_WAKEEN0);
-> @@ -332,33 +332,33 @@ static int sa1111_wake_lowirq(unsigned int irq, unsigned int on)
->  
->  static struct irq_chip sa1111_low_chip = {
->  	.name		= "SA1111-l",
-> -	.ack		= sa1111_ack_irq,
-> -	.mask		= sa1111_mask_lowirq,
-> -	.unmask		= sa1111_unmask_lowirq,
-> -	.retrigger	= sa1111_retrigger_lowirq,
-> -	.set_type	= sa1111_type_lowirq,
-> -	.set_wake	= sa1111_wake_lowirq,
-> +	.irq_ack	= sa1111_ack_irq,
-> +	.irq_mask	= sa1111_mask_lowirq,
-> +	.irq_unmask	= sa1111_unmask_lowirq,
-> +	.irq_retrigger	= sa1111_retrigger_lowirq,
-> +	.irq_set_type	= sa1111_type_lowirq,
-> +	.irq_set_wake	= sa1111_wake_lowirq,
->  };
->  
-> -static void sa1111_mask_highirq(unsigned int irq)
-> +static void sa1111_mask_highirq(struct irq_data *d)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
->  	unsigned long ie1;
->  
->  	ie1 = sa1111_readl(mapbase + SA1111_INTEN1);
-> -	ie1 &= ~SA1111_IRQMASK_HI(irq);
-> +	ie1 &= ~SA1111_IRQMASK_HI(d->irq);
->  	sa1111_writel(ie1, mapbase + SA1111_INTEN1);
->  }
->  
-> -static void sa1111_unmask_highirq(unsigned int irq)
-> +static void sa1111_unmask_highirq(struct irq_data *d)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
->  	unsigned long ie1;
->  
->  	ie1 = sa1111_readl(mapbase + SA1111_INTEN1);
-> -	ie1 |= SA1111_IRQMASK_HI(irq);
-> +	ie1 |= SA1111_IRQMASK_HI(d->irq);
->  	sa1111_writel(ie1, mapbase + SA1111_INTEN1);
->  }
->  
-> @@ -369,11 +369,11 @@ static void sa1111_unmask_highirq(unsigned int irq)
->   * be triggered.  In fact, its very difficult, if not impossible to get
->   * INTSET to re-trigger the interrupt.
->   */
-> -static int sa1111_retrigger_highirq(unsigned int irq)
-> +static int sa1111_retrigger_highirq(struct irq_data *d)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
-> -	unsigned int mask = SA1111_IRQMASK_HI(irq);
-> +	unsigned int mask = SA1111_IRQMASK_HI(d->irq);
->  	unsigned long ip1;
->  	int i;
->  
-> @@ -387,15 +387,15 @@ static int sa1111_retrigger_highirq(unsigned int irq)
->  
->  	if (i == 8)
->  		printk(KERN_ERR "Danger Will Robinson: failed to "
-> -			"re-trigger IRQ%d\n", irq);
-> +			"re-trigger IRQ%d\n", d->irq);
->  	return i == 8 ? -1 : 0;
->  }
->  
-> -static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
-> +static int sa1111_type_highirq(struct irq_data *d, unsigned int flags)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
-> -	unsigned int mask = SA1111_IRQMASK_HI(irq);
-> +	unsigned int mask = SA1111_IRQMASK_HI(d->irq);
->  	unsigned long ip1;
->  
->  	if (flags == IRQ_TYPE_PROBE)
-> @@ -415,11 +415,11 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
->  	return 0;
->  }
->  
-> -static int sa1111_wake_highirq(unsigned int irq, unsigned int on)
-> +static int sa1111_wake_highirq(struct irq_data *d, unsigned int on)
->  {
-> -	struct sa1111 *sachip = get_irq_chip_data(irq);
-> +	struct sa1111 *sachip = irq_data_get_irq_chip_data(d);
->  	void __iomem *mapbase = sachip->base + SA1111_INTC;
-> -	unsigned int mask = SA1111_IRQMASK_HI(irq);
-> +	unsigned int mask = SA1111_IRQMASK_HI(d->irq);
->  	unsigned long we1;
->  
->  	we1 = sa1111_readl(mapbase + SA1111_WAKEEN1);
-> @@ -434,12 +434,12 @@ static int sa1111_wake_highirq(unsigned int irq, unsigned int on)
->  
->  static struct irq_chip sa1111_high_chip = {
->  	.name		= "SA1111-h",
-> -	.ack		= sa1111_ack_irq,
-> -	.mask		= sa1111_mask_highirq,
-> -	.unmask		= sa1111_unmask_highirq,
-> -	.retrigger	= sa1111_retrigger_highirq,
-> -	.set_type	= sa1111_type_highirq,
-> -	.set_wake	= sa1111_wake_highirq,
-> +	.irq_ack	= sa1111_ack_irq,
-> +	.irq_mask	= sa1111_mask_highirq,
-> +	.irq_unmask	= sa1111_unmask_highirq,
-> +	.irq_retrigger	= sa1111_retrigger_highirq,
-> +	.irq_set_type	= sa1111_type_highirq,
-> +	.irq_set_wake	= sa1111_wake_highirq,
->  };
->  
->  static void sa1111_setup_irq(struct sa1111 *sachip)
-> -- 
-> 1.7.1
+   root at freescale /sys/kernel/debug/audmux$ ls
+   SSI3       SSI4       SSI5       SSI6       SSI7       imx-ssi.0  imx-ssi.1
+   root at freescale /sys/kernel/debug/audmux$ cat SSI7
+   PDCR: 0000c000
+   PTCR: 00000800
+   TxFS input, TxClk input
+   Port is symmetric
+   Data received from SSI7
+
+The ugly part is 'case 6:'.  However, there currently is no constants
+defined in audmux.h for this port.  Also,
+mxc_audmux_v2_configure_port() isn't protecting against ports out of
+range and there are no constants for the IMX25.  I would need answers
+to what should be done to invent a define for 'port 6 (SSI7)'.  Using
+MX31 constants seems incomplete as this code could be active for an
+MX35 and MX25 as well.
+
+Signed-off-by: Bill Pringlemeir <bpringle@sympatico.ca>
+diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
+index f9e7cdb..205de57 100644
+--- a/arch/arm/plat-mxc/audmux-v2.c
++++ b/arch/arm/plat-mxc/audmux-v2.c
+@@ -56,6 +56,8 @@ static const char *audmux_port_string(int port)
+                return "SSI5";
+        case MX31_AUDMUX_PORT6_SSI_PINS_6:
+                return "SSI6";
++       case 6: /* internal or pins AUDMUX_PORT7 */
++               return "SSI7";
+        default:
+                return "UNKNOWN";
+        }
+@@ -142,7 +144,6 @@ static const struct file_operations audmux_debugfs_fops = {
+ static void audmux_debugfs_init(void)
+ {
+        int i;
+-       char buf[20];
+ 
+        audmux_debugfs_root = debugfs_create_dir("audmux", NULL);
+        if (!audmux_debugfs_root) {
+@@ -150,9 +151,9 @@ static void audmux_debugfs_init(void)
+                return;
+        }
+ 
+-       for (i = 1; i < 8; i++) {
+-               snprintf(buf, sizeof(buf), "ssi%d", i);
+-               if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
++       for (i = 0; i < 7; i++) {
++               if (!debugfs_create_file(audmux_port_string(i), 0444,
++                                        audmux_debugfs_root,
+                                         (void *)i, &audmux_debugfs_fops))
+                        pr_warning("Failed to create AUDMUX port %d debugfs file\n",
+                                   i);
