@@ -1,48 +1,109 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 30 Nov 2010 09:23:13 +0900
-Subject: [GIT PULL] Samsung fixes for 2.6.37-rc4
-In-Reply-To: <4CEFFBE6.9040909@gmail.com>
-References: <008201cb8c58$363980e0$a2ac82a0$%kim@samsung.com>
-	<4CEFFBE6.9040909@gmail.com>
-Message-ID: <006601cb9024$c9369110$5ba3b330$%kim@samsung.com>
+From: prakity@marvell.com (Philip Rakity)
+Date: Mon, 29 Nov 2010 17:25:12 -0800
+Subject: PATCH 2/2] ARM: mmp2: add sd card to jasper
+In-Reply-To: <A8BF0628-3788-46BD-A8C1-069A25509DAB@marvell.com>
+References: <A8BF0628-3788-46BD-A8C1-069A25509DAB@marvell.com>
+Message-ID: <0841A86E-129C-4ACE-B8C8-AB9EA2ECEA14@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Darius Augulis wrote:
-> 
-> Hi Kukjin,
-> 
-Hi,
 
-> you have missed "serial: samsung: fix device name" again.
-> Please, don't forget to add it to your tree, better do it right now.
-> Perhaps it's fifth or sixth time when remind about that...
-> 
-I remember, I've replied about that like following.
-Maybe you missed...
+On Nov 29, 2010, at 5:17 PM, Philip Rakity wrote:
 
----
-> you have missed "serial: samsung: fix device name" which is hanging here
-> for a long time and was decided to merge in 2.6.37-rc1.
-> Please, pick it up.
-> 
-Hmm...I thought it should be handled by Ben Dooks at that time.
+>> -----Original Message-----
+>> From: zhangfei gao [mailto:zhangfei.gao at gmail.com]
+>> Sent: 2010?11?3? 5:07 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: Eric Miao; Haojian Zhuang; Chris Ball
+>> Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
+>> 
+>> From 43ad4ff49d6e94e32468776a278baabc463a613f Mon Sep 17 00:00:00 2001
+>> From: Zhangfei Gao <zhangfei.gao@marvell.com>
+>> Date: Wed, 3 Nov 2010 01:15:32 -0400
+>> Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
+>> 
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+>> ---
+>> arch/arm/mach-mmp/jasper.c |   47
+>> ++++++++++++++++++++++++++++++++++++++++++++
+>> 1 files changed, 47 insertions(+), 0 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
+>> index 2a684fa..757f251 100644
+>> --- a/arch/arm/mach-mmp/jasper.c
+>> +++ b/arch/arm/mach-mmp/jasper.c
+>> @@ -67,6 +67,36 @@ static unsigned long jasper_pin_config[] __initdata = {
+>> 
+>> 	/* PMIC */
+>> 	PMIC_PMIC_INT | MFP_LPM_EDGE_FALL,
+>> +
+>> +	/* MMC1 */
+>> +	GPIO131_MMC1_DAT3,
+>> +	GPIO132_MMC1_DAT2,
+>> +	GPIO133_MMC1_DAT1,
+>> +	GPIO134_MMC1_DAT0,
+>> +	GPIO136_MMC1_CMD,
+>> +	GPIO139_MMC1_CLK,
+>> +	GPIO140_MMC1_CD,
+>> +	GPIO141_MMC1_WP,
+>> +
+>> +	/* MMC2 */
+>> +	GPIO37_MMC2_DAT3,
+>> +	GPIO38_MMC2_DAT2,
+>> +	GPIO39_MMC2_DAT1,
+>> +	GPIO40_MMC2_DAT0,
+>> +	GPIO41_MMC2_CMD,
+>> +	GPIO42_MMC2_CLK,
+>> +
+>> +	/* MMC3 */
+>> +	GPIO165_MMC3_DAT7,
+>> +	GPIO162_MMC3_DAT6,
+>> +	GPIO166_MMC3_DAT5,
+>> +	GPIO163_MMC3_DAT4,
+>> +	GPIO167_MMC3_DAT3,
+>> +	GPIO164_MMC3_DAT2,
+>> +	GPIO168_MMC3_DAT1,
+>> +	GPIO111_MMC3_DAT0,
+>> +	GPIO112_MMC3_CMD,
+>> +	GPIO151_MMC3_CLK,
+>> };
+>> 
+>> static struct regulator_consumer_supply max8649_supply[] = {
+>> @@ -123,6 +153,19 @@ static struct i2c_board_info jasper_twsi1_info[] = {
+>> 	},
+>> };
+>> 
+>> +#if defined(CONFIG_MMC_SDHCI_PXA)
+>> +
+>> +static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+>> +	.max_speed	= 25000000,
+>> +};
+>> +
 
-Anyway, as Ben said, I'm thinking it should be sent upstream when merge
-window
-even though have missed it in the last merge window.
+There is no need to reduce the speed of the SD interface.  The SD/MMC/eMMC card has 
+speed information in the card specific data area and the controller knows the max clock
+from the capabilities register of the SD Host Controller.    Speeds up to 52MHz work on mmp2.
 
-However, if Ben is ok to merge this during 37-rc, will merge it into
-s5p-fixes-
-for-linus for 37-rc.
----
-
-But I still thinking it should be handled by Ben Dooks...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> +static void __init mmp2_init_mmc(void)
+>> +{
+>> +	mmp2_add_sdh(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
+>> +}
+>> +
+>> +#endif
+>> +
+>> static void __init jasper_init(void)
+>> {
+>> 	mfp_config(ARRAY_AND_SIZE(jasper_pin_config));
+>> @@ -132,6 +175,10 @@ static void __init jasper_init(void)
+>> 	mmp2_add_uart(3);
+>> 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(jasper_twsi1_info));
+>> 
+>> +#if defined(CONFIG_MMC_SDHCI_PXA)
+>> +	mmp2_init_mmc();
+>> +#endif
+>> +
+>> 	regulator_has_full_constraints();
+>> }
+>> 
+>> --
+>> 1.7.0.4
