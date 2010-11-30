@@ -1,34 +1,38 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 30 Nov 2010 17:45:41 -0200
-Subject: [PATCH v4 1/3] ARM: mx5: dynamically allocate pwm devices
-Message-ID: <1291146343-25808-1-git-send-email-fabio.estevam@freescale.com>
+Date: Tue, 30 Nov 2010 17:45:43 -0200
+Subject: [PATCH v4 3/3] ARM: mx5: fix keypad clock name
+In-Reply-To: <1291146343-25808-2-git-send-email-fabio.estevam@freescale.com>
+References: <1291146343-25808-1-git-send-email-fabio.estevam@freescale.com>
+	<1291146343-25808-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1291146343-25808-3-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+After moving to dynamically registration of the keypad, the keypad clock
+name needs to change accordingly.
+
+The reason is that the original mx5 keypad platform_device id was 0, 
+now we use id=-1 as per arch/arm/plat-mxc/devices/platform-imx-keypad.c.
+
+Tested keypad successfully on a MX51_3DS board.
+
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/plat-mxc/devices/platform-mxc_pwm.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-index 3d8ebdb..a5e1581 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-+++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-@@ -40,6 +40,15 @@ const struct imx_mxc_pwm_data imx27_mxc_pwm_data __initconst =
- 	imx_mxc_pwm_data_entry_single(MX27, 0, , SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX27 */
- 
-+#ifdef CONFIG_SOC_IMX51
-+const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
-+#define imx51_mxc_pwm_data_entry(_id, _hwid)				\
-+	imx_mxc_pwm_data_entry(MX51, _id, _hwid, SZ_16K)
-+	imx51_mxc_pwm_data_entry(0, 1),
-+	imx51_mxc_pwm_data_entry(1, 2),
-+};
-+#endif /* ifdef CONFIG_SOC_IMX51 */
-+
- struct platform_device *__init imx_add_mxc_pwm(
- 		const struct imx_mxc_pwm_data *data)
- {
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 344ee8e..57fea05 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1091,7 +1091,7 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
+-	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
++	_REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
+ 	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
+ 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
 -- 
 1.6.0.4
