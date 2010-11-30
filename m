@@ -1,121 +1,92 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 30 Nov 2010 12:43:30 +0200
-Subject: [PATCH] Kirkwood: Add support for 6282 based QNAP devices
-In-Reply-To: <20101129174440.GA14799@jirafa.cyrius.com>
-References: <20101129174440.GA14799@jirafa.cyrius.com>
-Message-ID: <AANLkTim=30kESuyy7b6xLtCSFY1J9o0PhR1privVsDbb@mail.gmail.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue, 30 Nov 2010 16:17:32 +0530
+Subject: [PATCH][ ARM cpu hotplug 1/2 ] extract common code for arm cpu
+	hotplug
+In-Reply-To: <20101129192407.GA20761@n2100.arm.linux.org.uk>
+References: <AANLkTi=fJeOUhH0xUJF8qx-fTJ5popE7ZuVxDZXpTH-i@mail.gmail.com>
+	<AANLkTimz=xv92c6FN4i4c3Xs-t71L4PHv3SQg0jk-x-r@mail.gmail.com>
+	<20101129104149.GA10703@n2100.arm.linux.org.uk>
+	<AANLkTikHv+Rz7+bZY8Qo2drUQO4fjhJgqORcGFB7B6s7@mail.gmail.com>
+	<20101129192407.GA20761@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimZfnmVMDZ2faUPpDHHv3oAhM9ZcVEpM0_MyHbq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 29, 2010 at 7:44 PM, Martin Michlmayr <tbm@cyrius.com> wrote:
-> Add support for the QNAP NAS devices based on Marvell's 6282 Kirkwood
-> chip (TS-119P+, TS-219P+ and TS-419P+). ?The differences to the 6281
-> based devices are:
-> ?- Ethernet PHY address
-> ?- GPIOs used for buttons (TS-119P+/TS-219P+)
+On Tue, Nov 30, 2010 at 12:54 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 >
-> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+> On Mon, Nov 29, 2010 at 06:27:02PM +0100, Vincent Guittot wrote:
+> > The goal of this patch is to remove as much duplicated code as
+> > possible in each platform hotplug file. I have also tried to keep in
+> > mind that current platform upstreamed code make nearly no power
+> > management in their current implementation. I have added a new
+> > interface and a new file in order to
+> > ?-Keep the current interface as it is. So each platform could move to
+> > common code when they want
+> > ?-Have a dedicated file for arm hotplug function in which we can add
+> > all code that must be executed on an arm core whatever the platform
+> > (flushing cache, SCU disabling and handling spurious wake up as a
+> > staring ?point). I agree that the current code is quite small for now
+> > and we can wonder if a dedicated file is useful, code might be put in
+> > kernel/smp.c file.
+> > The next step is also to add some hotplug tracepoints and I would
+> > prefer to add the tracepoints only in a platform independent code.
+> >
+> > With the common code, a new arm platform can have the hotplug feature
+> > with less than 20 lines (power management not included) and can be
+> > sure that minimal actions will be handled by the common Arm code.
+> >
+> > We can also keep the platform_cpu_die has the platform entry point and
+> > move the common part into kernel/smp.c file. We still have few
+> > duplicated code (spurious wake-up) but this seems to be acceptable.
+> >
+> > I have taken your example into account and have updated the patch accordingly
 >
-> --- a/arch/arm/mach-kirkwood/Kconfig
-> +++ b/arch/arm/mach-kirkwood/Kconfig
-> @@ -48,15 +48,15 @@ config MACH_TS219
-> ? ? ? ?bool "QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS"
-please add the new devices to the title as well.
-> ? ? ? ?help
-> ? ? ? ? ?Say 'Y' here if you want your kernel to support the
-> - ? ? ? ? QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS
-> - ? ? ? ? devices.
-> + ? ? ? ? QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and
-> + ? ? ? ? TS-219P+ Turbo NAS devices.
+> No you haven't because you don't understand the point of keeping the
+> existing interfaces. ?I'm not going to cripple the flexibility of the
+> current interface just in the name of merging them all together.
 >
-> ?config MACH_TS41X
-> ? ? ? ?bool "QNAP TS-410, TS-410U, TS-419P and TS-419U Turbo NAS"
-> ? ? ? ?help
-> ? ? ? ? ?Say 'Y' here if you want your kernel to support the
-> - ? ? ? ? QNAP TS-410, TS-410U, TS-419P and TS-419U Turbo NAS
-> - ? ? ? ? devices.
-> + ? ? ? ? QNAP TS-410, TS-410U, TS-419P, TS-419P+ and TS-419U Turbo
-> + ? ? ? ? NAS devices.
->
-> ?config MACH_DOCKSTAR
-> ? ? ? ?bool "Seagate FreeAgent DockStar"
-> diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
-> index 6710bd7..dc999c4 100644
-> --- a/arch/arm/mach-kirkwood/ts219-setup.c
-> +++ b/arch/arm/mach-kirkwood/ts219-setup.c
-> @@ -80,15 +80,19 @@ static unsigned int qnap_ts219_mpp_config[] __initdata = {
-> ? ? ? ?MPP11_UART0_RXD,
-> ? ? ? ?MPP13_UART1_TXD, ? ? ? ?/* PIC controller */
-> ? ? ? ?MPP14_UART1_RXD, ? ? ? ?/* PIC controller */
-> - ? ? ? MPP15_GPIO, ? ? ? ? ? ? /* USB Copy button */
-> - ? ? ? MPP16_GPIO, ? ? ? ? ? ? /* Reset button */
-> + ? ? ? MPP15_GPIO, ? ? ? ? ? ? /* USB Copy button (on devices with 88F6281) */
-> + ? ? ? MPP16_GPIO, ? ? ? ? ? ? /* Reset button (on devices with 88F6281) */
-> ? ? ? ?MPP36_GPIO, ? ? ? ? ? ? /* RAM: 0: 256 MB, 1: 512 MB */
-> + ? ? ? MPP37_GPIO, ? ? ? ? ? ? /* Reset button (on devices with 88F6282) */
-> + ? ? ? MPP43_GPIO, ? ? ? ? ? ? /* USB Copy button (on devices with 88F6282) */
-> ? ? ? ?MPP44_GPIO, ? ? ? ? ? ? /* Board ID: 0: TS-11x, 1: TS-21x */
-> ? ? ? ?0
-> ?};
->
-> ?static void __init qnap_ts219_init(void)
-> ?{
-> + ? ? ? u32 dev, rev;
-> +
-> ? ? ? ?/*
-> ? ? ? ? * Basic setup. Needs to be called early.
-> ? ? ? ? */
-> @@ -100,6 +104,14 @@ static void __init qnap_ts219_init(void)
-> ? ? ? ?qnap_tsx1x_register_flash();
-> ? ? ? ?kirkwood_i2c_init();
-> ? ? ? ?i2c_register_board_info(0, &qnap_ts219_i2c_rtc, 1);
-> +
-> + ? ? ? kirkwood_pcie_id(&dev, &rev);
-> + ? ? ? if (dev == MV88F6282_DEV_ID) {
-> + ? ? ? ? ? ? ? qnap_ts219_buttons[0].gpio = 43; /* USB Copy button */
-> + ? ? ? ? ? ? ? qnap_ts219_buttons[1].gpio = 37; /* Reset button */
-> + ? ? ? ? ? ? ? qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
-> + ? ? ? }
-> +
-> ? ? ? ?kirkwood_ge00_init(&qnap_ts219_ge00_data);
-> ? ? ? ?kirkwood_sata_init(&qnap_ts219_sata_data);
-> ? ? ? ?kirkwood_ehci_init();
-> diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
-> index 3587a28..9a44029 100644
-> --- a/arch/arm/mach-kirkwood/ts41x-setup.c
-> +++ b/arch/arm/mach-kirkwood/ts41x-setup.c
-> @@ -119,6 +119,8 @@ static unsigned int qnap_ts41x_mpp_config[] __initdata = {
->
-> ?static void __init qnap_ts41x_init(void)
-> ?{
-> + ? ? ? u32 dev, rev;
-> +
-> ? ? ? ?/*
-> ? ? ? ? * Basic setup. Needs to be called early.
-> ? ? ? ? */
-> @@ -130,8 +132,15 @@ static void __init qnap_ts41x_init(void)
-> ? ? ? ?qnap_tsx1x_register_flash();
-> ? ? ? ?kirkwood_i2c_init();
-> ? ? ? ?i2c_register_board_info(0, &qnap_ts41x_i2c_rtc, 1);
-> +
-> + ? ? ? kirkwood_pcie_id(&dev, &rev);
-> + ? ? ? if (dev == MV88F6282_DEV_ID) {
-> + ? ? ? ? ? ? ? qnap_ts41x_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
-> + ? ? ? ? ? ? ? qnap_ts41x_ge01_data.phy_addr = MV643XX_ETH_PHY_ADDR(1);
-> + ? ? ? }
-> ? ? ? ?kirkwood_ge00_init(&qnap_ts41x_ge00_data);
-> ? ? ? ?kirkwood_ge01_init(&qnap_ts41x_ge01_data);
-> +
-> ? ? ? ?kirkwood_sata_init(&qnap_ts41x_sata_data);
-> ? ? ? ?kirkwood_ehci_init();
-> ? ? ? ?platform_device_register(&qnap_ts41x_button_device);
->
-> --
-> Martin Michlmayr
-> http://www.cyrius.com/
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+
+To bring into context your reply to an earlier submission of a similar
+patch [1], you stated
+
+"So what if a platform wants to completely power down a CPU?
+
+You'd want to implement it such that platform_cpu_die() does all
+the shutdown of the CPU except for power-off, and platform_cpu_kill()
+waits for that to complete before turning power off.
+
+With platform_cpu_kill() and platform_cpu_die() moved into generic
+code, you can no longer do this."
+
+Since the main aim here is to consolidate as much code here as
+possible while still allowing platforms to override the defaults,
+would you have an objection to the introduction of a struct smp_ops
+that'll allow a platform to override the defaults? This seems to be
+done on other platforms I've briefly looked at.
+
+$ git grep "\.cpu_die"
+arch/mips/cavium-octeon/smp.c:  .cpu_die                = octeon_cpu_die,
+arch/mips/kernel/smp-up.c:      .cpu_die                = up_cpu_die,
+arch/powerpc/kernel/smp.c:      if (ppc_md.cpu_die)
+arch/powerpc/kernel/smp.c:              ppc_md.cpu_die();
+arch/powerpc/kernel/sysfs.c:            if (ppc_md.cpu_die)
+arch/powerpc/platforms/powermac/setup.c:        .cpu_die
+ = pmac64_cpu_die,
+arch/powerpc/platforms/powermac/setup.c:        .cpu_die
+ = pmac32_cpu_die,
+arch/powerpc/platforms/powermac/setup.c:        .cpu_die
+ = generic_mach_cpu_die,
+arch/powerpc/platforms/powermac/smp.c:  .cpu_die        = smp_core99_cpu_die,
+arch/powerpc/platforms/powermac/smp.c:  .cpu_die        = generic_cpu_die,
+arch/powerpc/platforms/pseries/hotplug-cpu.c:   ppc_md.cpu_die =
+pseries_mach_cpu_die;
+arch/sh/kernel/cpu/sh4a/smp-shx3.c:     .cpu_die                =
+native_cpu_die,
+arch/x86/include/asm/smp.h:     smp_ops.cpu_die(cpu);
+arch/x86/kernel/smp.c:  .cpu_die                = native_cpu_die,
+arch/x86/xen/smp.c:     .cpu_die = xen_cpu_die,
+
+
+
+[1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/89542
