@@ -1,182 +1,356 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 30 Nov 2010 15:26:15 -0200
-Subject: [PATCH v3 2/2] ARM: mx5: dynamically allocate imx-keypad devices
-In-Reply-To: <1291137975-9069-1-git-send-email-fabio.estevam@freescale.com>
-References: <1291137975-9069-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1291137975-9069-2-git-send-email-fabio.estevam@freescale.com>
+From: avorontsov@mvista.com (Anton Vorontsov)
+Date: Tue, 30 Nov 2010 20:31:05 +0300
+Subject: [PATCH] ARM: TWD: Consolidate local timers support
+Message-ID: <20101130173105.GA26929@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/Kconfig                       |    2 ++
- arch/arm/mach-mx5/board-mx51_3ds.c              |    5 ++---
- arch/arm/mach-mx5/devices-imx51.h               |    4 ++++
- arch/arm/mach-mx5/devices.c                     |   19 -------------------
- arch/arm/mach-mx5/devices.h                     |    1 -
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c    |    5 ++---
- arch/arm/plat-mxc/devices/platform-imx-keypad.c |    5 +++++
- arch/arm/plat-mxc/include/mach/mx51.h           |    2 +-
- 8 files changed, 16 insertions(+), 27 deletions(-)
+This greatly reduces amount of platform-specific code, and thus
+makes it easier to add local timers for new platforms.
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 7f5a696..9a2450b 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -30,6 +30,7 @@ config MACH_MX51_3DS
- 	bool "Support MX51PDK (3DS)"
- 	select SOC_IMX51
- 	select IMX_HAVE_PLATFORM_IMX_UART
-+	select IMX_HAVE_PLATFORM_IMX_KEYPAD
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	select IMX_HAVE_PLATFORM_SPI_IMX
- 	select MXC_DEBUG_BOARD
-@@ -56,6 +57,7 @@ choice
- config MACH_EUKREA_MBIMX51_BASEBOARD
- 	prompt "Eukrea MBIMX51 development board"
- 	bool
-+	select IMX_HAVE_PLATFORM_IMX_KEYPAD
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	help
- 	  This adds board specific devices that can be found on Eukrea's
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index 6cc2805..43cd5ab 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -12,7 +12,6 @@
+Technically, it's not very nice to place machine-specific (i.e.
+local_timer_setup()) routine into the machine-agnostic code.
+But the true thing is: currently all machines want the same thing.
+
+If machines will ever want something more complex, we may change
+the CONFIG_LOCAL_TIMERS ifdef to CONFIG_MACH_WANT_TWD_LOCAL_TIMER.
+
+Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
+---
+ arch/arm/kernel/smp_twd.c                   |   14 +++++++++++
+ arch/arm/mach-omap2/Makefile                |    1 -
+ arch/arm/mach-omap2/timer-mpu.c             |   34 ---------------------------
+ arch/arm/mach-realview/Makefile             |    1 -
+ arch/arm/mach-realview/localtimer.c         |   26 --------------------
+ arch/arm/mach-s5pv310/Makefile              |    1 -
+ arch/arm/mach-s5pv310/localtimer.c          |   25 -------------------
+ arch/arm/mach-tegra/Makefile                |    2 +-
+ arch/arm/mach-tegra/localtimer.c            |   25 -------------------
+ arch/arm/mach-ux500/Makefile                |    1 -
+ arch/arm/mach-ux500/localtimer.c            |   28 ----------------------
+ arch/arm/mach-vexpress/Makefile             |    1 -
+ arch/arm/mach-vexpress/localtimer.c         |   26 --------------------
+ arch/arm/plat-omap/include/plat/irqs-44xx.h |    1 +
+ 14 files changed, 16 insertions(+), 170 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
+ delete mode 100644 arch/arm/mach-realview/localtimer.c
+ delete mode 100644 arch/arm/mach-s5pv310/localtimer.c
+ delete mode 100644 arch/arm/mach-tegra/localtimer.c
+ delete mode 100644 arch/arm/mach-ux500/localtimer.c
+ delete mode 100644 arch/arm/mach-vexpress/localtimer.c
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 35882fb..148bc7a 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -19,8 +19,11 @@
+ #include <linux/io.h>
  
- #include <linux/irq.h>
- #include <linux/platform_device.h>
--#include <linux/input/matrix_keypad.h>
- #include <linux/spi/spi.h>
+ #include <asm/smp_twd.h>
++#include <asm/localtimer.h>
+ #include <asm/hardware/gic.h>
  
- #include <asm/mach-types.h>
-@@ -120,14 +119,14 @@ static int mx51_3ds_board_keymap[] = {
- 	KEY(3, 5, KEY_BACK)
- };
++#include <mach/irqs.h>
++
+ /* set up by the platform code */
+ void __iomem *twd_base;
  
--static struct matrix_keymap_data mx51_3ds_map_data = {
-+static const struct matrix_keymap_data mx51_3ds_map_data __initconst = {
- 	.keymap		= mx51_3ds_board_keymap,
- 	.keymap_size	= ARRAY_SIZE(mx51_3ds_board_keymap),
- };
- 
- static void mxc_init_keypad(void)
- {
--	mxc_register_device(&mxc_keypad_device, &mx51_3ds_map_data);
-+	imx51_add_imx_keypad(&mx51_3ds_map_data);
+@@ -151,6 +154,17 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clockevents_register_device(clk);
  }
- #else
- static inline void mxc_init_keypad(void)
-diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-index 939d2e8..3e31f3e 100644
---- a/arch/arm/mach-mx5/devices-imx51.h
-+++ b/arch/arm/mach-mx5/devices-imx51.h
-@@ -47,3 +47,7 @@ extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
- extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data __initconst;
- #define imx51_imx2_wdt_data(pdata)	\
- 	imx_add_imx2_wdt_data(&imx51_imx2_wdt_data, pdata)
+ 
++#ifdef CONFIG_LOCAL_TIMERS
++void __cpuinit local_timer_setup(struct clock_event_device *evt)
++{
++	if (!twd_base)
++		return;
 +
-+extern const struct imx_imx_keypad_data imx51_imx_keypad_data __initconst;
-+#define imx51_add_imx_keypad(pdata)	\
-+	imx_add_imx_keypad(&imx51_imx_keypad_data, pdata)
-diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-index ac55f7f..d733a97 100644
---- a/arch/arm/mach-mx5/devices.c
-+++ b/arch/arm/mach-mx5/devices.c
-@@ -97,25 +97,6 @@ struct platform_device mxc_usbh1_device = {
- 	},
- };
- 
--static struct resource mxc_kpp_resources[] = {
--	{
--		.start = MX51_MXC_INT_KPP,
--		.end = MX51_MXC_INT_KPP,
--		.flags = IORESOURCE_IRQ,
--	} , {
--		.start = MX51_KPP_BASE_ADDR,
--		.end = MX51_KPP_BASE_ADDR + 0x8 - 1,
--		.flags = IORESOURCE_MEM,
--	},
--};
--
--struct platform_device mxc_keypad_device = {
--	.name = "imx-keypad",
--	.id = 0,
--	.num_resources = ARRAY_SIZE(mxc_kpp_resources),
--	.resource = mxc_kpp_resources,
--};
--
- static struct mxc_gpio_port mxc_gpio_ports[] = {
- 	{
- 		.chip.label = "gpio-0",
-diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-index ccb7cdc..0905843 100644
---- a/arch/arm/mach-mx5/devices.h
-+++ b/arch/arm/mach-mx5/devices.h
-@@ -2,4 +2,3 @@ extern struct platform_device mxc_usbdr_host_device;
- extern struct platform_device mxc_usbh1_device;
- extern struct platform_device mxc_usbdr_udc_device;
- extern struct platform_device mxc_hsi2c_device;
--extern struct platform_device mxc_keypad_device;
-diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-index 94c293f..e86ade4 100644
---- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-+++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-@@ -21,7 +21,6 @@
- #include <linux/fsl_devices.h>
- #include <linux/i2c/tsc2007.h>
- #include <linux/leds.h>
--#include <linux/input/matrix_keypad.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
-@@ -157,7 +156,7 @@ static int mbimx51_keymap[] = {
- 	KEY(3, 3, KEY_ENTER),
- };
- 
--static struct matrix_keymap_data mbimx51_map_data = {
-+static const struct matrix_keymap_data mbimx51_map_data __initconst = {
- 	.keymap		= mbimx51_keymap,
- 	.keymap_size	= ARRAY_SIZE(mbimx51_keymap),
- };
-@@ -209,7 +208,7 @@ void __init eukrea_mbimx51_baseboard_init(void)
- 
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
--	mxc_register_device(&mxc_keypad_device, &mbimx51_map_data);
-+	imx51_add_imx_keypad(&mbimx51_map_data);
- 
- 	gpio_request(MBIMX51_TSC2007_GPIO, "tsc2007_irq");
- 	gpio_direction_input(MBIMX51_TSC2007_GPIO);
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-keypad.c b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
-index 40238f0..2636611 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-keypad.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
-@@ -41,6 +41,11 @@ const struct imx_imx_keypad_data imx35_imx_keypad_data __initconst =
- 	imx_imx_keypad_data_entry_single(MX35, SZ_16);
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
-+#ifdef CONFIG_SOC_IMX51
-+const struct imx_imx_keypad_data imx51_imx_keypad_data __initconst =
-+	imx_imx_keypad_data_entry_single(MX51, SZ_16);
-+#endif /* ifdef CONFIG_SOC_IMX51 */
++	evt->irq = IRQ_LOCALTIMER;
++	twd_timer_setup(evt);
++}
++#endif
 +
- struct platform_device *__init imx_add_imx_keypad(
- 		const struct imx_imx_keypad_data *data,
- 		const struct matrix_keymap_data *pdata)
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 8fddfef..a99522f 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -301,7 +301,7 @@
- #define MX51_MXC_INT_GPIO4_HIGH		57
- #define MX51_MXC_INT_WDOG1		58
- #define MX51_MXC_INT_WDOG2		59
--#define MX51_MXC_INT_KPP		60
-+#define MX51_INT_KPP			60
- #define MX51_MXC_INT_PWM1		61
- #define MX51_INT_I2C1			62
- #define MX51_INT_I2C2			63
+ #ifdef CONFIG_HOTPLUG_CPU
+ /*
+  * take a local timer down
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 60e51bc..55e7a0f 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -22,7 +22,6 @@ obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
+ 
+ # SMP support ONLY available for OMAP4
+ obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
+ 
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+deleted file mode 100644
+index 954682e..0000000
+--- a/arch/arm/mach-omap2/timer-mpu.c
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
+- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
+- * own timer in it's MPU domain. These timers will be driving the
+- * linux kernel SMP tick framework when active. These timers are not
+- * part of the wake up domain.
+- *
+- * Copyright (C) 2009 Texas Instruments, Inc.
+- *
+- * Author:
+- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
+- *
+- * This file is based on arm realview smp platform file.
+- * Copyright (C) 2002 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-void __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-}
+-
+diff --git a/arch/arm/mach-realview/Makefile b/arch/arm/mach-realview/Makefile
+index d456163..541fa4c 100644
+--- a/arch/arm/mach-realview/Makefile
++++ b/arch/arm/mach-realview/Makefile
+@@ -10,4 +10,3 @@ obj-$(CONFIG_MACH_REALVIEW_PBA8)	+= realview_pba8.o
+ obj-$(CONFIG_MACH_REALVIEW_PBX)		+= realview_pbx.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+diff --git a/arch/arm/mach-realview/localtimer.c b/arch/arm/mach-realview/localtimer.c
+deleted file mode 100644
+index 60b4e11..0000000
+--- a/arch/arm/mach-realview/localtimer.c
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-realview/localtimer.c
+- *
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-void __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->irq = IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-}
+diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
+index b72abd2..6b3a969 100644
+--- a/arch/arm/mach-s5pv310/Makefile
++++ b/arch/arm/mach-s5pv310/Makefile
+@@ -16,7 +16,6 @@ obj-$(CONFIG_CPU_S5PV310)	+= cpu.o init.o clock.o irq-combiner.o
+ obj-$(CONFIG_CPU_S5PV310)	+= setup-i2c0.o time.o gpiolib.o irq-eint.o
+ 
+ obj-$(CONFIG_SMP)		+= platsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ 
+ # machine support
+diff --git a/arch/arm/mach-s5pv310/localtimer.c b/arch/arm/mach-s5pv310/localtimer.c
+deleted file mode 100644
+index 2784036..0000000
+--- a/arch/arm/mach-s5pv310/localtimer.c
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/* linux/arch/arm/mach-s5pv310/localtimer.c
+- *
+- * Cloned from linux/arch/arm/mach-realview/localtimer.c
+- *
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#include <linux/clockchips.h>
+-
+-#include <asm/irq.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-void __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->irq = IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-}
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index cdbc68e..325e30a 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -10,7 +10,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_dvfs.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
+-obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
++obj-$(CONFIG_SMP)                       += platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+ obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+ obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
+diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
+deleted file mode 100644
+index f81ca7c..0000000
+--- a/arch/arm/mach-tegra/localtimer.c
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/*
+- *  arch/arm/mach-tegra/localtimer.c
+- *
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-void __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->irq = IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-}
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 90fa03c..1e13628 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -9,7 +9,6 @@ obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o board-mop500-sdi.o
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o
+ obj-$(CONFIG_SMP)		+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+-obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
+ obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem_irq.o
+ obj-$(CONFIG_U5500_MBOX)	+= mbox.o
+diff --git a/arch/arm/mach-ux500/localtimer.c b/arch/arm/mach-ux500/localtimer.c
+deleted file mode 100644
+index 2288f6a..0000000
+--- a/arch/arm/mach-ux500/localtimer.c
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- * Copyright (C) 2008-2009 ST-Ericsson
+- * Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+- *
+- * This file is heavily based on relaview platform, almost a copy.
+- *
+- * Copyright (C) 2002 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-void __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->irq = IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-}
+diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+index 6533d11..059aeaf 100644
+--- a/arch/arm/mach-vexpress/Makefile
++++ b/arch/arm/mach-vexpress/Makefile
+@@ -5,4 +5,3 @@
+ obj-y					:= v2m.o
+ obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+diff --git a/arch/arm/mach-vexpress/localtimer.c b/arch/arm/mach-vexpress/localtimer.c
+deleted file mode 100644
+index c0e3a59..0000000
+--- a/arch/arm/mach-vexpress/localtimer.c
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-vexpress/localtimer.c
+- *
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-#include <mach/irqs.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-void __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->irq = IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-}
+diff --git a/arch/arm/plat-omap/include/plat/irqs-44xx.h b/arch/arm/plat-omap/include/plat/irqs-44xx.h
+index 518322c..8a0eb52 100644
+--- a/arch/arm/plat-omap/include/plat/irqs-44xx.h
++++ b/arch/arm/plat-omap/include/plat/irqs-44xx.h
+@@ -22,6 +22,7 @@
+ 
+ /* OMAP44XX IRQs numbers definitions */
+ #define OMAP44XX_IRQ_LOCALTIMER			29
++#define IRQ_LOCALTIMER				OMAP44XX_IRQ_LOCALTIMER
+ #define OMAP44XX_IRQ_LOCALWDT			30
+ 
+ #define OMAP44XX_IRQ_GIC_START			32
 -- 
-1.6.0.4
+1.7.0.5
