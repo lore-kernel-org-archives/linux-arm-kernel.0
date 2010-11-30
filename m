@@ -1,45 +1,24 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 30 Nov 2010 15:49:37 -0800
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <20101130234215.GE8521@n2100.arm.linux.org.uk>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
-	<201011301621.48140.arnd@arndb.de>
-	<20101130184049.GC8521@n2100.arm.linux.org.uk>
-	<20101130184834.GA16055@kroah.com>
-	<20101130220550.GD8521@n2100.arm.linux.org.uk>
-	<20101130230533.GA11342@kroah.com>
-	<20101130234215.GE8521@n2100.arm.linux.org.uk>
-Message-ID: <20101130234937.GA7156@kroah.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 30 Nov 2010 18:56:18 -0500
+Subject: Forced HW_BREAKPOINT
+Message-ID: <4CF58F22.6070803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 11:42:15PM +0000, Russell King - ARM Linux wrote:
-> > It's a work in progress, but wherever possible, I encourage people to
-> > not make 'struct device' static.
-> 
-> Right, so saying to ARM developers that they can't submit code which
-> adds new static device structures is rather problematical then, and
-> effectively brings a section of kernel development to a complete
-> standstill - it means no support for additional ARM platforms until
-> this issue is resolved.  (This "condition" was mentioned by Arnd
-> earlier in this thread, and was put in such a way that it was now
-> a hard and fast rule.)
+Hi,
 
-Sorry, I didn't mean for that to be mentioned that way at all, as I know
-the issues that are keeping this from happening.
+I am running an ARM1176JZ-S based SoC, on which HW breakpoints do not
+seem to function for some reason.
 
-> I feel it would be better to allow the current situation to continue.
-> If we start telling people that they can't use statically declared
-> devices without first having an alternative, we'll end up with people
-> inventing their own individual - and different - solutions to this
-> problem, which could actually make the problem harder to resolve in
-> the longer term.
+Unfortunately the current Kconfig forces HW_BREAKPOINT if PERF_EVENTS is
+enabled on ARMV6 (commit 19852e59002fbba1c2c6ba0f154095a37ad2ac03):
 
-Ok, but again, I do encourage, wherever possible, that people do not
-statically create a 'struct device'.
+> +       select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
 
-thanks,
+As a result, I am unable to use the PMU for OProfile, without having hw
+breakpoints barf at boot.  Is there any dependency between h/w
+breakpoints and PMU that I am missing?  If not, does H/W breakpoints
+have be forced here?
 
-greg k-h
+Regards
+Cyril.
