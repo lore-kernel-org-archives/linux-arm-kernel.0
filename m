@@ -1,65 +1,56 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 30 Nov 2010 10:48:34 -0800
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <20101130184049.GC8521@n2100.arm.linux.org.uk>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
-	<201011301621.48140.arnd@arndb.de>
-	<20101130184049.GC8521@n2100.arm.linux.org.uk>
-Message-ID: <20101130184834.GA16055@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 30 Nov 2010 11:00:58 -0800
+Subject: [PATCH v2 1/4] drivers: hwspinlock: add generic framework
+In-Reply-To: <1290526740-27624-2-git-send-email-ohad@wizery.com>
+References: <1290526740-27624-1-git-send-email-ohad@wizery.com>
+	<1290526740-27624-2-git-send-email-ohad@wizery.com>
+Message-ID: <20101130190058.GX17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 06:40:49PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 30, 2010 at 04:21:47PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 30 November 2010, Linus Walleij wrote:
-> > > 2010/11/26 Arnd Bergmann <arnd@arndb.de>:
-> > > 
-> > > > * When you say that the devices are static, I hope you do not mean
-> > > >  static in the C language sense. We used to allow devices to be
-> > > >  declared as "static struct" and registered using
-> > > >  platform_device_register (or other bus specific functions). This
-> > > >  is no longer valid and we are removing the existing users, do not
-> > > >  add new ones. When creating a platform device, use
-> > > >  platform_device_register_simple or platform_device_register_resndata.
-> > > 
-> > > Is this part of the generic ARM runtime multi-platform kernel
-> > > and device trees shebang?
-> > > 
-> > > The Ux500 still isn't in that sector, it needs extensive rewriting
-> > > of arch/arm/mach-ux500 to be done first, so as to support e.g.
-> > > U8500 and U5500 with a single kernel image.
-> > > 
-> > > Trying to skin that cat that as part of this review is a bit too
-> > > much to ask IMO, I'd rather have the author of this driver
-> > > adapt to whatever platform data registration mechanism is
-> > > in place for the merge window. Else it needs fixing as part
-> > > of a bigger endavour to root out compile-time platform
-> > > configuration.
-> > 
-> > The 'no static devices' rule is something that Greg brought up
-> > at the embedded developer session during PlumbersConf this year,
-> > I wasn't aware of the problem before that either.
-> > 
-> > It is not related to the multi-platform kernel work and it's
-> > not ARM specific.
-> > 
-> > Maybe Greg can give a short explanation of the impact of this.
-> > AFAIR, static device definitions still work, but there are
-> > plans to remove that capability in the future.
+* Ohad Ben-Cohen <ohad@wizery.com> [101123 07:27]:
+> Add a common, platform-independent, hwspinlock framework.
 > 
-> There's lots of static devices, not only platform devices, in the ARM
-> tree.  It's going to be a hell of a lot of work to fix this all up
-> properly.
+> Hardware spinlock devices are needed, e.g., in order to access data
+> that is shared between remote processors, that otherwise have no
+> alternative mechanism to accomplish synchronization and mutual exclusion
+> operations.
 
-I agree, it's been abused for many years this way :(
+<snip>
 
-> I hope that the capability for static devices won't disappear until
-> the huge pile of work on ARM has been completed.
+> +  int hwspin_lock(struct hwspinlock *hwlock);
+> +   - lock a previously assigned hwspinlock. If the hwspinlock is already
+> +     taken, the function will busy loop waiting for it to be released.
+> +     Note: if a faulty remote core never releases this lock, this function
+> +     will deadlock.
+> +     This function will fail only if hwlock is invalid. Otherwise, it will
+> +     always succeed (or deadlock; see above) and it will never sleep.
+> +     Upon a successful return from this function, preemption is disabled so
+> +     the caller must not sleep, and is advised to release the hwspinlock as
+> +     soon as possible, in order to minimize remote cores polling on the
+> +     hardware interconnect.
+...
 
-Don't worry, it will not.
+> +  int hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned long timeout);
+> +   - lock a previously-assigned hwspinlock with a timeout limit (specified in
+> +     jiffies). If the hwspinlock is already taken, the function will busy loop
+> +     waiting for it to be released, but give up when the timeout meets jiffies.
+> +     If timeout is 0, the function will never give up (therefore if a faulty
+> +     remote core never releases the hwspinlock, it will deadlock).
+> +     Upon a successful return from this function, preemption is disabled so
+> +     the caller must not sleep, and is advised to release the hwspinlock as
+> +     soon as possible, in order to minimize remote cores polling on the
+> +     hardware interconnect.
+> +     Returns 0 when successful and an appropriate error code otherwise (most
+> +     notably -ETIMEDOUT if the hwspinlock is still busy after timeout meets
+> +     jiffies). The function will never sleep.
 
-thanks,
+Do we even need the hwspin_lock variants, why can't we always use the
+hwspin_lock_timeout variants?
 
-greg k-h
+To me the idea of looping waiting for some external system to release
+a lock is not a good idea..
+
+Regards,
+
+Tony
