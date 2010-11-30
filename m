@@ -1,29 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 30 Nov 2010 10:24:11 -0600
-Subject: [PATCH][ ARM cpu hotplug 1/2 ] extract common code for arm cpu
-	hotplug
-In-Reply-To: <20101130110331.GA31054@n2100.arm.linux.org.uk>
-References: <AANLkTi=fJeOUhH0xUJF8qx-fTJ5popE7ZuVxDZXpTH-i@mail.gmail.com>	<AANLkTimz=xv92c6FN4i4c3Xs-t71L4PHv3SQg0jk-x-r@mail.gmail.com>	<20101129104149.GA10703@n2100.arm.linux.org.uk>	<AANLkTikHv+Rz7+bZY8Qo2drUQO4fjhJgqORcGFB7B6s7@mail.gmail.com>	<20101129192407.GA20761@n2100.arm.linux.org.uk>	<AANLkTimZfnmVMDZ2faUPpDHHv3oAhM9ZcVEpM0_MyHbq@mail.gmail.com>
-	<20101130110331.GA31054@n2100.arm.linux.org.uk>
-Message-ID: <4CF5252B.5050109@gmail.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Tue, 30 Nov 2010 09:33:54 -0700
+Subject: [PATCH] ARM: imx: Add mx53 changes to crm_regs
+In-Reply-To: <AANLkTikbroTO6A=1_nBrO=y-O-MiGgtZAN5tg32+4-c=@mail.gmail.com>
+References: <1291071265-4238-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<AANLkTikbroTO6A=1_nBrO=y-O-MiGgtZAN5tg32+4-c=@mail.gmail.com>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA027763@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2010 05:03 AM, Russell King - ARM Linux wrote:
-> On Tue, Nov 30, 2010 at 04:17:32PM +0530, Amit Kucheria wrote:
->> Since the main aim here is to consolidate as much code here as
->> possible while still allowing platforms to override the defaults,
->> would you have an objection to the introduction of a struct smp_ops
->> that'll allow a platform to override the defaults? This seems to be
->> done on other platforms I've briefly looked at.
->
-> I see no point to what is being proposed in this thread.  It's _soo_
-> little code that the platforms have to implement that it really is
-> not worth the effort.
->
-Whether the code can be consolidated or not, the current API does not 
-allow a single kernel binary (ignoring the list of other issues). The 
-introduction of struct smp_ops would help enable both single kernel and 
-default versions of the functions.
+Hi Fabio,
 
-Rob
+ 
+
+From: Fabio Estevam [mailto:festevam at gmail.com] 
+Sent: Monday, November 29, 2010 6:11 PM
+To: Nguyen Dinh-R00091
+Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com; linux at arm.linux.org.uk; s.hauer at pengutronix.de; eric at eukrea.com; u.kleine-koenig at pengutronix.de; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] ARM: imx: Add mx53 changes to crm_regs
+
+ 
+
+Hi Dinh,
+
+On Mon, Nov 29, 2010 at 8:54 PM,  <Dinh.Nguyen@freescale.com> wrote:
+...
+>
+>  /* eSDHC */
+> -CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC1)
+> -CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC1)
+> -CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC1)
+> +CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC2)
+> +CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC2)
+> +CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC2)
+>
+> -CLK_GET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+> -CLK_SET_PARENT(esdhc2, 1, ESDHC2_MSHC2)
+> -CLK_SET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+> +CLK_GET_RATE(esdhc2, 1, ESDHC2_3_MSHC2)
+> +CLK_SET_PARENT(esdhc2, 1, ESDHC2_3_MSHC2)
+> +CLK_SET_RATE(esdhc2, 1, ESDHC2_3_MSHC2)
+
+Shouldn?t this be part of another patch?
+
+I needed these changes because the patch would break the build if these changes are made? Are you referring to the change from ESDHC1_MSHC1 -> ESDHC1_MSHC2, or ESDHC2_MSHC2 -> ESDCH2_3_MSHC2? 
+
+For the case of ESDHC1_MSHC1 -> ESDHC1_MSHC2, it just a matter of semantics fix(there is no MSHC1 in MX51 or MX53). But for the ESDHC2_MSHC2 -> ESDCH2_3_MSHC2 change, its because for MX53, ESDHC2(which was getting the clocks from the PLLs and feeding them to ESDHC3) is now reversed(ESDHC3 is getting clocks from the PLL and feeding it to ESDHC2). 
+
+Dinh
+
+
+
+Regards,
+
+Fabio Estevam
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101130/f670941f/attachment-0001.html>
