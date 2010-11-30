@@ -1,141 +1,48 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:36:44 +0100
-Subject: [PATCH 19/54] ARM: integrator: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:36:38 +0100
+Subject: [PATCH 14/54] ARM: ebsa110: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130133644.GT15575@mail.wantstofly.org>
+Message-ID: <20101130133638.GO15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-integrator/integrator_ap.c |   16 +++++-----
- arch/arm/mach-integrator/integrator_cp.c |   48 +++++++++++++++---------------
- 2 files changed, 32 insertions(+), 32 deletions(-)
+ arch/arm/mach-ebsa110/core.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 548208f..ca363c1 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -156,21 +156,21 @@ static void __init ap_map_io(void)
+diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+index 5df4099..7df083f 100644
+--- a/arch/arm/mach-ebsa110/core.c
++++ b/arch/arm/mach-ebsa110/core.c
+@@ -35,20 +35,20 @@
+ #define IRQ_STAT		0xff000000	/* read */
+ #define IRQ_MCLR		0xff000000	/* write */
  
- #define INTEGRATOR_SC_VALID_INT	0x003fffff
- 
--static void sc_mask_irq(unsigned int irq)
-+static void sc_mask_irq(struct irq_data *d)
+-static void ebsa110_mask_irq(unsigned int irq)
++static void ebsa110_mask_irq(struct irq_data *d)
  {
--	writel(1 << irq, VA_IC_BASE + IRQ_ENABLE_CLEAR);
-+	writel(1 << d->irq, VA_IC_BASE + IRQ_ENABLE_CLEAR);
+-	__raw_writeb(1 << irq, IRQ_MCLR);
++	__raw_writeb(1 << d->irq, IRQ_MCLR);
  }
  
--static void sc_unmask_irq(unsigned int irq)
-+static void sc_unmask_irq(struct irq_data *d)
+-static void ebsa110_unmask_irq(unsigned int irq)
++static void ebsa110_unmask_irq(struct irq_data *d)
  {
--	writel(1 << irq, VA_IC_BASE + IRQ_ENABLE_SET);
-+	writel(1 << d->irq, VA_IC_BASE + IRQ_ENABLE_SET);
+-	__raw_writeb(1 << irq, IRQ_MSET);
++	__raw_writeb(1 << d->irq, IRQ_MSET);
  }
  
- static struct irq_chip sc_chip = {
--	.name	= "SC",
--	.ack	= sc_mask_irq,
--	.mask	= sc_mask_irq,
--	.unmask = sc_unmask_irq,
-+	.name		= "SC",
-+	.irq_ack	= sc_mask_irq,
-+	.irq_mask	= sc_mask_irq,
-+	.irq_unmask	= sc_unmask_irq,
+ static struct irq_chip ebsa110_irq_chip = {
+-	.ack	= ebsa110_mask_irq,
+-	.mask	= ebsa110_mask_irq,
+-	.unmask = ebsa110_unmask_irq,
++	.irq_ack	= ebsa110_mask_irq,
++	.irq_mask	= ebsa110_mask_irq,
++	.irq_unmask	= ebsa110_unmask_irq,
  };
- 
- static void __init ap_init_irq(void)
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 6258c90..f0f16d4 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -147,61 +147,61 @@ static void __init intcp_map_io(void)
- #define sic_writel	__raw_writel
- #define sic_readl	__raw_readl
- 
--static void cic_mask_irq(unsigned int irq)
-+static void cic_mask_irq(struct irq_data *d)
- {
--	irq -= IRQ_CIC_START;
-+	unsigned int irq = d->irq - IRQ_CIC_START;
- 	cic_writel(1 << irq, INTCP_VA_CIC_BASE + IRQ_ENABLE_CLEAR);
- }
- 
--static void cic_unmask_irq(unsigned int irq)
-+static void cic_unmask_irq(struct irq_data *d)
- {
--	irq -= IRQ_CIC_START;
-+	unsigned int irq = d->irq - IRQ_CIC_START;
- 	cic_writel(1 << irq, INTCP_VA_CIC_BASE + IRQ_ENABLE_SET);
- }
- 
- static struct irq_chip cic_chip = {
--	.name	= "CIC",
--	.ack	= cic_mask_irq,
--	.mask	= cic_mask_irq,
--	.unmask	= cic_unmask_irq,
-+	.name		= "CIC",
-+	.irq_ack	= cic_mask_irq,
-+	.irq_mask	= cic_mask_irq,
-+	.irq_unmask	= cic_unmask_irq,
- };
- 
--static void pic_mask_irq(unsigned int irq)
-+static void pic_mask_irq(struct irq_data *d)
- {
--	irq -= IRQ_PIC_START;
-+	unsigned int irq = d->irq - IRQ_PIC_START;
- 	pic_writel(1 << irq, INTCP_VA_PIC_BASE + IRQ_ENABLE_CLEAR);
- }
- 
--static void pic_unmask_irq(unsigned int irq)
-+static void pic_unmask_irq(struct irq_data *d)
- {
--	irq -= IRQ_PIC_START;
-+	unsigned int irq = d->irq - IRQ_PIC_START;
- 	pic_writel(1 << irq, INTCP_VA_PIC_BASE + IRQ_ENABLE_SET);
- }
- 
- static struct irq_chip pic_chip = {
--	.name	= "PIC",
--	.ack	= pic_mask_irq,
--	.mask	= pic_mask_irq,
--	.unmask = pic_unmask_irq,
-+	.name		= "PIC",
-+	.irq_ack	= pic_mask_irq,
-+	.irq_mask	= pic_mask_irq,
-+	.irq_unmask	= pic_unmask_irq,
- };
- 
--static void sic_mask_irq(unsigned int irq)
-+static void sic_mask_irq(struct irq_data *d)
- {
--	irq -= IRQ_SIC_START;
-+	unsigned int irq = d->irq - IRQ_SIC_START;
- 	sic_writel(1 << irq, INTCP_VA_SIC_BASE + IRQ_ENABLE_CLEAR);
- }
- 
--static void sic_unmask_irq(unsigned int irq)
-+static void sic_unmask_irq(struct irq_data *d)
- {
--	irq -= IRQ_SIC_START;
-+	unsigned int irq = d->irq - IRQ_SIC_START;
- 	sic_writel(1 << irq, INTCP_VA_SIC_BASE + IRQ_ENABLE_SET);
- }
- 
- static struct irq_chip sic_chip = {
--	.name	= "SIC",
--	.ack	= sic_mask_irq,
--	.mask	= sic_mask_irq,
--	.unmask	= sic_unmask_irq,
-+	.name		= "SIC",
-+	.irq_ack	= sic_mask_irq,
-+	.irq_mask	= sic_mask_irq,
-+	.irq_unmask	= sic_unmask_irq,
- };
- 
- static void
+  
+ static void __init ebsa110_init_irq(void)
 -- 
 1.7.1
