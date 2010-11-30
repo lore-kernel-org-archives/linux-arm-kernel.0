@@ -1,44 +1,29 @@
-From: htejun@gmail.com (Tejun Heo)
-Date: Tue, 30 Nov 2010 20:49:29 +0100
-Subject: Cannot detect SATA disks w/ CONFIG_SATA_PMP w/o actually using
-	SATA multiplier
-In-Reply-To: <AANLkTi=0gBcfrAyJNb0+=obH2QDsqhGM5a9xxwHAoh88@mail.gmail.com>
-References: <AANLkTi=kbTcq3hYBiDzGcAb02Ppwb1QEcs12-1W_T=LG@mail.gmail.com>
-	<4CF50574.6000706@gmail.com>
-	<AANLkTi=0gBcfrAyJNb0+=obH2QDsqhGM5a9xxwHAoh88@mail.gmail.com>
-Message-ID: <4CF55549.4080000@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Nov 2010 20:52:11 +0100
+Subject: [PATCH v4 3/3] ARM: mx5: fix keypad clock name
+In-Reply-To: <1291146343-25808-3-git-send-email-fabio.estevam@freescale.com>
+References: <1291146343-25808-1-git-send-email-fabio.estevam@freescale.com>
+	<1291146343-25808-2-git-send-email-fabio.estevam@freescale.com>
+	<1291146343-25808-3-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20101130195211.GX20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Fabio,
 
-On 11/30/2010 06:46 PM, Lin Mac wrote:
-> Could be,  but disabling it is the last option. And it's anoying to
-> have 2 different modules for different uses.
+On Tue, Nov 30, 2010 at 05:45:43PM -0200, Fabio Estevam wrote:
+> After moving to dynamically registration of the keypad, the keypad clock
+> name needs to change accordingly.
 > 
-> I'd prefer some clues/checkpoint if possible.
+> The reason is that the original mx5 keypad platform_device id was 0, 
+> now we use id=-1 as per arch/arm/plat-mxc/devices/platform-imx-keypad.c.
+> 
+> Tested keypad successfully on a MX51_3DS board.
+I'd squash that into the previous patch otherwise your keypad doesn't
+work for one commit.
 
-One thing which could be possible is that the controller stashes the
-result code for the PMP aware SRST according to the PMP number instead
-of the usual place, so the driver can't see it.  In that case, the
-driver can be modified to check both places I suppose but if the
-hardware can be fixed, that would be great.
-
-> I supposed the behavior of detecting and resetting disks (without
-> using port multiplier) should be the same for both with and without
-> CONFIG_SATA_PMP. All I know about port multiplier is when it is used
-> (not much too), but is there any register configuration or behavior is
-> required for multiplier to work properly and take effect even when no
-> multiplier is used?
-
-Yeah, the only difference is the PMP port number when issuing SRST.
-Non-PMP devices ignore it and respond the same way while PMP
-recognizes it and responds with PMP signature instead of the signature
-of the first device.  As written above, I think it's quite likely that
-the controller is handling the response D2H Reg FIS incorrectly when a
-non-PMP device responds to PMP SRST.
-
-Good luck.
+Uwe
 
 -- 
-tejun
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
