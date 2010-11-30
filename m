@@ -1,321 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 30 Nov 2010 17:32:34 +0100
-Subject: [PATCH 08/15] ARM: mxs: Add iomux support
-In-Reply-To: <1290754154-9428-9-git-send-email-shawn.guo@freescale.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-9-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101130163234.GS20449@pengutronix.de>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 30 Nov 2010 08:24:13 -0800
+Subject: [PATCH 09/10] MCDE: Add build files and bus
+In-Reply-To: <201011301621.48140.arnd@arndb.de>
+References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
+	<201011261224.59490.arnd@arndb.de>
+	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
+	<201011301621.48140.arnd@arndb.de>
+Message-ID: <20101130162413.GA17505@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 26, 2010 at 02:49:07PM +0800, Shawn Guo wrote:
-> MXS-based SoCs implements iomux functions in block PINCTRL.
+On Tue, Nov 30, 2010 at 04:21:47PM +0100, Arnd Bergmann wrote:
+> On Tuesday 30 November 2010, Linus Walleij wrote:
+> > 2010/11/26 Arnd Bergmann <arnd@arndb.de>:
+> > 
+> > > * When you say that the devices are static, I hope you do not mean
+> > >  static in the C language sense. We used to allow devices to be
+> > >  declared as "static struct" and registered using
+> > >  platform_device_register (or other bus specific functions). This
+> > >  is no longer valid and we are removing the existing users, do not
+> > >  add new ones. When creating a platform device, use
+> > >  platform_device_register_simple or platform_device_register_resndata.
+> > 
+> > Is this part of the generic ARM runtime multi-platform kernel
+> > and device trees shebang?
+> > 
+> > The Ux500 still isn't in that sector, it needs extensive rewriting
+> > of arch/arm/mach-ux500 to be done first, so as to support e.g.
+> > U8500 and U5500 with a single kernel image.
+> > 
+> > Trying to skin that cat that as part of this review is a bit too
+> > much to ask IMO, I'd rather have the author of this driver
+> > adapt to whatever platform data registration mechanism is
+> > in place for the merge window. Else it needs fixing as part
+> > of a bigger endavour to root out compile-time platform
+> > configuration.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/mach-mxs/include/mach/iomux-mx23.h |   29 +++++++
->  arch/arm/mach-mxs/include/mach/iomux-mx28.h |   44 +++++++++++
->  arch/arm/mach-mxs/include/mach/iomux.h      |   77 +++++++++++++++++++
->  arch/arm/mach-mxs/iomux.c                   |  110 +++++++++++++++++++++++++++
->  4 files changed, 260 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx23.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx28.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/iomux.h
->  create mode 100644 arch/arm/mach-mxs/iomux.c
+> The 'no static devices' rule is something that Greg brought up
+> at the embedded developer session during PlumbersConf this year,
+> I wasn't aware of the problem before that either.
 > 
-> diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx23.h b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
-> new file mode 100644
-> index 0000000..3fc0439
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
-> @@ -0,0 +1,29 @@
-> +/*
-> + * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#ifndef __MACH_IOMUX_MX23_H__
-> +#define __MACH_IOMUX_MX23_H__
-> +
-> +#include <mach/iomux.h>
-> +
-> +/*
-> + * The naming convention for the pad modes is MX23_PAD_<padname>__<padmode>
-> + * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-> + * See also iomux.h
-> + *
-> + *					 		BANK PIN     MUX            VOL          MA            PULL
-> + */
-> +/* DUART */
-> +#define MX23_PAD_PWM0__DUART_RX			IOMUX_PAD(1, 26, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
-> +#define MX23_PAD_PWM1__DUART_TX			IOMUX_PAD(1, 27, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
-> +
-> +#endif /* __MACH_IOMUX_MX23_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-> new file mode 100644
-> index 0000000..ca37a15
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-> @@ -0,0 +1,44 @@
-> +/*
-> + * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#ifndef __MACH_IOMUX_MX28_H__
-> +#define __MACH_IOMUX_MX28_H__
-> +
-> +#include <mach/iomux.h>
-> +
-> +/*
-> + * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
-> + * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-> + * See also iomux.h
-> + *
-> + *					 		BANK PIN     MUX            VOL          MA            PULL
-> + */
-> +/* DUART */
-> +#define MX28_PAD_PWM0__DUART_RX			IOMUX_PAD(3, 16, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +#define MX28_PAD_PWM1__DUART_TX			IOMUX_PAD(3, 17, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +
-> +/* FEC */
-> +#define MX28_PAD_ENET0_MDC__ENET0_MDC		IOMUX_PAD(4, 0,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_MDIO__ENET0_MDIO		IOMUX_PAD(4, 1,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN	IOMUX_PAD(4, 2,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_RXD0__ENET0_RXD0		IOMUX_PAD(4, 3,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_RXD1__ENET0_RXD1		IOMUX_PAD(4, 4,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN	IOMUX_PAD(4, 6,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_TXD0__ENET0_TXD0		IOMUX_PAD(4, 7,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET0_TXD1__ENET0_TXD1		IOMUX_PAD(4, 8,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +#define MX28_PAD_ENET_CLK__ENET_CLK		IOMUX_PAD(4, 16, PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULL)
-> +
-> +/* GPIO */
-> +#define MX28_PAD_SSP1_DATA3__GPIO_2_15		IOMUX_PAD(2, 15, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13	IOMUX_PAD(4, 13, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-> +
-> +#endif /* __MACH_IOMUX_MX28_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
-> new file mode 100644
-> index 0000000..27bcada
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/iomux.h
-> @@ -0,0 +1,77 @@
-> +/*
-> + * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-> + *			<armlinux@phytec.de>
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +
-> +#ifndef __MACH_MXS_IOMUX_H__
-> +#define __MACH_MXS_IOMUX_H__
-> +
-> +typedef struct pad_desc {
-> +	unsigned bank:3;
-> +	unsigned pin:5;
-> +	unsigned muxsel:2;
-> +	unsigned ma:3;
-> +	unsigned vol:2;
-> +	unsigned pull:1;
-> +} iomux_cfg_t;
-mxc just switches to u64 (IIRC) for pad descriptions because the values
-are easier to manipulate.  This would be better for mxs, too.
+> It is not related to the multi-platform kernel work and it's
+> not ARM specific.
+> 
+> Maybe Greg can give a short explanation of the impact of this.
+> AFAIR, static device definitions still work, but there are
+> plans to remove that capability in the future.
 
-> +
-> +#define IOMUX_PAD(_bank, _pin, _muxsel, _vol, _ma, _pull)	\
-> +		{						\
-> +			.bank	= _bank,			\
-> +			.pin	= _pin,				\
-> +			.muxsel	= _muxsel,			\
-> +			.vol	= _vol,				\
-> +			.ma	= _ma,				\
-> +			.pull	= _pull,			\
-> +		}
-> +
-> +#define PAD_MUXSEL_0		0
-> +#define PAD_MUXSEL_1		1
-> +#define PAD_MUXSEL_2		2
-> +#define PAD_MUXSEL_GPIO		3
-> +
-> +#define PAD_1V8			0
-> +#define PAD_3V3			1
-> +#define PAD_VOL_NONE		2
-> +
-> +#define PAD_4MA			0
-> +#define PAD_8MA			1
-> +#define PAD_12MA		2
-> +#define PAD_16MA		3
-> +#define PAD_MA_NONE		4
-> +
-> +#define PAD_NOPULL		0
-> +#define PAD_PULL		1
-> +
-> +/*
-> + * setups a single pad in the iomuxer
-> + */
-> +int mxs_iomux_setup_pad(iomux_cfg_t *pad);
-> +
-> +/*
-> + * setups multiple pads
-> + * convenient way to call the above function with tables
-> + */
-> +int mxs_iomux_setup_multiple_pads(iomux_cfg_t *pad_list, unsigned count);
-> +
-> +/*
-> + * Initialise the iomux controller
-> + */
-> +void mxs_iomux_init(void __iomem *iomux_base);
-> +
-> +#endif /* __MACH_MXS_IOMUX_H__*/
-> diff --git a/arch/arm/mach-mxs/iomux.c b/arch/arm/mach-mxs/iomux.c
-> new file mode 100644
-> index 0000000..803cadf
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/iomux.c
-> @@ -0,0 +1,110 @@
-> +/*
-> + * Copyright 2004-2006,2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
-> + * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-> + *                       <armlinux@phytec.de>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +
-> +#include <linux/errno.h>
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/string.h>
-> +#include <linux/gpio.h>
-> +
-> +#include <asm/mach/map.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/iomux.h>
-> +
-> +static void __iomem *base;
-> +
-> +/*
-> + * configures a single pad in the iomuxer
-> + */
-> +int mxs_iomux_setup_pad(iomux_cfg_t *pad)
-> +{
-> +	u32 reg, ofs, bp, bm;
-> +
-> +	/* muxsel */
-> +	ofs = pad->bank * 0x20 + pad->pin / 16 * 0x10;
-> +	bp = pad->pin % 16 * 2;
-> +	bm = 0x3 << bp;
-> +	reg = __raw_readl(base + ofs);
-> +	reg &= ~bm;
-> +	reg |= pad->muxsel << bp;
-> +	__raw_writel(reg, base + ofs);
-> +
-> +	/* drive */
-> +	ofs = cpu_is_mx23() ? 0x200 : 0x300;
-> +	ofs += pad->bank * 0x40 + pad->pin / 8 * 0x10;
-> +	/* ma */
-> +	if (pad->ma != PAD_MA_NONE)
-> +	{
-> +		bp = pad->pin % 8 * 4;
-> +		bm = 0x3 << bp;
-> +		reg = __raw_readl(base + ofs);
-> +		reg &= ~bm;
-> +		reg |= pad->ma << bp;
-> +		__raw_writel(reg, base + ofs);
-> +	}
-> +	/* vol */
-> +	if (pad->vol != PAD_VOL_NONE)
-> +	{
-> +		bp = pad->pin % 8 * 4 + 2;
-> +		bm = 0x1 << bp;
-> +		reg = __raw_readl(base + ofs);
-> +		reg &= ~bm;
-> +		reg |= pad->vol << bp;
-> +		__raw_writel(reg, base + ofs);
-> +	}
-> +
-> +	/* pull */
-> +	ofs = cpu_is_mx23() ? 0x400 : 0x600;
-> +	ofs += pad->bank * 0x10;
-> +	bp = pad->pin;
-> +	bm = 0x1 << bp;
-> +	reg = __raw_readl(base + ofs);
-> +	reg &= ~bm;
-> +	reg |= pad->pull << bp;
-> +	__raw_writel(reg, base + ofs);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(mxs_iomux_setup_pad);
-Really needed?
+That is exactly correct.
 
-> +
-> +int mxs_iomux_setup_multiple_pads(iomux_cfg_t *pad_list, unsigned count)
-> +{
-> +	iomux_cfg_t *p = pad_list;
-> +	int i;
-> +	int ret;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		ret = mxs_iomux_setup_pad(p);
-> +		if (ret)
-> +			return ret;
-> +		p++;
-> +	}
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(mxs_iomux_setup_multiple_pads);
-> +
-> +void mxs_iomux_init(void __iomem *iomux_base)
-> +{
-> +	base = iomux_base;
-> +}
+A struct device is a dynamically referenced thing, and as such, should
+be dynamically created and it will be automatically destroyed when it
+needs to when everyone is finished with it.  By making a struct device
+static, that kind of defeats the whole purpose of reference counting the
+thing, not to mention making freeing the object when finished a bit
+difficult :)
 
-Best regards
-Uwe
+thanks,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+greg k-h
