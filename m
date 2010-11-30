@@ -1,61 +1,96 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 30 Nov 2010 08:24:13 -0800
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <201011301621.48140.arnd@arndb.de>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
-	<201011301621.48140.arnd@arndb.de>
-Message-ID: <20101130162413.GA17505@kroah.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Nov 2010 17:39:22 +0100
+Subject: [PATCH 09/15] ARM: mxs: Add clock support
+In-Reply-To: <1290754154-9428-10-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1290754154-9428-10-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101130163922.GT20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 04:21:47PM +0100, Arnd Bergmann wrote:
-> On Tuesday 30 November 2010, Linus Walleij wrote:
-> > 2010/11/26 Arnd Bergmann <arnd@arndb.de>:
-> > 
-> > > * When you say that the devices are static, I hope you do not mean
-> > >  static in the C language sense. We used to allow devices to be
-> > >  declared as "static struct" and registered using
-> > >  platform_device_register (or other bus specific functions). This
-> > >  is no longer valid and we are removing the existing users, do not
-> > >  add new ones. When creating a platform device, use
-> > >  platform_device_register_simple or platform_device_register_resndata.
-> > 
-> > Is this part of the generic ARM runtime multi-platform kernel
-> > and device trees shebang?
-> > 
-> > The Ux500 still isn't in that sector, it needs extensive rewriting
-> > of arch/arm/mach-ux500 to be done first, so as to support e.g.
-> > U8500 and U5500 with a single kernel image.
-> > 
-> > Trying to skin that cat that as part of this review is a bit too
-> > much to ask IMO, I'd rather have the author of this driver
-> > adapt to whatever platform data registration mechanism is
-> > in place for the merge window. Else it needs fixing as part
-> > of a bigger endavour to root out compile-time platform
-> > configuration.
+Hello Shawn,
+
+On Fri, Nov 26, 2010 at 02:49:08PM +0800, Shawn Guo wrote:
+> Add clock for MXS-based SoCs, MX23 and MX28.
 > 
-> The 'no static devices' rule is something that Greg brought up
-> at the embedded developer session during PlumbersConf this year,
-> I wasn't aware of the problem before that either.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mxs/clock-mx23.c          |  521 ++++++++++++++++++++++
+>  arch/arm/mach-mxs/clock-mx28.c          |  732 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/clock.c               |  201 +++++++++
+>  arch/arm/mach-mxs/include/mach/clkdev.h |    7 +
+>  arch/arm/mach-mxs/include/mach/clock.h  |   64 +++
+>  arch/arm/mach-mxs/regs-clkctrl-mx23.h   |  455 +++++++++++++++++++
+>  arch/arm/mach-mxs/regs-clkctrl-mx28.h   |  663 ++++++++++++++++++++++++++++
+>  7 files changed, 2643 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/clock-mx23.c
+>  create mode 100644 arch/arm/mach-mxs/clock-mx28.c
+>  create mode 100644 arch/arm/mach-mxs/clock.c
+>  create mode 100644 arch/arm/mach-mxs/include/mach/clkdev.h
+>  create mode 100644 arch/arm/mach-mxs/include/mach/clock.h
+>  create mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx23.h
+>  create mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx28.h
 > 
-> It is not related to the multi-platform kernel work and it's
-> not ARM specific.
-> 
-> Maybe Greg can give a short explanation of the impact of this.
-> AFAIR, static device definitions still work, but there are
-> plans to remove that capability in the future.
+> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> new file mode 100644
+> index 0000000..832db0b
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/clock-mx23.c
+> @@ -0,0 +1,521 @@
+> +/*
+> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#include <linux/mm.h>
+> +#include <linux/delay.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +
+> +#include <asm/clkdev.h>
+> +#include <asm/div64.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/common.h>
+> +#include <mach/clock.h>
+> +
+> +#include "regs-clkctrl-mx23.h"
+> +
+> +#define CLKCTRL_BASE_ADDR	MX23_IO_ADDRESS(MX23_CLKCTRL_BASE_ADDR)
+> +#define DIGCTRL_BASE_ADDR	MX23_IO_ADDRESS(MX23_DIGCTL_BASE_ADDR)
+> +
+> +static int _raw_clk_enable(struct clk *clk)
+> +{
+> +	u32 reg;
+> +
+> +	if (clk->enable_reg) {
+> +		reg = __raw_readl(clk->enable_reg);
+> +		reg &= ~(1 << clk->enable_shift);
+> +		__raw_writel(reg, clk->enable_reg);
+> +	}
+> +
+> +	return 0;
+> +}
+Hmm, I would have used an approach that is quickly switchable to the
+generic clock stuff posted a few times here.  But probably already too
+late.  So it's up to you to decide when to switch (or if at all).
 
-That is exactly correct.
+Best regards
+Uwe
 
-A struct device is a dynamically referenced thing, and as such, should
-be dynamically created and it will be automatically destroyed when it
-needs to when everyone is finished with it.  By making a struct device
-static, that kind of defeats the whole purpose of reference counting the
-thing, not to mention making freeing the object when finished a bit
-difficult :)
-
-thanks,
-
-greg k-h
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
