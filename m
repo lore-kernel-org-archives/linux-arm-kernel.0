@@ -1,239 +1,358 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:41:12 +0100
-Subject: [PATCH 41/54] ARM: sa1100: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:36:56 +0100
+Subject: [PATCH 27/54] ARM: lh7a40x: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130134112.GP15575@mail.wantstofly.org>
+Message-ID: <20101130133656.GB15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-sa1100/irq.c      |   84 +++++++++++++++++++-------------------
- arch/arm/mach-sa1100/neponset.c |    8 ++--
- 2 files changed, 46 insertions(+), 46 deletions(-)
+ arch/arm/mach-lh7a40x/arch-kev7a400.c |   20 +++++-----
+ arch/arm/mach-lh7a40x/arch-lpd7a40x.c |   25 +++++++------
+ arch/arm/mach-lh7a40x/irq-lh7a400.c   |   30 ++++++++--------
+ arch/arm/mach-lh7a40x/irq-lh7a404.c   |   60 ++++++++++++++++----------------
+ arch/arm/mach-lh7a40x/irq-lpd7a40x.c  |   22 ++++++------
+ 5 files changed, 79 insertions(+), 78 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index 3093d46..3d85dfa 100644
---- a/arch/arm/mach-sa1100/irq.c
-+++ b/arch/arm/mach-sa1100/irq.c
-@@ -37,14 +37,14 @@ static int GPIO_IRQ_mask = (1 << 11) - 1;
- #define GPIO_11_27_IRQ(i)	((i) - 21)
- #define GPIO11_27_MASK(irq)	(1 << GPIO_11_27_IRQ(irq))
+diff --git a/arch/arm/mach-lh7a40x/arch-kev7a400.c b/arch/arm/mach-lh7a40x/arch-kev7a400.c
+index 9088c16..71129c3 100644
+--- a/arch/arm/mach-lh7a40x/arch-kev7a400.c
++++ b/arch/arm/mach-lh7a40x/arch-kev7a400.c
+@@ -46,28 +46,28 @@ void __init kev7a400_map_io(void)
  
--static int sa1100_gpio_type(unsigned int irq, unsigned int type)
-+static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
+ static u16 CPLD_IRQ_mask;	/* Mask for CPLD IRQs, 1 == unmasked */
+ 
+-static void kev7a400_ack_cpld_irq (u32 irq)
++static void kev7a400_ack_cpld_irq(struct irq_data *d)
  {
- 	unsigned int mask;
- 
--	if (irq <= 10)
--		mask = 1 << irq;
-+	if (d->irq <= 10)
-+		mask = 1 << d->irq;
- 	else
--		mask = GPIO11_27_MASK(irq);
-+		mask = GPIO11_27_MASK(d->irq);
- 
- 	if (type == IRQ_TYPE_PROBE) {
- 		if ((GPIO_IRQ_rising_edge | GPIO_IRQ_falling_edge) & mask)
-@@ -70,37 +70,37 @@ static int sa1100_gpio_type(unsigned int irq, unsigned int type)
- /*
-  * GPIO IRQs must be acknowledged.  This is for IRQs from 0 to 10.
-  */
--static void sa1100_low_gpio_ack(unsigned int irq)
-+static void sa1100_low_gpio_ack(struct irq_data *d)
- {
--	GEDR = (1 << irq);
-+	GEDR = (1 << d->irq);
+-	CPLD_CL_INT = 1 << (irq - IRQ_KEV7A400_CPLD);
++	CPLD_CL_INT = 1 << (d->irq - IRQ_KEV7A400_CPLD);
  }
  
--static void sa1100_low_gpio_mask(unsigned int irq)
-+static void sa1100_low_gpio_mask(struct irq_data *d)
+-static void kev7a400_mask_cpld_irq (u32 irq)
++static void kev7a400_mask_cpld_irq(struct irq_data *d)
  {
--	ICMR &= ~(1 << irq);
-+	ICMR &= ~(1 << d->irq);
+-	CPLD_IRQ_mask &= ~(1 << (irq - IRQ_KEV7A400_CPLD));
++	CPLD_IRQ_mask &= ~(1 << (d->irq - IRQ_KEV7A400_CPLD));
+ 	CPLD_WR_PB_INT_MASK = CPLD_IRQ_mask;
  }
  
--static void sa1100_low_gpio_unmask(unsigned int irq)
-+static void sa1100_low_gpio_unmask(struct irq_data *d)
+-static void kev7a400_unmask_cpld_irq (u32 irq)
++static void kev7a400_unmask_cpld_irq(struct irq_data *d)
  {
--	ICMR |= 1 << irq;
-+	ICMR |= 1 << d->irq;
+-	CPLD_IRQ_mask |= 1 << (irq - IRQ_KEV7A400_CPLD);
++	CPLD_IRQ_mask |= 1 << (d->irq - IRQ_KEV7A400_CPLD);
+ 	CPLD_WR_PB_INT_MASK = CPLD_IRQ_mask;
  }
  
--static int sa1100_low_gpio_wake(unsigned int irq, unsigned int on)
-+static int sa1100_low_gpio_wake(struct irq_data *d, unsigned int on)
- {
- 	if (on)
--		PWER |= 1 << irq;
-+		PWER |= 1 << d->irq;
- 	else
--		PWER &= ~(1 << irq);
-+		PWER &= ~(1 << d->irq);
- 	return 0;
- }
- 
- static struct irq_chip sa1100_low_gpio_chip = {
- 	.name		= "GPIO-l",
--	.ack		= sa1100_low_gpio_ack,
--	.mask		= sa1100_low_gpio_mask,
--	.unmask		= sa1100_low_gpio_unmask,
--	.set_type	= sa1100_gpio_type,
--	.set_wake	= sa1100_low_gpio_wake,
-+	.irq_ack	= sa1100_low_gpio_ack,
-+	.irq_mask	= sa1100_low_gpio_mask,
-+	.irq_unmask	= sa1100_low_gpio_unmask,
-+	.irq_set_type	= sa1100_gpio_type,
-+	.irq_set_wake	= sa1100_low_gpio_wake,
+ static struct irq_chip kev7a400_cpld_chip = {
+-	.name	= "CPLD",
+-	.ack	= kev7a400_ack_cpld_irq,
+-	.mask	= kev7a400_mask_cpld_irq,
+-	.unmask	= kev7a400_unmask_cpld_irq,
++	.name		= "CPLD",
++	.irq_ack	= kev7a400_ack_cpld_irq,
++	.irq_mask	= kev7a400_mask_cpld_irq,
++	.irq_unmask	= kev7a400_unmask_cpld_irq,
  };
  
- /*
-@@ -139,16 +139,16 @@ sa1100_high_gpio_handler(unsigned int irq, struct irq_desc *desc)
-  * In addition, the IRQs are all collected up into one bit in the
-  * interrupt controller registers.
-  */
--static void sa1100_high_gpio_ack(unsigned int irq)
-+static void sa1100_high_gpio_ack(struct irq_data *d)
- {
--	unsigned int mask = GPIO11_27_MASK(irq);
-+	unsigned int mask = GPIO11_27_MASK(d->irq);
  
- 	GEDR = mask;
+diff --git a/arch/arm/mach-lh7a40x/arch-lpd7a40x.c b/arch/arm/mach-lh7a40x/arch-lpd7a40x.c
+index 7315a56..e735546 100644
+--- a/arch/arm/mach-lh7a40x/arch-lpd7a40x.c
++++ b/arch/arm/mach-lh7a40x/arch-lpd7a40x.c
+@@ -159,7 +159,7 @@ static void __init lpd7a40x_init (void)
+ #endif
  }
  
--static void sa1100_high_gpio_mask(unsigned int irq)
-+static void sa1100_high_gpio_mask(struct irq_data *d)
+-static void lh7a40x_ack_cpld_irq (u32 irq)
++static void lh7a40x_ack_cpld_irq(struct irq_data *d)
  {
--	unsigned int mask = GPIO11_27_MASK(irq);
-+	unsigned int mask = GPIO11_27_MASK(d->irq);
+ 	/* CPLD doesn't have ack capability, but some devices may */
  
- 	GPIO_IRQ_mask &= ~mask;
- 
-@@ -156,9 +156,9 @@ static void sa1100_high_gpio_mask(unsigned int irq)
- 	GFER &= ~mask;
+@@ -167,14 +167,14 @@ static void lh7a40x_ack_cpld_irq (u32 irq)
+ 	/* The touch control *must* mask the interrupt because the
+ 	 * interrupt bit is read by the driver to determine if the pen
+ 	 * is still down. */
+-	if (irq == IRQ_TOUCH)
++	if (d->irq == IRQ_TOUCH)
+ 		CPLD_INTERRUPTS |= CPLD_INTMASK_TOUCH;
+ #endif
  }
  
--static void sa1100_high_gpio_unmask(unsigned int irq)
-+static void sa1100_high_gpio_unmask(struct irq_data *d)
+-static void lh7a40x_mask_cpld_irq (u32 irq)
++static void lh7a40x_mask_cpld_irq(struct irq_data *d)
  {
--	unsigned int mask = GPIO11_27_MASK(irq);
-+	unsigned int mask = GPIO11_27_MASK(d->irq);
- 
- 	GPIO_IRQ_mask |= mask;
- 
-@@ -166,44 +166,44 @@ static void sa1100_high_gpio_unmask(unsigned int irq)
- 	GFER = GPIO_IRQ_falling_edge & GPIO_IRQ_mask;
+-	switch (irq) {
++	switch (d->irq) {
+ 	case IRQ_LPD7A40X_ETH_INT:
+ 		CPLD_INTERRUPTS |= CPLD_INTMASK_ETHERNET;
+ 		break;
+@@ -186,9 +186,9 @@ static void lh7a40x_mask_cpld_irq (u32 irq)
+ 	}
  }
  
--static int sa1100_high_gpio_wake(unsigned int irq, unsigned int on)
-+static int sa1100_high_gpio_wake(struct irq_data *d, unsigned int on)
+-static void lh7a40x_unmask_cpld_irq (u32 irq)
++static void lh7a40x_unmask_cpld_irq(struct irq_data *d)
  {
- 	if (on)
--		PWER |= GPIO11_27_MASK(irq);
-+		PWER |= GPIO11_27_MASK(d->irq);
- 	else
--		PWER &= ~GPIO11_27_MASK(irq);
-+		PWER &= ~GPIO11_27_MASK(d->irq);
- 	return 0;
+-	switch (irq) {
++	switch (d->irq) {
+ 	case IRQ_LPD7A40X_ETH_INT:
+ 		CPLD_INTERRUPTS &= ~CPLD_INTMASK_ETHERNET;
+ 		break;
+@@ -201,17 +201,17 @@ static void lh7a40x_unmask_cpld_irq (u32 irq)
  }
  
- static struct irq_chip sa1100_high_gpio_chip = {
- 	.name		= "GPIO-h",
--	.ack		= sa1100_high_gpio_ack,
--	.mask		= sa1100_high_gpio_mask,
--	.unmask		= sa1100_high_gpio_unmask,
--	.set_type	= sa1100_gpio_type,
--	.set_wake	= sa1100_high_gpio_wake,
-+	.irq_ack	= sa1100_high_gpio_ack,
-+	.irq_mask	= sa1100_high_gpio_mask,
-+	.irq_unmask	= sa1100_high_gpio_unmask,
-+	.irq_set_type	= sa1100_gpio_type,
-+	.irq_set_wake	= sa1100_high_gpio_wake,
+ static struct irq_chip lpd7a40x_cpld_chip = {
+-	.name	= "CPLD",
+-	.ack	= lh7a40x_ack_cpld_irq,
+-	.mask	= lh7a40x_mask_cpld_irq,
+-	.unmask	= lh7a40x_unmask_cpld_irq,
++	.name		= "CPLD",
++	.irq_ack	= lh7a40x_ack_cpld_irq,
++	.irq_mask	= lh7a40x_mask_cpld_irq,
++	.irq_unmask	= lh7a40x_unmask_cpld_irq,
  };
  
- /*
-  * We don't need to ACK IRQs on the SA1100 unless they're GPIOs
-  * this is for internal IRQs i.e. from 11 to 31.
-  */
--static void sa1100_mask_irq(unsigned int irq)
-+static void sa1100_mask_irq(struct irq_data *d)
+ static void lpd7a40x_cpld_handler (unsigned int irq, struct irq_desc *desc)
  {
--	ICMR &= ~(1 << irq);
-+	ICMR &= ~(1 << d->irq);
+ 	unsigned int mask = CPLD_INTERRUPTS;
+ 
+-	desc->chip->ack (irq);
++	desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 
+ 	if ((mask & (1<<0)) == 0)	/* WLAN */
+ 		generic_handle_irq(IRQ_LPD7A40X_ETH_INT);
+@@ -221,7 +221,8 @@ static void lpd7a40x_cpld_handler (unsigned int irq, struct irq_desc *desc)
+ 		generic_handle_irq(IRQ_TOUCH);
+ #endif
+ 
+-	desc->chip->unmask (irq); /* Level-triggered need this */
++	/* Level-triggered need this */
++	desc->irq_data.chip->irq_unmask(&desc->irq_data);
  }
  
--static void sa1100_unmask_irq(unsigned int irq)
-+static void sa1100_unmask_irq(struct irq_data *d)
+ 
+diff --git a/arch/arm/mach-lh7a40x/irq-lh7a400.c b/arch/arm/mach-lh7a40x/irq-lh7a400.c
+index 1ad3afc..f2e7e65 100644
+--- a/arch/arm/mach-lh7a40x/irq-lh7a400.c
++++ b/arch/arm/mach-lh7a40x/irq-lh7a400.c
+@@ -21,34 +21,34 @@
+ 
+   /* CPU IRQ handling */
+ 
+-static void lh7a400_mask_irq (u32 irq)
++static void lh7a400_mask_irq(struct irq_data *d)
  {
--	ICMR |= (1 << irq);
-+	ICMR |= (1 << d->irq);
+-	INTC_INTENC = (1 << irq);
++	INTC_INTENC = (1 << d->irq);
  }
  
- /*
-  * Apart form GPIOs, only the RTC alarm can be a wakeup event.
-  */
--static int sa1100_set_wake(unsigned int irq, unsigned int on)
-+static int sa1100_set_wake(struct irq_data *d, unsigned int on)
+-static void lh7a400_unmask_irq (u32 irq)
++static void lh7a400_unmask_irq(struct irq_data *d)
  {
--	if (irq == IRQ_RTCAlrm) {
-+	if (d->irq == IRQ_RTCAlrm) {
- 		if (on)
- 			PWER |= PWER_RTC;
- 		else
-@@ -215,10 +215,10 @@ static int sa1100_set_wake(unsigned int irq, unsigned int on)
+-	INTC_INTENS = (1 << irq);
++	INTC_INTENS = (1 << d->irq);
+ }
  
- static struct irq_chip sa1100_normal_chip = {
- 	.name		= "SC",
--	.ack		= sa1100_mask_irq,
--	.mask		= sa1100_mask_irq,
--	.unmask		= sa1100_unmask_irq,
--	.set_wake	= sa1100_set_wake,
-+	.irq_ack	= sa1100_mask_irq,
-+	.irq_mask	= sa1100_mask_irq,
-+	.irq_unmask	= sa1100_unmask_irq,
-+	.irq_set_wake	= sa1100_set_wake,
+-static void lh7a400_ack_gpio_irq (u32 irq)
++static void lh7a400_ack_gpio_irq(struct irq_data *d)
+ {
+-	GPIO_GPIOFEOI = (1 << IRQ_TO_GPIO (irq));
+-	INTC_INTENC = (1 << irq);
++	GPIO_GPIOFEOI = (1 << IRQ_TO_GPIO (d->irq));
++	INTC_INTENC = (1 << d->irq);
+ }
+ 
+ static struct irq_chip lh7a400_internal_chip = {
+-	.name	= "MPU",
+-	.ack	= lh7a400_mask_irq, /* Level triggering -> mask is ack */
+-	.mask	= lh7a400_mask_irq,
+-	.unmask	= lh7a400_unmask_irq,
++	.name		= "MPU",
++	.irq_ack	= lh7a400_mask_irq, /* Level triggering -> mask is ack */
++	.irq_mask	= lh7a400_mask_irq,
++	.irq_unmask	= lh7a400_unmask_irq,
  };
  
- static struct resource irq_resource = {
-diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
-index c601a75..4aad01f 100644
---- a/arch/arm/mach-sa1100/neponset.c
-+++ b/arch/arm/mach-sa1100/neponset.c
-@@ -35,7 +35,7 @@ neponset_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		/*
- 		 * Acknowledge the parent IRQ.
- 		 */
--		desc->chip->ack(irq);
-+		desc->irq_data.chip->irq_ack(&desc->irq_data);
+ static struct irq_chip lh7a400_gpio_chip = {
+-	.name	= "GPIO",
+-	.ack	= lh7a400_ack_gpio_irq,
+-	.mask	= lh7a400_mask_irq,
+-	.unmask	= lh7a400_unmask_irq,
++	.name		= "GPIO",
++	.irq_ack	= lh7a400_ack_gpio_irq,
++	.irq_mask	= lh7a400_mask_irq,
++	.irq_unmask	= lh7a400_unmask_irq,
+ };
  
- 		/*
- 		 * Read the interrupt reason register.  Let's have all
-@@ -53,7 +53,7 @@ neponset_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		 * recheck the register for any pending IRQs.
- 		 */
- 		if (irr & (IRR_ETHERNET | IRR_USAR)) {
--			desc->chip->mask(irq);
-+			desc->irq_data.chip->irq_mask(&desc->irq_data);
  
- 			/*
- 			 * Ack the interrupt now to prevent re-entering
-@@ -61,7 +61,7 @@ neponset_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			 * since we'll check the IRR register prior to
- 			 * leaving.
- 			 */
--			desc->chip->ack(irq);
-+			desc->irq_data.chip->irq_ack(&desc->irq_data);
+diff --git a/arch/arm/mach-lh7a40x/irq-lh7a404.c b/arch/arm/mach-lh7a40x/irq-lh7a404.c
+index 12b045b..14b1733 100644
+--- a/arch/arm/mach-lh7a40x/irq-lh7a404.c
++++ b/arch/arm/mach-lh7a40x/irq-lh7a404.c
+@@ -43,64 +43,64 @@ static unsigned char irq_pri_vic2[] = {
  
- 			if (irr & IRR_ETHERNET) {
- 				generic_handle_irq(IRQ_NEPONSET_SMC9196);
-@@ -71,7 +71,7 @@ neponset_irq_handler(unsigned int irq, struct irq_desc *desc)
- 				generic_handle_irq(IRQ_NEPONSET_USAR);
- 			}
+   /* CPU IRQ handling */
  
--			desc->chip->unmask(irq);
-+			desc->irq_data.chip->irq_unmask(&desc->irq_data);
- 		}
+-static void lh7a404_vic1_mask_irq (u32 irq)
++static void lh7a404_vic1_mask_irq(struct irq_data *d)
+ {
+-	VIC1_INTENCLR = (1 << irq);
++	VIC1_INTENCLR = (1 << d->irq);
+ }
  
- 		if (irr & IRR_SA1111) {
+-static void lh7a404_vic1_unmask_irq (u32 irq)
++static void lh7a404_vic1_unmask_irq(struct irq_data *d)
+ {
+-	VIC1_INTEN = (1 << irq);
++	VIC1_INTEN = (1 << d->irq);
+ }
+ 
+-static void lh7a404_vic2_mask_irq (u32 irq)
++static void lh7a404_vic2_mask_irq(struct irq_data *d)
+ {
+-	VIC2_INTENCLR = (1 << (irq - 32));
++	VIC2_INTENCLR = (1 << (d->irq - 32));
+ }
+ 
+-static void lh7a404_vic2_unmask_irq (u32 irq)
++static void lh7a404_vic2_unmask_irq(struct irq_data *d)
+ {
+-	VIC2_INTEN = (1 << (irq - 32));
++	VIC2_INTEN = (1 << (d->irq - 32));
+ }
+ 
+-static void lh7a404_vic1_ack_gpio_irq (u32 irq)
++static void lh7a404_vic1_ack_gpio_irq(struct irq_data *d)
+ {
+-	GPIO_GPIOFEOI = (1 << IRQ_TO_GPIO (irq));
+-	VIC1_INTENCLR = (1 << irq);
++	GPIO_GPIOFEOI = (1 << IRQ_TO_GPIO (d->irq));
++	VIC1_INTENCLR = (1 << d->irq);
+ }
+ 
+-static void lh7a404_vic2_ack_gpio_irq (u32 irq)
++static void lh7a404_vic2_ack_gpio_irq(struct irq_data *d)
+ {
+-	GPIO_GPIOFEOI = (1 << IRQ_TO_GPIO (irq));
+-	VIC2_INTENCLR = (1 << irq);
++	GPIO_GPIOFEOI = (1 << IRQ_TO_GPIO (d->irq));
++	VIC2_INTENCLR = (1 << d->irq);
+ }
+ 
+ static struct irq_chip lh7a404_vic1_chip = {
+-	.name	= "VIC1",
+-	.ack	= lh7a404_vic1_mask_irq, /* Because level-triggered */
+-	.mask	= lh7a404_vic1_mask_irq,
+-	.unmask	= lh7a404_vic1_unmask_irq,
++	.name		= "VIC1",
++	.irq_ack	= lh7a404_vic1_mask_irq, /* Because level-triggered */
++	.irq_mask	= lh7a404_vic1_mask_irq,
++	.irq_unmask	= lh7a404_vic1_unmask_irq,
+ };
+ 
+ static struct irq_chip lh7a404_vic2_chip = {
+-	.name	= "VIC2",
+-	.ack	= lh7a404_vic2_mask_irq, /* Because level-triggered */
+-	.mask	= lh7a404_vic2_mask_irq,
+-	.unmask	= lh7a404_vic2_unmask_irq,
++	.name		= "VIC2",
++	.irq_ack	= lh7a404_vic2_mask_irq, /* Because level-triggered */
++	.irq_mask	= lh7a404_vic2_mask_irq,
++	.irq_unmask	= lh7a404_vic2_unmask_irq,
+ };
+ 
+ static struct irq_chip lh7a404_gpio_vic1_chip = {
+-	.name	= "GPIO-VIC1",
+-	.ack	= lh7a404_vic1_ack_gpio_irq,
+-	.mask	= lh7a404_vic1_mask_irq,
+-	.unmask	= lh7a404_vic1_unmask_irq,
++	.name		= "GPIO-VIC1",
++	.irq_ack	= lh7a404_vic1_ack_gpio_irq,
++	.irq_mask	= lh7a404_vic1_mask_irq,
++	.irq_unmask	= lh7a404_vic1_unmask_irq,
+ };
+ 
+ static struct irq_chip lh7a404_gpio_vic2_chip = {
+-	.name	= "GPIO-VIC2",
+-	.ack	= lh7a404_vic2_ack_gpio_irq,
+-	.mask	= lh7a404_vic2_mask_irq,
+-	.unmask	= lh7a404_vic2_unmask_irq,
++	.name		= "GPIO-VIC2",
++	.irq_ack	= lh7a404_vic2_ack_gpio_irq,
++	.irq_mask	= lh7a404_vic2_mask_irq,
++	.irq_unmask	= lh7a404_vic2_unmask_irq,
+ };
+ 
+   /* IRQ initialization */
+diff --git a/arch/arm/mach-lh7a40x/irq-lpd7a40x.c b/arch/arm/mach-lh7a40x/irq-lpd7a40x.c
+index fd033bb..1bfdcdd 100644
+--- a/arch/arm/mach-lh7a40x/irq-lpd7a40x.c
++++ b/arch/arm/mach-lh7a40x/irq-lpd7a40x.c
+@@ -20,14 +20,14 @@
+ 
+ #include "common.h"
+ 
+-static void lh7a40x_ack_cpld_irq (u32 irq)
++static void lh7a40x_ack_cpld_irq(struct irq_data *d)
+ {
+ 	/* CPLD doesn't have ack capability */
+ }
+ 
+-static void lh7a40x_mask_cpld_irq (u32 irq)
++static void lh7a40x_mask_cpld_irq(struct irq_data *d)
+ {
+-	switch (irq) {
++	switch (d->irq) {
+ 	case IRQ_LPD7A40X_ETH_INT:
+ 		CPLD_INTERRUPTS = CPLD_INTERRUPTS | 0x4;
+ 		break;
+@@ -37,9 +37,9 @@ static void lh7a40x_mask_cpld_irq (u32 irq)
+ 	}
+ }
+ 
+-static void lh7a40x_unmask_cpld_irq (u32 irq)
++static void lh7a40x_unmask_cpld_irq(struct irq_data *d)
+ {
+-	switch (irq) {
++	switch (d->irq) {
+ 	case IRQ_LPD7A40X_ETH_INT:
+ 		CPLD_INTERRUPTS = CPLD_INTERRUPTS & ~ 0x4;
+ 		break;
+@@ -50,17 +50,17 @@ static void lh7a40x_unmask_cpld_irq (u32 irq)
+ }
+ 
+ static struct irq_chip lh7a40x_cpld_chip = {
+-	.name	= "CPLD",
+-	.ack	= lh7a40x_ack_cpld_irq,
+-	.mask	= lh7a40x_mask_cpld_irq,
+-	.unmask	= lh7a40x_unmask_cpld_irq,
++	.name		= "CPLD",
++	.irq_ack	= lh7a40x_ack_cpld_irq,
++	.irq_mask	= lh7a40x_mask_cpld_irq,
++	.irq_unmask	= lh7a40x_unmask_cpld_irq,
+ };
+ 
+ static void lh7a40x_cpld_handler (unsigned int irq, struct irq_desc *desc)
+ {
+ 	unsigned int mask = CPLD_INTERRUPTS;
+ 
+-	desc->chip->ack (irq);
++	desc->irq_data.chip->ack (irq);
+ 
+ 	if ((mask & 0x1) == 0)	/* WLAN */
+ 		generic_handle_irq(IRQ_LPD7A40X_ETH_INT);
+@@ -68,7 +68,7 @@ static void lh7a40x_cpld_handler (unsigned int irq, struct irq_desc *desc)
+ 	if ((mask & 0x2) == 0)	/* Touch */
+ 		generic_handle_irq(IRQ_LPD7A400_TS);
+ 
+-	desc->chip->unmask (irq); /* Level-triggered need this */
++	desc->irq_data.chip->unmask (irq); /* Level-triggered need this */
+ }
+ 
+ 
 -- 
 1.7.1
