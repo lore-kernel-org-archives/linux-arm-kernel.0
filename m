@@ -1,306 +1,34 @@
-From: spnlinux@gmail.com (Sylwester Nawrocki)
-Date: Tue, 30 Nov 2010 23:57:14 +0100
-Subject: [PATCH 3/4] S5PC110: add MIPI-DSI support for platform and
-	machine.
-In-Reply-To: <000b01cb902e$3ba14070$b2e3c150$%dae@samsung.com>
-References: <1290496593-4927-1-git-send-email-inki.dae@samsung.com>	<4CF13AC4.3060508@gmail.com>
-	<000b01cb902e$3ba14070$b2e3c150$%dae@samsung.com>
-Message-ID: <4CF5814A.8030204@gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 30 Nov 2010 14:57:55 -0800
+Subject: [PATCH 30/54] ARM: msm: irq_data conversion.
+In-Reply-To: <20101130133700.GE15575@mail.wantstofly.org>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130133700.GE15575@mail.wantstofly.org>
+Message-ID: <1291157875.3721.18.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Inki,
+On Tue, 2010-11-30 at 14:37 +0100, Lennert Buytenhek wrote:
+> -static void msm_irq_ack(unsigned int irq)
+> +static void msm_irq_ack(struct irq_data *d)
+>  {
+> -       void __iomem *reg = VIC_INT_TO_REG_ADDR(VIC_INT_CLEAR0, irq);
+> -       irq = 1 << (irq & 31);
+> -       writel(irq, reg);
+> +       void __iomem *reg = VIC_INT_TO_REG_ADDR(VIC_INT_CLEAR0, d->irq);
+> +       writel(1 << (d->irq & 31), reg);
+>  } 
 
-On 11/30/2010 02:30 AM, Inki Dae wrote:
-> Hello, Sylwester.
-> Long time no see. :)
->
-> Thank you for your comments.
->
->> -----Original Message-----
->> From: Sylwester Nawrocki [mailto:spnlinux at gmail.com]
->> Sent: Sunday, November 28, 2010 2:07 AM
->> To: Inki Dae
->> Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> kyungmin.park at samsung.com; kgene.kim at samsung.com; akpm at linux-
->> foundation.org; lethal at linux-sh.org
->> Subject: Re: [PATCH 3/4] S5PC110: add MIPI-DSI support for platform and
->> machine.
->>
->> Hello,
->>
->> On 11/23/2010 08:16 AM, Inki Dae wrote:
->>> clock.c
->>> - added dsim clock gate.
->>>
->>> dev-dsim.c
->>> - platform and machine specific definitions.
->>> Now just supports only MACHINE GONI so for other machines,
->>> mipi_1_1v_name and mipi_1_8v_name values should be changed to
->>> proper regulator name at each machine file.
->>>
->>> setup-dsim.c
->>> - platform specific definitions.
->>>
->>> Signed-off-by: Inki Dae<inki.dae@samsung.com>
->>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->>> ---
->>>    arch/arm/mach-s5pv210/Kconfig                   |   11 ++
->>>    arch/arm/mach-s5pv210/Makefile                  |    2 +
->>>    arch/arm/mach-s5pv210/clock.c                   |    6 +
->>>    arch/arm/mach-s5pv210/dev-dsim.c                |  149
->> +++++++++++++++++++++++
->>>    arch/arm/mach-s5pv210/include/mach/map.h        |    4 +
->>>    arch/arm/mach-s5pv210/include/mach/regs-clock.h |    3 +-
->>>    arch/arm/mach-s5pv210/mach-goni.c               |   12 ++
->>>    arch/arm/mach-s5pv210/setup-dsim.c              |  144
->> ++++++++++++++++++++++
->>>    arch/arm/plat-s5p/Kconfig                       |    5 +
->>>    9 files changed, 335 insertions(+), 1 deletions(-)
->>>    create mode 100644 arch/arm/mach-s5pv210/dev-dsim.c
->>>    create mode 100644 arch/arm/mach-s5pv210/setup-dsim.c
->>>
-[snip]
->>> diff --git a/arch/arm/mach-s5pv210/dev-dsim.c b/arch/arm/mach-
->> s5pv210/dev-dsim.c
-[snip]
->>> +
->>> +static struct s5p_platform_dsim dsim_platform_data = {
->>> +	.clk_name		= "dsim",
->>> +	.mipi_1_1v_name		= "vmipi_1.1v",
->>> +	.mipi_1_8v_name		= "vmipi_1.8v",
->>
->> You could avoid passing regulator's names in here. All you need to do is
->> defining regulator supplies properly (see further comments below).
->> Creating well known (e.g. as defined in the datasheet) regulator supply
->> names in the actual driver file (s5p-dsim.c) should be enough.
->> The regulator API can be used to match a regulator and its consumer.
->>
-> Regulator's name could be changed according to machine so I think should
- > be set to Machine specific file.
+I haven't really looked over this patch set as a whole, but I was
+looking at this section and I noticed that your doing a small clean up
+here. If your doing this kind of conversion it's much nicer if you do
+any cleanups prior to submitting the conversion. Everyone might agree on
+the conversion that your doing, but when you interleave cleanups then
+people may be agreeing to things that are hidden inside the conversion..
 
-First of all it is just my suggestion, please feel free to ignore it.
-
-Regulator names are mostly different across machines but it is
-the *"regulator consumer supply"* names that are used for lookup in 
-calls like regulator_get(). In the setup code of each machine that
-wants to use mipi-dsi you could insert an entry dedicated to your
-device into the consumers array of specific regulator.
-
-On the other hand, if the number of regulators needed varies across
-machines then using platform data structure for the names might be
-a solution. But that doesn't look like your case.
-
->>> +	.dsim_info		=&dsim_info,
->>> +	.dsim_lcd_info		=&dsim_lcd_info,
->>> +
->>> +	.mipi_power		= s5p_dsim_mipi_power,
->>> +	.part_reset		= s5p_dsim_part_reset,
->>> +	.init_d_phy		= s5p_dsim_init_d_phy,
->>> +	.get_fb_frame_done	= NULL,
->>> +	.trigger		= NULL,
->>> +
->>> +	.platform_rev		= 1,
->>> +
->>> +	/*
->>> +	 * the stable time of needing to write data on SFR
->>> +	 * when the mipi mode becomes LP mode.
->>> +	 */
->>> +	.delay_for_stabilization = 600,
->>> +};
->>> +
->>> +struct platform_device s5p_device_dsim = {
->>> +	.name			= "s5p-dsim",
->>> +	.id			= 0,
->>> +	.num_resources		= ARRAY_SIZE(s5p_dsim_resource),
->>> +	.resource		= s5p_dsim_resource,
->>> +	.dev			= {
->>> +		.platform_data = (void *)&dsim_platform_data,
->>> +	},
->>> +};
->>> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
->> s5pv210/include/mach/map.h
->>> index 861d7fe..1ad2dad 100644
->>> --- a/arch/arm/mach-s5pv210/include/mach/map.h
->>> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
->>> @@ -69,6 +69,10 @@
->>>
->>>    #define S5PV210_PA_FB		(0xF8000000)
->>>
->>> +/* MIPI-DSI */
->>> +#define S5PV210_PA_DSI		(0xFA500000)
->>> +#define S5PV210_SZ_DSI		SZ_1M
->>
->> How about removing S5PV210_SZ_DSI and directly using SZ_1M in dev-dsim.c
->> ? Also, 1MB is probably excessive.
->>
->>> +
->>>    #define S5PV210_PA_FIMC0	(0xFB200000)
->>>    #define S5PV210_PA_FIMC1	(0xFB300000)
->>>    #define S5PV210_PA_FIMC2	(0xFB400000)
->>> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
->> b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
->>> index ebaabe0..c8b9366 100644
->>> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
->>> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
->>> @@ -196,7 +196,8 @@
->>>    #define S5P_OTHERS_USB_SIG_MASK		(1<<   16)
->>>
->>>    /* MIPI */
->>> -#define S5P_MIPI_DPHY_EN		(3)
->>> +#define S5P_MIPI_DPHY_EN		(3<<   0)
->>> +#define S5P_MIPI_M_RESETN		(1<<   1)
->>>
->>>    /* S5P_DAC_CONTROL */
->>>    #define S5P_DAC_ENABLE			(1)
->>> diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-
->> s5pv210/mach-goni.c
->>> index b1dcf96..500cc1b 100644
->>> --- a/arch/arm/mach-s5pv210/mach-goni.c
->>> +++ b/arch/arm/mach-s5pv210/mach-goni.c
->>> @@ -269,10 +269,18 @@ static void __init goni_tsp_init(void)
->>>    /* MAX8998 regulators */
->>>    #if defined(CONFIG_REGULATOR_MAX8998) ||
->> defined(CONFIG_REGULATOR_MAX8998_MODULE)
->>>
->>> +static struct regulator_consumer_supply goni_ldo3_consumers[] = {
->>> +	REGULATOR_SUPPLY("vmipi_1.1v", ""),
->>> +};
->>
->> You could just do:
->> 	REGULATOR_SUPPLY("vmipi_1.1v", "s5p-dsim.0"),
->>
->> The second argument is used to match your consumer device with the
->> relevant regulator supply.
->>
-> Ok, it would be corrected.
->
->> Similar could be done in other machine's board setup files and there is
->> no need to pass anything in the platform data.
->>
->> Then in your driver probe you might just do:
->>
->> ... = regulator_get(&pdev->dev, "vmipi_1.1v");
->>
-> I mentioned before.
->>> +
->>>    static struct regulator_consumer_supply goni_ldo5_consumers[] = {
->>>    	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->>>    };
->>>
->>> +static struct regulator_consumer_supply goni_ldo7_consumers[] = {
->>> +	REGULATOR_SUPPLY("vmipi_1.8v", ""),
->>> +};
->>
->> Ditto.
->>
->>> +
->>>    static struct regulator_init_data goni_ldo2_data = {
->>>    	.constraints	= {
->>>    		.name		= "VALIVE_1.1V",
->>> @@ -294,6 +302,8 @@ static struct regulator_init_data goni_ldo3_data = {
->>>    		.apply_uV	= 1,
->>>    		.always_on	= 1,
->>>    	},
->>> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo3_consumers),
->>> +	.consumer_supplies = goni_ldo3_consumers,
->>>    };
->>>
->>>    static struct regulator_init_data goni_ldo4_data = {
->>> @@ -333,6 +343,8 @@ static struct regulator_init_data goni_ldo7_data = {
->>>    		.apply_uV	= 1,
->>>    		.always_on	= 1,
->>>    	},
->>> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo7_consumers),
->>> +	.consumer_supplies = goni_ldo7_consumers,
->>>    };
->>>
->>>    static struct regulator_init_data goni_ldo8_data = {
->>> diff --git a/arch/arm/mach-s5pv210/setup-dsim.c b/arch/arm/mach-
->> s5pv210/setup-dsim.c
->>> new file mode 100644
->>> index 0000000..874efa0
->>> --- /dev/null
->>> +++ b/arch/arm/mach-s5pv210/setup-dsim.c
->>> @@ -0,0 +1,144 @@
-[snip]
->>> +
->>> +int s5p_dsim_mipi_power(struct dsim_global *dsim, struct regulator
->> *p_mipi_1_1v,
->>> +	struct regulator *p_mipi_1_8v, unsigned int enable)
->>> +{
->>> +	int ret = -1;
->>> +
->>> +	WARN_ON(dsim == NULL);
->>> +
->>> +	if (IS_ERR(p_mipi_1_1v) || IS_ERR(p_mipi_1_8v)) {
->>> +		dev_err(dsim->dev, "p_mipi_1_1v or p_mipi_1_8v is NULL.\n");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	if (enable) {
->>> +		if (p_mipi_1_1v)
->>> +			ret = regulator_enable(p_mipi_1_1v);
->>> +
->>> +		if (ret<   0) {
->>> +			dev_err(dsim->dev,
->>> +				"failed to enable regulator mipi_1_1v.\n");
->>> +			return ret;
->>> +		}
->>> +
->>> +		if (p_mipi_1_8v)
->>> +			ret = regulator_enable(p_mipi_1_8v);
->>> +
->>> +		if (ret<   0) {
->>> +			dev_err(dsim->dev,
->>> +				"failed to enable regulator mipi_1_8v.\n");
->>> +			return ret;
->>> +		}
->>> +	} else {
->>> +		if (p_mipi_1_1v)
->>> +			ret = regulator_force_disable(p_mipi_1_1v);
->>> +		if (ret<   0) {
->>> +			dev_err(dsim->dev,
->>> +				"failed to disable regulator mipi_1_1v.\n");
->>> +			return ret;
->>> +		}
->>> +
->>> +		if (p_mipi_1_8v)
->>> +			ret = regulator_force_disable(p_mipi_1_8v);
->>> +		if (ret<   0) {
->>> +			dev_err(dsim->dev,
->>> +				"failed to disable regulator mipi_1_8v.\n");
->>> +			return ret;
->>> +		}
->>> +	}
->>> +
->>> +	return ret;
->>> +}
->>
->> This function seem to be called only in the driver and it uses driver's
->> (private?) data, so can you explain what is the purpose of having it in
->> arch?
->> I suspect all the above regulator handling code could well be moved to
->> the driver. Am I missing something?
->>
-> As I said above, regulator's name is specific to machine so it would be
- > got by driver's probe and then controlled by driver.
-
-Unless you plan to use mipi_power callback outside of the driver I
-don't see a good reason for having it here.
-
-Also you are not behaving nice by using regulator_force_disable().
-IIRC it should be used only as a last resort, in critical situations.
-If the mipi-dsi subsystem shares regulator with other device you will
-be cutting off other device's power anytime you are disabling supply
-of mipi-csi. Just imagine that this "other device" is the cpu core..
-
-> Note that some machine doesn?t use regulator(gpio instead of regulator)
-
-For those you could define the fixed voltage regulator if appropriate
-and you would also get at the same time the reference counting.
-
+Daniel
 
 -- 
-Regards,
-Sylwester
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
