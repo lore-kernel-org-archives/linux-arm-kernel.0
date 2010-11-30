@@ -1,58 +1,31 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 30 Nov 2010 15:53:09 +0100
-Subject: [PATCH RESEND v3] ARM: s3c2442: Setup gpio {set,
-	get}_pull callbacks
-In-Reply-To: <201011301633.05545.anarsoul@gmail.com>
-References: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
-	<201011301401.44973.anarsoul@gmail.com>
-	<4CF4F845.7010207@metafoo.de>
-	<201011301633.05545.anarsoul@gmail.com>
-Message-ID: <4CF50FD5.1090705@metafoo.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 30 Nov 2010 14:55:17 +0000
+Subject: [PATCH] make mc13783 code generic
+In-Reply-To: <20101130143247.GI20449@pengutronix.de>
+References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
+	<1291110118.3235.27.camel@realization>
+	<20101130143247.GI20449@pengutronix.de>
+Message-ID: <20101130145517.GF32368@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2010 03:33 PM, Vasily Khoruzhick wrote:
-> On Tuesday 30 November 2010 15:12:37 Lars-Peter Clausen wrote:
-> 
->> Hi
->>
->> While this might work for setting the pullup, what to you want to return in
->> get_pull?
-> 
-> Some custom value like S3C_GPIO_PULL_ENABLED?
-Well, or we could use a custom setter and getter functions for configuring the
-pull-ups/downs.
->  
->> The reason why s3c24xx_gpiocfg_default needs to have {get,set}_pull set at
->> compile time is that the board init code is called before the cpu init
->> code. Which is in my opinion a bit odd and should be fixed instead.
-> 
-> That's because cpu init code is arch_initcall. Kernel calls mdesc-
->> init_machine before any arch_initcall function, not sure if it can be fixed 
-> without massive rework of existing code.
+On Tue, Nov 30, 2010 at 03:32:47PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Nov 30, 2010 at 10:41:58AM +0100, Alberto Panizzo wrote:
 
-Both the cpu init code and the machine init code are run at arch_initcall.
+> > PS: ./scripts/get_maintainer.pl said to cc all these guys:
 
-> 
->> If it is not fixed for whatever reason we could fallback to using some sort
->> of "cpu_is_s3c2442() ? S3C_GPIO_PULL_UP : S3C_GPIO_PULL_DOWN"
-> 
-> AFAIK, Ben does not like runtime CPUtype checks
-> 
-I prefer it over broken code. And you would only need it until the cpu init functions
-have been run.
+> > Please, use always this script to decide who have to be cc'ed by default
+> > sending patches.
 
-You would add a wrapper like:
-s3c24xx_set_pull(...)
-{
-	if (cpu_is_s3c2442())
-		s3c_gpio_setpull_1down(...)
-	else
-		s3c_gpio_setpull_1up(...)
-}
+> No, please don't.  Better use your common sense.  get_maintainer.pl is a
+> hint at best.  E.g. Axel Lin only shows up in the list, because he
+> touched several other regulator drivers and drivers/regulator/Makefile.
+> I doubt that this is enough to imply interest.
 
-And then set s3c24xx_gpiocfg_default.{set,get}_pull to those at compile time. And
-once the cpu init code runs replace them with either s3c_gpio_setpull_1down or
-s3c_gpio_setpull_1up depending on the cpu.
-
-- Lars
+Yeah, Axel is doing a lot of cleanups but he's not got an active
+interest in most of the code he's touching.  If you use the --nogit
+option (which is the default with current -next) get_maintainer.pl is a
+bit safer but you then need to think about people who might be actively
+interested in the driver but not listed in MAINTAINERS, and you still
+need to make sure that everyone you're seeing is interested (especially
+with multi-level maintianance).
