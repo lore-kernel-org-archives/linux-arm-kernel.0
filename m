@@ -1,39 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Nov 2010 14:46:30 -0000
-Subject: ARM perf events spin locks
-In-Reply-To: <20101130143141.GA2377@n2100.arm.linux.org.uk>
-References: <20101130100802.GB4398@pulham.picochip.com>
-	<004101cb907b$16f911b0$44eb3510$@deacon@arm.com>
-	<20101130105856.GC4398@pulham.picochip.com>
-	<004401cb9095$6b1fbcc0$415f3640$@deacon@arm.com>
-	<20101130135407.GH4398@pulham.picochip.com>
-	<004601cb9096$c3a5d3b0$4af17b10$@deacon@arm.com>
-	<20101130143141.GA2377@n2100.arm.linux.org.uk>
-Message-ID: <004801cb909d$6010f3a0$2032dae0$@deacon@arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 30 Nov 2010 15:53:09 +0100
+Subject: [PATCH RESEND v3] ARM: s3c2442: Setup gpio {set,
+	get}_pull callbacks
+In-Reply-To: <201011301633.05545.anarsoul@gmail.com>
+References: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
+	<201011301401.44973.anarsoul@gmail.com>
+	<4CF4F845.7010207@metafoo.de>
+	<201011301633.05545.anarsoul@gmail.com>
+Message-ID: <4CF50FD5.1090705@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I don't mind doing it as a separate patch after Russell has pulled my
-> > perf-split branch.
+On 11/30/2010 03:33 PM, Vasily Khoruzhick wrote:
+> On Tuesday 30 November 2010 15:12:37 Lars-Peter Clausen wrote:
 > 
-> You mean this?
+>> Hi
+>>
+>> While this might work for setting the pullup, what to you want to return in
+>> get_pull?
 > 
-> commit f1690d17d2c7afa2a2079e3c91eb2bca8c1c5ecd
-> Merge: 612275a 43eab87
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date:   Fri Nov 26 10:26:43 2010 +0000
+> Some custom value like S3C_GPIO_PULL_ENABLED?
+Well, or we could use a custom setter and getter functions for configuring the
+pull-ups/downs.
+>  
+>> The reason why s3c24xx_gpiocfg_default needs to have {get,set}_pull set at
+>> compile time is that the board init code is called before the cpu init
+>> code. Which is in my opinion a bit odd and should be fixed instead.
 > 
->     Merge branch 'perf-split' of git://linux-arm.org/linux-2.6-wd into devel-stable
+> That's because cpu init code is arch_initcall. Kernel calls mdesc-
+>> init_machine before any arch_initcall function, not sure if it can be fixed 
+> without massive rework of existing code.
 
-Aha, brilliant - thanks.
+Both the cpu init code and the machine init code are run at arch_initcall.
 
-> Sorry, I didn't push the tree out for a week or so because I was busy with
-> other things (like the pgtable stuff.)
+> 
+>> If it is not fixed for whatever reason we could fallback to using some sort
+>> of "cpu_is_s3c2442() ? S3C_GPIO_PULL_UP : S3C_GPIO_PULL_DOWN"
+> 
+> AFAIK, Ben does not like runtime CPUtype checks
+> 
+I prefer it over broken code. And you would only need it until the cpu init functions
+have been run.
 
-There's no rest for the weary! I'll submit the patch to fix perf for sparse
-to the patch system (I didn't realise you'd pulled my changes on Friday) and
-tackle this spinlock thing at the same time.
+You would add a wrapper like:
+s3c24xx_set_pull(...)
+{
+	if (cpu_is_s3c2442())
+		s3c_gpio_setpull_1down(...)
+	else
+		s3c_gpio_setpull_1up(...)
+}
 
-Cheers,
+And then set s3c24xx_gpiocfg_default.{set,get}_pull to those at compile time. And
+once the cpu init code runs replace them with either s3c_gpio_setpull_1down or
+s3c_gpio_setpull_1up depending on the cpu.
 
-Will
+- Lars
