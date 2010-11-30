@@ -1,17 +1,44 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 30 Nov 2010 17:01:02 +0200
-Subject: [PATCH RESEND v3] ARM: s3c2442: Setup gpio {set,
-	get}_pull callbacks
-In-Reply-To: <4CF50FD5.1090705@metafoo.de>
-References: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
-	<201011301633.05545.anarsoul@gmail.com>
-	<4CF50FD5.1090705@metafoo.de>
-Message-ID: <201011301701.03443.anarsoul@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Nov 2010 16:15:40 +0100
+Subject: [PATCH] make mc13783 code generic
+In-Reply-To: <20101130145517.GF32368@sirena.org.uk>
+References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
+	<1291110118.3235.27.camel@realization>
+	<20101130143247.GI20449@pengutronix.de>
+	<20101130145517.GF32368@sirena.org.uk>
+Message-ID: <20101130151540.GN20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 November 2010 16:53:09 Lars-Peter Clausen wrote:
+Hello Mark,
 
-> Both the cpu init code and the machine init code are run at arch_initcall.
+On Tue, Nov 30, 2010 at 02:55:17PM +0000, Mark Brown wrote:
+> On Tue, Nov 30, 2010 at 03:32:47PM +0100, Uwe Kleine-K?nig wrote:
+> > On Tue, Nov 30, 2010 at 10:41:58AM +0100, Alberto Panizzo wrote:
+> 
+> > > PS: ./scripts/get_maintainer.pl said to cc all these guys:
+> 
+> > > Please, use always this script to decide who have to be cc'ed by default
+> > > sending patches.
+> 
+> > No, please don't.  Better use your common sense.  get_maintainer.pl is a
+> > hint at best.  E.g. Axel Lin only shows up in the list, because he
+> > touched several other regulator drivers and drivers/regulator/Makefile.
+> > I doubt that this is enough to imply interest.
+> 
+> Yeah, Axel is doing a lot of cleanups but he's not got an active
+> interest in most of the code he's touching.  If you use the --nogit
+> option (which is the default with current -next) get_maintainer.pl is a
+> bit safer but you then need to think about people who might be actively
+> interested in the driver but not listed in MAINTAINERS, and you still
+> need to make sure that everyone you're seeing is interested (especially
+> with multi-level maintianance).
+I tried --nogit some time ago, but it still used git.  After looking
+again I probably should have passed --nogit-fallback, too.
 
-Yeah, you're right.
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
