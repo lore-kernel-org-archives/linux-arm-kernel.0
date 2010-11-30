@@ -1,156 +1,131 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:41:24 +0100
-Subject: [PATCH 52/54] ARM: plat-orion: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:41:28 +0100
+Subject: [PATCH 54/54] ARM: plat-stmp3xxx: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130134124.GA15575@mail.wantstofly.org>
+Message-ID: <20101130134128.GC15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/plat-orion/gpio.c |   37 ++++++++++++++++++-------------------
- arch/arm/plat-orion/irq.c  |   18 +++++++++---------
- 2 files changed, 27 insertions(+), 28 deletions(-)
+ arch/arm/plat-stmp3xxx/irq.c    |    2 +-
+ arch/arm/plat-stmp3xxx/pinmux.c |   32 ++++++++++++++++----------------
+ 2 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
-index e814803..5f35223 100644
---- a/arch/arm/plat-orion/gpio.c
-+++ b/arch/arm/plat-orion/gpio.c
-@@ -232,20 +232,19 @@ EXPORT_SYMBOL(orion_gpio_set_blink);
-  *        polarity    LEVEL          mask
-  *
-  ****************************************************************************/
--
--static void gpio_irq_ack(u32 irq)
-+static void gpio_irq_ack(struct irq_data *d)
+diff --git a/arch/arm/plat-stmp3xxx/irq.c b/arch/arm/plat-stmp3xxx/irq.c
+index 20de4e0..aaa1686 100644
+--- a/arch/arm/plat-stmp3xxx/irq.c
++++ b/arch/arm/plat-stmp3xxx/irq.c
+@@ -34,7 +34,7 @@ void __init stmp3xxx_init_irq(struct irq_chip *chip)
+ 
+ 	/* Disable all interrupts initially */
+ 	for (i = 0; i < NR_REAL_IRQS; i++) {
+-		chip->mask(i);
++		chip->irq_mask(irq_get_irq_data(i));
+ 		set_irq_chip(i, chip);
+ 		set_irq_handler(i, handle_level_irq);
+ 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+diff --git a/arch/arm/plat-stmp3xxx/pinmux.c b/arch/arm/plat-stmp3xxx/pinmux.c
+index 6d6b1a4..66d5bac 100644
+--- a/arch/arm/plat-stmp3xxx/pinmux.c
++++ b/arch/arm/plat-stmp3xxx/pinmux.c
+@@ -351,27 +351,27 @@ void stmp3xxx_release_pin_group(struct pin_group *pin_group, const char *label)
+ }
+ EXPORT_SYMBOL(stmp3xxx_release_pin_group);
+ 
+-static int stmp3xxx_irq_to_gpio(int irq,
++static int stmp3xxx_irq_data_to_gpio(struct irq_data *d,
+ 	struct stmp3xxx_pinmux_bank **bank, unsigned *gpio)
  {
--	int type = irq_desc[irq].status & IRQ_TYPE_SENSE_MASK;
-+	int type = irq_desc[d->irq].status & IRQ_TYPE_SENSE_MASK;
- 	if (type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)) {
--		int pin = irq_to_gpio(irq);
-+		int pin = irq_to_gpio(d->irq);
- 		writel(~(1 << (pin & 31)), GPIO_EDGE_CAUSE(pin));
- 	}
+ 	struct stmp3xxx_pinmux_bank *pm;
+ 
+ 	for (pm = pinmux_banks; pm < pinmux_banks + NR_BANKS; pm++)
+-		if (pm->virq <= irq && irq < pm->virq + 32) {
++		if (pm->virq <= d->irq && d->irq < pm->virq + 32) {
+ 			*bank = pm;
+-			*gpio = irq - pm->virq;
++			*gpio = d->irq - pm->virq;
+ 			return 0;
+ 		}
+ 	return -ENOENT;
  }
  
--static void gpio_irq_mask(u32 irq)
-+static void gpio_irq_mask(struct irq_data *d)
+-static int stmp3xxx_set_irqtype(unsigned irq, unsigned type)
++static int stmp3xxx_set_irqtype(struct irq_data *d, unsigned type)
  {
--	int pin = irq_to_gpio(irq);
--	int type = irq_desc[irq].status & IRQ_TYPE_SENSE_MASK;
-+	int pin = irq_to_gpio(d->irq);
-+	int type = irq_desc[d->irq].status & IRQ_TYPE_SENSE_MASK;
- 	u32 reg = (type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)) ?
- 		GPIO_EDGE_MASK(pin) : GPIO_LEVEL_MASK(pin);
- 	u32 u = readl(reg);
-@@ -253,10 +252,10 @@ static void gpio_irq_mask(u32 irq)
- 	writel(u, reg);
+ 	struct stmp3xxx_pinmux_bank *pm;
+ 	unsigned gpio;
+ 	int l, p;
+ 
+-	stmp3xxx_irq_to_gpio(irq, &pm, &gpio);
++	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+ 	switch (type) {
+ 	case IRQ_TYPE_EDGE_RISING:
+ 		l = 0; p = 1; break;
+@@ -398,33 +398,33 @@ static int stmp3xxx_set_irqtype(unsigned irq, unsigned type)
+ 	return 0;
  }
  
--static void gpio_irq_unmask(u32 irq)
-+static void gpio_irq_unmask(struct irq_data *d)
+-static void stmp3xxx_pin_ack_irq(unsigned irq)
++static void stmp3xxx_pin_ack_irq(struct irq_data *d)
  {
--	int pin = irq_to_gpio(irq);
--	int type = irq_desc[irq].status & IRQ_TYPE_SENSE_MASK;
-+	int pin = irq_to_gpio(d->irq);
-+	int type = irq_desc[d->irq].status & IRQ_TYPE_SENSE_MASK;
- 	u32 reg = (type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)) ?
- 		GPIO_EDGE_MASK(pin) : GPIO_LEVEL_MASK(pin);
- 	u32 u = readl(reg);
-@@ -264,20 +263,20 @@ static void gpio_irq_unmask(u32 irq)
- 	writel(u, reg);
+ 	u32 stat;
+ 	struct stmp3xxx_pinmux_bank *pm;
+ 	unsigned gpio;
+ 
+-	stmp3xxx_irq_to_gpio(irq, &pm, &gpio);
++	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+ 	stat = __raw_readl(pm->irqstat) & (1 << gpio);
+ 	stmp3xxx_clearl(stat, pm->irqstat);
  }
  
--static int gpio_irq_set_type(u32 irq, u32 type)
-+static int gpio_irq_set_type(struct irq_data *d, u32 type)
+-static void stmp3xxx_pin_mask_irq(unsigned irq)
++static void stmp3xxx_pin_mask_irq(struct irq_data *d)
  {
--	int pin = irq_to_gpio(irq);
-+	int pin = irq_to_gpio(d->irq);
- 	struct irq_desc *desc;
- 	u32 u;
+ 	struct stmp3xxx_pinmux_bank *pm;
+ 	unsigned gpio;
  
- 	u = readl(GPIO_IO_CONF(pin)) & (1 << (pin & 31));
- 	if (!u) {
- 		printk(KERN_ERR "orion gpio_irq_set_type failed "
--				"(irq %d, pin %d).\n", irq, pin);
-+				"(irq %d, pin %d).\n", d->irq, pin);
- 		return -EINVAL;
- 	}
+-	stmp3xxx_irq_to_gpio(irq, &pm, &gpio);
++	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+ 	stmp3xxx_clearl(1 << gpio, pm->irqen);
+ 	stmp3xxx_clearl(1 << gpio, pm->pin2irq);
+ }
  
--	desc = irq_desc + irq;
-+	desc = irq_desc + d->irq;
+-static void stmp3xxx_pin_unmask_irq(unsigned irq)
++static void stmp3xxx_pin_unmask_irq(struct irq_data *d)
+ {
+ 	struct stmp3xxx_pinmux_bank *pm;
+ 	unsigned gpio;
  
- 	/*
- 	 * Set edge/level type.
-@@ -287,7 +286,7 @@ static int gpio_irq_set_type(u32 irq, u32 type)
- 	} else if (type & (IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW)) {
- 		desc->handle_irq = handle_level_irq;
- 	} else {
--		printk(KERN_ERR "failed to set irq=%d (type=%d)\n", irq, type);
-+		printk(KERN_ERR "failed to set irq=%d (type=%d)\n", d->irq, type);
- 		return -EINVAL;
- 	}
+-	stmp3xxx_irq_to_gpio(irq, &pm, &gpio);
++	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+ 	stmp3xxx_setl(1 << gpio, pm->irqen);
+ 	stmp3xxx_setl(1 << gpio, pm->pin2irq);
+ }
+@@ -503,10 +503,10 @@ static void stmp3xxx_gpio_irq(u32 irq, struct irq_desc *desc)
+ }
  
-@@ -325,10 +324,10 @@ static int gpio_irq_set_type(u32 irq, u32 type)
- 
- struct irq_chip orion_gpio_irq_chip = {
- 	.name		= "orion_gpio_irq",
--	.ack		= gpio_irq_ack,
--	.mask		= gpio_irq_mask,
--	.unmask		= gpio_irq_unmask,
--	.set_type	= gpio_irq_set_type,
-+	.irq_ack	= gpio_irq_ack,
-+	.irq_mask	= gpio_irq_mask,
-+	.irq_unmask	= gpio_irq_unmask,
-+	.irq_set_type	= gpio_irq_set_type,
+ static struct irq_chip gpio_irq_chip = {
+-	.ack	= stmp3xxx_pin_ack_irq,
+-	.mask	= stmp3xxx_pin_mask_irq,
+-	.unmask	= stmp3xxx_pin_unmask_irq,
+-	.set_type = stmp3xxx_set_irqtype,
++	.irq_ack	= stmp3xxx_pin_ack_irq,
++	.irq_mask	= stmp3xxx_pin_mask_irq,
++	.irq_unmask	= stmp3xxx_pin_unmask_irq,
++	.irq_set_type	= stmp3xxx_set_irqtype,
  };
  
- void orion_gpio_irq_handler(int pinoff)
-diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
-index 3f9d34f..7d0c7eb 100644
---- a/arch/arm/plat-orion/irq.c
-+++ b/arch/arm/plat-orion/irq.c
-@@ -14,31 +14,31 @@
- #include <linux/io.h>
- #include <plat/irq.h>
+ int __init stmp3xxx_pinmux_init(int virtual_irq_start)
+@@ -533,7 +533,7 @@ int __init stmp3xxx_pinmux_init(int virtual_irq_start)
+ 		pm->virq = virtual_irq_start + b * 32;
  
--static void orion_irq_mask(u32 irq)
-+static void orion_irq_mask(struct irq_data *d)
- {
--	void __iomem *maskaddr = get_irq_chip_data(irq);
-+	void __iomem *maskaddr = irq_data_get_irq_chip_data(d);
- 	u32 mask;
- 
- 	mask = readl(maskaddr);
--	mask &= ~(1 << (irq & 31));
-+	mask &= ~(1 << (d->irq & 31));
- 	writel(mask, maskaddr);
- }
- 
--static void orion_irq_unmask(u32 irq)
-+static void orion_irq_unmask(struct irq_data *d)
- {
--	void __iomem *maskaddr = get_irq_chip_data(irq);
-+	void __iomem *maskaddr = irq_data_get_irq_chip_data(d);
- 	u32 mask;
- 
- 	mask = readl(maskaddr);
--	mask |= 1 << (irq & 31);
-+	mask |= 1 << (d->irq & 31);
- 	writel(mask, maskaddr);
- }
- 
- static struct irq_chip orion_irq_chip = {
- 	.name		= "orion_irq",
--	.mask		= orion_irq_mask,
--	.mask_ack	= orion_irq_mask,
--	.unmask		= orion_irq_unmask,
-+	.irq_mask	= orion_irq_mask,
-+	.irq_mask_ack	= orion_irq_mask,
-+	.irq_unmask	= orion_irq_unmask,
- };
- 
- void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
+ 		for (virq = pm->virq; virq < pm->virq; virq++) {
+-			gpio_irq_chip.mask(virq);
++			gpio_irq_chip.irq_mask(irq_get_irq_data(virq));
+ 			set_irq_chip(virq, &gpio_irq_chip);
+ 			set_irq_handler(virq, handle_level_irq);
+ 			set_irq_flags(virq, IRQF_VALID);
 -- 
 1.7.1
