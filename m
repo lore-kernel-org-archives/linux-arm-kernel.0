@@ -1,91 +1,153 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 30 Nov 2010 22:05:24 +0200
-Subject: [PATCH v4] ARM: s3c244x: Fix mess with gpio {set,
-	get}_pull callbacks
-In-Reply-To: <4CF55785.5090403@metafoo.de>
-References: <201011301701.03443.anarsoul@gmail.com>
-	<1291146383-16215-1-git-send-email-anarsoul@gmail.com>
-	<4CF55785.5090403@metafoo.de>
-Message-ID: <201011302205.24839.anarsoul@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Nov 2010 21:06:29 +0100
+Subject: [PATCH 14/15] ARM: mxs: Add initial mx28evk support
+In-Reply-To: <1290754154-9428-15-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1290754154-9428-15-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101130200629.GA20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 November 2010 21:59:01 Lars-Peter Clausen wrote:
-> On 11/30/2010 08:46 PM, Vasily Khoruzhick wrote:
-> > Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default
-> > structure are initalized via s3c_gpio_{get,set}pull_1up. This results in
-> > a linker error when only CONFIG_CPU_S3C2442 is selected:
-> > 
-> > arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
-> > `s3c_gpio_getpull_1up'
-> > arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
-> > `s3c_gpio_setpull_1up'
-> > 
-> > The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
-> > The method of controlling them is the same though.
-> > So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper
-> > functions to take an additional parameter deciding whether the pin has a
-> > pullup or pulldown. The s3c_gpio_{get,set}pull_1{down,up} functions then
-> > wrap that functions passing either S3C_GPIO_PULL_UP or
-> > S3C_GPIO_PULL_DOWN.
-> > 
-> > Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull
-> > fields in the s3c244{0,2}_map_io function to the new pulldown helper
-> > functions.
-> > 
-> > Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
-> > 
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > ---
-> > v2: adapt patch for 2.6.37-rc1
-> > v3: restore default pull callbacks, add default pull callbacks for
-> > s3c2442 v4: remove default pull callbacks, set them in per-soc map_io
-> > function instead.
-> > 
-> >  arch/arm/mach-s3c2440/Kconfig                      |    1 +
-> >  arch/arm/mach-s3c2440/s3c2440.c                    |   11 ++++-
-> >  arch/arm/mach-s3c2440/s3c2442.c                    |   14 ++++++
-> >  arch/arm/plat-s3c24xx/cpu.c                        |    8 ++--
-> >  arch/arm/plat-s3c24xx/gpiolib.c                    |    2 -
-> >  arch/arm/plat-s3c24xx/include/plat/s3c244x.h       |    7 +++-
-> >  arch/arm/plat-samsung/gpio-config.c                |   45
-> >  ++++++++++++++++---- .../plat-samsung/include/plat/gpio-cfg-helpers.h  
-> >  |   11 +++++ 8 files changed, 80 insertions(+), 19 deletions(-)
-> > 
-> > ...
-> > 
-> > +static int s3c_gpio_setpull_1(struct s3c_gpio_chip *chip,
-> > +			 unsigned int off, s3c_gpio_pull_t pull,
-> > +			 s3c_gpio_pull_t updown)
-> > 
-> >  {
-> >  
-> >  	void __iomem *reg = chip->base + 0x08;
-> >  	u32 pup = __raw_readl(reg);
-> > 
-> > -	pup = __raw_readl(reg);
-> > -
-> > -	if (pup == S3C_GPIO_PULL_UP)
-> > +	if (pup == updown)
+On Fri, Nov 26, 2010 at 02:49:13PM +0800, Shawn Guo wrote:
+> Add initial mx28evk support with duart and fec0.
 > 
-> This should be pull == updown, otherwise looks fine to me
-
-You're right. Btw, can you test this patch on your s3c24xx-machine?
-
-> >  		pup &= ~(1 << off);
-> >  	
-> >  	else if (pup == S3C_GPIO_PULL_NONE)
-> >  	
-> >  		pup |= (1 << off);
-> > 
-> > @@ -300,17 +299,45 @@ int s3c_gpio_setpull_1up(struct s3c_gpio_chip
-> > *chip,
-> > 
-> >  	return 0;
-> >  
-> >  }
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mxs/mach-mx28evk.c |  108 ++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 108 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
 > 
-> - Lars
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> new file mode 100644
+> index 0000000..901e6b1
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -0,0 +1,108 @@
+> +/*
+> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/irq.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/common.h>
+> +#include <mach/iomux-mx28.h>
+> +
+> +#include "devices-mx28.h"
+> +
+> +#define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+> +#define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+> +
+> +static iomux_cfg_t mx28evk_pads[] = {
+> +	/* duart */
+> +	MX28_PAD_PWM0__DUART_RX,
+> +	MX28_PAD_PWM1__DUART_TX,
+> +
+> +	/* fec0 */
+> +	MX28_PAD_ENET0_MDC__ENET0_MDC,
+> +	MX28_PAD_ENET0_MDIO__ENET0_MDIO,
+> +	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN,
+> +	MX28_PAD_ENET0_RXD0__ENET0_RXD0,
+> +	MX28_PAD_ENET0_RXD1__ENET0_RXD1,
+> +	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN,
+> +	MX28_PAD_ENET0_TXD0__ENET0_TXD0,
+> +	MX28_PAD_ENET0_TXD1__ENET0_TXD1,
+> +	MX28_PAD_ENET_CLK__ENET_CLK,
+> +	/* phy power line */
+> +	MX28_PAD_SSP1_DATA3__GPIO_2_15,
+> +	/* phy reset line */
+> +	MX28_PAD_ENET0_RX_CLK__GPIO_4_13,
+> +};
+> +
+> +/* fec */
+> +static inline void mx28evk_fec_reset(void)
+If the function is inlined everything is OK.  If not it should live in
+.init.text.  I suggest to remove the inline to give the compiler the
+freedom to inline it or not and mark it with __init.
 
-Regards
-Vasily
+> +{
+> +	int ret;
+> +
+> +	/* Power up fec phy */
+> +	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
+> +	if (ret) {
+> +		pr_err("Failed to request GPIO_FEC_PHY_POWER: %d\n", ret);
+> +		return;
+> +	}
+> +	gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
+technically gpio_direction_output can fail.  Not sure this matters much
+here though.
+
+> +
+> +	/* Reset fec phy */
+> +	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
+> +	if (ret) {
+> +		pr_err("Failed to request GPIO_FEC_PHY_RESET: %d\n", ret);
+You can save a few bytes here by using the same format string as above.
+Obviously you need to pass "POWER" and "RESET" as parameter for that.
+Is it worth the effort?  Up to you to decide.
+
+> +		return;
+> +	}
+> +	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
+> +	mdelay(1);
+> +	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
+> +}
+> +
+> +static const struct fec_platform_data mx28_fec_pdata __initconst = {
+> +        .phy = PHY_INTERFACE_MODE_RMII,
+> +};
+> +
+> +static void __init mx28evk_init(void)
+> +{
+> +	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
+> +
+> +	mx28_add_duart();
+> +
+> +	mx28evk_fec_reset();
+> +	mx28_add_fec0(&mx28_fec_pdata);
+> +}
+> +
+> +static void __init mx28evk_timer_init(void)
+> +{
+> +	mx28_clocks_init();
+> +}
+> +
+> +static struct sys_timer mx28evk_timer = {
+> +	.init	= mx28evk_timer_init,
+> +};
+> +
+> +MACHINE_START(MX28EVK, "Freescale MX28 EVK")
+> +	/* Maintainer: Freescale Semiconductor, Inc. */
+> +	.boot_params    = PHYS_OFFSET + 0x100,
+> +	.map_io         = mx28_map_io,
+> +	.init_irq       = mx28_init_irq,
+> +	.init_machine   = mx28evk_init,
+> +	.timer          = &mx28evk_timer,
+> +MACHINE_END
+> -- 
+> 1.7.1
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
