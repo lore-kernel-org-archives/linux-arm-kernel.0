@@ -1,48 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Nov 2010 16:21:47 +0100
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
-Message-ID: <201011301621.48140.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 30 Nov 2010 16:34:17 +0100
+Subject: [GIT PULL] AT91: 2.6.37-rc4 at91rm9200 updates
+Message-ID: <4CF51979.1070208@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 November 2010, Linus Walleij wrote:
-> 2010/11/26 Arnd Bergmann <arnd@arndb.de>:
-> 
-> > * When you say that the devices are static, I hope you do not mean
-> >  static in the C language sense. We used to allow devices to be
-> >  declared as "static struct" and registered using
-> >  platform_device_register (or other bus specific functions). This
-> >  is no longer valid and we are removing the existing users, do not
-> >  add new ones. When creating a platform device, use
-> >  platform_device_register_simple or platform_device_register_resndata.
-> 
-> Is this part of the generic ARM runtime multi-platform kernel
-> and device trees shebang?
-> 
-> The Ux500 still isn't in that sector, it needs extensive rewriting
-> of arch/arm/mach-ux500 to be done first, so as to support e.g.
-> U8500 and U5500 with a single kernel image.
-> 
-> Trying to skin that cat that as part of this review is a bit too
-> much to ask IMO, I'd rather have the author of this driver
-> adapt to whatever platform data registration mechanism is
-> in place for the merge window. Else it needs fixing as part
-> of a bigger endavour to root out compile-time platform
-> configuration.
+Hi Linus,
 
-The 'no static devices' rule is something that Greg brought up
-at the embedded developer session during PlumbersConf this year,
-I wasn't aware of the problem before that either.
+Could you please pull the following:
 
-It is not related to the multi-platform kernel work and it's
-not ARM specific.
+  git://github.com/at91linux/linux-2.6-at91.git for_linus
 
-Maybe Greg can give a short explanation of the impact of this.
-AFAIR, static device definitions still work, but there are
-plans to remove that capability in the future.
+This contains a set of AT91 updates since 2.6.37-rc4 based on your tree:
+commit e8a7e48bb248a1196484d3f8afa53bded2b24e71
 
-	Arnd
+It removes several at91rm9200 defconfig and fixes issues and warnings
+dicovered while testing it. This series has been reviewed on 
+ARM mailing list.
+
+Eric Benard (1):
+      at91: merge all at91rm9200 defconfig in one single file
+
+Jean-Christophe PLAGNIOL-VILLARD (7):
+      at91: Convert remaining boards to new-style UART initialization
+      at91rm9200dk: fix warning: 'dk_mmc_data' defined but not used
+      at91rm9200ek: fix warning: 'ek_mmc_data' defined but not used
+      at91: rename rm9200ek and rm9200dk board file name
+      at91/picotux200: remove commenting usb device and dataflash support
+      atmel_spi: fix warning In function 'atmel_spi_dma_map_xfer'
+      at91/board-yl-9200: fix typo in video support
+
+ arch/arm/configs/at91rm9200_defconfig              |  341 ++++++++++++++++++++
+ arch/arm/configs/at91rm9200dk_defconfig            |   72 ----
+ arch/arm/configs/at91rm9200ek_defconfig            |   73 -----
+ arch/arm/configs/ateb9200_defconfig                |  131 --------
+ arch/arm/configs/carmeva_defconfig                 |   47 ---
+ arch/arm/configs/cpuat91_defconfig                 |  112 -------
+ arch/arm/configs/csb337_defconfig                  |  104 ------
+ arch/arm/configs/csb637_defconfig                  |   98 ------
+ arch/arm/configs/ecbat91_defconfig                 |   99 ------
+ arch/arm/configs/kafa_defconfig                    |   61 ----
+ arch/arm/configs/kb9202_defconfig                  |  127 --------
+ arch/arm/configs/onearm_defconfig                  |   80 -----
+ arch/arm/configs/picotux200_defconfig              |  242 --------------
+ arch/arm/configs/yl9200_defconfig                  |  137 --------
+ arch/arm/mach-at91/Makefile                        |    4 +-
+ arch/arm/mach-at91/at91rm9200_devices.c            |   45 ---
+ arch/arm/mach-at91/board-1arm.c                    |   26 +-
+ arch/arm/mach-at91/board-kafa.c                    |   21 +-
+ arch/arm/mach-at91/board-picotux200.c              |   53 +---
+ .../arm/mach-at91/{board-dk.c => board-rm9200dk.c} |    4 +-
+ .../arm/mach-at91/{board-ek.c => board-rm9200ek.c} |    4 +-
+ arch/arm/mach-at91/board-yl-9200.c                 |    2 +-
+ arch/arm/mach-at91/include/mach/board.h            |    6 -
+ drivers/spi/atmel_spi.c                            |    6 +-
+ 24 files changed, 386 insertions(+), 1509 deletions(-)
+ create mode 100644 arch/arm/configs/at91rm9200_defconfig
+ delete mode 100644 arch/arm/configs/at91rm9200dk_defconfig
+ delete mode 100644 arch/arm/configs/at91rm9200ek_defconfig
+ delete mode 100644 arch/arm/configs/ateb9200_defconfig
+ delete mode 100644 arch/arm/configs/carmeva_defconfig
+ delete mode 100644 arch/arm/configs/cpuat91_defconfig
+ delete mode 100644 arch/arm/configs/csb337_defconfig
+ delete mode 100644 arch/arm/configs/csb637_defconfig
+ delete mode 100644 arch/arm/configs/ecbat91_defconfig
+ delete mode 100644 arch/arm/configs/kafa_defconfig
+ delete mode 100644 arch/arm/configs/kb9202_defconfig
+ delete mode 100644 arch/arm/configs/onearm_defconfig
+ delete mode 100644 arch/arm/configs/picotux200_defconfig
+ delete mode 100644 arch/arm/configs/yl9200_defconfig
+ rename arch/arm/mach-at91/{board-dk.c => board-rm9200dk.c} (98%)
+ rename arch/arm/mach-at91/{board-ek.c => board-rm9200ek.c} (98%)
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
