@@ -1,34 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 29 Nov 2010 22:10:49 -0200
-Subject: [PATCH] ARM: imx: Add mx53 changes to crm_regs
-In-Reply-To: <1291071265-4238-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1291071265-4238-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <AANLkTikbroTO6A=1_nBrO=y-O-MiGgtZAN5tg32+4-c=@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 30 Nov 2010 09:23:13 +0900
+Subject: [GIT PULL] Samsung fixes for 2.6.37-rc4
+In-Reply-To: <4CEFFBE6.9040909@gmail.com>
+References: <008201cb8c58$363980e0$a2ac82a0$%kim@samsung.com>
+	<4CEFFBE6.9040909@gmail.com>
+Message-ID: <006601cb9024$c9369110$5ba3b330$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Darius Augulis wrote:
+> 
+> Hi Kukjin,
+> 
+Hi,
 
-On Mon, Nov 29, 2010 at 8:54 PM,  <Dinh.Nguyen@freescale.com> wrote:
-...
->
-> ?/* eSDHC */
-> -CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC1)
-> -CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC1)
-> -CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC1)
-> +CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC2)
-> +CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC2)
-> +CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC2)
->
-> -CLK_GET_RATE(esdhc2, 1, ESDHC2_MSHC2)
-> -CLK_SET_PARENT(esdhc2, 1, ESDHC2_MSHC2)
-> -CLK_SET_RATE(esdhc2, 1, ESDHC2_MSHC2)
-> +CLK_GET_RATE(esdhc2, 1, ESDHC2_3_MSHC2)
-> +CLK_SET_PARENT(esdhc2, 1, ESDHC2_3_MSHC2)
-> +CLK_SET_RATE(esdhc2, 1, ESDHC2_3_MSHC2)
+> you have missed "serial: samsung: fix device name" again.
+> Please, don't forget to add it to your tree, better do it right now.
+> Perhaps it's fifth or sixth time when remind about that...
+> 
+I remember, I've replied about that like following.
+Maybe you missed...
 
-Shouldn?t this be part of another patch?
+---
+> you have missed "serial: samsung: fix device name" which is hanging here
+> for a long time and was decided to merge in 2.6.37-rc1.
+> Please, pick it up.
+> 
+Hmm...I thought it should be handled by Ben Dooks at that time.
 
-Regards,
+Anyway, as Ben said, I'm thinking it should be sent upstream when merge
+window
+even though have missed it in the last merge window.
 
-Fabio Estevam
+However, if Ben is ok to merge this during 37-rc, will merge it into
+s5p-fixes-
+for-linus for 37-rc.
+---
+
+But I still thinking it should be handled by Ben Dooks...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
