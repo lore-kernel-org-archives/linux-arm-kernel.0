@@ -1,98 +1,258 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Tue, 30 Nov 2010 09:15:05 +0100 (CET)
-Subject: [PATCH] ARM: Gemini: Add support for PCI BUS
-In-Reply-To: <4CF40AEF.7070200@gmail.com>
-References: <1290860675-15453-1-git-send-email-ulli.kroll@googlemail.com>
-	<201011291745.22566.arnd@arndb.de> <4CF3F687.6040801@gmail.com>
-	<201011292102.41155.arnd@arndb.de> <4CF40AEF.7070200@gmail.com>
-Message-ID: <alpine.LNX.2.00.1011300910260.7489@localhost.localdomain>
+From: jekhor@gmail.com (Yauhen Kharuzhy)
+Date: Tue, 30 Nov 2010 10:21:52 +0200
+Subject: [PATCH 02/10] ARM S3C2416: Add address map and clock
+	definitions for HSMMC0
+In-Reply-To: <001b01cb905f$27aea180$770be480$%kim@samsung.com>
+References: <1290969027-10178-1-git-send-email-jekhor@gmail.com>
+	<1290969027-10178-2-git-send-email-jekhor@gmail.com>
+	<001b01cb905f$27aea180$770be480$%kim@samsung.com>
+Message-ID: <20101130082152.GA19722@jeknote.loshitsa1.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 29 Nov 2010, Paulius Zaleckas wrote:
-
-> On 11/29/2010 10:02 PM, Arnd Bergmann wrote:
-> > On Monday 29 November 2010 19:52:55 Paulius Zaleckas wrote:
-> > > On 11/29/2010 06:45 PM, Arnd Bergmann wrote:
-> > > > There are many differences between readl and __raw_readl, including
-> > > >
-> > > > * __raw_readl does not have barriers and does not serialize with
-> > > >     spinlocks, so it breaks on out-of-order CPUs.
-> > > > * __raw_readl does not have a specific endianess, while readl is
-> > > >     fixed little-endian, just as the hardware is in this case.
-> > > >     The endian-conversion is a NOP on little-endian ARM, but required
-> > > >     if you actually run on a big-endian ARM (you don't).
-> > > > * __raw_readl may not be atomic, gcc is free to split the access
-> > > >     into byte wise reads (it normally does not, unless you mark
-> > > >     the pointer __attribute__((packed))).
-> > > >
-> > > > In essence, it is almost never a good idea to use __raw_readl, and
-> > > > the double underscores should tell you so.
-> > >
-> > > You are wrong:
-> > >
-> > > Since CONFIG_ARM_DMA_MEM_BUFFERABLE is NOT defined for FA526 core,
-> > > no barriers are in use when using readl. It just translates into
-> > > le32_to_cpu(__raw_readl(x)). Now this CPU has physical pin for endianess
-> > > configuration and if you will chose big-endian you will fail to read
-> > > internal registers, because they ALSO change endianess and le32_to_cpu()
-> > > will screw it. However it is different when accessing registers through
-> > > PCI bus, then you need to use readl().
-> >
-> > Ok, I only checked that the platform does not support big-endian Linux
-> > kernel, not if the HW designers screwed up their registers, sorry about
-> > that.
-> >
-> > The other points are of course still valid: If the code ever gets
-> > used on an out of order CPU, it is broken. More importantly, if someone
-> > looks at the code as an example for writing another PCI support code,
-> > it may end up getting copied to some place where it ends up causing
-> > trouble.
-> >
-> > The typical way to deal with mixed-endian hardware reliably is to have
-> > a header file containing code like
-> >
-> > #ifdef CONFIG_GEMINI_BIG_ENDIAN_IO
-> > #define gemini_readl(x) __swab32(readl(x))
-> > #define ...
-> > #else
-> > #define gemini_readl(x) readl(x))
-> > #endif
-> >
-> > This also takes care of the (not as unlikely as you'd hope) case that
-> > the next person reusing the PCI hardware wires its endianess different
-> > from the CPU endianess.
+On Tue, Nov 30, 2010 at 04:21:01PM +0900, Kukjin Kim wrote:
+> Yauhen Kharuzhy wrote:
+> > 
+> > Define maps for HSMMC devices.
+> > 
+> > S3C2443 has one HSMMC device with base address 0x4A800000.
 > 
-> Actually I am not very sure how CPU works in big endian mode :)
-> I have never tried it and I think only some guys who made it did that.
-> So readl will work for 99.99% of cases. In datasheet they say that:
-> "All registers in Gemini use Little Endian and must be accessed by aligned
-> 32-bit word operations. The bus connection interface logic provides an Endian
-> Conversion function."
-> For me it looks like it can mean whatever you want :)
+> Hmm...according to data sheet, there are two SD/MMC on S3C2443.
+> The base address of channel 0 is 0x4A800000 and channel 1 is 0x5A000000.
+> So, need to update your patch.
+
+No. 0x5A000000 is old-style SD Interface, HSMMC is SDHCI. They are
+handled by different drivers.
+
+> 
+> > S3C2416 has HSMMC0 at 0x4AC00000 and HSMMC1 at 0x4A800000.
+> > 
+> > So suppose that S3C2443 has only HSMMC1.
+> > 
+> Hmm...
+> 
+> > Define clock for hsmmc0 device and register it.
+> > 
+> > Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+> 
+> I meant you used different here so asked...anyway...
+> 
+> > ---
+> >  arch/arm/mach-s3c2410/include/mach/irqs.h          |    4 ++--
+> >  arch/arm/mach-s3c2410/include/mach/map.h           |    4 ++--
+> >  .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
+> >  arch/arm/mach-s3c2416/clock.c                      |   18
+> +++++++++++++-----
+> >  arch/arm/mach-s3c2443/Kconfig                      |    2 +-
+> >  arch/arm/mach-s3c2443/clock.c                      |    4 ++--
+> >  arch/arm/mach-s3c2443/mach-smdk2443.c              |    2 +-
+> >  arch/arm/plat-s3c24xx/s3c2443-clock.c              |    2 +-
+> >  8 files changed, 23 insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-s3c2410/include/mach/irqs.h b/arch/arm/mach-
+> > s3c2410/include/mach/irqs.h
+> > index 11bb0f0..e5a68ea 100644
+> > --- a/arch/arm/mach-s3c2410/include/mach/irqs.h
+> > +++ b/arch/arm/mach-s3c2410/include/mach/irqs.h
+> > @@ -152,8 +152,8 @@
+> > 
+> >  #define IRQ_S3C2416_HSMMC0	S3C2410_IRQ(21)		/*
+> > S3C2416/S3C2450 */
+> > 
+> > -#define IRQ_HSMMC0		IRQ_S3C2443_HSMMC
+> > -#define IRQ_HSMMC1		IRQ_S3C2416_HSMMC0
+> > +#define IRQ_HSMMC0		IRQ_S3C2416_HSMMC0
+> > +#define IRQ_HSMMC1		IRQ_S3C2443_HSMMC
+> > 
+> Hmm...yeah, IRQ_HSMMC0 is (21) and IRQ_HSMMC1 is (20).
+> 
+> >  #define IRQ_S3C2443_LCD1	S3C2410_IRQSUB(14)
+> >  #define IRQ_S3C2443_LCD2	S3C2410_IRQSUB(15)
+> > diff --git a/arch/arm/mach-s3c2410/include/mach/map.h b/arch/arm/mach-
+> > s3c2410/include/mach/map.h
+> > index cd3983a..25bbf5a 100644
+> > --- a/arch/arm/mach-s3c2410/include/mach/map.h
+> > +++ b/arch/arm/mach-s3c2410/include/mach/map.h
+> > @@ -112,8 +112,8 @@
+> >  #define S3C_PA_IIC          S3C2410_PA_IIC
+> >  #define S3C_PA_UART	    S3C24XX_PA_UART
+> >  #define S3C_PA_USBHOST	S3C2410_PA_USBHOST
+> > -#define S3C_PA_HSMMC0	    S3C2443_PA_HSMMC
+> > -#define S3C_PA_HSMMC1	    S3C2416_PA_HSMMC0
+> > +#define S3C_PA_HSMMC0	    S3C2416_PA_HSMMC0
+> > +#define S3C_PA_HSMMC1	    S3C2443_PA_HSMMC
+> 
+> Please refer to my previous comment.
+> S3C2443 has 2 channel.
+> 
+> >  #define S3C_PA_WDT	    S3C2410_PA_WATCHDOG
+> >  #define S3C_PA_NAND	    S3C24XX_PA_NAND
+> > 
+> > diff --git a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
+> > b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
+> > index 101aeea..44494a5 100644
+> > --- a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
+> > +++ b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
+> > @@ -86,6 +86,7 @@
+> >  #define S3C2443_HCLKCON_LCDC		(1<<9)
+> >  #define S3C2443_HCLKCON_USBH		(1<<11)
+> >  #define S3C2443_HCLKCON_USBD		(1<<12)
+> > +#define S3C2416_HCLKCON_HSMMC0		(1<<15)
+> 
+> Right.
+> 
+> >  #define S3C2443_HCLKCON_HSMMC		(1<<16)
+> >  #define S3C2443_HCLKCON_CFC		(1<<17)
+> >  #define S3C2443_HCLKCON_SSMC		(1<<18)
+> > diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
+> > index 7ccf5a2..3b02d85 100644
+> > --- a/arch/arm/mach-s3c2416/clock.c
+> > +++ b/arch/arm/mach-s3c2416/clock.c
+> > @@ -38,12 +38,11 @@ static unsigned int armdiv[8] = {
+> >  	[7] = 8,
+> >  };
+> > 
+> > -/* ID to hardware numbering, 0 is HSMMC1, 1 is HSMMC0 */
+> 
+> Why remove?
+Now 0 is HSMMC0 and 1 is HSMMC1. I think that this should be obviously
+without comment.
+> 
+> >  static struct clksrc_clk hsmmc_div[] = {
+> >  	[0] = {
+> >  		.clk = {
+> >  			.name	= "hsmmc-div",
+> > -			.id	= 1,
+> > +			.id	= 0,
+> >  			.parent	= &clk_esysclk.clk,
+> >  		},
+> >  		.reg_div = { .reg = S3C2416_CLKDIV2, .size = 2, .shift = 6
+> },
+> > @@ -51,7 +50,7 @@ static struct clksrc_clk hsmmc_div[] = {
+> >  	[1] = {
+> >  		.clk = {
+> >  			.name	= "hsmmc-div",
+> > -			.id	= 0,
+> > +			.id	= 1,
+> >  			.parent	= &clk_esysclk.clk,
+> >  		},
+> >  		.reg_div = { .reg = S3C2443_CLKDIV1, .size = 2, .shift = 6
+> },
+> > @@ -61,7 +60,7 @@ static struct clksrc_clk hsmmc_div[] = {
+> >  static struct clksrc_clk hsmmc_mux[] = {
+> >  	[0] = {
+> >  		.clk	= {
+> > -			.id	= 1,
+> > +			.id	= 0,
+> >  			.name	= "hsmmc-if",
+> >  			.ctrlbit = (1 << 6),
+> >  			.enable = s3c2443_clkcon_enable_s,
+> > @@ -77,7 +76,7 @@ static struct clksrc_clk hsmmc_mux[] = {
+> >  	},
+> >  	[1] = {
+> >  		.clk	= {
+> > -			.id	= 0,
+> > +			.id	= 1,
+> >  			.name	= "hsmmc-if",
+> >  			.ctrlbit = (1 << 12),
+> >  			.enable = s3c2443_clkcon_enable_s,
+> > @@ -93,6 +92,13 @@ static struct clksrc_clk hsmmc_mux[] = {
+> >  	},
+> >  };
+> > 
+> > +static struct clk hsmmc0_clk = {
+> > +	.name		= "hsmmc",
+> > +	.id		= 0,
+> > +	.parent		= &clk_h,
+> > +	.enable		= s3c2443_clkcon_enable_h,
+> > +	.ctrlbit	= S3C2416_HCLKCON_HSMMC0,
+> > +};
+> > 
+> >  static inline unsigned int s3c2416_fclk_div(unsigned long clkcon0)
+> >  {
+> > @@ -130,6 +136,8 @@ void __init s3c2416_init_clocks(int xtal)
+> >  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+> >  		s3c_register_clksrc(clksrcs[ptr], 1);
+> > 
+> > +	s3c24xx_register_clock(&hsmmc0_clk);
+> > +
+> >  	s3c_pwmclk_init();
+> > 
+> >  }
+> > diff --git a/arch/arm/mach-s3c2443/Kconfig b/arch/arm/mach-s3c2443/Kconfig
+> > index 4fef723..0b7f0d6 100644
+> > --- a/arch/arm/mach-s3c2443/Kconfig
+> > +++ b/arch/arm/mach-s3c2443/Kconfig
+> > @@ -24,7 +24,7 @@ config MACH_SMDK2443
+> >  	bool "SMDK2443"
+> >  	select CPU_S3C2443
+> >  	select MACH_SMDK
+> > -	select S3C_DEV_HSMMC
+> > +	select S3C_DEV_HSMMC1
+> 
+> Please check S3C2443's HSMMC...
+> 
+> >  	help
+> >  	  Say Y here if you are using an SMDK2443
+> > 
+> > diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
+> > index 0c3c0c8..f4ec6d5 100644
+> > --- a/arch/arm/mach-s3c2443/clock.c
+> > +++ b/arch/arm/mach-s3c2443/clock.c
+> > @@ -196,7 +196,7 @@ static struct clksrc_clk clk_hsspi = {
+> >  static struct clksrc_clk clk_hsmmc_div = {
+> >  	.clk	= {
+> >  		.name		= "hsmmc-div",
+> > -		.id		= -1,
+> > +		.id		= 1,
+> >  		.parent		= &clk_esysclk.clk,
+> >  	},
+> >  	.reg_div = { .reg = S3C2443_CLKDIV1, .size = 2, .shift = 6 },
+> > @@ -231,7 +231,7 @@ static int s3c2443_enable_hsmmc(struct clk *clk, int
+> > enable)
+> > 
+> >  static struct clk clk_hsmmc = {
+> >  	.name		= "hsmmc-if",
+> > -	.id		= -1,
+> > +	.id		= 1,
+> >  	.parent		= &clk_hsmmc_div.clk,
+> >  	.enable		= s3c2443_enable_hsmmc,
+> >  	.ops		= &(struct clk_ops) {
+> > diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-
+> > s3c2443/mach-smdk2443.c
+> > index 4337f0a..d3b2922 100644
+> > --- a/arch/arm/mach-s3c2443/mach-smdk2443.c
+> > +++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
+> > @@ -105,7 +105,7 @@ static struct s3c2410_uartcfg smdk2443_uartcfgs[]
+> > __initdata = {
+> >  static struct platform_device *smdk2443_devices[] __initdata = {
+> >  	&s3c_device_wdt,
+> >  	&s3c_device_i2c0,
+> > -	&s3c_device_hsmmc0,
+> > +	&s3c_device_hsmmc1,
+> >  #ifdef CONFIG_SND_SOC_SMDK2443_WM9710
+> >  	&s3c_device_ac97,
+> >  #endif
+> > diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-
+> > s3c24xx/s3c2443-clock.c
+> > index 461f070..82f2d4a 100644
+> > --- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
+> > +++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+> > @@ -271,7 +271,7 @@ static struct clk init_clocks[] = {
+> >  		.ctrlbit	= S3C2443_HCLKCON_DMA5,
+> >  	}, {
+> >  		.name		= "hsmmc",
+> > -		.id		= 0,
+> > +		.id		= 1,
+> >  		.parent		= &clk_h,
+> >  		.enable		= s3c2443_clkcon_enable_h,
+> >  		.ctrlbit	= S3C2443_HCLKCON_HSMMC,
+> > --
 > 
 
-I think the endianes pin switched only the cpu, not the hardware 
-registers.
+-- 
+Yauhen Kharuzhy		jekhor _at_ gmail.com
+			JID: jek at jabber.ru
 
-Here is some sample code from the ethernet devive on Gemini
-typedef union
-{
-	unsigned int bits32;
-	struct bit
-	{
-#if (BIG_ENDIAN==1)
-		unsigned int reserved		: 15;	// bit 31:17
-		unsigned int v_bit_mode		: 1;	// bit 16
-		unsigned int device_id		: 12;	// bit 15:4
-		unsigned int revision_id	: 4;	// bit  3:0
-#else
-		unsigned int revision_id	: 4;	// bit  3:0
-		unsigned int device_id		: 12;	// bit 15:4
-		unsigned int v_bit_mode		: 1;	// bit 16
-		unsigned int reserved		: 15;	// bit 31:17
-#endif
-	} bits;
-} TOE_VERSION_T;
+A: No
+Q: Should I quote below my post?
