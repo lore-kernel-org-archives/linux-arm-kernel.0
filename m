@@ -1,44 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Nov 2010 14:05:38 -0000
-Subject: [PATCH][ ARM cpu hotplug 1/2 ] extract common code for arm
-	cpu	hotplug
-In-Reply-To: <20101130115148.GB31054@n2100.arm.linux.org.uk>
-References: <AANLkTi=fJeOUhH0xUJF8qx-fTJ5popE7ZuVxDZXpTH-i@mail.gmail.com>	<AANLkTimz=xv92c6FN4i4c3Xs-t71L4PHv3SQg0jk-x-r@mail.gmail.com>	<20101129104149.GA10703@n2100.arm.linux.org.uk>	<AANLkTikHv+Rz7+bZY8Qo2drUQO4fjhJgqORcGFB7B6s7@mail.gmail.com>	<20101129192407.GA20761@n2100.arm.linux.org.uk>	<AANLkTimZfnmVMDZ2faUPpDHHv3oAhM9ZcVEpM0_MyHbq@mail.gmail.com>	<20101130110331.GA31054@n2100.arm.linux.org.uk>
-	<20101130115148.GB31054@n2100.arm.linux.org.uk>
-Message-ID: <004701cb9097$ab173f40$0145bdc0$@deacon@arm.com>
+From: htejun@gmail.com (Tejun Heo)
+Date: Tue, 30 Nov 2010 15:08:52 +0100
+Subject: Cannot detect SATA disks w/ CONFIG_SATA_PMP w/o actually using
+	SATA multiplier
+In-Reply-To: <AANLkTi=kbTcq3hYBiDzGcAb02Ppwb1QEcs12-1W_T=LG@mail.gmail.com>
+References: <AANLkTi=kbTcq3hYBiDzGcAb02Ppwb1QEcs12-1W_T=LG@mail.gmail.com>
+Message-ID: <4CF50574.6000706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-> On Tue, Nov 30, 2010 at 11:03:31AM +0000, Russell King - ARM Linux wrote:
-> > I see no point to what is being proposed in this thread.  It's _soo_
-> > little code that the platforms have to implement that it really is
-> > not worth the effort.
-
-[...]
-
-> Note also that most implementations of this get it wrong.  Realview
-> assumes ARMv6 MPcore layout of the auxcontrol register, which is
-> cut'n'pasted into s5pv310 (ARMv7) and Tegra (ARMv7) without thinking.
-> The only implementation which has put some thought into it is the
-> UX500 one, which is extremely simple.
+On 11/30/2010 05:02 AM, Lin Mac wrote:
+> Hi,
 > 
-> So, out of the four existing implementations, at least two need fixing
-> to be different, and I'll bet that they do have some way to power down
-> the offlined CPUs for greater power savings.
+> I found that if I enabled CONFIG_SATA_PMP while not using multiplier
+> and connect the disks directly to the board, the disk cannot be found
+> due to software reset always failed.
+> 
+> With arm/cns3xxx
+> linux-2.6.37-rc3
+> ahci-platform driver
+> 
+> # modprobe ahci-platform
+> [   12.790000] ahci ahci.0: forcing PORTS_IMPL to 0x3
+> [   12.800000] ahci ahci.0: AHCI 0001.0100 32 slots 2 ports 3 Gbps 0x3
+> impl platform mode
+> [   12.810000] ahci ahci.0: flags: ncq sntf pm led clo only pmp pio
+> slum part ccc
+> [   12.850000] scsi0 : ahci_platform
+> [   12.860000] scsi1 : ahci_platform
+> [   12.870000] ata1: SATA max UDMA/133 irq_stat 0x00400040, connection
+> status changed irq 65
+> [   12.880000] ata2: SATA max UDMA/133 mmio [mem
+> 0x83000000-0x83ffffff] port 0x180 irq 65
+> [   13.240000] ata2: SATA link down (SStatus 0 SControl 300)
+> [   18.900000] ata1: link is slow to respond, please be patient (ready=0)
+> [   22.930000] ata1: softreset failed (device not ready)
+> [   28.940000] ata1: link is slow to respond, please be patient (ready=0)
+> [   32.970000] ata1: softreset failed (device not ready)
+> [   38.980000] ata1: link is slow to respond, please be patient (ready=0)
+> [   68.030000] ata1: softreset failed (device not ready)
+> [   68.040000] ata1: limiting SATA link speed to 1.5 Gbps
+> [   70.280000] ata1: SATA link down (SStatus 1 SControl 310)
+> 
+> With some debug, ahci_check_ready always get PORT_TFDATA(20)=0x1d0
+> 
+> While using multiplier with CONFIG_SATA_PMP enabled, or using disks
+> directly without CONFIG_SATA_PMP have no issue.
+> After some googling, it seems common and the only fix is to disable
+> CONFIG_SATA_PMP.
+> So, before I keep on going, I would like to know whether this is a
+> limitation, or a bug?
 
-I have patches that fix this for RealView and Versatile Express, I posted
-them to the list in the past (note that these are now out of date):
+Most likely a quirk in the controller.  Maybe we should disable PMP
+support for it?
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-September/026160.html
-
-I have a newer version here:
-
-git://linux-arm.org/linux-2.6-wd.git cpu-hotplug
-
-but it relies on the Versatile Express multi-tile patches that I'm posting at
-the moment. If the hotplug APIs aren't about to change fundamentally, then
-I'll repost these patches once the multi-tile stuff is accepted.
-
-Will
+-- 
+tejun
