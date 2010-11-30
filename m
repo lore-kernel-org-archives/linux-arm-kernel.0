@@ -1,22 +1,37 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Tue, 30 Nov 2010 20:04:38 +0100
-Subject: [PATCH] Kirkwood: Add support for 6282 based QNAP devices
-In-Reply-To: <20101130155457.GR7487@jirafa.cyrius.com>
-References: <20101129174440.GA14799@jirafa.cyrius.com>
-	<19700.59967.284644.290002@pilspetsen.it.uu.se>
-	<20101130155457.GR7487@jirafa.cyrius.com>
-Message-ID: <19701.19142.690387.121589@pilspetsen.it.uu.se>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 30 Nov 2010 17:13:36 -0200
+Subject: [PATCH v2] ARM: mx5: fix keypad clock name
+Message-ID: <1291144416-25197-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Michlmayr writes:
- > * Mikael Pettersson <mikpe@it.uu.se> [2010-11-30 13:12]:
- > > Slightly off-topic, but AFAIK the 6282 is rated for up to 2.0 GHz
- > > clock speed, while QNap writes that these devices run at 1.6 GHz.
- > > Do you know if QNap has artificially rate-limited the processors,
- > > or if they're actually manufactured to only go up to 1.6 GHz?
- > 
- > There are different variants of the 6282, operating at 1.6 GHz, 1.8
- > GHz and 2.0 GHz.
+This fixes the following error during keypad driver probe:
 
-Ok.  Thanks.
+imx-keypad imx-keypad: failed to get keypad clock
+imx-keypad: probe of imx-keypad failed with error -2
+
+commit 3f88014 (ARM: imx: dynamically allocate imx-keypad devices)
+uses id=-1 for imx_kpp_device, so change the clock name accordingly.
+
+Tested keypad successfully on a MX51_3DS board.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 344ee8e..57fea05 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1091,7 +1091,7 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
+-	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
++	_REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
+ 	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
+ 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+-- 
+1.6.0.4
