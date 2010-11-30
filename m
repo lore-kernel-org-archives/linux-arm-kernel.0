@@ -1,80 +1,69 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:41:13 +0100
-Subject: [PATCH 42/54] ARM: shark: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:41:15 +0100
+Subject: [PATCH 44/54] ARM: stmp37xx: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130134113.GQ15575@mail.wantstofly.org>
+Message-ID: <20101130134115.GS15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-shark/irq.c |   26 +++++++++++++-------------
- 1 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/mach-stmp37xx/stmp37xx.c |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-shark/irq.c b/arch/arm/mach-shark/irq.c
-index c04eb6a..831fc66 100644
---- a/arch/arm/mach-shark/irq.c
-+++ b/arch/arm/mach-shark/irq.c
-@@ -30,35 +30,35 @@ static unsigned char cached_irq_mask[2] = { 0xfb, 0xff };
-  * These have to be protected by the irq controller spinlock
-  * before being called.
+diff --git a/arch/arm/mach-stmp37xx/stmp37xx.c b/arch/arm/mach-stmp37xx/stmp37xx.c
+index 8c7d6fb..a9aed06 100644
+--- a/arch/arm/mach-stmp37xx/stmp37xx.c
++++ b/arch/arm/mach-stmp37xx/stmp37xx.c
+@@ -43,11 +43,11 @@
+ /*
+  * IRQ handling
   */
--static void shark_disable_8259A_irq(unsigned int irq)
-+static void shark_disable_8259A_irq(struct irq_data *d)
+-static void stmp37xx_ack_irq(unsigned int irq)
++static void stmp37xx_ack_irq(struct irq_data *d)
  {
- 	unsigned int mask;
--	if (irq<8) {
--	  mask = 1 << irq;
-+	if (d->irq<8) {
-+	  mask = 1 << d->irq;
- 	  cached_irq_mask[0] |= mask;
- 	  outb(cached_irq_mask[1],0xA1);
- 	} else {
--	  mask = 1 << (irq-8);
-+	  mask = 1 << (d->irq-8);
- 	  cached_irq_mask[1] |= mask;
- 	  outb(cached_irq_mask[0],0x21);
- 	}
+ 	/* Disable IRQ */
+-	stmp3xxx_clearl(0x04 << ((irq % 4) * 8),
+-		REGS_ICOLL_BASE + HW_ICOLL_PRIORITYn + irq / 4 * 0x10);
++	stmp3xxx_clearl(0x04 << ((d->irq % 4) * 8),
++		REGS_ICOLL_BASE + HW_ICOLL_PRIORITYn + d->irq / 4 * 0x10);
+ 
+ 	/* ACK current interrupt */
+ 	__raw_writel(1, REGS_ICOLL_BASE + HW_ICOLL_LEVELACK);
+@@ -56,24 +56,24 @@ static void stmp37xx_ack_irq(unsigned int irq)
+ 	(void)__raw_readl(REGS_ICOLL_BASE + HW_ICOLL_STAT);
  }
  
--static void shark_enable_8259A_irq(unsigned int irq)
-+static void shark_enable_8259A_irq(struct irq_data *d)
+-static void stmp37xx_mask_irq(unsigned int irq)
++static void stmp37xx_mask_irq(struct irq_data *d)
  {
- 	unsigned int mask;
--	if (irq<8) {
--	  mask = ~(1 << irq);
-+	if (d->irq<8) {
-+	  mask = ~(1 << d->irq);
- 	  cached_irq_mask[0] &= mask;
- 	  outb(cached_irq_mask[0],0x21);
- 	} else {
--	  mask = ~(1 << (irq-8));
-+	  mask = ~(1 << (d->irq-8));
- 	  cached_irq_mask[1] &= mask;
- 	  outb(cached_irq_mask[1],0xA1);
- 	}
+ 	/* IRQ disable */
+-	stmp3xxx_clearl(0x04 << ((irq % 4) * 8),
+-		REGS_ICOLL_BASE + HW_ICOLL_PRIORITYn + irq / 4 * 0x10);
++	stmp3xxx_clearl(0x04 << ((d->irq % 4) * 8),
++		REGS_ICOLL_BASE + HW_ICOLL_PRIORITYn + d->irq / 4 * 0x10);
  }
  
--static void shark_ack_8259A_irq(unsigned int irq){}
-+static void shark_ack_8259A_irq(struct irq_data *d){}
- 
- static irqreturn_t bogus_int(int irq, void *dev_id)
+-static void stmp37xx_unmask_irq(unsigned int irq)
++static void stmp37xx_unmask_irq(struct irq_data *d)
  {
-@@ -69,10 +69,10 @@ static irqreturn_t bogus_int(int irq, void *dev_id)
- static struct irqaction cascade;
+ 	/* IRQ enable */
+-	stmp3xxx_setl(0x04 << ((irq % 4) * 8),
+-		REGS_ICOLL_BASE + HW_ICOLL_PRIORITYn + irq / 4 * 0x10);
++	stmp3xxx_setl(0x04 << ((d->irq % 4) * 8),
++		REGS_ICOLL_BASE + HW_ICOLL_PRIORITYn + d->irq / 4 * 0x10);
+ }
  
- static struct irq_chip fb_chip = {
--	.name	= "XT-PIC",
--	.ack	= shark_ack_8259A_irq,
--	.mask	= shark_disable_8259A_irq,
--	.unmask = shark_enable_8259A_irq,
-+	.name		= "XT-PIC",
-+	.irq_ack	= shark_ack_8259A_irq,
-+	.irq_mask	= shark_disable_8259A_irq,
-+	.irq_unmask	= shark_enable_8259A_irq,
+ static struct irq_chip stmp37xx_chip = {
+-	.ack	= stmp37xx_ack_irq,
+-	.mask	= stmp37xx_mask_irq,
+-	.unmask = stmp37xx_unmask_irq,
++	.irq_ack	= stmp37xx_ack_irq,
++	.irq_mask	= stmp37xx_mask_irq,
++	.irq_unmask	= stmp37xx_unmask_irq,
  };
  
- void __init shark_init_irq(void)
+ void __init stmp37xx_init_irq(void)
 -- 
 1.7.1
