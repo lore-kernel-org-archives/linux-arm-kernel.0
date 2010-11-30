@@ -1,61 +1,122 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 30 Nov 2010 15:05:33 -0800
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <20101130220550.GD8521@n2100.arm.linux.org.uk>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
-	<201011301621.48140.arnd@arndb.de>
-	<20101130184049.GC8521@n2100.arm.linux.org.uk>
-	<20101130184834.GA16055@kroah.com>
-	<20101130220550.GD8521@n2100.arm.linux.org.uk>
-Message-ID: <20101130230533.GA11342@kroah.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 30 Nov 2010 17:31:39 -0600
+Subject: [PATCH] ARM: imx: Add support for low power suspend on MX51.
+Message-ID: <1291159899-32017-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 10:05:50PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 30, 2010 at 10:48:34AM -0800, Greg KH wrote:
-> > On Tue, Nov 30, 2010 at 06:40:49PM +0000, Russell King - ARM Linux wrote:
-> > > There's lots of static devices, not only platform devices, in the ARM
-> > > tree.  It's going to be a hell of a lot of work to fix this all up
-> > > properly.
-> > 
-> > I agree, it's been abused for many years this way :(
-> 
-> I don't agree that it is abuse - it was something explicitly allowed by
-> the original device model design by Patrick, with the condition that
-> such a device was never unregistered.  That's exactly the way we treat
-> these devices.
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-I understand Pat allowed this, I just don't agree that it's the correct
-thing to do :)
+Adds initial low power suspend functionality to MX51.
+Supports "mem" and "standby" modes.
 
--mm had a patch for a long time that would throw up warnings if you ever
-did this for x86 so that arch should be clean of this issue by now.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/Makefile           |    1 +
+ arch/arm/mach-mx5/pm.c               |   70 ++++++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mxc.h |    1 +
+ 3 files changed, 72 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/pm.c
 
-> What I'm slightly concerned about is that this is going to needlessly
-> bloat the kernel - we're going to have to find some other way to store
-> this information, and create devices from that - which means additional
-> code to do the creation, and data structures for it to create these from.
-> There will be additional wastage from kmalloc as kmalloc doesn't allocate
-> just the size you ask for, but normally a power of two which will contain
-> the size.
-> 
-> That could potentially mean that as the device structure is 216 bytes,
-> kmalloc will use the 256 byte allocation size, which means a wastage of
-> 40 bytes per device structure.  On top of that goes the size of
-> resources with the allocation slop on top for that, and then there's
-> another allocation for the platform data.
-> 
-> Has anyone considered these implications before making this choice?
-
-Yes, I have, which is one reason I haven't done this type of change yet.
-I need to figure out a way to not drasticly increase the size and still
-make it easy and simple for the platform and driver write their code.
-
-It's a work in progress, but wherever possible, I encourage people to
-not make 'struct device' static.
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+index 026cd85..906bc71 100644
+--- a/arch/arm/mach-mx5/Makefile
++++ b/arch/arm/mach-mx5/Makefile
+@@ -5,6 +5,7 @@
+ # Object file lists.
+ obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o
+ 
++obj-$(CONFIG_PM) += pm.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+ obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
+new file mode 100644
+index 0000000..417cce1
+--- /dev/null
++++ b/arch/arm/mach-mx5/pm.c
+@@ -0,0 +1,70 @@
++/*
++ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <linux/suspend.h>
++#include <asm/mach/map.h>
++#include <mach/system.h>
++#include "crm_regs.h"
++
++static int mx5_suspend_enter(suspend_state_t state)
++{
++	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
++
++	/* always allow platform to issue a deep sleep mode request */
++	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
++
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
++		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
++		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
++		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
++		break;
++	case PM_SUSPEND_STANDBY:
++		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
++		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
++		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
++		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
++	arm_srpgcr |= MXC_SRPGCR_PCR;
++
++	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
++	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
++	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
++
++	if (tzic_enable_wake(0) != 0)
++		return -EAGAIN;
++
++	cpu_do_idle();
++	return 0;
++}
++
++static int mx5_pm_valid(suspend_state_t state)
++{
++	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
++}
++
++static const struct platform_suspend_ops mx5_suspend_ops = {
++	.valid = mx5_pm_valid,
++	.enter = mx5_suspend_enter,
++};
++
++static int __init mx5_pm_init(void)
++{
++	if (cpu_is_mx51())
++		suspend_set_ops(&mx5_suspend_ops);
++	return 0;
++}
++device_initcall(mx5_pm_init);
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 4abbdd1..dc685d4 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -52,6 +52,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ extern unsigned int __mxc_cpu_type;
++int tzic_enable_wake(int is_idle);
+ #endif
+ 
+ #ifdef CONFIG_ARCH_MX1
+-- 
+1.6.0.4
