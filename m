@@ -1,889 +1,618 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 30 Nov 2010 10:12:34 +0100
-Subject: [PATCH] make mc13783 code generic
-In-Reply-To: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
-	(Yong Shen's message of "Tue, 30 Nov 2010 14:26:33 +0800")
-References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
-Message-ID: <878w0buqd9.fsf@lechat.rtp-net.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Nov 2010 10:21:45 +0100
+Subject: [PATCH v2 01/15] ARM: mxs: Add core definitions
+In-Reply-To: <1291031956-30314-1-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291031956-30314-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101130092145.GF20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yong Shen <yong.shen@linaro.org> writes:
+Hello Shawn,
 
-> Hi there,
-Hi,
-
->
-> For better code share between mc13783 and mc13892, I did some clean up
-> and move some common code to a separated file. And mc13892 code will
-> come after this patch.
-
-Please find comments below. They've been done only after looking at the
-patch so num build-test, no runtime-test. Moreover, the patch have been
-broken by something as there's word wrapping at some places, making
-patch rather grumpy.
-
->
-> Thanks
-> Yong
->
->>From 98e187834085624c3651587da56da48bec958e05 Mon Sep 17 00:00:00 2001
-> From: Yong Shen <yong.shen@linaro.org>
-> Date: Tue, 30 Nov 2010 14:11:34 +0800
-> Subject: [PATCH] make mc13783 code generic
->
-> move some common functions and micros to a seperate file,
-> which makes it possible for mc13892 to share code
->
-> Signed-off-by: Yong Shen <yong.shen@linaro.org>
+On Mon, Nov 29, 2010 at 07:59:11PM +0800, Shawn Guo wrote:
+> Add core definitions for MXS-based SoC MX23 and MX28.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
->  drivers/regulator/Makefile                 |    2 +-
->  drivers/regulator/mc13783-regulator.c      |  311 +++++-----------------------
->  drivers/regulator/mc13xxx-regulator-core.c |  241 +++++++++++++++++++++
->  include/linux/mfd/mc13783.h                |   67 +++---
->  include/linux/regulator/mc13xxx.h          |  101 +++++++++
->  5 files changed, 426 insertions(+), 296 deletions(-)
->  create mode 100644 drivers/regulator/mc13xxx-regulator-core.c
->  create mode 100644 include/linux/regulator/mc13xxx.h
->
-> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-> index bff8157..4008bf6 100644
-> --- a/drivers/regulator/Makefile
-> +++ b/drivers/regulator/Makefile
-> @@ -29,7 +29,7 @@ obj-$(CONFIG_REGULATOR_TPS6586X) += tps6586x-regulator.o
->  obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
->  obj-$(CONFIG_REGULATOR_PCF50633) += pcf50633-regulator.o
->  obj-$(CONFIG_REGULATOR_PCAP) += pcap-regulator.o
-> -obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
-> +obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o mc13xxx-regulator-core.o
->  obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
-
-Why don't you add a common Kconfig entry ? I've the (wrong ?) feeling
-that you're going to do :
-obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o mc13xxx-regulator-core.o
-
-which should be avoided. Being able to build mc13783 and mc13892 support
-at the same time is a must-have imho.
-
->
->  obj-$(CONFIG_REGULATOR_TPS65023) += tps65023-regulator.o
-> diff --git a/drivers/regulator/mc13783-regulator.c
-> b/drivers/regulator/mc13783-regulator.c
-> index 4597d50..fde55f4 100644
-> --- a/drivers/regulator/mc13783-regulator.c
-> +++ b/drivers/regulator/mc13783-regulator.c
-> @@ -1,6 +1,7 @@
->  /*
->   * Regulator Driver for Freescale MC13783 PMIC
->   *
-> + * Copyright 2010 Yong Shen <yong.shen@linaro.org>
->   * Copyright (C) 2008 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
->   * Copyright 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
->   *
-> @@ -10,6 +11,7 @@
->   */
->
->  #include <linux/mfd/mc13783.h>
-> +#include <linux/regulator/mc13xxx.h>
->  #include <linux/regulator/machine.h>
->  #include <linux/regulator/driver.h>
->  #include <linux/platform_device.h>
-> @@ -89,16 +91,6 @@
->  #define MC13783_REG_POWERMISC_PWGTSPI_M			(3 << 15)
->
->
-> -struct mc13783_regulator {
-> -	struct regulator_desc desc;
-> -	int reg;
-> -	int enable_bit;
-> -	int vsel_reg;
-> -	int vsel_shift;
-> -	int vsel_mask;
-> -	int const *voltages;
-> -};
-> -
->  /* Voltage Values */
->  static const int const mc13783_sw3_val[] = {
->  	5000000, 5000000, 5000000, 5500000,
-> @@ -175,10 +167,9 @@ static const int const mc13783_pwgtdrv_val[] = {
->  	5500000,
->  };
->
-> -static struct regulator_ops mc13783_regulator_ops;
-> -static struct regulator_ops mc13783_fixed_regulator_ops;
->  static struct regulator_ops mc13783_gpo_regulator_ops;
->
-> +/*
->  #define MC13783_DEFINE(prefix, _name, _reg, _vsel_reg, _voltages)	\
->  	[MC13783_ ## prefix ## _ ## _name] = {				\
->  		.desc = {						\
-> @@ -196,43 +187,26 @@ static struct regulator_ops mc13783_gpo_regulator_ops;
->  		.vsel_mask = MC13783_REG_ ## _vsel_reg ## _ ## _name ## VSEL_M,\
->  		.voltages =  _voltages,					\
->  	}
-> +	*/
-
-Forgot to remove it before sending the patch ? 
-
->
-> -#define MC13783_FIXED_DEFINE(prefix, _name, _reg, _voltages)		\
-> -	[MC13783_ ## prefix ## _ ## _name] = {				\
-> -		.desc = {						\
-> -			.name = #prefix "_" #_name,			\
-> -			.n_voltages = ARRAY_SIZE(_voltages),		\
-> -			.ops = &mc13783_fixed_regulator_ops,		\
-> -			.type = REGULATOR_VOLTAGE,			\
-> -			.id = MC13783_ ## prefix ## _ ## _name,		\
-> -			.owner = THIS_MODULE,				\
-> -		},							\
-> -		.reg = MC13783_REG_ ## _reg,				\
-> -		.enable_bit = MC13783_REG_ ## _reg ## _ ## _name ## EN,	\
-> -		.voltages =  _voltages,					\
-> -	}
-> +#define MC13783_DEFINE(prefix, name, reg, vsel_reg, voltages)	\
-> +	MC13xxx_DEFINE(MC13783_REG_, name, reg, vsel_reg, voltages, \
-> +			mc13xxx_regulator_ops)
-
-Why don't you just modify mc13783 driver to use MC13xxx_* instead of
-doing this ?
-
->
-> -#define MC13783_GPO_DEFINE(prefix, _name, _reg,  _voltages)		\
-> -	[MC13783_ ## prefix ## _ ## _name] = {				\
-> -		.desc = {						\
-> -			.name = #prefix "_" #_name,			\
-> -			.n_voltages = ARRAY_SIZE(_voltages),		\
-> -			.ops = &mc13783_gpo_regulator_ops,		\
-> -			.type = REGULATOR_VOLTAGE,			\
-> -			.id = MC13783_ ## prefix ## _ ## _name,		\
-> -			.owner = THIS_MODULE,				\
-> -		},							\
-> -		.reg = MC13783_REG_ ## _reg,				\
-> -		.enable_bit = MC13783_REG_ ## _reg ## _ ## _name ## EN,	\
-> -		.voltages =  _voltages,					\
-> -	}
-> +#define MC13783_FIXED_DEFINE(prefix, name, reg, voltages)		\
-> +	MC13xxx_FIXED_DEFINE(MC13783_REG_, name, reg, voltages, \
-> +			mc13xxx_fixed_regulator_ops)
-> +
-> +#define MC13783_GPO_DEFINE(prefix, name, reg, voltages)		\
-> +	MC13xxx_GPO_DEFINE(MC13783_REG_, name, reg, voltages, \
-> +			mc13783_gpo_regulator_ops)
->
->  #define MC13783_DEFINE_SW(_name, _reg, _vsel_reg, _voltages)		\
->  	MC13783_DEFINE(SW, _name, _reg, _vsel_reg, _voltages)
->  #define MC13783_DEFINE_REGU(_name, _reg, _vsel_reg, _voltages)		\
->  	MC13783_DEFINE(REGU, _name, _reg, _vsel_reg, _voltages)
->
-
-same here.
-
-> -static struct mc13783_regulator mc13783_regulators[] = {
-> +static struct mc13xxx_regulator mc13783_regulators[] = {
->  	MC13783_DEFINE_SW(SW3, SWITCHERS5, SWITCHERS5, mc13783_sw3_val),
->
->  	MC13783_FIXED_DEFINE(REGU, VAUDIO, REGULATORMODE0, mc13783_vaudio_val),
-> @@ -274,207 +248,16 @@ static struct mc13783_regulator mc13783_regulators[] = {
->  	MC13783_GPO_DEFINE(REGU, PWGT2SPI, POWERMISC, mc13783_pwgtdrv_val),
->  };
->
-> -struct mc13783_regulator_priv {
-> -	struct mc13783 *mc13783;
-> -	u32 powermisc_pwgt_state;
-> -	struct regulator_dev *regulators[];
-> -};
-> -
-> -static int mc13783_regulator_enable(struct regulator_dev *rdev)
-> -{
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> -	int id = rdev_get_id(rdev);
-> -	int ret;
-> -
-> -	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> -
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_reg_rmw(priv->mc13783, mc13783_regulators[id].reg,
-> -			mc13783_regulators[id].enable_bit,
-> -			mc13783_regulators[id].enable_bit);
-> -	mc13783_unlock(priv->mc13783);
-> -
-> -	return ret;
-> -}
-> -
-> -static int mc13783_regulator_disable(struct regulator_dev *rdev)
-> -{
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> -	int id = rdev_get_id(rdev);
-> -	int ret;
-> -
-> -	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> -
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_reg_rmw(priv->mc13783, mc13783_regulators[id].reg,
-> -			mc13783_regulators[id].enable_bit, 0);
-> -	mc13783_unlock(priv->mc13783);
-> -
-> -	return ret;
-> -}
-> -
-> -static int mc13783_regulator_is_enabled(struct regulator_dev *rdev)
-> -{
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> -	int ret, id = rdev_get_id(rdev);
-> -	unsigned int val;
-> -
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_reg_read(priv->mc13783, mc13783_regulators[id].reg, &val);
-> -	mc13783_unlock(priv->mc13783);
-> -
-> -	if (ret)
-> -		return ret;
-> -
-> -	return (val & mc13783_regulators[id].enable_bit) != 0;
-> -}
-> -
-> -static int mc13783_regulator_list_voltage(struct regulator_dev *rdev,
-> -						unsigned selector)
-> -{
-> -	int id = rdev_get_id(rdev);
-> -
-> -	if (selector >= mc13783_regulators[id].desc.n_voltages)
-> -		return -EINVAL;
-> -
-> -	return mc13783_regulators[id].voltages[selector];
-> -}
-> -
-> -static int mc13783_get_best_voltage_index(struct regulator_dev *rdev,
-> -						int min_uV, int max_uV)
-> -{
-> -	int reg_id = rdev_get_id(rdev);
-> -	int i;
-> -	int bestmatch;
-> -	int bestindex;
-> -
-> -	/*
-> -	 * Locate the minimum voltage fitting the criteria on
-> -	 * this regulator. The switchable voltages are not
-> -	 * in strict falling order so we need to check them
-> -	 * all for the best match.
-> -	 */
-> -	bestmatch = INT_MAX;
-> -	bestindex = -1;
-> -	for (i = 0; i < mc13783_regulators[reg_id].desc.n_voltages; i++) {
-> -		if (mc13783_regulators[reg_id].voltages[i] >= min_uV &&
-> -		    mc13783_regulators[reg_id].voltages[i] < bestmatch) {
-> -			bestmatch = mc13783_regulators[reg_id].voltages[i];
-> -			bestindex = i;
-> -		}
-> -	}
-> -
-> -	if (bestindex < 0 || bestmatch > max_uV) {
-> -		dev_warn(&rdev->dev, "no possible value for %d<=x<=%d uV\n",
-> -				min_uV, max_uV);
-> -		return -EINVAL;
-> -	}
-> -	return bestindex;
-> -}
-> -
-> -static int mc13783_regulator_set_voltage(struct regulator_dev *rdev,
-> -						int min_uV, int max_uV)
-> -{
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> -	int value, id = rdev_get_id(rdev);
-> -	int ret;
-> -
-> -	dev_dbg(rdev_get_dev(rdev), "%s id: %d min_uV: %d max_uV: %d\n",
-> -		__func__, id, min_uV, max_uV);
-> -
-> -	/* Find the best index */
-> -	value = mc13783_get_best_voltage_index(rdev, min_uV, max_uV);
-> -	dev_dbg(rdev_get_dev(rdev), "%s best value: %d \n", __func__, value);
-> -	if (value < 0)
-> -		return value;
-> -
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_reg_rmw(priv->mc13783, mc13783_regulators[id].vsel_reg,
-> -			mc13783_regulators[id].vsel_mask,
-> -			value << mc13783_regulators[id].vsel_shift);
-> -	mc13783_unlock(priv->mc13783);
-> -
-> -	return ret;
-> -}
-> -
-> -static int mc13783_regulator_get_voltage(struct regulator_dev *rdev)
-> -{
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> -	int ret, id = rdev_get_id(rdev);
-> -	unsigned int val;
-> -
-> -	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> -
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_reg_read(priv->mc13783,
-> -				mc13783_regulators[id].vsel_reg, &val);
-> -	mc13783_unlock(priv->mc13783);
-> -
-> -	if (ret)
-> -		return ret;
-> -
-> -	val = (val & mc13783_regulators[id].vsel_mask)
-> -		>> mc13783_regulators[id].vsel_shift;
-> -
-> -	dev_dbg(rdev_get_dev(rdev), "%s id: %d val: %d\n", __func__, id, val);
-> -
-> -	BUG_ON(val < 0 || val > mc13783_regulators[id].desc.n_voltages);
-> -
-> -	return mc13783_regulators[id].voltages[val];
-> -}
-> -
-> -static struct regulator_ops mc13783_regulator_ops = {
-> -	.enable = mc13783_regulator_enable,
-> -	.disable = mc13783_regulator_disable,
-> -	.is_enabled = mc13783_regulator_is_enabled,
-> -	.list_voltage = mc13783_regulator_list_voltage,
-> -	.set_voltage = mc13783_regulator_set_voltage,
-> -	.get_voltage = mc13783_regulator_get_voltage,
-> -};
-> -
-> -static int mc13783_fixed_regulator_set_voltage(struct regulator_dev *rdev,
-> -						int min_uV, int max_uV)
-> -{
-> -	int id = rdev_get_id(rdev);
-> -
-> -	dev_dbg(rdev_get_dev(rdev), "%s id: %d min_uV: %d max_uV: %d\n",
-> -		__func__, id, min_uV, max_uV);
-> -
-> -	if (min_uV >= mc13783_regulators[id].voltages[0] &&
-> -	    max_uV <= mc13783_regulators[id].voltages[0])
-> -		return 0;
-> -	else
-> -		return -EINVAL;
-> -}
-> -
-> -static int mc13783_fixed_regulator_get_voltage(struct regulator_dev *rdev)
-> -{
-> -	int id = rdev_get_id(rdev);
-> -
-> -	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> -
-> -	return mc13783_regulators[id].voltages[0];
-> -}
-> -
-> -static struct regulator_ops mc13783_fixed_regulator_ops = {
-> -	.enable = mc13783_regulator_enable,
-> -	.disable = mc13783_regulator_disable,
-> -	.is_enabled = mc13783_regulator_is_enabled,
-> -	.list_voltage = mc13783_regulator_list_voltage,
-> -	.set_voltage = mc13783_fixed_regulator_set_voltage,
-> -	.get_voltage = mc13783_fixed_regulator_get_voltage,
-> -};
-> -
-> -int mc13783_powermisc_rmw(struct mc13783_regulator_priv *priv, u32 mask,
-> +int mc13783_powermisc_rmw(struct mc13xxx_regulator_priv *priv, u32 mask,
->  									u32 val)
->  {
-> -	struct mc13783 *mc13783 = priv->mc13783;
-> +	struct mc13xxx *mc13783 = priv->mc13xxx;
->  	int ret;
->  	u32 valread;
->
->  	BUG_ON(val & ~mask);
->
-> -	ret = mc13783_reg_read(mc13783, MC13783_REG_POWERMISC, &valread);
-> +	ret = mc13xxx_reg_read(mc13783, MC13783_REG_POWERMISC, &valread);
->  	if (ret)
->  		return ret;
->
-> @@ -489,34 +272,36 @@ int mc13783_powermisc_rmw(struct
-> mc13783_regulator_priv *priv, u32 mask,
-
-patch broken.
-
->  	valread = (valread & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
->  						priv->powermisc_pwgt_state;
->
-> -	return mc13783_reg_write(mc13783, MC13783_REG_POWERMISC, valread);
-> +	return mc13xxx_reg_write(mc13783, MC13783_REG_POWERMISC, valread);
->  }
->
->  static int mc13783_gpo_regulator_enable(struct regulator_dev *rdev)
->  {
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
->  	int id = rdev_get_id(rdev);
->  	int ret;
-> -	u32 en_val = mc13783_regulators[id].enable_bit;
-> +	u32 en_val = mc13xxx_regulators[id].enable_bit;
->
->  	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
->
->  	/* Power Gate enable value is 0 */
-> -	if (id == MC13783_REGU_PWGT1SPI ||
-> -	    id == MC13783_REGU_PWGT2SPI)
-> +	if (id == MC13783_REG_PWGT1SPI ||
-> +	    id == MC13783_REG_PWGT2SPI)
->  		en_val = 0;
->
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_powermisc_rmw(priv, mc13783_regulators[id].enable_bit,
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13783_powermisc_rmw(priv, mc13xxx_regulators[id].enable_bit,
->  					en_val);
-> -	mc13783_unlock(priv->mc13783);
-> +	mc13xxx_unlock(priv->mc13xxx);
->
->  	return ret;
->  }
->
->  static int mc13783_gpo_regulator_disable(struct regulator_dev *rdev)
->  {
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
->  	int id = rdev_get_id(rdev);
->  	int ret;
->  	u32 dis_val = 0;
-> @@ -524,27 +309,28 @@ static int mc13783_gpo_regulator_disable(struct
-> regulator_dev *rdev)
-
-again.
-
->  	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
->
->  	/* Power Gate disable value is 1 */
-> -	if (id == MC13783_REGU_PWGT1SPI ||
-> -	    id == MC13783_REGU_PWGT2SPI)
-> -		dis_val = mc13783_regulators[id].enable_bit;
-> +	if (id == MC13783_REG_PWGT1SPI ||
-> +	    id == MC13783_REG_PWGT2SPI)
-> +		dis_val = mc13xxx_regulators[id].enable_bit;
->
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_powermisc_rmw(priv, mc13783_regulators[id].enable_bit,
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13783_powermisc_rmw(priv, mc13xxx_regulators[id].enable_bit,
->  					dis_val);
-> -	mc13783_unlock(priv->mc13783);
-> +	mc13xxx_unlock(priv->mc13xxx);
->
->  	return ret;
->  }
->
->  static int mc13783_gpo_regulator_is_enabled(struct regulator_dev *rdev)
->  {
-> -	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
->  	int ret, id = rdev_get_id(rdev);
->  	unsigned int val;
->
-> -	mc13783_lock(priv->mc13783);
-> -	ret = mc13783_reg_read(priv->mc13783, mc13783_regulators[id].reg, &val);
-> -	mc13783_unlock(priv->mc13783);
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_read(priv->mc13xxx, mc13xxx_regulators[id].reg, &val);
-> +	mc13xxx_unlock(priv->mc13xxx);
->
->  	if (ret)
->  		return ret;
-> @@ -554,22 +340,22 @@ static int
-> mc13783_gpo_regulator_is_enabled(struct regulator_dev *rdev)
-
-yet an other one
-
->  	val = (val & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
->  	      (priv->powermisc_pwgt_state ^ MC13783_REG_POWERMISC_PWGTSPI_M);
->
-> -	return (val & mc13783_regulators[id].enable_bit) != 0;
-> +	return (val & mc13xxx_regulators[id].enable_bit) != 0;
->  }
->
->  static struct regulator_ops mc13783_gpo_regulator_ops = {
->  	.enable = mc13783_gpo_regulator_enable,
->  	.disable = mc13783_gpo_regulator_disable,
->  	.is_enabled = mc13783_gpo_regulator_is_enabled,
-> -	.list_voltage = mc13783_regulator_list_voltage,
-> -	.set_voltage = mc13783_fixed_regulator_set_voltage,
-> -	.get_voltage = mc13783_fixed_regulator_get_voltage,
-> +	.list_voltage = mc13xxx_regulator_list_voltage,
-> +	.set_voltage = mc13xxx_fixed_regulator_set_voltage,
-> +	.get_voltage = mc13xxx_fixed_regulator_get_voltage,
->  };
->
->  static int __devinit mc13783_regulator_probe(struct platform_device *pdev)
->  {
-> -	struct mc13783_regulator_priv *priv;
-> -	struct mc13783 *mc13783 = dev_get_drvdata(pdev->dev.parent);
-> +	struct mc13xxx_regulator_priv *priv;
-> +	struct mc13xxx *mc13783 = dev_get_drvdata(pdev->dev.parent);
->  	struct mc13783_regulator_platform_data *pdata =
->  		dev_get_platdata(&pdev->dev);
->  	struct mc13783_regulator_init_data *init_data;
-> @@ -583,7 +369,8 @@ static int __devinit
-> mc13783_regulator_probe(struct platform_device *pdev)
->  	if (!priv)
->  		return -ENOMEM;
->
-> -	priv->mc13783 = mc13783;
-> +	priv->mc13xxx_regulators = mc13783_regulators;
-> +	priv->mc13xxx = mc13783;
->
->  	for (i = 0; i < pdata->num_regulators; i++) {
->  		init_data = &pdata->regulators[i];
-> @@ -613,7 +400,7 @@ err:
->
->  static int __devexit mc13783_regulator_remove(struct platform_device *pdev)
->  {
-> -	struct mc13783_regulator_priv *priv = platform_get_drvdata(pdev);
-> +	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
->  	struct mc13783_regulator_platform_data *pdata =
->  		dev_get_platdata(&pdev->dev);
->  	int i;
-> diff --git a/drivers/regulator/mc13xxx-regulator-core.c
-> b/drivers/regulator/mc13xxx-regulator-core.c
+> Changes for v2:
+>  - Remove MXS_IO_P2V_MODULE from hardware.h which is not needed
+>  - Simplify MXS_IO_P2V_MODULE definition in hardware.h
+>  - Remove unnecessary inclusion protection from hardware.h
+>  - Change cpu_is_mx23/mx28() implementation in mxs.h to use machine_is_xxx
+> 
+>  arch/arm/mach-mxs/include/mach/hardware.h |   55 +++++++
+>  arch/arm/mach-mxs/include/mach/irqs.h     |   32 ++++
+>  arch/arm/mach-mxs/include/mach/memory.h   |   24 +++
+>  arch/arm/mach-mxs/include/mach/mx23.h     |  147 +++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/mx28.h     |  227 +++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/mxs.h      |   43 ++++++
+>  6 files changed, 528 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/include/mach/hardware.h
+>  create mode 100644 arch/arm/mach-mxs/include/mach/irqs.h
+>  create mode 100644 arch/arm/mach-mxs/include/mach/memory.h
+>  create mode 100644 arch/arm/mach-mxs/include/mach/mx23.h
+>  create mode 100644 arch/arm/mach-mxs/include/mach/mx28.h
+>  create mode 100644 arch/arm/mach-mxs/include/mach/mxs.h
+> 
+> diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
 > new file mode 100644
-> index 0000000..1499615
+> index 0000000..9e757e0
 > --- /dev/null
-> +++ b/drivers/regulator/mc13xxx-regulator-core.c
-> @@ -0,0 +1,241 @@
+> +++ b/arch/arm/mach-mxs/include/mach/hardware.h
+> @@ -0,0 +1,55 @@
 > +/*
-> + * Regulator Driver for Freescale MC13xxx PMIC
+> + * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+> + * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
 > + *
-> + * Copyright 2010 Yong Shen <yong.shen@linaro.org>
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 > + *
-> + * Based on mc13783 regulator driver :
-> + * Copyright (C) 2008 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-> + * Copyright 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA  02110-1301, USA.
+> + */
+> +
+> +#ifndef __MACH_MXS_HARDWARE_H__
+> +#define __MACH_MXS_HARDWARE_H__
+> +
+> +#include <asm/sizes.h>
+> +
+> +#ifdef __ASSEMBLER__
+> +#define IOMEM(addr)	(addr)
+> +#else
+> +#define IOMEM(addr)	((void __force __iomem *)(addr))
+> +#endif
+> +
+> +/*
+> + * It maps the whole address space to [0xf4000000, 0xf5ffffff].
 > + *
+> + *	OCRAM	0x00000000+0x020000	->	0xf4000000+0x020000
+> + *	IO	0x80000000+0x100000	->	0xf4400000+0x100000
+> + */
+> +#define MXS_IO_P2V(x)	(0xf4000000 +					\
+> +			(((x) & 0x80000000) >> 6) +			\
+> +			(((x) & 0x000fffff)))
+The comment doesn't match the function.
+
+> +
+> +
+> +#define MXS_IO_ADDRESS(x)	IOMEM(MXS_IO_P2V(x))
+> +
+> +#include <mach/mx23.h>
+> +#include <mach/mx28.h>
+> +#include <mach/mxs.h>
+> +
+> +#define mxs_map_entry(soc, name, _type)	{				\
+> +	.virtual = soc ## _IO_P2V(soc ## _ ## name ## _BASE_ADDR),	\
+> +	.pfn = __phys_to_pfn(soc ## _ ## name ## _BASE_ADDR),		\
+> +	.length = soc ## _ ## name ## _SIZE,				\
+> +	.type = _type,							\
+> +}
+> +
+> +#endif /* __MACH_MXS_HARDWARE_H__ */
+> diff --git a/arch/arm/mach-mxs/include/mach/irqs.h b/arch/arm/mach-mxs/include/mach/irqs.h
+> new file mode 100644
+> index 0000000..f771039
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/irqs.h
+> @@ -0,0 +1,32 @@
+> +/*
+> + *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+> + */
+> +
+> +/*
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
 > + * published by the Free Software Foundation.
-> + *
-> + * Regs infos taken from mc13xxx drivers from freescale and mc13xxx.pdf file
-> + * from freescale
 > + */
 > +
-> +#define DEBUG
+> +#ifndef __MACH_MXS_IRQS_H__
+> +#define __MACH_MXS_IRQS_H__
+> +
+> +#define MXS_INTERNAL_IRQS	128
+> +
+> +#define MXS_GPIO_IRQ_START	MXS_INTERNAL_IRQS
+> +
+> +/* the maximum for MXS-based */
+> +#define MXS_GPIO_IRQS		(32 * 5)
+> +
+> +/*
+> + * The next 16 interrupts are for board specific purposes.  Since
+> + * the kernel can only run on one machine at a time, we can re-use
+> + * these.  If you need more, increase MXS_BOARD_IRQS, but keep it
+> + * within sensible limits.
+> + */
+> +#define MXS_BOARD_IRQ_START	(MXS_GPIO_IRQ_START + MXS_GPIO_IRQS)
+> +#define MXS_BOARD_IRQS		16
+> +
+> +#define NR_IRQS			(MXS_BOARD_IRQ_START + MXS_BOARD_IRQS)
+> +
+> +#endif /* __MACH_MXS_IRQS_H__ */
+> diff --git a/arch/arm/mach-mxs/include/mach/memory.h b/arch/arm/mach-mxs/include/mach/memory.h
+> new file mode 100644
+> index 0000000..b5420a5
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/memory.h
+> @@ -0,0 +1,24 @@
+> +/*
+> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#ifndef __MACH_MXS_MEMORY_H__
+> +#define __MACH_MXS_MEMORY_H__
+> +
+> +#define PHYS_OFFSET		UL(0x40000000)
+> +
+> +#endif /* __MACH_MXS_MEMORY_H__ */
+> diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
+> new file mode 100644
+> index 0000000..27a11ee
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/mx23.h
+> @@ -0,0 +1,147 @@
+> +/*
+> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#ifndef __MACH_MX23_H__
+> +#define __MACH_MX23_H__
+> +
+> +#ifndef __ASSEMBLER__
+> +#include <linux/io.h>
+> +#endif
+> +
+> +/*
+> + * OCRAM
+> + */
+> +#define MX23_OCRAM_BASE_ADDR		0x00000000
+> +#define MX23_OCRAM_SIZE			SZ_32K
+> +
+> +/*
+> + * IO
+> + */
+> +#define MX23_IO_BASE_ADDR		0x80000000
+> +#define MX23_IO_SIZE			SZ_1M
+> +
+> +#define MX23_ICOLL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x000000)
+> +#define MX23_APBH_DMA_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x004000)
+> +#define MX23_BCH_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x00a000)
+> +#define MX23_GPMI_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x00c000)
+> +#define MX23_SSP1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x010000)
+> +#define MX23_SSP2_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x034000)
+I'd prefer to have these sorted consistently.  Either sort by name or
+address, but not a mixure of both.
 
-drop this. It's nice for debugging but not for merged
-code. CONFIG_REGULATOR_DEBUG is there for that.
+> +#define MX23_PINCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x018000)
+> +#define MX23_DIGCTL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x01c000)
+> +#define MX23_ETM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x020000)
+> +#define MX23_APBX_DMA_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x024000)
+> +#define MX23_DCP_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x028000)
+> +#define MX23_PXP_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x02a000)
+> +#define MX23_OCOTP_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x02c000)
+> +#define MX23_AXI_AHB0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x02e000)
+> +#define MX23_LCDIF_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x030000)
+> +#define MX23_TVENC_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x038000)
+> +#define MX23_CLKCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x040000)
+> +#define MX23_SAIF0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x042000)
+> +#define MX23_POWER_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x044000)
+> +#define MX23_SAIF1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x046000)
+> +#define MX23_AUDIOOUT_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x048000)
+> +#define MX23_AUDIOIN_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x04c000)
+> +#define MX23_LRADC_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x050000)
+> +#define MX23_SPDIF_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x054000)
+> +#define MX23_RTC_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x05c000)
+> +#define MX23_I2C0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x058000)
+> +#define MX23_PWM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x064000)
+> +#define MX23_TIMROT_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x068000)
+> +#define MX23_AUART1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06c000)
+> +#define MX23_AUART2_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06e000)
+> +#define MX23_DUART_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x070000)
+> +#define MX23_USBPHY_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
+> +#define MX23_USBCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
+> +#define MX23_DRAM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x0e0000)
+> +
+> +#define MX23_IO_P2V(x)			MXS_IO_P2V(x)
+> +#define MX23_IO_ADDRESS(x)		IOMEM(MX23_IO_P2V(x))
+> +
+> +/*
+> + * IRQ
+> + */
+> +#define MX23_INT_DUART			0
+> +#define MX23_INT_COMMS_RX		1
+> +#define MX23_INT_COMMS_TX		1
+> +#define MX23_INT_SSP2_ERROR		2
+> +#define MX23_INT_VDD5V			3
+> +#define MX23_INT_HEADPHONE_SHORT	4
+> +#define MX23_INT_DAC_DMA		5
+> +#define MX23_INT_DAC_ERROR		6
+> +#define MX23_INT_ADC_DMA		7
+> +#define MX23_INT_ADC_ERROR		8
+> +#define MX23_INT_SPDIF_DMA		9
+> +#define MX23_INT_SAIF2_DMA		9
+> +#define MX23_INT_SPDIF_ERROR		10
+> +#define MX23_INT_SAIF1_IRQ		10
+> +#define MX23_INT_SAIF2_IRQ		10
+> +#define MX23_INT_USB_CTRL		11
+> +#define MX23_INT_USB_WAKEUP		12
+> +#define MX23_INT_GPMI_DMA		13
+> +#define MX23_INT_SSP1_DMA		14
+> +#define MX23_INT_SSP_ERROR		15
+> +#define MX23_INT_GPIO0			16
+> +#define MX23_INT_GPIO1			17
+> +#define MX23_INT_GPIO2			18
+> +#define MX23_INT_SAIF1_DMA		19
+> +#define MX23_INT_SSP2_DMA		20
+> +#define MX23_INT_ECC8_IRQ		21
+> +#define MX23_INT_RTC_ALARM		22
+> +#define MX23_INT_UARTAPP_TX_DMA		23
+> +#define MX23_INT_UARTAPP_INTERNAL	24
+> +#define MX23_INT_UARTAPP_RX_DMA		25
+> +#define MX23_INT_I2C_DMA		26
+> +#define MX23_INT_I2C_ERROR		27
+> +#define MX23_INT_TIMER0			28
+> +#define MX23_INT_TIMER1			29
+> +#define MX23_INT_TIMER2			30
+> +#define MX23_INT_TIMER3			31
+> +#define MX23_INT_BATT_BRNOUT		32
+> +#define MX23_INT_VDDD_BRNOUT		33
+> +#define MX23_INT_VDDIO_BRNOUT		34
+> +#define MX23_INT_VDD18_BRNOUT		35
+> +#define MX23_INT_TOUCH_DETECT		36
+> +#define MX23_INT_LRADC_CH0		37
+> +#define MX23_INT_LRADC_CH1		38
+> +#define MX23_INT_LRADC_CH2		39
+> +#define MX23_INT_LRADC_CH3		40
+> +#define MX23_INT_LRADC_CH4		41
+> +#define MX23_INT_LRADC_CH5		42
+> +#define MX23_INT_LRADC_CH6		43
+> +#define MX23_INT_LRADC_CH7		44
+> +#define MX23_INT_LCDIF_DMA		45
+> +#define MX23_INT_LCDIF_ERROR		46
+> +#define MX23_INT_DIGCTL_DEBUG_TRAP	47
+> +#define MX23_INT_RTC_1MSEC		48
+> +#define MX23_INT_DRI_DMA		49
+> +#define MX23_INT_DRI_ATTENTION		50
+> +#define MX23_INT_GPMI_ATTENTION		51
+> +#define MX23_INT_IR			52
+> +#define MX23_INT_DCP_VMI		53
+> +#define MX23_INT_DCP			54
+> +#define MX23_INT_BCH			56
+> +#define MX23_INT_PXP			57
+> +#define MX23_INT_UARTAPP2_TX_DMA	58
+> +#define MX23_INT_UARTAPP2_INTERNAL	59
+> +#define MX23_INT_UARTAPP2_RX_DMA	60
+> +#define MX23_INT_VDAC_DETECT		61
+> +#define MX23_INT_VDD5V_DROOP		64
+> +#define MX23_INT_DCDC4P2_BO		65
+> +
+> +#endif /* __MACH_MX23_H__ */
+> diff --git a/arch/arm/mach-mxs/include/mach/mx28.h b/arch/arm/mach-mxs/include/mach/mx28.h
+> new file mode 100644
+> index 0000000..836d807
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/mx28.h
+> @@ -0,0 +1,227 @@
+> +/*
+> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#ifndef __MACH_MX28_H__
+> +#define __MACH_MX28_H__
+> +
+> +#ifndef __ASSEMBLER__
+> +#include <linux/io.h>
+> +#endif
+> +
+> +/*
+> + * OCRAM
+> + */
+> +#define MX28_OCRAM_BASE_ADDR		0x00000000
+> +#define MX28_OCRAM_SIZE			SZ_128K
+> +
+> +/*
+> + * IO
+> + */
+> +#define MX28_IO_BASE_ADDR		0x80000000
+> +#define MX28_IO_SIZE			SZ_1M
+> +
+> +#define MX28_ICOLL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x000000)
+> +#define MX28_HSADC_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x002000)
+> +#define MX28_APBH_DMA_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x004000)
+> +#define MX28_PERFMON_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x006000)
+> +#define MX28_BCH_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x00a000)
+> +#define MX28_GPMI_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x00c000)
+> +#define MX28_SSP0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x010000)
+> +#define MX28_SSP1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x012000)
+> +#define MX28_SSP2_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x014000)
+> +#define MX28_SSP3_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x016000)
+> +#define MX28_PINCTRL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x018000)
+> +#define MX28_DIGCTL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x01c000)
+> +#define MX28_ETM_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x022000)
+> +#define MX28_APBX_DMA_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x024000)
+> +#define MX28_DCP_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x028000)
+> +#define MX28_PXP_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x02a000)
+> +#define MX28_OCOTP_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x02c000)
+> +#define MX28_AXI_AHB0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x02e000)
+> +#define MX28_LCDIF_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x030000)
+> +#define MX28_CAN0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x032000)
+> +#define MX28_CAN1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x034000)
+> +#define MX28_SIMDBG_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c000)
+> +#define MX28_SIMGPMISEL_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x03c200)
+> +#define MX28_SIMSSPSEL_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x03c300)
+> +#define MX28_SIMMEMSEL_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x03c400)
+> +#define MX28_GPIOMON_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c500)
+> +#define MX28_SIMENET_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c700)
+> +#define MX28_ARMJTAG_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x03c800)
+> +#define MX28_CLKCTRL_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x040000)
+> +#define MX28_SAIF0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x042000)
+> +#define MX28_POWER_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x044000)
+> +#define MX28_SAIF1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x046000)
+> +#define MX28_LRADC_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x050000)
+> +#define MX28_SPDIF_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x054000)
+> +#define MX28_RTC_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x056000)
+> +#define MX28_I2C0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x058000)
+> +#define MX28_I2C1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x05a000)
+> +#define MX28_PWM_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x064000)
+> +#define MX28_TIMROT_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x068000)
+> +#define MX28_AUART0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x06a000)
+> +#define MX28_AUART1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x06c000)
+> +#define MX28_AUART2_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x06e000)
+> +#define MX28_AUART3_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x070000)
+> +#define MX28_AUART4_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x072000)
+> +#define MX28_DUART_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x074000)
+> +#define MX28_USBPHY0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x07C000)
+> +#define MX28_USBPHY1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x07e000)
+> +#define MX28_USBCTRL0_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x080000)
+> +#define MX28_USBCTRL1_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x090000)
+> +#define MX28_DFLPT_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x0c0000)
+> +#define MX28_DRAM_BASE_ADDR		(MX28_IO_BASE_ADDR + 0x0e0000)
+> +#define MX28_ENET_MAC0_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x0f0000)
+> +#define MX28_ENET_MAC1_BASE_ADDR	(MX28_IO_BASE_ADDR + 0x0f4000)
+> +
+> +#define MX28_IO_P2V(x)			MXS_IO_P2V(x)
+> +#define MX28_IO_ADDRESS(x)		IOMEM(MX28_IO_P2V(x))
+> +
+> +/*
+> + * IRQ
+> + */
+> +#define MX28_INT_BATT_BRNOUT		0
+> +#define MX28_INT_VDDD_BRNOUT		1
+> +#define MX28_INT_VDDIO_BRNOUT		2
+> +#define MX28_INT_VDDA_BRNOUT		3
+> +#define MX28_INT_VDD5V_DROOP		4
+> +#define MX28_INT_DCDC4P2_BRNOUT		5
+> +#define MX28_INT_VDD5V			6
+> +#define MX28_INT_RESV7			7
+> +#define MX28_INT_CAN0			8
+> +#define MX28_INT_CAN1			9
+> +#define MX28_INT_LRADC_TOUCH		10
+> +#define MX28_INT_RESV11			11
+> +#define MX28_INT_RESV12			12
+> +#define MX28_INT_HSADC			13
+> +#define MX28_INT_IRADC_THRESH0		14
+> +#define MX28_INT_IRADC_THRESH1		15
+> +#define MX28_INT_LRADC_CH0		16
+> +#define MX28_INT_LRADC_CH1		17
+> +#define MX28_INT_LRADC_CH2		18
+> +#define MX28_INT_LRADC_CH3		19
+> +#define MX28_INT_LRADC_CH4		20
+> +#define MX28_INT_LRADC_CH5		21
+> +#define MX28_INT_LRADC_CH6		22
+> +#define MX28_INT_LRADC_CH7		23
+> +#define MX28_INT_LRADC_BUTTON0		24
+> +#define MX28_INT_LRADC_BUTTON1		25
+> +#define MX28_INT_RESV26			26
+> +#define MX28_INT_PERFMON		27
+> +#define MX28_INT_RTC_1MSEC		28
+> +#define MX28_INT_RTC_ALARM		29
+> +#define MX28_INT_RESV30			30
+> +#define MX28_INT_COMMS			31
+> +#define MX28_INT_EMI_ERR		32
+> +#define MX28_INT_RESV33			33
+> +#define MX28_INT_RESV34			34
+> +#define MX28_INT_RESV35			35
+> +#define MX28_INT_RESV36			36
+> +#define MX28_INT_RESV37			37
+> +#define MX28_INT_LCDIF			38
+> +#define MX28_INT_PXP			39
+> +#define MX28_INT_RESV40			40
+> +#define MX28_INT_BCH			41
+> +#define MX28_INT_GPMI			42
+> +#define MX28_INT_RESV43			43
+> +#define MX28_INT_RESV44			44
+> +#define MX28_INT_SPDIF_ERROR		45
+> +#define MX28_INT_RESV46			46
+> +#define MX28_INT_DUART			47
+> +#define MX28_INT_TIMER0			48
+> +#define MX28_INT_TIMER1			49
+> +#define MX28_INT_TIMER2			50
+> +#define MX28_INT_TIMER3			51
+> +#define MX28_INT_DCP_VMI		52
+> +#define MX28_INT_DCP			53
+> +#define MX28_INT_DCP_SECURE		54
+> +#define MX28_INT_RESV55			55
+> +#define MX28_INT_RESV56			56
+> +#define MX28_INT_RESV57			57
+> +#define MX28_INT_SAIF1			58
+> +#define MX28_INT_SAIF0			59
+> +#define MX28_INT_RESV60			60
+> +#define MX28_INT_RESV61			61
+> +#define MX28_INT_RESV62			62
+> +#define MX28_INT_RESV63			63
+> +#define MX28_INT_RESV64			64
+> +#define MX28_INT_RESV65			65
+> +#define MX28_INT_SPDIF_DMA		66
+> +#define MX28_INT_RESV67			67
+> +#define MX28_INT_I2C0_DMA		68
+> +#define MX28_INT_I2C1_DMA		69
+> +#define MX28_INT_AUART0_RX_DMA		70
+> +#define MX28_INT_AUART0_TX_DMA		71
+> +#define MX28_INT_AUART1_RX_DMA		72
+> +#define MX28_INT_AUART1_TX_DMA		73
+> +#define MX28_INT_AUART2_RX_DMA		74
+> +#define MX28_INT_AUART2_TX_DMA		75
+> +#define MX28_INT_AUART3_RX_DMA		76
+> +#define MX28_INT_AUART3_TX_DMA		77
+> +#define MX28_INT_AUART4_RX_DMA		78
+> +#define MX28_INT_AUART4_TX_DMA		79
+> +#define MX28_INT_SAIF0_DMA		80
+> +#define MX28_INT_SAIF1_DMA		81
+> +#define MX28_INT_SSP0_DMA		82
+> +#define MX28_INT_SSP1_DMA		83
+> +#define MX28_INT_SSP2_DMA		84
+> +#define MX28_INT_SSP3_DMA		85
+> +#define MX28_INT_LCDIF_DMA		86
+> +#define MX28_INT_HSADC_DMA		87
+> +#define MX28_INT_GPMI_DMA		88
+> +#define MX28_INT_DIGCTL_DEBUG_TRAP	89
+> +#define MX28_INT_RESV90			90
+> +#define MX28_INT_RESV91			91
+> +#define MX28_INT_USB1			92
+> +#define MX28_INT_USB0			93
+> +#define MX28_INT_USB1_WAKEUP		94
+> +#define MX28_INT_USB0_WAKEUP		95
+> +#define MX28_INT_SSP0			96
+> +#define MX28_INT_SSP1			97
+> +#define MX28_INT_SSP2			98
+> +#define MX28_INT_SSP3			99
+> +#define MX28_INT_ENET_SWI		100
+> +#define MX28_INT_ENET_MAC0		101
+> +#define MX28_INT_ENET_MAC1		102
+> +#define MX28_INT_ENET_MAC0_1588		103
+> +#define MX28_INT_ENET_MAC1_1588		104
+> +#define MX28_INT_RESV105		105
+> +#define MX28_INT_RESV106		106
+> +#define MX28_INT_RESV107		107
+> +#define MX28_INT_RESV108		108
+> +#define MX28_INT_RESV109		109
+> +#define MX28_INT_I2C1_ERROR		110
+> +#define MX28_INT_I2C0_ERROR		111
+> +#define MX28_INT_AUART0			112
+> +#define MX28_INT_AUART1			113
+> +#define MX28_INT_AUART2			114
+> +#define MX28_INT_AUART3			115
+> +#define MX28_INT_AUART4			116
+> +#define MX28_INT_RESV117		117
+> +#define MX28_INT_RESV118		118
+> +#define MX28_INT_RESV119		119
+> +#define MX28_INT_RESV120		120
+> +#define MX28_INT_RESV121		121
+> +#define MX28_INT_RESV122		122
+I'd skip these RESV defines.  They are unused anyhow.  And as soon as
+you need them they need a more sensible name anyhow.
 
+> +#define MX28_INT_GPIO4			123
+> +#define MX28_INT_GPIO3			124
+> +#define MX28_INT_GPIO2			125
+> +#define MX28_INT_GPIO1			126
+> +#define MX28_INT_GPIO0			127
 > +
-> +#include <linux/mfd/mc13xxx.h>
-> +#include <linux/regulator/mc13xxx.h>
-> +#include <linux/regulator/machine.h>
-> +#include <linux/regulator/driver.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/kernel.h>
-> +#include <linux/slab.h>
-> +#include <linux/init.h>
-> +#include <linux/err.h>
+> +#endif /* __MACH_MX28_H__ */
+> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+> new file mode 100644
+> index 0000000..b691c34
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
 > +
-> +static int mc13xxx_regulator_enable(struct regulator_dev *rdev)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int id = rdev_get_id(rdev);
-> +	int ret;
+> +#ifndef __MACH_MXS_H__
+> +#define __MACH_MXS_H__
 > +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
+> +#include <asm/mach-types.h>
 > +
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13xxx_regulators[id].reg,
-> +			mc13xxx_regulators[id].enable_bit,
-> +			mc13xxx_regulators[id].enable_bit);
-> +	mc13xxx_unlock(priv->mc13xxx);
+> +#define MXS_SET_ADDR		0x4
+> +#define MXS_CLR_ADDR		0x8
+> +#define MXS_TOG_ADDR		0xc
 > +
-> +	return ret;
-> +}
+> +/*
+> + * MXS CPU types
+> + */
+> +#ifdef CONFIG_SOC_IMX23
+> +# define cpu_is_mx23()		(machine_is_mx23evk())
+> +#else
+> +# define cpu_is_mx23()		(0)
+> +#endif
 > +
-> +static int mc13xxx_regulator_disable(struct regulator_dev *rdev)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int id = rdev_get_id(rdev);
-> +	int ret;
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> +
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13xxx_regulators[id].reg,
-> +			mc13xxx_regulators[id].enable_bit, 0);
-> +	mc13xxx_unlock(priv->mc13xxx);
-> +
-> +	return ret;
-> +}
-> +
-> +static int mc13xxx_regulator_is_enabled(struct regulator_dev *rdev)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int ret, id = rdev_get_id(rdev);
-> +	unsigned int val;
-> +
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_read(priv->mc13xxx, mc13xxx_regulators[id].reg, &val);
-> +	mc13xxx_unlock(priv->mc13xxx);
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	return (val & mc13xxx_regulators[id].enable_bit) != 0;
-> +}
-> +
-> +int mc13xxx_regulator_list_voltage(struct regulator_dev *rdev,
-> +						unsigned selector)
-> +{
-> +	int id = rdev_get_id(rdev);
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +
-> +	if (selector >= mc13xxx_regulators[id].desc.n_voltages)
-> +		return -EINVAL;
-> +
-> +	return mc13xxx_regulators[id].voltages[selector];
-> +}
-> +
-> +int mc13xxx_get_best_voltage_index(struct regulator_dev *rdev,
-> +						int min_uV, int max_uV)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int reg_id = rdev_get_id(rdev);
-> +	int i;
-> +	int bestmatch;
-> +	int bestindex;
-> +
-> +	/*
-> +	 * Locate the minimum voltage fitting the criteria on
-> +	 * this regulator. The switchable voltages are not
-> +	 * in strict falling order so we need to check them
-> +	 * all for the best match.
-> +	 */
-> +	bestmatch = INT_MAX;
-> +	bestindex = -1;
-> +	for (i = 0; i < mc13xxx_regulators[reg_id].desc.n_voltages; i++) {
-> +		if (mc13xxx_regulators[reg_id].voltages[i] >= min_uV &&
-> +		    mc13xxx_regulators[reg_id].voltages[i] < bestmatch) {
-> +			bestmatch = mc13xxx_regulators[reg_id].voltages[i];
-> +			bestindex = i;
-> +		}
-> +	}
-> +
-> +	if (bestindex < 0 || bestmatch > max_uV) {
-> +		dev_warn(&rdev->dev, "no possible value for %d<=x<=%d uV\n",
-> +				min_uV, max_uV);
-> +		return -EINVAL;
-> +	}
-> +	return bestindex;
-> +}
-> +
-> +static int mc13xxx_regulator_set_voltage(struct regulator_dev *rdev,
-> +						int min_uV, int max_uV)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int value, id = rdev_get_id(rdev);
-> +	int ret;
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d min_uV: %d max_uV: %d\n",
-> +		__func__, id, min_uV, max_uV);
-> +
-> +	/* Find the best index */
-> +	value = mc13xxx_get_best_voltage_index(rdev, min_uV, max_uV);
-> +	dev_dbg(rdev_get_dev(rdev), "%s best value: %d\n", __func__, value);
-> +	if (value < 0)
-> +		return value;
-> +
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13xxx_regulators[id].vsel_reg,
-> +			mc13xxx_regulators[id].vsel_mask,
-> +			value << mc13xxx_regulators[id].vsel_shift);
-> +	mc13xxx_unlock(priv->mc13xxx);
-> +
-> +	return ret;
-> +}
-> +
-> +static int mc13xxx_regulator_get_voltage(struct regulator_dev *rdev)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int ret, id = rdev_get_id(rdev);
-> +	unsigned int val;
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> +
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_read(priv->mc13xxx,
-> +				mc13xxx_regulators[id].vsel_reg, &val);
-> +	mc13xxx_unlock(priv->mc13xxx);
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = (val & mc13xxx_regulators[id].vsel_mask)
-> +		>> mc13xxx_regulators[id].vsel_shift;
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d val: %d\n", __func__, id, val);
-> +
-> +	BUG_ON(val < 0 || val > mc13xxx_regulators[id].desc.n_voltages);
-> +
-> +	return mc13xxx_regulators[id].voltages[val];
-> +}
-> +
-> +struct regulator_ops mc13xxx_regulator_ops = {
-> +	.enable = mc13xxx_regulator_enable,
-> +	.disable = mc13xxx_regulator_disable,
-> +	.is_enabled = mc13xxx_regulator_is_enabled,
-> +	.list_voltage = mc13xxx_regulator_list_voltage,
-> +	.set_voltage = mc13xxx_regulator_set_voltage,
-> +	.get_voltage = mc13xxx_regulator_get_voltage,
-> +};
-> +
-> +int mc13xxx_fixed_regulator_set_voltage(struct regulator_dev *rdev,
-> +						int min_uV, int max_uV)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int id = rdev_get_id(rdev);
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d min_uV: %d max_uV: %d\n",
-> +		__func__, id, min_uV, max_uV);
-> +
-> +	if (min_uV >= mc13xxx_regulators[id].voltages[0] &&
-> +	    max_uV <= mc13xxx_regulators[id].voltages[0])
-> +		return 0;
-> +	else
-> +		return -EINVAL;
-> +}
-> +
-> +int mc13xxx_fixed_regulator_get_voltage(struct regulator_dev *rdev)
-> +{
-> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	struct mc13xxx_regulator *mc13xxx_regulators = priv->mc13xxx_regulators;
-> +	int id = rdev_get_id(rdev);
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> +
-> +	return mc13xxx_regulators[id].voltages[0];
-> +}
-> +
-> +struct regulator_ops mc13xxx_fixed_regulator_ops = {
-> +	.enable = mc13xxx_regulator_enable,
-> +	.disable = mc13xxx_regulator_disable,
-> +	.is_enabled = mc13xxx_regulator_is_enabled,
-> +	.list_voltage = mc13xxx_regulator_list_voltage,
-> +	.set_voltage = mc13xxx_fixed_regulator_set_voltage,
-> +	.get_voltage = mc13xxx_fixed_regulator_get_voltage,
-> +};
-> +
-> +int mc13xxx_sw_regulator(struct regulator_dev *rdev)
-> +{
-> +	return 0;
-> +}
-> +
-> +int mc13xxx_sw_regulator_is_enabled(struct regulator_dev *rdev)
-> +{
-> +	return 1;
-> +}
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Yong Shen <yong.shen@linaro.org>");
-> +MODULE_DESCRIPTION("Regulator Driver for Freescale MC13xxx PMIC");
-> +MODULE_ALIAS("platform:mc13xxx-regulator-core");
+> +#ifdef CONFIG_SOC_IMX28
+> +# define cpu_is_mx28()		(machine_is_mx28evk())
+> +#else
+> +# define cpu_is_mx28()		(0)
+> +#endif
+Why not just:
 
-How can this work ? From a quick look, nothing else is using
-mc13xxx-regulator-core.
+#define cpu_is_mx28()	(machine_is_mx28evk())
 
-> diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
-> index b4c741e..7d0f3d6 100644
-> --- a/include/linux/mfd/mc13783.h
-> +++ b/include/linux/mfd/mc13783.h
-> @@ -1,4 +1,5 @@
->  /*
-> + * Copyright 2010 Yong Shen <yong.shen@linaro.org>
->   * Copyright 2009-2010 Pengutronix
->   * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
->   *
-> @@ -122,39 +123,39 @@ int mc13783_adc_do_conversion(struct mc13783
-> *mc13783, unsigned int mode,
->  		unsigned int channel, unsigned int *sample);
+?  If MACH_MX28EVK isn't defined the macro expands so 0 anyhow.
 
-patch broken here.
+Uwe
 
->
->
-> -#define	MC13783_SW_SW1A		0
-> -#define	MC13783_SW_SW1B		1
-> -#define	MC13783_SW_SW2A		2
-> -#define	MC13783_SW_SW2B		3
-> -#define	MC13783_SW_SW3		4
-> -#define	MC13783_SW_PLL		5
-> -#define	MC13783_REGU_VAUDIO	6
-> -#define	MC13783_REGU_VIOHI	7
-> -#define	MC13783_REGU_VIOLO	8
-> -#define	MC13783_REGU_VDIG	9
-> -#define	MC13783_REGU_VGEN	10
-> -#define	MC13783_REGU_VRFDIG	11
-> -#define	MC13783_REGU_VRFREF	12
-> -#define	MC13783_REGU_VRFCP	13
-> -#define	MC13783_REGU_VSIM	14
-> -#define	MC13783_REGU_VESIM	15
-> -#define	MC13783_REGU_VCAM	16
-> -#define	MC13783_REGU_VRFBG	17
-> -#define	MC13783_REGU_VVIB	18
-> -#define	MC13783_REGU_VRF1	19
-> -#define	MC13783_REGU_VRF2	20
-> -#define	MC13783_REGU_VMMC1	21
-> -#define	MC13783_REGU_VMMC2	22
-> -#define	MC13783_REGU_GPO1	23
-> -#define	MC13783_REGU_GPO2	24
-> -#define	MC13783_REGU_GPO3	25
-> -#define	MC13783_REGU_GPO4	26
-> -#define	MC13783_REGU_V1		27
-> -#define	MC13783_REGU_V2		28
-> -#define	MC13783_REGU_V3		29
-> -#define	MC13783_REGU_V4		30
-> -#define	MC13783_REGU_PWGT1SPI	31
-> -#define	MC13783_REGU_PWGT2SPI	32
-> +#define	MC13783_REG_SW1A		0
-> +#define	MC13783_REG_SW1B		1
-> +#define	MC13783_REG_SW2A		2
-> +#define	MC13783_REG_SW2B		3
-> +#define	MC13783_REG_SW3		4
-> +#define	MC13783_REG_PLL		5
-> +#define	MC13783_REG_VAUDIO	6
-> +#define	MC13783_REG_VIOHI	7
-> +#define	MC13783_REG_VIOLO	8
-> +#define	MC13783_REG_VDIG	9
-> +#define	MC13783_REG_VGEN	10
-> +#define	MC13783_REG_VRFDIG	11
-> +#define	MC13783_REG_VRFREF	12
-> +#define	MC13783_REG_VRFCP	13
-> +#define	MC13783_REG_VSIM	14
-> +#define	MC13783_REG_VESIM	15
-> +#define	MC13783_REG_VCAM	16
-> +#define	MC13783_REG_VRFBG	17
-> +#define	MC13783_REG_VVIB	18
-> +#define	MC13783_REG_VRF1	19
-> +#define	MC13783_REG_VRF2	20
-> +#define	MC13783_REG_VMMC1	21
-> +#define	MC13783_REG_VMMC2	22
-> +#define	MC13783_REG_GPO1	23
-> +#define	MC13783_REG_GPO2	24
-> +#define	MC13783_REG_GPO3	25
-> +#define	MC13783_REG_GPO4	26
-> +#define	MC13783_REG_V1		27
-> +#define	MC13783_REG_V2		28
-> +#define	MC13783_REG_V3		29
-> +#define	MC13783_REG_V4		30
-> +#define	MC13783_REG_PWGT1SPI	31
-> +#define	MC13783_REG_PWGT2SPI	32
-
-
-What's the purpose of this mass renaming ?
-
-
-
-Arnaud
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
