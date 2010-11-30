@@ -1,52 +1,29 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 30 Nov 2010 10:34:53 +0530
-Subject: [PATCH][ ARM cpu hotplug 2/2 ] Use common cpu hotplug code for
-	UX500
-In-Reply-To: <AANLkTi=o=vAHY+ixcRgt7kfqsLP=NsiO6JPwF=+ADbJ9@mail.gmail.com>
-References: <AANLkTinOdaYoztaHCkbFhfRtuo4XEVaC+K_7aAB0N28N@mail.gmail.com>
-	<AANLkTinmnN+Ta3LCpmL6kfjYLyY8eA8GspEmqEaaS8-p@mail.gmail.com>
-	<AANLkTi=o=vAHY+ixcRgt7kfqsLP=NsiO6JPwF=+ADbJ9@mail.gmail.com>
-Message-ID: <AANLkTi=8a=5WtwM__fvL0W80bEZ=u7sNoCufXCwfua4Y@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 30 Nov 2010 10:24:11 -0600
+Subject: [PATCH][ ARM cpu hotplug 1/2 ] extract common code for arm cpu
+	hotplug
+In-Reply-To: <20101130110331.GA31054@n2100.arm.linux.org.uk>
+References: <AANLkTi=fJeOUhH0xUJF8qx-fTJ5popE7ZuVxDZXpTH-i@mail.gmail.com>	<AANLkTimz=xv92c6FN4i4c3Xs-t71L4PHv3SQg0jk-x-r@mail.gmail.com>	<20101129104149.GA10703@n2100.arm.linux.org.uk>	<AANLkTikHv+Rz7+bZY8Qo2drUQO4fjhJgqORcGFB7B6s7@mail.gmail.com>	<20101129192407.GA20761@n2100.arm.linux.org.uk>	<AANLkTimZfnmVMDZ2faUPpDHHv3oAhM9ZcVEpM0_MyHbq@mail.gmail.com>
+	<20101130110331.GA31054@n2100.arm.linux.org.uk>
+Message-ID: <4CF5252B.5050109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 29, 2010 at 7:31 PM, Sundar <sunder.svit@gmail.com> wrote:
-
-> Hi Vincent,
+On 11/30/2010 05:03 AM, Russell King - ARM Linux wrote:
+> On Tue, Nov 30, 2010 at 04:17:32PM +0530, Amit Kucheria wrote:
+>> Since the main aim here is to consolidate as much code here as
+>> possible while still allowing platforms to override the defaults,
+>> would you have an objection to the introduction of a struct smp_ops
+>> that'll allow a platform to override the defaults? This seems to be
+>> done on other platforms I've briefly looked at.
 >
-> > On Mon, Nov 29, 2010 at 3:19 PM, Vincent Guittot <
-> vincent.guittot at linaro.org> wrote:
-> >>
-> >> This patch extracts the common code of the cpu hotplug feature across
-> >> arm platforms. The goal is to only keep the specific stuff of the
-> >> platform in the sub-architecture. I have created a hotplug.c file in
-> >> the  arm/common directory after studying the cpu hotplug code of
-> >> omap2, realview, s5pv310, ux500 and tegra. I have extracted 3 main
-> >> platform dependent functions:
-> >>  -platform_enter_lowpower which prepares the platform for low power.
-> >>  -platform_do_lowpower on which the cpu will loop until it becomes
-> >> really plugged (spurious wake up). This function must returned the cpu
-> >> Id in order to leave the unplug state.
-> >>  -platform_leave_lowpower which restore the platform context.
-> >>  An ux500 patch is available which uses the common/hotplug.c code.
-> >> This patch is quite short because the idle / power down functions are
-> >> not yet upstreamed
-> >>
-> >
+> I see no point to what is being proposed in this thread.  It's _soo_
+> little code that the platforms have to implement that it really is
+> not worth the effort.
 >
-> I had posted a patch which does exactly the same thing sometime ago,
-> but it got dropped
-> off from the radar. The patch set can be referenced
-> @ http://www.spinics.net/lists/arm-kernel/msg97600.html
-> I remember getting it Acked by most of the platform maintainers, but
-> Russell had some
-> reservations on that.
->
+Whether the code can be consolidated or not, the current API does not 
+allow a single kernel binary (ignoring the list of other issues). The 
+introduction of struct smp_ops would help enable both single kernel and 
+default versions of the functions.
 
-It is unfortunate that we didn't catch that work when we started on this.
-Let us continue discussion on the other sub-thread of the current posting.
-
-/Amit
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101130/8e4f2145/attachment-0001.html>
+Rob
