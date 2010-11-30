@@ -1,99 +1,74 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:25:34 +0100
-Subject: [PATCH 02/54] ARM: ecard: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:25:40 +0100
+Subject: [PATCH 05/54] ARM: LoCoMo: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130132534.GC15575@mail.wantstofly.org>
+Message-ID: <20101130132540.GF15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/kernel/ecard.c |   28 ++++++++++++++--------------
- 1 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/common/locomo.c |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
-index eed2f79..2ad62df 100644
---- a/arch/arm/kernel/ecard.c
-+++ b/arch/arm/kernel/ecard.c
-@@ -443,40 +443,40 @@ static expansioncard_ops_t ecard_default_ops = {
-  *
-  * They are not meant to be called directly, but via enable/disable_irq.
-  */
--static void ecard_irq_unmask(unsigned int irqnr)
-+static void ecard_irq_unmask(struct irq_data *d)
- {
--	ecard_t *ec = slot_to_ecard(irqnr - 32);
-+	ecard_t *ec = slot_to_ecard(d->irq - 32);
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 9dff07c..a026a6b 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -144,7 +144,7 @@ static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+ 	int req, i;
  
- 	if (ec) {
- 		if (!ec->ops)
- 			ec->ops = &ecard_default_ops;
+ 	/* Acknowledge the parent IRQ */
+-	desc->chip->ack(irq);
++	desc->irq_data.chip->irq_ack(&desc->irq_data);
  
- 		if (ec->claimed && ec->ops->irqenable)
--			ec->ops->irqenable(ec, irqnr);
-+			ec->ops->irqenable(ec, d->irq);
- 		else
- 			printk(KERN_ERR "ecard: rejecting request to "
--				"enable IRQs for %d\n", irqnr);
-+				"enable IRQs for %d\n", d->irq);
+ 	/* check why this interrupt was generated */
+ 	req = locomo_readl(lchip->base + LOCOMO_ICR) & 0x0f00;
+@@ -161,33 +161,33 @@ static void locomo_handler(unsigned int irq, struct irq_desc *desc)
  	}
  }
  
--static void ecard_irq_mask(unsigned int irqnr)
-+static void ecard_irq_mask(struct irq_data *d)
+-static void locomo_ack_irq(unsigned int irq)
++static void locomo_ack_irq(struct irq_data *d)
  {
--	ecard_t *ec = slot_to_ecard(irqnr - 32);
-+	ecard_t *ec = slot_to_ecard(d->irq - 32);
- 
- 	if (ec) {
- 		if (!ec->ops)
- 			ec->ops = &ecard_default_ops;
- 
- 		if (ec->ops && ec->ops->irqdisable)
--			ec->ops->irqdisable(ec, irqnr);
-+			ec->ops->irqdisable(ec, d->irq);
- 	}
  }
  
- static struct irq_chip ecard_chip = {
--	.name	= "ECARD",
--	.ack	= ecard_irq_mask,
--	.mask	= ecard_irq_mask,
--	.unmask = ecard_irq_unmask,
-+	.name		= "ECARD",
-+	.irq_ack	= ecard_irq_mask,
-+	.irq_mask	= ecard_irq_mask,
-+	.irq_unmask	= ecard_irq_unmask,
+-static void locomo_mask_irq(unsigned int irq)
++static void locomo_mask_irq(struct irq_data *d)
+ {
+-	struct locomo *lchip = get_irq_chip_data(irq);
++	struct locomo *lchip = irq_data_get_irq_chip_data(d);
+ 	unsigned int r;
+ 	r = locomo_readl(lchip->base + LOCOMO_ICR);
+-	r &= ~(0x0010 << (irq - lchip->irq_base));
++	r &= ~(0x0010 << (d->irq - lchip->irq_base));
+ 	locomo_writel(r, lchip->base + LOCOMO_ICR);
+ }
+ 
+-static void locomo_unmask_irq(unsigned int irq)
++static void locomo_unmask_irq(struct irq_data *d)
+ {
+-	struct locomo *lchip = get_irq_chip_data(irq);
++	struct locomo *lchip = irq_data_get_irq_chip_data(d);
+ 	unsigned int r;
+ 	r = locomo_readl(lchip->base + LOCOMO_ICR);
+-	r |= (0x0010 << (irq - lchip->irq_base));
++	r |= (0x0010 << (d->irq - lchip->irq_base));
+ 	locomo_writel(r, lchip->base + LOCOMO_ICR);
+ }
+ 
+ static struct irq_chip locomo_chip = {
+-	.name	= "LOCOMO",
+-	.ack	= locomo_ack_irq,
+-	.mask	= locomo_mask_irq,
+-	.unmask	= locomo_unmask_irq,
++	.name		= "LOCOMO",
++	.irq_ack	= locomo_ack_irq,
++	.irq_mask	= locomo_mask_irq,
++	.irq_unmask	= locomo_unmask_irq,
  };
  
- void ecard_enablefiq(unsigned int fiqnr)
-@@ -551,7 +551,7 @@ static void ecard_check_lockup(struct irq_desc *desc)
- 			printk(KERN_ERR "\nInterrupt lockup detected - "
- 			       "disabling all expansion card interrupts\n");
- 
--			desc->chip->mask(IRQ_EXPANSIONCARD);
-+			desc->irq_data.chip->irq_mask(&desc->irq_data);
- 			ecard_dump_irq_state();
- 		}
- 	} else
-@@ -574,7 +574,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	ecard_t *ec;
- 	int called = 0;
- 
--	desc->chip->mask(irq);
-+	desc->irq_data.chip->irq_mask(&desc->irq_data);
- 	for (ec = cards; ec; ec = ec->next) {
- 		int pending;
- 
-@@ -591,7 +591,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			called ++;
- 		}
- 	}
--	desc->chip->unmask(irq);
-+	desc->irq_data.chip->irq_unmask(&desc->irq_data);
- 
- 	if (called == 0)
- 		ecard_check_lockup(desc);
+ static void locomo_setup_irq(struct locomo *lchip)
 -- 
 1.7.1
