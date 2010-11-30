@@ -1,161 +1,141 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:36:58 +0100
-Subject: [PATCH 28/54] ARM: lpc32xx: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:36:44 +0100
+Subject: [PATCH 19/54] ARM: integrator: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130133658.GC15575@mail.wantstofly.org>
+Message-ID: <20101130133644.GT15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-lpc32xx/irq.c |   56 +++++++++++++++++++++---------------------
- 1 files changed, 28 insertions(+), 28 deletions(-)
+ arch/arm/mach-integrator/integrator_ap.c |   16 +++++-----
+ arch/arm/mach-integrator/integrator_cp.c |   48 +++++++++++++++---------------
+ 2 files changed, 32 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/irq.c b/arch/arm/mach-lpc32xx/irq.c
-index bd0df26..316ecbf 100644
---- a/arch/arm/mach-lpc32xx/irq.c
-+++ b/arch/arm/mach-lpc32xx/irq.c
-@@ -191,38 +191,38 @@ static void get_controller(unsigned int irq, unsigned int *base,
- 	}
- }
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 548208f..ca363c1 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -156,21 +156,21 @@ static void __init ap_map_io(void)
  
--static void lpc32xx_mask_irq(unsigned int irq)
-+static void lpc32xx_mask_irq(struct irq_data *d)
+ #define INTEGRATOR_SC_VALID_INT	0x003fffff
+ 
+-static void sc_mask_irq(unsigned int irq)
++static void sc_mask_irq(struct irq_data *d)
  {
- 	unsigned int reg, ctrl, mask;
- 
--	get_controller(irq, &ctrl, &mask);
-+	get_controller(d->irq, &ctrl, &mask);
- 
- 	reg = __raw_readl(LPC32XX_INTC_MASK(ctrl)) & ~mask;
- 	__raw_writel(reg, LPC32XX_INTC_MASK(ctrl));
+-	writel(1 << irq, VA_IC_BASE + IRQ_ENABLE_CLEAR);
++	writel(1 << d->irq, VA_IC_BASE + IRQ_ENABLE_CLEAR);
  }
  
--static void lpc32xx_unmask_irq(unsigned int irq)
-+static void lpc32xx_unmask_irq(struct irq_data *d)
+-static void sc_unmask_irq(unsigned int irq)
++static void sc_unmask_irq(struct irq_data *d)
  {
- 	unsigned int reg, ctrl, mask;
- 
--	get_controller(irq, &ctrl, &mask);
-+	get_controller(d->irq, &ctrl, &mask);
- 
- 	reg = __raw_readl(LPC32XX_INTC_MASK(ctrl)) | mask;
- 	__raw_writel(reg, LPC32XX_INTC_MASK(ctrl));
+-	writel(1 << irq, VA_IC_BASE + IRQ_ENABLE_SET);
++	writel(1 << d->irq, VA_IC_BASE + IRQ_ENABLE_SET);
  }
  
--static void lpc32xx_ack_irq(unsigned int irq)
-+static void lpc32xx_ack_irq(struct irq_data *d)
- {
- 	unsigned int ctrl, mask;
- 
--	get_controller(irq, &ctrl, &mask);
-+	get_controller(d->irq, &ctrl, &mask);
- 
- 	__raw_writel(mask, LPC32XX_INTC_RAW_STAT(ctrl));
- 
- 	/* Also need to clear pending wake event */
--	if (lpc32xx_events[irq].mask != 0)
--		__raw_writel(lpc32xx_events[irq].mask,
--			lpc32xx_events[irq].event_group->rawstat_reg);
-+	if (lpc32xx_events[d->irq].mask != 0)
-+		__raw_writel(lpc32xx_events[d->irq].mask,
-+			lpc32xx_events[d->irq].event_group->rawstat_reg);
- }
- 
- static void __lpc32xx_set_irq_type(unsigned int irq, int use_high_level,
-@@ -261,27 +261,27 @@ static void __lpc32xx_set_irq_type(unsigned int irq, int use_high_level,
- 	}
- }
- 
--static int lpc32xx_set_irq_type(unsigned int irq, unsigned int type)
-+static int lpc32xx_set_irq_type(struct irq_data *d, unsigned int type)
- {
- 	switch (type) {
- 	case IRQ_TYPE_EDGE_RISING:
- 		/* Rising edge sensitive */
--		__lpc32xx_set_irq_type(irq, 1, 1);
-+		__lpc32xx_set_irq_type(d->irq, 1, 1);
- 		break;
- 
- 	case IRQ_TYPE_EDGE_FALLING:
- 		/* Falling edge sensitive */
--		__lpc32xx_set_irq_type(irq, 0, 1);
-+		__lpc32xx_set_irq_type(d->irq, 0, 1);
- 		break;
- 
- 	case IRQ_TYPE_LEVEL_LOW:
- 		/* Low level sensitive */
--		__lpc32xx_set_irq_type(irq, 0, 0);
-+		__lpc32xx_set_irq_type(d->irq, 0, 0);
- 		break;
- 
- 	case IRQ_TYPE_LEVEL_HIGH:
- 		/* High level sensitive */
--		__lpc32xx_set_irq_type(irq, 1, 0);
-+		__lpc32xx_set_irq_type(d->irq, 1, 0);
- 		break;
- 
- 	/* Other modes are not supported */
-@@ -290,33 +290,33 @@ static int lpc32xx_set_irq_type(unsigned int irq, unsigned int type)
- 	}
- 
- 	/* Ok to use the level handler for all types */
--	set_irq_handler(irq, handle_level_irq);
-+	set_irq_handler(d->irq, handle_level_irq);
- 
- 	return 0;
- }
- 
--static int lpc32xx_irq_wake(unsigned int irqno, unsigned int state)
-+static int lpc32xx_irq_wake(struct irq_data *d, unsigned int state)
- {
- 	unsigned long eventreg;
- 
--	if (lpc32xx_events[irqno].mask != 0) {
--		eventreg = __raw_readl(lpc32xx_events[irqno].
-+	if (lpc32xx_events[d->irq].mask != 0) {
-+		eventreg = __raw_readl(lpc32xx_events[d->irq].
- 			event_group->enab_reg);
- 
- 		if (state)
--			eventreg |= lpc32xx_events[irqno].mask;
-+			eventreg |= lpc32xx_events[d->irq].mask;
- 		else
--			eventreg &= ~lpc32xx_events[irqno].mask;
-+			eventreg &= ~lpc32xx_events[d->irq].mask;
- 
- 		__raw_writel(eventreg,
--			lpc32xx_events[irqno].event_group->enab_reg);
-+			lpc32xx_events[d->irq].event_group->enab_reg);
- 
- 		return 0;
- 	}
- 
- 	/* Clear event */
--	__raw_writel(lpc32xx_events[irqno].mask,
--		lpc32xx_events[irqno].event_group->rawstat_reg);
-+	__raw_writel(lpc32xx_events[d->irq].mask,
-+		lpc32xx_events[d->irq].event_group->rawstat_reg);
- 
- 	return -ENODEV;
- }
-@@ -336,11 +336,11 @@ static void __init lpc32xx_set_default_mappings(unsigned int apr,
- }
- 
- static struct irq_chip lpc32xx_irq_chip = {
--	.ack = lpc32xx_ack_irq,
--	.mask = lpc32xx_mask_irq,
--	.unmask = lpc32xx_unmask_irq,
--	.set_type = lpc32xx_set_irq_type,
--	.set_wake = lpc32xx_irq_wake
-+	.irq_ack = lpc32xx_ack_irq,
-+	.irq_mask = lpc32xx_mask_irq,
-+	.irq_unmask = lpc32xx_unmask_irq,
-+	.irq_set_type = lpc32xx_set_irq_type,
-+	.irq_set_wake = lpc32xx_irq_wake
+ static struct irq_chip sc_chip = {
+-	.name	= "SC",
+-	.ack	= sc_mask_irq,
+-	.mask	= sc_mask_irq,
+-	.unmask = sc_unmask_irq,
++	.name		= "SC",
++	.irq_ack	= sc_mask_irq,
++	.irq_mask	= sc_mask_irq,
++	.irq_unmask	= sc_unmask_irq,
  };
  
- static void lpc32xx_sic1_handler(unsigned int irq, struct irq_desc *desc)
+ static void __init ap_init_irq(void)
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 6258c90..f0f16d4 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -147,61 +147,61 @@ static void __init intcp_map_io(void)
+ #define sic_writel	__raw_writel
+ #define sic_readl	__raw_readl
+ 
+-static void cic_mask_irq(unsigned int irq)
++static void cic_mask_irq(struct irq_data *d)
+ {
+-	irq -= IRQ_CIC_START;
++	unsigned int irq = d->irq - IRQ_CIC_START;
+ 	cic_writel(1 << irq, INTCP_VA_CIC_BASE + IRQ_ENABLE_CLEAR);
+ }
+ 
+-static void cic_unmask_irq(unsigned int irq)
++static void cic_unmask_irq(struct irq_data *d)
+ {
+-	irq -= IRQ_CIC_START;
++	unsigned int irq = d->irq - IRQ_CIC_START;
+ 	cic_writel(1 << irq, INTCP_VA_CIC_BASE + IRQ_ENABLE_SET);
+ }
+ 
+ static struct irq_chip cic_chip = {
+-	.name	= "CIC",
+-	.ack	= cic_mask_irq,
+-	.mask	= cic_mask_irq,
+-	.unmask	= cic_unmask_irq,
++	.name		= "CIC",
++	.irq_ack	= cic_mask_irq,
++	.irq_mask	= cic_mask_irq,
++	.irq_unmask	= cic_unmask_irq,
+ };
+ 
+-static void pic_mask_irq(unsigned int irq)
++static void pic_mask_irq(struct irq_data *d)
+ {
+-	irq -= IRQ_PIC_START;
++	unsigned int irq = d->irq - IRQ_PIC_START;
+ 	pic_writel(1 << irq, INTCP_VA_PIC_BASE + IRQ_ENABLE_CLEAR);
+ }
+ 
+-static void pic_unmask_irq(unsigned int irq)
++static void pic_unmask_irq(struct irq_data *d)
+ {
+-	irq -= IRQ_PIC_START;
++	unsigned int irq = d->irq - IRQ_PIC_START;
+ 	pic_writel(1 << irq, INTCP_VA_PIC_BASE + IRQ_ENABLE_SET);
+ }
+ 
+ static struct irq_chip pic_chip = {
+-	.name	= "PIC",
+-	.ack	= pic_mask_irq,
+-	.mask	= pic_mask_irq,
+-	.unmask = pic_unmask_irq,
++	.name		= "PIC",
++	.irq_ack	= pic_mask_irq,
++	.irq_mask	= pic_mask_irq,
++	.irq_unmask	= pic_unmask_irq,
+ };
+ 
+-static void sic_mask_irq(unsigned int irq)
++static void sic_mask_irq(struct irq_data *d)
+ {
+-	irq -= IRQ_SIC_START;
++	unsigned int irq = d->irq - IRQ_SIC_START;
+ 	sic_writel(1 << irq, INTCP_VA_SIC_BASE + IRQ_ENABLE_CLEAR);
+ }
+ 
+-static void sic_unmask_irq(unsigned int irq)
++static void sic_unmask_irq(struct irq_data *d)
+ {
+-	irq -= IRQ_SIC_START;
++	unsigned int irq = d->irq - IRQ_SIC_START;
+ 	sic_writel(1 << irq, INTCP_VA_SIC_BASE + IRQ_ENABLE_SET);
+ }
+ 
+ static struct irq_chip sic_chip = {
+-	.name	= "SIC",
+-	.ack	= sic_mask_irq,
+-	.mask	= sic_mask_irq,
+-	.unmask	= sic_unmask_irq,
++	.name		= "SIC",
++	.irq_ack	= sic_mask_irq,
++	.irq_mask	= sic_mask_irq,
++	.irq_unmask	= sic_unmask_irq,
+ };
+ 
+ static void
 -- 
 1.7.1
