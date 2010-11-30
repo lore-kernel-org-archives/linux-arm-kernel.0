@@ -1,34 +1,31 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 30 Nov 2010 15:26:14 -0200
-Subject: [PATCH v3 1/2] ARM: mx5: dynamically allocate pwm devices
-Message-ID: <1291137975-9069-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Nov 2010 18:07:18 +0000
+Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores
+	during IRQ enable
+In-Reply-To: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
+References: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
+Message-ID: <20101130180718.GB8521@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/devices/platform-mxc_pwm.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+On Wed, Nov 03, 2010 at 05:46:02PM -0400, Stephen Caudle wrote:
+> Some multi-core ARM chips designate a unique IRQ number for each core for
+> private peripheral interrupts (PPIs). Others designate a common IRQ number
+> for all cores. In the latter case, requesting/freeing private peripheral
+> interrupts currently unmasks/masks the interrupt for only the
+> executing core, respectively.
+> 
+> With this change, request_irq will unmask a PPI on all cores so a separate
+> call to enable_irq on the other cores is not required. Likewise, free_irq
+> will mask a PPI on the other cores. Also, shutdown is implemented instead
+> of disable to allow for lazy IRQ disabling.
 
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-index 3d8ebdb..a5e1581 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-+++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-@@ -40,6 +40,15 @@ const struct imx_mxc_pwm_data imx27_mxc_pwm_data __initconst =
- 	imx_mxc_pwm_data_entry_single(MX27, 0, , SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX27 */
- 
-+#ifdef CONFIG_SOC_IMX51
-+const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
-+#define imx51_mxc_pwm_data_entry(_id, _hwid)				\
-+	imx_mxc_pwm_data_entry(MX51, _id, _hwid, SZ_16K)
-+	imx51_mxc_pwm_data_entry(0, 1),
-+	imx51_mxc_pwm_data_entry(1, 2),
-+};
-+#endif /* ifdef CONFIG_SOC_IMX51 */
-+
- struct platform_device *__init imx_add_mxc_pwm(
- 		const struct imx_mxc_pwm_data *data)
- {
--- 
-1.6.0.4
+Sorry, missed this.
+
+If it's a private peripheral, it can only be accessed from its associated
+CPU.  What that means is you don't want to enable the interrupt on other
+CPUs as the peripheral may not be present or initialized on that CPU.
+
+So I'm nervous about this change - architecturally it feels like the
+wrong thing to do to take the PPI interrupts through the generic IRQ
+infrastructure.
