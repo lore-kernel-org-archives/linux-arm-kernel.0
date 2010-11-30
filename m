@@ -1,29 +1,38 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Tue, 30 Nov 2010 16:17:58 +0200
-Subject: [PATCH] arm: omap2: io: fix clk_get() error check
-Message-ID: <1291126678-2782-1-git-send-email-aaro.koskinen@nokia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Nov 2010 15:18:30 +0100
+Subject: [PATCH 09/10] MCDE: Add build files and bus
+In-Reply-To: <201011261224.59490.arnd@arndb.de>
+References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
+	<201011251747.48365.arnd@arndb.de>
+	<C832F8F5D375BD43BFA11E82E0FE9FE0082586F430@EXDCVYMBSTM005.EQ1STM.local>
+	<201011261224.59490.arnd@arndb.de>
+Message-ID: <AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_get() return value should be checked with IS_ERR().
+2010/11/26 Arnd Bergmann <arnd@arndb.de>:
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
----
- arch/arm/mach-omap2/io.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> * When you say that the devices are static, I hope you do not mean
+> ?static in the C language sense. We used to allow devices to be
+> ?declared as "static struct" and registered using
+> ?platform_device_register (or other bus specific functions). This
+> ?is no longer valid and we are removing the existing users, do not
+> ?add new ones. When creating a platform device, use
+> ?platform_device_register_simple or platform_device_register_resndata.
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 40562dd..a1939b1 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -297,7 +297,7 @@ static int __init _omap2_init_reprogram_sdrc(void)
- 		return 0;
- 
- 	dpll3_m2_ck = clk_get(NULL, "dpll3_m2_ck");
--	if (!dpll3_m2_ck)
-+	if (IS_ERR(dpll3_m2_ck))
- 		return -EINVAL;
- 
- 	rate = clk_get_rate(dpll3_m2_ck);
--- 
-1.5.6.5
+Is this part of the generic ARM runtime multi-platform kernel
+and device trees shebang?
+
+The Ux500 still isn't in that sector, it needs extensive rewriting
+of arch/arm/mach-ux500 to be done first, so as to support e.g.
+U8500 and U5500 with a single kernel image.
+
+Trying to skin that cat that as part of this review is a bit too
+much to ask IMO, I'd rather have the author of this driver
+adapt to whatever platform data registration mechanism is
+in place for the merge window. Else it needs fixing as part
+of a bigger endavour to root out compile-time platform
+configuration.
+
+Yours
+Linus Walleij
