@@ -1,71 +1,178 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Tue, 30 Nov 2010 17:49:07 +0200
-Subject: [GIT PULL] Samsung fixes for 2.6.37-rc4
-In-Reply-To: <006601cb9024$c9369110$5ba3b330$%kim@samsung.com>
-References: <008201cb8c58$363980e0$a2ac82a0$%kim@samsung.com>
-	<4CEFFBE6.9040909@gmail.com>
-	<006601cb9024$c9369110$5ba3b330$%kim@samsung.com>
-Message-ID: <AANLkTinuYg2LzwZJUnpT0-b3Gi+vOJr-_fi4o874DAFG@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Nov 2010 16:48:53 +0100
+Subject: [PATCH 05/15] ARM: mxs: Add low-level debug UART support
+In-Reply-To: <1290754154-9428-6-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1290754154-9428-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101130154853.GP20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben, Kukjin,
-
-could you please both find out who must 'handle' it?
-Do you think it's normal to force people to ping you for the same four
-lines patch for 4 months or more?
-I think, it's at least not optimal and not good for kernel development process.
-
-thanks,
-Darius
-
-
-On Tue, Nov 30, 2010 at 2:23 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Darius Augulis wrote:
->>
->> Hi Kukjin,
->>
-> Hi,
->
->> you have missed "serial: samsung: fix device name" again.
->> Please, don't forget to add it to your tree, better do it right now.
->> Perhaps it's fifth or sixth time when remind about that...
->>
-> I remember, I've replied about that like following.
-> Maybe you missed...
->
+On Fri, Nov 26, 2010 at 02:49:04PM +0800, Shawn Guo wrote:
+> * DEBUG_LL support, which is incompatible with single MXS image
+>   because of different DUART base address on MX23 and MX28
+> * uncompress message support
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
->> you have missed "serial: samsung: fix device name" which is hanging here
->> for a long time and was decided to merge in 2.6.37-rc1.
->> Please, pick it up.
->>
-> Hmm...I thought it should be handled by Ben Dooks at that time.
->
-> Anyway, as Ben said, I'm thinking it should be sent upstream when merge
-> window
-> even though have missed it in the last merge window.
->
-> However, if Ben is ok to merge this during 37-rc, will merge it into
-> s5p-fixes-
-> for-linus for 37-rc.
-> ---
->
-> But I still thinking it should be handled by Ben Dooks...
+>  arch/arm/mach-mxs/include/mach/debug-macro.S |   51 ++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/uncompress.h  |   82 ++++++++++++++++++++++++++
+>  2 files changed, 133 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
+>  create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
+> 
+> diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+> new file mode 100644
+> index 0000000..efb3173
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+> @@ -0,0 +1,51 @@
+> +/* arch/arm/mach-mxs/include/mach/debug-macro.S
+> + *
+> + * Debugging macro include header
+> + *
+> + *  Copyright (C) 1994-1999 Russell King
+> + *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <mach/hardware.h>
+> +
+> +#ifdef CONFIG_SOC_IMX23
+> +#ifdef UART_PADDR
+> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> +#endif
+> +#define UART_PADDR	MX23_DUART_BASE_ADDR
+> +#endif
+> +
+> +#ifdef CONFIG_SOC_IMX28
+> +#ifdef UART_PADDR
+> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> +#endif
+> +#define UART_PADDR	MX28_DUART_BASE_ADDR
+> +#endif
+> +
+> +#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
+> +
+> +		.macro	addruart, rp, rv
+> +		ldr	\rp, =UART_PADDR	@ physical
+> +		ldr	\rv, =UART_VADDR	@ virtual
+> +		.endm
+> +
+> +		.macro	senduart, rd, rx
+> +		str	\rd, [\rx, #0x0]	@ DR
+> +		.endm
+> +
+> +		.macro	waituart, rd, rx
+> +1001:		ldr	\rd, [\rx, #0x18]	@ FR
+> +		tst	\rd, #1 << 5		@ FR_TXFF
+> +		bne	1001b
+> +		.endm
+> +
+> +		.macro	busyuart, rd, rx
+> +1002:		ldr	\rd, [\rx, #0x18]	@ FR
+> +		tst	\rd, #1 << 3		@ FR_BUSY
+> +		beq	1002b
+> +		.endm
+> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+> new file mode 100644
+> index 0000000..47e5479
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+> @@ -0,0 +1,82 @@
+> +/*
+> + *  arch/arm/mach-mxs/include/mach/uncompress.h
+> + *
+> + *  Copyright (C) 1999 ARM Limited
+> + *  Copyright (C) Shane Nay (shane at minirl.com)
+> + *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#ifndef __MACH_MXS_UNCOMPRESS_H__
+> +#define __MACH_MXS_UNCOMPRESS_H__
+> +
+> +#define __MXS_BOOT_UNCOMPRESS
+> +
+> +#include <asm/mach-types.h>
+> +
+> +static unsigned long uart_base;
+> +
+> +#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
+> +
+> +#define DR		0x00
+> +#define FR		0x18
+> +#define FR_BUSY		(1 << 3)
+> +#define FR_TXFE		(1 << 7)
+> +#define CR		0x30
+> +#define CR_UARTEN	1
+> +
+> +/*
+> + * The following code assumes the serial port has already been
+> + * initialized by the bootloader.  We search for the first enabled
+> + * port in the most probable order.  If you didn't setup a port in
+> + * your bootloader then nothing will appear (which might be desired).
+> + *
+> + * This does not append a newline
+> + */
+This comment seems wrong.
 
-handle what? You have Ben ack to merge it. I'm confused how 'optimal'
-is development process when have to ping the same people for the same
-four lines patch for 4 months. You both  Do you think I really have to
-ask help for arm, serial or linux-stable maintainers to 'hadle' this?
-Because I gave up believing it's possible to do by samsung
-maintainers.
+> +static void putc(int ch)
+> +{
+> +	if (!uart_base)
+> +		return;
+> +	if (!(UART(CR) & CR_UARTEN))
+> +		return;
+> +
+> +	while (!(UART(FR) & FR_TXFE))
+> +		barrier();
+> +
+> +	UART(DR) = ch;
+> +}
+> +
+> +static inline void flush(void)
+> +{
+> +}
+> +
+> +#define MX23_DUART_BASE_ADDR	0x80070000
+> +#define MX28_DUART_BASE_ADDR	0x80074000
+> +
+> +static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+> +{
+> +	switch (arch_id) {
+> +	case MACH_TYPE_MX23EVK:
+> +		uart_base = MX23_DUART_BASE_ADDR;
+> +		break;
+> +	case MACH_TYPE_MX28EVK:
+> +		uart_base = MX28_DUART_BASE_ADDR;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+> +#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
+> +#define arch_decomp_wdog()
+> +
+> +#endif /* __MACH_MXS_UNCOMPRESS_H__ */
+> -- 
+> 1.7.1
+> 
+> 
+> 
 
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
