@@ -1,46 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 30 Nov 2010 19:22:48 +0100
-Subject: [PATCH] ARM: mx5: fix keypad clock
-In-Reply-To: <1291137573-8855-1-git-send-email-fabio.estevam@freescale.com>
-References: <1291137573-8855-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20101130182248.GU20449@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Nov 2010 18:40:49 +0000
+Subject: [PATCH 09/10] MCDE: Add build files and bus
+In-Reply-To: <201011301621.48140.arnd@arndb.de>
+References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
+	<201011261224.59490.arnd@arndb.de>
+	<AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
+	<201011301621.48140.arnd@arndb.de>
+Message-ID: <20101130184049.GC8521@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Nov 30, 2010 at 03:19:33PM -0200, Fabio Estevam wrote:
-> This fixes the following error during keypad driver probe:
+On Tue, Nov 30, 2010 at 04:21:47PM +0100, Arnd Bergmann wrote:
+> On Tuesday 30 November 2010, Linus Walleij wrote:
+> > 2010/11/26 Arnd Bergmann <arnd@arndb.de>:
+> > 
+> > > * When you say that the devices are static, I hope you do not mean
+> > >  static in the C language sense. We used to allow devices to be
+> > >  declared as "static struct" and registered using
+> > >  platform_device_register (or other bus specific functions). This
+> > >  is no longer valid and we are removing the existing users, do not
+> > >  add new ones. When creating a platform device, use
+> > >  platform_device_register_simple or platform_device_register_resndata.
+> > 
+> > Is this part of the generic ARM runtime multi-platform kernel
+> > and device trees shebang?
+> > 
+> > The Ux500 still isn't in that sector, it needs extensive rewriting
+> > of arch/arm/mach-ux500 to be done first, so as to support e.g.
+> > U8500 and U5500 with a single kernel image.
+> > 
+> > Trying to skin that cat that as part of this review is a bit too
+> > much to ask IMO, I'd rather have the author of this driver
+> > adapt to whatever platform data registration mechanism is
+> > in place for the merge window. Else it needs fixing as part
+> > of a bigger endavour to root out compile-time platform
+> > configuration.
 > 
-> imx-keypad imx-keypad: failed to get keypad clock
-> imx-keypad: probe of imx-keypad failed with error -2
+> The 'no static devices' rule is something that Greg brought up
+> at the embedded developer session during PlumbersConf this year,
+> I wasn't aware of the problem before that either.
 > 
-> Register keypad clock the same way as other imx platforms.
+> It is not related to the multi-platform kernel work and it's
+> not ARM specific.
 > 
-> Tested keypad succesfully on a MX51_3DS board.
-s/succesfully/successfully/
+> Maybe Greg can give a short explanation of the impact of this.
+> AFAIR, static device definitions still work, but there are
+> plans to remove that capability in the future.
 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51-mx53.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> index 344ee8e..86fa0f4 100644
-> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> @@ -1091,7 +1091,7 @@ static struct clk_lookup mx51_lookups[] = {
->  	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
-> -	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
-> +	_REGISTER_CLOCK(NULL, "kpp", kpp_clk)
-IMHO this is a step backwards.  Better fix the driver to use the right
-clock.
+There's lots of static devices, not only platform devices, in the ARM
+tree.  It's going to be a hell of a lot of work to fix this all up
+properly.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I hope that the capability for static devices won't disappear until
+the huge pile of work on ARM has been completed.
