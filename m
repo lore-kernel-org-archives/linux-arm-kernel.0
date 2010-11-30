@@ -1,73 +1,37 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:41:08 +0100
-Subject: [PATCH 36/54] ARM: omap2: irq_data conversion.
-In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130134108.GK15575@mail.wantstofly.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Nov 2010 13:49:32 -0000
+Subject: ARM perf events spin locks
+In-Reply-To: <20101130105856.GC4398@pulham.picochip.com>
+References: <20101130100802.GB4398@pulham.picochip.com>
+	<004101cb907b$16f911b0$44eb3510$@deacon@arm.com>
+	<20101130105856.GC4398@pulham.picochip.com>
+Message-ID: <004401cb9095$6b1fbcc0$415f3640$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
----
- arch/arm/mach-omap2/irq.c |   22 ++++++++++++----------
- 1 files changed, 12 insertions(+), 10 deletions(-)
+Jamie,
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 32eeabe..3d17ef6 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -100,13 +100,14 @@ static int omap_check_spurious(unsigned int irq)
- }
- 
- /* XXX: FIQ and additional INTC support (only MPU at the moment) */
--static void omap_ack_irq(unsigned int irq)
-+static void omap_ack_irq(struct irq_data *d)
- {
- 	intc_bank_write_reg(0x1, &irq_banks[0], INTC_CONTROL);
- }
- 
--static void omap_mask_irq(unsigned int irq)
-+static void omap_mask_irq(struct irq_data *d)
- {
-+	unsigned int irq = d->irq;
- 	int offset = irq & (~(IRQ_BITS_PER_REG - 1));
- 
- 	if (cpu_is_omap34xx()) {
-@@ -128,8 +129,9 @@ static void omap_mask_irq(unsigned int irq)
- 	intc_bank_write_reg(1 << irq, &irq_banks[0], INTC_MIR_SET0 + offset);
- }
- 
--static void omap_unmask_irq(unsigned int irq)
-+static void omap_unmask_irq(struct irq_data *d)
- {
-+	unsigned int irq = d->irq;
- 	int offset = irq & (~(IRQ_BITS_PER_REG - 1));
- 
- 	irq &= (IRQ_BITS_PER_REG - 1);
-@@ -137,17 +139,17 @@ static void omap_unmask_irq(unsigned int irq)
- 	intc_bank_write_reg(1 << irq, &irq_banks[0], INTC_MIR_CLEAR0 + offset);
- }
- 
--static void omap_mask_ack_irq(unsigned int irq)
-+static void omap_mask_ack_irq(struct irq_data *d)
- {
--	omap_mask_irq(irq);
--	omap_ack_irq(irq);
-+	omap_mask_irq(d);
-+	omap_ack_irq(d);
- }
- 
- static struct irq_chip omap_irq_chip = {
--	.name	= "INTC",
--	.ack	= omap_mask_ack_irq,
--	.mask	= omap_mask_irq,
--	.unmask	= omap_unmask_irq,
-+	.name		= "INTC",
-+	.irq_ack	= omap_mask_ack_irq,
-+	.irq_mask	= omap_mask_irq,
-+	.irq_unmask	= omap_unmask_irq,
- };
- 
- static void __init omap_irq_bank_init_one(struct omap_irq_bank *bank)
--- 
-1.7.1
+> On Tue, Nov 30, 2010 at 10:41:04AM -0000, Will Deacon wrote:
+> > > Hi Will,
+> >
+> > Hello,
+> >
+> > > I think we should convert the spinlocks in the ARM perf events code to raw
+> > > spinlocks for realtime. Should we wait for your split set to get merged first
+> > > before doing this?
+> >
+> > Since this is a logically separate change, I think we're better off waiting
+> > until the split stuff has been merged. As for the raw spinlocks, by realtime
+> > do you mean PREEMPT_RT? Also, do we actually *need* raw spinlocks in the perf
+> > code?
+> Yes, I meant PREEMPT_RT. It won't stop working without raw spinlocks but I'm
+> not convinced that we couldn't lose too much accuracy with normal spinlocks. I
+> am however willing to be convinced otherwise!
+
+Well struct perf_event_ctx has a lock field which is of type raw_spinlock_t.
+I *think* this is always held by the core perf code before calling the backend,
+however IRQs may still be enabled so we probably do need to change our pmu_lock.
+
+Is that a sane analysis?
+
+Will
