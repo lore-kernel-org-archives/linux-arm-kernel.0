@@ -1,38 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Nov 2010 15:18:30 +0100
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <201011261224.59490.arnd@arndb.de>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011251747.48365.arnd@arndb.de>
-	<C832F8F5D375BD43BFA11E82E0FE9FE0082586F430@EXDCVYMBSTM005.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-Message-ID: <AANLkTinCYdb8p4-H+Aki-z+i7ZL2ETwGJdDxOQ4XpBJ+@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Nov 2010 14:31:41 +0000
+Subject: ARM perf events spin locks
+In-Reply-To: <004601cb9096$c3a5d3b0$4af17b10$@deacon@arm.com>
+References: <20101130100802.GB4398@pulham.picochip.com>
+	<004101cb907b$16f911b0$44eb3510$@deacon@arm.com>
+	<20101130105856.GC4398@pulham.picochip.com>
+	<004401cb9095$6b1fbcc0$415f3640$@deacon@arm.com>
+	<20101130135407.GH4398@pulham.picochip.com>
+	<004601cb9096$c3a5d3b0$4af17b10$@deacon@arm.com>
+Message-ID: <20101130143141.GA2377@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/26 Arnd Bergmann <arnd@arndb.de>:
+On Tue, Nov 30, 2010 at 01:59:10PM -0000, Will Deacon wrote:
+> > > Well struct perf_event_ctx has a lock field which is of type raw_spinlock_t.
+> > > I *think* this is always held by the core perf code before calling the backend,
+> > > however IRQs may still be enabled so we probably do need to change our pmu_lock.
+> > >
+> > > Is that a sane analysis?
+> > That sounds perfectly reasonable to me! We don't hold these locks for any
+> > potentially long periods of time so it's probably better to be safe! Do you
+> > want me to make this change after perf-split is merged or is that something
+> > you're happy to do?
+> 
+> I don't mind doing it as a separate patch after Russell has pulled my
+> perf-split branch.
 
-> * When you say that the devices are static, I hope you do not mean
-> ?static in the C language sense. We used to allow devices to be
-> ?declared as "static struct" and registered using
-> ?platform_device_register (or other bus specific functions). This
-> ?is no longer valid and we are removing the existing users, do not
-> ?add new ones. When creating a platform device, use
-> ?platform_device_register_simple or platform_device_register_resndata.
+You mean this?
 
-Is this part of the generic ARM runtime multi-platform kernel
-and device trees shebang?
+commit f1690d17d2c7afa2a2079e3c91eb2bca8c1c5ecd
+Merge: 612275a 43eab87
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Fri Nov 26 10:26:43 2010 +0000
 
-The Ux500 still isn't in that sector, it needs extensive rewriting
-of arch/arm/mach-ux500 to be done first, so as to support e.g.
-U8500 and U5500 with a single kernel image.
+    Merge branch 'perf-split' of git://linux-arm.org/linux-2.6-wd into devel-stable
 
-Trying to skin that cat that as part of this review is a bit too
-much to ask IMO, I'd rather have the author of this driver
-adapt to whatever platform data registration mechanism is
-in place for the merge window. Else it needs fixing as part
-of a bigger endavour to root out compile-time platform
-configuration.
-
-Yours
-Linus Walleij
+Sorry, I didn't push the tree out for a week or so because I was busy with
+other things (like the pgtable stuff.)
