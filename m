@@ -1,228 +1,156 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:41:23 +0100
-Subject: [PATCH 51/54] ARM: plat-omap: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:41:24 +0100
+Subject: [PATCH 52/54] ARM: plat-orion: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130134123.GZ15575@mail.wantstofly.org>
+Message-ID: <20101130134124.GA15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/plat-omap/gpio.c |   93 ++++++++++++++++++++++-----------------------
- 1 files changed, 46 insertions(+), 47 deletions(-)
+ arch/arm/plat-orion/gpio.c |   37 ++++++++++++++++++-------------------
+ arch/arm/plat-orion/irq.c  |   18 +++++++++---------
+ 2 files changed, 27 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index c05c653..1e83b6b 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -878,17 +878,17 @@ bad:
- 	return -EINVAL;
- }
- 
--static int gpio_irq_type(unsigned irq, unsigned type)
-+static int gpio_irq_type(struct irq_data *d, unsigned type)
- {
- 	struct gpio_bank *bank;
- 	unsigned gpio;
- 	int retval;
- 	unsigned long flags;
- 
--	if (!cpu_class_is_omap2() && irq > IH_MPUIO_BASE)
--		gpio = OMAP_MPUIO(irq - IH_MPUIO_BASE);
-+	if (!cpu_class_is_omap2() && d->irq > IH_MPUIO_BASE)
-+		gpio = OMAP_MPUIO(d->irq - IH_MPUIO_BASE);
- 	else
--		gpio = irq - IH_GPIO_BASE;
-+		gpio = d->irq - IH_GPIO_BASE;
- 
- 	if (check_gpio(gpio) < 0)
- 		return -EINVAL;
-@@ -901,19 +901,19 @@ static int gpio_irq_type(unsigned irq, unsigned type)
- 			&& (type & (IRQ_TYPE_LEVEL_LOW|IRQ_TYPE_LEVEL_HIGH)))
- 		return -EINVAL;
- 
--	bank = get_irq_chip_data(irq);
-+	bank = irq_data_get_irq_chip_data(d);
- 	spin_lock_irqsave(&bank->lock, flags);
- 	retval = _set_gpio_triggering(bank, get_gpio_index(gpio), type);
- 	if (retval == 0) {
--		irq_desc[irq].status &= ~IRQ_TYPE_SENSE_MASK;
--		irq_desc[irq].status |= type;
-+		irq_desc[d->irq].status &= ~IRQ_TYPE_SENSE_MASK;
-+		irq_desc[d->irq].status |= type;
- 	}
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
- 	if (type & (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH))
--		__set_irq_handler_unlocked(irq, handle_level_irq);
-+		__set_irq_handler_unlocked(d->irq, handle_level_irq);
- 	else if (type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
--		__set_irq_handler_unlocked(irq, handle_edge_irq);
-+		__set_irq_handler_unlocked(d->irq, handle_edge_irq);
- 
- 	return retval;
- }
-@@ -1170,15 +1170,15 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
- }
- 
- /* Use disable_irq_wake() and enable_irq_wake() functions from drivers */
--static int gpio_wake_enable(unsigned int irq, unsigned int enable)
-+static int gpio_wake_enable(struct irq_data *d, unsigned int enable)
- {
--	unsigned int gpio = irq - IH_GPIO_BASE;
-+	unsigned int gpio = d->irq - IH_GPIO_BASE;
- 	struct gpio_bank *bank;
- 	int retval;
- 
- 	if (check_gpio(gpio) < 0)
- 		return -ENODEV;
--	bank = get_irq_chip_data(irq);
-+	bank = irq_data_get_irq_chip_data(d);
- 	retval = _set_gpio_wakeup(bank, get_gpio_index(gpio), enable);
- 
- 	return retval;
-@@ -1291,7 +1291,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	u32 retrigger = 0;
- 	int unmasked = 0;
- 
--	desc->chip->ack(irq);
-+	desc->irq_data.chip->irq_ack(&desc->irq_data);
- 
- 	bank = get_irq_data(irq);
- #ifdef CONFIG_ARCH_OMAP1
-@@ -1343,7 +1343,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		configured, we could unmask GPIO bank interrupt immediately */
- 		if (!level_mask && !unmasked) {
- 			unmasked = 1;
--			desc->chip->unmask(irq);
-+			desc->irq_data.chip->irq_unmask(&desc->irq_data);
- 		}
- 
- 		isr |= retrigger;
-@@ -1378,41 +1378,40 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	handler(s) are executed in order to avoid spurious bank
- 	interrupt */
- 	if (!unmasked)
--		desc->chip->unmask(irq);
+diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+index e814803..5f35223 100644
+--- a/arch/arm/plat-orion/gpio.c
++++ b/arch/arm/plat-orion/gpio.c
+@@ -232,20 +232,19 @@ EXPORT_SYMBOL(orion_gpio_set_blink);
+  *        polarity    LEVEL          mask
+  *
+  ****************************************************************************/
 -
-+		desc->irq_data.chip->irq_unmask(&desc->irq_data);
+-static void gpio_irq_ack(u32 irq)
++static void gpio_irq_ack(struct irq_data *d)
+ {
+-	int type = irq_desc[irq].status & IRQ_TYPE_SENSE_MASK;
++	int type = irq_desc[d->irq].status & IRQ_TYPE_SENSE_MASK;
+ 	if (type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)) {
+-		int pin = irq_to_gpio(irq);
++		int pin = irq_to_gpio(d->irq);
+ 		writel(~(1 << (pin & 31)), GPIO_EDGE_CAUSE(pin));
+ 	}
  }
  
--static void gpio_irq_shutdown(unsigned int irq)
-+static void gpio_irq_shutdown(struct irq_data *d)
+-static void gpio_irq_mask(u32 irq)
++static void gpio_irq_mask(struct irq_data *d)
  {
--	unsigned int gpio = irq - IH_GPIO_BASE;
--	struct gpio_bank *bank = get_irq_chip_data(irq);
-+	unsigned int gpio = d->irq - IH_GPIO_BASE;
-+	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
- 
- 	_reset_gpio(bank, gpio);
+-	int pin = irq_to_gpio(irq);
+-	int type = irq_desc[irq].status & IRQ_TYPE_SENSE_MASK;
++	int pin = irq_to_gpio(d->irq);
++	int type = irq_desc[d->irq].status & IRQ_TYPE_SENSE_MASK;
+ 	u32 reg = (type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)) ?
+ 		GPIO_EDGE_MASK(pin) : GPIO_LEVEL_MASK(pin);
+ 	u32 u = readl(reg);
+@@ -253,10 +252,10 @@ static void gpio_irq_mask(u32 irq)
+ 	writel(u, reg);
  }
  
--static void gpio_ack_irq(unsigned int irq)
-+static void gpio_ack_irq(struct irq_data *d)
+-static void gpio_irq_unmask(u32 irq)
++static void gpio_irq_unmask(struct irq_data *d)
  {
--	unsigned int gpio = irq - IH_GPIO_BASE;
--	struct gpio_bank *bank = get_irq_chip_data(irq);
-+	unsigned int gpio = d->irq - IH_GPIO_BASE;
-+	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
- 
- 	_clear_gpio_irqstatus(bank, gpio);
+-	int pin = irq_to_gpio(irq);
+-	int type = irq_desc[irq].status & IRQ_TYPE_SENSE_MASK;
++	int pin = irq_to_gpio(d->irq);
++	int type = irq_desc[d->irq].status & IRQ_TYPE_SENSE_MASK;
+ 	u32 reg = (type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)) ?
+ 		GPIO_EDGE_MASK(pin) : GPIO_LEVEL_MASK(pin);
+ 	u32 u = readl(reg);
+@@ -264,20 +263,20 @@ static void gpio_irq_unmask(u32 irq)
+ 	writel(u, reg);
  }
  
--static void gpio_mask_irq(unsigned int irq)
-+static void gpio_mask_irq(struct irq_data *d)
+-static int gpio_irq_set_type(u32 irq, u32 type)
++static int gpio_irq_set_type(struct irq_data *d, u32 type)
  {
--	unsigned int gpio = irq - IH_GPIO_BASE;
--	struct gpio_bank *bank = get_irq_chip_data(irq);
-+	unsigned int gpio = d->irq - IH_GPIO_BASE;
-+	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
+-	int pin = irq_to_gpio(irq);
++	int pin = irq_to_gpio(d->irq);
+ 	struct irq_desc *desc;
+ 	u32 u;
  
- 	_set_gpio_irqenable(bank, gpio, 0);
- 	_set_gpio_triggering(bank, get_gpio_index(gpio), IRQ_TYPE_NONE);
- }
+ 	u = readl(GPIO_IO_CONF(pin)) & (1 << (pin & 31));
+ 	if (!u) {
+ 		printk(KERN_ERR "orion gpio_irq_set_type failed "
+-				"(irq %d, pin %d).\n", irq, pin);
++				"(irq %d, pin %d).\n", d->irq, pin);
+ 		return -EINVAL;
+ 	}
  
--static void gpio_unmask_irq(unsigned int irq)
-+static void gpio_unmask_irq(struct irq_data *d)
- {
--	unsigned int gpio = irq - IH_GPIO_BASE;
--	struct gpio_bank *bank = get_irq_chip_data(irq);
-+	unsigned int gpio = d->irq - IH_GPIO_BASE;
-+	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
- 	unsigned int irq_mask = 1 << get_gpio_index(gpio);
--	struct irq_desc *desc = irq_to_desc(irq);
-+	struct irq_desc *desc = irq_to_desc(d->irq);
- 	u32 trigger = desc->status & IRQ_TYPE_SENSE_MASK;
+-	desc = irq_desc + irq;
++	desc = irq_desc + d->irq;
  
- 	if (trigger)
-@@ -1430,12 +1429,12 @@ static void gpio_unmask_irq(unsigned int irq)
+ 	/*
+ 	 * Set edge/level type.
+@@ -287,7 +286,7 @@ static int gpio_irq_set_type(u32 irq, u32 type)
+ 	} else if (type & (IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW)) {
+ 		desc->handle_irq = handle_level_irq;
+ 	} else {
+-		printk(KERN_ERR "failed to set irq=%d (type=%d)\n", irq, type);
++		printk(KERN_ERR "failed to set irq=%d (type=%d)\n", d->irq, type);
+ 		return -EINVAL;
+ 	}
  
- static struct irq_chip gpio_irq_chip = {
- 	.name		= "GPIO",
--	.shutdown	= gpio_irq_shutdown,
--	.ack		= gpio_ack_irq,
--	.mask		= gpio_mask_irq,
--	.unmask		= gpio_unmask_irq,
--	.set_type	= gpio_irq_type,
--	.set_wake	= gpio_wake_enable,
-+	.irq_shutdown	= gpio_irq_shutdown,
-+	.irq_ack	= gpio_ack_irq,
-+	.irq_mask	= gpio_mask_irq,
-+	.irq_unmask	= gpio_unmask_irq,
-+	.irq_set_type	= gpio_irq_type,
-+	.irq_set_wake	= gpio_wake_enable,
+@@ -325,10 +324,10 @@ static int gpio_irq_set_type(u32 irq, u32 type)
+ 
+ struct irq_chip orion_gpio_irq_chip = {
+ 	.name		= "orion_gpio_irq",
+-	.ack		= gpio_irq_ack,
+-	.mask		= gpio_irq_mask,
+-	.unmask		= gpio_irq_unmask,
+-	.set_type	= gpio_irq_set_type,
++	.irq_ack	= gpio_irq_ack,
++	.irq_mask	= gpio_irq_mask,
++	.irq_unmask	= gpio_irq_unmask,
++	.irq_set_type	= gpio_irq_set_type,
  };
  
- /*---------------------------------------------------------------------*/
-@@ -1444,36 +1443,36 @@ static struct irq_chip gpio_irq_chip = {
+ void orion_gpio_irq_handler(int pinoff)
+diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
+index 3f9d34f..7d0c7eb 100644
+--- a/arch/arm/plat-orion/irq.c
++++ b/arch/arm/plat-orion/irq.c
+@@ -14,31 +14,31 @@
+ #include <linux/io.h>
+ #include <plat/irq.h>
  
- /* MPUIO uses the always-on 32k clock */
- 
--static void mpuio_ack_irq(unsigned int irq)
-+static void mpuio_ack_irq(struct irq_data *d)
+-static void orion_irq_mask(u32 irq)
++static void orion_irq_mask(struct irq_data *d)
  {
- 	/* The ISR is reset automatically, so do nothing here. */
+-	void __iomem *maskaddr = get_irq_chip_data(irq);
++	void __iomem *maskaddr = irq_data_get_irq_chip_data(d);
+ 	u32 mask;
+ 
+ 	mask = readl(maskaddr);
+-	mask &= ~(1 << (irq & 31));
++	mask &= ~(1 << (d->irq & 31));
+ 	writel(mask, maskaddr);
  }
  
--static void mpuio_mask_irq(unsigned int irq)
-+static void mpuio_mask_irq(struct irq_data *d)
+-static void orion_irq_unmask(u32 irq)
++static void orion_irq_unmask(struct irq_data *d)
  {
--	unsigned int gpio = OMAP_MPUIO(irq - IH_MPUIO_BASE);
--	struct gpio_bank *bank = get_irq_chip_data(irq);
-+	unsigned int gpio = OMAP_MPUIO(d->irq - IH_MPUIO_BASE);
-+	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
+-	void __iomem *maskaddr = get_irq_chip_data(irq);
++	void __iomem *maskaddr = irq_data_get_irq_chip_data(d);
+ 	u32 mask;
  
- 	_set_gpio_irqenable(bank, gpio, 0);
+ 	mask = readl(maskaddr);
+-	mask |= 1 << (irq & 31);
++	mask |= 1 << (d->irq & 31);
+ 	writel(mask, maskaddr);
  }
  
--static void mpuio_unmask_irq(unsigned int irq)
-+static void mpuio_unmask_irq(struct irq_data *d)
- {
--	unsigned int gpio = OMAP_MPUIO(irq - IH_MPUIO_BASE);
--	struct gpio_bank *bank = get_irq_chip_data(irq);
-+	unsigned int gpio = OMAP_MPUIO(d->irq - IH_MPUIO_BASE);
-+	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
- 
- 	_set_gpio_irqenable(bank, gpio, 1);
- }
- 
- static struct irq_chip mpuio_irq_chip = {
- 	.name		= "MPUIO",
--	.ack		= mpuio_ack_irq,
--	.mask		= mpuio_mask_irq,
--	.unmask		= mpuio_unmask_irq,
--	.set_type	= gpio_irq_type,
-+	.irq_ack	= mpuio_ack_irq,
-+	.irq_mask	= mpuio_mask_irq,
-+	.irq_unmask	= mpuio_unmask_irq,
-+	.irq_set_type	= gpio_irq_type,
- #ifdef CONFIG_ARCH_OMAP16XX
- 	/* REVISIT: assuming only 16xx supports MPUIO wake events */
--	.set_wake	= gpio_wake_enable,
-+	.irq_set_wake	= gpio_wake_enable,
- #endif
+ static struct irq_chip orion_irq_chip = {
+ 	.name		= "orion_irq",
+-	.mask		= orion_irq_mask,
+-	.mask_ack	= orion_irq_mask,
+-	.unmask		= orion_irq_unmask,
++	.irq_mask	= orion_irq_mask,
++	.irq_mask_ack	= orion_irq_mask,
++	.irq_unmask	= orion_irq_unmask,
  };
  
+ void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
 -- 
 1.7.1
