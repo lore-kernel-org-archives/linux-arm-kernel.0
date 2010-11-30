@@ -1,9 +1,9 @@
 From: avorontsov@mvista.com (Anton Vorontsov)
-Date: Tue, 30 Nov 2010 20:17:05 +0300
-Subject: [PATCH 5/8] ARM: S5PV310: Switch to generic SCU routines
+Date: Tue, 30 Nov 2010 20:17:09 +0300
+Subject: [PATCH 6/8] ARM: ux500: Switch to generic SCU routines
 In-Reply-To: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
 References: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
-Message-ID: <20101130171705.GE24034@oksana.dev.rtsoft.ru>
+Message-ID: <20101130171709.GF24034@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,37 +11,36 @@ This shrinks platform-specific code quite a bit.
 
 Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 ---
- arch/arm/mach-s5pv310/Makefile  |    2 +-
- arch/arm/mach-s5pv310/headsmp.S |   41 -------------
- arch/arm/mach-s5pv310/hotplug.c |    5 +-
- arch/arm/mach-s5pv310/platsmp.c |  125 ++-------------------------------------
- 4 files changed, 9 insertions(+), 164 deletions(-)
- delete mode 100644 arch/arm/mach-s5pv310/headsmp.S
+ arch/arm/mach-ux500/Makefile           |    2 +-
+ arch/arm/mach-ux500/headsmp.S          |   38 -----------
+ arch/arm/mach-ux500/hotplug.c          |    5 +-
+ arch/arm/mach-ux500/include/mach/smp.h |    3 -
+ arch/arm/mach-ux500/platsmp.c          |  115 ++------------------------------
+ 5 files changed, 10 insertions(+), 153 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/headsmp.S
 
-diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-index 84afc64..b72abd2 100644
---- a/arch/arm/mach-s5pv310/Makefile
-+++ b/arch/arm/mach-s5pv310/Makefile
-@@ -15,7 +15,7 @@ obj-				:=
- obj-$(CONFIG_CPU_S5PV310)	+= cpu.o init.o clock.o irq-combiner.o
- obj-$(CONFIG_CPU_S5PV310)	+= setup-i2c0.o time.o gpiolib.o irq-eint.o
- 
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 9e27a84..90fa03c 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -7,7 +7,7 @@ obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o devices-db5500.o
+ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o prcmu.o
+ obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o board-mop500-sdi.o
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o
 -obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
 +obj-$(CONFIG_SMP)		+= platsmp.o
- obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
  obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- 
-diff --git a/arch/arm/mach-s5pv310/headsmp.S b/arch/arm/mach-s5pv310/headsmp.S
+ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
+diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
 deleted file mode 100644
-index 164b7b0..0000000
---- a/arch/arm/mach-s5pv310/headsmp.S
+index a6be2cd..0000000
+--- a/arch/arm/mach-ux500/headsmp.S
 +++ /dev/null
-@@ -1,41 +0,0 @@
+@@ -1,38 +0,0 @@
 -/*
-- *  linux/arch/arm/mach-s5pv310/headsmp.S
-- *
-- *  Cloned from linux/arch/arm/mach-realview/headsmp.S
-- *
+- *  Copyright (c) 2009 ST-Ericsson
+- *	This file is based  ARM Realview platform
 - *  Copyright (c) 2003 ARM Limited
 - *  All Rights Reserved
 - *
@@ -55,17 +54,16 @@ index 164b7b0..0000000
 -	__INIT
 -
 -/*
-- * s5pv310 specific entry point for secondary CPUs.  This provides
-- * a "holding pen" into which all secondary cores are held until we're
-- * ready for them to initialise.
+- * U8500 specific entry point for secondary CPUs.
 - */
--ENTRY(s5pv310_secondary_startup)
+-ENTRY(u8500_secondary_startup)
 -	mrc	p15, 0, r0, c0, c0, 5
 -	and	r0, r0, #15
 -	adr	r4, 1f
 -	ldmia	r4, {r5, r6}
 -	sub	r4, r4, r5
 -	add	r6, r6, r4
+-	dsb
 -pen:	ldr	r7, [r6]
 -	cmp	r7, r0
 -	bne	pen
@@ -78,11 +76,11 @@ index 164b7b0..0000000
 -
 -1:	.long	.
 -	.long	pen_release
-diff --git a/arch/arm/mach-s5pv310/hotplug.c b/arch/arm/mach-s5pv310/hotplug.c
-index ea951ef..ff1bc05 100644
---- a/arch/arm/mach-s5pv310/hotplug.c
-+++ b/arch/arm/mach-s5pv310/hotplug.c
-@@ -14,10 +14,9 @@
+diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+index dd8037e..38f4e1b 100644
+--- a/arch/arm/mach-ux500/hotplug.c
++++ b/arch/arm/mach-ux500/hotplug.c
+@@ -12,10 +12,9 @@
  #include <linux/errno.h>
  #include <linux/smp.h>
  
@@ -91,70 +89,76 @@ index ea951ef..ff1bc05 100644
  
 -extern volatile int pen_release;
 -
- static inline void cpu_enter_lowpower(void)
+ static inline void platform_do_lowpower(unsigned int cpu)
  {
- 	unsigned int v;
-@@ -72,7 +71,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
- 		    :
- 		    : "memory", "cc");
- 
+ 	flush_cache_all();
+@@ -24,7 +23,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 	for (;;) {
+ 		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+ 				: : : "memory");
 -		if (pen_release == cpu) {
 +		if (scu_pen_release == cpu) {
  			/*
  			 * OK, proper wakeup, we're done
  			 */
-diff --git a/arch/arm/mach-s5pv310/platsmp.c b/arch/arm/mach-s5pv310/platsmp.c
-index d474426..1a3f681 100644
---- a/arch/arm/mach-s5pv310/platsmp.c
-+++ b/arch/arm/mach-s5pv310/platsmp.c
-@@ -14,37 +14,25 @@
- */
+diff --git a/arch/arm/mach-ux500/include/mach/smp.h b/arch/arm/mach-ux500/include/mach/smp.h
+index bd57c50..646cea7 100644
+--- a/arch/arm/mach-ux500/include/mach/smp.h
++++ b/arch/arm/mach-ux500/include/mach/smp.h
+@@ -12,9 +12,6 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/smp_mpidr.h>
  
+-/* This is required to wakeup the secondary core */
+-extern void u8500_secondary_startup(void);
+-
+ /*
+  * We use IRQ1 as the IPI
+  */
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index b8987bd..0e195a2 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -11,30 +11,12 @@
+  * published by the Free Software Foundation.
+  */
  #include <linux/init.h>
 -#include <linux/errno.h>
 -#include <linux/delay.h>
 -#include <linux/device.h>
--#include <linux/jiffies.h>
  #include <linux/smp.h>
  #include <linux/io.h>
  
 -#include <asm/cacheflush.h>
 -#include <asm/localtimer.h>
  #include <asm/smp_scu.h>
- #include <asm/unified.h>
- 
  #include <mach/hardware.h>
- #include <mach/regs-clock.h>
  
--extern void s5pv310_secondary_startup(void);
--
- /*
-  * control for which core is the next to come out of the secondary
-  * boot "holding pen"
-  */
- 
+-/*
+- * control for which core is the next to come out of the secondary
+- * boot "holding pen"
+- */
 -volatile int __cpuinitdata pen_release = -1;
 -
- static void __iomem *scu_base_addr(void)
- {
- 	return (void __iomem *)(S5P_VA_SCU);
- }
- 
+-static unsigned int __init get_core_count(void)
+-{
+-	return scu_get_core_count(__io_address(UX500_SCU_BASE));
+-}
+-
 -static DEFINE_SPINLOCK(boot_lock);
 -
  void __cpuinit platform_secondary_init(unsigned int cpu)
  {
  	trace_hardirqs_off();
-@@ -56,65 +44,12 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -46,59 +28,18 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
  	 */
- 	gic_cpu_init(0, gic_cpu_base_addr);
+ 	gic_cpu_init(0, __io_address(UX500_GIC_CPU_BASE));
  
 -	/*
 -	 * let the primary processor know we're out of the
 -	 * pen, then head off into the C entry point
 -	 */
 -	pen_release = -1;
--	smp_wmb();
 -
 -	/*
 -	 * Synchronise with the boot thread.
@@ -169,7 +173,7 @@ index d474426..1a3f681 100644
 -	unsigned long timeout;
 -
 -	/*
--	 * Set synchronisation state between this boot processor
+-	 * set synchronisation state between this boot processor
 -	 * and the secondary one
 -	 */
 -	spin_lock(&boot_lock);
@@ -178,28 +182,17 @@ index d474426..1a3f681 100644
 -	 * The secondary processor is waiting to be released from
 -	 * the holding pen - release it, then wait for it to flag
 -	 * that it has been released by resetting pen_release.
--	 *
--	 * Note that "pen_release" is the hardware CPU ID, whereas
--	 * "cpu" is Linux's internal ID.
 -	 */
 -	pen_release = cpu;
 -	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
--	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+-	outer_clean_range(__pa(&pen_release), __pa(&pen_release) + 1);
 -
--	/*
--	 * Send the secondary CPU a soft interrupt, thereby causing
--	 * the boot monitor to read the system wide flags register,
--	 * and branch to the address found there.
--	 */
 -	smp_cross_call(cpumask_of(cpu), 1);
 -
 -	timeout = jiffies + (1 * HZ);
 -	while (time_before(jiffies, timeout)) {
--		smp_rmb();
 -		if (pen_release == -1)
 -			break;
--
--		udelay(10);
 -	}
 -
 -	/*
@@ -212,47 +205,60 @@ index d474426..1a3f681 100644
 +	return scu_boot_secondary(cpu, idle);
  }
  
- /*
-@@ -124,69 +59,21 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ static void __init wakeup_secondary(void)
+ {
+ 	/* nobody is to be released from the pen yet */
+-	pen_release = -1;
++	scu_pen_release = -1;
  
+ 	/*
+ 	 * write the address of secondary startup into the backup ram register
+@@ -107,7 +48,7 @@ static void __init wakeup_secondary(void)
+ 	 * is waiting for. This would wake up the secondary core from WFE
+ 	 */
+ #define U8500_CPU1_JUMPADDR_OFFSET 0x1FF4
+-	__raw_writel(virt_to_phys(u8500_secondary_startup),
++	__raw_writel(virt_to_phys(scu_secondary_startup),
+ 		__io_address(UX500_BACKUPRAM0_BASE) +
+ 		U8500_CPU1_JUMPADDR_OFFSET);
+ 
+@@ -126,55 +67,13 @@ static void __init wakeup_secondary(void)
+  */
  void __init smp_init_cpus(void)
  {
--	void __iomem *scu_base = scu_base_addr();
--	unsigned int i, ncores;
--
--	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
--
--	/* sanity check */
--	if (ncores == 0) {
--		printk(KERN_ERR
--		       "S5PV310: strange CM count of 0? Default to 1\n");
--
--		ncores = 1;
--	}
--
--	if (ncores > NR_CPUS) {
--		printk(KERN_WARNING
--		       "S5PV310: no. of cores (%d) greater than configured "
--		       "maximum of %d - clipping\n",
--		       ncores, NR_CPUS);
--		ncores = NR_CPUS;
--	}
+-	unsigned int i, ncores = get_core_count();
 -
 -	for (i = 0; i < ncores; i++)
 -		set_cpu_possible(i, true);
-+	scu_init_cpus(scu_base_addr());
++	scu_init_cpus(__io_address(UX500_SCU_BASE));
  }
  
  void __init smp_prepare_cpus(unsigned int max_cpus)
  {
--	unsigned int ncores = num_possible_cpus();
+-	unsigned int ncores = get_core_count();
 -	unsigned int cpu = smp_processor_id();
 -	int i;
 -
+-	/* sanity check */
+-	if (ncores == 0) {
+-		printk(KERN_ERR
+-		       "U8500: strange CM count of 0? Default to 1\n");
+-		ncores = 1;
+-	}
+-
+-	if (ncores > num_possible_cpus())	{
+-		printk(KERN_WARNING
+-		       "U8500: no. of cores (%d) greater than configured "
+-		       "maximum of %d - clipping\n",
+-		       ncores, num_possible_cpus());
+-		ncores = num_possible_cpus();
+-	}
+-
 -	smp_store_cpu_info(cpu);
-+	scu_prepare_cpus(scu_base_addr(), max_cpus);
- 
--	/* are we trying to boot more cores than exist? */
+-
+-	/*
+-	 * are we trying to boot more cores than exist?
+-	 */
 -	if (max_cpus > ncores)
 -		max_cpus = ncores;
 -
@@ -262,30 +268,18 @@ index d474426..1a3f681 100644
 -	 */
 -	for (i = 0; i < max_cpus; i++)
 -		set_cpu_present(i, true);
--
--	/*
--	 * Initialise the SCU if there are more than one CPU and let
--	 * them know where to start.
--	 */
- 	if (max_cpus > 1) {
- 		/*
++	scu_prepare_cpus(__io_address(UX500_SCU_BASE), max_cpus);
+ 
+-	if (max_cpus > 1) {
+-		/*
 -		 * Enable the local timer or broadcast device for the
 -		 * boot CPU, but only if we have more than one CPU.
 -		 */
 -		percpu_timer_setup();
--
--		scu_enable(scu_base_addr());
--
--		/*
- 		 * Write the address of secondary startup into the
- 		 * system-wide flags register. The boot monitor waits
- 		 * until it receives a soft interrupt, and then the
- 		 * secondary CPU branches to this address.
- 		 */
--	__raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)), S5P_VA_SYSRAM);
-+		__raw_writel(BSYM(virt_to_phys(scu_secondary_startup)),
-+			     S5P_VA_SYSRAM);
- 	}
+-		scu_enable(__io_address(UX500_SCU_BASE));
++	if (max_cpus > 1)
+ 		wakeup_secondary();
+-	}
  }
 -- 
 1.7.0.5
