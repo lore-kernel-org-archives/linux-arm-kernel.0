@@ -1,101 +1,50 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 30 Nov 2010 18:10:24 +0000
-Subject: [RFC PATCHv2 10/13] picoxcell: add chained GPIO IRQ handlers
-In-Reply-To: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-References: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1291140624-15961-1-git-send-email-jamie@jamieiles.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Nov 2010 18:14:42 +0000
+Subject: [PATCH 2/8] ARM: cns3xxx: Add support for SMP
+In-Reply-To: <20101130171700.GB24034@oksana.dev.rtsoft.ru>
+References: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
+	<20101130171700.GB24034@oksana.dev.rtsoft.ru>
+Message-ID: <20101130181442.GA9137@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 8 bits of port A on the ARM GPIO of all devices are capable of
-generating interrupts. Provide chained handlers so that these pins can
-be used as interrupts and the sensitivity and polarity can be set.
+On Tue, Nov 30, 2010 at 08:17:00PM +0300, Anton Vorontsov wrote:
+> Nothing fancy needs to be done, just use generic SCU routines.
+> 
+> Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 
-v2:
-	- Use the generic IRQ handlers rather than using the irq_desc.
+This I assume is an age old patch.
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/mach-picoxcell/include/mach/gpio.h |    2 +
- arch/arm/mach-picoxcell/picoxcell_core.c    |   39 +++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+), 0 deletions(-)
+> diff --git a/arch/arm/mach-cns3xxx/include/mach/smp.h b/arch/arm/mach-cns3xxx/include/mach/smp.h
+> new file mode 100644
+> index 0000000..44aa7ea
+> --- /dev/null
+> +++ b/arch/arm/mach-cns3xxx/include/mach/smp.h
+> @@ -0,0 +1,28 @@
+> +/*
+> + * Copyright 2002 ARM Ltd.
+> + * Copyright 2008 Cavium Networks
+> + *
+> + * This file is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, Version 2, as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __MACH_SMP_H
+> +#define __MACH_SMP_H
+> +
+> +#include <asm/hardware/gic.h>
+> +
+> +#define hard_smp_processor_id()				\
+> +	({						\
+> +		unsigned int cpunum;			\
+> +		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
+> +			: "=r" (cpunum));		\
+> +		cpunum &= 0x0F;				\
+> +	})
 
-diff --git a/arch/arm/mach-picoxcell/include/mach/gpio.h b/arch/arm/mach-picoxcell/include/mach/gpio.h
-index ce55c3d..8955e20 100644
---- a/arch/arm/mach-picoxcell/include/mach/gpio.h
-+++ b/arch/arm/mach-picoxcell/include/mach/gpio.h
-@@ -152,6 +152,8 @@ enum {
- 
- #ifdef __KERNEL__
- 
-+extern struct irq_chip armgpio_irqchip;
-+
- static inline int gpio_get_value(unsigned gpio)
- {
- 	return __gpio_get_value(gpio);
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index 8da0c34..1685df8 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.c
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -25,6 +25,18 @@
- #include "picoxcell_core.h"
- #include "soc.h"
- 
-+static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	unsigned real_irq = (irq - IRQ_GPIO0 + __IRQ_GPIO0);
-+	/*
-+	 * We have 8 GPIO pins that can generate interrupts and each one has
-+	 * it's own interrupt bit in the VIC. All we need to do is do a
-+	 * one-to-one translation from the virtual IRQ number to the real one
-+	 * and call the handler.
-+	 */
-+	generic_handle_irq(real_irq);
-+}
-+
- struct picoxcell_soc *picoxcell_get_soc(void)
- {
- 	unsigned long device_id = readl(IO_ADDRESS(PICOXCELL_AXI2CFG_BASE +
-@@ -37,6 +49,11 @@ struct picoxcell_soc *picoxcell_get_soc(void)
- 
- void __init picoxcell_init_irq(void)
- {
-+#define GPIO_INT_EN_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
-+				       GPIO_INT_EN_REG_OFFSET)
-+#define GPIO_EOI_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
-+				       GPIO_PORT_A_EOI_REG_OFFSET)
-+	unsigned i;
- 	u32 vic0_resume_sources =
- 		(1 << (IRQ_AXI2PICO8 & 31)) |
- 		(1 << (IRQ_EMAC & 31)) |
-@@ -45,6 +62,28 @@ void __init picoxcell_init_irq(void)
- 	vic_init(IO_ADDRESS(PICOXCELL_VIC0_BASE), 32, 0xFFFFFFFE,
- 		 vic0_resume_sources);
- 	vic_init(IO_ADDRESS(PICOXCELL_VIC1_BASE), 0, 0x7FF, 0);
-+
-+	/*
-+	 * We want to enable/disable interrupts for the GPIO pins through the
-+	 * GPIO block itself. To do this we install a chained handler. If a
-+	 * user requests one of the __IRQ_GPIOn interrupts then the GPIO block
-+	 * won't get configured.  We provide these interrupts below as virtual
-+	 * ones that will configure the GPIO block and enable the source in
-+	 * the VIC.
-+	 *
-+	 * The chained handler simply converts from the virtual IRQ handler to
-+	 * the real interrupt source and calls the GPIO IRQ handler.
-+	 */
-+	writel(0, GPIO_INT_EN_REG);
-+	writel(~0, GPIO_EOI_REG);
-+	for (i = IRQ_GPIO0; i <= IRQ_GPIO7; ++i) {
-+		set_irq_chip(i, &armgpio_irqchip);
-+		set_irq_handler(i, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+	}
-+
-+	for (i = __IRQ_GPIO0; i <= __IRQ_GPIO7; ++i)
-+		set_irq_chained_handler(i, gpio_irq_handler);
- }
- 
- static const char *picoxcell_get_partname(void)
--- 
-1.7.2.3
+#include <asm/smp_mpidr.h>
+
+replaces this, but it's not actually necessary - it's only used by some
+bug checking code in the CPU hotplug code.  I'm shortly going to be
+deleting all hard_smp_processor_id() implementations.
