@@ -1,37 +1,42 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 30 Nov 2010 17:13:36 -0200
-Subject: [PATCH v2] ARM: mx5: fix keypad clock name
-Message-ID: <1291144416-25197-1-git-send-email-fabio.estevam@freescale.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 30 Nov 2010 20:19:14 +0100
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <20101116200426.75085b68@lxorguk.ukuu.org.uk>
+References: <i9kk4o$svc$1@dough.gmane.org> <4CC418A9.6090602@evidence.eu.com>
+	<4CDA630F.4060903@atmel.com> <20101110172842.GC12371@suse.de>
+	<4CDBC3EC.6020707@evidence.eu.com> <20101116143016.GB6527@ucw.cz>
+	<AANLkTi=grehSnfWzCDtSXXmNb=-NAwbHHJ_P1XPyOuw8@mail.gmail.com>
+	<20101116172013.102e06a6@lxorguk.ukuu.org.uk>
+	<ibuh1v$uh6$1@dough.gmane.org>
+	<20101116200426.75085b68@lxorguk.ukuu.org.uk>
+Message-ID: <20101130191913.GA5295@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following error during keypad driver probe:
+On Tue 2010-11-16 20:04:26, Alan Cox wrote:
+> > Comtrol, Moxa, B&B, Sealevel, and others all sell PCI cards and
+> > Ethernet attached serial ports that have selectable interfaces
+> > (typically RS-232/422/485).  Comtrol and Moxa have had drivers in the
+> > kernel tree for ages, but they've always had to use custom ioctl calls
+> > for things like configuring 232/485/422 mode and half/full-duplex
+> > mode.
+> 
+> Ok so what is needed that isn't covered by the current termiox and
+> TIOCG/SRS485 ioctls ?
 
-imx-keypad imx-keypad: failed to get keypad clock
-imx-keypad: probe of imx-keypad failed with error -2
+IIRC selection of 232/485/422 mode was missing from proposed api.
 
-commit 3f88014 (ARM: imx: dynamically allocate imx-keypad devices)
-uses id=-1 for imx_kpp_device, so change the clock name accordingly.
+> > Having a standard API for things like interface mode, half-full
+> > duplex, inter-character timeout, 9-bit mode, and so on would be life a
+> > lot easier for those of us who maintain Linux serial drivers...
+> 
+> 9bit mode is a real problem with the tty layer defined in terms of 8bit
+> streams but yes.
 
-Tested keypad successfully on a MX51_3DS board.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 344ee8e..57fea05 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1091,7 +1091,7 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
--	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
-+	_REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
- 	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
- 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+Well, if you wanted to have some fun... kontron card is able to
+timestamp incoming characters, and saves state of the control signals
+when character is received...
+								Pavel
 -- 
-1.6.0.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
