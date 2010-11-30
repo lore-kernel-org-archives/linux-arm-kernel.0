@@ -1,145 +1,127 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 30 Nov 2010 14:36:43 +0100
-Subject: [PATCH 18/54] ARM: h720x: irq_data conversion.
+Date: Tue, 30 Nov 2010 14:36:55 +0100
+Subject: [PATCH 26/54] ARM: ks8695: irq_data conversion.
 In-Reply-To: <cover.1291118519.git.buytenh@wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-Message-ID: <20101130133643.GS15575@mail.wantstofly.org>
+Message-ID: <20101130133655.GA15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-h720x/common.c    |   38 +++++++++++++++++++-------------------
- arch/arm/mach-h720x/cpu-h7202.c |   14 +++++++-------
- 2 files changed, 26 insertions(+), 26 deletions(-)
+ arch/arm/mach-ks8695/irq.c |   43 ++++++++++++++++++++++---------------------
+ 1 files changed, 22 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-h720x/common.c b/arch/arm/mach-h720x/common.c
-index bdb3f67..1f28c90 100644
---- a/arch/arm/mach-h720x/common.c
-+++ b/arch/arm/mach-h720x/common.c
-@@ -52,17 +52,17 @@ unsigned long h720x_gettimeoffset(void)
- /*
-  * mask Global irq's
-  */
--static void mask_global_irq (unsigned int irq )
-+static void mask_global_irq(struct irq_data *d)
+diff --git a/arch/arm/mach-ks8695/irq.c b/arch/arm/mach-ks8695/irq.c
+index e375c1d..7998cca 100644
+--- a/arch/arm/mach-ks8695/irq.c
++++ b/arch/arm/mach-ks8695/irq.c
+@@ -34,29 +34,29 @@
+ #include <mach/regs-irq.h>
+ #include <mach/regs-gpio.h>
+ 
+-static void ks8695_irq_mask(unsigned int irqno)
++static void ks8695_irq_mask(struct irq_data *d)
  {
--	CPU_REG (IRQC_VIRT, IRQC_IER) &= ~(1 << irq);
-+	CPU_REG (IRQC_VIRT, IRQC_IER) &= ~(1 << d->irq);
+ 	unsigned long inten;
+ 
+ 	inten = __raw_readl(KS8695_IRQ_VA + KS8695_INTEN);
+-	inten &= ~(1 << irqno);
++	inten &= ~(1 << d->irq);
+ 
+ 	__raw_writel(inten, KS8695_IRQ_VA + KS8695_INTEN);
  }
  
- /*
-  * unmask Global irq's
-  */
--static void unmask_global_irq (unsigned int irq )
-+static void unmask_global_irq(struct irq_data *d)
+-static void ks8695_irq_unmask(unsigned int irqno)
++static void ks8695_irq_unmask(struct irq_data *d)
  {
--	CPU_REG (IRQC_VIRT, IRQC_IER) |= (1 << irq);
-+	CPU_REG (IRQC_VIRT, IRQC_IER) |= (1 << d->irq);
+ 	unsigned long inten;
+ 
+ 	inten = __raw_readl(KS8695_IRQ_VA + KS8695_INTEN);
+-	inten |= (1 << irqno);
++	inten |= (1 << d->irq);
+ 
+ 	__raw_writel(inten, KS8695_IRQ_VA + KS8695_INTEN);
+ }
+ 
+-static void ks8695_irq_ack(unsigned int irqno)
++static void ks8695_irq_ack(struct irq_data *d)
+ {
+-	__raw_writel((1 << irqno), KS8695_IRQ_VA + KS8695_INTST);
++	__raw_writel((1 << d->irq), KS8695_IRQ_VA + KS8695_INTST);
  }
  
  
-@@ -70,10 +70,10 @@ static void unmask_global_irq (unsigned int irq )
-  * ack GPIO irq's
-  * Ack only for edge triggered int's valid
-  */
--static void inline ack_gpio_irq(u32 irq)
-+static void inline ack_gpio_irq(struct irq_data *d)
- {
--	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(irq));
--	u32 bit = IRQ_TO_BIT(irq);
-+	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(d->irq));
-+	u32 bit = IRQ_TO_BIT(d->irq);
- 	if ( (CPU_REG (reg_base, GPIO_EDGE) & bit))
- 		CPU_REG (reg_base, GPIO_CLR) = bit;
- }
-@@ -81,20 +81,20 @@ static void inline ack_gpio_irq(u32 irq)
- /*
-  * mask GPIO irq's
-  */
--static void inline mask_gpio_irq(u32 irq)
-+static void inline mask_gpio_irq(struct irq_data *d)
- {
--	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(irq));
--	u32 bit = IRQ_TO_BIT(irq);
-+	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(d->irq));
-+	u32 bit = IRQ_TO_BIT(d->irq);
- 	CPU_REG (reg_base, GPIO_MASK) &= ~bit;
- }
+@@ -64,7 +64,7 @@ static struct irq_chip ks8695_irq_level_chip;
+ static struct irq_chip ks8695_irq_edge_chip;
  
- /*
-  * unmask GPIO irq's
-  */
--static void inline unmask_gpio_irq(u32 irq)
-+static void inline unmask_gpio_irq(struct irq_data *d)
+ 
+-static int ks8695_irq_set_type(unsigned int irqno, unsigned int type)
++static int ks8695_irq_set_type(struct irq_data *d, unsigned int type)
  {
--	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(irq));
--	u32 bit = IRQ_TO_BIT(irq);
-+	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(d->irq));
-+	u32 bit = IRQ_TO_BIT(d->irq);
- 	CPU_REG (reg_base, GPIO_MASK) |= bit;
+ 	unsigned long ctrl, mode;
+ 	unsigned short level_triggered = 0;
+@@ -93,7 +93,7 @@ static int ks8695_irq_set_type(unsigned int irqno, unsigned int type)
+ 			return -EINVAL;
+ 	}
+ 
+-	switch (irqno) {
++	switch (d->irq) {
+ 		case KS8695_IRQ_EXTERN0:
+ 			ctrl &= ~IOPC_IOEINT0TM;
+ 			ctrl |= IOPC_IOEINT0_MODE(mode);
+@@ -115,12 +115,12 @@ static int ks8695_irq_set_type(unsigned int irqno, unsigned int type)
+ 	}
+ 
+ 	if (level_triggered) {
+-		set_irq_chip(irqno, &ks8695_irq_level_chip);
+-		set_irq_handler(irqno, handle_level_irq);
++		set_irq_chip(d->irq, &ks8695_irq_level_chip);
++		set_irq_handler(d->irq, handle_level_irq);
+ 	}
+ 	else {
+-		set_irq_chip(irqno, &ks8695_irq_edge_chip);
+-		set_irq_handler(irqno, handle_edge_irq);
++		set_irq_chip(d->irq, &ks8695_irq_edge_chip);
++		set_irq_handler(d->irq, handle_edge_irq);
+ 	}
+ 
+ 	__raw_writel(ctrl, KS8695_GPIO_VA + KS8695_IOPC);
+@@ -128,17 +128,17 @@ static int ks8695_irq_set_type(unsigned int irqno, unsigned int type)
  }
  
-@@ -170,15 +170,15 @@ h720x_gpioe_demux_handler(unsigned int irq_unused, struct irq_desc *desc)
- #endif
- 
- static struct irq_chip h720x_global_chip = {
--	.ack = mask_global_irq,
--	.mask = mask_global_irq,
--	.unmask = unmask_global_irq,
-+	.irq_ack = mask_global_irq,
-+	.irq_mask = mask_global_irq,
-+	.irq_unmask = unmask_global_irq,
+ static struct irq_chip ks8695_irq_level_chip = {
+-	.ack		= ks8695_irq_mask,
+-	.mask		= ks8695_irq_mask,
+-	.unmask		= ks8695_irq_unmask,
+-	.set_type	= ks8695_irq_set_type,
++	.irq_ack	= ks8695_irq_mask,
++	.irq_mask	= ks8695_irq_mask,
++	.irq_unmask	= ks8695_irq_unmask,
++	.irq_set_type	= ks8695_irq_set_type,
  };
  
- static struct irq_chip h720x_gpio_chip = {
--	.ack = ack_gpio_irq,
--	.mask = mask_gpio_irq,
--	.unmask = unmask_gpio_irq,
-+	.irq_ack = ack_gpio_irq,
-+	.irq_mask = mask_gpio_irq,
-+	.irq_unmask = unmask_gpio_irq,
+ static struct irq_chip ks8695_irq_edge_chip = {
+-	.ack		= ks8695_irq_ack,
+-	.mask		= ks8695_irq_mask,
+-	.unmask		= ks8695_irq_unmask,
+-	.set_type	= ks8695_irq_set_type,
++	.irq_ack	= ks8695_irq_ack,
++	.irq_mask	= ks8695_irq_mask,
++	.irq_unmask	= ks8695_irq_unmask,
++	.irq_set_type	= ks8695_irq_set_type,
  };
  
- /*
-diff --git a/arch/arm/mach-h720x/cpu-h7202.c b/arch/arm/mach-h720x/cpu-h7202.c
-index fd33a19..ac3f914 100644
---- a/arch/arm/mach-h720x/cpu-h7202.c
-+++ b/arch/arm/mach-h720x/cpu-h7202.c
-@@ -141,27 +141,27 @@ h7202_timer_interrupt(int irq, void *dev_id)
- /*
-  * mask multiplexed timer IRQs
-  */
--static void inline mask_timerx_irq (u32 irq)
-+static void inline mask_timerx_irq(struct irq_data *d)
- {
- 	unsigned int bit;
--	bit = 2 << ((irq == IRQ_TIMER64B) ? 4 : (irq - IRQ_TIMER1));
-+	bit = 2 << ((d->irq == IRQ_TIMER64B) ? 4 : (d->irq - IRQ_TIMER1));
- 	CPU_REG (TIMER_VIRT, TIMER_TOPCTRL) &= ~bit;
- }
+ void __init ks8695_init_irq(void)
+@@ -164,7 +164,8 @@ void __init ks8695_init_irq(void)
  
- /*
-  * unmask multiplexed timer IRQs
-  */
--static void inline unmask_timerx_irq (u32 irq)
-+static void inline unmask_timerx_irq(struct irq_data *d)
- {
- 	unsigned int bit;
--	bit = 2 << ((irq == IRQ_TIMER64B) ? 4 : (irq - IRQ_TIMER1));
-+	bit = 2 << ((d->irq == IRQ_TIMER64B) ? 4 : (d->irq - IRQ_TIMER1));
- 	CPU_REG (TIMER_VIRT, TIMER_TOPCTRL) |= bit;
- }
- 
- static struct irq_chip h7202_timerx_chip = {
--	.ack = mask_timerx_irq,
--	.mask = mask_timerx_irq,
--	.unmask = unmask_timerx_irq,
-+	.irq_ack = mask_timerx_irq,
-+	.irq_mask = mask_timerx_irq,
-+	.irq_unmask = unmask_timerx_irq,
- };
- 
- static struct irqaction h7202_timer_irq = {
+ 			/* Edge-triggered interrupts */
+ 			default:
+-				ks8695_irq_ack(irq);	/* clear pending bit */
++				/* clear pending bit */
++				ks8695_irq_ack(irq_get_irq_data(irq));
+ 				set_irq_chip(irq, &ks8695_irq_edge_chip);
+ 				set_irq_handler(irq, handle_edge_irq);
+ 		}
 -- 
 1.7.1
