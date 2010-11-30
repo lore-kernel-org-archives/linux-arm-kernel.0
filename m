@@ -1,9 +1,9 @@
 From: avorontsov@mvista.com (Anton Vorontsov)
-Date: Tue, 30 Nov 2010 20:17:10 +0300
-Subject: [PATCH 7/8] ARM: tegra: Switch to generic SCU routines
+Date: Tue, 30 Nov 2010 20:17:12 +0300
+Subject: [PATCH 8/8] ARM: OMAP2: Switch to generic SCU routines
 In-Reply-To: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
 References: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
-Message-ID: <20101130171710.GG24034@oksana.dev.rtsoft.ru>
+Message-ID: <20101130171712.GH24034@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,67 @@ This shrinks platform-specific code a little bit.
 
 Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 ---
- arch/arm/mach-tegra/platsmp.c |   36 ++----------------------------------
- 1 files changed, 2 insertions(+), 34 deletions(-)
+ arch/arm/mach-omap2/omap-smp.c |   64 ++--------------------------------------
+ 1 files changed, 3 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 1c0fd92..bf5433a 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -115,42 +115,10 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 56a8bce..52379c7 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -29,16 +29,6 @@
+ /* SCU base address */
+ static void __iomem *scu_base;
+ 
+-/*
+- * Use SCU config register to count number of cores
+- */
+-static inline unsigned int get_core_count(void)
+-{
+-	if (scu_base)
+-		return scu_get_core_count(scu_base);
+-	return 1;
+-}
+-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -112,65 +102,17 @@ static void __init wakeup_secondary(void)
   */
  void __init smp_init_cpus(void)
  {
--	unsigned int i, ncores = scu_get_core_count(scu_base);
+-	unsigned int i, ncores;
+-
+ 	/* Never released */
+ 	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
+ 	BUG_ON(!scu_base);
+ 
+-	ncores = get_core_count();
 -
 -	for (i = 0; i < ncores; i++)
--		cpu_set(i, cpu_possible_map);
+-		set_cpu_possible(i, true);
 +	scu_init_cpus(scu_base);
  }
  
  void __init smp_prepare_cpus(unsigned int max_cpus)
  {
--	unsigned int ncores = scu_get_core_count(scu_base);
+-	unsigned int ncores = get_core_count();
 -	unsigned int cpu = smp_processor_id();
 -	int i;
 -
+-	/* sanity check */
+-	if (ncores == 0) {
+-		printk(KERN_ERR
+-		       "OMAP4: strange core count of 0? Default to 1\n");
+-		ncores = 1;
+-	}
+-
+-	if (ncores > NR_CPUS) {
+-		printk(KERN_WARNING
+-		       "OMAP4: no. of cores (%d) greater than configured "
+-		       "maximum of %d - clipping\n",
+-		       ncores, NR_CPUS);
+-		ncores = NR_CPUS;
+-	}
 -	smp_store_cpu_info(cpu);
 -
 -	/*
@@ -42,7 +79,8 @@ index 1c0fd92..bf5433a 100644
 -	 */
 -	if (max_cpus > ncores)
 -		max_cpus = ncores;
--
++	scu_prepare_cpus(scu_base, max_cpus);
+ 
 -	/*
 -	 * Initialise the present map, which describes the set of CPUs
 -	 * actually populated at the present time.
@@ -50,18 +88,21 @@ index 1c0fd92..bf5433a 100644
 -	for (i = 0; i < max_cpus; i++)
 -		set_cpu_present(i, true);
 -
--	/*
--	 * Initialise the SCU if there are more than one CPU and let
--	 * them know where to start. Note that, on modern versions of
--	 * MILO, the "poke" doesn't actually do anything until each
--	 * individual core is sent a soft interrupt to get it out of
--	 * WFI
--	 */
 -	if (max_cpus > 1) {
+-		/*
+-		 * Enable the local timer or broadcast device for the
+-		 * boot CPU, but only if we have more than one CPU.
+-		 */
 -		percpu_timer_setup();
+-
+-		/*
+-		 * Initialise the SCU and wake up the secondary core using
+-		 * wakeup_secondary().
+-		 */
 -		scu_enable(scu_base);
++	if (max_cpus > 1)
+ 		wakeup_secondary();
 -	}
-+	scu_prepare_cpus(scu_base, max_cpus);
  }
 -- 
 1.7.0.5
