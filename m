@@ -1,28 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Nov 2010 13:59:10 -0000
-Subject: ARM perf events spin locks
-In-Reply-To: <20101130135407.GH4398@pulham.picochip.com>
-References: <20101130100802.GB4398@pulham.picochip.com>
-	<004101cb907b$16f911b0$44eb3510$@deacon@arm.com>
-	<20101130105856.GC4398@pulham.picochip.com>
-	<004401cb9095$6b1fbcc0$415f3640$@deacon@arm.com>
-	<20101130135407.GH4398@pulham.picochip.com>
-Message-ID: <004601cb9096$c3a5d3b0$4af17b10$@deacon@arm.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Tue, 30 Nov 2010 16:02:33 +0200
+Subject: [PATCH 04/54] ARM: ITE 8152: irq_data conversion.
+In-Reply-To: <20101130132538.GE15575@mail.wantstofly.org>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130132538.GE15575@mail.wantstofly.org>
+Message-ID: <4CF503F9.8020209@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Well struct perf_event_ctx has a lock field which is of type raw_spinlock_t.
-> > I *think* this is always held by the core perf code before calling the backend,
-> > however IRQs may still be enabled so we probably do need to change our pmu_lock.
-> >
-> > Is that a sane analysis?
-> That sounds perfectly reasonable to me! We don't hold these locks for any
-> potentially long periods of time so it's probably better to be safe! Do you
-> want me to make this change after perf-split is merged or is that something
-> you're happy to do?
+On 11/30/10 15:25, Lennert Buytenhek wrote:
+> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 
-I don't mind doing it as a separate patch after Russell has pulled my
-perf-split branch. I don't think it should form part of the pull though
-because it's unrelated.
+Acked-by: Mike Rapoport <mike@compulab.co.il>
 
-Will
+> ---
+>  arch/arm/common/it8152.c |   14 +++++++++-----
+>  1 files changed, 9 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
+> index 1bec96e..fa708f7 100644
+> --- a/arch/arm/common/it8152.c
+> +++ b/arch/arm/common/it8152.c
+> @@ -31,8 +31,10 @@
+>  
+>  #define MAX_SLOTS		21
+>  
+> -static void it8152_mask_irq(unsigned int irq)
+> +static void it8152_mask_irq(struct irq_data *d)
+>  {
+> +	unsigned int irq = d->irq;
+> +
+>         if (irq >= IT8152_LD_IRQ(0)) {
+>  	       __raw_writel((__raw_readl(IT8152_INTC_LDCNIMR) |
+>  			    (1 << (irq - IT8152_LD_IRQ(0)))),
+> @@ -48,8 +50,10 @@ static void it8152_mask_irq(unsigned int irq)
+>         }
+>  }
+>  
+> -static void it8152_unmask_irq(unsigned int irq)
+> +static void it8152_unmask_irq(struct irq_data *d)
+>  {
+> +	unsigned int irq = d->irq;
+> +
+>         if (irq >= IT8152_LD_IRQ(0)) {
+>  	       __raw_writel((__raw_readl(IT8152_INTC_LDCNIMR) &
+>  			     ~(1 << (irq - IT8152_LD_IRQ(0)))),
+> @@ -67,9 +71,9 @@ static void it8152_unmask_irq(unsigned int irq)
+>  
+>  static struct irq_chip it8152_irq_chip = {
+>  	.name		= "it8152",
+> -	.ack		= it8152_mask_irq,
+> -	.mask		= it8152_mask_irq,
+> -	.unmask		= it8152_unmask_irq,
+> +	.irq_ack	= it8152_mask_irq,
+> +	.irq_mask	= it8152_mask_irq,
+> +	.irq_unmask	= it8152_unmask_irq,
+>  };
+>  
+>  void it8152_init_irq(void)
+
+
+-- 
+Sincerely yours,
+Mike.
