@@ -1,36 +1,40 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 30 Nov 2010 16:33:04 +0200
-Subject: [PATCH RESEND v3] ARM: s3c2442: Setup gpio {set,
-	get}_pull callbacks
-In-Reply-To: <4CF4F845.7010207@metafoo.de>
-References: <000201cb8fae$4d61fd20$e825f760$%kim@samsung.com>
-	<201011301401.44973.anarsoul@gmail.com>
-	<4CF4F845.7010207@metafoo.de>
-Message-ID: <201011301633.05545.anarsoul@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Nov 2010 15:35:06 +0100
+Subject: [PATCH] make mc13783 code generic
+In-Reply-To: <878w0buqd9.fsf@lechat.rtp-net.org>
+References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
+	<878w0buqd9.fsf@lechat.rtp-net.org>
+Message-ID: <20101130143506.GJ20449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 November 2010 15:12:37 Lars-Peter Clausen wrote:
+Hello,
 
-> Hi
+On Tue, Nov 30, 2010 at 10:12:34AM +0100, Arnaud Patard wrote:
+> > diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> > index bff8157..4008bf6 100644
+> > --- a/drivers/regulator/Makefile
+> > +++ b/drivers/regulator/Makefile
+> > @@ -29,7 +29,7 @@ obj-$(CONFIG_REGULATOR_TPS6586X) += tps6586x-regulator.o
+> >  obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
+> >  obj-$(CONFIG_REGULATOR_PCF50633) += pcf50633-regulator.o
+> >  obj-$(CONFIG_REGULATOR_PCAP) += pcap-regulator.o
+> > -obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
+> > +obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o mc13xxx-regulator-core.o
+> >  obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
 > 
-> While this might work for setting the pullup, what to you want to return in
-> get_pull?
+> Why don't you add a common Kconfig entry ? I've the (wrong ?) feeling
+> that you're going to do :
+> obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o mc13xxx-regulator-core.o
+> 
+> which should be avoided. Being able to build mc13783 and mc13892 support
+> at the same time is a must-have imho.
+AFAIK using this idiom is just fine.  You could argue that it's cleaner
+to have a CONFIG_REGULATOR_MC13XXX, but the result should be identical.
 
-Some custom value like S3C_GPIO_PULL_ENABLED?
- 
-> The reason why s3c24xx_gpiocfg_default needs to have {get,set}_pull set at
-> compile time is that the board init code is called before the cpu init
-> code. Which is in my opinion a bit odd and should be fixed instead.
+Best regards
+Uwe
 
-That's because cpu init code is arch_initcall. Kernel calls mdesc-
->init_machine before any arch_initcall function, not sure if it can be fixed 
-without massive rework of existing code.
-
-> If it is not fixed for whatever reason we could fallback to using some sort
-> of "cpu_is_s3c2442() ? S3C_GPIO_PULL_UP : S3C_GPIO_PULL_DOWN"
-
-AFAIK, Ben does not like runtime CPUtype checks
-
-Regards
-Vasily
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
