@@ -1,53 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Dec 2010 16:45:25 -0000
-Subject: [PATCH] ARM: perf: use raw_spinlock_t for pmu_lock
-In-Reply-To: <20101201163547.GE2898@pulham.picochip.com>
-References: <1291137443-13821-1-git-send-email-will.deacon@arm.com>
-	<20101201163547.GE2898@pulham.picochip.com>
-Message-ID: <004e01cb9177$2760c460$76224d20$@deacon@arm.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Wed, 01 Dec 2010 11:48:18 -0500
+Subject: Forced HW_BREAKPOINT
+In-Reply-To: <004d01cb9174$c8d83ec0$5a88bc40$@deacon@arm.com>
+References: <4CF58F22.6070803@ti.com>
+	<004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
+	<4CF67525.2010304@ti.com>
+	<004d01cb9174$c8d83ec0$5a88bc40$@deacon@arm.com>
+Message-ID: <4CF67C52.4000300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+Hi Will,
 
-> Subject: Re: [PATCH] ARM: perf: use raw_spinlock_t for pmu_lock
-
+On 12/01/2010 11:28 AM, Will Deacon wrote:
 [...]
-
-> Looks fine to me and tested on my board (not with PREEMPT_RT at the moment
-> though). Btw, it may be my mail reader (mutt) but trying to save your mail to
-> an mbox gave lots of extra characters in the patch like:
+>> Yes, this CPU has a trustzone capable v6.1 debug (DIDR reads
+>> 0x15121004).  The problem I am facing is that DSCR bit 15 (monitor
+>> debug-mode enable bit) cannot be set, it always reads back 0x2.  As a
+>> result the hw_breakpoint code spews a WARN_ON() at boot.
 > 
-> diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v=
-> 6.c
-> index 3f427aa..c058bfc 100644
-> --- a/arch/arm/kernel/perf_event_v6.c
-> +++ b/arch/arm/kernel/perf_event_v6.c
-> @@ -426,12 +426,12 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
->  =09 * Mask out the current event and set the counter to count the event
->  =09 * that we're interested in.
->  =09 */
-> -=09spin_lock_irqsave(&pmu_lock, flags);
-> +=09raw_spin_lock_irqsave(&pmu_lock, flags);
+> That's unfortunate. Is there a hardware debugger connected, or does
+> the core disallow monitor debug full-stop?
+> 
 
-Oh dear...
- 
-> Possibly an Exchange thing? Saving the message body worked and your
-> hw_breakpoint patches are fine.
+This was without a debugger connected.  It is possible that I have
+missed some top level debug enable in the SoC (haven't traced through
+the entire logic yet).
 
-Hmm, I just use an smtp server for sending messages so the message *should*
-be ok. It's the receiving side of things where I get into trouble. If I look
-at the .patch I gave to git send-email with hexdump it has:
-
-000007d0  69 74 65 28 76 61 6c 29  3b 0a 2d 09 73 70 69 6e  |ite(val);.-.spin|
-000007e0  5f 75 6e 6c 6f 63 6b 5f  69 72 71 72 65 73 74 6f  |_unlock_irqresto|
-000007f0  72 65 28 26 70 6d 75 5f  6c 6f 63 6b 2c 20 66 6c  |re(&pmu_lock, fl|
-00000800  61 67 73 29 3b 0a 2b 09  72 61 77 5f 73 70 69 6e  |ags);.+.raw_spin|
-00000810  5f 75 6e 6c 6f 63 6b 5f  69 72 71 72 65 73 74 6f  |_unlock_irqresto|
-00000820  72 65 28 26 70 6d 75 5f  6c 6f 63 6b 2c 20 66 6c  |re(&pmu_lock, fl|
-00000830  61 67 73 29 3b 0a 20 7d  0a 20 0a 20 73 74 61 74  |ags);. }. . stat|
-
-So it looks like tabs (ascii code 0x09) are being converted to =09 somewhere
-on your end. Mutt should be fine, what are you connecting it to?
-
-Will
+Regards
+Cyril.
