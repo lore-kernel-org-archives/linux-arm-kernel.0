@@ -1,47 +1,50 @@
-From: vm.rod25@gmail.com (Victor Rodriguez)
-Date: Wed, 1 Dec 2010 10:13:01 -0600
-Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247AFDA6E@dbde02.ent.ti.com>
-References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
-	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247AFD99E@dbde02.ent.ti.com>
-	<AANLkTi=Zjya8n0h3npfdQAR6Nx+YU1-T-EFe2Cqcmnwn@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDA6E@dbde02.ent.ti.com>
-Message-ID: <AANLkTiknoVtTaiEt=Vk7o3JBwi3tbhq46wgGCR57c3oj@mail.gmail.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Wed, 01 Dec 2010 11:17:41 -0500
+Subject: Forced HW_BREAKPOINT
+In-Reply-To: <004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
+References: <4CF58F22.6070803@ti.com>
+	<004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
+Message-ID: <4CF67525.2010304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By the way I will eliminate 3 of my patches
+Hi Will,
 
-[PATCH v8 3/9] davinci: ASoC support for Omapl138-Hawkboard
-[PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
-[PATCH v8 5/9] davinci: Audio support for Omapl138-Hawkboard
+On 12/01/2010 04:54 AM, Will Deacon wrote:
+> Hi Cyril,
+> 
+>> I am running an ARM1176JZ-S based SoC, on which HW breakpoints do not
+>> seem to function for some reason.
+> 
+> What are the symptoms that you are seeing? The 1176 has debug architecture
+> v6.1 so it should be supported by the code.
+>  
 
-Because if I eliminate the  McASP configuration I can not enable the
-audio support for the board, the kernel compiles and the sound card is
-recognized but when I try to play any file on the board it will not
-produce any error but no sound will be produced either
+Yes, this CPU has a trustzone capable v6.1 debug (DIDR reads
+0x15121004).  The problem I am facing is that DSCR bit 15 (monitor
+debug-mode enable bit) cannot be set, it always reads back 0x2.  As a
+result the hw_breakpoint code spews a WARN_ON() at boot.
 
-So in order to do not give a wrong support I will eliminate the audio
-support for hawk board
+>> Unfortunately the current Kconfig forces HW_BREAKPOINT if PERF_EVENTS is
+>> enabled on ARMV6 (commit 19852e59002fbba1c2c6ba0f154095a37ad2ac03):
+>>
+>>> +       select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
+>>
+>> As a result, I am unable to use the PMU for OProfile, without having hw
+>> breakpoints barf at boot.  Is there any dependency between h/w
+>> breakpoints and PMU that I am missing?  If not, does H/W breakpoints
+>> have be forced here?
+> 
+> The hw_breakpoint code depends on 1.) perf and 2.) hardware debug capabilities.
+> Since all v6 and v7 cores are supported (at least, everything should fail
+> gracefully if something is awry) then I don't see the point in not having it
+> enabled. However, if this is causing your board to break during boot we
+> should either fix it or allow it to be turned off.
+> 
+
+I understand hw_breakpoint's dependency on perf, as well as oprofile's
+dependency on perf.  However, if perf does not depend on hw_breakpoint
+(on v6/v7), isn't the select above incorrect?
 
 Regards
-
-Victor Rodriguez
-
-
-
-
-On Wed, Dec 1, 2010 at 10:04 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> On Wed, Dec 01, 2010 at 20:50:04, Victor Rodriguez wrote:
->>
->> Yes Sekhar I will do it ?right now, sorry for the delay with the other
->> patch that fix this
->
-> The issue was not yours to fix. The generic pin lists need to be cleaned
-> up regardless. So, don't be sorry :)
->
-> Thanks,
-> Sekhar
->
->
+Cyril.
