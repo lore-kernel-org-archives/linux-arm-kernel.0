@@ -1,64 +1,119 @@
 From: vm.rod25@gmail.com (vm.rod25 at gmail.com)
-Date: Wed,  1 Dec 2010 13:32:26 -0600
-Subject: [PATCH v9 3/6] davinci: MMC/SD and USB-OHCI configuration for
-	Omapl138-Hawkboard
+Date: Wed,  1 Dec 2010 13:32:27 -0600
+Subject: [PATCH v9 4/6] davinci: MMC/SD support for Omapl138-Hawkboard
 In-Reply-To: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
 References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
-Message-ID: <1291231949-23835-4-git-send-email-vm.rod25@gmail.com>
+Message-ID: <1291231949-23835-5-git-send-email-vm.rod25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Victor Rodriguez <victor.rodriguez@sasken.com>
 
-This patch defines Pin Mux configuration to enable MMC/SD
-and USB-OHCI on the Hawkboard-L138 system
+This patch adds MMC/SD support for the Hawkboard-L138 system
 
 Signed-off-by: Victor Rodriguez <victor.rodriguez@sasken.com>
 Tested-by: Rene Gonzalez <renegs.2378@gmail.com>
 ---
- arch/arm/mach-davinci/da850.c            |    4 ++++
- arch/arm/mach-davinci/include/mach/mux.h |    4 ++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+Notes:
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 63916b9..80803fa 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -543,11 +543,15 @@ static const struct mux_config da850_pins[] = {
- 	MUX_CFG(DA850, EMA_WAIT_1,	6,	24,	15,	1,	false)
- 	MUX_CFG(DA850, NEMA_CS_2,	7,	0,	15,	1,	false)
- 	/* GPIO function */
-+	MUX_CFG(DA850, GPIO2_4,		6,	12,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_6,		6,	4,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_8,		5,	28,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_15,	5,	0,	15,	8,	false)
-+	MUX_CFG(DA850, GPIO3_12,	7,	12,	15,	8,	false)
-+	MUX_CFG(DA850, GPIO3_13,	7,	8,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO4_0,		10,	28,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO4_1,		10,	24,	15,	8,	false)
-+	MUX_CFG(DA850, GPIO6_13,	13,	8,	15,	8,	false)
- 	MUX_CFG(DA850, RTC_ALARM,	0,	28,	15,	2,	false)
- #endif
- };
-diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
-index de11aac..5d4e0fe 100644
---- a/arch/arm/mach-davinci/include/mach/mux.h
-+++ b/arch/arm/mach-davinci/include/mach/mux.h
-@@ -908,11 +908,15 @@ enum davinci_da850_index {
- 	DA850_NEMA_CS_2,
+This patch works with da8xx_omapl_defconfig
+In order to test it select in menuconfig like insmodule
+
+MMC/SD/SDIO card support  --->
+      MMC block device driver
+      Use bounce buffer for simple hosts
+      TI DAVINCI Multimedia Card Interface support
+
+ arch/arm/mach-davinci/board-omapl138-hawk.c |   63 +++++++++++++++++++++++++++
+ 1 files changed, 63 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index cefff9b..d0c853f 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -22,6 +22,8 @@
+ #include <mach/mux.h>
  
- 	/* GPIO function */
-+	DA850_GPIO2_4,
- 	DA850_GPIO2_6,
- 	DA850_GPIO2_8,
- 	DA850_GPIO2_15,
-+	DA850_GPIO3_12,
-+	DA850_GPIO3_13,
- 	DA850_GPIO4_0,
- 	DA850_GPIO4_1,
-+	DA850_GPIO6_13,
- 	DA850_RTC_ALARM,
+ #define HAWKBOARD_PHY_ID		"0:07"
++#define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(3, 12)
++#define DA850_HAWK_MMCSD_WP_PIN		GPIO_TO_PIN(3, 13)
+ 
+ static short omapl138_hawk_mii_pins[] __initdata = {
+ 	DA850_MII_TXEN, DA850_MII_TXCLK, DA850_MII_COL, DA850_MII_TXD_3,
+@@ -110,6 +112,65 @@ static struct edma_rsv_info *da850_edma_rsv[2] = {
+ 	&da850_edma_cc1_rsv,
  };
  
++static const short hawk_mmcsd0_pins[] = {
++	DA850_MMCSD0_DAT_0, DA850_MMCSD0_DAT_1, DA850_MMCSD0_DAT_2,
++	DA850_MMCSD0_DAT_3, DA850_MMCSD0_CLK, DA850_MMCSD0_CMD,
++	DA850_GPIO3_12, DA850_GPIO3_13,
++	-1
++};
++
++static int da850_hawk_mmc_get_ro(int index)
++{
++	return gpio_get_value(DA850_HAWK_MMCSD_WP_PIN);
++}
++
++static int da850_hawk_mmc_get_cd(int index)
++{
++	return !gpio_get_value(DA850_HAWK_MMCSD_CD_PIN);
++}
++
++static struct davinci_mmc_config da850_mmc_config = {
++	.get_ro		= da850_hawk_mmc_get_ro,
++	.get_cd		= da850_hawk_mmc_get_cd,
++	.wires		= 4,
++	.max_freq	= 50000000,
++	.caps		= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
++	.version	= MMC_CTLR_VERSION_2,
++};
++
++static __init void omapl138_hawk_mmc_init(void)
++{
++	int ret;
++
++	ret = davinci_cfg_reg_list(hawk_mmcsd0_pins);
++	if (ret) {
++		pr_warning("%s: MMC/SD0 mux setup failed: %d\n",
++			__func__, ret);
++		return;
++	}
++
++	ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
++			GPIOF_DIR_IN, "MMC CD");
++	if (ret < 0) {
++		pr_warning("%s: can not open GPIO %d\n",
++			__func__, DA850_HAWK_MMCSD_CD_PIN);
++		return;
++	}
++
++	ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
++			GPIOF_DIR_IN, "MMC WP");
++	if (ret < 0) {
++		pr_warning("%s: can not open GPIO %d\n",
++			__func__, DA850_HAWK_MMCSD_WP_PIN);
++		return;
++	}
++
++	ret = da8xx_register_mmcsd0(&da850_mmc_config);
++	if (ret)
++		pr_warning("%s: MMC/SD0 registration failed: %d\n",
++			__func__, ret);
++}
++
+ static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
+ 	.enabled_uarts = 0x7,
+ };
+@@ -127,6 +188,8 @@ static __init void omapl138_hawk_init(void)
+ 		pr_warning("%s: EDMA registration failed: %d\n",
+ 			__func__, ret);
+ 
++	omapl138_hawk_mmc_init();
++
+ 	ret = da8xx_register_watchdog();
+ 	if (ret)
+ 		pr_warning("omapl138_hawk_init: "
 -- 
 1.7.0.4
