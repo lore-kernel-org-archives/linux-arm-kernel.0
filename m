@@ -1,76 +1,27 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 30 Nov 2010 19:55:08 -0500 (EST)
-Subject: [PATCH 13/54] ARM: dove: irq_data conversion.
-In-Reply-To: <20101130133637.GN15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130133637.GN15575@mail.wantstofly.org>
-Message-ID: <alpine.LFD.2.00.1011301954460.9313@xanadu.home>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 30 Nov 2010 16:53:32 -0800
+Subject: [RFC v2 5/8] TILER-DMM: TILER interface file and documentation
+In-Reply-To: <1291147139-23472-6-git-send-email-davidsin@ti.com>
+References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
+	<1291147139-23472-6-git-send-email-davidsin@ti.com>
+Message-ID: <20101201005332.GA29171@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Nov 2010, Lennert Buytenhek wrote:
-
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-
-Acked-by: Nicolas Pitre <nico@fluxnic.net>
-
+On Tue, Nov 30, 2010 at 01:58:56PM -0600, David Sin wrote:
+> From: Lajos Molnar <molnar@ti.com>
+> 
+> This patch contains the TILER interface file and the documentation.
+> 
+> Signed-off-by: Lajos Molnar <molnar@ti.com>
+> Signed-off-by: David Sin <davidsin@ti.com>
 > ---
->  arch/arm/mach-dove/irq.c |   18 +++++++++---------
->  1 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-> index 61bfcb3..9317f05 100644
-> --- a/arch/arm/mach-dove/irq.c
-> +++ b/arch/arm/mach-dove/irq.c
-> @@ -36,9 +36,9 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
->  	}
->  }
->  
-> -static void pmu_irq_mask(unsigned int irq)
-> +static void pmu_irq_mask(struct irq_data *d)
->  {
-> -	int pin = irq_to_pmu(irq);
-> +	int pin = irq_to_pmu(d->irq);
->  	u32 u;
->  
->  	u = readl(PMU_INTERRUPT_MASK);
-> @@ -46,9 +46,9 @@ static void pmu_irq_mask(unsigned int irq)
->  	writel(u, PMU_INTERRUPT_MASK);
->  }
->  
-> -static void pmu_irq_unmask(unsigned int irq)
-> +static void pmu_irq_unmask(struct irq_data *d)
->  {
-> -	int pin = irq_to_pmu(irq);
-> +	int pin = irq_to_pmu(d->irq);
->  	u32 u;
->  
->  	u = readl(PMU_INTERRUPT_MASK);
-> @@ -56,9 +56,9 @@ static void pmu_irq_unmask(unsigned int irq)
->  	writel(u, PMU_INTERRUPT_MASK);
->  }
->  
-> -static void pmu_irq_ack(unsigned int irq)
-> +static void pmu_irq_ack(struct irq_data *d)
->  {
-> -	int pin = irq_to_pmu(irq);
-> +	int pin = irq_to_pmu(d->irq);
->  	u32 u;
->  
->  	u = ~(1 << (pin & 31));
-> @@ -67,9 +67,9 @@ static void pmu_irq_ack(unsigned int irq)
->  
->  static struct irq_chip pmu_irq_chip = {
->  	.name		= "pmu_irq",
-> -	.mask		= pmu_irq_mask,
-> -	.unmask		= pmu_irq_unmask,
-> -	.ack		= pmu_irq_ack,
-> +	.irq_mask	= pmu_irq_mask,
-> +	.irq_unmask	= pmu_irq_unmask,
-> +	.irq_ack	= pmu_irq_ack,
->  };
->  
->  static void pmu_irq_handler(unsigned int irq, struct irq_desc *desc)
-> -- 
-> 1.7.1
-> 
+>  Documentation/arm/OMAP/TILER             |  126 ++++++++++++++++++++++
+>  arch/arm/mach-omap2/include/mach/tiler.h |  173 ++++++++++++++++++++++++++++++
+
+Shouldn't this .h file be in include/linux/ instead?  Why is it arch
+specific?
+
+thanks,
+
+greg k-h
