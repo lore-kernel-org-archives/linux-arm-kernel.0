@@ -1,52 +1,39 @@
-From: htejun@gmail.com (Tejun Heo)
-Date: Wed, 01 Dec 2010 10:45:25 +0100
-Subject: Cannot detect SATA disks w/ CONFIG_SATA_PMP w/o actually using
-	SATA multiplier
-In-Reply-To: <AANLkTinyJdTYXgpfvmw8vRBEFOc+SdCKe9hBZbGk1oLd@mail.gmail.com>
-References: <AANLkTi=kbTcq3hYBiDzGcAb02Ppwb1QEcs12-1W_T=LG@mail.gmail.com>
-	<4CF50574.6000706@gmail.com>
-	<AANLkTi=0gBcfrAyJNb0+=obH2QDsqhGM5a9xxwHAoh88@mail.gmail.com>
-	<4CF55549.4080000@gmail.com>
-	<AANLkTinyJdTYXgpfvmw8vRBEFOc+SdCKe9hBZbGk1oLd@mail.gmail.com>
-Message-ID: <4CF61935.2080501@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Dec 2010 09:54:46 -0000
+Subject: Forced HW_BREAKPOINT
+In-Reply-To: <4CF58F22.6070803@ti.com>
+References: <4CF58F22.6070803@ti.com>
+Message-ID: <004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Cyril,
 
-On 12/01/2010 06:53 AM, Lin Mac wrote:
-> While using multiplier with CONFIG_SATA_PMP enabled, or using disks directly
-> without CONFIG_SATA_PMP have no issue.
+> I am running an ARM1176JZ-S based SoC, on which HW breakpoints do not
+> seem to function for some reason.
+
+What are the symptoms that you are seeing? The 1176 has debug architecture
+v6.1 so it should be supported by the code.
+ 
+> Unfortunately the current Kconfig forces HW_BREAKPOINT if PERF_EVENTS is
+> enabled on ARMV6 (commit 19852e59002fbba1c2c6ba0f154095a37ad2ac03):
 > 
-> It is because sata_srst_pmp always return SATA_PMP_CTRL_PORT(15),
-> which casued ahci_do_softreset with pmp 15, which is not needed for
-> disks connected directly.
+> > +       select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
+> 
+> As a result, I am unable to use the PMU for OProfile, without having hw
+> breakpoints barf at boot.  Is there any dependency between h/w
+> breakpoints and PMU that I am missing?  If not, does H/W breakpoints
+> have be forced here?
 
-SRST w/ PMP==15 is the standard defined way to probe devices for PMP
-capable controllers.
+The hw_breakpoint code depends on 1.) perf and 2.) hardware debug capabilities.
+Since all v6 and v7 cores are supported (at least, everything should fail
+gracefully if something is awry) then I don't see the point in not having it
+enabled. However, if this is causing your board to break during boot we
+should either fix it or allow it to be turned off.
 
-> With SPMH3726-P rev:2.1.2, ata_dev_classify would report ATA_DEV_UNKNOWN on
-> ahci_hardreset. While with a Segate Barracuda 1TB SATA HD, it is ATA_DEV_ATA.
-> Therefore, the pmp returned by sata_srst_pmp should depends on the class
-> reported by ahci_hardreset.
+Can you give me some more details about how it breaks please as I don't
+have an 1176 that I can get my hands on?
 
-IIRC, PMP should return the signature of the first device after
-hardreset.  At any rate, the standard sanctioned way to probe is SRST
-w/ PMP==15.
+Thanks,
 
-> This patch does 2 things:
-> 1. ata_eh_reset calls ata_do_reset upon SRST without clearing classes, to be
->    used by sata_srst_pmp to decide pmp.
-> 2. sata_srst_pmp returns SATA_PMP_CTRL_PORT only when class is ATA_DEV_PMP or
->    ATA_DEV_UNKNOWN
-
-So, no, this isn't acceptable.  You're making the behavior deviate
-from the standard for all controllers and devices to work around a
-faulty, rather obscure controller.  If you want to work around, please
-implement a workaround which is specific to the controller in
-question.
-
-Thanks.
-
--- 
-tejun
+Will
