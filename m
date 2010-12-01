@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  1 Dec 2010 11:53:10 +0100
+Date: Wed,  1 Dec 2010 11:55:46 +0100
 Subject: [PATCH] OMAP: PM debug: fix wake-on-timer debugfs dependency
-Message-ID: <1291200790-29219-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1291200946-29342-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,6 +15,8 @@ Reported-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
 Applies to Tony's omap-fixes branch, targeted for .37-rc.
+
+Apologies for duplicates, original had wrong address for linux-omap ML
 
  arch/arm/mach-omap2/pm-debug.c |   34 +++++++++++++++++-----------------
  1 files changed, 17 insertions(+), 17 deletions(-)
