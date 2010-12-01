@@ -1,48 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 1 Dec 2010 10:34:35 -0800
-Subject: [PATCH v8 01-b/11] OMAP: GPIO: Make omap_gpio_show_rev bank specific
-In-Reply-To: <1290689318-10191-2-git-send-email-charu@ti.com>
-References: <1290689318-10191-1-git-send-email-charu@ti.com>
-	<1290689318-10191-2-git-send-email-charu@ti.com>
-Message-ID: <20101201183435.GJ17222@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 1 Dec 2010 19:51:03 +0100
+Subject: [PATCH] Kconfig: add new symbol MIGHT_HAVE_PCI
+In-Reply-To: <1291217412-9435-1-git-send-email-ulli.kroll@googlemail.com>
+References: <1291217412-9435-1-git-send-email-ulli.kroll@googlemail.com>
+Message-ID: <20101201185103.GK32355@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise GPIO init on 16xx may try to access uninitialized GPIO
-bank as the MPUIO bank does not have a revision register.
+On Wed, Dec 01, 2010 at 04:30:12PM +0100, Hans Ulli Kroll wrote:
+> Today more boards with arm cpu have selectable pci bus.
+> This patch makes this more scalable and remove line continuations in
+> Kconfig
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> ---
+>  arch/arm/Kconfig                 |    7 ++++++-
+>  arch/arm/mach-cns3xxx/Kconfig    |    1 +
+>  arch/arm/mach-integrator/Kconfig |    1 +
+>  arch/arm/mach-ks8695/Kconfig     |    1 +
+>  arch/arm/mach-pxa/Kconfig        |    1 +
+>  arch/arm/mach-versatile/Kconfig  |    1 +
+>  6 files changed, 11 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a19a526..614cf2f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -34,6 +34,9 @@ config ARM
+>  config HAVE_PWM
+>  	bool
+>  
+> +config MIGHT_HAVE_PCI
+HAVE_PCI or HAS_PCI is a more usual name for this purpose.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Uwe
 
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1689,16 +1689,16 @@ static struct clk * gpio5_fck;
- static struct clk *gpio_iclks[OMAP34XX_NR_GPIOS];
- #endif
- 
--static void __init omap_gpio_show_rev(void)
-+static void __init omap_gpio_show_rev(struct gpio_bank *bank)
- {
- 	u32 rev;
- 
--	if (cpu_is_omap16xx())
--		rev = __raw_readw(gpio_bank[1].base + OMAP1610_GPIO_REVISION);
-+	if (cpu_is_omap16xx() && !(bank->method != METHOD_MPUIO))
-+		rev = __raw_readw(bank->base + OMAP1610_GPIO_REVISION);
- 	else if (cpu_is_omap24xx() || cpu_is_omap34xx())
--		rev = __raw_readl(gpio_bank[0].base + OMAP24XX_GPIO_REVISION);
-+		rev = __raw_readl(bank->base + OMAP24XX_GPIO_REVISION);
- 	else if (cpu_is_omap44xx())
--		rev = __raw_readl(gpio_bank[0].base + OMAP4_GPIO_REVISION);
-+		rev = __raw_readl(bank->base + OMAP4_GPIO_REVISION);
- 	else
- 		return;
- 
-@@ -1958,7 +1958,7 @@ static int __init _omap_gpio_init(void)
- 		}
- 	}
- 
--	omap_gpio_show_rev();
-+	omap_gpio_show_rev(bank);
- 
- 	return 0;
- }
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
