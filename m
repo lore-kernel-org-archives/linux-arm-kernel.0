@@ -1,21 +1,51 @@
-From: aric@sdgsystems.com (Aric D. Blumer)
-Date: Wed, 01 Dec 2010 14:54:26 -0500
-Subject: bad pmd
-Message-ID: <4CF6A7F2.80206@sdgsystems.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 1 Dec 2010 20:55:42 +0100
+Subject: [PATCH] Kconfig: add new symbol MIGHT_HAVE_PCI
+In-Reply-To: <20101201190429.GC29347@n2100.arm.linux.org.uk>
+References: <1291217412-9435-1-git-send-email-ulli.kroll@googlemail.com>
+	<20101201185103.GK32355@pengutronix.de>
+	<20101201190429.GC29347@n2100.arm.linux.org.uk>
+Message-ID: <20101201195542.GL32355@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.  I'm using the long-term stable kernel 2.6.32 on a PXA320 platform,
-and I'm seeing errors like the following:
+On Wed, Dec 01, 2010 at 07:04:29PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 01, 2010 at 07:51:03PM +0100, Uwe Kleine-K?nig wrote:
+> > On Wed, Dec 01, 2010 at 04:30:12PM +0100, Hans Ulli Kroll wrote:
+> > > Today more boards with arm cpu have selectable pci bus.
+> > > This patch makes this more scalable and remove line continuations in
+> > > Kconfig
+> > > 
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> > > ---
+> > >  arch/arm/Kconfig                 |    7 ++++++-
+> > >  arch/arm/mach-cns3xxx/Kconfig    |    1 +
+> > >  arch/arm/mach-integrator/Kconfig |    1 +
+> > >  arch/arm/mach-ks8695/Kconfig     |    1 +
+> > >  arch/arm/mach-pxa/Kconfig        |    1 +
+> > >  arch/arm/mach-versatile/Kconfig  |    1 +
+> > >  6 files changed, 11 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index a19a526..614cf2f 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -34,6 +34,9 @@ config ARM
+> > >  config HAVE_PWM
+> > >  	bool
+> > >  
+> > > +config MIGHT_HAVE_PCI
+> > HAVE_PCI or HAS_PCI is a more usual name for this purpose.
+> 
+> This has been discussed in the thread "[PATCH] ARM: Gemini: Add support
+> for PCI Bus".
+Ah, I see, MIGHT_HAVE_PCI only makes the prompt available.  Hmm, well
+OK.
 
-/home/aric/sdg/git/linux/mm/memory.c:144: bad pmd 8040542e.
+Thanks for clearifying
+Uwe
 
-I have seen these messages on both the 2.6.32.15 and 2.6.32.24 kernels
-(haven't tried others).  Can someone tell me what the message means?  I
-suspect memory is being clobbered.  One interesting thing is that
-whenever that message is printed, the 8040542e is always the same.  I
-have not been able to establish any correlation yet with what causes it.
-
-Thanks for any insight you can give.
-
-Aric.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
