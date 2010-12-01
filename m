@@ -1,55 +1,52 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Wed, 1 Dec 2010 16:05:08 +0100 (CET)
-Subject: [PATCH] ARM: Gemini: Add support for PCI Bus
-In-Reply-To: <201011301719.03202.arnd@arndb.de>
-References: <1290263224-16965-1-git-send-email-ulli.kroll@googlemail.com>
-	<201011291657.53316.arnd@arndb.de>
-	<20101130160527.GB2377@n2100.arm.linux.org.uk>
-	<201011301719.03202.arnd@arndb.de>
-Message-ID: <alpine.LNX.2.00.1012011604510.8521@localhost.localdomain>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Wed, 1 Dec 2010 09:20:04 -0600
+Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247AFD99E@dbde02.ent.ti.com>
+References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
+	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFD99E@dbde02.ent.ti.com>
+Message-ID: <AANLkTi=Zjya8n0h3npfdQAR6Nx+YU1-T-EFe2Cqcmnwn@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 1, 2010 at 7:32 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Victor,
+>
+> On Sat, Nov 13, 2010 at 04:08:50, vm.rod25 at gmail.com wrote:
+>> From: Victor Rodriguez <victor.rodriguez@sasken.com>
+>>
+>> This patch defines Pin Mux configuration for MacASP
+>> used on the Hawkboard-L138 system in order to add Audio support
+>>
+>> Signed-off-by: Victor Rodriguez <victor.rodriguez@sasken.com>
+>> Tested-by: Rene Gonzalez <renegs.2378@gmail.com>
+>> ---
+>> ?arch/arm/mach-davinci/da850.c | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index 63916b9..f033a0a 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -591,7 +591,7 @@ const short da850_cpgmac_pins[] __initdata = {
+>> ?const short da850_mcasp_pins[] __initdata = {
+>> ? ? ? DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+>> ? ? ? DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
+>> - ? ? DA850_AXR_11, DA850_AXR_12,
+>> + ? ? DA850_AXR_11, DA850_AXR_12, DA850_AXR_13, DA850_AXR_14,
+>
+> To speed up acceptance of this series, can you please drop this
+> patch and submit the rest of the patches as a reduced series?
+>
+> Audio support can be revisited as a separate patch.
+>
+> Thanks,
+> Sekhar
+>
 
+Yes Sekhar I will do it  right now, sorry for the delay with the other
+patch that fix this
 
-On Tue, 30 Nov 2010, Arnd Bergmann wrote:
+Regards
 
-> On Tuesday 30 November 2010, Russell King - ARM Linux wrote:
-> > No, the above is correct.  What I was talking about was the difference
-> > between these:
-> > 
-> > config PCI
-> >         bool "PCI support" if MIGHT_HAVE_PCI
-> > 
-> > and
-> > 
-> > config PCI
-> >         bool "PCI support"
-> >         depends on MIGHT_HAVE_PCI
-> > 
-> > In the first instance, PCI itself does not depend on MIGHT_HAVE_PCI.
-> > MIGHT_HAVE_PCI controls whether the user is offered the "PCI support"
-> > option.
-> > 
-> > In the second instance, PCI depends on MIGHT_HAVE_PCI, which must be
-> > set to 'y' to offer the option and also if PCI is selected.
-> 
-> Right, I misread the patch as doing the wrong thing, thanks for
-> clearing that up.
-> 
-> > We want the first behaviour.  Platforms which must have PCI support can
-> > continue to select PCI as they currently do, and leave the MIGHT_HAVE_PCI
-> > option alone.
-> > 
-> > Platforms which may optionally have PCI support should select
-> > MIGHT_HAVE_PCI instead.
-> 
-> Yes, that sounds good.
-> 
-> 	Arnd
-> 
-
-OK.
-I prepare some patch.
-
-Ulli
+Victor Rodriguez
