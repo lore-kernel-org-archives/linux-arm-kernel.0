@@ -1,40 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Dec 2010 19:04:29 +0000
-Subject: [PATCH] Kconfig: add new symbol MIGHT_HAVE_PCI
-In-Reply-To: <20101201185103.GK32355@pengutronix.de>
-References: <1291217412-9435-1-git-send-email-ulli.kroll@googlemail.com>
-	<20101201185103.GK32355@pengutronix.de>
-Message-ID: <20101201190429.GC29347@n2100.arm.linux.org.uk>
+From: felipe.contreras@nokia.com (Felipe Contreras)
+Date: Wed, 01 Dec 2010 21:27:39 +0200
+Subject: [PATCHv5 0/4] omap: iovmm - fixes for iovmm module
+In-Reply-To: <20101129.104729.97149649.Hiroshi.DOYU@nokia.com>
+References: <1288033806-1496-1-git-send-email-x0095840@ti.com>
+	<20101129.104729.97149649.Hiroshi.DOYU@nokia.com>
+Message-ID: <1291231567-notmuch-felipe.contreras@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 01, 2010 at 07:51:03PM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Dec 01, 2010 at 04:30:12PM +0100, Hans Ulli Kroll wrote:
-> > Today more boards with arm cpu have selectable pci bus.
-> > This patch makes this more scalable and remove line continuations in
-> > Kconfig
-> > 
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> > ---
-> >  arch/arm/Kconfig                 |    7 ++++++-
-> >  arch/arm/mach-cns3xxx/Kconfig    |    1 +
-> >  arch/arm/mach-integrator/Kconfig |    1 +
-> >  arch/arm/mach-ks8695/Kconfig     |    1 +
-> >  arch/arm/mach-pxa/Kconfig        |    1 +
-> >  arch/arm/mach-versatile/Kconfig  |    1 +
-> >  6 files changed, 11 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index a19a526..614cf2f 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -34,6 +34,9 @@ config ARM
-> >  config HAVE_PWM
-> >  	bool
-> >  
-> > +config MIGHT_HAVE_PCI
-> HAVE_PCI or HAS_PCI is a more usual name for this purpose.
+Hiroshi.DOYU at nokia.com wrote:
+> From: ext Fernando Guzman Lugo <x0095840@ti.com>
+> Subject: [PATCHv5 0/4] omap: iovmm - fixes for iovmm module
+> Date: Mon, 25 Oct 2010 21:10:02 +0200
+> 
+> > Version 5:
+> > * Changes in "iommu: create new api to set valid da range"
+> >   - Change range variables to platform data structure.
+> 
+> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-This has been discussed in the thread "[PATCH] ARM: Gemini: Add support
-for PCI Bus".
+Does that means you are going to send a pull request with these for .38?
+
+Fernando, is there a branch where you have all the changes needed in
+tidspbridge?
+
+I guess the only patch missing would be the one for linux-arm.
+
+Cheers.
+
+-- 
+Felipe Contreras
