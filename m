@@ -1,39 +1,29 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Wed, 1 Dec 2010 13:24:37 +0000
-Subject: Change of Default kernel page size i.e 4KB
-In-Reply-To: <AANLkTi=4gtEC9fZyvc9g6uHecvjPrr0dDc==KsDOvq2Q@mail.gmail.com>
-References: <AANLkTi=4gtEC9fZyvc9g6uHecvjPrr0dDc==KsDOvq2Q@mail.gmail.com>
-Message-ID: <20101201132437.GA32555@linux-mips.org>
+From: nils.faerber@kernelconcepts.de (Nils Faerber)
+Date: Wed, 01 Dec 2010 15:12:27 +0100
+Subject: State of SMP / dual-core for MV78200?
+Message-ID: <4CF657CB.70901@kernelconcepts.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 01, 2010 at 01:50:13PM +0530, naveen yadav wrote:
+Hello!
+I have a Marvell Discover MV78200 at hand and am wondering about the
+multi core support in ARM Linux for it. I know that the Marvell based
+kernel suports dual-system, i.e. booting two kernel instances on the two
+cores. I also see that the upstream kernel still has the hooks for this
+in the board support files (for distributing the resources between the
+cores). Does anyone here know about the status about this dual-system
+support?
+And wouldn't SMP also work on such CPUs, i.e. having one kernel instance
+with two cores? For the application in question SMP would make more
+sense (high data I/O traffic).
 
-> Cc: kernelnewbies at nl.linux.org,
-> 	linux-arm-kernel-request at lists.arm.linux.org.uk,
-                        ^^^^^^^^ WTF?
-> 	linux-mips at linux-mips.org
+Any information is welcome!
 
-> I have few drivers and very big application running on ARM and MIPS target.
-> I want to check the performance by changing the page size ie.
-> 
-> 8K, 16K, 32K etc.
-> 
-> Is it possile, If yes then what all care i need to take .
+Cheers
+  nils
 
-For MIPS: Rebuild kernel with support for the new kernel size.  Few MIPS
-cores.  Note that the `odd? page sizes, that those that aren't a power
-of 4 are only supported by Cavium while all MIPS III and newer processors
-support even `even? sizes 4KB, 16KB and 64KB.
-
-Aside of rebuilding the kernel you also need a suitable userland; older
-versions of binutils will produce binaries that only run
-for 4kB page sizes.
-
-For ARM the page size is fixed at 4kB which will simplify your benchmarking
-efforts ;)
-
-Performance gains very much depends on the workload but in general larger
-sizes are beneficial except maybe for systems with very little memory.
-
-  Ralf
+-- 
+kernel concepts GbR      Tel: +49-271-771091-12
+Sieghuetter Hauptweg 48  Fax: +49-271-771091-19
+D-57072 Siegen           Mob: +49-176-21024535
+http://www.kernelconcepts.de
