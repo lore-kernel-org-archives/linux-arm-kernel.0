@@ -1,79 +1,150 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Wed, 1 Dec 2010 19:23:59 +0800
-Subject: [PATCH 04/15] ARM: mxs: Add interrupt support
-In-Reply-To: <20101130135623.GH20449@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-5-git-send-email-shawn.guo@freescale.com>
-	<20101130135623.GH20449@pengutronix.de>
-Message-ID: <AANLkTi=wjBOp9L5neRKLkjsJXi6fmpmxfbS=HRw0qpjN@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 01 Dec 2010 20:24:26 +0900
+Subject: [PATCH 1/3] ARM: SAMSUNG: Convert s3c_irqext_wake() to new irq_
+	interrupt methods
+In-Reply-To: <1290698309-7691-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1290698309-7691-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <002e01cb914a$5285f7f0$f791e7d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Mark Brown wrote:
+> 
+> Kernel 2.6.37 adds new interrupt methods which take a struct irq_data
+> rather than an irq number. Begin converting Samsung platforms over to
+> these methods by converting s3c_irqext_wake() with a simple textual
+> substitution.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/irq-eint.c        |    2 +-
+>  arch/arm/mach-s5pv310/irq-eint.c        |    2 +-
+>  arch/arm/plat-s3c24xx/irq.c             |    2 +-
+>  arch/arm/plat-s5p/irq-eint.c            |    4 ++--
+>  arch/arm/plat-samsung/include/plat/pm.h |    4 +++-
+>  arch/arm/plat-samsung/pm.c              |    6 +++---
+>  6 files changed, 11 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/irq-eint.c b/arch/arm/mach-s3c64xx/irq-
+> eint.c
+> index 5682d6a..1a1aa5d 100644
+> --- a/arch/arm/mach-s3c64xx/irq-eint.c
+> +++ b/arch/arm/mach-s3c64xx/irq-eint.c
+> @@ -145,7 +145,7 @@ static struct irq_chip s3c_irq_eint = {
+>  	.mask_ack	= s3c_irq_eint_maskack,
+>  	.ack		= s3c_irq_eint_ack,
+>  	.set_type	= s3c_irq_eint_set_type,
+> -	.set_wake	= s3c_irqext_wake,
+> +	.irq_set_wake	= s3c_irqext_wake,
+>  };
+> 
+>  /* s3c_irq_demux_eint
+> diff --git a/arch/arm/mach-s5pv310/irq-eint.c b/arch/arm/mach-s5pv310/irq-
+> eint.c
+> index 5877503..f5a415e 100644
+> --- a/arch/arm/mach-s5pv310/irq-eint.c
+> +++ b/arch/arm/mach-s5pv310/irq-eint.c
+> @@ -152,7 +152,7 @@ static struct irq_chip s5pv310_irq_eint = {
+>  	.ack		= s5pv310_irq_eint_ack,
+>  	.set_type	= s5pv310_irq_eint_set_type,
+>  #ifdef CONFIG_PM
+> -	.set_wake	= s3c_irqext_wake,
+> +	.irq_set_wake	= s3c_irqext_wake,
+>  #endif
+>  };
+> 
+> diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
+> index ad0d44e..91ce383 100644
+> --- a/arch/arm/plat-s3c24xx/irq.c
+> +++ b/arch/arm/plat-s3c24xx/irq.c
+> @@ -238,7 +238,7 @@ static struct irq_chip s3c_irqext_chip = {
+>  	.unmask		= s3c_irqext_unmask,
+>  	.ack		= s3c_irqext_ack,
+>  	.set_type	= s3c_irqext_type,
+> -	.set_wake	= s3c_irqext_wake
+> +	.irq_set_wake	= s3c_irqext_wake
+>  };
+> 
+>  static struct irq_chip s3c_irq_eint0t4 = {
+> diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
+> index 752f1a6..f2f2e1c 100644
+> --- a/arch/arm/plat-s5p/irq-eint.c
+> +++ b/arch/arm/plat-s5p/irq-eint.c
+> @@ -125,7 +125,7 @@ static struct irq_chip s5p_irq_eint = {
+>  	.ack		= s5p_irq_eint_ack,
+>  	.set_type	= s5p_irq_eint_set_type,
+>  #ifdef CONFIG_PM
+> -	.set_wake	= s3c_irqext_wake,
+> +	.irq_set_wake	= s3c_irqext_wake,
+>  #endif
+>  };
+> 
+> @@ -194,7 +194,7 @@ static struct irq_chip s5p_irq_vic_eint = {
+>  	.ack		= s5p_irq_vic_eint_ack,
+>  	.set_type	= s5p_irq_eint_set_type,
+>  #ifdef CONFIG_PM
+> -	.set_wake	= s3c_irqext_wake,
+> +	.irq_set_wake	= s3c_irqext_wake,
+>  #endif
+>  };
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-
+> samsung/include/plat/pm.h
+> index 245836d..d9025e3 100644
+> --- a/arch/arm/plat-samsung/include/plat/pm.h
+> +++ b/arch/arm/plat-samsung/include/plat/pm.h
+> @@ -15,6 +15,8 @@
+>   * management
+>  */
+> 
+> +#include <linux/irq.h>
+> +
+>  #ifdef CONFIG_PM
+> 
+>  extern __init int s3c_pm_init(void);
+> @@ -100,7 +102,7 @@ extern void s3c_pm_do_restore(struct sleep_save *ptr,
+int
+> count);
+>  extern void s3c_pm_do_restore_core(struct sleep_save *ptr, int count);
+> 
+>  #ifdef CONFIG_PM
+> -extern int s3c_irqext_wake(unsigned int irqno, unsigned int state);
+> +extern int s3c_irqext_wake(struct irq_data *data, unsigned int state);
+>  extern int s3c24xx_irq_suspend(struct sys_device *dev, pm_message_t
+state);
+>  extern int s3c24xx_irq_resume(struct sys_device *dev);
+>  #else
+> diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+> index 5bf3f2f..02d531f 100644
+> --- a/arch/arm/plat-samsung/pm.c
+> +++ b/arch/arm/plat-samsung/pm.c
+> @@ -136,15 +136,15 @@ static void s3c_pm_restore_uarts(void) { }
+>  unsigned long s3c_irqwake_intmask	= 0xffffffffL;
+>  unsigned long s3c_irqwake_eintmask	= 0xffffffffL;
+> 
+> -int s3c_irqext_wake(unsigned int irqno, unsigned int state)
+> +int s3c_irqext_wake(struct irq_data *data, unsigned int state)
+>  {
+> -	unsigned long bit = 1L << IRQ_EINT_BIT(irqno);
+> +	unsigned long bit = 1L << IRQ_EINT_BIT(data->irq);
+> 
+>  	if (!(s3c_irqwake_eintallow & bit))
+>  		return -ENOENT;
+> 
+>  	printk(KERN_INFO "wake %s for irq %d\n",
+> -	       state ? "enabled" : "disabled", irqno);
+> +	       state ? "enabled" : "disabled", data->irq);
+> 
+>  	if (!state)
+>  		s3c_irqwake_eintmask |= bit;
+> --
 
-2010/11/30 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Shawn,
->
-> On Fri, Nov 26, 2010 at 02:49:03PM +0800, Shawn Guo wrote:
-[...]
->> +static void icoll_ack_irq(unsigned int irq)
->> +{
->> + ? ? __raw_writel(0, icoll_base + HW_ICOLL_VECTOR);
-> You need to write this before handling the irq, no?
->
-No need, indeed.  Will remove it.
+Looks ok to me...will apply.
 
->> +
->> + ? ? /* ACK current interrupt (level 0) */
->> + ? ? __raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
->> + ? ? ? ? ? ? ? ? ? ? icoll_base + HW_ICOLL_LEVELACK);
->> +}
->> +
-[...]
->> +
->> + ? ? .macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
->> + ? ? ldr ? ? \base, =icoll_base
-> Maybe it's worth to hardcode the base address if only a single cpu is
-> compiled in? ?And what about setting the base register in
-> get_irqnr_preamble?
->
-I suppose you have known that MX23 and MX28 could be built into single
-zImage.  So you are asking something as below, right?
+Thanks.
 
-        .macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-        ldr     \irqnr, [\base, #0x70]
-        cmp     \irqnr, #0x7F
-        moveqs  \irqnr, #0
-        .endm
-
-        .macro  get_irqnr_preamble, base, tmp
-#if defined (CONFIG_SOC_IMX23) && defined (CONFIG_SOC_IMX28)
-        ldr     \base, =icoll_base
-        ldr     \base, [\base]
-#elif defined (CONFIG_SOC_IMX23)
-        ldr     \base, =MX23_ICOLL_BASE_ADDR
-#else
-        ldr     \base, =MX28_ICOLL_BASE_ADDR
-#endif
-        .endm
-
->> + ? ? ldr ? ? \base, [\base]
->> + ? ? ldr ? ? \irqnr, [\base, #0x70]
->> + ? ? cmp ? ? \irqnr, #0x7F
->> + ? ? moveqs ?\irqnr, #0
-> Hmm, you only need that cmp+moveqs because you cannot be sure that an
-> irq is pending, right. ?Maybe it would make sense not to check for irqs
-> in a loop? ?(This is a arm-global thing, Russell?) ?(BTW, you're lucky,
-> for your irq controller it's only ugly to check if there is an irq
-> pending. ?IIRC ns9xxx has a race here.)
->
-Right.  But we actually have a problem with that on i.MX28, because
-i.MX28  uses IRQ 127 as below.
-
-#define MX28_INT_GPIO0                  127
-
-So GPIO0 interrupt will not work.  Any suggestion to work around it?
-
--- 
-Regards,
-Shawn
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
