@@ -1,123 +1,50 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Wed,  1 Dec 2010 16:30:12 +0100
-Subject: [PATCH] Kconfig: add new symbol MIGHT_HAVE_PCI
-Message-ID: <1291217412-9435-1-git-send-email-ulli.kroll@googlemail.com>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Wed, 01 Dec 2010 17:32:55 +0200
+Subject: [PATCH 0/3] OMAP: Introduce Backlight driver for Sharp
+	LS037V7DW01 LCD panel
+In-Reply-To: <1291118860-10325-1-git-send-email-bryan.wu@canonical.com>
+References: <1291118860-10325-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1291217575.10133.165.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Today more boards with arm cpu have selectable pci bus.
-This patch makes this more scalable and remove line continuations in
-Kconfig
+Hi,
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
----
- arch/arm/Kconfig                 |    7 ++++++-
- arch/arm/mach-cns3xxx/Kconfig    |    1 +
- arch/arm/mach-integrator/Kconfig |    1 +
- arch/arm/mach-ks8695/Kconfig     |    1 +
- arch/arm/mach-pxa/Kconfig        |    1 +
- arch/arm/mach-versatile/Kconfig  |    1 +
- 6 files changed, 11 insertions(+), 1 deletions(-)
+On Tue, 2010-11-30 at 20:07 +0800, ext Bryan Wu wrote:
+> After instroducing generic DPI panel driver for OMAP DSS2 system, we need to
+> split out backlight driver from Sharp LS037V7DW01 panel driver before we move
+> to the generic DPI panel driver.
+> 
+> This patchset introcuded backlight driver and cleanup the old Sharp LS037V7DW01
+> panel driver related code.
+> 
+> It's built on mainline 2.6.37-rc4
+> 
+> Bryan Wu (3):
+>   Backlight: driver for Sharp LS037V7DW01 panel on OMAP machine
+>   OMAP: move Sharp LS LCD panel device to generic DPI panel driver and new backlight driver
+>   OMAP: DSS2: remove Sharp LS037V7DW01 panel driver
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a19a526..614cf2f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -34,6 +34,9 @@ config ARM
- config HAVE_PWM
- 	bool
- 
-+config MIGHT_HAVE_PCI
-+	bool
-+
- config SYS_SUPPORTS_APM_EMULATION
- 	bool
- 
-@@ -298,6 +301,7 @@ config ARCH_CNS3XXX
- 	select CPU_V6
- 	select GENERIC_CLOCKEVENTS
- 	select ARM_GIC
-+	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
- 	help
- 	  Support for Cavium Networks CNS3XXX platform.
-@@ -433,6 +437,7 @@ config ARCH_IXP4XX
- 	select CPU_XSCALE
- 	select GENERIC_GPIO
- 	select GENERIC_CLOCKEVENTS
-+	select MIGHT_HAVE_PCI
- 	select DMABOUNCE if PCI
- 	help
- 	  Support for Intel's IXP4XX (XScale) family of processors.
-@@ -1164,7 +1169,7 @@ config ISA_DMA_API
- 	bool
- 
- config PCI
--	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
-+	bool "PCI support" if MIGHT_HAVE_PCI
- 	help
- 	  Find out whether you have a PCI motherboard. PCI is the name of a
- 	  bus system, i.e. the way the CPU talks to the other stuff inside
-diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
-index 9ebfcc4..29b13f2 100644
---- a/arch/arm/mach-cns3xxx/Kconfig
-+++ b/arch/arm/mach-cns3xxx/Kconfig
-@@ -3,6 +3,7 @@ menu "CNS3XXX platform type"
- 
- config MACH_CNS3420VB
- 	bool "Support for CNS3420 Validation Board"
-+	select MIGHT_HAVE_PCI
- 	help
- 	  Include support for the Cavium Networks CNS3420 MPCore Platform
- 	  Baseboard.
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index 27db275..769b0f1 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -4,6 +4,7 @@ menu "Integrator Options"
- 
- config ARCH_INTEGRATOR_AP
- 	bool "Support Integrator/AP and Integrator/PP2 platforms"
-+	select MIGHT_HAVE_PCI
- 	help
- 	  Include support for the ARM(R) Integrator/AP and
- 	  Integrator/PP2 platforms.
-diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
-index fe0c82e..f5c39a8 100644
---- a/arch/arm/mach-ks8695/Kconfig
-+++ b/arch/arm/mach-ks8695/Kconfig
-@@ -4,6 +4,7 @@ menu "Kendin/Micrel KS8695 Implementations"
- 
- config MACH_KS8695
- 	bool "KS8695 development board"
-+	select MIGHT_HAVE_PCI
- 	help
- 	  Say 'Y' here if you want your kernel to run on the original
- 	  Kendin-Micrel KS8695 development board.
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index dd235ec..716a2e1 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -94,6 +94,7 @@ config MACH_ARMCORE
- 	select PXA27x
- 	select IWMMXT
- 	select PXA25x
-+	select MIGHT_HAVE_PCI
- 
- config MACH_EM_X270
- 	bool "CompuLab EM-x270 platform"
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-index c781f30..3f7b5e9 100644
---- a/arch/arm/mach-versatile/Kconfig
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -4,6 +4,7 @@ menu "Versatile platform type"
- config ARCH_VERSATILE_PB
- 	bool "Support Versatile/PB platform"
- 	select CPU_ARM926T
-+	select MIGHT_HAVE_PCI
- 	default y
- 	help
- 	  Include support for the ARM(R) Versatile/PB platform.
--- 
-1.7.3.2
+I don't think this is quite the right direction.
+
+All the backlight driver does is call a function in the board file. It's
+not really a "sharp ls backlight driver", but rather generic one. I'm
+not even sure if it needs the dssdev pointer.
+
+This kind of backlight is, in a sense, totally separate component from
+the panel itself. All they have in common is that they are packaged in
+the same physical display module, and they usually share the same
+connector.
+
+I have seen three kinds of backlights on OMAP devices:
+- on/off GPIO (like on 3430 SDP)
+- PWM based (zoom seems to have this)
+- Panel controlled (Taal-panel. Also PWM based, but OMAP doesn't see
+that)
+
+The first two could (should?) be totally separate backlights from the
+panel itself. For those, a generic backlight driver could perhaps work.
+The third one needs to be quite tied to the panel driver, and I'm not
+sure how easy it would be to have a separate driver for that.
+
+ Tomi
