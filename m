@@ -1,43 +1,35 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 1 Dec 2010 16:35:47 +0000
-Subject: [PATCH] ARM: perf: use raw_spinlock_t for pmu_lock
-In-Reply-To: <1291137443-13821-1-git-send-email-will.deacon@arm.com>
-References: <1291137443-13821-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20101201163547.GE2898@pulham.picochip.com>
+From: scaudle@codeaurora.org (Stephen Caudle)
+Date: Wed, 01 Dec 2010 11:36:10 -0500
+Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores
+	during IRQ enable
+In-Reply-To: <20101130180718.GB8521@n2100.arm.linux.org.uk>
+References: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
+	<20101130180718.GB8521@n2100.arm.linux.org.uk>
+Message-ID: <4CF6797A.2010807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 05:17:23PM +0000, Will Deacon wrote:
-> For kernels built with PREEMPT_RT, critical sections protected
-> by standard spinlocks are preemptible. This is not acceptable
-> on perf as (a) we may be scheduled onto a different CPU whilst
-> reading/writing banked PMU registers and (b) the latency when
-> reading the PMU registers becomes unpredictable.
-> 
-> This patch upgrades the pmu_lock spinlock to a raw_spinlock
-> instead.
-> 
-> Reported-by: Jamie Iles <jamie@jamieiles.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-Hi Will, 
+On 11/30/2010 01:07 PM, Russell King - ARM Linux wrote:
+> Sorry, missed this.
+>
+> If it's a private peripheral, it can only be accessed from its associated
+> CPU.  What that means is you don't want to enable the interrupt on other
+> CPUs as the peripheral may not be present or initialized on that CPU.
 
-Looks fine to me and tested on my board (not with PREEMPT_RT at the moment 
-though). Btw, it may be my mail reader (mutt) but trying to save your mail to 
-an mbox gave lots of extra characters in the patch like:
+Understood.  But the alternative is to require all code that requests a 
+PPI to have to enable the IRQ on the other cores.  This seems 
+unreasonable to me.
 
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v=
-6.c
-index 3f427aa..c058bfc 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -426,12 +426,12 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
- =09 * Mask out the current event and set the counter to count the event
- =09 * that we're interested in.
- =09 */
--=09spin_lock_irqsave(&pmu_lock, flags);
-+=09raw_spin_lock_irqsave(&pmu_lock, flags);
+> So I'm nervous about this change - architecturally it feels like the
+> wrong thing to do to take the PPI interrupts through the generic IRQ
+> infrastructure.
 
-Possibly an Exchange thing? Saving the message body worked and your 
-hw_breakpoint patches are fine.
+What do suggest as an alternative to this solution?  Creating separate 
+IRQ numbers for each core (per PPI) doesn't seem to scale well as the 
+number of cores increase.
 
-Jamie
+~Stephen
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
