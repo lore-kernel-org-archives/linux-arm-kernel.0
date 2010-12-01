@@ -1,31 +1,90 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 1 Dec 2010 17:23:18 +0000
-Subject: [PATCH] ARM: perf: use raw_spinlock_t for pmu_lock
-In-Reply-To: <004e01cb9177$2760c460$76224d20$@deacon@arm.com>
-References: <1291137443-13821-1-git-send-email-will.deacon@arm.com>
-	<20101201163547.GE2898@pulham.picochip.com>
-	<004e01cb9177$2760c460$76224d20$@deacon@arm.com>
-Message-ID: <20101201172318.GG2898@pulham.picochip.com>
+From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
+Date: Wed,  1 Dec 2010 22:28:50 +0530
+Subject: [Patch v3] AM35xx: Craneboard: Add USB EHCI support
+In-Reply-To: <[PATCH] Craneboard: Add USB EHCI Support>
+References: <[PATCH] Craneboard: Add USB EHCI Support>
+Message-ID: <1291222730-17614-1-git-send-email-srinath@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 01, 2010 at 04:45:25PM -0000, Will Deacon wrote:
-> Hmm, I just use an smtp server for sending messages so the message *should*
-> be ok. It's the receiving side of things where I get into trouble. If I look
-> at the .patch I gave to git send-email with hexdump it has:
-> 
-> 000007d0  69 74 65 28 76 61 6c 29  3b 0a 2d 09 73 70 69 6e  |ite(val);.-.spin|
-> 000007e0  5f 75 6e 6c 6f 63 6b 5f  69 72 71 72 65 73 74 6f  |_unlock_irqresto|
-> 000007f0  72 65 28 26 70 6d 75 5f  6c 6f 63 6b 2c 20 66 6c  |re(&pmu_lock, fl|
-> 00000800  61 67 73 29 3b 0a 2b 09  72 61 77 5f 73 70 69 6e  |ags);.+.raw_spin|
-> 00000810  5f 75 6e 6c 6f 63 6b 5f  69 72 71 72 65 73 74 6f  |_unlock_irqresto|
-> 00000820  72 65 28 26 70 6d 75 5f  6c 6f 63 6b 2c 20 66 6c  |re(&pmu_lock, fl|
-> 00000830  61 67 73 29 3b 0a 20 7d  0a 20 0a 20 73 74 61 74  |ags);. }. . stat|
-> 
-> So it looks like tabs (ascii code 0x09) are being converted to =09 somewhere
-> on your end. Mutt should be fine, what are you connecting it to?
-I'm getting the email from gmail but if I use "show original" in the gmail web 
-interface then it has the "=09"'s scattered through it. Your hw_breakpoint 
-patches seem fine though so I'm not sure what's different.
+From: Srinath <srinath@mistralsolutions.com>
 
-Jamie
+AM3517/05 Craneboard has one EHCI interface on board using port1.
+
+GPIO35 is used as power enable.
+GPIO38 is used as port1 PHY reset.
+
+History:
+http://marc.info/?l=linux-omap&w=2&r=1&s=Craneboard%3A+Add+USB+EHCI+support&q=t
+
+Signed-off-by: Srinath <srinath@mistralsolutions.com>
+---
+ arch/arm/mach-omap2/board-am3517crane.c |   40 +++++++++++++++++++++++++++++++
+ 1 files changed, 40 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+index 13ead33..6fd5dfe 100644
+--- a/arch/arm/mach-omap2/board-am3517crane.c
++++ b/arch/arm/mach-omap2/board-am3517crane.c
+@@ -28,8 +28,13 @@
+ 
+ #include <plat/board.h>
+ #include <plat/common.h>
++#include <plat/usb.h>
+ 
+ #include "mux.h"
++#include "control.h"
++
++#define GPIO_USB_POWER		35
++#define GPIO_USB_NRESET		38
+ 
+ /* Board initialization */
+ static struct omap_board_config_kernel am3517_crane_config[] __initdata = {
+@@ -53,10 +58,45 @@ static void __init am3517_crane_init_irq(void)
+ 	omap_gpio_init();
+ }
+ 
++static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
++	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
++	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
++	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
++
++	.phy_reset  = true,
++	.reset_gpio_port[0]  = GPIO_USB_NRESET,
++	.reset_gpio_port[1]  = -EINVAL,
++	.reset_gpio_port[2]  = -EINVAL
++};
++
+ static void __init am3517_crane_init(void)
+ {
++	int ret;
++
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 	omap_serial_init();
++
++	/* Configure GPIO for EHCI port */
++	omap_mux_init_gpio(GPIO_USB_POWER, OMAP_PIN_OUTPUT);
++
++	ret = gpio_request(GPIO_USB_POWER, "usb_ehci_enable");
++	if (ret < 0) {
++		pr_err("Cannot request GPIO %d\n", GPIO_USB_POWER);
++		return;
++	}
++
++	ret = gpio_direction_output(GPIO_USB_POWER, 1);
++	if (ret < 0)
++		goto err;
++
++	omap_mux_init_gpio(GPIO_USB_NRESET, OMAP_PIN_OUTPUT);
++	usb_ehci_init(&ehci_pdata);
++	return;
++
++err:
++	gpio_free(GPIO_USB_POWER);
++	pr_err("Unable to initialize EHCI power\n");
++	return;
+ }
+ 
+ MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
+-- 
+1.7.1.226.g770c5
