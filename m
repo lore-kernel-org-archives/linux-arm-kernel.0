@@ -1,39 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Dec 2010 16:28:27 -0000
-Subject: Forced HW_BREAKPOINT
-In-Reply-To: <4CF67525.2010304@ti.com>
-References: <4CF58F22.6070803@ti.com>
-	<004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
-	<4CF67525.2010304@ti.com>
-Message-ID: <004d01cb9174$c8d83ec0$5a88bc40$@deacon@arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 01 Dec 2010 19:32:22 +0300
+Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247AFD99E@dbde02.ent.ti.com>
+References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
+	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFD99E@dbde02.ent.ti.com>
+Message-ID: <4CF67896.1060002@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> I am running an ARM1176JZ-S based SoC, on which HW breakpoints do not
-> >> seem to function for some reason.
-> >
-> > What are the symptoms that you are seeing? The 1176 has debug architecture
-> > v6.1 so it should be supported by the code.
-> >
-> 
-> Yes, this CPU has a trustzone capable v6.1 debug (DIDR reads
-> 0x15121004).  The problem I am facing is that DSCR bit 15 (monitor
-> debug-mode enable bit) cannot be set, it always reads back 0x2.  As a
-> result the hw_breakpoint code spews a WARN_ON() at boot.
+Hello.
 
-That's unfortunate. Is there a hardware debugger connected, or does
-the core disallow monitor debug full-stop?
+Nori, Sekhar wrote:
 
-> I understand hw_breakpoint's dependency on perf, as well as oprofile's
-> dependency on perf.  However, if perf does not depend on hw_breakpoint
-> (on v6/v7), isn't the select above incorrect?
+> On Sat, Nov 13, 2010 at 04:08:50, vm.rod25 at gmail.com wrote:
+>> From: Victor Rodriguez <victor.rodriguez@sasken.com>
 
-I was hoping not to give people the option to turn this off in Kconfig
-because it will inevitably lead to GDB bug reports complaining that
-hardware breakpoints don't work because the option has been misconfigured
-in a distro kernel. How about I fix the initcall so that it always succeeds
-and prints a helpful message instead of WARNing?
+>> This patch defines Pin Mux configuration for MacASP
+>> used on the Hawkboard-L138 system in order to add Audio support
 
-Russell, do you have any thoughts on this (Kconfig vs runtime detection)?
+>> Signed-off-by: Victor Rodriguez <victor.rodriguez@sasken.com>
+>> Tested-by: Rene Gonzalez <renegs.2378@gmail.com>
+>> ---
+>>  arch/arm/mach-davinci/da850.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
 
-Will
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index 63916b9..f033a0a 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -591,7 +591,7 @@ const short da850_cpgmac_pins[] __initdata = {
+>>  const short da850_mcasp_pins[] __initdata = {
+>>       DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+>>       DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
+>> -     DA850_AXR_11, DA850_AXR_12,
+>> +     DA850_AXR_11, DA850_AXR_12, DA850_AXR_13, DA850_AXR_14,
+
+> To speed up acceptance of this series, can you please drop this
+> patch and submit the rest of the patches as a reduced series?
+
+    BTW, I've seen more AXR pins in DA850, so this patch is far from being 
+complete anyway.
+
+> Thanks,
+> Sekhar
+
+WBR, Sergei
