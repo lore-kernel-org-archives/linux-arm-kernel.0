@@ -1,334 +1,150 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 01 Dec 2010 11:29:17 +0900
-Subject: [PATCH 3/4] S5PC110: add MIPI-DSI support for platform and
-	machine.
-In-Reply-To: <4CF5814A.8030204@gmail.com>
-References: <1290496593-4927-1-git-send-email-inki.dae@samsung.com>
-	<4CF13AC4.3060508@gmail.com>
-	<000b01cb902e$3ba14070$b2e3c150$%dae@samsung.com>
-	<4CF5814A.8030204@gmail.com>
-Message-ID: <005101cb90ff$8d6185b0$a8249110$%dae@samsung.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 1 Dec 2010 10:51:12 +0800
+Subject: [PATCH 09/17] UCB1400: Pass ucb1400-gpio data through ac97 bus
+In-Reply-To: <1288741914-21328-9-git-send-email-marek.vasut@gmail.com>
+References: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
+	<1288741914-21328-9-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTinH=E==juc0vvMmwdj3R3b6HPGXWUz2LU2YpEkY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester.
+Cc'ed Samuel for the MFD part.
 
-Thank you for your comments.
-
-> -----Original Message-----
-> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
-> owner at vger.kernel.org] On Behalf Of Sylwester Nawrocki
-> Sent: Wednesday, December 01, 2010 7:57 AM
-> To: Inki Dae
-> Cc: linux-fbdev at vger.kernel.org; kgene.kim at samsung.com;
-> kyungmin.park at samsung.com; lethal at linux-sh.org; akpm at linux-foundation.org;
-> linux-arm-kernel at lists.infradead.org; 'Sylwester Nawrocki'
-> Subject: Re: [PATCH 3/4] S5PC110: add MIPI-DSI support for platform and
-> machine.
-> 
-> Hi Inki,
-> 
-> On 11/30/2010 02:30 AM, Inki Dae wrote:
-> > Hello, Sylwester.
-> > Long time no see. :)
-> >
-> > Thank you for your comments.
-> >
-> >> -----Original Message-----
-> >> From: Sylwester Nawrocki [mailto:spnlinux at gmail.com]
-> >> Sent: Sunday, November 28, 2010 2:07 AM
-> >> To: Inki Dae
-> >> Cc: linux-fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >> kyungmin.park at samsung.com; kgene.kim at samsung.com; akpm at linux-
-> >> foundation.org; lethal at linux-sh.org
-> >> Subject: Re: [PATCH 3/4] S5PC110: add MIPI-DSI support for platform and
-> >> machine.
-> >>
-> >> Hello,
-> >>
-> >> On 11/23/2010 08:16 AM, Inki Dae wrote:
-> >>> clock.c
-> >>> - added dsim clock gate.
-> >>>
-> >>> dev-dsim.c
-> >>> - platform and machine specific definitions.
-> >>> Now just supports only MACHINE GONI so for other machines,
-> >>> mipi_1_1v_name and mipi_1_8v_name values should be changed to
-> >>> proper regulator name at each machine file.
-> >>>
-> >>> setup-dsim.c
-> >>> - platform specific definitions.
-> >>>
-> >>> Signed-off-by: Inki Dae<inki.dae@samsung.com>
-> >>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
-> >>> ---
-> >>>    arch/arm/mach-s5pv210/Kconfig                   |   11 ++
-> >>>    arch/arm/mach-s5pv210/Makefile                  |    2 +
-> >>>    arch/arm/mach-s5pv210/clock.c                   |    6 +
-> >>>    arch/arm/mach-s5pv210/dev-dsim.c                |  149
-> >> +++++++++++++++++++++++
-> >>>    arch/arm/mach-s5pv210/include/mach/map.h        |    4 +
-> >>>    arch/arm/mach-s5pv210/include/mach/regs-clock.h |    3 +-
-> >>>    arch/arm/mach-s5pv210/mach-goni.c               |   12 ++
-> >>>    arch/arm/mach-s5pv210/setup-dsim.c              |  144
-> >> ++++++++++++++++++++++
-> >>>    arch/arm/plat-s5p/Kconfig                       |    5 +
-> >>>    9 files changed, 335 insertions(+), 1 deletions(-)
-> >>>    create mode 100644 arch/arm/mach-s5pv210/dev-dsim.c
-> >>>    create mode 100644 arch/arm/mach-s5pv210/setup-dsim.c
-> >>>
-> [snip]
-> >>> diff --git a/arch/arm/mach-s5pv210/dev-dsim.c b/arch/arm/mach-
-> >> s5pv210/dev-dsim.c
-> [snip]
-> >>> +
-> >>> +static struct s5p_platform_dsim dsim_platform_data = {
-> >>> +	.clk_name		= "dsim",
-> >>> +	.mipi_1_1v_name		= "vmipi_1.1v",
-> >>> +	.mipi_1_8v_name		= "vmipi_1.8v",
-> >>
-> >> You could avoid passing regulator's names in here. All you need to do
-> is
-> >> defining regulator supplies properly (see further comments below).
-> >> Creating well known (e.g. as defined in the datasheet) regulator supply
-> >> names in the actual driver file (s5p-dsim.c) should be enough.
-> >> The regulator API can be used to match a regulator and its consumer.
-> >>
-> > Regulator's name could be changed according to machine so I think should
->  > be set to Machine specific file.
-> 
-> First of all it is just my suggestion, please feel free to ignore it.
-> 
-> Regulator names are mostly different across machines but it is
-> the *"regulator consumer supply"* names that are used for lookup in
-> calls like regulator_get(). In the setup code of each machine that
-> wants to use mipi-dsi you could insert an entry dedicated to your
-> device into the consumers array of specific regulator.
-> 
-> On the other hand, if the number of regulators needed varies across
-> machines then using platform data structure for the names might be
-> a solution. But that doesn't look like your case.
-> 
-If it removes regulator consumer name from platform data then s5p_dsim_mipi_power() below should be added to machine code. In this case, every when mipi-dsi driver is ported to other machines regulator consumer name in s5p_dsim_mipi_power() should be modified properly in other words, s5p_dsim_mipi_power() couldn't be used commonly. if platform data includes regulator consumer name then it is done just only changing consumer name to machine specific and also s5p_dsim_mipi_power() could be used commonly. If I missed things then please feel free to give me your opinion.
-
-> >>> +	.dsim_info		=&dsim_info,
-> >>> +	.dsim_lcd_info		=&dsim_lcd_info,
-> >>> +
-> >>> +	.mipi_power		= s5p_dsim_mipi_power,
-> >>> +	.part_reset		= s5p_dsim_part_reset,
-> >>> +	.init_d_phy		= s5p_dsim_init_d_phy,
-> >>> +	.get_fb_frame_done	= NULL,
-> >>> +	.trigger		= NULL,
-> >>> +
-> >>> +	.platform_rev		= 1,
-> >>> +
-> >>> +	/*
-> >>> +	 * the stable time of needing to write data on SFR
-> >>> +	 * when the mipi mode becomes LP mode.
-> >>> +	 */
-> >>> +	.delay_for_stabilization = 600,
-> >>> +};
-> >>> +
-> >>> +struct platform_device s5p_device_dsim = {
-> >>> +	.name			= "s5p-dsim",
-> >>> +	.id			= 0,
-> >>> +	.num_resources		= ARRAY_SIZE(s5p_dsim_resource),
-> >>> +	.resource		= s5p_dsim_resource,
-> >>> +	.dev			= {
-> >>> +		.platform_data = (void *)&dsim_platform_data,
-> >>> +	},
-> >>> +};
-> >>> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
-> >> s5pv210/include/mach/map.h
-> >>> index 861d7fe..1ad2dad 100644
-> >>> --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> >>> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> >>> @@ -69,6 +69,10 @@
-> >>>
-> >>>    #define S5PV210_PA_FB		(0xF8000000)
-> >>>
-> >>> +/* MIPI-DSI */
-> >>> +#define S5PV210_PA_DSI		(0xFA500000)
-> >>> +#define S5PV210_SZ_DSI		SZ_1M
-> >>
-> >> How about removing S5PV210_SZ_DSI and directly using SZ_1M in dev-
-> dsim.c
-> >> ? Also, 1MB is probably excessive.
-> >>
-> >>> +
-> >>>    #define S5PV210_PA_FIMC0	(0xFB200000)
-> >>>    #define S5PV210_PA_FIMC1	(0xFB300000)
-> >>>    #define S5PV210_PA_FIMC2	(0xFB400000)
-> >>> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> >> b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> >>> index ebaabe0..c8b9366 100644
-> >>> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> >>> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> >>> @@ -196,7 +196,8 @@
-> >>>    #define S5P_OTHERS_USB_SIG_MASK		(1<<   16)
-> >>>
-> >>>    /* MIPI */
-> >>> -#define S5P_MIPI_DPHY_EN		(3)
-> >>> +#define S5P_MIPI_DPHY_EN		(3<<   0)
-> >>> +#define S5P_MIPI_M_RESETN		(1<<   1)
-> >>>
-> >>>    /* S5P_DAC_CONTROL */
-> >>>    #define S5P_DAC_ENABLE			(1)
-> >>> diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-
-> >> s5pv210/mach-goni.c
-> >>> index b1dcf96..500cc1b 100644
-> >>> --- a/arch/arm/mach-s5pv210/mach-goni.c
-> >>> +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> >>> @@ -269,10 +269,18 @@ static void __init goni_tsp_init(void)
-> >>>    /* MAX8998 regulators */
-> >>>    #if defined(CONFIG_REGULATOR_MAX8998) ||
-> >> defined(CONFIG_REGULATOR_MAX8998_MODULE)
-> >>>
-> >>> +static struct regulator_consumer_supply goni_ldo3_consumers[] = {
-> >>> +	REGULATOR_SUPPLY("vmipi_1.1v", ""),
-> >>> +};
-> >>
-> >> You could just do:
-> >> 	REGULATOR_SUPPLY("vmipi_1.1v", "s5p-dsim.0"),
-> >>
-> >> The second argument is used to match your consumer device with the
-> >> relevant regulator supply.
-> >>
-> > Ok, it would be corrected.
-> >
-> >> Similar could be done in other machine's board setup files and there is
-> >> no need to pass anything in the platform data.
-> >>
-> >> Then in your driver probe you might just do:
-> >>
-> >> ... = regulator_get(&pdev->dev, "vmipi_1.1v");
-> >>
-> > I mentioned before.
-> >>> +
-> >>>    static struct regulator_consumer_supply goni_ldo5_consumers[] = {
-> >>>    	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
-> >>>    };
-> >>>
-> >>> +static struct regulator_consumer_supply goni_ldo7_consumers[] = {
-> >>> +	REGULATOR_SUPPLY("vmipi_1.8v", ""),
-> >>> +};
-> >>
-> >> Ditto.
-> >>
-> >>> +
-> >>>    static struct regulator_init_data goni_ldo2_data = {
-> >>>    	.constraints	= {
-> >>>    		.name		= "VALIVE_1.1V",
-> >>> @@ -294,6 +302,8 @@ static struct regulator_init_data goni_ldo3_data =
-> {
-> >>>    		.apply_uV	= 1,
-> >>>    		.always_on	= 1,
-> >>>    	},
-> >>> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo3_consumers),
-> >>> +	.consumer_supplies = goni_ldo3_consumers,
-> >>>    };
-> >>>
-> >>>    static struct regulator_init_data goni_ldo4_data = {
-> >>> @@ -333,6 +343,8 @@ static struct regulator_init_data goni_ldo7_data =
-> {
-> >>>    		.apply_uV	= 1,
-> >>>    		.always_on	= 1,
-> >>>    	},
-> >>> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo7_consumers),
-> >>> +	.consumer_supplies = goni_ldo7_consumers,
-> >>>    };
-> >>>
-> >>>    static struct regulator_init_data goni_ldo8_data = {
-> >>> diff --git a/arch/arm/mach-s5pv210/setup-dsim.c b/arch/arm/mach-
-> >> s5pv210/setup-dsim.c
-> >>> new file mode 100644
-> >>> index 0000000..874efa0
-> >>> --- /dev/null
-> >>> +++ b/arch/arm/mach-s5pv210/setup-dsim.c
-> >>> @@ -0,0 +1,144 @@
-> [snip]
-> >>> +
-> >>> +int s5p_dsim_mipi_power(struct dsim_global *dsim, struct regulator
-> >> *p_mipi_1_1v,
-> >>> +	struct regulator *p_mipi_1_8v, unsigned int enable)
-> >>> +{
-> >>> +	int ret = -1;
-> >>> +
-> >>> +	WARN_ON(dsim == NULL);
-> >>> +
-> >>> +	if (IS_ERR(p_mipi_1_1v) || IS_ERR(p_mipi_1_8v)) {
-> >>> +		dev_err(dsim->dev, "p_mipi_1_1v or p_mipi_1_8v is NULL.\n");
-> >>> +		return -EINVAL;
-> >>> +	}
-> >>> +
-> >>> +	if (enable) {
-> >>> +		if (p_mipi_1_1v)
-> >>> +			ret = regulator_enable(p_mipi_1_1v);
-> >>> +
-> >>> +		if (ret<   0) {
-> >>> +			dev_err(dsim->dev,
-> >>> +				"failed to enable regulator mipi_1_1v.\n");
-> >>> +			return ret;
-> >>> +		}
-> >>> +
-> >>> +		if (p_mipi_1_8v)
-> >>> +			ret = regulator_enable(p_mipi_1_8v);
-> >>> +
-> >>> +		if (ret<   0) {
-> >>> +			dev_err(dsim->dev,
-> >>> +				"failed to enable regulator mipi_1_8v.\n");
-> >>> +			return ret;
-> >>> +		}
-> >>> +	} else {
-> >>> +		if (p_mipi_1_1v)
-> >>> +			ret = regulator_force_disable(p_mipi_1_1v);
-> >>> +		if (ret<   0) {
-> >>> +			dev_err(dsim->dev,
-> >>> +				"failed to disable regulator mipi_1_1v.\n");
-> >>> +			return ret;
-> >>> +		}
-> >>> +
-> >>> +		if (p_mipi_1_8v)
-> >>> +			ret = regulator_force_disable(p_mipi_1_8v);
-> >>> +		if (ret<   0) {
-> >>> +			dev_err(dsim->dev,
-> >>> +				"failed to disable regulator mipi_1_8v.\n");
-> >>> +			return ret;
-> >>> +		}
-> >>> +	}
-> >>> +
-> >>> +	return ret;
-> >>> +}
-> >>
-> >> This function seem to be called only in the driver and it uses driver's
-> >> (private?) data, so can you explain what is the purpose of having it in
-> >> arch?
-> >> I suspect all the above regulator handling code could well be moved to
-> >> the driver. Am I missing something?
-> >>
-> > As I said above, regulator's name is specific to machine so it would be
->  > got by driver's probe and then controlled by driver.
-> 
-> Unless you plan to use mipi_power callback outside of the driver I
-> don't see a good reason for having it here.
-> 
-> Also you are not behaving nice by using regulator_force_disable().
-> IIRC it should be used only as a last resort, in critical situations.
-> If the mipi-dsi subsystem shares regulator with other device you will
-> be cutting off other device's power anytime you are disabling supply
-> of mipi-csi. Just imagine that this "other device" is the cpu core..
-> 
-> > Note that some machine doesn?t use regulator(gpio instead of regulator)
-> 
-> For those you could define the fixed voltage regulator if appropriate
-> and you would also get at the same time the reference counting.
-> 
-Your pointing out is good. Definitely it's my mistake. Using regulator_force_disable() is critical. I will correct it. And also as you said, gpio could be used by regulator framework with fixed voltage regulator.
-> 
+On Wed, Nov 3, 2010 at 7:51 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+> ?drivers/gpio/ucb1400_gpio.c | ? 19 ++++++-------------
+> ?drivers/mfd/ucb1400_core.c ?| ? ?5 +++++
+> ?include/linux/ucb1400.h ? ? | ? 19 ++++++-------------
+> ?3 files changed, 17 insertions(+), 26 deletions(-)
+>
+> diff --git a/drivers/gpio/ucb1400_gpio.c b/drivers/gpio/ucb1400_gpio.c
+> index 50e6bd1..fba45a5 100644
+> --- a/drivers/gpio/ucb1400_gpio.c
+> +++ b/drivers/gpio/ucb1400_gpio.c
+> @@ -12,8 +12,6 @@
+> ?#include <linux/module.h>
+> ?#include <linux/ucb1400.h>
+>
+> -struct ucb1400_gpio_data *ucbdata;
+> -
+> ?static int ucb1400_gpio_dir_in(struct gpio_chip *gc, unsigned off)
+> ?{
+> ? ? ? ?struct ucb1400_gpio *gpio;
+> @@ -50,7 +48,7 @@ static int ucb1400_gpio_probe(struct platform_device *dev)
+> ? ? ? ?struct ucb1400_gpio *ucb = dev->dev.platform_data;
+> ? ? ? ?int err = 0;
+>
+> - ? ? ? if (!(ucbdata && ucbdata->gpio_offset)) {
+> + ? ? ? if (!(ucb && ucb->gpio_offset)) {
+> ? ? ? ? ? ? ? ?err = -EINVAL;
+> ? ? ? ? ? ? ? ?goto err;
+> ? ? ? ?}
+> @@ -58,7 +56,7 @@ static int ucb1400_gpio_probe(struct platform_device *dev)
+> ? ? ? ?platform_set_drvdata(dev, ucb);
+>
+> ? ? ? ?ucb->gc.label = "ucb1400_gpio";
+> - ? ? ? ucb->gc.base = ucbdata->gpio_offset;
+> + ? ? ? ucb->gc.base = ucb->gpio_offset;
+> ? ? ? ?ucb->gc.ngpio = 10;
+> ? ? ? ?ucb->gc.owner = THIS_MODULE;
+>
+> @@ -72,8 +70,8 @@ static int ucb1400_gpio_probe(struct platform_device *dev)
+> ? ? ? ?if (err)
+> ? ? ? ? ? ? ? ?goto err;
+>
+> - ? ? ? if (ucbdata && ucbdata->gpio_setup)
+> - ? ? ? ? ? ? ? err = ucbdata->gpio_setup(&dev->dev, ucb->gc.ngpio);
+> + ? ? ? if (ucb && ucb->gpio_setup)
+> + ? ? ? ? ? ? ? err = ucb->gpio_setup(&dev->dev, ucb->gc.ngpio);
+>
+> ?err:
+> ? ? ? ?return err;
+> @@ -85,8 +83,8 @@ static int ucb1400_gpio_remove(struct platform_device *dev)
+> ? ? ? ?int err = 0;
+> ? ? ? ?struct ucb1400_gpio *ucb = platform_get_drvdata(dev);
+>
+> - ? ? ? if (ucbdata && ucbdata->gpio_teardown) {
+> - ? ? ? ? ? ? ? err = ucbdata->gpio_teardown(&dev->dev, ucb->gc.ngpio);
+> + ? ? ? if (ucb && ucb->gpio_teardown) {
+> + ? ? ? ? ? ? ? err = ucb->gpio_teardown(&dev->dev, ucb->gc.ngpio);
+> ? ? ? ? ? ? ? ?if (err)
+> ? ? ? ? ? ? ? ? ? ? ? ?return err;
+> ? ? ? ?}
+> @@ -113,11 +111,6 @@ static void __exit ucb1400_gpio_exit(void)
+> ? ? ? ?platform_driver_unregister(&ucb1400_gpio_driver);
+> ?}
+>
+> -void __init ucb1400_gpio_set_data(struct ucb1400_gpio_data *data)
+> -{
+> - ? ? ? ucbdata = data;
+> -}
+> -
+> ?module_init(ucb1400_gpio_init);
+> ?module_exit(ucb1400_gpio_exit);
+>
+> diff --git a/drivers/mfd/ucb1400_core.c b/drivers/mfd/ucb1400_core.c
+> index d73f84b..63f4969 100644
+> --- a/drivers/mfd/ucb1400_core.c
+> +++ b/drivers/mfd/ucb1400_core.c
+> @@ -75,6 +75,11 @@ static int ucb1400_core_probe(struct device *dev)
+>
+> ? ? ? ?/* GPIO */
+> ? ? ? ?ucb_gpio.ac97 = ac97;
+> + ? ? ? if (pdata) {
+> + ? ? ? ? ? ? ? ucb_gpio.gpio_setup = pdata->gpio_setup;
+> + ? ? ? ? ? ? ? ucb_gpio.gpio_teardown = pdata->gpio_teardown;
+> + ? ? ? ? ? ? ? ucb_gpio.gpio_offset = pdata->gpio_offset;
+> + ? ? ? }
+> ? ? ? ?ucb->ucb1400_gpio = platform_device_alloc("ucb1400_gpio", -1);
+> ? ? ? ?if (!ucb->ucb1400_gpio) {
+> ? ? ? ? ? ? ? ?err = -ENOMEM;
+> diff --git a/include/linux/ucb1400.h b/include/linux/ucb1400.h
+> index 1b47909..1a6bfdd 100644
+> --- a/include/linux/ucb1400.h
+> +++ b/include/linux/ucb1400.h
+> @@ -83,15 +83,12 @@
+> ?#define UCB_ID ? ? ? ? ? ? ? ? 0x7e
+> ?#define UCB_ID_1400 ? ? ? ? ? ? 0x4304
+>
+> -struct ucb1400_gpio_data {
+> - ? ? ? int gpio_offset;
+> - ? ? ? int (*gpio_setup)(struct device *dev, int ngpio);
+> - ? ? ? int (*gpio_teardown)(struct device *dev, int ngpio);
+> -};
+> -
+> ?struct ucb1400_gpio {
+> ? ? ? ?struct gpio_chip ? ? ? ?gc;
+> ? ? ? ?struct snd_ac97 ? ? ? ? *ac97;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? gpio_offset;
+> + ? ? ? int (*gpio_setup)(struct device *dev, int ngpio);
+> + ? ? ? int (*gpio_teardown)(struct device *dev, int ngpio);
+> ?};
+>
+> ?struct ucb1400_ts {
+> @@ -112,6 +109,9 @@ struct ucb1400 {
+>
+> ?struct ucb1400_pdata {
+> ? ? ? ?int ? ? irq;
+> + ? ? ? int ? ? gpio_offset;
+> + ? ? ? int (*gpio_setup)(struct device *dev, int ngpio);
+> + ? ? ? int (*gpio_teardown)(struct device *dev, int ngpio);
+> ?};
+>
+> ?static inline u16 ucb1400_reg_read(struct snd_ac97 *ac97, u16 reg)
+> @@ -163,11 +163,4 @@ static inline void ucb1400_adc_disable(struct snd_ac97 *ac97)
+>
+> ?unsigned int ucb1400_adc_read(struct snd_ac97 *ac97, u16 adc_channel,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int adcsync);
+> -
+> -#ifdef CONFIG_GPIO_UCB1400
+> -void __init ucb1400_gpio_set_data(struct ucb1400_gpio_data *data);
+> -#else
+> -static inline void ucb1400_gpio_set_data(struct ucb1400_gpio_data *data) {}
+> -#endif
+> -
+> ?#endif
 > --
-> Regards,
-> Sylwester
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.7.2.3
+>
+>
