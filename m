@@ -1,41 +1,26 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 30 Nov 2010 16:56:47 -0800
-Subject: [RFC v2 8/8] TILER-DMM: Linking TILER driver into the Linux
-	kernel build
-In-Reply-To: <1291147139-23472-9-git-send-email-davidsin@ti.com>
-References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
-	<1291147139-23472-9-git-send-email-davidsin@ti.com>
-Message-ID: <20101201005647.GC29171@kroah.com>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Tue, 30 Nov 2010 17:08:17 -0800
+Subject: [PATCH 03/54] ARM: gic: irq_data conversion.
+In-Reply-To: <20101130132536.GD15575@mail.wantstofly.org>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130132536.GD15575@mail.wantstofly.org>
+Message-ID: <4CF5A001.8080906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 01:58:59PM -0600, David Sin wrote:
-> From: Lajos Molnar <molnar@ti.com>
-> 
-> This patch links the TILER driver into the Linux kernel build
-> and config system.
-> 
-> Signed-off-by: Lajos Molnar <molnar@ti.com>
-> Signed-off-by: David Sin <davidsin@ti.com>
+Works on msm 8660 surf.
+
+Acked-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+
+Lennert Buytenhek wrote:
+> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 > ---
->  drivers/misc/Kconfig  |    5 +++++
->  drivers/misc/Makefile |    1 +
->  2 files changed, 6 insertions(+), 0 deletions(-)
+>  arch/arm/common/gic.c |   62 ++++++++++++++++++++++++------------------------
+>  1 files changed, 31 insertions(+), 31 deletions(-)
 > 
-> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-> index ac6d6ac..fff7927 100644
-> --- a/drivers/misc/Kconfig
-> +++ b/drivers/misc/Kconfig
-> @@ -378,4 +378,9 @@ source "drivers/misc/eeprom/Kconfig"
->  source "drivers/misc/cb710/Kconfig"
->  source "drivers/misc/iwmc3200top/Kconfig"
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 772f95f..1118f40 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -47,57 +47,56 @@ struct gic_chip_data {
 >  
-> +#
-> +# TI TILER driver support
-> +#
-
-Comments not needed.
-
-thanks,
-
-greg k-h
