@@ -1,181 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 1 Dec 2010 09:05:24 +0100
-Subject: [PATCH 33/54] ARM: ns9xxx: irq_data conversion.
-In-Reply-To: <20101130134104.GH15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130134104.GH15575@mail.wantstofly.org>
-Message-ID: <20101201080524.GD32355@pengutronix.de>
+From: per.xx.fransson@stericsson.com (Per Fransson)
+Date: Wed, 1 Dec 2010 09:24:06 +0100
+Subject: [PATCH v3] ARM: kexec: Add call to non-crashing cores through IPI
+Message-ID: <1291191846-12417-1-git-send-email-per.xx.fransson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 02:41:04PM +0100, Lennert Buytenhek wrote:
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+When kexec is used to start a crash kernel the other cores
+are notified. These non-crashing cores will save their state
+in the crash notes and then do nothing.
 
-> ---
->  arch/arm/mach-ns9xxx/board-a9m9750dev.c |   28 ++++++++++++++--------------
->  arch/arm/mach-ns9xxx/irq.c              |   28 ++++++++++++++--------------
->  2 files changed, 28 insertions(+), 28 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ns9xxx/board-a9m9750dev.c b/arch/arm/mach-ns9xxx/board-a9m9750dev.c
-> index b45bb3b..0c0d524 100644
-> --- a/arch/arm/mach-ns9xxx/board-a9m9750dev.c
-> +++ b/arch/arm/mach-ns9xxx/board-a9m9750dev.c
-> @@ -37,44 +37,44 @@ void __init board_a9m9750dev_map_io(void)
->  		     ARRAY_SIZE(board_a9m9750dev_io_desc));
->  }
->  
-> -static void a9m9750dev_fpga_ack_irq(unsigned int irq)
-> +static void a9m9750dev_fpga_ack_irq(struct irq_data *d)
->  {
->  	/* nothing */
->  }
->  
-> -static void a9m9750dev_fpga_mask_irq(unsigned int irq)
-> +static void a9m9750dev_fpga_mask_irq(struct irq_data *d)
->  {
->  	u8 ier;
->  
->  	ier = __raw_readb(FPGA_IER);
->  
-> -	ier &= ~(1 << (irq - FPGA_IRQ(0)));
-> +	ier &= ~(1 << (d->irq - FPGA_IRQ(0)));
->  
->  	__raw_writeb(ier, FPGA_IER);
->  }
->  
-> -static void a9m9750dev_fpga_maskack_irq(unsigned int irq)
-> +static void a9m9750dev_fpga_maskack_irq(struct irq_data *d)
->  {
-> -	a9m9750dev_fpga_mask_irq(irq);
-> -	a9m9750dev_fpga_ack_irq(irq);
-> +	a9m9750dev_fpga_mask_irq(d);
-> +	a9m9750dev_fpga_ack_irq(d);
->  }
->  
-> -static void a9m9750dev_fpga_unmask_irq(unsigned int irq)
-> +static void a9m9750dev_fpga_unmask_irq(struct irq_data *d)
->  {
->  	u8 ier;
->  
->  	ier = __raw_readb(FPGA_IER);
->  
-> -	ier |= 1 << (irq - FPGA_IRQ(0));
-> +	ier |= 1 << (d->irq - FPGA_IRQ(0));
->  
->  	__raw_writeb(ier, FPGA_IER);
->  }
->  
->  static struct irq_chip a9m9750dev_fpga_chip = {
-> -	.ack		= a9m9750dev_fpga_ack_irq,
-> -	.mask		= a9m9750dev_fpga_mask_irq,
-> -	.mask_ack	= a9m9750dev_fpga_maskack_irq,
-> -	.unmask		= a9m9750dev_fpga_unmask_irq,
-> +	.irq_ack	= a9m9750dev_fpga_ack_irq,
-> +	.irq_mask	= a9m9750dev_fpga_mask_irq,
-> +	.irq_mask_ack	= a9m9750dev_fpga_maskack_irq,
-> +	.irq_unmask	= a9m9750dev_fpga_unmask_irq,
->  };
->  
->  static void a9m9750dev_fpga_demux_handler(unsigned int irq,
-> @@ -82,7 +82,7 @@ static void a9m9750dev_fpga_demux_handler(unsigned int irq,
->  {
->  	u8 stat = __raw_readb(FPGA_ISR);
->  
-> -	desc->chip->mask_ack(irq);
-> +	desc->irq_data.chip->irq_mask_ack(&desc->irq_data);
->  
->  	while (stat != 0) {
->  		int irqno = fls(stat) - 1;
-> @@ -92,7 +92,7 @@ static void a9m9750dev_fpga_demux_handler(unsigned int irq,
->  		generic_handle_irq(FPGA_IRQ(irqno));
->  	}
->  
-> -	desc->chip->unmask(irq);
-> +	desc->irq_data.chip->irq_unmask(&desc->irq_data);
->  }
->  
->  void __init board_a9m9750dev_init_irq(void)
-> diff --git a/arch/arm/mach-ns9xxx/irq.c b/arch/arm/mach-ns9xxx/irq.c
-> index 038f24d..389fa5c 100644
-> --- a/arch/arm/mach-ns9xxx/irq.c
-> +++ b/arch/arm/mach-ns9xxx/irq.c
-> @@ -22,40 +22,40 @@
->  #define irq2prio(i) (i)
->  #define prio2irq(p) (p)
->  
-> -static void ns9xxx_mask_irq(unsigned int irq)
-> +static void ns9xxx_mask_irq(struct irq_data *d)
->  {
->  	/* XXX: better use cpp symbols */
-> -	int prio = irq2prio(irq);
-> +	int prio = irq2prio(d->irq);
->  	u32 ic = __raw_readl(SYS_IC(prio / 4));
->  	ic &= ~(1 << (7 + 8 * (3 - (prio & 3))));
->  	__raw_writel(ic, SYS_IC(prio / 4));
->  }
->  
-> -static void ns9xxx_ack_irq(unsigned int irq)
-> +static void ns9xxx_ack_irq(struct irq_data *d)
->  {
->  	__raw_writel(0, SYS_ISRADDR);
->  }
->  
-> -static void ns9xxx_maskack_irq(unsigned int irq)
-> +static void ns9xxx_maskack_irq(struct irq_data *d)
->  {
-> -	ns9xxx_mask_irq(irq);
-> -	ns9xxx_ack_irq(irq);
-> +	ns9xxx_mask_irq(d);
-> +	ns9xxx_ack_irq(d);
->  }
->  
-> -static void ns9xxx_unmask_irq(unsigned int irq)
-> +static void ns9xxx_unmask_irq(struct irq_data *d)
->  {
->  	/* XXX: better use cpp symbols */
-> -	int prio = irq2prio(irq);
-> +	int prio = irq2prio(d->irq);
->  	u32 ic = __raw_readl(SYS_IC(prio / 4));
->  	ic |= 1 << (7 + 8 * (3 - (prio & 3)));
->  	__raw_writel(ic, SYS_IC(prio / 4));
->  }
->  
->  static struct irq_chip ns9xxx_chip = {
-> -	.ack		= ns9xxx_ack_irq,
-> -	.mask		= ns9xxx_mask_irq,
-> -	.mask_ack	= ns9xxx_maskack_irq,
-> -	.unmask		= ns9xxx_unmask_irq,
-> +	.irq_ack	= ns9xxx_ack_irq,
-> +	.irq_mask	= ns9xxx_mask_irq,
-> +	.irq_mask_ack	= ns9xxx_maskack_irq,
-> +	.irq_unmask	= ns9xxx_unmask_irq,
->  };
->  
->  #if 0
-> @@ -92,10 +92,10 @@ static void handle_prio_irq(unsigned int irq, struct irq_desc *desc)
->  
->  	if (desc->status & IRQ_DISABLED)
->  out_mask:
-> -		desc->chip->mask(irq);
-> +		desc->irq_data.chip->irq_mask(&desc->irq_data);
->  
->  	/* ack unconditionally to unmask lower prio irqs */
-> -	desc->chip->ack(irq);
-> +	desc->irq_data.chip->irq_ack(&desc->irq_data);
->  
->  	raw_spin_unlock(&desc->lock);
->  }
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+---
+v3 changes:
+* Lowered loglevel of non-crashing CPU prints
 
+* Added logging for non-crashing CPUs which do not respond
+
+ arch/arm/kernel/machine_kexec.c |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 3a8fd51..30ead13 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -23,6 +23,8 @@ extern unsigned long kexec_indirection_page;
+ extern unsigned long kexec_mach_type;
+ extern unsigned long kexec_boot_atags;
+ 
++static atomic_t waiting_for_crash_ipi;
++
+ /*
+  * Provide a dummy crash_notes definition while crash dump arrives to arm.
+  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
+@@ -37,9 +39,37 @@ void machine_kexec_cleanup(struct kimage *image)
+ {
+ }
+ 
++void machine_crash_nonpanic_core(void *unused)
++{
++	struct pt_regs regs;
++
++	crash_setup_regs(&regs, NULL);
++	printk(KERN_DEBUG "CPU %u will stop doing anything useful since another CPU has crashed\n",
++	       smp_processor_id());
++	crash_save_cpu(&regs, smp_processor_id());
++	flush_cache_all();
++
++	atomic_dec(&waiting_for_crash_ipi);
++	while (1)
++		cpu_relax();
++}
++
+ void machine_crash_shutdown(struct pt_regs *regs)
+ {
++	unsigned long msecs;
++
+ 	local_irq_disable();
++
++	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
++	smp_call_function(machine_crash_nonpanic_core, NULL, false);
++	msecs = 1000; /* Wait at most a second for the other cpus to stop */
++	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
++		mdelay(1);
++		msecs--;
++	}
++	if (atomic_read(&waiting_for_crash_ipi) > 0)
++		printk(KERN_WARNING "Non-crashing CPUs did not react to IPI\n");
++
+ 	crash_save_cpu(regs, smp_processor_id());
+ 
+ 	printk(KERN_INFO "Loading crashdump kernel...\n");
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.2
