@@ -1,31 +1,33 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Wed, 01 Dec 2010 11:48:18 -0500
-Subject: Forced HW_BREAKPOINT
-In-Reply-To: <004d01cb9174$c8d83ec0$5a88bc40$@deacon@arm.com>
-References: <4CF58F22.6070803@ti.com>
-	<004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
-	<4CF67525.2010304@ti.com>
-	<004d01cb9174$c8d83ec0$5a88bc40$@deacon@arm.com>
-Message-ID: <4CF67C52.4000300@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Dec 2010 17:14:26 +0000
+Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores
+	during IRQ enable
+In-Reply-To: <4CF6797A.2010807@codeaurora.org>
+References: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
+	<20101130180718.GB8521@n2100.arm.linux.org.uk>
+	<4CF6797A.2010807@codeaurora.org>
+Message-ID: <20101201171425.GA29347@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Dec 01, 2010 at 11:36:10AM -0500, Stephen Caudle wrote:
+> On 11/30/2010 01:07 PM, Russell King - ARM Linux wrote:
+>> Sorry, missed this.
+>>
+>> If it's a private peripheral, it can only be accessed from its associated
+>> CPU.  What that means is you don't want to enable the interrupt on other
+>> CPUs as the peripheral may not be present or initialized on that CPU.
+>
+> Understood.  But the alternative is to require all code that requests a  
+> PPI to have to enable the IRQ on the other cores.  This seems  
+> unreasonable to me.
 
-On 12/01/2010 11:28 AM, Will Deacon wrote:
-[...]
->> Yes, this CPU has a trustzone capable v6.1 debug (DIDR reads
->> 0x15121004).  The problem I am facing is that DSCR bit 15 (monitor
->> debug-mode enable bit) cannot be set, it always reads back 0x2.  As a
->> result the hw_breakpoint code spews a WARN_ON() at boot.
-> 
-> That's unfortunate. Is there a hardware debugger connected, or does
-> the core disallow monitor debug full-stop?
-> 
+It is also unreasonable to have one core enabling the PPI on other
+cores where the hardware behind the interrupt may not have been
+initialized yet.  If it is a private interrupt for a private peripheral,
+then only the associated CPU should be enabling that interrupt.
 
-This was without a debugger connected.  It is possible that I have
-missed some top level debug enable in the SoC (haven't traced through
-the entire logic yet).
-
-Regards
-Cyril.
+I guess this is something which genirq can't cope with, in which case
+either genirq needs to be modified to cope with private CPU interrupts,
+which are controlled individually by their associated CPU, or we need a
+private interface to support this.
