@@ -1,35 +1,52 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 01 Dec 2010 00:22:58 +0000
-Subject: [PATCH v5] ARM: s3c244x: Fix mess with gpio {set,
-	get}_pull callbacks
-In-Reply-To: <1291147949-18812-1-git-send-email-anarsoul@gmail.com>
-References: <4CF55785.5090403@metafoo.de>
-	<1291147949-18812-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <4CF59562.7000501@fluff.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 01 Dec 2010 13:26:38 +1300
+Subject: [PATCH 15/54] ARM: ep93xx: irq_data conversion.
+In-Reply-To: <20101201001945.GI15575@mail.wantstofly.org>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130133639.GP15575@mail.wantstofly.org>
+	<4CF55185.6010808@bluewatersys.com>
+	<20101201001945.GI15575@mail.wantstofly.org>
+Message-ID: <4CF5963E.8060500@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/10 20:12, Vasily Khoruzhick wrote:
-> Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default structure
-> are initalized via s3c_gpio_{get,set}pull_1up. This results in a linker
-> error when only CONFIG_CPU_S3C2442 is selected:
+On 12/01/2010 01:19 PM, Lennert Buytenhek wrote:
+> On Wed, Dec 01, 2010 at 08:33:25AM +1300, Ryan Mallon wrote:
 > 
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f4): undefined reference to
-> `s3c_gpio_getpull_1up'
-> arch/arm/plat-s3c24xx/built-in.o:(.data+0x13f8): undefined reference to
-> `s3c_gpio_setpull_1up'
+>>> -static int ep93xx_gpio_irq_type(unsigned int irq, unsigned int type)
+>>> +static int ep93xx_gpio_irq_type(struct irq_data *d, unsigned int type)
+>>>  {
+>>> -	struct irq_desc *desc = irq_desc + irq;
+>>> -	const int gpio = irq_to_gpio(irq);
+>>> +	struct irq_desc *desc = irq_desc + d->irq;
+>>
+>> Is this still correct? I haven't followed much of the irq_data
+>> discussion, but this post (https://patchwork.kernel.org/patch/230221/)
+>> says that with sparse irq converting irq number to irq_desc is now a
+>> radix tree lookup.
+>>
+>> I get the impression from the above email that we should be avoiding
+>> using irq_desc directly in these functions?
 > 
-> The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
-> The method of controlling them is the same though.
-> So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper functions
-> to take an additional parameter deciding whether the pin has a pullup or pulldown.
-> The s3c_gpio_{get,set}pull_1{down,up} functions then wrap that functions passing
-> either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
+> You are correct in that this construct is no longer valid with
+> CONFIG_SPARSE_IRQ.  It should be using irq_to_desc() instead, or
+> actually, it should not be looking at the irq_desc here at all.
 > 
-> Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull fields
-> in the s3c244{0,2}_map_io function to the new pulldown helper functions.
-> 
-> Based on patch from "Lars-Peter Clausen" <lars@metafoo.de>
+> What ep93xx wants to achieve should be possible to achieve by just
+> calling set_irq_handler() instead of frobbing fields in the irq_desc
+> directly -- that would work, right?
 
-Ok, I think this is the best solution. I'll apply it tomorrow
-if there's nothing else I can think of.
+I think set_irq_handler should be okay. The other way would be to use
+irq_to_desc for the lookup.
+
+~Ryan
+
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
