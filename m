@@ -1,90 +1,73 @@
-From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
-Date: Wed,  1 Dec 2010 22:28:50 +0530
-Subject: [Patch v3] AM35xx: Craneboard: Add USB EHCI support
-In-Reply-To: <[PATCH] Craneboard: Add USB EHCI Support>
-References: <[PATCH] Craneboard: Add USB EHCI Support>
-Message-ID: <1291222730-17614-1-git-send-email-srinath@mistralsolutions.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Dec 2010 17:32:38 -0000
+Subject: Forced HW_BREAKPOINT
+In-Reply-To: <4CF67C52.4000300@ti.com>
+References: <4CF58F22.6070803@ti.com>
+	<004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
+	<4CF67525.2010304@ti.com>
+	<004d01cb9174$c8d83ec0$5a88bc40$@deacon@arm.com>
+	<4CF67C52.4000300@ti.com>
+Message-ID: <004f01cb917d$c04b4910$40e1db30$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath <srinath@mistralsolutions.com>
+Cyril,
 
-AM3517/05 Craneboard has one EHCI interface on board using port1.
+> This was without a debugger connected.  It is possible that I have
+> missed some top level debug enable in the SoC (haven't traced through
+> the entire logic yet).
 
-GPIO35 is used as power enable.
-GPIO38 is used as port1 PHY reset.
+Please can you try this patch?
 
-History:
-http://marc.info/?l=linux-omap&w=2&r=1&s=Craneboard%3A+Add+USB+EHCI+support&q=t
 
-Signed-off-by: Srinath <srinath@mistralsolutions.com>
----
- arch/arm/mach-omap2/board-am3517crane.c |   40 +++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index 13ead33..6fd5dfe 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -28,8 +28,13 @@
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 21e3a4a..bcf8437 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -268,9 +268,6 @@ static u8 get_max_wp_len(void)
+        if (debug_arch < ARM_DEBUG_ARCH_V7_ECP14)
+                goto out;
  
- #include <plat/board.h>
- #include <plat/common.h>
-+#include <plat/usb.h>
+-       if (enable_monitor_mode())
+-               goto out;
+-
+        memset(&ctrl, 0, sizeof(ctrl));
+        ctrl.len = ARM_BREAKPOINT_LEN_8;
+        ctrl_reg = encode_ctrl_reg(ctrl);
+@@ -784,15 +781,18 @@ static void __init reset_ctrl_regs(void *unused)
  
- #include "mux.h"
-+#include "control.h"
-+
-+#define GPIO_USB_POWER		35
-+#define GPIO_USB_NRESET		38
- 
- /* Board initialization */
- static struct omap_board_config_kernel am3517_crane_config[] __initdata = {
-@@ -53,10 +58,45 @@ static void __init am3517_crane_init_irq(void)
- 	omap_gpio_init();
- }
- 
-+static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
-+	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-+	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-+	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-+
-+	.phy_reset  = true,
-+	.reset_gpio_port[0]  = GPIO_USB_NRESET,
-+	.reset_gpio_port[1]  = -EINVAL,
-+	.reset_gpio_port[2]  = -EINVAL
-+};
-+
- static void __init am3517_crane_init(void)
+ static int __init arch_hw_breakpoint_init(void)
  {
-+	int ret;
-+
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_serial_init();
-+
-+	/* Configure GPIO for EHCI port */
-+	omap_mux_init_gpio(GPIO_USB_POWER, OMAP_PIN_OUTPUT);
-+
-+	ret = gpio_request(GPIO_USB_POWER, "usb_ehci_enable");
-+	if (ret < 0) {
-+		pr_err("Cannot request GPIO %d\n", GPIO_USB_POWER);
-+		return;
-+	}
-+
-+	ret = gpio_direction_output(GPIO_USB_POWER, 1);
-+	if (ret < 0)
-+		goto err;
-+
-+	omap_mux_init_gpio(GPIO_USB_NRESET, OMAP_PIN_OUTPUT);
-+	usb_ehci_init(&ehci_pdata);
-+	return;
-+
-+err:
-+	gpio_free(GPIO_USB_POWER);
-+	pr_err("Unable to initialize EHCI power\n");
-+	return;
- }
+-       int ret = 0;
+        u32 dscr;
  
- MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
--- 
-1.7.1.226.g770c5
+        debug_arch = get_debug_arch();
+ 
+        if (debug_arch > ARM_DEBUG_ARCH_V7_ECP14) {
+                pr_info("debug architecture 0x%x unsupported.\n", debug_arch);
+-               ret = -ENODEV;
+-               goto out;
++               return 0;
++       }
++
++       if (enable_monitor_mode()) {
++               pr_warning("unable to activate monitor debug mode.\n");
++               return 0;
+        }
+ 
+        /* Determine how many BRPs/WRPs are available. */
+@@ -829,8 +829,7 @@ static int __init arch_hw_breakpoint_init(void)
+        hook_ifault_code(2, hw_breakpoint_pending, SIGTRAP, TRAP_HWBKPT,
+                        "breakpoint debug exception");
+ 
+-out:
+-       return ret;
++       return 0;
+ }
+ arch_initcall(arch_hw_breakpoint_init);
+
+
+This should cause the hw_breakpoint stuff to give up if monitor-mode
+cannot be enabled.
+
+Will
