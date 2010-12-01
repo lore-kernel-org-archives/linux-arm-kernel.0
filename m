@@ -1,177 +1,299 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Dec 2010 16:38:54 +0900
-Subject: [PATCH V2] ARM: SAMSUNG: Add support for clock debugging through
-	debug-fs interface
-In-Reply-To: <1290759545-2995-1-git-send-email-amit.daniel@samsung.com>
-References: <1290759545-2995-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <001b01cb912a$d1381a80$73a84f80$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 1 Dec 2010 08:50:02 +0100
+Subject: [PATCHv2] make mc13783 regulator code generic
+In-Reply-To: <AANLkTi=E8etAOPTCBw8ccTZ9LMU-Yf=wELn+VQkg2eom@mail.gmail.com>
+References: <AANLkTi=E8etAOPTCBw8ccTZ9LMU-Yf=wELn+VQkg2eom@mail.gmail.com>
+Message-ID: <20101201075002.GE6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amit Daniel Kachhap wrote:
+Hi Yong,
+
+On Wed, Dec 01, 2010 at 03:15:55PM +0800, Yong Shen wrote:
+> Hi there,
 > 
-> This patch adds support for clock information exposed to debug-fs
-interface.
+> This is the v2 with some changes according to comments from v1. There
+> will be few patches coming out after this one, for mc13892 regulator
+> to share some code with mc13783.
 > 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> Still, cause the firewall problem, I send out patch this way. Please
+> give comments inline and use attached patch for testing.
+
+This patch definitely goes into the right direction. Some comments
+inline.
+
+> 
+> Yong
+> 
+> From b3451070f4665c90f11e600a8722f86b68437ded Mon Sep 17 00:00:00 2001
+> From: Yong Shen <yong.shen@linaro.org>
+> Date: Tue, 30 Nov 2010 14:11:34 +0800
+> Subject: [PATCH] make mc13783 regulator code generic
+> 
+> move some common functions and micros of mc13783 regulaor driver to
+> a seperate file, which makes it possible for mc13892 to share code.
+> 
+> Signed-off-by: Yong Shen <yong.shen@linaro.org>
 > ---
-> Code modified for V2 version are,
-> a)Inserted the debug-fs code inside macro CONFIG_PM_DEBUG as suggested by
-> yong.shen at linaro.org.
-
-Could you please let me know why?
-
-> b)Removed macro CONFIG_PLAT_SAMSUNG and implemented other coding standards
-> as suggested by kgene.kim at samsung.com
+>  drivers/regulator/Kconfig                  |    4 +
+>  drivers/regulator/Makefile                 |    1 +
+>  drivers/regulator/mc13783-regulator.c      |  325 ++++------------------------
+>  drivers/regulator/mc13xxx-regulator-core.c |  239 ++++++++++++++++++++
+>  include/linux/mfd/mc13783.h                |   67 +++---
+>  include/linux/regulator/mc13xxx.h          |  101 +++++++++
+>  6 files changed, 425 insertions(+), 312 deletions(-)
+>  create mode 100644 drivers/regulator/mc13xxx-regulator-core.c
+>  create mode 100644 include/linux/regulator/mc13xxx.h
 > 
->  arch/arm/plat-samsung/clock.c              |   91
-> ++++++++++++++++++++++++++++
->  arch/arm/plat-samsung/include/plat/clock.h |    3 +
->  2 files changed, 94 insertions(+), 0 deletions(-)
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index dd30e88..63c2bdd 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -186,9 +186,13 @@ config REGULATOR_PCAP
+>  	 This driver provides support for the voltage regulators of the
+>  	 PCAP2 PMIC.
 > 
-> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-> index e8d20b0..029a49d 100644
-> --- a/arch/arm/plat-samsung/clock.c
-> +++ b/arch/arm/plat-samsung/clock.c
-> @@ -39,6 +39,9 @@
->  #include <linux/clk.h>
->  #include <linux/spinlock.h>
->  #include <linux/io.h>
-> +#if defined(CONFIG_DEBUG_FS)
-> +#include <linux/debugfs.h>
+> +config REGULATOR_MC13XXX_CORE
+> +	tristate "Support regulators on Freescale MC13xxx PMIC"
+> +
+
+This does not need a prompt. Selecting only this option does not make
+sense and it will be selected by the mc13783/mc13892 code anyway.
+
+>  config REGULATOR_MC13783
+>  	tristate "Support regulators on Freescale MC13783 PMIC"
+>  	depends on MFD_MC13783
+> +	select REGULATOR_MC13XXX_CORE
+>  	help
+>  	  Say y here to support the regulators found on the Freescale MC13783
+>  	  PMIC.
+> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> index bff8157..11876be 100644
+> --- a/drivers/regulator/Makefile
+> +++ b/drivers/regulator/Makefile
+> @@ -30,6 +30,7 @@ obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
+>  obj-$(CONFIG_REGULATOR_PCF50633) += pcf50633-regulator.o
+>  obj-$(CONFIG_REGULATOR_PCAP) += pcap-regulator.o
+>  obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
+> +obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
+>  obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+> 
+>  obj-$(CONFIG_REGULATOR_TPS65023) += tps65023-regulator.o
+
+[snip]
+
+> diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
+> index b4c741e..7d0f3d6 100644
+> --- a/include/linux/mfd/mc13783.h
+> +++ b/include/linux/mfd/mc13783.h
+> @@ -1,4 +1,5 @@
+>  /*
+> + * Copyright 2010 Yong Shen <yong.shen@linaro.org>
+>   * Copyright 2009-2010 Pengutronix
+>   * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+>   *
+> @@ -122,39 +123,39 @@ int mc13783_adc_do_conversion(struct mc13783
+> *mc13783, unsigned int mode,
+>  		unsigned int channel, unsigned int *sample);
+> 
+> 
+> -#define	MC13783_SW_SW1A		0
+> -#define	MC13783_SW_SW1B		1
+> -#define	MC13783_SW_SW2A		2
+> -#define	MC13783_SW_SW2B		3
+> -#define	MC13783_SW_SW3		4
+> -#define	MC13783_SW_PLL		5
+> -#define	MC13783_REGU_VAUDIO	6
+> -#define	MC13783_REGU_VIOHI	7
+> -#define	MC13783_REGU_VIOLO	8
+> -#define	MC13783_REGU_VDIG	9
+> -#define	MC13783_REGU_VGEN	10
+> -#define	MC13783_REGU_VRFDIG	11
+> -#define	MC13783_REGU_VRFREF	12
+> -#define	MC13783_REGU_VRFCP	13
+> -#define	MC13783_REGU_VSIM	14
+> -#define	MC13783_REGU_VESIM	15
+> -#define	MC13783_REGU_VCAM	16
+> -#define	MC13783_REGU_VRFBG	17
+> -#define	MC13783_REGU_VVIB	18
+> -#define	MC13783_REGU_VRF1	19
+> -#define	MC13783_REGU_VRF2	20
+> -#define	MC13783_REGU_VMMC1	21
+> -#define	MC13783_REGU_VMMC2	22
+> -#define	MC13783_REGU_GPO1	23
+> -#define	MC13783_REGU_GPO2	24
+> -#define	MC13783_REGU_GPO3	25
+> -#define	MC13783_REGU_GPO4	26
+> -#define	MC13783_REGU_V1		27
+> -#define	MC13783_REGU_V2		28
+> -#define	MC13783_REGU_V3		29
+> -#define	MC13783_REGU_V4		30
+> -#define	MC13783_REGU_PWGT1SPI	31
+> -#define	MC13783_REGU_PWGT2SPI	32
+
+These have users. If you really want to change them you must change
+the users aswell. Also, I would suggest an additional patch for this.
+Remember, one topic per patch. Renaming things is a topic that can
+easily be split out.
+
+> +#define	MC13783_REG_SW1A		0
+> +#define	MC13783_REG_SW1B		1
+> +#define	MC13783_REG_SW2A		2
+> +#define	MC13783_REG_SW2B		3
+> +#define	MC13783_REG_SW3		4
+> +#define	MC13783_REG_PLL		5
+> +#define	MC13783_REG_VAUDIO	6
+> +#define	MC13783_REG_VIOHI	7
+> +#define	MC13783_REG_VIOLO	8
+> +#define	MC13783_REG_VDIG	9
+> +#define	MC13783_REG_VGEN	10
+> +#define	MC13783_REG_VRFDIG	11
+> +#define	MC13783_REG_VRFREF	12
+> +#define	MC13783_REG_VRFCP	13
+> +#define	MC13783_REG_VSIM	14
+> +#define	MC13783_REG_VESIM	15
+> +#define	MC13783_REG_VCAM	16
+> +#define	MC13783_REG_VRFBG	17
+> +#define	MC13783_REG_VVIB	18
+> +#define	MC13783_REG_VRF1	19
+> +#define	MC13783_REG_VRF2	20
+> +#define	MC13783_REG_VMMC1	21
+> +#define	MC13783_REG_VMMC2	22
+> +#define	MC13783_REG_GPO1	23
+> +#define	MC13783_REG_GPO2	24
+> +#define	MC13783_REG_GPO3	25
+> +#define	MC13783_REG_GPO4	26
+> +#define	MC13783_REG_V1		27
+> +#define	MC13783_REG_V2		28
+> +#define	MC13783_REG_V3		29
+> +#define	MC13783_REG_V4		30
+> +#define	MC13783_REG_PWGT1SPI	31
+> +#define	MC13783_REG_PWGT2SPI	32
+> 
+>  #define MC13783_IRQ_ADCDONE	MC13XXX_IRQ_ADCDONE
+>  #define MC13783_IRQ_ADCBISDONE	MC13XXX_IRQ_ADCBISDONE
+> diff --git a/include/linux/regulator/mc13xxx.h
+> b/include/linux/regulator/mc13xxx.h
+> new file mode 100644
+> index 0000000..a60c9be
+> --- /dev/null
+> +++ b/include/linux/regulator/mc13xxx.h
+
+The things in this file are private to the driver. IMO this should go to
+drivers/regulator/mc13xxx.h.
+
+> @@ -0,0 +1,101 @@
+> +/*
+> + * mc13xxx.h - regulators for the Freescale mc13xxx PMIC
+> + *
+> + *  Copyright (C) 2010 Yong Shen <yong.shen@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#ifndef __LINUX_REGULATOR_MC13XXX_H
+> +#define __LINUX_REGULATOR_MC13XXX_H
+> +
+> +#include <linux/regulator/driver.h>
+> +
+> +struct mc13xxx_regulator {
+> +	struct regulator_desc desc;
+> +	int reg;
+> +	int enable_bit;
+> +	int vsel_reg;
+> +	int vsel_shift;
+> +	int vsel_mask;
+> +	int hi_bit;
+> +	int const *voltages;
+> +};
+> +
+> +struct mc13xxx_regulator_priv {
+> +	struct mc13xxx *mc13xxx;
+> +	u32 powermisc_pwgt_state;
+> +	struct mc13xxx_regulator *mc13xxx_regulators;
+> +	struct regulator_dev *regulators[];
+> +};
+> +
+> +extern int mc13xxx_sw_regulator(struct regulator_dev *rdev);
+> +extern int mc13xxx_sw_regulator_is_enabled(struct regulator_dev *rdev);
+> +extern int mc13xxx_get_best_voltage_index(struct regulator_dev *rdev,
+> +						int min_uV, int max_uV);
+> +extern int mc13xxx_regulator_list_voltage(struct regulator_dev *rdev,
+> +						unsigned selector);
+> +extern int mc13xxx_fixed_regulator_set_voltage(struct regulator_dev *rdev,
+> +						int min_uV, int max_uV);
+> +extern int mc13xxx_fixed_regulator_get_voltage(struct regulator_dev *rdev);
+> +
+> +extern struct regulator_ops mc13xxx_regulator_ops;
+> +extern struct regulator_ops mc13xxx_fixed_regulator_ops;
+> +
+> +#define MC13xxx_DEFINE(prefix, _name, _reg, _vsel_reg, _voltages, _ops)	\
+> +	[prefix ## _name] = {				\
+> +		.desc = {						\
+> +			.name = #prefix "_" #_name,			\
+> +			.n_voltages = ARRAY_SIZE(_voltages),		\
+> +			.ops = &_ops,			\
+> +			.type = REGULATOR_VOLTAGE,			\
+> +			.id = prefix ## _name,		\
+> +			.owner = THIS_MODULE,				\
+> +		},							\
+> +		.reg = prefix ## _reg,				\
+> +		.enable_bit = prefix ## _reg ## _ ## _name ## EN,	\
+> +		.vsel_reg = prefix ## _vsel_reg,			\
+> +		.vsel_shift = prefix ## _vsel_reg ## _ ## _name ## VSEL,\
+> +		.vsel_mask = prefix ## _vsel_reg ## _ ## _name ## VSEL_M,\
+> +		.voltages =  _voltages,					\
+> +	}
+> +
+> +#define MC13xxx_FIXED_DEFINE(prefix, _name, _reg, _voltages, _ops)	\
+> +	[prefix ## _name] = {				\
+> +		.desc = {						\
+> +			.name = #prefix "_" #_name,			\
+> +			.n_voltages = ARRAY_SIZE(_voltages),		\
+> +			.ops = &_ops,		\
+> +			.type = REGULATOR_VOLTAGE,			\
+> +			.id = prefix ## _name,		\
+> +			.owner = THIS_MODULE,				\
+> +		},							\
+> +		.reg = prefix ## _reg,				\
+> +		.enable_bit = prefix ## _reg ## _ ## _name ## EN,	\
+> +		.voltages =  _voltages,					\
+> +	}
+> +
+> +#define MC13xxx_GPO_DEFINE(prefix, _name, _reg,  _voltages, _ops)	\
+> +	[prefix ## _name] = {				\
+> +		.desc = {						\
+> +			.name = #prefix "_" #_name,			\
+> +			.n_voltages = ARRAY_SIZE(_voltages),		\
+> +			.ops = &_ops,		\
+> +			.type = REGULATOR_VOLTAGE,			\
+> +			.id = prefix ## _name,		\
+> +			.owner = THIS_MODULE,				\
+> +		},							\
+> +		.reg = prefix ## _reg,				\
+> +		.enable_bit = prefix ## _reg ## _ ## _name ## EN,	\
+> +		.voltages =  _voltages,					\
+> +	}
+> +
+> +#define MC13xxx_DEFINE_SW(_name, _reg, _vsel_reg, _voltages, ops)	\
+> +	MC13xxx_DEFINE(SW, _name, _reg, _vsel_reg, _voltages, ops)
+> +#define MC13xxx_DEFINE_REGU(_name, _reg, _vsel_reg, _voltages, ops)	\
+> +	MC13xxx_DEFINE(REGU, _name, _reg, _vsel_reg, _voltages, ops)
+> +
 > +#endif
+> -- 
+> 1.7.0.4
 > 
->  #include <mach/hardware.h>
->  #include <asm/irq.h>
-> @@ -447,3 +450,91 @@ int __init s3c24xx_register_baseclocks(unsigned long
-> xtal)
->  	return 0;
->  }
-> 
-> +#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-
-Hmm...please let me know the reason...
-
-> +/* debugfs support to trace clock tree hierarchy and attributes */
-> +
-> +static struct dentry *clk_debugfs_root;
-> +
-> +static int clk_debugfs_register_one(struct clk *c)
-> +{
-> +	int err;
-> +	struct dentry *d, *child, *child_tmp;
-> +	struct clk *pa = c->parent;
-> +	char s[255];
-> +	char *p = s;
-> +
-> +	p += sprintf(p, "%s", c->name);
-> +	/*Append id field with name also*/
-
-No need above comment. If required, please add other comments also.
-
-> +	if (c->id >= 0)
-> +		sprintf(p, ":%d", c->id);
-> +
-> +	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
-> +	if (!d)
-> +		return -ENOMEM;
-> +
-> +	c->dent = d;
-> +
-> +	d = debugfs_create_u8("usecount", S_IRUGO, c->dent, (u8
-*)&c->usage);
-> +	if (!d) {
-> +		err = -ENOMEM;
-> +		goto err_out;
-> +	}
-
-1 empty line would be helpful to read.
-
-> +	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
-> +	if (!d) {
-> +		err = -ENOMEM;
-> +		goto err_out;
-> +	}
-> +	return 0;
-> +
-> +err_out:
-> +	d = c->dent;
-> +	list_for_each_entry_safe(child, child_tmp, &d->d_subdirs,
-d_u.d_child)
-> +		debugfs_remove(child);
-> +	debugfs_remove(c->dent);
-> +	return err;
-> +}
-> +
-> +static int clk_debugfs_register(struct clk *c)
-> +{
-> +	int err;
-> +	struct clk *pa = c->parent;
-> +
-> +	if (pa && !pa->dent) {
-> +		err = clk_debugfs_register(pa);
-> +		if (err)
-> +			return err;
-> +	}
-> +
-> +	if (!c->dent) {
-> +		err = clk_debugfs_register_one(c);
-> +		if (err)
-> +			return err;
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int __init clk_debugfs_init(void)
-> +{
-> +	struct clk *c;
-> +	struct dentry *d;
-> +	int err;
-> +
-> +	d = debugfs_create_dir("clock", NULL);
-> +	if (!d)
-> +		return -ENOMEM;
-> +	clk_debugfs_root = d;
-> +
-> +	list_for_each_entry(c, &clocks, list) {
-> +		err = clk_debugfs_register(c);
-> +		if (err)
-> +			goto err_out;
-> +	}
-> +	return 0;
-> +err_out:
-> +	debugfs_remove_recursive(clk_debugfs_root);
-> +	return err;
-> +}
-> +late_initcall(clk_debugfs_init);
-> +
-> +#endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
-> +
-
-No need last one empty line.
-
-> diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-
-> samsung/include/plat/clock.h
-> index 0fbcd0e..9a82b88 100644
-> --- a/arch/arm/plat-samsung/include/plat/clock.h
-> +++ b/arch/arm/plat-samsung/include/plat/clock.h
-> @@ -47,6 +47,9 @@ struct clk {
-> 
->  	struct clk_ops		*ops;
->  	int		    (*enable)(struct clk *, int enable);
-> +#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-> +	struct dentry		*dent;	/* For visible tree hierarchy */
-> +#endif
->  };
-> 
->  /* other clocks which may be registered by board support */
-> --
+> Cheers
+> Yong
 
 
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
