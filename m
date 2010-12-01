@@ -1,39 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Dec 2010 21:11:21 +0900
-Subject: [PATCH 3/3] ARM: S3C64XX: Use chip_data to store the shift for
-	EINTs
-In-Reply-To: <20101201115535.GK24176@rakim.wolfsonmicro.main>
-References: <1290698309-7691-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1290698309-7691-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<003101cb914d$1caf7040$560e50c0$%kim@samsung.com>
-	<20101201115535.GK24176@rakim.wolfsonmicro.main>
-Message-ID: <003d01cb9150$e0282690$a07873b0$%kim@samsung.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 1 Dec 2010 14:16:00 +0200
+Subject: [PATCH v5] ARM: s3c244x: Fix mess with gpio {set,
+	get}_pull callbacks
+In-Reply-To: <003c01cb914f$fc6d3350$f54799f0$%kim@samsung.com>
+References: <4CF55785.5090403@metafoo.de>
+	<201012011217.41602.anarsoul@gmail.com>
+	<003c01cb914f$fc6d3350$f54799f0$%kim@samsung.com>
+Message-ID: <201012011416.01065.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+On Wednesday 01 December 2010 14:05:00 Kukjin Kim wrote:
+> Yeah, right...it depends on each SoCs. But, if there is no setup it in
+> map_io(), there is no functions of set_pull() and get_pull(). As you know,
+> used s3c_gpio_{set,get}pull_1up as default before your patch...
 > 
-> On Wed, Dec 01, 2010 at 08:44:25PM +0900, Kukjin Kim wrote:
-> > Mark Brown wrote:
-> 
-> > > This makes all the functions that use the shift slightly smaller, one
-> > > instruction in most cases but more for ack() and maskack().
-> 
-> > Uhm...I'm not sure to use chip_data for the eint_irq_to_bit() is best to
-us.
-> 
-> Could you elaborate on your concern here?  I can't think of anything
-> else we might want to include in the data, and avoiding the shifts
-> and/or dereferences seems useful for anyone doing interrupt heavy work.
+> Hmm...however, I will think about its necessity again.
 
-Hehehe :-)
-I just thought it again, I agree with you. Your patch looks ok to me...will
-apply.
+In this case it will fail if SoC does not support pull up, so does it matter 
+how it will fail?
+ 
+> Ok..I will do it and will apply.
+> Then, will be sent to Linus during 37-rc.
 
-Thanks.
+Thanks
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Vasily
