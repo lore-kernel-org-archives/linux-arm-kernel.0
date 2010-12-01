@@ -1,63 +1,53 @@
-From: vm.rod25@gmail.com (Victor Rodriguez)
-Date: Wed, 1 Dec 2010 10:41:48 -0600
-Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
-In-Reply-To: <4CF67896.1060002@mvista.com>
-References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
-	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247AFD99E@dbde02.ent.ti.com>
-	<4CF67896.1060002@mvista.com>
-Message-ID: <AANLkTinj=VAQuqZDzfbP33rzbmJY5iVC2vCyig2f+R-Y@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Dec 2010 16:45:25 -0000
+Subject: [PATCH] ARM: perf: use raw_spinlock_t for pmu_lock
+In-Reply-To: <20101201163547.GE2898@pulham.picochip.com>
+References: <1291137443-13821-1-git-send-email-will.deacon@arm.com>
+	<20101201163547.GE2898@pulham.picochip.com>
+Message-ID: <004e01cb9177$2760c460$76224d20$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 1, 2010 at 10:32 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
-> Nori, Sekhar wrote:
->
->> On Sat, Nov 13, 2010 at 04:08:50, vm.rod25 at gmail.com wrote:
->>>
->>> From: Victor Rodriguez <victor.rodriguez@sasken.com>
->
->>> This patch defines Pin Mux configuration for MacASP
->>> used on the Hawkboard-L138 system in order to add Audio support
->
->>> Signed-off-by: Victor Rodriguez <victor.rodriguez@sasken.com>
->>> Tested-by: Rene Gonzalez <renegs.2378@gmail.com>
->>> ---
->>> ?arch/arm/mach-davinci/da850.c | ? ?2 +-
->>> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
->>> diff --git a/arch/arm/mach-davinci/da850.c
->>> b/arch/arm/mach-davinci/da850.c
->>> index 63916b9..f033a0a 100644
->>> --- a/arch/arm/mach-davinci/da850.c
->>> +++ b/arch/arm/mach-davinci/da850.c
->>> @@ -591,7 +591,7 @@ const short da850_cpgmac_pins[] __initdata = {
->>> ?const short da850_mcasp_pins[] __initdata = {
->>> ? ? ?DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
->>> ? ? ?DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
->>> - ? ? DA850_AXR_11, DA850_AXR_12,
->>> + ? ? DA850_AXR_11, DA850_AXR_12, DA850_AXR_13, DA850_AXR_14,
->
->> To speed up acceptance of this series, can you please drop this
->> patch and submit the rest of the patches as a reduced series?
->
-> ? BTW, I've seen more AXR pins in DA850, so this patch is far from being
-> complete anyway.
+Hi Jamie,
 
-Ok Sergei we will need to work hard on it
+> Subject: Re: [PATCH] ARM: perf: use raw_spinlock_t for pmu_lock
 
-By the way is there any other comment to my patches with out this from
-audio and McASP pins ?
+[...]
 
-Regards
+> Looks fine to me and tested on my board (not with PREEMPT_RT at the moment
+> though). Btw, it may be my mail reader (mutt) but trying to save your mail to
+> an mbox gave lots of extra characters in the patch like:
+> 
+> diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v=
+> 6.c
+> index 3f427aa..c058bfc 100644
+> --- a/arch/arm/kernel/perf_event_v6.c
+> +++ b/arch/arm/kernel/perf_event_v6.c
+> @@ -426,12 +426,12 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
+>  =09 * Mask out the current event and set the counter to count the event
+>  =09 * that we're interested in.
+>  =09 */
+> -=09spin_lock_irqsave(&pmu_lock, flags);
+> +=09raw_spin_lock_irqsave(&pmu_lock, flags);
 
-Victor Rodriguez
+Oh dear...
+ 
+> Possibly an Exchange thing? Saving the message body worked and your
+> hw_breakpoint patches are fine.
 
+Hmm, I just use an smtp server for sending messages so the message *should*
+be ok. It's the receiving side of things where I get into trouble. If I look
+at the .patch I gave to git send-email with hexdump it has:
 
->> Thanks,
->> Sekhar
->
-> WBR, Sergei
->
+000007d0  69 74 65 28 76 61 6c 29  3b 0a 2d 09 73 70 69 6e  |ite(val);.-.spin|
+000007e0  5f 75 6e 6c 6f 63 6b 5f  69 72 71 72 65 73 74 6f  |_unlock_irqresto|
+000007f0  72 65 28 26 70 6d 75 5f  6c 6f 63 6b 2c 20 66 6c  |re(&pmu_lock, fl|
+00000800  61 67 73 29 3b 0a 2b 09  72 61 77 5f 73 70 69 6e  |ags);.+.raw_spin|
+00000810  5f 75 6e 6c 6f 63 6b 5f  69 72 71 72 65 73 74 6f  |_unlock_irqresto|
+00000820  72 65 28 26 70 6d 75 5f  6c 6f 63 6b 2c 20 66 6c  |re(&pmu_lock, fl|
+00000830  61 67 73 29 3b 0a 20 7d  0a 20 0a 20 73 74 61 74  |ags);. }. . stat|
+
+So it looks like tabs (ascii code 0x09) are being converted to =09 somewhere
+on your end. Mutt should be fine, what are you connecting it to?
+
+Will
