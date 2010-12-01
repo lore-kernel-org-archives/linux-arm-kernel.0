@@ -1,41 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 1 Dec 2010 19:51:03 +0100
-Subject: [PATCH] Kconfig: add new symbol MIGHT_HAVE_PCI
-In-Reply-To: <1291217412-9435-1-git-send-email-ulli.kroll@googlemail.com>
-References: <1291217412-9435-1-git-send-email-ulli.kroll@googlemail.com>
-Message-ID: <20101201185103.GK32355@pengutronix.de>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Thu, 2 Dec 2010 00:34:12 +0530
+Subject: [PATCH v5 00/14] OMAP: DMA: hwmod and DMA as platform device
+In-Reply-To: <20101125112811.GA27574@GLPP-machine>
+References: <1290603110-14119-1-git-send-email-manjugk@ti.com>
+	<20101125112811.GA27574@GLPP-machine>
+Message-ID: <20101201190412.GA8149@GLPP-machine>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 01, 2010 at 04:30:12PM +0100, Hans Ulli Kroll wrote:
-> Today more boards with arm cpu have selectable pci bus.
-> This patch makes this more scalable and remove line continuations in
-> Kconfig
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> ---
->  arch/arm/Kconfig                 |    7 ++++++-
->  arch/arm/mach-cns3xxx/Kconfig    |    1 +
->  arch/arm/mach-integrator/Kconfig |    1 +
->  arch/arm/mach-ks8695/Kconfig     |    1 +
->  arch/arm/mach-pxa/Kconfig        |    1 +
->  arch/arm/mach-versatile/Kconfig  |    1 +
->  6 files changed, 11 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a19a526..614cf2f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -34,6 +34,9 @@ config ARM
->  config HAVE_PWM
->  	bool
->  
-> +config MIGHT_HAVE_PCI
-HAVE_PCI or HAS_PCI is a more usual name for this purpose.
+Hi Tony/Kevin,
 
-Uwe
+* G, Manjunath Kondaiah <manjugk@ti.com> [2010-11-25 16:58:11 +0530]:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Kevin,
+> 
+> * G, Manjunath Kondaiah <manjugk@ti.com> [2010-11-24 18:21:36 +0530]:
+> 
+> > Patch series to convert DMA library into platform driver using platform
+> > device model and adapting hwmod for omap2+.
+> > 	
+> [...]
+> > 
+> > Patch series applies on top of latest linux omap master branch:
+> > *************************************************************************
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+> > Branch: master
+> > commit 25f7615faa843731af4eda7d05077f1c5132e1a9
+> > Merge: 784bee8 8973a21
+> > Author: Tony Lindgren <tony@atomide.com>
+> > 
+> >     Linux-omap rebuilt: Updated to -rc3
+> > *************************************************************************
+> 
+> It also applies cleanly on top of:
+> 
+> *************************************************************************
+> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+> Branch: pm-core
+> commit 8bcd9727ee126dc50093e84f19dd6c118842202f
+> Merge: 632dd87 25f7a1d
+> Author: Kevin Hilman <khilman@deeprootsystems.com>
+> 
+>     Merge branch 'pm-hacks' into pm-reset
+>   
+> *************************************************************************
+Do you have any further comments for this series?
+
+-Manjunath
+[...]
