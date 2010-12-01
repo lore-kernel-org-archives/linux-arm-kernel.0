@@ -1,35 +1,63 @@
-From: scaudle@codeaurora.org (Stephen Caudle)
-Date: Wed, 01 Dec 2010 11:36:10 -0500
-Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores
-	during IRQ enable
-In-Reply-To: <20101130180718.GB8521@n2100.arm.linux.org.uk>
-References: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
-	<20101130180718.GB8521@n2100.arm.linux.org.uk>
-Message-ID: <4CF6797A.2010807@codeaurora.org>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Wed, 1 Dec 2010 10:41:48 -0600
+Subject: [PATCH v8 4/9] davinci: McASP configuration for Omapl138-Hawkboard
+In-Reply-To: <4CF67896.1060002@mvista.com>
+References: <1289601535-6746-1-git-send-email-vm.rod25@gmail.com>
+	<1289601535-6746-5-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFD99E@dbde02.ent.ti.com>
+	<4CF67896.1060002@mvista.com>
+Message-ID: <AANLkTinj=VAQuqZDzfbP33rzbmJY5iVC2vCyig2f+R-Y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2010 01:07 PM, Russell King - ARM Linux wrote:
-> Sorry, missed this.
+On Wed, Dec 1, 2010 at 10:32 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
 >
-> If it's a private peripheral, it can only be accessed from its associated
-> CPU.  What that means is you don't want to enable the interrupt on other
-> CPUs as the peripheral may not be present or initialized on that CPU.
+> Nori, Sekhar wrote:
+>
+>> On Sat, Nov 13, 2010 at 04:08:50, vm.rod25 at gmail.com wrote:
+>>>
+>>> From: Victor Rodriguez <victor.rodriguez@sasken.com>
+>
+>>> This patch defines Pin Mux configuration for MacASP
+>>> used on the Hawkboard-L138 system in order to add Audio support
+>
+>>> Signed-off-by: Victor Rodriguez <victor.rodriguez@sasken.com>
+>>> Tested-by: Rene Gonzalez <renegs.2378@gmail.com>
+>>> ---
+>>> ?arch/arm/mach-davinci/da850.c | ? ?2 +-
+>>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+>>> diff --git a/arch/arm/mach-davinci/da850.c
+>>> b/arch/arm/mach-davinci/da850.c
+>>> index 63916b9..f033a0a 100644
+>>> --- a/arch/arm/mach-davinci/da850.c
+>>> +++ b/arch/arm/mach-davinci/da850.c
+>>> @@ -591,7 +591,7 @@ const short da850_cpgmac_pins[] __initdata = {
+>>> ?const short da850_mcasp_pins[] __initdata = {
+>>> ? ? ?DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+>>> ? ? ?DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
+>>> - ? ? DA850_AXR_11, DA850_AXR_12,
+>>> + ? ? DA850_AXR_11, DA850_AXR_12, DA850_AXR_13, DA850_AXR_14,
+>
+>> To speed up acceptance of this series, can you please drop this
+>> patch and submit the rest of the patches as a reduced series?
+>
+> ? BTW, I've seen more AXR pins in DA850, so this patch is far from being
+> complete anyway.
 
-Understood.  But the alternative is to require all code that requests a 
-PPI to have to enable the IRQ on the other cores.  This seems 
-unreasonable to me.
+Ok Sergei we will need to work hard on it
 
-> So I'm nervous about this change - architecturally it feels like the
-> wrong thing to do to take the PPI interrupts through the generic IRQ
-> infrastructure.
+By the way is there any other comment to my patches with out this from
+audio and McASP pins ?
 
-What do suggest as an alternative to this solution?  Creating separate 
-IRQ numbers for each core (per PPI) doesn't seem to scale well as the 
-number of cores increase.
+Regards
 
-~Stephen
+Victor Rodriguez
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+>> Thanks,
+>> Sekhar
+>
+> WBR, Sergei
+>
