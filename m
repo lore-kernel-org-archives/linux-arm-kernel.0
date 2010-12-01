@@ -1,48 +1,30 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 1 Dec 2010 12:17:41 +0200
-Subject: [PATCH v5] ARM: s3c244x: Fix mess with gpio {set,
-	get}_pull callbacks
-In-Reply-To: <001301cb9129$15f1b5c0$41d52140$%kim@samsung.com>
-References: <4CF55785.5090403@metafoo.de>
-	<1291147949-18812-1-git-send-email-anarsoul@gmail.com>
-	<001301cb9129$15f1b5c0$41d52140$%kim@samsung.com>
-Message-ID: <201012011217.41602.anarsoul@gmail.com>
+From: buytenh@wantstofly.org ('Lennert Buytenhek')
+Date: Wed, 1 Dec 2010 11:19:26 +0100
+Subject: [PATCH 00/54] ARM irq_data conversion.
+In-Reply-To: <001a01cb9129$86857150$939053f0$%kim@samsung.com>
+References: <20101130131105.GA15575@mail.wantstofly.org>
+	<20101130133754.GD32368@sirena.org.uk>
+	<001a01cb9129$86857150$939053f0$%kim@samsung.com>
+Message-ID: <20101201101926.GJ15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 December 2010 09:26:31 Kukjin Kim wrote:
+On Wed, Dec 01, 2010 at 04:29:39PM +0900, Kukjin Kim wrote:
 
-> How about following...
+> > >  arch/arm/mach-s3c64xx/irq-eint.c         |   34 +++---
+> > >  arch/arm/plat-samsung/include/plat/pm.h  |    4 +-
+> > >  arch/arm/plat-samsung/irq-uart.c         |   44 ++++----
+> > >  arch/arm/plat-samsung/irq-vic-timer.c    |   22 ++--
+> > >  arch/arm/plat-samsung/pm.c               |    7 +-
+> > 
+> > I've already sent changes which cover some of these (everything that
+> > appears on s3c64xx anyway) and use the opportunity of doing the
+> > conversion to introduce some trivial optimisations.  Hopefully Kukjin
+> > and/or Ben will get a chance to look at them soon.
 > 
-> +void __init s3c2440_map_io(void)
-> +{
-> +	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_1up;
-> +	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_1up;
-> +
-> +	s3c244x_map_io();
-> +}
-
-What's difference except order?
- 
-> Yeah, however, in my opinion, need to add following during gpiolib_init().
+> Hi Mark,
 > 
-> @@ -222,6 +222,11 @@ static __init int s3c24xx_gpiolib_init(void)
->                 if (!chip->config)
->                         chip->config = &s3c24xx_gpiocfg_default;
-> 
-> +               if (!chip->config->set_pull)
-> +                       chip->config->set_pull = s3c_gpio_setpull_1up;
-> +               if (!chip->config->get_pull)
-> +                       chip->config->get_pull = s3c_gpio_getpull_1up;
-> +
->                 s3c_gpiolib_add(chip);
->         }
+> Oh, sorry for late.
+> Will check soon :-)
 
-Pull callbacks are soc-specific, s3c24xx_gpiolib_init is common for all socs, 
-so we can't do like this.
-
-Btw, I've sent v6 version of patch, it still with empty line issues, should I 
-resend v7 version or maintainers can fixup it at their side? :)
-
-Regards
-Vasily
+So do you want me to drop my patch for now?
