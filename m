@@ -1,74 +1,25 @@
-From: per.xx.fransson@stericsson.com (Per Fransson)
-Date: Wed, 1 Dec 2010 09:24:06 +0100
-Subject: [PATCH v3] ARM: kexec: Add call to non-crashing cores through IPI
-Message-ID: <1291191846-12417-1-git-send-email-per.xx.fransson@stericsson.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 01 Dec 2010 09:37:15 +0100
+Subject: [patch 0/2] iMX51 small fixes
+Message-ID: <20101201083715.625363724@rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kexec is used to start a crash kernel the other cores
-are notified. These non-crashing cores will save their state
-in the crash notes and then do nothing.
 
-Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
----
-v3 changes:
-* Lowered loglevel of non-crashing CPU prints
 
-* Added logging for non-crashing CPUs which do not respond
+Hi,
 
- arch/arm/kernel/machine_kexec.c |   30 ++++++++++++++++++++++++++++++
- 1 files changed, 30 insertions(+), 0 deletions(-)
+This series is containing 2 small patches for iMX5 SoC.
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 3a8fd51..30ead13 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -23,6 +23,8 @@ extern unsigned long kexec_indirection_page;
- extern unsigned long kexec_mach_type;
- extern unsigned long kexec_boot_atags;
- 
-+static atomic_t waiting_for_crash_ipi;
-+
- /*
-  * Provide a dummy crash_notes definition while crash dump arrives to arm.
-  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
-@@ -37,9 +39,37 @@ void machine_kexec_cleanup(struct kimage *image)
- {
- }
- 
-+void machine_crash_nonpanic_core(void *unused)
-+{
-+	struct pt_regs regs;
-+
-+	crash_setup_regs(&regs, NULL);
-+	printk(KERN_DEBUG "CPU %u will stop doing anything useful since another CPU has crashed\n",
-+	       smp_processor_id());
-+	crash_save_cpu(&regs, smp_processor_id());
-+	flush_cache_all();
-+
-+	atomic_dec(&waiting_for_crash_ipi);
-+	while (1)
-+		cpu_relax();
-+}
-+
- void machine_crash_shutdown(struct pt_regs *regs)
- {
-+	unsigned long msecs;
-+
- 	local_irq_disable();
-+
-+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-+	smp_call_function(machine_crash_nonpanic_core, NULL, false);
-+	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-+		mdelay(1);
-+		msecs--;
-+	}
-+	if (atomic_read(&waiting_for_crash_ipi) > 0)
-+		printk(KERN_WARNING "Non-crashing CPUs did not react to IPI\n");
-+
- 	crash_save_cpu(regs, smp_processor_id());
- 
- 	printk(KERN_INFO "Loading crashdump kernel...\n");
--- 
-1.7.2.2
+The first one is touching at the gpiolib support. Currently, it's always
+returning 0 as gpio value when configured as output so I've modified it to
+report what we asked. I've only tested it by looking at /sys/kernel/debug/gpio
+so I've no idea if this can actively break something.
+
+The second one is less interesting. It's "only" fixing a build failure so not
+a lot of things to say.
+
+I've tested them against Sascha's Hauer imx-for-2.6.38 branch but they do apply
+on current mainline tree.
+
+Arnaud
