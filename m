@@ -1,62 +1,77 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 01 Dec 2010 11:09:32 +0100
-Subject: [patch 1/2] imx51: fix gpiolib support
-In-Reply-To: <20101201092529.GE32355@pengutronix.de> ("Uwe =?utf-8?Q?Klein?=
-	=?utf-8?Q?e-K=C3=B6nig=22's?=
-	message of "Wed, 1 Dec 2010 10:25:29 +0100")
-References: <20101201083715.625363724@rtp-net.org>
-	<20101201084257.327766974@rtp-net.org>
-	<20101201092529.GE32355@pengutronix.de>
-Message-ID: <87hbexu7mr.fsf@lechat.rtp-net.org>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Wed, 1 Dec 2010 18:45:20 +0800
+Subject: [PATCH v2 03/15] ARM: mxs: Add reset routines
+In-Reply-To: <20101130102505.GG20449@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291031956-30314-3-git-send-email-shawn.guo@freescale.com>
+	<20101130102505.GG20449@pengutronix.de>
+Message-ID: <AANLkTimvA2VUE0rGVorvtq607FOkZJDc4Mb4UTAF+ZAj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+Hi Uwe,
 
-> Hello Arnaud,
-
-Hi,
+2010/11/30 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
 >
-> On Wed, Dec 01, 2010 at 09:37:16AM +0100, Arnaud Patard wrote:
->> The gpiolib code is always returning 0 when reading pad values if the pads
->> are configured as output. Using DR registers instead of PSR is fixing that.
->> 
->> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->> Index: linux-2.6-submit/arch/arm/plat-mxc/gpio.c
->> ===================================================================
->> --- linux-2.6-submit.orig/arch/arm/plat-mxc/gpio.c	2010-11-24 18:00:47.000000000 +0100
->> +++ linux-2.6-submit/arch/arm/plat-mxc/gpio.c	2010-11-24 18:06:54.000000000 +0100
->> @@ -276,6 +276,10 @@
->>  {
->>  	struct mxc_gpio_port *port =
->>  		container_of(chip, struct mxc_gpio_port, chip);
->> +	u32 l = __raw_readl(port->base + GPIO_GDIR);
+> On Mon, Nov 29, 2010 at 07:59:13PM +0800, Shawn Guo wrote:
+>> +/*
+>> + * Reset the system. It is called by machine_restart().
+>> + */
+>> +void arch_reset(char mode, const char *cmd)
+>> +{
+>> + ? ? /* Set wdog count */
+>> + ? ? __raw_writel(1, wdog_base + MXS_RTC_WATCHDOG);
+> Which unit is used here? ?Does the timer only start running when it's
+> enabled below? ?Does this apply when the watchdog is already in use,
+> too?
+>
+The unit RTC (i.MX28 RM chapter 22) which has watchdog function inside
+is used here.
+
+Good catch here.  I thought the watchdog counter only starts counting
+after WATCHDOG_EN is set.  But I just confirmed it with designer that
+the watchdog counter starts counting once CLKGATE is cleared, and
+WATCHDOG_EN bit only controls the watchdog reset generation.  Even in
+this case, 1ms should be long enough for the WATCHDOG_EN setting below
+to get executed before counter goes to 0.  What is your concern here?
+
+I should change mdelay(500) to mdelay(1).
+
 >> +
->> +	if (cpu_is_mx51() && (l & (1 << offset)))
->> +		return (__raw_readl(port->base + GPIO_DR) >> offset) & 1;
-> Maybe only read GDIR on mx51?  Isn't the direction saved by gpiolib
-> somewhere in RAM?  Is the same needed on other SoCs, too (see below for
-> my grouping)?  Technically it's not needed at all I think.
-> (Documentation/gpio.txt has: "However, note that not all platforms can
-> read the value of output pins; those that can't should always return
-> zero.".  I didn't check if the implementation conforms here though.)
-
-yeah, I know that the gpiolib allows that and in this case, it's always
-returning 0 but while I was debugging an other problem, I wanted to read
-output value and it was not working. The manual was not explicitely
-saying it was not possible so I thought it was a bug and propose a
-fix. Hopefully, sending this patch allows me to get more feedback and
-tell me if I got something wrong and there's a better fix.
-
+>> + ? ? /* Assert SRS signal */
+>> + ? ? __raw_writel(MXS_WATCHDOG_EN, wdog_base + MXS_SET_ADDR);
+>> +
+>> + ? ? /* Wait for reset to assert... */
+>> + ? ? mdelay(500);
+>> +
+>> + ? ? pr_err("Watchdog reset failed to assert reset\n");
+>> +
+>> + ? ? /* Delay to allow the serial port to show the message */
+>> + ? ? mdelay(50);
+>> +
+>> + ? ? /* We'll take a jump through zero as a poor second */
+>> + ? ? cpu_reset(0);
+>> +}
+>> +
+>> +void mxs_arch_reset_init(void __iomem *base)
+>> +{
+>> + ? ? struct clk *clk;
+>> +
+>> + ? ? wdog_base = base;
+>> +
+>> + ? ? clk = clk_get_sys("rtc", NULL);
+>> + ? ? if (!IS_ERR(clk))
+>> + ? ? ? ? ? ? clk_enable(clk);
+> Actually I'm not sure if it's worth to do this. ?It might hurt if you
+> want to save power.
 >
-> I wonder if cpu_is_mx51 is the right macro to test, I'd prefer something
-> like imx_gpio_vX().  IMHO the gpio stuff needs a major overhaul getting
-> rid of most runtime checks.
+> I'll try to find a time slot to look into that.
+>
+As this is the very initial support, I would not consider the power
+saving very much.  I will be very happy to applied your solution after
+it becomes available.
 
-I used cpu_is_mx51() because I only had tested/seen that on imx515. I
-wanted to avoid breaking other systems while trying to fix mine.
-As regards getting rid of runtime checks, maybe registering different
-gpiochip depending on the SoC would allow to check it a init time and no
-more check later.
-
-Arnaud
+-- 
+Regards,
+Shawn
