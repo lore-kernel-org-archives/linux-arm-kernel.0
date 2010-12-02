@@ -1,37 +1,43 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Thu, 2 Dec 2010 13:04:57 +0200 (EET)
-Subject: [PATCH v2] arm: mach-omap2: remove NULL board_mux from board files
-In-Reply-To: <20101202103750.GM5429@legolas.emea.dhcp.ti.com>
-References: <1291283622-16359-1-git-send-email-aaro.koskinen@nokia.com>
-	<20101202103750.GM5429@legolas.emea.dhcp.ti.com>
-Message-ID: <alpine.DEB.1.10.1012021303240.27201@esdhcp041196.research.nokia.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Thu, 2 Dec 2010 19:15:23 +0800
+Subject: [PATCH 2/2] make mc13783 regulator code generic
+In-Reply-To: <20101202105701.GB26555@pengutronix.de>
+References: <AANLkTi=E8etAOPTCBw8ccTZ9LMU-Yf=wELn+VQkg2eom@mail.gmail.com>
+	<AANLkTim4TURXFb3g_L1jzU9S+Jic6OZp48uvAoZOh4+w@mail.gmail.com>
+	<20101202105701.GB26555@pengutronix.de>
+Message-ID: <AANLkTinqk5U3HJX6BoceXH=QG2QtW8oVUkdPoVZdcQ4m@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sorry, I will resend them.
 
-On Thu, 2 Dec 2010, Felipe Balbi wrote:
-> On Thu, Dec 02, 2010 at 11:53:42AM +0200, Aaro Koskinen wrote:
->> diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
->> index 350c04f..e224ab5 100644
->> --- a/arch/arm/mach-omap2/mux.h
->> +++ b/arch/arm/mach-omap2/mux.h
->> @@ -133,6 +133,8 @@ static inline int omap_mux_init_signal(char *muxname, 
->> int val)
->> 	return 0;
->> }
->> 
->> +static struct omap_board_mux *board_mux __initdata 
->> __attribute__((unused));
+2010/12/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Thu, Dec 02, 2010 at 06:45:32PM +0800, Yong Shen wrote:
+>> Hi there,
+>>
+>> Please give comments inline and use attached patch for testing.
+>>
+>> Thanks
+>> Yong
+>>
+>>
+>> From 377c680c35089aea7697397c42349189843eeaff Mon Sep 17 00:00:00 2001
+>> From: Yong Shen <yong.shen@linaro.org>
+>> Date: Thu, 2 Dec 2010 14:59:00 +0800
+>> Subject: [PATCH 2/2] make mc13783 regulator code generic
+>>
+>> move some common functions and micros of mc13783 regulaor driver to
+> s/micros/macros/ s/regulaor/regulator/
 >
-> how about __unused ??
-
-I don't think we have that:
-
-   CC      arch/arm/mach-omap2/mux.o
-In file included from arch/arm/mach-omap2/mux.c:39:
-arch/arm/mach-omap2/mux.h:136: error: expected ',' or ';' before '__unused'
-make[1]: *** [arch/arm/mach-omap2/mux.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
-
-A.
+>> a seperate file, which makes it possible for mc13892 to share code.
+> s/seperate/separate/
+>
+> (Note I havn't looked at the patch)
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
