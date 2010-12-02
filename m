@@ -1,54 +1,28 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 2 Dec 2010 20:50:13 +0900
-Subject: [PATCH] ARM: GIC irq desciptor bug fix
-In-Reply-To: <1291270659-24903-1-git-send-email-cxie4@marvell.com>
-References: <1291270659-24903-1-git-send-email-cxie4@marvell.com>
-Message-ID: <AANLkTinxHBSm3WVThN56fH0fePCwJ65ZWdL4g7nnFjJO@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Dec 2010 11:57:00 +0000
+Subject: [PATCH] mmci: supply per-instance regulator name
+In-Reply-To: <1291289707-5529-1-git-send-email-linus.walleij@stericsson.com>
+References: <1291289707-5529-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101202115700.GF29347@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I posted the similar patch. but looks better.
+On Thu, Dec 02, 2010 at 12:35:07PM +0100, Linus Walleij wrote:
+> On the Ux500 we have different regulators to different card slots
+> and eMMCs, and some have no regulator. Move the hardcoded "vmmc"
+> regulator name to platform data and supply it that way for the
+> platforms that use it. Remove the ugly and unneeded #ifdef around
+> the regulator fetch code at the same time.
 
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+It seems that the regulator code is making all the same mistakes that
+historically were made with the clk API code.
 
-On Thu, Dec 2, 2010 at 3:17 PM,  <Chao@marvell.com> wrote:
-> From: cxie4 <cxie4@marvell.com>
->
-> gic_set_cpu will directly use irq_desc[]. If CONFIG_SPARSE_IRQ is enabled, there is no
-> irq_desc[]. So we need use irq_to_desc(irq) to get the descriptor for irq.
->
-> Signed-off-by: cxie4 <cxie4@marvell.com>
-> ---
-> ?arch/arm/common/gic.c | ? ?8 +++++++-
-> ?1 files changed, 7 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index 7dfa9a8..6599acb 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -160,9 +160,15 @@ static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
-> ? ? ? ?unsigned int shift = (irq % 4) * 8;
-> ? ? ? ?unsigned int cpu = cpumask_first(mask_val);
-> ? ? ? ?u32 val;
-> + ? ? ? struct irq_desc *desc;
->
-> ? ? ? ?spin_lock(&irq_controller_lock);
-> - ? ? ? irq_desc[irq].node = cpu;
-> + ? ? ? desc = irq_to_desc(irq);
-> + ? ? ? if (desc == NULL) {
-> + ? ? ? ? ? ? ? spin_unlock(&irq_controller_lock);
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> + ? ? ? desc->node = cpu;
-> ? ? ? ?val = readl(reg) & ~(0xff << shift);
-> ? ? ? ?val |= 1 << (cpu + shift);
-> ? ? ? ?writel(val, reg);
-> --
-> 1.6.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Rather than using the struct device, it's trying to use the regulator
+name to distinguish individual sources of supply.  This can only lead
+to lots of regulator names being passed around from layer to layer,
+rather than the now proven cleaner method that the clk API always set
+out to do.
+
+I'd like regulator people to think long and hard about the sanity of
+passing names all the way from platform code into drivers and back
+into the regulator code before I consider this patch any further.
