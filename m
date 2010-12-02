@@ -1,28 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 1 Dec 2010 18:01:47 -0700 (MST)
-Subject: [PATCH 5/7 v2] OMAP3: clocks: Update clock domain name for mcspi
-	fck
-In-Reply-To: <33288.10.24.255.18.1291212111.squirrel@dbdmail.itg.ti.com>
-References: <33288.10.24.255.18.1291212111.squirrel@dbdmail.itg.ti.com>
-Message-ID: <alpine.DEB.2.00.1012011759490.2515@utopia.booyaka.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Wed, 1 Dec 2010 19:36:34 -0600
+Subject: [PATCHv5 0/4] omap: iovmm - fixes for iovmm module
+In-Reply-To: <1291231567-notmuch-felipe.contreras@nokia.com>
+References: <1288033806-1496-1-git-send-email-x0095840@ti.com>
+	<20101129.104729.97149649.Hiroshi.DOYU@nokia.com>
+	<1291231567-notmuch-felipe.contreras@nokia.com>
+Message-ID: <AANLkTimQcXrgxGjZonSUSkXqoHfAVVhXuHnGKBkMKc9X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Govindraj
+On Wed, Dec 1, 2010 at 1:27 PM, Felipe Contreras
+<felipe.contreras@nokia.com> wrote:
+> Hiroshi.DOYU at nokia.com wrote:
+>> From: ext Fernando Guzman Lugo <x0095840@ti.com>
+>> Subject: [PATCHv5 0/4] omap: iovmm - fixes for iovmm module
+>> Date: Mon, 25 Oct 2010 21:10:02 +0200
+>>
+>> > Version 5:
+>> > * Changes in "iommu: create new api to set valid da range"
+>> > ? - Change range variables to platform data structure.
+>>
+>> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+>
+> Does that means you are going to send a pull request with these for .38?
+>
+> Fernando, is there a branch where you have all the changes needed in
+> tidspbridge?
 
-On Wed, 1 Dec 2010, Govindraj.R wrote:
+No, I dont have that branch.
 
-> From: Charulatha V <charu@ti.com>
-> 
-> Update clock3xxx_data for mcspi1-4 with appropriate clock domain name.
-> 
-> Signed-off-by: Charulatha V <charu@ti.com>
+>
+> I guess the only patch missing would be the one for linux-arm.
 
-Looks like this is missing your Signed-off-by:.
+Yes, after merging them, the only missing is the SG chain patch.
 
-Also, please submit this patch separately and I will take it as part of 
-the clock patches for 2.6.38.
+Regards,
+Fernando.
 
-regards
-
-- Paul
+>
+> Cheers.
+>
+> --
+> Felipe Contreras
+>
