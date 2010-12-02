@@ -1,66 +1,83 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 02 Dec 2010 18:39:50 +0100
-Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
-In-Reply-To: <20101202171538.GB30933@pulham.picochip.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
-	<20101202171538.GB30933@pulham.picochip.com>
-Message-ID: <4CF7D9E6.5000409@samsung.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Thu, 2 Dec 2010 11:41:39 -0600
+Subject: [PATCH] scatterlist: define SG chain for arm architecture
+In-Reply-To: <20101003202920K.fujita.tomonori@lab.ntt.co.jp>
+References: <20101001163958.GA22533@n2100.arm.linux.org.uk>
+	<20101003195758B.fujita.tomonori@lab.ntt.co.jp>
+	<20101003112839.GA32736@n2100.arm.linux.org.uk>
+	<20101003202920K.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <AANLkTikES5y=hJhuE=iX-WJvcUvbpSqjDPBr2W8jGeJL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Oct 3, 2010 at 6:34 AM, FUJITA Tomonori
+<fujita.tomonori@lab.ntt.co.jp> wrote:
+> On Sun, 3 Oct 2010 12:28:39 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>
+>> On Sun, Oct 03, 2010 at 08:02:52PM +0900, FUJITA Tomonori wrote:
+>> > On Fri, 1 Oct 2010 17:39:58 +0100
+>> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> >
+>> > > On Fri, Oct 01, 2010 at 11:28:41AM -0500, Fernando Guzman Lugo
+> wrote:
+>> > > > Define SG chain for ARM architecture in order to work
+>> > > > with big buffers. This patch is needed in order to
+>> > > > iovmm users can pass a big buffer to map it and ARM
+>> > > > architecture has not issues using SG chain.
+>> > > >
+>> > > > This change was suggested by FUJITA Tomonori.
+>> > >
+>> > > Have you audited all places where SG lists are used in the ARM
+>> > > architecture to ensure that SG chain support is safe? ?(That
+>> > > goes for ARM generic code and ARM specific drivers.)
+>> >
+>> > As far as I know, only SCSI actually uses SG chain feature (that is,
+>> > sending chained scatter lists). All SCSI drivers were converted when
+>> > we added SG chain feature. So what you need to care about is the dma
+>> > code.
+>> >
+>> > There are only several files that actually use scatter list under
+>> > arch/arm.
+>> >
+>> > >From a quick look, arch/arm/mm/dma-mapping.c,
+>> > arch/arm/common/dmabounce.c, arch/arm/kernel/dma.c, and
+>> > arch/arm/include/asm/dma-mapping.h looks fine.
+>> >
+>> > arm/mach-imx/dma-v1.c also looks like to use chained sg API properly
+>> > (but this isn't used with SCSI, right?).
+>> >
+>> > Seems that arch/arm/plat-omap/iovmm.c can handle the chained SG
+>> > too. It doesn't allocate the chained SG now though.
+>>
+>> There's also RiscPC and its SCSI drivers could well be an issue for SG
+>> chaining. ?They have to manually save the SCSI 'data pointer' (down to
+>> the byte position in the SG chain and be able to restore a previously
+>> saved point.) ?This code was written before SG chaining ever appeared,
+>> and although it has been partly fixed up, it's probably buggy if SG
+>> chaining were to be enabled.
+>
+> What SCSI drviers we need to fix?
 
-Hi Jamie,
+Russell,
 
-On 12/02/2010 06:15 PM, Jamie Iles wrote:
-> Hi Sylwester,
-> 
-> On Thu, Dec 02, 2010 at 05:37:41PM +0100, Sylwester Nawrocki wrote:
->> diff --git a/arch/arm/plat-s5p/dev-csis0.c b/arch/arm/plat-s5p/dev-csis0.c
->> new file mode 100644
->> index 0000000..2b1ba43
->> --- /dev/null
->> +++ b/arch/arm/plat-s5p/dev-csis0.c
->> @@ -0,0 +1,34 @@
->> +/*
->> + * Copyright (C) 2010 Samsung Electronics
->> + *
->> + * S5P series device definition for MIPI-CSI device 0
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/platform_device.h>
->> +#include <mach/map.h>
->> +
->> +static struct resource s5p_csis_resource[] = {
->> +	[0] = {
->> +		.start = S5P_PA_CSIS0,
->> +		.end   = S5P_PA_CSIS0 + SZ_4K - 1,
->> +		.flags = IORESOURCE_MEM,
->> +	},
->> +	[1] = {
->> +		.start = IRQ_MIPICSI0,
->> +		.end   = IRQ_MIPICSI0,
->> +		.flags = IORESOURCE_IRQ,
->> +	}
->> +};
-> Do you really need the [0] and [1] here? These are only needed if you are 
-> sparsely initialising an array.
+Any update with this? I hope it can be merged for 2.6.38.
 
-I agree explicit indices are not really needed. I just followed the style of
-all other resource definitions already there.
-I am not quite sure what is the preference of the maintainer, I guess they want
-all devices to follow same style for consistence.
+>
+>
+>> If it's just OMAP users who wish to enable SG chaining, then the sane
+>> thing to do would be to make the definition of the macro conditional
+>> on OMAP.
+>
+> Yeah, that should work.
 
-Thanks,
-Sylwester
+some like this in scatterlist.h is ok?
 
--- 
-Sylwester Nawrocki
-Linux Platform Group
-Samsung Poland R&D Center
+#ifdef CONFIG_ARCH_OMAP
+#define ARCH_HAS_SG_CHAIN
+#endif
+
+
+Regards,
+Fernando.
+>
