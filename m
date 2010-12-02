@@ -1,31 +1,22 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Thu, 2 Dec 2010 13:46:00 +0100
-Subject: [PATCH] ARM: mach-ux500: AB8500 irqs is taken from header file
-Message-ID: <1291293960-23124-1-git-send-email-mattias.wallin@stericsson.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Dec 2010 13:08:09 +0000
+Subject: [PATCH] mmci: supply per-instance regulator name
+In-Reply-To: <20101202122827.GG29347@n2100.arm.linux.org.uk>
+References: <1291289707-5529-1-git-send-email-linus.walleij@stericsson.com>
+	<20101202120318.GB3182@sirena.org.uk>
+	<20101202122827.GG29347@n2100.arm.linux.org.uk>
+Message-ID: <20101202130809.GD859@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the dublicated define for number of
-interrupts and instead include the needed header file.
+On Thu, Dec 02, 2010 at 12:28:27PM +0000, Russell King - ARM Linux wrote:
 
-Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
----
- .../mach-ux500/include/mach/irqs-board-mop500.h    |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+> The way the MMCI code is, it only requests one regulator per AMBA
+> device, and therefore only one regulator per struct device.  So I
+> don't think the current code needs changing in any way provided the
+> struct device is used to find the corresponding regulator.
 
-diff --git a/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-index 7ee8aaa..4a91bbd 100644
---- a/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-+++ b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-@@ -8,7 +8,8 @@
- #ifndef __MACH_IRQS_BOARD_MOP500_H
- #define __MACH_IRQS_BOARD_MOP500_H
- 
--#define AB8500_NR_IRQS			104
-+/* Number of AB8500 irqs is taken from header file */
-+#include <linux/mfd/ab8500.h>
- 
- #define MOP500_AB8500_IRQ_BASE		IRQ_BOARD_START
- #define MOP500_AB8500_IRQ_END		(MOP500_AB8500_IRQ_BASE \
--- 
-1.7.2.2
+Hrm.  In that case I'm not sure what the problem Linus' patch fixes is -
+the driver is already requesting using the struct device, I was assuming
+that the supplies weren't being requested in a fine grained enough
+fashion.
