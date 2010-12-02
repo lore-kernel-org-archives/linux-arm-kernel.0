@@ -1,47 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Dec 2010 12:32:02 +0000
-Subject: [PATCHv5 3/4] omap: iovmm - replace __iounmap with omap_iounmap
-In-Reply-To: <1288033806-1496-4-git-send-email-x0095840@ti.com>
-References: <1288033806-1496-1-git-send-email-x0095840@ti.com>
-	<1288033806-1496-2-git-send-email-x0095840@ti.com>
-	<1288033806-1496-3-git-send-email-x0095840@ti.com>
-	<1288033806-1496-4-git-send-email-x0095840@ti.com>
-Message-ID: <20101202123202.GA10461@n2100.arm.linux.org.uk>
+Date: Thu, 2 Dec 2010 12:33:04 +0000
+Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
+In-Reply-To: <AANLkTind+DH5emar2L9EiV-pqpCvQHQGnFevh9Bncrpz@mail.gmail.com>
+References: <AANLkTind+DH5emar2L9EiV-pqpCvQHQGnFevh9Bncrpz@mail.gmail.com>
+Message-ID: <20101202123304.GB10461@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 25, 2010 at 02:10:05PM -0500, Fernando Guzman Lugo wrote:
-> Omap platform is omap_iounmap function.
+On Thu, Dec 02, 2010 at 06:07:23AM -0600, Kanigeri, Hari wrote:
+> Hi Tony,
 > 
-> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> ---
->  arch/arm/plat-omap/iovmm.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
+>   Linus Torvalds (1):
+>         Linux 2.6.37-rc4
 > 
-> diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-> index 93a34d9..5489ca9 100644
-> --- a/arch/arm/plat-omap/iovmm.c
-> +++ b/arch/arm/plat-omap/iovmm.c
-> @@ -821,7 +821,7 @@ void iommu_kunmap(struct iommu *obj, u32 da)
->  	struct sg_table *sgt;
->  	typedef void (*func_t)(const void *);
->  
-> -	sgt = unmap_vm_area(obj, da, (func_t)__iounmap,
-> +	sgt = unmap_vm_area(obj, da, (func_t)omap_iounmap,
->  			    IOVMF_LINEAR | IOVMF_MMIO);
->  	if (!sgt)
->  		dev_dbg(obj->dev, "%s: No sgt\n", __func__);
+> are available in the git repository at:
+> 
+>   git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
+> 
+> Fernando Guzman Lugo (5):
+>       OMAP: mailbox: change full flag per mailbox queue instead of global
+>       omap: iovmm - no gap checking for fixed address
+>       omap: iovmm - add superpages support to fixed da address
+>       omap: iovmm - replace __iounmap with omap_iounmap
 
-Err, this is wrong.  Why are you breaking the layer separation and going
-for the implementation detail of iounmap()?
+This change is wrong.  Nothing should be directly referencing omap_iounmap
+nor for that matter omap_ioremap.  Both are implementation details of the
+standard ioremap/iounmap APIs.
 
-plat/io.h:
-#define __arch_ioremap(p,s,t)   omap_ioremap(p,s,t)
-#define __arch_iounmap(v)       omap_iounmap(v)
-
-void __iomem *omap_ioremap(unsigned long phys, size_t size, unsigned int type);
-void omap_iounmap(volatile void __iomem *addr);
-
-asm/io.h:
-#define ioremap(cookie,size)            __arch_ioremap((cookie), (size), MT_DEVICE)
-#define iounmap(cookie)                 __arch_iounmap(cookie)
+Use the official APIs rather than the implementation details behind them.
