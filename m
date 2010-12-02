@@ -1,29 +1,37 @@
-From: trimarchi@gandalf.sssup.it (Michael Trimarchi)
-Date: Thu, 02 Dec 2010 12:00:05 +0100
-Subject: [RFC PATCH] mxc_timer1 patch on imx25
-In-Reply-To: <20101129113846.GD20449@pengutronix.de>
-References: <20101117212821.GF8942@pengutronix.de>
-	<1290029419-21435-28-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4CEFCC9A.2020500@fqingenieria.es>
-	<4CEFD139.8090600@gandalf.sssup.it>
-	<20101126200746.GB25293@pengutronix.de>
-	<4CF38BE9.1030607@gandalf.sssup.it>
-	<20101129113846.GD20449@pengutronix.de>
-Message-ID: <4CF77C35.5060208@gandalf.sssup.it>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Thu, 2 Dec 2010 13:04:57 +0200 (EET)
+Subject: [PATCH v2] arm: mach-omap2: remove NULL board_mux from board files
+In-Reply-To: <20101202103750.GM5429@legolas.emea.dhcp.ti.com>
+References: <1291283622-16359-1-git-send-email-aaro.koskinen@nokia.com>
+	<20101202103750.GM5429@legolas.emea.dhcp.ti.com>
+Message-ID: <alpine.DEB.1.10.1012021303240.27201@esdhcp041196.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi,
 
-sleep 1 was around 2 seconds
-and so on
+On Thu, 2 Dec 2010, Felipe Balbi wrote:
+> On Thu, Dec 02, 2010 at 11:53:42AM +0200, Aaro Koskinen wrote:
+>> diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+>> index 350c04f..e224ab5 100644
+>> --- a/arch/arm/mach-omap2/mux.h
+>> +++ b/arch/arm/mach-omap2/mux.h
+>> @@ -133,6 +133,8 @@ static inline int omap_mux_init_signal(char *muxname, 
+>> int val)
+>> 	return 0;
+>> }
+>> 
+>> +static struct omap_board_mux *board_mux __initdata 
+>> __attribute__((unused));
+>
+> how about __unused ??
 
-Michael
+I don't think we have that:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: mx25_clock.patch
-Type: text/x-diff
-Size: 719 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101202/1f9733cf/attachment.bin>
+   CC      arch/arm/mach-omap2/mux.o
+In file included from arch/arm/mach-omap2/mux.c:39:
+arch/arm/mach-omap2/mux.h:136: error: expected ',' or ';' before '__unused'
+make[1]: *** [arch/arm/mach-omap2/mux.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
+
+A.
