@@ -1,66 +1,53 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Thu, 2 Dec 2010 11:55:40 +0530
-Subject: [Patch v3] AM35xx: Craneboard: Add USB EHCI support
-In-Reply-To: <1291222730-17614-1-git-send-email-srinath@mistralsolutions.com>
-References: <1291222730-17614-1-git-send-email-srinath@mistralsolutions.com>
-Message-ID: <20101202062539.GB5645@GLPP-machine>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Thu, 2 Dec 2010 12:01:34 +0530
+Subject: [PATCH 5/7 v2] OMAP3: clocks: Update clock domain name for mcspi
+	fck
+In-Reply-To: <alpine.DEB.2.00.1012011759490.2515@utopia.booyaka.com>
+References: <33288.10.24.255.18.1291212111.squirrel@dbdmail.itg.ti.com>
+	<alpine.DEB.2.00.1012011759490.2515@utopia.booyaka.com>
+Message-ID: <AANLkTiky2Xb_iZpKzfOmEmiF9hSCqOrw6Wm-EQWMxe08@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* srinath at mistralsolutions.com <srinath@mistralsolutions.com> [2010-12-01 22:28:50 +0530]:
+On Thu, Dec 2, 2010 at 6:31 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hello Govindraj
+>
+> On Wed, 1 Dec 2010, Govindraj.R wrote:
+>
+>> From: Charulatha V <charu@ti.com>
+>>
+>> Update clock3xxx_data for mcspi1-4 with appropriate clock domain name.
+>>
+>> Signed-off-by: Charulatha V <charu@ti.com>
+>
+> Looks like this is missing your Signed-off-by:.
 
-> From: Srinath <srinath@mistralsolutions.com>
-> 
-> AM3517/05 Craneboard has one EHCI interface on board using port1.
-> 
-> GPIO35 is used as power enable.
-> GPIO38 is used as port1 PHY reset.
-> 
-> History:
-> http://marc.info/?l=linux-omap&w=2&r=1&s=Craneboard%3A+Add+USB+EHCI+support&q=t
-> 
-> Signed-off-by: Srinath <srinath@mistralsolutions.com>
-> ---
->  arch/arm/mach-omap2/board-am3517crane.c |   40 +++++++++++++++++++++++++++++++
->  1 files changed, 40 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-> index 13ead33..6fd5dfe 100644
-> --- a/arch/arm/mach-omap2/board-am3517crane.c
-> +++ b/arch/arm/mach-omap2/board-am3517crane.c
-> @@ -28,8 +28,13 @@
->  
-[...]
->  static void __init am3517_crane_init(void)
->  {
-> +	int ret;
-> +
->  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->  	omap_serial_init();
-> +
-> +	/* Configure GPIO for EHCI port */
-> +	omap_mux_init_gpio(GPIO_USB_POWER, OMAP_PIN_OUTPUT);
+Yes, I will add it
 
-This is non void function. You can consider return value for further
-processing.
+>
+> Also, please submit this patch separately and I will take it as part of
+> the clock patches for 2.6.38.
+>
 
-> +
-> +	ret = gpio_request(GPIO_USB_POWER, "usb_ehci_enable");
-> +	if (ret < 0) {
-> +		pr_err("Cannot request GPIO %d\n", GPIO_USB_POWER);
-> +		return;
-> +	}
-> +
-> +	ret = gpio_direction_output(GPIO_USB_POWER, 1);
-> +	if (ret < 0)
-> +		goto err;
-> +
-> +	omap_mux_init_gpio(GPIO_USB_NRESET, OMAP_PIN_OUTPUT);
+Yes sure. Will send out as a separate patch
 
--Ditto-
+--
+Thanks,
+Govindraj.R
 
-Also, why there is no gpio_request for "GPIO_USB_NRESET"
 
--Manjunath
+> regards
+>
+> - Paul
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
-[...]
+
+
+-- 
+---
+Regards,
+Govindraj.R
