@@ -1,39 +1,38 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu,  2 Dec 2010 21:09:48 +0100
-Subject: [PATCH 5/6] i2c/pxa2xx: check timeout correctly
-In-Reply-To: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
-References: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1291320589-31570-6-git-send-email-bigeasy@linutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 2 Dec 2010 21:39:25 +0100
+Subject: [PATCH] mmci: corrected calculation of clock div for ux500
+In-Reply-To: <20101202174550.GJ29347@n2100.arm.linux.org.uk>
+References: <1291308678-15497-1-git-send-email-linus.walleij@stericsson.com>
+	<20101202174550.GJ29347@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinFwDzz1HJCkJGjS=yy1g2k0EuHqszwirxySiKv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-timeout here maybe 0 if the event occured and a task with a higher
-priority stole the cpu and we were sleeping longer than the timeout
-value we specified.
-In case of a real timeout I changed the error code to I2C_RETRY so we
-retry the transfer.
+2010/12/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Dec 02, 2010 at 05:51:18PM +0100, Linus Walleij wrote:
+>> From: Ulf Hansson <ulf.hansson@stericsson.com>
+>>
+>> The Ux500 variant of this block has a different divider.
+>> The value used right now is too big and which means a loss
+>> in performance. This fix corrects it.
+>
+> Err.
+>
+>> + ? ? ? ? ? ? } else if (variant->st_clkdiv) {
+>> + ? ? ? ? ? ? ? ? ? ? clk = ((host->mclk + desired - 1) / desired) - 2;
+>> + ? ? ? ? ? ? ? ? ? ? if (clk >= 256)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? clk = 255;
+>> + ? ? ? ? ? ? ? ? ? ? host->cclk = host->mclk / (clk + 2);
+>
+> This causes the divider to be selected for the 'nearest' frequency.
+> You are not allowed to _exceed_ the desired frequency - you must
+> always round down.
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
----
- drivers/i2c/busses/i2c-pxa.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+I don't get it because what we try to do is round the divider
+up so the divided result will be rounded down... Is it the -2
+part that confuse things? That is just a constant from the
+datasheet. (Some default divider offset.)
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 7c724b2..c2089fe 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -757,8 +757,10 @@ static int i2c_pxa_do_xfer(struct pxa_i2c *i2c, struct i2c_msg *msg, int num)
- 	 */
- 	ret = i2c->msg_idx;
- 
--	if (timeout == 0)
-+	if (!timeout && i2c->msg_num) {
- 		i2c_pxa_scream_blue_murder(i2c, "timeout");
-+		ret = I2C_RETRY;
-+	}
- 
-  out:
- 	return ret;
--- 
-1.7.3.2
+I rewrote the patch using DIV_ROUND_UP() and expanded
+the maths from the datasheets so I properly understand it
+myself, is this better:
