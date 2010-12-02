@@ -1,44 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Dec 2010 15:24:28 +0000
-Subject: [PATCH 1/8] ARM: SCU: Add common routines for secondary CPU bootup
-In-Reply-To: <AANLkTikpjq-8BVanF5W76j0ZdDBur8DyHWSH8GGgJBQs@mail.gmail.com>
-References: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
-	<20101130171658.GA24034@oksana.dev.rtsoft.ru>
-	<20101130233204.GB14383@n2100.arm.linux.org.uk>
-	<20101201002527.GC14383@n2100.arm.linux.org.uk>
-	<AANLkTikpjq-8BVanF5W76j0ZdDBur8DyHWSH8GGgJBQs@mail.gmail.com>
-Message-ID: <20101202152428.GD10461@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 2 Dec 2010 13:36:15 -0200
+Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
+In-Reply-To: <20101202121400.GH6017@pengutronix.de>
+References: <20101124201831.GZ4693@pengutronix.de>
+	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
+	<20101125091346.GS6017@pengutronix.de>
+	<AANLkTi=L_5ib-Kj0fZRci7-bPOpkyojejZ9+jZpmH9aC@mail.gmail.com>
+	<20101129212446.GB6017@pengutronix.de>
+	<AANLkTik6CScZ5uL2s_qf9q5w6i13mBk_0CLkLZHCKwSm@mail.gmail.com>
+	<20101201111448.GF6017@pengutronix.de>
+	<878w09u3nu.fsf@lechat.rtp-net.org>
+	<20101201154128.GG6017@pengutronix.de>
+	<87wrntrrc2.fsf@lechat.rtp-net.org>
+	<20101202121400.GH6017@pengutronix.de>
+Message-ID: <AANLkTincSeqA79xbKJv5sWFbR7r79zSpbu1CT6H12tyU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 03:19:05PM +0000, Catalin Marinas wrote:
-> On 1 December 2010 00:25, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Nov 30, 2010 at 11:32:04PM +0000, Russell King - ARM Linux wrote:
-> >> Note that I'll go with factoring this out into arch/arm/kernel/smp_scu.c
-> >> for the time being, but I'm not convinced about the other parts yet.
-> >
-> > IOW, something like the attached. ?I've gone a little further and removed
-> > the now unnecessary scu_enable() and scu_get_core_count() global functions,
-> > making scu_enable() static, and eliminating scu_get_core_count() entirely.
-> 
-> There is some benefit in leaving get_core_count() in the platform
-> code. For example, the SCU on Cortex-A15 doesn't expose the core count
-> register and we have to get it from somewhere else (for now from some
-> L2 cache controller register but in the future it may be hardcoded,
-> passed via FDT or simply trying to boot maxcpus).
+On Thu, Dec 2, 2010 at 10:14 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+...
+>> what about to2 ?
+>
+> Someone from Freescale (I think it was Yong) said to me 'if you find a
+> board with an i.MX51 older than to3 outside of Freescale, just throw it
+> away'. I don't know which SDMA code we have to use for to2.
 
-I notice that there's no way to tell what revision of SCU is implemented
-on _any_ mpcore platform.
+MX51TO2 and MX51TO3 use the same SDMA firmware.
 
-In light of that, I think there's no point what so ever trying to
-consolidate this code - even the control register bits vary in
-unpredictable ways between different MPcore implementations.
+Regards,
 
-So we can't say "this is a SCU X and this is its register layout."
-
-And really, having it undetectable except via DT (which from what I
-can see, isn't happening any time soon) or via a command line argument
-isn't acceptable.
-
-So I think the idea of consolidating the SCU code is a lost cause.
+Fabio Estevam
