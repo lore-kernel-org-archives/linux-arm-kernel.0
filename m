@@ -1,47 +1,38 @@
-From: davidsin@ti.com (David Sin)
-Date: Thu, 2 Dec 2010 07:46:57 -0600
-Subject: [RFC v2 8/8] TILER-DMM: Linking TILER driver into the Linux
-	kernel build
-In-Reply-To: <20101201005647.GC29171@kroah.com>
-References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
-	<1291147139-23472-9-git-send-email-davidsin@ti.com>
-	<20101201005647.GC29171@kroah.com>
-Message-ID: <20101202134656.GC22875@lba0869738>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 2 Dec 2010 14:36:58 +0100
+Subject: [PATCH] mmci: drop superfluous regulator #ifdef
+Message-ID: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 04:56:47PM -0800, Greg KH wrote:
-> On Tue, Nov 30, 2010 at 01:58:59PM -0600, David Sin wrote:
-> > From: Lajos Molnar <molnar@ti.com>
-> > 
-> > This patch links the TILER driver into the Linux kernel build
-> > and config system.
-> > 
-> > Signed-off-by: Lajos Molnar <molnar@ti.com>
-> > Signed-off-by: David Sin <davidsin@ti.com>
-> > ---
-> >  drivers/misc/Kconfig  |    5 +++++
-> >  drivers/misc/Makefile |    1 +
-> >  2 files changed, 6 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-> > index ac6d6ac..fff7927 100644
-> > --- a/drivers/misc/Kconfig
-> > +++ b/drivers/misc/Kconfig
-> > @@ -378,4 +378,9 @@ source "drivers/misc/eeprom/Kconfig"
-> >  source "drivers/misc/cb710/Kconfig"
-> >  source "drivers/misc/iwmc3200top/Kconfig"
-> >  
-> > +#
-> > +# TI TILER driver support
-> > +#
-> 
-> Comments not needed.
-> 
-> thanks,
-> 
-> greg k-h
-thanks, Greg, for the comments.  I will make all of these changes 
-in the next revision.
+The regulator and MMC frameworks provide the proper stub functions
+for the regulator functions anyway, get rid of this.
+
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 3709ab3..7567872 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -844,7 +844,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 		mmc->f_max = min(host->mclk, fmax);
+ 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+ 
+-#ifdef CONFIG_REGULATOR
+ 	/* If we're using the regulator framework, try to fetch a regulator */
+ 	host->vcc = regulator_get(&dev->dev, "vmmc");
+ 	if (IS_ERR(host->vcc))
+@@ -863,7 +862,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 				 "(using regulator instead)\n");
+ 		}
+ 	}
+-#endif
++
+ 	/* Fall back to platform data if no regulator is found */
+ 	if (host->vcc == NULL)
+ 		mmc->ocr_avail = plat->ocr_mask;
 -- 
-David Sin
+1.7.3.2
