@@ -1,45 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Dec 2010 17:38:24 +0000
-Subject: [PATCH 1/8] ARM: SCU: Add common routines for secondary CPU bootup
-In-Reply-To: <1291307320.11271.51.camel@e102109-lin.cambridge.arm.com>
-References: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
-	<20101130171658.GA24034@oksana.dev.rtsoft.ru>
-	<20101130233204.GB14383@n2100.arm.linux.org.uk>
-	<20101201002527.GC14383@n2100.arm.linux.org.uk>
-	<AANLkTikpjq-8BVanF5W76j0ZdDBur8DyHWSH8GGgJBQs@mail.gmail.com>
-	<20101202152428.GD10461@n2100.arm.linux.org.uk>
-	<1291307320.11271.51.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20101202173824.GE10461@n2100.arm.linux.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 02 Dec 2010 18:39:50 +0100
+Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
+In-Reply-To: <20101202171538.GB30933@pulham.picochip.com>
+References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
+	<20101202171538.GB30933@pulham.picochip.com>
+Message-ID: <4CF7D9E6.5000409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 04:28:40PM +0000, Catalin Marinas wrote:
-> The SCU is part of the core TRM, so I don't expect it to be the same
-> across various MP cores (and A15 is an example).
+
+Hi Jamie,
+
+On 12/02/2010 06:15 PM, Jamie Iles wrote:
+> Hi Sylwester,
 > 
-> You may want to consolidate functions like scu_prepare_cpus (maybe call
-> it smp_prepare_cpus)
+> On Thu, Dec 02, 2010 at 05:37:41PM +0100, Sylwester Nawrocki wrote:
+>> diff --git a/arch/arm/plat-s5p/dev-csis0.c b/arch/arm/plat-s5p/dev-csis0.c
+>> new file mode 100644
+>> index 0000000..2b1ba43
+>> --- /dev/null
+>> +++ b/arch/arm/plat-s5p/dev-csis0.c
+>> @@ -0,0 +1,34 @@
+>> +/*
+>> + * Copyright (C) 2010 Samsung Electronics
+>> + *
+>> + * S5P series device definition for MIPI-CSI device 0
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/platform_device.h>
+>> +#include <mach/map.h>
+>> +
+>> +static struct resource s5p_csis_resource[] = {
+>> +	[0] = {
+>> +		.start = S5P_PA_CSIS0,
+>> +		.end   = S5P_PA_CSIS0 + SZ_4K - 1,
+>> +		.flags = IORESOURCE_MEM,
+>> +	},
+>> +	[1] = {
+>> +		.start = IRQ_MIPICSI0,
+>> +		.end   = IRQ_MIPICSI0,
+>> +		.flags = IORESOURCE_IRQ,
+>> +	}
+>> +};
+> Do you really need the [0] and [1] here? These are only needed if you are 
+> sparsely initialising an array.
 
-You do realise the function called from architecture independent code is
-called 'smp_prepare_cpus' ?
+I agree explicit indices are not really needed. I just followed the style of
+all other resource definitions already there.
+I am not quite sure what is the preference of the maintainer, I guess they want
+all devices to follow same style for consistence.
 
-> and something that calls set_cpu_possible() but
-> with platform callbacks for getting the number of calls and initialising
-> the SMP (SCU for most platforms).
+Thanks,
+Sylwester
 
-What if a platform, for what ever reason, wants to have 3 CPUs,
-numbered 0, 2, 3 ?  That's the reason why the code which sets the
-possible and present maps isn't in the ARM core code - Eg, we don't
-know if a platform wants to keep CPU 1 in AMP mode to run some
-special software on it.
-
-> Whether this is worth, I don't know.
-
-I don't think it's worth it because I think trying to considate this
-is going to cripple the code structure in the future.
-
-What we currently have is a nice sane separation of the core SMP
-support from the platform specific parts of the SMP support.
-
-BTW, is it worth making sure that the IC and SCU standby mode bits
-are set for A9 MPCore ?
+-- 
+Sylwester Nawrocki
+Linux Platform Group
+Samsung Poland R&D Center
