@@ -1,40 +1,28 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Fri, 3 Dec 2010 01:34:54 +0530
-Subject: [PATCH v5 09/14] OMAP: DMA: Convert DMA library into platform
-	driver
-In-Reply-To: <20101202184925.GT17222@atomide.com>
-References: <1290603110-14119-1-git-send-email-manjugk@ti.com>
-	<1290603110-14119-10-git-send-email-manjugk@ti.com>
-	<20101202184419.GR17222@atomide.com>
-	<20101202184617.GS17222@atomide.com>
-	<20101202184925.GT17222@atomide.com>
-Message-ID: <20101202200454.GA27696@manju-desktop>
+From: yauhen.kharuzhy@promwad.com (Yauhen Kharuzhy)
+Date: Thu, 2 Dec 2010 22:06:19 +0200
+Subject: [PATCH v2] ARM: S3C2416: Add platform helpers for setup SDHCI
+In-Reply-To: <1291197462-3062-1-git-send-email-yauhen.kharuzhy@promwad.com>
+References: <001d01cb9061$64a8e990$2dfabcb0$%kim@samsung.com>
+	<1291197462-3062-1-git-send-email-yauhen.kharuzhy@promwad.com>
+Message-ID: <AANLkTi==Ai+JbxTU+mvvRCH2y9nSXRZDOwx2D0LxKP1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 10:49:25AM -0800, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [101202 10:36]:
-> > * Tony Lindgren <tony@atomide.com> [101202 10:34]:
-> > > 
-> > > This fails on omap1 as d is not allocated. Please merge the
-> > > following fix.
-> > 
-> > And another fix here:
-> 
-> One more fix below.
+2010/12/1 Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>:
+> Samsung S3C2416 has two SDHCI controllers compatible with other
+> Samsung's SoCs (S3C64XX, S5PC100 etc...).
+>
+> Add required platform setup code that the devices can be used with
+> sdhci-s3c driver.
+>
+> Signed-off-by: Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
 
-Thanks. I will merge these fixes.
+ping?
 
-> 
-> Note that even with these three fixes, 5912OSK still fails to
-> boot to init. Maybe something wrong with the framebuffer DMA?
 
-Not sure. I don't have omap1 board for testing. Patch series is only 
-build tested for omap1.
+-- 
+Best regards,
+? ? Yauhen Kharuzhy? ?? jekhor_(at)_gmail.com
 
-Can you pls confirm if OSK5912 boots successfully without this patch
-series?
-
-If yes, I will cross verify omap1 changes again.
-
--Manjunath
+A: No
+Q: Should I quote below my post?
