@@ -1,30 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Dec 2010 15:19:05 +0000
-Subject: [PATCH 1/8] ARM: SCU: Add common routines for secondary CPU bootup
-In-Reply-To: <20101201002527.GC14383@n2100.arm.linux.org.uk>
-References: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
-	<20101130171658.GA24034@oksana.dev.rtsoft.ru>
-	<20101130233204.GB14383@n2100.arm.linux.org.uk>
-	<20101201002527.GC14383@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikpjq-8BVanF5W76j0ZdDBur8DyHWSH8GGgJBQs@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 2 Dec 2010 16:20:16 +0100 (CET)
+Subject: [PATCH 06/15] ARM: mxs: Add timer support
+In-Reply-To: <AANLkTi=V9he4nWQ773sQ17P+AnXqN9RVHA=nhmUc4X=s@mail.gmail.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1290754154-9428-7-git-send-email-shawn.guo@freescale.com>
+	<20101130161359.GQ20449@pengutronix.de>
+	<AANLkTi=V9he4nWQ773sQ17P+AnXqN9RVHA=nhmUc4X=s@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1012021614510.2653@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2010 00:25, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Nov 30, 2010 at 11:32:04PM +0000, Russell King - ARM Linux wrote:
->> Note that I'll go with factoring this out into arch/arm/kernel/smp_scu.c
->> for the time being, but I'm not convinced about the other parts yet.
->
-> IOW, something like the attached. ?I've gone a little further and removed
-> the now unnecessary scu_enable() and scu_get_core_count() global functions,
-> making scu_enable() static, and eliminating scu_get_core_count() entirely.
+On Thu, 2 Dec 2010, Shawn Guo wrote:
 
-There is some benefit in leaving get_core_count() in the platform
-code. For example, the SCU on Cortex-A15 doesn't expose the core count
-register and we have to get it from somewhere else (for now from some
-L2 cache controller register but in the future it may be hardcoded,
-passed via FDT or simply trying to boot maxcpus).
+> Hi Uwe,
+> 
+> 2010/12/1 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > Hello Shawn,
+> >
+> [...]
+> >> +
+> >> + ? ? /* Disable interrupt in timer module */
+> >> + ? ? timrot_irq_disable();
+> >> +
+> >> + ? ? if (mode != clockevent_mode) {
+> >> + ? ? ? ? ? ? /* Set event time into far-far future */
+> >> + ? ? ? ? ? ? __raw_writel(__raw_readl(timer_base +
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? HW_TIMROT_RUNNING_COUNTn(0)) + 3,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? timer_base + HW_TIMROT_MATCH_COUNTn(0));
+> > I don't know if this is needed, maybe there cannot be a pending event
+> > when set_mode is called? ?Thomas?
+> >
+> Freescale BSP works well without this.  It's probably not needed.
 
--- 
-Catalin
+There is no guarantee, that there is no event pending. Especially not
+when we shutdown the timer. And the observation that the Fleescale
+stuff did not explode yet does not prove anything.
+ 
+> > I wonder if a shift of 10 is a bit heavy for a 16 bit timer.
+> >
+> I do not understand that.  The shift is used in clocksource_hz2mult() as below.
+> 
+> static inline u32 clocksource_hz2mult(u32 hz, u32 shift_constant)
+
+Use clocksource_register_hz() or clocksource_register_khz() and let
+the clocksource code decide the shift and mult value.
+
+Thanks,
+
+	tglx
