@@ -1,61 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Dec 2010 14:32:08 -0800
-Subject: Mainline OMAP3 breakage (and other OMAP?)
-In-Reply-To: <20101202221612.GJ10461@n2100.arm.linux.org.uk>
-References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
-	<20101202215837.GW17222@atomide.com>
-	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
-Message-ID: <20101202223208.GA17222@atomide.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 2 Dec 2010 23:14:57 +0000
+Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
+In-Reply-To: <4CF7D9E6.5000409@samsung.com>
+References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
+	<20101202171538.GB30933@pulham.picochip.com>
+	<4CF7D9E6.5000409@samsung.com>
+Message-ID: <20101202231457.GA12385@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 14:06]:
-> On Thu, Dec 02, 2010 at 01:58:38PM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 13:04]:
-> > > This has been around since October:
-> > > 
-> > > drivers/video/omap2/vram.c: In function ?omap_vram_reserve_sdram_memblock?:
-> > > drivers/video/omap2/vram.c:573: error: ?MEMBLOCK_REAL_LIMIT? undeclared (first use in this function)
-> > > drivers/video/omap2/vram.c:573: error: (Each undeclared identifier is reported only once
-> > > drivers/video/omap2/vram.c:573: error: for each function it appears in.)
-> > > 
-> > > This requires a trivial one-liner compile fix:
-> > > 
-> > > diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
-> > > index fed2a72..a8973f0 100644
-> > > --- a/drivers/video/omap2/vram.c
-> > > +++ b/drivers/video/omap2/vram.c
-> > > @@ -570,7 +570,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
-> > >  			return;
-> > >  		}
-> > >  	} else {
-> > > -		paddr = memblock_alloc_base(size, PAGE_SIZE, MEMBLOCK_REAL_LIMIT);
-> > > +		paddr = memblock_alloc(size, PAGE_SIZE);
-> > >  	}
-> > >  
-> > >  	omap_vram_add_region(paddr, size);
-> > > 
-> > > which restores the old behaviour before the X86 memblock changes went
-> > > in.  Yes, there may be other changes due to the ioremap stuff, but
-> > > that's really no excuse for not fixing the compile error itself.
-> > 
-> > Great. Adding fbdev and Tomi to Cc.
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
+On Thu, Dec 02, 2010 at 06:39:50PM +0100, Sylwester Nawrocki wrote:
+> On 12/02/2010 06:15 PM, Jamie Iles wrote:
+> > On Thu, Dec 02, 2010 at 05:37:41PM +0100, Sylwester Nawrocki wrote:
+[...]
+> >> +static struct resource s5p_csis_resource[] = {
+> >> +	[0] = {
+> >> +		.start = S5P_PA_CSIS0,
+> >> +		.end   = S5P_PA_CSIS0 + SZ_4K - 1,
+> >> +		.flags = IORESOURCE_MEM,
+> >> +	},
+> >> +	[1] = {
+> >> +		.start = IRQ_MIPICSI0,
+> >> +		.end   = IRQ_MIPICSI0,
+> >> +		.flags = IORESOURCE_IRQ,
+> >> +	}
+> >> +};
+> > Do you really need the [0] and [1] here? These are only needed if you are 
+> > sparsely initialising an array.
 > 
-> http://marc.info/?l=linux-omap&w=2&r=1&s=MEMBLOCK_REAL_LIMIT%20vram&q=b
-> 
-> There have been patches posted throughout November to fix this, but
-> the problem is they're not making it to mainline.  It needs chasing
-> until someone does the right thing and sends one variant of the above
-> patch, rather than just leaving it until the ioremap fixes hit
-> mainline during the next merge window.
+> I agree explicit indices are not really needed. I just followed the style of
+> all other resource definitions already there.
+> I am not quite sure what is the preference of the maintainer, I guess they want
+> all devices to follow same style for consistence.
+Ok, that's fair enough, it just looked a bit odd to me!
 
-Yes this should go in during the -rc for sure.
-
-I suggest you merge this but let's wait a bit and check if Tomi
-already has a similar fix queued for the -rc series.
-
-Regards,
-
-Tony
+Jamie
