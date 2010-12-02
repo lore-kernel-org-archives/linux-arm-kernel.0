@@ -1,28 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Dec 2010 12:28:27 +0000
-Subject: [PATCH] mmci: supply per-instance regulator name
-In-Reply-To: <20101202120318.GB3182@sirena.org.uk>
-References: <1291289707-5529-1-git-send-email-linus.walleij@stericsson.com>
-	<20101202120318.GB3182@sirena.org.uk>
-Message-ID: <20101202122827.GG29347@n2100.arm.linux.org.uk>
+Date: Thu, 2 Dec 2010 12:32:02 +0000
+Subject: [PATCHv5 3/4] omap: iovmm - replace __iounmap with omap_iounmap
+In-Reply-To: <1288033806-1496-4-git-send-email-x0095840@ti.com>
+References: <1288033806-1496-1-git-send-email-x0095840@ti.com>
+	<1288033806-1496-2-git-send-email-x0095840@ti.com>
+	<1288033806-1496-3-git-send-email-x0095840@ti.com>
+	<1288033806-1496-4-git-send-email-x0095840@ti.com>
+Message-ID: <20101202123202.GA10461@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 12:03:18PM +0000, Mark Brown wrote:
-> On Thu, Dec 02, 2010 at 12:35:07PM +0100, Linus Walleij wrote:
-> > On the Ux500 we have different regulators to different card slots
-> > and eMMCs, and some have no regulator. Move the hardcoded "vmmc"
-> > regulator name to platform data and supply it that way for the
+On Mon, Oct 25, 2010 at 02:10:05PM -0500, Fernando Guzman Lugo wrote:
+> Omap platform is omap_iounmap function.
 > 
-> You should never be passing regulator names through platform data, this
-> appears to be broken.  You should be using the struct device to
-> distingish between multiple instances and using whatever the actual
-> supply names are for multiple supplies on the same device.
+> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+> ---
+>  arch/arm/plat-omap/iovmm.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Looking at this without seeing the datasheet I'd expect these would end
-> up as vmmcn for suitable values of n.
+> diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
+> index 93a34d9..5489ca9 100644
+> --- a/arch/arm/plat-omap/iovmm.c
+> +++ b/arch/arm/plat-omap/iovmm.c
+> @@ -821,7 +821,7 @@ void iommu_kunmap(struct iommu *obj, u32 da)
+>  	struct sg_table *sgt;
+>  	typedef void (*func_t)(const void *);
+>  
+> -	sgt = unmap_vm_area(obj, da, (func_t)__iounmap,
+> +	sgt = unmap_vm_area(obj, da, (func_t)omap_iounmap,
+>  			    IOVMF_LINEAR | IOVMF_MMIO);
+>  	if (!sgt)
+>  		dev_dbg(obj->dev, "%s: No sgt\n", __func__);
 
-The way the MMCI code is, it only requests one regulator per AMBA
-device, and therefore only one regulator per struct device.  So I
-don't think the current code needs changing in any way provided the
-struct device is used to find the corresponding regulator.
+Err, this is wrong.  Why are you breaking the layer separation and going
+for the implementation detail of iounmap()?
+
+plat/io.h:
+#define __arch_ioremap(p,s,t)   omap_ioremap(p,s,t)
+#define __arch_iounmap(v)       omap_iounmap(v)
+
+void __iomem *omap_ioremap(unsigned long phys, size_t size, unsigned int type);
+void omap_iounmap(volatile void __iomem *addr);
+
+asm/io.h:
+#define ioremap(cookie,size)            __arch_ioremap((cookie), (size), MT_DEVICE)
+#define iounmap(cookie)                 __arch_iounmap(cookie)
