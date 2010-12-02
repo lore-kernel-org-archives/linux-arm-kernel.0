@@ -1,51 +1,30 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 2 Dec 2010 16:12:53 +0100
-Subject: OMAP2+: PM/serial: hold console semaphore while OMAP UARTs are
-	disabled
-In-Reply-To: <alpine.DEB.2.00.1012020022390.2515@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1011241646310.20215@utopia.booyaka.com>
-	<AANLkTina+O1GgMgS0qDKix=d4HOtT1fFrCotTuCCxACv@mail.gmail.com>
-	<alpine.DEB.2.00.1011251017390.20215@utopia.booyaka.com>
-	<AANLkTik5cRQPodAYtacTD5EdQYnDbvGgOoNfNfHuW+fq@mail.gmail.com>
-	<alpine.DEB.2.00.1012020022390.2515@utopia.booyaka.com>
-Message-ID: <AANLkTi=hiwspQ4hM0Ok+MHjn5iHme4XRTKZPGa0Z2=Xy@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 Dec 2010 15:19:05 +0000
+Subject: [PATCH 1/8] ARM: SCU: Add common routines for secondary CPU bootup
+In-Reply-To: <20101201002527.GC14383@n2100.arm.linux.org.uk>
+References: <20101130171626.GA6165@oksana.dev.rtsoft.ru>
+	<20101130171658.GA24034@oksana.dev.rtsoft.ru>
+	<20101130233204.GB14383@n2100.arm.linux.org.uk>
+	<20101201002527.GC14383@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikpjq-8BVanF5W76j0ZdDBur8DyHWSH8GGgJBQs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Paul,
+On 1 December 2010 00:25, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Nov 30, 2010 at 11:32:04PM +0000, Russell King - ARM Linux wrote:
+>> Note that I'll go with factoring this out into arch/arm/kernel/smp_scu.c
+>> for the time being, but I'm not convinced about the other parts yet.
+>
+> IOW, something like the attached. ?I've gone a little further and removed
+> the now unnecessary scu_enable() and scu_get_core_count() global functions,
+> making scu_enable() static, and eliminating scu_get_core_count() entirely.
 
-On Thu, Dec 2, 2010 at 8:23 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hello Jean
->
-> On Thu, 25 Nov 2010, Jean Pihet wrote:
->
->> On Thu, Nov 25, 2010 at 6:35 PM, Paul Walmsley <paul@pwsan.com> wrote:
->> > On Thu, 25 Nov 2010, Jean Pihet wrote:
->> >> On Thu, Nov 25, 2010 at 12:49 AM, Paul Walmsley <paul@pwsan.com> wrote:
->> >> >
->> >> > The console semaphore must be held while the OMAP UART devices are
->> >> > disabled, lest a console write cause an ARM abort (and a kernel crash)
->> >> > when the underlying console device is inaccessible. ?These crashes
->> >> > only occur when the console is on one of the OMAP internal serial
->> >> > ports.
->> >> This does not fix the issue for me on Beagle (console on ttyO2).
->> >>
->> >> Doing:
->> >> ? / # echo 5 > /sys/devices/platform/omap/omap-hsuart.0/sleep_timeout
->> >> ? / # echo 5 > /sys/devices/platform/omap/omap-hsuart.1/sleep_timeout
->> >> ? / # echo 5 > /sys/devices/platform/omap/omap-hsuart.2/sleep_timeout
->> >> and waiting 5 seconds hangs the console.
->> >
->> > By the way, you write that the above situation "hangs the console." ?Is it
->> > just the case that the console dies and the rest of the system is still
->> > alive, or does the whole system crash?
->> The console hangs, the rest of the system still runs.
->
-> Just out of curiosity, if you send a few breaks to the OMAP over serial,
-> does that cause the console to pay attention again? ?CTRL-A F in minicom.
-Yes it helps. In most cases sending 2-3 breaks resumes the UART console.
+There is some benefit in leaving get_core_count() in the platform
+code. For example, the SCU on Cortex-A15 doesn't expose the core count
+register and we have to get it from somewhere else (for now from some
+L2 cache controller register but in the future it may be hardcoded,
+passed via FDT or simply trying to boot maxcpus).
 
->
-> - Paul
-
-Jean
+-- 
+Catalin
