@@ -1,20 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Dec 2010 14:02:57 +0000
-Subject: [PATCH] mmci: drop superfluous regulator #ifdef
-In-Reply-To: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
-References: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20101202140257.GD3182@sirena.org.uk>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 2 Dec 2010 19:48:07 +0530
+Subject: [PATCH v8 00/11] OMAP: GPIO: Implement GPIO as platform device
+In-Reply-To: <87zkso4hu3.fsf@deeprootsystems.com>
+References: <1290689318-10191-1-git-send-email-charu@ti.com>
+	<20101201183357.GI17222@atomide.com>
+	<87zkso4hu3.fsf@deeprootsystems.com>
+Message-ID: <AANLkTinY8FKbVvXD29KpgGnsnKwQziXws+zKLZWn69Hj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 02:36:58PM +0100, Linus Walleij wrote:
-> The regulator and MMC frameworks provide the proper stub functions
-> for the regulator functions anyway, get rid of this.
+On Thu, Dec 2, 2010 at 15:28, Kevin Hilman <khilman@deeprootsystems.com> wrote:
+> Tony Lindgren <tony@atomide.com> writes:
+>
+>> * Varadarajan, Charulatha <charu@ti.com> [101125 04:39]:
+>>> Implement OMAP GPIO module in platform device model. OMAP2+ specific GPIO
+>>> module uses hwmod FW.
+>>>
+>>> Tested on OMAP2430, OMAP4430, OMAP3430 SDP boards, OMAP4430 Blaze board
+>>> and zoom3 board. Verified that this patch series does not break the OMAP1
+>>> build.
+>>
+>> I've boot tested this on N800 + 5912OSK.
+>>
+>> I'll apply these patches into devel-gpio branch and start merging these
+>> into linux-omap master branch and into for-next for the next merge window.
+>>
+>> I've also added one minor fix for 16xx, will post that separately.
 
-It's more that the regulator API stubs have been changed to match what
-MMC is doing (there always were stubs) but that doesn't make any
-material difference.
+Tony, thanks for the patch.
 
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+>
+> Tony, you can also add
+>
+> Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Thanks Kevin.
+
+>
+> for this series, as v8 now looks good for me.
+>
+> Thanks Charu,
+>
+> Kevin
+>
