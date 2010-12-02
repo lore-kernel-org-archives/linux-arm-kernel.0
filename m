@@ -1,78 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Dec 2010 17:48:06 +0100
-Subject: [PATCH 06/15] ARM: mxs: Add timer support
-In-Reply-To: <AANLkTi=V9he4nWQ773sQ17P+AnXqN9RVHA=nhmUc4X=s@mail.gmail.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-7-git-send-email-shawn.guo@freescale.com>
-	<20101130161359.GQ20449@pengutronix.de>
-	<AANLkTi=V9he4nWQ773sQ17P+AnXqN9RVHA=nhmUc4X=s@mail.gmail.com>
-Message-ID: <20101202164806.GT32355@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 2 Dec 2010 17:51:18 +0100
+Subject: [PATCH] mmci: corrected calculation of clock div for ux500
+Message-ID: <1291308678-15497-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn (and Thomas),
+From: Ulf Hansson <ulf.hansson@stericsson.com>
 
-On Thu, Dec 02, 2010 at 10:44:06PM +0800, Shawn Guo wrote:
-> >> +
-> >> +static struct clocksource clocksource_mxs = {
-> >> + ? ? .name ? ? ? ? ? = "mxs_timer",
-> >> + ? ? .rating ? ? ? ? = 200,
-> >> + ? ? .read ? ? ? ? ? = timrot_get_cycles,
-> >> + ? ? .mask ? ? ? ? ? = CLOCKSOURCE_MASK(32),
-> >> + ? ? .shift ? ? ? ? ?= 10,
-> >> + ? ? .flags ? ? ? ? ?= CLOCK_SOURCE_IS_CONTINUOUS,
-> >> +};
-> >> +
-> >> +static int __init mxs_clocksource_init(struct clk *timer_clk)
-> >> +{
-> >> + ? ? unsigned int c = clk_get_rate(timer_clk);
-> >> +
-> >> + ? ? if (timrot_is_v1())
-> >> + ? ? ? ? ? ? clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
-> > I wonder if a shift of 10 is a bit heavy for a 16 bit timer.
-> >
-> I do not understand that.  The shift is used in clocksource_hz2mult() as below.
-> 
-> static inline u32 clocksource_hz2mult(u32 hz, u32 shift_constant)
-> {
->         /*  hz = cyc/(Billion ns)
->          *  mult/2^shift  = ns/cyc
->          *  mult = ns/cyc * 2^shift
->          *  mult = 1Billion/hz * 2^shift
->          *  mult = 1000000000 * 2^shift / hz
->          *  mult = (1000000000<<shift) / hz
->          */
->         u64 tmp = ((u64)1000000000) << shift_constant;
-> 
->         tmp += hz/2; /* round for do_div */
->         do_div(tmp, hz);
-> 
->         return (u32)tmp;
-> }
-> 
-> The shift is working against the timers frequency (hz).  Should hz be
-> the thing concerned here instead of timer bit width?  Since both MX23
-> and MX28 timer are running at 32K, so shift value 10 is picked here.
-Might be, it's some time ago that I dealt with the clock code.  After
-rechecking I think you're right, but now I think 10 is too low :-)
+The Ux500 variant of this block has a different divider.
+The value used right now is too big and which means a loss
+in performance. This fix corrects it.
 
-In general a bigger shift increases accuracy at the cost of the range of
-values that can be converted (from ticks to ns).  As a 16 bit counter
-has a very limited range anyhow you can at least use a high accuracy
-without loosing anything.
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-With shift=10 and tickrate=32k you get mult=0x1e84800, so the maximal
-value that (theoretically) occurs is 0xffff * 0x1e84800 = 0x1e84617b800
-which is far away from using the available 64 bits.  So (unless I'm
-mistaken) the shift value using most of the 64 would be 33 but that
-would overflow mult (which is only 32bit wide).  So I'd recommend 17
-(resulting in mult=0xf4240000) for both the 16 and the 32 bit case.
-
-Thomas, does this make sense?
-
-Best regards
-Uwe
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index cabd386..21fd486 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -57,6 +57,7 @@ static unsigned int fmax = 515633;
+  * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
+  *		using DMA.
+  * @sdio: variant supports SDIO
++ * @st_clkdiv: true if using a ST-specific clock divider algorithm
+  */
+ struct variant_data {
+ 	unsigned int		clkreg;
+@@ -69,6 +70,7 @@ struct variant_data {
+ 	bool			broken_blockend;
+ 	bool			broken_blockend_dma;
+ 	bool			sdio;
++	bool			st_clkdiv;
+ };
+ 
+ static struct variant_data variant_arm = {
+@@ -96,7 +98,9 @@ static struct variant_data variant_ux500 = {
+ 	.datalength_bits	= 24,
+ 	.broken_blockend	= true,
+ 	.sdio			= true,
++	.st_clkdiv		= true,
+ };
++
+ /*
+  * This must be called with host->lock held
+  */
+@@ -109,6 +113,11 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 		if (desired >= host->mclk) {
+ 			clk = MCI_CLK_BYPASS;
+ 			host->cclk = host->mclk;
++		} else if (variant->st_clkdiv) {
++			clk = ((host->mclk + desired - 1) / desired) - 2;
++			if (clk >= 256)
++				clk = 255;
++			host->cclk = host->mclk / (clk + 2);
+ 		} else {
+ 			clk = host->mclk / (2 * desired) - 1;
+ 			if (clk >= 256)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.3.2
