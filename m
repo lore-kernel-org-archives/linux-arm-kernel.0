@@ -1,170 +1,82 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Thu, 2 Dec 2010 16:20:42 +0100
-Subject: [PATCH v2] ARM: ux500: prcmu db8500 v2 support
-Message-ID: <1291303242-27000-1-git-send-email-mattias.wallin@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Dec 2010 15:20:53 +0000
+Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
+In-Reply-To: <AANLkTi=iRUD3_dcY47tebHGbxxAOcY61_2MtSVfO8zQB@mail.gmail.com>
+References: <AANLkTind+DH5emar2L9EiV-pqpCvQHQGnFevh9Bncrpz@mail.gmail.com>
+	<20101202123304.GB10461@n2100.arm.linux.org.uk>
+	<AANLkTi=iRUD3_dcY47tebHGbxxAOcY61_2MtSVfO8zQB@mail.gmail.com>
+Message-ID: <20101202152053.GC10461@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for db8500 chip version 2.
-The TCDM memory address of the PRCMU is changed and
-dynamic detection of that is added.
+On Thu, Dec 02, 2010 at 08:50:07AM -0600, Guzman Lugo, Fernando wrote:
+> On Thu, Dec 2, 2010 at 6:33 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Dec 02, 2010 at 06:07:23AM -0600, Kanigeri, Hari wrote:
+> >> Hi Tony,
+> >>
+> >> The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
+> >> ? Linus Torvalds (1):
+> >> ? ? ? ? Linux 2.6.37-rc4
+> >>
+> >> are available in the git repository at:
+> >>
+> >> ? git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
+> >>
+> >> Fernando Guzman Lugo (5):
+> >> ? ? ? OMAP: mailbox: change full flag per mailbox queue instead of global
+> >> ? ? ? omap: iovmm - no gap checking for fixed address
+> >> ? ? ? omap: iovmm - add superpages support to fixed da address
+> >> ? ? ? omap: iovmm - replace __iounmap with omap_iounmap
+> >
+> > This change is wrong. ?Nothing should be directly referencing omap_iounmap
+> > nor for that matter omap_ioremap. ?Both are implementation details of the
+> > standard ioremap/iounmap APIs.
+> >
+> > Use the official APIs rather than the implementation details behind them.
+> 
+> if you see where the function is used, you will see that it is not
+> calling the function, it is use as a parameter in unmap_vm_area(), if
+> I used iounmap which is a macro there I will get a compilation error.
 
-Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
----
-v2 of this patch allows the prcmu to be used on HW version early drop (ed).
----
- arch/arm/mach-ux500/cpu-db8500.c               |   18 +++++++++++-----
- arch/arm/mach-ux500/cpu.c                      |    2 +
- arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +-
- arch/arm/mach-ux500/include/mach/prcmu.h       |    1 +
- arch/arm/mach-ux500/prcmu.c                    |   25 +++++++++++++++++++----
- 5 files changed, 37 insertions(+), 12 deletions(-)
+Hmm, yes, because iounmap() is defined as a macro rather than iounmap.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 5966f35..b78970c 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -40,7 +40,6 @@ static struct platform_device *platform_devs[] __initdata = {
- /* minimum static i/o mapping required to boot U8500 platforms */
- static struct map_desc u8500_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U8500_PRCMU_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_PRCMU_TCDM_BASE, SZ_4K),
- 	__IO_DEV_DESC(U8500_GPIO0_BASE, SZ_4K),
- 	__IO_DEV_DESC(U8500_GPIO1_BASE, SZ_4K),
- 	__IO_DEV_DESC(U8500_GPIO2_BASE, SZ_4K),
-@@ -48,13 +47,18 @@ static struct map_desc u8500_io_desc[] __initdata = {
- 	__MEM_DEV_DESC(U8500_BOOT_ROM_BASE, SZ_1M),
- };
- 
--static struct map_desc u8500ed_io_desc[] __initdata = {
-+static struct map_desc u8500_ed_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U8500_MTU0_BASE_ED, SZ_4K),
- 	__IO_DEV_DESC(U8500_CLKRST7_BASE_ED, SZ_8K),
- };
- 
--static struct map_desc u8500v1_io_desc[] __initdata = {
-+static struct map_desc u8500_v1_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U8500_MTU0_BASE, SZ_4K),
-+	__IO_DEV_DESC(U8500_PRCMU_TCDM_BASE_V1, SZ_4K),
-+};
-+
-+static struct map_desc u8500_v2_io_desc[] __initdata = {
-+	__IO_DEV_DESC(U8500_PRCMU_TCDM_BASE, SZ_4K),
- };
+The solution to this is to fix iounmap and __arch_iounmap macros so
+they aren't macros which take arguments.  That will then allow them
+to be used in the way you desire.
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 815efa2..91be1f8 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -245,13 +245,13 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define ioremap_nocache(cookie,size)	__arm_ioremap(cookie, size, MT_DEVICE)
+ #define ioremap_cached(cookie,size)	__arm_ioremap(cookie, size, MT_DEVICE_CACHED)
+ #define ioremap_wc(cookie,size)		__arm_ioremap(cookie, size, MT_DEVICE_WC)
+-#define iounmap(cookie)			__iounmap(cookie)
++#define iounmap				__iounmap
+ #else
+ #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
+ #define ioremap_nocache(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE)
+ #define ioremap_cached(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
+ #define ioremap_wc(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE_WC)
+-#define iounmap(cookie)			__arch_iounmap(cookie)
++#define iounmap				__arch_iounmap
+ #endif
  
  /*
-@@ -127,9 +131,11 @@ void __init u8500_map_io(void)
- 	iotable_init(u8500_io_desc, ARRAY_SIZE(u8500_io_desc));
+diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
+index 128b549..204865f 100644
+--- a/arch/arm/plat-omap/include/plat/io.h
++++ b/arch/arm/plat-omap/include/plat/io.h
+@@ -294,8 +294,8 @@ static inline void omap44xx_map_common_io(void)
+ extern void omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
+ 				 struct omap_sdrc_params *sdrc_cs1);
  
- 	if (cpu_is_u8500ed())
--		iotable_init(u8500ed_io_desc, ARRAY_SIZE(u8500ed_io_desc));
--	else
--		iotable_init(u8500v1_io_desc, ARRAY_SIZE(u8500v1_io_desc));
-+		iotable_init(u8500_ed_io_desc, ARRAY_SIZE(u8500_ed_io_desc));
-+	else if (cpu_is_u8500v1())
-+		iotable_init(u8500_v1_io_desc, ARRAY_SIZE(u8500_v1_io_desc));
-+	else if (cpu_is_u8500v2())
-+		iotable_init(u8500_v2_io_desc, ARRAY_SIZE(u8500_v2_io_desc));
+-#define __arch_ioremap(p,s,t)	omap_ioremap(p,s,t)
+-#define __arch_iounmap(v)	omap_iounmap(v)
++#define __arch_ioremap	omap_ioremap
++#define __arch_iounmap	omap_iounmap
  
- 	/* Read out the ASIC ID as early as we can */
- 	get_db8500_asic_id();
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 0db48cc..f316484 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -19,6 +19,7 @@
- #include <mach/hardware.h>
- #include <mach/setup.h>
- #include <mach/devices.h>
-+#include <mach/prcmu.h>
- 
- #include "clock.h"
- 
-@@ -58,6 +59,7 @@ void __init ux500_init_irq(void)
- 	 * Init clocks here so that they are available for system timer
- 	 * initialization.
- 	 */
-+	prcmu_early_init();
- 	clk_init();
- }
- 
-diff --git a/arch/arm/mach-ux500/include/mach/db8500-regs.h b/arch/arm/mach-ux500/include/mach/db8500-regs.h
-index f07d098..0fefb34 100644
---- a/arch/arm/mach-ux500/include/mach/db8500-regs.h
-+++ b/arch/arm/mach-ux500/include/mach/db8500-regs.h
-@@ -92,7 +92,8 @@
- #define U8500_SCR_BASE		(U8500_PER4_BASE + 0x05000)
- #define U8500_DMC_BASE		(U8500_PER4_BASE + 0x06000)
- #define U8500_PRCMU_BASE	(U8500_PER4_BASE + 0x07000)
--#define U8500_PRCMU_TCDM_BASE	(U8500_PER4_BASE + 0x0f000)
-+#define U8500_PRCMU_TCDM_BASE_V1 (U8500_PER4_BASE + 0x0f000)
-+#define U8500_PRCMU_TCDM_BASE   (U8500_PER4_BASE + 0x68000)
- 
- /* per3 base addresses */
- #define U8500_FSMC_BASE		(U8500_PER3_BASE + 0x0000)
-diff --git a/arch/arm/mach-ux500/include/mach/prcmu.h b/arch/arm/mach-ux500/include/mach/prcmu.h
-index 549843f..daa9d3a 100644
---- a/arch/arm/mach-ux500/include/mach/prcmu.h
-+++ b/arch/arm/mach-ux500/include/mach/prcmu.h
-@@ -9,6 +9,7 @@
- #ifndef __MACH_PRCMU_H
- #define __MACH_PRCMU_H
- 
-+void __init prcmu_early_init(void);
- int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
- int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
- 
-diff --git a/arch/arm/mach-ux500/prcmu.c b/arch/arm/mach-ux500/prcmu.c
-index 293274d..3ba3e32 100644
---- a/arch/arm/mach-ux500/prcmu.c
-+++ b/arch/arm/mach-ux500/prcmu.c
-@@ -20,10 +20,11 @@
- #include <mach/hardware.h>
- #include <mach/prcmu-regs.h>
- 
--#define PRCMU_TCDM_BASE __io_address(U8500_PRCMU_TCDM_BASE)
-+/* Global var to runtime determine TCDM base for v2 or v1 */
-+static __iomem void *tcdm_base;
- 
--#define REQ_MB5 (PRCMU_TCDM_BASE + 0xE44)
--#define ACK_MB5 (PRCMU_TCDM_BASE + 0xDF4)
-+#define REQ_MB5 (tcdm_base + 0xE44)
-+#define ACK_MB5 (tcdm_base + 0xDF4)
- 
- #define REQ_MB5_I2C_SLAVE_OP (REQ_MB5)
- #define REQ_MB5_I2C_HW_BITS (REQ_MB5 + 1)
-@@ -33,8 +34,10 @@
- #define ACK_MB5_I2C_STATUS (ACK_MB5 + 1)
- #define ACK_MB5_I2C_VAL (ACK_MB5 + 3)
- 
--#define I2C_WRITE(slave) ((slave) << 1)
--#define I2C_READ(slave) (((slave) << 1) | BIT(0))
-+#define I2C_WRITE(slave) \
-+	(((slave) << 1) | (cpu_is_u8500v2() ? BIT(6) : 0))
-+#define I2C_READ(slave) \
-+	(((slave) << 1) | (cpu_is_u8500v2() ? BIT(6) : 0) | BIT(0))
- #define I2C_STOP_EN BIT(3)
- 
- enum ack_mb5_status {
-@@ -217,6 +220,18 @@ static irqreturn_t prcmu_irq_handler(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
-+void __init prcmu_early_init(void)
-+{
-+	if (cpu_is_u8500v11() || cpu_is_u8500ed()) {
-+		tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE_V1);
-+	} else if (cpu_is_u8500v2()) {
-+		tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
-+	} else {
-+		pr_err("prcmu: Unsupported chip version\n");
-+		BUG();
-+	}
-+}
-+
- static int __init prcmu_init(void)
- {
- 	mutex_init(&mb5_transfer.lock);
--- 
-1.7.2.2
+ void __iomem *omap_ioremap(unsigned long phys, size_t size, unsigned int type);
+ void omap_iounmap(volatile void __iomem *addr);
