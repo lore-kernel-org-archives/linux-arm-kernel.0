@@ -1,30 +1,92 @@
-From: sunder.svit@gmail.com (Sundar)
-Date: Thu, 2 Dec 2010 23:44:32 +0530
-Subject: [PATCH v2] ARM: ux500: prcmu db8500 v2 support
-In-Reply-To: <1291303242-27000-1-git-send-email-mattias.wallin@stericsson.com>
-References: <1291303242-27000-1-git-send-email-mattias.wallin@stericsson.com>
-Message-ID: <AANLkTik+ZhUomjD5QmKrU5vWE-H9Gt+4sbGYUWSzkQ-q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Dec 2010 10:44:19 -0800
+Subject: [PATCH v5 09/14] OMAP: DMA: Convert DMA library into platform
+	driver
+In-Reply-To: <1290603110-14119-10-git-send-email-manjugk@ti.com>
+References: <1290603110-14119-1-git-send-email-manjugk@ti.com>
+	<1290603110-14119-10-git-send-email-manjugk@ti.com>
+Message-ID: <20101202184419.GR17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* G, Manjunath Kondaiah <manjugk@ti.com> [101124 04:42]:
+> Convert DMA library into DMA platform driver and make use of
+> platform data provided by hwmod data base for OMAP2+ onwards.
+> 
+> For OMAP1 processors, the DMA driver in mach-omap uses resource
+> structures for getting platform data.
 
-On Thu, Dec 2, 2010 at 8:50 PM, Mattias Wallin
-<mattias.wallin@stericsson.com> wrote:
-> This patch adds support for db8500 chip version 2.
->
-> ? ? ? ?if (cpu_is_u8500ed())
-> - ? ? ? ? ? ? ? iotable_init(u8500ed_io_desc, ARRAY_SIZE(u8500ed_io_desc));
+And has never been tested..
 
-Now that the ED support is deprecated, why still play around with these?
+<snip>
 
-> + ? ? ? if (cpu_is_u8500v11() || cpu_is_u8500ed()) {
-> + ? ? ? ? ? ? ? tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE_V1);
+>  static int __init omap1_system_dma_init(void)
+>  {
+>  	struct omap_system_dma_plat_info	*p;
+> +	struct omap_dma_dev_attr		*d;
+>  	struct platform_device			*pdev;
+>  	int ret;
+>  
+> @@ -153,22 +295,74 @@ static int __init omap1_system_dma_init(void)
+>  		goto exit_device_put;
+>  	}
+>  
+> +	d = p->dma_attr;
 
-Same here..
+This fails on omap1 as d is not allocated. Please merge the
+following fix.
 
-Cheers!
--- 
----------
-The views expressed in this email are my personal ones and do not
-necessarily echo my employers.
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 2 Dec 2010 10:02:08 -0800
+Subject: [PATCH] Fix dma init for omap1
+
+Fix dma init for omap1
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap1/dma.c
++++ b/arch/arm/mach-omap1/dma.c
+@@ -295,13 +295,20 @@ static int __init omap1_system_dma_init(void)
+ 		goto exit_device_put;
+ 	}
+ 
+-	d = p->dma_attr;
++	d = kzalloc(sizeof(struct omap_dma_dev_attr), GFP_KERNEL);
++	if (!d) {
++		dev_err(&pdev->dev, "%s: Unable to allocate 'd' for %s\n",
++			__func__, pdev->name);
++		ret = -ENOMEM;
++		goto exit_release_p;
++	}
++
+ 	d->chan = kzalloc(sizeof(struct omap_dma_lch) *
+ 					(d->lch_count), GFP_KERNEL);
+ 	if (!d->chan) {
+ 		dev_err(&pdev->dev, "%s: Memory allocation failed"
+ 					"for d->chan!!!\n", __func__);
+-		goto exit_release_p;
++		goto exit_release_d;
+ 	}
+ 
+ 	/* Valid attributes for omap1 plus processors */
+@@ -328,6 +335,8 @@ static int __init omap1_system_dma_init(void)
+ 			d->chan_count = 9;
+ 	}
+ 
++	p->dma_attr = d;
++
+ 	dma_base		= (void __iomem *)res[0].start;
+ 
+ 	p->show_dma_caps	= omap1_show_dma_caps;
+@@ -361,6 +370,8 @@ static int __init omap1_system_dma_init(void)
+ 
+ exit_release_chan:
+ 	kfree(d->chan);
++exit_release_d:
++	kfree(d);
+ exit_release_p:
+ 	kfree(p);
+ exit_device_put:
