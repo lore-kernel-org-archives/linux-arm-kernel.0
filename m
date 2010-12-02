@@ -1,20 +1,16 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 2 Dec 2010 18:08:32 +0900
-Subject: [patch v4 0/2] ARM: mach-shmobile: Add zboot support for SuperH
-	Mobile ARM (update)
-Message-ID: <20101202090832.GA25632@verge.net.au>
+From: highvolt.lee@samsung.com (=?euc-kr?B?wMzD4bHm?=)
+Date: Thu, 02 Dec 2010 09:18:31 +0000 (GMT)
+Subject: mounting ext3 with readonly but there is some writing on it.
+Message-ID: <0LCS00K68N6XI4@ms11.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-I have submitted these patches to the patch system, however due
-to an error on my part the first patch got rejected and I had
-to resubmit it. As a result the patches are out of order in the patch
-system. So I'd like to confirm that the order that they need to be
-applied is:
-
-1: 6515/1: ARM: Add zboot support for SuperH Mobile ARM
-2: 6514/1: ARM: mach-shmobile: Add zboot support for SuperH Mobile ARM
-
-Thanks
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101202/669b4de2/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: image/jpeg
+Size: 72722 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101202/669b4de2/attachment-0001.jpe>
