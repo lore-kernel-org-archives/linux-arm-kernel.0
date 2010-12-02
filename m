@@ -1,30 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Dec 2010 21:32:13 +0000
-Subject: [PATCH 01/02] omap: dsp: remove shm from normal memory
-In-Reply-To: <1289440225-27221-2-git-send-email-omar.ramirez@ti.com>
-References: <1289440225-27221-1-git-send-email-omar.ramirez@ti.com>
-	<1289440225-27221-2-git-send-email-omar.ramirez@ti.com>
-Message-ID: <20101202213213.GI10461@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Dec 2010 13:58:38 -0800
+Subject: Mainline OMAP3 breakage (and other OMAP?)
+In-Reply-To: <20101202211421.GG10461@n2100.arm.linux.org.uk>
+References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
+Message-ID: <20101202215837.GW17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 10, 2010 at 07:50:24PM -0600, Omar Ramirez Luna wrote:
-> From: Felipe Contreras <felipe.contreras@gmail.com>
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 13:04]:
+> This has been around since October:
 > 
-> Also, don't be picky about the location, which incidentally fixes the
-> build since MEMBLOCK_REAL_LIMIT is gone on 2.6.37.
+> drivers/video/omap2/vram.c: In function ?omap_vram_reserve_sdram_memblock?:
+> drivers/video/omap2/vram.c:573: error: ?MEMBLOCK_REAL_LIMIT? undeclared (first use in this function)
+> drivers/video/omap2/vram.c:573: error: (Each undeclared identifier is reported only once
+> drivers/video/omap2/vram.c:573: error: for each function it appears in.)
+> 
+> This requires a trivial one-liner compile fix:
+> 
+> diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
+> index fed2a72..a8973f0 100644
+> --- a/drivers/video/omap2/vram.c
+> +++ b/drivers/video/omap2/vram.c
+> @@ -570,7 +570,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
+>  			return;
+>  		}
+>  	} else {
+> -		paddr = memblock_alloc_base(size, PAGE_SIZE, MEMBLOCK_REAL_LIMIT);
+> +		paddr = memblock_alloc(size, PAGE_SIZE);
+>  	}
+>  
+>  	omap_vram_add_region(paddr, size);
+> 
+> which restores the old behaviour before the X86 memblock changes went
+> in.  Yes, there may be other changes due to the ioremap stuff, but
+> that's really no excuse for not fixing the compile error itself.
 
-That comment is wrong.  memblock_alloc() is still as picky as the
-original.
+Great. Adding fbdev and Tomi to Cc.
 
-phys_addr_t __init memblock_alloc(phys_addr_t size, phys_addr_t align)
-{
-        return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
-}
-
-        /* Pump up max_addr */
-        if (end == MEMBLOCK_ALLOC_ACCESSIBLE)
-                end = memblock.current_limit;
-
-and current_limit is initialized to what was MEMBLOCK_REAL_LIMIT.  So,
-memblock_alloc() will always allocate from lowmem.
+Acked-by: Tony Lindgren <tony@atomide.com>
