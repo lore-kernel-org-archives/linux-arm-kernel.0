@@ -1,60 +1,73 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu,  2 Dec 2010 18:47:29 +0100
-Subject: [PATCH 1/9] spi/pxa2xx: register driver properly
+Date: Thu,  2 Dec 2010 18:47:31 +0100
+Subject: [PATCH 3/9] spi/pxa2xx: Use define for SSSR_TFL_MASK instead of plain
+	numbers
 In-Reply-To: <1291312057-7933-1-git-send-email-bigeasy@linutronix.de>
 References: <1291312057-7933-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1291312057-7933-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1291312057-7933-4-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-use platform_driver_register instead of platform_driver_probe. The
-latter only checks available devices at the time of calling. So if a
-device gets inserter at a later point in time then the driver will never
-play with it.
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
 ---
- drivers/spi/pxa2xx_spi.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/plat-pxa/include/plat/ssp.h |    3 ++-
+ drivers/spi/pxa2xx_spi.c             |    8 ++++----
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/plat-pxa/include/plat/ssp.h b/arch/arm/plat-pxa/include/plat/ssp.h
+index fe43150..21c12ca 100644
+--- a/arch/arm/plat-pxa/include/plat/ssp.h
++++ b/arch/arm/plat-pxa/include/plat/ssp.h
+@@ -82,7 +82,8 @@
+ #define SSSR_TFS	(1 << 5)	/* Transmit FIFO Service Request */
+ #define SSSR_RFS	(1 << 6)	/* Receive FIFO Service Request */
+ #define SSSR_ROR	(1 << 7)	/* Receive FIFO Overrun */
+-
++#define SSSR_TFL_MASK   (0xf << 8)	/* Transmit FIFO Level mask */
++#define SSSR_RFL_MASK   (0xf << 12)	/* Receive FIFO Level mask */
+ 
+ /* extra bits in PXA255, PXA26x and PXA27x SSP ports */
+ #define SSCR0_TISSP		(1 << 4)	/* TI Sync Serial Protocol */
 diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-index e76b1af..4e169b5 100644
+index 1865c23..5508344 100644
 --- a/drivers/spi/pxa2xx_spi.c
 +++ b/drivers/spi/pxa2xx_spi.c
-@@ -1366,7 +1366,7 @@ static void cleanup(struct spi_device *spi)
- 	kfree(chip);
- }
+@@ -224,7 +224,7 @@ static int null_writer(struct driver_data *drv_data)
+ 	void __iomem *reg = drv_data->ioaddr;
+ 	u8 n_bytes = drv_data->n_bytes;
  
--static int __init init_queue(struct driver_data *drv_data)
-+static int __devinit init_queue(struct driver_data *drv_data)
- {
- 	INIT_LIST_HEAD(&drv_data->queue);
- 	spin_lock_init(&drv_data->lock);
-@@ -1454,7 +1454,7 @@ static int destroy_queue(struct driver_data *drv_data)
- 	return 0;
- }
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
  
--static int __init pxa2xx_spi_probe(struct platform_device *pdev)
-+static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+@@ -252,7 +252,7 @@ static int u8_writer(struct driver_data *drv_data)
  {
- 	struct device *dev = &pdev->dev;
- 	struct pxa2xx_spi_master *platform_info;
-@@ -1723,13 +1723,14 @@ static struct platform_driver driver = {
- 		.pm	= &pxa2xx_spi_pm_ops,
- #endif
- 	},
-+	.probe = pxa2xx_spi_probe,
- 	.remove = pxa2xx_spi_remove,
- 	.shutdown = pxa2xx_spi_shutdown,
- };
+ 	void __iomem *reg = drv_data->ioaddr;
  
- static int __init pxa2xx_spi_init(void)
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -279,7 +279,7 @@ static int u16_writer(struct driver_data *drv_data)
  {
--	return platform_driver_probe(&driver, pxa2xx_spi_probe);
-+	return platform_driver_register(&driver);
- }
- subsys_initcall(pxa2xx_spi_init);
+ 	void __iomem *reg = drv_data->ioaddr;
+ 
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
+ 
+@@ -306,7 +306,7 @@ static int u32_writer(struct driver_data *drv_data)
+ {
+ 	void __iomem *reg = drv_data->ioaddr;
+ 
+-	if (((read_SSSR(reg) & 0x00000f00) == 0x00000f00)
++	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+ 		|| (drv_data->tx == drv_data->tx_end))
+ 		return 0;
  
 -- 
 1.7.3.2
