@@ -1,221 +1,96 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Dec 2010 08:27:50 +0100
-Subject: [PATCH v2 03/15] ARM: mxs: Add reset routines
-In-Reply-To: <AANLkTinavvbQFGQhcAZF+ZBV1OuiZYu0XaBYSM7YuuKG@mail.gmail.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291031956-30314-3-git-send-email-shawn.guo@freescale.com>
-	<20101130102505.GG20449@pengutronix.de>
-	<AANLkTinavvbQFGQhcAZF+ZBV1OuiZYu0XaBYSM7YuuKG@mail.gmail.com>
-Message-ID: <20101202072750.GM32355@pengutronix.de>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Thu, 02 Dec 2010 09:58:10 +0200
+Subject: [PATCH v6] OMAP2+: PM: omap device: API's for handling mstandby
+	mode
+In-Reply-To: <20101202061139.GA5645@GLPP-machine>
+References: <1291229228-4438-1-git-send-email-manjugk@ti.com>
+	<4CF6AD2C.4020907@nokia.com> <20101202061139.GA5645@GLPP-machine>
+Message-ID: <4CF75192.3090705@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 02/12/10 08:12, ext G, Manjunath Kondaiah wrote:
+> * Adrian Hunter<adrian.hunter@nokia.com>  [2010-12-01 22:16:44 +0200]:
+>
+>> On 01/12/10 20:47, ext G, Manjunath Kondaiah wrote:
+>>> Certain errata in OMAP2+ processors will require forcing
+>>> master standby to "no standby" mode before completing on going
+>>> operation. Without this, the results will be unpredictable.
+>>>
+>>> Since current implementation of PM run time framework does not support
+>>> changing sysconfig settings during middle of the on going operation,
+>>> these API's will support the same. One API will force the device's
+>>> sysconfig mstandby mode settings to "no standby" and other API will
+>>> release "no standby" mode and sets it to "smart standby" or "no
+>>> standby? depending on HWMOD_SWSUP_MSTANDBY value.
+>>>
+>>> These API's should be used by device drivers only incase of
+>>> erratum applicable to their modules if there is no other methods
+>>> to resolve.
+>>>
+>>> These API's are required for multiple DMA errata which require
+>>> putting DMA controller in no mstandby mode before stopping dma.
+>>>
+>>> The applicable errata:
+>>> 1. Erratum ID: i557(Applicable for omap36xx all ES versions)
+>>> The channel hangs when the Pause bit (DMA4_CDPi [7] ) is cleared
+>>> through config port while in Standby.
+>>>
+>>> 2. Erratum ID: i541
+>>> sDMA FIFO draining does not finish. Applicable to all omap2+ except
+>>> omap4.
+>>>
+>>> 3. Erratum ID:i88
+>>> The sDMA to be put in no mstandby mode before disabling the channel
+>>> after completing the data transfer operation.
+>>> Applicable only for OMAP3430 ES1.0
+>>>
+>>> Also fixes typo HWMOD_SWSUP_MSTDBY to HWMOD_SWSUP_MSTANDBY in
+>>> omap_hwmod.h
+>>>
+>>> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+>>> Cc: Kevin Hilman<khilman@deeprootsystems.com>
+>>> Cc: Paul Walmsley<paul@pwsan.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>
+>>> ---
+>>> Change summary:
+>>> v3: Review comments incorporated for:
+>>> https://patchwork.kernel.org/patch/282212/
+>>> v4: added mutex changes
+>>> v5: typo fixes for errata and erratum
+>>> v6: fixed oh increment bug and also mutex(missing in v5)
+>>>
+>>>   arch/arm/mach-omap2/omap_hwmod.c              |   47 +++++++++++++++++++-
+>>>   arch/arm/plat-omap/include/plat/omap_device.h |    2 +
+>>>   arch/arm/plat-omap/include/plat/omap_hwmod.h  |    4 +-
+>>>   arch/arm/plat-omap/omap_device.c              |   60 +++++++++++++++++++++++++
+>>>   4 files changed, 111 insertions(+), 2 deletions(-)
+>>>
+>>
+>> Does not seem to handle overlapping requests to set/clear
+>> midle mode.
+>
+> We can have use count so that we can avoid register access during
+> middle of operation if mstandby mode is already changed to "no standby"
+> mode.
 
-On Thu, Dec 02, 2010 at 02:02:39PM +0800, Shawn Guo wrote:
-> Hi Uwe,
-> 
-> 2010/11/30 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Hello,
-> >
-> [...]
-> >
-> >> + ? ? /* Poll CLKGATE set */
-> >> + ? ? timeout = 0x400;
-> >> + ? ? while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
-> >> + ? ? ? ? ? ? /* nothing */;
-> >> + ? ? if (!timeout)
-> >> + ? ? ? ? ? ? goto error;
-> >> +
-> >> + ? ? /* Clear SFTRST */
-> >> + ? ? val = __raw_readl(reset_addr);
-> >> + ? ? val &= ~MXS_MODULE_SFTRST;
-> >> + ? ? __raw_writel(val, reset_addr);
-> >> + ? ? /* Wait 1us */
-> >> + ? ? udelay(1);
-> >> + ? ? /* Poll SFTRST cleared */
-> >> + ? ? timeout = 0x400;
-> >> + ? ? while ((__raw_readl(reset_addr) & MXS_MODULE_SFTRST) && --timeout)
-> >> + ? ? ? ? ? ? /* nothing */;
-> >> + ? ? if (!timeout)
-> >> + ? ? ? ? ? ? goto error;
-> >> +
-> >> + ? ? /* Clear CLKGATE */
-> >> + ? ? val = __raw_readl(reset_addr);
-> >> + ? ? val &= ~MXS_MODULE_CLKGATE;
-> >> + ? ? __raw_writel(val, reset_addr);
-> >> + ? ? /* Wait 1us */
-> >> + ? ? udelay(1);
-> >> + ? ? /* Poll CLKGATE cleared */
-> >> + ? ? timeout = 0x400;
-> >> + ? ? while ((__raw_readl(reset_addr) & MXS_MODULE_CLKGATE) && --timeout)
-> >> + ? ? ? ? ? ? /* nothing */;
-> >> + ? ? if (!timeout)
-> >> + ? ? ? ? ? ? goto error;
-> >
-> > There are quite some repetitions in this function. ?If you could get it
-> > down to something that looks like
-> >
-> > ? ? ? ?clear SFTRST
-> > ? ? ? ?udelay
-> > ? ? ? ?poll SFTRST cleared
-> >
-> > ? ? ? ?clear CLKGATE
-> > ? ? ? ?set SFTRST
-> > ? ? ? ?udelay
-> > ? ? ? ?poll CLKGATE set
-> >
-> > ? ? ? ?clear SFTRST
-> > ? ? ? ?udelay
-> > ? ? ? ?poll SFTRST cleared
-> >
-> > ? ? ? ?clear CLKGATE
-> > ? ? ? ?udelay
-> > ? ? ? ?poll CLKGATE cleared
-> >
-> > it's IMHO better than the comment above. ?If "clear CLKGATE" and "set
-> > SFTRST" can be done in a single step this might be done like that:
-> >
-> > ? ? ? ?/* comment describing setmask_poll */
-> > ? ? ? ?static int setmask_poll(void __iomem *addr, u32 set, u32 mask,
-> > ? ? ? ? ? ? ? ?u32 pollval, u32 pollmask, u32 *curval)
-> > ? ? ? ?{
-> > ? ? ? ? ? ? ? ?int timeout = 0x400;
-> >
-> > ? ? ? ? ? ? ? ?*curval &= ~mask;
-> > ? ? ? ? ? ? ? ?*curval |= set;
-> > ? ? ? ? ? ? ? ?__raw_writel(*curval, addr)
-> >
-> > ? ? ? ? ? ? ? ?/*
-> > ? ? ? ? ? ? ? ? * some nice comment about 1us being a good idea
-> > ? ? ? ? ? ? ? ? */
-> > ? ? ? ? ? ? ? ?udelay(1);
-> >
-> > ? ? ? ? ? ? ? ?do {
-> > ? ? ? ? ? ? ? ? ? ? ? ?*curval = __raw_readl(addr);
-> > ? ? ? ? ? ? ? ? ? ? ? ?if ((*curval & pollmask) == pollval)
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?return 0;
-> >
-> > ? ? ? ? ? ? ? ?} while(--timeout);
-> >
-> > ? ? ? ? ? ? ? ?return 1;
-> > ? ? ? ?}
-> >
-> > ? ? ? ?int mxs_reset_block(void __iomem *reset_addr)
-> > ? ? ? ?{
-> > ? ? ? ? ? ? ? ?u32 val = __raw_readl(reset_addr);
-> > ? ? ? ? ? ? ? ?int ret;
-> >
-> > ? ? ? ? ? ? ? ?/* clear SFTRST and poll SFTRST becoming clear */
-> > ? ? ? ? ? ? ? ?ret = setmask_poll(reset_addr,
-> > ? ? ? ? ? ? ? ? ? ? ? ?0, MXS_MODULE_SFTRST,
-> > ? ? ? ? ? ? ? ? ? ? ? ?0, MXS_MODULE_SFTRST, &val);
-> > ? ? ? ? ? ? ? ?if (ret)
-> > ? ? ? ? ? ? ? ? ? ? ? ?goto error;
-> >
-> > ? ? ? ? ? ? ? ?/* clear CLKGATE, set SFTRST and poll CLKGATE becoming set */
-> > ? ? ? ? ? ? ? ?ret = setmask_poll(reset_addr,
-> > ? ? ? ? ? ? ? ? ? ? ? ?MXS_MODULE_SFTRST, MXS_MODULE_SFTRST | MXS_MODULE_CLKGATE,
-> > ? ? ? ? ? ? ? ? ? ? ? ?0, MXS_MODULE_CLKGATE, &val);
-> > ? ? ? ? ? ? ? ?if (ret)
-> > ? ? ? ? ? ? ? ? ? ? ? ?goto error;
-> >
-> > ? ? ? ? ? ? ? ?...
-> > ? ? ? ?}
-> >
-> > Well, not very nice, but IMHO better that your code. ?Maybe
-> > mxs_reset_block fits in a Terminal that way without decreasing the font
-> > size :-)
-> >
-> I checked designer about doing "clear CLKGATE" and "set SFTRST" in a
-> single step, and got the following feedback.
-> 
-> "Per HW design, it is not safe to get those two done by write once
-> time. By two step write, one instruction period interval can be
-> ensured at least for clock  enabling before sync. Soft reset.  Your
-> code is only once time write in fact, so it shall not be equal to two
-> write operation."
-> 
-> In this case, how do the following changes look to you?
-> 
-> /*
->  * Clear the bit and poll it cleared, the bit has to be
->  * SFTRST(bit 31) or CLKGATE (bit 30) of block control register.
-for the function it doesn't have to be one of these bits.  Maybe:
+Exactly
 
-	Clear the bit and poll it cleared.  This is usually called with
-	a reset address and mask being either SFTRST(bit 31) or CLKGATE
-	(bit 30).
+>
+>>
+>> Also, there is a mutex but don't these functions get called
+>> sometimes in interrupt context?
+>
+> I feel we should leave this to caller of these API's. The caller should
+> make sure that, he disables interrupts if it is used in interrupt context.
 
->  */
-> static int clear_poll_bit(void __iomem *addr, u32 mask)
-> {
->         int timeout = 0x400;
-> 
->         /* clear the bit */
->         __raw_writel(mask, addr + MXS_CLR_ADDR);
-ah, so there is a clr register, that's nice.
+How does that help?  It seems to me that a mutex cannot be used for this.
 
-> 
->         /*
->          * SFTRST needs 3 GPMI clocks to settle, the reference manual
->          * recommends to wait 1us.
->          */
->         udelay(1);
-> 
->         /* poll the bit becoming clear */
->         while ((__raw_readl(addr) & mask) && --timeout)
->                 /* nothing */;
-> 
->         if (unlikely(!timeout))
->                 return 1;
-> 
->         return 0;
-return !timeout; ?
-
-> }
-> 
-> int mxs_reset_block(void __iomem *reset_addr)
-> {
->         int ret;
->         int timeout = 0x400;
-> 
->         /* clear and poll SFTRST */
->         ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
->         if (ret)
->                 goto error;
-> 
->         /* clear CLKGATE */
->         __raw_writel(MXS_MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
->         /* set SFTRST to reset the block */
->         __raw_writel(MXS_MODULE_SFTRST, reset_addr + MXS_SET_ADDR);
->         udelay(1);
->         /* poll CLKGATE becoming set */
->         while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
->                 /* nothing */;
->         if (unlikely(!timeout))
->                 goto error;
-> 
->         /* clear and poll SFTRST */
->         ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
->         if (ret)
->                 goto error;
-> 
->         /* clear and poll CLKGATE */
->         ret = clear_poll_bit(reset_addr, MXS_MODULE_CLKGATE);
->         if (ret)
->                 goto error;
-> 
-	return 0;
-
-> error:
->         pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
->         return -ETIMEDOUT;
-> }
-Other than that it looks much better IMHO.
-
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> -Manjunath
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
