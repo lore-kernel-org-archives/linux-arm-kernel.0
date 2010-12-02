@@ -1,32 +1,97 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 2 Dec 2010 13:36:15 -0200
-Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-In-Reply-To: <20101202121400.GH6017@pengutronix.de>
-References: <20101124201831.GZ4693@pengutronix.de>
-	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
-	<20101125091346.GS6017@pengutronix.de>
-	<AANLkTi=L_5ib-Kj0fZRci7-bPOpkyojejZ9+jZpmH9aC@mail.gmail.com>
-	<20101129212446.GB6017@pengutronix.de>
-	<AANLkTik6CScZ5uL2s_qf9q5w6i13mBk_0CLkLZHCKwSm@mail.gmail.com>
-	<20101201111448.GF6017@pengutronix.de>
-	<878w09u3nu.fsf@lechat.rtp-net.org>
-	<20101201154128.GG6017@pengutronix.de>
-	<87wrntrrc2.fsf@lechat.rtp-net.org>
-	<20101202121400.GH6017@pengutronix.de>
-Message-ID: <AANLkTincSeqA79xbKJv5sWFbR7r79zSpbu1CT6H12tyU@mail.gmail.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Thu, 2 Dec 2010 09:43:38 -0600
+Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
+In-Reply-To: <20101202152053.GC10461@n2100.arm.linux.org.uk>
+References: <AANLkTind+DH5emar2L9EiV-pqpCvQHQGnFevh9Bncrpz@mail.gmail.com>
+	<20101202123304.GB10461@n2100.arm.linux.org.uk>
+	<AANLkTi=iRUD3_dcY47tebHGbxxAOcY61_2MtSVfO8zQB@mail.gmail.com>
+	<20101202152053.GC10461@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=01qGO6pX15n_w-W4RaaXsK3u697UQ9pD_DuvW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 2, 2010 at 10:14 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-...
->> what about to2 ?
+On Thu, Dec 2, 2010 at 9:20 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 02, 2010 at 08:50:07AM -0600, Guzman Lugo, Fernando wrote:
+>> On Thu, Dec 2, 2010 at 6:33 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Dec 02, 2010 at 06:07:23AM -0600, Kanigeri, Hari wrote:
+>> >> Hi Tony,
+>> >>
+>> >> The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
+>> >> ? Linus Torvalds (1):
+>> >> ? ? ? ? Linux 2.6.37-rc4
+>> >>
+>> >> are available in the git repository at:
+>> >>
+>> >> ? git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
+>> >>
+>> >> Fernando Guzman Lugo (5):
+>> >> ? ? ? OMAP: mailbox: change full flag per mailbox queue instead of global
+>> >> ? ? ? omap: iovmm - no gap checking for fixed address
+>> >> ? ? ? omap: iovmm - add superpages support to fixed da address
+>> >> ? ? ? omap: iovmm - replace __iounmap with omap_iounmap
+>> >
+>> > This change is wrong. ?Nothing should be directly referencing omap_iounmap
+>> > nor for that matter omap_ioremap. ?Both are implementation details of the
+>> > standard ioremap/iounmap APIs.
+>> >
+>> > Use the official APIs rather than the implementation details behind them.
+>>
+>> if you see where the function is used, you will see that it is not
+>> calling the function, it is use as a parameter in unmap_vm_area(), if
+>> I used iounmap which is a macro there I will get a compilation error.
 >
-> Someone from Freescale (I think it was Yong) said to me 'if you find a
-> board with an i.MX51 older than to3 outside of Freescale, just throw it
-> away'. I don't know which SDMA code we have to use for to2.
+> Hmm, yes, because iounmap() is defined as a macro rather than iounmap.
+>
+> The solution to this is to fix iounmap and __arch_iounmap macros so
+> they aren't macros which take arguments. ?That will then allow them
+> to be used in the way you desire.
 
-MX51TO2 and MX51TO3 use the same SDMA firmware.
+yes, that way it can be used in the function parameter. what is the
+right thing to do?
+1) You send your patch and then I send the new version of the patches.
+2) I make a new series of the patches with the change to iounmap and I
+include your patch in the series.
 
-Regards,
 
-Fabio Estevam
+Thanks,
+Fernando.
+
+>
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 815efa2..91be1f8 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -245,13 +245,13 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+> ?#define ioremap_nocache(cookie,size) ? __arm_ioremap(cookie, size, MT_DEVICE)
+> ?#define ioremap_cached(cookie,size) ? ?__arm_ioremap(cookie, size, MT_DEVICE_CACHED)
+> ?#define ioremap_wc(cookie,size) ? ? ? ? ? ? ? ?__arm_ioremap(cookie, size, MT_DEVICE_WC)
+> -#define iounmap(cookie) ? ? ? ? ? ? ? ? ? ? ? ?__iounmap(cookie)
+> +#define iounmap ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__iounmap
+> ?#else
+> ?#define ioremap(cookie,size) ? ? ? ? ? __arch_ioremap((cookie), (size), MT_DEVICE)
+> ?#define ioremap_nocache(cookie,size) ? __arch_ioremap((cookie), (size), MT_DEVICE)
+> ?#define ioremap_cached(cookie,size) ? ?__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
+> ?#define ioremap_wc(cookie,size) ? ? ? ? ? ? ? ?__arch_ioremap((cookie), (size), MT_DEVICE_WC)
+> -#define iounmap(cookie) ? ? ? ? ? ? ? ? ? ? ? ?__arch_iounmap(cookie)
+> +#define iounmap ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__arch_iounmap
+> ?#endif
+>
+> ?/*
+> diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
+> index 128b549..204865f 100644
+> --- a/arch/arm/plat-omap/include/plat/io.h
+> +++ b/arch/arm/plat-omap/include/plat/io.h
+> @@ -294,8 +294,8 @@ static inline void omap44xx_map_common_io(void)
+> ?extern void omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_sdrc_params *sdrc_cs1);
+>
+> -#define __arch_ioremap(p,s,t) ?omap_ioremap(p,s,t)
+> -#define __arch_iounmap(v) ? ? ?omap_iounmap(v)
+> +#define __arch_ioremap omap_ioremap
+> +#define __arch_iounmap omap_iounmap
+>
+> ?void __iomem *omap_ioremap(unsigned long phys, size_t size, unsigned int type);
+> ?void omap_iounmap(volatile void __iomem *addr);
+>
