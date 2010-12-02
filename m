@@ -1,83 +1,31 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Thu, 2 Dec 2010 11:41:39 -0600
-Subject: [PATCH] scatterlist: define SG chain for arm architecture
-In-Reply-To: <20101003202920K.fujita.tomonori@lab.ntt.co.jp>
-References: <20101001163958.GA22533@n2100.arm.linux.org.uk>
-	<20101003195758B.fujita.tomonori@lab.ntt.co.jp>
-	<20101003112839.GA32736@n2100.arm.linux.org.uk>
-	<20101003202920K.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <AANLkTikES5y=hJhuE=iX-WJvcUvbpSqjDPBr2W8jGeJL@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Dec 2010 17:42:53 +0000
+Subject: Cache maintenance on page table updates
+In-Reply-To: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
+References: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
+Message-ID: <20101202174253.GI29347@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 3, 2010 at 6:34 AM, FUJITA Tomonori
-<fujita.tomonori@lab.ntt.co.jp> wrote:
-> On Sun, 3 Oct 2010 12:28:39 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->
->> On Sun, Oct 03, 2010 at 08:02:52PM +0900, FUJITA Tomonori wrote:
->> > On Fri, 1 Oct 2010 17:39:58 +0100
->> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> >
->> > > On Fri, Oct 01, 2010 at 11:28:41AM -0500, Fernando Guzman Lugo
-> wrote:
->> > > > Define SG chain for ARM architecture in order to work
->> > > > with big buffers. This patch is needed in order to
->> > > > iovmm users can pass a big buffer to map it and ARM
->> > > > architecture has not issues using SG chain.
->> > > >
->> > > > This change was suggested by FUJITA Tomonori.
->> > >
->> > > Have you audited all places where SG lists are used in the ARM
->> > > architecture to ensure that SG chain support is safe? ?(That
->> > > goes for ARM generic code and ARM specific drivers.)
->> >
->> > As far as I know, only SCSI actually uses SG chain feature (that is,
->> > sending chained scatter lists). All SCSI drivers were converted when
->> > we added SG chain feature. So what you need to care about is the dma
->> > code.
->> >
->> > There are only several files that actually use scatter list under
->> > arch/arm.
->> >
->> > >From a quick look, arch/arm/mm/dma-mapping.c,
->> > arch/arm/common/dmabounce.c, arch/arm/kernel/dma.c, and
->> > arch/arm/include/asm/dma-mapping.h looks fine.
->> >
->> > arm/mach-imx/dma-v1.c also looks like to use chained sg API properly
->> > (but this isn't used with SCSI, right?).
->> >
->> > Seems that arch/arm/plat-omap/iovmm.c can handle the chained SG
->> > too. It doesn't allocate the chained SG now though.
->>
->> There's also RiscPC and its SCSI drivers could well be an issue for SG
->> chaining. ?They have to manually save the SCSI 'data pointer' (down to
->> the byte position in the SG chain and be able to restore a previously
->> saved point.) ?This code was written before SG chaining ever appeared,
->> and although it has been partly fixed up, it's probably buggy if SG
->> chaining were to be enabled.
->
-> What SCSI drviers we need to fix?
+On Thu, Dec 02, 2010 at 05:39:58PM +0100, Christoffer Dall wrote:
+> Hi Catalin.
+> 
+> I am hoping you can help me understand the following observed behavior in KVM.
+> 
+> When I update the page table mappings' AP bits, it is for some reason
+> not enough to clean caches, but I must also invalidate them for the
+> changes to take effect. The system runs on an arm1136 processor and I
+> was under the impression that page table walks never read from the L1
+> cache. If this is true, I cannot understand why an invalidation of
+> caches would make a difference.
+> 
+> In the course of understanding this behavior I have come across the
+> RGN, S and C bits in the TTBR0. I don't quite understand how these
+> bits affect the memory system - should they simply match the way that
+> the page tables themselves are mapped in virtual memory or do they
+> somehow control how the page table walk mechanism behaves?
 
-Russell,
-
-Any update with this? I hope it can be merged for 2.6.38.
-
->
->
->> If it's just OMAP users who wish to enable SG chaining, then the sane
->> thing to do would be to make the definition of the macro conditional
->> on OMAP.
->
-> Yeah, that should work.
-
-some like this in scatterlist.h is ok?
-
-#ifdef CONFIG_ARCH_OMAP
-#define ARCH_HAS_SG_CHAIN
-#endif
-
-
-Regards,
-Fernando.
->
+The CPU provides various controls during external memory accesses to
+control down-stream caches.  These bits set those controls, and
+should match the memory types etc used for accessing the page tables
+from the CPU.
