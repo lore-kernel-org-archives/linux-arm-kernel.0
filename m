@@ -1,27 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Dec 2010 10:28:22 +0100
-Subject: [PATCH] add clock debug information for imx51 babbage
-In-Reply-To: <AANLkTi=cTYjaDh0Zd-7joLCycMcLoPW+Ekws=46QMoDc@mail.gmail.com>
-References: <AANLkTi=cTYjaDh0Zd-7joLCycMcLoPW+Ekws=46QMoDc@mail.gmail.com>
-Message-ID: <20101202092822.GN32355@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Dec 2010 09:37:43 -0000
+Subject: Forced HW_BREAKPOINT
+In-Reply-To: <4CF6AC9B.9060500@ti.com>
+References: <4CF58F22.6070803@ti.com>
+	<004a01cb913d$c9c1e070$5d45a150$@deacon@arm.com>
+	<4CF67525.2010304@ti.com>
+	<004d01cb9174$c8d83ec0$5a88bc40$@deacon@arm.com>
+	<4CF67C52.4000300@ti.com>
+	<004f01cb917d$c04b4910$40e1db30$@deacon@arm.com>
+	<4CF6AC9B.9060500@ti.com>
+Message-ID: <005501cb9204$923e1de0$b6ba59a0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Dec 01, 2010 at 07:30:54PM +0800, Yong Shen wrote:
-> Hi there,
+> > Please can you try this patch?
+> >
+> [...]
+> >
+> >
+> > This should cause the hw_breakpoint stuff to give up if monitor-mode
+> > cannot be enabled.
 > 
-> This patch makes BSP development easier, since it displays the whole
-> clock information in tree-like manner. The final goal is to make it a
-> part of common clock framework, but so far this goal depends on other
-> unfinished work.
-BTW, I would prefer to have this on top of the generic clkdev patches
-(see http://thread.gmane.org/gmane.linux.ports.arm.kernel/90225)
+> Could we also scale down the WARN_ONs in enable_monitor_mode?
 
-Best regards
-Uwe
+That was my next step, I just wanted to make sure that those
+changes allow you to get to a prompt (since I don't have any
+1176 hardware). I have a bunch of changes pending in this area
+so I'll add this to the stack.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Will
