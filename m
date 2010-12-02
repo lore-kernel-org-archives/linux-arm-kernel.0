@@ -1,38 +1,20 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 2 Dec 2010 14:36:58 +0100
-Subject: [PATCH] mmci: drop superfluous regulator #ifdef
-Message-ID: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
+From: davidsin@ti.com (David Sin)
+Date: Thu, 2 Dec 2010 07:52:57 -0600
+Subject: [RFC v2 0/8] TI DMM-TILER driver
+In-Reply-To: <AANLkTi=39XEC9ie=bAapymAtx6k+ej49N5B1+_gfRhmE@mail.gmail.com>
+References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
+	<AANLkTi=39XEC9ie=bAapymAtx6k+ej49N5B1+_gfRhmE@mail.gmail.com>
+Message-ID: <20101202135254.GE22875@lba0869738>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regulator and MMC frameworks provide the proper stub functions
-for the regulator functions anyway, get rid of this.
-
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/mmc/host/mmci.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 3709ab3..7567872 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -844,7 +844,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 		mmc->f_max = min(host->mclk, fmax);
- 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
- 
--#ifdef CONFIG_REGULATOR
- 	/* If we're using the regulator framework, try to fetch a regulator */
- 	host->vcc = regulator_get(&dev->dev, "vmmc");
- 	if (IS_ERR(host->vcc))
-@@ -863,7 +862,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 				 "(using regulator instead)\n");
- 		}
- 	}
--#endif
-+
- 	/* Fall back to platform data if no regulator is found */
- 	if (host->vcc == NULL)
- 		mmc->ocr_avail = plat->ocr_mask;
+On Wed, Dec 01, 2010 at 12:17:22PM +0530, Varadarajan, Charulatha wrote:
+> On Wed, Dec 1, 2010 at 01:28, David Sin <davidsin@ti.com> wrote:
+> 
+> The dmm driver is making use of omap_hwmod fw. But I could not see a patch
+> to add  dmm hwmod data to omap4 hwmod base in this series. Is this patch series
+> tested?
+yes -- this code has been tested against the omap_hwmod fw.  I will send 
+out a patch in the next rev.  Thanks for your comments.
 -- 
-1.7.3.2
+David Sin
