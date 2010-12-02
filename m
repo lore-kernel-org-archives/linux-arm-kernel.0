@@ -1,83 +1,24 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 2 Dec 2010 16:01:43 +0530
-Subject: [RFC v2 1/8] TILER-DMM: DMM-PAT driver for TI TILER
-In-Reply-To: <AANLkTim6vtSnGrTXjy71UVu79+3QgHcUv3+7AWP=DTgA@mail.gmail.com>
-References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
-	<1291147139-23472-2-git-send-email-davidsin@ti.com>
-	<AANLkTi=q1HzYBpMH_pP+S5BtBQpHs62+zNfd_MtWHFuu@mail.gmail.com>
-	<AANLkTi=YUYuxQE8pDZrN5-PJq1Q3jw7cP2yZKCXNAvPP@mail.gmail.com>
-	<AANLkTik1o4Ka_UnwWvmjVhQGrPwrOpPGG4mmu4zSiH+U@mail.gmail.com>
-	<AANLkTikEY+0gGB9dbVFZvhwWbd5jGEGo7oDNs_y5xL=s@mail.gmail.com>
-	<AANLkTim6vtSnGrTXjy71UVu79+3QgHcUv3+7AWP=DTgA@mail.gmail.com>
-Message-ID: <AANLkTinQPsz2LjMdyxKfpg5eotEhTHYig427Gu_Q_6_K@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 2 Dec 2010 12:37:50 +0200
+Subject: [PATCH v2] arm: mach-omap2: remove NULL board_mux from board files
+In-Reply-To: <1291283622-16359-1-git-send-email-aaro.koskinen@nokia.com>
+References: <1291283622-16359-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20101202103750.GM5429@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 2, 2010 at 15:53, Hari Kanigeri <hari.kanigeri@gmail.com> wrote:
-> On Wed, Dec 1, 2010 at 11:16 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
->> On Thu, Dec 2, 2010 at 07:57, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
->>> On Wed, Dec 1, 2010 at 8:10 PM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
->>>> On Wed, Dec 1, 2010 at 12:04 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
->>>>> David,
->>>>
->>>>>
->>>>>> + ? ? ? ? ? ? ? if (!oh)
->>>>>> + ? ? ? ? ? ? ? ? ? ? ? goto error;
->>>>>> +
->>>>>> + ? ? ? ? ? ? ? data->base = oh->_mpu_rt_va;
->>>>>
->>>>> not required. Make use of platform_get APIs in probe to extract the
->>>>> base, dma and irq info using pdev.
->>>>
->>>> Not sure about using platform_get APIs. I think one has to use
->>>> omap_hwmod_get_mpu_rt_va to get the address, which internally returns
->>>> oh-<_mpu_rt_va.
->>> small correction... omap_device_get_rt_va and not omap_hwmod_get_mpu_rt_va.
->>
->> To get the base address & irq, you need not have to use
->> omap_device_get_rt_va and pass it as
->> pdata and then use it during probe. Instead in probe, you may do
->> something like the following:
+On Thu, Dec 02, 2010 at 11:53:42AM +0200, Aaro Koskinen wrote:
+>diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+>index 350c04f..e224ab5 100644
+>--- a/arch/arm/mach-omap2/mux.h
+>+++ b/arch/arm/mach-omap2/mux.h
+>@@ -133,6 +133,8 @@ static inline int omap_mux_init_signal(char *muxname, int val)
+> 	return 0;
+> }
 >
-> If hwmod framework is already doing the ioremap on device address,
-> then it is better to use it rather than duplicating the ioremap part
-> again in probe function.
-> From what I understand regarding omap_device_get_rt_va() function, it
-> is added so that Driver's can avoid doing ioremap.
-> check Santosh's comment on this API
-> http://www.spinics.net/lists/arm-kernel/msg92260.html
+>+static struct omap_board_mux *board_mux __initdata __attribute__((unused));
 
-Okay. For base address, I agree, as it avoids redoing ioremap in drivers.
-For "irq" & "DMA", it is still required to use platform_get*() APIs.
+how about __unused ??
 
->
->>
->> static int __devinit ?dev_probe (*pdev) {
->> ? struct resource *res;
->> ? void __iomem *base;
->> ? u16 irq;
->> ? ....
->> ? ....
->> ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> ? if (unlikely(!res)) {
->> ? ? ? ? ? ? ?....
->> ? ? ? ? ? ? ?return -ENODEV;
->> ? }
->>
->> ? base = ioremap(res->start, resource_size(res));
->> ? if (base) {
->> ? ? ? ? ? ? ? ....
->> ? ? ? ? ? ? ? return -ENOMEM;
->> ? }
->>
->> ? res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->> ? if (unlikely(!res)) {
->> ? ? ? ? ? ? ? ....
->> ? ? ? ? ? ? ? return -ENODEV;
->> ? }
->> ? irq = res->start;
->> ? ....
->> ? ....
->> }
->>
->> -V Charulatha
+-- 
+balbi
