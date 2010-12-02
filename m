@@ -1,66 +1,125 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  2 Dec 2010 13:45:53 +0000
-Subject: [PATCH 02/11] ARM: hw_breakpoint: reset control registers in hotplug
-	path
+Date: Thu,  2 Dec 2010 13:45:54 +0000
+Subject: [PATCH 03/11] ARM: hw_breakpoint: correct and simplify alignment
+	fixup code
 In-Reply-To: <1291297562-8052-1-git-send-email-will.deacon@arm.com>
 References: <1291297562-8052-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1291297562-8052-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1291297562-8052-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv7 debug architecture doesn't make any guarantees about the
-contents of debug control registers following a debug logic reset.
+The current hw_breakpoint code tries to fix up the alignment of
+breakpoints so that we can make use of sparse byte-address-select
+bits in the control register and give the illusion that we can
+set breakpoints on unaligned addresses.
 
-This patch ensures that we reset the control registers when a cpu
-comes ONLINE (for example, with hotplug) so that when we enable
-monitor mode while inserting a breakpoint we won't exhibit random
-behaviour.
+Although this works on v6 cores, v7 forbids this behaviour, instead
+requiring breakpoints to be set on aligned addresses and have contiguous
+byte-address-select ranges depending on the instruction set in use.
+For ARM the only supported size is 4 bytes, whilst Thumb-2 also permits
+2 byte breakpoints (watchpoints can be of 1, 2, 4 or 8 bytes long).
+
+This patch simplifies the alignment fixup code so that we require
+addresses to be aligned to the size of the corresponding breakpoint.
+This allows us to handle the common case of breaking on a half-word
+aligned Thumb-2 instruction and also allows us to set byte watchpoints
+on arbitrary addresses.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c |   16 +++++++++++++++-
- 1 files changed, 15 insertions(+), 1 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |   57 +++++++++++++++++++++-----------------
+ 1 files changed, 31 insertions(+), 26 deletions(-)
 
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 793959e..515a3c4 100644
+index 515a3c4..d37ed35 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -764,7 +764,7 @@ out:
- /*
-  * One-time initialisation.
-  */
--static void __init reset_ctrl_regs(void *unused)
-+static void reset_ctrl_regs(void *unused)
- {
- 	int i;
- 
-@@ -799,6 +799,18 @@ static void __init reset_ctrl_regs(void *unused)
+@@ -537,6 +537,17 @@ static int arch_build_bp_info(struct perf_event *bp)
+ 		return -EINVAL;
  	}
- }
  
-+static int __cpuinit dbg_reset_notify(struct notifier_block *self,
-+				      unsigned long action, void *cpu)
-+{
-+	if (action == CPU_ONLINE)
-+		smp_call_function_single((int)cpu, reset_ctrl_regs, NULL, 1);
-+	return NOTIFY_OK;
-+}
++	/*
++	 * Breakpoints must be of length 2 (thumb) or 4 (ARM) bytes.
++	 * Watchpoints can be of length 1, 2, 4 or 8 bytes if supported
++	 * by the hardware and must be aligned to the appropriate number of
++	 * bytes.
++	 */
++	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE &&
++	    info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
++	    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
++		return -EINVAL;
 +
-+static struct notifier_block __cpuinitdata dbg_reset_nb = {
-+	.notifier_call = dbg_reset_notify,
-+};
-+
- static int __init arch_hw_breakpoint_init(void)
+ 	/* Address */
+ 	info->address = bp->attr.bp_addr;
+ 
+@@ -561,7 +572,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
  {
+ 	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
  	int ret = 0;
-@@ -846,6 +858,8 @@ static int __init arch_hw_breakpoint_init(void)
- 	hook_ifault_code(2, hw_breakpoint_pending, SIGTRAP, TRAP_HWBKPT,
- 			"breakpoint debug exception");
+-	u32 bytelen, max_len, offset, alignment_mask = 0x3;
++	u32 offset, alignment_mask = 0x3;
  
-+	/* Register hotplug notifier. */
-+	register_cpu_notifier(&dbg_reset_nb);
+ 	/* Build the arch_hw_breakpoint. */
+ 	ret = arch_build_bp_info(bp);
+@@ -571,32 +582,27 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+ 	/* Check address alignment. */
+ 	if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+ 		alignment_mask = 0x7;
+-	if (info->address & alignment_mask) {
+-		/*
+-		 * Try to fix the alignment. This may result in a length
+-		 * that is too large, so we must check for that.
+-		 */
+-		bytelen = get_hbp_len(info->ctrl.len);
+-		max_len = info->ctrl.type == ARM_BREAKPOINT_EXECUTE ? 4 :
+-				max_watchpoint_len;
+-
+-		if (max_len >= 8)
+-			offset = info->address & 0x7;
+-		else
+-			offset = info->address & 0x3;
+-
+-		if (bytelen > (1 << ((max_len - (offset + 1)) >> 1))) {
+-			ret = -EFBIG;
+-			goto out;
+-		}
+-
+-		info->ctrl.len <<= offset;
+-		info->address &= ~offset;
+-
+-		pr_debug("breakpoint alignment fixup: length = 0x%x, "
+-			"address = 0x%x\n", info->ctrl.len, info->address);
++	offset = info->address & alignment_mask;
++	switch (offset) {
++	case 0:
++		/* Aligned */
++		break;
++	case 1:
++		/* Allow single byte watchpoint. */
++		if (info->ctrl.len == ARM_BREAKPOINT_LEN_1)
++			break;
++	case 2:
++		/* Allow halfword watchpoints and breakpoints. */
++		if (info->ctrl.len == ARM_BREAKPOINT_LEN_2)
++			break;
++	default:
++		ret = -EINVAL;
++		goto out;
+ 	}
+ 
++	info->address &= ~alignment_mask;
++	info->ctrl.len <<= offset;
++
+ 	/*
+ 	 * Currently we rely on an overflow handler to take
+ 	 * care of single-stepping the breakpoint when it fires.
+@@ -607,7 +613,6 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+ 		(arch_check_bp_in_kernelspace(bp) || !core_has_mismatch_bps()),
+ 			"overflow handler required but none found")) {
+ 		ret = -EINVAL;
+-		goto out;
+ 	}
  out:
  	return ret;
- }
 -- 
 1.7.0.4
