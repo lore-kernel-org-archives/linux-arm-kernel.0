@@ -1,45 +1,35 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Wed, 1 Dec 2010 19:36:34 -0600
-Subject: [PATCHv5 0/4] omap: iovmm - fixes for iovmm module
-In-Reply-To: <1291231567-notmuch-felipe.contreras@nokia.com>
-References: <1288033806-1496-1-git-send-email-x0095840@ti.com>
-	<20101129.104729.97149649.Hiroshi.DOYU@nokia.com>
-	<1291231567-notmuch-felipe.contreras@nokia.com>
-Message-ID: <AANLkTimQcXrgxGjZonSUSkXqoHfAVVhXuHnGKBkMKc9X@mail.gmail.com>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Wed, 1 Dec 2010 20:10:00 -0600
+Subject: [RFC v2 1/8] TILER-DMM: DMM-PAT driver for TI TILER
+In-Reply-To: <AANLkTi=q1HzYBpMH_pP+S5BtBQpHs62+zNfd_MtWHFuu@mail.gmail.com>
+References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
+	<1291147139-23472-2-git-send-email-davidsin@ti.com>
+	<AANLkTi=q1HzYBpMH_pP+S5BtBQpHs62+zNfd_MtWHFuu@mail.gmail.com>
+Message-ID: <AANLkTi=YUYuxQE8pDZrN5-PJq1Q3jw7cP2yZKCXNAvPP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 1, 2010 at 1:27 PM, Felipe Contreras
-<felipe.contreras@nokia.com> wrote:
-> Hiroshi.DOYU at nokia.com wrote:
->> From: ext Fernando Guzman Lugo <x0095840@ti.com>
->> Subject: [PATCHv5 0/4] omap: iovmm - fixes for iovmm module
->> Date: Mon, 25 Oct 2010 21:10:02 +0200
->>
->> > Version 5:
->> > * Changes in "iommu: create new api to set valid da range"
->> > ? - Change range variables to platform data structure.
->>
->> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
->
-> Does that means you are going to send a pull request with these for .38?
->
-> Fernando, is there a branch where you have all the changes needed in
-> tidspbridge?
-
-No, I dont have that branch.
+On Wed, Dec 1, 2010 at 12:04 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
+> David,
 
 >
-> I guess the only patch missing would be the one for linux-arm.
-
-Yes, after merging them, the only missing is the SG chain patch.
-
-Regards,
-Fernando.
-
+>> + ? ? ? ? ? ? ? if (!oh)
+>> + ? ? ? ? ? ? ? ? ? ? ? goto error;
+>> +
+>> + ? ? ? ? ? ? ? data->base = oh->_mpu_rt_va;
 >
-> Cheers.
->
-> --
-> Felipe Contreras
->
+> not required. Make use of platform_get APIs in probe to extract the
+> base, dma and irq info using pdev.
+
+Not sure about using platform_get APIs. I think one has to use
+omap_hwmod_get_mpu_rt_va to get the address, which internally returns
+oh-<_mpu_rt_va.
+omap_hwmod_get_mpu_rt_va was added so that the individual drivers can
+avoid doing the ioremap.
+check the discussion regarding this.
+http://www.spinics.net/lists/linux-omap/msg33048.html
+
+
+Thank you,
+Best regards,
+Hari Kanigeri
