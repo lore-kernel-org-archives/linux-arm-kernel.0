@@ -1,55 +1,42 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Thu, 2 Dec 2010 18:16:29 +0800
-Subject: [PATCH v2 03/15] ARM: mxs: Add reset routines
-In-Reply-To: <20101202094045.GO32355@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291031956-30314-3-git-send-email-shawn.guo@freescale.com>
-	<20101202094045.GO32355@pengutronix.de>
-Message-ID: <AANLkTi=iDTuD1w2XFTYtA-_bWDrCjM8KVc-9S4CPBrqF@mail.gmail.com>
+From: hari.kanigeri@gmail.com (Hari Kanigeri)
+Date: Thu, 2 Dec 2010 04:23:00 -0600
+Subject: [RFC v2 1/8] TILER-DMM: DMM-PAT driver for TI TILER
+In-Reply-To: <AANLkTikEY+0gGB9dbVFZvhwWbd5jGEGo7oDNs_y5xL=s@mail.gmail.com>
+References: <1291147139-23472-1-git-send-email-davidsin@ti.com>
+	<1291147139-23472-2-git-send-email-davidsin@ti.com>
+	<AANLkTi=q1HzYBpMH_pP+S5BtBQpHs62+zNfd_MtWHFuu@mail.gmail.com>
+	<AANLkTi=YUYuxQE8pDZrN5-PJq1Q3jw7cP2yZKCXNAvPP@mail.gmail.com>
+	<AANLkTik1o4Ka_UnwWvmjVhQGrPwrOpPGG4mmu4zSiH+U@mail.gmail.com>
+	<AANLkTikEY+0gGB9dbVFZvhwWbd5jGEGo7oDNs_y5xL=s@mail.gmail.com>
+Message-ID: <AANLkTim6vtSnGrTXjy71UVu79+3QgHcUv3+7AWP=DTgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Wed, Dec 1, 2010 at 11:16 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
+> On Thu, Dec 2, 2010 at 07:57, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
+>> On Wed, Dec 1, 2010 at 8:10 PM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
+>>> On Wed, Dec 1, 2010 at 12:04 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
+>>>> David,
+>>>
+>>>>
+>>>>> + ? ? ? ? ? ? ? if (!oh)
+>>>>> + ? ? ? ? ? ? ? ? ? ? ? goto error;
+>>>>> +
+>>>>> + ? ? ? ? ? ? ? data->base = oh->_mpu_rt_va;
+>>>>
+>>>> not required. Make use of platform_get APIs in probe to extract the
+>>>> base, dma and irq info using pdev.
+>>>
+>>> Not sure about using platform_get APIs. I think one has to use
+>>> omap_hwmod_get_mpu_rt_va to get the address, which internally returns
+>>> oh-<_mpu_rt_va.
+>> small correction... omap_device_get_rt_va and not omap_hwmod_get_mpu_rt_va.
+>
+> To get the base address & irq, you need not have to use
+> omap_device_get_rt_va and pass it as
+> pdata and then use it during probe. Instead in probe, you may do
+> something like the following:
 
-2010/12/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Shawn
->
-> On Mon, Nov 29, 2010 at 07:59:13PM +0800, Shawn Guo wrote:
->> +/*
->> + * Reset the system. It is called by machine_restart().
->> + */
->> +void arch_reset(char mode, const char *cmd)
->> +{
->> + ? ? /* Set wdog count */
->> + ? ? __raw_writel(1, wdog_base + MXS_RTC_WATCHDOG);
->> +
->> + ? ? /* Assert SRS signal */
->> + ? ? __raw_writel(MXS_WATCHDOG_EN, wdog_base + MXS_SET_ADDR);
->> +
->> + ? ? /* Wait for reset to assert... */
->> + ? ? mdelay(500);
->> +
->> + ? ? pr_err("Watchdog reset failed to assert reset\n");
->> +
->> + ? ? /* Delay to allow the serial port to show the message */
->> + ? ? mdelay(50);
->> +
->> + ? ? /* We'll take a jump through zero as a poor second */
->> + ? ? cpu_reset(0);
-> After reading a bit in IMX28RM, I wonder why do you bother with the
-> watchdog at all? ?Doesn't
->
-> ? ? ? ?__raw_writel(MXS_CLKCTRL_RESET_CHIP, MXS_CLKCTRL_RESET + MXS_SET_ADDR);
->
-> work easier and without the need to worry about timeouts, sleeping while
-> clk_{get,enable} and races?
-> (Note I didn't check if i.MX23 has the same register at the same
-> address.)
->
-Yes, it's a good way to reset mxs SoC.  But the bad thing is the
-offset of the register is different between MX23 and MX28.  Also there
-is no SET_ADDR for this register.
-
--- 
-Regards,
-Shawn
+If hwmod framework is already doing the ioremap on device address,
+then it is better to use it rather than duplicating the ioremap part
+again in probe function.
