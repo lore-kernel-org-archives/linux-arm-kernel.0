@@ -1,43 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 02 Dec 2010 16:56:33 +0000
-Subject: Cache maintenance on page table updates
-In-Reply-To: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
-References: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
-Message-ID: <1291308993.11271.60.camel@e102109-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 02 Dec 2010 17:37:40 +0100
+Subject: [PATCH 2/4] mach-s5pv310: Add resource definitions for mipi-csis
+In-Reply-To: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1291307862-8125-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Add IRQ and register base address definitions for mipi-csis devices.
 
-On Thu, 2010-12-02 at 16:39 +0000, Christoffer Dall wrote:
-> When I update the page table mappings' AP bits, it is for some reason
-> not enough to clean caches, but I must also invalidate them for the
-> changes to take effect. The system runs on an arm1136 processor and I
-> was under the impression that page table walks never read from the L1
-> cache. If this is true, I cannot understand why an invalidation of
-> caches would make a difference.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv310/include/mach/irqs.h |    3 +++
+ arch/arm/mach-s5pv310/include/mach/map.h  |    5 +++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-Cleaning the D-cache should be enough. If you modified an existing valid
-page table entry, you also need to issue a TLB invalidation.
-
-Also make sure that you have a DSB after that operation (the TLB
-functions in Linux do this already) since cache cleaning happens in
-background and may not finish by the time you need to access the page
-table. Maybe the invalidation just adds some extra delay.
-
-If the page table walks would read from L1, you don't even need to do
-the cache cleaning.
-
-> In the course of understanding this behavior I have come across the
-> RGN, S and C bits in the TTBR0. I don't quite understand how these
-> bits affect the memory system - should they simply match the way that
-> the page tables themselves are mapped in virtual memory or do they
-> somehow control how the page table walk mechanism behaves?
-
-These bits should follow the same attributes which are used for mapping
-the page table entry (in Linux normal cacheable), even though the
-hardware may not support L1 page table walks (and you need the extra
-cache flushing).
-
+diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-s5pv310/include/mach/irqs.h
+index 99e7dad..db63773 100644
+--- a/arch/arm/mach-s5pv310/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
+@@ -83,6 +83,9 @@
+ #define IRQ_HSMMC2		COMBINER_IRQ(29, 2)
+ #define IRQ_HSMMC3		COMBINER_IRQ(29, 3)
+ 
++#define IRQ_MIPICSI0		COMBINER_IRQ(30, 0)
++#define IRQ_MIPICSI1		COMBINER_IRQ(30, 1)
++
+ #define IRQ_ONENAND_AUDI	COMBINER_IRQ(34, 0)
+ 
+ #define IRQ_EINT4		COMBINER_IRQ(37, 0)
+diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
+index 7acf4e7..9905bfe 100644
+--- a/arch/arm/mach-s5pv310/include/mach/map.h
++++ b/arch/arm/mach-s5pv310/include/mach/map.h
+@@ -56,6 +56,9 @@
+ #define S5PV310_PA_GPIO2		(0x11000000)
+ #define S5PV310_PA_GPIO3		(0x03860000)
+ 
++#define S5PV310_PA_CSIS0		(0x11880000)
++#define S5PV310_PA_CSIS1		(0x11890000)
++
+ #define S5PV310_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
+ 
+ #define S5PV310_PA_SROMC		(0x12570000)
+@@ -95,5 +98,7 @@
+ #define S3C_PA_IIC7			S5PV310_PA_IIC(7)
+ #define S3C_PA_RTC			S5PV310_PA_RTC
+ #define S3C_PA_WDT			S5PV310_PA_WATCHDOG
++#define S5P_PA_CSIS0			S5PV310_PA_CSIS0
++#define S5P_PA_CSIS1			S5PV310_PA_CSIS1
+ 
+ #endif /* __ASM_ARCH_MAP_H */
 -- 
-Catalin
+1.7.1
