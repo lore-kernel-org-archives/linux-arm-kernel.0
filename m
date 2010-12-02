@@ -1,26 +1,72 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Thu, 2 Dec 2010 17:39:58 +0100
-Subject: Cache maintenance on page table updates
-Message-ID: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 02 Dec 2010 17:37:42 +0100
+Subject: [PATCH 4/4] mach-s5pv210: Add MIPI-CSI DPHY clock definition
+In-Reply-To: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1291307862-8125-5-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin.
+MIPI DPHY control register requires special handling since
+it is shared between CSI (camera serial interface) and DSI
+(display serial interface). By creating this clock
+a serialized interface is provided for mipi-csi and mipi-dsi
+drivers, so DPHYs may be safely controlled by both drivers.
+Similarly dsim_dphy clock could be added for mipi-dsim.
 
-I am hoping you can help me understand the following observed behavior in KVM.
+---
 
-When I update the page table mappings' AP bits, it is for some reason
-not enough to clean caches, but I must also invalidate them for the
-changes to take effect. The system runs on an arm1136 processor and I
-was under the impression that page table walks never read from the L1
-cache. If this is true, I cannot understand why an invalidation of
-caches would make a difference.
+I am not quite sure about "csis_dphy" clock, perhaps power domain
+handling code would better place for MIPI DPHY control.
 
-In the course of understanding this behavior I have come across the
-RGN, S and C bits in the TTBR0. I don't quite understand how these
-bits affect the memory system - should they simply match the way that
-the page tables themselves are mapped in virtual memory or do they
-somehow control how the page table walk mechanism behaves?
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/clock.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-Thanks,
-Christoffer
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index 019c3a6..14e42ca 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -185,6 +185,19 @@ static int s5pv210_clk_mask1_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(S5P_CLK_SRC_MASK1, clk, enable);
+ }
+ 
++static int s5pv210_clk_mipi_dphy_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_MIPI_DPHY_CONTROL, clk, enable);
++}
++
++/* The common parent clock for mipi-csi/dsi clocks. */
++static struct clk clk_vp_mipi_dphy = {
++	.name		= "vpclk_csis_dphy",
++	.id		= -1,
++	.enable		= s5pv210_clk_mipi_dphy_ctrl,
++	.ctrlbit	= (1 << 0),
++};
++
+ static struct clk clk_sclk_hdmi27m = {
+ 	.name		= "sclk_hdmi27m",
+ 	.id		= -1,
+@@ -323,6 +336,18 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip0_ctrl,
+ 		.ctrlbit	= (1 << 4),
+ 	}, {
++		.name		= "csis",
++		.id		= -1,
++		.parent		= &clk_pclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 31),
++	}, {
++		.name		= "csis_dphy",
++		.id		= -1,
++		.parent		= &clk_vp_mipi_dphy,
++		.enable		= s5pv210_clk_mipi_dphy_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
+ 		.name		= "rot",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_dsys.clk,
+-- 
+1.7.1
