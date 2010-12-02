@@ -1,35 +1,55 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 02 Dec 2010 11:11:02 +0100
-Subject: [PATCH] arm: omap2: io: fix clk_get() error check
-In-Reply-To: <1291126678-2782-1-git-send-email-aaro.koskinen@nokia.com> (Aaro
-	Koskinen's message of "Tue, 30 Nov 2010 16:17:58 +0200")
-References: <1291126678-2782-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <87vd3c4h8p.fsf@deeprootsystems.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 2 Dec 2010 18:16:29 +0800
+Subject: [PATCH v2 03/15] ARM: mxs: Add reset routines
+In-Reply-To: <20101202094045.GO32355@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291031956-30314-3-git-send-email-shawn.guo@freescale.com>
+	<20101202094045.GO32355@pengutronix.de>
+Message-ID: <AANLkTi=iDTuD1w2XFTYtA-_bWDrCjM8KVc-9S4CPBrqF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen <aaro.koskinen@nokia.com> writes:
+Hi Uwe,
 
-> clk_get() return value should be checked with IS_ERR().
+2010/12/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Shawn
 >
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
-
-> ---
->  arch/arm/mach-omap2/io.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> On Mon, Nov 29, 2010 at 07:59:13PM +0800, Shawn Guo wrote:
+>> +/*
+>> + * Reset the system. It is called by machine_restart().
+>> + */
+>> +void arch_reset(char mode, const char *cmd)
+>> +{
+>> + ? ? /* Set wdog count */
+>> + ? ? __raw_writel(1, wdog_base + MXS_RTC_WATCHDOG);
+>> +
+>> + ? ? /* Assert SRS signal */
+>> + ? ? __raw_writel(MXS_WATCHDOG_EN, wdog_base + MXS_SET_ADDR);
+>> +
+>> + ? ? /* Wait for reset to assert... */
+>> + ? ? mdelay(500);
+>> +
+>> + ? ? pr_err("Watchdog reset failed to assert reset\n");
+>> +
+>> + ? ? /* Delay to allow the serial port to show the message */
+>> + ? ? mdelay(50);
+>> +
+>> + ? ? /* We'll take a jump through zero as a poor second */
+>> + ? ? cpu_reset(0);
+> After reading a bit in IMX28RM, I wonder why do you bother with the
+> watchdog at all? ?Doesn't
 >
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index 40562dd..a1939b1 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -297,7 +297,7 @@ static int __init _omap2_init_reprogram_sdrc(void)
->  		return 0;
->  
->  	dpll3_m2_ck = clk_get(NULL, "dpll3_m2_ck");
-> -	if (!dpll3_m2_ck)
-> +	if (IS_ERR(dpll3_m2_ck))
->  		return -EINVAL;
->  
->  	rate = clk_get_rate(dpll3_m2_ck);
+> ? ? ? ?__raw_writel(MXS_CLKCTRL_RESET_CHIP, MXS_CLKCTRL_RESET + MXS_SET_ADDR);
+>
+> work easier and without the need to worry about timeouts, sleeping while
+> clk_{get,enable} and races?
+> (Note I didn't check if i.MX23 has the same register at the same
+> address.)
+>
+Yes, it's a good way to reset mxs SoC.  But the bad thing is the
+offset of the register is different between MX23 and MX28.  Also there
+is no SET_ADDR for this register.
+
+-- 
+Regards,
+Shawn
