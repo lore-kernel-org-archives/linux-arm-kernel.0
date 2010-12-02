@@ -1,40 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Dec 2010 14:00:24 -0800
-Subject: OMAP4 build error - omapfb
-In-Reply-To: <20101202212541.GH10461@n2100.arm.linux.org.uk>
-References: <20101202212541.GH10461@n2100.arm.linux.org.uk>
-Message-ID: <20101202220024.GX17222@atomide.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 2 Dec 2010 23:05:01 +0100
+Subject: [PATCH] ux500: minor revision to the eMMC/SD config
+Message-ID: <1291327501-8047-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 13:15]:
-> drivers/built-in.o: In function `omapfb_do_probe':
-> drivers/video/omap/omapfb_main.c:1773: undefined reference to `omap2_int_ctrl'
-> 
-> Looks like there's a missing dependency for CONFIG_FB_OMAP.  As the
-> only place omap2_int_ctrl is defined is in drivers/video/omap/dispc.c,
-> and this isn't built for OMAP4, maybe FB_OMAP is missing a dependency
-> such that it's only available for OMAP1, OMAP2 and OMAP3 ?
+This properly adds the missing external sdi0 interface and a small
+fixup for the v1(.0) ASIC.
 
-This is something for Tomi, adding fbdev and Tomi to Cc.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-ux500/board-mop500-sdi.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-Tony
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index be5e8cc..4b99667 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -137,12 +137,21 @@ static struct mmci_platform_data mop500_sdi4_data = {
+ 	.gpio_wp	= -1,
+ };
  
-> diff --git a/drivers/video/omap/Kconfig b/drivers/video/omap/Kconfig
-> index 455c605..083c8fe 100644
-> --- a/drivers/video/omap/Kconfig
-> +++ b/drivers/video/omap/Kconfig
-> @@ -1,7 +1,7 @@
->  config FB_OMAP
->  	tristate "OMAP frame buffer support (EXPERIMENTAL)"
-> -	depends on FB && ARCH_OMAP && (OMAP2_DSS = "n")
-> -
-> +	depends on FB && (OMAP2_DSS = "n")
-> +	depends on ARCH_OMAP1 || ARCH_OMAP2 || ARCH_OMAP3
->  	select FB_CFB_FILLRECT
->  	select FB_CFB_COPYAREA
->  	select FB_CFB_IMAGEBLIT
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-void mop500_sdi_init(void)
++void __init mop500_sdi_init(void)
+ {
+ 	nmk_config_pins(mop500_sdi_pins, ARRAY_SIZE(mop500_sdi_pins));
+ 
++	/*
++	 * sdi0 will finally be added when the TC35892 initializes and calls
++	 * mop500_sdi_tc35892_init() above.
++	 */
++
++	/* PoP:ed eMMC */
+ 	if (!cpu_is_u8500ed()) {
+ 		nmk_config_pins(mop500_sdi2_pins, ARRAY_SIZE(mop500_sdi2_pins));
++		/* POP eMMC on v1.0 has problems with high speed */
++		if (!cpu_is_u8500v10())
++			mop500_sdi2_data.capabilities |= MMC_CAP_MMC_HIGHSPEED;
+ 		db8500_add_sdi2(&mop500_sdi2_data);
+ 	}
+ 
+-- 
+1.7.3.2
