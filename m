@@ -1,40 +1,202 @@
-From: Chao@marvell.com (Chao at marvell.com)
-Date: Thu,  2 Dec 2010 14:17:39 +0800
-Subject: [PATCH] ARM: GIC irq desciptor bug fix
-Message-ID: <1291270659-24903-1-git-send-email-cxie4@marvell.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 2 Dec 2010 14:02:39 +0800
+Subject: [PATCH v2 03/15] ARM: mxs: Add reset routines
+In-Reply-To: <20101130102505.GG20449@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291031956-30314-3-git-send-email-shawn.guo@freescale.com>
+	<20101130102505.GG20449@pengutronix.de>
+Message-ID: <AANLkTinavvbQFGQhcAZF+ZBV1OuiZYu0XaBYSM7YuuKG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: cxie4 <cxie4@marvell.com>
+Hi Uwe,
 
-gic_set_cpu will directly use irq_desc[]. If CONFIG_SPARSE_IRQ is enabled, there is no
-irq_desc[]. So we need use irq_to_desc(irq) to get the descriptor for irq.
+2010/11/30 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+[...]
+>
+>> + ? ? /* Poll CLKGATE set */
+>> + ? ? timeout = 0x400;
+>> + ? ? while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
+>> + ? ? ? ? ? ? /* nothing */;
+>> + ? ? if (!timeout)
+>> + ? ? ? ? ? ? goto error;
+>> +
+>> + ? ? /* Clear SFTRST */
+>> + ? ? val = __raw_readl(reset_addr);
+>> + ? ? val &= ~MXS_MODULE_SFTRST;
+>> + ? ? __raw_writel(val, reset_addr);
+>> + ? ? /* Wait 1us */
+>> + ? ? udelay(1);
+>> + ? ? /* Poll SFTRST cleared */
+>> + ? ? timeout = 0x400;
+>> + ? ? while ((__raw_readl(reset_addr) & MXS_MODULE_SFTRST) && --timeout)
+>> + ? ? ? ? ? ? /* nothing */;
+>> + ? ? if (!timeout)
+>> + ? ? ? ? ? ? goto error;
+>> +
+>> + ? ? /* Clear CLKGATE */
+>> + ? ? val = __raw_readl(reset_addr);
+>> + ? ? val &= ~MXS_MODULE_CLKGATE;
+>> + ? ? __raw_writel(val, reset_addr);
+>> + ? ? /* Wait 1us */
+>> + ? ? udelay(1);
+>> + ? ? /* Poll CLKGATE cleared */
+>> + ? ? timeout = 0x400;
+>> + ? ? while ((__raw_readl(reset_addr) & MXS_MODULE_CLKGATE) && --timeout)
+>> + ? ? ? ? ? ? /* nothing */;
+>> + ? ? if (!timeout)
+>> + ? ? ? ? ? ? goto error;
+>
+> There are quite some repetitions in this function. ?If you could get it
+> down to something that looks like
+>
+> ? ? ? ?clear SFTRST
+> ? ? ? ?udelay
+> ? ? ? ?poll SFTRST cleared
+>
+> ? ? ? ?clear CLKGATE
+> ? ? ? ?set SFTRST
+> ? ? ? ?udelay
+> ? ? ? ?poll CLKGATE set
+>
+> ? ? ? ?clear SFTRST
+> ? ? ? ?udelay
+> ? ? ? ?poll SFTRST cleared
+>
+> ? ? ? ?clear CLKGATE
+> ? ? ? ?udelay
+> ? ? ? ?poll CLKGATE cleared
+>
+> it's IMHO better than the comment above. ?If "clear CLKGATE" and "set
+> SFTRST" can be done in a single step this might be done like that:
+>
+> ? ? ? ?/* comment describing setmask_poll */
+> ? ? ? ?static int setmask_poll(void __iomem *addr, u32 set, u32 mask,
+> ? ? ? ? ? ? ? ?u32 pollval, u32 pollmask, u32 *curval)
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?int timeout = 0x400;
+>
+> ? ? ? ? ? ? ? ?*curval &= ~mask;
+> ? ? ? ? ? ? ? ?*curval |= set;
+> ? ? ? ? ? ? ? ?__raw_writel(*curval, addr)
+>
+> ? ? ? ? ? ? ? ?/*
+> ? ? ? ? ? ? ? ? * some nice comment about 1us being a good idea
+> ? ? ? ? ? ? ? ? */
+> ? ? ? ? ? ? ? ?udelay(1);
+>
+> ? ? ? ? ? ? ? ?do {
+> ? ? ? ? ? ? ? ? ? ? ? ?*curval = __raw_readl(addr);
+> ? ? ? ? ? ? ? ? ? ? ? ?if ((*curval & pollmask) == pollval)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?return 0;
+>
+> ? ? ? ? ? ? ? ?} while(--timeout);
+>
+> ? ? ? ? ? ? ? ?return 1;
+> ? ? ? ?}
+>
+> ? ? ? ?int mxs_reset_block(void __iomem *reset_addr)
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?u32 val = __raw_readl(reset_addr);
+> ? ? ? ? ? ? ? ?int ret;
+>
+> ? ? ? ? ? ? ? ?/* clear SFTRST and poll SFTRST becoming clear */
+> ? ? ? ? ? ? ? ?ret = setmask_poll(reset_addr,
+> ? ? ? ? ? ? ? ? ? ? ? ?0, MXS_MODULE_SFTRST,
+> ? ? ? ? ? ? ? ? ? ? ? ?0, MXS_MODULE_SFTRST, &val);
+> ? ? ? ? ? ? ? ?if (ret)
+> ? ? ? ? ? ? ? ? ? ? ? ?goto error;
+>
+> ? ? ? ? ? ? ? ?/* clear CLKGATE, set SFTRST and poll CLKGATE becoming set */
+> ? ? ? ? ? ? ? ?ret = setmask_poll(reset_addr,
+> ? ? ? ? ? ? ? ? ? ? ? ?MXS_MODULE_SFTRST, MXS_MODULE_SFTRST | MXS_MODULE_CLKGATE,
+> ? ? ? ? ? ? ? ? ? ? ? ?0, MXS_MODULE_CLKGATE, &val);
+> ? ? ? ? ? ? ? ?if (ret)
+> ? ? ? ? ? ? ? ? ? ? ? ?goto error;
+>
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ?}
+>
+> Well, not very nice, but IMHO better that your code. ?Maybe
+> mxs_reset_block fits in a Terminal that way without decreasing the font
+> size :-)
+>
+I checked designer about doing "clear CLKGATE" and "set SFTRST" in a
+single step, and got the following feedback.
 
-Signed-off-by: cxie4 <cxie4@marvell.com>
----
- arch/arm/common/gic.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+"Per HW design, it is not safe to get those two done by write once
+time. By two step write, one instruction period interval can be
+ensured at least for clock  enabling before sync. Soft reset.  Your
+code is only once time write in fact, so it shall not be equal to two
+write operation."
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 7dfa9a8..6599acb 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -160,9 +160,15 @@ static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
- 	unsigned int shift = (irq % 4) * 8;
- 	unsigned int cpu = cpumask_first(mask_val);
- 	u32 val;
-+	struct irq_desc *desc;
- 
- 	spin_lock(&irq_controller_lock);
--	irq_desc[irq].node = cpu;
-+	desc = irq_to_desc(irq);
-+	if (desc == NULL) {
-+		spin_unlock(&irq_controller_lock);
-+		return -EINVAL;
-+	}
-+	desc->node = cpu;
- 	val = readl(reg) & ~(0xff << shift);
- 	val |= 1 << (cpu + shift);
- 	writel(val, reg);
+In this case, how do the following changes look to you?
+
+/*
+ * Clear the bit and poll it cleared, the bit has to be
+ * SFTRST(bit 31) or CLKGATE (bit 30) of block control register.
+ */
+static int clear_poll_bit(void __iomem *addr, u32 mask)
+{
+        int timeout = 0x400;
+
+        /* clear the bit */
+        __raw_writel(mask, addr + MXS_CLR_ADDR);
+
+        /*
+         * SFTRST needs 3 GPMI clocks to settle, the reference manual
+         * recommends to wait 1us.
+         */
+        udelay(1);
+
+        /* poll the bit becoming clear */
+        while ((__raw_readl(addr) & mask) && --timeout)
+                /* nothing */;
+
+        if (unlikely(!timeout))
+                return 1;
+
+        return 0;
+}
+
+int mxs_reset_block(void __iomem *reset_addr)
+{
+        int ret;
+        int timeout = 0x400;
+
+        /* clear and poll SFTRST */
+        ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
+        if (ret)
+                goto error;
+
+        /* clear CLKGATE */
+        __raw_writel(MXS_MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
+        /* set SFTRST to reset the block */
+        __raw_writel(MXS_MODULE_SFTRST, reset_addr + MXS_SET_ADDR);
+        udelay(1);
+        /* poll CLKGATE becoming set */
+        while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
+                /* nothing */;
+        if (unlikely(!timeout))
+                goto error;
+
+        /* clear and poll SFTRST */
+        ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
+        if (ret)
+                goto error;
+
+        /* clear and poll CLKGATE */
+        ret = clear_poll_bit(reset_addr, MXS_MODULE_CLKGATE);
+        if (ret)
+                goto error;
+
+error:
+        pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
+        return -ETIMEDOUT;
+}
+
 -- 
-1.6.3.3
+Regards,
+Shawn
