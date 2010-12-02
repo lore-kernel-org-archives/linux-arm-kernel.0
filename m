@@ -1,45 +1,68 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 2 Dec 2010 19:48:07 +0530
-Subject: [PATCH v8 00/11] OMAP: GPIO: Implement GPIO as platform device
-In-Reply-To: <87zkso4hu3.fsf@deeprootsystems.com>
-References: <1290689318-10191-1-git-send-email-charu@ti.com>
-	<20101201183357.GI17222@atomide.com>
-	<87zkso4hu3.fsf@deeprootsystems.com>
-Message-ID: <AANLkTinY8FKbVvXD29KpgGnsnKwQziXws+zKLZWn69Hj@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Thu, 2 Dec 2010 19:53:30 +0530
+Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling
+	mstandby mode
+In-Reply-To: <1291298392-28729-1-git-send-email-manjugk@ti.com>
+References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
+Message-ID: <20101202142329.GA21529@GLPP-machine>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 2, 2010 at 15:28, Kevin Hilman <khilman@deeprootsystems.com> wrote:
-> Tony Lindgren <tony@atomide.com> writes:
->
->> * Varadarajan, Charulatha <charu@ti.com> [101125 04:39]:
->>> Implement OMAP GPIO module in platform device model. OMAP2+ specific GPIO
->>> module uses hwmod FW.
->>>
->>> Tested on OMAP2430, OMAP4430, OMAP3430 SDP boards, OMAP4430 Blaze board
->>> and zoom3 board. Verified that this patch series does not break the OMAP1
->>> build.
->>
->> I've boot tested this on N800 + 5912OSK.
->>
->> I'll apply these patches into devel-gpio branch and start merging these
->> into linux-omap master branch and into for-next for the next merge window.
->>
->> I've also added one minor fix for 16xx, will post that separately.
 
-Tony, thanks for the patch.
+* G, Manjunath Kondaiah <manjugk@ti.com> [2010-12-02 19:29:52 +0530]:
 
->
-> Tony, you can also add
->
-> Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+> Certain errata in OMAP2+ processors will require forcing
+> master standby to "no standby" mode before completing on going
+> operation. Without this, the results will be unpredictable.
+> 
+> Since current implementation of PM run time framework does not support
+> changing sysconfig settings during middle of the on going operation,
+> these API's will support the same. One API will force the device's
+> sysconfig mstandby mode settings to "no standby" and other API will
+> release "no standby" mode and sets it to "smart standby" or "no
+> standby? depending on HWMOD_SWSUP_MSTANDBY value.
+> 
+> The hwmod API "omap_hwmod_set_master_standbymode" will use
+> no_stdby_cnt(introduced in omap_hwmod structure) for controlling
+> access to sysconfig register settings in case of overlapping
+> request/release API's are called. It also disables interrupts during
+> syconfig register access.
+> 
+> These API's should be used by device drivers only incase of
+> erratum applicable to their modules if there is no other methods
+> to resolve.
+> 
+> These API's are required for multiple DMA errata which require
+> putting DMA controller in no mstandby mode before stopping dma.
+> 
+> The applicable errata:
+> 1. Erratum ID: i557(Applicable for omap36xx all ES versions)
+> The channel hangs when the Pause bit (DMA4_CDPi [7] ) is cleared
+> through config port while in Standby.
+> 
+> 2. Erratum ID: i541
+> sDMA FIFO draining does not finish. Applicable to all omap2+ except
+> omap4.
+> 
+> 3. Erratum ID:i88
+> The sDMA to be put in no mstandby mode before disabling the channel
+> after completing the data transfer operation.
+> Applicable only for OMAP3430 ES1.0
+> 
+> Also fixes typo HWMOD_SWSUP_MSTDBY to HWMOD_SWSUP_MSTANDBY in
+> omap_hwmod.h
+> 
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Thanks Kevin.
+Pls ignore this patch. I have resent this patch as:
+[PATCH v7 RESEND] OMAP2+: PM: omap device: API's for handling mstandby
+mode
 
->
-> for this series, as v8 now looks good for me.
->
-> Thanks Charu,
->
-> Kevin
->
+Sorry for noise.
+
+-Manjunath
+
+[...]
