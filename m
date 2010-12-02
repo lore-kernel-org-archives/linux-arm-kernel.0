@@ -1,60 +1,54 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu,  2 Dec 2010 21:09:47 +0100
-Subject: [PATCH 4/6] i2c/pxa2xx: add support for shared IRQ handler
+Date: Thu,  2 Dec 2010 21:09:49 +0100
+Subject: [PATCH 6/6] i2c/pxa2xx: pass of_node from platform driver to adapter
+	and publish
 In-Reply-To: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
 References: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1291320589-31570-5-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1291320589-31570-7-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sodaville has three of them on a single IRQ. IRQF_DISABLED is removed
-because it is a NOP allready and scheduled for removal.
+the of_node will auto-publish devices which are added to the device
+tree.
+
+Commit 925bb9c6 aka ("of/i2c: Fix module load order issue caused by
+of_i2c.c) moved the of_i2c_register_devices() function from the i2c core
+back to the drivers. This patch does the same thing for the pxa driver.
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
 ---
- drivers/i2c/busses/i2c-pxa.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-pxa.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 32982fb..7c724b2 100644
+index c2089fe..294ac6c 100644
 --- a/drivers/i2c/busses/i2c-pxa.c
 +++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -943,11 +943,17 @@ static void i2c_pxa_irq_rxfull(struct pxa_i2c *i2c, u32 isr)
- 	writel(icr, _ICR(i2c));
- }
+@@ -29,6 +29,7 @@
+ #include <linux/errno.h>
+ #include <linux/interrupt.h>
+ #include <linux/i2c-pxa.h>
++#include <linux/of_i2c.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+ #include <linux/clk.h>
+@@ -1118,12 +1119,16 @@ static int i2c_pxa_probe(struct platform_device *dev)
  
-+#define VALID_INT_SOURCE	(ISR_SSD | ISR_ALD | ISR_ITE | ISR_IRF | \
-+				ISR_SAD | ISR_BED)
- static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
- {
- 	struct pxa_i2c *i2c = dev_id;
- 	u32 isr = readl(_ISR(i2c));
+ 	i2c->adap.algo_data = i2c;
+ 	i2c->adap.dev.parent = &dev->dev;
++#ifdef CONFIG_OF
++	i2c->adap.dev.of_node = dev->dev.of_node;
++#endif
  
-+	isr &= VALID_INT_SOURCE;
-+	if (!isr)
-+		return IRQ_NONE;
-+
- 	if (i2c_debug > 2 && 0) {
- 		dev_dbg(&i2c->adap.dev, "%s: ISR=%08x, ICR=%08x, IBMR=%02x\n",
- 			__func__, isr, readl(_ICR(i2c)), readl(_IBMR(i2c)));
-@@ -962,7 +968,7 @@ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
- 	/*
- 	 * Always clear all pending IRQs.
- 	 */
--	writel(isr & (ISR_SSD|ISR_ALD|ISR_ITE|ISR_IRF|ISR_SAD|ISR_BED), _ISR(i2c));
-+	writel(isr, _ISR(i2c));
+ 	ret = i2c_add_numbered_adapter(&i2c->adap);
+ 	if (ret < 0) {
+ 		printk(KERN_INFO "I2C: Failed to add bus\n");
+ 		goto eadapt;
+ 	}
++	of_i2c_register_devices(&i2c->adap);
  
- 	if (isr & ISR_SAD)
- 		i2c_pxa_slave_start(i2c, isr);
-@@ -1100,7 +1106,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 		i2c->adap.algo = &i2c_pxa_pio_algorithm;
- 	} else {
- 		i2c->adap.algo = &i2c_pxa_algorithm;
--		ret = request_irq(irq, i2c_pxa_handler, IRQF_DISABLED,
-+		ret = request_irq(irq, i2c_pxa_handler, IRQF_SHARED,
- 				  i2c->adap.name, i2c);
- 		if (ret)
- 			goto ereqirq;
+ 	platform_set_drvdata(dev, i2c);
+ 
 -- 
 1.7.3.2
