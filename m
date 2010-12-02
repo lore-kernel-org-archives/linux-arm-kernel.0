@@ -1,20 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 1 Dec 2010 18:37:46 -0800
-Subject: [PATCH v5 00/14] OMAP: DMA: hwmod and DMA as platform device
-In-Reply-To: <20101201190412.GA8149@GLPP-machine>
-References: <1290603110-14119-1-git-send-email-manjugk@ti.com>
-	<20101125112811.GA27574@GLPP-machine>
-	<20101201190412.GA8149@GLPP-machine>
-Message-ID: <20101202023746.GO17222@atomide.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 02 Dec 2010 05:31:24 +0200
+Subject: [PATCH 1/3] mtd: FSMC NAND remove PARTITION macro and fix
+	compile noise
+In-Reply-To: <1291035126-17770-1-git-send-email-linus.walleij@stericsson.com>
+References: <1291035126-17770-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1291260684.14534.3.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2010-11-29 at 13:52 +0100, Linus Walleij wrote:
+> This removes the PARTITION macro that David didn't like and also
+> removes a local variable that was dangling unused in some #ifdefs
+> by being a bit more clever.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 
-* G, Manjunath Kondaiah <manjugk@ti.com> [101201 10:53]:
->
-> Do you have any further comments for this series?
+Pushed this to l2-mtd-2.6.git, thanks.
 
-I'll be looking at it on Thursday.
-
-Tony
+-- 
+Best Regards,
+Artem Bityutskiy (???????? ?????)
