@@ -1,63 +1,43 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 2 Dec 2010 17:51:18 +0100
-Subject: [PATCH] mmci: corrected calculation of clock div for ux500
-Message-ID: <1291308678-15497-1-git-send-email-linus.walleij@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 02 Dec 2010 16:56:33 +0000
+Subject: Cache maintenance on page table updates
+In-Reply-To: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
+References: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
+Message-ID: <1291308993.11271.60.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@stericsson.com>
+Hi Christoffer,
 
-The Ux500 variant of this block has a different divider.
-The value used right now is too big and which means a loss
-in performance. This fix corrects it.
+On Thu, 2010-12-02 at 16:39 +0000, Christoffer Dall wrote:
+> When I update the page table mappings' AP bits, it is for some reason
+> not enough to clean caches, but I must also invalidate them for the
+> changes to take effect. The system runs on an arm1136 processor and I
+> was under the impression that page table walks never read from the L1
+> cache. If this is true, I cannot understand why an invalidation of
+> caches would make a difference.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/mmc/host/mmci.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Cleaning the D-cache should be enough. If you modified an existing valid
+page table entry, you also need to issue a TLB invalidation.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index cabd386..21fd486 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -57,6 +57,7 @@ static unsigned int fmax = 515633;
-  * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
-  *		using DMA.
-  * @sdio: variant supports SDIO
-+ * @st_clkdiv: true if using a ST-specific clock divider algorithm
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -69,6 +70,7 @@ struct variant_data {
- 	bool			broken_blockend;
- 	bool			broken_blockend_dma;
- 	bool			sdio;
-+	bool			st_clkdiv;
- };
- 
- static struct variant_data variant_arm = {
-@@ -96,7 +98,9 @@ static struct variant_data variant_ux500 = {
- 	.datalength_bits	= 24,
- 	.broken_blockend	= true,
- 	.sdio			= true,
-+	.st_clkdiv		= true,
- };
-+
- /*
-  * This must be called with host->lock held
-  */
-@@ -109,6 +113,11 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
- 		if (desired >= host->mclk) {
- 			clk = MCI_CLK_BYPASS;
- 			host->cclk = host->mclk;
-+		} else if (variant->st_clkdiv) {
-+			clk = ((host->mclk + desired - 1) / desired) - 2;
-+			if (clk >= 256)
-+				clk = 255;
-+			host->cclk = host->mclk / (clk + 2);
- 		} else {
- 			clk = host->mclk / (2 * desired) - 1;
- 			if (clk >= 256)
+Also make sure that you have a DSB after that operation (the TLB
+functions in Linux do this already) since cache cleaning happens in
+background and may not finish by the time you need to access the page
+table. Maybe the invalidation just adds some extra delay.
+
+If the page table walks would read from L1, you don't even need to do
+the cache cleaning.
+
+> In the course of understanding this behavior I have come across the
+> RGN, S and C bits in the TTBR0. I don't quite understand how these
+> bits affect the memory system - should they simply match the way that
+> the page tables themselves are mapped in virtual memory or do they
+> somehow control how the page table walk mechanism behaves?
+
+These bits should follow the same attributes which are used for mapping
+the page table entry (in Linux normal cacheable), even though the
+hardware may not support L1 page table walks (and you need the extra
+cache flushing).
+
 -- 
-1.7.3.2
+Catalin
