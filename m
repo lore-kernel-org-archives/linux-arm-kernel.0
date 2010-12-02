@@ -1,13 +1,13 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Dec 2010 09:46:31 +0000
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 2 Dec 2010 10:51:19 +0100
 Subject: mounting ext3 with readonly but there is some writing on it.
 In-Reply-To: <0LCS00K68N6XI4@ms11.samsung.com>
 References: <0LCS00K68N6XI4@ms11.samsung.com>
-Message-ID: <20101202094631.GE29347@n2100.arm.linux.org.uk>
+Message-ID: <20101202095119.GP32355@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And we should reply to HTML-only email because... ?
+Hello Chun-Gil Lee,
 
 On Thu, Dec 02, 2010 at 09:18:31AM +0000, ??? wrote:
 > <HTML><HEAD><TITLE>Samsung Enterprise Portal mySingle</TITLE>
@@ -48,9 +48,19 @@ On Thu, Dec 02, 2010 at 09:18:31AM +0000, ??? wrote:
 > <TD NAMO_LOCK>
 > <P><IMG border=0 src="cid:QKNMBDIFBEI0@namo.co.kr" width=520></P></TD></TR></TBODY></TABLE>
 > <P></P></BODY></HTML>
+Can you please advise your mail program to send plain text mails to this
+mailing list (and probably to all other Linux related lists, too), I'm
+sure I'm not the only person using a text-mode MUA.
 
+And note that your problem isn't specific to ARM, so this is the wrong
+mailing list.  I suggest linux-ext4 at vger.kernel.org which despite the
+name also cares for ext3.  Or still better ask google which finds e.g.
+http://pavelmachek.livejournal.com/64695.html for when when looking for
+"ext3 read only".
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
