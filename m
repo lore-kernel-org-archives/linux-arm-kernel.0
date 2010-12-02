@@ -1,182 +1,69 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 02 Dec 2010 17:37:41 +0100
-Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
-In-Reply-To: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Dec 2010 09:07:25 -0800
+Subject: [PATCH v5 10/14] OMAP: DMA: Use DMA device attributes
+In-Reply-To: <1290603110-14119-11-git-send-email-manjugk@ti.com>
+References: <1290603110-14119-1-git-send-email-manjugk@ti.com>
+	<1290603110-14119-11-git-send-email-manjugk@ti.com>
+Message-ID: <20101202170724.GQ17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There may be up to 2 MIPI-CSI2 interfaces depending on SoC version.
+* G, Manjunath Kondaiah <manjugk@ti.com> [101124 04:43]:
+> Existing DMA API's are using cpu_*is_* checks for differentiating
+> omap1 and omap2+ code and handle cpu_*is_* checks with DMA device
+> attributes.
+> 
+> Also, move OMAP1 and OMAP2+ specific API's into respective mach-omap
+> dma driver files.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/plat-s5p/Kconfig                 |   10 ++++++++
- arch/arm/plat-s5p/Makefile                |    2 +
- arch/arm/plat-s5p/dev-csis0.c             |   34 +++++++++++++++++++++++++++++
- arch/arm/plat-s5p/dev-csis1.c             |   33 ++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/csis.h |   28 +++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/devs.h |    3 ++
- 6 files changed, 110 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-s5p/dev-csis0.c
- create mode 100644 arch/arm/plat-s5p/dev-csis1.c
- create mode 100644 arch/arm/plat-samsung/include/plat/csis.h
+This patch is unreadable and needs to be split.
 
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 65dbfa8..2fb0c88 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -56,3 +56,13 @@ config S5P_DEV_ONENAND
- 	bool
- 	help
- 	  Compile in platform device definition for OneNAND controller
-+
-+config S5P_DEV_CSIS0
-+	bool
-+	help
-+	  Compile in platform device definitions for MIPI-CSI2 interface 0
-+
-+config S5P_DEV_CSIS1
-+	bool
-+	help
-+	  Compile in platform device definitions for MIPI-CSI2 interface 1
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index de65238..2b73173 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -28,3 +28,5 @@ obj-$(CONFIG_S5P_DEV_FIMC0)	+= dev-fimc0.o
- obj-$(CONFIG_S5P_DEV_FIMC1)	+= dev-fimc1.o
- obj-$(CONFIG_S5P_DEV_FIMC2)	+= dev-fimc2.o
- obj-$(CONFIG_S5P_DEV_ONENAND)	+= dev-onenand.o
-+obj-$(CONFIG_S5P_DEV_CSIS0)	+= dev-csis0.o
-+obj-$(CONFIG_S5P_DEV_CSIS1)	+= dev-csis1.o
-diff --git a/arch/arm/plat-s5p/dev-csis0.c b/arch/arm/plat-s5p/dev-csis0.c
-new file mode 100644
-index 0000000..2b1ba43
---- /dev/null
-+++ b/arch/arm/plat-s5p/dev-csis0.c
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright (C) 2010 Samsung Electronics
-+ *
-+ * S5P series device definition for MIPI-CSI device 0
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <mach/map.h>
-+
-+static struct resource s5p_csis_resource[] = {
-+	[0] = {
-+		.start = S5P_PA_CSIS0,
-+		.end   = S5P_PA_CSIS0 + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_MIPICSI0,
-+		.end   = IRQ_MIPICSI0,
-+		.flags = IORESOURCE_IRQ,
-+	}
-+};
-+
-+struct platform_device s5p_device_mipi_csis0 = {
-+	.name		  = "s5p-mipi-csis",
-+	.id		  = 0,
-+	.num_resources	  = 2,
-+	.resource	  = &s5p_csis_resource[0],
-+};
-diff --git a/arch/arm/plat-s5p/dev-csis1.c b/arch/arm/plat-s5p/dev-csis1.c
-new file mode 100644
-index 0000000..7f21ea8
---- /dev/null
-+++ b/arch/arm/plat-s5p/dev-csis1.c
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright (C) 2010 Samsung Electronics
-+ *
-+ * S5P series device definition for MIPI-CSI device 1
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <mach/map.h>
-+
-+static struct resource s5p_csis_resource[] = {
-+	[0] = {
-+		.start = S5P_PA_CSIS1,
-+		.end   = S5P_PA_CSIS1 + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_MIPICSI1,
-+		.end   = IRQ_MIPICSI1,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+struct platform_device s5p_device_mipi_csis1 = {
-+	.name		  = "s5p-mipi-csis",
-+	.id		  = 1,
-+	.num_resources	  = 2,
-+	.resource	  = &s5p_csis_resource[0],
-+};
-diff --git a/arch/arm/plat-samsung/include/plat/csis.h b/arch/arm/plat-samsung/include/plat/csis.h
-new file mode 100644
-index 0000000..6ea3a40
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/csis.h
-@@ -0,0 +1,28 @@
-+/*
-+ * Copyright (C) 2010 Samsung Electronics Co., Ltd
-+ *
-+ * S5P series MIPI CSI2 device support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef PLAT_CSIS_H_
-+#define PLAT_CSIS_H_ __FILE__
-+
-+/**
-+ * struct s3c_platform_csis - default platform data for MIPI CSI2 interface
-+ * @clock_rate: bus clock frequency
-+ * @nlanes: number of MIPI data lanes used
-+ * @alignment: MIPI data alignment in bits
-+ * @hs_settle: HSYNC settle time (see CSIS_DPHYCTRL register description)
-+ */
-+struct s3c_platform_csis {
-+	unsigned long clk_rate;
-+	u8 nlanes;
-+	u8 alignment;
-+	u8 hs_settle;
-+};
-+
-+#endif /* PLAT_CSIS_H_ */
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 2d82a6c..7935a8b 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -122,6 +122,9 @@ extern struct platform_device s5p_device_fimc0;
- extern struct platform_device s5p_device_fimc1;
- extern struct platform_device s5p_device_fimc2;
- 
-+extern struct platform_device s5p_device_mipi_csis0;
-+extern struct platform_device s5p_device_mipi_csis1;
-+
- /* s3c2440 specific devices */
- 
- #ifdef CONFIG_CPU_S3C2440
--- 
-1.7.1
+Also, why are you making duplicate copies of the same generic
+functions?
+
+Now you've copied these into mach-omap1/dma.c: 
+
+> +set_src_params(int lch, unsigned long src_start, int src_ei, int src_fi)
+> +{
+> +	dma_write(src_start, CSSA, lch);
+> +
+> +	dma_write(src_ei, CSEI, lch);
+> +	dma_write(src_fi, CSFI, lch);
+> +}
+> +
+> +static void set_dest_params(int lch, unsigned long dest_start, int dst_ei,
+> +								int dst_fi)
+> +{
+> +	dma_write(dest_start, CDSA, lch);
+> +
+> +	dma_write(dst_ei, CDEI, lch);
+> +	dma_write(dst_fi, CDFI, lch);
+> +}
+...
+
+And then again the same functions in mach-omap2/dma.c:
+
+> +static void omap2_set_src_params(int lch, unsigned long src_start, int src_ei,
+> +								int src_fi)
+> +{
+> +	dma_write(src_start, CSSA, lch);
+> +
+> +	dma_write(src_ei, CSEI, lch);
+> +	dma_write(src_fi, CSFI, lch);
+> +}
+> +
+> +static void omap2_set_dest_params(int lch, unsigned long dest_start, int dst_ei,
+> +								int dst_fi)
+> +{
+> +	dma_write(dest_start, CDSA, lch);
+> +
+> +	dma_write(dst_ei, CDEI, lch);
+> +	dma_write(dst_fi, CDFI, lch);
+> +}
+...
+
+All the common functions should stay in plat-omap/dma.c.
+
+Rgards,
+
+Tony
