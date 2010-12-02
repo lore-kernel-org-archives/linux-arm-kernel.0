@@ -1,57 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 2 Dec 2010 17:27:31 +0530
-Subject: [PATCH 0/5] omap4: l2x0 fixes and cleanup
-In-Reply-To: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <cc00e38ed5f706eff13e0fad542af71c@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Dec 2010 12:03:18 +0000
+Subject: [PATCH] mmci: supply per-instance regulator name
+In-Reply-To: <1291289707-5529-1-git-send-email-linus.walleij@stericsson.com>
+References: <1291289707-5529-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101202120318.GB3182@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-> -----Original Message-----
-> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> Sent: Friday, November 19, 2010 11:01 PM
-> To: linux-omap at vger.kernel.org
-> Cc: nm at ti.com; mans at mansr.com; tony at atomide.com;
-> khilman at deeprootsystems.com; linux-arm-kernel at lists.infradead.org;
-Santosh
-> Shilimkar
-> Subject: [PATCH 0/5] omap4: l2x0 fixes and cleanup
->
-> This series is outcome of the below discussion thread.
-> 	http://www.spinics.net/lists/arm-kernel/msg104254.html
->
-> The series in brief has following patches
-> 	- adds PL310 aux-control register bitfields
-> 	- Use these bitfields instead of hardcoded values as part of init
-> 	- Enable PL310 intsruction, Data prefetch hints and  BRESP to
-> 		improve performance
-> 	- Set share-override bit to avoid non-cached buffer corruption
->
-> Thanks to Nishant Menon for testing this series on OMAP4 panda using
-> the memspeed utility. Have boot tested this series on OMAP4 SDP with
-> omap2plus_defconfig.
->
-How about merging this series in omap-testing if you are ok
-with it. Patch  " ARM: l2x0: Add aux control register bitfields"
-is already acked by Catalin.
+On Thu, Dec 02, 2010 at 12:35:07PM +0100, Linus Walleij wrote:
+> On the Ux500 we have different regulators to different card slots
+> and eMMCs, and some have no regulator. Move the hardcoded "vmmc"
+> regulator name to platform data and supply it that way for the
 
-> The following changes since commit
-> e53beacd23d9cb47590da6a7a7f6d417b941a994:
->   Linus Torvalds (1):
->         Linux 2.6.37-rc2
->
-> Mans Rullgard (1):
->       omap4: l2x0: enable instruction and data prefetching
->
-> Santosh Shilimkar (4):
->       ARM: l2x0: Add aux control register bitfields
->       omap4: l2x0: Construct the AUXCTRL value using defines
->       omap4: l2x0: Set share override bit
->       omap4: l2x0: Enable early BRESP bit
->
->  arch/arm/include/asm/hardware/cache-l2x0.h |   12 ++++++++++-
->  arch/arm/mach-omap2/omap4-common.c         |   30
-+++++++++++++++++++++--
-> ----
->  2 files changed, 34 insertions(+), 8 deletions(-)
+You should never be passing regulator names through platform data, this
+appears to be broken.  You should be using the struct device to
+distingish between multiple instances and using whatever the actual
+supply names are for multiple supplies on the same device.
+
+Looking at this without seeing the datasheet I'd expect these would end
+up as vmmcn for suitable values of n.
+
+> platforms that use it. Remove the ugly and unneeded #ifdef around
+> the regulator fetch code at the same time.
+
+This is a separate change and is OK - it's this way as historically the
+regulator API returned a non-NULL pointer when built out.
+
+> +       if (plat->vcard) {
+> +               int mask;
+
+This will break users of this driver on any other platform - the naming
+of the driver suggests that it's not specific to your SoC.
