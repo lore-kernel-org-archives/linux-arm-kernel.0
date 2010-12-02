@@ -1,51 +1,70 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Dec 2010 10:46:17 -0800
+Date: Thu, 2 Dec 2010 10:49:25 -0800
 Subject: [PATCH v5 09/14] OMAP: DMA: Convert DMA library into platform
 	driver
-In-Reply-To: <20101202184419.GR17222@atomide.com>
+In-Reply-To: <20101202184617.GS17222@atomide.com>
 References: <1290603110-14119-1-git-send-email-manjugk@ti.com>
 	<1290603110-14119-10-git-send-email-manjugk@ti.com>
 	<20101202184419.GR17222@atomide.com>
-Message-ID: <20101202184617.GS17222@atomide.com>
+	<20101202184617.GS17222@atomide.com>
+Message-ID: <20101202184925.GT17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [101202 10:34]:
+* Tony Lindgren <tony@atomide.com> [101202 10:36]:
+> * Tony Lindgren <tony@atomide.com> [101202 10:34]:
+> > 
+> > This fails on omap1 as d is not allocated. Please merge the
+> > following fix.
 > 
-> This fails on omap1 as d is not allocated. Please merge the
-> following fix.
+> And another fix here:
 
-And another fix here:
+One more fix below.
+
+Note that even with these three fixes, 5912OSK still fails to
+boot to init. Maybe something wrong with the framebuffer DMA?
+
+Tony
+
 
 From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 2 Dec 2010 10:19:15 -0800
-Subject: [PATCH] Fix omap1_system_dma_init to use ioremap
+Date: Thu, 2 Dec 2010 10:34:18 -0800
+Subject: [PATCH] Fix omap1_system_dma_init to initialize d->lch_count earlier
 
-Fix omap1_system_dma_init to use ioremap
+Otherwise the kzalloc will allocate wrong amount of memory.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 
 --- a/arch/arm/mach-omap1/dma.c
 +++ b/arch/arm/mach-omap1/dma.c
-@@ -280,6 +280,12 @@ static int __init omap1_system_dma_init(void)
- 		return -ENOMEM;
+@@ -309,13 +309,7 @@ static int __init omap1_system_dma_init(void)
+ 		goto exit_release_p;
  	}
  
-+	dma_base = ioremap(res[0].start, resource_size(&res[0]));
-+	if (!dma_base) {
-+		pr_err("%s: Unable to ioremap\n", __func__);
-+		return -ENODEV;
-+	}
+-	d->chan = kzalloc(sizeof(struct omap_dma_lch) *
+-					(d->lch_count), GFP_KERNEL);
+-	if (!d->chan) {
+-		dev_err(&pdev->dev, "%s: Memory allocation failed"
+-					"for d->chan!!!\n", __func__);
+-		goto exit_release_d;
+-	}
++	d->lch_count		= OMAP1_LOGICAL_DMA_CH_COUNT;
+ 
+ 	/* Valid attributes for omap1 plus processors */
+ 	if (cpu_is_omap15xx())
+@@ -330,7 +324,14 @@ static int __init omap1_system_dma_init(void)
+ 	d->dev_caps		|= CLEAR_CSR_ON_READ;
+ 	d->dev_caps		|= IS_WORD_16;
+ 
+-	d->lch_count		= OMAP1_LOGICAL_DMA_CH_COUNT;
 +
- 	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
- 	if (ret) {
- 		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
-@@ -337,8 +343,6 @@ static int __init omap1_system_dma_init(void)
++	d->chan = kzalloc(sizeof(struct omap_dma_lch) *
++					(d->lch_count), GFP_KERNEL);
++	if (!d->chan) {
++		dev_err(&pdev->dev, "%s: Memory allocation failed"
++					"for d->chan!!!\n", __func__);
++		goto exit_release_d;
++	}
  
- 	p->dma_attr = d;
- 
--	dma_base		= (void __iomem *)res[0].start;
--
- 	p->show_dma_caps	= omap1_show_dma_caps;
- 	p->clear_lch_regs	= omap1_clear_lch_regs;
- 	p->clear_dma		= omap1_clear_dma;
+ 	if (cpu_is_omap15xx())
+ 		d->chan_count = 9;
