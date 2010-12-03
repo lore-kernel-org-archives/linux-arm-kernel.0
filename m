@@ -1,36 +1,76 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 03 Dec 2010 21:20:21 +0100
-Subject: PXA270 Random Hangs at Low Core Freq
-In-Reply-To: <201010261647.04676.marek.vasut@gmail.com> (Marek Vasut's message
-	of "Tue\, 26 Oct 2010 16\:47\:04 +0200")
-References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
-	<201010252146.05874.marek.vasut@gmail.com>
-	<D31D5F61-63E8-4C37-A880-7840336935F8@prograde.net>
-	<201010261647.04676.marek.vasut@gmail.com>
-Message-ID: <878w06zjzu.fsf@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 03 Dec 2010 20:21:18 +0000
+Subject: [PATCH 07/22] ARM: SMP: move ipi_count into irq_stat structure
+In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+Message-ID: <E1POc86-0007rR-B9@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+Move the ipi_count into irq_stat, which allows the ipi_data structure
+to be entirely removed.
 
-> On Monday 25 October 2010 22:53:32 Michael Cashwell wrote:
->> On Oct 25, 2010, at 3:46 PM, Marek Vasut wrote:
->> > I think I noticed something similar running ZipitZ2 on 312MHz ... yet I
->> > was unable to figure out the problem as well ...
->> 
->> Out of curiosity, what was your trigger event? MMC activity or something
->> else?
->
-> I believe it might have been MMC activity, as in initramfs it wasn't triggered
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/hardirq.h |    3 +++
+ arch/arm/kernel/smp.c          |   14 ++------------
+ 2 files changed, 5 insertions(+), 12 deletions(-)
 
-On the mioa701 with a PXA272, the problem occurs as well in the lowest frequency
-(104 MHz). If I block the frequency at 208MHz, no hang occurs.
-
-The hang occured several times in the boot sequence, before rootfs was even
-loaded.
-
-This happens even with no SD card inserted, with USB gadget driver loading the
-CPU, and then idling.
-
---
-Robert
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 923eaa1..824b08a 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -10,6 +10,9 @@ typedef struct {
+ #ifdef CONFIG_LOCAL_TIMERS
+ 	unsigned int local_timer_irqs;
+ #endif
++#ifdef CONFIG_SMP
++	unsigned int ipi_irqs;
++#endif
+ } ____cacheline_aligned irq_cpustat_t;
+ 
+ #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 101bce0..42e0ae9 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -46,15 +46,6 @@
+  */
+ struct secondary_data secondary_data;
+ 
+-/*
+- * structures for inter-processor calls
+- */
+-struct ipi_data {
+-	unsigned long ipi_count;
+-};
+-
+-static DEFINE_PER_CPU(struct ipi_data, ipi_data);
+-
+ enum ipi_msg_type {
+ 	IPI_TIMER = 2,
+ 	IPI_RESCHEDULE,
+@@ -406,7 +397,7 @@ void show_ipi_list(struct seq_file *p)
+ 	seq_puts(p, "IPI:");
+ 
+ 	for_each_present_cpu(cpu)
+-		seq_printf(p, " %10lu", per_cpu(ipi_data, cpu).ipi_count);
++		seq_printf(p, " %10u", __get_irq_stat(cpu, ipi_irqs));
+ 
+ 	seq_putc(p, '\n');
+ }
+@@ -521,10 +512,9 @@ static void ipi_cpu_stop(unsigned int cpu)
+ asmlinkage void __exception do_IPI(int ipinr, struct pt_regs *regs)
+ {
+ 	unsigned int cpu = smp_processor_id();
+-	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
+-	ipi->ipi_count++;
++	__inc_irq_stat(cpu, ipi_irqs);
+ 
+ 	switch (ipinr) {
+ 	case IPI_TIMER:
+-- 
+1.6.2.5
