@@ -1,40 +1,11 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Fri,  3 Dec 2010 09:12:49 +0800
-Subject: [PATCH] ARM: GIC irq desciptor bug fix
-Message-ID: <1291338769-31214-1-git-send-email-chao.xie@marvell.com>
+From: tarek.m.attia@gmail.com (tarek attia)
+Date: Fri, 3 Dec 2010 03:08:50 +0200
+Subject: No subject
+Message-ID: <AANLkTikfzihLRAGfnfyr5u7d2NV=C060jkdcHDAeZoF0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: cxie4 <cxie4@marvell.com>
+register
 
-gic_set_cpu will directly use irq_desc[]. If CONFIG_SPARSE_IRQ is enabled, there is no
-irq_desc[]. So we need use irq_to_desc(irq) to get the descriptor for irq.
-
-Signed-off-by: cxie4 <cxie4@marvell.com>
----
- arch/arm/common/gic.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 7dfa9a8..6599acb 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -160,9 +160,15 @@ static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
- 	unsigned int shift = (irq % 4) * 8;
- 	unsigned int cpu = cpumask_first(mask_val);
- 	u32 val;
-+	struct irq_desc *desc;
- 
- 	spin_lock(&irq_controller_lock);
--	irq_desc[irq].node = cpu;
-+	desc = irq_to_desc(irq);
-+	if (desc == NULL) {
-+		spin_unlock(&irq_controller_lock);
-+		return -EINVAL;
-+	}
-+	desc->node = cpu;
- 	val = readl(reg) & ~(0xff << shift);
- 	val |= 1 << (cpu + shift);
- 	writel(val, reg);
 -- 
-1.6.3.3
+tarek
