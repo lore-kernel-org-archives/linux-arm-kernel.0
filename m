@@ -1,100 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 03 Dec 2010 20:38:10 +0900
-Subject: [PATCH 2/2] ARM: SAMSUNG: Convert irq-vic-timer to irq_ functions
-In-Reply-To: <1290783085-20098-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1290783085-20098-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1290783085-20098-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <015701cb92de$91d63240$b58296c0$%kim@samsung.com>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Fri, 3 Dec 2010 12:47:14 +0100
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <20101109224012.GA21992@kroah.com>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+	<20101109224012.GA21992@kroah.com>
+Message-ID: <AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> Conver the VIC timer interrupts to use the irq_ versions of the IRQ
-> operatiosn introduced in 2.6.37, storing the mask for the timer
-> interrupt in the chip_data of the irq_data in order to save having to
-> do a substraction and a shift on every operation.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/plat-samsung/irq-vic-timer.c |   22 +++++++++++++---------
->  1 files changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-
-> samsung/irq-vic-timer.c
-> index 0270519..7ce77dd 100644
-> --- a/arch/arm/plat-samsung/irq-vic-timer.c
-> +++ b/arch/arm/plat-samsung/irq-vic-timer.c
-> @@ -29,38 +29,41 @@ static void s3c_irq_demux_vic_timer(unsigned int irq,
-> struct irq_desc *desc)
-> 
->  /* We assume the IRQ_TIMER0..IRQ_TIMER4 range is continuous. */
-> 
-> -static void s3c_irq_timer_mask(unsigned int irq)
-> +static void s3c_irq_timer_mask(struct irq_data *data)
->  {
->  	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
-> +	u32 mask = (u32)data->chip_data;
-> 
->  	reg &= 0x1f;  /* mask out pending interrupts */
-> -	reg &= ~(1 << (irq - IRQ_TIMER0));
-> +	reg &= ~mask;
->  	__raw_writel(reg, S3C64XX_TINT_CSTAT);
->  }
-> 
-> -static void s3c_irq_timer_unmask(unsigned int irq)
-> +static void s3c_irq_timer_unmask(struct irq_data *data)
->  {
->  	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
-> +	u32 mask = (u32)data->chip_data;
-> 
->  	reg &= 0x1f;  /* mask out pending interrupts */
-> -	reg |= 1 << (irq - IRQ_TIMER0);
-> +	reg |= mask;
->  	__raw_writel(reg, S3C64XX_TINT_CSTAT);
->  }
-> 
-> -static void s3c_irq_timer_ack(unsigned int irq)
-> +static void s3c_irq_timer_ack(struct irq_data *data)
->  {
->  	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
-> +	u32 mask = (u32)data->chip_data;
-> 
->  	reg &= 0x1f;
-> -	reg |= (1 << 5) << (irq - IRQ_TIMER0);
-> +	reg |= mask << 5;
->  	__raw_writel(reg, S3C64XX_TINT_CSTAT);
->  }
-> 
->  static struct irq_chip s3c_irq_timer = {
->  	.name		= "s3c-timer",
-> -	.mask		= s3c_irq_timer_mask,
-> -	.unmask		= s3c_irq_timer_unmask,
-> -	.ack		= s3c_irq_timer_ack,
-> +	.irq_mask	= s3c_irq_timer_mask,
-> +	.irq_unmask	= s3c_irq_timer_unmask,
-> +	.irq_ack	= s3c_irq_timer_ack,
->  };
-> 
->  /**
-> @@ -79,6 +82,7 @@ void __init s3c_init_vic_timer_irq(unsigned int
-parent_irq,
->  	set_irq_chained_handler(parent_irq, s3c_irq_demux_vic_timer);
-> 
->  	set_irq_chip(timer_irq, &s3c_irq_timer);
-> +	set_irq_chip_data(timer_irq, (void *)(1 << (timer_irq -
-IRQ_TIMER0)));
->  	set_irq_handler(timer_irq, handle_level_irq);
->  	set_irq_flags(timer_irq, IRQF_VALID);
-> 
-> --
+On Tue, Nov 9, 2010 at 11:40 PM, Greg KH <greg@kroah.com> wrote:
+> On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
+>> From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
+>>
+>> This patch allows to control the pl011 clock using set_termios
+>> callback. Any positive baudrate passed enables clock, otherwise
+>> disables. This saves a lot of power on submicron designs since
+>> we can clock off and disable unused UARTs.
+>
+> That's nice, but it seems like an overload of what people traditionally
+> think of when it comes to baud rates. ?Why not just power down ports
+> that are not open instead?
 
-Looks ok to me..will apply :-)
+I like the idea as well and this is definitely gonna help conserving
+the power for Bluetooth UARTs.
 
-Thanks.
+But using baud rate 0 is something I don't like. Why don't you stop
+the clocks if RTS is cleared? This would have allowed the line
+discipline driver to implicitly control the UART clock and there will
+be no risk of losing data, as well as no non-standard behavior
+involved. In fact, you'll be transparent to the upper layers in this
+case.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+~Vitaly
