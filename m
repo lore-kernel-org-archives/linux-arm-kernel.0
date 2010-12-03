@@ -1,77 +1,115 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:35 +0530
-Subject: [PATCH 02/20] mach-ux500: deprecate spi support for ab8500
+Date: Fri, 3 Dec 2010 20:35:38 +0530
+Subject: [PATCH 05/20] mach-ux500: add STMPE1601 platform data
 In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
 References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1291388753-14662-3-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1291388753-14662-6-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
 ---
- arch/arm/mach-ux500/board-mop500.c |   36 +-----------------------------------
- 1 files changed, 1 insertions(+), 35 deletions(-)
+ arch/arm/mach-ux500/board-mop500-keypads.c         |   32 ++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.c                 |    3 ++
+ .../mach-ux500/include/mach/irqs-board-mop500.h    |   13 +++++++-
+ 3 files changed, 47 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-ux500/board-mop500-keypads.c b/arch/arm/mach-ux500/board-mop500-keypads.c
+index c1218c5..4acc4f1 100644
+--- a/arch/arm/mach-ux500/board-mop500-keypads.c
++++ b/arch/arm/mach-ux500/board-mop500-keypads.c
+@@ -128,7 +128,39 @@ static struct ske_keypad_platform_data ske_keypad_board = {
+ 	.debounce_ms    = 40,                   /* in millsecs */
+ };
+ 
++/*
++ * STMPE1601
++ */
++static struct stmpe_keypad_platform_data stmpe1601_keypad_data = {
++	.debounce_ms    = 64,
++	.scan_count     = 8,
++	.no_autorepeat  = true,
++	.keymap_data    = &mop500_keymap_data,
++};
++
++static struct stmpe_platform_data stmpe1601_data = {
++	.id             = 1,
++	.blocks         = STMPE_BLOCK_KEYPAD,
++	.irq_trigger    = IRQF_TRIGGER_FALLING,
++	.irq_base       = MOP500_STMPE1601_IRQ(0),
++	.keypad         = &stmpe1601_keypad_data,
++	.autosleep      = true,
++	.autosleep_timeout = 1024,
++};
++
++static struct i2c_board_info __initdata mop500_i2c0_devices_stuib[] = {
++	{
++		I2C_BOARD_INFO("stmpe1601", 0x40),
++		.irq = NOMADIK_GPIO_TO_IRQ(218),
++		.platform_data = &stmpe1601_data,
++		.flags = I2C_CLIENT_WAKE,
++	},
++};
++
+ void mop500_keypad_init(void)
+ {
+ 	db8500_add_ske_keypad(&ske_keypad_board);
++
++	i2c_register_board_info(0, mop500_i2c0_devices_stuib,
++			ARRAY_SIZE(mop500_i2c0_devices_stuib));
+ }
 diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index eccbc13..28bc18b 100644
+index 9b5e66e..8f4a955 100644
 --- a/arch/arm/mach-ux500/board-mop500.c
 +++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -76,22 +76,6 @@ static pin_cfg_t mop500_pins[] = {
+@@ -19,6 +19,7 @@
+ #include <linux/amba/pl022.h>
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/ab8500.h>
++#include <linux/mfd/tc35892.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -71,6 +72,8 @@ static pin_cfg_t mop500_pins[] = {
+ 	GPIO168_KP_O0,
+ 
  	GPIO217_GPIO,		/* GPIO_EXP_INT */
++
++	GPIO218_GPIO    | PIN_INPUT_PULLUP, /* STMPE1601 IRQ */
  };
  
--static void ab4500_spi_cs_control(u32 command)
--{
--	/* set the FRM signal, which is CS  - TODO */
--}
--
--struct pl022_config_chip ab4500_chip_info = {
--	.com_mode = INTERRUPT_TRANSFER,
--	.iface = SSP_INTERFACE_MOTOROLA_SPI,
--	/* we can act as master only */
--	.hierarchy = SSP_MASTER,
--	.slave_tx_disable = 0,
--	.rx_lev_trig = SSP_RX_1_OR_MORE_ELEM,
--	.tx_lev_trig = SSP_TX_1_OR_MORE_EMPTY_LOC,
--	.cs_control = ab4500_spi_cs_control,
--};
--
  static struct ab8500_platform_data ab8500_platdata = {
- 	.irq_base	= MOP500_AB8500_IRQ_BASE,
- };
-@@ -114,19 +98,6 @@ struct platform_device ab8500_device = {
- 	.resource = ab8500_resources,
- };
+diff --git a/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
+index 7ee8aaa..c89ae0d 100644
+--- a/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
++++ b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
+@@ -14,6 +14,7 @@
+ #define MOP500_AB8500_IRQ_END		(MOP500_AB8500_IRQ_BASE \
+ 					 + AB8500_NR_IRQS)
  
--static struct spi_board_info ab8500_spi_devices[] = {
--	{
--		.modalias = "ab8500-spi",
--		.controller_data = &ab4500_chip_info,
--		.platform_data = &ab8500_platdata,
--		.max_speed_hz = 12000000,
--		.bus_num = 0,
--		.chip_select = 0,
--		.mode = SPI_MODE_3,
--		.irq = IRQ_DB8500_AB8500,
--	},
--};
--
- static struct pl022_ssp_controller ssp0_platform_data = {
- 	.bus_id = 0,
- 	/* pl022 not yet supports dma */
-@@ -339,12 +310,7 @@ static void __init u8500_init_machine(void)
- 	mop500_spi_init();
- 	mop500_uart_init();
++/* TC35892 */
+ #define TC35892_NR_INTERNAL_IRQS	8
+ #define TC35892_INT_GPIO(x)		(TC35892_NR_INTERNAL_IRQS + (x))
+ #define TC35892_NR_GPIOS		24
+@@ -24,8 +25,18 @@
+ #define MOP500_EGPIO_IRQ_BASE		MOP500_AB8500_IRQ_END
+ #define MOP500_EGPIO_IRQ_END		(MOP500_EGPIO_IRQ_BASE \
+ 					 + MOP500_EGPIO_NR_IRQS)
++/* STMPE1601 irqs */
++#define STMPE_NR_INTERNAL_IRQS          9
++#define STMPE_INT_GPIO(x)               (STMPE_NR_INTERNAL_IRQS + (x))
++#define STMPE_NR_GPIOS                  24
++#define STMPE_NR_IRQS                   STMPE_INT_GPIO(STMPE_NR_GPIOS)
  
--	/* If HW is early drop (ED) or V1.0 then use SPI to access AB8500 */
--	if (cpu_is_u8500ed() || cpu_is_u8500v10())
--		spi_register_board_info(ab8500_spi_devices,
--			ARRAY_SIZE(ab8500_spi_devices));
--	else /* If HW is v.1.1 or later use I2C to access AB8500 */
--		platform_device_register(&ab8500_device);
-+	platform_device_register(&ab8500_device);
+-#define MOP500_IRQ_END			MOP500_EGPIO_IRQ_END
++#define MOP500_STMPE1601_IRQBASE        MOP500_EGPIO_IRQ_END
++#define MOP500_STMPE1601_IRQ(x)         (MOP500_STMPE1601_IRQBASE + (x))
++
++#define MOP500_NR_IRQS          MOP500_STMPE1601_IRQ(STMPE_NR_INTERNAL_IRQS)
++
++#define MOP500_IRQ_END          MOP500_NR_IRQS
  
- 	i2c_register_board_info(0, mop500_i2c0_devices,
- 				ARRAY_SIZE(mop500_i2c0_devices));
+ #if MOP500_IRQ_END > IRQ_BOARD_END
+ #undef IRQ_BOARD_END
 -- 
 1.7.2.dirty
