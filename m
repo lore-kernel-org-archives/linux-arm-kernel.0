@@ -1,48 +1,52 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 3 Dec 2010 16:08:59 +0100
-Subject: [PATCH 1/2] Change the register name definitions for mc13783
-In-Reply-To: <1291373531.3271.8.camel@odin>
-References: <AANLkTinA-rNzSjGZQSmGUdOt8j0RWddfNo5m=fP2oQx8@mail.gmail.com>
-	<1291373531.3271.8.camel@odin>
-Message-ID: <20101203150858.GC28954@sortiz-mobl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Dec 2010 15:15:47 +0000
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+	<20101109224012.GA21992@kroah.com>
+	<AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
+Message-ID: <20101203151547.GA30898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liam,
-
-On Fri, Dec 03, 2010 at 10:52:11AM +0000, Liam Girdwood wrote:
-> On Thu, 2010-12-02 at 19:18 +0800, Yong Shen wrote:
-> > Hi there,
-> > 
-> > Please comment inline and use attached file for patch or test.
-> > 
-> > Thanks
-> > Yong
-> > 
-> > >From e112153c6f03b49c229a8e3913a0c0459245df20 Mon Sep 17 00:00:00 2001
-> > From: Yong Shen <yong.shen@linaro.org>
-> > Date: Thu, 2 Dec 2010 14:17:02 +0800
-> > Subject: [PATCH 1/2] Change the register name definitions for mc13783
-> > 
-> > To make mc13783 and mc13892 share code, the register names should be
-> > changed to fit the new macro definitions in the comming patch.
-> > 
-> > Signed-off-by: Yong Shen <yong.shen@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/mach-pcm038.c       |    4 +-
-> >  arch/arm/mach-mx3/mach-mx31_3ds.c     |    4 +-
-> >  arch/arm/mach-mx3/mach-mx31moboard.c  |    4 +-
-> >  drivers/regulator/mc13783-regulator.c |   30 +++++++-------
-> >  include/linux/mfd/mc13783.h           |   67 +++++++++++++++++----------------
-> >  5 files changed, 55 insertions(+), 54 deletions(-)
+On Fri, Dec 03, 2010 at 12:47:14PM +0100, Vitaly Wool wrote:
+> On Tue, Nov 9, 2010 at 11:40 PM, Greg KH <greg@kroah.com> wrote:
+> > On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
+> >> From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
+> >>
+> >> This patch allows to control the pl011 clock using set_termios
+> >> callback. Any positive baudrate passed enables clock, otherwise
+> >> disables. This saves a lot of power on submicron designs since
+> >> we can clock off and disable unused UARTs.
+> >
+> > That's nice, but it seems like an overload of what people traditionally
+> > think of when it comes to baud rates. ?Why not just power down ports
+> > that are not open instead?
 > 
-> Sascha, Samuel, this series touches some of mach-imx and mfd. I can take
-> via regulator if that's OK with you guys ?
-I'm fine with that, thanks a lot.
+> I like the idea as well and this is definitely gonna help conserving
+> the power for Bluetooth UARTs.
+> 
+> But using baud rate 0 is something I don't like.
 
-Cheers,
-Samuel.
+You can't use the baud rate of 0 to power down ports - that already has
+a POSIX-defined function (hang up).
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+> Why don't you stop
+> the clocks if RTS is cleared? This would have allowed the line
+> discipline driver to implicitly control the UART clock and there will
+> be no risk of losing data, as well as no non-standard behavior
+> involved. In fact, you'll be transparent to the upper layers in this
+> case.
+
+I've no idea what you're thinking, but you can't stop the UART clock
+because RTS is deasserted - or DTR for that matter.  Neither of those
+two define whether characters will be transmitted or received.
+
+There are specialist protocols and devices out there which require
+RTS and DTR to be held at certain non-standard states for them to work.
+One range of devices are car OBD-II interfaces, where RTS controls the
+L line and sometimes the TX/RX direction on the bidirectional K data
+line.
+
+Similar things are done with DTR, and there's protocols which use
+DTR as a handshake.
