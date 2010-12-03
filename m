@@ -1,38 +1,48 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 2 Dec 2010 23:14:57 +0000
-Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
-In-Reply-To: <4CF7D9E6.5000409@samsung.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
-	<20101202171538.GB30933@pulham.picochip.com>
-	<4CF7D9E6.5000409@samsung.com>
-Message-ID: <20101202231457.GA12385@pulham.picochip.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu,  2 Dec 2010 16:39:42 -0800
+Subject: [PATCH 1/4] msm: trout: add gpio_to_irq
+Message-ID: <1291336785-29108-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 06:39:50PM +0100, Sylwester Nawrocki wrote:
-> On 12/02/2010 06:15 PM, Jamie Iles wrote:
-> > On Thu, Dec 02, 2010 at 05:37:41PM +0100, Sylwester Nawrocki wrote:
-[...]
-> >> +static struct resource s5p_csis_resource[] = {
-> >> +	[0] = {
-> >> +		.start = S5P_PA_CSIS0,
-> >> +		.end   = S5P_PA_CSIS0 + SZ_4K - 1,
-> >> +		.flags = IORESOURCE_MEM,
-> >> +	},
-> >> +	[1] = {
-> >> +		.start = IRQ_MIPICSI0,
-> >> +		.end   = IRQ_MIPICSI0,
-> >> +		.flags = IORESOURCE_IRQ,
-> >> +	}
-> >> +};
-> > Do you really need the [0] and [1] here? These are only needed if you are 
-> > sparsely initialising an array.
-> 
-> I agree explicit indices are not really needed. I just followed the style of
-> all other resource definitions already there.
-> I am not quite sure what is the preference of the maintainer, I guess they want
-> all devices to follow same style for consistence.
-Ok, that's fair enough, it just looked a bit odd to me!
+trout has gpiolib support and interrupt support, but was
+missing the gpio_to_irq function. This adds that functions
+which should allow proper translation.
 
-Jamie
+Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+---
+ arch/arm/mach-msm/board-trout-gpio.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
+index c50f3af..f8c09ef 100644
+--- a/arch/arm/mach-msm/board-trout-gpio.c
++++ b/arch/arm/mach-msm/board-trout-gpio.c
+@@ -72,6 +72,13 @@ static int msm_gpiolib_direction_output(struct gpio_chip *chip,
+ 	return 0;
+ }
+ 
++static int trout_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	struct msm_gpio_chip *msm_gpio = to_msm_gpio_chip(chip);
++
++	return TROUT_GPIO_TO_INT(offset + chip->base);
++}
++
+ #define TROUT_GPIO_BANK(name, reg_num, base_gpio, shadow_val)		\
+ 	{								\
+ 		.chip = {						\
+@@ -80,6 +87,7 @@ static int msm_gpiolib_direction_output(struct gpio_chip *chip,
+ 			.direction_output = msm_gpiolib_direction_output, \
+ 			.get		  = msm_gpiolib_get,		\
+ 			.set		  = msm_gpiolib_set,		\
++			.to_irq		  = trout_gpio_to_irq,		\
+ 			.base		  = base_gpio,			\
+ 			.ngpio		  = 8,				\
+ 		},							\
+-- 
+1.7.1
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
