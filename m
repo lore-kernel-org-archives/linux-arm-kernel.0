@@ -1,55 +1,29 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:47 +0530
-Subject: [PATCH 14/20] plat-nomadik/gpio: add expander gpio pins enumeration
+Date: Fri, 3 Dec 2010 20:35:49 +0530
+Subject: [PATCH 16/20] i2c/nomadik: add adapter name for updated sanity
+	checkings
 In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
 References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1291388753-14662-15-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1291388753-14662-17-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
 ---
- arch/arm/mach-ux500/include/mach/gpio.h |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-nomadik.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/include/mach/gpio.h b/arch/arm/mach-ux500/include/mach/gpio.h
-index d548a62..f28da77 100644
---- a/arch/arm/mach-ux500/include/mach/gpio.h
-+++ b/arch/arm/mach-ux500/include/mach/gpio.h
-@@ -8,6 +8,34 @@
- #define ARCH_NR_GPIOS	350
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 2bd3469..baa8ff7 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -872,6 +872,7 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
+ 	adap->owner	= THIS_MODULE;
+ 	adap->class	= I2C_CLASS_HWMON | I2C_CLASS_SPD;
+ 	adap->algo	= &nmk_i2c_algo;
++	snprintf(adap->name, sizeof(adap->name), DRIVER_NAME);
  
- #include <plat/gpio.h>
-+#include <mach/irqs.h>
-+
-+enum {
-+	EGPIO_PIN_0 = NOMADIK_NR_GPIO,
-+	EGPIO_PIN_1,
-+	EGPIO_PIN_2,
-+	EGPIO_PIN_3,
-+	EGPIO_PIN_4,
-+	EGPIO_PIN_5,
-+	EGPIO_PIN_6,
-+	EGPIO_PIN_7,
-+	EGPIO_PIN_8,
-+	EGPIO_PIN_9,
-+	EGPIO_PIN_10,
-+	EGPIO_PIN_11,
-+	EGPIO_PIN_12,
-+	EGPIO_PIN_13,
-+	EGPIO_PIN_14,
-+	EGPIO_PIN_15,
-+	EGPIO_PIN_16,
-+	EGPIO_PIN_17,
-+	EGPIO_PIN_18,
-+	EGPIO_PIN_19,
-+	EGPIO_PIN_20,
-+	EGPIO_PIN_21,
-+	EGPIO_PIN_22,
-+	EGPIO_PIN_23,
-+};
- 
- #define __GPIO_RESOURCE(soc, block)					\
- 	{								\
+ 	/* fetch the controller id */
+ 	adap->nr	= pdev->id;
 -- 
 1.7.2.dirty
