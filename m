@@ -1,69 +1,108 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 3 Dec 2010 16:28:27 +0000
-Subject: RFC: Dynamic hwcaps
-Message-ID: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Fri, 3 Dec 2010 22:13:17 +0530
+Subject: [PATCH v5 09/14] OMAP: DMA: Convert DMA library into platform
+	driver
+In-Reply-To: <20101202205219.GV17222@atomide.com>
+References: <1290603110-14119-1-git-send-email-manjugk@ti.com>
+	<1290603110-14119-10-git-send-email-manjugk@ti.com>
+	<20101202184419.GR17222@atomide.com>
+	<20101202184617.GS17222@atomide.com>
+	<20101202184925.GT17222@atomide.com>
+	<20101202200454.GA27696@manju-desktop>
+	<20101202205219.GV17222@atomide.com>
+Message-ID: <20101203164317.GB10048@GLPP-machine>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Tony,
 
-I'd be interested in people's views on the following idea-- feel free
-to ignore if it doesn't interest you.
+* Tony Lindgren <tony@atomide.com> [2010-12-02 12:52:19 -0800]:
 
+> * G, Manjunath Kondaiah <manjugk@ti.com> [101202 11:55]:
+> > 
+> > > 
+> > > Note that even with these three fixes, 5912OSK still fails to
+> > > boot to init. Maybe something wrong with the framebuffer DMA?
+> > 
+> > Not sure. I don't have omap1 board for testing. Patch series is only 
+> > build tested for omap1.
+> > 
+> > Can you pls confirm if OSK5912 boots successfully without this patch
+> > series?
+> 
+> Yeah boots just fine without these as always.
+> 
+> Anybody care to donate a OSK5912 or similar for the TI guys
+> for doing quick omap1 boot testing on?
+>  
+> > If yes, I will cross verify omap1 changes again.
+> 
+> Found the problem. INT_DMA_LCD is handled in mach-omap1/lcd_dma.c.
+> In your omap_system_dma_probe we now exit everything if request_irq
+> fails for one channel. So let's skip INT_DMA_LCD.
+> 
+> Also, you should check the logic in omap_system_dma_probe as it's
+> not very good handling right now. Note how platform_get_irq_byname
+> does not free other dma_irqs like after request_irq we do.
 
-For power-management purposes, it's useful to be able to turn off
-functional blocks on the SoC.
+Fixed error handling cases.
 
-For on-SoC peripherals, this can be managed through the driver
-framework in the kernel, but for functional blocks of the CPU itself
-which are used by instruction set extensions, such as NEON or other
-media accelerators, it would be interesting if processes could adapt
-to these units appearing and disappearing at runtime.  This would mean
-that user processes would need to select dynamically between different
-implementations of accelerated functionality at runtime.
+> 
+> With your patches applied up to patch "Convert DMA library into
+> platform driver" + my three earlie fixes + the following fix
+> I can now boot OSK5912 and see the penguin on the LCD too.
 
-This allows for more active power management of such functional
-blocks: if the CPU is not fully loaded, you can turn them off -- the
-kernel can spot when there is significant idle time and do this.  If
-the CPU becomes fully loaded, applications which have soft-realtime
-constraints can notice this and switch to their accelerated code
-(which will cause the kernel to switch the functional unit(s) on).
-Or, the kernel can react to increasing CPU load by speculatively turn
-it on instead.  This is analogous to the behaviour of other power
-governors in the system.  Non-aware applications will still work
-seamlessly -- these may simply run accelerated code if the hardware
-supports it, causing the kernel to turn the affected functional
-block(s) on.
+Thanks a lot. I pulled in all these fixes into the patch series.
 
-In order for this to work, some dynamic status information would need
-to be visible to each user process, and polled each time a function
-with a dynamically switchable choice of implementations gets called.
-You probably don't need to worry about race conditions either-- if the
-process accidentally tries to use a turned-off feature, you will take
-a fault which gives the kernel the chance to turn the feature back on.
- Generally, this should be a rare occurrence.
+> 
+> I suggest you break your series into two where the last patch
+> in the first series is "Convert DMA library into platform driver".
 
+I am ok with this approach.
 
-The dynamic feature status information should ideally be per-CPU
-global, though we could have a separate copy per thread, at the cost
-of more memory.  It can't be system-global, since different CPUs may
-have a different set of functional blocks active at any one time --
-for this reason, the information can't be stored in an existing
-mapping such as the vectors page.  Conversely, existing mechanisms
-such sysfs probably involve too much overhead to be polled every time
-you call copy_pixmap() or whatever.
+> That way the init related changes are done, and we can merge
+> those in for testing while you update the rest of the series.
 
-Alternatively, each thread could register a userspace buffer (a single
-word is probably adequate) into which the CPU pokes the hardware
-status flags each time it returns to userspace, if the hardware status
-has changed or if the thread has been migrated.
+cool.
 
-Either of the above approaches could be prototyped as an mmap'able
-driver, though this may not be the best approach in the long run.
+I have done required changes to patch series and tested the same on
+omap2+ boards. Can you pls test OSK5912 board boot from the below
+git repo? If OSK5912 boots up(with LCD), I will post the 1st series to
+LO ML.
 
+git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git
+Branch: dma_testing
+commit 3047de5b11cc3fef9ea18a7e8d64fec7a9ea7a89
+Author: G, Manjunath Kondaiah <manjugk@ti.com>
+Date:   Fri Dec 3 20:03:23 2010 +0530
 
-Does anyone have a view on whether this is a worthwhile idea, or what
-the best approach would be?
+    OMAP: DMA: Convert DMA library into platform driver
+    
+    Convert DMA library into DMA platform driver and make use of
+    platform data provided by hwmod data base for OMAP2+ onwards.
+    
+    For OMAP1 processors, the DMA driver in mach-omap uses resource
+    structures for getting platform data.
+    
+    Thanks to Tony Lindgren <tony@atomide.com> for fixing various
+    omap1 issues and testing the same on OSK5912 board.
+    
+    Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
+    Cc: Benoit Cousson <b-cousson@ti.com>
+    Cc: Kevin Hilman <khilman@deeprootsystems.com>
+    Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Cheers
----Dave
+> 
+> Also, eventually within next few merge cycles we should have:
+> 
+> arch/arm/mach-omap1/dma.c	omap1 specific platform init
+> arch/arm/mach-omap2/dma.c	omap2+ specific platform init
+
+This seems to be ok.
+
+> drivers/dma/omap-dma.c		driver using dmaengine.c
+
+This might require more time.
+
+-Manjunath
