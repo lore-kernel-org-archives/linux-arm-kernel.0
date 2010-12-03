@@ -1,94 +1,83 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:51 +0530
-Subject: [PATCH 18/20] mach-ux500: explicit enable MTU TCR in the kernel
+Date: Fri, 3 Dec 2010 20:35:46 +0530
+Subject: [PATCH 13/20] mfd/tc3589x: add suspend/resume support
 In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
 References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1291388753-14662-19-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1291388753-14662-14-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PRCM_TCR enables the various timers in the system. This must be achieved
-before any of the MTUs are usable for kernel usage. Explicit enabling of
-this in the kernel makes it independent of bootloader actions.
-
 Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
 ---
- arch/arm/mach-ux500/clock.c |   49 ++++++++-----------------------------------
- 1 files changed, 9 insertions(+), 40 deletions(-)
+ drivers/mfd/tc3589x.c |   42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 42 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
-index 531de5c..6657b05 100644
---- a/arch/arm/mach-ux500/clock.c
-+++ b/arch/arm/mach-ux500/clock.c
-@@ -132,7 +132,7 @@ static unsigned long clk_mtu_get_rate(struct clk *clk)
- {
- 	void __iomem *addr = __io_address(UX500_PRCMU_BASE)
- 		+ PRCM_TCR;
--	u32 tcr = readl(addr);
-+	u32 tcr;
- 	int mtu = (int) clk->data;
- 	/*
- 	 * One of these is selected eventually
-@@ -143,6 +143,14 @@ static unsigned long clk_mtu_get_rate(struct clk *clk)
- 	unsigned long mturate;
- 	unsigned long retclk;
+diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
+index fd206fd..a7dd2b6 100644
+--- a/drivers/mfd/tc3589x.c
++++ b/drivers/mfd/tc3589x.c
+@@ -14,6 +14,9 @@
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/tc3589x.h>
  
-+	/*
-+	 * On a startup, always conifgure the TCR to the doze mode;
-+	 * bootloaders do it for us. Do this in the kernel too.
-+	 */
-+	writel(PRCM_TCR_DOZE_MODE, addr);
++#define TC3589x_CLKMODE_MODCTL_SLEEP		0x0
++#define TC3589x_CLKMODE_MODCTL_OPERATION	(1 << 0)
 +
-+	tcr = readl(addr);
-+
- 	/* Get the rate from the parent as a default */
- 	if (clk->parent_periph)
- 		mturate = clk_get_rate(clk->parent_periph);
-@@ -152,45 +160,6 @@ static unsigned long clk_mtu_get_rate(struct clk *clk)
- 		/* We need to be connected SOMEWHERE */
- 		BUG();
+ /**
+  * tc3589x_reg_read() - read a single TC3589x register
+  * @tc3589x:	Device to read from
+@@ -365,6 +368,42 @@ static int __devexit tc3589x_remove(struct i2c_client *client)
+ 	return 0;
+ }
  
--	/*
--	 * Are we in doze mode?
--	 * In this mode the parent peripheral or the fixed 32768 Hz
--	 * clock is fed into the block.
--	 */
--	if (!(tcr & PRCM_TCR_DOZE_MODE)) {
--		/*
--		 * Here we're using the clock input from the APE ULP
--		 * clock domain. But first: are the timers stopped?
--		 */
--		if (tcr & PRCM_TCR_STOPPED) {
--			clk32k = 0;
--			mturate = 0;
--		} else {
--			/* Else default mode: 0 and 2.4 MHz */
--			clk32k = 0;
--			if (cpu_is_u5500())
--				/* DB5500 divides by 8 */
--				mturate /= 8;
--			else if (cpu_is_u8500ed()) {
--				/*
--				 * This clocking setting must not be used
--				 * in the ED chip, it is simply not
--				 * connected anywhere!
--				 */
--				mturate = 0;
--				BUG();
--			} else
--				/*
--				 * In this mode the ulp38m4 clock is divided
--				 * by a factor 16, on the DB8500 typically
--				 * 38400000 / 16 ~ 2.4 MHz.
--				 * TODO: Replace the constant with a reference
--				 * to the ULP source once this is modeled.
--				 */
--				mturate = 38400000 / 16;
--		}
--	}
--
- 	/* Return the clock selected for this MTU */
- 	if (tcr & (1 << mtu))
- 		retclk = clk32k;
++#ifdef CONFIG_PM
++static int tc3589x_suspend(struct device *dev)
++{
++	struct tc3589x *tc35892 = dev_get_drvdata(dev);
++	struct i2c_client *client = tc3589x->i2c;
++	int ret = 0;
++
++	/* put the system to sleep mode */
++	if (!device_may_wakeup(&client->dev))
++		ret = tc3589x_reg_write(tc3589x, TC3589x_CLKMODE,
++				TC3589x_CLKMODE_MODCTL_SLEEP);
++
++	return ret;
++}
++
++static int tc3589x_resume(struct device *dev)
++{
++	struct tc3589x *tc3589x = dev_get_drvdata(dev);
++	struct i2c_client *client = tc3589x->i2c;
++	int ret = 0;
++
++	/* enable the system into operation */
++	if (!device_may_wakeup(&client->dev))
++		ret = tc3589x_reg_write(tc3589x, TC3589x_CLKMODE,
++				TC3589x_CLKMODE_MODCTL_OPERATION);
++
++	return ret;
++}
++
++
++static const struct dev_pm_ops tc3589x_dev_pm_ops = {
++	.suspend = tc3589x_suspend,
++	.resume  = tc3589x_resume,
++};
++#endif
++
+ static const struct i2c_device_id tc3589x_id[] = {
+ 	{ "tc3589x", 24 },
+ 	{ }
+@@ -374,6 +413,9 @@ MODULE_DEVICE_TABLE(i2c, tc3589x_id);
+ static struct i2c_driver tc3589x_driver = {
+ 	.driver.name	= "tc3589x",
+ 	.driver.owner	= THIS_MODULE,
++#ifdef CONFIG_PM
++	.driver.pm	= &tc3589x_dev_pm_ops,
++#endif
+ 	.probe		= tc3589x_probe,
+ 	.remove		= __devexit_p(tc3589x_remove),
+ 	.id_table	= tc3589x_id,
 -- 
 1.7.2.dirty
