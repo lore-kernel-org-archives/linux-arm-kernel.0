@@ -1,57 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Dec 2010 20:20:57 +0000
-Subject: [PATCH 06/22] ARM: SMP: provide accessors for irq_stat data
-In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-Message-ID: <E1POc7l-0007rN-Tr@rmk-PC.arm.linux.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 03 Dec 2010 21:20:21 +0100
+Subject: PXA270 Random Hangs at Low Core Freq
+In-Reply-To: <201010261647.04676.marek.vasut@gmail.com> (Marek Vasut's message
+	of "Tue\, 26 Oct 2010 16\:47\:04 +0200")
+References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
+	<201010252146.05874.marek.vasut@gmail.com>
+	<D31D5F61-63E8-4C37-A880-7840336935F8@prograde.net>
+	<201010261647.04676.marek.vasut@gmail.com>
+Message-ID: <878w06zjzu.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide __inc_irq_stat() and __get_irq_stat() to increment and
-read the irq stat counters.
+Marek Vasut <marek.vasut@gmail.com> writes:
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/hardirq.h |    3 +++
- arch/arm/kernel/smp.c          |    4 ++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+> On Monday 25 October 2010 22:53:32 Michael Cashwell wrote:
+>> On Oct 25, 2010, at 3:46 PM, Marek Vasut wrote:
+>> > I think I noticed something similar running ZipitZ2 on 312MHz ... yet I
+>> > was unable to figure out the problem as well ...
+>> 
+>> Out of curiosity, what was your trigger event? MMC activity or something
+>> else?
+>
+> I believe it might have been MMC activity, as in initramfs it wasn't triggered
 
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index 522fb23..923eaa1 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -14,6 +14,9 @@ typedef struct {
- 
- #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
- 
-+#define __inc_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)++
-+#define __get_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)
-+
- #if NR_IRQS > 512
- #define HARDIRQ_BITS	10
- #elif NR_IRQS > 256
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 6604d74..101bce0 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -431,7 +431,7 @@ asmlinkage void __exception do_local_timer(struct pt_regs *regs)
- 	int cpu = smp_processor_id();
- 
- 	if (local_timer_ack()) {
--		irq_stat[cpu].local_timer_irqs++;
-+		__inc_irq_stat(cpu, local_timer_irqs);
- 		ipi_timer();
- 	}
- 
-@@ -445,7 +445,7 @@ void show_local_irqs(struct seq_file *p)
- 	seq_printf(p, "LOC: ");
- 
- 	for_each_present_cpu(cpu)
--		seq_printf(p, "%10u ", irq_stat[cpu].local_timer_irqs);
-+		seq_printf(p, "%10u ", __get_irq_stat(cpu, local_timer_irqs));
- 
- 	seq_putc(p, '\n');
- }
--- 
-1.6.2.5
+On the mioa701 with a PXA272, the problem occurs as well in the lowest frequency
+(104 MHz). If I block the frequency at 208MHz, no hang occurs.
+
+The hang occured several times in the boot sequence, before rootfs was even
+loaded.
+
+This happens even with no SD card inserted, with USB gadget driver loading the
+CPU, and then idling.
+
+--
+Robert
