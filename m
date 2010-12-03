@@ -1,79 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Dec 2010 08:41:02 +0000
-Subject: Mainline OMAP3 breakage (and other OMAP?)
-In-Reply-To: <20101203030954.GD3367@linux-sh.org>
-References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
-	<20101202215837.GW17222@atomide.com>
-	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
-	<20101202223208.GA17222@atomide.com>
-	<20101203030954.GD3367@linux-sh.org>
-Message-ID: <20101203084102.GA30957@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 3 Dec 2010 09:46:27 +0100
+Subject: [PATCH] mmci: corrected calculation of clock div for ux500 v2
+Message-ID: <1291365987-17882-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 03, 2010 at 12:09:55PM +0900, Paul Mundt wrote:
-> On Thu, Dec 02, 2010 at 02:32:08PM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 14:06]:
-> > > On Thu, Dec 02, 2010 at 01:58:38PM -0800, Tony Lindgren wrote:
-> > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 13:04]:
-> > > > > This has been around since October:
-> > > > > 
-> > > > > drivers/video/omap2/vram.c: In function ???omap_vram_reserve_sdram_memblock???:
-> > > > > drivers/video/omap2/vram.c:573: error: ???MEMBLOCK_REAL_LIMIT??? undeclared (first use in this function)
-> > > > > drivers/video/omap2/vram.c:573: error: (Each undeclared identifier is reported only once
-> > > > > drivers/video/omap2/vram.c:573: error: for each function it appears in.)
-> > > > > 
-> > > > > This requires a trivial one-liner compile fix:
-> > > > > 
-> > > > > diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
-> > > > > index fed2a72..a8973f0 100644
-> > > > > --- a/drivers/video/omap2/vram.c
-> > > > > +++ b/drivers/video/omap2/vram.c
-> > > > > @@ -570,7 +570,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
-> > > > >  			return;
-> > > > >  		}
-> > > > >  	} else {
-> > > > > -		paddr = memblock_alloc_base(size, PAGE_SIZE, MEMBLOCK_REAL_LIMIT);
-> > > > > +		paddr = memblock_alloc(size, PAGE_SIZE);
-> > > > >  	}
-> > > > >  
-> > > > >  	omap_vram_add_region(paddr, size);
-> > > > > 
-> > > > > which restores the old behaviour before the X86 memblock changes went
-> > > > > in.  Yes, there may be other changes due to the ioremap stuff, but
-> > > > > that's really no excuse for not fixing the compile error itself.
-> > > > 
-> > > > Great. Adding fbdev and Tomi to Cc.
-> > > > 
-> > > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > http://marc.info/?l=linux-omap&w=2&r=1&s=MEMBLOCK_REAL_LIMIT%20vram&q=b
-> > > 
-> > > There have been patches posted throughout November to fix this, but
-> > > the problem is they're not making it to mainline.  It needs chasing
-> > > until someone does the right thing and sends one variant of the above
-> > > patch, rather than just leaving it until the ioremap fixes hit
-> > > mainline during the next merge window.
-> > 
-> > Yes this should go in during the -rc for sure.
-> > 
-> > I suggest you merge this but let's wait a bit and check if Tomi
-> > already has a similar fix queued for the -rc series.
-> > 
-> This has been fixed since -rc2.
+From: Ulf Hansson <ulf.hansson@stericsson.com>
 
-So it is.  However, the ioremap fix is wrong.
+The Ux500 variant of this block has a different divider.
+The value used right now is too big and which means a loss
+in performance. This fix corrects it. Also expand the math
+comments a bit so it's clear what's happening. Further
+the Ux500 variant does not like if we use the BYPASS bit,
+instead we are supposed to set the clock divider to zero.
 
-        } else {
-                paddr = memblock_alloc(size, PAGE_SIZE);
-        }
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |   27 ++++++++++++++++++++++++++-
+ 1 files changed, 26 insertions(+), 1 deletions(-)
 
-        memblock_free(paddr, size);
-        memblock_remove(paddr, size);
-
-Didn't I say that such blocks were supposed to be aligned to a 2MB
-boundary - and the size also so aligned?
-
-http://lists.arm.linux.org.uk/lurker/message/20101011.152516.893a6088.en.html
-
-It at least needs to be 1MB as that's the section size.
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 7567872..9bd3a18 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -51,6 +51,7 @@ static unsigned int fmax = 515633;
+  * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
+  *		using DMA.
+  * @sdio: variant supports SDIO
++ * @st_clkdiv: true if using a ST-specific clock divider algorithm
+  */
+ struct variant_data {
+ 	unsigned int		clkreg;
+@@ -61,6 +62,7 @@ struct variant_data {
+ 	bool			broken_blockend;
+ 	bool			broken_blockend_dma;
+ 	bool			sdio;
++	bool			st_clkdiv;
+ };
+ 
+ static struct variant_data variant_arm = {
+@@ -86,7 +88,9 @@ static struct variant_data variant_ux500 = {
+ 	.datalength_bits	= 24,
+ 	.broken_blockend	= true,
+ 	.sdio			= true,
++	.st_clkdiv		= true,
+ };
++
+ /*
+  * This must be called with host->lock held
+  */
+@@ -97,9 +101,30 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 
+ 	if (desired) {
+ 		if (desired >= host->mclk) {
+-			clk = MCI_CLK_BYPASS;
++			/*
++			 * The ST clock divider does not like the bypass bit,
++			 * even though it's available. Instead the datasheet
++			 * recommends setting the divider to zero.
++			 */
++			if (!variant->st_clkdiv)
++				clk = MCI_CLK_BYPASS;
+ 			host->cclk = host->mclk;
++		} else if (variant->st_clkdiv) {
++			/*
++			 * DB8500 TRM says f = mclk / (clkdiv + 2)
++			 * => clkdiv = (mclk / f) - 2
++			 * Round the divider up so we don't exceed the max
++			 * frequency
++			 */
++			clk = DIV_ROUND_UP(host->mclk, desired) - 2;
++			if (clk >= 256)
++				clk = 255;
++			host->cclk = host->mclk / (clk + 2);
+ 		} else {
++			/*
++			 * PL180 TRM says f = mclk / (2 * (clkdiv + 1))
++			 * => clkdiv = mclk / (2 * f) - 1
++			 */
+ 			clk = host->mclk / (2 * desired) - 1;
+ 			if (clk >= 256)
+ 				clk = 255;
+-- 
+1.7.3.2
