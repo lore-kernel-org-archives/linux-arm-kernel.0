@@ -1,39 +1,62 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 03 Dec 2010 14:00:47 +0100
-Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-In-Reply-To: <AANLkTimofVgY4M7U+aLA1RUz0a2LOmPUFr6bwcj1vcZw@mail.gmail.com>
-	(Fabio Estevam's message of "Wed, 1 Dec 2010 13:40:17 -0200")
-References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
-	<20101124194439.GY4693@pengutronix.de>
-	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
-	<20101124201831.GZ4693@pengutronix.de>
-	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
-	<20101125091346.GS6017@pengutronix.de>
-	<AANLkTi=L_5ib-Kj0fZRci7-bPOpkyojejZ9+jZpmH9aC@mail.gmail.com>
-	<20101129212446.GB6017@pengutronix.de>
-	<AANLkTik6CScZ5uL2s_qf9q5w6i13mBk_0CLkLZHCKwSm@mail.gmail.com>
-	<20101201111448.GF6017@pengutronix.de>
-	<AANLkTimofVgY4M7U+aLA1RUz0a2LOmPUFr6bwcj1vcZw@mail.gmail.com>
-Message-ID: <87zksnovsw.fsf@lechat.rtp-net.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Dec 2010 13:07:24 +0000
+Subject: Mainline OMAP3 breakage (and other OMAP?)
+In-Reply-To: <AANLkTim3573_MUZNpo2+tKa=ZJgQf26x5of_ZkMM6BR8@mail.gmail.com>
+References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
+	<20101202215837.GW17222@atomide.com>
+	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
+	<20101202223208.GA17222@atomide.com>
+	<20101203030954.GD3367@linux-sh.org>
+	<20101203084102.GA30957@n2100.arm.linux.org.uk>
+	<AANLkTim3573_MUZNpo2+tKa=ZJgQf26x5of_ZkMM6BR8@mail.gmail.com>
+Message-ID: <20101203130724.GB30957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam <festevam@gmail.com> writes:
+On Fri, Dec 03, 2010 at 02:10:23PM +0200, Felipe Contreras wrote:
+> On Fri, Dec 3, 2010 at 10:41 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Dec 03, 2010 at 12:09:55PM +0900, Paul Mundt wrote:
+> >> This has been fixed since -rc2.
+> >
+> > So it is. ?However, the ioremap fix is wrong.
+> >
+> > ? ? ? ?} else {
+> > ? ? ? ? ? ? ? ?paddr = memblock_alloc(size, PAGE_SIZE);
+> > ? ? ? ?}
+> >
+> > ? ? ? ?memblock_free(paddr, size);
+> > ? ? ? ?memblock_remove(paddr, size);
+> >
+> > Didn't I say that such blocks were supposed to be aligned to a 2MB
+> > boundary - and the size also so aligned?
+> 
+> I asked you if there was something special and I didn't receive any response:
+> http://article.gmane.org/gmane.linux.kernel/1048434
 
-Hi,
+So you thought you could ride rough-shod over my statement and ignore it?
+Thank you for treating me like shit, I'll remember that for future and
+treat you in a similar manner.
 
-[...]
+> So, why SZ_2M?
 
->> It would be great if someone steps forward and mainlines this sgtl5000
->> codec driver, that's currently the main showstopper for sound support on
->> the Freescale boards.
->
-> Thanks a lot for setting up this branch. I can confirm that audio
-> works on MX51 Babbage on this branch.
->
-> I will check internally if someone is willing to mainline sgtl5000.
+Firstly, that's the granularity which we allocate page tables - one
+Linux page table covers 2MB of memory.  We want to avoid creating page
+tables for the main memory mapping as that increases TLB pressure through
+the use of additional TLB entries, and more page table walks.
 
-If you find no vic^H^H^Hvolunteer, I'll look at it. Looks like the
-sgtl5000 chipset is not very complicated.
+Plus, we never used to allow the kernel's direct memory mapping to be
+mapped at anything less than section size - this restriction has since
+been lifted due to OMAP SRAM problems, but I'd rather we stuck with it
+to ensure that we have proper behaviour from all parts of the system.
 
-Arnaud
+Secondly, we don't want to end up with lots of fragmentation at the end
+of the memory mapping as that'll reduce performance, not only by making
+the pfn_valid() search more expensive.
+
+Emsuring a minimum allocation size and alignment makes sure that the
+regions can be coalesced together into one block, and minimises run-time
+expenses.
+
+So please, 2MB, or if you object, at the _very_ _least_ 1MB.  But
+definitely not PAGE_SIZE.
