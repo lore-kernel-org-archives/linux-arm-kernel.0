@@ -1,102 +1,232 @@
-From: phorton@bitbox.co.uk (Peter Horton)
-Date: Fri, 3 Dec 2010 17:07:28 +0000
-Subject: [PATCH] mx51: add SSI3
-Message-ID: <20101203170727.GA25996@porta-pete.localdomain>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Fri, 3 Dec 2010 11:10:44 -0600
+Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>
+References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
+	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>
+	<AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>
+Message-ID: <AANLkTinwj27dSdv9Djs9Fv6QN5vv5JY+br4xCHk=8YEu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SSI3 to MX51
+On Fri, Dec 3, 2010 at 5:51 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> On Fri, Dec 03, 2010 at 06:14:39, Victor Rodriguez wrote:
+>> On Thu, Dec 2, 2010 at 12:49 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+>> > On Thu, Dec 02, 2010 at 01:02:29, vm.rod25 at gmail.com wrote:
+>> >> +static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
+>> >> +{
+>> >> + ? ? int irq ? ? ? ? = gpio_to_irq(DA850_USB1_OC_PIN);
+>> >> + ? ? int error ? ? ? = 0;
+>> >> +
+>> >> + ? ? if (handler != NULL) {
+>> >> + ? ? ? ? ? ? hawk_usb_ocic_handler = handler;
+>> >> +
+>> >> + ? ? ? ? ? ? error = request_irq(irq, omapl138_hawk_usb_ocic_irq,
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED | IRQF_TRIGGER_RISING |
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_TRIGGER_FALLING,
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "OHCI over-current indicator", NULL);
+>> >> + ? ? ? ? ? ? if (error)
+>> >> + ? ? ? ? ? ? ? ? ? ? pr_err(KERN_ERR "%s: could not request IRQ to watch "
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "over-current indicator changes\n", __func__);
+>> >
+>> > pr_err adds a KERN_ERR already.
+>>
+>> Changed to this
+>>
+>> static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
+>> {
+>> ? ? ? int irq ? ? ? ? = gpio_to_irq(DA850_USB1_OC_PIN);
+>> ? ? ? int error ? ? ? = 0;
+>>
+>> ? ? ? if (handler != NULL) {
+>> ? ? ? ? ? ? ? hawk_usb_ocic_handler = handler;
+>>
+>> ? ? ? ? ? ? ? error = request_irq(irq, omapl138_hawk_usb_ocic_irq,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED | IRQF_TRIGGER_RISING |
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_TRIGGER_FALLING,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "OHCI over-current indicator", NULL);
+>> ? ? ? ? ? ? ? if (error)
+>> ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: could not request IRQ to watch "
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "over-current indicator changes\n", __func__);
+>
+> Looks good. Thanks. The same error is present elsewhere in the
+> patch and other patches too. Please fix those too.
 
-Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
+Ok thanks for check it, I am sending the changes in a patch format ,
+any way I will resend the series with the correction if it is ok
+>>
+>> USB part
+>>
+>> Changed to this
+>>
+>> ? ? ? if (ret < 0) {
+>> ? ? ? ? ? ? ? pr_err("%s: failed to request GPIO for USB 1.1 port "
+>> ? ? ? ? ? ? ? ? ? ? ? "power control: %d\n", __func__, ret);
+>> ? ? ? ? ? ? ? gpio_free(DA850_USB1_VBUS_PIN);
+>> ? ? ? ? ? ? ? return;
+>> ? ? ? }
+>>
+>> ? ? ? ret = gpio_request_one(DA850_USB1_OC_PIN,
+>> ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "USB1 OC");
+>> ? ? ? if (ret < 0) {
+>> ? ? ? ? ? ? ? pr_err("%s: failed to request GPIO for USB 1.1 port "
+>> ? ? ? ? ? ? ? ? ? ? ? "over-current indicator: %d\n", __func__, ret);
+>> ? ? ? ? ? ? ? gpio_free(DA850_USB1_OC_PIN);
+>> ? ? ? ? ? ? ? return;
+>> ? ? ? }
+>>
+>> Patch 4/6
+>>
+>> ? ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
+>> ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC CD");
+>> ? ? ? if (ret < 0) {
+>> ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
+>> ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_CD_PIN);
+>> ? ? ? ? ? ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+>> ? ? ? ? ? ? ? return;
+>> ? ? ? }
+>>
+>> ? ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
+>> ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC WP");
+>> ? ? ? if (ret < 0) {
+>> ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
+>> ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
+>> ? ? ? ? ? ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+>> ? ? ? ? ? ? ? return;
+>> ? ? ? }
+>>
+>>
+>> Is this ok ? or should I free the GPIO on the next section ? Same with USB
+>
+> Not sure what you mean by "next section"? goto based error recovery is
+> more commonly used and probably more preferred as it is easier to extend.
+
+I mean the next if
+
+ret = da8xx_register_usb11(&omapl138_hawk_usb11_pdata);
+	if (ret) {
+		pr_warning("%s: USB 1.1 registration failed: %d\n",
+			__func__, ret);
+	}
+
+> You can look at function da850_evm_ui_expander_setup() of
+> arch/arm/mach-davinci/board-da850-evm.c for an example.
+
+Thanks for the help I have free  the two gpio on the last registration
+request error handler
+
+check it on the next patch
 
 ---
+ arch/arm/mach-davinci/board-omapl138-hawk.c |   38 ++++++++++++++++++++------
+ 1 files changed, 29 insertions(+), 9 deletions(-)
 
-Patch is against Sascha's "for-next" tree
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
+b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index da51136..8fc78f2 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -157,7 +157,7 @@ static __init void omapl138_hawk_mmc_init(void)
+ 	if (ret < 0) {
+ 		pr_warning("%s: can not open GPIO %d\n",
+ 			__func__, DA850_HAWK_MMCSD_CD_PIN);
+-		return;
++		goto exp_setup_cd_fail;
+ 	}
 
- arch/arm/mach-mx5/clock-mx51-mx53.c          |    5 +++++
- arch/arm/plat-mxc/devices/platform-imx-ssi.c |    1 +
- arch/arm/plat-mxc/include/mach/mx51.h        |   12 ++++++------
- 3 files changed, 12 insertions(+), 6 deletions(-)
+ 	ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
+@@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
+ 	if (ret < 0) {
+ 		pr_warning("%s: can not open GPIO %d\n",
+ 			__func__, DA850_HAWK_MMCSD_WP_PIN);
+-		return;
++		goto exp_setup_wp_fail;
+ 	}
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 344ee8e..3b1da76 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1036,6 +1036,10 @@ DEFINE_CLOCK(ssi2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG10_OFFSET,
- 	NULL, NULL, &ipg_clk, NULL);
- DEFINE_CLOCK(ssi2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG11_OFFSET,
- 	NULL, NULL, &pll3_sw_clk, &ssi2_ipg_clk);
-+DEFINE_CLOCK(ssi3_ipg_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG12_OFFSET,
-+	NULL, NULL, &ipg_clk, NULL);
-+DEFINE_CLOCK(ssi3_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG13_OFFSET,
-+	NULL, NULL, &pll3_sw_clk, &ssi3_ipg_clk);
- 
- /* eCSPI */
- DEFINE_CLOCK_FULL(ecspi1_ipg_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG9_OFFSET,
-@@ -1095,6 +1099,7 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
- 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
-+	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
- 	_REGISTER_CLOCK("imx-sdma", NULL, sdma_clk)
- 	_REGISTER_CLOCK(NULL, "ckih", ckih_clk)
- 	_REGISTER_CLOCK(NULL, "ckih2", ckih2_clk)
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-ssi.c b/arch/arm/plat-mxc/devices/platform-imx-ssi.c
-index ac3d572..2569c8d 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-ssi.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-ssi.c
-@@ -72,6 +72,7 @@ const struct imx_imx_ssi_data imx51_imx_ssi_data[] __initconst = {
- 	imx_imx_ssi_data_entry(MX51, _id, _hwid, SZ_4K)
- 	imx51_imx_ssi_data_entry(0, 1),
- 	imx51_imx_ssi_data_entry(1, 2),
-+	imx51_imx_ssi_data_entry(2, 3),
- };
- #endif /* ifdef CONFIG_SOC_IMX51 */
- 
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 8fddfef..88b8b07 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -109,7 +109,7 @@
- #define MX51_MIPI_HSC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xdc000)
- #define MX51_ATA_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe0000)
- #define MX51_SIM_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe4000)
--#define MX51_SSI3BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe8000)
-+#define MX51_SSI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe8000)
- #define MX51_FEC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xec000)
- #define MX51_TVE_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xf0000)
- #define MX51_VPU_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xf4000)
-@@ -223,9 +223,9 @@
- #define MX51_DMA_REQ_EMI_WR		32
- #define MX51_DMA_REQ_CTI2_1		33
- #define MX51_DMA_REQ_EPIT2		34
--#define MX51_DMA_REQ_SSI3_RX2		35
-+#define MX51_DMA_REQ_SSI3_RX1		35
- #define MX51_DMA_REQ_IPU		36
--#define MX51_DMA_REQ_SSI3_TX2		37
-+#define MX51_DMA_REQ_SSI3_TX1		37
- #define MX51_DMA_REQ_CSPI_RX		38
- #define MX51_DMA_REQ_CSPI_TX		39
- #define MX51_DMA_REQ_SDHC3		40
-@@ -234,8 +234,8 @@
- #define MX51_DMA_REQ_UART3_RX		43
- #define MX51_DMA_REQ_UART3_TX		44
- #define MX51_DMA_REQ_SPDIF		45
--#define MX51_DMA_REQ_SSI3_RX1		46
--#define MX51_DMA_REQ_SSI3_TX1		47
-+#define MX51_DMA_REQ_SSI3_RX0		46
-+#define MX51_DMA_REQ_SSI3_TX0		47
- 
- /*
-  * Interrupt numbers
-@@ -337,7 +337,7 @@
- #define MX51_MXC_INT_FIRI		93
- #define MX51_MXC_INT_PWM2		94
- #define MX51_MXC_INT_SLIM_EXP		95
--#define MX51_MXC_INT_SSI3		96
-+#define MX51_INT_SSI3			96
- #define MX51_MXC_INT_EMI_BOOT		97
- #define MX51_MXC_INT_CTI1_TG3		98
- #define MX51_MXC_INT_SMC_RX		99
+ 	ret = da8xx_register_mmcsd0(&da850_mmc_config);
+-	if (ret)
++	if (ret) {
+ 		pr_warning("%s: MMC/SD0 registration failed: %d\n",
+ 			__func__, ret);
++		goto exp_setup_mmcsd_fail;
++	}
++		return;
++
++exp_setup_mmcsd_fail:
++	gpio_free(DA850_HAWK_MMCSD_WP_PIN);
++exp_setup_wp_fail:
++	gpio_free(DA850_HAWK_MMCSD_CD_PIN);
++exp_setup_cd_fail:
++		return;
+ }
+
+ static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id);
+@@ -211,7 +221,7 @@ static int
+hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
+ 					IRQF_TRIGGER_FALLING,
+ 					"OHCI over-current indicator", NULL);
+ 		if (error)
+-			pr_err(KERN_ERR "%s: could not request IRQ to watch "
++			pr_err("%s: could not request IRQ to watch "
+ 				"over-current indicator changes\n", __func__);
+ 	} else {
+ 		free_irq(irq, NULL);
+@@ -256,23 +266,33 @@ static __init void omapl138_hawk_usb_init(void)
+ 	ret = gpio_request_one(DA850_USB1_VBUS_PIN,
+ 			GPIOF_DIR_OUT, "USB1 VBUS");
+ 	if (ret < 0) {
+-		pr_err(KERN_ERR "%s: failed to request GPIO for USB 1.1 port "
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
+ 			"power control: %d\n", __func__, ret);
+-		return;
++		goto exp_setup_vbus_fail;
+ 	}
+
+ 	ret = gpio_request_one(DA850_USB1_OC_PIN,
+ 			GPIOF_DIR_IN, "USB1 OC");
+ 	if (ret < 0) {
+-		pr_err(KERN_ERR "%s: failed to request GPIO for USB 1.1 port "
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
+ 			"over-current indicator: %d\n", __func__, ret);
+-		return;
++		goto exp_setup_oc_fail;
+ 	}
+
+ 	ret = da8xx_register_usb11(&omapl138_hawk_usb11_pdata);
+-	if (ret)
++	if (ret) {
+ 		pr_warning("%s: USB 1.1 registration failed: %d\n",
+ 			__func__, ret);
++		goto exp_setup_usb11_fail;
++	}
++		return;
++
++exp_setup_usb11_fail:
++	gpio_free(DA850_USB1_OC_PIN);
++exp_setup_oc_fail:
++	gpio_free(DA850_USB1_VBUS_PIN);
++exp_setup_vbus_fail:
++		return;
+ }
+
+ static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
 -- 
-1.7.3.2
+1.7.0.4
+
+
+I have already compiled and tested. If it is ok for you I will resend
+the patches with the corrections
+
+Thanks a lot for your help
+
+Regards
+
+Victor Rodriguez
+
+
+> Thanks,
+> Sekhar
+>
+>
