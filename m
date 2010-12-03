@@ -1,26 +1,38 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Fri, 03 Dec 2010 12:03:52 +0000
-Subject: [PATCH 1/2] Change the register name definitions for mc13783
-In-Reply-To: <AANLkTinVZ3uM8S38Ug-pa1-1wCbem-ddsHmdOMLvtPhi@mail.gmail.com>
-References: <AANLkTinA-rNzSjGZQSmGUdOt8j0RWddfNo5m=fP2oQx8@mail.gmail.com>
-	<1291373531.3271.8.camel@odin>
-	<AANLkTinVZ3uM8S38Ug-pa1-1wCbem-ddsHmdOMLvtPhi@mail.gmail.com>
-Message-ID: <1291377832.3271.44.camel@odin>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Fri, 3 Dec 2010 14:10:23 +0200
+Subject: Mainline OMAP3 breakage (and other OMAP?)
+In-Reply-To: <20101203084102.GA30957@n2100.arm.linux.org.uk>
+References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
+	<20101202215837.GW17222@atomide.com>
+	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
+	<20101202223208.GA17222@atomide.com>
+	<20101203030954.GD3367@linux-sh.org>
+	<20101203084102.GA30957@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim3573_MUZNpo2+tKa=ZJgQf26x5of_ZkMM6BR8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-12-03 at 19:20 +0800, Yong Shen wrote:
-> Hi Liam,
-> 
-> If it is you take these two patches, please help add "Acked-by: Mark
-> Brown <broonie@opensource.wolfsonmicro.com>" in the commit, or you
-> prefer I send out updated ones for this.
-> 
+On Fri, Dec 3, 2010 at 10:41 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Dec 03, 2010 at 12:09:55PM +0900, Paul Mundt wrote:
+>> This has been fixed since -rc2.
+>
+> So it is. ?However, the ioremap fix is wrong.
+>
+> ? ? ? ?} else {
+> ? ? ? ? ? ? ? ?paddr = memblock_alloc(size, PAGE_SIZE);
+> ? ? ? ?}
+>
+> ? ? ? ?memblock_free(paddr, size);
+> ? ? ? ?memblock_remove(paddr, size);
+>
+> Didn't I say that such blocks were supposed to be aligned to a 2MB
+> boundary - and the size also so aligned?
 
-I'll take care of this, no need to resend.
+I asked you if there was something special and I didn't receive any response:
+http://article.gmane.org/gmane.linux.kernel/1048434
 
-Liam
+So, why SZ_2M?
+
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Felipe Contreras
