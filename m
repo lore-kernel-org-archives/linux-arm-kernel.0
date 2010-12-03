@@ -1,88 +1,50 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Dec 2010 20:22:39 +0000
-Subject: [PATCH 11/22] ARM: SMP: use more sane register allocation for
-	__fixup_smp_on_up
+Date: Fri, 03 Dec 2010 20:23:00 +0000
+Subject: [PATCH 12/22] ARM: SMP: ensure smp_send_stop() waits for CPUs to stop
 In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
 References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-Message-ID: <E1POc9P-0007rh-O5@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1POc9k-0007rl-5d@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use r0,r3-r6 rather than r0,r3,r4,r6,r7, which makes it easier to
-understand which registers can be modified.  Also document which
-registers hold values which must be preserved.
+Wait for CPUs to indicate that they've stopped, after sending the
+stop IPI, rather than blindly continuing on and hoping that they've
+stopped in time.  Print a warning if we fail to stop the other CPUs.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/head.S |   39 ++++++++++++++++++++++-----------------
- 1 files changed, 22 insertions(+), 17 deletions(-)
+ arch/arm/kernel/smp.c |   18 +++++++++++++++---
+ 1 files changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index dd6b369..fd94e4e 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -89,6 +89,11 @@ ENTRY(stext)
- 	bl	__lookup_machine_type		@ r5=machinfo
- 	movs	r8, r5				@ invalid machine (r5=0)?
- 	beq	__error_a			@ yes, error 'a'
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index aa1c6f5..48bccf3 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -583,10 +583,22 @@ void smp_send_reschedule(int cpu)
+ 
+ void smp_send_stop(void)
+ {
+-	cpumask_t mask = cpu_online_map;
+-	cpu_clear(smp_processor_id(), mask);
+-	if (!cpus_empty(mask))
++	unsigned long timeout;
 +
-+	/*
-+	 * r1 = machine no, r2 = atags,
-+	 * r8 = machinfo, r9 = cpuid, r10 = procinfo
-+	 */
- 	bl	__vet_atags
- #ifdef CONFIG_SMP_ON_UP
- 	bl	__fixup_smp
-@@ -381,19 +386,19 @@ ENDPROC(__turn_mmu_on)
++	if (num_online_cpus() > 1) {
++		cpumask_t mask = cpu_online_map;
++		cpu_clear(smp_processor_id(), mask);
++
+ 		send_ipi_message(&mask, IPI_CPU_STOP);
++	}
++
++	/* Wait up to one second for other CPUs to stop */
++	timeout = USEC_PER_SEC;
++	while (num_online_cpus() > 1 && timeout--)
++		udelay(1);
++
++	if (num_online_cpus() > 1)
++		pr_warning("SMP: failed to stop secondary CPUs\n");
+ }
  
- #ifdef CONFIG_SMP_ON_UP
- __fixup_smp:
--	mov	r7, #0x00070000
--	orr	r6, r7, #0xff000000	@ mask 0xff070000
--	orr	r7, r7, #0x41000000	@ val 0x41070000
--	and	r0, r9, r6
--	teq	r0, r7			@ ARM CPU and ARMv6/v7?
-+	mov	r4, #0x00070000
-+	orr	r3, r4, #0xff000000	@ mask 0xff070000
-+	orr	r4, r4, #0x41000000	@ val 0x41070000
-+	and	r0, r9, r3
-+	teq	r0, r4			@ ARM CPU and ARMv6/v7?
- 	bne	__fixup_smp_on_up	@ no, assume UP
- 
--	orr	r6, r6, #0x0000ff00
--	orr	r6, r6, #0x000000f0	@ mask 0xff07fff0
--	orr	r7, r7, #0x0000b000
--	orr	r7, r7, #0x00000020	@ val 0x4107b020
--	and	r0, r9, r6
--	teq	r0, r7			@ ARM 11MPCore?
-+	orr	r3, r3, #0x0000ff00
-+	orr	r3, r3, #0x000000f0	@ mask 0xff07fff0
-+	orr	r4, r4, #0x0000b000
-+	orr	r4, r4, #0x00000020	@ val 0x4107b020
-+	and	r0, r9, r3
-+	teq	r0, r4			@ ARM 11MPCore?
- 	moveq	pc, lr			@ yes, assume SMP
- 
- 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
-@@ -402,13 +407,13 @@ __fixup_smp:
- 
- __fixup_smp_on_up:
- 	adr	r0, 1f
--	ldmia	r0, {r3, r6, r7}
-+	ldmia	r0, {r3 - r5}
- 	sub	r3, r0, r3
--	add	r6, r6, r3
--	add	r7, r7, r3
--2:	cmp	r6, r7
--	ldmia	r6!, {r0, r4}
--	strlo	r4, [r0, r3]
-+	add	r4, r4, r3
-+	add	r5, r5, r3
-+2:	cmp	r4, r5
-+	ldmia	r4!, {r0, r6}
-+	strlo	r6, [r0, r3]
- 	blo	2b
- 	mov	pc, lr
- ENDPROC(__fixup_smp)
+ /*
 -- 
 1.6.2.5
