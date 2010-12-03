@@ -1,71 +1,49 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 03 Dec 2010 20:52:45 +0100
-Subject: [PATCH 4/4 v2] ARM: S5PV210: Add clock definition for MIPI-CSIS DPHY
-In-Reply-To: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>
-References: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1291405965-19482-5-git-send-email-s.nawrocki@samsung.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 03 Dec 2010 12:06:53 -0800
+Subject: [PATCH] arm: dma-mapping: move consistent_init to	early_initcall
+In-Reply-To: <20101202221909.GK29347@n2100.arm.linux.org.uk>
+References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
+	<20101202221909.GK29347@n2100.arm.linux.org.uk>
+Message-ID: <4CF94DDD.8000409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MIPI DPHY control register requires special handling since it is shared 
-between CSI (camera serial interface) and DSI (display serial interface). 
-By creating this clock a serialized interface is provided for mipi-csis 
-and mipi-dsim drivers, so DPHYs may be safely controlled by both drivers.
-Similarly dsim_dphy clock could be added for mipi-dsim.
+Russell King - ARM Linux wrote:
+> On Thu, Dec 02, 2010 at 02:11:18PM -0800, Jeff Ohlstein wrote:
+>> Some machines require the use of coherent memory to bring up auxillary
+>> cpus, and thus want to use dma_alloc_coherent prior to smp_init
+>> completing.
+> 
+> I'd like to see the rest of the code to indicate why you need DMA
+> coherent memory for SMP boot.  It seems to me quite unnecessary.
+> DMA coherent memory is meant for talking to devices, not to other
+> CPUs which will be part of the symmetric part of the system.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
----
+The code that needs this change will be submitted soon (hopefully in a 
+day or two).
 
-I am not quite sure about_"dphy_clock", perhaps power domain
-handling code would be better place for it.
+The MSM8660 SoC uses the TrustZone technology and the Linux kernel 
+executes in normal/non-secure domain. When the second core is brought 
+out of reset, it starts executing a secure image which then jumps to 
+"secondary_startup". So, before bringing the second core out of reset, 
+we need to inform the secure domain code where secondary_startup is 
+located in memory.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/clock.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+We do the communication with the secure code by using buffers in memory. 
+  The cache treats the NS (non secure) bit as an additional address bit 
+when tagging memory. Hence, cache accesses are not coherent between the 
+secure and non-secure domains. So, the secure side flushes it's cache 
+after writing to the buffer. To properly read the response from the 
+secure side, the kernel has to pick a buffer that isn't cacheable in the 
+first place. We have similar issues in the reverse direction.
 
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index b774ff1..b880b85 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -185,6 +185,19 @@ static int s5pv210_clk_mask1_ctrl(struct clk *clk, int enable)
- 	return s5p_gatectrl(S5P_CLK_SRC_MASK1, clk, enable);
- }
- 
-+static int s5pv210_clk_mipi_dphy_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_MIPI_DPHY_CONTROL, clk, enable);
-+}
-+
-+/* The common parent clock for mipi-csi/dsi clocks. */
-+static struct clk clk_vp_mipi_dphy = {
-+	.name		= "vpclk_csis_dphy",
-+	.id		= -1,
-+	.enable		= s5pv210_clk_mipi_dphy_ctrl,
-+	.ctrlbit	= (1 << 0),
-+};
-+
- static struct clk clk_sclk_hdmi27m = {
- 	.name		= "sclk_hdmi27m",
- 	.id		= -1,
-@@ -323,6 +336,18 @@ static struct clk init_clocks_disable[] = {
- 		.enable		= s5pv210_clk_ip0_ctrl,
- 		.ctrlbit	= (1 << 4),
- 	}, {
-+		.name		= "csis",
-+		.id		= -1,
-+		.parent		= &clk_pclk_dsys.clk,
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 31),
-+	}, {
-+		.name		= "csis_dphy",
-+		.id		= -1,
-+		.parent		= &clk_vp_mipi_dphy,
-+		.enable		= s5pv210_clk_mipi_dphy_ctrl,
-+		.ctrlbit	= (1 << 1),
-+	}, {
- 		.name		= "rot",
- 		.id		= -1,
- 		.parent		= &clk_hclk_dsys.clk,
+Thanks,
+Saravana
+
 -- 
-1.7.3.2
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
