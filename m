@@ -1,105 +1,144 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Dec 2010 17:23:08 +0000
-Subject: [PATCH 02/54] ARM: ecard: irq_data conversion.
-In-Reply-To: <20101130132534.GC15575@mail.wantstofly.org>
+Date: Fri, 3 Dec 2010 17:24:36 +0000
+Subject: [PATCH 16/54] ARM: footbridge: irq_data conversion.
+In-Reply-To: <20101130133641.GQ15575@mail.wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130132534.GC15575@mail.wantstofly.org>
-Message-ID: <20101203172308.GF30898@n2100.arm.linux.org.uk>
+	<20101130133641.GQ15575@mail.wantstofly.org>
+Message-ID: <20101203172436.GG30898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 02:25:34PM +0100, Lennert Buytenhek wrote:
+On Tue, Nov 30, 2010 at 02:36:41PM +0100, Lennert Buytenhek wrote:
 > Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 
 Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
+Note that there's a big with the isa-irq code - it assumes that we still
+have the ARM implementation of IRQ support, where there was a global lock.
+As this is no longer the case, the read-modify-writes there are no longer
+safe and need fixing.
+
 > ---
->  arch/arm/kernel/ecard.c |   28 ++++++++++++++--------------
->  1 files changed, 14 insertions(+), 14 deletions(-)
+>  arch/arm/mach-footbridge/common.c  |   14 +++++++-------
+>  arch/arm/mach-footbridge/isa-irq.c |   36 ++++++++++++++++++------------------
+>  2 files changed, 25 insertions(+), 25 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
-> index eed2f79..2ad62df 100644
-> --- a/arch/arm/kernel/ecard.c
-> +++ b/arch/arm/kernel/ecard.c
-> @@ -443,40 +443,40 @@ static expansioncard_ops_t ecard_default_ops = {
->   *
->   * They are not meant to be called directly, but via enable/disable_irq.
->   */
-> -static void ecard_irq_unmask(unsigned int irqnr)
-> +static void ecard_irq_unmask(struct irq_data *d)
->  {
-> -	ecard_t *ec = slot_to_ecard(irqnr - 32);
-> +	ecard_t *ec = slot_to_ecard(d->irq - 32);
->  
->  	if (ec) {
->  		if (!ec->ops)
->  			ec->ops = &ecard_default_ops;
->  
->  		if (ec->claimed && ec->ops->irqenable)
-> -			ec->ops->irqenable(ec, irqnr);
-> +			ec->ops->irqenable(ec, d->irq);
->  		else
->  			printk(KERN_ERR "ecard: rejecting request to "
-> -				"enable IRQs for %d\n", irqnr);
-> +				"enable IRQs for %d\n", d->irq);
->  	}
->  }
->  
-> -static void ecard_irq_mask(unsigned int irqnr)
-> +static void ecard_irq_mask(struct irq_data *d)
->  {
-> -	ecard_t *ec = slot_to_ecard(irqnr - 32);
-> +	ecard_t *ec = slot_to_ecard(d->irq - 32);
->  
->  	if (ec) {
->  		if (!ec->ops)
->  			ec->ops = &ecard_default_ops;
->  
->  		if (ec->ops && ec->ops->irqdisable)
-> -			ec->ops->irqdisable(ec, irqnr);
-> +			ec->ops->irqdisable(ec, d->irq);
->  	}
->  }
->  
->  static struct irq_chip ecard_chip = {
-> -	.name	= "ECARD",
-> -	.ack	= ecard_irq_mask,
-> -	.mask	= ecard_irq_mask,
-> -	.unmask = ecard_irq_unmask,
-> +	.name		= "ECARD",
-> +	.irq_ack	= ecard_irq_mask,
-> +	.irq_mask	= ecard_irq_mask,
-> +	.irq_unmask	= ecard_irq_unmask,
+> diff --git a/arch/arm/mach-footbridge/common.c b/arch/arm/mach-footbridge/common.c
+> index 88b3dd8..84c5f25 100644
+> --- a/arch/arm/mach-footbridge/common.c
+> +++ b/arch/arm/mach-footbridge/common.c
+> @@ -75,20 +75,20 @@ static const int fb_irq_mask[] = {
+>  	IRQ_MASK_PCI_PERR,	/* 19 */
 >  };
 >  
->  void ecard_enablefiq(unsigned int fiqnr)
-> @@ -551,7 +551,7 @@ static void ecard_check_lockup(struct irq_desc *desc)
->  			printk(KERN_ERR "\nInterrupt lockup detected - "
->  			       "disabling all expansion card interrupts\n");
+> -static void fb_mask_irq(unsigned int irq)
+> +static void fb_mask_irq(struct irq_data *d)
+>  {
+> -	*CSR_IRQ_DISABLE = fb_irq_mask[_DC21285_INR(irq)];
+> +	*CSR_IRQ_DISABLE = fb_irq_mask[_DC21285_INR(d->irq)];
+>  }
 >  
-> -			desc->chip->mask(IRQ_EXPANSIONCARD);
-> +			desc->irq_data.chip->irq_mask(&desc->irq_data);
->  			ecard_dump_irq_state();
->  		}
->  	} else
-> @@ -574,7 +574,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
->  	ecard_t *ec;
->  	int called = 0;
+> -static void fb_unmask_irq(unsigned int irq)
+> +static void fb_unmask_irq(struct irq_data *d)
+>  {
+> -	*CSR_IRQ_ENABLE = fb_irq_mask[_DC21285_INR(irq)];
+> +	*CSR_IRQ_ENABLE = fb_irq_mask[_DC21285_INR(d->irq)];
+>  }
 >  
-> -	desc->chip->mask(irq);
-> +	desc->irq_data.chip->irq_mask(&desc->irq_data);
->  	for (ec = cards; ec; ec = ec->next) {
->  		int pending;
+>  static struct irq_chip fb_chip = {
+> -	.ack	= fb_mask_irq,
+> -	.mask	= fb_mask_irq,
+> -	.unmask = fb_unmask_irq,
+> +	.irq_ack	= fb_mask_irq,
+> +	.irq_mask	= fb_mask_irq,
+> +	.irq_unmask	= fb_unmask_irq,
+>  };
 >  
-> @@ -591,7 +591,7 @@ ecard_irq_handler(unsigned int irq, struct irq_desc *desc)
->  			called ++;
->  		}
->  	}
-> -	desc->chip->unmask(irq);
-> +	desc->irq_data.chip->irq_unmask(&desc->irq_data);
+>  static void __init __fb_init_irq(void)
+> diff --git a/arch/arm/mach-footbridge/isa-irq.c b/arch/arm/mach-footbridge/isa-irq.c
+> index 8bfd06a..de7a5cb 100644
+> --- a/arch/arm/mach-footbridge/isa-irq.c
+> +++ b/arch/arm/mach-footbridge/isa-irq.c
+> @@ -30,61 +30,61 @@
 >  
->  	if (called == 0)
->  		ecard_check_lockup(desc);
+>  #include "common.h"
+>  
+> -static void isa_mask_pic_lo_irq(unsigned int irq)
+> +static void isa_mask_pic_lo_irq(struct irq_data *d)
+>  {
+> -	unsigned int mask = 1 << (irq & 7);
+> +	unsigned int mask = 1 << (d->irq & 7);
+>  
+>  	outb(inb(PIC_MASK_LO) | mask, PIC_MASK_LO);
+>  }
+>  
+> -static void isa_ack_pic_lo_irq(unsigned int irq)
+> +static void isa_ack_pic_lo_irq(struct irq_data *d)
+>  {
+> -	unsigned int mask = 1 << (irq & 7);
+> +	unsigned int mask = 1 << (d->irq & 7);
+>  
+>  	outb(inb(PIC_MASK_LO) | mask, PIC_MASK_LO);
+>  	outb(0x20, PIC_LO);
+>  }
+>  
+> -static void isa_unmask_pic_lo_irq(unsigned int irq)
+> +static void isa_unmask_pic_lo_irq(struct irq_data *d)
+>  {
+> -	unsigned int mask = 1 << (irq & 7);
+> +	unsigned int mask = 1 << (d->irq & 7);
+>  
+>  	outb(inb(PIC_MASK_LO) & ~mask, PIC_MASK_LO);
+>  }
+>  
+>  static struct irq_chip isa_lo_chip = {
+> -	.ack	= isa_ack_pic_lo_irq,
+> -	.mask	= isa_mask_pic_lo_irq,
+> -	.unmask = isa_unmask_pic_lo_irq,
+> +	.irq_ack	= isa_ack_pic_lo_irq,
+> +	.irq_mask	= isa_mask_pic_lo_irq,
+> +	.irq_unmask	= isa_unmask_pic_lo_irq,
+>  };
+>  
+> -static void isa_mask_pic_hi_irq(unsigned int irq)
+> +static void isa_mask_pic_hi_irq(struct irq_data *d)
+>  {
+> -	unsigned int mask = 1 << (irq & 7);
+> +	unsigned int mask = 1 << (d->irq & 7);
+>  
+>  	outb(inb(PIC_MASK_HI) | mask, PIC_MASK_HI);
+>  }
+>  
+> -static void isa_ack_pic_hi_irq(unsigned int irq)
+> +static void isa_ack_pic_hi_irq(struct irq_data *d)
+>  {
+> -	unsigned int mask = 1 << (irq & 7);
+> +	unsigned int mask = 1 << (d->irq & 7);
+>  
+>  	outb(inb(PIC_MASK_HI) | mask, PIC_MASK_HI);
+>  	outb(0x62, PIC_LO);
+>  	outb(0x20, PIC_HI);
+>  }
+>  
+> -static void isa_unmask_pic_hi_irq(unsigned int irq)
+> +static void isa_unmask_pic_hi_irq(struct irq_data *d)
+>  {
+> -	unsigned int mask = 1 << (irq & 7);
+> +	unsigned int mask = 1 << (d->irq & 7);
+>  
+>  	outb(inb(PIC_MASK_HI) & ~mask, PIC_MASK_HI);
+>  }
+>  
+>  static struct irq_chip isa_hi_chip = {
+> -	.ack	= isa_ack_pic_hi_irq,
+> -	.mask	= isa_mask_pic_hi_irq,
+> -	.unmask = isa_unmask_pic_hi_irq,
+> +	.irq_ack	= isa_ack_pic_hi_irq,
+> +	.irq_mask	= isa_mask_pic_hi_irq,
+> +	.irq_unmask	= isa_unmask_pic_hi_irq,
+>  };
+>  
+>  static void
 > -- 
 > 1.7.1
 > 
