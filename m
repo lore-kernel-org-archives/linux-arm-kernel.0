@@ -1,110 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 02 Dec 2010 16:45:31 -0800
-Subject: [PATCH 6/6] omap2+: Initialize serial ports for wake-up events for
-	n8x0
-In-Reply-To: <20101203004040.31687.9476.stgit@baageli.muru.com>
-References: <20101203004040.31687.9476.stgit@baageli.muru.com>
-Message-ID: <20101203004531.31687.55661.stgit@baageli.muru.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Fri,  3 Dec 2010 09:12:49 +0800
+Subject: [PATCH] ARM: GIC irq desciptor bug fix
+Message-ID: <1291338769-31214-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use omap_serial_init_port so we can let the serial code handle the
-remuxing of the RX pads.
+From: cxie4 <cxie4@marvell.com>
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+gic_set_cpu will directly use irq_desc[]. If CONFIG_SPARSE_IRQ is enabled, there is no
+irq_desc[]. So we need use irq_to_desc(irq) to get the descriptor for irq.
+
+Signed-off-by: cxie4 <cxie4@marvell.com>
 ---
- arch/arm/mach-omap2/board-n8x0.c |   66 ++++++++++++++++++++++++++++++++++++--
- 1 files changed, 63 insertions(+), 3 deletions(-)
+ arch/arm/common/gic.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-index d022301..e3429b4 100644
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -29,6 +29,7 @@
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 7dfa9a8..6599acb 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -160,9 +160,15 @@ static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
+ 	unsigned int shift = (irq % 4) * 8;
+ 	unsigned int cpu = cpumask_first(mask_val);
+ 	u32 val;
++	struct irq_desc *desc;
  
- #include <plat/board.h>
- #include <plat/common.h>
-+#include <plat/omap_device.h>
- #include <plat/menelaus.h>
- #include <mach/irqs.h>
- #include <plat/mcspi.h>
-@@ -754,8 +755,68 @@ static struct omap_board_mux board_mux[] __initdata = {
- 	OMAP2420_MUX(EAC_AC_DOUT, OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT),
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
-+
-+static struct omap_device_pad serial0_pads[] __initdata = {
-+	{ .name	= "uart1_rx.uart1_rx", .enable	= OMAP_MUX_MODE0 },
-+	{ .name	= "uart1_tx.uart1_tx", .enable	= OMAP_MUX_MODE0 },
-+};
-+
-+static struct omap_device_pad n800_serial1_pads[] __initdata = {
-+	{ .name	= "uart2_rx.uart2_rx", .enable	= OMAP_MUX_MODE7, },
-+	{
-+		.name	= "uart2_tx.uart2_tx",
-+		.enable	= OMAP_PULL_ENA | OMAP_MUX_MODE7,
-+	},
-+};
-+
-+static struct omap_device_pad n810_serial1_pads[] __initdata = {
-+	{ .name	= "uart2_rx.uart2_rx", .enable	= OMAP_MUX_MODE0, },
-+	{ .name	= "uart2_tx.uart2_tx", .enable	= OMAP_MUX_MODE0, },
-+};
-+
-+static struct omap_device_pad serial2_pads[] __initdata = {
-+	{
-+		.name	= "uart3_rx_irrx.uart3_rx_irrx",
-+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-+		.enable	= OMAP_MUX_MODE0,
-+		.idle	= OMAP_MUX_MODE3	/* Mux as GPIO for idle */
-+	},
-+	{ .name	= "uart3_tx_irtx.uart3_tx_irtx", .enable = OMAP_MUX_MODE0, },
-+};
-+
-+static struct omap_device_board_data serial0_data = {
-+	.id		= 0,
-+	.pads		= serial0_pads,
-+	.pads_cnt	= ARRAY_SIZE(serial0_pads),
-+};
-+
-+static struct omap_device_board_data serial1_data = {
-+	.id		= 1,
-+};
-+
-+static struct omap_device_board_data serial2_data = {
-+	.id		= 2,
-+	.pads		= serial2_pads,
-+	.pads_cnt	= ARRAY_SIZE(serial2_pads),
-+};
-+
-+static inline void board_serial_init(int is_n800)
-+{
-+	if (is_n800) {
-+		serial1_data.pads = n800_serial1_pads;
-+		serial1_data.pads_cnt = ARRAY_SIZE(n800_serial1_pads);
-+	} else {
-+		serial1_data.pads = n810_serial1_pads;
-+		serial1_data.pads_cnt = ARRAY_SIZE(n810_serial1_pads);
+ 	spin_lock(&irq_controller_lock);
+-	irq_desc[irq].node = cpu;
++	desc = irq_to_desc(irq);
++	if (desc == NULL) {
++		spin_unlock(&irq_controller_lock);
++		return -EINVAL;
 +	}
-+	omap_serial_init_port(&serial0_data);
-+	omap_serial_init_port(&serial1_data);
-+	omap_serial_init_port(&serial2_data);
-+}
- #else
--#define board_mux	NULL
-+static inline void board_serial_init(void)
-+	omap_serial_init();
-+}
- #endif
- 
- static void __init n8x0_init_machine(void)
-@@ -772,8 +833,7 @@ static void __init n8x0_init_machine(void)
- 	if (machine_is_nokia_n810())
- 		i2c_register_board_info(2, n810_i2c_board_info_2,
- 					ARRAY_SIZE(n810_i2c_board_info_2));
--
--	omap_serial_init();
-+	board_serial_init(machine_is_nokia_n800());
- 	n8x0_onenand_init();
- 	n8x0_mmc_init();
- 	n8x0_usb_init();
++	desc->node = cpu;
+ 	val = readl(reg) & ~(0xff << shift);
+ 	val |= 1 << (cpu + shift);
+ 	writel(val, reg);
+-- 
+1.6.3.3
