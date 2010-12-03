@@ -1,53 +1,75 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 03 Dec 2010 10:59:07 +0100
-Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
-In-Reply-To: <AANLkTikjQkmD-bvtTV=fh-xqMkhsxt67LhAUWuCv5mU3@mail.gmail.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
-	<20101202171538.GB30933@pulham.picochip.com>
-	<4CF7D9E6.5000409@samsung.com>
-	<AANLkTikjQkmD-bvtTV=fh-xqMkhsxt67LhAUWuCv5mU3@mail.gmail.com>
-Message-ID: <000301cb92d0$bd2a7400$377f5c00$%szyprowski@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 03 Dec 2010 19:01:34 +0900
+Subject: [GIT PULL] Samsung fixes for 2.6.37-rc4
+In-Reply-To: <AANLkTinuYg2LzwZJUnpT0-b3Gi+vOJr-_fi4o874DAFG@mail.gmail.com>
+References: <008201cb8c58$363980e0$a2ac82a0$%kim@samsung.com>
+	<4CEFFBE6.9040909@gmail.com>
+	<006601cb9024$c9369110$5ba3b330$%kim@samsung.com>
+	<AANLkTinuYg2LzwZJUnpT0-b3Gi+vOJr-_fi4o874DAFG@mail.gmail.com>
+Message-ID: <015301cb92d1$132c94a0$3985bde0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Friday, December 03, 2010 2:37 AM Jassi Brar wrote:
-
-> On Fri, Dec 3, 2010 at 2:39 AM, Sylwester Nawrocki
-
-<snip>
-
-> > I agree explicit indices are not really needed. I just followed the style of
-> > all other resource definitions already there.
-> > I am not quite sure what is the preference of the maintainer, I guess they want
-> > all devices to follow same style for consistence.
+Darius Augulis wrote:
 > 
-> And that style has its origin because explicit indices are as because
-> they stress the fact that
-> drivers expect  a particular resource at a particular index (when we
-> have more than 1
-> resource of a type).
-> IMO we should use some macro shared between platform devices and their drivers.
-> Something like -
-> static struct resource s5p_csis_resource[] = {
->        [PA_CSIS] = {
->                .start = S5P_PA_CSIS0,
->                .end   = S5P_PA_CSIS0 + SZ_4K - 1,
->                .flags = IORESOURCE_MEM,
->        },
->        [IRQ_CSIS] = {
->                .start = IRQ_MIPICSI0,
->                .end   = IRQ_MIPICSI0,
->                .flags = IORESOURCE_IRQ,
->        }
-> };
+> Hi Ben, Kukjin,
+> 
+Hi Darius,
+Ok...I will apply this in my tree for -next with Ben's ack.
 
-This looks like a huge over-engineering for me, especially for the simple device
-that has only one register area and interrupt.
+Ben, if any problems, please let me know.
 
-Best regards
+Thanks.
+
+Best regards,
+Kgene.
 --
-Marek Szyprowski
-Samsung Poland R&D Center
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> could you please both find out who must 'handle' it?
+> Do you think it's normal to force people to ping you for the same four
+> lines patch for 4 months or more?
+> I think, it's at least not optimal and not good for kernel development
+> process.
+> 
+> 
+> On Tue, Nov 30, 2010 at 2:23 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Darius Augulis wrote:
+> >>
+> >> Hi Kukjin,
+> >>
+> > Hi,
+> >
+> >> you have missed "serial: samsung: fix device name" again.
+> >> Please, don't forget to add it to your tree, better do it right now.
+> >> Perhaps it's fifth or sixth time when remind about that...
+> >>
+> > I remember, I've replied about that like following.
+> > Maybe you missed...
+> >
+> > ---
+> >> you have missed "serial: samsung: fix device name" which is hanging
+here
+> >> for a long time and was decided to merge in 2.6.37-rc1.
+> >> Please, pick it up.
+> >>
+> > Hmm...I thought it should be handled by Ben Dooks at that time.
+> >
+> > Anyway, as Ben said, I'm thinking it should be sent upstream when merge
+> > window
+> > even though have missed it in the last merge window.
+> >
+> > However, if Ben is ok to merge this during 37-rc, will merge it into
+> > s5p-fixes-
+> > for-linus for 37-rc.
+> > ---
+> >
+> > But I still thinking it should be handled by Ben Dooks...
+> 
+> handle what? You have Ben ack to merge it. I'm confused how 'optimal'
+> is development process when have to ping the same people for the same
+> four lines patch for 4 months. You both  Do you think I really have to
+> ask help for arm, serial or linux-stable maintainers to 'hadle' this?
+> Because I gave up believing it's possible to do by samsung
+> maintainers.
