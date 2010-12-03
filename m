@@ -1,47 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 3 Dec 2010 17:49:10 -0200
-Subject: [PATCH] imx: dma: remove SDMA_IS_MERGED
-In-Reply-To: <87zksnovsw.fsf@lechat.rtp-net.org>
-References: <1290626971-14863-1-git-send-email-fabio.estevam@freescale.com>
-	<20101124194439.GY4693@pengutronix.de>
-	<AANLkTingtkuvLE9TMxM5f=uwgK95Wfw8kPyXa_NxekEZ@mail.gmail.com>
-	<20101124201831.GZ4693@pengutronix.de>
-	<AANLkTi=BXLAOVxTbUerDVisHy9FHFV-YcXu1LN9GHN_h@mail.gmail.com>
-	<20101125091346.GS6017@pengutronix.de>
-	<AANLkTi=L_5ib-Kj0fZRci7-bPOpkyojejZ9+jZpmH9aC@mail.gmail.com>
-	<20101129212446.GB6017@pengutronix.de>
-	<AANLkTik6CScZ5uL2s_qf9q5w6i13mBk_0CLkLZHCKwSm@mail.gmail.com>
-	<20101201111448.GF6017@pengutronix.de>
-	<AANLkTimofVgY4M7U+aLA1RUz0a2LOmPUFr6bwcj1vcZw@mail.gmail.com>
-	<87zksnovsw.fsf@lechat.rtp-net.org>
-Message-ID: <AANLkTikbZhUNSRp3KrXJQf19TiaJKjCcLmN_EtzvrsPS@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 03 Dec 2010 20:52:41 +0100
+Subject: [PATCH 0/4 v2] ARM: S5P: Add platform support for MIPI-CSI slave
+	devices
+Message-ID: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
+Hello,
 
-On Fri, Dec 3, 2010 at 11:00 AM, Arnaud Patard
-<arnaud.patard@rtp-net.org> wrote:
-> Fabio Estevam <festevam@gmail.com> writes:
->
-> Hi,
->
-> [...]
->
->>> It would be great if someone steps forward and mainlines this sgtl5000
->>> codec driver, that's currently the main showstopper for sound support on
->>> the Freescale boards.
->>
->> Thanks a lot for setting up this branch. I can confirm that audio
->> works on MX51 Babbage on this branch.
->>
->> I will check internally if someone is willing to mainline sgtl5000.
->
-> If you find no vic^H^H^Hvolunteer, I'll look at it. Looks like the
-> sgtl5000 chipset is not very complicated.
+the following is a second version of patch series adding S5P platform support
+for MIPI-CSIS devices. Hopefully all the comments have been addressed, 
+if not please let me know.
 
-Ok, please go ahead.
+[PATCH 1/4 v2] ARM: S5PV210: Add resource definitions for MIPI CSIS
+[PATCH 2/4 v2] ARM: S5PV310: Add resource definitions for MIPI CSIS
+[PATCH 3/4 v2] ARM: S5P: Add platform support for MIPI CSIS devices
+[PATCH 4/4 v2] ARM: S5PV210: Add clock definition for MIPI-CSIS DPHY
+
+Rebased onto for-next branch at:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+
 
 Regards,
+Sylwester
 
-Fabio Estevam
+
+--
+Sylwester Nawrocki
+Samsung Poland R&D Center
