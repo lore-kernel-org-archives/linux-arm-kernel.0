@@ -1,83 +1,103 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:46 +0530
-Subject: [PATCH 13/20] mfd/tc3589x: add suspend/resume support
+Date: Fri, 3 Dec 2010 20:35:53 +0530
+Subject: [PATCH 20/20] i2c/nomadik: some checkpatch warnings
 In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
 References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1291388753-14662-14-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1291388753-14662-21-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
 ---
- drivers/mfd/tc3589x.c |   42 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-nomadik.c |   34 +++++++++++++++++-----------------
+ 1 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
-index fd206fd..a7dd2b6 100644
---- a/drivers/mfd/tc3589x.c
-+++ b/drivers/mfd/tc3589x.c
-@@ -14,6 +14,9 @@
- #include <linux/mfd/core.h>
- #include <linux/mfd/tc3589x.h>
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index baa8ff7..3ead1b6 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -62,11 +62,11 @@
+ /* Master controller (MCR) register */
+ #define I2C_MCR_OP		(0x1 << 0)	/* Operation */
+ #define I2C_MCR_A7		(0x7f << 1)	/* 7-bit address */
+-#define I2C_MCR_EA10		(0x7 << 8) 	/* 10-bit Extended address */
++#define I2C_MCR_EA10		(0x7 << 8)	/* 10-bit Extended address */
+ #define I2C_MCR_SB		(0x1 << 11)	/* Extended address */
+ #define I2C_MCR_AM		(0x3 << 12)	/* Address type */
+-#define I2C_MCR_STOP		(0x1 << 14) 	/* Stop condition */
+-#define I2C_MCR_LENGTH		(0x7ff << 15) 	/* Transaction length */
++#define I2C_MCR_STOP		(0x1 << 14)	/* Stop condition */
++#define I2C_MCR_LENGTH		(0x7ff << 15)	/* Transaction length */
  
-+#define TC3589x_CLKMODE_MODCTL_SLEEP		0x0
-+#define TC3589x_CLKMODE_MODCTL_OPERATION	(1 << 0)
-+
- /**
-  * tc3589x_reg_read() - read a single TC3589x register
-  * @tc3589x:	Device to read from
-@@ -365,6 +368,42 @@ static int __devexit tc3589x_remove(struct i2c_client *client)
- 	return 0;
+ /* Status register (SR) */
+ #define I2C_SR_OP		(0x3 << 0)	/* Operation */
+@@ -76,7 +76,7 @@
+ #define I2C_SR_LENGTH		(0x7ff << 9)	/* Transfer length */
+ 
+ /* Interrupt mask set/clear (IMSCR) bits */
+-#define I2C_IT_TXFE 		(0x1 << 0)
++#define I2C_IT_TXFE		(0x1 << 0)
+ #define I2C_IT_TXFNE		(0x1 << 1)
+ #define I2C_IT_TXFF		(0x1 << 2)
+ #define I2C_IT_TXFOVR		(0x1 << 3)
+@@ -154,15 +154,15 @@ struct i2c_nmk_client {
+  */
+ struct nmk_i2c_dev {
+ 	struct platform_device		*pdev;
+-	struct i2c_adapter 		adap;
+-	int 				irq;
++	struct i2c_adapter		adap;
++	int				irq;
+ 	void __iomem			*virtbase;
+ 	struct clk			*clk;
+ 	struct nmk_i2c_controller	cfg;
+ 	struct i2c_nmk_client		cli;
+-	int 				stop;
++	int				stop;
+ 	struct completion		xfer_complete;
+-	int 				result;
++	int				result;
+ };
+ 
+ /* controller's abort causes */
+@@ -275,7 +275,7 @@ static int init_hw(struct nmk_i2c_dev *dev)
  }
  
-+#ifdef CONFIG_PM
-+static int tc3589x_suspend(struct device *dev)
-+{
-+	struct tc3589x *tc35892 = dev_get_drvdata(dev);
-+	struct i2c_client *client = tc3589x->i2c;
-+	int ret = 0;
-+
-+	/* put the system to sleep mode */
-+	if (!device_may_wakeup(&client->dev))
-+		ret = tc3589x_reg_write(tc3589x, TC3589x_CLKMODE,
-+				TC3589x_CLKMODE_MODCTL_SLEEP);
-+
-+	return ret;
-+}
-+
-+static int tc3589x_resume(struct device *dev)
-+{
-+	struct tc3589x *tc3589x = dev_get_drvdata(dev);
-+	struct i2c_client *client = tc3589x->i2c;
-+	int ret = 0;
-+
-+	/* enable the system into operation */
-+	if (!device_may_wakeup(&client->dev))
-+		ret = tc3589x_reg_write(tc3589x, TC3589x_CLKMODE,
-+				TC3589x_CLKMODE_MODCTL_OPERATION);
-+
-+	return ret;
-+}
-+
-+
-+static const struct dev_pm_ops tc3589x_dev_pm_ops = {
-+	.suspend = tc3589x_suspend,
-+	.resume  = tc3589x_resume,
-+};
-+#endif
-+
- static const struct i2c_device_id tc3589x_id[] = {
- 	{ "tc3589x", 24 },
- 	{ }
-@@ -374,6 +413,9 @@ MODULE_DEVICE_TABLE(i2c, tc3589x_id);
- static struct i2c_driver tc3589x_driver = {
- 	.driver.name	= "tc3589x",
- 	.driver.owner	= THIS_MODULE,
-+#ifdef CONFIG_PM
-+	.driver.pm	= &tc3589x_dev_pm_ops,
-+#endif
- 	.probe		= tc3589x_probe,
- 	.remove		= __devexit_p(tc3589x_remove),
- 	.id_table	= tc3589x_id,
+ /* enable peripheral, master mode operation */
+-#define DEFAULT_I2C_REG_CR 	((1 << 1) | I2C_CR_PE)
++#define DEFAULT_I2C_REG_CR	((1 << 1) | I2C_CR_PE)
+ 
+ /**
+  * load_i2c_mcr_reg() - load the MCR register
+@@ -519,13 +519,13 @@ static int write_i2c(struct nmk_i2c_dev *dev)
+  *
+  * NOTE:
+  * READ TRANSFER : We impose a restriction of the first message to be the
+- * 		index message for any read transaction.
+- * 		- a no index is coded as '0',
+- * 		- 2byte big endian index is coded as '3'
+- * 		!!! msg[0].buf holds the actual index.
+- * 		This is compatible with generic messages of smbus emulator
+- * 		that send a one byte index.
+- * 		eg. a I2C transation to read 2 bytes from index 0
++ *		index message for any read transaction.
++ *		- a no index is coded as '0',
++ *		- 2byte big endian index is coded as '3'
++ *		!!! msg[0].buf holds the actual index.
++ *		This is compatible with generic messages of smbus emulator
++ *		that send a one byte index.
++ *		eg. a I2C transation to read 2 bytes from index 0
+  *			idx = 0;
+  *			msg[0].addr = client->addr;
+  *			msg[0].flags = 0x0;
+@@ -841,7 +841,7 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (request_mem_region(res->start, resource_size(res),
+-		DRIVER_NAME "I/O region") == 	NULL)	{
++		DRIVER_NAME "I/O region") ==	NULL)	{
+ 		ret = -EBUSY;
+ 		goto err_no_region;
+ 	}
 -- 
 1.7.2.dirty
