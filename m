@@ -1,52 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Dec 2010 15:15:47 +0000
-Subject: [PATCH] pl011: added clock management feature
-In-Reply-To: <AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
-References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
-	<20101109224012.GA21992@kroah.com>
-	<AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
-Message-ID: <20101203151547.GA30898@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 03 Dec 2010 16:17:08 +0100
+Subject: [PATCH] AT91 USB Serial Device
+In-Reply-To: <AANLkTimV2ENcWajrrMQ2Too4pf=XBfLczJ9HehNt4V_8@mail.gmail.com>
+References: <AANLkTimV2ENcWajrrMQ2Too4pf=XBfLczJ9HehNt4V_8@mail.gmail.com>
+Message-ID: <4CF909F4.4060905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 03, 2010 at 12:47:14PM +0100, Vitaly Wool wrote:
-> On Tue, Nov 9, 2010 at 11:40 PM, Greg KH <greg@kroah.com> wrote:
-> > On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
-> >> From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
-> >>
-> >> This patch allows to control the pl011 clock using set_termios
-> >> callback. Any positive baudrate passed enables clock, otherwise
-> >> disables. This saves a lot of power on submicron designs since
-> >> we can clock off and disable unused UARTs.
-> >
-> > That's nice, but it seems like an overload of what people traditionally
-> > think of when it comes to baud rates. ?Why not just power down ports
-> > that are not open instead?
+Rob,
+
+Le 11/11/2010 02:16, Rob Emanuele :
+> Hi Nicolas,
 > 
-> I like the idea as well and this is definitely gonna help conserving
-> the power for Bluetooth UARTs.
+> I came across a small bug while debugging my problems of getting the
+> host interface and device interface to work at the same time but on
+> different ports.  I had compiled the atmel usb device support as a
+> module and after unloading it and trying to reload it, the irq for
+> vbus was not released.  This little patch fixes that
+
+I have created the patch. The only thing that is missing it your
+Signed-off-by: xxxxx xxx <xxxx@xxx>
+line..
+
+Can you please send it to me (even quickly replying to this email saying
+ok)? I will add it before I send your patch upstream (to usb maintainer).
+
+Bye,
+
+> diff --git a/drivers/usb/gadget/atmel_usba_udc.c
+> b/drivers/usb/gadget/atmel_usba_udc.c
+> index d6ef3d5..bc70e53 100644
+> --- a/drivers/usb/gadget/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> @@ -2052,8 +2052,10 @@ static int __exit usba_udc_remove(struct
+> platform_device *pdev)
+>                 usba_ep_cleanup_debugfs(&usba_ep[i]);
+>         usba_cleanup_debugfs(udc);
 > 
-> But using baud rate 0 is something I don't like.
+> -       if (gpio_is_valid(udc->vbus_pin))
+> +       if (gpio_is_valid(udc->vbus_pin)) {
+> +               free_irq(gpio_to_irq(udc->vbus_pin), udc);
+>                 gpio_free(udc->vbus_pin);
+> +       }
+> 
+>         free_irq(udc->irq, udc);
+>         kfree(usba_ep);
+> 
+> 
+> On Tue, Nov 9, 2010 at 3:59 PM, Rob Emanuele <poorarm@shoreis.com> wrote:
+>> Nicolas et al,
+>>
+>> Thank you for the information.  For the moment I have a boot option to
+>> use either 2 host ports or a host and a device port.  That would seem
+>> to fit my needs except for the case that I'm loading the usb serial
+>> gadget as a module and then specifying in the inittab that getty use
+>> it as ttyGS0.  In that case connecting the device port to a host does
+>> not seem to ever register on the host.  If I remove the getty line
+>> from inittab and then run getty manually after it boots, it works
+>> fine.  To add insult to injury, then it will work after reboot also
+>> until a hard power down.
+>>
+>> Anyone experience this?
+>>
+>> Thank you,
+>>
+>> Rob
+>>
+>> On Tue, Nov 9, 2010 at 9:46 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>> Le 05/11/2010 22:09, Rob Emanuele :
+>>>> Greetings,
+>>>>
+>>>> We've been developing a at91sam9g45 product and it is finally available at:
+>>>> https://www.crystalfontz.com/product/CFA910.html
+>>>
+>>> Very nice platform!
+>>>
+>>>> We are looking into supporting USB OTG on this device as the 'g45 has
+>>>> the USB host/device port.  As far at I can tell Atmel or anyone else
+>>>> working on this platform has not made full use of this as an OTG
+>>>> device.
+>>>
+>>> Indeed, it is not done for the moment...
+>>>
+>>>>  I haven't found support in the USB or the OTG code for
+>>>> reading the USB ID line to determine host or device mode.
+>>>
+>>> I am not sure USB ID is well supported by consumer cable providers and
+>>> is a reliable way to determine host or device mode.
+>>>
+>>>> Am I missing something or is that an area that needs some code written for it?
+>>>
+>>> Anyway, using this port as host or device is a matter of
+>>> 1/ driving or not VBUS pin
+>>> 2/ dealing with loading the gadget driver (as the "Enable" of the usba
+>>> IP is responsible for swithing to device mode).
+>>>
+>>> I think that determining if the port shall be used in host or device
+>>> mode can be asked through the GUI... But note that I am not an USB expert...
+>>> --
+>>> Nicolas Ferre
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+> 
 
-You can't use the baud rate of 0 to power down ports - that already has
-a POSIX-defined function (hang up).
 
-> Why don't you stop
-> the clocks if RTS is cleared? This would have allowed the line
-> discipline driver to implicitly control the UART clock and there will
-> be no risk of losing data, as well as no non-standard behavior
-> involved. In fact, you'll be transparent to the upper layers in this
-> case.
-
-I've no idea what you're thinking, but you can't stop the UART clock
-because RTS is deasserted - or DTR for that matter.  Neither of those
-two define whether characters will be transmitted or received.
-
-There are specialist protocols and devices out there which require
-RTS and DTR to be held at certain non-standard states for them to work.
-One range of devices are car OBD-II interfaces, where RTS controls the
-L line and sometimes the TX/RX direction on the bidirectional K data
-line.
-
-Similar things are done with DTR, and there's protocols which use
-DTR as a handshake.
+-- 
+Nicolas Ferre
