@@ -1,10 +1,94 @@
-From: avictor.za@gmail.com (avictor.za at gmail.com)
-Date: Fri, 3 Dec 2010 14:33:53 +0200
-Subject: Fwd: AT91 Interrupt nesting/priority disabled since kernel 2.6.35
-In-Reply-To: <AANLkTi=YV2-P-7OKPHPwQo7mBM0OL=E3QwPKnWH=rpmq@mail.gmail.com>
-References: <AANLkTi=YV2-P-7OKPHPwQo7mBM0OL=E3QwPKnWH=rpmq@mail.gmail.com>
-Message-ID: <AANLkTikKXTkYi+pKDiO7HYz4aAcpCbVJ8sgva7+1Z3Q3@mail.gmail.com>
+From: jesse.barker@linaro.org (Jesse Barker)
+Date: Fri, 3 Dec 2010 08:43:45 -0800
+Subject: RFC: Dynamic hwcaps
+In-Reply-To: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
+References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
+Message-ID: <AANLkTin1+9bzD_TGAxvnyKArLg=nEHVE+ehB4LczaV98@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----------- Forwarded message ----------
+Dave,
+
+For the case of NEON and its use in graphics libraries, we are certainly
+pushing explicitly for runtime detection.  However, this tends to be done by
+detecting the presence of NEON at initialization time, rather than at each
+path invocation (to avoid rescanning /proc/self/auxv).  Are you saying that
+the init code could still detect NEON this way, but there would need to be
+additional checks when taking individual paths?
+
+cheers,
+Jesse
+
+On Fri, Dec 3, 2010 at 8:28 AM, Dave Martin <dave.martin@linaro.org> wrote:
+
+> Hi all,
+>
+> I'd be interested in people's views on the following idea-- feel free
+> to ignore if it doesn't interest you.
+>
+>
+> For power-management purposes, it's useful to be able to turn off
+> functional blocks on the SoC.
+>
+> For on-SoC peripherals, this can be managed through the driver
+> framework in the kernel, but for functional blocks of the CPU itself
+> which are used by instruction set extensions, such as NEON or other
+> media accelerators, it would be interesting if processes could adapt
+> to these units appearing and disappearing at runtime.  This would mean
+> that user processes would need to select dynamically between different
+> implementations of accelerated functionality at runtime.
+>
+> This allows for more active power management of such functional
+> blocks: if the CPU is not fully loaded, you can turn them off -- the
+> kernel can spot when there is significant idle time and do this.  If
+> the CPU becomes fully loaded, applications which have soft-realtime
+> constraints can notice this and switch to their accelerated code
+> (which will cause the kernel to switch the functional unit(s) on).
+> Or, the kernel can react to increasing CPU load by speculatively turn
+> it on instead.  This is analogous to the behaviour of other power
+> governors in the system.  Non-aware applications will still work
+> seamlessly -- these may simply run accelerated code if the hardware
+> supports it, causing the kernel to turn the affected functional
+> block(s) on.
+>
+> In order for this to work, some dynamic status information would need
+> to be visible to each user process, and polled each time a function
+> with a dynamically switchable choice of implementations gets called.
+> You probably don't need to worry about race conditions either-- if the
+> process accidentally tries to use a turned-off feature, you will take
+> a fault which gives the kernel the chance to turn the feature back on.
+>  Generally, this should be a rare occurrence.
+>
+>
+> The dynamic feature status information should ideally be per-CPU
+> global, though we could have a separate copy per thread, at the cost
+> of more memory.  It can't be system-global, since different CPUs may
+> have a different set of functional blocks active at any one time --
+> for this reason, the information can't be stored in an existing
+> mapping such as the vectors page.  Conversely, existing mechanisms
+> such sysfs probably involve too much overhead to be polled every time
+> you call copy_pixmap() or whatever.
+>
+> Alternatively, each thread could register a userspace buffer (a single
+> word is probably adequate) into which the CPU pokes the hardware
+> status flags each time it returns to userspace, if the hardware status
+> has changed or if the thread has been migrated.
+>
+> Either of the above approaches could be prototyped as an mmap'able
+> driver, though this may not be the best approach in the long run.
+>
+>
+> Does anyone have a view on whether this is a worthwhile idea, or what
+> the best approach would be?
+>
+> Cheers
+> ---Dave
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101203/c203f894/attachment-0001.html>
