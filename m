@@ -1,68 +1,88 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Dec 2010 20:22:19 +0000
-Subject: [PATCH 10/22] ARM: SMP: collect IPI and local timer IRQs for
-	/proc/stat
+Date: Fri, 03 Dec 2010 20:22:39 +0000
+Subject: [PATCH 11/22] ARM: SMP: use more sane register allocation for
+	__fixup_smp_on_up
 In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
 References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-Message-ID: <E1POc95-0007rd-KT@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1POc9P-0007rh-O5@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IPI and local timer interrupts weren't being properly accounted
-for in /proc/stat.  Collect them from the irq_stat structure, and
-return their sum.
+Use r0,r3-r6 rather than r0,r3,r4,r6,r7, which makes it easier to
+understand which registers can be modified.  Also document which
+registers hold values which must be preserved.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/hardirq.h |    8 ++++++++
- arch/arm/kernel/smp.c          |   15 +++++++++++++++
- 2 files changed, 23 insertions(+), 0 deletions(-)
+ arch/arm/kernel/head.S |   39 ++++++++++++++++++++++-----------------
+ 1 files changed, 22 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index c52e250..89ad180 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -22,6 +22,14 @@ typedef struct {
- #define __inc_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)++
- #define __get_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index dd6b369..fd94e4e 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -89,6 +89,11 @@ ENTRY(stext)
+ 	bl	__lookup_machine_type		@ r5=machinfo
+ 	movs	r8, r5				@ invalid machine (r5=0)?
+ 	beq	__error_a			@ yes, error 'a'
++
++	/*
++	 * r1 = machine no, r2 = atags,
++	 * r8 = machinfo, r9 = cpuid, r10 = procinfo
++	 */
+ 	bl	__vet_atags
+ #ifdef CONFIG_SMP_ON_UP
+ 	bl	__fixup_smp
+@@ -381,19 +386,19 @@ ENDPROC(__turn_mmu_on)
  
-+#ifdef CONFIG_SMP
-+u64 smp_irq_stat_cpu(unsigned int cpu);
-+#else
-+#define smp_irq_stat_cpu(cpu)	0
-+#endif
-+
-+#define arch_irq_stat_cpu	smp_irq_stat_cpu
-+
- #if NR_IRQS > 512
- #define HARDIRQ_BITS	10
- #elif NR_IRQS > 256
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 1d9d6d8..aa1c6f5 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -414,6 +414,21 @@ void show_ipi_list(struct seq_file *p, int prec)
- 	}
- }
+ #ifdef CONFIG_SMP_ON_UP
+ __fixup_smp:
+-	mov	r7, #0x00070000
+-	orr	r6, r7, #0xff000000	@ mask 0xff070000
+-	orr	r7, r7, #0x41000000	@ val 0x41070000
+-	and	r0, r9, r6
+-	teq	r0, r7			@ ARM CPU and ARMv6/v7?
++	mov	r4, #0x00070000
++	orr	r3, r4, #0xff000000	@ mask 0xff070000
++	orr	r4, r4, #0x41000000	@ val 0x41070000
++	and	r0, r9, r3
++	teq	r0, r4			@ ARM CPU and ARMv6/v7?
+ 	bne	__fixup_smp_on_up	@ no, assume UP
  
-+u64 smp_irq_stat_cpu(unsigned int cpu)
-+{
-+	u64 sum = 0;
-+	int i;
-+
-+	for (i = 0; i < NR_IPI; i++)
-+		sum += __get_irq_stat(cpu, ipi_irqs[i]);
-+
-+#ifdef CONFIG_LOCAL_TIMERS
-+	sum += __get_irq_stat(cpu, local_timer_irqs);
-+#endif
-+
-+	return sum;
-+}
-+
- /*
-  * Timer (local or broadcast) support
-  */
+-	orr	r6, r6, #0x0000ff00
+-	orr	r6, r6, #0x000000f0	@ mask 0xff07fff0
+-	orr	r7, r7, #0x0000b000
+-	orr	r7, r7, #0x00000020	@ val 0x4107b020
+-	and	r0, r9, r6
+-	teq	r0, r7			@ ARM 11MPCore?
++	orr	r3, r3, #0x0000ff00
++	orr	r3, r3, #0x000000f0	@ mask 0xff07fff0
++	orr	r4, r4, #0x0000b000
++	orr	r4, r4, #0x00000020	@ val 0x4107b020
++	and	r0, r9, r3
++	teq	r0, r4			@ ARM 11MPCore?
+ 	moveq	pc, lr			@ yes, assume SMP
+ 
+ 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
+@@ -402,13 +407,13 @@ __fixup_smp:
+ 
+ __fixup_smp_on_up:
+ 	adr	r0, 1f
+-	ldmia	r0, {r3, r6, r7}
++	ldmia	r0, {r3 - r5}
+ 	sub	r3, r0, r3
+-	add	r6, r6, r3
+-	add	r7, r7, r3
+-2:	cmp	r6, r7
+-	ldmia	r6!, {r0, r4}
+-	strlo	r4, [r0, r3]
++	add	r4, r4, r3
++	add	r5, r5, r3
++2:	cmp	r4, r5
++	ldmia	r4!, {r0, r6}
++	strlo	r6, [r0, r3]
+ 	blo	2b
+ 	mov	pc, lr
+ ENDPROC(__fixup_smp)
 -- 
 1.6.2.5
