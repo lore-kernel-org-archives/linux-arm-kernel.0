@@ -1,29 +1,100 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:49 +0530
-Subject: [PATCH 16/20] i2c/nomadik: add adapter name for updated sanity
-	checkings
+Date: Fri, 3 Dec 2010 20:35:40 +0530
+Subject: [PATCH 07/20] mfd/tc35892: rename tc35892 core driver to tc3589x
 In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
 References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1291388753-14662-17-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1291388753-14662-8-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Rename the tc35892 core/gpio drivers to tc3589x to include
+new variants in the same mfd core
+
 Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
 ---
- drivers/i2c/busses/i2c-nomadik.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/gpio/Kconfig                            |    8 ++++----
+ drivers/gpio/Makefile                           |    2 +-
+ drivers/gpio/{tc35892-gpio.c => tc3589x-gpio.c} |    0
+ drivers/mfd/Kconfig                             |    6 +++---
+ drivers/mfd/Makefile                            |    2 +-
+ drivers/mfd/{tc35892.c => tc3589x.c}            |    0
+ 6 files changed, 9 insertions(+), 9 deletions(-)
+ rename drivers/gpio/{tc35892-gpio.c => tc3589x-gpio.c} (100%)
+ rename drivers/mfd/{tc35892.c => tc3589x.c} (100%)
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 2bd3469..baa8ff7 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -872,6 +872,7 @@ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
- 	adap->owner	= THIS_MODULE;
- 	adap->class	= I2C_CLASS_HWMON | I2C_CLASS_SPD;
- 	adap->algo	= &nmk_i2c_algo;
-+	snprintf(adap->name, sizeof(adap->name), DRIVER_NAME);
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 3143ac7..082495b 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -230,11 +230,11 @@ config GPIO_STMPE
+ 	  This enables support for the GPIOs found on the STMPE I/O
+ 	  Expanders.
  
- 	/* fetch the controller id */
- 	adap->nr	= pdev->id;
+-config GPIO_TC35892
+-	bool "TC35892 GPIOs"
+-	depends on MFD_TC35892
++config GPIO_TC3589X
++	bool "TC3589X GPIOs"
++	depends on MFD_TC3589X
+ 	help
+-	  This enables support for the GPIOs found on the TC35892
++	  This enables support for the GPIOs found on the TC3589X
+ 	  I/O Expander.
+ 
+ config GPIO_TWL4030
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index bdf3dde..39bfd7a 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -24,7 +24,7 @@ obj-$(CONFIG_GPIO_PCF857X)	+= pcf857x.o
+ obj-$(CONFIG_GPIO_PCH)		+= pch_gpio.o
+ obj-$(CONFIG_GPIO_PL061)	+= pl061.o
+ obj-$(CONFIG_GPIO_STMPE)	+= stmpe-gpio.o
+-obj-$(CONFIG_GPIO_TC35892)	+= tc35892-gpio.o
++obj-$(CONFIG_GPIO_TC3589X)	+= tc3589x-gpio.o
+ obj-$(CONFIG_GPIO_TIMBERDALE)	+= timbgpio.o
+ obj-$(CONFIG_GPIO_TWL4030)	+= twl4030-gpio.o
+ obj-$(CONFIG_GPIO_UCB1400)	+= ucb1400_gpio.o
+diff --git a/drivers/gpio/tc35892-gpio.c b/drivers/gpio/tc3589x-gpio.c
+similarity index 100%
+rename from drivers/gpio/tc35892-gpio.c
+rename to drivers/gpio/tc3589x-gpio.c
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index c856aa7..a4c2e3e 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -218,12 +218,12 @@ config MFD_STMPE
+ 		Keypad: stmpe-keypad
+ 		Touchscreen: stmpe-ts
+ 
+-config MFD_TC35892
+-	bool "Support Toshiba TC35892"
++config MFD_TC3589X
++	bool "Support Toshiba TC35892 and variants"
+ 	depends on I2C=y && GENERIC_HARDIRQS
+ 	select MFD_CORE
+ 	help
+-	  Support for the Toshiba TC35892 I/O Expander.
++	  Support for the Toshiba TC35892 and variants I/O Expander.
+ 
+ 	  This driver provides common support for accessing the device,
+ 	  additional drivers must be enabled in order to use the
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 67c8bcb..e42e0889 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -16,7 +16,7 @@ obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
+ obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
+ 
+ obj-$(CONFIG_MFD_STMPE)		+= stmpe.o
+-obj-$(CONFIG_MFD_TC35892)	+= tc35892.o
++obj-$(CONFIG_MFD_TC3589X)	+= tc3589x.o
+ obj-$(CONFIG_MFD_T7L66XB)	+= t7l66xb.o tmio_core.o
+ obj-$(CONFIG_MFD_TC6387XB)	+= tc6387xb.o tmio_core.o
+ obj-$(CONFIG_MFD_TC6393XB)	+= tc6393xb.o tmio_core.o
+diff --git a/drivers/mfd/tc35892.c b/drivers/mfd/tc3589x.c
+similarity index 100%
+rename from drivers/mfd/tc35892.c
+rename to drivers/mfd/tc3589x.c
 -- 
 1.7.2.dirty
