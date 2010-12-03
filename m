@@ -1,17 +1,22 @@
-From: tarek.m.attia@gmail.com (tarek attia)
-Date: Fri, 3 Dec 2010 03:12:43 +0200
-Subject: CpuFreq for mini2440
-Message-ID: <AANLkTi=55k8Dr6CAe6O92j6P2ht4D+onFAEu7J0Q+Nvn@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Dec 2010 17:10:57 -0800
+Subject: [PATCH] arm: omap2: io: fix clk_get() error check
+In-Reply-To: <87vd3c4h8p.fsf@deeprootsystems.com>
+References: <1291126678-2782-1-git-send-email-aaro.koskinen@nokia.com>
+	<87vd3c4h8p.fsf@deeprootsystems.com>
+Message-ID: <20101203011057.GD17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+* Kevin Hilman <khilman@deeprootsystems.com> [101202 02:01]:
+> Aaro Koskinen <aaro.koskinen@nokia.com> writes:
+> 
+> > clk_get() return value should be checked with IS_ERR().
+> >
+> > Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> 
+> Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-I tried many times to enable the Cpufreq for the mini2440 "Friendly
-Arm board" but each time I enable it in the kernel it ended up by a
-successful compilation ,but when I mount the kernel image on the board
-,just I dun find it's folder nor it's kernel objects,,,what I miss
-,,or what track should I go to make it working ?
+Thanks, will queue.
 
--- 
-tarek
+Tony
