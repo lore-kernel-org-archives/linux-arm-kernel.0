@@ -1,11 +1,16 @@
-From: tarek.m.attia@gmail.com (tarek attia)
-Date: Fri, 3 Dec 2010 03:08:50 +0200
-Subject: No subject
-Message-ID: <AANLkTikfzihLRAGfnfyr5u7d2NV=C060jkdcHDAeZoF0@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Dec 2010 17:10:00 -0800
+Subject: [PATCH v3] arm: mach-omap2: remove NULL board_mux from board files
+In-Reply-To: <1291296340-27327-1-git-send-email-aaro.koskinen@nokia.com>
+References: <1291296340-27327-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20101203011000.GB17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-register
+* Aaro Koskinen <aaro.koskinen@nokia.com> [101202 05:15]:
+> If CONFIG_OMAP_MUX is not enabled, we can define board_mux in the header
+> file instead of forcing every single board to define it.
 
--- 
-tarek
+Thanks, queueing for the next merge window.
+
+Tony
