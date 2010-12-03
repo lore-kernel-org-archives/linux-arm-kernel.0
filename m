@@ -1,51 +1,75 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 3 Dec 2010 13:59:34 +0900
-Subject: [PATCH 2/4] mach-s5pv310: Add resource definitions for mipi-csis
-In-Reply-To: <012401cb92a3$a46443b0$ed2ccb10$%kim@samsung.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-3-git-send-email-s.nawrocki@samsung.com>
-	<012401cb92a3$a46443b0$ed2ccb10$%kim@samsung.com>
-Message-ID: <AANLkTimEEf5eD+q-qx7gw21ryFp1bbQ084Lo=eX+Bqjz@mail.gmail.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Fri, 3 Dec 2010 13:07:25 +0800
+Subject: [PATCH 09/15] ARM: mxs: Add clock support
+In-Reply-To: <20101202150718.GS32355@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1290754154-9428-10-git-send-email-shawn.guo@freescale.com>
+	<20101202150718.GS32355@pengutronix.de>
+Message-ID: <AANLkTi=ZD9uab9NbL+AXAc9-+KYpZAhak+GGbdPuUE3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 3, 2010 at 1:36 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Sylwester Nawrocki wrote:
->>
->> Add IRQ and register base address definitions for mipi-csis devices.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/mach-s5pv310/include/mach/irqs.h | ? ?3 +++
->> ?arch/arm/mach-s5pv310/include/mach/map.h ?| ? ?5 +++++
->> ?2 files changed, 8 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-
->> s5pv310/include/mach/irqs.h
->> index 99e7dad..db63773 100644
->> --- a/arch/arm/mach-s5pv310/include/mach/irqs.h
->> +++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
->> @@ -83,6 +83,9 @@
->> ?#define IRQ_HSMMC2 ? ? ? ? ? COMBINER_IRQ(29, 2)
->> ?#define IRQ_HSMMC3 ? ? ? ? ? COMBINER_IRQ(29, 3)
->>
->> +#define IRQ_MIPICSI0 ? ? ? ? COMBINER_IRQ(30, 0)
->> +#define IRQ_MIPICSI1 ? ? ? ? COMBINER_IRQ(30, 1)
+2010/12/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Fri, Nov 26, 2010 at 02:49:08PM +0800, Shawn Guo wrote:
 >> +
->> ?#define IRQ_ONENAND_AUDI ? ? COMBINER_IRQ(34, 0)
->>
->> ?#define IRQ_EINT4 ? ? ? ? ? ?COMBINER_IRQ(37, 0)
->> diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-
->> s5pv310/include/mach/map.h
->> index 7acf4e7..9905bfe 100644
->> --- a/arch/arm/mach-s5pv310/include/mach/map.h
->> +++ b/arch/arm/mach-s5pv310/include/mach/map.h
->> @@ -56,6 +56,9 @@
->> ?#define S5PV310_PA_GPIO2 ? ? ? ? ? ? (0x11000000)
->> ?#define S5PV310_PA_GPIO3 ? ? ? ? ? ? (0x03860000)
->>
->> +#define S5PV310_PA_CSIS0 ? ? ? ? ? ? (0x11880000)
->> +#define S5PV310_PA_CSIS1 ? ? ? ? ? ? (0x11890000)
+>> +/*
+>> + * ref_clk
+>> + */
+>> +#define _CLK_GET_RATE_REF(name, sr, ss) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> +static unsigned long name##_get_rate(struct clk *clk) ? ? ? ? ? ? ? ? ? ? ? ?\
+>> +{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? unsigned long parent_rate; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? u32 reg, div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##sr); ? ? ? ? \
+>> + ? ? div = (reg >> BP_CLKCTRL_##sr##_##ss##FRAC) & 0x3f; ? ? ? ? ? ? \
+>> + ? ? parent_rate = clk_get_rate(clk->parent); ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? return parent_rate * 18 / div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> +}
+>> +
+>> +_CLK_GET_RATE_REF(ref_cpu_clk, FRAC, CPU)
+>> +_CLK_GET_RATE_REF(ref_emi_clk, FRAC, EMI)
+>> +_CLK_GET_RATE_REF(ref_pix_clk, FRAC, PIX)
+>> +_CLK_GET_RATE_REF(ref_io_clk, FRAC, IO)
+>> +
+>> +#define _DEFINE_CLOCK_REF(name, er, es) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .enable_reg ? ? = CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er, ?\
+>> + ? ? ? ? ? ? .enable_shift ? = BP_CLKCTRL_##er##_CLKGATE##es, ? ? ? ?\
+>> + ? ? ? ? ? ? .get_rate ? ? ? = name##_get_rate, ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .enable ? ? ? ? = _raw_clk_enable, ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .disable ? ? ? ?= _raw_clk_disable, ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .parent ? ? ? ? = &pll_clk, ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? }
+>> +
+>> +_DEFINE_CLOCK_REF(ref_cpu_clk, FRAC, CPU);
+> What happens if get_clock_rate(ref_cpu_clk) is called?:
+>
+> ? ? ? ?ref_cpu_clk_get_rate
+> ? ? ? ? ? ? ? ?reg = something
+> ? ? ? ? ? ? ? ?div = something else
+> ? ? ? ? ? ? ? ?parent_rate = clk_get_rate(clk->parent)
+> ? ? ? ? ? ? ? ? ? ? ? ?= pll_clk_get_rate()
+> ? ? ? ? ? ? ? ? ? ? ? ?= 480000000;
+> ? ? ? ? ? ? ? ?return parent_rate * 18 / div
+> ? ? ? ? ? ? ? ? ? ? ? ?= (480000000 * 18) / div
+> ? ? ? ? ? ? ? ? ? ? ? ?= 0x202fbf000 / div
+> ? ? ? ? ? ? ? ? ? ? ? ?= ...
+>
+> Note that 0x202fbf000 is too big for an unsigned long so (AFAIK) this is
+> truncated to 0x02fbf000 / div which is wrong.
+>
+> The same overflow happens in at least one set_rate function, too.
+>
+> Either you have to switch to long long or (IMHO preferable) use shifted
+> values.
+>
+Excellent catch.  It solved another issue that I ran into, which
+caused by imprecise mdelay.
 
-Let us please not contain constants in brackets.
+Thanks a million, Uwe.
+
+-- 
+Regards,
+Shawn
