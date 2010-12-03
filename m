@@ -1,48 +1,96 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Fri, 3 Dec 2010 14:34:59 +0800
-Subject: [PATCH] make mc13783 code generic
-In-Reply-To: <20101202142823.GR32355@pengutronix.de>
-References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
-	<878w0buqd9.fsf@lechat.rtp-net.org>
-	<AANLkTi=Xm1ogmeyW5DBbhKvgTHOAUnd_1u2KQojpF6aB@mail.gmail.com>
-	<20101202142823.GR32355@pengutronix.de>
-Message-ID: <AANLkTik3Mc3w_zQ7m4k6p+VQL9Yud7zujcTiop8MTZ6c@mail.gmail.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Fri,  3 Dec 2010 12:04:49 +0530
+Subject: [PATCH RESEND] ARM: io: fix namespace conflicts
+Message-ID: <1291358089-10490-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
+Having __v as the variable name for the definition of different macros leads
+to the namespace pollution. For example,
+readl(p)
+unrolls to:
+({ u32 __v = ({ u32 __v = (( __u32)(__le32)(( __le32) ((void)0,
+*(volatile unsigned int *)((p))))); __v; }); __asm__ __volatile__ ("mcr
+p15,
+, %0, c7, c10, 5" : : "r" (0) : "memory"); __v; });
 
-Thanks for the suggestion.
-I had tried the method you mentioned long time ago, and it did not
-work since the port is blocked by the firewall. Next time, I will try
-to use my company's smtp server, however the constrain is that the
-company's smtp server may filter some emails from outside.
+({ u32 __v = ({ u32 __v
+causes sparse warning: "warning: symbol '__v' shadows an earlier one"
 
-Thanks
-Yong
+Using variable names which use the function name prefix across the
+various macros avoids the namespace pollution.
 
-2010/12/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Tue, Nov 30, 2010 at 05:47:21PM +0800, Yong Shen wrote:
->> Hi Arnaud,
->>
->> Thanks for quick response.
->> First of all, due to I am behind a firewall in the office, so I can
->> not send out patch by 'git send-email', maybe that's why you found
->> some format issue.
-> I don't know the exact problems you have with your firewall, but I'd
-> expect that if you can send a mail with a normal MUA git-send-email
-> should work, too.
->
-> I saw you using gmail, so maybe
->
-> ? ? ? ?https://git.wiki.kernel.org/index.php/GitTips#Using_gmail_to_send_your_patches
->
-> offers a working setup for you?
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+With this change, ~200 sparse warnings in omap2plus_defconfig build are
+fixed.
+
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Charulatha V <charu@ti.com>
+Reviewed by: Nishanth Menon <nm@ti.com>
+---
+Links related to previous discussions are as follows:
+https://patchwork.kernel.org/patch/250171/
+http://www.spinics.net/lists/linux-omap/msg38569.html
+http://marc.info/?t=128506336700011&r=1&w=2
+
+arch/arm/include/asm/io.h |   32 +++++++++++++++++++++-----------
+ 1 files changed, 21 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 1261b1f..01e4a7b 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -131,11 +131,11 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+ #define outl(v,p)		__raw_writel((__force __u32) \
+ 					cpu_to_le32(v),__io(p))
+ 
+-#define inb(p)	({ __u8 __v = __raw_readb(__io(p)); __v; })
+-#define inw(p)	({ __u16 __v = le16_to_cpu((__force __le16) \
+-			__raw_readw(__io(p))); __v; })
+-#define inl(p)	({ __u32 __v = le32_to_cpu((__force __le32) \
+-			__raw_readl(__io(p))); __v; })
++#define inb(p)	({ __u8 __inbv = __raw_readb(__io(p)); __inbv; })
++#define inw(p)	({ __u16 __inwv = le16_to_cpu((__force __le16) \
++			__raw_readw(__io(p))); __inwv; })
++#define inl(p)	({ __u32 __inlv = le32_to_cpu((__force __le32) \
++			__raw_readl(__io(p))); __inlv; })
+ 
+ #define outsb(p,d,l)		__raw_writesb(__io(p),d,l)
+ #define outsw(p,d,l)		__raw_writesw(__io(p),d,l)
+@@ -200,9 +200,12 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define __iowmb()		do { } while (0)
+ #endif
+ 
+-#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
+-#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
+-#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
++#define readb(c)		({ u8  __readbv = readb_relaxed(c); \
++					 __iormb(); __readbv; })
++#define readw(c)		({ u16 __readwv = readw_relaxed(c); \
++					 __iormb(); __readwv; })
++#define readl(c)		({ u32 __readlv = readl_relaxed(c);\
++					 __iormb(); __readlv; })
+ 
+ #define writeb(v,c)		({ __iowmb(); writeb_relaxed(v,c); })
+ #define writew(v,c)		({ __iowmb(); writew_relaxed(v,c); })
+@@ -258,9 +261,16 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+  * io{read,write}{8,16,32} macros
+  */
+ #ifndef ioread8
+-#define ioread8(p)	({ unsigned int __v = __raw_readb(p); __iormb(); __v; })
+-#define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __v; })
+-#define ioread32(p)	({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __v; })
++#define ioread8(p)	({ unsigned int __ioread8v = __raw_readb(p); \
++					 __iormb(); __ioread8v; })
++#define ioread16(p)	({ unsigned int __ioread16v = \
++					 le16_to_cpu((__force __le16) \
++					__raw_readw(p)); __iormb(); \
++					 __ioread16v; })
++#define ioread32(p)	({ unsigned int __ioread32v = \
++					 le32_to_cpu((__force __le32) \
++					__raw_readl(p)); __iormb(); \
++					 __ioread32v; })
+ 
+ #define iowrite8(v,p)	({ __iowmb(); (void)__raw_writeb(v, p); })
+ #define iowrite16(v,p)	({ __iowmb(); (void)__raw_writew((__force __u16)cpu_to_le16(v), p); })
+-- 
+1.7.0.4
