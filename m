@@ -1,28 +1,48 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 3 Dec 2010 14:52:23 +0900
-Subject: [PATCH 2/4] mach-s5pv310: Add resource definitions for mipi-csis
-In-Reply-To: <AANLkTiksQM8V9QeF+P2qvCQ1uOgcq-yzKp-kgnPVmMsJ@mail.gmail.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-3-git-send-email-s.nawrocki@samsung.com>
-	<012401cb92a3$a46443b0$ed2ccb10$%kim@samsung.com>
-	<AANLkTimEEf5eD+q-qx7gw21ryFp1bbQ084Lo=eX+Bqjz@mail.gmail.com>
-	<AANLkTiksQM8V9QeF+P2qvCQ1uOgcq-yzKp-kgnPVmMsJ@mail.gmail.com>
-Message-ID: <AANLkTikjXjS3AwuaYdRSr7Gs7jR3Yg8_vK4vrS62syDT@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Fri, 3 Dec 2010 14:34:59 +0800
+Subject: [PATCH] make mc13783 code generic
+In-Reply-To: <20101202142823.GR32355@pengutronix.de>
+References: <AANLkTimfDHRXZjB5=Ld9YSFzqh-hVWUTy-TQFV=GEaGA@mail.gmail.com>
+	<878w0buqd9.fsf@lechat.rtp-net.org>
+	<AANLkTi=Xm1ogmeyW5DBbhKvgTHOAUnd_1u2KQojpF6aB@mail.gmail.com>
+	<20101202142823.GR32355@pengutronix.de>
+Message-ID: <AANLkTik3Mc3w_zQ7m4k6p+VQL9Yud7zujcTiop8MTZ6c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 3, 2010 at 2:34 PM, Kyungmin Park <kyungmin.park@samsung.com> wrote:
-> On Fri, Dec 3, 2010 at 1:59 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>> Sylwester Nawrocki wrote:
+Uwe,
 
->>> +#define S5PV310_PA_CSIS0 ? ? ? ? ? ? (0x11880000)
->>> +#define S5PV310_PA_CSIS1 ? ? ? ? ? ? (0x11890000)
+Thanks for the suggestion.
+I had tried the method you mentioned long time ago, and it did not
+work since the port is blocked by the firewall. Next time, I will try
+to use my company's smtp server, however the constrain is that the
+company's smtp server may filter some emails from outside.
+
+Thanks
+Yong
+
+2010/12/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Tue, Nov 30, 2010 at 05:47:21PM +0800, Yong Shen wrote:
+>> Hi Arnaud,
 >>
->> Let us please not contain constants in brackets.
+>> Thanks for quick response.
+>> First of all, due to I am behind a firewall in the office, so I can
+>> not send out patch by 'git send-email', maybe that's why you found
+>> some format issue.
+> I don't know the exact problems you have with your firewall, but I'd
+> expect that if you can send a mail with a normal MUA git-send-email
+> should work, too.
 >
-> I think consistency is more higher than your comment normally.
+> I saw you using gmail, so maybe
 >
-> if you think these, then make a cleanup first.
-
-Bad logic. One shouldn't hold good practice at ransom because of
-the past bad ones.
+> ? ? ? ?https://git.wiki.kernel.org/index.php/GitTips#Using_gmail_to_send_your_patches
+>
+> offers a working setup for you?
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
