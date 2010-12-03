@@ -1,42 +1,15 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Dec 2010 20:36:53 +0000
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <4CF94DDD.8000409@codeaurora.org>
-References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
-	<20101202221909.GK29347@n2100.arm.linux.org.uk>
-	<4CF94DDD.8000409@codeaurora.org>
-Message-ID: <20101203203653.GB10245@n2100.arm.linux.org.uk>
+Date: Fri, 3 Dec 2010 20:37:39 +0000
+Subject: [PATCH 0/22] More SMP cleanup
+In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+Message-ID: <20101203203739.GC10245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 03, 2010 at 12:06:53PM -0800, Saravana Kannan wrote:
-> The MSM8660 SoC uses the TrustZone technology and the Linux kernel  
-> executes in normal/non-secure domain. When the second core is brought  
-> out of reset, it starts executing a secure image which then jumps to  
-> "secondary_startup". So, before bringing the second core out of reset,  
-> we need to inform the secure domain code where secondary_startup is  
-> located in memory.
->
-> We do the communication with the secure code by using buffers in memory.  
->  The cache treats the NS (non secure) bit as an additional address bit  
-> when tagging memory. Hence, cache accesses are not coherent between the  
-> secure and non-secure domains. So, the secure side flushes it's cache  
-> after writing to the buffer. To properly read the response from the  
-> secure side, the kernel has to pick a buffer that isn't cacheable in the  
-> first place. We have similar issues in the reverse direction.
+On Fri, Dec 03, 2010 at 08:07:46PM +0000, Russell King - ARM Linux wrote:
+> This patch series incorporates patches from the previously posted
+> "Clean up SMP IPI support" series of 9 patches.  Patch 5, and
+> 11 onwards are new.
 
-So when ARM gets DMA-coherent caches, you of course aren't going to
-complain that the DMA APIs start avoiding doing the current tricks with
-non-cacheable memory?
-
-I view what you're doing above with the DMA API as an abuse of the API.
-Just like the problems we're facing with ioremap() being used on system
-RAM, you're asking for problems when the ARM architecture changes because
-you're using an API for it's current properties, not for its purpose.
-
-I've been on for years about purpose-designed APIs for cache issues,
-and every time someone abuses them, they eventually end up suffering
-breakage.
-
-Let's wait until the full set of patches is available before discussing
-further.
+Sorry, patch 4 is the new one, not patch 5.
