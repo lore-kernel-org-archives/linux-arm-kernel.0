@@ -1,50 +1,149 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Dec 2010 20:23:00 +0000
-Subject: [PATCH 12/22] ARM: SMP: ensure smp_send_stop() waits for CPUs to stop
+Date: Fri, 03 Dec 2010 20:23:20 +0000
+Subject: [PATCH 13/22] ARM: SMP: move CPU number sanity checks to
+	smp_init_cpus()
 In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
 References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-Message-ID: <E1POc9k-0007rl-5d@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1POcA4-0007rp-JE@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wait for CPUs to indicate that they've stopped, after sending the
-stop IPI, rather than blindly continuing on and hoping that they've
-stopped in time.  Print a warning if we fail to stop the other CPUs.
+Ensure that the number of CPUs is sanity checked before setting
+the number of possible CPUs.  This avoids any chance of overflowing
+the cpu_possible bitmap.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/smp.c |   18 +++++++++++++++---
- 1 files changed, 15 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap-smp.c   |   21 +++++++++++----------
+ arch/arm/mach-realview/platsmp.c |   20 ++++++++++----------
+ arch/arm/mach-ux500/platsmp.c    |   26 +++++++++++++-------------
+ 3 files changed, 34 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index aa1c6f5..48bccf3 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -583,10 +583,22 @@ void smp_send_reschedule(int cpu)
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 56a8bce..3c87468 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -120,16 +120,6 @@ void __init smp_init_cpus(void)
  
- void smp_send_stop(void)
+ 	ncores = get_core_count();
+ 
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-}
+-
+-void __init smp_prepare_cpus(unsigned int max_cpus)
+-{
+-	unsigned int ncores = get_core_count();
+-	unsigned int cpu = smp_processor_id();
+-	int i;
+-
+ 	/* sanity check */
+ 	if (ncores == 0) {
+ 		printk(KERN_ERR
+@@ -144,6 +134,17 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		       ncores, NR_CPUS);
+ 		ncores = NR_CPUS;
+ 	}
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++}
++
++void __init smp_prepare_cpus(unsigned int max_cpus)
++{
++	unsigned int ncores = num_possible_cpus();
++	unsigned int cpu = smp_processor_id();
++	int i;
++
+ 	smp_store_cpu_info(cpu);
+ 
+ 	/*
+diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+index af3d909..108e92f 100644
+--- a/arch/arm/mach-realview/platsmp.c
++++ b/arch/arm/mach-realview/platsmp.c
+@@ -160,16 +160,6 @@ void __init smp_init_cpus(void)
  {
--	cpumask_t mask = cpu_online_map;
--	cpu_clear(smp_processor_id(), mask);
--	if (!cpus_empty(mask))
-+	unsigned long timeout;
-+
-+	if (num_online_cpus() > 1) {
-+		cpumask_t mask = cpu_online_map;
-+		cpu_clear(smp_processor_id(), mask);
-+
- 		send_ipi_message(&mask, IPI_CPU_STOP);
-+	}
-+
-+	/* Wait up to one second for other CPUs to stop */
-+	timeout = USEC_PER_SEC;
-+	while (num_online_cpus() > 1 && timeout--)
-+		udelay(1);
-+
-+	if (num_online_cpus() > 1)
-+		pr_warning("SMP: failed to stop secondary CPUs\n");
- }
+ 	unsigned int i, ncores = get_core_count();
  
- /*
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-}
+-
+-void __init smp_prepare_cpus(unsigned int max_cpus)
+-{
+-	unsigned int ncores = get_core_count();
+-	unsigned int cpu = smp_processor_id();
+-	int i;
+-
+ 	/* sanity check */
+ 	if (ncores == 0) {
+ 		printk(KERN_ERR
+@@ -186,6 +176,16 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		ncores = NR_CPUS;
+ 	}
+ 
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++}
++
++void __init smp_prepare_cpus(unsigned int max_cpus)
++{
++	unsigned int ncores = num_possible_cpus();
++	unsigned int cpu = smp_processor_id();
++	int i;
++
+ 	smp_store_cpu_info(cpu);
+ 
+ 	/*
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index b8987bd..a51962b 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -128,16 +128,6 @@ void __init smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores = get_core_count();
+ 
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-}
+-
+-void __init smp_prepare_cpus(unsigned int max_cpus)
+-{
+-	unsigned int ncores = get_core_count();
+-	unsigned int cpu = smp_processor_id();
+-	int i;
+-
+ 	/* sanity check */
+ 	if (ncores == 0) {
+ 		printk(KERN_ERR
+@@ -145,14 +135,24 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		ncores = 1;
+ 	}
+ 
+-	if (ncores > num_possible_cpus())	{
++	if (ncores > NR_CPUS) {
+ 		printk(KERN_WARNING
+ 		       "U8500: no. of cores (%d) greater than configured "
+ 		       "maximum of %d - clipping\n",
+-		       ncores, num_possible_cpus());
+-		ncores = num_possible_cpus();
++		       ncores, NR_CPUS);
++		ncores = NR_CPUS;
+ 	}
+ 
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++}
++
++void __init smp_prepare_cpus(unsigned int max_cpus)
++{
++	unsigned int ncores = num_possible_cpus();
++	unsigned int cpu = smp_processor_id();
++	int i;
++
+ 	smp_store_cpu_info(cpu);
+ 
+ 	/*
 -- 
 1.6.2.5
