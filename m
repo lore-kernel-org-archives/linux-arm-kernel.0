@@ -1,101 +1,48 @@
-From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:50 +0530
-Subject: [PATCH 17/20] mach-ux500: add TC35893 keypad platform data
-In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1291388753-14662-18-git-send-email-sundar.iyer@stericsson.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 3 Dec 2010 16:08:59 +0100
+Subject: [PATCH 1/2] Change the register name definitions for mc13783
+In-Reply-To: <1291373531.3271.8.camel@odin>
+References: <AANLkTinA-rNzSjGZQSmGUdOt8j0RWddfNo5m=fP2oQx8@mail.gmail.com>
+	<1291373531.3271.8.camel@odin>
+Message-ID: <20101203150858.GC28954@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
----
- arch/arm/mach-ux500/board-mop500-keypads.c |   63 ++++++++++++++++++++++++++++
- 1 files changed, 63 insertions(+), 0 deletions(-)
+Hi Liam,
 
-diff --git a/arch/arm/mach-ux500/board-mop500-keypads.c b/arch/arm/mach-ux500/board-mop500-keypads.c
-index 4acc4f1..663f0c3 100644
---- a/arch/arm/mach-ux500/board-mop500-keypads.c
-+++ b/arch/arm/mach-ux500/board-mop500-keypads.c
-@@ -11,6 +11,7 @@
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/mfd/stmpe.h>
-+#include <linux/mfd/tc3589x.h>
- #include <linux/input/matrix_keypad.h>
- 
- #include <plat/pincfg.h>
-@@ -157,10 +158,72 @@ static struct i2c_board_info __initdata mop500_i2c0_devices_stuib[] = {
- 	},
- };
- 
-+/*
-+ * TC35893
-+ */
-+
-+static const unsigned int nuib_keymap[] = {
-+	KEY(3, 1, KEY_END),
-+	KEY(4, 1, KEY_POWER),
-+	KEY(6, 4, KEY_VOLUMEDOWN),
-+	KEY(4, 2, KEY_EMAIL),
-+	KEY(3, 3, KEY_RIGHT),
-+	KEY(2, 5, KEY_BACKSPACE),
-+
-+	KEY(6, 7, KEY_MENU),
-+	KEY(5, 0, KEY_ENTER),
-+	KEY(4, 3, KEY_0),
-+	KEY(3, 4, KEY_DOT),
-+	KEY(5, 2, KEY_UP),
-+	KEY(3, 5, KEY_DOWN),
-+
-+	KEY(4, 5, KEY_SEND),
-+	KEY(0, 5, KEY_BACK),
-+	KEY(6, 2, KEY_VOLUMEUP),
-+	KEY(1, 3, KEY_SPACE),
-+	KEY(7, 6, KEY_LEFT),
-+	KEY(5, 5, KEY_SEARCH),
-+};
-+
-+static struct matrix_keymap_data nuib_keymap_data = {
-+	.keymap         = nuib_keymap,
-+	.keymap_size    = ARRAY_SIZE(nuib_keymap),
-+};
-+
-+static struct tc3589x_keypad_platform_data tc35893_data = {
-+	.krow = TC_KPD_ROWS,
-+	.kcol = TC_KPD_COLUMNS,
-+	.debounce_period = TC_KPD_DEBOUNCE_PERIOD,
-+	.settle_time = TC_KPD_SETTLE_TIME,
-+	.irqtype = IRQF_TRIGGER_FALLING,
-+	.enable_wakeup = true,
-+	.keymap_data    = &nuib_keymap_data,
-+	.no_autorepeat  = true,
-+};
-+
-+static struct tc3589x_platform_data tc3589x_keypad_data = {
-+	.block = TC3589x_BLOCK_KEYPAD,
-+	.keypad = &tc35893_data,
-+	.irq_base = MOP500_EGPIO_IRQ_BASE,
-+};
-+
-+static struct i2c_board_info __initdata mop500_i2c0_devices_nuib[] = {
-+	{
-+		I2C_BOARD_INFO("tc3589x", 0x44),
-+		.platform_data = &tc3589x_keypad_data,
-+		.irq = NOMADIK_GPIO_TO_IRQ(218),
-+		.flags = I2C_CLIENT_WAKE,
-+	},
-+};
-+
- void mop500_keypad_init(void)
- {
- 	db8500_add_ske_keypad(&ske_keypad_board);
- 
- 	i2c_register_board_info(0, mop500_i2c0_devices_stuib,
- 			ARRAY_SIZE(mop500_i2c0_devices_stuib));
-+
-+	i2c_register_board_info(0, mop500_i2c0_devices_nuib,
-+			ARRAY_SIZE(mop500_i2c0_devices_nuib));
-+
- }
+On Fri, Dec 03, 2010 at 10:52:11AM +0000, Liam Girdwood wrote:
+> On Thu, 2010-12-02 at 19:18 +0800, Yong Shen wrote:
+> > Hi there,
+> > 
+> > Please comment inline and use attached file for patch or test.
+> > 
+> > Thanks
+> > Yong
+> > 
+> > >From e112153c6f03b49c229a8e3913a0c0459245df20 Mon Sep 17 00:00:00 2001
+> > From: Yong Shen <yong.shen@linaro.org>
+> > Date: Thu, 2 Dec 2010 14:17:02 +0800
+> > Subject: [PATCH 1/2] Change the register name definitions for mc13783
+> > 
+> > To make mc13783 and mc13892 share code, the register names should be
+> > changed to fit the new macro definitions in the comming patch.
+> > 
+> > Signed-off-by: Yong Shen <yong.shen@linaro.org>
+> > ---
+> >  arch/arm/mach-imx/mach-pcm038.c       |    4 +-
+> >  arch/arm/mach-mx3/mach-mx31_3ds.c     |    4 +-
+> >  arch/arm/mach-mx3/mach-mx31moboard.c  |    4 +-
+> >  drivers/regulator/mc13783-regulator.c |   30 +++++++-------
+> >  include/linux/mfd/mc13783.h           |   67 +++++++++++++++++----------------
+> >  5 files changed, 55 insertions(+), 54 deletions(-)
+> 
+> Sascha, Samuel, this series touches some of mach-imx and mfd. I can take
+> via regulator if that's OK with you guys ?
+I'm fine with that, thanks a lot.
+
+Cheers,
+Samuel.
+
 -- 
-1.7.2.dirty
+Intel Open Source Technology Centre
+http://oss.intel.com/
