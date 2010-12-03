@@ -1,72 +1,88 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 03 Dec 2010 17:32:42 +0900
-Subject: [PATCH 1/4] mach-s5pv210: Add platform definitions for mipi-csis
-In-Reply-To: <014901cb92c2$d9c9e8b0$8d5dba10$%kim@samsung.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-2-git-send-email-s.nawrocki@samsung.com>
-	<012301cb92a1$a7020af0$f50620d0$%kim@samsung.com>
-	<AANLkTi=bARGdX2Y4Ea-YP8qQRcjAXme8NW9Mp-0dTxgZ@mail.gmail.com>
-	<014901cb92c2$d9c9e8b0$8d5dba10$%kim@samsung.com>
-Message-ID: <014a01cb92c4$a9af62c0$fd0e2840$%kim@samsung.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 3 Dec 2010 09:38:35 +0100
+Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling mstandby
+	mode
+In-Reply-To: <1291298392-28729-1-git-send-email-manjugk@ti.com>
+References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
+Message-ID: <4CF8AC8B.9040800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Kyungmin Park wrote:
-> >
+On 12/2/2010 2:59 PM, G, Manjunath Kondaiah wrote:
+> Certain errata in OMAP2+ processors will require forcing
+> master standby to "no standby" mode before completing on going
+> operation. Without this, the results will be unpredictable.
+>
+> Since current implementation of PM run time framework does not support
+> changing sysconfig settings during middle of the on going operation,
+> these API's will support the same. One API will force the device's
+> sysconfig mstandby mode settings to "no standby" and other API will
+> release "no standby" mode and sets it to "smart standby" or "no
+> standby? depending on HWMOD_SWSUP_MSTANDBY value.
+>
+> The hwmod API "omap_hwmod_set_master_standbymode" will use
+> no_stdby_cnt(introduced in omap_hwmod structure) for controlling
+> access to sysconfig register settings in case of overlapping
+> request/release API's are called. It also disables interrupts during
+> syconfig register access.
+>
+> These API's should be used by device drivers only incase of
+> erratum applicable to their modules if there is no other methods
+> to resolve.
+>
+> These API's are required for multiple DMA errata which require
+> putting DMA controller in no mstandby mode before stopping dma.
+>
+> The applicable errata:
+> 1. Erratum ID: i557(Applicable for omap36xx all ES versions)
+> The channel hangs when the Pause bit (DMA4_CDPi [7] ) is cleared
+> through config port while in Standby.
+>
+> 2. Erratum ID: i541
+> sDMA FIFO draining does not finish. Applicable to all omap2+ except
+> omap4.
+>
+> 3. Erratum ID:i88
+> The sDMA to be put in no mstandby mode before disabling the channel
+> after completing the data transfer operation.
+> Applicable only for OMAP3430 ES1.0
+>
+> Also fixes typo HWMOD_SWSUP_MSTDBY to HWMOD_SWSUP_MSTANDBY in
+> omap_hwmod.h
+>
+> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> Cc: Kevin Hilman<khilman@deeprootsystems.com>
+> Cc: Paul Walmsley<paul@pwsan.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-One more..
+You have to CC lakml during send-email, but it should not be in the 
+changelog.
 
-> > > And I'm confused about the name of MIPI-CSI...
-> > > Hmm...used MIPICSI or MIPI_CSI, sometimes MIPICSIS or MIPI_CSIS.
-> > >
-> > > Maybe the meaning is Camera Serial Interface Slave...
-> > > So...how about to use just one such as "IRQ_MIPI_CSIS" and
-> > > "S5PV210_PA_MIPI_CSIS".
-> >
-> > I think it's better use the common word, CSI. I can't find CSIS word
-> > at googling.
-> >
-> But used it in datasheet. How about FIMC, I think, it depends on usage of
-> datasheet.
-> 
-However, if required, it can be changed...
-I meant to use written name in datasheet is better to us.
+On the other hand, it is a good practice to add all the authors of the 
+file you change in CC.
 
-> > >
-> > > ---
-> > > @@ -65,7 +65,7 @@
-> > > ?#define IRQ_HSMMC0 ? ? ? ? ? ? S5P_IRQ_VIC1(26)
-> > > ?#define IRQ_HSMMC1 ? ? ? ? ? ? S5P_IRQ_VIC1(27)
-> > > ?#define IRQ_HSMMC2 ? ? ? ? ? ? S5P_IRQ_VIC1(28)
-> > > -#define IRQ_MIPICSI ? ? ? ? ? ?S5P_IRQ_VIC1(29)
-> > > +#define IRQ_MIPI_CSIS ? ? ? ? ?S5P_IRQ_VIC1(29)
-> > > ?#define IRQ_MIPIDSI ? ? ? ? ? ?S5P_IRQ_VIC1(30)
-> > > ?#define IRQ_ONENAND_AUDI ? ? ? S5P_IRQ_VIC1(31)
-> > >
-> > > @@ -132,5 +132,6 @@
-> > > ?#define IRQ_LCD_FIFO ? ? ? ? ? IRQ_LCD0
-> > > ?#define IRQ_LCD_VSYNC ? ? ? ? ?IRQ_LCD1
-> > > ?#define IRQ_LCD_SYSTEM ? ? ? ? IRQ_LCD2
-> > > +#define IRQ_MIPI_CSIS0 ? ? ? ? IRQ_MIPI_CSIS
-> >
-> > In this case, I can't find any good reason since it's first used.
-> > as s3c series used the different names compare to s5p series. it's
-> > okay make these wrapper.
-> > but it's new one and not used previous time.
-> >
-> I already commented about that.
-> Shortly, IRQ_MIPI_CSIS0 is used as common name for S5PV210 and S5PV310 in
-> plat-s5p.
-> And IRQ_MIPI_CSI is used as specific name on S5PV210. So needed it.
-> 
-To use IRQ_MIPI_CSIS means just one on S5PV210.
+> ---
+> v3: Review comments incorporated for:
+> https://patchwork.kernel.org/patch/282212/
+>
+> v4: added mutex changes
+> https://patchwork.kernel.org/patch/338611/
+>
+> v5: typo fixes for errata and erratum
+> https://patchwork.kernel.org/patch/352481/
+>
+> v6: fixed oh increment bug and also mutex(missing in v5)
+> https://patchwork.kernel.org/patch/372231/
+>
+> v7: replaced mutex lock with spin lock. Added use count for controlling
+> access to sysconfig registers in case if overlapping request/release API's
+> are used.
 
-Thanks.
+I'm not sure it should be done here. I'd rather keep that code in the 
+DMA, since this is the only user of that feature.
+These hwmod APIs are rather low level and should never be used except 
+for workaround. So I'd prefer keeping this API simple and not sexy at 
+all in order to prevent people to abuse it.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards,
+Benoit
