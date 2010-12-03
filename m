@@ -1,83 +1,344 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:33 +0530
-Subject: [PATCH 00/20] ux500: platform data, TC3589x keypad driver
-Message-ID: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
+Date: Fri, 3 Dec 2010 20:35:36 +0530
+Subject: [PATCH 03/20] mach-ux500: move keymaps to new file
+In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
+References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1291388753-14662-4-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These set of patches add platform data to most of our mainlined
-input drivers. Also included herein is
+Move keylayouts to a dedicated file and plug these keylayouts
+for input platform data. This will make addition of new and custom
+keylayouts localized.
 
- - Changing TC35892 MFD core to also plug in more variants
- - revised version for the TC3589X keypad driver
- - Minor i2c fixes, cleanups
- - Minor arch specific code cleanups
-
-(Apologies in advance to the i2c people for including them into
-this big list; but these patches preferably need to be in through
-single route)
-
-Rabin Vincent (1):
-  nomadik-gpio: allow sleep mode dir/pull to differ from normal mode
-
-Sundar Iyer (19):
-  mfd/ab8500: remove spi support
-  mach-ux500: deprecate spi support for ab8500
-  mach-ux500: move keymaps to new file
-  mach-ux500: add STMPE1601 platform data
-  mfd/tc35892: rename tc35892 header to tc3589x
-  mfd/tc35892: rename tc35892 core driver to tc3589x
-  mfd/tc3589x: rename tc35892 structs/registers to tc359x
-  mfd/tc3589x: add block identifier for multiple child devices
-  input/tc3589x: add tc3589x keypad support
-  mfd/tc3589x: fix random interrupt misses
-  mfd/tc3589x: undo gpio module reset during chip init
-  mfd/tc3589x: add suspend/resume support
-  plat-nomadik/gpio: add expander gpio pins enumeration
-  mach-ux500: add touchscreen interfaces platform data
-  i2c/nomadik: add adapter name for updated sanity checkings
-  mach-ux500: add TC35893 keypad platform data
-  mach-ux500: explicit enable MTU TCR in the kernel
-  mach-ux500: clean up checkpatch spits
-  i2c/nomadik: some checkpatch warnings
-
- arch/arm/mach-ux500/Makefile                       |    2 +
- arch/arm/mach-ux500/board-mop500-keypads.c         |  229 ++++++++++
- arch/arm/mach-ux500/board-mop500-touchscreen.c     |  170 ++++++++
- arch/arm/mach-ux500/board-mop500.c                 |  164 +-------
- arch/arm/mach-ux500/board-mop500.h                 |    3 +-
- arch/arm/mach-ux500/clock.c                        |  167 +++-----
- arch/arm/mach-ux500/devices-db8500.c               |    2 +-
- arch/arm/mach-ux500/include/mach/gpio.h            |   28 ++
- .../mach-ux500/include/mach/irqs-board-mop500.h    |   13 +-
- arch/arm/plat-nomadik/gpio.c                       |   50 ++-
- arch/arm/plat-nomadik/include/plat/pincfg.h        |   70 +++-
- drivers/gpio/Kconfig                               |    8 +-
- drivers/gpio/Makefile                              |    2 +-
- drivers/gpio/tc35892-gpio.c                        |  389 -----------------
- drivers/gpio/tc3589x-gpio.c                        |  389 +++++++++++++++++
- drivers/i2c/busses/i2c-nomadik.c                   |   35 +-
- drivers/input/keyboard/Kconfig                     |   10 +
- drivers/input/keyboard/Makefile                    |    1 +
- drivers/input/keyboard/tc3589x-keypad.c            |  440 ++++++++++++++++++++
- drivers/mfd/Kconfig                                |   14 +-
- drivers/mfd/Makefile                               |    4 +-
- drivers/mfd/ab8500-spi.c                           |  143 -------
- drivers/mfd/tc35892.c                              |  345 ---------------
- drivers/mfd/tc3589x.c                              |  438 +++++++++++++++++++
- include/linux/mfd/tc35892.h                        |  136 ------
- include/linux/mfd/tc3589x.h                        |  195 +++++++++
- 26 files changed, 2130 insertions(+), 1317 deletions(-)
+Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
+---
+ arch/arm/mach-ux500/Makefile               |    1 +
+ arch/arm/mach-ux500/board-mop500-keypads.c |  134 ++++++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.c         |  113 +-----------------------
+ arch/arm/mach-ux500/board-mop500.h         |    1 +
+ arch/arm/mach-ux500/devices-db8500.c       |    2 +-
+ 5 files changed, 139 insertions(+), 112 deletions(-)
  create mode 100644 arch/arm/mach-ux500/board-mop500-keypads.c
- create mode 100644 arch/arm/mach-ux500/board-mop500-touchscreen.c
- delete mode 100644 drivers/gpio/tc35892-gpio.c
- create mode 100644 drivers/gpio/tc3589x-gpio.c
- create mode 100644 drivers/input/keyboard/tc3589x-keypad.c
- delete mode 100644 drivers/mfd/ab8500-spi.c
- delete mode 100644 drivers/mfd/tc35892.c
- create mode 100644 drivers/mfd/tc3589x.c
- delete mode 100644 include/linux/mfd/tc35892.h
- create mode 100644 include/linux/mfd/tc3589x.h
 
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 0612013..e1d3822 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -13,3 +13,4 @@ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
+ obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem_irq.o
+ obj-$(CONFIG_U5500_MBOX)	+= mbox.o
++obj-$(CONFIG_INPUT_KEYBOARD)	+= board-mop500-keypads.o
+diff --git a/arch/arm/mach-ux500/board-mop500-keypads.c b/arch/arm/mach-ux500/board-mop500-keypads.c
+new file mode 100644
+index 0000000..c1218c5
+--- /dev/null
++++ b/arch/arm/mach-ux500/board-mop500-keypads.c
+@@ -0,0 +1,134 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * License Terms: GNU General Public License v2
++ *
++ * Keypad layouts for various boards
++ */
++
++#include <linux/i2c.h>
++#include <linux/gpio.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/stmpe.h>
++#include <linux/input/matrix_keypad.h>
++
++#include <plat/pincfg.h>
++#include <plat/ske.h>
++
++#include <mach/devices.h>
++#include <mach/hardware.h>
++
++#include "devices-db8500.h"
++#include "board-mop500.h"
++
++/* STMPE/SKE keypad use this key layout */
++static const unsigned int mop500_keymap[] = {
++	KEY(2, 5, KEY_END),
++	KEY(4, 1, KEY_POWER),
++	KEY(3, 5, KEY_VOLUMEDOWN),
++	KEY(1, 3, KEY_3),
++	KEY(5, 2, KEY_RIGHT),
++	KEY(5, 0, KEY_9),
++
++	KEY(0, 5, KEY_MENU),
++	KEY(7, 6, KEY_ENTER),
++	KEY(4, 5, KEY_0),
++	KEY(6, 7, KEY_2),
++	KEY(3, 4, KEY_UP),
++	KEY(3, 3, KEY_DOWN),
++
++	KEY(6, 4, KEY_SEND),
++	KEY(6, 2, KEY_BACK),
++	KEY(4, 2, KEY_VOLUMEUP),
++	KEY(5, 5, KEY_1),
++	KEY(4, 3, KEY_LEFT),
++	KEY(3, 2, KEY_7),
++};
++
++static const struct matrix_keymap_data mop500_keymap_data = {
++	.keymap         = mop500_keymap,
++	.keymap_size    = ARRAY_SIZE(mop500_keymap),
++};
++
++/*
++ * Nomadik SKE keypad
++ */
++#define ROW_PIN_I0      164
++#define ROW_PIN_I1      163
++#define ROW_PIN_I2      162
++#define ROW_PIN_I3      161
++#define ROW_PIN_I4      156
++#define ROW_PIN_I5      155
++#define ROW_PIN_I6      154
++#define ROW_PIN_I7      153
++#define COL_PIN_O0      168
++#define COL_PIN_O1      167
++#define COL_PIN_O2      166
++#define COL_PIN_O3      165
++#define COL_PIN_O4      160
++#define COL_PIN_O5      159
++#define COL_PIN_O6      158
++#define COL_PIN_O7      157
++
++#define SKE_KPD_MAX_ROWS        8
++#define SKE_KPD_MAX_COLS        8
++
++static int ske_kp_rows[] = {
++	ROW_PIN_I0, ROW_PIN_I1, ROW_PIN_I2, ROW_PIN_I3,
++	ROW_PIN_I4, ROW_PIN_I5, ROW_PIN_I6, ROW_PIN_I7,
++};
++
++/*
++ * ske_set_gpio_row: request and set gpio rows
++ */
++static int ske_set_gpio_row(int gpio)
++{
++	int ret;
++
++	ret = gpio_request(gpio, "ske-kp");
++	if (ret < 0) {
++		pr_err("ske_set_gpio_row: gpio request failed\n");
++		return ret;
++	}
++
++	ret = gpio_direction_output(gpio, 1);
++	if (ret < 0) {
++		pr_err("ske_set_gpio_row: gpio direction failed\n");
++		gpio_free(gpio);
++	}
++
++	return ret;
++}
++
++/*
++ * ske_kp_init - enable the gpio configuration
++ */
++static int ske_kp_init(void)
++{
++	int ret, i;
++
++	for (i = 0; i < SKE_KPD_MAX_ROWS; i++) {
++		ret = ske_set_gpio_row(ske_kp_rows[i]);
++		if (ret < 0) {
++			pr_err("ske_kp_init: failed init\n");
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static struct ske_keypad_platform_data ske_keypad_board = {
++	.init           = ske_kp_init,
++	.keymap_data    = &mop500_keymap_data,
++	.no_autorepeat  = true,
++	.krow           = SKE_KPD_MAX_ROWS,     /* 8x8 matrix */
++	.kcol           = SKE_KPD_MAX_COLS,
++	.debounce_ms    = 40,                   /* in millsecs */
++};
++
++void mop500_keypad_init(void)
++{
++	db8500_add_ske_keypad(&ske_keypad_board);
++}
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 28bc18b..9b5e66e 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -19,15 +19,12 @@
+ #include <linux/amba/pl022.h>
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/ab8500.h>
+-#include <linux/mfd/tc35892.h>
+-#include <linux/input/matrix_keypad.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+ #include <plat/pincfg.h>
+ #include <plat/i2c.h>
+-#include <plat/ske.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
+@@ -172,116 +169,8 @@ static void __init mop500_i2c_init(void)
+ 	db8500_add_i2c3(&u8500_i2c3_data);
+ }
+ 
+-static const unsigned int ux500_keymap[] = {
+-	KEY(2, 5, KEY_END),
+-	KEY(4, 1, KEY_POWER),
+-	KEY(3, 5, KEY_VOLUMEDOWN),
+-	KEY(1, 3, KEY_3),
+-	KEY(5, 2, KEY_RIGHT),
+-	KEY(5, 0, KEY_9),
+-
+-	KEY(0, 5, KEY_MENU),
+-	KEY(7, 6, KEY_ENTER),
+-	KEY(4, 5, KEY_0),
+-	KEY(6, 7, KEY_2),
+-	KEY(3, 4, KEY_UP),
+-	KEY(3, 3, KEY_DOWN),
+-
+-	KEY(6, 4, KEY_SEND),
+-	KEY(6, 2, KEY_BACK),
+-	KEY(4, 2, KEY_VOLUMEUP),
+-	KEY(5, 5, KEY_1),
+-	KEY(4, 3, KEY_LEFT),
+-	KEY(3, 2, KEY_7),
+-};
+-
+-static const struct matrix_keymap_data ux500_keymap_data = {
+-	.keymap         = ux500_keymap,
+-	.keymap_size    = ARRAY_SIZE(ux500_keymap),
+-};
+-
+-/*
+- * Nomadik SKE keypad
+- */
+-#define ROW_PIN_I0      164
+-#define ROW_PIN_I1      163
+-#define ROW_PIN_I2      162
+-#define ROW_PIN_I3      161
+-#define ROW_PIN_I4      156
+-#define ROW_PIN_I5      155
+-#define ROW_PIN_I6      154
+-#define ROW_PIN_I7      153
+-#define COL_PIN_O0      168
+-#define COL_PIN_O1      167
+-#define COL_PIN_O2      166
+-#define COL_PIN_O3      165
+-#define COL_PIN_O4      160
+-#define COL_PIN_O5      159
+-#define COL_PIN_O6      158
+-#define COL_PIN_O7      157
+-
+-#define SKE_KPD_MAX_ROWS        8
+-#define SKE_KPD_MAX_COLS        8
+-
+-static int ske_kp_rows[] = {
+-	ROW_PIN_I0, ROW_PIN_I1, ROW_PIN_I2, ROW_PIN_I3,
+-	ROW_PIN_I4, ROW_PIN_I5, ROW_PIN_I6, ROW_PIN_I7,
+-};
+-
+-/*
+- * ske_set_gpio_row: request and set gpio rows
+- */
+-static int ske_set_gpio_row(int gpio)
+-{
+-	int ret;
+-
+-	ret = gpio_request(gpio, "ske-kp");
+-	if (ret < 0) {
+-		pr_err("ske_set_gpio_row: gpio request failed\n");
+-		return ret;
+-	}
+-
+-	ret = gpio_direction_output(gpio, 1);
+-	if (ret < 0) {
+-		pr_err("ske_set_gpio_row: gpio direction failed\n");
+-		gpio_free(gpio);
+-	}
+-
+-	return ret;
+-}
+-
+-/*
+- * ske_kp_init - enable the gpio configuration
+- */
+-static int ske_kp_init(void)
+-{
+-	int ret, i;
+-
+-	for (i = 0; i < SKE_KPD_MAX_ROWS; i++) {
+-		ret = ske_set_gpio_row(ske_kp_rows[i]);
+-		if (ret < 0) {
+-			pr_err("ske_kp_init: failed init\n");
+-			return ret;
+-		}
+-	}
+-
+-	return 0;
+-}
+-
+-static struct ske_keypad_platform_data ske_keypad_board = {
+-	.init           = ske_kp_init,
+-	.keymap_data    = &ux500_keymap_data,
+-	.no_autorepeat  = true,
+-	.krow           = SKE_KPD_MAX_ROWS,     /* 8x8 matrix */
+-	.kcol           = SKE_KPD_MAX_COLS,
+-	.debounce_ms    = 40,                   /* in millsecs */
+-};
+-
+-
+-
+ /* add any platform devices here - TODO */
+ static struct platform_device *platform_devs[] __initdata = {
+-	&ux500_ske_keypad_device,
+ };
+ 
+ static void __init mop500_spi_init(void)
+@@ -310,6 +199,8 @@ static void __init u8500_init_machine(void)
+ 	mop500_spi_init();
+ 	mop500_uart_init();
+ 
++	mop500_keypad_init();
++
+ 	platform_device_register(&ab8500_device);
+ 
+ 	i2c_register_board_info(0, mop500_i2c0_devices,
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index 3a338e6..3104ae2 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -16,5 +16,6 @@
+ 
+ extern void mop500_sdi_init(void);
+ extern void mop500_sdi_tc35892_init(void);
++extern void mop500_keypad_init(void);
+ 
+ #endif
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index 1edcf82..e78445c 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -164,7 +164,7 @@ struct resource keypad_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device ux500_ske_keypad_device = {
++struct platform_device u8500_ske_keypad_device = {
+ 	.name = "nmk-ske-keypad",
+ 	.id = -1,
+ 	.num_resources = ARRAY_SIZE(keypad_resources),
 -- 
 1.7.2.dirty
