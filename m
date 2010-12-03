@@ -1,86 +1,123 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 3 Dec 2010 09:46:27 +0100
-Subject: [PATCH] mmci: corrected calculation of clock div for ux500 v2
-Message-ID: <1291365987-17882-1-git-send-email-linus.walleij@stericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 03 Dec 2010 17:19:43 +0900
+Subject: [PATCH 1/4] mach-s5pv210: Add platform definitions for mipi-csis
+In-Reply-To: <AANLkTi=bARGdX2Y4Ea-YP8qQRcjAXme8NW9Mp-0dTxgZ@mail.gmail.com>
+References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+	<1291307862-8125-2-git-send-email-s.nawrocki@samsung.com>
+	<012301cb92a1$a7020af0$f50620d0$%kim@samsung.com>
+	<AANLkTi=bARGdX2Y4Ea-YP8qQRcjAXme8NW9Mp-0dTxgZ@mail.gmail.com>
+Message-ID: <014901cb92c2$d9c9e8b0$8d5dba10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@stericsson.com>
+Kyungmin Park wrote:
+> 
+> On Fri, Dec 3, 2010 at 1:22 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Sylwester Nawrocki wrote:
+> >>
+> >> Added resource definitions for mipi-csis interface, naming
+> >> changed for consistency with s5pv310 where there are two
+> >> instances of the device.
+> >>
+> >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >> ---
+> >> ?arch/arm/mach-s5pv210/include/mach/irqs.h ? ? ? | ? ?2 +-
+> >> ?arch/arm/mach-s5pv210/include/mach/map.h ? ? ? ?| ? ?4 ++++
+> >> ?arch/arm/mach-s5pv210/include/mach/regs-clock.h | ? ?5 +----
+> >> ?3 files changed, 6 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
+> >> s5pv210/include/mach/irqs.h
+> >> index 119b95f..8b5994c 100644
+> >> --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
+> >> +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+> >> @@ -65,7 +65,7 @@
+> >> ?#define IRQ_HSMMC0 ? ? ? ? ? S5P_IRQ_VIC1(26)
+> >> ?#define IRQ_HSMMC1 ? ? ? ? ? S5P_IRQ_VIC1(27)
+> >> ?#define IRQ_HSMMC2 ? ? ? ? ? S5P_IRQ_VIC1(28)
+> >> -#define IRQ_MIPICSI ? ? ? ? ?S5P_IRQ_VIC1(29)
+> >> +#define IRQ_MIPICSI0 ? ? ? ? S5P_IRQ_VIC1(29)
+> >
+> > Firstly don't use directly IRQ_MIPICSI0 which is used in platform
+device.
+> > Because it can be confused that there would be another MIPICSI such as
+> > MIPICSI1.
+> > In that case, just use like following. For example,
+> Hi,
+> 
+> First respect others work.
+> my impression is that you forced the developers to work as you want.
+> 
+> okay who summit this code? If you think name is odd, then you check it
+> before you submitted.
+> When you commit the code is okay, but other should be considered as yours.
+> 
 
-The Ux500 variant of this block has a different divider.
-The value used right now is too big and which means a loss
-in performance. This fix corrects it. Also expand the math
-comments a bit so it's clear what's happening. Further
-the Ux500 variant does not like if we use the BYPASS bit,
-instead we are supposed to set the clock divider to zero.
+I can't get you :-(
 
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/mmc/host/mmci.c |   27 ++++++++++++++++++++++++++-
- 1 files changed, 26 insertions(+), 1 deletions(-)
+Maybe your talking is to change the name? Why?...
+When submitted it, used written name, IRQ_MIPICSI in datasheet.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 7567872..9bd3a18 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -51,6 +51,7 @@ static unsigned int fmax = 515633;
-  * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
-  *		using DMA.
-  * @sdio: variant supports SDIO
-+ * @st_clkdiv: true if using a ST-specific clock divider algorithm
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -61,6 +62,7 @@ struct variant_data {
- 	bool			broken_blockend;
- 	bool			broken_blockend_dma;
- 	bool			sdio;
-+	bool			st_clkdiv;
- };
- 
- static struct variant_data variant_arm = {
-@@ -86,7 +88,9 @@ static struct variant_data variant_ux500 = {
- 	.datalength_bits	= 24,
- 	.broken_blockend	= true,
- 	.sdio			= true,
-+	.st_clkdiv		= true,
- };
-+
- /*
-  * This must be called with host->lock held
-  */
-@@ -97,9 +101,30 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
- 
- 	if (desired) {
- 		if (desired >= host->mclk) {
--			clk = MCI_CLK_BYPASS;
-+			/*
-+			 * The ST clock divider does not like the bypass bit,
-+			 * even though it's available. Instead the datasheet
-+			 * recommends setting the divider to zero.
-+			 */
-+			if (!variant->st_clkdiv)
-+				clk = MCI_CLK_BYPASS;
- 			host->cclk = host->mclk;
-+		} else if (variant->st_clkdiv) {
-+			/*
-+			 * DB8500 TRM says f = mclk / (clkdiv + 2)
-+			 * => clkdiv = (mclk / f) - 2
-+			 * Round the divider up so we don't exceed the max
-+			 * frequency
-+			 */
-+			clk = DIV_ROUND_UP(host->mclk, desired) - 2;
-+			if (clk >= 256)
-+				clk = 255;
-+			host->cclk = host->mclk / (clk + 2);
- 		} else {
-+			/*
-+			 * PL180 TRM says f = mclk / (2 * (clkdiv + 1))
-+			 * => clkdiv = mclk / (2 * f) - 1
-+			 */
- 			clk = host->mclk / (2 * desired) - 1;
- 			if (clk >= 256)
- 				clk = 255;
--- 
-1.7.3.2
+But now, according to Sylwester's patch, used various name for it like
+MIPICSI, MIPICSIS and so on.
+So I suggested just one name in previous my comment.
+
+> >
+> > ---
+> > @@ -132,5 +132,6 @@
+> > ?#define IRQ_LCD_FIFO ? ? ? ? ? IRQ_LCD0
+> > ?#define IRQ_LCD_VSYNC ? ? ? ? ?IRQ_LCD1
+> > ?#define IRQ_LCD_SYSTEM ? ? ? ? IRQ_LCD2
+> > +#define IRQ_MIPI_CSIS0 ? ? ? ? IRQ_MIPICSI
+> >
+> > ?#endif /* ASM_ARCH_IRQS_H */
+> > ---
+> >
+> > And I'm confused about the name of MIPI-CSI...
+> > Hmm...used MIPICSI or MIPI_CSI, sometimes MIPICSIS or MIPI_CSIS.
+> >
+> > Maybe the meaning is Camera Serial Interface Slave...
+> > So...how about to use just one such as "IRQ_MIPI_CSIS" and
+> > "S5PV210_PA_MIPI_CSIS".
+> 
+> I think it's better use the common word, CSI. I can't find CSIS word
+> at googling.
+> 
+But used it in datasheet. How about FIMC, I think, it depends on usage of
+datasheet.
+
+> >
+> > ---
+> > @@ -65,7 +65,7 @@
+> > ?#define IRQ_HSMMC0 ? ? ? ? ? ? S5P_IRQ_VIC1(26)
+> > ?#define IRQ_HSMMC1 ? ? ? ? ? ? S5P_IRQ_VIC1(27)
+> > ?#define IRQ_HSMMC2 ? ? ? ? ? ? S5P_IRQ_VIC1(28)
+> > -#define IRQ_MIPICSI ? ? ? ? ? ?S5P_IRQ_VIC1(29)
+> > +#define IRQ_MIPI_CSIS ? ? ? ? ?S5P_IRQ_VIC1(29)
+> > ?#define IRQ_MIPIDSI ? ? ? ? ? ?S5P_IRQ_VIC1(30)
+> > ?#define IRQ_ONENAND_AUDI ? ? ? S5P_IRQ_VIC1(31)
+> >
+> > @@ -132,5 +132,6 @@
+> > ?#define IRQ_LCD_FIFO ? ? ? ? ? IRQ_LCD0
+> > ?#define IRQ_LCD_VSYNC ? ? ? ? ?IRQ_LCD1
+> > ?#define IRQ_LCD_SYSTEM ? ? ? ? IRQ_LCD2
+> > +#define IRQ_MIPI_CSIS0 ? ? ? ? IRQ_MIPI_CSIS
+> 
+> In this case, I can't find any good reason since it's first used.
+> as s3c series used the different names compare to s5p series. it's
+> okay make these wrapper.
+> but it's new one and not used previous time.
+> 
+I already commented about that.
+Shortly, IRQ_MIPI_CSIS0 is used as common name for S5PV210 and S5PV310 in
+plat-s5p.
+And IRQ_MIPI_CSI is used as specific name on S5PV210. So needed it.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
