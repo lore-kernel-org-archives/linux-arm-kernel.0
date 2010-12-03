@@ -1,88 +1,79 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 3 Dec 2010 09:38:35 +0100
-Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling mstandby
-	mode
-In-Reply-To: <1291298392-28729-1-git-send-email-manjugk@ti.com>
-References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
-Message-ID: <4CF8AC8B.9040800@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Dec 2010 08:41:02 +0000
+Subject: Mainline OMAP3 breakage (and other OMAP?)
+In-Reply-To: <20101203030954.GD3367@linux-sh.org>
+References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
+	<20101202215837.GW17222@atomide.com>
+	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
+	<20101202223208.GA17222@atomide.com>
+	<20101203030954.GD3367@linux-sh.org>
+Message-ID: <20101203084102.GA30957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/2/2010 2:59 PM, G, Manjunath Kondaiah wrote:
-> Certain errata in OMAP2+ processors will require forcing
-> master standby to "no standby" mode before completing on going
-> operation. Without this, the results will be unpredictable.
->
-> Since current implementation of PM run time framework does not support
-> changing sysconfig settings during middle of the on going operation,
-> these API's will support the same. One API will force the device's
-> sysconfig mstandby mode settings to "no standby" and other API will
-> release "no standby" mode and sets it to "smart standby" or "no
-> standby? depending on HWMOD_SWSUP_MSTANDBY value.
->
-> The hwmod API "omap_hwmod_set_master_standbymode" will use
-> no_stdby_cnt(introduced in omap_hwmod structure) for controlling
-> access to sysconfig register settings in case of overlapping
-> request/release API's are called. It also disables interrupts during
-> syconfig register access.
->
-> These API's should be used by device drivers only incase of
-> erratum applicable to their modules if there is no other methods
-> to resolve.
->
-> These API's are required for multiple DMA errata which require
-> putting DMA controller in no mstandby mode before stopping dma.
->
-> The applicable errata:
-> 1. Erratum ID: i557(Applicable for omap36xx all ES versions)
-> The channel hangs when the Pause bit (DMA4_CDPi [7] ) is cleared
-> through config port while in Standby.
->
-> 2. Erratum ID: i541
-> sDMA FIFO draining does not finish. Applicable to all omap2+ except
-> omap4.
->
-> 3. Erratum ID:i88
-> The sDMA to be put in no mstandby mode before disabling the channel
-> after completing the data transfer operation.
-> Applicable only for OMAP3430 ES1.0
->
-> Also fixes typo HWMOD_SWSUP_MSTDBY to HWMOD_SWSUP_MSTANDBY in
-> omap_hwmod.h
->
-> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
-> Cc: Kevin Hilman<khilman@deeprootsystems.com>
-> Cc: Paul Walmsley<paul@pwsan.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+On Fri, Dec 03, 2010 at 12:09:55PM +0900, Paul Mundt wrote:
+> On Thu, Dec 02, 2010 at 02:32:08PM -0800, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 14:06]:
+> > > On Thu, Dec 02, 2010 at 01:58:38PM -0800, Tony Lindgren wrote:
+> > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 13:04]:
+> > > > > This has been around since October:
+> > > > > 
+> > > > > drivers/video/omap2/vram.c: In function ???omap_vram_reserve_sdram_memblock???:
+> > > > > drivers/video/omap2/vram.c:573: error: ???MEMBLOCK_REAL_LIMIT??? undeclared (first use in this function)
+> > > > > drivers/video/omap2/vram.c:573: error: (Each undeclared identifier is reported only once
+> > > > > drivers/video/omap2/vram.c:573: error: for each function it appears in.)
+> > > > > 
+> > > > > This requires a trivial one-liner compile fix:
+> > > > > 
+> > > > > diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
+> > > > > index fed2a72..a8973f0 100644
+> > > > > --- a/drivers/video/omap2/vram.c
+> > > > > +++ b/drivers/video/omap2/vram.c
+> > > > > @@ -570,7 +570,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
+> > > > >  			return;
+> > > > >  		}
+> > > > >  	} else {
+> > > > > -		paddr = memblock_alloc_base(size, PAGE_SIZE, MEMBLOCK_REAL_LIMIT);
+> > > > > +		paddr = memblock_alloc(size, PAGE_SIZE);
+> > > > >  	}
+> > > > >  
+> > > > >  	omap_vram_add_region(paddr, size);
+> > > > > 
+> > > > > which restores the old behaviour before the X86 memblock changes went
+> > > > > in.  Yes, there may be other changes due to the ioremap stuff, but
+> > > > > that's really no excuse for not fixing the compile error itself.
+> > > > 
+> > > > Great. Adding fbdev and Tomi to Cc.
+> > > > 
+> > > > Acked-by: Tony Lindgren <tony@atomide.com>
+> > > 
+> > > http://marc.info/?l=linux-omap&w=2&r=1&s=MEMBLOCK_REAL_LIMIT%20vram&q=b
+> > > 
+> > > There have been patches posted throughout November to fix this, but
+> > > the problem is they're not making it to mainline.  It needs chasing
+> > > until someone does the right thing and sends one variant of the above
+> > > patch, rather than just leaving it until the ioremap fixes hit
+> > > mainline during the next merge window.
+> > 
+> > Yes this should go in during the -rc for sure.
+> > 
+> > I suggest you merge this but let's wait a bit and check if Tomi
+> > already has a similar fix queued for the -rc series.
+> > 
+> This has been fixed since -rc2.
 
-You have to CC lakml during send-email, but it should not be in the 
-changelog.
+So it is.  However, the ioremap fix is wrong.
 
-On the other hand, it is a good practice to add all the authors of the 
-file you change in CC.
+        } else {
+                paddr = memblock_alloc(size, PAGE_SIZE);
+        }
 
-> ---
-> v3: Review comments incorporated for:
-> https://patchwork.kernel.org/patch/282212/
->
-> v4: added mutex changes
-> https://patchwork.kernel.org/patch/338611/
->
-> v5: typo fixes for errata and erratum
-> https://patchwork.kernel.org/patch/352481/
->
-> v6: fixed oh increment bug and also mutex(missing in v5)
-> https://patchwork.kernel.org/patch/372231/
->
-> v7: replaced mutex lock with spin lock. Added use count for controlling
-> access to sysconfig registers in case if overlapping request/release API's
-> are used.
+        memblock_free(paddr, size);
+        memblock_remove(paddr, size);
 
-I'm not sure it should be done here. I'd rather keep that code in the 
-DMA, since this is the only user of that feature.
-These hwmod APIs are rather low level and should never be used except 
-for workaround. So I'd prefer keeping this API simple and not sexy at 
-all in order to prevent people to abuse it.
+Didn't I say that such blocks were supposed to be aligned to a 2MB
+boundary - and the size also so aligned?
 
-Regards,
-Benoit
+http://lists.arm.linux.org.uk/lurker/message/20101011.152516.893a6088.en.html
+
+It at least needs to be 1MB as that's the section size.
