@@ -1,108 +1,114 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Dec 2010 20:24:01 +0000
-Subject: [PATCH 15/22] ARM: SMP: get rid of get_core_count()
+Date: Fri, 03 Dec 2010 20:24:21 +0000
+Subject: [PATCH 16/22] ARM: SMP: get rid of references to poke_milo and Milo
 In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
 References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-Message-ID: <E1POcAj-0007rx-Eb@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1POcB3-0007s1-IH@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need this small function as well as scu_get_core_count()
+Milo is an old boot loader, which is no longer relevant for these
+platforms.  References to it are misleading.  Move the code out
+of poke_milo(), and remove references to milo in comments.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/omap-smp.c   |   12 +-----------
- arch/arm/mach-realview/platsmp.c |   13 ++++---------
- arch/arm/mach-ux500/platsmp.c    |    9 +++------
- 3 files changed, 8 insertions(+), 26 deletions(-)
+ arch/arm/mach-realview/platsmp.c |   44 ++++++++++---------------------------
+ arch/arm/mach-tegra/platsmp.c    |    7 ------
+ 2 files changed, 12 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 5f10f38..405a8fc 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -29,16 +29,6 @@
- /* SCU base address */
- static void __iomem *scu_base;
- 
--/*
-- * Use SCU config register to count number of cores
-- */
--static inline unsigned int get_core_count(void)
--{
--	if (scu_base)
--		return scu_get_core_count(scu_base);
--	return 1;
--}
--
- static DEFINE_SPINLOCK(boot_lock);
- 
- void __cpuinit platform_secondary_init(unsigned int cpu)
-@@ -118,7 +108,7 @@ void __init smp_init_cpus(void)
- 	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
- 	BUG_ON(!scu_base);
- 
--	ncores = get_core_count();
-+	ncores = scu_get_core_count(scu_base);
- 
- 	/* sanity check */
- 	if (ncores > NR_CPUS) {
 diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index 13116cd..6595e87 100644
+index 6595e87..ef3cc86 100644
 --- a/arch/arm/mach-realview/platsmp.c
 +++ b/arch/arm/mach-realview/platsmp.c
-@@ -50,14 +50,6 @@ static void __iomem *scu_base_addr(void)
- 		return (void __iomem *)0;
+@@ -99,14 +99,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	flush_cache_all();
+ 
+ 	/*
+-	 * XXX
+-	 *
+-	 * This is a later addition to the booting protocol: the
+-	 * bootMonitor now puts secondary cores into WFI, so
+-	 * poke_milo() no longer gets the cores moving; we need
+-	 * to send a soft interrupt to wake the secondary core.
+-	 * Use smp_cross_call() for this, since there's little
+-	 * point duplicating the code here
++	 * Send the secondary CPU a soft interrupt, thereby causing
++	 * the boot monitor to read the system wide flags register,
++	 * and branch to the address found there.
+ 	 */
+ 	smp_cross_call(cpumask_of(cpu), 1);
+ 
+@@ -128,22 +123,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return pen_release != -1 ? -ENOSYS : 0;
  }
  
--static inline unsigned int get_core_count(void)
+-static void __init poke_milo(void)
 -{
--	void __iomem *scu_base = scu_base_addr();
--	if (scu_base)
--		return scu_get_core_count(scu_base);
--	return 1;
+-	/* nobody is to be released from the pen yet */
+-	pen_release = -1;
+-
+-	/*
+-	 * Write the address of secondary startup into the system-wide flags
+-	 * register. The BootMonitor waits for this register to become
+-	 * non-zero.
+-	 */
+-	__raw_writel(BSYM(virt_to_phys(realview_secondary_startup)),
+-		     __io_address(REALVIEW_SYS_FLAGSSET));
+-
+-	mb();
 -}
 -
- static DEFINE_SPINLOCK(boot_lock);
+ /*
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
+@@ -189,13 +168,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	for (i = 0; i < max_cpus; i++)
+ 		set_cpu_present(i, true);
  
- void __cpuinit platform_secondary_init(unsigned int cpu)
-@@ -158,7 +150,10 @@ static void __init poke_milo(void)
-  */
- void __init smp_init_cpus(void)
- {
--	unsigned int i, ncores = get_core_count();
-+	void __iomem *scu_base = scu_base_addr();
-+	unsigned int i, ncores;
+-	/*
+-	 * Initialise the SCU if there are more than one CPU and let
+-	 * them know where to start. Note that, on modern versions of
+-	 * MILO, the "poke" doesn't actually do anything until each
+-	 * individual core is sent a soft interrupt to get it out of
+-	 * WFI
+-	 */
+ 	if (max_cpus > 1) {
+ 		/*
+ 		 * Enable the local timer or broadcast device for the
+@@ -204,6 +176,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		percpu_timer_setup();
+ 
+ 		scu_enable(scu_base_addr());
+-		poke_milo();
 +
-+	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
++		/*
++		 * Write the address of secondary startup into the
++		 * system-wide flags register. The BootMonitor waits
++		 * until it receives a soft interrupt, and then the
++		 * secondary CPU branches to this address.
++		 */
++		__raw_writel(BSYM(virt_to_phys(realview_secondary_startup)),
++			     __io_address(REALVIEW_SYS_FLAGSSET));
+ 	}
+ }
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 5b194dd..66d0634 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -148,13 +148,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	for (i = 0; i < max_cpus; i++)
+ 		set_cpu_present(i, true);
  
- 	/* sanity check */
- 	if (ncores > NR_CPUS) {
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index e31024e..fd40fa1 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -28,11 +28,6 @@
-  */
- volatile int __cpuinitdata pen_release = -1;
- 
--static unsigned int __init get_core_count(void)
--{
--	return scu_get_core_count(__io_address(UX500_SCU_BASE));
--}
--
- static DEFINE_SPINLOCK(boot_lock);
- 
- void __cpuinit platform_secondary_init(unsigned int cpu)
-@@ -126,7 +121,9 @@ static void __init wakeup_secondary(void)
-  */
- void __init smp_init_cpus(void)
- {
--	unsigned int i, ncores = get_core_count();
-+	unsigned int i, ncores;
-+
-+	ncores = scu_get_core_count(__io_address(UX500_SCU_BASE));
- 
- 	/* sanity check */
- 	if (ncores > NR_CPUS) {
+-	/*
+-	 * Initialise the SCU if there are more than one CPU and let
+-	 * them know where to start. Note that, on modern versions of
+-	 * MILO, the "poke" doesn't actually do anything until each
+-	 * individual core is sent a soft interrupt to get it out of
+-	 * WFI
+-	 */
+ 	if (max_cpus > 1) {
+ 		percpu_timer_setup();
+ 		scu_enable(scu_base);
 -- 
 1.6.2.5
