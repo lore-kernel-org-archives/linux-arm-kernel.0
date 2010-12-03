@@ -1,38 +1,38 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 3 Dec 2010 14:10:23 +0200
-Subject: Mainline OMAP3 breakage (and other OMAP?)
-In-Reply-To: <20101203084102.GA30957@n2100.arm.linux.org.uk>
-References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
-	<20101202215837.GW17222@atomide.com>
-	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
-	<20101202223208.GA17222@atomide.com>
-	<20101203030954.GD3367@linux-sh.org>
-	<20101203084102.GA30957@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTim3573_MUZNpo2+tKa=ZJgQf26x5of_ZkMM6BR8@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 3 Dec 2010 13:19:06 +0100
+Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling mstandby
+	mode
+In-Reply-To: <20101203092514.GA10048@GLPP-machine>
+References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
+	<4CF8AC8B.9040800@ti.com> <20101203092514.GA10048@GLPP-machine>
+Message-ID: <4CF8E03A.4010000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 3, 2010 at 10:41 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Dec 03, 2010 at 12:09:55PM +0900, Paul Mundt wrote:
->> This has been fixed since -rc2.
->
-> So it is. ?However, the ioremap fix is wrong.
->
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?paddr = memblock_alloc(size, PAGE_SIZE);
-> ? ? ? ?}
->
-> ? ? ? ?memblock_free(paddr, size);
-> ? ? ? ?memblock_remove(paddr, size);
->
-> Didn't I say that such blocks were supposed to be aligned to a 2MB
-> boundary - and the size also so aligned?
+On 12/3/2010 10:47 AM, G, Manjunath Kondaiah wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [2010-12-03 09:38:35 +0100]:
 
-I asked you if there was something special and I didn't receive any response:
-http://article.gmane.org/gmane.linux.kernel/1048434
+[...]
 
-So, why SZ_2M?
+>>> v7: replaced mutex lock with spin lock. Added use count for controlling
+>>> access to sysconfig registers in case if overlapping request/release API's
+>>> are used.
+>>
+>> I'm not sure it should be done here. I'd rather keep that code in
+>> the DMA, since this is the only user of that feature.
+>
+> Are you referring to spin lock or usage count?
 
--- 
-Felipe Contreras
+The spinlock is needed, I was referring to the usage count.
+
+That being said, the API proposed by Paul (request/release
+) sound like a get/put, so maybe he had that kind of usage in mind.
+
+I'm still not convince it should be done at hwmod API level.
+
+
+Paul,
+Any thoughts on that?
+
+Regards,
+Benoit
