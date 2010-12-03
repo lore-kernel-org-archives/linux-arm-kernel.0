@@ -1,75 +1,59 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Fri, 3 Dec 2010 13:07:25 +0800
-Subject: [PATCH 09/15] ARM: mxs: Add clock support
-In-Reply-To: <20101202150718.GS32355@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-10-git-send-email-shawn.guo@freescale.com>
-	<20101202150718.GS32355@pengutronix.de>
-Message-ID: <AANLkTi=ZD9uab9NbL+AXAc9-+KYpZAhak+GGbdPuUE3A@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 3 Dec 2010 14:14:27 +0900
+Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
+In-Reply-To: <1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
+References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <AANLkTimgazoKTyuG37oUbD_45Cv7Un4=GDMsXXxCuH5U@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Fri, Nov 26, 2010 at 02:49:08PM +0800, Shawn Guo wrote:
->> +
->> +/*
->> + * ref_clk
->> + */
->> +#define _CLK_GET_RATE_REF(name, sr, ss) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> +static unsigned long name##_get_rate(struct clk *clk) ? ? ? ? ? ? ? ? ? ? ? ?\
->> +{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? unsigned long parent_rate; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? u32 reg, div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##sr); ? ? ? ? \
->> + ? ? div = (reg >> BP_CLKCTRL_##sr##_##ss##FRAC) & 0x3f; ? ? ? ? ? ? \
->> + ? ? parent_rate = clk_get_rate(clk->parent); ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? return parent_rate * 18 / div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> +}
->> +
->> +_CLK_GET_RATE_REF(ref_cpu_clk, FRAC, CPU)
->> +_CLK_GET_RATE_REF(ref_emi_clk, FRAC, EMI)
->> +_CLK_GET_RATE_REF(ref_pix_clk, FRAC, PIX)
->> +_CLK_GET_RATE_REF(ref_io_clk, FRAC, IO)
->> +
->> +#define _DEFINE_CLOCK_REF(name, er, es) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? static struct clk name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .enable_reg ? ? = CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er, ?\
->> + ? ? ? ? ? ? .enable_shift ? = BP_CLKCTRL_##er##_CLKGATE##es, ? ? ? ?\
->> + ? ? ? ? ? ? .get_rate ? ? ? = name##_get_rate, ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .enable ? ? ? ? = _raw_clk_enable, ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .disable ? ? ? ?= _raw_clk_disable, ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .parent ? ? ? ? = &pll_clk, ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? }
->> +
->> +_DEFINE_CLOCK_REF(ref_cpu_clk, FRAC, CPU);
-> What happens if get_clock_rate(ref_cpu_clk) is called?:
+On Fri, Dec 3, 2010 at 1:37 AM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> There may be up to 2 MIPI-CSI2 interfaces depending on SoC version.
 >
-> ? ? ? ?ref_cpu_clk_get_rate
-> ? ? ? ? ? ? ? ?reg = something
-> ? ? ? ? ? ? ? ?div = something else
-> ? ? ? ? ? ? ? ?parent_rate = clk_get_rate(clk->parent)
-> ? ? ? ? ? ? ? ? ? ? ? ?= pll_clk_get_rate()
-> ? ? ? ? ? ? ? ? ? ? ? ?= 480000000;
-> ? ? ? ? ? ? ? ?return parent_rate * 18 / div
-> ? ? ? ? ? ? ? ? ? ? ? ?= (480000000 * 18) / div
-> ? ? ? ? ? ? ? ? ? ? ? ?= 0x202fbf000 / div
-> ? ? ? ? ? ? ? ? ? ? ? ?= ...
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ? | ? 10 ++++++++
+> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? ?| ? ?2 +
+> ?arch/arm/plat-s5p/dev-csis0.c ? ? ? ? ? ? | ? 34 +++++++++++++++++++++++++++++
+> ?arch/arm/plat-s5p/dev-csis1.c ? ? ? ? ? ? | ? 33 ++++++++++++++++++++++++++++
+> ?arch/arm/plat-samsung/include/plat/csis.h | ? 28 +++++++++++++++++++++++
+> ?arch/arm/plat-samsung/include/plat/devs.h | ? ?3 ++
+> ?6 files changed, 110 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/plat-s5p/dev-csis0.c
+> ?create mode 100644 arch/arm/plat-s5p/dev-csis1.c
+> ?create mode 100644 arch/arm/plat-samsung/include/plat/csis.h
 >
-> Note that 0x202fbf000 is too big for an unsigned long so (AFAIK) this is
-> truncated to 0x02fbf000 / div which is wrong.
->
-> The same overflow happens in at least one set_rate function, too.
->
-> Either you have to switch to long long or (IMHO preferable) use shifted
-> values.
->
-Excellent catch.  It solved another issue that I ran into, which
-caused by imprecise mdelay.
+> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+> index 65dbfa8..2fb0c88 100644
+> --- a/arch/arm/plat-s5p/Kconfig
+> +++ b/arch/arm/plat-s5p/Kconfig
+> @@ -56,3 +56,13 @@ config S5P_DEV_ONENAND
+> ? ? ? ?bool
+> ? ? ? ?help
+> ? ? ? ? ?Compile in platform device definition for OneNAND controller
+> +
+> +config S5P_DEV_CSIS0
+> + ? ? ? bool
+> + ? ? ? help
+> + ? ? ? ? Compile in platform device definitions for MIPI-CSI2 interface 0
+> +
+> +config S5P_DEV_CSIS1
+> + ? ? ? bool
+> + ? ? ? help
+> + ? ? ? ? Compile in platform device definitions for MIPI-CSI2 interface 1
+> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+> index de65238..2b73173 100644
+> --- a/arch/arm/plat-s5p/Makefile
+> +++ b/arch/arm/plat-s5p/Makefile
+> @@ -28,3 +28,5 @@ obj-$(CONFIG_S5P_DEV_FIMC0) ? += dev-fimc0.o
+> ?obj-$(CONFIG_S5P_DEV_FIMC1) ? ?+= dev-fimc1.o
+> ?obj-$(CONFIG_S5P_DEV_FIMC2) ? ?+= dev-fimc2.o
+> ?obj-$(CONFIG_S5P_DEV_ONENAND) ?+= dev-onenand.o
+> +obj-$(CONFIG_S5P_DEV_CSIS0) ? ?+= dev-csis0.o
+> +obj-$(CONFIG_S5P_DEV_CSIS1) ? ?+= dev-csis1.o
 
-Thanks a million, Uwe.
-
--- 
-Regards,
-Shawn
+When we do have defines for each device, why not have both in one file
+with each contained in ifdef for it's define ? That will reduce file count.
