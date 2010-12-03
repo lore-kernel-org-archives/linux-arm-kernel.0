@@ -1,45 +1,61 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Fri, 3 Dec 2010 01:44:24 +0000
-Subject: [PATCH 1/6] i2c/pxa2xx: Don't touch ISAR on X86
-In-Reply-To: <1291320589-31570-2-git-send-email-bigeasy@linutronix.de>
-References: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
-	<1291320589-31570-2-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20101203014424.GG24979@trinity.fluff.org>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Fri, 3 Dec 2010 12:09:55 +0900
+Subject: Mainline OMAP3 breakage (and other OMAP?)
+In-Reply-To: <20101202223208.GA17222@atomide.com>
+References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
+	<20101202215837.GW17222@atomide.com>
+	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
+	<20101202223208.GA17222@atomide.com>
+Message-ID: <20101203030954.GD3367@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 09:09:44PM +0100, Sebastian Andrzej Siewior wrote:
-> The reset functions sets writes the slave address even in not slave
-> mode. I don't see any reason in writting it if slave mode is not
-> enabled.
-> Ben Dooks was conserned about making this change make it unavable on X86
-> where it is not available.
+On Thu, Dec 02, 2010 at 02:32:08PM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 14:06]:
+> > On Thu, Dec 02, 2010 at 01:58:38PM -0800, Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 13:04]:
+> > > > This has been around since October:
+> > > > 
+> > > > drivers/video/omap2/vram.c: In function ???omap_vram_reserve_sdram_memblock???:
+> > > > drivers/video/omap2/vram.c:573: error: ???MEMBLOCK_REAL_LIMIT??? undeclared (first use in this function)
+> > > > drivers/video/omap2/vram.c:573: error: (Each undeclared identifier is reported only once
+> > > > drivers/video/omap2/vram.c:573: error: for each function it appears in.)
+> > > > 
+> > > > This requires a trivial one-liner compile fix:
+> > > > 
+> > > > diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
+> > > > index fed2a72..a8973f0 100644
+> > > > --- a/drivers/video/omap2/vram.c
+> > > > +++ b/drivers/video/omap2/vram.c
+> > > > @@ -570,7 +570,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
+> > > >  			return;
+> > > >  		}
+> > > >  	} else {
+> > > > -		paddr = memblock_alloc_base(size, PAGE_SIZE, MEMBLOCK_REAL_LIMIT);
+> > > > +		paddr = memblock_alloc(size, PAGE_SIZE);
+> > > >  	}
+> > > >  
+> > > >  	omap_vram_add_region(paddr, size);
+> > > > 
+> > > > which restores the old behaviour before the X86 memblock changes went
+> > > > in.  Yes, there may be other changes due to the ioremap stuff, but
+> > > > that's really no excuse for not fixing the compile error itself.
+> > > 
+> > > Great. Adding fbdev and Tomi to Cc.
+> > > 
+> > > Acked-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > http://marc.info/?l=linux-omap&w=2&r=1&s=MEMBLOCK_REAL_LIMIT%20vram&q=b
+> > 
+> > There have been patches posted throughout November to fix this, but
+> > the problem is they're not making it to mainline.  It needs chasing
+> > until someone does the right thing and sends one variant of the above
+> > patch, rather than just leaving it until the ioremap fixes hit
+> > mainline during the next merge window.
 > 
-> Cc: ben-i2c at fluff.org
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
-> ---
->  drivers/i2c/busses/i2c-pxa.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+> Yes this should go in during the -rc for sure.
 > 
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index f4c19a9..aadf9d2 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -418,7 +418,9 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->  	writel(I2C_ISR_INIT, _ISR(i2c));
->  	writel(readl(_ICR(i2c)) & ~ICR_UR, _ICR(i2c));
->  
-> +#ifndef CONFIG_X86
->  	writel(i2c->slave_addr, _ISAR(i2c));
-> +#endif
-
-I'd prefer some way of changing based on either the device name (see
-some other drivers which bind on multiple names) to define things such
-as this, as well as possibly changing the register layout.
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> I suggest you merge this but let's wait a bit and check if Tomi
+> already has a similar fix queued for the -rc series.
+> 
+This has been fixed since -rc2.
