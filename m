@@ -1,62 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Dec 2010 16:51:05 +0000
-Subject: RFC: Dynamic hwcaps
-In-Reply-To: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-Message-ID: <20101203165105.GD30898@n2100.arm.linux.org.uk>
+From: phorton@bitbox.co.uk (Peter Horton)
+Date: Fri, 3 Dec 2010 17:07:28 +0000
+Subject: [PATCH] mx51: add SSI3
+Message-ID: <20101203170727.GA25996@porta-pete.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 03, 2010 at 04:28:27PM +0000, Dave Martin wrote:
-> For on-SoC peripherals, this can be managed through the driver
-> framework in the kernel, but for functional blocks of the CPU itself
-> which are used by instruction set extensions, such as NEON or other
-> media accelerators, it would be interesting if processes could adapt
-> to these units appearing and disappearing at runtime.  This would mean
-> that user processes would need to select dynamically between different
-> implementations of accelerated functionality at runtime.
+Add SSI3 to MX51
 
-The ELF hwcaps are used by the linker to determine what facilities
-are available, and therefore which dynamic libraries to link in.
+Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
 
-For instance, if you have a selection of C libraries on your platform
-built for different features - eg, lets say you have a VFP based
-library and a soft-VFP based library.
+---
 
-If the linker sees - at application startup - that HWCAP_VFP is set,
-it will select the VFP based library.  If HWCAP_VFP is not set, it
-will select the soft-VFP based library instead.
+Patch is against Sascha's "for-next" tree
 
-A VFP-based library is likely to contain VFP instructions, sometimes
-in the most unlikely of places - eg, printf/scanf is likely to invoke
-VFP instructions even when they aren't dealing with floating point in
-their format string.
+ arch/arm/mach-mx5/clock-mx51-mx53.c          |    5 +++++
+ arch/arm/plat-mxc/devices/platform-imx-ssi.c |    1 +
+ arch/arm/plat-mxc/include/mach/mx51.h        |   12 ++++++------
+ 3 files changed, 12 insertions(+), 6 deletions(-)
 
-The problem comes is if you take away HWCAP_VFP after an application
-has been bound to the hard-VFP library, there is no way, sort of
-killing and re-exec'ing the program, to change the libraries that it
-is bound to.
-
-> In order for this to work, some dynamic status information would need
-> to be visible to each user process, and polled each time a function
-> with a dynamically switchable choice of implementations gets called.
-> You probably don't need to worry about race conditions either-- if the
-> process accidentally tries to use a turned-off feature, you will take
-> a fault which gives the kernel the chance to turn the feature back on.
-
-Yes, you can use a fault to re-enable some features such as VFP.
-
-> The dynamic feature status information should ideally be per-CPU
-> global, though we could have a separate copy per thread, at the cost
-> of more memory.
-
-Threads are migrated across CPUs so you can't rely on saying CPU0 has
-VFP powered up and CPU1 has VFP powered down, and then expect that
-threads using VFP will remain on CPU0.  The system will spontaneously
-move that thread to CPU1 if CPU1 is less loaded than CPU0.
-
-I think what may be possible is to hook VFP power state into the code
-which enables/disables access to VFP.
-
-However, I'm not aware of any platforms or CPUs where (eg) VFP is
-powered or clocked independently to the main CPU.
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 344ee8e..3b1da76 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1036,6 +1036,10 @@ DEFINE_CLOCK(ssi2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG10_OFFSET,
+ 	NULL, NULL, &ipg_clk, NULL);
+ DEFINE_CLOCK(ssi2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG11_OFFSET,
+ 	NULL, NULL, &pll3_sw_clk, &ssi2_ipg_clk);
++DEFINE_CLOCK(ssi3_ipg_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG12_OFFSET,
++	NULL, NULL, &ipg_clk, NULL);
++DEFINE_CLOCK(ssi3_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG13_OFFSET,
++	NULL, NULL, &pll3_sw_clk, &ssi3_ipg_clk);
+ 
+ /* eCSPI */
+ DEFINE_CLOCK_FULL(ecspi1_ipg_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG9_OFFSET,
+@@ -1095,6 +1099,7 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
+ 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
++	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+ 	_REGISTER_CLOCK("imx-sdma", NULL, sdma_clk)
+ 	_REGISTER_CLOCK(NULL, "ckih", ckih_clk)
+ 	_REGISTER_CLOCK(NULL, "ckih2", ckih2_clk)
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-ssi.c b/arch/arm/plat-mxc/devices/platform-imx-ssi.c
+index ac3d572..2569c8d 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-ssi.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-ssi.c
+@@ -72,6 +72,7 @@ const struct imx_imx_ssi_data imx51_imx_ssi_data[] __initconst = {
+ 	imx_imx_ssi_data_entry(MX51, _id, _hwid, SZ_4K)
+ 	imx51_imx_ssi_data_entry(0, 1),
+ 	imx51_imx_ssi_data_entry(1, 2),
++	imx51_imx_ssi_data_entry(2, 3),
+ };
+ #endif /* ifdef CONFIG_SOC_IMX51 */
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index 8fddfef..88b8b07 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -109,7 +109,7 @@
+ #define MX51_MIPI_HSC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xdc000)
+ #define MX51_ATA_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe0000)
+ #define MX51_SIM_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe4000)
+-#define MX51_SSI3BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe8000)
++#define MX51_SSI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe8000)
+ #define MX51_FEC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xec000)
+ #define MX51_TVE_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xf0000)
+ #define MX51_VPU_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xf4000)
+@@ -223,9 +223,9 @@
+ #define MX51_DMA_REQ_EMI_WR		32
+ #define MX51_DMA_REQ_CTI2_1		33
+ #define MX51_DMA_REQ_EPIT2		34
+-#define MX51_DMA_REQ_SSI3_RX2		35
++#define MX51_DMA_REQ_SSI3_RX1		35
+ #define MX51_DMA_REQ_IPU		36
+-#define MX51_DMA_REQ_SSI3_TX2		37
++#define MX51_DMA_REQ_SSI3_TX1		37
+ #define MX51_DMA_REQ_CSPI_RX		38
+ #define MX51_DMA_REQ_CSPI_TX		39
+ #define MX51_DMA_REQ_SDHC3		40
+@@ -234,8 +234,8 @@
+ #define MX51_DMA_REQ_UART3_RX		43
+ #define MX51_DMA_REQ_UART3_TX		44
+ #define MX51_DMA_REQ_SPDIF		45
+-#define MX51_DMA_REQ_SSI3_RX1		46
+-#define MX51_DMA_REQ_SSI3_TX1		47
++#define MX51_DMA_REQ_SSI3_RX0		46
++#define MX51_DMA_REQ_SSI3_TX0		47
+ 
+ /*
+  * Interrupt numbers
+@@ -337,7 +337,7 @@
+ #define MX51_MXC_INT_FIRI		93
+ #define MX51_MXC_INT_PWM2		94
+ #define MX51_MXC_INT_SLIM_EXP		95
+-#define MX51_MXC_INT_SSI3		96
++#define MX51_INT_SSI3			96
+ #define MX51_MXC_INT_EMI_BOOT		97
+ #define MX51_MXC_INT_CTI1_TG3		98
+ #define MX51_MXC_INT_SMC_RX		99
+-- 
+1.7.3.2
