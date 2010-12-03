@@ -1,234 +1,42 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 3 Dec 2010 20:35:48 +0530
-Subject: [PATCH 15/20] mach-ux500: add touchscreen interfaces platform data
+Date: Fri, 3 Dec 2010 20:35:45 +0530
+Subject: [PATCH 12/20] mfd/tc3589x: undo gpio module reset during chip init
 In-Reply-To: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
 References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1291388753-14662-16-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1291388753-14662-13-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Skip putting the GPIO module into a reset during the chip init.  This makes
+sure to preserve any existing GPIO configurations done by pre-kernel boot code.
+
 Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
 ---
- arch/arm/mach-ux500/Makefile                   |    1 +
- arch/arm/mach-ux500/board-mop500-touchscreen.c |  170 ++++++++++++++++++++++++
- arch/arm/mach-ux500/board-mop500.c             |    6 +-
- arch/arm/mach-ux500/board-mop500.h             |    2 +-
- 4 files changed, 177 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-ux500/board-mop500-touchscreen.c
+ drivers/mfd/tc3589x.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index e1d3822..e2af105 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -14,3 +14,4 @@ obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
- obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem_irq.o
- obj-$(CONFIG_U5500_MBOX)	+= mbox.o
- obj-$(CONFIG_INPUT_KEYBOARD)	+= board-mop500-keypads.o
-+obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= board-mop500-touchscreen.o
-diff --git a/arch/arm/mach-ux500/board-mop500-touchscreen.c b/arch/arm/mach-ux500/board-mop500-touchscreen.c
-new file mode 100644
-index 0000000..87cf2ac
---- /dev/null
-+++ b/arch/arm/mach-ux500/board-mop500-touchscreen.c
-@@ -0,0 +1,170 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * License Terms: GNU General Public License v2
-+ *
-+ * Author: Naveen Kumar G <naveen.gaddipati@stericsson.com>
-+ *
-+ * Touchscreen interfaces for various boards
-+ */
-+#include <linux/i2c.h>
-+#include <linux/gpio.h>
-+#include <linux/interrupt.h>
-+#include <linux/input/bu21013.h>
-+#include <../drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h>
-+
-+#include <mach/gpio.h>
-+#include <mach/irqs.h>
-+
-+/*
-+ * Synaptics RMI4 touchscreen interface on the NUIBs
-+ */
-+
-+/*
-+ * Descriptor structure.
-+ * Describes the number of i2c devices on the bus that speak RMI.
-+ */
-+static struct synaptics_rmi4_platform_data rmi4_i2c_dev_platformdata = {
-+	.name           = "synaptics_rmi4_i2c0",
-+	.irq_number     = NOMADIK_GPIO_TO_IRQ(84),
-+	.irq_type       = (IRQF_TRIGGER_FALLING | IRQF_SHARED),
-+	.x_flip         = true,
-+	.y_flip         = false,
-+	.regulator_en   = true,
-+};
-+
-+static struct i2c_board_info __initdata u8500_i2c3_devices_nuib[] = {
-+	{
-+		I2C_BOARD_INFO("synaptics_rmi4_i2c", 0x4B),
-+		.platform_data = &rmi4_i2c_dev_platformdata,
-+	},
-+};
-+
-+/*
-+ * BU21013 ROHM touchscreen interface on the STUIBs
-+ */
-+
-+/* tracks number of bu21013 devices being enabled */
-+static int bu21013_devices;
-+
-+#define TOUCH_GPIO_PIN  84
-+
-+#define TOUCH_XMAX	384
-+#define TOUCH_YMAX	704
-+
-+#define PRCMU_CLOCK_OCR		0x1CC
-+#define TSC_EXT_CLOCK_9_6MHZ	0x840000
-+
-+/**
-+ * bu21013_gpio_board_init : configures the touch panel.
-+ * @reset_pin: reset pin number
-+ * This function can be used to configures
-+ * the voltage and reset the touch panel controller.
-+ */
-+static int bu21013_gpio_board_init(int reset_pin)
-+{
-+	int retval = 0;
-+
-+	bu21013_devices++;
-+	if (bu21013_devices == 1) {
-+		retval = gpio_request(reset_pin, "touchp_reset");
-+		if (retval) {
-+			printk(KERN_ERR "Unable to request gpio reset_pin");
-+			return retval;
-+		}
-+		retval = gpio_direction_output(reset_pin, 1);
-+		if (retval < 0) {
-+			printk(KERN_ERR "%s: gpio direction failed\n",
-+					__func__);
-+			return retval;
-+		}
-+		gpio_set_value(reset_pin, 1);
-+	}
-+
-+	return retval;
-+}
-+
-+/**
-+ * bu21013_gpio_board_exit : deconfigures the touch panel controller
-+ * @reset_pin: reset pin number
-+ * This function can be used to deconfigures the chip selection
-+ * for touch panel controller.
-+ */
-+static int bu21013_gpio_board_exit(int reset_pin)
-+{
-+	int retval = 0;
-+
-+	if (bu21013_devices == 1) {
-+		retval = gpio_direction_output(reset_pin, 0);
-+		if (retval < 0) {
-+			printk(KERN_ERR "%s: gpio direction failed\n",
-+					__func__);
-+			return retval;
-+		}
-+		gpio_set_value(reset_pin, 0);
-+	}
-+	bu21013_devices--;
-+
-+	return retval;
-+}
-+
-+/**
-+ * bu21013_read_pin_val : get the interrupt pin value
-+ * This function can be used to get the interrupt pin value for touch panel
-+ * controller.
-+ */
-+static int bu21013_read_pin_val(void)
-+{
-+	return gpio_get_value(TOUCH_GPIO_PIN);
-+}
-+
-+static struct bu21013_platform_device tsc_plat_device = {
-+	.cs_en = bu21013_gpio_board_init,
-+	.cs_dis = bu21013_gpio_board_exit,
-+	.irq_read_val = bu21013_read_pin_val,
-+	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
-+	.cs_pin = EGPIO_PIN_13,
-+	.x_max_res = 480,
-+	.y_max_res = 864,
-+	.touch_x_max = TOUCH_XMAX,
-+	.touch_y_max = TOUCH_YMAX,
-+	.ext_clk = true,
-+	.x_flip         = true,
-+	.y_flip         = false,
-+};
-+
-+static struct bu21013_platform_device tsc_cntl2_plat_device = {
-+	.cs_en = bu21013_gpio_board_init,
-+	.cs_dis = bu21013_gpio_board_exit,
-+	.irq_read_val = bu21013_read_pin_val,
-+	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
-+	.cs_pin = EGPIO_PIN_13,
-+	.x_max_res = 480,
-+	.y_max_res = 864,
-+	.touch_x_max = TOUCH_XMAX,
-+	.touch_y_max = TOUCH_YMAX,
-+	.ext_clk = true,
-+	.x_flip         = true,
-+	.y_flip         = false,
-+};
-+
-+static struct i2c_board_info __initdata u8500_i2c3_devices_stuib[] = {
-+	{
-+		I2C_BOARD_INFO("bu21013_ts", 0x5C),
-+		.platform_data = &tsc_plat_device,
-+	},
-+	{
-+		I2C_BOARD_INFO("bu21013_ts", 0x5D),
-+		.platform_data = &tsc_cntl2_plat_device,
-+	},
-+};
-+
-+void mop500_touchpanel_init(void)
-+{
-+	i2c_register_board_info(3, u8500_i2c3_devices_nuib,
-+			ARRAY_SIZE(u8500_i2c3_devices_nuib));
-+
-+	i2c_register_board_info(3, u8500_i2c3_devices_stuib,
-+			ARRAY_SIZE(u8500_i2c3_devices_stuib));
-+}
-+
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 703840b..63313c4 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -202,8 +202,12 @@ static void __init u8500_init_machine(void)
- 	mop500_spi_init();
- 	mop500_uart_init();
+diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
+index e173f33..fd206fd 100644
+--- a/drivers/mfd/tc3589x.c
++++ b/drivers/mfd/tc3589x.c
+@@ -247,12 +247,15 @@ static int tc3589x_chip_init(struct tc3589x *tc3589x)
  
-+#ifdef CONFIG_INPUT_KEYBOARD
- 	mop500_keypad_init();
--
-+#endif
-+#ifdef CONFIG_INPUT_TOUCHSCREEN
-+	mop500_touchpanel_init();
-+#endif
- 	platform_device_register(&ab8500_device);
+ 	dev_info(tc3589x->dev, "manufacturer: %#x, version: %#x\n", manf, ver);
  
- 	i2c_register_board_info(0, mop500_i2c0_devices,
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 3104ae2..bac81c5 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -17,5 +17,5 @@
- extern void mop500_sdi_init(void);
- extern void mop500_sdi_tc35892_init(void);
- extern void mop500_keypad_init(void);
--
-+extern void mop500_touchpanel_init(void);
- #endif
+-	/* Put everything except the IRQ module into reset */
++	/*
++	 * Put everything except the IRQ module into reset;
++	 * also spare the GPIO module for any pin initialization
++	 * done during pre-kernel boot
++	 */
+ 	ret = tc3589x_reg_write(tc3589x, TC3589x_RSTCTRL,
+ 				TC3589x_RSTCTRL_TIMRST
+ 				| TC3589x_RSTCTRL_ROTRST
+-				| TC3589x_RSTCTRL_KBDRST
+-				| TC3589x_RSTCTRL_GPIRST);
++				| TC3589x_RSTCTRL_KBDRST);
+ 	if (ret < 0)
+ 		return ret;
+ 
 -- 
 1.7.2.dirty
