@@ -1,34 +1,106 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Fri, 3 Dec 2010 12:47:14 +0100
-Subject: [PATCH] pl011: added clock management feature
-In-Reply-To: <20101109224012.GA21992@kroah.com>
-References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
-	<20101109224012.GA21992@kroah.com>
-Message-ID: <AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 3 Dec 2010 17:21:54 +0530
+Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
+In-Reply-To: <AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>
+References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
+	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>
+	<AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 9, 2010 at 11:40 PM, Greg KH <greg@kroah.com> wrote:
-> On Tue, Nov 09, 2010 at 04:30:37PM +0100, Linus Walleij wrote:
->> From: Grzegorz Sygieda <grzegorz.sygieda@tieto.com>
->>
->> This patch allows to control the pl011 clock using set_termios
->> callback. Any positive baudrate passed enables clock, otherwise
->> disables. This saves a lot of power on submicron designs since
->> we can clock off and disable unused UARTs.
+On Fri, Dec 03, 2010 at 06:14:39, Victor Rodriguez wrote:
+> On Thu, Dec 2, 2010 at 12:49 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> > On Thu, Dec 02, 2010 at 01:02:29, vm.rod25 at gmail.com wrote:
+> >> +static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
+> >> +{
+> >> +     int irq         = gpio_to_irq(DA850_USB1_OC_PIN);
+> >> +     int error       = 0;
+> >> +
+> >> +     if (handler != NULL) {
+> >> +             hawk_usb_ocic_handler = handler;
+> >> +
+> >> +             error = request_irq(irq, omapl138_hawk_usb_ocic_irq,
+> >> +                                     IRQF_DISABLED | IRQF_TRIGGER_RISING |
+> >> +                                     IRQF_TRIGGER_FALLING,
+> >> +                                     "OHCI over-current indicator", NULL);
+> >> +             if (error)
+> >> +                     pr_err(KERN_ERR "%s: could not request IRQ to watch "
+> >> +                             "over-current indicator changes\n", __func__);
+> >
+> > pr_err adds a KERN_ERR already.
 >
-> That's nice, but it seems like an overload of what people traditionally
-> think of when it comes to baud rates. ?Why not just power down ports
-> that are not open instead?
+> Changed to this
+>
+> static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
+> {
+>       int irq         = gpio_to_irq(DA850_USB1_OC_PIN);
+>       int error       = 0;
+>
+>       if (handler != NULL) {
+>               hawk_usb_ocic_handler = handler;
+>
+>               error = request_irq(irq, omapl138_hawk_usb_ocic_irq,
+>                                       IRQF_DISABLED | IRQF_TRIGGER_RISING |
+>                                       IRQF_TRIGGER_FALLING,
+>                                       "OHCI over-current indicator", NULL);
+>               if (error)
+>                       pr_err("%s: could not request IRQ to watch "
+>                               "over-current indicator changes\n", __func__);
 
-I like the idea as well and this is definitely gonna help conserving
-the power for Bluetooth UARTs.
+Looks good. Thanks. The same error is present elsewhere in the
+patch and other patches too. Please fix those too.
 
-But using baud rate 0 is something I don't like. Why don't you stop
-the clocks if RTS is cleared? This would have allowed the line
-discipline driver to implicitly control the UART clock and there will
-be no risk of losing data, as well as no non-standard behavior
-involved. In fact, you'll be transparent to the upper layers in this
-case.
+>
+> USB part
+>
+> Changed to this
+>
+>       if (ret < 0) {
+>               pr_err("%s: failed to request GPIO for USB 1.1 port "
+>                       "power control: %d\n", __func__, ret);
+>               gpio_free(DA850_USB1_VBUS_PIN);
+>               return;
+>       }
+>
+>       ret = gpio_request_one(DA850_USB1_OC_PIN,
+>                       GPIOF_DIR_IN, "USB1 OC");
+>       if (ret < 0) {
+>               pr_err("%s: failed to request GPIO for USB 1.1 port "
+>                       "over-current indicator: %d\n", __func__, ret);
+>               gpio_free(DA850_USB1_OC_PIN);
+>               return;
+>       }
+>
+> Patch 4/6
+>
+>       ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
+>                       GPIOF_DIR_IN, "MMC CD");
+>       if (ret < 0) {
+>               pr_warning("%s: can not open GPIO %d\n",
+>                       __func__, DA850_HAWK_MMCSD_CD_PIN);
+>               gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+>               return;
+>       }
+>
+>       ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
+>                       GPIOF_DIR_IN, "MMC WP");
+>       if (ret < 0) {
+>               pr_warning("%s: can not open GPIO %d\n",
+>                       __func__, DA850_HAWK_MMCSD_WP_PIN);
+>               gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+>               return;
+>       }
+>
+>
+> Is this ok ? or should I free the GPIO on the next section ? Same with USB
 
-~Vitaly
+Not sure what you mean by "next section"? goto based error recovery is
+more commonly used and probably more preferred as it is easier to extend.
+
+You can look at function da850_evm_ui_expander_setup() of
+arch/arm/mach-davinci/board-da850-evm.c for an example.
+
+Thanks,
+Sekhar
