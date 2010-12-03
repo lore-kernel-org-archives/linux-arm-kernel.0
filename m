@@ -1,71 +1,28 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Fri, 3 Dec 2010 14:36:34 +0900
-Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
-In-Reply-To: <AANLkTimgazoKTyuG37oUbD_45Cv7Un4=GDMsXXxCuH5U@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 3 Dec 2010 14:52:23 +0900
+Subject: [PATCH 2/4] mach-s5pv310: Add resource definitions for mipi-csis
+In-Reply-To: <AANLkTiksQM8V9QeF+P2qvCQ1uOgcq-yzKp-kgnPVmMsJ@mail.gmail.com>
 References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
-	<AANLkTimgazoKTyuG37oUbD_45Cv7Un4=GDMsXXxCuH5U@mail.gmail.com>
-Message-ID: <AANLkTimg_COsOnfLbgTC36EgZvBnuWaGrygbWz-Sk+6m@mail.gmail.com>
+	<1291307862-8125-3-git-send-email-s.nawrocki@samsung.com>
+	<012401cb92a3$a46443b0$ed2ccb10$%kim@samsung.com>
+	<AANLkTimEEf5eD+q-qx7gw21ryFp1bbQ084Lo=eX+Bqjz@mail.gmail.com>
+	<AANLkTiksQM8V9QeF+P2qvCQ1uOgcq-yzKp-kgnPVmMsJ@mail.gmail.com>
+Message-ID: <AANLkTikjXjS3AwuaYdRSr7Gs7jR3Yg8_vK4vrS62syDT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 3, 2010 at 2:14 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Fri, Dec 3, 2010 at 1:37 AM, Sylwester Nawrocki
-> <s.nawrocki@samsung.com> wrote:
->> There may be up to 2 MIPI-CSI2 interfaces depending on SoC version.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ? | ? 10 ++++++++
->> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? ?| ? ?2 +
->> ?arch/arm/plat-s5p/dev-csis0.c ? ? ? ? ? ? | ? 34 +++++++++++++++++++++++++++++
->> ?arch/arm/plat-s5p/dev-csis1.c ? ? ? ? ? ? | ? 33 ++++++++++++++++++++++++++++
->> ?arch/arm/plat-samsung/include/plat/csis.h | ? 28 +++++++++++++++++++++++
->> ?arch/arm/plat-samsung/include/plat/devs.h | ? ?3 ++
->> ?6 files changed, 110 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/plat-s5p/dev-csis0.c
->> ?create mode 100644 arch/arm/plat-s5p/dev-csis1.c
->> ?create mode 100644 arch/arm/plat-samsung/include/plat/csis.h
->>
->> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
->> index 65dbfa8..2fb0c88 100644
->> --- a/arch/arm/plat-s5p/Kconfig
->> +++ b/arch/arm/plat-s5p/Kconfig
->> @@ -56,3 +56,13 @@ config S5P_DEV_ONENAND
->> ? ? ? ?bool
->> ? ? ? ?help
->> ? ? ? ? ?Compile in platform device definition for OneNAND controller
->> +
->> +config S5P_DEV_CSIS0
->> + ? ? ? bool
->> + ? ? ? help
->> + ? ? ? ? Compile in platform device definitions for MIPI-CSI2 interface 0
->> +
->> +config S5P_DEV_CSIS1
->> + ? ? ? bool
->> + ? ? ? help
->> + ? ? ? ? Compile in platform device definitions for MIPI-CSI2 interface 1
->> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
->> index de65238..2b73173 100644
->> --- a/arch/arm/plat-s5p/Makefile
->> +++ b/arch/arm/plat-s5p/Makefile
->> @@ -28,3 +28,5 @@ obj-$(CONFIG_S5P_DEV_FIMC0) ? += dev-fimc0.o
->> ?obj-$(CONFIG_S5P_DEV_FIMC1) ? ?+= dev-fimc1.o
->> ?obj-$(CONFIG_S5P_DEV_FIMC2) ? ?+= dev-fimc2.o
->> ?obj-$(CONFIG_S5P_DEV_ONENAND) ?+= dev-onenand.o
->> +obj-$(CONFIG_S5P_DEV_CSIS0) ? ?+= dev-csis0.o
->> +obj-$(CONFIG_S5P_DEV_CSIS1) ? ?+= dev-csis1.o
->
-> When we do have defines for each device, why not have both in one file
-> with each contained in ifdef for it's define ? That will reduce file count.
+On Fri, Dec 3, 2010 at 2:34 PM, Kyungmin Park <kyungmin.park@samsung.com> wrote:
+> On Fri, Dec 3, 2010 at 1:59 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> Sylwester Nawrocki wrote:
 
-To Jassi,
-
-Please make a conclusion from LSI first, I'm confused, I insisted it
-as you, but kgene rejected it.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>>> +#define S5PV310_PA_CSIS0 ? ? ? ? ? ? (0x11880000)
+>>> +#define S5PV310_PA_CSIS1 ? ? ? ? ? ? (0x11890000)
+>>
+>> Let us please not contain constants in brackets.
 >
+> I think consistency is more higher than your comment normally.
+>
+> if you think these, then make a cleanup first.
+
+Bad logic. One shouldn't hold good practice at ransom because of
+the past bad ones.
