@@ -1,89 +1,21 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Fri, 3 Dec 2010 15:17:47 +0530
-Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling
-	mstandby mode
-In-Reply-To: <4CF8AC8B.9040800@ti.com>
-References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
-	<4CF8AC8B.9040800@ti.com>
-Message-ID: <20101203092514.GA10048@GLPP-machine>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri,  3 Dec 2010 18:39:42 +0900
+Subject: [PATCH V2 0/2] ARM: SAMSUNG: Add Support Power Domain Control
+Message-ID: <1291369184-31460-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cousson, Benoit <b-cousson@ti.com> [2010-12-03 09:38:35 +0100]:
+This patch adds support Power Domain Control based on Runtim PM.
 
-> On 12/2/2010 2:59 PM, G, Manjunath Kondaiah wrote:
-> >Certain errata in OMAP2+ processors will require forcing
-> >master standby to "no standby" mode before completing on going
-> >operation. Without this, the results will be unpredictable.
-> >
-> >Since current implementation of PM run time framework does not support
-> >changing sysconfig settings during middle of the on going operation,
-> >these API's will support the same. One API will force the device's
-> >sysconfig mstandby mode settings to "no standby" and other API will
-> >release "no standby" mode and sets it to "smart standby" or "no
-> >standby? depending on HWMOD_SWSUP_MSTANDBY value.
-> >
-> >The hwmod API "omap_hwmod_set_master_standbymode" will use
-> >no_stdby_cnt(introduced in omap_hwmod structure) for controlling
-> >access to sysconfig register settings in case of overlapping
-> >request/release API's are called. It also disables interrupts during
-> >syconfig register access.
-> >
-> >These API's should be used by device drivers only incase of
-> >erratum applicable to their modules if there is no other methods
-> >to resolve.
-> >
-> >These API's are required for multiple DMA errata which require
-> >putting DMA controller in no mstandby mode before stopping dma.
-> >
-> >The applicable errata:
-> >1. Erratum ID: i557(Applicable for omap36xx all ES versions)
-> >The channel hangs when the Pause bit (DMA4_CDPi [7] ) is cleared
-> >through config port while in Standby.
-> >
-> >2. Erratum ID: i541
-> >sDMA FIFO draining does not finish. Applicable to all omap2+ except
-> >omap4.
-> >
-> >3. Erratum ID:i88
-> >The sDMA to be put in no mstandby mode before disabling the channel
-> >after completing the data transfer operation.
-> >Applicable only for OMAP3430 ES1.0
-> >
-> >Also fixes typo HWMOD_SWSUP_MSTDBY to HWMOD_SWSUP_MSTANDBY in
-> >omap_hwmod.h
-> >
-> >Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
-> >Cc: Kevin Hilman<khilman@deeprootsystems.com>
-> >Cc: Paul Walmsley<paul@pwsan.com>
-> >Cc: linux-arm-kernel at lists.infradead.org
-> 
-> You have to CC lakml during send-email, but it should not be in the
-> changelog.
-> 
-> On the other hand, it is a good practice to add all the authors of
-> the file you change in CC.
-> 
-> >---
-> >v3: Review comments incorporated for:
-> >https://patchwork.kernel.org/patch/282212/
-> >
-> >v4: added mutex changes
-> >https://patchwork.kernel.org/patch/338611/
-> >
-> >v5: typo fixes for errata and erratum
-> >https://patchwork.kernel.org/patch/352481/
-> >
-> >v6: fixed oh increment bug and also mutex(missing in v5)
-> >https://patchwork.kernel.org/patch/372231/
-> >
-> >v7: replaced mutex lock with spin lock. Added use count for controlling
-> >access to sysconfig registers in case if overlapping request/release API's
-> >are used.
-> 
-> I'm not sure it should be done here. I'd rather keep that code in
-> the DMA, since this is the only user of that feature.
+Each Power Domain is represented by a Power Domain device and the devices
+belong to these Power Domains should be set as a child device of the Power
+Domain devices. The corresponding drivers of the devices should implement
+Runtime PM to control the Power Domains.
 
-Are you referring to spin lock or usage count? 
+Changes since V1:
+- Removed calling of 'samsung_pd_init()' from machine specific code to arch_initcall as Ben's suggestion.
+- Use "base" variable in platform data instead of using long switch case statement as Marek's suggestion.
+- Add GPS power domain.
 
--Manjunath
+[PATCH V2 1/2] ARM: SAMSUNG: Add support for Power Domain control
+[PATCH V2 2/2] ARM: S5PV310: Add support Power Domain
