@@ -1,108 +1,68 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Dec 2010 20:21:59 +0000
-Subject: [PATCH 09/22] ARM: SMP: provide individual IPI interrupt statistics
+Date: Fri, 03 Dec 2010 20:22:19 +0000
+Subject: [PATCH 10/22] ARM: SMP: collect IPI and local timer IRQs for
+	/proc/stat
 In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
 References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-Message-ID: <E1POc8l-0007rZ-6b@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1POc95-0007rd-KT@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This separates out the individual IPI interrupt counts from the
-total IPI count, which allows better visibility of what IPIs are
-being used for.
+The IPI and local timer interrupts weren't being properly accounted
+for in /proc/stat.  Collect them from the irq_stat structure, and
+return their sum.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/hardirq.h |    4 +++-
- arch/arm/kernel/irq.c          |    5 +++++
- arch/arm/kernel/smp.c          |   25 +++++++++++++++++++------
- 3 files changed, 27 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/hardirq.h |    8 ++++++++
+ arch/arm/kernel/smp.c          |   15 +++++++++++++++
+ 2 files changed, 23 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index 824b08a..c52e250 100644
+index c52e250..89ad180 100644
 --- a/arch/arm/include/asm/hardirq.h
 +++ b/arch/arm/include/asm/hardirq.h
-@@ -5,13 +5,15 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
-+#define NR_IPI	5
-+
- typedef struct {
- 	unsigned int __softirq_pending;
- #ifdef CONFIG_LOCAL_TIMERS
- 	unsigned int local_timer_irqs;
- #endif
- #ifdef CONFIG_SMP
--	unsigned int ipi_irqs;
-+	unsigned int ipi_irqs[NR_IPI];
- #endif
- } ____cacheline_aligned irq_cpustat_t;
- 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 4e7a7d2..6276f01 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -62,6 +62,11 @@ int show_interrupts(struct seq_file *p, void *v)
- 	for (prec = 3, n = 1000; prec < 10 && n <= nr_irqs; prec++)
- 		n *= 10;
+@@ -22,6 +22,14 @@ typedef struct {
+ #define __inc_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)++
+ #define __get_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)
  
 +#ifdef CONFIG_SMP
-+	if (prec < 4)
-+		prec = 4;
++u64 smp_irq_stat_cpu(unsigned int cpu);
++#else
++#define smp_irq_stat_cpu(cpu)	0
 +#endif
 +
- 	if (i == 0) {
- 		char cpuname[12];
- 
++#define arch_irq_stat_cpu	smp_irq_stat_cpu
++
+ #if NR_IRQS > 512
+ #define HARDIRQ_BITS	10
+ #elif NR_IRQS > 256
 diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index e45efae..1d9d6d8 100644
+index 1d9d6d8..aa1c6f5 100644
 --- a/arch/arm/kernel/smp.c
 +++ b/arch/arm/kernel/smp.c
-@@ -390,16 +390,28 @@ void arch_send_call_function_single_ipi(int cpu)
- 	send_ipi_message(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+@@ -414,6 +414,21 @@ void show_ipi_list(struct seq_file *p, int prec)
+ 	}
  }
  
-+static const char *ipi_types[NR_IPI] = {
-+#define S(x,s)	[x - IPI_TIMER] = s
-+	S(IPI_TIMER, "Timer broadcast interrupts"),
-+	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
-+	S(IPI_CALL_FUNC, "Function call interrupts"),
-+	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
-+	S(IPI_CPU_STOP, "CPU stop interrupts"),
-+};
++u64 smp_irq_stat_cpu(unsigned int cpu)
++{
++	u64 sum = 0;
++	int i;
 +
- void show_ipi_list(struct seq_file *p, int prec)
- {
--	unsigned int cpu;
-+	unsigned int cpu, i;
- 
--	seq_printf(p, "%*s: ", prec, "IPI");
-+	for (i = 0; i < NR_IPI; i++) {
-+		seq_printf(p, "%*s%u: ", prec - 1, "IPI", i);
- 
--	for_each_present_cpu(cpu)
--		seq_printf(p, "%10u ", __get_irq_stat(cpu, ipi_irqs));
-+		for_each_present_cpu(cpu)
-+			seq_printf(p, "%10u ",
-+				   __get_irq_stat(cpu, ipi_irqs[i]));
- 
--	seq_printf(p, " Inter-processor interrupts\n");
-+		seq_printf(p, " %s\n", ipi_types[i]);
-+	}
- }
- 
++	for (i = 0; i < NR_IPI; i++)
++		sum += __get_irq_stat(cpu, ipi_irqs[i]);
++
++#ifdef CONFIG_LOCAL_TIMERS
++	sum += __get_irq_stat(cpu, local_timer_irqs);
++#endif
++
++	return sum;
++}
++
  /*
-@@ -514,7 +526,8 @@ asmlinkage void __exception do_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
--	__inc_irq_stat(cpu, ipi_irqs);
-+	if (ipinr >= IPI_TIMER && ipinr < IPI_TIMER + NR_IPI)
-+		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
- 
- 	switch (ipinr) {
- 	case IPI_TIMER:
+  * Timer (local or broadcast) support
+  */
 -- 
 1.6.2.5
