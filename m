@@ -1,139 +1,298 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sat,  4 Dec 2010 01:50:43 +0200
-Subject: [PATCH v3 0/4] Introduce hardware spinlock framework
-Message-ID: <1291420247-18171-1-git-send-email-ohad@wizery.com>
+Date: Sat,  4 Dec 2010 01:50:45 +0200
+Subject: [PATCH v3 2/4] drivers: hwspinlock: add OMAP implementation
+In-Reply-To: <1291420247-18171-1-git-send-email-ohad@wizery.com>
+References: <1291420247-18171-1-git-send-email-ohad@wizery.com>
+Message-ID: <1291420247-18171-3-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 introduces a Hardware Spinlock device, which provides hardware
-assistance for synchronization and mutual exclusion between heterogeneous
-processors and those not operating under a single, shared operating system
-(e.g. OMAP4 has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP).
+From: Simon Que <sque@ti.com>
 
-The intention of this hardware device is to allow remote processors,
-that have no alternative mechanism to accomplish synchronization and mutual
-exclusion operations, to share resources (such as memory and/or any other
-hardware resource).
+Add hwspinlock support for the OMAP4 Hardware Spinlock device.
 
-This patchset adds hwspinlock framework that makes it possible
-for drivers to use those hwspinlock devices and stay platform-independent.
+The Hardware Spinlock device on OMAP4 provides hardware assistance
+for synchronization between the multiple processors in the system
+(dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP).
 
-Currently there are two users for this hwspinlock interface:
-
-1. Inter-processor communications: on OMAP4, cpu-intensive multimedia
-tasks are offloaded by the host to the remote M3 and/or C64x+ slave
-processors.
-
-To achieve fast message-based communications, a minimal kernel support
-is needed to deliver messages arriving from a remote processor to the
-appropriate user process.
-
-This communication is based on a simple data structure that is shared between
-the remote processors, and access to it is synchronized using the hwspinlock
-module (remote processor directly places new messages in this shared data
-structure).
-
-2. On some OMAP4 boards, the I2C bus is shared between the A9 and the M3,
-and the hwspinlock is used to synchronize access to it.
-
-While (2) can get away with an omap-specific hwspinlock implementation,
-(1) is by no means omap-specific, and a common hwspinlock interface is
-needed to keep it generic, in hopes that it will be useful for other
-platforms as well.
-
-Changes v2->v3:
-- Remove the timeout-less _lock API variant (Tony)
-- s/state->io_base/io_base/ (Ionut)
-- Remove the "generic" wording (David)
-- s/hwspinlock_/hwspin_lock_/ (Mugdha)
-- Use MAX_SCHEDULE_TIMEOUT to indicate no timeout (Mugdha)
-- Be more verbose on egregious API misuse (Olof)
-- locking API misuse is BUG_ON material (Russell)
-
-  Note: Russell also suggested compiling out NULL checks on ARM.
-  I've posted an initial proposal for this (see
-  https://lkml.org/lkml/2010/11/29/96), which I'm going to resubmit
-  separately. If accepted, I'll adopt hwspinlocks to use it.
-
-Patches are tested against linux-omap-2.6 master, which is 2.6.37-rc4 plus
-omap material. All, but the third (the hwmod omap patch), apply on top of
-mainline 2.6.37-rc4 as well
-
-Changes v1->v2:
-- Convert to a generic interface (Tony)
-- API should silently succeed if framework isn't built (Greg)
-- Don't use ERR_PTR pattern (Grant)
-- Use tristate, fix and extend commentary (Kevin)
-- Provide API flexibility regarding irq handling (Arnd, Grant)
-
-  Note: after reviewing OMAP's L4 access times, and comparing them with
-  external memory latencies, I can say that there is no notable difference.
-  Because of that, we can safely treat the hwspinlock like we do
-  with regular spinlocks: preemption should be disabled, but whether
-  to disable interrupts or not is up to the caller.
-
-  So despite the TRM's recommendation to always disable local interrupts
-  when taking an OMAP Hardware Spinlock, I have decided to allow callers
-  not to do that (by providing the full extent of hwspin_lock(),
-  hwspin_lock_irq() and hwspin_lock_irqsave() API).
-
-  Just like regular spinlocks, it's up to the callers to decide whether
-  interrupts should be disabled or not.
-
-  Sleeping, btw, is still prohibited of course.
-
-Contributions:
-
-Previous versions of an omap-specific hwspinlock driver circulated in
-linux-omap several times, and received substantial attention and contribution
-from many developers (see [1][2][3][4][5][6]):
-
-Simon Que did the initial implementation and pushed several iterations
-Benoit Cousson provided extensive review, help, improvements and hwmod support
-Hari Kanigeri helped out when Simon was away
-Sanjeev Premi, Santosh Shilimkar and Nishanth Menon did lots of review
-
-I'd like to thank Benoit Cousson, Steve Krueger, Hari Kanigeri,
-Nourredine Hamoudi and Richard Woodruff for useful discussions about
-the OMAP Spinlock requirements and use-cases.
-
-Relevant linux-omap threads:
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/38755
-[2] http://thread.gmane.org/gmane.linux.ports.arm.omap/38917
-[3] http://thread.gmane.org/gmane.linux.ports.arm.omap/39187
-[4] http://thread.gmane.org/gmane.linux.ports.arm.omap/39365
-[5] http://thread.gmane.org/gmane.linux.ports.arm.omap/39815
-[6] http://thread.gmane.org/gmane.linux.ports.arm.omap/40901
-
-Benoit Cousson (1):
-  OMAP4: hwmod data: Add hwspinlock
-
-Ohad Ben-Cohen (1):
-  drivers: hwspinlock: add framework
-
-Simon Que (2):
-  drivers: hwspinlock: add OMAP implementation
-  omap: add hwspinlock device
-
- Documentation/hwspinlock.txt               |  299 +++++++++++++++
- arch/arm/mach-omap2/Makefile               |    1 +
- arch/arm/mach-omap2/hwspinlock.c           |   63 ++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   64 ++++
- drivers/Kconfig                            |    2 +
- drivers/Makefile                           |    1 +
- drivers/hwspinlock/Kconfig                 |   22 ++
- drivers/hwspinlock/Makefile                |    6 +
- drivers/hwspinlock/hwspinlock.h            |   61 +++
- drivers/hwspinlock/hwspinlock_core.c       |  557 ++++++++++++++++++++++++++++
- drivers/hwspinlock/omap_hwspinlock.c       |  231 ++++++++++++
- include/linux/hwspinlock.h                 |  298 +++++++++++++++
- 12 files changed, 1605 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/hwspinlock.txt
- create mode 100644 arch/arm/mach-omap2/hwspinlock.c
- create mode 100644 drivers/hwspinlock/Kconfig
- create mode 100644 drivers/hwspinlock/Makefile
- create mode 100644 drivers/hwspinlock/hwspinlock.h
- create mode 100644 drivers/hwspinlock/hwspinlock_core.c
+[ohad at wizery.com: adapt to hwspinlock framework, tidy up]
+Signed-off-by: Simon Que <sque@ti.com>
+Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+Signed-off-by: Krishnamoorthy, Balaji T <balajitk@ti.com>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ drivers/hwspinlock/Kconfig           |    9 ++
+ drivers/hwspinlock/Makefile          |    1 +
+ drivers/hwspinlock/omap_hwspinlock.c |  231 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 241 insertions(+), 0 deletions(-)
  create mode 100644 drivers/hwspinlock/omap_hwspinlock.c
- create mode 100644 include/linux/hwspinlock.h
+
+diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+index 9dd8db4..eb4af28 100644
+--- a/drivers/hwspinlock/Kconfig
++++ b/drivers/hwspinlock/Kconfig
+@@ -11,3 +11,12 @@ config HWSPINLOCK
+ 	  coprocessors).
+ 
+ 	  If unsure, say N.
++
++config HWSPINLOCK_OMAP
++	tristate "OMAP Hardware Spinlock device"
++	depends on HWSPINLOCK && ARCH_OMAP4
++	help
++	  Say y here to support the OMAP Hardware Spinlock device (firstly
++	  introduced in OMAP4).
++
++	  If unsure, say N.
+diff --git a/drivers/hwspinlock/Makefile b/drivers/hwspinlock/Makefile
+index b9d2b9f..5729a3f 100644
+--- a/drivers/hwspinlock/Makefile
++++ b/drivers/hwspinlock/Makefile
+@@ -3,3 +3,4 @@
+ #
+ 
+ obj-$(CONFIG_HWSPINLOCK)		+= hwspinlock_core.o
++obj-$(CONFIG_HWSPINLOCK_OMAP)		+= omap_hwspinlock.o
+diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
+new file mode 100644
+index 0000000..b5867e1
+--- /dev/null
++++ b/drivers/hwspinlock/omap_hwspinlock.c
+@@ -0,0 +1,231 @@
++/*
++ * OMAP hardware spinlock driver
++ *
++ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com
++ *
++ * Contact: Simon Que <sque@ti.com>
++ *          Hari Kanigeri <h-kanigeri2@ti.com>
++ *          Ohad Ben-Cohen <ohad@wizery.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/log2.h>
++#include <linux/pm_runtime.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/hwspinlock.h>
++#include <linux/platform_device.h>
++
++#include "hwspinlock.h"
++
++/* Spinlock register offsets */
++#define SYSSTATUS_OFFSET		0x0014
++#define LOCK_BASE_OFFSET		0x0800
++
++#define SPINLOCK_NUMLOCKS_BIT_OFFSET	(24)
++
++/* Possible values of SPINLOCK_LOCK_REG */
++#define SPINLOCK_NOTTAKEN		(0)	/* free */
++#define SPINLOCK_TAKEN			(1)	/* locked */
++
++#define to_omap_hwspinlock(lock)	\
++	container_of(lock, struct omap_hwspinlock, lock)
++
++struct omap_hwspinlock {
++	struct hwspinlock lock;
++	void __iomem *addr;
++};
++
++struct omap_hwspinlock_state {
++	int num_locks;			/* Total number of locks in system */
++	void __iomem *io_base;		/* Mapped base address */
++};
++
++static int omap_hwspinlock_trylock(struct hwspinlock *lock)
++{
++	struct omap_hwspinlock *omap_lock = to_omap_hwspinlock(lock);
++
++	/* attempt to acquire the lock by reading its value */
++	return (SPINLOCK_NOTTAKEN == readl(omap_lock->addr));
++}
++
++static void omap_hwspinlock_unlock(struct hwspinlock *lock)
++{
++	struct omap_hwspinlock *omap_lock = to_omap_hwspinlock(lock);
++
++	/* release the lock by writing 0 to it */
++	writel(SPINLOCK_NOTTAKEN, omap_lock->addr);
++}
++
++/*
++ * relax the OMAP interconnect while spinning on it.
++ *
++ * The specs recommended that the retry delay time will be
++ * just over half of the time that a requester would be
++ * expected to hold the lock.
++ *
++ * The number below is taken from an hardware specs example,
++ * obviously it is somewhat arbitrary.
++ */
++static void omap_hwspinlock_relax(struct hwspinlock *lock)
++{
++	ndelay(50);
++}
++
++static const struct hwspinlock_ops omap_hwspinlock_ops = {
++	.trylock = omap_hwspinlock_trylock,
++	.unlock = omap_hwspinlock_unlock,
++	.relax = omap_hwspinlock_relax,
++};
++
++static int __devinit omap_hwspinlock_probe(struct platform_device *pdev)
++{
++	struct omap_hwspinlock *omap_lock;
++	struct omap_hwspinlock_state *state;
++	struct hwspinlock *lock;
++	struct resource *res;
++	void __iomem *io_base;
++	int i, ret;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENODEV;
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (!state)
++		return -ENOMEM;
++
++	io_base = ioremap(res->start, resource_size(res));
++	if (!io_base) {
++		ret = -ENOMEM;
++		goto free_state;
++	}
++
++	/* Determine number of locks */
++	i = readl(io_base + SYSSTATUS_OFFSET);
++	i >>= SPINLOCK_NUMLOCKS_BIT_OFFSET;
++
++	/* exactly one of the four least significant bits must be 1 */
++	if (!i || !is_power_of_2(i) || i > 8) {
++		ret = -EINVAL;
++		goto iounmap_base;
++	}
++
++	state->num_locks = i * 32;
++	state->io_base = io_base;
++
++	platform_set_drvdata(pdev, state);
++
++	/*
++	 * runtime PM will make sure the clock of this module is
++	 * enabled iff at least one lock is requested
++	 */
++	pm_runtime_enable(&pdev->dev);
++
++	for (i = 0; i < state->num_locks; i++) {
++		omap_lock = kzalloc(sizeof(*omap_lock), GFP_KERNEL);
++		if (!omap_lock) {
++			ret = -ENOMEM;
++			goto free_locks;
++		}
++
++		omap_lock->lock.dev = &pdev->dev;
++		omap_lock->lock.owner = THIS_MODULE;
++		omap_lock->lock.id = i;
++		omap_lock->lock.ops = &omap_hwspinlock_ops;
++		omap_lock->addr = io_base + LOCK_BASE_OFFSET + sizeof(u32) * i;
++
++		ret = hwspin_lock_register(&omap_lock->lock);
++		if (ret) {
++			kfree(omap_lock);
++			goto free_locks;
++		}
++	}
++
++	return 0;
++
++free_locks:
++	while (--i >= 0) {
++		lock = hwspin_lock_unregister(i);
++		/* this should't happen, but let's give our best effort */
++		if (!lock) {
++			dev_err(&pdev->dev, "%s: cleanups failed\n", __func__);
++			continue;
++		}
++		omap_lock = to_omap_hwspinlock(lock);
++		kfree(omap_lock);
++	}
++	pm_runtime_disable(&pdev->dev);
++iounmap_base:
++	iounmap(io_base);
++free_state:
++	kfree(state);
++	return ret;
++}
++
++static int omap_hwspinlock_remove(struct platform_device *pdev)
++{
++	struct omap_hwspinlock_state *state = platform_get_drvdata(pdev);
++	struct hwspinlock *lock;
++	struct omap_hwspinlock *omap_lock;
++	int i;
++
++	for (i = 0; i < state->num_locks; i++) {
++		lock = hwspin_lock_unregister(i);
++		/* this shouldn't happen at this point. if it does, at least
++		 * don't continue with the remove */
++		if (!lock) {
++			dev_err(&pdev->dev, "%s: failed on %d\n", __func__, i);
++			return -EBUSY;
++		}
++
++		omap_lock = to_omap_hwspinlock(lock);
++		kfree(omap_lock);
++	}
++
++	pm_runtime_disable(&pdev->dev);
++	iounmap(state->io_base);
++	kfree(state);
++
++	return 0;
++}
++
++static struct platform_driver omap_hwspinlock_driver = {
++	.probe		= omap_hwspinlock_probe,
++	.remove		= omap_hwspinlock_remove,
++	.driver		= {
++		.name	= "omap_hwspinlock",
++	},
++};
++
++static int __init omap_hwspinlock_init(void)
++{
++	return platform_driver_register(&omap_hwspinlock_driver);
++}
++/* board init code might need to reserve hwspinlocks for predefined purposes */
++postcore_initcall(omap_hwspinlock_init);
++
++static void __exit omap_hwspinlock_exit(void)
++{
++	platform_driver_unregister(&omap_hwspinlock_driver);
++}
++module_exit(omap_hwspinlock_exit);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Hardware spinlock driver for OMAP");
++MODULE_AUTHOR("Simon Que <sque@ti.com>");
++MODULE_AUTHOR("Hari Kanigeri <h-kanigeri2@ti.com>");
++MODULE_AUTHOR("Ohad Ben-Cohen <ohad@wizery.com>");
+-- 
+1.7.0.4
