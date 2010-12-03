@@ -1,21 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Dec 2010 20:54:56 +0000
-Subject: [PATCH] ARM: GIC irq desciptor bug fix
-In-Reply-To: <1291270659-24903-1-git-send-email-cxie4@marvell.com>
-References: <1291270659-24903-1-git-send-email-cxie4@marvell.com>
-Message-ID: <20101203205456.GD10245@n2100.arm.linux.org.uk>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 03 Dec 2010 13:54:44 -0800
+Subject: [PATCH 0/22] More SMP cleanup
+In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+Message-ID: <1291413284.19493.15.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 02, 2010 at 02:17:39PM +0800, Chao at marvell.com wrote:
-> From: cxie4 <cxie4@marvell.com>
+On Fri, 2010-12-03 at 20:07 +0000, Russell King - ARM Linux wrote:
+> This patch series incorporates patches from the previously posted
+> "Clean up SMP IPI support" series of 9 patches.  Patch 5, and
+> 11 onwards are new.
 > 
-> gic_set_cpu will directly use irq_desc[]. If CONFIG_SPARSE_IRQ is enabled, there is no
+> This aims to reduce the amount of code in platform specific files
+> to the barest minimum, while maintaining the flexibility of the
+> API to allow platforms to decide which CPU numbers are populated.
 
-"SPARSE_IRQ" will do.  Please also wrap commit comments so they fit
-within 72 columns.
+Are you going to queue this for 2.6.38 or a later merge window?
 
-> irq_desc[]. So we need use irq_to_desc(irq) to get the descriptor for irq.
-
-Patch looks fine, please send (with Kyungmin's ack) to my patch system,
-thanks.
+Daniel
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
