@@ -1,81 +1,45 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 3 Dec 2010 10:37:10 +0900
-Subject: [PATCH 3/4] plat-s5p: Add platform support for MIPI-CSI2 devices
-In-Reply-To: <4CF7D9E6.5000409@samsung.com>
-References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
-	<1291307862-8125-4-git-send-email-s.nawrocki@samsung.com>
-	<20101202171538.GB30933@pulham.picochip.com>
-	<4CF7D9E6.5000409@samsung.com>
-Message-ID: <AANLkTikjQkmD-bvtTV=fh-xqMkhsxt67LhAUWuCv5mU3@mail.gmail.com>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Fri, 3 Dec 2010 01:44:24 +0000
+Subject: [PATCH 1/6] i2c/pxa2xx: Don't touch ISAR on X86
+In-Reply-To: <1291320589-31570-2-git-send-email-bigeasy@linutronix.de>
+References: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
+	<1291320589-31570-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20101203014424.GG24979@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 3, 2010 at 2:39 AM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
->
-> Hi Jamie,
->
-> On 12/02/2010 06:15 PM, Jamie Iles wrote:
->> Hi Sylwester,
->>
->> On Thu, Dec 02, 2010 at 05:37:41PM +0100, Sylwester Nawrocki wrote:
->>> diff --git a/arch/arm/plat-s5p/dev-csis0.c b/arch/arm/plat-s5p/dev-csis0.c
->>> new file mode 100644
->>> index 0000000..2b1ba43
->>> --- /dev/null
->>> +++ b/arch/arm/plat-s5p/dev-csis0.c
->>> @@ -0,0 +1,34 @@
->>> +/*
->>> + * Copyright (C) 2010 Samsung Electronics
->>> + *
->>> + * S5P series device definition for MIPI-CSI device 0
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> +*/
->>> +
->>> +#include <linux/kernel.h>
->>> +#include <linux/interrupt.h>
->>> +#include <linux/platform_device.h>
->>> +#include <mach/map.h>
->>> +
->>> +static struct resource s5p_csis_resource[] = {
->>> + ? ?[0] = {
->>> + ? ? ? ? ? ?.start = S5P_PA_CSIS0,
->>> + ? ? ? ? ? ?.end ? = S5P_PA_CSIS0 + SZ_4K - 1,
->>> + ? ? ? ? ? ?.flags = IORESOURCE_MEM,
->>> + ? ?},
->>> + ? ?[1] = {
->>> + ? ? ? ? ? ?.start = IRQ_MIPICSI0,
->>> + ? ? ? ? ? ?.end ? = IRQ_MIPICSI0,
->>> + ? ? ? ? ? ?.flags = IORESOURCE_IRQ,
->>> + ? ?}
->>> +};
->> Do you really need the [0] and [1] here? These are only needed if you are
->> sparsely initialising an array.
->
-> I agree explicit indices are not really needed. I just followed the style of
-> all other resource definitions already there.
-> I am not quite sure what is the preference of the maintainer, I guess they want
-> all devices to follow same style for consistence.
+On Thu, Dec 02, 2010 at 09:09:44PM +0100, Sebastian Andrzej Siewior wrote:
+> The reset functions sets writes the slave address even in not slave
+> mode. I don't see any reason in writting it if slave mode is not
+> enabled.
+> Ben Dooks was conserned about making this change make it unavable on X86
+> where it is not available.
+> 
+> Cc: ben-i2c at fluff.org
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
+> ---
+>  drivers/i2c/busses/i2c-pxa.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index f4c19a9..aadf9d2 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -418,7 +418,9 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+>  	writel(I2C_ISR_INIT, _ISR(i2c));
+>  	writel(readl(_ICR(i2c)) & ~ICR_UR, _ICR(i2c));
+>  
+> +#ifndef CONFIG_X86
+>  	writel(i2c->slave_addr, _ISAR(i2c));
+> +#endif
 
-And that style has its origin because explicit indices are as because
-they stress the fact that
-drivers expect  a particular resource at a particular index (when we
-have more than 1
-resource of a type).
-IMO we should use some macro shared between platform devices and their drivers.
-Something like -
-static struct resource s5p_csis_resource[] = {
-       [PA_CSIS] = {
-               .start = S5P_PA_CSIS0,
-               .end   = S5P_PA_CSIS0 + SZ_4K - 1,
-               .flags = IORESOURCE_MEM,
-       },
-       [IRQ_CSIS] = {
-               .start = IRQ_MIPICSI0,
-               .end   = IRQ_MIPICSI0,
-               .flags = IORESOURCE_IRQ,
-       }
-};
+I'd prefer some way of changing based on either the device name (see
+some other drivers which bind on multiple names) to define things such
+as this, as well as possibly changing the register layout.
+
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
