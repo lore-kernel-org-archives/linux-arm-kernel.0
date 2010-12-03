@@ -1,39 +1,72 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Fri, 3 Dec 2010 09:28:22 +0100
-Subject: Cache maintenance on page table updates
-In-Reply-To: <20101202174253.GI29347@n2100.arm.linux.org.uk>
-References: <AANLkTikHpQLh53JN4OhjS2_T9XC=66Lk1MMPh2y1jc3u@mail.gmail.com>
-	<20101202174253.GI29347@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinNksoQ08rQM71uhk8VTqCeuxFMRxn5-L++1Z-F@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 03 Dec 2010 17:32:42 +0900
+Subject: [PATCH 1/4] mach-s5pv210: Add platform definitions for mipi-csis
+In-Reply-To: <014901cb92c2$d9c9e8b0$8d5dba10$%kim@samsung.com>
+References: <1291307862-8125-1-git-send-email-s.nawrocki@samsung.com>
+	<1291307862-8125-2-git-send-email-s.nawrocki@samsung.com>
+	<012301cb92a1$a7020af0$f50620d0$%kim@samsung.com>
+	<AANLkTi=bARGdX2Y4Ea-YP8qQRcjAXme8NW9Mp-0dTxgZ@mail.gmail.com>
+	<014901cb92c2$d9c9e8b0$8d5dba10$%kim@samsung.com>
+Message-ID: <014a01cb92c4$a9af62c0$fd0e2840$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 2, 2010 at 6:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Dec 02, 2010 at 05:39:58PM +0100, Christoffer Dall wrote:
->> Hi Catalin.
->>
->> I am hoping you can help me understand the following observed behavior in KVM.
->>
->> When I update the page table mappings' AP bits, it is for some reason
->> not enough to clean caches, but I must also invalidate them for the
->> changes to take effect. The system runs on an arm1136 processor and I
->> was under the impression that page table walks never read from the L1
->> cache. If this is true, I cannot understand why an invalidation of
->> caches would make a difference.
->>
->> In the course of understanding this behavior I have come across the
->> RGN, S and C bits in the TTBR0. I don't quite understand how these
->> bits affect the memory system - should they simply match the way that
->> the page tables themselves are mapped in virtual memory or do they
->> somehow control how the page table walk mechanism behaves?
->
-> The CPU provides various controls during external memory accesses to
-> control down-stream caches. ?These bits set those controls, and
-> should match the memory types etc used for accessing the page tables
-> from the CPU.
->
+Kukjin Kim wrote:
+> 
+> Kyungmin Park wrote:
+> >
 
-Ok, thanks for clearing that up. With regards to the observed behavior
-it must be something more subtle then, which happens to be resolved
-when performing a cache invalidation. I'll investigate it further.
+One more..
+
+> > > And I'm confused about the name of MIPI-CSI...
+> > > Hmm...used MIPICSI or MIPI_CSI, sometimes MIPICSIS or MIPI_CSIS.
+> > >
+> > > Maybe the meaning is Camera Serial Interface Slave...
+> > > So...how about to use just one such as "IRQ_MIPI_CSIS" and
+> > > "S5PV210_PA_MIPI_CSIS".
+> >
+> > I think it's better use the common word, CSI. I can't find CSIS word
+> > at googling.
+> >
+> But used it in datasheet. How about FIMC, I think, it depends on usage of
+> datasheet.
+> 
+However, if required, it can be changed...
+I meant to use written name in datasheet is better to us.
+
+> > >
+> > > ---
+> > > @@ -65,7 +65,7 @@
+> > > ?#define IRQ_HSMMC0 ? ? ? ? ? ? S5P_IRQ_VIC1(26)
+> > > ?#define IRQ_HSMMC1 ? ? ? ? ? ? S5P_IRQ_VIC1(27)
+> > > ?#define IRQ_HSMMC2 ? ? ? ? ? ? S5P_IRQ_VIC1(28)
+> > > -#define IRQ_MIPICSI ? ? ? ? ? ?S5P_IRQ_VIC1(29)
+> > > +#define IRQ_MIPI_CSIS ? ? ? ? ?S5P_IRQ_VIC1(29)
+> > > ?#define IRQ_MIPIDSI ? ? ? ? ? ?S5P_IRQ_VIC1(30)
+> > > ?#define IRQ_ONENAND_AUDI ? ? ? S5P_IRQ_VIC1(31)
+> > >
+> > > @@ -132,5 +132,6 @@
+> > > ?#define IRQ_LCD_FIFO ? ? ? ? ? IRQ_LCD0
+> > > ?#define IRQ_LCD_VSYNC ? ? ? ? ?IRQ_LCD1
+> > > ?#define IRQ_LCD_SYSTEM ? ? ? ? IRQ_LCD2
+> > > +#define IRQ_MIPI_CSIS0 ? ? ? ? IRQ_MIPI_CSIS
+> >
+> > In this case, I can't find any good reason since it's first used.
+> > as s3c series used the different names compare to s5p series. it's
+> > okay make these wrapper.
+> > but it's new one and not used previous time.
+> >
+> I already commented about that.
+> Shortly, IRQ_MIPI_CSIS0 is used as common name for S5PV210 and S5PV310 in
+> plat-s5p.
+> And IRQ_MIPI_CSI is used as specific name on S5PV210. So needed it.
+> 
+To use IRQ_MIPI_CSIS means just one on S5PV210.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
