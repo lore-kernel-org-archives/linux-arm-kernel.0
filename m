@@ -1,132 +1,108 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 03 Dec 2010 20:23:41 +0000
-Subject: [PATCH 14/22] ARM: SMP: Clean up ncores sanity checks
+Date: Fri, 03 Dec 2010 20:24:01 +0000
+Subject: [PATCH 15/22] ARM: SMP: get rid of get_core_count()
 In-Reply-To: <20101203200746.GA10245@n2100.arm.linux.org.uk>
 References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-Message-ID: <E1POcAP-0007rt-0Y@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1POcAj-0007rx-Eb@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-scu_get_core_count() never returns zero cores, so we don't need to
-check and correct if ncores is zero.
-
-Tegra was missing the check against NR_CPUS, leading to a potential
-bitfield overflow if this becomes the case.
+We don't need this small function as well as scu_get_core_count()
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/omap-smp.c   |    6 ------
- arch/arm/mach-realview/platsmp.c |    7 -------
- arch/arm/mach-s5pv310/platsmp.c  |    7 -------
- arch/arm/mach-tegra/platsmp.c    |    6 ++++++
- arch/arm/mach-ux500/platsmp.c    |    6 ------
- arch/arm/mach-vexpress/platsmp.c |    7 -------
- 6 files changed, 6 insertions(+), 33 deletions(-)
+ arch/arm/mach-omap2/omap-smp.c   |   12 +-----------
+ arch/arm/mach-realview/platsmp.c |   13 ++++---------
+ arch/arm/mach-ux500/platsmp.c    |    9 +++------
+ 3 files changed, 8 insertions(+), 26 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 3c87468..5f10f38 100644
+index 5f10f38..405a8fc 100644
 --- a/arch/arm/mach-omap2/omap-smp.c
 +++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -121,12 +121,6 @@ void __init smp_init_cpus(void)
- 	ncores = get_core_count();
+@@ -29,16 +29,6 @@
+ /* SCU base address */
+ static void __iomem *scu_base;
+ 
+-/*
+- * Use SCU config register to count number of cores
+- */
+-static inline unsigned int get_core_count(void)
+-{
+-	if (scu_base)
+-		return scu_get_core_count(scu_base);
+-	return 1;
+-}
+-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -118,7 +108,7 @@ void __init smp_init_cpus(void)
+ 	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
+ 	BUG_ON(!scu_base);
+ 
+-	ncores = get_core_count();
++	ncores = scu_get_core_count(scu_base);
  
  	/* sanity check */
--	if (ncores == 0) {
--		printk(KERN_ERR
--		       "OMAP4: strange core count of 0? Default to 1\n");
--		ncores = 1;
--	}
--
  	if (ncores > NR_CPUS) {
- 		printk(KERN_WARNING
- 		       "OMAP4: no. of cores (%d) greater than configured "
 diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index 108e92f..13116cd 100644
+index 13116cd..6595e87 100644
 --- a/arch/arm/mach-realview/platsmp.c
 +++ b/arch/arm/mach-realview/platsmp.c
-@@ -161,13 +161,6 @@ void __init smp_init_cpus(void)
- 	unsigned int i, ncores = get_core_count();
- 
- 	/* sanity check */
--	if (ncores == 0) {
--		printk(KERN_ERR
--		       "Realview: strange CM count of 0? Default to 1\n");
--
--		ncores = 1;
--	}
--
- 	if (ncores > NR_CPUS) {
- 		printk(KERN_WARNING
- 		       "Realview: no. of cores (%d) greater than configured "
-diff --git a/arch/arm/mach-s5pv310/platsmp.c b/arch/arm/mach-s5pv310/platsmp.c
-index d474426..560ada8 100644
---- a/arch/arm/mach-s5pv310/platsmp.c
-+++ b/arch/arm/mach-s5pv310/platsmp.c
-@@ -130,13 +130,6 @@ void __init smp_init_cpus(void)
- 	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
- 
- 	/* sanity check */
--	if (ncores == 0) {
--		printk(KERN_ERR
--		       "S5PV310: strange CM count of 0? Default to 1\n");
--
--		ncores = 1;
--	}
--
- 	if (ncores > NR_CPUS) {
- 		printk(KERN_WARNING
- 		       "S5PV310: no. of cores (%d) greater than configured "
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 1c0fd92..5b194dd 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -117,6 +117,12 @@ void __init smp_init_cpus(void)
- {
- 	unsigned int i, ncores = scu_get_core_count(scu_base);
- 
-+	if (ncores > NR_CPUS) {
-+		printk(KERN_ERR "Tegra: no. of cores (%u) greater than configured (%u), clipping\n",
-+			ncores, NR_CPUS);
-+		ncores = NR_CPUS;
-+	}
-+
- 	for (i = 0; i < ncores; i++)
- 		cpu_set(i, cpu_possible_map);
+@@ -50,14 +50,6 @@ static void __iomem *scu_base_addr(void)
+ 		return (void __iomem *)0;
  }
+ 
+-static inline unsigned int get_core_count(void)
+-{
+-	void __iomem *scu_base = scu_base_addr();
+-	if (scu_base)
+-		return scu_get_core_count(scu_base);
+-	return 1;
+-}
+-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -158,7 +150,10 @@ static void __init poke_milo(void)
+  */
+ void __init smp_init_cpus(void)
+ {
+-	unsigned int i, ncores = get_core_count();
++	void __iomem *scu_base = scu_base_addr();
++	unsigned int i, ncores;
++
++	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
+ 
+ 	/* sanity check */
+ 	if (ncores > NR_CPUS) {
 diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index a51962b..e31024e 100644
+index e31024e..fd40fa1 100644
 --- a/arch/arm/mach-ux500/platsmp.c
 +++ b/arch/arm/mach-ux500/platsmp.c
-@@ -129,12 +129,6 @@ void __init smp_init_cpus(void)
- 	unsigned int i, ncores = get_core_count();
+@@ -28,11 +28,6 @@
+  */
+ volatile int __cpuinitdata pen_release = -1;
+ 
+-static unsigned int __init get_core_count(void)
+-{
+-	return scu_get_core_count(__io_address(UX500_SCU_BASE));
+-}
+-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -126,7 +121,9 @@ static void __init wakeup_secondary(void)
+  */
+ void __init smp_init_cpus(void)
+ {
+-	unsigned int i, ncores = get_core_count();
++	unsigned int i, ncores;
++
++	ncores = scu_get_core_count(__io_address(UX500_SCU_BASE));
  
  	/* sanity check */
--	if (ncores == 0) {
--		printk(KERN_ERR
--		       "U8500: strange CM count of 0? Default to 1\n");
--		ncores = 1;
--	}
--
  	if (ncores > NR_CPUS) {
- 		printk(KERN_WARNING
- 		       "U8500: no. of cores (%d) greater than configured "
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 276f916..b5a7586 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -124,13 +124,6 @@ void __init smp_init_cpus(void)
- 	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
- 
- 	/* sanity check */
--	if (ncores == 0) {
--		printk(KERN_ERR
--		       "vexpress: strange CM count of 0? Default to 1\n");
--
--		ncores = 1;
--	}
--
- 	if (ncores > NR_CPUS) {
- 		printk(KERN_WARNING
- 		       "vexpress: no. of cores (%d) greater than configured "
 -- 
 1.6.2.5
