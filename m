@@ -1,111 +1,56 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 03 Dec 2010 16:20:39 -0800
-Subject: [PATCH 2/4] omap2+: Use asm_irq_base for entry-macro.S
+Date: Fri, 03 Dec 2010 16:20:36 -0800
+Subject: [PATCH 1/4] ARM: Add asm_irq_base and asm_irq_flags for entry-armv.S
+	macros
 In-Reply-To: <20101204001435.28853.29616.stgit@baageli.muru.com>
 References: <20101204001435.28853.29616.stgit@baageli.muru.com>
-Message-ID: <20101204002039.28853.68667.stgit@baageli.muru.com>
+Message-ID: <20101204002036.28853.9320.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This way we can use the generic omap SoC detection code instead.
+This way we can use the SoC specific code to detect what we're
+running on.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/include/mach/entry-macro.S |   37 +++---------------------
- arch/arm/mach-omap2/io.c                       |   20 +++++++++++++
- 2 files changed, 25 insertions(+), 32 deletions(-)
+ arch/arm/include/asm/irq.h   |    2 ++
+ arch/arm/kernel/entry-armv.S |   13 +++++++++++++
+ 2 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
-index 06e64e1..c29728c 100644
---- a/arch/arm/mach-omap2/include/mach/entry-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
-@@ -38,41 +38,14 @@
-  */
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 2721a58..2610c59 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -20,6 +20,8 @@
+ #ifndef __ASSEMBLY__
+ struct irqaction;
+ struct pt_regs;
++extern void __iomem *asm_irq_base;
++extern unsigned int asm_irq_flags;
+ extern void migrate_irqs(void);
  
- #ifdef MULTI_OMAP2
--		.pushsection .data
--omap_irq_base:	.word	0
--		.popsection
+ extern void asm_do_IRQ(unsigned int, struct pt_regs *);
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index c09e357..37cdb27 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -63,6 +63,19 @@
  
--		/* Configure the interrupt base on the first interrupt */
-+		/*
-+		 * Configure the interrupt base on the first interrupt.
-+		 * See also omap_irq_base_init for setting asm_irq_base.
-+		 */
- 		.macro  get_irqnr_preamble, base, tmp
--9:
--		ldr	\base, =omap_irq_base	@ irq base address
-+		ldr	\base, =asm_irq_base	@ irq base address
- 		ldr	\base, [\base, #0]	@ irq base value
--		cmp	\base, #0		@ already configured?
--		bne	9997f			@ nothing to do
--
--		mrc	p15, 0, \tmp, c0, c0, 0	@ get processor revision
--		and	\tmp, \tmp, #0x000f0000	@ only check architecture
--		cmp	\tmp, #0x00070000	@ is v6?
--		beq	2400f			@ found v6 so it's omap24xx
--		mrc	p15, 0, \tmp, c0, c0, 0	@ get processor revision
--		and	\tmp, \tmp, #0x000000f0	@ check cortex 8 or 9
--		cmp	\tmp, #0x00000080	@ cortex A-8?
--		beq	3400f			@ found A-8 so it's omap34xx
--		cmp	\tmp, #0x00000090	@ cortex A-9?
--		beq	4400f			@ found A-9 so it's omap44xx
--2400:		ldr	\base, =OMAP2_IRQ_BASE
--		ldr	\tmp, =omap_irq_base
--		str	\base, [\tmp, #0]
--		b	9b
--3400:		ldr	\base, =OMAP3_IRQ_BASE
--		ldr	\tmp, =omap_irq_base
--		str	\base, [\tmp, #0]
--		b	9b
--4400:		ldr	\base, =OMAP4_IRQ_BASE
--		ldr	\tmp, =omap_irq_base
--		str	\base, [\tmp, #0]
--		b	9b
--9997:
- 		.endm
- 
- 		/* Check the pending interrupts. Note that base already set */
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index a1939b1..7ac1d31 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -46,6 +46,7 @@
- #include "clockdomains.h"
- 
- #include <plat/omap_hwmod.h>
-+#include <plat/multi.h>
- 
- /*
-  * The machine specific code may provide the extra mapping besides the
-@@ -311,6 +312,23 @@ static int __init _omap2_init_reprogram_sdrc(void)
- 	return v;
- }
+ 	.endm
  
 +/*
-+ * Initialize asm_irq_base for entry-macro.S
++ * Allow machine specific code to initialize asm_irq_base and asm_irq_flags
++ * for use in get_irqnr_preamble and get_irqnr_and_base macros
 + */
-+static inline void omap_irq_base_init(void)
-+{
-+#ifdef MULTI_OMAP2
-+	if (cpu_is_omap242x())
-+		asm_irq_base = OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE);
-+	else if (cpu_is_omap34xx())
-+		asm_irq_base = OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE);
-+	else if (cpu_is_omap44xx())
-+		asm_irq_base = OMAP2_L4_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE);
-+	else
-+		pr_err("Could not initialize asm_irq_base\n");
-+#endif
-+}
++	.pushsection .data
++	.globl	asm_irq_base
++asm_irq_base:
++	.long	0
++	.globl	asm_irq_flags
++asm_irq_flags:
++	.long	0
++	.popsection
 +
- void __init omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
- 				 struct omap_sdrc_params *sdrc_cs1)
- {
-@@ -352,4 +370,6 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
- 		_omap2_init_reprogram_sdrc();
- 	}
- 	gpmc_init();
-+
-+	omap_irq_base_init();
- }
+ #ifdef CONFIG_KPROBES
+ 	.section	.kprobes.text,"ax",%progbits
+ #else
