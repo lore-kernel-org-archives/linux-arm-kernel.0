@@ -1,79 +1,54 @@
-From: mkl0301@gmail.com (Lin Mac)
-Date: Sun, 5 Dec 2010 01:07:32 +0800
-Subject: Cannot detect SATA disks w/ CONFIG_SATA_PMP w/o actually using
-	SATA multiplier
-In-Reply-To: <4CF77570.9000700@gmail.com>
-References: <AANLkTi=kbTcq3hYBiDzGcAb02Ppwb1QEcs12-1W_T=LG@mail.gmail.com>
-	<4CF50574.6000706@gmail.com>
-	<AANLkTi=0gBcfrAyJNb0+=obH2QDsqhGM5a9xxwHAoh88@mail.gmail.com>
-	<4CF55549.4080000@gmail.com>
-	<AANLkTimWqFh-PD4DFXwaRmthb5Lyw3MAFknFmT7vp5pY@mail.gmail.com>
-	<4CF77570.9000700@gmail.com>
-Message-ID: <AANLkTi=aUA9qKVmEhfh=OG5f9oBNDG8LdZ-LRcjaXycw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 4 Dec 2010 10:05:41 -0800
+Subject: [PATCH 0/4] Patches to make multi-soc handling in entry-armv.S
+	easier
+In-Reply-To: <alpine.LFD.2.00.1012040040590.10437@xanadu.home>
+References: <20101204001435.28853.29616.stgit@baageli.muru.com>
+	<alpine.LFD.2.00.1012040040590.10437@xanadu.home>
+Message-ID: <20101204180541.GH17222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/2 Tejun Heo <htejun@gmail.com>:
-> Hello,
->
-> On 12/02/2010 11:23 AM, Lin Mac wrote:
->>> One thing which could be possible is that the controller stashes the
->>> result code for the PMP aware SRST according to the PMP number instead
->>> of the usual place, so the driver can't see it. ?In that case, the
->>> driver can be modified to check both places I suppose but if the
->>> hardware can be fixed, that would be great.
->> the usual place, I presume you mean PxTFD+PxSIG.
->> I've check RFIS of received FIS structure after softreset failed and
->> nothing there. (UFIS neither)
->> Is there any other suspect to check?
-> Have you checked all PxTFDs? ?It could be that the controller is
-> saving it in the wrong slot.
-No, they are not there.
+* Nicolas Pitre <nico@fluxnic.net> [101203 21:39]:
+> On Fri, 3 Dec 2010, Tony Lindgren wrote:
+> 
+> > Hi all,
+> > 
+> > I've got some patches almost ready to go to merge the omap1
+> > configs into a single omap1_defconfig. While working on getting
+> > that done, I had to come up with a better solution for entry-armv.S
+> > macros to detect the soc we're running on.
+> > 
+> > I suggest we add asm_irq_base and asm_irq_flags as in the first
+> > patch in this series does. This way we can do the soc based detection
+> > in init_irq or similar place. This might help also the multi-arm
+> > work too.
+> 
+> Did you see Eric Miao's patch series that introduces runtime IRQ demux 
+> handler support?
+> 
+> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
+> 
+> That is likely to be a better solution.
 
->> My situation is that device is sending D2H Reg FIS, but controller is
->> not reflecting it on PxTFD, PxSIG, or RFIS of received FIS
->> structure.With the patch I sent, it seems the controller receives D2H
->> Reg FIS of the same PMP setting of the previous sent H2D Reg FIS, and
->> drop the different one.
->
-> If the controller is dropping the D2H Reg FIS altogether, it'll
-> probably need more intricate workaround. ?:-(
->
->> The AHCI controller I used is AHCI v1.1 compatible, command-based switching.
->>
->> In SATA spec (rev2.6) 16.7.1, it says:
->>
->> A host controller may support command-based switching by implementing
->> the Port Multiplier Port (PMP) field in the SControl register as
->> detailed in section 14.1.3.In order to use this mechanism, host
->> software would set the PMP field appropriately before issuing a
->> command to a device conected to the Port Multiplier. (...) Note that
->> the PMP field shall be set to the control port when host software
->> issues commands to the Port Multiplier itself.
->> --
->>
->> In AHCI spec, the PMP field of PxSCTL "is not used by AHCI".Does it
->> implies AHCI would set it and software doesn't need to do anything?
->>
->> 13.13.4.1 Port Multiplier Discovery
->> If ?a device is present, the host issues a software reset with the PM
->> Port field set ?to the control port. The host checks the signature
->> value returned and if....
->> --
->>
->> SATA spec didn't says what to do IF it received a data with PMP
->> setting doesn't match it's current setting (did it?). While 13.13.4.1
->> only implies the host should receive the signature successfully, even
->> if it is of different PMP setting.
->
-> The probing sequence is described somewhere in the ahci spec and I'm
-> fairly sure the dropping behavior you're describing is out of spec.
-> You'll need to find a way to reliably distinguish a PMP device and
-> then probably implement the workaround in custom hardreset or
-> softreset method for the specific controller.
-I have resent the patch which retry ahci_do_softreset again with pmp=0
-if pmp=15 failed.
-Thanks a lot for the help.
+Yeah that works too, although is a bit heavier for simple cases.
 
-Best Regards,
-Mac Lin
+In the omap case just the irq base is different between omap2 vs omap3.
+And only level2 interrupt bit is different omap7xx vs omap16xx.
+
+Handling the difference between omap2/3 and omap4 would be the use
+case for handle_arch_irq. Currently that too can be handled
+without handle_arch_irq, but from multi-arm point of view
+handle_arch_irq is needed in the long run.
+
+I can do things either way quite easily for sure. But my preference
+would be to have both options available. This is because asm_irq_base
+and asm_irq_flags can be used to reduce 15 omap1 defconfigs into one
+defconfig with quite minimal changes. And for omap2+, these patches
+allow getting rid of the SoC detection code in entry-macro.S. Also,
+after these patches, moving to use handle_arch_irq can be done a bit
+easier later on.
+
+Regards,
+
+Tony
