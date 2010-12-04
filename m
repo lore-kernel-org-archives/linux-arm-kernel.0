@@ -1,181 +1,138 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 4 Dec 2010 12:23:40 +0000
-Subject: [PATCH] mmci: handle clock frequency 0 properly
-In-Reply-To: <1289927869-14519-1-git-send-email-linus.walleij@stericsson.com>
-References: <1289927869-14519-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20101204122340.GC20969@n2100.arm.linux.org.uk>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Sat,  4 Dec 2010 12:40:38 +0000
+Subject: [REPOST][PATCH] Fix IGEPv2 second MMC channel power supply
+Message-ID: <1291466438-12827-1-git-send-email-maz@misterjones.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 16, 2010 at 06:17:49PM +0100, Linus Walleij wrote:
-> This removes the default clocking for the MMCI controller so that
-> the external MCI card clock does not activate until the first
-> .set_ios() call is issued. It will further handle the transitions
-> from a clock != 0 to 0 and vice versa by gating/ungating the
-> clock with clk_disable()/clk_enable().
+Commit 72f381ba056 (omap3: Remove VMMC2 regulator on IGEP v2)
+removed an unused regulator entry, but left the second MMC channel
+(used by the Libertas WLAN module) without link to power regulator.
+This causes the SDIO module to fail being detected.
 
-I've just looked at this again, and I'm not happy - initially with the
-above description, but the on the way the clock gating is being handled.
+This patch adds the two regulators that actually feed the WLAN module
+(1v8 from the TWL4030 VIO LDO, and a fixed 3v3). With that patch, the
+second channel is properly detected. Details of the power supply
+implementation were kindly provided by Enric Balletbo i Serra.
 
-Your commentry seems to suggest that we currently don't turn off the
-clock signal to the card.  This is not the case:
+Also change vmmc1 to use symbolic names instead of direct device
+reference.
 
-| The clock management logic generates and controls the MMCICLK signal.
-| The MMCICLK output can use either a clock divide or clock bypass mode.
-| The clock output is inactive:
-| ? after the PrimeCell MMCI is reset
-| ? during the power-off or power-up phases
-| ? if the power saving mode is enabled and the card bus is in the IDLE
-|   state (eight clock periods after both the command and data path subunits
-|   enter the IDLE phase).
+Tested on an IGEPv2 Rev-B.
 
-I think what you actually mean is that the MCLK input to the primecell
-(described as "PrimeCell MMCI adapter clock (MCLK)") rather than "external
-MCI card clock".
+Signed-off-by: Marc Zyngier <maz@misterjones.org>
+Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/board-igep0020.c |   61 ++++++++++++++++++++++++++++-----
+ 1 files changed, 51 insertions(+), 10 deletions(-)
 
-> This assures that the MCI clock will not be active unless there
-> is a card in the MMC slot.
-
-Is this sufficient?  The ARM MMCI TRM says that (eg) clear signals for
-the status register (from the clear register) are synchronized to the
-MCLK domain, which means without MCLK running, writing to the clear
-register will be a no-op.
-
-Also, the power, clock, data control and command registers have a
-restriction that after any write to these individual registers, that
-register must not be re-written for 3 MCLK periods plus 2 PCLK periods.
-Are we sure that we're writing these registers with the MCLK turned
-on, and it remains on for sufficient time?
-
-I suspect that what this means is that we must enable MCLK before
-writing to these registers, and disable MCLK after a delay after the
-last write to any of these registers.  We probably want a read-back
-and barrier after the last write to ensure that any delay is correct.
-
-> By default the MMC core will not gate off the clock to a card
-> once it's enabled, but with the separate patch for aggressive
-> clocking this can optionally be enabled for the system.
-> 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> ---
-> Changes since v8:
-> 
-> The frequency registers shall be set with mmci_set_clkreg()
-> no matter whether the clock gets enabled or disabled, systems
-> without a clk framework will need this so that the clock
-> dividers are set to the apropriate values for clock 0 as
-> well, and that will probably mitigate power consumption
-> somewhat on these systems.
-> 
-> Chris: this is a new version after Russell found an error in
-> it. Can you please take the old version of this patch out of
-> the MMC tree so I can merge it through Russells ARM tree
-> instead? The patches are perfectly orthogonal so it doesn't
-> need to live in the MMC tree.
-> ---
->  drivers/mmc/host/mmci.c |   33 ++++++++++++++++++++++-----------
->  drivers/mmc/host/mmci.h |    1 +
->  2 files changed, 23 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 0814b88..3709ab3 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -689,6 +689,22 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  
->  	mmci_set_clkreg(host, ios->clock);
->  
-> +	/*
-> +	 * Turn on clock whenever ios->clock transitions
-> +	 * from 0 to !=0 and gate it off whenever ios->clock
-> +	 * transitions from !=0 to 0.
-> +	 */
-> +	if (host->iosclock == 0 && ios->clock != 0) {
-> +		dev_dbg(mmc_dev(mmc), "enable clock f=%d\n", ios->clock);
-> +		clk_enable(host->clk);
-> +	} else if (host->iosclock != 0 && ios->clock == 0) {
-> +		dev_dbg(mmc_dev(mmc), "disable clock\n");
-> +		clk_disable(host->clk);
-> +	} else if (ios->clock != 0) {
-> +		dev_dbg(mmc_dev(mmc), "set clock f=%d\n", ios->clock);
-> +	}
-> +	host->iosclock = ios->clock;
-> +
->  	if (host->pwr != pwr) {
->  		host->pwr = pwr;
->  		writel(pwr, host->base + MMCIPOWER);
-> @@ -772,6 +788,8 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
->  
->  	host = mmc_priv(mmc);
->  	host->mmc = mmc;
-> +	host->plat = plat;
-> +	host->variant = variant;
->  
->  	host->gpio_wp = -ENOSYS;
->  	host->gpio_cd = -ENOSYS;
-> @@ -782,19 +800,14 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
->  	dev_dbg(mmc_dev(mmc), "designer ID = 0x%02x\n", host->hw_designer);
->  	dev_dbg(mmc_dev(mmc), "revision = 0x%01x\n", host->hw_revision);
->  
-> +	/* This clock will be enabled/disabled by set_ios() calls later */
->  	host->clk = clk_get(&dev->dev, NULL);
->  	if (IS_ERR(host->clk)) {
->  		ret = PTR_ERR(host->clk);
->  		host->clk = NULL;
->  		goto host_free;
->  	}
-> -
-> -	ret = clk_enable(host->clk);
-> -	if (ret)
-> -		goto clk_free;
-> -
-> -	host->plat = plat;
-> -	host->variant = variant;
-> +	host->iosclock = 0;
->  	host->mclk = clk_get_rate(host->clk);
->  	/*
->  	 * According to the spec, mclk is max 100 MHz,
-> @@ -804,7 +817,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
->  	if (host->mclk > 100000000) {
->  		ret = clk_set_rate(host->clk, 100000000);
->  		if (ret < 0)
-> -			goto clk_disable;
-> +			goto clk_free;
->  		host->mclk = clk_get_rate(host->clk);
->  		dev_dbg(mmc_dev(mmc), "eventual mclk rate: %u Hz\n",
->  			host->mclk);
-> @@ -812,7 +825,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
->  	host->base = ioremap(dev->res.start, resource_size(&dev->res));
->  	if (!host->base) {
->  		ret = -ENOMEM;
-> -		goto clk_disable;
-> +		goto clk_free;
->  	}
->  
->  	mmc->ops = &mmci_ops;
-> @@ -961,8 +974,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
->  		gpio_free(host->gpio_cd);
->   err_gpio_cd:
->  	iounmap(host->base);
-> - clk_disable:
-> -	clk_disable(host->clk);
->   clk_free:
->  	clk_put(host->clk);
->   host_free:
-> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-> index df06f01..4791a2b 100644
-> --- a/drivers/mmc/host/mmci.h
-> +++ b/drivers/mmc/host/mmci.h
-> @@ -167,6 +167,7 @@ struct mmci_host {
->  
->  	unsigned int		mclk;
->  	unsigned int		cclk;
-> +	unsigned int		iosclock;
->  	u32			pwr;
->  	struct mmci_platform_data *plat;
->  	struct variant_data	*variant;
-> -- 
-> 1.6.3.3
-> 
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 5e035a5..9a85e60 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -19,6 +19,7 @@
+ #include <linux/interrupt.h>
+ 
+ #include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/mmc/host.h>
+ 
+@@ -257,9 +258,8 @@ static inline void __init igep2_init_smsc911x(void) { }
+ static struct omap_board_config_kernel igep2_config[] __initdata = {
+ };
+ 
+-static struct regulator_consumer_supply igep2_vmmc1_supply = {
+-	.supply		= "vmmc",
+-};
++static struct regulator_consumer_supply igep2_vmmc1_supply =
++	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.0");
+ 
+ /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
+ static struct regulator_init_data igep2_vmmc1 = {
+@@ -276,6 +276,52 @@ static struct regulator_init_data igep2_vmmc1 = {
+ 	.consumer_supplies      = &igep2_vmmc1_supply,
+ };
+ 
++static struct regulator_consumer_supply igep2_vio_supply =
++	REGULATOR_SUPPLY("vmmc_aux", "mmci-omap-hs.1");
++
++static struct regulator_init_data igep2_vio = {
++	.constraints = {
++		.min_uV			= 1800000,
++		.max_uV			= 1800000,
++		.apply_uV		= 1,
++		.valid_modes_mask	= REGULATOR_MODE_NORMAL
++					| REGULATOR_MODE_STANDBY,
++		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
++					| REGULATOR_CHANGE_MODE
++					| REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies  = 1,
++	.consumer_supplies      = &igep2_vio_supply,
++};
++
++static struct regulator_consumer_supply igep2_vmmc2_supply =
++	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.1");
++
++static struct regulator_init_data igep2_vmmc2 = {
++	.constraints		= {
++		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
++		.always_on		= 1,
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &igep2_vmmc2_supply,
++};
++
++static struct fixed_voltage_config igep2_vwlan = {
++	.supply_name		= "vwlan",
++	.microvolts		= 3300000,
++	.gpio			= -EINVAL,
++	.enabled_at_boot	= 1,
++	.init_data		= &igep2_vmmc2,
++};
++
++static struct platform_device igep2_vwlan_device = {
++	.name		= "reg-fixed-voltage",
++	.id		= 0,
++	.dev = {
++		.platform_data	= &igep2_vwlan,
++	},
++};
++
+ static struct omap2_hsmmc_info mmc[] = {
+ 	{
+ 		.mmc		= 1,
+@@ -373,12 +419,6 @@ static int igep2_twl_gpio_setup(struct device *dev,
+ 	omap2_hsmmc_init(mmc);
+ 
+ 	/*
+-	 * link regulators to MMC adapters ... we "know" the
+-	 * regulators will be set up only *after* we return.
+-	 */
+-	igep2_vmmc1_supply.dev = mmc[0].dev;
+-
+-	/*
+ 	 * REVISIT: need ehci-omap hooks for external VBUS
+ 	 * power switch and overcurrent detect
+ 	 */
+@@ -489,6 +529,7 @@ static void __init igep2_display_init(void)
+ 
+ static struct platform_device *igep2_devices[] __initdata = {
+ 	&igep2_dss_device,
++	&igep2_vwlan_device,
+ };
+ 
+ static void __init igep2_init_irq(void)
+@@ -519,7 +560,7 @@ static struct twl4030_platform_data igep2_twldata = {
+ 	.gpio		= &igep2_twl4030_gpio_pdata,
+ 	.vmmc1          = &igep2_vmmc1,
+ 	.vpll2		= &igep2_vpll2,
+-
++	.vio		= &igep2_vio,
+ };
+ 
+ static struct i2c_board_info __initdata igep2_i2c1_boardinfo[] = {
+-- 
+1.7.3.2
