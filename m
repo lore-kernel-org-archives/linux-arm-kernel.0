@@ -1,49 +1,33 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Fri,  3 Dec 2010 19:41:47 -0800
-Subject: [PATCH] ARM: Stop irqsoff trace on return to user
-Message-ID: <1291434107-17713-1-git-send-email-toddpoynor@google.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 04 Dec 2010 00:49:43 -0500 (EST)
+Subject: [PATCH 0/4] Patches to make multi-soc handling in entry-armv.S
+	easier
+In-Reply-To: <20101204001435.28853.29616.stgit@baageli.muru.com>
+References: <20101204001435.28853.29616.stgit@baageli.muru.com>
+Message-ID: <alpine.LFD.2.00.1012040040590.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the irqsoff tracer is in use, stop tracing the interrupt disable
-interval when returning to userspace.  Tracing userspace execution
-time as interrupts disabled time is not useful for kernel
-performance analysis purposes, and crowds out more helpful results
-with long userspace execution times.  Some other architectures do
-something similar.
+On Fri, 3 Dec 2010, Tony Lindgren wrote:
 
-Only do so if the irqsoff tracer is enabled, to avoid overhead for
-lockdep, which doesn't care about userspace execution time with
-interrupts disabled.
+> Hi all,
+> 
+> I've got some patches almost ready to go to merge the omap1
+> configs into a single omap1_defconfig. While working on getting
+> that done, I had to come up with a better solution for entry-armv.S
+> macros to detect the soc we're running on.
+> 
+> I suggest we add asm_irq_base and asm_irq_flags as in the first
+> patch in this series does. This way we can do the soc based detection
+> in init_irq or similar place. This might help also the multi-arm
+> work too.
 
-Signed-off-by: Todd Poynor <toddpoynor@google.com>
----
- arch/arm/kernel/entry-common.S |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Did you see Eric Miao's patch series that introduces runtime IRQ demux 
+handler support?
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 8bfa987..80bf8cd 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -29,6 +29,9 @@ ret_fast_syscall:
- 	ldr	r1, [tsk, #TI_FLAGS]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	fast_work_pending
-+#if defined(CONFIG_IRQSOFF_TRACER)
-+	asm_trace_hardirqs_on
-+#endif
- 
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
-@@ -65,6 +68,9 @@ ret_slow_syscall:
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	work_pending
- no_work_pending:
-+#if defined(CONFIG_IRQSOFF_TRACER)
-+	asm_trace_hardirqs_on
-+#endif
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
- 
--- 
-1.7.3.1
+http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
+
+That is likely to be a better solution.
+
+
+Nicolas
