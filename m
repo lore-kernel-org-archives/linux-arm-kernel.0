@@ -1,33 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 4 Dec 2010 13:25:54 -0800
-Subject: [PATCH v8 00/11] OMAP: GPIO: Implement GPIO as platform device
-In-Reply-To: <AANLkTinY8FKbVvXD29KpgGnsnKwQziXws+zKLZWn69Hj@mail.gmail.com>
-References: <1290689318-10191-1-git-send-email-charu@ti.com>
-	<20101201183357.GI17222@atomide.com>
-	<87zkso4hu3.fsf@deeprootsystems.com>
-	<AANLkTinY8FKbVvXD29KpgGnsnKwQziXws+zKLZWn69Hj@mail.gmail.com>
-Message-ID: <20101204212554.GM17222@atomide.com>
+Date: Sat, 04 Dec 2010 13:29:42 -0800
+Subject: [PATCH 0/5] Few misc patches for v2.6.38 merge window
+Message-ID: <20101204212904.25978.22090.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Varadarajan, Charulatha <charu@ti.com> [101202 06:08]:
-> On Thu, Dec 2, 2010 at 15:28, Kevin Hilman <khilman@deeprootsystems.com> wrote:
-> 
-> >
-> > Tony, you can also add
-> >
-> > Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Hi,
 
-OK, updated. Also made one more GPIO patch to allow us to deal
-with the 7xx vs 15xx/16xx MPUIO registers.
+Here are some misc patches for review.
 
 Regards,
 
 Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: omap-gpio-mpuio-regs.patch
-Type: text/x-diff
-Size: 7601 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101204/a1d1370d/attachment.bin>
+
+---
+
+Evgeny Kuznetsov (1):
+      omap: Ptr "isr_reg" tracked as NULL was dereferenced
+
+Jarkko Nikula (1):
+      omap: McBSP: Fix potential memory leak in omap_mcbsp_remove
+
+Shubhrajyoti D (1):
+      omap: McBSP: Make the free variable update more readable
+
+Tony Lindgren (2):
+      Fix undefined reference to omap2_i2c_mux_pins
+      omap: Don't select mux by default for each board
+
+
+ arch/arm/mach-omap2/Kconfig |    4 ----
+ arch/arm/plat-omap/gpio.c   |    5 +++++
+ arch/arm/plat-omap/i2c.c    |    7 +++++++
+ arch/arm/plat-omap/mcbsp.c  |   16 +++++-----------
+ 4 files changed, 17 insertions(+), 15 deletions(-)
+
+-- 
+Signature
