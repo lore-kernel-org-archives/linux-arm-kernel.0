@@ -1,164 +1,51 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  5 Dec 2010 15:09:06 -0800
-Subject: [PATCH 19/21] ARM: tegra: cpufreq: Disable cpufreq during suspend
+Date: Sun,  5 Dec 2010 15:09:02 -0800
+Subject: [PATCH 15/21] ARM: tegra: irq: Implement retrigger
 In-Reply-To: <1291590548-7341-1-git-send-email-ccross@android.com>
 References: <1291590548-7341-1-git-send-email-ccross@android.com>
-Message-ID: <1291590548-7341-20-git-send-email-ccross@android.com>
+Message-ID: <1291590548-7341-16-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@google.com>
-
-Adds a SUSPEND_PREPARE notification hook to drop the frequency to
-the lowest possible during suspend.  This prevents the cpufreq driver
-from attempting regulator calls after suspend has started - the
-regulator api can call into drivers that have already been suspended.
-Also adds 216MHz (off of PLLP) as the lowest CPU frequency, which
-allows PLLX to be turned off.
-
-Signed-off-by: Colin Cross <ccross@google.com>
+Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/cpu-tegra.c |   74 +++++++++++++++++++++++++++++++--------
- 1 files changed, 59 insertions(+), 15 deletions(-)
+ arch/arm/mach-tegra/irq.c |   15 ++++++++++++++-
+ 1 files changed, 14 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
-index fea5719..8363a21 100644
---- a/arch/arm/mach-tegra/cpu-tegra.c
-+++ b/arch/arm/mach-tegra/cpu-tegra.c
-@@ -28,6 +28,7 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/suspend.h>
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 8f0ddc6..458f9c8 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -208,9 +208,21 @@ static int tegra_set_type(unsigned int irq, unsigned int flow_type)
+ 	return 0;
+ }
  
- #include <asm/system.h>
- 
-@@ -36,14 +37,15 @@
- 
- /* Frequency table index must be sequential starting at 0 */
- static struct cpufreq_frequency_table freq_table[] = {
--	{ 0, 312000 },
--	{ 1, 456000 },
--	{ 2, 608000 },
--	{ 3, 760000 },
--	{ 4, 816000 },
--	{ 5, 912000 },
--	{ 6, 1000000 },
--	{ 7, CPUFREQ_TABLE_END },
-+	{ 0, 216000 },
-+	{ 1, 312000 },
-+	{ 2, 456000 },
-+	{ 3, 608000 },
-+	{ 4, 760000 },
-+	{ 5, 816000 },
-+	{ 6, 912000 },
-+	{ 7, 1000000 },
-+	{ 8, CPUFREQ_TABLE_END },
++static void tegra_ack(unsigned int irq)
++{
++	tegra_legacy_force_irq_clr(irq);
++	gic_ack_irq(irq);
++}
++
++static int tegra_retrigger(unsigned int irq)
++{
++	tegra_legacy_force_irq_set(irq);
++	return 1;
++}
++
+ static struct irq_chip tegra_irq = {
+ 	.name		= "PPI",
+-	.ack		= gic_ack_irq,
++	.ack		= tegra_ack,
+ 	.mask		= tegra_mask,
+ 	.unmask		= tegra_unmask,
+ 	.set_wake	= tegra_set_wake,
+@@ -218,6 +230,7 @@ static struct irq_chip tegra_irq = {
+ #ifdef CONFIG_SMP
+ 	.set_affinity	= gic_set_cpu,
+ #endif
++	.retrigger	= tegra_retrigger,
  };
  
- #define NUM_CPUS	2
-@@ -51,6 +53,8 @@ static struct cpufreq_frequency_table freq_table[] = {
- static struct clk *cpu_clk;
- 
- static unsigned long target_cpu_speed[NUM_CPUS];
-+static DEFINE_MUTEX(tegra_cpu_lock);
-+static bool is_suspended;
- 
- int tegra_verify_speed(struct cpufreq_policy *policy)
- {
-@@ -68,16 +72,11 @@ unsigned int tegra_getspeed(unsigned int cpu)
- 	return rate;
- }
- 
--static int tegra_update_cpu_speed(void)
-+static int tegra_update_cpu_speed(unsigned long rate)
- {
--	int i;
--	unsigned long rate = 0;
- 	int ret = 0;
- 	struct cpufreq_freqs freqs;
- 
--	for_each_online_cpu(i)
--		rate = max(rate, target_cpu_speed[i]);
--
- 	freqs.old = tegra_getspeed(0);
- 	freqs.new = rate;
- 
-@@ -105,12 +104,29 @@ static int tegra_update_cpu_speed(void)
- 	return 0;
- }
- 
-+static unsigned long tegra_cpu_highest_speed(void) {
-+	unsigned long rate = 0;
-+	int i;
-+
-+	for_each_online_cpu(i)
-+		rate = max(rate, target_cpu_speed[i]);
-+	return rate;
-+}
-+
- static int tegra_target(struct cpufreq_policy *policy,
- 		       unsigned int target_freq,
- 		       unsigned int relation)
- {
- 	int idx;
- 	unsigned int freq;
-+	int ret = 0;
-+
-+	mutex_lock(&tegra_cpu_lock);
-+
-+	if (is_suspended) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
- 
- 	cpufreq_frequency_table_target(policy, freq_table, target_freq,
- 		relation, &idx);
-@@ -119,9 +135,34 @@ static int tegra_target(struct cpufreq_policy *policy,
- 
- 	target_cpu_speed[policy->cpu] = freq;
- 
--	return tegra_update_cpu_speed();
-+	ret = tegra_update_cpu_speed(tegra_cpu_highest_speed());
-+
-+out:
-+	mutex_unlock(&tegra_cpu_lock);
-+	return ret;
- }
- 
-+static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
-+	void *dummy)
-+{
-+	mutex_lock(&tegra_cpu_lock);
-+	if (event == PM_SUSPEND_PREPARE) {
-+		is_suspended = true;
-+		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
-+			freq_table[0].frequency);
-+		tegra_update_cpu_speed(freq_table[0].frequency);
-+	} else if (event == PM_POST_SUSPEND) {
-+		is_suspended = false;
-+	}
-+	mutex_unlock(&tegra_cpu_lock);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block tegra_cpu_pm_notifier = {
-+	.notifier_call = tegra_pm_notify,
-+};
-+
- static int tegra_cpu_init(struct cpufreq_policy *policy)
- {
- 	if (policy->cpu >= NUM_CPUS)
-@@ -142,6 +183,9 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- 	policy->shared_type = CPUFREQ_SHARED_TYPE_ALL;
- 	cpumask_copy(policy->related_cpus, cpu_possible_mask);
- 
-+	if (policy->cpu == 0)
-+		register_pm_notifier(&tegra_cpu_pm_notifier);
-+
- 	return 0;
- }
- 
+ void __init tegra_init_irq(void)
 -- 
 1.7.3.1
