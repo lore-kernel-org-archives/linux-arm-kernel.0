@@ -1,47 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 05 Dec 2010 11:43:21 +0000
-Subject: [PATCH 1/2] ARM: implement support for read-mostly sections
-In-Reply-To: <20101205114257.GD9138@n2100.arm.linux.org.uk>
-References: <20101205114257.GD9138@n2100.arm.linux.org.uk>
-Message-ID: <E1PPCzx-0004yo-MJ@rmk-PC.arm.linux.org.uk>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Sun, 5 Dec 2010 13:32:37 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <19697.8378.717761.236202@pilspetsen.it.uu.se>
+References: <19697.8378.717761.236202@pilspetsen.it.uu.se>
+Message-ID: <19707.34405.791777.298955@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As our SMP implementation uses MESI protocols.  Grouping together data
-which is mostly only read together means that we avoid unnecessary
-cache line bouncing when this code shares a cache line with other data.
+Mikael Pettersson writes:
+ > The scenario is that I do a remote login to an ARM build server,
+ > use screen to start a sub-shell, in that shell start a largish
+ > compile job, detach from that screen, and from the original login
+ > shell I occasionally monitor the compile job with top or ps or
+ > by attaching to the screen.
+ > 
+ > With kernels 2.6.37-rc2 and -rc3 this causes the machine to become
+ > very sluggish: top takes forever to start, once started it shows no
+ > activity from the compile job (it's as if it's sleeping on a lock),
+ > and ps also takes forever and shows no activity from the compile job.
+ > 
+ > Rebooting into 2.6.36 eliminates these issues.
+ > 
+ > I do pretty much the same thing (remote login -> screen -> compile job)
+ > on other archs, but so far I've only seen the 2.6.37-rc misbehaviour
+ > on ARM EABI, specifically on an IOP n2100. (I have access to other ARM
+ > sub-archs, but haven't had time to test 2.6.37-rc on them yet.)
+ > 
+ > Has anyone else seen this? Any ideas about the cause?
 
-In other words, cache lines associated with read-mostly data are
-expected to spend most of their time in shared state.
+(Re-followup since I just realised my previous followups were to Rafael's
+regressions mailbot rather than the original thread.)
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/cache.h  |    2 ++
- arch/arm/kernel/vmlinux.lds.S |    1 +
- 2 files changed, 3 insertions(+), 0 deletions(-)
+> The bug is still present in 2.6.37-rc4.  I'm currently trying to bisect it.
 
-diff --git a/arch/arm/include/asm/cache.h b/arch/arm/include/asm/cache.h
-index 9d61220..75fe66b 100644
---- a/arch/arm/include/asm/cache.h
-+++ b/arch/arm/include/asm/cache.h
-@@ -23,4 +23,6 @@
- #define ARCH_SLAB_MINALIGN 8
- #endif
- 
-+#define __read_mostly __attribute__((__section__(".data..read_mostly")))
-+
- #endif
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index cead889..1581f6d 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -167,6 +167,7 @@ SECTIONS
- 
- 		NOSAVE_DATA
- 		CACHELINE_ALIGNED_DATA(32)
-+		READ_MOSTLY_DATA(32)
- 
- 		/*
- 		 * The exception fixup table (might need resorting at runtime)
--- 
-1.6.2.5
+git bisect identified
+
+[305e6835e05513406fa12820e40e4a8ecb63743c] sched: Do not account irq time to current task
+
+as the cause of this regression.  Reverting it from 2.6.37-rc4 (requires some
+hackery due to subsequent changes in the same area) restores sane behaviour.
+
+The original patch submission talks about irq-heavy scenarios.  My case is the
+exact opposite: UP, !PREEMPT, NO_HZ, very low irq rate, essentially 100% CPU
+bound in userspace but expected to schedule quickly when needed (e.g. running
+top or ps or just hitting CR in one shell while another runs a compile job).
+
+I've reproduced the misbehaviour with 2.6.37-rc4 on ARM/mach-iop32x and
+ARM/mach-ixp4xx, but ARM/mach-kirkwood does not misbehave, and other archs
+(x86 SMP, SPARC64 UP and SMP, PowerPC32 UP, Alpha UP) also do not misbehave.
+
+So it looks like an ARM-only issue, possibly depending on platform specifics.
+
+One difference I noticed between my Kirkwood machine and my ixp4xx and iop32x
+machines is that even though all have CONFIG_NO_HZ=y, the timer irq rate is
+much higher on Kirkwood, even when the machine is idle.
+
+/Mikael
