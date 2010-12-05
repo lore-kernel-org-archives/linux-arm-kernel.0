@@ -1,63 +1,51 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  5 Dec 2010 15:08:48 -0800
-Subject: [PATCH 01/21] ARM: tegra: irq: Rename gic pointers to avoid conflicts
+Date: Sun,  5 Dec 2010 15:09:03 -0800
+Subject: [PATCH 16/21] ARM: tegra: gpio: Add support for waking from suspend
 In-Reply-To: <1291590548-7341-1-git-send-email-ccross@android.com>
 References: <1291590548-7341-1-git-send-email-ccross@android.com>
-Message-ID: <1291590548-7341-2-git-send-email-ccross@android.com>
+Message-ID: <1291590548-7341-17-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A future patch will export gic_mask_irq and gic_unmask_irq.
-Rename the pointers in arch/arm/mach-tegra/irq.c to avoid
-a compile error.
+From: Colin Cross <ccross@google.com>
 
-Signed-off-by: Colin Cross <ccross@android.com>
+Signed-off-by: Colin Cross <ccross@google.com>
 ---
- arch/arm/mach-tegra/irq.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/gpio.c |   14 +++++++++++++-
+ 1 files changed, 13 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 50a8dfb..37b4f97 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -46,8 +46,8 @@
- #define ICTLR_COP_IER_CLR	0x38
- #define ICTLR_COP_IEP_CLASS	0x3c
+diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+index 1bf92e5..0187aaa 100644
+--- a/arch/arm/mach-tegra/gpio.c
++++ b/arch/arm/mach-tegra/gpio.c
+@@ -212,6 +212,9 @@ static int tegra_gpio_irq_set_type(unsigned int irq, unsigned int type)
+ 	else if (type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
+ 		__set_irq_handler_unlocked(irq, handle_edge_irq);
  
--static void (*gic_mask_irq)(unsigned int irq);
--static void (*gic_unmask_irq)(unsigned int irq);
-+static void (*tegra_gic_mask_irq)(unsigned int irq);
-+static void (*tegra_gic_unmask_irq)(unsigned int irq);
- 
- #define irq_to_ictlr(irq) (((irq)-32) >> 5)
- static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
-@@ -56,14 +56,14 @@ static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
- static void tegra_mask(unsigned int irq)
- {
- 	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
--	gic_mask_irq(irq);
-+	tegra_gic_mask_irq(irq);
- 	writel(1<<(irq&31), addr+ICTLR_CPU_IER_CLR);
++	if (tegra_get_suspend_mode() == TEGRA_SUSPEND_LP0)
++		tegra_set_lp0_wake_type(irq, type);
++
+ 	return 0;
  }
  
- static void tegra_unmask(unsigned int irq)
+@@ -319,8 +322,17 @@ void tegra_gpio_suspend(void)
+ 
+ static int tegra_gpio_wake_enable(unsigned int irq, unsigned int enable)
  {
- 	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
--	gic_unmask_irq(irq);
-+	tegra_gic_unmask_irq(irq);
- 	writel(1<<(irq&31), addr+ICTLR_CPU_IER_SET);
++	int ret;
+ 	struct tegra_gpio_bank *bank = get_irq_chip_data(irq);
+-	return set_irq_wake(bank->irq, enable);
++
++	ret = tegra_set_lp1_wake(bank->irq, enable);
++	if (ret)
++		return ret;
++
++	if (tegra_get_suspend_mode() == TEGRA_SUSPEND_LP0)
++		return tegra_set_lp0_wake(irq, enable);
++
++	return 0;
  }
+ #endif
  
-@@ -98,8 +98,8 @@ void __init tegra_init_irq(void)
- 	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
- 
- 	gic = get_irq_chip(29);
--	gic_unmask_irq = gic->unmask;
--	gic_mask_irq = gic->mask;
-+	tegra_gic_unmask_irq = gic->unmask;
-+	tegra_gic_mask_irq = gic->mask;
- 	tegra_irq.ack = gic->ack;
- #ifdef CONFIG_SMP
- 	tegra_irq.set_affinity = gic->set_affinity;
 -- 
 1.7.3.1
