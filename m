@@ -1,112 +1,42 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun,  5 Dec 2010 12:06:03 +0200
-Subject: [RFC] add BUG_ON_MAPPABLE_NULL macro
-Message-ID: <1291543563-5655-1-git-send-email-ohad@wizery.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Sun, 5 Dec 2010 12:28:14 +0100
+Subject: [PATCH 09/10] MCDE: Add build files and bus
+In-Reply-To: <AANLkTinSb-9=xzX3LfZVYcKiDt5Qkm=qV6CiFGUyq+fC@mail.gmail.com>
+References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
+	<201011251747.48365.arnd@arndb.de>
+	<C832F8F5D375BD43BFA11E82E0FE9FE0082586F430@EXDCVYMBSTM005.EQ1STM.local>
+	<201011261224.59490.arnd@arndb.de>
+	<AANLkTinSb-9=xzX3LfZVYcKiDt5Qkm=qV6CiFGUyq+fC@mail.gmail.com>
+Message-ID: <20101205112813.GB12542@viiv.ffwll.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce BUG_ON_MAPPABLE_NULL in order to eliminate redundant BUG_ON
-code, checking for NULL addresses, on architectures where the zero
-address can never be mapped.
+On Sat, Dec 04, 2010 at 04:34:22PM -0500, Alex Deucher wrote:
+> This doesn't seem that different from the graphics chips we support
+> with kms.  I don't think it would require much work to use KMS.  One
+> thing we considered, but never ended up implementing was a generic
+> overlay API for KMS.  Most PC hardware still has overlays, but we
+> don't use them much any more on the desktop side.  It may be
+> worthwhile to design an appropriate API for them for these type of
+> hardware.
 
-Originally proposed by Russell King <linux@arm.linux.org.uk>
+Just fyi about a generic overlay api: I've looked a bit into this when
+doing the intel overlay support and I think adding special overlay crtcs
+that can be attached real crtcs gives a nice clean api. We could the reuse
+the existing framebuffer/pageflipping api to get the buffers to the
+overlay engine.
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
-Compile tested on ARM and x86-64.
+The real pain starts when we want format discovery from userspace with all
+the alignement/size/layout constrains. Add in tiling support and its
+almost impossible to do in a generic way. But also for kms userspace needs
+to know these constrains (implemented for generic use in libkms). I favor
+such an approach for overlays, too (if it ever happens) - i.e. a few
+helpers in libkms that allocate an appropriate buffer for a given format
+and size and returns the buffer, strides and offsets for the different
+planes.
 
-Relevant threads:
-1. Original proposal by Russell - http://lkml.org/lkml/2010/1/21/238
-2. Recent discussion - https://lkml.org/lkml/2010/11/26/78
-
-Notes:
-* Implementation still feels hacky, especially since we don't care about the len param of arch_mmap_check.
-* Just like BUG_ON, this new macro is compiled out on !CONFIG_BUG. We might want to add a CONFIG_BUG commentary, so users will at least be aware of the security implications of compiling this out.
-* To get an (extremely!) rough upper bound of the profit of this macro, I did:
-
-1. find . -name '*.[ch]' | xargs sed -i 's/BUG_ON(!/BUG_ON_MAPPABLE_NULL(!/'
-2. removed some obviously bogus sed hits
-
-With omap2plus_defconfig, uImage shrank by ~4Kb (obviously this doesn't include the potential gain in modules)
-
- arch/arm/include/asm/mman.h |    2 +
- include/asm-generic/bug.h   |   46 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/mman.h b/arch/arm/include/asm/mman.h
-index 41f99c5..f0c5d58 100644
---- a/arch/arm/include/asm/mman.h
-+++ b/arch/arm/include/asm/mman.h
-@@ -1,4 +1,6 @@
- #include <asm-generic/mman.h>
-+#include <asm/pgtable.h>
-+#include <asm/errno.h>
- 
- #define arch_mmap_check(addr, len, flags) \
- 	(((flags) & MAP_FIXED && (addr) < FIRST_USER_ADDRESS) ? -EINVAL : 0)
-diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
-index c2c9ba0..0171a30 100644
---- a/include/asm-generic/bug.h
-+++ b/include/asm-generic/bug.h
-@@ -2,6 +2,11 @@
- #define _ASM_GENERIC_BUG_H
- 
- #include <linux/compiler.h>
-+#include <asm/mman.h>
-+
-+#ifndef arch_mmap_check
-+#define arch_mmap_check(addr, len, flags)	(0)
-+#endif
- 
- #ifdef CONFIG_BUG
- 
-@@ -53,6 +58,47 @@ struct bug_entry {
- #define BUG_ON(condition) do { if (unlikely(condition)) BUG(); } while(0)
- #endif
- 
-+/**
-+ * BUG_ON_MAPPABLE_NULL() - BUG_ON(condition) only if address 0 is mappable
-+ * @condition:	condition to check, should contain a NULL check
-+ *
-+ * In general, NULL dereference Oopses are not desirable, since they take down
-+ * the system with them and make the user extremely unhappy. So as a general
-+ * rule drivers should avoid dereferencing NULL pointers by doing a simple
-+ * check (when appropriate), and just return an error rather than crash.
-+ * This way the system, despite having reduced functionality, will just keep
-+ * running rather than immediately reboot.
-+ *
-+ * _Critical_ kernel code, OTOH, that should not (/cannot) keep running when
-+ * given an unexpected NULL pointer, should just crash. On some architectures,
-+ * a NULL dereference will always reliably produce an Oops. On others, where
-+ * the zero address can be mmapped, an Oops is not guaranteed. Relying on
-+ * NULL dereference Oopses to happen on these architectures might lead to
-+ * data corruptions (system will keep running despite a critical bug and
-+ * the results will be horribly undefined). In addition, these situations
-+ * can also have security implications - we have seen several privilege
-+ * escalation exploits with which an attacker gained full control over the
-+ * system due to NULL dereference bugs.
-+ *
-+ * This macro will BUG_ON if @condition is true on architectures where the zero
-+ * address can be mapped. On other architectures, where the zero address
-+ * can never be mapped, this macro is compiled out. It only makes sense to
-+ * use this macro if @condition contains a NULL check, in order to optimize that
-+ * check out on architectures where the zero address can never be mapped.
-+ * On such architectures, those checks are not necessary, since the code
-+ * itself will reliably reproduce an Oops as soon as the NULL address will
-+ * be dereferenced.
-+ *
-+ * As with BUG_ON, use this macro only if @condition cannot be tolerated.
-+ * If proceeding with degraded functionality is an option, it's much
-+ * better to just simply check for @condition and return some error code rather
-+ * than crash the system.
-+ */
-+#define BUG_ON_MAPPABLE_NULL(cond) do { \
-+	if (arch_mmap_check(0, 1, MAP_FIXED) == 0) \
-+		BUG_ON(cond); \
-+} while (0)
-+
- /*
-  * WARN(), WARN_ON(), WARN_ON_ONCE, and so on can be used to report
-  * significant issues that need prompt attention if they should ever
+-Daniel
 -- 
-1.7.0.4
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
