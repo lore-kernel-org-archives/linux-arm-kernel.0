@@ -1,42 +1,67 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Sun, 5 Dec 2010 12:28:14 +0100
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <AANLkTinSb-9=xzX3LfZVYcKiDt5Qkm=qV6CiFGUyq+fC@mail.gmail.com>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011251747.48365.arnd@arndb.de>
-	<C832F8F5D375BD43BFA11E82E0FE9FE0082586F430@EXDCVYMBSTM005.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-	<AANLkTinSb-9=xzX3LfZVYcKiDt5Qkm=qV6CiFGUyq+fC@mail.gmail.com>
-Message-ID: <20101205112813.GB12542@viiv.ffwll.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 5 Dec 2010 11:33:11 +0000
+Subject: [PATCH 0/5] ARM: GIC: cleanup
+Message-ID: <20101205113311.GC9138@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 04, 2010 at 04:34:22PM -0500, Alex Deucher wrote:
-> This doesn't seem that different from the graphics chips we support
-> with kms.  I don't think it would require much work to use KMS.  One
-> thing we considered, but never ended up implementing was a generic
-> overlay API for KMS.  Most PC hardware still has overlays, but we
-> don't use them much any more on the desktop side.  It may be
-> worthwhile to design an appropriate API for them for these type of
-> hardware.
+This patch series cleans up the GIC code, consolidating some of the
+per-platform practices into the common GIC code.
 
-Just fyi about a generic overlay api: I've looked a bit into this when
-doing the intel overlay support and I think adding special overlay crtcs
-that can be attached real crtcs gives a nice clean api. We could the reuse
-the existing framebuffer/pageflipping api to get the buffers to the
-overlay engine.
+One notable change is to the initialization methods - we used to
+require platforms to pass in the address of the per-CPU interfaces
+despite them always being identical between all cores.  This was
+nonsense, as even in the extremely unlikely event that they were
+different, we aren't storing them in a per-CPU manner.
 
-The real pain starts when we want format discovery from userspace with all
-the alignement/size/layout constrains. Add in tiling support and its
-almost impossible to do in a generic way. But also for kms userspace needs
-to know these constrains (implemented for generic use in libkms). I favor
-such an approach for overlays, too (if it ever happens) - i.e. a few
-helpers in libkms that allocate an appropriate buffer for a given format
-and size and returns the buffer, strides and offsets for the different
-planes.
+The GIC initialization methods are now simpler: one call to gic_init()
+from the boot CPU, and a call to gic_secondary_init() as each
+secondary CPU starts - and no need for platforms to keep track of
+the address anymore.
 
--Daniel
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+One question remains on this: on platforms where there are more than
+one GIC, do these have separate CPU interfaces as well?
+
+We also consolidate gic_cpu_base_addr to save platforms using that -
+but only for the first GIC, and therefore we can have a common
+get_irqnr_preamble assembler macro for platforms which make use of
+this.
+
+Lastly, we move the GIC data to __read_mostly - and when we have
+support for this feature, we benefit from avoiding potential cache
+line ping-pongs between cores for data so marked.
+
+ arch/arm/common/gic.c                             |   59 +++++++++++++-------
+ arch/arm/include/asm/hardware/entry-macro-gic.S   |    7 +++
+ arch/arm/include/asm/hardware/gic.h               |    6 ++-
+ arch/arm/mach-cns3xxx/core.c                      |    7 +--
+ arch/arm/mach-cns3xxx/core.h                      |    1 -
+ arch/arm/mach-cns3xxx/include/mach/entry-macro.S  |    5 --
+ arch/arm/mach-msm/board-msm8x60.c                 |    7 +--
+ arch/arm/mach-omap2/include/mach/entry-macro.S    |    1 +
+ arch/arm/mach-omap2/include/mach/omap4-common.h   |    1 -
+ arch/arm/mach-omap2/omap-smp.c                    |    2 +-
+ arch/arm/mach-omap2/omap4-common.c                |   11 ++--
+ arch/arm/mach-realview/core.c                     |    3 -
+ arch/arm/mach-realview/core.h                     |    1 -
+ arch/arm/mach-realview/include/mach/entry-macro.S |    5 --
+ arch/arm/mach-realview/platsmp.c                  |    2 +-
+ arch/arm/mach-realview/realview_eb.c              |   14 ++---
+ arch/arm/mach-realview/realview_pb1176.c          |   11 ++--
+ arch/arm/mach-realview/realview_pb11mp.c          |   10 ++--
+ arch/arm/mach-realview/realview_pba8.c            |    6 +-
+ arch/arm/mach-realview/realview_pbx.c             |   13 ++---
+ arch/arm/mach-s5pv310/cpu.c                       |    6 +--
+ arch/arm/mach-s5pv310/include/mach/smp.h          |    2 -
+ arch/arm/mach-s5pv310/platsmp.c                   |    2 +-
+ arch/arm/mach-tegra/include/mach/entry-macro.S    |    2 +-
+ arch/arm/mach-tegra/irq.c                         |    4 +-
+ arch/arm/mach-tegra/platsmp.c                     |    2 +-
+ arch/arm/mach-ux500/cpu.c                         |    4 +-
+ arch/arm/mach-ux500/include/mach/entry-macro.S    |    1 +
+ arch/arm/mach-ux500/platsmp.c                     |    2 +-
+ arch/arm/mach-vexpress/core.h                     |    2 -
+ arch/arm/mach-vexpress/ct-ca9x4.c                 |    7 +--
+ arch/arm/mach-vexpress/include/mach/entry-macro.S |    5 --
+ arch/arm/mach-vexpress/platsmp.c                  |    2 +-
+ 33 files changed, 100 insertions(+), 113 deletions(-)
