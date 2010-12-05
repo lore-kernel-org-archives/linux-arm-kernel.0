@@ -1,222 +1,164 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  5 Dec 2010 15:08:49 -0800
-Subject: [PATCH 02/21] ARM: gic: Add functions to save and restore gic state
+Date: Sun,  5 Dec 2010 15:09:06 -0800
+Subject: [PATCH 19/21] ARM: tegra: cpufreq: Disable cpufreq during suspend
 In-Reply-To: <1291590548-7341-1-git-send-email-ccross@android.com>
 References: <1291590548-7341-1-git-send-email-ccross@android.com>
-Message-ID: <1291590548-7341-3-git-send-email-ccross@android.com>
+Message-ID: <1291590548-7341-20-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on systems with idle states which power-gate the logic including
-the gic, such as tegra, the gic distributor needs to be shut down
-and restored on entry and exit from the architecture idle code
+From: Colin Cross <ccross@google.com>
 
-Original-author: Gary King <gking@nvidia.com>
-Signed-off-by: Gary King <gking@nvidia.com>
-Signed-off-by: Colin Cross <ccross@android.com>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Adds a SUSPEND_PREPARE notification hook to drop the frequency to
+the lowest possible during suspend.  This prevents the cpufreq driver
+from attempting regulator calls after suspend has started - the
+regulator api can call into drivers that have already been suspended.
+Also adds 216MHz (off of PLLP) as the lowest CPU frequency, which
+allows PLLX to be turned off.
+
+Signed-off-by: Colin Cross <ccross@google.com>
 ---
- arch/arm/common/gic.c               |  136 ++++++++++++++++++++++++++++++++--
- arch/arm/include/asm/hardware/gic.h |    4 +
- 2 files changed, 132 insertions(+), 8 deletions(-)
+ arch/arm/mach-tegra/cpu-tegra.c |   74 +++++++++++++++++++++++++++++++--------
+ 1 files changed, 59 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 772f95f..9deb34f 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -39,6 +39,13 @@ struct gic_chip_data {
- 	unsigned int irq_offset;
- 	void __iomem *dist_base;
- 	void __iomem *cpu_base;
-+#ifdef CONFIG_PM
-+	u32 saved_enable[DIV_ROUND_UP(1020, 32)];
-+	u32 saved_conf[DIV_ROUND_UP(1020, 16)];
-+	u32 saved_pri[DIV_ROUND_UP(1020, 4)];
-+	u32 saved_target[DIV_ROUND_UP(1020, 4)];
-+#endif
-+	unsigned int max_irq;
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index fea5719..8363a21 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -28,6 +28,7 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/suspend.h>
+ 
+ #include <asm/system.h>
+ 
+@@ -36,14 +37,15 @@
+ 
+ /* Frequency table index must be sequential starting at 0 */
+ static struct cpufreq_frequency_table freq_table[] = {
+-	{ 0, 312000 },
+-	{ 1, 456000 },
+-	{ 2, 608000 },
+-	{ 3, 760000 },
+-	{ 4, 816000 },
+-	{ 5, 912000 },
+-	{ 6, 1000000 },
+-	{ 7, CPUFREQ_TABLE_END },
++	{ 0, 216000 },
++	{ 1, 312000 },
++	{ 2, 456000 },
++	{ 3, 608000 },
++	{ 4, 760000 },
++	{ 5, 816000 },
++	{ 6, 912000 },
++	{ 7, 1000000 },
++	{ 8, CPUFREQ_TABLE_END },
  };
  
- #ifndef MAX_GIC_NR
-@@ -207,21 +214,15 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
- 	set_irq_chained_handler(irq, gic_handle_cascade_irq);
+ #define NUM_CPUS	2
+@@ -51,6 +53,8 @@ static struct cpufreq_frequency_table freq_table[] = {
+ static struct clk *cpu_clk;
+ 
+ static unsigned long target_cpu_speed[NUM_CPUS];
++static DEFINE_MUTEX(tegra_cpu_lock);
++static bool is_suspended;
+ 
+ int tegra_verify_speed(struct cpufreq_policy *policy)
+ {
+@@ -68,16 +72,11 @@ unsigned int tegra_getspeed(unsigned int cpu)
+ 	return rate;
  }
  
--void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
--			  unsigned int irq_start)
-+static unsigned int _gic_dist_init(unsigned int gic_nr)
+-static int tegra_update_cpu_speed(void)
++static int tegra_update_cpu_speed(unsigned long rate)
  {
- 	unsigned int max_irq, i;
-+	void __iomem *base = gic_data[gic_nr].dist_base;
- 	u32 cpumask = 1 << smp_processor_id();
+-	int i;
+-	unsigned long rate = 0;
+ 	int ret = 0;
+ 	struct cpufreq_freqs freqs;
  
--	if (gic_nr >= MAX_GIC_NR)
--		BUG();
+-	for_each_online_cpu(i)
+-		rate = max(rate, target_cpu_speed[i]);
 -
- 	cpumask |= cpumask << 8;
- 	cpumask |= cpumask << 16;
+ 	freqs.old = tegra_getspeed(0);
+ 	freqs.new = rate;
  
--	gic_data[gic_nr].dist_base = base;
--	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
--
- 	writel(0, base + GIC_DIST_CTRL);
+@@ -105,12 +104,29 @@ static int tegra_update_cpu_speed(void)
+ 	return 0;
+ }
  
- 	/*
-@@ -263,6 +264,109 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
- 	for (i = 32; i < max_irq; i += 32)
- 		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
- 
-+	return max_irq;
-+}
-+
-+static void _gic_dist_exit(unsigned int gic_nr)
-+{
-+	writel(0, gic_data[gic_nr].dist_base + GIC_DIST_CTRL);
-+}
-+
-+#ifdef CONFIG_PM
-+/*
-+ * Saves the GIC distributor registers during suspend or idle.  Must be called
-+ * with interrupts disabled but before powering down the GIC.  After calling
-+ * this function, no interrupts will be delivered by the GIC, and another
-+ * platform-specific wakeup source must be enabled.
-+ */
-+void gic_dist_save(unsigned int gic_nr)
-+{
-+	unsigned int max_irq = gic_data[gic_nr].max_irq;
-+	void __iomem *dist_base = gic_data[gic_nr].dist_base;
++static unsigned long tegra_cpu_highest_speed(void) {
++	unsigned long rate = 0;
 +	int i;
 +
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	_gic_dist_exit(gic_nr);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
-+		gic_data[gic_nr].saved_conf[i] =
-+			readl(dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		gic_data[gic_nr].saved_pri[i] =
-+			readl(dist_base + GIC_DIST_PRI + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		gic_data[gic_nr].saved_target[i] =
-+			readl(dist_base + GIC_DIST_TARGET + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
-+		gic_data[gic_nr].saved_enable[i] =
-+			readl(dist_base + GIC_DIST_ENABLE_SET + i * 4);
++	for_each_online_cpu(i)
++		rate = max(rate, target_cpu_speed[i]);
++	return rate;
 +}
 +
-+/*
-+ * Restores the GIC distributor registers during resume or when coming out of
-+ * idle.  Must be called before enabling interrupts.  If a level interrupt
-+ * that occured while the GIC was suspended is still present, it will be
-+ * handled normally, but any edge interrupts that occured will not be seen by
-+ * the GIC and need to be handled by the platform-specific wakeup source.
-+ */
-+void gic_dist_restore(unsigned int gic_nr)
-+{
-+	unsigned int max_irq;
-+	unsigned int i;
-+	void __iomem *dist_base;
-+	void __iomem *cpu_base;
+ static int tegra_target(struct cpufreq_policy *policy,
+ 		       unsigned int target_freq,
+ 		       unsigned int relation)
+ {
+ 	int idx;
+ 	unsigned int freq;
++	int ret = 0;
 +
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
++	mutex_lock(&tegra_cpu_lock);
 +
-+	_gic_dist_init(gic_nr);
++	if (is_suspended) {
++		ret = -EBUSY;
++		goto out;
++	}
+ 
+ 	cpufreq_frequency_table_target(policy, freq_table, target_freq,
+ 		relation, &idx);
+@@ -119,9 +135,34 @@ static int tegra_target(struct cpufreq_policy *policy,
+ 
+ 	target_cpu_speed[policy->cpu] = freq;
+ 
+-	return tegra_update_cpu_speed();
++	ret = tegra_update_cpu_speed(tegra_cpu_highest_speed());
 +
-+	max_irq = gic_data[gic_nr].max_irq;
-+	dist_base = gic_data[gic_nr].dist_base;
-+	cpu_base = gic_data[gic_nr].cpu_base;
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
-+		writel(gic_data[gic_nr].saved_conf[i],
-+			dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		writel(gic_data[gic_nr].saved_pri[i],
-+			dist_base + GIC_DIST_PRI + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		writel(gic_data[gic_nr].saved_target[i],
-+			dist_base + GIC_DIST_TARGET + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
-+		writel(gic_data[gic_nr].saved_enable[i],
-+			dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+
-+	writel(1, dist_base + GIC_DIST_CTRL);
-+	writel(0xf0, cpu_base + GIC_CPU_PRIMASK);
-+	writel(1, cpu_base + GIC_CPU_CTRL);
-+}
-+#endif
-+
-+void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
-+			  unsigned int irq_start)
-+{
-+	unsigned int max_irq;
-+	unsigned int i;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	gic_data[gic_nr].dist_base = base;
-+	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
-+
-+	max_irq = _gic_dist_init(gic_nr);
-+	gic_data[gic_nr].max_irq = max_irq;
-+
- 	/*
- 	 * Setup the Linux IRQ subsystem.
- 	 */
-@@ -276,6 +380,14 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
- 	writel(1, base + GIC_DIST_CTRL);
++out:
++	mutex_unlock(&tegra_cpu_lock);
++	return ret;
  }
  
-+void gic_dist_exit(unsigned int gic_nr)
++static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
++	void *dummy)
 +{
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
++	mutex_lock(&tegra_cpu_lock);
++	if (event == PM_SUSPEND_PREPARE) {
++		is_suspended = true;
++		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
++			freq_table[0].frequency);
++		tegra_update_cpu_speed(freq_table[0].frequency);
++	} else if (event == PM_POST_SUSPEND) {
++		is_suspended = false;
++	}
++	mutex_unlock(&tegra_cpu_lock);
 +
-+	_gic_dist_exit(gic_nr);
++	return NOTIFY_OK;
 +}
 +
- void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
++static struct notifier_block tegra_cpu_pm_notifier = {
++	.notifier_call = tegra_pm_notify,
++};
++
+ static int tegra_cpu_init(struct cpufreq_policy *policy)
  {
- 	void __iomem *dist_base;
-@@ -306,6 +418,14 @@ void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
- 	writel(1, base + GIC_CPU_CTRL);
+ 	if (policy->cpu >= NUM_CPUS)
+@@ -142,6 +183,9 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+ 	policy->shared_type = CPUFREQ_SHARED_TYPE_ALL;
+ 	cpumask_copy(policy->related_cpus, cpu_possible_mask);
+ 
++	if (policy->cpu == 0)
++		register_pm_notifier(&tegra_cpu_pm_notifier);
++
+ 	return 0;
  }
  
-+void gic_cpu_exit(unsigned int gic_nr)
-+{
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	writel(0, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
-+}
-+
- #ifdef CONFIG_SMP
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 7f34333..0a198b0 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -34,7 +34,11 @@
- 
- #ifndef __ASSEMBLY__
- void gic_dist_init(unsigned int gic_nr, void __iomem *base, unsigned int irq_start);
-+void gic_dist_save(unsigned int gic_nr);
-+void gic_dist_restore(unsigned int gic_nr);
-+void gic_dist_exit(unsigned int gic_nr);
- void gic_cpu_init(unsigned int gic_nr, void __iomem *base);
-+void gic_cpu_exit(unsigned int gic_nr);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
- #endif
 -- 
 1.7.3.1
