@@ -1,159 +1,112 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Dec 2010 09:23:45 +0000
-Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
-	run-time
-In-Reply-To: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
-References: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
-Message-ID: <20101205092345.GA9138@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun,  5 Dec 2010 12:06:03 +0200
+Subject: [RFC] add BUG_ON_MAPPABLE_NULL macro
+Message-ID: <1291543563-5655-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 22, 2010 at 04:26:50PM +0800, Eric Miao wrote:
-> I wonder if it's still acceptable for a patch like below to have a dynamic IRQ
-> handler at run-time. There is some changes to the irq_handler, esp. some
-> SMP changes.
-> 
-> Magnus had some similar patches to have a run-time irq_handler, which is
-> a bit more complicated, but I'm also very happy with.
+Introduce BUG_ON_MAPPABLE_NULL in order to eliminate redundant BUG_ON
+code, checking for NULL addresses, on architectures where the zero
+address can never be mapped.
 
-I'd prefer a simple but efficient approach.  I am worried about
-unnecessarily increasing the IRQ latency - and IRQ latency is something
-that we should be concerned about.  It has the ability to make platforms
-useless.
+Originally proposed by Russell King <linux@arm.linux.org.uk>
 
-Eg, we know that SMC91x net interfaces are sensitive to IRQ latency, and
-the same is true of serial ports with small FIFOs.
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+Compile tested on ARM and x86-64.
 
-Any attempt to support multiple IRQ handlers is going to increase IRQ
-handling latency - I don't think that's something which can be avoided,
-and I'm wondering what effect this and the recent genirq changes is going
-to have.  Has anyone been keeping an eye on IRQ handling latency?
+Relevant threads:
+1. Original proposal by Russell - http://lkml.org/lkml/2010/1/21/238
+2. Recent discussion - https://lkml.org/lkml/2010/11/26/78
 
-Lastly, this patch is dependent on your machine class patches, which makes
-it unsuitable as-is for mainline.
+Notes:
+* Implementation still feels hacky, especially since we don't care about the len param of arch_mmap_check.
+* Just like BUG_ON, this new macro is compiled out on !CONFIG_BUG. We might want to add a CONFIG_BUG commentary, so users will at least be aware of the security implications of compiling this out.
+* To get an (extremely!) rough upper bound of the profit of this macro, I did:
 
-> commit d57e464929c9b2b50cda07e8683679583adf0fee
-> Author: Eric Miao <eric.y.miao@gmail.com>
-> Date:   Mon Nov 22 16:13:51 2010 +0800
-> 
->     ARM: Allow machine to specify it's own IRQ handlers at run-time
-> 
->     Normally different ARM platform has different way to decode the IRQ
->     hardware status and demultiplex to the corresponding IRQ handler.
->     This is highly optimized by macro irq_handler in entry-armv.S, and
->     each machine class defines their own macro to decode the IRQ number.
->     However, this prevents multiple machine classes to be built into a
->     single kernel.
-> 
->     By allowing each machine to specify thier own handler, and making
->     function pointer 'handle_arch_irq' to point to it at run time, this
->     can be solved. And introduce CONFIG_MULTI_IRQ_HANDLER to allow both
->     solutions to work.
-> 
->     Comparing with the highly optimized macro of irq_handler, the new
->     function must be written with care not to lose too much performance.
->     And the IPI stuff on SMP is expected to move to the provided arch
->     IRQ handler as well.
-> 
->     Signed-off-by: Eric Miao <eric.miao@canonical.com>
->     Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a19a526..c2c9838 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1017,6 +1017,11 @@ config CPU_HAS_PMU
->  	default y
->  	bool
-> 
-> +config MULTI_IRQ_HANDLER
-> +	bool
-> +	help
-> +	  Allow each machine to specify it's own IRQ handler at run time.
-> +
->  if !MMU
->  source "arch/arm/Kconfig-nommu"
->  endif
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index d97a964..7d55356 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -40,6 +40,9 @@ struct machine_desc {
->  	void			(*init_irq)(void);
->  	struct sys_timer	*timer;		/* system tick timer	*/
->  	void			(*init_machine)(void);
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +	void			(*handle_irq)(struct pt_regs *);
-> +#endif
->  };
-> 
->  /*
-> diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-> index ce3eee9..6ecdad9 100644
-> --- a/arch/arm/include/asm/mach/irq.h
-> +++ b/arch/arm/include/asm/mach/irq.h
-> @@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
->  extern void init_FIQ(void);
->  extern int show_fiq_list(struct seq_file *, void *);
-> 
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +extern void (*handle_arch_irq)(struct pt_regs *);
-> +#endif
-> +
->  /*
->   * This is for easy migration, but should be changed in the source
->   */
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index c09e357..8ed4f7c 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -29,6 +29,7 @@
->  /*
->   * Interrupt handling.  Preserves r7, r8, r9
->   */
-> +#ifndef CONFIG_MULTI_IRQ_HANDLER
->  	.macro	irq_handler
->  	get_irqnr_preamble r5, lr
->  1:	get_irqnr_and_base r0, r6, r5, lr
-> @@ -62,6 +63,14 @@
->  #endif
-> 
->  	.endm
-> +#else
-> +	.macro	irq_handler
-> +	ldr	r4, =handle_arch_irq
-> +	mov	r0, sp
-> +	mov	lr, pc
-> +	ldr	pc, [r4]
-> +	.endm
-> +#endif	/* CONFIG_MULTI_IRQ_HANDLER */
-> 
->  #ifdef CONFIG_KPROBES
->  	.section	.kprobes.text,"ax",%progbits
-> @@ -1245,3 +1254,9 @@ cr_alignment:
->  	.space	4
->  cr_no_alignment:
->  	.space	4
-> +
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +	.globl	handle_arch_irq
-> +handle_arch_irq:
-> +	.long	0
-> +#endif
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 336f14e..a834c6c 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -876,6 +876,12 @@ void __init setup_arch(char **cmdline_p)
->  	system_timer = mdesc->timer;
->  	init_machine = mdesc->init_machine;
-> 
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +	handle_arch_irq = class ? class->handle_irq : NULL;
-> +	if (!handle_arch_irq)
-> +		panic("No machine class specific IRQ handler defined\n");
-> +#endif
-> +
->  #ifdef CONFIG_VT
->  #if defined(CONFIG_VGA_CONSOLE)
->  	conswitchp = &vga_con;
+1. find . -name '*.[ch]' | xargs sed -i 's/BUG_ON(!/BUG_ON_MAPPABLE_NULL(!/'
+2. removed some obviously bogus sed hits
+
+With omap2plus_defconfig, uImage shrank by ~4Kb (obviously this doesn't include the potential gain in modules)
+
+ arch/arm/include/asm/mman.h |    2 +
+ include/asm-generic/bug.h   |   46 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/mman.h b/arch/arm/include/asm/mman.h
+index 41f99c5..f0c5d58 100644
+--- a/arch/arm/include/asm/mman.h
++++ b/arch/arm/include/asm/mman.h
+@@ -1,4 +1,6 @@
+ #include <asm-generic/mman.h>
++#include <asm/pgtable.h>
++#include <asm/errno.h>
+ 
+ #define arch_mmap_check(addr, len, flags) \
+ 	(((flags) & MAP_FIXED && (addr) < FIRST_USER_ADDRESS) ? -EINVAL : 0)
+diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
+index c2c9ba0..0171a30 100644
+--- a/include/asm-generic/bug.h
++++ b/include/asm-generic/bug.h
+@@ -2,6 +2,11 @@
+ #define _ASM_GENERIC_BUG_H
+ 
+ #include <linux/compiler.h>
++#include <asm/mman.h>
++
++#ifndef arch_mmap_check
++#define arch_mmap_check(addr, len, flags)	(0)
++#endif
+ 
+ #ifdef CONFIG_BUG
+ 
+@@ -53,6 +58,47 @@ struct bug_entry {
+ #define BUG_ON(condition) do { if (unlikely(condition)) BUG(); } while(0)
+ #endif
+ 
++/**
++ * BUG_ON_MAPPABLE_NULL() - BUG_ON(condition) only if address 0 is mappable
++ * @condition:	condition to check, should contain a NULL check
++ *
++ * In general, NULL dereference Oopses are not desirable, since they take down
++ * the system with them and make the user extremely unhappy. So as a general
++ * rule drivers should avoid dereferencing NULL pointers by doing a simple
++ * check (when appropriate), and just return an error rather than crash.
++ * This way the system, despite having reduced functionality, will just keep
++ * running rather than immediately reboot.
++ *
++ * _Critical_ kernel code, OTOH, that should not (/cannot) keep running when
++ * given an unexpected NULL pointer, should just crash. On some architectures,
++ * a NULL dereference will always reliably produce an Oops. On others, where
++ * the zero address can be mmapped, an Oops is not guaranteed. Relying on
++ * NULL dereference Oopses to happen on these architectures might lead to
++ * data corruptions (system will keep running despite a critical bug and
++ * the results will be horribly undefined). In addition, these situations
++ * can also have security implications - we have seen several privilege
++ * escalation exploits with which an attacker gained full control over the
++ * system due to NULL dereference bugs.
++ *
++ * This macro will BUG_ON if @condition is true on architectures where the zero
++ * address can be mapped. On other architectures, where the zero address
++ * can never be mapped, this macro is compiled out. It only makes sense to
++ * use this macro if @condition contains a NULL check, in order to optimize that
++ * check out on architectures where the zero address can never be mapped.
++ * On such architectures, those checks are not necessary, since the code
++ * itself will reliably reproduce an Oops as soon as the NULL address will
++ * be dereferenced.
++ *
++ * As with BUG_ON, use this macro only if @condition cannot be tolerated.
++ * If proceeding with degraded functionality is an option, it's much
++ * better to just simply check for @condition and return some error code rather
++ * than crash the system.
++ */
++#define BUG_ON_MAPPABLE_NULL(cond) do { \
++	if (arch_mmap_check(0, 1, MAP_FIXED) == 0) \
++		BUG_ON(cond); \
++} while (0)
++
+ /*
+  * WARN(), WARN_ON(), WARN_ON_ONCE, and so on can be used to report
+  * significant issues that need prompt attention if they should ever
+-- 
+1.7.0.4
