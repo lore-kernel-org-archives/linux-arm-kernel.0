@@ -1,28 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Dec 2010 23:04:34 +0000
-Subject: [PATCH 1/2] ARM: implement support for read-mostly sections
-In-Reply-To: <AANLkTin5HiPRd=SF_kdvEnZjV7C3J+6MXKQL02zKKtp=@mail.gmail.com>
-References: <20101205114257.GD9138@n2100.arm.linux.org.uk>
-	<E1PPCzx-0004yo-MJ@rmk-PC.arm.linux.org.uk>
-	<AANLkTin5HiPRd=SF_kdvEnZjV7C3J+6MXKQL02zKKtp=@mail.gmail.com>
-Message-ID: <20101205230434.GI9138@n2100.arm.linux.org.uk>
+From: ccross@android.com (Colin Cross)
+Date: Sun,  5 Dec 2010 15:08:47 -0800
+Subject: [PATCH 00/21] Updates for Tegra support in 2.6.38
+Message-ID: <1291590548-7341-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 05, 2010 at 10:18:27PM +0000, Catalin Marinas wrote:
-> On 5 December 2010 11:43, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> > index cead889..1581f6d 100644
-> > --- a/arch/arm/kernel/vmlinux.lds.S
-> > +++ b/arch/arm/kernel/vmlinux.lds.S
-> > @@ -167,6 +167,7 @@ SECTIONS
-> >
-> > ? ? ? ? ? ? ? ?NOSAVE_DATA
-> > ? ? ? ? ? ? ? ?CACHELINE_ALIGNED_DATA(32)
-> > + ? ? ? ? ? ? ? READ_MOSTLY_DATA(32)
-> 
-> Should we change the alignments to 64?
+This patch set adds support for suspend, idle, and cpufreq
+for the Tegra subsystem.
 
-When we have some way to tell vmlinux.lds.S what the cache line size is.
-It should be a separate patch.
+Patches 2 and 3 make changes to the GIC driver that will
+likely conflict with Russell's recent changes to GIC
+initialization.  Patch 2 adds functions to save and
+restore the GIC state during suspend and resume, patch 3
+exports the GIC irq chip functions to support custom IRQ
+chips that need to update the GIC as well as another
+block during IRQ operations.
+
+ arch/arm/common/gic.c                          |  146 ++++-
+ arch/arm/include/asm/hardware/gic.h            |   12 +
+ arch/arm/mach-tegra/Makefile                   |   12 +-
+ arch/arm/mach-tegra/common.c                   |    6 +-
+ arch/arm/mach-tegra/cortex-a9.S                |  710 +++++++++++++++++++
+ arch/arm/mach-tegra/cpu-tegra.c                |   74 ++-
+ arch/arm/mach-tegra/cpuidle.c                  |  711 +++++++++++++++++++
+ arch/arm/mach-tegra/dma.c                      |  198 +++---
+ arch/arm/mach-tegra/gpio.c                     |   15 +-
+ arch/arm/mach-tegra/headsmp-t2.S               |  218 ++++++
+ arch/arm/mach-tegra/headsmp.S                  |   61 --
+ arch/arm/mach-tegra/hotplug.c                  |  140 ----
+ arch/arm/mach-tegra/include/mach/debug-macro.S |   31 +-
+ arch/arm/mach-tegra/include/mach/iomap.h       |   69 ++-
+ arch/arm/mach-tegra/include/mach/irqs.h        |   14 +-
+ arch/arm/mach-tegra/include/mach/legacy_irq.h  |    7 +-
+ arch/arm/mach-tegra/include/mach/pinmux-t2.h   |   10 +
+ arch/arm/mach-tegra/include/mach/powergate.h   |   40 ++
+ arch/arm/mach-tegra/include/mach/suspend.h     |   80 +++
+ arch/arm/mach-tegra/include/mach/system.h      |   18 +-
+ arch/arm/mach-tegra/include/mach/uncompress.h  |   18 +-
+ arch/arm/mach-tegra/irq.c                      |  326 +++++++---
+ arch/arm/mach-tegra/legacy_irq.c               |  109 +++-
+ arch/arm/mach-tegra/pinmux-t2-tables.c         |   26 +-
+ arch/arm/mach-tegra/platsmp.c                  |  130 +++-
+ arch/arm/mach-tegra/power-macros.S             |   57 ++
+ arch/arm/mach-tegra/power.h                    |   64 ++
+ arch/arm/mach-tegra/powergate.c                |  211 ++++++
+ arch/arm/mach-tegra/suspend-t2.c               |  413 +++++++++++
+ arch/arm/mach-tegra/suspend.c                  |  870 ++++++++++++++++++++++++
+ arch/arm/mach-tegra/tegra2_clocks.c            |  264 +++++++-
+ arch/arm/mach-tegra/tegra2_save.S              |  413 +++++++++++
+ arch/arm/mach-tegra/timer.c                    |  114 +++-
+ 33 files changed, 5075 insertions(+), 512 deletions(-)
