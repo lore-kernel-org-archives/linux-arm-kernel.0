@@ -1,91 +1,63 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  5 Dec 2010 15:08:50 -0800
-Subject: [PATCH 03/21] ARM: gic: Export irq chip functions
+Date: Sun,  5 Dec 2010 15:08:48 -0800
+Subject: [PATCH 01/21] ARM: tegra: irq: Rename gic pointers to avoid conflicts
 In-Reply-To: <1291590548-7341-1-git-send-email-ccross@android.com>
 References: <1291590548-7341-1-git-send-email-ccross@android.com>
-Message-ID: <1291590548-7341-4-git-send-email-ccross@android.com>
+Message-ID: <1291590548-7341-2-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some systems combine the GIC with an external interrupt controller.
-On these systems it may be necessary to update both the GIC registers
-and the external controller's registers to control IRQ behavior.
-Export the irq chip functions so that these systems can define a
-custom irq chip that calls into the GIC handlers.
+A future patch will export gic_mask_irq and gic_unmask_irq.
+Rename the pointers in arch/arm/mach-tegra/irq.c to avoid
+a compile error.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/common/gic.c               |   10 +++++-----
- arch/arm/include/asm/hardware/gic.h |    8 ++++++++
- 2 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/mach-tegra/irq.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 9deb34f..5c11dab 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -75,7 +75,7 @@ static inline unsigned int gic_irq(unsigned int irq)
- /*
-  * Routines to acknowledge, disable and enable interrupts
-  */
--static void gic_ack_irq(unsigned int irq)
-+void gic_ack_irq(unsigned int irq)
- {
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 50a8dfb..37b4f97 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -46,8 +46,8 @@
+ #define ICTLR_COP_IER_CLR	0x38
+ #define ICTLR_COP_IEP_CLASS	0x3c
  
- 	spin_lock(&irq_controller_lock);
-@@ -83,7 +83,7 @@ static void gic_ack_irq(unsigned int irq)
- 	spin_unlock(&irq_controller_lock);
+-static void (*gic_mask_irq)(unsigned int irq);
+-static void (*gic_unmask_irq)(unsigned int irq);
++static void (*tegra_gic_mask_irq)(unsigned int irq);
++static void (*tegra_gic_unmask_irq)(unsigned int irq);
+ 
+ #define irq_to_ictlr(irq) (((irq)-32) >> 5)
+ static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
+@@ -56,14 +56,14 @@ static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
+ static void tegra_mask(unsigned int irq)
+ {
+ 	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
+-	gic_mask_irq(irq);
++	tegra_gic_mask_irq(irq);
+ 	writel(1<<(irq&31), addr+ICTLR_CPU_IER_CLR);
  }
  
--static void gic_mask_irq(unsigned int irq)
-+void gic_mask_irq(unsigned int irq)
+ static void tegra_unmask(unsigned int irq)
  {
- 	u32 mask = 1 << (irq % 32);
- 
-@@ -92,7 +92,7 @@ static void gic_mask_irq(unsigned int irq)
- 	spin_unlock(&irq_controller_lock);
+ 	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
+-	gic_unmask_irq(irq);
++	tegra_gic_unmask_irq(irq);
+ 	writel(1<<(irq&31), addr+ICTLR_CPU_IER_SET);
  }
  
--static void gic_unmask_irq(unsigned int irq)
-+void gic_unmask_irq(unsigned int irq)
- {
- 	u32 mask = 1 << (irq % 32);
+@@ -98,8 +98,8 @@ void __init tegra_init_irq(void)
+ 	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
  
-@@ -101,7 +101,7 @@ static void gic_unmask_irq(unsigned int irq)
- 	spin_unlock(&irq_controller_lock);
- }
- 
--static int gic_set_type(unsigned int irq, unsigned int type)
-+int gic_set_type(unsigned int irq, unsigned int type)
- {
- 	void __iomem *base = gic_dist_base(irq);
- 	unsigned int gicirq = gic_irq(irq);
-@@ -147,7 +147,7 @@ static int gic_set_type(unsigned int irq, unsigned int type)
- }
- 
+ 	gic = get_irq_chip(29);
+-	gic_unmask_irq = gic->unmask;
+-	gic_mask_irq = gic->mask;
++	tegra_gic_unmask_irq = gic->unmask;
++	tegra_gic_mask_irq = gic->mask;
+ 	tegra_irq.ack = gic->ack;
  #ifdef CONFIG_SMP
--static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
-+int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
- {
- 	void __iomem *reg = gic_dist_base(irq) + GIC_DIST_TARGET + (gic_irq(irq) & ~3);
- 	unsigned int shift = (irq % 4) * 8;
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 0a198b0..5fd0ff2 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -41,6 +41,14 @@ void gic_cpu_init(unsigned int gic_nr, void __iomem *base);
- void gic_cpu_exit(unsigned int gic_nr);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
-+
-+void gic_ack_irq(unsigned int irq);
-+void gic_mask_irq(unsigned int irq);
-+void gic_unmask_irq(unsigned int irq);
-+int gic_set_type(unsigned int irq, unsigned int type);
-+#ifdef CONFIG_SMP
-+int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val);
-+#endif
- #endif
- 
- #endif
+ 	tegra_irq.set_affinity = gic->set_affinity;
 -- 
 1.7.3.1
