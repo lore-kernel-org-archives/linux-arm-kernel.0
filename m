@@ -1,193 +1,222 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  5 Dec 2010 15:09:00 -0800
-Subject: [PATCH 13/21] ARM: tegra: irq: Add set_wake and set_type support for
-	suspend
+Date: Sun,  5 Dec 2010 15:08:49 -0800
+Subject: [PATCH 02/21] ARM: gic: Add functions to save and restore gic state
 In-Reply-To: <1291590548-7341-1-git-send-email-ccross@android.com>
 References: <1291590548-7341-1-git-send-email-ccross@android.com>
-Message-ID: <1291590548-7341-14-git-send-email-ccross@android.com>
+Message-ID: <1291590548-7341-3-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/mach-tegra/include/mach/legacy_irq.h |    3 +-
- arch/arm/mach-tegra/irq.c                     |  106 +++++++++++++++++++++++++
- arch/arm/mach-tegra/legacy_irq.c              |    4 +-
- 3 files changed, 110 insertions(+), 3 deletions(-)
+on systems with idle states which power-gate the logic including
+the gic, such as tegra, the gic distributor needs to be shut down
+and restored on entry and exit from the architecture idle code
 
-diff --git a/arch/arm/mach-tegra/include/mach/legacy_irq.h b/arch/arm/mach-tegra/include/mach/legacy_irq.h
-index d898c0e..3a2bfab 100644
---- a/arch/arm/mach-tegra/include/mach/legacy_irq.h
-+++ b/arch/arm/mach-tegra/include/mach/legacy_irq.h
-@@ -31,5 +31,6 @@ int tegra_legacy_irq_set_wake(int irq, int enable);
- void tegra_legacy_irq_set_lp1_wake_mask(void);
- void tegra_legacy_irq_restore_mask(void);
- void tegra_init_legacy_irq(void);
+Original-author: Gary King <gking@nvidia.com>
+Signed-off-by: Gary King <gking@nvidia.com>
+Signed-off-by: Colin Cross <ccross@android.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/common/gic.c               |  136 ++++++++++++++++++++++++++++++++--
+ arch/arm/include/asm/hardware/gic.h |    4 +
+ 2 files changed, 132 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 772f95f..9deb34f 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -39,6 +39,13 @@ struct gic_chip_data {
+ 	unsigned int irq_offset;
+ 	void __iomem *dist_base;
+ 	void __iomem *cpu_base;
++#ifdef CONFIG_PM
++	u32 saved_enable[DIV_ROUND_UP(1020, 32)];
++	u32 saved_conf[DIV_ROUND_UP(1020, 16)];
++	u32 saved_pri[DIV_ROUND_UP(1020, 4)];
++	u32 saved_target[DIV_ROUND_UP(1020, 4)];
++#endif
++	unsigned int max_irq;
+ };
+ 
+ #ifndef MAX_GIC_NR
+@@ -207,21 +214,15 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+ 	set_irq_chained_handler(irq, gic_handle_cascade_irq);
+ }
+ 
+-void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+-			  unsigned int irq_start)
++static unsigned int _gic_dist_init(unsigned int gic_nr)
+ {
+ 	unsigned int max_irq, i;
++	void __iomem *base = gic_data[gic_nr].dist_base;
+ 	u32 cpumask = 1 << smp_processor_id();
+ 
+-	if (gic_nr >= MAX_GIC_NR)
+-		BUG();
 -
-+void tegra_legacy_irq_suspend(void);
-+void tegra_legacy_irq_resume(void);
- #endif
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 8f47a9c..ced7007 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -54,6 +54,51 @@ static void pmc_32kwritel(u32 val, unsigned long offs)
- 	udelay(130);
+ 	cpumask |= cpumask << 8;
+ 	cpumask |= cpumask << 16;
+ 
+-	gic_data[gic_nr].dist_base = base;
+-	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
+-
+ 	writel(0, base + GIC_DIST_CTRL);
+ 
+ 	/*
+@@ -263,6 +264,109 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+ 	for (i = 32; i < max_irq; i += 32)
+ 		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+ 
++	return max_irq;
++}
++
++static void _gic_dist_exit(unsigned int gic_nr)
++{
++	writel(0, gic_data[gic_nr].dist_base + GIC_DIST_CTRL);
++}
++
++#ifdef CONFIG_PM
++/*
++ * Saves the GIC distributor registers during suspend or idle.  Must be called
++ * with interrupts disabled but before powering down the GIC.  After calling
++ * this function, no interrupts will be delivered by the GIC, and another
++ * platform-specific wakeup source must be enabled.
++ */
++void gic_dist_save(unsigned int gic_nr)
++{
++	unsigned int max_irq = gic_data[gic_nr].max_irq;
++	void __iomem *dist_base = gic_data[gic_nr].dist_base;
++	int i;
++
++	if (gic_nr >= MAX_GIC_NR)
++		BUG();
++
++	_gic_dist_exit(gic_nr);
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
++		gic_data[gic_nr].saved_conf[i] =
++			readl(dist_base + GIC_DIST_CONFIG + i * 4);
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
++		gic_data[gic_nr].saved_pri[i] =
++			readl(dist_base + GIC_DIST_PRI + i * 4);
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
++		gic_data[gic_nr].saved_target[i] =
++			readl(dist_base + GIC_DIST_TARGET + i * 4);
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
++		gic_data[gic_nr].saved_enable[i] =
++			readl(dist_base + GIC_DIST_ENABLE_SET + i * 4);
++}
++
++/*
++ * Restores the GIC distributor registers during resume or when coming out of
++ * idle.  Must be called before enabling interrupts.  If a level interrupt
++ * that occured while the GIC was suspended is still present, it will be
++ * handled normally, but any edge interrupts that occured will not be seen by
++ * the GIC and need to be handled by the platform-specific wakeup source.
++ */
++void gic_dist_restore(unsigned int gic_nr)
++{
++	unsigned int max_irq;
++	unsigned int i;
++	void __iomem *dist_base;
++	void __iomem *cpu_base;
++
++	if (gic_nr >= MAX_GIC_NR)
++		BUG();
++
++	_gic_dist_init(gic_nr);
++
++	max_irq = gic_data[gic_nr].max_irq;
++	dist_base = gic_data[gic_nr].dist_base;
++	cpu_base = gic_data[gic_nr].cpu_base;
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
++		writel(gic_data[gic_nr].saved_conf[i],
++			dist_base + GIC_DIST_CONFIG + i * 4);
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
++		writel(gic_data[gic_nr].saved_pri[i],
++			dist_base + GIC_DIST_PRI + i * 4);
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
++		writel(gic_data[gic_nr].saved_target[i],
++			dist_base + GIC_DIST_TARGET + i * 4);
++
++	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
++		writel(gic_data[gic_nr].saved_enable[i],
++			dist_base + GIC_DIST_ENABLE_SET + i * 4);
++
++	writel(1, dist_base + GIC_DIST_CTRL);
++	writel(0xf0, cpu_base + GIC_CPU_PRIMASK);
++	writel(1, cpu_base + GIC_CPU_CTRL);
++}
++#endif
++
++void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
++			  unsigned int irq_start)
++{
++	unsigned int max_irq;
++	unsigned int i;
++
++	if (gic_nr >= MAX_GIC_NR)
++		BUG();
++
++	gic_data[gic_nr].dist_base = base;
++	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
++
++	max_irq = _gic_dist_init(gic_nr);
++	gic_data[gic_nr].max_irq = max_irq;
++
+ 	/*
+ 	 * Setup the Linux IRQ subsystem.
+ 	 */
+@@ -276,6 +380,14 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+ 	writel(1, base + GIC_DIST_CTRL);
  }
  
-+int tegra_set_lp0_wake(int irq, int enable)
++void gic_dist_exit(unsigned int gic_nr)
 +{
-+	int wake = tegra_irq_to_wake(irq);
++	if (gic_nr >= MAX_GIC_NR)
++		BUG();
 +
-+	if (wake < 0)
-+		return -EINVAL;
-+
-+	if (enable)
-+		tegra_lp0_wake_enb |= 1 << wake;
-+	else
-+		tegra_lp0_wake_enb &= ~(1 << wake);
-+
-+	return 0;
++	_gic_dist_exit(gic_nr);
 +}
 +
-+int tegra_set_lp0_wake_type(int irq, int flow_type)
-+{
-+	int wake = tegra_irq_to_wake(irq);
-+
-+	if (wake < 0)
-+		return 0;
-+
-+	switch (flow_type) {
-+	case IRQF_TRIGGER_FALLING:
-+	case IRQF_TRIGGER_LOW:
-+		tegra_lp0_wake_level &= ~(1 << wake);
-+		tegra_lp0_wake_level_any &= ~(1 << wake);
-+		break;
-+	case IRQF_TRIGGER_HIGH:
-+	case IRQF_TRIGGER_RISING:
-+		tegra_lp0_wake_level |= 1 << wake;
-+		tegra_lp0_wake_level_any &= ~(1 << wake);
-+		break;
-+
-+	case IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING:
-+		tegra_lp0_wake_level_any |= 1 << wake;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+
- int tegra_set_lp1_wake(int irq, int enable)
+ void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
  {
- 	return tegra_legacy_irq_set_wake(irq, enable);
-@@ -97,6 +142,33 @@ void tegra_set_lp0_wake_pads(u32 wake_enb, u32 wake_level, u32 wake_any)
- 	writel(wake_enb, pmc + PMC_WAKE_MASK);
+ 	void __iomem *dist_base;
+@@ -306,6 +418,14 @@ void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
+ 	writel(1, base + GIC_CPU_CTRL);
  }
  
-+static void tegra_irq_handle_wake(void)
++void gic_cpu_exit(unsigned int gic_nr)
 +{
-+	int wake;
-+	int irq;
-+	struct irq_desc *desc;
++	if (gic_nr >= MAX_GIC_NR)
++		BUG();
 +
-+	unsigned long wake_status = readl(pmc + PMC_WAKE_STATUS);
-+	for_each_set_bit(wake, &wake_status, sizeof(wake_status) * 8) {
-+		irq = tegra_wake_to_irq(wake);
-+		if (!irq) {
-+			pr_info("Resume caused by WAKE%d\n", wake);
-+			continue;
-+		}
-+
-+		desc = irq_to_desc(irq);
-+		if (!desc || !desc->action || !desc->action->name) {
-+			pr_info("Resume caused by WAKE%d, irq %d\n", wake, irq);
-+			continue;
-+		}
-+
-+		pr_info("Resume caused by WAKE%d, %s\n", wake,
-+			desc->action->name);
-+
-+		generic_handle_irq(irq);
-+	}
++	writel(0, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
 +}
 +
- static void tegra_mask(unsigned int irq)
- {
- 	gic_mask_irq(irq);
-@@ -109,11 +181,34 @@ static void tegra_unmask(unsigned int irq)
- 	tegra_legacy_unmask_irq(irq);
- }
- 
-+static int tegra_set_wake(unsigned int irq, unsigned int enable)
-+{
-+	int ret;
-+	ret = tegra_set_lp1_wake(irq, enable);
-+	if (ret)
-+		return ret;
-+
-+	if (tegra_get_suspend_mode() == TEGRA_SUSPEND_LP0)
-+		return tegra_set_lp0_wake(irq, enable);
-+
-+	return 0;
-+}
-+
-+static int tegra_set_type(unsigned int irq, unsigned int flow_type)
-+{
-+	if (tegra_get_suspend_mode() == TEGRA_SUSPEND_LP0)
-+		return tegra_set_lp0_wake_type(irq, flow_type);
-+
-+	return 0;
-+}
-+
- static struct irq_chip tegra_irq = {
- 	.name		= "PPI",
- 	.ack		= gic_ack_irq,
- 	.mask		= tegra_mask,
- 	.unmask		= tegra_unmask,
-+	.set_wake	= tegra_set_wake,
-+	.set_type	= tegra_set_type,
  #ifdef CONFIG_SMP
- 	.set_affinity	= gic_set_cpu,
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 7f34333..0a198b0 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -34,7 +34,11 @@
+ 
+ #ifndef __ASSEMBLY__
+ void gic_dist_init(unsigned int gic_nr, void __iomem *base, unsigned int irq_start);
++void gic_dist_save(unsigned int gic_nr);
++void gic_dist_restore(unsigned int gic_nr);
++void gic_dist_exit(unsigned int gic_nr);
+ void gic_cpu_init(unsigned int gic_nr, void __iomem *base);
++void gic_cpu_exit(unsigned int gic_nr);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
  #endif
-@@ -136,3 +231,14 @@ void __init tegra_init_irq(void)
- 		set_irq_flags(irq, IRQF_VALID);
- 	}
- }
-+
-+void tegra_irq_suspend(void)
-+{
-+	tegra_legacy_irq_suspend();
-+}
-+
-+void tegra_irq_resume(void)
-+{
-+	tegra_legacy_irq_resume();
-+	tegra_irq_handle_wake();
-+}
-diff --git a/arch/arm/mach-tegra/legacy_irq.c b/arch/arm/mach-tegra/legacy_irq.c
-index 38eb719..5a6197b 100644
---- a/arch/arm/mach-tegra/legacy_irq.c
-+++ b/arch/arm/mach-tegra/legacy_irq.c
-@@ -179,7 +179,7 @@ static u32 cop_ier[NUM_ICTLRS];
- static u32 cpu_ier[NUM_ICTLRS];
- static u32 cpu_iep[NUM_ICTLRS];
- 
--void tegra_irq_suspend(void)
-+void tegra_legacy_irq_suspend(void)
- {
- 	unsigned long flags;
- 	int i;
-@@ -195,7 +195,7 @@ void tegra_irq_suspend(void)
- 	local_irq_restore(flags);
- }
- 
--void tegra_irq_resume(void)
-+void tegra_legacy_irq_resume(void)
- {
- 	unsigned long flags;
- 	int i;
 -- 
 1.7.3.1
