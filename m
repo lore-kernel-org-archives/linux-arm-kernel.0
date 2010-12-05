@@ -1,160 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 04 Dec 2010 13:36:55 -0800
-Subject: [PATCH 2/4] omap1: Add initcall checks for omap1 and booted board
-In-Reply-To: <20101204213358.32208.4195.stgit@baageli.muru.com>
-References: <20101204213358.32208.4195.stgit@baageli.muru.com>
-Message-ID: <20101204213655.32208.23030.stgit@baageli.muru.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 04 Dec 2010 21:36:12 -0500 (EST)
+Subject: [PATCH 0/4] Patches to make multi-soc handling in entry-armv.S
+	easier
+In-Reply-To: <20101204180541.GH17222@atomide.com>
+References: <20101204001435.28853.29616.stgit@baageli.muru.com>
+	<alpine.LFD.2.00.1012040040590.10437@xanadu.home>
+	<20101204180541.GH17222@atomide.com>
+Message-ID: <alpine.LFD.2.00.1012042126350.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise multi-omap1 configurations will fail.
+On Sat, 4 Dec 2010, Tony Lindgren wrote:
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap1/board-ams-delta.c |    3 +++
- arch/arm/mach-omap1/board-voiceblue.c |    6 ++++++
- arch/arm/mach-omap1/devices.c         |    3 +++
- arch/arm/mach-omap1/lcd_dma.c         |    3 +++
- arch/arm/mach-omap1/leds.c            |    3 +++
- arch/arm/mach-omap1/mcbsp.c           |    3 +++
- arch/arm/mach-omap1/pm.c              |    3 +++
- arch/arm/mach-omap1/pm_bus.c          |    3 +++
- arch/arm/mach-omap1/serial.c          |    3 +++
- 9 files changed, 30 insertions(+), 0 deletions(-)
+> * Nicolas Pitre <nico@fluxnic.net> [101203 21:39]:
+> > On Fri, 3 Dec 2010, Tony Lindgren wrote:
+> > 
+> > > Hi all,
+> > > 
+> > > I've got some patches almost ready to go to merge the omap1
+> > > configs into a single omap1_defconfig. While working on getting
+> > > that done, I had to come up with a better solution for entry-armv.S
+> > > macros to detect the soc we're running on.
+> > > 
+> > > I suggest we add asm_irq_base and asm_irq_flags as in the first
+> > > patch in this series does. This way we can do the soc based detection
+> > > in init_irq or similar place. This might help also the multi-arm
+> > > work too.
+> > 
+> > Did you see Eric Miao's patch series that introduces runtime IRQ demux 
+> > handler support?
+> > 
+> > http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
+> > 
+> > That is likely to be a better solution.
+> 
+> Yeah that works too, although is a bit heavier for simple cases.
+> 
+> In the omap case just the irq base is different between omap2 vs omap3.
+> And only level2 interrupt bit is different omap7xx vs omap16xx.
+> 
+> Handling the difference between omap2/3 and omap4 would be the use
+> case for handle_arch_irq. Currently that too can be handled
+> without handle_arch_irq, but from multi-arm point of view
+> handle_arch_irq is needed in the long run.
+> 
+> I can do things either way quite easily for sure. But my preference
+> would be to have both options available. This is because asm_irq_base
+> and asm_irq_flags can be used to reduce 15 omap1 defconfigs into one
+> defconfig with quite minimal changes. And for omap2+, these patches
+> allow getting rid of the SoC detection code in entry-macro.S. Also,
+> after these patches, moving to use handle_arch_irq can be done a bit
+> easier later on.
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index ce4d69c..e143950 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -338,6 +338,9 @@ static int __init ams_delta_modem_init(void)
- {
- 	int err;
- 
-+	if (!machine_is_ams_delta())
-+		return -ENODEV;
-+
- 	omap_cfg_reg(M14_1510_GPIO2);
- 	ams_delta_modem_ports[0].irq =
- 			gpio_to_irq(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
-diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
-index 789f5ba..815a69c 100644
---- a/arch/arm/mach-omap1/board-voiceblue.c
-+++ b/arch/arm/mach-omap1/board-voiceblue.c
-@@ -83,6 +83,9 @@ static struct platform_device serial_device = {
- 
- static int __init ext_uart_init(void)
- {
-+	if (!machine_is_voiceblue())
-+		return -ENODEV;
-+
- 	return platform_device_register(&serial_device);
- }
- arch_initcall(ext_uart_init);
-@@ -235,6 +238,9 @@ static struct notifier_block panic_block = {
- 
- static int __init voiceblue_setup(void)
- {
-+	if (!machine_is_voiceblue())
-+		return -ENODEV;
-+
- 	/* Setup panic notifier */
- 	atomic_notifier_chain_register(&panic_notifier_list, &panic_block);
- 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index 86ad38a..b0f4c23 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -288,6 +288,9 @@ static inline void omap_init_audio(void) {}
-  */
- static int __init omap1_init_devices(void)
- {
-+	if (!cpu_class_is_omap1())
-+		return -ENODEV;
-+
- 	/* please keep these calls, and their implementations above,
- 	 * in alphabetical order so they're easier to sort through.
- 	 */
-diff --git a/arch/arm/mach-omap1/lcd_dma.c b/arch/arm/mach-omap1/lcd_dma.c
-index 3be11af..c9088d8 100644
---- a/arch/arm/mach-omap1/lcd_dma.c
-+++ b/arch/arm/mach-omap1/lcd_dma.c
-@@ -424,6 +424,9 @@ static int __init omap_init_lcd_dma(void)
- {
- 	int r;
- 
-+	if (!cpu_class_is_omap1())
-+		return -ENODEV;
-+
- 	if (cpu_is_omap16xx()) {
- 		u16 w;
- 
-diff --git a/arch/arm/mach-omap1/leds.c b/arch/arm/mach-omap1/leds.c
-index 277f356..22eb11d 100644
---- a/arch/arm/mach-omap1/leds.c
-+++ b/arch/arm/mach-omap1/leds.c
-@@ -17,6 +17,9 @@
- static int __init
- omap_leds_init(void)
- {
-+	if (!cpu_class_is_omap1())
-+		return -ENODEV;
-+
- 	if (machine_is_omap_innovator())
- 		leds_event = innovator_leds_event;
- 
-diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
-index 372ea71..8209736 100644
---- a/arch/arm/mach-omap1/mcbsp.c
-+++ b/arch/arm/mach-omap1/mcbsp.c
-@@ -176,6 +176,9 @@ static struct omap_mcbsp_platform_data omap16xx_mcbsp_pdata[] = {
- 
- static int __init omap1_mcbsp_init(void)
- {
-+	if (!cpu_class_is_omap1())
-+		return -ENODEV;
-+
- 	if (cpu_is_omap7xx()) {
- 		omap_mcbsp_count = OMAP7XX_MCBSP_PDATA_SZ;
- 		omap_mcbsp_cache_size = OMAP7XX_MCBSP_REG_NUM * sizeof(u16);
-diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-index b1d3f9f..0cca23a 100644
---- a/arch/arm/mach-omap1/pm.c
-+++ b/arch/arm/mach-omap1/pm.c
-@@ -661,6 +661,9 @@ static int __init omap_pm_init(void)
- 	int error;
- #endif
- 
-+	if (!cpu_class_is_omap1())
-+		return -ENODEV;
-+
- 	printk("Power Management for TI OMAP.\n");
- 
- 	/*
-diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
-index 8b66392..3266447 100644
---- a/arch/arm/mach-omap1/pm_bus.c
-+++ b/arch/arm/mach-omap1/pm_bus.c
-@@ -73,6 +73,9 @@ static int __init omap1_pm_runtime_init(void)
- 	const struct dev_pm_ops *pm;
- 	struct dev_pm_ops *omap_pm;
- 
-+	if (!cpu_class_is_omap1())
-+		return -ENODEV;
-+
- 	pm = platform_bus_get_pm_ops();
- 	if (!pm) {
- 		pr_err("%s: unable to get dev_pm_ops from platform_bus\n",
-diff --git a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
-index 9e1c4d4..550ca9d 100644
---- a/arch/arm/mach-omap1/serial.c
-+++ b/arch/arm/mach-omap1/serial.c
-@@ -258,6 +258,9 @@ late_initcall(omap_serial_wakeup_init);
- 
- static int __init omap_init(void)
- {
-+	if (!cpu_class_is_omap1())
-+		return -ENODEV;
-+
- 	return platform_device_register(&serial_device);
- }
- arch_initcall(omap_init);
+My only problem with your approach is the global addition of 
+asm_irq_base and asm_irq_flags in generic code which might not be useful 
+and/or appropriate for all targets.  If you were confining them to some 
+OMAP specific file then I wouldn't mind as much.  Looking at the patch I 
+see that you had omap_irq_base before.  Why wasn't that sufficient?  
+Only omap_irq_flags would be missing.
+
+
+Nicolas
