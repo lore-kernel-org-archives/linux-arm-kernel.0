@@ -1,115 +1,135 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  5 Dec 2010 15:09:01 -0800
-Subject: [PATCH 14/21] ARM: tegra: irq: Add debugfs file to show wake irqs
+Date: Sun,  5 Dec 2010 15:09:05 -0800
+Subject: [PATCH 18/21] ARM: tegra: iomap: Add missing devices, fix use of SZ_8,
+	SZ_64
 In-Reply-To: <1291590548-7341-1-git-send-email-ccross@android.com>
 References: <1291590548-7341-1-git-send-email-ccross@android.com>
-Message-ID: <1291590548-7341-15-git-send-email-ccross@android.com>
+Message-ID: <1291590548-7341-19-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Gary King <gking@nvidia.com>
+
+Adds gart, hdmi, avp, host1x, and pwm controllers to mach/iomap.h
+There is no SZ_8 or SZ_64, replace them with constants
+
+Signed-off-by: Gary King <gking@nvidia.com>
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/irq.c |   66 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 66 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/include/mach/iomap.h |   55 ++++++++++++++++++++++++------
+ 1 files changed, 44 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index ced7007..8f0ddc6 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -19,10 +19,12 @@
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index 325eca3..26f2363 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -26,6 +26,9 @@
+ #define TEGRA_IRAM_BASE			0x40000000
+ #define TEGRA_IRAM_SIZE			SZ_256K
  
- #include <linux/kernel.h>
- #include <linux/delay.h>
-+#include <linux/debugfs.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/seq_file.h>
++#define TEGRA_HOST1X_BASE		0x50000000
++#define TEGRA_HOST1X_SIZE		0x24000
++
+ #define TEGRA_ARM_PERIF_BASE		0x50040000
+ #define TEGRA_ARM_PERIF_SIZE		SZ_8K
  
- #include <asm/hardware/gic.h>
+@@ -35,38 +38,56 @@
+ #define TEGRA_ARM_INT_DIST_BASE		0x50041000
+ #define TEGRA_ARM_INT_DIST_SIZE		SZ_4K
  
-@@ -46,6 +48,8 @@ static u32 tegra_lp0_wake_enb;
- static u32 tegra_lp0_wake_level;
- static u32 tegra_lp0_wake_level_any;
++#define TEGRA_MPE_BASE			0x54040000
++#define TEGRA_MPE_SIZE			SZ_256K
++
++#define TEGRA_VI_BASE			0x54080000
++#define TEGRA_VI_SIZE			SZ_256K
++
++#define TEGRA_ISP_BASE			0x54100000
++#define TEGRA_ISP_SIZE			SZ_256K
++
+ #define TEGRA_DISPLAY_BASE		0x54200000
+ #define TEGRA_DISPLAY_SIZE		SZ_256K
  
-+static unsigned int tegra_wake_irq_count[32];
-+
- /* ensures that sufficient time is passed for a register write to
-  * serialize into the 32KHz domain */
- static void pmc_32kwritel(u32 val, unsigned long offs)
-@@ -165,6 +169,8 @@ static void tegra_irq_handle_wake(void)
- 		pr_info("Resume caused by WAKE%d, %s\n", wake,
- 			desc->action->name);
+ #define TEGRA_DISPLAY2_BASE		0x54240000
+ #define TEGRA_DISPLAY2_SIZE		SZ_256K
  
-+		tegra_wake_irq_count[wake]++;
++#define TEGRA_HDMI_BASE			0x54280000
++#define TEGRA_HDMI_SIZE			SZ_256K
 +
- 		generic_handle_irq(irq);
- 	}
- }
-@@ -242,3 +248,63 @@ void tegra_irq_resume(void)
- 	tegra_legacy_irq_resume();
- 	tegra_irq_handle_wake();
- }
++#define TEGRA_GART_BASE			0x58000000
++#define TEGRA_GART_SIZE			SZ_32M
 +
-+#ifdef CONFIG_DEBUG_FS
-+static int tegra_wake_irq_debug_show(struct seq_file *s, void *data)
-+{
-+	int wake;
-+	int irq;
-+	struct irq_desc *desc;
-+	const char *irq_name;
++#define TEGRA_RES_SEMA_BASE		0x60001000
++#define TEGRA_RES_SEMA_SIZE		SZ_4K
 +
-+	seq_printf(s, "wake  irq  count  name\n");
-+	seq_printf(s, "----------------------\n");
-+	for (wake = 0; wake < 32; wake++) {
-+		irq = tegra_wake_to_irq(wake);
-+		if (irq < 0)
-+			continue;
+ #define TEGRA_PRIMARY_ICTLR_BASE	0x60004000
+-#define TEGRA_PRIMARY_ICTLR_SIZE	SZ_64
++#define TEGRA_PRIMARY_ICTLR_SIZE	64
+ 
+ #define TEGRA_SECONDARY_ICTLR_BASE	0x60004100
+-#define TEGRA_SECONDARY_ICTLR_SIZE	SZ_64
++#define TEGRA_SECONDARY_ICTLR_SIZE	64
+ 
+ #define TEGRA_TERTIARY_ICTLR_BASE	0x60004200
+-#define TEGRA_TERTIARY_ICTLR_SIZE	SZ_64
++#define TEGRA_TERTIARY_ICTLR_SIZE	64
+ 
+ #define TEGRA_QUATERNARY_ICTLR_BASE	0x60004300
+-#define TEGRA_QUATERNARY_ICTLR_SIZE	SZ_64
++#define TEGRA_QUATERNARY_ICTLR_SIZE	64
+ 
+ #define TEGRA_TMR1_BASE			0x60005000
+-#define TEGRA_TMR1_SIZE			SZ_8
++#define TEGRA_TMR1_SIZE			8
+ 
+ #define TEGRA_TMR2_BASE			0x60005008
+-#define TEGRA_TMR2_SIZE			SZ_8
++#define TEGRA_TMR2_SIZE			8
+ 
+ #define TEGRA_TMRUS_BASE		0x60005010
+-#define TEGRA_TMRUS_SIZE		SZ_64
++#define TEGRA_TMRUS_SIZE		64
+ 
+ #define TEGRA_TMR3_BASE			0x60005050
+-#define TEGRA_TMR3_SIZE			SZ_8
++#define TEGRA_TMR3_SIZE			8
+ 
+ #define TEGRA_TMR4_BASE			0x60005058
+-#define TEGRA_TMR4_SIZE			SZ_8
++#define TEGRA_TMR4_SIZE			8
+ 
+ #define TEGRA_CLK_RESET_BASE		0x60006000
+ #define TEGRA_CLK_RESET_SIZE		SZ_4K
+@@ -114,10 +135,10 @@
+ #define TEGRA_I2S2_SIZE			SZ_256
+ 
+ #define TEGRA_UARTA_BASE		0x70006000
+-#define TEGRA_UARTA_SIZE		SZ_64
++#define TEGRA_UARTA_SIZE		64
+ 
+ #define TEGRA_UARTB_BASE		0x70006040
+-#define TEGRA_UARTB_SIZE		SZ_64
++#define TEGRA_UARTB_SIZE		64
+ 
+ #define TEGRA_UARTC_BASE		0x70006200
+ #define TEGRA_UARTC_SIZE		SZ_256
+@@ -140,6 +161,18 @@
+ #define TEGRA_PWFM_BASE			0x7000A000
+ #define TEGRA_PWFM_SIZE			SZ_256
+ 
++#define TEGRA_PWFM0_BASE		0x7000A000
++#define TEGRA_PWFM0_SIZE		4
 +
-+		desc = irq_to_desc(irq);
-+		if (tegra_wake_irq_count[wake] == 0 && desc->action == NULL)
-+			continue;
++#define TEGRA_PWFM1_BASE		0x7000A010
++#define TEGRA_PWFM1_SIZE		4
 +
-+		if (!(desc->status & IRQ_WAKEUP))
-+			continue;
++#define TEGRA_PWFM2_BASE		0x7000A020
++#define TEGRA_PWFM2_SIZE		4
 +
-+		irq_name = (desc->action && desc->action->name) ?
-+			desc->action->name : "???";
++#define TEGRA_PWFM3_BASE		0x7000A030
++#define TEGRA_PWFM3_SIZE		4
 +
-+		seq_printf(s, "%4d  %3d  %5d  %s\n",
-+			wake, irq, tegra_wake_irq_count[wake], irq_name);
-+	}
-+	return 0;
-+}
-+
-+static int tegra_wake_irq_debug_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, tegra_wake_irq_debug_show, NULL);
-+}
-+
-+static const struct file_operations tegra_wake_irq_debug_fops = {
-+	.open		= tegra_wake_irq_debug_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
-+};
-+
-+static int __init tegra_irq_debug_init(void)
-+{
-+	struct dentry *d;
-+
-+	d = debugfs_create_file("wake_irq", 0755, NULL, NULL,
-+		&tegra_wake_irq_debug_fops);
-+	if (!d) {
-+		pr_info("Failed to create suspend_mode debug file\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
-+late_initcall(tegra_irq_debug_init);
-+#endif
+ #define TEGRA_MIPI_BASE			0x7000B000
+ #define TEGRA_MIPI_SIZE			SZ_256
+ 
 -- 
 1.7.3.1
