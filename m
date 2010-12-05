@@ -1,76 +1,115 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  5 Dec 2010 15:09:07 -0800
-Subject: [PATCH 20/21] ARM: tegra: Allow overriding arch_reset
+Date: Sun,  5 Dec 2010 15:09:01 -0800
+Subject: [PATCH 14/21] ARM: tegra: irq: Add debugfs file to show wake irqs
 In-Reply-To: <1291590548-7341-1-git-send-email-ccross@android.com>
 References: <1291590548-7341-1-git-send-email-ccross@android.com>
-Message-ID: <1291590548-7341-21-git-send-email-ccross@android.com>
+Message-ID: <1291590548-7341-15-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@google.com>
-
-Signed-off-by: Colin Cross <ccross@google.com>
+Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/common.c              |    3 +++
- arch/arm/mach-tegra/include/mach/system.h |   18 ++++++++++++++++--
- 2 files changed, 19 insertions(+), 2 deletions(-)
+ arch/arm/mach-tegra/irq.c |   66 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 66 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 64ea415..c8e9bdb 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -26,12 +26,15 @@
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index ced7007..8f0ddc6 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -19,10 +19,12 @@
  
- #include <mach/iomap.h>
- #include <mach/dma.h>
-+#include <mach/system.h>
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
++#include <linux/debugfs.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/seq_file.h>
  
- #include "board.h"
- #include "clock.h"
- #include "fuse.h"
- #include "power.h"
+ #include <asm/hardware/gic.h>
  
-+void (*tegra_reset)(char mode, const char *cmd);
+@@ -46,6 +48,8 @@ static u32 tegra_lp0_wake_enb;
+ static u32 tegra_lp0_wake_level;
+ static u32 tegra_lp0_wake_level_any;
+ 
++static unsigned int tegra_wake_irq_count[32];
 +
- static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
- 	/* name		parent		rate		enabled */
- 	{ "clk_m",	NULL,		0,		true },
-diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
-index 84d5d46..70c95ac 100644
---- a/arch/arm/mach-tegra/include/mach/system.h
-+++ b/arch/arm/mach-tegra/include/mach/system.h
-@@ -24,16 +24,30 @@
- #include <mach/hardware.h>
- #include <mach/iomap.h>
+ /* ensures that sufficient time is passed for a register write to
+  * serialize into the 32KHz domain */
+ static void pmc_32kwritel(u32 val, unsigned long offs)
+@@ -165,6 +169,8 @@ static void tegra_irq_handle_wake(void)
+ 		pr_info("Resume caused by WAKE%d, %s\n", wake,
+ 			desc->action->name);
  
-+extern void (*tegra_reset)(char mode, const char *cmd);
++		tegra_wake_irq_count[wake]++;
 +
- static inline void arch_idle(void)
- {
+ 		generic_handle_irq(irq);
+ 	}
  }
- 
--static inline void arch_reset(char mode, const char *cmd)
-+static inline void tegra_assert_system_reset(void)
- {
- 	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
--	u32 reg = readl(reset);
-+	u32 reg;
-+
-+	reg = readl(reset);
- 	reg |= 0x04;
- 	writel(reg, reset);
+@@ -242,3 +248,63 @@ void tegra_irq_resume(void)
+ 	tegra_legacy_irq_resume();
+ 	tegra_irq_handle_wake();
  }
- 
-+static inline void arch_reset(char mode, const char *cmd)
++
++#ifdef CONFIG_DEBUG_FS
++static int tegra_wake_irq_debug_show(struct seq_file *s, void *data)
 +{
-+	if (tegra_reset)
-+		tegra_reset(mode, cmd);
-+	else
-+		tegra_assert_system_reset();
++	int wake;
++	int irq;
++	struct irq_desc *desc;
++	const char *irq_name;
 +
-+	do { } while (1);
++	seq_printf(s, "wake  irq  count  name\n");
++	seq_printf(s, "----------------------\n");
++	for (wake = 0; wake < 32; wake++) {
++		irq = tegra_wake_to_irq(wake);
++		if (irq < 0)
++			continue;
++
++		desc = irq_to_desc(irq);
++		if (tegra_wake_irq_count[wake] == 0 && desc->action == NULL)
++			continue;
++
++		if (!(desc->status & IRQ_WAKEUP))
++			continue;
++
++		irq_name = (desc->action && desc->action->name) ?
++			desc->action->name : "???";
++
++		seq_printf(s, "%4d  %3d  %5d  %s\n",
++			wake, irq, tegra_wake_irq_count[wake], irq_name);
++	}
++	return 0;
 +}
 +
- #endif
++static int tegra_wake_irq_debug_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, tegra_wake_irq_debug_show, NULL);
++}
++
++static const struct file_operations tegra_wake_irq_debug_fops = {
++	.open		= tegra_wake_irq_debug_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static int __init tegra_irq_debug_init(void)
++{
++	struct dentry *d;
++
++	d = debugfs_create_file("wake_irq", 0755, NULL, NULL,
++		&tegra_wake_irq_debug_fops);
++	if (!d) {
++		pr_info("Failed to create suspend_mode debug file\n");
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++late_initcall(tegra_irq_debug_init);
++#endif
 -- 
 1.7.3.1
