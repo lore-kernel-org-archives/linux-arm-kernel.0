@@ -1,58 +1,42 @@
-From: phorton@bitbox.co.uk (Peter Horton)
-Date: Mon, 06 Dec 2010 09:39:37 +0000
-Subject: [PATCH] mx51: add support for FIQ on TZIC
-In-Reply-To: <20101206074359.GR6017@pengutronix.de>
-References: <20101203161626.GA1149@porta-pete.localdomain>
-	<20101206074359.GR6017@pengutronix.de>
-Message-ID: <4CFCAF59.7090105@bitbox.co.uk>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Mon, 6 Dec 2010 10:53:20 +0100
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <20101203151547.GA30898@n2100.arm.linux.org.uk>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+	<20101109224012.GA21992@kroah.com>
+	<AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
+	<20101203151547.GA30898@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimxU-YL_wy9ZTjKXX+68u_KcPzhSn9mOU_MnzQS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2010 07:43, Sascha Hauer wrote:
-> On Fri, Dec 03, 2010 at 04:16:26PM +0000, Peter Horton wrote:
->> Add support for FIQ on mx51 TZIC
->>
->> TZIC changes tested with FIQ audio on an mx51 board
->>
->> AVIC changes build with mx3_defconfig, not tested
->>
+Hi Russell,
 
-[snip]
-
->>   	}
->> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
->> index aeb0869..c7dd4a9 100644
->> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
->> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
->> @@ -54,8 +54,18 @@
->>   #elif defined CONFIG_MXC_TZIC
->>   	@ Load offset&  priority of the highest priority
->>   	@ interrupt pending.
->> +	@ 0x080 is INTSEC0 register
->>   	@ 0xD80 is HIPND0 register
->>   	mov     \irqnr, #0
->> +#ifdef CONFIG_FIQ
->> +1000:
->> +	add	\irqstat, \base, \irqnr, lsr #3
->> +	ldr	\tmp, [\irqstat, #0xd80]
->> +	ldr	\irqstat, [\irqstat, #0x080]
->> +	ands	\tmp, \tmp, \irqstat
->> +	bne	1001f
->> +	add	\irqnr, \irqnr, #32
->> +#else
->>   	mov     \irqstat, #0x0D80
->>   1000:
->>   	ldr     \tmp,   [\irqstat, \base]
->> @@ -63,6 +73,7 @@
->>   	bne     1001f
->>   	addeq   \irqnr, \irqnr, #32
->>   	addeq   \irqstat, \irqstat, #4
->> +#endif
+On Fri, Dec 3, 2010 at 4:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>> Why don't you stop
+>> the clocks if RTS is cleared? This would have allowed the line
+>> discipline driver to implicitly control the UART clock and there will
+>> be no risk of losing data, as well as no non-standard behavior
+>> involved. In fact, you'll be transparent to the upper layers in this
+>> case.
 >
-> Can't we skip the #ifdef? The CONFIG_FIQ path should also work without FIQs
-> enabled, right?
->
+> I've no idea what you're thinking, but you can't stop the UART clock
+> because RTS is deasserted - or DTR for that matter. ?Neither of those
+> two define whether characters will be transmitted or received.
 
-Yes.
+What I'm mostly up to (and I guess Par also is) is how to conserve
+power for the Bluetooth UARTs. For a Bluetooth UART, there usually is
+a kind of signalling protocol, either inband or out-of-band, that
+allows the host and the chip to negotiate about power conservation
+during inactivity periods. These protocols do not belong to UART
+implementation and are usually implemented as line discipline drivers.
+While BT chip is sleeping, we don't need the UART clock running but we
+need to have a decent way of telling the UART driver it can shut those
+off. Using RTS for that, even though not being applicable in all the
+cases, seems to work pretty well for Bluetooth UARTs. So if we just
+add a flag if an UART is used for BT or not and then use RTS for this
+kind of communication, will it be okay with you?
 
-P.
+Thanks,
+   Vitaly
