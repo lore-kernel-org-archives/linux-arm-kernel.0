@@ -1,141 +1,151 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 6 Dec 2010 17:31:46 +0800
-Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
-	run-time
-In-Reply-To: <20101206080606.GA29563@n2100.arm.linux.org.uk>
-References: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
-	<20101205092345.GA9138@n2100.arm.linux.org.uk>
-	<AANLkTimbFYCxcSU0+c2Q2D2yQ1wRPMmTx1Pdtu3CvM4m@mail.gmail.com>
-	<20101206080606.GA29563@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=5sMZUwu+yhha=CugFwrhqTwYSTvKOHEbu8RE3@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 6 Dec 2010 15:02:09 +0530
+Subject: [PATCH 22/22] ARM: SMP: remove smp_mpidr.h
+In-Reply-To: <E1POcD1-0007sP-Rs@rmk-PC.arm.linux.org.uk>
+References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+	<E1POcD1-0007sP-Rs@rmk-PC.arm.linux.org.uk>
+Message-ID: <7ba9887da1b3a9057e833c1fae3458e7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 6, 2010 at 4:06 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 06, 2010 at 02:12:54PM +0800, Eric Miao wrote:
->> On Sun, Dec 5, 2010 at 5:23 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Nov 22, 2010 at 04:26:50PM +0800, Eric Miao wrote:
->> >> I wonder if it's still acceptable for a patch like below to have a dynamic IRQ
->> >> handler at run-time. There is some changes to the irq_handler, esp. some
->> >> SMP changes.
->> >>
->> >> Magnus had some similar patches to have a run-time irq_handler, which is
->> >> a bit more complicated, but I'm also very happy with.
->> >
->> > I'd prefer a simple but efficient approach. ?I am worried about
->> > unnecessarily increasing the IRQ latency - and IRQ latency is something
->> > that we should be concerned about. ?It has the ability to make platforms
->> > useless.
->> >
->> > Eg, we know that SMC91x net interfaces are sensitive to IRQ latency, and
->> > the same is true of serial ports with small FIFOs.
->> >
->> > Any attempt to support multiple IRQ handlers is going to increase IRQ
->> > handling latency - I don't think that's something which can be avoided,
->> > and I'm wondering what effect this and the recent genirq changes is going
->> > to have. ?Has anyone been keeping an eye on IRQ handling latency?
->> >
->> > Lastly, this patch is dependent on your machine class patches, which makes
->> > it unsuitable as-is for mainline.
->> >
->>
->> This one isn't. I've rebased this on top of v2.6.37-rc1.
->>
->> >> +#ifdef CONFIG_MULTI_IRQ_HANDLER
->> >> + ? ? handle_arch_irq = class ? class->handle_irq : NULL;
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^^^^^^^^^^^^^^^^^^^^
+Russell,
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
+Linux
+> Sent: Saturday, December 04, 2010 1:56 AM
+> To: linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> Subject: [PATCH 22/22] ARM: SMP: remove smp_mpidr.h
 >
+> With "ARM: CPU hotplug: remove bug checks in platform_cpu_die()", we
+> now do not use hard_smp_processor_id(), we no longer need to read the
+> hardware processor ID.  Remove the include providing this function.
+>
+hard_smp_processor_id() is also useful when wakeup from low power
+modes and wants to run specific restore code on specific
+CPUs. Ofcourse platform have it's own custome macro, but having
+ARM generic is better.
 
-Grrrr... wrong copy indeed. Corrected version below, I also made it less
-intrusive by judging on handle_arch_irq being NULL or not so to fall back
-to the original way of handling.
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index db524e7..0cecffb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1017,6 +1017,11 @@ config CPU_HAS_PMU
- 	default y
- 	bool
-
-+config MULTI_IRQ_HANDLER
-+	bool
-+	help
-+	  Allow each machine to specify it's own IRQ handler at run time.
-+
- if !MMU
- source "arch/arm/Kconfig-nommu"
- endif
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index d97a964..7d55356 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -40,6 +40,9 @@ struct machine_desc {
- 	void			(*init_irq)(void);
- 	struct sys_timer	*timer;		/* system tick timer	*/
- 	void			(*init_machine)(void);
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	void			(*handle_irq)(struct pt_regs *);
-+#endif
- };
-
- /*
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index ce3eee9..6ecdad9 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
- extern void init_FIQ(void);
- extern int show_fiq_list(struct seq_file *, void *);
-
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+extern void (*handle_arch_irq)(struct pt_regs *);
-+#endif
-+
- /*
-  * This is for easy migration, but should be changed in the source
-  */
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index c09e357..4f446a2 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -30,6 +30,13 @@
-  * Interrupt handling.  Preserves r7, r8, r9
-  */
- 	.macro	irq_handler
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	ldr	r1, =handle_arch_irq
-+	cmp	r1, #0
-+	movne	r0, sp
-+	adrne	lr, BSYM(9997f)
-+	ldrne	pc, [r1]
-+#endif
- 	get_irqnr_preamble r5, lr
- 1:	get_irqnr_and_base r0, r6, r5, lr
- 	movne	r1, sp
-@@ -1245,3 +1252,9 @@ cr_alignment:
- 	.space	4
- cr_no_alignment:
- 	.space	4
-+
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	.globl	handle_arch_irq
-+handle_arch_irq:
-+	.long	0
-+#endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 336f14e..b809521 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -875,6 +875,9 @@ void __init setup_arch(char **cmdline_p)
- 	init_arch_irq = mdesc->init_irq;
- 	system_timer = mdesc->timer;
- 	init_machine = mdesc->init_machine;
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	handle_arch_irq = mdesc->handle_irq;
-+#endif
-
- #ifdef CONFIG_VT
- #if defined(CONFIG_VGA_CONSOLE)
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/smp_mpidr.h          |   17 -----------------
+>  arch/arm/mach-realview/include/mach/smp.h |    1 -
+>  arch/arm/mach-s5pv310/include/mach/smp.h  |    1 -
+>  arch/arm/mach-tegra/include/mach/smp.h    |    1 -
+>  arch/arm/mach-ux500/include/mach/smp.h    |    1 -
+>  arch/arm/mach-vexpress/include/mach/smp.h |    1 -
+>  arch/arm/plat-omap/include/plat/smp.h     |    1 -
+>  7 files changed, 0 insertions(+), 23 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/smp_mpidr.h
+>
+> diff --git a/arch/arm/include/asm/smp_mpidr.h
+> b/arch/arm/include/asm/smp_mpidr.h
+> deleted file mode 100644
+> index 6a9307d..0000000
+> --- a/arch/arm/include/asm/smp_mpidr.h
+> +++ /dev/null
+> @@ -1,17 +0,0 @@
+> -#ifndef ASMARM_SMP_MIDR_H
+> -#define ASMARM_SMP_MIDR_H
+> -
+> -#define hard_smp_processor_id()
+\
+> -	({								\
+> -		unsigned int cpunum;					\
+> -		__asm__("\n"						\
+> -			"1:	mrc p15, 0, %0, c0, c0, 5\n"		\
+> -			"	.pushsection \".alt.smp.init\", \"a\"\n"\
+> -			"	.long	1b\n"				\
+> -			"	mov	%0, #0\n"			\
+> -			"	.popsection"				\
+> -			: "=r" (cpunum));				\
+> -		cpunum &= 0x0F;						\
+> -	})
+> -
+> -#endif
+> diff --git a/arch/arm/mach-realview/include/mach/smp.h b/arch/arm/mach-
+> realview/include/mach/smp.h
+> index d1aa704..c8221b3 100644
+> --- a/arch/arm/mach-realview/include/mach/smp.h
+> +++ b/arch/arm/mach-realview/include/mach/smp.h
+> @@ -2,7 +2,6 @@
+>  #define ASMARM_ARCH_SMP_H
+>
+>  #include <asm/hardware/gic.h>
+> -#include <asm/smp_mpidr.h>
+>
+>  /*
+>   * We use IRQ1 as the IPI
+> diff --git a/arch/arm/mach-s5pv310/include/mach/smp.h b/arch/arm/mach-
+> s5pv310/include/mach/smp.h
+> index 2897747..77e5a84 100644
+> --- a/arch/arm/mach-s5pv310/include/mach/smp.h
+> +++ b/arch/arm/mach-s5pv310/include/mach/smp.h
+> @@ -7,7 +7,6 @@
+>  #define ASM_ARCH_SMP_H __FILE__
+>
+>  #include <asm/hardware/gic.h>
+> -#include <asm/smp_mpidr.h>
+>
+>  extern void __iomem *gic_cpu_base_addr;
+>
+> diff --git a/arch/arm/mach-tegra/include/mach/smp.h b/arch/arm/mach-
+> tegra/include/mach/smp.h
+> index d1aa704..c8221b3 100644
+> --- a/arch/arm/mach-tegra/include/mach/smp.h
+> +++ b/arch/arm/mach-tegra/include/mach/smp.h
+> @@ -2,7 +2,6 @@
+>  #define ASMARM_ARCH_SMP_H
+>
+>  #include <asm/hardware/gic.h>
+> -#include <asm/smp_mpidr.h>
+>
+>  /*
+>   * We use IRQ1 as the IPI
+> diff --git a/arch/arm/mach-ux500/include/mach/smp.h b/arch/arm/mach-
+> ux500/include/mach/smp.h
+> index bd57c50..ca2b15b 100644
+> --- a/arch/arm/mach-ux500/include/mach/smp.h
+> +++ b/arch/arm/mach-ux500/include/mach/smp.h
+> @@ -10,7 +10,6 @@
+>  #define ASMARM_ARCH_SMP_H
+>
+>  #include <asm/hardware/gic.h>
+> -#include <asm/smp_mpidr.h>
+>
+>  /* This is required to wakeup the secondary core */
+>  extern void u8500_secondary_startup(void);
+> diff --git a/arch/arm/mach-vexpress/include/mach/smp.h b/arch/arm/mach-
+> vexpress/include/mach/smp.h
+> index 721be0f..4c05e4a 100644
+> --- a/arch/arm/mach-vexpress/include/mach/smp.h
+> +++ b/arch/arm/mach-vexpress/include/mach/smp.h
+> @@ -2,7 +2,6 @@
+>  #define __MACH_SMP_H
+>
+>  #include <asm/hardware/gic.h>
+> -#include <asm/smp_mpidr.h>
+>
+>  /*
+>   * We use IRQ1 as the IPI
+> diff --git a/arch/arm/plat-omap/include/plat/smp.h b/arch/arm/plat-
+> omap/include/plat/smp.h
+> index e5541e5..7a10257 100644
+> --- a/arch/arm/plat-omap/include/plat/smp.h
+> +++ b/arch/arm/plat-omap/include/plat/smp.h
+> @@ -18,7 +18,6 @@
+>  #define OMAP_ARCH_SMP_H
+>
+>  #include <asm/hardware/gic.h>
+> -#include <asm/smp_mpidr.h>
+>
+>  /* Needed for secondary core boot */
+>  extern void omap_secondary_startup(void);
+> --
+> 1.6.2.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
