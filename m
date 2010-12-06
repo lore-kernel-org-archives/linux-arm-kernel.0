@@ -1,12 +1,11 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 06 Dec 2010 09:12:43 +0900
-Subject: [patch 0/3] mmc, ARM: Add zboot from MMC support for SuperH Mobile ARM
-Message-ID: <20101206001243.949375995@vergenet.net>
+Date: Mon, 06 Dec 2010 09:12:44 +0900
+Subject: [patch 1/3] mmc, sh: Move MMCIF_PROGRESS_* into sh_mmcif.h
+References: <20101206001243.949375995@vergenet.net>
+Message-ID: <20101206001310.658304531@vergenet.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This short series allows a ROM-able zImage to be written to MMC and for
-SuperH Mobile ARM to boot directly from the MMCIF hardware block.
-
-The first two patches make minor preparatory changes to the MMCIF code.
-The last patch contains the code to load from the MMCIF hardware block.
+An embedded and charset-unspecified text was scrubbed...
+Name: MMCIF_PROGRESS-header.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101206/5613a8a3/attachment.ksh>
