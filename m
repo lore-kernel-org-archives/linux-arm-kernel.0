@@ -1,34 +1,69 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 06 Dec 2010 13:51:52 +0300
-Subject: [PATCH] ARM: Gemini: Add support for PCI BUS
-In-Reply-To: <201011291745.22566.arnd@arndb.de>
-References: <1290860675-15453-1-git-send-email-ulli.kroll@googlemail.com>	<201011282056.17389.arnd@arndb.de>
-	<4CF3CF33.20407@gmail.com> <201011291745.22566.arnd@arndb.de>
-Message-ID: <4CFCC048.4030408@ru.mvista.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 6 Dec 2010 10:56:36 +0000
+Subject: RFC: Dynamic hwcaps
+In-Reply-To: <20101205151242.298922ad@surf>
+References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
+	<20101205151242.298922ad@surf>
+Message-ID: <AANLkTi=3oQDZGuSraXokf7VZ2YaGtaLGud92RcqYFMSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Sun, Dec 5, 2010 at 2:12 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Hi,
+>
+> On Fri, 3 Dec 2010 16:28:27 +0000
+> Dave Martin <dave.martin@linaro.org> wrote:
+>
+>> This allows for more active power management of such functional
+>> blocks: if the CPU is not fully loaded, you can turn them off -- the
+>> kernel can spot when there is significant idle time and do this. ?If
+>> the CPU becomes fully loaded, applications which have soft-realtime
+>> constraints can notice this and switch to their accelerated code
+>> (which will cause the kernel to switch the functional unit(s) on).
+>> Or, the kernel can react to increasing CPU load by speculatively turn
+>> it on instead. ?This is analogous to the behaviour of other power
+>> governors in the system. ?Non-aware applications will still work
+>> seamlessly -- these may simply run accelerated code if the hardware
+>> supports it, causing the kernel to turn the affected functional
+>> block(s) on.
+>
+> From a power management perspective, is it really useful to load the
+> CPU instead of using specialized units which usually provide more
+> computing power per watt consumed ?
 
-On 29-11-2010 19:45, Arnd Bergmann wrote:
+No--- but you can't in general just exchange cycles on one functional
+unit for cycles on another in the same way as you
 
->>> The I/O ordering is probably not what you think it is.
->>> There is no ordering guarantee between __raw_writel and
->>> spin_lock/spin_unlock, so you really should be using
->>> readl/writel.
+Suppose 90% if your code (by execution time) can take advantage of a
+specialised functional unit.  Should you turn that unit on?
 
->> No he really should NOT use readl/writel. The ONLY difference
->> between readl/writel and __raw_readl/__raw_writel is endianess
->> conversion. __raw_*l is not doing it. Which to use depend only
->> on HW.
+Now, suppose only 5% of the code can take advantage, but the platform
+is not completely busy.  Turning on a special functional unit consumes
+extra power and will provide no speedup to the user -- is it still
+worth turning it on?  What if the CPU is fully loaded doing other work
+and your program is close to missing its realtime deadlines -- should
+you turn on the separate unit now?
 
-> There are many differences between readl and __raw_readl, including
+It not an easy thing to judge -- really, I'm just wondering whether
+dynamic adaptation is feasible at all and whether it's worth
+experimenting with...
 
-> * __raw_readl does not have barriers and does not serialize with
->    spinlocks, so it breaks on out-of-order CPUs.
-> * __raw_readl does not have a specific endianess, while readl is
->    fixed little-endian,
+> When the CPU is idle, it can enter sleep states to save power and let a
+> more specialized unit do the optimized work. For example, when doing
+> video decoding, probably specialized DSPs to a much better job from a
+> power management perspective than the CPU would do, so it's better to
+> keep the CPU idle and let the DSP do its video decoding job. No?
 
-    I know I'm late but readl()/writel() are CPU-endian, not LE.
+Often, definitely yes; however, it depends on various factors -- not
+least, the software must have been ported to make use of the DSP in
+order for this to be possible at all.
 
-WBR, Sergei
+But the performance and power aspects are not trivial: separate DSP
+units tend to have high setup and teardown costs, so as above, if the
+total load on the DSP will be low, it may not be worth using it at all
+from a power perspective; and using a DSP in the wrong way can also
+lead to slower execution than doing everything on the CPU.
+
+Cheers
+---Dave
