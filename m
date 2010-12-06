@@ -1,33 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Dec 2010 10:20:46 +0000
-Subject: [PATCH 3/5] msm: timer: SMP timer support for msm
-In-Reply-To: <alpine.LFD.2.00.1012061025240.2653@localhost6.localdomain6>
-References: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
-	<1291619778-30289-4-git-send-email-johlstei@codeaurora.org>
-	<alpine.LFD.2.00.1012061025240.2653@localhost6.localdomain6>
-Message-ID: <20101206102046.GD29563@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 6 Dec 2010 10:25:21 +0000
+Subject: ARM: add initial support for Picochip picoXcell SoC
+In-Reply-To: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
+References: <1290506774-17895-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20101206102521.GC2891@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 10:56:14AM +0100, Thomas Gleixner wrote:
-> > +	local_irq_save(flags);
-> > +	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
+On Tue, Nov 23, 2010 at 10:06:01AM +0000, Jamie Iles wrote:
+> Hi,
 > 
-> Why are you fiddling wiht the irqchip functions directly ? Please use
-> disable_irq/enable_irq if at all.
+> This patch series adds support for the Picochip picoXcell series of
+> femotcell SoC's. There are currently two device families - PC3X2 and
+> PC3X3. Both include an ARM1176JZ-S, 100Mb Ethernet controller, 2xDMA
+> controllers, eFuses, crypto offload engines and Picochip's array
+> processor the picoArray. This patch series adds support for the base
+> chip support including timers, gpio, pin muxing, clocks and pm and also
+> the PC7302 development board that can take either PC3X2 or PC3X3 devices.
+> 
+> This patch series is based off of linux-next (next-20101122) and also requires
+> the following patches:
+> 
+>     - 8250: add a UPIO_DWAPB32 for 32 bit accesses (v2):
+>     http://marc.info/?l=linux-serial&m=129043658715199&w=2
+>     - debug-8250: add a 32 bit mode:
+>     http://marc.info/?l=linux-arm-kernel&m=129044061221371&w=2
+Does anyone have any comments on this patch series?
 
-PPI.  The interrupt has to be enabled by the very same CPU that wants
-to receive the interrupt.  Other CPUs on the system do not have access
-to the interrupt enable bits for PPIs.
+Thanks,
 
-That's something which genirq can't handle because it doesn't _actually_
-support real per-CPU interrupts - iow, ones which are truely private to
-CPU N.
-
-Eg, if IRQ 29 is the local timer interrupt, then CPU0 has its own IRQ29
-which is distinctly different - and has separate enable registers and
-ultimately different timer hardware - from CPU1's IRQ29.
-
-On the other SMP platforms, these interrupts aren't handled by genirq,
-but we do control them via code like the above (which I'm about to kill
-off and move that detail into gic.c.)
+Jamie
