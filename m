@@ -1,28 +1,32 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  6 Dec 2010 11:09:56 +0100
-Subject: [PATCH for -rc] dmaengine: i.MX SDMA fixes
-Message-ID: <1291630198-9690-1-git-send-email-s.hauer@pengutronix.de>
+Date: Mon,  6 Dec 2010 11:09:57 +0100
+Subject: [PATCH 1/2] dmaengine i.MX SDMA: initialize on module_init
+In-Reply-To: <1291630198-9690-1-git-send-email-s.hauer@pengutronix.de>
+References: <1291630198-9690-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1291630198-9690-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The firmware framework gets initialized during fs_initcall time, so
+we are not allowed to call request_firmware earlier.
 
-The following series contains some fixes for the i.MX SDMA driver. Please
-consider them for -rc.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/dma/imx-sdma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Sascha
-
-The following changes since commit 771f8bc71c31c6bd103cdec283012253f352ab1c:
-
-  Merge branch 'slab/urgent' of git://git.kernel.org/pub/scm/linux/kernel/git/penberg/slab-2.6 (2010-12-05 16:45:02 -0800)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git sdma-fixes
-
-Sascha Hauer (2):
-      dmaengine i.MX SDMA: initialize on module_init
-      dmaengine i.MX SDMA: protect channel0
-
- drivers/dma/imx-sdma.c |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 0834323..01c4a5f 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -1385,7 +1385,7 @@ static int __init sdma_module_init(void)
+ {
+ 	return platform_driver_probe(&sdma_driver, sdma_probe);
+ }
+-subsys_initcall(sdma_module_init);
++module_init(sdma_module_init);
+ 
+ MODULE_AUTHOR("Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>");
+ MODULE_DESCRIPTION("i.MX SDMA driver");
+-- 
+1.7.2.3
