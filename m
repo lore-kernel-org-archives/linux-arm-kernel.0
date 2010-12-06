@@ -1,103 +1,97 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Dec 2010 15:53:10 +0000
-Subject: [PATCH v3] ARM: vexpress: add support for multiple core tiles
-In-Reply-To: <1291052921-30695-1-git-send-email-will.deacon@arm.com>
-References: <1291052921-30695-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20101206155310.GG31777@n2100.arm.linux.org.uk>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Mon, 6 Dec 2010 10:53:50 -0500
+Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
+In-Reply-To: <AANLkTikZiHTZV2PD8jKMZ+9h8XnUGPpAth2wSXM4oZmJ@mail.gmail.com>
+References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
+	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>
+	<AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>
+	<AANLkTinwj27dSdv9Djs9Fv6QN5vv5JY+br4xCHk=8YEu@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247C46537@dbde02.ent.ti.com>
+	<4CFCCC56.3010700@mvista.com>
+	<AANLkTikZiHTZV2PD8jKMZ+9h8XnUGPpAth2wSXM4oZmJ@mail.gmail.com>
+Message-ID: <AANLkTinqSzcnSSAaCE+uNp5iHubFLpabgWty+zzWwHg4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 29, 2010 at 05:48:41PM +0000, Will Deacon wrote:
-> The current Versatile Express BSP defines the MACHINE_START macro
-> in the core tile code.
-> 
-> This patch moves this into the generic board code and introduces
-> a method for determining the current tile at runtime, allowing
-> the Kernel to have support for multiple tiles compiled in.
-> Tile-specific functions are executed via a descriptor struct containing
-> the correct implementations for the current tile.
+On Mon, Dec 6, 2010 at 10:47 AM, Victor Rodriguez <vm.rod25@gmail.com> wrote:
+> On Mon, Dec 6, 2010 at 5:43 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+>> Hello.
+>>
+>> On 06-12-2010 14:12, Nori, Sekhar wrote:
+>>
+>>>> ?arch/arm/mach-davinci/board-omapl138-hawk.c | ? 38
+>>>> ++++++++++++++++++++------
+>>>> ?1 files changed, 29 insertions(+), 9 deletions(-)
+>>
+>>>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>>> b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>>> index da51136..8fc78f2 100644
+>>>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>
+>> [...]
+>>>>
+>>>> @@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
+>>>> ? ? ? if (ret< ?0) {
+>>>> ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
+>>>> ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
+>>>> - ? ? ? ? ? ? return;
+>>>> + ? ? ? ? ? ? goto exp_setup_wp_fail;
+>>>> ? ? ? }
+>>>>
+>>>> ? ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
+>>>> - ? ? if (ret)
+>>>> + ? ? if (ret) {
+>>>> ? ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
+>>>> ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
+>>>> + ? ? ? ? ? ? goto exp_setup_mmcsd_fail;
+>>>> + ? ? }
+>>>> + ? ? ? ? ? ? return;
+>>
+>>> This return has extra indentation.
+>>
+>>>> +
+>>>> +exp_setup_mmcsd_fail:
+>>>> + ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+>>>> +exp_setup_wp_fail:
+>>>> + ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+>>>> +exp_setup_cd_fail:
+>>>> + ? ? ? ? ? ? return;
+>>
+>>> This one too.
+>>
+>> ? Moreover, it's not needed at all.
+>
+> Ok
+>>> Other than that, it all looks good to me.
+>>
+>> ? Except those 'exp_setup_'prefixes which I'm not sure where are coming
+>> from...
+>
+>
+> it comes from
+>
+> arch/arm/mach-davinci/board-da850-evm.c
+>
+> I took this as a template and I think that is better to keep this
+> exp_setup_ ?as a template
+>
+> but if you have any other suggestion please tell me
 
-Obviously, this has been broken by the changes to the SMP and GIC code...
+I think those are based on the error handling in
+da850_evm_ui_expander_setup() which means that the 'exp' in
+'exp_setup_' stands-for IO-expander.
 
-> -MACHINE_START(VEXPRESS, "ARM-Versatile Express CA9x4")
-> -	.boot_params	= PHYS_OFFSET + 0x00000100,
-> +#ifdef CONFIG_SMP
-> +static unsigned int ct_ca9x4_get_core_count(void)
-> +{
-> +	return scu_get_core_count(MMIO_P2V(A9_MPCORE_SCU));
-> +}
-> +
-> +static void ct_ca9x4_smp_enable(void)
-> +{
-> +	scu_enable(MMIO_P2V(A9_MPCORE_SCU));
-> +}
-> +#endif
+Based on the function names where the your exp_setup_* labels were
+introduced I think that the label could be renamed 'mmc_setup_*' and
+'usb11_setup_*'.
 
-The SMP code is now down to the following:
 
-void __init smp_init_cpus(void)
-{
-	void __iomem *scu_base = scu_base_addr();
-	unsigned int i, ncores;
+Best Regards,
+Ben Gardiner
 
-	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-
-	/* sanity check */
-	if (ncores > NR_CPUS) {
-		printk(KERN_WARNING
-		       "vexpress: no. of cores (%d) greater than configured "
-		       "maximum of %d - clipping\n",
-		       ncores, NR_CPUS);
-		ncores = NR_CPUS;
-	}
-
-	for (i = 0; i < ncores; i++)
-		set_cpu_possible(i, true);
-}
-
-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-{
-	int i;
-
-	/*
-	 * Initialise the present map, which describes the set of CPUs
-	 * actually populated@the present time.
-	 */
-	for (i = 0; i < max_cpus; i++)
-		set_cpu_present(i, true);
-
-	scu_enable(scu_base_addr());
-
-	/*
-	 * Write the address of secondary startup into the
-	 * system-wide flags register. The boot monitor waits
-	 * until it receives a soft interrupt, and then the
-	 * secondary CPU branches to this address.
-	 */
-	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
-	writel(BSYM(virt_to_phys(vexpress_secondary_startup)),
-		MMIO_P2V(V2M_SYS_FLAGSSET));
-}
-
-The secondary startup addresses could be moved into boot_secondary(),
-leaving smp_init_cpus() and platform_smp_prepare_cpus() with the task
-of initializing the possible/present bitmaps, and enabling the SCU.
-
-I'm in two minds about that - one is that we know that the SCU on an
-A9 or MPCore is going to tell us that CPUs 0..N are present, so we
-can move that logic into smp_scu.c.
-
-However, just because there's CPUs 0..N doesn't mean that a platform
-would want to use all those CPUs for SMP, so it should be a platform
-choice which CPUs get populated into the maps.
-
-The other complication here is that the possible/present bitmaps use
-logical CPU numbers, which depending on the platform may or may not
-be the same as physical CPU numbers, even though it may be an A9 based
-platform.
-
-I think what we want is to not only move the count of cores and scu
-enable into the core tile code, but also the bitmap population too.
-That may ultimately be the sensible thing if we're eventually going
-to indirect smp_init_cpus()/platform_smp_prepare_cpus() in the longer
-term.
+---
+Nanometrics Inc.
+http://www.nanometrics.ca
