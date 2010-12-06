@@ -1,7 +1,7 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Mon, 6 Dec 2010 10:53:50 -0500
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Mon, 6 Dec 2010 09:56:17 -0600
 Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
-In-Reply-To: <AANLkTikZiHTZV2PD8jKMZ+9h8XnUGPpAth2wSXM4oZmJ@mail.gmail.com>
+In-Reply-To: <AANLkTinqSzcnSSAaCE+uNp5iHubFLpabgWty+zzWwHg4@mail.gmail.com>
 References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
 	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>
 	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>
@@ -11,87 +11,97 @@ References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
 	<B85A65D85D7EB246BE421B3FB0FBB5930247C46537@dbde02.ent.ti.com>
 	<4CFCCC56.3010700@mvista.com>
 	<AANLkTikZiHTZV2PD8jKMZ+9h8XnUGPpAth2wSXM4oZmJ@mail.gmail.com>
-Message-ID: <AANLkTinqSzcnSSAaCE+uNp5iHubFLpabgWty+zzWwHg4@mail.gmail.com>
+	<AANLkTinqSzcnSSAaCE+uNp5iHubFLpabgWty+zzWwHg4@mail.gmail.com>
+Message-ID: <AANLkTikO9zvyFT7-LDc+kq9ZD0AH=U_WiP6rnHZyLmZF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 6, 2010 at 10:47 AM, Victor Rodriguez <vm.rod25@gmail.com> wrote:
-> On Mon, Dec 6, 2010 at 5:43 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
->> Hello.
+On Mon, Dec 6, 2010 at 9:53 AM, Ben Gardiner <bengardiner@nanometrics.ca> wrote:
+> On Mon, Dec 6, 2010 at 10:47 AM, Victor Rodriguez <vm.rod25@gmail.com> wrote:
+>> On Mon, Dec 6, 2010 at 5:43 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+>>> Hello.
+>>>
+>>> On 06-12-2010 14:12, Nori, Sekhar wrote:
+>>>
+>>>>> ?arch/arm/mach-davinci/board-omapl138-hawk.c | ? 38
+>>>>> ++++++++++++++++++++------
+>>>>> ?1 files changed, 29 insertions(+), 9 deletions(-)
+>>>
+>>>>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>>>> b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>>>> index da51136..8fc78f2 100644
+>>>>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>>>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>>
+>>> [...]
+>>>>>
+>>>>> @@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
+>>>>> ? ? ? if (ret< ?0) {
+>>>>> ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
+>>>>> ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
+>>>>> - ? ? ? ? ? ? return;
+>>>>> + ? ? ? ? ? ? goto exp_setup_wp_fail;
+>>>>> ? ? ? }
+>>>>>
+>>>>> ? ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
+>>>>> - ? ? if (ret)
+>>>>> + ? ? if (ret) {
+>>>>> ? ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
+>>>>> ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
+>>>>> + ? ? ? ? ? ? goto exp_setup_mmcsd_fail;
+>>>>> + ? ? }
+>>>>> + ? ? ? ? ? ? return;
+>>>
+>>>> This return has extra indentation.
+>>>
+>>>>> +
+>>>>> +exp_setup_mmcsd_fail:
+>>>>> + ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+>>>>> +exp_setup_wp_fail:
+>>>>> + ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+>>>>> +exp_setup_cd_fail:
+>>>>> + ? ? ? ? ? ? return;
+>>>
+>>>> This one too.
+>>>
+>>> ? Moreover, it's not needed at all.
 >>
->> On 06-12-2010 14:12, Nori, Sekhar wrote:
+>> Ok
+>>>> Other than that, it all looks good to me.
+>>>
+>>> ? Except those 'exp_setup_'prefixes which I'm not sure where are coming
+>>> from...
 >>
->>>> ?arch/arm/mach-davinci/board-omapl138-hawk.c | ? 38
->>>> ++++++++++++++++++++------
->>>> ?1 files changed, 29 insertions(+), 9 deletions(-)
 >>
->>>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
->>>> b/arch/arm/mach-davinci/board-omapl138-hawk.c
->>>> index da51136..8fc78f2 100644
->>>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
->>>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> it comes from
 >>
->> [...]
->>>>
->>>> @@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
->>>> ? ? ? if (ret< ?0) {
->>>> ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
->>>> ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
->>>> - ? ? ? ? ? ? return;
->>>> + ? ? ? ? ? ? goto exp_setup_wp_fail;
->>>> ? ? ? }
->>>>
->>>> ? ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
->>>> - ? ? if (ret)
->>>> + ? ? if (ret) {
->>>> ? ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
->>>> ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
->>>> + ? ? ? ? ? ? goto exp_setup_mmcsd_fail;
->>>> + ? ? }
->>>> + ? ? ? ? ? ? return;
+>> arch/arm/mach-davinci/board-da850-evm.c
 >>
->>> This return has extra indentation.
+>> I took this as a template and I think that is better to keep this
+>> exp_setup_ ?as a template
 >>
->>>> +
->>>> +exp_setup_mmcsd_fail:
->>>> + ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
->>>> +exp_setup_wp_fail:
->>>> + ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
->>>> +exp_setup_cd_fail:
->>>> + ? ? ? ? ? ? return;
->>
->>> This one too.
->>
->> ? Moreover, it's not needed at all.
+>> but if you have any other suggestion please tell me
 >
-> Ok
->>> Other than that, it all looks good to me.
->>
->> ? Except those 'exp_setup_'prefixes which I'm not sure where are coming
->> from...
+> I think those are based on the error handling in
+> da850_evm_ui_expander_setup() which means that the 'exp' in
+> 'exp_setup_' stands-for IO-expander.
 >
+> Based on the function names where the your exp_setup_* labels were
+> introduced I think that the label could be renamed 'mmc_setup_*' and
+> 'usb11_setup_*'.
 >
-> it comes from
->
-> arch/arm/mach-davinci/board-da850-evm.c
->
-> I took this as a template and I think that is better to keep this
-> exp_setup_ ?as a template
->
-> but if you have any other suggestion please tell me
+I like it thanks I will submit the patches with that names. Sergei are
+you ok with this ?
 
-I think those are based on the error handling in
-da850_evm_ui_expander_setup() which means that the 'exp' in
-'exp_setup_' stands-for IO-expander.
+Regards
 
-Based on the function names where the your exp_setup_* labels were
-introduced I think that the label could be renamed 'mmc_setup_*' and
-'usb11_setup_*'.
+Victor Rodriguez
 
 
-Best Regards,
-Ben Gardiner
-
----
-Nanometrics Inc.
-http://www.nanometrics.ca
+> Best Regards,
+> Ben Gardiner
+>
+> ---
+> Nanometrics Inc.
+> http://www.nanometrics.ca
+>
