@@ -1,57 +1,58 @@
-From: per.fransson.ml@gmail.com (Per Fransson)
-Date: Mon, 6 Dec 2010 10:34:31 +0100
-Subject: mpcore watchdogs questions
-In-Reply-To: <20101203145803.GQ18100@redhat.com>
-References: <4CF8F702.1070502@stericsson.com>
-	<20101203145803.GQ18100@redhat.com>
-Message-ID: <AANLkTikRbF9yVUMLo2rRfM0zC2GRRhA7MD7dyCMR2+Sm@mail.gmail.com>
+From: phorton@bitbox.co.uk (Peter Horton)
+Date: Mon, 06 Dec 2010 09:39:37 +0000
+Subject: [PATCH] mx51: add support for FIQ on TZIC
+In-Reply-To: <20101206074359.GR6017@pengutronix.de>
+References: <20101203161626.GA1149@porta-pete.localdomain>
+	<20101206074359.GR6017@pengutronix.de>
+Message-ID: <4CFCAF59.7090105@bitbox.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I am not entirely sure what you are looking for, but the
+On 06/12/2010 07:43, Sascha Hauer wrote:
+> On Fri, Dec 03, 2010 at 04:16:26PM +0000, Peter Horton wrote:
+>> Add support for FIQ on mx51 TZIC
+>>
+>> TZIC changes tested with FIQ audio on an mx51 board
+>>
+>> AVIC changes build with mx3_defconfig, not tested
+>>
 
-Well, the basic premise of the question is this:
+[snip]
 
-We have these per-CPU watchdogs,
-what's the best fit for them in a linux kernel setting?
-
-Now, there's already a driver for these WDs, but even so the existing watchdog
-framework seems more suited to non-local watchdogs which can be counted on
-to stay awake all the time.
-
-> kernel/{softlockup,watchdog}.c takes a different approach to a normal
-> watchdog. ?Normal watchdogs have somebody kick them so they stay asleep,
-> with the intention that if they wake up bad things happened.
+>>   	}
+>> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
+>> index aeb0869..c7dd4a9 100644
+>> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
+>> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
+>> @@ -54,8 +54,18 @@
+>>   #elif defined CONFIG_MXC_TZIC
+>>   	@ Load offset&  priority of the highest priority
+>>   	@ interrupt pending.
+>> +	@ 0x080 is INTSEC0 register
+>>   	@ 0xD80 is HIPND0 register
+>>   	mov     \irqnr, #0
+>> +#ifdef CONFIG_FIQ
+>> +1000:
+>> +	add	\irqstat, \base, \irqnr, lsr #3
+>> +	ldr	\tmp, [\irqstat, #0xd80]
+>> +	ldr	\irqstat, [\irqstat, #0x080]
+>> +	ands	\tmp, \tmp, \irqstat
+>> +	bne	1001f
+>> +	add	\irqnr, \irqnr, #32
+>> +#else
+>>   	mov     \irqstat, #0x0D80
+>>   1000:
+>>   	ldr     \tmp,   [\irqstat, \base]
+>> @@ -63,6 +73,7 @@
+>>   	bne     1001f
+>>   	addeq   \irqnr, \irqnr, #32
+>>   	addeq   \irqstat, \irqstat, #4
+>> +#endif
 >
-> The hard/soft lockup detector will always wake up at a periodic rate and
-> check to see if they system has progressed since the last check.
-> Unfortunately, because of its periodic rate, it will cause wakeup events
-> (though every 60 seconds isn't that bad is it? :-) ), except for the
-> hardlockup case which uses the NMI. ?That is tied to cpu activity and
-> won't fire an NMI if the cpu is sleeping.
->
-> There have been talks about trying to tie the hrtimer and the kthread to
-> the power management layer with the idea that if the system is sleeping
-> there is no need to increment interrupt stats (using hrtimer) or check
-> process usage (using the kthread). ?That would cut down the number of
-> wakeups.
+> Can't we skip the #ifdef? The CONFIG_FIQ path should also work without FIQs
+> enabled, right?
 >
 
-The way I see it, the idea behind the lockup detection code, and please correct
-me if I'm wrong, is to cover the following case on a per-CPU basis:
+Yes.
 
-* Assuming the CPU in question is actually chugging along, is it
-getting real work
-done, where "real work" is defined as being able to schedule a high-prio kernel
-thread and have it perform the actions expected of it (kicking the watchdog).
-In the hardlockup case "real work" is instead defined as being able to
-respond to
-hrtimers going off.
-
-So, this is precisely why the Cortex-A9 mpcore WDs might work better
-as a part of
-the lockup detection code, they can only watch a CPU which is awake (enough) and
-they do so on a per-CPU basis.
-
-Regards,
-Per
+P.
