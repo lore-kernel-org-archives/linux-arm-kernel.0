@@ -1,49 +1,38 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 06 Dec 2010 14:27:46 +0300
-Subject: [PATCH 08/54] ARM: aaec2000: irq_data conversion.
-In-Reply-To: <20101130132552.GI15575@mail.wantstofly.org>
+Date: Mon, 06 Dec 2010 14:34:13 +0300
+Subject: [PATCH 12/54] ARM: davinci: irq_data conversion.
+In-Reply-To: <20101130133636.GM15575@mail.wantstofly.org>
 References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130132552.GI15575@mail.wantstofly.org>
-Message-ID: <4CFCC8B2.6000208@ru.mvista.com>
+	<20101130133636.GM15575@mail.wantstofly.org>
+Message-ID: <4CFCCA35.4030805@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 30-11-2010 16:25, Lennert Buytenhek wrote:
+On 30-11-2010 16:36, Lennert Buytenhek wrote:
 
 > Signed-off-by: Lennert Buytenhek<buytenh@secretlab.ca>
 [...]
 
-> diff --git a/arch/arm/mach-aaec2000/core.c b/arch/arm/mach-aaec2000/core.c
-> index 3ef6833..f8465bd 100644
-> --- a/arch/arm/mach-aaec2000/core.c
-> +++ b/arch/arm/mach-aaec2000/core.c
-> @@ -68,25 +68,25 @@ void __init aaec2000_map_io(void)
->   /*
->    * Interrupt handling routines
->    */
-> -static void aaec2000_int_ack(unsigned int irq)
-> +static void aaec2000_int_ack(struct irq_data *d)
->   {
-> -	IRQ_INTSR = 1<<  irq;
-> +	IRQ_INTSR = 1<<  d->irq;
->   }
->
-> -static void aaec2000_int_mask(unsigned int irq)
-> +static void aaec2000_int_mask(struct irq_data *d)
->   {
-> -	IRQ_INTENC |= (1<<  irq);
-> +	IRQ_INTENC |= (1<<  d->irq);
->   }
->
-> -static void aaec2000_int_unmask(unsigned int irq)
-> +static void aaec2000_int_unmask(struct irq_data *d)
->   {
-> -	IRQ_INTENS |= (1<<  irq);
-> +	IRQ_INTENS |= (1<<  d->irq);
->   }
+> diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+> index 784ddf3..f5f417e 100644
+> --- a/arch/arm/mach-davinci/irq.c
+> +++ b/arch/arm/mach-davinci/irq.c
+> @@ -53,14 +53,14 @@ static inline void davinci_irq_writel(unsigned long value, int offset)
+[...]
+> @@ -91,23 +91,23 @@ static void davinci_unmask_irq(unsigned int irq)
+[...]
+>   static struct irq_chip davinci_irq_chip_0 = {
+> -	.name	= "AINTC",
+> -	.ack	= davinci_ack_irq,
+> -	.mask	= davinci_mask_irq,
+> -	.unmask = davinci_unmask_irq,
+> +	.name		= "AINTC",
+> +	.irq_ack	= davinci_ack_irq,
+> +	.irq_mask	= davinci_mask_irq,
+> +	.irq_unmask = davinci_unmask_irq,
 
-    Probably could have dropped useless parens, while at it...
+    Er, you forgot to align it?
 
 WBR, Sergei
