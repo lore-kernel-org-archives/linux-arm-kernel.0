@@ -1,37 +1,48 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Dec 2010 10:11:00 +0000
-Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
-	run-time
-In-Reply-To: <AANLkTi=5sMZUwu+yhha=CugFwrhqTwYSTvKOHEbu8RE3@mail.gmail.com>
-References: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
-	<20101205092345.GA9138@n2100.arm.linux.org.uk>
-	<AANLkTimbFYCxcSU0+c2Q2D2yQ1wRPMmTx1Pdtu3CvM4m@mail.gmail.com>
-	<20101206080606.GA29563@n2100.arm.linux.org.uk>
-	<AANLkTi=5sMZUwu+yhha=CugFwrhqTwYSTvKOHEbu8RE3@mail.gmail.com>
-Message-ID: <20101206101100.GB29563@n2100.arm.linux.org.uk>
+Date: Mon, 6 Dec 2010 10:14:27 +0000
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <AANLkTimxU-YL_wy9ZTjKXX+68u_KcPzhSn9mOU_MnzQS@mail.gmail.com>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+	<20101109224012.GA21992@kroah.com>
+	<AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
+	<20101203151547.GA30898@n2100.arm.linux.org.uk>
+	<AANLkTimxU-YL_wy9ZTjKXX+68u_KcPzhSn9mOU_MnzQS@mail.gmail.com>
+Message-ID: <20101206101427.GC29563@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 05:31:46PM +0800, Eric Miao wrote:
-> Grrrr... wrong copy indeed. Corrected version below, I also made it less
-> intrusive by judging on handle_arch_irq being NULL or not so to fall back
-> to the original way of handling.
-...
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index c09e357..4f446a2 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -30,6 +30,13 @@
->   * Interrupt handling.  Preserves r7, r8, r9
->   */
->  	.macro	irq_handler
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +	ldr	r1, =handle_arch_irq
-> +	cmp	r1, #0
-> +	movne	r0, sp
-> +	adrne	lr, BSYM(9997f)
-> +	ldrne	pc, [r1]
-> +#endif
+On Mon, Dec 06, 2010 at 10:53:20AM +0100, Vitaly Wool wrote:
+> Hi Russell,
+> 
+> On Fri, Dec 3, 2010 at 4:15 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >> Why don't you stop
+> >> the clocks if RTS is cleared? This would have allowed the line
+> >> discipline driver to implicitly control the UART clock and there will
+> >> be no risk of losing data, as well as no non-standard behavior
+> >> involved. In fact, you'll be transparent to the upper layers in this
+> >> case.
+> >
+> > I've no idea what you're thinking, but you can't stop the UART clock
+> > because RTS is deasserted - or DTR for that matter. ?Neither of those
+> > two define whether characters will be transmitted or received.
+> 
+> What I'm mostly up to (and I guess Par also is) is how to conserve
+> power for the Bluetooth UARTs. For a Bluetooth UART, there usually is
+> a kind of signalling protocol, either inband or out-of-band, that
+> allows the host and the chip to negotiate about power conservation
+> during inactivity periods. These protocols do not belong to UART
+> implementation and are usually implemented as line discipline drivers.
+> While BT chip is sleeping, we don't need the UART clock running but we
+> need to have a decent way of telling the UART driver it can shut those
+> off. Using RTS for that, even though not being applicable in all the
+> cases, seems to work pretty well for Bluetooth UARTs. So if we just
+> add a flag if an UART is used for BT or not and then use RTS for this
+> kind of communication, will it be okay with you?
 
-Except this won't - you're testing the address of handle_arch_irq for
-NULL, which it'll never be.
+So you want to teach each UART driver a protocol-specific method of
+handling power management rather than implementing a sane API to do
+this?
+
+Please, come up with a sane API for power management of UARTs rather
+than trying to hack protocol specific stuff into UART drivers.
