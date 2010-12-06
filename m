@@ -1,51 +1,64 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 6 Dec 2010 12:11:38 +0100 (CET)
-Subject: [PATCH 3/5] msm: timer: SMP timer support for msm
-In-Reply-To: <20101206102046.GD29563@n2100.arm.linux.org.uk>
-References: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
-	<1291619778-30289-4-git-send-email-johlstei@codeaurora.org>
-	<alpine.LFD.2.00.1012061025240.2653@localhost6.localdomain6>
-	<20101206102046.GD29563@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1012061156100.2653@localhost6.localdomain6>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 6 Dec 2010 16:42:10 +0530
+Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
+In-Reply-To: <AANLkTinwj27dSdv9Djs9Fv6QN5vv5JY+br4xCHk=8YEu@mail.gmail.com>
+References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
+	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>
+	<AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>
+	<AANLkTinwj27dSdv9Djs9Fv6QN5vv5JY+br4xCHk=8YEu@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247C46537@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Dec 2010, Russell King - ARM Linux wrote:
+On Fri, Dec 03, 2010 at 22:40:44, Victor Rodriguez wrote:
 
-> On Mon, Dec 06, 2010 at 10:56:14AM +0100, Thomas Gleixner wrote:
-> > > +	local_irq_save(flags);
-> > > +	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
-> > 
-> > Why are you fiddling wiht the irqchip functions directly ? Please use
-> > disable_irq/enable_irq if at all.
-> 
-> PPI.  The interrupt has to be enabled by the very same CPU that wants
-> to receive the interrupt.  Other CPUs on the system do not have access
-> to the interrupt enable bits for PPIs.
+>  arch/arm/mach-davinci/board-omapl138-hawk.c |   38 ++++++++++++++++++++------
+>  1 files changed, 29 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> index da51136..8fc78f2 100644
+> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> @@ -157,7 +157,7 @@ static __init void omapl138_hawk_mmc_init(void)
+>       if (ret < 0) {
+>               pr_warning("%s: can not open GPIO %d\n",
+>                       __func__, DA850_HAWK_MMCSD_CD_PIN);
+> -             return;
+> +             goto exp_setup_cd_fail;
+>       }
+>
+>       ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
+> @@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
+>       if (ret < 0) {
+>               pr_warning("%s: can not open GPIO %d\n",
+>                       __func__, DA850_HAWK_MMCSD_WP_PIN);
+> -             return;
+> +             goto exp_setup_wp_fail;
+>       }
+>
+>       ret = da8xx_register_mmcsd0(&da850_mmc_config);
+> -     if (ret)
+> +     if (ret) {
+>               pr_warning("%s: MMC/SD0 registration failed: %d\n",
+>                       __func__, ret);
+> +             goto exp_setup_mmcsd_fail;
+> +     }
+> +             return;
 
-That's fine, but the code is called on that very cpu anyway, so
-enable_irq() ends up calling the very same chip->unmask()
- 
-> That's something which genirq can't handle because it doesn't _actually_
-> support real per-CPU interrupts - iow, ones which are truely private to
-> CPU N.
+This return has extra indentation.
 
-So what you want to avoid are the enable/disable_irq() side effects
-(setting/clearing the IRQ_DISABLED flags etc.) as they would apply to
-the other cpus as well - which would be bogus of course.
+> +
+> +exp_setup_mmcsd_fail:
+> +     gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+> +exp_setup_wp_fail:
+> +     gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+> +exp_setup_cd_fail:
+> +             return;
 
-We could actually solve that in the genirq code in a halfways simple
-way. Now that we get the references to the irq descriptors via
-irq_to_desc() we could add a function which marks an irq as percpu and
-use the main irq descriptor as a place holder which allocates percpu
-memory for the real descriptors. irq_to_desc() would lookup the main
-descriptor and hand back the one for the current cpu if the percpu
-pointer is set. That would allow you to use the generic functions at
-least with some care (functions need to be called from migration
-disabled code).
+This one too. Other than that, it all looks good to me.
 
 Thanks,
-
-	tglx
-
- 
+Sekhar
