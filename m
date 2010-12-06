@@ -1,118 +1,44 @@
 From: davidsin@ti.com (David Sin)
-Date: Mon,  6 Dec 2010 16:27:26 -0600
-Subject: [PATCH 9/9] TILER-DMM: Device support for OMAP
+Date: Mon,  6 Dec 2010 16:27:25 -0600
+Subject: [PATCH 8/9] TILER-DMM: Linking TILER driver into the Linux kernel
+	build
 In-Reply-To: <1291674446-10766-1-git-send-email-davidsin@ti.com>
 References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
-Message-ID: <1291674446-10766-10-git-send-email-davidsin@ti.com>
+Message-ID: <1291674446-10766-9-git-send-email-davidsin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DMM device support for OMAP utilizing the
-OMAP HWMOD framework.
+From: Lajos Molnar <molnar@ti.com>
 
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+This patch links the TILER driver into the Linux kernel build
+and config system.
+
+Signed-off-by: Lajos Molnar <molnar@ti.com>
 Signed-off-by: David Sin <davidsin@ti.com>
 ---
- arch/arm/mach-omap2/Makefile       |    2 +
- arch/arm/mach-omap2/dmm-omap44xx.c |   80 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 82 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/dmm-omap44xx.c
+ drivers/misc/Kconfig  |    1 +
+ drivers/misc/Makefile |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 60e51bc..fc682ea 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -194,3 +194,5 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 4d073f1..1ebc655 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -457,5 +457,6 @@ source "drivers/misc/eeprom/Kconfig"
+ source "drivers/misc/cb710/Kconfig"
+ source "drivers/misc/iwmc3200top/Kconfig"
+ source "drivers/misc/ti-st/Kconfig"
++source "drivers/misc/tiler/Kconfig"
  
- smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
- obj-y					+= $(smsc911x-m) $(smsc911x-y)
-+
-+obj-$(CONFIG_ARCH_OMAP4)		+= dmm-omap44xx.o
-diff --git a/arch/arm/mach-omap2/dmm-omap44xx.c b/arch/arm/mach-omap2/dmm-omap44xx.c
-new file mode 100644
-index 0000000..a84490c
---- /dev/null
-+++ b/arch/arm/mach-omap2/dmm-omap44xx.c
-@@ -0,0 +1,80 @@
-+/*
-+ * DMM driver support functions for TI OMAP processors.
-+ *
-+ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <mach/dmm.h>
-+#include <plat/omap_device.h>
-+#include <plat/omap_hwmod.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+
-+static struct dmm *plat_data;
-+static int pdata;
-+
-+#ifdef CONFIG_ARCH_OMAP4
-+static struct dmm omap4_plat_data[] = {
-+	{
-+		.oh_name = "dmm",
-+	},
-+};
-+#define NUM_PDATA ARRAY_SIZE(omap4_plat_data)
-+#else
-+#define omap4_plat_data NULL
-+#define NUM_PDATA 0
-+#endif
-+
-+static struct omap_device_pm_latency omap_dmm_latency[] = {
-+	[0] = {
-+		.deactivate_func = omap_device_idle_hwmods,
-+		.activate_func = omap_device_enable_hwmods,
-+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-+	},
-+};
-+
-+static s32 __init dmm_omap_init(void)
-+{
-+	struct omap_hwmod *oh = NULL;
-+	struct omap_device *od = NULL;
-+	struct omap_device_pm_latency *ohl = NULL;
-+	int ohlc = 0, i = 0;
-+
-+	plat_data = omap4_plat_data;
-+	pdata = NUM_PDATA;
-+
-+	for (i = 0; i < pdata; i++) {
-+		struct dmm *data = &plat_data[i];
-+
-+		oh = omap_hwmod_lookup(data->oh_name);
-+		if (!oh)
-+			goto error;
-+
-+		data->base = oh->_mpu_rt_va;
-+		ohl = omap_dmm_latency;
-+		ohlc = ARRAY_SIZE(omap_dmm_latency);
-+
-+		od = omap_device_build(data->oh_name, i, oh, data,
-+					 sizeof(*data), ohl, ohlc, false);
-+		if (IS_ERR(od))
-+			goto error;
-+	}
-+	return 0;
-+error:
-+	return -ENODEV;
-+}
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("David Sin <davidsin@ti.com>");
-+device_initcall(dmm_omap_init);
+ endif # MISC_DEVICES
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index 98009cc..3716c49 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -42,3 +42,4 @@ obj-$(CONFIG_ARM_CHARLCD)	+= arm-charlcd.o
+ obj-$(CONFIG_PCH_PHUB)		+= pch_phub.o
+ obj-y				+= ti-st/
+ obj-$(CONFIG_AB8500_PWM)	+= ab8500-pwm.o
++obj-$(CONFIG_TI_TILER)		+= tiler/
 -- 
 1.7.0.4
