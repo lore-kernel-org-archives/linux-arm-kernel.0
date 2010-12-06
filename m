@@ -1,28 +1,35 @@
-From: dzickus@redhat.com (Don Zickus)
-Date: Mon, 6 Dec 2010 08:56:11 -0500
-Subject: mpcore watchdogs questions
-In-Reply-To: <AANLkTikRbF9yVUMLo2rRfM0zC2GRRhA7MD7dyCMR2+Sm@mail.gmail.com>
-References: <4CF8F702.1070502@stericsson.com>
-	<20101203145803.GQ18100@redhat.com>
-	<AANLkTikRbF9yVUMLo2rRfM0zC2GRRhA7MD7dyCMR2+Sm@mail.gmail.com>
-Message-ID: <20101206135611.GC21786@redhat.com>
+From: marek.belisko@open-nandra.com (Marek Belisko)
+Date: Mon,  6 Dec 2010 15:04:03 +0100
+Subject: [PATCH] arm: ecard: Fix compilation warning.
+Message-ID: <1291644243-23540-1-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 10:34:31AM +0100, Per Fransson wrote:
-> 
-> The way I see it, the idea behind the lockup detection code, and please correct
-> me if I'm wrong, is to cover the following case on a per-CPU basis:
-> 
-> * Assuming the CPU in question is actually chugging along, is it
-> getting real work
-> done, where "real work" is defined as being able to schedule a high-prio kernel
-> thread and have it perform the actions expected of it (kicking the watchdog).
-> In the hardlockup case "real work" is instead defined as being able to
-> respond to
-> hrtimers going off.
+Fix following compilation warning:
+arch/arm/kernel/ecard.c:1066: warning: ignoring return value of
+'device_register', declared with attribute warn_unused_result
 
-Yup, that sounds right.
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+---
+ arch/arm/kernel/ecard.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-Cheers,
-Don
+diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
+index eed2f79..da882b1 100644
+--- a/arch/arm/kernel/ecard.c
++++ b/arch/arm/kernel/ecard.c
+@@ -1063,8 +1063,10 @@ ecard_probe(int slot, card_type_t type)
+ 	*ecp = ec;
+ 	slot_to_expcard[slot] = ec;
+ 
+-	device_register(&ec->dev);
+-
++	rc = device_register(&ec->dev);
++	if (rc)
++		goto nodev;
++
+ 	return 0;
+ 
+  nodev:
+-- 
+1.7.1
