@@ -1,21 +1,34 @@
-From: dmarion@me.com (Damjan Marion)
-Date: Mon, 06 Dec 2010 18:29:19 +0100
-Subject: Cavium Networks CNS21xx SoC Support
-Message-ID: <CB37CFFB-F7D5-4582-AADB-DBAD0FA96E81@me.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon,  6 Dec 2010 17:35:34 +0000
+Subject: [PATCH v2 0/3] ARM: omap: Thumb-2 kernel compatibility fixes
+Message-ID: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+These patches enable the omap kernel to build and work in
+Thumb-2 (CONFIG_THUMB2_KERNEL).
 
-Hi,
+They may make useful reading for all low-level BSP maintainers,
+since in general similar issues tend to crop up whenever migrating
+code to support Thumb-2.
 
-I would like to know if anybody considered so far adding support for Cavium Networks (ex Star Semiconductors) CNS21xx series SoCs. This SoC is based on FA526 core which is AFAIK supported in recent kernels and Cavium Networks is providing some patched old linux kernels (2.6.24).
+Tested on: omap3 (Beagle xM A2)
+Not tested on any other platforms yet.
 
-http://www.caviumnetworks.com/ECONA_CNS2XXX.html
+Dave Martin (3):
+  ARM: omap: Enable low-level omap3 PM code to work with
+    CONFIG_THUMB2_KERNEL
+  ARM: omap4: Correct definition of do_wfi() for CONFIG_THUMB2_KERNEL
+  ARM: omap4: Convert END() to ENDPROC() for correct linkage with
+    CONFIG_THUMB2_KERNEL
 
-There are some cheap devices on the marked based on this SoCs and marketed as NAS servers but basically due to small footprint they can be used for many other purposes.
-
-I'm willing to contribute and prepare some patches based on Cavium provided kernel, but before I start I would like to know from more experienced guys if this make a sense at all....
-
-Thanks,
-
-Damjan
+ arch/arm/mach-omap2/include/mach/omap4-common.h |    5 +++
+ arch/arm/mach-omap2/omap-headsmp.S              |    2 +-
+ arch/arm/mach-omap2/omap44xx-smc.S              |    8 ++--
+ arch/arm/mach-omap2/pm.h                        |    2 +
+ arch/arm/mach-omap2/pm34xx.c                    |   13 ++++++--
+ arch/arm/mach-omap2/sleep34xx.S                 |   37 +++++++++++++++++++++--
+ arch/arm/mach-omap2/sram34xx.S                  |   34 +++++++++++++++-----
+ arch/arm/plat-omap/include/plat/sram.h          |    1 +
+ arch/arm/plat-omap/sram.c                       |   10 +++++-
+ 9 files changed, 90 insertions(+), 22 deletions(-)
