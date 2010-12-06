@@ -1,57 +1,62 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Mon, 06 Dec 2010 12:42:32 +0100
-Subject: [PATCH] support PMIC mc13892
-In-Reply-To: <87tyirnpbm.fsf@lechat.rtp-net.org>
-References: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
-	<87tyirnpbm.fsf@lechat.rtp-net.org>
-Message-ID: <1291635752.3151.43.camel@realization>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 06 Dec 2010 14:43:18 +0300
+Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247C46537@dbde02.ent.ti.com>
+References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>	<AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>	<B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>	<AANLkTinwj27dSdv9Djs9Fv6QN5vv5JY+br4xCHk=8YEu@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247C46537@dbde02.ent.ti.com>
+Message-ID: <4CFCCC56.3010700@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On lun, 2010-12-06 at 11:55 +0100, Arnaud Patard wrote:
-> <yong.shen@freescale.com> writes:
-> 
-> Hi,
-> 
-> > From: Yong Shen <yong.shen@linaro.org>
-> >
-> > add support for mc13892, tested on mx51 babbage board
-> 
-> Will review/test it asap on my efikamx. thanks for working on this :)
-> 
-> >
-> > Signed-off-by: Yong Shen <yong.shen@linaro.org>
-> > ---
-> >  drivers/mfd/Kconfig                   |    4 +
-> >  drivers/regulator/Kconfig             |    8 +
-> >  drivers/regulator/Makefile            |    1 +
-> >  drivers/regulator/mc13892-regulator.c |  647 +++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/mc13892.h           |   38 ++
-> >  5 files changed, 698 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/regulator/mc13892-regulator.c
-> >  create mode 100644 include/linux/mfd/mc13892.h
-> 
-> [...]
-> 
-> > +
-> > +static const int mc13892_vvideo[] = {
-> > +	2500000, 2600000, 270000, 2775000,
-> > +};
-> 
-> Should be :
-> static const int mc13892_vvideo[] = {
->         270000, 2775000, 2500000, 2600000,
-> };
-> 
-> I've spotted this in my code some time ago. VVIDEO voltages are not
-> ascending order.
+Hello.
 
-If this is true, also a private get_best_voltage_index have to be
-developed for it.
+On 06-12-2010 14:12, Nori, Sekhar wrote:
 
+>>   arch/arm/mach-davinci/board-omapl138-hawk.c |   38 ++++++++++++++++++++------
+>>   1 files changed, 29 insertions(+), 9 deletions(-)
 
--- 
-Alberto!
+>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> index da51136..8fc78f2 100644
+>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+[...]
+>> @@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
+>>        if (ret<  0) {
+>>                pr_warning("%s: can not open GPIO %d\n",
+>>                        __func__, DA850_HAWK_MMCSD_WP_PIN);
+>> -             return;
+>> +             goto exp_setup_wp_fail;
+>>        }
+>>
+>>        ret = da8xx_register_mmcsd0(&da850_mmc_config);
+>> -     if (ret)
+>> +     if (ret) {
+>>                pr_warning("%s: MMC/SD0 registration failed: %d\n",
+>>                        __func__, ret);
+>> +             goto exp_setup_mmcsd_fail;
+>> +     }
+>> +             return;
 
-        Be Persistent!
-                - Greg Kroah-Hartman (FOSDEM 2010)
+> This return has extra indentation.
+
+>> +
+>> +exp_setup_mmcsd_fail:
+>> +     gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+>> +exp_setup_wp_fail:
+>> +     gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+>> +exp_setup_cd_fail:
+>> +             return;
+
+> This one too.
+
+    Moreover, it's not needed at all.
+
+> Other than that, it all looks good to me.
+
+    Except those 'exp_setup_'prefixes which I'm not sure where are coming from...
+
+> Thanks,
+> Sekhar
+
+WBR, Sergei
