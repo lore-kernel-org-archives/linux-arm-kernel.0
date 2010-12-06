@@ -1,141 +1,80 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 6 Dec 2010 09:20:16 +0100
-Subject: [PATCH] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <1291159899-32017-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1291159899-32017-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101206082016.GU6017@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 6 Dec 2010 09:33:06 +0100
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <20101124080214.GU4693@pengutronix.de>
+References: <20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<1290505382-16110-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20101123101210.GA18170@n2100.arm.linux.org.uk>
+	<20101123102632.GM4693@pengutronix.de>
+	<1290521329.3901.14.camel@realization>
+	<20101123141713.GQ4693@pengutronix.de>
+	<20101124080214.GU4693@pengutronix.de>
+Message-ID: <20101206083306.GI10693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Hello Alberto,
 
-On Tue, Nov 30, 2010 at 05:31:39PM -0600, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Adds initial low power suspend functionality to MX51.
-> Supports "mem" and "standby" modes.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/Makefile           |    1 +
->  arch/arm/mach-mx5/pm.c               |   70 ++++++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/mxc.h |    1 +
->  3 files changed, 72 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/pm.c
-> 
-> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> index 026cd85..906bc71 100644
-> --- a/arch/arm/mach-mx5/Makefile
-> +++ b/arch/arm/mach-mx5/Makefile
-> @@ -5,6 +5,7 @@
->  # Object file lists.
->  obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o
->  
-> +obj-$(CONFIG_PM) += pm.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
->  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
->  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-> diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
-> new file mode 100644
-> index 0000000..417cce1
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/pm.c
-> @@ -0,0 +1,70 @@
-> +/*
-> + *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#include <linux/suspend.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/system.h>
-> +#include "crm_regs.h"
-> +
-> +static int mx5_suspend_enter(suspend_state_t state)
-> +{
-> +	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
+On Wed, Nov 24, 2010 at 09:02:14AM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Nov 23, 2010 at 03:17:13PM +0100, Uwe Kleine-K?nig wrote:
+> > On Tue, Nov 23, 2010 at 03:08:49PM +0100, Alberto Panizzo wrote:
+> > > Hi Uwe,
+> > > On mar, 2010-11-23 at 11:26 +0100, Uwe Kleine-K?nig wrote:
+> > > > Hello Russell,
+> > > > 
+> > > > On Tue, Nov 23, 2010 at 10:12:11AM +0000, Russell King - ARM Linux wrote:
+> > > > > On Tue, Nov 23, 2010 at 10:43:02AM +0100, Uwe Kleine-K?nig wrote:
+> > > > > > There is no need to memzero the buffer because dma_alloc_coherent zeros
+> > > > > > the memory for us.
+> > > > > > 
+> > > > > > This fixes:
+> > > > > > 
+> > > > > > 	BUG: Your driver calls ioremap() on system memory.  This leads
+> > > > > > 	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
+> > > > > > 	<4>will fail in the next kernel release.  Please fix your driver.
+> > > > > > 
+> > > > > > Tested-by: Michael Grzeschik <mgr@pengutronix.de>
+> > > > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > > > ---
+> > > > > > Hello,
+> > > > > > 
+> > > > > > it seems to work this way, still I'd like to have some feedback if this
+> > > > > > is done right.  Russell?
+> > > > > 
+> > > > > Yes and probably no.  Yes, it's architecturally correct because the memory
+> > > > > will be mapped only once, thereby avoiding the aliasing issue.
+> > > > > 
+> > > > > Probably no, because the memory is mapped strongly as device memory by
+> > > > > ioremap.  ISTR whether memory remains accessible when mapped as a device
+> > > > > is not something covered by the architecture, but I guess is more to do
+> > > > > with how the interconnect on the SoC is setup.
+> > > > > 
+> > > > > In other words, we probably have gremlins lurking in
+> > > > > dma_declare_coherent_memory() which could bite us at a later date.
+> > > > That is, the patch is OK as such, right?
+> > > > 
+> > > > Best regards
+> > > > Uwe
+> > > > 
+> > > 
+> > > I'm trying to achieve the camera support for the i.MX31 3-Stack board.
+> > > The camera driver is in an early stage and results are not as expected
+> > > (I have to solve some timing issues). 
+> > > Adding the dma reservation code as you do in this patch results in 
+> > > system freeze when the capture chain is activated..
+> > Hmm, system freeze as is Sysrq doesn't work anymore?
+> > 
+> > Sysrq-L comes to mind, or CONFIG_DETECT_HUNG_TASK=y together with the
+> > various lock debug options!?
+> Anything new from your side?  I wonder if this is only a problem in your
+> driver.  Can I take a look at your driver?
+ping
 
-plat_lpc and arm_srpgcr are used unitialized.
+I'd like to have this patch in Sascha's for-.38 patch.  Sascha, what do
+you think?
 
-Sascha
-
-> +
-> +	/* always allow platform to issue a deep sleep mode request */
-> +	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-> +
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
-> +		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-> +		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-> +		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-> +		break;
-> +	case PM_SUSPEND_STANDBY:
-> +		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-> +		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-> +		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-> +		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
-> +	arm_srpgcr |= MXC_SRPGCR_PCR;
-> +
-> +	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-> +	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-> +	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-> +
-> +	if (tzic_enable_wake(0) != 0)
-> +		return -EAGAIN;
-> +
-> +	cpu_do_idle();
-> +	return 0;
-> +}
-> +
-> +static int mx5_pm_valid(suspend_state_t state)
-> +{
-> +	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-> +}
-> +
-> +static const struct platform_suspend_ops mx5_suspend_ops = {
-> +	.valid = mx5_pm_valid,
-> +	.enter = mx5_suspend_enter,
-> +};
-> +
-> +static int __init mx5_pm_init(void)
-> +{
-> +	if (cpu_is_mx51())
-> +		suspend_set_ops(&mx5_suspend_ops);
-> +	return 0;
-> +}
-> +device_initcall(mx5_pm_init);
-> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-> index 4abbdd1..dc685d4 100644
-> --- a/arch/arm/plat-mxc/include/mach/mxc.h
-> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
-> @@ -52,6 +52,7 @@
->  
->  #ifndef __ASSEMBLY__
->  extern unsigned int __mxc_cpu_type;
-> +int tzic_enable_wake(int is_idle);
->  #endif
->  
->  #ifdef CONFIG_ARCH_MX1
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
