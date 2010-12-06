@@ -1,43 +1,35 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Dec 2010 18:13:37 +0000
-Subject: [PATCH 21/22] ARM: CPU hotplug: ensure correct ordering of unplug
-In-Reply-To: <E1POcCh-0007sL-E6@rmk-PC.arm.linux.org.uk>
-References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-	<E1POcCh-0007sL-E6@rmk-PC.arm.linux.org.uk>
-Message-ID: <AANLkTimTFB+s9zWRCbPRCJk=p6eup8c8EMwnzOb+JMDy@mail.gmail.com>
+Date: Mon, 6 Dec 2010 18:17:05 +0000
+Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to work
+	with CONFIG_THUMB2_KERNEL
+In-Reply-To: <1291656937-24992-2-git-send-email-dave.martin@linaro.org>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
+	<1291656937-24992-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <AANLkTi=OhchW6rqMmTP5dpUF7aKwy9iArETaHdwi5cjN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 December 2010 20:26, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Don't call idle_task_exit() with interrupts disabled, and ensure
-> that we have a memory barrier after interrupts are disabled but
-> before signalling that this CPU has shut down.
+On 6 December 2010 17:35, Dave Martin <dave.martin@linaro.org> wrote:
+> ?* Explicitly build a few parts of sleep34xx.S as ARM.
 >
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> ?arch/arm/kernel/smp.c | ? ?4 +++-
-> ?1 files changed, 3 insertions(+), 1 deletions(-)
+> ? ? ?* lock_scratchpad_sem is kept as ARM because of the need to
+> ? ? ? ?synchronise with hardware (?) using the SWP instruction.
 >
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index bebe3bd..8cc9c03 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -269,9 +269,11 @@ void __ref cpu_die(void)
-> ?{
-> ? ? ? ?unsigned int cpu = smp_processor_id();
+> ? ? ?* save_secure_ram_context and omap34xx_cpu_suspend are built
+> ? ? ? ?as ARM in case the Secure World firmware expects to decode
+> ? ? ? ?the comment field from the SMC (aka smi) instructions.
 >
-> - ? ? ? local_irq_disable();
-> ? ? ? ?idle_task_exit();
+> ? ? ? ?This can be undone later if the firmware is confirmed as
+> ? ? ? ?able to decode the Thumb SMC encoding (or ignores the
+> ? ? ? ?comment field).
 >
-> + ? ? ? local_irq_disable();
-> + ? ? ? mb();
-> +
-> ? ? ? ?/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> ? ? ? ?complete(&cpu_died);
+> ? ? ?* es3_sdrc_fix should presumably only be called from the
+> ? ? ? ?low-level wakeup code. ?To minimise the diff, switched this
+> ? ? ? ?to ARM and demoted it to be a local symbol, since I believe
+> ? ? ? ?it shouldn't be called from outside anyway.
 
-I don't fully understand the point of the mb() here. If you want to
-drain the write buffer that would be a dsb().
+I haven't checked the code but does this always work? The kernel isn't
+built with interworking enabled, so it's either ARM or Thumb-2.
 
 -- 
 Catalin
