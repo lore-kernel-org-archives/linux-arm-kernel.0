@@ -1,70 +1,45 @@
-From: david.jander@protonic.nl (David Jander)
-Date: Mon, 6 Dec 2010 11:40:22 +0100
-Subject: [PATCH] support PMIC mc13892
-In-Reply-To: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
-References: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
-Message-ID: <20101206114022.249671bc@archvile>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 6 Dec 2010 16:17:42 +0530
+Subject: [PATCH 22/22] ARM: SMP: remove smp_mpidr.h
+In-Reply-To: <20101206103207.GF29563@n2100.arm.linux.org.uk>
+References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
+	<E1POcD1-0007sP-Rs@rmk-PC.arm.linux.org.uk>
+	<7ba9887da1b3a9057e833c1fae3458e7@mail.gmail.com>
+	<20101206103207.GF29563@n2100.arm.linux.org.uk>
+Message-ID: <9bef4fc88a98140aac3db389a9f4f0cc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Yong,
-
-On Mon, 6 Dec 2010 14:25:35 +0800 <yong.shen@freescale.com> wrote:
->[...]
-> --- /dev/null
-> +++ b/include/linux/mfd/mc13892.h
-> @@ -0,0 +1,38 @@
-> +/*
-> + * Copyright 2010 Yong Shen <yong.shen@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
-> +
-> +#ifndef __LINUX_MFD_MC13892_H
-> +#define __LINUX_MFD_MC13892_H
-> +#include <linux/mfd/mc13xxx.h>
-> +
-> +#define MC13892_SW1		0
-> +#define MC13892_SW2		1
-> +#define MC13892_SW3		2
-> +#define MC13892_SW4		3
-> +#define MC13892_SWBST	4
-> +#define MC13892_VIOHI	5
-> +#define MC13892_VPLL	6
-> +#define MC13892_VDIG	7
-> +#define MC13892_VSD	8
-> +#define MC13892_VUSB2	9
-> +#define MC13892_VVIDEO	10
-> +#define MC13892_VAUDIO	11
-> +#define MC13892_VCAM	12
-> +#define MC13892_VGEN1	13
-> +#define MC13892_VGEN2	14
-> +#define MC13892_VGEN3	15
-> +#define MC13892_VUSB	16
-> +#define MC13892_GPO1	17
-> +#define MC13892_GPO2	18
-> +#define MC13892_GPO3	19
-> +#define MC13892_GPO4	20
-> +#define MC13892_PWGT1SPI	21
-> +#define MC13892_PWGT2SPI	22
-> +#define MC13892_VCOINCELL	23
-> +
-> +#endif
-
-I suppose these are needed outside the driver .c file? If so, can't these go in
-linux/mfd/mc13xxx.h?
-The platform-data struct is in there too, so why not put the corresponding
-defines there also?
-For other subsystems, those defines that are common are prefixed MC13XXX_ and
-those that are individual, get MC13892_ or MC13783_. This makes it also easier
-and less intrusive to add support for future chips in this series....
-
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Monday, December 06, 2010 4:02 PM
+> To: Santosh Shilimkar
+> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> Subject: Re: [PATCH 22/22] ARM: SMP: remove smp_mpidr.h
+>
+> On Mon, Dec 06, 2010 at 03:02:09PM +0530, Santosh Shilimkar wrote:
+> > Russell,
+> > > -----Original Message-----
+> > > From: linux-arm-kernel-bounces at lists.infradead.org
+[mailto:linux-arm-
+> > > kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
+> > Linux
+> > > Sent: Saturday, December 04, 2010 1:56 AM
+> > > To: linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> > > Subject: [PATCH 22/22] ARM: SMP: remove smp_mpidr.h
+> > >
+> > > With "ARM: CPU hotplug: remove bug checks in platform_cpu_die()", we
+> > > now do not use hard_smp_processor_id(), we no longer need to read
+the
+> > > hardware processor ID.  Remove the include providing this function.
+> > >
+> > hard_smp_processor_id() is also useful when wakeup from low power
+> > modes and wants to run specific restore code on specific
+> > CPUs. Ofcourse platform have it's own custome macro, but having
+> > ARM generic is better.
+>
+> Maybe, but there's no code in the kernel making use of it.  Also note
+> that there is a tendency to compare the kernel's CPU numbers (which are
+> the logical numbers) with hard_smp_processor_id() (the physical number)
+> which may not always be the same thing.
+Agree. May be we can add it when the need arises.
