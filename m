@@ -1,72 +1,71 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Mon, 06 Dec 2010 15:54:00 +0100
-Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
-In-Reply-To: <20101206143427.GF31777@n2100.arm.linux.org.uk>
-References: <20101123102632.GM4693@pengutronix.de>
-	<1290521329.3901.14.camel@realization>
-	<20101123141713.GQ4693@pengutronix.de>
-	<20101124080214.GU4693@pengutronix.de>
-	<20101206083306.GI10693@pengutronix.de>
-	<1291630492.3151.14.camel@realization>
-	<20101206102602.GE29563@n2100.arm.linux.org.uk>
-	<1291635442.3151.39.camel@realization>
-	<20101206114629.GB31777@n2100.arm.linux.org.uk>
-	<1291644581.3151.89.camel@realization>
-	<20101206143427.GF31777@n2100.arm.linux.org.uk>
-Message-ID: <1291647240.3151.99.camel@realization>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Mon, 6 Dec 2010 09:16:23 -0600
+Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
+In-Reply-To: <AANLkTi=01qGO6pX15n_w-W4RaaXsK3u697UQ9pD_DuvW@mail.gmail.com>
+References: <AANLkTind+DH5emar2L9EiV-pqpCvQHQGnFevh9Bncrpz@mail.gmail.com>
+	<20101202123304.GB10461@n2100.arm.linux.org.uk>
+	<AANLkTi=iRUD3_dcY47tebHGbxxAOcY61_2MtSVfO8zQB@mail.gmail.com>
+	<20101202152053.GC10461@n2100.arm.linux.org.uk>
+	<AANLkTi=01qGO6pX15n_w-W4RaaXsK3u697UQ9pD_DuvW@mail.gmail.com>
+Message-ID: <AANLkTim641hqqyCczMPN_rDvVH_dqV0voQLFhQsrQLY3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On lun, 2010-12-06 at 14:34 +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 06, 2010 at 03:09:41PM +0100, Alberto Panizzo wrote:
-> > > And the memblock debug output?
-> > 
-> > The following is the complete debug:
-> > 
-> > Uncompressing Linux... done, booting the kernel.
-> > [    0.000000] Linux version 2.6.36-10808-ga06e72c-dirty (alberto at realization) (gcc version 4.3.2 (OSELAS.Toolchain-1.99.3) ) #180 PREEMPT Mon Dec 6 14:24:53 CET 2010
-> 
-> Ah ha.
-> 
-> > [    0.000000] mx31_3ds_reserve: Reserved 8388608 bytes from address 0x87800000
-> > 
-> > Removed 8 MB from the memory map. Start address 0x87800000 
-> > 
-> > [    0.000000] MEMBLOCK configuration:
-> > [    0.000000]  rmo_size    = 0x0
-> > [    0.000000]  memory.size = 0x7800000
-> > [    0.000000]  memory.cnt  = 0x1
-> > [    0.000000]  memory[0x0]	0x0000000080000000 - 0x00000000877fffff, 0x7800000 bytes
-> > [    0.000000]  reserved.cnt  = 0x1
-> > [    0.000000]  reserved[0x0]	0x0000000080004000 - 0x0000000080415ed7, 0x411ed8 bytes
-> > 
-> > That's true, because otherwise (without reserving memory) I get:
-> > >>[    0.000000]  memory[0x0]	0x0000000080000000 - 0x0000000087ffffff, 0x8000000 bytes
-> 
-> Ok.
-> 
-> > [    0.000000] Memory: 128MB = 128MB total
-> 
-> Ah ha.
-> 
-> You're trying to use something which requires code that was merged into
-> 2.6.37-rc on a kernel which doesn't have the commits necessary to make
-> it work...
-> 
-> You need at least the core memblock changes, plus 7dc50ec^..f25b4b4
-> to make this work.
+Ruseell,
+
+On Thu, Dec 2, 2010 at 9:43 AM, Guzman Lugo, Fernando
+<fernando.lugo@ti.com> wrote:
+> On Thu, Dec 2, 2010 at 9:20 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Thu, Dec 02, 2010 at 08:50:07AM -0600, Guzman Lugo, Fernando wrote:
+>>> On Thu, Dec 2, 2010 at 6:33 AM, Russell King - ARM Linux
+>>> <linux@arm.linux.org.uk> wrote:
+>>> > On Thu, Dec 02, 2010 at 06:07:23AM -0600, Kanigeri, Hari wrote:
+>>> >> Hi Tony,
+>>> >>
+>>> >> The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
+>>> >> ? Linus Torvalds (1):
+>>> >> ? ? ? ? Linux 2.6.37-rc4
+>>> >>
+>>> >> are available in the git repository at:
+>>> >>
+>>> >> ? git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
+>>> >>
+>>> >> Fernando Guzman Lugo (5):
+>>> >> ? ? ? OMAP: mailbox: change full flag per mailbox queue instead of global
+>>> >> ? ? ? omap: iovmm - no gap checking for fixed address
+>>> >> ? ? ? omap: iovmm - add superpages support to fixed da address
+>>> >> ? ? ? omap: iovmm - replace __iounmap with omap_iounmap
+>>> >
+>>> > This change is wrong. ?Nothing should be directly referencing omap_iounmap
+>>> > nor for that matter omap_ioremap. ?Both are implementation details of the
+>>> > standard ioremap/iounmap APIs.
+>>> >
+>>> > Use the official APIs rather than the implementation details behind them.
+>>>
+>>> if you see where the function is used, you will see that it is not
+>>> calling the function, it is use as a parameter in unmap_vm_area(), if
+>>> I used iounmap which is a macro there I will get a compilation error.
+>>
+>> Hmm, yes, because iounmap() is defined as a macro rather than iounmap.
+>>
+>> The solution to this is to fix iounmap and __arch_iounmap macros so
+>> they aren't macros which take arguments. ?That will then allow them
+>> to be used in the way you desire.
+>
+> yes, that way it can be used in the function parameter. what is the
+> right thing to do?
+> 1) You send your patch and then I send the new version of the patches.
+> 2) I make a new series of the patches with the change to iounmap and I
+> include your patch in the series.
+>
+
+Can you please suggest the approach we take here ? So, either you send
+your suggested change as a patch and Fernando's patch will be based on
+it, or he can take a TODO action item to patch again if you plan to
+send this change later.
 
 
-AAaaarrrgghhhhh!! Ok, Really sorry about all this noise guys!!
-I cloned the imx branch nearly before the 2.6.37 merge window
-and I did not sync my local branch since that time.
-
-Really sorry. I will feed back you after a fast rebase of my patch
-set onto the nowadays pengutronix for-next
-
-
--- 
-Alberto!
-
-        Be Persistent!
-                - Greg Kroah-Hartman (FOSDEM 2010)
+Thank you,
+Best regards,
+Hari Kanigeri
