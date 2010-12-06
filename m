@@ -1,74 +1,46 @@
-From: par-gunnar.p.hjalmdahl@stericsson.com (Par-Gunnar HJALMDAHL)
-Date: Mon, 6 Dec 2010 13:23:50 +0100
-Subject: [PATCH] pl011: added clock management feature
-In-Reply-To: <20101206101427.GC29563@n2100.arm.linux.org.uk>
-References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
-	<20101109224012.GA21992@kroah.com>
-	<AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
-	<20101203151547.GA30898@n2100.arm.linux.org.uk>
-	<AANLkTimxU-YL_wy9ZTjKXX+68u_KcPzhSn9mOU_MnzQS@mail.gmail.com>
-	<20101206101427.GC29563@n2100.arm.linux.org.uk>
-Message-ID: <AFCDDB4A3EA003429EEF1E7B211FDBBA33483F160F@EXDCVYMBSTM005.EQ1STM.local>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 06 Dec 2010 15:10:24 +0300
+Subject: [PATCH 47/54] ARM: versatile: irq_data conversion.
+In-Reply-To: <20101130134119.GV15575@mail.wantstofly.org>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130134119.GV15575@mail.wantstofly.org>
+Message-ID: <4CFCD2B0.6090902@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 30-11-2010 16:41, Lennert Buytenhek wrote:
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: den 6 december 2010 11:14
-> To: Vitaly Wool
-> Cc: Greg KH; Linus WALLEIJ; Par-Gunnar HJALMDAHL; Greg Kroah-Hartman;
-> Lukasz Rymanowski; Grzegorz Sygieda; linux-serial at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] pl011: added clock management feature
-> 
-> On Mon, Dec 06, 2010 at 10:53:20AM +0100, Vitaly Wool wrote:
-> > Hi Russell,
-> >
-> > On Fri, Dec 3, 2010 at 4:15 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > >> Why don't you stop
-> > >> the clocks if RTS is cleared? This would have allowed the line
-> > >> discipline driver to implicitly control the UART clock and there
-> will
-> > >> be no risk of losing data, as well as no non-standard behavior
-> > >> involved. In fact, you'll be transparent to the upper layers in
-> this
-> > >> case.
-> > >
-> > > I've no idea what you're thinking, but you can't stop the UART
-> clock
-> > > because RTS is deasserted - or DTR for that matter. ?Neither of
-> those
-> > > two define whether characters will be transmitted or received.
-> >
-> > What I'm mostly up to (and I guess Par also is) is how to conserve
-> > power for the Bluetooth UARTs. For a Bluetooth UART, there usually is
-> > a kind of signalling protocol, either inband or out-of-band, that
-> > allows the host and the chip to negotiate about power conservation
-> > during inactivity periods. These protocols do not belong to UART
-> > implementation and are usually implemented as line discipline
-> drivers.
-> > While BT chip is sleeping, we don't need the UART clock running but
-> we
-> > need to have a decent way of telling the UART driver it can shut
-> those
-> > off. Using RTS for that, even though not being applicable in all the
-> > cases, seems to work pretty well for Bluetooth UARTs. So if we just
-> > add a flag if an UART is used for BT or not and then use RTS for this
-> > kind of communication, will it be okay with you?
-> 
-> So you want to teach each UART driver a protocol-specific method of
-> handling power management rather than implementing a sane API to do
-> this?
-> 
-> Please, come up with a sane API for power management of UARTs rather
-> than trying to hack protocol specific stuff into UART drivers.
+> Signed-off-by: Lennert Buytenhek<buytenh@secretlab.ca>
+[...]
 
-So I guess the best solution would then be to add function(s) to struct tty_operations in tty_driver.h? Something like
-void (*clk_enable)(struct tty_struct *tty);
-void (*clk_disable)(struct tty_struct *tty);
-and then it is up to each UART driver to implement them? Would such a solution be OK?
+> diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+> index e38acb0..9b9b6fa 100644
+> --- a/arch/arm/mach-versatile/core.c
+> +++ b/arch/arm/mach-versatile/core.c
+> @@ -62,23 +62,23 @@
+>   #define VA_VIC_BASE		__io_address(VERSATILE_VIC_BASE)
+>   #define VA_SIC_BASE		__io_address(VERSATILE_SIC_BASE)
+>
+> -static void sic_mask_irq(unsigned int irq)
+> +static void sic_mask_irq(struct irq_data *d)
+>   {
+> -	irq -= IRQ_SIC_START;
+> +	unsigned int irq = d->irq - IRQ_SIC_START;
 
-/P-G
+    Perhaps should've inserted an empty line here...
+
+>   	writel(1<<  irq, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
+>   }
+>
+> -static void sic_unmask_irq(unsigned int irq)
+> +static void sic_unmask_irq(struct irq_data *d)
+>   {
+> -	irq -= IRQ_SIC_START;
+> +	unsigned int irq = d->irq - IRQ_SIC_START;
+
+    Here too.
+
+>   	writel(1<<  irq, VA_SIC_BASE + SIC_IRQ_ENABLE_SET);
+>   }
+
+WBR, Sergei
