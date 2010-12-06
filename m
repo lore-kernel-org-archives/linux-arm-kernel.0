@@ -1,37 +1,41 @@
 From: davidsin@ti.com (David Sin)
-Date: Mon,  6 Dec 2010 16:27:19 -0600
-Subject: [PATCH 2/9] TILER-DMM: Container manager interface and utility
-	definitons
+Date: Mon,  6 Dec 2010 16:27:26 -0600
+Subject: [PATCH 9/9] TILER-DMM: Device support for OMAP
 In-Reply-To: <1291674446-10766-1-git-send-email-davidsin@ti.com>
 References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
-Message-ID: <1291674446-10766-3-git-send-email-davidsin@ti.com>
+Message-ID: <1291674446-10766-10-git-send-email-davidsin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lajos Molnar <molnar@ti.com>
+Add DMM device support for OMAP utilizing the
+OMAP HWMOD framework.
 
-This patch defined the TILER Container Manager (TCM) interface and
-provides utility methods for implementing a TCM.
-
-Signed-off-by: Lajos Molnar <molnar@ti.com>
+Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 Signed-off-by: David Sin <davidsin@ti.com>
-Signed-off-by: Ravi Ramachandra <r.ramachandra@ti.com>
 ---
- drivers/misc/tiler/tcm.h           |  171 ++++++++++++++++++++++++++++++++++++
- drivers/misc/tiler/tcm/tcm-utils.h |   51 +++++++++++
- 2 files changed, 222 insertions(+), 0 deletions(-)
- create mode 100644 drivers/misc/tiler/tcm.h
- create mode 100644 drivers/misc/tiler/tcm/tcm-utils.h
+ arch/arm/mach-omap2/Makefile       |    2 +
+ arch/arm/mach-omap2/dmm-omap44xx.c |   80 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 82 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/dmm-omap44xx.c
 
-diff --git a/drivers/misc/tiler/tcm.h b/drivers/misc/tiler/tcm.h
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 60e51bc..fc682ea 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -194,3 +194,5 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
+ 
+ smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
+ obj-y					+= $(smsc911x-m) $(smsc911x-y)
++
++obj-$(CONFIG_ARCH_OMAP4)		+= dmm-omap44xx.o
+diff --git a/arch/arm/mach-omap2/dmm-omap44xx.c b/arch/arm/mach-omap2/dmm-omap44xx.c
 new file mode 100644
-index 0000000..8968108
+index 0000000..a84490c
 --- /dev/null
-+++ b/drivers/misc/tiler/tcm.h
-@@ -0,0 +1,171 @@
++++ b/arch/arm/mach-omap2/dmm-omap44xx.c
+@@ -0,0 +1,80 @@
 +/*
-+ * TILER container manager specification and support functions for TI
-+ * TILER driver.
++ * DMM driver support functions for TI OMAP processors.
 + *
 + * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
 + *
@@ -45,217 +49,70 @@ index 0000000..8968108
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef TCM_H
-+#define TCM_H
++#include <linux/init.h>
++#include <linux/module.h>
++#include <mach/dmm.h>
++#include <plat/omap_device.h>
++#include <plat/omap_hwmod.h>
++#include <linux/errno.h>
++#include <linux/err.h>
 +
-+struct tcm;
++static struct dmm *plat_data;
++static int pdata;
 +
-+/* point */
-+struct tcm_pt {
-+	u16 x;
-+	u16 y;
++#ifdef CONFIG_ARCH_OMAP4
++static struct dmm omap4_plat_data[] = {
++	{
++		.oh_name = "dmm",
++	},
 +};
-+
-+/* 2d area */
-+struct tcm_area {
-+	struct tcm    *tcm;	/* parent */
-+	struct tcm_pt  p0;
-+	struct tcm_pt  p1;
-+};
-+
-+struct tcm {
-+	u16 width, height;	/* container dimensions */
-+
-+	/*
-+	 * 'pvt' structure shall contain any tcm details (attr) along with
-+	 * linked list of allocated areas and mutex for mutually exclusive
-+	 * access to the list.  It may also contain copies of width and height
-+	 * to notice any changes to the publicly available width and height
-+	 * fields.
-+	 */
-+	void *pvt;
-+
-+	/* function table */
-+	s32 (*reserve_2d)(struct tcm *tcm, u16 height, u16 width, u8 align,
-+			  struct tcm_area *area);
-+	s32 (*free)      (struct tcm *tcm, struct tcm_area *area);
-+	void (*deinit)   (struct tcm *tcm);
-+};
-+
-+/*
-+ * Since some basic parameter checking is done outside the TCM algorithms,
-+ * TCM implementation do NOT have to check the following:
-+ *
-+ *   area pointer is NULL
-+ *   width and height fits within container
-+ *   number of pages is more than the size of the container
-+ */
-+
-+/*
-+ * Template for <ALGO_NAME>_tcm_init method.  Define as:
-+ * TCM_INIT(<ALGO_NAME>_tcm_init)
-+ *
-+ * Allocates and initializes a tiler container manager.
-+ *
-+ * Pointer to the allocated and initialized container manager.
-+ * NULL on failure.  DO NOT leak any memory on failure!
-+ */
-+#define TCM_INIT(name, attr_t) \
-+struct tcm *name(u16 width, u16 height, typeof(attr_t) *attr);
-+
-+/*
-+ * Deinitialize tiler container manager.
-+ *
-+ * The call should free as much memory as possible and meaningful
-+ * even on failure.  Some error codes: -ENODEV: invalid manager.
-+ */
-+static inline void tcm_deinit(struct tcm *tcm)
-+{
-+	if (tcm)
-+		tcm->deinit(tcm);
-+}
-+
-+/*
-+ * Reserves a 2D area in the container.
-+ *
-+ * The tcm field of the area will be set to NULL on failure.
-+ * Some error codes: -ENODEV: invalid manager, -EINVAL:
-+ * invalid area, -ENOMEM: not enough space for allocation.
-+ */
-+static inline s32 tcm_reserve_2d(struct tcm *tcm, u16 width, u16 height,
-+				 u16 align, struct tcm_area *area)
-+{
-+	/* perform rudimentary error checking */
-+	s32 res = (tcm  == NULL ? -ENODEV :
-+		(area == NULL || width == 0 || height == 0 ||
-+		 /* align must be a 2 power */
-+		 align & (align - 1)) ? -EINVAL :
-+		(height > tcm->height || width > tcm->width) ? -ENOMEM :
-+		tcm->reserve_2d(tcm, height, width, align, area));
-+
-+	if (area)
-+		area->tcm = res ? NULL : tcm;
-+
-+	return res;
-+}
-+
-+/*
-+ * Free a previously reserved area from the container.
-+ *
-+ * The tcm field of the area is set to NULL on success
-+ * to avoid subsequent freeing.  This call will succeed
-+ * even if supplying the area from a failed reserved call.
-+ */
-+static inline s32 tcm_free(struct tcm_area *area)
-+{
-+	s32 res = 0; /* free succeeds by default */
-+
-+	if (area && area->tcm) {
-+		res = area->tcm->free(area->tcm, area);
-+		if (res == 0)
-+			area->tcm = NULL;
-+	}
-+
-+	return res;
-+}
-+
-+/* Verify if a tcm area is logically valid */
-+static inline bool tcm_area_is_valid(struct tcm_area *area)
-+{
-+	return area && area->tcm &&
-+		/* coordinate bounds */
-+		area->p1.x < area->tcm->width &&
-+		area->p1.y < area->tcm->height &&
-+		area->p0.y <= area->p1.y &&
-+		area->p0.x <= area->p1.x;
-+}
-+
-+/* see if a coordinate is within an area */
-+static inline bool __tcm_is_in(struct tcm_pt *p, struct tcm_area *a)
-+{
-+	return p->x >= a->p0.x && p->x <= a->p1.x &&
-+		p->y >= a->p0.y && p->y <= a->p1.y;
-+}
-+
-+/* calculate area width */
-+static inline u16 __tcm_area_width(struct tcm_area *area)
-+{
-+	return area->p1.x - area->p0.x + 1;
-+}
-+
-+/* calculate area height */
-+static inline u16 __tcm_area_height(struct tcm_area *area)
-+{
-+	return area->p1.y - area->p0.y + 1;
-+}
-+
-+/* calculate number of slots in an area */
-+static inline u16 __tcm_sizeof(struct tcm_area *area)
-+{
-+	return __tcm_area_width(area) * __tcm_area_height(area);
-+}
-+#define tcm_sizeof(area) __tcm_sizeof(&(area))
-+#define tcm_awidth(area) __tcm_area_width(&(area))
-+#define tcm_aheight(area) __tcm_area_height(&(area))
-+#define tcm_is_in(pt, area) __tcm_is_in(&(pt), &(area))
-+
-+#endif
-diff --git a/drivers/misc/tiler/tcm/tcm-utils.h b/drivers/misc/tiler/tcm/tcm-utils.h
-new file mode 100644
-index 0000000..400c2fe
---- /dev/null
-+++ b/drivers/misc/tiler/tcm/tcm-utils.h
-@@ -0,0 +1,51 @@
-+/*
-+ * Utility functions for implementing TILER container managers.
-+ *
-+ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef TCM_UTILS_H
-+#define TCM_UTILS_H
-+
-+#include "../tcm.h"
-+
-+/* TCM_ALG_NAME must be defined to use the debug methods */
-+
-+#ifdef DEBUG
-+#define IFDEBUG(x) x
++#define NUM_PDATA ARRAY_SIZE(omap4_plat_data)
 +#else
-+/* compile-check debug statements even if not DEBUG */
-+#define IFDEBUG(x) do { if (0) x; } while (0)
++#define omap4_plat_data NULL
++#define NUM_PDATA 0
 +#endif
 +
-+#define P(level, fmt, ...) \
-+	IFDEBUG(printk(level TCM_ALG_NAME ":%d:%s()" fmt "\n", \
-+			__LINE__, __func__, ##__VA_ARGS__))
++static struct omap_device_pm_latency omap_dmm_latency[] = {
++	[0] = {
++		.deactivate_func = omap_device_idle_hwmods,
++		.activate_func = omap_device_enable_hwmods,
++		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
++	},
++};
 +
-+#define P1(fmt, ...) P(KERN_NOTICE, fmt, ##__VA_ARGS__)
-+#define P2(fmt, ...) P(KERN_INFO, fmt, ##__VA_ARGS__)
-+#define P3(fmt, ...) P(KERN_DEBUG, fmt, ##__VA_ARGS__)
-+
-+#define PA(level, msg, p_area) P##level(msg " (%03d %03d)-(%03d %03d)\n", \
-+	(p_area)->p0.x, (p_area)->p0.y, (p_area)->p1.x, (p_area)->p1.y)
-+
-+/* assign coordinates to area */
-+static inline
-+void assign(struct tcm_area *a, u16 x0, u16 y0, u16 x1, u16 y1)
++static s32 __init dmm_omap_init(void)
 +{
-+	a->p0.x = x0;
-+	a->p0.y = y0;
-+	a->p1.x = x1;
-+	a->p1.y = y1;
++	struct omap_hwmod *oh = NULL;
++	struct omap_device *od = NULL;
++	struct omap_device_pm_latency *ohl = NULL;
++	int ohlc = 0, i = 0;
++
++	plat_data = omap4_plat_data;
++	pdata = NUM_PDATA;
++
++	for (i = 0; i < pdata; i++) {
++		struct dmm *data = &plat_data[i];
++
++		oh = omap_hwmod_lookup(data->oh_name);
++		if (!oh)
++			goto error;
++
++		data->base = oh->_mpu_rt_va;
++		ohl = omap_dmm_latency;
++		ohlc = ARRAY_SIZE(omap_dmm_latency);
++
++		od = omap_device_build(data->oh_name, i, oh, data,
++					 sizeof(*data), ohl, ohlc, false);
++		if (IS_ERR(od))
++			goto error;
++	}
++	return 0;
++error:
++	return -ENODEV;
 +}
 +
-+#endif
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("David Sin <davidsin@ti.com>");
++device_initcall(dmm_omap_init);
 -- 
 1.7.0.4
