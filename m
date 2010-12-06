@@ -1,56 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 06 Dec 2010 18:54:17 +0000
-Subject: [PATCH 21/22] ARM: CPU hotplug: ensure correct ordering of unplug
-In-Reply-To: <20101206184609.GI31777@n2100.arm.linux.org.uk>
-References: <20101203200746.GA10245@n2100.arm.linux.org.uk>
-	<E1POcCh-0007sL-E6@rmk-PC.arm.linux.org.uk>
-	<AANLkTimTFB+s9zWRCbPRCJk=p6eup8c8EMwnzOb+JMDy@mail.gmail.com>
-	<20101206184609.GI31777@n2100.arm.linux.org.uk>
-Message-ID: <1291661657.30153.34.camel@e102109-lin.cambridge.arm.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Mon, 6 Dec 2010 20:11:16 +0100
+Subject: [PATCH] arm: ecard: Fix compilation warning.
+In-Reply-To: <20101206140506.GE31777@n2100.arm.linux.org.uk>
+References: <1291644243-23540-1-git-send-email-marek.belisko@open-nandra.com>
+	<20101206140506.GE31777@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinynXGtFs-CTW1MwgZE_kRgZ7VgJ1mLy-hktrF5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-12-06 at 18:46 +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 06, 2010 at 06:13:37PM +0000, Catalin Marinas wrote:
-> > On 3 December 2010 20:26, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > Don't call idle_task_exit() with interrupts disabled, and ensure
-> > > that we have a memory barrier after interrupts are disabled but
-> > > before signalling that this CPU has shut down.
-> > >
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > >  arch/arm/kernel/smp.c |    4 +++-
-> > >  1 files changed, 3 insertions(+), 1 deletions(-)
-> > >
-> > > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> > > index bebe3bd..8cc9c03 100644
-> > > --- a/arch/arm/kernel/smp.c
-> > > +++ b/arch/arm/kernel/smp.c
-> > > @@ -269,9 +269,11 @@ void __ref cpu_die(void)
-> > >  {
-> > >        unsigned int cpu = smp_processor_id();
-> > >
-> > > -       local_irq_disable();
-> > >        idle_task_exit();
-> > >
-> > > +       local_irq_disable();
-> > > +       mb();
-> > > +
-> > >        /* Tell __cpu_die() that this CPU is now safe to dispose of */
-> > >        complete(&cpu_died);
-> >
-> > I don't fully understand the point of the mb() here. If you want to
-> > drain the write buffer that would be a dsb().
-> 
-> It's there to ensure that writes prior to the IRQ disable do not
-> cross the complete() call, that is all.  local_irq_disable() does
-> not have any built-in barrier semantics.
+On Mon, Dec 6, 2010 at 3:05 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Dec 06, 2010 at 03:04:03PM +0100, Marek Belisko wrote:
+>> Fix following compilation warning:
+>> arch/arm/kernel/ecard.c:1066: warning: ignoring return value of
+>> 'device_register', declared with attribute warn_unused_result
+>>
+>> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+>> ---
+>> ?arch/arm/kernel/ecard.c | ? ?6 ++++--
+>> ?1 files changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
+>> index eed2f79..da882b1 100644
+>> --- a/arch/arm/kernel/ecard.c
+>> +++ b/arch/arm/kernel/ecard.c
+>> @@ -1063,8 +1063,10 @@ ecard_probe(int slot, card_type_t type)
+>> ? ? ? *ecp = ec;
+>> ? ? ? slot_to_expcard[slot] = ec;
+>>
+>> - ? ? device_register(&ec->dev);
+>> -
+>> + ? ? rc = device_register(&ec->dev);
+>> + ? ? if (rc)
+>> + ? ? ? ? ? ? goto nodev;
+>> +
+>> ? ? ? return 0;
+>
+> No. ?It is important that cards which are actually there remain present
+> even if device_register fails. ?In other words, we _really_ don't care
+> what device_register() returns.
+OK understand but anyway to stop compiler bark following could be OK and
+maybe other people saw error and try to send same patch so keep them informed.
 
-The DMB only ensures relative ordering between memory accesses and not
-function calls. What other memory access you try to prevent getting
-reordered? The complete() function takes a spinlock anyway so it has a
-memory barrier.
+diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
+index eed2f79..d3dcb1a 100644
+--- a/arch/arm/kernel/ecard.c
++++ b/arch/arm/kernel/ecard.c
+@@ -1062,8 +1062,12 @@ ecard_probe(int slot, card_type_t type)
+
+        *ecp = ec;
+        slot_to_expcard[slot] = ec;
+-
+-       device_register(&ec->dev);
++       /*
++        * Return value not checked. It is important that cards
++        * which are actually there remain present even if
++        * device_register fails.
++        */
++       rc = device_register(&ec->dev);
+
+        return 0;
+
+>
+
+thanks,
+
+marek
 
 -- 
-Catalin
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+icq: 290551086
+web: http://open-nandra.com
