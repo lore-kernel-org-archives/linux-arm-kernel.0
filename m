@@ -1,32 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Dec 2010 13:18:24 +0100
-Subject: [PATCH] ARM: Gemini: Add support for PCI BUS
-In-Reply-To: <4CFCC048.4030408@ru.mvista.com>
-References: <1290860675-15453-1-git-send-email-ulli.kroll@googlemail.com>
-	<201011291745.22566.arnd@arndb.de> <4CFCC048.4030408@ru.mvista.com>
-Message-ID: <201012061318.24541.arnd@arndb.de>
+From: par-gunnar.p.hjalmdahl@stericsson.com (Par-Gunnar HJALMDAHL)
+Date: Mon, 6 Dec 2010 13:23:50 +0100
+Subject: [PATCH] pl011: added clock management feature
+In-Reply-To: <20101206101427.GC29563@n2100.arm.linux.org.uk>
+References: <1289316637-7828-1-git-send-email-linus.walleij@stericsson.com>
+	<20101109224012.GA21992@kroah.com>
+	<AANLkTikUmq7qeFb+0XPpmzcvp5q_Z4SMjBaAgNZaCRqV@mail.gmail.com>
+	<20101203151547.GA30898@n2100.arm.linux.org.uk>
+	<AANLkTimxU-YL_wy9ZTjKXX+68u_KcPzhSn9mOU_MnzQS@mail.gmail.com>
+	<20101206101427.GC29563@n2100.arm.linux.org.uk>
+Message-ID: <AFCDDB4A3EA003429EEF1E7B211FDBBA33483F160F@EXDCVYMBSTM005.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 December 2010, Sergei Shtylyov wrote:
-> > There are many differences between readl and __raw_readl, including
+Hi Russell,
+
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: den 6 december 2010 11:14
+> To: Vitaly Wool
+> Cc: Greg KH; Linus WALLEIJ; Par-Gunnar HJALMDAHL; Greg Kroah-Hartman;
+> Lukasz Rymanowski; Grzegorz Sygieda; linux-serial at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] pl011: added clock management feature
 > 
-> > * __raw_readl does not have barriers and does not serialize with
-> >    spinlocks, so it breaks on out-of-order CPUs.
-> > * __raw_readl does not have a specific endianess, while readl is
-> >    fixed little-endian,
+> On Mon, Dec 06, 2010 at 10:53:20AM +0100, Vitaly Wool wrote:
+> > Hi Russell,
+> >
+> > On Fri, Dec 3, 2010 at 4:15 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > >> Why don't you stop
+> > >> the clocks if RTS is cleared? This would have allowed the line
+> > >> discipline driver to implicitly control the UART clock and there
+> will
+> > >> be no risk of losing data, as well as no non-standard behavior
+> > >> involved. In fact, you'll be transparent to the upper layers in
+> this
+> > >> case.
+> > >
+> > > I've no idea what you're thinking, but you can't stop the UART
+> clock
+> > > because RTS is deasserted - or DTR for that matter. ?Neither of
+> those
+> > > two define whether characters will be transmitted or received.
+> >
+> > What I'm mostly up to (and I guess Par also is) is how to conserve
+> > power for the Bluetooth UARTs. For a Bluetooth UART, there usually is
+> > a kind of signalling protocol, either inband or out-of-band, that
+> > allows the host and the chip to negotiate about power conservation
+> > during inactivity periods. These protocols do not belong to UART
+> > implementation and are usually implemented as line discipline
+> drivers.
+> > While BT chip is sleeping, we don't need the UART clock running but
+> we
+> > need to have a decent way of telling the UART driver it can shut
+> those
+> > off. Using RTS for that, even though not being applicable in all the
+> > cases, seems to work pretty well for Bluetooth UARTs. So if we just
+> > add a flag if an UART is used for BT or not and then use RTS for this
+> > kind of communication, will it be okay with you?
 > 
->     I know I'm late but readl()/writel() are CPU-endian, not LE.
+> So you want to teach each UART driver a protocol-specific method of
+> handling power management rather than implementing a sane API to do
+> this?
+> 
+> Please, come up with a sane API for power management of UARTs rather
+> than trying to hack protocol specific stuff into UART drivers.
 
-If that was the case, it would be a bug. readl/writel is defined to be
-the same endianess as PCI, which is little-endian. Otherwise you would
-not be able to use any PCI devices on big-endian ARM machines. The
-definition of readl is
+So I guess the best solution would then be to add function(s) to struct tty_operations in tty_driver.h? Something like
+void (*clk_enable)(struct tty_struct *tty);
+void (*clk_disable)(struct tty_struct *tty);
+and then it is up to each UART driver to implement them? Would such a solution be OK?
 
-#define readl(addr) __le32_to_cpu(__raw_readl(addr))
-
-which converts the little-endian I/O register into a native endian
-CPU register.
-
-
-	Arnd
+/P-G
