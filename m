@@ -1,99 +1,81 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 6 Dec 2010 17:38:13 -0200
-Subject: [PATCH] watchdog: imx: use clk_get to acquire the watchdog clock
-Message-ID: <1291664293-28360-1-git-send-email-fabio.estevam@freescale.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 6 Dec 2010 21:39:46 +0200
+Subject: [PATCH] s3c2410_udc: Add handling for S3C244X dual-packet mode
+In-Reply-To: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
+References: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201012062139.47129.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
+On Monday 30 August 2010 17:34:22 Vasily Khoruzhick wrote:
+> From: Fabian Godehardt <fg@emlix.com>
+> 
+> This is a patch that seems to make the USB hangs on the S3C244X go away.
+> At least a good amount of ping torture didn't make them come back so far.
+> 
+> The issue is that, if there are several back-to-back packets, sometimes no
+> interrupt is generated for one of them. This seems to be caused by the
+> mysterious dual packet mode, which the USB hardware enters automatically
+> if the endpoint size is half that of the FIFO. (On the 244X, this is the
+> normal situation for bulk data endpoints.)
+> 
+> There is also a timing factor in this. It seems that what happens is that
+> the USB hardware automatically sends an acknowledgement if there is only
+> one packet in the FIFO (the FIFO has space for two). If another packet
+> arrives before the host has retrieved and acknowledged the previous one,
+> no interrupt is generated for that second one.
+> 
+> However, there may be an indication. There is one undocumented bit (none
+> of the 244x manuals document it), OUT_CRS1_REG[1], that seems to be set
+> suspiciously often when this condition occurs. There is also
+> CLR_DATA_TOGGLE, OUT_CRS1_REG[7], which may have a function related to
+> this. (The Samsung manual is rather terse on that, as usual.)
+> 
+> This needs to be examined further. For now, the patch seems to do the
+> trick.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  drivers/usb/gadget/s3c2410_udc.c |   16 +++++++++++++++-
+>  1 files changed, 15 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/s3c2410_udc.c
+> b/drivers/usb/gadget/s3c2410_udc.c index ea2b3c7..fed323c 100644
+> --- a/drivers/usb/gadget/s3c2410_udc.c
+> +++ b/drivers/usb/gadget/s3c2410_udc.c
+> @@ -902,7 +902,7 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void
+> *_dev) int pwr_reg;
+>  	int ep0csr;
+>  	int i;
+> -	u32 idx;
+> +	u32 idx, idx2;
+>  	unsigned long flags;
+> 
+>  	spin_lock_irqsave(&dev->lock, flags);
+> @@ -1017,6 +1017,20 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void
+> *_dev) }
+>  	}
+> 
+> +	/* what else causes this interrupt? a receive! who is it? */
+> +	if (!usb_status && !usbd_status && !pwr_reg && !ep0csr) {
+> +		for (i = 1; i < S3C2410_ENDPOINTS; i++) {
+> +			idx2 = udc_read(S3C2410_UDC_INDEX_REG);
+> +			udc_write(i, S3C2410_UDC_INDEX_REG);
+> +
+> +			if (udc_read(S3C2410_UDC_OUT_CSR1_REG) & 0x1)
+> +				s3c2410_udc_handle_ep(&dev->ep[i]);
+> +
+> +			/* restore index */
+> +			udc_write(idx2, S3C2410_UDC_INDEX_REG);
+> +		}
+> +	}
+> +
+>  	dprintk(DEBUG_VERBOSE, "irq: %d s3c2410_udc_done.\n", IRQ_USBD);
+> 
+>  	/* Restore old index */
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clock-imx21.c |    2 +-
- arch/arm/mach-imx/clock-imx25.c |    2 +-
- arch/arm/mach-imx/clock-imx27.c |    2 +-
- arch/arm/mach-mx3/clock-imx31.c |    2 +-
- arch/arm/mach-mx3/clock-imx35.c |    2 +-
- drivers/watchdog/imx2_wdt.c     |    2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+Ping? s3c2410_udc is broken for s3c244x for ages, fix is available, why not to 
+apply it?
 
-diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
-index cf15ea5..c63a4f5 100644
---- a/arch/arm/mach-imx/clock-imx21.c
-+++ b/arch/arm/mach-imx/clock-imx21.c
-@@ -1185,7 +1185,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "brom", brom_clk)
- 	_REGISTER_CLOCK(NULL, "emma", emma_clk[0])
- 	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk[0])
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
- 	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c_clk)
- 	_REGISTER_CLOCK("mxc-keypad", NULL, kpp_clk)
-diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
-index 9e4a557..2c98be8 100644
---- a/arch/arm/mach-imx/clock-imx25.c
-+++ b/arch/arm/mach-imx/clock-imx25.c
-@@ -296,7 +296,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- 	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
- 	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdt_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
- 	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
-diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-index 2202b88..f32f3b8 100644
---- a/arch/arm/mach-imx/clock-imx27.c
-+++ b/arch/arm/mach-imx/clock-imx27.c
-@@ -667,7 +667,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "sahara2", sahara2_clk)
- 	_REGISTER_CLOCK(NULL, "ata", ata_clk)
- 	_REGISTER_CLOCK(NULL, "mstick", mstick_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
- 	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
- 	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
-diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
-index 7cf6d29..4193cf5 100644
---- a/arch/arm/mach-mx3/clock-imx31.c
-+++ b/arch/arm/mach-mx3/clock-imx31.c
-@@ -530,7 +530,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("imx31-cspi.2", NULL, cspi3_clk)
- 	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
- 	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
- 	_REGISTER_CLOCK(NULL, "epit", epit1_clk)
- 	_REGISTER_CLOCK(NULL, "epit", epit2_clk)
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index 61e4a31..22259d9 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -495,7 +495,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxc-ehci.2", "usb", usbotg_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usbotg_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usbahb_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "max", max_clk)
- 	_REGISTER_CLOCK(NULL, "audmux", audmux_clk)
- 	_REGISTER_CLOCK(NULL, "csi", csi_clk)
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 2ee7dac..86f7cac 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -270,7 +270,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
-+	imx2_wdt.clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(imx2_wdt.clk)) {
- 		dev_err(&pdev->dev, "can't get Watchdog clock\n");
- 		return PTR_ERR(imx2_wdt.clk);
--- 
-1.6.0.4
+Regards
+Vasily
