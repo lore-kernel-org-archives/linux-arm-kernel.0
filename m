@@ -1,70 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Dec 2010 15:21:20 +0100
-Subject: [RFC PATCH 06/18] ARM: LPAE: Introduce the 3-level page table
-	format definitions
-In-Reply-To: <AANLkTimEdNj71v-oiKKho27DWcZbxOWtO6M4eLg2NDRE@mail.gmail.com>
-References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
-	<201010252025.24128.arnd@arndb.de>
-	<AANLkTimEdNj71v-oiKKho27DWcZbxOWtO6M4eLg2NDRE@mail.gmail.com>
-Message-ID: <201012061521.20346.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Dec 2010 14:34:27 +0000
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <1291644581.3151.89.camel@realization>
+References: <20101123102632.GM4693@pengutronix.de>
+	<1290521329.3901.14.camel@realization>
+	<20101123141713.GQ4693@pengutronix.de>
+	<20101124080214.GU4693@pengutronix.de>
+	<20101206083306.GI10693@pengutronix.de>
+	<1291630492.3151.14.camel@realization>
+	<20101206102602.GE29563@n2100.arm.linux.org.uk>
+	<1291635442.3151.39.camel@realization>
+	<20101206114629.GB31777@n2100.arm.linux.org.uk>
+	<1291644581.3151.89.camel@realization>
+Message-ID: <20101206143427.GF31777@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 December 2010, Christoffer Dall wrote:
-> Sorry for jumping in here at such a late hour...
-> >
-> >> > Are there any significant differences to Linux between setting up page
-> >> > tables for a 32 bit VA space or a 40 bit IPA space, other than the
-> >> > size of the PGD?
-> >>
-> >> ...
-> >>
-> >> If KVM would reuse the existing pgd/pmd/pte Linux macros, it would
-> >> indeed be restricted to 32-bit IPA (sizeof(long)). You may need to
-> >> define different macros to use either a pfn or long long as address
-> >> input.
+On Mon, Dec 06, 2010 at 03:09:41PM +0100, Alberto Panizzo wrote:
+> > And the memblock debug output?
 > 
-> I'm not even sure it would be a big advantage to re-use the macros for
-> KVM. Sure, creating separate macros may duplicate some bit-shifting
-> logic, but my guess is that code will be easier to read if using
-> separate macros for the 2-nd stage translation in KVM. One might also
-> imagine specific virtualization-oriented bits which could be
-> explicitly names or directly targeted in macros that don't have to
-> handle both standard non-virt tables and 2-nd stage translation
-> tables.
+> The following is the complete debug:
 > 
-> At least from my experience writing KVM code, it's difficult enough to
-> make it clear to anyone reading the code which address space exactly
-> is being referenced at which time.
+> Uncompressing Linux... done, booting the kernel.
+> [    0.000000] Linux version 2.6.36-10808-ga06e72c-dirty (alberto at realization) (gcc version 4.3.2 (OSELAS.Toolchain-1.99.3) ) #180 PREEMPT Mon Dec 6 14:24:53 CET 2010
 
-Good point. My thoughts were that we basically treat KVM guests as
-processes with 40 bit virtual address space though, so the kernel
-would be using them directly.
+Ah ha.
 
-> So this depends on what the use would be. True, if you wanted a guest
-> that used more than 4GB of memory AND you wanted QEMU to be able to
-> readily access all of that, then yes, it would be difficult on a
-> 32-bit architecture.
+> [    0.000000] mx31_3ds_reserve: Reserved 8388608 bytes from address 0x87800000
 > 
-> But QEMU doesn't really use the mmap'ed areas backing physical memory
-> for anything - it's merely a way of telling KVM how much physical
-> memory should be given to the guest, and the kernel side conveniently
-> uses get_user_pages() to access that memory. Instead, QEMU could
-> simply call an IOCTL to KVM telling it something like
-> register_user_memory(long long base_phys_addr, long long size); and
-> KVM could just allocate physical pages to back that without them being
-> mapped on the host side. An individual page could be mapped in as
-> needed for emulation and mapped out again. I don't see a huge
-> performance hit for such a solution.
+> Removed 8 MB from the memory map. Start address 0x87800000 
+> 
+> [    0.000000] MEMBLOCK configuration:
+> [    0.000000]  rmo_size    = 0x0
+> [    0.000000]  memory.size = 0x7800000
+> [    0.000000]  memory.cnt  = 0x1
+> [    0.000000]  memory[0x0]	0x0000000080000000 - 0x00000000877fffff, 0x7800000 bytes
+> [    0.000000]  reserved.cnt  = 0x1
+> [    0.000000]  reserved[0x0]	0x0000000080004000 - 0x0000000080415ed7, 0x411ed8 bytes
+> 
+> That's true, because otherwise (without reserving memory) I get:
+> >>[    0.000000]  memory[0x0]	0x0000000080000000 - 0x0000000087ffffff, 0x8000000 bytes
 
 Ok.
- 
-> But as you both suggest, 32-bit physical address space is probably
-> going to be more than needed for initial uses of ARM virtual machines.
 
-Right. Note that as long as we keep the guest mapped into the qemu
-address space, we're limited to something between 0.5 and 3 GB of 
-guest physical address space, but even that is likely enough for the
-near future.
+> [    0.000000] Memory: 128MB = 128MB total
 
-	Arnd
+Ah ha.
+
+You're trying to use something which requires code that was merged into
+2.6.37-rc on a kernel which doesn't have the commits necessary to make
+it work...
+
+You need at least the core memblock changes, plus 7dc50ec^..f25b4b4
+to make this work.
