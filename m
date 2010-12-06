@@ -1,80 +1,116 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Mon, 6 Dec 2010 20:11:16 +0100
-Subject: [PATCH] arm: ecard: Fix compilation warning.
-In-Reply-To: <20101206140506.GE31777@n2100.arm.linux.org.uk>
-References: <1291644243-23540-1-git-send-email-marek.belisko@open-nandra.com>
-	<20101206140506.GE31777@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinynXGtFs-CTW1MwgZE_kRgZ7VgJ1mLy-hktrF5@mail.gmail.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Mon, 6 Dec 2010 13:23:18 -0600
+Subject: [PATCH] scatterlist: define SG chain for arm architecture
+In-Reply-To: <AANLkTikES5y=hJhuE=iX-WJvcUvbpSqjDPBr2W8jGeJL@mail.gmail.com>
+References: <20101001163958.GA22533@n2100.arm.linux.org.uk>
+	<20101003195758B.fujita.tomonori@lab.ntt.co.jp>
+	<20101003112839.GA32736@n2100.arm.linux.org.uk>
+	<20101003202920K.fujita.tomonori@lab.ntt.co.jp>
+	<AANLkTikES5y=hJhuE=iX-WJvcUvbpSqjDPBr2W8jGeJL@mail.gmail.com>
+Message-ID: <AANLkTi=j=MdihQHKxLPL7wUFP7WiKtFcM2wi-CHiSsNM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 6, 2010 at 3:05 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 06, 2010 at 03:04:03PM +0100, Marek Belisko wrote:
->> Fix following compilation warning:
->> arch/arm/kernel/ecard.c:1066: warning: ignoring return value of
->> 'device_register', declared with attribute warn_unused_result
+On Thu, Dec 2, 2010 at 11:41 AM, Guzman Lugo, Fernando
+<fernando.lugo@ti.com> wrote:
+> On Sun, Oct 3, 2010 at 6:34 AM, FUJITA Tomonori
+> <fujita.tomonori@lab.ntt.co.jp> wrote:
+>> On Sun, 3 Oct 2010 12:28:39 +0100
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 >>
->> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
->> ---
->> ?arch/arm/kernel/ecard.c | ? ?6 ++++--
->> ?1 files changed, 4 insertions(+), 2 deletions(-)
+>>> On Sun, Oct 03, 2010 at 08:02:52PM +0900, FUJITA Tomonori wrote:
+>>> > On Fri, 1 Oct 2010 17:39:58 +0100
+>>> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>>> >
+>>> > > On Fri, Oct 01, 2010 at 11:28:41AM -0500, Fernando Guzman Lugo
+>> wrote:
+>>> > > > Define SG chain for ARM architecture in order to work
+>>> > > > with big buffers. This patch is needed in order to
+>>> > > > iovmm users can pass a big buffer to map it and ARM
+>>> > > > architecture has not issues using SG chain.
+>>> > > >
+>>> > > > This change was suggested by FUJITA Tomonori.
+>>> > >
+>>> > > Have you audited all places where SG lists are used in the ARM
+>>> > > architecture to ensure that SG chain support is safe? ?(That
+>>> > > goes for ARM generic code and ARM specific drivers.)
+>>> >
+>>> > As far as I know, only SCSI actually uses SG chain feature (that is,
+>>> > sending chained scatter lists). All SCSI drivers were converted when
+>>> > we added SG chain feature. So what you need to care about is the dma
+>>> > code.
+>>> >
+>>> > There are only several files that actually use scatter list under
+>>> > arch/arm.
+>>> >
+>>> > >From a quick look, arch/arm/mm/dma-mapping.c,
+>>> > arch/arm/common/dmabounce.c, arch/arm/kernel/dma.c, and
+>>> > arch/arm/include/asm/dma-mapping.h looks fine.
+>>> >
+>>> > arm/mach-imx/dma-v1.c also looks like to use chained sg API properly
+>>> > (but this isn't used with SCSI, right?).
+>>> >
+>>> > Seems that arch/arm/plat-omap/iovmm.c can handle the chained SG
+>>> > too. It doesn't allocate the chained SG now though.
+>>>
+>>> There's also RiscPC and its SCSI drivers could well be an issue for SG
+>>> chaining. ?They have to manually save the SCSI 'data pointer' (down to
+>>> the byte position in the SG chain and be able to restore a previously
+>>> saved point.) ?This code was written before SG chaining ever appeared,
+>>> and although it has been partly fixed up, it's probably buggy if SG
+>>> chaining were to be enabled.
 >>
->> diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
->> index eed2f79..da882b1 100644
->> --- a/arch/arm/kernel/ecard.c
->> +++ b/arch/arm/kernel/ecard.c
->> @@ -1063,8 +1063,10 @@ ecard_probe(int slot, card_type_t type)
->> ? ? ? *ecp = ec;
->> ? ? ? slot_to_expcard[slot] = ec;
->>
->> - ? ? device_register(&ec->dev);
->> -
->> + ? ? rc = device_register(&ec->dev);
->> + ? ? if (rc)
->> + ? ? ? ? ? ? goto nodev;
->> +
->> ? ? ? return 0;
+>> What SCSI drviers we need to fix?
 >
-> No. ?It is important that cards which are actually there remain present
-> even if device_register fails. ?In other words, we _really_ don't care
-> what device_register() returns.
-OK understand but anyway to stop compiler bark following could be OK and
-maybe other people saw error and try to send same patch so keep them informed.
+> Russell,
+>
+> Any update with this? I hope it can be merged for 2.6.38.
 
-diff --git a/arch/arm/kernel/ecard.c b/arch/arm/kernel/ecard.c
-index eed2f79..d3dcb1a 100644
---- a/arch/arm/kernel/ecard.c
-+++ b/arch/arm/kernel/ecard.c
-@@ -1062,8 +1062,12 @@ ecard_probe(int slot, card_type_t type)
 
-        *ecp = ec;
-        slot_to_expcard[slot] = ec;
--
--       device_register(&ec->dev);
-+       /*
-+        * Return value not checked. It is important that cards
-+        * which are actually there remain present even if
-+        * device_register fails.
-+        */
-+       rc = device_register(&ec->dev);
+Russell,
 
-        return 0;
+The motivation for this patch is:
+
+The tidspbridge driver running in omap platform (omap3) is migrating
+to use the iommu and iovmm modules form DMM propose. In order to map
+user-side buffers into DSP virtual address we use the function
+iommu_vmap() in iovmm.c file, the third parameter of that funcion is
+of struct sg_table type, which contains all the pages that will be
+mapped.
+
+There is a restriction about the size of the sg list, that cannot be
+bigger than PAGE_SIZE, so that the number of pages cannot be bigger
+than SG_MAX_SINGLE_ALLOC. Therefore there is a restriction in the size
+of the buffer which iommu_vmap() can map. However MM apps using
+tidspbridge maps big buffers most of the time, so it is not possible
+to use  iommu_vmap() if it cannot map big buffer. Enabling SG chain
+for ARM resolves that problem.
+
+If you have a better solution please let me know. Otherwise I will
+follow your comment about make it a Kconfig entry to enable SG chain
+for ARM.
+
+
+Thanks a lot,
+Fernando.
 
 >
-
-thanks,
-
-marek
-
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-icq: 290551086
-web: http://open-nandra.com
+>>
+>>
+>>> If it's just OMAP users who wish to enable SG chaining, then the sane
+>>> thing to do would be to make the definition of the macro conditional
+>>> on OMAP.
+>>
+>> Yeah, that should work.
+>
+> some like this in scatterlist.h is ok?
+>
+> #ifdef CONFIG_ARCH_OMAP
+> #define ARCH_HAS_SG_CHAIN
+> #endif
+>
+>
+> Regards,
+> Fernando.
+>>
+>
