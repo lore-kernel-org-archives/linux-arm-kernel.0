@@ -1,107 +1,56 @@
-From: vm.rod25@gmail.com (Victor Rodriguez)
-Date: Mon, 6 Dec 2010 09:56:17 -0600
-Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
-In-Reply-To: <AANLkTinqSzcnSSAaCE+uNp5iHubFLpabgWty+zzWwHg4@mail.gmail.com>
-References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
-	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>
-	<AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>
-	<AANLkTinwj27dSdv9Djs9Fv6QN5vv5JY+br4xCHk=8YEu@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247C46537@dbde02.ent.ti.com>
-	<4CFCCC56.3010700@mvista.com>
-	<AANLkTikZiHTZV2PD8jKMZ+9h8XnUGPpAth2wSXM4oZmJ@mail.gmail.com>
-	<AANLkTinqSzcnSSAaCE+uNp5iHubFLpabgWty+zzWwHg4@mail.gmail.com>
-Message-ID: <AANLkTikO9zvyFT7-LDc+kq9ZD0AH=U_WiP6rnHZyLmZF@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 6 Dec 2010 17:13:43 +0100
+Subject: [PATCH] prevent 'BUG: sleeping function called from invalid
+	context' in arch_reset()
+In-Reply-To: <20101129095833.GB20449@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1290754154-9428-4-git-send-email-shawn.guo@freescale.com>
+	<19695.32386.279224.624305@ipc1.ka-ro>
+	<20101126095733.GA27637@pengutronix.de>
+	<19695.36407.793411.550458@ipc1.ka-ro>
+	<20101126113255.GC27637@pengutronix.de>
+	<19699.29070.822244.938508@ipc1.ka-ro>
+	<20101129095833.GB20449@pengutronix.de>
+Message-ID: <20101206161343.GB21020@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 6, 2010 at 9:53 AM, Ben Gardiner <bengardiner@nanometrics.ca> wrote:
-> On Mon, Dec 6, 2010 at 10:47 AM, Victor Rodriguez <vm.rod25@gmail.com> wrote:
->> On Mon, Dec 6, 2010 at 5:43 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
->>> Hello.
->>>
->>> On 06-12-2010 14:12, Nori, Sekhar wrote:
->>>
->>>>> ?arch/arm/mach-davinci/board-omapl138-hawk.c | ? 38
->>>>> ++++++++++++++++++++------
->>>>> ?1 files changed, 29 insertions(+), 9 deletions(-)
->>>
->>>>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
->>>>> b/arch/arm/mach-davinci/board-omapl138-hawk.c
->>>>> index da51136..8fc78f2 100644
->>>>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
->>>>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
->>>
->>> [...]
->>>>>
->>>>> @@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
->>>>> ? ? ? if (ret< ?0) {
->>>>> ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
->>>>> ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
->>>>> - ? ? ? ? ? ? return;
->>>>> + ? ? ? ? ? ? goto exp_setup_wp_fail;
->>>>> ? ? ? }
->>>>>
->>>>> ? ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
->>>>> - ? ? if (ret)
->>>>> + ? ? if (ret) {
->>>>> ? ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
->>>>> ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
->>>>> + ? ? ? ? ? ? goto exp_setup_mmcsd_fail;
->>>>> + ? ? }
->>>>> + ? ? ? ? ? ? return;
->>>
->>>> This return has extra indentation.
->>>
->>>>> +
->>>>> +exp_setup_mmcsd_fail:
->>>>> + ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
->>>>> +exp_setup_wp_fail:
->>>>> + ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
->>>>> +exp_setup_cd_fail:
->>>>> + ? ? ? ? ? ? return;
->>>
->>>> This one too.
->>>
->>> ? Moreover, it's not needed at all.
->>
->> Ok
->>>> Other than that, it all looks good to me.
->>>
->>> ? Except those 'exp_setup_'prefixes which I'm not sure where are coming
->>> from...
->>
->>
->> it comes from
->>
->> arch/arm/mach-davinci/board-da850-evm.c
->>
->> I took this as a template and I think that is better to keep this
->> exp_setup_ ?as a template
->>
->> but if you have any other suggestion please tell me
->
-> I think those are based on the error handling in
-> da850_evm_ui_expander_setup() which means that the 'exp' in
-> 'exp_setup_' stands-for IO-expander.
->
-> Based on the function names where the your exp_setup_* labels were
-> introduced I think that the label could be renamed 'mmc_setup_*' and
-> 'usb11_setup_*'.
->
-I like it thanks I will submit the patches with that names. Sergei are
-you ok with this ?
+[extended the audience, some context:  arch/arm/plat-mxc currently uses
+a clk_enable in arch_reset which might sleep]
 
-Regards
+On Mon, Nov 29, 2010 at 10:58:33AM +0100, Uwe Kleine-K?nig wrote:
+> Hello Lothar,
+> 
+> On Mon, Nov 29, 2010 at 10:25:34AM +0100, Lothar Wa?mann wrote:
+> > arch_reset() may be called from interrupt context (e.g. induced by
+> > SYSRQ-B), thus clk_get() and clk_enable() must not be called from
+> > within arch_reset(). Move these calls to mxc_arch_reset_init().
+> I wonder if SYSRQ-B is the only way to trigger that.  And if yes if that
+> could be "fixed" to allow sleeping?!
+Hmmm, the comment for emergency_restart() says:
 
-Victor Rodriguez
+/**
+ *      emergency_restart - reboot the system
+ *
+ *      Without shutting down any hardware or taking any locks
+ *      reboot the system.  This is called when we know we are in
+ *      trouble so this is our best effort to reboot.  This is
+ *      safe to call in interrupt context.
+ */
 
+emergency_restart has several callers apart from sysrq (watchdog, ocfs2,
+kdb, panic), so I think allowing to sleep isn't that easy.
 
-> Best Regards,
-> Ben Gardiner
->
-> ---
-> Nanometrics Inc.
-> http://www.nanometrics.ca
->
+Moreover the sysrq function is called with the uart port's lock hold,
+that would need fixing in the serial driver.  I found the same problem
+in amba-pl011 (the only driver I checked), so this seems to be a big
+task.  Sysrq holds a lock, too, while calling the handler.
+
+I still think it's wrong to enable the watchdog clock unconditionally
+during boot and wonder if that sleep in atomic can just be ignored?!
+
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
