@@ -1,35 +1,22 @@
-From: per.forlin@stericsson.com (Per Forlin)
-Date: Mon, 6 Dec 2010 13:52:23 +0100
-Subject: [PATCH 1/3] ux500: Call prmcu_init only for u8500
-In-Reply-To: <1291639945-2866-1-git-send-email-per.forlin@stericsson.com>
-References: <1291639945-2866-1-git-send-email-per.forlin@stericsson.com>
-Message-ID: <1291639945-2866-2-git-send-email-per.forlin@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Dec 2010 12:58:14 +0000
+Subject: [PATCH 47/54] ARM: versatile: irq_data conversion.
+In-Reply-To: <4CFCD2B0.6090902@ru.mvista.com>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130134119.GV15575@mail.wantstofly.org>
+	<4CFCD2B0.6090902@ru.mvista.com>
+Message-ID: <20101206125814.GD31777@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Per Forlin <per.forlin@linaro.org>
+On Mon, Dec 06, 2010 at 03:10:24PM +0300, Sergei Shtylyov wrote:
+>> -	irq -= IRQ_SIC_START;
+>> +	unsigned int irq = d->irq - IRQ_SIC_START;
+>
+>    Perhaps should've inserted an empty line here...
+>
+>>   	writel(1<<  irq, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
 
-PRCMU driver only supports u8500. Don't
-initialize prcmu if running on u5500.
-
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- arch/arm/mach-ux500/cpu.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 46c372f..a3700bc 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -59,7 +59,8 @@ void __init ux500_init_irq(void)
- 	 * Init clocks here so that they are available for system timer
- 	 * initialization.
- 	 */
--	prcmu_early_init();
-+	if (cpu_is_u8500())
-+		prcmu_early_init();
- 	clk_init();
- }
- 
--- 
-1.6.3.3
+Oh, it's _your_ mailer which is totally buggering up the spacing.  Please
+get an email client which doesn't think it has the right to randomly
+reformat text.
