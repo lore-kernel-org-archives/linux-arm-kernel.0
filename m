@@ -1,22 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Dec 2010 12:58:14 +0000
-Subject: [PATCH 47/54] ARM: versatile: irq_data conversion.
-In-Reply-To: <4CFCD2B0.6090902@ru.mvista.com>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130134119.GV15575@mail.wantstofly.org>
-	<4CFCD2B0.6090902@ru.mvista.com>
-Message-ID: <20101206125814.GD31777@n2100.arm.linux.org.uk>
+From: marek.belisko@open-nandra.com (Marek Belisko)
+Date: Mon,  6 Dec 2010 13:49:05 +0100
+Subject: [PATCH] omap1: htc_herald: Fix compilation warning.
+Message-ID: <1291639745-17320-1-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 03:10:24PM +0300, Sergei Shtylyov wrote:
->> -	irq -= IRQ_SIC_START;
->> +	unsigned int irq = d->irq - IRQ_SIC_START;
->
->    Perhaps should've inserted an empty line here...
->
->>   	writel(1<<  irq, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
+Patch fix following compilation warning:
+arch/arm/mach-omap1/board-htcherald.c:442:
+warning: large integer implicitly truncated to unsigned type
 
-Oh, it's _your_ mailer which is totally buggering up the spacing.  Please
-get an email client which doesn't think it has the right to randomly
-reformat text.
+Hopefully this is just a typo.
+
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+---
+ arch/arm/mach-omap1/board-htcherald.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
+index 071af3e..cdbf3b1 100644
+--- a/arch/arm/mach-omap1/board-htcherald.c
++++ b/arch/arm/mach-omap1/board-htcherald.c
+@@ -439,7 +439,7 @@ static const struct ads7846_platform_data htcherald_ts_platform_data = {
+ 	.keep_vref_on		= 1,
+ 	.x_plate_ohms		= 496,
+ 	.gpio_pendown		= HTCHERALD_GPIO_TS,
+-	.pressure_max		= 100000,
++	.pressure_max		= 10000,
+ 	.pressure_min		= 5000,
+ 	.x_min			= 528,
+ 	.x_max			= 3760,
+-- 
+1.7.1
