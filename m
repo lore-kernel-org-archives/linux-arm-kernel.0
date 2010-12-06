@@ -1,56 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 6 Dec 2010 17:13:43 +0100
-Subject: [PATCH] prevent 'BUG: sleeping function called from invalid
-	context' in arch_reset()
-In-Reply-To: <20101129095833.GB20449@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-4-git-send-email-shawn.guo@freescale.com>
-	<19695.32386.279224.624305@ipc1.ka-ro>
-	<20101126095733.GA27637@pengutronix.de>
-	<19695.36407.793411.550458@ipc1.ka-ro>
-	<20101126113255.GC27637@pengutronix.de>
-	<19699.29070.822244.938508@ipc1.ka-ro>
-	<20101129095833.GB20449@pengutronix.de>
-Message-ID: <20101206161343.GB21020@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Dec 2010 16:38:15 -0000
+Subject: [PATCH v3] ARM: vexpress: add support for multiple core tiles
+In-Reply-To: <20101206155310.GG31777@n2100.arm.linux.org.uk>
+References: <1291052921-30695-1-git-send-email-will.deacon@arm.com>
+	<20101206155310.GG31777@n2100.arm.linux.org.uk>
+Message-ID: <006f01cb9563$faf32210$f0d96630$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[extended the audience, some context:  arch/arm/plat-mxc currently uses
-a clk_enable in arch_reset which might sleep]
+Hi Russell,
 
-On Mon, Nov 29, 2010 at 10:58:33AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Lothar,
+> On Mon, Nov 29, 2010 at 05:48:41PM +0000, Will Deacon wrote:
+> > The current Versatile Express BSP defines the MACHINE_START macro
+> > in the core tile code.
+> >
+> > This patch moves this into the generic board code and introduces
+> > a method for determining the current tile at runtime, allowing
+> > the Kernel to have support for multiple tiles compiled in.
+> > Tile-specific functions are executed via a descriptor struct containing
+> > the correct implementations for the current tile.
 > 
-> On Mon, Nov 29, 2010 at 10:25:34AM +0100, Lothar Wa?mann wrote:
-> > arch_reset() may be called from interrupt context (e.g. induced by
-> > SYSRQ-B), thus clk_get() and clk_enable() must not be called from
-> > within arch_reset(). Move these calls to mxc_arch_reset_init().
-> I wonder if SYSRQ-B is the only way to trigger that.  And if yes if that
-> could be "fixed" to allow sleeping?!
-Hmmm, the comment for emergency_restart() says:
+> Obviously, this has been broken by the changes to the SMP and GIC code...
 
-/**
- *      emergency_restart - reboot the system
- *
- *      Without shutting down any hardware or taking any locks
- *      reboot the system.  This is called when we know we are in
- *      trouble so this is our best effort to reboot.  This is
- *      safe to call in interrupt context.
- */
+Yup, I posted the patch to your patch system before the SMP and GIC
+changes had hit the list, so I'll mark it as discarded for now.
+ 
+> The SMP code is now down to the following:
+> 
+> void __init smp_init_cpus(void)
 
-emergency_restart has several callers apart from sysrq (watchdog, ocfs2,
-kdb, panic), so I think allowing to sleep isn't that easy.
+[...]
+ 
+> void __init platform_smp_prepare_cpus(unsigned int max_cpus)
 
-Moreover the sysrq function is called with the uart port's lock hold,
-that would need fixing in the serial driver.  I found the same problem
-in amba-pl011 (the only driver I checked), so this seems to be a big
-task.  Sysrq holds a lock, too, while calling the handler.
+[...]
 
-I still think it's wrong to enable the watchdog clock unconditionally
-during boot and wonder if that sleep in atomic can just be ignored?!
+Ok, that looks easy enough to incorporate into the multi-tile stuff.
 
-Uwe
+> The secondary startup addresses could be moved into boot_secondary(),
+> leaving smp_init_cpus() and platform_smp_prepare_cpus() with the task
+> of initializing the possible/present bitmaps, and enabling the SCU.
+> 
+> I'm in two minds about that - one is that we know that the SCU on an
+> A9 or MPCore is going to tell us that CPUs 0..N are present, so we
+> can move that logic into smp_scu.c.
+> 
+> However, just because there's CPUs 0..N doesn't mean that a platform
+> would want to use all those CPUs for SMP, so it should be a platform
+> choice which CPUs get populated into the maps.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I agree, working out the set of CPUs that we want to bring up shouldn't
+have anything to do with the SCU. This becomes even more important for
+SMP platforms where the SCU doesn't have a memory-mapped interface, like
+A15.
+
+> The other complication here is that the possible/present bitmaps use
+> logical CPU numbers, which depending on the platform may or may not
+> be the same as physical CPU numbers, even though it may be an A9 based
+> platform.
+
+Eek. What sort of mapping do you get between logical and physical CPU
+numbers for these platforms? Are the logical numbers offset from the
+physical ones or is there just a random mapping between the two?
+
+> I think what we want is to not only move the count of cores and scu
+> enable into the core tile code, but also the bitmap population too.
+> That may ultimately be the sensible thing if we're eventually going
+> to indirect smp_init_cpus()/platform_smp_prepare_cpus() in the longer
+> term.
+
+Ok, I'll have a crack at incorporating that into v4 of this patch, which
+I'll base against -next.
+
+Thanks,
+
+Will
