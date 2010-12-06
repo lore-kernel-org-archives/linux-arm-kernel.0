@@ -1,91 +1,141 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 6 Dec 2010 10:27:50 +0100
-Subject: [RFC PATCH 06/18] ARM: LPAE: Introduce the 3-level page table
-	format definitions
-In-Reply-To: <201010252025.24128.arnd@arndb.de>
-References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
-	<201010251525.09002.arnd@arndb.de>
-	<1288023534.14756.109.camel@e102109-lin.cambridge.arm.com>
-	<201010252025.24128.arnd@arndb.de>
-Message-ID: <AANLkTimEdNj71v-oiKKho27DWcZbxOWtO6M4eLg2NDRE@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 6 Dec 2010 17:31:46 +0800
+Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
+	run-time
+In-Reply-To: <20101206080606.GA29563@n2100.arm.linux.org.uk>
+References: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
+	<20101205092345.GA9138@n2100.arm.linux.org.uk>
+	<AANLkTimbFYCxcSU0+c2Q2D2yQ1wRPMmTx1Pdtu3CvM4m@mail.gmail.com>
+	<20101206080606.GA29563@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=5sMZUwu+yhha=CugFwrhqTwYSTvKOHEbu8RE3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for jumping in here at such a late hour...
-
->> You can look at the IPA as the virtual address translation set up by the
->> hypervisor (stage 2 translation). The guest OS only sets up stage 1
->> translations but can use 40-bit physical addresses (via stage 1) with or
->> without the hypervisor. The input to the stage 1 translations is always
->> 32-bit.
->
->
-> Right, that's what I thought.
->
->> > Are there any significant differences to Linux between setting up page
->> > tables for a 32 bit VA space or a 40 bit IPA space, other than the
->> > size of the PGD?
+On Mon, Dec 6, 2010 at 4:06 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Dec 06, 2010 at 02:12:54PM +0800, Eric Miao wrote:
+>> On Sun, Dec 5, 2010 at 5:23 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Nov 22, 2010 at 04:26:50PM +0800, Eric Miao wrote:
+>> >> I wonder if it's still acceptable for a patch like below to have a dynamic IRQ
+>> >> handler at run-time. There is some changes to the irq_handler, esp. some
+>> >> SMP changes.
+>> >>
+>> >> Magnus had some similar patches to have a run-time irq_handler, which is
+>> >> a bit more complicated, but I'm also very happy with.
+>> >
+>> > I'd prefer a simple but efficient approach. ?I am worried about
+>> > unnecessarily increasing the IRQ latency - and IRQ latency is something
+>> > that we should be concerned about. ?It has the ability to make platforms
+>> > useless.
+>> >
+>> > Eg, we know that SMC91x net interfaces are sensitive to IRQ latency, and
+>> > the same is true of serial ports with small FIFOs.
+>> >
+>> > Any attempt to support multiple IRQ handlers is going to increase IRQ
+>> > handling latency - I don't think that's something which can be avoided,
+>> > and I'm wondering what effect this and the recent genirq changes is going
+>> > to have. ?Has anyone been keeping an eye on IRQ handling latency?
+>> >
+>> > Lastly, this patch is dependent on your machine class patches, which makes
+>> > it unsuitable as-is for mainline.
+>> >
 >>
->> I think I get what you were asking :).
+>> This one isn't. I've rebased this on top of v2.6.37-rc1.
 >>
->> >From KVM you could indeed set up stage 2 translations that a guest OS
->> can use (you need some code running in hypervisor mode to turn this on).
->> The format is pretty close to the stage 1 tables, so the Linux macros
->> could be reused. The PGD size would be different (depending on whether
->> you want to emulate 40-bit physical address space or a 32-bit one).
->> There are also a few bits (memory attributes) that may differ but you
->> could handle them in KVM.
->>
->> If KVM would reuse the existing pgd/pmd/pte Linux macros, it would
->> indeed be restricted to 32-bit IPA (sizeof(long)). You may need to
->> define different macros to use either a pfn or long long as address
->> input.
-
-I'm not even sure it would be a big advantage to re-use the macros for
-KVM. Sure, creating separate macros may duplicate some bit-shifting
-logic, but my guess is that code will be easier to read if using
-separate macros for the 2-nd stage translation in KVM. One might also
-imagine specific virtualization-oriented bits which could be
-explicitly names or directly targeted in macros that don't have to
-handle both standard non-virt tables and 2-nd stage translation
-tables.
-
-At least from my experience writing KVM code, it's difficult enough to
-make it clear to anyone reading the code which address space exactly
-is being referenced at which time.
-
->> But if KVM uses qemu for platform emulation, this may only support
->> 32-bit physical address space so the guest OS could only generate 32-bit
->> IPA.
+>> >> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> >> + ? ? handle_arch_irq = class ? class->handle_irq : NULL;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^^^^^^^^^^^^^^^^^^^^
 >
-> Good point. At the very least, qemu would need a way to get at the highmem
-> portion of the guest that is not normally part of the qemu virtual address
-> space. In fact this would already be required without LPAE in order to run
-> a VM with 4GB guest physical addressing.
->
-> There are probable (slow) ways of doing that, e.g. remap_file_pages or
-> a new syscall for accessing high guest memory. It's not entirely clear
-> to me how useful that is, the most sensible way to start here is certainly
-> to start out with a 32-bit IPA as you suggested and see how badly that
-> limits guests in real-world setups.
 
-So this depends on what the use would be. True, if you wanted a guest
-that used more than 4GB of memory AND you wanted QEMU to be able to
-readily access all of that, then yes, it would be difficult on a
-32-bit architecture.
+Grrrr... wrong copy indeed. Corrected version below, I also made it less
+intrusive by judging on handle_arch_irq being NULL or not so to fall back
+to the original way of handling.
 
-But QEMU doesn't really use the mmap'ed areas backing physical memory
-for anything - it's merely a way of telling KVM how much physical
-memory should be given to the guest, and the kernel side conveniently
-uses get_user_pages() to access that memory. Instead, QEMU could
-simply call an IOCTL to KVM telling it something like
-register_user_memory(long long base_phys_addr, long long size); and
-KVM could just allocate physical pages to back that without them being
-mapped on the host side. An individual page could be mapped in as
-needed for emulation and mapped out again. I don't see a huge
-performance hit for such a solution.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index db524e7..0cecffb 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1017,6 +1017,11 @@ config CPU_HAS_PMU
+ 	default y
+ 	bool
 
-But as you both suggest, 32-bit physical address space is probably
-going to be more than needed for initial uses of ARM virtual machines.
++config MULTI_IRQ_HANDLER
++	bool
++	help
++	  Allow each machine to specify it's own IRQ handler at run time.
++
+ if !MMU
+ source "arch/arm/Kconfig-nommu"
+ endif
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index d97a964..7d55356 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -40,6 +40,9 @@ struct machine_desc {
+ 	void			(*init_irq)(void);
+ 	struct sys_timer	*timer;		/* system tick timer	*/
+ 	void			(*init_machine)(void);
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	void			(*handle_irq)(struct pt_regs *);
++#endif
+ };
 
--Christoffer
+ /*
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index ce3eee9..6ecdad9 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
+ extern void init_FIQ(void);
+ extern int show_fiq_list(struct seq_file *, void *);
+
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++extern void (*handle_arch_irq)(struct pt_regs *);
++#endif
++
+ /*
+  * This is for easy migration, but should be changed in the source
+  */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index c09e357..4f446a2 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -30,6 +30,13 @@
+  * Interrupt handling.  Preserves r7, r8, r9
+  */
+ 	.macro	irq_handler
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	ldr	r1, =handle_arch_irq
++	cmp	r1, #0
++	movne	r0, sp
++	adrne	lr, BSYM(9997f)
++	ldrne	pc, [r1]
++#endif
+ 	get_irqnr_preamble r5, lr
+ 1:	get_irqnr_and_base r0, r6, r5, lr
+ 	movne	r1, sp
+@@ -1245,3 +1252,9 @@ cr_alignment:
+ 	.space	4
+ cr_no_alignment:
+ 	.space	4
++
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	.globl	handle_arch_irq
++handle_arch_irq:
++	.long	0
++#endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..b809521 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -875,6 +875,9 @@ void __init setup_arch(char **cmdline_p)
+ 	init_arch_irq = mdesc->init_irq;
+ 	system_timer = mdesc->timer;
+ 	init_machine = mdesc->init_machine;
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	handle_arch_irq = mdesc->handle_irq;
++#endif
+
+ #ifdef CONFIG_VT
+ #if defined(CONFIG_VGA_CONSOLE)
