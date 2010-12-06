@@ -1,94 +1,270 @@
-From: jesse.barker@linaro.org (Jesse Barker)
-Date: Fri, 3 Dec 2010 08:43:45 -0800
-Subject: RFC: Dynamic hwcaps
-In-Reply-To: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-Message-ID: <AANLkTin1+9bzD_TGAxvnyKArLg=nEHVE+ehB4LczaV98@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 6 Dec 2010 19:09:38 +0100
+Subject: [PATCH 19/22] ARM: CPU hotplug: move cpu_killed completion to
+	core code
+Message-ID: <AANLkTi=h6MCs9W8u7dFR-VdiRGeJMO7u9xz_RughcCXR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
+> Date: Fri, 03 Dec 2010 20:25:22 +0000
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> To: linux-arm-kernel at lists.infradead.org, ? ? ? Catalin Marinas
+> ? ? ? ?<catalin.marinas@arm.com>
+> Subject: [PATCH 19/22] ARM: CPU hotplug: move cpu_killed completion to
+> ? ? ? ?core ? ?code
+> Message-ID: <E1POcC2-0007sD-I3@rmk-PC.arm.linux.org.uk>
+> Content-Type: text/plain; charset="us-ascii"
+>
+> We always need to wait for the dying CPU to reach a safe state before
+> taking it down, irrespective of the requirements of the platform.
+> Move the completion code into the ARM SMP hotplug code rather than
+> having each platform re-implement this.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> ?arch/arm/kernel/smp.c ? ? ? ? ? ? ?| ? 14 +++++++++++++-
+> ?arch/arm/mach-omap2/omap-hotplug.c | ? ?8 ++------
+> ?arch/arm/mach-realview/hotplug.c ? | ? ?8 +-------
+> ?arch/arm/mach-s5pv310/hotplug.c ? ?| ? ?8 +-------
+> ?arch/arm/mach-tegra/hotplug.c ? ? ?| ? ?8 +-------
+> ?arch/arm/mach-ux500/hotplug.c ? ? ?| ? ?8 +-------
+> ?6 files changed, 19 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 1f1de2b..bebe3bd 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -24,6 +24,7 @@
+> ?#include <linux/irq.h>
+> ?#include <linux/percpu.h>
+> ?#include <linux/clockchips.h>
+> +#include <linux/completion.h>
+>
+> ?#include <asm/atomic.h>
+> ?#include <asm/cacheflush.h>
+> @@ -238,12 +239,20 @@ int __cpu_disable(void)
+> ? ? ? ?return 0;
+> ?}
+>
+> +static DECLARE_COMPLETION(cpu_died);
+> +
+> ?/*
+> ?* called on the thread which is asking for a CPU to be shutdown -
+> ?* waits until shutdown has completed, or it is timed out.
+> ?*/
+> ?void __cpu_die(unsigned int cpu)
+> ?{
+> + ? ? ? if (wait_for_completion_timeout(&cpu_died, 5000)) {
 
-For the case of NEON and its use in graphics libraries, we are certainly
-pushing explicitly for runtime detection.  However, this tends to be done by
-detecting the presence of NEON at initialization time, rather than at each
-path invocation (to avoid rescanning /proc/self/auxv).  Are you saying that
-the init code could still detect NEON this way, but there would need to be
-additional checks when taking individual paths?
+Shouldn't you test the opposite like with platform_cpu_kill below ?
 
-cheers,
-Jesse
 
-On Fri, Dec 3, 2010 at 8:28 AM, Dave Martin <dave.martin@linaro.org> wrote:
-
-> Hi all,
+> + ? ? ? ? ? ? ? printk(KERN_ERR "CPU%u: cpu didn't die\n", cpu);
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> + ? ? ? printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+> +
+> ? ? ? ?if (!platform_cpu_kill(cpu))
+> ? ? ? ? ? ? ? ?printk("CPU%u: unable to kill\n", cpu);
+> ?}
+> @@ -263,9 +272,12 @@ void __ref cpu_die(void)
+> ? ? ? ?local_irq_disable();
+> ? ? ? ?idle_task_exit();
 >
-> I'd be interested in people's views on the following idea-- feel free
-> to ignore if it doesn't interest you.
+> + ? ? ? /* Tell __cpu_die() that this CPU is now safe to dispose of */
+> + ? ? ? complete(&cpu_died);
+> +
+> ? ? ? ?/*
+> ? ? ? ? * actual CPU shutdown procedure is at least platform (if not
+> - ? ? ? ?* CPU) specific
+> + ? ? ? ?* CPU) specific.
+> ? ? ? ? */
+> ? ? ? ?platform_cpu_die(cpu);
+>
+> diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
+> index 6cee456..ace979d 100644
+> --- a/arch/arm/mach-omap2/omap-hotplug.c
+> +++ b/arch/arm/mach-omap2/omap-hotplug.c
+> @@ -17,16 +17,13 @@
+> ?#include <linux/kernel.h>
+> ?#include <linux/errno.h>
+> ?#include <linux/smp.h>
+> -#include <linux/completion.h>
+>
+> ?#include <asm/cacheflush.h>
+> ?#include <mach/omap4-common.h>
+>
+> -static DECLARE_COMPLETION(cpu_killed);
+> -
+> ?int platform_cpu_kill(unsigned int cpu)
+> ?{
+> - ? ? ? return wait_for_completion_timeout(&cpu_killed, 5000);
+> + ? ? ? return 1;
+> ?}
+>
+> ?/*
+> @@ -42,8 +39,7 @@ void platform_cpu_die(unsigned int cpu)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? this_cpu, cpu);
+> ? ? ? ? ? ? ? ?BUG();
+> ? ? ? ?}
+> - ? ? ? pr_notice("CPU%u: shutdown\n", cpu);
+> - ? ? ? complete(&cpu_killed);
+> +
+> ? ? ? ?flush_cache_all();
+> ? ? ? ?dsb();
+>
+> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+> index f95521a..7d58c16 100644
+> --- a/arch/arm/mach-realview/hotplug.c
+> +++ b/arch/arm/mach-realview/hotplug.c
+> @@ -11,14 +11,11 @@
+> ?#include <linux/kernel.h>
+> ?#include <linux/errno.h>
+> ?#include <linux/smp.h>
+> -#include <linux/completion.h>
+>
+> ?#include <asm/cacheflush.h>
+>
+> ?extern volatile int pen_release;
+>
+> -static DECLARE_COMPLETION(cpu_killed);
+> -
+> ?static inline void cpu_enter_lowpower(void)
+> ?{
+> ? ? ? ?unsigned int v;
+> @@ -95,7 +92,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+>
+> ?int platform_cpu_kill(unsigned int cpu)
+> ?{
+> - ? ? ? return wait_for_completion_timeout(&cpu_killed, 5000);
+> + ? ? ? return 1;
+> ?}
+>
+> ?/*
+> @@ -115,9 +112,6 @@ void platform_cpu_die(unsigned int cpu)
+> ? ? ? ?}
+> ?#endif
+>
+> - ? ? ? printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+> - ? ? ? complete(&cpu_killed);
+> -
+> ? ? ? ?/*
+> ? ? ? ? * we're ready for shutdown now, so do it
+> ? ? ? ? */
+> diff --git a/arch/arm/mach-s5pv310/hotplug.c b/arch/arm/mach-s5pv310/hotplug.c
+> index 03652c3..d7be70a 100644
+> --- a/arch/arm/mach-s5pv310/hotplug.c
+> +++ b/arch/arm/mach-s5pv310/hotplug.c
+> @@ -13,14 +13,11 @@
+> ?#include <linux/kernel.h>
+> ?#include <linux/errno.h>
+> ?#include <linux/smp.h>
+> -#include <linux/completion.h>
+>
+> ?#include <asm/cacheflush.h>
+>
+> ?extern volatile int pen_release;
+>
+> -static DECLARE_COMPLETION(cpu_killed);
+> -
+> ?static inline void cpu_enter_lowpower(void)
+> ?{
+> ? ? ? ?unsigned int v;
+> @@ -98,7 +95,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+>
+> ?int platform_cpu_kill(unsigned int cpu)
+> ?{
+> - ? ? ? return wait_for_completion_timeout(&cpu_killed, 5000);
+> + ? ? ? return 1;
+> ?}
+>
+> ?/*
+> @@ -118,9 +115,6 @@ void platform_cpu_die(unsigned int cpu)
+> ? ? ? ?}
+> ?#endif
+>
+> - ? ? ? printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+> - ? ? ? complete(&cpu_killed);
+> -
+> ? ? ? ?/*
+> ? ? ? ? * we're ready for shutdown now, so do it
+> ? ? ? ? */
+> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+> index 8e7f115..ecaa41c 100644
+> --- a/arch/arm/mach-tegra/hotplug.c
+> +++ b/arch/arm/mach-tegra/hotplug.c
+> @@ -11,12 +11,9 @@
+> ?#include <linux/kernel.h>
+> ?#include <linux/errno.h>
+> ?#include <linux/smp.h>
+> -#include <linux/completion.h>
+>
+> ?#include <asm/cacheflush.h>
+>
+> -static DECLARE_COMPLETION(cpu_killed);
+> -
+> ?static inline void cpu_enter_lowpower(void)
+> ?{
+> ? ? ? ?unsigned int v;
+> @@ -94,7 +91,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+>
+> ?int platform_cpu_kill(unsigned int cpu)
+> ?{
+> - ? ? ? return wait_for_completion_timeout(&cpu_killed, 5000);
+> + ? ? ? return 1;
+> ?}
+>
+> ?/*
+> @@ -114,9 +111,6 @@ void platform_cpu_die(unsigned int cpu)
+> ? ? ? ?}
+> ?#endif
+>
+> - ? ? ? printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+> - ? ? ? complete(&cpu_killed);
+> -
+> ? ? ? ?/*
+> ? ? ? ? * we're ready for shutdown now, so do it
+> ? ? ? ? */
+> diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+> index b782a03..7a4890b 100644
+> --- a/arch/arm/mach-ux500/hotplug.c
+> +++ b/arch/arm/mach-ux500/hotplug.c
+> @@ -11,14 +11,11 @@
+> ?#include <linux/kernel.h>
+> ?#include <linux/errno.h>
+> ?#include <linux/smp.h>
+> -#include <linux/completion.h>
+>
+> ?#include <asm/cacheflush.h>
+>
+> ?extern volatile int pen_release;
+>
+> -static DECLARE_COMPLETION(cpu_killed);
+> -
+> ?static inline void platform_do_lowpower(unsigned int cpu)
+> ?{
+> ? ? ? ?flush_cache_all();
+> @@ -38,7 +35,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+>
+> ?int platform_cpu_kill(unsigned int cpu)
+> ?{
+> - ? ? ? return wait_for_completion_timeout(&cpu_killed, 5000);
+> + ? ? ? return 1;
+> ?}
+>
+> ?/*
+> @@ -58,9 +55,6 @@ void platform_cpu_die(unsigned int cpu)
+> ? ? ? ?}
+> ?#endif
+>
+> - ? ? ? printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+> - ? ? ? complete(&cpu_killed);
+> -
+> ? ? ? ?/* directly enter low power state, skipping secure registers */
+> ? ? ? ?platform_do_lowpower(cpu);
+> ?}
+> --
+> 1.6.2.5
 >
 >
-> For power-management purposes, it's useful to be able to turn off
-> functional blocks on the SoC.
 >
-> For on-SoC peripherals, this can be managed through the driver
-> framework in the kernel, but for functional blocks of the CPU itself
-> which are used by instruction set extensions, such as NEON or other
-> media accelerators, it would be interesting if processes could adapt
-> to these units appearing and disappearing at runtime.  This would mean
-> that user processes would need to select dynamically between different
-> implementations of accelerated functionality at runtime.
->
-> This allows for more active power management of such functional
-> blocks: if the CPU is not fully loaded, you can turn them off -- the
-> kernel can spot when there is significant idle time and do this.  If
-> the CPU becomes fully loaded, applications which have soft-realtime
-> constraints can notice this and switch to their accelerated code
-> (which will cause the kernel to switch the functional unit(s) on).
-> Or, the kernel can react to increasing CPU load by speculatively turn
-> it on instead.  This is analogous to the behaviour of other power
-> governors in the system.  Non-aware applications will still work
-> seamlessly -- these may simply run accelerated code if the hardware
-> supports it, causing the kernel to turn the affected functional
-> block(s) on.
->
-> In order for this to work, some dynamic status information would need
-> to be visible to each user process, and polled each time a function
-> with a dynamically switchable choice of implementations gets called.
-> You probably don't need to worry about race conditions either-- if the
-> process accidentally tries to use a turned-off feature, you will take
-> a fault which gives the kernel the chance to turn the feature back on.
->  Generally, this should be a rare occurrence.
->
->
-> The dynamic feature status information should ideally be per-CPU
-> global, though we could have a separate copy per thread, at the cost
-> of more memory.  It can't be system-global, since different CPUs may
-> have a different set of functional blocks active at any one time --
-> for this reason, the information can't be stored in an existing
-> mapping such as the vectors page.  Conversely, existing mechanisms
-> such sysfs probably involve too much overhead to be polled every time
-> you call copy_pixmap() or whatever.
->
-> Alternatively, each thread could register a userspace buffer (a single
-> word is probably adequate) into which the CPU pokes the hardware
-> status flags each time it returns to userspace, if the hardware status
-> has changed or if the thread has been migrated.
->
-> Either of the above approaches could be prototyped as an mmap'able
-> driver, though this may not be the best approach in the long run.
->
->
-> Does anyone have a view on whether this is a worthwhile idea, or what
-> the best approach would be?
->
-> Cheers
-> ---Dave
->
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101203/c203f894/attachment-0001.html>
