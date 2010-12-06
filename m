@@ -1,35 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Dec 2010 17:16:57 +0000
-Subject: [PATCH v3] ARM: vexpress: add support for multiple core tiles
-In-Reply-To: <006f01cb9563$faf32210$f0d96630$@deacon@arm.com>
-References: <1291052921-30695-1-git-send-email-will.deacon@arm.com>
-	<20101206155310.GG31777@n2100.arm.linux.org.uk>
-	<006f01cb9563$faf32210$f0d96630$@deacon@arm.com>
-Message-ID: <20101206171657.GH31777@n2100.arm.linux.org.uk>
+From: dmarion@me.com (Damjan Marion)
+Date: Mon, 06 Dec 2010 18:29:19 +0100
+Subject: Cavium Networks CNS21xx SoC Support
+Message-ID: <CB37CFFB-F7D5-4582-AADB-DBAD0FA96E81@me.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 04:38:15PM -0000, Will Deacon wrote:
-> Hi Russell,
-> 
-> > The other complication here is that the possible/present bitmaps use
-> > logical CPU numbers, which depending on the platform may or may not
-> > be the same as physical CPU numbers, even though it may be an A9 based
-> > platform.
-> 
-> Eek. What sort of mapping do you get between logical and physical CPU
-> numbers for these platforms? Are the logical numbers offset from the
-> physical ones or is there just a random mapping between the two?
 
-We currently have a 1:1 mapping between the two, but only because that's
-a choice made entirely by the platform code.  The common code makes no
-assumptions about the cpu number space it is using.
+Hi,
 
-There are two places where logical and physical CPU numbers interact
-come together:
+I would like to know if anybody considered so far adding support for Cavium Networks (ex Star Semiconductors) CNS21xx series SoCs. This SoC is based on FA526 core which is AFAIK supported in recent kernels and Cavium Networks is providing some patched old linux kernels (2.6.24).
 
-1. boot_secondary / early startup code (via pen_release)
-2. IPI sending in the GIC code
+http://www.caviumnetworks.com/ECONA_CNS2XXX.html
 
-and this is where any platform can decide to place a mapping for whatever
-reason.
+There are some cheap devices on the marked based on this SoCs and marketed as NAS servers but basically due to small footprint they can be used for many other purposes.
+
+I'm willing to contribute and prepare some patches based on Cavium provided kernel, but before I start I would like to know from more experienced guys if this make a sense at all....
+
+Thanks,
+
+Damjan
