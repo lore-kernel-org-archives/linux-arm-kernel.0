@@ -1,79 +1,51 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 6 Dec 2010 11:07:05 +0000
-Subject: RFC: Dynamic hwcaps
-In-Reply-To: <4CFBAC6D.5060507@codesourcery.com>
-References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-	<20101203165105.GD30898@n2100.arm.linux.org.uk>
-	<AANLkTik9sqkbCPbcWUL+2otyfO1OZ=hx1tvSkQW65e4i@mail.gmail.com>
-	<4CFBAC6D.5060507@codesourcery.com>
-Message-ID: <AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 6 Dec 2010 12:11:38 +0100 (CET)
+Subject: [PATCH 3/5] msm: timer: SMP timer support for msm
+In-Reply-To: <20101206102046.GD29563@n2100.arm.linux.org.uk>
+References: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
+	<1291619778-30289-4-git-send-email-johlstei@codeaurora.org>
+	<alpine.LFD.2.00.1012061025240.2653@localhost6.localdomain6>
+	<20101206102046.GD29563@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1012061156100.2653@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 5, 2010 at 3:14 PM, Mark Mitchell <mark@codesourcery.com> wrote:
-> On 12/3/2010 11:35 AM, Dave Martin wrote:
->
->> What you describe is one of two mechanisms currently in use--- the
->> other is for a single library to contain two implementations of
->> certain functions and to choose between them based on the hwcaps.
->> Typically, one set of functions is chosen a library initialisation
->> time. ?Some libraries, such as libpixman, are implementated this way;
->> and it's often preferable since the the proportion of functions in a
->> library which get significant benefit from special instruction set
->> extensions is often pretty small.
->
-> I've believed for a long time that we should try to encourage this
-> approach. ?The current approach (different libraries for each hardware
-> configuration) is prevalent, both in the toolchain ("multilibs") and in
-> other libraries -- but it seems to me premised on the idea that one is
-> building everything from source for one's particular hardware. ?In the
-> earlier days of FOSS, the typical installation model was to download a
-> source tarball, build it, and install it on your local machine. ?In that
-> context, tuning the library "just so" for your machine made sense. ?But,
-> to enable binary distribution, having to have N copies of a library (let
-> alone an application) for N different ARM core variants just doesn't
-> make sense to me.
+On Mon, 6 Dec 2010, Russell King - ARM Linux wrote:
 
-Just so, and as discussed before improvements to package managers
-could help here to avoid installing duplicate libraries.  (I believe
-that rpm may have some capability here (?) but deb does not at
-present).
+> On Mon, Dec 06, 2010 at 10:56:14AM +0100, Thomas Gleixner wrote:
+> > > +	local_irq_save(flags);
+> > > +	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
+> > 
+> > Why are you fiddling wiht the irqchip functions directly ? Please use
+> > disable_irq/enable_irq if at all.
+> 
+> PPI.  The interrupt has to be enabled by the very same CPU that wants
+> to receive the interrupt.  Other CPUs on the system do not have access
+> to the interrupt enable bits for PPIs.
 
-> So, I certainly think that things like STT_GNU_IFUNC (which enable
-> determination of which routine to use at application start-up) make a
-> lot of sense.
->
-> I think your idea of exposing whether a unit is "ready", to allow even
-> more fine-grained choices as an application runs, is clever. ?I don't
-> really know enough to say whether most applications could take advantage
-> of that. ?One of the problems I see is that you need global information,
-> not local information. ?In particular, if I'm using NEON to implement
-> the inner loop of some performance-critical application, then when the
-> unit is not ready, I want the kernel to wake it up already! ?But, if I'm
-> just using NEON to do some random computation off the critical path, I'm
-> probably happy to do it slowly if that's more efficient than waking up
-> the NEON unit. ?But, which of these cases I'm in isn't always locally
-> known at the point I'm doing the computation; the computation may be
-> buried in a small library routine.
+That's fine, but the code is called on that very cpu anyway, so
+enable_irq() ends up calling the very same chip->unmask()
+ 
+> That's something which genirq can't handle because it doesn't _actually_
+> support real per-CPU interrupts - iow, ones which are truely private to
+> CPU N.
 
-That's a fair concern -- I haven't explored the policy aspect much.
-One possibility is that if the kernel sees system load nearing 100%,
-it turns NEON on regardless.  But that's a pretty crude lever, and
-might not bring a benefit if the software isn't able to use NEON.
-Subtler approaches might involve the kernel collecting statistics on
-applications' use of functional units, or some participation from
-applications with realtime requirements.  Obviously, this is a but
-fuzzy for now...
+So what you want to avoid are the enable/disable_irq() side effects
+(setting/clearing the IRQ_DISABLED flags etc.) as they would apply to
+the other cpus as well - which would be bogus of course.
 
->
-> Do we have good examples of applications that could profit from this
-> capability?
+We could actually solve that in the genirq code in a halfways simple
+way. Now that we get the references to the irq descriptors via
+irq_to_desc() we could add a function which marks an irq as percpu and
+use the main irq descriptor as a place holder which allocates percpu
+memory for the real descriptors. irq_to_desc() would lookup the main
+descriptor and hand back the one for the current cpu if the percpu
+pointer is set. That would allow you to use the generic functions at
+least with some care (functions need to be called from migration
+disabled code).
 
-Currently, I don't have many examples-- the main one is related to the
-discussions aroung using NEON for memcpy().  This can be a performance
-win on some platforms, but except when the system is heavily loaded,
-or when NEON happens to be turned on anyway, it may not be
-advantageous for the user or overall system performance.
+Thanks,
 
-Cheers
----Dave
+	tglx
+
+ 
