@@ -1,25 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Dec 2010 20:52:17 +0000
-Subject: [PATCH 1/5] msm: Secure Channel Manager (SCM) support
-In-Reply-To: <29863.1291665648@localhost>
-References: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
-	<1291619778-30289-2-git-send-email-johlstei@codeaurora.org>
-	<29863.1291665648@localhost>
-Message-ID: <20101206205217.GJ31777@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 06 Dec 2010 13:07:30 -0800
+Subject: [PATCH 14/21] ARM: tegra: irq: Add debugfs file to show wake irqs
+In-Reply-To: <1291590548-7341-15-git-send-email-ccross@android.com>
+References: <1291590548-7341-1-git-send-email-ccross@android.com>
+	<1291590548-7341-15-git-send-email-ccross@android.com>
+Message-ID: <4CFD5092.50809@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 03:00:48PM -0500, Valdis.Kletnieks at vt.edu wrote:
-> On Sun, 05 Dec 2010 23:16:14 PST, Jeff Ohlstein said:
-> 
-> > SCM is the protocol used to communicate between the secure and
-> > non-secure code executing on the applications processor. 
-> 
-> Does the presence of SCM hardware imply SMP?  From reading this, it's unclear
-> why the dependence on SMP - it looks like scm.c is something that hardware that
-> has one ARM processor and a 'secure processor' would still want.  Or is the
-> 'secure processor' just another (arbitrarily labeled) ARM CPU participating
-> as a full SMP processor?
+On 12/05/2010 03:09 PM, Colin Cross wrote:
+> +static int __init tegra_irq_debug_init(void)
+> +{
+> +	struct dentry *d;
+> +
+> +	d = debugfs_create_file("wake_irq", 0755, NULL, NULL,
+> +		&tegra_wake_irq_debug_fops);
 
-It's referring to the secure mode, which is a separate address space and
-system running on the same CPU.
+Why not use S_IRUGO? And why is this file executable?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
