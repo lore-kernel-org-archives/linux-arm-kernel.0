@@ -1,260 +1,810 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Sun,  5 Dec 2010 23:16:18 -0800
-Subject: [PATCH 5/5] msm: add SMP support for msm
-In-Reply-To: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
-References: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1291619778-30289-6-git-send-email-johlstei@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 6 Dec 2010 08:22:37 +0100
+Subject: [PATCH] support PMIC mc13892
+In-Reply-To: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
+References: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
+Message-ID: <20101206072237.GH10693@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
----
- arch/arm/mach-msm/Kconfig            |    1 +
- arch/arm/mach-msm/Makefile           |    1 +
- arch/arm/mach-msm/headsmp.S          |   43 ++++++++++
- arch/arm/mach-msm/include/mach/smp.h |    2 +
- arch/arm/mach-msm/platsmp.c          |  147 ++++++++++++++++++++++++++++++++++
- 5 files changed, 194 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/headsmp.S
- create mode 100644 arch/arm/mach-msm/platsmp.c
+Hello,
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index ab5338f..8c57425 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -40,6 +40,7 @@ config ARCH_MSM8X60
- 	bool "MSM8X60"
- 	select MACH_MSM8X60_SURF if (!MACH_MSM8X60_RUMI3 && !MACH_MSM8X60_SIM \
- 				  && !MACH_MSM8X60_FFA)
-+	select ARCH_MSM_SCORPIONMP
- 	select ARM_GIC
- 	select CPU_V7
- 	select MSM_V2_TLMM
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 7a11b4a..1945f9c 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
- obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
- 
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-+obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- 
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
-diff --git a/arch/arm/mach-msm/headsmp.S b/arch/arm/mach-msm/headsmp.S
-new file mode 100644
-index 0000000..438cfeb
---- /dev/null
-+++ b/arch/arm/mach-msm/headsmp.S
-@@ -0,0 +1,43 @@
-+/*
-+ *  Copyright (c) 2003 ARM Limited
-+ *  All Rights Reserved
-+ *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+/*
-+ * MSM specific entry point for secondary CPUs.  This provides
-+ * a "holding pen" into which all secondary cores are held until we're
-+ * ready for them to initialise.
-+ *
-+ * This is executing in physical space with cache's off.
-+ */
-+ENTRY(msm_secondary_startup)
-+	mrc	p15, 0, r0, c0, c0, 5 	@ MPIDR
-+	and	r0, r0, #15		@ What CPU am I
-+	adr	r4, 1f			@ address of
-+	ldmia	r4, {r5, r6}		@ load curr addr and pen_rel addr
-+	sub	r4, r4, r5		@ determine virtual/phys offsets
-+	add	r6, r6, r4		@ apply
-+pen:
-+	wfe
-+	dsb				@ ensure subsequent access is
-+					@ after event
-+
-+	ldr	r7, [r6]		@ pen_rel has cpu to remove from reset
-+	cmp	r7, r0			@ are we lucky?
-+	bne	pen
-+
-+	/*
-+	 * we've been released from the holding pen: secondary_stack
-+	 * should now contain the SVC stack for this core
-+	 */
-+	b	secondary_startup
-+
-+1:	.long	.
-+	.long	pen_release
-diff --git a/arch/arm/mach-msm/include/mach/smp.h b/arch/arm/mach-msm/include/mach/smp.h
-index 3ff7bf5..79f94b0 100644
---- a/arch/arm/mach-msm/include/mach/smp.h
-+++ b/arch/arm/mach-msm/include/mach/smp.h
-@@ -36,4 +36,6 @@ static inline void smp_cross_call(const struct cpumask *mask)
- 	gic_raise_softirq(mask, 1);
- }
- 
-+extern int pen_release;
-+extern void msm_secondary_startup(void);
- #endif
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-new file mode 100644
-index 0000000..fbce6de
---- /dev/null
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -0,0 +1,147 @@
-+/*
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
-+ *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/cpumask.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+
-+#include <asm/hardware/gic.h>
-+#include <asm/cacheflush.h>
-+#include <asm/mach-types.h>
-+
-+#include <mach/smp.h>
-+#include <mach/hardware.h>
-+#include <mach/msm_iomap.h>
-+
-+#include "scm-boot.h"
-+
-+#define SECONDARY_CPU_WAIT_MS 10
-+
-+#define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
-+#define SCSS_CPU1CORE_RESET 0xD80
-+#define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
-+
-+int pen_release = -1;
-+
-+int get_core_count(void)
-+{
-+#ifdef CONFIG_NR_CPUS
-+	return CONFIG_NR_CPUS;
-+#else
-+	return 1;
-+#endif
-+}
-+
-+/* Initialize the present map (set_cpu_present(i, true)). */
-+void smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	int i;
-+	unsigned int cpu = smp_processor_id();
-+
-+	smp_store_cpu_info(cpu);
-+
-+	for (i = 0; i < max_cpus; i++)
-+		set_cpu_present(i, true);
-+}
-+
-+void smp_init_cpus(void)
-+{
-+	unsigned int i, ncores = get_core_count();
-+
-+	for (i = 0; i < ncores; i++)
-+		set_cpu_possible(i, true);
-+}
-+
-+static void prepare_cold_cpu(unsigned int cpu)
-+{
-+	int ret;
-+	ret = scm_set_boot_addr((void *)
-+				virt_to_phys(msm_secondary_startup),
-+				SCM_FLAG_COLDBOOT_CPU1);
-+	if (ret == 0) {
-+		void *sc1_base_ptr;
-+		sc1_base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
-+		if (sc1_base_ptr) {
-+			writel(0, sc1_base_ptr + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
-+			writel(0, sc1_base_ptr + SCSS_CPU1CORE_RESET);
-+			writel(3, sc1_base_ptr + SCSS_DBG_STATUS_CORE_PWRDUP);
-+			iounmap(sc1_base_ptr);
-+		}
-+	} else
-+		printk(KERN_DEBUG "Failed to set secondary core boot "
-+				  "address\n");
-+}
-+
-+/* Executed by primary CPU, brings other CPUs out of reset. Called@boot
-+   as well as when a CPU is coming out of shutdown induced by echo 0 >
-+   /sys/devices/.../cpuX.
-+*/
-+int boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	static int cold_boot_done;
-+	int cnt = 0;
-+	printk(KERN_DEBUG "Starting secondary CPU %d\n", cpu);
-+
-+	if (cold_boot_done == false) {
-+		prepare_cold_cpu(cpu);
-+		cold_boot_done = true;
-+	}
-+
-+	pen_release = cpu;
-+	dmac_flush_range((void *)&pen_release,
-+			 (void *)(&pen_release + sizeof(pen_release)));
-+	__asm__("sev");
-+	dsb();
-+
-+	/* Use smp_cross_call() to send a soft interrupt to wake up
-+	 * the other core.
-+	 */
-+	smp_cross_call(cpumask_of(cpu));
-+
-+	while (pen_release != 0xFFFFFFFF) {
-+		smp_rmb();
-+		msleep_interruptible(1);
-+		if (cnt++ >= SECONDARY_CPU_WAIT_MS)
-+			break;
-+	}
-+
-+	return 0;
-+}
-+
-+/* Mask for edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
-+#define GIC_PPI_EDGE_MASK 0xFFFFD7FF
-+
-+/* Initialization routine for secondary CPUs after they are brought out of
-+ * reset.
-+*/
-+void platform_secondary_init(unsigned int cpu)
-+{
-+	printk(KERN_DEBUG "%s: cpu:%d\n", __func__, cpu);
-+
-+	trace_hardirqs_off();
-+
-+	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
-+
-+	/* RUMI does not adhere to GIC spec by enabling STIs by default.
-+	 * Enable/clear is supposed to be RO for STIs, but is RW on RUMI.
-+	 */
-+	if (!machine_is_msm8x60_sim())
-+		writel(0x0000FFFF, MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
-+
-+	/*
-+	 * setup GIC (GIC number NOT CPU number and the base address of the
-+	 * GIC CPU interface
-+	 */
-+	gic_cpu_init(0, MSM_QGIC_CPU_BASE);
-+	pen_release = -1;
-+	smp_wmb();
-+}
+On Mon, Dec 06, 2010 at 02:25:35PM +0800, yong.shen at freescale.com wrote:
+> From: Yong Shen <yong.shen@linaro.org>
+> 
+> add support for mc13892, tested on mx51 babbage board
+> 
+> Signed-off-by: Yong Shen <yong.shen@linaro.org>
+> ---
+>  drivers/mfd/Kconfig                   |    4 +
+>  drivers/regulator/Kconfig             |    8 +
+>  drivers/regulator/Makefile            |    1 +
+>  drivers/regulator/mc13892-regulator.c |  647 +++++++++++++++++++++++++++++++++
+>  include/linux/mfd/mc13892.h           |   38 ++
+>  5 files changed, 698 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/regulator/mc13892-regulator.c
+>  create mode 100644 include/linux/mfd/mc13892.h
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 3a1493b..7659af9 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -427,11 +427,15 @@ config MFD_PCF50633
+>  config MFD_MC13783
+>  	tristate
+>  
+> +config MFD_MC13892
+> +	tristate
+> +
+This is not needed, MFD_MC13783 only exists because when MFD_MC13XXX was
+introduced some drivers still depended on MFD_MC13783.  As mc13xxx.[ch]
+provided enough compatibility cruft MFD_MC13XXX just selected MFD_MC13783.
+
+>  config MFD_MC13XXX
+>  	tristate "Support Freescale MC13783 and MC13892"
+>  	depends on SPI_MASTER
+>  	select MFD_CORE
+>  	select MFD_MC13783
+> +	select MFD_MC13892
+>  	help
+>  	  Support for the Freescale (Atlas) PMIC and audio CODECs
+>  	  MC13783 and MC13892.
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index 6e54253..7f7bc22 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -197,6 +197,14 @@ config REGULATOR_MC13783
+>  	  Say y here to support the regulators found on the Freescale MC13783
+>  	  PMIC.
+>  
+> +config REGULATOR_MC13892
+> +	tristate "Support regulators on Freescale MC13892 PMIC"
+> +	depends on MFD_MC13892
+> +	select REGULATOR_MC13XXX_CORE
+> +	help
+> +	  Say y here to support the regulators found on the Freescale MC13892
+> +	  PMIC.
+> +
+>  config REGULATOR_AB3100
+>  	tristate "ST-Ericsson AB3100 Regulator functions"
+>  	depends on AB3100_CORE
+> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> index 11876be..3107480 100644
+> --- a/drivers/regulator/Makefile
+> +++ b/drivers/regulator/Makefile
+> @@ -30,6 +30,7 @@ obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
+>  obj-$(CONFIG_REGULATOR_PCF50633) += pcf50633-regulator.o
+>  obj-$(CONFIG_REGULATOR_PCAP) += pcap-regulator.o
+>  obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
+> +obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o
+>  obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
+>  obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+>  
+> diff --git a/drivers/regulator/mc13892-regulator.c b/drivers/regulator/mc13892-regulator.c
+> new file mode 100644
+> index 0000000..6e613d4
+> --- /dev/null
+> +++ b/drivers/regulator/mc13892-regulator.c
+> @@ -0,0 +1,647 @@
+> +/*
+> + * Regulator Driver for Freescale MC13892 PMIC
+> + *
+> + * Copyright 2010 Yong Shen <yong.shen@linaro.org>
+> + *
+> + * Based on draft driver from Arnaud Patard <arnaud.patard@rtp-net.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/mfd/mc13892.h>
+> +#include <linux/regulator/machine.h>
+> +#include <linux/regulator/driver.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/kernel.h>
+> +#include <linux/slab.h>
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include "mc13xxx.h"
+shouldn't that be
+
+	#include <linux/mfd/mc13xxx.h>
+
+?
+> +
+> +#define MC13892_REVISION				7
+> +
+> +#define MC13892_POWERCTL0				13
+> +#define MC13892_POWERCTL0_USEROFFSPI		3
+> +#define MC13892_POWERCTL0_VCOINCELLVSEL		20
+> +#define MC13892_POWERCTL0_VCOINCELLVSEL_M		(7<<20)
+> +#define MC13892_POWERCTL0_VCOINCELLEN		(1<<23)
+> +
+> +#define MC13892_SWITCHERS0_SWxHI			(1<<23)
+> +
+> +#define MC13892_SWITCHERS0				24
+> +#define MC13892_SWITCHERS0_SW1VSEL			0
+> +#define MC13892_SWITCHERS0_SW1VSEL_M		(0x1f<<0)
+> +#define MC13892_SWITCHERS0_SW1HI			(1<<23)
+> +#define MC13892_SWITCHERS0_SW1EN		0
+> +
+> +#define MC13892_SWITCHERS1				25
+> +#define MC13892_SWITCHERS1_SW2VSEL			0
+> +#define MC13892_SWITCHERS1_SW2VSEL_M		(0x1f<<0)
+> +#define MC13892_SWITCHERS1_SW2HI			(1<<23)
+> +#define MC13892_SWITCHERS1_SW2EN		0
+> +
+> +#define MC13892_SWITCHERS2				26
+> +#define MC13892_SWITCHERS2_SW3VSEL			0
+> +#define MC13892_SWITCHERS2_SW3VSEL_M		(0x1f<<0)
+> +#define MC13892_SWITCHERS2_SW3HI			(1<<23)
+> +#define MC13892_SWITCHERS2_SW3EN		0
+> +
+> +#define MC13892_SWITCHERS3				27
+> +#define MC13892_SWITCHERS3_SW4VSEL			0
+> +#define MC13892_SWITCHERS3_SW4VSEL_M		(0x1f<<0)
+> +#define MC13892_SWITCHERS3_SW4HI			(1<<23)
+> +#define MC13892_SWITCHERS3_SW4EN		0
+> +
+> +#define MC13892_SWITCHERS4				28
+> +#define MC13892_SWITCHERS4_SW1MODE			0
+> +#define MC13892_SWITCHERS4_SW1MODE_AUTO		(8<<0)
+> +#define MC13892_SWITCHERS4_SW1MODE_M		(0xf<<0)
+> +#define MC13892_SWITCHERS4_SW2MODE			10
+> +#define MC13892_SWITCHERS4_SW2MODE_AUTO		(8<<10)
+> +#define MC13892_SWITCHERS4_SW2MODE_M		(0xf<<10)
+> +
+> +#define MC13892_SWITCHERS5				29
+> +#define MC13892_SWITCHERS5_SW3MODE			0
+> +#define MC13892_SWITCHERS5_SW3MODE_AUTO		(8<<0)
+> +#define MC13892_SWITCHERS5_SW3MODE_M		(0xf<<0)
+> +#define MC13892_SWITCHERS5_SW4MODE			8
+> +#define MC13892_SWITCHERS5_SW4MODE_AUTO		(8<<8)
+> +#define MC13892_SWITCHERS5_SW4MODE_M		(0xf<<8)
+> +#define MC13892_SWITCHERS5_SWBSTEN			(1<<20)
+> +
+> +
+> +#define MC13892_REGULATORSETTING0			30
+> +#define MC13892_REGULATORSETTING0_VGEN1VSEL		0
+> +#define MC13892_REGULATORSETTING0_VDIGVSEL		4
+> +#define MC13892_REGULATORSETTING0_VGEN2VSEL		6
+> +#define MC13892_REGULATORSETTING0_VPLLVSEL		9
+> +#define MC13892_REGULATORSETTING0_VUSB2VSEL		11
+> +#define MC13892_REGULATORSETTING0_VGEN3VSEL		14
+> +#define MC13892_REGULATORSETTING0_VCAMVSEL		16
+> +
+> +#define MC13892_REGULATORSETTING0_VGEN1VSEL_M	(3<<0)
+> +#define MC13892_REGULATORSETTING0_VDIGVSEL_M	(3<<4)
+> +#define MC13892_REGULATORSETTING0_VGEN2VSEL_M	(7<<6)
+> +#define MC13892_REGULATORSETTING0_VPLLVSEL_M	(3<<9)
+> +#define MC13892_REGULATORSETTING0_VUSB2VSEL_M	(3<<11)
+> +#define MC13892_REGULATORSETTING0_VGEN3VSEL_M	(1<<14)
+> +#define MC13892_REGULATORSETTING0_VCAMVSEL_M	(3<<16)
+> +
+> +#define MC13892_REGULATORSETTING1			31
+> +#define MC13892_REGULATORSETTING1_VVIDEOVSEL	2
+> +#define MC13892_REGULATORSETTING1_VAUDIOVSEL	4
+> +#define MC13892_REGULATORSETTING1_VSDVSEL		6
+> +
+> +#define MC13892_REGULATORSETTING1_VVIDEOVSEL_M	(3<<2)
+> +#define MC13892_REGULATORSETTING1_VAUDIOVSEL_M	(3<<4)
+> +#define MC13892_REGULATORSETTING1_VSDVSEL_M		(7<<6)
+> +
+> +#define MC13892_REGULATORMODE0			32
+> +#define MC13892_REGULATORMODE0_VGEN1EN		(1<<0)
+> +#define MC13892_REGULATORMODE0_VGEN1STDBY		(1<<1)
+> +#define MC13892_REGULATORMODE0_VGEN1MODE		(1<<2)
+> +#define MC13892_REGULATORMODE0_VIOHIEN		(1<<3)
+> +#define MC13892_REGULATORMODE0_VIOHISTDBY		(1<<4)
+> +#define MC13892_REGULATORMODE0_VIOHIMODE		(1<<5)
+> +#define MC13892_REGULATORMODE0_VDIGEN		(1<<9)
+> +#define MC13892_REGULATORMODE0_VDIGSTDBY		(1<<10)
+> +#define MC13892_REGULATORMODE0_VDIGMODE		(1<<11)
+> +#define MC13892_REGULATORMODE0_VGEN2EN		(1<<12)
+> +#define MC13892_REGULATORMODE0_VGEN2STDBY		(1<<13)
+> +#define MC13892_REGULATORMODE0_VGEN2MODE		(1<<14)
+> +#define MC13892_REGULATORMODE0_VPLLEN		(1<<15)
+> +#define MC13892_REGULATORMODE0_VPLLSTDBY		(1<<16)
+> +#define MC13892_REGULATORMODE0_VPLLMODE		(1<<17)
+> +#define MC13892_REGULATORMODE0_VUSB2EN		(1<<18)
+> +#define MC13892_REGULATORMODE0_VUSB2STDBY		(1<<19)
+> +#define MC13892_REGULATORMODE0_VUSB2MODE		(1<<20)
+> +
+> +#define MC13892_REGULATORMODE1			33
+> +#define MC13892_REGULATORMODE1_VGEN3EN		(1<<0)
+> +#define MC13892_REGULATORMODE1_VGEN3STDBY		(1<<1)
+> +#define MC13892_REGULATORMODE1_VGEN3MODE		(1<<2)
+> +#define MC13892_REGULATORMODE1_VCAMEN		(1<<6)
+> +#define MC13892_REGULATORMODE1_VCAMSTDBY		(1<<7)
+> +#define MC13892_REGULATORMODE1_VCAMMODE		(1<<8)
+> +#define MC13892_REGULATORMODE1_VCAMCONFIGEN		(1<<9)
+> +#define MC13892_REGULATORMODE1_VVIDEOEN		(1<<12)
+> +#define MC13892_REGULATORMODE1_VVIDEOSTDBY		(1<<13)
+> +#define MC13892_REGULATORMODE1_VVIDEOMODE		(1<<14)
+> +#define MC13892_REGULATORMODE1_VAUDIOEN		(1<<15)
+> +#define MC13892_REGULATORMODE1_VAUDIOSTDBY		(1<<16)
+> +#define MC13892_REGULATORMODE1_VAUDIOMODE		(1<<17)
+> +#define MC13892_REGULATORMODE1_VSDEN		(1<<18)
+> +#define MC13892_REGULATORMODE1_VSDSTDBY		(1<<19)
+> +#define MC13892_REGULATORMODE1_VSDMODE		(1<<20)
+> +
+> +#define MC13892_POWERMISC				34
+> +#define MC13892_POWERMISC_GPO1EN			(1<<6)
+> +#define MC13892_POWERMISC_GPO2EN			(1<<8)
+> +#define MC13892_POWERMISC_GPO3EN			(1<<10)
+> +#define MC13892_POWERMISC_GPO4EN			(1<<12)
+> +#define MC13892_POWERMISC_PWGT1SPIEN		(1<<15)
+> +#define MC13892_POWERMISC_PWGT2SPIEN		(1<<16)
+> +#define MC13892_POWERMISC_GPO4ADINEN		(1<<21)
+> +
+> +#define MC13892_POWERMISC_PWGTSPI_M			(3 << 15)
+> +
+> +#define MC13892_USB1				50
+> +#define MC13892_USB1_VUSBEN				(1<<3)
+> +
+> +static const int mc13892_vcoincell[] = {
+> +	2500000, 2700000, 2800000, 2900000, 3000000, 3100000,
+> +	3200000, 3300000,
+> +};
+> +
+> +static const int mc13892_sw1[] = {
+> +	600000,   625000,  650000,  675000,  700000,  725000,
+> +	750000,   775000,  800000,  825000,  850000,  875000,
+> +	900000,   925000,  950000,  975000, 1000000, 1025000,
+> +	1050000, 1075000, 1100000, 1125000, 1150000, 1175000,
+> +	1200000, 1225000, 1250000, 1275000, 1300000, 1325000,
+> +	1350000, 1375000
+> +};
+> +
+> +static const int mc13892_sw[] = {
+> +	600000,   625000,  650000,  675000,  700000,  725000,
+> +	750000,   775000,  800000,  825000,  850000,  875000,
+> +	900000,   925000,  950000,  975000, 1000000, 1025000,
+> +	1050000, 1075000, 1100000, 1125000, 1150000, 1175000,
+> +	1200000, 1225000, 1250000, 1275000, 1300000, 1325000,
+> +	1350000, 1375000, 1400000, 1425000, 1450000, 1475000,
+> +	1500000, 1525000, 1550000, 1575000, 1600000, 1625000,
+> +	1650000, 1675000, 1700000, 1725000, 1750000, 1775000,
+> +	1800000, 1825000, 1850000, 1875000
+> +};
+> +
+> +static const int mc13892_swbst[] = {
+> +	5000000,
+> +};
+> +
+> +static const int mc13892_viohi[] = {
+> +	2775000,
+> +};
+> +
+> +static const int mc13892_vpll[] = {
+> +	1050000, 1250000, 1650000, 1800000,
+> +};
+> +
+> +static const int mc13892_vdig[] = {
+> +	1050000, 1250000, 1650000, 1800000,
+> +};
+> +
+> +static const int mc13892_vsd[] = {
+> +	1800000, 2000000, 2600000, 2700000,
+> +	2800000, 2900000, 3000000, 3150000,
+> +};
+> +
+> +static const int mc13892_vusb2[] = {
+> +	2400000, 2600000, 2700000, 2775000,
+> +};
+> +
+> +static const int mc13892_vvideo[] = {
+> +	2500000, 2600000, 270000, 2775000,
+> +};
+> +
+> +static const int mc13892_vaudio[] = {
+> +	2300000, 2500000, 2775000, 3000000,
+> +};
+> +
+> +static const int mc13892_vcam[] = {
+> +	2500000, 2600000, 2750000, 3000000,
+> +};
+> +
+> +static const int mc13892_vgen1[] = {
+> +	1200000, 1500000, 2775000, 3150000,
+> +};
+> +
+> +static const int mc13892_vgen2[] = {
+> +	1200000, 1500000, 1600000, 1800000,
+> +	2700000, 2800000, 3000000, 3150000,
+> +};
+> +
+> +static const int mc13892_vgen3[] = {
+> +	1800000, 2900000,
+> +};
+> +
+> +static const int mc13892_vusb[] = {
+> +	3300000,
+> +};
+> +
+> +static const int mc13892_gpo[] = {
+> +	2750000,
+> +};
+> +
+> +static const int mc13892_pwgtdrv[] = {
+> +	5000000,
+> +};
+> +
+> +static struct regulator_ops mc13892_gpo_regulator_ops;
+> +/* sw regulators need special care due to the "hi bit" */
+> +static struct regulator_ops mc13892_sw_regulator_ops;
+> +
+> +
+> +#define MC13892_FIXED_DEFINE(name, reg, voltages)\
+> +	MC13xxx_FIXED_DEFINE(MC13892_, name, reg, voltages, \
+> +			mc13xxx_fixed_regulator_ops)
+> +
+> +#define MC13892_GPO_DEFINE(name, reg, voltages)		\
+> +	MC13xxx_GPO_DEFINE(MC13892_, name, reg, voltages, \
+> +			mc13892_gpo_regulator_ops)
+> +
+> +#define MC13892_SW_DEFINE(name, reg, vsel_reg, voltages)		\
+> +	MC13xxx_DEFINE(MC13892_, name, reg, vsel_reg, voltages, \
+> +			mc13892_sw_regulator_ops)
+> +
+> +#define MC13892_DEFINE_REGU(name, reg, vsel_reg, voltages)		\
+> +	MC13xxx_DEFINE(MC13892_, name, reg, vsel_reg, voltages, \
+> +			mc13xxx_regulator_ops)
+> +
+> +static struct mc13xxx_regulator mc13892_regulators[] = {
+> +	MC13892_DEFINE_REGU(VCOINCELL, POWERCTL0, POWERCTL0,		\
+> +			    mc13892_vcoincell),
+> +	MC13892_SW_DEFINE(SW1, SWITCHERS0, SWITCHERS0, mc13892_sw1),
+> +	MC13892_SW_DEFINE(SW2, SWITCHERS1, SWITCHERS1, mc13892_sw),
+> +	MC13892_SW_DEFINE(SW3, SWITCHERS2, SWITCHERS2, mc13892_sw),
+> +	MC13892_SW_DEFINE(SW4, SWITCHERS3, SWITCHERS3, mc13892_sw),
+> +	MC13892_FIXED_DEFINE(SWBST, SWITCHERS5, mc13892_swbst),
+> +	MC13892_FIXED_DEFINE(VIOHI, REGULATORMODE0, mc13892_viohi),
+> +	MC13892_DEFINE_REGU(VPLL, REGULATORMODE0, REGULATORSETTING0,	\
+> +			    mc13892_vpll),
+> +	MC13892_DEFINE_REGU(VDIG, REGULATORMODE0, REGULATORSETTING0,	\
+> +			    mc13892_vdig),
+> +	MC13892_DEFINE_REGU(VSD, REGULATORMODE1, REGULATORSETTING1,	\
+> +			    mc13892_vsd),
+> +	MC13892_DEFINE_REGU(VUSB2, REGULATORMODE0, REGULATORSETTING0,	\
+> +			    mc13892_vusb2),
+> +	MC13892_DEFINE_REGU(VVIDEO, REGULATORMODE1, REGULATORSETTING1,	\
+> +			    mc13892_vvideo),
+> +	MC13892_DEFINE_REGU(VAUDIO, REGULATORMODE1, REGULATORSETTING1,	\
+> +			    mc13892_vaudio),
+> +	MC13892_DEFINE_REGU(VCAM, REGULATORMODE1, REGULATORSETTING0, \
+> +			    mc13892_vcam),
+> +	MC13892_DEFINE_REGU(VGEN1, REGULATORMODE0, REGULATORSETTING0,	\
+> +			    mc13892_vgen1),
+> +	MC13892_DEFINE_REGU(VGEN2, REGULATORMODE0, REGULATORSETTING0,	\
+> +			    mc13892_vgen2),
+> +	MC13892_DEFINE_REGU(VGEN3, REGULATORMODE1, REGULATORSETTING0,	\
+> +			    mc13892_vgen3),
+> +	MC13892_FIXED_DEFINE(VUSB, USB1, mc13892_vusb),
+> +	MC13892_GPO_DEFINE(GPO1, POWERMISC, mc13892_gpo),
+> +	MC13892_GPO_DEFINE(GPO2, POWERMISC, mc13892_gpo),
+> +	MC13892_GPO_DEFINE(GPO3, POWERMISC, mc13892_gpo),
+> +	MC13892_GPO_DEFINE(GPO4, POWERMISC, mc13892_gpo),
+> +	MC13892_GPO_DEFINE(PWGT1SPI, POWERMISC, mc13892_pwgtdrv),
+> +	MC13892_GPO_DEFINE(PWGT2SPI, POWERMISC, mc13892_pwgtdrv),
+> +};
+> +
+> +int mc13892_powermisc_rmw(struct mc13xxx_regulator_priv *priv, u32 mask,
+> +									u32 val)
+> +{
+> +	struct mc13xxx *mc13892 = priv->mc13xxx;
+> +	int ret;
+> +	u32 valread;
+> +
+> +	BUG_ON(val & ~mask);
+> +
+> +	ret = mc13xxx_reg_read(mc13892, MC13892_POWERMISC, &valread);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Update the stored state for Power Gates. */
+> +	priv->powermisc_pwgt_state =
+> +				(priv->powermisc_pwgt_state & ~mask) | val;
+> +	priv->powermisc_pwgt_state &= MC13892_POWERMISC_PWGTSPI_M;
+> +
+> +	/* Construct the new register value */
+> +	valread = (valread & ~mask) | val;
+> +	/* Overwrite the PWGTxEN with the stored version */
+> +	valread = (valread & ~MC13892_POWERMISC_PWGTSPI_M) |
+> +						priv->powermisc_pwgt_state;
+> +
+> +	return mc13xxx_reg_write(mc13892, MC13892_POWERMISC, valread);
+> +}
+> +
+> +static int mc13892_gpo_regulator_enable(struct regulator_dev *rdev)
+> +{
+> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int id = rdev_get_id(rdev);
+> +	int ret;
+> +	u32 en_val = mc13892_regulators[id].enable_bit;
+> +	u32 mask = mc13892_regulators[id].enable_bit;
+> +
+> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
+> +
+> +	/* Power Gate enable value is 0 */
+> +	if (id == MC13892_PWGT1SPI ||
+> +	    id == MC13892_PWGT2SPI)
+> +		en_val = 0;
+> +
+> +	if (id == MC13892_GPO4)
+> +		mask |= MC13892_POWERMISC_GPO4ADINEN;
+> +
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13892_powermisc_rmw(priv, mask, en_val);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +
+> +	return ret;
+> +}
+> +
+> +static int mc13892_gpo_regulator_disable(struct regulator_dev *rdev)
+> +{
+> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int id = rdev_get_id(rdev);
+> +	int ret;
+> +	u32 dis_val = 0;
+> +
+> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
+> +
+> +	/* Power Gate disable value is 1 */
+> +	if (id == MC13892_PWGT1SPI ||
+> +	    id == MC13892_PWGT2SPI)
+> +		dis_val = mc13892_regulators[id].enable_bit;
+> +
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13892_powermisc_rmw(priv, mc13892_regulators[id].enable_bit,
+> +					dis_val);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +
+> +	return ret;
+> +}
+> +
+> +static int mc13892_gpo_regulator_is_enabled(struct regulator_dev *rdev)
+> +{
+> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int ret, id = rdev_get_id(rdev);
+> +	unsigned int val;
+> +
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13xxx_reg_read(priv->mc13xxx, mc13892_regulators[id].reg, &val);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Power Gates state is stored in powermisc_pwgt_state
+> +	 * where the meaning of bits is negated */
+> +	val = (val & ~MC13892_POWERMISC_PWGTSPI_M) |
+> +	      (priv->powermisc_pwgt_state ^ MC13892_POWERMISC_PWGTSPI_M);
+> +
+> +	return (val & mc13892_regulators[id].enable_bit) != 0;
+> +}
+> +
+> +
+> +static struct regulator_ops mc13892_gpo_regulator_ops = {
+> +	.enable = mc13892_gpo_regulator_enable,
+> +	.disable = mc13892_gpo_regulator_disable,
+> +	.is_enabled = mc13892_gpo_regulator_is_enabled,
+> +	.list_voltage = mc13xxx_regulator_list_voltage,
+> +	.set_voltage = mc13xxx_fixed_regulator_set_voltage,
+> +	.get_voltage = mc13xxx_fixed_regulator_get_voltage,
+> +};
+> +
+> +static int mc13892_sw_regulator_get_voltage(struct regulator_dev *rdev)
+> +{
+> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int ret, id = rdev_get_id(rdev);
+> +	unsigned int val, hi;
+> +
+> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
+> +
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13xxx_reg_read(priv->mc13xxx,
+> +				mc13892_regulators[id].vsel_reg, &val);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +	if (ret)
+> +		return ret;
+> +
+> +	hi  = val & MC13892_SWITCHERS0_SWxHI;
+> +	val = (val & mc13892_regulators[id].vsel_mask)
+> +		>> mc13892_regulators[id].vsel_shift;
+> +
+> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d val: %d\n", __func__, id, val);
+> +
+> +	if (hi)
+> +		val = (25000 * val) + 1100000;
+> +	else
+> +		val = (25000 * val) + 600000;
+> +
+> +	return val;
+> +}
+> +
+> +static int mc13892_sw_regulator_set_voltage(struct regulator_dev *rdev,
+> +						int min_uV, int max_uV)
+> +{
+> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int hi, value, val, mask, id = rdev_get_id(rdev);
+> +	int ret;
+> +
+> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d min_uV: %d max_uV: %d\n",
+> +		__func__, id, min_uV, max_uV);
+> +
+> +	/* Find the best index */
+> +	value = mc13xxx_get_best_voltage_index(rdev, min_uV, max_uV);
+> +	dev_dbg(rdev_get_dev(rdev), "%s best value: %d\n", __func__, value);
+> +	if (value < 0)
+> +		return value;
+> +
+> +	value = mc13892_regulators[id].voltages[value];
+> +
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13xxx_reg_read(priv->mc13xxx,
+> +				mc13892_regulators[id].vsel_reg, &val);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +	if (ret)
+> +		return ret;
+> +
+> +	hi  = val & MC13892_SWITCHERS0_SWxHI;
+> +	if (value > 1375)
+> +		hi = 1;
+> +	if (value < 1100)
+> +		hi = 0;
+> +
+> +	if (hi) {
+> +		value = (value - 1100000) / 25000;
+> +		value |= MC13892_SWITCHERS0_SWxHI;
+> +	} else
+> +		value = (value - 600000) / 25000;
+> +
+> +	mask = mc13892_regulators[id].vsel_mask | MC13892_SWITCHERS0_SWxHI;
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13892_regulators[id].vsel_reg,
+> +			mask,
+> +			value << mc13892_regulators[id].vsel_shift);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct regulator_ops mc13892_sw_regulator_ops = {
+> +	.is_enabled = mc13xxx_sw_regulator_is_enabled,
+> +	.list_voltage = mc13xxx_regulator_list_voltage,
+> +	.set_voltage = mc13892_sw_regulator_set_voltage,
+> +	.get_voltage = mc13892_sw_regulator_get_voltage,
+> +};
+> +
+> +static int mc13892_vcam_set_mode(struct regulator_dev *rdev, unsigned int mode)
+> +{
+> +	unsigned int en_val = 0;
+> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int ret, id = rdev_get_id(rdev);
+> +
+> +	if (mode == REGULATOR_MODE_FAST)
+> +		en_val = MC13892_REGULATORMODE1_VCAMCONFIGEN;
+> +
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13892_regulators[id].reg,
+> +			MC13892_REGULATORMODE1_VCAMCONFIGEN,
+> +			en_val);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +
+> +	return ret;
+> +}
+> +
+> +unsigned int mc13892_vcam_get_mode(struct regulator_dev *rdev)
+> +{
+> +	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int ret, id = rdev_get_id(rdev);
+> +	unsigned int val;
+> +
+> +	mc13xxx_lock(priv->mc13xxx);
+> +	ret = mc13xxx_reg_read(priv->mc13xxx, mc13892_regulators[id].reg, &val);
+> +	mc13xxx_unlock(priv->mc13xxx);
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (val & MC13892_REGULATORMODE1_VCAMCONFIGEN)
+> +		return REGULATOR_MODE_FAST;
+> +
+> +	return REGULATOR_MODE_NORMAL;
+> +}
+> +
+> +
+> +static int __devinit mc13892_regulator_probe(struct platform_device *pdev)
+> +{
+> +	struct mc13xxx_regulator_priv *priv;
+> +	struct mc13xxx *mc13892 = dev_get_drvdata(pdev->dev.parent);
+> +	struct mc13xxx_regulator_platform_data *pdata =
+> +		dev_get_platdata(&pdev->dev);
+> +	struct mc13xxx_regulator_init_data *init_data;
+> +	int i, ret;
+> +	u32 val;
+> +
+> +	priv = kzalloc(sizeof(*priv) +
+> +			pdata->num_regulators * sizeof(priv->regulators[0]),
+> +			GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->mc13xxx_regulators = mc13892_regulators;
+> +	priv->mc13xxx = mc13892;
+> +
+> +	mc13xxx_lock(mc13892);
+> +	ret = mc13xxx_reg_read(mc13892, MC13892_REVISION, &val);
+> +	mc13xxx_unlock(mc13892);
+> +	if (ret)
+> +		goto err_alloc;
+err_alloc looks wrong
+
+> +
+> +	/* enable switch auto mode - ENGR00120510, ENGR00121057 */
+> +	/* no doc with regs description means no way to know if */
+> +	/* there's a better way to do it			*/
+This is an unusual commenting style.  Please use
+
+	/*
+	 * enable switch auto mode ...
+	 */
+
+> +	if ((val & 0x0000FFFF) == 0x45d0) {
+> +		mc13xxx_lock(mc13892);
+> +		ret = mc13xxx_reg_rmw(mc13892, MC13892_SWITCHERS4,
+> +			MC13892_SWITCHERS4_SW1MODE_M |
+> +			MC13892_SWITCHERS4_SW2MODE_M,
+> +			MC13892_SWITCHERS4_SW1MODE_AUTO |
+> +			MC13892_SWITCHERS4_SW2MODE_AUTO);
+> +		mc13xxx_unlock(mc13892);
+It should be possible to hold the lock for longer that a single mc13xxx
+API call.  Your error handler just needs to unlock for that.
+
+> +		if (ret)
+> +			goto err_alloc;
+> +
+> +		mc13xxx_lock(mc13892);
+> +		mc13xxx_reg_rmw(mc13892, MC13892_SWITCHERS5,
+> +			MC13892_SWITCHERS5_SW3MODE_M |
+> +			MC13892_SWITCHERS5_SW4MODE_M,
+> +			MC13892_SWITCHERS5_SW3MODE_AUTO |
+> +			MC13892_SWITCHERS5_SW4MODE_AUTO);
+> +		mc13xxx_unlock(mc13892);
+> +		if (ret)
+> +			goto err_alloc;
+> +	}
+> +
+> +	mc13892_regulators[MC13892_VCAM].desc.ops->set_mode
+> +		= mc13892_vcam_set_mode;
+> +	mc13892_regulators[MC13892_VCAM].desc.ops->get_mode
+> +		= mc13892_vcam_get_mode;
+> +	for (i = 0; i < pdata->num_regulators; i++) {
+> +		init_data = &pdata->regulators[i];
+> +		priv->regulators[i] = regulator_register(
+> +				&mc13892_regulators[init_data->id].desc,
+> +				&pdev->dev, init_data->init_data, priv);
+> +
+> +		if (IS_ERR(priv->regulators[i])) {
+> +			dev_err(&pdev->dev, "failed to register regulator %s\n",
+> +				mc13892_regulators[i].desc.name);
+> +			ret = PTR_ERR(priv->regulators[i]);
+> +			goto err;
+> +		}
+> +	}
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	return 0;
+> +err:
+> +	while (--i >= 0)
+> +		regulator_unregister(priv->regulators[i]);
+> +
+> +err_alloc:
+> +	kfree(priv);
+> +
+> +	return ret;
+> +}
+> +
+> +static int __devexit mc13892_regulator_remove(struct platform_device *pdev)
+> +{
+> +	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
+> +	struct mc13xxx_regulator_platform_data *pdata =
+> +		dev_get_platdata(&pdev->dev);
+> +	int i;
+> +
+> +	platform_set_drvdata(pdev, NULL);
+> +
+> +	for (i = 0; i < pdata->num_regulators; i++)
+> +		regulator_unregister(priv->regulators[i]);
+> +
+> +	kfree(priv);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver mc13892_regulator_driver = {
+> +	.driver	= {
+> +		.name	= "mc13892-regulator",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.remove		= __devexit_p(mc13892_regulator_remove),
+> +	.probe		= mc13892_regulator_probe,
+If you ask me just use a single space before =, but there is no common
+style visible in the kernel, so do as you prefer.
+(The advantage of using a single space is that if later
+.averylongmembername needs to be initialized you either have to fix
+lines that are technically unrelated or the indention isn't uniform.)
+
+Best regards
+Uwe
+
+> +};
+> +
+> +static int __init mc13892_regulator_init(void)
+> +{
+> +	return platform_driver_register(&mc13892_regulator_driver);
+> +}
+> +subsys_initcall(mc13892_regulator_init);
+> +
+> +static void __exit mc13892_regulator_exit(void)
+> +{
+> +	platform_driver_unregister(&mc13892_regulator_driver);
+> +}
+> +module_exit(mc13892_regulator_exit);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Yong Shen <yong.shen@linaro.org>");
+> +MODULE_DESCRIPTION("Regulator Driver for Freescale MC13892 PMIC");
+> +MODULE_ALIAS("platform:mc13892-regulator");
+> diff --git a/include/linux/mfd/mc13892.h b/include/linux/mfd/mc13892.h
+> new file mode 100644
+> index 0000000..7df13e8
+> --- /dev/null
+> +++ b/include/linux/mfd/mc13892.h
+> @@ -0,0 +1,38 @@
+> +/*
+> + * Copyright 2010 Yong Shen <yong.shen@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +
+> +#ifndef __LINUX_MFD_MC13892_H
+> +#define __LINUX_MFD_MC13892_H
+> +#include <linux/mfd/mc13xxx.h>
+> +
+> +#define MC13892_SW1		0
+> +#define MC13892_SW2		1
+> +#define MC13892_SW3		2
+> +#define MC13892_SW4		3
+> +#define MC13892_SWBST	4
+> +#define MC13892_VIOHI	5
+> +#define MC13892_VPLL	6
+> +#define MC13892_VDIG	7
+> +#define MC13892_VSD	8
+> +#define MC13892_VUSB2	9
+> +#define MC13892_VVIDEO	10
+> +#define MC13892_VAUDIO	11
+> +#define MC13892_VCAM	12
+> +#define MC13892_VGEN1	13
+> +#define MC13892_VGEN2	14
+> +#define MC13892_VGEN3	15
+> +#define MC13892_VUSB	16
+> +#define MC13892_GPO1	17
+> +#define MC13892_GPO2	18
+> +#define MC13892_GPO3	19
+> +#define MC13892_GPO4	20
+> +#define MC13892_PWGT1SPI	21
+> +#define MC13892_PWGT2SPI	22
+> +#define MC13892_VCOINCELL	23
+> +
+> +#endif
+> -- 
+> 1.7.0.4
+
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
