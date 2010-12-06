@@ -1,61 +1,32 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Mon, 06 Dec 2010 12:55:49 +0100
-Subject: [PATCH] support PMIC mc13892
-In-Reply-To: <1291635752.3151.43.camel@realization> (Alberto Panizzo's message
-	of "Mon, 06 Dec 2010 12:42:32 +0100")
-References: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
-	<87tyirnpbm.fsf@lechat.rtp-net.org>
-	<1291635752.3151.43.camel@realization>
-Message-ID: <87k4jnnmii.fsf@lechat.rtp-net.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 Dec 2010 13:18:24 +0100
+Subject: [PATCH] ARM: Gemini: Add support for PCI BUS
+In-Reply-To: <4CFCC048.4030408@ru.mvista.com>
+References: <1290860675-15453-1-git-send-email-ulli.kroll@googlemail.com>
+	<201011291745.22566.arnd@arndb.de> <4CFCC048.4030408@ru.mvista.com>
+Message-ID: <201012061318.24541.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alberto Panizzo <maramaopercheseimorto@gmail.com> writes:
+On Monday 06 December 2010, Sergei Shtylyov wrote:
+> > There are many differences between readl and __raw_readl, including
+> 
+> > * __raw_readl does not have barriers and does not serialize with
+> >    spinlocks, so it breaks on out-of-order CPUs.
+> > * __raw_readl does not have a specific endianess, while readl is
+> >    fixed little-endian,
+> 
+>     I know I'm late but readl()/writel() are CPU-endian, not LE.
 
-> On lun, 2010-12-06 at 11:55 +0100, Arnaud Patard wrote:
->> <yong.shen@freescale.com> writes:
->> 
->> Hi,
->> 
->> > From: Yong Shen <yong.shen@linaro.org>
->> >
->> > add support for mc13892, tested on mx51 babbage board
->> 
->> Will review/test it asap on my efikamx. thanks for working on this :)
->> 
->> >
->> > Signed-off-by: Yong Shen <yong.shen@linaro.org>
->> > ---
->> >  drivers/mfd/Kconfig                   |    4 +
->> >  drivers/regulator/Kconfig             |    8 +
->> >  drivers/regulator/Makefile            |    1 +
->> >  drivers/regulator/mc13892-regulator.c |  647 +++++++++++++++++++++++++++++++++
->> >  include/linux/mfd/mc13892.h           |   38 ++
->> >  5 files changed, 698 insertions(+), 0 deletions(-)
->> >  create mode 100644 drivers/regulator/mc13892-regulator.c
->> >  create mode 100644 include/linux/mfd/mc13892.h
->> 
->> [...]
->> 
->> > +
->> > +static const int mc13892_vvideo[] = {
->> > +	2500000, 2600000, 270000, 2775000,
->> > +};
->> 
->> Should be :
->> static const int mc13892_vvideo[] = {
->>         270000, 2775000, 2500000, 2600000,
->> };
->> 
->> I've spotted this in my code some time ago. VVIDEO voltages are not
->> ascending order.
->
-> If this is true, also a private get_best_voltage_index have to be
-> developed for it.
+If that was the case, it would be a bug. readl/writel is defined to be
+the same endianess as PCI, which is little-endian. Otherwise you would
+not be able to use any PCI devices on big-endian ARM machines. The
+definition of readl is
 
-It _is_ true. That's sure. About get_best_voltage_index, it's working
-fine with it as it doesn't care about voltage order afaik. See the
-comment in the get_best_voltage_index() function.
+#define readl(addr) __le32_to_cpu(__raw_readl(addr))
+
+which converts the little-endian I/O register into a native endian
+CPU register.
 
 
-Arnaud
+	Arnd
