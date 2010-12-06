@@ -1,31 +1,57 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 06 Dec 2010 14:39:05 +0300
-Subject: [PATCH 22/54] ARM: iop33x: irq_data conversion.
-In-Reply-To: <20101130133650.GW15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130133650.GW15575@mail.wantstofly.org>
-Message-ID: <4CFCCB59.80701@ru.mvista.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 06 Dec 2010 12:42:32 +0100
+Subject: [PATCH] support PMIC mc13892
+In-Reply-To: <87tyirnpbm.fsf@lechat.rtp-net.org>
+References: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
+	<87tyirnpbm.fsf@lechat.rtp-net.org>
+Message-ID: <1291635752.3151.43.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-11-2010 16:36, Lennert Buytenhek wrote:
+On lun, 2010-12-06 at 11:55 +0100, Arnaud Patard wrote:
+> <yong.shen@freescale.com> writes:
+> 
+> Hi,
+> 
+> > From: Yong Shen <yong.shen@linaro.org>
+> >
+> > add support for mc13892, tested on mx51 babbage board
+> 
+> Will review/test it asap on my efikamx. thanks for working on this :)
+> 
+> >
+> > Signed-off-by: Yong Shen <yong.shen@linaro.org>
+> > ---
+> >  drivers/mfd/Kconfig                   |    4 +
+> >  drivers/regulator/Kconfig             |    8 +
+> >  drivers/regulator/Makefile            |    1 +
+> >  drivers/regulator/mc13892-regulator.c |  647 +++++++++++++++++++++++++++++++++
+> >  include/linux/mfd/mc13892.h           |   38 ++
+> >  5 files changed, 698 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/regulator/mc13892-regulator.c
+> >  create mode 100644 include/linux/mfd/mc13892.h
+> 
+> [...]
+> 
+> > +
+> > +static const int mc13892_vvideo[] = {
+> > +	2500000, 2600000, 270000, 2775000,
+> > +};
+> 
+> Should be :
+> static const int mc13892_vvideo[] = {
+>         270000, 2775000, 2500000, 2600000,
+> };
+> 
+> I've spotted this in my code some time ago. VVIDEO voltages are not
+> ascending order.
 
-> Signed-off-by: Lennert Buytenhek<buytenh@secretlab.ca>
-[...]
+If this is true, also a private get_best_voltage_index have to be
+developed for it.
 
-> diff --git a/arch/arm/mach-iop33x/irq.c b/arch/arm/mach-iop33x/irq.c
-> index abb4ea2..0ff2f74 100644
-> --- a/arch/arm/mach-iop33x/irq.c
-> +++ b/arch/arm/mach-iop33x/irq.c
-> @@ -53,45 +53,45 @@ static void intsize_write(u32 val)
-[...]
->   static void
-> -iop33x_irq_unmask2(unsigned int irq)
-> +iop33x_irq_unmask2(struct irq_data *d)
->   {
-> -	iop33x_mask1 |= (1 << (irq - 32));
-> +	iop33x_mask1 |= (1 << (d->irq - 32));
 
-    Probably could have dropped useless parens, while at it...
+-- 
+Alberto!
 
-WBR, Sergei
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
