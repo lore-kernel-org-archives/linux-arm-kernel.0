@@ -1,77 +1,157 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 6 Dec 2010 16:38:15 -0000
-Subject: [PATCH v3] ARM: vexpress: add support for multiple core tiles
-In-Reply-To: <20101206155310.GG31777@n2100.arm.linux.org.uk>
-References: <1291052921-30695-1-git-send-email-will.deacon@arm.com>
-	<20101206155310.GG31777@n2100.arm.linux.org.uk>
-Message-ID: <006f01cb9563$faf32210$f0d96630$@deacon@arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 6 Dec 2010 18:43:13 +0200
+Subject: [PATCH 2/2] h1940-leds: Fix compile issue introduced by
+	latch-related changes
+In-Reply-To: <1289248308-21272-2-git-send-email-anarsoul@gmail.com>
+References: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
+	<1289248308-21272-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <201012061843.13558.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-> On Mon, Nov 29, 2010 at 05:48:41PM +0000, Will Deacon wrote:
-> > The current Versatile Express BSP defines the MACHINE_START macro
-> > in the core tile code.
-> >
-> > This patch moves this into the generic board code and introduces
-> > a method for determining the current tile at runtime, allowing
-> > the Kernel to have support for multiple tiles compiled in.
-> > Tile-specific functions are executed via a descriptor struct containing
-> > the correct implementations for the current tile.
+On Monday 08 November 2010 22:31:48 Vasily Khoruzhick wrote:
+> Latch API was converted to gpiolib API as result we got this compile
+> error:
 > 
-> Obviously, this has been broken by the changes to the SMP and GIC code...
-
-Yup, I posted the patch to your patch system before the SMP and GIC
-changes had hit the list, so I'll mark it as discarded for now.
- 
-> The SMP code is now down to the following:
+> drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
+> drivers/leds/leds-h1940.c:33: error: implicit declaration of function
+> 'h1940_latch_control
 > 
-> void __init smp_init_cpus(void)
-
-[...]
- 
-> void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-
-[...]
-
-Ok, that looks easy enough to incorporate into the multi-tile stuff.
-
-> The secondary startup addresses could be moved into boot_secondary(),
-> leaving smp_init_cpus() and platform_smp_prepare_cpus() with the task
-> of initializing the possible/present bitmaps, and enabling the SCU.
+> Adapt h1940-leds driver to new changes and fix compile issue.
 > 
-> I'm in two minds about that - one is that we know that the SCU on an
-> A9 or MPCore is going to tell us that CPUs 0..N are present, so we
-> can move that logic into smp_scu.c.
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  drivers/leds/leds-h1940.c |   67
+> ++++++++++++++++++++++++++++++++------------- 1 files changed, 48
+> insertions(+), 19 deletions(-)
 > 
-> However, just because there's CPUs 0..N doesn't mean that a platform
-> would want to use all those CPUs for SMP, so it should be a platform
-> choice which CPUs get populated into the maps.
+> diff --git a/drivers/leds/leds-h1940.c b/drivers/leds/leds-h1940.c
+> index 173d104..d9c2729 100644
+> --- a/drivers/leds/leds-h1940.c
+> +++ b/drivers/leds/leds-h1940.c
+> @@ -30,18 +30,18 @@ static void h1940_greenled_set(struct led_classdev
+> *led_dev, {
+>  	switch (value) {
+>  	case LED_HALF:
+> -		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
+> -		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
+> +		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
+> +		gpio_set_value(S3C2410_GPA(7), 1);
+>  		break;
+>  	case LED_FULL:
+> -		h1940_latch_control(0, H1940_LATCH_LED_GREEN);
+> -		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
+> +		gpio_set_value(H1940_LATCH_LED_GREEN, 1);
+> +		gpio_set_value(S3C2410_GPA(7), 1);
+>  		break;
+>  	default:
+>  	case LED_OFF:
+> -		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+> -		h1940_latch_control(H1940_LATCH_LED_GREEN, 0);
+> -		s3c2410_gpio_setpin(S3C2410_GPA7, 0);
+> +		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
+> +		gpio_set_value(H1940_LATCH_LED_GREEN, 0);
+> +		gpio_set_value(S3C2410_GPA(7), 0);
+>  		break;
+>  	}
+>  }
+> @@ -60,18 +60,18 @@ static void h1940_redled_set(struct led_classdev
+> *led_dev, {
+>  	switch (value) {
+>  	case LED_HALF:
+> -		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
+> -		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
+> +		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
+> +		gpio_set_value(S3C2410_GPA(1), 1);
+>  		break;
+>  	case LED_FULL:
+> -		h1940_latch_control(0, H1940_LATCH_LED_RED);
+> -		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
+> +		gpio_set_value(H1940_LATCH_LED_RED, 1);
+> +		gpio_set_value(S3C2410_GPA(1), 1);
+>  		break;
+>  	default:
+>  	case LED_OFF:
+> -		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+> -		h1940_latch_control(H1940_LATCH_LED_RED, 0);
+> -		s3c2410_gpio_setpin(S3C2410_GPA1, 0);
+> +		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
+> +		gpio_set_value(H1940_LATCH_LED_RED, 0);
+> +		gpio_set_value(S3C2410_GPA(1), 0);
+>  		break;
+>  	}
+>  }
+> @@ -91,11 +91,11 @@ static void h1940_blueled_set(struct led_classdev
+> *led_dev, {
+>  	if (value) {
+>  		/* flashing Blue */
+> -		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
+> -		s3c2410_gpio_setpin(S3C2410_GPA3, 1);
+> +		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
+> +		gpio_set_value(S3C2410_GPA(3), 1);
+>  	} else {
+> -		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+> -		s3c2410_gpio_setpin(S3C2410_GPA3, 0);
+> +		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
+> +		gpio_set_value(S3C2410_GPA(3), 0);
+>  	}
+> 
+>  }
+> @@ -108,7 +108,24 @@ static struct led_classdev h1940_blueled = {
+> 
+>  static int __devinit h1940leds_probe(struct platform_device *pdev)
+>  {
+> -	int ret;
+> +	int ret, gpioidx = 0;
+> +	int led_gpios[] = {
+> +		H1940_LATCH_LED_GREEN,
+> +		H1940_LATCH_LED_RED,
+> +		H1940_LATCH_LED_FLASH,
+> +		S3C2410_GPA(1),
+> +		S3C2410_GPA(3),
+> +		S3C2410_GPA(7),
+> +	};
+> +
+> +	for (gpioidx = 0; gpioidx < ARRAY_SIZE(led_gpios); gpioidx++) {
+> +		ret = gpio_request(led_gpios[gpioidx], "h1940 leds");
+> +		if (ret < 0)
+> +			goto err_gpio;
+> +		ret = gpio_direction_output(led_gpios[gpioidx], 0);
+> +		if (ret < 0)
+> +			goto err_gpio;
+> +	}
+> 
+>  	ret = led_classdev_register(&pdev->dev, &h1940_greenled);
+>  	if (ret)
+> @@ -129,6 +146,10 @@ err_blue:
+>  err_red:
+>  	led_classdev_unregister(&h1940_greenled);
+>  err_green:
+> +err_gpio:
+> +	while (--gpioidx >= 0)
+> +		gpio_free(led_gpios[gpioidx]);
+> +
+>  	return ret;
+>  }
+> 
+> @@ -137,6 +158,14 @@ static int h1940leds_remove(struct platform_device
+> *pdev) led_classdev_unregister(&h1940_greenled);
+>  	led_classdev_unregister(&h1940_redled);
+>  	led_classdev_unregister(&h1940_blueled);
+> +
+> +	gpio_free(H1940_LATCH_LED_GREEN);
+> +	gpio_free(H1940_LATCH_LED_RED);
+> +	gpio_free(H1940_LATCH_LED_FLASH);
+> +	gpio_free(S3C2410_GPA(1));
+> +	gpio_free(S3C2410_GPA(3));
+> +	gpio_free(S3C2410_GPA(7));
+> +
+>  	return 0;
+>  }
 
-I agree, working out the set of CPUs that we want to bring up shouldn't
-have anything to do with the SCU. This becomes even more important for
-SMP platforms where the SCU doesn't have a memory-mapped interface, like
-A15.
+Added Richard Purdie to CC (it seems he changed email address).
 
-> The other complication here is that the possible/present bitmaps use
-> logical CPU numbers, which depending on the platform may or may not
-> be the same as physical CPU numbers, even though it may be an A9 based
-> platform.
+Richard, could you review/merge this patch?
 
-Eek. What sort of mapping do you get between logical and physical CPU
-numbers for these platforms? Are the logical numbers offset from the
-physical ones or is there just a random mapping between the two?
-
-> I think what we want is to not only move the count of cores and scu
-> enable into the core tile code, but also the bitmap population too.
-> That may ultimately be the sensible thing if we're eventually going
-> to indirect smp_init_cpus()/platform_smp_prepare_cpus() in the longer
-> term.
-
-Ok, I'll have a crack at incorporating that into v4 of this patch, which
-I'll base against -next.
-
-Thanks,
-
-Will
+Regards
+Vasily
