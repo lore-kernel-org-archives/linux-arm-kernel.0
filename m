@@ -1,73 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Dec 2010 15:26:09 +0000
-Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
-In-Reply-To: <AANLkTim641hqqyCczMPN_rDvVH_dqV0voQLFhQsrQLY3@mail.gmail.com>
-References: <AANLkTind+DH5emar2L9EiV-pqpCvQHQGnFevh9Bncrpz@mail.gmail.com>
-	<20101202123304.GB10461@n2100.arm.linux.org.uk>
-	<AANLkTi=iRUD3_dcY47tebHGbxxAOcY61_2MtSVfO8zQB@mail.gmail.com>
-	<20101202152053.GC10461@n2100.arm.linux.org.uk>
-	<AANLkTi=01qGO6pX15n_w-W4RaaXsK3u697UQ9pD_DuvW@mail.gmail.com>
-	<AANLkTim641hqqyCczMPN_rDvVH_dqV0voQLFhQsrQLY3@mail.gmail.com>
-Message-ID: <20101206152609.GA3701@n2100.arm.linux.org.uk>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Mon, 6 Dec 2010 09:47:22 -0600
+Subject: [PATCH v9 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
+In-Reply-To: <4CFCCC56.3010700@mvista.com>
+References: <1291231949-23835-1-git-send-email-vm.rod25@gmail.com>
+	<1291231949-23835-7-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247AFDD7E@dbde02.ent.ti.com>
+	<AANLkTinMGvRS4N2rSRp43Osnn_Df=JRAJB0iBdZLzrZ-@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247B9A907@dbde02.ent.ti.com>
+	<AANLkTinwj27dSdv9Djs9Fv6QN5vv5JY+br4xCHk=8YEu@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247C46537@dbde02.ent.ti.com>
+	<4CFCCC56.3010700@mvista.com>
+Message-ID: <AANLkTikZiHTZV2PD8jKMZ+9h8XnUGPpAth2wSXM4oZmJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 09:16:23AM -0600, Kanigeri, Hari wrote:
-> Ruseell,
-> 
-> On Thu, Dec 2, 2010 at 9:43 AM, Guzman Lugo, Fernando
-> <fernando.lugo@ti.com> wrote:
-> > On Thu, Dec 2, 2010 at 9:20 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >> On Thu, Dec 02, 2010 at 08:50:07AM -0600, Guzman Lugo, Fernando wrote:
-> >>> On Thu, Dec 2, 2010 at 6:33 AM, Russell King - ARM Linux
-> >>> <linux@arm.linux.org.uk> wrote:
-> >>> > On Thu, Dec 02, 2010 at 06:07:23AM -0600, Kanigeri, Hari wrote:
-> >>> >> Hi Tony,
-> >>> >>
-> >>> >> The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
-> >>> >> ? Linus Torvalds (1):
-> >>> >> ? ? ? ? Linux 2.6.37-rc4
-> >>> >>
-> >>> >> are available in the git repository at:
-> >>> >>
-> >>> >> ? git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
-> >>> >>
-> >>> >> Fernando Guzman Lugo (5):
-> >>> >> ? ? ? OMAP: mailbox: change full flag per mailbox queue instead of global
-> >>> >> ? ? ? omap: iovmm - no gap checking for fixed address
-> >>> >> ? ? ? omap: iovmm - add superpages support to fixed da address
-> >>> >> ? ? ? omap: iovmm - replace __iounmap with omap_iounmap
-> >>> >
-> >>> > This change is wrong. ?Nothing should be directly referencing omap_iounmap
-> >>> > nor for that matter omap_ioremap. ?Both are implementation details of the
-> >>> > standard ioremap/iounmap APIs.
-> >>> >
-> >>> > Use the official APIs rather than the implementation details behind them.
-> >>>
-> >>> if you see where the function is used, you will see that it is not
-> >>> calling the function, it is use as a parameter in unmap_vm_area(), if
-> >>> I used iounmap which is a macro there I will get a compilation error.
-> >>
-> >> Hmm, yes, because iounmap() is defined as a macro rather than iounmap.
-> >>
-> >> The solution to this is to fix iounmap and __arch_iounmap macros so
-> >> they aren't macros which take arguments. ?That will then allow them
-> >> to be used in the way you desire.
-> >
-> > yes, that way it can be used in the function parameter. what is the
-> > right thing to do?
-> > 1) You send your patch and then I send the new version of the patches.
-> > 2) I make a new series of the patches with the change to iounmap and I
-> > include your patch in the series.
-> >
-> 
-> Can you please suggest the approach we take here ? So, either you send
-> your suggested change as a patch and Fernando's patch will be based on
-> it, or he can take a TODO action item to patch again if you plan to
-> send this change later.
+On Mon, Dec 6, 2010 at 5:43 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
+>
+> On 06-12-2010 14:12, Nori, Sekhar wrote:
+>
+>>> ?arch/arm/mach-davinci/board-omapl138-hawk.c | ? 38
+>>> ++++++++++++++++++++------
+>>> ?1 files changed, 29 insertions(+), 9 deletions(-)
+>
+>>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>> b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>> index da51136..8fc78f2 100644
+>>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>
+> [...]
+>>>
+>>> @@ -165,13 +165,23 @@ static __init void omapl138_hawk_mmc_init(void)
+>>> ? ? ? if (ret< ?0) {
+>>> ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
+>>> ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
+>>> - ? ? ? ? ? ? return;
+>>> + ? ? ? ? ? ? goto exp_setup_wp_fail;
+>>> ? ? ? }
+>>>
+>>> ? ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
+>>> - ? ? if (ret)
+>>> + ? ? if (ret) {
+>>> ? ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
+>>> ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
+>>> + ? ? ? ? ? ? goto exp_setup_mmcsd_fail;
+>>> + ? ? }
+>>> + ? ? ? ? ? ? return;
+>
+>> This return has extra indentation.
+>
+>>> +
+>>> +exp_setup_mmcsd_fail:
+>>> + ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+>>> +exp_setup_wp_fail:
+>>> + ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+>>> +exp_setup_cd_fail:
+>>> + ? ? ? ? ? ? return;
+>
+>> This one too.
+>
+> ? Moreover, it's not needed at all.
 
-I've not yet decided myself what to do about it, which is why I haven't
-replied or even committed the patch myself - I've had the hotplug/SMP/gic
-stuff to concentrate on during the latter half of last week _and_ the
-weekend, so I've not had time to get back to this yet.
+Ok
+>> Other than that, it all looks good to me.
+>
+> ? Except those 'exp_setup_'prefixes which I'm not sure where are coming
+> from...
+
+
+it comes from
+
+arch/arm/mach-davinci/board-da850-evm.c
+
+I took this as a template and I think that is better to keep this
+exp_setup_  as a template
+
+but if you have any other suggestion please tell me
+
+Thanks for check it helps me a lot
+
+Regards
+
+Victor Rodriguez
+
+
+>> Thanks,
+>> Sekhar
+>
+> WBR, Sergei
+>
