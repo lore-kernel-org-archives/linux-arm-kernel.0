@@ -1,157 +1,80 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 6 Dec 2010 18:43:13 +0200
-Subject: [PATCH 2/2] h1940-leds: Fix compile issue introduced by
-	latch-related changes
-In-Reply-To: <1289248308-21272-2-git-send-email-anarsoul@gmail.com>
-References: <1289248308-21272-1-git-send-email-anarsoul@gmail.com>
-	<1289248308-21272-2-git-send-email-anarsoul@gmail.com>
-Message-ID: <201012061843.13558.anarsoul@gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 06 Dec 2010 17:54:09 +0100
+Subject: [PATCH] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <1291647240.3151.99.camel@realization>
+References: <20101123102632.GM4693@pengutronix.de>
+	<1290521329.3901.14.camel@realization>
+	<20101123141713.GQ4693@pengutronix.de>
+	<20101124080214.GU4693@pengutronix.de>
+	<20101206083306.GI10693@pengutronix.de>
+	<1291630492.3151.14.camel@realization>
+	<20101206102602.GE29563@n2100.arm.linux.org.uk>
+	<1291635442.3151.39.camel@realization>
+	<20101206114629.GB31777@n2100.arm.linux.org.uk>
+	<1291644581.3151.89.camel@realization>
+	<20101206143427.GF31777@n2100.arm.linux.org.uk>
+	<1291647240.3151.99.camel@realization>
+Message-ID: <1291654449.3151.103.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 November 2010 22:31:48 Vasily Khoruzhick wrote:
-> Latch API was converted to gpiolib API as result we got this compile
-> error:
+On lun, 2010-12-06 at 15:54 +0100, Alberto Panizzo wrote:
+> On lun, 2010-12-06 at 14:34 +0000, Russell King - ARM Linux wrote:
+> > On Mon, Dec 06, 2010 at 03:09:41PM +0100, Alberto Panizzo wrote:
+> > > > And the memblock debug output?
+> > > 
+> > > The following is the complete debug:
+> > > 
+> > > Uncompressing Linux... done, booting the kernel.
+> > > [    0.000000] Linux version 2.6.36-10808-ga06e72c-dirty (alberto at realization) (gcc version 4.3.2 (OSELAS.Toolchain-1.99.3) ) #180 PREEMPT Mon Dec 6 14:24:53 CET 2010
+> > 
+> > Ah ha.
+> > 
+> > > [    0.000000] mx31_3ds_reserve: Reserved 8388608 bytes from address 0x87800000
+> > > 
+> > > Removed 8 MB from the memory map. Start address 0x87800000 
+> > > 
+> > > [    0.000000] MEMBLOCK configuration:
+> > > [    0.000000]  rmo_size    = 0x0
+> > > [    0.000000]  memory.size = 0x7800000
+> > > [    0.000000]  memory.cnt  = 0x1
+> > > [    0.000000]  memory[0x0]	0x0000000080000000 - 0x00000000877fffff, 0x7800000 bytes
+> > > [    0.000000]  reserved.cnt  = 0x1
+> > > [    0.000000]  reserved[0x0]	0x0000000080004000 - 0x0000000080415ed7, 0x411ed8 bytes
+> > > 
+> > > That's true, because otherwise (without reserving memory) I get:
+> > > >>[    0.000000]  memory[0x0]	0x0000000080000000 - 0x0000000087ffffff, 0x8000000 bytes
+> > 
+> > Ok.
+> > 
+> > > [    0.000000] Memory: 128MB = 128MB total
+> > 
+> > Ah ha.
+> > 
+> > You're trying to use something which requires code that was merged into
+> > 2.6.37-rc on a kernel which doesn't have the commits necessary to make
+> > it work...
+> > 
+> > You need at least the core memblock changes, plus 7dc50ec^..f25b4b4
+> > to make this work.
 > 
-> drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
-> drivers/leds/leds-h1940.c:33: error: implicit declaration of function
-> 'h1940_latch_control
 > 
-> Adapt h1940-leds driver to new changes and fix compile issue.
+> AAaaarrrgghhhhh!! Ok, Really sorry about all this noise guys!!
+> I cloned the imx branch nearly before the 2.6.37 merge window
+> and I did not sync my local branch since that time.
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  drivers/leds/leds-h1940.c |   67
-> ++++++++++++++++++++++++++++++++------------- 1 files changed, 48
-> insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/leds/leds-h1940.c b/drivers/leds/leds-h1940.c
-> index 173d104..d9c2729 100644
-> --- a/drivers/leds/leds-h1940.c
-> +++ b/drivers/leds/leds-h1940.c
-> @@ -30,18 +30,18 @@ static void h1940_greenled_set(struct led_classdev
-> *led_dev, {
->  	switch (value) {
->  	case LED_HALF:
-> -		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
-> -		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
-> +		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
-> +		gpio_set_value(S3C2410_GPA(7), 1);
->  		break;
->  	case LED_FULL:
-> -		h1940_latch_control(0, H1940_LATCH_LED_GREEN);
-> -		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
-> +		gpio_set_value(H1940_LATCH_LED_GREEN, 1);
-> +		gpio_set_value(S3C2410_GPA(7), 1);
->  		break;
->  	default:
->  	case LED_OFF:
-> -		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
-> -		h1940_latch_control(H1940_LATCH_LED_GREEN, 0);
-> -		s3c2410_gpio_setpin(S3C2410_GPA7, 0);
-> +		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-> +		gpio_set_value(H1940_LATCH_LED_GREEN, 0);
-> +		gpio_set_value(S3C2410_GPA(7), 0);
->  		break;
->  	}
->  }
-> @@ -60,18 +60,18 @@ static void h1940_redled_set(struct led_classdev
-> *led_dev, {
->  	switch (value) {
->  	case LED_HALF:
-> -		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
-> -		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
-> +		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
-> +		gpio_set_value(S3C2410_GPA(1), 1);
->  		break;
->  	case LED_FULL:
-> -		h1940_latch_control(0, H1940_LATCH_LED_RED);
-> -		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
-> +		gpio_set_value(H1940_LATCH_LED_RED, 1);
-> +		gpio_set_value(S3C2410_GPA(1), 1);
->  		break;
->  	default:
->  	case LED_OFF:
-> -		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
-> -		h1940_latch_control(H1940_LATCH_LED_RED, 0);
-> -		s3c2410_gpio_setpin(S3C2410_GPA1, 0);
-> +		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-> +		gpio_set_value(H1940_LATCH_LED_RED, 0);
-> +		gpio_set_value(S3C2410_GPA(1), 0);
->  		break;
->  	}
->  }
-> @@ -91,11 +91,11 @@ static void h1940_blueled_set(struct led_classdev
-> *led_dev, {
->  	if (value) {
->  		/* flashing Blue */
-> -		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
-> -		s3c2410_gpio_setpin(S3C2410_GPA3, 1);
-> +		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
-> +		gpio_set_value(S3C2410_GPA(3), 1);
->  	} else {
-> -		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
-> -		s3c2410_gpio_setpin(S3C2410_GPA3, 0);
-> +		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-> +		gpio_set_value(S3C2410_GPA(3), 0);
->  	}
-> 
->  }
-> @@ -108,7 +108,24 @@ static struct led_classdev h1940_blueled = {
-> 
->  static int __devinit h1940leds_probe(struct platform_device *pdev)
->  {
-> -	int ret;
-> +	int ret, gpioidx = 0;
-> +	int led_gpios[] = {
-> +		H1940_LATCH_LED_GREEN,
-> +		H1940_LATCH_LED_RED,
-> +		H1940_LATCH_LED_FLASH,
-> +		S3C2410_GPA(1),
-> +		S3C2410_GPA(3),
-> +		S3C2410_GPA(7),
-> +	};
-> +
-> +	for (gpioidx = 0; gpioidx < ARRAY_SIZE(led_gpios); gpioidx++) {
-> +		ret = gpio_request(led_gpios[gpioidx], "h1940 leds");
-> +		if (ret < 0)
-> +			goto err_gpio;
-> +		ret = gpio_direction_output(led_gpios[gpioidx], 0);
-> +		if (ret < 0)
-> +			goto err_gpio;
-> +	}
-> 
->  	ret = led_classdev_register(&pdev->dev, &h1940_greenled);
->  	if (ret)
-> @@ -129,6 +146,10 @@ err_blue:
->  err_red:
->  	led_classdev_unregister(&h1940_greenled);
->  err_green:
-> +err_gpio:
-> +	while (--gpioidx >= 0)
-> +		gpio_free(led_gpios[gpioidx]);
-> +
->  	return ret;
->  }
-> 
-> @@ -137,6 +158,14 @@ static int h1940leds_remove(struct platform_device
-> *pdev) led_classdev_unregister(&h1940_greenled);
->  	led_classdev_unregister(&h1940_redled);
->  	led_classdev_unregister(&h1940_blueled);
-> +
-> +	gpio_free(H1940_LATCH_LED_GREEN);
-> +	gpio_free(H1940_LATCH_LED_RED);
-> +	gpio_free(H1940_LATCH_LED_FLASH);
-> +	gpio_free(S3C2410_GPA(1));
-> +	gpio_free(S3C2410_GPA(3));
-> +	gpio_free(S3C2410_GPA(7));
-> +
->  	return 0;
->  }
+> Really sorry. I will feed back you after a fast rebase of my patch
+> set onto the nowadays pengutronix for-next
 
-Added Richard Purdie to CC (it seems he changed email address).
+Ok. Yes, updating to 2.6.37-rc4 solve the problem.
+Now with the Uwe original patch style I am able to capture a 1600x1200
+rgb565 image.
+Thanks all and OK for the patch!
 
-Richard, could you review/merge this patch?
+Best regards,
 
-Regards
-Vasily
+-- 
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
