@@ -1,46 +1,32 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 06 Dec 2010 15:10:24 +0300
-Subject: [PATCH 47/54] ARM: versatile: irq_data conversion.
-In-Reply-To: <20101130134119.GV15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130134119.GV15575@mail.wantstofly.org>
-Message-ID: <4CFCD2B0.6090902@ru.mvista.com>
+From: per.forlin@stericsson.com (Per Forlin)
+Date: Mon, 6 Dec 2010 13:52:22 +0100
+Subject: [PATCH 0/3] ux500: Add support to boot from eMMC for U5500
+Message-ID: <1291639945-2866-1-git-send-email-per.forlin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-11-2010 16:41, Lennert Buytenhek wrote:
+From: Per Forlin <per.forlin@linaro.org>
 
-> Signed-off-by: Lennert Buytenhek<buytenh@secretlab.ca>
-[...]
+U5500 now boots from eMMC.
+Clock tree for U5500 is not implemented.
+* Fix build issue with prcmu
+* UART and MMC clock rates are adjusted for U5500
+* Basic DMA support
 
-> diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-> index e38acb0..9b9b6fa 100644
-> --- a/arch/arm/mach-versatile/core.c
-> +++ b/arch/arm/mach-versatile/core.c
-> @@ -62,23 +62,23 @@
->   #define VA_VIC_BASE		__io_address(VERSATILE_VIC_BASE)
->   #define VA_SIC_BASE		__io_address(VERSATILE_SIC_BASE)
->
-> -static void sic_mask_irq(unsigned int irq)
-> +static void sic_mask_irq(struct irq_data *d)
->   {
-> -	irq -= IRQ_SIC_START;
-> +	unsigned int irq = d->irq - IRQ_SIC_START;
+Per Forlin (3):
+  ux500: Call prmcu_init only for u8500
+  ux500: Add eMMC support in U5500.
+  ux500: Add DMA support for U5500
 
-    Perhaps should've inserted an empty line here...
-
->   	writel(1<<  irq, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
->   }
->
-> -static void sic_unmask_irq(unsigned int irq)
-> +static void sic_unmask_irq(struct irq_data *d)
->   {
-> -	irq -= IRQ_SIC_START;
-> +	unsigned int irq = d->irq - IRQ_SIC_START;
-
-    Here too.
-
->   	writel(1<<  irq, VA_SIC_BASE + SIC_IRQ_ENABLE_SET);
->   }
-
-WBR, Sergei
+ arch/arm/mach-ux500/Makefile                   |    4 +-
+ arch/arm/mach-ux500/board-u5500-sdi.c          |   49 ++++++++++
+ arch/arm/mach-ux500/board-u5500.c              |    3 +-
+ arch/arm/mach-ux500/clock.c                    |    2 +
+ arch/arm/mach-ux500/cpu-db5500.c               |    2 +
+ arch/arm/mach-ux500/cpu.c                      |    3 +-
+ arch/arm/mach-ux500/dma-db5500.c               |  120 ++++++++++++++++++++++++
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |    4 +
+ arch/arm/mach-ux500/include/mach/setup.h       |    5 +
+ 9 files changed, 188 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-u5500-sdi.c
+ create mode 100644 arch/arm/mach-ux500/dma-db5500.c
