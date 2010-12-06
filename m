@@ -1,151 +1,77 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Mon, 06 Dec 2010 04:40:18 +0000
-Subject: [sodaville] [PATCH 1/6] i2c/pxa2xx: Don't touch ISAR on X86
-In-Reply-To: <20101204182209.GA23352@www.tglx.de>
-References: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
-	<1291320589-31570-2-git-send-email-bigeasy@linutronix.de>
-	<20101203014424.GG24979@trinity.fluff.org>
-	<4CF93420.9010006@linutronix.de>
-	<20101204182209.GA23352@www.tglx.de>
-Message-ID: <4CFC6932.5040502@fluff.org>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 6 Dec 2010 13:06:36 +0800
+Subject: [PATCH 0/3] OMAP: Introduce Backlight driver for Sharp
+	LS037V7DW01 LCD panel
+In-Reply-To: <1291217575.10133.165.camel@tubuntu>
+References: <1291118860-10325-1-git-send-email-bryan.wu@canonical.com>
+	<1291217575.10133.165.camel@tubuntu>
+Message-ID: <AANLkTikMzXs=Rp8Wgm5PRD-VEGn=O9ii+by_27hsP-ar@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/10 18:22, Sebastian Andrzej Siewior wrote:
-> * Sebastian Andrzej Siewior | 2010-12-03 19:17:04 [+0100]:
-> 
->> Ben Dooks wrote:
->>>> +#ifndef CONFIG_X86
->>>>  	writel(i2c->slave_addr, _ISAR(i2c));
->>>> +#endif
+On Wed, Dec 1, 2010 at 11:32 PM, Tomi Valkeinen
+<tomi.valkeinen@nokia.com> wrote:
+> Hi,
+>
+> On Tue, 2010-11-30 at 20:07 +0800, ext Bryan Wu wrote:
+>> After instroducing generic DPI panel driver for OMAP DSS2 system, we need to
+>> split out backlight driver from Sharp LS037V7DW01 panel driver before we move
+>> to the generic DPI panel driver.
 >>
+>> This patchset introcuded backlight driver and cleanup the old Sharp LS037V7DW01
+>> panel driver related code.
 >>
->>> I'd prefer some way of changing based on either the device name (see
->>> some other drivers which bind on multiple names) to define things such
->>> as this, as well as possibly changing the register layout.
+>> It's built on mainline 2.6.37-rc4
 >>
->> Do you want me to also change the register access? This would be a
->> intrusive patch since I would have to touch every readl()/writel() line
->> in this file.
-> I've been looking at the wrong code while writting this. Here are two
-> variants. -variant2 containts the size using this patch. variant1 uses
-> 
->  #define _IBMR(i2c)     ((i2c)->reg_base + pxa_reg_layout[(i2c)->layout].ibmr)
-> 
-> for the access.
-> 
->     text    data     bss     dec     hex filename
->     3753      84       0    3837     efd i2c-pxa-org.o
->     4017      84       0    4101    1005 i2c-pxa-variant1.o
->     3525      84       0    3609     e19 i2c-pxa-variant2.o
-> 
-> Are you fine with this?
-> 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->  drivers/i2c/busses/i2c-pxa.c |   64 +++++++++++++++++++++++++++++++----------
->  1 files changed, 48 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index f4c19a9..29ff876 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -38,17 +38,40 @@
->  #include <asm/irq.h>
->  #include <plat/i2c.h>
->  
-> -/*
-> - * I2C register offsets will be shifted 0 or 1 bit left, depending on
-> - * different SoCs
-> - */
-> -#define REG_SHIFT_0	(0 << 0)
-> -#define REG_SHIFT_1	(1 << 0)
-> -#define REG_SHIFT(d)	((d) & 0x1)
-> +
-> +struct pxa_reg_layout {
-> +	u32 ibmr;
-> +	u32 idbr;
-> +	u32 icr;
-> +	u32 isr;
-> +	u32 isar;
-> +};
-> +
-> +enum pxa_i2c_types {
-> +	REGS_PXA2XX,
-> +	REGS_PXA3XX,
-> +};
-> +
-> +static struct pxa_reg_layout pxa_reg_layout[] = {
-> +	[REGS_PXA2XX] = {
-> +		.ibmr =	0x00,
-> +		.idbr =	0x10,
-> +		.icr =	0x20,
-> +		.isr =	0x30,
-> +		.isar =	0x40,
-> +
-> +	}, [REGS_PXA3XX] = {
-> +		.ibmr =	0x00,
-> +		.idbr =	0x08,
-> +		.icr =	0x10,
-> +		.isr =	0x18,
-> +		.isar =	0x20,
-> +	},
-> +};
->  
->  static const struct platform_device_id i2c_pxa_id_table[] = {
-> -	{ "pxa2xx-i2c",		REG_SHIFT_1 },
-> -	{ "pxa3xx-pwri2c",	REG_SHIFT_0 },
-> +	{ "pxa2xx-i2c",		REGS_PXA2XX },
-> +	{ "pxa3xx-pwri2c",	REGS_PXA3XX },
->  	{ },
->  };
->  MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
-> @@ -111,7 +134,11 @@ struct pxa_i2c {
->  	u32			icrlog[32];
->  
->  	void __iomem		*reg_base;
-> -	unsigned int		reg_shift;
-> +	void __iomem		*reg_ibmr;
-> +	void __iomem		*reg_idbr;
-> +	void __iomem		*reg_icr;
-> +	void __iomem		*reg_isr;
-> +	void __iomem		*reg_isar;
->  
->  	unsigned long		iobase;
->  	unsigned long		iosize;
-> @@ -121,11 +148,11 @@ struct pxa_i2c {
->  	unsigned int		fast_mode :1;
->  };
->  
-> -#define _IBMR(i2c)	((i2c)->reg_base + (0x0 << (i2c)->reg_shift))
-> -#define _IDBR(i2c)	((i2c)->reg_base + (0x4 << (i2c)->reg_shift))
-> -#define _ICR(i2c)	((i2c)->reg_base + (0x8 << (i2c)->reg_shift))
-> -#define _ISR(i2c)	((i2c)->reg_base + (0xc << (i2c)->reg_shift))
-> -#define _ISAR(i2c)	((i2c)->reg_base + (0x10 << (i2c)->reg_shift))
-> +#define _IBMR(i2c)	((i2c)->reg_ibmr)
-> +#define _IDBR(i2c)	((i2c)->reg_idbr)
-> +#define _ICR(i2c)	((i2c)->reg_icr)
-> +#define _ISR(i2c)	((i2c)->reg_isr)
-> +#define _ISAR(i2c)	((i2c)->reg_isar)
->  
->  /*
->   * I2C Slave mode address
-> @@ -1044,7 +1071,12 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  		ret = -EIO;
->  		goto eremap;
->  	}
-> -	i2c->reg_shift = REG_SHIFT(id->driver_data);
-> +
-> +	i2c->reg_ibmr = i2c->reg_base + pxa_reg_layout[id->driver_data].ibmr;
-> +	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[id->driver_data].idbr;
-> +	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[id->driver_data].icr;
-> +	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[id->driver_data].isr;
-> +	i2c->reg_isar = i2c->reg_base + pxa_reg_layout[id->driver_data].isar;
->  
->  	i2c->iobase = res->start;
->  	i2c->iosize = resource_size(res);
+>> Bryan Wu (3):
+>> ? Backlight: driver for Sharp LS037V7DW01 panel on OMAP machine
+>> ? OMAP: move Sharp LS LCD panel device to generic DPI panel driver and new backlight driver
+>> ? OMAP: DSS2: remove Sharp LS037V7DW01 panel driver
+>
+> I don't think this is quite the right direction.
+>
+> All the backlight driver does is call a function in the board file. It's
+> not really a "sharp ls backlight driver", but rather generic one. I'm
+> not even sure if it needs the dssdev pointer.
+>
 
-Ok, this seems to be looking good.
+Since dssdev struct contains backlight releated fields, I passed that
+into the driver. It can be replaced by a backlight related platform
+data struct. Then we can remove those backlight related fields from
+dssdev struct.
 
-I'll hold this for a few days before a final decision. will add to -next
-tomorrow.
+> This kind of backlight is, in a sense, totally separate component from
+> the panel itself. All they have in common is that they are packaged in
+> the same physical display module, and they usually share the same
+> connector.
+>
+> I have seen three kinds of backlights on OMAP devices:
+> - on/off GPIO (like on 3430 SDP)
+It seems like that we need a gpio_bl.c driver for this kind of usage.
+
+> - PWM based (zoom seems to have this)
+
+I failed to find any PWM or Backlight code in ZOOM boards source file.
+Is that possible to us pwm_bl.c driver which is used by pxa?
+
+> - Panel controlled (Taal-panel. Also PWM based, but OMAP doesn't see
+> that)
+>
+Yeah, I don't plan to reform this driver at this time.
+
+> The first two could (should?) be totally separate backlights from the
+> panel itself. For those, a generic backlight driver could perhaps work.
+> The third one needs to be quite tied to the panel driver, and I'm not
+> sure how easy it would be to have a separate driver for that.
+>
+
+OK, I totally understand you concern now. How about a GPIO based
+backlight driver for the first 2 cases.
+
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
