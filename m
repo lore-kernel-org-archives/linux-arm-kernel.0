@@ -1,15 +1,15 @@
 From: vm.rod25@gmail.com (vm.rod25 at gmail.com)
-Date: Tue,  7 Dec 2010 16:14:47 -0600
-Subject: [PATCH v10 4/6] davinci: MMC/SD support for Omapl138-Hawkboard
+Date: Tue,  7 Dec 2010 16:14:49 -0600
+Subject: [PATCH v10 6/6] davinci: USB1.1 support for Omapl138-Hawkboard
 In-Reply-To: <1291760089-5818-1-git-send-email-vm.rod25@gmail.com>
 References: <1291760089-5818-1-git-send-email-vm.rod25@gmail.com>
-Message-ID: <1291760089-5818-5-git-send-email-vm.rod25@gmail.com>
+Message-ID: <1291760089-5818-7-git-send-email-vm.rod25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Victor Rodriguez <victor.rodriguez@sasken.com>
 
-This patch adds MMC/SD support for the Hawkboard-L138 system
+This patch adds USB1.1 support for the Hawkboard-L138 system
 
 Signed-off-by: Victor Rodriguez <victor.rodriguez@sasken.com>
 Tested-by: Rene Gonzalez <renegs.2378@gmail.com>
@@ -19,108 +19,171 @@ Notes:
 This patch works with da8xx_omapl_defconfig
 In order to test it select in menuconfig like insmodule
 
-MMC/SD/SDIO card support  --->
-      MMC block device driver
-      Use bounce buffer for simple hosts
-      TI DAVINCI Multimedia Card Interface support
+ Device Drivers  --->
+    SCSI device support  --->
+       SCSI device support
+       legacy /proc/scsi/ support
+       SCSI disk support
+       SCSI low-level drivers
 
- arch/arm/mach-davinci/board-omapl138-hawk.c |   73 +++++++++++++++++++++++++++
- 1 files changed, 73 insertions(+), 0 deletions(-)
+       USB support  --->
+               Support for Host-side USB
+               OHCI HCD support (NEW)
+               USB Mass Storage support (NEW)
+               USB Gadget Support  --->
+               USB Gadget Drivers (Ethernet Gadget\
+                (with CDC Ethernet support))  --->
+               NOP USB Transceiver Driver
+
+And you will be able to mount an USB pen drive
+
+In order to connect a keyboard or a mouse on a USB-hub
+select in menuconfig like insmodule
+
+HID Devices  --->
+       Generic HID support
+       USB Human Interface Device (full HID) support
+
+ arch/arm/mach-davinci/board-omapl138-hawk.c |  116 +++++++++++++++++++++++++++
+ 1 files changed, 116 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index cefff9b..df50637 100644
+index df50637..8646b74 100644
 --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
 +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -22,6 +22,8 @@
- #include <mach/mux.h>
+@@ -25,6 +25,9 @@
+ #define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(3, 12)
+ #define DA850_HAWK_MMCSD_WP_PIN		GPIO_TO_PIN(3, 13)
  
- #define HAWKBOARD_PHY_ID		"0:07"
-+#define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(3, 12)
-+#define DA850_HAWK_MMCSD_WP_PIN		GPIO_TO_PIN(3, 13)
- 
++#define DA850_USB1_VBUS_PIN		GPIO_TO_PIN(2, 4)
++#define DA850_USB1_OC_PIN		GPIO_TO_PIN(6, 13)
++
  static short omapl138_hawk_mii_pins[] __initdata = {
  	DA850_MII_TXEN, DA850_MII_TXCLK, DA850_MII_COL, DA850_MII_TXD_3,
-@@ -110,6 +112,75 @@ static struct edma_rsv_info *da850_edma_rsv[2] = {
- 	&da850_edma_cc1_rsv,
- };
+ 	DA850_MII_TXD_2, DA850_MII_TXD_1, DA850_MII_TXD_0, DA850_MII_RXER,
+@@ -181,6 +184,117 @@ mmc_setup_wp_fail:
+ 	gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+ }
  
-+static const short hawk_mmcsd0_pins[] = {
-+	DA850_MMCSD0_DAT_0, DA850_MMCSD0_DAT_1, DA850_MMCSD0_DAT_2,
-+	DA850_MMCSD0_DAT_3, DA850_MMCSD0_CLK, DA850_MMCSD0_CMD,
-+	DA850_GPIO3_12, DA850_GPIO3_13,
++static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id);
++static da8xx_ocic_handler_t hawk_usb_ocic_handler;
++
++static const short da850_hawk_usb11_pins[] = {
++	DA850_GPIO2_4, DA850_GPIO6_13,
 +	-1
 +};
 +
-+static int da850_hawk_mmc_get_ro(int index)
++static int hawk_usb_set_power(unsigned port, int on)
 +{
-+	return gpio_get_value(DA850_HAWK_MMCSD_WP_PIN);
++	gpio_set_value(DA850_USB1_VBUS_PIN, on);
++	return 0;
 +}
 +
-+static int da850_hawk_mmc_get_cd(int index)
++static int hawk_usb_get_power(unsigned port)
 +{
-+	return !gpio_get_value(DA850_HAWK_MMCSD_CD_PIN);
++	return gpio_get_value(DA850_USB1_VBUS_PIN);
 +}
 +
-+static struct davinci_mmc_config da850_mmc_config = {
-+	.get_ro		= da850_hawk_mmc_get_ro,
-+	.get_cd		= da850_hawk_mmc_get_cd,
-+	.wires		= 4,
-+	.max_freq	= 50000000,
-+	.caps		= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
-+	.version	= MMC_CTLR_VERSION_2,
++static int hawk_usb_get_oci(unsigned port)
++{
++	return !gpio_get_value(DA850_USB1_OC_PIN);
++}
++
++static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
++{
++	int irq         = gpio_to_irq(DA850_USB1_OC_PIN);
++	int error       = 0;
++
++	if (handler != NULL) {
++		hawk_usb_ocic_handler = handler;
++
++		error = request_irq(irq, omapl138_hawk_usb_ocic_irq,
++					IRQF_DISABLED | IRQF_TRIGGER_RISING |
++					IRQF_TRIGGER_FALLING,
++					"OHCI over-current indicator", NULL);
++		if (error)
++			pr_err("%s: could not request IRQ to watch "
++				"over-current indicator changes\n", __func__);
++	} else {
++		free_irq(irq, NULL);
++	}
++	return error;
++}
++
++static struct da8xx_ohci_root_hub omapl138_hawk_usb11_pdata = {
++	.set_power      = hawk_usb_set_power,
++	.get_power      = hawk_usb_get_power,
++	.get_oci        = hawk_usb_get_oci,
++	.ocic_notify    = hawk_usb_ocic_notify,
++	/* TPS2087 switch @ 5V */
++	.potpgt         = (3 + 1) / 2,  /* 3 ms max */
 +};
 +
-+static __init void omapl138_hawk_mmc_init(void)
++static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id)
++{
++	hawk_usb_ocic_handler(&omapl138_hawk_usb11_pdata, 1);
++	return IRQ_HANDLED;
++}
++
++static __init void omapl138_hawk_usb_init(void)
 +{
 +	int ret;
++	u32 cfgchip2;
 +
-+	ret = davinci_cfg_reg_list(hawk_mmcsd0_pins);
++	ret = davinci_cfg_reg_list(da850_hawk_usb11_pins);
 +	if (ret) {
-+		pr_warning("%s: MMC/SD0 mux setup failed: %d\n",
++		pr_warning("%s: USB 1.1 PinMux setup failed: %d\n",
 +			__func__, ret);
 +		return;
 +	}
 +
-+	ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
-+			GPIOF_DIR_IN, "MMC CD");
++	/* Setup the Ref. clock frequency for the HAWK at 24 MHz. */
++
++	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
++	cfgchip2 &= ~CFGCHIP2_REFFREQ;
++	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
++	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
++
++	ret = gpio_request_one(DA850_USB1_VBUS_PIN,
++			GPIOF_DIR_OUT, "USB1 VBUS");
 +	if (ret < 0) {
-+		pr_warning("%s: can not open GPIO %d\n",
-+			__func__, DA850_HAWK_MMCSD_CD_PIN);
-+		goto mmc_setup_cd_fail;
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
++			"power control: %d\n", __func__, ret);
++		goto usb11_setup_vbus_fail;
 +	}
 +
-+	ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
-+			GPIOF_DIR_IN, "MMC WP");
++	ret = gpio_request_one(DA850_USB1_OC_PIN,
++			GPIOF_DIR_IN, "USB1 OC");
 +	if (ret < 0) {
-+		pr_warning("%s: can not open GPIO %d\n",
-+			__func__, DA850_HAWK_MMCSD_WP_PIN);
-+		goto mmc_setup_wp_fail;
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
++			"over-current indicator: %d\n", __func__, ret);
++		goto usb11_setup_oc_fail;
 +	}
 +
-+	ret = da8xx_register_mmcsd0(&da850_mmc_config);
++	ret = da8xx_register_usb11(&omapl138_hawk_usb11_pdata);
 +	if (ret) {
-+		pr_warning("%s: MMC/SD0 registration failed: %d\n",
++		pr_warning("%s: USB 1.1 registration failed: %d\n",
 +			__func__, ret);
-+		goto mmc_setup_mmcsd_fail;
++		goto usb11_setup_fail;
 +	}
 +
-+mmc_setup_cd_fail:
++usb11_setup_vbus_fail:
 +	return;
 +
-+mmc_setup_mmcsd_fail:
-+	gpio_free(DA850_HAWK_MMCSD_WP_PIN);
-+mmc_setup_wp_fail:
-+	gpio_free(DA850_HAWK_MMCSD_CD_PIN);
++usb11_setup_fail:
++	gpio_free(DA850_USB1_OC_PIN);
++usb11_setup_oc_fail:
++	gpio_free(DA850_USB1_VBUS_PIN);
 +}
 +
  static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
  	.enabled_uarts = 0x7,
  };
-@@ -127,6 +198,8 @@ static __init void omapl138_hawk_init(void)
- 		pr_warning("%s: EDMA registration failed: %d\n",
- 			__func__, ret);
+@@ -200,6 +314,8 @@ static __init void omapl138_hawk_init(void)
  
-+	omapl138_hawk_mmc_init();
+ 	omapl138_hawk_mmc_init();
+ 
++	omapl138_hawk_usb_init();
 +
  	ret = da8xx_register_watchdog();
  	if (ret)
