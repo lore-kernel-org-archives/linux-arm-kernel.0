@@ -1,36 +1,43 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 7 Dec 2010 15:16:15 -0200
-Subject: [PATCH v2] watchdog: imx: use clk_get to acquire the watchdogclock
-In-Reply-To: <20101207164905.GD6017@pengutronix.de>
-References: <1291738564-10374-1-git-send-email-fabio.estevam@freescale.com>
-	<20101207164905.GD6017@pengutronix.de>
-Message-ID: <4CFE6BDF.9030706@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Dec 2010 17:18:10 +0000
+Subject: [RFC] Fixing CPU Hotplug for RealView Platforms
+In-Reply-To: <007401cb962d$d53d2500$7fb76f00$@deacon@arm.com>
+References: <007401cb962d$d53d2500$7fb76f00$@deacon@arm.com>
+Message-ID: <20101207171810.GA25839@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On 12/7/2010 2:49 PM, Sascha Hauer wrote:
+On Tue, Dec 07, 2010 at 04:43:10PM -0000, Will Deacon wrote:
+> Hello,
+> 
+> Currently, CPU hotplug is broken for RealView platforms. I posted some
+> patches previously to try and address this, but they didn't solve the
+> problems fully:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-September/026157.html
+> 
+> I'm now revisiting the code and it looks like the main problem is when
+> we wish to *leave* the lowpower state. The enter/leave routines look
+> like this:
+> 
 ...
-> I should have seen this happen. This breaks i.MX1 reset which uses
-> imx-wdt.0.
+> 
+> The problem is that by turning off coherency, the contents of the D-cache
+> becomes stale. If data is prefetched into L1 between the flush_cache_all
+> invocation and disabling the D-cache then this data will still be present
+> when we come out of lowpower. Without coherency, we *must not* use this
+> data and so a D-cache invalidation to the PoC is required in
+> cpu_leave_lowpower().
 
-I think it doesn?t break current mx1 reset mechanism. Please see the 
-code below (arcm/arm/plat-mxc/system.c):
+What if we fixed the cpu_reset functions for v6 and v7, and when a CPU
+is taken offline, we actually go through a proper shutdown of that CPU
+and call the reset vector, re-entering the boot loader?
 
-	if (cpu_is_mx1()) {
-		wcr_enable = (1 << 0);
-	} else {
-		struct clk *clk;
+We can only do this for CPUs other than the original boot CPU, because
+the boot loader should be checking which are the secondary CPUs and
+putting those into this simple WFI loop with the GIC appropriately
+programmed.
 
-		clk = clk_get_sys("imx2-wdt.0", NULL);
-		if (!IS_ERR(clk))
-			clk_enable(clk);
-		wcr_enable = (1 << 2);
-	}
-
-For mx1 the clk_get_sys function is not called.
-
-Regards,
-
-Fabio Estevam
+This means when we re-activate the CPU, we'll be waking it up in
+exactly the same way as we do when the kernel boots - and we have all
+that code around just waiting to be used.
