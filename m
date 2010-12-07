@@ -1,318 +1,167 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 06 Dec 2010 18:25:06 -0700
-Subject: [PATCH 03/14] OMAP: powerdomain: Arch specific funcs for state control
-In-Reply-To: <20101207012242.3708.45451.stgit@twilight.localdomain>
-References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-Message-ID: <20101207012504.3708.7909.stgit@twilight.localdomain>
+Date: Mon, 06 Dec 2010 18:24:58 -0700
+Subject: [PATCH 00/14] OMAP: PRCM/powerdomain/clockdomain patches for 2.6.38,
+	part one
+Message-ID: <20101207012242.3708.45451.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+This patch series, intended for 2.6.38:
 
-Define the following architecture specific funtions for omap2/3/4
-.pwrdm_set_next_pwrst
-.pwrdm_read_next_pwrst
-.pwrdm_read_pwrst
-.pwrdm_read_prev_pwrst
+- includes Rajendra's powerdomain changes to add OMAP4 support;
 
-Convert the platform-independent framework to call these functions.
+- allocates static powerdomain and clockdomain data in C files
+  rather than header files (long overdue);
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[paul at pwsan.com: remove remaining static allocations in powerdomains.h file;
- remove path in file header comments, rearranged Makefile changes]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
+- begins the process of cleaning up mach-omap2/prcm.c;
+
+- splits the OMAP4 PRCM header files into per-hwmod or per-PRCM partition
+  files;
+
+- renames the OMAP4 PRCM *_MOD macros to *_INST so the names actually have
+  some meaning in regards to the hardware;
+
+- moves the OMAP2/3-specific PRCM functions into OMAP2/3-specific files, in
+  preparation for creating OMAP4-specific versions;
+
+- moves the CM context save/restore file to CM-specific code, and
+  removes the PRM context save/restore code - which should save a few
+  microseconds in the off-mode save/restore path.
+
+The series applies on top of v2.6.37-rc4.  It is available via git from
+git://git.pwsan.com/linux-2.6 in the branch 'pwrdm_prcm_a_2.6.38'.
+
+Kevin, I'd appreciate review and acks, if appropriate, on the patches
+that touch code that you maintain.  Rajendra, Santosh, I've made some
+minor changes to your patches; if you have the chance you might want
+to take a look and comment if necessary.
+
+Boot-tested on N800, OMAP35xx Beagle, and OMAP4430ES2 Panda.
+
+A followup series that builds on this one will be sent tomorrow.
+
+
+- Paul
+
 ---
- arch/arm/mach-omap2/Makefile               |    7 +++
- arch/arm/mach-omap2/powerdomain.c          |   33 ++++++++++-----
- arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |   62 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain44xx.c      |   55 +++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomains.h         |   22 ++++++++++
- arch/arm/mach-omap2/powerdomains_data.c    |    8 +++-
- 6 files changed, 175 insertions(+), 12 deletions(-)
+
+pwrdm_prcm_a_2.6.38
+   text	   data	    bss	    dec	    hex	filename
+5707592	 473984	5608864	11790440	 b3e868	vmlinux.orig
+5709988	 473952	5608800	11792740	 b3f164	vmlinux.patched
+
+Paul Walmsley (8):
+      OMAP2+: powerdomains: move powerdomain static data to .c files
+      OMAP2+: clockdomains: move clockdomain static data to .c files
+      OMAP3: control/PRCM: add omap3_ctrl_write_boot_mode()
+      OMAP3: control/PRCM: move CONTROL_PADCONF_SYS_NIRQ save/restore to SCM code
+      OMAP4: PRCM: reorganize existing OMAP4 PRCM header files
+      OMAP4: PRCM: rename _MOD macros to _INST
+      OMAP2/3: PRCM: split OMAP2/3-specific PRCM code into OMAP2/3-specific files
+      OMAP3: PRM/CM: separate CM context save/restore; remove PRM context save/restore
+
+Rajendra Nayak (5):
+      OMAP: powerdomain: Move static allocations from powerdomains.h to a .c file
+      OMAP: powerdomain: Infrastructure to put arch specific code
+      OMAP: powerdomain: Arch specific funcs for state control
+      OMAP: powerdomain: Arch specific funcs for logic control
+      OMAP: powerdomain: Arch specific funcs for mem control
+
+Santosh Shilimkar (1):
+      OMAP4: powerdomain: Add pwrdm_clear_all_prev_pwrst
+
+
+ arch/arm/mach-omap2/Makefile                     |   44 +
+ arch/arm/mach-omap2/clkt2xxx_apll.c              |    2 
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c          |    2 
+ arch/arm/mach-omap2/clkt2xxx_osc.c               |    2 
+ arch/arm/mach-omap2/clkt2xxx_sys.c               |    2 
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c     |    2 
+ arch/arm/mach-omap2/clkt_dpll.c                  |    1 
+ arch/arm/mach-omap2/clock.c                      |    4 
+ arch/arm/mach-omap2/clock2420_data.c             |    4 
+ arch/arm/mach-omap2/clock2430.c                  |    2 
+ arch/arm/mach-omap2/clock2430_data.c             |    4 
+ arch/arm/mach-omap2/clock34xx.c                  |    2 
+ arch/arm/mach-omap2/clock3517.c                  |    2 
+ arch/arm/mach-omap2/clock3xxx.c                  |    4 
+ arch/arm/mach-omap2/clock3xxx_data.c             |    4 
+ arch/arm/mach-omap2/clock44xx_data.c             |   10 
+ arch/arm/mach-omap2/clockdomain.c                |    5 
+ arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |   67 --
+ arch/arm/mach-omap2/clockdomains44xx_data.c      |   46 +
+ arch/arm/mach-omap2/cm-regbits-24xx.h            |    2 
+ arch/arm/mach-omap2/cm-regbits-34xx.h            |    2 
+ arch/arm/mach-omap2/cm-regbits-44xx.h            |    3 
+ arch/arm/mach-omap2/cm.c                         |   68 --
+ arch/arm/mach-omap2/cm.h                         |  137 ----
+ arch/arm/mach-omap2/cm1_44xx.h                   |  251 +++++++
+ arch/arm/mach-omap2/cm2_44xx.h                   |  648 +++++++------------
+ arch/arm/mach-omap2/cm2xxx_3xxx.c                |  393 ++++++++++++
+ arch/arm/mach-omap2/cm2xxx_3xxx.h                |   70 +-
+ arch/arm/mach-omap2/cm44xx.h                     |  668 --------------------
+ arch/arm/mach-omap2/cm4xxx.c                     |    2 
+ arch/arm/mach-omap2/control.c                    |   40 +
+ arch/arm/mach-omap2/control.h                    |    1 
+ arch/arm/mach-omap2/dpll3xxx.c                   |    4 
+ arch/arm/mach-omap2/dsp.c                        |    9 
+ arch/arm/mach-omap2/io.c                         |   22 -
+ arch/arm/mach-omap2/omap_hwmod.c                 |    6 
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c       |    4 
+ arch/arm/mach-omap2/pm-debug.c                   |    4 
+ arch/arm/mach-omap2/pm24xx.c                     |    4 
+ arch/arm/mach-omap2/pm34xx.c                     |    8 
+ arch/arm/mach-omap2/powerdomain-common.c         |  111 +++
+ arch/arm/mach-omap2/powerdomain.c                |  400 +++---------
+ arch/arm/mach-omap2/powerdomain2xxx_3xxx.c       |  232 +++++++
+ arch/arm/mach-omap2/powerdomain44xx.c            |  177 +++++
+ arch/arm/mach-omap2/powerdomains.h               |  151 ----
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |   81 ++
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.h |   22 +
+ arch/arm/mach-omap2/powerdomains2xxx_data.c      |   47 +
+ arch/arm/mach-omap2/powerdomains3xxx_data.c      |   47 +
+ arch/arm/mach-omap2/powerdomains44xx_data.c      |   70 +-
+ arch/arm/mach-omap2/prcm-common.h                |   85 ---
+ arch/arm/mach-omap2/prcm.c                       |  481 --------------
+ arch/arm/mach-omap2/prcm_mpu44xx.h               |   91 +++
+ arch/arm/mach-omap2/prm-regbits-24xx.h           |    2 
+ arch/arm/mach-omap2/prm-regbits-34xx.h           |    8 
+ arch/arm/mach-omap2/prm-regbits-44xx.h           |    2 
+ arch/arm/mach-omap2/prm.h                        |  369 -----------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c               |   52 +-
+ arch/arm/mach-omap2/prm2xxx_3xxx.h               |  116 +--
+ arch/arm/mach-omap2/prm44xx.c                    |    2 
+ arch/arm/mach-omap2/prm44xx.h                    |  743 +++++++++++-----------
+ arch/arm/mach-omap2/scrm44xx.h                   |   32 +
+ arch/arm/mach-omap2/sdrc.c                       |    2 
+ arch/arm/mach-omap2/sdrc2xxx.c                   |    2 
+ arch/arm/mach-omap2/serial.c                     |    4 
+ arch/arm/mach-omap2/sleep34xx.S                  |    4 
+ arch/arm/mach-omap2/sram242x.S                   |    4 
+ arch/arm/mach-omap2/sram243x.S                   |    4 
+ arch/arm/mach-omap2/sram34xx.S                   |    2 
+ arch/arm/plat-omap/include/plat/clockdomain.h    |   11 
+ arch/arm/plat-omap/include/plat/common.h         |    2 
+ arch/arm/plat-omap/include/plat/powerdomain.h    |   57 ++
+ arch/arm/plat-omap/include/plat/prcm.h           |   10 
+ arch/arm/plat-omap/mcbsp.c                       |    2 
+ arch/arm/plat-omap/sram.c                        |    5 
+ 75 files changed, 2663 insertions(+), 3322 deletions(-)
+ rename arch/arm/mach-omap2/{clockdomains.h => clockdomains2xxx_3xxx_data.c} (95%)
+ rename arch/arm/mach-omap2/{clockdomains44xx.h => clockdomains44xx_data.c} (90%)
+ delete mode 100644 arch/arm/mach-omap2/cm.c
+ create mode 100644 arch/arm/mach-omap2/cm1_44xx.h
+ copy arch/arm/mach-omap2/{cm44xx.h => cm2_44xx.h} (53%)
+ create mode 100644 arch/arm/mach-omap2/cm2xxx_3xxx.c
+ copy arch/arm/mach-omap2/{cm.h => cm2xxx_3xxx.h} (68%)
+ create mode 100644 arch/arm/mach-omap2/powerdomain-common.c
  create mode 100644 arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
  create mode 100644 arch/arm/mach-omap2/powerdomain44xx.c
- create mode 100644 arch/arm/mach-omap2/powerdomains.h
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index ddc0a6f..f8dcaf8 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -70,7 +70,12 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm4xxx.o
- 
- # OMAP powerdomain framework
- powerdomain-common			+= powerdomain.o powerdomains_data.o
--obj-y					+= $(powerdomain-common)
-+obj-$(CONFIG_ARCH_OMAP2)		+= $(powerdomain-common) \
-+					   powerdomain2xxx_3xxx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= $(powerdomain-common) \
-+					   powerdomain2xxx_3xxx.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= $(powerdomain-common) \
-+					   powerdomain44xx.o
- 
- # Clock framework
- obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o \
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 3aa3eb3..0ae1ebf 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -439,6 +439,8 @@ int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm)
-  */
- int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
- 		return -EINVAL;
- 
-@@ -448,11 +450,10 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
- 		 pwrdm->name, pwrst);
- 
--	prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
--			     (pwrst << OMAP_POWERSTATE_SHIFT),
--			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
-+		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -465,11 +466,15 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-  */
- int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
--				 pwrstctrl_reg_offs, OMAP_POWERSTATE_MASK);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst)
-+		ret = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
-+
-+	return ret;
- }
- 
- /**
-@@ -482,11 +487,15 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_pwrst(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
--				 pwrstst_reg_offs, OMAP_POWERSTATEST_MASK);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
-+		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
-+
-+	return ret;
- }
- 
- /**
-@@ -499,11 +508,15 @@ int pwrdm_read_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST,
--					OMAP3430_LASTPOWERSTATEENTERED_MASK);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_pwrst)
-+		ret = arch_pwrdm->pwrdm_read_prev_pwrst(pwrdm);
-+
-+	return ret;
- }
- 
- /**
-diff --git a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-new file mode 100644
-index 0000000..a25dd64
---- /dev/null
-+++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-@@ -0,0 +1,62 @@
-+/*
-+ * OMAP2 and OMAP3 powerdomain control
-+ *
-+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2009 Nokia Corporation
-+ *
-+ * Derived from mach-omap2/powerdomain.c written by Paul Walmsley
-+ * Rajendra Nayak <rnayak@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/errno.h>
-+#include <linux/delay.h>
-+#include <plat/prcm.h>
-+#include "prm.h"
-+#include "prm-regbits-34xx.h"
-+#include "powerdomains.h"
-+
-+/* Common functions across OMAP2 and OMAP3 */
-+static int omap2_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-+{
-+	prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
-+				(pwrst << OMAP_POWERSTATE_SHIFT),
-+				pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
-+	return 0;
-+}
-+
-+static int omap2_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+				OMAP2_PM_PWSTCTRL, OMAP_POWERSTATE_MASK);
-+}
-+
-+static int omap2_pwrdm_read_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+				OMAP2_PM_PWSTST, OMAP_POWERSTATEST_MASK);
-+}
-+
-+/* Applicable only for OMAP3. Not supported on OMAP2 */
-+static int omap3_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST,
-+				OMAP3430_LASTPOWERSTATEENTERED_MASK);
-+}
-+
-+struct pwrdm_ops omap2_pwrdm_operations = {
-+	.pwrdm_set_next_pwrst	= omap2_pwrdm_set_next_pwrst,
-+	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
-+	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
-+};
-+
-+struct pwrdm_ops omap3_pwrdm_operations = {
-+	.pwrdm_set_next_pwrst	= omap2_pwrdm_set_next_pwrst,
-+	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
-+	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
-+	.pwrdm_read_prev_pwrst	= omap3_pwrdm_read_prev_pwrst,
-+};
-diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
-new file mode 100644
-index 0000000..5dc337c
---- /dev/null
-+++ b/arch/arm/mach-omap2/powerdomain44xx.c
-@@ -0,0 +1,55 @@
-+/*
-+ * OMAP4 powerdomain control
-+ *
-+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2009 Nokia Corporation
-+ *
-+ * Derived from mach-omap2/powerdomain.c written by Paul Walmsley
-+ * Rajendra Nayak <rnayak@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/errno.h>
-+#include <linux/delay.h>
-+#include <plat/powerdomain.h>
-+#include <plat/prcm.h>
-+#include "prm.h"
-+#include "prm-regbits-44xx.h"
-+#include "powerdomains.h"
-+
-+static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-+{
-+	prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
-+				(pwrst << OMAP_POWERSTATE_SHIFT),
-+				pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
-+	return 0;
-+}
-+
-+static int omap4_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+				OMAP4_PM_PWSTCTRL, OMAP_POWERSTATE_MASK);
-+}
-+
-+static int omap4_pwrdm_read_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+				OMAP4_PM_PWSTST, OMAP_POWERSTATEST_MASK);
-+}
-+
-+static int omap4_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_PWSTST,
-+				OMAP4430_LASTPOWERSTATEENTERED_MASK);
-+}
-+
-+struct pwrdm_ops omap4_pwrdm_operations = {
-+	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
-+	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
-+	.pwrdm_read_pwrst	= omap4_pwrdm_read_pwrst,
-+	.pwrdm_read_prev_pwrst	= omap4_pwrdm_read_prev_pwrst,
-+};
-diff --git a/arch/arm/mach-omap2/powerdomains.h b/arch/arm/mach-omap2/powerdomains.h
-new file mode 100644
-index 0000000..e57bc41
---- /dev/null
-+++ b/arch/arm/mach-omap2/powerdomains.h
-@@ -0,0 +1,22 @@
-+/*
-+ * OMAP2+ powerdomain prototypes
-+ *
-+ * Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * Rajendra Nayak <rnayak@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef ARCH_ARM_MACH_OMAP2_POWERDOMAINS
-+#define ARCH_ARM_MACH_OMAP2_POWERDOMAINS
-+
-+#include <plat/powerdomain.h>
-+
-+extern struct pwrdm_ops omap2_pwrdm_operations;
-+extern struct pwrdm_ops omap3_pwrdm_operations;
-+extern struct pwrdm_ops omap4_pwrdm_operations;
-+
-+#endif /* ARCH_ARM_MACH_OMAP2_POWERDOMAINS */
-diff --git a/arch/arm/mach-omap2/powerdomains_data.c b/arch/arm/mach-omap2/powerdomains_data.c
-index bf5b39b..29690c6 100644
---- a/arch/arm/mach-omap2/powerdomains_data.c
-+++ b/arch/arm/mach-omap2/powerdomains_data.c
-@@ -55,6 +55,7 @@
- #include "powerdomains24xx.h"
- #include "powerdomains34xx.h"
- #include "powerdomains44xx.h"
-+#include "powerdomains.h"
- 
- /* OMAP2/3-common powerdomains */
- 
-@@ -149,5 +150,10 @@ static struct powerdomain *powerdomains_omap[] __initdata = {
- 
- void pwrdm_fw_init(void)
- {
--	pwrdm_init(powerdomains_omap, NULL);
-+	if (cpu_is_omap24xx())
-+		pwrdm_init(powerdomains_omap, &omap2_pwrdm_operations);
-+	else if (cpu_is_omap34xx())
-+		pwrdm_init(powerdomains_omap, &omap3_pwrdm_operations);
-+	else if (cpu_is_omap44xx())
-+		pwrdm_init(powerdomains_omap, &omap4_pwrdm_operations);
- }
+ create mode 100644 arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+ create mode 100644 arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.h
+ rename arch/arm/mach-omap2/{powerdomains24xx.h => powerdomains2xxx_data.c} (76%)
+ rename arch/arm/mach-omap2/{powerdomains34xx.h => powerdomains3xxx_data.c} (89%)
+ rename arch/arm/mach-omap2/{powerdomains44xx.h => powerdomains44xx_data.c} (85%)
+ create mode 100644 arch/arm/mach-omap2/prcm_mpu44xx.h
+ copy arch/arm/mach-omap2/{prm.h => prm2xxx_3xxx.h} (82%)
+ create mode 100644 arch/arm/mach-omap2/scrm44xx.h
