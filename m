@@ -1,753 +1,155 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue,  7 Dec 2010 09:51:56 -0500
-Subject: [PATCH v7 06/12] regulator: add driver for tps6524x regulator
-In-Reply-To: <1291733522-3626-1-git-send-email-cyril@ti.com>
-References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-Message-ID: <1291733522-3626-7-git-send-email-cyril@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 7 Dec 2010 14:53:56 +0000
+Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to work
+	withCONFIG_THUMB2_KERNEL
+In-Reply-To: <AANLkTimPiySTjzTw6owG8GWPv2OwoNQ=wyV4kdvP9EZu@mail.gmail.com>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
+	<1291656937-24992-2-git-send-email-dave.martin@linaro.org>
+	<8ff74b57e40b64459978eefba8f4c9ca@mail.gmail.com>
+	<AANLkTikOSb5-wBSy_ZANVsHga7XmWPrwP=0Xs0eGOxb5@mail.gmail.com>
+	<AANLkTimPiySTjzTw6owG8GWPv2OwoNQ=wyV4kdvP9EZu@mail.gmail.com>
+Message-ID: <AANLkTi=7MXKUwjyPgDBO9XV-CZw7RNOmWKj0JP_kB9aC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPS6524X provides three step-down converters and two general-purpose LDO
-voltage regulators.  This device is interfaced using SPI.
+Hi,
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
----
- drivers/regulator/Kconfig              |   10 +
- drivers/regulator/Makefile             |    1 +
- drivers/regulator/tps6524x-regulator.c |  692 ++++++++++++++++++++++++++++++++
- 3 files changed, 703 insertions(+), 0 deletions(-)
- create mode 100644 drivers/regulator/tps6524x-regulator.c
+On Tue, Dec 7, 2010 at 11:59 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Hi Dave,
+>
+> On Tue, Dec 7, 2010 at 11:16 AM, Dave Martin <dave.martin@linaro.org> wrote:
+>> On Tue, Dec 7, 2010 at 6:31 AM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>>> Dave,
+>>>> -----Original Message-----
+>>>> From: linaro-dev-bounces at lists.linaro.org [mailto:linaro-dev-
+>>>> bounces at lists.linaro.org] On Behalf Of Dave Martin
+>>>> Sent: Monday, December 06, 2010 11:06 PM
+>>>> To: linux-arm-kernel at lists.infradead.org
+>>>> Cc: Tony Lindgren; Dave Martin; linux-omap at vger.kernel.org; linaro-
+>>>> dev at lists.linaro.org
+>>>> Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to
+>>> work
+>>>> withCONFIG_THUMB2_KERNEL
+>>>>
+>>
+>> [...]
+>>
+>>>
+>>> No need to mention but this patch changes lot of things around
+>>> power management code. You said " Tested on: omap3 (Beagle xM A2)"
+>>>
+>>> What did you test ? Is it just boot test ? For sure just boot
+>>> test is not enough for this patch and needs to test the PM.
+>>
+>> That's a fair point--- yes, I've only tested boot / reboot / shutdown so far.
+>>
+> The ASM idle code is being reworked right now, which means the T2
+> support will need to be reworked on top of the patches. Cf. [1] and
+> [2].
+[...]
+On Tue, Dec 7, 2010 at 12:59 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+[...]
+> For your information, the on-going changes are:
+> - run (most of the) code from the DDR instead of the internal SRAM.
+> - convert the ASM idle code to C-code,
+>
+> I am working on getting those changes submitted, it should be done this week.
+>
+> Unfortunately those changes have implications on your changes for T2.
+> As far as I understood converting the code to C-code should solve the
+> T2 problem as well. What do you think?
+>
+> In any case I will let you know. Could you test the changes when they
+> are available?
+[...]
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index dd30e88..da34981 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -250,5 +250,15 @@ config REGULATOR_TPS6586X
- 	help
- 	  This driver supports TPS6586X voltage regulator chips.
- 
-+config REGULATOR_TPS6524X
-+	tristate "TI TPS6524X Power regulators"
-+	depends on SPI
-+	help
-+	  This driver supports TPS6524X voltage regulator chips. TPS6524X
-+	  provides three step-down converters and two general-purpose LDO
-+	  voltage regulators.  This device is interfaced using a customized
-+	  serial interface currently supported on the sequencer serial
-+	  port controller.
-+
- endif
- 
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index bff8157..cf71df7 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -34,6 +34,7 @@ obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
- 
- obj-$(CONFIG_REGULATOR_TPS65023) += tps65023-regulator.o
- obj-$(CONFIG_REGULATOR_TPS6507X) += tps6507x-regulator.o
-+obj-$(CONFIG_REGULATOR_TPS6524X) += tps6524x-regulator.o
- obj-$(CONFIG_REGULATOR_88PM8607) += 88pm8607.o
- obj-$(CONFIG_REGULATOR_ISL6271A) += isl6271a-regulator.o
- obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
-diff --git a/drivers/regulator/tps6524x-regulator.c b/drivers/regulator/tps6524x-regulator.c
-new file mode 100644
-index 0000000..dea1260
---- /dev/null
-+++ b/drivers/regulator/tps6524x-regulator.c
-@@ -0,0 +1,692 @@
-+/*
-+ * Regulator driver for TPS6524x PMIC
-+ *
-+ * Copyright (C) 2010 Texas Instruments
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
-+ * whether express or implied; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/slab.h>
-+#include <linux/spi/spi.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+
-+#define REG_LDO_SET		0x0
-+#define LDO_ILIM_MASK		1	/* 0 = 400-800, 1 = 900-1500 */
-+#define LDO_VSEL_MASK		0x0f
-+#define LDO2_ILIM_SHIFT		12
-+#define LDO2_VSEL_SHIFT		4
-+#define LDO1_ILIM_SHIFT		8
-+#define LDO1_VSEL_SHIFT		0
-+
-+#define REG_BLOCK_EN		0x1
-+#define BLOCK_MASK		1
-+#define BLOCK_LDO1_SHIFT	0
-+#define BLOCK_LDO2_SHIFT	1
-+#define BLOCK_LCD_SHIFT		2
-+#define BLOCK_USB_SHIFT		3
-+
-+#define REG_DCDC_SET		0x2
-+#define DCDC_VDCDC_MASK		0x1f
-+#define DCDC_VDCDC1_SHIFT	0
-+#define DCDC_VDCDC2_SHIFT	5
-+#define DCDC_VDCDC3_SHIFT	10
-+
-+#define REG_DCDC_EN		0x3
-+#define DCDCDCDC_EN_MASK	0x1
-+#define DCDCDCDC1_EN_SHIFT	0
-+#define DCDCDCDC1_PG_MSK	BIT(1)
-+#define DCDCDCDC2_EN_SHIFT	2
-+#define DCDCDCDC2_PG_MSK	BIT(3)
-+#define DCDCDCDC3_EN_SHIFT	4
-+#define DCDCDCDC3_PG_MSK	BIT(5)
-+
-+#define REG_USB			0x4
-+#define USB_ILIM_SHIFT		0
-+#define USB_ILIM_MASK		0x3
-+#define USB_TSD_SHIFT		2
-+#define USB_TSD_MASK		0x3
-+#define USB_TWARN_SHIFT		4
-+#define USB_TWARN_MASK		0x3
-+#define USB_IWARN_SD		BIT(6)
-+#define USB_FAST_LOOP		BIT(7)
-+
-+#define REG_ALARM		0x5
-+#define ALARM_LDO1		BIT(0)
-+#define ALARM_DCDC1		BIT(1)
-+#define ALARM_DCDC2		BIT(2)
-+#define ALARM_DCDC3		BIT(3)
-+#define ALARM_LDO2		BIT(4)
-+#define ALARM_USB_WARN		BIT(5)
-+#define ALARM_USB_ALARM		BIT(6)
-+#define ALARM_LCD		BIT(9)
-+#define ALARM_TEMP_WARM		BIT(10)
-+#define ALARM_TEMP_HOT		BIT(11)
-+#define ALARM_NRST		BIT(14)
-+#define ALARM_POWERUP		BIT(15)
-+
-+#define REG_INT_ENABLE		0x6
-+#define INT_LDO1		BIT(0)
-+#define INT_DCDC1		BIT(1)
-+#define INT_DCDC2		BIT(2)
-+#define INT_DCDC3		BIT(3)
-+#define INT_LDO2		BIT(4)
-+#define INT_USB_WARN		BIT(5)
-+#define INT_USB_ALARM		BIT(6)
-+#define INT_LCD			BIT(9)
-+#define INT_TEMP_WARM		BIT(10)
-+#define INT_TEMP_HOT		BIT(11)
-+#define INT_GLOBAL_EN		BIT(15)
-+
-+#define REG_INT_STATUS		0x7
-+#define STATUS_LDO1		BIT(0)
-+#define STATUS_DCDC1		BIT(1)
-+#define STATUS_DCDC2		BIT(2)
-+#define STATUS_DCDC3		BIT(3)
-+#define STATUS_LDO2		BIT(4)
-+#define STATUS_USB_WARN		BIT(5)
-+#define STATUS_USB_ALARM	BIT(6)
-+#define STATUS_LCD		BIT(9)
-+#define STATUS_TEMP_WARM	BIT(10)
-+#define STATUS_TEMP_HOT		BIT(11)
-+
-+#define REG_SOFTWARE_RESET	0xb
-+#define REG_WRITE_ENABLE	0xd
-+#define REG_REV_ID		0xf
-+
-+#define N_DCDC			3
-+#define N_LDO			2
-+#define N_SWITCH		2
-+#define N_REGULATORS		(3 /* DCDC */ + \
-+				 2 /* LDO */  + \
-+				 2 /* switch */)
-+
-+#define FIXED_ILIMSEL		BIT(0)
-+#define FIXED_VOLTAGE		BIT(1)
-+
-+#define CMD_READ(reg)		((reg) << 6)
-+#define CMD_WRITE(reg)		(BIT(5) | (reg) << 6)
-+#define STAT_CLK		BIT(3)
-+#define STAT_WRITE		BIT(2)
-+#define STAT_INVALID		BIT(1)
-+#define STAT_WP			BIT(0)
-+
-+struct field {
-+	int		reg;
-+	int		shift;
-+	int		mask;
-+};
-+
-+struct supply_info {
-+	const char	*name;
-+	int		n_voltages;
-+	const int	*voltages;
-+	int		fixed_voltage;
-+	int		n_ilimsels;
-+	const int	*ilimsels;
-+	int		fixed_ilimsel;
-+	int		flags;
-+	struct field	enable, voltage, ilimsel;
-+};
-+
-+struct tps6524x {
-+	struct device		*dev;
-+	struct spi_device	*spi;
-+	struct mutex		lock;
-+	struct regulator_desc	desc[N_REGULATORS];
-+	struct regulator_dev	*rdev[N_REGULATORS];
-+};
-+
-+static int __read_reg(struct tps6524x *hw, int reg)
-+{
-+	int error = 0;
-+	u16 cmd = CMD_READ(reg), in;
-+	u8 status;
-+	struct spi_message m;
-+	struct spi_transfer t[3];
-+
-+	spi_message_init(&m);
-+	memset(t, 0, sizeof(t));
-+
-+	t[0].tx_buf = &cmd;
-+	t[0].len = 2;
-+	t[0].bits_per_word = 12;
-+	spi_message_add_tail(&t[0], &m);
-+
-+	t[1].rx_buf = &in;
-+	t[1].len = 2;
-+	t[1].bits_per_word = 16;
-+	spi_message_add_tail(&t[1], &m);
-+
-+	t[2].rx_buf = &status;
-+	t[2].len = 1;
-+	t[2].bits_per_word = 4;
-+	spi_message_add_tail(&t[2], &m);
-+
-+	error = spi_sync(hw->spi, &m);
-+	if (error < 0)
-+		return error;
-+
-+	dev_dbg(hw->dev, "read reg %d, data %x, status %x\n",
-+		reg, in, status);
-+
-+	if (!(status & STAT_CLK) || (status & STAT_WRITE))
-+		return -EIO;
-+
-+	if (status & STAT_INVALID)
-+		return -EINVAL;
-+
-+	return in;
-+}
-+
-+static int read_reg(struct tps6524x *hw, int reg)
-+{
-+	int ret;
-+
-+	mutex_lock(&hw->lock);
-+	ret = __read_reg(hw, reg);
-+	mutex_unlock(&hw->lock);
-+
-+	return ret;
-+}
-+
-+static int __write_reg(struct tps6524x *hw, int reg, int val)
-+{
-+	int error = 0;
-+	u16 cmd = CMD_WRITE(reg), out = val;
-+	u8 status;
-+	struct spi_message m;
-+	struct spi_transfer t[3];
-+
-+	spi_message_init(&m);
-+	memset(t, 0, sizeof(t));
-+
-+	t[0].tx_buf = &cmd;
-+	t[0].len = 2;
-+	t[0].bits_per_word = 12;
-+	spi_message_add_tail(&t[0], &m);
-+
-+	t[1].tx_buf = &out;
-+	t[1].len = 2;
-+	t[1].bits_per_word = 16;
-+	spi_message_add_tail(&t[1], &m);
-+
-+	t[2].rx_buf = &status;
-+	t[2].len = 1;
-+	t[2].bits_per_word = 4;
-+	spi_message_add_tail(&t[2], &m);
-+
-+	error = spi_sync(hw->spi, &m);
-+	if (error < 0)
-+		return error;
-+
-+	dev_dbg(hw->dev, "wrote reg %d, data %x, status %x\n",
-+		reg, out, status);
-+
-+	if (!(status & STAT_CLK) || !(status & STAT_WRITE))
-+		return -EIO;
-+
-+	if (status & (STAT_INVALID | STAT_WP))
-+		return -EINVAL;
-+
-+	return error;
-+}
-+
-+static int __rmw_reg(struct tps6524x *hw, int reg, int mask, int val)
-+{
-+	int ret;
-+
-+	ret = __read_reg(hw, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret &= ~mask;
-+	ret |= val;
-+
-+	ret = __write_reg(hw, reg, ret);
-+
-+	return (ret < 0) ? ret : 0;
-+}
-+
-+static int rmw_protect(struct tps6524x *hw, int reg, int mask, int val)
-+{
-+	int ret;
-+
-+	mutex_lock(&hw->lock);
-+
-+	ret = __write_reg(hw, REG_WRITE_ENABLE, 1);
-+	if (ret) {
-+		dev_err(hw->dev, "failed to set write enable\n");
-+		goto error;
-+	}
-+
-+	ret = __rmw_reg(hw, reg, mask, val);
-+	if (ret)
-+		dev_err(hw->dev, "failed to rmw register %d\n", reg);
-+
-+	ret = __write_reg(hw, REG_WRITE_ENABLE, 0);
-+	if (ret) {
-+		dev_err(hw->dev, "failed to clear write enable\n");
-+		goto error;
-+	}
-+
-+error:
-+	mutex_unlock(&hw->lock);
-+
-+	return ret;
-+}
-+
-+static int read_field(struct tps6524x *hw, const struct field *field)
-+{
-+	int tmp;
-+
-+	tmp = read_reg(hw, field->reg);
-+	if (tmp < 0)
-+		return tmp;
-+
-+	return (tmp >> field->shift) & field->mask;
-+}
-+
-+static int write_field(struct tps6524x *hw, const struct field *field,
-+		       int val)
-+{
-+	if (val & ~field->mask)
-+		return -EOVERFLOW;
-+
-+	return rmw_protect(hw, field->reg,
-+				    field->mask << field->shift,
-+				    val << field->shift);
-+}
-+
-+static const int dcdc1_voltages[] = {
-+	 800000,  825000,  850000,  875000,
-+	 900000,  925000,  950000,  975000,
-+	1000000, 1025000, 1050000, 1075000,
-+	1100000, 1125000, 1150000, 1175000,
-+	1200000, 1225000, 1250000, 1275000,
-+	1300000, 1325000, 1350000, 1375000,
-+	1400000, 1425000, 1450000, 1475000,
-+	1500000, 1525000, 1550000, 1575000,
-+};
-+
-+static const int dcdc2_voltages[] = {
-+	1400000, 1450000, 1500000, 1550000,
-+	1600000, 1650000, 1700000, 1750000,
-+	1800000, 1850000, 1900000, 1950000,
-+	2000000, 2050000, 2100000, 2150000,
-+	2200000, 2250000, 2300000, 2350000,
-+	2400000, 2450000, 2500000, 2550000,
-+	2600000, 2650000, 2700000, 2750000,
-+	2800000, 2850000, 2900000, 2950000,
-+};
-+
-+static const int dcdc3_voltages[] = {
-+	2400000, 2450000, 2500000, 2550000, 2600000,
-+	2650000, 2700000, 2750000, 2800000, 2850000,
-+	2900000, 2950000, 3000000, 3050000, 3100000,
-+	3150000, 3200000, 3250000, 3300000, 3350000,
-+	3400000, 3450000, 3500000, 3550000, 3600000,
-+};
-+
-+static const int ldo1_voltages[] = {
-+	4300000, 4350000, 4400000, 4450000,
-+	4500000, 4550000, 4600000, 4650000,
-+	4700000, 4750000, 4800000, 4850000,
-+	4900000, 4950000, 5000000, 5050000,
-+};
-+
-+static const int ldo2_voltages[] = {
-+	1100000, 1150000, 1200000, 1250000,
-+	1300000, 1700000, 1750000, 1800000,
-+	1850000, 1900000, 3150000, 3200000,
-+	3250000, 3300000, 3350000, 3400000,
-+};
-+
-+static const int ldo_ilimsel[] = {
-+	400000, 1500000
-+};
-+
-+static const int usb_ilimsel[] = {
-+	200000, 400000, 800000, 1000000
-+};
-+
-+#define __MK_FIELD(_reg, _mask, _shift) \
-+	{ .reg = (_reg), .mask = (_mask), .shift = (_shift), }
-+
-+static const struct supply_info supply_info[N_REGULATORS] = {
-+	{
-+		.name		= "DCDC1",
-+		.flags		= FIXED_ILIMSEL,
-+		.n_voltages	= ARRAY_SIZE(dcdc1_voltages),
-+		.voltages	= dcdc1_voltages,
-+		.fixed_ilimsel	= 2400000,
-+		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
-+					     DCDCDCDC1_EN_SHIFT),
-+		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
-+					     DCDC_VDCDC1_SHIFT),
-+	},
-+	{
-+		.name		= "DCDC2",
-+		.flags		= FIXED_ILIMSEL,
-+		.n_voltages	= ARRAY_SIZE(dcdc2_voltages),
-+		.voltages	= dcdc2_voltages,
-+		.fixed_ilimsel	= 1200000,
-+		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
-+					     DCDCDCDC2_EN_SHIFT),
-+		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
-+					     DCDC_VDCDC2_SHIFT),
-+	},
-+	{
-+		.name		= "DCDC3",
-+		.flags		= FIXED_ILIMSEL,
-+		.n_voltages	= ARRAY_SIZE(dcdc3_voltages),
-+		.voltages	= dcdc3_voltages,
-+		.fixed_ilimsel	= 1200000,
-+		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
-+					DCDCDCDC3_EN_SHIFT),
-+		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
-+					     DCDC_VDCDC3_SHIFT),
-+	},
-+	{
-+		.name		= "LDO1",
-+		.n_voltages	= ARRAY_SIZE(ldo1_voltages),
-+		.voltages	= ldo1_voltages,
-+		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
-+		.ilimsels	= ldo_ilimsel,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_LDO1_SHIFT),
-+		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
-+					     LDO1_VSEL_SHIFT),
-+		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
-+					     LDO1_ILIM_SHIFT),
-+	},
-+	{
-+		.name		= "LDO2",
-+		.n_voltages	= ARRAY_SIZE(ldo2_voltages),
-+		.voltages	= ldo2_voltages,
-+		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
-+		.ilimsels	= ldo_ilimsel,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_LDO2_SHIFT),
-+		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
-+					     LDO2_VSEL_SHIFT),
-+		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
-+					     LDO2_ILIM_SHIFT),
-+	},
-+	{
-+		.name		= "USB",
-+		.flags		= FIXED_VOLTAGE,
-+		.fixed_voltage	= 5000000,
-+		.n_ilimsels	= ARRAY_SIZE(usb_ilimsel),
-+		.ilimsels	= usb_ilimsel,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_USB_SHIFT),
-+		.ilimsel	= __MK_FIELD(REG_USB, USB_ILIM_MASK,
-+					     USB_ILIM_SHIFT),
-+	},
-+	{
-+		.name		= "LCD",
-+		.flags		= FIXED_VOLTAGE | FIXED_ILIMSEL,
-+		.fixed_voltage	= 5000000,
-+		.fixed_ilimsel	=  400000,
-+		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
-+					     BLOCK_LCD_SHIFT),
-+	},
-+};
-+
-+static int list_voltage(struct regulator_dev *rdev, unsigned selector)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_VOLTAGE)
-+		return selector ? -EINVAL : info->fixed_voltage;
-+
-+	if (selector < 0 || selector >= info->n_voltages)
-+		return -EINVAL;
-+
-+	return info->voltages[selector];
-+}
-+
-+static int set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int i;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_VOLTAGE)
-+		return -EINVAL;
-+
-+	for (i = 0; i < info->n_voltages; i++)
-+		if (min_uV <= info->voltages[i] &&
-+		    max_uV >= info->voltages[i])
-+			break;
-+
-+	if (i >= info->n_voltages)
-+		return -EINVAL;
-+
-+	return write_field(hw, &info->voltage, i);
-+}
-+
-+static int get_voltage(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int ret;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_VOLTAGE)
-+		return info->fixed_voltage;
-+
-+	ret = read_field(hw, &info->voltage);
-+	if (ret < 0)
-+		return ret;
-+	if (WARN_ON(ret >= info->n_voltages))
-+		return -EIO;
-+
-+	return info->voltages[ret];
-+}
-+
-+static int set_current_limit(struct regulator_dev *rdev, int min_uA,
-+			     int max_uA)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int i;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_ILIMSEL)
-+		return -EINVAL;
-+
-+	for (i = 0; i < info->n_ilimsels; i++)
-+		if (min_uA <= info->ilimsels[i] &&
-+		    max_uA >= info->ilimsels[i])
-+			break;
-+
-+	if (i >= info->n_ilimsels)
-+		return -EINVAL;
-+
-+	return write_field(hw, &info->ilimsel, i);
-+}
-+
-+static int get_current_limit(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+	int ret;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	if (info->flags & FIXED_ILIMSEL)
-+		return info->fixed_ilimsel;
-+
-+	ret = read_field(hw, &info->ilimsel);
-+	if (ret < 0)
-+		return ret;
-+	if (WARN_ON(ret >= info->n_ilimsels))
-+		return -EIO;
-+
-+	return info->ilimsels[ret];
-+}
-+
-+static int enable_supply(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	return write_field(hw, &info->enable, 1);
-+}
-+
-+static int disable_supply(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	return write_field(hw, &info->enable, 0);
-+}
-+
-+static int is_supply_enabled(struct regulator_dev *rdev)
-+{
-+	const struct supply_info *info;
-+	struct tps6524x *hw;
-+
-+	hw	= rdev_get_drvdata(rdev);
-+	info	= &supply_info[rdev_get_id(rdev)];
-+
-+	return read_field(hw, &info->enable);
-+}
-+
-+static struct regulator_ops regulator_ops = {
-+	.is_enabled		= is_supply_enabled,
-+	.enable			= enable_supply,
-+	.disable		= disable_supply,
-+	.get_voltage		= get_voltage,
-+	.set_voltage		= set_voltage,
-+	.list_voltage		= list_voltage,
-+	.set_current_limit	= set_current_limit,
-+	.get_current_limit	= get_current_limit,
-+};
-+
-+static int __devexit pmic_remove(struct spi_device *spi)
-+{
-+	struct tps6524x *hw = spi_get_drvdata(spi);
-+	int i;
-+
-+	if (!hw)
-+		return 0;
-+	for (i = 0; i < N_REGULATORS; i++) {
-+		if (hw->rdev[i])
-+			regulator_unregister(hw->rdev[i]);
-+		hw->rdev[i] = NULL;
-+	}
-+	spi_set_drvdata(spi, NULL);
-+	kfree(hw);
-+	return 0;
-+}
-+
-+static int __devinit pmic_probe(struct spi_device *spi)
-+{
-+	struct tps6524x *hw;
-+	struct device *dev = &spi->dev;
-+	const struct supply_info *info = supply_info;
-+	struct regulator_init_data *init_data;
-+	int ret = 0, i;
-+
-+	init_data = dev->platform_data;
-+	if (!init_data) {
-+		dev_err(dev, "could not find regulator platform data\n");
-+		return -EINVAL;
-+	}
-+
-+	hw = kzalloc(sizeof(struct tps6524x), GFP_KERNEL);
-+	if (!hw) {
-+		dev_err(dev, "cannot allocate regulator private data\n");
-+		return -ENOMEM;
-+	}
-+	spi_set_drvdata(spi, hw);
-+
-+	memset(hw, 0, sizeof(struct tps6524x));
-+	hw->dev = dev;
-+	hw->spi = spi_dev_get(spi);
-+	mutex_init(&hw->lock);
-+
-+	for (i = 0; i < N_REGULATORS; i++, info++, init_data++) {
-+		hw->desc[i].name	= info->name;
-+		hw->desc[i].id		= i;
-+		hw->desc[i].n_voltages	= info->n_voltages;
-+		hw->desc[i].ops		= &regulator_ops;
-+		hw->desc[i].type	= REGULATOR_VOLTAGE;
-+		hw->desc[i].owner	= THIS_MODULE;
-+
-+		if (info->flags & FIXED_VOLTAGE)
-+			hw->desc[i].n_voltages = 1;
-+
-+		hw->rdev[i] = regulator_register(&hw->desc[i], dev,
-+						 init_data, hw);
-+		if (IS_ERR(hw->rdev[i])) {
-+			ret = PTR_ERR(hw->rdev[i]);
-+			hw->rdev[i] = NULL;
-+			goto fail;
-+		}
-+	}
-+
-+	return 0;
-+
-+fail:
-+	pmic_remove(spi);
-+	return ret;
-+}
-+
-+static struct spi_driver pmic_driver = {
-+	.probe		= pmic_probe,
-+	.remove		= __devexit_p(pmic_remove),
-+	.driver		= {
-+		.name	= "tps6524x",
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+static int __init pmic_driver_init(void)
-+{
-+	return spi_register_driver(&pmic_driver);
-+}
-+module_init(pmic_driver_init);
-+
-+static void __exit pmic_driver_exit(void)
-+{
-+	spi_unregister_driver(&pmic_driver);
-+}
-+module_exit(pmic_driver_exit);
-+
-+MODULE_DESCRIPTION("TPS6524X PMIC Driver");
-+MODULE_AUTHOR("Cyril Chemparathy");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("spi:tps6524x");
--- 
-1.7.1
+In general, converting the code to C will solve a lot of potential
+problems.  If you don't copy the code, that also simplifies matters.
+
+Note that converting to C doesn't mean that code which attempts to
+copy function bodies will work: you still need to handle the fact that
+if f() is a C function symbol, then the value of the symbol f is
+actually the function's base address + 1.  See my changes in sram.c,
+pm34xx.c etc.
+
+If there are still bits of ARM code (such as the resume re-entry
+point?) some care will still be needed there.
+
+Anyone maintaining low-level and assembler code may find the following
+useful: https://wiki.ubuntu.com/ARM/Thumb2PortingHowto
+
+>> If you have any thoughts about how to exercise the power management
+>> functionality more completely, I'd be happy to have a go...
+> Cf. [3] for more details on how to exercise the PM on the target. This
+> wiki page is slightly outdated but the idea is still the same. Note
+> that only cpuidle is currently supported correctly on l-o master.
+>
+> [1] http://marc.info/?l=linux-omap&m=129139584919242&w=2
+> [2] http://marc.info/?l=linux-omap&m=129172034809447&w=2
+> [3] http://elinux.org/OMAP_Power_Management
+
+Thanks for this info
+
+Humm, which reference tree should I be using?  I'm not convinced it
+works properly/usefully in the linaro trees ... only OMAP_PM_NOOP is
+provided, and when I echo mem >/sys/power/state, the platform does not
+crash (at least, it doesn't lock up) but doesn't appear to suspend
+properly either.  Also, I'm not seeing your debugs contents.
+
+
+On a separate topic, I have some firmware questions you might be able to answer:
+  * Does the secure firmware attempt to read the comment field from
+SMC instructions?  And if so, does it assume the SMC is in ARM code?
+  * Is the secure firmware able to cope with a Thumb resume re-entry point?
+
+Currently, I've taken the conservative approach and assume that the
+answer to both of these questions is "no".  But this means that a few
+bits of code need to be built as ARM which could otherwise be Thumb.
+It would be cleaner to get the amount of ARM code down to an absolute
+minimum when building a Thumb kernel.
+
+
+
+Some specific comments on your patches:
+
+After the label "finished:" in sleep34xx.S
++	ldr r1, kernel_flush
++	mov lr, pc
++	bx  r1
+
+If the code might be built as Thumb-2, this won't work correctly,
+because the Thumb bit (bit 0) will not get set properly in lr.
+Instead:
+
++	ldr r1, kernel_flush
++	blx r1
+
+Even if you think this code isn't going to be built for Thumb-2, it's
+specific to v7+ platforms, so I recommend you use the above change
+anyway: it's more compact and will help avoid maintenance problems
+further down the line...
+
+
++	str	r4, wait_dll_lock_counter
+[...]
++	str	r4, kick_counter
+
+PC-relative stores are illegal in Thumb-2.  Worse, current binutils
+will assemble invalid code if you do this in the source and build for
+Thumb-2.  For details and my fix, search for "PC-relative stores" on
+http://lists.arm.linux.org.uk/lurker/message/20101130.133117.a98bf92f.en.html
+
+
+
++ENTRY(get_omap3630_restore_pointer)
++        stmfd   sp!, {lr}     @ save registers on stack
++	adr	r0, restore_3630
+
+If restore_3630 is a Thumb symbol, this will go wrong, because the
+"Thumb bit" won't get set in the address.  Instead, you would need to
+use "adr r0, BSYM(restore_3630)", but only if restore_3630 is built as
+Thumb-2 when the kernel is built with CONFIG_THUMB2_KERNEL.
+
+Cheers
+---Dave
