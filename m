@@ -1,40 +1,31 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 8 Dec 2010 00:31:53 +0800
-Subject: [PATCH v3 03/15] ARM: mxs: Add reset routines
+Date: Wed, 8 Dec 2010 00:32:01 +0800
+Subject: [PATCH v2 13/15] ARM: mxs: Add initial mx23evk support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1291739523-25077-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1291739523-25077-10-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- - The mxs wdog is implemented in RTC block.
- - There is a generic software reset routine for most modules on mxs.
+Add initial mx23evk support with duart.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
-Changes for v3:
- - Change wdog timeout to 10ms for safety
- - Simplify function mxs_reset_block() to get it look better
-
 Changes for v2:
- - Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
+ - Remove boot_params
 
- arch/arm/mach-mxs/include/mach/system.h |   27 ++++++
- arch/arm/mach-mxs/system.c              |  134 +++++++++++++++++++++++++++++++
- 2 files changed, 161 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/system.h
- create mode 100644 arch/arm/mach-mxs/system.c
+ arch/arm/mach-mxs/mach-mx23evk.c |   58 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 58 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mach-mx23evk.c
 
-diff --git a/arch/arm/mach-mxs/include/mach/system.h b/arch/arm/mach-mxs/include/mach/system.h
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
 new file mode 100644
-index 0000000..0e42823
+index 0000000..2169937
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/system.h
-@@ -0,0 +1,27 @@
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -0,0 +1,58 @@
 +/*
-+ *  Copyright (C) 1999 ARM Limited
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -47,156 +38,49 @@ index 0000000..0e42823
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef __MACH_MXS_SYSTEM_H__
-+#define __MACH_MXS_SYSTEM_H__
-+
-+static inline void arch_idle(void)
-+{
-+	cpu_do_idle();
-+}
-+
-+void arch_reset(char mode, const char *cmd);
-+
-+#endif /* __MACH_MXS_SYSTEM_H__ */
-diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-new file mode 100644
-index 0000000..58cb044
---- /dev/null
-+++ b/arch/arm/mach-mxs/system.c
-@@ -0,0 +1,134 @@
-+/*
-+ * Copyright (C) 1999 ARM Limited
-+ * Copyright (C) 2000 Deep Blue Solutions Ltd
-+ * Copyright 2006-2007,2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-+ * Copyright 2009 Ilya Yanok, Emcraft Systems Ltd, yanok at emcraft.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
 +#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/irq.h>
 +
-+#include <asm/proc-fns.h>
-+#include <asm/system.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
 +
 +#include <mach/hardware.h>
 +#include <mach/common.h>
++#include <mach/iomux-mx23.h>
 +
-+#define MXS_RTC_WATCHDOG	0x50
-+#define MXS_WATCHDOG_EN		(1 << 4)
++#include "devices-mx23.h"
 +
-+#define MXS_MODULE_CLKGATE	(1 << 30)
-+#define MXS_MODULE_SFTRST	(1 << 31)
++static iomux_cfg_t mx23evk_pads[] = {
++	/* duart */
++	MX23_PAD_PWM0__DUART_RX,
++	MX23_PAD_PWM1__DUART_TX,
++};
 +
-+static void __iomem *wdog_base;
-+
-+/*
-+ * Reset the system. It is called by machine_restart().
-+ */
-+void arch_reset(char mode, const char *cmd)
++static void __init mx23evk_init(void)
 +{
-+	/* Set wdog timer 10 ms */
-+	__raw_writel(10, wdog_base + MXS_RTC_WATCHDOG);
++	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
 +
-+	/* Enable wdog reset */
-+	__raw_writel(MXS_WATCHDOG_EN, wdog_base + MXS_SET_ADDR);
-+
-+	/* Wait for reset to assert... */
-+	mdelay(10);
-+
-+	pr_err("Watchdog reset failed to assert reset\n");
-+
-+	/* Delay to allow the serial port to show the message */
-+	mdelay(50);
-+
-+	/* We'll take a jump through zero as a poor second */
-+	cpu_reset(0);
++	mx23_add_duart();
 +}
 +
-+void mxs_arch_reset_init(void __iomem *base)
++static void __init mx23evk_timer_init(void)
 +{
-+	struct clk *clk;
-+
-+	wdog_base = base;
-+
-+	clk = clk_get_sys("rtc", NULL);
-+	if (!IS_ERR(clk))
-+		clk_enable(clk);
++	mx23_clocks_init();
 +}
 +
-+/*
-+ * Clear the bit and poll it cleared.  This is usually called with
-+ * a reset address and mask being either SFTRST(bit 31) or CLKGATE
-+ * (bit 30).
-+ */
-+static int clear_poll_bit(void __iomem *addr, u32 mask)
-+{
-+	int timeout = 0x400;
++static struct sys_timer mx23evk_timer = {
++	.init	= mx23evk_timer_init,
++};
 +
-+	/* clear the bit */
-+	__raw_writel(mask, addr + MXS_CLR_ADDR);
-+
-+	/*
-+	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
-+	 * recommends to wait 1us.
-+	 */
-+	udelay(1);
-+
-+	/* poll the bit becoming clear */
-+	while ((__raw_readl(addr) & mask) && --timeout)
-+		/* nothing */;
-+
-+	return !timeout;
-+}
-+
-+int mxs_reset_block(void __iomem *reset_addr)
-+{
-+	int ret;
-+	int timeout = 0x400;
-+
-+	/* clear and poll SFTRST */
-+	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
-+	if (ret)
-+		goto error;
-+
-+	/* clear CLKGATE */
-+	__raw_writel(MXS_MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
-+	/* set SFTRST to reset the block */
-+	__raw_writel(MXS_MODULE_SFTRST, reset_addr + MXS_SET_ADDR);
-+	udelay(1);
-+	/* poll CLKGATE becoming set */
-+	while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
-+		/* nothing */;
-+	if (unlikely(!timeout))
-+		goto error;
-+
-+	/* clear and poll SFTRST */
-+	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
-+	if (ret)
-+		goto error;
-+
-+	/* clear and poll CLKGATE */
-+	ret = clear_poll_bit(reset_addr, MXS_MODULE_CLKGATE);
-+	if (ret)
-+		goto error;
-+
-+	return 0;
-+
-+error:
-+	pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
-+	return -ETIMEDOUT;
-+}
++MACHINE_START(MX23EVK, "Freescale MX23 EVK")
++	/* Maintainer: Freescale Semiconductor, Inc. */
++	.map_io         = mx23_map_io,
++	.init_irq       = mx23_init_irq,
++	.init_machine   = mx23evk_init,
++	.timer          = &mx23evk_timer,
++MACHINE_END
 -- 
 1.7.1
