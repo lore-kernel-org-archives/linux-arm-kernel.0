@@ -1,575 +1,277 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Wed,  8 Dec 2010 09:52:26 +1100
-Subject: [PATCH] Added i2c support for mc13xxx-core
-In-Reply-To: <1291761693-29689-2-git-send-email-marc@cpdesign.com.au>
-References: <1291761693-29689-2-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1291762346-29912-1-git-send-email-marc@cpdesign.com.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Dec 2010 15:23:16 -0800
+Subject: [PATCH 12/11] omap1: Fix gpio mpuio bank to work for multi-omap
+	for 7xx/15xx/16xx
+In-Reply-To: <20101204212554.GM17222@atomide.com>
+References: <1290689318-10191-1-git-send-email-charu@ti.com>
+	<20101201183357.GI17222@atomide.com>
+	<87zkso4hu3.fsf@deeprootsystems.com>
+	<AANLkTinY8FKbVvXD29KpgGnsnKwQziXws+zKLZWn69Hj@mail.gmail.com>
+	<20101204212554.GM17222@atomide.com>
+Message-ID: <20101207232315.GE17435@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
----
- drivers/mfd/mc13xxx-core.c |  341 +++++++++++++++++++++++++++++++-------------
- 1 files changed, 243 insertions(+), 98 deletions(-)
+* Tony Lindgren <tony@atomide.com> [101204 13:16]:
+> * Varadarajan, Charulatha <charu@ti.com> [101202 06:08]:
+> > On Thu, Dec 2, 2010 at 15:28, Kevin Hilman <khilman@deeprootsystems.com> wrote:
+> > 
+> > >
+> > > Tony, you can also add
+> > >
+> > > Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+> 
+> OK, updated. Also made one more GPIO patch to allow us to deal
+> with the 7xx vs 15xx/16xx MPUIO registers.
 
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index a2ac2ed..858ad6f 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -9,7 +9,6 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-@@ -18,12 +17,28 @@
- #include <linux/spi/spi.h>
- #include <linux/mfd/core.h>
- #include <linux/mfd/mc13xxx.h>
-+#include <linux/i2c.h>
-+
-+enum mc13xxx_id {
-+	MC13XXX_ID_MC13783,
-+	MC13XXX_ID_MC13892,
-+	MC13XXX_ID_INVALID,
-+};
- 
- struct mc13xxx {
--	struct spi_device *spidev;
-+	union {
-+		struct spi_device *spidev;
-+		struct i2c_client *client;
-+	};
-+	struct device *pdev;
-+	enum mc13xxx_id icid;
-+
- 	struct mutex lock;
- 	int irq;
- 
-+	int (*read_dev)(struct mc13xxx*, unsigned int, u32*);
-+	int (*write_dev)(struct mc13xxx*, unsigned int, u32);
-+
- 	irq_handler_t irqhandler[MC13XXX_NUM_IRQ];
- 	void *irqdata[MC13XXX_NUM_IRQ];
- };
-@@ -150,36 +165,48 @@ EXPORT_SYMBOL(mc13783_to_mc13xxx);
- void mc13xxx_lock(struct mc13xxx *mc13xxx)
- {
- 	if (!mutex_trylock(&mc13xxx->lock)) {
--		dev_dbg(&mc13xxx->spidev->dev, "wait for %s from %pf\n",
-+		dev_dbg(mc13xxx->pdev, "wait for %s from %pf\n",
- 				__func__, __builtin_return_address(0));
- 
- 		mutex_lock(&mc13xxx->lock);
- 	}
--	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
-+	dev_dbg(mc13xxx->pdev, "%s from %pf\n",
- 			__func__, __builtin_return_address(0));
- }
- EXPORT_SYMBOL(mc13xxx_lock);
- 
- void mc13xxx_unlock(struct mc13xxx *mc13xxx)
- {
--	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
-+	dev_dbg(mc13xxx->pdev, "%s from %pf\n",
- 			__func__, __builtin_return_address(0));
- 	mutex_unlock(&mc13xxx->lock);
- }
- EXPORT_SYMBOL(mc13xxx_unlock);
- 
--#define MC13XXX_REGOFFSET_SHIFT 25
- int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
- {
--	struct spi_transfer t;
--	struct spi_message m;
- 	int ret;
--
-+	BUG_ON(!mc13xxx->read_dev);
- 	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
- 
- 	if (offset > MC13XXX_NUMREGS)
- 		return -EINVAL;
- 
-+	ret = mc13xxx->read_dev(mc13xxx, offset, val);
-+	dev_vdbg(mc13xxx->pdev, "[0x%02x] -> 0x%06x\n", offset, *val);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(mc13xxx_reg_read);
-+
-+#define MC13XXX_REGOFFSET_SHIFT 25
-+static int mc13xxx_spi_reg_read(struct mc13xxx *mc13xxx,
-+				unsigned int offset, u32 *val)
-+{
-+	struct spi_transfer t;
-+	struct spi_message m;
-+	int ret;
-+
- 	*val = offset << MC13XXX_REGOFFSET_SHIFT;
- 
- 	memset(&t, 0, sizeof(t));
-@@ -201,26 +228,30 @@ int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
- 
- 	*val &= 0xffffff;
- 
--	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
--
- 	return 0;
- }
--EXPORT_SYMBOL(mc13xxx_reg_read);
- 
- int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
- {
--	u32 buf;
--	struct spi_transfer t;
--	struct spi_message m;
--	int ret;
--
- 	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
--
--	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] <- 0x%06x\n", offset, val);
-+	BUG_ON(!mc13xxx->write_dev);
-+	dev_vdbg(mc13xxx->pdev, "[0x%02x] <- 0x%06x\n", offset, val);
- 
- 	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
- 		return -EINVAL;
- 
-+	return mc13xxx->write_dev(mc13xxx, offset, val);
-+}
-+EXPORT_SYMBOL(mc13xxx_reg_write);
-+
-+static int mc13xxx_spi_reg_write(struct mc13xxx *mc13xxx,
-+				unsigned int offset, u32 val)
-+{
-+	u32 buf;
-+	struct spi_transfer t;
-+	struct spi_message m;
-+	int ret;
-+
- 	buf = 1 << 31 | offset << MC13XXX_REGOFFSET_SHIFT | val;
- 
- 	memset(&t, 0, sizeof(t));
-@@ -241,7 +272,33 @@ int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
- 
- 	return 0;
- }
--EXPORT_SYMBOL(mc13xxx_reg_write);
-+
-+static int mc13xxx_i2c_reg_read(struct mc13xxx *mc13xxx, unsigned int offset,
-+		u32 *val)
-+{
-+	int ret;
-+	unsigned char buff[3] = {0, 0, 0};
-+
-+	ret = i2c_smbus_read_i2c_block_data(mc13xxx->client, offset, 3, buff);
-+	*val = buff[0] << 16 | buff[1] << 8 | buff[2];
-+
-+	return ret == 3 ? 0 : ret;
-+}
-+
-+static int mc13xxx_i2c_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
-+		u32 val)
-+{
-+	int ret;
-+	unsigned char buff[3];
-+
-+	buff[0] = (val >> 16) & 0xff;
-+	buff[1] = (val >> 8) & 0xff;
-+	buff[2] = val & 0xff;
-+
-+	ret = i2c_smbus_write_i2c_block_data(mc13xxx->client, offset, 3, buff);
-+
-+	return ret;
-+}
- 
- int mc13xxx_reg_rmw(struct mc13xxx *mc13xxx, unsigned int offset,
- 		u32 mask, u32 val)
-@@ -445,7 +502,7 @@ static int mc13xxx_irq_handle(struct mc13xxx *mc13xxx,
- 			if (handled == IRQ_HANDLED)
- 				num_handled++;
- 		} else {
--			dev_err(&mc13xxx->spidev->dev,
-+			dev_err(mc13xxx->pdev,
- 					"BUG: irq %u but no handler\n",
- 					baseirq + irq);
- 
-@@ -481,11 +538,6 @@ static irqreturn_t mc13xxx_irq_thread(int irq, void *data)
- 	return IRQ_RETVAL(handled);
- }
- 
--enum mc13xxx_id {
--	MC13XXX_ID_MC13783,
--	MC13XXX_ID_MC13892,
--	MC13XXX_ID_INVALID,
--};
- 
- const char *mc13xxx_chipname[] = {
- 	[MC13XXX_ID_MC13783] = "mc13783",
-@@ -493,41 +545,38 @@ const char *mc13xxx_chipname[] = {
+Turns out that broke drivers/mtd/nand/ams-delta.c as it directly uses
+multiple lines in parallel. So let's use 15xx/16xx offsets instead
+and divide them by two.
+
+Regards,
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Sat, 4 Dec 2010 12:39:43 -0800
+Subject: [PATCH] omap1: Fix gpio mpuio bank to work for multi-omap for 7xx/15xx/16xx
+
+We need to divide the 15xx/16xx offset by 2 for 7xx. Use bank->stride
+for that. This allows us to get rid of the duplicate defines for the
+MPUIO registers.
+
+Note that this will cause omap-keypad.c driver to not work on 7xx.
+However, the right fix there is to move over to gpio-keys instead as
+suggested by Cory Maccarrone <darkstar6262@gmail.com> and
+Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>.
+
+Cc: Cory Maccarrone <darkstar6262@gmail.com>
+Cc: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+index dbd8168..04c4b04 100644
+--- a/arch/arm/mach-omap1/gpio15xx.c
++++ b/arch/arm/mach-omap1/gpio15xx.c
+@@ -38,6 +38,7 @@ static struct __initdata omap_gpio_platform_data omap15xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+ 	.bank_type		= METHOD_MPUIO,
+ 	.bank_width		= 16,
++	.bank_stride		= 1,
  };
  
- #define maskval(reg, mask)	(((reg) & (mask)) >> __ffs(mask))
--static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
-+static int mc13xxx_identify(struct mc13xxx *mc13xxx, int usespi)
- {
- 	u32 icid;
- 	u32 revision;
- 	const char *name;
- 	int ret;
- 
--	ret = mc13xxx_reg_read(mc13xxx, 46, &icid);
-+	ret = mc13xxx_reg_read(mc13xxx, MC13XXX_REVISION, &revision);
- 	if (ret)
- 		return ret;
- 
--	icid = (icid >> 6) & 0x7;
-+	icid = (revision >> 6) & 0x7;
- 
- 	switch (icid) {
- 	case 2:
--		*id = MC13XXX_ID_MC13783;
-+		mc13xxx->icid = MC13XXX_ID_MC13783;
- 		name = "mc13783";
- 		break;
- 	case 7:
--		*id = MC13XXX_ID_MC13892;
-+		mc13xxx->icid = MC13XXX_ID_MC13892;
- 		name = "mc13892";
- 		break;
- 	default:
--		*id = MC13XXX_ID_INVALID;
-+		mc13xxx->icid = MC13XXX_ID_INVALID;
- 		break;
- 	}
- 
--	if (*id == MC13XXX_ID_MC13783 || *id == MC13XXX_ID_MC13892) {
--		ret = mc13xxx_reg_read(mc13xxx, MC13XXX_REVISION, &revision);
--		if (ret)
--			return ret;
--
--		dev_info(&mc13xxx->spidev->dev, "%s: rev: %d.%d, "
-+	if (mc13xxx->icid == MC13XXX_ID_MC13783 ||
-+			mc13xxx->icid == MC13XXX_ID_MC13892) {
-+		dev_info(mc13xxx->pdev, "%s: rev: %d.%d, "
- 				"fin: %d, fab: %d, icid: %d/%d\n",
--				mc13xxx_chipname[*id],
-+				mc13xxx_chipname[mc13xxx->icid],
- 				maskval(revision, MC13XXX_REVISION_REVFULL),
- 				maskval(revision, MC13XXX_REVISION_REVMETAL),
- 				maskval(revision, MC13XXX_REVISION_FIN),
-@@ -535,27 +584,23 @@ static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
- 				maskval(revision, MC13XXX_REVISION_ICID),
- 				maskval(revision, MC13XXX_REVISION_ICIDCODE));
- 	}
--
--	if (*id != MC13XXX_ID_INVALID) {
--		const struct spi_device_id *devid =
--			spi_get_device_id(mc13xxx->spidev);
--		if (!devid || devid->driver_data != *id)
--			dev_warn(&mc13xxx->spidev->dev, "device id doesn't "
--					"match auto detection!\n");
-+	if (mc13xxx->icid != MC13XXX_ID_INVALID) {
-+		if (usespi) {
-+			const struct spi_device_id *devid =
-+				spi_get_device_id(mc13xxx->spidev);
-+			if (!devid || devid->driver_data != mc13xxx->icid)
-+				dev_warn(mc13xxx->pdev, "device id doesn't "
-+						"match auto detection!\n");
-+		} else {
-+			/* TODO */
-+		}
- 	}
--
- 	return 0;
- }
- 
- static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
- {
--	const struct spi_device_id *devid =
--		spi_get_device_id(mc13xxx->spidev);
--
--	if (!devid)
--		return NULL;
--
--	return mc13xxx_chipname[devid->driver_data];
-+	return mc13xxx_chipname[mc13xxx->icid];
- }
- 
- #include <linux/mfd/mc13783.h>
-@@ -563,7 +608,7 @@ static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
- int mc13xxx_get_flags(struct mc13xxx *mc13xxx)
- {
- 	struct mc13xxx_platform_data *pdata =
--		dev_get_platdata(&mc13xxx->spidev->dev);
-+		dev_get_platdata(mc13xxx->pdev);
- 
- 	return pdata->flags;
- }
-@@ -601,7 +646,7 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
- 	};
- 	init_completion(&adcdone_data.done);
- 
--	dev_dbg(&mc13xxx->spidev->dev, "%s\n", __func__);
-+	dev_dbg(mc13xxx->pdev, "%s\n", __func__);
- 
- 	mc13xxx_lock(mc13xxx);
- 
-@@ -643,7 +688,7 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
- 		return -EINVAL;
- 	}
- 
--	dev_dbg(&mc13783->mc13xxx.spidev->dev, "%s: request irq\n", __func__);
-+	dev_dbg(mc13783->mc13xxx.pdev, "%s: request irq\n", __func__);
- 	mc13xxx_irq_request(mc13xxx, MC13783_IRQ_ADCDONE,
- 			mc13783_handler_adcdone, __func__, &adcdone_data);
- 	mc13xxx_irq_ack(mc13xxx, MC13783_IRQ_ADCDONE);
-@@ -701,7 +746,7 @@ static int mc13xxx_add_subdevice_pdata(struct mc13xxx *mc13xxx,
- 	if (!cell.name)
- 		return -ENOMEM;
- 
--	return mfd_add_devices(&mc13xxx->spidev->dev, -1, &cell, 1, NULL, 0);
-+	return mfd_add_devices(mc13xxx->pdev, -1, &cell, 1, NULL, 0);
- }
- 
- static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
-@@ -709,11 +754,48 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
- 	return mc13xxx_add_subdevice_pdata(mc13xxx, format, NULL, 0);
- }
- 
--static int mc13xxx_probe(struct spi_device *spi)
-+static int mc13xxx_common_probe(struct mc13xxx *mc13xxx,
-+				struct mc13xxx_platform_data *pdata)
-+{
-+	mc13xxx_unlock(mc13xxx);
-+
-+	if (!pdata)
-+		return 0;
-+
-+	if (pdata->flags & MC13XXX_USE_ADC)
-+		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
-+
-+	if (pdata->flags & MC13XXX_USE_CODEC)
-+		mc13xxx_add_subdevice(mc13xxx, "%s-codec");
-+
-+	if (pdata->flags & MC13XXX_USE_REGULATOR) {
-+		struct mc13xxx_regulator_platform_data regulator_pdata = {
-+			.num_regulators = pdata->num_regulators,
-+			.regulators = pdata->regulators,
-+		};
-+
-+		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
-+				&regulator_pdata, sizeof(regulator_pdata));
-+	}
-+
-+	if (pdata->flags & MC13XXX_USE_RTC)
-+		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
-+
-+	if (pdata->flags & MC13XXX_USE_TOUCHSCREEN)
-+		mc13xxx_add_subdevice(mc13xxx, "%s-ts");
-+
-+	if (pdata->flags & MC13XXX_USE_LED) {
-+		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
-+					pdata->leds, sizeof(*pdata->leds));
-+	}
-+
-+	return 0;
-+}
-+
-+static int mc13xxx_spi_probe(struct spi_device *spi)
- {
- 	struct mc13xxx *mc13xxx;
- 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
--	enum mc13xxx_id id;
- 	int ret;
- 
- 	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-@@ -725,13 +807,17 @@ static int mc13xxx_probe(struct spi_device *spi)
- 	spi->bits_per_word = 32;
- 	spi_setup(spi);
- 
-+	mc13xxx->pdev = &spi->dev;
- 	mc13xxx->spidev = spi;
-+	mc13xxx->read_dev = mc13xxx_spi_reg_read;
-+	mc13xxx->write_dev = mc13xxx_spi_reg_write;
-+	mc13xxx->irq = spi->irq;
- 
- 	mutex_init(&mc13xxx->lock);
- 	mc13xxx_lock(mc13xxx);
- 
--	ret = mc13xxx_identify(mc13xxx, &id);
--	if (ret || id == MC13XXX_ID_INVALID)
-+	ret = mc13xxx_identify(mc13xxx, 1);
-+	if (ret || (mc13xxx->icid == MC13XXX_ID_INVALID))
- 		goto err_revision;
- 
- 	/* mask all irqs */
-@@ -743,7 +829,7 @@ static int mc13xxx_probe(struct spi_device *spi)
- 	if (ret)
- 		goto err_mask;
- 
--	ret = request_threaded_irq(spi->irq, NULL, mc13xxx_irq_thread,
-+	ret = request_threaded_irq(mc13xxx->irq, NULL, mc13xxx_irq_thread,
- 			IRQF_ONESHOT | IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx);
- 
- 	if (ret) {
-@@ -755,43 +841,15 @@ err_revision:
- 		return ret;
- 	}
- 
--	mc13xxx_unlock(mc13xxx);
--
--	if (pdata->flags & MC13XXX_USE_ADC)
--		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
--
--	if (pdata->flags & MC13XXX_USE_CODEC)
--		mc13xxx_add_subdevice(mc13xxx, "%s-codec");
--
--	if (pdata->flags & MC13XXX_USE_REGULATOR) {
--		struct mc13xxx_regulator_platform_data regulator_pdata = {
--			.num_regulators = pdata->num_regulators,
--			.regulators = pdata->regulators,
--		};
--
--		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
--				&regulator_pdata, sizeof(regulator_pdata));
--	}
--
--	if (pdata->flags & MC13XXX_USE_RTC)
--		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
--
--	if (pdata->flags & MC13XXX_USE_TOUCHSCREEN)
--		mc13xxx_add_subdevice(mc13xxx, "%s-ts");
--
--	if (pdata->flags & MC13XXX_USE_LED) {
--		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
--					pdata->leds, sizeof(*pdata->leds));
--	}
--
--	return 0;
-+	return mc13xxx_common_probe(mc13xxx, pdata);
- }
- 
--static int __devexit mc13xxx_remove(struct spi_device *spi)
-+
-+static int __devexit mc13xxx_spi_remove(struct spi_device *spi)
- {
- 	struct mc13xxx *mc13xxx = dev_get_drvdata(&spi->dev);
- 
--	free_irq(mc13xxx->spidev->irq, mc13xxx);
-+	free_irq(mc13xxx->irq, mc13xxx);
- 
- 	mfd_remove_devices(&spi->dev);
- 
-@@ -819,18 +877,105 @@ static struct spi_driver mc13xxx_driver = {
- 		.bus = &spi_bus_type,
- 		.owner = THIS_MODULE,
- 	},
--	.probe = mc13xxx_probe,
--	.remove = __devexit_p(mc13xxx_remove),
-+	.probe = mc13xxx_spi_probe,
-+	.remove = __devexit_p(mc13xxx_spi_remove),
-+};
-+
-+static int mc13xxx_i2c_probe(struct i2c_client *client,
-+			     const struct i2c_device_id *id)
-+{
-+	struct mc13xxx *mc13xxx;
-+	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-+	int ret;
-+
-+	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-+	if (!mc13xxx)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&client->dev, mc13xxx);
-+	mc13xxx->pdev = &client->dev;
-+	mc13xxx->client = client;
-+	mc13xxx->read_dev = mc13xxx_i2c_reg_read;
-+	mc13xxx->write_dev = mc13xxx_i2c_reg_write;
-+	mc13xxx->irq = client->irq;
-+
-+	mutex_init(&mc13xxx->lock);
-+	mc13xxx_lock(mc13xxx);
-+
-+	ret = mc13xxx_identify(mc13xxx, 0);
-+	if (ret || (mc13xxx->icid == MC13XXX_ID_INVALID))
-+		goto err_revision;
-+
-+	/* mask all irqs */
-+	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK0, 0x00ffffff);
-+	if (ret)
-+		goto err_mask;
-+
-+	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK1, 0x00ffffff);
-+	if (ret)
-+		goto err_mask;
-+
-+	ret = request_threaded_irq(mc13xxx->irq, NULL, mc13xxx_irq_thread,
-+			IRQF_ONESHOT | IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx);
-+
-+	if (ret) {
-+err_mask:
-+err_revision:
-+		mutex_unlock(&mc13xxx->lock);
-+		kfree(mc13xxx);
-+		return ret;
-+	}
-+
-+	return mc13xxx_common_probe(mc13xxx, pdata);
-+}
-+
-+static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-+{
-+	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-+
-+	free_irq(mc13xxx->irq, mc13xxx);
-+
-+	mfd_remove_devices(&client->dev);
-+
-+	kfree(mc13xxx);
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id mc13xxx_i2c_idtable[] = {
-+	{ "mc13892", MC13XXX_ID_MC13892},
-+	{ }
-+};
-+
-+static struct i2c_driver mc13xxx_i2c_driver = {
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "mc13xxx-i2c"
-+	},
-+	.id_table = mc13xxx_i2c_idtable,
-+	.probe = mc13xxx_i2c_probe,
-+	.remove = __devexit_p(mc13xxx_i2c_remove),
+ static struct __initdata platform_device omap15xx_mpu_gpio = {
+diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
+index 8d4d0a0..5dd0d4c 100644
+--- a/arch/arm/mach-omap1/gpio16xx.c
++++ b/arch/arm/mach-omap1/gpio16xx.c
+@@ -41,6 +41,7 @@ static struct __initdata omap_gpio_platform_data omap16xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+ 	.bank_type		= METHOD_MPUIO,
+ 	.bank_width		= 16,
++	.bank_stride		= 1,
  };
  
- static int __init mc13xxx_init(void)
- {
--	return spi_register_driver(&mc13xxx_driver);
-+	int i2cret;
-+	int spiret;
-+	i2cret = i2c_add_driver(&mc13xxx_i2c_driver);
-+	spiret = spi_register_driver(&mc13xxx_driver);
-+
-+	if (i2cret != 0)
-+		return i2cret;
-+	if (spiret != 0)
-+		return spiret;
-+
-+	return 0;
- }
- subsys_initcall(mc13xxx_init);
+ static struct __initdata platform_device omap16xx_mpu_gpio = {
+diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+index 94bccd4..1204c8b 100644
+--- a/arch/arm/mach-omap1/gpio7xx.c
++++ b/arch/arm/mach-omap1/gpio7xx.c
+@@ -43,6 +43,7 @@ static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+ 	.bank_type		= METHOD_MPUIO,
+ 	.bank_width		= 32,
++	.bank_stride		= 2,
+ };
  
- static void __exit mc13xxx_exit(void)
+ static struct __initdata platform_device omap7xx_mpu_gpio = {
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index 59afe77..de93251 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -159,6 +159,7 @@ struct gpio_bank {
+ 	u32 dbck_enable_mask;
+ 	struct device *dev;
+ 	bool dbck_flag;
++	int stride;
+ };
+ 
+ #ifdef CONFIG_ARCH_OMAP3
+@@ -267,7 +268,7 @@ static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_IO_CNTL;
++		reg += OMAP_MPUIO_IO_CNTL / bank->stride;
+ 		break;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP15XX
+@@ -315,7 +316,7 @@ static void _set_gpio_dataout(struct gpio_bank *bank, int gpio, int enable)
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_OUTPUT;
++		reg += OMAP_MPUIO_OUTPUT / bank->stride;
+ 		l = __raw_readl(reg);
+ 		if (enable)
+ 			l |= 1 << gpio;
+@@ -387,7 +388,7 @@ static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_INPUT_LATCH;
++		reg += OMAP_MPUIO_INPUT_LATCH / bank->stride;
+ 		break;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP15XX
+@@ -433,7 +434,7 @@ static int _get_gpio_dataout(struct gpio_bank *bank, int gpio)
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_OUTPUT;
++		reg += OMAP_MPUIO_OUTPUT / bank->stride;
+ 		break;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP15XX
+@@ -620,7 +621,7 @@ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio)
+ 
+ 	switch (bank->method) {
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_GPIO_INT_EDGE;
++		reg += OMAP_MPUIO_GPIO_INT_EDGE / bank->stride;
+ 		break;
+ #ifdef CONFIG_ARCH_OMAP15XX
+ 	case METHOD_GPIO_1510:
+@@ -654,7 +655,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_GPIO_INT_EDGE;
++		reg += OMAP_MPUIO_GPIO_INT_EDGE / bank->stride;
+ 		l = __raw_readl(reg);
+ 		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
+ 			bank->toggle_mask |= 1 << gpio;
+@@ -840,7 +841,7 @@ static u32 _get_gpio_irqbank_mask(struct gpio_bank *bank)
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_GPIO_MASKIT;
++		reg += OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+ 		mask = 0xffff;
+ 		inv = 1;
+ 		break;
+@@ -897,7 +898,7 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask, int enab
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_GPIO_MASKIT;
++		reg += OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+ 		l = __raw_readl(reg);
+ 		if (enable)
+ 			l &= ~(gpio_mask);
+@@ -1147,7 +1148,8 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	bank = get_irq_data(irq);
+ #ifdef CONFIG_ARCH_OMAP1
+ 	if (bank->method == METHOD_MPUIO)
+-		isr_reg = bank->base + OMAP_MPUIO_GPIO_INT;
++		isr_reg = bank->base +
++				OMAP_MPUIO_GPIO_INT / bank->stride;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP15XX
+ 	if (bank->method == METHOD_GPIO_1510)
+@@ -1340,7 +1342,8 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
  {
-+	i2c_del_driver(&mc13xxx_i2c_driver);
- 	spi_unregister_driver(&mc13xxx_driver);
- }
- module_exit(mc13xxx_exit);
--- 
-1.7.1
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct gpio_bank	*bank = platform_get_drvdata(pdev);
+-	void __iomem		*mask_reg = bank->base + OMAP_MPUIO_GPIO_MASKIT;
++	void __iomem		*mask_reg = bank->base +
++					OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+ 	unsigned long		flags;
+ 
+ 	spin_lock_irqsave(&bank->lock, flags);
+@@ -1355,7 +1358,8 @@ static int omap_mpuio_resume_noirq(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct gpio_bank	*bank = platform_get_drvdata(pdev);
+-	void __iomem		*mask_reg = bank->base + OMAP_MPUIO_GPIO_MASKIT;
++	void __iomem		*mask_reg = bank->base +
++					OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+ 	unsigned long		flags;
+ 
+ 	spin_lock_irqsave(&bank->lock, flags);
+@@ -1435,7 +1439,7 @@ static int gpio_is_input(struct gpio_bank *bank, int mask)
+ 
+ 	switch (bank->method) {
+ 	case METHOD_MPUIO:
+-		reg += OMAP_MPUIO_IO_CNTL;
++		reg += OMAP_MPUIO_IO_CNTL / bank->stride;
+ 		break;
+ 	case METHOD_GPIO_1510:
+ 		reg += OMAP1510_GPIO_DIR_CONTROL;
+@@ -1596,8 +1600,8 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
+ 		}
+ 	} else if (cpu_class_is_omap1()) {
+ 		if (bank_is_mpuio(bank))
+-			__raw_writew(0xffff, bank->base
+-						+ OMAP_MPUIO_GPIO_MASKIT);
++			__raw_writew(0xffff, bank->base +
++				OMAP_MPUIO_GPIO_MASKIT / bank->stride);
+ 		if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
+ 			__raw_writew(0xffff, bank->base
+ 						+ OMAP1510_GPIO_INT_MASK);
+@@ -1711,6 +1715,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	bank->method = pdata->bank_type;
+ 	bank->dev = &pdev->dev;
+ 	bank->dbck_flag = pdata->dbck_flag;
++	bank->stride = pdata->bank_stride;
+ 	bank_width = pdata->bank_width;
+ 
+ 	spin_lock_init(&bank->lock);
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index 5f118ff..41ff2f8 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -32,22 +32,10 @@
+ 
+ #define OMAP1_MPUIO_BASE			0xfffb5000
+ 
+-#if (defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850))
+-
+-#define OMAP_MPUIO_INPUT_LATCH		0x00
+-#define OMAP_MPUIO_OUTPUT		0x02
+-#define OMAP_MPUIO_IO_CNTL		0x04
+-#define OMAP_MPUIO_KBR_LATCH		0x08
+-#define OMAP_MPUIO_KBC			0x0a
+-#define OMAP_MPUIO_GPIO_EVENT_MODE	0x0c
+-#define OMAP_MPUIO_GPIO_INT_EDGE	0x0e
+-#define OMAP_MPUIO_KBD_INT		0x10
+-#define OMAP_MPUIO_GPIO_INT		0x12
+-#define OMAP_MPUIO_KBD_MASKIT		0x14
+-#define OMAP_MPUIO_GPIO_MASKIT		0x16
+-#define OMAP_MPUIO_GPIO_DEBOUNCING	0x18
+-#define OMAP_MPUIO_LATCH		0x1a
+-#else
++/*
++ * These are the omap15xx/16xx offsets. The omap7xx offset are
++ * OMAP_MPUIO_ / 2 offsets below.
++ */
+ #define OMAP_MPUIO_INPUT_LATCH		0x00
+ #define OMAP_MPUIO_OUTPUT		0x04
+ #define OMAP_MPUIO_IO_CNTL		0x08
+@@ -61,7 +49,6 @@
+ #define OMAP_MPUIO_GPIO_MASKIT		0x2c
+ #define OMAP_MPUIO_GPIO_DEBOUNCING	0x30
+ #define OMAP_MPUIO_LATCH		0x34
+-#endif
+ 
+ #define OMAP34XX_NR_GPIOS		6
+ 
+@@ -88,6 +75,7 @@ struct omap_gpio_platform_data {
+ 	u16 virtual_irq_start;
+ 	int bank_type;
+ 	int bank_width;		/* GPIO bank width */
++	int bank_stride;	/* Only needed for omap1 MPUIO */
+ 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
+ };
+ 
