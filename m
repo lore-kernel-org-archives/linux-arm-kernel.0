@@ -1,92 +1,51 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Tue, 7 Dec 2010 11:13:13 +0530
-Subject: [PATCH v8 04/11] OMAP7xx: GPIO: Introduce support for GPIO init
-In-Reply-To: <AANLkTi=jjqj8Gv5tWqfMnndM037U-Qidtp=ju3VmhQyF@mail.gmail.com>
-References: <1290689318-10191-1-git-send-email-charu@ti.com>
-	<1290689318-10191-5-git-send-email-charu@ti.com>
-	<AANLkTi=jjqj8Gv5tWqfMnndM037U-Qidtp=ju3VmhQyF@mail.gmail.com>
-Message-ID: <AANLkTimO0TCctsLDhCkKZbDHay5JgEDjTvn4XMp=Gb+x@mail.gmail.com>
+From: mark@codesourcery.com (Mark Mitchell)
+Date: Mon, 06 Dec 2010 19:02:30 -0600
+Subject: RFC: Dynamic hwcaps
+In-Reply-To: <AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
+References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>	<20101203165105.GD30898@n2100.arm.linux.org.uk>	<AANLkTik9sqkbCPbcWUL+2otyfO1OZ=hx1tvSkQW65e4i@mail.gmail.com>	<4CFBAC6D.5060507@codesourcery.com>
+	<AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
+Message-ID: <4CFD87A6.8030104@codesourcery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 7, 2010 at 10:50, Cory Maccarrone <darkstar6262@gmail.com> wrote:
-> On Thu, Nov 25, 2010 at 4:48 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
->> Add support for handling OMAP7xx specific gpio_init by
->> providing platform device data and doing device registration.
->>
->> Signed-off-by: Charulatha V <charu@ti.com>
->> ---
->> ?arch/arm/mach-omap1/gpio7xx.c | ?261 +++++++++++++++++++++++++++++++++++++++++
->> ?1 files changed, 261 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-omap1/gpio7xx.c
->>
->> diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
->> new file mode 100644
->> index 0000000..94bccd4
->> --- /dev/null
->> +++ b/arch/arm/mach-omap1/gpio7xx.c
->> @@ -0,0 +1,261 @@
->> +/*
->> + * OMAP7xx specific gpio init
->> + *
->> + * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
->> + *
->> + * Author:
->> + * ? ? Charulatha V <charu@ti.com>
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/gpio.h>
->> +
->> +#define OMAP7XX_GPIO1_BASE ? ? ? ? ? ? 0xfffbc000
->> +#define OMAP7XX_GPIO2_BASE ? ? ? ? ? ? 0xfffbc800
->> +#define OMAP7XX_GPIO3_BASE ? ? ? ? ? ? 0xfffbd000
->> +#define OMAP7XX_GPIO4_BASE ? ? ? ? ? ? 0xfffbd800
->> +#define OMAP7XX_GPIO5_BASE ? ? ? ? ? ? 0xfffbe000
->> +#define OMAP7XX_GPIO6_BASE ? ? ? ? ? ? 0xfffbe800
->> +#define OMAP1_MPUIO_VBASE ? ? ? ? ? ? ?OMAP1_MPUIO_BASE
->> +
->> +/* mpu gpio */
->> +static struct __initdata resource omap7xx_mpu_gpio_resources[] = {
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .start ?= OMAP1_MPUIO_VBASE,
->> + ? ? ? ? ? ? ? .end ? ?= OMAP1_MPUIO_VBASE + SZ_2K - 1,
->> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
->> + ? ? ? },
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .start ?= INT_7XX_MPUIO,
->> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
->> + ? ? ? },
->> +};
->> +
->> +static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
->> + ? ? ? .virtual_irq_start ? ? ?= IH_MPUIO_BASE,
->> + ? ? ? .bank_type ? ? ? ? ? ? ?= METHOD_MPUIO,
->> + ? ? ? .bank_width ? ? ? ? ? ? = 32,
->
-> I think we need
->
-> ? ?.dbck_flag = false,
+On 12/6/2010 5:07 AM, Dave Martin wrote:
 
-I think it's not required since it is a static data. Modifying the
-"if" condition
-in gpio_debounce as per your suggestion will resolve this issue.
+>> But,
+>> to enable binary distribution, having to have N copies of a library (let
+>> alone an application) for N different ARM core variants just doesn't
+>> make sense to me.
+> 
+> Just so, and as discussed before improvements to package managers
+> could help here to avoid installing duplicate libraries.  (I believe
+> that rpm may have some capability here (?) but deb does not at
+> present).
 
->
-> here -- we don't have a dbclk on omap7xx. ?Without this, we get:
->
-> ? ?omap_gpio omap_gpio.5: Could not get gpio dbck
-> ? ?omap_gpio omap_gpio.6: Could not get gpio dbck
->
-> This needs to be added to the other 5 GPIO blocks in this file as well.
->
-> - Cory
->
+Yes, a smarter package manager could help a device builder automatically
+get the right version of a library.  But, something more fundamental has
+to happen to avoid the library developer having to *produce* N versions
+of a library.  (Yes, in theory, you just type "make" with different
+CFLAGS options, but in practice of course it's often more complex than
+that, especially if you need to validate the library.)
+
+> Currently, I don't have many examples-- the main one is related to the
+> discussions aroung using NEON for memcpy().  This can be a performance
+> win on some platforms, but except when the system is heavily loaded,
+> or when NEON happens to be turned on anyway, it may not be
+> advantageous for the user or overall system performance.
+
+How good of a proxy would the length of the copy be, do you think?  If
+you want to copy 1G of data, and NEON makes you 2x-4x faster, then it
+seems to me that you probably want to use NEON, almost independent of
+overall system load.  But, if you're only going to copy 16 bytes, even
+if NEON is faster, it's probably OK not to use it -- the function-call
+overhead to get into memcpy at all is probably significant relative to
+the time you'd save by using NEON.  In between, it's harder, of course
+-- but perhaps if memcpy is the key example, we could get 80% of the
+benefit of your idea simply by a test inside memcpy as to the length of
+the data to be copied?
+
+-- 
+Mark Mitchell
+CodeSourcery
+mark at codesourcery.com
+(650) 331-3385 x713
