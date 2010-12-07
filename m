@@ -1,35 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Dec 2010 15:02:03 +0000
-Subject: generic irq handler and stack?
-In-Reply-To: <201012071356.16281.tim.sander@hbm.com>
-References: <201012071129.26211.tim.sander@hbm.com>
-	<20101207104116.GA20264@n2100.arm.linux.org.uk>
-	<201012071356.16281.tim.sander@hbm.com>
-Message-ID: <20101207150203.GA23589@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 7 Dec 2010 15:06:51 +0000
+Subject: RFC: Dynamic hwcaps
+In-Reply-To: <20101207110401.GA20451@n2100.arm.linux.org.uk>
+References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
+	<20101203165105.GD30898@n2100.arm.linux.org.uk>
+	<AANLkTik9sqkbCPbcWUL+2otyfO1OZ=hx1tvSkQW65e4i@mail.gmail.com>
+	<4CFBAC6D.5060507@codesourcery.com>
+	<AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
+	<4CFD87A6.8030104@codesourcery.com>
+	<AANLkTikh-a++NQj+cUJOf9B3tjr_=CvAqJmjhLGA0Xt7@mail.gmail.com>
+	<20101207110401.GA20451@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik5NaF3r3mocthuVc-NiYNS3yJbEpkNt3_ghjUj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 01:56:16PM +0100, Tim Sander wrote:
-> Hi
-> 
-> > > The interrupt handling on the i.mx35x seems to handle only one interrupt
-> > > at a time. This generates larger then nessecary interrupt jitter. I am
-> > > currently investigating to reprogram the AVIC to enable higher priority
-> > > interrupts to interrupt lower priority interrupts. The mechanism is
-> > > outlined in section 13,3.8 of the IMX35 Reference Manual.
-> > 
-> > The kernel now runs _all_ interrupts with IRQs masked on the CPU.  See
-> > e58aa3d2d0cc01ad8d6f7f640a0670433f794922.
+Hi,
+
+On Tue, Dec 7, 2010 at 11:04 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 07, 2010 at 10:45:42AM +0000, Dave Martin wrote:
+>> Yes-- though I didn't elaborate on it. ?You need a packager that can
+>> understand, say, that a binary built for ARMv5 EABI can interoperate
+>> with ARMv7 binaries etc.
+>> Again, I've heard it suggested that RPM can handle this, but I haven't
+>> looked at it in detail myself.
 >
-> Thanks Russell for your  quick answer. But as far as i understand this is only
-> one step to get better interrupt latency on i.mx35x since the AVIC by default
-> only allows one interrupt at a time. So any idea which is the cleanest way to 
-> push the SPSR_irq register on the stack.
+> That is indeed the case - as on x86, it used to be common to build the
+> majority of the distribution for i386, and glibc and a few other bits
+> for a range of ix86 CPUs.
+>
+> rpm and yum know that i386 is compatible with i486, which is compatible
+> with i586 etc, so it will install an i386 package on i686 if no i486,
+> i586 or i686 package is available.
+>
+> It does the same for ARM with ARMv3, ARMv4 etc.
 
-We don't run interrupts in IRQ mode.  The exception is entered in IRQ
-mode, but we then save what state is necessary and switch to SVC mode.
+That sounds plausible.  If you really want to go to town on this it
+gets more complicated, but there's still a lot of value in modelling
+the architectural development as a linear progression in this way.
 
-We have supported nested interrupts since the 1.x kernel days - there's
-no code changes needed to support having one interrupt handler interrupt
-another handler - merely re-enabling interrupts in your own handlers
-will allow it to happen if your IRQ controller will also allow it.
+>
+>> The dynamic hwcaps approach doesn't really solve that problem:
+>
+> Has anyone investigated whether it is possible to power down things like
+> Neon etc meanwhile leaving the rest of the CPU running? ?I've not seen
+> anything in the ARM documentation to suggest that's the case.
+>
+> Even in MPCore based systems, the interface between the SCU and individual
+> processors by default doesn't have the necessary clamps built in to allow
+> individual CPUs to be powered off, and I'm not aware of any designs which
+> decided to enable this feature (as there's a performance penalty).  So I'd
+> be really surprised if there was any support for powering down Neon
+> separately from the host CPU.
+
+It's not part of the architecture per se, but some SoCs do put NEON in
+a separate power domain and can power manage it somewhat indepedently.
+
+However, I guess we need to clarify exactly how this works for SoCs in
+practice.  If NEON and VFP are power-managed co-dependently (for
+example, but no so likely(?)) this is not so useful to us ... since
+it's becoming common to build everything with -mfpu=vfp*.
+
+Because the kernel only uses FPEXC.EN to en/disable these extensions,
+NEON and VFP are somewhat tied together ... though we might be able to
+get more flexible by toggling the CPACR.ASEDIS control bit instead.  I
+don't believe the kernel currently touches this (?)
+
+>
+> If that's the case, it's entirely pointless discussing what userspace can
+> or can't do - if you have Neon available and can't power it down, and it's
+> faster for doing something, you might as well use it so you can put the
+> main CPU into WFI mode or get on with some other useful work.
+>
+
+Indeed ... my layman's understanding is that it is worth it on some
+platforms, but I guess I need to clarify this with someone who
+understands the hardware.
+
+Cheers
+---Dave
