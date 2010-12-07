@@ -1,481 +1,753 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue,  7 Dec 2010 09:51:54 -0500
-Subject: [PATCH v7 04/12] spi: add ti-ssp spi master driver
+Date: Tue,  7 Dec 2010 09:51:56 -0500
+Subject: [PATCH v7 06/12] regulator: add driver for tps6524x regulator
 In-Reply-To: <1291733522-3626-1-git-send-email-cyril@ti.com>
 References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-Message-ID: <1291733522-3626-5-git-send-email-cyril@ti.com>
+Message-ID: <1291733522-3626-7-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an SPI master implementation that operates on top of an
-underlying TI-SSP port.
+TPS6524X provides three step-down converters and two general-purpose LDO
+voltage regulators.  This device is interfaced using SPI.
 
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- drivers/spi/Kconfig        |   10 +
- drivers/spi/Makefile       |    1 +
- drivers/spi/ti-ssp-spi.c   |  402 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/ti_ssp.h |    6 +
- 4 files changed, 419 insertions(+), 0 deletions(-)
- create mode 100644 drivers/spi/ti-ssp-spi.c
+ drivers/regulator/Kconfig              |   10 +
+ drivers/regulator/Makefile             |    1 +
+ drivers/regulator/tps6524x-regulator.c |  692 ++++++++++++++++++++++++++++++++
+ 3 files changed, 703 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/regulator/tps6524x-regulator.c
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 78f9fd0..7f0ed2a 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -336,6 +336,16 @@ config SPI_TEGRA
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index dd30e88..da34981 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -250,5 +250,15 @@ config REGULATOR_TPS6586X
  	help
- 	  SPI driver for NVidia Tegra SoCs
+ 	  This driver supports TPS6586X voltage regulator chips.
  
-+config SPI_TI_SSP
-+	tristate "TI Sequencer Serial Port - SPI Support"
-+	depends on MFD_TI_SSP
++config REGULATOR_TPS6524X
++	tristate "TI TPS6524X Power regulators"
++	depends on SPI
 +	help
-+	  This selects an SPI master implementation using a TI sequencer
-+	  serial port.
++	  This driver supports TPS6524X voltage regulator chips. TPS6524X
++	  provides three step-down converters and two general-purpose LDO
++	  voltage regulators.  This device is interfaced using a customized
++	  serial interface currently supported on the sequencer serial
++	  port controller.
 +
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called ti-ssp-spi.
-+
- config SPI_TOPCLIFF_PCH
- 	tristate "Topcliff PCH SPI Controller"
- 	depends on PCI
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index 8bc1a5a..595e5b8 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -40,6 +40,7 @@ obj-$(CONFIG_SPI_S3C24XX_GPIO)		+= spi_s3c24xx_gpio.o
- obj-$(CONFIG_SPI_S3C24XX)		+= spi_s3c24xx_hw.o
- obj-$(CONFIG_SPI_S3C64XX)		+= spi_s3c64xx.o
- obj-$(CONFIG_SPI_TEGRA)			+= spi_tegra.o
-+obj-$(CONFIG_SPI_TI_SSP)		+= ti-ssp-spi.o
- obj-$(CONFIG_SPI_TOPCLIFF_PCH)		+= spi_topcliff_pch.o
- obj-$(CONFIG_SPI_TXX9)			+= spi_txx9.o
- obj-$(CONFIG_SPI_XILINX)		+= xilinx_spi.o
-diff --git a/drivers/spi/ti-ssp-spi.c b/drivers/spi/ti-ssp-spi.c
+ endif
+ 
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index bff8157..cf71df7 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -34,6 +34,7 @@ obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+ 
+ obj-$(CONFIG_REGULATOR_TPS65023) += tps65023-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS6507X) += tps6507x-regulator.o
++obj-$(CONFIG_REGULATOR_TPS6524X) += tps6524x-regulator.o
+ obj-$(CONFIG_REGULATOR_88PM8607) += 88pm8607.o
+ obj-$(CONFIG_REGULATOR_ISL6271A) += isl6271a-regulator.o
+ obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
+diff --git a/drivers/regulator/tps6524x-regulator.c b/drivers/regulator/tps6524x-regulator.c
 new file mode 100644
-index 0000000..30fc0e2
+index 0000000..dea1260
 --- /dev/null
-+++ b/drivers/spi/ti-ssp-spi.c
-@@ -0,0 +1,402 @@
++++ b/drivers/regulator/tps6524x-regulator.c
+@@ -0,0 +1,692 @@
 +/*
-+ * Sequencer Serial Port (SSP) based SPI master driver
++ * Regulator driver for TPS6524x PMIC
 + *
-+ * Copyright (C) 2010 Texas Instruments Inc
++ * Copyright (C) 2010 Texas Instruments
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
++ * whether express or implied; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
 + */
 +
 +#include <linux/kernel.h>
++#include <linux/module.h>
 +#include <linux/err.h>
-+#include <linux/completion.h>
-+#include <linux/delay.h>
-+#include <linux/platform_device.h>
++#include <linux/errno.h>
++#include <linux/slab.h>
 +#include <linux/spi/spi.h>
-+#include <linux/mfd/ti_ssp.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/machine.h>
 +
-+#define MODE_BITS	(SPI_CPHA | SPI_CPOL | SPI_CS_HIGH)
++#define REG_LDO_SET		0x0
++#define LDO_ILIM_MASK		1	/* 0 = 400-800, 1 = 900-1500 */
++#define LDO_VSEL_MASK		0x0f
++#define LDO2_ILIM_SHIFT		12
++#define LDO2_VSEL_SHIFT		4
++#define LDO1_ILIM_SHIFT		8
++#define LDO1_VSEL_SHIFT		0
 +
-+struct ti_ssp_spi {
-+	const struct ti_ssp_spi_data	*pdata;
-+	struct spi_master		*master;
-+	struct device			*dev;
-+	spinlock_t			lock;
-+	struct list_head		msg_queue;
-+	struct completion		complete;
-+	int				shutdown:1;
-+	struct workqueue_struct		*workqueue;
-+	struct work_struct		work;
-+	u8				mode, bpw;
-+	int				cs_active;
-+	u32				pc_en, pc_dis, pc_wr, pc_rd;
++#define REG_BLOCK_EN		0x1
++#define BLOCK_MASK		1
++#define BLOCK_LDO1_SHIFT	0
++#define BLOCK_LDO2_SHIFT	1
++#define BLOCK_LCD_SHIFT		2
++#define BLOCK_USB_SHIFT		3
++
++#define REG_DCDC_SET		0x2
++#define DCDC_VDCDC_MASK		0x1f
++#define DCDC_VDCDC1_SHIFT	0
++#define DCDC_VDCDC2_SHIFT	5
++#define DCDC_VDCDC3_SHIFT	10
++
++#define REG_DCDC_EN		0x3
++#define DCDCDCDC_EN_MASK	0x1
++#define DCDCDCDC1_EN_SHIFT	0
++#define DCDCDCDC1_PG_MSK	BIT(1)
++#define DCDCDCDC2_EN_SHIFT	2
++#define DCDCDCDC2_PG_MSK	BIT(3)
++#define DCDCDCDC3_EN_SHIFT	4
++#define DCDCDCDC3_PG_MSK	BIT(5)
++
++#define REG_USB			0x4
++#define USB_ILIM_SHIFT		0
++#define USB_ILIM_MASK		0x3
++#define USB_TSD_SHIFT		2
++#define USB_TSD_MASK		0x3
++#define USB_TWARN_SHIFT		4
++#define USB_TWARN_MASK		0x3
++#define USB_IWARN_SD		BIT(6)
++#define USB_FAST_LOOP		BIT(7)
++
++#define REG_ALARM		0x5
++#define ALARM_LDO1		BIT(0)
++#define ALARM_DCDC1		BIT(1)
++#define ALARM_DCDC2		BIT(2)
++#define ALARM_DCDC3		BIT(3)
++#define ALARM_LDO2		BIT(4)
++#define ALARM_USB_WARN		BIT(5)
++#define ALARM_USB_ALARM		BIT(6)
++#define ALARM_LCD		BIT(9)
++#define ALARM_TEMP_WARM		BIT(10)
++#define ALARM_TEMP_HOT		BIT(11)
++#define ALARM_NRST		BIT(14)
++#define ALARM_POWERUP		BIT(15)
++
++#define REG_INT_ENABLE		0x6
++#define INT_LDO1		BIT(0)
++#define INT_DCDC1		BIT(1)
++#define INT_DCDC2		BIT(2)
++#define INT_DCDC3		BIT(3)
++#define INT_LDO2		BIT(4)
++#define INT_USB_WARN		BIT(5)
++#define INT_USB_ALARM		BIT(6)
++#define INT_LCD			BIT(9)
++#define INT_TEMP_WARM		BIT(10)
++#define INT_TEMP_HOT		BIT(11)
++#define INT_GLOBAL_EN		BIT(15)
++
++#define REG_INT_STATUS		0x7
++#define STATUS_LDO1		BIT(0)
++#define STATUS_DCDC1		BIT(1)
++#define STATUS_DCDC2		BIT(2)
++#define STATUS_DCDC3		BIT(3)
++#define STATUS_LDO2		BIT(4)
++#define STATUS_USB_WARN		BIT(5)
++#define STATUS_USB_ALARM	BIT(6)
++#define STATUS_LCD		BIT(9)
++#define STATUS_TEMP_WARM	BIT(10)
++#define STATUS_TEMP_HOT		BIT(11)
++
++#define REG_SOFTWARE_RESET	0xb
++#define REG_WRITE_ENABLE	0xd
++#define REG_REV_ID		0xf
++
++#define N_DCDC			3
++#define N_LDO			2
++#define N_SWITCH		2
++#define N_REGULATORS		(3 /* DCDC */ + \
++				 2 /* LDO */  + \
++				 2 /* switch */)
++
++#define FIXED_ILIMSEL		BIT(0)
++#define FIXED_VOLTAGE		BIT(1)
++
++#define CMD_READ(reg)		((reg) << 6)
++#define CMD_WRITE(reg)		(BIT(5) | (reg) << 6)
++#define STAT_CLK		BIT(3)
++#define STAT_WRITE		BIT(2)
++#define STAT_INVALID		BIT(1)
++#define STAT_WP			BIT(0)
++
++struct field {
++	int		reg;
++	int		shift;
++	int		mask;
 +};
 +
-+static u32 do_read_data(struct ti_ssp_spi *hw)
-+{
-+	u32 ret;
++struct supply_info {
++	const char	*name;
++	int		n_voltages;
++	const int	*voltages;
++	int		fixed_voltage;
++	int		n_ilimsels;
++	const int	*ilimsels;
++	int		fixed_ilimsel;
++	int		flags;
++	struct field	enable, voltage, ilimsel;
++};
 +
-+	ti_ssp_run(hw->dev, hw->pc_rd, 0, &ret);
++struct tps6524x {
++	struct device		*dev;
++	struct spi_device	*spi;
++	struct mutex		lock;
++	struct regulator_desc	desc[N_REGULATORS];
++	struct regulator_dev	*rdev[N_REGULATORS];
++};
++
++static int __read_reg(struct tps6524x *hw, int reg)
++{
++	int error = 0;
++	u16 cmd = CMD_READ(reg), in;
++	u8 status;
++	struct spi_message m;
++	struct spi_transfer t[3];
++
++	spi_message_init(&m);
++	memset(t, 0, sizeof(t));
++
++	t[0].tx_buf = &cmd;
++	t[0].len = 2;
++	t[0].bits_per_word = 12;
++	spi_message_add_tail(&t[0], &m);
++
++	t[1].rx_buf = &in;
++	t[1].len = 2;
++	t[1].bits_per_word = 16;
++	spi_message_add_tail(&t[1], &m);
++
++	t[2].rx_buf = &status;
++	t[2].len = 1;
++	t[2].bits_per_word = 4;
++	spi_message_add_tail(&t[2], &m);
++
++	error = spi_sync(hw->spi, &m);
++	if (error < 0)
++		return error;
++
++	dev_dbg(hw->dev, "read reg %d, data %x, status %x\n",
++		reg, in, status);
++
++	if (!(status & STAT_CLK) || (status & STAT_WRITE))
++		return -EIO;
++
++	if (status & STAT_INVALID)
++		return -EINVAL;
++
++	return in;
++}
++
++static int read_reg(struct tps6524x *hw, int reg)
++{
++	int ret;
++
++	mutex_lock(&hw->lock);
++	ret = __read_reg(hw, reg);
++	mutex_unlock(&hw->lock);
++
 +	return ret;
 +}
 +
-+static void do_write_data(struct ti_ssp_spi *hw, u32 data)
++static int __write_reg(struct tps6524x *hw, int reg, int val)
 +{
-+	ti_ssp_run(hw->dev, hw->pc_wr, data << (32 - hw->bpw), NULL);
-+}
++	int error = 0;
++	u16 cmd = CMD_WRITE(reg), out = val;
++	u8 status;
++	struct spi_message m;
++	struct spi_transfer t[3];
 +
-+static int do_transfer(struct ti_ssp_spi *hw, struct spi_message *msg,
-+		       struct spi_transfer *t)
-+{
-+	int count;
++	spi_message_init(&m);
++	memset(t, 0, sizeof(t));
 +
-+	if (hw->bpw <= 8) {
-+		u8		*rx = t->rx_buf;
-+		const u8	*tx = t->tx_buf;
++	t[0].tx_buf = &cmd;
++	t[0].len = 2;
++	t[0].bits_per_word = 12;
++	spi_message_add_tail(&t[0], &m);
 +
-+		for (count = 0; count < t->len; count += 1) {
-+			if (t->tx_buf)
-+				do_write_data(hw, *tx++);
-+			if (t->rx_buf)
-+				*rx++ = do_read_data(hw);
-+		}
-+	} else if (hw->bpw <= 16) {
-+		u16		*rx = t->rx_buf;
-+		const u16	*tx = t->tx_buf;
++	t[1].tx_buf = &out;
++	t[1].len = 2;
++	t[1].bits_per_word = 16;
++	spi_message_add_tail(&t[1], &m);
 +
-+		for (count = 0; count < t->len; count += 2) {
-+			if (t->tx_buf)
-+				do_write_data(hw, *tx++);
-+			if (t->rx_buf)
-+				*rx++ = do_read_data(hw);
-+		}
-+	} else {
-+		u32		*rx = t->rx_buf;
-+		const u32	*tx = t->tx_buf;
++	t[2].rx_buf = &status;
++	t[2].len = 1;
++	t[2].bits_per_word = 4;
++	spi_message_add_tail(&t[2], &m);
 +
-+		for (count = 0; count < t->len; count += 4) {
-+			if (t->tx_buf)
-+				do_write_data(hw, *tx++);
-+			if (t->rx_buf)
-+				*rx++ = do_read_data(hw);
-+		}
-+	}
-+
-+	msg->actual_length += count; /* bytes transferred */
-+
-+	dev_dbg(&msg->spi->dev, "xfer %s%s, %d bytes, %d bpw, count %d%s\n",
-+		t->tx_buf ? "tx" : "", t->rx_buf ? "rx" : "", t->len,
-+		hw->bpw, count, (count < t->len) ? " (under)" : "");
-+
-+	return (count < t->len) ? -EIO : 0; /* left over data */
-+}
-+
-+static void chip_select(struct ti_ssp_spi *hw, int cs_active)
-+{
-+	cs_active = !!cs_active;
-+	if (cs_active == hw->cs_active)
-+		return;
-+	ti_ssp_run(hw->dev, cs_active ? hw->pc_en : hw->pc_dis, 0, NULL);
-+	hw->cs_active = cs_active;
-+}
-+
-+#define __SHIFT_OUT(bits)	(SSP_OPCODE_SHIFT | SSP_OUT_MODE | \
-+				 cs_en | clk | SSP_COUNT((bits) * 2 - 1))
-+#define __SHIFT_IN(bits)	(SSP_OPCODE_SHIFT | SSP_IN_MODE  | \
-+				 cs_en | clk | SSP_COUNT((bits) * 2 - 1))
-+
-+static int setup_xfer(struct ti_ssp_spi *hw, u8 bpw, u8 mode)
-+{
-+	int error, idx = 0;
-+	u32 seqram[16];
-+	u32 cs_en, cs_dis, clk;
-+	u32 topbits, botbits;
-+
-+	mode &= MODE_BITS;
-+	if (mode == hw->mode && bpw == hw->bpw)
-+		return 0;
-+
-+	cs_en  = (mode & SPI_CS_HIGH) ? SSP_CS_HIGH : SSP_CS_LOW;
-+	cs_dis = (mode & SPI_CS_HIGH) ? SSP_CS_LOW  : SSP_CS_HIGH;
-+	clk    = (mode & SPI_CPOL)    ? SSP_CLK_HIGH : SSP_CLK_LOW;
-+
-+	/* Construct instructions */
-+
-+	/* Disable Chip Select */
-+	hw->pc_dis = idx;
-+	seqram[idx++] = SSP_OPCODE_DIRECT | SSP_OUT_MODE | cs_dis | clk;
-+	seqram[idx++] = SSP_OPCODE_STOP   | SSP_OUT_MODE | cs_dis | clk;
-+
-+	/* Enable Chip Select */
-+	hw->pc_en = idx;
-+	seqram[idx++] = SSP_OPCODE_DIRECT | SSP_OUT_MODE | cs_en | clk;
-+	seqram[idx++] = SSP_OPCODE_STOP   | SSP_OUT_MODE | cs_en | clk;
-+
-+	/* Reads and writes need to be split for bpw > 16 */
-+	topbits = (bpw > 16) ? 16 : bpw;
-+	botbits = bpw - topbits;
-+
-+	/* Write */
-+	hw->pc_wr = idx;
-+	seqram[idx++] = __SHIFT_OUT(topbits) | SSP_ADDR_REG;
-+	if (botbits)
-+		seqram[idx++] = __SHIFT_OUT(botbits)  | SSP_DATA_REG;
-+	seqram[idx++] = SSP_OPCODE_STOP | SSP_OUT_MODE | cs_en | clk;
-+
-+	/* Read */
-+	hw->pc_rd = idx;
-+	if (botbits)
-+		seqram[idx++] = __SHIFT_IN(botbits) | SSP_ADDR_REG;
-+	seqram[idx++] = __SHIFT_IN(topbits) | SSP_DATA_REG;
-+	seqram[idx++] = SSP_OPCODE_STOP | SSP_OUT_MODE | cs_en | clk;
-+
-+	error = ti_ssp_load(hw->dev, 0, seqram, idx);
++	error = spi_sync(hw->spi, &m);
 +	if (error < 0)
 +		return error;
 +
-+	error = ti_ssp_set_mode(hw->dev, ((mode & SPI_CPHA) ?
-+					  0 : SSP_EARLY_DIN));
-+	if (error < 0)
-+		return error;
++	dev_dbg(hw->dev, "wrote reg %d, data %x, status %x\n",
++		reg, out, status);
 +
-+	hw->bpw = bpw;
-+	hw->mode = mode;
++	if (!(status & STAT_CLK) || !(status & STAT_WRITE))
++		return -EIO;
++
++	if (status & (STAT_INVALID | STAT_WP))
++		return -EINVAL;
 +
 +	return error;
 +}
 +
-+static void ti_ssp_spi_work(struct work_struct *work)
++static int __rmw_reg(struct tps6524x *hw, int reg, int mask, int val)
 +{
-+	struct ti_ssp_spi *hw = container_of(work, struct ti_ssp_spi, work);
++	int ret;
 +
-+	spin_lock(&hw->lock);
++	ret = __read_reg(hw, reg);
++	if (ret < 0)
++		return ret;
 +
-+	 while (!list_empty(&hw->msg_queue)) {
-+		struct spi_message	*m;
-+		struct spi_device	*spi;
-+		struct spi_transfer	*t = NULL;
-+		int			status = 0;
++	ret &= ~mask;
++	ret |= val;
 +
-+		m = container_of(hw->msg_queue.next, struct spi_message,
-+				 queue);
++	ret = __write_reg(hw, reg, ret);
 +
-+		list_del_init(&m->queue);
-+
-+		spin_unlock(&hw->lock);
-+
-+		spi = m->spi;
-+
-+		if (hw->pdata->select)
-+			hw->pdata->select(spi->chip_select);
-+
-+		list_for_each_entry(t, &m->transfers, transfer_list) {
-+			int bpw = spi->bits_per_word;
-+			int xfer_status;
-+
-+			if (t->bits_per_word)
-+				bpw = t->bits_per_word;
-+
-+			if (setup_xfer(hw, bpw, spi->mode) < 0)
-+				break;
-+
-+			chip_select(hw, 1);
-+
-+			xfer_status = do_transfer(hw, m, t);
-+			if (xfer_status < 0)
-+				status = xfer_status;
-+
-+			if (t->delay_usecs)
-+				udelay(t->delay_usecs);
-+
-+			if (t->cs_change)
-+				chip_select(hw, 0);
-+		}
-+
-+		chip_select(hw, 0);
-+		m->status = status;
-+		m->complete(m->context);
-+
-+		spin_lock(&hw->lock);
-+	}
-+
-+	if (hw->shutdown)
-+		complete(&hw->complete);
-+
-+	spin_unlock(&hw->lock);
++	return (ret < 0) ? ret : 0;
 +}
 +
-+static int ti_ssp_spi_setup(struct spi_device *spi)
++static int rmw_protect(struct tps6524x *hw, int reg, int mask, int val)
 +{
-+	if (spi->bits_per_word > 32)
++	int ret;
++
++	mutex_lock(&hw->lock);
++
++	ret = __write_reg(hw, REG_WRITE_ENABLE, 1);
++	if (ret) {
++		dev_err(hw->dev, "failed to set write enable\n");
++		goto error;
++	}
++
++	ret = __rmw_reg(hw, reg, mask, val);
++	if (ret)
++		dev_err(hw->dev, "failed to rmw register %d\n", reg);
++
++	ret = __write_reg(hw, REG_WRITE_ENABLE, 0);
++	if (ret) {
++		dev_err(hw->dev, "failed to clear write enable\n");
++		goto error;
++	}
++
++error:
++	mutex_unlock(&hw->lock);
++
++	return ret;
++}
++
++static int read_field(struct tps6524x *hw, const struct field *field)
++{
++	int tmp;
++
++	tmp = read_reg(hw, field->reg);
++	if (tmp < 0)
++		return tmp;
++
++	return (tmp >> field->shift) & field->mask;
++}
++
++static int write_field(struct tps6524x *hw, const struct field *field,
++		       int val)
++{
++	if (val & ~field->mask)
++		return -EOVERFLOW;
++
++	return rmw_protect(hw, field->reg,
++				    field->mask << field->shift,
++				    val << field->shift);
++}
++
++static const int dcdc1_voltages[] = {
++	 800000,  825000,  850000,  875000,
++	 900000,  925000,  950000,  975000,
++	1000000, 1025000, 1050000, 1075000,
++	1100000, 1125000, 1150000, 1175000,
++	1200000, 1225000, 1250000, 1275000,
++	1300000, 1325000, 1350000, 1375000,
++	1400000, 1425000, 1450000, 1475000,
++	1500000, 1525000, 1550000, 1575000,
++};
++
++static const int dcdc2_voltages[] = {
++	1400000, 1450000, 1500000, 1550000,
++	1600000, 1650000, 1700000, 1750000,
++	1800000, 1850000, 1900000, 1950000,
++	2000000, 2050000, 2100000, 2150000,
++	2200000, 2250000, 2300000, 2350000,
++	2400000, 2450000, 2500000, 2550000,
++	2600000, 2650000, 2700000, 2750000,
++	2800000, 2850000, 2900000, 2950000,
++};
++
++static const int dcdc3_voltages[] = {
++	2400000, 2450000, 2500000, 2550000, 2600000,
++	2650000, 2700000, 2750000, 2800000, 2850000,
++	2900000, 2950000, 3000000, 3050000, 3100000,
++	3150000, 3200000, 3250000, 3300000, 3350000,
++	3400000, 3450000, 3500000, 3550000, 3600000,
++};
++
++static const int ldo1_voltages[] = {
++	4300000, 4350000, 4400000, 4450000,
++	4500000, 4550000, 4600000, 4650000,
++	4700000, 4750000, 4800000, 4850000,
++	4900000, 4950000, 5000000, 5050000,
++};
++
++static const int ldo2_voltages[] = {
++	1100000, 1150000, 1200000, 1250000,
++	1300000, 1700000, 1750000, 1800000,
++	1850000, 1900000, 3150000, 3200000,
++	3250000, 3300000, 3350000, 3400000,
++};
++
++static const int ldo_ilimsel[] = {
++	400000, 1500000
++};
++
++static const int usb_ilimsel[] = {
++	200000, 400000, 800000, 1000000
++};
++
++#define __MK_FIELD(_reg, _mask, _shift) \
++	{ .reg = (_reg), .mask = (_mask), .shift = (_shift), }
++
++static const struct supply_info supply_info[N_REGULATORS] = {
++	{
++		.name		= "DCDC1",
++		.flags		= FIXED_ILIMSEL,
++		.n_voltages	= ARRAY_SIZE(dcdc1_voltages),
++		.voltages	= dcdc1_voltages,
++		.fixed_ilimsel	= 2400000,
++		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
++					     DCDCDCDC1_EN_SHIFT),
++		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
++					     DCDC_VDCDC1_SHIFT),
++	},
++	{
++		.name		= "DCDC2",
++		.flags		= FIXED_ILIMSEL,
++		.n_voltages	= ARRAY_SIZE(dcdc2_voltages),
++		.voltages	= dcdc2_voltages,
++		.fixed_ilimsel	= 1200000,
++		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
++					     DCDCDCDC2_EN_SHIFT),
++		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
++					     DCDC_VDCDC2_SHIFT),
++	},
++	{
++		.name		= "DCDC3",
++		.flags		= FIXED_ILIMSEL,
++		.n_voltages	= ARRAY_SIZE(dcdc3_voltages),
++		.voltages	= dcdc3_voltages,
++		.fixed_ilimsel	= 1200000,
++		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
++					DCDCDCDC3_EN_SHIFT),
++		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
++					     DCDC_VDCDC3_SHIFT),
++	},
++	{
++		.name		= "LDO1",
++		.n_voltages	= ARRAY_SIZE(ldo1_voltages),
++		.voltages	= ldo1_voltages,
++		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
++		.ilimsels	= ldo_ilimsel,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_LDO1_SHIFT),
++		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
++					     LDO1_VSEL_SHIFT),
++		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
++					     LDO1_ILIM_SHIFT),
++	},
++	{
++		.name		= "LDO2",
++		.n_voltages	= ARRAY_SIZE(ldo2_voltages),
++		.voltages	= ldo2_voltages,
++		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
++		.ilimsels	= ldo_ilimsel,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_LDO2_SHIFT),
++		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
++					     LDO2_VSEL_SHIFT),
++		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
++					     LDO2_ILIM_SHIFT),
++	},
++	{
++		.name		= "USB",
++		.flags		= FIXED_VOLTAGE,
++		.fixed_voltage	= 5000000,
++		.n_ilimsels	= ARRAY_SIZE(usb_ilimsel),
++		.ilimsels	= usb_ilimsel,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_USB_SHIFT),
++		.ilimsel	= __MK_FIELD(REG_USB, USB_ILIM_MASK,
++					     USB_ILIM_SHIFT),
++	},
++	{
++		.name		= "LCD",
++		.flags		= FIXED_VOLTAGE | FIXED_ILIMSEL,
++		.fixed_voltage	= 5000000,
++		.fixed_ilimsel	=  400000,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_LCD_SHIFT),
++	},
++};
++
++static int list_voltage(struct regulator_dev *rdev, unsigned selector)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_VOLTAGE)
++		return selector ? -EINVAL : info->fixed_voltage;
++
++	if (selector < 0 || selector >= info->n_voltages)
 +		return -EINVAL;
 +
++	return info->voltages[selector];
++}
++
++static int set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int i;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_VOLTAGE)
++		return -EINVAL;
++
++	for (i = 0; i < info->n_voltages; i++)
++		if (min_uV <= info->voltages[i] &&
++		    max_uV >= info->voltages[i])
++			break;
++
++	if (i >= info->n_voltages)
++		return -EINVAL;
++
++	return write_field(hw, &info->voltage, i);
++}
++
++static int get_voltage(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int ret;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_VOLTAGE)
++		return info->fixed_voltage;
++
++	ret = read_field(hw, &info->voltage);
++	if (ret < 0)
++		return ret;
++	if (WARN_ON(ret >= info->n_voltages))
++		return -EIO;
++
++	return info->voltages[ret];
++}
++
++static int set_current_limit(struct regulator_dev *rdev, int min_uA,
++			     int max_uA)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int i;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_ILIMSEL)
++		return -EINVAL;
++
++	for (i = 0; i < info->n_ilimsels; i++)
++		if (min_uA <= info->ilimsels[i] &&
++		    max_uA >= info->ilimsels[i])
++			break;
++
++	if (i >= info->n_ilimsels)
++		return -EINVAL;
++
++	return write_field(hw, &info->ilimsel, i);
++}
++
++static int get_current_limit(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int ret;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_ILIMSEL)
++		return info->fixed_ilimsel;
++
++	ret = read_field(hw, &info->ilimsel);
++	if (ret < 0)
++		return ret;
++	if (WARN_ON(ret >= info->n_ilimsels))
++		return -EIO;
++
++	return info->ilimsels[ret];
++}
++
++static int enable_supply(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	return write_field(hw, &info->enable, 1);
++}
++
++static int disable_supply(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	return write_field(hw, &info->enable, 0);
++}
++
++static int is_supply_enabled(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	return read_field(hw, &info->enable);
++}
++
++static struct regulator_ops regulator_ops = {
++	.is_enabled		= is_supply_enabled,
++	.enable			= enable_supply,
++	.disable		= disable_supply,
++	.get_voltage		= get_voltage,
++	.set_voltage		= set_voltage,
++	.list_voltage		= list_voltage,
++	.set_current_limit	= set_current_limit,
++	.get_current_limit	= get_current_limit,
++};
++
++static int __devexit pmic_remove(struct spi_device *spi)
++{
++	struct tps6524x *hw = spi_get_drvdata(spi);
++	int i;
++
++	if (!hw)
++		return 0;
++	for (i = 0; i < N_REGULATORS; i++) {
++		if (hw->rdev[i])
++			regulator_unregister(hw->rdev[i]);
++		hw->rdev[i] = NULL;
++	}
++	spi_set_drvdata(spi, NULL);
++	kfree(hw);
 +	return 0;
 +}
 +
-+static int ti_ssp_spi_transfer(struct spi_device *spi, struct spi_message *m)
++static int __devinit pmic_probe(struct spi_device *spi)
 +{
-+	struct ti_ssp_spi	*hw;
-+	struct spi_transfer	*t;
-+	int			error = 0;
++	struct tps6524x *hw;
++	struct device *dev = &spi->dev;
++	const struct supply_info *info = supply_info;
++	struct regulator_init_data *init_data;
++	int ret = 0, i;
 +
-+	m->actual_length = 0;
-+	m->status = -EINPROGRESS;
-+
-+	hw = spi_master_get_devdata(spi->master);
-+
-+	if (list_empty(&m->transfers) || !m->complete)
-+		return -EINVAL;
-+
-+	list_for_each_entry(t, &m->transfers, transfer_list) {
-+		if (t->len && !(t->rx_buf || t->tx_buf)) {
-+			dev_err(&spi->dev, "invalid xfer, no buffer\n");
-+			return -EINVAL;
-+		}
-+
-+		if (t->len && t->rx_buf && t->tx_buf) {
-+			dev_err(&spi->dev, "invalid xfer, full duplex\n");
-+			return -EINVAL;
-+		}
-+
-+		if (t->bits_per_word > 32) {
-+			dev_err(&spi->dev, "invalid xfer width %d\n",
-+				t->bits_per_word);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	spin_lock(&hw->lock);
-+	if (hw->shutdown) {
-+		error = -ESHUTDOWN;
-+		goto error_unlock;
-+	}
-+	list_add_tail(&m->queue, &hw->msg_queue);
-+	queue_work(hw->workqueue, &hw->work);
-+error_unlock:
-+	spin_unlock(&hw->lock);
-+	return error;
-+}
-+
-+static int __devinit ti_ssp_spi_probe(struct platform_device *pdev)
-+{
-+	const struct ti_ssp_spi_data *pdata;
-+	struct ti_ssp_spi *hw;
-+	struct spi_master *master;
-+	struct device *dev = &pdev->dev;
-+	int error = 0;
-+
-+	pdata = dev->platform_data;
-+	if (!pdata) {
-+		dev_err(dev, "platform data not found\n");
++	init_data = dev->platform_data;
++	if (!init_data) {
++		dev_err(dev, "could not find regulator platform data\n");
 +		return -EINVAL;
 +	}
 +
-+	master = spi_alloc_master(dev, sizeof(struct ti_ssp_spi));
-+	if (!master) {
-+		dev_err(dev, "cannot allocate SPI master\n");
++	hw = kzalloc(sizeof(struct tps6524x), GFP_KERNEL);
++	if (!hw) {
++		dev_err(dev, "cannot allocate regulator private data\n");
 +		return -ENOMEM;
 +	}
++	spi_set_drvdata(spi, hw);
 +
-+	hw = spi_master_get_devdata(master);
-+	platform_set_drvdata(pdev, hw);
-+
-+	hw->master = master;
++	memset(hw, 0, sizeof(struct tps6524x));
 +	hw->dev = dev;
-+	hw->pdata = pdata;
++	hw->spi = spi_dev_get(spi);
++	mutex_init(&hw->lock);
 +
-+	spin_lock_init(&hw->lock);
-+	init_completion(&hw->complete);
-+	INIT_LIST_HEAD(&hw->msg_queue);
-+	INIT_WORK(&hw->work, ti_ssp_spi_work);
++	for (i = 0; i < N_REGULATORS; i++, info++, init_data++) {
++		hw->desc[i].name	= info->name;
++		hw->desc[i].id		= i;
++		hw->desc[i].n_voltages	= info->n_voltages;
++		hw->desc[i].ops		= &regulator_ops;
++		hw->desc[i].type	= REGULATOR_VOLTAGE;
++		hw->desc[i].owner	= THIS_MODULE;
 +
-+	hw->workqueue = create_singlethread_workqueue(dev_name(dev));
-+	if (!hw->workqueue) {
-+		error = -ENOMEM;
-+		dev_err(dev, "work queue creation failed\n");
-+		goto error_wq;
-+	}
++		if (info->flags & FIXED_VOLTAGE)
++			hw->desc[i].n_voltages = 1;
 +
-+	error = ti_ssp_set_iosel(hw->dev, hw->pdata->iosel);
-+	if (error < 0) {
-+		dev_err(dev, "io setup failed\n");
-+		goto error_iosel;
-+	}
-+
-+	master->bus_num		= pdev->id;
-+	master->num_chipselect	= hw->pdata->num_cs;
-+	master->mode_bits	= MODE_BITS;
-+	master->flags		= SPI_MASTER_HALF_DUPLEX;
-+	master->setup		= ti_ssp_spi_setup;
-+	master->transfer	= ti_ssp_spi_transfer;
-+
-+	error = spi_register_master(master);
-+	if (error) {
-+		dev_err(dev, "master registration failed\n");
-+		goto error_reg;
-+	}
-+
-+	return 0;
-+
-+error_reg:
-+error_iosel:
-+	destroy_workqueue(hw->workqueue);
-+error_wq:
-+	spi_master_put(master);
-+	return error;
-+}
-+
-+static int __devexit ti_ssp_spi_remove(struct platform_device *pdev)
-+{
-+	struct ti_ssp_spi *hw = platform_get_drvdata(pdev);
-+	int error;
-+
-+	hw->shutdown = 1;
-+	while (!list_empty(&hw->msg_queue)) {
-+		error = wait_for_completion_interruptible(&hw->complete);
-+		if (error < 0) {
-+			hw->shutdown = 0;
-+			return error;
++		hw->rdev[i] = regulator_register(&hw->desc[i], dev,
++						 init_data, hw);
++		if (IS_ERR(hw->rdev[i])) {
++			ret = PTR_ERR(hw->rdev[i]);
++			hw->rdev[i] = NULL;
++			goto fail;
 +		}
 +	}
-+	destroy_workqueue(hw->workqueue);
-+	spi_unregister_master(hw->master);
 +
 +	return 0;
++
++fail:
++	pmic_remove(spi);
++	return ret;
 +}
 +
-+static struct platform_driver ti_ssp_spi_driver = {
-+	.probe		= ti_ssp_spi_probe,
-+	.remove		= __devexit_p(ti_ssp_spi_remove),
++static struct spi_driver pmic_driver = {
++	.probe		= pmic_probe,
++	.remove		= __devexit_p(pmic_remove),
 +	.driver		= {
-+		.name	= "ti-ssp-spi",
++		.name	= "tps6524x",
 +		.owner	= THIS_MODULE,
 +	},
 +};
 +
-+static int __init ti_ssp_spi_init(void)
++static int __init pmic_driver_init(void)
 +{
-+	return platform_driver_register(&ti_ssp_spi_driver);
++	return spi_register_driver(&pmic_driver);
 +}
-+module_init(ti_ssp_spi_init);
++module_init(pmic_driver_init);
 +
-+static void __exit ti_ssp_spi_exit(void)
++static void __exit pmic_driver_exit(void)
 +{
-+	platform_driver_unregister(&ti_ssp_spi_driver);
++	spi_unregister_driver(&pmic_driver);
 +}
-+module_exit(ti_ssp_spi_exit);
++module_exit(pmic_driver_exit);
 +
-+MODULE_DESCRIPTION("SSP SPI Master");
++MODULE_DESCRIPTION("TPS6524X PMIC Driver");
 +MODULE_AUTHOR("Cyril Chemparathy");
 +MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:ti-ssp-spi");
-diff --git a/include/linux/mfd/ti_ssp.h b/include/linux/mfd/ti_ssp.h
-index 021fe09..dbb4b43 100644
---- a/include/linux/mfd/ti_ssp.h
-+++ b/include/linux/mfd/ti_ssp.h
-@@ -32,6 +32,12 @@ struct ti_ssp_data {
- 	struct ti_ssp_dev_data	dev_data[2];
- };
- 
-+struct ti_ssp_spi_data {
-+	unsigned long	iosel;
-+	int		num_cs;
-+	void		(*select)(int cs);
-+};
-+
- /*
-  * Sequencer port IO pin configuration bits.  These do not correlate 1-1 with
-  * the hardware.  The iosel field in the port data combines iosel1 and iosel2,
++MODULE_ALIAS("spi:tps6524x");
 -- 
 1.7.1
