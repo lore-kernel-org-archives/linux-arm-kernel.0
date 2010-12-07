@@ -1,31 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 7 Dec 2010 09:06:09 -0200
-Subject: [PATCH 1/3] ARM: mx5: add support for the two watchdog modules
-In-Reply-To: <20101207091613.GD21020@pengutronix.de>
-References: <1291660714-16396-1-git-send-email-fabio.estevam@freescale.com>
-	<20101207091613.GD21020@pengutronix.de>
-Message-ID: <AANLkTi=1ugnEX=f4Ko=d=7JWr5LZtTK+9L6ZWGt0Epth@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 7 Dec 2010 11:54:29 +0000
+Subject: [PATCHv2] support PMIC mc13892
+In-Reply-To: <AANLkTikr5egA+mktGwCUfT8eHvnTBt6VmYxx3eb-eL4W@mail.gmail.com>
+References: <1291708905-23645-1-git-send-email-b00984@freescale.com>
+	<87pqtdncpl.fsf@lechat.rtp-net.org>
+	<AANLkTikr5egA+mktGwCUfT8eHvnTBt6VmYxx3eb-eL4W@mail.gmail.com>
+Message-ID: <20101207115429.GB4698@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, Dec 07, 2010 at 05:55:00PM +0800, Yong Shen wrote:
+> On Tue, Dec 7, 2010 at 5:39 PM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
 
-2010/12/7 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Mon, Dec 06, 2010 at 04:38:32PM -0200, Fabio Estevam wrote:
->> MX51 has two watchdog modules.
->>
->> Add support for both of them.
-> I don't know why you need two watchdogs, but the patches look OK.
+> > I'm not sure if it should be a signed-off-by: or acked-by: or reviewed-by:
+> > tag since I wrote the code you've used a basis. I'm putting my s-o-b but
+> > if I'm wrong, I do hope someone will correct it.
 
-Can I get your Acked-by?
+> > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 
-> Note there is a conflict between this patch series and the clk-change
-> for the watchdog driver.
+> It is nice that you mention this issue. I was also wondering for a
+> while about what should I do about this, I was not sure, so I put
+> Arnaud in the head comments. Is there any conventions for this? I am
+> OK with:
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Signed-off-by: Yong Shen <yong.shen@linaro.org>
 
-Yes, I am aware of it. Probably the watchod driver patch I sent will
-go via the watchdog maintainer and when it gets applied I can fix the
-clocks for mx5 watchdog.
+A signoff has a very specific meaning which would in this situation mean
+that Arnaud wrote part of the patch - see SubmittingPatches.  Otherwise
+a Tested-by and/or Reviewed-by seem appropriate (with the obvious
+meanings).
 
-Thanks,
+> It seems that I should send out a new patch for this, or can I just
+> ask maintainer who is responsible for merging this patch to change the
+> s-o-b?
 
-Fabio Estevam
+Maintainers will usually take care of this, but if you need to resend
+please do include tags that still apply.
