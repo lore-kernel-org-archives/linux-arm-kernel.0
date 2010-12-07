@@ -1,33 +1,19 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 Dec 2010 14:33:22 +0100
-Subject: [PATCH 09/15] ARM: mxs: Add clock support
-In-Reply-To: <AANLkTi=OTPd6wJ0hHO8jnO5NVC9f2ZpRDMeC7zWJwObG@mail.gmail.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-10-git-send-email-shawn.guo@freescale.com>
-	<20101130163922.GT20449@pengutronix.de>
-	<AANLkTi=OTPd6wJ0hHO8jnO5NVC9f2ZpRDMeC7zWJwObG@mail.gmail.com>
-Message-ID: <20101207133322.GH21020@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 7 Dec 2010 13:37:11 +0000
+Subject: [PATCH 13/14] OMAP2/3: PRCM: split OMAP2/3-specific PRCM code
+	into OMAP2/3-specific files
+In-Reply-To: <20101207012516.3708.87606.stgit@twilight.localdomain>
+References: <20101207012242.3708.45451.stgit@twilight.localdomain>
+	<20101207012516.3708.87606.stgit@twilight.localdomain>
+Message-ID: <20101207133710.GW4698@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+On Mon, Dec 06, 2010 at 06:25:17PM -0700, Paul Walmsley wrote:
+> In preparation for adding OMAP4-specific PRCM accessor/mutator
+> functions, split the existing OMAP2/3 PRCM code into OMAP2/3-specific
+> files.  Most of what was in mach-omap2/{cm,prm}.{c,h} has now been
+> moved into mach-omap2/{cm,prm}2xxx_3xxx.{c,h}, since it was
+> OMAP2xxx/3xxx-specific.
 
-> > Hmm, I would have used an approach that is quickly switchable to the
-> > generic clock stuff posted a few times here. ?But probably already too
-> > late. ?So it's up to you to decide when to switch (or if at all).
-> >
-> I suppose you are talking about the common struct clk patch from
-> Jeremy Kerr.  Since mxs is closely tracking mxc, I would switch mxs
-> only mxc is switched.
-I want mxc switched sooner rather than later.
-
-If you ask me, don't stop to be inovative because of tracking mxc which
-supports many machines and so isn't that flexible as a new machine
-support.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
