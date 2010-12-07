@@ -1,51 +1,65 @@
-From: mark@codesourcery.com (Mark Mitchell)
-Date: Mon, 06 Dec 2010 19:02:30 -0600
-Subject: RFC: Dynamic hwcaps
-In-Reply-To: <AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
-References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>	<20101203165105.GD30898@n2100.arm.linux.org.uk>	<AANLkTik9sqkbCPbcWUL+2otyfO1OZ=hx1tvSkQW65e4i@mail.gmail.com>	<4CFBAC6D.5060507@codesourcery.com>
-	<AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
-Message-ID: <4CFD87A6.8030104@codesourcery.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 7 Dec 2010 11:50:37 +0530
+Subject: Problem with sram size on OMAP1611 (OSK)
+In-Reply-To: <20101207001831.GX8345@atomide.com>
+References: <4CE73921.6030908@am.sony.com> <20101207001831.GX8345@atomide.com>
+Message-ID: <7742888e3135b6c4394cf8f3eaab1c25@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/6/2010 5:07 AM, Dave Martin wrote:
-
->> But,
->> to enable binary distribution, having to have N copies of a library (let
->> alone an application) for N different ARM core variants just doesn't
->> make sense to me.
-> 
-> Just so, and as discussed before improvements to package managers
-> could help here to avoid installing duplicate libraries.  (I believe
-> that rpm may have some capability here (?) but deb does not at
-> present).
-
-Yes, a smarter package manager could help a device builder automatically
-get the right version of a library.  But, something more fundamental has
-to happen to avoid the library developer having to *produce* N versions
-of a library.  (Yes, in theory, you just type "make" with different
-CFLAGS options, but in practice of course it's often more complex than
-that, especially if you need to validate the library.)
-
-> Currently, I don't have many examples-- the main one is related to the
-> discussions aroung using NEON for memcpy().  This can be a performance
-> win on some platforms, but except when the system is heavily loaded,
-> or when NEON happens to be turned on anyway, it may not be
-> advantageous for the user or overall system performance.
-
-How good of a proxy would the length of the copy be, do you think?  If
-you want to copy 1G of data, and NEON makes you 2x-4x faster, then it
-seems to me that you probably want to use NEON, almost independent of
-overall system load.  But, if you're only going to copy 16 bytes, even
-if NEON is faster, it's probably OK not to use it -- the function-call
-overhead to get into memcpy at all is probably significant relative to
-the time you'd save by using NEON.  In between, it's harder, of course
--- but perhaps if memcpy is the key example, we could get 80% of the
-benefit of your idea simply by a test inside memcpy as to the length of
-the data to be copied?
-
--- 
-Mark Mitchell
-CodeSourcery
-mark at codesourcery.com
-(650) 331-3385 x713
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Tuesday, December 07, 2010 5:49 AM
+> To: Tim Bird
+> Cc: santosh.shilimkar at ti.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: Problem with sram size on OMAP1611 (OSK)
+>
+> Hi,
+>
+> * Tim Bird <tim.bird@am.sony.com> [101119 18:48]:
+> > Santosh,
+> >
+> > I just tried the latest kernel (well, v2.6.36), and found a problem
+> > that bisected to the following commit:
+> >
+> > commit e546f21b4b7af012d9f18edad6237339adfeb681
+> > Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Date:   Fri Sep 24 07:19:49 2010 +0100
+> >
+> >     ARM: 6408/1: omap: Map only available sram memory
+> >
+> > I am testing Linux on an OSK board (with an OMAP1611),
+> > and the above commmit causes the machine to hang.
+> > I isolated the problem to the sram length.  The commit
+> > above changes it to a value detected in omap_detect_sram(),
+> > but when this value is used, my OSK hangs on boot.
+> >
+> > Below is the hack I used to work around this.  I'm not sure
+> > what the problem is, but I'd be happy to provide more information
+> > or try other things, to fix support for omap1611 in mainline.
+> > I tried putting the 1024 * 1024 value into omap_detect_sram(),
+> > with no luck.  There's some additional processing there which
+> > might alter the value.  Or perhaps the current value there
+> > for omap_sram_size on a 1611 is just wrong.
+> >
+> > diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> > index 10b3b4c..d4ba4fa 100644
+> > --- a/arch/arm/plat-omap/sram.c
+> > +++ b/arch/arm/plat-omap/sram.c
+> > @@ -236,6 +236,8 @@ void __init omap_map_sram(void)
+> >         base = ROUND_DOWN(base, PAGE_SIZE);
+> >         omap_sram_io_desc[0].pfn = __phys_to_pfn(base);
+> >         omap_sram_io_desc[0].length = ROUND_DOWN(omap_sram_size,
+> PAGE_SIZE);
+> > +       if (cpu_is_omap1611())
+> > +               omap_sram_io_desc[0].length = 1024 * 1024;
+> >         iotable_init(omap_sram_io_desc,
+ARRAY_SIZE(omap_sram_io_desc));
+> >
+> >         printk(KERN_INFO "SRAM: Mapped pa 0x%08lx to va 0x%08lx size:
+> 0x%lx\n",
+>
+> I'm not seeing this on my OSK, can you please check if this still
+> happening with v2.6.37-rc4?
+>
+Any updates Tim ??
