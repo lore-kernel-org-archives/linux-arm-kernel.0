@@ -1,134 +1,65 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 7 Dec 2010 12:59:57 +0200
-Subject: [PATCH] Kirkwood: Add support for 6282 based QNAP devices
-In-Reply-To: <20101206215316.GH9684@jirafa.cyrius.com>
-References: <20101129174440.GA14799@jirafa.cyrius.com>
-	<AANLkTim=30kESuyy7b6xLtCSFY1J9o0PhR1privVsDbb@mail.gmail.com>
-	<20101206215316.GH9684@jirafa.cyrius.com>
-Message-ID: <AANLkTimk8G0kf_+M_yx8n0Wh2tgLAUZV7JbmyzR7RM59@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 7 Dec 2010 16:34:05 +0530
+Subject: [PATCH v1 0/9] OMAP: DMA: hwmod and DMA as platform device
+In-Reply-To: <1291434246-30716-1-git-send-email-manjugk@ti.com>
+References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
+Message-ID: <20101207110405.GB1754@GLPP-machine>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 6, 2010 at 11:53 PM, Martin Michlmayr <tbm@cyrius.com> wrote:
-> * saeed bishara <saeed.bishara@gmail.com> [2010-11-30 12:43]:
->> > ? ? ? ?bool "QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS"
->> please add the new devices to the title as well.
->
-> Ok, here's a new version:
->
-> From: Martin Michlmayr <tbm@cyrius.com>
->
-> Add support for the QNAP NAS devices based on Marvell's 6282 Kirkwood
-> chip (TS-119P+, TS-219P+ and TS-419P+). ?The differences to the 6281
-> based devices are:
-> ?- Ethernet PHY address
-> ?- GPIOs used for buttons (TS-119P+/TS-219P+)
->
-> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
->
-> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-> index 3410633..7fc603b 100644
-> --- a/arch/arm/mach-kirkwood/Kconfig
-> +++ b/arch/arm/mach-kirkwood/Kconfig
-> @@ -45,18 +45,18 @@ config MACH_GURUPLUG
-> ? ? ? ? ?Marvell GuruPlug Reference Board.
->
-> ?config MACH_TS219
-> - ? ? ? bool "QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS"
-> + ? ? ? bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
-> ? ? ? ?help
-> ? ? ? ? ?Say 'Y' here if you want your kernel to support the
-> - ? ? ? ? QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS
-> - ? ? ? ? devices.
-> + ? ? ? ? QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and
-> + ? ? ? ? TS-219P+ Turbo NAS devices.
->
-> ?config MACH_TS41X
-> - ? ? ? bool "QNAP TS-410, TS-410U, TS-419P and TS-419U Turbo NAS"
-> + ? ? ? bool "QNAP TS-410, TS-410U, TS-419P, TS-419P+ and TS-419U Turbo NAS"
-> ? ? ? ?help
-> ? ? ? ? ?Say 'Y' here if you want your kernel to support the
-> - ? ? ? ? QNAP TS-410, TS-410U, TS-419P and TS-419U Turbo NAS
-> - ? ? ? ? devices.
-> + ? ? ? ? QNAP TS-410, TS-410U, TS-419P, TS-419P+ and TS-419U Turbo
-> + ? ? ? ? NAS devices.
->
-> ?config MACH_DOCKSTAR
-> ? ? ? ?bool "Seagate FreeAgent DockStar"
-> diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
-> index 6710bd7..dc999c4 100644
-> --- a/arch/arm/mach-kirkwood/ts219-setup.c
-> +++ b/arch/arm/mach-kirkwood/ts219-setup.c
-> @@ -80,15 +80,19 @@ static unsigned int qnap_ts219_mpp_config[] __initdata = {
-> ? ? ? ?MPP11_UART0_RXD,
-> ? ? ? ?MPP13_UART1_TXD, ? ? ? ?/* PIC controller */
-> ? ? ? ?MPP14_UART1_RXD, ? ? ? ?/* PIC controller */
-> - ? ? ? MPP15_GPIO, ? ? ? ? ? ? /* USB Copy button */
-> - ? ? ? MPP16_GPIO, ? ? ? ? ? ? /* Reset button */
-> + ? ? ? MPP15_GPIO, ? ? ? ? ? ? /* USB Copy button (on devices with 88F6281) */
-> + ? ? ? MPP16_GPIO, ? ? ? ? ? ? /* Reset button (on devices with 88F6281) */
-> ? ? ? ?MPP36_GPIO, ? ? ? ? ? ? /* RAM: 0: 256 MB, 1: 512 MB */
-> + ? ? ? MPP37_GPIO, ? ? ? ? ? ? /* Reset button (on devices with 88F6282) */
-> + ? ? ? MPP43_GPIO, ? ? ? ? ? ? /* USB Copy button (on devices with 88F6282) */
-> ? ? ? ?MPP44_GPIO, ? ? ? ? ? ? /* Board ID: 0: TS-11x, 1: TS-21x */
-> ? ? ? ?0
-> ?};
->
-> ?static void __init qnap_ts219_init(void)
-> ?{
-> + ? ? ? u32 dev, rev;
-> +
-> ? ? ? ?/*
-> ? ? ? ? * Basic setup. Needs to be called early.
-> ? ? ? ? */
-> @@ -100,6 +104,14 @@ static void __init qnap_ts219_init(void)
-> ? ? ? ?qnap_tsx1x_register_flash();
-> ? ? ? ?kirkwood_i2c_init();
-> ? ? ? ?i2c_register_board_info(0, &qnap_ts219_i2c_rtc, 1);
-> +
-> + ? ? ? kirkwood_pcie_id(&dev, &rev);
-> + ? ? ? if (dev == MV88F6282_DEV_ID) {
-> + ? ? ? ? ? ? ? qnap_ts219_buttons[0].gpio = 43; /* USB Copy button */
-> + ? ? ? ? ? ? ? qnap_ts219_buttons[1].gpio = 37; /* Reset button */
-> + ? ? ? ? ? ? ? qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
-> + ? ? ? }
-> +
-> ? ? ? ?kirkwood_ge00_init(&qnap_ts219_ge00_data);
-> ? ? ? ?kirkwood_sata_init(&qnap_ts219_sata_data);
-> ? ? ? ?kirkwood_ehci_init();
-> diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
-> index 3587a28..9a44029 100644
-> --- a/arch/arm/mach-kirkwood/ts41x-setup.c
-> +++ b/arch/arm/mach-kirkwood/ts41x-setup.c
-> @@ -119,6 +119,8 @@ static unsigned int qnap_ts41x_mpp_config[] __initdata = {
->
-> ?static void __init qnap_ts41x_init(void)
-> ?{
-> + ? ? ? u32 dev, rev;
-> +
-> ? ? ? ?/*
-> ? ? ? ? * Basic setup. Needs to be called early.
-> ? ? ? ? */
-> @@ -130,8 +132,15 @@ static void __init qnap_ts41x_init(void)
-> ? ? ? ?qnap_tsx1x_register_flash();
-> ? ? ? ?kirkwood_i2c_init();
-> ? ? ? ?i2c_register_board_info(0, &qnap_ts41x_i2c_rtc, 1);
-> +
-> + ? ? ? kirkwood_pcie_id(&dev, &rev);
-> + ? ? ? if (dev == MV88F6282_DEV_ID) {
-> + ? ? ? ? ? ? ? qnap_ts41x_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
-> + ? ? ? ? ? ? ? qnap_ts41x_ge01_data.phy_addr = MV643XX_ETH_PHY_ADDR(1);
-> + ? ? ? }
-> ? ? ? ?kirkwood_ge00_init(&qnap_ts41x_ge00_data);
-> ? ? ? ?kirkwood_ge01_init(&qnap_ts41x_ge01_data);
-> +
-> ? ? ? ?kirkwood_sata_init(&qnap_ts41x_sata_data);
-> ? ? ? ?kirkwood_ehci_init();
-> ? ? ? ?platform_device_register(&qnap_ts41x_button_device);
->
-> --
-> Martin Michlmayr
-> http://www.cyrius.com/
->
-looks fine to me, Nico, please merge
-saeed
+Hi Tony,
+
+* G, Manjunath Kondaiah <manjugk@ti.com> [2010-12-04 09:13:57 +0530]:
+
+> Patch series to convert DMA library into platform driver using platform
+> device model and adapting hwmod for omap2+.
+> 
+> The original patch series :
+> http://comments.gmane.org/gmane.linux.ports.arm.omap/46953
+> has been split into two patch series based on suggestion from Tony.
+> (https://patchwork.kernel.org/patch/375831/)
+> 
+> The first series will prepare existing DMA library for DMA hwmod and 
+> converting the same into platform driver.
+> 
+> The second series will have:
+> arch/arm/mach-omap1/dma.c       omap1 specific platform init
+> arch/arm/mach-omap2/dma.c       omap2+ specific platform init
+> drivers/dma/omap-dma.c          driver using dmaengine.c
+> 
+> Patch series1 Design:
+> 1. The low level read/write macros are converted into static inline functions
+> so that, these functions can be moved to respective mach-omap driver
+> files later.
+> (Thanks to Tony and Kevin for their suggestions on handling all omap register
+> offset without adding extra enums)
+> 2. Implements generic errata handling for all OMAP DMA errata.
+> 3. DMA hwmod data is updated for respective hwmod db files.
+> 4. The DMA library is split into two layers.
+>    a. The generic code is retained in plat-omap/dma.c
+>    b. The machine specific init code is moved to
+>       respective mach-omap dma files.
+> 
+> Minimal machine specific code is moved to respective mach-omap dma files with 
+> this series. Rest of code movement and API cleanup's are handled in second
+> series.
+> 
+> Patch series applies on top of latest linux omap master branch:
+> *************************************************************************
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+> Branch: master
+> commit a04fd22204b13ce34a3f8a8157f83c44d64f8da9
+> Merge: e941bb0 afd2d11
+> Author: Tony Lindgren <tony@atomide.com>
+> 
+>     Linux-omap rebuilt: Merged in usb patches for testing
+> *************************************************************************
+
+If there are no further issues, can you pls merge this series for
+testing. I can send pull request if it is convinient.
+
+As per the alignment with original series(v5), all the fixes done for
+OMAP1 are pulled into this patch series. OMAP1 and OMAP2+ will build and
+boots with published test reports.
+
+-Manjunath
