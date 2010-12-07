@@ -1,57 +1,91 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Tue, 7 Dec 2010 10:52:17 +0800
-Subject: [PATCH] support PMIC mc13892
-In-Reply-To: <87tyirnpbm.fsf@lechat.rtp-net.org>
-References: <1291616735-29645-1-git-send-email-yong.shen@freescale.com>
-	<87tyirnpbm.fsf@lechat.rtp-net.org>
-Message-ID: <AANLkTikwAGr5p_RdZF_fP8XjZf+=G=n0G9KykmGvymUX@mail.gmail.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Mon, 6 Dec 2010 20:53:59 -0600
+Subject: [PATCH] ARM: Add Kconfig entry for SG chain support
+In-Reply-To: <20101207104451X.fujita.tomonori@lab.ntt.co.jp>
+References: <1291686036-32562-1-git-send-email-fernando.lugo@ti.com>
+	<20101207104451X.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <AANLkTi=-ktF0F5uxYy9CCU1-R4_2o32eYQJrr1uHuUxs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 6, 2010 at 6:55 PM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-> <yong.shen@freescale.com> writes:
+On Mon, Dec 6, 2010 at 7:45 PM, FUJITA Tomonori
+<fujita.tomonori@lab.ntt.co.jp> wrote:
+> On Mon, ?6 Dec 2010 19:40:36 -0600
+> Fernando Guzman Lugo <fernando.lugo@ti.com> wrote:
 >
-> Hi,
->
->> From: Yong Shen <yong.shen@linaro.org>
+>> Add a entry to make possible SG chaining under ARM
+>> architecture.
 >>
->> add support for mc13892, tested on mx51 babbage board
->
-> Will review/test it asap on my efikamx. thanks for working on this :)
-Welcome, it is also one of my tasks.
->
+>> Tidspbridge driver needs SG chaining, however SG chain has not
+>> been tested under all platforms. Adding this option OMAP
+>> platform can enable it and if other platforms have issues they
+>> would not enable it.
 >>
->> Signed-off-by: Yong Shen <yong.shen@linaro.org>
+>> This patch is base on this discussion:
+>>
+>> http://marc.info/?l=linux-arm-kernel&m=129166415415541&w=2
+>>
+>> Signed-off-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
 >> ---
->> ?drivers/mfd/Kconfig ? ? ? ? ? ? ? ? ? | ? ?4 +
->> ?drivers/regulator/Kconfig ? ? ? ? ? ? | ? ?8 +
->> ?drivers/regulator/Makefile ? ? ? ? ? ?| ? ?1 +
->> ?drivers/regulator/mc13892-regulator.c | ?647 +++++++++++++++++++++++++++++++++
->> ?include/linux/mfd/mc13892.h ? ? ? ? ? | ? 38 ++
->> ?5 files changed, 698 insertions(+), 0 deletions(-)
->> ?create mode 100644 drivers/regulator/mc13892-regulator.c
->> ?create mode 100644 include/linux/mfd/mc13892.h
->
-> [...]
->
+>> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? | ? ?6 ++++++
+>> ?arch/arm/include/asm/scatterlist.h | ? ?4 ++++
+>> ?2 files changed, 10 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index dd944bd..f5cfd42 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1017,6 +1017,12 @@ config CPU_HAS_PMU
+>> ? ? ? default y
+>> ? ? ? bool
+>>
+>> +config ARM_SG_CHAIN
+>> + ? ? bool "Enable SG chain support"
+>> + ? ? default n
+>> + ? ? help
+>> + ? ? ? Enable support for SG chaining for ARM
 >> +
->> +static const int mc13892_vvideo[] = {
->> + ? ? 2500000, 2600000, 270000, 2775000,
->> +};
 >
-> Should be :
-> static const int mc13892_vvideo[] = {
-> ? ? ? ?270000, 2775000, 2500000, 2600000,
-> };
+> I thought that you simply add something like the following to
+> arch/arm/include/asm/scatterlist.h?
+>
+> #ifdef CONFIG_ARCH_OMAP
+> #define ARCH_HAS_SG_CHAIN
+> #endif
 
-confirmed by spec. I will update it.
+That is exactly to one of my proposals, but I did not received any
+comment. I heart from Russell it would be good to have a Kconfig
+entry, that's why I am proposing ti patch now.
 
-Thanks
-Yong
 >
-> I've spotted this in my code some time ago. VVIDEO voltages are not
-> ascending order.
+> Because you can't enable sg chaining on some arm architectures. Some
+> arm SCSI drivers can't handle sg chaining but they are not available
+> on omap, right? Why do you make this configurable on all arm archs
+> like the above?
+
+AFAIK omap does not have SCSI drivers. I think it could help other
+platforms to test if they have some issues with SG chain, once there
+is not issues in any platform it can be enable for all ARM.
+
+Thanks,
+Fernando.
+
 >
 >
-> Arnaud
+>> ?if !MMU
+>> ?source "arch/arm/Kconfig-nommu"
+>> ?endif
+>> diff --git a/arch/arm/include/asm/scatterlist.h b/arch/arm/include/asm/scatterlist.h
+>> index 2f87870..eab7c4f 100644
+>> --- a/arch/arm/include/asm/scatterlist.h
+>> +++ b/arch/arm/include/asm/scatterlist.h
+>> @@ -5,4 +5,8 @@
+>> ?#include <asm/types.h>
+>> ?#include <asm-generic/scatterlist.h>
+>>
+>> +#ifdef CONFIG_ARM_SG_CHAIN
+>> +#define ARCH_HAS_SG_CHAIN
+>> +#endif
+>> +
+>> ?#endif /* _ASMARM_SCATTERLIST_H */
 >
