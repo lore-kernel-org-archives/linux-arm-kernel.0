@@ -1,31 +1,79 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 7 Dec 2010 21:43:40 +0100
-Subject: [PATCH 11/14] OMAP4: PRCM: reorganize existing OMAP4 PRCM header
-	files
-In-Reply-To: <20101207012514.3708.87532.stgit@twilight.localdomain>
-References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-	<20101207012514.3708.87532.stgit@twilight.localdomain>
-Message-ID: <4CFE9C7C.6060101@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue,  7 Dec 2010 12:50:56 -0800
+Subject: [PATCH] OMAP2+: PM/serial: fix console semaphore acquire during
+	suspend
+Message-ID: <1291755056-23860-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/7/2010 2:25 AM, Paul Walmsley wrote:
+commit 0d8e2d0dad98a693bad88aea6876ac8b94ad95c6 (OMAP2+: PM/serial:
+hold console semaphore while OMAP UARTs are disabled) added use of the
+console semaphore to protect UARTs from being accessed after disabled
+during idle, but this causes problems in suspend.
 
-[...]
+During suspend, the console semaphore is already held by the time we reach
+the OMAP suspend path, so the try_acquire_console_sem() will always fail and
+suspend will be aborted.
 
-> + *
-> + * XXX This file needs to be updated to align on one of "OMAP4", "OMAP44XX",
-> + *     or "OMAP4430".
+To fix, introduce a check so the console semaphore is only attempted
+during idle, and not during suspend.
 
-Yep, I was thinking to change that as well. My first thought was OMAP4 
-to get a shorter name, but when we will introduce OMAP4440, we might 
-have some new entries, that will looks ugly close to OMAP4.
-So at the end I will prefer OMAP44XX for the moment and we might renamed 
-to OMAP4430 or OMAP4440 for the entries that will diverge.
+Cc: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+Applies to Tony's omap-fixes branch.
 
-Do you want to change that for 2.6.38?
-It will require some sync with the various users of these defines, but 
-that should be doable.
+ arch/arm/mach-omap2/pm34xx.c |   24 ++++++++++++++++++------
+ 1 files changed, 18 insertions(+), 6 deletions(-)
 
-Regards,
-Benoit
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 0ec8a04..122ef3c 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -50,6 +50,19 @@
+ #include "sdrc.h"
+ #include "control.h"
+ 
++#ifdef CONFIG_SUSPEND
++static suspend_state_t suspend_state = PM_SUSPEND_ON;
++static inline bool is_suspending(void)
++{
++	return (suspend_state != PM_SUSPEND_ON);
++}
++#else
++static inline bool is_suspending(void)
++{
++	return false;
++}
++#endif
++
+ /* Scratchpad offsets */
+ #define OMAP343X_TABLE_ADDRESS_OFFSET	   0xc4
+ #define OMAP343X_TABLE_VALUE_OFFSET	   0xc0
+@@ -387,10 +400,11 @@ void omap_sram_idle(void)
+ 	}
+ 
+ 	/* Block console output in case it is on one of the OMAP UARTs */
+-	if (per_next_state < PWRDM_POWER_ON ||
+-	    core_next_state < PWRDM_POWER_ON)
+-		if (try_acquire_console_sem())
+-			goto console_still_active;
++	if (!is_suspending())
++		if (per_next_state < PWRDM_POWER_ON ||
++		    core_next_state < PWRDM_POWER_ON)
++			if (try_acquire_console_sem())
++				goto console_still_active;
+ 
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+@@ -514,8 +528,6 @@ out:
+ }
+ 
+ #ifdef CONFIG_SUSPEND
+-static suspend_state_t suspend_state;
+-
+ static int omap3_pm_prepare(void)
+ {
+ 	disable_hlt();
+-- 
+1.7.2.1
