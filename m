@@ -1,41 +1,57 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Dec 2010 15:51:58 -0800
-Subject: [PATCH] arm: plat-omap: counter_32k: use IS_ERR() instead of
-	NULL check
-In-Reply-To: <1290791163-21190-1-git-send-email-segoon@openwall.com>
-References: <1290791163-21190-1-git-send-email-segoon@openwall.com>
-Message-ID: <20101206235158.GU8345@atomide.com>
+Date: Mon, 6 Dec 2010 16:18:31 -0800
+Subject: Problem with sram size on OMAP1611 (OSK)
+In-Reply-To: <4CE73921.6030908@am.sony.com>
+References: <4CE73921.6030908@am.sony.com>
+Message-ID: <20101207001831.GX8345@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vasiliy Kulikov <segoon@openwall.com> [101126 08:56]:
-> clk_get() returns ERR_PTR() on error, not NULL.
-> 
-> Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
-> ---
->  Cannot compile this driver, so it is not tested at all.
+Hi,
 
-Thanks will merge this.
+* Tim Bird <tim.bird@am.sony.com> [101119 18:48]:
+> Santosh,
+> 
+> I just tried the latest kernel (well, v2.6.36), and found a problem
+> that bisected to the following commit:
+> 
+> commit e546f21b4b7af012d9f18edad6237339adfeb681
+> Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date:   Fri Sep 24 07:19:49 2010 +0100
+> 
+>     ARM: 6408/1: omap: Map only available sram memory
+> 
+> I am testing Linux on an OSK board (with an OMAP1611),
+> and the above commmit causes the machine to hang.
+> I isolated the problem to the sram length.  The commit
+> above changes it to a value detected in omap_detect_sram(),
+> but when this value is used, my OSK hangs on boot.
+> 
+> Below is the hack I used to work around this.  I'm not sure
+> what the problem is, but I'd be happy to provide more information
+> or try other things, to fix support for omap1611 in mainline.
+> I tried putting the 1024 * 1024 value into omap_detect_sram(),
+> with no luck.  There's some additional processing there which
+> might alter the value.  Or perhaps the current value there
+> for omap_sram_size on a 1611 is just wrong.
+> 
+> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> index 10b3b4c..d4ba4fa 100644
+> --- a/arch/arm/plat-omap/sram.c
+> +++ b/arch/arm/plat-omap/sram.c
+> @@ -236,6 +236,8 @@ void __init omap_map_sram(void)
+>         base = ROUND_DOWN(base, PAGE_SIZE);
+>         omap_sram_io_desc[0].pfn = __phys_to_pfn(base);
+>         omap_sram_io_desc[0].length = ROUND_DOWN(omap_sram_size, PAGE_SIZE);
+> +       if (cpu_is_omap1611())
+> +               omap_sram_io_desc[0].length = 1024 * 1024;
+>         iotable_init(omap_sram_io_desc, ARRAY_SIZE(omap_sram_io_desc));
+> 
+>         printk(KERN_INFO "SRAM: Mapped pa 0x%08lx to va 0x%08lx size: 0x%lx\n",
+
+I'm not seeing this on my OSK, can you please check if this still
+happening with v2.6.37-rc4?
+
+Regards,
 
 Tony
-
-> 
->  arch/arm/plat-omap/counter_32k.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-> index 155fe43..c1e0d00 100644
-> --- a/arch/arm/plat-omap/counter_32k.c
-> +++ b/arch/arm/plat-omap/counter_32k.c
-> @@ -164,7 +164,7 @@ static int __init omap_init_clocksource_32k(void)
->  			return -ENODEV;
->  
->  		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
-> -		if (sync_32k_ick)
-> +		if (!IS_ERR(sync_32k_ick))
->  			clk_enable(sync_32k_ick);
->  
->  		clocksource_32k.mult = clocksource_hz2mult(32768,
-> -- 
-> 1.7.0.4
-> 
