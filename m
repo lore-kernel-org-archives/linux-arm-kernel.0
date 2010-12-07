@@ -1,26 +1,89 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 6 Dec 2010 19:41:04 -0600
-Subject: [PATCH] [2.6.37] ARM: tegra: fix regression from addruart rewrite
-In-Reply-To: <AANLkTimAksepMCzuMzqTs53sUx8ErJxzJJZ8POHaqMJs@mail.gmail.com>
-References: <20101207013632.GA9379@lixom.net>
-	<AANLkTimAksepMCzuMzqTs53sUx8ErJxzJJZ8POHaqMJs@mail.gmail.com>
-Message-ID: <20101207014103.GB9379@lixom.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 06 Dec 2010 18:25:14 -0700
+Subject: [PATCH 10/14] OMAP3: control/PRCM: move CONTROL_PADCONF_SYS_NIRQ
+	save/restore to SCM code
+In-Reply-To: <20101207012242.3708.45451.stgit@twilight.localdomain>
+References: <20101207012242.3708.45451.stgit@twilight.localdomain>
+Message-ID: <20101207012512.3708.64651.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 05:40:01PM -0800, Colin Cross wrote:
-> On Mon, Dec 6, 2010 at 5:36 PM, Olof Johansson <olof@lixom.net> wrote:
-> > 0ea1293009826da45e1019f45dfde1e557bb30df took out the test for
-> > MMU on/off but didn't switch the ldr instructions to no longer be
-> > conditionals based on said test.
-> >
-> > Fix that.
-> 
-> This is fixed in the uart macro consolidation patch I posted yesterday.
+For some reason, the PRCM context save/restore code also saves and
+restores a single System Control Module register,
+CONTROL_PADCONF_SYS_NIRQ.  This is probably just an error -- the
+register should be handled by SCM code -- so this patch moves it
+there.
 
-Yep, which is scheduled for .38, not .37. I'm actually trying to boot
-a mainline kernel instead of the one from the android tree right now,
-so I hit this...
+If this register really does need to be saved and restored before the
+rest of the PRCM registers, the code to do so should live in the SCM
+code, and the PM code should call this separate function.  This
+register pertains to devices with a stacked modem, so this patch is
+unlikely to affect most OMAP devices out there.
 
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+---
+ arch/arm/mach-omap2/control.c |    5 +++++
+ arch/arm/mach-omap2/prcm.c    |    5 -----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
--Olof
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 9fda3d7..b260e1b 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -134,6 +134,7 @@ struct omap3_control_regs {
+ 	u32 sramldo4;
+ 	u32 sramldo5;
+ 	u32 csi;
++	u32 padconf_sys_nirq;
+ };
+ 
+ static struct omap3_control_regs control_context;
+@@ -447,6 +448,8 @@ void omap3_control_save_context(void)
+ 	control_context.sramldo4 = omap_ctrl_readl(OMAP343X_CONTROL_SRAMLDO4);
+ 	control_context.sramldo5 = omap_ctrl_readl(OMAP343X_CONTROL_SRAMLDO5);
+ 	control_context.csi = omap_ctrl_readl(OMAP343X_CONTROL_CSI);
++	control_context.padconf_sys_nirq =
++		omap_ctrl_readl(OMAP343X_CONTROL_PADCONF_SYSNIRQ);
+ 	return;
+ }
+ 
+@@ -503,6 +506,8 @@ void omap3_control_restore_context(void)
+ 	omap_ctrl_writel(control_context.sramldo4, OMAP343X_CONTROL_SRAMLDO4);
+ 	omap_ctrl_writel(control_context.sramldo5, OMAP343X_CONTROL_SRAMLDO5);
+ 	omap_ctrl_writel(control_context.csi, OMAP343X_CONTROL_CSI);
++	omap_ctrl_writel(control_context.padconf_sys_nirq,
++			 OMAP343X_CONTROL_PADCONF_SYSNIRQ);
+ 	return;
+ }
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 2eca847..d27cdba 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -42,7 +42,6 @@ static void __iomem *cm2_base;
+ #define MAX_MODULE_ENABLE_WAIT		100000
+ 
+ struct omap3_prcm_regs {
+-	u32 control_padconf_sys_nirq;
+ 	u32 iva2_cm_clksel1;
+ 	u32 iva2_cm_clksel2;
+ 	u32 cm_sysconfig;
+@@ -312,8 +311,6 @@ void __init omap2_set_globals_prcm(struct omap_globals *omap2_globals)
+ #ifdef CONFIG_ARCH_OMAP3
+ void omap3_prcm_save_context(void)
+ {
+-	prcm_context.control_padconf_sys_nirq =
+-			 omap_ctrl_readl(OMAP343X_CONTROL_PADCONF_SYSNIRQ);
+ 	prcm_context.iva2_cm_clksel1 =
+ 			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_CLKSEL1);
+ 	prcm_context.iva2_cm_clksel2 =
+@@ -466,8 +463,6 @@ void omap3_prcm_save_context(void)
+ 
+ void omap3_prcm_restore_context(void)
+ {
+-	omap_ctrl_writel(prcm_context.control_padconf_sys_nirq,
+-					 OMAP343X_CONTROL_PADCONF_SYSNIRQ);
+ 	cm_write_mod_reg(prcm_context.iva2_cm_clksel1, OMAP3430_IVA2_MOD,
+ 					 CM_CLKSEL1);
+ 	cm_write_mod_reg(prcm_context.iva2_cm_clksel2, OMAP3430_IVA2_MOD,
