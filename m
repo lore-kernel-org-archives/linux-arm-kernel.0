@@ -1,38 +1,69 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 7 Dec 2010 11:54:29 +0000
-Subject: [PATCHv2] support PMIC mc13892
-In-Reply-To: <AANLkTikr5egA+mktGwCUfT8eHvnTBt6VmYxx3eb-eL4W@mail.gmail.com>
-References: <1291708905-23645-1-git-send-email-b00984@freescale.com>
-	<87pqtdncpl.fsf@lechat.rtp-net.org>
-	<AANLkTikr5egA+mktGwCUfT8eHvnTBt6VmYxx3eb-eL4W@mail.gmail.com>
-Message-ID: <20101207115429.GB4698@rakim.wolfsonmicro.main>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 7 Dec 2010 12:59:32 +0100
+Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to work
+	withCONFIG_THUMB2_KERNEL
+In-Reply-To: <AANLkTikOSb5-wBSy_ZANVsHga7XmWPrwP=0Xs0eGOxb5@mail.gmail.com>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
+	<1291656937-24992-2-git-send-email-dave.martin@linaro.org>
+	<8ff74b57e40b64459978eefba8f4c9ca@mail.gmail.com>
+	<AANLkTikOSb5-wBSy_ZANVsHga7XmWPrwP=0Xs0eGOxb5@mail.gmail.com>
+Message-ID: <AANLkTimPiySTjzTw6owG8GWPv2OwoNQ=wyV4kdvP9EZu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 05:55:00PM +0800, Yong Shen wrote:
-> On Tue, Dec 7, 2010 at 5:39 PM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
+Hi Dave,
 
-> > I'm not sure if it should be a signed-off-by: or acked-by: or reviewed-by:
-> > tag since I wrote the code you've used a basis. I'm putting my s-o-b but
-> > if I'm wrong, I do hope someone will correct it.
+On Tue, Dec 7, 2010 at 11:16 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Tue, Dec 7, 2010 at 6:31 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Dave,
+>>> -----Original Message-----
+>>> From: linaro-dev-bounces at lists.linaro.org [mailto:linaro-dev-
+>>> bounces at lists.linaro.org] On Behalf Of Dave Martin
+>>> Sent: Monday, December 06, 2010 11:06 PM
+>>> To: linux-arm-kernel at lists.infradead.org
+>>> Cc: Tony Lindgren; Dave Martin; linux-omap at vger.kernel.org; linaro-
+>>> dev at lists.linaro.org
+>>> Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to
+>> work
+>>> withCONFIG_THUMB2_KERNEL
+>>>
+>
+> [...]
+>
+>>
+>> No need to mention but this patch changes lot of things around
+>> power management code. You said " Tested on: omap3 (Beagle xM A2)"
+>>
+>> What did you test ? Is it just boot test ? For sure just boot
+>> test is not enough for this patch and needs to test the PM.
+>
+> That's a fair point--- yes, I've only tested boot / reboot / shutdown so far.
+>
+The ASM idle code is being reworked right now, which means the T2
+support will need to be reworked on top of the patches. Cf. [1] and
+[2].
 
-> > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> If you have any thoughts about how to exercise the power management
+> functionality more completely, I'd be happy to have a go...
+Cf. [3] for more details on how to exercise the PM on the target. This
+wiki page is slightly outdated but the idea is still the same. Note
+that only cpuidle is currently supported correctly on l-o master.
 
-> It is nice that you mention this issue. I was also wondering for a
-> while about what should I do about this, I was not sure, so I put
-> Arnaud in the head comments. Is there any conventions for this? I am
-> OK with:
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Signed-off-by: Yong Shen <yong.shen@linaro.org>
+[1] http://marc.info/?l=linux-omap&m=129139584919242&w=2
+[2] http://marc.info/?l=linux-omap&m=129172034809447&w=2
+[3] http://elinux.org/OMAP_Power_Management
 
-A signoff has a very specific meaning which would in this situation mean
-that Arnaud wrote part of the patch - see SubmittingPatches.  Otherwise
-a Tested-by and/or Reviewed-by seem appropriate (with the obvious
-meanings).
+>
+> Cheers
+> ---Dave
 
-> It seems that I should send out a new patch for this, or can I just
-> ask maintainer who is responsible for merging this patch to change the
-> s-o-b?
+Thanks,
+Jean
 
-Maintainers will usually take care of this, but if you need to resend
-please do include tags that still apply.
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
+>
