@@ -1,41 +1,62 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 7 Dec 2010 14:48:19 +0000
-Subject: [PATCHv2] support PMIC mc13892
-In-Reply-To: <1291708905-23645-1-git-send-email-b00984@freescale.com>
-References: <1291708905-23645-1-git-send-email-b00984@freescale.com>
-Message-ID: <20101207144818.GB9689@rakim.wolfsonmicro.main>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue,  7 Dec 2010 09:51:53 -0500
+Subject: [PATCH v7 03/12] davinci: add ssp config for tnetv107x evm board
+In-Reply-To: <1291733522-3626-1-git-send-email-cyril@ti.com>
+References: <1291733522-3626-1-git-send-email-cyril@ti.com>
+Message-ID: <1291733522-3626-4-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 04:01:45PM +0800, b00984 at freescale.com wrote:
+This patch adds SSP configuration and pin muxing info for tnetv107x
+evm boards.
 
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_read(priv->mc13xxx,
-> +				mc13892_regulators[id].vsel_reg, &val);
-> +	mc13xxx_unlock(priv->mc13xxx);
-> +	if (ret)
-> +		return ret;
-> +
-> +	hi  = val & MC13892_SWITCHERS0_SWxHI;
-> +	if (value > 1375)
-> +		hi = 1;
-> +	if (value < 1100)
-> +		hi = 0;
-> +
-> +	if (hi) {
-> +		value = (value - 1100000) / 25000;
-> +		value |= MC13892_SWITCHERS0_SWxHI;
-> +	} else
-> +		value = (value - 600000) / 25000;
-> +
-> +	mask = mc13892_regulators[id].vsel_mask | MC13892_SWITCHERS0_SWxHI;
-> +	mc13xxx_lock(priv->mc13xxx);
-> +	ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13892_regulators[id].vsel_reg,
-> +			mask,
-> +			value << mc13892_regulators[id].vsel_shift);
-> +	mc13xxx_unlock(priv->mc13xxx);
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+---
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-This section here reads like it's all one big read/modify/write cycle
-and therefore the mutex ought to be held throughout?  
-
-Otherwise the patch looks good.
+diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
+index a6db854..ef526b1 100644
+--- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
++++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
+@@ -99,6 +99,12 @@ static const short uart1_pins[] __initdata = {
+ 	-1
+ };
+ 
++static const short ssp_pins[] __initdata = {
++	TNETV107X_SSP0_0, TNETV107X_SSP0_1, TNETV107X_SSP0_2,
++	TNETV107X_SSP1_0, TNETV107X_SSP1_1, TNETV107X_SSP1_2,
++	TNETV107X_SSP1_3, -1
++};
++
+ static struct mtd_partition nand_partitions[] = {
+ 	/* bootloader (U-Boot, etc) in first 12 sectors */
+ 	{
+@@ -196,17 +202,25 @@ static struct matrix_keypad_platform_data keypad_config = {
+ 	.no_autorepeat	= 0,
+ };
+ 
++static struct ti_ssp_data ssp_config = {
++	.out_clock	= 250 * 1000,
++	.dev_data	= {
++	},
++};
++
+ static struct tnetv107x_device_info evm_device_info __initconst = {
+ 	.serial_config		= &serial_config,
+ 	.mmc_config[1]		= &mmc_config,	/* controller 1 */
+ 	.nand_config[0]		= &nand_config,	/* chip select 0 */
+ 	.keypad_config		= &keypad_config,
++	.ssp_config		= &ssp_config,
+ };
+ 
+ static __init void tnetv107x_evm_board_init(void)
+ {
+ 	davinci_cfg_reg_list(sdio1_pins);
+ 	davinci_cfg_reg_list(uart1_pins);
++	davinci_cfg_reg_list(ssp_pins);
+ 
+ 	tnetv107x_devices_init(&evm_device_info);
+ }
+-- 
+1.7.1
