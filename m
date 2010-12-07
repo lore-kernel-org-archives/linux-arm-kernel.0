@@ -1,35 +1,43 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Tue, 7 Dec 2010 21:09:27 +1100
-Subject: [PATCH] Added i2c support for mc13xxx-core
-In-Reply-To: <AANLkTim-kgUjAB7DaMtnd8EHjcRjGTZG5NzN6C4idh40@mail.gmail.com>
-References: <201012070854.21049.marc@cpdesign.com.au>
-	<1291706087-6476-2-git-send-email-marc@cpdesign.com.au>
-	<AANLkTim-kgUjAB7DaMtnd8EHjcRjGTZG5NzN6C4idh40@mail.gmail.com>
-Message-ID: <201012072109.27892.marc@cpdesign.com.au>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 7 Dec 2010 10:16:31 +0000
+Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to work
+	withCONFIG_THUMB2_KERNEL
+In-Reply-To: <8ff74b57e40b64459978eefba8f4c9ca@mail.gmail.com>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
+	<1291656937-24992-2-git-send-email-dave.martin@linaro.org>
+	<8ff74b57e40b64459978eefba8f4c9ca@mail.gmail.com>
+Message-ID: <AANLkTikOSb5-wBSy_ZANVsHga7XmWPrwP=0Xs0eGOxb5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 7, 2010 at 6:31 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Dave,
+>> -----Original Message-----
+>> From: linaro-dev-bounces at lists.linaro.org [mailto:linaro-dev-
+>> bounces at lists.linaro.org] On Behalf Of Dave Martin
+>> Sent: Monday, December 06, 2010 11:06 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: Tony Lindgren; Dave Martin; linux-omap at vger.kernel.org; linaro-
+>> dev at lists.linaro.org
+>> Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to
+> work
+>> withCONFIG_THUMB2_KERNEL
+>>
 
-> What's your code base? I can not apply your patch.
+[...]
 
-I'm sorry, I'm not very good with git.
-I'm working off the imx-for-2.6.38 branch (is that what you were asking?)
+>
+> No need to mention but this patch changes lot of things around
+> power management code. You said " Tested on: omap3 (Beagle xM A2)"
+>
+> What did you test ? Is it just boot test ? For sure just boot
+> test is not enough for this patch and needs to test the PM.
 
-> You may also want to cc directly to u.kleine-koenig at pengutronix.de,
-> sameo at linux.intel.com who are the module owner of mc13xxx-core.c.
-Thanks for the heads up. CC'd them to this email, hopefully not too much 
-effort to find my previous email(s) on the list. :) I welcome any comments 
-before doing a V2 (a re-submit is obviously required anyway).
+That's a fair point--- yes, I've only tested boot / reboot / shutdown so far.
 
-> 
-> Cheers
-> Yong
-
-Thanks to you. 
-At least this exercise has shown that your regulator code works for mc13892. I 
-added all but VVIDEO, VAUDIO, VCAM and VCOINCELL to my board and the reported 
-voltages for each reg were correct.
+If you have any thoughts about how to excercise the power management
+functionality more completely, I'd be happy to have a go...
 
 Cheers
-Marc
+---Dave
