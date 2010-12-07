@@ -1,39 +1,35 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Tue, 7 Dec 2010 17:55:00 +0800
-Subject: [PATCHv2] support PMIC mc13892
-In-Reply-To: <87pqtdncpl.fsf@lechat.rtp-net.org>
-References: <1291708905-23645-1-git-send-email-b00984@freescale.com>
-	<87pqtdncpl.fsf@lechat.rtp-net.org>
-Message-ID: <AANLkTikr5egA+mktGwCUfT8eHvnTBt6VmYxx3eb-eL4W@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Tue, 7 Dec 2010 21:09:27 +1100
+Subject: [PATCH] Added i2c support for mc13xxx-core
+In-Reply-To: <AANLkTim-kgUjAB7DaMtnd8EHjcRjGTZG5NzN6C4idh40@mail.gmail.com>
+References: <201012070854.21049.marc@cpdesign.com.au>
+	<1291706087-6476-2-git-send-email-marc@cpdesign.com.au>
+	<AANLkTim-kgUjAB7DaMtnd8EHjcRjGTZG5NzN6C4idh40@mail.gmail.com>
+Message-ID: <201012072109.27892.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 7, 2010 at 5:39 PM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-> <b00984@freescale.com> writes:
->
->> From: Yong Shen <yong.shen@linaro.org>
->>
->> add support for mc13892, tested on mx51 babbage board
->
-> I've compared this version with mine, checked & tested it. I'm happy
-> with it and moreover it has the nice idea to work on my efikamx.
->
-> I'm not sure if it should be a signed-off-by: or acked-by: or reviewed-by:
-> tag since I wrote the code you've used a basis. I'm putting my s-o-b but
-> if I'm wrong, I do hope someone will correct it.
->
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->
+Hi,
 
-It is nice that you mention this issue. I was also wondering for a
-while about what should I do about this, I was not sure, so I put
-Arnaud in the head comments. Is there any conventions for this? I am
-OK with:
-Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-Signed-off-by: Yong Shen <yong.shen@linaro.org>
+> What's your code base? I can not apply your patch.
 
-It seems that I should send out a new patch for this, or can I just
-ask maintainer who is responsible for merging this patch to change the
-s-o-b?
+I'm sorry, I'm not very good with git.
+I'm working off the imx-for-2.6.38 branch (is that what you were asking?)
 
-Yong
+> You may also want to cc directly to u.kleine-koenig at pengutronix.de,
+> sameo at linux.intel.com who are the module owner of mc13xxx-core.c.
+Thanks for the heads up. CC'd them to this email, hopefully not too much 
+effort to find my previous email(s) on the list. :) I welcome any comments 
+before doing a V2 (a re-submit is obviously required anyway).
+
+> 
+> Cheers
+> Yong
+
+Thanks to you. 
+At least this exercise has shown that your regulator code works for mc13892. I 
+added all but VVIDEO, VAUDIO, VCAM and VCOINCELL to my board and the reported 
+voltages for each reg were correct.
+
+Cheers
+Marc
