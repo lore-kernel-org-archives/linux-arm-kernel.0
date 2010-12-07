@@ -1,51 +1,87 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue,  7 Dec 2010 09:51:59 -0500
-Subject: [PATCH v7 09/12] davinci: add tnetv107x evm ti-ssp gpio device
+Date: Tue,  7 Dec 2010 09:52:02 -0500
+Subject: [PATCH v7 12/12] davinci: add tnetv107x evm i2c eeprom device
 In-Reply-To: <1291733522-3626-1-git-send-email-cyril@ti.com>
 References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-Message-ID: <1291733522-3626-10-git-send-email-cyril@ti.com>
+Message-ID: <1291733522-3626-13-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds definitions to hook up one of the ti-ssp ports to the SSP GPIO
-driver.
+The tnetv107x evm board has an I2C device connected on one of the SSP ports.
+This patch adds board definitions for a GPIO based I2C master, as well as
+definitions for the eeprom device on these boards.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/mach-davinci/board-tnetv107x-evm.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |   30 +++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index ca23516..e3863dd 100644
+index ac62de2..869af15 100644
 --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
 +++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -39,6 +39,8 @@
- #include <mach/cp_intc.h>
- #include <mach/tnetv107x.h>
+@@ -29,6 +29,9 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/regulator/driver.h>
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
++#include <linux/i2c-gpio.h>
  
-+#define SSP_GPIO_START		128
-+
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -44,6 +47,8 @@
  #define EVM_MMC_WP_GPIO		21
  #define EVM_MMC_CD_GPIO		24
  #define EVM_SPI_CS_GPIO		54
-@@ -238,9 +240,18 @@ static struct ti_ssp_spi_data spi_master_data = {
- 		  SSP_INPUT_SEL(3),
++#define EVM_I2C_SDA_GPIO	(SSP_GPIO_START + 0)
++#define EVM_I2C_SCL_GPIO	(SSP_GPIO_START + 1)
+ #define EVM_BACKLIGHT_GPIO	(SSP_GPIO_START + 2)
+ 
+ static int initialize_gpio(int gpio, char *desc)
+@@ -360,6 +365,29 @@ static struct platform_device backlight_device = {
+ 	.dev.platform_data = (void *)EVM_BACKLIGHT_GPIO,
  };
  
-+static struct ti_ssp_gpio_data ssp_gpio_data = {
-+	.start		= SSP_GPIO_START,
++struct i2c_gpio_platform_data i2c_data = {
++	.sda_pin	= EVM_I2C_SDA_GPIO,
++	.scl_pin	= EVM_I2C_SCL_GPIO,
 +};
 +
- static struct ti_ssp_data ssp_config = {
- 	.out_clock	= 250 * 1000,
- 	.dev_data	= {
-+		[0] = {
-+			.dev_name = "ti-ssp-gpio",
-+			.pdata = &ssp_gpio_data,
-+			.pdata_size = sizeof(ssp_gpio_data),
-+		},
- 		[1] = {
- 			.dev_name = "ti-ssp-spi",
- 			.pdata = &spi_master_data,
++static struct platform_device i2c_device = {
++	.name		= "i2c-gpio",
++	.id		= 0,
++	.dev.platform_data = &i2c_data,
++};
++
++static struct at24_platform_data at24_config = {
++	.byte_len	= SZ_16K / 8,
++	.page_size	= 16,
++};
++
++static struct i2c_board_info i2c_info[] __initconst =  {
++	{
++		I2C_BOARD_INFO("24c16", 0x50),
++		.platform_data	= &at24_config,
++	},
++};
++
+ static __init void tnetv107x_evm_board_init(void)
+ {
+ 	davinci_cfg_reg_list(sdio1_pins);
+@@ -369,11 +397,13 @@ static __init void tnetv107x_evm_board_init(void)
+ 	tnetv107x_devices_init(&evm_device_info);
+ 
+ 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
++	i2c_register_board_info(0, i2c_info, ARRAY_SIZE(i2c_info));
+ }
+ 
+ static int __init tnetv107x_evm_late_init(void)
+ {
+ 	platform_device_register(&backlight_device);
++	platform_device_register(&i2c_device);
+ 	return 0;
+ }
+ late_initcall(tnetv107x_evm_late_init);
 -- 
 1.7.1
