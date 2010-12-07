@@ -1,116 +1,63 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 7 Dec 2010 14:16:04 -0200
-Subject: [PATCH v2] watchdog: imx: use clk_get to acquire the watchdog clock
-Message-ID: <1291738564-10374-1-git-send-email-fabio.estevam@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 Dec 2010 16:18:07 -0000
+Subject: [PATCH v4] ARM: vexpress: add support for multiple core tiles
+In-Reply-To: <20101207151310.GB23589@n2100.arm.linux.org.uk>
+References: <1291732998-22789-1-git-send-email-will.deacon@arm.com>
+	<20101207151310.GB23589@n2100.arm.linux.org.uk>
+Message-ID: <007301cb962a$55de83b0$019b8b10$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
+Hi Russell,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- adapted the watchdog name in arch/arm/plat-mxc/system.c
+> > -	/* sanity check */
+> > -	if (ncores > NR_CPUS) {
+> > +	ct_desc->init_cpu_map();
+> > +	if (!num_possible_cpus()) {
+> >  		printk(KERN_WARNING
+> > -		       "vexpress: no. of cores (%d) greater than configured "
+> > -		       "maximum of %d - clipping\n",
+> > -		       ncores, NR_CPUS);
+> > -		ncores = NR_CPUS;
+> > +		       "vexpress: no possible CPUs declared, forcing logical "
+> > +		       "CPU 0\n");
+> > +		set_cpu_possible(0, true);
+> 
+> Hmm. The right check is whether the current CPU number is set in the
+> possible map - if it's clear, then that's certainly a bug.
+> 
+> However, this will never happen, unless you do something really silly
+> in ->init_cpu_map() such as clearing all possible CPUs, or setting
+> them false.  See boot_cpu_init() in init/main.c.
+> 
+> So I don't think we need this check (and I think it should be in the
+> platform code.)
 
- arch/arm/mach-imx/clock-imx21.c |    2 +-
- arch/arm/mach-imx/clock-imx25.c |    2 +-
- arch/arm/mach-imx/clock-imx27.c |    2 +-
- arch/arm/mach-mx3/clock-imx31.c |    2 +-
- arch/arm/mach-mx3/clock-imx35.c |    2 +-
- arch/arm/plat-mxc/system.c      |    2 +-
- drivers/watchdog/imx2_wdt.c     |    2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
-index cf15ea5..c63a4f5 100644
---- a/arch/arm/mach-imx/clock-imx21.c
-+++ b/arch/arm/mach-imx/clock-imx21.c
-@@ -1185,7 +1185,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "brom", brom_clk)
- 	_REGISTER_CLOCK(NULL, "emma", emma_clk[0])
- 	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk[0])
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
- 	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c_clk)
- 	_REGISTER_CLOCK("mxc-keypad", NULL, kpp_clk)
-diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
-index 9e4a557..2c98be8 100644
---- a/arch/arm/mach-imx/clock-imx25.c
-+++ b/arch/arm/mach-imx/clock-imx25.c
-@@ -296,7 +296,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- 	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
- 	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdt_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
- 	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
-diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-index 2202b88..f32f3b8 100644
---- a/arch/arm/mach-imx/clock-imx27.c
-+++ b/arch/arm/mach-imx/clock-imx27.c
-@@ -667,7 +667,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "sahara2", sahara2_clk)
- 	_REGISTER_CLOCK(NULL, "ata", ata_clk)
- 	_REGISTER_CLOCK(NULL, "mstick", mstick_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
- 	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
- 	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
-diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
-index 7cf6d29..4193cf5 100644
---- a/arch/arm/mach-mx3/clock-imx31.c
-+++ b/arch/arm/mach-mx3/clock-imx31.c
-@@ -530,7 +530,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("imx31-cspi.2", NULL, cspi3_clk)
- 	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
- 	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
- 	_REGISTER_CLOCK(NULL, "epit", epit1_clk)
- 	_REGISTER_CLOCK(NULL, "epit", epit2_clk)
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index 61e4a31..22259d9 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -495,7 +495,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxc-ehci.2", "usb", usbotg_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usbotg_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usbahb_clk)
--	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
- 	_REGISTER_CLOCK(NULL, "max", max_clk)
- 	_REGISTER_CLOCK(NULL, "audmux", audmux_clk)
- 	_REGISTER_CLOCK(NULL, "csi", csi_clk)
-diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
-index c3972c5..3455fc0 100644
---- a/arch/arm/plat-mxc/system.c
-+++ b/arch/arm/plat-mxc/system.c
-@@ -55,7 +55,7 @@ void arch_reset(char mode, const char *cmd)
- 	} else {
- 		struct clk *clk;
+Ok, my initial thought was to lose the check as well. This means
+that all we do in smp_init_cpus for vexpress is invoke
+ct_desc->init_cpu_map(). 
  
--		clk = clk_get_sys("imx-wdt.0", NULL);
-+		clk = clk_get_sys("imx2-wdt.0", NULL);
- 		if (!IS_ERR(clk))
- 			clk_enable(clk);
- 		wcr_enable = (1 << 2);
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 2ee7dac..86f7cac 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -270,7 +270,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
-+	imx2_wdt.clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(imx2_wdt.clk)) {
- 		dev_err(&pdev->dev, "can't get Watchdog clock\n");
- 		return PTR_ERR(imx2_wdt.clk);
--- 
-1.6.0.4
+> Alteratively, we could do this in the generic SMP code:
+> 
+> 	if (num_possible_cpus() > NR_CPUS) {
+> 		unsigned int nr = 0, cpu;
+> 
+> 		pr_warning("SMP: number of CPUs greater than configured %u, disabling CPU",
+> 			NR_CPUS);
+> 
+> 		for_each_possible_cpu(cpu) {
+> 			if (nr >= NR_CPUS) {
+> 				cpu_set_possible(cpu, false);
+> 				pr_cont(" %u", cpu);
+> 			}
+> 			nr++;
+> 		}
+> 		pr_cont("\n");
+> 	}
+
+Can num_possible_cpus() be > NR_CPUS? I think the bitmap used to calculate
+the former is limited by the latter anyway.
+
+Thanks,
+
+Will
