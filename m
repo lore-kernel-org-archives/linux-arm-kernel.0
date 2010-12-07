@@ -1,28 +1,39 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 7 Dec 2010 13:06:02 +0100
-Subject: [PATCH] watchdog: imx: use clk_get to acquire the watchdog clock
-In-Reply-To: <1291664293-28360-1-git-send-email-fabio.estevam@freescale.com>
-References: <1291664293-28360-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20101207120602.GA4134@pengutronix.de>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Tue,  7 Dec 2010 17:39:37 +0530
+Subject: [PATCH] arm: plat-omap: counter_32k: Fix build error due to IS_ERR
+Message-ID: <1291723777-27316-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 05:38:13PM -0200, Fabio Estevam wrote:
-> Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Fix the following build error by including linux/err.h
+arch/arm/plat-omap/counter_32k.c: In function 'omap_init_clocksource_32k':
+arch/arm/plat-omap/counter_32k.c:167: error: implicit declaration of
+                                      function 'IS_ERR'
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+The above error is due to the following commit:
+subject: arm: plat-omap: counter_32k: use IS_ERR() instead of NULL check
+commit: 235fbace0334c846c21e902f330020122fc85955
 
-Thanks!
+Created on linux-omap-2.6 branch: omap-fixes
 
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+Reviewed-by: Charulatha V <charu@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/plat-omap/counter_32k.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index c1e0d00..8722a13 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -16,6 +16,7 @@
+ #include <linux/init.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/err.h>
+ 
+ #include <plat/common.h>
+ #include <plat/board.h>
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101207/4274f285/attachment.sig>
+1.7.0.4
