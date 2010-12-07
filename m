@@ -1,65 +1,49 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 7 Dec 2010 16:34:05 +0530
-Subject: [PATCH v1 0/9] OMAP: DMA: hwmod and DMA as platform device
-In-Reply-To: <1291434246-30716-1-git-send-email-manjugk@ti.com>
-References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
-Message-ID: <20101207110405.GB1754@GLPP-machine>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Dec 2010 11:04:01 +0000
+Subject: RFC: Dynamic hwcaps
+In-Reply-To: <AANLkTikh-a++NQj+cUJOf9B3tjr_=CvAqJmjhLGA0Xt7@mail.gmail.com>
+References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
+	<20101203165105.GD30898@n2100.arm.linux.org.uk>
+	<AANLkTik9sqkbCPbcWUL+2otyfO1OZ=hx1tvSkQW65e4i@mail.gmail.com>
+	<4CFBAC6D.5060507@codesourcery.com>
+	<AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
+	<4CFD87A6.8030104@codesourcery.com>
+	<AANLkTikh-a++NQj+cUJOf9B3tjr_=CvAqJmjhLGA0Xt7@mail.gmail.com>
+Message-ID: <20101207110401.GA20451@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, Dec 07, 2010 at 10:45:42AM +0000, Dave Martin wrote:
+> Yes-- though I didn't elaborate on it.  You need a packager that can
+> understand, say, that a binary built for ARMv5 EABI can interoperate
+> with ARMv7 binaries etc.
+> Again, I've heard it suggested that RPM can handle this, but I haven't
+> looked at it in detail myself.
 
-* G, Manjunath Kondaiah <manjugk@ti.com> [2010-12-04 09:13:57 +0530]:
+That is indeed the case - as on x86, it used to be common to build the
+majority of the distribution for i386, and glibc and a few other bits
+for a range of ix86 CPUs.
 
-> Patch series to convert DMA library into platform driver using platform
-> device model and adapting hwmod for omap2+.
-> 
-> The original patch series :
-> http://comments.gmane.org/gmane.linux.ports.arm.omap/46953
-> has been split into two patch series based on suggestion from Tony.
-> (https://patchwork.kernel.org/patch/375831/)
-> 
-> The first series will prepare existing DMA library for DMA hwmod and 
-> converting the same into platform driver.
-> 
-> The second series will have:
-> arch/arm/mach-omap1/dma.c       omap1 specific platform init
-> arch/arm/mach-omap2/dma.c       omap2+ specific platform init
-> drivers/dma/omap-dma.c          driver using dmaengine.c
-> 
-> Patch series1 Design:
-> 1. The low level read/write macros are converted into static inline functions
-> so that, these functions can be moved to respective mach-omap driver
-> files later.
-> (Thanks to Tony and Kevin for their suggestions on handling all omap register
-> offset without adding extra enums)
-> 2. Implements generic errata handling for all OMAP DMA errata.
-> 3. DMA hwmod data is updated for respective hwmod db files.
-> 4. The DMA library is split into two layers.
->    a. The generic code is retained in plat-omap/dma.c
->    b. The machine specific init code is moved to
->       respective mach-omap dma files.
-> 
-> Minimal machine specific code is moved to respective mach-omap dma files with 
-> this series. Rest of code movement and API cleanup's are handled in second
-> series.
-> 
-> Patch series applies on top of latest linux omap master branch:
-> *************************************************************************
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
-> Branch: master
-> commit a04fd22204b13ce34a3f8a8157f83c44d64f8da9
-> Merge: e941bb0 afd2d11
-> Author: Tony Lindgren <tony@atomide.com>
-> 
->     Linux-omap rebuilt: Merged in usb patches for testing
-> *************************************************************************
+rpm and yum know that i386 is compatible with i486, which is compatible
+with i586 etc, so it will install an i386 package on i686 if no i486,
+i586 or i686 package is available.
 
-If there are no further issues, can you pls merge this series for
-testing. I can send pull request if it is convinient.
+It does the same for ARM with ARMv3, ARMv4 etc.
 
-As per the alignment with original series(v5), all the fixes done for
-OMAP1 are pulled into this patch series. OMAP1 and OMAP2+ will build and
-boots with published test reports.
+> The dynamic hwcaps approach doesn't really solve that problem:
 
--Manjunath
+Has anyone investigated whether it is possible to power down things like
+Neon etc meanwhile leaving the rest of the CPU running?  I've not seen
+anything in the ARM documentation to suggest that's the case.
+
+Even in MPCore based systems, the interface between the SCU and individual
+processors by default doesn't have the necessary clamps built in to allow
+individual CPUs to be powered off, and I'm not aware of any designs which
+decided to enable this feature (as there's a performance penalty).  So I'd
+be really surprised if there was any support for powering down Neon
+separately from the host CPU.
+
+If that's the case, it's entirely pointless discussing what userspace can
+or can't do - if you have Neon available and can't power it down, and it's
+faster for doing something, you might as well use it so you can put the
+main CPU into WFI mode or get on with some other useful work.
