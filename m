@@ -1,50 +1,92 @@
 From: charu@ti.com (Varadarajan, Charulatha)
-Date: Tue, 7 Dec 2010 11:05:47 +0530
-Subject: [PATCH v8 10/11] OMAP: GPIO: Implement GPIO as a platform device
-In-Reply-To: <AANLkTin1rehDSfvEvjZJB8VZP8RrXsVKA8wH-WEODLTN@mail.gmail.com>
+Date: Tue, 7 Dec 2010 11:13:13 +0530
+Subject: [PATCH v8 04/11] OMAP7xx: GPIO: Introduce support for GPIO init
+In-Reply-To: <AANLkTi=jjqj8Gv5tWqfMnndM037U-Qidtp=ju3VmhQyF@mail.gmail.com>
 References: <1290689318-10191-1-git-send-email-charu@ti.com>
-	<1290689318-10191-11-git-send-email-charu@ti.com>
-	<AANLkTin1rehDSfvEvjZJB8VZP8RrXsVKA8wH-WEODLTN@mail.gmail.com>
-Message-ID: <AANLkTinBAJmtn7=Nm75kEWrUxBOKFSi4Mf08mqn0W9X8@mail.gmail.com>
+	<1290689318-10191-5-git-send-email-charu@ti.com>
+	<AANLkTi=jjqj8Gv5tWqfMnndM037U-Qidtp=ju3VmhQyF@mail.gmail.com>
+Message-ID: <AANLkTimO0TCctsLDhCkKZbDHay5JgEDjTvn4XMp=Gb+x@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cory,
-
-On Tue, Dec 7, 2010 at 10:49, Cory Maccarrone <darkstar6262@gmail.com> wrote:
+On Tue, Dec 7, 2010 at 10:50, Cory Maccarrone <darkstar6262@gmail.com> wrote:
 > On Thu, Nov 25, 2010 at 4:48 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
-
-<<snip>>
-
->> @@ -1642,6 +1502,13 @@ static int gpio_debounce(struct gpio_chip *chip, unsigned offset,
->> ? ? ? ?unsigned long flags;
+>> Add support for handling OMAP7xx specific gpio_init by
+>> providing platform device data and doing device registration.
 >>
->> ? ? ? ?bank = container_of(chip, struct gpio_bank, chip);
+>> Signed-off-by: Charulatha V <charu@ti.com>
+>> ---
+>> ?arch/arm/mach-omap1/gpio7xx.c | ?261 +++++++++++++++++++++++++++++++++++++++++
+>> ?1 files changed, 261 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-omap1/gpio7xx.c
+>>
+>> diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+>> new file mode 100644
+>> index 0000000..94bccd4
+>> --- /dev/null
+>> +++ b/arch/arm/mach-omap1/gpio7xx.c
+>> @@ -0,0 +1,261 @@
+>> +/*
+>> + * OMAP7xx specific gpio init
+>> + *
+>> + * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+>> + *
+>> + * Author:
+>> + * ? ? Charulatha V <charu@ti.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+>> + * GNU General Public License for more details.
+>> + */
 >> +
->> + ? ? ? if (!bank->dbck) {
->> + ? ? ? ? ? ? ? bank->dbck = clk_get(bank->dev, "dbclk");
->> + ? ? ? ? ? ? ? if (IS_ERR(bank->dbck))
->> + ? ? ? ? ? ? ? ? ? ? ? dev_err(bank->dev, "Could not get gpio dbck\n");
->> + ? ? ? }
+>> +#include <linux/gpio.h>
 >> +
+>> +#define OMAP7XX_GPIO1_BASE ? ? ? ? ? ? 0xfffbc000
+>> +#define OMAP7XX_GPIO2_BASE ? ? ? ? ? ? 0xfffbc800
+>> +#define OMAP7XX_GPIO3_BASE ? ? ? ? ? ? 0xfffbd000
+>> +#define OMAP7XX_GPIO4_BASE ? ? ? ? ? ? 0xfffbd800
+>> +#define OMAP7XX_GPIO5_BASE ? ? ? ? ? ? 0xfffbe000
+>> +#define OMAP7XX_GPIO6_BASE ? ? ? ? ? ? 0xfffbe800
+>> +#define OMAP1_MPUIO_VBASE ? ? ? ? ? ? ?OMAP1_MPUIO_BASE
+>> +
+>> +/* mpu gpio */
+>> +static struct __initdata resource omap7xx_mpu_gpio_resources[] = {
+>> + ? ? ? {
+>> + ? ? ? ? ? ? ? .start ?= OMAP1_MPUIO_VBASE,
+>> + ? ? ? ? ? ? ? .end ? ?= OMAP1_MPUIO_VBASE + SZ_2K - 1,
+>> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
+>> + ? ? ? },
+>> + ? ? ? {
+>> + ? ? ? ? ? ? ? .start ?= INT_7XX_MPUIO,
+>> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
+>> + ? ? ? },
+>> +};
+>> +
+>> +static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+>> + ? ? ? .virtual_irq_start ? ? ?= IH_MPUIO_BASE,
+>> + ? ? ? .bank_type ? ? ? ? ? ? ?= METHOD_MPUIO,
+>> + ? ? ? .bank_width ? ? ? ? ? ? = 32,
 >
-> I'm testing this on omap7xx, which doesn't have a dbclk. ?Even with
-> dbck_flag set to false, this code still runs, causing these messages
-> to show up:
+> I think we need
+>
+> ? ?.dbck_flag = false,
 
-Thanks for testing this series on OMAP7xx.
+I think it's not required since it is a static data. Modifying the
+"if" condition
+in gpio_debounce as per your suggestion will resolve this issue.
 
+>
+> here -- we don't have a dbclk on omap7xx. ?Without this, we get:
 >
 > ? ?omap_gpio omap_gpio.5: Could not get gpio dbck
 > ? ?omap_gpio omap_gpio.6: Could not get gpio dbck
 >
-> I think that 'if' should be:
+> This needs to be added to the other 5 GPIO blocks in this file as well.
 >
-> ? ?if (bank->dbck_flag && !bank->dbck) {
-
-You are right. Will send a patch now.
-
+> - Cory
 >
-> Also, see my comments in patch 4 - OMAP7xx: GPIO: Introduce support
-> for GPIO init, as there's dbck_flag entries there that are needed for
-> omap7xx. ?Otherwise, seems to work well.
