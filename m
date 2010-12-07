@@ -1,91 +1,52 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Mon, 6 Dec 2010 20:53:59 -0600
-Subject: [PATCH] ARM: Add Kconfig entry for SG chain support
-In-Reply-To: <20101207104451X.fujita.tomonori@lab.ntt.co.jp>
-References: <1291686036-32562-1-git-send-email-fernando.lugo@ti.com>
-	<20101207104451X.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <AANLkTi=-ktF0F5uxYy9CCU1-R4_2o32eYQJrr1uHuUxs@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 6 Dec 2010 21:30:57 -0700 (MST)
+Subject: [PATCH] OMAP1: I2C: fix device initialization
+Message-ID: <alpine.DEB.2.00.1012062130060.13430@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 6, 2010 at 7:45 PM, FUJITA Tomonori
-<fujita.tomonori@lab.ntt.co.jp> wrote:
-> On Mon, ?6 Dec 2010 19:40:36 -0600
-> Fernando Guzman Lugo <fernando.lugo@ti.com> wrote:
->
->> Add a entry to make possible SG chaining under ARM
->> architecture.
->>
->> Tidspbridge driver needs SG chaining, however SG chain has not
->> been tested under all platforms. Adding this option OMAP
->> platform can enable it and if other platforms have issues they
->> would not enable it.
->>
->> This patch is base on this discussion:
->>
->> http://marc.info/?l=linux-arm-kernel&m=129166415415541&w=2
->>
->> Signed-off-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
->> ---
->> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? | ? ?6 ++++++
->> ?arch/arm/include/asm/scatterlist.h | ? ?4 ++++
->> ?2 files changed, 10 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index dd944bd..f5cfd42 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1017,6 +1017,12 @@ config CPU_HAS_PMU
->> ? ? ? default y
->> ? ? ? bool
->>
->> +config ARM_SG_CHAIN
->> + ? ? bool "Enable SG chain support"
->> + ? ? default n
->> + ? ? help
->> + ? ? ? Enable support for SG chaining for ARM
->> +
->
-> I thought that you simply add something like the following to
-> arch/arm/include/asm/scatterlist.h?
->
-> #ifdef CONFIG_ARCH_OMAP
-> #define ARCH_HAS_SG_CHAIN
-> #endif
 
-That is exactly to one of my proposals, but I did not received any
-comment. I heart from Russell it would be good to have a Kconfig
-entry, that's why I am proposing ti patch now.
+Commit 4d17aeb1c5b2375769446d13012a98e6d265ec13 ("OMAP: I2C: split
+device registration and convert OMAP2+ to omap_device") broke I2C on
+OMAP1.  The following messages appear at boot:
 
->
-> Because you can't enable sg chaining on some arm architectures. Some
-> arm SCSI drivers can't handle sg chaining but they are not available
-> on omap, right? Why do you make this configurable on all arm archs
-> like the above?
+i2c_omap i2c_omap.1: failure requesting irq 0
+i2c_omap: probe of i2c_omap.1 failed with error -22
 
-AFAIK omap does not have SCSI drivers. I think it could help other
-platforms to test if they have some issues with SG chain, once there
-is not issues in any platform it can be enable for all ARM.
+Investigation revealed that a chunk of code is missing from the
+original plat-omap/i2c.c file which configured the IRQ and base address
+for the I2C block on OMAP1.  Upon adding this back, the OMAP1 I2C block
+seems to initialize correctly.
 
-Thanks,
-Fernando.
+Thanks to Cory Maccarrone <darkstar6262@gmail.com> for reporting the bug,
+and apologies for the breakage.
 
->
->
->> ?if !MMU
->> ?source "arch/arm/Kconfig-nommu"
->> ?endif
->> diff --git a/arch/arm/include/asm/scatterlist.h b/arch/arm/include/asm/scatterlist.h
->> index 2f87870..eab7c4f 100644
->> --- a/arch/arm/include/asm/scatterlist.h
->> +++ b/arch/arm/include/asm/scatterlist.h
->> @@ -5,4 +5,8 @@
->> ?#include <asm/types.h>
->> ?#include <asm-generic/scatterlist.h>
->>
->> +#ifdef CONFIG_ARM_SG_CHAIN
->> +#define ARCH_HAS_SG_CHAIN
->> +#endif
->> +
->> ?#endif /* _ASMARM_SCATTERLIST_H */
->
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Cory Maccarrone <darkstar6262@gmail.com>
+Cc: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+ arch/arm/plat-omap/i2c.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index a5bff9c..a6cf4e9 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -97,10 +97,15 @@ static inline int omap1_i2c_add_bus(int bus_id)
+ {
+ 	struct platform_device *pdev;
+ 	struct omap_i2c_bus_platform_data *pdata;
++	struct resource *res;
+ 
+ 	omap1_i2c_mux_pins(bus_id);
+ 
+ 	pdev = &omap_i2c_devices[bus_id - 1];
++	res = pdev->resource;
++	res[0].start = OMAP1_I2C_BASE;
++	res[0].end = res[0].start + OMAP_I2C_SIZE;
++	res[1].start = INT_I2C;
+ 	pdata = &i2c_pdata[bus_id - 1];
+ 
+ 	return platform_device_register(pdev);
+-- 
+1.7.2.3
