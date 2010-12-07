@@ -1,112 +1,143 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 Dec 2010 14:09:56 +0100
-Subject: [PATCH] watchdog: imx: use clk_get to acquire the watchdog clock
-In-Reply-To: <1291664293-28360-1-git-send-email-fabio.estevam@freescale.com>
-References: <1291664293-28360-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20101207130956.GG21020@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 7 Dec 2010 21:31:11 +0800
+Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
+	run-time
+In-Reply-To: <20101206101100.GB29563@n2100.arm.linux.org.uk>
+References: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
+	<20101205092345.GA9138@n2100.arm.linux.org.uk>
+	<AANLkTimbFYCxcSU0+c2Q2D2yQ1wRPMmTx1Pdtu3CvM4m@mail.gmail.com>
+	<20101206080606.GA29563@n2100.arm.linux.org.uk>
+	<AANLkTi=5sMZUwu+yhha=CugFwrhqTwYSTvKOHEbu8RE3@mail.gmail.com>
+	<20101206101100.GB29563@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinuQWszBuA01zDkXBM5gWOsxYufWQFyqYQmOcbP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Mon, Dec 6, 2010 at 6:11 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Dec 06, 2010 at 05:31:46PM +0800, Eric Miao wrote:
+>> Grrrr... wrong copy indeed. Corrected version below, I also made it less
+>> intrusive by judging on handle_arch_irq being NULL or not so to fall back
+>> to the original way of handling.
+> ...
+>> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+>> index c09e357..4f446a2 100644
+>> --- a/arch/arm/kernel/entry-armv.S
+>> +++ b/arch/arm/kernel/entry-armv.S
+>> @@ -30,6 +30,13 @@
+>> ? * Interrupt handling. ?Preserves r7, r8, r9
+>> ? */
+>> ? ? ? .macro ?irq_handler
+>> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> + ? ? ldr ? ? r1, =handle_arch_irq
+>> + ? ? cmp ? ? r1, #0
+>> + ? ? movne ? r0, sp
+>> + ? ? adrne ? lr, BSYM(9997f)
+>> + ? ? ldrne ? pc, [r1]
+>> +#endif
+>
+> Except this won't - you're testing the address of handle_arch_irq for
+> NULL, which it'll never be.
+>
 
-On Mon, Dec 06, 2010 at 05:38:13PM -0200, Fabio Estevam wrote:
-> Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/clock-imx21.c |    2 +-
->  arch/arm/mach-imx/clock-imx25.c |    2 +-
->  arch/arm/mach-imx/clock-imx27.c |    2 +-
->  arch/arm/mach-mx3/clock-imx31.c |    2 +-
->  arch/arm/mach-mx3/clock-imx35.c |    2 +-
->  drivers/watchdog/imx2_wdt.c     |    2 +-
->  6 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
-> index cf15ea5..c63a4f5 100644
-> --- a/arch/arm/mach-imx/clock-imx21.c
-> +++ b/arch/arm/mach-imx/clock-imx21.c
-> @@ -1185,7 +1185,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK(NULL, "brom", brom_clk)
->  	_REGISTER_CLOCK(NULL, "emma", emma_clk[0])
->  	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk[0])
-> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
->  	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
->  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c_clk)
->  	_REGISTER_CLOCK("mxc-keypad", NULL, kpp_clk)
-> diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
-> index 9e4a557..2c98be8 100644
-> --- a/arch/arm/mach-imx/clock-imx25.c
-> +++ b/arch/arm/mach-imx/clock-imx25.c
-> @@ -296,7 +296,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
->  	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
->  	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
-> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdt_clk)
-> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
->  	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
->  	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
->  	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
-> diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-> index 2202b88..f32f3b8 100644
-> --- a/arch/arm/mach-imx/clock-imx27.c
-> +++ b/arch/arm/mach-imx/clock-imx27.c
-> @@ -667,7 +667,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK(NULL, "sahara2", sahara2_clk)
->  	_REGISTER_CLOCK(NULL, "ata", ata_clk)
->  	_REGISTER_CLOCK(NULL, "mstick", mstick_clk)
-> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
->  	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
->  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
->  	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
-> diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
-> index 7cf6d29..4193cf5 100644
-> --- a/arch/arm/mach-mx3/clock-imx31.c
-> +++ b/arch/arm/mach-mx3/clock-imx31.c
-> @@ -530,7 +530,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("imx31-cspi.2", NULL, cspi3_clk)
->  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
->  	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
-> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
->  	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
->  	_REGISTER_CLOCK(NULL, "epit", epit1_clk)
->  	_REGISTER_CLOCK(NULL, "epit", epit2_clk)
-> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-> index 61e4a31..22259d9 100644
-> --- a/arch/arm/mach-mx3/clock-imx35.c
-> +++ b/arch/arm/mach-mx3/clock-imx35.c
-> @@ -495,7 +495,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("mxc-ehci.2", "usb", usbotg_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usbotg_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usbahb_clk)
-> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
-> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
->  	_REGISTER_CLOCK(NULL, "max", max_clk)
->  	_REGISTER_CLOCK(NULL, "audmux", audmux_clk)
->  	_REGISTER_CLOCK(NULL, "csi", csi_clk)
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index 2ee7dac..86f7cac 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -270,7 +270,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> -	imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
-> +	imx2_wdt.clk = clk_get(&pdev->dev, NULL);
->  	if (IS_ERR(imx2_wdt.clk)) {
->  		dev_err(&pdev->dev, "can't get Watchdog clock\n");
->  		return PTR_ERR(imx2_wdt.clk);
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Ah silly me, the patch below fixed this, and tested on Marvell Dove:
 
-Depending on the order you get the patches in feel free to keep my ack
-when adapting the mx51 clocks.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index db524e7..0cecffb 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1017,6 +1017,11 @@ config CPU_HAS_PMU
+ 	default y
+ 	bool
 
-Uwe
++config MULTI_IRQ_HANDLER
++	bool
++	help
++	  Allow each machine to specify it's own IRQ handler at run time.
++
+ if !MMU
+ source "arch/arm/Kconfig-nommu"
+ endif
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index d97a964..7d55356 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -40,6 +40,9 @@ struct machine_desc {
+ 	void			(*init_irq)(void);
+ 	struct sys_timer	*timer;		/* system tick timer	*/
+ 	void			(*init_machine)(void);
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	void			(*handle_irq)(struct pt_regs *);
++#endif
+ };
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ /*
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index ce3eee9..6ecdad9 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
+ extern void init_FIQ(void);
+ extern int show_fiq_list(struct seq_file *, void *);
+
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++extern void (*handle_arch_irq)(struct pt_regs *);
++#endif
++
+ /*
+  * This is for easy migration, but should be changed in the source
+  */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index c09e357..d29e31b 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -30,6 +30,14 @@
+  * Interrupt handling.  Preserves r7, r8, r9
+  */
+ 	.macro	irq_handler
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	ldr	r1, =handle_arch_irq
++	ldr	r0, [r1]
++	cmp	r0, #0
++	movne	r0, sp
++	adrne	lr, BSYM(9997f)
++	ldrne	pc, [r1]
++#endif
+ 	get_irqnr_preamble r5, lr
+ 1:	get_irqnr_and_base r0, r6, r5, lr
+ 	movne	r1, sp
+@@ -58,9 +66,8 @@
+ 	adrne	lr, BSYM(1b)
+ 	bne	do_local_timer
+ #endif
+-9997:
+ #endif
+-
++9997:
+ 	.endm
+
+ #ifdef CONFIG_KPROBES
+@@ -1245,3 +1252,9 @@ cr_alignment:
+ 	.space	4
+ cr_no_alignment:
+ 	.space	4
++
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	.globl	handle_arch_irq
++handle_arch_irq:
++	.long	0
++#endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..b809521 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -875,6 +875,9 @@ void __init setup_arch(char **cmdline_p)
+ 	init_arch_irq = mdesc->init_irq;
+ 	system_timer = mdesc->timer;
+ 	init_machine = mdesc->init_machine;
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	handle_arch_irq = mdesc->handle_irq;
++#endif
+
+ #ifdef CONFIG_VT
+ #if defined(CONFIG_VGA_CONSOLE)
