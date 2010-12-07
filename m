@@ -1,31 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 7 Dec 2010 14:23:38 -0700 (MST)
-Subject: [PATCH] OMAP2+: PM/serial: fix console semaphore acquire during
-	suspend
-In-Reply-To: <1291755056-23860-1-git-send-email-khilman@deeprootsystems.com>
-References: <1291755056-23860-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <alpine.DEB.2.00.1012071423200.13430@utopia.booyaka.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 07 Dec 2010 13:41:53 -0800
+Subject: [PATCH 0/8] OMAP2+: hwmod core upgrades for 2.6.38: first set
+In-Reply-To: <alpine.DEB.2.00.1011221715000.20215@utopia.booyaka.com> (Paul
+	Walmsley's message of "Mon, 22 Nov 2010 17:15:39 -0700 (MST)")
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+	<alpine.DEB.2.00.1011160945100.32653@utopia.booyaka.com>
+	<87y68lnhsp.fsf@deeprootsystems.com>
+	<alpine.DEB.2.00.1011221715000.20215@utopia.booyaka.com>
+Message-ID: <8739q9l0pq.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Dec 2010, Kevin Hilman wrote:
+Paul Walmsley <paul@pwsan.com> writes:
 
-> commit 0d8e2d0dad98a693bad88aea6876ac8b94ad95c6 (OMAP2+: PM/serial:
-> hold console semaphore while OMAP UARTs are disabled) added use of the
-> console semaphore to protect UARTs from being accessed after disabled
-> during idle, but this causes problems in suspend.
-> 
-> During suspend, the console semaphore is already held by the time we reach
-> the OMAP suspend path, so the try_acquire_console_sem() will always fail and
-> suspend will be aborted.
-> 
-> To fix, introduce a check so the console semaphore is only attempted
-> during idle, and not during suspend.
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> On Mon, 22 Nov 2010, Kevin Hilman wrote:
+>
+>> Paul Walmsley <paul@pwsan.com> writes:
+>> 
+>> > On Tue, 16 Nov 2010, Paul Walmsley wrote:
+>> >
+>> >> This patch series contains upgrades for the OMAP2+ hwmod core
+>> >> code, intended for 2.6.38.  Most of these patches were developed
+>> >> in response to use-cases discovered while converting device
+>> >> drivers to use the hwmod code.
+>> >> 
+>> >> Tested on an OMAP34xx BeagleBoard with omap2plus_defconfig.
+>> >
+>> > Just FYI, this branch 'hwmod_a_2.6.38' is available at 
+>> > git://git.pwsan.com/linux-2.6
+>> >
+>> > Warning: it's based on Tony's tree, not the mainline, due to the recent 
+>> > board file changes.
+>> 
+>> Looks like Tony has collected the board file changes into his
+>> devel-board branch.  Can this rebased there?
+>> 
+>> That way, I can included it as part of the PM branch testing without
+>> having to pull in master.
+>
+> hwmod_a_2.6.38 is now based on devel-board and wdt_2.6.38 is now rebased 
+> on the updated hwmod_a_2.6.38.
 
-Tested-by: Paul Walmsley <paul@pwsan.com>
+Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
 
+Tested on 35xx/omap3evm, 34xx/n900 and 35xx/beagle.
 
-- Paul
+Kevin
