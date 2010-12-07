@@ -1,23 +1,24 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 Dec 2010 10:16:13 +0100
-Subject: [PATCH 1/3] ARM: mx5: add support for the two watchdog modules
-In-Reply-To: <1291660714-16396-1-git-send-email-fabio.estevam@freescale.com>
-References: <1291660714-16396-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20101207091613.GD21020@pengutronix.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 07 Dec 2010 10:39:50 +0100
+Subject: [PATCHv2] support PMIC mc13892
+In-Reply-To: <1291708905-23645-1-git-send-email-b00984@freescale.com>
+	(b00984@freescale.com's message of "Tue, 7 Dec 2010 16:01:45 +0800")
+References: <1291708905-23645-1-git-send-email-b00984@freescale.com>
+Message-ID: <87pqtdncpl.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 06, 2010 at 04:38:32PM -0200, Fabio Estevam wrote:
-> MX51 has two watchdog modules.
-> 
-> Add support for both of them.
-I don't know why you need two watchdogs, but the patches look OK.
+<b00984@freescale.com> writes:
 
-Note there is a conflict between this patch series and the clk-change
-for the watchdog driver.
+> From: Yong Shen <yong.shen@linaro.org>
+>
+> add support for mc13892, tested on mx51 babbage board
 
-Uwe
+I've compared this version with mine, checked & tested it. I'm happy
+with it and moreover it has the nice idea to work on my efikamx.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I'm not sure if it should be a signed-off-by: or acked-by: or reviewed-by:
+tag since I wrote the code you've used a basis. I'm putting my s-o-b but
+if I'm wrong, I do hope someone will correct it.
+
+Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
