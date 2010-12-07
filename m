@@ -1,230 +1,101 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 06 Dec 2010 18:25:07 -0700
-Subject: [PATCH 04/14] OMAP: powerdomain: Arch specific funcs for logic control
+Date: Mon, 06 Dec 2010 18:25:12 -0700
+Subject: [PATCH 09/14] OMAP3: control/PRCM: add omap3_ctrl_write_boot_mode()
 In-Reply-To: <20101207012242.3708.45451.stgit@twilight.localdomain>
 References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-Message-ID: <20101207012506.3708.38333.stgit@twilight.localdomain>
+Message-ID: <20101207012511.3708.89350.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Get rid of the open-coded scratchpad write in mach-omap2/prcm.c and
+replace it with an actual API, omap3_ctrl_write_boot_mode().  While
+there, get rid of the gratuitous omap_writel().
 
-Define the following architecture specific funtions for omap2/3/4
-.pwrdm_set_logic_retst
-.pwrdm_read_logic_pwrst
-.pwrdm_read_prev_logic_pwrst
-.pwrdm_read_logic_retst
+There's not much documentation available for what should wind up in
+the scratchpad here, so more documentation would be appreciated.
+Also, at some point, we should formalize our treatment of the scratchpad;
+right now, accesses to the scratchpad are not well-documented.
 
-Convert the platform-independent framework to call these functions.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/powerdomain.c          |   51 ++++++++++++----------------
- arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |   34 +++++++++++++++++++
- arch/arm/mach-omap2/powerdomain44xx.c      |   26 ++++++++++++++
- 3 files changed, 82 insertions(+), 29 deletions(-)
+ arch/arm/mach-omap2/control.c |   31 +++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/control.h |    1 +
+ arch/arm/mach-omap2/prcm.c    |   10 +---------
+ 3 files changed, 33 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 0ae1ebf..562a3fe 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -532,7 +532,7 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
- {
--	u32 v;
-+	int ret = -EINVAL;
- 
- 	if (!pwrdm)
- 		return -EINVAL;
-@@ -543,17 +543,10 @@ int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
- 	pr_debug("powerdomain: setting next logic powerstate for %s to %0x\n",
- 		 pwrdm->name, pwrst);
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	v = pwrst << __ffs(OMAP3430_LOGICL1CACHERETSTATE_MASK);
--	prm_rmw_mod_reg_bits(OMAP3430_LOGICL1CACHERETSTATE_MASK, v,
--			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_logic_retst)
-+		ret = arch_pwrdm->pwrdm_set_logic_retst(pwrdm, pwrst);
- 
--	return 0;
-+	return ret;
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 1fa3294..9fda3d7 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -209,6 +209,37 @@ void omap4_ctrl_pad_writel(u32 val, u16 offset)
+ 	__raw_writel(val, OMAP4_CTRL_PAD_REGADDR(offset));
  }
  
- /**
-@@ -696,11 +689,15 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
-  */
- int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
++#ifdef CONFIG_ARCH_OMAP3
 +
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs, pwrstst_reg_offs,
--				       OMAP3430_LOGICSTATEST_MASK);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_logic_pwrst)
-+		ret = arch_pwrdm->pwrdm_read_logic_pwrst(pwrdm);
-+
-+	return ret;
- }
- 
- /**
-@@ -713,17 +710,15 @@ int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST,
--					OMAP3430_LASTLOGICSTATEENTERED_MASK);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_logic_pwrst)
-+		ret = arch_pwrdm->pwrdm_read_prev_logic_pwrst(pwrdm);
-+
-+	return ret;
- }
- 
- /**
-@@ -736,17 +731,15 @@ int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_logic_retst(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs, pwrstctrl_reg_offs,
--				       OMAP3430_LOGICSTATEST_MASK);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_logic_retst)
-+		ret = arch_pwrdm->pwrdm_read_logic_retst(pwrdm);
-+
-+	return ret;
- }
- 
- /**
-diff --git a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-index a25dd64..b7ea191 100644
---- a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-@@ -41,6 +41,17 @@ static int omap2_pwrdm_read_pwrst(struct powerdomain *pwrdm)
- 				OMAP2_PM_PWSTST, OMAP_POWERSTATEST_MASK);
- }
- 
-+static int omap2_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
++/**
++ * omap3_ctrl_write_boot_mode - set scratchpad boot mode for the next boot
++ * @bootmode: 8-bit value to pass to some boot code
++ *
++ * Set the bootmode in the scratchpad RAM.  This is used after the
++ * system restarts.  Not sure what actually uses this - it may be the
++ * bootloader, rather than the boot ROM - contrary to the preserved
++ * comment below.  No return value.
++ */
++void omap3_ctrl_write_boot_mode(u8 bootmode)
 +{
-+	u32 v;
++	u32 l;
 +
-+	v = pwrst << __ffs(OMAP3430_LOGICL1CACHERETSTATE_MASK);
-+	prm_rmw_mod_reg_bits(OMAP3430_LOGICL1CACHERETSTATE_MASK, v,
-+				pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
++	l = ('B' << 24) | ('M' << 16) | bootmode;
 +
-+	return 0;
++	/*
++	 * Reserve the first word in scratchpad for communicating
++	 * with the boot ROM. A pointer to a data structure
++	 * describing the boot process can be stored there,
++	 * cf. OMAP34xx TRM, Initialization / Software Booting
++	 * Configuration.
++	 *
++	 * XXX This should use some omap_ctrl_writel()-type function
++	 */
++	__raw_writel(l, OMAP2_L4_IO_ADDRESS(OMAP343X_SCRATCHPAD + 4));
 +}
 +
- /* Applicable only for OMAP3. Not supported on OMAP2 */
- static int omap3_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- {
-@@ -48,10 +59,29 @@ static int omap3_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- 				OMAP3430_LASTPOWERSTATEENTERED_MASK);
- }
++#endif
++
+ #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+ /*
+  * Clears the scratchpad contents in case of cold boot-
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index b6c6b7c..a9325ad 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -350,6 +350,7 @@ extern u32 *get_es3_restore_pointer(void);
+ extern u32 omap3_arm_context[128];
+ extern void omap3_control_save_context(void);
+ extern void omap3_control_restore_context(void);
++extern void omap3_ctrl_write_boot_mode(u8 bootmode);
  
-+static int omap3_pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP2_PM_PWSTST,
-+				OMAP3430_LOGICSTATEST_MASK);
-+}
-+
-+static int omap3_pwrdm_read_logic_retst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL,
-+				OMAP3430_LOGICSTATEST_MASK);
-+}
-+
-+static int omap3_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST,
-+				OMAP3430_LASTLOGICSTATEENTERED_MASK);
-+}
-+
- struct pwrdm_ops omap2_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst	= omap2_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
- 	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
-+	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
- };
+ #else
+ #define omap_ctrl_base_get()		0
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index a51846e..2eca847 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -143,16 +143,8 @@ void omap_prcm_arch_reset(char mode, const char *cmd)
  
- struct pwrdm_ops omap3_pwrdm_operations = {
-@@ -59,4 +89,8 @@ struct pwrdm_ops omap3_pwrdm_operations = {
- 	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
- 	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
- 	.pwrdm_read_prev_pwrst	= omap3_pwrdm_read_prev_pwrst,
-+	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
-+	.pwrdm_read_logic_pwrst	= omap3_pwrdm_read_logic_pwrst,
-+	.pwrdm_read_logic_retst	= omap3_pwrdm_read_logic_retst,
-+	.pwrdm_read_prev_logic_pwrst	= omap3_pwrdm_read_prev_logic_pwrst,
- };
-diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
-index 5dc337c..996790a 100644
---- a/arch/arm/mach-omap2/powerdomain44xx.c
-+++ b/arch/arm/mach-omap2/powerdomain44xx.c
-@@ -47,9 +47,35 @@ static int omap4_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- 				OMAP4430_LASTPOWERSTATEENTERED_MASK);
- }
- 
-+static int omap4_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
-+{
-+	u32 v;
-+
-+	v = pwrst << __ffs(OMAP4430_LOGICRETSTATE_MASK);
-+	prm_rmw_mod_reg_bits(OMAP4430_LOGICRETSTATE_MASK, v,
-+				pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
-+
-+	return 0;
-+}
-+
-+static int omap4_pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_PWSTST,
-+				OMAP4430_LOGICSTATEST_MASK);
-+}
-+
-+static int omap4_pwrdm_read_logic_retst(struct powerdomain *pwrdm)
-+{
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL,
-+				OMAP4430_LOGICRETSTATE_MASK);
-+}
-+
- struct pwrdm_ops omap4_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
- 	.pwrdm_read_pwrst	= omap4_pwrdm_read_pwrst,
- 	.pwrdm_read_prev_pwrst	= omap4_pwrdm_read_prev_pwrst,
-+	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
-+	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
-+	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
- };
+ 		prcm_offs = WKUP_MOD;
+ 	} else if (cpu_is_omap34xx()) {
+-		u32 l;
+-
+ 		prcm_offs = OMAP3430_GR_MOD;
+-		l = ('B' << 24) | ('M' << 16) | (cmd ? (u8)*cmd : 0);
+-		/* Reserve the first word in scratchpad for communicating
+-		 * with the boot ROM. A pointer to a data structure
+-		 * describing the boot process can be stored there,
+-		 * cf. OMAP34xx TRM, Initialization / Software Booting
+-		 * Configuration. */
+-		omap_writel(l, OMAP343X_SCRATCHPAD + 4);
++		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+ 	} else if (cpu_is_omap44xx())
+ 		prcm_offs = OMAP4430_PRM_DEVICE_MOD;
+ 	else
