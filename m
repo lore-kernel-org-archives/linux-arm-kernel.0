@@ -1,79 +1,43 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue,  7 Dec 2010 12:50:56 -0800
-Subject: [PATCH] OMAP2+: PM/serial: fix console semaphore acquire during
-	suspend
-Message-ID: <1291755056-23860-1-git-send-email-khilman@deeprootsystems.com>
+Date: Tue, 07 Dec 2010 12:59:51 -0800
+Subject: OMAP2+: PM/serial: hold console semaphore while OMAP UARTs are
+	disabled
+In-Reply-To: <20101125005923.GE31536@atomide.com> (Tony Lindgren's message of
+	"Wed, 24 Nov 2010 16:59:23 -0800")
+References: <alpine.DEB.2.00.1011241646310.20215@utopia.booyaka.com>
+	<87oc9e5j4c.fsf@deeprootsystems.com>
+	<20101125005923.GE31536@atomide.com>
+Message-ID: <87sjy9l2ns.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 0d8e2d0dad98a693bad88aea6876ac8b94ad95c6 (OMAP2+: PM/serial:
-hold console semaphore while OMAP UARTs are disabled) added use of the
-console semaphore to protect UARTs from being accessed after disabled
-during idle, but this causes problems in suspend.
+Tony Lindgren <tony@atomide.com> writes:
 
-During suspend, the console semaphore is already held by the time we reach
-the OMAP suspend path, so the try_acquire_console_sem() will always fail and
-suspend will be aborted.
+> * Kevin Hilman <khilman@deeprootsystems.com> [101124 16:32]:
+>> Paul Walmsley <paul@pwsan.com> writes:
+>
+> <snip>
+>
+>> Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+>> 
+>> Very nice.  I've been exploring various solutions to this problem as
+>> well, but this one is much cleaner.  Also, I hadn't discovered the 'try'
+>> version of the console semaphore, so was running into recursive locking.
+>> 
+>> Anyways, tested on omap35xx: omap3evm (uart1/core console) and beagle
+>> (uart3/per console) and omap34xx/n900 (uart3/per console) using both
+>> retention-idle and off-idle.
+>
+> Thanks, queuing this as fix for the -rc cycle.
 
-To fix, introduce a check so the console semaphore is only attempted
-during idle, and not during suspend.
+FYI.. just found a regression caused by this patch.  It prevented
+suspend from ever happening since the console semaphore is already held
+during suspend.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
-Applies to Tony's omap-fixes branch.
+Just posted a fix for this:
 
- arch/arm/mach-omap2/pm34xx.c |   24 ++++++++++++++++++------
- 1 files changed, 18 insertions(+), 6 deletions(-)
+Date: Tue, 7 Dec 2010 12:24:13 -0800
+Subject: [PATCH] OMAP2+: PM/serial: fix console semaphore acquire during suspend
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 0ec8a04..122ef3c 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -50,6 +50,19 @@
- #include "sdrc.h"
- #include "control.h"
- 
-+#ifdef CONFIG_SUSPEND
-+static suspend_state_t suspend_state = PM_SUSPEND_ON;
-+static inline bool is_suspending(void)
-+{
-+	return (suspend_state != PM_SUSPEND_ON);
-+}
-+#else
-+static inline bool is_suspending(void)
-+{
-+	return false;
-+}
-+#endif
-+
- /* Scratchpad offsets */
- #define OMAP343X_TABLE_ADDRESS_OFFSET	   0xc4
- #define OMAP343X_TABLE_VALUE_OFFSET	   0xc0
-@@ -387,10 +400,11 @@ void omap_sram_idle(void)
- 	}
- 
- 	/* Block console output in case it is on one of the OMAP UARTs */
--	if (per_next_state < PWRDM_POWER_ON ||
--	    core_next_state < PWRDM_POWER_ON)
--		if (try_acquire_console_sem())
--			goto console_still_active;
-+	if (!is_suspending())
-+		if (per_next_state < PWRDM_POWER_ON ||
-+		    core_next_state < PWRDM_POWER_ON)
-+			if (try_acquire_console_sem())
-+				goto console_still_active;
- 
- 	/* PER */
- 	if (per_next_state < PWRDM_POWER_ON) {
-@@ -514,8 +528,6 @@ out:
- }
- 
- #ifdef CONFIG_SUSPEND
--static suspend_state_t suspend_state;
--
- static int omap3_pm_prepare(void)
- {
- 	disable_hlt();
--- 
-1.7.2.1
+
+Kevin
