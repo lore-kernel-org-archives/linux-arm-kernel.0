@@ -1,27 +1,58 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 07 Dec 2010 13:52:48 -0500 (EST)
-Subject: [PATCH] Kirkwood: Add support for 6282 based QNAP devices
-In-Reply-To: <AANLkTimk8G0kf_+M_yx8n0Wh2tgLAUZV7JbmyzR7RM59@mail.gmail.com>
-References: <20101129174440.GA14799@jirafa.cyrius.com>
-	<AANLkTim=30kESuyy7b6xLtCSFY1J9o0PhR1privVsDbb@mail.gmail.com>
-	<20101206215316.GH9684@jirafa.cyrius.com>
-	<AANLkTimk8G0kf_+M_yx8n0Wh2tgLAUZV7JbmyzR7RM59@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1012071351050.10437@xanadu.home>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 7 Dec 2010 11:45:19 -0800
+Subject: [PATCH v5 0/3] OMAP2/3: DMA: FIFO drain errata fixes
+In-Reply-To: <20101105212902.GU9264@atomide.com>
+References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
+	<20101005181525.GL3117@atomide.com>
+	<20101008221746.GS7558@atomide.com>
+	<201010211305.17559.peter.ujfalusi@nokia.com>
+	<20101105212902.GU9264@atomide.com>
+Message-ID: <20101207194519.GN13189@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Dec 2010, saeed bishara wrote:
+On Fri, Nov 05, 2010 at 02:29:02PM -0700, Tony Lindgren wrote:
+> Hi Greg,
+> 
+> Considering below..
+> 
+> * Peter Ujfalusi <peter.ujfalusi@nokia.com> [101021 02:56]:
+> > Sorry, I did missed this mail...
+> > 
+> > On Saturday 09 October 2010 01:17:46 ext Tony Lindgren wrote:
+> > 
+> > > Guys, as we're so late into getting 2.6.36 tagged, I'm thinking about just
+> > > queueing these for 2.6.37 for the following reasons:
+> > > 
+> > > - The 24xx patch is a fix for commit c12abc0 that's was merged over a
+> > >   year ago. We've lived with it for over a year now. What difference does
+> > >   extra few more months make if we have it in 2.6.37 instead of 2.6.36?
+> > > 
+> > > - The second 34xx fix seems to happen only when disabling DMA on the fly.
+> > >   Again, we've had support for 34xx in the mainline kernel for a few
+> > >   years, and we're not seeing unrecoverable issues with MMC or USB or
+> > >   any other code calling omap_dma_stop().
+> > > 
+> > > Sure these fix major issues with the DMA, but are these really critical
+> > > for 2.6.36?
+> > > 
+> > > So if you really want me to argue for merging these into 2.6.36, please let
+> > > me know some oops causing cases or data corruption that happens without
+> > > these patches.
+> > 
+> > Well 2.6.36 is released.
+> > I still would like to see this to be part of the 2.6.36.1 release. We can 
+> > reproduce the DMA error in 2.6.36 with audio.
+> > 
+> > Tony: can you make sure it is going to part of 2.6.36.1?
+> 
+> ..are you interested in these two patches for stable kernels?
+> 
+> The two patches in question are the following mainline commits:
+> 
+> 3e57f1626b5febe5cc99aa6870377deef3ae03cc
+> 0e4905c0199d683497833be60a428c784d7575b8
 
-> On Mon, Dec 6, 2010 at 11:53 PM, Martin Michlmayr <tbm@cyrius.com> wrote:
-> > * saeed bishara <saeed.bishara@gmail.com> [2010-11-30 12:43]:
-> >> > ? ? ? ?bool "QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS"
-> >> please add the new devices to the title as well.
-> >
-> > Ok, here's a new version:
-> looks fine to me, Nico, please merge
-> saeed
+Now queued up, thanks.
 
-Done.
-
-
-Nicolas
+greg k-h
