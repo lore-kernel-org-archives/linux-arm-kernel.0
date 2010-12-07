@@ -1,101 +1,112 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Tue, 7 Dec 2010 21:09:14 +0800
-Subject: [PATCH 09/15] ARM: mxs: Add clock support
-In-Reply-To: <20101130163922.GT20449@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1290754154-9428-10-git-send-email-shawn.guo@freescale.com>
-	<20101130163922.GT20449@pengutronix.de>
-Message-ID: <AANLkTi=OTPd6wJ0hHO8jnO5NVC9f2ZpRDMeC7zWJwObG@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 7 Dec 2010 14:09:56 +0100
+Subject: [PATCH] watchdog: imx: use clk_get to acquire the watchdog clock
+In-Reply-To: <1291664293-28360-1-git-send-email-fabio.estevam@freescale.com>
+References: <1291664293-28360-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20101207130956.GG21020@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Fabio,
 
-2010/12/1 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Shawn,
->
-> On Fri, Nov 26, 2010 at 02:49:08PM +0800, Shawn Guo wrote:
->> Add clock for MXS-based SoCs, MX23 and MX28.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
->> ---
->> ?arch/arm/mach-mxs/clock-mx23.c ? ? ? ? ?| ?521 ++++++++++++++++++++++
->> ?arch/arm/mach-mxs/clock-mx28.c ? ? ? ? ?| ?732 +++++++++++++++++++++++++++++++
->> ?arch/arm/mach-mxs/clock.c ? ? ? ? ? ? ? | ?201 +++++++++
->> ?arch/arm/mach-mxs/include/mach/clkdev.h | ? ?7 +
->> ?arch/arm/mach-mxs/include/mach/clock.h ?| ? 64 +++
->> ?arch/arm/mach-mxs/regs-clkctrl-mx23.h ? | ?455 +++++++++++++++++++
->> ?arch/arm/mach-mxs/regs-clkctrl-mx28.h ? | ?663 ++++++++++++++++++++++++++++
->> ?7 files changed, 2643 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-mxs/clock-mx23.c
->> ?create mode 100644 arch/arm/mach-mxs/clock-mx28.c
->> ?create mode 100644 arch/arm/mach-mxs/clock.c
->> ?create mode 100644 arch/arm/mach-mxs/include/mach/clkdev.h
->> ?create mode 100644 arch/arm/mach-mxs/include/mach/clock.h
->> ?create mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx23.h
->> ?create mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx28.h
->>
->> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
->> new file mode 100644
->> index 0000000..832db0b
->> --- /dev/null
->> +++ b/arch/arm/mach-mxs/clock-mx23.c
->> @@ -0,0 +1,521 @@
->> +/*
->> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along
->> + * with this program; if not, write to the Free Software Foundation, Inc.,
->> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
->> + */
->> +
->> +#include <linux/mm.h>
->> +#include <linux/delay.h>
->> +#include <linux/clk.h>
->> +#include <linux/io.h>
->> +
->> +#include <asm/clkdev.h>
->> +#include <asm/div64.h>
->> +
->> +#include <mach/hardware.h>
->> +#include <mach/common.h>
->> +#include <mach/clock.h>
->> +
->> +#include "regs-clkctrl-mx23.h"
->> +
->> +#define CLKCTRL_BASE_ADDR ? ?MX23_IO_ADDRESS(MX23_CLKCTRL_BASE_ADDR)
->> +#define DIGCTRL_BASE_ADDR ? ?MX23_IO_ADDRESS(MX23_DIGCTL_BASE_ADDR)
->> +
->> +static int _raw_clk_enable(struct clk *clk)
->> +{
->> + ? ? u32 reg;
->> +
->> + ? ? if (clk->enable_reg) {
->> + ? ? ? ? ? ? reg = __raw_readl(clk->enable_reg);
->> + ? ? ? ? ? ? reg &= ~(1 << clk->enable_shift);
->> + ? ? ? ? ? ? __raw_writel(reg, clk->enable_reg);
->> + ? ? }
->> +
->> + ? ? return 0;
->> +}
-> Hmm, I would have used an approach that is quickly switchable to the
-> generic clock stuff posted a few times here. ?But probably already too
-> late. ?So it's up to you to decide when to switch (or if at all).
->
-I suppose you are talking about the common struct clk patch from
-Jeremy Kerr.  Since mxs is closely tracking mxc, I would switch mxs
-only mxc is switched.
+On Mon, Dec 06, 2010 at 05:38:13PM -0200, Fabio Estevam wrote:
+> Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/clock-imx21.c |    2 +-
+>  arch/arm/mach-imx/clock-imx25.c |    2 +-
+>  arch/arm/mach-imx/clock-imx27.c |    2 +-
+>  arch/arm/mach-mx3/clock-imx31.c |    2 +-
+>  arch/arm/mach-mx3/clock-imx35.c |    2 +-
+>  drivers/watchdog/imx2_wdt.c     |    2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
+> index cf15ea5..c63a4f5 100644
+> --- a/arch/arm/mach-imx/clock-imx21.c
+> +++ b/arch/arm/mach-imx/clock-imx21.c
+> @@ -1185,7 +1185,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK(NULL, "brom", brom_clk)
+>  	_REGISTER_CLOCK(NULL, "emma", emma_clk[0])
+>  	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk[0])
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
+>  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c_clk)
+>  	_REGISTER_CLOCK("mxc-keypad", NULL, kpp_clk)
+> diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
+> index 9e4a557..2c98be8 100644
+> --- a/arch/arm/mach-imx/clock-imx25.c
+> +++ b/arch/arm/mach-imx/clock-imx25.c
+> @@ -296,7 +296,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+>  	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
+>  	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdt_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+>  	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+>  	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
+> diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+> index 2202b88..f32f3b8 100644
+> --- a/arch/arm/mach-imx/clock-imx27.c
+> +++ b/arch/arm/mach-imx/clock-imx27.c
+> @@ -667,7 +667,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK(NULL, "sahara2", sahara2_clk)
+>  	_REGISTER_CLOCK(NULL, "ata", ata_clk)
+>  	_REGISTER_CLOCK(NULL, "mstick", mstick_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
+>  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
+>  	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+> diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
+> index 7cf6d29..4193cf5 100644
+> --- a/arch/arm/mach-mx3/clock-imx31.c
+> +++ b/arch/arm/mach-mx3/clock-imx31.c
+> @@ -530,7 +530,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("imx31-cspi.2", NULL, cspi3_clk)
+>  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+>  	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
+>  	_REGISTER_CLOCK(NULL, "epit", epit1_clk)
+>  	_REGISTER_CLOCK(NULL, "epit", epit2_clk)
+> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> index 61e4a31..22259d9 100644
+> --- a/arch/arm/mach-mx3/clock-imx35.c
+> +++ b/arch/arm/mach-mx3/clock-imx35.c
+> @@ -495,7 +495,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("mxc-ehci.2", "usb", usbotg_clk)
+>  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usbotg_clk)
+>  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usbahb_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "max", max_clk)
+>  	_REGISTER_CLOCK(NULL, "audmux", audmux_clk)
+>  	_REGISTER_CLOCK(NULL, "csi", csi_clk)
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 2ee7dac..86f7cac 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -270,7 +270,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> -	imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
+> +	imx2_wdt.clk = clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(imx2_wdt.clk)) {
+>  		dev_err(&pdev->dev, "can't get Watchdog clock\n");
+>  		return PTR_ERR(imx2_wdt.clk);
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Depending on the order you get the patches in feel free to keep my ack
+when adapting the mx51 clocks.
+
+Uwe
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
