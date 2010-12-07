@@ -1,322 +1,159 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 8 Dec 2010 00:31:56 +0800
-Subject: [PATCH v3 06/15] ARM: mxs: Add timer support
+Date: Wed, 8 Dec 2010 00:32:02 +0800
+Subject: [PATCH v2 14/15] ARM: mxs: Add initial mx28evk support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1291739523-25077-5-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale MXS-based SoCs implement timer support in block TIMROT.
-There are two versions of TIMROT. The v1 on MX23 only gets 16 bits
-counter and has no match function. The v2 on MX28 extends the
-counter to 32 bits and add the match function.
-
-As the result, we need two instances of timers with v1 for better
-implementation, one for clock_event and another for clocksource.
-Otherwise, get_cycles may get imprecise result after long time
-cumulating. With v2, one instance can serve two purposes well.
+Add initial mx28evk support with duart and fec0.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
-Changes for v3:
- - Use term clock_event over next_event and clocksource over get_cycles
- - Split BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL into two definitions for v1 and v2 respectively
- - Turn timrot_get_cycles() into timrotv1_get_cycles() and timrotv2_get_cycles()
- - Turn timrot_set_next_event() into timrotv1_set_next_event() and timrotv2_set_next_event()
- - Skip flag IRQF_DISABLED
- - Remove unncessary IRQ disabling in mxs_set_mode()
- - Change shift of clocksource_mxs to 17
-
 Changes for v2:
- - Fix a bug in timrot_set_next_event(). It should read
-   HW_TIMROT_RUNNING_COUNTn to get the current counts.
+ - Change function mx28evk_fec_reset() from inline to __init
+ - Enable pll2 clock before phy operation
+ - Add error checking for gpio_direction_output()
+ - Save bytes by passing parameter into pr_err format string
+ - Change mx28_add_fec0() to mx28_add_fec(0)
+ - Remove boot_params
 
- arch/arm/mach-mxs/timer.c |  276 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 276 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/timer.c
+ arch/arm/mach-mxs/mach-mx28evk.c |  126 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 126 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
 
-diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
 new file mode 100644
-index 0000000..b0e7ffe
+index 0000000..3e8e37a
 --- /dev/null
-+++ b/arch/arm/mach-mxs/timer.c
-@@ -0,0 +1,276 @@
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -0,0 +1,126 @@
 +/*
-+ *  Copyright (C) 2000-2001 Deep Blue Solutions
-+ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-+ *  Copyright (C) 2006-2007 Pavel Pisa (ppisa at pikron.com)
-+ *  Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-+ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
 + */
 +
-+#include <linux/interrupt.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
 +#include <linux/irq.h>
-+#include <linux/clockchips.h>
 +#include <linux/clk.h>
 +
-+#include <mach/hardware.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
 +#include <asm/mach/time.h>
++
++#include <mach/hardware.h>
 +#include <mach/common.h>
++#include <mach/iomux-mx28.h>
 +
-+/*
-+ * There are 2 versions of the timrot on Freescale MXS-based SoCs.
-+ * The v1 on MX23 only gets 16 bits counter and has no match function.
-+ * The v2 on MX28 extends the counter to 32 bits and add the match function.
-+ *
-+ * As the result, we need two instances of timers with v1 for better
-+ * implementation, one for clock_event and another for clocksource. Otherwise,
-+ * get_cycles may get imprecise result after long time cumulating.
-+ * With v2, one instance can serve two purposes well.
-+ */
-+#define timrot_is_v1()	(cpu_is_mx23())
++#include "devices-mx28.h"
++#include "gpio.h"
 +
-+#define HW_TIMROT_ROTCTRL			0x00
-+#define HW_TIMROT_TIMCTRLn(n)			(0x20 + (n) * 0x40)
-+#define HW_TIMROT_RUNNING_COUNTn(n)		(0x30 + (n) * 0x40)
-+#define HW_TIMROT_MATCH_COUNTn(n)		(0x50 + (n) * 0x40)
-+#define BM_TIMROT_TIMCTRLn_RELOAD		(1 << 6)
-+#define BM_TIMROT_TIMCTRLn_UPDATE		(1 << 7)
-+#define BM_TIMROT_TIMCTRLn_MATCH_MODE		(1 << 11)
-+#define BM_TIMROT_TIMCTRLn_IRQ_EN		(1 << 14)
-+#define BM_TIMROT_TIMCTRLn_IRQ			(1 << 15)
-+#define BP_TIMROT_TIMCTRLn_SELECT		0
-+#define BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL	0x8
-+#define BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL	0xb
++#define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
++#define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
 +
-+static struct clock_event_device clockevent_mxs;
-+static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
++static iomux_cfg_t mx28evk_pads[] = {
++	/* duart */
++	MX28_PAD_PWM0__DUART_RX,
++	MX28_PAD_PWM1__DUART_TX,
 +
-+static void __iomem *timer_base;
-+
-+static inline void timrot_irq_disable(void)
-+{
-+	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
-+			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
-+}
-+
-+static inline void timrot_irq_enable(void)
-+{
-+	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
-+			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_SET_ADDR);
-+}
-+
-+static void timrot_irq_acknowledge(void)
-+{
-+	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ,
-+			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
-+}
-+
-+static cycle_t timrotv1_get_cycles(struct clocksource *cs)
-+{
-+	return ~((__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(1))
-+			& 0xffff0000) >> 16);
-+}
-+
-+static cycle_t timrotv2_get_cycles(struct clocksource *cs)
-+{
-+	return ~__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(0));
-+}
-+
-+static int timrotv1_set_next_event(unsigned long evt,
-+					struct clock_event_device *dev)
-+{
-+	/* timrot decrements the count */
-+	__raw_writel(evt, timer_base + HW_TIMROT_RUNNING_COUNTn(0));
-+
-+	return 0;
-+}
-+
-+static int timrotv2_set_next_event(unsigned long evt,
-+					struct clock_event_device *dev)
-+{
-+	unsigned long match;
-+
-+	/* timrot decrements the count */
-+	match = __raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(0))
-+			- evt;
-+	__raw_writel(match, timer_base + HW_TIMROT_MATCH_COUNTn(0));
-+
-+	return (int)(match - __raw_readl(timer_base +
-+			HW_TIMROT_RUNNING_COUNTn(0))) > 0 ? -ETIME : 0;
-+}
-+
-+static irqreturn_t mxs_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &clockevent_mxs;
-+
-+	timrot_irq_acknowledge();
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction mxs_timer_irq = {
-+	.name		= "MXS Timer Tick",
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= mxs_timer_interrupt,
++	/* fec0 */
++	MX28_PAD_ENET0_MDC__ENET0_MDC,
++	MX28_PAD_ENET0_MDIO__ENET0_MDIO,
++	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN,
++	MX28_PAD_ENET0_RXD0__ENET0_RXD0,
++	MX28_PAD_ENET0_RXD1__ENET0_RXD1,
++	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN,
++	MX28_PAD_ENET0_TXD0__ENET0_TXD0,
++	MX28_PAD_ENET0_TXD1__ENET0_TXD1,
++	MX28_PAD_ENET_CLK__ENET_CLK,
++	/* phy power line */
++	MX28_PAD_SSP1_DATA3__GPIO_2_15,
++	/* phy reset line */
++	MX28_PAD_ENET0_RX_CLK__GPIO_4_13,
 +};
 +
-+#ifdef DEBUG
-+static const char *clock_event_mode_label[] = {
-+	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
-+	[CLOCK_EVT_MODE_ONESHOT]  = "CLOCK_EVT_MODE_ONESHOT",
-+	[CLOCK_EVT_MODE_SHUTDOWN] = "CLOCK_EVT_MODE_SHUTDOWN",
-+	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED"
-+};
-+#endif /* DEBUG */
-+
-+static void mxs_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evt)
++/* fec */
++static void __init mx28evk_fec_reset(void)
 +{
-+	/* Disable interrupt in timer module */
-+	timrot_irq_disable();
++	int ret;
++	struct clk *clk;
 +
-+	if (mode != clockevent_mode) {
-+		/* Set event time into far-far future */
-+		__raw_writel(__raw_readl(timer_base +
-+				HW_TIMROT_RUNNING_COUNTn(0)) + 3,
-+				timer_base + HW_TIMROT_MATCH_COUNTn(0));
++	/* Enable fec phy clock */
++	clk = clk_get_sys("pll2", NULL);
++	if (!IS_ERR(clk))
++		clk_enable(clk);
 +
-+		/* Clear pending interrupt */
-+		timrot_irq_acknowledge();
++	/* Power up fec phy */
++	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
++	if (ret) {
++		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
++		return;
 +	}
 +
-+#ifdef DEBUG
-+	printk(KERN_INFO "mxs_set_mode: changing mode from %s to %s\n",
-+		clock_event_mode_label[clockevent_mode],
-+		clock_event_mode_label[mode]);
-+#endif /* DEBUG */
-+
-+	/* Remember timer mode */
-+	clockevent_mode = mode;
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		printk(KERN_ERR "mxs_set_mode: Periodic mode is not "
-+				"supported for MXS-based\n");
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		timrot_irq_enable();
-+		break;
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_RESUME:
-+		/* Left event sources disabled, no more interrupts appear */
-+		break;
++	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
++	if (ret) {
++		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
++		return;
 +	}
++
++	/* Reset fec phy */
++	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
++	if (ret) {
++		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
++		return;
++	}
++
++	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
++	if (ret) {
++		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
++		return;
++	}
++
++	mdelay(1);
++	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
 +}
 +
-+static struct clock_event_device clockevent_mxs = {
-+	.name		= "mxs_timrot",
-+	.features	= CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
-+	.set_mode	= mxs_set_mode,
-+	.set_next_event	= timrotv2_set_next_event,
-+	.rating		= 200,
++static const struct fec_platform_data mx28_fec_pdata __initconst = {
++        .phy = PHY_INTERFACE_MODE_RMII,
 +};
 +
-+static int __init mxs_clockevent_init(struct clk *timer_clk)
++static void __init mx28evk_init(void)
 +{
-+	unsigned int c = clk_get_rate(timer_clk);
++	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
 +
-+	clockevent_mxs.mult = div_sc(c, NSEC_PER_SEC, clockevent_mxs.shift);
-+	clockevent_mxs.cpumask = cpumask_of(0);
-+	if (timrot_is_v1()) {
-+		clockevent_mxs.set_next_event = timrotv1_set_next_event;
-+		clockevent_mxs.max_delta_ns =
-+			clockevent_delta2ns(0xfffe, &clockevent_mxs);
-+		clockevent_mxs.min_delta_ns =
-+			clockevent_delta2ns(0xf, &clockevent_mxs);
-+	} else {
-+		clockevent_mxs.max_delta_ns =
-+			clockevent_delta2ns(0xfffffffe, &clockevent_mxs);
-+		clockevent_mxs.min_delta_ns =
-+			clockevent_delta2ns(0xff, &clockevent_mxs);
-+	}
++	mx28_add_duart();
 +
-+	clockevents_register_device(&clockevent_mxs);
-+
-+	return 0;
++	mx28evk_fec_reset();
++	mx28_add_fec(0, &mx28_fec_pdata);
 +}
 +
-+static struct clocksource clocksource_mxs = {
-+	.name 		= "mxs_timer",
-+	.rating		= 200,
-+	.read		= timrotv2_get_cycles,
-+	.mask		= CLOCKSOURCE_MASK(32),
-+	.shift 		= 17,
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++static void __init mx28evk_timer_init(void)
++{
++	mx28_clocks_init();
++}
++
++static struct sys_timer mx28evk_timer = {
++	.init	= mx28evk_timer_init,
 +};
 +
-+static int __init mxs_clocksource_init(struct clk *timer_clk)
-+{
-+	unsigned int c = clk_get_rate(timer_clk);
-+
-+	if (timrot_is_v1()) {
-+		clocksource_mxs.read = timrotv1_get_cycles;
-+		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
-+	}
-+	clocksource_mxs.mult = clocksource_hz2mult(c, clocksource_mxs.shift);
-+	clocksource_register(&clocksource_mxs);
-+
-+	return 0;
-+}
-+
-+void __init mxs_timer_init(struct clk *timer_clk,
-+				void __iomem *base, int irq)
-+{
-+	clk_enable(timer_clk);
-+
-+	timer_base = base;
-+
-+	/*
-+	 * Initialize timers to a known state
-+	 */
-+	mxs_reset_block(base + HW_TIMROT_ROTCTRL);
-+
-+	if (timrot_is_v1()) {
-+		/* timer0 is for clock_event */
-+		__raw_writel(
-+			BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL |
-+			BM_TIMROT_TIMCTRLn_UPDATE |
-+			BM_TIMROT_TIMCTRLn_IRQ_EN,
-+			base + HW_TIMROT_TIMCTRLn(0));
-+		/* timer1 is for clocksource */
-+		__raw_writel(
-+			BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL |
-+			BM_TIMROT_TIMCTRLn_RELOAD,
-+			base + HW_TIMROT_TIMCTRLn(1));
-+		__raw_writel(0xffff, timer_base  + HW_TIMROT_RUNNING_COUNTn(1));
-+
-+	} else {
-+		__raw_writel(
-+			BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL |
-+			BM_TIMROT_TIMCTRLn_IRQ_EN |
-+			BM_TIMROT_TIMCTRLn_MATCH_MODE,
-+			timer_base + HW_TIMROT_TIMCTRLn(0));
-+	}
-+
-+	/* init and register the timer to the framework */
-+	mxs_clocksource_init(timer_clk);
-+	mxs_clockevent_init(timer_clk);
-+
-+	/* Make irqs happen */
-+	setup_irq(irq, &mxs_timer_irq);
-+}
++MACHINE_START(MX28EVK, "Freescale MX28 EVK")
++	/* Maintainer: Freescale Semiconductor, Inc. */
++	.map_io         = mx28_map_io,
++	.init_irq       = mx28_init_irq,
++	.init_machine   = mx28evk_init,
++	.timer          = &mx28evk_timer,
++MACHINE_END
 -- 
 1.7.1
