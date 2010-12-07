@@ -1,81 +1,59 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 7 Dec 2010 15:06:51 +0000
-Subject: RFC: Dynamic hwcaps
-In-Reply-To: <20101207110401.GA20451@n2100.arm.linux.org.uk>
-References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-	<20101203165105.GD30898@n2100.arm.linux.org.uk>
-	<AANLkTik9sqkbCPbcWUL+2otyfO1OZ=hx1tvSkQW65e4i@mail.gmail.com>
-	<4CFBAC6D.5060507@codesourcery.com>
-	<AANLkTi=woxGqfpd12tr32FymOx77UnVehvEFQt5GnRzG@mail.gmail.com>
-	<4CFD87A6.8030104@codesourcery.com>
-	<AANLkTikh-a++NQj+cUJOf9B3tjr_=CvAqJmjhLGA0Xt7@mail.gmail.com>
-	<20101207110401.GA20451@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTik5NaF3r3mocthuVc-NiYNS3yJbEpkNt3_ghjUj@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Dec 2010 15:13:10 +0000
+Subject: [PATCH v4] ARM: vexpress: add support for multiple core tiles
+In-Reply-To: <1291732998-22789-1-git-send-email-will.deacon@arm.com>
+References: <1291732998-22789-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20101207151310.GB23589@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 07, 2010 at 02:43:18PM +0000, Will Deacon wrote:
+> @@ -115,36 +108,22 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+>   */
+>  void __init smp_init_cpus(void)
+>  {
+> -	void __iomem *scu_base = scu_base_addr();
+> -	unsigned int i, ncores;
+> -
+> -	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
+> -
+> -	/* sanity check */
+> -	if (ncores > NR_CPUS) {
+> +	ct_desc->init_cpu_map();
+> +	if (!num_possible_cpus()) {
+>  		printk(KERN_WARNING
+> -		       "vexpress: no. of cores (%d) greater than configured "
+> -		       "maximum of %d - clipping\n",
+> -		       ncores, NR_CPUS);
+> -		ncores = NR_CPUS;
+> +		       "vexpress: no possible CPUs declared, forcing logical "
+> +		       "CPU 0\n");
+> +		set_cpu_possible(0, true);
 
-On Tue, Dec 7, 2010 at 11:04 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 07, 2010 at 10:45:42AM +0000, Dave Martin wrote:
->> Yes-- though I didn't elaborate on it. ?You need a packager that can
->> understand, say, that a binary built for ARMv5 EABI can interoperate
->> with ARMv7 binaries etc.
->> Again, I've heard it suggested that RPM can handle this, but I haven't
->> looked at it in detail myself.
->
-> That is indeed the case - as on x86, it used to be common to build the
-> majority of the distribution for i386, and glibc and a few other bits
-> for a range of ix86 CPUs.
->
-> rpm and yum know that i386 is compatible with i486, which is compatible
-> with i586 etc, so it will install an i386 package on i686 if no i486,
-> i586 or i686 package is available.
->
-> It does the same for ARM with ARMv3, ARMv4 etc.
+Hmm. The right check is whether the current CPU number is set in the
+possible map - if it's clear, then that's certainly a bug.
 
-That sounds plausible.  If you really want to go to town on this it
-gets more complicated, but there's still a lot of value in modelling
-the architectural development as a linear progression in this way.
+However, this will never happen, unless you do something really silly
+in ->init_cpu_map() such as clearing all possible CPUs, or setting
+them false.  See boot_cpu_init() in init/main.c.
 
->
->> The dynamic hwcaps approach doesn't really solve that problem:
->
-> Has anyone investigated whether it is possible to power down things like
-> Neon etc meanwhile leaving the rest of the CPU running? ?I've not seen
-> anything in the ARM documentation to suggest that's the case.
->
-> Even in MPCore based systems, the interface between the SCU and individual
-> processors by default doesn't have the necessary clamps built in to allow
-> individual CPUs to be powered off, and I'm not aware of any designs which
-> decided to enable this feature (as there's a performance penalty).  So I'd
-> be really surprised if there was any support for powering down Neon
-> separately from the host CPU.
+So I don't think we need this check (and I think it should be in the
+platform code.)
 
-It's not part of the architecture per se, but some SoCs do put NEON in
-a separate power domain and can power manage it somewhat indepedently.
+Alteratively, we could do this in the generic SMP code:
 
-However, I guess we need to clarify exactly how this works for SoCs in
-practice.  If NEON and VFP are power-managed co-dependently (for
-example, but no so likely(?)) this is not so useful to us ... since
-it's becoming common to build everything with -mfpu=vfp*.
+	if (num_possible_cpus() > NR_CPUS) {
+		unsigned int nr = 0, cpu;
 
-Because the kernel only uses FPEXC.EN to en/disable these extensions,
-NEON and VFP are somewhat tied together ... though we might be able to
-get more flexible by toggling the CPACR.ASEDIS control bit instead.  I
-don't believe the kernel currently touches this (?)
-
->
-> If that's the case, it's entirely pointless discussing what userspace can
-> or can't do - if you have Neon available and can't power it down, and it's
-> faster for doing something, you might as well use it so you can put the
-> main CPU into WFI mode or get on with some other useful work.
->
-
-Indeed ... my layman's understanding is that it is worth it on some
-platforms, but I guess I need to clarify this with someone who
-understands the hardware.
-
-Cheers
----Dave
+		pr_warning("SMP: number of CPUs greater than configured %u, disabling CPU",
+			NR_CPUS);
+		
+		for_each_possible_cpu(cpu) {
+			if (nr >= NR_CPUS) {
+				cpu_set_possible(cpu, false);
+				pr_cont(" %u", cpu);
+			}
+			nr++;
+		}
+		pr_cont("\n");
+	}
