@@ -1,945 +1,798 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 06 Dec 2010 18:25:08 -0700
-Subject: [PATCH 05/14] OMAP: powerdomain: Arch specific funcs for mem control
+Date: Mon, 06 Dec 2010 18:25:18 -0700
+Subject: [PATCH 14/14] OMAP3: PRM/CM: separate CM context save/restore;
+	remove PRM context save/restore
 In-Reply-To: <20101207012242.3708.45451.stgit@twilight.localdomain>
 References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-Message-ID: <20101207012507.3708.81251.stgit@twilight.localdomain>
+Message-ID: <20101207012517.3708.95448.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+The OMAP3 PRM module is in the WKUP powerdomain, which is always
+powered when the chip is powered, so it shouldn't be necessary to save
+and restore those PRM registers.  Remove the PRM register save/restore
+code, which should save several microseconds during off-mode
+entry/exit, since PRM register accesses are relatively slow.
 
-Define the following architecture specific funtions for omap2/3/4
-.pwrdm_set_mem_onst
-.pwrdm_set_mem_retst
-.pwrdm_read_mem_pwrst
-.pwrdm_read_prev_mem_pwrst
-.pwrdm_read_mem_retst
-.pwrdm_clear_all_prev_pwrst
-.pwrdm_enable_hdwr_sar
-.pwrdm_disable_hdwr_sar
-.pwrdm_wait_transition
-.pwrdm_set_lowpwrstchange
+While doing so, move the CM register save/restore code into
+CM-specific code.  The CM module has been distinct from the PRM module
+since 2430.
 
-Convert the platform-independent framework to call these functions.
+This patch includes some minor changes to pm34xx.c.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[paul at pwsan.com: rearranged Makefile changes]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Tero Kristo <tero.kristo@nokia.com>
+Cc: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
 ---
- arch/arm/mach-omap2/Makefile               |    2 
- arch/arm/mach-omap2/powerdomain-common.c   |  111 ++++++++++
- arch/arm/mach-omap2/powerdomain.c          |  303 +++++-----------------------
- arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |  131 ++++++++++++
- arch/arm/mach-omap2/powerdomain44xx.c      |   85 ++++++++
- arch/arm/mach-omap2/powerdomains.h         |    5 
- 6 files changed, 389 insertions(+), 248 deletions(-)
- create mode 100644 arch/arm/mach-omap2/powerdomain-common.c
+ arch/arm/mach-omap2/cm2xxx_3xxx.c      |  296 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/cm2xxx_3xxx.h      |    7 +
+ arch/arm/mach-omap2/pm34xx.c           |    4 
+ arch/arm/mach-omap2/prcm.c             |  375 --------------------------------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c     |    1 
+ arch/arm/plat-omap/include/plat/prcm.h |    3 
+ 6 files changed, 304 insertions(+), 382 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index f8dcaf8..b5c4fe8 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -69,7 +69,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= prcm.o cm.o
- obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm4xxx.o
+diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.c b/arch/arm/mach-omap2/cm2xxx_3xxx.c
+index 5978ce4..1c98dfc 100644
+--- a/arch/arm/mach-omap2/cm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/cm2xxx_3xxx.c
+@@ -29,7 +29,6 @@ static const u8 cm_idlest_offs[] = {
+ 	CM_IDLEST1, CM_IDLEST2, OMAP2430_CM_IDLEST3
+ };
  
- # OMAP powerdomain framework
--powerdomain-common			+= powerdomain.o powerdomains_data.o
-+powerdomain-common			+= powerdomain.o powerdomains_data.o powerdomain-common.o
- obj-$(CONFIG_ARCH_OMAP2)		+= $(powerdomain-common) \
- 					   powerdomain2xxx_3xxx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= $(powerdomain-common) \
-diff --git a/arch/arm/mach-omap2/powerdomain-common.c b/arch/arm/mach-omap2/powerdomain-common.c
-new file mode 100644
-index 0000000..cb01c7a
---- /dev/null
-+++ b/arch/arm/mach-omap2/powerdomain-common.c
-@@ -0,0 +1,111 @@
+-
+ u32 cm_read_mod_reg(s16 module, u16 idx)
+ {
+ 	return __raw_readl(cm_base + module + idx);
+@@ -97,3 +96,298 @@ int omap2_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift)
+ 	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
+ }
+ 
 +/*
-+ *  linux/arch/arm/mach-omap2/powerdomain-common.c
-+ *  Contains common powerdomain framework functions
-+ *
-+ *  Copyright (C) 2010 Texas Instruments, Inc.
-+ *  Copyright (C) 2010 Nokia Corporation
-+ *
-+ * Derived from mach-omap2/powerdomain.c written by Paul Walmsley
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Context save/restore code - OMAP3 only
 + */
++#ifdef CONFIG_ARCH_OMAP3
++struct omap3_cm_regs {
++	u32 iva2_cm_clksel1;
++	u32 iva2_cm_clksel2;
++	u32 cm_sysconfig;
++	u32 sgx_cm_clksel;
++	u32 dss_cm_clksel;
++	u32 cam_cm_clksel;
++	u32 per_cm_clksel;
++	u32 emu_cm_clksel;
++	u32 emu_cm_clkstctrl;
++	u32 pll_cm_autoidle2;
++	u32 pll_cm_clksel4;
++	u32 pll_cm_clksel5;
++	u32 pll_cm_clken2;
++	u32 cm_polctrl;
++	u32 iva2_cm_fclken;
++	u32 iva2_cm_clken_pll;
++	u32 core_cm_fclken1;
++	u32 core_cm_fclken3;
++	u32 sgx_cm_fclken;
++	u32 wkup_cm_fclken;
++	u32 dss_cm_fclken;
++	u32 cam_cm_fclken;
++	u32 per_cm_fclken;
++	u32 usbhost_cm_fclken;
++	u32 core_cm_iclken1;
++	u32 core_cm_iclken2;
++	u32 core_cm_iclken3;
++	u32 sgx_cm_iclken;
++	u32 wkup_cm_iclken;
++	u32 dss_cm_iclken;
++	u32 cam_cm_iclken;
++	u32 per_cm_iclken;
++	u32 usbhost_cm_iclken;
++	u32 iva2_cm_autoidle2;
++	u32 mpu_cm_autoidle2;
++	u32 iva2_cm_clkstctrl;
++	u32 mpu_cm_clkstctrl;
++	u32 core_cm_clkstctrl;
++	u32 sgx_cm_clkstctrl;
++	u32 dss_cm_clkstctrl;
++	u32 cam_cm_clkstctrl;
++	u32 per_cm_clkstctrl;
++	u32 neon_cm_clkstctrl;
++	u32 usbhost_cm_clkstctrl;
++	u32 core_cm_autoidle1;
++	u32 core_cm_autoidle2;
++	u32 core_cm_autoidle3;
++	u32 wkup_cm_autoidle;
++	u32 dss_cm_autoidle;
++	u32 cam_cm_autoidle;
++	u32 per_cm_autoidle;
++	u32 usbhost_cm_autoidle;
++	u32 sgx_cm_sleepdep;
++	u32 dss_cm_sleepdep;
++	u32 cam_cm_sleepdep;
++	u32 per_cm_sleepdep;
++	u32 usbhost_cm_sleepdep;
++	u32 cm_clkout_ctrl;
++};
 +
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include "pm.h"
-+#include "cm.h"
-+#include "cm-regbits-34xx.h"
-+#include "cm-regbits-44xx.h"
-+#include "prm-regbits-34xx.h"
-+#include "prm-regbits-44xx.h"
-+#include "powerdomains.h"
++static struct omap3_cm_regs cm_context;
 +
-+/*
-+ * OMAP3 and OMAP4 specific register bit initialisations
-+ * Notice that the names here are not according to each power
-+ * domain but the bit mapping used applies to all of them
-+ */
-+/* OMAP3 and OMAP4 Memory Onstate Masks (common across all power domains) */
-+#define OMAP_MEM0_ONSTATE_MASK OMAP3430_SHAREDL1CACHEFLATONSTATE_MASK
-+#define OMAP_MEM1_ONSTATE_MASK OMAP3430_L1FLATMEMONSTATE_MASK
-+#define OMAP_MEM2_ONSTATE_MASK OMAP3430_SHAREDL2CACHEFLATONSTATE_MASK
-+#define OMAP_MEM3_ONSTATE_MASK OMAP3430_L2FLATMEMONSTATE_MASK
-+#define OMAP_MEM4_ONSTATE_MASK OMAP4430_OCP_NRET_BANK_ONSTATE_MASK
-+
-+/* OMAP3 and OMAP4 Memory Retstate Masks (common across all power domains) */
-+#define OMAP_MEM0_RETSTATE_MASK OMAP3430_SHAREDL1CACHEFLATRETSTATE_MASK
-+#define OMAP_MEM1_RETSTATE_MASK OMAP3430_L1FLATMEMRETSTATE_MASK
-+#define OMAP_MEM2_RETSTATE_MASK OMAP3430_SHAREDL2CACHEFLATRETSTATE_MASK
-+#define OMAP_MEM3_RETSTATE_MASK OMAP3430_L2FLATMEMRETSTATE_MASK
-+#define OMAP_MEM4_RETSTATE_MASK OMAP4430_OCP_NRET_BANK_RETSTATE_MASK
-+
-+/* OMAP3 and OMAP4 Memory Status bits */
-+#define OMAP_MEM0_STATEST_MASK OMAP3430_SHAREDL1CACHEFLATSTATEST_MASK
-+#define OMAP_MEM1_STATEST_MASK OMAP3430_L1FLATMEMSTATEST_MASK
-+#define OMAP_MEM2_STATEST_MASK OMAP3430_SHAREDL2CACHEFLATSTATEST_MASK
-+#define OMAP_MEM3_STATEST_MASK OMAP3430_L2FLATMEMSTATEST_MASK
-+#define OMAP_MEM4_STATEST_MASK OMAP4430_OCP_NRET_BANK_STATEST_MASK
-+
-+/* Common Internal functions used across OMAP rev's*/
-+u32 omap2_pwrdm_get_mem_bank_onstate_mask(u8 bank)
++void omap3_cm_save_context(void)
 +{
-+	switch (bank) {
-+	case 0:
-+		return OMAP_MEM0_ONSTATE_MASK;
-+	case 1:
-+		return OMAP_MEM1_ONSTATE_MASK;
-+	case 2:
-+		return OMAP_MEM2_ONSTATE_MASK;
-+	case 3:
-+		return OMAP_MEM3_ONSTATE_MASK;
-+	case 4:
-+		return OMAP_MEM4_ONSTATE_MASK;
-+	default:
-+		WARN_ON(1); /* should never happen */
-+		return -EEXIST;
-+	}
-+	return 0;
++	cm_context.iva2_cm_clksel1 =
++		cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_CLKSEL1);
++	cm_context.iva2_cm_clksel2 =
++		cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_CLKSEL2);
++	cm_context.cm_sysconfig = __raw_readl(OMAP3430_CM_SYSCONFIG);
++	cm_context.sgx_cm_clksel =
++		cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_CLKSEL);
++	cm_context.dss_cm_clksel =
++		cm_read_mod_reg(OMAP3430_DSS_MOD, CM_CLKSEL);
++	cm_context.cam_cm_clksel =
++		cm_read_mod_reg(OMAP3430_CAM_MOD, CM_CLKSEL);
++	cm_context.per_cm_clksel =
++		cm_read_mod_reg(OMAP3430_PER_MOD, CM_CLKSEL);
++	cm_context.emu_cm_clksel =
++		cm_read_mod_reg(OMAP3430_EMU_MOD, CM_CLKSEL1);
++	cm_context.emu_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430_EMU_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.pll_cm_autoidle2 =
++		cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE2);
++	cm_context.pll_cm_clksel4 =
++		cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKSEL4);
++	cm_context.pll_cm_clksel5 =
++		cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKSEL5);
++	cm_context.pll_cm_clken2 =
++		cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKEN2);
++	cm_context.cm_polctrl = __raw_readl(OMAP3430_CM_POLCTRL);
++	cm_context.iva2_cm_fclken =
++		cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_FCLKEN);
++	cm_context.iva2_cm_clken_pll = cm_read_mod_reg(OMAP3430_IVA2_MOD,
++						       OMAP3430_CM_CLKEN_PLL);
++	cm_context.core_cm_fclken1 =
++		cm_read_mod_reg(CORE_MOD, CM_FCLKEN1);
++	cm_context.core_cm_fclken3 =
++		cm_read_mod_reg(CORE_MOD, OMAP3430ES2_CM_FCLKEN3);
++	cm_context.sgx_cm_fclken =
++		cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_FCLKEN);
++	cm_context.wkup_cm_fclken =
++		cm_read_mod_reg(WKUP_MOD, CM_FCLKEN);
++	cm_context.dss_cm_fclken =
++		cm_read_mod_reg(OMAP3430_DSS_MOD, CM_FCLKEN);
++	cm_context.cam_cm_fclken =
++		cm_read_mod_reg(OMAP3430_CAM_MOD, CM_FCLKEN);
++	cm_context.per_cm_fclken =
++		cm_read_mod_reg(OMAP3430_PER_MOD, CM_FCLKEN);
++	cm_context.usbhost_cm_fclken =
++		cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, CM_FCLKEN);
++	cm_context.core_cm_iclken1 =
++		cm_read_mod_reg(CORE_MOD, CM_ICLKEN1);
++	cm_context.core_cm_iclken2 =
++		cm_read_mod_reg(CORE_MOD, CM_ICLKEN2);
++	cm_context.core_cm_iclken3 =
++		cm_read_mod_reg(CORE_MOD, CM_ICLKEN3);
++	cm_context.sgx_cm_iclken =
++		cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_ICLKEN);
++	cm_context.wkup_cm_iclken =
++		cm_read_mod_reg(WKUP_MOD, CM_ICLKEN);
++	cm_context.dss_cm_iclken =
++		cm_read_mod_reg(OMAP3430_DSS_MOD, CM_ICLKEN);
++	cm_context.cam_cm_iclken =
++		cm_read_mod_reg(OMAP3430_CAM_MOD, CM_ICLKEN);
++	cm_context.per_cm_iclken =
++		cm_read_mod_reg(OMAP3430_PER_MOD, CM_ICLKEN);
++	cm_context.usbhost_cm_iclken =
++		cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, CM_ICLKEN);
++	cm_context.iva2_cm_autoidle2 =
++		cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_AUTOIDLE2);
++	cm_context.mpu_cm_autoidle2 =
++		cm_read_mod_reg(MPU_MOD, CM_AUTOIDLE2);
++	cm_context.iva2_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.mpu_cm_clkstctrl =
++		cm_read_mod_reg(MPU_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.core_cm_clkstctrl =
++		cm_read_mod_reg(CORE_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.sgx_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430ES2_SGX_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.dss_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430_DSS_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.cam_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430_CAM_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.per_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430_PER_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.neon_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430_NEON_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.usbhost_cm_clkstctrl =
++		cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_context.core_cm_autoidle1 =
++		cm_read_mod_reg(CORE_MOD, CM_AUTOIDLE1);
++	cm_context.core_cm_autoidle2 =
++		cm_read_mod_reg(CORE_MOD, CM_AUTOIDLE2);
++	cm_context.core_cm_autoidle3 =
++		cm_read_mod_reg(CORE_MOD, CM_AUTOIDLE3);
++	cm_context.wkup_cm_autoidle =
++		cm_read_mod_reg(WKUP_MOD, CM_AUTOIDLE);
++	cm_context.dss_cm_autoidle =
++		cm_read_mod_reg(OMAP3430_DSS_MOD, CM_AUTOIDLE);
++	cm_context.cam_cm_autoidle =
++		cm_read_mod_reg(OMAP3430_CAM_MOD, CM_AUTOIDLE);
++	cm_context.per_cm_autoidle =
++		cm_read_mod_reg(OMAP3430_PER_MOD, CM_AUTOIDLE);
++	cm_context.usbhost_cm_autoidle =
++		cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, CM_AUTOIDLE);
++	cm_context.sgx_cm_sleepdep =
++		cm_read_mod_reg(OMAP3430ES2_SGX_MOD, OMAP3430_CM_SLEEPDEP);
++	cm_context.dss_cm_sleepdep =
++		cm_read_mod_reg(OMAP3430_DSS_MOD, OMAP3430_CM_SLEEPDEP);
++	cm_context.cam_cm_sleepdep =
++		cm_read_mod_reg(OMAP3430_CAM_MOD, OMAP3430_CM_SLEEPDEP);
++	cm_context.per_cm_sleepdep =
++		cm_read_mod_reg(OMAP3430_PER_MOD, OMAP3430_CM_SLEEPDEP);
++	cm_context.usbhost_cm_sleepdep =
++		cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, OMAP3430_CM_SLEEPDEP);
++	cm_context.cm_clkout_ctrl =
++		cm_read_mod_reg(OMAP3430_CCR_MOD, OMAP3_CM_CLKOUT_CTRL_OFFSET);
 +}
 +
-+u32 omap2_pwrdm_get_mem_bank_retst_mask(u8 bank)
++void omap3_cm_restore_context(void)
 +{
-+	switch (bank) {
-+	case 0:
-+		return OMAP_MEM0_RETSTATE_MASK;
-+	case 1:
-+		return OMAP_MEM1_RETSTATE_MASK;
-+	case 2:
-+		return OMAP_MEM2_RETSTATE_MASK;
-+	case 3:
-+		return OMAP_MEM3_RETSTATE_MASK;
-+	case 4:
-+		return OMAP_MEM4_RETSTATE_MASK;
-+	default:
-+		WARN_ON(1); /* should never happen */
-+		return -EEXIST;
-+	}
-+	return 0;
++	cm_write_mod_reg(cm_context.iva2_cm_clksel1, OMAP3430_IVA2_MOD,
++			 CM_CLKSEL1);
++	cm_write_mod_reg(cm_context.iva2_cm_clksel2, OMAP3430_IVA2_MOD,
++			 CM_CLKSEL2);
++	__raw_writel(cm_context.cm_sysconfig, OMAP3430_CM_SYSCONFIG);
++	cm_write_mod_reg(cm_context.sgx_cm_clksel, OMAP3430ES2_SGX_MOD,
++			 CM_CLKSEL);
++	cm_write_mod_reg(cm_context.dss_cm_clksel, OMAP3430_DSS_MOD,
++			 CM_CLKSEL);
++	cm_write_mod_reg(cm_context.cam_cm_clksel, OMAP3430_CAM_MOD,
++			 CM_CLKSEL);
++	cm_write_mod_reg(cm_context.per_cm_clksel, OMAP3430_PER_MOD,
++			 CM_CLKSEL);
++	cm_write_mod_reg(cm_context.emu_cm_clksel, OMAP3430_EMU_MOD,
++			 CM_CLKSEL1);
++	cm_write_mod_reg(cm_context.emu_cm_clkstctrl, OMAP3430_EMU_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.pll_cm_autoidle2, PLL_MOD,
++			 CM_AUTOIDLE2);
++	cm_write_mod_reg(cm_context.pll_cm_clksel4, PLL_MOD,
++			 OMAP3430ES2_CM_CLKSEL4);
++	cm_write_mod_reg(cm_context.pll_cm_clksel5, PLL_MOD,
++			 OMAP3430ES2_CM_CLKSEL5);
++	cm_write_mod_reg(cm_context.pll_cm_clken2, PLL_MOD,
++			 OMAP3430ES2_CM_CLKEN2);
++	__raw_writel(cm_context.cm_polctrl, OMAP3430_CM_POLCTRL);
++	cm_write_mod_reg(cm_context.iva2_cm_fclken, OMAP3430_IVA2_MOD,
++			 CM_FCLKEN);
++	cm_write_mod_reg(cm_context.iva2_cm_clken_pll, OMAP3430_IVA2_MOD,
++			 OMAP3430_CM_CLKEN_PLL);
++	cm_write_mod_reg(cm_context.core_cm_fclken1, CORE_MOD, CM_FCLKEN1);
++	cm_write_mod_reg(cm_context.core_cm_fclken3, CORE_MOD,
++			 OMAP3430ES2_CM_FCLKEN3);
++	cm_write_mod_reg(cm_context.sgx_cm_fclken, OMAP3430ES2_SGX_MOD,
++			 CM_FCLKEN);
++	cm_write_mod_reg(cm_context.wkup_cm_fclken, WKUP_MOD, CM_FCLKEN);
++	cm_write_mod_reg(cm_context.dss_cm_fclken, OMAP3430_DSS_MOD,
++			 CM_FCLKEN);
++	cm_write_mod_reg(cm_context.cam_cm_fclken, OMAP3430_CAM_MOD,
++			 CM_FCLKEN);
++	cm_write_mod_reg(cm_context.per_cm_fclken, OMAP3430_PER_MOD,
++			 CM_FCLKEN);
++	cm_write_mod_reg(cm_context.usbhost_cm_fclken,
++			 OMAP3430ES2_USBHOST_MOD, CM_FCLKEN);
++	cm_write_mod_reg(cm_context.core_cm_iclken1, CORE_MOD, CM_ICLKEN1);
++	cm_write_mod_reg(cm_context.core_cm_iclken2, CORE_MOD, CM_ICLKEN2);
++	cm_write_mod_reg(cm_context.core_cm_iclken3, CORE_MOD, CM_ICLKEN3);
++	cm_write_mod_reg(cm_context.sgx_cm_iclken, OMAP3430ES2_SGX_MOD,
++			 CM_ICLKEN);
++	cm_write_mod_reg(cm_context.wkup_cm_iclken, WKUP_MOD, CM_ICLKEN);
++	cm_write_mod_reg(cm_context.dss_cm_iclken, OMAP3430_DSS_MOD,
++			 CM_ICLKEN);
++	cm_write_mod_reg(cm_context.cam_cm_iclken, OMAP3430_CAM_MOD,
++			 CM_ICLKEN);
++	cm_write_mod_reg(cm_context.per_cm_iclken, OMAP3430_PER_MOD,
++			 CM_ICLKEN);
++	cm_write_mod_reg(cm_context.usbhost_cm_iclken,
++			 OMAP3430ES2_USBHOST_MOD, CM_ICLKEN);
++	cm_write_mod_reg(cm_context.iva2_cm_autoidle2, OMAP3430_IVA2_MOD,
++			 CM_AUTOIDLE2);
++	cm_write_mod_reg(cm_context.mpu_cm_autoidle2, MPU_MOD, CM_AUTOIDLE2);
++	cm_write_mod_reg(cm_context.iva2_cm_clkstctrl, OMAP3430_IVA2_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.mpu_cm_clkstctrl, MPU_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.core_cm_clkstctrl, CORE_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.sgx_cm_clkstctrl, OMAP3430ES2_SGX_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.dss_cm_clkstctrl, OMAP3430_DSS_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.cam_cm_clkstctrl, OMAP3430_CAM_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.per_cm_clkstctrl, OMAP3430_PER_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.neon_cm_clkstctrl, OMAP3430_NEON_MOD,
++			 OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.usbhost_cm_clkstctrl,
++			 OMAP3430ES2_USBHOST_MOD, OMAP2_CM_CLKSTCTRL);
++	cm_write_mod_reg(cm_context.core_cm_autoidle1, CORE_MOD,
++			 CM_AUTOIDLE1);
++	cm_write_mod_reg(cm_context.core_cm_autoidle2, CORE_MOD,
++			 CM_AUTOIDLE2);
++	cm_write_mod_reg(cm_context.core_cm_autoidle3, CORE_MOD,
++			 CM_AUTOIDLE3);
++	cm_write_mod_reg(cm_context.wkup_cm_autoidle, WKUP_MOD, CM_AUTOIDLE);
++	cm_write_mod_reg(cm_context.dss_cm_autoidle, OMAP3430_DSS_MOD,
++			 CM_AUTOIDLE);
++	cm_write_mod_reg(cm_context.cam_cm_autoidle, OMAP3430_CAM_MOD,
++			 CM_AUTOIDLE);
++	cm_write_mod_reg(cm_context.per_cm_autoidle, OMAP3430_PER_MOD,
++			 CM_AUTOIDLE);
++	cm_write_mod_reg(cm_context.usbhost_cm_autoidle,
++			 OMAP3430ES2_USBHOST_MOD, CM_AUTOIDLE);
++	cm_write_mod_reg(cm_context.sgx_cm_sleepdep, OMAP3430ES2_SGX_MOD,
++			 OMAP3430_CM_SLEEPDEP);
++	cm_write_mod_reg(cm_context.dss_cm_sleepdep, OMAP3430_DSS_MOD,
++			 OMAP3430_CM_SLEEPDEP);
++	cm_write_mod_reg(cm_context.cam_cm_sleepdep, OMAP3430_CAM_MOD,
++			 OMAP3430_CM_SLEEPDEP);
++	cm_write_mod_reg(cm_context.per_cm_sleepdep, OMAP3430_PER_MOD,
++			 OMAP3430_CM_SLEEPDEP);
++	cm_write_mod_reg(cm_context.usbhost_cm_sleepdep,
++			 OMAP3430ES2_USBHOST_MOD, OMAP3430_CM_SLEEPDEP);
++	cm_write_mod_reg(cm_context.cm_clkout_ctrl, OMAP3430_CCR_MOD,
++			 OMAP3_CM_CLKOUT_CTRL_OFFSET);
 +}
-+
-+u32 omap2_pwrdm_get_mem_bank_stst_mask(u8 bank)
-+{
-+	switch (bank) {
-+	case 0:
-+		return OMAP_MEM0_STATEST_MASK;
-+	case 1:
-+		return OMAP_MEM1_STATEST_MASK;
-+	case 2:
-+		return OMAP_MEM2_STATEST_MASK;
-+	case 3:
-+		return OMAP_MEM3_STATEST_MASK;
-+	case 4:
-+		return OMAP_MEM4_STATEST_MASK;
-+	default:
-+		WARN_ON(1); /* should never happen */
-+		return -EEXIST;
-+	}
-+	return 0;
-+}
-+
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 562a3fe..6206721 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -15,23 +15,10 @@
- #undef DEBUG
++#endif
+diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.h b/arch/arm/mach-omap2/cm2xxx_3xxx.h
+index 5e57211..ce2582c1 100644
+--- a/arch/arm/mach-omap2/cm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/cm2xxx_3xxx.h
+@@ -128,4 +128,11 @@ extern u32 cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx);
+ /* CM_IDLEST_GFX */
+ #define OMAP_ST_GFX_MASK				(1 << 0)
  
- #include <linux/kernel.h>
--#include <linux/module.h>
- #include <linux/types.h>
--#include <linux/delay.h>
--#include <linux/spinlock.h>
- #include <linux/list.h>
- #include <linux/errno.h>
--#include <linux/err.h>
--#include <linux/io.h>
++
++/* Function prototypes */
++# ifndef __ASSEMBLER__
++extern void omap3_cm_save_context(void);
++extern void omap3_cm_restore_context(void);
++# endif
++
+ #endif
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 0d73d75..a776241 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -407,7 +407,7 @@ void omap_sram_idle(void)
+ 		omap_uart_prepare_idle(1);
+ 		if (core_next_state == PWRDM_POWER_OFF) {
+ 			omap3_core_save_context();
+-			omap3_prcm_save_context();
++			omap3_cm_save_context();
+ 		}
+ 	}
+ 
+@@ -447,7 +447,7 @@ void omap_sram_idle(void)
+ 		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
+ 		if (core_prev_state == PWRDM_POWER_OFF) {
+ 			omap3_core_restore_context();
+-			omap3_prcm_restore_context();
++			omap3_cm_restore_context();
+ 			omap3_sram_restore_context();
+ 			omap2_sms_restore_context();
+ 		}
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 171c710..dd95cbb 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -43,85 +43,6 @@ void __iomem *cm2_base;
+ 
+ #define MAX_MODULE_ENABLE_WAIT		100000
+ 
+-struct omap3_prcm_regs {
+-	u32 iva2_cm_clksel1;
+-	u32 iva2_cm_clksel2;
+-	u32 cm_sysconfig;
+-	u32 sgx_cm_clksel;
+-	u32 dss_cm_clksel;
+-	u32 cam_cm_clksel;
+-	u32 per_cm_clksel;
+-	u32 emu_cm_clksel;
+-	u32 emu_cm_clkstctrl;
+-	u32 pll_cm_autoidle2;
+-	u32 pll_cm_clksel4;
+-	u32 pll_cm_clksel5;
+-	u32 pll_cm_clken2;
+-	u32 cm_polctrl;
+-	u32 iva2_cm_fclken;
+-	u32 iva2_cm_clken_pll;
+-	u32 core_cm_fclken1;
+-	u32 core_cm_fclken3;
+-	u32 sgx_cm_fclken;
+-	u32 wkup_cm_fclken;
+-	u32 dss_cm_fclken;
+-	u32 cam_cm_fclken;
+-	u32 per_cm_fclken;
+-	u32 usbhost_cm_fclken;
+-	u32 core_cm_iclken1;
+-	u32 core_cm_iclken2;
+-	u32 core_cm_iclken3;
+-	u32 sgx_cm_iclken;
+-	u32 wkup_cm_iclken;
+-	u32 dss_cm_iclken;
+-	u32 cam_cm_iclken;
+-	u32 per_cm_iclken;
+-	u32 usbhost_cm_iclken;
+-	u32 iva2_cm_autiidle2;
+-	u32 mpu_cm_autoidle2;
+-	u32 iva2_cm_clkstctrl;
+-	u32 mpu_cm_clkstctrl;
+-	u32 core_cm_clkstctrl;
+-	u32 sgx_cm_clkstctrl;
+-	u32 dss_cm_clkstctrl;
+-	u32 cam_cm_clkstctrl;
+-	u32 per_cm_clkstctrl;
+-	u32 neon_cm_clkstctrl;
+-	u32 usbhost_cm_clkstctrl;
+-	u32 core_cm_autoidle1;
+-	u32 core_cm_autoidle2;
+-	u32 core_cm_autoidle3;
+-	u32 wkup_cm_autoidle;
+-	u32 dss_cm_autoidle;
+-	u32 cam_cm_autoidle;
+-	u32 per_cm_autoidle;
+-	u32 usbhost_cm_autoidle;
+-	u32 sgx_cm_sleepdep;
+-	u32 dss_cm_sleepdep;
+-	u32 cam_cm_sleepdep;
+-	u32 per_cm_sleepdep;
+-	u32 usbhost_cm_sleepdep;
+-	u32 cm_clkout_ctrl;
+-	u32 prm_clkout_ctrl;
+-	u32 sgx_pm_wkdep;
+-	u32 dss_pm_wkdep;
+-	u32 cam_pm_wkdep;
+-	u32 per_pm_wkdep;
+-	u32 neon_pm_wkdep;
+-	u32 usbhost_pm_wkdep;
+-	u32 core_pm_mpugrpsel1;
+-	u32 iva2_pm_ivagrpsel1;
+-	u32 core_pm_mpugrpsel3;
+-	u32 core_pm_ivagrpsel3;
+-	u32 wkup_pm_mpugrpsel;
+-	u32 wkup_pm_ivagrpsel;
+-	u32 per_pm_mpugrpsel;
+-	u32 per_pm_ivagrpsel;
+-	u32 wkup_pm_wken;
+-};
 -
--#include <asm/atomic.h>
+-static struct omap3_prcm_regs prcm_context;
 -
--#include "cm.h"
--#include "cm-regbits-34xx.h"
--#include "cm-regbits-44xx.h"
--#include "prm.h"
--#include "prm-regbits-34xx.h"
--#include "prm-regbits-44xx.h"
-+#include <linux/string.h>
- 
- #include <plat/cpu.h>
- #include <plat/powerdomain.h>
-@@ -45,37 +32,6 @@ enum {
- 	PWRDM_STATE_PREV,
- };
- 
--/* Variable holding value of the CPU dependent PWRSTCTRL Register Offset */
--static u16 pwrstctrl_reg_offs;
+ u32 omap_prcm_get_reset_sources(void)
+ {
+ 	/* XXX This presumably needs modification for 34XX */
+@@ -238,299 +159,3 @@ void __init omap2_set_globals_prcm(struct omap_globals *omap2_globals)
+ 		WARN_ON(!cm2_base);
+ 	}
+ }
 -
--/* Variable holding value of the CPU dependent PWRSTST Register Offset */
--static u16 pwrstst_reg_offs;
+-#ifdef CONFIG_ARCH_OMAP3
+-void omap3_prcm_save_context(void)
+-{
+-	prcm_context.iva2_cm_clksel1 =
+-			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_CLKSEL1);
+-	prcm_context.iva2_cm_clksel2 =
+-			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_CLKSEL2);
+-	prcm_context.cm_sysconfig = __raw_readl(OMAP3430_CM_SYSCONFIG);
+-	prcm_context.sgx_cm_clksel =
+-			 cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_CLKSEL);
+-	prcm_context.dss_cm_clksel =
+-			 cm_read_mod_reg(OMAP3430_DSS_MOD, CM_CLKSEL);
+-	prcm_context.cam_cm_clksel =
+-			 cm_read_mod_reg(OMAP3430_CAM_MOD, CM_CLKSEL);
+-	prcm_context.per_cm_clksel =
+-			 cm_read_mod_reg(OMAP3430_PER_MOD, CM_CLKSEL);
+-	prcm_context.emu_cm_clksel =
+-			 cm_read_mod_reg(OMAP3430_EMU_MOD, CM_CLKSEL1);
+-	prcm_context.emu_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430_EMU_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.pll_cm_autoidle2 =
+-			 cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE2);
+-	prcm_context.pll_cm_clksel4 =
+-			cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKSEL4);
+-	prcm_context.pll_cm_clksel5 =
+-			 cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKSEL5);
+-	prcm_context.pll_cm_clken2 =
+-			cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKEN2);
+-	prcm_context.cm_polctrl = __raw_readl(OMAP3430_CM_POLCTRL);
+-	prcm_context.iva2_cm_fclken =
+-			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_FCLKEN);
+-	prcm_context.iva2_cm_clken_pll = cm_read_mod_reg(OMAP3430_IVA2_MOD,
+-			OMAP3430_CM_CLKEN_PLL);
+-	prcm_context.core_cm_fclken1 =
+-			 cm_read_mod_reg(CORE_MOD, CM_FCLKEN1);
+-	prcm_context.core_cm_fclken3 =
+-			 cm_read_mod_reg(CORE_MOD, OMAP3430ES2_CM_FCLKEN3);
+-	prcm_context.sgx_cm_fclken =
+-			 cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_FCLKEN);
+-	prcm_context.wkup_cm_fclken =
+-			 cm_read_mod_reg(WKUP_MOD, CM_FCLKEN);
+-	prcm_context.dss_cm_fclken =
+-			 cm_read_mod_reg(OMAP3430_DSS_MOD, CM_FCLKEN);
+-	prcm_context.cam_cm_fclken =
+-			 cm_read_mod_reg(OMAP3430_CAM_MOD, CM_FCLKEN);
+-	prcm_context.per_cm_fclken =
+-			 cm_read_mod_reg(OMAP3430_PER_MOD, CM_FCLKEN);
+-	prcm_context.usbhost_cm_fclken =
+-			 cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, CM_FCLKEN);
+-	prcm_context.core_cm_iclken1 =
+-			 cm_read_mod_reg(CORE_MOD, CM_ICLKEN1);
+-	prcm_context.core_cm_iclken2 =
+-			 cm_read_mod_reg(CORE_MOD, CM_ICLKEN2);
+-	prcm_context.core_cm_iclken3 =
+-			 cm_read_mod_reg(CORE_MOD, CM_ICLKEN3);
+-	prcm_context.sgx_cm_iclken =
+-			 cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_ICLKEN);
+-	prcm_context.wkup_cm_iclken =
+-			 cm_read_mod_reg(WKUP_MOD, CM_ICLKEN);
+-	prcm_context.dss_cm_iclken =
+-			 cm_read_mod_reg(OMAP3430_DSS_MOD, CM_ICLKEN);
+-	prcm_context.cam_cm_iclken =
+-			 cm_read_mod_reg(OMAP3430_CAM_MOD, CM_ICLKEN);
+-	prcm_context.per_cm_iclken =
+-			 cm_read_mod_reg(OMAP3430_PER_MOD, CM_ICLKEN);
+-	prcm_context.usbhost_cm_iclken =
+-			 cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, CM_ICLKEN);
+-	prcm_context.iva2_cm_autiidle2 =
+-			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_AUTOIDLE2);
+-	prcm_context.mpu_cm_autoidle2 =
+-			 cm_read_mod_reg(MPU_MOD, CM_AUTOIDLE2);
+-	prcm_context.iva2_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.mpu_cm_clkstctrl =
+-			 cm_read_mod_reg(MPU_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.core_cm_clkstctrl =
+-			 cm_read_mod_reg(CORE_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.sgx_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430ES2_SGX_MOD,
+-						OMAP2_CM_CLKSTCTRL);
+-	prcm_context.dss_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430_DSS_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.cam_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430_CAM_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.per_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430_PER_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.neon_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430_NEON_MOD, OMAP2_CM_CLKSTCTRL);
+-	prcm_context.usbhost_cm_clkstctrl =
+-			 cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD,
+-						OMAP2_CM_CLKSTCTRL);
+-	prcm_context.core_cm_autoidle1 =
+-			 cm_read_mod_reg(CORE_MOD, CM_AUTOIDLE1);
+-	prcm_context.core_cm_autoidle2 =
+-			 cm_read_mod_reg(CORE_MOD, CM_AUTOIDLE2);
+-	prcm_context.core_cm_autoidle3 =
+-			 cm_read_mod_reg(CORE_MOD, CM_AUTOIDLE3);
+-	prcm_context.wkup_cm_autoidle =
+-			 cm_read_mod_reg(WKUP_MOD, CM_AUTOIDLE);
+-	prcm_context.dss_cm_autoidle =
+-			 cm_read_mod_reg(OMAP3430_DSS_MOD, CM_AUTOIDLE);
+-	prcm_context.cam_cm_autoidle =
+-			 cm_read_mod_reg(OMAP3430_CAM_MOD, CM_AUTOIDLE);
+-	prcm_context.per_cm_autoidle =
+-			 cm_read_mod_reg(OMAP3430_PER_MOD, CM_AUTOIDLE);
+-	prcm_context.usbhost_cm_autoidle =
+-			 cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, CM_AUTOIDLE);
+-	prcm_context.sgx_cm_sleepdep =
+-		 cm_read_mod_reg(OMAP3430ES2_SGX_MOD, OMAP3430_CM_SLEEPDEP);
+-	prcm_context.dss_cm_sleepdep =
+-		 cm_read_mod_reg(OMAP3430_DSS_MOD, OMAP3430_CM_SLEEPDEP);
+-	prcm_context.cam_cm_sleepdep =
+-		 cm_read_mod_reg(OMAP3430_CAM_MOD, OMAP3430_CM_SLEEPDEP);
+-	prcm_context.per_cm_sleepdep =
+-		 cm_read_mod_reg(OMAP3430_PER_MOD, OMAP3430_CM_SLEEPDEP);
+-	prcm_context.usbhost_cm_sleepdep =
+-		 cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, OMAP3430_CM_SLEEPDEP);
+-	prcm_context.cm_clkout_ctrl = cm_read_mod_reg(OMAP3430_CCR_MOD,
+-		 OMAP3_CM_CLKOUT_CTRL_OFFSET);
+-	prcm_context.prm_clkout_ctrl = prm_read_mod_reg(OMAP3430_CCR_MOD,
+-		OMAP3_PRM_CLKOUT_CTRL_OFFSET);
+-	prcm_context.sgx_pm_wkdep =
+-		 prm_read_mod_reg(OMAP3430ES2_SGX_MOD, PM_WKDEP);
+-	prcm_context.dss_pm_wkdep =
+-		 prm_read_mod_reg(OMAP3430_DSS_MOD, PM_WKDEP);
+-	prcm_context.cam_pm_wkdep =
+-		 prm_read_mod_reg(OMAP3430_CAM_MOD, PM_WKDEP);
+-	prcm_context.per_pm_wkdep =
+-		 prm_read_mod_reg(OMAP3430_PER_MOD, PM_WKDEP);
+-	prcm_context.neon_pm_wkdep =
+-		 prm_read_mod_reg(OMAP3430_NEON_MOD, PM_WKDEP);
+-	prcm_context.usbhost_pm_wkdep =
+-		 prm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, PM_WKDEP);
+-	prcm_context.core_pm_mpugrpsel1 =
+-		 prm_read_mod_reg(CORE_MOD, OMAP3430_PM_MPUGRPSEL1);
+-	prcm_context.iva2_pm_ivagrpsel1 =
+-		 prm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_PM_IVAGRPSEL1);
+-	prcm_context.core_pm_mpugrpsel3 =
+-		 prm_read_mod_reg(CORE_MOD, OMAP3430ES2_PM_MPUGRPSEL3);
+-	prcm_context.core_pm_ivagrpsel3 =
+-		 prm_read_mod_reg(CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
+-	prcm_context.wkup_pm_mpugrpsel =
+-		 prm_read_mod_reg(WKUP_MOD, OMAP3430_PM_MPUGRPSEL);
+-	prcm_context.wkup_pm_ivagrpsel =
+-		 prm_read_mod_reg(WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
+-	prcm_context.per_pm_mpugrpsel =
+-		 prm_read_mod_reg(OMAP3430_PER_MOD, OMAP3430_PM_MPUGRPSEL);
+-	prcm_context.per_pm_ivagrpsel =
+-		 prm_read_mod_reg(OMAP3430_PER_MOD, OMAP3430_PM_IVAGRPSEL);
+-	prcm_context.wkup_pm_wken = prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+-	return;
+-}
 -
--/* OMAP3 and OMAP4 specific register bit initialisations
-- * Notice that the names here are not according to each power
-- * domain but the bit mapping used applies to all of them
-- */
+-void omap3_prcm_restore_context(void)
+-{
+-	cm_write_mod_reg(prcm_context.iva2_cm_clksel1, OMAP3430_IVA2_MOD,
+-					 CM_CLKSEL1);
+-	cm_write_mod_reg(prcm_context.iva2_cm_clksel2, OMAP3430_IVA2_MOD,
+-					 CM_CLKSEL2);
+-	__raw_writel(prcm_context.cm_sysconfig, OMAP3430_CM_SYSCONFIG);
+-	cm_write_mod_reg(prcm_context.sgx_cm_clksel, OMAP3430ES2_SGX_MOD,
+-					 CM_CLKSEL);
+-	cm_write_mod_reg(prcm_context.dss_cm_clksel, OMAP3430_DSS_MOD,
+-					 CM_CLKSEL);
+-	cm_write_mod_reg(prcm_context.cam_cm_clksel, OMAP3430_CAM_MOD,
+-					 CM_CLKSEL);
+-	cm_write_mod_reg(prcm_context.per_cm_clksel, OMAP3430_PER_MOD,
+-					 CM_CLKSEL);
+-	cm_write_mod_reg(prcm_context.emu_cm_clksel, OMAP3430_EMU_MOD,
+-					 CM_CLKSEL1);
+-	cm_write_mod_reg(prcm_context.emu_cm_clkstctrl, OMAP3430_EMU_MOD,
+-					 OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.pll_cm_autoidle2, PLL_MOD,
+-					 CM_AUTOIDLE2);
+-	cm_write_mod_reg(prcm_context.pll_cm_clksel4, PLL_MOD,
+-					OMAP3430ES2_CM_CLKSEL4);
+-	cm_write_mod_reg(prcm_context.pll_cm_clksel5, PLL_MOD,
+-					 OMAP3430ES2_CM_CLKSEL5);
+-	cm_write_mod_reg(prcm_context.pll_cm_clken2, PLL_MOD,
+-					OMAP3430ES2_CM_CLKEN2);
+-	__raw_writel(prcm_context.cm_polctrl, OMAP3430_CM_POLCTRL);
+-	cm_write_mod_reg(prcm_context.iva2_cm_fclken, OMAP3430_IVA2_MOD,
+-					 CM_FCLKEN);
+-	cm_write_mod_reg(prcm_context.iva2_cm_clken_pll, OMAP3430_IVA2_MOD,
+-					OMAP3430_CM_CLKEN_PLL);
+-	cm_write_mod_reg(prcm_context.core_cm_fclken1, CORE_MOD, CM_FCLKEN1);
+-	cm_write_mod_reg(prcm_context.core_cm_fclken3, CORE_MOD,
+-					 OMAP3430ES2_CM_FCLKEN3);
+-	cm_write_mod_reg(prcm_context.sgx_cm_fclken, OMAP3430ES2_SGX_MOD,
+-					 CM_FCLKEN);
+-	cm_write_mod_reg(prcm_context.wkup_cm_fclken, WKUP_MOD, CM_FCLKEN);
+-	cm_write_mod_reg(prcm_context.dss_cm_fclken, OMAP3430_DSS_MOD,
+-					 CM_FCLKEN);
+-	cm_write_mod_reg(prcm_context.cam_cm_fclken, OMAP3430_CAM_MOD,
+-					 CM_FCLKEN);
+-	cm_write_mod_reg(prcm_context.per_cm_fclken, OMAP3430_PER_MOD,
+-					 CM_FCLKEN);
+-	cm_write_mod_reg(prcm_context.usbhost_cm_fclken,
+-					 OMAP3430ES2_USBHOST_MOD, CM_FCLKEN);
+-	cm_write_mod_reg(prcm_context.core_cm_iclken1, CORE_MOD, CM_ICLKEN1);
+-	cm_write_mod_reg(prcm_context.core_cm_iclken2, CORE_MOD, CM_ICLKEN2);
+-	cm_write_mod_reg(prcm_context.core_cm_iclken3, CORE_MOD, CM_ICLKEN3);
+-	cm_write_mod_reg(prcm_context.sgx_cm_iclken, OMAP3430ES2_SGX_MOD,
+-					CM_ICLKEN);
+-	cm_write_mod_reg(prcm_context.wkup_cm_iclken, WKUP_MOD, CM_ICLKEN);
+-	cm_write_mod_reg(prcm_context.dss_cm_iclken, OMAP3430_DSS_MOD,
+-					CM_ICLKEN);
+-	cm_write_mod_reg(prcm_context.cam_cm_iclken, OMAP3430_CAM_MOD,
+-					CM_ICLKEN);
+-	cm_write_mod_reg(prcm_context.per_cm_iclken, OMAP3430_PER_MOD,
+-					CM_ICLKEN);
+-	cm_write_mod_reg(prcm_context.usbhost_cm_iclken,
+-					OMAP3430ES2_USBHOST_MOD, CM_ICLKEN);
+-	cm_write_mod_reg(prcm_context.iva2_cm_autiidle2, OMAP3430_IVA2_MOD,
+-					CM_AUTOIDLE2);
+-	cm_write_mod_reg(prcm_context.mpu_cm_autoidle2, MPU_MOD, CM_AUTOIDLE2);
+-	cm_write_mod_reg(prcm_context.iva2_cm_clkstctrl, OMAP3430_IVA2_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.mpu_cm_clkstctrl, MPU_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.core_cm_clkstctrl, CORE_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.sgx_cm_clkstctrl, OMAP3430ES2_SGX_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.dss_cm_clkstctrl, OMAP3430_DSS_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.cam_cm_clkstctrl, OMAP3430_CAM_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.per_cm_clkstctrl, OMAP3430_PER_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.neon_cm_clkstctrl, OMAP3430_NEON_MOD,
+-					OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.usbhost_cm_clkstctrl,
+-				OMAP3430ES2_USBHOST_MOD, OMAP2_CM_CLKSTCTRL);
+-	cm_write_mod_reg(prcm_context.core_cm_autoidle1, CORE_MOD,
+-					CM_AUTOIDLE1);
+-	cm_write_mod_reg(prcm_context.core_cm_autoidle2, CORE_MOD,
+-					CM_AUTOIDLE2);
+-	cm_write_mod_reg(prcm_context.core_cm_autoidle3, CORE_MOD,
+-					CM_AUTOIDLE3);
+-	cm_write_mod_reg(prcm_context.wkup_cm_autoidle, WKUP_MOD, CM_AUTOIDLE);
+-	cm_write_mod_reg(prcm_context.dss_cm_autoidle, OMAP3430_DSS_MOD,
+-					CM_AUTOIDLE);
+-	cm_write_mod_reg(prcm_context.cam_cm_autoidle, OMAP3430_CAM_MOD,
+-					CM_AUTOIDLE);
+-	cm_write_mod_reg(prcm_context.per_cm_autoidle, OMAP3430_PER_MOD,
+-					CM_AUTOIDLE);
+-	cm_write_mod_reg(prcm_context.usbhost_cm_autoidle,
+-					OMAP3430ES2_USBHOST_MOD, CM_AUTOIDLE);
+-	cm_write_mod_reg(prcm_context.sgx_cm_sleepdep, OMAP3430ES2_SGX_MOD,
+-					OMAP3430_CM_SLEEPDEP);
+-	cm_write_mod_reg(prcm_context.dss_cm_sleepdep, OMAP3430_DSS_MOD,
+-					OMAP3430_CM_SLEEPDEP);
+-	cm_write_mod_reg(prcm_context.cam_cm_sleepdep, OMAP3430_CAM_MOD,
+-					OMAP3430_CM_SLEEPDEP);
+-	cm_write_mod_reg(prcm_context.per_cm_sleepdep, OMAP3430_PER_MOD,
+-					OMAP3430_CM_SLEEPDEP);
+-	cm_write_mod_reg(prcm_context.usbhost_cm_sleepdep,
+-				OMAP3430ES2_USBHOST_MOD, OMAP3430_CM_SLEEPDEP);
+-	cm_write_mod_reg(prcm_context.cm_clkout_ctrl, OMAP3430_CCR_MOD,
+-					OMAP3_CM_CLKOUT_CTRL_OFFSET);
+-	prm_write_mod_reg(prcm_context.prm_clkout_ctrl, OMAP3430_CCR_MOD,
+-					OMAP3_PRM_CLKOUT_CTRL_OFFSET);
+-	prm_write_mod_reg(prcm_context.sgx_pm_wkdep, OMAP3430ES2_SGX_MOD,
+-					PM_WKDEP);
+-	prm_write_mod_reg(prcm_context.dss_pm_wkdep, OMAP3430_DSS_MOD,
+-					PM_WKDEP);
+-	prm_write_mod_reg(prcm_context.cam_pm_wkdep, OMAP3430_CAM_MOD,
+-					PM_WKDEP);
+-	prm_write_mod_reg(prcm_context.per_pm_wkdep, OMAP3430_PER_MOD,
+-					PM_WKDEP);
+-	prm_write_mod_reg(prcm_context.neon_pm_wkdep, OMAP3430_NEON_MOD,
+-					PM_WKDEP);
+-	prm_write_mod_reg(prcm_context.usbhost_pm_wkdep,
+-					OMAP3430ES2_USBHOST_MOD, PM_WKDEP);
+-	prm_write_mod_reg(prcm_context.core_pm_mpugrpsel1, CORE_MOD,
+-					OMAP3430_PM_MPUGRPSEL1);
+-	prm_write_mod_reg(prcm_context.iva2_pm_ivagrpsel1, OMAP3430_IVA2_MOD,
+-					OMAP3430_PM_IVAGRPSEL1);
+-	prm_write_mod_reg(prcm_context.core_pm_mpugrpsel3, CORE_MOD,
+-					OMAP3430ES2_PM_MPUGRPSEL3);
+-	prm_write_mod_reg(prcm_context.core_pm_ivagrpsel3, CORE_MOD,
+-					OMAP3430ES2_PM_IVAGRPSEL3);
+-	prm_write_mod_reg(prcm_context.wkup_pm_mpugrpsel, WKUP_MOD,
+-					OMAP3430_PM_MPUGRPSEL);
+-	prm_write_mod_reg(prcm_context.wkup_pm_ivagrpsel, WKUP_MOD,
+-					OMAP3430_PM_IVAGRPSEL);
+-	prm_write_mod_reg(prcm_context.per_pm_mpugrpsel, OMAP3430_PER_MOD,
+-					OMAP3430_PM_MPUGRPSEL);
+-	prm_write_mod_reg(prcm_context.per_pm_ivagrpsel, OMAP3430_PER_MOD,
+-					 OMAP3430_PM_IVAGRPSEL);
+-	prm_write_mod_reg(prcm_context.wkup_pm_wken, WKUP_MOD, PM_WKEN);
+-	return;
+-}
+-#endif
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index 064b52a..3e1d36c 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -154,4 +154,3 @@ int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift)
+ 
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+ }
 -
--/* OMAP3 and OMAP4 Memory Onstate Masks (common across all power domains) */
--#define OMAP_MEM0_ONSTATE_MASK OMAP3430_SHAREDL1CACHEFLATONSTATE_MASK
--#define OMAP_MEM1_ONSTATE_MASK OMAP3430_L1FLATMEMONSTATE_MASK
--#define OMAP_MEM2_ONSTATE_MASK OMAP3430_SHAREDL2CACHEFLATONSTATE_MASK
--#define OMAP_MEM3_ONSTATE_MASK OMAP3430_L2FLATMEMONSTATE_MASK
--#define OMAP_MEM4_ONSTATE_MASK OMAP4430_OCP_NRET_BANK_ONSTATE_MASK
+diff --git a/arch/arm/plat-omap/include/plat/prcm.h b/arch/arm/plat-omap/include/plat/prcm.h
+index 3769fc6..d059a05 100644
+--- a/arch/arm/plat-omap/include/plat/prcm.h
++++ b/arch/arm/plat-omap/include/plat/prcm.h
+@@ -31,9 +31,6 @@ int omap2_cm_wait_idlest(void __iomem *reg, u32 mask, u8 idlest,
+ #define START_PADCONF_SAVE 0x2
+ #define PADCONF_SAVE_DONE  0x1
+ 
+-void omap3_prcm_save_context(void);
+-void omap3_prcm_restore_context(void);
 -
--/* OMAP3 and OMAP4 Memory Retstate Masks (common across all power domains) */
--#define OMAP_MEM0_RETSTATE_MASK OMAP3430_SHAREDL1CACHEFLATRETSTATE_MASK
--#define OMAP_MEM1_RETSTATE_MASK OMAP3430_L1FLATMEMRETSTATE_MASK
--#define OMAP_MEM2_RETSTATE_MASK OMAP3430_SHAREDL2CACHEFLATRETSTATE_MASK
--#define OMAP_MEM3_RETSTATE_MASK OMAP3430_L2FLATMEMRETSTATE_MASK
--#define OMAP_MEM4_RETSTATE_MASK OMAP4430_OCP_NRET_BANK_RETSTATE_MASK
--
--/* OMAP3 and OMAP4 Memory Status bits */
--#define OMAP_MEM0_STATEST_MASK OMAP3430_SHAREDL1CACHEFLATSTATEST_MASK
--#define OMAP_MEM1_STATEST_MASK OMAP3430_L1FLATMEMSTATEST_MASK
--#define OMAP_MEM2_STATEST_MASK OMAP3430_SHAREDL2CACHEFLATSTATEST_MASK
--#define OMAP_MEM3_STATEST_MASK OMAP3430_L2FLATMEMSTATEST_MASK
--#define OMAP_MEM4_STATEST_MASK OMAP4430_OCP_NRET_BANK_STATEST_MASK
+ u32 omap4_prm_read_bits_shift(void __iomem *reg, u32 mask);
+ u32 omap4_prm_rmw_reg_bits(u32 mask, u32 bits, void __iomem *reg);
  
- /* pwrdm_list contains all registered struct powerdomains */
- static LIST_HEAD(pwrdm_list);
-@@ -225,18 +181,6 @@ void pwrdm_init(struct powerdomain **pwrdm_list, struct pwrdm_ops *custom_funcs)
- {
- 	struct powerdomain **p = NULL;
- 
--	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
--		pwrstctrl_reg_offs = OMAP2_PM_PWSTCTRL;
--		pwrstst_reg_offs = OMAP2_PM_PWSTST;
--	} else if (cpu_is_omap44xx()) {
--		pwrstctrl_reg_offs = OMAP4_PM_PWSTCTRL;
--		pwrstst_reg_offs = OMAP4_PM_PWSTST;
--	} else {
--		printk(KERN_ERR "Power Domain struct not supported for " \
--							"this CPU\n");
--		return;
--	}
--
- 	if (!custom_funcs)
- 		WARN(1, "powerdomain: No custom pwrdm functions registered\n");
- 	else
-@@ -566,7 +510,7 @@ int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
-  */
- int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
- {
--	u32 m;
-+	int ret = -EINVAL;
- 
- 	if (!pwrdm)
- 		return -EINVAL;
-@@ -580,37 +524,10 @@ int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
- 	pr_debug("powerdomain: setting next memory powerstate for domain %s "
- 		 "bank %0x while pwrdm-ON to %0x\n", pwrdm->name, bank, pwrst);
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	switch (bank) {
--	case 0:
--		m = OMAP_MEM0_ONSTATE_MASK;
--		break;
--	case 1:
--		m = OMAP_MEM1_ONSTATE_MASK;
--		break;
--	case 2:
--		m = OMAP_MEM2_ONSTATE_MASK;
--		break;
--	case 3:
--		m = OMAP_MEM3_ONSTATE_MASK;
--		break;
--	case 4:
--		m = OMAP_MEM4_ONSTATE_MASK;
--		break;
--	default:
--		WARN_ON(1); /* should never happen */
--		return -EEXIST;
--	}
--
--	prm_rmw_mod_reg_bits(m, (pwrst << __ffs(m)),
--			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_onst)
-+		ret = arch_pwrdm->pwrdm_set_mem_onst(pwrdm, bank, pwrst);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -631,7 +548,7 @@ int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
-  */
- int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
- {
--	u32 m;
-+	int ret = -EINVAL;
- 
- 	if (!pwrdm)
- 		return -EINVAL;
-@@ -645,37 +562,10 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
- 	pr_debug("powerdomain: setting next memory powerstate for domain %s "
- 		 "bank %0x while pwrdm-RET to %0x\n", pwrdm->name, bank, pwrst);
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	switch (bank) {
--	case 0:
--		m = OMAP_MEM0_RETSTATE_MASK;
--		break;
--	case 1:
--		m = OMAP_MEM1_RETSTATE_MASK;
--		break;
--	case 2:
--		m = OMAP_MEM2_RETSTATE_MASK;
--		break;
--	case 3:
--		m = OMAP_MEM3_RETSTATE_MASK;
--		break;
--	case 4:
--		m = OMAP_MEM4_RETSTATE_MASK;
--		break;
--	default:
--		WARN_ON(1); /* should never happen */
--		return -EEXIST;
--	}
--
--	prm_rmw_mod_reg_bits(m, (pwrst << __ffs(m)), pwrdm->prcm_offs,
--			     pwrstctrl_reg_offs);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_retst)
-+		ret = arch_pwrdm->pwrdm_set_mem_retst(pwrdm, bank, pwrst);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -754,46 +644,21 @@ int pwrdm_read_logic_retst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
- {
--	u32 m;
-+	int ret = -EINVAL;
- 
- 	if (!pwrdm)
--		return -EINVAL;
-+		return ret;
- 
- 	if (pwrdm->banks < (bank + 1))
--		return -EEXIST;
-+		return ret;
- 
- 	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
- 		bank = 1;
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	switch (bank) {
--	case 0:
--		m = OMAP_MEM0_STATEST_MASK;
--		break;
--	case 1:
--		m = OMAP_MEM1_STATEST_MASK;
--		break;
--	case 2:
--		m = OMAP_MEM2_STATEST_MASK;
--		break;
--	case 3:
--		m = OMAP_MEM3_STATEST_MASK;
--		break;
--	case 4:
--		m = OMAP_MEM4_STATEST_MASK;
--		break;
--	default:
--		WARN_ON(1); /* should never happen */
--		return -EEXIST;
--	}
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_mem_pwrst)
-+		ret = arch_pwrdm->pwrdm_read_mem_pwrst(pwrdm, bank);
- 
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
--					 pwrstst_reg_offs, m);
-+	return ret;
- }
- 
- /**
-@@ -809,43 +674,21 @@ int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
-  */
- int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
- {
--	u32 m;
-+	int ret = -EINVAL;
- 
- 	if (!pwrdm)
--		return -EINVAL;
-+		return ret;
- 
- 	if (pwrdm->banks < (bank + 1))
--		return -EEXIST;
-+		return ret;
- 
- 	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
- 		bank = 1;
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	switch (bank) {
--	case 0:
--		m = OMAP3430_LASTMEM1STATEENTERED_MASK;
--		break;
--	case 1:
--		m = OMAP3430_LASTMEM2STATEENTERED_MASK;
--		break;
--	case 2:
--		m = OMAP3430_LASTSHAREDL2CACHEFLATSTATEENTERED_MASK;
--		break;
--	case 3:
--		m = OMAP3430_LASTL2FLATMEMSTATEENTERED_MASK;
--		break;
--	default:
--		WARN_ON(1); /* should never happen */
--		return -EEXIST;
--	}
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_mem_pwrst)
-+		ret = arch_pwrdm->pwrdm_read_prev_mem_pwrst(pwrdm, bank);
- 
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
--					OMAP3430_PM_PREPWSTST, m);
-+	return ret;
- }
- 
- /**
-@@ -860,43 +703,18 @@ int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
-  */
- int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
- {
--	u32 m;
-+	int ret = -EINVAL;
- 
- 	if (!pwrdm)
--		return -EINVAL;
-+		return ret;
- 
- 	if (pwrdm->banks < (bank + 1))
--		return -EEXIST;
-+		return ret;
- 
--	/*
--	 * The register bit names below may not correspond to the
--	 * actual names of the bits in each powerdomain's register,
--	 * but the type of value returned is the same for each
--	 * powerdomain.
--	 */
--	switch (bank) {
--	case 0:
--		m = OMAP_MEM0_RETSTATE_MASK;
--		break;
--	case 1:
--		m = OMAP_MEM1_RETSTATE_MASK;
--		break;
--	case 2:
--		m = OMAP_MEM2_RETSTATE_MASK;
--		break;
--	case 3:
--		m = OMAP_MEM3_RETSTATE_MASK;
--		break;
--	case 4:
--		m = OMAP_MEM4_RETSTATE_MASK;
--		break;
--	default:
--		WARN_ON(1); /* should never happen */
--		return -EEXIST;
--	}
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_mem_retst)
-+		ret = arch_pwrdm->pwrdm_read_mem_retst(pwrdm, bank);
- 
--	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
--					pwrstctrl_reg_offs, m);
-+	return ret;
- }
- 
- /**
-@@ -910,8 +728,10 @@ int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
-  */
- int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
--		return -EINVAL;
-+		return ret;
- 
- 	/*
- 	 * XXX should get the powerdomain's current state here;
-@@ -921,9 +741,10 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
- 	pr_debug("powerdomain: clearing previous power state reg for %s\n",
- 		 pwrdm->name);
- 
--	prm_write_mod_reg(0, pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_clear_all_prev_pwrst)
-+		ret = arch_pwrdm->pwrdm_clear_all_prev_pwrst(pwrdm);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -939,19 +760,21 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
--		return -EINVAL;
-+		return ret;
- 
- 	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
--		return -EINVAL;
-+		return ret;
- 
- 	pr_debug("powerdomain: %s: setting SAVEANDRESTORE bit\n",
- 		 pwrdm->name);
- 
--	prm_rmw_mod_reg_bits(0, 1 << OMAP3430ES2_SAVEANDRESTORE_SHIFT,
--			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_enable_hdwr_sar)
-+		ret = arch_pwrdm->pwrdm_enable_hdwr_sar(pwrdm);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -967,19 +790,21 @@ int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
-  */
- int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
--		return -EINVAL;
-+		return ret;
- 
- 	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
--		return -EINVAL;
-+		return ret;
- 
- 	pr_debug("powerdomain: %s: clearing SAVEANDRESTORE bit\n",
- 		 pwrdm->name);
- 
--	prm_rmw_mod_reg_bits(1 << OMAP3430ES2_SAVEANDRESTORE_SHIFT, 0,
--			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_disable_hdwr_sar)
-+		ret = arch_pwrdm->pwrdm_disable_hdwr_sar(pwrdm);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -1006,6 +831,8 @@ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
-  */
- int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
- {
-+	int ret = -EINVAL;
-+
- 	if (!pwrdm)
- 		return -EINVAL;
- 
-@@ -1015,11 +842,10 @@ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
- 	pr_debug("powerdomain: %s: setting LOWPOWERSTATECHANGE bit\n",
- 		 pwrdm->name);
- 
--	prm_rmw_mod_reg_bits(OMAP4430_LOWPOWERSTATECHANGE_MASK,
--			     (1 << OMAP4430_LOWPOWERSTATECHANGE_SHIFT),
--			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_lowpwrstchange)
-+		ret = arch_pwrdm->pwrdm_set_lowpwrstchange(pwrdm);
- 
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -1034,32 +860,15 @@ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
-  */
- int pwrdm_wait_transition(struct powerdomain *pwrdm)
- {
--	u32 c = 0;
-+	int ret = -EINVAL;
- 
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	/*
--	 * REVISIT: pwrdm_wait_transition() may be better implemented
--	 * via a callback and a periodic timer check -- how long do we expect
--	 * powerdomain transitions to take?
--	 */
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_wait_transition)
-+		ret = arch_pwrdm->pwrdm_wait_transition(pwrdm);
- 
--	/* XXX Is this udelay() value meaningful? */
--	while ((prm_read_mod_reg(pwrdm->prcm_offs, pwrstst_reg_offs) &
--		OMAP_INTRANSITION_MASK) &&
--	       (c++ < PWRDM_TRANSITION_BAILOUT))
--			udelay(1);
--
--	if (c > PWRDM_TRANSITION_BAILOUT) {
--		printk(KERN_ERR "powerdomain: waited too long for "
--		       "powerdomain %s to complete transition\n", pwrdm->name);
--		return -EAGAIN;
--	}
--
--	pr_debug("powerdomain: completed transition in %d loops\n", c);
--
--	return 0;
-+	return ret;
- }
- 
- int pwrdm_state_switch(struct powerdomain *pwrdm)
-diff --git a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-index b7ea191..6cdf678 100644
---- a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-@@ -41,6 +41,50 @@ static int omap2_pwrdm_read_pwrst(struct powerdomain *pwrdm)
- 				OMAP2_PM_PWSTST, OMAP_POWERSTATEST_MASK);
- }
- 
-+static int omap2_pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank,
-+								u8 pwrst)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_onstate_mask(bank);
-+
-+	prm_rmw_mod_reg_bits(m, (pwrst << __ffs(m)), pwrdm->prcm_offs,
-+				OMAP2_PM_PWSTCTRL);
-+
-+	return 0;
-+}
-+
-+static int omap2_pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank,
-+								u8 pwrst)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_retst_mask(bank);
-+
-+	prm_rmw_mod_reg_bits(m, (pwrst << __ffs(m)), pwrdm->prcm_offs,
-+				OMAP2_PM_PWSTCTRL);
-+
-+	return 0;
-+}
-+
-+static int omap2_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_stst_mask(bank);
-+
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP2_PM_PWSTST, m);
-+}
-+
-+static int omap2_pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_retst_mask(bank);
-+
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL, m);
-+}
-+
- static int omap2_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
- {
- 	u32 v;
-@@ -52,6 +96,33 @@ static int omap2_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
- 	return 0;
- }
- 
-+static int omap2_pwrdm_wait_transition(struct powerdomain *pwrdm)
-+{
-+	u32 c = 0;
-+
-+	/*
-+	 * REVISIT: pwrdm_wait_transition() may be better implemented
-+	 * via a callback and a periodic timer check -- how long do we expect
-+	 * powerdomain transitions to take?
-+	 */
-+
-+	/* XXX Is this udelay() value meaningful? */
-+	while ((prm_read_mod_reg(pwrdm->prcm_offs, OMAP2_PM_PWSTST) &
-+		OMAP_INTRANSITION_MASK) &&
-+		(c++ < PWRDM_TRANSITION_BAILOUT))
-+			udelay(1);
-+
-+	if (c > PWRDM_TRANSITION_BAILOUT) {
-+		printk(KERN_ERR "powerdomain: waited too long for "
-+			"powerdomain %s to complete transition\n", pwrdm->name);
-+		return -EAGAIN;
-+	}
-+
-+	pr_debug("powerdomain: completed transition in %d loops\n", c);
-+
-+	return 0;
-+}
-+
- /* Applicable only for OMAP3. Not supported on OMAP2 */
- static int omap3_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- {
-@@ -77,11 +148,62 @@ static int omap3_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
- 				OMAP3430_LASTLOGICSTATEENTERED_MASK);
- }
- 
-+static int omap3_get_mem_bank_lastmemst_mask(u8 bank)
-+{
-+	switch (bank) {
-+	case 0:
-+		return OMAP3430_LASTMEM1STATEENTERED_MASK;
-+	case 1:
-+		return OMAP3430_LASTMEM2STATEENTERED_MASK;
-+	case 2:
-+		return OMAP3430_LASTSHAREDL2CACHEFLATSTATEENTERED_MASK;
-+	case 3:
-+		return OMAP3430_LASTL2FLATMEMSTATEENTERED_MASK;
-+	default:
-+		WARN_ON(1); /* should never happen */
-+		return -EEXIST;
-+	}
-+	return 0;
-+}
-+
-+static int omap3_pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
-+{
-+	u32 m;
-+
-+	m = omap3_get_mem_bank_lastmemst_mask(bank);
-+
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+				OMAP3430_PM_PREPWSTST, m);
-+}
-+
-+static int omap3_pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
-+{
-+	prm_write_mod_reg(0, pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST);
-+	return 0;
-+}
-+
-+static int omap3_pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
-+{
-+	return prm_rmw_mod_reg_bits(0, 1 << OMAP3430ES2_SAVEANDRESTORE_SHIFT,
-+				pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
-+}
-+
-+static int omap3_pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
-+{
-+	return prm_rmw_mod_reg_bits(1 << OMAP3430ES2_SAVEANDRESTORE_SHIFT, 0,
-+				pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
-+}
-+
- struct pwrdm_ops omap2_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst	= omap2_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
- 	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
- 	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
-+	.pwrdm_set_mem_onst	= omap2_pwrdm_set_mem_onst,
-+	.pwrdm_set_mem_retst	= omap2_pwrdm_set_mem_retst,
-+	.pwrdm_read_mem_pwrst	= omap2_pwrdm_read_mem_pwrst,
-+	.pwrdm_read_mem_retst	= omap2_pwrdm_read_mem_retst,
-+	.pwrdm_wait_transition	= omap2_pwrdm_wait_transition,
- };
- 
- struct pwrdm_ops omap3_pwrdm_operations = {
-@@ -93,4 +215,13 @@ struct pwrdm_ops omap3_pwrdm_operations = {
- 	.pwrdm_read_logic_pwrst	= omap3_pwrdm_read_logic_pwrst,
- 	.pwrdm_read_logic_retst	= omap3_pwrdm_read_logic_retst,
- 	.pwrdm_read_prev_logic_pwrst	= omap3_pwrdm_read_prev_logic_pwrst,
-+	.pwrdm_set_mem_onst	= omap2_pwrdm_set_mem_onst,
-+	.pwrdm_set_mem_retst	= omap2_pwrdm_set_mem_retst,
-+	.pwrdm_read_mem_pwrst	= omap2_pwrdm_read_mem_pwrst,
-+	.pwrdm_read_mem_retst	= omap2_pwrdm_read_mem_retst,
-+	.pwrdm_read_prev_mem_pwrst	= omap3_pwrdm_read_prev_mem_pwrst,
-+	.pwrdm_clear_all_prev_pwrst	= omap3_pwrdm_clear_all_prev_pwrst,
-+	.pwrdm_enable_hdwr_sar	= omap3_pwrdm_enable_hdwr_sar,
-+	.pwrdm_disable_hdwr_sar	= omap3_pwrdm_disable_hdwr_sar,
-+	.pwrdm_wait_transition	= omap2_pwrdm_wait_transition,
- };
-diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
-index 996790a..123a25f 100644
---- a/arch/arm/mach-omap2/powerdomain44xx.c
-+++ b/arch/arm/mach-omap2/powerdomain44xx.c
-@@ -47,6 +47,14 @@ static int omap4_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- 				OMAP4430_LASTPOWERSTATEENTERED_MASK);
- }
- 
-+static int omap4_pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
-+{
-+	prm_rmw_mod_reg_bits(OMAP4430_LOWPOWERSTATECHANGE_MASK,
-+				(1 << OMAP4430_LOWPOWERSTATECHANGE_SHIFT),
-+				pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
-+	return 0;
-+}
-+
- static int omap4_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
- {
- 	u32 v;
-@@ -58,6 +66,32 @@ static int omap4_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
- 	return 0;
- }
- 
-+static int omap4_pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank,
-+								u8 pwrst)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_onstate_mask(bank);
-+
-+	prm_rmw_mod_reg_bits(m, (pwrst << __ffs(m)), pwrdm->prcm_offs,
-+				OMAP4_PM_PWSTCTRL);
-+
-+	return 0;
-+}
-+
-+static int omap4_pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank,
-+								u8 pwrst)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_retst_mask(bank);
-+
-+	prm_rmw_mod_reg_bits(m, (pwrst << __ffs(m)), pwrdm->prcm_offs,
-+				OMAP4_PM_PWSTCTRL);
-+
-+	return 0;
-+}
-+
- static int omap4_pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
- {
- 	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_PWSTST,
-@@ -70,12 +104,63 @@ static int omap4_pwrdm_read_logic_retst(struct powerdomain *pwrdm)
- 				OMAP4430_LOGICRETSTATE_MASK);
- }
- 
-+static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_stst_mask(bank);
-+
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_PWSTST, m);
-+}
-+
-+static int omap4_pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
-+{
-+	u32 m;
-+
-+	m = omap2_pwrdm_get_mem_bank_retst_mask(bank);
-+
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL, m);
-+}
-+
-+static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
-+{
-+	u32 c = 0;
-+
-+	/*
-+	 * REVISIT: pwrdm_wait_transition() may be better implemented
-+	 * via a callback and a periodic timer check -- how long do we expect
-+	 * powerdomain transitions to take?
-+	 */
-+
-+	/* XXX Is this udelay() value meaningful? */
-+	while ((prm_read_mod_reg(pwrdm->prcm_offs, OMAP4_PM_PWSTST) &
-+		OMAP_INTRANSITION_MASK) &&
-+		(c++ < PWRDM_TRANSITION_BAILOUT))
-+			udelay(1);
-+
-+	if (c > PWRDM_TRANSITION_BAILOUT) {
-+		printk(KERN_ERR "powerdomain: waited too long for "
-+			"powerdomain %s to complete transition\n", pwrdm->name);
-+		return -EAGAIN;
-+	}
-+
-+	pr_debug("powerdomain: completed transition in %d loops\n", c);
-+
-+	return 0;
-+}
-+
- struct pwrdm_ops omap4_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
- 	.pwrdm_read_pwrst	= omap4_pwrdm_read_pwrst,
- 	.pwrdm_read_prev_pwrst	= omap4_pwrdm_read_prev_pwrst,
-+	.pwrdm_set_lowpwrstchange	= omap4_pwrdm_set_lowpwrstchange,
- 	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
- 	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
- 	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
-+	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
-+	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
-+	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
-+	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
-+	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
- };
-diff --git a/arch/arm/mach-omap2/powerdomains.h b/arch/arm/mach-omap2/powerdomains.h
-index e57bc41..55cd8e6 100644
---- a/arch/arm/mach-omap2/powerdomains.h
-+++ b/arch/arm/mach-omap2/powerdomains.h
-@@ -19,4 +19,9 @@ extern struct pwrdm_ops omap2_pwrdm_operations;
- extern struct pwrdm_ops omap3_pwrdm_operations;
- extern struct pwrdm_ops omap4_pwrdm_operations;
- 
-+/* Common Internal functions used across OMAP rev's */
-+extern u32 omap2_pwrdm_get_mem_bank_onstate_mask(u8 bank);
-+extern u32 omap2_pwrdm_get_mem_bank_retst_mask(u8 bank);
-+extern u32 omap2_pwrdm_get_mem_bank_stst_mask(u8 bank);
-+
- #endif /* ARCH_ARM_MACH_OMAP2_POWERDOMAINS */
