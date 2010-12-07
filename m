@@ -1,59 +1,103 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue,  7 Dec 2010 09:52:01 -0500
-Subject: [PATCH v7 11/12] davinci: add tnetv107x evm backlight device
+Date: Tue,  7 Dec 2010 09:51:55 -0500
+Subject: [PATCH v7 05/12] davinci: add spi devices on tnetv107x evm
 In-Reply-To: <1291733522-3626-1-git-send-email-cyril@ti.com>
 References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-Message-ID: <1291733522-3626-12-git-send-email-cyril@ti.com>
+Message-ID: <1291733522-3626-6-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tnetv107x evm board has a backlight device that is connected on one of the
-SSP ports.  This patch adds the board definitions necessary to plug the
-backlight driver to the GPIO corresponding to this SSP pin.
+This patch adds definitions for spi devices on the tnetv107x evm platform.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/mach-davinci/board-tnetv107x-evm.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |   43 +++++++++++++++++++++++++++
+ 1 files changed, 43 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index e3863dd..ac62de2 100644
+index ef526b1..1a656e8 100644
 --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
 +++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -44,6 +44,7 @@
+@@ -25,6 +25,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/input.h>
+ #include <linux/input/matrix_keypad.h>
++#include <linux/spi/spi.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -37,6 +38,7 @@
+ 
  #define EVM_MMC_WP_GPIO		21
  #define EVM_MMC_CD_GPIO		24
- #define EVM_SPI_CS_GPIO		54
-+#define EVM_BACKLIGHT_GPIO	(SSP_GPIO_START + 2)
++#define EVM_SPI_CS_GPIO		54
  
  static int initialize_gpio(int gpio, char *desc)
  {
-@@ -353,6 +354,12 @@ static struct spi_board_info spi_info[] __initconst = {
+@@ -202,9 +204,45 @@ static struct matrix_keypad_platform_data keypad_config = {
+ 	.no_autorepeat	= 0,
+ };
+ 
++static void spi_select_device(int cs)
++{
++	static int gpio;
++
++	if (!gpio) {
++		int ret;
++		ret = gpio_request(EVM_SPI_CS_GPIO, "spi chipsel");
++		if (ret < 0) {
++			pr_err("cannot open spi chipsel gpio\n");
++			gpio = -ENOSYS;
++			return;
++		} else {
++			gpio = EVM_SPI_CS_GPIO;
++			gpio_direction_output(gpio, 0);
++		}
++	}
++
++	if (gpio < 0)
++		return;
++
++	return gpio_set_value(gpio, cs ? 1 : 0);
++}
++
++static struct ti_ssp_spi_data spi_master_data = {
++	.num_cs	= 2,
++	.select	= spi_select_device,
++	.iosel	= SSP_PIN_SEL(0, SSP_CLOCK)	| SSP_PIN_SEL(1, SSP_DATA) |
++		  SSP_PIN_SEL(2, SSP_CHIPSEL)	| SSP_PIN_SEL(3, SSP_IN)   |
++		  SSP_INPUT_SEL(3),
++};
++
+ static struct ti_ssp_data ssp_config = {
+ 	.out_clock	= 250 * 1000,
+ 	.dev_data	= {
++		[1] = {
++			.dev_name = "ti-ssp-spi",
++			.pdata = &spi_master_data,
++			.pdata_size = sizeof(spi_master_data),
++		},
  	},
  };
  
-+static struct platform_device backlight_device = {
-+	.name		= "tps6116x",
-+	.id		= -1,
-+	.dev.platform_data = (void *)EVM_BACKLIGHT_GPIO,
+@@ -216,6 +254,9 @@ static struct tnetv107x_device_info evm_device_info __initconst = {
+ 	.ssp_config		= &ssp_config,
+ };
+ 
++static struct spi_board_info spi_info[] __initconst = {
 +};
 +
  static __init void tnetv107x_evm_board_init(void)
  {
  	davinci_cfg_reg_list(sdio1_pins);
-@@ -364,6 +371,13 @@ static __init void tnetv107x_evm_board_init(void)
- 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
+@@ -223,6 +264,8 @@ static __init void tnetv107x_evm_board_init(void)
+ 	davinci_cfg_reg_list(ssp_pins);
+ 
+ 	tnetv107x_devices_init(&evm_device_info);
++
++	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
  }
  
-+static int __init tnetv107x_evm_late_init(void)
-+{
-+	platform_device_register(&backlight_device);
-+	return 0;
-+}
-+late_initcall(tnetv107x_evm_late_init);
-+
  #ifdef CONFIG_SERIAL_8250_CONSOLE
- static int __init tnetv107x_evm_console_init(void)
- {
 -- 
 1.7.1
