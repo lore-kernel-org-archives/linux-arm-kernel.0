@@ -1,63 +1,54 @@
 From: vm.rod25@gmail.com (vm.rod25 at gmail.com)
-Date: Tue,  7 Dec 2010 16:14:46 -0600
-Subject: [PATCH v10 3/6] davinci: MMC/SD and USB-OHCI configuration for
-	Omapl138-Hawkboard
+Date: Tue,  7 Dec 2010 16:14:48 -0600
+Subject: [PATCH v10 5/6] davinci: USB clocks for Omapl138-Hawkboard
 In-Reply-To: <1291760089-5818-1-git-send-email-vm.rod25@gmail.com>
 References: <1291760089-5818-1-git-send-email-vm.rod25@gmail.com>
-Message-ID: <1291760089-5818-4-git-send-email-vm.rod25@gmail.com>
+Message-ID: <1291760089-5818-6-git-send-email-vm.rod25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Victor Rodriguez <victor.rodriguez@sasken.com>
 
-This patch defines Pin Mux configuration to enable MMC/SD
-and USB-OHCI on the Hawkboard-L138 system
+This patch adds USB1.1 and USB2.0 clocks for the Hawkboard-L138 system
 
 Signed-off-by: Victor Rodriguez <victor.rodriguez@sasken.com>
 Tested-by: Rene Gonzalez <renegs.2378@gmail.com>
 ---
- arch/arm/mach-davinci/da850.c            |    4 ++++
- arch/arm/mach-davinci/include/mach/mux.h |    4 ++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/da850.c |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 63916b9..80803fa 100644
+index 80803fa..93a4df4 100644
 --- a/arch/arm/mach-davinci/da850.c
 +++ b/arch/arm/mach-davinci/da850.c
-@@ -543,11 +543,15 @@ static const struct mux_config da850_pins[] = {
- 	MUX_CFG(DA850, EMA_WAIT_1,	6,	24,	15,	1,	false)
- 	MUX_CFG(DA850, NEMA_CS_2,	7,	0,	15,	1,	false)
- 	/* GPIO function */
-+	MUX_CFG(DA850, GPIO2_4,		6,	12,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_6,		6,	4,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_8,		5,	28,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_15,	5,	0,	15,	8,	false)
-+	MUX_CFG(DA850, GPIO3_12,	7,	12,	15,	8,	false)
-+	MUX_CFG(DA850, GPIO3_13,	7,	8,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO4_0,		10,	28,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO4_1,		10,	24,	15,	8,	false)
-+	MUX_CFG(DA850, GPIO6_13,	13,	8,	15,	8,	false)
- 	MUX_CFG(DA850, RTC_ALARM,	0,	28,	15,	2,	false)
- #endif
+@@ -345,6 +345,20 @@ static struct clk aemif_clk = {
+ 	.flags		= ALWAYS_ENABLED,
  };
-diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
-index de11aac..5d4e0fe 100644
---- a/arch/arm/mach-davinci/include/mach/mux.h
-+++ b/arch/arm/mach-davinci/include/mach/mux.h
-@@ -908,11 +908,15 @@ enum davinci_da850_index {
- 	DA850_NEMA_CS_2,
  
- 	/* GPIO function */
-+	DA850_GPIO2_4,
- 	DA850_GPIO2_6,
- 	DA850_GPIO2_8,
- 	DA850_GPIO2_15,
-+	DA850_GPIO3_12,
-+	DA850_GPIO3_13,
- 	DA850_GPIO4_0,
- 	DA850_GPIO4_1,
-+	DA850_GPIO6_13,
- 	DA850_RTC_ALARM,
++static struct clk usb11_clk = {
++	.name		= "usb11",
++	.parent		= &pll0_sysclk4,
++	.lpsc		= DA8XX_LPSC1_USB11,
++	.gpsc		= 1,
++};
++
++static struct clk usb20_clk = {
++	.name		= "usb20",
++	.parent		= &pll0_sysclk2,
++	.lpsc		= DA8XX_LPSC1_USB20,
++	.gpsc		= 1,
++};
++
+ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"ref",		&ref_clk),
+ 	CLK(NULL,		"pll0",		&pll0_clk),
+@@ -387,6 +401,8 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("davinci_mmc.0",	NULL,		&mmcsd0_clk),
+ 	CLK("davinci_mmc.1",	NULL,		&mmcsd1_clk),
+ 	CLK(NULL,		"aemif",	&aemif_clk),
++	CLK(NULL,		"usb11",	&usb11_clk),
++	CLK(NULL,		"usb20",	&usb20_clk),
+ 	CLK(NULL,		NULL,		NULL),
  };
  
 -- 
