@@ -1,50 +1,188 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 08 Dec 2010 12:26:32 -0800
-Subject: [PATCHv3 2/4] ARM: Allow machines to override __delay()
-In-Reply-To: <4CFFE965.30906@codeaurora.org>
-References: <1291783128-27520-1-git-send-email-sboyd@codeaurora.org>
-	<1291783128-27520-3-git-send-email-sboyd@codeaurora.org>
-	<1291836162.12568.17.camel@c-dwalke-linux.qualcomm.com>
-	<4CFFE965.30906@codeaurora.org>
-Message-ID: <1291839992.12568.31.camel@c-dwalke-linux.qualcomm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 8 Dec 2010 21:27:35 +0100
+Subject: [PATCH v2 05/15] ARM: mxs: Add low-level debug UART support
+In-Reply-To: <1291739523-25077-4-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101208202735.GC17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-12-08 at 12:24 -0800, Stephen Boyd wrote:
-> On 12/08/2010 11:22 AM, Daniel Walker wrote:
-> > On Tue, 2010-12-07 at 20:38 -0800, Stephen Boyd wrote:
-> >> +
-> >> +static void (*delay_fn)(unsigned long) = delay_loop;
-> >> +
-> >> +void set_delay_fn(void (*fn)(unsigned long))
-> >> +{
-> >> +       delay_fn = fn;
-> >> +}
-> >> +
-> >> +/*
-> >> + * loops = usecs * HZ * loops_per_jiffy / 1000000
-> >> + */
-> >> +void __delay(unsigned long loops)
-> >> +{
-> >> +       delay_fn(loops);
-> >> +}
-> >>  EXPORT_SYMBOL(__delay);
-> > Didn't we already go over this part ? Why are aren't you putting these
-> > in a header file ?
+On Wed, Dec 08, 2010 at 12:31:55AM +0800, Shawn Guo wrote:
+>  - DEBUG_LL support, which is incompatible with single MXS image
+maybe better: s/single/multi-soc/
+
+>    because of different DUART base address on MX23 and MX28
+>  - uncompress message support
 > 
-> Last time we saw that inlining set_delay_fn() actually increased the
-> text size of the kernel. I know it sounds wrong, but its probably due to
-> that compiler behavior Russell posted about last month on arm-lkml.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Changes for v2:
+>  - Remove incorrect comments
+> 
+>  arch/arm/mach-mxs/include/mach/debug-macro.S |   51 +++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/uncompress.h  |   78 ++++++++++++++++++++++++++
+>  2 files changed, 129 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
+>  create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
+> 
+> diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+> new file mode 100644
+> index 0000000..efb3173
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+> @@ -0,0 +1,51 @@
+> +/* arch/arm/mach-mxs/include/mach/debug-macro.S
+> + *
+> + * Debugging macro include header
+> + *
+> + *  Copyright (C) 1994-1999 Russell King
+> + *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <mach/hardware.h>
+> +
+> +#ifdef CONFIG_SOC_IMX23
+> +#ifdef UART_PADDR
+> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> +#endif
+> +#define UART_PADDR	MX23_DUART_BASE_ADDR
+> +#endif
+> +
+> +#ifdef CONFIG_SOC_IMX28
+> +#ifdef UART_PADDR
+> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> +#endif
+> +#define UART_PADDR	MX28_DUART_BASE_ADDR
+> +#endif
+> +
+> +#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
+> +
+> +		.macro	addruart, rp, rv
+> +		ldr	\rp, =UART_PADDR	@ physical
+> +		ldr	\rv, =UART_VADDR	@ virtual
+> +		.endm
+> +
+> +		.macro	senduart, rd, rx
+> +		str	\rd, [\rx, #0x0]	@ DR
+> +		.endm
+> +
+> +		.macro	waituart, rd, rx
+> +1001:		ldr	\rd, [\rx, #0x18]	@ FR
+> +		tst	\rd, #1 << 5		@ FR_TXFF
+> +		bne	1001b
+> +		.endm
+> +
+> +		.macro	busyuart, rd, rx
+> +1002:		ldr	\rd, [\rx, #0x18]	@ FR
+> +		tst	\rd, #1 << 3		@ FR_BUSY
+> +		beq	1002b
+> +		.endm
+> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+> new file mode 100644
+> index 0000000..efdacc7
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+> @@ -0,0 +1,78 @@
+> +/*
+> + *  arch/arm/mach-mxs/include/mach/uncompress.h
+> + *
+> + *  Copyright (C) 1999 ARM Limited
+> + *  Copyright (C) Shane Nay (shane at minirl.com)
+> + *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#ifndef __MACH_MXS_UNCOMPRESS_H__
+> +#define __MACH_MXS_UNCOMPRESS_H__
+> +
+> +#define __MXS_BOOT_UNCOMPRESS
+> +
+> +#include <asm/mach-types.h>
+> +
+> +static unsigned long uart_base;
+> +
+> +#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
+> +
+> +#define DR		0x00
+> +#define FR		0x18
+> +#define FR_BUSY		(1 << 3)
+> +#define FR_TXFE		(1 << 7)
+> +#define CR		0x30
+> +#define CR_UARTEN	1
+Maybe namespace these?  Maybe better define CR_UARTEN as (1 << 0) for
+consistency?
 
-The last time I thought you said there was no size change ? My tests
-showed a decrease ..
-
-What compiler optimizations are you talking about ?
-
-Daniel
-
+> +
+> +/*
+> + * The following code assumes the serial port has already been
+> + * initialized by the bootloader.
+Maybe add:
+    * If it's not, the output is simply discarded.
+> + */
+> +
+> +static void putc(int ch)
+> +{
+> +	if (!uart_base)
+> +		return;
+> +	if (!(UART(CR) & CR_UARTEN))
+> +		return;
+> +
+> +	while (!(UART(FR) & FR_TXFE))
+> +		barrier();
+> +
+> +	UART(DR) = ch;
+> +}
+> +
+> +static inline void flush(void)
+> +{
+> +}
+> +
+> +#define MX23_DUART_BASE_ADDR	0x80070000
+> +#define MX28_DUART_BASE_ADDR	0x80074000
+> +
+> +static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+> +{
+> +	switch (arch_id) {
+> +	case MACH_TYPE_MX23EVK:
+> +		uart_base = MX23_DUART_BASE_ADDR;
+> +		break;
+> +	case MACH_TYPE_MX28EVK:
+> +		uart_base = MX28_DUART_BASE_ADDR;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+> +#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
+> +#define arch_decomp_wdog()
+> +
+> +#endif /* __MACH_MXS_UNCOMPRESS_H__ */
+> -- 
+> 1.7.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
