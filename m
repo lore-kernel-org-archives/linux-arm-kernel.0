@@ -1,34 +1,33 @@
 From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 8 Dec 2010 08:25:19 +0100
-Subject: [PATCH v2 08/15] ARM: mxs: Add iomux support
-In-Reply-To: <1291739523-25077-7-git-send-email-shawn.guo@freescale.com>
+Date: Wed, 8 Dec 2010 08:33:32 +0100
+Subject: [PATCH v3 03/15] ARM: mxs: Add reset routines
+In-Reply-To: <1291739523-25077-2-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-7-git-send-email-shawn.guo@freescale.com>
-Message-ID: <19711.13023.154958.539289@ipc1.ka-ro>
+	<1291739523-25077-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <19711.13516.842225.349704@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 Shawn Guo writes:
-> MXS-based SoCs implements iomux functions in block PINCTRL.
+>  - The mxs wdog is implemented in RTC block.
+>  - There is a generic software reset routine for most modules on mxs.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
+> Changes for v3:
+>  - Change wdog timeout to 10ms for safety
+>  - Simplify function mxs_reset_block() to get it look better
+> 
 > Changes for v2:
->  - Define iomux_cfg_t as u64
-     ^^^^^^^^^^^^^^^^^^^^^^^^^
-Really?
-
-> +typedef struct pad_desc {
-> +	unsigned bank:12;
-> +	unsigned pin:20;
-> +	unsigned muxsel:8;
-> +	unsigned ma:12;
-> +	unsigned vol:8;
-> +	unsigned pull:4;
-> +} iomux_cfg_t;
-^^^^^^^^^^^^^^^^^
+>  - Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
+> 
+mxs_arch_reset_init() is currently being called from the .map_io hook
+in mach-mxs/mm-mx23.c and mm-mx28.c which is called before clocks are
+registered.
+But IMO this should be removed from the .map_io hook anyway (as well
+as mxs_iomux_init()).
 
 
 Lothar Wa?mann
