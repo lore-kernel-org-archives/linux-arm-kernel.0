@@ -1,60 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 8 Dec 2010 13:16:13 -0700 (MST)
-Subject: [PATCH 01/11] OMAP4: PRCM: add OMAP4-specific
-	accessor/mutatorfunctions
-In-Reply-To: <alpine.DEB.2.00.1012081243270.13430@utopia.booyaka.com>
-References: <20101208061657.30541.79824.stgit@twilight.localdomain>
-	<20101208061829.30541.99531.stgit@twilight.localdomain>
-	<3407936b2b482d0f7f6b5bb273455377@mail.gmail.com>
-	<alpine.DEB.2.00.1012081243270.13430@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1012081315160.13430@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Dec 2010 20:20:43 +0000
+Subject: [RFC] Fixing CPU Hotplug for RealView Platforms
+In-Reply-To: <007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
+References: <007401cb962d$d53d2500$7fb76f00$@deacon@arm.com>
+	<20101207171810.GA25839@n2100.arm.linux.org.uk>
+	<007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
+Message-ID: <20101208202043.GR9777@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Dec 2010, Paul Walmsley wrote:
-
-> On Wed, 8 Dec 2010, Rajendra Nayak wrote:
+On Tue, Dec 07, 2010 at 05:47:00PM -0000, Will Deacon wrote:
+> Hi Russell,
+> > What if we fixed the cpu_reset functions for v6 and v7, and when a CPU
+> > is taken offline, we actually go through a proper shutdown of that CPU
+> > and call the reset vector, re-entering the boot loader?
 > 
-> > > +#include "cminst44xx.h"
-> > 
-> > This header seems to be missed in the series.
-> 
-> Oops, sorry about that.  Fixed in the git branch on git.pwsan.com.
-> 
-> Attached below is the final mach-omap2/cminst44xx.h file.
+> This will certainly solve our problem, but people might complain that it's
+> too heavyweight :)
 
-Well, anyway, here it is.
+Our current hot plug-in code already re-runs most of the secondary CPU
+initialization in the kernel - we reset the stack and jump back to
+secondary_start_kernel().
 
-- Paul
+What we'll be adding to that is the overheads in the boot loader (which
+would happen at the point we go offline) and getting back to the kernel
+code.  From that point, the additional things are looking up the CPU
+type, calling its setup function, and enabling the MMU.
 
-/*
- * OMAP4 Power/Reset Management (CM) function prototypes
- *
- * Copyright (C) 2010 Nokia Corporation
- * Paul Walmsley
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- */
-#ifndef __ARCH_ASM_MACH_OMAP2_CMINST44XX_H
-#define __ARCH_ASM_MACH_OMAP2_CMINST44XX_H
-
-extern bool omap4_cminst_is_clkdm_in_hwsup(u8 part, s16 inst, u16 cdoffs);
-extern void omap4_cminst_clkdm_enable_hwsup(u8 part, s16 inst, u16 cdoffs);
-extern void omap4_cminst_clkdm_disable_hwsup(u8 part, s16 inst, u16 cdoffs);
-extern void omap4_cminst_clkdm_force_sleep(u8 part, s16 inst, u16 cdoffs);
-extern void omap4_cminst_clkdm_force_wakeup(u8 part, s16 inst, u16 cdoffs);
-
-/*
- * In an ideal world, we would not export these low-level functions,
- * but this will probably take some time to fix properly
- */
-extern u32 omap4_cminst_read_inst_reg(u8 part, s16 inst, u16 idx);
-extern void omap4_cminst_write_inst_reg(u32 val, u8 part, s16 inst, u16 idx);
-extern u32 omap4_cminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part,
-					   s16 inst, s16 idx);
-
-extern int omap4_cm_wait_module_ready(void __iomem *clkctrl_reg);
-
-#endif
+Everything from that point on would be identical to what already happens
+on the hot plug-in path.
