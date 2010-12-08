@@ -1,122 +1,25 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Wed, 8 Dec 2010 10:54:28 -0600
-Subject: [PATCHv2] ARM: imx: Add support for low power suspend on MX51.
-Message-ID: <1291827268-13580-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 08 Dec 2010 16:48:29 +0000
+Subject: [PATCH 1/3] Add a common struct clk
+In-Reply-To: <201012080902.37859.jeremy.kerr@canonical.com>
+References: <1284522014.516876.675872472687.0.gpush@pororo>	<201011291559.21928.jeremy.kerr@canonical.com>	<20101207143113.GJ21020@pengutronix.de>
+	<201012080902.37859.jeremy.kerr@canonical.com>
+Message-ID: <4CFFB6DD.4000108@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On 08/12/10 01:02, Jeremy Kerr wrote:
+> Hi Uwe,
+> 
+>> I assume the initial feedback should be provided from someone internal
+>> to Canonical or Linaro?  Can you give an estimate when you can post it,
+>> I really thing that's the way to go for simplifying the clock code on
+>> imx which is on my todo list.
+> 
+> No, I was waiting on feedback from the ST-E platform folks, who will need the 
+> atomic clocks. However, I've been out of action for a couple of weeks, hence 
+> the delay.
 
-Adds initial low power suspend functionality to MX51.
-Supports "mem" and "standby" modes.
+Why do they need atomic clocks?
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/mach-mx5/Makefile           |    1 +
- arch/arm/mach-mx5/pm.c               |   70 ++++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mxc.h |    1 +
- 3 files changed, 72 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mx5/pm.c
-
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 026cd85..906bc71 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -5,6 +5,7 @@
- # Object file lists.
- obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o
- 
-+obj-$(CONFIG_PM) += pm.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
- obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
-new file mode 100644
-index 0000000..12ba2de
---- /dev/null
-+++ b/arch/arm/mach-mx5/pm.c
-@@ -0,0 +1,70 @@
-+/*
-+ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#include <linux/suspend.h>
-+#include <asm/mach/map.h>
-+#include <mach/system.h>
-+#include "crm_regs.h"
-+
-+static int mx5_suspend_enter(suspend_state_t state)
-+{
-+	u32 plat_lpc = 0, arm_srpgcr = 0, ccm_clpcr = 0;
-+
-+	/* always allow platform to issue a deep sleep mode request */
-+	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-+
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
-+		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-+		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-+		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-+		break;
-+	case PM_SUSPEND_STANDBY:
-+		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-+		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-+		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-+		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
-+	arm_srpgcr |= MXC_SRPGCR_PCR;
-+
-+	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-+	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-+	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-+
-+	if (tzic_enable_wake(0) != 0)
-+		return -EAGAIN;
-+
-+	cpu_do_idle();
-+	return 0;
-+}
-+
-+static int mx5_pm_valid(suspend_state_t state)
-+{
-+	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-+}
-+
-+static const struct platform_suspend_ops mx5_suspend_ops = {
-+	.valid = mx5_pm_valid,
-+	.enter = mx5_suspend_enter,
-+};
-+
-+static int __init mx5_pm_init(void)
-+{
-+	if (cpu_is_mx51())
-+		suspend_set_ops(&mx5_suspend_ops);
-+	return 0;
-+}
-+device_initcall(mx5_pm_init);
-diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-index 4abbdd1..dc685d4 100644
---- a/arch/arm/plat-mxc/include/mach/mxc.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc.h
-@@ -52,6 +52,7 @@
- 
- #ifndef __ASSEMBLY__
- extern unsigned int __mxc_cpu_type;
-+int tzic_enable_wake(int is_idle);
- #endif
- 
- #ifdef CONFIG_ARCH_MX1
--- 
-1.6.0.4
+This is starting to look like a real mess.
