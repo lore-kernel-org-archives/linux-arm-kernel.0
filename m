@@ -1,59 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 8 Dec 2010 14:28:46 +0000
-Subject: Linux kernel compilation failed with error: FPA is unsupported in
-	the AAPCS
-In-Reply-To: <AANLkTi=zWaZro08Q_8jSwpWfjdJsk7oRSV4bB7i_OYBD@mail.gmail.com>
-References: <AANLkTikjG0DYxcG9Mo6jVKs2jKe7-uGL6eh2jGF10dpD@mail.gmail.com>
-	<20101208133719.GC2716@pulham.picochip.com>
-	<AANLkTi=zWaZro08Q_8jSwpWfjdJsk7oRSV4bB7i_OYBD@mail.gmail.com>
-Message-ID: <AANLkTim9ZXMYQoXD5Uu-px_7446frquHBWLSJg3yGwSF@mail.gmail.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Wed, 08 Dec 2010 15:44:19 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+References: <19697.8378.717761.236202@pilspetsen.it.uu.se>
+	<19707.34405.791777.298955@pilspetsen.it.uu.se>
+	<20101205131702.GE9138@n2100.arm.linux.org.uk>
+	<20101205141921.GF9138@n2100.arm.linux.org.uk>
+	<19707.47304.977978.297596@pilspetsen.it.uu.se>
+	<20101205162151.GH9138@n2100.arm.linux.org.uk>
+	<1291812015.28378.24.camel@laptop>
+	<20101208125548.GA9777@n2100.arm.linux.org.uk>
+	<1291817076.28378.28.camel@laptop>
+	<20101208142814.GE9777@n2100.arm.linux.org.uk>
+Message-ID: <1291819459.28378.64.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 8, 2010 at 2:03 PM, Prasad Joshi <prasadjoshi124@gmail.com> wrote:
+On Wed, 2010-12-08 at 14:28 +0000, Russell King - ARM Linux wrote:
+> So, what I'm saying is that if wrapping in 4 seconds is a problem,
+> then maybe we shouldn't be providing sched_clock() at all.
 
-[...]
+4 seconds should be perfectly fine, we call it at least every scheduler
+tick (HZ) and NO_HZ will either have to limit the max sleep period or
+provide its own sleep duration (using a more expensive clock) so we can
+recover (much like GTOD already requires).
 
->
-> Thanks a lot Jamie and Mikael. I can not follow what is EABI or OABI.
-> But while configuring the linux kernel I enabled EABI. After disabling
-> it, make is running smoothly.
+> Also, if wrapping below 64-bits is also a problem, again, maybe we
+> shouldn't be providing it there either.  Eg:
 
-EABI is the new ABI intended to be used with newer ARM processors, and
-is applicable primarily for ARMv5 and later (though with some
-limitations it also works with ARMv4T -- the Debian community
-currently use this configuration for their "armel" architecture for
-example).
+That's mostly due to hysterical raisins and we should just fix that, the
+simplest way is to use something like kernel/sched_clock.c to use
+sched_clock() deltas to make a running u64 value.
 
-OABI ("Old ABI") is the informal name for pre-existing ABI prior to
-EABI, used with ARMv4 processors and earlier.  OABI isn't really an
-official name for the old ABI, it's just a useful to have a name which
-distinguishes it from the new ABI.
+Like said, John Stultz was already looking at doing something like that
+because there's a number of architectures suffering this same problem
+and they're all already using part of the clocksource infrastructure to
+implement the sched_clock() interface simply because they only have a
+single hardware resource.
 
-With regard to that, EABI compilers all have "eabi" in the GNU
-architecture name, e.g.
-
-$  arm-linux-gnueabi-gcc -dumpmachine
-arm-linux-gnueabi
-
-I believe the old ABI may get deprecated and eventually dropped from
-new releases of GCC/binutils in the not-too-distant future.  Unless
-you're using a really old platform (unlikely) you should stick with
-EABI.
-
->
-> I have one more (silly) question on same, my intention behind
-> compiling the linux kernel is to boot RealView ARM under QEMU. Would
-> disabling EABI would make kernel unbootable with QEMU?
-
-If you are using full system emulation (I guess you are, if you're
-running a kernel under QEMU) then either ABI should work, in general.
-
-However, building an EABI kernel does imply a different system call
-interface.  Therefore, EABI userspace (as used by pretty much all
-modern distros for ARM) needs an EABI kernel.  For backwards
-compatibility, you can use OABI userspace with an EABI kernel if you
-turn on the CONFIG_OABI_COMPAT kernel option.
-
-Cheers
----Dave
+One of the problems is I think the cycles2ns multiplication of the raw
+clock, that makes dealing with wrap-around lots harder, so I guess we
+should deal with the wrap on the raw clock values and then apply
+cycles2ns on the delta or somesuch. But I expect the clocksource
+infrastructure already has something like that, John?
