@@ -1,43 +1,35 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 8 Dec 2010 08:33:32 +0100
-Subject: [PATCH v3 03/15] ARM: mxs: Add reset routines
-In-Reply-To: <1291739523-25077-2-git-send-email-shawn.guo@freescale.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <19711.13516.842225.349704@ipc1.ka-ro>
+From: raghuveer.murthy@ti.com (Raghuveer Murthy)
+Date: Wed,  8 Dec 2010 13:09:24 +0530
+Subject: [PATCH v2 resend] OMAP4: Pandaboard: Add omap_reserve functionality
+Message-ID: <1291793964-26769-1-git-send-email-raghuveer.murthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds omap_reserve functionality to board-omap4panda.c.
+Helps in the reserving boot time memory in SDRAM, used here for
+framebuffer allocation.
 
-Shawn Guo writes:
->  - The mxs wdog is implemented in RTC block.
->  - There is a generic software reset routine for most modules on mxs.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Changes for v3:
->  - Change wdog timeout to 10ms for safety
->  - Simplify function mxs_reset_block() to get it look better
-> 
-> Changes for v2:
->  - Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
-> 
-mxs_arch_reset_init() is currently being called from the .map_io hook
-in mach-mxs/mm-mx23.c and mm-mx28.c which is called before clocks are
-registered.
-But IMO this should be removed from the .map_io hook anyway (as well
-as mxs_iomux_init()).
+This patch is in similar lines to commit id 71ee7dad9b6991, from
+Russell king
 
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
+---
+ arch/arm/mach-omap2/board-omap4panda.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Lothar Wa?mann
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index da24745..0ccc24f 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -393,6 +393,7 @@ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
+ 	/* Maintainer: David Anders - Texas Instruments Inc */
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= omap4_panda_map_io,
++	.reserve	= omap_reserve,
+ 	.init_irq	= omap4_panda_init_irq,
+ 	.init_machine	= omap4_panda_init,
+ 	.timer		= &omap_timer,
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.0.4
