@@ -1,87 +1,80 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  7 Dec 2010 20:38:46 -0800
-Subject: [PATCHv3 2/4] ARM: Allow machines to override __delay()
+Date: Tue,  7 Dec 2010 20:38:48 -0800
+Subject: [PATCHv3 4/4] msm: timer: Migrate to timer based __delay()
 In-Reply-To: <1291783128-27520-1-git-send-email-sboyd@codeaurora.org>
 References: <1291783128-27520-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1291783128-27520-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1291783128-27520-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some machines want to implement their own __delay() routine based
-on fixed rate timers. Expose functionality to set the __delay()
-routine at runtime. This should allow two machines with different
-__delay() routines to happily co-exist within the same kernel
-with minimal overhead.
-
-Russell expressed concern that using a timer based __delay()
-would cause problems when an iomapped device isn't mapped in
-prior to a delay call being made (see
-http://article.gmane.org/gmane.linux.ports.arm.kernel/78543 for
-more info). We can sidestep that issue with this approach since
-the __delay() routine _should_ only be pointed to a timer based
-delay once the timer has been properly mapped. Up until that
-point __delay() and udelay() will use delay_loop() which is
-always safe to call.
-
-This patch is inspired by x86's delay.c
+We have to provide a dummy set_mode for the DGT since we don't
+want it to ever turn off.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/include/asm/delay.h |    2 ++
- arch/arm/lib/delay.c         |   19 ++++++++++++++++---
- 2 files changed, 18 insertions(+), 3 deletions(-)
+ arch/arm/mach-msm/include/mach/timex.h |    1 +
+ arch/arm/mach-msm/timer.c              |   16 +++++++++++++++-
+ 2 files changed, 16 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index ccc5ed5..7c732b5 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -40,5 +40,7 @@ extern void __const_udelay(unsigned long);
- 			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
- 	  __udelay(n))
+diff --git a/arch/arm/mach-msm/include/mach/timex.h b/arch/arm/mach-msm/include/mach/timex.h
+index a62e6b2..52b602b 100644
+--- a/arch/arm/mach-msm/include/mach/timex.h
++++ b/arch/arm/mach-msm/include/mach/timex.h
+@@ -17,5 +17,6 @@
+ #define __ASM_ARCH_MSM_TIMEX_H
  
-+extern void set_delay_fn(void (*fn)(unsigned long));
-+
- #endif /* defined(_ARM_DELAY_H) */
+ #define CLOCK_TICK_RATE		1000000
++#define ARCH_HAS_READ_CURRENT_TIMER
  
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index f92aca0..b38f7c0 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -11,11 +11,9 @@
- #include <linux/delay.h>
- 
- /*
-- * loops = usecs * HZ * loops_per_jiffy / 1000000
-- *
-  * Oh, if only we had a cycle counter...
-  */
--void __delay(unsigned long loops)
-+void delay_loop(unsigned long loops)
- {
- 	asm volatile(
- 	"1:	subs %0, %0, #1 \n"
-@@ -24,6 +22,21 @@ void __delay(unsigned long loops)
- 	: "r" (loops)
- 	);
+ #endif
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 950100f..3e4c205 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -84,6 +84,12 @@ static cycle_t msm_dgt_read(struct clocksource *cs)
+ 	return readl(MSM_DGT_BASE + TIMER_COUNT_VAL) >> MSM_DGT_SHIFT;
  }
-+
-+static void (*delay_fn)(unsigned long) = delay_loop;
-+
-+void set_delay_fn(void (*fn)(unsigned long))
-+{
-+	delay_fn = fn;
-+}
-+
-+/*
-+ * loops = usecs * HZ * loops_per_jiffy / 1000000
-+ */
-+void __delay(unsigned long loops)
-+{
-+	delay_fn(loops);
-+}
- EXPORT_SYMBOL(__delay);
  
- /*
++int read_current_timer(unsigned long *timer_val)
++{
++	*timer_val = readl(MSM_DGT_BASE + TIMER_COUNT_VAL);
++	return 0;
++}
++
+ static int msm_timer_set_next_event(unsigned long cycles,
+ 				    struct clock_event_device *evt)
+ {
+@@ -122,6 +128,12 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
+ 	}
+ }
+ 
++static void msm_timer_set_mode_nop(enum clock_event_mode mode,
++				struct clock_event_device *evt)
++{
++	/* The timer is always ticking so do nothing */
++}
++
+ static struct msm_clock msm_clocks[] = {
+ 	{
+ 		.clockevent = {
+@@ -157,7 +169,7 @@ static struct msm_clock msm_clocks[] = {
+ 			.shift          = 32 + MSM_DGT_SHIFT,
+ 			.rating         = 300,
+ 			.set_next_event = msm_timer_set_next_event,
+-			.set_mode       = msm_timer_set_mode,
++			.set_mode       = msm_timer_set_mode_nop,
+ 		},
+ 		.clocksource = {
+ 			.name           = "dg_timer",
+@@ -218,6 +230,8 @@ static void __init msm_timer_init(void)
+ 
+ 		clockevents_register_device(ce);
+ 	}
++	writel(1, MSM_DGT_BASE + TIMER_ENABLE);
++	set_delay_fn(read_current_timer_delay_loop);
+ }
+ 
+ struct sys_timer msm_timer = {
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
