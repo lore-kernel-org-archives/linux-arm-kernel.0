@@ -1,33 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Dec 2010 18:00:19 -0800
-Subject: [PATCH 3/4] omap1: Add omap1_defconfig
-In-Reply-To: <AANLkTi=siEk_ZLY0k94ktv_sUAF5AO3PTkT-4ynDqLX7@mail.gmail.com>
-References: <20101204213358.32208.4195.stgit@baageli.muru.com>
-	<20101204213657.32208.50997.stgit@baageli.muru.com>
-	<AANLkTi=siEk_ZLY0k94ktv_sUAF5AO3PTkT-4ynDqLX7@mail.gmail.com>
-Message-ID: <20101208020019.GO17435@atomide.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 08 Dec 2010 10:05:32 +0800
+Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
+In-Reply-To: <1291773932.578726.468741339223.1.gpush@pororo>
+Message-ID: <1291773932.579113.476506736919.2.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Contreras <felipe.contreras@gmail.com> [101207 04:28]:
-> On Sat, Dec 4, 2010 at 11:36 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > The omap1_defconfig this should be eventually usable for booting
-> > all omap1 machines. Generated based on:
-> >
-> > $ grep ARCH_OMAP1=y arch/arm/configs/* | cut -d: -f1 | xargs cat | \
-> > ? ? sort | uniq >> arch/arm/configs/omap1_defconfig
-> >
-> > Then change few things manually, like use Nokia 770 CONFIG_CMDLINE
-> > as it does not allow setting it in the bootloader.
-> >
-> > After make oldconfig, ran reduce_defconfig python script on it
-> > as posted by Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> 
-> AFAIK you should use 'make savedefconfig'.
+Since most platforms will need a fixed-rate clock, add one. This will
+also serve as a basic example of an implementation of struct clk.
 
-OK cool thanks for the tip. Updating the description for that
-and also will take out CONFIG_DEBUG_DRIVER=y as it's too noisy.
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-Regards,
+---
+ include/linux/clk.h |   13 +++++++++++++
+ kernel/clk.c        |   14 ++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-Tony
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index e09e40e..ae7e4ed 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -158,6 +158,19 @@ static inline void clk_common_init(struct clk *clk)
+ 		mutex_init(&clk->lock.mutex);
+ }
+ 
++/* Simple fixed-rate clock */
++struct clk_fixed {
++	struct clk	clk;
++	unsigned long	rate;
++};
++
++extern struct clk_ops clk_fixed_ops;
++
++#define INIT_CLK_FIXED(name, r) { \
++	.clk = INIT_CLK(name.clk, clk_fixed_ops), \
++	.rate = (r) \
++}
++
+ #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+ 
+ /*
+diff --git a/kernel/clk.c b/kernel/clk.c
+index 1545e69..2779abb 100644
+--- a/kernel/clk.c
++++ b/kernel/clk.c
+@@ -98,3 +98,17 @@ struct clk *clk_get_parent(struct clk *clk)
+ 	return ERR_PTR(-ENOSYS);
+ }
+ EXPORT_SYMBOL_GPL(clk_get_parent);
++
++/* clk_fixed support */
++
++#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
++
++static unsigned long clk_fixed_get_rate(struct clk *clk)
++{
++	return to_clk_fixed(clk)->rate;
++}
++
++struct clk_ops clk_fixed_ops = {
++	.get_rate = clk_fixed_get_rate,
++};
++EXPORT_SYMBOL_GPL(clk_fixed_ops);
