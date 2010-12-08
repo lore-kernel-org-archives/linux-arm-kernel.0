@@ -1,68 +1,39 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 8 Dec 2010 12:32:16 +0100
-Subject: [PATCH v2 08/15] ARM: mxs: Add iomux support
-In-Reply-To: <AANLkTimHyYUkDqLQ79o9fP_9NgOK1Lec=psoFCpb1+jA@mail.gmail.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-7-git-send-email-shawn.guo@freescale.com>
-	<19711.13023.154958.539289@ipc1.ka-ro>
-	<AANLkTikb4Ytx==R=n7RDOXv+tKtVvgcTUX7R-QDQfVoc@mail.gmail.com>
-	<20101208105643.GO18244@pengutronix.de>
-	<AANLkTimHyYUkDqLQ79o9fP_9NgOK1Lec=psoFCpb1+jA@mail.gmail.com>
-Message-ID: <19711.27840.946740.905255@ipc1.ka-ro>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 8 Dec 2010 11:40:13 +0000
+Subject: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
+	forCONFIG_THUMB2_KERNEL
+In-Reply-To: <20101207192906.GA28724@n2100.arm.linux.org.uk>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
+	<1291656937-24992-3-git-send-email-dave.martin@linaro.org>
+	<a86d8e4b47fad17e71d0202f3c469868@mail.gmail.com>
+	<AANLkTinPifchS23j5EdrhMBNNdtEfF_KmX=AE9tUiiL=@mail.gmail.com>
+	<20101207192906.GA28724@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik8=8HdzvKS8aLh3=-QncDf3v_kC8PkjnJEvZqS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo writes:
-> 2010/12/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Hello,
-> >
-> > On Wed, Dec 08, 2010 at 06:52:36PM +0800, Shawn Guo wrote:
-> >> Hi Lothar,
-> >>
-> >> Thanks for the review.
-> >>
-> >> On Wed, Dec 8, 2010 at 3:25 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> >> > Hi,
-> >> >
-> >> > Shawn Guo writes:
-> >> >> MXS-based SoCs implements iomux functions in block PINCTRL.
-> >> >>
-> >> >> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> >> >> ---
-> >> >> Changes for v2:
-> >> >> ?- Define iomux_cfg_t as u64
-> >> > ? ? ^^^^^^^^^^^^^^^^^^^^^^^^^
-> >> > Really?
-> >> >
-> >> >> +typedef struct pad_desc {
-> >> >> + ? ? unsigned bank:12;
-> >> >> + ? ? unsigned pin:20;
-> >> >> + ? ? unsigned muxsel:8;
-> >> >> + ? ? unsigned ma:12;
-> >> >> + ? ? unsigned vol:8;
-> >> >> + ? ? unsigned pull:4;
-> >> >> +} iomux_cfg_t;
-> >> > ^^^^^^^^^^^^^^^^^
-> >> >
-> >> I did not pick the correct word. ?What I meant is 64 bits. ?Since this
-> >> error is in change log, I would fix it if there is v3 of the patch.
-> > the idea was to really use an u64 to have the pin definitions modifyable.
-> >
-> Ah, I misunderstood the comments.  But I did not see mxc switches to
-> u64.  Do you have example to show what you want exactly?
-> 
-See:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-November/032202.html
+On Tue, Dec 7, 2010 at 7:29 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 07, 2010 at 04:50:50PM +0000, Dave Martin wrote:
+>> I'll follow up shortly with a patch to the generic ARM Kconfig to make
+>> this explicit, so that ARCH_OMAP2 and THUMB2_KERNEL can't accidentally
+>> be configured together.
+>
+> That's a rubbish dependency. ?You may have an ARCH_OMAP2 platform which
+> is Cortex A9, and you only have Cortex A9 support selected. ?In that
+> case there's no reason to prevent THUMB2_KERNEL being selected.
+>
+> The right thing to do is to make THUMB2_KERNEL depend on those CPUs
+> which are not to be selected - not by making it depend on some platform
+> configuration option(s) which aren't actually relevent.
+>
 
+You're correct on this point-- this was my conclusion also.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+If you haven't already, take a look at my other post
+http://www.spinics.net/lists/arm-kernel/msg106576.html
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Does this address your concern?
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Cheers
+---Dave
