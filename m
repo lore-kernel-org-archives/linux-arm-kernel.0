@@ -1,125 +1,118 @@
-From: venki@google.com (Venkatesh Pallipadi)
-Date: Wed,  8 Dec 2010 15:31:19 -0800
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-Message-ID: <1291851079-27061-1-git-send-email-venki@google.com>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Thu, 9 Dec 2010 00:51:29 +0100
+Subject: [PATCH v3] OMAP2+: PM/serial: fix console semaphore acquire
+	during suspend
+In-Reply-To: <1291848040-23394-1-git-send-email-khilman@deeprootsystems.com>
+References: <1291848040-23394-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <AANLkTi=9TBbuwr4uiQb6f_f=cLxK2NvWJDJYXwr2tTxu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As I mentioned earlier in this thread, there are other places in
-the scheduler, where we do curr_sched_clock - prev_sched_clock kind of math
-in u64 and this 32 bit wraparound will cause problems there as well. Example-
-accounting a big positive number as exec_time for some task. So, we
-need a generic fix for sched_clock. This particular code happened to cause
-an easy to notice failure.
+On Wed, Dec 8, 2010 at 11:40 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> @@ -120,8 +133,9 @@ static void omap2_enter_full_retention(void)
+> ? ? ? ? ? ? ? ?goto no_sleep;
+>
+> ? ? ? ?/* Block console output in case it is on one of the OMAP UARTs */
+> - ? ? ? if (try_acquire_console_sem())
+> - ? ? ? ? ? ? ? goto no_sleep;
+> + ? ? ? if (!is_suspending())
+> + ? ? ? ? ? ? ? if (try_acquire_console_sem())
+> + ? ? ? ? ? ? ? ? ? ? ? goto no_sleep;
 
-Anyways, here's the patch that should resolve the wraparound problem with
-this particular piece of code. I haven't been able to test this with latest
-git as my test systems fail to boot with divide error in
-select_task_rq_fair+0x5dd/0x70a
-with vanilla git. Thats an unrelated bug that has been reported earlier.
+Combine into one if?
+Hi Kevin,
 
-I have only tested with older known to work kernel with this sched irq changes.
+<snip>
 
-Peter: Also, this change will cause some conflict with pending IRQ time
-reporting changeset. Let me know how you want to deal with this patch and that
-pending patchset.
+> ? ? ? ?omap_uart_prepare_idle(0);
+> ? ? ? ?omap_uart_prepare_idle(1);
+> @@ -136,7 +150,8 @@ static void omap2_enter_full_retention(void)
+> ? ? ? ?omap_uart_resume_idle(1);
+> ? ? ? ?omap_uart_resume_idle(0);
+>
+> - ? ? ? release_console_sem();
+> + ? ? ? if (!is_suspending())
+> + ? ? ? ? ? ? ? release_console_sem();
+>
+> ?no_sleep:
+> ? ? ? ?if (omap2_pm_debug) {
+> @@ -284,6 +299,12 @@ out:
+> ? ? ? ?local_irq_enable();
+> ?}
+>
+> +static int omap2_pm_begin(suspend_state_t state)
+> +{
+> + ? ? ? suspend_state = state;
+> + ? ? ? return 0;
+> +}
+
+Do you really need a return code here?
+
+> ?static int omap2_pm_prepare(void)
+> ?{
+> ? ? ? ?/* We cannot sleep in idle until we have resumed */
+> @@ -333,10 +354,18 @@ static void omap2_pm_finish(void)
+> ? ? ? ?enable_hlt();
+> ?}
+>
+> +static void omap2_pm_end(void)
+> +{
+> + ? ? ? suspend_state = PM_SUSPEND_ON;
+> + ? ? ? return;
+> +}
+
+Redundant return.
+
+> +
+> ?static struct platform_suspend_ops omap_pm_ops = {
+> + ? ? ? .begin ? ? ? ? ?= omap2_pm_begin,
+> ? ? ? ?.prepare ? ? ? ?= omap2_pm_prepare,
+> ? ? ? ?.enter ? ? ? ? ?= omap2_pm_enter,
+> ? ? ? ?.finish ? ? ? ? = omap2_pm_finish,
+> + ? ? ? .end ? ? ? ? ? ?= omap2_pm_end,
+> ? ? ? ?.valid ? ? ? ? ?= suspend_valid_only_mem,
+> ?};
+>
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 0ec8a04..648b8c5 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -50,6 +50,19 @@
+> ?#include "sdrc.h"
+> ?#include "control.h"
+>
+> +#ifdef CONFIG_SUSPEND
+> +static suspend_state_t suspend_state = PM_SUSPEND_ON;
+> +static inline bool is_suspending(void)
+> +{
+> + ? ? ? return (suspend_state != PM_SUSPEND_ON);
+> +}
+> +#else
+> +static inline bool is_suspending(void)
+> +{
+> + ? ? ? return false;
+> +}
+> +#endif
+> +
+> ?/* Scratchpad offsets */
+> ?#define OMAP343X_TABLE_ADDRESS_OFFSET ? ? 0xc4
+> ?#define OMAP343X_TABLE_VALUE_OFFSET ? ? ? 0xc0
+> @@ -387,10 +400,11 @@ void omap_sram_idle(void)
+> ? ? ? ?}
+>
+> ? ? ? ?/* Block console output in case it is on one of the OMAP UARTs */
+> - ? ? ? if (per_next_state < PWRDM_POWER_ON ||
+> - ? ? ? ? ? core_next_state < PWRDM_POWER_ON)
+> - ? ? ? ? ? ? ? if (try_acquire_console_sem())
+> - ? ? ? ? ? ? ? ? ? ? ? goto console_still_active;
+> + ? ? ? if (!is_suspending())
+> + ? ? ? ? ? ? ? if (per_next_state < PWRDM_POWER_ON ||
+> + ? ? ? ? ? ? ? ? ? core_next_state < PWRDM_POWER_ON)
+> + ? ? ? ? ? ? ? ? ? ? ? if (try_acquire_console_sem())
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto console_still_active;
+
+Oh well, 3 nested ifs...
 
 Thanks,
-Venki
-
-[PATCH] update_rq_clock() with irq_time should handle 64 bit wraparound
-
-update_rq_clock with IRQ_TIME_ACCOUNTING assumed 64 bit sched_clock that
-practically will not wraparound. Change to code to handle wraparounds,
-still preventing rq->clock_task from going backwards.
-
-Signed-off-by: Venkatesh Pallipadi <venki@google.com>
----
- kernel/sched.c |   49 ++++++++++++++++++++++++++++++-------------------
- 1 files changed, 30 insertions(+), 19 deletions(-)
-
-diff --git a/kernel/sched.c b/kernel/sched.c
-index dc91a4d..29ce549 100644
---- a/kernel/sched.c
-+++ b/kernel/sched.c
-@@ -636,21 +636,13 @@ static inline struct task_group *task_group(struct task_struct *p)
- 
- #endif /* CONFIG_CGROUP_SCHED */
- 
--static u64 irq_time_cpu(int cpu);
--static void sched_irq_time_avg_update(struct rq *rq, u64 irq_time);
-+static void update_rq_clock_irqtime(struct rq *rq, int cpu);
- 
- inline void update_rq_clock(struct rq *rq)
- {
- 	if (!rq->skip_clock_update) {
- 		int cpu = cpu_of(rq);
--		u64 irq_time;
--
--		rq->clock = sched_clock_cpu(cpu);
--		irq_time = irq_time_cpu(cpu);
--		if (rq->clock - irq_time > rq->clock_task)
--			rq->clock_task = rq->clock - irq_time;
--
--		sched_irq_time_avg_update(rq, irq_time);
-+		update_rq_clock_irqtime(rq, cpu);
- 	}
- }
- 
-@@ -1983,24 +1975,43 @@ void account_system_vtime(struct task_struct *curr)
- }
- EXPORT_SYMBOL_GPL(account_system_vtime);
- 
--static void sched_irq_time_avg_update(struct rq *rq, u64 curr_irq_time)
-+/*
-+ * Update rq->clock_task making sure that it does not go backwards due to
-+ * irq_time subtraction, allowing for possible wraparound.
-+ */
-+static void update_rq_clock_irqtime(struct rq *rq, int cpu)
- {
--	if (sched_clock_irqtime && sched_feat(NONIRQ_POWER)) {
--		u64 delta_irq = curr_irq_time - rq->prev_irq_time;
--		rq->prev_irq_time = curr_irq_time;
--		sched_rt_avg_update(rq, delta_irq);
-+	u64 curr_rq_clock = sched_clock_cpu(cpu);
-+	u64 curr_irq_time = irq_time_cpu(cpu);
-+
-+	if (!sched_clock_irqtime) {
-+		rq->clock = sched_clock_cpu(cpu);
-+		rq->clock_task = rq->clock;
-+		return;
- 	}
-+
-+	if (unlikely(curr_irq_time - rq->prev_irq_time >
-+		     curr_rq_clock - rq->clock)) {
-+		curr_irq_time = rq->prev_irq_time + curr_rq_clock - rq->clock;
-+	}
-+
-+	rq->clock = curr_rq_clock;
-+	rq->clock_task = rq->clock - curr_irq_time;
-+
-+	if (sched_feat(NONIRQ_POWER))
-+		sched_rt_avg_update(rq, curr_irq_time - rq->prev_irq_time);
-+
-+	rq->prev_irq_time = curr_irq_time;
- }
- 
- #else
- 
--static u64 irq_time_cpu(int cpu)
-+static void update_rq_clock_irqtime(struct rq *rq, int cpu)
- {
--	return 0;
-+	rq->clock = sched_clock_cpu(cpu);
-+	rq->clock_task = rq->clock;
- }
- 
--static void sched_irq_time_avg_update(struct rq *rq, u64 curr_irq_time) { }
--
- #endif
- 
- #include "sched_idletask.c"
--- 
-1.7.3.1
+   Vitaly
