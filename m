@@ -1,71 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Dec 2010 14:28:14 +0000
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <1291817076.28378.28.camel@laptop>
-References: <19697.8378.717761.236202@pilspetsen.it.uu.se>
-	<19707.34405.791777.298955@pilspetsen.it.uu.se>
-	<20101205131702.GE9138@n2100.arm.linux.org.uk>
-	<20101205141921.GF9138@n2100.arm.linux.org.uk>
-	<19707.47304.977978.297596@pilspetsen.it.uu.se>
-	<20101205162151.GH9138@n2100.arm.linux.org.uk>
-	<1291812015.28378.24.camel@laptop>
-	<20101208125548.GA9777@n2100.arm.linux.org.uk>
-	<1291817076.28378.28.camel@laptop>
-Message-ID: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 8 Dec 2010 14:28:46 +0000
+Subject: Linux kernel compilation failed with error: FPA is unsupported in
+	the AAPCS
+In-Reply-To: <AANLkTi=zWaZro08Q_8jSwpWfjdJsk7oRSV4bB7i_OYBD@mail.gmail.com>
+References: <AANLkTikjG0DYxcG9Mo6jVKs2jKe7-uGL6eh2jGF10dpD@mail.gmail.com>
+	<20101208133719.GC2716@pulham.picochip.com>
+	<AANLkTi=zWaZro08Q_8jSwpWfjdJsk7oRSV4bB7i_OYBD@mail.gmail.com>
+Message-ID: <AANLkTim9ZXMYQoXD5Uu-px_7446frquHBWLSJg3yGwSF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 08, 2010 at 03:04:36PM +0100, Peter Zijlstra wrote:
-> On Wed, 2010-12-08 at 12:55 +0000, Russell King - ARM Linux wrote:
-> > Hmm, you're right.  In which case it's purely down to sched_clock()
-> > only being able to cover 4s - which seems to be far too small a gap.
-> > 
-> > I'm not sure that the unstable sched clock stuff makes much sense to
-> > be enabled - we don't have an unstable clock, we just don't have the
-> > required number of bits for the scheduler to work correctly.
-> 
-> We can perhaps make part of the HAVE_UNSTABLE_SCHED_CLOCK depend on SMP
-> and only deal with the short wraps (and maybe monotonicity) on UP.
-> 
-> > Nevertheless, this provides a good way to find this kind of wrap bug.
-> > Even with cnt_32_to_63, we still don't get a 64-bit sched_clock(), so
-> > this bug will still be there.  Even with a 64-bit clock, the bug will
-> > still be there.  It's basically crap code.
-> 
-> You're referring to the clock_task bit from Venki? Yes that needs
-> fixing.
+On Wed, Dec 8, 2010 at 2:03 PM, Prasad Joshi <prasadjoshi124@gmail.com> wrote:
 
-Indeed.
+[...]
 
-> > Maybe it's better that on ARM, we just don't implement sched_clock()
-> > at all?
-> 
-> If you have a high res clock source that's cheap to read it would be
-> better if we can simply fix the infrastructure such that we can make use
-> of it.
+>
+> Thanks a lot Jamie and Mikael. I can not follow what is EABI or OABI.
+> But while configuring the linux kernel I enabled EABI. After disabling
+> it, make is running smoothly.
 
-This is the point.  We don't have high res clock sources that run for
-millenium before wrapping.  What we have depends on the platform, and
-as this example has found, some platforms have high-res clock sources
-but they wrap in as little as 4 seconds.  Other platforms will have
-slower clock sources which'll run for longer before wrapping.
+EABI is the new ABI intended to be used with newer ARM processors, and
+is applicable primarily for ARMv5 and later (though with some
+limitations it also works with ARMv4T -- the Debian community
+currently use this configuration for their "armel" architecture for
+example).
 
-Essentially, clock sources on ARM so far have been a 32-bit counter
-(if you're lucky) clocked at some rate.
+OABI ("Old ABI") is the informal name for pre-existing ABI prior to
+EABI, used with ARMv4 processors and earlier.  OABI isn't really an
+official name for the old ABI, it's just a useful to have a name which
+distinguishes it from the new ABI.
 
-So, what I'm saying is that if wrapping in 4 seconds is a problem,
-then maybe we shouldn't be providing sched_clock() at all.
+With regard to that, EABI compilers all have "eabi" in the GNU
+architecture name, e.g.
 
-Also, if wrapping below 64-bits is also a problem, again, maybe we
-shouldn't be providing it there either.  Eg:
+$  arm-linux-gnueabi-gcc -dumpmachine
+arm-linux-gnueabi
 
-#define TCR2NS_SCALE_FACTOR     10
+I believe the old ABI may get deprecated and eventually dropped from
+new releases of GCC/binutils in the not-too-distant future.  Unless
+you're using a really old platform (unlikely) you should stick with
+EABI.
 
-unsigned long long sched_clock(void)
-{
-        unsigned long long v = cnt32_to_63(timer_read());
-        return (v * tcr2ns_scale) >> TCR2NS_SCALE_FACTOR;
-}
+>
+> I have one more (silly) question on same, my intention behind
+> compiling the linux kernel is to boot RealView ARM under QEMU. Would
+> disabling EABI would make kernel unbootable with QEMU?
 
-has a maximum of 54 bits - and this seems to be the most we can sanely
-get from a 32-bit counter.
+If you are using full system emulation (I guess you are, if you're
+running a kernel under QEMU) then either ABI should work, in general.
+
+However, building an EABI kernel does imply a different system call
+interface.  Therefore, EABI userspace (as used by pretty much all
+modern distros for ARM) needs an EABI kernel.  For backwards
+compatibility, you can use OABI userspace with an EABI kernel if you
+turn on the CONFIG_OABI_COMPAT kernel option.
+
+Cheers
+---Dave
