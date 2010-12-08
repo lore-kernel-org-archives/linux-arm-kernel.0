@@ -1,35 +1,35 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Wed, 08 Dec 2010 13:40:15 +0100
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <20101205162151.GH9138@n2100.arm.linux.org.uk>
-References: <19697.8378.717761.236202@pilspetsen.it.uu.se>
-	<19707.34405.791777.298955@pilspetsen.it.uu.se>
-	<20101205131702.GE9138@n2100.arm.linux.org.uk>
-	<20101205141921.GF9138@n2100.arm.linux.org.uk>
-	<19707.47304.977978.297596@pilspetsen.it.uu.se>
-	<20101205162151.GH9138@n2100.arm.linux.org.uk>
-Message-ID: <1291812015.28378.24.camel@laptop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 8 Dec 2010 12:46:37 +0000
+Subject: [PATCH 1/3] ASoC: EP93xx I2S and PCM fixes
+In-Reply-To: <1291809693.31916.2.camel@r60e>
+References: <1291809693.31916.2.camel@r60e>
+Message-ID: <20101208124637.GD16418@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2010-12-05 at 16:21 +0000, Russell King - ARM Linux wrote:
+On Wed, Dec 08, 2010 at 03:01:33PM +0300, Alexander wrote:
 
-> I'm not sure that's the correct fix - it looks like sched_clock_cpu()
-> should already be preventing scheduler clock time going backwards.
-> 
-> Hmm. IOP32x seems to have a 32-bit timer clocked at 200MHz.  That means
-> it wraps once every 21s.  However, we have that converted to ns by an
-> unknown multiplier and shift.  It seems that those are chosen to
-> guarantee that we will cover only 4s without wrapping in the clocksource
-> conversion.  Maybe that's not sufficient?
-> 
-> Could you try looking into sched_clock_cpu(), sched_clock_local() and
-> sched_clock() to see whether anything odd stands out?
+> Changes to I2S code:
 
-# git grep HAVE_UNSTABLE_SCHED_CLOCK arch/arm | wc -l
-0
+This should be split into a patch series, there's a bunch of changes
+here that are pretty much unrelated.  Having everything in one patch
+makes review harder as more changes have to be thought about
+simultaneously and means that the different changes get tied up with
+each other and a problem with one can hold up others.
 
-That code won't help if you don't enable it ;-)
+> - MCLK is turned on on driver probe. This is done for several codecs that need this for 
+>   registers access (like CS4271).
 
-John Stultz was also looking into making the kernel/sched_clock.c code
-deal with short clocks.
+This seems like a retrograde step for systems that don't need it.  Would
+it not be better to make this configurable by the machine driver?
+
+> - SCLK and LRCLK rates are corrected, assuming we always send 32 bits * 2 channels to codec.
+
+What was the problem?
+
+> - Formats list shortened to just S32_LE, this makes all the DMA transactions right,
+>   while ALSA will do all sample format translation for us.
+
+Again, what was the actual problem?  32 bit samples seem very large if
+the hardware is capable of other formats, especially given that things
+like MP3 tend to produce 16 bit data.
