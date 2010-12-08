@@ -1,52 +1,50 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Tue, 7 Dec 2010 21:55:51 -0500
-Subject: [PATCH] ARM: Fix warning with gcc 4.5.1 in alignment fixup
-In-Reply-To: <1291753724-14437-1-git-send-email-jamie@jamieiles.com>
-References: <1291753724-14437-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <20101208025551.GY3368@mvista.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Wed, 8 Dec 2010 11:19:13 +0800
+Subject: [PATCHv2] support PMIC mc13892
+In-Reply-To: <20101207144818.GB9689@rakim.wolfsonmicro.main>
+References: <1291708905-23645-1-git-send-email-b00984@freescale.com>
+	<20101207144818.GB9689@rakim.wolfsonmicro.main>
+Message-ID: <AANLkTik_QfU8Db-J+xVf-1kpUfr0cGSFSJd0Lcidpf+-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 08:28:44PM +0000, Jamie Iles wrote:
-> With GCC 4.5.1 we get the following warning:
-> 
-> 	  CC      arch/arm/mm/alignment.o
-> 	arch/arm/mm/alignment.c: In function 'do_alignment':
-> 	arch/arm/mm/alignment.c:720:21: warning: 'offset.un' may be used
-> 	uninitialized in this function
-> 
-> This warning is triggered for the LDM/STM instructions which don't have
-> a register offset so set the offset to 0 to keep GCC happy.
+Hi,
 
-Your change looks fine to me.
+On Tue, Dec 7, 2010 at 10:48 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Dec 07, 2010 at 04:01:45PM +0800, b00984 at freescale.com wrote:
+>
+>> + ? ? mc13xxx_lock(priv->mc13xxx);
+>> + ? ? ret = mc13xxx_reg_read(priv->mc13xxx,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? mc13892_regulators[id].vsel_reg, &val);
+>> + ? ? mc13xxx_unlock(priv->mc13xxx);
+>> + ? ? if (ret)
+>> + ? ? ? ? ? ? return ret;
+>> +
+>> + ? ? hi ?= val & MC13892_SWITCHERS0_SWxHI;
+>> + ? ? if (value > 1375)
+>> + ? ? ? ? ? ? hi = 1;
+>> + ? ? if (value < 1100)
+>> + ? ? ? ? ? ? hi = 0;
+>> +
+>> + ? ? if (hi) {
+>> + ? ? ? ? ? ? value = (value - 1100000) / 25000;
+>> + ? ? ? ? ? ? value |= MC13892_SWITCHERS0_SWxHI;
+>> + ? ? } else
+>> + ? ? ? ? ? ? value = (value - 600000) / 25000;
+>> +
+>> + ? ? mask = mc13892_regulators[id].vsel_mask | MC13892_SWITCHERS0_SWxHI;
+>> + ? ? mc13xxx_lock(priv->mc13xxx);
+>> + ? ? ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13892_regulators[id].vsel_reg,
+>> + ? ? ? ? ? ? ? ? ? ? mask,
+>> + ? ? ? ? ? ? ? ? ? ? value << mc13892_regulators[id].vsel_shift);
+>> + ? ? mc13xxx_unlock(priv->mc13xxx);
+>
+> This section here reads like it's all one big read/modify/write cycle
+> and therefore the mutex ought to be held throughout?
+That's right.
 
---
-Regards,
-George
-
-> 
-> Cc: George G. Davis <gdavis@mvista.com>
-> Cc: Min Zhang <mzhang@mvista.com>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> ---
->  arch/arm/mm/alignment.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index 724ba3b..298aaef 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -824,8 +824,10 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  	case 0x08000000:	/* ldm or stm, or thumb-2 32bit instruction */
->  		if (thumb2_32b)
->  			handler = do_alignment_t32_to_handler(&instr, regs, &offset);
-> -		else
-> +		else {
->  			handler = do_alignment_ldmstm;
-> +			offset.un = 0;
-> +		}
->  		break;
->  
->  	default:
-> -- 
-> 1.7.3.2
+Yong
+>
+> Otherwise the patch looks good.
+>
