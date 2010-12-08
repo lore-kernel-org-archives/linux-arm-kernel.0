@@ -1,28 +1,44 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 8 Dec 2010 18:51:22 +0800
-Subject: [PATCH 0/2] Common struct clk implementation, v8
-In-Reply-To: <20101208103355.GK18244@pengutronix.de>
-References: <1291774094.269634.503532219345.0.gpush@pororo>
-	<20101208103355.GK18244@pengutronix.de>
-Message-ID: <201012081851.23218.jeremy.kerr@canonical.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Wed, 8 Dec 2010 18:52:36 +0800
+Subject: [PATCH v2 08/15] ARM: mxs: Add iomux support
+In-Reply-To: <19711.13023.154958.539289@ipc1.ka-ro>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-7-git-send-email-shawn.guo@freescale.com>
+	<19711.13023.154958.539289@ipc1.ka-ro>
+Message-ID: <AANLkTikb4Ytx==R=n7RDOXv+tKtVvgcTUX7R-QDQfVoc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Lothar,
 
-> I would have expected that clk-common is an ancestor of clk-common-mx51.
-> Currently it bases on v7(?) that doesn't have the spinlock.
-> 
-> BTW, I took a quick look over the patches in clk-common-mx51 and I think
-> arch/arm/plat-mxc/include/mach/clock.h doesn't compile without
-> CONFIG_USE_COMMON_STRUCT_CLK (because then there is no struct clk_mxc),
-> so either you need more magic or just remove the #ifndef
-> CONFIG_USE_COMMON_STRUCT_CLK.
+Thanks for the review.
 
-Ah, I haven't pushed updates to the clk-common-mx51 branch yet, I'll get to 
-this soon.
+On Wed, Dec 8, 2010 at 3:25 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> Hi,
+>
+> Shawn Guo writes:
+>> MXS-based SoCs implements iomux functions in block PINCTRL.
+>>
+>> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+>> ---
+>> Changes for v2:
+>> ?- Define iomux_cfg_t as u64
+> ? ? ^^^^^^^^^^^^^^^^^^^^^^^^^
+> Really?
+>
+>> +typedef struct pad_desc {
+>> + ? ? unsigned bank:12;
+>> + ? ? unsigned pin:20;
+>> + ? ? unsigned muxsel:8;
+>> + ? ? unsigned ma:12;
+>> + ? ? unsigned vol:8;
+>> + ? ? unsigned pull:4;
+>> +} iomux_cfg_t;
+> ^^^^^^^^^^^^^^^^^
+>
+I did not pick the correct word.  What I meant is 64 bits.  Since this
+error is in change log, I would fix it if there is v3 of the patch.
 
-Cheers,
-
-
-Jeremy
+-- 
+Regards,
+Shawn
