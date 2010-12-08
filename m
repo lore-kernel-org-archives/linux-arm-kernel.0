@@ -1,28 +1,194 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 8 Dec 2010 15:53:54 +0000
-Subject: Driver for Hard Disk GPIOs
-Message-ID: <20101208155354.GH1377@kw.sim.vm.gnt>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Wed, 8 Dec 2010 09:55:25 -0600
+Subject: [PATCH v10 4/6] davinci: MMC/SD support for Omapl138-Hawkboard
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247C470AD@dbde02.ent.ti.com>
+References: <1291760089-5818-1-git-send-email-vm.rod25@gmail.com>
+	<1291760089-5818-5-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247C470AD@dbde02.ent.ti.com>
+Message-ID: <AANLkTi=VZQAhC=Hm7dGB8tW38FA-SqLUc-GCiNUX7iSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 7, 2010 at 11:20 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> On Wed, Dec 08, 2010 at 03:44:47, vm.rod25 at gmail.com wrote:
+>
+>> +static __init void omapl138_hawk_mmc_init(void)
+>> +{
+>> + ? ? int ret;
+>> +
+>> + ? ? ret = davinci_cfg_reg_list(hawk_mmcsd0_pins);
+>> + ? ? if (ret) {
+>> + ? ? ? ? ? ? pr_warning("%s: MMC/SD0 mux setup failed: %d\n",
+>> + ? ? ? ? ? ? ? ? ? ? __func__, ret);
+>> + ? ? ? ? ? ? return;
+>> + ? ? }
+>> +
+>> + ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
+>> + ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC CD");
+>> + ? ? if (ret < 0) {
+>> + ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
+>> + ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_CD_PIN);
+>> + ? ? ? ? ? ? goto mmc_setup_cd_fail;
+>> + ? ? }
+>
+> A goto is only used when there is some recovery
+> to be done. In this case, you should simply return
+> here. The USB patch needs the same correction.
+>
+> Thanks,
+> Sekhar
 
-On some LaCie boards (and probably others), it is possible to control
-hard disk power using dedicated GPIOs as 'power enable' and 'presence
-detection'. I would like to add a driver for this GPIOs. The most
-interesting target is to provide support for scattered disk power-up.
+Sorry for this my mistake
 
-After a quick search, I have failed to match hard disk GPIOs with an
-existing Linux driver category. Where could be the appropriate location
-in the Linux tree ?
+It wil change to this
 
-Any hints are welcome.
++static __init void omapl138_hawk_mmc_init(void)
++{
++	int ret;
++
++	ret = davinci_cfg_reg_list(hawk_mmcsd0_pins);
++	if (ret) {
++		pr_warning("%s: MMC/SD0 mux setup failed: %d\n",
++			__func__, ret);
++		return;
++	}
++
++	ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
++			GPIOF_DIR_IN, "MMC CD");
++	if (ret < 0) {
++		pr_warning("%s: can not open GPIO %d\n",
++			__func__, DA850_HAWK_MMCSD_CD_PIN);
++		return;
++	}
++
++	ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
++			GPIOF_DIR_IN, "MMC WP");
++	if (ret < 0) {
++		pr_warning("%s: can not open GPIO %d\n",
++			__func__, DA850_HAWK_MMCSD_WP_PIN);
++		goto mmc_setup_wp_fail;
++	}
++
++	ret = da8xx_register_mmcsd0(&da850_mmc_config);
++	if (ret) {
++		pr_warning("%s: MMC/SD0 registration failed: %d\n",
++			__func__, ret);
++		goto mmc_setup_mmcsd_fail;
++	}
++
++	return;
++
++mmc_setup_mmcsd_fail:
++	gpio_free(DA850_HAWK_MMCSD_WP_PIN);
++mmc_setup_wp_fail:
++	gpio_free(DA850_HAWK_MMCSD_CD_PIN);
++}
++
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101208/f1a13660/attachment.sig>
+And USB will be this
+
++static __init void omapl138_hawk_usb_init(void)
++{
++	int ret;
++	u32 cfgchip2;
++
++	ret = davinci_cfg_reg_list(da850_hawk_usb11_pins);
++	if (ret) {
++		pr_warning("%s: USB 1.1 PinMux setup failed: %d\n",
++			__func__, ret);
++		return;
++	}
++
++	/* Setup the Ref. clock frequency for the HAWK@24 MHz. */
++
++	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
++	cfgchip2 &= ~CFGCHIP2_REFFREQ;
++	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
++	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
++
++	ret = gpio_request_one(DA850_USB1_VBUS_PIN,
++			GPIOF_DIR_OUT, "USB1 VBUS");
++	if (ret < 0) {
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
++			"power control: %d\n", __func__, ret);
++		return;
++	}
++
++	ret = gpio_request_one(DA850_USB1_OC_PIN,
++			GPIOF_DIR_IN, "USB1 OC");
++	if (ret < 0) {
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
++			"over-current indicator: %d\n", __func__, ret);
++		goto usb11_setup_oc_fail;
++	}
++
++	ret = da8xx_register_usb11(&omapl138_hawk_usb11_pdata);
++	if (ret) {
++		pr_warning("%s: USB 1.1 registration failed: %d\n",
++			__func__, ret);
++		goto usb11_setup_fail;
++	}
++
++	return;
++
++usb11_setup_fail:
++	gpio_free(DA850_USB1_OC_PIN);
++usb11_setup_oc_fail:
++	gpio_free(DA850_USB1_VBUS_PIN);
++}
++
+
+Thanks a lot for the comments
+
+Regards
+
+Victor Rodriguez
+
+
+>> +
+>> + ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
+>> + ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC WP");
+>> + ? ? if (ret < 0) {
+>> + ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
+>> + ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
+>> + ? ? ? ? ? ? goto mmc_setup_wp_fail;
+>> + ? ? }
+>> +
+>> + ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
+>> + ? ? if (ret) {
+>> + ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
+>> + ? ? ? ? ? ? ? ? ? ? __func__, ret);
+>> + ? ? ? ? ? ? goto mmc_setup_mmcsd_fail;
+>> + ? ? }
+>> +
+>> +mmc_setup_cd_fail:
+>> + ? ? return;
+>> +
+>> +mmc_setup_mmcsd_fail:
+>> + ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
+>> +mmc_setup_wp_fail:
+>> + ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
+>> +}
+>> +
+>> ?static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
+>> ? ? ? .enabled_uarts = 0x7,
+>> ?};
+>> @@ -127,6 +198,8 @@ static __init void omapl138_hawk_init(void)
+>> ? ? ? ? ? ? ? pr_warning("%s: EDMA registration failed: %d\n",
+>> ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
+>>
+>> + ? ? omapl138_hawk_mmc_init();
+>> +
+>> ? ? ? ret = da8xx_register_watchdog();
+>> ? ? ? if (ret)
+>> ? ? ? ? ? ? ? pr_warning("omapl138_hawk_init: "
+>> --
+>> 1.7.0.4
+>>
+>> _______________________________________________
+>> Davinci-linux-open-source mailing list
+>> Davinci-linux-open-source at linux.davincidsp.com
+>> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+>>
+>
+>
