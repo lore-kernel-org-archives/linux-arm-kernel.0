@@ -1,449 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Dec 2010 11:21:50 +0100
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <1291773932.578726.468741339223.1.gpush@pororo>
-References: <1291773932.578726.468741339223.1.gpush@pororo>
-Message-ID: <20101208102150.GJ18244@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 8 Dec 2010 10:24:58 +0000
+Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to work
+	withCONFIG_THUMB2_KERNEL
+In-Reply-To: <alpine.LFD.2.00.1012071412260.10437@xanadu.home>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
+	<1291656937-24992-2-git-send-email-dave.martin@linaro.org>
+	<8ff74b57e40b64459978eefba8f4c9ca@mail.gmail.com>
+	<AANLkTikOSb5-wBSy_ZANVsHga7XmWPrwP=0Xs0eGOxb5@mail.gmail.com>
+	<AANLkTimPiySTjzTw6owG8GWPv2OwoNQ=wyV4kdvP9EZu@mail.gmail.com>
+	<AANLkTi=7MXKUwjyPgDBO9XV-CZw7RNOmWKj0JP_kB9aC@mail.gmail.com>
+	<AANLkTin4oiDGqMJqjYO+5pCM4MffiGiTEKW5WxXx9gfg@mail.gmail.com>
+	<alpine.LFD.2.00.1012071412260.10437@xanadu.home>
+Message-ID: <AANLkTikVHOgujYh+28TFJDQbHx=AXT_5354bTy9+FLVR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+Hi,
 
-On Wed, Dec 08, 2010 at 10:05:32AM +0800, Jeremy Kerr wrote:
-> We currently have ~21 definitions of struct clk in the ARM architecture,
-> each defined on a per-platform basis. This makes it difficult to define
-> platform- (or architecture-) independent clock sources without making
-> assumptions about struct clk, and impossible to compile two
-> platforms with different struct clks into a single image.
-> 
-> This change is an effort to unify struct clk where possible, by defining
-> a common struct clk, containing a set of clock operations. Different
-> clock implementations can set their own operations, and have a standard
-> interface for generic code. The callback interface is exposed to the
-> kernel proper, while the clock implementations only need to be seen by
-> the platform internals.
-> 
-> This allows us to share clock code among platforms, and makes it
-> possible to dynamically create clock devices in platform-independent
-> code.
-> 
-> Platforms can enable the generic struct clock through
-> CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
-> consists of a common struct clk:
-> 
-> struct clk {
-> 	const struct clk_ops	*ops;
-> 	unsigned int		enable_count;
-> 	int			flags;
-> 	union {
-> 		struct mutex	mutex;
-> 		spinlock_t	spinlock;
-> 	} lock;
-> };
-> 
-> And a set of clock operations (defined per type of clock):
-> 
-> struct clk_ops {
-> 	int             (*enable)(struct clk *);
-> 	void            (*disable)(struct clk *);
-> 	unsigned long   (*get_rate)(struct clk *);
-> 	[...]
-> };
-> 
-> To define a hardware-specific clock, machine code can "subclass" the
-> struct clock into a new struct (adding any device-specific data), and
-> provide a set of operations:
-> 
-> struct clk_foo {
-> 	struct clk	clk;
-> 	void __iomem	*some_register;
-> };
-> 
-> struct clk_ops clk_foo_ops = {
-> 	.get_rate = clk_foo_get_rate,
-> };
-> 
-> The common clock definitions are based on a development patch from Ben
-> Herrenschmidt <benh@kernel.crashing.org>.
-> 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Acked-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> 
-> ---
->  arch/Kconfig        |    3 
->  include/linux/clk.h |  158 +++++++++++++++++++++++++++++++++++++++++---
->  kernel/Makefile     |    1 
->  kernel/clk.c        |  100 +++++++++++++++++++++++++++
->  4 files changed, 253 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 8bf0fa6..212bd3c 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -165,6 +165,9 @@ config HAVE_MIXED_BREAKPOINTS_REGS
->  config HAVE_USER_RETURN_NOTIFIER
->  	bool
->  
-> +config USE_COMMON_STRUCT_CLK
-> +	bool
-> +
->  config HAVE_PERF_EVENTS_NMI
->  	bool
->  	help
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 1d37f42..e09e40e 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -3,6 +3,7 @@
->   *
->   *  Copyright (C) 2004 ARM Limited.
->   *  Written by Deep Blue Solutions Limited.
-> + *  Copyright (c) 2010 Jeremy Kerr <jeremy.kerr@canonical.com>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -11,18 +12,163 @@
->  #ifndef __LINUX_CLK_H
->  #define __LINUX_CLK_H
->  
-> +#include <linux/err.h>
-> +#include <linux/mutex.h>
-> +#include <linux/spinlock.h>
-> +
->  struct device;
->  
-> -/*
-> - * The base API.
-> +#ifdef CONFIG_USE_COMMON_STRUCT_CLK
-> +
-> +#define CLK_ATOMIC	0x1
-> +
-> +/* If we're using the common struct clk, we define the base clk object here */
-> +
-> +/**
-> + * struct clk - hardware independent clock structure
-> + * @clk_ops:		implementation-specific ops for this clock
-> + * @enable_count:	count of clk_enable() calls active on this clock
-> + * @flags:		platform-independent flags
-> + * @lock:		lock for enable/disable or other HW-specific ops
-> + *
-> + * The base clock object, used by drivers for hardware-independent manipulation
-> + * of clock lines. This will be 'subclassed' by device-specific implementations,
-> + * which add device-specific data to struct clk. For example:
-> + *
-> + *  struct clk_foo {
-> + *      struct clk;
-> + *      [device specific fields]
-> + *  };
-> + *
-> + * The clock driver code will manage the device-specific data, and pass
-> + * clk_foo.clk to the common clock code. The clock driver will be called
-> + * through the @ops callbacks.
-> + *
-> + * The @lock member provides either a spinlock or a mutex to protect (at least)
-> + * @enable_count. The type of lock used will depend on @flags; if CLK_ATOMIC is
-> + * set, then the core clock code will use a spinlock, otherwise a mutex. This
-> + * lock will be acquired during clk_enable and clk_disable, so for atomic
-> + * clocks, these ops callbacks must not sleep.
-> + *
-> + * The choice of atomic or non-atomic clock depends on how the clock is enabled.
-> + * Typically, you'll want to use a non-atomic clock. For clocks that need to be
-> + * enabled/disabled in interrupt context, use CLK_ATOMIC. Note that atomic
-> + * clocks with parents will typically cascade enable/disable operations to
-> + * their parent, so the parent of an atomic clock *must* be atomic too.
-> + */
-> +struct clk {
-> +	const struct clk_ops	*ops;
-> +	unsigned int		enable_count;
-> +	int			flags;
-> +	union {
-> +		struct mutex	mutex;
-> +		spinlock_t	spinlock;
-> +	} lock;
-> +};
-> +
-> +/* static initialiser for non-atomic clocks */
-> +#define INIT_CLK(name, o) {						\
-> +	.ops		= &o,						\
-> +	.enable_count	= 0,						\
-> +	.flags		= 0,						\
-> +	.lock.mutex	= __MUTEX_INITIALIZER(name.lock.mutex),		\
-> +}
-> +
-> +/* static initialiser for atomic clocks */
-> +#define INIT_CLK_ATOMIC(name, o) {					\
-> +	.ops		= &o,						\
-> +	.enable_count	= 0,						\
-> +	.flags		= CLK_ATOMIC,					\
-> +	.lock.spinlock	= __SPIN_LOCK_UNLOCKED(name.lock.spinlock),	\
-> +}
-> +
-> +/**
-> + * clk_ops: Callback operations for clocks; these are to be provided by the
-> + * clock implementation, and will be called by drivers through the clk_* API.
-> + *
-> + * @enable:	Enable the clock. This must not return until the clock is
-> + *		generating a valid clock signal, usable by consumer devices.
-> + *		Called with clk->lock held.
-> + *
-> + * @disable:	Disable the clock. Called with clk->lock held.
-> + *
-> + * @get	/ @put:	Called by the core clock code to notify the driver about
-I wonder if this is valid kerneldoc.  The tab before / looks (IMHO)
-ugly.  Maybe specify "driver" a bit more to distinguish from "drivers"
-above.  "clk_ops driver"?
+On Tue, Dec 7, 2010 at 7:15 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 7 Dec 2010, Dave Martin wrote:
+>
+>> On Tue, Dec 7, 2010 at 2:53 PM, Dave Martin <dave.martin@linaro.org> wrote:
+>> [...]
+>> > Note that converting to C doesn't mean that code which attempts to
+>> > copy function bodies will work: you still need to handle the fact that
+>> > if f() is a C function symbol, then the value of the symbol f is
+>> > actually the function's base address + 1. ?See my changes in sram.c,
+>>
+>> To clarify, this applies *if* f is a Thumb symbol.
+>
+> To make it generic, a new macro could be used:
+>
+> #define SYM_ADDR(x) ((void *)((long)(x) & ~1L))
 
-> + *		refounts as clk is passed to drivers. Optional.
-> + *
-> + * For other callbacks, see the corresponding clk_* functions. Parameters and
-> + * return values are passed directly from/to these API functions directly, or
-duplicated "directly"
-> + * -ENOSYS is returned if the callback is NULL, see kernel/clk.c for
-> + * implementation details. All are optional.
->   */
-> +struct clk_ops {
-> +       int		(*enable)(struct clk *);
-> +       void		(*disable)(struct clk *);
-> +       int		(*get)(struct clk *);
-> +       void		(*put)(struct clk *);
-> +       unsigned long	(*get_rate)(struct clk *);
-> +       long		(*round_rate)(struct clk *, unsigned long);
-> +       int		(*set_rate)(struct clk *, unsigned long);
-> +       int		(*set_parent)(struct clk *, struct clk *);
-> +       struct clk *	(*get_parent)(struct clk *);
-> +};
->  
-> +static inline void __clk_lock(struct clk *clk)
-> +{
-> +	if (clk->flags & CLK_ATOMIC)
-> +		spin_lock(&clk->lock.spinlock);
-> +	else
-> +		mutex_lock(&clk->lock.mutex);
-> +}
-> +
-> +static inline void __clk_unlock(struct clk *clk)
-> +{
-> +	if (clk->flags & CLK_ATOMIC)
-> +		spin_unlock(&clk->lock.spinlock);
-> +	else
-> +		mutex_unlock(&clk->lock.mutex);
-> +}
-> +
-> +/**
-> + * __clk_get - update clock-specific refcounter
-> + *
-> + * @clk: The clock to refcount
-"The clock to update the refcount for"?
+Could do ... I wasn't sure if it was useful for just this one case,
+but I guess we may encounter others.  And it would make the code a lot
+less messy...
 
-> + *
-> + * Before a clock is returned from clk_get, this function should be called
-> + * to update any clock-specific refcounting.
-> + *
-> + * Returns non-zero on success, zero on failure.
-> + *
-> + * Drivers should not need this function; it is only needed by the
-> + * arch-specific clk_get() implementations.
-> + */
-> +int __clk_get(struct clk *clk);
-> +
-> +/**
-> + * clk_common_init - initialise a clock for driver usage
-> + *
-> + * Used for runtime intialization of clocks; you don't need to call this
-> + * if your clock has been (statically) initialized with INIT_CLK.
-> + */
-> +static inline void clk_common_init(struct clk *clk)
-> +{
-> +	clk->enable_count = 0;
-> +	if (clk->flags & CLK_ATOMIC)
-> +		spin_lock_init(&clk->lock.spinlock);
-> +	else
-> +		mutex_init(&clk->lock.mutex);
-> +}
-> +
-> +#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
->  
->  /*
-> - * struct clk - an machine class defined object / cookie.
-> + * Global clock object, actual structure is declared per-machine
->   */
->  struct clk;
->  
-> +static inline void clk_common_init(struct clk *clk) { }
-> +
-> +#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
-> +
->  /**
->   * clk_get - lookup and obtain a reference to a clock producer.
->   * @dev: device for clock "consumer"
-> @@ -83,12 +229,6 @@ unsigned long clk_get_rate(struct clk *clk);
->   */
->  void clk_put(struct clk *clk);
->  
-> -
-> -/*
-> - * The remaining APIs are optional for machine class support.
-> - */
-> -
-> -
->  /**
->   * clk_round_rate - adjust a rate to the exact rate a clock can provide
->   * @clk: clock source
-> diff --git a/kernel/Makefile b/kernel/Makefile
-> index 0b5ff08..01383a0 100644
-> --- a/kernel/Makefile
-> +++ b/kernel/Makefile
-> @@ -106,6 +106,7 @@ obj-$(CONFIG_PERF_EVENTS) += perf_event.o
->  obj-$(CONFIG_HAVE_HW_BREAKPOINT) += hw_breakpoint.o
->  obj-$(CONFIG_USER_RETURN_NOTIFIER) += user-return-notifier.o
->  obj-$(CONFIG_PADATA) += padata.o
-> +obj-$(CONFIG_USE_COMMON_STRUCT_CLK) += clk.o
->  
->  ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
->  # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
-> diff --git a/kernel/clk.c b/kernel/clk.c
-> new file mode 100644
-> index 0000000..1545e69
-> --- /dev/null
-> +++ b/kernel/clk.c
-> @@ -0,0 +1,100 @@
-> +/*
-> + * Copyright (C) 2010 Canonical Ltd <jeremy.kerr@canonical.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Standard functionality for the common clock API.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/module.h>
-> +
-> +int clk_enable(struct clk *clk)
-> +{
-> +	int ret = 0;
-> +
-> +	if (!clk->ops->enable)
-> +		return 0;
-> +
-> +	__clk_lock(clk);
-> +	if (!clk->enable_count)
-> +		ret = clk->ops->enable(clk);
-I wonder if it's worth to handle parents here, e.g.
+if so, a macro for exracting just the Thumb bit, and a macro for
+rebasing a symbol while preserving the Thumb bit could also be useful.
 
-	if (!clk->enable_count) {
-		struct clk *parent = clk_get_parent(clk);
-		if (parent) {
-			ret = clk_enable(parent);
-			if (ret)
-				return ret;
-		}
+#define SYM_STATE(x) ((long)(x) & 1)
+#define SYM_REBASE(new_addr, sym) ((void *)((long)SYM_ADDR(new_addr) |
+SYM_STATE(sym)))
 
-		ret = clk->ops->enable(clk);
-		if (likely(!ret))
-			clk->enable_count++;
-		else if (parent)
-			clk_disable(parent);
-	}
+The relationship could be a bit clearer if we use the name SYM_BASE
+instead of SYM_ADDR.
 
-as they are quite common.
+With these, the affected code becomes something like:
 
-And I wonder further if it makes the code a bit more efficient to use:
+memcpy(buffer, SYM_BASE(f), size_of_f);
+new_f = SYM_REBASE(f, buffer);
 
-	if (!clk->enable_count++) {
-		... enable clock (and maybe parent)
-		if (unlikely(ret))
-			clk->enable_count--
-		...
+What do you think?
 
+Is there a recommended type for a pointer-sized integer?  I notice
+linux/types.h defines uintptr_t (as unsigned long).
 
-> +
-> +	if (!ret)
-> +		clk->enable_count++;
-> +	__clk_unlock(clk);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_enable);
-> +
-> +void clk_disable(struct clk *clk)
-> +{
-> +	if (!clk->ops->disable)
-> +		return;
-
-	WARN_ON(!clk->enable_count) ?
-> +
-> +	__clk_lock(clk);
-> +
-> +	if (!--clk->enable_count)
-> +		clk->ops->disable(clk);
-> +
-> +	__clk_unlock(clk);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_disable);
-> +
-> +unsigned long clk_get_rate(struct clk *clk)
-> +{
-> +	if (clk->ops->get_rate)
-> +		return clk->ops->get_rate(clk);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_get_rate);
-> +
-> +int __clk_get(struct clk *clk)
-> +{
-> +	if (clk->ops->get)
-> +		return clk->ops->get(clk);
-> +	return 1;
-> +}
-> +EXPORT_SYMBOL_GPL(__clk_get);
-> +
-> +void clk_put(struct clk *clk)
-> +{
-> +	if (clk->ops->put)
-> +		clk->ops->put(clk);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_put);
-> +
-> +long clk_round_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	if (clk->ops->round_rate)
-> +		return clk->ops->round_rate(clk, rate);
-> +	return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_round_rate);
-> +
-> +int clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	if (clk->ops->set_rate)
-> +		return clk->ops->set_rate(clk, rate);
-> +	return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_rate);
-> +
-> +int clk_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	if (clk->ops->set_parent)
-> +		return clk->ops->set_parent(clk, parent);
-> +	return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_parent);
-> +
-> +struct clk *clk_get_parent(struct clk *clk)
-> +{
-> +	if (clk->ops->get_parent)
-> +		return clk->ops->get_parent(clk);
-> +	return ERR_PTR(-ENOSYS);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_get_parent);
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers
+---Dave
