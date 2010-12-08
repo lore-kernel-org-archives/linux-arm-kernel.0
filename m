@@ -1,69 +1,128 @@
-From: prasadjoshi124@gmail.com (Prasad Joshi)
-Date: Wed, 8 Dec 2010 13:04:17 +0000
-Subject: Linux kernel compilation failed with error: FPA is unsupported in the
-	AAPCS
-Message-ID: <AANLkTikjG0DYxcG9Mo6jVKs2jKe7-uGL6eh2jGF10dpD@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 8 Dec 2010 13:05:58 +0000
+Subject: [PATCH 2/3] ASoC: CS4271 codec support
+In-Reply-To: <1291809772.31916.4.camel@r60e>
+References: <1291809772.31916.4.camel@r60e>
+Message-ID: <20101208130558.GE16418@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello All,
+On Wed, Dec 08, 2010 at 03:02:52PM +0300, Alexander wrote:
 
-I am trying to compile the linux 2.6.36 kernel for arm-linux. This is
-the error I am getting during compilation.
+> From: Alexander Sverdlin <subaparts@yandex.ru>
+> 
+> Added support for CS4271 codec to ASoC.
+> 
+> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
 
-clfs at prasad-desktop:/mnt/clfs/sources/linux-2.6.36$ make
-ARCH=${CLFS_ARCH} CROSS_COMPILE=${CLFS_TARGET}- zImage modules
-  CHK     include/linux/version.h
-  CHK     include/generated/utsrelease.h
-make[1]: `include/generated/mach-types.h' is up to date.
-  CC      kernel/bounds.s
-kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
-make[1]: *** [kernel/bounds.s] Error 1
-make: *** [prepare0] Error 2
+Overall this looks very good but a few issues below, mostly coding
+style/clarity.
 
+> +static int cs4271_set_dai_fmt(struct snd_soc_dai *codec_dai,
+> +			      unsigned int format)
+> +{
+> +	struct snd_soc_codec *codec = codec_dai->codec;
+> +	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
+> +
+> +	cs4271->mode = format & SND_SOC_DAIFMT_FORMAT_MASK;
+> +
+> +	switch (format & SND_SOC_DAIFMT_MASTER_MASK) {
+> +	default:
+> +		dev_err(codec->dev, "Invalid DAI format\n");
+> +		return -EINVAL;
+> +	case SND_SOC_DAIFMT_CBS_CFS:
+> +		cs4271->master = 0;
+> +		break;
+> +	case SND_SOC_DAIFMT_CBM_CFM:
+> +		cs4271->master = 1;
+> +	}
 
-These are the environment variables
-export BUILD="-mabi=arm-linux"
-export CLFS_ARCH="arm"
-export CLFS_TARGET="arm-unknown-linux-uclibc"
-export CLFS_HOST="x86_64-cross-linux-gnu"
-export CLFS_ENDIAN="little"
-export CC="arm-unknown-linux-uclibc-gcc"
-export CXX="arm-unknown-linux-uclibc-g++"
-export AR="arm-unknown-linux-uclibc-ar"
-export AS="arm-unknown-linux-uclibc-as"
-export LD="arm-unknown-linux-uclibc-ld"
-export RANLIB="arm-unknown-linux-uclibc-ranlib"
-export READELF="arm-unknown-linux-uclibc-readelf"
-export STRIP="arm-unknown-linux-uclibc-strip"
+Missing break;  It's also much more usual to have the default: case be
+the last one.  Similarly for your other switch statements.
 
+> +	/* Configure ADC */
+> +	snd_soc_update_bits(codec, CS4271_ADCCTL, CS4271_ADCCTL_ADC_DIF_MASK,
+> +		(cs4271->mode == SND_SOC_DAIFMT_I2S) ?
+> +		CS4271_ADCCTL_ADC_DIF_I2S : CS4271_ADCCTL_ADC_DIF_LJ);
 
+Please don't use the ternery operator like this, it's not terribly
+legible.
 
-clfs at prasad-desktop:/mnt/clfs/sources/linux-2.6.36$
-arm-unknown-linux-uclibc-gcc -v
-Using built-in specs.
-COLLECT_GCC=arm-unknown-linux-uclibc-gcc
-COLLECT_LTO_WRAPPER=/mnt/clfs/cross-tools/libexec/gcc/arm-unknown-linux-uclibc/4.5.1/lto-wrapper
-Target: arm-unknown-linux-uclibc
-Configured with: ../gcc-4.5.1/configure --prefix=/mnt/clfs/cross-tools
---build=x86_64-cross-linux-gnu --host=x86_64-cross-linux-gnu
---target=arm-unknown-linux-uclibc --with-sysroot=/mnt/clfs
---disable-nls --disable-shared --with-mpfr=/mnt/clfs/cross-tools
---with-gmp=/mnt/clfs/cross-tools --without-headers --with-newlib
---disable-decimal-float --disable-libgomp --disable-libmudflap
---disable-libssp --disable-threads --enable-languages=c :
-(reconfigured) ../gcc-4.5.1/configure --prefix=/mnt/clfs/cross-tools
---build=x86_64-cross-linux-gnu --target=arm-unknown-linux-uclibc
---host=x86_64-cross-linux-gnu --with-sysroot=/mnt/clfs --disable-nls
---enable-shared --enable-languages=c --enable-c99 --enable-long-long
---with-mpfr=/mnt/clfs/cross-tools --with-gmp=/mnt/clfs/cross-tools
-Thread model: posix
-gcc version 4.5.1 (GCC)
+> +static const char *cs4271_de_texts[] = {"None", "44.1KHz", "48KHz", "32KHz"};
+> +static const struct soc_enum cs4271_de_enum =
+> +	SOC_ENUM_SINGLE(CS4271_DACCTL, 4, 4, cs4271_de_texts);
 
+Ideally the deemphasis would be managed based on the sample rate.
 
-Can someone please help?
+> +struct snd_soc_dai_driver cs4271_dai = {
+> +	.name = "cs4271-hifi",
+> +	.playback = {
+> +		.stream_name = "Playback",
+> +		.channels_min = 2,
+> +		.channels_max = 2,
+> +		.rates = SNDRV_PCM_RATE_8000_96000,
+> +		.rate_min = 8000,
+> +		.rate_max = 96000,
 
-I am not subscribed to the mailing list, please include me in CC when replying.
+No need to set rate_min and rate_max if rates is set.
 
-Thanks and Regards,
-Prasad
+Looking at the code above I suspect you need to set symmetric_rates on
+the DAI too - it looks like the playback and capture must be at the same
+rate.
+
+> +/*
+> + * This function writes all writeble registers from cache to codec.
+> + * It's used to setup initial config and restore after suspend.
+> + */
+> +static int cs4271_write_cache(struct snd_soc_codec *codec)
+> +{
+> +	int i, ret;
+> +
+> +	for (i = CS4271_LASTREG; i >= CS4271_FIRSTREG; i--) {
+> +		ret = snd_soc_write(codec, i, snd_soc_read(codec, i));
+> +		if (ret) {
+> +			dev_err(codec->dev, "Cache write failed\n");
+> +			return ret;
+> +		}
+> +	}
+
+If you use the standard cache code in soc-cache.c there's a standard
+cache sync implementation you could use - snd_soc_cache_sync().
+
+> +#ifdef CONFIG_PM
+> +static int cs4271_soc_suspend(struct snd_soc_codec *codec, pm_message_t mesg)
+> +{
+> +	/* Set power-down bit */
+> +	snd_soc_update_bits(codec, CS4271_MODE2, CS4271_MODE2_PDN,
+> +		CS4271_MODE2_PDN);
+> +
+> +	return 0;
+> +}
+> +#else
+> +#define cs4271_soc_suspend	NULL
+> +#endif /* CONFIG_PM */
+> +
+> +static int cs4271_soc_resume(struct snd_soc_codec *codec)
+> +{
+
+A comment explaining why this isn't in the ifdef above would be useful.
+I guessed why it was being done before I searched but it'd be good to be
+clear.
+
+> +	if ((gpio_disable >= 0) &&
+> +		gpio_request(gpio_disable, "CS4271 Disable"))
+> +		gpio_disable = -EINVAL;
+> +	if (gpio_disable >= 0)
+> +		gpio_direction_output(gpio_disable, 0);
+
+This is quite hard to read.  One issue is that the indentation of the
+second argument to the && is very confusing as it's lined up with the
+contents of the if statement, the other is that non-explicit check on
+the return value of gpio_request() means the expected value is not so
+clear as it could be.
+
+> +static struct i2c_driver cs4271_i2c_driver = {
+> +	.driver = {
+> +		.name	= "cs4271-codec",
+
+No need for the -codec.
