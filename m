@@ -1,67 +1,55 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Wed, 8 Dec 2010 13:58:17 +0800
-Subject: [PATCH v3 06/15] ARM: mxs: Add timer support
-In-Reply-To: <20101207211858.GD14775@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-5-git-send-email-shawn.guo@freescale.com>
-	<20101207211858.GD14775@pengutronix.de>
-Message-ID: <AANLkTimTqWorHFJOAzpcJU_Z1N9Aw=Pk63xZpRVR4_SV@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 8 Dec 2010 11:29:37 +0530
+Subject: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
+	forCONFIG_THUMB2_KERNEL
+In-Reply-To: <2080abb418a8d3c651dd41353ef59d25@mail.gmail.com>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org><1291656937-24992-3-git-send-email-dave.martin@linaro.org><a86d8e4b47fad17e71d0202f3c469868@mail.gmail.com>
+	<AANLkTinPifchS23j5EdrhMBNNdtEfF_KmX=AE9tUiiL=@mail.gmail.com>
+	<2080abb418a8d3c651dd41353ef59d25@mail.gmail.com>
+Message-ID: <d9fec68fc0ce14215439c6e753871bc2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Dave,
 
-2010/12/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Wed, Dec 08, 2010 at 12:31:56AM +0800, Shawn Guo wrote:
-[...]
->> +static int timrotv2_set_next_event(unsigned long evt,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct clock_event_device *dev)
->> +{
->> + ? ? unsigned long match;
->> +
->> + ? ? /* timrot decrements the count */
->> + ? ? match = __raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(0))
->> + ? ? ? ? ? ? ? ? ? ? - evt;
->> + ? ? __raw_writel(match, timer_base + HW_TIMROT_MATCH_COUNTn(0));
->> +
->> + ? ? return (int)(match - __raw_readl(timer_base +
->> + ? ? ? ? ? ? ? ? ? ? HW_TIMROT_RUNNING_COUNTn(0))) > 0 ? -ETIME : 0;
-> Wouldn't it be easier to use the same approach as in timrotv1? ?(i.e.
-> use two timers and then having a simpler set_next_event.)
+> -----Original Message-----
+> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> Sent: Wednesday, December 08, 2010 11:27 AM
+> To: Dave Martin
+> Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; linux-
+> omap at vger.kernel.org; linaro-dev at lists.linaro.org
+> Subject: RE: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
+> forCONFIG_THUMB2_KERNEL
 >
-Using two timrotv1 timers is not to make code look simpler. Instead,
-we have to use two, because timrotv1 has no match function.  One most
-significant improvement of v2 over v1 is adding match function, so
-that one v2 timer can serve clock_event and clocksource without
-problem.  I would keep the implementation to utilize v2 capability,
-save timer resource and show the difference between v1 and v2.
+> > -----Original Message-----
+> > From: Dave Martin [mailto:dave.martin at linaro.org]
+> > Sent: Tuesday, December 07, 2010 10:21 PM
+> > To: Santosh Shilimkar
+> > Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; linux-
+> > omap at vger.kernel.org; linaro-dev at lists.linaro.org
+> > Subject: Re: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
+> > forCONFIG_THUMB2_KERNEL
+> >
+> > Hi,
+> >
+> > On Tue, Dec 7, 2010 at 6:28 AM, Santosh Shilimkar
+> > <santosh.shilimkar@ti.com> wrote:
+> > > Dave,
 
->> +}
->> +
->> +static irqreturn_t mxs_timer_interrupt(int irq, void *dev_id)
->> +{
->> + ? ? struct clock_event_device *evt = &clockevent_mxs;
-> I assume dev_id is &clockevent_mxs
+[.....]
 >
-The assumption is only true if we assign &clockevent_mxs to dev_id.
-So you want to see the following change?
+> > So anything inside #ifdef CONFIG_THUMB2_KERNEL can assume v7/Thumb-2
+> > capable (and hence reasonably new) tools.
+> >
+> > I'll follow up shortly with a patch to the generic ARM Kconfig to make
+> > this explicit, so that ARCH_OMAP2 and THUMB2_KERNEL can't accidentally
+> > be configured together.
+> >
+> sure
 
- static irqreturn_t mxs_timer_interrupt(int irq, void *dev_id)
- {
--       struct clock_event_device *evt = &clockevent_mxs;
-+       struct clock_event_device *evt = dev_id;
+When you are doing the changes can you please check if you could build
+the THUMB2 kernel with omap2plus_defconfig. I suspect the build will
+fail.
 
-        timrot_irq_acknowledge();
-        evt->event_handler(evt);
-
- static struct irqaction mxs_timer_irq = {
-        .name           = "MXS Timer Tick",
-+       .dev_id         = &clockevent_mxs,
-        .flags          = IRQF_TIMER | IRQF_IRQPOLL,
-        .handler        = mxs_timer_interrupt,
- };
-
-
--- 
 Regards,
-Shawn
+Santosh
