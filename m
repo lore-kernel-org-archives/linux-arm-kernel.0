@@ -1,21 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Dec 2010 10:19:23 +0000
-Subject: generic irq handler and stack?
-In-Reply-To: <201012080954.13998.tim.sander@hbm.com>
-References: <201012071129.26211.tim.sander@hbm.com>
-	<201012071356.16281.tim.sander@hbm.com>
-	<20101207150203.GA23589@n2100.arm.linux.org.uk>
-	<201012080954.13998.tim.sander@hbm.com>
-Message-ID: <20101208101923.GA8221@n2100.arm.linux.org.uk>
+From: vbarshak@mvista.com (Valentine Barshak)
+Date: Wed, 08 Dec 2010 13:25:14 +0300
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
+	RWFO fix
+In-Reply-To: <20101124183936.GA18796@mvista.com>
+References: <20101124183936.GA18796@mvista.com>
+Message-ID: <4CFF5D0A.7030700@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 08, 2010 at 09:54:13AM +0100, Tim Sander wrote:
-> Hi Russell
-> > We don't run interrupts in IRQ mode.  The exception is entered in IRQ
-> > mode, but we then save what state is necessary and switch to SVC mode.
-> Ok. So e58aa3d2d0cc01ad8d6f7f640a0670433f794922 probably doesn't add any
-> additional delays in this case.
+Valentine Barshak wrote:
+> Updated according to the comments to avoid r/w outside the buffer and
+> used byte r/w for the possible unaligned data. Seems to work fine.
+>
+>   
+Any comments on this one?
 
-I fail to see what has that commit ID got to do with whether we run IRQ
-handlers in IRQ mode or SVC mode.
+Thanks,
+Val.
+> Cache ownership must be acqired by reading/writing data from the
+> cache line to make cache operation have the desired effect on the
+> SMP MPCore CPU. However, the ownership is never aquired in the
+> v6_dma_inv_range function when cleaning the first line and
+> flushing the last one, in case the address is not aligned
+> to D_CACHE_LINE_SIZE boundary.
+> Fix this by reading/writing data if needed, before performing
+> cache operations.
+> While at it, fix v6_dma_flush_range to prevent RWFO outside
+> the buffer.
+>
+> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+> Signed-off-by: George G. Davis <gdavis@mvista.com>
