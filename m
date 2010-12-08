@@ -1,84 +1,54 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 8 Dec 2010 15:21:10 +0100
-Subject: Linux kernel compilation failed with error: FPA is unsupported in
-	the AAPCS
-In-Reply-To: <AANLkTi=zWaZro08Q_8jSwpWfjdJsk7oRSV4bB7i_OYBD@mail.gmail.com>
-References: <AANLkTikjG0DYxcG9Mo6jVKs2jKe7-uGL6eh2jGF10dpD@mail.gmail.com>
-	<20101208133719.GC2716@pulham.picochip.com>
-	<AANLkTi=zWaZro08Q_8jSwpWfjdJsk7oRSV4bB7i_OYBD@mail.gmail.com>
-Message-ID: <19711.37974.746770.294781@pilspetsen.it.uu.se>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 08 Dec 2010 15:26:16 +0100
+Subject: [PATCHv3] support PMIC mc13892
+In-Reply-To: <20101208100138.GB16418@rakim.wolfsonmicro.main> (Mark Brown's
+	message of "Wed, 8 Dec 2010 10:01:38 +0000")
+References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
+	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
+	<20101208091226.GD18244@pengutronix.de>
+	<20101208100138.GB16418@rakim.wolfsonmicro.main>
+Message-ID: <87r5dsl4s7.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prasad Joshi writes:
- > On Wed, Dec 8, 2010 at 1:37 PM, Jamie Iles <jamie@jamieiles.com> wrote:
- > > On Wed, Dec 08, 2010 at 01:04:17PM +0000, Prasad Joshi wrote:
- > >> Hello All,
- > >>
- > >> I am trying to compile the linux 2.6.36 kernel for arm-linux. This is
- > >> the error I am getting during compilation.
- > >>
- > >> clfs at prasad-desktop:/mnt/clfs/sources/linux-2.6.36$ make
- > >> ARCH=${CLFS_ARCH} CROSS_COMPILE=${CLFS_TARGET}- zImage modules
- > >> ? CHK ? ? include/linux/version.h
- > >> ? CHK ? ? include/generated/utsrelease.h
- > >> make[1]: `include/generated/mach-types.h' is up to date.
- > >> ? CC ? ? ?kernel/bounds.s
- > >> kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
- > >> make[1]: *** [kernel/bounds.s] Error 1
- > >> make: *** [prepare0] Error 2
- > >>
- > >> These are the environment variables
- > >> export BUILD="-mabi=arm-linux"
- > >> export CLFS_ARCH="arm"
- > >> export CLFS_TARGET="arm-unknown-linux-uclibc"
- > >> export CLFS_HOST="x86_64-cross-linux-gnu"
- > >> export CLFS_ENDIAN="little"
- > >> export CC="arm-unknown-linux-uclibc-gcc"
- > >> export CXX="arm-unknown-linux-uclibc-g++"
- > >> export AR="arm-unknown-linux-uclibc-ar"
- > >> export AS="arm-unknown-linux-uclibc-as"
- > >> export LD="arm-unknown-linux-uclibc-ld"
- > >> export RANLIB="arm-unknown-linux-uclibc-ranlib"
- > >> export READELF="arm-unknown-linux-uclibc-readelf"
- > >> export STRIP="arm-unknown-linux-uclibc-strip"
- > >>
- > >> clfs at prasad-desktop:/mnt/clfs/sources/linux-2.6.36$
- > >> arm-unknown-linux-uclibc-gcc -v
- > >> Using built-in specs.
- > >> COLLECT_GCC=arm-unknown-linux-uclibc-gcc
- > >> COLLECT_LTO_WRAPPER=/mnt/clfs/cross-tools/libexec/gcc/arm-unknown-linux-uclibc/4.5.1/lto-wrapper
- > >> Target: arm-unknown-linux-uclibc
- > >> Configured with: ../gcc-4.5.1/configure --prefix=/mnt/clfs/cross-tools
- > >> --build=x86_64-cross-linux-gnu --host=x86_64-cross-linux-gnu
- > >> --target=arm-unknown-linux-uclibc --with-sysroot=/mnt/clfs
- > >> --disable-nls --disable-shared --with-mpfr=/mnt/clfs/cross-tools
- > >> --with-gmp=/mnt/clfs/cross-tools --without-headers --with-newlib
- > >> --disable-decimal-float --disable-libgomp --disable-libmudflap
- > >> --disable-libssp --disable-threads --enable-languages=c :
- > >> (reconfigured) ../gcc-4.5.1/configure --prefix=/mnt/clfs/cross-tools
- > >> --build=x86_64-cross-linux-gnu --target=arm-unknown-linux-uclibc
- > >> --host=x86_64-cross-linux-gnu --with-sysroot=/mnt/clfs --disable-nls
- > >> --enable-shared --enable-languages=c --enable-c99 --enable-long-long
- > >> --with-mpfr=/mnt/clfs/cross-tools --with-gmp=/mnt/clfs/cross-tools
- > >> Thread model: posix
- > >> gcc version 4.5.1 (GCC)
- > > If your kernel is configured for EABI (CONFIG_AEABI=y) then you'll need a
- > > compiler built for EABI. You can find one at
- > > http://kernel.org/pub/tools/crosstool/files/bin/ that doesn't have a libc.
- > >
- > 
- > Thanks a lot Jamie and Mikael. I can not follow what is EABI or OABI.
- > But while configuring the linux kernel I enabled EABI. After disabling
- > it, make is running smoothly.
- > 
- > I have one more (silly) question on same, my intention behind
- > compiling the linux kernel is to boot RealView ARM under QEMU. Would
- > disabling EABI would make kernel unbootable with QEMU?
+Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
-The kernel, no, but user-space won't work if it's EABI while the kernel
-is OABI.  I'm guessing your user-space is arm-unknown-linux-uclibc, which
-presumably is OABI, so an OABI kernel should be selected.
+> On Wed, Dec 08, 2010 at 10:12:26AM +0100, Uwe Kleine-K?nig wrote:
+>
+> Please cut unneded context - it makes it much easier to find the new
+> text in your replies!
+>
+>> > +	if (ret)
+>> > +		goto err_alloc;
+>
+>> err_alloc seems wrong.  The goto is taken when reading the revision
+>> register fails, not on a failed allocation.
+>
+> His code is following the style of naming the exit points after what
+> needs to be unwound rather than after the place jumped from which is
+> common enough?
+>
+>> > +#define MC13892_PWGT1SPI	21
+>> > +#define MC13892_PWGT2SPI	22
+>> > +#define MC13892_VCOINCELL	23
+>
+>> I thought you wanted to put these somewhere below drivers/regulator/.
+>
+> Please.
 
-However, OABI is becoming obsolete and unsupported.  New projects should
-be EABI.
+If we move this header into drivers/regulator, how are we supposed to
+declared regulators in the machine file ?
+The regulator code does:
+                priv->regulators[i] = regulator_register(
+                                &mc13892_regulators[init_data->id].desc,
+                                &pdev->dev, init_data->init_data, priv);
+
+so, I'm declaring like this in the machine file:
+static struct mc13xxx_regulator_init_data mx51_efikamx_regulators[] = {
+        { .id = MC13892_SW1,            .init_data =  &sw1_init },
+        { .id = MC13892_SW2,            .init_data =  &sw2_init },
+
+I'm stupid enough to think that .id should match in the machine file and
+in the regulator driver. Did I miss something ?
+
+Arnaud
