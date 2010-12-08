@@ -1,135 +1,91 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Wed, 8 Dec 2010 19:07:55 +1100
-Subject: [PATCH] Added i2c support for mc13xxx-core
-In-Reply-To: <AANLkTikuhKAsgY-9X+FUzeL5piv5S6Cy4_RXdiAD0efP@mail.gmail.com>
-References: <201012070854.21049.marc@cpdesign.com.au>
-	<1291706087-6476-2-git-send-email-marc@cpdesign.com.au>
-	<AANLkTikuhKAsgY-9X+FUzeL5piv5S6Cy4_RXdiAD0efP@mail.gmail.com>
-Message-ID: <201012081907.55980.marc@cpdesign.com.au>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Wed, 8 Dec 2010 09:24:28 +0100
+Subject: [PATCH v2 04/15] ARM: mxs: Add interrupt support
+In-Reply-To: <1291739523-25077-3-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <19711.16572.458847.161711@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi,
 
-> It's better to use git format-patch to gernerate patch for review, by
-> which you can add some commit information and s-o-b stuff.
-
-I've submitted a (slightly) better patch earlier today. (although this was 
-generated via format-patch, I forgot the sob.). 
-
-My main hope was to get some indication that I was progressing along the right 
-path.
-
-> Please see inline comments.
-Thanks, replies also in-line.
-
-snip...
-
-> > +               if (usespi) {
-> > +                       const struct spi_device_id *devid =
-> > +                               spi_get_device_id(mc13xxx->spidev);
-> > +                       if (!devid || devid->driver_data !=
-> > mc13xxx->icid) +                               dev_warn(mc13xxx->pdev,
-> > "device id doesn't " +                                              
-> > "match auto detection!\n"); +               } else {
-> > +                       /* TODO */
+Shawn Guo writes:
+> Add Interrupt Collector (ICOLL) support for MXS-based.
 > 
-> todo what? remove this or add real code here.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Changes for v2:
+>  - Get icoll base in get_irqnr_preamble
+>  - Check the case of single SoC build and use hard-coding address if possible
 > 
-
-I wasn't immediately sure of what the equivalent way to do this via the i2c 
-subsystem is. I'm not sure how useful it would be anyway, so I'll leave it out 
-in future.
-
-snip ...
-
-> > +       mutex_init(&mc13xxx->lock);
-> > +       mc13xxx_lock(mc13xxx);
-> > +
-> > +       ret = mc13xxx_identify(mc13xxx, 0);
-> > +       if (ret || (mc13xxx->icid == MC13XXX_ID_INVALID))
-> > +               goto err_revision;
-> > +
-> > +       /* mask all irqs */
-> > +       ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK0, 0x00ffffff);
-> > +       if (ret)
-> > +               goto err_mask;
-> > +
-> > +       ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK1, 0x00ffffff);
-> > +       if (ret)
-> > +               goto err_mask;
-> > +
-> > +       ret = request_threaded_irq(mc13xxx->irq, NULL,
-> > mc13xxx_irq_thread, +                       IRQF_ONESHOT |
-> > IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx); +
-> > +       if (ret) {
-> > +err_mask:
+>  arch/arm/mach-mxs/icoll.c                    |   77 ++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/entry-macro.S |   44 +++++++++++++++
+>  2 files changed, 121 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/icoll.c
+>  create mode 100644 arch/arm/mach-mxs/include/mach/entry-macro.S
 > 
-> > +err_revision:
-> Why two labels here?
+[...]
+> diff --git a/arch/arm/mach-mxs/include/mach/entry-macro.S b/arch/arm/mach-mxs/include/mach/entry-macro.S
+> new file mode 100644
+> index 0000000..2c7755b
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/entry-macro.S
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Low-level IRQ helper macros for Freescale MXS-based
+> + *
+> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#include <mach/hardware.h>
+> +
+> +	.macro	disable_fiq
+> +	.endm
+> +
+> +	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> +	ldr	\irqnr, [\base, #0x70]
+> +	cmp	\irqnr, #0x7F
+> +	moveqs	\irqnr, #0
+> +	.endm
+> +
+> +	.macro  get_irqnr_preamble, base, tmp
+> +#if defined (CONFIG_SOC_IMX23) && defined (CONFIG_SOC_IMX28)
+> +	ldr	\base, =icoll_base
+> +	ldr	\base, [\base]
+> +#elif defined (CONFIG_SOC_IMX23)
+> +	ldr	\base, =MX23_ICOLL_BASE_ADDR
+>
+MX23_IO_ADDRESS(MX23_ICOLL_BASE_ADDR)
 
-Copied from existing code. 
+> +#else
+> +	ldr	\base, =MX28_ICOLL_BASE_ADDR
+>
+MX28_IO_ADDRESS(MX28_ICOLL_BASE_ADDR)
 
-> Also, if ret == 0, the lock will not be released.
 
-The lock is released in mc13xxx_common_probe. 
-Yes, it would be better in this function, before common_probe is called.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-> 
-> > +               mutex_unlock(&mc13xxx->lock);
-> > +               kfree(mc13xxx);
-> > +               return ret;
-> > +       }
-> > +
-> > +       return mc13xxx_common_probe(mc13xxx,pdata);
-> > +}
-> > +
-> > +static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-> > +{
-> > +       struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-> > +
-> > +       free_irq(mc13xxx->irq, mc13xxx);
-> > +
-> > +       mfd_remove_devices(&client->dev);
-> > +
-> > +       kfree(mc13xxx);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct i2c_device_id mc13xxx_i2c_idtable[] = {
-> > +       { "mc13892", MC13XXX_ID_MC13892},
-> > +       { }
-> 
-> you may want to remove empty '{}'
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Again, mimicking the existing spi device table.
-
-> 
-> > +};
-> > +
-> > +static struct i2c_driver mc13xxx_i2c_driver = {
-> > +       .driver = {
-> > +               .owner = THIS_MODULE,
-> > +               .name = "mc13xxx-i2c"
-> > +       },
-> > +       .id_table = mc13xxx_i2c_idtable,
-> > +       .probe = mc13xxx_i2c_probe,
-> > +       .remove = __devexit_p(mc13xxx_i2c_remove),
-> >  };
-> > 
-> >  static int __init mc13xxx_init(void)
-> >  {
-> > -       return spi_register_driver(&mc13xxx_driver);
-> > +       int i2cret;
-> > +       int spiret;
-> > +       i2cret = i2c_add_driver(&mc13xxx_i2c_driver);
-> > +       spiret = spi_register_driver(&mc13xxx_driver);
-> > +
-> > +       return (i2cret == 0) && (spiret == 0);
-
-For the record, I missed this, its fixed in my later patch. Return should be 0 
-if both are successful.
-
-Cheers,
-Marc
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
