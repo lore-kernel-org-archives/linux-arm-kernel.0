@@ -1,26 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Dec 2010 09:52:08 +0100
-Subject: [PATCHv3] support PMIC mc13892
-In-Reply-To: <AANLkTim-_Xft9b0D3PfG8bC6_m4Kp0GtC8ZwW-NEp5-0@mail.gmail.com>
-References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
-	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
-	<AANLkTim-_Xft9b0D3PfG8bC6_m4Kp0GtC8ZwW-NEp5-0@mail.gmail.com>
-Message-ID: <20101208085208.GA10745@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 08 Dec 2010 09:53:52 +0100
+Subject: [PATCH v2] mach-at91: Support for gms board added
+In-Reply-To: <4CFE90CA.9050004@bluewatersys.com>
+References: <1291732927-9429-1-git-send-email-plyatov@gmail.com>
+	<4CFE90CA.9050004@bluewatersys.com>
+Message-ID: <4CFF47A0.8010208@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi Igor,
 
-On Wed, Dec 08, 2010 at 11:28:38AM +0800, Yong Shen wrote:
-> Last time, you took the previous patches for mc13783 code
-> reorganization in your tree, I suppose you can also please take
-> mc13892, which had passed review.
-IMHO it's fair to wait a bit longer than 7 minutes after the last post
-to request merging.  The changes compared to v2 might be trivial, still
-you should give your reviewers a chance to check what you did.
+Le 07/12/2010 20:53, Ryan Mallon :
+> On 12/08/2010 03:42 AM, Igor Plyatov wrote:
+>> * The gms is a board from GeoSIG Ltd company.
+>>   It is based on the Stamp9G20 module from Taskit company.
+>> * This is a second version of the patch with adjustments according
+>>   to comments from Ryan Mallon.
+>> * This patch made for Linux 2.6.37-rc5.
 
-Uwe
+First thank you for submitting this board support.
 
+>> Signed-off-by: Igor Plyatov <plyatov@gmail.com>
+>> ---
+
+[..]
+
+> Couple more comments below.
+> Looking at this a bit more closely, the Stamp9G20 is a system on module
+> (SoM) board. The MACH_STAMP9G20 option supports the Stamp9G20 on
+> taskits's evaluation board and the MACH_PCONTROL_G20 option supports it
+> on the PControl carrier board. There is a reasonable amount of code
+> replication in each of the board files for the UARTs, NAND, MMC, etc.
+> 
+> Would it be better to have MACH_STAMPG20/board-stamp-9g20.c contain the
+> core support for the Stamp9G20 module and then each of the carrier board
+> files contain only the setup/devices found on the carrier board?
+
+I have exactly the same feeling as Ryan. We should make sure 
+to factorize as much code as possible for maintenance reasons.
+
+If you need to distinguish between board features, you can 
+pass information in system_rev as implemented in this 
+board merging commit:
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=a6e016f19d393fbe4e040bee8155b03b840fa689
+
+Best regards,
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Nicolas Ferre
