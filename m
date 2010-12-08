@@ -1,70 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Dec 2010 21:57:40 +0100
-Subject: [PATCH v2 09/15] ARM: mxs: Add clock support
-In-Reply-To: <1291739523-25077-8-git-send-email-shawn.guo@freescale.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-8-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101208205740.GG17441@pengutronix.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 08 Dec 2010 12:57:55 -0800
+Subject: [PATCH 11/14] OMAP4: PRCM: reorganize existing OMAP4 PRCM header
+	files
+In-Reply-To: <alpine.DEB.2.00.1012072338130.13430@utopia.booyaka.com> (Paul
+	Walmsley's message of "Tue, 7 Dec 2010 23:40:03 -0700 (MST)")
+References: <20101207012242.3708.45451.stgit@twilight.localdomain>
+	<20101207012514.3708.87532.stgit@twilight.localdomain>
+	<4CFE9C7C.6060101@ti.com>
+	<alpine.DEB.2.00.1012072338130.13430@utopia.booyaka.com>
+Message-ID: <8739q8gey4.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 08, 2010 at 12:31:59AM +0800, Shawn Guo wrote:
-> Add clock for MXS-based SoCs, MX23 and MX28.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Changes for v2:
->  - Shift pll0_clock freq 480MHz in children freq computation to avoid overflow
-really?
+Paul Walmsley <paul@pwsan.com> writes:
 
-> [...]
-> +/*
-> + * pll_clk
-> + */
-> +static unsigned long pll_clk_get_rate(struct clk *clk)
-> +{
-> +	return 480000000;
-pll's get_rate still returns 0x1c9c3800
+> On Tue, 7 Dec 2010, Cousson, Benoit wrote:
+>
+>> On 12/7/2010 2:25 AM, Paul Walmsley wrote:
+>> 
+>> [...]
+>> 
+>> > + *
+>> > + * XXX This file needs to be updated to align on one of "OMAP4",
+>> > "OMAP44XX",
+>> > + *     or "OMAP4430".
+>> 
+>> Yep, I was thinking to change that as well. My first thought was OMAP4 to get
+>> a shorter name, but when we will introduce OMAP4440, we might have some new
+>> entries, that will looks ugly close to OMAP4.
+>> So at the end I will prefer OMAP44XX for the moment and we might renamed to
+>> OMAP4430 or OMAP4440 for the entries that will diverge.
+>> 
+>> Do you want to change that for 2.6.38?
+>> It will require some sync with the various users of these defines, but that
+>> should be doable.
+>
+> I don't mind waiting until after 2.6.38, I think we'll have a pretty huge 
+> pile of patches on our hands to merge already for .38... maybe Tony or 
+> Kevin have some opinions though.
 
-> [...]
-> +/*
-> + * ref_clk
-> + */
-> +#define _CLK_GET_RATE_REF(name, sr, ss)					\
-> +static unsigned long name##_get_rate(struct clk *clk)			\
-> +{									\
-> +	unsigned long parent_rate;					\
-> +	u32 reg, div;							\
-> +									\
-> +	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##sr);		\
-> +	div = (reg >> BP_CLKCTRL_##sr##_##ss##FRAC) & 0x3f;		\
-> +	parent_rate = clk_get_rate(clk->parent);			\
-> +									\
-> +	return parent_rate * 18 / div;					\
-> +}
-> +
-> +_CLK_GET_RATE_REF(ref_cpu_clk, FRAC, CPU)
-ref_cpu_clk's get_rate still uses parent_rate * 18
+I think this should wait 'til after 2.6.38, but be early in the next
+cycle so all dependencies can be handled early.
 
-> +_CLK_GET_RATE_REF(ref_emi_clk, FRAC, EMI)
-> +_CLK_GET_RATE_REF(ref_pix_clk, FRAC, PIX)
-> +_CLK_GET_RATE_REF(ref_io_clk, FRAC, IO)
-> +
-> +#define _DEFINE_CLOCK_REF(name, er, es)					\
-> +	static struct clk name = {					\
-> +		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
-> +		.enable_shift	= BP_CLKCTRL_##er##_CLKGATE##es,	\
-> +		.get_rate	= name##_get_rate,			\
-> +		.enable		= _raw_clk_enable,			\
-> +		.disable	= _raw_clk_disable,			\
-> +		.parent		= &pll_clk,				\
-> +	}
-> +
-> +_DEFINE_CLOCK_REF(ref_cpu_clk, FRAC, CPU);
-ref_cpu_clk's parent still is pll_clk
-
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kevin
