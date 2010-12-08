@@ -1,342 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Dec 2010 16:53:17 +0000
-Subject: [PATCH v2 2/6] msm: Secure Channel Manager (SCM) support
-In-Reply-To: <1291782501-3909-3-git-send-email-johlstei@codeaurora.org>
-References: <1291782501-3909-1-git-send-email-johlstei@codeaurora.org>
-	<1291782501-3909-3-git-send-email-johlstei@codeaurora.org>
-Message-ID: <20101208165317.GP9777@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 8 Dec 2010 11:56:59 -0500 (EST)
+Subject: [PATCH v2 1/3] ARM: omap: Enable low-level omap3 PM code to work
+	withCONFIG_THUMB2_KERNEL
+In-Reply-To: <AANLkTikVHOgujYh+28TFJDQbHx=AXT_5354bTy9+FLVR@mail.gmail.com>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org>
+	<1291656937-24992-2-git-send-email-dave.martin@linaro.org>
+	<8ff74b57e40b64459978eefba8f4c9ca@mail.gmail.com>
+	<AANLkTikOSb5-wBSy_ZANVsHga7XmWPrwP=0Xs0eGOxb5@mail.gmail.com>
+	<AANLkTimPiySTjzTw6owG8GWPv2OwoNQ=wyV4kdvP9EZu@mail.gmail.com>
+	<AANLkTi=7MXKUwjyPgDBO9XV-CZw7RNOmWKj0JP_kB9aC@mail.gmail.com>
+	<AANLkTin4oiDGqMJqjYO+5pCM4MffiGiTEKW5WxXx9gfg@mail.gmail.com>
+	<alpine.LFD.2.00.1012071412260.10437@xanadu.home>
+	<AANLkTikVHOgujYh+28TFJDQbHx=AXT_5354bTy9+FLVR@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1012081154310.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 08:28:17PM -0800, Jeff Ohlstein wrote:
-> From: Stephen Boyd <sboyd@codeaurora.org>
+On Wed, 8 Dec 2010, Dave Martin wrote:
+
+> Hi,
 > 
-> SCM is the protocol used to communicate between the secure and
-> non-secure code executing on the applications processor. The
-> non-secure side uses a physically contiguous buffer to pass
-> information to the secure side; where the buffer conforms to a
-> format that is agreed upon by both sides. The use of a buffer
-> allows multiple pending requests to be in flight on the secure
-> side. It also benefits use cases where the command or response
-> buffer contains large chunks of data.
+> On Tue, Dec 7, 2010 at 7:15 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 7 Dec 2010, Dave Martin wrote:
+> >
+> >> On Tue, Dec 7, 2010 at 2:53 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> >> [...]
+> >> > Note that converting to C doesn't mean that code which attempts to
+> >> > copy function bodies will work: you still need to handle the fact that
+> >> > if f() is a C function symbol, then the value of the symbol f is
+> >> > actually the function's base address + 1. ?See my changes in sram.c,
+> >>
+> >> To clarify, this applies *if* f is a Thumb symbol.
+> >
+> > To make it generic, a new macro could be used:
+> >
+> > #define SYM_ADDR(x) ((void *)((long)(x) & ~1L))
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mach-msm/Kconfig  |    4 +
->  arch/arm/mach-msm/Makefile |    1 +
->  arch/arm/mach-msm/scm.c    |  280 ++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-msm/scm.h    |   41 +++++++
->  4 files changed, 326 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-msm/scm.c
->  create mode 100644 arch/arm/mach-msm/scm.h
+> Could do ... I wasn't sure if it was useful for just this one case,
+> but I guess we may encounter others.  And it would make the code a lot
+> less messy...
+
+That also makes the code self documenting.
+
+> if so, a macro for exracting just the Thumb bit, and a macro for
+> rebasing a symbol while preserving the Thumb bit could also be useful.
 > 
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 31e5fd6..ab5338f 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -44,6 +44,7 @@ config ARCH_MSM8X60
->  	select CPU_V7
->  	select MSM_V2_TLMM
->  	select MSM_GPIOMUX
-> +	select MSM_SCM if SMP
->  
->  endchoice
->  
-> @@ -164,4 +165,7 @@ config MSM_GPIOMUX
->  
->  config MSM_V2_TLMM
->  	bool
-> +
-> +config MSM_SCM
-> +	bool
->  endif
-> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-> index b5a7b07..eed503b 100644
-> --- a/arch/arm/mach-msm/Makefile
-> +++ b/arch/arm/mach-msm/Makefile
-> @@ -18,6 +18,7 @@ obj-$(CONFIG_MSM_PROC_COMM) += clock.o
->  obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
->  obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
->  obj-$(CONFIG_MSM_SMD) += last_radio_log.o
-> +obj-$(CONFIG_MSM_SCM) += scm.o
->  
->  obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
->  obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
-> diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-> new file mode 100644
-> index 0000000..85ed2cc
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/scm.c
-> @@ -0,0 +1,280 @@
-> +/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-> + * 02110-1301, USA.
-> + */
-> +
-> +#include <linux/slab.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/mutex.h>
-> +#include <linux/errno.h>
-> +#include <linux/err.h>
-> +#include <linux/dma-mapping.h>
-> +
-> +#include <asm/cacheflush.h>
-> +
-> +#include "scm.h"
-> +
-> +#define SCM_ENOMEM		-5
-> +#define SCM_EOPNOTSUPP		-4
-> +#define SCM_EINVAL_ADDR		-3
-> +#define SCM_EINVAL_ARG		-2
-> +#define SCM_ERROR		-1
-> +#define SCM_INTERRUPTED		1
-> +
-> +static DEFINE_MUTEX(scm_lock);
-> +
-> +/**
-> + * struct scm_command - one SCM command buffer
-> + * @len: total available memory for command and response
-> + * @buf_offset: start of command buffer
-> + * @resp_hdr_offset: start of response buffer
-> + * @id: command to be executed
-> + *
-> + * An SCM command is layed out in memory as follows:
-> + *
-> + *	------------------- <--- struct scm_command
-> + *	| command header  |
-> + *	------------------- <--- scm_get_command_buffer()
-> + *	| command buffer  |
-> + *	------------------- <--- struct scm_response and
-> + *	| response header |      scm_command_to_response()
-> + *	------------------- <--- scm_get_response_buffer()
-> + *	| response buffer |
-> + *	-------------------
-> + *
-> + * There can be arbitrary padding between the headers and buffers so
-> + * you should always use the appropriate scm_get_*_buffer() routines
-> + * to access the buffers in a safe manner.
-> + */
-> +struct scm_command {
-> +	u32	len;
-> +	u32	buf_offset;
-> +	u32	resp_hdr_offset;
-> +	u32	id;
-> +};
-> +
-> +/**
-> + * struct scm_response - one SCM response buffer
-> + * @len: total available memory for response
-> + * @buf_offset: start of response data relative to start of scm_response
-> + * @is_complete: indicates if the command has finished processing
-> + */
-> +struct scm_response {
-> +	u32	len;
-> +	u32	buf_offset;
-> +	u32	is_complete;
-> +};
-> +
-> +/**
-> + * alloc_scm_command() - Allocate an SCM command
-> + * @cmd_size: size of the command buffer
-> + * @resp_size: size of the response buffer
-> + * @handle: dma handle
-> + *
-> + * Allocate an SCM command, including enough room for the command
-> + * and response headers as well as the command and response buffers.
-> + *
-> + * Returns a valid &scm_command on success or %NULL if the allocation fails.
-> + */
-> +static struct scm_command *alloc_scm_command(size_t cmd_size, size_t resp_size,
-> +		dma_addr_t *handle)
-> +{
-> +	struct scm_command *cmd;
-> +	size_t len = sizeof(*cmd) + sizeof(struct scm_response) + cmd_size +
-> +		resp_size;
-> +
-> +	cmd = dma_alloc_coherent(NULL, len, handle, GFP_KERNEL);
-> +	if (cmd) {
-> +		cmd->len = len;
-> +		cmd->buf_offset = sizeof(*cmd);
+> #define SYM_STATE(x) ((long)(x) & 1)
+> #define SYM_REBASE(new_addr, sym) ((void *)((long)SYM_ADDR(new_addr) |
+> SYM_STATE(sym)))
+> 
+> The relationship could be a bit clearer if we use the name SYM_BASE
+> instead of SYM_ADDR.
+> 
+> With these, the affected code becomes something like:
+> 
+> memcpy(buffer, SYM_BASE(f), size_of_f);
+> new_f = SYM_REBASE(f, buffer);
+> 
+> What do you think?
 
-Ok, so the real command bytes come after this struct scm_command structure.
-So why not do this:
+Looks fine to me.
 
-+struct scm_command {
-+	u32	len;
-+	u32	buf_offset;
-+	u32	resp_hdr_offset;
-+	u32	id;
-+	u32	cmdwds[0];
-+};
+> Is there a recommended type for a pointer-sized integer?  I notice
+> linux/types.h defines uintptr_t (as unsigned long).
 
-and
+If uintptr_t is already defined then it is probably a good idea to just 
+use it.
 
-		cmd->buff_offset = offsetof(struct scm_command, cmdwds);
 
-sizeof(struct scm_command) will still be 32, but now you can do:
-
-> +		cmd->resp_hdr_offset = cmd->buf_offset + cmd_size;
-> +	}
-> +	return cmd;
-> +}
-> +
-> +/**
-> + * free_scm_command() - Free an SCM command
-> + * @cmd: command to free
-> + * @handle: dma handle
-> + *
-> + * Free an SCM command.
-> + */
-> +static inline void free_scm_command(struct scm_command *cmd, dma_addr_t handle)
-> +{
-> +	dma_free_coherent(NULL, cmd->len, cmd, handle);
-> +}
-> +
-> +/**
-> + * scm_command_to_response() - Get a pointer to a scm_response
-> + * @cmd: command
-> + *
-> + * Returns a pointer to a response for a command.
-> + */
-> +static inline struct scm_response *scm_command_to_response(
-> +		const struct scm_command *cmd)
-> +{
-> +	return (void *)cmd + cmd->resp_hdr_offset;
-> +}
-> +
-> +/**
-> + * scm_get_command_buffer() - Get a pointer to a command buffer
-> + * @cmd: command
-> + *
-> + * Returns a pointer to the command buffer of a command.
-> + */
-> +static inline void *scm_get_command_buffer(const struct scm_command *cmd)
-> +{
-> +	return (void *)cmd + cmd->buf_offset;
-
-and here becomes:
-	return (void *)cmd->cmdwds;
-if it's necessary for it to exist at all.
-
-> +}
-> +
-> +/**
-> + * scm_get_response_buffer() - Get a pointer to a response buffer
-> + * @rsp: response
-> + *
-> + * Returns a pointer to a response buffer of a response.
-> + */
-> +static inline void *scm_get_response_buffer(const struct scm_response *rsp)
-> +{
-> +	return (void *)rsp + rsp->buf_offset;
-> +}
-> +
-> +static int scm_remap_error(int err)
-> +{
-> +	switch (err) {
-> +	case SCM_ERROR:
-> +		return -EIO;
-> +	case SCM_EINVAL_ADDR:
-> +	case SCM_EINVAL_ARG:
-> +		return -EINVAL;
-> +	case SCM_EOPNOTSUPP:
-> +		return -EOPNOTSUPP;
-> +	case SCM_ENOMEM:
-> +		return -ENOMEM;
-> +	}
-> +	return -EINVAL;
-> +}
-> +
-> +static u32 smc(dma_addr_t cmd_addr)
-> +{
-> +	int context_id;
-> +	register u32 r0 asm("r0") = 1;
-> +	register u32 r1 asm("r1") = (u32)&context_id;
-> +	register u32 r2 asm("r2") = (u32)cmd_addr;
-> +	asm(
-> +		__asmeq("%0", "r0")
-> +		__asmeq("%1", "r0")
-> +		__asmeq("%2", "r1")
-> +		__asmeq("%3", "r2")
-> +		"smc	#0	@ switch to secure world\n"
-> +		: "=r" (r0)
-> +		: "r" (r0), "r" (r1), "r" (r2)
-> +		: "r3");
-> +	return r0;
-> +}
-> +
-> +static int __scm_call(const dma_addr_t cmd)
-> +{
-> +	int ret;
-> +
-> +	/*
-> +	 * Flush the entire cache here so callers don't have to remember
-> +	 * to flush the cache when passing physical addresses to the secure
-> +	 * side in the buffer.
-> +	 */
-> +	flush_cache_all();
-> +	do {
-> +		ret = smc(cmd);
-> +		if (ret < 0) {
-> +			ret = scm_remap_error(ret);
-> +			break;
-> +		}
-> +	} while (ret == SCM_INTERRUPTED);
-> +
-> +	return ret;
-> +}
-> +
-> +/**
-> + * scm_call() - Send an SCM command
-> + * @svc_id: service identifier
-> + * @cmd_id: command identifier
-> + * @cmd_buf: command buffer
-> + * @cmd_len: length of the command buffer
-> + * @resp_buf: response buffer
-> + * @resp_len: length of the response buffer
-> + *
-> + * Sends a command to the SCM and waits for the command to finish processing.
-> + */
-> +int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
-> +		void *resp_buf, size_t resp_len)
-> +{
-> +	int ret;
-> +	struct scm_command *cmd;
-> +	struct scm_response *rsp;
-> +	dma_addr_t handle;
-> +
-> +	cmd = alloc_scm_command(cmd_len, resp_len, &handle);
-> +	if (!cmd)
-> +		return -ENOMEM;
-> +
-> +	cmd->id = (svc_id << 10) | cmd_id;
-> +	if (cmd_buf)
-> +		memcpy(scm_get_command_buffer(cmd), cmd_buf, cmd_len);
-> +	wmb();
-> +
-> +	mutex_lock(&scm_lock);
-> +	ret = __scm_call(handle);
-> +	mutex_unlock(&scm_lock);
-> +	if (ret)
-> +		goto out;
-> +
-> +	rsp = scm_command_to_response(cmd);
-> +	do {
-> +		rmb();
-> +	} while (!rsp->is_complete);
-
-Hmm, this seems weird.  Doesn't the SMC call only return once the request
-has been completed?
+Nicolas
