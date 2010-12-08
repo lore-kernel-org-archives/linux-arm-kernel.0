@@ -1,55 +1,79 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 8 Dec 2010 11:29:37 +0530
-Subject: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
-	forCONFIG_THUMB2_KERNEL
-In-Reply-To: <2080abb418a8d3c651dd41353ef59d25@mail.gmail.com>
-References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org><1291656937-24992-3-git-send-email-dave.martin@linaro.org><a86d8e4b47fad17e71d0202f3c469868@mail.gmail.com>
-	<AANLkTinPifchS23j5EdrhMBNNdtEfF_KmX=AE9tUiiL=@mail.gmail.com>
-	<2080abb418a8d3c651dd41353ef59d25@mail.gmail.com>
-Message-ID: <d9fec68fc0ce14215439c6e753871bc2@mail.gmail.com>
+Date: Wed, 8 Dec 2010 11:33:58 +0530
+Subject: [RFC] Fixing CPU Hotplug for RealView Platforms
+In-Reply-To: <007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
+References: <007401cb962d$d53d2500$7fb76f00$@deacon@arm.com><20101207171810.GA25839@n2100.arm.linux.org.uk>
+	<007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
+Message-ID: <a23df178794882d81bc1068d8240dfc8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
-
 > -----Original Message-----
-> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> Sent: Wednesday, December 08, 2010 11:27 AM
-> To: Dave Martin
-> Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; linux-
-> omap at vger.kernel.org; linaro-dev at lists.linaro.org
-> Subject: RE: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
-> forCONFIG_THUMB2_KERNEL
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Will Deacon
+> Sent: Tuesday, December 07, 2010 11:17 PM
+> To: 'Russell King - ARM Linux'
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: RE: [RFC] Fixing CPU Hotplug for RealView Platforms
 >
-> > -----Original Message-----
-> > From: Dave Martin [mailto:dave.martin at linaro.org]
-> > Sent: Tuesday, December 07, 2010 10:21 PM
-> > To: Santosh Shilimkar
-> > Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; linux-
-> > omap at vger.kernel.org; linaro-dev at lists.linaro.org
-> > Subject: Re: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
-> > forCONFIG_THUMB2_KERNEL
-> >
-> > Hi,
-> >
-> > On Tue, Dec 7, 2010 at 6:28 AM, Santosh Shilimkar
-> > <santosh.shilimkar@ti.com> wrote:
-> > > Dave,
-
-[.....]
+> Hi Russell,
 >
-> > So anything inside #ifdef CONFIG_THUMB2_KERNEL can assume v7/Thumb-2
-> > capable (and hence reasonably new) tools.
+> > On Tue, Dec 07, 2010 at 04:43:10PM -0000, Will Deacon wrote:
+> > > Hello,
+> > >
+> > > Currently, CPU hotplug is broken for RealView platforms. I posted
+some
+> > > patches previously to try and address this, but they didn't solve
+the
+> > > problems fully:
+> > >
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-
+> September/026157.html
+> > >
+> > > I'm now revisiting the code and it looks like the main problem is
+when
+> > > we wish to *leave* the lowpower state. The enter/leave routines look
+> > > like this:
+> > >
+> > ...
+> > >
+> > > The problem is that by turning off coherency, the contents of the D-
+> cache
+> > > becomes stale. If data is prefetched into L1 between the
+> flush_cache_all
+> > > invocation and disabling the D-cache then this data will still be
+> present
+> > > when we come out of lowpower. Without coherency, we *must not* use
+> this
+> > > data and so a D-cache invalidation to the PoC is required in
+> > > cpu_leave_lowpower().
 > >
-> > I'll follow up shortly with a patch to the generic ARM Kconfig to make
-> > this explicit, so that ARCH_OMAP2 and THUMB2_KERNEL can't accidentally
-> > be configured together.
+> > What if we fixed the cpu_reset functions for v6 and v7, and when a CPU
+> > is taken offline, we actually go through a proper shutdown of that CPU
+> > and call the reset vector, re-entering the boot loader?
+>
+> This will certainly solve our problem, but people might complain that
+it's
+> too heavyweight :) That said, for v7 this may be the only solution as
+the
+> platform can require an IMPLEMENTATION DEFINED initialisation routine to
+> be
+> executed before enabling the D-cache out of reset. This should be
+> something
+> that the bootloader does for us.
+>
+> > We can only do this for CPUs other than the original boot CPU, because
+> > the boot loader should be checking which are the secondary CPUs and
+> > putting those into this simple WFI loop with the GIC appropriately
+> > programmed.
 > >
-> sure
-
-When you are doing the changes can you please check if you could build
-the THUMB2 kernel with omap2plus_defconfig. I suspect the build will
-fail.
+> > This means when we re-activate the CPU, we'll be waking it up in
+> > exactly the same way as we do when the kernel boots - and we have all
+> > that code around just waiting to be used.
+>
+One more simpler thing which could work is disable "C' bit before flushing
+the L1 cache. That way prefetch would be avoided and cache also will
+be in clean state while restarting the core.
 
 Regards,
 Santosh
