@@ -1,42 +1,116 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed,  8 Dec 2010 22:10:19 +0200
-Subject: [PATCH] ARM: S3C2442: rx1950: Retain LEDs state in suspend
-Message-ID: <1291839019-27336-1-git-send-email-anarsoul@gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 09 Dec 2010 09:13:32 +1300
+Subject: [PATCH v3] mach-at91: Support for gms board added
+In-Reply-To: <1291837552-8389-1-git-send-email-plyatov@gmail.com>
+References: <1291837552-8389-1-git-send-email-plyatov@gmail.com>
+Message-ID: <4CFFE6EC.5020008@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c_adc_battery uses LEDs to indicate charging process,
-retain LEDs state in suspend, otherwise user have no information if PDA
-battery is charging after he put it to suspend.
+On 12/09/2010 08:45 AM, Igor Plyatov wrote:
+> Code for the Stamp9G20 SoM separated into the board-stamp9g20.c, and following
+> files correspond to carrier boards for Stamp9G20:
+> * carrier-board-gms.c - "GMS", Seismograph from GeoSIG.
+> * carrier-board-panelcardevb.c - "Panel Card EVB", Taskit's eval. board.
+> * carrier-board-portuxg20.c - "Portux G20", derivative from Stamp9G20.
+> * carrier-board-pcontrol_g20.c - "Pcontrol G20", PORTNER-Elektronik.
+> .
+> All stuff specific to carrier board encapsulated into functions:
+> * carrier_board_map_io()
+> * carrier_board_init()
+> which used in the board-stamp9g20.c
+> .
+> There is only one choice for Stamp9G20 carrier board from:
+> * CONFIG_CARRIERBOARD_GMS
+> * CONFIG_CARRIERBOARD_PANELCARDEVB
+> * CONFIG_CARRIERBOARD_PCONTROL_G20
+> * CONFIG_CARRIERBOARD_PORTUXG20
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm/mach-s3c2440/mach-rx1950.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+It is useful to be able to build multiple boards into a single kernel.
 
-diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
-index e0622bb..2c41254 100644
---- a/arch/arm/mach-s3c2440/mach-rx1950.c
-+++ b/arch/arm/mach-s3c2440/mach-rx1950.c
-@@ -268,16 +268,19 @@ static struct gpio_led rx1950_leds_desc[] = {
- 		.name				= "Green",
- 		.default_trigger	= "main-battery-charging-or-full",
- 		.gpio				= S3C2410_GPA(6),
-+		.retain_state_suspended		= 1,
- 	},
- 	{
- 		.name				= "Red",
- 		.default_trigger	= "main-battery-full",
- 		.gpio				= S3C2410_GPA(7),
-+		.retain_state_suspended		= 1,
- 	},
- 	{
- 		.name				= "Blue",
- 		.default_trigger	= "rx1950-acx-mem",
- 		.gpio				= S3C2410_GPA(11),
-+		.retain_state_suspended		= 1,
- 	},
- };
- 
+> --- /dev/null
+> +++ b/arch/arm/mach-at91/carrier-board-gms.c
+> @@ -0,0 +1,556 @@
+> +/*
+> + *  Copyright (C) 2010 Christian Glindkamp <christian.glindkamp@taskit.de>
+> + *			taskit GmbH
+> + *                2010 Igor Plyatov <plyatov@gmail.com>
+> + *			GeoSIG Ltd
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/input.h>
+> +#include <linux/i2c/pcf857x.h>
+> +
+> +#include <mach/board.h>
+> +#include <mach/gms.h>
+> +
+> +void __init carrier_board_map_io(void)
+> +{
+
+This approach won't work. If you have more than one carrier board
+compiled into your kernel then you will get multiple definition errors.
+The name carrier_board_map_io is also way too generic.
+
+The better approach would be to do this the other way so that the
+carrier board calls the SoM map_io function.
+
+> +	/*
+> +	 * USART0 on ttyS1 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI).
+> +	 * Used for Internal Analog Modem.
+> +	 */
+> +	at91_register_uart(AT91SAM9260_ID_US0, 1,
+> +			     ATMEL_UART_CTS | ATMEL_UART_RTS
+> +			   | ATMEL_UART_DTR | ATMEL_UART_DSR
+> +			   | ATMEL_UART_DCD | ATMEL_UART_RI);
+> +	/*
+> +	 * USART1 on ttyS2 (Rx, Tx, CTS, RTS).
+> +	 * Used for GPS or WiFi or Data stream.
+> +	 */
+> +	at91_register_uart(AT91SAM9260_ID_US1, 2,
+> +			   ATMEL_UART_CTS | ATMEL_UART_RTS);
+> +	/*
+> +	 * USART2 on ttyS3 (Rx, Tx, CTS, RTS).
+> +	 * Used for External Modem.
+> +	 */
+> +	at91_register_uart(AT91SAM9260_ID_US2, 3,
+> +			   ATMEL_UART_CTS | ATMEL_UART_RTS);
+> +	/*
+> +	 * USART3 on ttyS4 (Rx, Tx, RTS).
+> +	 * Used for RS-485.
+> +	 */
+> +	at91_register_uart(AT91SAM9260_ID_US3, 4, ATMEL_UART_RTS);
+> +
+> +	/*
+> +	 * USART4 on ttyS5 (Rx, Tx).
+> +	 * Used for TRX433 Radio Module.
+> +	 */
+> +	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
+> +}
+
+~Ryan
+
 -- 
-1.7.3.2
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
