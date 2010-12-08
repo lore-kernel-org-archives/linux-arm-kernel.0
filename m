@@ -1,57 +1,53 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 8 Dec 2010 11:01:05 +0000
-Subject: RFC: Dynamic hwcaps
-In-Reply-To: <AANLkTi=3oQDZGuSraXokf7VZ2YaGtaLGud92RcqYFMSA@mail.gmail.com>
-References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-	<20101205151242.298922ad@surf>
-	<AANLkTi=3oQDZGuSraXokf7VZ2YaGtaLGud92RcqYFMSA@mail.gmail.com>
-Message-ID: <20101208110105.GR22787@shareable.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 8 Dec 2010 11:03:36 +0000
+Subject: [PATCH] ARM: Thumb-2: Make CONFIG_THUMB2_KERNEL depend on !CPU_V6
+In-Reply-To: <233071.45934.qm@web180308.mail.gq1.yahoo.com>
+References: <233071.45934.qm@web180308.mail.gq1.yahoo.com>
+Message-ID: <AANLkTin8r4-ooAUsf-T5SnM_QDHdY_c3XfRL4o=nZkHC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin wrote:
-> On Sun, Dec 5, 2010 at 2:12 PM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Fri, 3 Dec 2010 16:28:27 +0000
-> > Dave Martin <dave.martin@linaro.org> wrote:
-> >
-> >> This allows for more active power management of such functional
-> >> blocks: if the CPU is not fully loaded, you can turn them off -- the
-> >> kernel can spot when there is significant idle time and do this. ?If
-> >> the CPU becomes fully loaded, applications which have soft-realtime
-> >> constraints can notice this and switch to their accelerated code
-> >> (which will cause the kernel to switch the functional unit(s) on).
-> >> Or, the kernel can react to increasing CPU load by speculatively turn
-> >> it on instead. ?This is analogous to the behaviour of other power
-> >> governors in the system. ?Non-aware applications will still work
-> >> seamlessly -- these may simply run accelerated code if the hardware
-> >> supports it, causing the kernel to turn the affected functional
-> >> block(s) on.
-> >
-> > From a power management perspective, is it really useful to load the
-> > CPU instead of using specialized units which usually provide more
-> > computing power per watt consumed ?
-> 
-> No--- but you can't in general just exchange cycles on one functional
-> unit for cycles on another in the same way as you
-> 
-> Suppose 90% if your code (by execution time) can take advantage of a
-> specialised functional unit.  Should you turn that unit on?
-> 
-> Now, suppose only 5% of the code can take advantage, but the platform
-> is not completely busy.  Turning on a special functional unit consumes
-> extra power and will provide no speedup to the user -- is it still
-> worth turning it on?  What if the CPU is fully loaded doing other work
-> and your program is close to missing its realtime deadlines -- should
-> you turn on the separate unit now?
+On Wed, Dec 8, 2010 at 7:43 AM, David Brownell <david-b@pacbell.net> wrote:
+>
+> --- On Tue, 12/7/10, Dave Martin <dave.martin@linaro.org> wrote:
+>
+>> From: Dave Martin <dave.martin@linaro.org>
+>> Subject: [PATCH] ARM: Thumb-2: Make CONFIG_THUMB2_KERNEL depend on !CPU_V6...
+>
+>> This makes sense, because Thumb-2
+>> code can't execute on anything
+>> prior to ARMv7.
+>
+> WRONG ... but you may be overlooking the
+> fact that there are at least three
+> flavors of Thumb-2 ...
+>
+> ?- Original, as on some ARMv6 chips ARM1156 was
+> the introductory Thumb2 core).? It's Thumb1
+> plus a very few 32-bit instructions.? (And
+> maybe the SIMD instructions too; I forget.? Not
+> suitable for OS work like IRQ handling, ISTR; or
+> at least, not as suitable as the ARMv7 flavors.
+>
+> ?-Microcontroller ... ARMv7M chips, and likely
+> not available on Linux-capable hardware ...???Suitable for RTOS work like IRQ
+> handling.
 
-I think Thomas's point is that doing the 5% on the CPU may consume
-more power than turning on the special functional unit - even when
-the system is not busy and the user doesn't see a time difference.
+You're correct on some points ... *but* v7-M is not supported in the
+kernel yet, and in any case full linux is not applicable - this will
+be ucLinux territory.  v7-M shares much of the instruction set with
+v7-A/R, bit it's a substantially different architecture when it comes
+to things like exception handling etc.
 
-I don't know if that's true for available hardware, but it seems like
-it's worth investigating before taking the idea further.
+The v6T2 architecture supported by arm1156 does have comprehensive
+Thumb-2 support (not just a few 32-bit instructions), and arm1156
+supports taking of exceptions in Thumb-2 etc., so in principle the
+complete OS could be built in Thumb-2 as is the case for v7.  But this
+particular processor is rare and I believe it's not supported in the
+kernel right now ... and not likely to be.  No other processors
+implement v6T2, and no new processors will implement it either.
 
--- Jamie
+The rules might need to be refined later, but !CPU_V6 seems sensible for now.
+
+Cheers
+---Dave
