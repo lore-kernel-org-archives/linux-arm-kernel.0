@@ -1,77 +1,94 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 8 Dec 2010 18:09:14 +0000
-Subject: [PATCH] ARM: Thumb-2: Make CONFIG_THUMB2_KERNEL depend on !CPU_V6
-In-Reply-To: <603978.51278.qm@web180303.mail.gq1.yahoo.com>
-References: <AANLkTin8r4-ooAUsf-T5SnM_QDHdY_c3XfRL4o=nZkHC@mail.gmail.com>
-	<603978.51278.qm@web180303.mail.gq1.yahoo.com>
-Message-ID: <AANLkTinxHKnSk3=q2e1RkTJ_eA6CB2N6RZzNe6upnGFe@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 08 Dec 2010 21:36:56 +0300
+Subject: [PATCH] ARM: Add writethrough dcache support for ARM926EJS
+	processor
+In-Reply-To: <20090909165035.GA31462@mag.az.mvista.com>
+References: <20090909165035.GA31462@mag.az.mvista.com>
+Message-ID: <4CFFD048.9030605@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Wed, Dec 8, 2010 at 4:38 PM, David Brownell <david-b@pacbell.net> wrote:
-> So to recapitulate ... you're agreeing with me on
-> my key point -- that ARM1156, a V6T2 core with
-> ?Thumb2 support (used in fact to introduce
-> Thumb2), should ?work for some in-kernel Thumb2
-> usage, degree TBD, but obviously the v7 cores
-> are more capable (with SIMD support in T2, etc).
+Mark A. Greer wrote:
 
-To be strictly accurate, 1156 is not an ARMv6 core -- it's an ARMv6T2
-core, so it's debatable whether CPU_V6 should be set in this case.  A
-separate config item, such as CPU_V6T2 might be needed to express this
-distinction if support for 1156 were to be added.
+> From: Mark A. Greer <mgreer@mvista.com>
 
-I believe if multiple CPU_* are defined, this usually means a kernel
-configured to support multiple platforms in the same binary; this is
-supported by some mach tress.  A kernel binary intended to execute on
-a set of platforms including a plain v6 platform (indicated by CPU_V6
-being set) most not be built in Thumb-2, since it then wouldn't work
-on those v6 platforms.
+> The ARM kernel supports writethrough data cache via the
+> CONFIG_CPU_DCACHE_WRITETHROUGH option.  However, that
+> functionality wasn't implemented in the arch/arm/boot/compressed
+> code.  It is now necessary due to a new ARM926EJS processor
+> that has an issue with writeback data cache.
 
->
-> And no, *I* never said anything about a V7M Linux,
-> that was your words. ?I'm used to the advantages of using MMUs with fork() and mprotect(), etc.
->
->
-> But the updated reason you gave for not allowing V6T2 is
-> that it's an uncommon architecture (one core, not
-> widely manufactured today) ... not impossibility.
+> Signed-off-by: Mark A. Greer <mgreer@mvista.com>
+> ---
+> This patch was motivated by a dcache writeback bug in some revisions
+> of TI's DA830/OMAP-L137 (ARM926EJS) SoC.  It has been tested using
+> Kevin Hilman's DaVinci tree where that SoC is supported.  Compile
+> tested only in the linux-2.6 ARM kernel.
 
-Agreed.  Out of interest, do you know of anyone working with 1156 of
-patches to support it?  This would be a different story, since then it
-would be clearer how CONFIG_THUMB2_KERNEL should integrate in this
-case.
+> I submitted this patch a while back,
+> 	http://marc.info/?l=linux-arm-kernel&m=124208189923479&w=4
+> and Russell responded with,
+> 	http://marc.info/?l=linux-arm-kernel&m=124277262417440&w=4
+> to which both George Davis and I responded but Russell has been too
+> busy to continue the conversation.
 
->
-> In short, the basic premise of $PATCH is wrong, as
-> I pointed out, but there may be other reasons to
-> merge it, related to V6T2 chip availability not the
-> actual architecture specs from ARM.
+> So, I'm resubmitting in the hope that this patch gets accepted or I
+> can get some more feedback as to what needs to be done to make it
+> acceptable.
 
-Well, the statement "Thumb-2 code can't execute on anything prior to
-ARMv7" was a generalisation; the commit message can certainly be made
-clearer.  Really, what I meant was something like "Thumb-2 code can't
-execute on any common architecture prior to ARMv7", but I'm happy to
-make it clearer to explain the v6T2 case.
+> Many thanks to George Davis for helping me with the low-level ARM-ese.
 
->
-> A similar argument would be that making the ASM code
-> cope with core variants would get ugly/messy. ?At
-> least the GNU assembler is, as I recall, aware of
-> which instructions which cores support, so it would
-> provide clean errors if given instructions that are
-> Thumb2 (some flavor) but not accepted by the target.
-> But Linux code shouldn't trigger such errors in the
-> first place, even if they're a good backstop (and
-> that implies ugly core-driven conditional code.
->
+>  arch/arm/boot/compressed/head.S |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
 
-That's why I prefer not to allow CONFIG_THUMB2_KERNEL to be turned on
-in situations where it won't work.
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index fa6fbf4..70806c1 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -412,7 +412,11 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+>  		orr	r1, r1, #3 << 10
+>  		add	r2, r3, #16384
+>  1:		cmp	r1, r9			@ if virt > start of RAM
+> +#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+> +		orrhs	r1, r1, #0x08		@ set cacheable
+> +#else
+>  		orrhs	r1, r1, #0x0c		@ set cacheable, bufferable
+> +#endif
+>  		cmp	r1, r10			@ if virt > end of RAM
+>  		bichs	r1, r1, #0x0c		@ clear cacheable, bufferable
+>  		str	r1, [r0], #4		@ 1:1 mapping
+> @@ -436,6 +440,12 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+>  		mov	pc, lr
+>  ENDPROC(__setup_mmu)
+>  
+> +__arm926ejs_mmu_cache_on:
+> +#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+> +		mov	r0, #4			@ put dcache in WT mode
+> +		mcr	p15, 7, r0, c15, c0, 0
+> +#endif
+> +
+>  __armv4_mmu_cache_on:
+>  		mov	r12, lr
+>  #ifdef CONFIG_MMU
+> @@ -655,6 +665,12 @@ proc_types:
+>  		W(b)	__armv4_mpu_cache_off
+>  		W(b)	__armv4_mpu_cache_flush
+>  
+> +		.word	0x41069260		@ ARM926EJ-S (v5TEJ)
+> +		.word	0xff0ffff0
+> +		b	__arm926ejs_mmu_cache_on
+> +		b	__armv4_mmu_cache_off
+> +		b	__armv5tej_mmu_cache_flush
+> +
+>  		.word	0x00007000		@ ARM7 IDs
+>  		.word	0x0000f000
+>  		mov	pc, lr
+> --
+> 1.6.2.5.182.ga808d
 
-If you have a cleaner solution, feel free to suggest it.
+    I'd like to know when this will be accepted?
+    DA830/OMAP-L137 are still not bootable in mainline without this patch... :-(
 
-Cheers
----Dave
+WBR, Sergei
