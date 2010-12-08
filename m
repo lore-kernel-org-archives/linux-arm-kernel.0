@@ -1,32 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Dec 2010 11:49:43 +0100
-Subject: [PATCH v2 1/2] ARM: mx5: introduce SOC_IMX51
-In-Reply-To: <AANLkTi=4p6_2ub0WeSBfnFJubtgqa6QLC06hUXTWdFo1@mail.gmail.com>
-References: <1290724946-23516-1-git-send-email-user@fabio-desktop>
-	<20101126113639.GD27637@pengutronix.de>
-	<AANLkTi=4p6_2ub0WeSBfnFJubtgqa6QLC06hUXTWdFo1@mail.gmail.com>
-Message-ID: <20101208104943.GM18244@pengutronix.de>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 8 Dec 2010 18:51:22 +0800
+Subject: [PATCH 0/2] Common struct clk implementation, v8
+In-Reply-To: <20101208103355.GK18244@pengutronix.de>
+References: <1291774094.269634.503532219345.0.gpush@pororo>
+	<20101208103355.GK18244@pengutronix.de>
+Message-ID: <201012081851.23218.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 08, 2010 at 06:32:01PM +0800, Richard Zhao wrote:
-> Hi Fabio and Uwe,
+Hi Uwe,
+
+> I would have expected that clk-common is an ancestor of clk-common-mx51.
+> Currently it bases on v7(?) that doesn't have the spinlock.
 > 
-> Why do we have both ARCH_MX51 and SOC_IMX51? It looks redundant.
-> Will ARCH_MX51 be removed after all other places are replace by SOC_IMX51?
-yes
- 
-> I don't need to define ARCH_MX50 any more, correct?
-The motivation for SOC_... is described in arch/arm/mach-mx3/Kconfig[1].
-So if you have multi-soc kernels in mind when using SOC_IMX50 not adding
-ARCH_MX50 is fine (and prefered).
+> BTW, I took a quick look over the patches in clk-common-mx51 and I think
+> arch/arm/plat-mxc/include/mach/clock.h doesn't compile without
+> CONFIG_USE_COMMON_STRUCT_CLK (because then there is no struct clk_mxc),
+> so either you need more magic or just remove the #ifndef
+> CONFIG_USE_COMMON_STRUCT_CLK.
 
-Best regards
-UWe
+Ah, I haven't pushed updates to the clk-common-mx51 branch yet, I'll get to 
+this soon.
 
-[1]
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=blob;f=arch/arm/mach-mx3/Kconfig;hb=imx-for-2.6.38
+Cheers,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+Jeremy
