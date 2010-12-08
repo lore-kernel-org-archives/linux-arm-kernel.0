@@ -1,63 +1,109 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 8 Dec 2010 11:07:10 +0000
-Subject: RFC: Dynamic hwcaps
-In-Reply-To: <20101208110105.GR22787@shareable.org>
-References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
-	<20101205151242.298922ad@surf>
-	<AANLkTi=3oQDZGuSraXokf7VZ2YaGtaLGud92RcqYFMSA@mail.gmail.com>
-	<20101208110105.GR22787@shareable.org>
-Message-ID: <AANLkTinJ8CPk27iG1007OO1TasSvFx6jne1GYBQToH5Q@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 8 Dec 2010 16:40:18 +0530
+Subject: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
+	forCONFIG_THUMB2_KERNEL
+In-Reply-To: <AANLkTi=OC4ydAtrxNK4Jd_CDo9eLayRusOm9CNM_JFei@mail.gmail.com>
+References: <1291656937-24992-1-git-send-email-dave.martin@linaro.org><1291656937-24992-3-git-send-email-dave.martin@linaro.org><a86d8e4b47fad17e71d0202f3c469868@mail.gmail.com><AANLkTinPifchS23j5EdrhMBNNdtEfF_KmX=AE9tUiiL=@mail.gmail.com><2080abb418a8d3c651dd41353ef59d25@mail.gmail.com><d9fec68fc0ce14215439c6e753871bc2@mail.gmail.com><AANLkTim-tdF83gnQ-0o0i7bp7QmQHoT_KbZMHrWTE12g@mail.gmail.com><289b46ad4e4f4a05b6636134e446010c@mail.gmail.com>
+	<AANLkTi=OC4ydAtrxNK4Jd_CDo9eLayRusOm9CNM_JFei@mail.gmail.com>
+Message-ID: <df00a773077a1dac38b7e6b67190d8f9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 8, 2010 at 11:01 AM, Jamie Lokier <jamie@shareable.org> wrote:
-> Dave Martin wrote:
->> On Sun, Dec 5, 2010 at 2:12 PM, Thomas Petazzoni
->> <thomas.petazzoni@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Fri, 3 Dec 2010 16:28:27 +0000
->> > Dave Martin <dave.martin@linaro.org> wrote:
->> >
->> >> This allows for more active power management of such functional
->> >> blocks: if the CPU is not fully loaded, you can turn them off -- the
->> >> kernel can spot when there is significant idle time and do this. ?If
->> >> the CPU becomes fully loaded, applications which have soft-realtime
->> >> constraints can notice this and switch to their accelerated code
->> >> (which will cause the kernel to switch the functional unit(s) on).
->> >> Or, the kernel can react to increasing CPU load by speculatively turn
->> >> it on instead. ?This is analogous to the behaviour of other power
->> >> governors in the system. ?Non-aware applications will still work
->> >> seamlessly -- these may simply run accelerated code if the hardware
->> >> supports it, causing the kernel to turn the affected functional
->> >> block(s) on.
->> >
->> > From a power management perspective, is it really useful to load the
->> > CPU instead of using specialized units which usually provide more
->> > computing power per watt consumed ?
->>
->> No--- but you can't in general just exchange cycles on one functional
->> unit for cycles on another in the same way as you
->>
->> Suppose 90% if your code (by execution time) can take advantage of a
->> specialised functional unit. ?Should you turn that unit on?
->>
->> Now, suppose only 5% of the code can take advantage, but the platform
->> is not completely busy. ?Turning on a special functional unit consumes
->> extra power and will provide no speedup to the user -- is it still
->> worth turning it on? ?What if the CPU is fully loaded doing other work
->> and your program is close to missing its realtime deadlines -- should
->> you turn on the separate unit now?
+> -----Original Message-----
+> From: Dave Martin [mailto:dave.martin at linaro.org]
+> Sent: Wednesday, December 08, 2010 4:35 PM
+> To: Santosh Shilimkar
+> Cc: Tony Lindgren; linux-omap at vger.kernel.org; linaro-
+> dev at lists.linaro.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 2/3] ARM: omap4: Correct definition of do_wfi()
+> forCONFIG_THUMB2_KERNEL
 >
-> I think Thomas's point is that doing the 5% on the CPU may consume
-> more power than turning on the special functional unit - even when
-> the system is not busy and the user doesn't see a time difference.
+> On Wed, Dec 8, 2010 at 10:45 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> >> -----Original Message-----
+> >> From: Dave Martin [mailto:dave.martin at linaro.org]
+> >> Sent: Wednesday, December 08, 2010 4:11 PM
+> >> To: Santosh Shilimkar
+> >> Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; linux-
+> >> omap at vger.kernel.org; linaro-dev at lists.linaro.org
+> >> Subject: Re: [PATCH v2 2/3] ARM: omap4: Correct definition of
+do_wfi()
+> >> forCONFIG_THUMB2_KERNEL
+> >>
+> >> On Wed, Dec 8, 2010 at 5:59 AM, Santosh Shilimkar
+> >> <santosh.shilimkar@ti.com> wrote:
+> >> > Dave,
+> >> >
+> >> >> -----Original Message-----
+> >> >> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> >> >> Sent: Wednesday, December 08, 2010 11:27 AM
+> >> >> To: Dave Martin
+> >> >> Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; linux-
+> >> >> omap at vger.kernel.org; linaro-dev at lists.linaro.org
+> >> >> Subject: RE: [PATCH v2 2/3] ARM: omap4: Correct definition of
+> > do_wfi()
+> >> >> forCONFIG_THUMB2_KERNEL
+> >> >>
+> >> >> > -----Original Message-----
+> >> >> > From: Dave Martin [mailto:dave.martin at linaro.org]
+> >> >> > Sent: Tuesday, December 07, 2010 10:21 PM
+> >> >> > To: Santosh Shilimkar
+> >> >> > Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; linux-
+> >> >> > omap at vger.kernel.org; linaro-dev at lists.linaro.org
+> >> >> > Subject: Re: [PATCH v2 2/3] ARM: omap4: Correct definition of
+> >> do_wfi()
+> >> >> > forCONFIG_THUMB2_KERNEL
+> >> >> >
+> >> >> > Hi,
+> >> >> >
+> >> >> > On Tue, Dec 7, 2010 at 6:28 AM, Santosh Shilimkar
+> >> >> > <santosh.shilimkar@ti.com> wrote:
+> >> >> > > Dave,
+> >> >
+> >> > [.....]
+> >> >>
+> >> >> > So anything inside #ifdef CONFIG_THUMB2_KERNEL can assume
+> > v7/Thumb-2
+> >> >> > capable (and hence reasonably new) tools.
+> >> >> >
+> >> >> > I'll follow up shortly with a patch to the generic ARM Kconfig
+to
+> >> make
+> >> >> > this explicit, so that ARCH_OMAP2 and THUMB2_KERNEL can't
+> >> accidentally
+> >> >> > be configured together.
+> >> >> >
+> >> >> sure
+> >> >
+> >> > When you are doing the changes can you please check if you could
+> build
+> >> > the THUMB2 kernel with omap2plus_defconfig. I suspect the build
+will
+> >> > fail.
+> >>
+> >> With my Kconfig patch, kconfig won't let you turn on Thumb-2 in that
+> >> configuration:
+> >>
+> >>
+> >
 >
-> I don't know if that's true for available hardware, but it seems like
-> it's worth investigating before taking the idea further.
+http://lists.arm.linux.org.uk/lurker/message/20101207.165737.0897658f.en.h
+> >> tml
+> >>
+> >> If you want to turn on Thumb-2, you must disable ARCH_OMAP2 first.
+?If
+> >> my understanding is correct, this is the right behaviour.
+> >>
+> >>
+> > Ofcourse it will build with ARCH_OMAP2 disabled :) (ARMv6 dependency)
+> > In other words, I wanted to say that "omap2plus_defconfig" can't
+> > be used as is to build THUMB kernel binary.
+>
+> Well, yes, that's another way of looking at it.  Anyway, I think this
+> is the intended result -- is it OK for you?
+>
+Should be ok considering you can't do much with it. But I let Tony comment
+on it.
 
-Agreed -- either could be the case.  It's something you can never be
-certain about without doing some measurements...
-
-Cheers
----Dave
+Regards,
+Santosh
