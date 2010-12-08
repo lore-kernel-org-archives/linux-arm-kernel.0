@@ -1,398 +1,265 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue,  7 Dec 2010 20:28:17 -0800
-Subject: [PATCH v2 2/6] msm: Secure Channel Manager (SCM) support
+Date: Tue,  7 Dec 2010 20:28:19 -0800
+Subject: [PATCH v2 4/6] msm: timer: SMP timer support for msm
 In-Reply-To: <1291782501-3909-1-git-send-email-johlstei@codeaurora.org>
 References: <1291782501-3909-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1291782501-3909-3-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1291782501-3909-5-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
-
-SCM is the protocol used to communicate between the secure and
-non-secure code executing on the applications processor. The
-non-secure side uses a physically contiguous buffer to pass
-information to the secure side; where the buffer conforms to a
-format that is agreed upon by both sides. The use of a buffer
-allows multiple pending requests to be in flight on the secure
-side. It also benefits use cases where the command or response
-buffer contains large chunks of data.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
 ---
- arch/arm/mach-msm/Kconfig  |    4 +
- arch/arm/mach-msm/Makefile |    1 +
- arch/arm/mach-msm/scm.c    |  280 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-msm/scm.h    |   41 +++++++
- 4 files changed, 326 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/scm.c
- create mode 100644 arch/arm/mach-msm/scm.h
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    6 +-
+ arch/arm/mach-msm/io.c                          |    1 +
+ arch/arm/mach-msm/timer.c                       |  130 +++++++++++++++++++----
+ 3 files changed, 115 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 31e5fd6..ab5338f 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_MSM8X60
- 	select CPU_V7
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
-+	select MSM_SCM if SMP
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+index 45bab50..873e0b7 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+@@ -60,7 +60,11 @@
  
- endchoice
+ #define MSM_TMR_BASE		IOMEM(0xF0200000)
+ #define MSM_TMR_PHYS		0x02000000
+-#define MSM_TMR_SIZE		(SZ_1M)
++#define MSM_TMR_SIZE		SZ_4K
++
++#define MSM_TMR0_BASE		IOMEM(0xF0201000)
++#define MSM_TMR0_PHYS		0x02040000
++#define MSM_TMR0_SIZE		SZ_4K
  
-@@ -164,4 +165,7 @@ config MSM_GPIOMUX
+ #define MSM_GPT_BASE		(MSM_TMR_BASE + 0x4)
+ #define MSM_DGT_BASE		(MSM_TMR_BASE + 0x24)
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index d36b610..b826b6b 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -105,6 +105,7 @@ static struct map_desc msm8x60_io_desc[] __initdata = {
+ 	MSM_DEVICE(QGIC_DIST),
+ 	MSM_DEVICE(QGIC_CPU),
+ 	MSM_DEVICE(TMR),
++	MSM_DEVICE(TMR0),
+ 	MSM_DEVICE(ACC),
+ 	MSM_DEVICE(GCC),
+ };
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 950100f..92ac220 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -47,6 +47,19 @@ enum {
  
- config MSM_V2_TLMM
- 	bool
-+
-+config MSM_SCM
-+	bool
- endif
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index b5a7b07..eed503b 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -18,6 +18,7 @@ obj-$(CONFIG_MSM_PROC_COMM) += clock.o
- obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
- obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
- obj-$(CONFIG_MSM_SMD) += last_radio_log.o
-+obj-$(CONFIG_MSM_SCM) += scm.o
+ #define GPT_HZ 32768
  
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
-diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-new file mode 100644
-index 0000000..85ed2cc
---- /dev/null
-+++ b/arch/arm/mach-msm/scm.c
-@@ -0,0 +1,280 @@
-+/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-+ * 02110-1301, USA.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <asm/cacheflush.h>
-+
-+#include "scm.h"
-+
-+#define SCM_ENOMEM		-5
-+#define SCM_EOPNOTSUPP		-4
-+#define SCM_EINVAL_ADDR		-3
-+#define SCM_EINVAL_ARG		-2
-+#define SCM_ERROR		-1
-+#define SCM_INTERRUPTED		1
-+
-+static DEFINE_MUTEX(scm_lock);
-+
-+/**
-+ * struct scm_command - one SCM command buffer
-+ * @len: total available memory for command and response
-+ * @buf_offset: start of command buffer
-+ * @resp_hdr_offset: start of response buffer
-+ * @id: command to be executed
-+ *
-+ * An SCM command is layed out in memory as follows:
-+ *
-+ *	------------------- <--- struct scm_command
-+ *	| command header  |
-+ *	------------------- <--- scm_get_command_buffer()
-+ *	| command buffer  |
-+ *	------------------- <--- struct scm_response and
-+ *	| response header |      scm_command_to_response()
-+ *	------------------- <--- scm_get_response_buffer()
-+ *	| response buffer |
-+ *	-------------------
-+ *
-+ * There can be arbitrary padding between the headers and buffers so
-+ * you should always use the appropriate scm_get_*_buffer() routines
-+ * to access the buffers in a safe manner.
-+ */
-+struct scm_command {
-+	u32	len;
-+	u32	buf_offset;
-+	u32	resp_hdr_offset;
-+	u32	id;
++enum timer_location {
++	LOCAL_TIMER = 0,
++	GLOBAL_TIMER = 1,
 +};
 +
-+/**
-+ * struct scm_response - one SCM response buffer
-+ * @len: total available memory for response
-+ * @buf_offset: start of response data relative to start of scm_response
-+ * @is_complete: indicates if the command has finished processing
-+ */
-+struct scm_response {
-+	u32	len;
-+	u32	buf_offset;
-+	u32	is_complete;
-+};
-+
-+/**
-+ * alloc_scm_command() - Allocate an SCM command
-+ * @cmd_size: size of the command buffer
-+ * @resp_size: size of the response buffer
-+ * @handle: dma handle
-+ *
-+ * Allocate an SCM command, including enough room for the command
-+ * and response headers as well as the command and response buffers.
-+ *
-+ * Returns a valid &scm_command on success or %NULL if the allocation fails.
-+ */
-+static struct scm_command *alloc_scm_command(size_t cmd_size, size_t resp_size,
-+		dma_addr_t *handle)
-+{
-+	struct scm_command *cmd;
-+	size_t len = sizeof(*cmd) + sizeof(struct scm_response) + cmd_size +
-+		resp_size;
-+
-+	cmd = dma_alloc_coherent(NULL, len, handle, GFP_KERNEL);
-+	if (cmd) {
-+		cmd->len = len;
-+		cmd->buf_offset = sizeof(*cmd);
-+		cmd->resp_hdr_offset = cmd->buf_offset + cmd_size;
-+	}
-+	return cmd;
-+}
-+
-+/**
-+ * free_scm_command() - Free an SCM command
-+ * @cmd: command to free
-+ * @handle: dma handle
-+ *
-+ * Free an SCM command.
-+ */
-+static inline void free_scm_command(struct scm_command *cmd, dma_addr_t handle)
-+{
-+	dma_free_coherent(NULL, cmd->len, cmd, handle);
-+}
-+
-+/**
-+ * scm_command_to_response() - Get a pointer to a scm_response
-+ * @cmd: command
-+ *
-+ * Returns a pointer to a response for a command.
-+ */
-+static inline struct scm_response *scm_command_to_response(
-+		const struct scm_command *cmd)
-+{
-+	return (void *)cmd + cmd->resp_hdr_offset;
-+}
-+
-+/**
-+ * scm_get_command_buffer() - Get a pointer to a command buffer
-+ * @cmd: command
-+ *
-+ * Returns a pointer to the command buffer of a command.
-+ */
-+static inline void *scm_get_command_buffer(const struct scm_command *cmd)
-+{
-+	return (void *)cmd + cmd->buf_offset;
-+}
-+
-+/**
-+ * scm_get_response_buffer() - Get a pointer to a response buffer
-+ * @rsp: response
-+ *
-+ * Returns a pointer to a response buffer of a response.
-+ */
-+static inline void *scm_get_response_buffer(const struct scm_response *rsp)
-+{
-+	return (void *)rsp + rsp->buf_offset;
-+}
-+
-+static int scm_remap_error(int err)
-+{
-+	switch (err) {
-+	case SCM_ERROR:
-+		return -EIO;
-+	case SCM_EINVAL_ADDR:
-+	case SCM_EINVAL_ARG:
-+		return -EINVAL;
-+	case SCM_EOPNOTSUPP:
-+		return -EOPNOTSUPP;
-+	case SCM_ENOMEM:
-+		return -ENOMEM;
-+	}
-+	return -EINVAL;
-+}
-+
-+static u32 smc(dma_addr_t cmd_addr)
-+{
-+	int context_id;
-+	register u32 r0 asm("r0") = 1;
-+	register u32 r1 asm("r1") = (u32)&context_id;
-+	register u32 r2 asm("r2") = (u32)cmd_addr;
-+	asm(
-+		__asmeq("%0", "r0")
-+		__asmeq("%1", "r0")
-+		__asmeq("%2", "r1")
-+		__asmeq("%3", "r2")
-+		"smc	#0	@ switch to secure world\n"
-+		: "=r" (r0)
-+		: "r" (r0), "r" (r1), "r" (r2)
-+		: "r3");
-+	return r0;
-+}
-+
-+static int __scm_call(const dma_addr_t cmd)
-+{
-+	int ret;
-+
-+	/*
-+	 * Flush the entire cache here so callers don't have to remember
-+	 * to flush the cache when passing physical addresses to the secure
-+	 * side in the buffer.
-+	 */
-+	flush_cache_all();
-+	do {
-+		ret = smc(cmd);
-+		if (ret < 0) {
-+			ret = scm_remap_error(ret);
-+			break;
-+		}
-+	} while (ret == SCM_INTERRUPTED);
-+
-+	return ret;
-+}
-+
-+/**
-+ * scm_call() - Send an SCM command
-+ * @svc_id: service identifier
-+ * @cmd_id: command identifier
-+ * @cmd_buf: command buffer
-+ * @cmd_len: length of the command buffer
-+ * @resp_buf: response buffer
-+ * @resp_len: length of the response buffer
-+ *
-+ * Sends a command to the SCM and waits for the command to finish processing.
-+ */
-+int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
-+		void *resp_buf, size_t resp_len)
-+{
-+	int ret;
-+	struct scm_command *cmd;
-+	struct scm_response *rsp;
-+	dma_addr_t handle;
-+
-+	cmd = alloc_scm_command(cmd_len, resp_len, &handle);
-+	if (!cmd)
-+		return -ENOMEM;
-+
-+	cmd->id = (svc_id << 10) | cmd_id;
-+	if (cmd_buf)
-+		memcpy(scm_get_command_buffer(cmd), cmd_buf, cmd_len);
-+	wmb();
-+
-+	mutex_lock(&scm_lock);
-+	ret = __scm_call(handle);
-+	mutex_unlock(&scm_lock);
-+	if (ret)
-+		goto out;
-+
-+	rsp = scm_command_to_response(cmd);
-+	do {
-+		rmb();
-+	} while (!rsp->is_complete);
-+
-+	if (resp_buf)
-+		memcpy(resp_buf, scm_get_response_buffer(rsp), resp_len);
-+out:
-+	free_scm_command(cmd, handle);
-+	return ret;
-+}
-+EXPORT_SYMBOL(scm_call);
-+
-+u32 scm_get_version(void)
-+{
-+	int context_id;
-+	static u32 version = -1;
-+	register u32 r0 asm("r0") = 0x1 << 8;
-+	register u32 r1 asm("r1") = (u32)&context_id;
-+
-+	if (version != -1)
-+		return version;
-+
-+	mutex_lock(&scm_lock);
-+	asm(
-+		__asmeq("%0", "r1")
-+		__asmeq("%1", "r0")
-+		__asmeq("%2", "r1")
-+		"smc	#0	@ switch to secure world\n"
-+		: "=r" (r1)
-+		: "r" (r0), "r" (r1)
-+		: "r2", "r3");
-+	version = r1;
-+	mutex_unlock(&scm_lock);
-+
-+	return version;
-+}
-+EXPORT_SYMBOL(scm_get_version);
-diff --git a/arch/arm/mach-msm/scm.h b/arch/arm/mach-msm/scm.h
-new file mode 100644
-index 0000000..261786b
---- /dev/null
-+++ b/arch/arm/mach-msm/scm.h
-@@ -0,0 +1,41 @@
-+/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are
-+ * met:
-+ *     * Redistributions of source code must retain the above copyright
-+ *       notice, this list of conditions and the following disclaimer.
-+ *     * Redistributions in binary form must reproduce the above
-+ *       copyright notice, this list of conditions and the following
-+ *       disclaimer in the documentation and/or other materials provided
-+ *       with the distribution.
-+ *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
-+ *       contributors may be used to endorse or promote products derived
-+ *       from this software without specific prior written permission.
-+ *
-+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
-+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
-+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
-+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
-+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+#ifndef __MACH_SCM_H
-+#define __MACH_SCM_H
-+
-+#define SCM_SVC_BOOT			0x1
-+#define SCM_SVC_PIL			0x2
-+
-+extern int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
-+		void *resp_buf, size_t resp_len);
-+
-+#define SCM_VERSION(major, minor) (((major) << 16) | ((minor) & 0xFF))
-+
-+extern u32 scm_get_version(void);
-+
++#ifdef MSM_TMR0_BASE
++#define MSM_TMR_GLOBAL		(MSM_TMR0_BASE - MSM_TMR_BASE)
++#else
++#define MSM_TMR_GLOBAL		0
 +#endif
++
++#define MSM_GLOBAL_TIMER MSM_CLOCK_DGT
++
+ #if defined(CONFIG_ARCH_QSD8X50)
+ #define DGT_HZ (19200000 / 4) /* 19.2 MHz / 4 by default */
+ #define MSM_DGT_SHIFT (0)
+@@ -65,49 +78,67 @@ struct msm_clock {
+ 	void __iomem                *regbase;
+ 	uint32_t                    freq;
+ 	uint32_t                    shift;
++	void                        *global_counter;
++	void                        *local_counter;
+ };
+ 
++enum {
++	MSM_CLOCK_GPT,
++	MSM_CLOCK_DGT,
++	NR_TIMERS,
++};
++
++
++static struct msm_clock msm_clocks[];
++static struct clock_event_device *local_clock_event;
++
+ static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
+ {
+ 	struct clock_event_device *evt = dev_id;
++	if (smp_processor_id() != 0)
++		evt = local_clock_event;
++	if (evt->event_handler == NULL)
++		return IRQ_HANDLED;
+ 	evt->event_handler(evt);
+ 	return IRQ_HANDLED;
+ }
+ 
+-static cycle_t msm_gpt_read(struct clocksource *cs)
++static cycle_t msm_read_timer_count(struct clocksource *cs)
+ {
+-	return readl(MSM_GPT_BASE + TIMER_COUNT_VAL);
++	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
++
++	return readl(clk->global_counter) >> clk->shift;
+ }
+ 
+-static cycle_t msm_dgt_read(struct clocksource *cs)
++static struct msm_clock *clockevent_to_clock(struct clock_event_device *evt)
+ {
+-	return readl(MSM_DGT_BASE + TIMER_COUNT_VAL) >> MSM_DGT_SHIFT;
++#ifdef CONFIG_SMP
++	int i;
++	for (i = 0; i < NR_TIMERS; i++)
++		if (evt == &(msm_clocks[i].clockevent))
++			return &msm_clocks[i];
++	return &msm_clocks[MSM_GLOBAL_TIMER];
++#else
++	return container_of(evt, struct msm_clock, clockevent);
++#endif
+ }
+ 
+ static int msm_timer_set_next_event(unsigned long cycles,
+ 				    struct clock_event_device *evt)
+ {
+-	struct msm_clock *clock = container_of(evt, struct msm_clock, clockevent);
+-	uint32_t now = readl(clock->regbase + TIMER_COUNT_VAL);
++	struct msm_clock *clock = clockevent_to_clock(evt);
++	uint32_t now = readl(clock->local_counter);
+ 	uint32_t alarm = now + (cycles << clock->shift);
+-	int late;
+ 
+ 	writel(alarm, clock->regbase + TIMER_MATCH_VAL);
+-	now = readl(clock->regbase + TIMER_COUNT_VAL);
+-	late = now - alarm;
+-	if (late >= (-2 << clock->shift) && late < DGT_HZ*5) {
+-		printk(KERN_NOTICE "msm_timer_set_next_event(%lu) clock %s, "
+-		       "alarm already expired, now %x, alarm %x, late %d\n",
+-		       cycles, clock->clockevent.name, now, alarm, late);
+-		return -ETIME;
+-	}
+ 	return 0;
+ }
+ 
+ static void msm_timer_set_mode(enum clock_event_mode mode,
+ 			      struct clock_event_device *evt)
+ {
+-	struct msm_clock *clock = container_of(evt, struct msm_clock, clockevent);
++	struct msm_clock *clock = clockevent_to_clock(evt);
++
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_RESUME:
+ 	case CLOCK_EVT_MODE_PERIODIC:
+@@ -135,7 +166,7 @@ static struct msm_clock msm_clocks[] = {
+ 		.clocksource = {
+ 			.name           = "gp_timer",
+ 			.rating         = 200,
+-			.read           = msm_gpt_read,
++			.read           = msm_read_timer_count,
+ 			.mask           = CLOCKSOURCE_MASK(32),
+ 			.shift          = 17,
+ 			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+@@ -148,7 +179,10 @@ static struct msm_clock msm_clocks[] = {
+ 			.irq     = INT_GP_TIMER_EXP
+ 		},
+ 		.regbase = MSM_GPT_BASE,
+-		.freq = GPT_HZ
++		.freq = GPT_HZ,
++		.local_counter = MSM_GPT_BASE + TIMER_COUNT_VAL,
++		.global_counter = MSM_GPT_BASE + TIMER_COUNT_VAL +
++			MSM_TMR_GLOBAL,
+ 	},
+ 	{
+ 		.clockevent = {
+@@ -162,7 +196,7 @@ static struct msm_clock msm_clocks[] = {
+ 		.clocksource = {
+ 			.name           = "dg_timer",
+ 			.rating         = 300,
+-			.read           = msm_dgt_read,
++			.read           = msm_read_timer_count,
+ 			.mask           = CLOCKSOURCE_MASK((32 - MSM_DGT_SHIFT)),
+ 			.shift          = 24 - MSM_DGT_SHIFT,
+ 			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+@@ -176,7 +210,10 @@ static struct msm_clock msm_clocks[] = {
+ 		},
+ 		.regbase = MSM_DGT_BASE,
+ 		.freq = DGT_HZ >> MSM_DGT_SHIFT,
+-		.shift = MSM_DGT_SHIFT
++		.shift = MSM_DGT_SHIFT,
++		.local_counter = MSM_DGT_BASE + TIMER_COUNT_VAL,
++		.global_counter = MSM_DGT_BASE + TIMER_COUNT_VAL +
++			MSM_TMR_GLOBAL,
+ 	}
+ };
+ 
+@@ -185,7 +222,7 @@ static void __init msm_timer_init(void)
+ 	int i;
+ 	int res;
+ 
+-#ifdef CONFIG_ARCH_MSM8X60
++#ifdef CONFIG_ARCH_MSM_SCORPIONMP
+ 	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
+ #endif
+ 
+@@ -220,6 +257,57 @@ static void __init msm_timer_init(void)
+ 	}
+ }
+ 
++#ifdef CONFIG_SMP
++void local_timer_setup(struct clock_event_device *evt)
++{
++	unsigned long flags;
++	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
++
++	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
++
++	if (!local_clock_event) {
++		writel(0, clock->regbase  + TIMER_ENABLE);
++		writel(0, clock->regbase + TIMER_CLEAR);
++		writel(~0, clock->regbase + TIMER_MATCH_VAL);
++	}
++	evt->irq = clock->irq.irq;
++	evt->name = "local_timer";
++	evt->features = CLOCK_EVT_FEAT_ONESHOT;
++	evt->rating = clock->clockevent.rating;
++	evt->set_mode = msm_timer_set_mode;
++	evt->set_next_event = msm_timer_set_next_event;
++	evt->shift = clock->clockevent.shift;
++	evt->mult = div_sc(clock->freq, NSEC_PER_SEC, evt->shift);
++	evt->max_delta_ns =
++		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
++	evt->min_delta_ns = clockevent_delta2ns(4, evt);
++	evt->cpumask = cpumask_of(smp_processor_id());
++
++	local_clock_event = evt;
++
++	local_irq_save(flags);
++	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
++	local_irq_restore(flags);
++
++	clockevents_register_device(evt);
++}
++
++inline int local_timer_ack(void)
++{
++	return 1;
++}
++
++#ifdef CONFIG_HOTPLUG_CPU
++void __cpuexit local_timer_stop(void)
++{
++	struct msm_clock *clock = clockevent_to_clock(local_clock_event);
++	writel(0, clock->regbase + TIMER_MATCH_VAL);
++	writel(0, clock->regbase + TIMER_ENABLE);
++	get_irq_chip(local_clock_event->irq)->mask(local_clock_event->irq);
++}
++#endif
++#endif
++
+ struct sys_timer msm_timer = {
+ 	.init = msm_timer_init
+ };
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
