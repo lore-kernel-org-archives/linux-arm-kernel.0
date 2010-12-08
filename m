@@ -1,31 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Dec 2010 20:20:43 +0000
-Subject: [RFC] Fixing CPU Hotplug for RealView Platforms
-In-Reply-To: <007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
-References: <007401cb962d$d53d2500$7fb76f00$@deacon@arm.com>
-	<20101207171810.GA25839@n2100.arm.linux.org.uk>
-	<007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
-Message-ID: <20101208202043.GR9777@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 08 Dec 2010 12:24:05 -0800
+Subject: [PATCHv3 2/4] ARM: Allow machines to override __delay()
+In-Reply-To: <1291836162.12568.17.camel@c-dwalke-linux.qualcomm.com>
+References: <1291783128-27520-1-git-send-email-sboyd@codeaurora.org>	
+	<1291783128-27520-3-git-send-email-sboyd@codeaurora.org>
+	<1291836162.12568.17.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <4CFFE965.30906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 05:47:00PM -0000, Will Deacon wrote:
-> Hi Russell,
-> > What if we fixed the cpu_reset functions for v6 and v7, and when a CPU
-> > is taken offline, we actually go through a proper shutdown of that CPU
-> > and call the reset vector, re-entering the boot loader?
-> 
-> This will certainly solve our problem, but people might complain that it's
-> too heavyweight :)
+On 12/08/2010 11:22 AM, Daniel Walker wrote:
+> On Tue, 2010-12-07 at 20:38 -0800, Stephen Boyd wrote:
+>> +
+>> +static void (*delay_fn)(unsigned long) = delay_loop;
+>> +
+>> +void set_delay_fn(void (*fn)(unsigned long))
+>> +{
+>> +       delay_fn = fn;
+>> +}
+>> +
+>> +/*
+>> + * loops = usecs * HZ * loops_per_jiffy / 1000000
+>> + */
+>> +void __delay(unsigned long loops)
+>> +{
+>> +       delay_fn(loops);
+>> +}
+>>  EXPORT_SYMBOL(__delay);
+> Didn't we already go over this part ? Why are aren't you putting these
+> in a header file ?
 
-Our current hot plug-in code already re-runs most of the secondary CPU
-initialization in the kernel - we reset the stack and jump back to
-secondary_start_kernel().
+Last time we saw that inlining set_delay_fn() actually increased the
+text size of the kernel. I know it sounds wrong, but its probably due to
+that compiler behavior Russell posted about last month on arm-lkml.
 
-What we'll be adding to that is the overheads in the boot loader (which
-would happen at the point we go offline) and getting back to the kernel
-code.  From that point, the additional things are looking up the CPU
-type, calling its setup function, and enabling the MMU.
+I'd like to see what Russell wants to do since so far he's been silent
+on this whole series.
 
-Everything from that point on would be identical to what already happens
-on the hot plug-in path.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
