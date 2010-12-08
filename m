@@ -1,100 +1,40 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Dec 2010 21:27:35 +0100
-Subject: [PATCH v2 05/15] ARM: mxs: Add low-level debug UART support
-In-Reply-To: <1291739523-25077-4-git-send-email-shawn.guo@freescale.com>
+Date: Wed, 8 Dec 2010 21:28:22 +0100
+Subject: [PATCH v2 14/15] ARM: mxs: Add initial mx28evk support
+In-Reply-To: <1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-4-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101208202735.GC17441@pengutronix.de>
+	<1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101208202822.GD17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 08, 2010 at 12:31:55AM +0800, Shawn Guo wrote:
->  - DEBUG_LL support, which is incompatible with single MXS image
-maybe better: s/single/multi-soc/
+Hello Shawn,
 
->    because of different DUART base address on MX23 and MX28
->  - uncompress message support
+On Wed, Dec 08, 2010 at 12:32:02AM +0800, Shawn Guo wrote:
+> Add initial mx28evk support with duart and fec0.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
 > Changes for v2:
->  - Remove incorrect comments
+>  - Change function mx28evk_fec_reset() from inline to __init
+>  - Enable pll2 clock before phy operation
+>  - Add error checking for gpio_direction_output()
+>  - Save bytes by passing parameter into pr_err format string
+>  - Change mx28_add_fec0() to mx28_add_fec(0)
+>  - Remove boot_params
 > 
->  arch/arm/mach-mxs/include/mach/debug-macro.S |   51 +++++++++++++++++
->  arch/arm/mach-mxs/include/mach/uncompress.h  |   78 ++++++++++++++++++++++++++
->  2 files changed, 129 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
->  create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
+>  arch/arm/mach-mxs/mach-mx28evk.c |  126 ++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 126 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
 > 
-> diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
 > new file mode 100644
-> index 0000000..efb3173
+> index 0000000..3e8e37a
 > --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
-> @@ -0,0 +1,51 @@
-> +/* arch/arm/mach-mxs/include/mach/debug-macro.S
-> + *
-> + * Debugging macro include header
-> + *
-> + *  Copyright (C) 1994-1999 Russell King
-> + *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <mach/hardware.h>
-> +
-> +#ifdef CONFIG_SOC_IMX23
-> +#ifdef UART_PADDR
-> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> +#endif
-> +#define UART_PADDR	MX23_DUART_BASE_ADDR
-> +#endif
-> +
-> +#ifdef CONFIG_SOC_IMX28
-> +#ifdef UART_PADDR
-> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> +#endif
-> +#define UART_PADDR	MX28_DUART_BASE_ADDR
-> +#endif
-> +
-> +#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
-> +
-> +		.macro	addruart, rp, rv
-> +		ldr	\rp, =UART_PADDR	@ physical
-> +		ldr	\rv, =UART_VADDR	@ virtual
-> +		.endm
-> +
-> +		.macro	senduart, rd, rx
-> +		str	\rd, [\rx, #0x0]	@ DR
-> +		.endm
-> +
-> +		.macro	waituart, rd, rx
-> +1001:		ldr	\rd, [\rx, #0x18]	@ FR
-> +		tst	\rd, #1 << 5		@ FR_TXFF
-> +		bne	1001b
-> +		.endm
-> +
-> +		.macro	busyuart, rd, rx
-> +1002:		ldr	\rd, [\rx, #0x18]	@ FR
-> +		tst	\rd, #1 << 3		@ FR_BUSY
-> +		beq	1002b
-> +		.endm
-> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
-> new file mode 100644
-> index 0000000..efdacc7
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
-> @@ -0,0 +1,78 @@
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -0,0 +1,126 @@
 > +/*
-> + *  arch/arm/mach-mxs/include/mach/uncompress.h
-> + *
-> + *  Copyright (C) 1999 ARM Limited
-> + *  Copyright (C) Shane Nay (shane at minirl.com)
-> + *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License as published by
@@ -106,72 +46,121 @@ maybe better: s/single/multi-soc/
 > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 > + * GNU General Public License for more details.
 > + */
-> +#ifndef __MACH_MXS_UNCOMPRESS_H__
-> +#define __MACH_MXS_UNCOMPRESS_H__
 > +
-> +#define __MXS_BOOT_UNCOMPRESS
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/irq.h>
+> +#include <linux/clk.h>
 > +
 > +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
 > +
-> +static unsigned long uart_base;
+> +#include <mach/hardware.h>
+> +#include <mach/common.h>
+> +#include <mach/iomux-mx28.h>
 > +
-> +#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
+> +#include "devices-mx28.h"
+> +#include "gpio.h"
 > +
-> +#define DR		0x00
-> +#define FR		0x18
-> +#define FR_BUSY		(1 << 3)
-> +#define FR_TXFE		(1 << 7)
-> +#define CR		0x30
-> +#define CR_UARTEN	1
-Maybe namespace these?  Maybe better define CR_UARTEN as (1 << 0) for
-consistency?
+> +#define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+> +#define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+> +
+> +static iomux_cfg_t mx28evk_pads[] = {
+This can be const and __initconst, ditto for mx23evk
 
+> +	/* duart */
+> +	MX28_PAD_PWM0__DUART_RX,
+> +	MX28_PAD_PWM1__DUART_TX,
 > +
-> +/*
-> + * The following code assumes the serial port has already been
-> + * initialized by the bootloader.
-Maybe add:
-    * If it's not, the output is simply discarded.
-> + */
+> +	/* fec0 */
+> +	MX28_PAD_ENET0_MDC__ENET0_MDC,
+> +	MX28_PAD_ENET0_MDIO__ENET0_MDIO,
+> +	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN,
+> +	MX28_PAD_ENET0_RXD0__ENET0_RXD0,
+> +	MX28_PAD_ENET0_RXD1__ENET0_RXD1,
+> +	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN,
+> +	MX28_PAD_ENET0_TXD0__ENET0_TXD0,
+> +	MX28_PAD_ENET0_TXD1__ENET0_TXD1,
+> +	MX28_PAD_ENET_CLK__ENET_CLK,
+> +	/* phy power line */
+> +	MX28_PAD_SSP1_DATA3__GPIO_2_15,
+> +	/* phy reset line */
+> +	MX28_PAD_ENET0_RX_CLK__GPIO_4_13,
+> +};
 > +
-> +static void putc(int ch)
+> +/* fec */
+> +static void __init mx28evk_fec_reset(void)
 > +{
-> +	if (!uart_base)
+> +	int ret;
+> +	struct clk *clk;
+> +
+> +	/* Enable fec phy clock */
+> +	clk = clk_get_sys("pll2", NULL);
+> +	if (!IS_ERR(clk))
+> +		clk_enable(clk);
+> +
+> +	/* Power up fec phy */
+> +	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
+> +	if (ret) {
+> +		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
 > +		return;
-> +	if (!(UART(CR) & CR_UARTEN))
-> +		return;
-> +
-> +	while (!(UART(FR) & FR_TXFE))
-> +		barrier();
-> +
-> +	UART(DR) = ch;
-> +}
-> +
-> +static inline void flush(void)
-> +{
-> +}
-> +
-> +#define MX23_DUART_BASE_ADDR	0x80070000
-> +#define MX28_DUART_BASE_ADDR	0x80074000
-> +
-> +static __inline__ void __arch_decomp_setup(unsigned long arch_id)
-> +{
-> +	switch (arch_id) {
-> +	case MACH_TYPE_MX23EVK:
-> +		uart_base = MX23_DUART_BASE_ADDR;
-> +		break;
-> +	case MACH_TYPE_MX28EVK:
-> +		uart_base = MX28_DUART_BASE_ADDR;
-> +		break;
-> +	default:
-> +		break;
 > +	}
+> +
+> +	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
+> +	if (ret) {
+> +		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
+> +		return;
+> +	}
+> +
+> +	/* Reset fec phy */
+> +	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
+> +	if (ret) {
+> +		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
+> +		return;
+> +	}
+> +
+> +	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
+> +	if (ret) {
+> +		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
+> +		return;
+> +	}
+> +
+> +	mdelay(1);
+> +	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
 > +}
 > +
-> +#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
-> +#define arch_decomp_wdog()
+> +static const struct fec_platform_data mx28_fec_pdata __initconst = {
+> +        .phy = PHY_INTERFACE_MODE_RMII,
+> +};
 > +
-> +#endif /* __MACH_MXS_UNCOMPRESS_H__ */
+> +static void __init mx28evk_init(void)
+> +{
+> +	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
+> +
+> +	mx28_add_duart();
+> +
+> +	mx28evk_fec_reset();
+> +	mx28_add_fec(0, &mx28_fec_pdata);
+> +}
+> +
+> +static void __init mx28evk_timer_init(void)
+> +{
+> +	mx28_clocks_init();
+> +}
+> +
+> +static struct sys_timer mx28evk_timer = {
+> +	.init	= mx28evk_timer_init,
+> +};
+> +
+> +MACHINE_START(MX28EVK, "Freescale MX28 EVK")
+> +	/* Maintainer: Freescale Semiconductor, Inc. */
+> +	.map_io         = mx28_map_io,
+> +	.init_irq       = mx28_init_irq,
+> +	.init_machine   = mx28evk_init,
+> +	.timer          = &mx28evk_timer,
+> +MACHINE_END
 > -- 
 > 1.7.1
 > 
