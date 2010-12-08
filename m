@@ -1,48 +1,118 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Dec 2010 17:45:48 -0800
-Subject: [PATCH 0/4] Patches to make multi-soc handling in entry-armv.S
-	easier
-In-Reply-To: <20101205031002.GP17222@atomide.com>
+Date: Tue, 7 Dec 2010 17:47:28 -0800
+Subject: [PATCH 1/3] omap1: Use asm_irq_flags for entry-macro.S
+In-Reply-To: <20101208014548.GJ17435@atomide.com>
 References: <20101204001435.28853.29616.stgit@baageli.muru.com>
 	<alpine.LFD.2.00.1012040040590.10437@xanadu.home>
 	<20101204180541.GH17222@atomide.com>
 	<alpine.LFD.2.00.1012042126350.10437@xanadu.home>
 	<20101205031002.GP17222@atomide.com>
-Message-ID: <20101208014548.GJ17435@atomide.com>
+	<20101208014548.GJ17435@atomide.com>
+Message-ID: <20101208014728.GK17435@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [101204 19:00]:
-> * Nicolas Pitre <nico@fluxnic.net> [101204 18:26]:
-> > On Sat, 4 Dec 2010, Tony Lindgren wrote:
-> > 
-> > My only problem with your approach is the global addition of 
-> > asm_irq_base and asm_irq_flags in generic code which might not be useful 
-> > and/or appropriate for all targets.  If you were confining them to some 
-> > OMAP specific file then I wouldn't mind as much.  Looking at the patch I 
-> > see that you had omap_irq_base before.  Why wasn't that sufficient?  
-> > Only omap_irq_flags would be missing.
-> 
-> I guess I was thinking this is something that might help others
-> to build more machines into one defconfig. If that's not the case,
-> sure these can be kept omap specific.
-> 
-> After a quick browsing of the entry-macro.S files, looks like
-> there's some similar ifdeffery for get_irqnr_* macros that just might
-> be possible to clear out with asm_irq_base and asm_irq_flags:
-> 
-> arch/arm/mach-davinci/include/mach/entry-macro.S
-> arch/arm/mach-s5p64x0/include/mach/entry-macro.S
-> arch/arm/mach-ixp4xx/include/mach/entry-macro.S
-> arch/arm/mach-h720x/include/mach/entry-macro.S
-> arch/arm/plat-mxc/include/mach/entry-macro.S
-> 
-> Maybe let's wait a while to see if there are other use cases,
-> if not, I'll make them omap specific.
+Initialize asm_irq_flags in omap_init_irq and use it in
+get_irqnr_and_base to detect between omap7xx and omap15xx/16xx.
 
-OK, no other people interested, will post the omap specific
-versions as a reply to this message.
+Note that both INT_1510_IH2_IRQ and INT_1510_IH2_IRQ are defined
+as 0, so use INT_1510_IH2_IRQ for both of them.
 
-Regards,
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Tony
+diff --git a/arch/arm/mach-omap1/include/mach/entry-macro.S b/arch/arm/mach-omap1/include/mach/entry-macro.S
+index df9060e..c9be6d4 100644
+--- a/arch/arm/mach-omap1/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap1/include/mach/entry-macro.S
+@@ -14,18 +14,17 @@
+ #include <mach/irqs.h>
+ #include <asm/hardware/gic.h>
+ 
+-#if (defined(CONFIG_ARCH_OMAP730)||defined(CONFIG_ARCH_OMAP850)) && \
+-	(defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX))
+-#error "FIXME: OMAP7XX doesn't support multiple-OMAP"
+-#elif defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+-#define INT_IH2_IRQ		INT_7XX_IH2_IRQ
+-#elif defined(CONFIG_ARCH_OMAP15XX)
+-#define INT_IH2_IRQ		INT_1510_IH2_IRQ
+-#elif defined(CONFIG_ARCH_OMAP16XX)
+-#define INT_IH2_IRQ		INT_1610_IH2_IRQ
+-#else
+-#warning "IH2 IRQ defaulted"
+-#define INT_IH2_IRQ		INT_1510_IH2_IRQ
++/*
++ * We use __glue to avoid errors with multiple definitions of
++ * .globl omap_irq_flags as it's included from entry-armv.S but not
++ * from entry-common.S.
++ */
++#ifdef __glue
++		.pushsection .data
++		.globl	omap_irq_flags
++omap_irq_flags:
++		.word	0
++		.popsection
+ #endif
+ 
+  		.macro	disable_fiq
+@@ -47,9 +46,11 @@
+ 		beq	1510f
+ 
+ 		ldr	\irqnr, [\base, #IRQ_SIR_FIQ_REG_OFFSET]
++		ldr	\tmp, =omap_irq_flags	@ irq flags address
++		ldr	\tmp, [\tmp, #0]	@ irq flags value
+ 		cmp	\irqnr, #0
+ 		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ_REG_OFFSET]
+-		cmpeq	\irqnr, #INT_IH2_IRQ
++		cmpeq	\irqnr, \tmp
+ 		ldreq	\base, =OMAP1_IO_ADDRESS(OMAP_IH2_BASE)
+ 		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ_REG_OFFSET]
+ 		addeqs	\irqnr, \irqnr, #32
+diff --git a/arch/arm/mach-omap1/irq.c b/arch/arm/mach-omap1/irq.c
+index db913c3..6bddbc8 100644
+--- a/arch/arm/mach-omap1/irq.c
++++ b/arch/arm/mach-omap1/irq.c
+@@ -176,26 +176,31 @@ static struct irq_chip omap_irq_chip = {
+ 
+ void __init omap_init_irq(void)
+ {
++	extern unsigned int omap_irq_flags;
+ 	int i, j;
+ 
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+ 	if (cpu_is_omap7xx()) {
++		omap_irq_flags = INT_7XX_IH2_IRQ;
+ 		irq_banks = omap7xx_irq_banks;
+ 		irq_bank_count = ARRAY_SIZE(omap7xx_irq_banks);
+ 	}
+ #endif
+ #ifdef CONFIG_ARCH_OMAP15XX
+ 	if (cpu_is_omap1510()) {
++		omap_irq_flags = INT_1510_IH2_IRQ;
+ 		irq_banks = omap1510_irq_banks;
+ 		irq_bank_count = ARRAY_SIZE(omap1510_irq_banks);
+ 	}
+ 	if (cpu_is_omap310()) {
++		omap_irq_flags = INT_1510_IH2_IRQ;
+ 		irq_banks = omap310_irq_banks;
+ 		irq_bank_count = ARRAY_SIZE(omap310_irq_banks);
+ 	}
+ #endif
+ #if defined(CONFIG_ARCH_OMAP16XX)
+ 	if (cpu_is_omap16xx()) {
++		omap_irq_flags = INT_1510_IH2_IRQ;
+ 		irq_banks = omap1610_irq_banks;
+ 		irq_bank_count = ARRAY_SIZE(omap1610_irq_banks);
+ 	}
+diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+index 65e20a6..2910de9 100644
+--- a/arch/arm/plat-omap/include/plat/irqs.h
++++ b/arch/arm/plat-omap/include/plat/irqs.h
+@@ -77,7 +77,7 @@
+ /*
+  * OMAP-1610 specific IRQ numbers for interrupt handler 1
+  */
+-#define INT_1610_IH2_IRQ	0
++#define INT_1610_IH2_IRQ	INT_1510_IH2_IRQ
+ #define INT_1610_IH2_FIQ	2
+ #define INT_1610_McBSP2_TX	4
+ #define INT_1610_McBSP2_RX	5
