@@ -1,79 +1,90 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 8 Dec 2010 11:33:58 +0530
-Subject: [RFC] Fixing CPU Hotplug for RealView Platforms
-In-Reply-To: <007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
-References: <007401cb962d$d53d2500$7fb76f00$@deacon@arm.com><20101207171810.GA25839@n2100.arm.linux.org.uk>
-	<007501cb9636$c0a54c90$41efe5b0$@deacon@arm.com>
-Message-ID: <a23df178794882d81bc1068d8240dfc8@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 07 Dec 2010 23:18:36 -0700
+Subject: [PATCH 02/11] OMAP4: PRCM: move global reset function for OMAP4 to an
+	OMAP4-specific file
+In-Reply-To: <20101208061657.30541.79824.stgit@twilight.localdomain>
+References: <20101208061657.30541.79824.stgit@twilight.localdomain>
+Message-ID: <20101208061835.30541.28012.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Will Deacon
-> Sent: Tuesday, December 07, 2010 11:17 PM
-> To: 'Russell King - ARM Linux'
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: RE: [RFC] Fixing CPU Hotplug for RealView Platforms
->
-> Hi Russell,
->
-> > On Tue, Dec 07, 2010 at 04:43:10PM -0000, Will Deacon wrote:
-> > > Hello,
-> > >
-> > > Currently, CPU hotplug is broken for RealView platforms. I posted
-some
-> > > patches previously to try and address this, but they didn't solve
-the
-> > > problems fully:
-> > >
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-
-> September/026157.html
-> > >
-> > > I'm now revisiting the code and it looks like the main problem is
-when
-> > > we wish to *leave* the lowpower state. The enter/leave routines look
-> > > like this:
-> > >
-> > ...
-> > >
-> > > The problem is that by turning off coherency, the contents of the D-
-> cache
-> > > becomes stale. If data is prefetched into L1 between the
-> flush_cache_all
-> > > invocation and disabling the D-cache then this data will still be
-> present
-> > > when we come out of lowpower. Without coherency, we *must not* use
-> this
-> > > data and so a D-cache invalidation to the PoC is required in
-> > > cpu_leave_lowpower().
-> >
-> > What if we fixed the cpu_reset functions for v6 and v7, and when a CPU
-> > is taken offline, we actually go through a proper shutdown of that CPU
-> > and call the reset vector, re-entering the boot loader?
->
-> This will certainly solve our problem, but people might complain that
-it's
-> too heavyweight :) That said, for v7 this may be the only solution as
-the
-> platform can require an IMPLEMENTATION DEFINED initialisation routine to
-> be
-> executed before enabling the D-cache out of reset. This should be
-> something
-> that the bootloader does for us.
->
-> > We can only do this for CPUs other than the original boot CPU, because
-> > the boot loader should be checking which are the secondary CPUs and
-> > putting those into this simple WFI loop with the GIC appropriately
-> > programmed.
-> >
-> > This means when we re-activate the CPU, we'll be waking it up in
-> > exactly the same way as we do when the kernel boots - and we have all
-> > that code around just waiting to be used.
->
-One more simpler thing which could work is disable "C' bit before flushing
-the L1 cache. That way prefetch would be avoided and cache also will
-be in clean state while restarting the core.
+Move the OMAP4 global software reset function to the OMAP4-specific
+prm44xx.c file, where it belongs.  Part of the long-term process of
+moving all of the direct PRCM register writes into lower-layer code.
 
-Regards,
-Santosh
+Also add OCP barriers on OMAP2/3/4 to reduce the chance that the MPU
+will continue executing while the system is supposed to be resetting
+itself.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/prcm.c    |   17 ++++++++---------
+ arch/arm/mach-omap2/prm44xx.c |   14 ++++++++++++++
+ arch/arm/mach-omap2/prm44xx.h |    2 ++
+ 3 files changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index fe0865b..68c541f 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -68,17 +68,16 @@ void omap_prcm_arch_reset(char mode, const char *cmd)
+ 	} else if (cpu_is_omap34xx()) {
+ 		prcm_offs = OMAP3430_GR_MOD;
+ 		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+-	} else if (cpu_is_omap44xx())
+-		prcm_offs = OMAP4430_PRM_DEVICE_INST;
+-	else
++	} else if (cpu_is_omap44xx()) {
++		omap4_prm_global_warm_sw_reset(); /* never returns */
++	} else {
+ 		WARN_ON(1);
++	}
+ 
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		prm_set_mod_reg_bits(OMAP_RST_DPLL3_MASK, prcm_offs,
+-						 OMAP2_RM_RSTCTRL);
+-	if (cpu_is_omap44xx())
+-		prm_set_mod_reg_bits(OMAP4430_RST_GLOBAL_WARM_SW_MASK,
+-				     prcm_offs, OMAP4_RM_RSTCTRL);
++	/* XXX should be moved to some OMAP2/3 specific code */
++	prm_set_mod_reg_bits(OMAP_RST_DPLL3_MASK, prcm_offs,
++			     OMAP2_RM_RSTCTRL);
++	prm_read_mod_reg(prcm_offs, OMAP2_RM_RSTCTRL); /* OCP barrier */
+ }
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index c016ae4..a2a04bf 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -179,3 +179,17 @@ int omap4_prm_deassert_hardreset(void __iomem *rstctrl_reg, u8 shift)
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+ }
+ 
++void omap4_prm_global_warm_sw_reset(void)
++{
++	u32 v;
++
++	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++				    OMAP4_RM_RSTCTRL);
++	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
++	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST,
++				 OMAP4_RM_RSTCTRL);
++
++	/* OCP barrier */
++	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++				    OMAP4_RM_RSTCTRL);
++}
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index 3588653..95542ae 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -756,6 +756,8 @@ extern int omap4_prm_is_hardreset_asserted(void __iomem *rstctrl_reg, u8 shift);
+ extern int omap4_prm_assert_hardreset(void __iomem *rstctrl_reg, u8 shift);
+ extern int omap4_prm_deassert_hardreset(void __iomem *rstctrl_reg, u8 shift);
+ 
++extern void omap4_prm_global_warm_sw_reset(void);
++
+ # endif
+ 
+ #endif
