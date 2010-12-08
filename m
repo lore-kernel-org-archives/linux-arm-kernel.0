@@ -1,7 +1,8 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 08 Dec 2010 10:05:32 +0800
+Date: Wed, 08 Dec 2010 10:08:14 +0800
 Subject: [PATCH 1/2] Add a common struct clk
-Message-ID: <1291773932.578726.468741339223.1.gpush@pororo>
+In-Reply-To: <1291774094.269634.503532219345.0.gpush@pororo>
+Message-ID: <1291774094.270194.710085940392.1.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
