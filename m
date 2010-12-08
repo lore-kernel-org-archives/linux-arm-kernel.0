@@ -1,41 +1,38 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Wed, 8 Dec 2010 16:56:40 +0800
-Subject: [PATCH v2 04/15] ARM: mxs: Add interrupt support
-In-Reply-To: <20101207210352.GC14775@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-3-git-send-email-shawn.guo@freescale.com>
-	<20101207210352.GC14775@pengutronix.de>
-Message-ID: <AANLkTim4i1fo1ebKxONeu79-AMXevyhhqh-uV26Yb2aK@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Wed, 8 Dec 2010 17:02:02 +0800
+Subject: [PATCHv3] support PMIC mc13892
+In-Reply-To: <20101208085208.GA10745@pengutronix.de>
+References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
+	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
+	<AANLkTim-_Xft9b0D3PfG8bC6_m4Kp0GtC8ZwW-NEp5-0@mail.gmail.com>
+	<20101208085208.GA10745@pengutronix.de>
+Message-ID: <AANLkTine1d6SOJqo+2LCDuHeMUVd10O_Ur+8B4PoisDe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Uwe,
 
 2010/12/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Shawn,
+> Hi Yong,
 >
-[...]
->> +
->> + ? ? .macro ?disable_fiq
->> + ? ? .endm
-> I think is isn't needed. ?Only when you start to actually use the fiq.
+> On Wed, Dec 08, 2010 at 11:28:38AM +0800, Yong Shen wrote:
+>> Last time, you took the previous patches for mc13783 code
+>> reorganization in your tree, I suppose you can also please take
+>> mc13892, which had passed review.
+> IMHO it's fair to wait a bit longer than 7 minutes after the last post
+> to request merging. ?The changes compared to v2 might be trivial, still
+> you should give your reviewers a chance to check what you did.
 >
-Without it, the compiler will complain when compiling
-arch/arm/kernel/entry-armv.S.
+You are right.
+Since it was quite a while after v2, I had not received comments, I
+had this illusion of "no more comments coming" :).
+Thanks for reminding and welcome more feedback.
 
-[...]
->> + ? ? ldr ? ? \base, =icoll_base
->> + ? ? ldr ? ? \base, [\base]
->> +#elif defined (CONFIG_SOC_IMX23)
->> + ? ? ldr ? ? \base, =MX23_ICOLL_BASE_ADDR
->> +#else
->> + ? ? ldr ? ? \base, =MX28_ICOLL_BASE_ADDR
->> +#endif
-> Mhh, you said the base addresses are different. ?Unless I'm mistaken
-> they are not. ?So you can just remove icoll_base.
->
-Something went wrong in my head.  The addresses are same.
+Yong
 
--- 
-Regards,
-Shawn
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
