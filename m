@@ -1,51 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 7 Dec 2010 23:47:28 -0700 (MST)
-Subject: [PATCH 11/14] OMAP4: PRCM: reorganize existing OMAP4 PRCM header
-	files
-In-Reply-To: <4CFDEBB7.8040309@ti.com>
-References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-	<20101207012514.3708.87532.stgit@twilight.localdomain>
-	<4CFDEBB7.8040309@ti.com>
-Message-ID: <alpine.DEB.2.00.1012072340250.13430@utopia.booyaka.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Wed, 8 Dec 2010 08:21:51 +0100
+Subject: [PATCH v2 07/15] ARM: mxs: Add gpio support
+In-Reply-To: <1291739523-25077-6-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <19711.12815.128304.234766@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Beno?t, 
+Hi,
 
-On Tue, 7 Dec 2010, Cousson, Benoit wrote:
-
-> Salut Paul,
+Shawn Guo writes:
+> MXS-based SoCs implement gpio support in block PINCTRL.
 > 
-> On 12/7/2010 2:25 AM, Paul Walmsley wrote:
-> > Split the existing cm44xx.h file into cm1_44xx.h and cm2_44xx.h files
-> > so they match their underlying OMAP hardware modules.  Add clockdomain
-> > offset information.
-> > 
-> > Add header files for the MPU local PRCM, prcm_mpu44xx.h, and for the
-> > SCRM, scrm44xx.h.  SCRM register offsets still need to be added; TI
-> > should do this.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Changes for v2:
+>  - Create arch/arm/mach-mxs/gpio.h to accommodate stuff private for mach-mxs
+>  - Use GPIO_INT_LEV_MASK and GPIO_INT_POL_MASK instead of constant
+>  - Remove both edges IRQ support which is not needed
+>  - Use SET and CLR register of PINCTRL_DOE in _set_gpio_direction()
+>  - Use pr_info over printk(KERN_INFO)
 > 
-> And we did it :-)
-
-Even better :-)
-
-> I sent it last week along with clock data series:
-> https://patchwork.kernel.org/patch/373751/
+>  arch/arm/mach-mxs/gpio.c              |  331 +++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/gpio.h              |   36 ++++
+>  arch/arm/mach-mxs/include/mach/gpio.h |   35 ++++
+>  3 files changed, 402 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/gpio.c
+>  create mode 100644 arch/arm/mach-mxs/gpio.h
+>  create mode 100644 arch/arm/mach-mxs/include/mach/gpio.h
 > 
-> OK, I've just realized that it was a little bit hidden in the clock data
-> patch, and maybe we should have been sent two patches.
-> Sorry for that. Do you want to take it in that series, or should I re-sent the
-> clock data one?
+> diff --git a/arch/arm/mach-mxs/gpio.c b/arch/arm/mach-mxs/gpio.c
+> new file mode 100644
+> index 0000000..6db7541
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/gpio.c
+[...]
+> +static void mxs_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> +{
+> +	struct mxs_gpio_port *port =
+> +		container_of(chip, struct mxs_gpio_port, chip);
+> +	u32 l;
+> +	unsigned long flags;
+> +	void __iomem *reg = port->base + PINCTRL_DOUT(port->id);
+> +
+> +	spin_lock_irqsave(&port->lock, flags);
+> +	l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
+> +	__raw_writel(l, reg);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+Why not:
+	__raw_writel(1 << offset, reg + (value ? MXS_SET_ADDR : MXS_CLR_ADDR));
+which would not even need any locking.
 
-I guess it's better done in the clock series; that should avoid a branch
-dependency between the PRCM patchsets and the clock patch sets.
 
-One thing that would be nice on the scrm44xx.h file is to keep the _OFFSET 
-macros.  It would be nice in the long run to get rid of the absolute 
-addressing macros in case someone decides to shuffle around the IP block 
-addresses again... can you update your clock series with that change?  
-Getting the clock patchsets put together for 2.6.38 is one of the next 
-big projects here.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-- Paul
+www.karo-electronics.de | info@karo-electronics.de
+___________________________________________________________
