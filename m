@@ -1,36 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 08 Dec 2010 12:30:56 -0800
-Subject: [PATCHv3 2/4] ARM: Allow machines to override __delay()
-In-Reply-To: <1291839992.12568.31.camel@c-dwalke-linux.qualcomm.com>
-References: <1291783128-27520-1-git-send-email-sboyd@codeaurora.org>	
-	<1291783128-27520-3-git-send-email-sboyd@codeaurora.org>	
-	<1291836162.12568.17.camel@c-dwalke-linux.qualcomm.com>	
-	<4CFFE965.30906@codeaurora.org>
-	<1291839992.12568.31.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <4CFFEB00.5090807@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 8 Dec 2010 21:31:48 +0100
+Subject: [PATCH v3 03/15] ARM: mxs: Add reset routines
+In-Reply-To: <19711.13516.842225.349704@ipc1.ka-ro>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-2-git-send-email-shawn.guo@freescale.com>
+	<19711.13516.842225.349704@ipc1.ka-ro>
+Message-ID: <20101208203148.GE17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2010 12:26 PM, Daniel Walker wrote:
->
-> The last time I thought you said there was no size change ? My tests
-> showed a decrease ..
+Hi Lothar,
 
-Oh, right. There was no size change when I moved __delay() into the
-header in addition to the others.
+On Wed, Dec 08, 2010 at 08:33:32AM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Shawn Guo writes:
+> >  - The mxs wdog is implemented in RTC block.
+> >  - There is a generic software reset routine for most modules on mxs.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> > Changes for v3:
+> >  - Change wdog timeout to 10ms for safety
+> >  - Simplify function mxs_reset_block() to get it look better
+> > 
+> > Changes for v2:
+> >  - Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
+> > 
+> mxs_arch_reset_init() is currently being called from the .map_io hook
+> in mach-mxs/mm-mx23.c and mm-mx28.c which is called before clocks are
+> registered.
+> But IMO this should be removed from the .map_io hook anyway (as well
+> as mxs_iomux_init()).
+I assume you want to make this an initcall?
 
->
-> What compiler optimizations are you talking about 
-
-See
-
-Subject: Weirdo gcc 4.3.x behaviour
-Message-ID: <20101121191148.GA12234@n2100.arm.linux.org.uk>
-
-and
-
-http://gcc.gnu.org/bugzilla/show_bug.cgi?id=29950
+Best regards
+Uwe
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
