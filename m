@@ -1,45 +1,32 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 08 Dec 2010 12:57:55 -0800
-Subject: [PATCH 11/14] OMAP4: PRCM: reorganize existing OMAP4 PRCM header
-	files
-In-Reply-To: <alpine.DEB.2.00.1012072338130.13430@utopia.booyaka.com> (Paul
-	Walmsley's message of "Tue, 7 Dec 2010 23:40:03 -0700 (MST)")
-References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-	<20101207012514.3708.87532.stgit@twilight.localdomain>
-	<4CFE9C7C.6060101@ti.com>
-	<alpine.DEB.2.00.1012072338130.13430@utopia.booyaka.com>
-Message-ID: <8739q8gey4.fsf@deeprootsystems.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 08 Dec 2010 13:07:59 -0800
+Subject: [PATCHv3 2/4] ARM: Allow machines to override __delay()
+In-Reply-To: <4CFFEB00.5090807@codeaurora.org>
+References: <1291783128-27520-1-git-send-email-sboyd@codeaurora.org>
+	<1291783128-27520-3-git-send-email-sboyd@codeaurora.org>
+	<1291836162.12568.17.camel@c-dwalke-linux.qualcomm.com>
+	<4CFFE965.30906@codeaurora.org>
+	<1291839992.12568.31.camel@c-dwalke-linux.qualcomm.com>
+	<4CFFEB00.5090807@codeaurora.org>
+Message-ID: <1291842479.12568.39.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+On Wed, 2010-12-08 at 12:30 -0800, Stephen Boyd wrote:
+> On 12/08/2010 12:26 PM, Daniel Walker wrote:
+> >
+> > The last time I thought you said there was no size change ? My tests
+> > showed a decrease ..
+> 
+> Oh, right. There was no size change when I moved __delay() into the
+> header in addition to the others.
 
-> On Tue, 7 Dec 2010, Cousson, Benoit wrote:
->
->> On 12/7/2010 2:25 AM, Paul Walmsley wrote:
->> 
->> [...]
->> 
->> > + *
->> > + * XXX This file needs to be updated to align on one of "OMAP4",
->> > "OMAP44XX",
->> > + *     or "OMAP4430".
->> 
->> Yep, I was thinking to change that as well. My first thought was OMAP4 to get
->> a shorter name, but when we will introduce OMAP4440, we might have some new
->> entries, that will looks ugly close to OMAP4.
->> So at the end I will prefer OMAP44XX for the moment and we might renamed to
->> OMAP4430 or OMAP4440 for the entries that will diverge.
->> 
->> Do you want to change that for 2.6.38?
->> It will require some sync with the various users of these defines, but that
->> should be doable.
->
-> I don't mind waiting until after 2.6.38, I think we'll have a pretty huge 
-> pile of patches on our hands to merge already for .38... maybe Tony or 
-> Kevin have some opinions though.
+So is there a problem with doing the inlining then ? If you get the same
+size kernel, then that seems like a lateral move in your case.
 
-I think this should wait 'til after 2.6.38, but be early in the next
-cycle so all dependencies can be handled early.
+Daniel
 
-Kevin
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
