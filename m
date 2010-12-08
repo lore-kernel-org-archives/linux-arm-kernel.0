@@ -1,100 +1,122 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Dec 2010 16:39:56 +0000
-Subject: [PATCH v2 4/6] msm: timer: SMP timer support for msm
-In-Reply-To: <1291782501-3909-5-git-send-email-johlstei@codeaurora.org>
-References: <1291782501-3909-1-git-send-email-johlstei@codeaurora.org>
-	<1291782501-3909-5-git-send-email-johlstei@codeaurora.org>
-Message-ID: <20101208163956.GO9777@n2100.arm.linux.org.uk>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Wed, 8 Dec 2010 10:54:28 -0600
+Subject: [PATCHv2] ARM: imx: Add support for low power suspend on MX51.
+Message-ID: <1291827268-13580-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 08:28:19PM -0800, Jeff Ohlstein wrote:
-> Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-I think Thomas' comments still apply to this patch.  In addition:
+Adds initial low power suspend functionality to MX51.
+Supports "mem" and "standby" modes.
 
-> @@ -65,49 +78,67 @@ struct msm_clock {
->  	void __iomem                *regbase;
->  	uint32_t                    freq;
->  	uint32_t                    shift;
-> +	void                        *global_counter;
-> +	void                        *local_counter;
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/Makefile           |    1 +
+ arch/arm/mach-mx5/pm.c               |   70 ++++++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mxc.h |    1 +
+ 3 files changed, 72 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/pm.c
 
-These seem to be mmio addresses, so they should be 'void __iomem *' not
-just 'void *'.
-
->  };
->  
-> +enum {
-> +	MSM_CLOCK_GPT,
-> +	MSM_CLOCK_DGT,
-> +	NR_TIMERS,
-> +};
-
-If these are supposed to be indexes to msm_clocks[], then please use
-them as explicit array initializers in there - it adds useful
-documentation so its not necessary to search around to find out
-what's going on.
-
-> -static cycle_t msm_gpt_read(struct clocksource *cs)
-> +static cycle_t msm_read_timer_count(struct clocksource *cs)
->  {
-> -	return readl(MSM_GPT_BASE + TIMER_COUNT_VAL);
-> +	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
-> +
-> +	return readl(clk->global_counter) >> clk->shift;
->  }
-
-Err.  This is what the core clocksource code does:
-
-        cycle_now = tc->cc->read(tc->cc);
-
-        /* calculate the delta since the last timecounter_read_delta(): */
-        cycle_delta = (cycle_now - tc->cycle_last) & tc->cc->mask;
-
-        /* convert to nanoseconds: */
-        ns_offset = cyclecounter_cyc2ns(tc->cc, cycle_delta);
-
-static inline u64 cyclecounter_cyc2ns(const struct cyclecounter *cc,
-                                      cycle_t cycles)
-{
-        u64 ret = (u64)cycles;
-        ret = (ret * cc->mult) >> cc->shift;
-        return ret;
-
-So doesn't this result in shifting left twice?
-
-> +#ifdef CONFIG_SMP
-> +void local_timer_setup(struct clock_event_device *evt)
-> +{
-> +	unsigned long flags;
-> +	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
-> +
-> +	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
-> +
-> +	if (!local_clock_event) {
-> +		writel(0, clock->regbase  + TIMER_ENABLE);
-> +		writel(0, clock->regbase + TIMER_CLEAR);
-> +		writel(~0, clock->regbase + TIMER_MATCH_VAL);
-> +	}
-> +	evt->irq = clock->irq.irq;
-> +	evt->name = "local_timer";
-> +	evt->features = CLOCK_EVT_FEAT_ONESHOT;
-> +	evt->rating = clock->clockevent.rating;
-> +	evt->set_mode = msm_timer_set_mode;
-> +	evt->set_next_event = msm_timer_set_next_event;
-> +	evt->shift = clock->clockevent.shift;
-> +	evt->mult = div_sc(clock->freq, NSEC_PER_SEC, evt->shift);
-> +	evt->max_delta_ns =
-> +		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
-> +	evt->min_delta_ns = clockevent_delta2ns(4, evt);
-> +	evt->cpumask = cpumask_of(smp_processor_id());
-> +
-> +	local_clock_event = evt;
-> +
-> +	local_irq_save(flags);
-> +	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
-> +	local_irq_restore(flags);
-
-I can't make out what the situation is here.  Are you using what is a
-local timer on CPU0 as a global timer?
+diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+index 026cd85..906bc71 100644
+--- a/arch/arm/mach-mx5/Makefile
++++ b/arch/arm/mach-mx5/Makefile
+@@ -5,6 +5,7 @@
+ # Object file lists.
+ obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o
+ 
++obj-$(CONFIG_PM) += pm.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+ obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
+new file mode 100644
+index 0000000..12ba2de
+--- /dev/null
++++ b/arch/arm/mach-mx5/pm.c
+@@ -0,0 +1,70 @@
++/*
++ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <linux/suspend.h>
++#include <asm/mach/map.h>
++#include <mach/system.h>
++#include "crm_regs.h"
++
++static int mx5_suspend_enter(suspend_state_t state)
++{
++	u32 plat_lpc = 0, arm_srpgcr = 0, ccm_clpcr = 0;
++
++	/* always allow platform to issue a deep sleep mode request */
++	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
++
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
++		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
++		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
++		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
++		break;
++	case PM_SUSPEND_STANDBY:
++		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
++		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
++		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
++		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
++	arm_srpgcr |= MXC_SRPGCR_PCR;
++
++	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
++	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
++	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
++
++	if (tzic_enable_wake(0) != 0)
++		return -EAGAIN;
++
++	cpu_do_idle();
++	return 0;
++}
++
++static int mx5_pm_valid(suspend_state_t state)
++{
++	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
++}
++
++static const struct platform_suspend_ops mx5_suspend_ops = {
++	.valid = mx5_pm_valid,
++	.enter = mx5_suspend_enter,
++};
++
++static int __init mx5_pm_init(void)
++{
++	if (cpu_is_mx51())
++		suspend_set_ops(&mx5_suspend_ops);
++	return 0;
++}
++device_initcall(mx5_pm_init);
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 4abbdd1..dc685d4 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -52,6 +52,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ extern unsigned int __mxc_cpu_type;
++int tzic_enable_wake(int is_idle);
+ #endif
+ 
+ #ifdef CONFIG_ARCH_MX1
+-- 
+1.6.0.4
