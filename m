@@ -1,45 +1,27 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Wed, 08 Dec 2010 15:44:19 +0100
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-References: <19697.8378.717761.236202@pilspetsen.it.uu.se>
-	<19707.34405.791777.298955@pilspetsen.it.uu.se>
-	<20101205131702.GE9138@n2100.arm.linux.org.uk>
-	<20101205141921.GF9138@n2100.arm.linux.org.uk>
-	<19707.47304.977978.297596@pilspetsen.it.uu.se>
-	<20101205162151.GH9138@n2100.arm.linux.org.uk>
-	<1291812015.28378.24.camel@laptop>
-	<20101208125548.GA9777@n2100.arm.linux.org.uk>
-	<1291817076.28378.28.camel@laptop>
-	<20101208142814.GE9777@n2100.arm.linux.org.uk>
-Message-ID: <1291819459.28378.64.camel@laptop>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 8 Dec 2010 14:47:57 +0000
+Subject: [PATCH 2/3] ASoC: CS4271 codec support
+In-Reply-To: <20101208133935.GI16418@rakim.wolfsonmicro.main>
+References: <1291809772.31916.4.camel@r60e>
+	<20101208130720.GB2716@pulham.picochip.com>
+	<20101208133935.GI16418@rakim.wolfsonmicro.main>
+Message-ID: <20101208144757.GD2716@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-12-08 at 14:28 +0000, Russell King - ARM Linux wrote:
-> So, what I'm saying is that if wrapping in 4 seconds is a problem,
-> then maybe we shouldn't be providing sched_clock() at all.
+On Wed, Dec 08, 2010 at 01:39:35PM +0000, Mark Brown wrote:
+> On Wed, Dec 08, 2010 at 01:07:20PM +0000, Jamie Iles wrote:
+> 
+> > Doesn't the dependency on SND_SOC_I2C_AND_SPI mean that you will always have 
+> > I2C and SPI_MASTER?
+> 
+> It's not a dependency for the CODEC driver at all.  It means that when
+> SND_SOC_ALL_CODECS is selecting the module it will ensure that a
+> consistent combination of options is chosen but it is unrelated to use
+> in machine drivers and doesn't force both to be enabled even when it is
+> selected.
+Ahh, thanks for the explanation, I completely misunderstood the way that the 
+codecs were selected by the arch's in sound/soc/* and assumed that they were 
+user selectable options.
 
-4 seconds should be perfectly fine, we call it at least every scheduler
-tick (HZ) and NO_HZ will either have to limit the max sleep period or
-provide its own sleep duration (using a more expensive clock) so we can
-recover (much like GTOD already requires).
-
-> Also, if wrapping below 64-bits is also a problem, again, maybe we
-> shouldn't be providing it there either.  Eg:
-
-That's mostly due to hysterical raisins and we should just fix that, the
-simplest way is to use something like kernel/sched_clock.c to use
-sched_clock() deltas to make a running u64 value.
-
-Like said, John Stultz was already looking at doing something like that
-because there's a number of architectures suffering this same problem
-and they're all already using part of the clocksource infrastructure to
-implement the sched_clock() interface simply because they only have a
-single hardware resource.
-
-One of the problems is I think the cycles2ns multiplication of the raw
-clock, that makes dealing with wrap-around lots harder, so I guess we
-should deal with the wrap on the raw clock values and then apply
-cycles2ns on the delta or somesuch. But I expect the clocksource
-infrastructure already has something like that, John?
+Jamie
