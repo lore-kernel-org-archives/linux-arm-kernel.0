@@ -1,52 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Dec 2010 11:56:43 +0100
-Subject: [PATCH v2 08/15] ARM: mxs: Add iomux support
-In-Reply-To: <AANLkTikb4Ytx==R=n7RDOXv+tKtVvgcTUX7R-QDQfVoc@mail.gmail.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-7-git-send-email-shawn.guo@freescale.com>
-	<19711.13023.154958.539289@ipc1.ka-ro>
-	<AANLkTikb4Ytx==R=n7RDOXv+tKtVvgcTUX7R-QDQfVoc@mail.gmail.com>
-Message-ID: <20101208105643.GO18244@pengutronix.de>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 8 Dec 2010 11:01:05 +0000
+Subject: RFC: Dynamic hwcaps
+In-Reply-To: <AANLkTi=3oQDZGuSraXokf7VZ2YaGtaLGud92RcqYFMSA@mail.gmail.com>
+References: <AANLkTikWgWWubP9VozvUtA92N-BWyUFRp7ykCho8itMA@mail.gmail.com>
+	<20101205151242.298922ad@surf>
+	<AANLkTi=3oQDZGuSraXokf7VZ2YaGtaLGud92RcqYFMSA@mail.gmail.com>
+Message-ID: <20101208110105.GR22787@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Dec 08, 2010 at 06:52:36PM +0800, Shawn Guo wrote:
-> Hi Lothar,
-> 
-> Thanks for the review.
-> 
-> On Wed, Dec 8, 2010 at 3:25 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+Dave Martin wrote:
+> On Sun, Dec 5, 2010 at 2:12 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
 > > Hi,
 > >
-> > Shawn Guo writes:
-> >> MXS-based SoCs implements iomux functions in block PINCTRL.
-> >>
-> >> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> >> ---
-> >> Changes for v2:
-> >> ?- Define iomux_cfg_t as u64
-> > ? ? ^^^^^^^^^^^^^^^^^^^^^^^^^
-> > Really?
+> > On Fri, 3 Dec 2010 16:28:27 +0000
+> > Dave Martin <dave.martin@linaro.org> wrote:
 > >
-> >> +typedef struct pad_desc {
-> >> + ? ? unsigned bank:12;
-> >> + ? ? unsigned pin:20;
-> >> + ? ? unsigned muxsel:8;
-> >> + ? ? unsigned ma:12;
-> >> + ? ? unsigned vol:8;
-> >> + ? ? unsigned pull:4;
-> >> +} iomux_cfg_t;
-> > ^^^^^^^^^^^^^^^^^
+> >> This allows for more active power management of such functional
+> >> blocks: if the CPU is not fully loaded, you can turn them off -- the
+> >> kernel can spot when there is significant idle time and do this. ?If
+> >> the CPU becomes fully loaded, applications which have soft-realtime
+> >> constraints can notice this and switch to their accelerated code
+> >> (which will cause the kernel to switch the functional unit(s) on).
+> >> Or, the kernel can react to increasing CPU load by speculatively turn
+> >> it on instead. ?This is analogous to the behaviour of other power
+> >> governors in the system. ?Non-aware applications will still work
+> >> seamlessly -- these may simply run accelerated code if the hardware
+> >> supports it, causing the kernel to turn the affected functional
+> >> block(s) on.
 > >
-> I did not pick the correct word.  What I meant is 64 bits.  Since this
-> error is in change log, I would fix it if there is v3 of the patch.
-the idea was to really use an u64 to have the pin definitions modifyable.
+> > From a power management perspective, is it really useful to load the
+> > CPU instead of using specialized units which usually provide more
+> > computing power per watt consumed ?
+> 
+> No--- but you can't in general just exchange cycles on one functional
+> unit for cycles on another in the same way as you
+> 
+> Suppose 90% if your code (by execution time) can take advantage of a
+> specialised functional unit.  Should you turn that unit on?
+> 
+> Now, suppose only 5% of the code can take advantage, but the platform
+> is not completely busy.  Turning on a special functional unit consumes
+> extra power and will provide no speedup to the user -- is it still
+> worth turning it on?  What if the CPU is fully loaded doing other work
+> and your program is close to missing its realtime deadlines -- should
+> you turn on the separate unit now?
 
-Best regards
-Uwe
+I think Thomas's point is that doing the 5% on the CPU may consume
+more power than turning on the special functional unit - even when
+the system is not busy and the user doesn't see a time difference.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I don't know if that's true for available hardware, but it seems like
+it's worth investigating before taking the idea further.
+
+-- Jamie
