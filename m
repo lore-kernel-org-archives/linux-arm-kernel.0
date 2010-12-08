@@ -1,54 +1,71 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 08 Dec 2010 15:26:16 +0100
-Subject: [PATCHv3] support PMIC mc13892
-In-Reply-To: <20101208100138.GB16418@rakim.wolfsonmicro.main> (Mark Brown's
-	message of "Wed, 8 Dec 2010 10:01:38 +0000")
-References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
-	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
-	<20101208091226.GD18244@pengutronix.de>
-	<20101208100138.GB16418@rakim.wolfsonmicro.main>
-Message-ID: <87r5dsl4s7.fsf@lechat.rtp-net.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Dec 2010 14:28:14 +0000
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <1291817076.28378.28.camel@laptop>
+References: <19697.8378.717761.236202@pilspetsen.it.uu.se>
+	<19707.34405.791777.298955@pilspetsen.it.uu.se>
+	<20101205131702.GE9138@n2100.arm.linux.org.uk>
+	<20101205141921.GF9138@n2100.arm.linux.org.uk>
+	<19707.47304.977978.297596@pilspetsen.it.uu.se>
+	<20101205162151.GH9138@n2100.arm.linux.org.uk>
+	<1291812015.28378.24.camel@laptop>
+	<20101208125548.GA9777@n2100.arm.linux.org.uk>
+	<1291817076.28378.28.camel@laptop>
+Message-ID: <20101208142814.GE9777@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+On Wed, Dec 08, 2010 at 03:04:36PM +0100, Peter Zijlstra wrote:
+> On Wed, 2010-12-08 at 12:55 +0000, Russell King - ARM Linux wrote:
+> > Hmm, you're right.  In which case it's purely down to sched_clock()
+> > only being able to cover 4s - which seems to be far too small a gap.
+> > 
+> > I'm not sure that the unstable sched clock stuff makes much sense to
+> > be enabled - we don't have an unstable clock, we just don't have the
+> > required number of bits for the scheduler to work correctly.
+> 
+> We can perhaps make part of the HAVE_UNSTABLE_SCHED_CLOCK depend on SMP
+> and only deal with the short wraps (and maybe monotonicity) on UP.
+> 
+> > Nevertheless, this provides a good way to find this kind of wrap bug.
+> > Even with cnt_32_to_63, we still don't get a 64-bit sched_clock(), so
+> > this bug will still be there.  Even with a 64-bit clock, the bug will
+> > still be there.  It's basically crap code.
+> 
+> You're referring to the clock_task bit from Venki? Yes that needs
+> fixing.
 
-> On Wed, Dec 08, 2010 at 10:12:26AM +0100, Uwe Kleine-K?nig wrote:
->
-> Please cut unneded context - it makes it much easier to find the new
-> text in your replies!
->
->> > +	if (ret)
->> > +		goto err_alloc;
->
->> err_alloc seems wrong.  The goto is taken when reading the revision
->> register fails, not on a failed allocation.
->
-> His code is following the style of naming the exit points after what
-> needs to be unwound rather than after the place jumped from which is
-> common enough?
->
->> > +#define MC13892_PWGT1SPI	21
->> > +#define MC13892_PWGT2SPI	22
->> > +#define MC13892_VCOINCELL	23
->
->> I thought you wanted to put these somewhere below drivers/regulator/.
->
-> Please.
+Indeed.
 
-If we move this header into drivers/regulator, how are we supposed to
-declared regulators in the machine file ?
-The regulator code does:
-                priv->regulators[i] = regulator_register(
-                                &mc13892_regulators[init_data->id].desc,
-                                &pdev->dev, init_data->init_data, priv);
+> > Maybe it's better that on ARM, we just don't implement sched_clock()
+> > at all?
+> 
+> If you have a high res clock source that's cheap to read it would be
+> better if we can simply fix the infrastructure such that we can make use
+> of it.
 
-so, I'm declaring like this in the machine file:
-static struct mc13xxx_regulator_init_data mx51_efikamx_regulators[] = {
-        { .id = MC13892_SW1,            .init_data =  &sw1_init },
-        { .id = MC13892_SW2,            .init_data =  &sw2_init },
+This is the point.  We don't have high res clock sources that run for
+millenium before wrapping.  What we have depends on the platform, and
+as this example has found, some platforms have high-res clock sources
+but they wrap in as little as 4 seconds.  Other platforms will have
+slower clock sources which'll run for longer before wrapping.
 
-I'm stupid enough to think that .id should match in the machine file and
-in the regulator driver. Did I miss something ?
+Essentially, clock sources on ARM so far have been a 32-bit counter
+(if you're lucky) clocked at some rate.
 
-Arnaud
+So, what I'm saying is that if wrapping in 4 seconds is a problem,
+then maybe we shouldn't be providing sched_clock() at all.
+
+Also, if wrapping below 64-bits is also a problem, again, maybe we
+shouldn't be providing it there either.  Eg:
+
+#define TCR2NS_SCALE_FACTOR     10
+
+unsigned long long sched_clock(void)
+{
+        unsigned long long v = cnt32_to_63(timer_read());
+        return (v * tcr2ns_scale) >> TCR2NS_SCALE_FACTOR;
+}
+
+has a maximum of 54 bits - and this seems to be the most we can sanely
+get from a 32-bit counter.
