@@ -1,96 +1,52 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 08 Dec 2010 10:08:14 +0800
-Subject: [PATCH 0/2] Common struct clk implementation, v8
-Message-ID: <1291774094.269634.503532219345.0.gpush@pororo>
+From: gdavis@mvista.com (George G. Davis)
+Date: Tue, 7 Dec 2010 21:55:51 -0500
+Subject: [PATCH] ARM: Fix warning with gcc 4.5.1 in alignment fixup
+In-Reply-To: <1291753724-14437-1-git-send-email-jamie@jamieiles.com>
+References: <1291753724-14437-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20101208025551.GY3368@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[apologies for the resend: missed this series description]
+On Tue, Dec 07, 2010 at 08:28:44PM +0000, Jamie Iles wrote:
+> With GCC 4.5.1 we get the following warning:
+> 
+> 	  CC      arch/arm/mm/alignment.o
+> 	arch/arm/mm/alignment.c: In function 'do_alignment':
+> 	arch/arm/mm/alignment.c:720:21: warning: 'offset.un' may be used
+> 	uninitialized in this function
+> 
+> This warning is triggered for the LDM/STM instructions which don't have
+> a register offset so set the offset to 0 to keep GCC happy.
 
-Hi all,
-
-These patches are an attempt to allow platforms to share clock code. At
-present, the definitions of 'struct clk' are local to platform code,
-which makes allocating and initialising cross-platform clock sources
-difficult, and makes it impossible to compile a single image containing
-support for two ARM platforms with different struct clks.
-
-The two patches are for the architecture-independent kernel code,
-introducing the common clk infrastructure. The changelog for the first
-patch includes details about the new clock definitions.
-
-As requested by rmk, I've put together a small series of patches
-illustrating the usage of the common struct clock on the ARM imx51
-platform. These are available in my git tree:
-
- git://kernel.ubuntu.com/jk/dt/linux-2.6
-
-in the clk-common-mx51 branch (clk-common..clk-common-mx51). There is
-also a port  for versatile (clk-common-versatile) in this tree too.
-
-The approach I've taken with the imx51 port is to temporarly duplicate
-the platform-common clock code (ie, for all mxc-based boards) to enable
-usage of the common struct clk on one machine (imx51), while leaving the
-others as-is. For a proper platform-wide usage of the common struct clk,
-we'd be better off doing the whole platform at once. However, mx51 is
-the only mxc-based HW I have, hence the duplicated example port.
-
-In the example port, the first change simply converts the mxc's struct
-clk to a struct clk_mxc, using the new API.  The subsequent patches move
-certain clocks to more specific data structures (eg clk_fixed and
-clk_pll) where possible.
-
-Ben Herrenschmidt is looking at using common struct clk code for powerpc
-too, hence the kernel-wide approach.
-
-Many thanks to the following for their input:
- * Ben Dooks <ben-linux@fluff.org>
- * Baruch Siach <baruch@tkos.co.il>
- * Russell King <linux@arm.linux.org.uk>
- * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
- * Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
- * Vincent Guittot <vincent.guittot@linaro.org>
-
-Russell - now that we've had a few platforms ported to the common clk
-infrastructure, I believe it's ready to merge. If so, do you want this
-in the patch tracker? Otherwise, let me know what needs changing.
-
-Cheers,
-
-
-Jeremy
+Your change looks fine to me.
 
 --
-v8:
- * add atomic clocks, and locking wrappers
- * expand comments on clk and clk_ops
+Regards,
+George
 
-v7:
- * change CLK_INIT to initialise clk->mutex statically
-
-v6:
- * fixed up references to 'clk_operations' in the changelog
-
-v5:
- * uninline main API, and share definitions with !USE_COMMON_STRUCT_CLK
- * add __clk_get
- * delay mutex init
- * kerneldoc for struct clk
-
-v4:
- * use mutex for enable/disable locking
- * DEFINE_CLK -> INIT_CLK, and pass the clk name for mutex init
- * struct clk_operations -> struct clk_ops
-
-v3:
- * do clock usage refcounting in common code
- * provide sample port
-
-v2:
- * no longer ARM-specific
- * use clk_operations
-
----
-Jeremy Kerr (2):
-      Add a common struct clk
-      clk: Generic support for fixed-rate clocks
+> 
+> Cc: George G. Davis <gdavis@mvista.com>
+> Cc: Min Zhang <mzhang@mvista.com>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> ---
+>  arch/arm/mm/alignment.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index 724ba3b..298aaef 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -824,8 +824,10 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	case 0x08000000:	/* ldm or stm, or thumb-2 32bit instruction */
+>  		if (thumb2_32b)
+>  			handler = do_alignment_t32_to_handler(&instr, regs, &offset);
+> -		else
+> +		else {
+>  			handler = do_alignment_ldmstm;
+> +			offset.un = 0;
+> +		}
+>  		break;
+>  
+>  	default:
+> -- 
+> 1.7.3.2
