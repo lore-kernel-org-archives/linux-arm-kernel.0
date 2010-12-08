@@ -1,78 +1,59 @@
-From: prasadjoshi124@gmail.com (Prasad Joshi)
-Date: Wed, 8 Dec 2010 14:03:06 +0000
-Subject: Linux kernel compilation failed with error: FPA is unsupported in
-	the AAPCS
-In-Reply-To: <20101208133719.GC2716@pulham.picochip.com>
-References: <AANLkTikjG0DYxcG9Mo6jVKs2jKe7-uGL6eh2jGF10dpD@mail.gmail.com>
-	<20101208133719.GC2716@pulham.picochip.com>
-Message-ID: <AANLkTi=zWaZro08Q_8jSwpWfjdJsk7oRSV4bB7i_OYBD@mail.gmail.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Wed, 08 Dec 2010 15:04:36 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <20101208125548.GA9777@n2100.arm.linux.org.uk>
+References: <19697.8378.717761.236202@pilspetsen.it.uu.se>
+	<19707.34405.791777.298955@pilspetsen.it.uu.se>
+	<20101205131702.GE9138@n2100.arm.linux.org.uk>
+	<20101205141921.GF9138@n2100.arm.linux.org.uk>
+	<19707.47304.977978.297596@pilspetsen.it.uu.se>
+	<20101205162151.GH9138@n2100.arm.linux.org.uk>
+	<1291812015.28378.24.camel@laptop>
+	<20101208125548.GA9777@n2100.arm.linux.org.uk>
+Message-ID: <1291817076.28378.28.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 8, 2010 at 1:37 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> On Wed, Dec 08, 2010 at 01:04:17PM +0000, Prasad Joshi wrote:
->> Hello All,
->>
->> I am trying to compile the linux 2.6.36 kernel for arm-linux. This is
->> the error I am getting during compilation.
->>
->> clfs at prasad-desktop:/mnt/clfs/sources/linux-2.6.36$ make
->> ARCH=${CLFS_ARCH} CROSS_COMPILE=${CLFS_TARGET}- zImage modules
->> ? CHK ? ? include/linux/version.h
->> ? CHK ? ? include/generated/utsrelease.h
->> make[1]: `include/generated/mach-types.h' is up to date.
->> ? CC ? ? ?kernel/bounds.s
->> kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
->> make[1]: *** [kernel/bounds.s] Error 1
->> make: *** [prepare0] Error 2
->>
->> These are the environment variables
->> export BUILD="-mabi=arm-linux"
->> export CLFS_ARCH="arm"
->> export CLFS_TARGET="arm-unknown-linux-uclibc"
->> export CLFS_HOST="x86_64-cross-linux-gnu"
->> export CLFS_ENDIAN="little"
->> export CC="arm-unknown-linux-uclibc-gcc"
->> export CXX="arm-unknown-linux-uclibc-g++"
->> export AR="arm-unknown-linux-uclibc-ar"
->> export AS="arm-unknown-linux-uclibc-as"
->> export LD="arm-unknown-linux-uclibc-ld"
->> export RANLIB="arm-unknown-linux-uclibc-ranlib"
->> export READELF="arm-unknown-linux-uclibc-readelf"
->> export STRIP="arm-unknown-linux-uclibc-strip"
->>
->> clfs at prasad-desktop:/mnt/clfs/sources/linux-2.6.36$
->> arm-unknown-linux-uclibc-gcc -v
->> Using built-in specs.
->> COLLECT_GCC=arm-unknown-linux-uclibc-gcc
->> COLLECT_LTO_WRAPPER=/mnt/clfs/cross-tools/libexec/gcc/arm-unknown-linux-uclibc/4.5.1/lto-wrapper
->> Target: arm-unknown-linux-uclibc
->> Configured with: ../gcc-4.5.1/configure --prefix=/mnt/clfs/cross-tools
->> --build=x86_64-cross-linux-gnu --host=x86_64-cross-linux-gnu
->> --target=arm-unknown-linux-uclibc --with-sysroot=/mnt/clfs
->> --disable-nls --disable-shared --with-mpfr=/mnt/clfs/cross-tools
->> --with-gmp=/mnt/clfs/cross-tools --without-headers --with-newlib
->> --disable-decimal-float --disable-libgomp --disable-libmudflap
->> --disable-libssp --disable-threads --enable-languages=c :
->> (reconfigured) ../gcc-4.5.1/configure --prefix=/mnt/clfs/cross-tools
->> --build=x86_64-cross-linux-gnu --target=arm-unknown-linux-uclibc
->> --host=x86_64-cross-linux-gnu --with-sysroot=/mnt/clfs --disable-nls
->> --enable-shared --enable-languages=c --enable-c99 --enable-long-long
->> --with-mpfr=/mnt/clfs/cross-tools --with-gmp=/mnt/clfs/cross-tools
->> Thread model: posix
->> gcc version 4.5.1 (GCC)
-> If your kernel is configured for EABI (CONFIG_AEABI=y) then you'll need a
-> compiler built for EABI. You can find one at
-> http://kernel.org/pub/tools/crosstool/files/bin/ that doesn't have a libc.
->
+On Wed, 2010-12-08 at 12:55 +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 08, 2010 at 01:40:15PM +0100, Peter Zijlstra wrote:
+> > On Sun, 2010-12-05 at 16:21 +0000, Russell King - ARM Linux wrote:
+> > 
+> > > I'm not sure that's the correct fix - it looks like sched_clock_cpu()
+> > > should already be preventing scheduler clock time going backwards.
+> > > 
+> > > Hmm. IOP32x seems to have a 32-bit timer clocked at 200MHz.  That means
+> > > it wraps once every 21s.  However, we have that converted to ns by an
+> > > unknown multiplier and shift.  It seems that those are chosen to
+> > > guarantee that we will cover only 4s without wrapping in the clocksource
+> > > conversion.  Maybe that's not sufficient?
+> > > 
+> > > Could you try looking into sched_clock_cpu(), sched_clock_local() and
+> > > sched_clock() to see whether anything odd stands out?
+> > 
+> > # git grep HAVE_UNSTABLE_SCHED_CLOCK arch/arm | wc -l
+> > 0
+> 
+> Hmm, you're right.  In which case it's purely down to sched_clock()
+> only being able to cover 4s - which seems to be far too small a gap.
+> 
+> I'm not sure that the unstable sched clock stuff makes much sense to
+> be enabled - we don't have an unstable clock, we just don't have the
+> required number of bits for the scheduler to work correctly.
 
-Thanks a lot Jamie and Mikael. I can not follow what is EABI or OABI.
-But while configuring the linux kernel I enabled EABI. After disabling
-it, make is running smoothly.
+We can perhaps make part of the HAVE_UNSTABLE_SCHED_CLOCK depend on SMP
+and only deal with the short wraps (and maybe monotonicity) on UP.
 
-I have one more (silly) question on same, my intention behind
-compiling the linux kernel is to boot RealView ARM under QEMU. Would
-disabling EABI would make kernel unbootable with QEMU?
+> Nevertheless, this provides a good way to find this kind of wrap bug.
+> Even with cnt_32_to_63, we still don't get a 64-bit sched_clock(), so
+> this bug will still be there.  Even with a 64-bit clock, the bug will
+> still be there.  It's basically crap code.
 
-> Jamie
->
+You're referring to the clock_task bit from Venki? Yes that needs
+fixing.
+
+> Maybe it's better that on ARM, we just don't implement sched_clock()
+> at all?
+
+If you have a high res clock source that's cheap to read it would be
+better if we can simply fix the infrastructure such that we can make use
+of it.
