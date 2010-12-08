@@ -1,21 +1,20 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 08 Dec 2010 00:45:35 +0000
-Subject: CpuFreq for mini2440
-In-Reply-To: <AANLkTi=55k8Dr6CAe6O92j6P2ht4D+onFAEu7J0Q+Nvn@mail.gmail.com>
-References: <AANLkTi=55k8Dr6CAe6O92j6P2ht4D+onFAEu7J0Q+Nvn@mail.gmail.com>
-Message-ID: <4CFED52F.8070307@fluff.org>
+Date: Wed, 08 Dec 2010 00:52:41 +0000
+Subject: [PATCH] s3c2410_udc: Add handling for S3C244X dual-packet mode
+In-Reply-To: <201012062139.47129.anarsoul@gmail.com>
+References: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
+	<201012062139.47129.anarsoul@gmail.com>
+Message-ID: <4CFED6D9.9030706@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/10 01:12, tarek attia wrote:
-> Hi all,
-> 
-> I tried many times to enable the Cpufreq for the mini2440 "Friendly
-> Arm board" but each time I enable it in the kernel it ended up by a
-> successful compilation ,but when I mount the kernel image on the board
-> ,just I dun find it's folder nor it's kernel objects,,,what I miss
-> ,,or what track should I go to make it working ?
+On 06/12/10 19:39, Vasily Khoruzhick wrote:
+> On Monday 30 August 2010 17:34:22 Vasily Khoruzhick wrote:
+>> From: Fabian Godehardt <fg@emlix.com>
+>>
+>> This is a patch that seems to make the USB hangs on the S3C244X go away.
 
-The board's init code may not support it. If no-one else comes
-forward, I will try as I think I still have one of these boards
-somewhere.
+Hmm who's job is it to apply it?
+I'd certainly ack it
+
+Acked-by: Ben Dooks <ben-linux@fluff.org>
