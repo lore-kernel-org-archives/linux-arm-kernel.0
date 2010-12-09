@@ -1,42 +1,37 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  9 Dec 2010 11:59:42 +0000
-Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend on !CONFIG_THUMB2_KERNEL
-In-Reply-To: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
-References: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1291895982-4775-3-git-send-email-dave.martin@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu,  9 Dec 2010 14:15:14 +0100
+Subject: [RFC PATCH] scatterlist: Initialize the dma_address field with
+	invalid dma address
+Message-ID: <1291900514-7290-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the nwfpe support is unlikely to be used on new platforms
-and requires CONFIG_OABI_COMPAT, which is not generally used with
-ARMv7+, we shouldn't expect to build nwfpe support into a Thumb-2
-kernel.
+Initialize the the dma_address field so that it will be possible to test
+its value while using scatterlists. This field will be compatible with
+testing by dma_mapping_error().
 
-At present, nwfpe contains assembly code which isn't Thumb-2
-compatible, and for now it doesn't appear useful to port this
-code.
-
-All ARMv7-A/R platforms necessarily have VFPv3 hardware floating-
-point natively, making emulation unnecessary.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Hi,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f9ca7f3..7e825c3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1759,7 +1759,7 @@ comment "At least one emulation must be selected"
- 
- config FPE_NWFPE
- 	bool "NWFPE math emulation"
--	depends on !AEABI || OABI_COMPAT
-+	depends on (!AEABI || OABI_COMPAT) && !THUMB2_KERNEL
- 	---help---
- 	  Say Y to include the NWFPE floating point emulator in the kernel.
- 	  This is necessary to run most binaries. Linux does not currently
+I wonder why this field is not initialized in the scatterlist: is it
+intentional and is there a different way to check if dma_address is a
+valid field?
+
+ lib/scatterlist.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/lib/scatterlist.c b/lib/scatterlist.c
+index 4ceb05d..ca69409 100644
+--- a/lib/scatterlist.c
++++ b/lib/scatterlist.c
+@@ -85,6 +85,7 @@ EXPORT_SYMBOL(sg_last);
+ void sg_init_table(struct scatterlist *sgl, unsigned int nents)
+ {
+ 	memset(sgl, 0, sizeof(*sgl) * nents);
++	sgl->dma_address = (~(dma_addr_t)0);
+ #ifdef CONFIG_DEBUG_SG
+ 	{
+ 		unsigned int i;
 -- 
-1.7.1
+1.7.3
