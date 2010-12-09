@@ -1,118 +1,29 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Thu, 9 Dec 2010 00:51:29 +0100
-Subject: [PATCH v3] OMAP2+: PM/serial: fix console semaphore acquire
-	during suspend
-In-Reply-To: <1291848040-23394-1-git-send-email-khilman@deeprootsystems.com>
-References: <1291848040-23394-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <AANLkTi=9TBbuwr4uiQb6f_f=cLxK2NvWJDJYXwr2tTxu@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 8 Dec 2010 17:00:21 -0700 (MST)
+Subject: [PATCH 05/11] OMAP2+: clockdomains: split the clkdm hwsup
+	enable/disable function
+In-Reply-To: <871v5rg8px.fsf@deeprootsystems.com>
+References: <20101208061657.30541.79824.stgit@twilight.localdomain>
+	<20101208061838.30541.36426.stgit@twilight.localdomain>
+	<871v5rg8px.fsf@deeprootsystems.com>
+Message-ID: <alpine.DEB.2.00.1012081659520.13430@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 8, 2010 at 11:40 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> @@ -120,8 +133,9 @@ static void omap2_enter_full_retention(void)
-> ? ? ? ? ? ? ? ?goto no_sleep;
+On Wed, 8 Dec 2010, Kevin Hilman wrote:
+
+> Paul Walmsley <paul@pwsan.com> writes:
 >
-> ? ? ? ?/* Block console output in case it is on one of the OMAP UARTs */
-> - ? ? ? if (try_acquire_console_sem())
-> - ? ? ? ? ? ? ? goto no_sleep;
-> + ? ? ? if (!is_suspending())
-> + ? ? ? ? ? ? ? if (try_acquire_console_sem())
-> + ? ? ? ? ? ? ? ? ? ? ? goto no_sleep;
+> > - * _omap2_clkdm_set_hwsup - set the hwsup idle transition bit
+> > +/**
+> > + * _enable_hwsup - set the hwsup idle transition bit
+> > + * @clkdm: struct clockdomain *
+> > + *
+> > + * XXX fix doco
+> 
+> hmm, 'doco' must be a new lingo I haven't learned yet.
 
-Combine into one if?
-Hi Kevin,
+Thanks, will fix these.
 
-<snip>
 
-> ? ? ? ?omap_uart_prepare_idle(0);
-> ? ? ? ?omap_uart_prepare_idle(1);
-> @@ -136,7 +150,8 @@ static void omap2_enter_full_retention(void)
-> ? ? ? ?omap_uart_resume_idle(1);
-> ? ? ? ?omap_uart_resume_idle(0);
->
-> - ? ? ? release_console_sem();
-> + ? ? ? if (!is_suspending())
-> + ? ? ? ? ? ? ? release_console_sem();
->
-> ?no_sleep:
-> ? ? ? ?if (omap2_pm_debug) {
-> @@ -284,6 +299,12 @@ out:
-> ? ? ? ?local_irq_enable();
-> ?}
->
-> +static int omap2_pm_begin(suspend_state_t state)
-> +{
-> + ? ? ? suspend_state = state;
-> + ? ? ? return 0;
-> +}
-
-Do you really need a return code here?
-
-> ?static int omap2_pm_prepare(void)
-> ?{
-> ? ? ? ?/* We cannot sleep in idle until we have resumed */
-> @@ -333,10 +354,18 @@ static void omap2_pm_finish(void)
-> ? ? ? ?enable_hlt();
-> ?}
->
-> +static void omap2_pm_end(void)
-> +{
-> + ? ? ? suspend_state = PM_SUSPEND_ON;
-> + ? ? ? return;
-> +}
-
-Redundant return.
-
-> +
-> ?static struct platform_suspend_ops omap_pm_ops = {
-> + ? ? ? .begin ? ? ? ? ?= omap2_pm_begin,
-> ? ? ? ?.prepare ? ? ? ?= omap2_pm_prepare,
-> ? ? ? ?.enter ? ? ? ? ?= omap2_pm_enter,
-> ? ? ? ?.finish ? ? ? ? = omap2_pm_finish,
-> + ? ? ? .end ? ? ? ? ? ?= omap2_pm_end,
-> ? ? ? ?.valid ? ? ? ? ?= suspend_valid_only_mem,
-> ?};
->
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 0ec8a04..648b8c5 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -50,6 +50,19 @@
-> ?#include "sdrc.h"
-> ?#include "control.h"
->
-> +#ifdef CONFIG_SUSPEND
-> +static suspend_state_t suspend_state = PM_SUSPEND_ON;
-> +static inline bool is_suspending(void)
-> +{
-> + ? ? ? return (suspend_state != PM_SUSPEND_ON);
-> +}
-> +#else
-> +static inline bool is_suspending(void)
-> +{
-> + ? ? ? return false;
-> +}
-> +#endif
-> +
-> ?/* Scratchpad offsets */
-> ?#define OMAP343X_TABLE_ADDRESS_OFFSET ? ? 0xc4
-> ?#define OMAP343X_TABLE_VALUE_OFFSET ? ? ? 0xc0
-> @@ -387,10 +400,11 @@ void omap_sram_idle(void)
-> ? ? ? ?}
->
-> ? ? ? ?/* Block console output in case it is on one of the OMAP UARTs */
-> - ? ? ? if (per_next_state < PWRDM_POWER_ON ||
-> - ? ? ? ? ? core_next_state < PWRDM_POWER_ON)
-> - ? ? ? ? ? ? ? if (try_acquire_console_sem())
-> - ? ? ? ? ? ? ? ? ? ? ? goto console_still_active;
-> + ? ? ? if (!is_suspending())
-> + ? ? ? ? ? ? ? if (per_next_state < PWRDM_POWER_ON ||
-> + ? ? ? ? ? ? ? ? ? core_next_state < PWRDM_POWER_ON)
-> + ? ? ? ? ? ? ? ? ? ? ? if (try_acquire_console_sem())
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto console_still_active;
-
-Oh well, 3 nested ifs...
-
-Thanks,
-   Vitaly
+- Paul
