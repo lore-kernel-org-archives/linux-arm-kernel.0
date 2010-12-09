@@ -1,67 +1,108 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Thu, 9 Dec 2010 16:14:24 -0500
-Subject: [PATCH (sh-2.6) 1/2] sh: add stack smashing protection support
-In-Reply-To: <alpine.LFD.2.00.1012091313270.10437@xanadu.home>
-References: <1291717254-17455-1-git-send-email-filippo.arcidiacono@st.com>
-	<201012091232.31577.vapier@gentoo.org>
-	<alpine.LFD.2.00.1012091313270.10437@xanadu.home>
-Message-ID: <201012091614.26353.vapier@gentoo.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 9 Dec 2010 22:33:48 +0100
+Subject: [PATCH v8 01/11] OMAP: GPIO: prepare for platform driver
+In-Reply-To: <8762v292ld.fsf@deeprootsystems.com>
+References: <1290689318-10191-1-git-send-email-charu@ti.com>	<1290689318-10191-2-git-send-email-charu@ti.com>
+	<8762v292ld.fsf@deeprootsystems.com>
+Message-ID: <4D014B3C.7040806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 09, 2010 13:23:55 Nicolas Pitre wrote:
-> On Thu, 9 Dec 2010, Mike Frysinger wrote:
-> > On Thursday, December 09, 2010 11:45:30 Carmelo AMOROSO wrote:
-> > > On 12/9/2010 5:07 PM, Mike Frysinger wrote:
-> > > > On Thursday, December 09, 2010 10:56:26 Carmelo AMOROSO wrote:
-> > > >> I agree with you that the Kconfig and Makefile changes are not arch
-> > > >> specific, so these changes can be moved to a common code (even if I
-> > > >> don't know if other archs do support SSP).
-> > > >> In the current kernel, only x86 and ARM added this support, so I'm
-> > > >> wondering if, moving SSP to the common Makefile, it needs to depend
-> > > >> on x86, ARM, SH being configured ?
-> > > > 
-> > > > i'm not sure it does.  ssp is designed to be arch independent, so
-> > > > really you only need a new enough gcc version.  which means i dont
-> > > > think it needs to depend on any arch code and you can simply add to
-> > > > the Makefile a compiler check.
-> > > 
-> > > agreed, but if arch wants to implement the per-task canary feature,
-> > > some change into arch specific code is required.
-> > 
-> > yes, but that doesnt mean the common symbol definition needs to be
-> > duplicated
-> 
-> We are talking about only one symbol here, which symbol is also
-> dependent on the way this feature is implemented in gcc (e.g. on x86 the
-> implementation is totally different and this symbol isn't used).  So I
-> don't see a huge gain by defining this symbol in generic code, given the
-> number of lines involved in the addition of a new file, just for a
-> single symbol.
+Salut Kevin,
 
-you're right, a few targets dont have any symbol at all and do it through TLS.  
-although that is more of an exception than a rule, so i'd still like to see 
-the symbol in a common file.  perhaps reverse selected by the arch Kconfig 
-like "select ARCH_WANT_STACK_CHK_GUARD".  or perhaps invert the logic so only 
-the funky arches get punished.
+On 12/9/2010 8:18 PM, Kevin Hilman wrote:
+> Hi Charu,
+>
+> "Varadarajan, Charulatha"<charu@ti.com>  writes:
+>
+>> Prepare for implementing GPIO as a platform driver.
+>>
+>> Modifies omap_gpio_init() to make use of omap_gpio_chip_init()
+>> and omap_gpio_mod_init(). omap_gpio_mod_init() does the module init
+>> by clearing the status register and initializing the GPIO control register.
+>> omap_gpio_chip_init() initializes the chip request, free, get, set and
+>> other function pointers and sets the gpio irq handler.
+>>
+>> This is only to reorganize the code so that the "omap gpio platform driver
+>> implementation patch" looks cleaner and better to review.
+>>
+>> Signed-off-by: Charulatha V<charu@ti.com>
+>
+> I just noticed while testing on 36xx/Zoom3 that GPIO wakeups are no
+> longer working after this series.
+>
+> The problem seems to be that for OMAP2+, this series removed manual
+> SYSCONFIG register setting in favor of using omap_hwmod (which is good),
+> however some of the SYSCONFIG values, specifically, in the current code,
+> the ENAWAKEUP bit was set in each bank, but this is no longer the
+> default with omap_hwmod.
 
-i might highlight that the way gcc/i386 manages its canary is dependent upon 
-the C library it was compiled against, but i dont want to poke that nest as 
-i'm not interested in making it work on that arch ;).
+That part is strange, because Rajendra did a patch to enable the wakeup 
+bit during _omap_hwmod_enable as soon as the idlemode is set to smartidle.
 
-> > i think you only need to test that gcc accepts -fstack-protector
-> > and then assume the rest ... i dont think you need to come up with random
-> > pieces of code and cajole the symbol references out of gcc.
-> 
-> Would you care to elaborate?
+/* If slave port is in SMARTIDLE, also enable wakeup */
+if ((sf & SYSC_HAS_SIDLEMODE) && (s_idlemode == HWMOD_IDLEMODE_SMART))
+	_enable_wakeup(oh);
 
-i simply mean that any makefile code checking for support need only look for 
-gcc supporting -fstack-protector.
--mike
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101209/057b6444/attachment.sig>
+The _disable_wakeup is never called, so in theory once it is set, it 
+should remain enabled.
+
+Does that mean that this the GPIO is not in smartidle anymore in your case?
+
+Regards,
+Benoit
+
+>> -#ifdef CONFIG_ARCH_OMAP2PLUS
+>> -		if ((bank->method == METHOD_GPIO_24XX) ||
+>> -				(bank->method == METHOD_GPIO_44XX)) {
+>> -			static const u32 non_wakeup_gpios[] = {
+>> -				0xe203ffc0, 0x08700040
+>> -			};
+>> -
+>> -			if (cpu_is_omap44xx()) {
+>> -				__raw_writel(0xffffffff, bank->base +
+>> -						OMAP4_GPIO_IRQSTATUSCLR0);
+>> -				__raw_writew(0x0015, bank->base +
+>> -						OMAP4_GPIO_SYSCONFIG);
+>> -				__raw_writel(0x00000000, bank->base +
+>> -						 OMAP4_GPIO_DEBOUNCENABLE);
+>> -				/*
+>> -				 * Initialize interface clock ungated,
+>> -				 * module enabled
+>> -				 */
+>> -				__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
+>> -			} else {
+>> -				__raw_writel(0x00000000, bank->base +
+>> -						OMAP24XX_GPIO_IRQENABLE1);
+>> -				__raw_writel(0xffffffff, bank->base +
+>> -						OMAP24XX_GPIO_IRQSTATUS1);
+>> -				__raw_writew(0x0015, bank->base +
+>> -						OMAP24XX_GPIO_SYSCONFIG);
+>
+> Here bit 2 (ENAWAKEUP) is set, and is not reconfigured anywhere in this
+> series.  Same for OMAP4 above.
+>
+> Here's a quick fix to preserve current functionality (will post
+> w/changelog shortly), but it shows that GPIO wakeups were not fully
+> tested with this series.  In the future, along with reporting what
+> platforms it was testing on, it would be very helpful to include a
+> summary of how the series was tested.
+>
+> Thanks,
+>
+> Kevin
+>
+>
+>
+> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+> index 413de18..05a123f 100644
+> --- a/arch/arm/mach-omap2/gpio.c
+> +++ b/arch/arm/mach-omap2/gpio.c
+> @@ -75,6 +75,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+>   		return -EINVAL;
+>   	}
+>
+> +	omap_hwmod_enable_wakeup(oh);
+>   	od = omap_device_build(name, id - 1, oh, pdata,
+>   				sizeof(*pdata),	omap_gpio_latency,
+>   				ARRAY_SIZE(omap_gpio_latency),
