@@ -1,39 +1,25 @@
-From: daiane.angolini@freescale.com (Daiane Angolini)
-Date: Thu, 9 Dec 2010 15:50:49 -0200
-Subject: [PATCH] ARM: mx5/mx51_3ds: Add watchdog support
-Message-ID: <1291917049-8183-1-git-send-email-daiane.angolini@freescale.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 09 Dec 2010 18:55:30 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+	<1291899120.29292.7.camel@twins>
+	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+Message-ID: <1291917330.6803.7.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daiane Angolini <daiane.angolini@freescale.com>
----
- arch/arm/mach-mx5/Kconfig          |    1 +
- arch/arm/mach-mx5/board-mx51_3ds.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+On Thu, 2010-12-09 at 09:43 -0800, Venkatesh Pallipadi wrote:
+> 
+> The same problem will be there with below code, with irq_delta >
+> delta, clock_task can go backwards which is not good.
+> +       delta -= irq_delta;
+> +       rq->clock_task += delta;
+> 
+> The reason for this is rq->clock and irqtime updates kind of happen
+> independently and specifically, if a rq->clock update happens while we
+> are in a softirq, we may have this case of going backwards on the next
+> update.
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 5011f42..b6180e5 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -30,6 +30,7 @@ config MACH_MX51_BABBAGE
- config MACH_MX51_3DS
- 	bool "Support MX51PDK (3DS)"
- 	select SOC_IMX51
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	select IMX_HAVE_PLATFORM_SPI_IMX
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index 6cc2805..54b3f25 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -174,6 +174,7 @@ static void __init mxc_board_init(void)
- 
- 	imx51_add_sdhci_esdhc_imx(0, NULL);
- 	mxc_init_keypad();
-+	imx51_add_imx2_wdt(0, NULL);
- }
- 
- static void __init mx51_3ds_timer_init(void)
--- 
-1.7.0.4
+But how can irq_delta > delta?, we measure it using the same clock.
