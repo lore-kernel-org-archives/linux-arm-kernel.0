@@ -1,27 +1,57 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 09 Dec 2010 09:45:33 -0800
-Subject: [PATCH] msm: trout: add keypad support
-In-Reply-To: <4D00800E.7050004@codeaurora.org>
-References: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
-	<4D00800E.7050004@codeaurora.org>
-Message-ID: <1291916733.18827.1.camel@c-dwalke-linux.qualcomm.com>
+From: will.newton@gmail.com (Will Newton)
+Date: Thu, 9 Dec 2010 17:46:20 +0000
+Subject: [PATCH] dw_mmc: Add Synopsys DesignWare mmc host driver.
+In-Reply-To: <20101209173525.GA29879@void.printf.net>
+References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
+	<20101208115510.GD10998@console-pimps.org>
+	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
+	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
+	<20101209064751.GA21128@void.printf.net>
+	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
+	<20101209160157.GA28586@void.printf.net>
+	<20101209173525.GA29879@void.printf.net>
+Message-ID: <AANLkTi=BXxfNcnhNb6Bd_N3gVpDUMWBCQtZ0d=m9p_sa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-09 at 12:36 +0530, Trilok Soni wrote:
+On Thu, Dec 9, 2010 at 5:35 PM, Chris Ball <cjb@laptop.org> wrote:
+> Hi Andrew,
+>
+> On Thu, Dec 09, 2010 at 04:01:57PM +0000, Chris Ball wrote:
+>> > > Is there something we could depend on that would stop this driver being
+>> > > presented to everyone, without being far too specific? ?At the moment
+>> > > we'd be making x86 desktop users say whether they have this IP, which
+>> > > isn't good. ?Are the architectures that use this IP already upstream?
+>> > > Are they all ARM architectures, for instance?
+>> >
+>> > I don't know of any architectures upstream that use this IP block. There is an
+>> > SoC from NXP that uses this it but it is not upstream:
+>> >
+>> > http://ics.nxp.com/support/software/lpc313x.bsp.linux/
+>> >
+>> > The architecture we tested and debugged this driver on is not upstream either
+>> > unfortunately. :-/
+>>
+>> Okay. ?I think "depends on ARM" is appropriate for now, and we could
+>> expand that later if the block appears in a MIPS SoC or something.
+>> Does that work for you?
+>
+> Oh, hey, rmk says that he seems to recall that akpm says that if the
+> driver builds on x86 (it does), we should just allow it to be built
+> there too so that it gets build coverage. ?Andrew, does this still
+> represent your stance?
+>
+> I've heard the distro maintainers complain about having to investigate
+> Kconfig entries for drivers that their users would never possibly use,
+> though, and this certainly falls into that case. ?Is there something
+> better we can do here, to correctly hide this driver from non-ARM users
+> but also make it clear that it can be built if somebody wants to do a
+> mass driver build?
 
-> > +static char *keycaps = "--qwerty";
-> > +#undef MODULE_PARAM_PREFIX
-> > +#define MODULE_PARAM_PREFIX "board_trout."
-> > +module_param_named(keycaps, keycaps, charp, 0);
-> 
-> I would like to know what is the use of this param?
+The driver does build on x86{_64} and it has been useful for me to do
+that in the past to test cosmetic changes. It might also be good to
+have it building on x86 to get more compile testing, as I suspect a
+lot more people doing randconfig builds are doing it on x86 rather
+than arm.
 
-No idea .. It was part of Google's implementation ..
-
-Daniel
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+But I'm fine with it either way.
