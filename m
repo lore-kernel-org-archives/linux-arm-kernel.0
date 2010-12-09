@@ -1,184 +1,220 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 9 Dec 2010 15:24:16 +0100
-Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap -> omap_i2c
-In-Reply-To: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
-References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1291904657-32729-2-git-send-email-b-cousson@ti.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 9 Dec 2010 15:29:12 +0100
+Subject: [PATCH 01/20] mfd/ab8500: remove spi support
+In-Reply-To: <1291388753-14662-2-git-send-email-sundar.iyer@stericsson.com>
+References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
+	<1291388753-14662-2-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <20101209142912.GM8884@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The convention for omap device naming is omap_XXX.
+Hi Sundar,
 
-Rename the device and driver name in order to stick
-to this naming convention.
+On Fri, Dec 03, 2010 at 08:35:34PM +0530, Sundar Iyer wrote:
+> Since the Ab8500 v1.0, the SPI support is deprecated on the HW.
+I'm fine with that, but you really don't want to be able to support pre 1.0
+devices ?
 
-Change device name in clock nodes as well.
+Cheers,
+Samuel.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-c: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Ben Dooks <ben-i2c@fluff.org>
----
- arch/arm/mach-omap1/clock_data.c     |    6 +++---
- arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
- arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
- arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
- arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
- arch/arm/plat-omap/i2c.c             |    2 +-
- drivers/i2c/busses/i2c-omap.c        |    4 ++--
- 7 files changed, 28 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
-index af54114..aa6dd67 100644
---- a/arch/arm/mach-omap1/clock_data.c
-+++ b/arch/arm/mach-omap1/clock_data.c
-@@ -736,9 +736,9 @@ static struct omap_clk omap_clks[] = {
- 	CLK("mmci-omap.1", "ick",	&armper_ck.clk,	CK_16XX),
- 	/* Virtual clocks */
- 	CLK(NULL,	"mpu",		&virtual_ck_mpu, CK_16XX | CK_1510 | CK_310),
--	CLK("i2c_omap.1", "fck",	&i2c_fck,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
--	CLK("i2c_omap.1", "ick",	&i2c_ick,	CK_16XX),
--	CLK("i2c_omap.1", "ick",	&dummy_ck,	CK_1510 | CK_310 | CK_7XX),
-+	CLK("omap_i2c.1", "fck",	&i2c_fck,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
-+	CLK("omap_i2c.1", "ick",	&i2c_ick,	CK_16XX),
-+	CLK("omap_i2c.1", "ick",	&dummy_ck,	CK_1510 | CK_310 | CK_7XX),
- 	CLK("omap1_spi100k.1", "fck",	&dummy_ck,	CK_7XX),
- 	CLK("omap1_spi100k.1", "ick",	&dummy_ck,	CK_7XX),
- 	CLK("omap1_spi100k.2", "fck",	&dummy_ck,	CK_7XX),
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 21f8562..ed61ac2 100644
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -1862,10 +1862,10 @@ static struct omap_clk omap2420_clks[] = {
- 	CLK(NULL,	"eac_fck",	&eac_fck,	CK_242X),
- 	CLK("omap_hdq.0", "ick",	&hdq_ick,	CK_242X),
- 	CLK("omap_hdq.1", "fck",	&hdq_fck,	CK_242X),
--	CLK("i2c_omap.1", "ick",	&i2c1_ick,	CK_242X),
--	CLK("i2c_omap.1", "fck",	&i2c1_fck,	CK_242X),
--	CLK("i2c_omap.2", "ick",	&i2c2_ick,	CK_242X),
--	CLK("i2c_omap.2", "fck",	&i2c2_fck,	CK_242X),
-+	CLK("omap_i2c.1", "ick",	&i2c1_ick,	CK_242X),
-+	CLK("omap_i2c.1", "fck",	&i2c1_fck,	CK_242X),
-+	CLK("omap_i2c.2", "ick",	&i2c2_ick,	CK_242X),
-+	CLK("omap_i2c.2", "fck",	&i2c2_fck,	CK_242X),
- 	CLK(NULL,	"gpmc_fck",	&gpmc_fck,	CK_242X),
- 	CLK(NULL,	"sdma_fck",	&sdma_fck,	CK_242X),
- 	CLK(NULL,	"sdma_ick",	&sdma_ick,	CK_242X),
-diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-index e32afcb..1bded4e 100644
---- a/arch/arm/mach-omap2/clock2430_data.c
-+++ b/arch/arm/mach-omap2/clock2430_data.c
-@@ -1969,10 +1969,10 @@ static struct omap_clk omap2430_clks[] = {
- 	CLK(NULL,	"fac_fck",	&fac_fck,	CK_243X),
- 	CLK("omap_hdq.0", "ick",	&hdq_ick,	CK_243X),
- 	CLK("omap_hdq.1", "fck",	&hdq_fck,	CK_243X),
--	CLK("i2c_omap.1", "ick",	&i2c1_ick,	CK_243X),
--	CLK("i2c_omap.1", "fck",	&i2chs1_fck,	CK_243X),
--	CLK("i2c_omap.2", "ick",	&i2c2_ick,	CK_243X),
--	CLK("i2c_omap.2", "fck",	&i2chs2_fck,	CK_243X),
-+	CLK("omap_i2c.1", "ick",	&i2c1_ick,	CK_243X),
-+	CLK("omap_i2c.1", "fck",	&i2chs1_fck,	CK_243X),
-+	CLK("omap_i2c.2", "ick",	&i2c2_ick,	CK_243X),
-+	CLK("omap_i2c.2", "fck",	&i2chs2_fck,	CK_243X),
- 	CLK(NULL,	"gpmc_fck",	&gpmc_fck,	CK_243X),
- 	CLK(NULL,	"sdma_fck",	&sdma_fck,	CK_243X),
- 	CLK(NULL,	"sdma_ick",	&sdma_ick,	CK_243X),
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index d85ecd5..ee8aa39 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -3285,9 +3285,9 @@ static struct omap_clk omap3xxx_clks[] = {
- 	CLK("mmci-omap-hs.1",	"fck",	&mmchs2_fck,	CK_3XXX),
- 	CLK(NULL,	"mspro_fck",	&mspro_fck,	CK_343X),
- 	CLK("mmci-omap-hs.0",	"fck",	&mmchs1_fck,	CK_3XXX),
--	CLK("i2c_omap.3", "fck",	&i2c3_fck,	CK_3XXX),
--	CLK("i2c_omap.2", "fck",	&i2c2_fck,	CK_3XXX),
--	CLK("i2c_omap.1", "fck",	&i2c1_fck,	CK_3XXX),
-+	CLK("omap_i2c.3", "fck",	&i2c3_fck,	CK_3XXX),
-+	CLK("omap_i2c.2", "fck",	&i2c2_fck,	CK_3XXX),
-+	CLK("omap_i2c.1", "fck",	&i2c1_fck,	CK_3XXX),
- 	CLK("omap-mcbsp.5", "fck",	&mcbsp5_fck,	CK_3XXX),
- 	CLK("omap-mcbsp.1", "fck",	&mcbsp1_fck,	CK_3XXX),
- 	CLK(NULL,	"core_48m_fck",	&core_48m_fck,	CK_3XXX),
-@@ -3326,9 +3326,9 @@ static struct omap_clk omap3xxx_clks[] = {
- 	CLK("omap2_mcspi.3", "ick",	&mcspi3_ick,	CK_3XXX),
- 	CLK("omap2_mcspi.2", "ick",	&mcspi2_ick,	CK_3XXX),
- 	CLK("omap2_mcspi.1", "ick",	&mcspi1_ick,	CK_3XXX),
--	CLK("i2c_omap.3", "ick",	&i2c3_ick,	CK_3XXX),
--	CLK("i2c_omap.2", "ick",	&i2c2_ick,	CK_3XXX),
--	CLK("i2c_omap.1", "ick",	&i2c1_ick,	CK_3XXX),
-+	CLK("omap_i2c.3", "ick",	&i2c3_ick,	CK_3XXX),
-+	CLK("omap_i2c.2", "ick",	&i2c2_ick,	CK_3XXX),
-+	CLK("omap_i2c.1", "ick",	&i2c1_ick,	CK_3XXX),
- 	CLK(NULL,	"uart2_ick",	&uart2_ick,	CK_3XXX),
- 	CLK(NULL,	"uart1_ick",	&uart1_ick,	CK_3XXX),
- 	CLK(NULL,	"gpt11_ick",	&gpt11_ick,	CK_3XXX),
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 1599836..217cce4 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -2872,10 +2872,10 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"gpu_fck",			&gpu_fck,	CK_443X),
- 	CLK("omap2_hdq.0",	"fck",				&hdq1w_fck,	CK_443X),
- 	CLK(NULL,	"hsi_fck",			&hsi_fck,	CK_443X),
--	CLK("i2c_omap.1",	"fck",				&i2c1_fck,	CK_443X),
--	CLK("i2c_omap.2",	"fck",				&i2c2_fck,	CK_443X),
--	CLK("i2c_omap.3",	"fck",				&i2c3_fck,	CK_443X),
--	CLK("i2c_omap.4",	"fck",				&i2c4_fck,	CK_443X),
-+	CLK("omap_i2c.1",	"fck",				&i2c1_fck,	CK_443X),
-+	CLK("omap_i2c.2",	"fck",				&i2c2_fck,	CK_443X),
-+	CLK("omap_i2c.3",	"fck",				&i2c3_fck,	CK_443X),
-+	CLK("omap_i2c.4",	"fck",				&i2c4_fck,	CK_443X),
- 	CLK(NULL,	"ipu_fck",			&ipu_fck,	CK_443X),
- 	CLK(NULL,	"iss_ctrlclk",			&iss_ctrlclk,	CK_443X),
- 	CLK(NULL,	"iss_fck",			&iss_fck,	CK_443X),
-@@ -2975,10 +2975,10 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"gpt9_ick",			&dummy_ck,	CK_443X),
- 	CLK(NULL,	"gpt10_ick",			&dummy_ck,	CK_443X),
- 	CLK(NULL,	"gpt11_ick",			&dummy_ck,	CK_443X),
--	CLK("i2c_omap.1",	"ick",				&dummy_ck,	CK_443X),
--	CLK("i2c_omap.2",	"ick",				&dummy_ck,	CK_443X),
--	CLK("i2c_omap.3",	"ick",				&dummy_ck,	CK_443X),
--	CLK("i2c_omap.4",	"ick",				&dummy_ck,	CK_443X),
-+	CLK("omap_i2c.1",	"ick",				&dummy_ck,	CK_443X),
-+	CLK("omap_i2c.2",	"ick",				&dummy_ck,	CK_443X),
-+	CLK("omap_i2c.3",	"ick",				&dummy_ck,	CK_443X),
-+	CLK("omap_i2c.4",	"ick",				&dummy_ck,	CK_443X),
- 	CLK("mmci-omap-hs.0",	"ick",				&dummy_ck,	CK_443X),
- 	CLK("mmci-omap-hs.1",	"ick",				&dummy_ck,	CK_443X),
- 	CLK("mmci-omap-hs.2",	"ick",				&dummy_ck,	CK_443X),
-diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-index a5bff9c..0a271ad 100644
---- a/arch/arm/plat-omap/i2c.c
-+++ b/arch/arm/plat-omap/i2c.c
-@@ -40,7 +40,7 @@
- #define OMAP_I2C_SIZE		0x3f
- #define OMAP1_I2C_BASE		0xfffb3800
- 
--static const char name[] = "i2c_omap";
-+static const char name[] = "omap_i2c";
- 
- #define I2C_RESOURCE_BUILDER(base, irq)			\
- 	{						\
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 760b8be..9d09083 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
- 	.probe		= omap_i2c_probe,
- 	.remove		= omap_i2c_remove,
- 	.driver		= {
--		.name	= "i2c_omap",
-+		.name	= "omap_i2c",
- 		.owner	= THIS_MODULE,
- 	},
- };
-@@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
- MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
- MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
- MODULE_LICENSE("GPL");
--MODULE_ALIAS("platform:i2c_omap");
-+MODULE_ALIAS("platform:omap_i2c");
+> Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
+> ---
+>  drivers/mfd/Kconfig      |    8 +-
+>  drivers/mfd/Makefile     |    2 +-
+>  drivers/mfd/ab8500-spi.c |  143 ----------------------------------------------
+>  3 files changed, 5 insertions(+), 148 deletions(-)
+>  delete mode 100644 drivers/mfd/ab8500-spi.c
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 3a7b891..c856aa7 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -496,13 +496,13 @@ config EZX_PCAP
+>  
+>  config AB8500_CORE
+>  	bool "ST-Ericsson AB8500 Mixed Signal Power Management chip"
+> -	depends on GENERIC_HARDIRQS && ABX500_CORE && SPI_MASTER && ARCH_U8500
+> +	depends on GENERIC_HARDIRQS && ABX500_CORE && ARCH_U8500
+>  	select MFD_CORE
+>  	help
+>  	  Select this option to enable access to AB8500 power management
+> -	  chip. This connects to U8500 either on the SSP/SPI bus
+> -	  or the I2C bus via PRCMU. It also adds the irq_chip
+> -	  parts for handling the Mixed Signal chip events.
+> +	  chip. This connects to U8500 either on the SSP/SPI bus (deprecated
+> +	  since hardware version v1.0) or the I2C bus via PRCMU. It also adds
+> +	  the irq_chip parts for handling the Mixed Signal chip events.
+>  	  This chip embeds various other multimedia funtionalities as well.
+>  
+>  config AB8500_I2C_CORE
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 04a7226..67c8bcb 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -70,7 +70,7 @@ obj-$(CONFIG_ABX500_CORE)	+= abx500-core.o
+>  obj-$(CONFIG_AB3100_CORE)	+= ab3100-core.o
+>  obj-$(CONFIG_AB3100_OTP)	+= ab3100-otp.o
+>  obj-$(CONFIG_AB3550_CORE)	+= ab3550-core.o
+> -obj-$(CONFIG_AB8500_CORE)	+= ab8500-core.o ab8500-spi.o
+> +obj-$(CONFIG_AB8500_CORE)	+= ab8500-core.o
+>  obj-$(CONFIG_AB8500_I2C_CORE)	+= ab8500-i2c.o
+>  obj-$(CONFIG_AB8500_DEBUG)	+= ab8500-debugfs.o
+>  obj-$(CONFIG_MFD_TIMBERDALE)    += timberdale.o
+> diff --git a/drivers/mfd/ab8500-spi.c b/drivers/mfd/ab8500-spi.c
+> deleted file mode 100644
+> index b165342..0000000
+> --- a/drivers/mfd/ab8500-spi.c
+> +++ /dev/null
+> @@ -1,143 +0,0 @@
+> -/*
+> - * Copyright (C) ST-Ericsson SA 2010
+> - *
+> - * License Terms: GNU General Public License v2
+> - * Author: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> - */
+> -
+> -#include <linux/kernel.h>
+> -#include <linux/slab.h>
+> -#include <linux/init.h>
+> -#include <linux/module.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/spi/spi.h>
+> -#include <linux/mfd/ab8500.h>
+> -
+> -/*
+> - * This funtion writes to any AB8500 registers using
+> - * SPI protocol &  before it writes it packs the data
+> - * in the below 24 bit frame format
+> - *
+> - *	 *|------------------------------------|
+> - *	 *| 23|22...18|17.......10|9|8|7......0|
+> - *	 *| r/w  bank       adr          data  |
+> - *	 * ------------------------------------
+> - *
+> - * This function shouldn't be called from interrupt
+> - * context
+> - */
+> -static int ab8500_spi_write(struct ab8500 *ab8500, u16 addr, u8 data)
+> -{
+> -	struct spi_device *spi = container_of(ab8500->dev, struct spi_device,
+> -					      dev);
+> -	unsigned long spi_data = addr << 10 | data;
+> -	struct spi_transfer xfer;
+> -	struct spi_message msg;
+> -
+> -	ab8500->tx_buf[0] = spi_data;
+> -	ab8500->rx_buf[0] = 0;
+> -
+> -	xfer.tx_buf	= ab8500->tx_buf;
+> -	xfer.rx_buf	= NULL;
+> -	xfer.len	= sizeof(unsigned long);
+> -
+> -	spi_message_init(&msg);
+> -	spi_message_add_tail(&xfer, &msg);
+> -
+> -	return spi_sync(spi, &msg);
+> -}
+> -
+> -static int ab8500_spi_read(struct ab8500 *ab8500, u16 addr)
+> -{
+> -	struct spi_device *spi = container_of(ab8500->dev, struct spi_device,
+> -					      dev);
+> -	unsigned long spi_data = 1 << 23 | addr << 10;
+> -	struct spi_transfer xfer;
+> -	struct spi_message msg;
+> -	int ret;
+> -
+> -	ab8500->tx_buf[0] = spi_data;
+> -	ab8500->rx_buf[0] = 0;
+> -
+> -	xfer.tx_buf	= ab8500->tx_buf;
+> -	xfer.rx_buf	= ab8500->rx_buf;
+> -	xfer.len	= sizeof(unsigned long);
+> -
+> -	spi_message_init(&msg);
+> -	spi_message_add_tail(&xfer, &msg);
+> -
+> -	ret = spi_sync(spi, &msg);
+> -	if (!ret)
+> -		/*
+> -		 * Only the 8 lowermost bytes are
+> -		 * defined with value, the rest may
+> -		 * vary depending on chip/board noise.
+> -		 */
+> -		ret = ab8500->rx_buf[0] & 0xFFU;
+> -
+> -	return ret;
+> -}
+> -
+> -static int __devinit ab8500_spi_probe(struct spi_device *spi)
+> -{
+> -	struct ab8500 *ab8500;
+> -	int ret;
+> -
+> -	spi->bits_per_word = 24;
+> -	ret = spi_setup(spi);
+> -	if (ret < 0)
+> -		return ret;
+> -
+> -	ab8500 = kzalloc(sizeof *ab8500, GFP_KERNEL);
+> -	if (!ab8500)
+> -		return -ENOMEM;
+> -
+> -	ab8500->dev = &spi->dev;
+> -	ab8500->irq = spi->irq;
+> -
+> -	ab8500->read = ab8500_spi_read;
+> -	ab8500->write = ab8500_spi_write;
+> -
+> -	spi_set_drvdata(spi, ab8500);
+> -
+> -	ret = ab8500_init(ab8500);
+> -	if (ret)
+> -		kfree(ab8500);
+> -
+> -	return ret;
+> -}
+> -
+> -static int __devexit ab8500_spi_remove(struct spi_device *spi)
+> -{
+> -	struct ab8500 *ab8500 = spi_get_drvdata(spi);
+> -
+> -	ab8500_exit(ab8500);
+> -	kfree(ab8500);
+> -
+> -	return 0;
+> -}
+> -
+> -static struct spi_driver ab8500_spi_driver = {
+> -	.driver = {
+> -		.name = "ab8500-spi",
+> -		.owner = THIS_MODULE,
+> -	},
+> -	.probe	= ab8500_spi_probe,
+> -	.remove	= __devexit_p(ab8500_spi_remove)
+> -};
+> -
+> -static int __init ab8500_spi_init(void)
+> -{
+> -	return spi_register_driver(&ab8500_spi_driver);
+> -}
+> -subsys_initcall(ab8500_spi_init);
+> -
+> -static void __exit ab8500_spi_exit(void)
+> -{
+> -	spi_unregister_driver(&ab8500_spi_driver);
+> -}
+> -module_exit(ab8500_spi_exit);
+> -
+> -MODULE_AUTHOR("Srinidhi KASAGAR <srinidhi.kasagar@stericsson.com");
+> -MODULE_DESCRIPTION("AB8500 SPI");
+> -MODULE_LICENSE("GPL v2");
+> -- 
+> 1.7.2.dirty
+> 
+
 -- 
-1.7.0.4
+Intel Open Source Technology Centre
+http://oss.intel.com/
