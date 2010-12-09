@@ -1,61 +1,127 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Dec 2010 12:34:57 +0000
-Subject: [PATCH 1/3] ASoC: EP93xx I2S and PCM fixes
-In-Reply-To: <1291897061.31916.149.camel@r60e>
-References: <1291809693.31916.2.camel@r60e>
-	<20101208124637.GD16418@rakim.wolfsonmicro.main>
-	<1291855051.31916.85.camel@r60e>
-	<20101209105443.GA4469@rakim.wolfsonmicro.main>
-	<1291897061.31916.149.camel@r60e>
-Message-ID: <20101209123457.GD4469@rakim.wolfsonmicro.main>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 09 Dec 2010 13:52:00 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <1291851079-27061-1-git-send-email-venki@google.com>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+Message-ID: <1291899120.29292.7.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 03:17:41PM +0300, Alexander wrote:
-> On Thu, 2010-12-09 at 10:54 +0000, Mark Brown wrote:
+On Wed, 2010-12-08 at 15:31 -0800, Venkatesh Pallipadi wrote:
 
-> > pair of samples at a go, which works well enough.  Some of the hardware
-> > configuration may be technically incorrect according to the spec but so
-> > long as the externally observable behaviour is OK that's not an issue.
+> [PATCH] update_rq_clock() with irq_time should handle 64 bit wraparound
+> 
+> update_rq_clock with IRQ_TIME_ACCOUNTING assumed 64 bit sched_clock that
+> practically will not wraparound. Change to code to handle wraparounds,
+> still preventing rq->clock_task from going backwards.
 
-> I2S controller always takes 2 samples (2 ch) from DMA, DMA is always 32
-> bit, so if you will feed it with 16 samples, you will get 2 times faster
-> sound.
+All we should do is deal with the 64wrap, not filter backward motion, I
+came up with something like the below.
 
-How exactly does it "take" the samples?  You're really not being clear
-about what the hardware is doing here.  Please be specific about the
-interaction between the I2S controller and the DMA controller - for
-example, is there a FIFO on the edge of the I2S controller, is there any
-mediation of the data words anywhere in the process?
+I think for now the best solution to the early wrap problem for ARM is
+for them to select HAVE_UNSTABLE_SCHED_CLOCK, it will mostly deal with
+the short wrap by filtering out the occasional negative value.
 
-I *think* what you're trying to say above is that the I2S controller
-reads each sample as an individual word directly from the DMA controller
-so the DMA word size must match exactly the I2S word size but you're
-really not being clear.
+Then later we can look at cleaning/breaking-up the kernel/sched_clock.c
+code to provide smaller bits of functionality and possibly merging it
+with some of the clocksource code.
 
-> > It may be that there's limitations in the hardware that prevent such a
-> > configuration but I'd like to see more analysis of what's going on here.
+---
+ kernel/sched.c |   54 +++++++++++++++++++++++++-----------------------------
+ 1 files changed, 25 insertions(+), 29 deletions(-)
 
-> If we take a look into I2S specification, we will figure that LRCLK MUST
-> be equal to sample rate, if we are talking about stereo (in mono too,
-> but it's not our case at all). So it doesnt seems strange to you,
-> ep93xx-i2s.c produces LRCLK two times slower than it MUST be? It's a
-> bug, making DMA bug less visible...
-
-Right, but the DMA controller can (ignoring any restrictions in your
-hardware) happily transfer data in any size and this needn't have
-anything to do with what the I2S controller is emitting.  You need to
-look at the configuration of the interaction between the I2S and DMA
-controllers rather than the external interface when looking at this
-stuff.
-
-This is all broadly orthogonal to the external BCLK and LRCLK rates,
-it's all about how the data gets between the I2S and DMA controllers.
-
-> Always using 32 bit chunks is not a problem for I2S, the codec I use
-> uses less bits too (24), it's permitted by I2S standard.
-
-It's a problem because it means that the data needs to be laid out in
-memory in 32 bit words which means that a lot of data is going to need
-to be repacked from 16 bit to 32 bit samples which is wasteful.  If the
-hardware can be persuaded to avoid this then that's much better.
+diff --git a/kernel/sched.c b/kernel/sched.c
+index 8e885c1..0fb7de8 100644
+--- a/kernel/sched.c
++++ b/kernel/sched.c
+@@ -642,23 +642,19 @@ static inline struct task_group *task_group(struct task_struct *p)
+ 
+ #endif /* CONFIG_CGROUP_SCHED */
+ 
+-static u64 irq_time_cpu(int cpu);
+-static void sched_irq_time_avg_update(struct rq *rq, u64 irq_time);
++static void update_rq_clock_task(struct rq *rq, s64 delta);
+ 
+ inline void update_rq_clock(struct rq *rq)
+ {
+-	int cpu = cpu_of(rq);
+-	u64 irq_time;
++	s64 delta;
+ 
+ 	if (rq->skip_clock_update)
+ 		return;
+ 
+-	rq->clock = sched_clock_cpu(cpu);
+-	irq_time = irq_time_cpu(cpu);
+-	if (rq->clock - irq_time > rq->clock_task)
+-		rq->clock_task = rq->clock - irq_time;
++	delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
++	rq->clock += delta;
++	update_rq_clock_task(rq, delta);
+ 
+-	sched_irq_time_avg_update(rq, irq_time);
+ }
+ 
+ /*
+@@ -1817,14 +1813,6 @@ void disable_sched_clock_irqtime(void)
+ 	sched_clock_irqtime = 0;
+ }
+ 
+-static u64 irq_time_cpu(int cpu)
+-{
+-	if (!sched_clock_irqtime)
+-		return 0;
+-
+-	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
+-}
+-
+ void account_system_vtime(struct task_struct *curr)
+ {
+ 	unsigned long flags;
+@@ -1855,25 +1843,33 @@ void account_system_vtime(struct task_struct *curr)
+ }
+ EXPORT_SYMBOL_GPL(account_system_vtime);
+ 
+-static void sched_irq_time_avg_update(struct rq *rq, u64 curr_irq_time)
++static inline u64 irq_time_cpu(int cpu)
+ {
+-	if (sched_clock_irqtime && sched_feat(NONIRQ_POWER)) {
+-		u64 delta_irq = curr_irq_time - rq->prev_irq_time;
+-		rq->prev_irq_time = curr_irq_time;
+-		sched_rt_avg_update(rq, delta_irq);
+-	}
++	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
+ }
+ 
+-#else
+-
+-static u64 irq_time_cpu(int cpu)
++static void update_rq_clock_task(struct rq *rq, s64 delta)
+ {
+-	return 0;
++	s64 irq_delta;
++
++	irq_delta = irq_time_cpu(cpu_of(rq)) - rq->prev_irq_time;
++	rq->prev_irq_time += irq_delta;
++
++	delta -= irq_delta;
++	rq->clock_task += delta;
++
++	if (irq_delta && sched_feat(NONIRQ_POWER))
++		sched_rt_avg_update(rq, irq_delta);
+ }
+ 
+-static void sched_irq_time_avg_update(struct rq *rq, u64 curr_irq_time) { }
++#else /* CONFIG_IRQ_TIME_ACCOUNTING */
+ 
+-#endif
++static inline void update_rq_clock_task(struct rq *rq, s64 delta)
++{
++	rq->clock_task += delta;
++}
++
++#endif /* CONFIG_IRQ_TIME_ACCOUNTING */
+ 
+ #include "sched_idletask.c"
+ #include "sched_fair.c"
