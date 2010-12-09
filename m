@@ -1,89 +1,38 @@
-From: peterhuewe@gmx.de (Peter Huewe)
-Date: Thu,  9 Dec 2010 23:04:52 +0100
-Subject: [PATCH] leds/h1940: Use gpiolib for latch access / fix build failure
-Message-ID: <1291932292-16049-1-git-send-email-peterhuewe@gmx.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 09 Dec 2010 14:07:17 -0800
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
+	RWFO fix
+In-Reply-To: <AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
+References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>	<20101124183936.GA18796@mvista.com>
+	<AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
+Message-ID: <4D015315.5070600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a build failure by converting leds-h1940.c to use
-gpiolib for latch access introduced by 14477095abc6
-(ARM: h1940: Use gpiolib for latch access)
+On 12/09/2010 08:04 AM, Catalin Marinas wrote:
+> On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
+>> Updated according to the comments to avoid r/w outside the buffer and
+>> used byte r/w for the possible unaligned data. Seems to work fine.
+>>
+>> Cache ownership must be acqired by reading/writing data from the
+>> cache line to make cache operation have the desired effect on the
+>> SMP MPCore CPU. However, the ownership is never aquired in the
+>> v6_dma_inv_range function when cleaning the first line and
+>> flushing the last one, in case the address is not aligned
+>> to D_CACHE_LINE_SIZE boundary.
+>> Fix this by reading/writing data if needed, before performing
+>> cache operations.
+>> While at it, fix v6_dma_flush_range to prevent RWFO outside
+>> the buffer.
+>>
+>> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+>> Signed-off-by: George G. Davis <gdavis@mvista.com>
+> I eventually found a bit of time to look at this. The patch looks fine to me:
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Unfortunately this driver was not converted back then.
+Is this also a stable candidate? At least it applies cleanly to .35
 
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
----
-KernelVersion: linux-next-20101209
-
-Build failure:
-  CC [M]  drivers/leds/leds-h1940.o
-  drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
-  drivers/leds/leds-h1940.c:33: error: implicit declaration of function 'h1940_latch_control'
-  make[2]: *** [drivers/leds/leds-h1940
-
- drivers/leds/leds-h1940.c |   20 ++++++++++----------
- 1 files changed, 10 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/leds/leds-h1940.c b/drivers/leds/leds-h1940.c
-index 173d104..7811701 100644
---- a/drivers/leds/leds-h1940.c
-+++ b/drivers/leds/leds-h1940.c
-@@ -30,17 +30,17 @@ static void h1940_greenled_set(struct led_classdev *led_dev,
- {
- 	switch (value) {
- 	case LED_HALF:
--		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
- 		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
- 		break;
- 	case LED_FULL:
--		h1940_latch_control(0, H1940_LATCH_LED_GREEN);
-+		gpio_set_value(H1940_LATCH_LED_GREEN, 1);
- 		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
- 		break;
- 	default:
- 	case LED_OFF:
--		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
--		h1940_latch_control(H1940_LATCH_LED_GREEN, 0);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-+		gpio_set_value(H1940_LATCH_LED_GREEN, 0);
- 		s3c2410_gpio_setpin(S3C2410_GPA7, 0);
- 		break;
- 	}
-@@ -60,17 +60,17 @@ static void h1940_redled_set(struct led_classdev *led_dev,
- {
- 	switch (value) {
- 	case LED_HALF:
--		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
- 		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
- 		break;
- 	case LED_FULL:
--		h1940_latch_control(0, H1940_LATCH_LED_RED);
-+		gpio_set_value(H1940_LATCH_LED_RED, 1);
- 		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
- 		break;
- 	default:
- 	case LED_OFF:
--		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
--		h1940_latch_control(H1940_LATCH_LED_RED, 0);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
-+		gpio_set_value(H1940_LATCH_LED_RED, 0);
- 		s3c2410_gpio_setpin(S3C2410_GPA1, 0);
- 		break;
- 	}
-@@ -91,10 +91,10 @@ static void h1940_blueled_set(struct led_classdev *led_dev,
- {
- 	if (value) {
- 		/* flashing Blue */
--		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
- 		s3c2410_gpio_setpin(S3C2410_GPA3, 1);
- 	} else {
--		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
-+		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
- 		s3c2410_gpio_setpin(S3C2410_GPA3, 0);
- 	}
- 
 -- 
-1.7.2.2
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
