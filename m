@@ -1,67 +1,39 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 9 Dec 2010 14:25:49 +0530
-Subject: [PATCH v7 11/12] davinci: add tnetv107x evm backlight device
-In-Reply-To: <1291733522-3626-12-git-send-email-cyril@ti.com>
-References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-	<1291733522-3626-12-git-send-email-cyril@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247CD83E1@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Dec 2010 09:00:52 +0000
+Subject: [PATCH 1/6] ARM: mx5: use config to define boot related addresses
+In-Reply-To: <20101209085255.GS17441@pengutronix.de>
+References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
+	<20101209070411.GH17441@pengutronix.de>
+	<20101209084430.GS9777@n2100.arm.linux.org.uk>
+	<20101209085255.GS17441@pengutronix.de>
+Message-ID: <20101209090052.GT9777@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyril,
+On Thu, Dec 09, 2010 at 09:52:55AM +0100, Uwe Kleine-K?nig wrote:
+> Hell Russell,
+> 
+> On Thu, Dec 09, 2010 at 08:44:30AM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Dec 09, 2010 at 08:04:11AM +0100, Uwe Kleine-K?nig wrote:
+> > > > diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+> > > > index 9939a19..388d2e8 100644
+> > > > --- a/arch/arm/mach-mx5/Makefile.boot
+> > > > +++ b/arch/arm/mach-mx5/Makefile.boot
+> > > > @@ -1,3 +1,3 @@
+> > > > -   zreladdr-y	:= 0x90008000
+> > > > -params_phys-y	:= 0x90000100
+> > > > -initrd_phys-y	:= 0x90800000
+> > > > +   zreladdr-$(CONFIG_SOC_IMX51)	:= 0x90008000
+> > > > +params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
+> > > > +initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
+> > > That is one of the places that is not multi-soc capable.  You can make
+> > > it 66% less worse by just removing params_phys and initrd_phys.
+> > 
+> > Which then destroys the ability to use the bootp veneer which combines
+> > a kernel and initrd.
+> I am aware of that.  I think it's OK to add the assignments when they
+> are needed the first time which I don't expect to happen soon if at all.
 
-On Tue, Dec 07, 2010 at 20:22:01, Chemparathy, Cyril wrote:
-> The tnetv107x evm board has a backlight device that is connected on one of the
-> SSP ports.  This patch adds the board definitions necessary to plug the
-> backlight driver to the GPIO corresponding to this SSP pin.
->
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> ---
->  arch/arm/mach-davinci/board-tnetv107x-evm.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-> index e3863dd..ac62de2 100644
-> --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
-> +++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-> @@ -44,6 +44,7 @@
->  #define EVM_MMC_WP_GPIO              21
->  #define EVM_MMC_CD_GPIO              24
->  #define EVM_SPI_CS_GPIO              54
-> +#define EVM_BACKLIGHT_GPIO   (SSP_GPIO_START + 2)
->
->  static int initialize_gpio(int gpio, char *desc)
->  {
-> @@ -353,6 +354,12 @@ static struct spi_board_info spi_info[] __initconst = {
->       },
->  };
->
-> +static struct platform_device backlight_device = {
-> +     .name           = "tps6116x",
-> +     .id             = -1,
-> +     .dev.platform_data = (void *)EVM_BACKLIGHT_GPIO,
-> +};
-> +
->  static __init void tnetv107x_evm_board_init(void)
->  {
->       davinci_cfg_reg_list(sdio1_pins);
-> @@ -364,6 +371,13 @@ static __init void tnetv107x_evm_board_init(void)
->       spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
->  }
->
-> +static int __init tnetv107x_evm_late_init(void)
-> +{
-> +     platform_device_register(&backlight_device);
-> +     return 0;
-> +}
-> +late_initcall(tnetv107x_evm_late_init);
-
-This call should simply return if machine is not tnetv107x EVM.
-
-I didn't follow the entire series but wondering why
-platform device registration should be a late init call.
-Typically the driver probe can be made a late init call
-in case of init sequence dependencies.
-
-Thanks,
-Sekhar
+That depends who is trying to use it.  If it's someone who isn't the
+original platform developer, they may give up with it if the definitions
+aren't provided.
