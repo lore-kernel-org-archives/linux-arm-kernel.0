@@ -1,85 +1,75 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 09 Dec 2010 12:46:35 -0800
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Thu, 9 Dec 2010 20:58:53 +0000
 Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
 	omap_i2c
-In-Reply-To: <20101209190110.GR20097@trinity.fluff.org> (Ben Dooks's message
-	of "Thu, 9 Dec 2010 19:01:10 +0000")
+In-Reply-To: <878vzydgxr.fsf@deeprootsystems.com>
 References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
 	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
 	<878vzydgxr.fsf@deeprootsystems.com>
-	<20101209190110.GR20097@trinity.fluff.org>
-Message-ID: <87wrni7jys.fsf@deeprootsystems.com>
+Message-ID: <20101209205853.GT20097@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks <ben-i2c@fluff.org> writes:
+On Thu, Dec 09, 2010 at 08:55:28AM -0800, Kevin Hilman wrote:
+> Ben,
+> 
+> Benoit Cousson <b-cousson@ti.com> writes:
+> 
+> > The convention for omap device naming is omap_XXX.
+> >
+> > Rename the device and driver name in order to stick
+> > to this naming convention.
+> >
+> > Change device name in clock nodes as well.
+> >
+> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> > c: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Rajendra Nayak <rnayak@ti.com>
+> > Cc: Ben Dooks <ben-i2c@fluff.org>
+Acked-by: Ben Dooks <ben-linux@fluff.org>
+> > ---
+> >  arch/arm/mach-omap1/clock_data.c     |    6 +++---
+> >  arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
+> >  arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
+> >  arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
+> >  arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
+> >  arch/arm/plat-omap/i2c.c             |    2 +-
+> >  drivers/i2c/busses/i2c-omap.c        |    4 ++--
+> >  7 files changed, 28 insertions(+), 28 deletions(-)
+> 
+> [...]
+> 
+> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> > index 760b8be..9d09083 100644
+> > --- a/drivers/i2c/busses/i2c-omap.c
+> > +++ b/drivers/i2c/busses/i2c-omap.c
+> > @@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
+> >  	.probe		= omap_i2c_probe,
+> >  	.remove		= omap_i2c_remove,
+> >  	.driver		= {
+> > -		.name	= "i2c_omap",
+> > +		.name	= "omap_i2c",
+> >  		.owner	= THIS_MODULE,
+> >  	},
+> >  };
+> > @@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
+> >  MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
+> >  MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
+> >  MODULE_LICENSE("GPL");
+> > -MODULE_ALIAS("platform:i2c_omap");
+> > +MODULE_ALIAS("platform:omap_i2c");
+> 
+> With your ack for the name change in the driver, we can merge this
+> through the OMAP tree with the other core changes.
+> 
+> Thanks,
+> 
+> Kevin
+> 
 
-> On Thu, Dec 09, 2010 at 08:55:28AM -0800, Kevin Hilman wrote:
->> Ben,
->> 
->> > The convention for omap device naming is omap_XXX.
->> >
->> > Rename the device and driver name in order to stick
->> > to this naming convention.
->
-> Renaming stuff like this is going to have an impact on the userspace
-> as anyone looking through /sys's driver heirarchy is going to miss the
-> old name... 
->
-> It all depends if you really want to go ahead with this...
->
+-- 
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-Yes, we are aware of the userspace impact, but this name change makes
-all devices on OMAP have consistent names and actually improves the
-ability to have userspace tools have consistent naming as well.
-
-Kevin
-
->> > Change device name in clock nodes as well.
->> >
->> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
->> > c: Paul Walmsley <paul@pwsan.com>
->> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
->> > Cc: Rajendra Nayak <rnayak@ti.com>
->> > Cc: Ben Dooks <ben-i2c@fluff.org>
->> > ---
->> >  arch/arm/mach-omap1/clock_data.c     |    6 +++---
->> >  arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
->> >  arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
->> >  arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
->> >  arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
->> >  arch/arm/plat-omap/i2c.c             |    2 +-
->> >  drivers/i2c/busses/i2c-omap.c        |    4 ++--
->> >  7 files changed, 28 insertions(+), 28 deletions(-)
->> 
->> [...]
->> 
->> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->> > index 760b8be..9d09083 100644
->> > --- a/drivers/i2c/busses/i2c-omap.c
->> > +++ b/drivers/i2c/busses/i2c-omap.c
->> > @@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
->> >  	.probe		= omap_i2c_probe,
->> >  	.remove		= omap_i2c_remove,
->> >  	.driver		= {
->> > -		.name	= "i2c_omap",
->> > +		.name	= "omap_i2c",
->> >  		.owner	= THIS_MODULE,
->> >  	},
->> >  };
->> > @@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
->> >  MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
->> >  MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
->> >  MODULE_LICENSE("GPL");
->> > -MODULE_ALIAS("platform:i2c_omap");
->> > +MODULE_ALIAS("platform:omap_i2c");
->> 
->> With your ack for the name change in the driver, we can merge this
->> through the OMAP tree with the other core changes.
->> 
->> Thanks,
->> 
->> Kevin
->> 
->
-> -- 
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
