@@ -1,146 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu,  9 Dec 2010 09:47:15 +0900
-Subject: [PATCH] rfc v3: ARM: mach-shmobile: mackerel: Add zboot support
-Message-ID: <1291855635-30882-1-git-send-email-horms@verge.net.au>
+From: subaparts@yandex.ru (Alexander)
+Date: Thu, 09 Dec 2010 03:59:35 +0300
+Subject: [PATCH] ASoC: EP93xx: fixed LRCLK rate and DMA oper. in I2S code
+In-Reply-To: <20101208124637.GD16418@rakim.wolfsonmicro.main>
+References: <1291809693.31916.2.camel@r60e>
+	<20101208124637.GD16418@rakim.wolfsonmicro.main>
+Message-ID: <1291856375.31916.94.camel@r60e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ZBOOT_ROM is selected, the resulting zImage file will be small
-boot loader and may be burned to rom or flash.
+From: Alexander Sverdlin <subaparts@yandex.ru>
 
-Compile tested only.
+Changes to I2S code:
+- SCLK and LRCLK rates are corrected, assuming we always send 32 bits * 2 channels to codec.
+- Formats list shortened to just S32_LE, this makes all the DMA transactions right,
+  while ALSA will do all sample format translation for us.
 
-This patch assumes that head-mackerel.txt will be the same as head-ap4evb.txt.
-I am waiting for verification of this.
-
-This patch depends on
-* ARM: 6515/1: Add zboot support for SuperH Mobile ARM
-  (merged into the devel branch of Russel King's linux-2.6-arm tree)
-* ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
-  (merged into the devel branch of Russel King's linux-2.6-arm tree)
-* MACH_MACKEREL (3211) being present in arch/arm/tools/mach-types
-
-v2:
-* Use head-mackerel.txt for Mackerel.
-  head-ap4evb.txt was used by mistake.
-
-v3:
-* Actually make the change to use head-mackerel.txt
-
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
 ---
- .../mach-shmobile/include/mach/head-mackerel.txt   |   87 ++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/zboot.h        |    3 +
- 2 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/include/mach/head-mackerel.txt
 
-diff --git a/arch/arm/mach-shmobile/include/mach/head-mackerel.txt b/arch/arm/mach-shmobile/include/mach/head-mackerel.txt
-new file mode 100644
-index 0000000..e3ebfa7
---- /dev/null
-+++ b/arch/arm/mach-shmobile/include/mach/head-mackerel.txt
-@@ -0,0 +1,87 @@
-+LIST "partner-jet-setup.txt"
-+LIST "(C) Copyright 2010 Renesas Solutions Corp"
-+LIST "Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>"
-+
-+LIST "RWT Setting"
-+EW 0xE6020004, 0xA500
-+EW 0xE6030004, 0xA500
-+
-+DD 0x01001000, 0x01001000
-+
-+LIST "GPIO Setting"
-+EB 0xE6051013, 0xA2
-+
-+LIST "CPG"
-+ED 0xE6150080, 0x00000180
-+ED 0xE61500C0, 0x00000002
-+
-+WAIT 1, 0xFE40009C
-+
-+LIST "FRQCR"
-+ED 0xE6150000, 0x2D1305C3
-+ED 0xE61500E0, 0x9E40358E
-+ED 0xE6150004, 0x80331050
-+
-+WAIT 1, 0xFE40009C
-+
-+ED 0xE61500E4, 0x00002000
-+
-+WAIT 1, 0xFE40009C
-+
-+LIST "PLL"
-+ED 0xE6150028, 0x00004000
-+
-+WAIT 1, 0xFE40009C
-+
-+ED 0xE615002C, 0x93000040
-+
-+WAIT 1, 0xFE40009C
-+
-+LIST "BSC"
-+ED 0xFEC10000, 0x00E0001B
-+
-+LIST "SBSC1"
-+ED 0xFE400354, 0x01AD8000
-+ED 0xFE400354, 0x01AD8001
-+
-+WAIT 5, 0xFE40009C
-+
-+ED 0xFE400008, 0xBCC90151
-+ED 0xFE400040, 0x41774113
-+ED 0xFE400044, 0x2712E229
-+ED 0xFE400048, 0x20C18505
-+ED 0xFE40004C, 0x00110209
-+ED 0xFE400010, 0x00000087
-+
-+WAIT 10, 0xFE40009C
-+
-+ED 0xFE400084, 0x0000003F
-+EB 0xFE500000, 0x00
-+
-+WAIT 5, 0xFE40009C
-+
-+ED 0xFE400084, 0x0000FF0A
-+EB 0xFE500000, 0x00
-+
-+WAIT 1, 0xFE40009C
-+
-+ED 0xFE400084, 0x00002201
-+EB 0xFE500000, 0x00
-+ED 0xFE400084, 0x00000302
-+EB 0xFE500000, 0x00
-+EB 0xFE5C0000, 0x00
-+ED 0xFE400008, 0xBCC90159
-+ED 0xFE40008C, 0x88800004
-+ED 0xFE400094, 0x00000004
-+ED 0xFE400028, 0xA55A0032
-+ED 0xFE40002C, 0xA55A000C
-+ED 0xFE400020, 0xA55A2048
-+ED 0xFE400008, 0xBCC90959
-+
-+LIST "Change CPGA setting"
-+ED 0xE61500E0, 0x9E40352E
-+ED 0xE6150004, 0x80331050
-+
-+WAIT 1, 0xFE40009C
-+
-+ED 0xE6150354, 0x00000002
-diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
-index 3ad86b7..6d6a205 100644
---- a/arch/arm/mach-shmobile/include/mach/zboot.h
-+++ b/arch/arm/mach-shmobile/include/mach/zboot.h
-@@ -13,6 +13,9 @@
- #ifdef CONFIG_MACH_AP4EVB
- #define MACH_TYPE	MACH_TYPE_AP4EVB
- #include "mach/head-ap4evb.txt"
-+#elif CONFIG_MACH_MACKEREL
-+#define MACH_TYPE	MACH_TYPE_MACKEREL
-+#include "mach/head-mackerel.txt"
- #else
- #error "unsupported board."
- #endif
--- 
-1.7.2.3
+ sound/soc/ep93xx/ep93xx-i2s.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/sound/soc/ep93xx/ep93xx-i2s.c b/sound/soc/ep93xx/ep93xx-i2s.c
+index 4f48733..3e4c3d9 100644
+--- a/sound/soc/ep93xx/ep93xx-i2s.c
++++ b/sound/soc/ep93xx/ep93xx-i2s.c
+@@ -267,14 +267,16 @@ static int ep93xx_i2s_hw_params(struct snd_pcm_substream *substream,
+ 		ep93xx_i2s_write_reg(info, EP93XX_I2S_RXWRDLEN, word_len);
+ 
+ 	/*
+-	 * Calculate the sdiv (bit clock) and lrdiv (left/right clock) values.
+-	 * If the lrclk is pulse length is larger than the word size, then the
+-	 * bit clock will be gated for the unused bits.
++	 * EP93xx I2S module can be setup so SCLK / LRCLK value can be
++	 * 32, 64, 128. MCLK / SCLK value can be 2 and 4.
++	 * We set LRCLK equal to `rate' and minimum SCLK / LRCLK 
++	 * value is 64, because our sample size is 32 bit * 2 channels.
++	 * I2S standard permits us to transmit more bits than
++	 * the codec uses.
+ 	 */
+-	div = (clk_get_rate(info->mclk) / params_rate(params)) *
+-		params_channels(params);
++	div = clk_get_rate(info->mclk) / params_rate(params);
+ 	for (sdiv = 2; sdiv <= 4; sdiv += 2)
+-		for (lrdiv = 32; lrdiv <= 128; lrdiv <<= 1)
++		for (lrdiv = 64; lrdiv <= 128; lrdiv <<= 1)
+ 			if (sdiv * lrdiv == div) {
+ 				found = 1;
+ 				goto out;
+@@ -341,9 +343,7 @@ static struct snd_soc_dai_ops ep93xx_i2s_dai_ops = {
+ 	.set_fmt	= ep93xx_i2s_set_dai_fmt,
+ };
+ 
+-#define EP93XX_I2S_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | \
+-			    SNDRV_PCM_FMTBIT_S24_LE | \
+-			    SNDRV_PCM_FMTBIT_S32_LE)
++#define EP93XX_I2S_FORMATS (SNDRV_PCM_FMTBIT_S32_LE)
+ 
+ static struct snd_soc_dai_driver ep93xx_i2s_dai = {
+ 	.symmetric_rates= 1,
