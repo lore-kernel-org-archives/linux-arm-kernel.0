@@ -1,27 +1,32 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 9 Dec 2010 13:32:22 -0500 (EST)
-Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend on
-	!CONFIG_THUMB2_KERNEL
-In-Reply-To: <1291895982-4775-3-git-send-email-dave.martin@linaro.org>
+Date: Thu, 9 Dec 2010 13:34:31 -0500 (EST)
+Subject: [PATCH 1/2] ARM: Thumb-2: Make CONFIG_THUMB2_KERNEL depend on
+	!CPU_V6
+In-Reply-To: <1291895982-4775-2-git-send-email-dave.martin@linaro.org>
 References: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
-	<1291895982-4775-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1012091331500.10437@xanadu.home>
+	<1291895982-4775-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1012091333460.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 9 Dec 2010, Dave Martin wrote:
 
-> Because the nwfpe support is unlikely to be used on new platforms
-> and requires CONFIG_OABI_COMPAT, which is not generally used with
-> ARMv7+, we shouldn't expect to build nwfpe support into a Thumb-2
-> kernel.
+> This makes sense, because Thumb-2 code can't execute on plain
+> ARMv6 processors.
 > 
-> At present, nwfpe contains assembly code which isn't Thumb-2
-> compatible, and for now it doesn't appear useful to port this
-> code.
+> This will avoid accidentally configuring a broken kernel where the
+> config otherwise would allow multiple architecture versions to
+> coexist in the same kernel.
 > 
-> All ARMv7-A/R platforms necessarily have VFPv3 hardware floating-
-> point natively, making emulation unnecessary.
+> Not adding !CPU_V5 etc., because the chance of anyone trying to
+> put v5 and v7 in the same kernel is low, and I'm not aware of
+> any mach which can do this.  These could be added later if it
+> matters.
+> 
+> Note that the rules may need to be refined if support for the
+> ARM1156J(F)-S processor is later added to the kernel, since this
+> processor supports the rare ARMv6T2 extensions, which add support
+> for Thumb-2 and a few other ARMv7 features.
 > 
 > Signed-off-by: Dave Martin <dave.martin@linaro.org>
 > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
@@ -34,18 +39,18 @@ Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 >  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
 > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index f9ca7f3..7e825c3 100644
+> index db524e7..f9ca7f3 100644
 > --- a/arch/arm/Kconfig
 > +++ b/arch/arm/Kconfig
-> @@ -1759,7 +1759,7 @@ comment "At least one emulation must be selected"
+> @@ -1311,7 +1311,7 @@ config HZ
 >  
->  config FPE_NWFPE
->  	bool "NWFPE math emulation"
-> -	depends on !AEABI || OABI_COMPAT
-> +	depends on (!AEABI || OABI_COMPAT) && !THUMB2_KERNEL
->  	---help---
->  	  Say Y to include the NWFPE floating point emulator in the kernel.
->  	  This is necessary to run most binaries. Linux does not currently
+>  config THUMB2_KERNEL
+>  	bool "Compile the kernel in Thumb-2 mode"
+> -	depends on CPU_V7 && EXPERIMENTAL
+> +	depends on CPU_V7 && !CPU_V6 && EXPERIMENTAL
+>  	select AEABI
+>  	select ARM_ASM_UNIFIED
+>  	help
 > -- 
 > 1.7.1
 > 
