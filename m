@@ -1,40 +1,85 @@
-From: vbarshak@mvista.com (Valentine Barshak)
-Date: Thu, 09 Dec 2010 20:04:44 +0300
-Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
-	RWFO fix
-In-Reply-To: <AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
-References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>	<20101124183936.GA18796@mvista.com>
-	<AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
-Message-ID: <4D010C2C.2050900@mvista.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 9 Dec 2010 17:03:10 +0000
+Subject: [PATCH 8/8] arm: omap: add minimal support for RM-680
+In-Reply-To: <1291912764-12823-9-git-send-email-aaro.koskinen@nokia.com>
+References: <1291912764-12823-1-git-send-email-aaro.koskinen@nokia.com>
+	<1291912764-12823-9-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20101209170310.GC2763@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
->   
->> Updated according to the comments to avoid r/w outside the buffer and
->> used byte r/w for the possible unaligned data. Seems to work fine.
->>
->> Cache ownership must be acqired by reading/writing data from the
->> cache line to make cache operation have the desired effect on the
->> SMP MPCore CPU. However, the ownership is never aquired in the
->> v6_dma_inv_range function when cleaning the first line and
->> flushing the last one, in case the address is not aligned
->> to D_CACHE_LINE_SIZE boundary.
->> Fix this by reading/writing data if needed, before performing
->> cache operations.
->> While at it, fix v6_dma_flush_range to prevent RWFO outside
->> the buffer.
->>
->> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
->> Signed-off-by: George G. Davis <gdavis@mvista.com>
->>     
->
-> I eventually found a bit of time to look at this. The patch looks fine to me:
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->   
-Thanks!
+Hi Aaro,
 
-Regards,
-Val.
+A couple of small comments below, otherwise looks nice to me.
+
+Jamie
+
+On Thu, Dec 09, 2010 at 06:39:24PM +0200, Aaro Koskinen wrote:
+> Add minimal support for Nokia RM-680 board.
+> 
+> Tested with omap2plus_defconfig.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+[...]
+> +#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
+> +	defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
+> +static struct omap_onenand_platform_data board_onenand_data[] = {
+> +	{
+> +		.gpio_irq	= 65,
+> +		.flags		= ONENAND_SYNC_READWRITE,
+> +	}
+> +};
+> +#endif
+> +
+> +/* eMMC */
+> +static struct omap2_hsmmc_info mmc[] __initdata = {
+> +	{
+> +		.name		= "internal",
+> +		.mmc		= 2,
+> +		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_MMC_HIGHSPEED,
+> +		.gpio_cd	= -EINVAL,
+> +		.gpio_wp	= -EINVAL,
+> +	},
+> +	{ /* Terminator */ }
+> +};
+> +
+> +static void __init rm680_peripherals_init(void)
+> +{
+> +	platform_add_devices(rm680_peripherals_devices,
+> +				ARRAY_SIZE(rm680_peripherals_devices));
+> +	rm680_i2c_init();
+> +	gpmc_onenand_init(board_onenand_data);
+What happens if CONFIG_MTD_ONENAND_OMAP2=n and 
+CONFIG_MTD_ONENAND_OMAP2_MODULE=n? Do you need to define board_onenand_data to 
+NULL if these aren't enabled?
+
+> +	omap2_hsmmc_init(mmc);
+> +}
+> +
+> +static void __init rm680_init_irq(void)
+> +{
+> +	struct omap_sdrc_params *sdrc_params;
+> +
+> +	sdrc_params = nokia_get_sdram_timings();
+> +	omap2_init_common_hw(sdrc_params, sdrc_params);
+> +	omap_init_irq();
+> +	omap_gpio_init();
+> +}
+> +
+> +#ifdef CONFIG_OMAP_MUX
+> +static struct omap_board_mux board_mux[] __initdata = {
+> +	{ .reg_offset = OMAP_MUX_TERMINATOR },
+> +};
+> +#endif
+> +
+> +static struct omap_musb_board_data rm680_musb_data = {
+> +	.interface_type	= MUSB_INTERFACE_ULPI,
+> +	.mode		= MUSB_PERIPHERAL,
+> +	.power		= 100,
+> +};
+> +
+> +static void __init rm680_init(void)
+> +{
+> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+The same here as with the onenand data.
