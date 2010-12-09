@@ -1,32 +1,23 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 9 Dec 2010 18:03:57 +0100
-Subject: [PATCH 13/20] mfd/tc3589x: add suspend/resume support
-In-Reply-To: <1291388753-14662-14-git-send-email-sundar.iyer@stericsson.com>
-References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-	<1291388753-14662-14-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <20101209170356.GY8884@sortiz-mobl>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 9 Dec 2010 10:04:47 -0700 (MST)
+Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
+	omap_i2c
+In-Reply-To: <1291904657-32729-2-git-send-email-b-cousson@ti.com>
+References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
+	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1012091003400.11479@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sundar,
+On Thu, 9 Dec 2010, Benoit Cousson wrote:
 
-On Fri, Dec 03, 2010 at 08:35:46PM +0530, Sundar Iyer wrote:
+> The convention for omap device naming is omap_XXX.
+> 
+> Rename the device and driver name in order to stick
+> to this naming convention.
+> 
+> Change device name in clock nodes as well.
 
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
-One remark though:
-> +
-> +static const struct dev_pm_ops tc3589x_dev_pm_ops = {
-> +	.suspend = tc3589x_suspend,
-> +	.resume  = tc3589x_resume,
-> +};
-> +#endif
-SIMPLE_DEV_PM_OPS or UNIVERSAL_DEV_PM_OPS may be useful and save one ifdef
-here.
-
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+- Paul
