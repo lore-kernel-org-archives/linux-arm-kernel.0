@@ -1,33 +1,35 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 09 Dec 2010 17:43:54 +0100
-Subject: [sodaville] SPI support for CE4100, v2
-In-Reply-To: <1291312057-7933-1-git-send-email-bigeasy@linutronix.de>
-References: <1291312057-7933-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <4D01074A.2020106@linutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 09 Dec 2010 10:45:27 -0600
+Subject: [PATCH 2/8] arm: omap: add sdram-nokia.h
+In-Reply-To: <1291912764-12823-3-git-send-email-aaro.koskinen@nokia.com>
+References: <1291912764-12823-1-git-send-email-aaro.koskinen@nokia.com>
+	<1291912764-12823-3-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <4D0107A7.80900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Andrzej Siewior wrote:
-> The SPI core inside CE4100 is very much the same as in PXA25x.
-> I Cc the ARM folks because patch 4 reorganizes some files so that they
-> can be access from x86. Yes, CE4100 is a x86 SoC :)
-> The SPI device is behind a PCI bus. The PCI probe code simply creates a
-> platform device so we don't have much changes to the platform driver.
-> There is no clock framework on x86 and the peripherals don't support
-> changing their clocks or to enable/disable them. So I provided dummy
-> function which keep the driver happy.
-> 
-> History:
-> v1: initial post
-> v2: - the patch touching subys_inticall() got removed.
->     - platform_driver_probe() is replaced with platform_driver_register()
->     - there are no files created in include/asm.
-> 
-> The patch series has been created with the -M option so file moves can
-> be easily noticed. The whole series is also available at
->   git://git.linutronix.de/users/bigeasy/soda.git spi
+Aaro Koskinen had written, on 12/09/2010 10:39 AM, the following:
+[...]
+> diff --git a/arch/arm/mach-omap2/sdram-nokia.h b/arch/arm/mach-omap2/sdram-nokia.h
+> new file mode 100644
+> index 0000000..ee63da5
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/sdram-nokia.h
+> @@ -0,0 +1,12 @@
+> +/*
+> + * SDRC register values for Nokia boards
+> + *
+> + * Copyright (C) 2010 Nokia
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +struct omap_sdrc_params *nokia_get_sdram_timings(void);
+> +
+Minor comment: Header guard missing. maybe nice to add #ifndef, #def, 
+#endif.
 
-It's been week since I posted this and nobody commented on it. Is this
-patchset missing something or is it good to go?
-
-Sebastian
+Regards,
+Nishanth Menon
