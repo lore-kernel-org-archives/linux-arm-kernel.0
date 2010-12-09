@@ -1,38 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 09 Dec 2010 14:07:17 -0800
-Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
-	RWFO fix
-In-Reply-To: <AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
-References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>	<20101124183936.GA18796@mvista.com>
-	<AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
-Message-ID: <4D015315.5070600@codeaurora.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 9 Dec 2010 23:13:32 +0100
+Subject: [PATCH v2 0/8] OMAP3&4: clock data: Fixes and add new clocks nodes
+Message-ID: <1291932820-11163-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2010 08:04 AM, Catalin Marinas wrote:
-> On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
->> Updated according to the comments to avoid r/w outside the buffer and
->> used byte r/w for the possible unaligned data. Seems to work fine.
->>
->> Cache ownership must be acqired by reading/writing data from the
->> cache line to make cache operation have the desired effect on the
->> SMP MPCore CPU. However, the ownership is never aquired in the
->> v6_dma_inv_range function when cleaning the first line and
->> flushing the last one, in case the address is not aligned
->> to D_CACHE_LINE_SIZE boundary.
->> Fix this by reading/writing data if needed, before performing
->> cache operations.
->> While at it, fix v6_dma_flush_range to prevent RWFO outside
->> the buffer.
->>
->> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
->> Signed-off-by: George G. Davis <gdavis@mvista.com>
-> I eventually found a bit of time to look at this. The patch looks fine to me:
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Hi Paul,
 
-Is this also a stable candidate? At least it applies cleanly to .35
+Here is a collections of fixes and clock nodes addition done on OMAP3
+and OMAP4 clock data files.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I have included the one that Thara already submitted after fixing the
+various comments done on the original version.
+
+That revision include as well a new fix from Jon. Thanks to both fixes,
+the clocks rate are now accurate and the func_48m_fclk does report 48MHz
+now! Cool isn't it?
+
+Tested on sdp4430 + ES2.0.
+
+The series is based on 2.6.37-rc5 and is available here:
+git://gitorious.org/omap-pm/linux.git for_2.6.38/clock
+
+Regards,
+Benoit
+
+
+Benoit Cousson (3):
+  OMAP4: clock data: Add control for pad_clks_ck and slimbus_clk
+  OMAP3: clock data: Add "wkup_clkdm" in sr1_fck and sr2_fck
+  OMAP4: PRCM: Add SCRM header file
+
+Jon Hunter (1):
+  OMAP4: clock data: Add missing fixed divisors
+
+Jonathan Bergsagel (1):
+  OMAP4: clock data: Add missing fields in iva_hsd_byp_clk_mux_ck
+
+Rajendra Nayak (2):
+  OMAP4: clock data: Add SCRM auxiliary clock nodes
+  OMAP4: clock data: Export control to enable/disable CORE/PER M3
+    clocks
+
+Thara Gopinath (1):
+  OMAP4: clock data: Add missing DPLL x2 clock nodes
+
+ arch/arm/mach-omap2/clock3xxx_data.c |    2 +
+ arch/arm/mach-omap2/clock44xx_data.c |  653 ++++++++++++++++++++++++----------
+ arch/arm/mach-omap2/scrm44xx.h       |  176 +++++++++
+ 3 files changed, 640 insertions(+), 191 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/scrm44xx.h
