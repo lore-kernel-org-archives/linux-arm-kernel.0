@@ -1,66 +1,56 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 09 Dec 2010 08:55:28 -0800
-Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
-	omap_i2c
-In-Reply-To: <1291904657-32729-2-git-send-email-b-cousson@ti.com> (Benoit
-	Cousson's message of "Thu, 9 Dec 2010 15:24:16 +0100")
+Date: Thu, 09 Dec 2010 08:56:20 -0800
+Subject: [PATCH v2 0/2] OMAP: I2C and UART device name cleanup
+In-Reply-To: <1291904657-32729-1-git-send-email-b-cousson@ti.com> (Benoit
+	Cousson's message of "Thu, 9 Dec 2010 15:24:15 +0100")
 References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
-	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
-Message-ID: <878vzydgxr.fsf@deeprootsystems.com>
+Message-ID: <874oamdgwb.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
-
 Benoit Cousson <b-cousson@ti.com> writes:
 
-> The convention for omap device naming is omap_XXX.
+> Hi All,
 >
-> Rename the device and driver name in order to stick
-> to this naming convention.
+> In order to enforce a little bit of consistency in the omap devices name,
+> the convention for omap devices name will be now omap_xxx. All the drivers
+> adapted to hwmod will be named like that during the on-going adaptations.
 >
-> Change device name in clock nodes as well.
+> The I2C and UART drivers are already adapted to hwmod but with
+> the originals name.
 >
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> c: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Ben Dooks <ben-i2c@fluff.org>
-> ---
->  arch/arm/mach-omap1/clock_data.c     |    6 +++---
->  arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
->  arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
->  arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
->  arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
->  arch/arm/plat-omap/i2c.c             |    2 +-
->  drivers/i2c/busses/i2c-omap.c        |    4 ++--
->  7 files changed, 28 insertions(+), 28 deletions(-)
+> Rename i2c and uart using this convention:
+> i2c_omap -> omap_i2c
+> omap-hsuart -> omap_uart
+>
+> Tested on OMAP4 ES2 on Panda / sdp4430. Some more validation will be needed on OMAP2 & 3.
+>
+> This series is based on Kevin's pm-hwmod-i2c branch and is available here:
+> git://gitorious.org/omap-pm/linux.git for_2.6.38/device_name
 
-[...]
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 760b8be..9d09083 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
->  	.probe		= omap_i2c_probe,
->  	.remove		= omap_i2c_remove,
->  	.driver		= {
-> -		.name	= "i2c_omap",
-> +		.name	= "omap_i2c",
->  		.owner	= THIS_MODULE,
->  	},
->  };
-> @@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
->  MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
->  MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
->  MODULE_LICENSE("GPL");
-> -MODULE_ALIAS("platform:i2c_omap");
-> +MODULE_ALIAS("platform:omap_i2c");
-
-With your ack for the name change in the driver, we can merge this
-through the OMAP tree with the other core changes.
-
-Thanks,
-
-Kevin
+> Regards,
+> Benoit
+>
+>
+> v1
+>     http://www.spinics.net/lists/linux-omap/msg41474.html
+>     
+>     Merge previous patch #1 and #2 as suggested by Kevin to change the driver name 
+>     at the same time with the device name in the clockdev.
+>
+>
+> Benoit Cousson (2):
+>   I2C: i2c-omap: Change device name: i2c_omap -> omap_i2c
+>   OMAP: serial: Change device name: omap-hsuart -> omap_uart
+>
+>  arch/arm/mach-omap1/clock_data.c              |    6 +++---
+>  arch/arm/mach-omap2/clock2420_data.c          |    8 ++++----
+>  arch/arm/mach-omap2/clock2430_data.c          |    8 ++++----
+>  arch/arm/mach-omap2/clock3xxx_data.c          |   12 ++++++------
+>  arch/arm/mach-omap2/clock44xx_data.c          |   16 ++++++++--------
+>  arch/arm/plat-omap/i2c.c                      |    2 +-
+>  arch/arm/plat-omap/include/plat/omap-serial.h |    2 +-
+>  drivers/i2c/busses/i2c-omap.c                 |    4 ++--
+>  8 files changed, 29 insertions(+), 29 deletions(-)
