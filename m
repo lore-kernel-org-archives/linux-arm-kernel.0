@@ -1,60 +1,42 @@
-From: scaudle@codeaurora.org (Stephen Caudle)
-Date: Thu, 09 Dec 2010 11:24:19 -0500
-Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores
-	during IRQ enable
-In-Reply-To: <20101201171425.GA29347@n2100.arm.linux.org.uk>
-References: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
-	<20101130180718.GB8521@n2100.arm.linux.org.uk>
-	<4CF6797A.2010807@codeaurora.org>
-	<20101201171425.GA29347@n2100.arm.linux.org.uk>
-Message-ID: <4D0102B3.8010302@codeaurora.org>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Thu,  9 Dec 2010 18:39:16 +0200
+Subject: [PATCH 0/8] arm: omap: add support for RM-680
+Message-ID: <1291912764-12823-1-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2010 12:14 PM, Russell King - ARM Linux wrote:
-> On Wed, Dec 01, 2010 at 11:36:10AM -0500, Stephen Caudle wrote:
->> On 11/30/2010 01:07 PM, Russell King - ARM Linux wrote:
->>> Sorry, missed this.
->>>
->>> If it's a private peripheral, it can only be accessed from its associated
->>> CPU.  What that means is you don't want to enable the interrupt on other
->>> CPUs as the peripheral may not be present or initialized on that CPU.
->>
->> Understood.  But the alternative is to require all code that requests a  
->> PPI to have to enable the IRQ on the other cores.  This seems  
->> unreasonable to me.
-> 
-> It is also unreasonable to have one core enabling the PPI on other
-> cores where the hardware behind the interrupt may not have been
-> initialized yet.  If it is a private interrupt for a private peripheral,
-> then only the associated CPU should be enabling that interrupt.
-> 
-> I guess this is something which genirq can't cope with, in which case
-> either genirq needs to be modified to cope with private CPU interrupts,
-> which are controlled individually by their associated CPU, or we need a
-> private interface to support this.
+These patches add initial support for Nokia RM-680 board.
 
-I see your point.  Our immediate need for this is to support a
-performance monitor interrupt that happens to be a PPI.  It is used by
-perf events (and subsequently, oprofile).
+Patches 1-7 are just preparation and make board-rx51-sdram.c reusable
+by renaming it to sdram-nokia.c etc.
 
-Since PPIs are so machine-specific, I started looking into patching
-perf_events.c by adding a machine specific function to handle the PMU
-IRQ request.  For mach-msm, we would call request_irq like normal, but
-also unmask the performance monitor interrupt on the other cores.  The
-downside to this is that a machine specific implementation would be
-needed anytime a PPI is requested, not just in perf_events.c.
+Patch 8 adds a new board and requires updated mach-types from
+http://www.arm.linux.org.uk/developer/machines/download.php in order
+to compile.
 
-Then, I saw Thomas' email regarding our local timer PPI:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/033840.html.
+These are based on top of linux-omap/master
+(92f446c47b18827e61483787668b0bb5f7a033b6).
 
-Russell, before I submit another patch, I would like to know if you
-prefer a more generic approach like Thomas suggests, or a
-machine-specific approach like I have described?
+...
 
-Thanks,
-Stephen
+Aaro Koskinen (8):
+  arm: omap: rename board-rx51-sdram.c to sdram-nokia.c
+  arm: omap: add sdram-nokia.h
+  arm: omap: sdram-nokia: prepare for new memory timings
+  arm: omap: sdram-nokia: use array to list timings
+  arm: omap: sdram-nokia: improve error handling
+  arm: omap: sdram-nokia: delete redundant timing data
+  arm: omap: sdram-nokia: add 97.6/195.2 MHz timing data
+  arm: omap: add minimal support for RM-680
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+ arch/arm/mach-omap2/Kconfig                        |    6 +
+ arch/arm/mach-omap2/Makefile                       |    5 +-
+ arch/arm/mach-omap2/board-rm680.c                  |  187 ++++++++++++++++++++
+ arch/arm/mach-omap2/board-rx51.c                   |    4 +-
+ .../{board-rx51-sdram.c => sdram-nokia.c}          |  102 +++++++++---
+ arch/arm/mach-omap2/sdram-nokia.h                  |   12 ++
+ arch/arm/plat-omap/include/plat/uncompress.h       |    1 +
+ 7 files changed, 292 insertions(+), 25 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-rm680.c
+ rename arch/arm/mach-omap2/{board-rx51-sdram.c => sdram-nokia.c} (66%)
+ create mode 100644 arch/arm/mach-omap2/sdram-nokia.h
