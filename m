@@ -1,29 +1,66 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 09 Dec 2010 10:08:02 +0000
-Subject: [alsa-devel] [PATCH] ASoC: EP93xx: fixed LRCLK rate and DMA
-	oper. in I2S code
-In-Reply-To: <1291856375.31916.94.camel@r60e>
-References: <1291809693.31916.2.camel@r60e>
-	<20101208124637.GD16418@rakim.wolfsonmicro.main>
-	<1291856375.31916.94.camel@r60e>
-Message-ID: <1291889282.3271.20.camel@odin>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 9 Dec 2010 18:17:00 +0800
+Subject: [PATCH v2 14/15] ARM: mxs: Add initial mx28evk support
+In-Reply-To: <20101209093746.GU17441@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
+	<20101208202822.GD17441@pengutronix.de>
+	<AANLkTiny2P3RobZfq_G_OPHu_SLjZ2w9CFhU7HgL3VPx@mail.gmail.com>
+	<20101209083237.GO17441@pengutronix.de>
+	<AANLkTin3-f7x2BXS=zTYYw+uWiu9UYG8sPWdQXWcxpxn@mail.gmail.com>
+	<20101209093746.GU17441@pengutronix.de>
+Message-ID: <AANLkTinwmdxEXNObEbHd10ZxfTmTCaWiHmwXpf8hs3f1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-09 at 03:59 +0300, Alexander wrote:
-> From: Alexander Sverdlin <subaparts@yandex.ru>
-> 
-> Changes to I2S code:
-> - SCLK and LRCLK rates are corrected, assuming we always send 32 bits * 2 channels to codec.
-> - Formats list shortened to just S32_LE, this makes all the DMA transactions right,
->   while ALSA will do all sample format translation for us.
-> 
-> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
-> ---
+2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Shawn
+> On Thu, Dec 09, 2010 at 05:03:54PM +0800, Shawn Guo wrote:
+>> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> > Hello Shwan,
+> ups, sorry for mistyping your name.
+>
+>> > On Thu, Dec 09, 2010 at 03:04:37PM +0800, Shawn Guo wrote:
+>> >> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> >> > On Wed, Dec 08, 2010 at 12:32:02AM +0800, Shawn Guo wrote:
+>> >> >> +static iomux_cfg_t mx28evk_pads[] = {
+>> >> > This can be const and __initconst, ditto for mx23evk
+>> >> >
+>> >> With u64 iomux_cfg_t changes, I'm afraid the suggestion becomes invalid.
+>> > Really? Why?
+>> >
+>> I'm confused by the compiling error below when adding __initconst for
+>> mx28evk_pads[], and mistakenly blaming u64 iomux_cfg_t changes.
+>>
+>> arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
+>> arch/arm/mach-mxs/mach-mx28evk.c:34: error: mx28_fec_pdata causes a
+>> section type conflict
+>> make[1]: *** [arch/arm/mach-mxs/mach-mx28evk.o] Error 1
+>> make: *** [arch/arm/mach-mxs] Error 2
+>>
+>> Actually it can be fixed by the following change.
+>>
+>> -static const struct fec_platform_data mx28_fec_pdata __initconst = {
+>> +static struct fec_platform_data mx28_fec_pdata __initconst = {
+>> ? ? ? ? ?.phy = PHY_INTERFACE_MODE_RMII,
+>> ?};
+> this change is wrong. ?You need to assert that all data being marked
+> with __initconst is const, too.
+>
+After adding const for mx28evk_pads[], I got the following error.
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+  CC      arch/arm/mach-mxs/mach-mx28evk.o
+arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
+arch/arm/mach-mxs/mach-mx28evk.c:102: warning: passing argument 1 of
+?mxs_iomux_setup_multiple_pads? discards qualifiers from pointer
+target type
+arch/arm/mach-mxs/include/mach/iomux.h:115: note: expected
+?iomux_cfg_t *? but argument is of type ?const iomux_cfg_t *?
+
+This takes me back to my first judgment.  Is it proper to add
+__initconst for mx28evk_pads[]? We are changing iomux_cfg_t to u64 for
+making pad definition modifiable.
 
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Regards,
+Shawn
