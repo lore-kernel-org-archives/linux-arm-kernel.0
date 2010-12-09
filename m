@@ -1,125 +1,195 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  9 Dec 2010 14:47:18 +0100
-Subject: [PATCH 6/9] ARM i.MX51: Add IPU device support
+Date: Thu,  9 Dec 2010 14:47:13 +0100
+Subject: [PATCH 1/9] ARM i.MX51: Add ipu clock support
 In-Reply-To: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
 References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1291902441-24712-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1291902441-24712-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx5/devices-imx51.h               |    4 ++
- arch/arm/plat-mxc/devices/Kconfig               |    4 ++
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-imx_ipuv3.c  |   47 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h |   10 +++++
- 5 files changed, 66 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
+ arch/arm/mach-mx5/clock-mx51-mx53.c |  140 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 140 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-index 6302e46..851c114 100644
---- a/arch/arm/mach-mx5/devices-imx51.h
-+++ b/arch/arm/mach-mx5/devices-imx51.h
-@@ -47,3 +47,7 @@ extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
- extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data[] __initconst;
- #define imx51_add_imx2_wdt(id, pdata)	\
- 	imx_add_imx2_wdt(&imx51_imx2_wdt_data[id])
-+
-+extern const struct imx_ipuv3_data imx51_ipuv3_data __initconst;
-+#define imx51_add_ipuv3(pdata)	\
-+	imx_add_ipuv3(&imx51_ipuv3_data, pdata)
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index 2537166..262d9c5 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -71,3 +71,7 @@ config IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 9fc65bb..f550d02 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -39,6 +39,9 @@ static struct clk periph_apm_clk;
+ static struct clk ahb_clk;
+ static struct clk ipg_clk;
+ static struct clk usboh3_clk;
++static struct clk emi_fast_clk;
++static struct clk ipu_clk;
++static struct clk mipi_hsc1_clk;
  
- config IMX_HAVE_PLATFORM_SPI_IMX
- 	bool
-+
-+config IMX_HAVE_PLATFORM_IMX_IPUV3
-+	bool
-+
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index 75cd2ec..0a6be0a 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -22,3 +22,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_IPUV3) +=  platform-imx_ipuv3.o
-diff --git a/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
-new file mode 100644
-index 0000000..a470edb
---- /dev/null
-+++ b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (C) 2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <mach/hardware.h>
-+#include <mach/devices-common.h>
-+
-+#define imx51_ipuv3_data_entry_single(soc)				\
-+	{								\
-+		.iobase = soc ## _IPU_CTRL_BASE_ADDR,			\
-+		.irq_err = soc ## _INT_IPU_ERR,				\
-+		.irq = soc ## _INT_IPU_SYN,				\
-+	}
-+
-+#ifdef CONFIG_SOC_IMX51
-+const struct imx_ipuv3_data imx51_ipuv3_data __initconst =
-+	imx51_ipuv3_data_entry_single(MX51);
-+#endif /* ifdef CONFIG_SOC_IMX35 */
-+
-+struct platform_device *__init imx_add_ipuv3(
-+		const struct imx_ipuv3_data *data,
-+		const struct imx_ipuv3_platform_data *pdata)
+ #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
+ 
+@@ -688,6 +691,19 @@ static unsigned long clk_emi_slow_get_rate(struct clk *clk)
+ 	return clk_get_rate(clk->parent) / div;
+ }
+ 
++static unsigned long _clk_ddr_hf_get_rate(struct clk *clk)
 +{
-+	struct resource res[] = {
-+		{
-+			.start = data->iobase,
-+			.end = data->iobase + SZ_4K - 1,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = data->irq_err,
-+			.end = data->irq_err,
-+			.flags = IORESOURCE_IRQ,
-+		}, {
-+			.start = data->irq,
-+			.end = data->irq,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	};
++	unsigned long rate;
++	u32 reg, div;
 +
-+	return imx_add_platform_device("imx-ipuv3", -1,
-+			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
++	reg = __raw_readl(MXC_CCM_CBCDR);
++	div = ((reg & MXC_CCM_CBCDR_DDR_PODF_MASK) >>
++		MXC_CCM_CBCDR_DDR_PODF_OFFSET) + 1;
++	rate = clk_get_rate(clk->parent) / div;
++
++	return rate;
 +}
 +
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 8658c9c..8f5197f 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -264,3 +264,13 @@ struct imx_spi_imx_data {
- struct platform_device *__init imx_add_spi_imx(
- 		const struct imx_spi_imx_data *data,
- 		const struct spi_imx_master *pdata);
+ /* External high frequency clock */
+ static struct clk ckih_clk = {
+ 	.get_rate = get_high_reference_clock_rate,
+@@ -846,6 +862,109 @@ static struct clk emi_slow_clk = {
+ 	.get_rate = clk_emi_slow_get_rate,
+ };
+ 
++static int clk_ipu_enable(struct clk *clk)
++{
++	u32 reg;
 +
-+#include <mach/ipu-v3.h>
-+struct imx_ipuv3_data {
-+	resource_size_t iobase;
-+	resource_size_t irq_err;
-+	resource_size_t irq;
++	_clk_ccgr_enable(clk);
++
++	/* Enable handshake with IPU when certain clock rates are changed */
++	reg = __raw_readl(MXC_CCM_CCDR);
++	reg &= ~MXC_CCM_CCDR_IPU_HS_MASK;
++	__raw_writel(reg, MXC_CCM_CCDR);
++
++	/* Enable handshake with IPU when LPM is entered */
++	reg = __raw_readl(MXC_CCM_CLPCR);
++	reg &= ~MXC_CCM_CLPCR_BYPASS_IPU_LPM_HS;
++	__raw_writel(reg, MXC_CCM_CLPCR);
++
++	return 0;
++}
++
++static void clk_ipu_disable(struct clk *clk)
++{
++	u32 reg;
++
++	_clk_ccgr_disable(clk);
++
++	/* Disable handshake with IPU whe dividers are changed */
++	reg = __raw_readl(MXC_CCM_CCDR);
++	reg |= MXC_CCM_CCDR_IPU_HS_MASK;
++	__raw_writel(reg, MXC_CCM_CCDR);
++
++	/* Disable handshake with IPU when LPM is entered */
++	reg = __raw_readl(MXC_CCM_CLPCR);
++	reg |= MXC_CCM_CLPCR_BYPASS_IPU_LPM_HS;
++	__raw_writel(reg, MXC_CCM_CLPCR);
++}
++
++static struct clk ahbmux1_clk = {
++	.parent = &ahb_clk,
++	.secondary = &ahb_max_clk,
++	.enable_reg = MXC_CCM_CCGR0,
++	.enable_shift = MXC_CCM_CCGRx_CG8_OFFSET,
++	.enable = _clk_ccgr_enable,
++	.disable = _clk_ccgr_disable_inwait,
 +};
-+struct platform_device *__init imx_add_ipuv3(
-+		const struct imx_ipuv3_data *data,
-+		const struct imx_ipuv3_platform_data *pdata);
++
++static struct clk ipu_sec_clk = {
++	.parent = &emi_fast_clk,
++	.secondary = &ahbmux1_clk,
++};
++
++static struct clk ddr_hf_clk = {
++	.parent = &pll1_sw_clk,
++	.get_rate = _clk_ddr_hf_get_rate,
++};
++
++static struct clk ddr_clk = {
++	.parent = &ddr_hf_clk,
++};
++
++/* clock definitions for MIPI HSC unit which has been removed
++ * from documentation, but not from hardware
++ */
++static int _clk_hsc_enable(struct clk *clk)
++{
++	u32 reg;
++
++	_clk_ccgr_enable(clk);
++	/* Handshake with IPU when certain clock rates are changed. */
++	reg = __raw_readl(MXC_CCM_CCDR);
++	reg &= ~MXC_CCM_CCDR_HSC_HS_MASK;
++	__raw_writel(reg, MXC_CCM_CCDR);
++
++	reg = __raw_readl(MXC_CCM_CLPCR);
++	reg &= ~MXC_CCM_CLPCR_BYPASS_HSC_LPM_HS;
++	__raw_writel(reg, MXC_CCM_CLPCR);
++
++	return 0;
++}
++
++static void _clk_hsc_disable(struct clk *clk)
++{
++	u32 reg;
++
++	_clk_ccgr_disable(clk);
++	/* No handshake with HSC as its not enabled. */
++	reg = __raw_readl(MXC_CCM_CCDR);
++	reg |= MXC_CCM_CCDR_HSC_HS_MASK;
++	__raw_writel(reg, MXC_CCM_CCDR);
++
++	reg = __raw_readl(MXC_CCM_CLPCR);
++	reg |= MXC_CCM_CLPCR_BYPASS_HSC_LPM_HS;
++	__raw_writel(reg, MXC_CCM_CLPCR);
++}
++
++static struct clk mipi_hsp_clk = {
++	.parent = &ipu_clk,
++	.enable_reg = MXC_CCM_CCGR4,
++	.enable_shift = MXC_CCM_CCGRx_CG6_OFFSET,
++	.enable = _clk_hsc_enable,
++	.disable = _clk_hsc_disable,
++	.secondary = &mipi_hsc1_clk,
++};
++
+ #define DEFINE_CLOCK_CCGR(name, i, er, es, pfx, p, s)	\
+ 	static struct clk name = {			\
+ 		.id		= i,			\
+@@ -1077,6 +1196,23 @@ DEFINE_CLOCK_FULL(esdhc2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG2_OFFSET,
+ DEFINE_CLOCK_MAX(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
+ 	clk_esdhc2, &pll2_sw_clk, &esdhc2_ipg_clk);
+ 
++DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
++DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
++DEFINE_CLOCK(mipi_hsc1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET, NULL, NULL, &mipi_hsc2_clk, &pll2_sw_clk);
++
++/* IPU */
++DEFINE_CLOCK_FULL(ipu_clk, 0, MXC_CCM_CCGR5, MXC_CCM_CCGRx_CG5_OFFSET,
++	NULL,  NULL, clk_ipu_enable, clk_ipu_disable, &ahb_clk, &ipu_sec_clk);
++
++DEFINE_CLOCK_FULL(emi_fast_clk, 0, MXC_CCM_CCGR5, MXC_CCM_CCGRx_CG7_OFFSET,
++		NULL, NULL, _clk_ccgr_enable, _clk_ccgr_disable_inwait,
++		&ddr_clk, NULL);
++
++DEFINE_CLOCK(ipu_di0_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG5_OFFSET,
++		NULL, NULL, &pll3_sw_clk, NULL);
++DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
++		NULL, NULL, &pll3_sw_clk, NULL);
++
+ #define _REGISTER_CLOCK(d, n, c) \
+        { \
+ 		.dev_id = d, \
+@@ -1117,6 +1253,10 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
++	_REGISTER_CLOCK(NULL, "mipi_hsp", mipi_hsp_clk)
++	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
++	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
++	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
+ };
+ 
+ static struct clk_lookup mx53_lookups[] = {
 -- 
 1.7.2.3
