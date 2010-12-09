@@ -1,192 +1,118 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 10 Dec 2010 00:33:35 +0100
-Subject: [PATCH 5/5] OMAP4: hwmod & clock data: Fix GPIO opt_clks and ocp_if
-	iclk
-In-Reply-To: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
-References: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1291937615-18571-6-git-send-email-b-cousson@ti.com>
+From: venki@google.com (Venkatesh Pallipadi)
+Date: Thu, 9 Dec 2010 15:35:11 -0800
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <1291936593.13513.3.camel@laptop>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+	<1291899120.29292.7.camel@twins>
+	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+	<1291917330.6803.7.camel@twins>
+	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
+	<1291920939.6803.38.camel@twins>
+	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+	<1291936593.13513.3.camel@laptop>
+Message-ID: <AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix opt clocks name in clock framework and hwmod.
+On Thu, Dec 9, 2010 at 3:16 PM, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, 2010-12-09 at 14:21 -0800, Venkatesh Pallipadi wrote:
+>> This should mostly work. There would be a small window there on
+>> rq->clock=sched_clock_cpu() and system_vtime doing sched_clock_cpu()
+>> and also the overhead of doing this everytime when this going
+>> backwards may happen rarely.
+>
+> Right, so something like the below removes that tiny race by re-using
+> rq->clock as now. It also removes some overhead by removing the IRQ
+> fudging (we already know IRQs are disabled).
+>
+> It does have a few extra branches (2 afaict) than your monotonicity path
+> had, but it seems to me this approach is slightly more accurate.
+>
 
-Add the missing iclk in the ocp_if structure.
+Looks fine.
 
-Add the HWMOD_CONTROL_OPT_CLKS_IN_RESET flag to ensure
-the the GPIO optional clock is enable during reset.
+Just to make sure, update_rq_clock() always gets called on current
+CPU. Right? The pending patches I have optimizes
+account_system_vtime() to use this_cpu_write and friends. Want to make
+sure this change will still keep that optimization relevant.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Tested-by: Charulatha V <charu@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/clock44xx_data.c       |   12 ++++++------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   23 +++++++++++++++++------
- 2 files changed, 23 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 1599836..c59a5a9 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -2856,17 +2856,17 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"emif2_fck",			&emif2_fck,	CK_443X),
- 	CLK(NULL,	"fdif_fck",			&fdif_fck,	CK_443X),
- 	CLK(NULL,	"fpka_fck",			&fpka_fck,	CK_443X),
--	CLK(NULL,	"gpio1_dbck",			&gpio1_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio1_dbclk",			&gpio1_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio1_ick",			&gpio1_ick,	CK_443X),
--	CLK(NULL,	"gpio2_dbck",			&gpio2_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio2_dbclk",			&gpio2_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio2_ick",			&gpio2_ick,	CK_443X),
--	CLK(NULL,	"gpio3_dbck",			&gpio3_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio3_dbclk",			&gpio3_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio3_ick",			&gpio3_ick,	CK_443X),
--	CLK(NULL,	"gpio4_dbck",			&gpio4_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio4_dbclk",			&gpio4_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio4_ick",			&gpio4_ick,	CK_443X),
--	CLK(NULL,	"gpio5_dbck",			&gpio5_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio5_dbclk",			&gpio5_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio5_ick",			&gpio5_ick,	CK_443X),
--	CLK(NULL,	"gpio6_dbck",			&gpio6_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio6_dbclk",			&gpio6_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio6_ick",			&gpio6_ick,	CK_443X),
- 	CLK(NULL,	"gpmc_ick",			&gpmc_ick,	CK_443X),
- 	CLK(NULL,	"gpu_fck",			&gpu_fck,	CK_443X),
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 102c76f..0ed9cdd 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -696,6 +696,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio1_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_wkup__gpio1 = {
- 	.master		= &omap44xx_l4_wkup_hwmod,
- 	.slave		= &omap44xx_gpio1_hwmod,
-+	.clk		= "l4_wkup_clk_mux_ck",
- 	.addr		= omap44xx_gpio1_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio1_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -707,7 +708,7 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio1_slaves[] = {
- };
- 
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio1_dbclk" },
- };
- 
- static struct omap_hwmod omap44xx_gpio1_hwmod = {
-@@ -747,6 +748,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio2_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio2 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio2_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio2_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio2_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -758,12 +760,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio2_slaves[] = {
- };
- 
- static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio2_dbclk" },
- };
- 
- static struct omap_hwmod omap44xx_gpio2_hwmod = {
- 	.name		= "gpio2",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio2_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio2_irqs),
- 	.main_clk	= "gpio2_ick",
-@@ -798,6 +801,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio3_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio3 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio3_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio3_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio3_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -809,12 +813,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio3_slaves[] = {
- };
- 
- static struct omap_hwmod_opt_clk gpio3_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio3_dbclk" },
- };
- 
- static struct omap_hwmod omap44xx_gpio3_hwmod = {
- 	.name		= "gpio3",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio3_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio3_irqs),
- 	.main_clk	= "gpio3_ick",
-@@ -849,6 +854,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio4_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio4 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio4_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio4_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio4_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -860,12 +866,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio4_slaves[] = {
- };
- 
- static struct omap_hwmod_opt_clk gpio4_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio4_dbclk" },
- };
- 
- static struct omap_hwmod omap44xx_gpio4_hwmod = {
- 	.name		= "gpio4",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio4_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio4_irqs),
- 	.main_clk	= "gpio4_ick",
-@@ -900,6 +907,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio5_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio5 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio5_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio5_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio5_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -911,12 +919,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio5_slaves[] = {
- };
- 
- static struct omap_hwmod_opt_clk gpio5_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio5_dbclk" },
- };
- 
- static struct omap_hwmod omap44xx_gpio5_hwmod = {
- 	.name		= "gpio5",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio5_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio5_irqs),
- 	.main_clk	= "gpio5_ick",
-@@ -951,6 +960,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio6_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio6 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio6_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio6_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio6_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -962,12 +972,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio6_slaves[] = {
- };
- 
- static struct omap_hwmod_opt_clk gpio6_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio6_dbclk" },
- };
- 
- static struct omap_hwmod omap44xx_gpio6_hwmod = {
- 	.name		= "gpio6",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio6_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio6_irqs),
- 	.main_clk	= "gpio6_ick",
--- 
-1.7.0.4
+> ---
+> Index: linux-2.6/kernel/sched.c
+> ===================================================================
+> --- linux-2.6.orig/kernel/sched.c
+> +++ linux-2.6/kernel/sched.c
+> @@ -1813,19 +1813,10 @@ void disable_sched_clock_irqtime(void)
+> ? ? ? ?sched_clock_irqtime = 0;
+> ?}
+>
+> -void account_system_vtime(struct task_struct *curr)
+> +static void __account_system_vtime(int cpu, u64 now)
+> ?{
+> - ? ? ? unsigned long flags;
+> - ? ? ? int cpu;
+> - ? ? ? u64 now, delta;
+> + ? ? ? s64 delta;
+>
+> - ? ? ? if (!sched_clock_irqtime)
+> - ? ? ? ? ? ? ? return;
+> -
+> - ? ? ? local_irq_save(flags);
+> -
+> - ? ? ? cpu = smp_processor_id();
+> - ? ? ? now = sched_clock_cpu(cpu);
+> ? ? ? ?delta = now - per_cpu(irq_start_time, cpu);
+> ? ? ? ?per_cpu(irq_start_time, cpu) = now;
+> ? ? ? ?/*
+> @@ -1836,16 +1827,36 @@ void account_system_vtime(struct task_st
+> ? ? ? ? */
+> ? ? ? ?if (hardirq_count())
+> ? ? ? ? ? ? ? ?per_cpu(cpu_hardirq_time, cpu) += delta;
+> - ? ? ? else if (in_serving_softirq() && !(curr->flags & PF_KSOFTIRQD))
+> + ? ? ? else if (in_serving_softirq() && !(current->flags & PF_KSOFTIRQD))
+> ? ? ? ? ? ? ? ?per_cpu(cpu_softirq_time, cpu) += delta;
+> +}
+> +
+> +void account_system_vtime(struct task_struct *curr)
+> +{
+> + ? ? ? unsigned long flags;
+> + ? ? ? u64 now;
+> + ? ? ? int cpu;
+> +
+> + ? ? ? if (!sched_clock_irqtime)
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? local_irq_save(flags);
+> +
+> + ? ? ? cpu = smp_processor_id();
+> + ? ? ? now = sched_clock_cpu(cpu);
+> + ? ? ? __account_system_vtime(cpu, now);
+>
+> ? ? ? ?local_irq_restore(flags);
+> ?}
+> ?EXPORT_SYMBOL_GPL(account_system_vtime);
+>
+> -static u64 irq_time_cpu(int cpu)
+> +static u64 irq_time_cpu(struct rq *rq)
+> ?{
+> - ? ? ? account_system_vtime(current);
+> + ? ? ? int cpu = cpu_of(rq);
+> +
+> + ? ? ? if (sched_clock_irqtime)
+> + ? ? ? ? ? ? ? __account_system_vtime(cpu, rq->clock);
+> +
+> ? ? ? ?return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
+> ?}
+>
+> @@ -1853,7 +1864,7 @@ static void update_rq_clock_task(struct
+> ?{
+> ? ? ? ?s64 irq_delta;
+>
+> - ? ? ? irq_delta = irq_time_cpu(cpu_of(rq)) - rq->prev_irq_time;
+> + ? ? ? irq_delta = irq_time_cpu(rq) - rq->prev_irq_time;
+> ? ? ? ?rq->prev_irq_time += irq_delta;
+>
+> ? ? ? ?delta -= irq_delta;
+>
+>
