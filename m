@@ -1,32 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 9 Dec 2010 16:04:03 +0000
-Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
-	RWFO fix
-In-Reply-To: <20101124183936.GA18796@mvista.com>
-References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
-	<20101124183936.GA18796@mvista.com>
-Message-ID: <AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Thu, 9 Dec 2010 11:07:49 -0500
+Subject: [PATCH (sh-2.6) 1/2] sh: add stack smashing protection support
+In-Reply-To: <4D00FC2A.8040309@st.com>
+References: <1291717254-17455-1-git-send-email-filippo.arcidiacono@st.com>
+	<20101208044052.GA31508@linux-sh.org> <4D00FC2A.8040309@st.com>
+Message-ID: <201012091107.51911.vapier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
-> Updated according to the comments to avoid r/w outside the buffer and
-> used byte r/w for the possible unaligned data. Seems to work fine.
->
-> Cache ownership must be acqired by reading/writing data from the
-> cache line to make cache operation have the desired effect on the
-> SMP MPCore CPU. However, the ownership is never aquired in the
-> v6_dma_inv_range function when cleaning the first line and
-> flushing the last one, in case the address is not aligned
-> to D_CACHE_LINE_SIZE boundary.
-> Fix this by reading/writing data if needed, before performing
-> cache operations.
-> While at it, fix v6_dma_flush_range to prevent RWFO outside
-> the buffer.
->
-> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
-> Signed-off-by: George G. Davis <gdavis@mvista.com>
+On Thursday, December 09, 2010 10:56:26 Carmelo AMOROSO wrote:
+> I agree with you that the Kconfig and Makefile changes are not arch
+> specific, so these changes can be moved to a common code (even if I
+> don't know if other archs do support SSP).
+> In the current kernel, only x86 and ARM added this support, so I'm
+> wondering if, moving SSP to the common Makefile, it needs to depend on
+> x86, ARM, SH being configured ?
 
-I eventually found a bit of time to look at this. The patch looks fine to me:
+i'm not sure it does.  ssp is designed to be arch independent, so really you 
+only need a new enough gcc version.  which means i dont think it needs to 
+depend on any arch code and you can simply add to the Makefile a compiler 
+check.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Regarding the __stack_chk_guard symbol defined in process[_32].c, I
+> don't know if all archs need to define this global variable to implement
+> SSP. For sure x86 does not need it. It depends on how the gcc implements
+> this feature. This was mainly the reason for which we defined it
+> specifically in an arch specific code.
+
+the common gcc code too outputs __stack_chk_guard references.  none of that is 
+in arch-specific places.
+-mike
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101209/18ba3db9/attachment-0001.sig>
