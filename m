@@ -1,155 +1,55 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 9 Dec 2010 23:29:33 +0100
-Subject: [PATCH v8 01/11] OMAP: GPIO: prepare for platform driver
-In-Reply-To: <871v5q7fn4.fsf@deeprootsystems.com>
-References: <1290689318-10191-1-git-send-email-charu@ti.com>	<1290689318-10191-2-git-send-email-charu@ti.com>	<8762v292ld.fsf@deeprootsystems.com>
-	<4D014B3C.7040806@ti.com> <871v5q7fn4.fsf@deeprootsystems.com>
-Message-ID: <4D01584D.8080606@ti.com>
+Date: Thu, 9 Dec 2010 23:31:57 +0100
+Subject: [PATCH 11/14] OMAP4: PRCM: reorganize existing OMAP4 PRCM header
+	files
+In-Reply-To: <alpine.DEB.2.00.1012072340250.13430@utopia.booyaka.com>
+References: <20101207012242.3708.45451.stgit@twilight.localdomain>
+	<20101207012514.3708.87532.stgit@twilight.localdomain>
+	<4CFDEBB7.8040309@ti.com>
+	<alpine.DEB.2.00.1012072340250.13430@utopia.booyaka.com>
+Message-ID: <4D0158DD.30200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/9/2010 11:19 PM, Kevin Hilman wrote:
-> "Cousson, Benoit"<b-cousson@ti.com>  writes:
+Salut Paul,
+
+On 12/8/2010 7:47 AM, Paul Walmsley wrote:
+> Salut Beno?t,
 >
->> Salut Kevin,
+> On Tue, 7 Dec 2010, Cousson, Benoit wrote:
+>
+>> Salut Paul,
 >>
->> On 12/9/2010 8:18 PM, Kevin Hilman wrote:
->>> Hi Charu,
+>> On 12/7/2010 2:25 AM, Paul Walmsley wrote:
+>>> Split the existing cm44xx.h file into cm1_44xx.h and cm2_44xx.h files
+>>> so they match their underlying OMAP hardware modules.  Add clockdomain
+>>> offset information.
 >>>
->>> "Varadarajan, Charulatha"<charu@ti.com>   writes:
->>>
->>>> Prepare for implementing GPIO as a platform driver.
->>>>
->>>> Modifies omap_gpio_init() to make use of omap_gpio_chip_init()
->>>> and omap_gpio_mod_init(). omap_gpio_mod_init() does the module init
->>>> by clearing the status register and initializing the GPIO control register.
->>>> omap_gpio_chip_init() initializes the chip request, free, get, set and
->>>> other function pointers and sets the gpio irq handler.
->>>>
->>>> This is only to reorganize the code so that the "omap gpio platform driver
->>>> implementation patch" looks cleaner and better to review.
->>>>
->>>> Signed-off-by: Charulatha V<charu@ti.com>
->>>
->>> I just noticed while testing on 36xx/Zoom3 that GPIO wakeups are no
->>> longer working after this series.
->>>
->>> The problem seems to be that for OMAP2+, this series removed manual
->>> SYSCONFIG register setting in favor of using omap_hwmod (which is good),
->>> however some of the SYSCONFIG values, specifically, in the current code,
->>> the ENAWAKEUP bit was set in each bank, but this is no longer the
->>> default with omap_hwmod.
+>>> Add header files for the MPU local PRCM, prcm_mpu44xx.h, and for the
+>>> SCRM, scrm44xx.h.  SCRM register offsets still need to be added; TI
+>>> should do this.
 >>
->> That part is strange, because Rajendra did a patch to enable the
->> wakeup bit during _omap_hwmod_enable as soon as the idlemode is set to
->> smartidle.
+>> And we did it :-)
+>
+> Even better :-)
+>
+>> I sent it last week along with clock data series:
+>> https://patchwork.kernel.org/patch/373751/
 >>
->> /* If slave port is in SMARTIDLE, also enable wakeup */
->> if ((sf&  SYSC_HAS_SIDLEMODE)&&  (s_idlemode == HWMOD_IDLEMODE_SMART))
->> 	_enable_wakeup(oh);
->>
->> The _disable_wakeup is never called, so in theory once it is set, it
->> should remain enabled.
->>
->> Does that mean that this the GPIO is not in smartidle anymore in your case?
+>> OK, I've just realized that it was a little bit hidden in the clock data
+>> patch, and maybe we should have been sent two patches.
+>> Sorry for that. Do you want to take it in that series, or should I re-sent the
+>> clock data one?
 >
-> Looks like a bug in the patch that added automatic wakeup enables.
-> Basically, wakeups are enabled, but are promptly disabled if
-> SYSC_HAS_AUTOIDLE.  Here's the code:
+> I guess it's better done in the clock series; that should avoid a branch
+> dependency between the PRCM patchsets and the clock patch sets.
 >
-> 	/*
-> 	 * XXX The clock framework should handle this, by
-> 	 * calling into this code.  But this must wait until the
-> 	 * clock structures are tagged with omap_hwmod entries
-> 	 */
-> 	if ((oh->flags&  HWMOD_SET_DEFAULT_CLOCKACT)&&
-> 	(sf&  SYSC_HAS_CLOCKACTIVITY))
-> 		_set_clockactivity(oh, oh->class->sysc->clockact,&v);
->
-> 	_write_sysconfig(v, oh);
->
-> OK, so here, 'v' has wakeups disabled.
->
-> 	/* If slave is in SMARTIDLE, also enable wakeup */
-> 	if ((sf&  SYSC_HAS_SIDLEMODE)&&  !(oh->flags&  HWMOD_SWSUP_SIDLE))
-> 		_enable_wakeup(oh);
->
-> Here we enabled them directly in SYSC (but 'v' is not updated)
->
-> 	/*
-> 	 * Set the autoidle bit only after setting the smartidle bit
-> 	 * Setting this will not have any impact on the other modules.
-> 	 */
-> 	if (sf&  SYSC_HAS_AUTOIDLE) {
-> 		idlemode = (oh->flags&  HWMOD_NO_OCP_AUTOIDLE) ?
-> 			0 : 1;
-> 		_set_module_autoidle(oh, idlemode,&v);
-> 		_write_sysconfig(v, oh);
-> 	}
->
-> And here, SYSCONFIG is updated again using 'v', which does not have
-> wakeups enabled.
->
-> A quick patch (below) shows that if I update 'v' after enabling wakeups,
-> the problem is fixed.
->
-> I'll cook up a cleaner patch for this, but I think the solution is
-> probably to change _enable_wakeup() to take the 'v' argument and modify
-> it instead of directly writing SYSCONFIG.  That will make it more like
-> all the other helper functions.
+> One thing that would be nice on the scrm44xx.h file is to keep the _OFFSET
+> macros.  It would be nice in the long run to get rid of the absolute
+> addressing macros in case someone decides to shuffle around the IP block
+> addresses again... can you update your clock series with that change?
 
-Funny, I did a patch that does that yesterday just because the wakeup 
-enable on some OMAP4 IPs does require changing the idlemode as well.
-
-So I added a new _set_enawakeup API to use the same programming model.
-
-+static int _set_enawakeup(struct omap_hwmod *oh, u8 enawakeup, u32 *v)
-  {
--	u32 v, wakeup_mask;
-+	u32 wakeup_mask;
-+	u8 wakeup_shift;
-
-  	if (!oh->class->sysc ||
-  	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
-@@ -401,10 +402,44 @@ static int _enable_wakeup(struct omap_hwmod *oh)
-  		return -EINVAL;
-  	}
-
--	wakeup_mask = (0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
-+	wakeup_shift = oh->class->sysc->sysc_fields->enwkup_shift;
-+	wakeup_mask = 0x1 << wakeup_shift;
-+
-+	*v &= ~wakeup_mask;
-+	*v |= enawakeup << wakeup_shift;
-+
-+	return 0;
-+}
-+
-
-That does not solve the issue I was trying to fix with the McPDM driver, 
-that's why I didn't send it yet, but that might be enough for the GPIO.
+OK, this is done. I've just posted it.
 
 Regards,
 Benoit
-
->
-> Kevin
->
->
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 12856eb..adcb1fc 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -791,8 +791,10 @@ static void _enable_sysc(struct omap_hwmod *oh)
->   	_write_sysconfig(v, oh);
->
->   	/* If slave is in SMARTIDLE, also enable wakeup */
-> -	if ((sf&  SYSC_HAS_SIDLEMODE)&&  !(oh->flags&  HWMOD_SWSUP_SIDLE))
-> +	if ((sf&  SYSC_HAS_SIDLEMODE)&&  !(oh->flags&  HWMOD_SWSUP_SIDLE)) {
->   		_enable_wakeup(oh);
-> +		v = oh->_sysc_cache;
-> +	}
->
->   	/*
->   	 * Set the autoidle bit only after setting the smartidle bit
