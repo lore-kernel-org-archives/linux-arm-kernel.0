@@ -1,46 +1,81 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 09 Dec 2010 09:21:19 +0000
-Subject: [PATCHv3] support PMIC mc13892
-In-Reply-To: <AANLkTinAmxdoy2mXqDEOPrkKk4BwLefF=7GNAGwZQz=N@mail.gmail.com>
-References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
-	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
-	<AANLkTim-_Xft9b0D3PfG8bC6_m4Kp0GtC8ZwW-NEp5-0@mail.gmail.com>
-	<1291812851.3260.189.camel@odin>
-	<AANLkTinAmxdoy2mXqDEOPrkKk4BwLefF=7GNAGwZQz=N@mail.gmail.com>
-Message-ID: <1291886479.3271.11.camel@odin>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Thu, 9 Dec 2010 01:23:24 -0800 (PST)
+Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
+In-Reply-To: <4CFDD297.4020600@codeaurora.org>
+References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
+	<20101202221909.GK29347@n2100.arm.linux.org.uk>
+	<4CF94DDD.8000409@codeaurora.org>
+	<20101203203653.GB10245@n2100.arm.linux.org.uk>
+	<4CFDD297.4020600@codeaurora.org>
+Message-ID: <15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-09 at 13:13 +0800, Yong Shen wrote:
-> Hi Sascha and Uwe,
-> 
-> On Wed, Dec 8, 2010 at 8:54 PM, Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> > On Wed, 2010-12-08 at 11:28 +0800, Yong Shen wrote:
-> >> Hi Liam,
-> >>
-> >> Last time, you took the previous patches for mc13783 code
-> >> reorganization in your tree,
-> >
-> > I've not applied this yet, I'm waiting on an Ack from either Sascha or
-> > Uwe regarding the arch mxc changes in this patch.
-> >
-> It seems that Liam is waiting for an ack from you about previous
-> mc13783 patch. I am not sure about the arch mxc changes he mentioned,
-> could you please feedback on this?
-> 
 
-Fwiw, it's always better to send a reply to all on the same thread as
-your previous patch when discussing the previous patch. That way people
-will have a better idea of the patch being discussed.
+> Russell King - ARM Linux wrote:
+>> On Fri, Dec 03, 2010 at 12:06:53PM -0800, Saravana Kannan wrote:
+>>> The MSM8660 SoC uses the TrustZone technology and the Linux kernel
+>>> executes in normal/non-secure domain. When the second core is brought
+>>> out of reset, it starts executing a secure image which then jumps to
+>>> "secondary_startup". So, before bringing the second core out of reset,
+>>> we need to inform the secure domain code where secondary_startup is
+>>> located in memory.
+>>>
+>>> We do the communication with the secure code by using buffers in
+>>> memory.
+>>>  The cache treats the NS (non secure) bit as an additional address bit
+>>> when tagging memory. Hence, cache accesses are not coherent between the
+>>> secure and non-secure domains. So, the secure side flushes it's cache
+>>> after writing to the buffer. To properly read the response from the
+>>> secure side, the kernel has to pick a buffer that isn't cacheable in
+>>> the
+>>> first place. We have similar issues in the reverse direction.
+>>
+>> So when ARM gets DMA-coherent caches, you of course aren't going to
+>> complain that the DMA APIs start avoiding doing the current tricks with
+>> non-cacheable memory?
+>>
+>> I view what you're doing above with the DMA API as an abuse of the API.
+>> Just like the problems we're facing with ioremap() being used on system
+>> RAM, you're asking for problems when the ARM architecture changes
+>> because
+>> you're using an API for it's current properties, not for its purpose.
+>
+> You are right. Thanks for catching this.
+>
+> So, that basically leaves us with these options:
+> * Create another API to allow getting uncached pages. I don't think we
+> will be the first or the last to want uncached pages. Even if ARM
+> introduces DMA-coherent caches, it's  possible for SoC vendors to have
+> other h/w blocks that could directly operate on memory. The cache might
+> not be coherent with these h/w blocks.
+> * Add a cache invalidate API that's outside the DMA APIs and can be used
+>   when needed.
+>
+> Do one of the above two options sound reasonable to you?
+>
+>> I've been on for years about purpose-designed APIs for cache issues,
+>> and every time someone abuses them, they eventually end up suffering
+>> breakage.
+>>
+>> Let's wait until the full set of patches is available before discussing
+>> further.
+>
+> Jeff Ohlstein sent out a series of patches ([PATCH 0/5] SMP support for
+> msm). The patch that deals with talking to the secure domain code is
+> titled "[PATCH 2/5] msm: scm-boot: Support for setting cold/warm boot
+> addresses". I see that you replied to an email on that, but it's not
+> clear if you connected that patch with this thread.
+>
+> Thanks,
+> Saravana
+>
 
-Your previous patch did have some changes to some files under
-arch/arm/mach-mxc and it's good practice to get either Sascha's or Uwe's
-Ack on those changes before they are applied via the regulator tree.
+Russell, Have you had a chance to look at this? Any comments? How do we
+move ahead?
 
-Thanks
-
-Liam
+Thanks,
+Saravana
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
