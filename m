@@ -1,33 +1,91 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 9 Dec 2010 20:09:50 +0100
-Subject: [PATCH] ARM: mx5/mx51_3ds: Add watchdog support
-In-Reply-To: <4D012512.4040709@freescale.com>
-References: <1291917049-8183-1-git-send-email-daiane.angolini@freescale.com>
-	<20101209184242.GY17441@pengutronix.de>
-	<4D012512.4040709@freescale.com>
-Message-ID: <20101209190950.GA17441@pengutronix.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 09 Dec 2010 11:18:54 -0800
+Subject: [PATCH v8 01/11] OMAP: GPIO: prepare for platform driver
+In-Reply-To: <1290689318-10191-2-git-send-email-charu@ti.com> (Charulatha
+	Varadarajan's message of "Thu, 25 Nov 2010 18:18:28 +0530")
+References: <1290689318-10191-1-git-send-email-charu@ti.com>
+	<1290689318-10191-2-git-send-email-charu@ti.com>
+Message-ID: <8762v292ld.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Daiane,
+Hi Charu,
 
-On Thu, Dec 09, 2010 at 04:50:58PM -0200, Daiane Angolini wrote:
-> On 12/09/2010 04:42 PM, Uwe Kleine-K?nig wrote:
->> On Thu, Dec 09, 2010 at 03:50:49PM -0200, Daiane Angolini wrote:
->>> Signed-off-by: Daiane Angolini<daiane.angolini@freescale.com>
->> This is a duplicate of
->>
->> http://mid.gmane.org/1291749285-11406-2-git-send-email-fabio.estevam at freescale.com
-> My patch is for iMX51_3DS board, and Fabio's patch in the link you sent  
-> me is for iMX27_3DS
-You're right, I mixed up the series.  There is another one (
-http://mid.gmane.org/1291660714-16396-1-git-send-email-fabio.estevam at freescale.com
-) for mx51.  I just searched in my mail folder, found 3ds and thought
-this was the mx51 series.
+"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-Sorry and Ack for your patch
-Uwe
+> Prepare for implementing GPIO as a platform driver.
+>
+> Modifies omap_gpio_init() to make use of omap_gpio_chip_init()
+> and omap_gpio_mod_init(). omap_gpio_mod_init() does the module init
+> by clearing the status register and initializing the GPIO control register.
+> omap_gpio_chip_init() initializes the chip request, free, get, set and
+> other function pointers and sets the gpio irq handler.
+>
+> This is only to reorganize the code so that the "omap gpio platform driver
+> implementation patch" looks cleaner and better to review.
+>
+> Signed-off-by: Charulatha V <charu@ti.com>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I just noticed while testing on 36xx/Zoom3 that GPIO wakeups are no
+longer working after this series.
+
+The problem seems to be that for OMAP2+, this series removed manual
+SYSCONFIG register setting in favor of using omap_hwmod (which is good),
+however some of the SYSCONFIG values, specifically, in the current code,
+the ENAWAKEUP bit was set in each bank, but this is no longer the
+default with omap_hwmod.
+
+> -#ifdef CONFIG_ARCH_OMAP2PLUS
+> -		if ((bank->method == METHOD_GPIO_24XX) ||
+> -				(bank->method == METHOD_GPIO_44XX)) {
+> -			static const u32 non_wakeup_gpios[] = {
+> -				0xe203ffc0, 0x08700040
+> -			};
+> -
+> -			if (cpu_is_omap44xx()) {
+> -				__raw_writel(0xffffffff, bank->base +
+> -						OMAP4_GPIO_IRQSTATUSCLR0);
+> -				__raw_writew(0x0015, bank->base +
+> -						OMAP4_GPIO_SYSCONFIG);
+> -				__raw_writel(0x00000000, bank->base +
+> -						 OMAP4_GPIO_DEBOUNCENABLE);
+> -				/*
+> -				 * Initialize interface clock ungated,
+> -				 * module enabled
+> -				 */
+> -				__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
+> -			} else {
+> -				__raw_writel(0x00000000, bank->base +
+> -						OMAP24XX_GPIO_IRQENABLE1);
+> -				__raw_writel(0xffffffff, bank->base +
+> -						OMAP24XX_GPIO_IRQSTATUS1);
+> -				__raw_writew(0x0015, bank->base +
+> -						OMAP24XX_GPIO_SYSCONFIG);
+
+Here bit 2 (ENAWAKEUP) is set, and is not reconfigured anywhere in this
+series.  Same for OMAP4 above.
+
+Here's a quick fix to preserve current functionality (will post
+w/changelog shortly), but it shows that GPIO wakeups were not fully
+tested with this series.  In the future, along with reporting what
+platforms it was testing on, it would be very helpful to include a
+summary of how the series was tested.
+
+Thanks,
+
+Kevin
+
+
+
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index 413de18..05a123f 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -75,6 +75,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		return -EINVAL;
+ 	}
+ 
++	omap_hwmod_enable_wakeup(oh);
+ 	od = omap_device_build(name, id - 1, oh, pdata,
+ 				sizeof(*pdata),	omap_gpio_latency,
+ 				ARRAY_SIZE(omap_gpio_latency),
