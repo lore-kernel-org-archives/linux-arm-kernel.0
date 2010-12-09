@@ -1,129 +1,162 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 9 Dec 2010 23:12:45 +0800
-Subject: [PATCH v2 10/15] ARM: mxs: Add static memory mapping
+Date: Thu, 9 Dec 2010 23:12:49 +0800
+Subject: [PATCH v3 14/15] ARM: mxs: Add initial mx28evk support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1291907569-8925-10-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1291907569-8925-14-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create static memory mapping for MX23 and MX28.
+Add initial mx28evk support with duart and fec0.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
+Changes for v3:
+ - Remove inclusion of hardware.h
+ - Add __initconst for mx28evk_pads[]
+
 Changes for v2:
- - Change the inclusion of hardware.h to mx23.h and mx28.h respectively
- - Remove the call to mxs_iomux_init() and mxs_arch_reset_init() from
-   map_io callback, and turn them into __initcall, as the call here is
-   a little late.
+ - Change function mx28evk_fec_reset() from inline to __init
+ - Enable pll2 clock before phy operation
+ - Add error checking for gpio_direction_output()
+ - Save bytes by passing parameter into pr_err format string
+ - Change mx28_add_fec0() to mx28_add_fec(0)
+ - Remove boot_params
 
- arch/arm/mach-mxs/mm-mx23.c |   45 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mm-mx28.c |   45 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/mm-mx23.c
- create mode 100644 arch/arm/mach-mxs/mm-mx28.c
+ arch/arm/mach-mxs/mach-mx28evk.c |  125 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 125 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
 
-diff --git a/arch/arm/mach-mxs/mm-mx23.c b/arch/arm/mach-mxs/mm-mx23.c
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
 new file mode 100644
-index 0000000..5148cd6
+index 0000000..226d374
 --- /dev/null
-+++ b/arch/arm/mach-mxs/mm-mx23.c
-@@ -0,0 +1,45 @@
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -0,0 +1,125 @@
 +/*
-+ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License.  You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ *
-+ * Create static mapping between physical to virtual memory.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+#include <linux/mm.h>
-+#include <linux/init.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/irq.h>
++#include <linux/clk.h>
 +
-+#include <asm/mach/map.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
 +
-+#include <mach/mx23.h>
 +#include <mach/common.h>
-+#include <mach/iomux.h>
++#include <mach/iomux-mx28.h>
 +
-+/*
-+ * Define the MX23 memory map.
-+ */
-+static struct map_desc mx23_io_desc[] __initdata = {
-+	mxs_map_entry(MX23, OCRAM, MT_DEVICE),
-+	mxs_map_entry(MX23, IO, MT_DEVICE),
++#include "devices-mx28.h"
++#include "gpio.h"
++
++#define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
++#define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
++
++static const iomux_cfg_t mx28evk_pads[] __initconst = {
++	/* duart */
++	MX28_PAD_PWM0__DUART_RX,
++	MX28_PAD_PWM1__DUART_TX,
++
++	/* fec0 */
++	MX28_PAD_ENET0_MDC__ENET0_MDC,
++	MX28_PAD_ENET0_MDIO__ENET0_MDIO,
++	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN,
++	MX28_PAD_ENET0_RXD0__ENET0_RXD0,
++	MX28_PAD_ENET0_RXD1__ENET0_RXD1,
++	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN,
++	MX28_PAD_ENET0_TXD0__ENET0_TXD0,
++	MX28_PAD_ENET0_TXD1__ENET0_TXD1,
++	MX28_PAD_ENET_CLK__ENET_CLK,
++	/* phy power line */
++	MX28_PAD_SSP1_DATA3__GPIO_2_15,
++	/* phy reset line */
++	MX28_PAD_ENET0_RX_CLK__GPIO_4_13,
 +};
 +
-+/*
-+ * This function initializes the memory map. It is called during the
-+ * system startup to create static physical to virtual memory mappings
-+ * for the IO modules.
-+ */
-+void __init mx23_map_io(void)
++/* fec */
++static void __init mx28evk_fec_reset(void)
 +{
-+	iotable_init(mx23_io_desc, ARRAY_SIZE(mx23_io_desc));
++	int ret;
++	struct clk *clk;
++
++	/* Enable fec phy clock */
++	clk = clk_get_sys("pll2", NULL);
++	if (!IS_ERR(clk))
++		clk_enable(clk);
++
++	/* Power up fec phy */
++	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
++	if (ret) {
++		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
++		return;
++	}
++
++	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
++	if (ret) {
++		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
++		return;
++	}
++
++	/* Reset fec phy */
++	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
++	if (ret) {
++		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
++		return;
++	}
++
++	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
++	if (ret) {
++		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
++		return;
++	}
++
++	mdelay(1);
++	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
 +}
 +
-+void __init mx23_init_irq(void)
-+{
-+	icoll_init_irq();
-+	mx23_register_gpios();
-+}
-diff --git a/arch/arm/mach-mxs/mm-mx28.c b/arch/arm/mach-mxs/mm-mx28.c
-new file mode 100644
-index 0000000..7e4cea3
---- /dev/null
-+++ b/arch/arm/mach-mxs/mm-mx28.c
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License.  You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ *
-+ * Create static mapping between physical to virtual memory.
-+ */
-+
-+#include <linux/mm.h>
-+#include <linux/init.h>
-+
-+#include <asm/mach/map.h>
-+
-+#include <mach/mx28.h>
-+#include <mach/common.h>
-+#include <mach/iomux.h>
-+
-+/*
-+ * Define the MX28 memory map.
-+ */
-+static struct map_desc mx28_io_desc[] __initdata = {
-+	mxs_map_entry(MX28, OCRAM, MT_DEVICE),
-+	mxs_map_entry(MX28, IO, MT_DEVICE),
++static const struct fec_platform_data mx28_fec_pdata __initconst = {
++        .phy = PHY_INTERFACE_MODE_RMII,
 +};
 +
-+/*
-+ * This function initializes the memory map. It is called during the
-+ * system startup to create static physical to virtual memory mappings
-+ * for the IO modules.
-+ */
-+void __init mx28_map_io(void)
++static void __init mx28evk_init(void)
 +{
-+	iotable_init(mx28_io_desc, ARRAY_SIZE(mx28_io_desc));
++	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
++
++	mx28_add_duart();
++
++	mx28evk_fec_reset();
++	mx28_add_fec(0, &mx28_fec_pdata);
 +}
 +
-+void __init mx28_init_irq(void)
++static void __init mx28evk_timer_init(void)
 +{
-+	icoll_init_irq();
-+	mx28_register_gpios();
++	mx28_clocks_init();
 +}
++
++static struct sys_timer mx28evk_timer = {
++	.init	= mx28evk_timer_init,
++};
++
++MACHINE_START(MX28EVK, "Freescale MX28 EVK")
++	/* Maintainer: Freescale Semiconductor, Inc. */
++	.map_io         = mx28_map_io,
++	.init_irq       = mx28_init_irq,
++	.init_machine   = mx28evk_init,
++	.timer          = &mx28evk_timer,
++MACHINE_END
 -- 
 1.7.1
