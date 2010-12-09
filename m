@@ -1,41 +1,25 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Thu, 9 Dec 2010 18:04:37 +0800
-Subject: [PATCH v2 09/15] ARM: mxs: Add clock support
-In-Reply-To: <20101209084146.GP17441@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-8-git-send-email-shawn.guo@freescale.com>
-	<20101209084146.GP17441@pengutronix.de>
-Message-ID: <AANLkTimK0=0gvD8WQ1+u7OM==KTKy9_+pPDwb-KhMEd8@mail.gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Thu, 09 Dec 2010 10:07:22 +0000
+Subject: [alsa-devel] [PATCH] ASoC: EP93xx: sampling rate range extended
+In-Reply-To: <1291855429.31916.90.camel@r60e>
+References: <1291809693.31916.2.camel@r60e>
+	<20101208124637.GD16418@rakim.wolfsonmicro.main>
+	<1291855429.31916.90.camel@r60e>
+Message-ID: <1291889242.3271.19.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Thu, 2010-12-09 at 03:43 +0300, Alexander wrote:
+> From: Alexander Sverdlin <subaparts@yandex.ru>
+> 
+> Changes to both I2S and PCM code:
+> - Rates list extended up to 96kHz, it's tested on EDB9302 and works for both capture and
+>   playback.
+> 
+> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
 
-2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Shawn,
->
->> +static unsigned long name##_get_rate(struct clk *clk) ? ? ? ? ? ? ? ? ? ? ? ?\
->> +{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? unsigned long parent_rate; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? u32 reg, div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##sr); ? ? ? ? \
->> + ? ? div = (reg >> BP_CLKCTRL_##sr##_##ss##FRAC) & 0x3f; ? ? ? ? ? ? \
->> + ? ? parent_rate = clk_get_rate(clk->parent); ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? return parent_rate / 1000 * 18 / div * 1000; ? ? ? ? ? ? ? ? ? ?\
->> +}
-> 1000 isn't the most clever choice. ?It might be for a human, but not for
-> a machine.
->
-> I'd suggest (untested):
->
-> ? ? ? ?return SH_DIV((parent_rate >> 8) * 18, div, 8);
->
-> (don't know if 8 is a good value). ?What is the range of div here?
->
-The div range is 18 ~ 35.
-
+Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
 -- 
-Regards,
-Shawn
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
