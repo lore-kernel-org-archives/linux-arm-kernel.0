@@ -1,179 +1,105 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  9 Dec 2010 15:10:47 -0800
-Subject: [PATCH] OMAP2+: omap_hwmod: fix wakeup enable/disable for consistency
-Message-ID: <1291936247-17955-1-git-send-email-khilman@deeprootsystems.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 10 Dec 2010 00:16:33 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+	<1291899120.29292.7.camel@twins>
+	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+	<1291917330.6803.7.camel@twins>
+	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
+	<1291920939.6803.38.camel@twins>
+	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+Message-ID: <1291936593.13513.3.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the omap_hwmod core, most of the SYSCONFIG register helper
-functions do not directly write the register, but instead just modify
-a value passed in.
+On Thu, 2010-12-09 at 14:21 -0800, Venkatesh Pallipadi wrote:
+> This should mostly work. There would be a small window there on
+> rq->clock=sched_clock_cpu() and system_vtime doing sched_clock_cpu()
+> and also the overhead of doing this everytime when this going
+> backwards may happen rarely. 
 
-This patch converts the _enable_wakeup() and _disable_wakeup() helper
-functions to take a value argument and only modify it instead of
-actually writing the register.  This makes the wakeup helpers
-consistent with the other helper functions and avoids unintentional
-problems like the following.
+Right, so something like the below removes that tiny race by re-using
+rq->clock as now. It also removes some overhead by removing the IRQ
+fudging (we already know IRQs are disabled).
 
-This problem was found after discovering that GPIO wakeups were no
-longer functional.  The root cause was that the ENAWAKEUP bit of the
-SYSCONFIG register was being unintentionaly overwritten, leaving
-wakeups disabled after the following two commits were combined:
+It does have a few extra branches (2 afaict) than your monotonicity path
+had, but it seems to me this approach is slightly more accurate.
 
-commit: 9980ce53c97392a3dbdc9d1ac3e455d79b4167ed
-        OMAP: hwmod: Enable module wakeup if in smartidle
-
-commit: 78f26e872f77b6312273216de1a8f836c6f2e143
-        OMAP: hwmod: Set autoidle after smartidle during _sysc_enable
-
-There resulting in code in _enable_sysc() was this:
-
-	/*
-	 * XXX The clock framework should handle this, by
-	 * calling into this code.  But this must wait until the
-	 * clock structures are tagged with omap_hwmod entries
-	 */
-	if ((oh->flags & HWMOD_SET_DEFAULT_CLOCKACT) &&
-	    (sf & SYSC_HAS_CLOCKACTIVITY))
-		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
-
-	_write_sysconfig(v, oh);
-
-so here, 'v' has wakeups disabled.
-
-	/* If slave is in SMARTIDLE, also enable wakeup */
-	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
-		_enable_wakeup(oh);
-
-Here wakeup is enabled in the SYSCONFIG register (but 'v' is not updated)
-
-	/*
-	 * Set the autoidle bit only after setting the smartidle bit
-	 * Setting this will not have any impact on the other modules.
-	 */
-	if (sf & SYSC_HAS_AUTOIDLE) {
-		idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
-			0 : 1;
-		_set_module_autoidle(oh, idlemode, &v);
-		_write_sysconfig(v, oh);
-	}
-
-And here, SYSCONFIG is updated again using 'v', which does not have
-wakeups enabled, resulting in ENAWAKEUP being cleared.
-
-Special thanks to Benoit Cousson for pointing out that wakeups were
-supposed to be automatically enabled when a hwmod is enabled, and thus
-helping target the root cause of this problem.
-
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
-Applies on top of Paul's hwmod_a_2.6.38 branch.
-
- arch/arm/mach-omap2/omap_hwmod.c |   32 +++++++++++++++++---------------
- 1 files changed, 17 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index a039b37..84a03eb 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -388,9 +388,9 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
-  * Allow the hardware module @oh to send wakeups.  Returns -EINVAL
-  * upon error or 0 upon success.
-  */
--static int _enable_wakeup(struct omap_hwmod *oh)
-+static int _enable_wakeup(struct omap_hwmod *oh, u32 *v)
+Index: linux-2.6/kernel/sched.c
+===================================================================
+--- linux-2.6.orig/kernel/sched.c
++++ linux-2.6/kernel/sched.c
+@@ -1813,19 +1813,10 @@ void disable_sched_clock_irqtime(void)
+ 	sched_clock_irqtime = 0;
+ }
+ 
+-void account_system_vtime(struct task_struct *curr)
++static void __account_system_vtime(int cpu, u64 now)
  {
--	u32 v, wakeup_mask;
-+	u32 wakeup_mask;
+-	unsigned long flags;
+-	int cpu;
+-	u64 now, delta;
++	s64 delta;
  
- 	if (!oh->class->sysc ||
- 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
-@@ -403,9 +403,7 @@ static int _enable_wakeup(struct omap_hwmod *oh)
- 
- 	wakeup_mask = (0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
- 
--	v = oh->_sysc_cache;
--	v |= wakeup_mask;
--	_write_sysconfig(v, oh);
-+	*v |= wakeup_mask;
- 
- 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
- 
-@@ -421,9 +419,9 @@ static int _enable_wakeup(struct omap_hwmod *oh)
-  * Prevent the hardware module @oh to send wakeups.  Returns -EINVAL
-  * upon error or 0 upon success.
-  */
--static int _disable_wakeup(struct omap_hwmod *oh)
-+static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
- {
--	u32 v, wakeup_mask;
-+	u32 wakeup_mask;
- 
- 	if (!oh->class->sysc ||
- 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
-@@ -436,9 +434,7 @@ static int _disable_wakeup(struct omap_hwmod *oh)
- 
- 	wakeup_mask = (0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
- 
--	v = oh->_sysc_cache;
--	v &= ~wakeup_mask;
--	_write_sysconfig(v, oh);
-+	*v &= ~wakeup_mask;
- 
- 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
- 
-@@ -786,11 +782,11 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 	    (sf & SYSC_HAS_CLOCKACTIVITY))
- 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
- 
--	_write_sysconfig(v, oh);
+-	if (!sched_clock_irqtime)
+-		return;
 -
- 	/* If slave is in SMARTIDLE, also enable wakeup */
- 	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
--		_enable_wakeup(oh);
-+		_enable_wakeup(oh, &v);
-+
-+	_write_sysconfig(v, oh);
- 
+-	local_irq_save(flags);
+-
+-	cpu = smp_processor_id();
+-	now = sched_clock_cpu(cpu);
+ 	delta = now - per_cpu(irq_start_time, cpu);
+ 	per_cpu(irq_start_time, cpu) = now;
  	/*
- 	 * Set the autoidle bit only after setting the smartidle bit
-@@ -2009,13 +2005,16 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
- int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+@@ -1836,16 +1827,36 @@ void account_system_vtime(struct task_st
+ 	 */
+ 	if (hardirq_count())
+ 		per_cpu(cpu_hardirq_time, cpu) += delta;
+-	else if (in_serving_softirq() && !(curr->flags & PF_KSOFTIRQD))
++	else if (in_serving_softirq() && !(current->flags & PF_KSOFTIRQD))
+ 		per_cpu(cpu_softirq_time, cpu) += delta;
++}
++
++void account_system_vtime(struct task_struct *curr)
++{
++	unsigned long flags;
++	u64 now;
++	int cpu;
++
++	if (!sched_clock_irqtime)
++		return;
++
++	local_irq_save(flags);
++
++	cpu = smp_processor_id();
++	now = sched_clock_cpu(cpu);
++	__account_system_vtime(cpu, now);
+ 
+ 	local_irq_restore(flags);
+ }
+ EXPORT_SYMBOL_GPL(account_system_vtime);
+ 
+-static u64 irq_time_cpu(int cpu)
++static u64 irq_time_cpu(struct rq *rq)
  {
- 	unsigned long flags;
-+	u32 v;
+-	account_system_vtime(current);
++	int cpu = cpu_of(rq);
++
++	if (sched_clock_irqtime)
++		__account_system_vtime(cpu, rq->clock);
++
+ 	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
+ }
  
- 	if (!oh->class->sysc ||
- 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
- 
- 	spin_lock_irqsave(&oh->_lock, flags);
--	_enable_wakeup(oh);
-+	v = oh->_sysc_cache;
-+	_enable_wakeup(oh, &v);
-+	_write_sysconfig(v, oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
-@@ -2036,13 +2035,16 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+@@ -1853,7 +1864,7 @@ static void update_rq_clock_task(struct
  {
- 	unsigned long flags;
-+	u32 v;
+ 	s64 irq_delta;
  
- 	if (!oh->class->sysc ||
- 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
+-	irq_delta = irq_time_cpu(cpu_of(rq)) - rq->prev_irq_time;
++	irq_delta = irq_time_cpu(rq) - rq->prev_irq_time;
+ 	rq->prev_irq_time += irq_delta;
  
- 	spin_lock_irqsave(&oh->_lock, flags);
--	_disable_wakeup(oh);
-+	v = oh->_sysc_cache;
-+	_disable_wakeup(oh, &v);
-+	_write_sysconfig(v, oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
--- 
-1.7.2.1
+ 	delta -= irq_delta;
