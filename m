@@ -1,78 +1,33 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Thu, 9 Dec 2010 19:01:10 +0000
-Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
-	omap_i2c
-In-Reply-To: <878vzydgxr.fsf@deeprootsystems.com>
-References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
-	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
-	<878vzydgxr.fsf@deeprootsystems.com>
-Message-ID: <20101209190110.GR20097@trinity.fluff.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 9 Dec 2010 20:09:50 +0100
+Subject: [PATCH] ARM: mx5/mx51_3ds: Add watchdog support
+In-Reply-To: <4D012512.4040709@freescale.com>
+References: <1291917049-8183-1-git-send-email-daiane.angolini@freescale.com>
+	<20101209184242.GY17441@pengutronix.de>
+	<4D012512.4040709@freescale.com>
+Message-ID: <20101209190950.GA17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 08:55:28AM -0800, Kevin Hilman wrote:
-> Ben,
-> 
-> > The convention for omap device naming is omap_XXX.
-> >
-> > Rename the device and driver name in order to stick
-> > to this naming convention.
+Hallo Daiane,
 
-Renaming stuff like this is going to have an impact on the userspace
-as anyone looking through /sys's driver heirarchy is going to miss the
-old name... 
+On Thu, Dec 09, 2010 at 04:50:58PM -0200, Daiane Angolini wrote:
+> On 12/09/2010 04:42 PM, Uwe Kleine-K?nig wrote:
+>> On Thu, Dec 09, 2010 at 03:50:49PM -0200, Daiane Angolini wrote:
+>>> Signed-off-by: Daiane Angolini<daiane.angolini@freescale.com>
+>> This is a duplicate of
+>>
+>> http://mid.gmane.org/1291749285-11406-2-git-send-email-fabio.estevam at freescale.com
+> My patch is for iMX51_3DS board, and Fabio's patch in the link you sent  
+> me is for iMX27_3DS
+You're right, I mixed up the series.  There is another one (
+http://mid.gmane.org/1291660714-16396-1-git-send-email-fabio.estevam at freescale.com
+) for mx51.  I just searched in my mail folder, found 3ds and thought
+this was the mx51 series.
 
-It all depends if you really want to go ahead with this...
-
-> > Change device name in clock nodes as well.
-> >
-> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> > c: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> > Cc: Rajendra Nayak <rnayak@ti.com>
-> > Cc: Ben Dooks <ben-i2c@fluff.org>
-> > ---
-> >  arch/arm/mach-omap1/clock_data.c     |    6 +++---
-> >  arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
-> >  arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
-> >  arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
-> >  arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
-> >  arch/arm/plat-omap/i2c.c             |    2 +-
-> >  drivers/i2c/busses/i2c-omap.c        |    4 ++--
-> >  7 files changed, 28 insertions(+), 28 deletions(-)
-> 
-> [...]
-> 
-> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> > index 760b8be..9d09083 100644
-> > --- a/drivers/i2c/busses/i2c-omap.c
-> > +++ b/drivers/i2c/busses/i2c-omap.c
-> > @@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
-> >  	.probe		= omap_i2c_probe,
-> >  	.remove		= omap_i2c_remove,
-> >  	.driver		= {
-> > -		.name	= "i2c_omap",
-> > +		.name	= "omap_i2c",
-> >  		.owner	= THIS_MODULE,
-> >  	},
-> >  };
-> > @@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
-> >  MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
-> >  MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
-> >  MODULE_LICENSE("GPL");
-> > -MODULE_ALIAS("platform:i2c_omap");
-> > +MODULE_ALIAS("platform:omap_i2c");
-> 
-> With your ack for the name change in the driver, we can merge this
-> through the OMAP tree with the other core changes.
-> 
-> Thanks,
-> 
-> Kevin
-> 
+Sorry and Ack for your patch
+Uwe
 
 -- 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
