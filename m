@@ -1,28 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 9 Dec 2010 15:34:45 +0100
-Subject: [PATCH 2/9] ARM i.MX51: rename IPU irqs
-In-Reply-To: <1291902441-24712-3-git-send-email-s.hauer@pengutronix.de>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20101209143445.GX17441@pengutronix.de>
+From: sundar.iyer@stericsson.com (Sundar R IYER)
+Date: Thu, 9 Dec 2010 15:35:05 +0100
+Subject: [PATCH 01/20] mfd/ab8500: remove spi support
+In-Reply-To: <20101209142912.GM8884@sortiz-mobl>
+References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
+	<1291388753-14662-2-git-send-email-sundar.iyer@stericsson.com>
+	<20101209142912.GM8884@sortiz-mobl>
+Message-ID: <33A307AF30D7BF4F811B1568FE7A9B18047C7D405F@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 02:47:14PM +0100, Sascha Hauer wrote:
-> -#define MX51_MXC_INT_IPU_ERR		10
-> -#define MX51_MXC_INT_IPU_SYN		11
-> +#define MX51_INT_IPU_ERR		10
-> +#define MX51_INT_IPU_SYN		11
-This one is easy.  Acked-by: me.  Maybe it's worth to do
+Hi Sam,
 
-	git ls-files | xargs perl -p -i -e 's/\bMX51_MXC_INT_/MX51_INT_/
+[pruning up the CC list]
 
-and then fix up the layout damage.
+>-----Original Message-----
+>From: Samuel Ortiz [mailto:sameo at linux.intel.com]
+>
+>> Since the Ab8500 v1.0, the SPI support is deprecated on the HW.
+>I'm fine with that, but you really don't want to be able to support pre 1.0
+>devices ?
 
-Best regards
-Uwe
+AFAIK, there aren't active pieces of those outside STE :) and it is accepted
+that we drop the support for them.
 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers!
