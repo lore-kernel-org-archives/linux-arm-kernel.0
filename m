@@ -1,81 +1,52 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Thu, 9 Dec 2010 01:23:24 -0800 (PST)
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <4CFDD297.4020600@codeaurora.org>
-References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
-	<20101202221909.GK29347@n2100.arm.linux.org.uk>
-	<4CF94DDD.8000409@codeaurora.org>
-	<20101203203653.GB10245@n2100.arm.linux.org.uk>
-	<4CFDD297.4020600@codeaurora.org>
-Message-ID: <15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 9 Dec 2010 10:37:46 +0100
+Subject: [PATCH v2 14/15] ARM: mxs: Add initial mx28evk support
+In-Reply-To: <AANLkTin3-f7x2BXS=zTYYw+uWiu9UYG8sPWdQXWcxpxn@mail.gmail.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
+	<20101208202822.GD17441@pengutronix.de>
+	<AANLkTiny2P3RobZfq_G_OPHu_SLjZ2w9CFhU7HgL3VPx@mail.gmail.com>
+	<20101209083237.GO17441@pengutronix.de>
+	<AANLkTin3-f7x2BXS=zTYYw+uWiu9UYG8sPWdQXWcxpxn@mail.gmail.com>
+Message-ID: <20101209093746.GU17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Shawn
+On Thu, Dec 09, 2010 at 05:03:54PM +0800, Shawn Guo wrote:
+> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > Hello Shwan,
+ups, sorry for mistyping your name.
 
-> Russell King - ARM Linux wrote:
->> On Fri, Dec 03, 2010 at 12:06:53PM -0800, Saravana Kannan wrote:
->>> The MSM8660 SoC uses the TrustZone technology and the Linux kernel
->>> executes in normal/non-secure domain. When the second core is brought
->>> out of reset, it starts executing a secure image which then jumps to
->>> "secondary_startup". So, before bringing the second core out of reset,
->>> we need to inform the secure domain code where secondary_startup is
->>> located in memory.
->>>
->>> We do the communication with the secure code by using buffers in
->>> memory.
->>>  The cache treats the NS (non secure) bit as an additional address bit
->>> when tagging memory. Hence, cache accesses are not coherent between the
->>> secure and non-secure domains. So, the secure side flushes it's cache
->>> after writing to the buffer. To properly read the response from the
->>> secure side, the kernel has to pick a buffer that isn't cacheable in
->>> the
->>> first place. We have similar issues in the reverse direction.
->>
->> So when ARM gets DMA-coherent caches, you of course aren't going to
->> complain that the DMA APIs start avoiding doing the current tricks with
->> non-cacheable memory?
->>
->> I view what you're doing above with the DMA API as an abuse of the API.
->> Just like the problems we're facing with ioremap() being used on system
->> RAM, you're asking for problems when the ARM architecture changes
->> because
->> you're using an API for it's current properties, not for its purpose.
->
-> You are right. Thanks for catching this.
->
-> So, that basically leaves us with these options:
-> * Create another API to allow getting uncached pages. I don't think we
-> will be the first or the last to want uncached pages. Even if ARM
-> introduces DMA-coherent caches, it's  possible for SoC vendors to have
-> other h/w blocks that could directly operate on memory. The cache might
-> not be coherent with these h/w blocks.
-> * Add a cache invalidate API that's outside the DMA APIs and can be used
->   when needed.
->
-> Do one of the above two options sound reasonable to you?
->
->> I've been on for years about purpose-designed APIs for cache issues,
->> and every time someone abuses them, they eventually end up suffering
->> breakage.
->>
->> Let's wait until the full set of patches is available before discussing
->> further.
->
-> Jeff Ohlstein sent out a series of patches ([PATCH 0/5] SMP support for
-> msm). The patch that deals with talking to the secure domain code is
-> titled "[PATCH 2/5] msm: scm-boot: Support for setting cold/warm boot
-> addresses". I see that you replied to an email on that, but it's not
-> clear if you connected that patch with this thread.
->
-> Thanks,
-> Saravana
->
+> > On Thu, Dec 09, 2010 at 03:04:37PM +0800, Shawn Guo wrote:
+> >> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> >> > On Wed, Dec 08, 2010 at 12:32:02AM +0800, Shawn Guo wrote:
+> >> >> +static iomux_cfg_t mx28evk_pads[] = {
+> >> > This can be const and __initconst, ditto for mx23evk
+> >> >
+> >> With u64 iomux_cfg_t changes, I'm afraid the suggestion becomes invalid.
+> > Really? Why?
+> >
+> I'm confused by the compiling error below when adding __initconst for
+> mx28evk_pads[], and mistakenly blaming u64 iomux_cfg_t changes.
+> 
+> arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
+> arch/arm/mach-mxs/mach-mx28evk.c:34: error: mx28_fec_pdata causes a
+> section type conflict
+> make[1]: *** [arch/arm/mach-mxs/mach-mx28evk.o] Error 1
+> make: *** [arch/arm/mach-mxs] Error 2
+> 
+> Actually it can be fixed by the following change.
+> 
+> -static const struct fec_platform_data mx28_fec_pdata __initconst = {
+> +static struct fec_platform_data mx28_fec_pdata __initconst = {
+>          .phy = PHY_INTERFACE_MODE_RMII,
+>  };
+this change is wrong.  You need to assert that all data being marked
+with __initconst is const, too.
 
-Russell, Have you had a chance to look at this? Any comments? How do we
-move ahead?
+Uwe
 
-Thanks,
-Saravana
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
