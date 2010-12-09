@@ -1,105 +1,47 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 10 Dec 2010 00:16:33 +0100
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
-References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-	<1291851079-27061-1-git-send-email-venki@google.com>
-	<1291899120.29292.7.camel@twins>
-	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
-	<1291917330.6803.7.camel@twins>
-	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
-	<1291920939.6803.38.camel@twins>
-	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
-Message-ID: <1291936593.13513.3.camel@laptop>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 09 Dec 2010 15:19:04 -0800
+Subject: [PATCH v8 01/11] OMAP: GPIO: prepare for platform driver
+In-Reply-To: <8762v292ld.fsf@deeprootsystems.com> (Kevin Hilman's message of
+	"Thu, 09 Dec 2010 11:18:54 -0800")
+References: <1290689318-10191-1-git-send-email-charu@ti.com>
+	<1290689318-10191-2-git-send-email-charu@ti.com>
+	<8762v292ld.fsf@deeprootsystems.com>
+Message-ID: <87aake5yc7.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-09 at 14:21 -0800, Venkatesh Pallipadi wrote:
-> This should mostly work. There would be a small window there on
-> rq->clock=sched_clock_cpu() and system_vtime doing sched_clock_cpu()
-> and also the overhead of doing this everytime when this going
-> backwards may happen rarely. 
+Hi Charu,
 
-Right, so something like the below removes that tiny race by re-using
-rq->clock as now. It also removes some overhead by removing the IRQ
-fudging (we already know IRQs are disabled).
+I owe you an apology.
 
-It does have a few extra branches (2 afaict) than your monotonicity path
-had, but it seems to me this approach is slightly more accurate.
+Kevin Hilman <khilman@deeprootsystems.com> writes:
 
----
-Index: linux-2.6/kernel/sched.c
-===================================================================
---- linux-2.6.orig/kernel/sched.c
-+++ linux-2.6/kernel/sched.c
-@@ -1813,19 +1813,10 @@ void disable_sched_clock_irqtime(void)
- 	sched_clock_irqtime = 0;
- }
- 
--void account_system_vtime(struct task_struct *curr)
-+static void __account_system_vtime(int cpu, u64 now)
- {
--	unsigned long flags;
--	int cpu;
--	u64 now, delta;
-+	s64 delta;
- 
--	if (!sched_clock_irqtime)
--		return;
--
--	local_irq_save(flags);
--
--	cpu = smp_processor_id();
--	now = sched_clock_cpu(cpu);
- 	delta = now - per_cpu(irq_start_time, cpu);
- 	per_cpu(irq_start_time, cpu) = now;
- 	/*
-@@ -1836,16 +1827,36 @@ void account_system_vtime(struct task_st
- 	 */
- 	if (hardirq_count())
- 		per_cpu(cpu_hardirq_time, cpu) += delta;
--	else if (in_serving_softirq() && !(curr->flags & PF_KSOFTIRQD))
-+	else if (in_serving_softirq() && !(current->flags & PF_KSOFTIRQD))
- 		per_cpu(cpu_softirq_time, cpu) += delta;
-+}
-+
-+void account_system_vtime(struct task_struct *curr)
-+{
-+	unsigned long flags;
-+	u64 now;
-+	int cpu;
-+
-+	if (!sched_clock_irqtime)
-+		return;
-+
-+	local_irq_save(flags);
-+
-+	cpu = smp_processor_id();
-+	now = sched_clock_cpu(cpu);
-+	__account_system_vtime(cpu, now);
- 
- 	local_irq_restore(flags);
- }
- EXPORT_SYMBOL_GPL(account_system_vtime);
- 
--static u64 irq_time_cpu(int cpu)
-+static u64 irq_time_cpu(struct rq *rq)
- {
--	account_system_vtime(current);
-+	int cpu = cpu_of(rq);
-+
-+	if (sched_clock_irqtime)
-+		__account_system_vtime(cpu, rq->clock);
-+
- 	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
- }
- 
-@@ -1853,7 +1864,7 @@ static void update_rq_clock_task(struct
- {
- 	s64 irq_delta;
- 
--	irq_delta = irq_time_cpu(cpu_of(rq)) - rq->prev_irq_time;
-+	irq_delta = irq_time_cpu(rq) - rq->prev_irq_time;
- 	rq->prev_irq_time += irq_delta;
- 
- 	delta -= irq_delta;
+[...]
+
+> I just noticed while testing on 36xx/Zoom3 that GPIO wakeups are no
+> longer working after this series.
+>
+> The problem seems to be that for OMAP2+, this series removed manual
+> SYSCONFIG register setting in favor of using omap_hwmod (which is good),
+> however some of the SYSCONFIG values, specifically, in the current code,
+> the ENAWAKEUP bit was set in each bank, but this is no longer the
+> default with omap_hwmod.
+
+I was wrong here.  The enable wakeup mode was supposed to be enabled by
+default in the hwmod, but due to a bug[1], it was not.  This problem was
+not directly related to your series.
+
+[...]
+
+> ... but it shows that GPIO wakeups were not fully
+> tested with this series.  In the future, along with reporting what
+> platforms it was testing on, it would be very helpful to include a
+> summary of how the series was tested.
+
+I apologize for accusing you of not testing GPIO wakeups.  I now know
+that this functionality was broken by patches independent of your
+series, so I deeply regret the accusation.
+
+Kevin
+
+[1] http://marc.info/?l=linux-omap&m=129193625420446&w=2
