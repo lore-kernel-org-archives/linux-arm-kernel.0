@@ -1,56 +1,40 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 09 Dec 2010 08:56:20 -0800
-Subject: [PATCH v2 0/2] OMAP: I2C and UART device name cleanup
-In-Reply-To: <1291904657-32729-1-git-send-email-b-cousson@ti.com> (Benoit
-	Cousson's message of "Thu, 9 Dec 2010 15:24:15 +0100")
-References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
-Message-ID: <874oamdgwb.fsf@deeprootsystems.com>
+From: vbarshak@mvista.com (Valentine Barshak)
+Date: Thu, 09 Dec 2010 20:04:44 +0300
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
+	RWFO fix
+In-Reply-To: <AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
+References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>	<20101124183936.GA18796@mvista.com>
+	<AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
+Message-ID: <4D010C2C.2050900@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit Cousson <b-cousson@ti.com> writes:
+Catalin Marinas wrote:
+> On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
+>   
+>> Updated according to the comments to avoid r/w outside the buffer and
+>> used byte r/w for the possible unaligned data. Seems to work fine.
+>>
+>> Cache ownership must be acqired by reading/writing data from the
+>> cache line to make cache operation have the desired effect on the
+>> SMP MPCore CPU. However, the ownership is never aquired in the
+>> v6_dma_inv_range function when cleaning the first line and
+>> flushing the last one, in case the address is not aligned
+>> to D_CACHE_LINE_SIZE boundary.
+>> Fix this by reading/writing data if needed, before performing
+>> cache operations.
+>> While at it, fix v6_dma_flush_range to prevent RWFO outside
+>> the buffer.
+>>
+>> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+>> Signed-off-by: George G. Davis <gdavis@mvista.com>
+>>     
+>
+> I eventually found a bit of time to look at this. The patch looks fine to me:
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>   
+Thanks!
 
-> Hi All,
->
-> In order to enforce a little bit of consistency in the omap devices name,
-> the convention for omap devices name will be now omap_xxx. All the drivers
-> adapted to hwmod will be named like that during the on-going adaptations.
->
-> The I2C and UART drivers are already adapted to hwmod but with
-> the originals name.
->
-> Rename i2c and uart using this convention:
-> i2c_omap -> omap_i2c
-> omap-hsuart -> omap_uart
->
-> Tested on OMAP4 ES2 on Panda / sdp4430. Some more validation will be needed on OMAP2 & 3.
->
-> This series is based on Kevin's pm-hwmod-i2c branch and is available here:
-> git://gitorious.org/omap-pm/linux.git for_2.6.38/device_name
-
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
-
-> Regards,
-> Benoit
->
->
-> v1
->     http://www.spinics.net/lists/linux-omap/msg41474.html
->     
->     Merge previous patch #1 and #2 as suggested by Kevin to change the driver name 
->     at the same time with the device name in the clockdev.
->
->
-> Benoit Cousson (2):
->   I2C: i2c-omap: Change device name: i2c_omap -> omap_i2c
->   OMAP: serial: Change device name: omap-hsuart -> omap_uart
->
->  arch/arm/mach-omap1/clock_data.c              |    6 +++---
->  arch/arm/mach-omap2/clock2420_data.c          |    8 ++++----
->  arch/arm/mach-omap2/clock2430_data.c          |    8 ++++----
->  arch/arm/mach-omap2/clock3xxx_data.c          |   12 ++++++------
->  arch/arm/mach-omap2/clock44xx_data.c          |   16 ++++++++--------
->  arch/arm/plat-omap/i2c.c                      |    2 +-
->  arch/arm/plat-omap/include/plat/omap-serial.h |    2 +-
->  drivers/i2c/busses/i2c-omap.c                 |    4 ++--
->  8 files changed, 29 insertions(+), 29 deletions(-)
+Regards,
+Val.
