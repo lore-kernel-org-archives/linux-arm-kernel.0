@@ -1,15 +1,17 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 9 Dec 2010 10:08:08 +0100
-Subject: [PATCH 1/9] ux500: fix uncompressor UART address for U5500
-In-Reply-To: <1291786681-8664-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1291786681-8664-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <AANLkTim3S22BSEUU336CCXUvEViTZ06qZbVMq0uf9V78@mail.gmail.com>
+Date: Thu, 9 Dec 2010 10:09:01 +0100
+Subject: [PATCH 1/2] arm: ux500: Add prcmu support for operating points
+In-Reply-To: <1291817608-29071-1-git-send-email-martin.persson@stericsson.com>
+References: <1291817608-29071-1-git-send-email-martin.persson@stericsson.com>
+Message-ID: <AANLkTi=MdMd+-OXVZaf8jPyea7g9Ep=PnntXSG9xPDpW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've picked patches 1 thru 4 in this patch set to ux500-core and
--next testing, need 5 thru 9 to be rebased, maybe I will be able to
-do that maybe not (#5 looks hairy, I could use some help).
+2010/12/8 Martin Persson <martin.persson@stericsson.com>:
+
+> Adds support in PRCMU driver to handle CPU and APE operating points.
+
+I've picked these into ux500-core for testing in -next.
 
 Yours,
 Linus Walleij
