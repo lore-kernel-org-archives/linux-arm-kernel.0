@@ -1,43 +1,57 @@
 From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu, 9 Dec 2010 15:28:42 +0800
-Subject: [PATCH 1/6] ARM: mx5: use config to define boot related addresses
-In-Reply-To: <20101209070411.GH17441@pengutronix.de>
+Date: Thu, 9 Dec 2010 15:52:01 +0800
+Subject: [PATCH 4/6] arm: mx5: always use __mxc_cpu_type to check cpu type
+In-Reply-To: <20101209071026.GI17441@pengutronix.de>
 References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
-	<20101209070411.GH17441@pengutronix.de>
-Message-ID: <AANLkTikfenirotizODPEDj0Qg7X5wu5k_-18LWpLRQgJ@mail.gmail.com>
+	<1291903716-31388-4-git-send-email-richard.zhao@freescale.com>
+	<20101209071026.GI17441@pengutronix.de>
+Message-ID: <AANLkTinOu0GHKTRJCB0Yn11QjN8ZoiCp9ZmAUTtDAJkZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
->
-> On Thu, Dec 09, 2010 at 10:08:31PM +0800, Richard Zhao wrote:
->> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> ---
->> This series of patch support mx50 reference design board. I've tested it using
->> initramfs on the board.
->>
->> ?arch/arm/mach-mx5/Makefile.boot | ? ?6 +++---
->> ?1 files changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
->> index 9939a19..388d2e8 100644
->> --- a/arch/arm/mach-mx5/Makefile.boot
->> +++ b/arch/arm/mach-mx5/Makefile.boot
->> @@ -1,3 +1,3 @@
->> - ? zreladdr-y ? ? ? ?:= 0x90008000
->> -params_phys-y ? ? ? ?:= 0x90000100
->> -initrd_phys-y ? ? ? ?:= 0x90800000
->> + ? zreladdr-$(CONFIG_SOC_IMX51) ? ? ?:= 0x90008000
->> +params_phys-$(CONFIG_SOC_IMX51) ? ? ?:= 0x90000100
->> +initrd_phys-$(CONFIG_SOC_IMX51) ? ? ?:= 0x90800000
-> That is one of the places that is not multi-soc capable. ?You can make
-> it 66% less worse by just removing params_phys and initrd_phys.
-Yes. Thanks!
+> On Thu, Dec 09, 2010 at 10:08:34PM +0800, Richard Zhao wrote:
+>> Every SoC in mach-mx5 calls mxc_set_cpu_type to set cpu type.
+> I don't like that. ?Your change makes the usage of cpu_is_mx51() for
+> single-machine builds more expensive.
+You're right. I'll add the below like other SoCs:
+#ifdef CONFIG_SOC_IMX51
+..
+#else
+# define cpu_is_mx51()          (mxc_cpu_type == MXC_CPU_MX51)
+#endif
 
+can I remove cpu_is_mx53 definition?  because CONFIG_SOC_IMX53 is
+undefined yet. Dinh can add it back when he send out other commits.
+
+Thanks
 Richard
 >
-> Best regards
+>>
+>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> ---
+>> ?arch/arm/plat-mxc/include/mach/mxc.h | ? ?4 +---
+>> ?1 files changed, 1 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+>> index 4abbdd1..04afa33 100644
+>> --- a/arch/arm/plat-mxc/include/mach/mxc.h
+>> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
+>> @@ -129,10 +129,8 @@ extern unsigned int __mxc_cpu_type;
+>> ?#ifdef CONFIG_ARCH_MX5
+>> ?# ifdef mxc_cpu_type
+>> ?# ?undef mxc_cpu_type
+>> -# ?define mxc_cpu_type __mxc_cpu_type
+>> -# else
+>> -# ?define mxc_cpu_type MXC_CPU_MX51
+>> ?# endif
+>> +# define mxc_cpu_type __mxc_cpu_type
+>> ?# define cpu_is_mx51() ? ? ? ? ? ? ? (mxc_cpu_type == MXC_CPU_MX51)
+>> ?# define cpu_is_mx53() ? ? ? ? ? ? ? (mxc_cpu_type == MXC_CPU_MX53)
+>> ?#else
+> Here is a bug. ?cpu_is_mx53 will never be true for a mx5-only build.
+> (That is currently always true for images supporting mx5.)
+>
 > Uwe
 >
 > --
