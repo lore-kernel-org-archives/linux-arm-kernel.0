@@ -1,38 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Dec 2010 08:44:30 +0000
-Subject: [PATCH 1/6] ARM: mx5: use config to define boot related addresses
-In-Reply-To: <20101209070411.GH17441@pengutronix.de>
-References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
-	<20101209070411.GH17441@pengutronix.de>
-Message-ID: <20101209084430.GS9777@n2100.arm.linux.org.uk>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 9 Dec 2010 16:51:08 +0800
+Subject: [PATCH v3 03/15] ARM: mxs: Add reset routines
+In-Reply-To: <20101208203148.GE17441@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-2-git-send-email-shawn.guo@freescale.com>
+	<19711.13516.842225.349704@ipc1.ka-ro>
+	<20101208203148.GE17441@pengutronix.de>
+Message-ID: <AANLkTikQh4oGOo+mx8MZyBxuPfMJQA2mMQKjY-yCGQ4M@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 08:04:11AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Thu, Dec 09, 2010 at 10:08:31PM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> > This series of patch support mx50 reference design board. I've tested it using
-> > initramfs on the board.
-> > 
-> >  arch/arm/mach-mx5/Makefile.boot |    6 +++---
-> >  1 files changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
-> > index 9939a19..388d2e8 100644
-> > --- a/arch/arm/mach-mx5/Makefile.boot
-> > +++ b/arch/arm/mach-mx5/Makefile.boot
-> > @@ -1,3 +1,3 @@
-> > -   zreladdr-y	:= 0x90008000
-> > -params_phys-y	:= 0x90000100
-> > -initrd_phys-y	:= 0x90800000
-> > +   zreladdr-$(CONFIG_SOC_IMX51)	:= 0x90008000
-> > +params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
-> > +initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
-> That is one of the places that is not multi-soc capable.  You can make
-> it 66% less worse by just removing params_phys and initrd_phys.
+2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hi Lothar,
+>
+> On Wed, Dec 08, 2010 at 08:33:32AM +0100, Lothar Wa?mann wrote:
+>> Hi,
+>>
+>> Shawn Guo writes:
+>> > ?- The mxs wdog is implemented in RTC block.
+>> > ?- There is a generic software reset routine for most modules on mxs.
+>> >
+>> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+>> > ---
+>> > Changes for v3:
+>> > ?- Change wdog timeout to 10ms for safety
+>> > ?- Simplify function mxs_reset_block() to get it look better
+>> >
+>> > Changes for v2:
+>> > ?- Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
+>> >
+>> mxs_arch_reset_init() is currently being called from the .map_io hook
+>> in mach-mxs/mm-mx23.c and mm-mx28.c which is called before clocks are
+>> registered.
+>> But IMO this should be removed from the .map_io hook anyway (as well
+>> as mxs_iomux_init()).
+> I assume you want to make this an initcall?
+>
+Here is how they look.
 
-Which then destroys the ability to use the bootp veneer which combines
-a kernel and initrd.
+static int __init mxs_arch_reset_init(void)
+{
+        struct clk *clk;
+
+        wdog_base = cpu_is_mx23() ? MX23_IO_ADDRESS(MX23_RTC_BASE_ADDR) :
+                                    MX28_IO_ADDRESS(MX28_RTC_BASE_ADDR);
+
+        clk = clk_get_sys("rtc", NULL);
+        if (!IS_ERR(clk))
+                clk_enable(clk);
+        else
+
+        return 0;
+}
+core_initcall(mxs_arch_reset_init);
+
+static int __init mxs_iomux_init(void)
+{
+        iomux_base = MXS_IO_ADDRESS(MXS_PINCTRL_BASE_ADDR);
+
+        return 0;
+}
+core_initcall(mxs_iomux_init);
+
+-- 
+Regards,
+Shawn
