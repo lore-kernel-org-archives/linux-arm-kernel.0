@@ -1,59 +1,53 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Thu, 9 Dec 2010 12:32:29 -0500
-Subject: [PATCH (sh-2.6) 1/2] sh: add stack smashing protection support
-In-Reply-To: <4D0107AA.2020909@st.com>
-References: <1291717254-17455-1-git-send-email-filippo.arcidiacono@st.com>
-	<201012091107.51911.vapier@gentoo.org> <4D0107AA.2020909@st.com>
-Message-ID: <201012091232.31577.vapier@gentoo.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 9 Dec 2010 17:35:25 +0000
+Subject: [PATCH] dw_mmc: Add Synopsys DesignWare mmc host driver.
+In-Reply-To: <20101209160157.GA28586@void.printf.net>
+References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
+	<20101208115510.GD10998@console-pimps.org>
+	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
+	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
+	<20101209064751.GA21128@void.printf.net>
+	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
+	<20101209160157.GA28586@void.printf.net>
+Message-ID: <20101209173525.GA29879@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 09, 2010 11:45:30 Carmelo AMOROSO wrote:
-> On 12/9/2010 5:07 PM, Mike Frysinger wrote:
-> > On Thursday, December 09, 2010 10:56:26 Carmelo AMOROSO wrote:
-> >> I agree with you that the Kconfig and Makefile changes are not arch
-> >> specific, so these changes can be moved to a common code (even if I
-> >> don't know if other archs do support SSP).
-> >> In the current kernel, only x86 and ARM added this support, so I'm
-> >> wondering if, moving SSP to the common Makefile, it needs to depend on
-> >> x86, ARM, SH being configured ?
+Hi Andrew,
+
+On Thu, Dec 09, 2010 at 04:01:57PM +0000, Chris Ball wrote:
+> > > Is there something we could depend on that would stop this driver being
+> > > presented to everyone, without being far too specific? ?At the moment
+> > > we'd be making x86 desktop users say whether they have this IP, which
+> > > isn't good. ?Are the architectures that use this IP already upstream?
+> > > Are they all ARM architectures, for instance?
 > > 
-> > i'm not sure it does.  ssp is designed to be arch independent, so really
-> > you only need a new enough gcc version.  which means i dont think it
-> > needs to depend on any arch code and you can simply add to the Makefile
-> > a compiler check.
-> 
-> agreed, but if arch wants to implement the per-task canary feature, some
-> change into arch specific code is required.
-
-yes, but that doesnt mean the common symbol definition needs to be duplicated
-
-> >> Regarding the __stack_chk_guard symbol defined in process[_32].c, I
-> >> don't know if all archs need to define this global variable to implement
-> >> SSP. For sure x86 does not need it. It depends on how the gcc implements
-> >> this feature. This was mainly the reason for which we defined it
-> >> specifically in an arch specific code.
+> > I don't know of any architectures upstream that use this IP block. There is an
+> > SoC from NXP that uses this it but it is not upstream:
 > > 
-> > the common gcc code too outputs __stack_chk_guard references.  none of
-> > that is in arch-specific places.
+> > http://ics.nxp.com/support/software/lpc313x.bsp.linux/
+> > 
+> > The architecture we tested and debugged this driver on is not upstream either
+> > unfortunately. :-/
 > 
-> a simple test on x86 just prints reference to __stack_chk_fail only (not
-> reference to the global variable guard)
-> 
-> gcc is 4.3.0-8 (Fedora C9)
+> Okay.  I think "depends on ARM" is appropriate for now, and we could
+> expand that later if the block appears in a MIPS SoC or something.
+> Does that work for you?
 
-gcc will reference both __stack_chk_fail and __stack_chk_guard depending on 
-the code.  i think you only need to test that gcc accepts -fstack-protector 
-and then assume the rest ... i dont think you need to come up with random 
-pieces of code and cajole the symbol references out of gcc.
+Oh, hey, rmk says that he seems to recall that akpm says that if the
+driver builds on x86 (it does), we should just allow it to be built
+there too so that it gets build coverage.  Andrew, does this still
+represent your stance?
 
-along those lines, i see your patch adding __stack_chk_guard, but where is 
-__stack_chk_fail ?
--mike
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101209/b39fab0d/attachment-0001.sig>
+I've heard the distro maintainers complain about having to investigate
+Kconfig entries for drivers that their users would never possibly use,
+though, and this certainly falls into that case.  Is there something
+better we can do here, to correctly hide this driver from non-ARM users
+but also make it clear that it can be built if somebody wants to do a
+mass driver build?
+
+Thanks,
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
