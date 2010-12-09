@@ -1,129 +1,70 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 09 Dec 2010 07:56:40 -0800
-Subject: [PATCH v3] OMAP2+: PM/serial: fix console semaphore acquire
-	during suspend
-In-Reply-To: <AANLkTi=9TBbuwr4uiQb6f_f=cLxK2NvWJDJYXwr2tTxu@mail.gmail.com>
-	(Vitaly Wool's message of "Thu, 9 Dec 2010 00:51:29 +0100")
-References: <1291848040-23394-1-git-send-email-khilman@deeprootsystems.com>
-	<AANLkTi=9TBbuwr4uiQb6f_f=cLxK2NvWJDJYXwr2tTxu@mail.gmail.com>
-Message-ID: <87zksfc53b.fsf@deeprootsystems.com>
+From: carmelo.amoroso@st.com (Carmelo AMOROSO)
+Date: Thu, 9 Dec 2010 16:56:26 +0100
+Subject: [PATCH (sh-2.6) 1/2] sh: add stack smashing protection support
+In-Reply-To: <20101208044052.GA31508@linux-sh.org>
+References: <1291717254-17455-1-git-send-email-filippo.arcidiacono@st.com>
+	<201012071515.25418.vapier@gentoo.org>
+	<20101208044052.GA31508@linux-sh.org>
+Message-ID: <4D00FC2A.8040309@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vitaly Wool <vitalywool@gmail.com> writes:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-> On Wed, Dec 8, 2010 at 11:40 PM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->> @@ -120,8 +133,9 @@ static void omap2_enter_full_retention(void)
->> ? ? ? ? ? ? ? ?goto no_sleep;
->>
->> ? ? ? ?/* Block console output in case it is on one of the OMAP UARTs */
->> - ? ? ? if (try_acquire_console_sem())
->> - ? ? ? ? ? ? ? goto no_sleep;
->> + ? ? ? if (!is_suspending())
->> + ? ? ? ? ? ? ? if (try_acquire_console_sem())
->> + ? ? ? ? ? ? ? ? ? ? ? goto no_sleep;
->
-> Combine into one if?
+On 12/8/2010 5:40 AM, Paul Mundt wrote:
+> On Tue, Dec 07, 2010 at 03:15:23PM -0500, Mike Frysinger wrote:
+>  > On Tuesday, December 07, 2010 05:20:53 Filippo ARCIDIACONO wrote:
+>  > > Add stack smashing suppurt for SH architecture. This is based on work
+>  > > from Nicolas Pitre for ARM (c743f38013aeff58ef6252601e397b5ba281c633).
+>  > > Use the ARM boot_init_stack_canary function to initialize the guard
+>  > > canary. It has been placed under asm-generic to allow archtectures
+>  > > based on __stack_chk_guard to use a common implementation.
+>  > > Update the __stack_chk_guard global variable with the value stored in
+>  > > the task struct whenever a task switch occurs to allow for different
+>  > > canary values per task. This cannot work on SMP where the initial
+>  > > canary value is always used.
+>  > >
+>  > > arch/sh/Kconfig | 13 +++++++++++
+>  > > arch/sh/Makefile | 4 +++
+>  > > arch/sh/include/asm/stackprotector.h | 10 ++++++++
+>  > > arch/sh/kernel/process_32.c | 9 +++++++
+>  > > include/asm-generic/stackprotector.h | 39
+>  >
+>  > if you're starting asm-generic stuff, why not go the distance and do it all in
+>  > common code ? your sh/Kconfig and sh/Makefile changes arent specific to
+>  > SuperH, nor is the symbol in process_32.c.
+> 
+> Indeed. It would be nice to simply shove this in to lib/ with the
+> Makefile bits in the top-level Makefile.
+> 
 
-personal preference I guess.  I prefer it nested.
+Hi Paul, Mike
+thanks for your feedback.
 
->
-> <snip>
->
->> ? ? ? ?omap_uart_prepare_idle(0);
->> ? ? ? ?omap_uart_prepare_idle(1);
->> @@ -136,7 +150,8 @@ static void omap2_enter_full_retention(void)
->> ? ? ? ?omap_uart_resume_idle(1);
->> ? ? ? ?omap_uart_resume_idle(0);
->>
->> - ? ? ? release_console_sem();
->> + ? ? ? if (!is_suspending())
->> + ? ? ? ? ? ? ? release_console_sem();
->>
->> ?no_sleep:
->> ? ? ? ?if (omap2_pm_debug) {
->> @@ -284,6 +299,12 @@ out:
->> ? ? ? ?local_irq_enable();
->> ?}
->>
->> +static int omap2_pm_begin(suspend_state_t state)
->> +{
->> + ? ? ? suspend_state = state;
->> + ? ? ? return 0;
->> +}
->
-> Do you really need a return code here?
+I agree with you that the Kconfig and Makefile changes are not arch
+specific, so these changes can be moved to a common code (even if I
+don't know if other archs do support SSP).
+In the current kernel, only x86 and ARM added this support, so I'm
+wondering if, moving SSP to the common Makefile, it needs to depend on
+x86, ARM, SH being configured ?
 
-yes, this function prototype is defined by the driver model, not by me.
+Regarding the __stack_chk_guard symbol defined in process[_32].c, I
+don't know if all archs need to define this global variable to implement
+SSP. For sure x86 does not need it. It depends on how the gcc implements
+this feature. This was mainly the reason for which we defined it
+specifically in an arch specific code.
 
->> ?static int omap2_pm_prepare(void)
->> ?{
->> ? ? ? ?/* We cannot sleep in idle until we have resumed */
->> @@ -333,10 +354,18 @@ static void omap2_pm_finish(void)
->> ? ? ? ?enable_hlt();
->> ?}
->>
->> +static void omap2_pm_end(void)
->> +{
->> + ? ? ? suspend_state = PM_SUSPEND_ON;
->> + ? ? ? return;
->> +}
->
-> Redundant return.
+What is your opinion ?
 
-but harmless
+Thanks,
+Carmelo & Filippo
 
->> +
->> ?static struct platform_suspend_ops omap_pm_ops = {
->> + ? ? ? .begin ? ? ? ? ?= omap2_pm_begin,
->> ? ? ? ?.prepare ? ? ? ?= omap2_pm_prepare,
->> ? ? ? ?.enter ? ? ? ? ?= omap2_pm_enter,
->> ? ? ? ?.finish ? ? ? ? = omap2_pm_finish,
->> + ? ? ? .end ? ? ? ? ? ?= omap2_pm_end,
->> ? ? ? ?.valid ? ? ? ? ?= suspend_valid_only_mem,
->> ?};
->>
->> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->> index 0ec8a04..648b8c5 100644
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -50,6 +50,19 @@
->> ?#include "sdrc.h"
->> ?#include "control.h"
->>
->> +#ifdef CONFIG_SUSPEND
->> +static suspend_state_t suspend_state = PM_SUSPEND_ON;
->> +static inline bool is_suspending(void)
->> +{
->> + ? ? ? return (suspend_state != PM_SUSPEND_ON);
->> +}
->> +#else
->> +static inline bool is_suspending(void)
->> +{
->> + ? ? ? return false;
->> +}
->> +#endif
->> +
->> ?/* Scratchpad offsets */
->> ?#define OMAP343X_TABLE_ADDRESS_OFFSET ? ? 0xc4
->> ?#define OMAP343X_TABLE_VALUE_OFFSET ? ? ? 0xc0
->> @@ -387,10 +400,11 @@ void omap_sram_idle(void)
->> ? ? ? ?}
->>
->> ? ? ? ?/* Block console output in case it is on one of the OMAP UARTs */
->> - ? ? ? if (per_next_state < PWRDM_POWER_ON ||
->> - ? ? ? ? ? core_next_state < PWRDM_POWER_ON)
->> - ? ? ? ? ? ? ? if (try_acquire_console_sem())
->> - ? ? ? ? ? ? ? ? ? ? ? goto console_still_active;
->> + ? ? ? if (!is_suspending())
->> + ? ? ? ? ? ? ? if (per_next_state < PWRDM_POWER_ON ||
->> + ? ? ? ? ? ? ? ? ? core_next_state < PWRDM_POWER_ON)
->> + ? ? ? ? ? ? ? ? ? ? ? if (try_acquire_console_sem())
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto console_still_active;
->
-> Oh well, 3 nested ifs...
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (MingW32)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
 
-again, personal preference.
-
-Kevin
+iEYEARECAAYFAk0A/CoACgkQoRq/3BrK1s/slgCg2GVWo/uuURyvmu1401rQWP74
+L3UAoNwppj1eZFpReEe0wCIbalZ7ksMs
+=kDGH
+-----END PGP SIGNATURE-----
