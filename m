@@ -1,50 +1,89 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 09 Dec 2010 14:03:36 -0800
-Subject: [PATCH] msm: trout: add keypad support
-In-Reply-To: <AANLkTi=3LHHNJUh35AUkq--KtRCnRaBHx8Ky2bhxxzE4@mail.gmail.com>
-References: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
-	<4D00800E.7050004@codeaurora.org>
-	<1291916733.18827.1.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTi=3LHHNJUh35AUkq--KtRCnRaBHx8Ky2bhxxzE4@mail.gmail.com>
-Message-ID: <1291932216.18827.16.camel@c-dwalke-linux.qualcomm.com>
+From: peterhuewe@gmx.de (Peter Huewe)
+Date: Thu,  9 Dec 2010 23:04:52 +0100
+Subject: [PATCH] leds/h1940: Use gpiolib for latch access / fix build failure
+Message-ID: <1291932292-16049-1-git-send-email-peterhuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-09 at 14:01 -0800, Arve Hj?nnev?g wrote:
-> On Thu, Dec 9, 2010 at 9:45 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
-> > On Thu, 2010-12-09 at 12:36 +0530, Trilok Soni wrote:
-> >
-> >> > +static char *keycaps = "--qwerty";
-> >> > +#undef MODULE_PARAM_PREFIX
-> >> > +#define MODULE_PARAM_PREFIX "board_trout."
-> >> > +module_param_named(keycaps, keycaps, charp, 0);
-> >>
-> >> I would like to know what is the use of this param?
-> >
-> > No idea .. It was part of Google's implementation ..
-> >
-> 
-> You removed the code that uses it. If you look at the original file
-> you can see how it is used:
-> http://android.git.kernel.org/?p=kernel/msm.git;a=blob;f=arch/arm/mach-msm/board-trout-keypad.c;hb=refs/heads/android-msm-2.6.35
-> It is set by the bootloader according to the hardware version.
-> 
-> You can also see that the "/* userspace needs to know about these
-> changes as well */" comments refer to the code that changes the name
-> of the input device.
-> 
-> I don't think this change will work correctly with our existing
-> user-space code though since you are now reporting the power-key,
-> camera-key and slide-switch from a separate input device.
+This patch fixes a build failure by converting leds-h1940.c to use
+gpiolib for latch access introduced by 14477095abc6
+(ARM: h1940: Use gpiolib for latch access)
 
-Yeah, I did remove those parts.. I'm not sure where to put that stuff in
-this new implementation. I can try to find an appropriate place , unless
-you have some suggestions ?
+Unfortunately this driver was not converted back then.
 
-Daniel
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+---
+KernelVersion: linux-next-20101209
 
+Build failure:
+  CC [M]  drivers/leds/leds-h1940.o
+  drivers/leds/leds-h1940.c: In function 'h1940_greenled_set':
+  drivers/leds/leds-h1940.c:33: error: implicit declaration of function 'h1940_latch_control'
+  make[2]: *** [drivers/leds/leds-h1940
 
+ drivers/leds/leds-h1940.c |   20 ++++++++++----------
+ 1 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/leds/leds-h1940.c b/drivers/leds/leds-h1940.c
+index 173d104..7811701 100644
+--- a/drivers/leds/leds-h1940.c
++++ b/drivers/leds/leds-h1940.c
+@@ -30,17 +30,17 @@ static void h1940_greenled_set(struct led_classdev *led_dev,
+ {
+ 	switch (value) {
+ 	case LED_HALF:
+-		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
++		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
+ 		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
+ 		break;
+ 	case LED_FULL:
+-		h1940_latch_control(0, H1940_LATCH_LED_GREEN);
++		gpio_set_value(H1940_LATCH_LED_GREEN, 1);
+ 		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
+ 		break;
+ 	default:
+ 	case LED_OFF:
+-		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+-		h1940_latch_control(H1940_LATCH_LED_GREEN, 0);
++		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
++		gpio_set_value(H1940_LATCH_LED_GREEN, 0);
+ 		s3c2410_gpio_setpin(S3C2410_GPA7, 0);
+ 		break;
+ 	}
+@@ -60,17 +60,17 @@ static void h1940_redled_set(struct led_classdev *led_dev,
+ {
+ 	switch (value) {
+ 	case LED_HALF:
+-		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
++		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
+ 		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
+ 		break;
+ 	case LED_FULL:
+-		h1940_latch_control(0, H1940_LATCH_LED_RED);
++		gpio_set_value(H1940_LATCH_LED_RED, 1);
+ 		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
+ 		break;
+ 	default:
+ 	case LED_OFF:
+-		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+-		h1940_latch_control(H1940_LATCH_LED_RED, 0);
++		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
++		gpio_set_value(H1940_LATCH_LED_RED, 0);
+ 		s3c2410_gpio_setpin(S3C2410_GPA1, 0);
+ 		break;
+ 	}
+@@ -91,10 +91,10 @@ static void h1940_blueled_set(struct led_classdev *led_dev,
+ {
+ 	if (value) {
+ 		/* flashing Blue */
+-		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
++		gpio_set_value(H1940_LATCH_LED_FLASH, 1);
+ 		s3c2410_gpio_setpin(S3C2410_GPA3, 1);
+ 	} else {
+-		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
++		gpio_set_value(H1940_LATCH_LED_FLASH, 0);
+ 		s3c2410_gpio_setpin(S3C2410_GPA3, 0);
+ 	}
+ 
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.2.2
