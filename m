@@ -1,21 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Dec 2010 11:10:49 +0000
-Subject: [PATCH] ASoC: EP93xx: sampling rate range extended
-In-Reply-To: <1291855429.31916.90.camel@r60e>
-References: <1291809693.31916.2.camel@r60e>
-	<20101208124637.GD16418@rakim.wolfsonmicro.main>
-	<1291855429.31916.90.camel@r60e>
-Message-ID: <20101209111049.GC4548@rakim.wolfsonmicro.main>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  9 Dec 2010 11:59:40 +0000
+Subject: [PATCH 0/2] ARM: Thumb-2: Fix Kconfig rules to avoid nonworking
+	configs
+Message-ID: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 03:43:49AM +0300, Alexander wrote:
-> From: Alexander Sverdlin <subaparts@yandex.ru>
-> 
-> Changes to both I2S and PCM code:
-> - Rates list extended up to 96kHz, it's tested on EDB9302 and works for both capture and
->   playback.
-> 
-> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
+Some configurations don't make sense with Thumb-2, or don't
+currently work and are unlikely to be relevant.
 
-Applied, thanks.
+The patches avoid Kconfig from allowing these problematic
+combinations, for now.
+
+Dave Martin (2):
+  ARM: Thumb-2: Make CONFIG_THUMB2_KERNEL depend on !CPU_V6
+  ARM: Make CONFIG_FPE_NWFPE depend on !CONFIG_THUMB2_KERNEL
+
+ arch/arm/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
