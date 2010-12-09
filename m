@@ -1,127 +1,48 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 09 Dec 2010 13:52:00 +0100
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <1291851079-27061-1-git-send-email-venki@google.com>
-References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-	<1291851079-27061-1-git-send-email-venki@google.com>
-Message-ID: <1291899120.29292.7.camel@twins>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Thu, 09 Dec 2010 12:59:26 +0000
+Subject: [PATCHv3] support PMIC mc13892
+In-Reply-To: <20101209102526.GN6017@pengutronix.de>
+References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
+	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
+	<20101209102526.GN6017@pengutronix.de>
+Message-ID: <1291899566.3271.135.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-12-08 at 15:31 -0800, Venkatesh Pallipadi wrote:
-
-> [PATCH] update_rq_clock() with irq_time should handle 64 bit wraparound
+On Thu, 2010-12-09 at 11:25 +0100, Sascha Hauer wrote:
+> On Wed, Dec 08, 2010 at 11:21:00AM +0800, yong.shen at freescale.com wrote:
+> > From: Yong Shen <yong.shen@linaro.org>
+> > 
+> > add support for mc13892, tested on mx51 babbage board
+> > 
+> > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> > Signed-off-by: Yong Shen <yong.shen@linaro.org>
 > 
-> update_rq_clock with IRQ_TIME_ACCOUNTING assumed 64 bit sched_clock that
-> practically will not wraparound. Change to code to handle wraparounds,
-> still preventing rq->clock_task from going backwards.
+> As there seem to be only whitespace changes left to worry about:
+> 
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
 
-All we should do is deal with the 64wrap, not filter backward motion, I
-came up with something like the below.
+Thanks Sascha. 
 
-I think for now the best solution to the early wrap problem for ARM is
-for them to select HAVE_UNSTABLE_SCHED_CLOCK, it will mostly deal with
-the short wrap by filtering out the occasional negative value.
+Are you also happy with his other MC139892 patch. I believe both you and
+Uwe were involved in the review. It's fine from regulator pov, just best
+to get your Ack re the mxc changes :-
 
-Then later we can look at cleaning/breaking-up the kernel/sched_clock.c
-code to provide smaller bits of functionality and possibly merging it
-with some of the clocksource code.
+>From e112153c6f03b49c229a8e3913a0c0459245df20 Mon Sep 17 00:00:00 2001
+From: Yong Shen <yong.shen@linaro.org>
+Date: Thu, 2 Dec 2010 14:17:02 +0800
+Subject: [PATCH 1/2] Change the register name definitions for mc13783
+
+To make mc13783 and mc13892 share code, the register names should be
+changed to fit the new macro definitions in the comming patch.
+
+Signed-off-by: Yong Shen <yong.shen@linaro.org>
 
 ---
- kernel/sched.c |   54 +++++++++++++++++++++++++-----------------------------
- 1 files changed, 25 insertions(+), 29 deletions(-)
-
-diff --git a/kernel/sched.c b/kernel/sched.c
-index 8e885c1..0fb7de8 100644
---- a/kernel/sched.c
-+++ b/kernel/sched.c
-@@ -642,23 +642,19 @@ static inline struct task_group *task_group(struct task_struct *p)
- 
- #endif /* CONFIG_CGROUP_SCHED */
- 
--static u64 irq_time_cpu(int cpu);
--static void sched_irq_time_avg_update(struct rq *rq, u64 irq_time);
-+static void update_rq_clock_task(struct rq *rq, s64 delta);
- 
- inline void update_rq_clock(struct rq *rq)
- {
--	int cpu = cpu_of(rq);
--	u64 irq_time;
-+	s64 delta;
- 
- 	if (rq->skip_clock_update)
- 		return;
- 
--	rq->clock = sched_clock_cpu(cpu);
--	irq_time = irq_time_cpu(cpu);
--	if (rq->clock - irq_time > rq->clock_task)
--		rq->clock_task = rq->clock - irq_time;
-+	delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
-+	rq->clock += delta;
-+	update_rq_clock_task(rq, delta);
- 
--	sched_irq_time_avg_update(rq, irq_time);
- }
- 
- /*
-@@ -1817,14 +1813,6 @@ void disable_sched_clock_irqtime(void)
- 	sched_clock_irqtime = 0;
- }
- 
--static u64 irq_time_cpu(int cpu)
--{
--	if (!sched_clock_irqtime)
--		return 0;
--
--	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
--}
--
- void account_system_vtime(struct task_struct *curr)
- {
- 	unsigned long flags;
-@@ -1855,25 +1843,33 @@ void account_system_vtime(struct task_struct *curr)
- }
- EXPORT_SYMBOL_GPL(account_system_vtime);
- 
--static void sched_irq_time_avg_update(struct rq *rq, u64 curr_irq_time)
-+static inline u64 irq_time_cpu(int cpu)
- {
--	if (sched_clock_irqtime && sched_feat(NONIRQ_POWER)) {
--		u64 delta_irq = curr_irq_time - rq->prev_irq_time;
--		rq->prev_irq_time = curr_irq_time;
--		sched_rt_avg_update(rq, delta_irq);
--	}
-+	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
- }
- 
--#else
--
--static u64 irq_time_cpu(int cpu)
-+static void update_rq_clock_task(struct rq *rq, s64 delta)
- {
--	return 0;
-+	s64 irq_delta;
-+
-+	irq_delta = irq_time_cpu(cpu_of(rq)) - rq->prev_irq_time;
-+	rq->prev_irq_time += irq_delta;
-+
-+	delta -= irq_delta;
-+	rq->clock_task += delta;
-+
-+	if (irq_delta && sched_feat(NONIRQ_POWER))
-+		sched_rt_avg_update(rq, irq_delta);
- }
- 
--static void sched_irq_time_avg_update(struct rq *rq, u64 curr_irq_time) { }
-+#else /* CONFIG_IRQ_TIME_ACCOUNTING */
- 
--#endif
-+static inline void update_rq_clock_task(struct rq *rq, s64 delta)
-+{
-+	rq->clock_task += delta;
-+}
-+
-+#endif /* CONFIG_IRQ_TIME_ACCOUNTING */
- 
- #include "sched_idletask.c"
- #include "sched_fair.c"
+ arch/arm/mach-imx/mach-pcm038.c       |    4 +-
+ arch/arm/mach-mx3/mach-mx31_3ds.c     |    4 +-
+ arch/arm/mach-mx3/mach-mx31moboard.c  |    4 +-
+ drivers/regulator/mc13783-regulator.c |   30 +++++++-------
+ include/linux/mfd/mc13783.h           |   67 +++++++++++++++++----------------
+ 5 files changed, 55 insertions(+), 54 deletions(-)
