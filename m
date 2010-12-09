@@ -1,75 +1,42 @@
-From: venki@google.com (Venkatesh Pallipadi)
-Date: Thu, 9 Dec 2010 14:21:33 -0800
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <1291920939.6803.38.camel@twins>
-References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-	<1291851079-27061-1-git-send-email-venki@google.com>
-	<1291899120.29292.7.camel@twins>
-	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
-	<1291917330.6803.7.camel@twins>
-	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
-	<1291920939.6803.38.camel@twins>
-Message-ID: <AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Thu, 9 Dec 2010 22:21:40 +0000
+Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
+	omap_i2c
+In-Reply-To: <BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
+References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
+	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
+	<878vzydgxr.fsf@deeprootsystems.com>
+	<87wrni7jys.fsf@deeprootsystems.com>
+	<BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
+Message-ID: <20101209222140.GU20097@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 9, 2010 at 10:55 AM, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Thu, 2010-12-09 at 10:11 -0800, Venkatesh Pallipadi wrote:
->> On Thu, Dec 9, 2010 at 9:55 AM, Peter Zijlstra <peterz@infradead.org> wrote:
->> > On Thu, 2010-12-09 at 09:43 -0800, Venkatesh Pallipadi wrote:
->> >>
->> >> The same problem will be there with below code, with irq_delta >
->> >> delta, clock_task can go backwards which is not good.
->> >> + ? ? ? delta -= irq_delta;
->> >> + ? ? ? rq->clock_task += delta;
->> >>
->> >> The reason for this is rq->clock and irqtime updates kind of happen
->> >> independently and specifically, if a rq->clock update happens while we
->> >> are in a softirq, we may have this case of going backwards on the next
->> >> update.
->> >
->> > But how can irq_delta > delta?, we measure it using the same clock.
->> >
->>
->> This would be mostly a corner case like:
->> - softirq start time t1
->> - rq->clock updated at t2 and rq->clock_task updated at t2 without
->> accounting for current softirq
->> - softirq end time t3
->> - cpu spends most time here in softirq or hardirq
->> - next rq->clock update at t4 and rq->clock_task update, with delta =
->> t4-t2 and irq_delta ~= t4 - t1
->
-> Ah, something like that would happen when we do a wakeup from
-> soft/hard-irq context, not an altogether uncommon occurrence.
->
-> Wouldn't that be cured by updating the irq-time when asking for it,
-> something like the below? (on top of my earlier patch)
+On Thu, Dec 09, 2010 at 10:18:48PM +0000, aaro.koskinen at nokia.com wrote:
+> Hi,
+> 
+> Kevin Hilman [khilman at deeprootsystems.com]:
+> > Ben Dooks <ben-i2c@fluff.org> writes:
+> > > Renaming stuff like this is going to have an impact on the userspace
+> > > as anyone looking through /sys's driver heirarchy is going to miss the
+> > > old name...
+> > >
+> > > It all depends if you really want to go ahead with this...
+> >
+> > Yes, we are aware of the userspace impact, but this name change makes
+> > all devices on OMAP have consistent names and actually improves the
+> > ability to have userspace tools have consistent naming as well.
+> 
+> So there are no imporant users, or if there is, they are prepared for this change?
+> 
+> >> >  drivers/i2c/busses/i2c-omap.c        |    4 ++--
+> 
+> What about the .c / .ko file name?
 
-This should mostly work. There would be a small window there on
-rq->clock=sched_clock_cpu() and system_vtime doing sched_clock_cpu()
-and also the overhead of doing this everytime when this going
-backwards may happen rarely.
+Pretty much everyone is in the form of i2c-xxx.c, so I would prefer it
+to stay that way.
 
-Thanks,
-Venki
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
->
-> ---
-> Index: linux-2.6/kernel/sched.c
-> ===================================================================
-> --- linux-2.6.orig/kernel/sched.c
-> +++ linux-2.6/kernel/sched.c
-> @@ -1843,8 +1843,9 @@ void account_system_vtime(struct task_st
-> ?}
-> ?EXPORT_SYMBOL_GPL(account_system_vtime);
->
-> -static inline u64 irq_time_cpu(int cpu)
-> +static u64 irq_time_cpu(int cpu)
-> ?{
-> + ? ? ? account_system_vtime(current);
-> ? ? ? ?return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
-> ?}
->
->
->
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
