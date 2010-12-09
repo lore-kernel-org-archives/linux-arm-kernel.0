@@ -1,24 +1,21 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 9 Dec 2010 16:30:28 +0530
-Subject: [PATCH v7 11/12] davinci: add tnetv107x evm backlight device
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247CD83E1@dbde02.ent.ti.com>
-References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-	<1291733522-3626-12-git-send-email-cyril@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247CD83E1@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247CD84F4@dbde02.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 9 Dec 2010 11:10:49 +0000
+Subject: [PATCH] ASoC: EP93xx: sampling rate range extended
+In-Reply-To: <1291855429.31916.90.camel@r60e>
+References: <1291809693.31916.2.camel@r60e>
+	<20101208124637.GD16418@rakim.wolfsonmicro.main>
+	<1291855429.31916.90.camel@r60e>
+Message-ID: <20101209111049.GC4548@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 14:25:49, Nori, Sekhar wrote:
+On Thu, Dec 09, 2010 at 03:43:49AM +0300, Alexander wrote:
+> From: Alexander Sverdlin <subaparts@yandex.ru>
+> 
+> Changes to both I2S and PCM code:
+> - Rates list extended up to 96kHz, it's tested on EDB9302 and works for both capture and
+>   playback.
+> 
+> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
 
-> This call should simply return if machine is not tnetv107x EVM.
->
-> I didn't follow the entire series but wondering why
-> platform device registration should be a late init call.
-> Typically the driver probe can be made a late init call
-> in case of init sequence dependencies.
-
-I meant driver init, not probe.
-
-Thanks,
-Sekhar
+Applied, thanks.
