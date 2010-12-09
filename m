@@ -1,39 +1,20 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Thu, 9 Dec 2010 18:30:44 +0800
-Subject: [PATCH v2 09/15] ARM: mxs: Add clock support
-In-Reply-To: <20101209084146.GP17441@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-8-git-send-email-shawn.guo@freescale.com>
-	<20101209084146.GP17441@pengutronix.de>
-Message-ID: <AANLkTi=zUdNwAsgW1gOPjTM=Q6o_GCJ30E8k1Dh46U-4@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Dec 2010 10:38:35 +0000
+Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
+In-Reply-To: <15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
+References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
+	<20101202221909.GK29347@n2100.arm.linux.org.uk>
+	<4CF94DDD.8000409@codeaurora.org>
+	<20101203203653.GB10245@n2100.arm.linux.org.uk>
+	<4CFDD297.4020600@codeaurora.org>
+	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
+Message-ID: <20101209103835.GA31465@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Shawn,
->
->> +static unsigned long name##_get_rate(struct clk *clk) ? ? ? ? ? ? ? ? ? ? ? ?\
->> +{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? unsigned long parent_rate; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? u32 reg, div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##sr); ? ? ? ? \
->> + ? ? div = (reg >> BP_CLKCTRL_##sr##_##ss##FRAC) & 0x3f; ? ? ? ? ? ? \
->> + ? ? parent_rate = clk_get_rate(clk->parent); ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? return parent_rate / 1000 * 18 / div * 1000; ? ? ? ? ? ? ? ? ? ?\
->> +}
-> 1000 isn't the most clever choice. ?It might be for a human, but not for
-> a machine.
->
-> I'd suggest (untested):
->
-> ? ? ? ?return SH_DIV((parent_rate >> 8) * 18, div, 8);
->
-> (don't know if 8 is a good value). ?What is the range of div here?
->
-Tested.
+On Thu, Dec 09, 2010 at 01:23:24AM -0800, skannan at codeaurora.org wrote:
+> Russell, Have you had a chance to look at this? Any comments? How do we
+> move ahead?
 
--- 
-Regards,
-Shawn
+I had connected the other thread with this one - it's pretty hard not
+to as it included this patch in that set as the first patch.
