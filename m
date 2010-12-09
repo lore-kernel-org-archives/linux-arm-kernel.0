@@ -1,98 +1,61 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Thu, 9 Dec 2010 13:27:53 +0100
-Subject: [PATCH v2 14/15] ARM: mxs: Add initial mx28evk support
-In-Reply-To: <AANLkTinwmdxEXNObEbHd10ZxfTmTCaWiHmwXpf8hs3f1@mail.gmail.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
-	<20101208202822.GD17441@pengutronix.de>
-	<AANLkTiny2P3RobZfq_G_OPHu_SLjZ2w9CFhU7HgL3VPx@mail.gmail.com>
-	<20101209083237.GO17441@pengutronix.de>
-	<AANLkTin3-f7x2BXS=zTYYw+uWiu9UYG8sPWdQXWcxpxn@mail.gmail.com>
-	<20101209093746.GU17441@pengutronix.de>
-	<AANLkTinwmdxEXNObEbHd10ZxfTmTCaWiHmwXpf8hs3f1@mail.gmail.com>
-Message-ID: <19712.52041.958400.447834@ipc1.ka-ro>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 9 Dec 2010 12:34:57 +0000
+Subject: [PATCH 1/3] ASoC: EP93xx I2S and PCM fixes
+In-Reply-To: <1291897061.31916.149.camel@r60e>
+References: <1291809693.31916.2.camel@r60e>
+	<20101208124637.GD16418@rakim.wolfsonmicro.main>
+	<1291855051.31916.85.camel@r60e>
+	<20101209105443.GA4469@rakim.wolfsonmicro.main>
+	<1291897061.31916.149.camel@r60e>
+Message-ID: <20101209123457.GD4469@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo writes:
-> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Hello Shawn
-> > On Thu, Dec 09, 2010 at 05:03:54PM +0800, Shawn Guo wrote:
-> >> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> >> > Hello Shwan,
-> > ups, sorry for mistyping your name.
-> >
-> >> > On Thu, Dec 09, 2010 at 03:04:37PM +0800, Shawn Guo wrote:
-> >> >> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> >> >> > On Wed, Dec 08, 2010 at 12:32:02AM +0800, Shawn Guo wrote:
-> >> >> >> +static iomux_cfg_t mx28evk_pads[] = {
-> >> >> > This can be const and __initconst, ditto for mx23evk
-> >> >> >
-> >> >> With u64 iomux_cfg_t changes, I'm afraid the suggestion becomes invalid.
-> >> > Really? Why?
-> >> >
-> >> I'm confused by the compiling error below when adding __initconst for
-> >> mx28evk_pads[], and mistakenly blaming u64 iomux_cfg_t changes.
-> >>
-> >> arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
-> >> arch/arm/mach-mxs/mach-mx28evk.c:34: error: mx28_fec_pdata causes a
-> >> section type conflict
-> >> make[1]: *** [arch/arm/mach-mxs/mach-mx28evk.o] Error 1
-> >> make: *** [arch/arm/mach-mxs] Error 2
-> >>
-> >> Actually it can be fixed by the following change.
-> >>
-> >> -static const struct fec_platform_data mx28_fec_pdata __initconst = {
-> >> +static struct fec_platform_data mx28_fec_pdata __initconst = {
-> >> ? ? ? ? ?.phy = PHY_INTERFACE_MODE_RMII,
-> >> ?};
-> > this change is wrong. ?You need to assert that all data being marked
-> > with __initconst is const, too.
-> >
-> After adding const for mx28evk_pads[], I got the following error.
-> 
->   CC      arch/arm/mach-mxs/mach-mx28evk.o
-> arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
-> arch/arm/mach-mxs/mach-mx28evk.c:102: warning: passing argument 1 of
-> ?mxs_iomux_setup_multiple_pads? discards qualifiers from pointer
-> target type
-> arch/arm/mach-mxs/include/mach/iomux.h:115: note: expected
-> ?iomux_cfg_t *? but argument is of type ?const iomux_cfg_t *?
-> 
-The argument of mxs_iomux_setup_multiple_pads() should get the const
-attribute:
--int mxs_iomux_setup_multiple_pads(iomux_cfg_t *pad_list, unsigned count)
-+int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count)
+On Thu, Dec 09, 2010 at 03:17:41PM +0300, Alexander wrote:
+> On Thu, 2010-12-09 at 10:54 +0000, Mark Brown wrote:
 
-> This takes me back to my first judgment.  Is it proper to add
-> __initconst for mx28evk_pads[]? We are changing iomux_cfg_t to u64 for
-> making pad definition modifiable.
-> 
-Modifiable in the sense that you can add platform specific PAD
-settings by simply ORing them to the original pad definition so that
-there is no need for runtime modifications like:
-|	iomux_v3_cfg_t power_key = MX51_PAD_EIM_A27__GPIO_2_21;
-...
-|	power_key.pad_ctrl = MX51_GPIO_PAD_CTRL_2;
-|	mxc_iomux_v3_setup_pad(&power_key);
-but you can do:
-|	iomux_v3_cfg_t power_key = (MX51_PAD_EIM_A27__GPIO_2_21 &
-|				~MUX_PAD_CTRL_MASK) | MX51_GPIO_PAD_CTRL_2;
-...
-|	mxc_iomux_v3_setup_pad(power_key);
-instead. You can also augment the pad desc in a static table:
-|static iomux_cfg_t pad_desc[] = {
-|	(MX51_PAD_EIM_A27__GPIO_2_21 & ~MUX_PAD_CTRL_MASK) | MX51_GPIO_PAD_CTRL_2,
+> > pair of samples at a go, which works well enough.  Some of the hardware
+> > configuration may be technically incorrect according to the spec but so
+> > long as the externally observable behaviour is OK that's not an issue.
 
+> I2S controller always takes 2 samples (2 ch) from DMA, DMA is always 32
+> bit, so if you will feed it with 16 samples, you will get 2 times faster
+> sound.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+How exactly does it "take" the samples?  You're really not being clear
+about what the hardware is doing here.  Please be specific about the
+interaction between the I2S controller and the DMA controller - for
+example, is there a FIFO on the edge of the I2S controller, is there any
+mediation of the data words anywhere in the process?
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+I *think* what you're trying to say above is that the I2S controller
+reads each sample as an individual word directly from the DMA controller
+so the DMA word size must match exactly the I2S word size but you're
+really not being clear.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> > It may be that there's limitations in the hardware that prevent such a
+> > configuration but I'd like to see more analysis of what's going on here.
+
+> If we take a look into I2S specification, we will figure that LRCLK MUST
+> be equal to sample rate, if we are talking about stereo (in mono too,
+> but it's not our case at all). So it doesnt seems strange to you,
+> ep93xx-i2s.c produces LRCLK two times slower than it MUST be? It's a
+> bug, making DMA bug less visible...
+
+Right, but the DMA controller can (ignoring any restrictions in your
+hardware) happily transfer data in any size and this needn't have
+anything to do with what the I2S controller is emitting.  You need to
+look at the configuration of the interaction between the I2S and DMA
+controllers rather than the external interface when looking at this
+stuff.
+
+This is all broadly orthogonal to the external BCLK and LRCLK rates,
+it's all about how the data gets between the I2S and DMA controllers.
+
+> Always using 32 bit chunks is not a problem for I2S, the codec I use
+> uses less bits too (24), it's permitted by I2S standard.
+
+It's a problem because it means that the data needs to be laid out in
+memory in 32 bit words which means that a lot of data is going to need
+to be repacked from 16 bit to 32 bit samples which is wasteful.  If the
+hardware can be persuaded to avoid this then that's much better.
