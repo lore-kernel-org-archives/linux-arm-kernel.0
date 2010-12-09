@@ -1,62 +1,78 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 09 Dec 2010 19:55:39 +0100
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
-References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-	<1291851079-27061-1-git-send-email-venki@google.com>
-	<1291899120.29292.7.camel@twins>
-	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
-	<1291917330.6803.7.camel@twins>
-	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
-Message-ID: <1291920939.6803.38.camel@twins>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Thu, 9 Dec 2010 19:01:10 +0000
+Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
+	omap_i2c
+In-Reply-To: <878vzydgxr.fsf@deeprootsystems.com>
+References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
+	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
+	<878vzydgxr.fsf@deeprootsystems.com>
+Message-ID: <20101209190110.GR20097@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-09 at 10:11 -0800, Venkatesh Pallipadi wrote:
-> On Thu, Dec 9, 2010 at 9:55 AM, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Thu, 2010-12-09 at 09:43 -0800, Venkatesh Pallipadi wrote:
-> >>
-> >> The same problem will be there with below code, with irq_delta >
-> >> delta, clock_task can go backwards which is not good.
-> >> +       delta -= irq_delta;
-> >> +       rq->clock_task += delta;
-> >>
-> >> The reason for this is rq->clock and irqtime updates kind of happen
-> >> independently and specifically, if a rq->clock update happens while we
-> >> are in a softirq, we may have this case of going backwards on the next
-> >> update.
-> >
-> > But how can irq_delta > delta?, we measure it using the same clock.
-> >
+On Thu, Dec 09, 2010 at 08:55:28AM -0800, Kevin Hilman wrote:
+> Ben,
 > 
-> This would be mostly a corner case like:
-> - softirq start time t1
-> - rq->clock updated at t2 and rq->clock_task updated at t2 without
-> accounting for current softirq
-> - softirq end time t3
-> - cpu spends most time here in softirq or hardirq
-> - next rq->clock update at t4 and rq->clock_task update, with delta =
-> t4-t2 and irq_delta ~= t4 - t1
+> > The convention for omap device naming is omap_XXX.
+> >
+> > Rename the device and driver name in order to stick
+> > to this naming convention.
 
-Ah, something like that would happen when we do a wakeup from
-soft/hard-irq context, not an altogether uncommon occurrence.
+Renaming stuff like this is going to have an impact on the userspace
+as anyone looking through /sys's driver heirarchy is going to miss the
+old name... 
 
-Wouldn't that be cured by updating the irq-time when asking for it,
-something like the below? (on top of my earlier patch)
+It all depends if you really want to go ahead with this...
 
----
-Index: linux-2.6/kernel/sched.c
-===================================================================
---- linux-2.6.orig/kernel/sched.c
-+++ linux-2.6/kernel/sched.c
-@@ -1843,8 +1843,9 @@ void account_system_vtime(struct task_st
- }
- EXPORT_SYMBOL_GPL(account_system_vtime);
- 
--static inline u64 irq_time_cpu(int cpu)
-+static u64 irq_time_cpu(int cpu)
- {
-+	account_system_vtime(current);
- 	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
- }
- 
+> > Change device name in clock nodes as well.
+> >
+> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> > c: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Rajendra Nayak <rnayak@ti.com>
+> > Cc: Ben Dooks <ben-i2c@fluff.org>
+> > ---
+> >  arch/arm/mach-omap1/clock_data.c     |    6 +++---
+> >  arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
+> >  arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
+> >  arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
+> >  arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
+> >  arch/arm/plat-omap/i2c.c             |    2 +-
+> >  drivers/i2c/busses/i2c-omap.c        |    4 ++--
+> >  7 files changed, 28 insertions(+), 28 deletions(-)
+> 
+> [...]
+> 
+> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> > index 760b8be..9d09083 100644
+> > --- a/drivers/i2c/busses/i2c-omap.c
+> > +++ b/drivers/i2c/busses/i2c-omap.c
+> > @@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
+> >  	.probe		= omap_i2c_probe,
+> >  	.remove		= omap_i2c_remove,
+> >  	.driver		= {
+> > -		.name	= "i2c_omap",
+> > +		.name	= "omap_i2c",
+> >  		.owner	= THIS_MODULE,
+> >  	},
+> >  };
+> > @@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
+> >  MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
+> >  MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
+> >  MODULE_LICENSE("GPL");
+> > -MODULE_ALIAS("platform:i2c_omap");
+> > +MODULE_ALIAS("platform:omap_i2c");
+> 
+> With your ack for the name change in the driver, we can merge this
+> through the OMAP tree with the other core changes.
+> 
+> Thanks,
+> 
+> Kevin
+> 
+
+-- 
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
