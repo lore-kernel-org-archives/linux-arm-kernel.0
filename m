@@ -1,55 +1,29 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 9 Dec 2010 23:31:57 +0100
-Subject: [PATCH 11/14] OMAP4: PRCM: reorganize existing OMAP4 PRCM header
-	files
-In-Reply-To: <alpine.DEB.2.00.1012072340250.13430@utopia.booyaka.com>
-References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-	<20101207012514.3708.87532.stgit@twilight.localdomain>
-	<4CFDEBB7.8040309@ti.com>
-	<alpine.DEB.2.00.1012072340250.13430@utopia.booyaka.com>
-Message-ID: <4D0158DD.30200@ti.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Thu, 09 Dec 2010 22:33:53 +0000
+Subject: [PATCHv3] support PMIC mc13892
+In-Reply-To: <AANLkTim-_Xft9b0D3PfG8bC6_m4Kp0GtC8ZwW-NEp5-0@mail.gmail.com>
+References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
+	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
+	<AANLkTim-_Xft9b0D3PfG8bC6_m4Kp0GtC8ZwW-NEp5-0@mail.gmail.com>
+Message-ID: <1291934033.3271.229.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Paul,
+On Wed, 2010-12-08 at 11:28 +0800, Yong Shen wrote:
+> Hi Liam,
+> 
+> Last time, you took the previous patches for mc13783 code
+> reorganization in your tree, I suppose you can also please take
+> mc13892, which had passed review.
 
-On 12/8/2010 7:47 AM, Paul Walmsley wrote:
-> Salut Beno?t,
->
-> On Tue, 7 Dec 2010, Cousson, Benoit wrote:
->
->> Salut Paul,
->>
->> On 12/7/2010 2:25 AM, Paul Walmsley wrote:
->>> Split the existing cm44xx.h file into cm1_44xx.h and cm2_44xx.h files
->>> so they match their underlying OMAP hardware modules.  Add clockdomain
->>> offset information.
->>>
->>> Add header files for the MPU local PRCM, prcm_mpu44xx.h, and for the
->>> SCRM, scrm44xx.h.  SCRM register offsets still need to be added; TI
->>> should do this.
->>
->> And we did it :-)
->
-> Even better :-)
->
->> I sent it last week along with clock data series:
->> https://patchwork.kernel.org/patch/373751/
->>
->> OK, I've just realized that it was a little bit hidden in the clock data
->> patch, and maybe we should have been sent two patches.
->> Sorry for that. Do you want to take it in that series, or should I re-sent the
->> clock data one?
->
-> I guess it's better done in the clock series; that should avoid a branch
-> dependency between the PRCM patchsets and the clock patch sets.
->
-> One thing that would be nice on the scrm44xx.h file is to keep the _OFFSET
-> macros.  It would be nice in the long run to get rid of the absolute
-> addressing macros in case someone decides to shuffle around the IP block
-> addresses again... can you update your clock series with that change?
+There are still some comments needing addressed here. When you make the
+changes please make sure they apply to the regulator tree and add the
+Acks.
 
-OK, this is done. I've just posted it.
+Thanks
 
-Regards,
-Benoit
+Liam
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
