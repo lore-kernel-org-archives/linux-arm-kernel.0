@@ -1,42 +1,36 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Thu, 9 Dec 2010 22:21:40 +0000
-Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
-	omap_i2c
-In-Reply-To: <BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
-References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
-	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
-	<878vzydgxr.fsf@deeprootsystems.com>
-	<87wrni7jys.fsf@deeprootsystems.com>
-	<BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
-Message-ID: <20101209222140.GU20097@trinity.fluff.org>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Thu, 09 Dec 2010 22:24:35 +0000
+Subject: [PATCH 1/2] Change the register name definitions for mc13783
+In-Reply-To: <AANLkTi=L0fXFnF2-u+zdObs56h-FYgedhe0adxOAuCq=@mail.gmail.com>
+References: <AANLkTi=L0fXFnF2-u+zdObs56h-FYgedhe0adxOAuCq=@mail.gmail.com>
+Message-ID: <1291933475.3271.211.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 10:18:48PM +0000, aaro.koskinen at nokia.com wrote:
-> Hi,
+On Thu, 2010-12-02 at 18:43 +0800, Yong Shen wrote:
+> Hi there,
 > 
-> Kevin Hilman [khilman at deeprootsystems.com]:
-> > Ben Dooks <ben-i2c@fluff.org> writes:
-> > > Renaming stuff like this is going to have an impact on the userspace
-> > > as anyone looking through /sys's driver heirarchy is going to miss the
-> > > old name...
-> > >
-> > > It all depends if you really want to go ahead with this...
-> >
-> > Yes, we are aware of the userspace impact, but this name change makes
-> > all devices on OMAP have consistent names and actually improves the
-> > ability to have userspace tools have consistent naming as well.
+> Please give comments inline and use attached patch for testing.
 > 
-> So there are no imporant users, or if there is, they are prepared for this change?
+> Thanks
+> Yong
 > 
-> >> >  drivers/i2c/busses/i2c-omap.c        |    4 ++--
+> >From e112153c6f03b49c229a8e3913a0c0459245df20 Mon Sep 17 00:00:00 2001
+> From: Yong Shen <yong.shen@linaro.org>
+> Date: Thu, 2 Dec 2010 14:17:02 +0800
+> Subject: [PATCH 1/2] Change the register name definitions for mc13783
 > 
-> What about the .c / .ko file name?
+> To make mc13783 and mc13892 share code, the register names should be
+> changed to fit the new macro definitions in the comming patch.
 
-Pretty much everyone is in the form of i2c-xxx.c, so I would prefer it
-to stay that way.
+I've just tried to apply this patch and looks like your mailer has
+mangled parts of it. I repaired it and sadly it still does not apply
+against the regulator tree.
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git #for-next
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Can you redo, add the acks received and resubmit.
+
+Thanks
+
+Liam 
