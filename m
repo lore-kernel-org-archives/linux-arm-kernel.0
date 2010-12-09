@@ -1,98 +1,45 @@
-From: tsoni@codeaurora.org (Trilok Soni)
-Date: Thu, 09 Dec 2010 12:36:54 +0530
-Subject: [PATCH] msm: trout: add keypad support
-In-Reply-To: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
-References: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <4D00800E.7050004@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 9 Dec 2010 08:10:26 +0100
+Subject: [PATCH 4/6] arm: mx5: always use __mxc_cpu_type to check cpu type
+In-Reply-To: <1291903716-31388-4-git-send-email-richard.zhao@freescale.com>
+References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
+	<1291903716-31388-4-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20101209071026.GI17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Dec 09, 2010 at 10:08:34PM +0800, Richard Zhao wrote:
+> Every SoC in mach-mx5 calls mxc_set_cpu_type to set cpu type.
+I don't like that.  Your change makes the usage of cpu_is_mx51() for
+single-machine builds more expensive.
 
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-trout-keypad.c
-> @@ -0,0 +1,342 @@
-> +/* arch/arm/mach-msm/board-trout-keypad.c
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  arch/arm/plat-mxc/include/mach/mxc.h |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+> index 4abbdd1..04afa33 100644
+> --- a/arch/arm/plat-mxc/include/mach/mxc.h
+> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
+> @@ -129,10 +129,8 @@ extern unsigned int __mxc_cpu_type;
+>  #ifdef CONFIG_ARCH_MX5
+>  # ifdef mxc_cpu_type
+>  #  undef mxc_cpu_type
+> -#  define mxc_cpu_type __mxc_cpu_type
+> -# else
+> -#  define mxc_cpu_type MXC_CPU_MX51
+>  # endif
+> +# define mxc_cpu_type __mxc_cpu_type
+>  # define cpu_is_mx51()		(mxc_cpu_type == MXC_CPU_MX51)
+>  # define cpu_is_mx53()		(mxc_cpu_type == MXC_CPU_MX53)
+>  #else
+Here is a bug.  cpu_is_mx53 will never be true for a mx5-only build.
+(That is currently always true for images supporting mx5.)
 
-No paths please.
-
-> + *
-> + * Copyright (C) 2008 Google, Inc.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful),
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/input.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/input/matrix_keypad.h>
-> +#include <linux/gpio_keys.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include "board-trout.h"
-> +
-> +static char *keycaps = "--qwerty";
-> +#undef MODULE_PARAM_PREFIX
-> +#define MODULE_PARAM_PREFIX "board_trout."
-> +module_param_named(keycaps, keycaps, charp, 0);
-
-I would like to know what is the use of this param?
-
-> +
-> +
-> +static unsigned int trout_col_gpios[] = { 35, 34, 33, 32, 31, 23, 30, 78 };
-> +static unsigned int trout_row_gpios[] = { 42, 41, 40, 39, 38, 37, 36 };
-
-const?
-
-> +
-> +static unsigned int trout_col_gpios_evt2[] = { 35, 34, 33, 32, 31, 23, 30, 109 };
-> +static unsigned int trout_row_gpios_evt2[] = { 42, 41, 40, 39, 38, 37, 36 };
-
-const?
-
-> +static int __init trout_init_keypad(void)
-> +{
-> +	int ret;
-> +
-> +	if (!machine_is_trout())
-> +		return 0;
-> +
-> +	switch (system_rev) {
-> +	case 0:
-> +		/* legacy default keylayout */
-> +		break;
-> +	case 1:
-> +		/* v1 has a new keyboard layout */
-> +		trout_pdata.keymap_data = &trout_keymap_data_2_1;
-> +		trout_pdata.col_gpios = trout_col_gpios_evt2;
-> +		trout_pdata.row_gpios = trout_row_gpios_evt2;
-> +
-> +		/* userspace needs to know about these changes as well */
-
-?? what is the meaning of this comment?
-
-> +		break;
-> +	default: /* 2, 3, 4 currently */
-> +		/* v2 has a new keyboard layout */
-> +		trout_pdata.keymap_data = &trout_keymap_data_2_2;
-> +		trout_pdata.col_gpios = trout_col_gpios_evt2;
-> +		trout_pdata.row_gpios = trout_row_gpios_evt2;
-> +
-> +		/* userspace needs to know about these changes as well */
-
-ditto.
-
----Trilok Soni
+Uwe
 
 -- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
