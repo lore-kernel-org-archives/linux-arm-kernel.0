@@ -1,43 +1,39 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 9 Dec 2010 09:42:53 +0100
-Subject: [PATCH v2 05/15] ARM: mxs: Add low-level debug UART support
-In-Reply-To: <AANLkTikbiPCtGG9S2YsAPHdNqUGGB_iFrHtGTzNAEx88@mail.gmail.com>
+Date: Thu, 9 Dec 2010 09:43:58 +0100
+Subject: [PATCH v2 08/15] ARM: mxs: Add iomux support
+In-Reply-To: <AANLkTimsFBsDu6dKLWPafG5zuAq4BYB1uMGcgEFOYY80@mail.gmail.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-4-git-send-email-shawn.guo@freescale.com>
-	<20101208202735.GC17441@pengutronix.de>
-	<AANLkTikbiPCtGG9S2YsAPHdNqUGGB_iFrHtGTzNAEx88@mail.gmail.com>
-Message-ID: <20101209084253.GQ17441@pengutronix.de>
+	<1291739523-25077-7-git-send-email-shawn.guo@freescale.com>
+	<19711.13023.154958.539289@ipc1.ka-ro>
+	<AANLkTikb4Ytx==R=n7RDOXv+tKtVvgcTUX7R-QDQfVoc@mail.gmail.com>
+	<20101208105643.GO18244@pengutronix.de>
+	<AANLkTimHyYUkDqLQ79o9fP_9NgOK1Lec=psoFCpb1+jA@mail.gmail.com>
+	<19711.27840.946740.905255@ipc1.ka-ro>
+	<AANLkTimsFBsDu6dKLWPafG5zuAq4BYB1uMGcgEFOYY80@mail.gmail.com>
+Message-ID: <20101209084358.GR17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+Hello,
 
-On Thu, Dec 09, 2010 at 10:02:48AM +0800, Shawn Guo wrote:
-> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> >> +#ifndef __MACH_MXS_UNCOMPRESS_H__
-> >> +#define __MACH_MXS_UNCOMPRESS_H__
-> >> +
-> >> +#define __MXS_BOOT_UNCOMPRESS
-is this used, BTW?
-
-> >> +
-> >> +#include <asm/mach-types.h>
-> >> +
-> >> +static unsigned long uart_base;
-> >> +
-> >> +#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
-> >> +
-> >> +#define DR ? ? ? ? ? 0x00
-> >> +#define FR ? ? ? ? ? 0x18
-> >> +#define FR_BUSY ? ? ? ? ? ? ?(1 << 3)
-> >> +#define FR_TXFE ? ? ? ? ? ? ?(1 << 7)
-> >> +#define CR ? ? ? ? ? 0x30
-> >> +#define CR_UARTEN ? ?1
-> > Maybe namespace these? ?Maybe better define CR_UARTEN as (1 << 0) for
-> > consistency?
+On Thu, Dec 09, 2010 at 02:15:27PM +0800, Shawn Guo wrote:
+> >> Ah, I misunderstood the comments. ?But I did not see mxc switches to
+> >> u64. ?Do you have example to show what you want exactly?
+> >>
+> > See:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-November/032202.html
 > >
-> Are you expecting namespace "MXS_" or "DUART_" for better?
-both?
+> Thanks, Lothar.
+> 
+> Hi Uwe,
+> 
+> Looking at the page Lothar gave, the patch is to facilitate adding
+> platform specific pad_ctrl settings to an
+> existing pad definition.  In this case, it might be reasonable to keep
+> EXPORT_SYMBOL(mxs_iomux_setup_pad), which you asked me to remove.
+> What do you think?
+Just don't make it static.  There is no need for EXPORT_SYMBOL.  Ditto
+for the multiple variant.
 
 Uwe
 
