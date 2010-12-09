@@ -1,195 +1,76 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  9 Dec 2010 14:47:13 +0100
-Subject: [PATCH 1/9] ARM i.MX51: Add ipu clock support
-In-Reply-To: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1291902441-24712-2-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  9 Dec 2010 14:47:12 +0100
+Subject: [PATCH RFC] i.MX51 Framebuffer support
+Message-ID: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |  140 +++++++++++++++++++++++++++++++++++
- 1 files changed, 140 insertions(+), 0 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 9fc65bb..f550d02 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -39,6 +39,9 @@ static struct clk periph_apm_clk;
- static struct clk ahb_clk;
- static struct clk ipg_clk;
- static struct clk usboh3_clk;
-+static struct clk emi_fast_clk;
-+static struct clk ipu_clk;
-+static struct clk mipi_hsc1_clk;
- 
- #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
- 
-@@ -688,6 +691,19 @@ static unsigned long clk_emi_slow_get_rate(struct clk *clk)
- 	return clk_get_rate(clk->parent) / div;
- }
- 
-+static unsigned long _clk_ddr_hf_get_rate(struct clk *clk)
-+{
-+	unsigned long rate;
-+	u32 reg, div;
-+
-+	reg = __raw_readl(MXC_CCM_CBCDR);
-+	div = ((reg & MXC_CCM_CBCDR_DDR_PODF_MASK) >>
-+		MXC_CCM_CBCDR_DDR_PODF_OFFSET) + 1;
-+	rate = clk_get_rate(clk->parent) / div;
-+
-+	return rate;
-+}
-+
- /* External high frequency clock */
- static struct clk ckih_clk = {
- 	.get_rate = get_high_reference_clock_rate,
-@@ -846,6 +862,109 @@ static struct clk emi_slow_clk = {
- 	.get_rate = clk_emi_slow_get_rate,
- };
- 
-+static int clk_ipu_enable(struct clk *clk)
-+{
-+	u32 reg;
-+
-+	_clk_ccgr_enable(clk);
-+
-+	/* Enable handshake with IPU when certain clock rates are changed */
-+	reg = __raw_readl(MXC_CCM_CCDR);
-+	reg &= ~MXC_CCM_CCDR_IPU_HS_MASK;
-+	__raw_writel(reg, MXC_CCM_CCDR);
-+
-+	/* Enable handshake with IPU when LPM is entered */
-+	reg = __raw_readl(MXC_CCM_CLPCR);
-+	reg &= ~MXC_CCM_CLPCR_BYPASS_IPU_LPM_HS;
-+	__raw_writel(reg, MXC_CCM_CLPCR);
-+
-+	return 0;
-+}
-+
-+static void clk_ipu_disable(struct clk *clk)
-+{
-+	u32 reg;
-+
-+	_clk_ccgr_disable(clk);
-+
-+	/* Disable handshake with IPU whe dividers are changed */
-+	reg = __raw_readl(MXC_CCM_CCDR);
-+	reg |= MXC_CCM_CCDR_IPU_HS_MASK;
-+	__raw_writel(reg, MXC_CCM_CCDR);
-+
-+	/* Disable handshake with IPU when LPM is entered */
-+	reg = __raw_readl(MXC_CCM_CLPCR);
-+	reg |= MXC_CCM_CLPCR_BYPASS_IPU_LPM_HS;
-+	__raw_writel(reg, MXC_CCM_CLPCR);
-+}
-+
-+static struct clk ahbmux1_clk = {
-+	.parent = &ahb_clk,
-+	.secondary = &ahb_max_clk,
-+	.enable_reg = MXC_CCM_CCGR0,
-+	.enable_shift = MXC_CCM_CCGRx_CG8_OFFSET,
-+	.enable = _clk_ccgr_enable,
-+	.disable = _clk_ccgr_disable_inwait,
-+};
-+
-+static struct clk ipu_sec_clk = {
-+	.parent = &emi_fast_clk,
-+	.secondary = &ahbmux1_clk,
-+};
-+
-+static struct clk ddr_hf_clk = {
-+	.parent = &pll1_sw_clk,
-+	.get_rate = _clk_ddr_hf_get_rate,
-+};
-+
-+static struct clk ddr_clk = {
-+	.parent = &ddr_hf_clk,
-+};
-+
-+/* clock definitions for MIPI HSC unit which has been removed
-+ * from documentation, but not from hardware
-+ */
-+static int _clk_hsc_enable(struct clk *clk)
-+{
-+	u32 reg;
-+
-+	_clk_ccgr_enable(clk);
-+	/* Handshake with IPU when certain clock rates are changed. */
-+	reg = __raw_readl(MXC_CCM_CCDR);
-+	reg &= ~MXC_CCM_CCDR_HSC_HS_MASK;
-+	__raw_writel(reg, MXC_CCM_CCDR);
-+
-+	reg = __raw_readl(MXC_CCM_CLPCR);
-+	reg &= ~MXC_CCM_CLPCR_BYPASS_HSC_LPM_HS;
-+	__raw_writel(reg, MXC_CCM_CLPCR);
-+
-+	return 0;
-+}
-+
-+static void _clk_hsc_disable(struct clk *clk)
-+{
-+	u32 reg;
-+
-+	_clk_ccgr_disable(clk);
-+	/* No handshake with HSC as its not enabled. */
-+	reg = __raw_readl(MXC_CCM_CCDR);
-+	reg |= MXC_CCM_CCDR_HSC_HS_MASK;
-+	__raw_writel(reg, MXC_CCM_CCDR);
-+
-+	reg = __raw_readl(MXC_CCM_CLPCR);
-+	reg |= MXC_CCM_CLPCR_BYPASS_HSC_LPM_HS;
-+	__raw_writel(reg, MXC_CCM_CLPCR);
-+}
-+
-+static struct clk mipi_hsp_clk = {
-+	.parent = &ipu_clk,
-+	.enable_reg = MXC_CCM_CCGR4,
-+	.enable_shift = MXC_CCM_CCGRx_CG6_OFFSET,
-+	.enable = _clk_hsc_enable,
-+	.disable = _clk_hsc_disable,
-+	.secondary = &mipi_hsc1_clk,
-+};
-+
- #define DEFINE_CLOCK_CCGR(name, i, er, es, pfx, p, s)	\
- 	static struct clk name = {			\
- 		.id		= i,			\
-@@ -1077,6 +1196,23 @@ DEFINE_CLOCK_FULL(esdhc2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG2_OFFSET,
- DEFINE_CLOCK_MAX(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
- 	clk_esdhc2, &pll2_sw_clk, &esdhc2_ipg_clk);
- 
-+DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
-+DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
-+DEFINE_CLOCK(mipi_hsc1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET, NULL, NULL, &mipi_hsc2_clk, &pll2_sw_clk);
-+
-+/* IPU */
-+DEFINE_CLOCK_FULL(ipu_clk, 0, MXC_CCM_CCGR5, MXC_CCM_CCGRx_CG5_OFFSET,
-+	NULL,  NULL, clk_ipu_enable, clk_ipu_disable, &ahb_clk, &ipu_sec_clk);
-+
-+DEFINE_CLOCK_FULL(emi_fast_clk, 0, MXC_CCM_CCGR5, MXC_CCM_CCGRx_CG7_OFFSET,
-+		NULL, NULL, _clk_ccgr_enable, _clk_ccgr_disable_inwait,
-+		&ddr_clk, NULL);
-+
-+DEFINE_CLOCK(ipu_di0_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG5_OFFSET,
-+		NULL, NULL, &pll3_sw_clk, NULL);
-+DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
-+		NULL, NULL, &pll3_sw_clk, NULL);
-+
- #define _REGISTER_CLOCK(d, n, c) \
-        { \
- 		.dev_id = d, \
-@@ -1117,6 +1253,10 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
- 	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
- 	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
-+	_REGISTER_CLOCK(NULL, "mipi_hsp", mipi_hsp_clk)
-+	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
-+	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
-+	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
- };
- 
- static struct clk_lookup mx53_lookups[] = {
--- 
-1.7.2.3
+The following series adds i.MX51 framebuffer support based on the IPUv3. It
+is not perfect but I decided it is good enough to open it for a wider audience
+and collect first reviews. I tested this on a babbage board using both outputs
+(VGA/DVI) with different resolutions up to 1680x1050 and different colour depths.
+I also tested it on one custom board using a fixed display setting.
+
+Sascha
+
+The following changes since commit a96a688dcea84047c982dfbb61a335fa00d14f9a:
+
+  mx51: support FIQ on TZIC, revised (2010-12-07 22:29:32 +0100)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git ipuv3
+
+Sascha Hauer (9):
+      ARM i.MX51: Add ipu clock support
+      ARM i.MX51: rename IPU irqs
+      Add a mfd IPUv3 driver
+      fb: export fb mode db table
+      Add i.MX5 framebuffer driver
+      ARM i.MX51: Add IPU device support
+      ARM i.MX5: Allow to increase max zone order
+      ARM i.MX5: increase dma consistent size for IPU support
+      ARM i.MX51 babbage: Add framebuffer support
+
+ arch/arm/Kconfig                                |    4 +-
+ arch/arm/mach-mx5/Kconfig                       |    1 +
+ arch/arm/mach-mx5/board-mx51_babbage.c          |   74 ++
+ arch/arm/mach-mx5/clock-mx51-mx53.c             |  140 ++++
+ arch/arm/mach-mx5/devices-imx51.h               |    4 +
+ arch/arm/plat-mxc/devices/Kconfig               |    4 +
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-imx_ipuv3.c  |   47 ++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   10 +
+ arch/arm/plat-mxc/include/mach/ipu-v3.h         |   48 ++
+ arch/arm/plat-mxc/include/mach/memory.h         |    2 +-
+ arch/arm/plat-mxc/include/mach/mx51.h           |    4 +-
+ drivers/mfd/Kconfig                             |    7 +
+ drivers/mfd/Makefile                            |    1 +
+ drivers/mfd/imx-ipu-v3/Makefile                 |    3 +
+ drivers/mfd/imx-ipu-v3/ipu-common.c             |  661 ++++++++++++++++++
+ drivers/mfd/imx-ipu-v3/ipu-cpmem.c              |  608 ++++++++++++++++
+ drivers/mfd/imx-ipu-v3/ipu-dc.c                 |  362 ++++++++++
+ drivers/mfd/imx-ipu-v3/ipu-di.c                 |  507 ++++++++++++++
+ drivers/mfd/imx-ipu-v3/ipu-dmfc.c               |  343 +++++++++
+ drivers/mfd/imx-ipu-v3/ipu-dp.c                 |  468 +++++++++++++
+ drivers/mfd/imx-ipu-v3/ipu-prv.h                |  214 ++++++
+ drivers/video/Kconfig                           |   11 +
+ drivers/video/Makefile                          |    1 +
+ drivers/video/modedb.c                          |    7 +-
+ drivers/video/mx5fb.c                           |  846 +++++++++++++++++++++++
+ include/linux/fb.h                              |    3 +
+ include/linux/mfd/imx-ipu-v3.h                  |  218 ++++++
+ 28 files changed, 4593 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/ipu-v3.h
+ create mode 100644 drivers/mfd/imx-ipu-v3/Makefile
+ create mode 100644 drivers/mfd/imx-ipu-v3/ipu-common.c
+ create mode 100644 drivers/mfd/imx-ipu-v3/ipu-cpmem.c
+ create mode 100644 drivers/mfd/imx-ipu-v3/ipu-dc.c
+ create mode 100644 drivers/mfd/imx-ipu-v3/ipu-di.c
+ create mode 100644 drivers/mfd/imx-ipu-v3/ipu-dmfc.c
+ create mode 100644 drivers/mfd/imx-ipu-v3/ipu-dp.c
+ create mode 100644 drivers/mfd/imx-ipu-v3/ipu-prv.h
+ create mode 100644 drivers/video/mx5fb.c
+ create mode 100644 include/linux/mfd/imx-ipu-v3.h
