@@ -1,39 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+From: linus.walleij@stericsson.com (Linus Walleij)
 Date: Thu, 9 Dec 2010 09:52:55 +0100
-Subject: [PATCH 1/6] ARM: mx5: use config to define boot related addresses
-In-Reply-To: <20101209084430.GS9777@n2100.arm.linux.org.uk>
-References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
-	<20101209070411.GH17441@pengutronix.de>
-	<20101209084430.GS9777@n2100.arm.linux.org.uk>
-Message-ID: <20101209085255.GS17441@pengutronix.de>
+Subject: [PATCH] mmci: partially revert clock divisor code
+Message-ID: <1291884775-25509-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hell Russell,
+I misread the datasheet as if bypass mode was not available at all
+on the ux500's, I was wrong. It is there, the datasheet just
+states that you should not have to use it.
 
-On Thu, Dec 09, 2010 at 08:44:30AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 09, 2010 at 08:04:11AM +0100, Uwe Kleine-K?nig wrote:
-> > > diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
-> > > index 9939a19..388d2e8 100644
-> > > --- a/arch/arm/mach-mx5/Makefile.boot
-> > > +++ b/arch/arm/mach-mx5/Makefile.boot
-> > > @@ -1,3 +1,3 @@
-> > > -   zreladdr-y	:= 0x90008000
-> > > -params_phys-y	:= 0x90000100
-> > > -initrd_phys-y	:= 0x90800000
-> > > +   zreladdr-$(CONFIG_SOC_IMX51)	:= 0x90008000
-> > > +params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
-> > > +initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
-> > That is one of the places that is not multi-soc capable.  You can make
-> > it 66% less worse by just removing params_phys and initrd_phys.
-> 
-> Which then destroys the ability to use the bootp veneer which combines
-> a kernel and initrd.
-I am aware of that.  I think it's OK to add the assignments when they
-are needed the first time which I don't expect to happen soon if at all.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |    8 +-------
+ 1 files changed, 1 insertions(+), 7 deletions(-)
 
-Uwe
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 82880e8..907e582 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -101,13 +101,7 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 
+ 	if (desired) {
+ 		if (desired >= host->mclk) {
+-			/*
+-			 * The ST clock divider does not like the bypass bit,
+-			 * even though it's available. Instead the datasheet
+-			 * recommends setting the divider to zero.
+-			 */
+-			if (!variant->st_clkdiv)
+-				clk = MCI_CLK_BYPASS;
++			clk = MCI_CLK_BYPASS;
+ 			host->cclk = host->mclk;
+ 		} else if (variant->st_clkdiv) {
+ 			/*
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.3.2
