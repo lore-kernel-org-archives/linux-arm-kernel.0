@@ -1,27 +1,40 @@
-From: tsoni@codeaurora.org (Trilok Soni)
-Date: Thu, 09 Dec 2010 12:32:57 +0530
-Subject: [PATCH] msm: trout: add keypad support
-In-Reply-To: <AANLkTikOOH3qHHRtqETytYBk_MiCeVBU724CooUYqgdy@mail.gmail.com>
-References: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTikOOH3qHHRtqETytYBk_MiCeVBU724CooUYqgdy@mail.gmail.com>
-Message-ID: <4D007F21.5060602@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 9 Dec 2010 08:04:11 +0100
+Subject: [PATCH 1/6] ARM: mx5: use config to define boot related addresses
+In-Reply-To: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
+References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20101209070411.GH17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abraham,
+Hello,
 
-On 12/9/2010 12:04 PM, Arce, Abraham wrote:
+On Thu, Dec 09, 2010 at 10:08:31PM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+> This series of patch support mx50 reference design board. I've tested it using
+> initramfs on the board.
 > 
->> +
->> +static unsigned int trout_col_gpios_evt2[] = { 35, 34, 33, 32, 31, 23, 30, 109 };
+>  arch/arm/mach-mx5/Makefile.boot |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> WARNING: line over 80 characters
+> diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+> index 9939a19..388d2e8 100644
+> --- a/arch/arm/mach-mx5/Makefile.boot
+> +++ b/arch/arm/mach-mx5/Makefile.boot
+> @@ -1,3 +1,3 @@
+> -   zreladdr-y	:= 0x90008000
+> -params_phys-y	:= 0x90000100
+> -initrd_phys-y	:= 0x90800000
+> +   zreladdr-$(CONFIG_SOC_IMX51)	:= 0x90008000
+> +params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
+> +initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
+That is one of the places that is not multi-soc capable.  You can make
+it 66% less worse by just removing params_phys and initrd_phys.
 
-I would leave this to Daniel if he wants to fix it, because by making it under 80 is not
-going to improve any code readability, so I prefer to keep it as is.
-
----Trilok Soni
+Best regards
+Uwe
 
 -- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
