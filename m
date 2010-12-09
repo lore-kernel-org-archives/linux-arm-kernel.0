@@ -1,249 +1,172 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 9 Dec 2010 23:12:46 +0800
-Subject: [PATCH v2 11/15] ARM: mxs: Dynamically allocate duart devices
+Date: Thu, 9 Dec 2010 23:12:40 +0800
+Subject: [PATCH v3 05/15] ARM: mxs: Add low-level debug UART support
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1291907569-8925-11-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1291907569-8925-5-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamically allocate duart devices for MX23 and MX28.
+ - DEBUG_LL support, which is incompatible with multi-soc MXS image
+   because of different DUART base address on MX23 and MX28
+ - uncompress message support
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
+Changes for v3:
+ - debug-macro.S: change inclusion of hardware.h to mx23.h plus mx28.h
+ - Remove #define __MXS_BOOT_UNCOMPRESS
+ - Add namespace MXS_DUART_ for macros
+ - Add comment "If it's not, the output is simply discarded."
+
 Changes for v2:
- - Change inclusion of hardware.h to mx23.h plus mx28.h
+ - Remove incorrect comments
 
- arch/arm/mach-mxs/devices-mx23.h                |   16 +++++
- arch/arm/mach-mxs/devices-mx28.h                |   16 +++++
- arch/arm/mach-mxs/devices.c                     |   75 +++++++++++++++++++++++
- arch/arm/mach-mxs/devices/platform-duart.c      |   48 ++++++++++++++
- arch/arm/mach-mxs/include/mach/devices-common.h |   34 ++++++++++
- 5 files changed, 189 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices-mx23.h
- create mode 100644 arch/arm/mach-mxs/devices-mx28.h
- create mode 100644 arch/arm/mach-mxs/devices.c
- create mode 100644 arch/arm/mach-mxs/devices/platform-duart.c
- create mode 100644 arch/arm/mach-mxs/include/mach/devices-common.h
+ arch/arm/mach-mxs/include/mach/debug-macro.S |   52 ++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
+ 2 files changed, 128 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
 
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
 new file mode 100644
-index 0000000..d0f49fc
+index 0000000..a1522fd
 --- /dev/null
-+++ b/arch/arm/mach-mxs/devices-mx23.h
-@@ -0,0 +1,16 @@
-+/*
-+ * Copyright (C) 2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+@@ -0,0 +1,52 @@
++/* arch/arm/mach-mxs/include/mach/debug-macro.S
 + *
-+ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Debugging macro include header
 + *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
 + */
++
 +#include <mach/mx23.h>
-+#include <mach/devices-common.h>
-+
-+extern const struct mxs_duart_data mx23_duart_data __initconst;
-+#define mx23_add_duart() \
-+	mxs_add_duart(&mx23_duart_data)
-diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-new file mode 100644
-index 0000000..47c2f04
---- /dev/null
-+++ b/arch/arm/mach-mxs/devices-mx28.h
-@@ -0,0 +1,16 @@
-+/*
-+ * Copyright (C) 2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
 +#include <mach/mx28.h>
-+#include <mach/devices-common.h>
 +
-+extern const struct mxs_duart_data mx28_duart_data __initconst;
-+#define mx28_add_duart() \
-+	mxs_add_duart(&mx28_duart_data)
-diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
++#ifdef CONFIG_SOC_IMX23
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX23_DUART_BASE_ADDR
++#endif
++
++#ifdef CONFIG_SOC_IMX28
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX28_DUART_BASE_ADDR
++#endif
++
++#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
++
++		.macro	addruart, rp, rv
++		ldr	\rp, =UART_PADDR	@ physical
++		ldr	\rv, =UART_VADDR	@ virtual
++		.endm
++
++		.macro	senduart, rd, rx
++		str	\rd, [\rx, #0x0]	@ DR
++		.endm
++
++		.macro	waituart, rd, rx
++1001:		ldr	\rd, [\rx, #0x18]	@ FR
++		tst	\rd, #1 << 5		@ FR_TXFF
++		bne	1001b
++		.endm
++
++		.macro	busyuart, rd, rx
++1002:		ldr	\rd, [\rx, #0x18]	@ FR
++		tst	\rd, #1 << 3		@ FR_BUSY
++		beq	1002b
++		.endm
+diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
 new file mode 100644
-index 0000000..6b60f02
+index 0000000..793d92e
 --- /dev/null
-+++ b/arch/arm/mach-mxs/devices.c
-@@ -0,0 +1,75 @@
++++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+@@ -0,0 +1,76 @@
 +/*
-+ * Copyright 2008 Sascha Hauer, kernel at pengutronix.de
++ *  arch/arm/mach-mxs/include/mach/uncompress.h
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
++ *  Copyright (C) 1999 ARM Limited
++ *  Copyright (C) Shane Nay (shane@minirl.com)
++ *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor,
-+ * Boston, MA  02110-1301, USA.
 + */
++#ifndef __MACH_MXS_UNCOMPRESS_H__
++#define __MACH_MXS_UNCOMPRESS_H__
 +
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <mach/common.h>
++#include <asm/mach-types.h>
 +
-+struct platform_device *__init mxs_add_platform_device_dmamask(
-+		const char *name, int id,
-+		const struct resource *res, unsigned int num_resources,
-+		const void *data, size_t size_data, u64 dmamask)
-+{
-+	int ret = -ENOMEM;
-+	struct platform_device *pdev;
++static unsigned long uart_base;
 +
-+	pdev = platform_device_alloc(name, id);
-+	if (!pdev)
-+		goto err;
++#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
 +
-+	if (dmamask) {
-+		/*
-+		 * This memory isn't freed when the device is put,
-+		 * I don't have a nice idea for that though.  Conceptually
-+		 * dma_mask in struct device should not be a pointer.
-+		 * See http://thread.gmane.org/gmane.linux.kernel.pci/9081
-+		 */
-+		pdev->dev.dma_mask =
-+			kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-+		if (!pdev->dev.dma_mask)
-+			/* ret is still -ENOMEM; */
-+			goto err;
++#define MXS_DUART_DR		0x00
++#define MXS_DUART_FR		0x18
++#define MXS_DUART_FR_TXFE	(1 << 7)
++#define MXS_DUART_CR		0x30
++#define MXS_DUART_CR_UARTEN	(1 << 0)
 +
-+		*pdev->dev.dma_mask = dmamask;
-+		pdev->dev.coherent_dma_mask = dmamask;
-+	}
-+
-+	if (res) {
-+		ret = platform_device_add_resources(pdev, res, num_resources);
-+		if (ret)
-+			goto err;
-+	}
-+
-+	if (data) {
-+		ret = platform_device_add_data(pdev, data, size_data);
-+		if (ret)
-+			goto err;
-+	}
-+
-+	ret = platform_device_add(pdev);
-+	if (ret) {
-+err:
-+		platform_device_put(pdev);
-+		return ERR_PTR(ret);
-+	}
-+
-+	return pdev;
-+}
-diff --git a/arch/arm/mach-mxs/devices/platform-duart.c b/arch/arm/mach-mxs/devices/platform-duart.c
-new file mode 100644
-index 0000000..2fe0df5
---- /dev/null
-+++ b/arch/arm/mach-mxs/devices/platform-duart.c
-@@ -0,0 +1,48 @@
 +/*
-+ * Copyright (C) 2009-2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
++ * The following code assumes the serial port has already been
++ * initialized by the bootloader. If it's not, the output is
++ * simply discarded.
 + */
-+#include <mach/mx23.h>
-+#include <mach/mx28.h>
-+#include <mach/devices-common.h>
 +
-+#define mxs_duart_data_entry(soc)					\
-+	{								\
-+		.iobase = soc ## _DUART_BASE_ADDR,			\
-+		.irq = soc ## _INT_DUART,				\
++static void putc(int ch)
++{
++	if (!uart_base)
++		return;
++	if (!(UART(MXS_DUART_CR) & MXS_DUART_CR_UARTEN))
++		return;
++
++	while (!(UART(MXS_DUART_FR) & MXS_DUART_FR_TXFE))
++		barrier();
++
++	UART(MXS_DUART_DR) = ch;
++}
++
++static inline void flush(void)
++{
++}
++
++#define MX23_DUART_BASE_ADDR	0x80070000
++#define MX28_DUART_BASE_ADDR	0x80074000
++
++static __inline__ void __arch_decomp_setup(unsigned long arch_id)
++{
++	switch (arch_id) {
++	case MACH_TYPE_MX23EVK:
++		uart_base = MX23_DUART_BASE_ADDR;
++		break;
++	case MACH_TYPE_MX28EVK:
++		uart_base = MX28_DUART_BASE_ADDR;
++		break;
++	default:
++		break;
 +	}
-+
-+#ifdef CONFIG_SOC_IMX23
-+const struct mxs_duart_data mx23_duart_data __initconst =
-+	mxs_duart_data_entry(MX23);
-+#endif
-+
-+#ifdef CONFIG_SOC_IMX28
-+const struct mxs_duart_data mx28_duart_data __initconst =
-+	mxs_duart_data_entry(MX28);
-+#endif
-+
-+struct platform_device *__init mxs_add_duart(
-+		const struct mxs_duart_data *data)
-+{
-+	struct resource res[] = {
-+		{
-+			.start = data->iobase,
-+			.end = data->iobase + SZ_8K - 1,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = data->irq,
-+			.end = data->irq,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	};
-+
-+	return mxs_add_platform_device("mxs-duart", 0, res, ARRAY_SIZE(res),
-+					NULL, 0);
-+}
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-new file mode 100644
-index 0000000..07b4439
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright (C) 2009-2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/init.h>
-+
-+struct platform_device *mxs_add_platform_device_dmamask(
-+		const char *name, int id,
-+		const struct resource *res, unsigned int num_resources,
-+		const void *data, size_t size_data, u64 dmamask);
-+
-+static inline struct platform_device *mxs_add_platform_device(
-+		const char *name, int id,
-+		const struct resource *res, unsigned int num_resources,
-+		const void *data, size_t size_data)
-+{
-+	return mxs_add_platform_device_dmamask(
-+			name, id, res, num_resources, data, size_data, 0);
 +}
 +
-+/* duart */
-+struct mxs_duart_data {
-+	resource_size_t iobase;
-+	resource_size_t iosize;
-+	resource_size_t irq;
-+};
-+struct platform_device *__init mxs_add_duart(
-+		const struct mxs_duart_data *data);
++#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
++#define arch_decomp_wdog()
++
++#endif /* __MACH_MXS_UNCOMPRESS_H__ */
 -- 
 1.7.1
