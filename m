@@ -1,60 +1,332 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu, 9 Dec 2010 15:52:01 +0800
-Subject: [PATCH 4/6] arm: mx5: always use __mxc_cpu_type to check cpu type
-In-Reply-To: <20101209071026.GI17441@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 9 Dec 2010 09:29:21 +0100
+Subject: [PATCH 6/6] arm: mx50: add mx50 reference design board support
+In-Reply-To: <1291903716-31388-6-git-send-email-richard.zhao@freescale.com>
 References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
-	<1291903716-31388-4-git-send-email-richard.zhao@freescale.com>
-	<20101209071026.GI17441@pengutronix.de>
-Message-ID: <AANLkTinOu0GHKTRJCB0Yn11QjN8ZoiCp9ZmAUTtDAJkZ@mail.gmail.com>
+	<1291903716-31388-6-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20101209082921.GL17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Thu, Dec 09, 2010 at 10:08:34PM +0800, Richard Zhao wrote:
->> Every SoC in mach-mx5 calls mxc_set_cpu_type to set cpu type.
-> I don't like that. ?Your change makes the usage of cpu_is_mx51() for
-> single-machine builds more expensive.
-You're right. I'll add the below like other SoCs:
-#ifdef CONFIG_SOC_IMX51
-..
-#else
-# define cpu_is_mx51()          (mxc_cpu_type == MXC_CPU_MX51)
-#endif
+On Thu, Dec 09, 2010 at 10:08:36PM +0800, Richard Zhao wrote:
+> Add basic function and uart device support.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  arch/arm/mach-mx5/Kconfig                   |   11 ++
+>  arch/arm/mach-mx5/Makefile                  |    1 +
+>  arch/arm/mach-mx5/board-mx50_rdp.c          |  232 +++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/uncompress.h |    4 +
+uncompress.h should come earlier in the series
 
-can I remove cpu_is_mx53 definition?  because CONFIG_SOC_IMX53 is
-undefined yet. Dinh can add it back when he send out other commits.
+>  4 files changed, 248 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mx5/board-mx50_rdp.c
+> 
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index aae4014..27d78d7 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -108,4 +108,15 @@ config MACH_MX51_EFIKAMX
+>  	  Include support for Genesi Efika MX nettop. This includes specific
+>  	  configurations for the board and its peripherals.
+>  
+> +config MACH_MX50_RDP
+> +	bool "Support MX50 reference design board"
+P as in "board"?
 
-Thanks
-Richard
->
->>
->> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> ---
->> ?arch/arm/plat-mxc/include/mach/mxc.h | ? ?4 +---
->> ?1 files changed, 1 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
->> index 4abbdd1..04afa33 100644
->> --- a/arch/arm/plat-mxc/include/mach/mxc.h
->> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
->> @@ -129,10 +129,8 @@ extern unsigned int __mxc_cpu_type;
->> ?#ifdef CONFIG_ARCH_MX5
->> ?# ifdef mxc_cpu_type
->> ?# ?undef mxc_cpu_type
->> -# ?define mxc_cpu_type __mxc_cpu_type
->> -# else
->> -# ?define mxc_cpu_type MXC_CPU_MX51
->> ?# endif
->> +# define mxc_cpu_type __mxc_cpu_type
->> ?# define cpu_is_mx51() ? ? ? ? ? ? ? (mxc_cpu_type == MXC_CPU_MX51)
->> ?# define cpu_is_mx53() ? ? ? ? ? ? ? (mxc_cpu_type == MXC_CPU_MX53)
->> ?#else
-> Here is a bug. ?cpu_is_mx53 will never be true for a mx5-only build.
-> (That is currently always true for images supporting mx5.)
->
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+> +	select SOC_IMX50
+> +	select IMX_HAVE_PLATFORM_IMX_I2C
+> +	select IMX_HAVE_PLATFORM_IMX_UART
+> +	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+> +	select IMX_HAVE_PLATFORM_SPI_IMX
+> +	help
+> +	  Include support for MX50 reference design board. This includes specific
+> +	  configurations for the board and its peripherals.
+> +
+>  endif
+> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+> index 6f4f212..bdd2696 100644
+> --- a/arch/arm/mach-mx5/Makefile
+> +++ b/arch/arm/mach-mx5/Makefile
+> @@ -15,3 +15,4 @@ obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd-baseboard.o
+>  obj-$(CONFIG_MACH_MX51_EFIKAMX) += board-mx51_efikamx.o
+>  
+>  obj-$(CONFIG_SOC_IMX50) += mm-mx50.o clock-mx50.o
+> +obj-$(CONFIG_MACH_MX50_RDP) += board-mx50_rdp.o
+> diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
+> new file mode 100644
+> index 0000000..61d7eb8
+> --- /dev/null
+> +++ b/arch/arm/mach-mx5/board-mx50_rdp.c
+> @@ -0,0 +1,232 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + */
+> +
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> +
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> +
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#include <linux/types.h>
+> +#include <linux/sched.h>
+> +#include <linux/delay.h>
+> +#include <linux/pm.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/init.h>
+> +#include <linux/input.h>
+> +#include <linux/nodemask.h>
+> +#include <linux/clk.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/fsl_devices.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/i2c.h>
+> +#include <linux/ata.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/map.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/pwm_backlight.h>
+> +#include <linux/fec.h>
+> +
+> +#include <mach/common.h>
+> +#include <mach/hardware.h>
+> +#include <mach/memory.h>
+> +#include <mach/gpio.h>
+> +#include <mach/mmc.h>
+> +#include <mach/iomux-mx50.h>
+> +#include <mach/i2c.h>
+> +#include <mach/imx-uart.h>
+> +
+> +#include <asm/irq.h>
+> +#include <asm/setup.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +#include <asm/mach/flash.h>
+are you sure you need all of these?
+
+> +
+> +#include "devices-mx50.h"
+> +
+> +static iomux_v3_cfg_t mx50rdp_pads[] = {
+const? __initconst?
+
+> +	/* SD1 */
+> +	MX50_PAD_ECSPI2_SS0__GPIO_4_19,
+> +	MX50_PAD_EIM_CRE__GPIO_1_27,
+> +	MX50_PAD_SD1_CMD__SD1_CMD,
+> +
+> +	MX50_PAD_SD1_CLK__SD1_CLK,
+> +	MX50_PAD_SD1_D0__SD1_D0,
+> +	MX50_PAD_SD1_D1__SD1_D1,
+> +	MX50_PAD_SD1_D2__SD1_D2,
+> +	MX50_PAD_SD1_D3__SD1_D3,
+> +
+> +	/* SD2 */
+> +	MX50_PAD_SD2_CD__GPIO_5_17,
+> +	MX50_PAD_SD2_WP__GPIO_5_16,
+> +	MX50_PAD_SD2_CMD__SD2_CMD,
+> +	MX50_PAD_SD2_CLK__SD2_CLK,
+> +	MX50_PAD_SD2_D0__SD2_D0,
+> +	MX50_PAD_SD2_D1__SD2_D1,
+> +	MX50_PAD_SD2_D2__SD2_D2,
+> +	MX50_PAD_SD2_D3__SD2_D3,
+> +	MX50_PAD_SD2_D4__SD2_D4,
+> +	MX50_PAD_SD2_D5__SD2_D5,
+> +	MX50_PAD_SD2_D6__SD2_D6,
+> +	MX50_PAD_SD2_D7__SD2_D7,
+> +
+> +	/* SD3 */
+> +	MX50_PAD_SD3_CMD__SD3_CMD,
+> +	MX50_PAD_SD3_CLK__SD3_CLK,
+> +	MX50_PAD_SD3_D0__SD3_D0,
+> +	MX50_PAD_SD3_D1__SD3_D1,
+> +	MX50_PAD_SD3_D2__SD3_D2,
+> +	MX50_PAD_SD3_D3__SD3_D3,
+> +	MX50_PAD_SD3_D4__SD3_D4,
+> +	MX50_PAD_SD3_D5__SD3_D5,
+> +	MX50_PAD_SD3_D6__SD3_D6,
+> +	MX50_PAD_SD3_D7__SD3_D7,
+> +
+> +	/* PWR_INT */
+> +	MX50_PAD_ECSPI2_MISO__GPIO_4_18,
+> +
+> +	/* UART pad setting */
+> +	MX50_PAD_UART1_TXD__UART1_TXD,
+> +	MX50_PAD_UART1_RXD__UART1_RXD,
+> +	MX50_PAD_UART1_RTS__UART1_RTS,
+> +	MX50_PAD_UART2_TXD__UART2_TXD,
+> +	MX50_PAD_UART2_RXD__UART2_RXD,
+> +	MX50_PAD_UART2_CTS__UART2_CTS,
+> +	MX50_PAD_UART2_RTS__UART2_RTS,
+> +
+> +	MX50_PAD_I2C1_SCL__I2C1_SCL,
+> +	MX50_PAD_I2C1_SDA__I2C1_SDA,
+> +	MX50_PAD_I2C2_SCL__I2C2_SCL,
+> +	MX50_PAD_I2C2_SDA__I2C2_SDA,
+> +
+> +	MX50_PAD_EPITO__USBH1_PWR,
+> +	/* Need to comment below line if
+> +	 * one needs to debug owire.
+> +	 */
+> +	MX50_PAD_OWIRE__USBH1_OC,
+> +	/* using gpio to control otg pwr */
+> +	MX50_PAD_PWM2__GPIO_6_25,
+> +	MX50_PAD_I2C3_SCL__USBOTG_OC,
+> +
+> +	MX50_PAD_SSI_RXC__FEC_MDIO,
+> +	MX50_PAD_SSI_RXC__FEC_MDIO,
+> +	MX50_PAD_DISP_D0__FEC_TXCLK,
+> +	MX50_PAD_DISP_D1__FEC_RX_ER,
+> +	MX50_PAD_DISP_D2__FEC_RX_DV,
+> +	MX50_PAD_DISP_D3__FEC_RXD1,
+> +	MX50_PAD_DISP_D4__FEC_RXD0,
+> +	MX50_PAD_DISP_D5__FEC_TX_EN,
+> +	MX50_PAD_DISP_D6__FEC_TXD1,
+> +	MX50_PAD_DISP_D7__FEC_TXD0,
+> +	MX50_PAD_SSI_RXFS__FEC_MDC,
+> +	MX50_PAD_I2C3_SDA__GPIO_6_23,
+> +	MX50_PAD_ECSPI1_SCLK__GPIO_4_12,
+> +
+> +	MX50_PAD_CSPI_SS0__CSPI_SS0,
+> +	MX50_PAD_ECSPI1_MOSI__CSPI_SS1,
+> +	MX50_PAD_CSPI_MOSI__CSPI_MOSI,
+> +	MX50_PAD_CSPI_MISO__CSPI_MISO,
+> +
+> +	/* SGTL500_OSC_EN */
+> +	MX50_PAD_UART1_CTS__GPIO_6_8,
+> +
+> +	/* SGTL_AMP_SHDN */
+> +	MX50_PAD_UART3_RXD__GPIO_6_15,
+> +
+> +	/* Keypad */
+> +	MX50_PAD_KEY_COL0__KEY_COL0,
+> +	MX50_PAD_KEY_ROW0__KEY_ROW0,
+> +	MX50_PAD_KEY_COL1__KEY_COL1,
+> +	MX50_PAD_KEY_ROW1__KEY_ROW1,
+> +	MX50_PAD_KEY_COL2__KEY_COL2,
+> +	MX50_PAD_KEY_ROW2__KEY_ROW2,
+> +	MX50_PAD_KEY_COL3__KEY_COL3,
+> +	MX50_PAD_KEY_ROW3__KEY_ROW3,
+> +	MX50_PAD_EIM_DA0__KEY_COL4,
+> +	MX50_PAD_EIM_DA1__KEY_ROW4,
+> +	MX50_PAD_EIM_DA2__KEY_COL5,
+> +	MX50_PAD_EIM_DA3__KEY_ROW5,
+> +	MX50_PAD_EIM_DA4__KEY_COL6,
+> +	MX50_PAD_EIM_DA5__KEY_ROW6,
+> +	MX50_PAD_EIM_DA6__KEY_COL7,
+> +	MX50_PAD_EIM_DA7__KEY_ROW7,
+> +	/*EIM pads */
+> +	MX50_PAD_EIM_DA8__GPIO_1_8,
+> +	MX50_PAD_EIM_DA9__GPIO_1_9,
+> +	MX50_PAD_EIM_DA10__GPIO_1_10,
+> +	MX50_PAD_EIM_DA11__GPIO_1_11,
+> +	MX50_PAD_EIM_DA12__GPIO_1_12,
+> +	MX50_PAD_EIM_DA13__GPIO_1_13,
+> +	MX50_PAD_EIM_DA14__GPIO_1_14,
+> +	MX50_PAD_EIM_DA15__GPIO_1_15,
+> +	MX50_PAD_EIM_CS2__GPIO_1_16,
+> +	MX50_PAD_EIM_CS1__GPIO_1_17,
+> +	MX50_PAD_EIM_CS0__GPIO_1_18,
+> +	MX50_PAD_EIM_EB0__GPIO_1_19,
+> +	MX50_PAD_EIM_EB1__GPIO_1_20,
+> +	MX50_PAD_EIM_WAIT__GPIO_1_21,
+> +	MX50_PAD_EIM_BCLK__GPIO_1_22,
+> +	MX50_PAD_EIM_RDY__GPIO_1_23,
+> +	MX50_PAD_EIM_OE__GPIO_1_24,
+> +};
+> +
+> +/* Serial ports */
+> +#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
+please add all devices unconditionally
+
+> +static const struct imxuart_platform_data uart_pdata __initconst = {
+> +	.flags = IMXUART_HAVE_RTSCTS,
+> +};
+> +
+> +static inline void mxc_init_imx_uart(void)
+> +{
+> +	imx50_add_imx_uart(0, &uart_pdata);
+> +	imx50_add_imx_uart(1, &uart_pdata);
+> +}
+> +#else /* !SERIAL_IMX */
+> +static inline void mxc_init_imx_uart(void)
+> +{
+> +}
+> +#endif /* SERIAL_IMX */
+> +
+> +/*!
+s/!//
+
+> + * Board specific initialization.
+> + */
+> +static void __init mxc_board_init(void)
+> +{
+> +	mxc_iomux_v3_setup_multiple_pads(mx50rdp_pads,
+> +					ARRAY_SIZE(mx50rdp_pads));
+> +	mxc_init_imx_uart();
+> +
+> +}
+> +
+> +static void __init mx50_rdp_timer_init(void)
+> +{
+> +	mx50_clocks_init(32768, 24000000, 22579200);
+> +}
+> +
+> +static struct sys_timer mxc_timer = {
+> +	.init	= mx50_rdp_timer_init,
+> +};
+> +
+> +/*
+> + * The following uses standard kernel macros define in arch.h in order to
+> + * initialize __mach_desc_MX50_RDP data structure.
+> + */
+> +MACHINE_START(MX50_RDP, "Freescale MX50 Reference Design Platform")
+> +	.map_io = mx50_map_io,
+> +	.init_irq = mx50_init_irq,
+> +	.init_machine = mxc_board_init,
+> +	.timer = &mxc_timer,
+> +MACHINE_END
+> diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+> index 9dd9c20..5ccf3ef 100644
+> --- a/arch/arm/plat-mxc/include/mach/uncompress.h
+> +++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+> @@ -63,6 +63,7 @@ static inline void flush(void)
+>  #define MX3X_UART1_BASE_ADDR	0x43F90000
+>  #define MX3X_UART2_BASE_ADDR	0x43F94000
+>  #define MX51_UART1_BASE_ADDR	0x73fbc000
+> +#define MX50_UART1_BASE_ADDR	0x53fbc000
+>  
+>  static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+>  {
+> @@ -102,6 +103,9 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+>  	case MACH_TYPE_EUKREA_CPUIMX51SD:
+>  		uart_base = MX51_UART1_BASE_ADDR;
+>  		break;
+> +	case MACH_TYPE_MX50_RDP:
+> +		uart_base = MX50_UART1_BASE_ADDR;
+> +		break;
+>  	default:
+>  		break;
+>  	}
+> -- 
+> 1.6.3.3
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
