@@ -1,172 +1,129 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 9 Dec 2010 23:12:40 +0800
-Subject: [PATCH v3 05/15] ARM: mxs: Add low-level debug UART support
+Date: Thu, 9 Dec 2010 23:12:45 +0800
+Subject: [PATCH v2 10/15] ARM: mxs: Add static memory mapping
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1291907569-8925-5-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1291907569-8925-10-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- - DEBUG_LL support, which is incompatible with multi-soc MXS image
-   because of different DUART base address on MX23 and MX28
- - uncompress message support
+Create static memory mapping for MX23 and MX28.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
-Changes for v3:
- - debug-macro.S: change inclusion of hardware.h to mx23.h plus mx28.h
- - Remove #define __MXS_BOOT_UNCOMPRESS
- - Add namespace MXS_DUART_ for macros
- - Add comment "If it's not, the output is simply discarded."
-
 Changes for v2:
- - Remove incorrect comments
+ - Change the inclusion of hardware.h to mx23.h and mx28.h respectively
+ - Remove the call to mxs_iomux_init() and mxs_arch_reset_init() from
+   map_io callback, and turn them into __initcall, as the call here is
+   a little late.
 
- arch/arm/mach-mxs/include/mach/debug-macro.S |   52 ++++++++++++++++++
- arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
- 2 files changed, 128 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
+ arch/arm/mach-mxs/mm-mx23.c |   45 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/mm-mx28.c |   45 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 90 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mm-mx23.c
+ create mode 100644 arch/arm/mach-mxs/mm-mx28.c
 
-diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+diff --git a/arch/arm/mach-mxs/mm-mx23.c b/arch/arm/mach-mxs/mm-mx23.c
 new file mode 100644
-index 0000000..a1522fd
+index 0000000..5148cd6
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
-@@ -0,0 +1,52 @@
-+/* arch/arm/mach-mxs/include/mach/debug-macro.S
++++ b/arch/arm/mach-mxs/mm-mx23.c
+@@ -0,0 +1,45 @@
++/*
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * Debugging macro include header
++ * The code contained herein is licensed under the GNU General Public
++ * License.  You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
 + *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
++ * Create static mapping between physical to virtual memory.
 + */
++
++#include <linux/mm.h>
++#include <linux/init.h>
++
++#include <asm/mach/map.h>
 +
 +#include <mach/mx23.h>
-+#include <mach/mx28.h>
++#include <mach/common.h>
++#include <mach/iomux.h>
 +
-+#ifdef CONFIG_SOC_IMX23
-+#ifdef UART_PADDR
-+#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-+#endif
-+#define UART_PADDR	MX23_DUART_BASE_ADDR
-+#endif
++/*
++ * Define the MX23 memory map.
++ */
++static struct map_desc mx23_io_desc[] __initdata = {
++	mxs_map_entry(MX23, OCRAM, MT_DEVICE),
++	mxs_map_entry(MX23, IO, MT_DEVICE),
++};
 +
-+#ifdef CONFIG_SOC_IMX28
-+#ifdef UART_PADDR
-+#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-+#endif
-+#define UART_PADDR	MX28_DUART_BASE_ADDR
-+#endif
++/*
++ * This function initializes the memory map. It is called during the
++ * system startup to create static physical to virtual memory mappings
++ * for the IO modules.
++ */
++void __init mx23_map_io(void)
++{
++	iotable_init(mx23_io_desc, ARRAY_SIZE(mx23_io_desc));
++}
 +
-+#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
-+
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =UART_PADDR	@ physical
-+		ldr	\rv, =UART_VADDR	@ virtual
-+		.endm
-+
-+		.macro	senduart, rd, rx
-+		str	\rd, [\rx, #0x0]	@ DR
-+		.endm
-+
-+		.macro	waituart, rd, rx
-+1001:		ldr	\rd, [\rx, #0x18]	@ FR
-+		tst	\rd, #1 << 5		@ FR_TXFF
-+		bne	1001b
-+		.endm
-+
-+		.macro	busyuart, rd, rx
-+1002:		ldr	\rd, [\rx, #0x18]	@ FR
-+		tst	\rd, #1 << 3		@ FR_BUSY
-+		beq	1002b
-+		.endm
-diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
++void __init mx23_init_irq(void)
++{
++	icoll_init_irq();
++	mx23_register_gpios();
++}
+diff --git a/arch/arm/mach-mxs/mm-mx28.c b/arch/arm/mach-mxs/mm-mx28.c
 new file mode 100644
-index 0000000..793d92e
+index 0000000..7e4cea3
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/uncompress.h
-@@ -0,0 +1,76 @@
++++ b/arch/arm/mach-mxs/mm-mx28.c
+@@ -0,0 +1,45 @@
 +/*
-+ *  arch/arm/mach-mxs/include/mach/uncompress.h
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ *  Copyright (C) 1999 ARM Limited
-+ *  Copyright (C) Shane Nay (shane@minirl.com)
-+ *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * The code contained herein is licensed under the GNU General Public
++ * License.  You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __MACH_MXS_UNCOMPRESS_H__
-+#define __MACH_MXS_UNCOMPRESS_H__
-+
-+#include <asm/mach-types.h>
-+
-+static unsigned long uart_base;
-+
-+#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
-+
-+#define MXS_DUART_DR		0x00
-+#define MXS_DUART_FR		0x18
-+#define MXS_DUART_FR_TXFE	(1 << 7)
-+#define MXS_DUART_CR		0x30
-+#define MXS_DUART_CR_UARTEN	(1 << 0)
-+
-+/*
-+ * The following code assumes the serial port has already been
-+ * initialized by the bootloader. If it's not, the output is
-+ * simply discarded.
++ * Create static mapping between physical to virtual memory.
 + */
 +
-+static void putc(int ch)
++#include <linux/mm.h>
++#include <linux/init.h>
++
++#include <asm/mach/map.h>
++
++#include <mach/mx28.h>
++#include <mach/common.h>
++#include <mach/iomux.h>
++
++/*
++ * Define the MX28 memory map.
++ */
++static struct map_desc mx28_io_desc[] __initdata = {
++	mxs_map_entry(MX28, OCRAM, MT_DEVICE),
++	mxs_map_entry(MX28, IO, MT_DEVICE),
++};
++
++/*
++ * This function initializes the memory map. It is called during the
++ * system startup to create static physical to virtual memory mappings
++ * for the IO modules.
++ */
++void __init mx28_map_io(void)
 +{
-+	if (!uart_base)
-+		return;
-+	if (!(UART(MXS_DUART_CR) & MXS_DUART_CR_UARTEN))
-+		return;
-+
-+	while (!(UART(MXS_DUART_FR) & MXS_DUART_FR_TXFE))
-+		barrier();
-+
-+	UART(MXS_DUART_DR) = ch;
++	iotable_init(mx28_io_desc, ARRAY_SIZE(mx28_io_desc));
 +}
 +
-+static inline void flush(void)
++void __init mx28_init_irq(void)
 +{
++	icoll_init_irq();
++	mx28_register_gpios();
 +}
-+
-+#define MX23_DUART_BASE_ADDR	0x80070000
-+#define MX28_DUART_BASE_ADDR	0x80074000
-+
-+static __inline__ void __arch_decomp_setup(unsigned long arch_id)
-+{
-+	switch (arch_id) {
-+	case MACH_TYPE_MX23EVK:
-+		uart_base = MX23_DUART_BASE_ADDR;
-+		break;
-+	case MACH_TYPE_MX28EVK:
-+		uart_base = MX28_DUART_BASE_ADDR;
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
-+#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
-+#define arch_decomp_wdog()
-+
-+#endif /* __MACH_MXS_UNCOMPRESS_H__ */
 -- 
 1.7.1
