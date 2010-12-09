@@ -1,75 +1,77 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 10 Dec 2010 00:33:32 +0100
-Subject: [PATCH 2/5] OMAP4: hwmod data: Add SYSS_HAS_RESET_STATUS flag
+Date: Fri, 10 Dec 2010 00:33:33 +0100
+Subject: [PATCH 3/5] OMAP4: hwmod data: Fix missing address in DMM and EMIF_FW
 In-Reply-To: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
 References: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1291937615-18571-3-git-send-email-b-cousson@ti.com>
+Message-ID: <1291937615-18571-4-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the data for GPIO, UART, WD_TIMER and I2C in order to
-support the new reset status flag introduce in the following
-commit:
-commit 2cb068149c365f1c2b10f2ece6786139527dcc16
-OMAP: hwmod: Fix softreset status check for some new OMAP4 IPs
-
-Without this flag properly set, the reset is done, but the hwmod
-core code will not wait for the reset completion to continue its
-excecution.
+The DMM is a piece of interconnect that need to be configured properly
+for the tiler functionnality. It thus exposes some configuration registers
+that were missing previously.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Tested-by: Charulatha V <charu@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Govindraj.R <govindraj.raja@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   12 +++++++-----
- 1 files changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   26 +++++++++++++++++++++++---
+ 1 files changed, 23 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index d8ef977..1e3a94e 100644
+index 1e3a94e..7dccba3 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -518,8 +518,9 @@ static struct omap_hwmod_class_sysconfig omap44xx_gpio_sysc = {
- 	.rev_offs	= 0x0000,
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0114,
--	.sysc_flags	= (SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
--			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_ENAWAKEUP |
-+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
+@@ -68,7 +68,15 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_1__dmm = {
+ 	.master		= &omap44xx_l3_main_1_hwmod,
+ 	.slave		= &omap44xx_dmm_hwmod,
+ 	.clk		= "l3_div_ck",
+-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++	.user		= OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_addr_space omap44xx_dmm_addrs[] = {
++	{
++		.pa_start	= 0x4e000000,
++		.pa_end		= 0x4e0007ff,
++		.flags		= ADDR_TYPE_RT
++	},
  };
-@@ -852,7 +853,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_i2c_sysc = {
- 	.syss_offs	= 0x0090,
- 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
- 			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
--			   SYSC_HAS_SOFTRESET),
-+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ 
+ /* mpu -> dmm */
+@@ -76,7 +84,9 @@ static struct omap_hwmod_ocp_if omap44xx_mpu__dmm = {
+ 	.master		= &omap44xx_mpu_hwmod,
+ 	.slave		= &omap44xx_dmm_hwmod,
+ 	.clk		= "l3_div_ck",
+-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++	.addr		= omap44xx_dmm_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_dmm_addrs),
++	.user		= OCP_USER_MPU,
  };
-@@ -1124,7 +1125,8 @@ static struct omap_hwmod_class_sysconfig omap44xx_uart_sysc = {
- 	.sysc_offs	= 0x0054,
- 	.syss_offs	= 0x0058,
- 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_ENAWAKEUP |
--			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ 
+ /* dmm slave ports */
+@@ -116,12 +126,22 @@ static struct omap_hwmod_ocp_if omap44xx_dmm__emif_fw = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
  };
-@@ -1354,7 +1356,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_wd_timer_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_EMUFREE | SYSC_HAS_SIDLEMODE |
--			   SYSC_HAS_SOFTRESET),
-+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ 
++static struct omap_hwmod_addr_space omap44xx_emif_fw_addrs[] = {
++	{
++		.pa_start	= 0x4a20c000,
++		.pa_end		= 0x4a20c0ff,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
+ /* l4_cfg -> emif_fw */
+ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__emif_fw = {
+ 	.master		= &omap44xx_l4_cfg_hwmod,
+ 	.slave		= &omap44xx_emif_fw_hwmod,
+ 	.clk		= "l4_div_ck",
+-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++	.addr		= omap44xx_emif_fw_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_emif_fw_addrs),
++	.user		= OCP_USER_MPU,
  };
+ 
+ /* emif_fw slave ports */
 -- 
 1.7.0.4
