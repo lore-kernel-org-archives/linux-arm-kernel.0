@@ -1,58 +1,35 @@
-From: subaparts@yandex.ru (Alexander)
-Date: Thu, 09 Dec 2010 03:43:49 +0300
-Subject: [PATCH] ASoC: EP93xx: sampling rate range extended
-In-Reply-To: <20101208124637.GD16418@rakim.wolfsonmicro.main>
-References: <1291809693.31916.2.camel@r60e>
-	<20101208124637.GD16418@rakim.wolfsonmicro.main>
-Message-ID: <1291855429.31916.90.camel@r60e>
+From: simon@horms.net (Simon Horman)
+Date: Thu, 9 Dec 2010 09:43:56 +0900
+Subject: [PATCH] rfc v2: ARM: mach-shmobile: mackerel: Add zboot support
+In-Reply-To: <20101209002512.GB13412@linux-sh.org>
+References: <1291850087-11388-1-git-send-email-horms@verge.net.au>
+	<20101209002512.GB13412@linux-sh.org>
+Message-ID: <20101209004356.GA21650@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Sverdlin <subaparts@yandex.ru>
+On Thu, Dec 09, 2010 at 09:25:12AM +0900, Paul Mundt wrote:
+> On Thu, Dec 09, 2010 at 08:14:47AM +0900, Simon Horman wrote:
+> > * Use head-mackerel.txt for Mackerel.
+> >   head-ap4evb.txt was used by mistake.
+> > 
+> ...
+> 
+> > diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
+> > index 3ad86b7..994b891 100644
+> > --- a/arch/arm/mach-shmobile/include/mach/zboot.h
+> > +++ b/arch/arm/mach-shmobile/include/mach/zboot.h
+> > @@ -13,6 +13,9 @@
+> >  #ifdef CONFIG_MACH_AP4EVB
+> >  #define MACH_TYPE	MACH_TYPE_AP4EVB
+> >  #include "mach/head-ap4evb.txt"
+> > +#elif CONFIG_MACH_MACKEREL
+> > +#define MACH_TYPE	MACH_TYPE_MACKEREL
+> > +#include "mach/head-ap4evb.txt"
+> >  #else
+> >  #error "unsupported board."
+> >  #endif
+> 
+> Looks like it still does?
 
-Changes to both I2S and PCM code:
-- Rates list extended up to 96kHz, it's tested on EDB9302 and works for both capture and
-  playback.
-
-Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
----
- sound/soc/ep93xx/ep93xx-i2s.c |    4 ++--
- sound/soc/ep93xx/ep93xx-pcm.c |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/sound/soc/ep93xx/ep93xx-i2s.c b/sound/soc/ep93xx/ep93xx-i2s.c
-index 4f48733..9ac93f6 100644
---- a/sound/soc/ep93xx/ep93xx-i2s.c
-+++ b/sound/soc/ep93xx/ep93xx-i2s.c
-@@ -352,13 +352,13 @@ static struct snd_soc_dai_driver ep93xx_i2s_dai = {
- 	.playback	= {
- 		.channels_min	= 2,
- 		.channels_max	= 2,
--		.rates		= SNDRV_PCM_RATE_8000_48000,
-+		.rates		= SNDRV_PCM_RATE_8000_96000,
- 		.formats	= EP93XX_I2S_FORMATS,
- 	},
- 	.capture	= {
- 		 .channels_min	= 2,
- 		 .channels_max	= 2,
--		 .rates		= SNDRV_PCM_RATE_8000_48000,
-+		 .rates		= SNDRV_PCM_RATE_8000_96000,
- 		 .formats	= EP93XX_I2S_FORMATS,
- 	},
- 	.ops		= &ep93xx_i2s_dai_ops,
-diff --git a/sound/soc/ep93xx/ep93xx-pcm.c b/sound/soc/ep93xx/ep93xx-pcm.c
-index 2f121dd..0667077 100644
---- a/sound/soc/ep93xx/ep93xx-pcm.c
-+++ b/sound/soc/ep93xx/ep93xx-pcm.c
-@@ -35,9 +35,9 @@ static const struct snd_pcm_hardware ep93xx_pcm_hardware = {
- 				   SNDRV_PCM_INFO_INTERLEAVED	|
- 				   SNDRV_PCM_INFO_BLOCK_TRANSFER),
- 				   
--	.rates			= SNDRV_PCM_RATE_8000_48000,
-+	.rates			= SNDRV_PCM_RATE_8000_96000,
- 	.rate_min		= SNDRV_PCM_RATE_8000,
--	.rate_max		= SNDRV_PCM_RATE_48000,
-+	.rate_max		= SNDRV_PCM_RATE_96000,
- 	
- 	.formats		= (SNDRV_PCM_FMTBIT_S16_LE |
- 				   SNDRV_PCM_FMTBIT_S24_LE |
+oops
