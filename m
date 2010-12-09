@@ -1,70 +1,32 @@
-From: carmelo.amoroso@st.com (Carmelo AMOROSO)
-Date: Thu, 9 Dec 2010 16:56:26 +0100
-Subject: [PATCH (sh-2.6) 1/2] sh: add stack smashing protection support
-In-Reply-To: <20101208044052.GA31508@linux-sh.org>
-References: <1291717254-17455-1-git-send-email-filippo.arcidiacono@st.com>
-	<201012071515.25418.vapier@gentoo.org>
-	<20101208044052.GA31508@linux-sh.org>
-Message-ID: <4D00FC2A.8040309@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Dec 2010 16:04:03 +0000
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
+	RWFO fix
+In-Reply-To: <20101124183936.GA18796@mvista.com>
+References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
+	<20101124183936.GA18796@mvista.com>
+Message-ID: <AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
+> Updated according to the comments to avoid r/w outside the buffer and
+> used byte r/w for the possible unaligned data. Seems to work fine.
+>
+> Cache ownership must be acqired by reading/writing data from the
+> cache line to make cache operation have the desired effect on the
+> SMP MPCore CPU. However, the ownership is never aquired in the
+> v6_dma_inv_range function when cleaning the first line and
+> flushing the last one, in case the address is not aligned
+> to D_CACHE_LINE_SIZE boundary.
+> Fix this by reading/writing data if needed, before performing
+> cache operations.
+> While at it, fix v6_dma_flush_range to prevent RWFO outside
+> the buffer.
+>
+> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+> Signed-off-by: George G. Davis <gdavis@mvista.com>
 
-On 12/8/2010 5:40 AM, Paul Mundt wrote:
-> On Tue, Dec 07, 2010 at 03:15:23PM -0500, Mike Frysinger wrote:
->  > On Tuesday, December 07, 2010 05:20:53 Filippo ARCIDIACONO wrote:
->  > > Add stack smashing suppurt for SH architecture. This is based on work
->  > > from Nicolas Pitre for ARM (c743f38013aeff58ef6252601e397b5ba281c633).
->  > > Use the ARM boot_init_stack_canary function to initialize the guard
->  > > canary. It has been placed under asm-generic to allow archtectures
->  > > based on __stack_chk_guard to use a common implementation.
->  > > Update the __stack_chk_guard global variable with the value stored in
->  > > the task struct whenever a task switch occurs to allow for different
->  > > canary values per task. This cannot work on SMP where the initial
->  > > canary value is always used.
->  > >
->  > > arch/sh/Kconfig | 13 +++++++++++
->  > > arch/sh/Makefile | 4 +++
->  > > arch/sh/include/asm/stackprotector.h | 10 ++++++++
->  > > arch/sh/kernel/process_32.c | 9 +++++++
->  > > include/asm-generic/stackprotector.h | 39
->  >
->  > if you're starting asm-generic stuff, why not go the distance and do it all in
->  > common code ? your sh/Kconfig and sh/Makefile changes arent specific to
->  > SuperH, nor is the symbol in process_32.c.
-> 
-> Indeed. It would be nice to simply shove this in to lib/ with the
-> Makefile bits in the top-level Makefile.
-> 
+I eventually found a bit of time to look at this. The patch looks fine to me:
 
-Hi Paul, Mike
-thanks for your feedback.
-
-I agree with you that the Kconfig and Makefile changes are not arch
-specific, so these changes can be moved to a common code (even if I
-don't know if other archs do support SSP).
-In the current kernel, only x86 and ARM added this support, so I'm
-wondering if, moving SSP to the common Makefile, it needs to depend on
-x86, ARM, SH being configured ?
-
-Regarding the __stack_chk_guard symbol defined in process[_32].c, I
-don't know if all archs need to define this global variable to implement
-SSP. For sure x86 does not need it. It depends on how the gcc implements
-this feature. This was mainly the reason for which we defined it
-specifically in an arch specific code.
-
-What is your opinion ?
-
-Thanks,
-Carmelo & Filippo
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.10 (MingW32)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-
-iEYEARECAAYFAk0A/CoACgkQoRq/3BrK1s/slgCg2GVWo/uuURyvmu1401rQWP74
-L3UAoNwppj1eZFpReEe0wCIbalZ7ksMs
-=kDGH
------END PGP SIGNATURE-----
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
