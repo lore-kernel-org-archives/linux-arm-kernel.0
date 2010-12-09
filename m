@@ -1,81 +1,98 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Thu, 9 Dec 2010 15:04:37 +0800
-Subject: [PATCH v2 14/15] ARM: mxs: Add initial mx28evk support
-In-Reply-To: <20101208202822.GD17441@pengutronix.de>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
-	<20101208202822.GD17441@pengutronix.de>
-Message-ID: <AANLkTiny2P3RobZfq_G_OPHu_SLjZ2w9CFhU7HgL3VPx@mail.gmail.com>
+From: tsoni@codeaurora.org (Trilok Soni)
+Date: Thu, 09 Dec 2010 12:36:54 +0530
+Subject: [PATCH] msm: trout: add keypad support
+In-Reply-To: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
+References: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
+Message-ID: <4D00800E.7050004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Daniel,
 
-2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Shawn,
->
-> On Wed, Dec 08, 2010 at 12:32:02AM +0800, Shawn Guo wrote:
->> Add initial mx28evk support with duart and fec0.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
->> ---
->> Changes for v2:
->> ?- Change function mx28evk_fec_reset() from inline to __init
->> ?- Enable pll2 clock before phy operation
->> ?- Add error checking for gpio_direction_output()
->> ?- Save bytes by passing parameter into pr_err format string
->> ?- Change mx28_add_fec0() to mx28_add_fec(0)
->> ?- Remove boot_params
->>
->> ?arch/arm/mach-mxs/mach-mx28evk.c | ?126 ++++++++++++++++++++++++++++++++++++++
->> ?1 files changed, 126 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
->>
->> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
->> new file mode 100644
->> index 0000000..3e8e37a
->> --- /dev/null
->> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
->> @@ -0,0 +1,126 @@
->> +/*
->> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/delay.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/gpio.h>
->> +#include <linux/irq.h>
->> +#include <linux/clk.h>
->> +
->> +#include <asm/mach-types.h>
->> +#include <asm/mach/arch.h>
->> +#include <asm/mach/time.h>
->> +
->> +#include <mach/hardware.h>
->> +#include <mach/common.h>
->> +#include <mach/iomux-mx28.h>
->> +
->> +#include "devices-mx28.h"
->> +#include "gpio.h"
->> +
->> +#define MX28EVK_FEC_PHY_POWER ? ? ? ?MXS_GPIO_NR(2, 15)
->> +#define MX28EVK_FEC_PHY_RESET ? ? ? ?MXS_GPIO_NR(4, 13)
->> +
->> +static iomux_cfg_t mx28evk_pads[] = {
-> This can be const and __initconst, ditto for mx23evk
->
-With u64 iomux_cfg_t changes, I'm afraid the suggestion becomes invalid.
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/board-trout-keypad.c
+> @@ -0,0 +1,342 @@
+> +/* arch/arm/mach-msm/board-trout-keypad.c
+
+No paths please.
+
+> + *
+> + * Copyright (C) 2008 Google, Inc.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful),
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/input.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/input/matrix_keypad.h>
+> +#include <linux/gpio_keys.h>
+> +#include <asm/mach-types.h>
+> +
+> +#include "board-trout.h"
+> +
+> +static char *keycaps = "--qwerty";
+> +#undef MODULE_PARAM_PREFIX
+> +#define MODULE_PARAM_PREFIX "board_trout."
+> +module_param_named(keycaps, keycaps, charp, 0);
+
+I would like to know what is the use of this param?
+
+> +
+> +
+> +static unsigned int trout_col_gpios[] = { 35, 34, 33, 32, 31, 23, 30, 78 };
+> +static unsigned int trout_row_gpios[] = { 42, 41, 40, 39, 38, 37, 36 };
+
+const?
+
+> +
+> +static unsigned int trout_col_gpios_evt2[] = { 35, 34, 33, 32, 31, 23, 30, 109 };
+> +static unsigned int trout_row_gpios_evt2[] = { 42, 41, 40, 39, 38, 37, 36 };
+
+const?
+
+> +static int __init trout_init_keypad(void)
+> +{
+> +	int ret;
+> +
+> +	if (!machine_is_trout())
+> +		return 0;
+> +
+> +	switch (system_rev) {
+> +	case 0:
+> +		/* legacy default keylayout */
+> +		break;
+> +	case 1:
+> +		/* v1 has a new keyboard layout */
+> +		trout_pdata.keymap_data = &trout_keymap_data_2_1;
+> +		trout_pdata.col_gpios = trout_col_gpios_evt2;
+> +		trout_pdata.row_gpios = trout_row_gpios_evt2;
+> +
+> +		/* userspace needs to know about these changes as well */
+
+?? what is the meaning of this comment?
+
+> +		break;
+> +	default: /* 2, 3, 4 currently */
+> +		/* v2 has a new keyboard layout */
+> +		trout_pdata.keymap_data = &trout_keymap_data_2_2;
+> +		trout_pdata.col_gpios = trout_col_gpios_evt2;
+> +		trout_pdata.row_gpios = trout_row_gpios_evt2;
+> +
+> +		/* userspace needs to know about these changes as well */
+
+ditto.
+
+---Trilok Soni
 
 -- 
-Regards,
-Shawn
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
