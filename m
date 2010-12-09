@@ -1,85 +1,32 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 9 Dec 2010 17:03:10 +0000
-Subject: [PATCH 8/8] arm: omap: add minimal support for RM-680
-In-Reply-To: <1291912764-12823-9-git-send-email-aaro.koskinen@nokia.com>
-References: <1291912764-12823-1-git-send-email-aaro.koskinen@nokia.com>
-	<1291912764-12823-9-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <20101209170310.GC2763@pulham.picochip.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 9 Dec 2010 18:03:57 +0100
+Subject: [PATCH 13/20] mfd/tc3589x: add suspend/resume support
+In-Reply-To: <1291388753-14662-14-git-send-email-sundar.iyer@stericsson.com>
+References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
+	<1291388753-14662-14-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <20101209170356.GY8884@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aaro,
+Hi Sundar,
 
-A couple of small comments below, otherwise looks nice to me.
+On Fri, Dec 03, 2010 at 08:35:46PM +0530, Sundar Iyer wrote:
 
-Jamie
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
-On Thu, Dec 09, 2010 at 06:39:24PM +0200, Aaro Koskinen wrote:
-> Add minimal support for Nokia RM-680 board.
-> 
-> Tested with omap2plus_defconfig.
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> ---
-[...]
-> +#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
-> +	defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
-> +static struct omap_onenand_platform_data board_onenand_data[] = {
-> +	{
-> +		.gpio_irq	= 65,
-> +		.flags		= ONENAND_SYNC_READWRITE,
-> +	}
+One remark though:
+> +
+> +static const struct dev_pm_ops tc3589x_dev_pm_ops = {
+> +	.suspend = tc3589x_suspend,
+> +	.resume  = tc3589x_resume,
 > +};
 > +#endif
-> +
-> +/* eMMC */
-> +static struct omap2_hsmmc_info mmc[] __initdata = {
-> +	{
-> +		.name		= "internal",
-> +		.mmc		= 2,
-> +		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_MMC_HIGHSPEED,
-> +		.gpio_cd	= -EINVAL,
-> +		.gpio_wp	= -EINVAL,
-> +	},
-> +	{ /* Terminator */ }
-> +};
-> +
-> +static void __init rm680_peripherals_init(void)
-> +{
-> +	platform_add_devices(rm680_peripherals_devices,
-> +				ARRAY_SIZE(rm680_peripherals_devices));
-> +	rm680_i2c_init();
-> +	gpmc_onenand_init(board_onenand_data);
-What happens if CONFIG_MTD_ONENAND_OMAP2=n and 
-CONFIG_MTD_ONENAND_OMAP2_MODULE=n? Do you need to define board_onenand_data to 
-NULL if these aren't enabled?
+SIMPLE_DEV_PM_OPS or UNIVERSAL_DEV_PM_OPS may be useful and save one ifdef
+here.
 
-> +	omap2_hsmmc_init(mmc);
-> +}
-> +
-> +static void __init rm680_init_irq(void)
-> +{
-> +	struct omap_sdrc_params *sdrc_params;
-> +
-> +	sdrc_params = nokia_get_sdram_timings();
-> +	omap2_init_common_hw(sdrc_params, sdrc_params);
-> +	omap_init_irq();
-> +	omap_gpio_init();
-> +}
-> +
-> +#ifdef CONFIG_OMAP_MUX
-> +static struct omap_board_mux board_mux[] __initdata = {
-> +	{ .reg_offset = OMAP_MUX_TERMINATOR },
-> +};
-> +#endif
-> +
-> +static struct omap_musb_board_data rm680_musb_data = {
-> +	.interface_type	= MUSB_INTERFACE_ULPI,
-> +	.mode		= MUSB_PERIPHERAL,
-> +	.power		= 100,
-> +};
-> +
-> +static void __init rm680_init(void)
-> +{
-> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-The same here as with the onenand data.
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
