@@ -1,324 +1,215 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 9 Dec 2010 23:12:41 +0800
-Subject: [PATCH v4 06/15] ARM: mxs: Add timer support
+Date: Thu, 9 Dec 2010 23:12:38 +0800
+Subject: [PATCH v4 03/15] ARM: mxs: Add reset routines
 In-Reply-To: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
 References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1291907569-8925-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1291907569-8925-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 2 versions of the timrot on Freescale MXS-based SoCs.
-The v1 on MX23 only gets 16 bits counter, while v2 on MX28
-extends the counter to 32 bits.
-
-The implementation uses two timers, one for clock_event and
-another for clocksource. MX28 uses timer0 and timer1, while
-MX23 uses timer0 and timer3.
+ - The mxs wdog is implemented in RTC block.
+ - There is a generic software reset routine for most modules on mxs.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
 Changes for v4:
- - Change inclusion of hardware.h to mxs.h
- - Use two timers on MX28 also to simpify timrotv2_set_next_event()
- - MX23 and MX28 share the common timrot base address, so it can be
-   a hard-assignment.
- - Pass &clockevent_mxs to mxs_timer_interrupt via mxs_timer_irq.dev_id
- - Fix code of setting far-far future
- - Change printk to pr_info and pr_err
- - Change timrotv2 min_delta_ns to 0xf
+ - Add blank line above comment to make the code easy to read
+ - Tell compiler unlikely(ret)
+ - Make mxs_arch_reset_init __initcall
 
 Changes for v3:
- - Use term clock_event over next_event and clocksource over get_cycles
- - Split BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL into two definitions for v1 and v2 respectively
- - Turn timrot_get_cycles() into timrotv1_get_cycles() and timrotv2_get_cycles()
- - Turn timrot_set_next_event() into timrotv1_set_next_event() and timrotv2_set_next_event()
- - Skip flag IRQF_DISABLED
- - Remove unncessary IRQ disabling in mxs_set_mode()
- - Change shift of clocksource_mxs to 17
+ - Change wdog timeout to 10ms for safety
+ - Simplify function mxs_reset_block() to get it look better
 
 Changes for v2:
- - Fix a bug in timrot_set_next_event(). It should read
-   HW_TIMROT_RUNNING_COUNTn to get the current counts.
+ - Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
 
- arch/arm/mach-mxs/timer.c |  270 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 270 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/timer.c
+ arch/arm/mach-mxs/include/mach/system.h |   27 ++++++
+ arch/arm/mach-mxs/system.c              |  142 +++++++++++++++++++++++++++++++
+ 2 files changed, 169 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/system.h
+ create mode 100644 arch/arm/mach-mxs/system.c
 
-diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+diff --git a/arch/arm/mach-mxs/include/mach/system.h b/arch/arm/mach-mxs/include/mach/system.h
 new file mode 100644
-index 0000000..75f2805
+index 0000000..0e42823
 --- /dev/null
-+++ b/arch/arm/mach-mxs/timer.c
-@@ -0,0 +1,270 @@
++++ b/arch/arm/mach-mxs/include/mach/system.h
+@@ -0,0 +1,27 @@
 +/*
-+ *  Copyright (C) 2000-2001 Deep Blue Solutions
-+ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-+ *  Copyright (C) 2006-2007 Pavel Pisa (ppisa at pikron.com)
-+ *  Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-+ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright (C) 1999 ARM Limited
++ *  Copyright (C) 2000 Deep Blue Solutions Ltd
++ *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
 + */
 +
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/clockchips.h>
-+#include <linux/clk.h>
++#ifndef __MACH_MXS_SYSTEM_H__
++#define __MACH_MXS_SYSTEM_H__
 +
-+#include <asm/mach/time.h>
-+#include <mach/mxs.h>
++static inline void arch_idle(void)
++{
++	cpu_do_idle();
++}
++
++void arch_reset(char mode, const char *cmd);
++
++#endif /* __MACH_MXS_SYSTEM_H__ */
+diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
+new file mode 100644
+index 0000000..bc73f9f
+--- /dev/null
++++ b/arch/arm/mach-mxs/system.c
+@@ -0,0 +1,142 @@
++/*
++ * Copyright (C) 1999 ARM Limited
++ * Copyright (C) 2000 Deep Blue Solutions Ltd
++ * Copyright 2006-2007,2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
++ * Copyright 2009 Ilya Yanok, Emcraft Systems Ltd, yanok at emcraft.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++
++#include <asm/proc-fns.h>
++#include <asm/system.h>
++
++#include <mach/mx23.h>
++#include <mach/mx28.h>
 +#include <mach/common.h>
 +
++#define MXS_RTC_WATCHDOG	0x50
++#define MXS_WATCHDOG_EN		(1 << 4)
++
++#define MXS_MODULE_CLKGATE	(1 << 30)
++#define MXS_MODULE_SFTRST	(1 << 31)
++
++static void __iomem *wdog_base;
++
 +/*
-+ * There are 2 versions of the timrot on Freescale MXS-based SoCs.
-+ * The v1 on MX23 only gets 16 bits counter, while v2 on MX28
-+ * extends the counter to 32 bits.
-+ *
-+ * The implementation uses two timers, one for clock_event and
-+ * another for clocksource. MX28 uses timer0 and timer1, while
-+ * MX23 uses timer0 and timer3.
++ * Reset the system. It is called by machine_restart().
 + */
-+#define timrot_is_v1()	(cpu_is_mx23())
-+
-+#define HW_TIMROT_ROTCTRL			0x00
-+#define HW_TIMROT_TIMCTRLn(n)			(0x20 + (n) * 0x40)
-+#define HW_TIMROT_RUNNING_COUNTn(n)		(0x30 + (n) * 0x40)
-+#define HW_TIMROT_FIXED_COUNTn(n)		(0x40 + (n) * 0x40)
-+#define BM_TIMROT_TIMCTRLn_RELOAD		(1 << 6)
-+#define BM_TIMROT_TIMCTRLn_UPDATE		(1 << 7)
-+#define BM_TIMROT_TIMCTRLn_IRQ_EN		(1 << 14)
-+#define BM_TIMROT_TIMCTRLn_IRQ			(1 << 15)
-+#define BP_TIMROT_TIMCTRLn_SELECT		0
-+#define BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL	0x8
-+#define BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL	0xb
-+
-+static struct clock_event_device clockevent_mxs;
-+static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
-+
-+static void __iomem *timer_base = MXS_IO_ADDRESS(MXS_TIMROT_BASE_ADDR);
-+
-+static inline void timrot_irq_disable(void)
++void arch_reset(char mode, const char *cmd)
 +{
-+	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
-+			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
++	/* Set wdog timer 10 ms */
++	__raw_writel(10, wdog_base + MXS_RTC_WATCHDOG);
++
++	/* Enable wdog reset */
++	__raw_writel(MXS_WATCHDOG_EN, wdog_base + MXS_SET_ADDR);
++
++	/* Wait for reset to assert... */
++	mdelay(10);
++
++	pr_err("Watchdog reset failed to assert reset\n");
++
++	/* Delay to allow the serial port to show the message */
++	mdelay(50);
++
++	/* We'll take a jump through zero as a poor second */
++	cpu_reset(0);
 +}
 +
-+static inline void timrot_irq_enable(void)
++static int __init mxs_arch_reset_init(void)
 +{
-+	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ_EN,
-+			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_SET_ADDR);
-+}
++	struct clk *clk;
 +
-+static void timrot_irq_acknowledge(void)
-+{
-+	__raw_writel(BM_TIMROT_TIMCTRLn_IRQ,
-+			timer_base + HW_TIMROT_TIMCTRLn(0) + MXS_CLR_ADDR);
-+}
++	wdog_base = cpu_is_mx23() ? MX23_IO_ADDRESS(MX23_RTC_BASE_ADDR) :
++				    MX28_IO_ADDRESS(MX28_RTC_BASE_ADDR);
 +
-+static cycle_t timrotv1_get_cycles(struct clocksource *cs)
-+{
-+	return ~((__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(1))
-+			& 0xffff0000) >> 16);
-+}
-+
-+static cycle_t timrotv2_get_cycles(struct clocksource *cs)
-+{
-+	return ~__raw_readl(timer_base + HW_TIMROT_RUNNING_COUNTn(1));
-+}
-+
-+static int timrotv1_set_next_event(unsigned long evt,
-+					struct clock_event_device *dev)
-+{
-+	/* timrot decrements the count */
-+	__raw_writel(evt, timer_base + HW_TIMROT_RUNNING_COUNTn(0));
++	clk = clk_get_sys("rtc", NULL);
++	if (!IS_ERR(clk))
++		clk_enable(clk);
 +
 +	return 0;
 +}
++core_initcall(mxs_arch_reset_init);
 +
-+static int timrotv2_set_next_event(unsigned long evt,
-+					struct clock_event_device *dev)
++/*
++ * Clear the bit and poll it cleared.  This is usually called with
++ * a reset address and mask being either SFTRST(bit 31) or CLKGATE
++ * (bit 30).
++ */
++static int clear_poll_bit(void __iomem *addr, u32 mask)
 +{
-+	/* timrot decrements the count */
-+	__raw_writel(evt, timer_base + HW_TIMROT_FIXED_COUNTn(0));
++	int timeout = 0x400;
 +
-+	return 0;
-+}
-+
-+static irqreturn_t mxs_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	timrot_irq_acknowledge();
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction mxs_timer_irq = {
-+	.name		= "MXS Timer Tick",
-+	.dev_id		= &clockevent_mxs,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= mxs_timer_interrupt,
-+};
-+
-+#ifdef DEBUG
-+static const char *clock_event_mode_label[] = {
-+	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
-+	[CLOCK_EVT_MODE_ONESHOT]  = "CLOCK_EVT_MODE_ONESHOT",
-+	[CLOCK_EVT_MODE_SHUTDOWN] = "CLOCK_EVT_MODE_SHUTDOWN",
-+	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED"
-+};
-+#endif /* DEBUG */
-+
-+static void mxs_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evt)
-+{
-+	/* Disable interrupt in timer module */
-+	timrot_irq_disable();
-+
-+	if (mode != clockevent_mode) {
-+		/* Set event time into the furthest future */
-+		if (timrot_is_v1())
-+			__raw_writel(0xffff,
-+				timer_base  + HW_TIMROT_RUNNING_COUNTn(1));
-+		else
-+			__raw_writel(0xffffffff,
-+				timer_base  + HW_TIMROT_FIXED_COUNTn(1));
-+
-+		/* Clear pending interrupt */
-+		timrot_irq_acknowledge();
-+	}
-+
-+#ifdef DEBUG
-+	pr_info("%s: changing mode from %s to %s\n", __func__,
-+		clock_event_mode_label[clockevent_mode],
-+		clock_event_mode_label[mode]);
-+#endif /* DEBUG */
-+
-+	/* Remember timer mode */
-+	clockevent_mode = mode;
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		pr_err("%s: Periodic mode is not implemented\n", __func__);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		timrot_irq_enable();
-+		break;
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_RESUME:
-+		/* Left event sources disabled, no more interrupts appear */
-+		break;
-+	}
-+}
-+
-+static struct clock_event_device clockevent_mxs = {
-+	.name		= "mxs_timrot",
-+	.features	= CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
-+	.set_mode	= mxs_set_mode,
-+	.set_next_event	= timrotv2_set_next_event,
-+	.rating		= 200,
-+};
-+
-+static int __init mxs_clockevent_init(struct clk *timer_clk)
-+{
-+	unsigned int c = clk_get_rate(timer_clk);
-+
-+	clockevent_mxs.mult = div_sc(c, NSEC_PER_SEC, clockevent_mxs.shift);
-+	clockevent_mxs.cpumask = cpumask_of(0);
-+	if (timrot_is_v1()) {
-+		clockevent_mxs.set_next_event = timrotv1_set_next_event;
-+		clockevent_mxs.max_delta_ns =
-+			clockevent_delta2ns(0xfffe, &clockevent_mxs);
-+		clockevent_mxs.min_delta_ns =
-+			clockevent_delta2ns(0xf, &clockevent_mxs);
-+	} else {
-+		clockevent_mxs.max_delta_ns =
-+			clockevent_delta2ns(0xfffffffe, &clockevent_mxs);
-+		clockevent_mxs.min_delta_ns =
-+			clockevent_delta2ns(0xf, &clockevent_mxs);
-+	}
-+
-+	clockevents_register_device(&clockevent_mxs);
-+
-+	return 0;
-+}
-+
-+static struct clocksource clocksource_mxs = {
-+	.name 		= "mxs_timer",
-+	.rating		= 200,
-+	.read		= timrotv2_get_cycles,
-+	.mask		= CLOCKSOURCE_MASK(32),
-+	.shift 		= 17,
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+static int __init mxs_clocksource_init(struct clk *timer_clk)
-+{
-+	unsigned int c = clk_get_rate(timer_clk);
-+
-+	if (timrot_is_v1()) {
-+		clocksource_mxs.read = timrotv1_get_cycles;
-+		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
-+	}
-+	clocksource_mxs.mult = clocksource_hz2mult(c, clocksource_mxs.shift);
-+	clocksource_register(&clocksource_mxs);
-+
-+	return 0;
-+}
-+
-+void __init mxs_timer_init(struct clk *timer_clk, int irq)
-+{
-+	clk_enable(timer_clk);
++	/* clear the bit */
++	__raw_writel(mask, addr + MXS_CLR_ADDR);
 +
 +	/*
-+	 * Initialize timers to a known state
++	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
++	 * recommends to wait 1us.
 +	 */
-+	mxs_reset_block(timer_base + HW_TIMROT_ROTCTRL);
++	udelay(1);
 +
-+	/* timer0 is for clock_event */
-+	__raw_writel((timrot_is_v1() ?
-+			BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL :
-+			BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL) |
-+			BM_TIMROT_TIMCTRLn_UPDATE |
-+			BM_TIMROT_TIMCTRLn_IRQ_EN,
-+			timer_base + HW_TIMROT_TIMCTRLn(0));
++	/* poll the bit becoming clear */
++	while ((__raw_readl(addr) & mask) && --timeout)
++		/* nothing */;
 +
-+	/* timer1 is for clocksource */
-+	__raw_writel((timrot_is_v1() ?
-+			BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL :
-+			BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL) |
-+			BM_TIMROT_TIMCTRLn_RELOAD,
-+			timer_base + HW_TIMROT_TIMCTRLn(1));
++	return !timeout;
++}
 +
-+	/* set timer1 fixed count to the maximum */
-+	if (timrot_is_v1())
-+		__raw_writel(0xffff,
-+			timer_base + HW_TIMROT_RUNNING_COUNTn(1));
-+	else
-+		__raw_writel(0xffffffff,
-+			timer_base + HW_TIMROT_FIXED_COUNTn(1));
++int mxs_reset_block(void __iomem *reset_addr)
++{
++	int ret;
++	int timeout = 0x400;
 +
-+	/* init and register the timer to the framework */
-+	mxs_clocksource_init(timer_clk);
-+	mxs_clockevent_init(timer_clk);
++	/* clear and poll SFTRST */
++	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
++	if (unlikely(ret))
++		goto error;
 +
-+	/* Make irqs happen */
-+	setup_irq(irq, &mxs_timer_irq);
++	/* clear CLKGATE */
++	__raw_writel(MXS_MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
++
++	/* set SFTRST to reset the block */
++	__raw_writel(MXS_MODULE_SFTRST, reset_addr + MXS_SET_ADDR);
++	udelay(1);
++
++	/* poll CLKGATE becoming set */
++	while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
++		/* nothing */;
++	if (unlikely(!timeout))
++		goto error;
++
++	/* clear and poll SFTRST */
++	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
++	if (unlikely(ret))
++		goto error;
++
++	/* clear and poll CLKGATE */
++	ret = clear_poll_bit(reset_addr, MXS_MODULE_CLKGATE);
++	if (unlikely(ret))
++		goto error;
++
++	return 0;
++
++error:
++	pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
++	return -ETIMEDOUT;
 +}
 -- 
 1.7.1
