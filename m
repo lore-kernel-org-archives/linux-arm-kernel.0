@@ -1,57 +1,39 @@
-From: will.newton@gmail.com (Will Newton)
-Date: Thu, 9 Dec 2010 17:46:20 +0000
-Subject: [PATCH] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <20101209173525.GA29879@void.printf.net>
-References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
-	<20101208115510.GD10998@console-pimps.org>
-	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
-	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
-	<20101209064751.GA21128@void.printf.net>
-	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
-	<20101209160157.GA28586@void.printf.net>
-	<20101209173525.GA29879@void.printf.net>
-Message-ID: <AANLkTi=BXxfNcnhNb6Bd_N3gVpDUMWBCQtZ0d=m9p_sa@mail.gmail.com>
+From: daiane.angolini@freescale.com (Daiane Angolini)
+Date: Thu, 9 Dec 2010 15:50:49 -0200
+Subject: [PATCH] ARM: mx5/mx51_3ds: Add watchdog support
+Message-ID: <1291917049-8183-1-git-send-email-daiane.angolini@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 9, 2010 at 5:35 PM, Chris Ball <cjb@laptop.org> wrote:
-> Hi Andrew,
->
-> On Thu, Dec 09, 2010 at 04:01:57PM +0000, Chris Ball wrote:
->> > > Is there something we could depend on that would stop this driver being
->> > > presented to everyone, without being far too specific? ?At the moment
->> > > we'd be making x86 desktop users say whether they have this IP, which
->> > > isn't good. ?Are the architectures that use this IP already upstream?
->> > > Are they all ARM architectures, for instance?
->> >
->> > I don't know of any architectures upstream that use this IP block. There is an
->> > SoC from NXP that uses this it but it is not upstream:
->> >
->> > http://ics.nxp.com/support/software/lpc313x.bsp.linux/
->> >
->> > The architecture we tested and debugged this driver on is not upstream either
->> > unfortunately. :-/
->>
->> Okay. ?I think "depends on ARM" is appropriate for now, and we could
->> expand that later if the block appears in a MIPS SoC or something.
->> Does that work for you?
->
-> Oh, hey, rmk says that he seems to recall that akpm says that if the
-> driver builds on x86 (it does), we should just allow it to be built
-> there too so that it gets build coverage. ?Andrew, does this still
-> represent your stance?
->
-> I've heard the distro maintainers complain about having to investigate
-> Kconfig entries for drivers that their users would never possibly use,
-> though, and this certainly falls into that case. ?Is there something
-> better we can do here, to correctly hide this driver from non-ARM users
-> but also make it clear that it can be built if somebody wants to do a
-> mass driver build?
+Signed-off-by: Daiane Angolini <daiane.angolini@freescale.com>
+---
+ arch/arm/mach-mx5/Kconfig          |    1 +
+ arch/arm/mach-mx5/board-mx51_3ds.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-The driver does build on x86{_64} and it has been useful for me to do
-that in the past to test cosmetic changes. It might also be good to
-have it building on x86 to get more compile testing, as I suspect a
-lot more people doing randconfig builds are doing it on x86 rather
-than arm.
-
-But I'm fine with it either way.
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 5011f42..b6180e5 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -30,6 +30,7 @@ config MACH_MX51_BABBAGE
+ config MACH_MX51_3DS
+ 	bool "Support MX51PDK (3DS)"
+ 	select SOC_IMX51
++	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	select IMX_HAVE_PLATFORM_SPI_IMX
+diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+index 6cc2805..54b3f25 100644
+--- a/arch/arm/mach-mx5/board-mx51_3ds.c
++++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+@@ -174,6 +174,7 @@ static void __init mxc_board_init(void)
+ 
+ 	imx51_add_sdhci_esdhc_imx(0, NULL);
+ 	mxc_init_keypad();
++	imx51_add_imx2_wdt(0, NULL);
+ }
+ 
+ static void __init mx51_3ds_timer_init(void)
+-- 
+1.7.0.4
