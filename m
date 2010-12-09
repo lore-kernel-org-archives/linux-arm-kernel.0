@@ -1,185 +1,85 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Thu,  9 Dec 2010 21:02:56 +0100
-Subject: [PATCH v3] OMAP2+: disable idle early in the suspend sequence
-Message-ID: <1291924976-19280-1-git-send-email-jean.pihet@newoldbits.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 09 Dec 2010 12:46:35 -0800
+Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
+	omap_i2c
+In-Reply-To: <20101209190110.GR20097@trinity.fluff.org> (Ben Dooks's message
+	of "Thu, 9 Dec 2010 19:01:10 +0000")
+References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
+	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
+	<878vzydgxr.fsf@deeprootsystems.com>
+	<20101209190110.GR20097@trinity.fluff.org>
+Message-ID: <87wrni7jys.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+Ben Dooks <ben-i2c@fluff.org> writes:
 
-Some bad interaction between the idle and the suspend paths has been
-identified: the idle code is called during the suspend enter and exit
-sequences. This could cause corruption or lock-up of resources.
+> On Thu, Dec 09, 2010 at 08:55:28AM -0800, Kevin Hilman wrote:
+>> Ben,
+>> 
+>> > The convention for omap device naming is omap_XXX.
+>> >
+>> > Rename the device and driver name in order to stick
+>> > to this naming convention.
+>
+> Renaming stuff like this is going to have an impact on the userspace
+> as anyone looking through /sys's driver heirarchy is going to miss the
+> old name... 
+>
+> It all depends if you really want to go ahead with this...
+>
 
-The solution is to move the calls to disable_hlt at the very beginning
-of the suspend sequence (ex. in omap3_pm_begin instead of
-omap3_pm_prepare), and the call to enable_hlt at the very end of
-the suspend sequence (ex. in omap3_pm_end instead of omap3_pm_finish).
+Yes, we are aware of the userspace impact, but this name change makes
+all devices on OMAP have consistent names and actually improves the
+ability to have userspace tools have consistent naming as well.
 
-Tested with RET and OFF on Beagle and OMAP3EVM.
+Kevin
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
----
-v1:
- Support for OMAP3 only.
- Tested on board.
-
-v2:
- Added support for OMAP2 and OMAP4.
- Compile tested only for OMAP2 and OMAP4.
- Tested on board for OMAP3.
-
-v3: 
- Rebased on Kevin's latest 'OMAP2+: PM/serial: fix console semaphore acquire during suspend', cf. http://marc.info/?l=linux-omap&m=129184804805075&w=2
- Removed the empty _pm_prepare and _pm_finish functions.
-
- arch/arm/mach-omap2/pm24xx.c |   16 ++--------------
- arch/arm/mach-omap2/pm34xx.c |   15 ++-------------
- arch/arm/mach-omap2/pm44xx.c |   16 ++--------------
- 3 files changed, 6 insertions(+), 41 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 1e031d0..6cde8ed 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -301,14 +301,8 @@ out:
- 
- static int omap2_pm_begin(suspend_state_t state)
- {
--	suspend_state = state;
--	return 0;
--}
--
--static int omap2_pm_prepare(void)
--{
--	/* We cannot sleep in idle until we have resumed */
- 	disable_hlt();
-+	suspend_state = state;
- 	return 0;
- }
- 
-@@ -349,22 +343,16 @@ static int omap2_pm_enter(suspend_state_t state)
- 	return ret;
- }
- 
--static void omap2_pm_finish(void)
--{
--	enable_hlt();
--}
--
- static void omap2_pm_end(void)
- {
- 	suspend_state = PM_SUSPEND_ON;
-+	enable_hlt();
- 	return;
- }
- 
- static struct platform_suspend_ops omap_pm_ops = {
- 	.begin		= omap2_pm_begin,
--	.prepare	= omap2_pm_prepare,
- 	.enter		= omap2_pm_enter,
--	.finish		= omap2_pm_finish,
- 	.end		= omap2_pm_end,
- 	.valid		= suspend_valid_only_mem,
- };
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 648b8c5..5bf344a 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -529,12 +529,6 @@ out:
- }
- 
- #ifdef CONFIG_SUSPEND
--static int omap3_pm_prepare(void)
--{
--	disable_hlt();
--	return 0;
--}
--
- static int omap3_pm_suspend(void)
- {
- 	struct power_state *pwrst;
-@@ -597,14 +591,10 @@ static int omap3_pm_enter(suspend_state_t unused)
- 	return ret;
- }
- 
--static void omap3_pm_finish(void)
--{
--	enable_hlt();
--}
--
- /* Hooks to enable / disable UART interrupts during suspend */
- static int omap3_pm_begin(suspend_state_t state)
- {
-+	disable_hlt();
- 	suspend_state = state;
- 	omap_uart_enable_irqs(0);
- 	return 0;
-@@ -614,15 +604,14 @@ static void omap3_pm_end(void)
- {
- 	suspend_state = PM_SUSPEND_ON;
- 	omap_uart_enable_irqs(1);
-+	enable_hlt();
- 	return;
- }
- 
- static struct platform_suspend_ops omap_pm_ops = {
- 	.begin		= omap3_pm_begin,
- 	.end		= omap3_pm_end,
--	.prepare	= omap3_pm_prepare,
- 	.enter		= omap3_pm_enter,
--	.finish		= omap3_pm_finish,
- 	.valid		= suspend_valid_only_mem,
- };
- #endif /* CONFIG_SUSPEND */
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 54544b4..6aff996 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -31,12 +31,6 @@ struct power_state {
- static LIST_HEAD(pwrst_list);
- 
- #ifdef CONFIG_SUSPEND
--static int omap4_pm_prepare(void)
--{
--	disable_hlt();
--	return 0;
--}
--
- static int omap4_pm_suspend(void)
- {
- 	do_wfi();
-@@ -59,28 +53,22 @@ static int omap4_pm_enter(suspend_state_t suspend_state)
- 	return ret;
- }
- 
--static void omap4_pm_finish(void)
--{
--	enable_hlt();
--	return;
--}
--
- static int omap4_pm_begin(suspend_state_t state)
- {
-+	disable_hlt();
- 	return 0;
- }
- 
- static void omap4_pm_end(void)
- {
-+	enable_hlt();
- 	return;
- }
- 
- static struct platform_suspend_ops omap_pm_ops = {
- 	.begin		= omap4_pm_begin,
- 	.end		= omap4_pm_end,
--	.prepare	= omap4_pm_prepare,
- 	.enter		= omap4_pm_enter,
--	.finish		= omap4_pm_finish,
- 	.valid		= suspend_valid_only_mem,
- };
- #endif /* CONFIG_SUSPEND */
--- 
-1.7.1
+>> > Change device name in clock nodes as well.
+>> >
+>> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+>> > c: Paul Walmsley <paul@pwsan.com>
+>> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>> > Cc: Rajendra Nayak <rnayak@ti.com>
+>> > Cc: Ben Dooks <ben-i2c@fluff.org>
+>> > ---
+>> >  arch/arm/mach-omap1/clock_data.c     |    6 +++---
+>> >  arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
+>> >  arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
+>> >  arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
+>> >  arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
+>> >  arch/arm/plat-omap/i2c.c             |    2 +-
+>> >  drivers/i2c/busses/i2c-omap.c        |    4 ++--
+>> >  7 files changed, 28 insertions(+), 28 deletions(-)
+>> 
+>> [...]
+>> 
+>> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> > index 760b8be..9d09083 100644
+>> > --- a/drivers/i2c/busses/i2c-omap.c
+>> > +++ b/drivers/i2c/busses/i2c-omap.c
+>> > @@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
+>> >  	.probe		= omap_i2c_probe,
+>> >  	.remove		= omap_i2c_remove,
+>> >  	.driver		= {
+>> > -		.name	= "i2c_omap",
+>> > +		.name	= "omap_i2c",
+>> >  		.owner	= THIS_MODULE,
+>> >  	},
+>> >  };
+>> > @@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
+>> >  MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
+>> >  MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
+>> >  MODULE_LICENSE("GPL");
+>> > -MODULE_ALIAS("platform:i2c_omap");
+>> > +MODULE_ALIAS("platform:omap_i2c");
+>> 
+>> With your ack for the name change in the driver, we can merge this
+>> through the OMAP tree with the other core changes.
+>> 
+>> Thanks,
+>> 
+>> Kevin
+>> 
+>
+> -- 
