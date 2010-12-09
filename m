@@ -1,31 +1,59 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  9 Dec 2010 14:47:14 +0100
-Subject: [PATCH 2/9] ARM i.MX51: rename IPU irqs
+Date: Thu,  9 Dec 2010 14:47:16 +0100
+Subject: [PATCH 4/9] fb: export fb mode db table
 In-Reply-To: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
 References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1291902441-24712-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1291902441-24712-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The different modes can be useful for drivers. Currently there is
+no way to expose the modes to sysfs, so export them.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/mx51.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/video/modedb.c |    7 ++++++-
+ include/linux/fb.h     |    3 +++
+ 2 files changed, 9 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index fa3a2a5..873807f 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -251,8 +251,8 @@
- #define MX51_MXC_INT_IOMUX		7
- #define MX51_INT_NFC			8
- #define MX51_MXC_INT_VPU		9
--#define MX51_MXC_INT_IPU_ERR		10
--#define MX51_MXC_INT_IPU_SYN		11
-+#define MX51_INT_IPU_ERR		10
-+#define MX51_INT_IPU_SYN		11
- #define MX51_MXC_INT_GPU		12
- #define MX51_MXC_INT_RESV13		13
- #define MX51_MXC_INT_USB_H1		14
+diff --git a/drivers/video/modedb.c b/drivers/video/modedb.c
+index 0a4dbdc..82122a9 100644
+--- a/drivers/video/modedb.c
++++ b/drivers/video/modedb.c
+@@ -36,7 +36,7 @@ EXPORT_SYMBOL_GPL(fb_mode_option);
+      *  Standard video mode definitions (taken from XFree86)
+      */
+ 
+-static const struct fb_videomode modedb[] = {
++const struct fb_videomode modedb[] = {
+     {
+ 	/* 640x400 @ 70 Hz, 31.5 kHz hsync */
+ 	NULL, 70, 640, 400, 39721, 40, 24, 39, 9, 96, 2,
+@@ -277,6 +277,11 @@ static const struct fb_videomode modedb[] = {
+     },
+ };
+ 
++const struct fb_videomode *fb_modes = modedb;
++EXPORT_SYMBOL(fb_modes);
++const int num_fb_modes = ARRAY_SIZE(modedb);
++EXPORT_SYMBOL(num_fb_modes);
++
+ #ifdef CONFIG_FB_MODE_HELPERS
+ const struct fb_videomode vesa_modes[] = {
+ 	/* 0 640x350-85 VESA */
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+index d1631d3..e006172 100644
+--- a/include/linux/fb.h
++++ b/include/linux/fb.h
+@@ -1151,6 +1151,9 @@ struct fb_videomode {
+ extern const char *fb_mode_option;
+ extern const struct fb_videomode vesa_modes[];
+ 
++extern const struct fb_videomode *fb_modes;
++extern const int num_fb_modes;
++
+ struct fb_modelist {
+ 	struct list_head list;
+ 	struct fb_videomode mode;
 -- 
 1.7.2.3
