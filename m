@@ -1,127 +1,66 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Thu, 9 Dec 2010 17:47:22 +0100
-Subject: [PATCH v3 07/15] ARM: mxs: Add gpio support
-In-Reply-To: <1291907569-8925-7-git-send-email-shawn.guo@freescale.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291907569-8925-7-git-send-email-shawn.guo@freescale.com>
-Message-ID: <19713.2074.562086.117710@ipc1.ka-ro>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 09 Dec 2010 08:55:28 -0800
+Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
+	omap_i2c
+In-Reply-To: <1291904657-32729-2-git-send-email-b-cousson@ti.com> (Benoit
+	Cousson's message of "Thu, 9 Dec 2010 15:24:16 +0100")
+References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
+	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
+Message-ID: <878vzydgxr.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ben,
 
-Shawn Guo writes:
-> MXS-based SoCs implement gpio support in block PINCTRL.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Benoit Cousson <b-cousson@ti.com> writes:
+
+> The convention for omap device naming is omap_XXX.
+>
+> Rename the device and driver name in order to stick
+> to this naming convention.
+>
+> Change device name in clock nodes as well.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> c: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Ben Dooks <ben-i2c@fluff.org>
 > ---
-> Changes for v3:
->  - include/mach/gpio.h: remove the inclusion of hardware.h
->  - gpio.c: change inclusion of hardware.h to mx23.h plus mx28.h
->  - Remove spinlock totally since SET/CLE can be used in all the
->    gpio register access
-> 
-> Changes for v2:
->  - Create arch/arm/mach-mxs/gpio.h to accommodate stuff private for mach-mxs
->  - Use GPIO_INT_LEV_MASK and GPIO_INT_POL_MASK instead of constant
->  - Remove both edges IRQ support which is not needed
->  - Use SET and CLR register of PINCTRL_DOE in _set_gpio_direction()
->  - Use pr_info over printk(KERN_INFO)
-> 
->  arch/arm/mach-mxs/gpio.c              |  321 +++++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/gpio.h              |   33 ++++
->  arch/arm/mach-mxs/include/mach/gpio.h |   34 ++++
->  3 files changed, 388 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/gpio.c
->  create mode 100644 arch/arm/mach-mxs/gpio.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/gpio.h
-> 
-> diff --git a/arch/arm/mach-mxs/gpio.c b/arch/arm/mach-mxs/gpio.c
-> new file mode 100644
-> index 0000000..d88acf3
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/gpio.c
-> @@ -0,0 +1,321 @@
-> +/*
-> + * MXC GPIO support. (c) 2008 Daniel Mack <daniel@caiaq.de>
-> + * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-> + *
-> + * Based on code from Freescale,
-> + * Copyright (C) 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/gpio.h>
-> +#include <mach/mx23.h>
-> +#include <mach/mx28.h>
-> +#include <asm-generic/bug.h>
-> +
-> +#include "gpio.h"
-> +
-> +static struct mxs_gpio_port *mxs_gpio_ports;
-> +static int gpio_table_size;
-> +
-> +#define PINCTRL_DOUT(n)		((cpu_is_mx23() ? 0x0500 : 0x0700) + (n) * 0x10)
-> +#define PINCTRL_DIN(n)		((cpu_is_mx23() ? 0x0600 : 0x0900) + (n) * 0x10)
-> +#define PINCTRL_DOE(n)		((cpu_is_mx23() ? 0x0700 : 0x0b00) + (n) * 0x10)
-> +#define PINCTRL_PIN2IRQ(n)	((cpu_is_mx23() ? 0x0800 : 0x1000) + (n) * 0x10)
-> +#define PINCTRL_IRQEN(n)	((cpu_is_mx23() ? 0x0900 : 0x1100) + (n) * 0x10)
-> +#define PINCTRL_IRQLEV(n)	((cpu_is_mx23() ? 0x0a00 : 0x1200) + (n) * 0x10)
-> +#define PINCTRL_IRQPOL(n)	((cpu_is_mx23() ? 0x0b00 : 0x1300) + (n) * 0x10)
-> +#define PINCTRL_IRQSTAT(n)	((cpu_is_mx23() ? 0x0c00 : 0x1400) + (n) * 0x10)
-> +
-> +#define GPIO_INT_FALL_EDGE	0x0
-> +#define GPIO_INT_LOW_LEV	0x1
-> +#define GPIO_INT_RISE_EDGE	0x2
-> +#define GPIO_INT_HIGH_LEV	0x3
-> +#define GPIO_INT_LEV_MASK	(1 << 0)
-> +#define GPIO_INT_POL_MASK	(1 << 1)
-> +
-> +/* Note: This driver assumes 32 GPIOs are handled in one register */
-> +
-> +static void _clear_gpio_irqstatus(struct mxs_gpio_port *port, u32 index)
-> +{
-> +	__raw_writel(1 << index,
-> +			port->base + PINCTRL_IRQSTAT(port->id) + MXS_CLR_ADDR);
-> +}
-> +
-> +static void _set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
-> +				int enable)
-> +{
-> +	if (enable == 0) {
-> +		__raw_writel(1 << index,
-> +			port->base + PINCTRL_PIN2IRQ(port->id) + MXS_CLR_ADDR);
-> +		__raw_writel(1 << index,
-> +			port->base + PINCTRL_IRQEN(port->id) + MXS_CLR_ADDR);
-This will loose interrupt pulses that happen while IRQs are disabled.
-IMO PIN2IRQ should only be cleared when an IRQ is freed, not when it
-is disabled.
+>  arch/arm/mach-omap1/clock_data.c     |    6 +++---
+>  arch/arm/mach-omap2/clock2420_data.c |    8 ++++----
+>  arch/arm/mach-omap2/clock2430_data.c |    8 ++++----
+>  arch/arm/mach-omap2/clock3xxx_data.c |   12 ++++++------
+>  arch/arm/mach-omap2/clock44xx_data.c |   16 ++++++++--------
+>  arch/arm/plat-omap/i2c.c             |    2 +-
+>  drivers/i2c/busses/i2c-omap.c        |    4 ++--
+>  7 files changed, 28 insertions(+), 28 deletions(-)
 
+[...]
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 760b8be..9d09083 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1139,7 +1139,7 @@ static struct platform_driver omap_i2c_driver = {
+>  	.probe		= omap_i2c_probe,
+>  	.remove		= omap_i2c_remove,
+>  	.driver		= {
+> -		.name	= "i2c_omap",
+> +		.name	= "omap_i2c",
+>  		.owner	= THIS_MODULE,
+>  	},
+>  };
+> @@ -1161,4 +1161,4 @@ module_exit(omap_i2c_exit_driver);
+>  MODULE_AUTHOR("MontaVista Software, Inc. (and others)");
+>  MODULE_DESCRIPTION("TI OMAP I2C bus adapter");
+>  MODULE_LICENSE("GPL");
+> -MODULE_ALIAS("platform:i2c_omap");
+> +MODULE_ALIAS("platform:omap_i2c");
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+With your ack for the name change in the driver, we can merge this
+through the OMAP tree with the other core changes.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Thanks,
+
+Kevin
