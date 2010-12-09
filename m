@@ -1,48 +1,133 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 09 Dec 2010 12:59:26 +0000
-Subject: [PATCHv3] support PMIC mc13892
-In-Reply-To: <20101209102526.GN6017@pengutronix.de>
-References: <1291778460-22819-1-git-send-email-yong.shen@freescale.com>
-	<1291778460-22819-2-git-send-email-yong.shen@freescale.com>
-	<20101209102526.GN6017@pengutronix.de>
-Message-ID: <1291899566.3271.135.camel@odin>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 9 Dec 2010 21:38:51 +0800
+Subject: [PATCH v2 14/15] ARM: mxs: Add initial mx28evk support
+In-Reply-To: <19712.52041.958400.447834@ipc1.ka-ro>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-11-git-send-email-shawn.guo@freescale.com>
+	<20101208202822.GD17441@pengutronix.de>
+	<AANLkTiny2P3RobZfq_G_OPHu_SLjZ2w9CFhU7HgL3VPx@mail.gmail.com>
+	<20101209083237.GO17441@pengutronix.de>
+	<AANLkTin3-f7x2BXS=zTYYw+uWiu9UYG8sPWdQXWcxpxn@mail.gmail.com>
+	<20101209093746.GU17441@pengutronix.de>
+	<AANLkTinwmdxEXNObEbHd10ZxfTmTCaWiHmwXpf8hs3f1@mail.gmail.com>
+	<19712.52041.958400.447834@ipc1.ka-ro>
+Message-ID: <AANLkTim4mD88r5r6Yw5syYasw53z1jXZoMhJ+xGdFehT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-09 at 11:25 +0100, Sascha Hauer wrote:
-> On Wed, Dec 08, 2010 at 11:21:00AM +0800, yong.shen at freescale.com wrote:
-> > From: Yong Shen <yong.shen@linaro.org>
-> > 
-> > add support for mc13892, tested on mx51 babbage board
-> > 
-> > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> > Signed-off-by: Yong Shen <yong.shen@linaro.org>
-> 
-> As there seem to be only whitespace changes left to worry about:
-> 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
+Hi Lothar,
 
-Thanks Sascha. 
+On Thu, Dec 9, 2010 at 8:27 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> Shawn Guo writes:
+>> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> > Hello Shawn
+>> > On Thu, Dec 09, 2010 at 05:03:54PM +0800, Shawn Guo wrote:
+>> >> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> >> > Hello Shwan,
+>> > ups, sorry for mistyping your name.
+>> >
+>> >> > On Thu, Dec 09, 2010 at 03:04:37PM +0800, Shawn Guo wrote:
+>> >> >> 2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> >> >> > On Wed, Dec 08, 2010 at 12:32:02AM +0800, Shawn Guo wrote:
+>> >> >> >> +static iomux_cfg_t mx28evk_pads[] = {
+>> >> >> > This can be const and __initconst, ditto for mx23evk
+>> >> >> >
+>> >> >> With u64 iomux_cfg_t changes, I'm afraid the suggestion becomes invalid.
+>> >> > Really? Why?
+>> >> >
+>> >> I'm confused by the compiling error below when adding __initconst for
+>> >> mx28evk_pads[], and mistakenly blaming u64 iomux_cfg_t changes.
+>> >>
+>> >> arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
+>> >> arch/arm/mach-mxs/mach-mx28evk.c:34: error: mx28_fec_pdata causes a
+>> >> section type conflict
+>> >> make[1]: *** [arch/arm/mach-mxs/mach-mx28evk.o] Error 1
+>> >> make: *** [arch/arm/mach-mxs] Error 2
+>> >>
+>> >> Actually it can be fixed by the following change.
+>> >>
+>> >> -static const struct fec_platform_data mx28_fec_pdata __initconst = {
+>> >> +static struct fec_platform_data mx28_fec_pdata __initconst = {
+>> >> ? ? ? ? ?.phy = PHY_INTERFACE_MODE_RMII,
+>> >> ?};
+>> > this change is wrong. ?You need to assert that all data being marked
+>> > with __initconst is const, too.
+>> >
+>> After adding const for mx28evk_pads[], I got the following error.
+>>
+>> ? CC ? ? ?arch/arm/mach-mxs/mach-mx28evk.o
+>> arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
+>> arch/arm/mach-mxs/mach-mx28evk.c:102: warning: passing argument 1 of
+>> ?mxs_iomux_setup_multiple_pads? discards qualifiers from pointer
+>> target type
+>> arch/arm/mach-mxs/include/mach/iomux.h:115: note: expected
+>> ?iomux_cfg_t *? but argument is of type ?const iomux_cfg_t *?
+>>
+> The argument of mxs_iomux_setup_multiple_pads() should get the const
+> attribute:
+> -int mxs_iomux_setup_multiple_pads(iomux_cfg_t *pad_list, unsigned count)
+> +int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count)
+>
+>> This takes me back to my first judgment. ?Is it proper to add
+>> __initconst for mx28evk_pads[]? We are changing iomux_cfg_t to u64 for
+>> making pad definition modifiable.
+>>
+> Modifiable in the sense that you can add platform specific PAD
+> settings by simply ORing them to the original pad definition so that
+> there is no need for runtime modifications like:
+> | ? ? ? iomux_v3_cfg_t power_key = MX51_PAD_EIM_A27__GPIO_2_21;
+> ...
+> | ? ? ? power_key.pad_ctrl = MX51_GPIO_PAD_CTRL_2;
+> | ? ? ? mxc_iomux_v3_setup_pad(&power_key);
+> but you can do:
+> | ? ? ? iomux_v3_cfg_t power_key = (MX51_PAD_EIM_A27__GPIO_2_21 &
+> | ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ~MUX_PAD_CTRL_MASK) | MX51_GPIO_PAD_CTRL_2;
+> ...
+> | ? ? ? mxc_iomux_v3_setup_pad(power_key);
+> instead. You can also augment the pad desc in a static table:
+> |static iomux_cfg_t pad_desc[] = {
+> | ? ? ? (MX51_PAD_EIM_A27__GPIO_2_21 & ~MUX_PAD_CTRL_MASK) | MX51_GPIO_PAD_CTRL_2,
+>
+>
+Thanks for the explanation.  But I'm a little puzzled by the use of
+"const" here. Per your suggestion, I have the following.
 
-Are you also happy with his other MC139892 patch. I believe both you and
-Uwe were involved in the review. It's fine from regulator pov, just best
-to get your Ack re the mxc changes :-
+mach-28evk.c
+static const iomux_cfg_t mx28evk_pads[] __initconst = {
 
->From e112153c6f03b49c229a8e3913a0c0459245df20 Mon Sep 17 00:00:00 2001
-From: Yong Shen <yong.shen@linaro.org>
-Date: Thu, 2 Dec 2010 14:17:02 +0800
-Subject: [PATCH 1/2] Change the register name definitions for mc13783
+iomux.h
+int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count);
 
-To make mc13783 and mc13892 share code, the register names should be
-changed to fit the new macro definitions in the comming patch.
+iomux.c
+int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count)
 
-Signed-off-by: Yong Shen <yong.shen@linaro.org>
+Compiler complains as below.
 
----
- arch/arm/mach-imx/mach-pcm038.c       |    4 +-
- arch/arm/mach-mx3/mach-mx31_3ds.c     |    4 +-
- arch/arm/mach-mx3/mach-mx31moboard.c  |    4 +-
- drivers/regulator/mc13783-regulator.c |   30 +++++++-------
- include/linux/mfd/mc13783.h           |   67 +++++++++++++++++----------------
- 5 files changed, 55 insertions(+), 54 deletions(-)
+  CC      arch/arm/mach-mxs/iomux.o
+arch/arm/mach-mxs/iomux.c:89: error: conflicting types for
+?mxs_iomux_setup_multiple_pads?
+arch/arm/mach-mxs/include/mach/iomux.h:115: note: previous declaration
+of ?mxs_iomux_setup_multiple_pads? was here
+make[1]: *** [arch/arm/mach-mxs/iomux.o] Error 1
+make: *** [arch/arm/mach-mxs] Error 2
+
+If I remove the "const" in iomux.h as below.
+
+iomux.h
+int mxs_iomux_setup_multiple_pads(iomux_cfg_t *pad_list, unsigned count);
+
+Compiler gives the following warning.
+
+  CC      arch/arm/mach-mxs/mach-mx28evk.o
+arch/arm/mach-mxs/mach-mx28evk.c: In function ?mx28evk_init?:
+arch/arm/mach-mxs/mach-mx28evk.c:102: warning: passing argument 1 of
+?mxs_iomux_setup_multiple_pads? discards qualifiers from pointer
+target type
+arch/arm/mach-mxs/include/mach/iomux.h:115: note: expected
+?iomux_cfg_t *? but argument is of type ?const iomux_cfg_t *?
+
+What's wrong here?
+
+-- 
+Regards,
+Shawn
