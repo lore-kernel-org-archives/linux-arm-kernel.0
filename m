@@ -1,61 +1,72 @@
-From: subaparts@yandex.ru (Alexander)
-Date: Thu, 09 Dec 2010 03:59:35 +0300
-Subject: [PATCH] ASoC: EP93xx: fixed LRCLK rate and DMA oper. in I2S code
-In-Reply-To: <20101208124637.GD16418@rakim.wolfsonmicro.main>
-References: <1291809693.31916.2.camel@r60e>
-	<20101208124637.GD16418@rakim.wolfsonmicro.main>
-Message-ID: <1291856375.31916.94.camel@r60e>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 9 Dec 2010 09:44:10 +0800
+Subject: [PATCH v2 09/15] ARM: mxs: Add clock support
+In-Reply-To: <20101208205740.GG17441@pengutronix.de>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-8-git-send-email-shawn.guo@freescale.com>
+	<20101208205740.GG17441@pengutronix.de>
+Message-ID: <AANLkTin_B-y0HxZ-+6w8qgz8FkNRCw7E4WrLfpeOdTn4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Sverdlin <subaparts@yandex.ru>
+2010/12/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Wed, Dec 08, 2010 at 12:31:59AM +0800, Shawn Guo wrote:
+>> Add clock for MXS-based SoCs, MX23 and MX28.
+>>
+>> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+>> ---
+>> Changes for v2:
+>> ?- Shift pll0_clock freq 480MHz in children freq computation to avoid overflow
+> really?
+>
+>> [...]
+>> +/*
+>> + * pll_clk
+>> + */
+>> +static unsigned long pll_clk_get_rate(struct clk *clk)
+>> +{
+>> + ? ? return 480000000;
+> pll's get_rate still returns 0x1c9c3800
+>
+>> [...]
+>> +/*
+>> + * ref_clk
+>> + */
+>> +#define _CLK_GET_RATE_REF(name, sr, ss) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> +static unsigned long name##_get_rate(struct clk *clk) ? ? ? ? ? ? ? ? ? ? ? ?\
+>> +{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? unsigned long parent_rate; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? u32 reg, div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##sr); ? ? ? ? \
+>> + ? ? div = (reg >> BP_CLKCTRL_##sr##_##ss##FRAC) & 0x3f; ? ? ? ? ? ? \
+>> + ? ? parent_rate = clk_get_rate(clk->parent); ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? return parent_rate * 18 / div; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> +}
+>> +
+>> +_CLK_GET_RATE_REF(ref_cpu_clk, FRAC, CPU)
+> ref_cpu_clk's get_rate still uses parent_rate * 18
+>
+>> +_CLK_GET_RATE_REF(ref_emi_clk, FRAC, EMI)
+>> +_CLK_GET_RATE_REF(ref_pix_clk, FRAC, PIX)
+>> +_CLK_GET_RATE_REF(ref_io_clk, FRAC, IO)
+>> +
+>> +#define _DEFINE_CLOCK_REF(name, er, es) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .enable_reg ? ? = CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er, ?\
+>> + ? ? ? ? ? ? .enable_shift ? = BP_CLKCTRL_##er##_CLKGATE##es, ? ? ? ?\
+>> + ? ? ? ? ? ? .get_rate ? ? ? = name##_get_rate, ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .enable ? ? ? ? = _raw_clk_enable, ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .disable ? ? ? ?= _raw_clk_disable, ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .parent ? ? ? ? = &pll_clk, ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? }
+>> +
+>> +_DEFINE_CLOCK_REF(ref_cpu_clk, FRAC, CPU);
+> ref_cpu_clk's parent still is pll_clk
+>
+My mistake.  I only fixed clock-mx28.c and forgot clock-mx23.c.
 
-Changes to I2S code:
-- SCLK and LRCLK rates are corrected, assuming we always send 32 bits * 2 channels to codec.
-- Formats list shortened to just S32_LE, this makes all the DMA transactions right,
-  while ALSA will do all sample format translation for us.
-
-Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
----
-
- sound/soc/ep93xx/ep93xx-i2s.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
-
-diff --git a/sound/soc/ep93xx/ep93xx-i2s.c b/sound/soc/ep93xx/ep93xx-i2s.c
-index 4f48733..3e4c3d9 100644
---- a/sound/soc/ep93xx/ep93xx-i2s.c
-+++ b/sound/soc/ep93xx/ep93xx-i2s.c
-@@ -267,14 +267,16 @@ static int ep93xx_i2s_hw_params(struct snd_pcm_substream *substream,
- 		ep93xx_i2s_write_reg(info, EP93XX_I2S_RXWRDLEN, word_len);
- 
- 	/*
--	 * Calculate the sdiv (bit clock) and lrdiv (left/right clock) values.
--	 * If the lrclk is pulse length is larger than the word size, then the
--	 * bit clock will be gated for the unused bits.
-+	 * EP93xx I2S module can be setup so SCLK / LRCLK value can be
-+	 * 32, 64, 128. MCLK / SCLK value can be 2 and 4.
-+	 * We set LRCLK equal to `rate' and minimum SCLK / LRCLK 
-+	 * value is 64, because our sample size is 32 bit * 2 channels.
-+	 * I2S standard permits us to transmit more bits than
-+	 * the codec uses.
- 	 */
--	div = (clk_get_rate(info->mclk) / params_rate(params)) *
--		params_channels(params);
-+	div = clk_get_rate(info->mclk) / params_rate(params);
- 	for (sdiv = 2; sdiv <= 4; sdiv += 2)
--		for (lrdiv = 32; lrdiv <= 128; lrdiv <<= 1)
-+		for (lrdiv = 64; lrdiv <= 128; lrdiv <<= 1)
- 			if (sdiv * lrdiv == div) {
- 				found = 1;
- 				goto out;
-@@ -341,9 +343,7 @@ static struct snd_soc_dai_ops ep93xx_i2s_dai_ops = {
- 	.set_fmt	= ep93xx_i2s_set_dai_fmt,
- };
- 
--#define EP93XX_I2S_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | \
--			    SNDRV_PCM_FMTBIT_S24_LE | \
--			    SNDRV_PCM_FMTBIT_S32_LE)
-+#define EP93XX_I2S_FORMATS (SNDRV_PCM_FMTBIT_S32_LE)
- 
- static struct snd_soc_dai_driver ep93xx_i2s_dai = {
- 	.symmetric_rates= 1,
+-- 
+Regards,
+Shawn
