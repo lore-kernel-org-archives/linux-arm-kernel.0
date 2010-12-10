@@ -1,30 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Dec 2010 16:57:17 -0800
-Subject: [PATCH v3] OMAP2+: PM/serial: fix console semaphore acquire
-	during suspend
-In-Reply-To: <87zksfc53b.fsf@deeprootsystems.com>
-References: <1291848040-23394-1-git-send-email-khilman@deeprootsystems.com>
-	<AANLkTi=9TBbuwr4uiQb6f_f=cLxK2NvWJDJYXwr2tTxu@mail.gmail.com>
-	<87zksfc53b.fsf@deeprootsystems.com>
-Message-ID: <20101210005717.GP3054@atomide.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 09 Dec 2010 16:58:45 -0800
+Subject: [PATCH] arm: dma-mapping: move consistent_init to	early_initcall
+In-Reply-To: <20101209103835.GA31465@n2100.arm.linux.org.uk>
+References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
+	<20101202221909.GK29347@n2100.arm.linux.org.uk>
+	<4CF94DDD.8000409@codeaurora.org>
+	<20101203203653.GB10245@n2100.arm.linux.org.uk>
+	<4CFDD297.4020600@codeaurora.org>
+	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
+	<20101209103835.GA31465@n2100.arm.linux.org.uk>
+Message-ID: <4D017B45.4000805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [101209 07:40]:
-> Vitaly Wool <vitalywool@gmail.com> writes:
-> >>
-> >> +static void omap2_pm_end(void)
-> >> +{
-> >> + ? ? ? suspend_state = PM_SUSPEND_ON;
-> >> + ? ? ? return;
-> >> +}
-> >
-> > Redundant return.
+Russell King - ARM Linux wrote:
+> On Thu, Dec 09, 2010 at 01:23:24AM -0800, skannan at codeaurora.org wrote:
+>> Russell, Have you had a chance to look at this? Any comments? How do we
+>> move ahead?
 > 
-> but harmless
+> I had connected the other thread with this one - it's pretty hard not
+> to as it included this patch in that set as the first patch.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-I'll queue this fix, will leave out the harmless return.
+Ok. So what's your take on handling the cache coherency with secure 
+domain? Do we get to add cache invalidate APIs outside of DMA APIs?
 
-Regards,
+-Saravana
 
-Tony
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
