@@ -1,38 +1,33 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 10 Dec 2010 17:21:04 +0000
-Subject: [PATCH] MMC: Fix multiblock SDIO transfers in ATMEL MCI
-In-Reply-To: <1292004872-5122-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20101210162351.GA11798@void.printf.net>
-	<1292004872-5122-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20101210172104.GA12871@void.printf.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 10 Dec 2010 09:41:53 -0800
+Subject: [PATCH 12/11] omap1: Fix gpio mpuio bank to work for
+	multi-omap for 7xx/15xx/16xx
+In-Reply-To: <201012101704.37054.jkrzyszt@tis.icnet.pl>
+References: <1290689318-10191-1-git-send-email-charu@ti.com>
+	<20101204212554.GM17222@atomide.com>
+	<20101207232315.GE17435@atomide.com>
+	<201012101704.37054.jkrzyszt@tis.icnet.pl>
+Message-ID: <20101210174153.GU3054@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [101210 08:05]:
+> > We need to divide the 15xx/16xx offset by 2 for 7xx. Use bank->stride
+> > for that. This allows us to get rid of the duplicate defines for the
+> > MPUIO registers.
+> >
+> > Note that this will cause omap-keypad.c driver to not work on 7xx.
+> > However, the right fix there is to move over to gpio-keys instead as
+> > suggested by Cory Maccarrone <darkstar6262@gmail.com> and
+> > Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>.
+> >
+> > Cc: Cory Maccarrone <darkstar6262@gmail.com>
+> > Cc: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> Acked-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-On Fri, Dec 10, 2010 at 07:14:32PM +0100, Nicolas Ferre wrote:
-> Based on report made by Yauhen in:
-> "MMC: Fix multiblock SDIO transfers in AT91 MCI" patch,
-> I report those changes to the brother driver: atmel-mci.
-> 
-> So, this patch sets SDIO transfer types: SDIO block and SDIO byte
-> transfers instead of using ordinary MMC block transfers.
-> It is checking opcode for SDIO CMD53 and setting transfer
-> type in MCI_CMDR register properly.
-> 
-> Reported-by: Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> 
-> Hi Chris,
-> 
-> In addition to the at91_mci multiblock SDIO fix, I add this little one too as
-> it concerns the brother driver atmel-mci with same issue.
-> 
-> I hope that you will be able to queue those fixes to .37-final and stable...
+Thanks, will now merge the gpio into omap-for-linus for the next
+merge window.
 
-That's fine, this is queued now too.  Thanks!
-
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Tony
