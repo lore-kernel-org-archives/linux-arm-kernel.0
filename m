@@ -1,59 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 10 Dec 2010 09:11:26 +0100
-Subject: [PATCH v3 07/15] ARM: mxs: Add gpio support
-In-Reply-To: <AANLkTin=urFhXb1DRcHjeTZ-MM4Ae0_OHbsfP0KzPmiK@mail.gmail.com>
-References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
-	<1291907569-8925-7-git-send-email-shawn.guo@freescale.com>
-	<19713.2074.562086.117710@ipc1.ka-ro>
-	<AANLkTi=r_HNk1Xsv8yAXZ54-NNn_awA3qR204NMKu6rB@mail.gmail.com>
-	<AANLkTin=urFhXb1DRcHjeTZ-MM4Ae0_OHbsfP0KzPmiK@mail.gmail.com>
-Message-ID: <20101210081126.GE17441@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Dec 2010 08:12:03 +0000
+Subject: [PATCH] mmci: drop superfluous regulator #ifdef
+In-Reply-To: <20101210033908.GA4455@void.printf.net>
+References: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
+	<20101210033908.GA4455@void.printf.net>
+Message-ID: <20101210081202.GA19186@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
-
-On Fri, Dec 10, 2010 at 03:23:13PM +0800, Shawn Guo wrote:
-> On Fri, Dec 10, 2010 at 3:06 PM, Shawn Guo <shawn.gsc@gmail.com> wrote:
-> > On Fri, Dec 10, 2010 at 12:47 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> >> Shawn Guo writes:
-> >>> +static void _set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
-> >>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? int enable)
-> >>> +{
-> >>> + ? ? if (enable == 0) {
-> >>> + ? ? ? ? ? ? __raw_writel(1 << index,
-> >>> + ? ? ? ? ? ? ? ? ? ? port->base + PINCTRL_PIN2IRQ(port->id) + MXS_CLR_ADDR);
-> >>> + ? ? ? ? ? ? __raw_writel(1 << index,
-> >>> + ? ? ? ? ? ? ? ? ? ? port->base + PINCTRL_IRQEN(port->id) + MXS_CLR_ADDR);
-> >> This will loose interrupt pulses that happen while IRQs are disabled.
-> >> IMO PIN2IRQ should only be cleared when an IRQ is freed, not when it
-> >> is disabled.
-> >>
-> > What about leaving PIN2IRQ always be 1 and only using IRQEN to
-> > enable/disable IRQ? ?I consulted the designer it's no problem no
-> > matter what the pin function is.
-> >
-> The code will be like:
+On Fri, Dec 10, 2010 at 03:39:08AM +0000, Chris Ball wrote:
+> Hi Linus,
 > 
-> static void _set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
->                                 int enable)
-> {
->         if (enable) {
->                 __raw_writel(1 << index,
->                         port->base + PINCTRL_IRQEN(port->id) + MXS_SET_ADDR);
->                 __raw_writel(1 << index,
->                         port->base + PINCTRL_PIN2IRQ(port->id) + MXS_SET_ADDR);
->         } else {
->                 __raw_writel(1 << index,
->                         port->base + PINCTRL_IRQEN(port->id) + MXS_CLR_ADDR);
->         }
-> }
-If I understood Lothar correctly the best way is to set and clear
-PINCTRL_PIN2IRQ in the irqchips irq_startup and irq_shutdown routine.
+> On Thu, Dec 02, 2010 at 02:36:58PM +0100, Linus Walleij wrote:
+> > The regulator and MMC frameworks provide the proper stub functions
+> > for the regulator functions anyway, get rid of this.
+> > 
+> > Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> > ---
+> >  drivers/mmc/host/mmci.c |    3 +--
+> >  1 files changed, 1 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> > index 3709ab3..7567872 100644
+> > --- a/drivers/mmc/host/mmci.c
+> > +++ b/drivers/mmc/host/mmci.c
+> > @@ -844,7 +844,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+> >  		mmc->f_max = min(host->mclk, fmax);
+> >  	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+> >  
+> > -#ifdef CONFIG_REGULATOR
+> >  	/* If we're using the regulator framework, try to fetch a regulator */
+> >  	host->vcc = regulator_get(&dev->dev, "vmmc");
+> >  	if (IS_ERR(host->vcc))
+> > @@ -863,7 +862,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+> >  				 "(using regulator instead)\n");
+> >  		}
+> >  	}
+> > -#endif
+> > +
+> >  	/* Fall back to platform data if no regulator is found */
+> >  	if (host->vcc == NULL)
+> >  		mmc->ocr_avail = plat->ocr_mask;
+> 
+> Thanks, pushed to mmc-next for .38.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Also queued in the ARM tree.
