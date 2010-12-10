@@ -1,34 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Dec 2010 10:00:12 +0000
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <4D017B45.4000805@codeaurora.org>
-References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
-	<20101202221909.GK29347@n2100.arm.linux.org.uk>
-	<4CF94DDD.8000409@codeaurora.org>
-	<20101203203653.GB10245@n2100.arm.linux.org.uk>
-	<4CFDD297.4020600@codeaurora.org>
-	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
-	<20101209103835.GA31465@n2100.arm.linux.org.uk>
-	<4D017B45.4000805@codeaurora.org>
-Message-ID: <AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 10 Dec 2010 11:08:24 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+	<1291899120.29292.7.camel@twins>
+	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+	<1291917330.6803.7.camel@twins>
+	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
+	<1291920939.6803.38.camel@twins>
+	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+	<1291936593.13513.3.camel@laptop>
+	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
+Message-ID: <1291975704.6803.59.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 December 2010 00:58, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Russell King - ARM Linux wrote:
->>
->> On Thu, Dec 09, 2010 at 01:23:24AM -0800, skannan at codeaurora.org wrote:
->>>
->>> Russell, Have you had a chance to look at this? Any comments? How do we
->>> move ahead?
->>
->> I had connected the other thread with this one - it's pretty hard not
->> to as it included this patch in that set as the first patch.
->
-> Ok. So what's your take on handling the cache coherency with secure domain?
-> Do we get to add cache invalidate APIs outside of DMA APIs?
+On Thu, 2010-12-09 at 15:35 -0800, Venkatesh Pallipadi wrote:
+> 
+> Just to make sure, update_rq_clock() always gets called on current
+> CPU. Right? 
 
-Can the secure software not create NS pages and be fully coherent?
+No, specifically not. If that were the case we wouldn't need the
+cross-cpu synced timestamp. Things like load-balancing and
+remote-wakeups need to update a remote CPUs clock.
 
--- 
-Catalin
+> The pending patches I have optimizes
+> account_system_vtime() to use this_cpu_write and friends. Want to make
+> sure this change will still keep that optimization relevant.
+
+Ah, good point, remote CPUs updating that will mess with the consistency
+of the per-cpu timestamps due to non atomic updates :/
+
+Bugger.. making them atomics will make it even more expensive. /me goes
+ponder.
