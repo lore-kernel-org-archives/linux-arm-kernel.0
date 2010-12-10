@@ -1,200 +1,88 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 10 Dec 2010 14:58:53 +0900
-Subject: [PATCH 02/02][RFC] ARM: shmobile: Use Subarch IRQ handler for INTC
-In-Reply-To: <20101210055835.8635.98614.sendpatchset@t400s>
-References: <20101210055835.8635.98614.sendpatchset@t400s>
-Message-ID: <20101210055853.8635.83051.sendpatchset@t400s>
+From: carmelo.amoroso@st.com (Carmelo AMOROSO)
+Date: Fri, 10 Dec 2010 06:56:34 +0100
+Subject: [PATCH (sh-2.6) 1/2] sh: add stack smashing protection support
+In-Reply-To: <201012091614.26353.vapier@gentoo.org>
+References: <1291717254-17455-1-git-send-email-filippo.arcidiacono@st.com>
+	<201012091232.31577.vapier@gentoo.org>
+	<alpine.LFD.2.00.1012091313270.10437@xanadu.home>
+	<201012091614.26353.vapier@gentoo.org>
+Message-ID: <4D01C112.80101@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Example code that shows how to use arch_irq_handler
-together with the handle_irq callback on SH-Mobile ARM.
+On 12/9/2010 10:14 PM, Mike Frysinger wrote:
+> On Thursday, December 09, 2010 13:23:55 Nicolas Pitre wrote:
+>> On Thu, 9 Dec 2010, Mike Frysinger wrote:
+>>> On Thursday, December 09, 2010 11:45:30 Carmelo AMOROSO wrote:
+>>>> On 12/9/2010 5:07 PM, Mike Frysinger wrote:
+>>>>> On Thursday, December 09, 2010 10:56:26 Carmelo AMOROSO wrote:
+>>>>>> I agree with you that the Kconfig and Makefile changes are not arch
+>>>>>> specific, so these changes can be moved to a common code (even if I
+>>>>>> don't know if other archs do support SSP).
+>>>>>> In the current kernel, only x86 and ARM added this support, so I'm
+>>>>>> wondering if, moving SSP to the common Makefile, it needs to depend
+>>>>>> on x86, ARM, SH being configured ?
+>>>>>
+>>>>> i'm not sure it does.  ssp is designed to be arch independent, so
+>>>>> really you only need a new enough gcc version.  which means i dont
+>>>>> think it needs to depend on any arch code and you can simply add to
+>>>>> the Makefile a compiler check.
+>>>>
+>>>> agreed, but if arch wants to implement the per-task canary feature,
+>>>> some change into arch specific code is required.
+>>>
+>>> yes, but that doesnt mean the common symbol definition needs to be
+>>> duplicated
+>>
+>> We are talking about only one symbol here, which symbol is also
+>> dependent on the way this feature is implemented in gcc (e.g. on x86 the
+>> implementation is totally different and this symbol isn't used).  So I
+>> don't see a huge gain by defining this symbol in generic code, given the
+>> number of lines involved in the addition of a new file, just for a
+>> single symbol.
+> 
+> you're right, a few targets dont have any symbol at all and do it through TLS.  
+> although that is more of an exception than a rule, so i'd still like to see 
+> the symbol in a common file.  perhaps reverse selected by the arch Kconfig 
+> like "select ARCH_WANT_STACK_CHK_GUARD".  or perhaps invert the logic so only 
+> the funky arches get punished.
+> 
 
-Not-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Mike,
+we will post a n update version of the patch.
 
- arch/arm/mach-shmobile/Kconfig                    |    3 ++
- arch/arm/mach-shmobile/Makefile                   |   12 ++++++--
- arch/arm/mach-shmobile/board-ap4evb.c             |    1 
- arch/arm/mach-shmobile/board-g3evm.c              |    1 
- arch/arm/mach-shmobile/board-g4evm.c              |    1 
- arch/arm/mach-shmobile/entry-intc.S               |   30 +++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/common.h      |    1 
- arch/arm/mach-shmobile/include/mach/entry-macro.S |   27 ------------------
- arch/arm/mach-shmobile/include/mach/hardware.h    |    3 --
- 9 files changed, 46 insertions(+), 33 deletions(-)
+> i might highlight that the way gcc/i386 manages its canary is dependent upon 
+> the C library it was compiled against, but i dont want to poke that nest as 
+> i'm not interested in making it work on that arch ;).
+> 
 
---- 0001/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2010-12-09 23:15:46.000000000 +0900
-@@ -9,6 +9,7 @@ config ARCH_SH7367
- 	select CLKDEV_LOOKUP
- 	select SH_CLK_CPG
- 	select GENERIC_CLOCKEVENTS
-+	select MULTI_IRQ_HANDLER
- 
- config ARCH_SH7377
- 	bool "SH-Mobile G4 (SH7377)"
-@@ -17,6 +18,7 @@ config ARCH_SH7377
- 	select CLKDEV_LOOKUP
- 	select SH_CLK_CPG
- 	select GENERIC_CLOCKEVENTS
-+	select MULTI_IRQ_HANDLER
- 
- config ARCH_SH7372
- 	bool "SH-Mobile AP4 (SH7372)"
-@@ -25,6 +27,7 @@ config ARCH_SH7372
- 	select CLKDEV_LOOKUP
- 	select SH_CLK_CPG
- 	select GENERIC_CLOCKEVENTS
-+	select MULTI_IRQ_HANDLER
- 
- comment "SH-Mobile Board Type"
- 
---- 0001/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2010-12-09 23:15:46.000000000 +0900
-@@ -6,9 +6,15 @@
- obj-y				:= timer.o console.o clock.o pm_runtime.o
- 
- # CPU objects
--obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
--obj-$(CONFIG_ARCH_SH7377)	+= setup-sh7377.o clock-sh7377.o intc-sh7377.o
--obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o clock-sh7372.o intc-sh7372.o
-+obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o
-+obj-$(CONFIG_ARCH_SH7377)	+= setup-sh7377.o clock-sh7377.o
-+obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o clock-sh7372.o
-+
-+# IRQ objects
-+irq-$(CONFIG_ARCH_SH7367)	+= intc-sh7367.o entry-intc.o
-+irq-$(CONFIG_ARCH_SH7377)	+= intc-sh7377.o entry-intc.o
-+irq-$(CONFIG_ARCH_SH7372)	+= intc-sh7372.o entry-intc.o
-+obj-y				+= $(irq-y)
- 
- # Pinmux setup
- pfc-$(CONFIG_ARCH_SH7367)	:= pfc-sh7367.o
---- 0001/arch/arm/mach-shmobile/board-ap4evb.c
-+++ work/arch/arm/mach-shmobile/board-ap4evb.c	2010-12-09 23:15:46.000000000 +0900
-@@ -1356,6 +1356,7 @@ static struct sys_timer ap4evb_timer = {
- MACHINE_START(AP4EVB, "ap4evb")
- 	.map_io		= ap4evb_map_io,
- 	.init_irq	= sh7372_init_irq,
-+	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= ap4evb_init,
- 	.timer		= &ap4evb_timer,
- MACHINE_END
---- 0001/arch/arm/mach-shmobile/board-g3evm.c
-+++ work/arch/arm/mach-shmobile/board-g3evm.c	2010-12-09 23:15:46.000000000 +0900
-@@ -367,6 +367,7 @@ static struct sys_timer g3evm_timer = {
- MACHINE_START(G3EVM, "g3evm")
- 	.map_io		= g3evm_map_io,
- 	.init_irq	= sh7367_init_irq,
-+	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= g3evm_init,
- 	.timer		= &g3evm_timer,
- MACHINE_END
---- 0001/arch/arm/mach-shmobile/board-g4evm.c
-+++ work/arch/arm/mach-shmobile/board-g4evm.c	2010-12-09 23:15:46.000000000 +0900
-@@ -394,6 +394,7 @@ static struct sys_timer g4evm_timer = {
- MACHINE_START(G4EVM, "g4evm")
- 	.map_io		= g4evm_map_io,
- 	.init_irq	= sh7377_init_irq,
-+	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= g4evm_init,
- 	.timer		= &g4evm_timer,
- MACHINE_END
---- /dev/null
-+++ work/arch/arm/mach-shmobile/entry-intc.S	2010-12-09 23:20:52.000000000 +0900
-@@ -0,0 +1,30 @@
-+/*
-+ * ARM Interrupt demux handler using INTC 
-+ *
-+ * Copyright (C) 2010 Magnus Damm
-+ * Copyright (C) 2008 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under  the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <asm/entry-macro-multi.S>
-+
-+#define INTFLGA	0xe6980018
-+
-+	.macro  get_irqnr_preamble, base, tmp
-+	ldr     \base, =INTFLGA
-+	.endm
-+
-+	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-+	ldr     \irqnr, [\base]
-+	cmp	\irqnr, #0
-+	beq	1000f
-+	/* intevt to irq number */
-+	lsr	\irqnr, \irqnr, #0x5
-+	subs	\irqnr, \irqnr, #16
-+1000:
-+	.endm
-+
-+	arch_irq_handler shmobile_handle_irq_intc
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2010-12-09 23:15:46.000000000 +0900
-@@ -5,6 +5,7 @@ extern struct sys_timer shmobile_timer;
- extern void shmobile_setup_console(void);
- struct clk;
- extern int clk_init(void);
-+extern void shmobile_handle_irq_intc(struct pt_regs *);
- 
- extern void sh7367_init_irq(void);
- extern void sh7367_add_early_devices(void);
---- 0001/arch/arm/mach-shmobile/include/mach/entry-macro.S
-+++ work/arch/arm/mach-shmobile/include/mach/entry-macro.S	2010-12-09 23:15:46.000000000 +0900
-@@ -1,39 +1,12 @@
--/*
-- * Copyright (C) 2008 Renesas Solutions Corp.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--#include <mach/hardware.h>
--#include <mach/irqs.h>
- 
- 	.macro  disable_fiq
- 	.endm
- 
- 	.macro  get_irqnr_preamble, base, tmp
--	ldr     \base, =INTFLGA
- 	.endm
- 
- 	.macro  arch_ret_to_user, tmp1, tmp2
- 	.endm
- 
- 	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--	ldr     \irqnr, [\base]
--	cmp	\irqnr, #0
--	beq	1000f
--	/* intevt to irq number */
--	lsr	\irqnr, \irqnr, #0x5
--	subs	\irqnr, \irqnr, #16
--
--1000:
- 	.endm
---- 0001/arch/arm/mach-shmobile/include/mach/hardware.h
-+++ work/arch/arm/mach-shmobile/include/mach/hardware.h	2010-12-09 23:18:37.000000000 +0900
-@@ -1,7 +1,4 @@
- #ifndef __ASM_MACH_HARDWARE_H
- #define __ASM_MACH_HARDWARE_H
- 
--/* INTFLGA register - used by low level interrupt code in entry-macro.S */
--#define INTFLGA			0xe6980018
--
- #endif /* __ASM_MACH_HARDWARE_H */
+interesting... but x86 is out of scope for me too ;)
+
+>>> i think you only need to test that gcc accepts -fstack-protector
+>>> and then assume the rest ... i dont think you need to come up with random
+>>> pieces of code and cajole the symbol references out of gcc.
+>>
+>> Would you care to elaborate?
+> 
+> i simply mean that any makefile code checking for support need only look for 
+> gcc supporting -fstack-protector.
+
+yes, sure
+
+> -mike
+
+cheers,
+carmelo
+
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (MingW32)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEYEARECAAYFAk0BwRIACgkQoRq/3BrK1s9gRwCeKMQ2xsGNrVEqo4gbL6NSXM8A
+LeoAoNZgsIpvNxHSULHXZaPf3i6i4u/d
+=kqky
+-----END PGP SIGNATURE-----
