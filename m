@@ -1,33 +1,38 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu,  9 Dec 2010 15:45:27 -0800
-Subject: [PATCH] MAINTAINERS: update MSM git tree
-Message-ID: <1291938327-22243-1-git-send-email-dwalker@codeaurora.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 09 Dec 2010 16:14:44 -0800
+Subject: [PATCH 13/11] OMAP2+: GPIO: ensure bank wakeups are enabled by
+	default
+In-Reply-To: <20101210000750.GM3054@atomide.com> (Tony Lindgren's message of
+	"Thu, 9 Dec 2010 16:07:50 -0800")
+References: <1290689318-10191-1-git-send-email-charu@ti.com>
+	<1291923226-10112-1-git-send-email-khilman@deeprootsystems.com>
+	<20101210000750.GM3054@atomide.com>
+Message-ID: <87vd324h6z.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM main git tree has changed over to this new address.
+Tony Lindgren <tony@atomide.com> writes:
 
-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
----
- MAINTAINERS |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> * Kevin Hilman <khilman@deeprootsystems.com> [101209 11:33]:
+>> As part of the GPIO conversion to platform_device/platform_driver,
+>> commit 2fae7fbed072705d91e09ed393b2e580b2d895fc (OMAP: GPIO: prepare
+>> for platform driver) removed hard-coded per-bank SYSCONFIG register
+>> values in favor of using omap_hwmod to manage the SYSCONFIG register.
+>> 
+>> In the previous code, bank-level wakeups were enabled by default using
+>> the SYSCONFIG.ENAWAKEUP bit, but omap_hwmod does not enable wakeups by
+>> default.  Thus the above commit effectively disabled GPIO bank wakeups.
+>> 
+>> This patch enables GPIO bank level wakeups by default to preserve
+>> previous functionality.
+>
+> So this patch is no longer needed, right?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1a1c27b..34d44ec 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -815,7 +815,7 @@ F:	drivers/mmc/host/msm_sdcc.c
- F:	drivers/mmc/host/msm_sdcc.h
- F:	drivers/serial/msm_serial.h
- F:	drivers/serial/msm_serial.c
--T:	git git://codeaurora.org/quic/kernel/dwalker/linux-msm.git
-+T:	git git://codeaurora.org/quic/kernel/davidb/linux-msm.git
- S:	Maintained
- 
- ARM/TOSA MACHINE SUPPORT
--- 
-1.7.0.4
+Yup, you beat me to it.
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+This is actually a problem in the omap_hwmod core, and I posted a
+separate patch[1] to fix that problem.
+
+Kevin
+
+[1] http://marc.info/?l=linux-omap&m=129193625420446&w=2
