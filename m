@@ -1,42 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Dec 2010 17:03:56 +0000
-Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
-In-Reply-To: <201012101203.09441.jkrzyszt@tis.icnet.pl>
-References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
-	<201012101159.21845.jkrzyszt@tis.icnet.pl>
-	<201012101203.09441.jkrzyszt@tis.icnet.pl>
-Message-ID: <20101210170356.GA28472@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 10 Dec 2010 19:14:32 +0100
+Subject: [PATCH] MMC: Fix multiblock SDIO transfers in ATMEL MCI
+In-Reply-To: <20101210162351.GA11798@void.printf.net>
+References: <20101210162351.GA11798@void.printf.net>
+Message-ID: <1292004872-5122-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
->  void __init omap1_camera_init(void *info)
->  {
->  	struct platform_device *dev = &omap1_camera_device;
-> +	dma_addr_t paddr = omap1_camera_phys_mempool_base;
-> +	dma_addr_t size = omap1_camera_phys_mempool_size;
->  	int ret;
->  
->  	dev->dev.platform_data = info;
->  
-> +	if (paddr) {
-> +		if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
-> +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
+Based on report made by Yauhen in:
+"MMC: Fix multiblock SDIO transfers in AT91 MCI" patch,
+I report those changes to the brother driver: atmel-mci.
 
-Although this works, you're ending up with SDRAM being mapped via
-ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
-mapped as if it were a device.
+So, this patch sets SDIO transfer types: SDIO block and SDIO byte
+transfers instead of using ordinary MMC block transfers.
+It is checking opcode for SDIO CMD53 and setting transfer
+type in MCI_CMDR register properly.
 
-For OMAP1, which is ARMv5 or lower, device memory becomes 'uncacheable,
-unbufferable' which is luckily what is used for the DMA coherent
-memory on those platforms - so no technical problem here.
+Reported-by: Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
 
-However, on ARMv6 and later, ioremapped memory is device memory, which
-has different ordering wrt normal memory mappings, and may appear on
-different busses on the CPU's interface.  So, this is something I don't
-encourage as it's unclear that the hardware will work.
+Hi Chris,
 
-Essentially, dma_declare_coherent_memory() on ARM with main SDRAM should
-be viewed as a 'it might work, it might not, and it might stop working
-in the future' kind of interface.  In other words, there is no guarantee
-that this kind of thing will be supported in the future.
+In addition to the at91_mci multiblock SDIO fix, I add this little one too as
+it concerns the brother driver atmel-mci with same issue.
+
+I hope that you will be able to queue those fixes to .37-final and stable...
+
+Thanks a lot, best regards,
+
+ drivers/mmc/host/atmel-mci.c |   18 ++++++++++++------
+ 1 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 301351a..ad2a7a0 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -26,6 +26,7 @@
+ #include <linux/stat.h>
+ 
+ #include <linux/mmc/host.h>
++#include <linux/mmc/sdio.h>
+ 
+ #include <mach/atmel-mci.h>
+ #include <linux/atmel-mci.h>
+@@ -532,12 +533,17 @@ static u32 atmci_prepare_command(struct mmc_host *mmc,
+ 	data = cmd->data;
+ 	if (data) {
+ 		cmdr |= MCI_CMDR_START_XFER;
+-		if (data->flags & MMC_DATA_STREAM)
+-			cmdr |= MCI_CMDR_STREAM;
+-		else if (data->blocks > 1)
+-			cmdr |= MCI_CMDR_MULTI_BLOCK;
+-		else
+-			cmdr |= MCI_CMDR_BLOCK;
++
++		if (cmd->opcode == SD_IO_RW_EXTENDED) {
++			cmdr |= MCI_CMDR_SDIO_BLOCK;
++		} else {
++			if (data->flags & MMC_DATA_STREAM)
++				cmdr |= MCI_CMDR_STREAM;
++			else if (data->blocks > 1)
++				cmdr |= MCI_CMDR_MULTI_BLOCK;
++			else
++				cmdr |= MCI_CMDR_BLOCK;
++		}
+ 
+ 		if (data->flags & MMC_DATA_READ)
+ 			cmdr |= MCI_CMDR_TRDIR_READ;
+-- 
+1.7.3
