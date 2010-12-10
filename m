@@ -1,206 +1,52 @@
-From: vm.rod25@gmail.com (Victor Rodriguez)
-Date: Fri, 10 Dec 2010 15:02:35 -0600
-Subject: [PATCH v10 4/6] davinci: MMC/SD support for Omapl138-Hawkboard
-In-Reply-To: <AANLkTi=VZQAhC=Hm7dGB8tW38FA-SqLUc-GCiNUX7iSw@mail.gmail.com>
-References: <1291760089-5818-1-git-send-email-vm.rod25@gmail.com>
-	<1291760089-5818-5-git-send-email-vm.rod25@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247C470AD@dbde02.ent.ti.com>
-	<AANLkTi=VZQAhC=Hm7dGB8tW38FA-SqLUc-GCiNUX7iSw@mail.gmail.com>
-Message-ID: <AANLkTiktxX3X+qTmentd+gDE3zPSqkry72P8GE6SLvf9@mail.gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Fri, 10 Dec 2010 22:03:52 +0100
+Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
+In-Reply-To: <20101210170356.GA28472@n2100.arm.linux.org.uk>
+References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
+	<201012101203.09441.jkrzyszt@tis.icnet.pl>
+	<20101210170356.GA28472@n2100.arm.linux.org.uk>
+Message-ID: <201012102203.54413.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 8, 2010 at 9:55 AM, Victor Rodriguez <vm.rod25@gmail.com> wrote:
-> On Tue, Dec 7, 2010 at 11:20 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
->> On Wed, Dec 08, 2010 at 03:44:47, vm.rod25 at gmail.com wrote:
->>
->>> +static __init void omapl138_hawk_mmc_init(void)
->>> +{
->>> + ? ? int ret;
->>> +
->>> + ? ? ret = davinci_cfg_reg_list(hawk_mmcsd0_pins);
->>> + ? ? if (ret) {
->>> + ? ? ? ? ? ? pr_warning("%s: MMC/SD0 mux setup failed: %d\n",
->>> + ? ? ? ? ? ? ? ? ? ? __func__, ret);
->>> + ? ? ? ? ? ? return;
->>> + ? ? }
->>> +
->>> + ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
->>> + ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC CD");
->>> + ? ? if (ret < 0) {
->>> + ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
->>> + ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_CD_PIN);
->>> + ? ? ? ? ? ? goto mmc_setup_cd_fail;
->>> + ? ? }
->>
->> A goto is only used when there is some recovery
->> to be done. In this case, you should simply return
->> here. The USB patch needs the same correction.
->>
->> Thanks,
->> Sekhar
+Friday 10 December 2010 18:03:56 Russell King - ARM Linux napisa?(a):
+> On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
+> >  void __init omap1_camera_init(void *info)
+> >  {
+> >  	struct platform_device *dev = &omap1_camera_device;
+> > +	dma_addr_t paddr = omap1_camera_phys_mempool_base;
+> > +	dma_addr_t size = omap1_camera_phys_mempool_size;
+> >  	int ret;
+> >
+> >  	dev->dev.platform_data = info;
+> >
+> > +	if (paddr) {
+> > +		if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
+> > +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
 >
-> Sorry for this my mistake
+> Although this works, you're ending up with SDRAM being mapped via
+> ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
+> mapped as if it were a device.
 >
-> It wil change to this
+> For OMAP1, which is ARMv5 or lower, device memory becomes 'uncacheable,
+> unbufferable' which is luckily what is used for the DMA coherent
+> memory on those platforms - so no technical problem here.
 >
-> +static __init void omapl138_hawk_mmc_init(void)
-> +{
-> + ? ? ? int ret;
-> +
-> + ? ? ? ret = davinci_cfg_reg_list(hawk_mmcsd0_pins);
-> + ? ? ? if (ret) {
-> + ? ? ? ? ? ? ? pr_warning("%s: MMC/SD0 mux setup failed: %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> +
-> + ? ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
-> + ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC CD");
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_CD_PIN);
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> +
-> + ? ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
-> + ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC WP");
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
-> + ? ? ? ? ? ? ? goto mmc_setup_wp_fail;
-> + ? ? ? }
-> +
-> + ? ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
-> + ? ? ? if (ret) {
-> + ? ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
-> + ? ? ? ? ? ? ? goto mmc_setup_mmcsd_fail;
-> + ? ? ? }
-> +
-> + ? ? ? return;
-> +
-> +mmc_setup_mmcsd_fail:
-> + ? ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
-> +mmc_setup_wp_fail:
-> + ? ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
-> +}
-> +
+> However, on ARMv6 and later, ioremapped memory is device memory, which
+> has different ordering wrt normal memory mappings, and may appear on
+> different busses on the CPU's interface.  So, this is something I don't
+> encourage as it's unclear that the hardware will work.
 >
-> And USB will be this
->
-> +static __init void omapl138_hawk_usb_init(void)
-> +{
-> + ? ? ? int ret;
-> + ? ? ? u32 cfgchip2;
-> +
-> + ? ? ? ret = davinci_cfg_reg_list(da850_hawk_usb11_pins);
-> + ? ? ? if (ret) {
-> + ? ? ? ? ? ? ? pr_warning("%s: USB 1.1 PinMux setup failed: %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> +
-> + ? ? ? /* Setup the Ref. clock frequency for the HAWK at 24 MHz. */
-> +
-> + ? ? ? cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
-> + ? ? ? cfgchip2 &= ~CFGCHIP2_REFFREQ;
-> + ? ? ? cfgchip2 |= ?CFGCHIP2_REFFREQ_24MHZ;
-> + ? ? ? __raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
-> +
-> + ? ? ? ret = gpio_request_one(DA850_USB1_VBUS_PIN,
-> + ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_OUT, "USB1 VBUS");
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_err("%s: failed to request GPIO for USB 1.1 port "
-> + ? ? ? ? ? ? ? ? ? ? ? "power control: %d\n", __func__, ret);
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> +
-> + ? ? ? ret = gpio_request_one(DA850_USB1_OC_PIN,
-> + ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "USB1 OC");
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_err("%s: failed to request GPIO for USB 1.1 port "
-> + ? ? ? ? ? ? ? ? ? ? ? "over-current indicator: %d\n", __func__, ret);
-> + ? ? ? ? ? ? ? goto usb11_setup_oc_fail;
-> + ? ? ? }
-> +
-> + ? ? ? ret = da8xx_register_usb11(&omapl138_hawk_usb11_pdata);
-> + ? ? ? if (ret) {
-> + ? ? ? ? ? ? ? pr_warning("%s: USB 1.1 registration failed: %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
-> + ? ? ? ? ? ? ? goto usb11_setup_fail;
-> + ? ? ? }
-> +
-> + ? ? ? return;
-> +
-> +usb11_setup_fail:
-> + ? ? ? gpio_free(DA850_USB1_OC_PIN);
-> +usb11_setup_oc_fail:
-> + ? ? ? gpio_free(DA850_USB1_VBUS_PIN);
-> +}
-> +
->
-> Thanks a lot for the comments
->
-> Regards
->
-> Victor Rodriguez
+> Essentially, dma_declare_coherent_memory() on ARM with main SDRAM should
+> be viewed as a 'it might work, it might not, and it might stop working
+> in the future' kind of interface.  In other words, there is no guarantee
+> that this kind of thing will be supported in the future.
 
+I was affraid of an unswer of this kind. I'm not capable of comming out with 
+any better, alternative solutions. Any hints other than giving up with that 
+old videobuf-contig, coherent memory based interface? Or can we agree on 
+that 'luckily uncacheable, unbufferable, SDRAM based DMA coherent memory' 
+solution for now?
 
-Any update of this is Ok to resend the series with this small change?
-
-
-Regards
-
-Victor Rodriguez
-
-
->
->>> +
->>> + ? ? ret = gpio_request_one(DA850_HAWK_MMCSD_WP_PIN,
->>> + ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_IN, "MMC WP");
->>> + ? ? if (ret < 0) {
->>> + ? ? ? ? ? ? pr_warning("%s: can not open GPIO %d\n",
->>> + ? ? ? ? ? ? ? ? ? ? __func__, DA850_HAWK_MMCSD_WP_PIN);
->>> + ? ? ? ? ? ? goto mmc_setup_wp_fail;
->>> + ? ? }
->>> +
->>> + ? ? ret = da8xx_register_mmcsd0(&da850_mmc_config);
->>> + ? ? if (ret) {
->>> + ? ? ? ? ? ? pr_warning("%s: MMC/SD0 registration failed: %d\n",
->>> + ? ? ? ? ? ? ? ? ? ? __func__, ret);
->>> + ? ? ? ? ? ? goto mmc_setup_mmcsd_fail;
->>> + ? ? }
->>> +
->>> +mmc_setup_cd_fail:
->>> + ? ? return;
->>> +
->>> +mmc_setup_mmcsd_fail:
->>> + ? ? gpio_free(DA850_HAWK_MMCSD_WP_PIN);
->>> +mmc_setup_wp_fail:
->>> + ? ? gpio_free(DA850_HAWK_MMCSD_CD_PIN);
->>> +}
->>> +
->>> ?static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
->>> ? ? ? .enabled_uarts = 0x7,
->>> ?};
->>> @@ -127,6 +198,8 @@ static __init void omapl138_hawk_init(void)
->>> ? ? ? ? ? ? ? pr_warning("%s: EDMA registration failed: %d\n",
->>> ? ? ? ? ? ? ? ? ? ? ? __func__, ret);
->>>
->>> + ? ? omapl138_hawk_mmc_init();
->>> +
->>> ? ? ? ret = da8xx_register_watchdog();
->>> ? ? ? if (ret)
->>> ? ? ? ? ? ? ? pr_warning("omapl138_hawk_init: "
->>> --
->>> 1.7.0.4
->>>
->>> _______________________________________________
->>> Davinci-linux-open-source mailing list
->>> Davinci-linux-open-source at linux.davincidsp.com
->>> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
->>>
->>
->>
->
+Thanks,
+Janusz
