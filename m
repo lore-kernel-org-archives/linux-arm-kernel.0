@@ -1,26 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Dec 2010 16:31:07 -0800
-Subject: Problem with sram size on OMAP1611 (OSK)
-In-Reply-To: <4D011D59.4060304@am.sony.com>
-References: <4CE73921.6030908@am.sony.com> <20101207001831.GX8345@atomide.com>
-	<1291769811.2796.39.camel@localhost> <4D011D59.4060304@am.sony.com>
-Message-ID: <20101210003107.GO3054@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 09 Dec 2010 16:35:39 -0800
+Subject: [PATCH v2 0/8] OMAP3&4: clock data: Fixes and add new clocks nodes
+In-Reply-To: <1291932820-11163-1-git-send-email-b-cousson@ti.com> (Benoit
+	Cousson's message of "Thu, 9 Dec 2010 23:13:32 +0100")
+References: <1291932820-11163-1-git-send-email-b-cousson@ti.com>
+Message-ID: <87mxoe4g84.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tim Bird <tim.bird@am.sony.com> [101209 10:18]:
-> On 12/7/2010 4:56 PM, Kevin Hilman wrote:
-> >On Mon, 2010-12-06 at 16:18 -0800, Tony Lindgren wrote:
-> >>
-> >>I'm not seeing this on my OSK, can you please check if this still
-> >>happening with v2.6.37-rc4?
-> 
-> Sorry I didn't report back sooner.  I was going to try another test to see
-> if I could determine what size *did* work, but ran out of time.  However,
-> I tested v2.6.37-rc4, and it had the same problem I originally reported.
-> 
-> Kevin's explanation sounds likely to me.
+Hi Benoit,
 
-OK thanks, will queue it.
+Benoit Cousson <b-cousson@ti.com> writes:
 
-Tony
+> Hi Paul,
+>
+> Here is a collections of fixes and clock nodes addition done on OMAP3
+> and OMAP4 clock data files.
+>
+> I have included the one that Thara already submitted after fixing the
+> various comments done on the original version.
+>
+> That revision include as well a new fix from Jon. Thanks to both fixes,
+> the clocks rate are now accurate and the func_48m_fclk does report 48MHz
+> now! Cool isn't it?
+>
+> Tested on sdp4430 + ES2.0.
+>
+> The series is based on 2.6.37-rc5 and is available here:
+> git://gitorious.org/omap-pm/linux.git for_2.6.38/clock
+
+I tried to pull this into my pm-core for testing with all the other PM
+stuff we have baking for 2.6.38.
+
+Unfortunately, this series has conflicts with Paul's
+pwrdm_prcm_[ab]_2.6.38 branches.
+
+Could you rebase this on Paul's pwrdm_prcm_b_2.6.38 branch?
+
+Kevin
+
+>
+> Benoit Cousson (3):
+>   OMAP4: clock data: Add control for pad_clks_ck and slimbus_clk
+>   OMAP3: clock data: Add "wkup_clkdm" in sr1_fck and sr2_fck
+>   OMAP4: PRCM: Add SCRM header file
+>
+> Jon Hunter (1):
+>   OMAP4: clock data: Add missing fixed divisors
+>
+> Jonathan Bergsagel (1):
+>   OMAP4: clock data: Add missing fields in iva_hsd_byp_clk_mux_ck
+>
+> Rajendra Nayak (2):
+>   OMAP4: clock data: Add SCRM auxiliary clock nodes
+>   OMAP4: clock data: Export control to enable/disable CORE/PER M3
+>     clocks
+>
+> Thara Gopinath (1):
+>   OMAP4: clock data: Add missing DPLL x2 clock nodes
+>
+>  arch/arm/mach-omap2/clock3xxx_data.c |    2 +
+>  arch/arm/mach-omap2/clock44xx_data.c |  653 ++++++++++++++++++++++++----------
+>  arch/arm/mach-omap2/scrm44xx.h       |  176 +++++++++
+>  3 files changed, 640 insertions(+), 191 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/scrm44xx.h
