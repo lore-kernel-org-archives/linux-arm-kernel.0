@@ -1,31 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Dec 2010 09:44:08 -0800
-Subject: [PATCH 1/3] omap1: Use asm_irq_flags for entry-macro.S
-In-Reply-To: <201012101706.24089.jkrzyszt@tis.icnet.pl>
-References: <20101204001435.28853.29616.stgit@baageli.muru.com>
-	<20101208014548.GJ17435@atomide.com>
-	<20101208014728.GK17435@atomide.com>
-	<201012101706.24089.jkrzyszt@tis.icnet.pl>
-Message-ID: <20101210174407.GV3054@atomide.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 10 Dec 2010 18:49:06 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <1292001500.3580.268.camel@edumazet-laptop>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+	<1291899120.29292.7.camel@twins>
+	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+	<1291917330.6803.7.camel@twins>
+	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
+	<1291920939.6803.38.camel@twins>
+	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+	<1291936593.13513.3.camel@laptop>
+	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
+	<1291975704.6803.59.camel@twins>  <1291987065.6803.151.camel@twins>
+	<1291987635.6803.161.camel@twins>  <1291988866.6803.171.camel@twins>
+	<1292001500.3580.268.camel@edumazet-laptop>
+Message-ID: <1292003346.13513.30.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [101210 08:06]:
-> Wednesday 08 December 2010 02:47:28 Tony Lindgren napisa?(a):
-> > Initialize asm_irq_flags in omap_init_irq and use it in
-> > get_irqnr_and_base to detect between omap7xx and omap15xx/16xx.
-> >
-> > Note that both INT_1510_IH2_IRQ and INT_1510_IH2_IRQ are defined
-> > as 0, so use INT_1510_IH2_IRQ for both of them.
-> 
-> Tested on Amstrad Delta.
-> 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+On Fri, 2010-12-10 at 18:18 +0100, Eric Dumazet wrote:
+> Le vendredi 10 d?cembre 2010 ? 14:47 +0100, Peter Zijlstra a ?crit :
 
-Thanks, merging these into omap-for-linus.
+> Also irq_time_write_begin() and irq_time_write_end() could be faster
+> (called for current cpu)
+> 
+> static inline void irq_time_write_begin(void)
+> {
+> 	__this_cpu_inc(irq_time_seq.sequence);
+> 	smp_wmb();
+> }
+>  
+> static inline void irq_time_write_end(void)
+> {
+> 	smp_wmb();
+> 	__this_cpu_inc(irq_time_seq.sequence);
+> }
 
-Regards,
+Yeah, but that kinda defeats the purpose of having it implemented in
+seqlock.h. Ideally we'd teach gcc about these long pointers and have
+something like: 
 
-Tony
+  write_seqcount_begin(&this_cpu_read(irq_time_seq));
+
+do the right thing.
