@@ -1,180 +1,155 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 10 Dec 2010 20:51:11 +0800
-Subject: [PATCH 5/6] arm: mx50: add core functions support
-In-Reply-To: <20101210105653.GI17441@pengutronix.de>
-References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
-	<1291903716-31388-5-git-send-email-richard.zhao@freescale.com>
-	<20101209082535.GK17441@pengutronix.de>
-	<20101210070835.GB29383@b20223-2.ap.freescale.net>
-	<20101210084248.GF17441@pengutronix.de>
-	<20101210093000.GA29588@b20223-2.ap.freescale.net>
-	<20101210105653.GI17441@pengutronix.de>
-Message-ID: <AANLkTikiPkP_u3f95ivVbr5Sj-3xGw_2CPWSAgJO=+2N@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 10 Dec 2010 14:17:45 +0100
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <1291975704.6803.59.camel@twins>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+	<1291899120.29292.7.camel@twins>
+	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+	<1291917330.6803.7.camel@twins>
+	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
+	<1291920939.6803.38.camel@twins>
+	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+	<1291936593.13513.3.camel@laptop>
+	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
+	<1291975704.6803.59.camel@twins>
+Message-ID: <1291987065.6803.151.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Fri, 2010-12-10 at 11:08 +0100, Peter Zijlstra wrote:
+> > Just to make sure, update_rq_clock() always gets called on current
+> > CPU. Right? 
+> 
+> No, specifically not. If that were the case we wouldn't need the
+> cross-cpu synced timestamp. Things like load-balancing and
+> remote-wakeups need to update a remote CPUs clock.
+> 
+> > The pending patches I have optimizes
+> > account_system_vtime() to use this_cpu_write and friends. Want to make
+> > sure this change will still keep that optimization relevant.
+> 
+> Ah, good point, remote CPUs updating that will mess with the consistency
+> of the per-cpu timestamps due to non atomic updates :/
+> 
+> Bugger.. making them atomics will make it even more expensive. /me goes
+> ponder. 
 
-2010/12/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Richard,
->
-> On Fri, Dec 10, 2010 at 05:30:00PM +0800, Richard Zhao wrote:
->> On Fri, Dec 10, 2010 at 09:42:48AM +0100, Uwe Kleine-K?nig wrote:
->> > On Fri, Dec 10, 2010 at 03:08:35PM +0800, Richard Zhao wrote:
->> > > On Thu, Dec 09, 2010 at 09:25:35AM +0100, Uwe Kleine-K?nig wrote:
->> > > > On Thu, Dec 09, 2010 at 10:08:35PM +0800, Richard Zhao wrote:
->> > > > > +#define WAIT(exp, timeout) \
->> > > > > +({ \
->> > > > > + ? ? struct timespec nstimeofday; \
->> > > > > + ? ? struct timespec curtime; \
->> > > > > + ? ? int result = 1; \
->> > > > > + ? ? getnstimeofday(&nstimeofday); \
->> > > > > + ? ? while (!(exp)) { \
->> > > > > + ? ? ? ? ? ? getnstimeofday(&curtime); \
->> > > > > + ? ? ? ? ? ? if ((curtime.tv_nsec - nstimeofday.tv_nsec) > (timeout)) { \
->> > > > > + ? ? ? ? ? ? ? ? ? ? result = 0; \
->> > > > > + ? ? ? ? ? ? ? ? ? ? break; \
->> > > > > + ? ? ? ? ? ? } \
->> > > > > + ? ? } \
->> > > > > + ? ? result; \
->> > > > this is broken. ?Consider getnstimeofday(&nstimeofday) returns with
->> > > > nstimeofday = { .ts_sec = 42, .ts_nsec = 999999999, }. ?If timeout is >0
->> > > > the break is never taken. ?And furthermore I'm sure that getnstimeofday
->> > > > isn't the right function for that job.
->> > > So, what do I suppose to use? udelay is not accurate here.
->> > I'd just busy-loop bounded by a loop count. ?Do you need exact timing
->> > here?
->> Yes. If the time is too short, the system may hang.
-> What is the unit of the needed time? ?If it's clock ticks a busy loop is
-> fine. ?Why udelay isn't accurate enough?
-In most cases, it's some specific clock cycles.
-udelay may depend on calibrate_delay(). I first used udelay, but it
-won't work anyway, so I changed it to getnstimeofday.
-I need to add a abs here to avoid overflow.
->
->> > > > > +static void __calc_pre_post_dividers(u32 div, u32 *pre, u32 *post)
->> > > > > +{
->> > > > > + ? ? u32 min_pre, temp_pre, old_err, err;
->> > > > > +
->> > > > > + ? ? if (div >= 512) {
->> > > > > + ? ? ? ? ? ? *pre = 8;
->> > > > > + ? ? ? ? ? ? *post = 64;
->> > > > > + ? ? } else if (div >= 8) {
->> > > > > + ? ? ? ? ? ? min_pre = (div - 1) / 64 + 1;
->> > > > > + ? ? ? ? ? ? old_err = 8;
->> > > > > + ? ? ? ? ? ? for (temp_pre = 8; temp_pre >= min_pre; temp_pre--) {
->> > > > > + ? ? ? ? ? ? ? ? ? ? err = div % temp_pre;
->> > > > > + ? ? ? ? ? ? ? ? ? ? if (err == 0) {
->> > > > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? *pre = temp_pre;
->> > > > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> > > > > + ? ? ? ? ? ? ? ? ? ? }
->> > > > > + ? ? ? ? ? ? ? ? ? ? err = temp_pre - err;
->> > > > > + ? ? ? ? ? ? ? ? ? ? if (err < old_err) {
->> > > > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? old_err = err;
->> > > > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? *pre = temp_pre;
->> > > > > + ? ? ? ? ? ? ? ? ? ? }
->> > > > > + ? ? ? ? ? ? }
->> > > > > + ? ? ? ? ? ? *post = (div + *pre - 1) / *pre;
->> > > > > + ? ? } else if (div < 8) {
->> > > > > + ? ? ? ? ? ? *pre = div;
->> > > > > + ? ? ? ? ? ? *post = 1;
->> > > > > + ? ? }
->> > > > You seem to have copied an old version of this function. ?The similarity
->> > > > to arch/arm/mach-mx5/clock-mx51.c makes me wonder if you shouldn't copy
->> > > > the Copyright lines from there, too.
->> > > It's freescale code. clock-mx51.c is originally freescale code too.
->> > If you copied from Freescale only that's obviously OK. ?Still I wonder
->> > about the years. ?clock-mx51 has
->> >
->> > ? ? ? ? ?* Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
->> > ? ? ? ? ?* Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
->> >
->> > while your suggested clock-mx50.c has
->> >
->> > ? ? ? ? ?* Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
->> It's because this file was created in 2010.
-> INAL, but I think it's in your (and/or your employer's) interest to have
-> an early date here.
-I'll check with professional.
->
->> > > > > +static int _clk_enable(struct clk *clk)
->> > > > > +{
->> > > > > + ? ? u32 reg;
->> > > > > + ? ? reg = __raw_readl(clk->enable_reg);
->> > > > > + ? ? reg |= MXC_CCM_CCGRx_CG_MASK << clk->enable_shift;
->> > > > > + ? ? __raw_writel(reg, clk->enable_reg);
->> > > > > +
->> > > > > + ? ? return 0;
->> > > > > +}
->> > > > These functions are refactored in arch/arm/mach-mx5/clock-mx51.c in the
->> > > > meantime, too.
->> > > Do you mean _clk_ccgr_xxx? Do I need to abstract common file clock.c, or
->> > > just repeat the function?
->> > See Sascha's comment. ?I agree that it makes sense to get the
->> > common clock stuff in first. ?With that I have the hope that we can
->> > simplify here considerably.
->> Where should I put the common code? plat-mxc or mach-mx5?
->> Is it ok for you if I only share the code between mx5x?
-> hmm, don't know yet. ?This needs a deeper comparison in my opinion.
-ok. I will look at mx3 and mx5.
->
->> /*
->> ?* Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
->> ?*
->> ?* The code contained herein is licensed under the GNU General Public
->> ?* License. You may obtain a copy of the GNU General Public License
->> ?* at the following locations:
->> ?*
->> ?* http://www.opensource.org/licenses/gpl-license.html
->> ?* http://www.gnu.org/copyleft/gpl.html
->> ?*/
->> Is above ok?
-> I think this is something Freescale has to decide. ?I prefer the
-> statement I wrote e.g. in arch/arm/plat-mxc/devices/platform-imx-dma.c,
-> but as I said, it's up to you.
-I will check with professional, and use the official one.
->
->> > > > > + ? ? tzic_virt = ioremap(tzic_addr, SZ_16K);
->> > > > > + ? ? if (!tzic_virt)
->> > > > > + ? ? ? ? ? ? panic("unable to map TZIC interrupt controller\n");
->> > > > Is it really necessary for soc code to map the irq controller? ?If yes
->> > > > that needs to be changed.
->> > > TZIC is in on-chip memory section. It's a large memory region. It's hare to
->> > > use current memory map routines to map it. I mean imx_map_entry.
->> > Hmm, MX50_TZIC_BASE_ADDR is at 0x0fffc000. ?If you add it to the
->> > statically mapped memory, your map looks as follows:
->> >
->> > ?* ? ? ?TZIC ? ?0x0fffc000+0x004000 ? ? -> ? ? ?0xf4bfc000+0x004000
->> > ?* ? ? ?SPBA0 ? 0x50000000+0x100000 ? ? -> ? ? ?0xf5400000+0x100000
->> > ?* ? ? ?AIPS1 ? 0x53f00000+0x100000 ? ? -> ? ? ?0xf5700000+0x100000
->> > ?* ? ? ?AIPS2 ? 0x63f00000+0x100000 ? ? -> ? ? ?0xf5300000+0x100000
->> >
->> > which is OK, isn't it?
->> Great! I will add a macro MX50_TZIC_SIZE.
-> And maybe do the same for mx51.
-ok
->
->> > > > > ?# ?define PHYS_OFFSET ? ? ? ? ? ? ? ?MX3x_PHYS_OFFSET
->> > > > > ?# elif defined CONFIG_ARCH_MXC91231
->> > > > > ?# ?define PHYS_OFFSET ? ? ? ? ? ? ? ?MXC91231_PHYS_OFFSET
->> > > > > +# elif defined CONFIG_SOC_IMX50
->> > > > > +# ?define PHYS_OFFSET ? ? ? ? ? ? ? ?MX50_PHYS_OFFSET
->> > > > I think introducing ARCH_MX50 would be nice and using it e.g. here.
->> > > Why? Isn't it redundant? They're all soc level macro.
->> > Right from a technical pov. ?For maintainability they have a different
->> > meaning. ?That is, ARCH_... needs further addressing for multi-SOC. ?I
->> > really like being able to grep for these places.
->> Is it the only reason that be easy to grep? I really think we only need one of
->> them, either a or b.
-> IMHO the reason is good enough.
-Both you and Sascha have made your decision? Then, OK.
-No other platforms use SOC_XXX, I really can not understand the meaning.
->
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-Thanks
-Richard
->
+OK, so I ended up doing the same you did.. Still staring at that, 32bit
+will go very funny in the head once every so often. One possible
+solution would be to ignore the occasional abs(irq_delta) > 2 * delta.
+
+That would however result in an accounting discrepancy such that:
+   clock_task + irq_time != clock
+
+Thoughts?
+
+---
+Index: linux-2.6/kernel/sched.c
+===================================================================
+--- linux-2.6.orig/kernel/sched.c
++++ linux-2.6/kernel/sched.c
+@@ -1813,11 +1813,36 @@ void disable_sched_clock_irqtime(void)
+ 	sched_clock_irqtime = 0;
+ }
+ 
++static void __account_system_vtime(int cpu, u64 now)
++{
++	s64 delta;
++
++	delta = now - per_cpu(irq_start_time, cpu);
++	per_cpu(irq_start_time, cpu) = now;
++
++	if (hardirq_count())
++		per_cpu(cpu_hardirq_time, cpu) += delta;
++	/*
++	 * We do not account for softirq time from ksoftirqd here. We want to
++	 * continue accounting softirq time to ksoftirqd thread in that case,
++	 * so as not to confuse scheduler with a special task that do not
++	 * consume any time, but still wants to run.
++	 */
++	else if (in_serving_softirq() && !(current->flags & PF_KSOFTIRQD))
++		per_cpu(cpu_softirq_time, cpu) += delta;
++}
++
++/*
++ * Called before incrementing preempt_count on {soft,}irq_enter
++ * and before decrementing preempt_count on {soft,}irq_exit.
++ *
++ * @curr should at all times be current.
++ */
+ void account_system_vtime(struct task_struct *curr)
+ {
+ 	unsigned long flags;
++	u64 now;
+ 	int cpu;
+-	u64 now, delta;
+ 
+ 	if (!sched_clock_irqtime)
+ 		return;
+@@ -1826,26 +1851,21 @@ void account_system_vtime(struct task_st
+ 
+ 	cpu = smp_processor_id();
+ 	now = sched_clock_cpu(cpu);
+-	delta = now - per_cpu(irq_start_time, cpu);
+-	per_cpu(irq_start_time, cpu) = now;
+-	/*
+-	 * We do not account for softirq time from ksoftirqd here.
+-	 * We want to continue accounting softirq time to ksoftirqd thread
+-	 * in that case, so as not to confuse scheduler with a special task
+-	 * that do not consume any time, but still wants to run.
+-	 */
+-	if (hardirq_count())
+-		per_cpu(cpu_hardirq_time, cpu) += delta;
+-	else if (in_serving_softirq() && !(curr->flags & PF_KSOFTIRQD))
+-		per_cpu(cpu_softirq_time, cpu) += delta;
++	__account_system_vtime(cpu, now);
+ 
+ 	local_irq_restore(flags);
+ }
+ EXPORT_SYMBOL_GPL(account_system_vtime);
+ 
+-static u64 irq_time_cpu(int cpu)
++static u64 irq_time_cpu(struct rq *rq)
+ {
+-	account_system_vtime(current);
++	int cpu = cpu_of(rq);
++	/*
++	 * See the comment in update_rq_clock_task(), ideally we'd update
++	 * the *irq_time values using rq->clock here.
++	 *
++	 * As it stands, reading this from a remote cpu is buggy on 32bit.
++	 */
+ 	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
+ }
+ 
+@@ -1853,9 +1873,27 @@ static void update_rq_clock_task(struct
+ {
+ 	s64 irq_delta;
+ 
+-	irq_delta = irq_time_cpu(cpu_of(rq)) - rq->prev_irq_time;
+-	rq->prev_irq_time += irq_delta;
++	irq_delta = irq_time_cpu(rq) - rq->prev_irq_time;
++
++	/*
++	 * Since irq_time is only updated on {soft,}irq_exit, we might run into
++	 * this case when a previous update_rq_clock() happened inside a
++	 * {soft,}irq region.
++	 *
++	 * When this happens, we stop ->clock_task and only update the
++	 * prev_irq_time stamp to account for the part that fit, so that a next
++	 * update will consume the rest. This ensures ->clock_task is
++	 * monotonic.
++	 *
++	 * It does however cause some slight miss-attribution of {soft,}irq
++	 * time, a more accurate solution would be to update the irq_time using
++	 * the current rq->clock timestamp, except that would require using
++	 * atomic ops.
++	 */
++	if (irq_delta > delta)
++		irq_delta = delta;
+ 
++	rq->prev_irq_time += irq_delta;
+ 	delta -= irq_delta;
+ 	rq->clock_task += delta;
+ 
