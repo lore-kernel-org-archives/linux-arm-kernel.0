@@ -1,44 +1,173 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 10 Dec 2010 21:31:59 +0530
-Subject: [PATCH v7 11/12] davinci: add tnetv107x evm backlight device
-In-Reply-To: <4D00EEA1.8070201@ti.com>
-References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-	<1291733522-3626-12-git-send-email-cyril@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247CD83E1@dbde02.ent.ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247CD84F4@dbde02.ent.ti.com>
-	<4D00EEA1.8070201@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247CD8CE8@dbde02.ent.ti.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Fri, 10 Dec 2010 17:02:33 +0100
+Subject: [PATCH 2/4] omap1: Add initcall checks for omap1 and booted board
+In-Reply-To: <20101204213655.32208.23030.stgit@baageli.muru.com>
+References: <20101204213358.32208.4195.stgit@baageli.muru.com>
+	<20101204213655.32208.23030.stgit@baageli.muru.com>
+Message-ID: <201012101702.34825.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 20:28:41, Chemparathy, Cyril wrote:
-> On 12/09/2010 06:00 AM, Nori, Sekhar wrote:
-> > On Thu, Dec 09, 2010 at 14:25:49, Nori, Sekhar wrote:
-> >
-> >> This call should simply return if machine is not tnetv107x EVM.
-> >>
-> >> I didn't follow the entire series but wondering why
-> >> platform device registration should be a late init call.
-> >> Typically the driver probe can be made a late init call
-> >> in case of init sequence dependencies.
-> >
-> > I meant driver init, not probe.
->
-> This was done to handle driver dependencies, and is meant to be
-> temporary (until a real driver dependency framework comes in).
->
-> Please see [1] for a bit more of background on changing drivers to use
-> module_init().
+Saturday 04 December 2010 22:36:55 Tony Lindgren napisa?(a):
+> Otherwise multi-omap1 configurations will fail.
 
-Hmm, okay. Please include a check for machine in that case.
+Tested on Amstrad Delta with omap1_defconfig.
 
-Thanks,
-Sekhar
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
+Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+
+> ---
+>  arch/arm/mach-omap1/board-ams-delta.c |    3 +++
+>  arch/arm/mach-omap1/board-voiceblue.c |    6 ++++++
+>  arch/arm/mach-omap1/devices.c         |    3 +++
+>  arch/arm/mach-omap1/lcd_dma.c         |    3 +++
+>  arch/arm/mach-omap1/leds.c            |    3 +++
+>  arch/arm/mach-omap1/mcbsp.c           |    3 +++
+>  arch/arm/mach-omap1/pm.c              |    3 +++
+>  arch/arm/mach-omap1/pm_bus.c          |    3 +++
+>  arch/arm/mach-omap1/serial.c          |    3 +++
+>  9 files changed, 30 insertions(+), 0 deletions(-)
 >
-> Regards
-> - Cyril.
+> diff --git a/arch/arm/mach-omap1/board-ams-delta.c
+> b/arch/arm/mach-omap1/board-ams-delta.c index ce4d69c..e143950 100644
+> --- a/arch/arm/mach-omap1/board-ams-delta.c
+> +++ b/arch/arm/mach-omap1/board-ams-delta.c
+> @@ -338,6 +338,9 @@ static int __init ams_delta_modem_init(void)
+>  {
+>  	int err;
 >
-> [1]
-> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/020987.html
+> +	if (!machine_is_ams_delta())
+> +		return -ENODEV;
+> +
+>  	omap_cfg_reg(M14_1510_GPIO2);
+>  	ams_delta_modem_ports[0].irq =
+>  			gpio_to_irq(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
+> diff --git a/arch/arm/mach-omap1/board-voiceblue.c
+> b/arch/arm/mach-omap1/board-voiceblue.c index 789f5ba..815a69c 100644
+> --- a/arch/arm/mach-omap1/board-voiceblue.c
+> +++ b/arch/arm/mach-omap1/board-voiceblue.c
+> @@ -83,6 +83,9 @@ static struct platform_device serial_device = {
 >
+>  static int __init ext_uart_init(void)
+>  {
+> +	if (!machine_is_voiceblue())
+> +		return -ENODEV;
+> +
+>  	return platform_device_register(&serial_device);
+>  }
+>  arch_initcall(ext_uart_init);
+> @@ -235,6 +238,9 @@ static struct notifier_block panic_block = {
+>
+>  static int __init voiceblue_setup(void)
+>  {
+> +	if (!machine_is_voiceblue())
+> +		return -ENODEV;
+> +
+>  	/* Setup panic notifier */
+>  	atomic_notifier_chain_register(&panic_notifier_list, &panic_block);
+>
+> diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
+> index 86ad38a..b0f4c23 100644
+> --- a/arch/arm/mach-omap1/devices.c
+> +++ b/arch/arm/mach-omap1/devices.c
+> @@ -288,6 +288,9 @@ static inline void omap_init_audio(void) {}
+>   */
+>  static int __init omap1_init_devices(void)
+>  {
+> +	if (!cpu_class_is_omap1())
+> +		return -ENODEV;
+> +
+>  	/* please keep these calls, and their implementations above,
+>  	 * in alphabetical order so they're easier to sort through.
+>  	 */
+> diff --git a/arch/arm/mach-omap1/lcd_dma.c b/arch/arm/mach-omap1/lcd_dma.c
+> index 3be11af..c9088d8 100644
+> --- a/arch/arm/mach-omap1/lcd_dma.c
+> +++ b/arch/arm/mach-omap1/lcd_dma.c
+> @@ -424,6 +424,9 @@ static int __init omap_init_lcd_dma(void)
+>  {
+>  	int r;
+>
+> +	if (!cpu_class_is_omap1())
+> +		return -ENODEV;
+> +
+>  	if (cpu_is_omap16xx()) {
+>  		u16 w;
+>
+> diff --git a/arch/arm/mach-omap1/leds.c b/arch/arm/mach-omap1/leds.c
+> index 277f356..22eb11d 100644
+> --- a/arch/arm/mach-omap1/leds.c
+> +++ b/arch/arm/mach-omap1/leds.c
+> @@ -17,6 +17,9 @@
+>  static int __init
+>  omap_leds_init(void)
+>  {
+> +	if (!cpu_class_is_omap1())
+> +		return -ENODEV;
+> +
+>  	if (machine_is_omap_innovator())
+>  		leds_event = innovator_leds_event;
+>
+> diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
+> index 372ea71..8209736 100644
+> --- a/arch/arm/mach-omap1/mcbsp.c
+> +++ b/arch/arm/mach-omap1/mcbsp.c
+> @@ -176,6 +176,9 @@ static struct omap_mcbsp_platform_data
+> omap16xx_mcbsp_pdata[] = {
+>
+>  static int __init omap1_mcbsp_init(void)
+>  {
+> +	if (!cpu_class_is_omap1())
+> +		return -ENODEV;
+> +
+>  	if (cpu_is_omap7xx()) {
+>  		omap_mcbsp_count = OMAP7XX_MCBSP_PDATA_SZ;
+>  		omap_mcbsp_cache_size = OMAP7XX_MCBSP_REG_NUM * sizeof(u16);
+> diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
+> index b1d3f9f..0cca23a 100644
+> --- a/arch/arm/mach-omap1/pm.c
+> +++ b/arch/arm/mach-omap1/pm.c
+> @@ -661,6 +661,9 @@ static int __init omap_pm_init(void)
+>  	int error;
+>  #endif
+>
+> +	if (!cpu_class_is_omap1())
+> +		return -ENODEV;
+> +
+>  	printk("Power Management for TI OMAP.\n");
+>
+>  	/*
+> diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
+> index 8b66392..3266447 100644
+> --- a/arch/arm/mach-omap1/pm_bus.c
+> +++ b/arch/arm/mach-omap1/pm_bus.c
+> @@ -73,6 +73,9 @@ static int __init omap1_pm_runtime_init(void)
+>  	const struct dev_pm_ops *pm;
+>  	struct dev_pm_ops *omap_pm;
+>
+> +	if (!cpu_class_is_omap1())
+> +		return -ENODEV;
+> +
+>  	pm = platform_bus_get_pm_ops();
+>  	if (!pm) {
+>  		pr_err("%s: unable to get dev_pm_ops from platform_bus\n",
+> diff --git a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
+> index 9e1c4d4..550ca9d 100644
+> --- a/arch/arm/mach-omap1/serial.c
+> +++ b/arch/arm/mach-omap1/serial.c
+> @@ -258,6 +258,9 @@ late_initcall(omap_serial_wakeup_init);
+>
+>  static int __init omap_init(void)
+>  {
+> +	if (!cpu_class_is_omap1())
+> +		return -ENODEV;
+> +
+>  	return platform_device_register(&serial_device);
+>  }
+>  arch_initcall(omap_init);
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
