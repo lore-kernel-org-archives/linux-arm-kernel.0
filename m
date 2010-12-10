@@ -1,23 +1,21 @@
-From: linus.walleij@stericsson.com (Linus WALLEIJ)
-Date: Fri, 10 Dec 2010 11:41:32 +0100
-Subject: [PATCH] mmci: partially revert clock divisor code
-In-Reply-To: <20101210101303.GA19552@n2100.arm.linux.org.uk>
-References: <1291884775-25509-1-git-send-email-linus.walleij@stericsson.com>
-	<20101210101303.GA19552@n2100.arm.linux.org.uk>
-Message-ID: <CEE6BB42CAD6E947908279175AF8470A075EE07BDD@EXDCVYMBSTM006.EQ1STM.local>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 10 Dec 2010 10:52:13 +0000
+Subject: [PATCH 1/9] regulators: Moved define for number of regulators
+	in ab8500
+In-Reply-To: <1291975728-12525-2-git-send-email-bengt.g.jonsson@stericsson.com>
+References: <1291975728-12525-1-git-send-email-bengt.g.jonsson@stericsson.com>
+	<1291975728-12525-2-git-send-email-bengt.g.jonsson@stericsson.com>
+Message-ID: <20101210105213.GB3200@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Russell]
-> On Thu, Dec 09, 2010 at 09:52:55AM +0100, Linus Walleij wrote:
-> > I misread the datasheet as if bypass mode was not available at all
-> > on the ux500's, I was wrong. It is there, the datasheet just
-> > states that you should not have to use it.
-> 
-> Should this be merged with the patch which introduced this change?
+On Fri, Dec 10, 2010 at 11:08:40AM +0100, Bengt Jonsson wrote:
+> The define for number of regulators is moved from ab8500-core to
+> ab8500-regulator so that the regulator driver can be updated
+> independently of ab8500-core. This also changes the platform
+> configuration structure of ab8500-core so that it contains a
+> pointer to the regulator_init_data array plus number of
+> regulators instead of an fixed size array of pointers to
+> regulator_init_data.
 
-If you want to squash them into one, feel free to go ahead. I'm fine
-either way.
-
-Yours,
-Linus Walleij
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
