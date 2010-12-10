@@ -1,52 +1,59 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Fri, 10 Dec 2010 00:44:04 -0500
-Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
-	RWFO fix
-In-Reply-To: <4D015315.5070600@codeaurora.org>
-References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
-	<20101124183936.GA18796@mvista.com>
-	<AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
-	<4D015315.5070600@codeaurora.org>
-Message-ID: <20101210054404.GB13313@mvista.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 10 Dec 2010 11:17:09 +0530
+Subject: [PATCH 1/2] ARM: Thumb-2: Make CONFIG_THUMB2_KERNEL depend on
+	!CPU_V6
+In-Reply-To: <1291895982-4775-2-git-send-email-dave.martin@linaro.org>
+References: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
+	<1291895982-4775-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <2bccf49434b4a89a3f5493bdf83d728c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 02:07:17PM -0800, Stephen Boyd wrote:
-> On 12/09/2010 08:04 AM, Catalin Marinas wrote:
-> > On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
-> >> Updated according to the comments to avoid r/w outside the buffer and
-> >> used byte r/w for the possible unaligned data. Seems to work fine.
-> >>
-> >> Cache ownership must be acqired by reading/writing data from the
-> >> cache line to make cache operation have the desired effect on the
-> >> SMP MPCore CPU. However, the ownership is never aquired in the
-> >> v6_dma_inv_range function when cleaning the first line and
-> >> flushing the last one, in case the address is not aligned
-> >> to D_CACHE_LINE_SIZE boundary.
-> >> Fix this by reading/writing data if needed, before performing
-> >> cache operations.
-> >> While at it, fix v6_dma_flush_range to prevent RWFO outside
-> >> the buffer.
-> >>
-> >> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
-> >> Signed-off-by: George G. Davis <gdavis@mvista.com>
-> > I eventually found a bit of time to look at this. The patch looks fine to me:
-> >
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> Is this also a stable candidate? At least it applies cleanly to .35
-
-I'd say it makes sense to add "Cc: stable at kernel.org" to the commit
-header before forwarding this to the ARM Linux kernel Patch Tracking
-System [1] in this case.
-
---
-Regards,
-George
-
-[1] http://www.arm.linux.org.uk/developer/patches/info.php
-
-> 
-> -- 
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> -----Original Message-----
+> From: Dave Martin [mailto:dave.martin at linaro.org]
+> Sent: Thursday, December 09, 2010 5:30 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Dave Martin; Santosh Shilimkar; linux-omap at vger.kernel.org
+> Subject: [PATCH 1/2] ARM: Thumb-2: Make CONFIG_THUMB2_KERNEL depend
+> on !CPU_V6
+>
+> This makes sense, because Thumb-2 code can't execute on plain
+> ARMv6 processors.
+>
+> This will avoid accidentally configuring a broken kernel where the
+> config otherwise would allow multiple architecture versions to
+> coexist in the same kernel.
+>
+> Not adding !CPU_V5 etc., because the chance of anyone trying to
+> put v5 and v7 in the same kernel is low, and I'm not aware of
+> any mach which can do this.  These could be added later if it
+> matters.
+>
+> Note that the rules may need to be refined if support for the
+> ARM1156J(F)-S processor is later added to the kernel, since this
+> processor supports the rare ARMv6T2 extensions, which add support
+> for Thumb-2 and a few other ARMv7 features.
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+If you like,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index db524e7..f9ca7f3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1311,7 +1311,7 @@ config HZ
+>
+>  config THUMB2_KERNEL
+>  	bool "Compile the kernel in Thumb-2 mode"
+> -	depends on CPU_V7 && EXPERIMENTAL
+> +	depends on CPU_V7 && !CPU_V6 && EXPERIMENTAL
+>  	select AEABI
+>  	select ARM_ASM_UNIFIED
+>  	help
+> --
+> 1.7.1
