@@ -1,129 +1,131 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 10 Dec 2010 18:26:36 +0200
-Subject: [RFC] add BUG_ON_MAPPABLE_NULL macro
-In-Reply-To: <20101207161054.d502fae8.akpm@linux-foundation.org>
-References: <1291543563-5655-1-git-send-email-ohad@wizery.com>
-	<20101207161054.d502fae8.akpm@linux-foundation.org>
-Message-ID: <AANLkTi=zhjT1fw5_8hWufDDM4QkOcb=kBhhyiZ1PcDMo@mail.gmail.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Fri, 10 Dec 2010 11:49:13 -0500
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
+	RWFO fix
+In-Reply-To: <4D021D15.5070300@mvista.com>
+References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
+	<20101124183936.GA18796@mvista.com>
+	<20101210052604.GA13313@mvista.com>
+	<1291974616.13511.1.camel@e102109-lin.cambridge.arm.com>
+	<4D021D15.5070300@mvista.com>
+Message-ID: <20101210164913.GB18720@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 8, 2010 at 2:10 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
-> Every time someone sends me a patch with text after the "---", I decide
-> it was good changelog material and I promote it to above the "---".
-> How's about you save us the effort :)
+On Fri, Dec 10, 2010 at 03:29:09PM +0300, Valentine Barshak wrote:
+> Catalin Marinas wrote:
+> >On Fri, 2010-12-10 at 05:26 +0000, George G. Davis wrote:
+> >>On Wed, Nov 24, 2010 at 09:39:36PM +0300, Valentine Barshak wrote:
+> >>>Updated according to the comments to avoid r/w outside the buffer and
+> >>>used byte r/w for the possible unaligned data. Seems to work fine.
+> >>>
+> >>>Cache ownership must be acqired by reading/writing data from the
+> >>>cache line to make cache operation have the desired effect on the
+> >>>SMP MPCore CPU. However, the ownership is never aquired in the
+> >>>v6_dma_inv_range function when cleaning the first line and
+> >>>flushing the last one, in case the address is not aligned
+> >>>to D_CACHE_LINE_SIZE boundary.
+> >>>Fix this by reading/writing data if needed, before performing
+> >>>cache operations.
+> >>>While at it, fix v6_dma_flush_range to prevent RWFO outside
+> >>>the buffer.
+> >>>
+> >>>Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+> >>>Signed-off-by: George G. Davis <gdavis@mvista.com>
+> >>>---
+> >>> arch/arm/mm/cache-v6.S |   40 ++++++++++++++++++++++++++--------------
+> >>> 1 files changed, 26 insertions(+), 14 deletions(-)
+> >>>
+> >>>diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+> >>>index 99fa688..622f8a1 100644
+> >>>--- a/arch/arm/mm/cache-v6.S
+> >>>+++ b/arch/arm/mm/cache-v6.S
+> >>>@@ -203,25 +203,29 @@ ENTRY(v6_flush_kern_dcache_area)
+> >>>  *   - end     - virtual end address of region
+> >>>  */
+> >>> v6_dma_inv_range:
+> >>>-     tst     r0, #D_CACHE_LINE_SIZE - 1
+> >>>-     bic     r0, r0, #D_CACHE_LINE_SIZE - 1
+> >>>-#ifdef HARVARD_CACHE
+> >>>-     mcrne   p15, 0, r0, c7, c10, 1          @ clean D line
+> >>>-#else
+> >>>-     mcrne   p15, 0, r0, c7, c11, 1          @ clean unified line
+> >>>-#endif
+> >>>      tst     r1, #D_CACHE_LINE_SIZE - 1
+> >>>+#ifdef CONFIG_DMA_CACHE_RWFO
+> >>>+     ldrneb  r2, [r1, #-1]                   @ read for ownership
+> >>>+     strneb  r2, [r1, #-1]                   @ write for ownership
+> >>>+#endif
+> >>>      bic     r1, r1, #D_CACHE_LINE_SIZE - 1
+> >>> #ifdef HARVARD_CACHE
+> >>>      mcrne   p15, 0, r1, c7, c14, 1          @ clean & invalidate D line
+> >>> #else
+> >>>      mcrne   p15, 0, r1, c7, c15, 1          @ clean & invalidate unified line
+> >>> #endif
+> >>>-1:
+> >>> #ifdef CONFIG_DMA_CACHE_RWFO
+> >>>-     ldr     r2, [r0]                        @ read for ownership
+> >>>-     str     r2, [r0]                        @ write for ownership
+> >>>+     ldrb    r2, [r0]                        @ read for ownership
+> >>>+     strb    r2, [r0]                        @ write for ownership
+> >>>+#endif
+> >>>+     tst     r0, #D_CACHE_LINE_SIZE - 1
+> >>>+     bic     r0, r0, #D_CACHE_LINE_SIZE - 1
+> >>>+#ifdef HARVARD_CACHE
+> >>>+     mcrne   p15, 0, r0, c7, c10, 1          @ clean D line
+> >>>+#else
+> >>>+     mcrne   p15, 0, r0, c7, c11, 1          @ clean unified line
+> >>> #endif
+> >>>+1:
+> >>> #ifdef HARVARD_CACHE
+> >>>      mcr     p15, 0, r0, c7, c6, 1           @ invalidate D line
+> >>> #else
+> >>>@@ -229,6 +233,10 @@ v6_dma_inv_range:
+> >>> #endif
+> >>>      add     r0, r0, #D_CACHE_LINE_SIZE
+> >>>      cmp     r0, r1
+> >>>+#ifdef CONFIG_DMA_CACHE_RWFO
+> >>>+     ldrlo   r2, [r0]                        @ read for ownership
+> >>>+     strlo   r2, [r0]                        @ write for ownership
+> >>>+#endif
+> >>>      blo     1b
+> >>>      mov     r0, #0
+> >>>      mcr     p15, 0, r0, c7, c10, 4          @ drain write buffer
+> >>Just a minor nit...
+> >>
+> >>Any reason for rearranging the order of 'start'/'end' parameters in the
+> >>above changes?  It's not clear that there is any performance benefit by
+> >>rearranging those parameters and it obfuscates the changes, e.g. this
+> >>is equivalent to your change above and also much clearer:
+> >
+> It probably obfuscates the change, but I thought it made the code a
+> bit cleaner and easier to read.
+> So that first the end (r1) is flushed and then we do all the
+> operations needed on the first cache line (r0) in a row.
 
-sure :)
+OK, I see your rationale now for moving start (r0) alignment and RWFO
+fixups just prior to the "clean & invalidate" loop to make the code
+clearer to the casual reader that RWFO for the first line is done
+outside the loop and conditionally for remaining lines at the end of the
+loop.  That's admittedly subtle but I'd still prefer to see small
+incremental changes for faster review (or more fully describe those
+subtle changes in the commit header).  Alas, without comments in the
+code or commit header, the subtleness of those RWFOs won't be any
+clearer regardless of their spatial locality.  You can always submit
+another patch to rearrange the code for better flow/readability later.
 
->> +/**
->> + * BUG_ON_MAPPABLE_NULL() - BUG_ON(condition) only if address 0 is mappable
->> + * @condition: ? ? ? condition to check, should contain a NULL check
->> + *
->> + * In general, NULL dereference Oopses are not desirable, since they take down
->> + * the system with them and make the user extremely unhappy. So as a general
->> + * rule drivers should avoid dereferencing NULL pointers by doing a simple
->
-> s/drivers/code/
+> I'll resubmit the change and add "Cc: stable at kernel.org" to the header.
 
-definitely.
+Thanks!
 
->> + * check (when appropriate), and just return an error rather than crash.
->> + * This way the system, despite having reduced functionality, will just keep
->> + * running rather than immediately reboot.
->> + *
->> + * _Critical_ kernel code, OTOH, that should not (/cannot) keep running when
->> + * given an unexpected NULL pointer, should just crash. On some architectures,
->> + * a NULL dereference will always reliably produce an Oops. On others, where
->> + * the zero address can be mmapped, an Oops is not guaranteed. Relying on
->> + * NULL dereference Oopses to happen on these architectures might lead to
->> + * data corruptions (system will keep running despite a critical bug and
->> + * the results will be horribly undefined). In addition, these situations
->> + * can also have security implications - we have seen several privilege
->> + * escalation exploits with which an attacker gained full control over the
->> + * system due to NULL dereference bugs.
->
-> yup.
->
->> + * This macro will BUG_ON if @condition is true on architectures where the zero
->> + * address can be mapped. On other architectures, where the zero address
->> + * can never be mapped, this macro is compiled out. It only makes sense to
->> + * use this macro if @condition contains a NULL check, in order to optimize that
->> + * check out on architectures where the zero address can never be mapped.
->> + * On such architectures, those checks are not necessary, since the code
->> + * itself will reliably reproduce an Oops as soon as the NULL address will
->> + * be dereferenced.
->> + *
->> + * As with BUG_ON, use this macro only if @condition cannot be tolerated.
->> + * If proceeding with degraded functionality is an option, it's much
->> + * better to just simply check for @condition and return some error code rather
->> + * than crash the system.
->> + */
->> +#define BUG_ON_MAPPABLE_NULL(cond) do { \
->> + ? ? if (arch_mmap_check(0, 1, MAP_FIXED) == 0) \
->> + ? ? ? ? ? ? BUG_ON(cond); \
->> +} while (0)
->
-> - arch_mmap_check() didn't have any documentation. ?Please fix?
+--
+Regards,
+George
 
-Sure.
-
->
-> - arch_mmap_check() is a pretty poor identifier (identifiers which
-> ?include the word "check" are usually poor ones). ?Maybe
-> ?arch_address_accessible()?
-
-Maybe arch_address_mappable() might be more accurate (an address might
-be accessible but not mappable due to some other arch-specific usage)
-?
-
-But, do you think it makes sense to rename arch_mmap_check() without
-adding any functional benefit to it ?
-
-arch_mmap_check is already defined today for ARM, IA64, MN10300, S390
-and SPARC, and used by get_unmapped_area() [mmap.c], and this patch
-adds a second usage of it.
-
-To rename it, the patch will have to touch all of those architectures,
-and usually, patches that carry stylistic changes in areas which they
-don't add any functional benefit to, are considered pretty annoying...
-
-> - I worry about arch_mmap_check(). ?Is it expected that it will
-> ?perform a runtime check, like probe_kernel_address()? ?Spell out the
-> ?expectations, please.
-
-Yes, arch_mmap_check does perform a runtime check: get_unmapped_area()
-calls it with its addr, len and flags parameters.
-
-But, since BUG_ON_MAPPABLE_NULL() calls it with constant values, I
-expect arch_mmap_check() to be compiled out (tested on ARM and
-X86_64).
-
-> - BUG_ON_MAPPABLE_NULL() will evaluate arch_mmap_check() even if
-> ?CONFIG_BUG=n. ?Seems bad, depending on what those unspelled-out
-> ?expectations are!
-
-Definitely. I'll add:
-
-#define BUG_ON_MAPPABLE_NULL(condition)  do { if (condition) ; } while(0)
-
-in case CONFIG_BUG=n.
-
->
-> - BUG_ON_MAPPABLE_NULL() is a mouthful. ?I can't immedaitely think of
-> ?anythinjg nicer :(
-
-Heartily agree...
-
-> - Is BUG_ON_MAPPABLE_NULL() really the interface you want? ?Or do we
-> ?just want an interface which checks a pointer for nearly-nullness?
-
-I guess we can start with BUG_ON_MAPPABLE_NULL(), since this is what
-people commonly check today, and we will now be able to optimize those
-checks out when they are unnecessary.
-
-Thanks a lot,
-Ohad.
-
->
->
->
+> 
+> Thanks,
+> Val.
+> >I've been wondering about this as well. But I was too lazy to rewrite it
+> >and see whether there is a performance benefit in the original patch. I
+> >agree that yours looks cleaner.
+> >
