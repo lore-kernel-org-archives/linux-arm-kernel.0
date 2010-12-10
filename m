@@ -1,48 +1,102 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Dec 2010 10:12:53 +0100
-Subject: [PATCH 4/4 v2] ARM: S5PV210: Add clock definition for MIPI-CSIS
-	DPHY
-In-Reply-To: <028901cb9829$1ad1cfb0$50756f10$%kim@samsung.com>
-References: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>
-	<1291405965-19482-5-git-send-email-s.nawrocki@samsung.com>
-	<028901cb9829$1ad1cfb0$50756f10$%kim@samsung.com>
-Message-ID: <011101cb984a$701446d0$503cd470$%szyprowski@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 10 Dec 2010 09:50:16 +0000
+Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
+	RWFO fix
+In-Reply-To: <20101210052604.GA13313@mvista.com>
+References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
+	<20101124183936.GA18796@mvista.com> <20101210052604.GA13313@mvista.com>
+Message-ID: <1291974616.13511.1.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Friday, December 10, 2010 6:14 AM Kukjin Kim wrote:
-
-> Sylwester Nawrocki wrote:
+On Fri, 2010-12-10 at 05:26 +0000, George G. Davis wrote:
+> On Wed, Nov 24, 2010 at 09:39:36PM +0300, Valentine Barshak wrote:
+> > Updated according to the comments to avoid r/w outside the buffer and
+> > used byte r/w for the possible unaligned data. Seems to work fine.
 > >
-> > MIPI DPHY control register requires special handling since it is shared
-> > between CSI (camera serial interface) and DSI (display serial interface).
-> > By creating this clock a serialized interface is provided for mipi-csis
-> > and mipi-dsim drivers, so DPHYs may be safely controlled by both drivers.
-> > Similarly dsim_dphy clock could be added for mipi-dsim.
+> > Cache ownership must be acqired by reading/writing data from the
+> > cache line to make cache operation have the desired effect on the
+> > SMP MPCore CPU. However, the ownership is never aquired in the
+> > v6_dma_inv_range function when cleaning the first line and
+> > flushing the last one, in case the address is not aligned
+> > to D_CACHE_LINE_SIZE boundary.
+> > Fix this by reading/writing data if needed, before performing
+> > cache operations.
+> > While at it, fix v6_dma_flush_range to prevent RWFO outside
+> > the buffer.
 > >
+> > Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+> > Signed-off-by: George G. Davis <gdavis@mvista.com>
 > > ---
+> >  arch/arm/mm/cache-v6.S |   40 ++++++++++++++++++++++++++--------------
+> >  1 files changed, 26 insertions(+), 14 deletions(-)
 > >
-> > I am not quite sure about_"dphy_clock", perhaps power domain
-> > handling code would be better place for it.
-> >
-> Yeah, it is MIPI DPHY enable/disable control register not clock control.
-> So its proper position is not here...
+> > diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+> > index 99fa688..622f8a1 100644
+> > --- a/arch/arm/mm/cache-v6.S
+> > +++ b/arch/arm/mm/cache-v6.S
+> > @@ -203,25 +203,29 @@ ENTRY(v6_flush_kern_dcache_area)
+> >   *   - end     - virtual end address of region
+> >   */
+> >  v6_dma_inv_range:
+> > -     tst     r0, #D_CACHE_LINE_SIZE - 1
+> > -     bic     r0, r0, #D_CACHE_LINE_SIZE - 1
+> > -#ifdef HARVARD_CACHE
+> > -     mcrne   p15, 0, r0, c7, c10, 1          @ clean D line
+> > -#else
+> > -     mcrne   p15, 0, r0, c7, c11, 1          @ clean unified line
+> > -#endif
+> >       tst     r1, #D_CACHE_LINE_SIZE - 1
+> > +#ifdef CONFIG_DMA_CACHE_RWFO
+> > +     ldrneb  r2, [r1, #-1]                   @ read for ownership
+> > +     strneb  r2, [r1, #-1]                   @ write for ownership
+> > +#endif
+> >       bic     r1, r1, #D_CACHE_LINE_SIZE - 1
+> >  #ifdef HARVARD_CACHE
+> >       mcrne   p15, 0, r1, c7, c14, 1          @ clean & invalidate D line
+> >  #else
+> >       mcrne   p15, 0, r1, c7, c15, 1          @ clean & invalidate unified line
+> >  #endif
+> > -1:
+> >  #ifdef CONFIG_DMA_CACHE_RWFO
+> > -     ldr     r2, [r0]                        @ read for ownership
+> > -     str     r2, [r0]                        @ write for ownership
+> > +     ldrb    r2, [r0]                        @ read for ownership
+> > +     strb    r2, [r0]                        @ write for ownership
+> > +#endif
+> > +     tst     r0, #D_CACHE_LINE_SIZE - 1
+> > +     bic     r0, r0, #D_CACHE_LINE_SIZE - 1
+> > +#ifdef HARVARD_CACHE
+> > +     mcrne   p15, 0, r0, c7, c10, 1          @ clean D line
+> > +#else
+> > +     mcrne   p15, 0, r0, c7, c11, 1          @ clean unified line
+> >  #endif
+> > +1:
+> >  #ifdef HARVARD_CACHE
+> >       mcr     p15, 0, r0, c7, c6, 1           @ invalidate D line
+> >  #else
+> > @@ -229,6 +233,10 @@ v6_dma_inv_range:
+> >  #endif
+> >       add     r0, r0, #D_CACHE_LINE_SIZE
+> >       cmp     r0, r1
+> > +#ifdef CONFIG_DMA_CACHE_RWFO
+> > +     ldrlo   r2, [r0]                        @ read for ownership
+> > +     strlo   r2, [r0]                        @ write for ownership
+> > +#endif
+> >       blo     1b
+> >       mov     r0, #0
+> >       mcr     p15, 0, r0, c7, c10, 4          @ drain write buffer
 > 
-> Hmm...how about driver's probe/open or some kind of setup in machine
-> directory?
+> Just a minor nit...
+> 
+> Any reason for rearranging the order of 'start'/'end' parameters in the
+> above changes?  It's not clear that there is any performance benefit by
+> rearranging those parameters and it obfuscates the changes, e.g. this
+> is equivalent to your change above and also much clearer:
 
-I'm not sure that this is the best way of handling this phy controller. Please
-notice that mipi phy controller has different register location on S5PC110 and
-S5PC210. Please also notice that S5PC210 has 2 mipi csci controllers and phy
-interfaces, while s5pc110 has only one. Hiding all the logic and register
-specific writes behind this 'csi_dphy' clock easily resolves all these issues
-on all different samsung platforms and makes it easy to use it from the driver.
-Similar patch has been proposed some time ago for usb_phy interface and imho
-this is the right way to go.
+I've been wondering about this as well. But I was too lazy to rewrite it
+and see whether there is a performance benefit in the original patch. I
+agree that yours looks cleaner.
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+-- 
+Catalin
