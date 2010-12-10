@@ -1,5 +1,5 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 10 Dec 2010 21:32:37 +0100
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 10 Dec 2010 21:39:50 +0100
 Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
 In-Reply-To: <alpine.DEB.2.00.1012101410571.13986@router.home>
 References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
@@ -22,11 +22,11 @@ References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
 	<alpine.DEB.2.00.1012101344570.13986@router.home>
 	<1292011644.13513.61.camel@laptop>
 	<alpine.DEB.2.00.1012101410571.13986@router.home>
-Message-ID: <1292013157.13513.69.camel@laptop>
+Message-ID: <1292013590.2746.2.camel@edumazet-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-12-10 at 14:23 -0600, Christoph Lameter wrote:
+Le vendredi 10 d?cembre 2010 ? 14:23 -0600, Christoph Lameter a ?crit :
 > On Fri, 10 Dec 2010, Peter Zijlstra wrote:
 > 
 > > Its not about passing per-cpu pointers, its about passing long pointers.
@@ -64,28 +64,7 @@ On Fri, 2010-12-10 at 14:23 -0600, Christoph Lameter wrote:
 > differently for each processor. If we would have a different page table
 > for each processor then we could avoid using segment register and do the
 > same on x86.
-
-I don't think its a runtime issue, its a compile time issue. At compile
-time the compiler can see the argument is a long pointer:
-%fs:(addr,idx,size), and could propagate this into the caller.
-
-The above example will compute the effective address by doing something
-like:
-
-  lea %fs:(addr,idx,size),%ebx
-
-and will then do something like
-
-  inc (%ebx)
-
-Where it could easily have optimized this into:
-
-  inc %fs:(addr,idx,size)
-
-esp when foo would be inlined. If its an actual call-site you need
-function overloading because a long pointer has a different signature
-from a regular pointer, and that is something C doesn't do.
-
+> 
 > > > Seems that you do not have that use case in mind. So a seqlock restricted
 > > > to a single processor? If so then you wont need any of those smp write
 > > > barriers mentioned earlier. A simple compiler barrier() is sufficient.
@@ -97,15 +76,60 @@ from a regular pointer, and that is something C doesn't do.
 > its own seqlock. Then you could have this_cpu_read_seqcount_begin and
 > friends:
 > 
+> 
 
+Yes. It was the idea.
+
+> DEFINE_PER_CPU(seqcount, bla);
+> 
+> 
+
+This is in Peter patch :)
+
+> 
+> 
+> /* Start of read using pointer to a sequence counter only.  */
+> static inline unsigned this_cpu_read_seqcount_begin(const seqcount_t __percpu *s)
+> {
+>         /* No other processor can be using this lock since it is per cpu*/
+>         ret = this_cpu_read(s->sequence);
+> 	barrier();
+>         return ret;
+> }
+> 
+> /*
+>  * Test if reader processed invalid data because sequence number has changed.
+>  */
+> static inline int this_cpu_read_seqcount_retry(const seqcount_t __percpu *s, unsigned start)
+> {
+> 	barrier();
+>         return this_cpu_read(s->sequence) != start;
+> }
+> 
+> 
+> /*
+>  * Sequence counter only version assumes that callers are using their
+>  * own mutexing.
+>  */
+> static inline void this_cpu_write_seqcount_begin(seqcount_t __percpu *s)
+> {
+>         __this_cpu_inc(s->sequence);
+> 	barrier();
+> }
+> 
+> static inline void this_cpuwrite_seqcount_end(seqcount_t __percpu *s)
+> {
+>         __this_cpu_dec(s->sequence);
+> 	barrier();
+> }
+> 
+> 
 > Then you can do
 > 
 > this_cpu_read_seqcount_begin(&bla)
 > 
+> ...
 
-Which to me seems to be exactly what Eric proposed..
+This was exactly my suggestion Christoph.
 
-> But then this seemed to be a discussion related to ARM. ARM does not have
-> optimized per cpu accesses.
-
-Nah, there's multiple issues all nicely mangled into one thread ;-)
+I am glad you understand it now.
