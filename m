@@ -1,51 +1,60 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 10 Dec 2010 12:05:28 +0100
-Subject: [PATCH 2/2] OMAP1: Amstrad Delta: reserve memory for camera
-In-Reply-To: <201012101159.21845.jkrzyszt@tis.icnet.pl>
-References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
-	<201012101159.21845.jkrzyszt@tis.icnet.pl>
-Message-ID: <201012101205.29696.jkrzyszt@tis.icnet.pl>
+From: spnlinux@gmail.com (Sylwester Nawrocki)
+Date: Fri, 10 Dec 2010 13:01:08 +0100
+Subject: [PATCH 4/4 v2] ARM: S5PV210: Add clock definition for MIPI-CSIS
+	DPHY
+In-Reply-To: <011101cb984a$701446d0$503cd470$%szyprowski@samsung.com>
+References: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>	<1291405965-19482-5-git-send-email-s.nawrocki@samsung.com>	<028901cb9829$1ad1cfb0$50756f10$%kim@samsung.com>
+	<011101cb984a$701446d0$503cd470$%szyprowski@samsung.com>
+Message-ID: <4D021684.1000103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 1/2 from this set provides a possibility to reserve a block of memory 
-for use as the OMAP1 camera dedicated dma coherent memory. Use this 
-functionality to avoid the camera driver switching form videobuf_contig mode 
-to less efficient videobuf_sg mode in case of dma coherent memory allocation 
-failure after system memory gets fragmented.
+Hi,
 
-Created and tested against linux-2.6.27-rc4 on top of patch 1/2.
+On 2010-12-10 10:12, Marek Szyprowski wrote:
+> Hello,
+> 
+> On Friday, December 10, 2010 6:14 AM Kukjin Kim wrote:
+> 
+>> Sylwester Nawrocki wrote:
+>>>
+>>> MIPI DPHY control register requires special handling since it is shared
+>>> between CSI (camera serial interface) and DSI (display serial interface).
+>>> By creating this clock a serialized interface is provided for mipi-csis
+>>> and mipi-dsim drivers, so DPHYs may be safely controlled by both drivers.
+>>> Similarly dsim_dphy clock could be added for mipi-dsim.
+>>>
+>>> ---
+>>>
+>>> I am not quite sure about_"dphy_clock", perhaps power domain
+>>> handling code would be better place for it.
+>>>
+>> Yeah, it is MIPI DPHY enable/disable control register not clock control.
+>> So its proper position is not here...
+>>
+>> Hmm...how about driver's probe/open or some kind of setup in machine
+>> directory?
+> 
+> I'm not sure that this is the best way of handling this phy controller. Please
+> notice that mipi phy controller has different register location on S5PC110 and
+> S5PC210. Please also notice that S5PC210 has 2 mipi csci controllers and phy
+> interfaces, while s5pc110 has only one. Hiding all the logic and register
+> specific writes behind this 'csi_dphy' clock easily resolves all these issues
+> on all different samsung platforms and makes it easy to use it from the driver.
+> Similar patch has been proposed some time ago for usb_phy interface and imho
+> this is the right way to go.
+> 
+More importantly S5P_MIPI_DPHY_CONTROL* register is shared between two
+devices - MIPI-CSIS and MIPI-DSIM. It means some kind of serialization
+mechanism need to be employed while accessing this register, a spinlock
+seems to fit best here. It also means that if we decided to create the
+platform callback such a code would have to be placed in a common
+compilation unit which would be built when either mipi-csis or mipi-dsim
+is selected. And this callback would have to account the differences
+between various SoC flavours or it would have to be repeated for each
+mach-s5pvXXX.
+So if the platform callback is the preferred way, where do we put an
+implementation of it?
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
- arch/arm/mach-omap1/board-ams-delta.c |   12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
---- linux-2.6.37-rc4/arch/arm/mach-omap1/board-ams-delta.c.orig	2010-12-04 18:05:25.000000000 +0100
-+++ linux-2.6.37-rc4/arch/arm/mach-omap1/board-ams-delta.c	2010-12-04 22:19:39.000000000 +0100
-@@ -262,6 +262,16 @@ static struct omap1_cam_platform_data am
- 	.lclk_khz_max	= 1334,		/* results in 5fps CIF, 10fps QCIF */
- };
- 
-+void __init amsdelta_reserve(void)
-+{
-+#if defined(CONFIG_VIDEO_OMAP1) || defined(CONFIG_VIDEO_OMAP1_MODULE)
-+	omap1_camera_reserve(PAGE_SIZE << get_order(352 * 288 * 2 *
-+			OMAP1_CAMERA_MIN_BUF_COUNT(OMAP1_CAM_DMA_CONTIG)));
-+#endif
-+
-+	omap_reserve();
-+}
-+
- static struct platform_device *ams_delta_devices[] __initdata = {
- 	&ams_delta_kp_device,
- 	&ams_delta_lcd_device,
-@@ -366,7 +376,7 @@ MACHINE_START(AMS_DELTA, "Amstrad E3 (De
- 	/* Maintainer: Jonathan McDowell <noodles@earth.li> */
- 	.boot_params	= 0x10000100,
- 	.map_io		= ams_delta_map_io,
--	.reserve	= omap_reserve,
-+	.reserve	= amsdelta_reserve,
- 	.init_irq	= ams_delta_init_irq,
- 	.init_machine	= ams_delta_init,
- 	.timer		= &omap_timer,
+Regards,
+Sylwester
