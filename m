@@ -1,27 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Dec 2010 16:07:50 -0800
-Subject: [PATCH 13/11] OMAP2+: GPIO: ensure bank wakeups are enabled by
-	default
-In-Reply-To: <1291923226-10112-1-git-send-email-khilman@deeprootsystems.com>
-References: <1290689318-10191-1-git-send-email-charu@ti.com>
-	<1291923226-10112-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20101210000750.GM3054@atomide.com>
+Date: Thu, 9 Dec 2010 16:30:00 -0800
+Subject: [PATCH] OMAP1: SRAM: fix size for OMAP1611 SoCs
+In-Reply-To: <1291770132-2283-1-git-send-email-khilman@deeprootsystems.com>
+References: <1291770132-2283-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <20101210002959.GN3054@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [101209 11:33]:
-> As part of the GPIO conversion to platform_device/platform_driver,
-> commit 2fae7fbed072705d91e09ed393b2e580b2d895fc (OMAP: GPIO: prepare
-> for platform driver) removed hard-coded per-bank SYSCONFIG register
-> values in favor of using omap_hwmod to manage the SYSCONFIG register.
+* Kevin Hilman <khilman@deeprootsystems.com> [101207 17:06]:
+> Kernel was failing to boot on omap1611 based OSK boards due to
+> mis-configured SRAM size.  Existing code was using a hard-coded value
+> for 250k, which was then rounded down by PAGE_SIZE.  Increasing this to
+> 256k allows kernel to boot on omap1611 SoCs.
 > 
-> In the previous code, bank-level wakeups were enabled by default using
-> the SYSCONFIG.ENAWAKEUP bit, but omap_hwmod does not enable wakeups by
-> default.  Thus the above commit effectively disabled GPIO bank wakeups.
+> Problem reported by and initial fix suggested by Tim Bird.
 > 
-> This patch enables GPIO bank level wakeups by default to preserve
-> previous functionality.
+> Thanks to Tony Lindgren for helping diagnose the problem to being
+> specific to OMAP1611 and not affecting OMAP1610/OMAP1623.
 
-So this patch is no longer needed, right?
+Thanks, will queue this fix.
 
 Tony
