@@ -1,55 +1,71 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 10 Dec 2010 11:18:00 +0530
-Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend on
-	!CONFIG_THUMB2_KERNEL
-In-Reply-To: <1291895982-4775-3-git-send-email-dave.martin@linaro.org>
-References: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
-	<1291895982-4775-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <07daf23764a279fb2f61f1666d1de74a@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 10 Dec 2010 14:58:35 +0900
+Subject: [PATCH 00/02][RFC] ARM: Subarch IRQ handler macro support
+Message-ID: <20101210055835.8635.98614.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Dave Martin [mailto:dave.martin at linaro.org]
-> Sent: Thursday, December 09, 2010 5:30 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Dave Martin; Santosh Shilimkar; linux-omap at vger.kernel.org
-> Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend
-> on !CONFIG_THUMB2_KERNEL
->
-> Because the nwfpe support is unlikely to be used on new platforms
-> and requires CONFIG_OABI_COMPAT, which is not generally used with
-> ARMv7+, we shouldn't expect to build nwfpe support into a Thumb-2
-> kernel.
->
-> At present, nwfpe contains assembly code which isn't Thumb-2
-> compatible, and for now it doesn't appear useful to port this
-> code.
->
-> All ARMv7-A/R platforms necessarily have VFPv3 hardware floating-
-> point natively, making emulation unnecessary.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-If you like.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index f9ca7f3..7e825c3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1759,7 +1759,7 @@ comment "At least one emulation must be selected"
->
->  config FPE_NWFPE
->  	bool "NWFPE math emulation"
-> -	depends on !AEABI || OABI_COMPAT
-> +	depends on (!AEABI || OABI_COMPAT) && !THUMB2_KERNEL
->  	---help---
->  	  Say Y to include the NWFPE floating point emulator in the
-kernel.
->  	  This is necessary to run most binaries. Linux does not currently
-> --
-> 1.7.1
+ARM: Subarch IRQ handler macro support
+
+[PATCH 01/02][RFC] ARM: Introduce Subarch IRQ handler macros
+[PATCH 02/02][RFC] ARM: shmobile: Use Subarch IRQ handler for INTC
+
+These patches add a macro for per-subarch use together with some
+example code that shows how to use it.
+
+The first patch simply breaks out code from the irq_handler macro
+in entry-armv.S to the new macro arch_irq_handler that is put in a
+shared header file. The new header file also adds the new macro
+arch_irq_handler_default which replaces previous code in the
+entry-armv.S file.
+
+Patch number two gives an example on how to make use of the macro
+arch_irq_handler on the SH-Mobile ARM subarch. Compile-time tested
+on top of RMKs devel tree with the CONFIG_MULTI_IRQ_HANDLER patch
+by Eric Miao. Please note that this patch isn't suitable for merge
+since it needs to be reworked to fit on the sh-2.6 tree where the
+rest of the SH-Mobile changes are.
+
+In short, the per-subarch code is reduced to the following on the
+sh7372 uniprocessor:
+
++#include <asm/entry-macro-multi.S>
++
++#define INTFLGA        0xe6980018
++
++       .macro  get_irqnr_preamble, base, tmp
++       ldr     \base, =INTFLGA
++       .endm
++
++       .macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
++       ldr     \irqnr, [\base]
++       cmp     \irqnr, #0
++       beq     1000f
++       /* intevt to irq number */
++       lsr     \irqnr, \irqnr, #0x5
++       subs    \irqnr, \irqnr, #16
++1000:
++       .endm
++
++       arch_irq_handler shmobile_handle_irq_intc
+
+This code depends on the following patch by Eric Miao:
+
+ [PATCH] ARM: Allow machine to specify it's own IRQ handlers at run-time
+
+Comments are more than welcome!
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+ arch/arm/include/asm/entry-macro-multi.S          |   43 +++++++++++++++++++++
+ arch/arm/kernel/entry-armv.S                      |   31 ---------------
+ arch/arm/mach-shmobile/Kconfig                    |    3 +
+ arch/arm/mach-shmobile/Makefile                   |   12 ++++-
+ arch/arm/mach-shmobile/board-ap4evb.c             |    1 
+ arch/arm/mach-shmobile/board-g3evm.c              |    1 
+ arch/arm/mach-shmobile/board-g4evm.c              |    1 
+ arch/arm/mach-shmobile/entry-intc.S               |   30 ++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h      |    1 
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |   27 -------------
+ arch/arm/mach-shmobile/include/mach/hardware.h    |    3 -
+ 11 files changed, 91 insertions(+), 62 deletions(-)
