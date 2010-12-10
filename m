@@ -1,99 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Dec 2010 14:14:18 +0900
-Subject: [PATCH 4/4 v2] ARM: S5PV210: Add clock definition for MIPI-CSIS
-	DPHY
-In-Reply-To: <1291405965-19482-5-git-send-email-s.nawrocki@samsung.com>
-References: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>
-	<1291405965-19482-5-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <028901cb9829$1ad1cfb0$50756f10$%kim@samsung.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 10 Dec 2010 13:21:44 +0800
+Subject: [PATCH 1/6] ARM: mx5: use config to define boot related addresses
+In-Reply-To: <20101209090052.GT9777@n2100.arm.linux.org.uk>
+References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
+	<20101209070411.GH17441@pengutronix.de>
+	<20101209084430.GS9777@n2100.arm.linux.org.uk>
+	<20101209085255.GS17441@pengutronix.de>
+	<20101209090052.GT9777@n2100.arm.linux.org.uk>
+Message-ID: <20101210052143.GA29335@b20223-2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+On Thu, Dec 09, 2010 at 09:00:52AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 09, 2010 at 09:52:55AM +0100, Uwe Kleine-K?nig wrote:
+> > Hell Russell,
+> > 
+> > On Thu, Dec 09, 2010 at 08:44:30AM +0000, Russell King - ARM Linux wrote:
+> > > On Thu, Dec 09, 2010 at 08:04:11AM +0100, Uwe Kleine-K?nig wrote:
+> > > > > diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+> > > > > index 9939a19..388d2e8 100644
+> > > > > --- a/arch/arm/mach-mx5/Makefile.boot
+> > > > > +++ b/arch/arm/mach-mx5/Makefile.boot
+> > > > > @@ -1,3 +1,3 @@
+> > > > > -   zreladdr-y	:= 0x90008000
+> > > > > -params_phys-y	:= 0x90000100
+> > > > > -initrd_phys-y	:= 0x90800000
+> > > > > +   zreladdr-$(CONFIG_SOC_IMX51)	:= 0x90008000
+> > > > > +params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
+> > > > > +initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
+> > > > That is one of the places that is not multi-soc capable.  You can make
+> > > > it 66% less worse by just removing params_phys and initrd_phys.
+> > > 
+> > > Which then destroys the ability to use the bootp veneer which combines
+> > > a kernel and initrd.
+> > I am aware of that.  I think it's OK to add the assignments when they
+> > are needed the first time which I don't expect to happen soon if at all.
 > 
-> MIPI DPHY control register requires special handling since it is shared
-> between CSI (camera serial interface) and DSI (display serial interface).
-> By creating this clock a serialized interface is provided for mipi-csis
-> and mipi-dsim drivers, so DPHYs may be safely controlled by both drivers.
-> Similarly dsim_dphy clock could be added for mipi-dsim.
-> 
-> ---
-> 
-> I am not quite sure about_"dphy_clock", perhaps power domain
-> handling code would be better place for it.
-> 
-Yeah, it is MIPI DPHY enable/disable control register not clock control.
-So its proper position is not here...
+> That depends who is trying to use it.  If it's someone who isn't the
+> original platform developer, they may give up with it if the definitions
+> aren't provided.
+Hi uwe,
 
-Hmm...how about driver's probe/open or some kind of setup in machine
-directory?
+IMO, removing params_phys and initrd_phys is just a work around. It's not 
+the final way to fix multi-SoC support. Do you insist on removing it?
 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/clock.c |   25 +++++++++++++++++++++++++
->  1 files changed, 25 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index b774ff1..b880b85 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -185,6 +185,19 @@ static int s5pv210_clk_mask1_ctrl(struct clk *clk,
-int
-> enable)
->  	return s5p_gatectrl(S5P_CLK_SRC_MASK1, clk, enable);
->  }
-> 
-> +static int s5pv210_clk_mipi_dphy_ctrl(struct clk *clk, int enable)
-> +{
-> +	return s5p_gatectrl(S5P_MIPI_DPHY_CONTROL, clk, enable);
-> +}
-> +
-> +/* The common parent clock for mipi-csi/dsi clocks. */
-> +static struct clk clk_vp_mipi_dphy = {
-> +	.name		= "vpclk_csis_dphy",
-> +	.id		= -1,
-> +	.enable		= s5pv210_clk_mipi_dphy_ctrl,
-> +	.ctrlbit	= (1 << 0),
-> +};
-> +
-
-Hmm...
-
->  static struct clk clk_sclk_hdmi27m = {
->  	.name		= "sclk_hdmi27m",
->  	.id		= -1,
-> @@ -323,6 +336,18 @@ static struct clk init_clocks_disable[] = {
->  		.enable		= s5pv210_clk_ip0_ctrl,
->  		.ctrlbit	= (1 << 4),
->  	}, {
-> +		.name		= "csis",
-> +		.id		= -1,
-> +		.parent		= &clk_pclk_dsys.clk,
-> +		.enable		= s5pv210_clk_ip0_ctrl,
-> +		.ctrlbit	= (1 << 31),
-> +	}, {
-
-ok.
-
-> +		.name		= "csis_dphy",
-> +		.id		= -1,
-> +		.parent		= &clk_vp_mipi_dphy,
-> +		.enable		= s5pv210_clk_mipi_dphy_ctrl,
-> +		.ctrlbit	= (1 << 1),
-> +	}, {
-
-Same as above.
-
->  		.name		= "rot",
->  		.id		= -1,
->  		.parent		= &clk_hclk_dsys.clk,
-> --
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks
+Richard
