@@ -1,44 +1,23 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 10 Dec 2010 11:37:06 +0100
-Subject: [RFC PATCH] scatterlist: Initialize the dma_address field with
-	invalid dma address
-In-Reply-To: <20101209.120006.189701386.davem@davemloft.net>
-References: <1291900514-7290-1-git-send-email-nicolas.ferre@atmel.com>
-	<20101209.120006.189701386.davem@davemloft.net>
-Message-ID: <4D0202D2.8010208@atmel.com>
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Fri, 10 Dec 2010 11:41:32 +0100
+Subject: [PATCH] mmci: partially revert clock divisor code
+In-Reply-To: <20101210101303.GA19552@n2100.arm.linux.org.uk>
+References: <1291884775-25509-1-git-send-email-linus.walleij@stericsson.com>
+	<20101210101303.GA19552@n2100.arm.linux.org.uk>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A075EE07BDD@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/12/2010 21:00, David Miller :
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Date: Thu,  9 Dec 2010 14:15:14 +0100
+[Russell]
+> On Thu, Dec 09, 2010 at 09:52:55AM +0100, Linus Walleij wrote:
+> > I misread the datasheet as if bypass mode was not available at all
+> > on the ux500's, I was wrong. It is there, the datasheet just
+> > states that you should not have to use it.
 > 
->> Initialize the the dma_address field so that it will be possible to test
->> its value while using scatterlists. This field will be compatible with
->> testing by dma_mapping_error().
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Please don't do this, it's unjustified and it's going to kill performance.
+> Should this be merged with the patch which introduced this change?
 
-Yes, that is what I suspected...
+If you want to squash them into one, feel free to go ahead. I'm fine
+either way.
 
-> Even if it were a good change, you should have used the invalid DMA
-> address definition defined by various architectures instead of a constant.
-
-Well this definition seems to be spread among drivers (mostly usb ones):
-DMA_ADDR_INVALID...
-And also sometimes with different names:
-DMA_INVALID_HANDLE, INVALID_DMA_ADDRESS
-
-> You should be aware of whether entries in a scatterlist have been setup
-> by your code path.
-
-Yes, in fact my need is related to the fact that my scatterlist is
-filled in a driver and then handled by the dmaengine driver.
-But I will reconsider the path taken by my sg to be able to avoid
-checking the dma_address field.
-
-Best regards,
--- 
-Nicolas Ferre
+Yours,
+Linus Walleij
