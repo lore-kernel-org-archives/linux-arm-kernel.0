@@ -1,33 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Dec 2010 09:41:53 -0800
-Subject: [PATCH 12/11] omap1: Fix gpio mpuio bank to work for
-	multi-omap for 7xx/15xx/16xx
-In-Reply-To: <201012101704.37054.jkrzyszt@tis.icnet.pl>
-References: <1290689318-10191-1-git-send-email-charu@ti.com>
-	<20101204212554.GM17222@atomide.com>
-	<20101207232315.GE17435@atomide.com>
-	<201012101704.37054.jkrzyszt@tis.icnet.pl>
-Message-ID: <20101210174153.GU3054@atomide.com>
+Date: Fri, 10 Dec 2010 09:44:08 -0800
+Subject: [PATCH 1/3] omap1: Use asm_irq_flags for entry-macro.S
+In-Reply-To: <201012101706.24089.jkrzyszt@tis.icnet.pl>
+References: <20101204001435.28853.29616.stgit@baageli.muru.com>
+	<20101208014548.GJ17435@atomide.com>
+	<20101208014728.GK17435@atomide.com>
+	<201012101706.24089.jkrzyszt@tis.icnet.pl>
+Message-ID: <20101210174407.GV3054@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [101210 08:05]:
-> > We need to divide the 15xx/16xx offset by 2 for 7xx. Use bank->stride
-> > for that. This allows us to get rid of the duplicate defines for the
-> > MPUIO registers.
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [101210 08:06]:
+> Wednesday 08 December 2010 02:47:28 Tony Lindgren napisa?(a):
+> > Initialize asm_irq_flags in omap_init_irq and use it in
+> > get_irqnr_and_base to detect between omap7xx and omap15xx/16xx.
 > >
-> > Note that this will cause omap-keypad.c driver to not work on 7xx.
-> > However, the right fix there is to move over to gpio-keys instead as
-> > suggested by Cory Maccarrone <darkstar6262@gmail.com> and
-> > Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>.
-> >
-> > Cc: Cory Maccarrone <darkstar6262@gmail.com>
-> > Cc: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> > Note that both INT_1510_IH2_IRQ and INT_1510_IH2_IRQ are defined
+> > as 0, so use INT_1510_IH2_IRQ for both of them.
+> 
+> Tested on Amstrad Delta.
+> 
 > > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> Acked-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Thanks, will now merge the gpio into omap-for-linus for the next
-merge window.
+Thanks, merging these into omap-for-linus.
+
+Regards,
 
 Tony
