@@ -1,31 +1,31 @@
-From: tarek.m.attia@gmail.com (tarek attia)
-Date: Fri, 10 Dec 2010 16:42:57 +0200
-Subject: CpuFreq for mini2440
-In-Reply-To: <4CFED52F.8070307@fluff.org>
-References: <AANLkTi=55k8Dr6CAe6O92j6P2ht4D+onFAEu7J0Q+Nvn@mail.gmail.com>
-	<4CFED52F.8070307@fluff.org>
-Message-ID: <AANLkTimYReh+Uj8keqtiBuZUNUAvRjqE_-jHwjw=KP+O@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 10 Dec 2010 15:51:06 +0100
+Subject: [PATCH v3 15/15] ARM: mxs: Add build configuration for mxs
+In-Reply-To: <1291739523-25077-12-git-send-email-shawn.guo@freescale.com>
+References: <1290754154-9428-1-git-send-email-shawn.guo@freescale.com>
+	<1291739523-25077-12-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101210145106.GM17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thxxxx Ben,,can you tell me from where to start ??what code should I care about
+Hallo Shawn,
 
-On Wed, Dec 8, 2010 at 2:45 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On 03/12/10 01:12, tarek attia wrote:
->> Hi all,
->>
->> I tried many times to enable the Cpufreq for the mini2440 "Friendly
->> Arm board" but each time I enable it in the kernel it ended up by a
->> successful compilation ,but when I mount the kernel image on the board
->> ,just I dun find it's folder nor it's kernel objects,,,what I miss
->> ,,or what track should I go to make it working ?
+On Wed, Dec 08, 2010 at 12:32:03AM +0800, Shawn Guo wrote:
+>  - Remove cpu.o from arch/arm/mach-mxs/Makefile
+> [...]
 >
-> The board's init code may not support it. If no-one else comes
-> forward, I will try as I think I still have one of these boards
-> somewhere.
->
+> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> new file mode 100644
+> index 0000000..40b808c
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/Makefile
+> @@ -0,0 +1,10 @@
+> +# Common support
+> +obj-y := clock.o cpu.o devices.o gpio.o icoll.o iomux.o system.o timer.o
+                    ^^^^^
 
-
+Uwe
 
 -- 
-tarek
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
