@@ -1,183 +1,52 @@
 From: gdavis@mvista.com (George G. Davis)
-Date: Fri, 10 Dec 2010 00:26:04 -0500
+Date: Fri, 10 Dec 2010 00:44:04 -0500
 Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
 	RWFO fix
-In-Reply-To: <20101124183936.GA18796@mvista.com>
+In-Reply-To: <4D015315.5070600@codeaurora.org>
 References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
 	<20101124183936.GA18796@mvista.com>
-Message-ID: <20101210052604.GA13313@mvista.com>
+	<AANLkTi=g7eHv9=L8G9CphLLLp6n-e_quDbuSW1LeSEqK@mail.gmail.com>
+	<4D015315.5070600@codeaurora.org>
+Message-ID: <20101210054404.GB13313@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Apologies for the delayed reply.
-
-On Wed, Nov 24, 2010 at 09:39:36PM +0300, Valentine Barshak wrote:
-> Updated according to the comments to avoid r/w outside the buffer and
-> used byte r/w for the possible unaligned data. Seems to work fine.
+On Thu, Dec 09, 2010 at 02:07:17PM -0800, Stephen Boyd wrote:
+> On 12/09/2010 08:04 AM, Catalin Marinas wrote:
+> > On 24 November 2010 18:39, Valentine Barshak <vbarshak@mvista.com> wrote:
+> >> Updated according to the comments to avoid r/w outside the buffer and
+> >> used byte r/w for the possible unaligned data. Seems to work fine.
+> >>
+> >> Cache ownership must be acqired by reading/writing data from the
+> >> cache line to make cache operation have the desired effect on the
+> >> SMP MPCore CPU. However, the ownership is never aquired in the
+> >> v6_dma_inv_range function when cleaning the first line and
+> >> flushing the last one, in case the address is not aligned
+> >> to D_CACHE_LINE_SIZE boundary.
+> >> Fix this by reading/writing data if needed, before performing
+> >> cache operations.
+> >> While at it, fix v6_dma_flush_range to prevent RWFO outside
+> >> the buffer.
+> >>
+> >> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+> >> Signed-off-by: George G. Davis <gdavis@mvista.com>
+> > I eventually found a bit of time to look at this. The patch looks fine to me:
+> >
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Cache ownership must be acqired by reading/writing data from the
-> cache line to make cache operation have the desired effect on the
-> SMP MPCore CPU. However, the ownership is never aquired in the
-> v6_dma_inv_range function when cleaning the first line and
-> flushing the last one, in case the address is not aligned
-> to D_CACHE_LINE_SIZE boundary.
-> Fix this by reading/writing data if needed, before performing
-> cache operations.
-> While at it, fix v6_dma_flush_range to prevent RWFO outside
-> the buffer.
-> 
-> Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
-> Signed-off-by: George G. Davis <gdavis@mvista.com>
-> ---
->  arch/arm/mm/cache-v6.S |   40 ++++++++++++++++++++++++++--------------
->  1 files changed, 26 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-> index 99fa688..622f8a1 100644
-> --- a/arch/arm/mm/cache-v6.S
-> +++ b/arch/arm/mm/cache-v6.S
-> @@ -203,25 +203,29 @@ ENTRY(v6_flush_kern_dcache_area)
->   *	- end     - virtual end address of region
->   */
->  v6_dma_inv_range:
-> -	tst	r0, #D_CACHE_LINE_SIZE - 1
-> -	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
-> -#ifdef HARVARD_CACHE
-> -	mcrne	p15, 0, r0, c7, c10, 1		@ clean D line
-> -#else
-> -	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
-> -#endif
->  	tst	r1, #D_CACHE_LINE_SIZE - 1
-> +#ifdef CONFIG_DMA_CACHE_RWFO
-> +	ldrneb	r2, [r1, #-1]			@ read for ownership
-> +	strneb	r2, [r1, #-1]			@ write for ownership
-> +#endif
->  	bic	r1, r1, #D_CACHE_LINE_SIZE - 1
->  #ifdef HARVARD_CACHE
->  	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D line
->  #else
->  	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
->  #endif
-> -1:
->  #ifdef CONFIG_DMA_CACHE_RWFO
-> -	ldr	r2, [r0]			@ read for ownership
-> -	str	r2, [r0]			@ write for ownership
-> +	ldrb	r2, [r0]			@ read for ownership
-> +	strb	r2, [r0]			@ write for ownership
-> +#endif
-> +	tst	r0, #D_CACHE_LINE_SIZE - 1
-> +	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
-> +#ifdef HARVARD_CACHE
-> +	mcrne	p15, 0, r0, c7, c10, 1		@ clean D line
-> +#else
-> +	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
->  #endif
-> +1:
->  #ifdef HARVARD_CACHE
->  	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
->  #else
-> @@ -229,6 +233,10 @@ v6_dma_inv_range:
->  #endif
->  	add	r0, r0, #D_CACHE_LINE_SIZE
->  	cmp	r0, r1
-> +#ifdef CONFIG_DMA_CACHE_RWFO
-> +	ldrlo	r2, [r0]			@ read for ownership
-> +	strlo	r2, [r0]			@ write for ownership
-> +#endif
->  	blo	1b
->  	mov	r0, #0
->  	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
+> Is this also a stable candidate? At least it applies cleanly to .35
 
-Just a minor nit...
-
-Any reason for rearranging the order of 'start'/'end' parameters in the
-above changes?  It's not clear that there is any performance benefit by
-rearranging those parameters and it obfuscates the changes, e.g. this
-is equivalent to your change above and also much clearer:
-
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 99fa688..28e4799 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -203,6 +203,10 @@ ENTRY(v6_flush_kern_dcache_area)
-  *	- end     - virtual end address of region
-  */
- v6_dma_inv_range:
-+#ifdef CONFIG_DMA_CACHE_RWFO
-+	ldrb	r2, [r0]			@ read for ownership
-+	strb	r2, [r0]			@ write for ownership
-+#endif
- 	tst	r0, #D_CACHE_LINE_SIZE - 1
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- #ifdef HARVARD_CACHE
-@@ -211,6 +215,10 @@ v6_dma_inv_range:
- 	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
- #endif
- 	tst	r1, #D_CACHE_LINE_SIZE - 1
-+#ifdef CONFIG_DMA_CACHE_RWFO
-+	ldrneb	r2, [r1, #-1]			@ read for ownership
-+	strneb	r2, [r1, #-1]			@ write for ownership
-+#endif
- 	bic	r1, r1, #D_CACHE_LINE_SIZE - 1
- #ifdef HARVARD_CACHE
- 	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D line
-@@ -218,10 +226,6 @@ v6_dma_inv_range:
- 	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
- #endif
- 1:
--#ifdef CONFIG_DMA_CACHE_RWFO
--	ldr	r2, [r0]			@ read for ownership
--	str	r2, [r0]			@ write for ownership
--#endif
- #ifdef HARVARD_CACHE
- 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
- #else
-@@ -229,6 +233,10 @@ v6_dma_inv_range:
- #endif
- 	add	r0, r0, #D_CACHE_LINE_SIZE
- 	cmp	r0, r1
-+#ifdef CONFIG_DMA_CACHE_RWFO
-+	ldrlo	r2, [r0]			@ read for ownership
-+	strlo	r2, [r0]			@ write for ownership
-+#endif
- 	blo	1b
- 	mov	r0, #0
- 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
-
+I'd say it makes sense to add "Cc: stable at kernel.org" to the commit
+header before forwarding this to the ARM Linux kernel Patch Tracking
+System [1] in this case.
 
 --
 Regards,
 George
 
-> @@ -263,12 +271,12 @@ v6_dma_clean_range:
->   *	- end     - virtual end address of region
->   */
->  ENTRY(v6_dma_flush_range)
-> -	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
-> -1:
->  #ifdef CONFIG_DMA_CACHE_RWFO
-> -	ldr	r2, [r0]			@ read for ownership
-> -	str	r2, [r0]			@ write for ownership
-> +	ldrb	r2, [r0]		@ read for ownership
-> +	strb	r2, [r0]		@ write for ownership
->  #endif
-> +	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
-> +1:
->  #ifdef HARVARD_CACHE
->  	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
->  #else
-> @@ -276,6 +284,10 @@ ENTRY(v6_dma_flush_range)
->  #endif
->  	add	r0, r0, #D_CACHE_LINE_SIZE
->  	cmp	r0, r1
-> +#ifdef CONFIG_DMA_CACHE_RWFO
-> +	ldrlob	r2, [r0]			@ read for ownership
-> +	strlob	r2, [r0]			@ write for ownership
-> +#endif
->  	blo	1b
->  	mov	r0, #0
->  	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
+[1] http://www.arm.linux.org.uk/developer/patches/info.php
+
+> 
 > -- 
-> 1.6.0.6
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
