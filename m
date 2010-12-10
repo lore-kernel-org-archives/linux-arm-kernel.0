@@ -1,51 +1,55 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 10 Dec 2010 08:51:50 +0100
-Subject: [PATCH 0/5] OMAP4: hwmod data fixes and update
-In-Reply-To: <87hbem4g76.fsf@deeprootsystems.com>
-References: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
-	<87hbem4g76.fsf@deeprootsystems.com>
-Message-ID: <4D01DC16.5010109@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 10 Dec 2010 09:00:39 +0100
+Subject: [PATCH 1/6] ARM: mx5: use config to define boot related addresses
+In-Reply-To: <20101210052143.GA29335@b20223-2.ap.freescale.net>
+References: <1291903716-31388-1-git-send-email-richard.zhao@freescale.com>
+	<20101209070411.GH17441@pengutronix.de>
+	<20101209084430.GS9777@n2100.arm.linux.org.uk>
+	<20101209085255.GS17441@pengutronix.de>
+	<20101209090052.GT9777@n2100.arm.linux.org.uk>
+	<20101210052143.GA29335@b20223-2.ap.freescale.net>
+Message-ID: <20101210080039.GD17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2010 1:36 AM, Kevin Hilman wrote:
-> Benoit Cousson<b-cousson@ti.com>  writes:
->
->> Hi Paul,
->>
->> Here is a small set of OMAP4 hwmod data updates.
->>
->> Re-order properly the data that were a little bit shuffled during
->> the previous merge window.
->> Add the new reset flags introduced in 2.6.37 and that were not
->> used in the hwmod data. The OMAP2 and OMAP3 fixes should come soon.
->> Fix some missing field in the GPIO OMAP4 hwmod data that I missed
->> during the review.
->> IVA and DSP are added just to allow the processors device creation
->> at boot time and avoid the warnings.
->>
->> Thanks to Charu for testing the GPIO / WD_TIMER changes.
->> Thanks to Govindraj for testing the UART changes.
->>
->> The series is based on lo/for-next (v2.6.37-rc5-66-ga2814df) and is
->> available here:
->> git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod_data
->>
->> Please note that there is a slight dependency with the following patch
->> due to the name change of the iva fclk:
->> OMAP4: clock data: Add missing DPLL x2 clock node
->> https://patchwork.kernel.org/patch/396612/
->>
->> Tested on sdp4430 + ES2.0/ES2.1.
->
-> As with the other series, I tried to pull this into my pm-core for
-> testing with all the other PM stuff we have baking for 2.6.38.
->
-> Unfortunately, this series has conflicts with Paul's
-> pwrdm_prcm_[ab]_2.6.38 branches.
-> Could you rebase this on Paul's pwrdm_prcm_b_2.6.38 branch?
+Hello Richard,
 
-OK, I will rebase all my series on top of that one.
+On Fri, Dec 10, 2010 at 01:21:44PM +0800, Richard Zhao wrote:
+> On Thu, Dec 09, 2010 at 09:00:52AM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Dec 09, 2010 at 09:52:55AM +0100, Uwe Kleine-K?nig wrote:
+> > > On Thu, Dec 09, 2010 at 08:44:30AM +0000, Russell King - ARM Linux wrote:
+> > > > On Thu, Dec 09, 2010 at 08:04:11AM +0100, Uwe Kleine-K?nig wrote:
+> > > > > > diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+> > > > > > index 9939a19..388d2e8 100644
+> > > > > > --- a/arch/arm/mach-mx5/Makefile.boot
+> > > > > > +++ b/arch/arm/mach-mx5/Makefile.boot
+> > > > > > @@ -1,3 +1,3 @@
+> > > > > > -   zreladdr-y	:= 0x90008000
+> > > > > > -params_phys-y	:= 0x90000100
+> > > > > > -initrd_phys-y	:= 0x90800000
+> > > > > > +   zreladdr-$(CONFIG_SOC_IMX51)	:= 0x90008000
+> > > > > > +params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
+> > > > > > +initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
+> > > > > That is one of the places that is not multi-soc capable.  You can make
+> > > > > it 66% less worse by just removing params_phys and initrd_phys.
+> > > > 
+> > > > Which then destroys the ability to use the bootp veneer which combines
+> > > > a kernel and initrd.
+> > > I am aware of that.  I think it's OK to add the assignments when they
+> > > are needed the first time which I don't expect to happen soon if at all.
+> > 
+> > That depends who is trying to use it.  If it's someone who isn't the
+> > original platform developer, they may give up with it if the definitions
+> > aren't provided.
+> Hi uwe,
+> 
+> IMO, removing params_phys and initrd_phys is just a work around. It's not 
+> the final way to fix multi-SoC support. Do you insist on removing it?
+no, I don't care much.  I think it will never be used, but go ahead, do
+as you prefer.
 
-Regards,
-Benoit
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
