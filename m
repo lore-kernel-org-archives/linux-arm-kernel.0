@@ -1,46 +1,48 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 10 Dec 2010 18:49:06 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Dec 2010 17:56:45 +0000
 Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <1292001500.3580.268.camel@edumazet-laptop>
-References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-	<1291851079-27061-1-git-send-email-venki@google.com>
-	<1291899120.29292.7.camel@twins>
-	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
-	<1291917330.6803.7.camel@twins>
+In-Reply-To: <1291988866.6803.171.camel@twins>
+References: <1291917330.6803.7.camel@twins>
 	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
 	<1291920939.6803.38.camel@twins>
 	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
 	<1291936593.13513.3.camel@laptop>
 	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
-	<1291975704.6803.59.camel@twins>  <1291987065.6803.151.camel@twins>
-	<1291987635.6803.161.camel@twins>  <1291988866.6803.171.camel@twins>
-	<1292001500.3580.268.camel@edumazet-laptop>
-Message-ID: <1292003346.13513.30.camel@laptop>
+	<1291975704.6803.59.camel@twins> <1291987065.6803.151.camel@twins>
+	<1291987635.6803.161.camel@twins> <1291988866.6803.171.camel@twins>
+Message-ID: <20101210175645.GB28263@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-12-10 at 18:18 +0100, Eric Dumazet wrote:
-> Le vendredi 10 d?cembre 2010 ? 14:47 +0100, Peter Zijlstra a ?crit :
-
-> Also irq_time_write_begin() and irq_time_write_end() could be faster
-> (called for current cpu)
-> 
-> static inline void irq_time_write_begin(void)
-> {
-> 	__this_cpu_inc(irq_time_seq.sequence);
-> 	smp_wmb();
-> }
+On Fri, Dec 10, 2010 at 02:47:46PM +0100, Peter Zijlstra wrote:
+>  inline void update_rq_clock(struct rq *rq)
+>  {
+> -	int cpu = cpu_of(rq);
+> -	u64 irq_time;
+> +	s64 delta;
 >  
-> static inline void irq_time_write_end(void)
-> {
-> 	smp_wmb();
-> 	__this_cpu_inc(irq_time_seq.sequence);
-> }
+>  	if (rq->skip_clock_update)
+>  		return;
+>  
+> -	rq->clock = sched_clock_cpu(cpu);
+> -	irq_time = irq_time_cpu(cpu);
+> -	if (rq->clock - irq_time > rq->clock_task)
+> -		rq->clock_task = rq->clock - irq_time;
+> +	delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
+> +	rq->clock += delta;
 
-Yeah, but that kinda defeats the purpose of having it implemented in
-seqlock.h. Ideally we'd teach gcc about these long pointers and have
-something like: 
+Hmm.  Can you tell me how this is different to:
 
-  write_seqcount_begin(&this_cpu_read(irq_time_seq));
+	new_clock = sched_clock_cpu(cpu_of(rq));
+	delta = new_clock - rq->clock;
+	rq->clock = new_clock;
 
-do the right thing.
+which I think may be simpler in terms of 64-bit math for 32-bit compilers
+to deal with?
+
+In terms of the wrap-around, I don't see this as any different from the
+above, as:
+
+	rq->clock += sched_clock_cpu(cpu_of(rq)) - rq_clock;
+	rq->clock = rq->clock + sched_clock_cpu(cpu_of(rq)) - rq_clock;
+	rq->clock = sched_clock_cpu(cpu_of(rq));
