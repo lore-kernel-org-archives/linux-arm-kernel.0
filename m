@@ -1,41 +1,71 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 10 Dec 2010 16:28:19 +0000
-Subject: [PATCH v3 08/14] picoxcell: add cpufreq support
+Date: Fri, 10 Dec 2010 16:28:20 +0000
+Subject: [PATCH v3 09/14] picoxcell: add support for pm
 In-Reply-To: <1291998505-25891-1-git-send-email-jamie@jamieiles.com>
 References: <1291998505-25891-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1291998505-25891-9-git-send-email-jamie@jamieiles.com>
+Message-ID: <1291998505-25891-10-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PC3X3 devices have a PLL to control the ARM core speed. Add a cpufreq
-driver so that we can run at optimum speed and power.
+PC3X3 devices support clock gating so provide support for PM on these
+devices. We only support standby modes as we can't gate the ARM clock or
+memory controllers.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
  arch/arm/mach-picoxcell/Makefile         |    1 +
- arch/arm/mach-picoxcell/cpufreq.c        |  145 ++++++++++++++++++++++++++++++
- arch/arm/mach-picoxcell/picoxcell_core.c |    3 +
+ arch/arm/mach-picoxcell/picoxcell_core.c |    2 +
  arch/arm/mach-picoxcell/picoxcell_core.h |    9 ++
+ arch/arm/mach-picoxcell/pm.c             |  146 ++++++++++++++++++++++++++++++
  4 files changed, 158 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-picoxcell/cpufreq.c
+ create mode 100644 arch/arm/mach-picoxcell/pm.c
 
 diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index f71a33e..c0bbb25 100644
+index c0bbb25..f122a84 100644
 --- a/arch/arm/mach-picoxcell/Makefile
 +++ b/arch/arm/mach-picoxcell/Makefile
-@@ -4,3 +4,4 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
- 				   gpio.o \
+@@ -5,3 +5,4 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
  				   clk.o \
  				   devices.o
-+obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
-diff --git a/arch/arm/mach-picoxcell/cpufreq.c b/arch/arm/mach-picoxcell/cpufreq.c
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
++obj-$(CONFIG_PM)		+= pm.o
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
+index 60bc878..7f6f3fd 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.c
++++ b/arch/arm/mach-picoxcell/picoxcell_core.c
+@@ -277,4 +277,6 @@ void __init picoxcell_core_init(void)
+ 
+ 	if (picoxcell_has_feature(PICOXCELL_FEATURE_CPUFREQ))
+ 		WARN_ON(picoxcell_cpufreq_init());
++	if (picoxcell_has_feature(PICOXCELL_FEATURE_PM))
++		WARN_ON(picoxcell_pm_init());
+ }
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.h b/arch/arm/mach-picoxcell/picoxcell_core.h
+index f6d90bf..3a673cf 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.h
++++ b/arch/arm/mach-picoxcell/picoxcell_core.h
+@@ -30,4 +30,13 @@ static inline int picoxcell_cpufreq_init(void)
+ }
+ # endif /* CONFIG_CPU_FREQ */
+ 
++# ifdef CONFIG_PM
++extern int __init picoxcell_pm_init(void);
++# else /* CONFIG_PM */
++static inline int picoxcell_pm_init(void)
++{
++	return 0;
++}
++# endif /* CONFIG_PM */
++
+ #endif /* __ASM_ARCH_PICOXCELL_CORE_H__ */
+diff --git a/arch/arm/mach-picoxcell/pm.c b/arch/arm/mach-picoxcell/pm.c
 new file mode 100644
-index 0000000..7fa8719
+index 0000000..1aa591a
 --- /dev/null
-+++ b/arch/arm/mach-picoxcell/cpufreq.c
-@@ -0,0 +1,145 @@
++++ b/arch/arm/mach-picoxcell/pm.c
+@@ -0,0 +1,146 @@
 +/*
-+ * Copyright (c) 2010 picoChip Designs Ltd., Jamie Iles
++ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -43,171 +73,142 @@ index 0000000..7fa8719
 + *
 + * All enquiries to support at picochip.com
 + */
-+#define pr_fmt(fmt) "picoxcell_cpufreq: " fmt
-+
++#define pr_fmt(fmt) "picoxcell_pm: " fmt
 +#include <linux/clk.h>
 +#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/cpufreq.h>
++#include <linux/init.h>
++#include <linux/suspend.h>
 +
 +#include <mach/hardware.h>
 +
 +#include "picoxcell_core.h"
 +
-+static struct {
-+	struct clk  *arm_clk;
-+} cpufreq;
-+
-+/* The minimum frequency that we'll allow the ARM to run at (in KHz). */
-+#define PC3X3_PLL_MIN_KHZ			    140000
-+/* The maximum frequency that we'll allow the ARM to run at (in KHz). */
-+#define PC3X3_PLL_MAX_KHZ			    700000
-+/* The step between frequencies that the PLL can generate. */
-+#define PC3X3_PLL_STEP				    5000
-+
 +/*
-+ * The fuse block contains an 8 bit number which is the maximum clkf value
-+ * that we can program. If this isn't programmed then allow 700Mhz operation.
-+ * If not, limit the maximum speed to whatever this value corresponds to.
++ * Clocks that aren't controlled by drivers and need to be explicitly
++ * controlled by the PM code. The clocks affected are:
++ *	- TZPC
++ *	- EBI
 + */
-+static unsigned int picoxcell_cpufreq_max_clkf(void)
-+{
-+#define MAX_CLKF_FUSE	904
-+#define MAX_CLKF_REG	IO_ADDRESS(PICOXCELL_FUSE_BASE + 904 / 8)
-+	u8 max_clkf = readb(MAX_CLKF_REG);
++static struct clk *tzpc_clk;
++static struct clk *ebi_clk;
 +
-+	return max_clkf ? ((max_clkf + 1) * 5) / 1000 : PC3X3_PLL_MAX_KHZ;
++static int picoxcell_pm_valid(suspend_state_t state)
++{
++	/*
++	 * We only support standby mode. There is no point in doing anything
++	 * for PM_SUSPEND_MEM as we can't power down the core or the memory
++	 * interfaces.
++	 *
++	 * When we enter standby, the only thing we can do is power down some
++	 * of the peripherals.
++	 */
++	return (state == PM_SUSPEND_ON || state == PM_SUSPEND_STANDBY);
 +}
 +
-+/*
-+ * Initialise the new policy. We allow the PLL to go to the minimum speed but
-+ * limit it to either 700Mhz or the frequency that corresponds to the clkf
-+ * value in ARM_PLL_M_NUMBER fuses in the fuse block (if nonzero), whichever
-+ * is smallest.
-+ *
-+ * A change of 20% should take ~2uS so we specify the transition latency as
-+ * 50uS. This should allow jumps from 400MHz->700MHz within this period.
-+ */
-+static int picoxcell_cpufreq_init_policy(struct cpufreq_policy *policy)
++static void wait_for_event(void)
 +{
-+	policy->cpuinfo.min_freq		= PC3X3_PLL_MIN_KHZ;
-+	policy->cpuinfo.max_freq		= picoxcell_cpufreq_max_clkf();
-+	policy->cpuinfo.transition_latency	= 50000;
-+	policy->cur				= clk_get_rate(cpufreq.arm_clk);
-+	policy->min				= PC3X3_PLL_MIN_KHZ;
-+	policy->max				= picoxcell_cpufreq_max_clkf();
-+
-+	return 0;
++	pr_debug("entering sleep - wait for interrupt\n");
++	/*
++	 * Drain the writebuffer and wait for an interrupt.
++	 */
++	dsb();
++	asm volatile("mcr   p15, 0, %0, c7, c0, 4\n" : : "r"(0));
 +}
 +
-+static int picoxcell_cpufreq_verify(struct cpufreq_policy *policy)
++static void picoxcell_pm_disable_clks(void)
 +{
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+				     policy->cpuinfo.max_freq);
++	pr_debug("disable ebi and tzpc clks\n");
++	clk_disable(tzpc_clk);
++	clk_disable(ebi_clk);
 +
-+	policy->min = clk_round_rate(cpufreq.arm_clk, policy->min);
-+	policy->max = clk_round_rate(cpufreq.arm_clk, policy->max);
-+
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+				     policy->cpuinfo.max_freq);
-+
-+	return 0;
++#ifdef CONFIG_PC3X3_STOP_WDT_IN_SUSPEND
++	syscfg_update(1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX,
++		      1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX);
++#endif /* CONFIG_PC3X3_STOP_WDT_IN_SUSPEND */
 +}
 +
-+static int picoxcell_cpufreq_target(struct cpufreq_policy *policy,
-+				    unsigned int target_freq,
-+				    unsigned int relation)
++static int picoxcell_pm_restore_clks(void)
 +{
-+	int ret = 0;
-+	struct cpufreq_freqs freqs;
++	pr_debug("restore ebi and tzpc clks\n");
 +
-+	if (target_freq > policy->max)
-+		target_freq = policy->max;
-+	if (target_freq < policy->min)
-+		target_freq = policy->min;
-+
-+	target_freq = clk_round_rate(cpufreq.arm_clk, target_freq);
-+
-+	freqs.old = clk_get_rate(cpufreq.arm_clk);
-+	freqs.new = target_freq;
-+	freqs.cpu = policy->cpu;
-+
-+	if (freqs.new == freqs.old)
-+		return 0;
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+
-+	ret = clk_set_rate(cpufreq.arm_clk, target_freq);
-+	if (ret) {
-+		pr_err("unable to set cpufreq rate to %u\n", target_freq);
-+		freqs.new = freqs.old;
++	if (clk_enable(tzpc_clk)) {
++		pr_err("unable to restore tzpc clk\n");
++		return -EBUSY;
 +	}
 +
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	if (clk_enable(ebi_clk)) {
++		pr_err("unable to restore ebi clk\n");
++		return -EBUSY;
++	}
 +
-+	return ret;
++#ifdef CONFIG_PC3X3_STOP_WDT_IN_SUSPEND
++	syscfg_update(1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX, 0);
++#endif /* CONFIG_PC3X3_STOP_WDT_IN_SUSPEND */
++
++	return 0;
 +}
 +
-+static unsigned int picoxcell_cpufreq_get(unsigned int cpu)
++static int picoxcell_pm_enter(suspend_state_t state)
 +{
-+	return (unsigned int)clk_get_rate(cpufreq.arm_clk);
++	int err = 0;
++
++	pr_debug("entering suspend state\n");
++
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++		/*
++		 * Disable any clocks that aren't controlled by drivers but
++		 * need to be enabled. This includes the EBI, TZPC etc.
++		 */
++		picoxcell_pm_disable_clks();
++		wait_for_event();
++		/*
++		 * Reenable any clcoks that aren't controlled by drivers.
++		 */
++		err = picoxcell_pm_restore_clks();
++
++		break;
++
++	case PM_SUSPEND_ON:
++		wait_for_event();
++		break;
++
++	default:
++		err = -EOPNOTSUPP;
++	}
++
++	pr_debug("resumed\n");
++
++	return 0;
 +}
 +
-+static struct cpufreq_driver picoxcell_cpufreq_driver = {
-+	.owner		= THIS_MODULE,
-+	.flags		= CPUFREQ_STICKY,
-+	.name		= "picoxcell",
-+	.init		= picoxcell_cpufreq_init_policy,
-+	.verify		= picoxcell_cpufreq_verify,
-+	.target		= picoxcell_cpufreq_target,
-+	.get		= picoxcell_cpufreq_get,
++static struct platform_suspend_ops picoxcell_pm_ops = {
++	.valid	    = picoxcell_pm_valid,
++	.enter	    = picoxcell_pm_enter,
 +};
 +
-+int __init picoxcell_cpufreq_init(void)
++int __init picoxcell_pm_init(void)
 +{
-+	cpufreq.arm_clk = clk_get(NULL, "arm");
-+
-+	/*
-+	 * If there isn't a clock then there's nothing to do. Some devices
-+	 * e.g. PC3X2 don't have scalable clocks.
-+	 */
-+	if (IS_ERR_OR_NULL(cpufreq.arm_clk)) {
-+		pr_info("cpufreq: no arm clock available - disabling scaling\n");
-+		return 0;
++	ebi_clk = clk_get(NULL, "ebi");
++	if (IS_ERR_OR_NULL(ebi_clk)) {
++		pr_warning("no ebi clock\n");
++		return -ENODEV;
 +	}
 +
-+	return cpufreq_register_driver(&picoxcell_cpufreq_driver);
-+}
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index a912cfe..60bc878 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.c
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -274,4 +274,7 @@ void __init picoxcell_core_init(void)
- 
- 	/* Register the devices. */
- 	picoxcell_add_devices();
++	tzpc_clk = clk_get(NULL, "tzprot_ctl");
++	if (IS_ERR_OR_NULL(tzpc_clk)) {
++		pr_warning("no tzpc clock\n");
++		goto tzpc_clk_fail;
++	}
 +
-+	if (picoxcell_has_feature(PICOXCELL_FEATURE_CPUFREQ))
-+		WARN_ON(picoxcell_cpufreq_init());
- }
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.h b/arch/arm/mach-picoxcell/picoxcell_core.h
-index 9647b7a..f6d90bf 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.h
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.h
-@@ -21,4 +21,13 @@ extern void __init picoxcell_map_io(void);
- extern struct sys_timer picoxcell_sys_timer;
- extern void __init picoxcell_add_devices(void);
- 
-+# ifdef CONFIG_CPU_FREQ
-+extern int __init picoxcell_cpufreq_init(void);
-+# else /* CONFIG_CPU_FREQ */
-+static inline int picoxcell_cpufreq_init(void)
-+{
++	suspend_set_ops(&picoxcell_pm_ops);
++
 +	return 0;
-+}
-+# endif /* CONFIG_CPU_FREQ */
 +
- #endif /* __ASM_ARCH_PICOXCELL_CORE_H__ */
++tzpc_clk_fail:
++	clk_put(ebi_clk);
++
++	return -ENODEV;
++}
 -- 
 1.7.2.3
