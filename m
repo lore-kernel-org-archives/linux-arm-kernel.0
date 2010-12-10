@@ -1,8 +1,10 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Dec 2010 19:17:20 +0000
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 10 Dec 2010 20:25:56 +0100
 Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
 In-Reply-To: <1292004654.13513.38.camel@laptop>
-References: <1291920939.6803.38.camel@twins>
+References: <1291917330.6803.7.camel@twins>
+	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
+	<1291920939.6803.38.camel@twins>
 	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
 	<1291936593.13513.3.camel@laptop>
 	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
@@ -10,42 +12,52 @@ References: <1291920939.6803.38.camel@twins>
 	<1291987635.6803.161.camel@twins> <1291988866.6803.171.camel@twins>
 	<20101210175645.GB28263@n2100.arm.linux.org.uk>
 	<1292004654.13513.38.camel@laptop>
-Message-ID: <20101210191720.GC28263@n2100.arm.linux.org.uk>
+Message-ID: <1292009156.13513.47.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 10, 2010 at 07:10:54PM +0100, Peter Zijlstra wrote:
-> On Fri, 2010-12-10 at 17:56 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Dec 10, 2010 at 02:47:46PM +0100, Peter Zijlstra wrote:
-> > >  inline void update_rq_clock(struct rq *rq)
-> > >  {
-> > > -	int cpu = cpu_of(rq);
-> > > -	u64 irq_time;
-> > > +	s64 delta;
-> > >  
-> > >  	if (rq->skip_clock_update)
-> > >  		return;
-> > >  
-> > > -	rq->clock = sched_clock_cpu(cpu);
-> > > -	irq_time = irq_time_cpu(cpu);
-> > > -	if (rq->clock - irq_time > rq->clock_task)
-> > > -		rq->clock_task = rq->clock - irq_time;
-> > > +	delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
-> > > +	rq->clock += delta;
+On Fri, 2010-12-10 at 19:10 +0100, Peter Zijlstra wrote:
+> > > +   delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
+> > > +   rq->clock += delta;
 > > 
 > > Hmm.  Can you tell me how this is different to:
 > > 
-> > 	new_clock = sched_clock_cpu(cpu_of(rq));
-> > 	delta = new_clock - rq->clock;
-> > 	rq->clock = new_clock;
+> >       new_clock = sched_clock_cpu(cpu_of(rq));
+> >       delta = new_clock - rq->clock;
+> >       rq->clock = new_clock;
 > > 
 > > which I think may be simpler in terms of 64-bit math for 32-bit compilers
 > > to deal with?
 > 
 > Its not, I could write it like that, the only reason I didn't is because
 > it uses an extra variable. If gcc on 32bit targets really generates
-> hideous code for it I'll happily change it.
+> hideous code for it I'll happily change it. 
 
-Well, I can't tell you what kind of code this produces on ARM, as it
-doesn't appear to apply to any kernel I've tried.  So, I assume it's
-against some scheduler development tree rather than Linus' tree?
+Index: linux-2.6/kernel/sched.c
+===================================================================
+--- linux-2.6.orig/kernel/sched.c
++++ linux-2.6/kernel/sched.c
+@@ -1863,6 +1863,7 @@ void account_system_vtime(struct task_st
+ {
+        unsigned long flags;
+        s64 delta;
++       u64 now;
+        int cpu;
+ 
+        if (!sched_clock_irqtime)
+@@ -1870,8 +1871,9 @@ void account_system_vtime(struct task_st
+ 
+        local_irq_save(flags);
+        cpu = smp_processor_id();
+-       delta = sched_clock_cpu(cpu) - per_cpu(irq_start_time, cpu);
+-       per_cpu(irq_start_time, cpu) += delta;
++       now = sched_clock_cpu(cpu);
++       delta = now - per_cpu(irq_start_time, cpu);
++       per_cpu(irq_start_time, cpu) = now;
+ 
+        irq_time_write_begin(cpu);
+ 
+On i386 (gcc (Ubuntu/Linaro 4.4.4-14ubuntu5) 4.4.5):
+
+Before: account_system_vtime: 160 bytes
+After:  account_system_vtime: 214 bytes
