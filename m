@@ -1,48 +1,70 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Fri, 10 Dec 2010 23:00:54 +0000
-Subject: [PATCH 0/9] regulators: Update ab8500 regulator driver
-In-Reply-To: <1291975728-12525-1-git-send-email-bengt.g.jonsson@stericsson.com>
-References: <1291975728-12525-1-git-send-email-bengt.g.jonsson@stericsson.com>
-Message-ID: <1292022054.3422.23.camel@odin>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Fri, 10 Dec 2010 17:45:42 -0600
+Subject: [PATCH] OMAP: omap_device: use pdev as parameter to get rt_va
+Message-ID: <1292024742-27319-1-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-12-10 at 11:08 +0100, Bengt Jonsson wrote:
-> This patchset updates the ab8500 regulator driver:
-> * The first patch modifies the ab8500 platform configuration structure.
-> * Patches two through eight updates the ab8500 regulator driver.
-> * The ninth patch modifies the ab8500 regulator configuration.
-> 
-> The eighth patch is optional as discussed before.
-> 
-> Bengt Jonsson (9):
->   regulators: Moved define for number of regulators in ab8500
->   regulators: Fixed errors in ab8500 register mapping
->   regulators: Clean out unused code in ab8500 regulators
->   regulators: Added ab8500 v2 support
->   regulators: Updated ab8500 variable names, macro names and comments
->   regulators: Modified ab8500 error handling
->   regulators: Added verbose debug messages to ab8500 regulators
->   regulators: Removed macros for initialization of ab8500 regulators
->   mach-ux500: Updated and connected ab8500 regulator board
->     configuration
-> 
->  arch/arm/mach-ux500/board-mop500-regulators.c |  153 ++++-----
->  arch/arm/mach-ux500/board-mop500-regulators.h |   19 +
->  arch/arm/mach-ux500/board-mop500.c            |    3 +
->  drivers/regulator/ab8500.c                    |  448 +++++++++++++++++--------
->  include/linux/mfd/ab8500.h                    |    5 +-
->  include/linux/regulator/ab8500.h              |   24 +-
->  6 files changed, 426 insertions(+), 226 deletions(-)
->  create mode 100644 arch/arm/mach-ux500/board-mop500-regulators.h
-> 
+Make the parameter received by omap_device_get_mpu_rt_va
+consistent with the functions meant to be called by drivers.
 
-All applied.
+Also move its header declaration to appear in the set of
+functions to be used by drivers, as per the comment there.
 
-Thanks
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+ arch/arm/plat-omap/include/plat/omap_device.h |    3 +--
+ arch/arm/plat-omap/omap_device.c              |    8 ++++++--
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
-Liam
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 28e2d1a..1877c1a 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -80,6 +80,7 @@ struct omap_device {
+ int omap_device_enable(struct platform_device *pdev);
+ int omap_device_idle(struct platform_device *pdev);
+ int omap_device_shutdown(struct platform_device *pdev);
++void __iomem *omap_device_get_rt_va(struct platform_device *pdev);
+ 
+ /* Core code interface */
+ 
+@@ -101,8 +102,6 @@ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ int omap_device_register(struct omap_device *od);
+ int omap_early_device_register(struct omap_device *od);
+ 
+-void __iomem *omap_device_get_rt_va(struct omap_device *od);
+-
+ /* OMAP PM interface */
+ int omap_device_align_pm_lat(struct platform_device *pdev,
+ 			     u32 new_wakeup_lat_limit);
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index abe933c..9d11195 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -681,7 +681,7 @@ struct powerdomain *omap_device_get_pwrdm(struct omap_device *od)
+ 
+ /**
+  * omap_device_get_mpu_rt_va - return the MPU's virtual addr for the hwmod base
+- * @od: struct omap_device *
++ * @pdev: struct platform_device *
+  *
+  * Return the MPU's virtual address for the base of the hwmod, from
+  * the ioremap() that the hwmod code does.  Only valid if there is one
+@@ -690,8 +690,12 @@ struct powerdomain *omap_device_get_pwrdm(struct omap_device *od)
+  * otherwise, passes along the return value from
+  * omap_hwmod_get_mpu_rt_va().
+  */
+-void __iomem *omap_device_get_rt_va(struct omap_device *od)
++void __iomem *omap_device_get_rt_va(struct platform_device *pdev)
+ {
++	struct omap_device *od;
++
++	od = _find_by_pdev(pdev);
++
+ 	if (od->hwmods_cnt != 1)
+ 		return NULL;
+ 
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+1.7.1
