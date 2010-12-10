@@ -1,52 +1,57 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 10 Dec 2010 22:03:52 +0100
-Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
-In-Reply-To: <20101210170356.GA28472@n2100.arm.linux.org.uk>
-References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
-	<201012101203.09441.jkrzyszt@tis.icnet.pl>
-	<20101210170356.GA28472@n2100.arm.linux.org.uk>
-Message-ID: <201012102203.54413.jkrzyszt@tis.icnet.pl>
+From: cl@linux.com (Christoph Lameter)
+Date: Fri, 10 Dec 2010 15:09:08 -0600 (CST)
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <1292014165.2746.9.camel@edumazet-laptop>
+References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
+	<1291851079-27061-1-git-send-email-venki@google.com>
+	<1291899120.29292.7.camel@twins>
+	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
+	<1291917330.6803.7.camel@twins>
+	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
+	<1291920939.6803.38.camel@twins>
+	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+	<1291936593.13513.3.camel@laptop>
+	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
+	<1291975704.6803.59.camel@twins> <1291987065.6803.151.camel@twins>
+	<1291987635.6803.161.camel@twins> <1291988866.6803.171.camel@twins>
+	<1292001500.3580.268.camel@edumazet-laptop>
+	<1292003346.13513.30.camel@laptop>
+	<1292004859.3580.387.camel@edumazet-laptop>
+	<alpine.DEB.2.00.1012101236300.13986@router.home>
+	<1292006788.13513.43.camel@laptop>
+	<alpine.DEB.2.00.1012101344570.13986@router.home>
+	<1292011644.13513.61.camel@laptop>
+	<alpine.DEB.2.00.1012101410571.13986@router.home>
+	<1292013590.2746.2.camel@edumazet-laptop>
+	<1292014165.2746.9.camel@edumazet-laptop>
+Message-ID: <alpine.DEB.2.00.1012101505250.13986@router.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Friday 10 December 2010 18:03:56 Russell King - ARM Linux napisa?(a):
-> On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
-> >  void __init omap1_camera_init(void *info)
-> >  {
-> >  	struct platform_device *dev = &omap1_camera_device;
-> > +	dma_addr_t paddr = omap1_camera_phys_mempool_base;
-> > +	dma_addr_t size = omap1_camera_phys_mempool_size;
-> >  	int ret;
-> >
-> >  	dev->dev.platform_data = info;
-> >
-> > +	if (paddr) {
-> > +		if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
-> > +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
->
-> Although this works, you're ending up with SDRAM being mapped via
-> ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
-> mapped as if it were a device.
->
-> For OMAP1, which is ARMv5 or lower, device memory becomes 'uncacheable,
-> unbufferable' which is luckily what is used for the DMA coherent
-> memory on those platforms - so no technical problem here.
->
-> However, on ARMv6 and later, ioremapped memory is device memory, which
-> has different ordering wrt normal memory mappings, and may appear on
-> different busses on the CPU's interface.  So, this is something I don't
-> encourage as it's unclear that the hardware will work.
->
-> Essentially, dma_declare_coherent_memory() on ARM with main SDRAM should
-> be viewed as a 'it might work, it might not, and it might stop working
-> in the future' kind of interface.  In other words, there is no guarantee
-> that this kind of thing will be supported in the future.
+On Fri, 10 Dec 2010, Eric Dumazet wrote:
 
-I was affraid of an unswer of this kind. I'm not capable of comming out with 
-any better, alternative solutions. Any hints other than giving up with that 
-old videobuf-contig, coherent memory based interface? Or can we agree on 
-that 'luckily uncacheable, unbufferable, SDRAM based DMA coherent memory' 
-solution for now?
+>
+> By the way, we need smp_wmb(), not barrier(), even only the "owner cpu"
+> can write into its 'percpu' seqcount.
+>
+> There is nothing special about a seqcount being percpu or a 'global'
+> one. We must have same memory barrier semantics.
 
-Thanks,
-Janusz
+There is certainly a major difference in that execution of a stream of
+instructions on the same cpu is guaranteed to have a coherent view of
+the data. That is not affected by interrupts etc.
+
+>
+> 	this_cpu_write_seqcount_begin(&myseqcount);
+> 	this_cpu_add(mydata1, add1);
+> 	this_cpu_add(mydata2, add2);
+> 	this_cpu_inc(mydata3);
+> 	this_cpu_write_seqcount_end(&myseqcount);
+>
+> We protect the data[1,2,3] set with a seqcount, so need smp_wmb() in
+> both _begin() and _end()
+
+There is nothing to protect there since processing is on the same cpu. The
+data coherency guarantees of the processor will not allow anything out of
+sequence to affect execution. An interrupt f.e. will not cause updates to
+mydata1 to get lost.
