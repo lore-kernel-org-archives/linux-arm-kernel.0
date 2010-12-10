@@ -1,132 +1,127 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 10 Dec 2010 16:28:11 +0000
-Subject: [PATCH v3 00/14] ARM: add initial support for Picochip picoXcell SoC
-Message-ID: <1291998505-25891-1-git-send-email-jamie@jamieiles.com>
+Date: Fri, 10 Dec 2010 16:28:13 +0000
+Subject: [PATCH v3 02/14] picoxcell: add support for AXI bus snoopers
+In-Reply-To: <1291998505-25891-1-git-send-email-jamie@jamieiles.com>
+References: <1291998505-25891-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <1291998505-25891-3-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The picoXcell devices have a number of peripherals that may perform
+master accesses to the AXI bus, but if incorrectly programmed can
+generate a bus error. The AXI2CFG block has bus snoopers that monitor
+the bus for errors from other masters and raises an interrupt if
+detected. These errors are typically irrecoverable so panic if we see
+them.
 
-This patch series adds support for the Picochip picoXcell series of
-femtocell SoC's. There are currently two device families - PC3X2 and
-PC3X3. Both include an ARM1176JZ-S, 100Mb Ethernet controller, 2xDMA
-controllers, eFuses, crypto offload engines and Picochip's array
-processor the picoArray. This patch series adds support for the base
-chip support including timers, gpio, pin muxing, clocks and pm and also
-the PC7302 development board that can take either PC3X2 or PC3X3 devices.
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/mach-picoxcell/picoxcell_core.c |   88 ++++++++++++++++++++++++++++++
+ 1 files changed, 88 insertions(+), 0 deletions(-)
 
-This patch series is based off of RMK's devel branch to get the CLKDEV_LOOKUP
-changes and also requires the following patches:
-
-    - 8250: add a UPIO_DWAPB32 for 32 bit accesses (v2):
-    http://marc.info/?l=linux-serial&m=129043658715199&w=2
-    - debug-8250: add a 32 bit mode:
-    http://marc.info/?l=linux-arm-kernel&m=129044061221371&w=2
-
-This series is sent as v3 as I sent some individual follow up patches as v2.
-I'll repost as a whole series for subsequent reviews. I've taken on board
-Russell's comments and added support for the onchip SRAM (based on the DaVinci
-SRAM allocator). Individual changelogs are in the patches themselves.
-
-Jamie Iles (14):
-  picoxcell: add support for picoXcell
-  picoxcell: add support for AXI bus snoopers
-  picoxcell: add support for the system timers
-  picoxcell: add a pin muxing infrastructure
-  picoxcell: add gpio infrastructure
-  picoxcell: add support for system clks
-  picoxcell: add common SoC devices
-  picoxcell: add cpufreq support
-  picoxcell: add support for pm
-  picoxcell: add chained GPIO IRQ handlers
-  picoxcell: add support for pc3x2 devices
-  picoxcell: add support for pc3x3 devices
-  picoxcell: add support for the onchip SRAM
-  picoxcell: add support for the PC7302 development board
-
- arch/arm/Kconfig                                   |   17 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/configs/picoxcell_defconfig               |  103 ++
- arch/arm/mach-picoxcell/Kconfig                    |   47 +
- arch/arm/mach-picoxcell/Makefile                   |   12 +
- arch/arm/mach-picoxcell/Makefile.boot              |    3 +
- arch/arm/mach-picoxcell/axi2cfg.c                  |  167 +++
- arch/arm/mach-picoxcell/board_pc7302.c             |  206 +++
- arch/arm/mach-picoxcell/clk.c                      |  134 ++
- arch/arm/mach-picoxcell/cpufreq.c                  |  145 +++
- arch/arm/mach-picoxcell/devices.c                  |  118 ++
- arch/arm/mach-picoxcell/gpio.c                     |  712 +++++++++++
- arch/arm/mach-picoxcell/include/mach/clkdev.h      |   71 +
- arch/arm/mach-picoxcell/include/mach/debug-macro.S |   18 +
- arch/arm/mach-picoxcell/include/mach/entry-macro.S |   19 +
- arch/arm/mach-picoxcell/include/mach/gpio.h        |  189 +++
- arch/arm/mach-picoxcell/include/mach/hardware.h    |   29 +
- arch/arm/mach-picoxcell/include/mach/io.h          |   38 +
- arch/arm/mach-picoxcell/include/mach/irqs.h        |   89 ++
- arch/arm/mach-picoxcell/include/mach/memory.h      |   27 +
- .../include/mach/picoxcell/axi2cfg.h               |  169 +++
- .../mach-picoxcell/include/mach/picoxcell/gpio.h   |   48 +
- .../include/mach/picoxcell/picoxcell.h             |   62 +
- .../mach-picoxcell/include/mach/picoxcell/timer.h  |   37 +
- .../mach-picoxcell/include/mach/picoxcell/wdog.h   |   43 +
- arch/arm/mach-picoxcell/include/mach/platform.h    |   27 +
- arch/arm/mach-picoxcell/include/mach/sram.h        |   28 +
- arch/arm/mach-picoxcell/include/mach/system.h      |   51 +
- arch/arm/mach-picoxcell/include/mach/timex.h       |   26 +
- arch/arm/mach-picoxcell/include/mach/uncompress.h  |   60 +
- arch/arm/mach-picoxcell/include/mach/vmalloc.h     |   18 +
- arch/arm/mach-picoxcell/io.c                       |   57 +
- arch/arm/mach-picoxcell/mux.c                      |  402 ++++++
- arch/arm/mach-picoxcell/mux.h                      |  110 ++
- arch/arm/mach-picoxcell/pc3x2.c                    |  437 +++++++
- arch/arm/mach-picoxcell/pc3x3.c                    | 1336 ++++++++++++++++++++
- arch/arm/mach-picoxcell/picoxcell_core.c           |  343 +++++
- arch/arm/mach-picoxcell/picoxcell_core.h           |   42 +
- arch/arm/mach-picoxcell/pm.c                       |  146 +++
- arch/arm/mach-picoxcell/soc.h                      |   61 +
- arch/arm/mach-picoxcell/sram.c                     |   66 +
- arch/arm/mach-picoxcell/time.c                     |  255 ++++
- 42 files changed, 5969 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/picoxcell_defconfig
- create mode 100644 arch/arm/mach-picoxcell/Kconfig
- create mode 100644 arch/arm/mach-picoxcell/Makefile
- create mode 100644 arch/arm/mach-picoxcell/Makefile.boot
- create mode 100644 arch/arm/mach-picoxcell/axi2cfg.c
- create mode 100644 arch/arm/mach-picoxcell/board_pc7302.c
- create mode 100644 arch/arm/mach-picoxcell/clk.c
- create mode 100644 arch/arm/mach-picoxcell/cpufreq.c
- create mode 100644 arch/arm/mach-picoxcell/devices.c
- create mode 100644 arch/arm/mach-picoxcell/gpio.c
- create mode 100644 arch/arm/mach-picoxcell/include/mach/clkdev.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-picoxcell/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-picoxcell/include/mach/gpio.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/hardware.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/io.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/irqs.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/memory.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/picoxcell/axi2cfg.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/picoxcell/gpio.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/picoxcell/picoxcell.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/picoxcell/timer.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/picoxcell/wdog.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/platform.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/sram.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/system.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/timex.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-picoxcell/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-picoxcell/io.c
- create mode 100644 arch/arm/mach-picoxcell/mux.c
- create mode 100644 arch/arm/mach-picoxcell/mux.h
- create mode 100644 arch/arm/mach-picoxcell/pc3x2.c
- create mode 100644 arch/arm/mach-picoxcell/pc3x3.c
- create mode 100644 arch/arm/mach-picoxcell/picoxcell_core.c
- create mode 100644 arch/arm/mach-picoxcell/picoxcell_core.h
- create mode 100644 arch/arm/mach-picoxcell/pm.c
- create mode 100644 arch/arm/mach-picoxcell/soc.h
- create mode 100644 arch/arm/mach-picoxcell/sram.c
- create mode 100644 arch/arm/mach-picoxcell/time.c
-
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
+index e2c996a..9ce3ebd 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.c
++++ b/arch/arm/mach-picoxcell/picoxcell_core.c
+@@ -153,6 +153,91 @@ static void __init picoxcell_debugfs_init(void)
+ 	}
+ }
+ 
++/*
++ * AXI Bus Read / Write Error Handling
++ *
++ * Some of the peripherals on the AXI bus can generate aborts. For example, a
++ * DMAC trying to DMA from the EBI. This isn't supported and will generate an
++ * error response. This can't be recovered from so we report the error and
++ * panic.
++ *
++ * Given a bit number in the AXI2Cfg snoop AXI error IRQ post mask register,
++ * give the textual name of the operation that generated the error.
++ */
++static const char *axi_bus_error_name(int bit)
++{
++	static const char *snoop_err_names[32] = {
++		[0]	= "dmac1_channel0 (read)",
++		[1]	= "dmac1_channel1 (read)",
++		[2]	= "dmac1_channel2 (read)",
++		[3]	= "dmac1_channel3 (read)",
++		[4]	= "dmac2_channel0 (read)",
++		[5]	= "dmac2_channel1 (read)",
++		[6]	= "dmac2_channel2 (read)",
++		[7]	= "dmac2_channel3 (read)",
++		[8]	= "emac (read)",
++		[9]	= "cipher (read)",
++		[10]	= "srtp (read)",
++		[11]	= "ipsec (read)",
++		[12]	= "dmac1_channel0 (write)",
++		[13]	= "dmac1_channel1 (write)",
++		[14]	= "dmac1_channel2 (write)",
++		[15]	= "dmac1_channel3 (write)",
++		[16]	= "dmac2_channel0 (write)",
++		[17]	= "dmac2_channel1 (write)",
++		[18]	= "dmac2_channel2 (write)",
++		[19]	= "dmac2_channel3 (write)",
++		[20]	= "emac (write)",
++		[21]	= "cipher (write)",
++		[22]	= "srtp (write)",
++		[23]	= "ipsec (write)",
++	};
++
++	return snoop_err_names[bit] ?: "<INVALID SNOOP ERROR>";
++}
++
++/* AXI Bus write errors */
++static irqreturn_t picoxcell_axi_bus_error_interrupt(int irq, void *dev_id)
++{
++	/*
++	 * If we ever get one of these interrupts then we are in big trouble,
++	 * they should never happen. The error condition is non recoverable.
++	 */
++	unsigned long axi_error =
++		axi2cfg_readl(AXI2CFG_AXI_ERR_STATE_REG_OFFSET);
++	int bit;
++
++	for_each_set_bit(bit, &axi_error, 32) {
++		pr_emerg("AXI bus error [%s] detected\n",
++			 axi_bus_error_name(bit));
++	}
++	panic("unable to handle AXI bus error");
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction picoxcell_axi_error_irq = {
++	.name	    = "picoxcell axi bus error",
++	.flags	    = IRQF_DISABLED,
++	.handler    = picoxcell_axi_bus_error_interrupt,
++};
++
++/* Initialise AXI Bus error handling */
++static void __init picoxcell_axi_bus_error_init(void)
++{
++	/* Setup the irq handler for AXI read and write errors. */
++	setup_irq(IRQ_AXI_RD_ERR, &picoxcell_axi_error_irq);
++	setup_irq(IRQ_AXI_WR_ERR, &picoxcell_axi_error_irq);
++
++	/* Make sure no AXI errors are masked */
++	axi2cfg_writel(AXI2CFG_AXI_ERR_MASK_NONE,
++		       AXI2CFG_AXI_ERR_MASK_REG_OFFSET);
++
++	/* Enable interrupts for all AXI Read & Write errors */
++	axi2cfg_writel(AXI2CFG_AXI_ERR_ENABLE_ALL,
++		       AXI2CFG_AXI_ERR_ENABLE_REG_OFFSET);
++}
++
+ void __init picoxcell_core_init(void)
+ {
+ 	struct picoxcell_soc *soc = picoxcell_get_soc();
+@@ -171,4 +256,7 @@ void __init picoxcell_core_init(void)
+ 
+ 	/* Add the arch debugfs entry. */
+ 	picoxcell_debugfs_init();
++
++	/* Add handlers for the AXI bus snooping. */
++	picoxcell_axi_bus_error_init();
+ }
 -- 
 1.7.2.3
