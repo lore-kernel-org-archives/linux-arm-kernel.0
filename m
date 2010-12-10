@@ -1,39 +1,47 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Dec 2010 11:27:51 +0900
-Subject: [PATCH 0/4 v2] ARM: S5P: Add platform support for MIPI-CSI slave
-	devices
-In-Reply-To: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>
-References: <1291405965-19482-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <026801cb9811$da775230$8f65f690$%kim@samsung.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 10 Dec 2010 03:39:08 +0000
+Subject: [PATCH] mmci: drop superfluous regulator #ifdef
+In-Reply-To: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
+References: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101210033908.GA4455@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> Hello,
-> 
-Hi,
+Hi Linus,
 
-> the following is a second version of patch series adding S5P platform
-support
-> for MIPI-CSIS devices. Hopefully all the comments have been addressed,
-> if not please let me know.
+On Thu, Dec 02, 2010 at 02:36:58PM +0100, Linus Walleij wrote:
+> The regulator and MMC frameworks provide the proper stub functions
+> for the regulator functions anyway, get rid of this.
 > 
-> [PATCH 1/4 v2] ARM: S5PV210: Add resource definitions for MIPI CSIS
-> [PATCH 2/4 v2] ARM: S5PV310: Add resource definitions for MIPI CSIS
-> [PATCH 3/4 v2] ARM: S5P: Add platform support for MIPI CSIS devices
-> [PATCH 4/4 v2] ARM: S5PV210: Add clock definition for MIPI-CSIS DPHY
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  drivers/mmc/host/mmci.c |    3 +--
+>  1 files changed, 1 insertions(+), 2 deletions(-)
 > 
-> Rebased onto for-next branch at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> 
-Looks ok to me 1st, 2nd and 3rd to me...will apply.
-And will check your 4th patch also soon.
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 3709ab3..7567872 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -844,7 +844,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+>  		mmc->f_max = min(host->mclk, fmax);
+>  	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+>  
+> -#ifdef CONFIG_REGULATOR
+>  	/* If we're using the regulator framework, try to fetch a regulator */
+>  	host->vcc = regulator_get(&dev->dev, "vmmc");
+>  	if (IS_ERR(host->vcc))
+> @@ -863,7 +862,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+>  				 "(using regulator instead)\n");
+>  		}
+>  	}
+> -#endif
+> +
+>  	/* Fall back to platform data if no regulator is found */
+>  	if (host->vcc == NULL)
+>  		mmc->ocr_avail = plat->ocr_mask;
 
-Thanks.
+Thanks, pushed to mmc-next for .38.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
