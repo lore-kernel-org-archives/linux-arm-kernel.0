@@ -1,25 +1,48 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 10 Dec 2010 17:54:15 +0100
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <20101210165021.GA28263@n2100.arm.linux.org.uk>
-References: <1291917330.6803.7.camel@twins>
-	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
-	<1291920939.6803.38.camel@twins>
-	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
-	<1291936593.13513.3.camel@laptop>
-	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
-	<1291975704.6803.59.camel@twins> <1291987065.6803.151.camel@twins>
-	<1291987635.6803.161.camel@twins> <1291988866.6803.171.camel@twins>
-	<20101210165021.GA28263@n2100.arm.linux.org.uk>
-Message-ID: <1292000055.13513.26.camel@laptop>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 10 Dec 2010 08:56:28 -0800
+Subject: [PATCH v7 11/12] davinci: add tnetv107x evm backlight device
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247CD8CE8@dbde02.ent.ti.com>
+	(Sekhar Nori's message of "Fri, 10 Dec 2010 21:31:59 +0530")
+References: <1291733522-3626-1-git-send-email-cyril@ti.com>
+	<1291733522-3626-12-git-send-email-cyril@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247CD83E1@dbde02.ent.ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247CD84F4@dbde02.ent.ti.com>
+	<4D00EEA1.8070201@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247CD8CE8@dbde02.ent.ti.com>
+Message-ID: <87aakdd0sj.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-12-10 at 16:50 +0000, Russell King - ARM Linux wrote:
-> > Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> 
-> I think credit should go to Mikael Pettersson, who identified the
-> interactivity regression and problematical commit.  I only pointed
-> out the dubious nature of the code. 
+"Nori, Sekhar" <nsekhar@ti.com> writes:
 
-Ah, thanks, missed that. Updated the patch.
+> On Thu, Dec 09, 2010 at 20:28:41, Chemparathy, Cyril wrote:
+>> On 12/09/2010 06:00 AM, Nori, Sekhar wrote:
+>> > On Thu, Dec 09, 2010 at 14:25:49, Nori, Sekhar wrote:
+>> >
+>> >> This call should simply return if machine is not tnetv107x EVM.
+>> >>
+>> >> I didn't follow the entire series but wondering why
+>> >> platform device registration should be a late init call.
+>> >> Typically the driver probe can be made a late init call
+>> >> in case of init sequence dependencies.
+>> >
+>> > I meant driver init, not probe.
+>>
+>> This was done to handle driver dependencies, and is meant to be
+>> temporary (until a real driver dependency framework comes in).
+>>
+>> Please see [1] for a bit more of background on changing drivers to use
+>> module_init().
+>
+> Hmm, okay. Please include a check for machine in that case.
+>
+
+Sekhar is right.  
+
+Today, we don't (can't) build this machine with others for a couple
+reasons, but we're moving towards removing those restrictions, so when
+this machine is included in a binary with others, it needs to check.
+
+Thanks,
+
+Kevin
