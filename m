@@ -1,45 +1,51 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Fri, 10 Dec 2010 12:47:02 -0600
-Subject: [PATCH] OMAP: device: make rt_va easily avaialable to drivers
-In-Reply-To: <87oc8uc1dg.fsf@deeprootsystems.com>
-References: <1291852792-3584-1-git-send-email-omar.ramirez@ti.com>
-	<87oc8uc1dg.fsf@deeprootsystems.com>
-Message-ID: <AANLkTi=mGG5mRUP9VpH5AfPn1irNXn-+sZTFwjhG6_Jp@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Dec 2010 19:17:20 +0000
+Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
+In-Reply-To: <1292004654.13513.38.camel@laptop>
+References: <1291920939.6803.38.camel@twins>
+	<AANLkTim+v21RpWobdw6exEbazDJwm4JjemPVB2+3PuRJ@mail.gmail.com>
+	<1291936593.13513.3.camel@laptop>
+	<AANLkTi=_qf8NAgj2HHMP0qG-ibnH-726NzoXbxd-bS1N@mail.gmail.com>
+	<1291975704.6803.59.camel@twins> <1291987065.6803.151.camel@twins>
+	<1291987635.6803.161.camel@twins> <1291988866.6803.171.camel@twins>
+	<20101210175645.GB28263@n2100.arm.linux.org.uk>
+	<1292004654.13513.38.camel@laptop>
+Message-ID: <20101210191720.GC28263@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 9, 2010 at 11:16 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Omar Ramirez Luna <omar.ramirez@ti.com> writes:
->
->> Patch "OMAP: hwmod/device: add omap_{device, hwmod}_get_mpu_rt_va"[1],
->> introduces omap_device_get_rt_va which is meant to be called
->> by drivers to retrieve the _mpu_rt_va, however this function
->> receives a pointer to an omap_device; since there is no
->> practical way for a driver to get this parameter without
->> fiddling with pdev and container_of macro, and omap_device code
->> already does this, it is better for it to handle this case.
->>
->> Also moved header declaration to appear in the set of
->> functions to be used by drivers, as per the comment there.
->>
->> [1] http://marc.info/?l=linux-omap&m=127808467703366&w=2
->>
->> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
->
-> Looks right, since all the other driver-accessible functions take a
-> platform_device pointer, not an omap_device pointer.
->
-> Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
->
-> However, I thing the subject/shortlog should be clearer. ?IMO, this
-> patch makes the API more consistent rather than making it easier.
-> Also, subject prefix should be preferrably 'OMAP: omap_device:'.
+On Fri, Dec 10, 2010 at 07:10:54PM +0100, Peter Zijlstra wrote:
+> On Fri, 2010-12-10 at 17:56 +0000, Russell King - ARM Linux wrote:
+> > On Fri, Dec 10, 2010 at 02:47:46PM +0100, Peter Zijlstra wrote:
+> > >  inline void update_rq_clock(struct rq *rq)
+> > >  {
+> > > -	int cpu = cpu_of(rq);
+> > > -	u64 irq_time;
+> > > +	s64 delta;
+> > >  
+> > >  	if (rq->skip_clock_update)
+> > >  		return;
+> > >  
+> > > -	rq->clock = sched_clock_cpu(cpu);
+> > > -	irq_time = irq_time_cpu(cpu);
+> > > -	if (rq->clock - irq_time > rq->clock_task)
+> > > -		rq->clock_task = rq->clock - irq_time;
+> > > +	delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
+> > > +	rq->clock += delta;
+> > 
+> > Hmm.  Can you tell me how this is different to:
+> > 
+> > 	new_clock = sched_clock_cpu(cpu_of(rq));
+> > 	delta = new_clock - rq->clock;
+> > 	rq->clock = new_clock;
+> > 
+> > which I think may be simpler in terms of 64-bit math for 32-bit compilers
+> > to deal with?
+> 
+> Its not, I could write it like that, the only reason I didn't is because
+> it uses an extra variable. If gcc on 32bit targets really generates
+> hideous code for it I'll happily change it.
 
-I saw few patches following the convention "OMAP: device" that's why I
-followed that one, I will change the subject/changelog according to
-your suggestions.
-
-Thanks,
-
-Omar
+Well, I can't tell you what kind of code this produces on ARM, as it
+doesn't appear to apply to any kernel I've tried.  So, I assume it's
+against some scheduler development tree rather than Linus' tree?
