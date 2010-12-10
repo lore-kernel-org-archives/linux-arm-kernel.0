@@ -1,102 +1,34 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Dec 2010 09:50:16 +0000
-Subject: [PATCH] ARM: V6 MPCore v6_dma_inv_range and v6_dma_flush_range
-	RWFO fix
-In-Reply-To: <20101210052604.GA13313@mvista.com>
-References: <1290622059.3056.41.camel@e102109-lin.cambridge.arm.com>
-	<20101124183936.GA18796@mvista.com> <20101210052604.GA13313@mvista.com>
-Message-ID: <1291974616.13511.1.camel@e102109-lin.cambridge.arm.com>
+Date: Fri, 10 Dec 2010 10:00:12 +0000
+Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
+In-Reply-To: <4D017B45.4000805@codeaurora.org>
+References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
+	<20101202221909.GK29347@n2100.arm.linux.org.uk>
+	<4CF94DDD.8000409@codeaurora.org>
+	<20101203203653.GB10245@n2100.arm.linux.org.uk>
+	<4CFDD297.4020600@codeaurora.org>
+	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
+	<20101209103835.GA31465@n2100.arm.linux.org.uk>
+	<4D017B45.4000805@codeaurora.org>
+Message-ID: <AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-12-10 at 05:26 +0000, George G. Davis wrote:
-> On Wed, Nov 24, 2010 at 09:39:36PM +0300, Valentine Barshak wrote:
-> > Updated according to the comments to avoid r/w outside the buffer and
-> > used byte r/w for the possible unaligned data. Seems to work fine.
-> >
-> > Cache ownership must be acqired by reading/writing data from the
-> > cache line to make cache operation have the desired effect on the
-> > SMP MPCore CPU. However, the ownership is never aquired in the
-> > v6_dma_inv_range function when cleaning the first line and
-> > flushing the last one, in case the address is not aligned
-> > to D_CACHE_LINE_SIZE boundary.
-> > Fix this by reading/writing data if needed, before performing
-> > cache operations.
-> > While at it, fix v6_dma_flush_range to prevent RWFO outside
-> > the buffer.
-> >
-> > Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
-> > Signed-off-by: George G. Davis <gdavis@mvista.com>
-> > ---
-> >  arch/arm/mm/cache-v6.S |   40 ++++++++++++++++++++++++++--------------
-> >  1 files changed, 26 insertions(+), 14 deletions(-)
-> >
-> > diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-> > index 99fa688..622f8a1 100644
-> > --- a/arch/arm/mm/cache-v6.S
-> > +++ b/arch/arm/mm/cache-v6.S
-> > @@ -203,25 +203,29 @@ ENTRY(v6_flush_kern_dcache_area)
-> >   *   - end     - virtual end address of region
-> >   */
-> >  v6_dma_inv_range:
-> > -     tst     r0, #D_CACHE_LINE_SIZE - 1
-> > -     bic     r0, r0, #D_CACHE_LINE_SIZE - 1
-> > -#ifdef HARVARD_CACHE
-> > -     mcrne   p15, 0, r0, c7, c10, 1          @ clean D line
-> > -#else
-> > -     mcrne   p15, 0, r0, c7, c11, 1          @ clean unified line
-> > -#endif
-> >       tst     r1, #D_CACHE_LINE_SIZE - 1
-> > +#ifdef CONFIG_DMA_CACHE_RWFO
-> > +     ldrneb  r2, [r1, #-1]                   @ read for ownership
-> > +     strneb  r2, [r1, #-1]                   @ write for ownership
-> > +#endif
-> >       bic     r1, r1, #D_CACHE_LINE_SIZE - 1
-> >  #ifdef HARVARD_CACHE
-> >       mcrne   p15, 0, r1, c7, c14, 1          @ clean & invalidate D line
-> >  #else
-> >       mcrne   p15, 0, r1, c7, c15, 1          @ clean & invalidate unified line
-> >  #endif
-> > -1:
-> >  #ifdef CONFIG_DMA_CACHE_RWFO
-> > -     ldr     r2, [r0]                        @ read for ownership
-> > -     str     r2, [r0]                        @ write for ownership
-> > +     ldrb    r2, [r0]                        @ read for ownership
-> > +     strb    r2, [r0]                        @ write for ownership
-> > +#endif
-> > +     tst     r0, #D_CACHE_LINE_SIZE - 1
-> > +     bic     r0, r0, #D_CACHE_LINE_SIZE - 1
-> > +#ifdef HARVARD_CACHE
-> > +     mcrne   p15, 0, r0, c7, c10, 1          @ clean D line
-> > +#else
-> > +     mcrne   p15, 0, r0, c7, c11, 1          @ clean unified line
-> >  #endif
-> > +1:
-> >  #ifdef HARVARD_CACHE
-> >       mcr     p15, 0, r0, c7, c6, 1           @ invalidate D line
-> >  #else
-> > @@ -229,6 +233,10 @@ v6_dma_inv_range:
-> >  #endif
-> >       add     r0, r0, #D_CACHE_LINE_SIZE
-> >       cmp     r0, r1
-> > +#ifdef CONFIG_DMA_CACHE_RWFO
-> > +     ldrlo   r2, [r0]                        @ read for ownership
-> > +     strlo   r2, [r0]                        @ write for ownership
-> > +#endif
-> >       blo     1b
-> >       mov     r0, #0
-> >       mcr     p15, 0, r0, c7, c10, 4          @ drain write buffer
-> 
-> Just a minor nit...
-> 
-> Any reason for rearranging the order of 'start'/'end' parameters in the
-> above changes?  It's not clear that there is any performance benefit by
-> rearranging those parameters and it obfuscates the changes, e.g. this
-> is equivalent to your change above and also much clearer:
+On 10 December 2010 00:58, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Russell King - ARM Linux wrote:
+>>
+>> On Thu, Dec 09, 2010 at 01:23:24AM -0800, skannan at codeaurora.org wrote:
+>>>
+>>> Russell, Have you had a chance to look at this? Any comments? How do we
+>>> move ahead?
+>>
+>> I had connected the other thread with this one - it's pretty hard not
+>> to as it included this patch in that set as the first patch.
+>
+> Ok. So what's your take on handling the cache coherency with secure domain?
+> Do we get to add cache invalidate APIs outside of DMA APIs?
 
-I've been wondering about this as well. But I was too lazy to rewrite it
-and see whether there is a performance benefit in the original patch. I
-agree that yours looks cleaner.
+Can the secure software not create NS pages and be fully coherent?
 
 -- 
 Catalin
