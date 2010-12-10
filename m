@@ -1,34 +1,48 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 10 Dec 2010 14:12:03 -0800
-Subject: [PATCH] msm: iommu: Use the correct memory allocation flag
-Message-ID: <1292019123-6044-1-git-send-email-stepanm@codeaurora.org>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Fri, 10 Dec 2010 23:00:54 +0000
+Subject: [PATCH 0/9] regulators: Update ab8500 regulator driver
+In-Reply-To: <1291975728-12525-1-git-send-email-bengt.g.jonsson@stericsson.com>
+References: <1291975728-12525-1-git-send-email-bengt.g.jonsson@stericsson.com>
+Message-ID: <1292022054.3422.23.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change msm_iommu_map to use GFP_ATOMIC instead of
-GFP_KERNEL due to the fact that the call occurs within
-a spinlock-protected region.
+On Fri, 2010-12-10 at 11:08 +0100, Bengt Jonsson wrote:
+> This patchset updates the ab8500 regulator driver:
+> * The first patch modifies the ab8500 platform configuration structure.
+> * Patches two through eight updates the ab8500 regulator driver.
+> * The ninth patch modifies the ab8500 regulator configuration.
+> 
+> The eighth patch is optional as discussed before.
+> 
+> Bengt Jonsson (9):
+>   regulators: Moved define for number of regulators in ab8500
+>   regulators: Fixed errors in ab8500 register mapping
+>   regulators: Clean out unused code in ab8500 regulators
+>   regulators: Added ab8500 v2 support
+>   regulators: Updated ab8500 variable names, macro names and comments
+>   regulators: Modified ab8500 error handling
+>   regulators: Added verbose debug messages to ab8500 regulators
+>   regulators: Removed macros for initialization of ab8500 regulators
+>   mach-ux500: Updated and connected ab8500 regulator board
+>     configuration
+> 
+>  arch/arm/mach-ux500/board-mop500-regulators.c |  153 ++++-----
+>  arch/arm/mach-ux500/board-mop500-regulators.h |   19 +
+>  arch/arm/mach-ux500/board-mop500.c            |    3 +
+>  drivers/regulator/ab8500.c                    |  448 +++++++++++++++++--------
+>  include/linux/mfd/ab8500.h                    |    5 +-
+>  include/linux/regulator/ab8500.h              |   24 +-
+>  6 files changed, 426 insertions(+), 226 deletions(-)
+>  create mode 100644 arch/arm/mach-ux500/board-mop500-regulators.h
+> 
 
-Change-Id: I7e9345a9a58811c421f9e7fae0c1ec5a759c6178
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
----
- arch/arm/mach-msm/iommu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+All applied.
 
-diff --git a/arch/arm/mach-msm/iommu.c b/arch/arm/mach-msm/iommu.c
-index f651017..e2d58e4 100644
---- a/arch/arm/mach-msm/iommu.c
-+++ b/arch/arm/mach-msm/iommu.c
-@@ -386,7 +386,7 @@ static int msm_iommu_map(struct iommu_domain *domain, unsigned long va,
- 	/* Need a 2nd level table */
- 	if ((len == SZ_4K || len == SZ_64K) && (*fl_pte) == 0) {
- 		unsigned long *sl;
--		sl = (unsigned long *) __get_free_pages(GFP_KERNEL,
-+		sl = (unsigned long *) __get_free_pages(GFP_ATOMIC,
- 							get_order(SZ_4K));
+Thanks
 
- 		if (!sl) {
---
-1.7.0.2
- Sent by an employee of the Qualcomm Innovation Center, Inc.
- The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Liam
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
