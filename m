@@ -1,36 +1,44 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 09 Dec 2010 16:35:39 -0800
-Subject: [PATCH v2 0/8] OMAP3&4: clock data: Fixes and add new clocks nodes
-In-Reply-To: <1291932820-11163-1-git-send-email-b-cousson@ti.com> (Benoit
-	Cousson's message of "Thu, 9 Dec 2010 23:13:32 +0100")
-References: <1291932820-11163-1-git-send-email-b-cousson@ti.com>
-Message-ID: <87mxoe4g84.fsf@deeprootsystems.com>
+Date: Thu, 09 Dec 2010 16:36:13 -0800
+Subject: [PATCH 0/5] OMAP4: hwmod data fixes and update
+In-Reply-To: <1291937615-18571-1-git-send-email-b-cousson@ti.com> (Benoit
+	Cousson's message of "Fri, 10 Dec 2010 00:33:30 +0100")
+References: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
+Message-ID: <87hbem4g76.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Benoit,
 
 Benoit Cousson <b-cousson@ti.com> writes:
 
 > Hi Paul,
 >
-> Here is a collections of fixes and clock nodes addition done on OMAP3
-> and OMAP4 clock data files.
+> Here is a small set of OMAP4 hwmod data updates.
 >
-> I have included the one that Thara already submitted after fixing the
-> various comments done on the original version.
+> Re-order properly the data that were a little bit shuffled during
+> the previous merge window.
+> Add the new reset flags introduced in 2.6.37 and that were not
+> used in the hwmod data. The OMAP2 and OMAP3 fixes should come soon.
+> Fix some missing field in the GPIO OMAP4 hwmod data that I missed
+> during the review.
+> IVA and DSP are added just to allow the processors device creation
+> at boot time and avoid the warnings.
 >
-> That revision include as well a new fix from Jon. Thanks to both fixes,
-> the clocks rate are now accurate and the func_48m_fclk does report 48MHz
-> now! Cool isn't it?
+> Thanks to Charu for testing the GPIO / WD_TIMER changes.
+> Thanks to Govindraj for testing the UART changes. 
 >
-> Tested on sdp4430 + ES2.0.
+> The series is based on lo/for-next (v2.6.37-rc5-66-ga2814df) and is
+> available here:
+> git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod_data
 >
-> The series is based on 2.6.37-rc5 and is available here:
-> git://gitorious.org/omap-pm/linux.git for_2.6.38/clock
+> Please note that there is a slight dependency with the following patch
+> due to the name change of the iva fclk:
+> OMAP4: clock data: Add missing DPLL x2 clock node
+> https://patchwork.kernel.org/patch/396612/
+>
+> Tested on sdp4430 + ES2.0/ES2.1.
 
-I tried to pull this into my pm-core for testing with all the other PM
-stuff we have baking for 2.6.38.
+As with the other series, I tried to pull this into my pm-core for
+testing with all the other PM stuff we have baking for 2.6.38.
 
 Unfortunately, this series has conflicts with Paul's
 pwrdm_prcm_[ab]_2.6.38 branches.
@@ -40,27 +48,17 @@ Could you rebase this on Paul's pwrdm_prcm_b_2.6.38 branch?
 Kevin
 
 >
-> Benoit Cousson (3):
->   OMAP4: clock data: Add control for pad_clks_ck and slimbus_clk
->   OMAP3: clock data: Add "wkup_clkdm" in sr1_fck and sr2_fck
->   OMAP4: PRCM: Add SCRM header file
+> Regards,
+> Benoit
 >
-> Jon Hunter (1):
->   OMAP4: clock data: Add missing fixed divisors
 >
-> Jonathan Bergsagel (1):
->   OMAP4: clock data: Add missing fields in iva_hsd_byp_clk_mux_ck
+> Benoit Cousson (5):
+>   OMAP4: hwmod data: Fix hwmod entries order
+>   OMAP4: hwmod data: Add SYSS_HAS_RESET_STATUS flag
+>   OMAP4: hwmod data: Fix missing address in DMM and EMIF_FW
+>   OMAP4: hwmod data: Add IVA and DSP
+>   OMAP4: hwmod & clock data: Fix GPIO opt_clks and ocp_if iclk
 >
-> Rajendra Nayak (2):
->   OMAP4: clock data: Add SCRM auxiliary clock nodes
->   OMAP4: clock data: Export control to enable/disable CORE/PER M3
->     clocks
->
-> Thara Gopinath (1):
->   OMAP4: clock data: Add missing DPLL x2 clock nodes
->
->  arch/arm/mach-omap2/clock3xxx_data.c |    2 +
->  arch/arm/mach-omap2/clock44xx_data.c |  653 ++++++++++++++++++++++++----------
->  arch/arm/mach-omap2/scrm44xx.h       |  176 +++++++++
->  3 files changed, 640 insertions(+), 191 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/scrm44xx.h
+>  arch/arm/mach-omap2/clock44xx_data.c       |   12 +-
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 1256 ++++++++++++++++++----------
+>  2 files changed, 822 insertions(+), 446 deletions(-)
