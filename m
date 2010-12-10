@@ -1,47 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Dec 2010 08:12:03 +0000
-Subject: [PATCH] mmci: drop superfluous regulator #ifdef
-In-Reply-To: <20101210033908.GA4455@void.printf.net>
-References: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
-	<20101210033908.GA4455@void.printf.net>
-Message-ID: <20101210081202.GA19186@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 10 Dec 2010 09:28:37 +0100
+Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
+	omap_i2c
+In-Reply-To: <BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
+References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>	<1291904657-32729-2-git-send-email-b-cousson@ti.com>	<878vzydgxr.fsf@deeprootsystems.com>	<20101209190110.GR20097@trinity.fluff.org>,
+	<87wrni7jys.fsf@deeprootsystems.com>
+	<BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
+Message-ID: <4D01E4B5.1010703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 10, 2010 at 03:39:08AM +0000, Chris Ball wrote:
-> Hi Linus,
-> 
-> On Thu, Dec 02, 2010 at 02:36:58PM +0100, Linus Walleij wrote:
-> > The regulator and MMC frameworks provide the proper stub functions
-> > for the regulator functions anyway, get rid of this.
-> > 
-> > Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> > ---
-> >  drivers/mmc/host/mmci.c |    3 +--
-> >  1 files changed, 1 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> > index 3709ab3..7567872 100644
-> > --- a/drivers/mmc/host/mmci.c
-> > +++ b/drivers/mmc/host/mmci.c
-> > @@ -844,7 +844,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
-> >  		mmc->f_max = min(host->mclk, fmax);
-> >  	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
-> >  
-> > -#ifdef CONFIG_REGULATOR
-> >  	/* If we're using the regulator framework, try to fetch a regulator */
-> >  	host->vcc = regulator_get(&dev->dev, "vmmc");
-> >  	if (IS_ERR(host->vcc))
-> > @@ -863,7 +862,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
-> >  				 "(using regulator instead)\n");
-> >  		}
-> >  	}
-> > -#endif
-> > +
-> >  	/* Fall back to platform data if no regulator is found */
-> >  	if (host->vcc == NULL)
-> >  		mmc->ocr_avail = plat->ocr_mask;
-> 
-> Thanks, pushed to mmc-next for .38.
+On 12/9/2010 11:18 PM, aaro.koskinen at nokia.com wrote:
+> Hi,
+>
+> Kevin Hilman [khilman at deeprootsystems.com]:
+>> Ben Dooks<ben-i2c@fluff.org>  writes:
+>>> Renaming stuff like this is going to have an impact on the userspace
+>>> as anyone looking through /sys's driver heirarchy is going to miss the
+>>> old name...
+>>>
+>>> It all depends if you really want to go ahead with this...
+>>
+>> Yes, we are aware of the userspace impact, but this name change makes
+>> all devices on OMAP have consistent names and actually improves the
+>> ability to have userspace tools have consistent naming as well.
+>
+> So there are no imporant users, or if there is, they are prepared for this change?
 
-Also queued in the ARM tree.
+Well, I do not know any user of that today. Do you have some in mind?
+
+Benoit
