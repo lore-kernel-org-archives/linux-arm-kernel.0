@@ -1,56 +1,74 @@
 From: bengt.g.jonsson@stericsson.com (Bengt Jonsson)
-Date: Fri, 10 Dec 2010 11:08:41 +0100
-Subject: [PATCH 2/9] regulators: Fixed errors in ab8500 register mapping
+Date: Fri, 10 Dec 2010 11:08:43 +0100
+Subject: [PATCH 4/9] regulators: Added ab8500 v2 support
 In-Reply-To: <1291975728-12525-1-git-send-email-bengt.g.jonsson@stericsson.com>
 References: <1291975728-12525-1-git-send-email-bengt.g.jonsson@stericsson.com>
-Message-ID: <1291975728-12525-3-git-send-email-bengt.g.jonsson@stericsson.com>
+Message-ID: <1291975728-12525-5-git-send-email-bengt.g.jonsson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For INTCORE and TVOUT regulators, the low power register bit is
-included in the mask so that enable will set the regulator in
-normal (high power) mode.
-
-ANAMIC1, ANAMIC2, DMIC regulator settings are swapped with each
-other so that the correct regulator gets enabled/disabled.
-
-ANA regulator register address is corrected.
+The AUX3 regulator voltage setting is changed in ab8500 v2 compared
+to ab8500 v1. This patch adds v2 support while keeping support for
+v1.
 
 Signed-off-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/regulator/ab8500.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/regulator/ab8500.c |   28 ++++++++++++++++++++++++++--
+ 1 files changed, 26 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index 5670775..4efe3cf 100644
+index 51ff569..9a3dc79 100644
 --- a/drivers/regulator/ab8500.c
 +++ b/drivers/regulator/ab8500.c
-@@ -330,19 +330,19 @@ static struct ab8500_regulator_info ab8500_regulator_info[] = {
- 			ldo_vauxn_voltages, ARRAY_SIZE(ldo_vauxn_voltages)),
- 	AB8500_LDO(AUX3, 1100, 3300, 0x04, 0x0a, 0x3, 0x1, 0x04, 0x21, 0xf,
- 			ldo_vauxn_voltages, ARRAY_SIZE(ldo_vauxn_voltages)),
--	AB8500_LDO(INTCORE, 1100, 3300, 0x03, 0x80, 0x4, 0x4, 0x03, 0x80, 0x38,
-+	AB8500_LDO(INTCORE, 1100, 3300, 0x03, 0x80, 0x44, 0x4, 0x03, 0x80, 0x38,
- 		ldo_vintcore_voltages, ARRAY_SIZE(ldo_vintcore_voltages)),
- 
- 	/*
- 	 * Fixed Voltage LDOs
- 	 *		 name,	o/p uV, ctrl bank, ctrl reg, enable, disable
- 	 */
--	AB8500_FIXED_LDO(TVOUT,	  2000, 0x03,      0x80,     0x2,    0x2),
-+	AB8500_FIXED_LDO(TVOUT,	  2000, 0x03,      0x80,     0x82,    0x2),
- 	AB8500_FIXED_LDO(AUDIO,   2000, 0x03,      0x83,     0x2,    0x2),
--	AB8500_FIXED_LDO(ANAMIC1, 2050, 0x03,      0x83,     0x4,    0x4),
--	AB8500_FIXED_LDO(ANAMIC2, 2050, 0x03,      0x83,     0x8,    0x8),
--	AB8500_FIXED_LDO(DMIC,    1800, 0x03,      0x83,     0x10,   0x10),
--	AB8500_FIXED_LDO(ANA,     1200, 0x03,      0x83,     0xc,    0x4),
-+	AB8500_FIXED_LDO(ANAMIC1, 2050, 0x03,      0x83,     0x08,    0x08),
-+	AB8500_FIXED_LDO(ANAMIC2, 2050, 0x03,      0x83,     0x10,    0x10),
-+	AB8500_FIXED_LDO(DMIC,    1800, 0x03,      0x83,     0x04,   0x04),
-+	AB8500_FIXED_LDO(ANA,     1200, 0x04,      0x06,     0xc,    0x4),
+@@ -81,6 +81,17 @@ static const int ldo_vauxn_voltages[] = {
+ 	3300000,
  };
  
- static inline struct ab8500_regulator_info *find_regulator_info(int id)
++static const int ldo_vaux3_voltages[] = {
++	1200000,
++	1500000,
++	1800000,
++	2100000,
++	2500000,
++	2750000,
++	2790000,
++	2910000,
++};
++
+ static const int ldo_vintcore_voltages[] = {
+ 	1200000,
+ 	1225000,
+@@ -326,8 +337,8 @@ static struct ab8500_regulator_info ab8500_regulator_info[] = {
+ 			ldo_vauxn_voltages, ARRAY_SIZE(ldo_vauxn_voltages)),
+ 	AB8500_LDO(AUX2, 1100, 3300, 0x04, 0x09, 0xc, 0x4, 0x04, 0x20, 0xf,
+ 			ldo_vauxn_voltages, ARRAY_SIZE(ldo_vauxn_voltages)),
+-	AB8500_LDO(AUX3, 1100, 3300, 0x04, 0x0a, 0x3, 0x1, 0x04, 0x21, 0xf,
+-			ldo_vauxn_voltages, ARRAY_SIZE(ldo_vauxn_voltages)),
++	AB8500_LDO(AUX3, 1100, 3300, 0x04, 0x0a, 0x3, 0x1, 0x04, 0x21, 0x7,
++			ldo_vaux3_voltages, ARRAY_SIZE(ldo_vaux3_voltages)),
+ 	AB8500_LDO(INTCORE, 1100, 3300, 0x03, 0x80, 0x44, 0x4, 0x03, 0x80, 0x38,
+ 		ldo_vintcore_voltages, ARRAY_SIZE(ldo_vintcore_voltages)),
+ 
+@@ -369,6 +380,19 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
+ 		info = &ab8500_regulator_info[i];
+ 		info->dev = &pdev->dev;
+ 
++		/* fix for hardware before ab8500v2.0 */
++		if (abx500_get_chip_id(info->dev) < 0x20) {
++			if (info->desc.id == AB8500_LDO_AUX3) {
++				info->desc.n_voltages =
++					ARRAY_SIZE(ldo_vauxn_voltages);
++				info->supported_voltages = ldo_vauxn_voltages;
++				info->voltages_len =
++					ARRAY_SIZE(ldo_vauxn_voltages);
++				info->voltage_mask = 0xf;
++			}
++		}
++
++		/* register regulator with framework */
+ 		info->regulator = regulator_register(&info->desc, &pdev->dev,
+ 				&pdata->regulator[i], info);
+ 		if (IS_ERR(info->regulator)) {
 -- 
 1.7.2.2
