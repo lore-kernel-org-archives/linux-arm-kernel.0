@@ -1,22 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 10 Dec 2010 14:52:47 +0100
-Subject: [PATCH v2] watchdog: imx: use clk_get to acquire the watchdog
-	clock
-In-Reply-To: <1291738564-10374-1-git-send-email-fabio.estevam@freescale.com>
-References: <1291738564-10374-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20101210135246.GJ17441@pengutronix.de>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Fri, 10 Dec 2010 15:28:42 +0100
+Subject: Question about ARM virtualization
+In-Reply-To: <182024c.be2d.12cc1439ae9.Coremail.bill_carson@126.com>
+References: <182024c.be2d.12cc1439ae9.Coremail.bill_carson@126.com>
+Message-ID: <AANLkTi=MpxC8wZmdEO6_MDH8UeXdzkh=Eugg9o2CXORA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 02:16:04PM -0200, Fabio Estevam wrote:
-> Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+yes, I am working on a KVM for ARM solution.
 
-Best regards
-Uwe
+Current status is that it runs, although very slow on ARMv5, it fully
+boots a kernel on ARMv6 on hardware, but has some issues in bringing
+up user space, and finally we have an ARMv7 version which boots the
+kernel with the same user space issues as on ARMv6 on simulators, but
+sees a crash on real hardware when switching host vectors. You may
+want to look at our sources http://git.ncl.cs.columbia.edu/git/ and
+there's also a mailing list
+https://lists.cs.columbia.edu/cucslists/listinfo/android-virt.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best,
+Christoffer
+
+On Tue, Dec 7, 2010 at 3:37 PM, rocky <bill_carson@126.com> wrote:
+> se is hardware virtualizable, while some people have already doing this on non-virtualizable ARM core;
+>
+> So is there any open-source project on virtualizable ARM or non-virtualizable ARM availiable for study?
