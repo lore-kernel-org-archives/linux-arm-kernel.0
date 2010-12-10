@@ -1,66 +1,134 @@
-From: christian.glindkamp@taskit.de (Christian Glindkamp)
-Date: Fri, 10 Dec 2010 10:03:24 +0100
-Subject: [PATCH] at91: Refactor Stamp9G20 and PControl G20 board file
-In-Reply-To: <20101210033850.GC19897@game.jcrosoft.org>
-References: <4CFFE5A9.4040407@bluewatersys.com>
-	<1291889759-12281-1-git-send-email-christian.glindkamp@taskit.de>
-	<20101210033850.GC19897@game.jcrosoft.org>
-Message-ID: <20101210090324.GB24295@taskit.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 10 Dec 2010 10:21:53 +0100
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <201012100958.32365.jeremy.kerr@canonical.com>
+References: <1291773932.578726.468741339223.1.gpush@pororo>
+	<20101208102150.GJ18244@pengutronix.de>
+	<201012100958.32365.jeremy.kerr@canonical.com>
+Message-ID: <20101210092153.GG17441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-12-10 04:38, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> HI,
+On Fri, Dec 10, 2010 at 09:58:31AM +0800, Jeremy Kerr wrote:
+> Hi Uwe
 > 
-> 	If the hardware are so near I do need to the need to create a new
-> 	machine use system_rev to auto detect it will be better
+> > > +/**
+> > > + * clk_ops: Callback operations for clocks; these are to be provided by
+> > > the + * clock implementation, and will be called by drivers through the
+> > > clk_* API. + *
+> > > + * @enable:	Enable the clock. This must not return until the clock is
+> > > + *		generating a valid clock signal, usable by consumer devices.
+> > > + *		Called with clk->lock held.
+> > > + *
+> > > + * @disable:	Disable the clock. Called with clk->lock held.
+> > > + *
+> > > + * @get	/ @put:	Called by the core clock code to notify the driver 
+> about
+> > 
+> > I wonder if this is valid kerneldoc.  The tab before / looks (IMHO)
+> > ugly.
 > 
-> 	but we need to have only one defconfig as done on rm9200
-> 	it's really reduce the maintainance and allow to be sure when we
-> 	compile the at91sam9g20_defconfig that we do not brake any board
+> Not valid kernel doc, so I'll fix that up. The tab was unintentional.
 > 
-> 	if a board have incompatible option please the system_rev to specify
-> 	them or a specific entry in the Kconfig for this board it will allow
-> 	also to known this information for the maintainance
-
-Just because it is near does not mean it is a revision of the other
-board. Just compare
-http://www.taskit.de/en/products/portuxg20/index.htm
-http://www.taskit.de/en/products/stamp9g20/starterkit.htm
-
-Apart from that, both boards are correctly identifiable via the machine
-id for a year, respectively one and a half year for the Stamp9G20 EVB.
-Why change it for sake of change?
-
-They both have there own machine id to make it clear that these are
-really different boards. I could have also submitted two board files
-and maybe nobody would have noticed that share a lot, but I thought code
-reuse is better so there are in the same file.
-
-And for different carrier boards, system_rev does not make sense at all.
-
+> > Maybe specify "driver" a bit more to distinguish from "drivers"
+> > above.  "clk_ops driver"?
 > 
-> Best Regards,
-> J.
-> On 11:15 Thu 09 Dec     , Christian Glindkamp wrote:
-> > As PControl G20 is a carrier board for the Stamp9G20 SoM, some code can
-> > be shared. Therefore board-stamp9g20.c is refactored to allow reusing the
-> > SoM initialization and board-pcontrol-g20.c is modified to use it.
+> This is actually for refcounting for uses by device drivers (ie, not the clock 
+> provider), I've updated the comment:
+> 
+> /**
+>  * struct clk_ops -  Callback operations for clocks; these are to be provided
+>  * by the clock implementation, and will be called by drivers through the
+>  * clk_* API.
+>  *
+>  * @enable:	Enable the clock. This must not return until the clock is
+>  *		generating a valid clock signal, usable by consumer devices.
+>  *		Called with clk->lock held.
+>  *
+>  * @disable:	Disable the clock. Called with clk->lock held.
+>  *
+>  * @get:	     Called by the core clock code to increment the clock's
+>  *		     refount as clk is passed to device drivers. Optional.
+s/refount/refcount/ (once more below)
+>  *
+>  * @put:	     Called by the core clock code to decrement the clocks's
+>  *		     refounts as clk is released from device drivers. Optional.
+again inconsistent tabbing.
+
+IMHO the wording above is better.  This makes me unsure if the callback
+has to fiddle with the refcount.
+
+>  *
+>  * For other callbacks, see the corresponding clk_* functions. Parameters and
+>  * return values are passed directly from/to these API functions, or
+>  * -ENOSYS is returned if the callback is NULL, see kernel/clk.c for
+This is not true for clk_get_rate.  This returns 0 if the callback isn't
+set.
+
+>  * implementation details. All are optional.
+>  */
+> 
+> > > +/**
+> > > + * __clk_get - update clock-specific refcounter
+> > > + *
+> > > + * @clk: The clock to refcount
 > > 
-> > Signed-off-by: Christian Glindkamp <christian.glindkamp@taskit.de>
-> > ---
+> > "The clock to update the refcount for"?
+> 
+> I'm using refcount as a verb here; if this isn't clear I can come up with 
+> something else. Your solution splits the 'clock' and the 'for' which may be 
+> difficult to parse too. Let me know if you have any other suggestions :)
+hmm, don't know.  Keeping it as is is OK for me, too, if you don't
+consider my suggestion to be better.
+ 
+> > I wonder if it's worth to handle parents here, e.g.
 > > 
-> > How about this approach? Compile tested for PControl G20 and run time tested
-> > for Stamp9G20 EVB and PortuxG20.
+> > 	if (!clk->enable_count) {
+> > 		struct clk *parent = clk_get_parent(clk);
+> > 		if (parent) {
+> > 			ret = clk_enable(parent);
+> > 			if (ret)
+> > 				return ret;
+> > 		}
 > > 
-> > Just a side note: PortuxG20 is not a carrier board for the Stamp9G20. It just
-> > shares so much with the evaluation board, that it makes sense to put them both
-> > into the same file. And there is no intention to put other boards into this
-> > file.
+> > 		ret = clk->ops->enable(clk);
+> > 		if (likely(!ret))
+> > 			clk->enable_count++;
+> > 		else if (parent)
+> > 			clk_disable(parent);
+> > 	}
 > > 
-> >  arch/arm/mach-at91/Makefile                 |    2 +-
-> >  arch/arm/mach-at91/board-pcontrol-g20.c     |   98 +--------------------------
-> >  arch/arm/mach-at91/board-stamp9g20.c        |   82 ++++++++++++-----------
-> >  arch/arm/mach-at91/include/mach/stamp9g20.h |    7 ++
-> >  4 files changed, 54 insertions(+), 135 deletions(-)
-> >  create mode 100644 arch/arm/mach-at91/include/mach/stamp9g20.h
+> > as they are quite common.
+> 
+> I'm not convinced we should do the parent handling in the core clock code. 
+> It's fairly easy to do the parent enable/disable in platform code, which 
+> should have explicit knowledge about whether or not the clock has a parent, 
+> and the semantics of how the parent/child clocks interact.
+> 
+> However, happy to discuss this further if needs be.
+As already said in #armlinux, in the meantime I agree.
+
+> > > +void clk_disable(struct clk *clk)
+> > > +{
+> > > +	if (!clk->ops->disable)
+> > > +		return;
+> > 
+> > 	WARN_ON(!clk->enable_count) ?
+> 
+> Yep, good idea. I'll do this check with the lock acquired.
+fine.
+
+> Thanks for the comments, I've updated my tree accordingly (along with some 
+> other kerneldoc fixups). I'll wait to see if there is any other feedback and 
+> re-post next week.
+fine, too.
+
+Thanks for your efforts
+Uwe
+
+PS: I don't know who looks at your git tree, but you might want to
+update the arch branches to base on your current work.
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
