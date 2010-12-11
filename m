@@ -1,58 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 11 Dec 2010 13:02:08 +0530
-Subject: [PATCH 01/11] OMAP4: PRCM: add OMAP4-specific
-	accessor/mutatorfunctions
-In-Reply-To: <alpine.DEB.2.00.1012101839460.13430@utopia.booyaka.com>
-References: <20101208061657.30541.79824.stgit@twilight.localdomain>
-	<20101208061829.30541.99531.stgit@twilight.localdomain>
-	<0adb8bf19a1586d582ac168dcbfc4f5e@mail.gmail.com>
-	<alpine.DEB.2.00.1012101839460.13430@utopia.booyaka.com>
-Message-ID: <a7496daab729031fd82a064513659761@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Sat, 11 Dec 2010 10:55:52 +0100
+Subject: [PATCH] sched: Fix the irqtime code to deal with u64 wraps
+In-Reply-To: <alpine.LFD.2.00.1012102116540.10437@xanadu.home>
+References: <1292013506.13513.78.camel@laptop>
+	<alpine.LFD.2.00.1012102116540.10437@xanadu.home>
+Message-ID: <1292061352.13513.191.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Saturday, December 11, 2010 7:26 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Rajendra Nayak; Benoit Cousson
-> Subject: RE: [PATCH 01/11] OMAP4: PRCM: add OMAP4-specific
-> accessor/mutatorfunctions
->
-> On Wed, 8 Dec 2010, Santosh Shilimkar wrote:
->
-> > One more possible road block of removing the direct register access
-> > from PM code is DEVICE PRM module. Even with this clean-up for DEVCIE
-> > PRM related registers. I guess we still need to use the lowest level
-> > APIs.
->
-> To clarify my comments, I'm not talking about replacing omap4_prm_*()
-with
-> omap4_prminst_*() for the device PRM cases.  I agree that is not
-> desirable.  What I'd like to see is for the middle-level PM code, such
-as
-> pm*.c, to call functions that describe what they are actually trying to
-do
-> at a higher level, rather than writing to registers directly.
->
-> I'll take the PRM_VOLTSETUP* registers as a rough example.  This may be
-a
-> bad example since we probably don't write to this directly from pm*.c
-any
-> more, but the basic idea is, rather than writing some mystery value to a
-> register from the pm*.c code, we should write something like:
->
-> int omap4_prm_regulator_set_ramp_up_duration(u32 ns, u8 starting_pwrst);
->
-> which would then take care of computing the prescaler and count values
-> appropriately given the current sys_clk and writing them to the register
-> or returning an error if something is wrong.
->
-> The long-term goal is to be able to reuse as much PM code as possible
-> between all of the different OMAP2+ platforms.
->
-Thanks for clarification. We are fully aligned here.
+On Fri, 2010-12-10 at 21:23 -0500, Nicolas Pitre wrote:
+> On Fri, 10 Dec 2010, Peter Zijlstra wrote:
+> 
+> > OK, so here's the latest version, using fancy __this_cpu thingies.
+> > 
+> > I started a new thread since the old one was quite unwieldy.
+> > 
+> > Now, admittedly this patch is a tad large, esp for -rc5. So either we
+> > need lots of Reviewed-by and such or I need to shrink this patch
+> > somehow.
+> > 
+> > 
+> > ---
+> > Subject: sched: Fix the irqtime code to deal with u64 wraps
+> > From: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> > Date: Thu Dec 09 14:15:34 CET 2010
+> > 
+> > ARM systems have a 32bit sched_clock() [ which needs to be fixed ],
+> > but this exposed a bug in the irq_time code as well, it doesn't deal
+> > with wraps at all.
+> [...]
+> 
+> That would be more close to reality if you stated "Some ARM systems have 
+> a 32bit sched_clock() [" above.  Most ARM systems in use today have a 
+> sched_clock() with more than 32 bits, like 55 bits or so.
 
-Regards,
-Santosh
+OK, I'll rephrase.
