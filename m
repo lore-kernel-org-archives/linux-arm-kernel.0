@@ -1,37 +1,43 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 10 Dec 2010 16:19:48 -0800
-Subject: [PATCH v7 00/12] tnetv107x ssp drivers
-In-Reply-To: <1291733522-3626-1-git-send-email-cyril@ti.com> (Cyril
-	Chemparathy's message of "Tue, 7 Dec 2010 09:51:50 -0500")
-References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-Message-ID: <87r5dp6tzv.fsf@deeprootsystems.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 10 Dec 2010 17:34:15 -0700 (MST)
+Subject: [PATCH v2 4/8] OMAP4: clock data: Add missing fields in
+	iva_hsd_byp_clk_mux_ck
+In-Reply-To: <1291932820-11163-5-git-send-email-b-cousson@ti.com>
+References: <1291932820-11163-1-git-send-email-b-cousson@ti.com>
+	<1291932820-11163-5-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1012101732320.13430@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cyril Chemparathy <cyril@ti.com> writes:
+On Thu, 9 Dec 2010, Benoit Cousson wrote:
 
-> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
-> device.  It has a built-in programmable execution engine that can be programmed
-> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
+> From: Jonathan Bergsagel <jbergsagel@ti.com>
+> 
+> Add register address, mask and link to the clksel structure that
+> were missing in the IVA DPLL mux clock node.
+> 
+> Signed-off-by: Jonathan Bergsagel <jbergsagel@ti.com>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 
-OK, this series seems to be stabilizing.  The question now is how to
-merge it.
+This patch results in a checkpatch warning:
 
-I'm happy to merge it as a single series via the davinci tree as long as
-I get some acks on the drivers.  For me to merge this, I'm missing some
-acks for the following:
+---
 
-[PATCH v7 04/12] spi: add ti-ssp spi master driver
-Grant Likely, although I thought he gave an ack earlier)
+WARNING: please, no space before tabs
+#23: FILE: arch/arm/mach-omap2/clock44xx_data.c:639:
++^I.clksel ^I= iva_hsd_byp_clk_mux_sel,$
 
-[PATCH v7 10/12] backlight: add support for tps6116x controller
-Richard Purdie
+total: 0 errors, 1 warnings, 0 checks, 13 lines checked
 
-[PATCH v7 08/12] gpio: add ti-ssp gpio driver
-David Brownell?  (MAINTAINERS isn't clear here)
+Your patch has style problems, please review.  If any of these errors
+are false positives report them to the maintainer, see
+CHECKPATCH in MAINTAINERS.
 
-If I get acks soon, we can get this in for 2.6.38. 
+---
 
-Thanks,
+I've fixed it in the copy in my local branch, but next time, please run 
+checkpatch.pl and fix any problems before submitting.
 
-Kevin
+regards,
+
+- Paul
