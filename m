@@ -1,60 +1,58 @@
-From: plyatov@gmail.com (Igor Plyatov)
-Date: Sat, 11 Dec 2010 06:37:31 +0300
-Subject: [PATCH] ata: pata_at91.c bugfix for high master clock
-Message-ID: <1292038651-5578-1-git-send-email-plyatov@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 11 Dec 2010 13:02:08 +0530
+Subject: [PATCH 01/11] OMAP4: PRCM: add OMAP4-specific
+	accessor/mutatorfunctions
+In-Reply-To: <alpine.DEB.2.00.1012101839460.13430@utopia.booyaka.com>
+References: <20101208061657.30541.79824.stgit@twilight.localdomain>
+	<20101208061829.30541.99531.stgit@twilight.localdomain>
+	<0adb8bf19a1586d582ac168dcbfc4f5e@mail.gmail.com>
+	<alpine.DEB.2.00.1012101839460.13430@utopia.booyaka.com>
+Message-ID: <a7496daab729031fd82a064513659761@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91SAM9 microcontrollers with master clock higher then 105 MHz
-and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
-lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and pata_at91
-driver does not detect ATA device.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Saturday, December 11, 2010 7:26 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Rajendra Nayak; Benoit Cousson
+> Subject: RE: [PATCH 01/11] OMAP4: PRCM: add OMAP4-specific
+> accessor/mutatorfunctions
+>
+> On Wed, 8 Dec 2010, Santosh Shilimkar wrote:
+>
+> > One more possible road block of removing the direct register access
+> > from PM code is DEVICE PRM module. Even with this clean-up for DEVCIE
+> > PRM related registers. I guess we still need to use the lowest level
+> > APIs.
+>
+> To clarify my comments, I'm not talking about replacing omap4_prm_*()
+with
+> omap4_prminst_*() for the device PRM cases.  I agree that is not
+> desirable.  What I'd like to see is for the middle-level PM code, such
+as
+> pm*.c, to call functions that describe what they are actually trying to
+do
+> at a higher level, rather than writing to registers directly.
+>
+> I'll take the PRM_VOLTSETUP* registers as a rough example.  This may be
+a
+> bad example since we probably don't write to this directly from pm*.c
+any
+> more, but the basic idea is, rather than writing some mystery value to a
+> register from the pm*.c code, we should write something like:
+>
+> int omap4_prm_regulator_set_ramp_up_duration(u32 ns, u8 starting_pwrst);
+>
+> which would then take care of computing the prescaler and count values
+> appropriately given the current sys_clk and writing them to the register
+> or returning an error if something is wrong.
+>
+> The long-term goal is to be able to reuse as much PM code as possible
+> between all of the different OMAP2+ platforms.
+>
+Thanks for clarification. We are fully aligned here.
 
-Signed-off-by: Igor Plyatov <plyatov@gmail.com>
----
- drivers/ata/pata_at91.c |   11 +++++++++--
- 1 files changed, 9 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
-index 0da0dcc..2e189be 100644
---- a/drivers/ata/pata_at91.c
-+++ b/drivers/ata/pata_at91.c
-@@ -33,12 +33,14 @@
- 
- 
- #define DRV_NAME "pata_at91"
--#define DRV_VERSION "0.1"
-+#define DRV_VERSION "0.2"
- 
- #define CF_IDE_OFFSET	    0x00c00000
- #define CF_ALT_IDE_OFFSET   0x00e00000
- #define CF_IDE_RES_SIZE     0x08
- 
-+#define NCS_RD_PULSE_LIMIT  0x3f /* maximal value for pulse bitfields */
-+
- struct at91_ide_info {
- 	unsigned long mode;
- 	unsigned int cs;
-@@ -50,7 +52,7 @@ struct at91_ide_info {
- };
- 
- static const struct ata_timing initial_timing =
--	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 600, 0};
-+	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
- 
- static unsigned long calc_mck_cycles(unsigned long ns, unsigned long mck_hz)
- {
-@@ -109,6 +111,11 @@ static void set_smc_timing(struct device *dev,
- 	/* (CS0, CS1, DIR, OE) <= (CFCE1, CFCE2, CFRNW, NCSX) timings */
- 	ncs_read_setup = 1;
- 	ncs_read_pulse = read_cycle - 2;
-+	if (ncs_read_pulse > NCS_RD_PULSE_LIMIT) {
-+		ncs_read_pulse = NCS_RD_PULSE_LIMIT;
-+		dev_dbg(dev, "ncs_read_pulse limited to maximal value %lu\n",
-+			ncs_read_pulse);
-+	}
- 
- 	/* Write timings same as read timings */
- 	write_cycle = read_cycle;
--- 
-1.7.0.4
+Regards,
+Santosh
