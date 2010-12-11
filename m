@@ -1,76 +1,60 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Sat, 11 Dec 2010 20:17:54 +0000
-Subject: [PATCH] arm/ixp4xx: Rename FREQ macro to avoid collisions
-Message-ID: <1292098674.3136.41.camel@localhost>
+From: plyatov@gmail.com (Igor Plyatov)
+Date: Sat, 11 Dec 2010 23:37:26 +0300
+Subject: [PATCH v2] ata: pata_at91.c bugfix for high master clock
+Message-ID: <1292099846-24528-1-git-send-email-plyatov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FREQ is a ridiculously short name for a platform-specific macro in a
-generic header, and it now conflicts with an enumeration in the
-gspca/ov519 driver.
+The AT91SAM9 microcontrollers with master clock higher then 105 MHz
+and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
+lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
+does not detect ATA device.
 
-Also delete conditional reference to ixp4xx_get_board_tick_rate()
-which is not defined anywhere.
-
-Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+Signed-off-by: Igor Plyatov <plyatov@gmail.com>
 ---
- arch/arm/mach-ixp4xx/common.c             |    4 ++--
- arch/arm/mach-ixp4xx/include/mach/timex.h |    5 +++--
- drivers/input/misc/ixp4xx-beeper.c        |    6 +-----
- 3 files changed, 6 insertions(+), 9 deletions(-)
+ drivers/ata/pata_at91.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 0bce097..f5c42fe 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -415,7 +415,7 @@ static struct clocksource clocksource_ixp4xx = {
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+index 0da0dcc..a462405 100644
+--- a/drivers/ata/pata_at91.c
++++ b/drivers/ata/pata_at91.c
+@@ -33,12 +33,14 @@
+ 
+ 
+ #define DRV_NAME "pata_at91"
+-#define DRV_VERSION "0.1"
++#define DRV_VERSION "0.2"
+ 
+ #define CF_IDE_OFFSET	    0x00c00000
+ #define CF_ALT_IDE_OFFSET   0x00e00000
+ #define CF_IDE_RES_SIZE     0x08
+ 
++#define NCS_RD_PULSE_LIMIT  0x3f /* maximal value for pulse bitfields */
++
+ struct at91_ide_info {
+ 	unsigned long mode;
+ 	unsigned int cs;
+@@ -50,7 +52,7 @@ struct at91_ide_info {
  };
  
--unsigned long ixp4xx_timer_freq = FREQ;
-+unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
- EXPORT_SYMBOL(ixp4xx_timer_freq);
- static void __init ixp4xx_clocksource_init(void)
+ static const struct ata_timing initial_timing =
+-	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 600, 0};
++	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
+ 
+ static unsigned long calc_mck_cycles(unsigned long ns, unsigned long mck_hz)
  {
-@@ -491,7 +491,7 @@ static struct clock_event_device clockevent_ixp4xx = {
+@@ -109,6 +111,11 @@ static void set_smc_timing(struct device *dev,
+ 	/* (CS0, CS1, DIR, OE) <= (CFCE1, CFCE2, CFRNW, NCSX) timings */
+ 	ncs_read_setup = 1;
+ 	ncs_read_pulse = read_cycle - 2;
++	if (ncs_read_pulse > NCS_RD_PULSE_LIMIT) {
++		ncs_read_pulse = NCS_RD_PULSE_LIMIT;
++		dev_warn(dev, "ncs_read_pulse limited to maximal value %lu\n",
++			ncs_read_pulse);
++	}
  
- static void __init ixp4xx_clockevent_init(void)
- {
--	clockevent_ixp4xx.mult = div_sc(FREQ, NSEC_PER_SEC,
-+	clockevent_ixp4xx.mult = div_sc(IXP4XX_TIMER_FREQ, NSEC_PER_SEC,
- 					clockevent_ixp4xx.shift);
- 	clockevent_ixp4xx.max_delta_ns =
- 		clockevent_delta2ns(0xfffffffe, &clockevent_ixp4xx);
-diff --git a/arch/arm/mach-ixp4xx/include/mach/timex.h b/arch/arm/mach-ixp4xx/include/mach/timex.h
-index 2c3f93c..c9e930f 100644
---- a/arch/arm/mach-ixp4xx/include/mach/timex.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/timex.h
-@@ -10,6 +10,7 @@
-  * 66.66... MHz. We do a convulted calculation of CLOCK_TICK_RATE b/c the
-  * timer register ignores the bottom 2 bits of the LATCH value.
-  */
--#define FREQ 66666000
--#define CLOCK_TICK_RATE (((FREQ / HZ & ~IXP4XX_OST_RELOAD_MASK) + 1) * HZ)
-+#define IXP4XX_TIMER_FREQ 66666000
-+#define CLOCK_TICK_RATE \
-+	(((IXP4XX_TIMER_FREQ / HZ & ~IXP4XX_OST_RELOAD_MASK) + 1) * HZ)
- 
-diff --git a/drivers/input/misc/ixp4xx-beeper.c b/drivers/input/misc/ixp4xx-beeper.c
-index 9dfd6e5..1f38302 100644
---- a/drivers/input/misc/ixp4xx-beeper.c
-+++ b/drivers/input/misc/ixp4xx-beeper.c
-@@ -69,11 +69,7 @@ static int ixp4xx_spkr_event(struct input_dev *dev, unsigned int type, unsigned
- 	}
- 
- 	if (value > 20 && value < 32767)
--#ifndef FREQ
--		count = (ixp4xx_get_board_tick_rate() / (value * 4)) - 1;
--#else
--		count = (FREQ / (value * 4)) - 1;
--#endif
-+		count = (IXP4XX_TIMER_FREQ / (value * 4)) - 1;
- 
- 	ixp4xx_spkr_control(pin, count);
- 
+ 	/* Write timings same as read timings */
+ 	write_cycle = read_cycle;
 -- 
-1.7.2.3
+1.7.0.4
