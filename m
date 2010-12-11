@@ -1,76 +1,42 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Sat, 11 Dec 2010 22:16:45 +0300
-Subject: [PATCH] ata: pata_at91.c bugfix for high master clock
-In-Reply-To: <1292011430-20835-1-git-send-email-plyatov@gmail.com>
-References: <1292011430-20835-1-git-send-email-plyatov@gmail.com>
-Message-ID: <20101211221645.087d02f7@realm>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 11 Dec 2010 19:23:20 +0000
+Subject: [PATCH] dw_mmc: Add Synopsys DesignWare mmc host driver.
+In-Reply-To: <AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
+References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
+	<20101208115510.GD10998@console-pimps.org>
+	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
+	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
+	<20101209064751.GA21128@void.printf.net>
+	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
+	<20101209160157.GA28586@void.printf.net>
+	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
+Message-ID: <20101211192320.GA24430@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Igor,
+Hi Will,
 
-On Fri, 10 Dec 2010 23:03:50 +0300
-Igor Plyatov <plyatov@gmail.com> wrote:
-
-> The AT91SAM9 microcontrollers with master clock higher then 105 MHz
-> and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
-> lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and
-> pata_at91 driver does detect ATA device.
+On Thu, Dec 09, 2010 at 05:24:26PM +0000, Will Newton wrote:
+> This adds the mmc host driver for the Synopsys DesignWare mmc
+> host controller, found in a number of embedded SoC designs.
 > 
-> Signed-off-by: Igor Plyatov <plyatov@gmail.com>
-> ---
->  drivers/ata/pata_at91.c |   11 +++++++++--
->  1 files changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
-> index 0da0dcc..2e189be 100644
-> --- a/drivers/ata/pata_at91.c
-> +++ b/drivers/ata/pata_at91.c
-> @@ -33,12 +33,14 @@
->  
->  
->  #define DRV_NAME "pata_at91"
-> -#define DRV_VERSION "0.1"
-> +#define DRV_VERSION "0.2"
->  
->  #define CF_IDE_OFFSET	    0x00c00000
->  #define CF_ALT_IDE_OFFSET   0x00e00000
->  #define CF_IDE_RES_SIZE     0x08
->  
-> +#define NCS_RD_PULSE_LIMIT  0x3f /* maximal value for pulse
-> bitfields */ +
->  struct at91_ide_info {
->  	unsigned long mode;
->  	unsigned int cs;
-> @@ -50,7 +52,7 @@ struct at91_ide_info {
->  };
->  
->  static const struct ata_timing initial_timing =
-> -	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 600, 0};
-> +	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
->  
->  static unsigned long calc_mck_cycles(unsigned long ns, unsigned long
-> mck_hz) {
-> @@ -109,6 +111,11 @@ static void set_smc_timing(struct device *dev,
->  	/* (CS0, CS1, DIR, OE) <= (CFCE1, CFCE2, CFRNW, NCSX)
-> timings */ ncs_read_setup = 1;
->  	ncs_read_pulse = read_cycle - 2;
-> +	if (ncs_read_pulse > NCS_RD_PULSE_LIMIT) {
-> +		ncs_read_pulse = NCS_RD_PULSE_LIMIT;
-> +		dev_dbg(dev, "ncs_read_pulse limited to maximal
+> Signed-off-by: Will Newton <will.newton@imgtec.com>
+> Reviewed-by: Matt Fleming <matt@console-pimps.org>
 
-arguably 'dev_warn' would be more useful in this case
+Running a test build on ARM fails:
 
-> value %lu\n",
-> +			ncs_read_pulse);
-> +	}
->  
->  	/* Write timings same as read timings */
->  	write_cycle = read_cycle;
+drivers/mmc/host/dw_mmc.c: In function ?dw_mci_push_data64?:
+drivers/mmc/host/dw_mmc.c:985: error: implicit declaration of function ?__raw_writeq?
+drivers/mmc/host/dw_mmc.c: In function ?dw_mci_pull_data64?:
+drivers/mmc/host/dw_mmc.c:998: error: implicit declaration of function ?__raw_readq?
 
-Thanks for the fix.
+because arch/arm doesn't implement raw versions of these 64-bit accesses.
+I'm surprised that this driver hasn't been compiled on ARM before!  What
+kind of arch are you testing on?  Do you have any ARM hardware (lpc313x?)
+to verify the driver on?
 
-Acked-by: Sergey Matyukevich <geomatsi@gmail.com>
+Thanks,
 
-Best regards,
-Sergey
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
