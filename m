@@ -1,54 +1,28 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 11 Dec 2010 21:50:31 +0100
-Subject: [PATCH] OMAP1: clock_data: use runtime cpu / machine checks
-Message-ID: <201012112150.33831.jkrzyszt@tis.icnet.pl>
+From: plyatov@gmail.com (Igor Plyatov)
+Date: Sat, 11 Dec 2010 23:51:34 +0300
+Subject: [PATCH] ata: pata_at91.c bugfix for high master clock
+In-Reply-To: <20101211214044.37b866e0@realm>
+References: <1292038651-5578-1-git-send-email-plyatov@gmail.com>
+	<20101211214044.37b866e0@realm>
+Message-ID: <1292100694.27634.25.camel@homepc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise multi-omap1 configurations may set wrong clock speed.
+Dear Sergey,
 
-Created and tested against l-o master on Amstrad Delta.
+> > @@ -109,6 +111,11 @@ static void set_smc_timing(struct device *dev,
+> >  	/* (CS0, CS1, DIR, OE) <= (CFCE1, CFCE2, CFRNW, NCSX)
+> > timings */ ncs_read_setup = 1;
+> >  	ncs_read_pulse = read_cycle - 2;
+> > +	if (ncs_read_pulse > NCS_RD_PULSE_LIMIT) {
+> > +		ncs_read_pulse = NCS_RD_PULSE_LIMIT;
+> > +		dev_dbg(dev, "ncs_read_pulse limited to maximal
+> > value %lu\n",
+> 
+> arguably 'dev_warn' would be better in this case
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
-Tested with omap1_defconfig after dropping 
-CONFIG_OMAP_CLOCKS_SET_BY_BOOTLOADER=y and those of 12MHz xtal based clock 
-speeds which are too high for my board.
+Done as "PATCH v2".
 
- arch/arm/mach-omap1/clock_data.c |   17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
-
---- git/arch/arm/mach-omap1/clock_data.c.orig	2010-12-09 23:07:35.000000000 +0100
-+++ git/arch/arm/mach-omap1/clock_data.c	2010-12-11 21:05:52.000000000 +0100
-@@ -823,12 +823,10 @@ int __init omap1_clk_init(void)
- 			crystal_type = info->system_clock_type;
- 	}
- 
--#if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
--	ck_ref.rate = 13000000;
--#elif defined(CONFIG_ARCH_OMAP16XX)
--	if (crystal_type == 2)
-+	if (cpu_is_omap7xx())
-+		ck_ref.rate = 13000000;
-+	if (cpu_is_omap16xx() && crystal_type == 2)
- 		ck_ref.rate = 19200000;
--#endif
- 
- 	pr_info("Clocks: ARM_SYSST: 0x%04x DPLL_CTL: 0x%04x ARM_CKCTL: "
- 		"0x%04x\n", omap_readw(ARM_SYSST), omap_readw(DPLL_CTL),
-@@ -883,10 +881,11 @@ int __init omap1_clk_init(void)
- 	       ck_dpll1.rate / 1000000, (ck_dpll1.rate / 100000) % 10,
- 	       arm_ck.rate / 1000000, (arm_ck.rate / 100000) % 10);
- 
--#if defined(CONFIG_MACH_OMAP_PERSEUS2) || defined(CONFIG_MACH_OMAP_FSAMPLE)
--	/* Select slicer output as OMAP input clock */
--	omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1, OMAP7XX_PCC_UPLD_CTRL);
--#endif
-+	if (machine_is_omap_perseus2() || machine_is_omap_fsample()) {
-+		/* Select slicer output as OMAP input clock */
-+		omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1,
-+				OMAP7XX_PCC_UPLD_CTRL);
-+	}
- 
- 	/* Amstrad Delta wants BCLK high when inactive */
- 	if (machine_is_ams_delta())
+Best regards!
+--
+Igor Plyatov
