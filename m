@@ -1,18 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 11 Dec 2010 12:42:42 +0000
-Subject: [PATCH v7 00/12] tnetv107x ssp drivers
-In-Reply-To: <87r5dp6tzv.fsf@deeprootsystems.com>
-References: <1291733522-3626-1-git-send-email-cyril@ti.com>
-	<87r5dp6tzv.fsf@deeprootsystems.com>
-Message-ID: <20101211124242.GE9380@opensource.wolfsonmicro.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Sat, 11 Dec 2010 09:25:34 -0600
+Subject: [PATCH v3 5/5] OMAP: mailbox: add omap_device latency information
+In-Reply-To: <1292032266-29460-6-git-send-email-omar.ramirez@ti.com>
+References: <1292032266-29460-1-git-send-email-omar.ramirez@ti.com>
+	<1292032266-29460-6-git-send-email-omar.ramirez@ti.com>
+Message-ID: <AANLkTi=cQVr-T1mJeq9uaRn5VyXxBG-xcp79z898E6nx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 10, 2010 at 04:19:48PM -0800, Kevin Hilman wrote:
+On Fri, Dec 10, 2010 at 7:51 PM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+> From: Felipe Contreras <felipe.contreras@gmail.com>
+>
+> So that we can enable the main clock.
 
-> [PATCH v7 08/12] gpio: add ti-ssp gpio driver
-> David Brownell?  (MAINTAINERS isn't clear here)
+This should be:
 
-It's mostly abandoned at the minute.  Andrew Morton has been taking
-patches.  Grant Likely said he might take it over so sending stuff his
-way might prod him into action.
+Subject: OMAP: mailbox: use runtime pm for clk and sysc handling
+
+Use runtime pm APIs to enable/disable mailbox clocks and to configure
+SYSCONFIG registers.
+
+And if someone agrees, device_latency can be merged with the previous
+patch for device_build. I'll wait for comments and resubmit.
+
+Regards,
+
+Omar
