@@ -1,43 +1,36 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sat, 11 Dec 2010 11:21:51 +0900
-Subject: [PATCH 1/3] Add a common struct clk
-In-Reply-To: <AANLkTinGHXNrL-KJiQBq8G7a_oz-gpp9-unxeS1-e5-x@mail.gmail.com>
-References: <1284522014.516876.675872472687.0.gpush@pororo>
-	<201012080902.37859.jeremy.kerr@canonical.com>
-	<4CFFB6DD.4000108@fluff.org>
-	<201012091016.54130.jeremy.kerr@canonical.com>
-	<AANLkTinGHXNrL-KJiQBq8G7a_oz-gpp9-unxeS1-e5-x@mail.gmail.com>
-Message-ID: <AANLkTimucN+feao11U3sn5P8nR9Odu8OmLcaOz+bLJ_1@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 10 Dec 2010 21:23:01 -0500 (EST)
+Subject: [PATCH] sched: Fix the irqtime code to deal with u64 wraps
+In-Reply-To: <1292013506.13513.78.camel@laptop>
+References: <1292013506.13513.78.camel@laptop>
+Message-ID: <alpine.LFD.2.00.1012102116540.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 11, 2010 at 12:09 AM, Richard Zhao <linuxzsc@gmail.com> wrote:
+On Fri, 10 Dec 2010, Peter Zijlstra wrote:
 
->>> Why do they need atomic clocks?
-just the question in my mind...
+> OK, so here's the latest version, using fancy __this_cpu thingies.
+> 
+> I started a new thread since the old one was quite unwieldy.
+> 
+> Now, admittedly this patch is a tad large, esp for -rc5. So either we
+> need lots of Reviewed-by and such or I need to shrink this patch
+> somehow.
+> 
+> 
+> ---
+> Subject: sched: Fix the irqtime code to deal with u64 wraps
+> From: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Date: Thu Dec 09 14:15:34 CET 2010
+> 
+> ARM systems have a 32bit sched_clock() [ which needs to be fixed ],
+> but this exposed a bug in the irq_time code as well, it doesn't deal
+> with wraps at all.
+[...]
 
-> atomic clock make it easy to use, or we have to move many irq tasks to
-> kthread context. we may involves many kthreads. If we put tasks to
-> global work queue, ?sometimes it conflicts each other, and causes dead
-> lock.
-Sounds like more of a requirement of convenience, than technical limitation.
-See below..
+That would be more close to reality if you stated "Some ARM systems have 
+a 32bit sched_clock() [" above.  Most ARM systems in use today have a 
+sched_clock() with more than 32 bits, like 55 bits or so.
 
-> Cases to use atomic clock: when insert a sd card, we have to enable sd
-> host controller clock.
-One does have to enable the HC clock ... but why only in the irq context
-of the OOB signal ?
 
-> when a dma call back tell you everything is
-> done, you may want to disable controller clock. ...
-Again, why can't you disable the clock later?
-I doubt if power saving should be the reason here.
-
-IMHO, we should have atomic clocks only if there is really
-no other alternative.
-Making it available in standard API will only make its (ab)use
-more common.
-Also, it might get difficult to upgrade the API in future if there
-are two different types of clocks to manage.
-
-Thanks.
+Nicolas
