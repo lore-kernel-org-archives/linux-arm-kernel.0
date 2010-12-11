@@ -1,29 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Dec 2010 18:07:55 -0800
-Subject: [PATCH 8/8] arm: omap: add minimal support for RM-680
-In-Reply-To: <20101209172918.GE2763@pulham.picochip.com>
-References: <1291912764-12823-1-git-send-email-aaro.koskinen@nokia.com>
-	<1291912764-12823-9-git-send-email-aaro.koskinen@nokia.com>
-	<20101209170310.GC2763@pulham.picochip.com>
-	<alpine.DEB.1.10.1012091905210.22143@esdhcp041196.research.nokia.com>
-	<20101209172918.GE2763@pulham.picochip.com>
-Message-ID: <20101211020755.GD3054@atomide.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 11 Dec 2010 11:21:51 +0900
+Subject: [PATCH 1/3] Add a common struct clk
+In-Reply-To: <AANLkTinGHXNrL-KJiQBq8G7a_oz-gpp9-unxeS1-e5-x@mail.gmail.com>
+References: <1284522014.516876.675872472687.0.gpush@pororo>
+	<201012080902.37859.jeremy.kerr@canonical.com>
+	<4CFFB6DD.4000108@fluff.org>
+	<201012091016.54130.jeremy.kerr@canonical.com>
+	<AANLkTinGHXNrL-KJiQBq8G7a_oz-gpp9-unxeS1-e5-x@mail.gmail.com>
+Message-ID: <AANLkTimucN+feao11U3sn5P8nR9Odu8OmLcaOz+bLJ_1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Iles <jamie@jamieiles.com> [101209 09:29]:
-> On Thu, Dec 09, 2010 at 07:11:28PM +0200, Aaro Koskinen wrote:
-> > 
-> > Check the following commits in linux-omap tree:
-> > 
-> > http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=commit;h=5403187f83c12c6f4c03547e0cc05bac0310be7b
-> > 
-> > and
-> > 
-> > http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=commit;h=7203f8a48bb63015ebe58a6f2a38aec1cb208b9d
-> Thanks for the pointer! It looks a bit confusing to my eyes but I guess it's 
-> better than lots of ifdeffery.
+On Sat, Dec 11, 2010 at 12:09 AM, Richard Zhao <linuxzsc@gmail.com> wrote:
 
-Queuing these for the next merge window.
+>>> Why do they need atomic clocks?
+just the question in my mind...
 
-Tony
+> atomic clock make it easy to use, or we have to move many irq tasks to
+> kthread context. we may involves many kthreads. If we put tasks to
+> global work queue, ?sometimes it conflicts each other, and causes dead
+> lock.
+Sounds like more of a requirement of convenience, than technical limitation.
+See below..
+
+> Cases to use atomic clock: when insert a sd card, we have to enable sd
+> host controller clock.
+One does have to enable the HC clock ... but why only in the irq context
+of the OOB signal ?
+
+> when a dma call back tell you everything is
+> done, you may want to disable controller clock. ...
+Again, why can't you disable the clock later?
+I doubt if power saving should be the reason here.
+
+IMHO, we should have atomic clocks only if there is really
+no other alternative.
+Making it available in standard API will only make its (ab)use
+more common.
+Also, it might get difficult to upgrade the API in future if there
+are two different types of clocks to manage.
+
+Thanks.
