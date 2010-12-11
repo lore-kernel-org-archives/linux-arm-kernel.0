@@ -1,51 +1,18 @@
-From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Sat, 11 Dec 2010 21:57:11 +0100
-Subject: [PATCH] sa1100: Fix platform device registration
-In-Reply-To: <1292090000-21779-1-git-send-email-jochen@scram.de>
-References: <1292090000-21779-1-git-send-email-jochen@scram.de>
-Message-ID: <20101211205710.GB810@boggieman>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Sat, 11 Dec 2010 17:10:11 -0500
+Subject: [PATCH v2] ata: pata_at91.c bugfix for high master clock
+In-Reply-To: <1292099846-24528-1-git-send-email-plyatov@gmail.com>
+References: <1292099846-24528-1-git-send-email-plyatov@gmail.com>
+Message-ID: <4D03F6C3.5030709@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/11/2010 03:37 PM, Igor Plyatov wrote:
+> The AT91SAM9 microcontrollers with master clock higher then 105 MHz
+> and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
+> lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
+> does not detect ATA device.
+>
+> Signed-off-by: Igor Plyatov<plyatov@gmail.com>
 
-Applies and makes sense, so
-
-Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
-
-On Sat, Dec 11, 2010 at 06:53:20PM +0100, Jochen Friedrich wrote:
-> Since commit 7a5b4e16c880f8350d255dc188f81622905618c1, simpad devices don't
-> boot anymore, since platform devices are registered too early. Fix by moving
-> the registration from map_io to arch_initcall as done on other sa1100 boards.
-> 
-> Signed-off-by: Jochen Friedrich <jochen@scram.de>
-> ---
->  arch/arm/mach-sa1100/simpad.c |    7 ++++---
->  1 files changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-> index 27692d0..cfb7607 100644
-> --- a/arch/arm/mach-sa1100/simpad.c
-> +++ b/arch/arm/mach-sa1100/simpad.c
-> @@ -166,9 +166,6 @@ static void __init simpad_map_io(void)
->  	PCFR = 0;
->  	PSDR = 0;
->  
-> -	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
-> -			      ARRAY_SIZE(simpad_flash_resources));
-> -	sa11x0_register_mcp(&simpad_mcp_data);
->  }
->  
->  static void simpad_power_off(void)
-> @@ -216,6 +213,10 @@ static int __init simpad_init(void)
->  
->  	pm_power_off = simpad_power_off;
->  
-> +	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
-> +			      ARRAY_SIZE(simpad_flash_resources));
-> +	sa11x0_register_mcp(&simpad_mcp_data);
-> +
->  	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
->  	if(ret)
->  		printk(KERN_WARNING "simpad: Unable to register mq200 framebuffer device");
-> -- 
-> 1.7.2.3
+Thanks, queued (absent further comments...)
