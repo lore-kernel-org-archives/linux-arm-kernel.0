@@ -1,43 +1,79 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Sat, 11 Dec 2010 18:53:20 +0100
-Subject: [PATCH] sa1100: Fix platform device registration
-Message-ID: <1292090000-21779-1-git-send-email-jochen@scram.de>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Sat, 11 Dec 2010 21:40:44 +0300
+Subject: [PATCH] ata: pata_at91.c bugfix for high master clock
+In-Reply-To: <1292038651-5578-1-git-send-email-plyatov@gmail.com>
+References: <1292038651-5578-1-git-send-email-plyatov@gmail.com>
+Message-ID: <20101211214044.37b866e0@realm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 7a5b4e16c880f8350d255dc188f81622905618c1, simpad devices don't
-boot anymore, since platform devices are registered too early. Fix by moving
-the registration from map_io to arch_initcall as done on other sa1100 boards.
+Hello Igor,
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- arch/arm/mach-sa1100/simpad.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+On Sat, 11 Dec 2010 06:37:31 +0300
+Igor Plyatov <plyatov@gmail.com> wrote:
 
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index 27692d0..cfb7607 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -166,9 +166,6 @@ static void __init simpad_map_io(void)
- 	PCFR = 0;
- 	PSDR = 0;
- 
--	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
--			      ARRAY_SIZE(simpad_flash_resources));
--	sa11x0_register_mcp(&simpad_mcp_data);
- }
- 
- static void simpad_power_off(void)
-@@ -216,6 +213,10 @@ static int __init simpad_init(void)
- 
- 	pm_power_off = simpad_power_off;
- 
-+	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
-+			      ARRAY_SIZE(simpad_flash_resources));
-+	sa11x0_register_mcp(&simpad_mcp_data);
-+
- 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
- 	if(ret)
- 		printk(KERN_WARNING "simpad: Unable to register mq200 framebuffer device");
--- 
-1.7.2.3
+> The AT91SAM9 microcontrollers with master clock higher then 105 MHz
+> and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
+> lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and
+> pata_at91 driver does not detect ATA device.
+> 
+> Signed-off-by: Igor Plyatov <plyatov@gmail.com>
+> ---
+>  drivers/ata/pata_at91.c |   11 +++++++++--
+>  1 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+> index 0da0dcc..2e189be 100644
+> --- a/drivers/ata/pata_at91.c
+> +++ b/drivers/ata/pata_at91.c
+> @@ -33,12 +33,14 @@
+>  
+>  
+>  #define DRV_NAME "pata_at91"
+> -#define DRV_VERSION "0.1"
+> +#define DRV_VERSION "0.2"
+>  
+>  #define CF_IDE_OFFSET	    0x00c00000
+>  #define CF_ALT_IDE_OFFSET   0x00e00000
+>  #define CF_IDE_RES_SIZE     0x08
+>  
+> +#define NCS_RD_PULSE_LIMIT  0x3f /* maximal value for pulse
+> bitfields */ +
+>  struct at91_ide_info {
+>  	unsigned long mode;
+>  	unsigned int cs;
+> @@ -50,7 +52,7 @@ struct at91_ide_info {
+>  };
+>  
+>  static const struct ata_timing initial_timing =
+> -	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 600, 0};
+> +	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
+>  
+>  static unsigned long calc_mck_cycles(unsigned long ns, unsigned long
+> mck_hz) {
+> @@ -109,6 +111,11 @@ static void set_smc_timing(struct device *dev,
+>  	/* (CS0, CS1, DIR, OE) <= (CFCE1, CFCE2, CFRNW, NCSX)
+> timings */ ncs_read_setup = 1;
+>  	ncs_read_pulse = read_cycle - 2;
+> +	if (ncs_read_pulse > NCS_RD_PULSE_LIMIT) {
+> +		ncs_read_pulse = NCS_RD_PULSE_LIMIT;
+> +		dev_dbg(dev, "ncs_read_pulse limited to maximal
+> value %lu\n",
+
+arguably 'dev_warn' would be better in this case
+
+> +			ncs_read_pulse);
+> +	}
+>  
+>  	/* Write timings same as read timings */
+>  	write_cycle = read_cycle;
+
+Thanks for the fix.
+
+By the way, it was not a good idea to send this patch separately to
+both lists: linux-ide and linux-arm-kernel. I will ack this patch and
+add linux-arm-kernel and other recipients in my reply to your email 
+to linux-ide list.
+
+Thanks,
+Sergey
