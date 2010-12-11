@@ -1,30 +1,76 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 11 Dec 2010 12:07:38 -0800 (PST)
-Subject: [PATCH] ide: at91_ide.c bugfix for high master clock
-In-Reply-To: <1292097745-9680-1-git-send-email-plyatov@gmail.com>
-References: <1292097745-9680-1-git-send-email-plyatov@gmail.com>
-Message-ID: <20101211.120738.59690708.davem@davemloft.net>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sat, 11 Dec 2010 20:17:54 +0000
+Subject: [PATCH] arm/ixp4xx: Rename FREQ macro to avoid collisions
+Message-ID: <1292098674.3136.41.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Igor Plyatov <plyatov@gmail.com>
-Date: Sat, 11 Dec 2010 23:02:25 +0300
+FREQ is a ridiculously short name for a platform-specific macro in a
+generic header, and it now conflicts with an enumeration in the
+gspca/ov519 driver.
 
-> The AT91SAM9 microcontrollers with master clock higher then 105 MHz
-> and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
-> lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and at91_ide
-> driver does not detect ATA device.
-> This patch must be applied on top of my patch for pata_at91 where the
-> same bug fixed.
-> 
-> Signed-off-by: Igor Plyatov <plyatov@gmail.com>
+Also delete conditional reference to ixp4xx_get_board_tick_rate()
+which is not defined anywhere.
 
-Please submit this as two patches, since different people maintain
-the IDE vs. ATA layers.
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+---
+ arch/arm/mach-ixp4xx/common.c             |    4 ++--
+ arch/arm/mach-ixp4xx/include/mach/timex.h |    5 +++--
+ drivers/input/misc/ixp4xx-beeper.c        |    6 +-----
+ 3 files changed, 6 insertions(+), 9 deletions(-)
 
-In fact the dev_warn() change is the only change you made to the
-ATA driver and that has nothing to do with the bug fix you are
-making here.  So it would belong as a seperate patch submission
-anyways.
-
-Thanks.
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 0bce097..f5c42fe 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -415,7 +415,7 @@ static struct clocksource clocksource_ixp4xx = {
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+-unsigned long ixp4xx_timer_freq = FREQ;
++unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
+ EXPORT_SYMBOL(ixp4xx_timer_freq);
+ static void __init ixp4xx_clocksource_init(void)
+ {
+@@ -491,7 +491,7 @@ static struct clock_event_device clockevent_ixp4xx = {
+ 
+ static void __init ixp4xx_clockevent_init(void)
+ {
+-	clockevent_ixp4xx.mult = div_sc(FREQ, NSEC_PER_SEC,
++	clockevent_ixp4xx.mult = div_sc(IXP4XX_TIMER_FREQ, NSEC_PER_SEC,
+ 					clockevent_ixp4xx.shift);
+ 	clockevent_ixp4xx.max_delta_ns =
+ 		clockevent_delta2ns(0xfffffffe, &clockevent_ixp4xx);
+diff --git a/arch/arm/mach-ixp4xx/include/mach/timex.h b/arch/arm/mach-ixp4xx/include/mach/timex.h
+index 2c3f93c..c9e930f 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/timex.h
++++ b/arch/arm/mach-ixp4xx/include/mach/timex.h
+@@ -10,6 +10,7 @@
+  * 66.66... MHz. We do a convulted calculation of CLOCK_TICK_RATE b/c the
+  * timer register ignores the bottom 2 bits of the LATCH value.
+  */
+-#define FREQ 66666000
+-#define CLOCK_TICK_RATE (((FREQ / HZ & ~IXP4XX_OST_RELOAD_MASK) + 1) * HZ)
++#define IXP4XX_TIMER_FREQ 66666000
++#define CLOCK_TICK_RATE \
++	(((IXP4XX_TIMER_FREQ / HZ & ~IXP4XX_OST_RELOAD_MASK) + 1) * HZ)
+ 
+diff --git a/drivers/input/misc/ixp4xx-beeper.c b/drivers/input/misc/ixp4xx-beeper.c
+index 9dfd6e5..1f38302 100644
+--- a/drivers/input/misc/ixp4xx-beeper.c
++++ b/drivers/input/misc/ixp4xx-beeper.c
+@@ -69,11 +69,7 @@ static int ixp4xx_spkr_event(struct input_dev *dev, unsigned int type, unsigned
+ 	}
+ 
+ 	if (value > 20 && value < 32767)
+-#ifndef FREQ
+-		count = (ixp4xx_get_board_tick_rate() / (value * 4)) - 1;
+-#else
+-		count = (FREQ / (value * 4)) - 1;
+-#endif
++		count = (IXP4XX_TIMER_FREQ / (value * 4)) - 1;
+ 
+ 	ixp4xx_spkr_control(pin, count);
+ 
+-- 
+1.7.2.3
