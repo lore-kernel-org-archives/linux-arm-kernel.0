@@ -1,43 +1,34 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 10 Dec 2010 17:34:15 -0700 (MST)
-Subject: [PATCH v2 4/8] OMAP4: clock data: Add missing fields in
-	iva_hsd_byp_clk_mux_ck
-In-Reply-To: <1291932820-11163-5-git-send-email-b-cousson@ti.com>
-References: <1291932820-11163-1-git-send-email-b-cousson@ti.com>
-	<1291932820-11163-5-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1012101732320.13430@utopia.booyaka.com>
+Date: Fri, 10 Dec 2010 18:36:00 -0700 (MST)
+Subject: [PATCH 05/11] OMAP2+: clockdomains: split the clkdm hwsup
+	enable/disable function
+In-Reply-To: <alpine.DEB.2.00.1012081659520.13430@utopia.booyaka.com>
+References: <20101208061657.30541.79824.stgit@twilight.localdomain>
+	<20101208061838.30541.36426.stgit@twilight.localdomain>
+	<871v5rg8px.fsf@deeprootsystems.com>
+	<alpine.DEB.2.00.1012081659520.13430@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1012101832200.13430@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Dec 2010, Benoit Cousson wrote:
+On Wed, 8 Dec 2010, Paul Walmsley wrote:
 
-> From: Jonathan Bergsagel <jbergsagel@ti.com>
+> On Wed, 8 Dec 2010, Kevin Hilman wrote:
 > 
-> Add register address, mask and link to the clksel structure that
-> were missing in the IVA DPLL mux clock node.
+> > Paul Walmsley <paul@pwsan.com> writes:
+> >
+> > > - * _omap2_clkdm_set_hwsup - set the hwsup idle transition bit
+> > > +/**
+> > > + * _enable_hwsup - set the hwsup idle transition bit
+> > > + * @clkdm: struct clockdomain *
+> > > + *
+> > > + * XXX fix doco
+> > 
+> > hmm, 'doco' must be a new lingo I haven't learned yet.
 > 
-> Signed-off-by: Jonathan Bergsagel <jbergsagel@ti.com>
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Thanks, will fix these.
 
-This patch results in a checkpatch warning:
+Here's the revised patch.
 
----
-
-WARNING: please, no space before tabs
-#23: FILE: arch/arm/mach-omap2/clock44xx_data.c:639:
-+^I.clksel ^I= iva_hsd_byp_clk_mux_sel,$
-
-total: 0 errors, 1 warnings, 0 checks, 13 lines checked
-
-Your patch has style problems, please review.  If any of these errors
-are false positives report them to the maintainer, see
-CHECKPATCH in MAINTAINERS.
-
----
-
-I've fixed it in the copy in my local branch, but next time, please run 
-checkpatch.pl and fix any problems before submitting.
-
-regards,
 
 - Paul
