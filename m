@@ -1,80 +1,54 @@
-From: plyatov@gmail.com (Igor Plyatov)
-Date: Sat, 11 Dec 2010 23:45:26 +0300
-Subject: [PATCH v2] ide: at91_ide.c bugfix for high master clock
-Message-ID: <1292100326-637-1-git-send-email-plyatov@gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sat, 11 Dec 2010 21:50:31 +0100
+Subject: [PATCH] OMAP1: clock_data: use runtime cpu / machine checks
+Message-ID: <201012112150.33831.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91SAM9 microcontrollers with master clock higher then 105 MHz
-and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
-lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
-does not detect IDE device.
+Otherwise multi-omap1 configurations may set wrong clock speed.
 
-Signed-off-by: Igor Plyatov <plyatov@gmail.com>
+Created and tested against l-o master on Amstrad Delta.
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 ---
- drivers/ide/at91_ide.c |   33 +++++++++++++++++++++++----------
- 1 files changed, 23 insertions(+), 10 deletions(-)
+Tested with omap1_defconfig after dropping 
+CONFIG_OMAP_CLOCKS_SET_BY_BOOTLOADER=y and those of 12MHz xtal based clock 
+speeds which are too high for my board.
 
-diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
-index 000a78e..5f97710 100644
---- a/drivers/ide/at91_ide.c
-+++ b/drivers/ide/at91_ide.c
-@@ -36,6 +36,8 @@
- #define perr(fmt, args...) pr_err(DRV_NAME ": " fmt, ##args)
- #define pdbg(fmt, args...) pr_debug("%s " fmt, __func__, ##args)
+ arch/arm/mach-omap1/clock_data.c |   17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
+
+--- git/arch/arm/mach-omap1/clock_data.c.orig	2010-12-09 23:07:35.000000000 +0100
++++ git/arch/arm/mach-omap1/clock_data.c	2010-12-11 21:05:52.000000000 +0100
+@@ -823,12 +823,10 @@ int __init omap1_clk_init(void)
+ 			crystal_type = info->system_clock_type;
+ 	}
  
-+#define NCS_RD_PULSE_LIMIT  0x3f /* maximal value for pulse bitfields */
-+
- /*
-  * Access to IDE device is possible through EBI Static Memory Controller
-  * with Compact Flash logic. For details see EBI and SMC datasheet sections
-@@ -70,6 +72,7 @@ static void set_smc_timings(const u8 chipselect, const u16 cycle,
- 			    const u16 setup, const u16 pulse,
- 			    const u16 data_float, int use_iordy)
- {
-+	u16 ncs_rd_pulse;
- 	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
- 			     AT91_SMC_BAT_SELECT;
+-#if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+-	ck_ref.rate = 13000000;
+-#elif defined(CONFIG_ARCH_OMAP16XX)
+-	if (crystal_type == 2)
++	if (cpu_is_omap7xx())
++		ck_ref.rate = 13000000;
++	if (cpu_is_omap16xx() && crystal_type == 2)
+ 		ck_ref.rate = 19200000;
+-#endif
  
-@@ -81,19 +84,29 @@ static void set_smc_timings(const u8 chipselect, const u16 cycle,
- 	if (data_float)
- 		mode |= AT91_SMC_TDF_(data_float);
+ 	pr_info("Clocks: ARM_SYSST: 0x%04x DPLL_CTL: 0x%04x ARM_CKCTL: "
+ 		"0x%04x\n", omap_readw(ARM_SYSST), omap_readw(DPLL_CTL),
+@@ -883,10 +881,11 @@ int __init omap1_clk_init(void)
+ 	       ck_dpll1.rate / 1000000, (ck_dpll1.rate / 100000) % 10,
+ 	       arm_ck.rate / 1000000, (arm_ck.rate / 100000) % 10);
  
-+	ncs_rd_pulse = cycle;
-+	if (ncs_rd_pulse > NCS_RD_PULSE_LIMIT) {
-+		ncs_rd_pulse = NCS_RD_PULSE_LIMIT;
-+		pr_warn(DRV_NAME ": ncs_rd_pulse limited to maximal value %d\n",
-+			ncs_rd_pulse);
+-#if defined(CONFIG_MACH_OMAP_PERSEUS2) || defined(CONFIG_MACH_OMAP_FSAMPLE)
+-	/* Select slicer output as OMAP input clock */
+-	omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1, OMAP7XX_PCC_UPLD_CTRL);
+-#endif
++	if (machine_is_omap_perseus2() || machine_is_omap_fsample()) {
++		/* Select slicer output as OMAP input clock */
++		omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1,
++				OMAP7XX_PCC_UPLD_CTRL);
 +	}
-+
- 	at91_sys_write(AT91_SMC_MODE(chipselect), mode);
  
- 	/* setup timings in SMC */
--	at91_sys_write(AT91_SMC_SETUP(chipselect), AT91_SMC_NWESETUP_(setup) |
--						   AT91_SMC_NCS_WRSETUP_(0) |
--						   AT91_SMC_NRDSETUP_(setup) |
--						   AT91_SMC_NCS_RDSETUP_(0));
--	at91_sys_write(AT91_SMC_PULSE(chipselect), AT91_SMC_NWEPULSE_(pulse) |
--						   AT91_SMC_NCS_WRPULSE_(cycle) |
--						   AT91_SMC_NRDPULSE_(pulse) |
--						   AT91_SMC_NCS_RDPULSE_(cycle));
--	at91_sys_write(AT91_SMC_CYCLE(chipselect), AT91_SMC_NWECYCLE_(cycle) |
--						   AT91_SMC_NRDCYCLE_(cycle));
-+	at91_sys_write(AT91_SMC_SETUP(chipselect),
-+			AT91_SMC_NWESETUP_(setup) |
-+			AT91_SMC_NCS_WRSETUP_(0) |
-+			AT91_SMC_NRDSETUP_(setup) |
-+			AT91_SMC_NCS_RDSETUP_(0));
-+	at91_sys_write(AT91_SMC_PULSE(chipselect),
-+			AT91_SMC_NWEPULSE_(pulse) |
-+			AT91_SMC_NCS_WRPULSE_(ncs_rd_pulse) |
-+			AT91_SMC_NRDPULSE_(pulse) |
-+			AT91_SMC_NCS_RDPULSE_(ncs_rd_pulse));
-+	at91_sys_write(AT91_SMC_CYCLE(chipselect),
-+			AT91_SMC_NWECYCLE_(cycle) |
-+			AT91_SMC_NRDCYCLE_(cycle));
- }
- 
- static unsigned int calc_mck_cycles(unsigned int ns, unsigned int mck_hz)
--- 
-1.7.0.4
+ 	/* Amstrad Delta wants BCLK high when inactive */
+ 	if (machine_is_ams_delta())
