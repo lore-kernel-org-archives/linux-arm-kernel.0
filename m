@@ -1,25 +1,55 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 12 Dec 2010 23:42:48 +0800
-Subject: [GIT PULL] pxa: fixes for v2.6.37-rc4
-Message-ID: <AANLkTikTKAFNfJUgNG3AwFj-1risT53TeW348c-H5-y2@mail.gmail.com>
+From: plyatov@gmail.com (Igor Plyatov)
+Date: Sun, 12 Dec 2010 22:02:59 +0300
+Subject: [PATCH v2] ata: pata_at91.c bugfix for high master clock
+In-Reply-To: <4D04D2E2.20100@ru.mvista.com>
+References: <1292099846-24528-1-git-send-email-plyatov@gmail.com>
+	<4D04D2E2.20100@ru.mvista.com>
+Message-ID: <1292180579.8737.12.camel@homepc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
+Dear Sergei,
 
-  Linux 2.6.37-rc4 (2010-11-29 20:42:04 -0800)
+> Hello.
+> 
+> On 11-12-2010 23:37, Igor Plyatov wrote:
+> 
+> > The AT91SAM9 microcontrollers with master clock higher then 105 MHz
+> > and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
+> > lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
+> > does not detect ATA device.
+> 
+> > Signed-off-by: Igor Plyatov<plyatov@gmail.com>
+> [...]
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+Please use more descriptive comments, because it is not clear what you
+mean here. Maybe here you just cut a text...
+It is so strange to cut such small amount of text and I does not have
+any idea why here is "[...]" exists.
 
-Jason Chagas (1):
-      ARM: mmp2: remove not used clk_rtc
+> > diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+> > index 0da0dcc..a462405 100644
+> > --- a/drivers/ata/pata_at91.c
+> > +++ b/drivers/ata/pata_at91.c
+> [...]
 
-Marek Vasut (2):
-      ARM: pxa: fix pxa2xx-flash section mismatch
-      ARM: pxa/palm: fix ifdef around gen_nand driver registration
+The same as above. Nobody are able to read you mind on the distance :-)
 
- arch/arm/mach-mmp/mmp2.c        |    1 -
- arch/arm/mach-pxa/palmtx.c      |    3 ++-
- drivers/mtd/maps/pxa2xx-flash.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+> > @@ -50,7 +52,7 @@ struct at91_ide_info {
+> >   };
+> >
+> >   static const struct ata_timing initial_timing =
+> > -	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 600, 0};
+> > +	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
+> 
+>     BTW, you haven't described this in the changelog...
+
+Here is just a typo fixed for the ata_timing structure. This typo does
+not have influence on the driver operation, but I do not like to leave
+such a negligible problem as it is.
+
+> WBR, Sergei
+
+Best regards!
+--
+Igor Plyatov
