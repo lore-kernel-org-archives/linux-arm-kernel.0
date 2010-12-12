@@ -1,48 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Dec 2010 14:11:12 +0000
-Subject: [PATCH] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <AANLkTinMYeWNLu8e7xyBTvjmeFMsJ5sDGtsCesu04d4K@mail.gmail.com>
-References: <AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
-	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
-	<20101209064751.GA21128@void.printf.net>
-	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
-	<20101209160157.GA28586@void.printf.net>
-	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
-	<20101211192320.GA24430@void.printf.net>
-	<AANLkTin5aVPz5Y=jS89V00XS=rje3gqeUb2VTYt2A_9=@mail.gmail.com>
-	<20101212135224.GA31812@void.printf.net>
-	<AANLkTinMYeWNLu8e7xyBTvjmeFMsJ5sDGtsCesu04d4K@mail.gmail.com>
-Message-ID: <20101212141112.GF8665@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 12 Dec 2010 15:07:27 +0100
+Subject: [PATCH v4] mach-at91: Support for gsia18s board added
+In-Reply-To: <1292135848.2456.19.camel@homepc>
+References: <1292000411-6691-1-git-send-email-plyatov@gmail.com>
+	<20101212005048.GH19897@game.jcrosoft.org>
+	<1292135848.2456.19.camel@homepc>
+Message-ID: <20101212140727.GI19897@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 12, 2010 at 02:03:52PM +0000, Will Newton wrote:
-> On Sun, Dec 12, 2010 at 1:52 PM, Chris Ball <cjb@laptop.org> wrote:
-> > Hi Will,
-> >
-> > On Sun, Dec 12, 2010 at 10:57:44AM +0000, Will Newton wrote:
-> >> > drivers/mmc/host/dw_mmc.c: In function ?dw_mci_pull_data64?:
-> >> > drivers/mmc/host/dw_mmc.c:998: error: implicit declaration of function ?__raw_readq?
-> >> >
-> >> > because arch/arm doesn't implement raw versions of these 64-bit accesses.
-> >> > I'm surprised that this driver hasn't been compiled on ARM before! ?What
-> >>
-> >> That particular bit of code has been added since it was last built for
-> >> arm. Our architecture can do 64bit accesses so we implement readq.
-> >> Unfortunately there doesn't seem to be a sane way to conditionalize
-> >> code for architectures that have or don't have readq, so I suspect
-> >> I'll have to just remove that branch of the if statement for now.
-> >
-> > (Russell, thanks for the excellent explanation.)
-> >
-> > Other drivers (MTD, gpio/basic_mmio_gpio.c, fs/fuse, pcm_oss.c)
-> > conditionalize uses of {read,write}q on BITS_PER_LONG >= 64, so
-> > something like this:
+On 09:37 Sun 12 Dec     , Igor Plyatov wrote:
+> Dear Jean-Christophe,
 > 
-> I don't think that's going to work, BITS_PER_LONG isn't equivalent to
-> "can do 64bit IO accesses", at least it isn't on our architecture. x86
-> is in the same situation it would appear, although x86 does explicitly
-> #define readq so it may be possible to #ifdef on that?
+> > On 20:00 Fri 10 Dec     , Igor Plyatov wrote:
+> > > The GS_IA18_S (GMS) is a carrier board from GeoSIG Ltd used with the
+> > > Stamp9G20 SoM from Taskit company.
+> > > It operate as an internet accelerometer.
+> > > 
+> > > Signed-off-by: Igor Plyatov <plyatov@gmail.com>
+> > > ---
+> > >  arch/arm/configs/gsia18s_defconfig        |  147 +++++++
+> > please no new defconfig
+> > start to merge them
+> 
+> I already write that it is not possible to use same defconfig for our
+> board and Stamp9G20, because 69 different CONFIG_xxx options required
+> for our machine (compared with Portux G20 and Stamp9G20) and our options
+> very excessive for other devices based on the Stamp9G20.
+> This device for the embedded, where space constraints exists for memory
+> and it is required to save resources as more as possible.
+sorry as I explain before if you have exclusive option you need to create
+kconfig options which are board specific to manage them
+we work to reduce the number of defconfig in the mainline
+and it's not PortuxG20 and Stamp9g20 specific but to have only one defconfig
+for all 9g20 at a first step and late for all sam9
+> 
+> > your patch contain a lots of whitespace please fix it
+> 
+> There is no problems with whitespace. This patch checked by
+> scripts/checkpatch.pl twice. It seems your mailer corrupt this patch.
+my mailer no way mutt does not do it
+and when I edit with vim I saw the whitespace too
+please check again
+> 
+> > > +
+> > > +/*
+> > > + * Up to date linux/arch/arm/tools/mach-types database required to support this.
+> > > +MACHINE_START(GSIA18S, "GS_IA18_S")
+> > > +*/
+> > > +MACHINE_START(STAMP9G20, "GS_IA18_S")
+> > if you do this you must use system_rev to identify the board
+> 
+> I can cite Christian Glindkamp:
+> "And for different carrier boards, system_rev does not make sense at
+> all."
+> 
+> Please, use more testimony why it is required to use system_rev here.
+> Yours position does not clear for me.
+> You can point me to the right documentation or discussion about this
+> requirements in the mail archives...
+two bards with the same machine id NACK as we can not compile them in the same
+kernel and this a target we all work on to allow
+if you want to tuse the same machine id as I did for other boards you must use
+system_rev or any detection to identify tehm
 
-Maybe invent CONFIG_HAVE_MMIO_64BIT which architectures can select as
-appropriate?
+Best Regards,
+J.
