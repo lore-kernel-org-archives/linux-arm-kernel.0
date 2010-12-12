@@ -1,74 +1,75 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Dec 2010 11:15:45 +0000
-Subject: [PATCH] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <20101212084135.GC8665@n2100.arm.linux.org.uk>
-References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
-	<20101208115510.GD10998@console-pimps.org>
-	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
-	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
-	<20101209064751.GA21128@void.printf.net>
-	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
-	<20101209160157.GA28586@void.printf.net>
-	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
-	<20101211192320.GA24430@void.printf.net>
-	<20101212084135.GC8665@n2100.arm.linux.org.uk>
-Message-ID: <20101212111545.GE8665@n2100.arm.linux.org.uk>
+Date: Sun, 12 Dec 2010 11:20:50 +0000
+Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
+In-Reply-To: <AANLkTim641hqqyCczMPN_rDvVH_dqV0voQLFhQsrQLY3@mail.gmail.com>
+References: <AANLkTind+DH5emar2L9EiV-pqpCvQHQGnFevh9Bncrpz@mail.gmail.com>
+	<20101202123304.GB10461@n2100.arm.linux.org.uk>
+	<AANLkTi=iRUD3_dcY47tebHGbxxAOcY61_2MtSVfO8zQB@mail.gmail.com>
+	<20101202152053.GC10461@n2100.arm.linux.org.uk>
+	<AANLkTi=01qGO6pX15n_w-W4RaaXsK3u697UQ9pD_DuvW@mail.gmail.com>
+	<AANLkTim641hqqyCczMPN_rDvVH_dqV0voQLFhQsrQLY3@mail.gmail.com>
+Message-ID: <20101212112050.GA8777@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 12, 2010 at 08:41:36AM +0000, Russell King - ARM Linux wrote:
-> On Sat, Dec 11, 2010 at 07:23:20PM +0000, Chris Ball wrote:
-> > Hi Will,
-> > 
-> > On Thu, Dec 09, 2010 at 05:24:26PM +0000, Will Newton wrote:
-> > > This adds the mmc host driver for the Synopsys DesignWare mmc
-> > > host controller, found in a number of embedded SoC designs.
-> > > 
-> > > Signed-off-by: Will Newton <will.newton@imgtec.com>
-> > > Reviewed-by: Matt Fleming <matt@console-pimps.org>
-> > 
-> > Running a test build on ARM fails:
-> > 
-> > drivers/mmc/host/dw_mmc.c: In function ?dw_mci_push_data64?:
-> > drivers/mmc/host/dw_mmc.c:985: error: implicit declaration of function ?__raw_writeq?
-> > drivers/mmc/host/dw_mmc.c: In function ?dw_mci_pull_data64?:
-> > drivers/mmc/host/dw_mmc.c:998: error: implicit declaration of function ?__raw_readq?
-> > 
-> > because arch/arm doesn't implement raw versions of these 64-bit accesses.
-> > I'm surprised that this driver hasn't been compiled on ARM before!  What
-> > kind of arch are you testing on?  Do you have any ARM hardware (lpc313x?)
-> > to verify the driver on?
+On Mon, Dec 06, 2010 at 09:16:23AM -0600, Kanigeri, Hari wrote:
+> Ruseell,
 > 
-> What's the semantics of a 64-bit IO access?  Does the low 32-bit get
-> written before the high 32-bit, or is it the other way around?  Does
-> it depend on the endian-ness?  What if some hardware needs the low
-> 32-bit first and other needs the high 32-bit first?
+> On Thu, Dec 2, 2010 at 9:43 AM, Guzman Lugo, Fernando
+> <fernando.lugo@ti.com> wrote:
+> > On Thu, Dec 2, 2010 at 9:20 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Thu, Dec 02, 2010 at 08:50:07AM -0600, Guzman Lugo, Fernando wrote:
+> >>> On Thu, Dec 2, 2010 at 6:33 AM, Russell King - ARM Linux
+> >>> <linux@arm.linux.org.uk> wrote:
+> >>> > On Thu, Dec 02, 2010 at 06:07:23AM -0600, Kanigeri, Hari wrote:
+> >>> >> Hi Tony,
+> >>> >>
+> >>> >> The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
+> >>> >> ? Linus Torvalds (1):
+> >>> >> ? ? ? ? Linux 2.6.37-rc4
+> >>> >>
+> >>> >> are available in the git repository at:
+> >>> >>
+> >>> >> ? git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
+> >>> >>
+> >>> >> Fernando Guzman Lugo (5):
+> >>> >> ? ? ? OMAP: mailbox: change full flag per mailbox queue instead of global
+> >>> >> ? ? ? omap: iovmm - no gap checking for fixed address
+> >>> >> ? ? ? omap: iovmm - add superpages support to fixed da address
+> >>> >> ? ? ? omap: iovmm - replace __iounmap with omap_iounmap
+> >>> >
+> >>> > This change is wrong. ?Nothing should be directly referencing omap_iounmap
+> >>> > nor for that matter omap_ioremap. ?Both are implementation details of the
+> >>> > standard ioremap/iounmap APIs.
+> >>> >
+> >>> > Use the official APIs rather than the implementation details behind them.
+> >>>
+> >>> if you see where the function is used, you will see that it is not
+> >>> calling the function, it is use as a parameter in unmap_vm_area(), if
+> >>> I used iounmap which is a macro there I will get a compilation error.
+> >>
+> >> Hmm, yes, because iounmap() is defined as a macro rather than iounmap.
+> >>
+> >> The solution to this is to fix iounmap and __arch_iounmap macros so
+> >> they aren't macros which take arguments. ?That will then allow them
+> >> to be used in the way you desire.
+> >
+> > yes, that way it can be used in the function parameter. what is the
+> > right thing to do?
+> > 1) You send your patch and then I send the new version of the patches.
+> > 2) I make a new series of the patches with the change to iounmap and I
+> > include your patch in the series.
+> >
 > 
-> I don't think it's reasonable to expect 32-bit hardware to perform 64-bit
-> IO accesses.
+> Can you please suggest the approach we take here ? So, either you send
+> your suggested change as a patch and Fernando's patch will be based on
+> it, or he can take a TODO action item to patch again if you plan to
+> send this change later.
 
-I should cover something else here, in anticipation of someone trying
-to be clever...
+Right, the patches are in my git tree, under the 'io' branch:
 
-Using ldrd/strd, or ldm/stm for IO accesses on ARM is a very bad idea
-for generic code.  While nothing prevents you from using these for 64-bit
-IO accesses, you have to be aware that the normal access guarantees do
-not apply.
+ http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git io
 
-ldrd/strd is implemented as two individual 32-bit single-access operations,
-each of which is atomic, and therefore the instruction can be interrupted
-half-way through.  Upon restart, it can repeat the first load/store.
-
-If you're accessing a FIFO, repeated accesses will be a problem, and
-will cause data corrpution.  If you're accessing a control register,
-the first write could have a side effect (eg, starting DMA) before the
-second write has occurred (eg, setting DMA parameters.)
-
-So, even with ldrd/strd, you still have the problem of whether the
-64-bit access can be split into two separate 32-bit accesses safely,
-but you also have the problem that the individual 32-bit accesses may
-be repeated.
-
-You're safer using standard 32-bit load/stores, which won't suffer
-from being repeated - but you still have to decide whether high-word
-first or low-word first is the correct transfer order.
+which you can use to base stuff off of.  Make sure your tree has commits
+up to 2.6.37-rc5 before pulling to avoid grabbing MB's of pack files.
