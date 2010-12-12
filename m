@@ -1,64 +1,85 @@
-From: plyatov@gmail.com (Igor Plyatov)
-Date: Sun, 12 Dec 2010 09:37:28 +0300
-Subject: [PATCH v4] mach-at91: Support for gsia18s board added
-In-Reply-To: <20101212005048.GH19897@game.jcrosoft.org>
-References: <1292000411-6691-1-git-send-email-plyatov@gmail.com>
-	<20101212005048.GH19897@game.jcrosoft.org>
-Message-ID: <1292135848.2456.19.camel@homepc>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 12 Dec 2010 15:57:07 +0900
+Subject: [PATCH] rfc v1: ARM: mach-shmobile: mackerel: Add zboot MMCIF support
+Message-ID: <1292137027-17779-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jean-Christophe,
+Hi Magnus, Hi Morimoto-san, I wonder if this might
+be sufficient to get MMCIF zboot working on mackerel.
 
-> On 20:00 Fri 10 Dec     , Igor Plyatov wrote:
-> > The GS_IA18_S (GMS) is a carrier board from GeoSIG Ltd used with the
-> > Stamp9G20 SoM from Taskit company.
-> > It operate as an internet accelerometer.
-> > 
-> > Signed-off-by: Igor Plyatov <plyatov@gmail.com>
-> > ---
-> >  arch/arm/configs/gsia18s_defconfig        |  147 +++++++
-> please no new defconfig
-> start to merge them
+This patch depends on
+* ARM: 6515/1: Add zboot support for SuperH Mobile ARM
+  (merged into the devel branch of Russel King's linux-2.6-arm tree)
+* ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
+  (merged into the devel branch of Russel King's linux-2.6-arm tree)
+* MACH_MACKEREL (3211) being present in arch/arm/tools/mach-types
+* ARM: mach-shmobile: mackerel: Add zboot support
+* rfc v3: mmc, ARM: Add zboot from MMC support for SuperH Mobile ARM,
+  which depends on
+  * mmc, sh: Remove sh_mmcif_boot_slurp()
+    (merged into the common/mmcif branch of Paul Mundt's sh-2.6 tree)
+  * sh, mmc: Use defines when setting CE_CLK_CTRL
+    (merged into the common/mmcif branch of Paul Mundt's sh-2.6 tree)
+  * mmc, sh: Move MMCIF_PROGRESS_* into sh_mmcif.h
+    (merged into the common/mmcif branch of Paul Mundt's sh-2.6 tree)
 
-I already write that it is not possible to use same defconfig for our
-board and Stamp9G20, because 69 different CONFIG_xxx options required
-for our machine (compared with Portux G20 and Stamp9G20) and our options
-very excessive for other devices based on the Stamp9G20.
-This device for the embedded, where space constraints exists for memory
-and it is required to save resources as more as possible.
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ .../mach-shmobile/include/mach/mmcif-mackerel.h    |   29 ++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/mmcif.h        |    2 +
+ 2 files changed, 31 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h
 
-> your patch contain a lots of whitespace please fix it
-
-There is no problems with whitespace. This patch checked by
-scripts/checkpatch.pl twice. It seems your mailer corrupt this patch.
-
-> > +
-> > +/*
-> > + * Up to date linux/arch/arm/tools/mach-types database required to support this.
-> > +MACHINE_START(GSIA18S, "GS_IA18_S")
-> > +*/
-> > +MACHINE_START(STAMP9G20, "GS_IA18_S")
-> if you do this you must use system_rev to identify the board
-
-I can cite Christian Glindkamp:
-"And for different carrier boards, system_rev does not make sense at
-all."
-
-Please, use more testimony why it is required to use system_rev here.
-Yours position does not clear for me.
-You can point me to the right documentation or discussion about this
-requirements in the mail archives...
-
-> > +	.boot_params	= AT91_SDRAM_BASE + 0x100,
-> > +	.timer		= &at91sam926x_timer,
-> > +	.map_io		= gsia18s_map_io,
-> > +	.init_irq	= init_irq,
-> > +	.init_machine	= gsia18s_board_init,
-> > +MACHINE_END
-> Best Regards,
-> J.
-
-Best regards!
---
-Igor Plyatov
+diff --git a/arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h b/arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h
+new file mode 100644
+index 0000000..34253c1
+--- /dev/null
++++ b/arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h
+@@ -0,0 +1,29 @@
++#ifndef MMCIF_MACKEREL_H
++#define MMCIF_MACKEREL_H
++
++#define PORT0CR      0xe6051001
++#define PORT1CR      0xe6051002
++#define PORT2CR      0xe6051003
++#define PORT3CR      0xe6051004
++
++#define PORTR031_000DR 0xe6055000
++
++static inline void mmcif_init_progress(void)
++{
++       /* Initialise LEDS0-3
++        * registers: PORT0CR-PORT1CR (LED0-LED3 Control)
++        * value:     0x10 - enable output
++        */
++       __raw_writeb(0x10, PORT0CR);
++       __raw_writeb(0x10, PORT1CR);
++       __raw_writeb(0x10, PORT2CR);
++       __raw_writeb(0x10, PORT3CR);
++}
++
++static inline void mmcif_update_progress(int n)
++{
++	__raw_writel((__raw_readl(PORTR031_000DR) & 0xf) |
++		     (1 << n), PORTR031_000DR);
++}
++
++#endif /* MMCIF_MACKEREL_H */
+diff --git a/arch/arm/mach-shmobile/include/mach/mmcif.h b/arch/arm/mach-shmobile/include/mach/mmcif.h
+index 0812f1e..f4dc327 100644
+--- a/arch/arm/mach-shmobile/include/mach/mmcif.h
++++ b/arch/arm/mach-shmobile/include/mach/mmcif.h
+@@ -9,6 +9,8 @@
+ 
+ #ifdef CONFIG_MACH_AP4EVB
+ #include "mach/mmcif-ap4eb.h"
++#elif CONFIG_MACH_MACKEREL
++#include "mach/mmcif-mackerel.h"
+ #else
+ #error "unsupported board."
+ #endif
+-- 
+1.7.2.3
