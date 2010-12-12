@@ -1,60 +1,42 @@
-From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Sun, 12 Dec 2010 15:28:50 -0500
-Subject: [PATCH] ARM: mmp: added 5V Regulator enable for Brownstone
-Message-ID: <1292185730-3015-1-git-send-email-mark.brown314@gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sun, 12 Dec 2010 22:52:36 +0100
+Subject: Fix IXP4xx build
+Message-ID: <m3ei9m7j6j.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-5V supply for USB ports, LCD connector, and HDMI
+Russell,
 
-Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
----
- arch/arm/mach-mmp/brownstone.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+Is it ok if I send the following to Linus, or would you like to do it
+yourself? Leaving IXP4xx build broken for 2.6.37 isn't the best idea.
 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index 635c400..9d37b35 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -97,8 +97,13 @@ static unsigned long brownstone_pin_config[] __initdata = {
- 	GPIO111_MMC3_DAT0 | MFP_PULL_HIGH,
- 	GPIO112_MMC3_CMD | MFP_PULL_HIGH,
- 	GPIO151_MMC3_CLK,
-+
-+	/* 5V Regulator */
-+	GPIO89_GPIO89,
- };
+From: Imre Kaloz <kaloz@openwrt.org>
+
+arm: export dma_set_coherent_mask
+
+While a regression was fixed with commit 710224fa2750cf (arm: fix
+"arm: fix pci_set_consistent_dma_mask for dmabounce devices"), a
+new one was introduced as dma_set_coherent_mask wasn't exported
+for modules. This patch takes care for this issue.
+
+Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+
+--- a/arch/arm/common/it8152.c
++++ b/arch/arm/common/it8152.c
+@@ -352,3 +352,4 @@ struct pci_bus * __init it8152_pci_scan_bus(int nr, struct pci_sys_data *sys)
+ 	return pci_scan_bus(nr, &it8152_ops, sys);
+ }
  
-+#define GPIO_5V_ENABLE	(89)
-+
- static struct regulator_consumer_supply max8649_supply[] = {
- 	REGULATOR_SUPPLY("vcc_core", NULL),
- };
-@@ -145,10 +150,25 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
- 	.max_speed	= 25000000,
- };
++EXPORT_SYMBOL(dma_set_coherent_mask);
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -483,4 +483,4 @@ int dma_set_coherent_mask(struct device *dev, u64 mask)
  
-+/* enable for MAX8815A regulator (5V_ENABLE) */
-+static void brownstone_enable_5v_regulator(void)
-+{
-+	int ret;
-+	ret = gpio_request(GPIO_5V_ENABLE, "5V_ENABLE");
-+	if (ret < 0)
-+		pr_warning("Unable to request GPIO_5V_ENABLE\n");
-+	else
-+		gpio_direction_output(GPIO_5V_ENABLE, 1);
-+	gpio_free(GPIO_5V_ENABLE);
-+}
-+
- static void __init brownstone_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
- 
-+	/* enable 5v regulator */
-+	brownstone_enable_5v_regulator();
-+
- 	/* on-chip devices */
- 	mmp2_add_uart(1);
- 	mmp2_add_uart(3);
+ EXPORT_SYMBOL(ixp4xx_pci_read);
+ EXPORT_SYMBOL(ixp4xx_pci_write);
+-
++EXPORT_SYMBOL(dma_set_coherent_mask);
+
 -- 
-1.7.0.4
+Krzysztof Halasa
