@@ -1,54 +1,72 @@
 From: plyatov@gmail.com (Igor Plyatov)
-Date: Sun, 12 Dec 2010 22:02:59 +0300
-Subject: [PATCH v2] ata: pata_at91.c bugfix for high master clock
-In-Reply-To: <4D04D2E2.20100@ru.mvista.com>
-References: <1292099846-24528-1-git-send-email-plyatov@gmail.com>
-	<4D04D2E2.20100@ru.mvista.com>
-Message-ID: <1292180579.8737.12.camel@homepc>
+Date: Sun, 12 Dec 2010 22:52:50 +0300
+Subject: [PATCH v4] mach-at91: Support for gsia18s board added
+In-Reply-To: <20101212142200.GG8665@n2100.arm.linux.org.uk>
+References: <1292000411-6691-1-git-send-email-plyatov@gmail.com>
+	<20101212005048.GH19897@game.jcrosoft.org>
+	<1292135848.2456.19.camel@homepc>
+	<20101212140727.GI19897@game.jcrosoft.org>
+	<20101212142200.GG8665@n2100.arm.linux.org.uk>
+Message-ID: <1292183570.8737.33.camel@homepc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sergei,
+Dear Russell,
 
-> Hello.
+> On Sun, Dec 12, 2010 at 03:07:27PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 09:37 Sun 12 Dec     , Igor Plyatov wrote:
+> > > Dear Jean-Christophe,
+> > > 
+> > > > On 20:00 Fri 10 Dec     , Igor Plyatov wrote:
+> > > > > +/*
+> > > > > + * Up to date linux/arch/arm/tools/mach-types database required to support this.
 > 
-> On 11-12-2010 23:37, Igor Plyatov wrote:
-> 
-> > The AT91SAM9 microcontrollers with master clock higher then 105 MHz
-> > and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
-> > lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
-> > does not detect ATA device.
-> 
-> > Signed-off-by: Igor Plyatov<plyatov@gmail.com>
-> [...]
+> Please wrap comments.
 
-Please use more descriptive comments, because it is not clear what you
-mean here. Maybe here you just cut a text...
-It is so strange to cut such small amount of text and I does not have
-any idea why here is "[...]" exists.
+This comment exactly 80 characters long, but anyway I will split it into
+two strings in next version of this patch.
 
-> > diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
-> > index 0da0dcc..a462405 100644
-> > --- a/drivers/ata/pata_at91.c
-> > +++ b/drivers/ata/pata_at91.c
-> [...]
-
-The same as above. Nobody are able to read you mind on the distance :-)
-
-> > @@ -50,7 +52,7 @@ struct at91_ide_info {
-> >   };
+> > > > > +MACHINE_START(GSIA18S, "GS_IA18_S")
+> > > > > +*/
+> > > > > +MACHINE_START(STAMP9G20, "GS_IA18_S")
+> > > > if you do this you must use system_rev to identify the board
+> > > 
+> > > I can cite Christian Glindkamp:
+> > > "And for different carrier boards, system_rev does not make sense at
+> > > all."
+> > > 
+> > > Please, use more testimony why it is required to use system_rev here.
+> > > Yours position does not clear for me.
+> > > You can point me to the right documentation or discussion about this
+> > > requirements in the mail archives...
 > >
-> >   static const struct ata_timing initial_timing =
-> > -	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 600, 0};
-> > +	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
+> > two bards with the same machine id NACK as we can not compile them in the same
+> > kernel and this a target we all work on to allow
+> > if you want to tuse the same machine id as I did for other boards you must use
+> > system_rev or any detection to identify tehm
 > 
->     BTW, you haven't described this in the changelog...
+> Well, the platform was registered into the machine database on 10th
+> December, so it's missed my recent update to the file queued for the next
+> -rc.
 
-Here is just a typo fixed for the ata_timing structure. This typo does
-not have influence on the driver operation, but I do not like to leave
-such a negligible problem as it is.
+Just to clarify: my gsia18s machine number will be added into
+linux-2.6.37-rc6?
 
-> WBR, Sergei
+Does this mean that I must wait for rc6 and then send my patch with new
+machine name or I can send it now?
+
+> I also notice that the name has been changed - machine_is_gsia18s() vs
+> MACH_TYPE_GS_IA18_S / CONFIG_MACH_GS_IA18_S.  This means I'll simply
+> delete it from any future updates until someone talks to me about fixing
+> the entry, exactly as I'm doing with a bunch of others who also haven't
+> contacted me.
+> 
+> All it takes is an email and the entry gets quickly fixed...
+
+Russel, please fix it to more readable "gsia18s" and "*_GSIA18S" for my
+3234 machine.
+Old names with two underscores ("gs_ia18_s" and "*_GS_IA18_S") was very
+hard to read in the source code.
 
 Best regards!
 --
