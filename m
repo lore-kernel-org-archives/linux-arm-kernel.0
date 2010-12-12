@@ -1,166 +1,61 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Sun, 12 Dec 2010 09:37:38 +0800
-Subject: [PATCH 9/9] ARM i.MX51 babbage: Add framebuffer support
-In-Reply-To: <1291902441-24712-10-git-send-email-s.hauer@pengutronix.de>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-10-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <AANLkTi=vT8pX1QQ6DjzQatceO-tQb3Zu90CRAVi2DcpZ@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Sat, 11 Dec 2010 20:58:58 -0800
+Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
+In-Reply-To: <AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
+References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>	<20101202221909.GK29347@n2100.arm.linux.org.uk>	<4CF94DDD.8000409@codeaurora.org>	<20101203203653.GB10245@n2100.arm.linux.org.uk>	<4CFDD297.4020600@codeaurora.org>	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>	<20101209103835.GA31465@n2100.arm.linux.org.uk>	<4D017B45.4000805@codeaurora.org>
+	<AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
+Message-ID: <4D045692.4050607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Sascha,
+On 12/10/2010 02:00 AM, Catalin Marinas wrote:
+> On 10 December 2010 00:58, Saravana Kannan<skannan@codeaurora.org>  wrote:
+>> Russell King - ARM Linux wrote:
+>>>
+>>> On Thu, Dec 09, 2010 at 01:23:24AM -0800, skannan at codeaurora.org wrote:
+>>>>
+>>>> Russell, Have you had a chance to look at this? Any comments? How do we
+>>>> move ahead?
+>>>
+>>> I had connected the other thread with this one - it's pretty hard not
+>>> to as it included this patch in that set as the first patch.
+>>
+>> Ok. So what's your take on handling the cache coherency with secure domain?
+>> Do we get to add cache invalidate APIs outside of DMA APIs?
+>
+> Can the secure software not create NS pages and be fully coherent?
+>
 
-I have following 3 comments to this patch:
-1) I think DISP1_DATx pins need not be set specially, as they keep the
-default register values.
-2) Please define 'MX51_PAD_DI_GP4__IPU_DI2_PIN15' in
-arch/arm/plat-mxc/include/mach/iomux-mx51.h, and rename the pin to be
-'MX51_PAD_DI_GP4__DI2_PIN15', as we name it according to the MX51
-iomux reference manual.
-3) It is better to exchange the following two lines or just remove the
-first line:
-+       gpio_set_value(GPIO_DVI_RESET, 0);
-+       gpio_direction_output(GPIO_DVI_RESET, 0);
+IMHO, trying to keep the cache fully coherent with the secure world 
+without using explicit cache flush/invalidate raises the following 
+concerns (in decreasing order of importance):
+1. Since the secure world would need to enable the MMU to mark the pages 
+as NS, it removes the possibility of secure world implementations that 
+don't use MMU. The secure world image that's in use for MSM8660 as of 
+today doesn't enable its MMU.
+2. Even if MMU was enabled in secure world, the same binary needs to 
+operate with different non-secure kernels. I'm certainly not a cache 
+expert, but if I'm not mistaken, there are other page attributes that 
+need to match between virt mem mappings for them to end up on the same 
+cache lines (wasn't this a reason that Russell added the "already 
+mapped?" check to ioremap). Trying to coordinate this between various 
+non-secure kernels would be harder than having the various non-secure 
+kernels do a flush/invalidate.
+3. *If* a user of the SCM driver wants to pass phys addr of other memory 
+pages to a service on the secure world (say, to avoid multiple copies), 
+then they will also have to start coordinating on the page attributes. 
+That would be harder to maintain than just an "invalidate before reading 
+if secure-world service will write to this memory" approach.
+4. Coordinating to make sure all the necessary page attributes match 
+becomes harder if OEMs decide to make changes to the secure world 
+implementation or drop in a new one.
 
-Best Regards,
-Liu Ying
+As you and James suggested, having the NS bit set by the secure world is 
+definitely a solution that would work. But IMHO, the explicit cache 
+flush/invalidate approach keeps the design simple and easy to maintain.
 
-2010/12/9 Sascha Hauer <s.hauer@pengutronix.de>:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-mx5/board-mx51_babbage.c | ? 74 ++++++++++++++++++++++++++++++++
-> ?2 files changed, 75 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index 5011f42..2a936b7 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -22,6 +22,7 @@ config MACH_MX51_BABBAGE
-> ? ? ? ?select IMX_HAVE_PLATFORM_IMX_UART
-> ? ? ? ?select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
-> ? ? ? ?select IMX_HAVE_PLATFORM_SPI_IMX
-> + ? ? ? select IMX_HAVE_PLATFORM_IMX_IPUV3
-> ? ? ? ?help
-> ? ? ? ? ?Include support for MX51 Babbage platform, also known as MX51EVK in
-> ? ? ? ? ?u-boot. This includes specific configurations for the board and its
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index a896f84..169c48c 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -22,11 +22,13 @@
-> ?#include <linux/input.h>
-> ?#include <linux/spi/flash.h>
-> ?#include <linux/spi/spi.h>
-> +#include <linux/mfd/imx-ipu-v3.h>
->
-> ?#include <mach/common.h>
-> ?#include <mach/hardware.h>
-> ?#include <mach/iomux-mx51.h>
-> ?#include <mach/mxc_ehci.h>
-> +#include <mach/ipu-v3.h>
->
-> ?#include <asm/irq.h>
-> ?#include <asm/setup.h>
-> @@ -158,6 +160,41 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
-> ? ? ? ?MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
-> ? ? ? ?MX51_PAD_CSPI1_SS0__GPIO_4_24,
-> ? ? ? ?MX51_PAD_CSPI1_SS1__GPIO_4_25,
-> +
-> + ? ? ? /* Display */
-> + ? ? ? MX51_PAD_DISPB2_SER_DIN__GPIO_3_5,
-> + ? ? ? MX51_PAD_DISPB2_SER_DIO__GPIO_3_6,
-> + ? ? ? MX51_PAD_NANDF_D12__GPIO_3_28,
-> +
-> + ? ? ? MX51_PAD_DISP1_DAT0__DISP1_DAT0,
-> + ? ? ? MX51_PAD_DISP1_DAT1__DISP1_DAT1,
-> + ? ? ? MX51_PAD_DISP1_DAT2__DISP1_DAT2,
-> + ? ? ? MX51_PAD_DISP1_DAT3__DISP1_DAT3,
-> + ? ? ? MX51_PAD_DISP1_DAT4__DISP1_DAT4,
-> + ? ? ? MX51_PAD_DISP1_DAT5__DISP1_DAT5,
-> + ? ? ? MX51_PAD_DISP1_DAT6__DISP1_DAT6,
-> + ? ? ? MX51_PAD_DISP1_DAT7__DISP1_DAT7,
-> + ? ? ? MX51_PAD_DISP1_DAT8__DISP1_DAT8,
-> + ? ? ? MX51_PAD_DISP1_DAT9__DISP1_DAT9,
-> + ? ? ? MX51_PAD_DISP1_DAT10__DISP1_DAT10,
-> + ? ? ? MX51_PAD_DISP1_DAT11__DISP1_DAT11,
-> + ? ? ? MX51_PAD_DISP1_DAT12__DISP1_DAT12,
-> + ? ? ? MX51_PAD_DISP1_DAT13__DISP1_DAT13,
-> + ? ? ? MX51_PAD_DISP1_DAT14__DISP1_DAT14,
-> + ? ? ? MX51_PAD_DISP1_DAT15__DISP1_DAT15,
-> + ? ? ? MX51_PAD_DISP1_DAT16__DISP1_DAT16,
-> + ? ? ? MX51_PAD_DISP1_DAT17__DISP1_DAT17,
-> + ? ? ? MX51_PAD_DISP1_DAT18__DISP1_DAT18,
-> + ? ? ? MX51_PAD_DISP1_DAT19__DISP1_DAT19,
-> + ? ? ? MX51_PAD_DISP1_DAT20__DISP1_DAT20,
-> + ? ? ? MX51_PAD_DISP1_DAT21__DISP1_DAT21,
-> + ? ? ? MX51_PAD_DISP1_DAT22__DISP1_DAT22,
-> + ? ? ? MX51_PAD_DISP1_DAT23__DISP1_DAT23,
-> +#define MX51_PAD_DI_GP4__IPU_DI2_PIN15 ? ? ? ? ? ? ? ? IOMUX_PAD(0x758, 0x350, 4, 0x0, ? 0, NO_PAD_CTRL)
-> + ? ? ? MX51_PAD_DI_GP4__IPU_DI2_PIN15,
-> +
-> + ? ? ? /* I2C DVI enable */
-> + ? ? ? MX51_PAD_CSI2_HSYNC__GPIO_4_14,
-> ?};
->
-> ?/* Serial ports */
-> @@ -342,6 +379,21 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
-> ? ? ? ?.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
-> ?};
->
-> +static struct ipuv3_fb_platform_data babbage_fb0_data = {
-> + ? ? ? .interface_pix_fmt = IPU_PIX_FMT_RGB24,
-> + ? ? ? .flags = IMX_IPU_FB_USE_MODEDB | IMX_IPU_FB_USE_OVERLAY,
-> +};
-> +
-> +static struct ipuv3_fb_platform_data babbage_fb1_data = {
-> + ? ? ? .interface_pix_fmt = IPU_PIX_FMT_RGB565,
-> + ? ? ? .flags = IMX_IPU_FB_USE_MODEDB,
-> +};
-> +
-> +static struct imx_ipuv3_platform_data ipu_data = {
-> + ? ? ? .fb0_platform_data = &babbage_fb0_data,
-> + ? ? ? .fb1_platform_data = &babbage_fb1_data,
-> +};
-> +
-> ?/*
-> ?* Board specific initialization.
-> ?*/
-> @@ -388,6 +440,28 @@ static void __init mxc_board_init(void)
-> ? ? ? ? ? ? ? ?ARRAY_SIZE(mx51_babbage_spi_board_info));
-> ? ? ? ?imx51_add_ecspi(0, &mx51_babbage_spi_pdata);
-> ? ? ? ?imx51_add_imx2_wdt(0, NULL);
-> +
-> +#define GPIO_DVI_DETECT ? ? ? ?(2 * 32 + 28)
-> +#define GPIO_DVI_RESET (2 * 32 + 5)
-> +#define GPIO_DVI_PWRDN (2 * 32 + 6)
-> +#define GPIO_DVI_I2C ? (3 * 32 + 14)
-> +
-> + ? ? ? /* DVI Detect */
-> + ? ? ? gpio_request(GPIO_DVI_DETECT, "dvi detect");
-> + ? ? ? gpio_direction_input(GPIO_DVI_DETECT);
-> + ? ? ? /* DVI Reset - Assert for i2c disabled mode */
-> + ? ? ? gpio_request(GPIO_DVI_RESET, "dvi reset");
-> + ? ? ? gpio_set_value(GPIO_DVI_RESET, 0);
-> + ? ? ? gpio_direction_output(GPIO_DVI_RESET, 0);
-> + ? ? ? /* DVI Power-down */
-> + ? ? ? gpio_request(GPIO_DVI_PWRDN, "dvi pwdn");
-> + ? ? ? gpio_direction_output(GPIO_DVI_PWRDN, 0);
-> + ? ? ? gpio_set_value(GPIO_DVI_PWRDN, 1);
-> +
-> + ? ? ? gpio_request(GPIO_DVI_I2C, "dvi i2c");
-> + ? ? ? gpio_direction_output(GPIO_DVI_I2C, 0);
-> +
-> + ? ? ? imx51_add_ipuv3(&ipu_data);
-> ?}
->
-> ?static void __init mx51_babbage_timer_init(void)
-> --
-> 1.7.2.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+Thanks,
+Saravana
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
