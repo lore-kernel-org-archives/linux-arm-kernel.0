@@ -1,9 +1,10 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Dec 2010 19:22:47 +0000
-Subject: [PATCH 23/24] ARM: stmp: update clock source registration
+Date: Mon, 13 Dec 2010 19:23:08 +0000
+Subject: [PATCH 24/24] ARM: realview/versatile: update clock source
+	registration
 In-Reply-To: <20101213191437.GN8665@n2100.arm.linux.org.uk>
 References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
-Message-ID: <E1PSDyx-0008Dm-SC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PSDzI-0008Dq-9v@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,38 +14,30 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/plat-stmp3xxx/timer.c |    5 +----
- 1 files changed, 1 insertions(+), 4 deletions(-)
+ arch/arm/plat-versatile/timer-sp.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-stmp3xxx/timer.c b/arch/arm/plat-stmp3xxx/timer.c
-index 063c7bc..c395630 100644
---- a/arch/arm/plat-stmp3xxx/timer.c
-+++ b/arch/arm/plat-stmp3xxx/timer.c
-@@ -89,7 +89,6 @@ static struct clocksource cksrc_stmp3xxx = {
- 	.rating         = 250,
- 	.read           = stmp3xxx_clock_read,
- 	.mask           = CLOCKSOURCE_MASK(16),
--	.shift          = 10,
+diff --git a/arch/arm/plat-versatile/timer-sp.c b/arch/arm/plat-versatile/timer-sp.c
+index fb0d1c2..f09941b 100644
+--- a/arch/arm/plat-versatile/timer-sp.c
++++ b/arch/arm/plat-versatile/timer-sp.c
+@@ -46,7 +46,6 @@ static struct clocksource clocksource_sp804 = {
+ 	.rating		= 200,
+ 	.read		= sp804_read,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+-	.shift		= 20,
  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -106,8 +105,6 @@ static struct irqaction stmp3xxx_timer_irq = {
-  */
- static void __init stmp3xxx_init_timer(void)
- {
--	cksrc_stmp3xxx.mult = clocksource_hz2mult(CLOCK_TICK_RATE,
--				cksrc_stmp3xxx.shift);
- 	ckevt_timrot.mult = div_sc(CLOCK_TICK_RATE, NSEC_PER_SEC,
- 				ckevt_timrot.shift);
- 	ckevt_timrot.min_delta_ns = clockevent_delta2ns(2, &ckevt_timrot);
-@@ -140,7 +137,7 @@ static void __init stmp3xxx_init_timer(void)
+@@ -63,8 +62,7 @@ void __init sp804_clocksource_init(void __iomem *base)
+ 	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+ 		clksrc_base + TIMER_CTRL);
  
- 	setup_irq(IRQ_TIMER0, &stmp3xxx_timer_irq);
- 
--	clocksource_register(&cksrc_stmp3xxx);
-+	clocksource_register_hz(&cksrc_stmp3xxx, CLOCK_TICK_RATE);
- 	clockevents_register_device(&ckevt_timrot);
+-	cs->mult = clocksource_khz2mult(TIMER_FREQ_KHZ, cs->shift);
+-	clocksource_register(cs);
++	clocksource_register_khz(cs, TIMER_FREQ_KHZ);
  }
+ 
  
 -- 
 1.6.2.5
