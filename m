@@ -1,32 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 13 Dec 2010 13:48:41 +0100
-Subject: [PATCH] dmaengine: at_hdmac: fix buffer transfer size specification
-Message-ID: <1292244521-20756-1-git-send-email-nicolas.ferre@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 13 Dec 2010 12:43:32 +0100
+Subject: [PATCH 9/9] ARM i.MX51 babbage: Add framebuffer support
+In-Reply-To: <AANLkTi=vT8pX1QQ6DjzQatceO-tQb3Zu90CRAVi2DcpZ@mail.gmail.com>
+References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
+	<1291902441-24712-10-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTi=vT8pX1QQ6DjzQatceO-tQb3Zu90CRAVi2DcpZ@mail.gmail.com>
+Message-ID: <20101213114332.GF6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Buffer transfer size is the number of transfers to be performed in
-relation with the width of the _source_ interface.
-So in the DMA_FROM_DEVICE case, it should be the register width that
-should be taken into account.
+On Sun, Dec 12, 2010 at 09:37:38AM +0800, Liu Ying wrote:
+> Hello, Sascha,
+> 
+> I have following 3 comments to this patch:
+> 1) I think DISP1_DATx pins need not be set specially, as they keep the
+> default register values.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/dma/at_hdmac.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+We do not want to depend on default register values in the Linux Kernel.
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index a0f3e6a..ea0ee81 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -722,7 +722,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			desc->lli.daddr = mem;
- 			desc->lli.ctrla = ctrla
- 					| ATC_DST_WIDTH(mem_width)
--					| len >> mem_width;
-+					| len >> reg_width;
- 			desc->lli.ctrlb = ctrlb;
- 
- 			if (!first) {
+> 2) Please define 'MX51_PAD_DI_GP4__IPU_DI2_PIN15' in
+> arch/arm/plat-mxc/include/mach/iomux-mx51.h, and rename the pin to be
+> 'MX51_PAD_DI_GP4__DI2_PIN15', as we name it according to the MX51
+> iomux reference manual.
+
+I'm not sure. Normally it's good practice to code the unit into the
+name. Otherwise we end up with names like MX51_PAD_xyz__TX which could
+be the tx pin of just about any unit.
+
+
+> 3) It is better to exchange the following two lines or just remove the
+> first line:
+> +       gpio_set_value(GPIO_DVI_RESET, 0);
+> +       gpio_direction_output(GPIO_DVI_RESET, 0);
+
+ok.
+
+Sascha
+
+
 -- 
-1.7.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
