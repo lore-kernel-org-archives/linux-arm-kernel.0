@@ -1,39 +1,118 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 13 Dec 2010 15:26:29 +0000
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <4D045692.4050607@codeaurora.org>
-References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
-	<20101202221909.GK29347@n2100.arm.linux.org.uk>
-	<4CF94DDD.8000409@codeaurora.org>
-	<20101203203653.GB10245@n2100.arm.linux.org.uk>
-	<4CFDD297.4020600@codeaurora.org>
-	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
-	<20101209103835.GA31465@n2100.arm.linux.org.uk>
-	<4D017B45.4000805@codeaurora.org>
-	<AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
-	<4D045692.4050607@codeaurora.org>
-Message-ID: <AANLkTimwqC6DqN8ft10EyRbPh9XvibN1fA-Cug4OdS5m@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 13 Dec 2010 16:41:42 +0100
+Subject: [RFC] i.MX clock support
+In-Reply-To: <20101213150120.GE26210@pengutronix.de>
+References: <20101213102538.GB6017@pengutronix.de>
+	<20101213150120.GE26210@pengutronix.de>
+Message-ID: <20101213154142.GP6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2010 04:58, Saravana Kannan <skannan@codeaurora.org> wrote:
-> As you and James suggested, having the NS bit set by the secure world is
-> definitely a solution that would work. But IMHO, the explicit cache
-> flush/invalidate approach keeps the design simple and easy to maintain.
+On Mon, Dec 13, 2010 at 04:01:20PM +0100, Uwe Kleine-K?nig wrote:
+> Hi Sascha,
+> 
+> On Mon, Dec 13, 2010 at 11:25:38AM +0100, Sascha Hauer wrote:
+> > I am not willing to accept patches for adding i.MX50 support in the mess
+> > we currently have. These patches offer a way to cleanup the clock support
+> > and the i.MX50 may be a good test bed for an implementation without
+> > old cruft to worry about. That said the following patch is not set in
+> > stone, it's a request for comments and I'm of course open to other
+> > suggestions, but it's clear that we have to do something.
+> Full ack.
+> 
+> > +#define to_clk_divider(clk) (container_of(clk, struct clk_divider, clk))
+> > +
+> > +static unsigned long clk_divider_get_rate(struct clk *clk)
+> > +{
+> > +	struct clk_divider *divider = to_clk_divider(clk);
+> > +
+> > +	unsigned long rate = clk_get_rate(divider->parent);
+> > +	unsigned int div = 1;
+> > +
+> > +	if (divider->reg) {
+> > +		div = readl(divider->reg) >> divider->shift;
+> > +		div &= (1 << divider->width) - 1;
+> > +		div++;
+> > +	}
+> > +
+> > +	return rate / div / divider->div * divider->mult;
+> Maybe you need to spend more effort to exactness e.g. by using
+> DIV_ROUND_CLOSEST and/or reordering?
+> (You didn't describe div and mult in struct clk_divider (below), so this
+> is a bit guess work for me here.)
 
-That is indeed an approach to the problem. But it depends on whether
-we consider the DMA API appropriate for this. We can view the secure
-world as a non-coherent agent accessing the memory and could try to
-justify the use of the DMA API in Linux.
+Ok, this needs some work. My original idea was to have seperate fixed
+dividers and configurable dividers. Then I decided to combine these into
+one divider. The end result was a mixure of both. We have a struct
+clk_divider_fixed, which is described but unused.
 
-At some point we'll probably have platforms supporting cacheable DMA
-(e.g. via the ARM coherency port) and the DMA API would no longer give
-you what you need. But it is also possible that platforms with ACP
-would only have 1 or 2 devices on that port (some HD LCD controller
-for example) and the rest of devices non-coherent. In this case, we
-need to have different DMA operations depending on the bus/device (via
-get_dma_ops) and thus we can allow your scenario via dedicated DMA
-ops.
+> 
+> > +}
+> > +
+> > +static long clk_divider_round_rate(struct clk *clk, unsigned long rate)
+> > +{
+> > +	struct clk_divider *divider = to_clk_divider(clk);
+> > +	unsigned long parent_rate = clk_get_rate(divider->parent);
+> > +	unsigned int max_div, div;
+> > +
+> > +	if (rate > parent_rate)
+> > +		return parent_rate;
+> > +
+> > +	max_div = 1 << divider->width;
+> > +
+> > +	div = parent_rate / rate;
+> > +	div = max(div, max_div);
+> > +
+> > +	return parent_rate / div / divider->div * divider->mult;
+> ditto
+> 
+> > +}
+> > +
+> > +static int clk_divider_set_rate(struct clk *clk, unsigned long rate)
+> > +{
+> > +	struct clk_divider *divider = to_clk_divider(clk);
+> > +	unsigned long parent_rate = clk_get_rate(divider->parent);
+> > +	unsigned int max_div, div;
+> > +	u32 val;
+> > +
+> > +	parent_rate /= divider->div;
+> > +	parent_rate *= divider->mult;
+> > +
+> > +	if (rate > parent_rate)
+> > +		rate = parent_rate;
+> > +
+> > +	max_div = 1 << divider->width;
+> > +
+> > +	div = parent_rate / rate;
+> > +
+> > +	div = max(div, max_div);
+> > +	div--;
+> > +
+> > +	val = readl(divider->reg);
+> > +	val &= ~(((1 << divider->width) - 1) << divider->shift);
+> > +	val |= div << divider->shift;
+> > +	writel(val, divider->reg);
+> > +
+> > +	return 0;
+> You could spend more efforts here, but I think this is OK for now.
+> 
+> > [...]
+> > +struct clk_ops clk_multiplexer_ops = {
+> > +	.enable = clk_parent_enable,
+> > +	.disable = clk_parent_disable,
+> > +	.get_rate = clk_parent_get_rate,
+> > +	.round_rate = clk_parent_round_rate,
+> > +	.set_rate = clk_parent_set_rate,
+> Oh, this might have surprising effects if the parent is "public".
+> Is this intended?
+
+I have no idea what the best way is here. We could remove it and wait
+if somebody comes up with a good reason to add it again.
+
+Sascha
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
