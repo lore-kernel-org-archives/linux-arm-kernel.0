@@ -1,47 +1,34 @@
-From: wanders.thirst@gmail.com (Jack Daniel)
-Date: Mon, 13 Dec 2010 20:03:02 +0530
-Subject: [BUG] 2.6.37-rc3 massive interactivity regression on ARM
-In-Reply-To: <AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
-References: <20101208142814.GE9777@n2100.arm.linux.org.uk>
-	<1291851079-27061-1-git-send-email-venki@google.com>
-	<1291899120.29292.7.camel@twins>
-	<AANLkTikd3X4pLs5De-LO6=XD+JqUz3-Ku7YM8+0-oK8t@mail.gmail.com>
-	<1291917330.6803.7.camel@twins>
-	<AANLkTin+eO_jPceSOHL4e7vqd+tf0ZCMHJ-USoz8aZL1@mail.gmail.com>
-Message-ID: <AANLkTi=3eFomJhT8xntZs6FxUJ9b5iKQ2x+CaDHR2Yqd@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 13 Dec 2010 14:56:04 +0000
+Subject: [PATCH v3 5/5] msm: add SMP support for msm
+In-Reply-To: <-5043037405149418685@unknownmsgid>
+References: <-5043037405149418685@unknownmsgid>
+Message-ID: <AANLkTi=LZJiEP2rfQ_gL096A1GbCW+FBBmfG2eSdFY5W@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 9, 2010 at 11:41 PM, Venkatesh Pallipadi <venki@google.com> wrote:
-> On Thu, Dec 9, 2010 at 9:55 AM, Peter Zijlstra <peterz@infradead.org> wrote:
->> On Thu, 2010-12-09 at 09:43 -0800, Venkatesh Pallipadi wrote:
->>>
->>> The same problem will be there with below code, with irq_delta >
->>> delta, clock_task can go backwards which is not good.
->>> + ? ? ? delta -= irq_delta;
->>> + ? ? ? rq->clock_task += delta;
->>>
->>> The reason for this is rq->clock and irqtime updates kind of happen
->>> independently and specifically, if a rq->clock update happens while we
->>> are in a softirq, we may have this case of going backwards on the next
->>> update.
->>
->> But how can irq_delta > delta?, we measure it using the same clock.
->>
->
-> This would be mostly a corner case like:
-> - softirq start time t1
-> - rq->clock updated at t2 and rq->clock_task updated at t2 without
-> accounting for current softirq
-> - softirq end time t3
-> - cpu spends most time here in softirq or hardirq
-> - next rq->clock update at t4 and rq->clock_task update, with delta =
-> t4-t2 and irq_delta ~= t4 - t1
-                                  ^^^
-I was curious on this line. Shouldn't this be irq_delta ~= t3 - t1 ?
-If so the time going backwards shouldn't happen. If it does happen
-then wouldn't it be better to program irq_time_cpu(cpu_of(rq)) to
-return t3 instead of t4?
+On 13 December 2010 01:20,  <ykaoua@qualcomm.com> wrote:
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/headsmp.S
+[...]
+> +ENTRY(msm_secondary_startup)
+> + ? ? ? mrc ? ? p15, 0, r0, c0, c0, 5 ? @ MPIDR
+> + ? ? ? and ? ? r0, r0, #15 ? ? ? ? ? ? @ What CPU am I
+> + ? ? ? adr ? ? r4, 1f ? ? ? ? ? ? ? ? ?@ address of
+> + ? ? ? ldmia ? r4, {r5, r6} ? ? ? ? ? ?@ load curr addr and pen_rel addr
+> + ? ? ? sub ? ? r4, r4, r5 ? ? ? ? ? ? ?@ determine virtual/phys offsets
+> + ? ? ? add ? ? r6, r6, r4 ? ? ? ? ? ? ?@ apply
+> +pen:
+> + ? ? ? wfe
+> + ? ? ? dsb ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ ensure subsequent access is
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ after event
+> +
+> + ? ? ? ldr ? ? r7, [r6] ? ? ? ? ? ? ? ?@ pen_rel has cpu to remove from reset
+> + ? ? ? cmp ? ? r7, r0 ? ? ? ? ? ? ? ? ?@ are we lucky?
+> + ? ? ? bne ? ? pen
 
-Thanks,
-Jack
+Is the primary CPU using SEV to wake the secondary from the WFE? I may
+have missed it.
+
+-- 
+Catalin
