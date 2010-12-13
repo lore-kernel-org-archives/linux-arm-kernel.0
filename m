@@ -1,222 +1,56 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Mon, 13 Dec 2010 09:02:50 -0800
-Subject: [PATCH 2/2] msm: documentation: Update gpiomux documentation.
-In-Reply-To: <1292259770-22972-1-git-send-email-gbean@codeaurora.org>
-References: <1292259770-22972-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1292259770-22972-2-git-send-email-gbean@codeaurora.org>
+From: davidsin@ti.com (David Sin)
+Date: Mon, 13 Dec 2010 11:32:40 -0600
+Subject: [PATCH 7/9] TILER-DMM: Main TILER driver implementation
+In-Reply-To: <20101206232159.GS8345@atomide.com>
+References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
+	<1291674446-10766-8-git-send-email-davidsin@ti.com>
+	<20101206232159.GS8345@atomide.com>
+Message-ID: <20101213173239.GC23421@lba0869738>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring gpiomux documentation up-to-date with the current API.
+On Mon, Dec 06, 2010 at 03:21:59PM -0800, Tony Lindgren wrote:
+> Hi,
+> 
+> * David Sin <davidsin@ti.com> [101206 14:09]:
+> > From: Lajos Molnar <molnar@ti.com>
+> > 
+> > This patch contains the TILER driver and implementation of the TILER
+> > block manipulation and mapping functions.
+> > 
+> > It also contains the makefile and config file for the TILER driver.
+> 
+> ...
+> > +config TILER_GRANULARITY
+> > +        int "Allocation granularity"
+> > +        range 1 4096
+> > +        default 128
+> ...
+> > +config TILER_ALIGNMENT
+> > +        int "Allocation alignment"
+> > +        range 1 4096
+> > +        default 4096
+> ...
+> > +config TILER_CACHE_LIMIT
+> > +        int "Memory limit to cache free pages in MBytes"
+> > +        range 0 128
+> > +        default 40
+> ...
+> 
+> Do you really need these Kconfig options? To me it seems you
+> should pass these in platform_data.
+> 
+> Regards,
+> 
+> Tony
+Hi Tony,
+No -- we don't really need these here, but we thought that 
+it would be an easy way for the user to set them -- esp the 
+ CACHE_LIMIT.  We can actually remove themi, since it's not 
+ going to change very often, and add it to plat data later.  
+I'll revise the patch.  BTW, Are you going to be the one to 
+ merge this code? 
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- Documentation/arm/msm/gpiomux.txt |  170 +++++++++++++------------------------
- 1 files changed, 58 insertions(+), 112 deletions(-)
-
-diff --git a/Documentation/arm/msm/gpiomux.txt b/Documentation/arm/msm/gpiomux.txt
-index 67a8162..aaf0793 100644
---- a/Documentation/arm/msm/gpiomux.txt
-+++ b/Documentation/arm/msm/gpiomux.txt
-@@ -2,112 +2,79 @@ This document provides an overview of the msm_gpiomux interface, which
- is used to provide gpio pin multiplexing and configuration on mach-msm
- targets.
- 
--History
--=======
--
--The first-generation API for gpio configuration & multiplexing on msm
--is the function gpio_tlmm_config().  This function has a few notable
--shortcomings, which led to its deprecation and replacement by gpiomux:
--
--The 'disable' parameter:  Setting the second parameter to
--gpio_tlmm_config to GPIO_CFG_DISABLE tells the peripheral
--processor in charge of the subsystem to perform a look-up into a
--low-power table and apply the low-power/sleep setting for the pin.
--As the msm family evolved this became problematic. Not all pins
--have sleep settings, not all peripheral processors will accept requests
--to apply said sleep settings, and not all msm targets have their gpio
--subsystems managed by a peripheral processor. In order to get consistent
--behavior on all targets, drivers are forced to ignore this parameter,
--rendering it useless.
--
--The 'direction' flag: for all mux-settings other than raw-gpio (0),
--the output-enable bit of a gpio is hard-wired to a known
--input (usually VDD or ground).  For those settings, the direction flag
--is meaningless at best, and deceptive at worst.  In addition, using the
--direction flag to change output-enable (OE) directly can cause trouble in
--gpiolib, which has no visibility into gpio direction changes made
--in this way.  Direction control in gpio mode should be made through gpiolib.
--
--Key Features of gpiomux
--=======================
--
--- A consistent interface across all generations of msm.  Drivers can expect
--the same results on every target.
--- gpiomux plays nicely with gpiolib.  Functions that should belong to gpiolib
--are left to gpiolib and not duplicated here.  gpiomux is written with the
--intent that gpio_chips will call gpiomux reference-counting methods
--from their request() and free() hooks, providing full integration.
--- Tabular configuration.  Instead of having to call gpio_tlmm_config
--hundreds of times, gpio configuration is placed in a single table.
--- Per-gpio sleep.  Each gpio is individually reference counted, allowing only
--those lines which are in use to be put in high-power states.
--- 0 means 'do nothing': all flags are designed so that the default memset-zero
--equates to a sensible default of 'no configuration', preventing users
--from having to provide hundreds of 'no-op' configs for unused or
--unwanted lines.
--
- Usage
- =====
- 
--To use gpiomux, provide configuration information for relevant gpio lines
--in the msm_gpiomux_configs table.  Since a 0 equates to "unconfigured",
--only those lines to be managed by gpiomux need to be specified.  Here
--is a completely fictional example:
--
--struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
--	[12] = {
--		.active = GPIOMUX_VALID | GPIOMUX_DRV_8MA | GPIOMUX_FUNC_1,
--		.suspended = GPIOMUX_VALID | GPIOMUX_PULL_DOWN,
--	},
--	[34] = {
--		.suspended = GPIOMUX_VALID | GPIOMUX_PULL_DOWN,
-+To use gpiomux, do the following before the msmgpio gpiochips probe:
-+
-+- Call msm_gpiomux_init to allocate needed resources.
-+- Install one or more sets of gpiomux configuration data via
-+  msm_gpiomux_install and/or msm_gpiomux_write.
-+
-+Failing to finish these steps before the probe of msmgpio can result in calls
-+from msmgpio to gpiomux to try and activate lines which have not yet
-+been configured.
-+
-+A basic gpiomux setting is described by a gpiomux_setting structure.
-+A gpiomux configuration is a group of those settings (one for each power
-+state of the board) paired with a specific gpio, like so:
-+
-+struct msm_gpiomux_config gpio123_config __initdata = {
-+	.gpio = 123,
-+	.settings = {
-+		[GPIOMUX_ACTIVE] = {
-+			.func = GPIOMUX_FUNC_GPIO,
-+			.drv  = GPIOMUX_DRV_2MA,
-+			.pull = GPIOMUX_PULL_NONE,
-+			.dir  = GPIOMUX_OUT_HIGH,
-+		},
-+		[GPIOMUX_SUSPENDED] = {
-+			.func = GPIOMUX_FUNC_3,
-+			.drv  = GPIOMUX_DRV_8MA,
-+			.pull = GPIOMUX_PULL_DOWN,
-+		},
- 	},
- };
- 
--To indicate that a gpio is in use, call msm_gpiomux_get() to increase
--its reference count.  To decrease the reference count, call msm_gpiomux_put().
--
- The effect of this configuration is as follows:
- 
--When the system boots, gpios 12 and 34 will be initialized with their
--'suspended' configurations.  All other gpios, which were left unconfigured,
--will not be touched.
--
--When msm_gpiomux_get() is called on gpio 12 to raise its reference count
--above 0, its active configuration will be applied.  Since no other gpio
--line has a valid active configuration, msm_gpiomux_get() will have no
--effect on any other line.
--
--When msm_gpiomux_put() is called on gpio 12 or 34 to drop their reference
--count to 0, their suspended configurations will be applied.
--Since no other gpio line has a valid suspended configuration, no other
--gpio line will be effected by msm_gpiomux_put().  Since gpio 34 has no valid
--active configuration, this is effectively a no-op for gpio 34 as well,
--with one small caveat, see the section "About Output-Enable Settings".
--
--All of the GPIOMUX_VALID flags may seem like unnecessary overhead, but
--they address some important issues.  As unused entries (all those
--except 12 and 34) are zero-filled, gpiomux needs a way to distinguish
--the used fields from the unused.  In addition, the all-zero pattern
--is a valid configuration!  Therefore, gpiomux defines an additional bit
--which is used to indicate when a field is used.  This has the pleasant
--side-effect of allowing calls to msm_gpiomux_write to use '0' to indicate
--that a value should not be changed:
--
--  msm_gpiomux_write(0, GPIOMUX_VALID, 0);
--
--replaces the active configuration of gpio 0 with an all-zero configuration,
--but leaves the suspended configuration as it was.
-+- When the system boots, gpio 123 will be put into the SUSPENDED setting.
-+- When the reference count for gpio 123 rises above 0, the ACTIVE setting
-+  will be applied.
-+- When the reference count falls back to 0, the SUSPENDED setting will be
-+  reapplied.
-+
-+The reference count rises when msm_gpiomux_get() is called and falls
-+when msm_gpiomux_put() is called.  msmgpio has hooks to these functions
-+in its gpiolib implementation.  This means that when you call gpio_request()
-+on an msmgpio, msm_gpiomux_get() is automatically called on your behalf.
-+Similarly, when you call gpio_free(), msm_gpiomux_put() is called for you.
-+This allows generic drivers to obtain low-level management of msmgpio lines
-+without having to be aware of the gpiomux layer.
-+
-+Note that the .dir field is ignored if .func != GPIOMUX_FUNC_GPIO, since
-+software control of gpios is allowed only in GPIO mode.  By selecting any
-+other .func, you assign the gpio to another piece of hardware and lose
-+control of it from gpiolib.  You can still reserve such gpios with gpio_request
-+to prevent other modules from using them while they're in such a state,
-+but other gpiolib functions will not behave as you expect if .func != GPIO.
-+
-+If a configuration is omitted, nothing will happen at the relevant transitions.
-+This allows for the creation of 'static configurations' which do not
-+change as the line is requested and freed.
- 
- Static Configurations
- =====================
- 
- To install a static configuration, which is applied at boot and does
- not change after that, install a configuration with a suspended component
--but no active component, as in the previous example:
-+but no active component:
- 
--	[34] = {
--		.suspended = GPIOMUX_VALID | GPIOMUX_PULL_DOWN,
-+	.gpio = ...,
-+	.settings = {
-+		[GPIOMUX_SUSPENDED] = {
-+			...
-+		},
- 	},
- 
- The suspended setting is applied during boot, and the lack of any valid
-@@ -153,24 +120,3 @@ This provides important functionality:
- This mechanism allows for "auto-request" of gpiomux lines via gpiolib
- when it is suitable.  Drivers wishing more exact control are, of course,
- free to also use msm_gpiomux_set and msm_gpiomux_get.
--
--About Output-Enable Settings
--============================
--
--Some msm targets do not have the ability to query the current gpio
--configuration setting.  This means that changes made to the output-enable
--(OE) bit by gpiolib cannot be consistently detected and preserved by gpiomux.
--Therefore, when gpiomux applies a configuration setting, any direction
--settings which may have been applied by gpiolib are lost and the default
--input settings are re-applied.
--
--For this reason, drivers should not assume that gpio direction settings
--continue to hold if they free and then re-request a gpio.  This seems like
--common sense - after all, anybody could have obtained the line in the
--meantime - but it needs saying.
--
--This also means that calls to msm_gpiomux_write will reset the OE bit,
--which means that if the gpio line is held by a client of gpiolib and
--msm_gpiomux_write is called, the direction setting has been lost and
--gpiolib's internal state has been broken.
--Release gpio lines before reconfiguring them.
+Regards,
 -- 
-1.7.0.4
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+David Sin
