@@ -1,51 +1,49 @@
-From: plyatov@gmail.com (Igor Plyatov)
-Date: Mon, 13 Dec 2010 10:15:40 +0300
-Subject: [PATCH v4] mach-at91: Support for gsia18s board added
-In-Reply-To: <20101212140727.GI19897@game.jcrosoft.org>
-References: <1292000411-6691-1-git-send-email-plyatov@gmail.com>
-	<20101212005048.GH19897@game.jcrosoft.org>
-	<1292135848.2456.19.camel@homepc>
-	<20101212140727.GI19897@game.jcrosoft.org>
-Message-ID: <1292224540.4117.16.camel@homepc>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 13 Dec 2010 15:28:14 +0800
+Subject: [PATCH v5 07/15] ARM: mxs: Add gpio support
+In-Reply-To: <20101210102416.GH17441@pengutronix.de>
+References: <1291968402-19393-1-git-send-email-shawn.guo@freescale.com>
+	<1291968402-19393-2-git-send-email-shawn.guo@freescale.com>
+	<20101210102416.GH17441@pengutronix.de>
+Message-ID: <20101213072743.GA23558@ubuntu.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jean-Christophe,
+Hi Uwe,
 
-> sorry as I explain before if you have exclusive option you need to create
-> kconfig options which are board specific to manage them
-> we work to reduce the number of defconfig in the mainline
-> and it's not PortuxG20 and Stamp9g20 specific but to have only one defconfig
-> for all 9g20 at a first step and late for all sam9
+On Fri, Dec 10, 2010 at 03:24:16AM -0700, Uwe Kleine-K?nig wrote:
+> Hello Shawn,
+> 
+> On Fri, Dec 10, 2010 at 04:06:40PM +0800, Shawn Guo wrote:
+[...]
+> > +int __init mxs_gpio_init(struct mxs_gpio_port *port, int cnt)
+> > +{
+> > +	int i, j;
+> > +
+> > +	/* save for local usage */
+> > +	mxs_gpio_ports = port;
+> > +	gpio_table_size = cnt;
+> > +
+> > +	pr_info("MXS GPIO hardware\n");
+> > +
+> > +	for (i = 0; i < cnt; i++) {
+> > +		/* disable the interrupt and clear the status */
+> > +		__raw_writel(0, port[i].base +
+> > +				PINCTRL_PIN2IRQ(i));
+> > +		__raw_writel(0, port[i].base +
+> > +				PINCTRL_IRQEN(i));
+> > +		__raw_writel(~0, port[i].base +
+> > +				PINCTRL_IRQSTAT(i) + MXS_CLR_ADDR);
+> Why not __raw_writel(0, port[i].base + PINCTRL_IRQSTAT(i)) ?
+> (And note that applying ~ on a signed integer isn't portable in
+> general.  For all sane archs this is the same as ~0U though and ARM is
+> sane (here), still I think it's good to be aware of such things and
+> avoid them if easily possible.)
+> 
+The i.MX28 RM section 9.4.78 tells "Software may clear any bit in this
+register by writing a 1 to the bit at the SCT clear address".
 
-Thank you for time spent on my patches and e-mails!
-I was think to do it this way, but unsure that this is a right way.
-Now, with yours help, I know what to do.
+What about writing 0xffffffff into clear address?
 
-> > > your patch contain a lots of whitespace please fix it
-> > 
-> > There is no problems with whitespace. This patch checked by
-> > scripts/checkpatch.pl twice. It seems your mailer corrupt this patch.
-> my mailer no way mutt does not do it
-> and when I edit with vim I saw the whitespace too
-> please check again
-
-I found this whitespaces. There is something strange inside of gedit,
-because I does not have practice to use spaces for formatting.
-It seems, time to learn vi, come :-)
-
-> > Please, use more testimony why it is required to use system_rev here.
-> > Yours position does not clear for me.
-> > You can point me to the right documentation or discussion about this
-> > requirements in the mail archives...
-> two bards with the same machine id NACK as we can not compile them in the same
-> kernel and this a target we all work on to allow
-> if you want to tuse the same machine id as I did for other boards you must use
-> system_rev or any detection to identify tehm
-
-OK. I will use the GSIA18S machine instead of the STAMP9G20.
-The GSIA18S already registerd in the ARM machines database.
-
-Best regards!
---
-Igor Plyatov
+Regards,
+Shawn
