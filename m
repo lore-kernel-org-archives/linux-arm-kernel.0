@@ -1,108 +1,362 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 13 Dec 2010 14:48:56 +0200
-Subject: [PATCH 05/10] gpio: pl061: irq_data conversion.
-In-Reply-To: <20101213120256.GD15575@mail.wantstofly.org>
-References: <cover.1292240053.git.buytenh@wantstofly.org>
-	<20101213120256.GD15575@mail.wantstofly.org>
-Message-ID: <20101213124856.GE5766@jasper.tkos.co.il>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 13 Dec 2010 20:55:02 +0800
+Subject: [PATCH v6 08/15] ARM: mxs: Add iomux support
+In-Reply-To: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1292244903-30392-6-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lennert,
+MXS-based SoCs implements iomux functions in block PINCTRL.
 
-(Added LAKL to Cc).
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-On Mon, Dec 13, 2010 at 01:02:56PM +0100, Lennert Buytenhek wrote:
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
+Changes for v6:
+ - Use __mxs_setl() and __mxs_clrl() for bit set/clear
 
-Acked-by: Baruch Siach <baruch@tkos.co.il>
+Changes for v5:
+ - Change iomux_cfg_t from u64 to u16
+ - Add namespace MXS_ to shift, mask, and pad definitions
+ - Use SET/CLR register for 1 bit setting
+ - Get "if" and "{" at the same line
+ - Remove space in middle of tabs
+ - Change "setups" to "configures" in comments
 
-> ---
->  drivers/gpio/pl061.c |   28 ++++++++++++++--------------
->  1 files changed, 14 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/gpio/pl061.c b/drivers/gpio/pl061.c
-> index 5005990..2975d22 100644
-> --- a/drivers/gpio/pl061.c
-> +++ b/drivers/gpio/pl061.c
-> @@ -129,10 +129,10 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
->  /*
->   * PL061 GPIO IRQ
->   */
-> -static void pl061_irq_disable(unsigned irq)
-> +static void pl061_irq_disable(struct irq_data *d)
->  {
-> -	struct pl061_gpio *chip = get_irq_chip_data(irq);
-> -	int offset = irq - chip->irq_base;
-> +	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
-> +	int offset = d->irq - chip->irq_base;
->  	unsigned long flags;
->  	u8 gpioie;
->  
-> @@ -143,10 +143,10 @@ static void pl061_irq_disable(unsigned irq)
->  	spin_unlock_irqrestore(&chip->irq_lock, flags);
->  }
->  
-> -static void pl061_irq_enable(unsigned irq)
-> +static void pl061_irq_enable(struct irq_data *d)
->  {
-> -	struct pl061_gpio *chip = get_irq_chip_data(irq);
-> -	int offset = irq - chip->irq_base;
-> +	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
-> +	int offset = d->irq - chip->irq_base;
->  	unsigned long flags;
->  	u8 gpioie;
->  
-> @@ -157,10 +157,10 @@ static void pl061_irq_enable(unsigned irq)
->  	spin_unlock_irqrestore(&chip->irq_lock, flags);
->  }
->  
-> -static int pl061_irq_type(unsigned irq, unsigned trigger)
-> +static int pl061_irq_type(struct irq_data *d, unsigned trigger)
->  {
-> -	struct pl061_gpio *chip = get_irq_chip_data(irq);
-> -	int offset = irq - chip->irq_base;
-> +	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
-> +	int offset = d->irq - chip->irq_base;
->  	unsigned long flags;
->  	u8 gpiois, gpioibe, gpioiev;
->  
-> @@ -203,9 +203,9 @@ static int pl061_irq_type(unsigned irq, unsigned trigger)
->  
->  static struct irq_chip pl061_irqchip = {
->  	.name		= "GPIO",
-> -	.enable		= pl061_irq_enable,
-> -	.disable	= pl061_irq_disable,
-> -	.set_type	= pl061_irq_type,
-> +	.irq_enable	= pl061_irq_enable,
-> +	.irq_disable	= pl061_irq_disable,
-> +	.irq_set_type	= pl061_irq_type,
->  };
->  
->  static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
-> @@ -214,7 +214,7 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
->  	struct list_head *ptr;
->  	struct pl061_gpio *chip;
->  
-> -	desc->chip->ack(irq);
-> +	desc->irq_data.chip->irq_ack(&desc->irq_data);
->  	list_for_each(ptr, chip_list) {
->  		unsigned long pending;
->  		int offset;
-> @@ -229,7 +229,7 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
->  		for_each_set_bit(offset, &pending, PL061_GPIO_NR)
->  			generic_handle_irq(pl061_to_irq(&chip->gc, offset));
->  	}
-> -	desc->chip->unmask(irq);
-> +	desc->irq_data.chip->irq_unmask(&desc->irq_data);
->  }
->  
->  static int pl061_probe(struct amba_device *dev, struct amba_id *id)
-> -- 
-> 1.7.1
-> 
+Changes for v3:
+ - Change iomux_cfg_t to u64 to facilitate adding platform specific
+   pad_ctrl settings to an existing pad definition
+ - Change inclusion of hardware.h to mxs.h
+ - Get iomux_base a hard-assignment in mxs_iomux_setup_pad(), since
+   mx23 and mx28 share the common pinctrl base adress and it's only
+   used in mxs_iomux_setup_pad().
+ - Remove EXPORT_SYMBOL and the static of mxs_iomux_setup_pad()
 
+Changes for v2:
+ - Define iomux_cfg_t as u64
+ - Turn mxs_iomux_setup_pad() into a static function
+ - Fix a bug in mxs_iomux_setup_pad(), muxsel starts at offset 0x100 than 0 of pinctrl block.
+---
+ arch/arm/mach-mxs/include/mach/iomux-mx23.h |   29 +++++++
+ arch/arm/mach-mxs/include/mach/iomux-mx28.h |   44 ++++++++++
+ arch/arm/mach-mxs/include/mach/iomux.h      |  116 +++++++++++++++++++++++++++
+ arch/arm/mach-mxs/iomux.c                   |   99 +++++++++++++++++++++++
+ 4 files changed, 288 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx23.h
+ create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx28.h
+ create mode 100644 arch/arm/mach-mxs/include/mach/iomux.h
+ create mode 100644 arch/arm/mach-mxs/iomux.c
+
+diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx23.h b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
+new file mode 100644
+index 0000000..5a316f4
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#ifndef __MACH_IOMUX_MX23_H__
++#define __MACH_IOMUX_MX23_H__
++
++#include <mach/iomux.h>
++
++/*
++ * The naming convention for the pad modes is MX23_PAD_<padname>__<padmode>
++ * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
++ * See also iomux.h
++ *
++ *							    BANK PIN     MUX            VOL          MA            PULL
++ */
++/* DUART */
++#define MX23_PAD_PWM0__DUART_RX			MXS_IOMUX_PAD(1, 26, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
++#define MX23_PAD_PWM1__DUART_TX			MXS_IOMUX_PAD(1, 27, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
++
++#endif /* __MACH_IOMUX_MX23_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+new file mode 100644
+index 0000000..be8ad2d
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#ifndef __MACH_IOMUX_MX28_H__
++#define __MACH_IOMUX_MX28_H__
++
++#include <mach/iomux.h>
++
++/*
++ * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
++ * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
++ * See also iomux.h
++ *
++ *							    BANK PIN     MUX            VOL          MA            PULL
++ */
++/* DUART */
++#define MX28_PAD_PWM0__DUART_RX			MXS_IOMUX_PAD(3, 16, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
++#define MX28_PAD_PWM1__DUART_TX			MXS_IOMUX_PAD(3, 17, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
++
++/* FEC */
++#define MX28_PAD_ENET0_MDC__ENET0_MDC		MXS_IOMUX_PAD(4, 0,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET0_MDIO__ENET0_MDIO		MXS_IOMUX_PAD(4, 1,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN	MXS_IOMUX_PAD(4, 2,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET0_RXD0__ENET0_RXD0		MXS_IOMUX_PAD(4, 3,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET0_RXD1__ENET0_RXD1		MXS_IOMUX_PAD(4, 4,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN	MXS_IOMUX_PAD(4, 6,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET0_TXD0__ENET0_TXD0		MXS_IOMUX_PAD(4, 7,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET0_TXD1__ENET0_TXD1		MXS_IOMUX_PAD(4, 8,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++#define MX28_PAD_ENET_CLK__ENET_CLK		MXS_IOMUX_PAD(4, 16, PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
++
++/* GPIO */
++#define MX28_PAD_SSP1_DATA3__GPIO_2_15		MXS_IOMUX_PAD(2, 15, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
++#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13	MXS_IOMUX_PAD(4, 13, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
++
++#endif /* __MACH_IOMUX_MX28_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
+new file mode 100644
+index 0000000..765b361
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/iomux.h
+@@ -0,0 +1,116 @@
++/*
++ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
++ *			<armlinux@phytec.de>
++ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#ifndef __MACH_MXS_IOMUX_H__
++#define __MACH_MXS_IOMUX_H__
++
++/*
++ * IOMUX/PAD Bit field definitions
++ *
++ * PAD_BANK:	 0..2	(3)
++ * PAD_PIN:	 3..7	(5)
++ * PAD_MUXSEL:	 8..9	(2)
++ * PAD_MA:	10..12	(3)
++ * PAD_VOL:	13..14	(2)
++ * PAD_PULL:	15	(1)
++ */
++typedef u16 iomux_cfg_t;
++
++#define MXS_PAD_BANK_SHIFT	0
++#define MXS_PAD_BANK_MASK	((iomux_cfg_t)0x7 << MXS_PAD_BANK_SHIFT)
++#define MXS_PAD_PIN_SHIFT	3
++#define MXS_PAD_PIN_MASK	((iomux_cfg_t)0x1f << MXS_PAD_PIN_SHIFT)
++#define MXS_PAD_MUXSEL_SHIFT	8
++#define MXS_PAD_MUXSEL_MASK	((iomux_cfg_t)0x3 << MXS_PAD_MUXSEL_SHIFT)
++#define MXS_PAD_MA_SHIFT	10
++#define MXS_PAD_MA_MASK		((iomux_cfg_t)0x7 << MXS_PAD_MA_SHIFT)
++#define MXS_PAD_VOL_SHIFT	13
++#define MXS_PAD_VOL_MASK	((iomux_cfg_t)0x3 << MXS_PAD_VOL_SHIFT)
++#define MXS_PAD_PULL_SHIFT	15
++#define MXS_PAD_PULL_MASK	((iomux_cfg_t)0x1 << MXS_PAD_PULL_SHIFT)
++
++#define MXS_IOMUX_PAD(_bank, _pin, _muxsel, _vol, _ma, _pull)		\
++		(((iomux_cfg_t)(_bank) << MXS_PAD_BANK_SHIFT) |		\
++		((iomux_cfg_t)(_pin) << MXS_PAD_PIN_SHIFT) |		\
++		((iomux_cfg_t)(_muxsel) << MXS_PAD_MUXSEL_SHIFT) |	\
++		((iomux_cfg_t)(_vol) << MXS_PAD_VOL_SHIFT) |		\
++		((iomux_cfg_t)(_ma) << MXS_PAD_MA_SHIFT) |		\
++		((iomux_cfg_t)(_pull) << MXS_PAD_PULL_SHIFT))
++
++#define PAD_MUXSEL_0		0
++#define PAD_MUXSEL_1		1
++#define PAD_MUXSEL_2		2
++#define PAD_MUXSEL_GPIO		3
++
++#define PAD_1V8			0
++#define PAD_3V3			1
++#define PAD_VOL_NONE		2
++
++#define PAD_4MA			0
++#define PAD_8MA			1
++#define PAD_12MA		2
++#define PAD_16MA		3
++#define PAD_MA_NONE		4
++
++#define PAD_NOPULL		0
++#define PAD_PULLUP		1
++
++static inline unsigned int PAD_BANK(iomux_cfg_t pad)
++{
++	return (pad & MXS_PAD_BANK_MASK) >> MXS_PAD_BANK_SHIFT;
++}
++
++static inline unsigned int PAD_PIN(iomux_cfg_t pad)
++{
++	return (pad & MXS_PAD_PIN_MASK) >> MXS_PAD_PIN_SHIFT;
++}
++
++static inline unsigned int PAD_MUXSEL(iomux_cfg_t pad)
++{
++	return (pad & MXS_PAD_MUXSEL_MASK) >> MXS_PAD_MUXSEL_SHIFT;
++}
++
++static inline unsigned int PAD_MA(iomux_cfg_t pad)
++{
++	return (pad & MXS_PAD_MA_MASK) >> MXS_PAD_MA_SHIFT;
++}
++
++static inline unsigned int PAD_VOL(iomux_cfg_t pad)
++{
++	return (pad & MXS_PAD_VOL_MASK) >> MXS_PAD_VOL_SHIFT;
++}
++
++static inline unsigned int PAD_PULL(iomux_cfg_t pad)
++{
++	return (pad & MXS_PAD_PULL_MASK) >> MXS_PAD_PULL_SHIFT;
++}
++
++/*
++ * configures a single pad in the iomuxer
++ */
++int mxs_iomux_setup_pad(iomux_cfg_t pad);
++
++/*
++ * configures multiple pads
++ * convenient way to call the above function with tables
++ */
++int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count);
++
++#endif /* __MACH_MXS_IOMUX_H__*/
+diff --git a/arch/arm/mach-mxs/iomux.c b/arch/arm/mach-mxs/iomux.c
+new file mode 100644
+index 0000000..131908c
+--- /dev/null
++++ b/arch/arm/mach-mxs/iomux.c
+@@ -0,0 +1,99 @@
++/*
++ * Copyright 2004-2006,2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
++ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
++ *                       <armlinux@phytec.de>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include <linux/errno.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/string.h>
++#include <linux/gpio.h>
++
++#include <asm/mach/map.h>
++
++#include <mach/mxs.h>
++#include <mach/iomux.h>
++
++/*
++ * configures a single pad in the iomuxer
++ */
++int mxs_iomux_setup_pad(iomux_cfg_t pad)
++{
++	u32 reg, ofs, bp, bm;
++	void __iomem *iomux_base = MXS_IO_ADDRESS(MXS_PINCTRL_BASE_ADDR);
++
++	/* muxsel */
++	ofs = 0x100;
++	ofs += PAD_BANK(pad) * 0x20 + PAD_PIN(pad) / 16 * 0x10;
++	bp = PAD_PIN(pad) % 16 * 2;
++	bm = 0x3 << bp;
++	reg = __raw_readl(iomux_base + ofs);
++	reg &= ~bm;
++	reg |= PAD_MUXSEL(pad) << bp;
++	__raw_writel(reg, iomux_base + ofs);
++
++	/* drive */
++	ofs = cpu_is_mx23() ? 0x200 : 0x300;
++	ofs += PAD_BANK(pad) * 0x40 + PAD_PIN(pad) / 8 * 0x10;
++	/* mA */
++	if (PAD_MA(pad) != PAD_MA_NONE) {
++		bp = PAD_PIN(pad) % 8 * 4;
++		bm = 0x3 << bp;
++		reg = __raw_readl(iomux_base + ofs);
++		reg &= ~bm;
++		reg |= PAD_MA(pad) << bp;
++		__raw_writel(reg, iomux_base + ofs);
++	}
++	/* vol */
++	if (PAD_VOL(pad) != PAD_VOL_NONE) {
++		bp = PAD_PIN(pad) % 8 * 4 + 2;
++		if (PAD_VOL(pad))
++			__mxs_setl(1 << bp, iomux_base + ofs);
++		else
++			__mxs_clrl(1 << bp, iomux_base + ofs);
++	}
++
++	/* pull */
++	ofs = cpu_is_mx23() ? 0x400 : 0x600;
++	ofs += PAD_BANK(pad) * 0x10;
++	bp = PAD_PIN(pad);
++	if (PAD_PULL(pad))
++		__mxs_setl(1 << bp, iomux_base + ofs);
++	else
++		__mxs_clrl(1 << bp, iomux_base + ofs);
++
++	return 0;
++}
++
++int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count)
++{
++	const iomux_cfg_t *p = pad_list;
++	int i;
++	int ret;
++
++	for (i = 0; i < count; i++) {
++		ret = mxs_iomux_setup_pad(*p);
++		if (ret)
++			return ret;
++		p++;
++	}
++
++	return 0;
++}
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.1
