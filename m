@@ -1,362 +1,218 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 13 Dec 2010 20:55:02 +0800
-Subject: [PATCH v6 08/15] ARM: mxs: Add iomux support
+Date: Mon, 13 Dec 2010 20:54:59 +0800
+Subject: [PATCH v6 03/15] ARM: mxs: Add reset routines
 In-Reply-To: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
 References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1292244903-30392-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1292244903-30392-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MXS-based SoCs implements iomux functions in block PINCTRL.
+ - The mxs wdog is implemented in RTC block.
+ - There is a generic software reset routine for most modules on mxs.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
 Changes for v6:
  - Use __mxs_setl() and __mxs_clrl() for bit set/clear
 
-Changes for v5:
- - Change iomux_cfg_t from u64 to u16
- - Add namespace MXS_ to shift, mask, and pad definitions
- - Use SET/CLR register for 1 bit setting
- - Get "if" and "{" at the same line
- - Remove space in middle of tabs
- - Change "setups" to "configures" in comments
+Changes for v4:
+ - Add blank line above comment to make the code easy to read
+ - Tell compiler unlikely(ret)
+ - Make mxs_arch_reset_init __initcall
 
 Changes for v3:
- - Change iomux_cfg_t to u64 to facilitate adding platform specific
-   pad_ctrl settings to an existing pad definition
- - Change inclusion of hardware.h to mxs.h
- - Get iomux_base a hard-assignment in mxs_iomux_setup_pad(), since
-   mx23 and mx28 share the common pinctrl base adress and it's only
-   used in mxs_iomux_setup_pad().
- - Remove EXPORT_SYMBOL and the static of mxs_iomux_setup_pad()
+ - Change wdog timeout to 10ms for safety
+ - Simplify function mxs_reset_block() to get it look better
 
 Changes for v2:
- - Define iomux_cfg_t as u64
- - Turn mxs_iomux_setup_pad() into a static function
- - Fix a bug in mxs_iomux_setup_pad(), muxsel starts at offset 0x100 than 0 of pinctrl block.
+ - Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
 ---
- arch/arm/mach-mxs/include/mach/iomux-mx23.h |   29 +++++++
- arch/arm/mach-mxs/include/mach/iomux-mx28.h |   44 ++++++++++
- arch/arm/mach-mxs/include/mach/iomux.h      |  116 +++++++++++++++++++++++++++
- arch/arm/mach-mxs/iomux.c                   |   99 +++++++++++++++++++++++
- 4 files changed, 288 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx23.h
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx28.h
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux.h
- create mode 100644 arch/arm/mach-mxs/iomux.c
+ arch/arm/mach-mxs/include/mach/system.h |   27 ++++++
+ arch/arm/mach-mxs/system.c              |  142 +++++++++++++++++++++++++++++++
+ 2 files changed, 169 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/system.h
+ create mode 100644 arch/arm/mach-mxs/system.c
 
-diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx23.h b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
+diff --git a/arch/arm/mach-mxs/include/mach/system.h b/arch/arm/mach-mxs/include/mach/system.h
 new file mode 100644
-index 0000000..5a316f4
+index 0000000..0e42823
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
-@@ -0,0 +1,29 @@
++++ b/arch/arm/mach-mxs/include/mach/system.h
+@@ -0,0 +1,27 @@
 +/*
-+ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
++ *  Copyright (C) 1999 ARM Limited
++ *  Copyright (C) 2000 Deep Blue Solutions Ltd
++ *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#ifndef __MACH_IOMUX_MX23_H__
-+#define __MACH_IOMUX_MX23_H__
-+
-+#include <mach/iomux.h>
-+
-+/*
-+ * The naming convention for the pad modes is MX23_PAD_<padname>__<padmode>
-+ * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-+ * See also iomux.h
-+ *
-+ *							    BANK PIN     MUX            VOL          MA            PULL
-+ */
-+/* DUART */
-+#define MX23_PAD_PWM0__DUART_RX			MXS_IOMUX_PAD(1, 26, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
-+#define MX23_PAD_PWM1__DUART_TX			MXS_IOMUX_PAD(1, 27, PAD_MUXSEL_2,    PAD_VOL_NONE, PAD_4MA,      PAD_NOPULL)
-+
-+#endif /* __MACH_IOMUX_MX23_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-new file mode 100644
-index 0000000..be8ad2d
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-@@ -0,0 +1,44 @@
-+/*
-+ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#ifndef __MACH_IOMUX_MX28_H__
-+#define __MACH_IOMUX_MX28_H__
-+
-+#include <mach/iomux.h>
-+
-+/*
-+ * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
-+ * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-+ * See also iomux.h
-+ *
-+ *							    BANK PIN     MUX            VOL          MA            PULL
-+ */
-+/* DUART */
-+#define MX28_PAD_PWM0__DUART_RX			MXS_IOMUX_PAD(3, 16, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+#define MX28_PAD_PWM1__DUART_TX			MXS_IOMUX_PAD(3, 17, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+
-+/* FEC */
-+#define MX28_PAD_ENET0_MDC__ENET0_MDC		MXS_IOMUX_PAD(4, 0,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET0_MDIO__ENET0_MDIO		MXS_IOMUX_PAD(4, 1,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN	MXS_IOMUX_PAD(4, 2,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET0_RXD0__ENET0_RXD0		MXS_IOMUX_PAD(4, 3,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET0_RXD1__ENET0_RXD1		MXS_IOMUX_PAD(4, 4,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN	MXS_IOMUX_PAD(4, 6,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET0_TXD0__ENET0_TXD0		MXS_IOMUX_PAD(4, 7,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET0_TXD1__ENET0_TXD1		MXS_IOMUX_PAD(4, 8,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+#define MX28_PAD_ENET_CLK__ENET_CLK		MXS_IOMUX_PAD(4, 16, PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
-+
-+/* GPIO */
-+#define MX28_PAD_SSP1_DATA3__GPIO_2_15		MXS_IOMUX_PAD(2, 15, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13	MXS_IOMUX_PAD(4, 13, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
-+
-+#endif /* __MACH_IOMUX_MX28_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
-new file mode 100644
-index 0000000..765b361
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/iomux.h
-@@ -0,0 +1,116 @@
-+/*
-+ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-+ *			<armlinux@phytec.de>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
 + */
 +
-+#ifndef __MACH_MXS_IOMUX_H__
-+#define __MACH_MXS_IOMUX_H__
++#ifndef __MACH_MXS_SYSTEM_H__
++#define __MACH_MXS_SYSTEM_H__
 +
-+/*
-+ * IOMUX/PAD Bit field definitions
-+ *
-+ * PAD_BANK:	 0..2	(3)
-+ * PAD_PIN:	 3..7	(5)
-+ * PAD_MUXSEL:	 8..9	(2)
-+ * PAD_MA:	10..12	(3)
-+ * PAD_VOL:	13..14	(2)
-+ * PAD_PULL:	15	(1)
-+ */
-+typedef u16 iomux_cfg_t;
-+
-+#define MXS_PAD_BANK_SHIFT	0
-+#define MXS_PAD_BANK_MASK	((iomux_cfg_t)0x7 << MXS_PAD_BANK_SHIFT)
-+#define MXS_PAD_PIN_SHIFT	3
-+#define MXS_PAD_PIN_MASK	((iomux_cfg_t)0x1f << MXS_PAD_PIN_SHIFT)
-+#define MXS_PAD_MUXSEL_SHIFT	8
-+#define MXS_PAD_MUXSEL_MASK	((iomux_cfg_t)0x3 << MXS_PAD_MUXSEL_SHIFT)
-+#define MXS_PAD_MA_SHIFT	10
-+#define MXS_PAD_MA_MASK		((iomux_cfg_t)0x7 << MXS_PAD_MA_SHIFT)
-+#define MXS_PAD_VOL_SHIFT	13
-+#define MXS_PAD_VOL_MASK	((iomux_cfg_t)0x3 << MXS_PAD_VOL_SHIFT)
-+#define MXS_PAD_PULL_SHIFT	15
-+#define MXS_PAD_PULL_MASK	((iomux_cfg_t)0x1 << MXS_PAD_PULL_SHIFT)
-+
-+#define MXS_IOMUX_PAD(_bank, _pin, _muxsel, _vol, _ma, _pull)		\
-+		(((iomux_cfg_t)(_bank) << MXS_PAD_BANK_SHIFT) |		\
-+		((iomux_cfg_t)(_pin) << MXS_PAD_PIN_SHIFT) |		\
-+		((iomux_cfg_t)(_muxsel) << MXS_PAD_MUXSEL_SHIFT) |	\
-+		((iomux_cfg_t)(_vol) << MXS_PAD_VOL_SHIFT) |		\
-+		((iomux_cfg_t)(_ma) << MXS_PAD_MA_SHIFT) |		\
-+		((iomux_cfg_t)(_pull) << MXS_PAD_PULL_SHIFT))
-+
-+#define PAD_MUXSEL_0		0
-+#define PAD_MUXSEL_1		1
-+#define PAD_MUXSEL_2		2
-+#define PAD_MUXSEL_GPIO		3
-+
-+#define PAD_1V8			0
-+#define PAD_3V3			1
-+#define PAD_VOL_NONE		2
-+
-+#define PAD_4MA			0
-+#define PAD_8MA			1
-+#define PAD_12MA		2
-+#define PAD_16MA		3
-+#define PAD_MA_NONE		4
-+
-+#define PAD_NOPULL		0
-+#define PAD_PULLUP		1
-+
-+static inline unsigned int PAD_BANK(iomux_cfg_t pad)
++static inline void arch_idle(void)
 +{
-+	return (pad & MXS_PAD_BANK_MASK) >> MXS_PAD_BANK_SHIFT;
++	cpu_do_idle();
 +}
 +
-+static inline unsigned int PAD_PIN(iomux_cfg_t pad)
-+{
-+	return (pad & MXS_PAD_PIN_MASK) >> MXS_PAD_PIN_SHIFT;
-+}
++void arch_reset(char mode, const char *cmd);
 +
-+static inline unsigned int PAD_MUXSEL(iomux_cfg_t pad)
-+{
-+	return (pad & MXS_PAD_MUXSEL_MASK) >> MXS_PAD_MUXSEL_SHIFT;
-+}
-+
-+static inline unsigned int PAD_MA(iomux_cfg_t pad)
-+{
-+	return (pad & MXS_PAD_MA_MASK) >> MXS_PAD_MA_SHIFT;
-+}
-+
-+static inline unsigned int PAD_VOL(iomux_cfg_t pad)
-+{
-+	return (pad & MXS_PAD_VOL_MASK) >> MXS_PAD_VOL_SHIFT;
-+}
-+
-+static inline unsigned int PAD_PULL(iomux_cfg_t pad)
-+{
-+	return (pad & MXS_PAD_PULL_MASK) >> MXS_PAD_PULL_SHIFT;
-+}
-+
-+/*
-+ * configures a single pad in the iomuxer
-+ */
-+int mxs_iomux_setup_pad(iomux_cfg_t pad);
-+
-+/*
-+ * configures multiple pads
-+ * convenient way to call the above function with tables
-+ */
-+int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count);
-+
-+#endif /* __MACH_MXS_IOMUX_H__*/
-diff --git a/arch/arm/mach-mxs/iomux.c b/arch/arm/mach-mxs/iomux.c
++#endif /* __MACH_MXS_SYSTEM_H__ */
+diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
 new file mode 100644
-index 0000000..131908c
+index 0000000..c156e25
 --- /dev/null
-+++ b/arch/arm/mach-mxs/iomux.c
-@@ -0,0 +1,99 @@
++++ b/arch/arm/mach-mxs/system.c
+@@ -0,0 +1,142 @@
 +/*
-+ * Copyright 2004-2006,2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
-+ * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
-+ *                       <armlinux@phytec.de>
++ * Copyright (C) 1999 ARM Limited
++ * Copyright (C) 2000 Deep Blue Solutions Ltd
++ * Copyright 2006-2007,2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
++ * Copyright 2009 Ilya Yanok, Emcraft Systems Ltd, yanok at emcraft.com
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/init.h>
 +#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/string.h>
-+#include <linux/gpio.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/init.h>
 +
-+#include <asm/mach/map.h>
++#include <asm/proc-fns.h>
++#include <asm/system.h>
 +
-+#include <mach/mxs.h>
-+#include <mach/iomux.h>
++#include <mach/mx23.h>
++#include <mach/mx28.h>
++#include <mach/common.h>
++
++#define MXS_RTC_WATCHDOG	0x50
++#define MXS_WATCHDOG_EN		(1 << 4)
++
++#define MXS_MODULE_CLKGATE	(1 << 30)
++#define MXS_MODULE_SFTRST	(1 << 31)
++
++static void __iomem *wdog_base;
 +
 +/*
-+ * configures a single pad in the iomuxer
++ * Reset the system. It is called by machine_restart().
 + */
-+int mxs_iomux_setup_pad(iomux_cfg_t pad)
++void arch_reset(char mode, const char *cmd)
 +{
-+	u32 reg, ofs, bp, bm;
-+	void __iomem *iomux_base = MXS_IO_ADDRESS(MXS_PINCTRL_BASE_ADDR);
++	/* Set wdog timer 10 ms */
++	__raw_writel(10, wdog_base + MXS_RTC_WATCHDOG);
 +
-+	/* muxsel */
-+	ofs = 0x100;
-+	ofs += PAD_BANK(pad) * 0x20 + PAD_PIN(pad) / 16 * 0x10;
-+	bp = PAD_PIN(pad) % 16 * 2;
-+	bm = 0x3 << bp;
-+	reg = __raw_readl(iomux_base + ofs);
-+	reg &= ~bm;
-+	reg |= PAD_MUXSEL(pad) << bp;
-+	__raw_writel(reg, iomux_base + ofs);
++	/* Enable wdog reset */
++	__mxs_setl(MXS_WATCHDOG_EN, wdog_base);
 +
-+	/* drive */
-+	ofs = cpu_is_mx23() ? 0x200 : 0x300;
-+	ofs += PAD_BANK(pad) * 0x40 + PAD_PIN(pad) / 8 * 0x10;
-+	/* mA */
-+	if (PAD_MA(pad) != PAD_MA_NONE) {
-+		bp = PAD_PIN(pad) % 8 * 4;
-+		bm = 0x3 << bp;
-+		reg = __raw_readl(iomux_base + ofs);
-+		reg &= ~bm;
-+		reg |= PAD_MA(pad) << bp;
-+		__raw_writel(reg, iomux_base + ofs);
-+	}
-+	/* vol */
-+	if (PAD_VOL(pad) != PAD_VOL_NONE) {
-+		bp = PAD_PIN(pad) % 8 * 4 + 2;
-+		if (PAD_VOL(pad))
-+			__mxs_setl(1 << bp, iomux_base + ofs);
-+		else
-+			__mxs_clrl(1 << bp, iomux_base + ofs);
-+	}
++	/* Wait for reset to assert... */
++	mdelay(10);
 +
-+	/* pull */
-+	ofs = cpu_is_mx23() ? 0x400 : 0x600;
-+	ofs += PAD_BANK(pad) * 0x10;
-+	bp = PAD_PIN(pad);
-+	if (PAD_PULL(pad))
-+		__mxs_setl(1 << bp, iomux_base + ofs);
-+	else
-+		__mxs_clrl(1 << bp, iomux_base + ofs);
++	pr_err("Watchdog reset failed to assert reset\n");
++
++	/* Delay to allow the serial port to show the message */
++	mdelay(50);
++
++	/* We'll take a jump through zero as a poor second */
++	cpu_reset(0);
++}
++
++static int __init mxs_arch_reset_init(void)
++{
++	struct clk *clk;
++
++	wdog_base = cpu_is_mx23() ? MX23_IO_ADDRESS(MX23_RTC_BASE_ADDR) :
++				    MX28_IO_ADDRESS(MX28_RTC_BASE_ADDR);
++
++	clk = clk_get_sys("rtc", NULL);
++	if (!IS_ERR(clk))
++		clk_enable(clk);
 +
 +	return 0;
 +}
++core_initcall(mxs_arch_reset_init);
 +
-+int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count)
++/*
++ * Clear the bit and poll it cleared.  This is usually called with
++ * a reset address and mask being either SFTRST(bit 31) or CLKGATE
++ * (bit 30).
++ */
++static int clear_poll_bit(void __iomem *addr, u32 mask)
 +{
-+	const iomux_cfg_t *p = pad_list;
-+	int i;
-+	int ret;
++	int timeout = 0x400;
 +
-+	for (i = 0; i < count; i++) {
-+		ret = mxs_iomux_setup_pad(*p);
-+		if (ret)
-+			return ret;
-+		p++;
-+	}
++	/* clear the bit */
++	__mxs_clrl(mask, addr);
++
++	/*
++	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
++	 * recommends to wait 1us.
++	 */
++	udelay(1);
++
++	/* poll the bit becoming clear */
++	while ((__raw_readl(addr) & mask) && --timeout)
++		/* nothing */;
++
++	return !timeout;
++}
++
++int mxs_reset_block(void __iomem *reset_addr)
++{
++	int ret;
++	int timeout = 0x400;
++
++	/* clear and poll SFTRST */
++	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
++	if (unlikely(ret))
++		goto error;
++
++	/* clear CLKGATE */
++	__mxs_clrl(MXS_MODULE_CLKGATE, reset_addr);
++
++	/* set SFTRST to reset the block */
++	__mxs_setl(MXS_MODULE_SFTRST, reset_addr);
++	udelay(1);
++
++	/* poll CLKGATE becoming set */
++	while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
++		/* nothing */;
++	if (unlikely(!timeout))
++		goto error;
++
++	/* clear and poll SFTRST */
++	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
++	if (unlikely(ret))
++		goto error;
++
++	/* clear and poll CLKGATE */
++	ret = clear_poll_bit(reset_addr, MXS_MODULE_CLKGATE);
++	if (unlikely(ret))
++		goto error;
 +
 +	return 0;
++
++error:
++	pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
++	return -ETIMEDOUT;
 +}
 -- 
 1.7.1
