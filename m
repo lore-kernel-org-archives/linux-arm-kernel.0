@@ -1,87 +1,48 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 13 Dec 2010 09:12:54 +0100
-Subject: [PATCH] OMAP: omap_device: use pdev as parameter to get rt_va
-In-Reply-To: <1292024742-27319-1-git-send-email-omar.ramirez@ti.com>
-References: <1292024742-27319-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <4D05D586.6090408@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 13 Dec 2010 16:19:41 +0800
+Subject: [PATCH v5 07/15] ARM: mxs: Add gpio support
+In-Reply-To: <20101213081021.GA23591@ubuntu.localdomain>
+References: <1291968402-19393-1-git-send-email-shawn.guo@freescale.com>
+	<1291968402-19393-2-git-send-email-shawn.guo@freescale.com>
+	<20101210102416.GH17441@pengutronix.de>
+	<20101213072743.GA23558@ubuntu.localdomain>
+	<20101213075738.GA26210@pengutronix.de>
+	<20101213081021.GA23591@ubuntu.localdomain>
+Message-ID: <20101213081940.GB23591@ubuntu.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
-
-On 12/11/2010 12:45 AM, Ramirez Luna, Omar wrote:
-> Make the parameter received by omap_device_get_mpu_rt_va
-> consistent with the functions meant to be called by drivers.
->
-> Also move its header declaration to appear in the set of
-> functions to be used by drivers, as per the comment there.
-
-Please note that even if Paul submitted this API upon request from 
-Santosh, we do not want driver to us it most of the time.
-
-All drivers should us the generic Linux way to get physical mem resource 
-and then ioremap it.
-
-I assume that if you want to update this API, you are probably already 
-using it.
-Why cannot you use the generic way?
+On Mon, Dec 13, 2010 at 01:10:22AM -0700, Guo Shawn-R65073 wrote:
+> On Mon, Dec 13, 2010 at 12:57:38AM -0700, Uwe Kleine-K?nig wrote:
+> > Hi Shawn,
+> > 
+> > On Mon, Dec 13, 2010 at 03:28:14PM +0800, Shawn Guo wrote:
+> > > On Fri, Dec 10, 2010 at 03:24:16AM -0700, Uwe Kleine-K?nig wrote:
+> > > > On Fri, Dec 10, 2010 at 04:06:40PM +0800, Shawn Guo wrote:
+> > > > > +		__raw_writel(~0, port[i].base +
+> > > > > +				PINCTRL_IRQSTAT(i) + MXS_CLR_ADDR);
+> > > > Why not __raw_writel(0, port[i].base + PINCTRL_IRQSTAT(i)) ?
+> > > > (And note that applying ~ on a signed integer isn't portable in
+> > > > general.  For all sane archs this is the same as ~0U though and ARM is
+> > > > sane (here), still I think it's good to be aware of such things and
+> > > > avoid them if easily possible.)
+> > > > 
+> > > The i.MX28 RM section 9.4.78 tells "Software may clear any bit in this
+> > > register by writing a 1 to the bit at the SCT clear address".
+> > I didn't say that __raw_writel(~0,  ... + MXS_CLR_ADDR) didn't work.
+> > It's just that I consider writing a 0 directly into the PINCTRL_IRQSTAT
+> > register a bit more clear.
+> >  
+> I thought software has to clear bit by writing clear address for this
+> register. Just confirmed with designer it's not necessary, writing 0
+> to register has the same effect as writing 1 to clear address.
+> 
+> So Uwe, Lothar, your suggestion is being taken.  Thanks.
+> 
+I have to say sorry, as the designer just said the same word to me.
+He took it for granted that writing 0 to the address can also clear
+the status. But after checking the RTL code, he told me that
+only writing clear address will work.
 
 Regards,
-Benoit
-
->
-> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
-> Acked-by: Kevin Hilman<khilman@deeprootsystems.com>
-> ---
->   arch/arm/plat-omap/include/plat/omap_device.h |    3 +--
->   arch/arm/plat-omap/omap_device.c              |    8 ++++++--
->   2 files changed, 7 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-> index 28e2d1a..1877c1a 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_device.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
-> @@ -80,6 +80,7 @@ struct omap_device {
->   int omap_device_enable(struct platform_device *pdev);
->   int omap_device_idle(struct platform_device *pdev);
->   int omap_device_shutdown(struct platform_device *pdev);
-> +void __iomem *omap_device_get_rt_va(struct platform_device *pdev);
->
->   /* Core code interface */
->
-> @@ -101,8 +102,6 @@ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
->   int omap_device_register(struct omap_device *od);
->   int omap_early_device_register(struct omap_device *od);
->
-> -void __iomem *omap_device_get_rt_va(struct omap_device *od);
-> -
->   /* OMAP PM interface */
->   int omap_device_align_pm_lat(struct platform_device *pdev,
->   			     u32 new_wakeup_lat_limit);
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index abe933c..9d11195 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -681,7 +681,7 @@ struct powerdomain *omap_device_get_pwrdm(struct omap_device *od)
->
->   /**
->    * omap_device_get_mpu_rt_va - return the MPU's virtual addr for the hwmod base
-> - * @od: struct omap_device *
-> + * @pdev: struct platform_device *
->    *
->    * Return the MPU's virtual address for the base of the hwmod, from
->    * the ioremap() that the hwmod code does.  Only valid if there is one
-> @@ -690,8 +690,12 @@ struct powerdomain *omap_device_get_pwrdm(struct omap_device *od)
->    * otherwise, passes along the return value from
->    * omap_hwmod_get_mpu_rt_va().
->    */
-> -void __iomem *omap_device_get_rt_va(struct omap_device *od)
-> +void __iomem *omap_device_get_rt_va(struct platform_device *pdev)
->   {
-> +	struct omap_device *od;
-> +
-> +	od = _find_by_pdev(pdev);
-> +
->   	if (od->hwmods_cnt != 1)
->   		return NULL;
->
+Shawn
