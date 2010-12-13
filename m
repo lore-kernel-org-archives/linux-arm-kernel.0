@@ -1,9 +1,9 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Dec 2010 19:19:24 +0000
-Subject: [PATCH 13/24] ARM: s5pv310: update clock source registration
+Date: Mon, 13 Dec 2010 19:19:44 +0000
+Subject: [PATCH 14/24] ARM: SA11x0: update clock source registration
 In-Reply-To: <20101213191437.GN8665@n2100.arm.linux.org.uk>
 References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
-Message-ID: <E1PSDvg-0008D8-6F@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PSDw0-0008DC-KA@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,31 +13,33 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-s5pv310/time.c |    6 +-----
+ arch/arm/mach-sa1100/time.c |    6 +-----
  1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv310/time.c b/arch/arm/mach-s5pv310/time.c
-index 01b012a..b262d46 100644
---- a/arch/arm/mach-s5pv310/time.c
-+++ b/arch/arm/mach-s5pv310/time.c
-@@ -211,7 +211,6 @@ struct clocksource pwm_clocksource = {
- 	.rating		= 250,
- 	.read		= s5pv310_pwm4_read,
+diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
+index 74b6e0e..96154f5 100644
+--- a/arch/arm/mach-sa1100/time.c
++++ b/arch/arm/mach-sa1100/time.c
+@@ -81,7 +81,6 @@ static struct clocksource cksrc_sa1100_oscr = {
+ 	.rating		= 200,
+ 	.read		= sa1100_read_oscr,
  	.mask		= CLOCKSOURCE_MASK(32),
 -	.shift		= 20,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS ,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -230,10 +229,7 @@ static void __init s5pv310_clocksource_init(void)
- 	s5pv310_pwm_init(4, ~0);
- 	s5pv310_pwm_start(4, 1);
+@@ -105,12 +104,9 @@ static void __init sa1100_timer_init(void)
+ 		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_sa1100_osmr0) + 1;
+ 	ckevt_sa1100_osmr0.cpumask = cpumask_of(0);
  
--	pwm_clocksource.mult =
--		clocksource_khz2mult(clock_rate/1000, pwm_clocksource.shift);
+-	cksrc_sa1100_oscr.mult =
+-		clocksource_hz2mult(CLOCK_TICK_RATE, cksrc_sa1100_oscr.shift);
 -
--	if (clocksource_register(&pwm_clocksource))
-+	if (clocksource_register_hz(&pwm_clocksource, clock_rate))
- 		panic("%s: can't register clocksource\n", pwm_clocksource.name);
+ 	setup_irq(IRQ_OST0, &sa1100_timer_irq);
+ 
+-	clocksource_register(&cksrc_sa1100_oscr);
++	clocksource_register_hz(&cksrc_sa1100_oscr, CLOCK_TICK_RATE);
+ 	clockevents_register_device(&ckevt_sa1100_osmr0);
  }
  
 -- 
