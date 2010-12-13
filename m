@@ -1,86 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Dec 2010 16:29:47 +0000
-Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
-In-Reply-To: <AANLkTimTVWVmVfppAWSosidqLmo6c+8rPhLg=oJAVoYH@mail.gmail.com>
-References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
-	<201012101159.21845.jkrzyszt@tis.icnet.pl>
-	<201012101203.09441.jkrzyszt@tis.icnet.pl>
-	<20101210170356.GA28472@n2100.arm.linux.org.uk>
-	<AANLkTimTVWVmVfppAWSosidqLmo6c+8rPhLg=oJAVoYH@mail.gmail.com>
-Message-ID: <20101213162947.GA11730@n2100.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 13 Dec 2010 08:35:11 -0800
+Subject: [PATCH 0/5 v3] SMP support for msm
+In-Reply-To: <1292203221-2609-1-git-send-email-y>
+References: <1292203221-2609-1-git-send-email-y>
+Message-ID: <20101213163511.GA10659@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 03:52:20PM +0000, Catalin Marinas wrote:
-> On 10 December 2010 17:03, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
-> >> ?void __init omap1_camera_init(void *info)
-> >> ?{
-> >> ? ? ? struct platform_device *dev = &omap1_camera_device;
-> >> + ? ? dma_addr_t paddr = omap1_camera_phys_mempool_base;
-> >> + ? ? dma_addr_t size = omap1_camera_phys_mempool_size;
-> >> ? ? ? int ret;
-> >>
-> >> ? ? ? dev->dev.platform_data = info;
-> >>
-> >> + ? ? if (paddr) {
-> >> + ? ? ? ? ? ? if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
-> >
-> > Although this works, you're ending up with SDRAM being mapped via
-> > ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
-> > mapped as if it were a device.
+On Sun, Dec 12, 2010 at 05:20:15PM -0800, ykaoua at qualcomm.com wrote:
+> From: Jeff Ohlstein <johlstei@codeaurora.org>
 > 
-> BTW, does the generic dma_declare_coherent_memory() does the correct
-> thing in using ioremap()?
+> This series adds support for SMP on msm targets, and specifically adds
+> support for SMP on the msm8x60. This version is rebased on top of
+> Russell's SMP and gic patches, and doesn't need to change dma-mapping.
 
-I argue it doesn't, as I said above.  It means we map SDRAM as device
-memory, and as I understand the way interconnects work, it's entirely
-possible that this may not result in the SDRAM being accessible.
+Heh.  These are supposed to be from Jeff Ohlstein, not ykaoua.  Jeff,
+when you incorporate fixes, please make sure the series gets sent from
+your address.
 
-> Maybe some other function that takes a
-> pgprot_t would be better (ioremap_page_range) and could pass something
-> like pgprot_noncached (though ideally a pgprot_dmacoherent). Or just
-> an architecturally-defined function.
+Yvonne, apologies that you'll be getting all of the replies to this
+thread, please ignore them.
 
-This API was designed in the ARMv5 days when things were a lot simpler.
-What we now have is rather messy though, and really needs sorting out
-before we get too many users of it.  (Arguably it should never have been
-accepted in its current state.)
+As far as I can tell, what happened is that 'git send-email' asks to
+confirm the email address.  It's not a question, so if you type 'y',
+it happily sends the email from 'y', which in our case expands to the
+ykaoua user.
 
-We have a rule that the returned value of ioremap() is not to be used
-as a pointer which can be dereferenced by anything except driver code.
-Yet this is exactly what dma_declare_coherent_memory() does:
-
-struct dma_coherent_mem {
-        void            *virt_base;
-...
-};
-
-int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
-                                dma_addr_t device_addr, size_t size, int flags)
-{
-        void __iomem *mem_base = NULL;
-        mem_base = ioremap(bus_addr, size);
-        dev->dma_mem->virt_base = mem_base;
-}
-
-int dma_alloc_from_coherent(struct device *dev, ssize_t size,
-                                       dma_addr_t *dma_handle, void **ret)
-{
-        *ret = mem->virt_base + (pageno << PAGE_SHIFT);
-}
-
-and drivers expect the returned value from dma_alloc_coherent() to be
-dereferenceable.
-
-Note that this also fails sparse checking.  It will fail on any
-architecture where the return value from ioremap() is not a virtual
-address.
-
-So, not only does this fail the kernel's own rules, but as we already know,
-it fails the architecture's restrictions with multiple mappings of memory
-when used with SDRAM, and it also maps main memory as a device.  I wonder
-how many more things this broken API needs to do wrong before it's current
-implementation is consigned to the circular filing cabinet.
+David
