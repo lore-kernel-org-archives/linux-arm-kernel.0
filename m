@@ -1,68 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Dec 2010 11:32:05 -0800
-Subject: [GIT PULL] omap fixes for v2.6.37-rc5
-Message-ID: <20101213193204.GY3054@atomide.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Mon, 13 Dec 2010 11:36:03 -0800
+Subject: [PATCH 02/24] ARM: bcmring: update clock source
+ registration
+In-Reply-To: <E1PSDs3-0008CQ-FW@rmk-PC.arm.linux.org.uk>
+References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
+	<E1PSDs3-0008CQ-FW@rmk-PC.arm.linux.org.uk>
+Message-ID: <9383297B60843144AC17878B479520F1129E584129@SJEXCHCCR01.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-Please pull what should be the last set of omap specific fixes
-for this -rc cycle:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-The main fixes are to make PM code to compile without CONFIG_DEBUG_FS,
-and a fix for the console for suspend.
-
-The first patch just moves some code around. The second patch adds
-checks for suspend to the recent fix 0d8e2d0dad98a693bad88aea6876ac8b94ad95c6
-(OMAP2+: PM/serial: hold console semaphore while OMAP UARTs are disabled).
-Again, this will eventually be handled by runtime PM but that's not
-suitable for the -rc series.
-
-The rest are trivial fixes for for some board specific issues, and
-to handle clk_get values with IS_ERR.
-
-Regards,
-
-Tony
 
 
-The following changes since commit cf7d7e5a1980d1116ee152d25dac382b112b9c17:
+> -----Original Message-----
+> From: Russell King [mailto:rmk at arm.linux.org.uk] On Behalf Of Russell
+> King - ARM Linux
+> Sent: December 13, 2010 11:16 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Leo Chen; Scott Branden
+> Subject: [PATCH 02/24] ARM: bcmring: update clock source registration
+> 
+> In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
+> interfaces were added which simplify (and optimize) the selection of
+> the
+> divisor shift/mult constants.  Switch over to using this new interface.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-  Linux 2.6.37-rc5 (2010-12-06 20:09:04 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Aaro Koskinen (1):
-      arm: omap2: io: fix clk_get() error check
-
-Kevin Hilman (3):
-      omap: PM debug: fix wake-on-timer debugfs dependency
-      OMAP1: SRAM: fix size for OMAP1611 SoCs
-      OMAP2+: PM/serial: fix console semaphore acquire during suspend
-
-Ohad Ben-Cohen (1):
-      omap: zoom: wl1271 slot is MMC_CAP_POWER_OFF_CARD
-
-Paul Walmsley (1):
-      OMAP2: PRCM: fix some SHIFT macros that were actually bitmasks
-
-Sukumar Ghorai (1):
-      omap: nand: remove hardware ECC as default
-
-Vasiliy Kulikov (1):
-      arm: plat-omap: counter_32k: use IS_ERR() instead of NULL check
-
- arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
- arch/arm/mach-omap2/io.c                     |    2 +-
- arch/arm/mach-omap2/pm-debug.c               |   34 +++++++++++++-------------
- arch/arm/mach-omap2/pm24xx.c                 |   34 +++++++++++++++++++++++--
- arch/arm/mach-omap2/pm34xx.c                 |   27 +++++++++++++++-----
- arch/arm/mach-omap2/prcm-common.h            |   11 ++++----
- arch/arm/plat-omap/counter_32k.c             |    3 +-
- arch/arm/plat-omap/sram.c                    |    2 +-
- drivers/mtd/nand/omap2.c                     |    1 -
- 9 files changed, 79 insertions(+), 37 deletions(-)
+Changes follow John Stultz' notes from his commit 
+Acked-By: Scott Branden <sbranden@broadcom.com>
+> ---
+>  arch/arm/mach-bcmring/core.c |   14 ++++----------
+>  1 files changed, 4 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-
+> bcmring/core.c
+> index d3f959e..b91b1b0 100644
+> --- a/arch/arm/mach-bcmring/core.c
+> +++ b/arch/arm/mach-bcmring/core.c
+> @@ -294,7 +294,6 @@ static struct clocksource
+> clocksource_bcmring_timer1 = {
+>  	.rating = 200,
+>  	.read = bcmring_get_cycles_timer1,
+>  	.mask = CLOCKSOURCE_MASK(32),
+> -	.shift = 20,
+>  	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+>  };
+> 
+> @@ -303,7 +302,6 @@ static struct clocksource
+> clocksource_bcmring_timer3 = {
+>  	.rating = 100,
+>  	.read = bcmring_get_cycles_timer3,
+>  	.mask = CLOCKSOURCE_MASK(32),
+> -	.shift = 20,
+>  	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+>  };
+> 
+> @@ -316,10 +314,8 @@ static int __init bcmring_clocksource_init(void)
+>  	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE |
+> TIMER_CTRL_PERIODIC,
+>  	       TIMER1_VA_BASE + TIMER_CTRL);
+> 
+> -	clocksource_bcmring_timer1.mult =
+> -	    clocksource_khz2mult(TIMER1_FREQUENCY_MHZ * 1000,
+> -				 clocksource_bcmring_timer1.shift);
+> -	clocksource_register(&clocksource_bcmring_timer1);
+> +	clocksource_register_khz(&clocksource_bcmring_timer1,
+> +				 TIMER1_FREQUENCY_MHZ * 1000);
+> 
+>  	/* setup timer3 as free-running clocksource */
+>  	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
+> @@ -328,10 +324,8 @@ static int __init bcmring_clocksource_init(void)
+>  	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE |
+> TIMER_CTRL_PERIODIC,
+>  	       TIMER3_VA_BASE + TIMER_CTRL);
+> 
+> -	clocksource_bcmring_timer3.mult =
+> -	    clocksource_khz2mult(TIMER3_FREQUENCY_KHZ,
+> -				 clocksource_bcmring_timer3.shift);
+> -	clocksource_register(&clocksource_bcmring_timer3);
+> +	clocksource_register_khz(&clocksource_bcmring_timer3,
+> +				 TIMER3_FREQUENCY_KHZ);
+> 
+>  	return 0;
+>  }
+> --
+> 1.6.2.5
+> 
