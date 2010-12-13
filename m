@@ -1,45 +1,53 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 13 Dec 2010 21:55:30 +0900
-Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
-	run-time
-In-Reply-To: <AANLkTimnQgW2K+n4Ttgi=jzkh0xXSkgA5B5bj7ZYGwKc@mail.gmail.com>
-References: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
-	<20101205092345.GA9138@n2100.arm.linux.org.uk>
-	<AANLkTimbFYCxcSU0+c2Q2D2yQ1wRPMmTx1Pdtu3CvM4m@mail.gmail.com>
-	<20101206080606.GA29563@n2100.arm.linux.org.uk>
-	<AANLkTi=5sMZUwu+yhha=CugFwrhqTwYSTvKOHEbu8RE3@mail.gmail.com>
-	<20101206101100.GB29563@n2100.arm.linux.org.uk>
-	<AANLkTinuQWszBuA01zDkXBM5gWOsxYufWQFyqYQmOcbP@mail.gmail.com>
-	<20101208134140.GB9777@n2100.arm.linux.org.uk>
-	<AANLkTinWANEgSqioEUtR6UcwD7JK1hpXuspKQGqEctko@mail.gmail.com>
-	<20101212144934.GI8665@n2100.arm.linux.org.uk>
-	<AANLkTincg=mOt+5sHSDU-Oiz_ETpoCg010fO52QNNZRM@mail.gmail.com>
-	<AANLkTimnQgW2K+n4Ttgi=jzkh0xXSkgA5B5bj7ZYGwKc@mail.gmail.com>
-Message-ID: <AANLkTim9bvBpPatFvvO_fmqdyOrvVNvc45SW5V1ZA7=z@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 13 Dec 2010 14:14:10 +0100
+Subject: [PATCH v2 4/8] OMAP4: clock data: Add missing fields in
+	iva_hsd_byp_clk_mux_ck
+In-Reply-To: <alpine.DEB.2.00.1012101732320.13430@utopia.booyaka.com>
+References: <1291932820-11163-1-git-send-email-b-cousson@ti.com>
+	<1291932820-11163-5-git-send-email-b-cousson@ti.com>
+	<alpine.DEB.2.00.1012101732320.13430@utopia.booyaka.com>
+Message-ID: <4D061C22.9020405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Paul,
 
-On Mon, Dec 13, 2010 at 5:45 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> Hi Russell,
+On 12/11/2010 1:34 AM, Paul Walmsley wrote:
+> On Thu, 9 Dec 2010, Benoit Cousson wrote:
 >
-> I've submitted the patch to your patch tracking system with the line
-> below:
+>> From: Jonathan Bergsagel<jbergsagel@ti.com>
+>>
+>> Add register address, mask and link to the clksel structure that
+>> were missing in the IVA DPLL mux clock node.
+>>
+>> Signed-off-by: Jonathan Bergsagel<jbergsagel@ti.com>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
 >
-> The assembly code to invoke handle_arch_irq is optimized by Russell
-> King.
+> This patch results in a checkpatch warning:
 >
-> Shame that it now looks I did almost nothing to this patch :-)
+> ---
+>
+> WARNING: please, no space before tabs
+> #23: FILE: arch/arm/mach-omap2/clock44xx_data.c:639:
+> +^I.clksel ^I= iva_hsd_byp_clk_mux_sel,$
+>
+> total: 0 errors, 1 warnings, 0 checks, 13 lines checked
+>
+> Your patch has style problems, please review.  If any of these errors
+> are false positives report them to the maintainer, see
+> CHECKPATCH in MAINTAINERS.
+>
+> ---
+>
+> I've fixed it in the copy in my local branch, but next time, please run
+> checkpatch.pl and fix any problems before submitting.
 
-Thanks for your work on this. I've tried out your patch on real
-hardware today and it works well. Sorry for not giving you more
-feedback earlier. No need to rip the patch out of the tracker or
-anything, but feel free to add my acked-by if you happen to resubmit
-in the future.
+Oops, that's my mistake. the original patch was good, and I messed it up 
+during the merge conflict resolution.
+And then on top of that I completely missed this warning due to the 
+important number of "line over 80 characters" warnings in this series.
+I have now a "filter for dummies" to remove that and avoid missing real 
+warnings in the future.
 
-Acked-by: Magnus Damm <damm@opensource.se>
-
-Cheers,
-
-/ magnus
+Thanks,
+Benoit
