@@ -1,42 +1,28 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Dec 2010 12:43:32 +0100
-Subject: [PATCH 9/9] ARM i.MX51 babbage: Add framebuffer support
-In-Reply-To: <AANLkTi=vT8pX1QQ6DjzQatceO-tQb3Zu90CRAVi2DcpZ@mail.gmail.com>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-10-git-send-email-s.hauer@pengutronix.de>
-	<AANLkTi=vT8pX1QQ6DjzQatceO-tQb3Zu90CRAVi2DcpZ@mail.gmail.com>
-Message-ID: <20101213114332.GF6017@pengutronix.de>
+Date: Mon, 13 Dec 2010 12:46:35 +0100
+Subject: [PATCH v2] watchdog: imx: use clk_get to acquire the watchdog
+	clock
+In-Reply-To: <20101210131837.GA3783@infomag.iguana.be>
+References: <1291738564-10374-1-git-send-email-fabio.estevam@freescale.com>
+	<20101210131837.GA3783@infomag.iguana.be>
+Message-ID: <20101213114635.GG6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 12, 2010 at 09:37:38AM +0800, Liu Ying wrote:
-> Hello, Sascha,
+On Fri, Dec 10, 2010 at 02:18:37PM +0100, Wim Van Sebroeck wrote:
+> Hi All,
 > 
-> I have following 3 comments to this patch:
-> 1) I think DISP1_DATx pins need not be set specially, as they keep the
-> default register values.
+> > Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Acked-by: Wim Van Sebroeck <wim@iguana.be>
+> 
+> Since this looks more arch specific, can this go via the arm kernel tree?
 
-We do not want to depend on default register values in the Linux Kernel.
-
-> 2) Please define 'MX51_PAD_DI_GP4__IPU_DI2_PIN15' in
-> arch/arm/plat-mxc/include/mach/iomux-mx51.h, and rename the pin to be
-> 'MX51_PAD_DI_GP4__DI2_PIN15', as we name it according to the MX51
-> iomux reference manual.
-
-I'm not sure. Normally it's good practice to code the unit into the
-name. Otherwise we end up with names like MX51_PAD_xyz__TX which could
-be the tx pin of just about any unit.
-
-
-> 3) It is better to exchange the following two lines or just remove the
-> first line:
-> +       gpio_set_value(GPIO_DVI_RESET, 0);
-> +       gpio_direction_output(GPIO_DVI_RESET, 0);
-
-ok.
+Yes, please. I already scheduled this.
 
 Sascha
-
 
 -- 
 Pengutronix e.K.                           |                             |
