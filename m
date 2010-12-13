@@ -1,63 +1,32 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 13 Dec 2010 16:45:10 +0800
-Subject: [PATCH] ARM: Allow machine to specify it's own IRQ handlers at
-	run-time
-In-Reply-To: <AANLkTincg=mOt+5sHSDU-Oiz_ETpoCg010fO52QNNZRM@mail.gmail.com>
-References: <AANLkTi=Unb_08zF8jStBJvbFeo01QprPt=ag0CrE1oLB@mail.gmail.com>
-	<20101205092345.GA9138@n2100.arm.linux.org.uk>
-	<AANLkTimbFYCxcSU0+c2Q2D2yQ1wRPMmTx1Pdtu3CvM4m@mail.gmail.com>
-	<20101206080606.GA29563@n2100.arm.linux.org.uk>
-	<AANLkTi=5sMZUwu+yhha=CugFwrhqTwYSTvKOHEbu8RE3@mail.gmail.com>
-	<20101206101100.GB29563@n2100.arm.linux.org.uk>
-	<AANLkTinuQWszBuA01zDkXBM5gWOsxYufWQFyqYQmOcbP@mail.gmail.com>
-	<20101208134140.GB9777@n2100.arm.linux.org.uk>
-	<AANLkTinWANEgSqioEUtR6UcwD7JK1hpXuspKQGqEctko@mail.gmail.com>
-	<20101212144934.GI8665@n2100.arm.linux.org.uk>
-	<AANLkTincg=mOt+5sHSDU-Oiz_ETpoCg010fO52QNNZRM@mail.gmail.com>
-Message-ID: <AANLkTimnQgW2K+n4Ttgi=jzkh0xXSkgA5B5bj7ZYGwKc@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 13 Dec 2010 09:45:46 +0100
+Subject: [PATCH v3 5/5] OMAP: mailbox: add omap_device latency information
+In-Reply-To: <AANLkTi=cQVr-T1mJeq9uaRn5VyXxBG-xcp79z898E6nx@mail.gmail.com>
+References: <1292032266-29460-1-git-send-email-omar.ramirez@ti.com>	<1292032266-29460-6-git-send-email-omar.ramirez@ti.com>
+	<AANLkTi=cQVr-T1mJeq9uaRn5VyXxBG-xcp79z898E6nx@mail.gmail.com>
+Message-ID: <4D05DD3A.2050807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 12, 2010 at 10:50 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Sun, Dec 12, 2010 at 10:49 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Sun, Dec 12, 2010 at 10:33:01PM +0800, Eric Miao wrote:
->>> On Wed, Dec 8, 2010 at 9:41 PM, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>> > On Tue, Dec 07, 2010 at 09:31:11PM +0800, Eric Miao wrote:
->>> >> +#ifdef CONFIG_MULTI_IRQ_HANDLER
->>> >> + ? ? ldr ? ? r1, =handle_arch_irq
->>> >> + ? ? ldr ? ? r0, [r1]
->>> >> + ? ? cmp ? ? r0, #0
->>> >> + ? ? movne ? r0, sp
->>> >> + ? ? adrne ? lr, BSYM(9997f)
->>> >> + ? ? ldrne ? pc, [r1]
->>> >> +#endif
->>> >
->>> > You might as well do this:
->>> > ...
+On 12/11/2010 4:25 PM, Ramirez Luna, Omar wrote:
+> On Fri, Dec 10, 2010 at 7:51 PM, Omar Ramirez Luna<omar.ramirez@ti.com>  wrote:
+>> From: Felipe Contreras<felipe.contreras@gmail.com>
 >>
->>> +#ifdef CONFIG_MULTI_IRQ_HANDLER
->>> + ? ? ldr ? ? r1, =handle_arch_irq
->>> + ? ? ldr ? ? r0, [r1]
->>> + ? ? cmp ? ? r0, #0
->>> + ? ? movne ? r0, sp
->>> + ? ? adrne ? lr, BSYM(9997f)
->>> + ? ? ldrne ? pc, [r1]
->>> +#endif
->>
->> This looks suspiciously like the old version to me.
->>
+>> So that we can enable the main clock.
 >
-> Yeah, my brain malfunctioned. :-)
+> This should be:
 >
+> Subject: OMAP: mailbox: use runtime pm for clk and sysc handling
+>
+> Use runtime pm APIs to enable/disable mailbox clocks and to configure
+> SYSCONFIG registers.
+>
+> And if someone agrees, device_latency can be merged with the previous
+> patch for device_build. I'll wait for comments and resubmit.
 
-Hi Russell,
+Yes, you're right, the device latency has nothing to do in that patch. 
+It should be in the previous patch: [PATCH v3 4/5] OMAP: mailbox: build 
+device using omap_device/omap_hwmod.
 
-I've submitted the patch to your patch tracking system with the line
-below:
-
-The assembly code to invoke handle_arch_irq is optimized by Russell
-King.
-
-Shame that it now looks I did almost nothing to this patch :-)
+regards,
+Benoit
