@@ -1,151 +1,38 @@
-From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
-Date: Mon, 13 Dec 2010 17:47:53 +0100
-Subject: [REPOST][PATCH] Fix IGEPv2 second MMC channel power supply
-In-Reply-To: <1291466438-12827-1-git-send-email-maz@misterjones.org>
-References: <1291466438-12827-1-git-send-email-maz@misterjones.org>
-Message-ID: <AANLkTi=9+AafKvyBanYeFjQtWQvUKK1rLLLJRO0z1ekw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 13 Dec 2010 16:53:37 +0000
+Subject: [PATCH v3 4/5] msm: hotplug: support cpu hotplug on msm
+In-Reply-To: <AANLkTimkUpgPD5BdjL-3aV=miJwbT0OOWAJJ+V7LUhbP@mail.gmail.com>
+References: <-1357135968697415881@unknownmsgid>
+	<AANLkTimkUpgPD5BdjL-3aV=miJwbT0OOWAJJ+V7LUhbP@mail.gmail.com>
+Message-ID: <AANLkTi=VaayMuiU-RXnL40gf3_y0YWYvOWayDofdDmpL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 13 December 2010 15:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On 13 December 2010 01:20, ?<ykaoua@qualcomm.com> wrote:
+>> --- /dev/null
+>> +++ b/arch/arm/mach-msm/hotplug.c
+> [...]
+>> +static inline void platform_do_lowpower(unsigned int cpu)
+>> +{
+>> + ? ? ? /* Just enter wfe for now. */
+>> + ? ? ? for (;;) {
+>> + ? ? ? ? ? ? ? asm("wfe");
+>> + ? ? ? ? ? ? ? if (pen_release == cpu) {
+>> + ? ? ? ? ? ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ? ? ? ? ? ?* OK, proper wakeup, we're done
+>> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ? smp_rmb();
+>
+> Do you need some barrier after wfe?
 
-2010/12/4 Marc Zyngier <maz@misterjones.org>:
-> Commit 72f381ba056 (omap3: Remove VMMC2 regulator on IGEP v2)
-> removed an unused regulator entry, but left the second MMC channel
-> (used by the Libertas WLAN module) without link to power regulator.
-> This causes the SDIO module to fail being detected.
->
-> This patch adds the two regulators that actually feed the WLAN module
-> (1v8 from the TWL4030 VIO LDO, and a fixed 3v3). With that patch, the
-> second channel is properly detected. Details of the power supply
-> implementation were kindly provided by Enric Balletbo i Serra.
->
-> Also change vmmc1 to use symbolic names instead of direct device
-> reference.
->
-> Tested on an IGEPv2 Rev-B.
->
-> Signed-off-by: Marc Zyngier <maz@misterjones.org>
-> Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
-> ?arch/arm/mach-omap2/board-igep0020.c | ? 61 ++++++++++++++++++++++++++++-----
-> ?1 files changed, 51 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-> index 5e035a5..9a85e60 100644
-> --- a/arch/arm/mach-omap2/board-igep0020.c
-> +++ b/arch/arm/mach-omap2/board-igep0020.c
-> @@ -19,6 +19,7 @@
-> ?#include <linux/interrupt.h>
->
-> ?#include <linux/regulator/machine.h>
-> +#include <linux/regulator/fixed.h>
-> ?#include <linux/i2c/twl.h>
-> ?#include <linux/mmc/host.h>
->
-> @@ -257,9 +258,8 @@ static inline void __init igep2_init_smsc911x(void) { }
-> ?static struct omap_board_config_kernel igep2_config[] __initdata = {
-> ?};
->
-> -static struct regulator_consumer_supply igep2_vmmc1_supply = {
-> - ? ? ? .supply ? ? ? ? = "vmmc",
-> -};
-> +static struct regulator_consumer_supply igep2_vmmc1_supply =
-> + ? ? ? REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.0");
->
-> ?/* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
-> ?static struct regulator_init_data igep2_vmmc1 = {
-> @@ -276,6 +276,52 @@ static struct regulator_init_data igep2_vmmc1 = {
-> ? ? ? ?.consumer_supplies ? ? ?= &igep2_vmmc1_supply,
-> ?};
->
-> +static struct regulator_consumer_supply igep2_vio_supply =
-> + ? ? ? REGULATOR_SUPPLY("vmmc_aux", "mmci-omap-hs.1");
-> +
-> +static struct regulator_init_data igep2_vio = {
-> + ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? .min_uV ? ? ? ? ? ? ? ? = 1800000,
-> + ? ? ? ? ? ? ? .max_uV ? ? ? ? ? ? ? ? = 1800000,
-> + ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | REGULATOR_MODE_STANDBY,
-> + ? ? ? ? ? ? ? .valid_ops_mask ? ? ? ? = REGULATOR_CHANGE_VOLTAGE
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | REGULATOR_CHANGE_MODE
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | REGULATOR_CHANGE_STATUS,
-> + ? ? ? },
-> + ? ? ? .num_consumer_supplies ?= 1,
-> + ? ? ? .consumer_supplies ? ? ?= &igep2_vio_supply,
-> +};
-> +
-> +static struct regulator_consumer_supply igep2_vmmc2_supply =
-> + ? ? ? REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.1");
-> +
-> +static struct regulator_init_data igep2_vmmc2 = {
-> + ? ? ? .constraints ? ? ? ? ? ?= {
-> + ? ? ? ? ? ? ? .valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL,
-> + ? ? ? ? ? ? ? .always_on ? ? ? ? ? ? ?= 1,
-> + ? ? ? },
-> + ? ? ? .num_consumer_supplies ?= 1,
-> + ? ? ? .consumer_supplies ? ? ?= &igep2_vmmc2_supply,
-> +};
-> +
-> +static struct fixed_voltage_config igep2_vwlan = {
-> + ? ? ? .supply_name ? ? ? ? ? ?= "vwlan",
-> + ? ? ? .microvolts ? ? ? ? ? ? = 3300000,
-> + ? ? ? .gpio ? ? ? ? ? ? ? ? ? = -EINVAL,
-> + ? ? ? .enabled_at_boot ? ? ? ?= 1,
-> + ? ? ? .init_data ? ? ? ? ? ? ?= &igep2_vmmc2,
-> +};
-> +
-> +static struct platform_device igep2_vwlan_device = {
-> + ? ? ? .name ? ? ? ? ? = "reg-fixed-voltage",
-> + ? ? ? .id ? ? ? ? ? ? = 0,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data ?= &igep2_vwlan,
-> + ? ? ? },
-> +};
-> +
-> ?static struct omap2_hsmmc_info mmc[] = {
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.mmc ? ? ? ? ? ?= 1,
-> @@ -373,12 +419,6 @@ static int igep2_twl_gpio_setup(struct device *dev,
-> ? ? ? ?omap2_hsmmc_init(mmc);
->
-> ? ? ? ?/*
-> - ? ? ? ?* link regulators to MMC adapters ... we "know" the
-> - ? ? ? ?* regulators will be set up only *after* we return.
-> - ? ? ? ?*/
-> - ? ? ? igep2_vmmc1_supply.dev = mmc[0].dev;
-> -
-> - ? ? ? /*
-> ? ? ? ? * REVISIT: need ehci-omap hooks for external VBUS
-> ? ? ? ? * power switch and overcurrent detect
-> ? ? ? ? */
-> @@ -489,6 +529,7 @@ static void __init igep2_display_init(void)
->
-> ?static struct platform_device *igep2_devices[] __initdata = {
-> ? ? ? ?&igep2_dss_device,
-> + ? ? ? &igep2_vwlan_device,
-> ?};
->
-> ?static void __init igep2_init_irq(void)
-> @@ -519,7 +560,7 @@ static struct twl4030_platform_data igep2_twldata = {
-> ? ? ? ?.gpio ? ? ? ? ? = &igep2_twl4030_gpio_pdata,
-> ? ? ? ?.vmmc1 ? ? ? ? ?= &igep2_vmmc1,
-> ? ? ? ?.vpll2 ? ? ? ? ?= &igep2_vpll2,
-> -
-> + ? ? ? .vio ? ? ? ? ? ?= &igep2_vio,
-> ?};
->
-> ?static struct i2c_board_info __initdata igep2_i2c1_boardinfo[] = {
-> --
-> 1.7.3.2
->
->
+I checked with the hw people and it looks like we don't need a DSB
+after an WFE (as you have in headsmp.S) since the hardware doesn't
+speculate the loads beyond the WFE (lower power state). But in the
+above case you may need some compiler barrier to avoid code
+reordering.
 
-Tony, please can this patch be included before 2.6.37 ? Without this
-patch the wifi module on IGEP v2 board not works.
-
-Thanks,
-   Enric Balletbo i Serra.
+-- 
+Catalin
