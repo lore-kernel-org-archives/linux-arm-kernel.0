@@ -1,59 +1,108 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Dec 2010 13:42:54 +0100
-Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
-In-Reply-To: <201012132035.41371.jeremy.kerr@canonical.com>
-References: <1291774094.269634.503532219345.0.gpush@pororo>
-	<1291774094.270492.31002734529.2.gpush@pororo>
-	<20101213121413.GA29833@pengutronix.de>
-	<201012132035.41371.jeremy.kerr@canonical.com>
-Message-ID: <20101213124254.GI6017@pengutronix.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 13 Dec 2010 14:48:56 +0200
+Subject: [PATCH 05/10] gpio: pl061: irq_data conversion.
+In-Reply-To: <20101213120256.GD15575@mail.wantstofly.org>
+References: <cover.1292240053.git.buytenh@wantstofly.org>
+	<20101213120256.GD15575@mail.wantstofly.org>
+Message-ID: <20101213124856.GE5766@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 08:35:37PM +0800, Jeremy Kerr wrote:
-> Hi Sascha,
-> 
-> > > +extern struct clk_ops clk_fixed_ops;
-> > > +
-> > > +#define INIT_CLK_FIXED(name, r) { \
-> > > +	.clk = INIT_CLK(name.clk, clk_fixed_ops), \
-> > > +	.rate = (r) \
-> > > +}
-> > 
-> > Is there any other valid usecase for this other than
-> > 
-> > struct clk_fixed bla = INIT_CLK_FIXED(bla, rate);
-> > 
-> > Otherwise I suggest to convert the macro to:
-> > 
-> > #define INIT_CLK_FIXED(name, r) \
-> > 	struct clk_fixed name = { \
-> > 		.clk = INIT_CLK(name.clk, clk_fixed_ops), \
-> > 		.rate = (r) \
-> > 	}
-> > 
-> > This way we do not have to specify the same name twice (and it has
-> > to be exactly the same name, otherwise it won't compile).
-> 
-> For the system-wide INIT_CLK* macros, I've intentionally made them initalisers 
-> rather than declarators, so that we can use them in other declarators (ie, the 
-> usage of INIT_CLK() above). This would be relevant if someone is using 
-> clk_fixed in their struct - probably not likely, but good to be consistent.
-> 
-> But yes, it would be good to avoid having to specify the name twice - how 
-> about adding a:
-> 
-> #define DEFINE_CLK_FIXED(name, r) \
-> 	struct clk_fixed name = INIT_CLK_FIXED(name, r)
-> 
-> - just like DEFINE_MUTEX and MUTEX_INITIALIZER.
+Hi Lennert,
 
-Jup, sounds good.
+(Added LAKL to Cc).
 
-Sascha
+On Mon, Dec 13, 2010 at 01:02:56PM +0100, Lennert Buytenhek wrote:
+> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
+
+Acked-by: Baruch Siach <baruch@tkos.co.il>
+
+> ---
+>  drivers/gpio/pl061.c |   28 ++++++++++++++--------------
+>  1 files changed, 14 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/gpio/pl061.c b/drivers/gpio/pl061.c
+> index 5005990..2975d22 100644
+> --- a/drivers/gpio/pl061.c
+> +++ b/drivers/gpio/pl061.c
+> @@ -129,10 +129,10 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
+>  /*
+>   * PL061 GPIO IRQ
+>   */
+> -static void pl061_irq_disable(unsigned irq)
+> +static void pl061_irq_disable(struct irq_data *d)
+>  {
+> -	struct pl061_gpio *chip = get_irq_chip_data(irq);
+> -	int offset = irq - chip->irq_base;
+> +	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
+> +	int offset = d->irq - chip->irq_base;
+>  	unsigned long flags;
+>  	u8 gpioie;
+>  
+> @@ -143,10 +143,10 @@ static void pl061_irq_disable(unsigned irq)
+>  	spin_unlock_irqrestore(&chip->irq_lock, flags);
+>  }
+>  
+> -static void pl061_irq_enable(unsigned irq)
+> +static void pl061_irq_enable(struct irq_data *d)
+>  {
+> -	struct pl061_gpio *chip = get_irq_chip_data(irq);
+> -	int offset = irq - chip->irq_base;
+> +	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
+> +	int offset = d->irq - chip->irq_base;
+>  	unsigned long flags;
+>  	u8 gpioie;
+>  
+> @@ -157,10 +157,10 @@ static void pl061_irq_enable(unsigned irq)
+>  	spin_unlock_irqrestore(&chip->irq_lock, flags);
+>  }
+>  
+> -static int pl061_irq_type(unsigned irq, unsigned trigger)
+> +static int pl061_irq_type(struct irq_data *d, unsigned trigger)
+>  {
+> -	struct pl061_gpio *chip = get_irq_chip_data(irq);
+> -	int offset = irq - chip->irq_base;
+> +	struct pl061_gpio *chip = irq_data_get_irq_chip_data(d);
+> +	int offset = d->irq - chip->irq_base;
+>  	unsigned long flags;
+>  	u8 gpiois, gpioibe, gpioiev;
+>  
+> @@ -203,9 +203,9 @@ static int pl061_irq_type(unsigned irq, unsigned trigger)
+>  
+>  static struct irq_chip pl061_irqchip = {
+>  	.name		= "GPIO",
+> -	.enable		= pl061_irq_enable,
+> -	.disable	= pl061_irq_disable,
+> -	.set_type	= pl061_irq_type,
+> +	.irq_enable	= pl061_irq_enable,
+> +	.irq_disable	= pl061_irq_disable,
+> +	.irq_set_type	= pl061_irq_type,
+>  };
+>  
+>  static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
+> @@ -214,7 +214,7 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
+>  	struct list_head *ptr;
+>  	struct pl061_gpio *chip;
+>  
+> -	desc->chip->ack(irq);
+> +	desc->irq_data.chip->irq_ack(&desc->irq_data);
+>  	list_for_each(ptr, chip_list) {
+>  		unsigned long pending;
+>  		int offset;
+> @@ -229,7 +229,7 @@ static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
+>  		for_each_set_bit(offset, &pending, PL061_GPIO_NR)
+>  			generic_handle_irq(pl061_to_irq(&chip->gc, offset));
+>  	}
+> -	desc->chip->unmask(irq);
+> +	desc->irq_data.chip->irq_unmask(&desc->irq_data);
+>  }
+>  
+>  static int pl061_probe(struct amba_device *dev, struct amba_id *id)
+> -- 
+> 1.7.1
+> 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
