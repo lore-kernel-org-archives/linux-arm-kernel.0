@@ -1,9 +1,9 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Dec 2010 19:18:22 +0000
-Subject: [PATCH 10/24] ARM: ns9xxx: update clock source registration
+Date: Mon, 13 Dec 2010 19:18:43 +0000
+Subject: [PATCH 11/24] ARM: omap: update clock source registration
 In-Reply-To: <20101213191437.GN8665@n2100.arm.linux.org.uk>
 References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
-Message-ID: <E1PSDug-0008Cw-Sl@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PSDv1-0008D0-AK@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,32 +13,86 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ns9xxx/time-ns9360.c |    6 +-----
- 1 files changed, 1 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap1/time.c       |    6 +-----
+ arch/arm/mach-omap2/timer-gp.c   |    5 +----
+ arch/arm/plat-omap/counter_32k.c |    6 +-----
+ 3 files changed, 3 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-ns9xxx/time-ns9360.c b/arch/arm/mach-ns9xxx/time-ns9360.c
-index 7728126..9ca32f5 100644
---- a/arch/arm/mach-ns9xxx/time-ns9360.c
-+++ b/arch/arm/mach-ns9xxx/time-ns9360.c
-@@ -35,7 +35,6 @@ static struct clocksource ns9360_clocksource = {
- 	.rating	= 300,
- 	.read	= ns9360_clocksource_read,
- 	.mask	= CLOCKSOURCE_MASK(32),
--	.shift	= 20,
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
+index 1be6a21..abb34ff 100644
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -208,7 +208,6 @@ static struct clocksource clocksource_mpu = {
+ 	.rating		= 300,
+ 	.read		= mpu_read,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+-	.shift		= 24,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -148,10 +147,7 @@ static void __init ns9360_timer_init(void)
+@@ -217,13 +216,10 @@ static void __init omap_init_clocksource(unsigned long rate)
+ 	static char err[] __initdata = KERN_ERR
+ 			"%s: can't register clocksource!\n";
  
- 	__raw_writel(tc, SYS_TC(TIMER_CLOCKSOURCE));
- 
--	ns9360_clocksource.mult = clocksource_hz2mult(ns9360_cpuclock(),
--			ns9360_clocksource.shift);
+-	clocksource_mpu.mult
+-		= clocksource_khz2mult(rate/1000, clocksource_mpu.shift);
 -
--	clocksource_register(&ns9360_clocksource);
-+	clocksource_register_hz(&ns9360_clocksource, ns9360_cpuclock());
+ 	setup_irq(INT_TIMER2, &omap_mpu_timer2_irq);
+ 	omap_mpu_timer_start(1, ~0, 1);
  
- 	latch = SH_DIV(ns9360_cpuclock(), HZ, 0);
+-	if (clocksource_register(&clocksource_mpu))
++	if (clocksource_register_hz(&clocksource_mpu, rate))
+ 		printk(err, clocksource_mpu.name);
+ }
  
+diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
+index e13c29e..a7816db 100644
+--- a/arch/arm/mach-omap2/timer-gp.c
++++ b/arch/arm/mach-omap2/timer-gp.c
+@@ -195,7 +195,6 @@ static struct clocksource clocksource_gpt = {
+ 	.rating		= 300,
+ 	.read		= clocksource_read_cycles,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+-	.shift		= 24,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+@@ -220,9 +219,7 @@ static void __init omap2_gp_clocksource_init(void)
+ 
+ 	omap_dm_timer_set_load_start(gpt, 1, 0);
+ 
+-	clocksource_gpt.mult =
+-		clocksource_khz2mult(tick_rate/1000, clocksource_gpt.shift);
+-	if (clocksource_register(&clocksource_gpt))
++	if (clocksource_register_hz(&clocksource_gpt, tick_rate))
+ 		printk(err2, clocksource_gpt.name);
+ }
+ #endif
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index 155fe43..8f149f5 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -102,7 +102,6 @@ static struct clocksource clocksource_32k = {
+ 	.rating		= 250,
+ 	.read		= omap_32k_read_dummy,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+-	.shift		= 10,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+@@ -167,12 +166,9 @@ static int __init omap_init_clocksource_32k(void)
+ 		if (sync_32k_ick)
+ 			clk_enable(sync_32k_ick);
+ 
+-		clocksource_32k.mult = clocksource_hz2mult(32768,
+-					    clocksource_32k.shift);
+-
+ 		offset_32k = clocksource_32k.read(&clocksource_32k);
+ 
+-		if (clocksource_register(&clocksource_32k))
++		if (clocksource_register_hz(&clocksource_32k, 32768))
+ 			printk(err, clocksource_32k.name);
+ 	}
+ 	return 0;
 -- 
 1.6.2.5
