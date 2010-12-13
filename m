@@ -1,179 +1,176 @@
 From: m.nazarewicz@samsung.com (Michal Nazarewicz)
-Date: Mon, 13 Dec 2010 12:26:48 +0100
-Subject: [PATCHv7 07/10] mm: MIGRATE_CMA isolation functions added
+Date: Mon, 13 Dec 2010 12:26:51 +0100
+Subject: [PATCHv7 10/10] ARM: cma: Added CMA to Aquila,
+	Goni and c210 universal boards
 In-Reply-To: <cover.1292004520.git.m.nazarewicz@samsung.com>
 References: <cover.1292004520.git.m.nazarewicz@samsung.com>
-Message-ID: <de44570cf13cd2043c14b17dd4a4ac268ccd3112.1292004520.git.m.nazarewicz@samsung.com>
+Message-ID: <cb1df81fb822b99ff00d2f4387525f8b07f05e57.1292004520.git.m.nazarewicz@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit changes various functions that change pages and
-pageblocks migrate type between MIGRATE_ISOLATE and
-MIGRATE_MOVABLE in such a way as to allow to work with
-MIGRATE_CMA migrate type.
+This commit adds CMA memory reservation code to Aquila, Goni and c210
+universal boards.
 
 Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- include/linux/page-isolation.h |   39 ++++++++++++++++++++++++++-------------
- mm/page_alloc.c                |    6 +++---
- mm/page_isolation.c            |   15 ++++++++-------
- 3 files changed, 37 insertions(+), 23 deletions(-)
+ arch/arm/mach-s5pv210/mach-aquila.c         |    2 +
+ arch/arm/mach-s5pv210/mach-goni.c           |    2 +
+ arch/arm/mach-s5pv310/mach-universal_c210.c |    2 +
+ arch/arm/plat-s5p/Makefile                  |    2 +
+ arch/arm/plat-s5p/cma-stub.c                |   49 +++++++++++++++++++++++++++
+ arch/arm/plat-s5p/include/plat/cma-stub.h   |   21 +++++++++++
+ 6 files changed, 78 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-s5p/cma-stub.c
+ create mode 100644 arch/arm/plat-s5p/include/plat/cma-stub.h
 
-diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
-index f1417ed..56f0e13 100644
---- a/include/linux/page-isolation.h
-+++ b/include/linux/page-isolation.h
-@@ -3,35 +3,49 @@
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index 28677ca..8608a16 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -39,6 +39,7 @@
+ #include <plat/fb.h>
+ #include <plat/fimc-core.h>
+ #include <plat/sdhci.h>
++#include <plat/cma-stub.h>
  
- /*
-  * Changes migrate type in [start_pfn, end_pfn) to be MIGRATE_ISOLATE.
-- * If specified range includes migrate types other than MOVABLE,
-+ * If specified range includes migrate types other than MOVABLE or CMA,
-  * this will fail with -EBUSY.
-  *
-  * For isolating all pages in the range finally, the caller have to
-  * free all pages in the range. test_page_isolated() can be used for
-  * test it.
-  */
--extern int
--start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn);
-+int __start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-+			       unsigned migratetype);
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define AQUILA_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -690,4 +691,5 @@ MACHINE_START(AQUILA, "Aquila")
+ 	.map_io		= aquila_map_io,
+ 	.init_machine	= aquila_machine_init,
+ 	.timer		= &s3c24xx_timer,
++	.reserve	= cma_mach_reserve,
+ MACHINE_END
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index b1dcf96..b1bf079 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -45,6 +45,7 @@
+ #include <plat/keypad.h>
+ #include <plat/sdhci.h>
+ #include <plat/clock.h>
++#include <plat/cma-stub.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define GONI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -865,4 +866,5 @@ MACHINE_START(GONI, "GONI")
+ 	.map_io		= goni_map_io,
+ 	.init_machine	= goni_machine_init,
+ 	.timer		= &s3c24xx_timer,
++	.reserve	= cma_mach_reserve,
+ MACHINE_END
+diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
+index 16d8fc0..d65703a 100644
+--- a/arch/arm/mach-s5pv310/mach-universal_c210.c
++++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
+@@ -21,6 +21,7 @@
+ #include <plat/s5pv310.h>
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
++#include <plat/cma-stub.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -152,6 +153,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	.boot_params	= S5P_PA_SDRAM + 0x100,
+ 	.init_irq	= s5pv310_init_irq,
+ 	.map_io		= universal_map_io,
++	.reserve	= cma_mach_reserve,
+ 	.init_machine	= universal_machine_init,
+ 	.timer		= &s5pv310_timer,
+ MACHINE_END
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index de65238..6fdb6ce 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -28,3 +28,5 @@ obj-$(CONFIG_S5P_DEV_FIMC0)	+= dev-fimc0.o
+ obj-$(CONFIG_S5P_DEV_FIMC1)	+= dev-fimc1.o
+ obj-$(CONFIG_S5P_DEV_FIMC2)	+= dev-fimc2.o
+ obj-$(CONFIG_S5P_DEV_ONENAND)	+= dev-onenand.o
 +
-+static inline int
-+start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn)
++obj-$(CONFIG_CMA) += cma-stub.o
+diff --git a/arch/arm/plat-s5p/cma-stub.c b/arch/arm/plat-s5p/cma-stub.c
+new file mode 100644
+index 0000000..716e56d
+--- /dev/null
++++ b/arch/arm/plat-s5p/cma-stub.c
+@@ -0,0 +1,49 @@
++/*
++ * This file is just a quick and dirty hack to get CMA testing device
++ * working.  The cma_mach_reserve() should be called as mach's reserve
++ * callback.  CMA testing device will use cma_ctx for allocations.
++ */
++
++#include <plat/cma-stub.h>
++
++#include <linux/cma.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++
++struct cma *cma_ctx;
++
++#define cma_size (32UL << 20) /* 32 MiB */
++
++static unsigned long cma_start __initdata;
++
++void __init cma_mach_reserve(void)
 +{
-+	return __start_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
++	unsigned long start = cma_reserve(0, cma_size, 0);
++	if (IS_ERR_VALUE(start))
++		printk(KERN_WARNING "cma: unable to reserve %lu for CMA: %d\n",
++		       cma_size >> 20, (int)start);
++	else
++		cma_start = start;
 +}
 +
-+int __undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-+			      unsigned migratetype);
- 
- /*
-  * Changes MIGRATE_ISOLATE to MIGRATE_MOVABLE.
-  * target range is [start_pfn, end_pfn)
-  */
--extern int
--undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn);
-+static inline int
-+undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn)
++static int __init cma_mach_init(void)
 +{
-+	return __undo_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
++	int ret = -ENOMEM;
++
++	if (cma_start) {
++		struct cma *ctx = cma_create(cma_start, cma_size);
++		if (IS_ERR(ctx)) {
++			ret = PTR_ERR(ctx);
++			printk(KERN_WARNING
++			       "cma: cma_create(%p, %p) failed: %d\n",
++			       (void *)cma_start, (void *)cma_size, ret);
++		} else {
++			cma_ctx = ctx;
++			ret = 0;
++		}
++	}
++
++	return ret;
 +}
- 
- /*
-- * test all pages in [start_pfn, end_pfn)are isolated or not.
-+ * Test all pages in [start_pfn, end_pfn) are isolated or not.
-  */
--extern int
--test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
-+int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
- 
- /*
-- * Internal funcs.Changes pageblock's migrate type.
-- * Please use make_pagetype_isolated()/make_pagetype_movable().
-+ * Internal functions. Changes pageblock's migrate type.
-  */
--extern int set_migratetype_isolate(struct page *page);
--extern void unset_migratetype_isolate(struct page *page);
-+int set_migratetype_isolate(struct page *page);
-+void __unset_migratetype_isolate(struct page *page, unsigned migratetype);
-+static inline void unset_migratetype_isolate(struct page *page)
-+{
-+	__unset_migratetype_isolate(page, MIGRATE_MOVABLE);
-+}
- extern unsigned long alloc_contig_freed_pages(unsigned long start,
- 					      unsigned long end, gfp_t flag);
- extern void free_contig_pages(struct page *page, int nr_pages);
-@@ -39,7 +53,6 @@ extern void free_contig_pages(struct page *page, int nr_pages);
- /*
-  * For migration.
-  */
--
- int test_pages_in_a_zone(unsigned long start_pfn, unsigned long end_pfn);
- unsigned long scan_lru_pages(unsigned long start, unsigned long end);
- int do_migrate_range(unsigned long start_pfn, unsigned long end_pfn);
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 537d1f6..084f1a9 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -5474,7 +5474,7 @@ out:
- 	return ret;
- }
- 
--void unset_migratetype_isolate(struct page *page)
-+void __unset_migratetype_isolate(struct page *page, unsigned migratetype)
- {
- 	struct zone *zone;
- 	unsigned long flags;
-@@ -5482,8 +5482,8 @@ void unset_migratetype_isolate(struct page *page)
- 	spin_lock_irqsave(&zone->lock, flags);
- 	if (get_pageblock_migratetype(page) != MIGRATE_ISOLATE)
- 		goto out;
--	set_pageblock_migratetype(page, MIGRATE_MOVABLE);
--	move_freepages_block(zone, page, MIGRATE_MOVABLE);
-+	set_pageblock_migratetype(page, migratetype);
-+	move_freepages_block(zone, page, migratetype);
- out:
- 	spin_unlock_irqrestore(&zone->lock, flags);
- }
-diff --git a/mm/page_isolation.c b/mm/page_isolation.c
-index 077cf19..ea9781e 100644
---- a/mm/page_isolation.c
-+++ b/mm/page_isolation.c
-@@ -23,10 +23,11 @@ __first_valid_page(unsigned long pfn, unsigned long nr_pages)
- }
- 
- /*
-- * start_isolate_page_range() -- make page-allocation-type of range of pages
-+ * __start_isolate_page_range() -- make page-allocation-type of range of pages
-  * to be MIGRATE_ISOLATE.
-  * @start_pfn: The lower PFN of the range to be isolated.
-  * @end_pfn: The upper PFN of the range to be isolated.
-+ * @migratetype: migrate type to set in error recovery.
-  *
-  * Making page-allocation-type to be MIGRATE_ISOLATE means free pages in
-  * the range will never be allocated. Any free pages and pages freed in the
-@@ -35,8 +36,8 @@ __first_valid_page(unsigned long pfn, unsigned long nr_pages)
-  * start_pfn/end_pfn must be aligned to pageblock_order.
-  * Returns 0 on success and -EBUSY if any part of range cannot be isolated.
-  */
--int
--start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn)
-+int __start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-+			       unsigned migratetype)
- {
- 	unsigned long pfn;
- 	unsigned long undo_pfn;
-@@ -59,7 +60,7 @@ undo:
- 	for (pfn = start_pfn;
- 	     pfn < undo_pfn;
- 	     pfn += pageblock_nr_pages)
--		unset_migratetype_isolate(pfn_to_page(pfn));
-+		__unset_migratetype_isolate(pfn_to_page(pfn), migratetype);
- 
- 	return -EBUSY;
- }
-@@ -67,8 +68,8 @@ undo:
- /*
-  * Make isolated pages available again.
-  */
--int
--undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn)
-+int __undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
-+			      unsigned migratetype)
- {
- 	unsigned long pfn;
- 	struct page *page;
-@@ -80,7 +81,7 @@ undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn)
- 		page = __first_valid_page(pfn, pageblock_nr_pages);
- 		if (!page || get_pageblock_migratetype(page) != MIGRATE_ISOLATE)
- 			continue;
--		unset_migratetype_isolate(page);
-+		__unset_migratetype_isolate(page, migratetype);
- 	}
- 	return 0;
- }
++device_initcall(cma_mach_init);
+diff --git a/arch/arm/plat-s5p/include/plat/cma-stub.h b/arch/arm/plat-s5p/include/plat/cma-stub.h
+new file mode 100644
+index 0000000..a24a03b
+--- /dev/null
++++ b/arch/arm/plat-s5p/include/plat/cma-stub.h
+@@ -0,0 +1,21 @@
++/*
++ * This file is just a quick and dirty hack to get CMA testing device
++ * working.  The cma_mach_reserve() should be called as mach's reserve
++ * callback.  CMA testing device will use cma_ctx for allocations.
++ */
++
++struct cma;
++
++#ifdef CONFIG_CMA
++
++extern struct cma *cma_ctx;
++
++void cma_mach_reserve(void);
++
++#else
++
++#define cma_ctx ((struct cma *)NULL)
++
++#define cma_mach_reserve NULL
++
++#endif
 -- 
 1.7.2.3
