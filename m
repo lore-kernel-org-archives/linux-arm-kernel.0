@@ -1,31 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 13 Dec 2010 15:12:15 +0000
-Subject: [PATCH v3 4/5] msm: hotplug: support cpu hotplug on msm
-In-Reply-To: <-1357135968697415881@unknownmsgid>
-References: <1292203221-2609-1-git-send-email-y>
-	<-1357135968697415881@unknownmsgid>
-Message-ID: <AANLkTimkUpgPD5BdjL-3aV=miJwbT0OOWAJJ+V7LUhbP@mail.gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 13 Dec 2010 15:15:26 +0000
+Subject: [PATCHv4] regulator: support PMIC mc13892
+In-Reply-To: <1292231217-4121-2-git-send-email-yong.shen@freescale.com>
+References: <1292231217-4121-1-git-send-email-yong.shen@freescale.com>
+	<1292231217-4121-2-git-send-email-yong.shen@freescale.com>
+Message-ID: <1292253326.3320.82.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2010 01:20,  <ykaoua@qualcomm.com> wrote:
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/hotplug.c
-[...]
-> +static inline void platform_do_lowpower(unsigned int cpu)
-> +{
-> + ? ? ? /* Just enter wfe for now. */
-> + ? ? ? for (;;) {
-> + ? ? ? ? ? ? ? asm("wfe");
-> + ? ? ? ? ? ? ? if (pen_release == cpu) {
-> + ? ? ? ? ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ? ? ? ? ?* OK, proper wakeup, we're done
-> + ? ? ? ? ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? smp_rmb();
+On Mon, 2010-12-13 at 17:06 +0800, yong.shen at freescale.com wrote:
+> From: Yong Shen <yong.shen@linaro.org>
+> 
+> add support for mc13892, tested on mx51 babbage board
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Signed-off-by: Yong Shen <yong.shen@linaro.org>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+> ---
+>  drivers/regulator/Kconfig             |    8 +
+>  drivers/regulator/Makefile            |    1 +
+>  drivers/regulator/mc13892-regulator.c |  635 +++++++++++++++++++++++++++++++++
+>  include/linux/mfd/mc13892.h           |   39 ++
+>  4 files changed, 683 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/regulator/mc13892-regulator.c
+>  create mode 100644 include/linux/mfd/mc13892.h
+> 
 
-Do you need some barrier after wfe?
+Applied.
 
+Can you check regulator for-next as one of your previous patches may
+have been missed.
+
+Thanks
+
+Liam
 -- 
-Catalin
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
