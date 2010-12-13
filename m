@@ -1,44 +1,49 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 13 Dec 2010 14:35:07 -0800
-Subject: [PATCH v2 1/5] msm: trout: add gpio_to_irq
-Message-ID: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
+Date: Mon, 13 Dec 2010 14:35:10 -0800
+Subject: [PATCH v2 4/5] msm: add handling for clocks tagged as CLK_MINMAX
+In-Reply-To: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
+References: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1292279711-4460-4-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-trout has gpiolib support and interrupt support, but was
-missing the gpio_to_irq function. This adds that functions
-which should allow proper translation.
+CLK_MINMAX is used to denote clocks that have a wide variation
+in possible frequencies. This handling just sets the min and
+max values to the same value.
 
+This code was original created by Saravana Kannan.
+
+Cc: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mach-msm/board-trout-gpio.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-msm/clock.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
-index c50f3af..f8c09ef 100644
---- a/arch/arm/mach-msm/board-trout-gpio.c
-+++ b/arch/arm/mach-msm/board-trout-gpio.c
-@@ -72,6 +72,13 @@ static int msm_gpiolib_direction_output(struct gpio_chip *chip,
- 	return 0;
- }
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index c57210f..2069bfa 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -120,6 +120,21 @@ EXPORT_SYMBOL(clk_get_rate);
  
-+static int trout_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct msm_gpio_chip *msm_gpio = to_msm_gpio_chip(chip);
+ int clk_set_rate(struct clk *clk, unsigned long rate)
+ {
++	int ret;
++	if (clk->flags & CLKFLAG_MAX) {
++		ret = clk->ops->set_max_rate(clk->id, rate);
++		if (ret)
++			return ret;
++	}
++	if (clk->flags & CLKFLAG_MIN) {
++		ret = clk->ops->set_min_rate(clk->id, rate);
++		if (ret)
++			return ret;
++	}
 +
-+	return TROUT_GPIO_TO_INT(offset + chip->base);
-+}
++	if (clk->flags & CLKFLAG_MAX || clk->flags & CLKFLAG_MIN)
++		return ret;
 +
- #define TROUT_GPIO_BANK(name, reg_num, base_gpio, shadow_val)		\
- 	{								\
- 		.chip = {						\
-@@ -80,6 +87,7 @@ static int msm_gpiolib_direction_output(struct gpio_chip *chip,
- 			.direction_output = msm_gpiolib_direction_output, \
- 			.get		  = msm_gpiolib_get,		\
- 			.set		  = msm_gpiolib_set,		\
-+			.to_irq		  = trout_gpio_to_irq,		\
- 			.base		  = base_gpio,			\
- 			.ngpio		  = 8,				\
- 		},							\
+ 	return clk->ops->set_rate(clk->id, rate);
+ }
+ EXPORT_SYMBOL(clk_set_rate);
 -- 
 1.7.1
