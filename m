@@ -1,49 +1,33 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 13 Dec 2010 14:35:10 -0800
-Subject: [PATCH v2 4/5] msm: add handling for clocks tagged as CLK_MINMAX
+Date: Mon, 13 Dec 2010 14:35:09 -0800
+Subject: [PATCH v2 3/5] msm: trout: change name of pmdh_clk to mddi_clk
 In-Reply-To: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
 References: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1292279711-4460-4-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1292279711-4460-3-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLK_MINMAX is used to denote clocks that have a wide variation
-in possible frequencies. This handling just sets the min and
-max values to the same value.
+This clock is used in the framebuffer driver as mddi_clk.
+This just changes the name to match that. This also
+mirrors a change in Google tree.
 
-This code was original created by Saravana Kannan.
-
-Cc: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mach-msm/clock.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-msm/devices-msm7x00.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index c57210f..2069bfa 100644
---- a/arch/arm/mach-msm/clock.c
-+++ b/arch/arm/mach-msm/clock.c
-@@ -120,6 +120,21 @@ EXPORT_SYMBOL(clk_get_rate);
- 
- int clk_set_rate(struct clk *clk, unsigned long rate)
- {
-+	int ret;
-+	if (clk->flags & CLKFLAG_MAX) {
-+		ret = clk->ops->set_max_rate(clk->id, rate);
-+		if (ret)
-+			return ret;
-+	}
-+	if (clk->flags & CLKFLAG_MIN) {
-+		ret = clk->ops->set_min_rate(clk->id, rate);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	if (clk->flags & CLKFLAG_MAX || clk->flags & CLKFLAG_MIN)
-+		return ret;
-+
- 	return clk->ops->set_rate(clk->id, rate);
- }
- EXPORT_SYMBOL(clk_set_rate);
+diff --git a/arch/arm/mach-msm/devices-msm7x00.c b/arch/arm/mach-msm/devices-msm7x00.c
+index 3bf8cb5..b00a94b 100644
+--- a/arch/arm/mach-msm/devices-msm7x00.c
++++ b/arch/arm/mach-msm/devices-msm7x00.c
+@@ -364,7 +364,7 @@ struct clk msm_clocks_7x01a[] = {
+ 	CLK_PCOM("mdp_clk",	MDP_CLK,	NULL, OFF),
+ 	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, 0),
+ 	CLK_PCOM("pcm_clk",	PCM_CLK,	NULL, 0),
+-	CLK_PCOM("pmdh_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
++	CLK_PCOM("mddi_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
+ 	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
+ 	CLK_PCOM("sdc_clk",	SDC1_CLK,	&msm_device_sdc1.dev, OFF),
+ 	CLK_PCOM("sdc_pclk",	SDC1_P_CLK,	&msm_device_sdc1.dev, OFF),
 -- 
 1.7.1
