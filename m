@@ -1,50 +1,68 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 13 Dec 2010 14:26:33 -0500 (EST)
-Subject: [PATCH 22/24] ARM: orion: update clock source registration
-In-Reply-To: <E1PSDyd-0008Di-EB@rmk-PC.arm.linux.org.uk>
-References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
-	<E1PSDyd-0008Di-EB@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1012131426110.10437@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Dec 2010 11:32:05 -0800
+Subject: [GIT PULL] omap fixes for v2.6.37-rc5
+Message-ID: <20101213193204.GY3054@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Dec 2010, Russell King - ARM Linux wrote:
+Hi Linus,
 
-> In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
-> interfaces were added which simplify (and optimize) the selection of the
-> divisor shift/mult constants.  Switch over to using this new interface.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Please pull what should be the last set of omap specific fixes
+for this -rc cycle:
 
-Acked-by: Nicolas Pitre <nico@fluxnic.net>
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+The main fixes are to make PM code to compile without CONFIG_DEBUG_FS,
+and a fix for the console for suspend.
+
+The first patch just moves some code around. The second patch adds
+checks for suspend to the recent fix 0d8e2d0dad98a693bad88aea6876ac8b94ad95c6
+(OMAP2+: PM/serial: hold console semaphore while OMAP UARTs are disabled).
+Again, this will eventually be handled by runtime PM but that's not
+suitable for the -rc series.
+
+The rest are trivial fixes for for some board specific issues, and
+to handle clk_get values with IS_ERR.
+
+Regards,
+
+Tony
 
 
-> ---
->  arch/arm/plat-orion/time.c |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
-> index 715a301..11e2583 100644
-> --- a/arch/arm/plat-orion/time.c
-> +++ b/arch/arm/plat-orion/time.c
-> @@ -102,7 +102,6 @@ static cycle_t orion_clksrc_read(struct clocksource *cs)
->  
->  static struct clocksource orion_clksrc = {
->  	.name		= "orion_clocksource",
-> -	.shift		= 20,
->  	.rating		= 300,
->  	.read		= orion_clksrc_read,
->  	.mask		= CLOCKSOURCE_MASK(32),
-> @@ -245,8 +244,7 @@ void __init orion_time_init(unsigned int irq, unsigned int tclk)
->  	writel(u & ~BRIDGE_INT_TIMER0, BRIDGE_MASK);
->  	u = readl(TIMER_CTRL);
->  	writel(u | TIMER0_EN | TIMER0_RELOAD_EN, TIMER_CTRL);
-> -	orion_clksrc.mult = clocksource_hz2mult(tclk, orion_clksrc.shift);
-> -	clocksource_register(&orion_clksrc);
-> +	clocksource_register_hz(&orion_clksrc, tclk);
->  
->  	/*
->  	 * Setup clockevent timer (interrupt-driven.)
-> -- 
-> 1.6.2.5
-> 
+The following changes since commit cf7d7e5a1980d1116ee152d25dac382b112b9c17:
+
+  Linux 2.6.37-rc5 (2010-12-06 20:09:04 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Aaro Koskinen (1):
+      arm: omap2: io: fix clk_get() error check
+
+Kevin Hilman (3):
+      omap: PM debug: fix wake-on-timer debugfs dependency
+      OMAP1: SRAM: fix size for OMAP1611 SoCs
+      OMAP2+: PM/serial: fix console semaphore acquire during suspend
+
+Ohad Ben-Cohen (1):
+      omap: zoom: wl1271 slot is MMC_CAP_POWER_OFF_CARD
+
+Paul Walmsley (1):
+      OMAP2: PRCM: fix some SHIFT macros that were actually bitmasks
+
+Sukumar Ghorai (1):
+      omap: nand: remove hardware ECC as default
+
+Vasiliy Kulikov (1):
+      arm: plat-omap: counter_32k: use IS_ERR() instead of NULL check
+
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
+ arch/arm/mach-omap2/io.c                     |    2 +-
+ arch/arm/mach-omap2/pm-debug.c               |   34 +++++++++++++-------------
+ arch/arm/mach-omap2/pm24xx.c                 |   34 +++++++++++++++++++++++--
+ arch/arm/mach-omap2/pm34xx.c                 |   27 +++++++++++++++-----
+ arch/arm/mach-omap2/prcm-common.h            |   11 ++++----
+ arch/arm/plat-omap/counter_32k.c             |    3 +-
+ arch/arm/plat-omap/sram.c                    |    2 +-
+ drivers/mtd/nand/omap2.c                     |    1 -
+ 9 files changed, 79 insertions(+), 37 deletions(-)
