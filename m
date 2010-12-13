@@ -1,42 +1,39 @@
-From: stf_xl@wp.pl (Stanislaw Gruszka)
-Date: Mon, 13 Dec 2010 22:35:49 +0100
-Subject: [PATCH v2] ide: at91_ide.c bugfix for high master clock
-In-Reply-To: <1292100326-637-1-git-send-email-plyatov@gmail.com>
-References: <1292100326-637-1-git-send-email-plyatov@gmail.com>
-Message-ID: <20101213213549.GA2077@r2bh72.net.upc.cz>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 13 Dec 2010 22:49:24 +0100
+Subject: [PATCH 0/5] OMAP3&4: Fixes in setup/suspend/powerdomain
+Message-ID: <1292276969-29733-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 11, 2010 at 11:45:26PM +0300, Igor Plyatov wrote:
-> The AT91SAM9 microcontrollers with master clock higher then 105 MHz
-> and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
-> lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
-> does not detect IDE device.
+Hi Paul,
 
-The overflow happens because MSB (bit 6) is multiplied by 256.
-NCS pulse length = 256*NCS_RD_PULSE[6] + NCS_RD_PULSE[5:0] clock
-cycles. So NCS_RD_PULSE 0x41 gives 257 clock cycles not 65 as we
-expected before. Static memory controller behaviour is undefined
-when pulse length is bigger than cycle length, so things not work.
+This is a series of fixes on OMAP3/4 in setup apis,
+in the suspend framework and in powerdomain modelling
+for OMAP4.
 
-> +	u16 ncs_rd_pulse;
->  	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
->  			     AT91_SMC_BAT_SELECT;
->  
-> @@ -81,19 +84,29 @@ static void set_smc_timings(const u8 chipselect, const u16 cycle,
->  	if (data_float)
->  		mode |= AT91_SMC_TDF_(data_float);
->  
-> +	ncs_rd_pulse = cycle;
-> +	if (ncs_rd_pulse > NCS_RD_PULSE_LIMIT) {
-> +		ncs_rd_pulse = NCS_RD_PULSE_LIMIT;
-> +		pr_warn(DRV_NAME ": ncs_rd_pulse limited to maximal value %d\n",
-> +			ncs_rd_pulse);
-> +	}
+The series is based on your power domain series and is available here:
+git://gitorious.org/omap-pm/linux.git for_2.6.38/power
 
-I'm fine with that fix. We can possibly still have problems with higher
-frequencies, but I'm not sure if someone will use that hardware with 
-faster clocks. 
+Tested on 4430sdp + ES2.0 with omap2plus_defconfig.
+Tested on 3430sdp - validate OFF in suspend, with omap3_pm_defconfig
+from Kevin's tree.
+Tested on 2430sdp after fixing the break on linux-omap master.
+See http://www.spinics.net/lists/linux-omap/msg42050.html
 
-Thanks
-Stanislaw
+Regards,
+Rajendra, Santosh & Benoit
+
+
+Rajendra Nayak (3):
+  OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
+  OMAP4: PM: Do not assume clkdm supports hw transitions
+  OMAP4: powerdomain: l4per pwrdm does not support OFF
+
+Santosh Shilimkar (2):
+  OMAP4: powerdomain: Remove L3INIT_PD OFF state
+  OMAP4: clock data: Keep L3INSTR clock domain modulemode under HW control
+
+ arch/arm/mach-omap2/clock44xx_data.c        |    3 +++
+ arch/arm/mach-omap2/pm.c                    |   16 +++++++++++++---
+ arch/arm/mach-omap2/powerdomains44xx_data.c |    4 ++--
+ 3 files changed, 18 insertions(+), 5 deletions(-)
