@@ -1,53 +1,22 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 13 Dec 2010 14:14:10 +0100
-Subject: [PATCH v2 4/8] OMAP4: clock data: Add missing fields in
-	iva_hsd_byp_clk_mux_ck
-In-Reply-To: <alpine.DEB.2.00.1012101732320.13430@utopia.booyaka.com>
-References: <1291932820-11163-1-git-send-email-b-cousson@ti.com>
-	<1291932820-11163-5-git-send-email-b-cousson@ti.com>
-	<alpine.DEB.2.00.1012101732320.13430@utopia.booyaka.com>
-Message-ID: <4D061C22.9020405@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Dec 2010 13:51:10 +0000
+Subject: [PATCH] ARM: tegra: timer: Separate clocksource and sched_clock
+In-Reply-To: <1290039615-23407-1-git-send-email-ccross@android.com>
+References: <1290039615-23407-1-git-send-email-ccross@android.com>
+Message-ID: <20101213135110.GL8665@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Wed, Nov 17, 2010 at 04:20:15PM -0800, Colin Cross wrote:
+> tegra_clocksource_read should not use cnt32_to_63, wrapping is
+> already handled in the clocksource code.  Move the cnt32_to_63
+> into the sched_clock function, and replace the use of clocksource
+> mult and shift with a multiplication by 1000 to convert us to ns.
 
-On 12/11/2010 1:34 AM, Paul Walmsley wrote:
-> On Thu, 9 Dec 2010, Benoit Cousson wrote:
->
->> From: Jonathan Bergsagel<jbergsagel@ti.com>
->>
->> Add register address, mask and link to the clksel structure that
->> were missing in the IVA DPLL mux clock node.
->>
->> Signed-off-by: Jonathan Bergsagel<jbergsagel@ti.com>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->
-> This patch results in a checkpatch warning:
->
-> ---
->
-> WARNING: please, no space before tabs
-> #23: FILE: arch/arm/mach-omap2/clock44xx_data.c:639:
-> +^I.clksel ^I= iva_hsd_byp_clk_mux_sel,$
->
-> total: 0 errors, 1 warnings, 0 checks, 13 lines checked
->
-> Your patch has style problems, please review.  If any of these errors
-> are false positives report them to the maintainer, see
-> CHECKPATCH in MAINTAINERS.
->
-> ---
->
-> I've fixed it in the copy in my local branch, but next time, please run
-> checkpatch.pl and fix any problems before submitting.
+Colin,
 
-Oops, that's my mistake. the original patch was good, and I messed it up 
-during the merge conflict resolution.
-And then on top of that I completely missed this warning due to the 
-important number of "line over 80 characters" warnings in this series.
-I have now a "filter for dummies" to remove that and avoid missing real 
-warnings in the future.
+Mind if I pick this up into my tree - I'm doing other work with
+clocksources and sched_clock() at the moment which will clash with
+this patch.
 
-Thanks,
-Benoit
+Thanks.
