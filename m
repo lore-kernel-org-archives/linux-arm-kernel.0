@@ -1,118 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Dec 2010 16:41:42 +0100
-Subject: [RFC] i.MX clock support
-In-Reply-To: <20101213150120.GE26210@pengutronix.de>
-References: <20101213102538.GB6017@pengutronix.de>
-	<20101213150120.GE26210@pengutronix.de>
-Message-ID: <20101213154142.GP6017@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 13 Dec 2010 15:52:20 +0000
+Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
+In-Reply-To: <20101210170356.GA28472@n2100.arm.linux.org.uk>
+References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
+	<201012101159.21845.jkrzyszt@tis.icnet.pl>
+	<201012101203.09441.jkrzyszt@tis.icnet.pl>
+	<20101210170356.GA28472@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimTVWVmVfppAWSosidqLmo6c+8rPhLg=oJAVoYH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 04:01:20PM +0100, Uwe Kleine-K?nig wrote:
-> Hi Sascha,
-> 
-> On Mon, Dec 13, 2010 at 11:25:38AM +0100, Sascha Hauer wrote:
-> > I am not willing to accept patches for adding i.MX50 support in the mess
-> > we currently have. These patches offer a way to cleanup the clock support
-> > and the i.MX50 may be a good test bed for an implementation without
-> > old cruft to worry about. That said the following patch is not set in
-> > stone, it's a request for comments and I'm of course open to other
-> > suggestions, but it's clear that we have to do something.
-> Full ack.
-> 
-> > +#define to_clk_divider(clk) (container_of(clk, struct clk_divider, clk))
-> > +
-> > +static unsigned long clk_divider_get_rate(struct clk *clk)
-> > +{
-> > +	struct clk_divider *divider = to_clk_divider(clk);
-> > +
-> > +	unsigned long rate = clk_get_rate(divider->parent);
-> > +	unsigned int div = 1;
-> > +
-> > +	if (divider->reg) {
-> > +		div = readl(divider->reg) >> divider->shift;
-> > +		div &= (1 << divider->width) - 1;
-> > +		div++;
-> > +	}
-> > +
-> > +	return rate / div / divider->div * divider->mult;
-> Maybe you need to spend more effort to exactness e.g. by using
-> DIV_ROUND_CLOSEST and/or reordering?
-> (You didn't describe div and mult in struct clk_divider (below), so this
-> is a bit guess work for me here.)
+On 10 December 2010 17:03, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
+>> ?void __init omap1_camera_init(void *info)
+>> ?{
+>> ? ? ? struct platform_device *dev = &omap1_camera_device;
+>> + ? ? dma_addr_t paddr = omap1_camera_phys_mempool_base;
+>> + ? ? dma_addr_t size = omap1_camera_phys_mempool_size;
+>> ? ? ? int ret;
+>>
+>> ? ? ? dev->dev.platform_data = info;
+>>
+>> + ? ? if (paddr) {
+>> + ? ? ? ? ? ? if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
+>
+> Although this works, you're ending up with SDRAM being mapped via
+> ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
+> mapped as if it were a device.
 
-Ok, this needs some work. My original idea was to have seperate fixed
-dividers and configurable dividers. Then I decided to combine these into
-one divider. The end result was a mixure of both. We have a struct
-clk_divider_fixed, which is described but unused.
-
-> 
-> > +}
-> > +
-> > +static long clk_divider_round_rate(struct clk *clk, unsigned long rate)
-> > +{
-> > +	struct clk_divider *divider = to_clk_divider(clk);
-> > +	unsigned long parent_rate = clk_get_rate(divider->parent);
-> > +	unsigned int max_div, div;
-> > +
-> > +	if (rate > parent_rate)
-> > +		return parent_rate;
-> > +
-> > +	max_div = 1 << divider->width;
-> > +
-> > +	div = parent_rate / rate;
-> > +	div = max(div, max_div);
-> > +
-> > +	return parent_rate / div / divider->div * divider->mult;
-> ditto
-> 
-> > +}
-> > +
-> > +static int clk_divider_set_rate(struct clk *clk, unsigned long rate)
-> > +{
-> > +	struct clk_divider *divider = to_clk_divider(clk);
-> > +	unsigned long parent_rate = clk_get_rate(divider->parent);
-> > +	unsigned int max_div, div;
-> > +	u32 val;
-> > +
-> > +	parent_rate /= divider->div;
-> > +	parent_rate *= divider->mult;
-> > +
-> > +	if (rate > parent_rate)
-> > +		rate = parent_rate;
-> > +
-> > +	max_div = 1 << divider->width;
-> > +
-> > +	div = parent_rate / rate;
-> > +
-> > +	div = max(div, max_div);
-> > +	div--;
-> > +
-> > +	val = readl(divider->reg);
-> > +	val &= ~(((1 << divider->width) - 1) << divider->shift);
-> > +	val |= div << divider->shift;
-> > +	writel(val, divider->reg);
-> > +
-> > +	return 0;
-> You could spend more efforts here, but I think this is OK for now.
-> 
-> > [...]
-> > +struct clk_ops clk_multiplexer_ops = {
-> > +	.enable = clk_parent_enable,
-> > +	.disable = clk_parent_disable,
-> > +	.get_rate = clk_parent_get_rate,
-> > +	.round_rate = clk_parent_round_rate,
-> > +	.set_rate = clk_parent_set_rate,
-> Oh, this might have surprising effects if the parent is "public".
-> Is this intended?
-
-I have no idea what the best way is here. We could remove it and wait
-if somebody comes up with a good reason to add it again.
-
-Sascha
+BTW, does the generic dma_declare_coherent_memory() does the correct
+thing in using ioremap()? Maybe some other function that takes a
+pgprot_t would be better (ioremap_page_range) and could pass something
+like pgprot_noncached (though ideally a pgprot_dmacoherent). Or just
+an architecturally-defined function.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
