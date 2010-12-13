@@ -1,46 +1,51 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Mon, 13 Dec 2010 15:14:29 +0800
-Subject: [PATCH 1/2] Change the register name definitions for mc13783
-In-Reply-To: <1291933475.3271.211.camel@odin>
-References: <AANLkTi=L0fXFnF2-u+zdObs56h-FYgedhe0adxOAuCq=@mail.gmail.com>
-	<1291933475.3271.211.camel@odin>
-Message-ID: <AANLkTi=Ry7=wofZgHFO6_4TxLs1TPTPbEbH=4JP1cvD_@mail.gmail.com>
+From: plyatov@gmail.com (Igor Plyatov)
+Date: Mon, 13 Dec 2010 10:15:40 +0300
+Subject: [PATCH v4] mach-at91: Support for gsia18s board added
+In-Reply-To: <20101212140727.GI19897@game.jcrosoft.org>
+References: <1292000411-6691-1-git-send-email-plyatov@gmail.com>
+	<20101212005048.GH19897@game.jcrosoft.org>
+	<1292135848.2456.19.camel@homepc>
+	<20101212140727.GI19897@game.jcrosoft.org>
+Message-ID: <1292224540.4117.16.camel@homepc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liam,
+Dear Jean-Christophe,
 
-On Fri, Dec 10, 2010 at 6:24 AM, Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> On Thu, 2010-12-02 at 18:43 +0800, Yong Shen wrote:
->> Hi there,
->>
->> Please give comments inline and use attached patch for testing.
->>
->> Thanks
->> Yong
->>
->> >From e112153c6f03b49c229a8e3913a0c0459245df20 Mon Sep 17 00:00:00 2001
->> From: Yong Shen <yong.shen@linaro.org>
->> Date: Thu, 2 Dec 2010 14:17:02 +0800
->> Subject: [PATCH 1/2] Change the register name definitions for mc13783
->>
->> To make mc13783 and mc13892 share code, the register names should be
->> changed to fit the new macro definitions in the comming patch.
->
-> I've just tried to apply this patch and looks like your mailer has
-> mangled parts of it. I repaired it and sadly it still does not apply
-> against the regulator tree.
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git #for-next
->
-> Can you redo, add the acks received and resubmit.
-Sure, I can redo it.
+> sorry as I explain before if you have exclusive option you need to create
+> kconfig options which are board specific to manage them
+> we work to reduce the number of defconfig in the mainline
+> and it's not PortuxG20 and Stamp9g20 specific but to have only one defconfig
+> for all 9g20 at a first step and late for all sam9
 
-Yong
+Thank you for time spent on my patches and e-mails!
+I was think to do it this way, but unsure that this is a right way.
+Now, with yours help, I know what to do.
 
->
-> Thanks
->
-> Liam
->
->
+> > > your patch contain a lots of whitespace please fix it
+> > 
+> > There is no problems with whitespace. This patch checked by
+> > scripts/checkpatch.pl twice. It seems your mailer corrupt this patch.
+> my mailer no way mutt does not do it
+> and when I edit with vim I saw the whitespace too
+> please check again
+
+I found this whitespaces. There is something strange inside of gedit,
+because I does not have practice to use spaces for formatting.
+It seems, time to learn vi, come :-)
+
+> > Please, use more testimony why it is required to use system_rev here.
+> > Yours position does not clear for me.
+> > You can point me to the right documentation or discussion about this
+> > requirements in the mail archives...
+> two bards with the same machine id NACK as we can not compile them in the same
+> kernel and this a target we all work on to allow
+> if you want to tuse the same machine id as I did for other boards you must use
+> system_rev or any detection to identify tehm
+
+OK. I will use the GSIA18S machine instead of the STAMP9G20.
+The GSIA18S already registerd in the ARM machines database.
+
+Best regards!
+--
+Igor Plyatov
