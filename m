@@ -1,9 +1,9 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Dec 2010 19:18:43 +0000
-Subject: [PATCH 11/24] ARM: omap: update clock source registration
+Date: Mon, 13 Dec 2010 19:19:03 +0000
+Subject: [PATCH 12/24] ARM: PXA: update clock source registration
 In-Reply-To: <20101213191437.GN8665@n2100.arm.linux.org.uk>
 References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
-Message-ID: <E1PSDv1-0008D0-AK@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PSDvL-0008D4-Oi@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,86 +13,34 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap1/time.c       |    6 +-----
- arch/arm/mach-omap2/timer-gp.c   |    5 +----
- arch/arm/plat-omap/counter_32k.c |    6 +-----
- 3 files changed, 3 insertions(+), 14 deletions(-)
+ arch/arm/mach-pxa/time.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
-index 1be6a21..abb34ff 100644
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -208,7 +208,6 @@ static struct clocksource clocksource_mpu = {
- 	.rating		= 300,
- 	.read		= mpu_read,
- 	.mask		= CLOCKSOURCE_MASK(32),
--	.shift		= 24,
+diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
+index 293e40a..caf92c0 100644
+--- a/arch/arm/mach-pxa/time.c
++++ b/arch/arm/mach-pxa/time.c
+@@ -127,7 +127,6 @@ static struct clocksource cksrc_pxa_oscr0 = {
+ 	.rating         = 200,
+ 	.read           = pxa_read_oscr,
+ 	.mask           = CLOCKSOURCE_MASK(32),
+-	.shift          = 20,
  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -217,13 +216,10 @@ static void __init omap_init_clocksource(unsigned long rate)
- 	static char err[] __initdata = KERN_ERR
- 			"%s: can't register clocksource!\n";
+@@ -155,12 +154,9 @@ static void __init pxa_timer_init(void)
+ 		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_pxa_osmr0) + 1;
+ 	ckevt_pxa_osmr0.cpumask = cpumask_of(0);
  
--	clocksource_mpu.mult
--		= clocksource_khz2mult(rate/1000, clocksource_mpu.shift);
+-	cksrc_pxa_oscr0.mult =
+-		clocksource_hz2mult(clock_tick_rate, cksrc_pxa_oscr0.shift);
 -
- 	setup_irq(INT_TIMER2, &omap_mpu_timer2_irq);
- 	omap_mpu_timer_start(1, ~0, 1);
+ 	setup_irq(IRQ_OST0, &pxa_ost0_irq);
  
--	if (clocksource_register(&clocksource_mpu))
-+	if (clocksource_register_hz(&clocksource_mpu, rate))
- 		printk(err, clocksource_mpu.name);
+-	clocksource_register(&cksrc_pxa_oscr0);
++	clocksource_register_hz(&cksrc_pxa_oscr0, clock_tick_rate);
+ 	clockevents_register_device(&ckevt_pxa_osmr0);
  }
  
-diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index e13c29e..a7816db 100644
---- a/arch/arm/mach-omap2/timer-gp.c
-+++ b/arch/arm/mach-omap2/timer-gp.c
-@@ -195,7 +195,6 @@ static struct clocksource clocksource_gpt = {
- 	.rating		= 300,
- 	.read		= clocksource_read_cycles,
- 	.mask		= CLOCKSOURCE_MASK(32),
--	.shift		= 24,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-@@ -220,9 +219,7 @@ static void __init omap2_gp_clocksource_init(void)
- 
- 	omap_dm_timer_set_load_start(gpt, 1, 0);
- 
--	clocksource_gpt.mult =
--		clocksource_khz2mult(tick_rate/1000, clocksource_gpt.shift);
--	if (clocksource_register(&clocksource_gpt))
-+	if (clocksource_register_hz(&clocksource_gpt, tick_rate))
- 		printk(err2, clocksource_gpt.name);
- }
- #endif
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index 155fe43..8f149f5 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -102,7 +102,6 @@ static struct clocksource clocksource_32k = {
- 	.rating		= 250,
- 	.read		= omap_32k_read_dummy,
- 	.mask		= CLOCKSOURCE_MASK(32),
--	.shift		= 10,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-@@ -167,12 +166,9 @@ static int __init omap_init_clocksource_32k(void)
- 		if (sync_32k_ick)
- 			clk_enable(sync_32k_ick);
- 
--		clocksource_32k.mult = clocksource_hz2mult(32768,
--					    clocksource_32k.shift);
--
- 		offset_32k = clocksource_32k.read(&clocksource_32k);
- 
--		if (clocksource_register(&clocksource_32k))
-+		if (clocksource_register_hz(&clocksource_32k, 32768))
- 			printk(err, clocksource_32k.name);
- 	}
- 	return 0;
 -- 
 1.6.2.5
