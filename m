@@ -1,32 +1,44 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 13 Dec 2010 14:35:08 -0800
-Subject: [PATCH v2 2/5] msm: add CLK_MINMAX to pmdh_clk
-In-Reply-To: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
-References: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1292279711-4460-2-git-send-email-dwalker@codeaurora.org>
+Date: Mon, 13 Dec 2010 14:35:07 -0800
+Subject: [PATCH v2 1/5] msm: trout: add gpio_to_irq
+Message-ID: <1292279711-4460-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds in the CLK_MINMAX flag to the pmdh_clk since it's actual
-a min/max clock instead of a single frequency clock.
+trout has gpiolib support and interrupt support, but was
+missing the gpio_to_irq function. This adds that functions
+which should allow proper translation.
 
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mach-msm/devices-msm7x00.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-msm/board-trout-gpio.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/devices-msm7x00.c b/arch/arm/mach-msm/devices-msm7x00.c
-index 4e8c0bc..3bf8cb5 100644
---- a/arch/arm/mach-msm/devices-msm7x00.c
-+++ b/arch/arm/mach-msm/devices-msm7x00.c
-@@ -364,7 +364,7 @@ struct clk msm_clocks_7x01a[] = {
- 	CLK_PCOM("mdp_clk",	MDP_CLK,	NULL, OFF),
- 	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, 0),
- 	CLK_PCOM("pcm_clk",	PCM_CLK,	NULL, 0),
--	CLK_PCOM("pmdh_clk",	PMDH_CLK,	NULL, OFF ),
-+	CLK_PCOM("pmdh_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
- 	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
- 	CLK_PCOM("sdc_clk",	SDC1_CLK,	&msm_device_sdc1.dev, OFF),
- 	CLK_PCOM("sdc_pclk",	SDC1_P_CLK,	&msm_device_sdc1.dev, OFF),
+diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
+index c50f3af..f8c09ef 100644
+--- a/arch/arm/mach-msm/board-trout-gpio.c
++++ b/arch/arm/mach-msm/board-trout-gpio.c
+@@ -72,6 +72,13 @@ static int msm_gpiolib_direction_output(struct gpio_chip *chip,
+ 	return 0;
+ }
+ 
++static int trout_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	struct msm_gpio_chip *msm_gpio = to_msm_gpio_chip(chip);
++
++	return TROUT_GPIO_TO_INT(offset + chip->base);
++}
++
+ #define TROUT_GPIO_BANK(name, reg_num, base_gpio, shadow_val)		\
+ 	{								\
+ 		.chip = {						\
+@@ -80,6 +87,7 @@ static int msm_gpiolib_direction_output(struct gpio_chip *chip,
+ 			.direction_output = msm_gpiolib_direction_output, \
+ 			.get		  = msm_gpiolib_get,		\
+ 			.set		  = msm_gpiolib_set,		\
++			.to_irq		  = trout_gpio_to_irq,		\
+ 			.base		  = base_gpio,			\
+ 			.ngpio		  = 8,				\
+ 		},							\
 -- 
 1.7.1
