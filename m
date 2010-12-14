@@ -1,67 +1,151 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 14 Dec 2010 16:31:10 +0800
-Subject: [PATCH v6 00/15] ARM: mxs: Add initial support for MX23 andMX28
-In-Reply-To: <20101213142045.GD26210@pengutronix.de>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-	<20101213142045.GD26210@pengutronix.de>
-Message-ID: <20101214083109.GB1913@ubuntu.localdomain>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 14 Dec 2010 09:40:24 +0100
+Subject: [PATCH 3/9] Add a mfd IPUv3 driver
+In-Reply-To: <AANLkTimuchaGAEuGX24GSnAu5-FVtG_kE_KDozGKo9e-@mail.gmail.com>
+References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
+	<1291902441-24712-4-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTine90yN=e-J_zr03GmGCXekEWTPKv0pB5-EhA1v@mail.gmail.com>
+	<20101213112345.GD6017@pengutronix.de>
+	<AANLkTimuchaGAEuGX24GSnAu5-FVtG_kE_KDozGKo9e-@mail.gmail.com>
+Message-ID: <20101214084024.GS6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 07:20:45AM -0700, Uwe Kleine-K?nig wrote:
-[...]
+On Tue, Dec 14, 2010 at 12:05:07PM +0800, Liu Ying wrote:
+> Hello, Sascha,
 > 
-> There are some things still on my list.  Most of them are only nitpicks,
-> but there is at least one bigger issue left:
+> Please find my feedback with [LY] embedded.
 > 
->  - use virtual address in get_irqnr_preamble (comment by Lothar Wa?mann)
->    (Does irq handling really works without that?)
-No, it does not work without that. I just did not ran into the case,
-as only the path of icoll_base will be hit when both mx23 and mx28 are
-built in.
+> Best Regards,
+> Liu Ying
+> 
+> 2010/12/13 Sascha Hauer <s.hauer@pengutronix.de>:
+> > Hi Liu Ying,
+> >
+> > Thanks for looking at the patches.
+> [LY] You are welcome.
+> >
+> > On Sun, Dec 12, 2010 at 01:21:57PM +0800, Liu Ying wrote:
+> >> Hello, Sascha,
+> >>
+> >> IPU is not embedded in i,MX50 SoC, but in i.MX51/53 SoCs, please
+> >> modify the commit message.
+> >>
+> >> I have the following comments for the files editted respectively:
+> >> 1) ipu-common.c
+> >> ? ? - ipu_idmac_get()/ipu_idmac_put() need a mechanism to protect IPU
+> >> IDMAC resources, namely, get rid of potential race condition issue. As
+> >> only framebuffer support is added in your patches, there should be no
+> >> race condition issue now. After IC channels are supported(maybe as DMA
+> >> engine), perhaps, there will be such kind of issue.
+> >
+> > ok.
+> >
+> >> ? ? - ipu_idmac_select_buffer() need to add spinlock to protect
+> >> IPU_CHA_BUFx_RDY registers.
+> >
+> > ok.
+> >
+> >> ? ? - It looks that ipu_uninit_channel() only clears
+> >> IPU_CHA_DB_MODE_SEL register, so why not put it in
+> >> ipu_idmac_disable_channel()?
+> >
+> > ok.
+> >
+> >> ? ? - It looks that ipu_add_client_devices() and your framebuffer
+> >> patch assume /dev/fb0 uses DP_BG, /dev/fb1 uses DP_FG and /dev/fb2
+> >> uses DC.
+> >> ? ? ? But fb1_platform_data->ipu_channel_bg is
+> >> MX51_IPU_CHANNEL_MEM_DC_SYNC, this may make confusion for driver
+> >> readers and it is not easy for code maintenance.
+> >
+> > Do you have a better suggestion? fb2 becomes fb1 when overlay support
+> > is not used.
+> [LY] How about assigning DP-BG to /dev/fb0, DC to /dev/fb1 and DP_FG
+> to /dev/fb2?
+> >
+> >> ? ? - It also looks that ipu_add_client_devices() and your framebuffer
+> >> driver assume DP_BG/DP_FG are bound with DI0 and DC is bound with DI1.
+> >> ? ? ? It is ok for babbage board to support this kind of
+> >> configuration, but it may bring some limitation. For example, TVE(TV
+> >> encoder) module embedded in MX51 SoC can only connected with DI1 and
+> >> users may like to use TV as the primary device(support HW overlay),
+> >> and FSL Android BSP does support to use DI1 with LCD as the primary
+> >> device on babbage board.
+> >
+> > SO we need to put the display number into the platform data, right?
+> [LY] Yes, I think so. As the primary display port could be DI0 or DI1
+> on boards like babbage board(two display ports are used), the primary
+> display number in platform data should be configurable(I'm not sure
+> whether this can be accepted by community), perhaps, configured by
+> kernel bootup command line.
 
-It reminded me that I should test single SoC build carefully.
+Ok, I'll find a solution for this.
 
->  - various namespace problems, at least:
->    - ICOLL_VBASE in arch/arm/mach-mxs/include/mach/entry-macro.S
->    - uart_base, UART in arch/arm/mach-mxs/include/mach/uncompress.h
-OK
+> >
+> >>
+> >> 2) ipu-cpmem.c
+> >> ? ? - In order to improve performance, maybe writing
+> >> ipu_ch_param_addr(ch) directly will be fine, but not using memset()
+> >> and memcpy() in ipu_ch_param_init().
+> >
+> > I don't see this function in any performance critical path.
+> [LY] Yes, currently, this function is not in performance critical
+> path, so it is ok for me now. However, after IC/IRT channels are
+> involved, the channels' idmac configuration might be changed from time
+> to time and frequently, as the channels could be used as dma engine.
 
->    - clockevent_mxs, clockevent_mode in arch/arm/mach-mxs/timer.c
-Since clockevent_mxs already has namespace "_mxs" in there, I have to
-assume that you are asking something like mxs_clockevent_device and
-mxs_clockevent_mode. Correct me if I'm wrong.
+We are talking about 60 frames per second at maximum, right? So the
+channel would be reconfigured 60 times a second, that's still not
+performance critical, at least not if we are talking about a 100 byte or
+something memset.
+
+> >
+> >>
+> >> 3) ipu-dc.c
+> >> ? ? - Looks '#include <asm/atomic.h>' and '#include
+> >> <linux/spinlock.h>' are unnecessary.
+> >> ? ? - Need to call 'ipu_module_disable(IPU_CONF_DC_EN);' somewhere.
+> >
+> > ok.
+> >
+> >>
+> >> 4) ipu-di.c
+> >> ? ? - Looks '#include <asm/atomic.h>' and '#include <linux/delay.h>'
+> >> are unnecessary.
+> >
+> > ok.
+> >
+> >>
+> >> 5) ipu-dmfc.c
+> >> ? ? - Looks '#include <linux/delay.h>' are unnecessary.
+> >
+> > ok.
+> >
+> >>
+> >> 6) ipu-dp.c
+> >> ? ? - Looks '#include <asm/atomic.h>' and '#include <linux/delay.h>'
+> >> are unnecessary.
+> >
+> > ok.
+> >
+> >>
+> >> 7) ipu-prv.h
+> >> ? ? - Looks '#include <linux/interrupt.h>' is unnecessary.
+> >> ? ? - Please rename 'MX51_IPU_CHANNEL_xxxx' to be 'IPU_CHANNEL_xxxx',
+> >> IPUv3 channel names do not depend on SoC name.
+> >
+> > I was proven wrong each time I believed this.
+> [LY] What if IPUv3 will be embedded in more SoCs? Could you please
+> tell the reason? Thanks.
+
+Then channel assignments will change, I'll promise.
+
+Sascha
 
 
->  - on TIMROTv1 there is no HW_TIMROT_RUNNING_COUNTn register.  That's
->    called HW_TIMROT_TIMCOUNTn.
-I'm reusing the offset definition here. But it seems you are asking
-two definitions to avoid confusion.
-
->  - Typo in comment above timrot_is_v1: MX23 uses timers 0 and 1, too.
-It's a typo, but partially. mx28 uses timrot 0 and 1, while mx23 uses
-0 and 2. There are 4 registers for each timrot instance on mx28,
-but only 2 on mx23. So address step 0x40 in HW_TIMROT_TIMCTRLn strides
-one instance on mx28 while two instances on mx23. Confusion again,
-adding more definitions, right?
-
->  - Would it make sense to detect the version of the TIMROT block by
->    reading the TIMROT_VERSION register instead of using cpu_is_mxXYZ?
-Yes, we can do that, but we can not avoid using cpu_is_mxXYZ anyway,
-as the offset of TIMROT_VERSION is different between mx23 and mx28.
-If you really want to go this way, I can work it out for you to
-have a look.
-
->  - IMHO you could better use MXS_CLKCTRL_RESET instead of the watchdog
->    in arch_reset.  You argued that this needs an cpu_is_mxXYZ, still I
->    think this would be preferable.  Alternatively you can use an
->    initcall that sets the address similar to how wdog_base is
->    initialized now.  (BTW, wdog_base is another item in the namespace
->    list above.)
-OK
-
->  - Use clocksource_register_hz (recent comment by Russell King)
-OK
-
-Regards,
-Shawn
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
