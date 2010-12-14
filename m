@@ -1,51 +1,38 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 14 Dec 2010 15:53:30 +0200
-Subject: [PATCH 0/3] OMAP: Introduce Backlight driver for Sharp
-	LS037V7DW01 LCD panel
-In-Reply-To: <AANLkTikMzXs=Rp8Wgm5PRD-VEGn=O9ii+by_27hsP-ar@mail.gmail.com>
-References: <1291118860-10325-1-git-send-email-bryan.wu@canonical.com>
-	<1291217575.10133.165.camel@tubuntu>
-	<AANLkTikMzXs=Rp8Wgm5PRD-VEGn=O9ii+by_27hsP-ar@mail.gmail.com>
-Message-ID: <1292334810.6893.126.camel@tubuntu>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 Dec 2010 16:05:39 +0100
+Subject: [PATCH] AT91: usb gadget: fix freeing irq in _udc_remove()
+In-Reply-To: <AANLkTimV2ENcWajrrMQ2Too4pf=XBfLczJ9HehNt4V_8@mail.gmail.com>
+References: <AANLkTimV2ENcWajrrMQ2Too4pf=XBfLczJ9HehNt4V_8@mail.gmail.com>
+Message-ID: <1292339139-26212-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-12-06 at 13:06 +0800, ext Bryan Wu wrote:
+From: Rob Emanuele <rje@crystalfontz.com>
 
-> > This kind of backlight is, in a sense, totally separate component from
-> > the panel itself. All they have in common is that they are packaged in
-> > the same physical display module, and they usually share the same
-> > connector.
-> >
-> > I have seen three kinds of backlights on OMAP devices:
-> > - on/off GPIO (like on 3430 SDP)
-> It seems like that we need a gpio_bl.c driver for this kind of usage.
-> 
-> > - PWM based (zoom seems to have this)
-> 
-> I failed to find any PWM or Backlight code in ZOOM boards source file.
-> Is that possible to us pwm_bl.c driver which is used by pxa?
+Add a free_irq() call on vbus gpio when we remove udc so that the
+vbus irq is properly released.
 
-It's not yet in the official kernel. You can find it in
-arch/arm/mach-omap2/board-zoom-display.c in my tree, under devel-branch.
+Signed-off-by: Rob Emanuele <rje@crystalfontz.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/usb/gadget/atmel_usba_udc.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-I haven't looked at pwm_bl.c, but I wouldn't be surprised if there
-already was a driver we can use for this.
-
-> > - Panel controlled (Taal-panel. Also PWM based, but OMAP doesn't see
-> > that)
-> >
-> Yeah, I don't plan to reform this driver at this time.
-> 
-> > The first two could (should?) be totally separate backlights from the
-> > panel itself. For those, a generic backlight driver could perhaps work.
-> > The third one needs to be quite tied to the panel driver, and I'm not
-> > sure how easy it would be to have a separate driver for that.
-> >
-> 
-> OK, I totally understand you concern now. How about a GPIO based
-> backlight driver for the first 2 cases.
-
-GPIO based backlight driver would work properly only for the first case.
-
- Tomi
+diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+index 717ff65..e7c65a4 100644
+--- a/drivers/usb/gadget/atmel_usba_udc.c
++++ b/drivers/usb/gadget/atmel_usba_udc.c
+@@ -2057,8 +2057,10 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
+ 		usba_ep_cleanup_debugfs(&usba_ep[i]);
+ 	usba_cleanup_debugfs(udc);
+ 
+-	if (gpio_is_valid(udc->vbus_pin))
++	if (gpio_is_valid(udc->vbus_pin)) {
++		free_irq(gpio_to_irq(udc->vbus_pin), udc);
+ 		gpio_free(udc->vbus_pin);
++	}
+ 
+ 	free_irq(udc->irq, udc);
+ 	kfree(usba_ep);
+-- 
+1.7.3
