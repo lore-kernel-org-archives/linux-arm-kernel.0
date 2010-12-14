@@ -1,40 +1,22 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Tue, 14 Dec 2010 12:09:18 -0600
-Subject: [PATCH 0/4] omap: iovmm - fixes for iovmm module
-In-Reply-To: <AANLkTim3i+nAV+isLy+rVZ9gtkeW408G_6BhJAbLJZTL@mail.gmail.com>
-References: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
-	<AANLkTim3i+nAV+isLy+rVZ9gtkeW408G_6BhJAbLJZTL@mail.gmail.com>
-Message-ID: <AANLkTimT99yQ3yShp4OgxEM5MJZHdS9x+BByH-=w9UHC@mail.gmail.com>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Tue, 14 Dec 2010 10:11:52 -0800
+Subject: [PATCH 0/5] ARM: GIC: cleanup
+In-Reply-To: <20101213173129.GB11730@n2100.arm.linux.org.uk>
+References: <20101205113311.GC9138@n2100.arm.linux.org.uk>	<4D065691.9010802@codeaurora.org>
+	<20101213173129.GB11730@n2100.arm.linux.org.uk>
+Message-ID: <4D07B368.7040005@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 9:10 AM, Felipe Contreras
-<felipe.contreras@gmail.com> wrote:
-> On Tue, Dec 14, 2010 at 3:07 PM, Fernando Guzman Lugo
-> <fernando.lugo@ti.com> wrote:
->
-> You are missing a description here.
+Russell King - ARM Linux wrote:
+> On Mon, Dec 13, 2010 at 09:23:29AM -0800, Abhijeet Dharmapurikar wrote:
+>> Sorry for being late on testing this out. The patch series and works on  
+>> the msm 8660.
+>>
+>> Acked-By: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> 
+> Would you prefer a Tested-by: ?
 
-Yes, I forget the description but it is pretty much the same than the subject.
+Yes, Tested-by is more appropriate.
 
->
->> Version 6:
->> * Rebase on Russell King branch.
->> ?- for details see:
->> ?http://marc.info/?l=linux-omap&m=129228495723001&w=2
->
-> Even if these patches are applied, iommu would still not be usable
-> form tidspbridge, you need at least this patch:
-> http://article.gmane.org/gmane.linux.ports.arm.omap/44753
-
-I think Hari can take that patch too.
-
-Regards,
-Fernando.
-
->
-> Cheers.
->
-> --
-> Felipe Contreras
->
+Tested-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
