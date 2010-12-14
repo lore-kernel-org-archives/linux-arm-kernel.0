@@ -1,36 +1,24 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Tue, 14 Dec 2010 17:08:42 +0200
-Subject: [PATCHv6 4/4] omap: iommu - create new api to set valid da range
-In-Reply-To: <1292332047-8206-5-git-send-email-fernando.lugo@ti.com>
-References: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
-	<1292332047-8206-5-git-send-email-fernando.lugo@ti.com>
-Message-ID: <AANLkTin0eBk1tMDUJQQ6KuM6eOu1gu+JmwY-Nz0V+jw8@mail.gmail.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Tue, 14 Dec 2010 16:08:25 +0100
+Subject: [PATCH 0/2] ARM: Gemini: add RTC support for Gemini SoC 
+Message-ID: <1292339307-14336-1-git-send-email-ulli.kroll@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 3:07 PM, Fernando Guzman Lugo
-<fernando.lugo@ti.com> wrote:
-> From: Guzman Lugo, Fernando <x0095840@ti.com>
->
-> Some IOMMUs cannot use the whole 0x0 - 0xFFFFFFFF rage.
-> With this new API the valid range can be set.
->
-> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+This patch adds the driver for the rtc chip on the Gemini SoC
 
-I still don't see where this API is being used.
+I divided this patch into two parts.
+One for the core rtc-driver in /drivers/rtc
+and one for the needed platform bindings in /arch/arm/mach-gemini
 
-Also, the point of using platform data was to add it to omap3_devices
-in omap-iommu.c, see[1]. I thought the platform data start/end would
-move to struct iommu, and iommu_set_da_range would change the
-start/end on struct iommu, but that would only be necessary if the
-platform data doesn't match that.
-
-If there's no sensible platform data default, then there's no point in
-using platform data, as the platform is not the limiting factor, but
-the DSP SW.
-
-[1] http://article.gmane.org/gmane.linux.kernel/1051268
-
--- 
-Felipe Contreras
+ MAINTAINERS                           |    1 +
+ arch/arm/mach-gemini/board-nas4220b.c |    1 +
+ arch/arm/mach-gemini/board-rut1xx.c   |    1 +
+ arch/arm/mach-gemini/board-wbd111.c   |    1 +
+ arch/arm/mach-gemini/board-wbd222.c   |    1 +
+ arch/arm/mach-gemini/common.h         |    1 +
+ arch/arm/mach-gemini/devices.c        |   26 ++++
+ drivers/rtc/Kconfig                   |    9 ++
+ drivers/rtc/Makefile                  |    1 +
+ drivers/rtc/rtc-gemini.c              |  206 +++++++++++++++++++++++++++++++++
+ 10 files changed, 248 insertions(+), 0 deletions(-)
