@@ -1,36 +1,53 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Tue, 14 Dec 2010 21:00:40 +0800
-Subject: [PATCH v6 00/15] ARM: mxs: Add initial support for MX23 andMX28
-In-Reply-To: <20101214083109.GB1913@ubuntu.localdomain>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-	<20101213142045.GD26210@pengutronix.de>
-	<20101214083109.GB1913@ubuntu.localdomain>
-Message-ID: <AANLkTikW13zwEqrgvtpR-eUPR=ehaUFO5=LYq5bPCn_6@mail.gmail.com>
+From: fernando.lugo@ti.com (Fernando Guzman Lugo)
+Date: Tue, 14 Dec 2010 07:07:23 -0600
+Subject: [PATCH 0/4] omap: iovmm - fixes for iovmm module
+Message-ID: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Version 6:
+* Rebase on Russell King branch.
+ - for details see:
+ http://marc.info/?l=linux-omap&m=129228495723001&w=2
 
-2010/12/14 Shawn Guo <shawn.guo@freescale.com>:
-[...]
->> ?- on TIMROTv1 there is no HW_TIMROT_RUNNING_COUNTn register. ?That's
->> ? ?called HW_TIMROT_TIMCOUNTn.
-> I'm reusing the offset definition here. But it seems you are asking
-> two definitions to avoid confusion.
->
->> ?- Typo in comment above timrot_is_v1: MX23 uses timers 0 and 1, too.
-> It's a typo, but partially. mx28 uses timrot 0 and 1, while mx23 uses
-> 0 and 2. There are 4 registers for each timrot instance on mx28,
-> but only 2 on mx23. So address step 0x40 in HW_TIMROT_TIMCTRLn strides
-> one instance on mx28 while two instances on mx23. Confusion again,
-> adding more definitions, right?
->
-I'm not going to argue the first one, since HW_TIMROT_RUNNING_COUNTn
-is being used in functions that are already separated for v1 and v2.
-But for HW_TIMROT_TIMCTRLn, it's being used in shared codes/functions.
-Can we keep the trick and add more comments on that to save some codes
-duplication?
+Version 5:
+* Changes in "iommu: create new api to set valid da range"
+ - Change range variables to platform data structure.
+
+Version 4:
+* Changes in "iommu: create new api to set valid da range"
+ - Validate range for fixed address.
+ - Change way of change boundaries to avoid possible overflow
+   instead of style :
+      start + bytes >= end     which start + end can overflow
+   use style:
+      end - start < bytes
+
+Version 3:
+* change patch 2 base on Felipe Contreras' comments,
+ now it uses min_t and I deleted some blank lines.
+* patch "create new api to set valid da range" is base on
+ "iovmm: IVA2 MMU range is from 0x11000000 to 0xFFFFFFFF"
+ patch and on Hiroshi's comments and now it is added to
+ this set.
+
+Version 2:
+* Removed "iovmm: fixes for iovmm module" that patch was already
+ sent.
+* Modified "iovmm: fix roundup for next area and end check for the
+ last area" patch, base on Davin Cohen's comments and rename it
+ to a proper name that describes what it is doing now.
+
+Guzman Lugo, Fernando (4):
+  omap: iovmm - no gap checking for fixed address
+  omap: iovmm - add superpages support to fixed da address
+  omap: iovmm - replace __iounmap with iounmap
+  omap: iommu - create new api to set valid da range
+
+ arch/arm/plat-omap/include/plat/iommu.h |    3 +
+ arch/arm/plat-omap/iommu.c              |   33 ++++++++++++
+ arch/arm/plat-omap/iovmm.c              |   84 ++++++++++++++++++-------------
+ 3 files changed, 85 insertions(+), 35 deletions(-)
 
 -- 
-Regards,
-Shawn
+1.7.3.2
