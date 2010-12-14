@@ -1,62 +1,67 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 13 Dec 2010 20:57:39 -0800
-Subject: [PATCH 4/4] Do not call flush_cache_user_range with mmap_sem held
-In-Reply-To: <1292302659-1863-1-git-send-email-john.stultz@linaro.org>
-References: <1292302659-1863-1-git-send-email-john.stultz@linaro.org>
-Message-ID: <1292302659-1863-5-git-send-email-john.stultz@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 14 Dec 2010 10:38:20 +0530
+Subject: [PATCH 0/5] omap4: l2x0 fixes and cleanup
+In-Reply-To: <cc00e38ed5f706eff13e0fad542af71c@mail.gmail.com>
+References: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
+	<cc00e38ed5f706eff13e0fad542af71c@mail.gmail.com>
+Message-ID: <8e452d427e061b34d119e860a0e30b31@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dima Zavin <dima@android.com>
-
-We can't be holding the mmap_sem while calling flush_cache_user_range
-because the flush can fault. If we fault on a user address, the
-page fault handler will try to take mmap_sem again. Since both places
-acquire the read lock, most of the time it succeeds. However, if another
-thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
-between the call to flush_cache_user_range and the fault, the down_read
-in do_page_fault will deadlock.
-
-Also, since we really can't be holding the mmap_sem while calling
-flush_cache_user_range AND vma is actually unused by the flush itself,
-get rid of vma as an argument.
-
-CC: Nicolas Pitre <nicolas.pitre@linaro.org>
-CC: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Dima Zavin <dima@android.com>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
----
- arch/arm/include/asm/cacheflush.h |    2 +-
- arch/arm/kernel/traps.c           |    4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 3acd8fa..f533a6a 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -377,7 +377,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
-  * Harvard caches are synchronised for the user space address range.
-  * This is used for the ARM private sys_cacheflush system call.
-  */
--#define flush_cache_user_range(vma,start,end) \
-+#define flush_cache_user_range(start,end) \
- 	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
- 
- /*
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 446aee9..7644a56 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -451,7 +451,9 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
- 		if (end > vma->vm_end)
- 			end = vma->vm_end;
- 
--		flush_cache_user_range(vma, start, end);
-+		up_read(&mm->mmap_sem);
-+		flush_cache_user_range(start, end);
-+		return;
- 	}
- 	up_read(&mm->mmap_sem);
- }
--- 
-1.7.3.2.146.gca209
+ping
+> -----Original Message-----
+> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> Sent: Thursday, December 02, 2010 5:28 PM
+> To: tony at atomide.com
+> Cc: Nishanth Menon; mans at mansr.com; khilman at deeprootsystems.com; linux-
+> arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> Subject: RE: [PATCH 0/5] omap4: l2x0 fixes and cleanup
+>
+> Tony,
+> > -----Original Message-----
+> > From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> > Sent: Friday, November 19, 2010 11:01 PM
+> > To: linux-omap at vger.kernel.org
+> > Cc: nm at ti.com; mans at mansr.com; tony at atomide.com;
+> > khilman at deeprootsystems.com; linux-arm-kernel at lists.infradead.org;
+> Santosh
+> > Shilimkar
+> > Subject: [PATCH 0/5] omap4: l2x0 fixes and cleanup
+> >
+> > This series is outcome of the below discussion thread.
+> > 	http://www.spinics.net/lists/arm-kernel/msg104254.html
+> >
+> > The series in brief has following patches
+> > 	- adds PL310 aux-control register bitfields
+> > 	- Use these bitfields instead of hardcoded values as part of init
+> > 	- Enable PL310 intsruction, Data prefetch hints and  BRESP to
+> > 		improve performance
+> > 	- Set share-override bit to avoid non-cached buffer corruption
+> >
+> > Thanks to Nishant Menon for testing this series on OMAP4 panda using
+> > the memspeed utility. Have boot tested this series on OMAP4 SDP with
+> > omap2plus_defconfig.
+> >
+> How about merging this series in omap-testing if you are ok
+> with it. Patch  " ARM: l2x0: Add aux control register bitfields"
+> is already acked by Catalin.
+>
+> > The following changes since commit
+> > e53beacd23d9cb47590da6a7a7f6d417b941a994:
+> >   Linus Torvalds (1):
+> >         Linux 2.6.37-rc2
+> >
+> > Mans Rullgard (1):
+> >       omap4: l2x0: enable instruction and data prefetching
+> >
+> > Santosh Shilimkar (4):
+> >       ARM: l2x0: Add aux control register bitfields
+> >       omap4: l2x0: Construct the AUXCTRL value using defines
+> >       omap4: l2x0: Set share override bit
+> >       omap4: l2x0: Enable early BRESP bit
+> >
+> >  arch/arm/include/asm/hardware/cache-l2x0.h |   12 ++++++++++-
+> >  arch/arm/mach-omap2/omap4-common.c         |   30
+> +++++++++++++++++++++--
+> > ----
+> >  2 files changed, 34 insertions(+), 8 deletions(-)
