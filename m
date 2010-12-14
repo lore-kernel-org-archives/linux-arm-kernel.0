@@ -1,106 +1,133 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 14 Dec 2010 09:45:46 +0100
-Subject: [PATCH 5/9] Add i.MX5 framebuffer driver
-In-Reply-To: <AANLkTikwTjUUzc6BovFKXq-FverNMqg-ustodk+sKUCY@mail.gmail.com>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-6-git-send-email-s.hauer@pengutronix.de>
-	<AANLkTikZowDCK4JPiCyEou1ekRuYA1qGnKrBPT5dXB+8@mail.gmail.com>
-	<20101213113830.GE6017@pengutronix.de>
-	<AANLkTikwTjUUzc6BovFKXq-FverNMqg-ustodk+sKUCY@mail.gmail.com>
-Message-ID: <20101214084546.GT6017@pengutronix.de>
+Date: Tue, 14 Dec 2010 09:57:11 +0100
+Subject: [PATCH v2] watchdog: imx: use clk_get to acquire the watchdog
+	clock
+In-Reply-To: <1291738564-10374-1-git-send-email-fabio.estevam@freescale.com>
+References: <1291738564-10374-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20101214085711.GV6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 02:40:09PM +0800, Liu Ying wrote:
-> Hello, Sascha,
-> 
-> Please find my feedback with [LY] embedded.
-> 
-> And, a bug related with this patch:
-> 1) Bootup the babbage board.
-> 2) echo U:640x480p-60 > /sys/class/graphics/fb0/mode
-> 3) cat /sys/class/graphics/fb0/virtual_size, it shows '640,480'.
-> 4) echo 640,960 > /sys/class/graphics/fb0/virtual_size, change virtual
-> yres to be 960.
-> 5) cat /sys/class/graphics/fb0/virtual_size, it still shows '640,480'.
-> I think this is caused by 'var->yres_virtual = var->yres;' in custom
-> fb_set_par() function(Sorry, I cannot make the comment inline this
-> time, as I don't find the original code within the mail I am
-> replying). This makes fb0 use only one block of memory whose size is
-> equal to screen size, so pan display can not really play her role and
-> screen tearing issue may happen.
-> 
-> Best Regards,
-> Liu Ying
-> 
-> 2010/12/13 Sascha Hauer <s.hauer@pengutronix.de>:
-> > On Sun, Dec 12, 2010 at 02:13:40PM +0800, Liu Ying wrote:
-> >> Hello, Sascha,
-> >>
-> >> I have following comments to this patch:
-> >> 1) Please modify the commit message, as IPUv3 is not embedded in i.MX50 SoC.
-> >
-> > ok.
-> >
-> >> 2) ADC is not supported yet in the framebuffer driver, so please
-> >> modify this comment:
-> >> ? ?> + * Framebuffer Framebuffer Driver for SDC and ADC.
-> >
-> > ok.
-> >
-> >> 3) 'ipu_dp_set_window_pos()' is called only once in
-> >> imx_ipu_fb_set_par_overlay(). So, the framebuffer driver doesn't
-> >> support to change the overlay framebuffer position. Need a
-> >> mechanism/interface for users to change the overlay framebuffer
-> >> position.
-> >
-> > Yes. The overlay support is currently only present in the driver because
-> > I didn't want to break it in general. There is no generic overlay API in
-> > the kernel and I didn't want to invent the n+1 API. Currently the
-> > possible use cases of the overlay support are not clear to me. Number
-> > one use case would probably be to display video output, but the
-> > corresponding driver would be a v4l2 driver, so in this case we would
-> > only need an in-kernel API.
-> > Anyway, I have not the resources to implement complete overlay support.
-> > So either we keep it like it is and it more has an example character
-> > or we remove it completely from the driver for now.
-> >
-> >> 4) Need to make sure the framebuffer on DP-FG is blanked before the
-> >> framebuffer on DP-BG is blanked. Meanwhile, the framebuffer on DP-FG
-> >> should be unblanked after the framebuffer on DP-BG is unblanked
-> >> 5) Need to check the framebuffer on DP-FG doesn't run out of the range
-> >> of the framebuffer on DP-BG.
-> >
-> > I tend to remove the overlay support.
-> >
-> >> 6) I prefer to find the video mode in modedb first, and if we cannot
-> >> find the video mode in common video mode data base, we can find a
-> >> video mode in custom video mode data base which is defined in platform
-> >> data. In this way, we don't need to export common modefb.
-> >
-> > I exported the modedb to be able to show the different modes under
-> > /sys/class/graphics/fb0/modes and to set it with
-> > /sys/class/graphics/fb0/mode. If you want this there is no way around
-> > exporting it. The ioctl interface for mode setting is independent of the
-> > specific modes anyway.
-> [LY]  Just a concern. If a platform choose to add the generic video
-> mode data base to IPUv3 framebuffer modelist, 'cat
-> /sys/class/graphics/fb0/modes' will show all the video modes in the
-> generic data base to users. I am not sure whether showing them to
-> users means the IPUv3 framebuffer driver acknowledges to support all
-> of them or not. I tried to do 'echo U:1800x1440p-70 >
-> /sys/class/graphics/fb0/mode' with the kernel on ipuv3 branch, there
-> will be a kernel dump(seems it can not allocate enough memory).
+Hi Fabio,
 
-We'll have to increase the dma coherent size (and max zone order) for
-these resolutions to work. I have patches for this in my local tree but
-decided to wait until some contiguous memory allocator hits the tree.
-Also, the fb driver should sanity check the generic modes before adding
-them to the list. FOr example the IPU can't do 1920x1200 at 60. This code
-is missing currently.
+On Tue, Dec 07, 2010 at 02:16:04PM -0200, Fabio Estevam wrote:
+> Use clk_get to acquire the watchdog clock and also avoid hardcoding the clock name.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - adapted the watchdog name in arch/arm/plat-mxc/system.c
+> 
+>  arch/arm/mach-imx/clock-imx21.c |    2 +-
+>  arch/arm/mach-imx/clock-imx25.c |    2 +-
+>  arch/arm/mach-imx/clock-imx27.c |    2 +-
+>  arch/arm/mach-mx3/clock-imx31.c |    2 +-
+>  arch/arm/mach-mx3/clock-imx35.c |    2 +-
+>  arch/arm/plat-mxc/system.c      |    2 +-
+>  drivers/watchdog/imx2_wdt.c     |    2 +-
+>  7 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
+> index cf15ea5..c63a4f5 100644
+> --- a/arch/arm/mach-imx/clock-imx21.c
+> +++ b/arch/arm/mach-imx/clock-imx21.c
+> @@ -1185,7 +1185,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK(NULL, "brom", brom_clk)
+>  	_REGISTER_CLOCK(NULL, "emma", emma_clk[0])
+>  	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk[0])
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
+>  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c_clk)
+>  	_REGISTER_CLOCK("mxc-keypad", NULL, kpp_clk)
+> diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
+> index 9e4a557..2c98be8 100644
+> --- a/arch/arm/mach-imx/clock-imx25.c
+> +++ b/arch/arm/mach-imx/clock-imx25.c
+> @@ -296,7 +296,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+>  	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
+>  	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdt_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+
+This breaks compilation on i.MX25. I updated the patch to fix this.
 
 Sascha
 
+>  	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+>  	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+>  	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
+> diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+> index 2202b88..f32f3b8 100644
+> --- a/arch/arm/mach-imx/clock-imx27.c
+> +++ b/arch/arm/mach-imx/clock-imx27.c
+> @@ -667,7 +667,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK(NULL, "sahara2", sahara2_clk)
+>  	_REGISTER_CLOCK(NULL, "ata", ata_clk)
+>  	_REGISTER_CLOCK(NULL, "mstick", mstick_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
+>  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
+>  	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+> diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
+> index 7cf6d29..4193cf5 100644
+> --- a/arch/arm/mach-mx3/clock-imx31.c
+> +++ b/arch/arm/mach-mx3/clock-imx31.c
+> @@ -530,7 +530,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("imx31-cspi.2", NULL, cspi3_clk)
+>  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+>  	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
+>  	_REGISTER_CLOCK(NULL, "epit", epit1_clk)
+>  	_REGISTER_CLOCK(NULL, "epit", epit2_clk)
+> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> index 61e4a31..22259d9 100644
+> --- a/arch/arm/mach-mx3/clock-imx35.c
+> +++ b/arch/arm/mach-mx3/clock-imx35.c
+> @@ -495,7 +495,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("mxc-ehci.2", "usb", usbotg_clk)
+>  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usbotg_clk)
+>  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usbahb_clk)
+> -	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+> +	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+>  	_REGISTER_CLOCK(NULL, "max", max_clk)
+>  	_REGISTER_CLOCK(NULL, "audmux", audmux_clk)
+>  	_REGISTER_CLOCK(NULL, "csi", csi_clk)
+> diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
+> index c3972c5..3455fc0 100644
+> --- a/arch/arm/plat-mxc/system.c
+> +++ b/arch/arm/plat-mxc/system.c
+> @@ -55,7 +55,7 @@ void arch_reset(char mode, const char *cmd)
+>  	} else {
+>  		struct clk *clk;
+>  
+> -		clk = clk_get_sys("imx-wdt.0", NULL);
+> +		clk = clk_get_sys("imx2-wdt.0", NULL);
+>  		if (!IS_ERR(clk))
+>  			clk_enable(clk);
+>  		wcr_enable = (1 << 2);
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 2ee7dac..86f7cac 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -270,7 +270,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> -	imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
+> +	imx2_wdt.clk = clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(imx2_wdt.clk)) {
+>  		dev_err(&pdev->dev, "can't get Watchdog clock\n");
+>  		return PTR_ERR(imx2_wdt.clk);
+> -- 
+> 1.6.0.4
+> 
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
