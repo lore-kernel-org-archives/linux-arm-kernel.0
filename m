@@ -1,62 +1,67 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 15 Dec 2010 08:52:31 +1300
-Subject: [PATCH 15/54] ARM: ep93xx: irq_data conversion.
-In-Reply-To: <20101214192835.GM15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130133639.GP15575@mail.wantstofly.org>
-	<4CF55185.6010808@bluewatersys.com>
-	<20101201001945.GI15575@mail.wantstofly.org>
-	<4CF5963E.8060500@bluewatersys.com>
-	<20101214192835.GM15575@mail.wantstofly.org>
-Message-ID: <4D07CAFF.2030705@bluewatersys.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 14 Dec 2010 11:51:52 -0800
+Subject: [PATCH 1/5] OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
+In-Reply-To: <1292276969-29733-2-git-send-email-b-cousson@ti.com> (Benoit
+	Cousson's message of "Mon, 13 Dec 2010 22:49:25 +0100")
+References: <1292276969-29733-1-git-send-email-b-cousson@ti.com>
+	<1292276969-29733-2-git-send-email-b-cousson@ti.com>
+Message-ID: <87zks8rv3b.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2010 08:28 AM, Lennert Buytenhek wrote:
-> On Wed, Dec 01, 2010 at 01:26:38PM +1300, Ryan Mallon wrote:
-> 
->>>>> -static int ep93xx_gpio_irq_type(unsigned int irq, unsigned int type)
->>>>> +static int ep93xx_gpio_irq_type(struct irq_data *d, unsigned int type)
->>>>>  {
->>>>> -	struct irq_desc *desc = irq_desc + irq;
->>>>> -	const int gpio = irq_to_gpio(irq);
->>>>> +	struct irq_desc *desc = irq_desc + d->irq;
->>>>
->>>> Is this still correct? I haven't followed much of the irq_data
->>>> discussion, but this post (https://patchwork.kernel.org/patch/230221/)
->>>> says that with sparse irq converting irq number to irq_desc is now a
->>>> radix tree lookup.
->>>>
->>>> I get the impression from the above email that we should be avoiding
->>>> using irq_desc directly in these functions?
->>>
->>> You are correct in that this construct is no longer valid with
->>> CONFIG_SPARSE_IRQ.  It should be using irq_to_desc() instead, or
->>> actually, it should not be looking at the irq_desc here at all.
->>>
->>> What ep93xx wants to achieve should be possible to achieve by just
->>> calling set_irq_handler() instead of frobbing fields in the irq_desc
->>> directly -- that would work, right?
->>
->> I think set_irq_handler should be okay. The other way would be to use
->> irq_to_desc for the lookup.
-> 
-> I can do that, but that's really an orthogonal issue, and ought to be
-> a separate patch.
-> 
-> Are you OK with this patch as-is?
+Benoit Cousson <b-cousson@ti.com> writes:
 
-Yes. We don't select SPARSE_IRQ for EP93xx so it's not a pressing issue.
-The code should be fixed to be correct though, but as you say this is a
-separate issue and can be handled with another patch.
+> From: Rajendra Nayak <rnayak@ti.com>
+>
+> For pwrdm's which support lowperstatechange, do not try waking
+> up the domain to put it back to deeper sleep state.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Benoit Cousson <b-cousson@ti.com>
 
-~Ryan
+Re: $SUBJECT, the rather than using the cryptic lowpwrstchange name from the 
+pwrdm API, just use the more readable "low-power state change"
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+Also, readability/flow, I have some questions/comments...
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+> ---
+>  arch/arm/mach-omap2/pm.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index cf1c4c9..dc68044 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -114,6 +114,14 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+>  		return ret;
+>  
+>  	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
+> +		if ((pwrdm_read_pwrst(pwrdm) > state) &&
+> +			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+> +				ret = pwrdm_set_next_pwrst(pwrdm, state);
+> +				pwrdm_set_lowpwrstchange(pwrdm);
+> +				pwrdm_wait_transition(pwrdm);
+> +				pwrdm_state_switch(pwrdm);
+> +				return ret;
+
+Personally, I'd prefer if this function flowed through better instead of
+the early return in order to emphasize the common code.
+
+Rather than the return here, can you just set the low-power state change
+bit here (and put the clkdm_wakeup + sleep_switch = 1 into the else
+clause?
+
+Or, does the next state have to be set before the low-power state change
+bit?
+
+Basically, what I'm getting at is this should be a single function with
+common flow.  The conditional code based on low-power state change
+should be isolated instead of having a special path.
+
+Kevin
+
+> +		}
+>  		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
+>  		sleep_switch = 1;
+>  		pwrdm_wait_transition(pwrdm);
