@@ -1,31 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 14 Dec 2010 11:13:22 -0700 (MST)
-Subject: [PATCH 05/12] OMAP4: PRCM: Add SCRM header file
-In-Reply-To: <4D07782E.5050000@ti.com>
-References: <20101214063308.21555.76050.stgit@twilight.localdomain>
-	<20101214063447.21555.64470.stgit@twilight.localdomain>
-	<4D07782E.5050000@ti.com>
-Message-ID: <alpine.DEB.2.00.1012141105570.15971@utopia.booyaka.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 Dec 2010 18:18:38 +0000
+Subject: [PATCH 4/4] Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <1292302659-1863-5-git-send-email-john.stultz@linaro.org>
+References: <1292302659-1863-1-git-send-email-john.stultz@linaro.org>
+	<1292302659-1863-5-git-send-email-john.stultz@linaro.org>
+Message-ID: <AANLkTikqza9kdqj_KTMUinX_UmuRYQ+ERpVT-xe8xDJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Dec 2010, Cousson, Benoit wrote:
-
-> This patch will conflict with your power prcm series, because you are creating
-> an empty scrm44xx.h in it.
-> 
-> So I did rebased this series on top on your prcm to fix that.
-> 
-> Don't you want to use the already rebased version instead?
-
-I would rather have patches and branches based on mainline commits where 
-possible.  If a series has some explicit dependency on a non-mainline 
-patch or branch then I'd like to know about it in the messages if 
-possible.
-
-As far as the empty scrm44xx.h goes, I will probably go back and rebuild 
-that branch with your patch that creates SCRM from my patch set inserted 
-earlier, so I can drop the part of my patch that creates the empty file.
-
-
-- Paul
+On 14 December 2010 04:57, John Stultz <john.stultz@linaro.org> wrote:
+> From: Dima Zavin <dima@android.com>
+>
+> We can't be holding the mmap_sem while calling flush_cache_user_range
+> because the flush can fault. If we fault on a user address, the
+> page fault handler will try to take mmap_sem again. Since both places
+> acquire the read lock, most of the time it succeeds. However, if another
+> thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
+> between the call to flush_cache_user_range and the fault, the down_read
+> in do_page_fault will deadlock.
+>
+> Also, since we really can't be holding the mmap_sem while calling
+> flush_cache_user_range AND vma is actually unused by the flush itself,
+> get rid of vma as an argument.
+>
+> CC: Nicolas Pitre <nicolas.pitre@linaro.org>
+> CC: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Dima Zavin <dima@android.com>
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
