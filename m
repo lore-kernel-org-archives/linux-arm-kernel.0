@@ -1,134 +1,32 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Wed, 15 Dec 2010 07:20:08 +0800
-Subject: [RFC] i.MX clock support
-In-Reply-To: <20101213154142.GP6017@pengutronix.de>
-References: <20101213102538.GB6017@pengutronix.de>
-	<20101213150120.GE26210@pengutronix.de>
-	<20101213154142.GP6017@pengutronix.de>
-Message-ID: <AANLkTimGa757yD1FPBLRm7WBTVA_0EHX8eMUHVieyodO@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 15 Dec 2010 07:20:32 +0800
+Subject: [PATCH] ARM: pxa: PXA_ESERIES depends on FB_W100.
+In-Reply-To: <20101214180505.GL15575@mail.wantstofly.org>
+References: <20101214180505.GL15575@mail.wantstofly.org>
+Message-ID: <AANLkTikkvCbBO-6vaQen+cg3Fx1Fhz+1N2EfJh_hsQo0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/13 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Mon, Dec 13, 2010 at 04:01:20PM +0100, Uwe Kleine-K?nig wrote:
->> Hi Sascha,
->>
->> On Mon, Dec 13, 2010 at 11:25:38AM +0100, Sascha Hauer wrote:
->> > I am not willing to accept patches for adding i.MX50 support in the mess
->> > we currently have. These patches offer a way to cleanup the clock support
->> > and the i.MX50 may be a good test bed for an implementation without
->> > old cruft to worry about. That said the following patch is not set in
->> > stone, it's a request for comments and I'm of course open to other
->> > suggestions, but it's clear that we have to do something.
->> Full ack.
->>
->> > +#define to_clk_divider(clk) (container_of(clk, struct clk_divider, clk))
->> > +
->> > +static unsigned long clk_divider_get_rate(struct clk *clk)
->> > +{
->> > + ? struct clk_divider *divider = to_clk_divider(clk);
->> > +
->> > + ? unsigned long rate = clk_get_rate(divider->parent);
->> > + ? unsigned int div = 1;
->> > +
->> > + ? if (divider->reg) {
->> > + ? ? ? ? ? div = readl(divider->reg) >> divider->shift;
->> > + ? ? ? ? ? div &= (1 << divider->width) - 1;
->> > + ? ? ? ? ? div++;
->> > + ? }
->> > +
->> > + ? return rate / div / divider->div * divider->mult;
->> Maybe you need to spend more effort to exactness e.g. by using
->> DIV_ROUND_CLOSEST and/or reordering?
->> (You didn't describe div and mult in struct clk_divider (below), so this
->> is a bit guess work for me here.)
+On Wed, Dec 15, 2010 at 2:05 AM, Lennert Buytenhek
+<buytenh@wantstofly.org> wrote:
+> As arch/arm/mach-pxa/eseries.c references w100fb_gpio_{read,write}()
+> directly.
 >
-> Ok, this needs some work. My original idea was to have seperate fixed
-> dividers and configurable dividers. Then I decided to combine these into
-> one divider. The end result was a mixure of both. We have a struct
-> clk_divider_fixed, which is described but unused.
->
->>
->> > +}
->> > +
->> > +static long clk_divider_round_rate(struct clk *clk, unsigned long rate)
->> > +{
->> > + ? struct clk_divider *divider = to_clk_divider(clk);
->> > + ? unsigned long parent_rate = clk_get_rate(divider->parent);
->> > + ? unsigned int max_div, div;
->> > +
->> > + ? if (rate > parent_rate)
->> > + ? ? ? ? ? return parent_rate;
->> > +
->> > + ? max_div = 1 << divider->width;
->> > +
->> > + ? div = parent_rate / rate;
->> > + ? div = max(div, max_div);
->> > +
->> > + ? return parent_rate / div / divider->div * divider->mult;
->> ditto
->>
->> > +}
->> > +
->> > +static int clk_divider_set_rate(struct clk *clk, unsigned long rate)
->> > +{
->> > + ? struct clk_divider *divider = to_clk_divider(clk);
->> > + ? unsigned long parent_rate = clk_get_rate(divider->parent);
->> > + ? unsigned int max_div, div;
->> > + ? u32 val;
->> > +
->> > + ? parent_rate /= divider->div;
->> > + ? parent_rate *= divider->mult;
->> > +
->> > + ? if (rate > parent_rate)
->> > + ? ? ? ? ? rate = parent_rate;
->> > +
->> > + ? max_div = 1 << divider->width;
->> > +
->> > + ? div = parent_rate / rate;
->> > +
->> > + ? div = max(div, max_div);
->> > + ? div--;
->> > +
->> > + ? val = readl(divider->reg);
->> > + ? val &= ~(((1 << divider->width) - 1) << divider->shift);
->> > + ? val |= div << divider->shift;
->> > + ? writel(val, divider->reg);
->> > +
->> > + ? return 0;
->> You could spend more efforts here, but I think this is OK for now.
->>
->> > [...]
->> > +struct clk_ops clk_multiplexer_ops = {
->> > + ? .enable = clk_parent_enable,
->> > + ? .disable = clk_parent_disable,
->> > + ? .get_rate = clk_parent_get_rate,
->> > + ? .round_rate = clk_parent_round_rate,
->> > + ? .set_rate = clk_parent_set_rate,
->> Oh, this might have surprising effects if the parent is "public".
->> Is this intended?
->
-> I have no idea what the best way is here. We could remove it and wait
-> if somebody comes up with a good reason to add it again.
-How about adding a child_count. If child_count >1, we stop its child
-calling its set_rate/set_parent. In such way, we have to register
-every clock, which is easier to debug. child_count maybe none zero
-intend, in case there're some clocks in physical we don't set up in
-software.
+> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 
-Thanks
-Richard
+Applied to 'fix'.
+
 >
-> Sascha
+> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+> index dd235ec..c93e73d 100644
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+> @@ -540,6 +540,7 @@ config MACH_ICONTROL
+> ?config ARCH_PXA_ESERIES
+> ? ? ? ?bool "PXA based Toshiba e-series PDAs"
+> ? ? ? ?select PXA25x
+> + ? ? ? select FB_W100
 >
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ?config MACH_E330
+> ? ? ? ?bool "Toshiba e330"
 >
