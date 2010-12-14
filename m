@@ -1,49 +1,36 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 14 Dec 2010 14:44:22 +0200
-Subject: OMAP4 build error - omapfb
-In-Reply-To: <20101202220024.GX17222@atomide.com>
-References: <20101202212541.GH10461@n2100.arm.linux.org.uk>
-	<20101202220024.GX17222@atomide.com>
-Message-ID: <1292330662.6893.115.camel@tubuntu>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Tue, 14 Dec 2010 21:00:40 +0800
+Subject: [PATCH v6 00/15] ARM: mxs: Add initial support for MX23 andMX28
+In-Reply-To: <20101214083109.GB1913@ubuntu.localdomain>
+References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+	<20101213142045.GD26210@pengutronix.de>
+	<20101214083109.GB1913@ubuntu.localdomain>
+Message-ID: <AANLkTikW13zwEqrgvtpR-eUPR=ehaUFO5=LYq5bPCn_6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-02 at 14:00 -0800, ext Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [101202 13:15]:
-> > drivers/built-in.o: In function `omapfb_do_probe':
-> > drivers/video/omap/omapfb_main.c:1773: undefined reference to `omap2_int_ctrl'
-> > 
-> > Looks like there's a missing dependency for CONFIG_FB_OMAP.  As the
-> > only place omap2_int_ctrl is defined is in drivers/video/omap/dispc.c,
-> > and this isn't built for OMAP4, maybe FB_OMAP is missing a dependency
-> > such that it's only available for OMAP1, OMAP2 and OMAP3 ?
-> 
-> This is something for Tomi, adding fbdev and Tomi to Cc.
+Hi Uwe,
 
-Looks correct. The old omapfb will never work with OMAP4, so a
-dependency to OMAP1/2/3 fixes the build problem. I'll add this fix to my
-tree.
+2010/12/14 Shawn Guo <shawn.guo@freescale.com>:
+[...]
+>> ?- on TIMROTv1 there is no HW_TIMROT_RUNNING_COUNTn register. ?That's
+>> ? ?called HW_TIMROT_TIMCOUNTn.
+> I'm reusing the offset definition here. But it seems you are asking
+> two definitions to avoid confusion.
+>
+>> ?- Typo in comment above timrot_is_v1: MX23 uses timers 0 and 1, too.
+> It's a typo, but partially. mx28 uses timrot 0 and 1, while mx23 uses
+> 0 and 2. There are 4 registers for each timrot instance on mx28,
+> but only 2 on mx23. So address step 0x40 in HW_TIMROT_TIMCTRLn strides
+> one instance on mx28 while two instances on mx23. Confusion again,
+> adding more definitions, right?
+>
+I'm not going to argue the first one, since HW_TIMROT_RUNNING_COUNTn
+is being used in functions that are already separated for v1 and v2.
+But for HW_TIMROT_TIMCTRLn, it's being used in shared codes/functions.
+Can we keep the trick and add more comments on that to save some codes
+duplication?
 
- Tomi
-
-> 
-> Tony
->  
-> > diff --git a/drivers/video/omap/Kconfig b/drivers/video/omap/Kconfig
-> > index 455c605..083c8fe 100644
-> > --- a/drivers/video/omap/Kconfig
-> > +++ b/drivers/video/omap/Kconfig
-> > @@ -1,7 +1,7 @@
-> >  config FB_OMAP
-> >  	tristate "OMAP frame buffer support (EXPERIMENTAL)"
-> > -	depends on FB && ARCH_OMAP && (OMAP2_DSS = "n")
-> > -
-> > +	depends on FB && (OMAP2_DSS = "n")
-> > +	depends on ARCH_OMAP1 || ARCH_OMAP2 || ARCH_OMAP3
-> >  	select FB_CFB_FILLRECT
-> >  	select FB_CFB_COPYAREA
-> >  	select FB_CFB_IMAGEBLIT
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Regards,
+Shawn
