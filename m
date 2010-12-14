@@ -1,157 +1,155 @@
-From: fernando.lugo@ti.com (Fernando Guzman Lugo)
-Date: Tue, 14 Dec 2010 07:07:27 -0600
-Subject: [PATCHv6 4/4] omap: iommu - create new api to set valid da range
-In-Reply-To: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
-References: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
-Message-ID: <1292332047-8206-5-git-send-email-fernando.lugo@ti.com>
+From: liu.y.victor@gmail.com (Liu Ying)
+Date: Tue, 14 Dec 2010 21:13:28 +0800
+Subject: [PATCH 3/9] Add a mfd IPUv3 driver
+In-Reply-To: <20101214084024.GS6017@pengutronix.de>
+References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
+	<1291902441-24712-4-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTine90yN=e-J_zr03GmGCXekEWTPKv0pB5-EhA1v@mail.gmail.com>
+	<20101213112345.GD6017@pengutronix.de>
+	<AANLkTimuchaGAEuGX24GSnAu5-FVtG_kE_KDozGKo9e-@mail.gmail.com>
+	<20101214084024.GS6017@pengutronix.de>
+Message-ID: <AANLkTi=3v+Fb77aYAarGDBLRZBMSz-GkngV2umN+hKbU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guzman Lugo, Fernando <x0095840@ti.com>
+2010/12/14 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Tue, Dec 14, 2010 at 12:05:07PM +0800, Liu Ying wrote:
+>> Hello, Sascha,
+>>
+>> Please find my feedback with [LY] embedded.
+>>
+>> Best Regards,
+>> Liu Ying
+>>
+>> 2010/12/13 Sascha Hauer <s.hauer@pengutronix.de>:
+>> > Hi Liu Ying,
+>> >
+>> > Thanks for looking at the patches.
+>> [LY] You are welcome.
+>> >
+>> > On Sun, Dec 12, 2010 at 01:21:57PM +0800, Liu Ying wrote:
+>> >> Hello, Sascha,
+>> >>
+>> >> IPU is not embedded in i,MX50 SoC, but in i.MX51/53 SoCs, please
+>> >> modify the commit message.
+>> >>
+>> >> I have the following comments for the files editted respectively:
+>> >> 1) ipu-common.c
+>> >> ? ? - ipu_idmac_get()/ipu_idmac_put() need a mechanism to protect IPU
+>> >> IDMAC resources, namely, get rid of potential race condition issue. As
+>> >> only framebuffer support is added in your patches, there should be no
+>> >> race condition issue now. After IC channels are supported(maybe as DMA
+>> >> engine), perhaps, there will be such kind of issue.
+>> >
+>> > ok.
+>> >
+>> >> ? ? - ipu_idmac_select_buffer() need to add spinlock to protect
+>> >> IPU_CHA_BUFx_RDY registers.
+>> >
+>> > ok.
+>> >
+>> >> ? ? - It looks that ipu_uninit_channel() only clears
+>> >> IPU_CHA_DB_MODE_SEL register, so why not put it in
+>> >> ipu_idmac_disable_channel()?
+>> >
+>> > ok.
+>> >
+>> >> ? ? - It looks that ipu_add_client_devices() and your framebuffer
+>> >> patch assume /dev/fb0 uses DP_BG, /dev/fb1 uses DP_FG and /dev/fb2
+>> >> uses DC.
+>> >> ? ? ? But fb1_platform_data->ipu_channel_bg is
+>> >> MX51_IPU_CHANNEL_MEM_DC_SYNC, this may make confusion for driver
+>> >> readers and it is not easy for code maintenance.
+>> >
+>> > Do you have a better suggestion? fb2 becomes fb1 when overlay support
+>> > is not used.
+>> [LY] How about assigning DP-BG to /dev/fb0, DC to /dev/fb1 and DP_FG
+>> to /dev/fb2?
+>> >
+>> >> ? ? - It also looks that ipu_add_client_devices() and your framebuffer
+>> >> driver assume DP_BG/DP_FG are bound with DI0 and DC is bound with DI1.
+>> >> ? ? ? It is ok for babbage board to support this kind of
+>> >> configuration, but it may bring some limitation. For example, TVE(TV
+>> >> encoder) module embedded in MX51 SoC can only connected with DI1 and
+>> >> users may like to use TV as the primary device(support HW overlay),
+>> >> and FSL Android BSP does support to use DI1 with LCD as the primary
+>> >> device on babbage board.
+>> >
+>> > SO we need to put the display number into the platform data, right?
+>> [LY] Yes, I think so. As the primary display port could be DI0 or DI1
+>> on boards like babbage board(two display ports are used), the primary
+>> display number in platform data should be configurable(I'm not sure
+>> whether this can be accepted by community), perhaps, configured by
+>> kernel bootup command line.
+>
+> Ok, I'll find a solution for this.
+>
+>> >
+>> >>
+>> >> 2) ipu-cpmem.c
+>> >> ? ? - In order to improve performance, maybe writing
+>> >> ipu_ch_param_addr(ch) directly will be fine, but not using memset()
+>> >> and memcpy() in ipu_ch_param_init().
+>> >
+>> > I don't see this function in any performance critical path.
+>> [LY] Yes, currently, this function is not in performance critical
+>> path, so it is ok for me now. However, after IC/IRT channels are
+>> involved, the channels' idmac configuration might be changed from time
+>> to time and frequently, as the channels could be used as dma engine.
+>
+> We are talking about 60 frames per second at maximum, right? So the
+> channel would be reconfigured 60 times a second, that's still not
+> performance critical, at least not if we are talking about a 100 byte or
+> something memset.
+>
+You are right. Take processing VGA(640x480) frames for example, IC
+channel's input bandwidth is 100MPixel/sec and output 50MPixel/sec,
+the framerate can theoritically reach 162fps, then there will be about
+162fps x 2 IDMACs x 2(memset/memcpy) x100Byte = 63KByte/sec memory
+accessing overhead.
+>> >
+>> >>
+>> >> 3) ipu-dc.c
+>> >> ? ? - Looks '#include <asm/atomic.h>' and '#include
+>> >> <linux/spinlock.h>' are unnecessary.
+>> >> ? ? - Need to call 'ipu_module_disable(IPU_CONF_DC_EN);' somewhere.
+>> >
+>> > ok.
+>> >
+>> >>
+>> >> 4) ipu-di.c
+>> >> ? ? - Looks '#include <asm/atomic.h>' and '#include <linux/delay.h>'
+>> >> are unnecessary.
+>> >
+>> > ok.
+>> >
+>> >>
+>> >> 5) ipu-dmfc.c
+>> >> ? ? - Looks '#include <linux/delay.h>' are unnecessary.
+>> >
+>> > ok.
+>> >
+>> >>
+>> >> 6) ipu-dp.c
+>> >> ? ? - Looks '#include <asm/atomic.h>' and '#include <linux/delay.h>'
+>> >> are unnecessary.
+>> >
+>> > ok.
+>> >
+>> >>
+>> >> 7) ipu-prv.h
+>> >> ? ? - Looks '#include <linux/interrupt.h>' is unnecessary.
+>> >> ? ? - Please rename 'MX51_IPU_CHANNEL_xxxx' to be 'IPU_CHANNEL_xxxx',
+>> >> IPUv3 channel names do not depend on SoC name.
+>> >
+>> > I was proven wrong each time I believed this.
+>> [LY] What if IPUv3 will be embedded in more SoCs? Could you please
+>> tell the reason? Thanks.
+>
+> Then channel assignments will change, I'll promise.
 
-Some IOMMUs cannot use the whole 0x0 - 0xFFFFFFFF rage.
-With this new API the valid range can be set.
-
-Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
----
- arch/arm/plat-omap/include/plat/iommu.h |    3 ++
- arch/arm/plat-omap/iommu.c              |   33 +++++++++++++++++++++++++++++++
- arch/arm/plat-omap/iovmm.c              |   18 ++++++++++------
- 3 files changed, 47 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
-index 33c7d41..2ea8ea3 100644
---- a/arch/arm/plat-omap/include/plat/iommu.h
-+++ b/arch/arm/plat-omap/include/plat/iommu.h
-@@ -103,6 +103,8 @@ struct iommu_platform_data {
- 	const char *name;
- 	const char *clk_name;
- 	const int nr_tlb_entries;
-+	u32 da_start;
-+	u32 da_end;
- };
- 
- #if defined(CONFIG_ARCH_OMAP1)
-@@ -152,6 +154,7 @@ extern void flush_iotlb_all(struct iommu *obj);
- extern int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e);
- extern size_t iopgtable_clear_entry(struct iommu *obj, u32 iova);
- 
-+extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
- extern struct iommu *iommu_get(const char *name);
- extern void iommu_put(struct iommu *obj);
- 
-diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-index 6cd151b..b3846bd 100644
---- a/arch/arm/plat-omap/iommu.c
-+++ b/arch/arm/plat-omap/iommu.c
-@@ -25,6 +25,12 @@
- 
- #include "iopgtable.h"
- 
-+/* Reserve the first page for NULL */
-+#define IOMMU_DEFAULT_DA_START	PAGE_SIZE
-+/* 0xFFFFFFFF not allowed because it is not page aligned */
-+#define IOMMU_DEFAULT_DA_END	0xFFFFF000
-+
-+
- #define for_each_iotlb_cr(obj, n, __i, cr)				\
- 	for (__i = 0;							\
- 	     (__i < (n)) && (cr = __iotlb_read_cr((obj), __i), true);	\
-@@ -830,6 +836,31 @@ static int device_match_by_alias(struct device *dev, void *data)
- }
- 
- /**
-+ * iommu_set_da_range - Set a valid device address range
-+ * @obj:		target iommu
-+ * @start		Start of valid range
-+ * @end			End of valid range
-+ **/
-+int iommu_set_da_range(struct iommu *obj, u32 start, u32 end)
-+{
-+	struct iommu_platform_data *pdata;
-+
-+	if (!obj)
-+		return -EFAULT;
-+
-+	if (end < start || !PAGE_ALIGN(start | end))
-+		return -EINVAL;
-+
-+	pdata = obj->dev->platform_data;
-+
-+	pdata->da_start = start;
-+	pdata->da_end = end;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(iommu_set_da_range);
-+
-+/**
-  * iommu_get - Get iommu handler
-  * @name:	target iommu name
-  **/
-@@ -853,6 +884,8 @@ struct iommu *iommu_get(const char *name)
- 		if (err)
- 			goto err_enable;
- 		flush_iotlb_all(obj);
-+		iommu_set_da_range(obj, IOMMU_DEFAULT_DA_START,
-+					IOMMU_DEFAULT_DA_END);
- 	}
- 
- 	if (!try_module_get(obj->owner))
-diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-index fa6e643..ee3ca20 100644
---- a/arch/arm/plat-omap/iovmm.c
-+++ b/arch/arm/plat-omap/iovmm.c
-@@ -272,21 +272,25 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
- {
- 	struct iovm_struct *new, *tmp;
- 	u32 start, prev_end, alignement;
-+	struct iommu_platform_data *pdata;
- 
- 	if (!obj || !bytes)
- 		return ERR_PTR(-EINVAL);
- 
-+	pdata = obj->dev->platform_data;
-+
- 	start = da;
- 	alignement = PAGE_SIZE;
- 
- 	if (flags & IOVMF_DA_ANON) {
--		/*
--		 * Reserve the first page for NULL
--		 */
--		start = PAGE_SIZE;
-+		start = pdata->da_start;
-+
- 		if (flags & IOVMF_LINEAR)
- 			alignement = iopgsz_max(bytes);
- 		start = roundup(start, alignement);
-+	} else if (start < pdata->da_start || start > pdata->da_end ||
-+					pdata->da_end - start < bytes) {
-+		return ERR_PTR(-EINVAL);
- 	}
- 
- 	tmp = NULL;
-@@ -299,16 +303,16 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
- 		if (prev_end > start)
- 			break;
- 
--		if (start + bytes <= tmp->da_start)
-+		if (tmp->da_start > start && (tmp->da_start - start) >= bytes)
- 			goto found;
- 
--		if (flags & IOVMF_DA_ANON)
-+		if (tmp->da_end >= start && flags & IOVMF_DA_ANON)
- 			start = roundup(tmp->da_end + 1, alignement);
- 
- 		prev_end = tmp->da_end;
- 	}
- 
--	if ((start >= prev_end) && (ULONG_MAX - start + 1 >= bytes))
-+	if ((start >= prev_end) && (pdata->da_end - start >= bytes))
- 		goto found;
- 
- 	dev_dbg(obj->dev, "%s: no space to fit %08x(%x) flags: %08x\n",
+i.MX53 SoC doesn't change IPUv3 channel assignments.
+>
+> Sascha
 -- 
-1.7.3.2
+Liu Ying
