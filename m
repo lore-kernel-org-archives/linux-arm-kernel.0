@@ -1,45 +1,44 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 13 Dec 2010 23:34:51 -0700
-Subject: [PATCH 08/12] OMAP2xxx clock: fix dss2_fck recalc to use clksel
+Date: Mon, 13 Dec 2010 23:34:53 -0700
+Subject: [PATCH 10/12] OMAP3: clock: fix incorrect rate display when switching
+	MPU rate at boot
 In-Reply-To: <20101214063308.21555.76050.stgit@twilight.localdomain>
 References: <20101214063308.21555.76050.stgit@twilight.localdomain>
-Message-ID: <20101214063450.21555.2723.stgit@twilight.localdomain>
+Message-ID: <20101214063452.21555.26259.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dss2_fck is a clksel clock, and therefore its rate should be recalculated
-with the clksel mechanism.  This was working in early 2009, but was one of
-the casualties of the big OMAP clock merge between 2.6.29 and 2.6.30.
+The OMAP3 clock code contains some legacy code to allow the MPU rate
+to be specified as a kernel command line parameter.  If the 'mpurate'
+parameter is specified, the kernel will attempt to switch the MPU rate
+to this rate during boot.  As part of this process, a short message
+"Switched to new clocking rate" is generated -- and in this message,
+the "Core" clock rate and "MPU" clock rate are transposed.
+
+This patch ensures that the clock rates are displayed in the correct
+order.
+
+Thanks to Bruno Guerin <br_guerin@free.fr> for reporting this bug and
+proposing a fix.  Thanks to Richard Woodruff <r-woodruff2@ti.com> for
+reviewing the problem and passing the report on.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Bruno Guerin <br.guerin@free.fr>
+Cc: Richard Woodruff <r-woodruff2@ti.com>
 ---
- arch/arm/mach-omap2/clock2420_data.c |    2 +-
- arch/arm/mach-omap2/clock2430_data.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/clock3xxx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 831e25c..7cfa186 100644
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -812,7 +812,7 @@ static struct clk dss2_fck = {		/* Alt clk used in power management */
- 	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
- 	.clksel_mask	= OMAP24XX_CLKSEL_DSS2_MASK,
- 	.clksel		= dss2_fck_clksel,
--	.recalc		= &followparent_recalc,
-+	.recalc		= &omap2_clksel_recalc,
- };
+diff --git a/arch/arm/mach-omap2/clock3xxx.c b/arch/arm/mach-omap2/clock3xxx.c
+index a447c4d..90b9477 100644
+--- a/arch/arm/mach-omap2/clock3xxx.c
++++ b/arch/arm/mach-omap2/clock3xxx.c
+@@ -94,7 +94,7 @@ static int __init omap3xxx_clk_arch_init(void)
  
- static struct clk dss_54m_fck = {	/* Alt clk used in power management */
-diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-index a9c60b7..3bd437a 100644
---- a/arch/arm/mach-omap2/clock2430_data.c
-+++ b/arch/arm/mach-omap2/clock2430_data.c
-@@ -800,7 +800,7 @@ static struct clk dss2_fck = {		/* Alt clk used in power management */
- 	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
- 	.clksel_mask	= OMAP24XX_CLKSEL_DSS2_MASK,
- 	.clksel		= dss2_fck_clksel,
--	.recalc		= &followparent_recalc,
-+	.recalc		= &omap2_clksel_recalc,
- };
+ 	ret = omap2_clk_switch_mpurate_at_boot("dpll1_ck");
+ 	if (!ret)
+-		omap2_clk_print_new_rates("osc_sys_ck", "arm_fck", "core_ck");
++		omap2_clk_print_new_rates("osc_sys_ck", "core_ck", "arm_fck");
  
- static struct clk dss_54m_fck = {	/* Alt clk used in power management */
+ 	return ret;
+ }
