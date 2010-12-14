@@ -1,25 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Dec 2010 09:34:50 +0000
-Subject: [PATCH 3/4] process: Add display of memory around registers
-	when displaying regs.
-In-Reply-To: <1292302659-1863-4-git-send-email-john.stultz@linaro.org>
-References: <1292302659-1863-1-git-send-email-john.stultz@linaro.org>
-	<1292302659-1863-4-git-send-email-john.stultz@linaro.org>
-Message-ID: <20101214093450.GC18425@n2100.arm.linux.org.uk>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 14 Dec 2010 18:57:03 +0900
+Subject: [PATCH 00/03] ARM: mach-shmobile: Initial SMP support
+In-Reply-To: <20101214075647.11275.25933.sendpatchset@t400s>
+References: <20101214075647.11275.25933.sendpatchset@t400s>
+Message-ID: <20101214095703.GG14606@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 08:57:38PM -0800, John Stultz wrote:
-> From: San Mehat <san@google.com>
+On Tue, Dec 14, 2010 at 04:56:47PM +0900, Magnus Damm wrote:
+> ARM: mach-shmobile: Initial SMP support
 > 
-> This is extremely useful in diagnosing remote crashes, and is based heavily
-> on original work by <md@google.com>.
+> [PATCH 01/03] ARM: mach-shmobile: SMP base support 
+> [PATCH 02/03] ARM: mach-shmobile: Enable SMP support
+> [PATCH 03/03] ARM: mach-shmobile: sh73a0 SMP support
+> 
+> These patches add SMP framework support for R-Mobile and
+> SH-Mobile processors, together with hardware specific SMP
+> support for the sh73a0 processor.
+> 
+> Survives onlining and offlining of secondary processor cores
+> through sysfs. Should compile and boot regardless of 
+> CONFIG_SMP, CONFIG_HOTPLUG_CPU and CONFIG_LOCAL_TIMERS.
+> 
+> I suggest that patch 1 and 3 are taken through sh-2.6 and
+> patch 2 goes through the RMK patch tracker.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Why reinvent dump_mem() ?
+Applied to rmobile/smp, thanks.
 
-If we dump out two lines of data per register, that's 32 additional
-lines in the oops dump.  That might make it difficult to get the
-register information which may have been lost off the scrollback.
+There are integration issues with regards to the GIC changes that I'll
+have to take care of during the merge window regardless, so resolving the
+CONFIG_SMP thing at that point should be pretty straightforward. My plan
+is to wait until after Russell merges, merge your stuff on top of that,
+and then send the updated bits to Linus in one shot.
 
-Or worse still, it might wrap the kernel buffers before syslog gets
-it.
+In order to avoid clashes with -next for now however I won't be merging
+the topic branch in to my -latest branch. Given that the number of boards
+in the wild for this at the moment are in the single digits, I'm not too
+worried about the amount of time these changes spend in -next so long as
+no regressions are introduced for the other boards.
