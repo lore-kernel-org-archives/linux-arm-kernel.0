@@ -1,37 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Dec 2010 17:51:36 +0000
-Subject: [PATCH 4/4] Do not call flush_cache_user_range with mmap_sem held
-In-Reply-To: <20101214093002.GA18425@n2100.arm.linux.org.uk>
-References: <1292302659-1863-1-git-send-email-john.stultz@linaro.org>
-	<1292302659-1863-5-git-send-email-john.stultz@linaro.org>
-	<20101214093002.GA18425@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTim1Wspod2LnfVw7atzP921C6o7EiKRVqw9LeqhG@mail.gmail.com>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Tue, 14 Dec 2010 19:05:05 +0100
+Subject: [PATCH] ARM: pxa: PXA_ESERIES depends on FB_W100.
+Message-ID: <20101214180505.GL15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 December 2010 09:30, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 13, 2010 at 08:57:39PM -0800, John Stultz wrote:
->> From: Dima Zavin <dima@android.com>
->>
->> We can't be holding the mmap_sem while calling flush_cache_user_range
->> because the flush can fault. If we fault on a user address, the
->> page fault handler will try to take mmap_sem again. Since both places
->> acquire the read lock, most of the time it succeeds. However, if another
->> thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
->> between the call to flush_cache_user_range and the fault, the down_read
->> in do_page_fault will deadlock.
->>
->> Also, since we really can't be holding the mmap_sem while calling
->> flush_cache_user_range AND vma is actually unused by the flush itself,
->> get rid of vma as an argument.
->
-> Holding the mmap sem prevents a concurrent munmap, mremap or other change
-> to the VMA while the flush operation is in progress. ?There is no other
-> lock which will do this for us.
+As arch/arm/mach-pxa/eseries.c references w100fb_gpio_{read,write}()
+directly.
 
-But what's the problem if such mapping disappears? The
-flush_cache_user_range code should just skip such pages.
+Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 
--- 
-Catalin
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index dd235ec..c93e73d 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -540,6 +540,7 @@ config MACH_ICONTROL
+ config ARCH_PXA_ESERIES
+ 	bool "PXA based Toshiba e-series PDAs"
+ 	select PXA25x
++	select FB_W100
+ 
+ config MACH_E330
+ 	bool "Toshiba e330"
