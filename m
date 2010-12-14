@@ -1,67 +1,9 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 14 Dec 2010 10:38:20 +0530
-Subject: [PATCH 0/5] omap4: l2x0 fixes and cleanup
-In-Reply-To: <cc00e38ed5f706eff13e0fad542af71c@mail.gmail.com>
-References: <1290187866-26941-1-git-send-email-santosh.shilimkar@ti.com>
-	<cc00e38ed5f706eff13e0fad542af71c@mail.gmail.com>
-Message-ID: <8e452d427e061b34d119e860a0e30b31@mail.gmail.com>
+From: yong.shen@freescale.com (yong.shen at freescale.com)
+Date: Tue, 14 Dec 2010 14:00:52 +0800
+Subject: patch serial for mc13783 and mc13892 
+Message-ID: <1292306455-26752-1-git-send-email-yong.shen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
-> -----Original Message-----
-> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> Sent: Thursday, December 02, 2010 5:28 PM
-> To: tony at atomide.com
-> Cc: Nishanth Menon; mans at mansr.com; khilman at deeprootsystems.com; linux-
-> arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Subject: RE: [PATCH 0/5] omap4: l2x0 fixes and cleanup
->
-> Tony,
-> > -----Original Message-----
-> > From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> > Sent: Friday, November 19, 2010 11:01 PM
-> > To: linux-omap at vger.kernel.org
-> > Cc: nm at ti.com; mans at mansr.com; tony at atomide.com;
-> > khilman at deeprootsystems.com; linux-arm-kernel at lists.infradead.org;
-> Santosh
-> > Shilimkar
-> > Subject: [PATCH 0/5] omap4: l2x0 fixes and cleanup
-> >
-> > This series is outcome of the below discussion thread.
-> > 	http://www.spinics.net/lists/arm-kernel/msg104254.html
-> >
-> > The series in brief has following patches
-> > 	- adds PL310 aux-control register bitfields
-> > 	- Use these bitfields instead of hardcoded values as part of init
-> > 	- Enable PL310 intsruction, Data prefetch hints and  BRESP to
-> > 		improve performance
-> > 	- Set share-override bit to avoid non-cached buffer corruption
-> >
-> > Thanks to Nishant Menon for testing this series on OMAP4 panda using
-> > the memspeed utility. Have boot tested this series on OMAP4 SDP with
-> > omap2plus_defconfig.
-> >
-> How about merging this series in omap-testing if you are ok
-> with it. Patch  " ARM: l2x0: Add aux control register bitfields"
-> is already acked by Catalin.
->
-> > The following changes since commit
-> > e53beacd23d9cb47590da6a7a7f6d417b941a994:
-> >   Linus Torvalds (1):
-> >         Linux 2.6.37-rc2
-> >
-> > Mans Rullgard (1):
-> >       omap4: l2x0: enable instruction and data prefetching
-> >
-> > Santosh Shilimkar (4):
-> >       ARM: l2x0: Add aux control register bitfields
-> >       omap4: l2x0: Construct the AUXCTRL value using defines
-> >       omap4: l2x0: Set share override bit
-> >       omap4: l2x0: Enable early BRESP bit
-> >
-> >  arch/arm/include/asm/hardware/cache-l2x0.h |   12 ++++++++++-
-> >  arch/arm/mach-omap2/omap4-common.c         |   30
-> +++++++++++++++++++++--
-> > ----
-> >  2 files changed, 34 insertions(+), 8 deletions(-)
+
+Given the long review process, reviewers and maintainers may be confused about the order of these patches. I resend these patches based on git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git, for maintainer's convenience.
