@@ -1,51 +1,104 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Tue, 14 Dec 2010 14:47:08 +0800
-Subject: [PATCH 9/9] ARM i.MX51 babbage: Add framebuffer support
-In-Reply-To: <20101213114332.GF6017@pengutronix.de>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-10-git-send-email-s.hauer@pengutronix.de>
-	<AANLkTi=vT8pX1QQ6DjzQatceO-tQb3Zu90CRAVi2DcpZ@mail.gmail.com>
-	<20101213114332.GF6017@pengutronix.de>
-Message-ID: <AANLkTimPpo5nJ2Bg_wZohgTuB1ypfqGJxvQSu5_2fKz2@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 14 Dec 2010 12:19:02 +0530
+Subject: [PATCH 00/12] OMAP: clock/SRAM: patches for 2.6.38, part one
+In-Reply-To: <20101214063308.21555.76050.stgit@twilight.localdomain>
+References: <20101214063308.21555.76050.stgit@twilight.localdomain>
+Message-ID: <c4bb5d1427408e750a004cfc352c4a54@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/13 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Sun, Dec 12, 2010 at 09:37:38AM +0800, Liu Ying wrote:
->> Hello, Sascha,
->>
->> I have following 3 comments to this patch:
->> 1) I think DISP1_DATx pins need not be set specially, as they keep the
->> default register values.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> Sent: Tuesday, December 14, 2010 12:05 PM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH 00/12] OMAP: clock/SRAM: patches for 2.6.38, part one
 >
-> We do not want to depend on default register values in the Linux Kernel.
-[LY] Ok. Please add disp1 related pins configuration, including
-DISP1_HSYNC, DISP1_VSYNC and DISP1_CLK.
-       It will be fine to add disp2 related pins configuration also.
+I guess you wanted to say "SCRM" instead of SRAM in subject line
+
+> This clock/SRAM patch series, based on v2.6.37-rc5:
 >
->> 2) Please define 'MX51_PAD_DI_GP4__IPU_DI2_PIN15' in
->> arch/arm/plat-mxc/include/mach/iomux-mx51.h, and rename the pin to be
->> 'MX51_PAD_DI_GP4__DI2_PIN15', as we name it according to the MX51
->> iomux reference manual.
+> - fixes some problems and missing data with OMAP4 clocks,
 >
-> I'm not sure. Normally it's good practice to code the unit into the
-> name. Otherwise we end up with names like MX51_PAD_xyz__TX which could
-> be the tx pin of just about any unit.
+> - adds SCRM IP block data (part of the OMAP4 PRCM collection of
+modules),
+>
+> - cleans up the way that OMAP3 clock data CK_* and RATE_IN_* flags are
+>   used,
+>
+> - adds some comments to the SRAM code,
+>
+> - prepares part of the OMAP1 clock code for a combined OMAP1 defconfig
+>   (although more work is left to be done before a combined OMAP1
+>    defconfig is safe, from a clock framework perspective),
+>
+> - and fixes a few minor bugs in the OMAP2/3 clock code.
 >
 >
->> 3) It is better to exchange the following two lines or just remove the
->> first line:
->> + ? ? ? gpio_set_value(GPIO_DVI_RESET, 0);
->> + ? ? ? gpio_direction_output(GPIO_DVI_RESET, 0);
+> Boot-tested on OSK 5912, N800, OMAP35xx Beagle, and OMAP37xx Beagle-XM.
 >
-> ok.
+> This series is also available from git://git.pwsan.com/linux-2.6
+> branch 'clk_a_2.6.38'.
 >
-> Sascha
 >
+> - Paul
+>
+> ---
+>
+> clk_a_2.6.38
+>    text	   data	    bss	    dec	    hex	filename
+> 5733349	 471616	5608768	11813733	 b44365	vmlinux.orig
+> 5734273	 473728	5608768	11816769	 b44f41
+> 	vmlinux.patched
+>
+>
+> Benoit Cousson (3):
+>       OMAP4: clock data: Add control for pad_clks_ck and slimbus_clk
+>       OMAP3: clock data: Add "wkup_clkdm" in sr1_fck and sr2_fck
+>       OMAP4: PRCM: Add SCRM header file
+>
+> Janusz Krzysztofik (1):
+>       OMAP1: clock_data: use runtime cpu / machine checks
+>
+> Jonathan Bergsagel (1):
+>       OMAP4: clock data: Add missing fields in iva_hsd_byp_clk_mux_ck
+>
+> Paul Walmsley (4):
+>       OMAP2xxx clock: fix dss2_fck recalc to use clksel
+>       OMAP3: clock: clarify usage of struct clksel_rate.flags and struct
+> omap_clk.cpu
+>       OMAP3: clock: fix incorrect rate display when switching MPU rate
+at
+> boot
+>       OMAP2/3: SRAM: add comment about crashes during a TLB miss
+>
+> Rajendra Nayak (2):
+>       OMAP4: clock data: Add SCRM auxiliary clock nodes
+>       OMAP4: clock data: Export control to enable/disable CORE/PER M3
+> clocks
+>
+> Thara Gopinath (1):
+>       OMAP4: clock data: Add missing DPLL x2 clock nodes
+>
+>
+>  arch/arm/mach-omap1/clock_data.c              |   17 -
+>  arch/arm/mach-omap2/clock2420_data.c          |    2
+>  arch/arm/mach-omap2/clock2430_data.c          |    2
+>  arch/arm/mach-omap2/clock3xxx.c               |    2
+>  arch/arm/mach-omap2/clock3xxx_data.c          |  218 ++++-----
+>  arch/arm/mach-omap2/clock44xx_data.c          |  620
+++++++++++++++++++--
+> -----
+>  arch/arm/mach-omap2/scrm44xx.h                |  176 +++++++
+>  arch/arm/mach-omap2/sram242x.S                |    6
+>  arch/arm/mach-omap2/sram243x.S                |    6
+>  arch/arm/mach-omap2/sram34xx.S                |    6
+>  arch/arm/plat-omap/include/plat/clkdev_omap.h |   20 -
+>  arch/arm/plat-omap/include/plat/clock.h       |   11
+>  12 files changed, 772 insertions(+), 314 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/scrm44xx.h
 >
 > --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
