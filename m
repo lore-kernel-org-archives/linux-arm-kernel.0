@@ -1,43 +1,36 @@
-From: mreimer@sdgsystems.com (Matt Reimer)
-Date: Tue, 14 Dec 2010 10:08:01 -0500
-Subject: bad pmd
-In-Reply-To: <20101208140210.GC9777@n2100.arm.linux.org.uk>
-References: <4CF6A7F2.80206@sdgsystems.com>
-	<20101201201440.GD29347@n2100.arm.linux.org.uk>
-	<4CF70607.1010905@sdgsystems.com> <4CFE6E55.1080308@sdgsystems.com>
-	<20101208140210.GC9777@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinP=1opPSDMULHn9DDBMVfT15RaZ0K_WAh7JJuz@mail.gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Tue, 14 Dec 2010 17:08:42 +0200
+Subject: [PATCHv6 4/4] omap: iommu - create new api to set valid da range
+In-Reply-To: <1292332047-8206-5-git-send-email-fernando.lugo@ti.com>
+References: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
+	<1292332047-8206-5-git-send-email-fernando.lugo@ti.com>
+Message-ID: <AANLkTin0eBk1tMDUJQQ6KuM6eOu1gu+JmwY-Nz0V+jw8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 8, 2010 at 9:02 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 07, 2010 at 12:26:45PM -0500, Aric D. Blumer wrote:
->> Matt Reimer and I believe we have found what is going on here. ?I've put
->> in a fix (no failures yet), but I wanted to bounce it off anyone interested.
->>
->> The PXA platform does not use the "bad pmd" mapping that Russell
->> describes above under normal circumstances, but the PXA resume code
->> (arch/arm/mach-pxa/sleep.S) does on resume:
+On Tue, Dec 14, 2010 at 3:07 PM, Fernando Guzman Lugo
+<fernando.lugo@ti.com> wrote:
+> From: Guzman Lugo, Fernando <x0095840@ti.com>
 >
-> Good find.
+> Some IOMMUs cannot use the whole 0x0 - 0xFFFFFFFF rage.
+> With this new API the valid range can be set.
 >
->> I'm using the patch below as a fix for now, but it's hard to know what
->> registers are available. ?Might be better to just mask it off the lower
->> bits in r1 again.
->>
->> ? ? ? ? @ Let us ensure we jump to resume_after_mmu only when the mcr above
->> ? ? ? ? @ actually took effect. ?They call it the "cpwait" operation.
->> - ? ? ? mrc ? ? p15, 0, r1, c2, c0, 0 ? ? ? ? ? @ queue a dependency on CP15
->> - ? ? ? sub ? ? pc, r2, r1, lsr #32 ? ? ? ? ? ? @ jump to virtual addr
->> + ? ? ? mrc ? ? p15, 0, r0, c2, c0, 0 ? ? ? ? ? @ queue a dependency on CP15
->> + ? ? ? sub ? ? pc, r2, r0, lsr #32 ? ? ? ? ? ? @ jump to virtual addr
->
-> I don't see anything wrong with this. ?Any PXA people want to ack this?
+> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-This patch fixes the problem for us. We have yet to see a failure with
-this patch applied.
+I still don't see where this API is being used.
 
-Eric, do you concur that this is a proper fix?
+Also, the point of using platform data was to add it to omap3_devices
+in omap-iommu.c, see[1]. I thought the platform data start/end would
+move to struct iommu, and iommu_set_da_range would change the
+start/end on struct iommu, but that would only be necessary if the
+platform data doesn't match that.
 
-Matt
+If there's no sensible platform data default, then there's no point in
+using platform data, as the platform is not the limiting factor, but
+the DSP SW.
+
+[1] http://article.gmane.org/gmane.linux.kernel/1051268
+
+-- 
+Felipe Contreras
