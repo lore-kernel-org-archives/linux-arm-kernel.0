@@ -1,236 +1,47 @@
-From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Tue, 14 Dec 2010 12:20:16 +0800
-Subject: [PATCH] Change the register name definitions for mc13783
-In-Reply-To: <1292300416-16770-1-git-send-email-yong.shen@freescale.com>
-References: <1292300416-16770-1-git-send-email-yong.shen@freescale.com>
-Message-ID: <1292300416-16770-2-git-send-email-yong.shen@freescale.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Mon, 13 Dec 2010 20:50:28 -0800
+Subject: [PATCH v4 0/5] SMP support for msm
+Message-ID: <1292302233-16194-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Shen <yong.shen@linaro.org>
+This series adds support for SMP on msm targets, and specifically adds
+support for SMP on the msm8x60. This version is rebased on top of
+Russell's SMP and gic patches, and has fixes for hotplug and smp.
 
-To make mc13783 and mc13892 share code, the register names should be
-changed to fit the new macro definitions in the comming patch.
+Jeff Ohlstein (3):
+  msm: timer: SMP timer support for msm
+  msm: hotplug: support cpu hotplug on msm
+  msm: add SMP support for msm
 
-Signed-off-by: Yong Shen <yong.shen@linaro.org>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-imx/mach-pcm038.c       |    4 +-
- arch/arm/mach-mx3/mach-mx31_3ds.c     |    4 +-
- arch/arm/mach-mx3/mach-mx31moboard.c  |    4 +-
- drivers/regulator/mc13783-regulator.c |   30 +++++++-------
- include/linux/mfd/mc13783.h           |   67 +++++++++++++++++----------------
- 5 files changed, 55 insertions(+), 54 deletions(-)
+Stepan Moskovchenko (1):
+  msm: scm-boot: Support for setting cold/warm boot addresses
 
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index 49a97ce..6601c55 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -258,10 +258,10 @@ static struct regulator_init_data cam_data = {
- 
- static struct mc13783_regulator_init_data pcm038_regulators[] = {
- 	{
--		.id = MC13783_REGU_VCAM,
-+		.id = MC13783_REG_VCAM,
- 		.init_data = &cam_data,
- 	}, {
--		.id = MC13783_REGU_VMMC1,
-+		.id = MC13783_REG_VMMC1,
- 		.init_data = &sdhc1_data,
- 	},
- };
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 0ad9e78..0db68f8 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -117,10 +117,10 @@ static struct regulator_init_data pwgtx_init = {
- 
- static struct mc13783_regulator_init_data mx31_3ds_regulators[] = {
- 	{
--		.id = MC13783_REGU_PWGT1SPI, /* Power Gate for ARM core. */
-+		.id = MC13783_REG_PWGT1SPI, /* Power Gate for ARM core. */
- 		.init_data = &pwgtx_init,
- 	}, {
--		.id = MC13783_REGU_PWGT2SPI, /* Power Gate for L2 Cache. */
-+		.id = MC13783_REG_PWGT2SPI, /* Power Gate for L2 Cache. */
- 		.init_data = &pwgtx_init,
- 	},
- };
-diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-index eb5f426..a6223e8 100644
---- a/arch/arm/mach-mx3/mach-mx31moboard.c
-+++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-@@ -218,11 +218,11 @@ static struct regulator_init_data cam_vreg_data = {
- 
- static struct mc13783_regulator_init_data moboard_regulators[] = {
- 	{
--		.id = MC13783_REGU_VMMC1,
-+		.id = MC13783_REG_VMMC1,
- 		.init_data = &sdhc_vreg_data,
- 	},
- 	{
--		.id = MC13783_REGU_VCAM,
-+		.id = MC13783_REG_VCAM,
- 		.init_data = &cam_vreg_data,
- 	},
- };
-diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
-index e99917a..6a6e1d6 100644
---- a/drivers/regulator/mc13783-regulator.c
-+++ b/drivers/regulator/mc13783-regulator.c
-@@ -228,15 +228,15 @@ static struct regulator_ops mc13783_gpo_regulator_ops;
- 	}
- 
- #define MC13783_DEFINE_SW(_name, _reg, _vsel_reg, _voltages)		\
--	MC13783_DEFINE(SW, _name, _reg, _vsel_reg, _voltages)
-+	MC13783_DEFINE(REG, _name, _reg, _vsel_reg, _voltages)
- #define MC13783_DEFINE_REGU(_name, _reg, _vsel_reg, _voltages)		\
--	MC13783_DEFINE(REGU, _name, _reg, _vsel_reg, _voltages)
-+	MC13783_DEFINE(REG, _name, _reg, _vsel_reg, _voltages)
- 
- static struct mc13783_regulator mc13783_regulators[] = {
- 	MC13783_DEFINE_SW(SW3, SWITCHERS5, SWITCHERS5, mc13783_sw3_val),
- 
--	MC13783_FIXED_DEFINE(REGU, VAUDIO, REGULATORMODE0, mc13783_vaudio_val),
--	MC13783_FIXED_DEFINE(REGU, VIOHI, REGULATORMODE0, mc13783_viohi_val),
-+	MC13783_FIXED_DEFINE(REG, VAUDIO, REGULATORMODE0, mc13783_vaudio_val),
-+	MC13783_FIXED_DEFINE(REG, VIOHI, REGULATORMODE0, mc13783_viohi_val),
- 	MC13783_DEFINE_REGU(VIOLO, REGULATORMODE0, REGULATORSETTING0,	\
- 			    mc13783_violo_val),
- 	MC13783_DEFINE_REGU(VDIG, REGULATORMODE0, REGULATORSETTING0,	\
-@@ -255,7 +255,7 @@ static struct mc13783_regulator mc13783_regulators[] = {
- 			    mc13783_vesim_val),
- 	MC13783_DEFINE_REGU(VCAM, REGULATORMODE1, REGULATORSETTING0,	\
- 			    mc13783_vcam_val),
--	MC13783_FIXED_DEFINE(REGU, VRFBG, REGULATORMODE1, mc13783_vrfbg_val),
-+	MC13783_FIXED_DEFINE(REG, VRFBG, REGULATORMODE1, mc13783_vrfbg_val),
- 	MC13783_DEFINE_REGU(VVIB, REGULATORMODE1, REGULATORSETTING1,	\
- 			    mc13783_vvib_val),
- 	MC13783_DEFINE_REGU(VRF1, REGULATORMODE1, REGULATORSETTING1,	\
-@@ -266,12 +266,12 @@ static struct mc13783_regulator mc13783_regulators[] = {
- 			    mc13783_vmmc_val),
- 	MC13783_DEFINE_REGU(VMMC2, REGULATORMODE1, REGULATORSETTING1,	\
- 			    mc13783_vmmc_val),
--	MC13783_GPO_DEFINE(REGU, GPO1, POWERMISC, mc13783_gpo_val),
--	MC13783_GPO_DEFINE(REGU, GPO2, POWERMISC, mc13783_gpo_val),
--	MC13783_GPO_DEFINE(REGU, GPO3, POWERMISC, mc13783_gpo_val),
--	MC13783_GPO_DEFINE(REGU, GPO4, POWERMISC, mc13783_gpo_val),
--	MC13783_GPO_DEFINE(REGU, PWGT1SPI, POWERMISC, mc13783_pwgtdrv_val),
--	MC13783_GPO_DEFINE(REGU, PWGT2SPI, POWERMISC, mc13783_pwgtdrv_val),
-+	MC13783_GPO_DEFINE(REG, GPO1, POWERMISC, mc13783_gpo_val),
-+	MC13783_GPO_DEFINE(REG, GPO2, POWERMISC, mc13783_gpo_val),
-+	MC13783_GPO_DEFINE(REG, GPO3, POWERMISC, mc13783_gpo_val),
-+	MC13783_GPO_DEFINE(REG, GPO4, POWERMISC, mc13783_gpo_val),
-+	MC13783_GPO_DEFINE(REG, PWGT1SPI, POWERMISC, mc13783_pwgtdrv_val),
-+	MC13783_GPO_DEFINE(REG, PWGT2SPI, POWERMISC, mc13783_pwgtdrv_val),
- };
- 
- struct mc13783_regulator_priv {
-@@ -508,8 +508,8 @@ static int mc13783_gpo_regulator_enable(struct regulator_dev *rdev)
- 	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
- 
- 	/* Power Gate enable value is 0 */
--	if (id == MC13783_REGU_PWGT1SPI ||
--	    id == MC13783_REGU_PWGT2SPI)
-+	if (id == MC13783_REG_PWGT1SPI ||
-+	    id == MC13783_REG_PWGT2SPI)
- 		en_val = 0;
- 
- 	mc13783_lock(priv->mc13783);
-@@ -530,8 +530,8 @@ static int mc13783_gpo_regulator_disable(struct regulator_dev *rdev)
- 	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
- 
- 	/* Power Gate disable value is 1 */
--	if (id == MC13783_REGU_PWGT1SPI ||
--	    id == MC13783_REGU_PWGT2SPI)
-+	if (id == MC13783_REG_PWGT1SPI ||
-+	    id == MC13783_REG_PWGT2SPI)
- 		dis_val = mc13783_regulators[id].enable_bit;
- 
- 	mc13783_lock(priv->mc13783);
-diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
-index b4c741e..7d0f3d6 100644
---- a/include/linux/mfd/mc13783.h
-+++ b/include/linux/mfd/mc13783.h
-@@ -1,4 +1,5 @@
- /*
-+ * Copyright 2010 Yong Shen <yong.shen@linaro.org>
-  * Copyright 2009-2010 Pengutronix
-  * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-  *
-@@ -122,39 +123,39 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
- 		unsigned int channel, unsigned int *sample);
- 
- 
--#define	MC13783_SW_SW1A		0
--#define	MC13783_SW_SW1B		1
--#define	MC13783_SW_SW2A		2
--#define	MC13783_SW_SW2B		3
--#define	MC13783_SW_SW3		4
--#define	MC13783_SW_PLL		5
--#define	MC13783_REGU_VAUDIO	6
--#define	MC13783_REGU_VIOHI	7
--#define	MC13783_REGU_VIOLO	8
--#define	MC13783_REGU_VDIG	9
--#define	MC13783_REGU_VGEN	10
--#define	MC13783_REGU_VRFDIG	11
--#define	MC13783_REGU_VRFREF	12
--#define	MC13783_REGU_VRFCP	13
--#define	MC13783_REGU_VSIM	14
--#define	MC13783_REGU_VESIM	15
--#define	MC13783_REGU_VCAM	16
--#define	MC13783_REGU_VRFBG	17
--#define	MC13783_REGU_VVIB	18
--#define	MC13783_REGU_VRF1	19
--#define	MC13783_REGU_VRF2	20
--#define	MC13783_REGU_VMMC1	21
--#define	MC13783_REGU_VMMC2	22
--#define	MC13783_REGU_GPO1	23
--#define	MC13783_REGU_GPO2	24
--#define	MC13783_REGU_GPO3	25
--#define	MC13783_REGU_GPO4	26
--#define	MC13783_REGU_V1		27
--#define	MC13783_REGU_V2		28
--#define	MC13783_REGU_V3		29
--#define	MC13783_REGU_V4		30
--#define	MC13783_REGU_PWGT1SPI	31
--#define	MC13783_REGU_PWGT2SPI	32
-+#define	MC13783_REG_SW1A		0
-+#define	MC13783_REG_SW1B		1
-+#define	MC13783_REG_SW2A		2
-+#define	MC13783_REG_SW2B		3
-+#define	MC13783_REG_SW3		4
-+#define	MC13783_REG_PLL		5
-+#define	MC13783_REG_VAUDIO	6
-+#define	MC13783_REG_VIOHI	7
-+#define	MC13783_REG_VIOLO	8
-+#define	MC13783_REG_VDIG	9
-+#define	MC13783_REG_VGEN	10
-+#define	MC13783_REG_VRFDIG	11
-+#define	MC13783_REG_VRFREF	12
-+#define	MC13783_REG_VRFCP	13
-+#define	MC13783_REG_VSIM	14
-+#define	MC13783_REG_VESIM	15
-+#define	MC13783_REG_VCAM	16
-+#define	MC13783_REG_VRFBG	17
-+#define	MC13783_REG_VVIB	18
-+#define	MC13783_REG_VRF1	19
-+#define	MC13783_REG_VRF2	20
-+#define	MC13783_REG_VMMC1	21
-+#define	MC13783_REG_VMMC2	22
-+#define	MC13783_REG_GPO1	23
-+#define	MC13783_REG_GPO2	24
-+#define	MC13783_REG_GPO3	25
-+#define	MC13783_REG_GPO4	26
-+#define	MC13783_REG_V1		27
-+#define	MC13783_REG_V2		28
-+#define	MC13783_REG_V3		29
-+#define	MC13783_REG_V4		30
-+#define	MC13783_REG_PWGT1SPI	31
-+#define	MC13783_REG_PWGT2SPI	32
- 
- #define MC13783_IRQ_ADCDONE	MC13XXX_IRQ_ADCDONE
- #define MC13783_IRQ_ADCBISDONE	MC13XXX_IRQ_ADCBISDONE
+Stephen Boyd (1):
+  msm: Secure Channel Manager (SCM) support
+
+ arch/arm/mach-msm/Kconfig                       |    5 +
+ arch/arm/mach-msm/Makefile                      |    4 +
+ arch/arm/mach-msm/headsmp.S                     |   43 ++++
+ arch/arm/mach-msm/hotplug.c                     |   88 +++++++
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    6 +-
+ arch/arm/mach-msm/include/mach/smp.h            |    2 +
+ arch/arm/mach-msm/io.c                          |    1 +
+ arch/arm/mach-msm/platsmp.c                     |  121 ++++++++++
+ arch/arm/mach-msm/scm-boot.c                    |   39 +++
+ arch/arm/mach-msm/scm-boot.h                    |   38 +++
+ arch/arm/mach-msm/scm.c                         |  287 +++++++++++++++++++++++
+ arch/arm/mach-msm/scm.h                         |   41 ++++
+ arch/arm/mach-msm/timer.c                       |  137 +++++++++--
+ 13 files changed, 788 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/mach-msm/headsmp.S
+ create mode 100644 arch/arm/mach-msm/hotplug.c
+ create mode 100644 arch/arm/mach-msm/platsmp.c
+ create mode 100644 arch/arm/mach-msm/scm-boot.c
+ create mode 100644 arch/arm/mach-msm/scm-boot.h
+ create mode 100644 arch/arm/mach-msm/scm.c
+ create mode 100644 arch/arm/mach-msm/scm.h
+
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
