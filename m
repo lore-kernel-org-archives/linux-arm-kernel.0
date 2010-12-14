@@ -1,40 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Dec 2010 14:42:14 -0800
-Subject: [PATCH v3] OMAP3: clean up ASM idle code
-In-Reply-To: <1292347603-17703-1-git-send-email-j-pihet@ti.com>
-References: <1292347603-17703-1-git-send-email-j-pihet@ti.com>
-Message-ID: <20101214224214.GB14990@atomide.com>
+From: j.neuschaefer@gmx.net (Jonathan =?utf-8?Q?Neusch=C3=A4fer?=)
+Date: Tue, 14 Dec 2010 23:48:48 +0100
+Subject: [PATCH] arch/arm/kernel: use cpu_relax() in halt loops
+Message-ID: <20101214224848.GA1706@debian.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Looking throught arch/arm/kernel/ I found some halt loops.
+I just thought we could save some power here using cpu_relax(),
+or am I missing something?
 
-* jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [101214 09:28]:
-> From: Jean Pihet <j-pihet@ti.com>
-> 
-> This patch only contains clean-ups and cosmetic changes,
-> no functional change.
-> 
-> Clean up of the ASM code:
-> - reorganized the code in logical sections: defines, API
->    functions, internal functions and variables,
-> - reworked and simplified the execution paths, for better
->    readability and to avoid duplication of code,
-> - added comments on the entry and exit points and the interaction
->    with the ROM code for OFF mode restore,
-> - reworked the existing comments for better readability,
-> - reworked the code formating, alignment and white spaces,
-> - added comments for the i443 erratum workarounds,
-> - changed the hardcoded values in favor of existing macros
->    from include files,
-> - clean up of non used symbols.
+Signed-off-by: Jonathan Neusch?fer <j.neuschaefer@gmx.net>
+---
+ arch/arm/kernel/process.c |    6 ++++--
+ arch/arm/kernel/setup.c   |    7 +++++--
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
-Can you please split it further, it's not obvious from reading it
-that it does not change anything.
-
-How about first do one or more patches to move the code around.
-Then rework the comments and formatting.
-
-Thanks,
-
-Tony
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index e76fcaa..4a83fdf 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -124,7 +124,8 @@ void arm_machine_restart(char mode, const char *cmd)
+ 	 */
+ 	mdelay(1000);
+ 	printk("Reboot failed -- System halted\n");
+-	while (1);
++	while (1)
++		cpu_relax();
+ }
+ 
+ /*
+@@ -235,7 +236,8 @@ void machine_shutdown(void)
+ void machine_halt(void)
+ {
+ 	machine_shutdown();
+-	while (1);
++	while (1)
++		cpu_relax();
+ }
+ 
+ void machine_power_off(void)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..0d77329 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -41,6 +41,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cachetype.h>
+ #include <asm/tlbflush.h>
++#include <asm/processor.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/irq.h>
+@@ -337,7 +338,8 @@ static void __init setup_processor(void)
+ 	if (!list) {
+ 		printk("CPU configuration botched (ID %08x), unable "
+ 		       "to continue.\n", read_cpuid_id());
+-		while (1);
++		while (1)
++			cpu_relax();
+ 	}
+ 
+ 	cpu_name = list->cpu_name;
+@@ -434,7 +436,8 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
+ 	if (!list) {
+ 		printk("Machine configuration botched (nr %d), unable "
+ 		       "to continue.\n", nr);
+-		while (1);
++		while (1)
++			cpu_relax();
+ 	}
+ 
+ 	printk("Machine: %s\n", list->name);
+-- 
+1.7.2.3
