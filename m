@@ -1,45 +1,24 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 14 Dec 2010 19:00:30 +0100
-Subject: [PATCH v2] USB: atmel_usba_udc: fix freeing irq in usba_udc_remove()
-In-Reply-To: <636999.52551.qm@web180309.mail.gq1.yahoo.com>
-References: <636999.52551.qm@web180309.mail.gq1.yahoo.com>
-Message-ID: <1292349630-3610-1-git-send-email-nicolas.ferre@atmel.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 14 Dec 2010 08:59:03 -0800
+Subject: [PATCH v4 0/5] SMP support for msm
+In-Reply-To: <1292302233-16194-1-git-send-email-johlstei@codeaurora.org>
+References: <1292302233-16194-1-git-send-email-johlstei@codeaurora.org>
+Message-ID: <20101214165902.GA24646@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Emanuele <rje@crystalfontz.com>
+On Mon, Dec 13, 2010 at 08:50:28PM -0800, Jeff Ohlstein wrote:
 
-Add a free_irq() call on vbus gpio when we remove udc so that the
-vbus irq is properly released.
+> This series adds support for SMP on msm targets, and specifically adds
+> support for SMP on the msm8x60. This version is rebased on top of
+> Russell's SMP and gic patches, and has fixes for hotplug and smp.
 
-Signed-off-by: Rob Emanuele <rje@crystalfontz.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-David,
+Russell, do you want to pick up these patches as well, since they
+depend on the other SMP patches in your tree?
 
-I modified $SUBJECT to be more explicit about which driver is modified.
-Hope that makes sense now...
+Thanks,
+David
 
-Bye,
-
- drivers/usb/gadget/atmel_usba_udc.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 717ff65..e7c65a4 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -2057,8 +2057,10 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- 		usba_ep_cleanup_debugfs(&usba_ep[i]);
- 	usba_cleanup_debugfs(udc);
- 
--	if (gpio_is_valid(udc->vbus_pin))
-+	if (gpio_is_valid(udc->vbus_pin)) {
-+		free_irq(gpio_to_irq(udc->vbus_pin), udc);
- 		gpio_free(udc->vbus_pin);
-+	}
- 
- 	free_irq(udc->irq, udc);
- 	kfree(usba_ep);
 -- 
-1.7.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
