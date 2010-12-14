@@ -1,125 +1,40 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 14 Dec 2010 14:31:49 -0800
-Subject: [PATCH v4 4/5] msm: hotplug: support cpu hotplug on msm
-In-Reply-To: <20101214173007.GA24303@n2100.arm.linux.org.uk>
-References: <20101214173007.GA24303@n2100.arm.linux.org.uk>
-Message-ID: <1292365910-30336-1-git-send-email-johlstei@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Dec 2010 14:42:14 -0800
+Subject: [PATCH v3] OMAP3: clean up ASM idle code
+In-Reply-To: <1292347603-17703-1-git-send-email-j-pihet@ti.com>
+References: <1292347603-17703-1-git-send-email-j-pihet@ti.com>
+Message-ID: <20101214224214.GB14990@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
----
- arch/arm/mach-msm/Makefile  |    2 +
- arch/arm/mach-msm/hotplug.c |   87 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 89 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/hotplug.c
+Hi Jean,
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 34cd0a8..7a11b4a 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -20,6 +20,8 @@ obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
- obj-$(CONFIG_MSM_SMD) += last_radio_log.o
- obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
- 
-+obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-+
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
- obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
-diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
-new file mode 100644
-index 0000000..d24f71f
---- /dev/null
-+++ b/arch/arm/mach-msm/hotplug.c
-@@ -0,0 +1,87 @@
-+/*
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <linux/completion.h>
-+#include <linux/irq.h>
-+
-+#include <asm/cacheflush.h>
-+
-+#include <mach/smp.h>
-+
-+static inline void cpu_enter_lowpower(void)
-+{
-+	flush_cache_all();
-+}
-+
-+static inline void cpu_leave_lowpower(void)
-+{
-+	pen_release = -1;
-+	smp_wmb();
-+}
-+
-+static inline void platform_do_lowpower(unsigned int cpu)
-+{
-+	/* Just enter wfe for now. */
-+	for (;;) {
-+		asm("wfe" : : : "memory");
-+		if (pen_release == cpu) {
-+			/*
-+			 * OK, proper wakeup, we're done
-+			 */
-+			break;
-+		}
-+
-+		/*
-+		 * getting here, means that we have come out of WFI without
-+		 * having been woken up - this shouldn't happen
-+		 *
-+		 * The trouble is, letting people know about this is not really
-+		 * possible, since we are currently running incoherently, and
-+		 * therefore cannot safely call printk() or anything else
-+		*/
-+		pr_debug("CPU%u: spurious wakeup call\n", cpu);
-+	}
-+}
-+
-+int platform_cpu_kill(unsigned int cpu)
-+{
-+	return 1;
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void platform_cpu_die(unsigned int cpu)
-+{
-+	/*
-+	 * we're ready for shutdown now, so do it
-+	 */
-+	cpu_enter_lowpower();
-+	platform_do_lowpower(cpu);
-+
-+	/*
-+	 * bring this CPU back into the world of cache
-+	 * coherency, and then restore interrupts
-+	 */
-+	cpu_leave_lowpower();
-+}
-+
-+int platform_cpu_disable(unsigned int cpu)
-+{
-+	/*
-+	 * we don't allow CPU 0 to be shutdown (it is still too special
-+	 * e.g. clock tick interrupts)
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+* jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [101214 09:28]:
+> From: Jean Pihet <j-pihet@ti.com>
+> 
+> This patch only contains clean-ups and cosmetic changes,
+> no functional change.
+> 
+> Clean up of the ASM code:
+> - reorganized the code in logical sections: defines, API
+>    functions, internal functions and variables,
+> - reworked and simplified the execution paths, for better
+>    readability and to avoid duplication of code,
+> - added comments on the entry and exit points and the interaction
+>    with the ROM code for OFF mode restore,
+> - reworked the existing comments for better readability,
+> - reworked the code formating, alignment and white spaces,
+> - added comments for the i443 erratum workarounds,
+> - changed the hardcoded values in favor of existing macros
+>    from include files,
+> - clean up of non used symbols.
+
+Can you please split it further, it's not obvious from reading it
+that it does not change anything.
+
+How about first do one or more patches to move the code around.
+Then rework the comments and formatting.
+
+Thanks,
+
+Tony
