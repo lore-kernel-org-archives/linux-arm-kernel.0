@@ -1,54 +1,52 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Tue, 14 Dec 2010 23:11:33 +0200
-Subject: [PATCHv6 4/4] omap: iommu - create new api to set valid da range
-In-Reply-To: <AANLkTimNeDCH4jvP1QM785oNdua+GzwmtUA+OKzmO5aX@mail.gmail.com>
-References: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
-	<1292332047-8206-5-git-send-email-fernando.lugo@ti.com>
-	<AANLkTin0eBk1tMDUJQQ6KuM6eOu1gu+JmwY-Nz0V+jw8@mail.gmail.com>
-	<AANLkTimNeDCH4jvP1QM785oNdua+GzwmtUA+OKzmO5aX@mail.gmail.com>
-Message-ID: <AANLkTin6CBc3gBCHbD8XdQ7E3mQdEkO+rn6Y=u-tv2m0@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Dec 2010 22:01:57 +0000
+Subject: {PATCH] BCMRING maintainer change (was RE: [PATCH 02/24] ARM:
+	bcmring: update clock source registration)
+In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AADDDEFC6EE00@SJEXCHCCR02.corp.ad.broadcom.com>
+References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
+	<E1PSDs3-0008CQ-FW@rmk-PC.arm.linux.org.uk>
+	<9383297B60843144AC17878B479520F1129E584129@SJEXCHCCR01.corp.ad.broadcom.com>
+	<8628FE4E7912BF47A96AE7DD7BAC0AADDDEFC6EE00@SJEXCHCCR02.corp.ad.broadcom.com>
+Message-ID: <20101214220157.GC24303@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 8:59 PM, Guzman Lugo, Fernando
-<fernando.lugo@ti.com> wrote:
-> On Tue, Dec 14, 2010 at 9:08 AM, Felipe Contreras
-> <felipe.contreras@gmail.com> wrote:
->> On Tue, Dec 14, 2010 at 3:07 PM, Fernando Guzman Lugo
->> <fernando.lugo@ti.com> wrote:
->>> From: Guzman Lugo, Fernando <x0095840@ti.com>
->>>
->>> Some IOMMUs cannot use the whole 0x0 - 0xFFFFFFFF rage.
->>> With this new API the valid range can be set.
->>>
->>> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
->>> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
->>
->> I still don't see where this API is being used.
->
-> you can find it here:
->
-> http://marc.info/?l=linux-kernel&m=128805403014740&w=2
+On Mon, Dec 13, 2010 at 12:28:40PM -0800, JD (Jiandong) Zheng wrote:
+> Hello,
+> 
+> This is second time I submit this patch because there are complains about Leo 
+> Chen's email is not valid and reachable.
+> 
+> I am Jiandong Zheng working on BCMRING in Broadcom Canada Ltd. I am replacing 
+> Leo Chen (leochen at broadcom.com) as " ARM/BCMRING ARM ARCHITECTURE" and "
+> ARM/BCMRING MTD NAND DRIVER" maintainer from Broadcom as he is no longer the 
+> maintainer of these components.
+> 
+> Here is the patch to MAINTAINERS file in linux 2.6.36 about this change.
+> 
+> Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+> 
+> Subject: [PATCH] Change bcmring Maintainer list.
 
-Oh, ok, thanks. somehow I missed it.
+I've commited this manually, to fix up the text of the commit message:
 
->> Also, the point of using platform data was to add it to omap3_devices
->> in omap-iommu.c, see[1]. I thought the platform data start/end would
->> move to struct iommu, and iommu_set_da_range would change the
->> start/end on struct iommu, but that would only be necessary if the
->> platform data doesn't match that.
->
-> it is not clear for me. do you mean having default start/end in
-> platform data then when iommu_get is call pass them to start/end in
-> struct iommu and the new api change start/end in struct iommu?
->
-> Please let me know if that is correct.
+    Change bcmring Maintainer list.
 
-Yeah, if you are not going to add it in the platform data
-(mach-omap2/omap-iommu.c), then it doesn't make sense to use platform
-data for that.
+    I am Jiandong Zheng working on BCMRING in Broadcom Canada Ltd. I am
+    replacing Leo Chen (leochen at broadcom.com) as "ARM/BCMRING ARM
+    ARCHITECTURE" and "ARM/BCMRING MTD NAND DRIVER" maintainer from
+    Broadcom as he is no longer the maintainer of these components.
 
-Cheers.
+    Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+    Acked-by: Scott Branden <sbranden@broadcom.com>
 
--- 
-Felipe Contreras
+A few notes for future:
+
+1. don't overflow more than 72 characters, unless you're quoting kernel
+   messages.
+2. The patch summary should be in the email subject, so 'git am' can
+   safely parse it.
+3. sign-offs should be the last thing before the "---" line before the
+   diffstat.
+4. commentry about how many times a patch has been sent, and that this
+   is a patch should go after the "---" line.
