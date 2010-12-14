@@ -1,104 +1,29 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Tue, 14 Dec 2010 14:40:09 +0800
-Subject: [PATCH 5/9] Add i.MX5 framebuffer driver
-In-Reply-To: <20101213113830.GE6017@pengutronix.de>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-6-git-send-email-s.hauer@pengutronix.de>
-	<AANLkTikZowDCK4JPiCyEou1ekRuYA1qGnKrBPT5dXB+8@mail.gmail.com>
-	<20101213113830.GE6017@pengutronix.de>
-Message-ID: <AANLkTikwTjUUzc6BovFKXq-FverNMqg-ustodk+sKUCY@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 13 Dec 2010 23:43:56 -0700 (MST)
+Subject: [PATCH 0/5] OMAP3&4: Fixes in setup/suspend/powerdomain
+In-Reply-To: <1292276969-29733-1-git-send-email-b-cousson@ti.com>
+References: <1292276969-29733-1-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1012132342030.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Sascha,
+Hi Beno?t, Kevin,
 
-Please find my feedback with [LY] embedded.
+On Mon, 13 Dec 2010, Benoit Cousson wrote:
 
-And, a bug related with this patch:
-1) Bootup the babbage board.
-2) echo U:640x480p-60 > /sys/class/graphics/fb0/mode
-3) cat /sys/class/graphics/fb0/virtual_size, it shows '640,480'.
-4) echo 640,960 > /sys/class/graphics/fb0/virtual_size, change virtual
-yres to be 960.
-5) cat /sys/class/graphics/fb0/virtual_size, it still shows '640,480'.
-I think this is caused by 'var->yres_virtual = var->yres;' in custom
-fb_set_par() function(Sorry, I cannot make the comment inline this
-time, as I don't find the original code within the mail I am
-replying). This makes fb0 use only one block of memory whose size is
-equal to screen size, so pan display can not really play her role and
-screen tearing issue may happen.
+> This is a series of fixes on OMAP3/4 in setup apis,
+> in the suspend framework and in powerdomain modelling
+> for OMAP4.
 
-Best Regards,
-Liu Ying
+...
 
-2010/12/13 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Sun, Dec 12, 2010 at 02:13:40PM +0800, Liu Ying wrote:
->> Hello, Sascha,
->>
->> I have following comments to this patch:
->> 1) Please modify the commit message, as IPUv3 is not embedded in i.MX50 SoC.
->
-> ok.
->
->> 2) ADC is not supported yet in the framebuffer driver, so please
->> modify this comment:
->> ? ?> + * Framebuffer Framebuffer Driver for SDC and ADC.
->
-> ok.
->
->> 3) 'ipu_dp_set_window_pos()' is called only once in
->> imx_ipu_fb_set_par_overlay(). So, the framebuffer driver doesn't
->> support to change the overlay framebuffer position. Need a
->> mechanism/interface for users to change the overlay framebuffer
->> position.
->
-> Yes. The overlay support is currently only present in the driver because
-> I didn't want to break it in general. There is no generic overlay API in
-> the kernel and I didn't want to invent the n+1 API. Currently the
-> possible use cases of the overlay support are not clear to me. Number
-> one use case would probably be to display video output, but the
-> corresponding driver would be a v4l2 driver, so in this case we would
-> only need an in-kernel API.
-> Anyway, I have not the resources to implement complete overlay support.
-> So either we keep it like it is and it more has an example character
-> or we remove it completely from the driver for now.
->
->> 4) Need to make sure the framebuffer on DP-FG is blanked before the
->> framebuffer on DP-BG is blanked. Meanwhile, the framebuffer on DP-FG
->> should be unblanked after the framebuffer on DP-BG is unblanked
->> 5) Need to check the framebuffer on DP-FG doesn't run out of the range
->> of the framebuffer on DP-BG.
->
-> I tend to remove the overlay support.
->
->> 6) I prefer to find the video mode in modedb first, and if we cannot
->> find the video mode in common video mode data base, we can find a
->> video mode in custom video mode data base which is defined in platform
->> data. In this way, we don't need to export common modefb.
->
-> I exported the modedb to be able to show the different modes under
-> /sys/class/graphics/fb0/modes and to set it with
-> /sys/class/graphics/fb0/mode. If you want this there is no way around
-> exporting it. The ioctl interface for mode setting is independent of the
-> specific modes anyway.
-[LY]  Just a concern. If a platform choose to add the generic video
-mode data base to IPUv3 framebuffer modelist, 'cat
-/sys/class/graphics/fb0/modes' will show all the video modes in the
-generic data base to users. I am not sure whether showing them to
-users means the IPUv3 framebuffer driver acknowledges to support all
-of them or not. I tried to do 'echo U:1800x1440p-70 >
-/sys/class/graphics/fb0/mode' with the kernel on ipuv3 branch, there
-will be a kernel dump(seems it can not allocate enough memory).
->
-> BTW please make comments specific to specific code inline.
-[LY] Ok.
->
-> Sascha
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
+> Rajendra Nayak (3):
+>   OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
+>   OMAP4: PM: Do not assume clkdm supports hw transitions
+
+The above two patches should be run by Kevin for his ack (cc'ed on this 
+message).  Kevin, care to ack these?
+
+
+
+- Paul
