@@ -1,37 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 14 Dec 2010 20:17:21 -0200
-Subject: ulpi_check_integrity returning error
-In-Reply-To: <877hfce2xd.fsf@lechat.rtp-net.org>
-References: <AANLkTinxLr10X-EBGQHdhC5JyxbJOqcUz_+UMOCo+OFA@mail.gmail.com>
-	<4D076E49.3020805@compulab.co.il>
-	<AANLkTintiOa5mhcF_viNCzC5q1EEHjgTLHhYsJc5Un-5@mail.gmail.com>
-	<87d3p4e6r1.fsf@lechat.rtp-net.org>
-	<AANLkTimUSdV-0L+BSLumTJCDeFOgYNhw6azLjWuK4uX6@mail.gmail.com>
-	<877hfce2xd.fsf@lechat.rtp-net.org>
-Message-ID: <AANLkTikjJ9y=t6=3RHtt+NF8SQbGdTkZfSfpi_L-61ex@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Dec 2010 14:28:21 -0800
+Subject: [PATCH v2] MTD: NAND: ams-delta: convert to platform driver
+In-Reply-To: <201012142109.42784.jkrzyszt@tis.icnet.pl>
+References: <201012111840.05270.jkrzyszt@tis.icnet.pl>
+	<1292346023.2538.103.camel@localhost>
+	<201012142109.42784.jkrzyszt@tis.icnet.pl>
+Message-ID: <20101214222821.GA14990@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [101214 12:31]:
+> In its current form, the driver may interfere with different hardware on 
+> different boards if built into the kernel, hence is not suitable for 
+> inclusion into a defconfig, inteded to be usable with multiple OMAP1 cpu and 
+> machine types.
+> 
+> Convert it to a platform driver, that should be free from this issue.
+> 
+> Created and tested against linux-2.6.37-rc5 on Amstrad Delta.
 
-On Tue, Dec 14, 2010 at 2:26 PM, Arnaud Patard
-<arnaud.patard@rtp-net.org> wrote:
-...
->
-> Please, read again what I said. I'm not talking of .portsc but of
-> .init. To reach the ulpi, the portsc register should be set to ulpi mode
-> _before_ calling otg_init() in ehci_mxc_drv_probe() but the code is using
-> .portsc/setting portsc in ehci_mxc_setup() which is afaik _after_
-> ehci_mxc_drv_probe().
+Good to see this happen, I assume this is for MTD. If not and you
+want me to merge it instead, let me know.
 
-Ok, I understand what you mean now and I confirmed what you said:
-current code is setting the portsc register after writing to the OTG
-viewport.
-
-The MX31 is by default configured for a USB serial phy, so like you
-stated we need first to setup portsc to work in ULPI mode and after
-that we can read/write the OTG viewport.
-
-Thanks,
-
-Fabio Estevam
+Acked-by: Tony Lindgren <tony@atomide.com>
