@@ -1,52 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Dec 2010 22:01:57 +0000
-Subject: {PATCH] BCMRING maintainer change (was RE: [PATCH 02/24] ARM:
-	bcmring: update clock source registration)
-In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AADDDEFC6EE00@SJEXCHCCR02.corp.ad.broadcom.com>
-References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
-	<E1PSDs3-0008CQ-FW@rmk-PC.arm.linux.org.uk>
-	<9383297B60843144AC17878B479520F1129E584129@SJEXCHCCR01.corp.ad.broadcom.com>
-	<8628FE4E7912BF47A96AE7DD7BAC0AADDDEFC6EE00@SJEXCHCCR02.corp.ad.broadcom.com>
-Message-ID: <20101214220157.GC24303@n2100.arm.linux.org.uk>
+From: buytenh@wantstofly.org ('Lennert Buytenhek')
+Date: Tue, 14 Dec 2010 23:10:55 +0100
+Subject: [PATCH 40/54] ARM: Samsung SoCs: irq_data conversion.
+In-Reply-To: <015801cb92e1$117861b0$34692510$%kim@samsung.com>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130134112.GO15575@mail.wantstofly.org>
+	<015801cb92e1$117861b0$34692510$%kim@samsung.com>
+Message-ID: <20101214221055.GA16079@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 12:28:40PM -0800, JD (Jiandong) Zheng wrote:
-> Hello,
+On Fri, Dec 03, 2010 at 08:56:03PM +0900, Kukjin Kim wrote:
+
+> Hi Lennert,
+
+Hi again,
+
+
+> (Added Mark Brown in Cc)
 > 
-> This is second time I submit this patch because there are complains about Leo 
-> Chen's email is not valid and reachable.
+> Looks ok to me but there are some comments.
 > 
-> I am Jiandong Zheng working on BCMRING in Broadcom Canada Ltd. I am replacing 
-> Leo Chen (leochen at broadcom.com) as " ARM/BCMRING ARM ARCHITECTURE" and "
-> ARM/BCMRING MTD NAND DRIVER" maintainer from Broadcom as he is no longer the 
-> maintainer of these components.
+> Firstly, how about to separate this to regarding S3C24XX(mach-s3c24xx and
+> plat-s3c24xx), S5P(mach-s5pxxxx and plat-s5p) and plat-samsung?
+> (Actually, already applied S3C64XX changes so that we can drop that in your
+> patch.)
 > 
-> Here is the patch to MAINTAINERS file in linux 2.6.36 about this change.
+> As you know, I already applied some changes which is from Mark Brown in my
+> tree.
+> You can find that in
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> #for-next
 > 
-> Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
-> 
-> Subject: [PATCH] Change bcmring Maintainer list.
+> So could you please re-work this based on that?
 
-I've commited this manually, to fix up the text of the commit message:
+I've reworked the patch I had in my tree on top of your git tree
+(latest commit "Merge branch 'next-s5p64x0' into for-next"), and came
+up with the three attached patches.  I've incorporated the whitespace
+changes you requested, and changed the struct irq_data * variable
+names from 'd' to 'data' to match Mark's earlier patches.
 
-    Change bcmring Maintainer list.
+Caveat emptor -- uncompiled, and totally untested.
 
-    I am Jiandong Zheng working on BCMRING in Broadcom Canada Ltd. I am
-    replacing Leo Chen (leochen at broadcom.com) as "ARM/BCMRING ARM
-    ARCHITECTURE" and "ARM/BCMRING MTD NAND DRIVER" maintainer from
-    Broadcom as he is no longer the maintainer of these components.
+How's this look?
 
-    Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
-    Acked-by: Scott Branden <sbranden@broadcom.com>
+Feel free to merge this via your tree -- I'll drop the Samsung patch
+from my tree then.
 
-A few notes for future:
 
-1. don't overflow more than 72 characters, unless you're quoting kernel
-   messages.
-2. The patch summary should be in the email subject, so 'git am' can
-   safely parse it.
-3. sign-offs should be the last thing before the "---" line before the
-   diffstat.
-4. commentry about how many times a patch has been sent, and that this
-   is a patch should go after the "---" line.
+thanks,
+Lennert
