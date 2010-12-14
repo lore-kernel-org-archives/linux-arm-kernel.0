@@ -1,126 +1,38 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 13 Dec 2010 19:17:52 -0800
-Subject: [PATCH 6/6] omap2+: Initialize serial ports for wake-up events
-	for n8x0
-In-Reply-To: <20101203004531.31687.55661.stgit@baageli.muru.com> (Tony
-	Lindgren's message of "Thu, 02 Dec 2010 16:45:31 -0800")
-References: <20101203004040.31687.9476.stgit@baageli.muru.com>
-	<20101203004531.31687.55661.stgit@baageli.muru.com>
-Message-ID: <87y67t11r3.fsf@deeprootsystems.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 14 Dec 2010 12:49:20 +0900
+Subject: [PATCH] ARM: mach-shmobile: SCIF port for earlyprintk when using zboot
+Message-ID: <1292298560-31329-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Initialise the SCIF serial port to allow earlyprintk
+output when using zboot.
 
-> Use omap_serial_init_port so we can let the serial code handle the
-> remuxing of the RX pads.
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+This patch requires the following patches which are going through
+Russell King's tree.
 
-Does this work for UART wakeups on n810?  I don't see any 'idle' value
-for the pads, so I'm guessing it wont work without those, right?  Or am
-I missing something here.
+* ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
+* ARM: 6515/1: Add zboot support for SuperH Mobile ARM
 
-Kevin
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ .../arm/mach-shmobile/include/mach/head-ap4evb.txt |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-> ---
->  arch/arm/mach-omap2/board-n8x0.c |   66 ++++++++++++++++++++++++++++++++++++--
->  1 files changed, 63 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-> index d022301..e3429b4 100644
-> --- a/arch/arm/mach-omap2/board-n8x0.c
-> +++ b/arch/arm/mach-omap2/board-n8x0.c
-> @@ -29,6 +29,7 @@
->  
->  #include <plat/board.h>
->  #include <plat/common.h>
-> +#include <plat/omap_device.h>
->  #include <plat/menelaus.h>
->  #include <mach/irqs.h>
->  #include <plat/mcspi.h>
-> @@ -754,8 +755,68 @@ static struct omap_board_mux board_mux[] __initdata = {
->  	OMAP2420_MUX(EAC_AC_DOUT, OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT),
->  	{ .reg_offset = OMAP_MUX_TERMINATOR },
->  };
-> +
-> +static struct omap_device_pad serial0_pads[] __initdata = {
-> +	{ .name	= "uart1_rx.uart1_rx", .enable	= OMAP_MUX_MODE0 },
-> +	{ .name	= "uart1_tx.uart1_tx", .enable	= OMAP_MUX_MODE0 },
-> +};
-> +
-> +static struct omap_device_pad n800_serial1_pads[] __initdata = {
-> +	{ .name	= "uart2_rx.uart2_rx", .enable	= OMAP_MUX_MODE7, },
-> +	{
-> +		.name	= "uart2_tx.uart2_tx",
-> +		.enable	= OMAP_PULL_ENA | OMAP_MUX_MODE7,
-> +	},
-> +};
-> +
-> +static struct omap_device_pad n810_serial1_pads[] __initdata = {
-> +	{ .name	= "uart2_rx.uart2_rx", .enable	= OMAP_MUX_MODE0, },
-> +	{ .name	= "uart2_tx.uart2_tx", .enable	= OMAP_MUX_MODE0, },
-> +};
-> +
-> +static struct omap_device_pad serial2_pads[] __initdata = {
-> +	{
-> +		.name	= "uart3_rx_irrx.uart3_rx_irrx",
-> +		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> +		.enable	= OMAP_MUX_MODE0,
-> +		.idle	= OMAP_MUX_MODE3	/* Mux as GPIO for idle */
-> +	},
-> +	{ .name	= "uart3_tx_irtx.uart3_tx_irtx", .enable = OMAP_MUX_MODE0, },
-> +};
-> +
-> +static struct omap_device_board_data serial0_data = {
-> +	.id		= 0,
-> +	.pads		= serial0_pads,
-> +	.pads_cnt	= ARRAY_SIZE(serial0_pads),
-> +};
-> +
-> +static struct omap_device_board_data serial1_data = {
-> +	.id		= 1,
-> +};
-> +
-> +static struct omap_device_board_data serial2_data = {
-> +	.id		= 2,
-> +	.pads		= serial2_pads,
-> +	.pads_cnt	= ARRAY_SIZE(serial2_pads),
-> +};
-> +
-> +static inline void board_serial_init(int is_n800)
-> +{
-> +	if (is_n800) {
-> +		serial1_data.pads = n800_serial1_pads;
-> +		serial1_data.pads_cnt = ARRAY_SIZE(n800_serial1_pads);
-> +	} else {
-> +		serial1_data.pads = n810_serial1_pads;
-> +		serial1_data.pads_cnt = ARRAY_SIZE(n810_serial1_pads);
-> +	}
-> +	omap_serial_init_port(&serial0_data);
-> +	omap_serial_init_port(&serial1_data);
-> +	omap_serial_init_port(&serial2_data);
-> +}
->  #else
-> -#define board_mux	NULL
-> +static inline void board_serial_init(void)
-> +	omap_serial_init();
-> +}
->  #endif
->  
->  static void __init n8x0_init_machine(void)
-> @@ -772,8 +833,7 @@ static void __init n8x0_init_machine(void)
->  	if (machine_is_nokia_n810())
->  		i2c_register_board_info(2, n810_i2c_board_info_2,
->  					ARRAY_SIZE(n810_i2c_board_info_2));
-> -
-> -	omap_serial_init();
-> +	board_serial_init(machine_is_nokia_n800());
->  	n8x0_onenand_init();
->  	n8x0_mmc_init();
->  	n8x0_usb_init();
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-shmobile/include/mach/head-ap4evb.txt b/arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
+index e3ebfa7..efd3687 100644
+--- a/arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
++++ b/arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
+@@ -85,3 +85,10 @@ ED 0xE6150004, 0x80331050
+ WAIT 1, 0xFE40009C
+ 
+ ED 0xE6150354, 0x00000002
++
++LIST "SCIF0 - Serial port for earlyprintk"
++EB 0xE6053098, 0x11
++EB 0xE6053098, 0xe1
++EW 0xE6C40000, 0x0000
++EB 0xE6C40004, 0x19
++EW 0xE6C40008, 0x3000
+-- 
+1.7.2.3
