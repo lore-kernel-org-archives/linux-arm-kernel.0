@@ -1,118 +1,27 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Tue, 14 Dec 2010 16:08:27 +0100
-Subject: [PATCH 2/2] ARM: Gemini: add platform support for Gemini RTC
-In-Reply-To: <1292339307-14336-1-git-send-email-ulli.kroll@googlemail.com>
-References: <1292339307-14336-1-git-send-email-ulli.kroll@googlemail.com>
-Message-ID: <1292339307-14336-3-git-send-email-ulli.kroll@googlemail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Tue, 14 Dec 2010 17:10:54 +0200
+Subject: [PATCH 0/4] omap: iovmm - fixes for iovmm module
+In-Reply-To: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
+References: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
+Message-ID: <AANLkTim3i+nAV+isLy+rVZ9gtkeW408G_6BhJAbLJZTL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adds rtc support for all Gemini SoC boards
-nas4220b, rut1xx, wbd111, wbd222
+On Tue, Dec 14, 2010 at 3:07 PM, Fernando Guzman Lugo
+<fernando.lugo@ti.com> wrote:
 
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
----
- arch/arm/mach-gemini/board-nas4220b.c |    1 +
- arch/arm/mach-gemini/board-rut1xx.c   |    1 +
- arch/arm/mach-gemini/board-wbd111.c   |    1 +
- arch/arm/mach-gemini/board-wbd222.c   |    1 +
- arch/arm/mach-gemini/common.h         |    1 +
- arch/arm/mach-gemini/devices.c        |   26 ++++++++++++++++++++++++++
- 6 files changed, 31 insertions(+), 0 deletions(-)
+You are missing a description here.
 
-diff --git a/arch/arm/mach-gemini/board-nas4220b.c b/arch/arm/mach-gemini/board-nas4220b.c
-index 2ba096d..0cf7a07 100644
---- a/arch/arm/mach-gemini/board-nas4220b.c
-+++ b/arch/arm/mach-gemini/board-nas4220b.c
-@@ -98,6 +98,7 @@ static void __init ib4220b_init(void)
- 	platform_register_pflash(SZ_16M, NULL, 0);
- 	platform_device_register(&ib4220b_led_device);
- 	platform_device_register(&ib4220b_key_device);
-+	platform_register_rtc();
- }
- 
- MACHINE_START(NAS4220B, "Raidsonic NAS IB-4220-B")
-diff --git a/arch/arm/mach-gemini/board-rut1xx.c b/arch/arm/mach-gemini/board-rut1xx.c
-index a9a0d8b..4fa09af 100644
---- a/arch/arm/mach-gemini/board-rut1xx.c
-+++ b/arch/arm/mach-gemini/board-rut1xx.c
-@@ -82,6 +82,7 @@ static void __init rut1xx_init(void)
- 	platform_register_pflash(SZ_8M, NULL, 0);
- 	platform_device_register(&rut1xx_leds);
- 	platform_device_register(&rut1xx_keys_device);
-+	platform_register_rtc();
- }
- 
- MACHINE_START(RUT100, "Teltonika RUT100")
-diff --git a/arch/arm/mach-gemini/board-wbd111.c b/arch/arm/mach-gemini/board-wbd111.c
-index 8b88d50..af7b68a 100644
---- a/arch/arm/mach-gemini/board-wbd111.c
-+++ b/arch/arm/mach-gemini/board-wbd111.c
-@@ -130,6 +130,7 @@ static void __init wbd111_init(void)
- 				 wbd111_num_partitions);
- 	platform_device_register(&wbd111_leds_device);
- 	platform_device_register(&wbd111_keys_device);
-+	platform_register_rtc();
- }
- 
- MACHINE_START(WBD111, "Wiliboard WBD-111")
-diff --git a/arch/arm/mach-gemini/board-wbd222.c b/arch/arm/mach-gemini/board-wbd222.c
-index 1eebcec..99e5bbe 100644
---- a/arch/arm/mach-gemini/board-wbd222.c
-+++ b/arch/arm/mach-gemini/board-wbd222.c
-@@ -130,6 +130,7 @@ static void __init wbd222_init(void)
- 		wbd222_num_partitions);
- 	platform_device_register(&wbd222_leds_device);
- 	platform_device_register(&wbd222_keys_device);
-+	platform_register_rtc();
- }
- 
- MACHINE_START(WBD222, "Wiliboard WBD-222")
-diff --git a/arch/arm/mach-gemini/common.h b/arch/arm/mach-gemini/common.h
-index 9392834..7670c39 100644
---- a/arch/arm/mach-gemini/common.h
-+++ b/arch/arm/mach-gemini/common.h
-@@ -18,6 +18,7 @@ extern void gemini_map_io(void);
- extern void gemini_init_irq(void);
- extern void gemini_timer_init(void);
- extern void gemini_gpio_init(void);
-+extern void platform_register_rtc(void);
- 
- /* Common platform devices registration functions */
- extern int platform_register_uart(void);
-diff --git a/arch/arm/mach-gemini/devices.c b/arch/arm/mach-gemini/devices.c
-index 6b52525..5cff298 100644
---- a/arch/arm/mach-gemini/devices.c
-+++ b/arch/arm/mach-gemini/devices.c
-@@ -90,3 +90,29 @@ int platform_register_pflash(unsigned int size, struct mtd_partition *parts,
- 
- 	return platform_device_register(&pflash_device);
- }
-+
-+static struct resource gemini_rtc_resources[] = {
-+	[0] = {
-+		.start  = GEMINI_RTC_BASE,
-+		.end    = GEMINI_RTC_BASE + 0x24,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = IRQ_RTC,
-+		.end    = IRQ_RTC,
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device gemini_rtc_device = {
-+	.name		= "rtc-gemini",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(gemini_rtc_resources),
-+	.resource	= gemini_rtc_resources,
-+};
-+
-+int __init platform_register_rtc(void)
-+{
-+	return platform_device_register(&gemini_rtc_device);
-+}
-+
+> Version 6:
+> * Rebase on Russell King branch.
+> ?- for details see:
+> ?http://marc.info/?l=linux-omap&m=129228495723001&w=2
+
+Even if these patches are applied, iommu would still not be usable
+form tidspbridge, you need at least this patch:
+http://article.gmane.org/gmane.linux.ports.arm.omap/44753
+
+Cheers.
+
 -- 
-1.7.3.2
+Felipe Contreras
