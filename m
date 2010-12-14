@@ -1,24 +1,40 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 14 Dec 2010 19:05:05 +0100
-Subject: [PATCH] ARM: pxa: PXA_ESERIES depends on FB_W100.
-Message-ID: <20101214180505.GL15575@mail.wantstofly.org>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Tue, 14 Dec 2010 12:09:18 -0600
+Subject: [PATCH 0/4] omap: iovmm - fixes for iovmm module
+In-Reply-To: <AANLkTim3i+nAV+isLy+rVZ9gtkeW408G_6BhJAbLJZTL@mail.gmail.com>
+References: <1292332047-8206-1-git-send-email-fernando.lugo@ti.com>
+	<AANLkTim3i+nAV+isLy+rVZ9gtkeW408G_6BhJAbLJZTL@mail.gmail.com>
+Message-ID: <AANLkTimT99yQ3yShp4OgxEM5MJZHdS9x+BByH-=w9UHC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As arch/arm/mach-pxa/eseries.c references w100fb_gpio_{read,write}()
-directly.
+On Tue, Dec 14, 2010 at 9:10 AM, Felipe Contreras
+<felipe.contreras@gmail.com> wrote:
+> On Tue, Dec 14, 2010 at 3:07 PM, Fernando Guzman Lugo
+> <fernando.lugo@ti.com> wrote:
+>
+> You are missing a description here.
 
-Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
+Yes, I forget the description but it is pretty much the same than the subject.
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index dd235ec..c93e73d 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -540,6 +540,7 @@ config MACH_ICONTROL
- config ARCH_PXA_ESERIES
- 	bool "PXA based Toshiba e-series PDAs"
- 	select PXA25x
-+	select FB_W100
- 
- config MACH_E330
- 	bool "Toshiba e330"
+>
+>> Version 6:
+>> * Rebase on Russell King branch.
+>> ?- for details see:
+>> ?http://marc.info/?l=linux-omap&m=129228495723001&w=2
+>
+> Even if these patches are applied, iommu would still not be usable
+> form tidspbridge, you need at least this patch:
+> http://article.gmane.org/gmane.linux.ports.arm.omap/44753
+
+I think Hari can take that patch too.
+
+Regards,
+Fernando.
+
+>
+> Cheers.
+>
+> --
+> Felipe Contreras
+>
