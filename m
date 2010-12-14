@@ -1,82 +1,57 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 13 Dec 2010 23:34:54 -0700
-Subject: [PATCH 11/12] OMAP2/3: SRAM: add comment about crashes during a TLB
-	miss
+Date: Mon, 13 Dec 2010 23:34:55 -0700
+Subject: [PATCH 12/12] OMAP1: clock_data: use runtime cpu / machine checks
 In-Reply-To: <20101214063308.21555.76050.stgit@twilight.localdomain>
 References: <20101214063308.21555.76050.stgit@twilight.localdomain>
-Message-ID: <20101214063453.21555.15306.stgit@twilight.localdomain>
+Message-ID: <20101214063454.21555.37831.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some users were observing crashes during the execution of CORE DVFS
-code from OCM RAM -- a locally-modified copy of the linux-omap code.
-Richard Woodruff tracked this down to a DTLB miss which had been
-inadvertently and intermittently caused by the local modifications.
-(The TLB miss caused the ARM MMU to attempt to walk the page tables
-stored in SDRAM, which was not possible since SDRAM is off-line for a
-portion of the CORE DVFS OCM RAM code.)
+From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Add a note to the OMAP2 & OMAP3 CORE DVFS SRAM code to warn others that
-changes may result in crashes here if they are not carefully tested.
+Otherwise multi-omap1 configurations may set wrong clock speed.
 
+Created and tested against l-o master on Amstrad Delta.
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
-Cc: Jon Hunter <jon-hunter@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/sram242x.S |    6 ++++++
- arch/arm/mach-omap2/sram243x.S |    6 ++++++
- arch/arm/mach-omap2/sram34xx.S |    6 ++++++
- 3 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap1/clock_data.c |   17 ++++++++---------
+ 1 files changed, 8 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/sram242x.S b/arch/arm/mach-omap2/sram242x.S
-index 92e6e1a..6d88cee 100644
---- a/arch/arm/mach-omap2/sram242x.S
-+++ b/arch/arm/mach-omap2/sram242x.S
-@@ -21,6 +21,12 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-  * MA 02111-1307 USA
-+ *
-+ * Richard Woodruff notes that any changes to this code must be carefully
-+ * audited and tested to ensure that they don't cause a TLB miss while
-+ * the SDRAM is inaccessible.  Such a situation will crash the system
-+ * since it will cause the ARM MMU to attempt to walk the page tables.
-+ * These crashes may be intermittent.
-  */
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-diff --git a/arch/arm/mach-omap2/sram243x.S b/arch/arm/mach-omap2/sram243x.S
-index ab49736..2f104a6 100644
---- a/arch/arm/mach-omap2/sram243x.S
-+++ b/arch/arm/mach-omap2/sram243x.S
-@@ -21,6 +21,12 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-  * MA 02111-1307 USA
-+ *
-+ * Richard Woodruff notes that any changes to this code must be carefully
-+ * audited and tested to ensure that they don't cause a TLB miss while
-+ * the SDRAM is inaccessible.  Such a situation will crash the system
-+ * since it will cause the ARM MMU to attempt to walk the page tables.
-+ * These crashes may be intermittent.
-  */
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
-index 3637274..43f67f5 100644
---- a/arch/arm/mach-omap2/sram34xx.S
-+++ b/arch/arm/mach-omap2/sram34xx.S
-@@ -104,6 +104,12 @@
-  * touching the SDRAM.  Until that time, users who know that their use case
-  * can satisfy the above requirement can enable the CONFIG_OMAP3_SDRC_AC_TIMING
-  * option.
-+ *
-+ * Richard Woodruff notes that any changes to this code must be carefully
-+ * audited and tested to ensure that they don't cause a TLB miss while
-+ * the SDRAM is inaccessible.  Such a situation will crash the system
-+ * since it will cause the ARM MMU to attempt to walk the page tables.
-+ * These crashes may be intermittent.
-  */
- ENTRY(omap3_sram_configure_core_dpll)
- 	stmfd	sp!, {r1-r12, lr}	@ store regs to stack
+diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
+index 423d21d..c7c2a52 100644
+--- a/arch/arm/mach-omap1/clock_data.c
++++ b/arch/arm/mach-omap1/clock_data.c
+@@ -823,12 +823,10 @@ int __init omap1_clk_init(void)
+ 			crystal_type = info->system_clock_type;
+ 	}
+ 
+-#if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+-	ck_ref.rate = 13000000;
+-#elif defined(CONFIG_ARCH_OMAP16XX)
+-	if (crystal_type == 2)
++	if (cpu_is_omap7xx())
++		ck_ref.rate = 13000000;
++	if (cpu_is_omap16xx() && crystal_type == 2)
+ 		ck_ref.rate = 19200000;
+-#endif
+ 
+ 	pr_info("Clocks: ARM_SYSST: 0x%04x DPLL_CTL: 0x%04x ARM_CKCTL: "
+ 		"0x%04x\n", omap_readw(ARM_SYSST), omap_readw(DPLL_CTL),
+@@ -883,10 +881,11 @@ int __init omap1_clk_init(void)
+ 	       ck_dpll1.rate / 1000000, (ck_dpll1.rate / 100000) % 10,
+ 	       arm_ck.rate / 1000000, (arm_ck.rate / 100000) % 10);
+ 
+-#if defined(CONFIG_MACH_OMAP_PERSEUS2) || defined(CONFIG_MACH_OMAP_FSAMPLE)
+-	/* Select slicer output as OMAP input clock */
+-	omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1, OMAP7XX_PCC_UPLD_CTRL);
+-#endif
++	if (machine_is_omap_perseus2() || machine_is_omap_fsample()) {
++		/* Select slicer output as OMAP input clock */
++		omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1,
++				OMAP7XX_PCC_UPLD_CTRL);
++	}
+ 
+ 	/* Amstrad Delta wants BCLK high when inactive */
+ 	if (machine_is_ams_delta())
