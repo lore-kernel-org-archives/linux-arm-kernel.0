@@ -1,38 +1,121 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 14 Dec 2010 21:16:37 +0100
-Subject: [PATCH 05/12] OMAP4: PRCM: Add SCRM header file
-In-Reply-To: <alpine.DEB.2.00.1012141105570.15971@utopia.booyaka.com>
-References: <20101214063308.21555.76050.stgit@twilight.localdomain>
-	<20101214063447.21555.64470.stgit@twilight.localdomain>
-	<4D07782E.5050000@ti.com>
-	<alpine.DEB.2.00.1012141105570.15971@utopia.booyaka.com>
-Message-ID: <4D07D0A5.9040703@ti.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 14 Dec 2010 21:09:40 +0100
+Subject: [PATCH v2] MTD: NAND: ams-delta: convert to platform driver
+In-Reply-To: <1292346023.2538.103.camel@localhost>
+References: <201012111840.05270.jkrzyszt@tis.icnet.pl>
+	<1292346023.2538.103.camel@localhost>
+Message-ID: <201012142109.42784.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2010 7:13 PM, Paul Walmsley wrote:
-> On Tue, 14 Dec 2010, Cousson, Benoit wrote:
->
->> This patch will conflict with your power prcm series, because you are creating
->> an empty scrm44xx.h in it.
->>
->> So I did rebased this series on top on your prcm to fix that.
->>
->> Don't you want to use the already rebased version instead?
->
-> I would rather have patches and branches based on mainline commits where
-> possible.  If a series has some explicit dependency on a non-mainline
-> patch or branch then I'd like to know about it in the messages if
-> possible.
+In its current form, the driver may interfere with different hardware on 
+different boards if built into the kernel, hence is not suitable for 
+inclusion into a defconfig, inteded to be usable with multiple OMAP1 cpu and 
+machine types.
 
-Well, I sent this series before you sent your prcm one, so at the time 
-the dependency didn't exist ;-)
+Convert it to a platform driver, that should be free from this issue.
 
-> As far as the empty scrm44xx.h goes, I will probably go back and rebuild
-> that branch with your patch that creates SCRM from my patch set inserted
-> earlier, so I can drop the part of my patch that creates the empty file.
+Created and tested against linux-2.6.37-rc5 on Amstrad Delta.
 
-OK good for me.
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+Tuesday 14 December 2010 18:00:23 Artem Bityutskiy wrote:
+> Sorry, but would it please be possible to split this few small patches -
+> this one is too difficult to review, at least for me.
 
-Thanks,
-Benoit
+v1 -> v2 changes:
+- remove any changes that were not essential for actually converting the 
+  driver to a platform driver and modifying its user, ie. the Amstrad Delta 
+  board, to register a corresponding platform device on startup,
+- re-word the commit message a little bit.
+
+ arch/arm/mach-omap1/board-ams-delta.c |    6 ++++++
+ drivers/mtd/nand/ams-delta.c          |   31 ++++++++++++++++++++++++++-----
+ 2 files changed, 32 insertions(+), 5 deletions(-)
+
+--- linux-2.6.37-rc5/drivers/mtd/nand/ams-delta.c.orig	2010-12-14 20:25:58.000000000 +0100
++++ linux-2.6.37-rc5/drivers/mtd/nand/ams-delta.c	2010-12-14 20:26:40.000000000 +0100
+@@ -4,6 +4,7 @@
+  *  Copyright (C) 2006 Jonathan McDowell <noodles@earth.li>
+  *
+  *  Derived from drivers/mtd/toto.c
++ *  Converted to platform driver by Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -151,7 +152,7 @@ static int ams_delta_nand_ready(struct m
+ /*
+  * Main initialization routine
+  */
+-static int __init ams_delta_init(void)
++static int __devinit ams_delta_init(struct platform_device *pdev)
+ {
+ 	struct nand_chip *this;
+ 	int err = 0;
+@@ -219,20 +222,40 @@ static int __init ams_delta_init(void)
+ 	return err;
+ }
+ 
+-module_init(ams_delta_init);
+-
+ /*
+  * Clean up routine
+  */
+-static void __exit ams_delta_cleanup(void)
++static int __devexit ams_delta_cleanup(struct platform_device *pdev)
+ {
+ 	/* Release resources, unregister device */
+ 	nand_release(ams_delta_mtd);
+ 
+ 	/* Free the MTD device structure */
+ 	kfree(ams_delta_mtd);
++
++	return 0;
++}
++
++static struct platform_driver ams_delta_nand_driver = {
++	.probe		= ams_delta_init,
++	.remove		= __devexit_p(ams_delta_cleanup),
++	.driver		= {
++		.name	= "ams-delta-nand",
++		.owner	= THIS_MODULE,
++	},
++};
++
++static int __init ams_delta_nand_init(void)
++{
++	return platform_driver_register(&ams_delta_nand_driver);
++}
++module_init(ams_delta_nand_init);
++
++static void __exit ams_delta_nand_exit(void)
++{
++	platform_driver_unregister(&ams_delta_nand_driver);
+ }
+-module_exit(ams_delta_cleanup);
++module_exit(ams_delta_nand_exit);
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Jonathan McDowell <noodles@earth.li>");
+--- linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c.orig	2010-12-09 23:13:04.000000000 +0100
++++ linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c	2010-12-14 20:26:40.000000000 +0100
+@@ -181,6 +181,11 @@ static struct omap_board_config_kernel a
+ 	{ OMAP_TAG_LCD,		&ams_delta_lcd_config },
+ };
+ 
++static struct platform_device ams_delta_nand_device = {
++	.name	= "ams-delta-nand",
++	.id	= -1
++};
++
+ static struct resource ams_delta_kp_resources[] = {
+ 	[0] = {
+ 		.start	= INT_KEYBOARD,
+@@ -273,6 +278,7 @@ void __init amsdelta_reserve(void)
+ }
+ 
+ static struct platform_device *ams_delta_devices[] __initdata = {
++	&ams_delta_nand_device,
+ 	&ams_delta_kp_device,
+ 	&ams_delta_lcd_device,
+ 	&ams_delta_led_device,
