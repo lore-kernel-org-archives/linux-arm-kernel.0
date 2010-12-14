@@ -1,16 +1,21 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 14 Dec 2010 11:38:11 +0000
-Subject: [PATCH 3/3] regulator: support PMIC mc13892
-In-Reply-To: <1292306455-26752-4-git-send-email-yong.shen@freescale.com>
-References: <1292306455-26752-1-git-send-email-yong.shen@freescale.com>
-	<1292306455-26752-4-git-send-email-yong.shen@freescale.com>
-Message-ID: <20101214113810.GA13649@rakim.wolfsonmicro.main>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 14 Dec 2010 13:05:16 +0100
+Subject: [PATCH] dmaengine: at_hdmac: fix buffer transfer size
+	specification
+In-Reply-To: <1292244521-20756-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1292244521-20756-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20101214120516.GN19897@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 02:00:55PM +0800, yong.shen at freescale.com wrote:
-> From: Yong Shen <yong.shen@linaro.org>
+On 13:48 Mon 13 Dec     , Nicolas Ferre wrote:
+> Buffer transfer size is the number of transfers to be performed in
+> relation with the width of the _source_ interface.
+> So in the DMA_FROM_DEVICE case, it should be the register width that
+> should be taken into account.
 > 
-> add support for mc13892, tested on mx51 babbage board
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Best Regards,
+J.
