@@ -1,22 +1,31 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Tue, 14 Dec 2010 10:11:52 -0800
-Subject: [PATCH 0/5] ARM: GIC: cleanup
-In-Reply-To: <20101213173129.GB11730@n2100.arm.linux.org.uk>
-References: <20101205113311.GC9138@n2100.arm.linux.org.uk>	<4D065691.9010802@codeaurora.org>
-	<20101213173129.GB11730@n2100.arm.linux.org.uk>
-Message-ID: <4D07B368.7040005@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 14 Dec 2010 11:13:22 -0700 (MST)
+Subject: [PATCH 05/12] OMAP4: PRCM: Add SCRM header file
+In-Reply-To: <4D07782E.5050000@ti.com>
+References: <20101214063308.21555.76050.stgit@twilight.localdomain>
+	<20101214063447.21555.64470.stgit@twilight.localdomain>
+	<4D07782E.5050000@ti.com>
+Message-ID: <alpine.DEB.2.00.1012141105570.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Mon, Dec 13, 2010 at 09:23:29AM -0800, Abhijeet Dharmapurikar wrote:
->> Sorry for being late on testing this out. The patch series and works on  
->> the msm 8660.
->>
->> Acked-By: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+On Tue, 14 Dec 2010, Cousson, Benoit wrote:
+
+> This patch will conflict with your power prcm series, because you are creating
+> an empty scrm44xx.h in it.
 > 
-> Would you prefer a Tested-by: ?
+> So I did rebased this series on top on your prcm to fix that.
+> 
+> Don't you want to use the already rebased version instead?
 
-Yes, Tested-by is more appropriate.
+I would rather have patches and branches based on mainline commits where 
+possible.  If a series has some explicit dependency on a non-mainline 
+patch or branch then I'd like to know about it in the messages if 
+possible.
 
-Tested-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+As far as the empty scrm44xx.h goes, I will probably go back and rebuild 
+that branch with your patch that creates SCRM from my patch set inserted 
+earlier, so I can drop the part of my patch that creates the empty file.
+
+
+- Paul
