@@ -1,11 +1,11 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 14 Dec 2010 11:51:52 -0800
-Subject: [PATCH 1/5] OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
-In-Reply-To: <1292276969-29733-2-git-send-email-b-cousson@ti.com> (Benoit
-	Cousson's message of "Mon, 13 Dec 2010 22:49:25 +0100")
+Date: Tue, 14 Dec 2010 11:52:50 -0800
+Subject: [PATCH 2/5] OMAP4: PM: Do not assume clkdm supports hw transitions
+In-Reply-To: <1292276969-29733-3-git-send-email-b-cousson@ti.com> (Benoit
+	Cousson's message of "Mon, 13 Dec 2010 22:49:26 +0100")
 References: <1292276969-29733-1-git-send-email-b-cousson@ti.com>
-	<1292276969-29733-2-git-send-email-b-cousson@ti.com>
-Message-ID: <87zks8rv3b.fsf@deeprootsystems.com>
+	<1292276969-29733-3-git-send-email-b-cousson@ti.com>
+Message-ID: <87r5dkrv1p.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,55 +13,43 @@ Benoit Cousson <b-cousson@ti.com> writes:
 
 > From: Rajendra Nayak <rnayak@ti.com>
 >
-> For pwrdm's which support lowperstatechange, do not try waking
-> up the domain to put it back to deeper sleep state.
+> omap_set_pwrdm_state today assumes a clkdm supports hw_auto
+> transitions and hence leaves some which do not support this
+> in sw wkup state preventing low power transitions.
 >
 > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > Acked-by: Benoit Cousson <b-cousson@ti.com>
 
-Re: $SUBJECT, the rather than using the cryptic lowpwrstchange name from the 
-pwrdm API, just use the more readable "low-power state change"
-
-Also, readability/flow, I have some questions/comments...
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 
 > ---
->  arch/arm/mach-omap2/pm.c |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
+>  arch/arm/mach-omap2/pm.c |    8 +++++---
+>  1 files changed, 5 insertions(+), 3 deletions(-)
 >
 > diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index cf1c4c9..dc68044 100644
+> index dc68044..a2a70e1 100644
 > --- a/arch/arm/mach-omap2/pm.c
 > +++ b/arch/arm/mach-omap2/pm.c
-> @@ -114,6 +114,14 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
->  		return ret;
+> @@ -91,8 +91,7 @@ static void omap2_init_processor_devices(void)
 >  
->  	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
-> +		if ((pwrdm_read_pwrst(pwrdm) > state) &&
-> +			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
-> +				ret = pwrdm_set_next_pwrst(pwrdm, state);
-> +				pwrdm_set_lowpwrstchange(pwrdm);
-> +				pwrdm_wait_transition(pwrdm);
-> +				pwrdm_state_switch(pwrdm);
-> +				return ret;
-
-Personally, I'd prefer if this function flowed through better instead of
-the early return in order to emphasize the common code.
-
-Rather than the return here, can you just set the low-power state change
-bit here (and put the clkdm_wakeup + sleep_switch = 1 into the else
-clause?
-
-Or, does the next state have to be set before the low-power state change
-bit?
-
-Basically, what I'm getting at is this should be a single function with
-common flow.  The conditional code based on low-power state change
-should be isolated instead of having a special path.
-
-Kevin
-
-> +		}
->  		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
->  		sleep_switch = 1;
+>  /*
+>   * This sets pwrdm state (other than mpu & core. Currently only ON &
+> - * RET are supported. Function is assuming that clkdm doesn't have
+> - * hw_sup mode enabled.
+> + * RET are supported.
+>   */
+>  int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+>  {
+> @@ -135,7 +134,10 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+>  	}
+>  
+>  	if (sleep_switch) {
+> -		omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
+> +		if (pwrdm->pwrdm_clkdms[0]->flags & CLKDM_CAN_ENABLE_AUTO)
+> +			omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
+> +		else
+> +			omap2_clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
 >  		pwrdm_wait_transition(pwrdm);
+>  		pwrdm_state_switch(pwrdm);
+>  	}
