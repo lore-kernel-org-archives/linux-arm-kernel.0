@@ -1,56 +1,56 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 14 Dec 2010 20:40:28 +0200
-Subject: [PATCH v3 0/4] Introduce hardware spinlock framework
-In-Reply-To: <20101214170656.GA3832@kroah.com>
-References: <1291420247-18171-1-git-send-email-ohad@wizery.com>
-	<AANLkTin1fd=Kei7Fo6G+uR+270HdTkc71fvsA6qjBjcA@mail.gmail.com>
-	<20101214170656.GA3832@kroah.com>
-Message-ID: <AANLkTi=q=QMQ_Abxb8eUWT_qGG8K=pc892ZB-mqgt_mh@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Dec 2010 10:55:50 -0800
+Subject: Mainline OMAP3 breakage (and other OMAP?)
+In-Reply-To: <1292329431.6893.113.camel@tubuntu>
+References: <20101202211421.GG10461@n2100.arm.linux.org.uk>
+	<20101202215837.GW17222@atomide.com>
+	<20101202221612.GJ10461@n2100.arm.linux.org.uk>
+	<20101202223208.GA17222@atomide.com>
+	<20101203030954.GD3367@linux-sh.org>
+	<20101203084102.GA30957@n2100.arm.linux.org.uk>
+	<AANLkTim3573_MUZNpo2+tKa=ZJgQf26x5of_ZkMM6BR8@mail.gmail.com>
+	<20101203130724.GB30957@n2100.arm.linux.org.uk>
+	<1292329431.6893.113.camel@tubuntu>
+Message-ID: <20101214185550.GM3054@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 7:06 PM, Greg KH <greg@kroah.com> wrote:
->> Can you please have a look and say if this looks OK ?
->
-> Look at what, I don't see a patch here.
+* Tomi Valkeinen <tomi.valkeinen@nokia.com> [101214 04:23]:
+> >
+> > So please, 2MB, or if you object, at the _very_ _least_ 1MB.  But
+> > definitely not PAGE_SIZE.
 
-Here's the complete patchset:
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39833.html
-
-If you prefer, I can resubmit.
-
->
-> I've seen a lot of discussion about this, are all of the review comments
-> now addressed?
-
-Yes, all comments were addressed in this v3 iteration, and this thread
-has been idle for about 10 days.
-
-> ?Like the most important one, why is this generic code if
->  it's only for one specific platform?
-
-We started out with an omap-specific driver, but Tony preferred that we
-make this a platform-agnostic framework, in order to keep the IPC drivers that
-will use it generic, and assuming that more users will show up for
-such framework.
-
-To me it sounds reasonable, but both ways (framework / omap-specific
-driver) will work for us just fine, and I can switch back to a misc
-driver if this is preferred.
-
-The complete discussion of v1 is at:
-http://comments.gmane.org/gmane.linux.kernel/1049802
-
-We also discussed this at v2 of the patches with David, see the
-complete discussion at:
-http://comments.gmane.org/gmane.linux.kernel/1067016
-
-Thanks,
-Ohad.
-
->
-> thanks,
->
-> greg k-h
->
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
+> ---
+>  drivers/video/omap2/vram.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
+> index 2fd7e52..9441e2e 100644
+> --- a/drivers/video/omap2/vram.c
+> +++ b/drivers/video/omap2/vram.c
+> @@ -551,7 +551,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
+>  	if (!size)
+>  		return;
+>  
+> -	size = PAGE_ALIGN(size);
+> +	size = ALIGN(size, SZ_2M);
+>  
+>  	if (paddr) {
+>  		if (paddr & ~PAGE_MASK) {
+> @@ -576,7 +576,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
+>  			return;
+>  		}
+>  	} else {
+> -		paddr = memblock_alloc(size, PAGE_SIZE);
+> +		paddr = memblock_alloc(size, SZ_2M);
+>  	}
+>  
+>  	memblock_free(paddr, size);
+> -- 
+> 1.7.1
+> 
+> 
+> 
