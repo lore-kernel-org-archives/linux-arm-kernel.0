@@ -1,51 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 15 Dec 2010 08:39:35 -0700 (MST)
-Subject: [PATCH v1 3/9] OMAP2420: hwmod data: add system DMA]
-In-Reply-To: <20101215121558.GE11931@GLPP-machine>
-References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
-	<1291434246-30716-4-git-send-email-manjugk@ti.com>
-	<alpine.DEB.2.00.1012141922550.15971@utopia.booyaka.com>
-	<20101215110917.GD11931@GLPP-machine>
-	<20101215121558.GE11931@GLPP-machine>
-Message-ID: <alpine.DEB.2.00.1012150833530.15971@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Dec 2010 16:40:03 +0100
+Subject: [PATCH 1/9] ARM i.MX51: Add ipu clock support
+In-Reply-To: <1291902441-24712-2-git-send-email-s.hauer@pengutronix.de>
+References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
+	<1291902441-24712-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <201012151640.03789.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Dec 2010, G, Manjunath Kondaiah wrote:
+On Thursday 09 December 2010, Sascha Hauer wrote:
+> +static int clk_ipu_enable(struct clk *clk)
+> +{
+> +       u32 reg;
+> +
+> +       _clk_ccgr_enable(clk);
+> +
+> +       /* Enable handshake with IPU when certain clock rates are changed */
+> +       reg = __raw_readl(MXC_CCM_CCDR);
+> +       reg &= ~MXC_CCM_CCDR_IPU_HS_MASK;
+> +       __raw_writel(reg, MXC_CCM_CCDR);
+> +
+> +       /* Enable handshake with IPU when LPM is entered */
+> +       reg = __raw_readl(MXC_CCM_CLPCR);
+> +       reg &= ~MXC_CCM_CLPCR_BYPASS_IPU_LPM_HS;
+> +       __raw_writel(reg, MXC_CCM_CLPCR);
+> +
+> +       return 0;
+> +}
 
-> On Wed, Dec 15, 2010 at 04:39:17PM +0530, G, Manjunath Kondaiah wrote:
-> > On Tue, Dec 14, 2010 at 07:25:23PM -0700, Paul Walmsley wrote:
-> > > On Sat, 4 Dec 2010, G, Manjunath Kondaiah wrote:
-> > > 
-> > > > Add OMAP2420 DMA hwmod data and also add required
-> > > > DMA device attributes.
-> > > > 
-> > > > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> > > > Cc: Benoit Cousson <b-cousson@ti.com>
-> > > > Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> > > > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > > >
-> > > > +/* dma_system -> L3 */
-> > > > +static struct omap_hwmod_ocp_if omap2420_dma_system__l3 = {
-> > > > +	.master		= &omap2420_dma_system_hwmod,
-> > > > +	.slave		= &omap2420_l3_main_hwmod,
-> > > > +	.clk		= "l3_div_ck",
-> > > 
-> > > This clock does not exist on OMAP2420.  Did you test this patch on 2420?
-> > 
-> > ok. will be replaced with "sdma_ick". I don't have 2420 for testing. I
-> > tested it on 2430. My understanding is that, DMA clock interface is same
-> > for 2420 and 2430. Correct me if am wrong.
-> 
-> Looking into omap3/omap4 structures, this entry takes core l3 clock.
-> 
-> This should be "sdma_fck" since it's parent is core_l3_ck.
+Why __raw_readl?
 
-The OMAP2xxx SDMA data can use either sdma_fck or core_l3_ck for its 
-functional clock.  At some point we will probably remove sdma_fck from the 
-2xxx data.  That's a relic of the pre-clkdev days, so you might as well 
-just use core_l3_ck.  Maybe just stick with sdma_ick for the interface 
-clock for right now.
+The regular accessor function for I/O registers is readl, which handles
+the access correctly with regard to atomicity, I/O ordering and byteorder.
 
-
-- Paul
+	Arnd
