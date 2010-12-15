@@ -1,43 +1,36 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 15 Dec 2010 20:47:52 +0530
-Subject: [PATCH 1/5] OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
-In-Reply-To: <87zks8rv3b.fsf@deeprootsystems.com>
-References: <1292276969-29733-1-git-send-email-b-cousson@ti.com><1292276969-29733-2-git-send-email-b-cousson@ti.com>
-	<87zks8rv3b.fsf@deeprootsystems.com>
-Message-ID: <c454400af490d75c274f19a5d0a5a655@mail.gmail.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Wed, 15 Dec 2010 16:19:15 +0100
+Subject: [PATCH] i.MX51: Full iomux support
+In-Reply-To: <20101215151528.GD29833@pengutronix.de>
+References: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
+	<87y67rcdnf.fsf@lechat.rtp-net.org>
+	<20101215151528.GD29833@pengutronix.de>
+Message-ID: <19720.56435.675373.277522@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi,
 
-<snip>..
+Sascha Hauer writes:
+> On i.MX51 there are several pins which do not have a sel_input register
+> associated (I2C) and so setting the SION bit becomes mandatory. On the
+> other hand not all pins have a SION bit. I'm confused...
+> 
+sel_input has nothing to do with SION. sel_input is an additional
+multiplexer that can route one of different pads for a given internal
+function.
+SION (according to the spec) enables the input path of a pad no matter
+what function is chosen.
 
-> >  	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
-> > +		if ((pwrdm_read_pwrst(pwrdm) > state) &&
-> > +			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
-> > +				ret = pwrdm_set_next_pwrst(pwrdm, state);
-> > +				pwrdm_set_lowpwrstchange(pwrdm);
-> > +				pwrdm_wait_transition(pwrdm);
-> > +				pwrdm_state_switch(pwrdm);
-> > +				return ret;
->
-> Personally, I'd prefer if this function flowed through better instead of
-> the early return in order to emphasize the common code.
->
-> Rather than the return here, can you just set the low-power state change
-> bit here (and put the clkdm_wakeup + sleep_switch = 1 into the else
-> clause?
->
-> Or, does the next state have to be set before the low-power state change
-> bit?
 
-Yes, that sequencing is needed.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
->
-> Basically, what I'm getting at is this should be a single function with
-> common flow.  The conditional code based on low-power state change
-> should be isolated instead of having a special path.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-I get your point. See if the below approach looks better.
-If it looks fine, I'll do some more testing (currently only tested
-on OMAP4430sdp) and repost the 2 patches.
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
