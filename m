@@ -1,78 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Dec 2010 17:01:42 +0000
-Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
-In-Reply-To: <AANLkTi=ZYi=12k2vZMGp9AWNX8zofp6C-FnMu2egQOA1@mail.gmail.com>
-References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
-	<201012101159.21845.jkrzyszt@tis.icnet.pl>
-	<201012101203.09441.jkrzyszt@tis.icnet.pl>
-	<20101210170356.GA28472@n2100.arm.linux.org.uk>
-	<AANLkTimTVWVmVfppAWSosidqLmo6c+8rPhLg=oJAVoYH@mail.gmail.com>
-	<20101213162947.GA11730@n2100.arm.linux.org.uk>
-	<AANLkTi=ZYi=12k2vZMGp9AWNX8zofp6C-FnMu2egQOA1@mail.gmail.com>
-Message-ID: <20101215170142.GA10883@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 15 Dec 2010 18:06:36 +0100
+Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
+In-Reply-To: <201012151758.42896.arnd@arndb.de>
+References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+	<201012151722.21939.arnd@arndb.de>
+	<20101215164046.GH28971@pengutronix.de>
+	<201012151758.42896.arnd@arndb.de>
+Message-ID: <20101215170636.GJ28971@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 12:39:20PM +0000, Catalin Marinas wrote:
-> On 13 December 2010 16:29, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Dec 13, 2010 at 03:52:20PM +0000, Catalin Marinas wrote:
-> >> On 10 December 2010 17:03, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
-> >> >> ?void __init omap1_camera_init(void *info)
-> >> >> ?{
-> >> >> ? ? ? struct platform_device *dev = &omap1_camera_device;
-> >> >> + ? ? dma_addr_t paddr = omap1_camera_phys_mempool_base;
-> >> >> + ? ? dma_addr_t size = omap1_camera_phys_mempool_size;
-> >> >> ? ? ? int ret;
-> >> >>
-> >> >> ? ? ? dev->dev.platform_data = info;
-> >> >>
-> >> >> + ? ? if (paddr) {
-> >> >> + ? ? ? ? ? ? if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
-> >> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
-> >> >
-> >> > Although this works, you're ending up with SDRAM being mapped via
-> >> > ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
-> >> > mapped as if it were a device.
-> >>
-> >> BTW, does the generic dma_declare_coherent_memory() does the correct
-> >> thing in using ioremap()?
-> >
-> > I argue it doesn't, as I said above. ?It means we map SDRAM as device
-> > memory, and as I understand the way interconnects work, it's entirely
-> > possible that this may not result in the SDRAM being accessible.
-> [...]
-> > So, not only does this fail the kernel's own rules, but as we already know,
-> > it fails the architecture's restrictions with multiple mappings of memory
-> > when used with SDRAM, and it also maps main memory as a device. ?I wonder
-> > how many more things this broken API needs to do wrong before it's current
-> > implementation is consigned to the circular filing cabinet.
+Hello Arnd,
+
+On Wed, Dec 15, 2010 at 05:58:42PM +0100, Arnd Bergmann wrote:
+> On Wednesday 15 December 2010, Uwe Kleine-K?nig wrote:
+> > On Wed, Dec 15, 2010 at 05:22:21PM +0100, Arnd Bergmann wrote:
+> > > > +
+> > > > +#ifndef __ASSEMBLER__
+> > > > +static inline void __mxs_setl(u32 mask, void __iomem *reg)
+> > > > +{
+> > > > +	__raw_writel(mask, reg + MXS_SET_ADDR);
+> > > > +}
+> > > > +
+> > > > +static inline void __mxs_clrl(u32 mask, void __iomem *reg)
+> > > > +{
+> > > > +	__raw_writel(mask, reg + MXS_CLR_ADDR);
+> > > > +}
+> > > > +
+> > > > +static inline void __mxs_togl(u32 mask, void __iomem *reg)
+> > > > +{
+> > > > +	__raw_writel(mask, reg + MXS_TOG_ADDR);
+> > > > +}
+> > > > +#endif
+> > > 
+> > > Why __raw_writel()? All regular I/O accesses should use
+> > > readl/writel etc, not the internal helpers.
+> > nak, readl does little endian accesses, __raw_readl native endian.  So
+> > for platform use __raw_readl is most of the time the better one.
 > 
-> Should we not try to fix the generic code and still allow platforms to
-> use dma_declare_coherent_memory() in a safer way? I guess it may need
-> some arguing/explanation on linux-arch.
+> Then we should define a proper function for this with well-defined
+> behaviour. I would suggest defining a mxs_readl/mxs_writel here,
+> that is defined to have the same endianess as the mxs SOC, but
+> otherwise has the same properties as readl/writel.
+I don't get your point here.  What are the properties of readl/writel
+you want here?  The barrier?  __mem_pci?
 
-I think so - one of the issues with dma_declare_coherent_memory() is that
-it's original intention (as I understand it) was to allow drivers to use
-on-device dma coherent memory.
+For me __mxs_setl is a proper function with well-defined behaviour, no?
+(One thing I currently consider to argue is to make these .c file local
+because different IPs might have different offsets for SET, CLR and TOG
+or not support it at all, but other than that I'm happy with it.)
 
-Eg, a network controller with its own local SRAM which it can fetch DMA
-descriptors from, which tells it where in the bus address space to fetch
-packets from.  This SRAM is not part of the hosts memory, but is on the
-peripheral's bus, and so ioremap() (or maybe ioremap_wc()) would be
-appropriate for it.
+Best regards
+Uwe
 
-However, ioremap() on system RAM (even that which has been taken out on
-the memory map) may be problematical.
-
-I think the correct solution would be to revise the interface so it takes
-a void * pointer, which can be handed out by dma_alloc_coherent() directly
-without the API having to worry about how to map the memory.  IOW, push
-the mapping of that memory up a level to the caller of
-dma_declare_coherent_memory().
-
-We can then sanely do preallocations via dma_coherent_alloc() and caching
-them back into dma_declare_coherent_memory() without creating additional
-mappings which cause architectural violations.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
