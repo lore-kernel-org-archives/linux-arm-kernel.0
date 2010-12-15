@@ -1,59 +1,59 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Wed, 15 Dec 2010 03:03:56 +0100
-Subject: [PATCH 15/16] ARM: sa1100: Switch over to gpiolib ->to_irq() and
+Date: Wed, 15 Dec 2010 03:04:03 +0100
+Subject: [PATCH 16/16] ARM: w90x900: Switch over to gpiolib ->to_irq() and
 	__gpio_to_irq().
 In-Reply-To: <cover.1292377339.git.buytenh@wantstofly.org>
 References: <cover.1292377339.git.buytenh@wantstofly.org>
-Message-ID: <20101215020356.GH15575@mail.wantstofly.org>
+Message-ID: <20101215020403.GI15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-sa1100/gpio.c              |    9 +++++++++
- arch/arm/mach-sa1100/include/mach/gpio.h |    3 +--
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/mach-w90x900/gpio.c              |    6 ++++++
+ arch/arm/mach-w90x900/include/mach/gpio.h |    6 +-----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/gpio.c b/arch/arm/mach-sa1100/gpio.c
-index 0d3829a..07fda32 100644
---- a/arch/arm/mach-sa1100/gpio.c
-+++ b/arch/arm/mach-sa1100/gpio.c
-@@ -49,12 +49,21 @@ static int sa1100_direction_output(struct gpio_chip *chip, unsigned offset, int
+diff --git a/arch/arm/mach-w90x900/gpio.c b/arch/arm/mach-w90x900/gpio.c
+index ba05aec..dbf1825 100644
+--- a/arch/arm/mach-w90x900/gpio.c
++++ b/arch/arm/mach-w90x900/gpio.c
+@@ -40,6 +40,7 @@
+ 			.direction_output = nuc900_dir_output,		\
+ 			.get		  = nuc900_gpio_get,		\
+ 			.set		  = nuc900_gpio_set,		\
++			.to_irq		  = nuc900_gpio_to_irq,		\
+ 			.base		  = base_gpio,			\
+ 			.ngpio		  = nr_gpio,			\
+ 		}							\
+@@ -130,6 +131,11 @@ static int nuc900_dir_output(struct gpio_chip *chip, unsigned offset, int val)
  	return 0;
  }
  
-+static int sa1100_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++static int nuc900_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 +{
-+	if (offset <= 10)
-+		return IRQ_GPIO0 + offset;
-+
-+	return IRQ_GPIO11 + (offset - 11);
++	return chip->base + offset;
 +}
 +
- static struct gpio_chip sa1100_gpio_chip = {
- 	.label			= "gpio",
- 	.direction_input	= sa1100_direction_input,
- 	.direction_output	= sa1100_direction_output,
- 	.set			= sa1100_gpio_set,
- 	.get			= sa1100_gpio_get,
-+	.to_irq			= sa1100_gpio_to_irq,
- 	.base			= 0,
- 	.ngpio			= GPIO_MAX + 1,
- };
-diff --git a/arch/arm/mach-sa1100/include/mach/gpio.h b/arch/arm/mach-sa1100/include/mach/gpio.h
-index 7befc10..982b8f0 100644
---- a/arch/arm/mach-sa1100/include/mach/gpio.h
-+++ b/arch/arm/mach-sa1100/include/mach/gpio.h
-@@ -48,9 +48,8 @@ static inline void gpio_set_value(unsigned gpio, int value)
- }
- 
+ static struct nuc900_gpio_chip nuc900_gpio[] = {
+ 	NUC900_GPIO_CHIP("GROUPC", 0, 16),
+ 	NUC900_GPIO_CHIP("GROUPD", 16, 10),
+diff --git a/arch/arm/mach-w90x900/include/mach/gpio.h b/arch/arm/mach-w90x900/include/mach/gpio.h
+index 034da3e..f9b9a37 100644
+--- a/arch/arm/mach-w90x900/include/mach/gpio.h
++++ b/arch/arm/mach-w90x900/include/mach/gpio.h
+@@ -20,11 +20,7 @@
+ #define gpio_get_value	__gpio_get_value
+ #define gpio_set_value	__gpio_set_value
  #define gpio_cansleep	__gpio_cansleep
+-
+-static inline int gpio_to_irq(unsigned gpio)
+-{
+-	return gpio;
+-}
 +#define gpio_to_irq	__gpio_to_irq
  
--#define gpio_to_irq(gpio)	((gpio < 11) ? (IRQ_GPIO0 + gpio) : \
--					(IRQ_GPIO11 - 11 + gpio))
- #define irq_to_gpio(irq)	((irq < IRQ_GPIO11_27) ? (irq - IRQ_GPIO0) : \
- 					(irq - IRQ_GPIO11 + 11))
- 
+ static inline int irq_to_gpio(unsigned irq)
+ {
 -- 
 1.7.1
