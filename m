@@ -1,25 +1,57 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Dec 2010 18:44:34 -0800
-Subject: [PATCH v1 7/9] OMAP1: DMA: Implement in platform device model
-In-Reply-To: <20101215020123.GB6725@manju-desktop>
-References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
-	<1291434246-30716-8-git-send-email-manjugk@ti.com>
-	<87d3p3q35h.fsf@deeprootsystems.com>
-	<87aak7onvu.fsf@deeprootsystems.com>
-	<20101215010400.GC3190@atomide.com>
-	<20101215020123.GB6725@manju-desktop>
-Message-ID: <20101215024434.GH3190@atomide.com>
+Date: Tue, 14 Dec 2010 19:25:38 -0800
+Subject: [PATCH 3/3] omap2+: Initialize omap_irq_base for
+	entry-macro.Sfrom platform code
+In-Reply-To: <774b6f8f3fa4cae7210bfdb317c68e12@mail.gmail.com>
+References: <20101204001435.28853.29616.stgit@baageli.muru.com>
+	<alpine.LFD.2.00.1012040040590.10437@xanadu.home>
+	<20101204180541.GH17222@atomide.com>
+	<alpine.LFD.2.00.1012042126350.10437@xanadu.home>
+	<20101205031002.GP17222@atomide.com>
+	<20101208014548.GJ17435@atomide.com>
+	<20101208014921.GM17435@atomide.com>
+	<774b6f8f3fa4cae7210bfdb317c68e12@mail.gmail.com>
+Message-ID: <20101215032538.GI3190@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* G, Manjunath Kondaiah <manjugk@ti.com> [101214 18:01]:
-> On Tue, Dec 14, 2010 at 05:04:00PM -0800, Tony Lindgren wrote:
-> > 
-> > OK thanks, will fold it in and let's merge them into linux-omap
-> > master branch for few days for testing. Then if everything looks
-> > good, I'll queue these for the 2.6.38 next merge window.
+* Rajendra Nayak <rnayak@ti.com> [101213 03:57]:
+> >
+> > +static inline void omap_irq_base_init(void)
+> > +{
+> > +	extern void __iomem *omap_irq_base;
+> > +
+> > +#ifdef MULTI_OMAP2
+> > +	if (cpu_is_omap242x())
+> 
+> Looks like this should be a cpu_is_omap24xx(). The
+> current master is broken on a 2430sdp and a git-bisect
+> pointed me to this patch.
 
-Oops, not quite ready yet, see the mail from Paul. Waiting for
-those fixes.
+Thanks, just noticed that too. Here's a fix for that.
+
+Regards,
 
 Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 14 Dec 2010 19:17:31 -0800
+Subject: [PATCH] omap: Fix setting omap_irq_base for 2430
+
+We need to test for 24xx not 242x. Otherwise interrupts won't work.
+
+Reported-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -320,7 +320,7 @@ static inline void omap_irq_base_init(void)
+ 	extern void __iomem *omap_irq_base;
+ 
+ #ifdef MULTI_OMAP2
+-	if (cpu_is_omap242x())
++	if (cpu_is_omap24xx())
+ 		omap_irq_base = OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE);
+ 	else if (cpu_is_omap34xx())
+ 		omap_irq_base = OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE);
