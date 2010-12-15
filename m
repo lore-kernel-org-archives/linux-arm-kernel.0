@@ -1,36 +1,42 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 15 Dec 2010 07:31:23 +0530
-Subject: [PATCH v1 7/9] OMAP1: DMA: Implement in platform device model
-In-Reply-To: <20101215010400.GC3190@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 14 Dec 2010 18:02:06 -0800
+Subject: [PATCH v1 0/9] OMAP: DMA: hwmod and DMA as platform device
+In-Reply-To: <20101215015512.GF3190@atomide.com> (Tony Lindgren's message of
+	"Tue, 14 Dec 2010 17:55:13 -0800")
 References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
-	<1291434246-30716-8-git-send-email-manjugk@ti.com>
-	<87d3p3q35h.fsf@deeprootsystems.com>
-	<87aak7onvu.fsf@deeprootsystems.com>
-	<20101215010400.GC3190@atomide.com>
-Message-ID: <20101215020123.GB6725@manju-desktop>
+	<87tyifn7ed.fsf@deeprootsystems.com>
+	<20101215015512.GF3190@atomide.com>
+Message-ID: <87aak7n68w.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 05:04:00PM -0800, Tony Lindgren wrote:
-> * Kevin Hilman <khilman@deeprootsystems.com> [101214 16:55]:
-> > Kevin Hilman <khilman@deeprootsystems.com> writes:
-> > 
-> > [...]
-> > 
-> > >
-> > > Using the patch below which fixes up the interrupt numbers to match the
-> > > original code, the memory-to-memory test is now working on OSK.
-> > 
-> > Tony, if you prefer just to fold this into the original, feel free to
-> > add
-> > 
-> > [khilman at deeprootsystems.com]: fixed IRQ numbers to match original code
-> > Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-> 
-> OK thanks, will fold it in and let's merge them into linux-omap
-> master branch for few days for testing. Then if everything looks
-> good, I'll queue these for the 2.6.38 next merge window.
+Tony Lindgren <tony@atomide.com> writes:
 
-Thanks Tony.
+> * Kevin Hilman <khilman@deeprootsystems.com> [101214 17:37]:
+>> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+>> 
+>> > Patch series to convert DMA library into platform driver using platform
+>> > device model and adapting hwmod for omap2+.
+>> 
+>> After the OMAP1 fixup for PATCH 7/9,
+>> 
+>> Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+>
+> I guess here you mean Signed-off-by for this patch since
+> you wrote some code? Assuming Signed-off-by, let me know
+> if you want to change that.
 
--Manjunath
+I only added my s-o-b to PATCH 7/9 since that's the only one I added
+code to.
+
+Kevin
+
+>> and
+>> 
+>> Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
+>
+> Adding this to the others in the series.
+>
+> Regards,
+>
+> Tony
