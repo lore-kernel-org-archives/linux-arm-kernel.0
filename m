@@ -1,49 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Dec 2010 16:07:00 +0000
-Subject: [PATCH 1/5] msm: Secure Channel Manager (SCM) support
-In-Reply-To: <20101215140558.GA9736@huya.qualcomm.com>
-References: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
-	<1291619778-30289-2-git-send-email-johlstei@codeaurora.org>
-	<20101215074811.GA2483@ucw.cz>
-	<20101215140558.GA9736@huya.qualcomm.com>
-Message-ID: <20101215160700.GB9937@n2100.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 15 Dec 2010 08:12:06 -0800
+Subject: [PATCH 0/7 v2] OMAP: McSPI: Hwmod adaptation + runtime conversion
+In-Reply-To: <33183.10.24.255.18.1291212072.squirrel@dbdmail.itg.ti.com>
+	(Govindraj R.'s message of "Wed, 1 Dec 2010 19:31:12 +0530 (IST)")
+References: <33183.10.24.255.18.1291212072.squirrel@dbdmail.itg.ti.com>
+Message-ID: <87d3p3kobt.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 06:05:58AM -0800, David Brown wrote:
-> On Wed, Dec 15, 2010 at 08:48:11AM +0100, Pavel Machek wrote:
-> 
-> > > +static u32 smc(dma_addr_t cmd_addr)
-> > > +{
-> > > +	int context_id;
-> > > +	register u32 r0 asm("r0") = 1;
-> > > +	register u32 r1 asm("r1") = (u32)&context_id;
-> > > +	register u32 r2 asm("r2") = (u32)cmd_addr;
-> > 
-> > Are these neccessary?
-> 
-> The values have to be in specific registers.  Without them it doesn't
-> generate the right code.
-...
-> > > +	int context_id;
-> > > +	static u32 version = -1;
-> > > +	register u32 r0 asm("r0") = 0x1 << 8;
-> > > +	register u32 r1 asm("r1") = (u32)&context_id;
-> > 
-> > And does this even work?
-> 
-> In what sense?  It generates the desired code.
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-What you're doing is entirely valid and supported by gcc.  There's no
-problem with it.
+> Changes invloves:
+> ----------------
+> 1) Addition of hwmod data for omap2/3/4.
+> 1) McSPI driver hwmod adaptation with cleanup of base address
+>    macros and using omap-device API's.
+> 2) Runtime Conversion of McSPI driver
+>
+> Changes from v1:
+> ---------------
+> 1) Fixing patch 5/5 comments for hwmod+runtime
+>    Split the patch 5/5 to hwmod adaptation
+>    and then runtime conversion
+>    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg33387.html
+>
+> Testing Updates:
+> ----------------
+> Was tested using data transfer test module available at:
+> http://dev.omapzoom.org/?p=richo/device_driver_test.git;a=blob;f=mcspi/test_code/
+> utils/mcspi_modules/omap_mcspi_datatest.c;
+> h=e42ec10c5c844abdde6a7175a268b379fbbdb655;
+> hb=5d9a755d50e58de861c5e8991f2f607bc49b5dc3
 
-> > > +	mutex_lock(&scm_lock);
-> > > +	asm(
-> > > +		__asmeq("%0", "r1")
-> > > +		__asmeq("%1", "r0")
-> > > +		__asmeq("%2", "r1")
+Can you summarize what this test does?  
 
-And even if you use an older gcc version where this trips over bugs,
-these asmeq() will save you from having silently generated wrong code.
+On what platforms was this tested?  
 
-So don't worry about this, you're not doing anything wrong.
+How was it tested for OMAP1 and OMAP2?
+
+Kevin
+
+> System wide suspend and ret/off counts observation,
+> ensured that no behavioral difference with and without
+> this patch series.
+>
+> Benoit Cousson (1):
+>   OMAP4: hwmod data: Add McSPI
+>
+> Charulatha V (5):
+>   OMAP2420: hwmod data: Add McSPI
+>   OMAP2430: hwmod data: Add McSPI
+>   OMAP3: hwmod data: Add McSPI
+>   OMAP3: clocks: Update clock domain name for mcspi fck
+>   OMAP: devices: Modify McSPI device to adapt to hwmod framework
+>
+> Govindraj.R (1):
+>   OMAP: runtime: McSPI driver runtime conversion
+>
+>  arch/arm/mach-omap2/clock3xxx_data.c       |    4 +
+>  arch/arm/mach-omap2/devices.c              |  189 ++++---------------
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c |  156 ++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |  219 ++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  280 ++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  267 ++++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/mcspi.h    |   11 +
+>  drivers/spi/omap2_mcspi.c                  |  225 +++++++---------------
+>  8 files changed, 1051 insertions(+), 300 deletions(-)
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
