@@ -1,28 +1,36 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 14 Dec 2010 18:12:26 -0700 (MST)
-Subject: [PATCH] OMAP: omap_device: use pdev as parameter to get rt_va
-In-Reply-To: <alpine.DEB.2.00.1012141710260.15971@utopia.booyaka.com>
-References: <1292024742-27319-1-git-send-email-omar.ramirez@ti.com>
-	<4D05D586.6090408@ti.com>
-	<AANLkTik667cW19eCVNNLf3_dc9efFYms0H2z-fGU24Ob@mail.gmail.com>
-	<alpine.DEB.2.00.1012141710260.15971@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1012141811380.15971@utopia.booyaka.com>
+Date: Tue, 14 Dec 2010 18:15:39 -0700 (MST)
+Subject: [PATCH 05/12] OMAP4: PRCM: Add SCRM header file
+In-Reply-To: <4D07D0A5.9040703@ti.com>
+References: <20101214063308.21555.76050.stgit@twilight.localdomain>
+	<20101214063447.21555.64470.stgit@twilight.localdomain>
+	<4D07782E.5050000@ti.com>
+	<alpine.DEB.2.00.1012141105570.15971@utopia.booyaka.com>
+	<4D07D0A5.9040703@ti.com>
+Message-ID: <alpine.DEB.2.00.1012141813180.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Omar
+Salut Beno?t
 
-On Tue, 14 Dec 2010, Paul Walmsley wrote:
+On Tue, 14 Dec 2010, Cousson, Benoit wrote:
 
-> - In your driver-to-core-OMAP integration code in arch/arm/*omap*, call 
-> omap_hwmod_get_mpu_rt_va(), and pass that to the driver via an entry in 
-> the struct platform_data.
+> Well, I sent this series before you sent your prcm one, so at the time the
+> dependency didn't exist ;-)
 
-One brief note here - this should have been more clear:
+No worries, it was just meant to be a general suggestion, not a specific 
+one to this case.
 
-- In your driver-to-core-OMAP integration code in arch/arm/*omap*, call 
-  omap_hwmod_get_mpu_rt_va(), and pass the virtual address that it returns 
-  to the driver via an entry in the struct platform_data.
+> > As far as the empty scrm44xx.h goes, I will probably go back and rebuild
+> > that branch with your patch that creates SCRM from my patch set inserted
+> > earlier, so I can drop the part of my patch that creates the empty file.
+
+I went ahead and moved the SCRM patch earlier in the branch sets.  I did 
+make one change in it - I'll reply to it with the update details.
+
+The current integration tag that contains the revised patch is 
+'integration-2.6.38-20101214-010' available from 
+git://git.pwsan.com/linux-integration
 
 
 - Paul
