@@ -1,11 +1,11 @@
 From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 15 Dec 2010 10:08:53 +0800
+Date: Wed, 15 Dec 2010 10:09:16 +0800
 Subject: [PATCH 16/16] ARM: w90x900: Switch over to gpiolib ->to_irq() and
 	__gpio_to_irq().
 In-Reply-To: <20101215020403.GI15575@mail.wantstofly.org>
 References: <cover.1292377339.git.buytenh@wantstofly.org>
 	<20101215020403.GI15575@mail.wantstofly.org>
-Message-ID: <AANLkTikxxgJMaAby3AGvMbYDQniO1yEkhtQqoQuewJsy@mail.gmail.com>
+Message-ID: <AANLkTikS4VBWmFhQxkp9vYi4DnJc5cuzS1bHaL6WPrw2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
