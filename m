@@ -1,57 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 15 Dec 2010 16:15:28 +0100
-Subject: [PATCH] i.MX51: Full iomux support
-In-Reply-To: <87y67rcdnf.fsf@lechat.rtp-net.org>
-References: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
-	<87y67rcdnf.fsf@lechat.rtp-net.org>
-Message-ID: <20101215151528.GD29833@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 15 Dec 2010 20:47:52 +0530
+Subject: [PATCH 1/5] OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
+In-Reply-To: <87zks8rv3b.fsf@deeprootsystems.com>
+References: <1292276969-29733-1-git-send-email-b-cousson@ti.com><1292276969-29733-2-git-send-email-b-cousson@ti.com>
+	<87zks8rv3b.fsf@deeprootsystems.com>
+Message-ID: <c454400af490d75c274f19a5d0a5a655@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 03:29:56PM +0100, Arnaud Patard wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
-> 
-> > Hi,
-> 
-> Hi,
-> 
-> >
-> > The following series picks up the patch from Lothar Wa?mann replacing
-> > the struct pad_desc with a 64bit variable and adds full i.MX51 iomux
-> > support based on this patch.
-> > The iomux configurations are taken from the Freescale pinmux tool, so the
-> > definitions should be rather complete. Anyway, there are some modes
-> > not present in the tool.
-> > I took the padmux settings from the old iomux support where present.
-> 
-> I'm seeing a lot of changes in the iomux file and I have a patch [1]
-> setting the SION bit for all gpios configuration so that reading the PSR
-> value is giving usefull results when the gpio is configured as output. I
-> wanted to send it this week but it will obviously conflict with
-> this. Should I test your patchset first and if it's working, wait
-> for its merge or should I send it anyway ? How do you want to deal with
-> this (as long as you're fine with setting the SION bit for all gpios) ?
+Hi Kevin,
 
-I'm fine with setting the SION bit for all gpios, I'm also fine with
-setting the SION bit everywhere it's available (I tried this during
-testing and it didn't have bad effects).
+<snip>..
 
-Maybe one of the Freescale guys can comment on this. On the i.MX35
-we did not need this bit. There were the pinmux registers for
-configuring the the way from the internal units to the pads and the
-sel_input registers for the way back.
-On i.MX51 there are several pins which do not have a sel_input register
-associated (I2C) and so setting the SION bit becomes mandatory. On the
-other hand not all pins have a SION bit. I'm confused...
+> >  	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
+> > +		if ((pwrdm_read_pwrst(pwrdm) > state) &&
+> > +			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+> > +				ret = pwrdm_set_next_pwrst(pwrdm, state);
+> > +				pwrdm_set_lowpwrstchange(pwrdm);
+> > +				pwrdm_wait_transition(pwrdm);
+> > +				pwrdm_state_switch(pwrdm);
+> > +				return ret;
+>
+> Personally, I'd prefer if this function flowed through better instead of
+> the early return in order to emphasize the common code.
+>
+> Rather than the return here, can you just set the low-power state change
+> bit here (and put the clkdm_wakeup + sleep_switch = 1 into the else
+> clause?
+>
+> Or, does the next state have to be set before the low-power state change
+> bit?
 
-Anyway, I can add the SION bits to the missing pins once we agree on
-what we want to do.
+Yes, that sequencing is needed.
 
-Sascha
+>
+> Basically, what I'm getting at is this should be a single function with
+> common flow.  The conditional code based on low-power state change
+> should be isolated instead of having a special path.
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I get your point. See if the below approach looks better.
+If it looks fine, I'll do some more testing (currently only tested
+on OMAP4430sdp) and repost the 2 patches.
