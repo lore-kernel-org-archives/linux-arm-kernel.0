@@ -1,43 +1,51 @@
 From: saeed@marvell.com (Saeed Bishara)
-Date: Wed, 15 Dec 2010 10:08:51 +0200
-Subject: [PATCH 02/16] ARM: Remove dependency of plat-orion GPIO code on
-	mach directory includes.
-In-Reply-To: <20101215020233.GU15575@mail.wantstofly.org>
+Date: Wed, 15 Dec 2010 10:10:44 +0200
+Subject: [PATCH 04/16] ARM: Dove: Remove PXA compatibility IRQ defines.
+In-Reply-To: <20101215020306.GW15575@mail.wantstofly.org>
 References: <cover.1292377339.git.buytenh@wantstofly.org>
-	<20101215020233.GU15575@mail.wantstofly.org>
-Message-ID: <FCBE654890C0334289D0AD3AF4EF009FE148BBBCFC@IL-MB01.marvell.com>
+	<20101215020306.GW15575@mail.wantstofly.org>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009FE148BBBCFF@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->diff --git a/arch/arm/mach-dove/include/mach/dove.h 
->b/arch/arm/mach-dove/include/mach/dove.h
->index f6a0839..df51131 100644
->--- a/arch/arm/mach-dove/include/mach/dove.h
->+++ b/arch/arm/mach-dove/include/mach/dove.h
->@@ -130,7 +130,8 @@
-> #define DOVE_PMU_MPP_GENERAL_CTRL (DOVE_MPP_VIRT_BASE + 0x10)
-> #define DOVE_RESET_SAMPLE_LO	(DOVE_MPP_VIRT_BASE | 0x014)
-> #define DOVE_RESET_SAMPLE_HI	(DOVE_MPP_VIRT_BASE | 0x018)
->-#define DOVE_GPIO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0400)
->+#define DOVE_GPIO_LO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
->| 0xd0400)
->+#define DOVE_GPIO_HI_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
->| 0xd0420)
-> #define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
->| 0xe803c)
-> #define  DOVE_AU1_SPDIFO_GPIO_EN	(1 << 1)
-> #define  DOVE_NAND_GPIO_EN		(1 << 0)
->diff --git a/arch/arm/mach-dove/include/mach/gpio.h 
->b/arch/arm/mach-dove/include/mach/gpio.h
->index 0ee70ff..e7e5101 100644
->--- a/arch/arm/mach-dove/include/mach/gpio.h
->+++ b/arch/arm/mach-dove/include/mach/gpio.h
+ 
 
-Lennert, this patch conflicts with 2 paches sent by Mike that deal with dove gpio/mpp
-[PATCH v4 1/2] [ARM] Dove: add support for GPIOs 64-71
-[PATCH v3 2/2] [ARM] Dove: add support for multi-purpose pins configuration
-
-Nico, I've acked those patches but didn't notice that it wasn't merged in the orion git.
-Can you please merge it.
+>-----Original Message-----
+>From: Lennert Buytenhek [mailto:buytenh at wantstofly.org] 
+>Sent: Wednesday, December 15, 2010 4:03 AM
+>To: Saeed Bishara
+>Cc: linux-arm-kernel at lists.infradead.org
+>Subject: [PATCH 04/16] ARM: Dove: Remove PXA compatibility IRQ defines.
+>
+>These are not currently used anywhere, but when the relevant
+>peripherals are enabled on the Dove port, the IRQ numbers should be
+>passed into the drivers via platform device resources rather than
+>having the drivers get them from platform headers directly.
+>
+>Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
+>---
+> arch/arm/mach-dove/include/mach/irqs.h |    7 +------
+> 1 files changed, 1 insertions(+), 6 deletions(-)
+>
+>diff --git a/arch/arm/mach-dove/include/mach/irqs.h 
+>b/arch/arm/mach-dove/include/mach/irqs.h
+>index 4668146..03d401d 100644
+>--- a/arch/arm/mach-dove/include/mach/irqs.h
+>+++ b/arch/arm/mach-dove/include/mach/irqs.h
+>@@ -92,10 +92,5 @@
+> 
+> #define NR_IRQS			(IRQ_DOVE_PMU_START + 
+>NR_PMU_IRQS)
+> 
+>-/* Required for compatability with PXA AC97 driver.	*/
+>-#define IRQ_AC97		IRQ_DOVE_AC97
+>-/* Required for compatability with PXA DMA driver.	*/
+>-#define IRQ_DMA			IRQ_DOVE_PDMA
+>-/* Required for compatability with PXA NAND driver 	*/
+>-#define IRQ_NAND		IRQ_DOVE_NAND
+>+
+> #endif
+>-- 
+Acked-by: Saeed Bishara <saeed@marvell.com>
 
 saeed
