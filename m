@@ -1,78 +1,31 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Tue, 14 Dec 2010 19:49:21 -0800
-Subject: [PATCH 7/7] msm: Build support for the MSM8960 target
-In-Reply-To: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1292384961-8851-8-git-send-email-stepanm@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 14 Dec 2010 20:54:38 -0700 (MST)
+Subject: [PATCH] OMAP2+: omap_hwmod: fix wakeup enable/disable for
+	consistency
+In-Reply-To: <1291936247-17955-1-git-send-email-khilman@deeprootsystems.com>
+References: <1291936247-17955-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <alpine.DEB.2.00.1012142041530.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Kconfig options and Makefile options needed to
-build for the MSM8960 target. Only the simulator is
-supported at this time.
+On Thu, 9 Dec 2010, Kevin Hilman wrote:
 
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
----
- arch/arm/mach-msm/Kconfig  |   16 ++++++++++++++++
- arch/arm/mach-msm/Makefile |    2 ++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+> In the omap_hwmod core, most of the SYSCONFIG register helper
+> functions do not directly write the register, but instead just modify
+> a value passed in.
+> 
+> This patch converts the _enable_wakeup() and _disable_wakeup() helper
+> functions to take a value argument and only modify it instead of
+> actually writing the register.  This makes the wakeup helpers
+> consistent with the other helper functions and avoids unintentional
+> problems like the following.
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 8c57425..ba5c955 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -47,6 +47,16 @@ config ARCH_MSM8X60
- 	select MSM_GPIOMUX
- 	select MSM_SCM if SMP
+Thanks, this looks great.  Queued for 2.6.38 in the 'hwmod_b_2.6.38' 
+branch along with the OMAP4 hwmod cleanup patches.
 
-+config ARCH_MSM8960
-+	bool "MSM8960"
-+	select ARCH_MSM_SCORPIONMP
-+	select MACH_MSM8960_SIM
-+	select ARM_GIC
-+	select CPU_V7
-+	select MSM_V2_TLMM
-+	select MSM_GPIOMUX
-+	select MSM_SCM if SMP
-+
- endchoice
+The current integration tag that contains these patches is 
+'integration-2.6.38-20101214-012' available from 
+git://git.pwsan.com/linux-integration
 
- config MSM_SOC_REV_A
-@@ -124,6 +134,12 @@ config MACH_MSM8X60_FFA
- 	help
- 	  Support for the Qualcomm MSM8x60 FFA eval board.
 
-+config MACH_MSM8960_SIM
-+	depends on ARCH_MSM8960
-+	bool "MSM8960 Simulator"
-+	help
-+	  Support for the Qualcomm MSM8960 simulator.
-+
- endmenu
-
- config MSM_DEBUG_UART
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 8cd0b5b..9e5717b 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MSM7X00A) += dma.o irq.o acpuclock-arm11.o
- obj-$(CONFIG_ARCH_MSM7X30) += dma.o
- obj-$(CONFIG_ARCH_QSD8X50) += dma.o sirc.o
- obj-$(CONFIG_ARCH_MSM8X60) += clock-dummy.o iommu.o iommu_dev.o devices-msm8x60-iommu.o
-+obj-$(CONFIG_ARCH_MSM8960) += clock-dummy.o iommu.o iommu_dev.o
-
- obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
- obj-$(CONFIG_MSM_PROC_COMM) += clock.o
-@@ -22,6 +23,7 @@ obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
- obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
- obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
- obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
-+obj-$(CONFIG_ARCH_MSM8960) += board-msm8960.o
-
- obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
- obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
---
-1.7.0.2
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+- Paul
