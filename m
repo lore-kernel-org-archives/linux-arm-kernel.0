@@ -1,54 +1,39 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 15 Dec 2010 16:10:16 +0100
-Subject: [PATCH] i.MX51: Full iomux support
-In-Reply-To: <87y67rcdnf.fsf@lechat.rtp-net.org>
-References: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
-	<87y67rcdnf.fsf@lechat.rtp-net.org>
-Message-ID: <19720.55896.197553.407321@ipc1.ka-ro>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 15 Dec 2010 08:14:49 -0700 (MST)
+Subject: [PATCH v1 4/9] OMAP2430: hwmod data: add system DMA
+In-Reply-To: <20101215105953.GC11931@GLPP-machine>
+References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
+	<1291434246-30716-5-git-send-email-manjugk@ti.com>
+	<alpine.DEB.2.00.1012141925300.15971@utopia.booyaka.com>
+	<20101215105953.GC11931@GLPP-machine>
+Message-ID: <alpine.DEB.2.00.1012150814250.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 15 Dec 2010, G, Manjunath Kondaiah wrote:
 
-Arnaud Patard (Rtp) writes:
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
-[...]
-> > The following series picks up the patch from Lothar Wa?mann replacing
-> > the struct pad_desc with a 64bit variable and adds full i.MX51 iomux
-> > support based on this patch.
-> > The iomux configurations are taken from the Freescale pinmux tool, so the
-> > definitions should be rather complete. Anyway, there are some modes
-> > not present in the tool.
-> > I took the padmux settings from the old iomux support where present.
+> On Tue, Dec 14, 2010 at 07:27:33PM -0700, Paul Walmsley wrote:
+> > On Sat, 4 Dec 2010, G, Manjunath Kondaiah wrote:
+> > 
+> > > Add OMAP2430 DMA hwmod data and also add required
+> > > DMA device attributes.
+> > 
+> > ...
+> > 
+> > > +/* dma_system -> L3 */
+> > > +static struct omap_hwmod_ocp_if omap2430_dma_system__l3 = {
+> > > +	.master		= &omap2430_dma_system_hwmod,
+> > > +	.slave		= &omap2430_l3_main_hwmod,
+> > > +	.clk		= "l3_div_ck",
+> > 
+> > This clock does not exist on OMAP2430.  Did you test this on OMAP2430?
 > 
-> I'm seeing a lot of changes in the iomux file and I have a patch [1]
-> setting the SION bit for all gpios configuration so that reading the PSR
-> value is giving usefull results when the gpio is configured as output. I
-> wanted to send it this week but it will obviously conflict with
-> this. Should I test your patchset first and if it's working, wait
-> for its merge or should I send it anyway ? How do you want to deal with
-> this (as long as you're fine with setting the SION bit for all gpios) ?
-> 
-I had done the same, but had some trouble with this.
-E.g. on our board GPIO1_7 is used as a generic GPIO to enable an
-external clock oscillator for the USBH1 ULPI PHY. When the SION bit
-for this pad was set, I got strange errors on the USBH1 port
-(disconnecting low speed devices behind a hub would stall the
-bus). When I removed the SION bit for that pin everything worked
-well.
+> Yes. I have tested this on SDP2430. For confirmation, I tested again now.
+> It boots up without any issues and all DMA test cases are passing.
 
-It looks like the SION setting may adversly affect the GPIO functions
-on the i.MX51.
+Don't you see warnings in the boot messages that this clock cannot be 
+found?
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+- Paul
