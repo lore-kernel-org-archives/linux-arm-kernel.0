@@ -1,38 +1,78 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 15 Dec 2010 11:59:58 -0500 (EST)
-Subject: [PATCH 01/16] ARM: Remove dependency of plat-orion time code on
-	mach directory includes.
-In-Reply-To: <20101215162552.GD9937@n2100.arm.linux.org.uk>
-References: <cover.1292377339.git.buytenh@wantstofly.org>
-	<20101215020228.GT15575@mail.wantstofly.org>
-	<20101215162552.GD9937@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1012151157270.10437@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Dec 2010 17:01:42 +0000
+Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
+In-Reply-To: <AANLkTi=ZYi=12k2vZMGp9AWNX8zofp6C-FnMu2egQOA1@mail.gmail.com>
+References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
+	<201012101159.21845.jkrzyszt@tis.icnet.pl>
+	<201012101203.09441.jkrzyszt@tis.icnet.pl>
+	<20101210170356.GA28472@n2100.arm.linux.org.uk>
+	<AANLkTimTVWVmVfppAWSosidqLmo6c+8rPhLg=oJAVoYH@mail.gmail.com>
+	<20101213162947.GA11730@n2100.arm.linux.org.uk>
+	<AANLkTi=ZYi=12k2vZMGp9AWNX8zofp6C-FnMu2egQOA1@mail.gmail.com>
+Message-ID: <20101215170142.GA10883@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Dec 2010, Russell King - ARM Linux wrote:
-
-> On Wed, Dec 15, 2010 at 03:02:28AM +0100, Lennert Buytenhek wrote:
-> > This patch makes the various mach dirs that use the plat-orion time
-> > code pass in timer and bridge addresses explicitly, instead of having
-> > plat-orion get those values by including a mach dir include file --
-> > the latter mechanism is problematic if you want to support multiple
-> > ARM platforms in the same kernel image.
+On Wed, Dec 15, 2010 at 12:39:20PM +0000, Catalin Marinas wrote:
+> On 13 December 2010 16:29, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Dec 13, 2010 at 03:52:20PM +0000, Catalin Marinas wrote:
+> >> On 10 December 2010 17:03, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
+> >> >> ?void __init omap1_camera_init(void *info)
+> >> >> ?{
+> >> >> ? ? ? struct platform_device *dev = &omap1_camera_device;
+> >> >> + ? ? dma_addr_t paddr = omap1_camera_phys_mempool_base;
+> >> >> + ? ? dma_addr_t size = omap1_camera_phys_mempool_size;
+> >> >> ? ? ? int ret;
+> >> >>
+> >> >> ? ? ? dev->dev.platform_data = info;
+> >> >>
+> >> >> + ? ? if (paddr) {
+> >> >> + ? ? ? ? ? ? if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
+> >> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
+> >> >
+> >> > Although this works, you're ending up with SDRAM being mapped via
+> >> > ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
+> >> > mapped as if it were a device.
+> >>
+> >> BTW, does the generic dma_declare_coherent_memory() does the correct
+> >> thing in using ioremap()?
+> >
+> > I argue it doesn't, as I said above. ?It means we map SDRAM as device
+> > memory, and as I understand the way interconnects work, it's entirely
+> > possible that this may not result in the SDRAM being accessible.
+> [...]
+> > So, not only does this fail the kernel's own rules, but as we already know,
+> > it fails the architecture's restrictions with multiple mappings of memory
+> > when used with SDRAM, and it also maps main memory as a device. ?I wonder
+> > how many more things this broken API needs to do wrong before it's current
+> > implementation is consigned to the circular filing cabinet.
 > 
-> I'd prefer you to leave sched_clock() alone - I'm preparing a patch
-> series which replaces all sched_clock() implementations with something
-> that fully satisfies the scheduler requirements.
-> 
-> The first step of that is fixing the clocksource mess, which I recently
-> posted.  I have a currently set of three possible further resolutions
-> which meet the scheduler requirements with varying overheads - some with
-> more and some with less overhead in the fast path than the current
-> cnt32_to_63 + multiply + do_div.
+> Should we not try to fix the generic code and still allow platforms to
+> use dma_declare_coherent_memory() in a safer way? I guess it may need
+> some arguing/explanation on linux-arch.
 
-OK -- Lennert asked me to carry this patch in the orion Git tree but 
-I'll hold it back for now.
+I think so - one of the issues with dma_declare_coherent_memory() is that
+it's original intention (as I understand it) was to allow drivers to use
+on-device dma coherent memory.
 
-Looking forward to your sched_clock patch series.
+Eg, a network controller with its own local SRAM which it can fetch DMA
+descriptors from, which tells it where in the bus address space to fetch
+packets from.  This SRAM is not part of the hosts memory, but is on the
+peripheral's bus, and so ioremap() (or maybe ioremap_wc()) would be
+appropriate for it.
 
+However, ioremap() on system RAM (even that which has been taken out on
+the memory map) may be problematical.
 
-Nicolas
+I think the correct solution would be to revise the interface so it takes
+a void * pointer, which can be handed out by dma_alloc_coherent() directly
+without the API having to worry about how to map the memory.  IOW, push
+the mapping of that memory up a level to the caller of
+dma_declare_coherent_memory().
+
+We can then sanely do preallocations via dma_coherent_alloc() and caching
+them back into dma_declare_coherent_memory() without creating additional
+mappings which cause architectural violations.
