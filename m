@@ -1,92 +1,59 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Tue, 14 Dec 2010 21:39:50 -0600
-Subject: [PATCHv7 0/4] omap: iovmm - fixes for iovmm module
-In-Reply-To: <AANLkTi=CCVe0ST0UiwMrfy8RsP-xfS9gCxUewv1q5Vu=@mail.gmail.com>
-References: <1292374443-4055-1-git-send-email-fernando.lugo@ti.com>
-	<AANLkTi=CCVe0ST0UiwMrfy8RsP-xfS9gCxUewv1q5Vu=@mail.gmail.com>
-Message-ID: <AANLkTinm5=8hVtDbBX-r+17CL-iMkEjHitBs=EdDhX0d@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 14 Dec 2010 21:44:14 -0500 (EST)
+Subject: [PATCH 01/16] ARM: Remove dependency of plat-orion time code on
+	mach directory includes.
+In-Reply-To: <20101215020228.GT15575@mail.wantstofly.org>
+References: <cover.1292377339.git.buytenh@wantstofly.org>
+	<20101215020228.GT15575@mail.wantstofly.org>
+Message-ID: <alpine.LFD.2.00.1012142121560.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 7:54 PM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
-> Fernando,
->
-> For omap patches, follow the convention
->
-> OMAP: iommu: <subject>
-> OMAP: iovmm: <subject>
->
-> Ref: http://www.spinics.net/lists/linux-omap/msg39956.html
+On Wed, 15 Dec 2010, Lennert Buytenhek wrote:
 
-Ok, I will take in account that for next paches.
+> This patch makes the various mach dirs that use the plat-orion time
+> code pass in timer and bridge addresses explicitly, instead of having
+> plat-orion get those values by including a mach dir include file --
+> the latter mechanism is problematic if you want to support multiple
+> ARM platforms in the same kernel image.
+> 
+> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
+[...]
+> @@ -57,8 +71,11 @@ static unsigned long tclk2ns_scale;
+>  
+>  unsigned long long sched_clock(void)
+>  {
+> -	unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
+> -	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
+> +	unsigned long val;
+> +
+> +	val = ~readl(timer_base + TIMER0_VAL_OFF);
+> +
+> +	return (cnt32_to_63(val) * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
+>  }
 
-Thanks,
-Fernando.
+This is wrong.
 
->
->
-> On Tue, Dec 14, 2010 at 6:53 PM, Fernando Guzman Lugo
-> <fernando.lugo@ti.com> wrote:
->> Misc fixes found while working with iovmm module. They are
->> needed in order to tidspbridge can work properly along with
->> iovmm module.
->>
->> Version 7:
->> * Change 4/4 patch base on Felipe Contreras comments about
->> ?having start/end in platform data and struct iommu.
->>
->> Version 6:
->> * Rebase on Russell King branch.
->> ?- for details see:
->> ?http://marc.info/?l=linux-omap&m=129228495723001&w=2
->>
->> Version 5:
->> * Changes in "iommu: create new api to set valid da range"
->> ?- Change range variables to platform data structure.
->>
->> Version 4:
->> * Changes in "iommu: create new api to set valid da range"
->> ?- Validate range for fixed address.
->> ?- Change way of change boundaries to avoid possible overflow
->> ?instead of style :
->> ? ? start + bytes >= end ? ? which start + end can overflow
->> ?use style:
->> ? ? end - start < bytes
->>
->> Version 3:
->> * change patch 2 base on Felipe Contreras' comments,
->> ?now it uses min_t and I deleted some blank lines.
->> * patch "create new api to set valid da range" is base on
->> ?"iovmm: IVA2 MMU range is from 0x11000000 to 0xFFFFFFFF"
->> ?patch and on Hiroshi's comments and now it is added to
->> ?this set.
->>
->> Version 2:
->> * Removed "iovmm: fixes for iovmm module" that patch was already
->> ?sent.
->> * Modified "iovmm: fix roundup for next area and end check for the
->> ?last area" patch, base on Davin Cohen's comments and rename it
->> ?to a proper name that describes what it is doing now.
->>
->>
->> Guzman Lugo, Fernando (4):
->> ?omap: iovmm - no gap checking for fixed address
->> ?omap: iovmm - add superpages support to fixed da address
->> ?omap: iovmm - replace __iounmap with iounmap
->> ?omap: iommu - create new api to set valid da range
->>
->> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ?| ? ?8 +++
->> ?arch/arm/plat-omap/include/plat/iommu.h | ? ?5 ++
->> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 24 +++++++++
->> ?arch/arm/plat-omap/iovmm.c ? ? ? ? ? ? ?| ? 81 +++++++++++++++++-------------
->> ?4 files changed, 83 insertions(+), 35 deletions(-)
->>
->>
->
->
->
-> --
-> Thank you,
-> Best regards,
-> Hari Kanigeri
->
+The implementation of cnt32_to_63() looks like this:
+
+#define cnt32_to_63(cnt_lo) \
+({ \
+        static u32 __m_cnt_hi; \
+        union cnt32_to_63 __x; \
+        __x.hi = __m_cnt_hi; \
+        smp_rmb(); \
+        __x.lo = (cnt_lo); \
+[...]
+
+Notice the smp_rmb() _before_ the cnt_lo argument is evaluated, and 
+_after_ __m_cnt_hi is retrieved. Tthis ordering is important for the 
+lockless algorithm used here, otherwise a racing thread could make the 
+hardware counter look like it went backward, or that it actually jumped 
+ahead almost one full period.  If you are caching the hardware counter 
+value in a variable then you are defeating the algorithm.
+
+I realize that this constraint is not properly documented in 
+cnt32_to_63.h so I should fix that.
+
+
+Nicolas
