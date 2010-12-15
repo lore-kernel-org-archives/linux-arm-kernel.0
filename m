@@ -1,37 +1,51 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 15 Dec 2010 07:38:38 -0800
-Subject: [PATCH 2/7] msm: Physical offset for MSM8960
-In-Reply-To: <1292424054.13887.5.camel@m0nster>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1292384961-8851-3-git-send-email-stepanm@codeaurora.org>
-	<4D08BFFC.3020103@ru.mvista.com>
-	<20101215135508.GB8682@huya.qualcomm.com>
-	<1292424054.13887.5.camel@m0nster>
-Message-ID: <20101215153837.GB15817@huya.qualcomm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 15 Dec 2010 08:39:35 -0700 (MST)
+Subject: [PATCH v1 3/9] OMAP2420: hwmod data: add system DMA]
+In-Reply-To: <20101215121558.GE11931@GLPP-machine>
+References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
+	<1291434246-30716-4-git-send-email-manjugk@ti.com>
+	<alpine.DEB.2.00.1012141922550.15971@utopia.booyaka.com>
+	<20101215110917.GD11931@GLPP-machine>
+	<20101215121558.GE11931@GLPP-machine>
+Message-ID: <alpine.DEB.2.00.1012150833530.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 06:40:54AM -0800, Daniel Walker wrote:
+On Wed, 15 Dec 2010, G, Manjunath Kondaiah wrote:
 
-> > > -#elif defined(CONFIG_ARCH_MSM8X60)
-> > > +#elif defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960)
+> On Wed, Dec 15, 2010 at 04:39:17PM +0530, G, Manjunath Kondaiah wrote:
+> > On Tue, Dec 14, 2010 at 07:25:23PM -0700, Paul Walmsley wrote:
+> > > On Sat, 4 Dec 2010, G, Manjunath Kondaiah wrote:
+> > > 
+> > > > Add OMAP2420 DMA hwmod data and also add required
+> > > > DMA device attributes.
+> > > > 
+> > > > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> > > > Cc: Benoit Cousson <b-cousson@ti.com>
+> > > > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > > > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > > >
+> > > > +/* dma_system -> L3 */
+> > > > +static struct omap_hwmod_ocp_if omap2420_dma_system__l3 = {
+> > > > +	.master		= &omap2420_dma_system_hwmod,
+> > > > +	.slave		= &omap2420_l3_main_hwmod,
+> > > > +	.clk		= "l3_div_ck",
+> > > 
+> > > This clock does not exist on OMAP2420.  Did you test this patch on 2420?
 > > 
-> > I guess it's a matter of style, and what one is trying to emphasize.
-> > Having each one listed makes it easier to change them individually.
-> > The file is just a listing of the addresses of each chip, so I don't
-> > see much reason to try and compact it.
+> > ok. will be replaced with "sdma_ick". I don't have 2420 for testing. I
+> > tested it on 2430. My understanding is that, DMA clock interface is same
+> > for 2420 and 2430. Correct me if am wrong.
 > 
-> It just shows a deeper issue, that the namespace needs work. There's too
-> much duplication here vs. 8x60 .. If you look over this whole patchset
-> it looks very much like 8x60 was just copied over.
+> Looking into omap3/omap4 structures, this entry takes core l3 clock.
+> 
+> This should be "sdma_fck" since it's parent is core_l3_ck.
 
-There's not very much copying here, in fact there isn't very much to
-the 8960 support to begin with.  Despite the confusing names, 8960 is
-quite a bit different from 8[26]60.  I agree we would probably be best
-with different names, which might help make the difference clearer.
+The OMAP2xxx SDMA data can use either sdma_fck or core_l3_ck for its 
+functional clock.  At some point we will probably remove sdma_fck from the 
+2xxx data.  That's a relic of the pre-clkdev days, so you might as well 
+just use core_l3_ck.  Maybe just stick with sdma_ick for the interface 
+clock for right now.
 
-David
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+- Paul
