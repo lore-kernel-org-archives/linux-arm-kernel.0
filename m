@@ -1,54 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Dec 2010 16:47:57 +0000
-Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
-In-Reply-To: <201012151722.21939.arnd@arndb.de>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-	<1292244903-30392-2-git-send-email-shawn.guo@freescale.com>
-	<201012151722.21939.arnd@arndb.de>
-Message-ID: <20101215164757.GF9937@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Dec 2010 17:49:59 +0100
+Subject: [PATCH 1/9] ARM i.MX51: Add ipu clock support
+In-Reply-To: <20101215163445.GE9937@n2100.arm.linux.org.uk>
+References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
+	<201012151640.03789.arnd@arndb.de>
+	<20101215163445.GE9937@n2100.arm.linux.org.uk>
+Message-ID: <201012151749.59488.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 05:22:21PM +0100, Arnd Bergmann wrote:
-> On Monday 13 December 2010, Shawn Guo wrote:
-> > +#ifdef __ASSEMBLER__
-> > +#define IOMEM(addr)	(addr)
-> > +#else
-> > +#define IOMEM(addr)	((void __force __iomem *)(addr))
-> > +#endif
+On Wednesday 15 December 2010, Russell King - ARM Linux wrote:
+> > The regular accessor function for I/O registers is readl, which handles
+> > the access correctly with regard to atomicity, I/O ordering and byteorder.
 > 
-> This looks like a rather ugly hack to hide misuse of __iomem
-> pointers. If you pass virtual addresses of I/O registers,
-> just make them always be of type (void __iomem *), so you
-> can actually benefit from the sparse annotations, rather
-> working against them.
+> There's no possibility of those two being mis-ordered - they will be in
+> program order whatever.
+> 
+> What isn't guaranteed is the ordering between I/O accesses (accesses to
+> device memory) and SDRAM accesses (normal memory) which can pass each other
+> without additional barriers.  Memory accesses can pass I/O accesses.
 
-Err, no - you're not understanding its purpose.  It's used like so:
+Yes, that's what I meant.
 
-#define FOO_BASE		IOMEM(0xf0000000)
+> If you don't need normal vs device access ordering, using readl_relaxed()/
+> writel_relaxed() is preferred, and avoids the (apparantly rather high)
+> performance overhead of having to issue barriers all the way down to the
+> L2 cache.
 
-in headers, which means you can use FOO_BASE both in C code (and it'll
-be correctly typed) and also use it in assembly code (where it will be
-an assembly expression.)
+Well, my point was that the authors should choose their I/O accessors
+carefully. Using __raw_writel() without any explanations is a rather
+bad default, it's not designed for that. Using writel() as a default
+is usually a good choice, as we can assume it to do the right thing.
 
-The alternative is we end up with:
+writel_relaxed() is also good where appropriate, because it tells
+the reader that the driver author has thought about the I/O (vs. code)
+ordering and concluded that it's safe to do.
+ 
+> Lastly, I don't see where atomicity comes into it - __raw_writel vs writel
+> have the same atomicity.  Both are single access atomic provided they're
+> naturally aligned.  Misaligned device accesses are not predictable.
 
-#define FOO_ASM_BASE		0xf0000000
-#define FOO_C_BASE		((void __force __iomem *)0xf0000000)
+This is just what gcc turns it into today. In theory, a future gcc or
+a future cpu might change that. If you mark a pointer as
+'__attribute__((packed))', it probably already does, even for aligned
+pointers, while it does not when using writel_{,relaxed}. The point is
+that __raw_* means just that -- we don't give any guarantees on what
+happens on the bus, so people should not use it.
 
-Or worse still, we end up with stuff like:
-
-#define FOO_BASE		0xf0000000
-
-struct blah {
-	unsigned long base;
-};
-
-unsigned int blah(struct blah *b, unsigned int reg)
-{
-	return readl(b->base + reg);
-}
-
-Having IOMEM(), which can be audited to only be used in header files
-defining registers gets around such problems, and ensures that the C
-code is written more correctly than it otherwise would be.
+	Arnd
