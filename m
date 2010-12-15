@@ -1,192 +1,182 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 15 Dec 2010 14:51:41 +0100
-Subject: [PATCH v2 5/7] OMAP4: hwmod & clock data: Fix GPIO opt_clks and
-	ocp_if iclk
+Date: Wed, 15 Dec 2010 14:51:42 +0100
+Subject: [PATCH v2 6/7] OMAP2+: omap_hwmod: fix wakeup enable/disable for
+	consistency
 In-Reply-To: <1292421103-19282-1-git-send-email-b-cousson@ti.com>
 References: <1292421103-19282-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1292421103-19282-6-git-send-email-b-cousson@ti.com>
+Message-ID: <1292421103-19282-7-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix opt clocks name in clock framework and hwmod.
+From: Kevin Hilman <khilman@deeprootsystems.com>
 
-Add the missing iclk in the ocp_if structure.
+In the omap_hwmod core, most of the SYSCONFIG register helper
+functions do not directly write the register, but instead just modify
+a value passed in.
 
-Add the HWMOD_CONTROL_OPT_CLKS_IN_RESET flag to ensure
-the the GPIO optional clock is enable during reset.
+This patch converts the _enable_wakeup() and _disable_wakeup() helper
+functions to take a value argument and only modify it instead of
+actually writing the register.  This makes the wakeup helpers
+consistent with the other helper functions and avoids unintentional
+problems like the following.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Tested-by: Charulatha V <charu@ti.com>
+This problem was found after discovering that GPIO wakeups were no
+longer functional.  The root cause was that the ENAWAKEUP bit of the
+SYSCONFIG register was being unintentionaly overwritten, leaving
+wakeups disabled after the following two commits were combined:
+
+commit: 9980ce53c97392a3dbdc9d1ac3e455d79b4167ed
+        OMAP: hwmod: Enable module wakeup if in smartidle
+
+commit: 78f26e872f77b6312273216de1a8f836c6f2e143
+        OMAP: hwmod: Set autoidle after smartidle during _sysc_enable
+
+There resulting in code in _enable_sysc() was this:
+
+	/*
+	 * XXX The clock framework should handle this, by
+	 * calling into this code.  But this must wait until the
+	 * clock structures are tagged with omap_hwmod entries
+	 */
+	if ((oh->flags & HWMOD_SET_DEFAULT_CLOCKACT) &&
+	    (sf & SYSC_HAS_CLOCKACTIVITY))
+		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
+
+	_write_sysconfig(v, oh);
+
+so here, 'v' has wakeups disabled.
+
+	/* If slave is in SMARTIDLE, also enable wakeup */
+	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
+		_enable_wakeup(oh);
+
+Here wakeup is enabled in the SYSCONFIG register (but 'v' is not updated)
+
+	/*
+	 * Set the autoidle bit only after setting the smartidle bit
+	 * Setting this will not have any impact on the other modules.
+	 */
+	if (sf & SYSC_HAS_AUTOIDLE) {
+		idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
+			0 : 1;
+		_set_module_autoidle(oh, idlemode, &v);
+		_write_sysconfig(v, oh);
+	}
+
+And here, SYSCONFIG is updated again using 'v', which does not have
+wakeups enabled, resulting in ENAWAKEUP being cleared.
+
+Special thanks to Benoit Cousson for pointing out that wakeups were
+supposed to be automatically enabled when a hwmod is enabled, and thus
+helping target the root cause of this problem.
+
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/clock44xx_data.c       |   12 ++++++------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   23 +++++++++++++++++------
- 2 files changed, 23 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   32 +++++++++++++++++---------------
+ 1 files changed, 17 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index a807adc..94a1eb3 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -3110,17 +3110,17 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"emif2_fck",			&emif2_fck,	CK_443X),
- 	CLK(NULL,	"fdif_fck",			&fdif_fck,	CK_443X),
- 	CLK(NULL,	"fpka_fck",			&fpka_fck,	CK_443X),
--	CLK(NULL,	"gpio1_dbck",			&gpio1_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio1_dbclk",			&gpio1_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio1_ick",			&gpio1_ick,	CK_443X),
--	CLK(NULL,	"gpio2_dbck",			&gpio2_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio2_dbclk",			&gpio2_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio2_ick",			&gpio2_ick,	CK_443X),
--	CLK(NULL,	"gpio3_dbck",			&gpio3_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio3_dbclk",			&gpio3_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio3_ick",			&gpio3_ick,	CK_443X),
--	CLK(NULL,	"gpio4_dbck",			&gpio4_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio4_dbclk",			&gpio4_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio4_ick",			&gpio4_ick,	CK_443X),
--	CLK(NULL,	"gpio5_dbck",			&gpio5_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio5_dbclk",			&gpio5_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio5_ick",			&gpio5_ick,	CK_443X),
--	CLK(NULL,	"gpio6_dbck",			&gpio6_dbclk,	CK_443X),
-+	CLK(NULL,	"gpio6_dbclk",			&gpio6_dbclk,	CK_443X),
- 	CLK(NULL,	"gpio6_ick",			&gpio6_ick,	CK_443X),
- 	CLK(NULL,	"gpmc_ick",			&gpmc_ick,	CK_443X),
- 	CLK(NULL,	"gpu_fck",			&gpu_fck,	CK_443X),
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 8524d92..aaeb3e3 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -699,6 +699,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio1_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_wkup__gpio1 = {
- 	.master		= &omap44xx_l4_wkup_hwmod,
- 	.slave		= &omap44xx_gpio1_hwmod,
-+	.clk		= "l4_wkup_clk_mux_ck",
- 	.addr		= omap44xx_gpio1_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio1_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -710,7 +711,7 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio1_slaves[] = {
- };
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 12856eb..81c1097 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -390,9 +390,9 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
+  * Allow the hardware module @oh to send wakeups.  Returns -EINVAL
+  * upon error or 0 upon success.
+  */
+-static int _enable_wakeup(struct omap_hwmod *oh)
++static int _enable_wakeup(struct omap_hwmod *oh, u32 *v)
+ {
+-	u32 v, wakeup_mask;
++	u32 wakeup_mask;
  
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio1_dbclk" },
- };
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+@@ -405,9 +405,7 @@ static int _enable_wakeup(struct omap_hwmod *oh)
  
- static struct omap_hwmod omap44xx_gpio1_hwmod = {
-@@ -750,6 +751,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio2_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio2 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio2_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio2_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio2_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -761,12 +763,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio2_slaves[] = {
- };
+ 	wakeup_mask = (0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
  
- static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio2_dbclk" },
- };
+-	v = oh->_sysc_cache;
+-	v |= wakeup_mask;
+-	_write_sysconfig(v, oh);
++	*v |= wakeup_mask;
  
- static struct omap_hwmod omap44xx_gpio2_hwmod = {
- 	.name		= "gpio2",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio2_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio2_irqs),
- 	.main_clk	= "gpio2_ick",
-@@ -801,6 +804,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio3_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio3 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio3_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio3_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio3_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -812,12 +816,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio3_slaves[] = {
- };
+ 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
  
- static struct omap_hwmod_opt_clk gpio3_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio3_dbclk" },
- };
+@@ -423,9 +421,9 @@ static int _enable_wakeup(struct omap_hwmod *oh)
+  * Prevent the hardware module @oh to send wakeups.  Returns -EINVAL
+  * upon error or 0 upon success.
+  */
+-static int _disable_wakeup(struct omap_hwmod *oh)
++static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
+ {
+-	u32 v, wakeup_mask;
++	u32 wakeup_mask;
  
- static struct omap_hwmod omap44xx_gpio3_hwmod = {
- 	.name		= "gpio3",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio3_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio3_irqs),
- 	.main_clk	= "gpio3_ick",
-@@ -852,6 +857,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio4_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio4 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio4_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio4_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio4_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -863,12 +869,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio4_slaves[] = {
- };
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+@@ -438,9 +436,7 @@ static int _disable_wakeup(struct omap_hwmod *oh)
  
- static struct omap_hwmod_opt_clk gpio4_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio4_dbclk" },
- };
+ 	wakeup_mask = (0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
  
- static struct omap_hwmod omap44xx_gpio4_hwmod = {
- 	.name		= "gpio4",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio4_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio4_irqs),
- 	.main_clk	= "gpio4_ick",
-@@ -903,6 +910,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio5_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio5 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio5_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio5_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio5_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -914,12 +922,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio5_slaves[] = {
- };
+-	v = oh->_sysc_cache;
+-	v &= ~wakeup_mask;
+-	_write_sysconfig(v, oh);
++	*v &= ~wakeup_mask;
  
- static struct omap_hwmod_opt_clk gpio5_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio5_dbclk" },
- };
+ 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
  
- static struct omap_hwmod omap44xx_gpio5_hwmod = {
- 	.name		= "gpio5",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio5_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio5_irqs),
- 	.main_clk	= "gpio5_ick",
-@@ -954,6 +963,7 @@ static struct omap_hwmod_addr_space omap44xx_gpio6_addrs[] = {
- static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio6 = {
- 	.master		= &omap44xx_l4_per_hwmod,
- 	.slave		= &omap44xx_gpio6_hwmod,
-+	.clk		= "l4_div_ck",
- 	.addr		= omap44xx_gpio6_addrs,
- 	.addr_cnt	= ARRAY_SIZE(omap44xx_gpio6_addrs),
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -965,12 +975,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio6_slaves[] = {
- };
+@@ -788,11 +784,11 @@ static void _enable_sysc(struct omap_hwmod *oh)
+ 	    (sf & SYSC_HAS_CLOCKACTIVITY))
+ 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
  
- static struct omap_hwmod_opt_clk gpio6_opt_clks[] = {
--	{ .role = "dbclk", .clk = "sys_32k_ck" },
-+	{ .role = "dbclk", .clk = "gpio6_dbclk" },
- };
+-	_write_sysconfig(v, oh);
+-
+ 	/* If slave is in SMARTIDLE, also enable wakeup */
+ 	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
+-		_enable_wakeup(oh);
++		_enable_wakeup(oh, &v);
++
++	_write_sysconfig(v, oh);
  
- static struct omap_hwmod omap44xx_gpio6_hwmod = {
- 	.name		= "gpio6",
- 	.class		= &omap44xx_gpio_hwmod_class,
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap44xx_gpio6_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio6_irqs),
- 	.main_clk	= "gpio6_ick",
+ 	/*
+ 	 * Set the autoidle bit only after setting the smartidle bit
+@@ -2011,13 +2007,16 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
+ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ {
+ 	unsigned long flags;
++	u32 v;
+ 
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&oh->_lock, flags);
+-	_enable_wakeup(oh);
++	v = oh->_sysc_cache;
++	_enable_wakeup(oh, &v);
++	_write_sysconfig(v, oh);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+@@ -2038,13 +2037,16 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ {
+ 	unsigned long flags;
++	u32 v;
+ 
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&oh->_lock, flags);
+-	_disable_wakeup(oh);
++	v = oh->_sysc_cache;
++	_disable_wakeup(oh, &v);
++	_write_sysconfig(v, oh);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
 -- 
 1.7.0.4
