@@ -1,41 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Dec 2010 23:37:19 +0100
-Subject: [PATCH 1/7] msm: io: I/O register definitions for MSM8960
-In-Reply-To: <20101215220317.GA22394@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<201012151740.24933.arnd@arndb.de>
-	<20101215220317.GA22394@huya.qualcomm.com>
-Message-ID: <201012152337.19475.arnd@arndb.de>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Wed, 15 Dec 2010 16:49:00 -0600
+Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
+Message-ID: <AANLkTi=d58bT9TdrGQWwayt7G-h2nEtCv=M18zV48AK6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 December 2010, David Brown wrote:
-> 
-> On Wed, Dec 15, 2010 at 05:40:24PM +0100, Arnd Bergmann wrote:
-> 
-> > My point was really that they should not be exclusive, even if they
-> > are rather different. If the code is structured in a more modular
-> > way, you can turn all MSM/QSD options from the "Qualcomm MSM SoC Type"
-> > choice into separate "bool" config options. You probably don't want
-> > to do that now for all the existing ones, but I would suggest you
-> > try not add more to the pile ;-).
-> 
-> It's kind of hard to do too much of this, though, until ARM kernels
-> can be relocated.  They mostly all live at different base addresses
-> (and 8960 might also move).  Throw CPU differences into the mix and it
-> gets messier.
-> 
-> I'm not saying it isn't solvable, but there are a lot of things that
-> need to be done to get there.
+Hi Tony,
 
-Yes, I understand that it's hard for many reasons, but my impression
-is that there is a general agreement on the idea. As I said, I don't
-expect you to fix it all at once, but it shouldn't be too hard
-to take care when adding new code.
+The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
+ Linus Torvalds (1):
+       Linux 2.6.37-rc4
 
-We already have infrastructure that deals with different CPU cores
-in one kernel binary, at least from v5 to v7, and some platforms
-like omap and realview can already be built for a variety of very
-different machines without such problems.
+are available in the git repository at:
 
-	Arnd
+ git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
+
+Felipe Contreras (1):
+     OMAP: iommu: make iva2 iommu selectable
+
+Fernando Guzman Lugo (1):
+     OMAP: mailbox: change full flag per mailbox queue instead of global
+
+Guzman Lugo, Fernando (4):
+     OMAP: iovmm: no gap checking for fixed address
+     OMAP: iovmm: add superpages support to fixed da address
+     OMAP: iovmm: replace __iounmap with iounmap
+     OMAP: iommu: create new api to set valid da range
+
+Kanigeri, Hari (3):
+     OMAP: mailbox: fix checkpatch warnings
+     OMAP: mailbox: send message in process context
+     OMAP: mailbox: add notification support for multiple readers
+
+Omar Ramirez Luna (2):
+     OMAP: mailbox: remove unreachable return
+     OMAP: mailbox: fix detection for previously supported chips
+
+ arch/arm/mach-omap2/mailbox.c             |   19 +++--
+ arch/arm/mach-omap2/omap-iommu.c          |   10 ++-
+ arch/arm/plat-omap/Kconfig                |    3 +
+ arch/arm/plat-omap/include/plat/iommu.h   |    5 +
+ arch/arm/plat-omap/include/plat/mailbox.h |    8 +-
+ arch/arm/plat-omap/iommu.c                |   24 +++++
+ arch/arm/plat-omap/iovmm.c                |   81 ++++++++++--------
+ arch/arm/plat-omap/mailbox.c              |  130 +++++++++++++++++------------
+ 8 files changed, 179 insertions(+), 101 deletions(-)
+
+The above patch set is dependent on the following 2 Russell's patches.
+
+ARM: io: make iounmap() a simple macro
+ARM: io: simplify ioremap* and iounmap definitions
+Ref: http://www.spinics.net/lists/linux-omap/msg42023.html
+
+Thank you,
+Best regards,
+Hari Kanigeri
