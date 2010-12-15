@@ -1,109 +1,53 @@
-From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
-Date: Wed, 15 Dec 2010 15:38:44 +0100
-Subject: [PATCH 5/9] Add i.MX5 framebuffer driver
-In-Reply-To: <33F32152BE7EC740BC2C838D2836AC8704A9F5@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <33F32152BE7EC740BC2C838D2836AC8704A957@039-SN1MPN1-002.039d.mgd.msft.net>
-	<33F32152BE7EC740BC2C838D2836AC8704A9F5@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20101215143844.GE6017@pengutronix.de>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 15 Dec 2010 06:40:54 -0800
+Subject: [PATCH 2/7] msm: Physical offset for MSM8960
+In-Reply-To: <20101215135508.GB8682@huya.qualcomm.com>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1292384961-8851-3-git-send-email-stepanm@codeaurora.org>
+	<4D08BFFC.3020103@ru.mvista.com>
+	<20101215135508.GB8682@huya.qualcomm.com>
+Message-ID: <1292424054.13887.5.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 12:38:08PM +0000, Chen Jie-B02280 wrote:
-> Hi, Sascha,
+On Wed, 2010-12-15 at 05:55 -0800, David Brown wrote:
+> On Wed, Dec 15, 2010 at 04:17:48PM +0300, Sergei Shtylyov wrote:
 > 
-> Few comments inline with [Jason]
-
-Please consider switching to a sane mailer which is able to quote correctly.
-
+> > On 15-12-2010 6:49, Stepan Moskovchenko wrote:
+> > 
+> > > Add the physical memory offset value for the Qualcomm
+> > > MSM8960 chip.
+> > 
+> > > Signed-off-by: Stepan Moskovchenko<stepanm@codeaurora.org>
+> > [...]
+> > 
+> > > diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
+> > > index 070e17d..014bbd3 100644
+> > > --- a/arch/arm/mach-msm/include/mach/memory.h
+> > > +++ b/arch/arm/mach-msm/include/mach/memory.h
+> > > @@ -25,6 +25,8 @@
+> > >  #define PHYS_OFFSET		UL(0x00200000)
+> > >  #elif defined(CONFIG_ARCH_MSM8X60)
+> > >  #define PHYS_OFFSET		UL(0x40200000)
+> > > +#elif defined(CONFIG_ARCH_MSM8960)
+> > > +#define PHYS_OFFSET		UL(0x40200000)
+> > 
+> >     Why not:
+> > 
+> > -#elif defined(CONFIG_ARCH_MSM8X60)
+> > +#elif defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960)
 > 
-> I have following comments to this patch:
-> 1) Please modify the commit message, as IPUv3 is not embedded in i.MX50 SoC.
-> 2) ADC is not supported yet in the framebuffer driver, so please
-> modify this comment:
->   > + * Framebuffer Framebuffer Driver for SDC and ADC.
-> 3) 'ipu_dp_set_window_pos()' is called only once in
-> imx_ipu_fb_set_par_overlay(). So, the framebuffer driver doesn't
-> support to change the overlay framebuffer position. Need a
-> mechanism/interface for users to change the overlay framebuffer
-> position.
-> [Jason] DP-FG should be one fb device, sequence ioctl should be added
-> after it, like global alpha , color key etc.
+> I guess it's a matter of style, and what one is trying to emphasize.
+> Having each one listed makes it easier to change them individually.
+> The file is just a listing of the addresses of each chip, so I don't
+> see much reason to try and compact it.
 
-As said before, I have no interest in making the overlay fully
-functional atm. So either we'll leave it here for reference if someone
-ever tries to implement it properly or I'll remove it completely.
+It just shows a deeper issue, that the namespace needs work. There's too
+much duplication here vs. 8x60 .. If you look over this whole patchset
+it looks very much like 8x60 was just copied over.
 
-> > +static int imx_ipu_fb_set_par(struct fb_info *fbi)
-> > +{
-> > +       int ret;
-> > +       struct ipu_di_signal_cfg sig_cfg;
-> > +       struct imx_ipu_fb_info *mxc_fbi = fbi->par;
-> > +       u32 out_pixel_fmt;
-> > +       int interlaced = 0;
-> > +       struct fb_var_screeninfo *var = &fbi->var;
-> > +       int enabled = mxc_fbi->enabled;
-> > +
-> > +       dev_dbg(fbi->device, "Reconfiguring framebuffer %dx%d-%d\n",
-> > +               fbi->var.xres, fbi->var.yres, fbi->var.bits_per_pixel);
-> > +
-> > +       if (enabled)
-> > +               imx_ipu_fb_disable(fbi);
-> > +
-> > +       fbi->fix.line_length = var->xres_virtual * var->bits_per_pixel / 8;
-> > +
-> > +       var->yres_virtual = var->yres;
-> > +
-> > +       ret = imx_ipu_fb_map_video_memory(fbi);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       if (var->vmode & FB_VMODE_INTERLACED)
-> > +               interlaced = 1;
-> > +
-> > +       memset(&sig_cfg, 0, sizeof(sig_cfg));
-> > +       out_pixel_fmt = mxc_fbi->ipu_di_pix_fmt;
-> > +
-> > +       if (var->vmode & FB_VMODE_INTERLACED)
-> > +               sig_cfg.interlaced = 1;
-> > +       if (var->vmode & FB_VMODE_ODD_FLD_FIRST) /* PAL */
-> > +               sig_cfg.odd_field_first = 1;
-> > +       if (var->sync & FB_SYNC_EXT)
-> > +               sig_cfg.ext_clk = 1;
-> [Jason] FB_SYNC_EXT has not be used in FSL kernel mainline, it
-> represent SYNC ext, should not be flag of ext clk. Some application
-> for example X-server could not recognize it.
-
-Ok, I'll remove it.
-
-
-> > +static int imx_ipu_fb_pan_display(struct fb_var_screeninfo *var,
-> > +               struct fb_info *info)
-> > +{
-> > +       struct imx_ipu_fb_info *mxc_fbi = info->par;
-> > +       unsigned long base;
-> > +       int ret;
-> > +
-> > +       if (info->var.yoffset == var->yoffset)
-> > +               return 0;       /* No change, do nothing */
-> > +
-> > +       base = var->yoffset * var->xres_virtual * var->bits_per_pixel / 8;
-> > +       base += info->fix.smem_start;
-> > +
-> > +       ret = ipu_wait_for_interrupt(IPU_IRQ_EOF(mxc_fbi->ipu_channel_num), 100);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       if (ipu_idmac_update_channel_buffer(mxc_fbi->ipu_ch, 0, base)) {
-> > +               dev_err(info->device,
-> > +                       "Error updating SDC buf to address=0x%08lX\n", base);
-> > +       }
-> [Jason] It's better to enable double -buffer for fb which could avoid tearing issue.
-
-There is no tearing as the switching is done during vsync.
-
-
+Daniel
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
