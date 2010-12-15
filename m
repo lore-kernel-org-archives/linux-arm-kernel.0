@@ -1,74 +1,85 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 15 Dec 2010 08:12:06 -0800
-Subject: [PATCH 0/7 v2] OMAP: McSPI: Hwmod adaptation + runtime conversion
-In-Reply-To: <33183.10.24.255.18.1291212072.squirrel@dbdmail.itg.ti.com>
-	(Govindraj R.'s message of "Wed, 1 Dec 2010 19:31:12 +0530 (IST)")
-References: <33183.10.24.255.18.1291212072.squirrel@dbdmail.itg.ti.com>
-Message-ID: <87d3p3kobt.fsf@deeprootsystems.com>
+From: phorton@bitbox.co.uk (Peter Horton)
+Date: Wed, 15 Dec 2010 16:12:50 +0000
+Subject: [PATCH] i.MX51: Full iomux support
+In-Reply-To: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
+References: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4D08E902.80308@bitbox.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Govindraj.R" <govindraj.raja@ti.com> writes:
+On 15/12/2010 14:01, Sascha Hauer wrote:
+>
+> The following series picks up the patch from Lothar Wa?mann replacing
+> the struct pad_desc with a 64bit variable and adds full i.MX51 iomux
+> support based on this patch.
+> The iomux configurations are taken from the Freescale pinmux tool, so the
+> definitions should be rather complete. Anyway, there are some modes
+> not present in the tool.
+> I took the padmux settings from the old iomux support where present.
+> This series was tested on the babbage board, but due to the mass of defines
+> they are of course not completely tested, so please test yourself if
+> your board still works.
+>
 
-> Changes invloves:
-> ----------------
-> 1) Addition of hwmod data for omap2/3/4.
-> 1) McSPI driver hwmod adaptation with cleanup of base address
->    macros and using omap-device API's.
-> 2) Runtime Conversion of McSPI driver
->
-> Changes from v1:
-> ---------------
-> 1) Fixing patch 5/5 comments for hwmod+runtime
->    Split the patch 5/5 to hwmod adaptation
->    and then runtime conversion
->    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg33387.html
->
-> Testing Updates:
-> ----------------
-> Was tested using data transfer test module available at:
-> http://dev.omapzoom.org/?p=richo/device_driver_test.git;a=blob;f=mcspi/test_code/
-> utils/mcspi_modules/omap_mcspi_datatest.c;
-> h=e42ec10c5c844abdde6a7175a268b379fbbdb655;
-> hb=5d9a755d50e58de861c5e8991f2f607bc49b5dc3
+I had just started implementing an alternative solution :(
 
-Can you summarize what this test does?  
+MACROS
+======
 
-On what platforms was this tested?  
+#define _MX51_PAD_DEF(mux, pad)	.mux_ctrl_ofs = (mux), .pad_ctrl_ofs = (pad)
+#define _MX51_SIG_DEF(sel)	.select_input_ofs = (sel)
+#define _MX51_MAP_DEF(mux, sel)	.mux_mode = (mux), .select_input = (sel)
+#define _MX51_CTL_DEF(ctl)	.pad_ctrl = (ctl)
 
-How was it tested for OMAP1 and OMAP2?
+/* pad definitions */
 
-Kevin
+...
+#define _MX51_PAD_EIM_D25		_MX51_PAD_DEF(0x414, 0x080)
+...
 
-> System wide suspend and ret/off counts observation,
-> ensured that no behavioral difference with and without
-> this patch series.
->
-> Benoit Cousson (1):
->   OMAP4: hwmod data: Add McSPI
->
-> Charulatha V (5):
->   OMAP2420: hwmod data: Add McSPI
->   OMAP2430: hwmod data: Add McSPI
->   OMAP3: hwmod data: Add McSPI
->   OMAP3: clocks: Update clock domain name for mcspi fck
->   OMAP: devices: Modify McSPI device to adapt to hwmod framework
->
-> Govindraj.R (1):
->   OMAP: runtime: McSPI driver runtime conversion
->
->  arch/arm/mach-omap2/clock3xxx_data.c       |    4 +
->  arch/arm/mach-omap2/devices.c              |  189 ++++---------------
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c |  156 ++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c |  219 ++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  280 ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  267 ++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/mcspi.h    |   11 +
->  drivers/spi/omap2_mcspi.c                  |  225 +++++++---------------
->  8 files changed, 1051 insertions(+), 300 deletions(-)
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+/* signal definitions */
+
+...
+#define _MX51_SIG_UART3_RXD		_MX51_SIG_DEF(0x9f4)
+...
+
+/* pad to signal mappings */
+
+...
+#define _MX51_MAP_EIM_D25__UART3_RXD	_MX51_MAP_DEF(3, 0)
+...
+
+/* default pad control settings */
+
+...
+#define _MX51_CTL_EIM_D25__UART3_RXD	_MX51_CTL_DEF(MX51_UART3_PAD_CTRL)
+...
+
+/* external macros */
+
+#define MX51_PAD(pad, sig) \
+	{ _MX51_PAD_##pad, _MX51_SIG_##sig, _MX51_MAP_##pad##__##sig, 
+_MX51_CTL_##pad##__##sig }
+
+#define MX51_PAD_CTL(pad, sig, ctl) \
+	{ _MX51_PAD_##pad, _MX51_SIG_##sig, _MX51_MAP_##pad##__##sig, 
+_MX51_CTL_DEF(ctl) }
+
+USAGE
+=====
+
+/* using the default pad control value */
+
+static iomux_v3_cfg_t board_pads[] = {
+	...
+	MX51_PAD(EIM_D25, UART3_RXD),
+	...
+};
+
+/* specifying a pad control value */
+
+static iomux_v3_cfg_t board_pads[] = {
+	...
+	MX51_PAD_CTL(EIM_D25, UART3_RXD, PAD_CTL_DSE_HIGH),
+	...
+};
