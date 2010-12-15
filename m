@@ -1,50 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Dec 2010 17:27:54 +0000
-Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
-In-Reply-To: <201012151817.33671.arnd@arndb.de>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-	<201012151758.42896.arnd@arndb.de>
-	<20101215170636.GJ28971@pengutronix.de>
-	<201012151817.33671.arnd@arndb.de>
-Message-ID: <20101215172754.GI9937@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Dec 2010 09:37:12 -0800
+Subject: [PATCH 2/2] arm: mach-omap2: Kconfig: devkit8000 should select
+	needed options
+In-Reply-To: <1292417352-18082-2-git-send-email-aaro.koskinen@nokia.com>
+References: <1292417352-18082-1-git-send-email-aaro.koskinen@nokia.com>
+	<1292417352-18082-2-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20101215173709.GB8406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 06:17:33PM +0100, Arnd Bergmann wrote:
-> The problem is that __raw_* is defined as a pointer reference on
-> all architectures, nothing more. Depending on the architecture and
-> compiler, sometimes even on the I/O subsystem, it may or may not
-> do any of the following:
+Hi Aaro,
+
+* Aaro Koskinen <aaro.koskinen@nokia.com> [101215 04:48]:
+> It's not possible to compile a kernel for this board without I2C,
+> MFD_SUPPORT and TWL4030_CORE, so those should be selected. This will
+> prevent build errors when trying out different configurations.
+
+This one I'm not so convinced about. We should be able to compile
+support for each board and enable and disable these kind of options
+just fine if CONFIG_ARCH_OMAP2PLUS_TYPICAL is disabled.
+
+In the long run we really want to have just a minimal kernel
+and have everything else as modules for the default configs
+and boot using initramfs.
+
+Probably the best way to deal with issues like this is to
+have omap generic platform init code for the common devices
+that gets built if those options are selected. Otherwise
+we'll end up with ifdefs all over the board-*.c files.
+
+Regards,
+
+Tony
+ 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> * work on mapped PCI addresses
-> * work on mapped non-PCI addresses
-> * work on addresses returned from ioport_map
-> * be synchronized with spinlocks
-
-Err.  Even readl/writel are not synchronized with spinlocks.  See
-Documentation/memory-barriers.txt:
-
-| Under certain circumstances (especially involving NUMA), I/O accesses within
-| two spinlocked sections on two different CPUs may be seen as interleaved by the
-| PCI bridge, because the PCI bridge does not necessarily participate in the
-| cache-coherence protocol, and is therefore incapable of issuing the required
-| read memory barriers.
-|
-| For example:
-|
-|       CPU 1                           CPU 2
-|       =============================== ===============================
-|       spin_lock(Q)
-|       writel(0, ADDR)
-|       writel(1, DATA);
-|       spin_unlock(Q);
-|                                       spin_lock(Q);
-|                                       writel(4, ADDR);
-|                                       writel(5, DATA);
-|                                       spin_unlock(Q);
-|
-| may be seen by the PCI bridge as follows:
-|
-|       STORE *ADDR = 0, STORE *ADDR = 4, STORE *DATA = 1, STORE *DATA = 5
-|
-| which would probably cause the hardware to malfunction.
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index db20351..bb32f35 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -129,6 +129,10 @@ config MACH_DEVKIT8000
+>  	default y
+>  	select OMAP_PACKAGE_CUS
+>  	select OMAP_MUX
+> +	select I2C
+> +	select I2C_OMAP
+> +	select MFD_SUPPORT
+> +	select TWL4030_CORE
+>  
+>  config MACH_OMAP_LDP
+>  	bool "OMAP3 LDP board"
+> -- 
+> 1.5.6.5
+> 
