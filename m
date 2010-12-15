@@ -1,32 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Dec 2010 16:12:13 +0000
-Subject: [PATCH] MTD: m25p80: add debugging trace in sst_write()
-In-Reply-To: <4D08C1C8.3090100@ru.mvista.com>
-References: <1292414372-17085-1-git-send-email-nicolas.ferre@atmel.com>
-	<4D08C1C8.3090100@ru.mvista.com>
-Message-ID: <20101215161213.GC9937@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Dec 2010 17:22:21 +0100
+Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
+In-Reply-To: <1292244903-30392-2-git-send-email-shawn.guo@freescale.com>
+References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+	<1292244903-30392-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <201012151722.21939.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 04:25:28PM +0300, Sergei Shtylyov wrote:
->> +	DEBUG(MTD_DEBUG_LEVEL2, "%s: %s %s 0x%08x, len %zd\n",
->> +			dev_name(&flash->spi->dev), __func__, "to",
->
->    What's the point of printing "to" as variable? :-)
+On Monday 13 December 2010, Shawn Guo wrote:
+> Add core definitions for MXS-based SoC MX23 and MX28.
 
-One valid reason to do this is if you have several formatting strings
-all the same.  GCC can merge identical strings together.
+How different are these from the MXC SoCs? Is it really
+worth having a totally separate plat-* directory for them?
 
-So, if you have:
+AFAICT, combining the two would make it much easier to build
+a kernel that works on mx23/28 as well as mx25 or the later
+MXS implementations.
 
- "%s: %s %s 0x%08x, len %zd", dev_name(), __func__, "to"
- "%s: %s %s 0x%08x, len %zd", dev_name(), __func__, "from"
- "%s: %s %s 0x%08x, len %zd", dev_name(), __func__, "foo"
+> diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
+> new file mode 100644
+> index 0000000..53e89a0
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/hardware.h
+> +
+> +#ifndef __MACH_MXS_HARDWARE_H__
+> +#define __MACH_MXS_HARDWARE_H__
+> +
+> +#ifdef __ASSEMBLER__
+> +#define IOMEM(addr)	(addr)
+> +#else
+> +#define IOMEM(addr)	((void __force __iomem *)(addr))
+> +#endif
 
-Then you end up with one long string and three short strings instead of
+This looks like a rather ugly hack to hide misuse of __iomem
+pointers. If you pass virtual addresses of I/O registers,
+just make them always be of type (void __iomem *), so you
+can actually benefit from the sparse annotations, rather
+working against them.
 
- "%s: %s to 0x%08x, len %zd", dev_name(), __func__
- "%s: %s from 0x%08x, len %zd", dev_name(), __func__
- "%s: %s foo 0x%08x, len %zd", dev_name(), __func__
+> +
+> +#ifndef __ASSEMBLER__
+> +static inline void __mxs_setl(u32 mask, void __iomem *reg)
+> +{
+> +	__raw_writel(mask, reg + MXS_SET_ADDR);
+> +}
+> +
+> +static inline void __mxs_clrl(u32 mask, void __iomem *reg)
+> +{
+> +	__raw_writel(mask, reg + MXS_CLR_ADDR);
+> +}
+> +
+> +static inline void __mxs_togl(u32 mask, void __iomem *reg)
+> +{
+> +	__raw_writel(mask, reg + MXS_TOG_ADDR);
+> +}
+> +#endif
 
-which'd be three long strings.
+Why __raw_writel()? All regular I/O accesses should use
+readl/writel etc, not the internal helpers.
+
+	Arnd
