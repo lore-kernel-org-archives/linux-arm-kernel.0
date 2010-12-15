@@ -1,36 +1,30 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 15 Dec 2010 16:25:28 +0300
-Subject: [PATCH] MTD: m25p80: add debugging trace in sst_write()
-In-Reply-To: <1292414372-17085-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1292414372-17085-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4D08C1C8.3090100@ru.mvista.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 15 Dec 2010 05:44:14 -0800
+Subject: [PATCH v5 5/5] msm: add SMP support for msm
+In-Reply-To: <AANLkTimnuTcv+5cWNzvV-Z=1LHsAmTojDSBJMjjOs7K+@mail.gmail.com>
+References: <1292302233-16194-1-git-send-email-johlstei@codeaurora.org>
+	<1292302233-16194-6-git-send-email-johlstei@codeaurora.org>
+	<AANLkTimnuTcv+5cWNzvV-Z=1LHsAmTojDSBJMjjOs7K+@mail.gmail.com>
+Message-ID: <20101215134414.GA8682@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Dec 15, 2010 at 12:35:18PM +0000, Catalin Marinas wrote:
+> On 14 December 2010 04:50, Jeff Ohlstein <johlstei@codeaurora.org> wrote:
+> > + ? ? ? outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+> > + ? ? ? __asm__("sev");
+> > + ? ? ? dsb();
+> 
+> What's the need for the dsb() here (one before SEV maybe)?
+> 
+> Also, do we need to add a "memory" clobber to the SEV asm, not sure
+> whether the compiler would try to reorder the code.
 
-On 15-12-2010 14:59, Nicolas Ferre wrote:
+It doesn't seem to, but it seems to me that it would be allowed to,
+so, I would think the "memory" clobber should be there.
 
-> Add a DEBUG(MTD_DEBUG_LEVEL2, ..) trace at beginning of sst_write() function as
-> it is done in m25p80_write() function.
+David
 
-> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-[...]
-
-> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-> index bf5a002..e6b5707 100644
-> --- a/drivers/mtd/devices/m25p80.c
-> +++ b/drivers/mtd/devices/m25p80.c
-> @@ -482,6 +482,10 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
->   	size_t actual;
->   	int cmd_sz, ret;
->
-> +	DEBUG(MTD_DEBUG_LEVEL2, "%s: %s %s 0x%08x, len %zd\n",
-> +			dev_name(&flash->spi->dev), __func__, "to",
-
-    What's the point of printing "to" as variable? :-)
-
-> +			(u32)to, len);
-> +
-
-WBR, Sergei
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
