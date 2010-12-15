@@ -1,185 +1,137 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Wed, 15 Dec 2010 03:03:48 +0100
-Subject: [PATCH 12/16] ARM: pxa: Provide gpiolib ->to_irq() implementation.
+Date: Wed, 15 Dec 2010 03:03:40 +0100
+Subject: [PATCH 09/16] ARM: ep93xx: Switch over to gpiolib ->to_irq() and
+	__gpio_to_irq().
 In-Reply-To: <cover.1292377339.git.buytenh@wantstofly.org>
 References: <cover.1292377339.git.buytenh@wantstofly.org>
-Message-ID: <20101215020348.GE15575@mail.wantstofly.org>
+Message-ID: <20101215020340.GB15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-mmp/mmp2.c              |    3 ++-
- arch/arm/mach-mmp/pxa168.c            |    3 ++-
- arch/arm/mach-mmp/pxa910.c            |    3 ++-
- arch/arm/mach-pxa/pxa25x.c            |    6 ++++--
- arch/arm/mach-pxa/pxa27x.c            |    3 ++-
- arch/arm/mach-pxa/pxa3xx.c            |    3 ++-
- arch/arm/plat-pxa/gpio.c              |   19 ++++++++++++++++++-
- arch/arm/plat-pxa/include/plat/gpio.h |    5 ++++-
- 8 files changed, 36 insertions(+), 9 deletions(-)
+ arch/arm/mach-ep93xx/gpio.c              |   31 +++++++++++++++++++++--------
+ arch/arm/mach-ep93xx/include/mach/gpio.h |    8 +++---
+ arch/arm/mach-ep93xx/include/mach/irqs.h |    4 +++
+ 3 files changed, 30 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index daf3993..8fcfad3 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -106,7 +106,8 @@ static void __init mmp2_init_gpio(void)
- 	for (i = 0; i < 6; i++)
- 		__raw_writel(0xffffffff, APMASK(i));
+diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
+index cf547ad..d2b8d77 100644
+--- a/arch/arm/mach-ep93xx/gpio.c
++++ b/arch/arm/mach-ep93xx/gpio.c
+@@ -258,6 +258,7 @@ struct ep93xx_gpio_chip {
  
--	pxa_init_gpio(IRQ_MMP2_GPIO, 0, 167, NULL);
-+	pxa_init_gpio(IRQ_MMP2_GPIO, IRQ_GPIO_START, IRQ_GPIO_START,
-+		      0, 167, NULL);
- }
- 
- void __init mmp2_init_irq(void)
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 72b4e76..a4bf158 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -54,7 +54,8 @@ static void __init pxa168_init_gpio(void)
- 	for (i = 0; i < 4; i++)
- 		__raw_writel(0xffffffff, APMASK(i));
- 
--	pxa_init_gpio(IRQ_PXA168_GPIOX, 0, 127, NULL);
-+	pxa_init_gpio(IRQ_PXA168_GPIOX, IRQ_GPIO_START, IRQ_GPIO_START,
-+		      0, 127, NULL);
- }
- 
- void __init pxa168_init_irq(void)
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index 46f2d69..c0c25d0 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -91,7 +91,8 @@ static void __init pxa910_init_gpio(void)
- 	for (i = 0; i < 4; i++)
- 		__raw_writel(0xffffffff, APMASK(i));
- 
--	pxa_init_gpio(IRQ_PXA910_AP_GPIO, 0, 127, NULL);
-+	pxa_init_gpio(IRQ_PXA910_AP_GPIO, IRQ_GPIO_START, IRQ_GPIO_START,
-+		      0, 127, NULL);
- }
- 
- void __init pxa910_init_irq(void)
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index de53f2e..9b943f1 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -309,14 +309,16 @@ set_pwer:
- void __init pxa25x_init_irq(void)
- {
- 	pxa_init_irq(32, pxa25x_set_wake);
--	pxa_init_gpio(IRQ_GPIO_2_x, 2, 84, pxa25x_set_wake);
-+	pxa_init_gpio(IRQ_GPIO_2_x, IRQ_GPIO0, PXA_GPIO_IRQ_BASE,
-+		      2, 84, pxa25x_set_wake);
- }
- 
- #ifdef CONFIG_CPU_PXA26x
- void __init pxa26x_init_irq(void)
- {
- 	pxa_init_irq(32, pxa25x_set_wake);
--	pxa_init_gpio(IRQ_GPIO_2_x, 2, 89, pxa25x_set_wake);
-+	pxa_init_gpio(IRQ_GPIO_2_x, IRQ_GPIO0, PXA_GPIO_IRQ_BASE,
-+		      2, 89, pxa25x_set_wake);
- }
- #endif
- 
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index d1fbf29..bf0d7e9 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -367,7 +367,8 @@ static int pxa27x_set_wake(unsigned int irq, unsigned int on)
- void __init pxa27x_init_irq(void)
- {
- 	pxa_init_irq(34, pxa27x_set_wake);
--	pxa_init_gpio(IRQ_GPIO_2_x, 2, 120, pxa27x_set_wake);
-+	pxa_init_gpio(IRQ_GPIO_2_x, IRQ_GPIO0, PXA_GPIO_IRQ_BASE,
-+		      2, 120, pxa27x_set_wake);
- }
- 
- /*
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index d1c747c..41c7fc3 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -577,7 +577,8 @@ void __init pxa3xx_init_irq(void)
- 
- 	pxa_init_irq(56, pxa3xx_set_wake);
- 	pxa_init_ext_wakeup_irq(pxa3xx_set_wake);
--	pxa_init_gpio(IRQ_GPIO_2_x, 2, 127, NULL);
-+	pxa_init_gpio(IRQ_GPIO_2_x, IRQ_GPIO0, PXA_GPIO_IRQ_BASE,
-+		      2, 127, NULL);
- }
- 
- /*
-diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
-index 98548c6..1df5f13 100644
---- a/arch/arm/plat-pxa/gpio.c
-+++ b/arch/arm/plat-pxa/gpio.c
-@@ -20,6 +20,8 @@
- 
- #include <mach/gpio.h>
- 
-+int pxa_secondary_irq_0_base;
-+int pxa_secondary_irq_2_base;
- int pxa_last_gpio;
- 
- struct pxa_gpio_chip {
-@@ -107,6 +109,16 @@ static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 				(value ? GPSR_OFFSET : GPCR_OFFSET));
- }
- 
-+static int pxa_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	int gpio = chip->base + offset;
-+
-+	if (gpio < 2)
-+		return pxa_secondary_irq_0_base + gpio;
-+	else
-+		return pxa_secondary_irq_2_base + gpio;
-+}
-+
- static int __init pxa_init_gpio_chip(int gpio_end)
- {
- 	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
-@@ -131,6 +143,7 @@ static int __init pxa_init_gpio_chip(int gpio_end)
- 		c->direction_output = pxa_gpio_direction_output;
- 		c->get = pxa_gpio_get;
- 		c->set = pxa_gpio_set;
-+		c->to_irq = pxa_gpio_to_irq;
- 
- 		/* number of GPIOs on last bank may be less than 32 */
- 		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
-@@ -266,11 +279,15 @@ static struct irq_chip pxa_muxed_gpio_chip = {
- 	.set_type	= pxa_gpio_irq_type,
+ 	void __iomem		*data_reg;
+ 	void __iomem		*data_dir_reg;
++	int			base_irq;
  };
  
--void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
-+void __init pxa_init_gpio(int mux_irq, int secondary_irq_0_base,
-+			  int secondary_irq_2_base,
-+			  int start, int end, set_wake_t fn)
- {
- 	struct pxa_gpio_chip *c;
- 	int gpio, irq;
+ #define to_ep93xx_gpio_chip(c) container_of(c, struct ep93xx_gpio_chip, chip)
+@@ -335,6 +336,16 @@ static void ep93xx_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+ 	local_irq_restore(flags);
+ }
  
-+	pxa_secondary_irq_0_base = secondary_irq_0_base;
-+	pxa_secondary_irq_2_base = secondary_irq_2_base;
- 	pxa_last_gpio = end;
- 
- 	/* Initialize GPIO chips */
-diff --git a/arch/arm/plat-pxa/include/plat/gpio.h b/arch/arm/plat-pxa/include/plat/gpio.h
-index 44248cb..60c0f83 100644
---- a/arch/arm/plat-pxa/include/plat/gpio.h
-+++ b/arch/arm/plat-pxa/include/plat/gpio.h
-@@ -58,5 +58,8 @@ extern int pxa_last_gpio;
- 
- typedef int (*set_wake_t)(unsigned int irq, unsigned int on);
- 
--extern void pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn);
-+extern void pxa_init_gpio(int mux_irq, int secondary_irq_0_base,
-+			  int secondary_irq_2_base,
-+			  int start, int end, set_wake_t fn);
++static int ep93xx_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
 +
- #endif /* __PLAT_GPIO_H */
++	if (ep93xx_chip->base_irq != NO_IRQ)
++		return ep93xx_chip->base_irq + offset;
++
++	return -EINVAL;
++}
++
+ static void ep93xx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ {
+ 	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
+@@ -396,7 +407,7 @@ static void ep93xx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	}
+ }
+ 
+-#define EP93XX_GPIO_BANK(name, dr, ddr, base_gpio)			\
++#define EP93XX_GPIO_BANK(name, dr, ddr, base_gpio, _base_irq)		\
+ 	{								\
+ 		.chip = {						\
+ 			.label		  = name,			\
+@@ -404,23 +415,25 @@ static void ep93xx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 			.direction_output = ep93xx_gpio_direction_output, \
+ 			.get		  = ep93xx_gpio_get,		\
+ 			.set		  = ep93xx_gpio_set,		\
++			.to_irq		  = ep93xx_gpio_to_irq,		\
+ 			.dbg_show	  = ep93xx_gpio_dbg_show,	\
+ 			.base		  = base_gpio,			\
+ 			.ngpio		  = 8,				\
+ 		},							\
+ 		.data_reg	= EP93XX_GPIO_REG(dr),			\
+ 		.data_dir_reg	= EP93XX_GPIO_REG(ddr),			\
++		.base_irq	= _base_irq,				\
+ 	}
+ 
+ static struct ep93xx_gpio_chip ep93xx_gpio_banks[] = {
+-	EP93XX_GPIO_BANK("A", 0x00, 0x10, 0),
+-	EP93XX_GPIO_BANK("B", 0x04, 0x14, 8),
+-	EP93XX_GPIO_BANK("C", 0x08, 0x18, 40),
+-	EP93XX_GPIO_BANK("D", 0x0c, 0x1c, 24),
+-	EP93XX_GPIO_BANK("E", 0x20, 0x24, 32),
+-	EP93XX_GPIO_BANK("F", 0x30, 0x34, 16),
+-	EP93XX_GPIO_BANK("G", 0x38, 0x3c, 48),
+-	EP93XX_GPIO_BANK("H", 0x40, 0x44, 56),
++	EP93XX_GPIO_BANK("A", 0x00, 0x10,  0, IRQ_EP93XX_GPIO_A),
++	EP93XX_GPIO_BANK("B", 0x04, 0x14,  8, IRQ_EP93XX_GPIO_B),
++	EP93XX_GPIO_BANK("C", 0x08, 0x18, 40, NO_IRQ),
++	EP93XX_GPIO_BANK("D", 0x0c, 0x1c, 24, NO_IRQ),
++	EP93XX_GPIO_BANK("E", 0x20, 0x24, 32, NO_IRQ),
++	EP93XX_GPIO_BANK("F", 0x30, 0x34, 16, IRQ_EP93XX_GPIO_F),
++	EP93XX_GPIO_BANK("G", 0x38, 0x3c, 48, NO_IRQ),
++	EP93XX_GPIO_BANK("H", 0x40, 0x44, 56, NO_IRQ),
+ };
+ 
+ void __init ep93xx_gpio_init(void)
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
+index c991b14..a43d992 100644
+--- a/arch/arm/mach-ep93xx/include/mach/gpio.h
++++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
+@@ -5,6 +5,8 @@
+ #ifndef __ASM_ARCH_GPIO_H
+ #define __ASM_ARCH_GPIO_H
+ 
++#include <mach/irqs.h>
++
+ /* GPIO port A.  */
+ #define EP93XX_GPIO_LINE_A(x)		((x) + 0)
+ #define EP93XX_GPIO_LINE_EGPIO0		EP93XX_GPIO_LINE_A(0)
+@@ -108,15 +110,13 @@ extern void ep93xx_gpio_int_debounce(unsigned int irq, int enable);
+ #define gpio_get_value	__gpio_get_value
+ #define gpio_set_value	__gpio_set_value
+ #define gpio_cansleep	__gpio_cansleep
++#define gpio_to_irq	__gpio_to_irq
+ 
+ /*
+  * Map GPIO A0..A7  (0..7)  to irq 64..71,
+  *          B0..B7  (7..15) to irq 72..79, and
+  *          F0..F7 (16..24) to irq 80..87.
+  */
+-#define gpio_to_irq(gpio)	\
+-	(((gpio) <= EP93XX_GPIO_LINE_MAX_IRQ) ? (64 + (gpio)) : -EINVAL)
+-
+-#define irq_to_gpio(irq)	((irq) - gpio_to_irq(0))
++#define irq_to_gpio(irq)	((irq) - IRQ_EP93XX_GPIO_A)
+ 
+ #endif
+diff --git a/arch/arm/mach-ep93xx/include/mach/irqs.h b/arch/arm/mach-ep93xx/include/mach/irqs.h
+index ff98390..ee95ac5 100644
+--- a/arch/arm/mach-ep93xx/include/mach/irqs.h
++++ b/arch/arm/mach-ep93xx/include/mach/irqs.h
+@@ -67,6 +67,10 @@
+ #define IRQ_EP93XX_SAI			60
+ #define EP93XX_VIC2_VALID_IRQ_MASK	0x1fffffff
+ 
++#define IRQ_EP93XX_GPIO_A		64
++#define IRQ_EP93XX_GPIO_B		72
++#define IRQ_EP93XX_GPIO_F		80
++
+ #define NR_EP93XX_IRQS			(64 + 24)
+ 
+ #define EP93XX_BOARD_IRQ(x)		(NR_EP93XX_IRQS + (x))
 -- 
 1.7.1
