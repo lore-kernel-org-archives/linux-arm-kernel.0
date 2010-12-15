@@ -1,78 +1,51 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 15 Dec 2010 10:18:45 +0800
-Subject: [PATCH 16/16] ARM: w90x900: Switch over to gpiolib ->to_irq() and
-	__gpio_to_irq().
-In-Reply-To: <20101215020403.GI15575@mail.wantstofly.org>
-References: <cover.1292377339.git.buytenh@wantstofly.org>
-	<20101215020403.GI15575@mail.wantstofly.org>
-Message-ID: <AANLkTi=iF8DGprHKj6Z1gGM=TA2kkU1WakFNjNbc+7og@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 14 Dec 2010 19:25:23 -0700 (MST)
+Subject: [PATCH v1 3/9] OMAP2420: hwmod data: add system DMA
+In-Reply-To: <1291434246-30716-4-git-send-email-manjugk@ti.com>
+References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
+	<1291434246-30716-4-git-send-email-manjugk@ti.com>
+Message-ID: <alpine.DEB.2.00.1012141922550.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/15 Lennert Buytenhek <buytenh@wantstofly.org>:
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-> ---
-> ?arch/arm/mach-w90x900/gpio.c ? ? ? ? ? ? ?| ? ?6 ++++++
-> ?arch/arm/mach-w90x900/include/mach/gpio.h | ? ?6 +-----
-> ?2 files changed, 7 insertions(+), 5 deletions(-)
+Manju
+
+On Sat, 4 Dec 2010, G, Manjunath Kondaiah wrote:
+
+> Add OMAP2420 DMA hwmod data and also add required
+> DMA device attributes.
+> 
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 >
-> diff --git a/arch/arm/mach-w90x900/gpio.c b/arch/arm/mach-w90x900/gpio.c
-> index ba05aec..dbf1825 100644
-> --- a/arch/arm/mach-w90x900/gpio.c
-> +++ b/arch/arm/mach-w90x900/gpio.c
-> @@ -40,6 +40,7 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?.direction_output = nuc900_dir_output, ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ?.get ? ? ? ? ? ? ?= nuc900_gpio_get, ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ?.set ? ? ? ? ? ? ?= nuc900_gpio_set, ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? .to_irq ? ? ? ? ? = nuc900_gpio_to_irq, ? ? ? ? \
-> ? ? ? ? ? ? ? ? ? ? ? ?.base ? ? ? ? ? ? = base_gpio, ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ?.ngpio ? ? ? ? ? ?= nr_gpio, ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?} ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> @@ -130,6 +131,11 @@ static int nuc900_dir_output(struct gpio_chip *chip, unsigned offset, int val)
-> ? ? ? ?return 0;
-> ?}
->
-> +static int nuc900_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-> +{
-> + ? ? ? return chip->base + offset;
-> +}
-> +
-> ?static struct nuc900_gpio_chip nuc900_gpio[] = {
-> ? ? ? ?NUC900_GPIO_CHIP("GROUPC", 0, 16),
-> ? ? ? ?NUC900_GPIO_CHIP("GROUPD", 16, 10),
-> diff --git a/arch/arm/mach-w90x900/include/mach/gpio.h b/arch/arm/mach-w90x900/include/mach/gpio.h
-> index 034da3e..f9b9a37 100644
-> --- a/arch/arm/mach-w90x900/include/mach/gpio.h
-> +++ b/arch/arm/mach-w90x900/include/mach/gpio.h
-> @@ -20,11 +20,7 @@
-> ?#define gpio_get_value __gpio_get_value
-> ?#define gpio_set_value __gpio_set_value
-> ?#define gpio_cansleep ?__gpio_cansleep
-> -
-> -static inline int gpio_to_irq(unsigned gpio)
-> -{
-> - ? ? ? return gpio;
-> -}
-> +#define gpio_to_irq ? ?__gpio_to_irq
->
-> ?static inline int irq_to_gpio(unsigned irq)
-> ?{
+> +/* dma_system -> L3 */
+> +static struct omap_hwmod_ocp_if omap2420_dma_system__l3 = {
+> +	.master		= &omap2420_dma_system_hwmod,
+> +	.slave		= &omap2420_l3_main_hwmod,
+> +	.clk		= "l3_div_ck",
 
-Acked-by : Wan zongshun <mcuos.com@gmail.com>
-> --
-> 1.7.1
->
+This clock does not exist on OMAP2420.  Did you test this patch on 2420?
+
+> +/* l4_cfg -> dma_system */
+> +static struct omap_hwmod_ocp_if omap2420_l4_core__dma_system = {
+> +	.master		= &omap2420_l4_core_hwmod,
+> +	.slave		= &omap2420_dma_system_hwmod,
+> +	.clk		= "l4_div_ck",
+
+Nor does this clock exist on OMAP2420.
+
+> +static struct omap_hwmod omap2420_dma_system_hwmod = {
+> +	.name		= "dma",
+> +	.class		= &omap2420_dma_hwmod_class,
+> +	.mpu_irqs	= omap2420_dma_system_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap2420_dma_system_irqs),
+> +	.main_clk	= "l3_div_ck",
+
+And neither does this one.
+
+Please fix these and test on OMAP2420 before sending the fixed patches.
 
 
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+- Paul
