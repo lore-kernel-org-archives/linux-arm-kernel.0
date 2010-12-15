@@ -1,57 +1,29 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Wed, 15 Dec 2010 16:49:00 -0600
-Subject: [GIT PULL] OMAP: mailbox and iommu changes: for-next for v2.6.38
-Message-ID: <AANLkTi=d58bT9TdrGQWwayt7G-h2nEtCv=M18zV48AK6@mail.gmail.com>
+From: kernelccrazy@gmail.com (y bhanu)
+Date: Wed, 15 Dec 2010 14:54:57 -0800
+Subject: dma_cache_sync replacement call
+Message-ID: <AANLkTi=p3eaVKUNvxLCThhDC534j_SX+TUtxYgGfu40Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi guys,
 
-The following changes since commit e8a7e48bb248a1196484d3f8afa53bded2b24e71:
- Linus Torvalds (1):
-       Linux 2.6.37-rc4
+I am porting a Linux wireless driver from MIPS to ARM (ixp4xx).
 
-are available in the git repository at:
+As dma_cache_sync() is not implemented for ARM ,I get some nasty errors:
+I am not sure whats the replacement for this deprecated call under ARM.
 
- git://gitorious.org/iommu_mailbox/iommu_mailbox.git for_2.6.38
+can  anyone help figure out what use instread of dma_cache_sync() &
+dma_cache_wback_inv() calls?
 
-Felipe Contreras (1):
-     OMAP: iommu: make iva2 iommu selectable
+Missing dma_cache_sync & dma_cache_wback_inv under arch/arm/*
 
-Fernando Guzman Lugo (1):
-     OMAP: mailbox: change full flag per mailbox queue instead of global
+Erorr log
+~~~~~~~
+if_bus.c:32: error: implicit declaration of function 'dma_cache_sync'
+if_bus.c: In function 'bus_map_single':
+if_bus.c:49: error: implicit declaration of function 'dma_cache_wback_inv'
+if_bus.o] Error 1
+make[8]: *** [th_dev] Error 2
 
-Guzman Lugo, Fernando (4):
-     OMAP: iovmm: no gap checking for fixed address
-     OMAP: iovmm: add superpages support to fixed da address
-     OMAP: iovmm: replace __iounmap with iounmap
-     OMAP: iommu: create new api to set valid da range
-
-Kanigeri, Hari (3):
-     OMAP: mailbox: fix checkpatch warnings
-     OMAP: mailbox: send message in process context
-     OMAP: mailbox: add notification support for multiple readers
-
-Omar Ramirez Luna (2):
-     OMAP: mailbox: remove unreachable return
-     OMAP: mailbox: fix detection for previously supported chips
-
- arch/arm/mach-omap2/mailbox.c             |   19 +++--
- arch/arm/mach-omap2/omap-iommu.c          |   10 ++-
- arch/arm/plat-omap/Kconfig                |    3 +
- arch/arm/plat-omap/include/plat/iommu.h   |    5 +
- arch/arm/plat-omap/include/plat/mailbox.h |    8 +-
- arch/arm/plat-omap/iommu.c                |   24 +++++
- arch/arm/plat-omap/iovmm.c                |   81 ++++++++++--------
- arch/arm/plat-omap/mailbox.c              |  130 +++++++++++++++++------------
- 8 files changed, 179 insertions(+), 101 deletions(-)
-
-The above patch set is dependent on the following 2 Russell's patches.
-
-ARM: io: make iounmap() a simple macro
-ARM: io: simplify ioremap* and iounmap definitions
-Ref: http://www.spinics.net/lists/linux-omap/msg42023.html
-
-Thank you,
-Best regards,
-Hari Kanigeri
+Thanks,
+Bhan
