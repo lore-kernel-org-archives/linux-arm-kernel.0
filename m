@@ -1,28 +1,32 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 15 Dec 2010 11:37:45 +0200
-Subject: [PATCH v2] MTD: NAND: ams-delta: convert to platform driver
-In-Reply-To: <201012142109.42784.jkrzyszt@tis.icnet.pl>
-References: <201012111840.05270.jkrzyszt@tis.icnet.pl>
-	<1292346023.2538.103.camel@localhost>
-	<201012142109.42784.jkrzyszt@tis.icnet.pl>
-Message-ID: <1292405865.2512.28.camel@localhost>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 15 Dec 2010 12:59:32 +0100
+Subject: [PATCH] MTD: m25p80: add debugging trace in sst_write()
+Message-ID: <1292414372-17085-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-12-14 at 21:09 +0100, Janusz Krzysztofik wrote:
-> In its current form, the driver may interfere with different hardware on 
-> different boards if built into the kernel, hence is not suitable for 
-> inclusion into a defconfig, inteded to be usable with multiple OMAP1 cpu and 
-> machine types.
-> 
-> Convert it to a platform driver, that should be free from this issue.
-> 
-> Created and tested against linux-2.6.37-rc5 on Amstrad Delta.
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Add a DEBUG(MTD_DEBUG_LEVEL2, ..) trace at beginning of sst_write() function as
+it is done in m25p80_write() function.
 
-Pushed to l2-mtd-2.6.git, thanks!
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mtd/devices/m25p80.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index bf5a002..e6b5707 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -482,6 +482,10 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
+ 	size_t actual;
+ 	int cmd_sz, ret;
+ 
++	DEBUG(MTD_DEBUG_LEVEL2, "%s: %s %s 0x%08x, len %zd\n",
++			dev_name(&flash->spi->dev), __func__, "to",
++			(u32)to, len);
++
+ 	*retlen = 0;
+ 
+ 	/* sanity checks */
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+1.7.3
