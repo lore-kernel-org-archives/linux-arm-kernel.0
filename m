@@ -1,57 +1,56 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 15 Dec 2010 12:35:18 +0000
-Subject: [PATCH v5 5/5] msm: add SMP support for msm
-In-Reply-To: <1292302233-16194-6-git-send-email-johlstei@codeaurora.org>
-References: <1292302233-16194-1-git-send-email-johlstei@codeaurora.org>
-	<1292302233-16194-6-git-send-email-johlstei@codeaurora.org>
-Message-ID: <AANLkTimnuTcv+5cWNzvV-Z=1LHsAmTojDSBJMjjOs7K+@mail.gmail.com>
+Date: Wed, 15 Dec 2010 12:39:20 +0000
+Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
+In-Reply-To: <20101213162947.GA11730@n2100.arm.linux.org.uk>
+References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
+	<201012101159.21845.jkrzyszt@tis.icnet.pl>
+	<201012101203.09441.jkrzyszt@tis.icnet.pl>
+	<20101210170356.GA28472@n2100.arm.linux.org.uk>
+	<AANLkTimTVWVmVfppAWSosidqLmo6c+8rPhLg=oJAVoYH@mail.gmail.com>
+	<20101213162947.GA11730@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=ZYi=12k2vZMGp9AWNX8zofp6C-FnMu2egQOA1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 December 2010 04:50, Jeff Ohlstein <johlstei@codeaurora.org> wrote:
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/headsmp.S
+On 13 December 2010 16:29, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Dec 13, 2010 at 03:52:20PM +0000, Catalin Marinas wrote:
+>> On 10 December 2010 17:03, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
+>> >> ?void __init omap1_camera_init(void *info)
+>> >> ?{
+>> >> ? ? ? struct platform_device *dev = &omap1_camera_device;
+>> >> + ? ? dma_addr_t paddr = omap1_camera_phys_mempool_base;
+>> >> + ? ? dma_addr_t size = omap1_camera_phys_mempool_size;
+>> >> ? ? ? int ret;
+>> >>
+>> >> ? ? ? dev->dev.platform_data = info;
+>> >>
+>> >> + ? ? if (paddr) {
+>> >> + ? ? ? ? ? ? if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
+>> >
+>> > Although this works, you're ending up with SDRAM being mapped via
+>> > ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
+>> > mapped as if it were a device.
+>>
+>> BTW, does the generic dma_declare_coherent_memory() does the correct
+>> thing in using ioremap()?
+>
+> I argue it doesn't, as I said above. ?It means we map SDRAM as device
+> memory, and as I understand the way interconnects work, it's entirely
+> possible that this may not result in the SDRAM being accessible.
 [...]
-> +ENTRY(msm_secondary_startup)
-> + ? ? ? mrc ? ? p15, 0, r0, c0, c0, 5 ? @ MPIDR
-> + ? ? ? and ? ? r0, r0, #15 ? ? ? ? ? ? @ What CPU am I
-> + ? ? ? adr ? ? r4, 1f ? ? ? ? ? ? ? ? ?@ address of
-> + ? ? ? ldmia ? r4, {r5, r6} ? ? ? ? ? ?@ load curr addr and pen_rel addr
-> + ? ? ? sub ? ? r4, r4, r5 ? ? ? ? ? ? ?@ determine virtual/phys offsets
-> + ? ? ? add ? ? r6, r6, r4 ? ? ? ? ? ? ?@ apply
-> +pen:
-> + ? ? ? wfe
-> + ? ? ? dsb ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ ensure subsequent access is
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ after event
+> So, not only does this fail the kernel's own rules, but as we already know,
+> it fails the architecture's restrictions with multiple mappings of memory
+> when used with SDRAM, and it also maps main memory as a device. ?I wonder
+> how many more things this broken API needs to do wrong before it's current
+> implementation is consigned to the circular filing cabinet.
 
-As I wrote in a different e-mail, this DSB isn't actually needed as
-the processor shouldn't speculate beyond the WFE. But it's harmless
-anyway.
-
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/platsmp.c
-[...]
-> +int boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> + ? ? ? static int cold_boot_done;
-> + ? ? ? unsigned long timeout;
-> + ? ? ? printk(KERN_DEBUG "Starting secondary CPU %d\n", cpu);
-> +
-> + ? ? ? if (cold_boot_done == false) {
-> + ? ? ? ? ? ? ? prepare_cold_cpu(cpu);
-> + ? ? ? ? ? ? ? cold_boot_done = true;
-> + ? ? ? }
-> +
-> + ? ? ? pen_release = cpu;
-> + ? ? ? __cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
-> + ? ? ? outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
-> + ? ? ? __asm__("sev");
-> + ? ? ? dsb();
-
-What's the need for the dsb() here (one before SEV maybe)?
-
-Also, do we need to add a "memory" clobber to the SEV asm, not sure
-whether the compiler would try to reorder the code.
+Should we not try to fix the generic code and still allow platforms to
+use dma_declare_coherent_memory() in a safer way? I guess it may need
+some arguing/explanation on linux-arch.
 
 -- 
 Catalin
