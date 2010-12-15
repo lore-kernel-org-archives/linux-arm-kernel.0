@@ -1,85 +1,32 @@
-From: phorton@bitbox.co.uk (Peter Horton)
-Date: Wed, 15 Dec 2010 16:12:50 +0000
-Subject: [PATCH] i.MX51: Full iomux support
-In-Reply-To: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
-References: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4D08E902.80308@bitbox.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Dec 2010 16:12:13 +0000
+Subject: [PATCH] MTD: m25p80: add debugging trace in sst_write()
+In-Reply-To: <4D08C1C8.3090100@ru.mvista.com>
+References: <1292414372-17085-1-git-send-email-nicolas.ferre@atmel.com>
+	<4D08C1C8.3090100@ru.mvista.com>
+Message-ID: <20101215161213.GC9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/2010 14:01, Sascha Hauer wrote:
+On Wed, Dec 15, 2010 at 04:25:28PM +0300, Sergei Shtylyov wrote:
+>> +	DEBUG(MTD_DEBUG_LEVEL2, "%s: %s %s 0x%08x, len %zd\n",
+>> +			dev_name(&flash->spi->dev), __func__, "to",
 >
-> The following series picks up the patch from Lothar Wa?mann replacing
-> the struct pad_desc with a 64bit variable and adds full i.MX51 iomux
-> support based on this patch.
-> The iomux configurations are taken from the Freescale pinmux tool, so the
-> definitions should be rather complete. Anyway, there are some modes
-> not present in the tool.
-> I took the padmux settings from the old iomux support where present.
-> This series was tested on the babbage board, but due to the mass of defines
-> they are of course not completely tested, so please test yourself if
-> your board still works.
->
+>    What's the point of printing "to" as variable? :-)
 
-I had just started implementing an alternative solution :(
+One valid reason to do this is if you have several formatting strings
+all the same.  GCC can merge identical strings together.
 
-MACROS
-======
+So, if you have:
 
-#define _MX51_PAD_DEF(mux, pad)	.mux_ctrl_ofs = (mux), .pad_ctrl_ofs = (pad)
-#define _MX51_SIG_DEF(sel)	.select_input_ofs = (sel)
-#define _MX51_MAP_DEF(mux, sel)	.mux_mode = (mux), .select_input = (sel)
-#define _MX51_CTL_DEF(ctl)	.pad_ctrl = (ctl)
+ "%s: %s %s 0x%08x, len %zd", dev_name(), __func__, "to"
+ "%s: %s %s 0x%08x, len %zd", dev_name(), __func__, "from"
+ "%s: %s %s 0x%08x, len %zd", dev_name(), __func__, "foo"
 
-/* pad definitions */
+Then you end up with one long string and three short strings instead of
 
-...
-#define _MX51_PAD_EIM_D25		_MX51_PAD_DEF(0x414, 0x080)
-...
+ "%s: %s to 0x%08x, len %zd", dev_name(), __func__
+ "%s: %s from 0x%08x, len %zd", dev_name(), __func__
+ "%s: %s foo 0x%08x, len %zd", dev_name(), __func__
 
-/* signal definitions */
-
-...
-#define _MX51_SIG_UART3_RXD		_MX51_SIG_DEF(0x9f4)
-...
-
-/* pad to signal mappings */
-
-...
-#define _MX51_MAP_EIM_D25__UART3_RXD	_MX51_MAP_DEF(3, 0)
-...
-
-/* default pad control settings */
-
-...
-#define _MX51_CTL_EIM_D25__UART3_RXD	_MX51_CTL_DEF(MX51_UART3_PAD_CTRL)
-...
-
-/* external macros */
-
-#define MX51_PAD(pad, sig) \
-	{ _MX51_PAD_##pad, _MX51_SIG_##sig, _MX51_MAP_##pad##__##sig, 
-_MX51_CTL_##pad##__##sig }
-
-#define MX51_PAD_CTL(pad, sig, ctl) \
-	{ _MX51_PAD_##pad, _MX51_SIG_##sig, _MX51_MAP_##pad##__##sig, 
-_MX51_CTL_DEF(ctl) }
-
-USAGE
-=====
-
-/* using the default pad control value */
-
-static iomux_v3_cfg_t board_pads[] = {
-	...
-	MX51_PAD(EIM_D25, UART3_RXD),
-	...
-};
-
-/* specifying a pad control value */
-
-static iomux_v3_cfg_t board_pads[] = {
-	...
-	MX51_PAD_CTL(EIM_D25, UART3_RXD, PAD_CTL_DSE_HIGH),
-	...
-};
+which'd be three long strings.
