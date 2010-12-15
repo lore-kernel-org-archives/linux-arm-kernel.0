@@ -1,51 +1,73 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Wed, 15 Dec 2010 10:10:44 +0200
-Subject: [PATCH 04/16] ARM: Dove: Remove PXA compatibility IRQ defines.
-In-Reply-To: <20101215020306.GW15575@mail.wantstofly.org>
-References: <cover.1292377339.git.buytenh@wantstofly.org>
-	<20101215020306.GW15575@mail.wantstofly.org>
-Message-ID: <FCBE654890C0334289D0AD3AF4EF009FE148BBBCFF@IL-MB01.marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Dec 2010 08:56:46 +0000
+Subject: [PATCH] OMAP: omap_device: use pdev as parameter to get rt_va
+In-Reply-To: <alpine.DEB.2.00.1012141710260.15971@utopia.booyaka.com>
+References: <1292024742-27319-1-git-send-email-omar.ramirez@ti.com>
+	<4D05D586.6090408@ti.com>
+	<AANLkTik667cW19eCVNNLf3_dc9efFYms0H2z-fGU24Ob@mail.gmail.com>
+	<alpine.DEB.2.00.1012141710260.15971@utopia.booyaka.com>
+Message-ID: <20101215085646.GA5222@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-
->-----Original Message-----
->From: Lennert Buytenhek [mailto:buytenh at wantstofly.org] 
->Sent: Wednesday, December 15, 2010 4:03 AM
->To: Saeed Bishara
->Cc: linux-arm-kernel at lists.infradead.org
->Subject: [PATCH 04/16] ARM: Dove: Remove PXA compatibility IRQ defines.
->
->These are not currently used anywhere, but when the relevant
->peripherals are enabled on the Dove port, the IRQ numbers should be
->passed into the drivers via platform device resources rather than
->having the drivers get them from platform headers directly.
->
->Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
->---
-> arch/arm/mach-dove/include/mach/irqs.h |    7 +------
-> 1 files changed, 1 insertions(+), 6 deletions(-)
->
->diff --git a/arch/arm/mach-dove/include/mach/irqs.h 
->b/arch/arm/mach-dove/include/mach/irqs.h
->index 4668146..03d401d 100644
->--- a/arch/arm/mach-dove/include/mach/irqs.h
->+++ b/arch/arm/mach-dove/include/mach/irqs.h
->@@ -92,10 +92,5 @@
+On Tue, Dec 14, 2010 at 05:17:28PM -0700, Paul Walmsley wrote:
+> Hello Omar
 > 
-> #define NR_IRQS			(IRQ_DOVE_PMU_START + 
->NR_PMU_IRQS)
+> On Mon, 13 Dec 2010, Ramirez Luna, Omar wrote:
 > 
->-/* Required for compatability with PXA AC97 driver.	*/
->-#define IRQ_AC97		IRQ_DOVE_AC97
->-/* Required for compatability with PXA DMA driver.	*/
->-#define IRQ_DMA			IRQ_DOVE_PDMA
->-/* Required for compatability with PXA NAND driver 	*/
->-#define IRQ_NAND		IRQ_DOVE_NAND
->+
-> #endif
->-- 
-Acked-by: Saeed Bishara <saeed@marvell.com>
+> > On Mon, Dec 13, 2010 at 2:12 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> > > On 12/11/2010 12:45 AM, Ramirez Luna, Omar wrote:
+> > >>
+> > >> Make the parameter received by omap_device_get_mpu_rt_va
+> > >> consistent with the functions meant to be called by drivers.
+> > >>
+> > >> Also move its header declaration to appear in the set of
+> > >> functions to be used by drivers, as per the comment there.
+> > >
+> > > Please note that even if Paul submitted this API upon request from Santosh,
+> > > we do not want driver to us it most of the time.
+> > 
+> > Oh, ok. Yes, I was under the impression that this ioremap was internal
+> > to hwmod, and drivers should do their own one but then I noticed that
+> > API and since it was under the "public functions through struct
+> > platform data", I thought it was easier to pass pdev than od.
+> > 
+> > > All drivers should us the generic Linux way to get physical mem resource and
+> > > then ioremap it.
+> > 
+> > Then I guess this function belongs to the "public for core code" and
+> > not for drivers along with the omap_device_get_pwrdm.
+> > 
+> > > I assume that if you want to update this API, you are probably already using
+> > > it.
+> > > Why cannot you use the generic way?
+> > 
+> > I can leave the generic way along with ioremap, the purpose was to use
+> > omap_device APIs as much as possible.
+> 
+> The above isn't quite it.  What I'd suggest you do in your code is this:
+> 
+> - In your driver-to-core-OMAP integration code in arch/arm/*omap*, call 
+> omap_hwmod_get_mpu_rt_va(), and pass that to the driver via an entry in 
+> the struct platform_data.
+> 
+> - In your driver code in drivers/*, test to see if that struct 
+> platform_data entry is NULL.  If it is, only then should your driver 
+> ioremap().  Otherwise, it should use the address from the struct 
+> platform_data.
+> 
+> This is because it's not guaranteed that ioremap() on OMAP will continue 
+> to reuse the current static mapping in the future.  We've heard from some 
+> mobile OS vendors that they are under significant address space 
+> constraints, so on those distributions it might make sense to only map 
+> devices that are actually in use, and take the additional TLB entry cost.
+> 
+> Does this make sense?
 
-saeed
+No it doesn't - this is not a valid reason to bugger about with drivers
+to make them non-standard.
+
+omap_ioremap() can be improved to retain its re-use of static mappings
+by having some kind of tree structure or something like that - ioremap
+is after all not a performance critical path.  There's no need to start
+passing virtual addresses to drivers.
