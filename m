@@ -1,46 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Dec 2010 17:12:46 +0000
-Subject: [PATCH 1/9] ARM i.MX51: Add ipu clock support
-In-Reply-To: <201012151749.59488.arnd@arndb.de>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<201012151640.03789.arnd@arndb.de>
-	<20101215163445.GE9937@n2100.arm.linux.org.uk>
-	<201012151749.59488.arnd@arndb.de>
-Message-ID: <20101215171246.GG9937@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Dec 2010 18:17:33 +0100
+Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
+In-Reply-To: <20101215170636.GJ28971@pengutronix.de>
+References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+	<201012151758.42896.arnd@arndb.de>
+	<20101215170636.GJ28971@pengutronix.de>
+Message-ID: <201012151817.33671.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 05:49:59PM +0100, Arnd Bergmann wrote:
-> On Wednesday 15 December 2010, Russell King - ARM Linux wrote:
-> > Lastly, I don't see where atomicity comes into it - __raw_writel vs writel
-> > have the same atomicity.  Both are single access atomic provided they're
-> > naturally aligned.  Misaligned device accesses are not predictable.
-> 
-> This is just what gcc turns it into today. In theory, a future gcc or
-> a future cpu might change that. If you mark a pointer as
-> '__attribute__((packed))', it probably already does, even for aligned
-> pointers, while it does not when using writel_{,relaxed}. The point is
-> that __raw_* means just that -- we don't give any guarantees on what
-> happens on the bus, so people should not use it.
+On Wednesday 15 December 2010, Uwe Kleine-K?nig wrote:
+> > Then we should define a proper function for this with well-defined
+> > behaviour. I would suggest defining a mxs_readl/mxs_writel here,
+> > that is defined to have the same endianess as the mxs SOC, but
+> > otherwise has the same properties as readl/writel.
+> I don't get your point here.  What are the properties of readl/writel
+> you want here?  The barrier?  __mem_pci?
 
-No.  It does give guarantees on what happens on the bus.  The kind of
-pointer you pass in has no bearing on what happens on the bus because it's
-casted away immediately.
+Being a documented interface.
 
-__raw_writel(v, ptr) doesn't just do *(ptr) = v - that doesn't work when
-ptr is void.  Instead, it has to do a cast to ensure that we have a valid
-C dereference (void pointers are illegal to dereference):
+> For me __mxs_setl is a proper function with well-defined behaviour, no?
+> (One thing I currently consider to argue is to make these .c file local
+> because different IPs might have different offsets for SET, CLR and TOG
+> or not support it at all, but other than that I'm happy with it.)
 
-#define __raw_writel(v,a)  (__chk_io_ptr(a), \
-	*(volatile unsigned int __force   *)(a) = (v))
+The problem is that __raw_* is defined as a pointer reference on
+all architectures, nothing more. Depending on the architecture and
+compiler, sometimes even on the I/O subsystem, it may or may not
+do any of the following:
 
-Doesn't matter if 'a' was marked as packed or not - that's all casted away.
-That's not something that should ever change - otherwise we'll all be
-screwed as you could never cast away pointer attributes.
+* work on mapped PCI addresses
+* work on mapped non-PCI addresses
+* work on addresses returned from ioport_map
+* be synchronized with spinlocks
+* cause an atomic access on the bus
+* trap on I/O device exceptions
+* cause writes to be posted/nonposted
 
-It _may_ possible that the compiler decides that accessing an 'unsigned int'
-will not be done as a single word load, in which case we have exactly the
-same problems with writel() too.
+It's just not something that can possibly be used correctly
+in portable code. I do realize that on mxs, it does pretty
+much what you need, but that doesn't make it an officially
+supported interface. Just like you are supposed to use spinlock
+instead of raw_spinlock unless you know exactly why you need it
+and document it.
 
-And in any case, if __raw_writel() was as you're suggesting, then it would
-serve absolutely no purpose at all.
+	Arnd
