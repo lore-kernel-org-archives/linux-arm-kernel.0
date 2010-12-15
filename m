@@ -1,65 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Dec 2010 22:04:41 +0100
-Subject: [PATCH] msm: rmnet: msm rmnet smd virtual ethernet driver
-In-Reply-To: <1292437866-11652-1-git-send-email-nvishwan@codeaurora.org>
-References: <1292437866-11652-1-git-send-email-nvishwan@codeaurora.org>
-Message-ID: <201012152204.42002.arnd@arndb.de>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Wed, 15 Dec 2010 16:33:54 -0500
+Subject: IMX SPI - 17-24 bit bug and >32 bit support.
+Message-ID: <BLU0-SMTP23E8D9768DB476BFCE7B23B8140@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 December 2010 19:31:06 Niranjana Vishwanathapura wrote:
-> +struct rmnet_private {
-> +       smd_channel_t *ch;
-> +       struct net_device_stats stats;
-> +       const char *chname;
-> +#ifdef CONFIG_MSM_RMNET_DEBUG
-> +       ktime_t last_packet;
-> +       short active_countdown; /* Number of times left to check */
-> +       short restart_count; /* Number of polls seems so far */
-> +       unsigned long wakeups_xmit;
-> +       unsigned long wakeups_rcv;
-> +       unsigned long timeout_us;
-> +       unsigned long awake_time_ms;
-> +       struct delayed_work work;
-> +#endif
-> +};
 
-It feels like a significant portion of the code and the complexity
-(of which there fortunately is very little otherwise) is in the
-debugging code. How important is that debugging code still?
+Attach is an example patch to the spi_imx.c file.  The iMX spi doesn't
+handle 17-24bit values properly.  At least in sound/soc, the 24 bit
+values are being passed with three data bytes per unit.  Also the SPI
+count is being filled with '3' as a length.  Such data passed to the
+current iMX spi driver will cause it to loop forever as it decrements
+the unsigned length by '4' and eventually accesses invalid memory.
 
-In my experience, once a driver gets stable enough for inclusion,
-most of the debugging code that you have put in there to write
-the driver becomes obsolete, because the next bug is not going
-to be found with it anyway.
+I believe that the reset of the kernel believes that the SPI layer
+should use three bytes per transfer/receive item if the SPI word
+length is 17 to 24 bits.
 
-How about deleting the debug code now? You still have the code and
-if something goes wrong, you can always put it back to analyse
-the problem.
+The other issue is that the current driver does not support SPI
+transfers of greater than 32bits (called 'BURST LENGTH' in iMX
+documentation).
 
-> +/* Called in soft-irq context */
-> +static void smd_net_data_handler(unsigned long arg)
-> +{
-> ...
-> +}
-> +
-> +static DECLARE_TASKLET(smd_net_data_tasklet, smd_net_data_handler, 0);
-> +
-> +static void smd_net_notify(void *_dev, unsigned event)
-> +{
-> +       if (event != SMD_EVENT_DATA)
-> +               return;
-> +
-> +       smd_net_data_tasklet.data = (unsigned long) _dev;
-> +
-> +       tasklet_schedule(&smd_net_data_tasklet);
-> +}
+Currently I have left the original code and just conditionalized it on
+SPI_IMX_FLEXIBLE.  I have changed the 'tx', and 'rx' pointers to call
+fixed routines.  I have only currently coded for 'little endian'.  I
+am unsure whether any iMx processor can work with little endian.
 
-It appears strange to do all the receive work in a tasklet. The
-common networking code already has infrastructure for deferring
-the rx to softirq time, and using the NAPI poll() logic likely gives
-you better performance as well.
+I haven't limited the word size to 128*32 bits which is the maximum
+burst for the iMx25 and investigated the maximums for the other
+supported processors.  I suspect there is a better way to do the
+wrapping of bytes.
 
-Aside from these, the driver looks very nice and clean to me.
+I have tested this code with 8 and 24 bit transfer sizes on the
+transmit side with the iMx25.
 
-	Arnd
+Thanks,
+Bill Pringlemeir.
+
+Signed-off-by: Bill Pringlemeir <bpringle@sympatico.ca>
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: imx_spi.patch
+Type: text/x-diff
+Size: 4413 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101215/49f6c84f/attachment.bin>
