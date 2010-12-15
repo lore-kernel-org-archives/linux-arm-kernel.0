@@ -1,53 +1,49 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 15 Dec 2010 06:40:54 -0800
-Subject: [PATCH 2/7] msm: Physical offset for MSM8960
-In-Reply-To: <20101215135508.GB8682@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1292384961-8851-3-git-send-email-stepanm@codeaurora.org>
-	<4D08BFFC.3020103@ru.mvista.com>
-	<20101215135508.GB8682@huya.qualcomm.com>
-Message-ID: <1292424054.13887.5.camel@m0nster>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 15 Dec 2010 15:49:21 +0100
+Subject: [PATCH v2 0/6] OMAP: hwmod core fix and cleanup for 2.6.38
+Message-ID: <1292424567-25794-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-12-15 at 05:55 -0800, David Brown wrote:
-> On Wed, Dec 15, 2010 at 04:17:48PM +0300, Sergei Shtylyov wrote:
-> 
-> > On 15-12-2010 6:49, Stepan Moskovchenko wrote:
-> > 
-> > > Add the physical memory offset value for the Qualcomm
-> > > MSM8960 chip.
-> > 
-> > > Signed-off-by: Stepan Moskovchenko<stepanm@codeaurora.org>
-> > [...]
-> > 
-> > > diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
-> > > index 070e17d..014bbd3 100644
-> > > --- a/arch/arm/mach-msm/include/mach/memory.h
-> > > +++ b/arch/arm/mach-msm/include/mach/memory.h
-> > > @@ -25,6 +25,8 @@
-> > >  #define PHYS_OFFSET		UL(0x00200000)
-> > >  #elif defined(CONFIG_ARCH_MSM8X60)
-> > >  #define PHYS_OFFSET		UL(0x40200000)
-> > > +#elif defined(CONFIG_ARCH_MSM8960)
-> > > +#define PHYS_OFFSET		UL(0x40200000)
-> > 
-> >     Why not:
-> > 
-> > -#elif defined(CONFIG_ARCH_MSM8X60)
-> > +#elif defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960)
-> 
-> I guess it's a matter of style, and what one is trying to emphasize.
-> Having each one listed makes it easier to change them individually.
-> The file is just a listing of the addresses of each chip, so I don't
-> see much reason to try and compact it.
+Hi Paul,
 
-It just shows a deeper issue, that the namespace needs work. There's too
-much duplication here vs. 8x60 .. If you look over this whole patchset
-it looks very much like 8x60 was just copied over.
+Here is a small series that just remove the omap_hwmod_mutex
+and move functions not needed at runtime to the __init section.
 
-Daniel
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+It fix as well a bug discovered during the on-going hwmod migration
+of device that does have a functional clock external (mcpdm).
+
+It extends as well the fix Kevin did for wakeup for OMAP4 IP with
+smart idle with wakeup support. 
+
+The series is based on my for_2.6.38/hwmod_data branch and is available 
+here: git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod
+
+Tested on sdp4430 ES2.0 with omap2plus_defconfig.
+It still requires some test on OMAP3 and OMAP2.
+
+Thanks to Seb Guiriec for testing the SIDLE_SMART_WKUP fix.
+
+Regards,
+Benoit
+
+
+Changes since v1:
+    http://www.spinics.net/lists/linux-omap/msg40580.html:
+    - Add SIDLE_SMART_WKUP flag support for OMAP4
+
+
+Benoit Cousson (5):
+  OMAP2+: hwmod: Make omap_hwmod_register private and remove omap_hwmod_unregister
+  OMAP2+: hwmod: Mark functions used only during initialization with __init
+  OMAP2+: hwmod: Remove omap_hwmod_mutex
+  OMAP2+: hwmod: Add wakeup support for new OMAP4 IPs
+  OMAP4: hwmod data: Add SIDLE_SMART_WKUP modes to several IPs
+
+Rajendra Nayak (1):
+  OMAP2+: hwmod: Disable clocks when hwmod enable fails
+
+ arch/arm/mach-omap2/omap_hwmod.c             |  172 +++++++++++---------------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   12 ++-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    7 +-
+ 3 files changed, 82 insertions(+), 109 deletions(-)
