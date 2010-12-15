@@ -1,21 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Dec 2010 17:24:03 +0100
-Subject: [PATCH v6 00/15] ARM: mxs: Add initial support for MX23 and MX28
-In-Reply-To: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <201012151724.03736.arnd@arndb.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 15 Dec 2010 17:26:20 +0100
+Subject: [PATCH 6/9] ARM i.MX51: Add IPU device support
+In-Reply-To: <201012151649.45199.arnd@arndb.de> (Arnd Bergmann's message of
+	"Wed, 15 Dec 2010 16:49:45 +0100")
+References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
+	<1291902441-24712-7-git-send-email-s.hauer@pengutronix.de>
+	<201012151649.45199.arnd@arndb.de>
+Message-ID: <87pqt3c89f.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 December 2010, Shawn Guo wrote:
->  [PATCH v6 01/15] ARM: mxs: Add core definitions
->  [PATCH v6 03/15] ARM: mxs: Add reset routines
->  [PATCH v6 06/15] ARM: mxs: Add timer support
->  [PATCH v6 07/15] ARM: mxs: Add gpio support
->  [PATCH v6 08/15] ARM: mxs: Add iomux support
->  [PATCH v6 15/15] ARM: mxs: Add build configuration for mxs
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Where are the other patches? You listed (and posted) only six,
-but apparently there is a total of 15 patches.
+Hi,
 
-	Arnd
+> On Thursday 09 December 2010, Sascha Hauer wrote:
+>> +#define imx51_add_ipuv3(pdata) \
+>> +       imx_add_ipuv3(&imx51_ipuv3_data, pdata)
+>
+> This looks  like a pointless abstraction, it does not make
+> the code smaller or easier to read. I know it's sometimes
+> tempting to use macros, but in most cases, you should try
+> not to.
+>
+
+it's how things have been handled atm in the imx code. I don't have
+any preference on this at all but at least either we go on with it 
+or we get rid of all theses #defines. It's a matter of consistency.
+The thing is that I would consider removing the imx*add* stuff to be
+a cleanup and should be done in a different patch, not in a patchset
+adding IPU support for imx51.
+
+Anyway, let's wait for Sascha's point of view, he knows the imx stuff
+far better than me.
+
+Arnaud
