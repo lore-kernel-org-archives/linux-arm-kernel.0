@@ -1,22 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 15 Dec 2010 08:48:41 +0100
-Subject: [PATCH] msm: trout: add keypad support
-In-Reply-To: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
-References: <1291854285-29566-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20101215074841.GB2483@ucw.cz>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Wed, 15 Dec 2010 10:08:51 +0200
+Subject: [PATCH 02/16] ARM: Remove dependency of plat-orion GPIO code on
+	mach directory includes.
+In-Reply-To: <20101215020233.GU15575@mail.wantstofly.org>
+References: <cover.1292377339.git.buytenh@wantstofly.org>
+	<20101215020233.GU15575@mail.wantstofly.org>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009FE148BBBCFC@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2010-12-08 16:24:45, Daniel Walker wrote:
-> This adds matrix keypad support, and gpio buttons support for
-> trout's various keys and buttons.
+>diff --git a/arch/arm/mach-dove/include/mach/dove.h 
+>b/arch/arm/mach-dove/include/mach/dove.h
+>index f6a0839..df51131 100644
+>--- a/arch/arm/mach-dove/include/mach/dove.h
+>+++ b/arch/arm/mach-dove/include/mach/dove.h
+>@@ -130,7 +130,8 @@
+> #define DOVE_PMU_MPP_GENERAL_CTRL (DOVE_MPP_VIRT_BASE + 0x10)
+> #define DOVE_RESET_SAMPLE_LO	(DOVE_MPP_VIRT_BASE | 0x014)
+> #define DOVE_RESET_SAMPLE_HI	(DOVE_MPP_VIRT_BASE | 0x018)
+>-#define DOVE_GPIO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0400)
+>+#define DOVE_GPIO_LO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
+>| 0xd0400)
+>+#define DOVE_GPIO_HI_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
+>| 0xd0420)
+> #define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
+>| 0xe803c)
+> #define  DOVE_AU1_SPDIFO_GPIO_EN	(1 << 1)
+> #define  DOVE_NAND_GPIO_EN		(1 << 0)
+>diff --git a/arch/arm/mach-dove/include/mach/gpio.h 
+>b/arch/arm/mach-dove/include/mach/gpio.h
+>index 0ee70ff..e7e5101 100644
+>--- a/arch/arm/mach-dove/include/mach/gpio.h
+>+++ b/arch/arm/mach-dove/include/mach/gpio.h
 
-Yeah, but everyone knows trout as 'HTC Dream'.
+Lennert, this patch conflicts with 2 paches sent by Mike that deal with dove gpio/mpp
+[PATCH v4 1/2] [ARM] Dove: add support for GPIOs 64-71
+[PATCH v3 2/2] [ARM] Dove: add support for multi-purpose pins configuration
 
-> +static const uint32_t trout_keymap_evt2_1[] = {
+Nico, I've acked those patches but didn't notice that it wasn't merged in the orion git.
+Can you please merge it.
 
-u32?
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+saeed
