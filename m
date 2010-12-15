@@ -1,24 +1,35 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 14 Dec 2010 20:57:58 -0700 (MST)
-Subject: [PATCH 00/11] OMAP: PRCM/powerdomain/clockdomain patches for
-	2.6.38,part two
-In-Reply-To: <a52218d5bcff8d959b86230ce9a7ca89@mail.gmail.com>
-References: <20101208061657.30541.79824.stgit@twilight.localdomain>
-	<a52218d5bcff8d959b86230ce9a7ca89@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1012142057030.15971@utopia.booyaka.com>
+Date: Tue, 14 Dec 2010 21:03:24 -0700 (MST)
+Subject: [PATCH 6/8] OMAP2+: hwmod: upgrade per-hwmod mutex to a spinlock
+In-Reply-To: <20101116101809.22777.92945.stgit@twilight.localdomain>
+References: <20101116101615.22777.49212.stgit@twilight.localdomain>
+	<20101116101809.22777.92945.stgit@twilight.localdomain>
+Message-ID: <alpine.DEB.2.00.1012142059230.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Dec 2010, Rajendra Nayak wrote:
+Hi Kevin, Beno?t,
 
-> Boot tested on 2430/3430/4430SDP. Tested RET/OFF mode in suspend
-> on 3430SDP with minimal config (omap3_pm_defconfig).
+On Tue, 16 Nov 2010, Paul Walmsley wrote:
 
-Thanks for testing this.  Would you like me to add Tested-by:'s ?
+> Change the per-hwmod mutex to a spinlock.  (The per-hwmod lock
+> serializes most post-initialization hwmod operations such as enable,
+> idle, and shutdown.)  Spinlocks are needed, because in some cases,
+> hwmods must be enabled from timer interrupt disabled-context, such as
+> an ISR.  The current use-case that is driving this is the OMAP GPIO
+> block ISR: it can trigger interrupts even with its clocks disabled,
+> but these clocks are needed for register accesses in the ISR to succeed.
 
-Also, I still plan to make that change that you proposed to cause the 
-prminst, cminst functions to read/write directly to the registers... 
-soon...
+The more I think about this patch, the less I like it.  At some point it 
+would be good to try to convert the OMAP clock code to using mutexes in as 
+many places as possible, rather than spinlocks.  When that happens, this 
+is going to be a liability.  Nevertheless I will leave it this patch in 
+for now by request, but this is just a simultaneous request: as we review 
+these hwmod conversions, we need to be very careful with any code that 
+will attempt to call the hwmod functions from timer-interrupt-disabled 
+context ... we should try to discourage it if at all possible and if that 
+is not possible, to put a big fat XXX comment there to review the 
+situation...
 
 
 - Paul
