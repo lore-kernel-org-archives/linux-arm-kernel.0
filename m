@@ -1,138 +1,55 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 15 Dec 2010 15:40:31 -0800
-Subject: [PATCH 1/5] OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
-In-Reply-To: <c454400af490d75c274f19a5d0a5a655@mail.gmail.com> (Rajendra
-	Nayak's message of "Wed, 15 Dec 2010 20:47:52 +0530")
-References: <1292276969-29733-1-git-send-email-b-cousson@ti.com>
-	<1292276969-29733-2-git-send-email-b-cousson@ti.com>
-	<87zks8rv3b.fsf@deeprootsystems.com>
-	<c454400af490d75c274f19a5d0a5a655@mail.gmail.com>
-Message-ID: <874oaek3kg.fsf@deeprootsystems.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Wed, 15 Dec 2010 17:45:13 -0600
+Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
+Message-ID: <AANLkTinM524ozYQhHSpCN49LvZLePO6faHJrqxKBtyJe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+Hi,
 
-> Hi Kevin,
->
-> <snip>..
->
->> >  	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
->> > +		if ((pwrdm_read_pwrst(pwrdm) > state) &&
->> > +			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
->> > +				ret = pwrdm_set_next_pwrst(pwrdm, state);
->> > +				pwrdm_set_lowpwrstchange(pwrdm);
->> > +				pwrdm_wait_transition(pwrdm);
->> > +				pwrdm_state_switch(pwrdm);
->> > +				return ret;
->>
->> Personally, I'd prefer if this function flowed through better instead of
->> the early return in order to emphasize the common code.
->>
->> Rather than the return here, can you just set the low-power state change
->> bit here (and put the clkdm_wakeup + sleep_switch = 1 into the else
->> clause?
->>
->> Or, does the next state have to be set before the low-power state change
->> bit?
->
-> Yes, that sequencing is needed.
->
->>
->> Basically, what I'm getting at is this should be a single function with
->> common flow.  The conditional code based on low-power state change
->> should be isolated instead of having a special path.
->
-> I get your point. See if the below approach looks better.
-> If it looks fine, I'll do some more testing (currently only tested
-> on OMAP4430sdp) and repost the 2 patches.
+This is my first time on linux-arm-kernel, and while I've read the
+FAQ, hopefully I don't screw up too badly :).
 
-Yes, this approach leads to better readability IMO.
+Anyway, we're on a dual-core ARMv7 running 2.6.36, and during
+stability stress testing saw the following:
+1) After a number hotplug iterations, CPU1 fails to set its online bit
+quickly enough and __cpu_up() times-out.
+2) CPU1 eventually completes its startup and sets the bit, however,
+since _cpu_up() failed, CPU1's active bit is never set.
+3) On the next call to cpu_down(), the function checks that the online
+bit is set and proceeds.
+4) The workqueue receives a CPU_DOWN_PENDING notification and creates
+a trustee_thread to run on CPU1.
+5) Since CPU1's active bit is not set, the scheduler runs the thread
+on CPU0 instead and the BUG_ON at kernel/workqueue.c:3111 fires (check
+that CPU run on is the desired one)
 
-Thanks,
+I have a patch that resolves this in two ways -
+1) I only wait with timeouts to make sure the CPU registers the SIPI
+and enters secondary_start_kernel. After that we're in "safe"
+territory and it doesn't matter how long the rest of initialization
+takes. So that puts the waited time into deterministic land.
 
-Kevin
+2) Additionally I ensure that if the CPU comes up later than it were
+supposed to (shouldn't, but...), then it will not start initializing
+behind cpu_up's back (which is not really undoable). This solves the
+problem with both cpu_up+secondary_start_kernel races and with
+platform_cpu_kill+secondary_start_kernel races.
 
-> From 5d206ba908071edafae6c044bd3ef6ad8a9c32e7 Mon Sep 17 00:00:00 2001
-> From: Rajendra Nayak <rnayak@ti.com>
-> Date: Thu, 25 Nov 2010 14:26:51 +0530
-> Subject: [PATCH 1/5] OMAP4: PM: Use the low-power state change feature on
-> OMAP4
->
-> For pwrdm's which support LOWPOWERSTATECHANGE, do not try waking
-> up the domain to put it back to deeper sleep state.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
-> ---
->  arch/arm/mach-omap2/pm.c |   28 ++++++++++++++++++++++------
->  1 file changed, 22 insertions(+), 6 deletions(-)
->
-> Index: linux/arch/arm/mach-omap2/pm.c
-> ===================================================================
-> --- linux.orig/arch/arm/mach-omap2/pm.c	2010-12-15 17:29:42.361228780
-> +0530
-> +++ linux/arch/arm/mach-omap2/pm.c	2010-12-15 20:19:48.321228780
-> +0530
-> @@ -89,6 +89,10 @@
->  	}
->  }
->
-> +/* Types of sleep_switch used in omap_set_pwrdm_state */
-> +#define FORCEWAKEUP_SWITCH	0
-> +#define LOWPOWERSTATE_SWITCH	1
-> +
->  /*
->   * This sets pwrdm state (other than mpu & core. Currently only ON &
->   * RET are supported. Function is assuming that clkdm doesn't have
-> @@ -114,9 +118,14 @@
->  		return ret;
->
->  	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
-> -		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
-> -		sleep_switch = 1;
-> -		pwrdm_wait_transition(pwrdm);
-> +		if ((pwrdm_read_pwrst(pwrdm) > state) &&
-> +			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
-> +			sleep_switch = LOWPOWERSTATE_SWITCH;
-> +		} else {
-> +			omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
-> +			pwrdm_wait_transition(pwrdm);
-> +			sleep_switch = FORCEWAKEUP_SWITCH;
-> +		}
->  	}
->
->  	ret = pwrdm_set_next_pwrst(pwrdm, state);
-> @@ -126,12 +135,19 @@
->  		goto err;
->  	}
->
-> -	if (sleep_switch) {
-> +	switch (sleep_switch) {
-> +	case FORCEWAKEUP_SWITCH:
->  		omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
-> -		pwrdm_wait_transition(pwrdm);
-> -		pwrdm_state_switch(pwrdm);
-> +		break;
-> +	case LOWPOWERSTATE_SWITCH:
-> +		pwrdm_set_lowpwrstchange(pwrdm);
-> +		break;
-> +	default:
-> +		return ret;
->  	}
->
-> +	pwrdm_wait_transition(pwrdm);
-> +	pwrdm_state_switch(pwrdm);
->  err:
->  	return ret;
->  }
->
->
->>
->> Kevin
->>
->> > +		}
->> >  		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
->> >  		sleep_switch = 1;
->> >  		pwrdm_wait_transition(pwrdm);
+Tested this by injecting mdelays into secondary_start_kernel (before
+clearing the booting bit and after), and by putting a while(1) into
+secondary_start_kernel at different points.
+
+There were concerns brought up that this patch might conflict with all
+the ARM SMP work going into .38, so I wanted to check with the list
+first.
+
+Thank You,
+A
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-Make-SMP-init-more-resilient-to-failures.patch
+Type: text/x-patch
+Size: 4678 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101215/ec26c93b/attachment.bin>
