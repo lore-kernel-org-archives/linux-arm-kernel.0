@@ -1,46 +1,25 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 14 Dec 2010 19:27:33 -0700 (MST)
-Subject: [PATCH v1 4/9] OMAP2430: hwmod data: add system DMA
-In-Reply-To: <1291434246-30716-5-git-send-email-manjugk@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Dec 2010 18:44:34 -0800
+Subject: [PATCH v1 7/9] OMAP1: DMA: Implement in platform device model
+In-Reply-To: <20101215020123.GB6725@manju-desktop>
 References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
-	<1291434246-30716-5-git-send-email-manjugk@ti.com>
-Message-ID: <alpine.DEB.2.00.1012141925300.15971@utopia.booyaka.com>
+	<1291434246-30716-8-git-send-email-manjugk@ti.com>
+	<87d3p3q35h.fsf@deeprootsystems.com>
+	<87aak7onvu.fsf@deeprootsystems.com>
+	<20101215010400.GC3190@atomide.com>
+	<20101215020123.GB6725@manju-desktop>
+Message-ID: <20101215024434.GH3190@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Dec 2010, G, Manjunath Kondaiah wrote:
+* G, Manjunath Kondaiah <manjugk@ti.com> [101214 18:01]:
+> On Tue, Dec 14, 2010 at 05:04:00PM -0800, Tony Lindgren wrote:
+> > 
+> > OK thanks, will fold it in and let's merge them into linux-omap
+> > master branch for few days for testing. Then if everything looks
+> > good, I'll queue these for the 2.6.38 next merge window.
 
-> Add OMAP2430 DMA hwmod data and also add required
-> DMA device attributes.
+Oops, not quite ready yet, see the mail from Paul. Waiting for
+those fixes.
 
-...
-
-> +/* dma_system -> L3 */
-> +static struct omap_hwmod_ocp_if omap2430_dma_system__l3 = {
-> +	.master		= &omap2430_dma_system_hwmod,
-> +	.slave		= &omap2430_l3_main_hwmod,
-> +	.clk		= "l3_div_ck",
-
-This clock does not exist on OMAP2430.  Did you test this on OMAP2430?
-
-> +/* l4_cfg -> dma_system */
-> +static struct omap_hwmod_ocp_if omap2430_l4_core__dma_system = {
-> +	.master		= &omap2430_l4_core_hwmod,
-> +	.slave		= &omap2430_dma_system_hwmod,
-> +	.clk		= "l4_div_ck",
-
-This clock also does not exist on OMAP2430.
-
-> +static struct omap_hwmod omap2430_dma_system_hwmod = {
-> +	.name		= "dma",
-> +	.class		= &omap2430_dma_hwmod_class,
-> +	.mpu_irqs	= omap2430_dma_system_irqs,
-> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap2430_dma_system_irqs),
-> +	.main_clk	= "l3_div_ck",
-
-Nor does this one.
-
-Please fix these and test on OMAP2430 before resending.
-
-
-- Paul
+Tony
