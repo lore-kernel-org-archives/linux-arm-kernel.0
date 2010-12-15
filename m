@@ -1,78 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Dec 2010 18:51:06 +0100
-Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
-In-Reply-To: <20101215172305.GH9937@n2100.arm.linux.org.uk>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-	<201012151808.41969.arnd@arndb.de>
-	<20101215172305.GH9937@n2100.arm.linux.org.uk>
-Message-ID: <201012151851.06217.arnd@arndb.de>
+From: smuckle@codeaurora.org (Steve Muckle)
+Date: Wed, 15 Dec 2010 09:53:43 -0800
+Subject: [PATCH 2/7] msm: Physical offset for MSM8960
+In-Reply-To: <20101215153837.GB15817@huya.qualcomm.com>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1292384961-8851-3-git-send-email-stepanm@codeaurora.org>
+	<4D08BFFC.3020103@ru.mvista.com>
+	<20101215135508.GB8682@huya.qualcomm.com>
+	<1292424054.13887.5.camel@m0nster>
+	<20101215153837.GB15817@huya.qualcomm.com>
+Message-ID: <4D0900A7.8070405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 December 2010, Russell King - ARM Linux wrote:
-> On Wed, Dec 15, 2010 at 06:08:41PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 15 December 2010, Russell King - ARM Linux wrote:
-> > > The alternative is we end up with:
-> > > 
-> > > #define FOO_ASM_BASE            0xf0000000
-> > > #define FOO_C_BASE              ((void __force __iomem *)0xf0000000)
-> > 
-> > But isn't a hardwire virtual I/O address something that should be
-> > used only very rarely?
-> 
-> You'd be surprised.  With x86, the answer is clearly yes, because you
-> have the special IO space.
->
-> On architectures with no special IO space, everything is MMIO, including
-> system peripherals.  So when you come to the basics such as interrupt
-> controllers and timers, which don't lend themselves to being ioremap()'d,
-> you have to come up with a different scheme.
+On 12/15/10 07:38, David Brown wrote:
+> There's not very much copying here, in fact there isn't very much to
+> the 8960 support to begin with.  Despite the confusing names, 8960 is
+> quite a bit different from 8[26]60.  I agree we would probably be best
+> with different names, which might help make the difference clearer.
 
-I don't know too much about x86, but on most architectures I've looked
-at recently (powerpc, tile, microblaze, ...), the peripherals get
-initialized way after the memory management, so actually everything
-can get mapped using ioremap.
+A couple more comments here...
 
-I understand that it's convenient for the system devices on ARM,
-especially if they get used from assembly code, but I still thought
-this would be an exception for stuff that is rather low-level.
+Currently it is the case that there is a lot of similarity between 8960
+and 8660, however the two are expected to diverge as 8960 support
+matures. This may include things like the physical offset so IMO it is
+better to leave this things as per-ARCH rather than combining them.
 
-> With statically mapped MMIO devices, we define the v:p mapping explicitly,
-> and define constants above.  And its these kinds of basic system
-> peripherals that need to be accessed in one way or another from assembly
-> code (eg, for stuff like sleep support.)
+During some previous discussions on the naming situation, one idea which
+was floated was renaming 8x60 to 8660, which would help clarify the
+difference from 8960. The only issue with that is that 8260, which is
+for purposes of the kernel the same as 8660, would be left out and
+probably just have to be mentioned in the Kconfig help text for 8660.
 
-Right, I know.
+thanks,
+Steve
 
-> > I would assume that we only need to have the base address of the
-> > mapping window defined somewhere and then use offsets:
-> > 
-> > #ifdef __ASSEMBLY__
-> > #define IOMEM_BASE	0xf0000000
-> > #else
-> > #define IOMEM_BASE	((void __iomem *)0xf0000000)
-> > #endif
-> > 
-> > #define FOO_BASE	IOMEM_BASE + 0x18000
-> > #define BAR_BASE	IOMEM_BASE + 0x20000
-> 
-> What if your interrupt controller and system controller are 1GB apart?
-
-Well, we already map them them through a table, so we can always
-define the table in a way that physically distinct ranges get mapped
-to virtually contiguous locations.
-
-> The reason I haven't done so is because it doesn't fit into an existing
-> header file (we could create asm/iomem.h to contain it for people to
-> include, but for the sake of five lines that's OTT.)
-> 
-> Putting it in asm/io.h doesn't work because that's generally not safe
-> for assembly code (and also causes issues with checkpatch wanting people
-> rightfully to be using linux/io.h).
-
-A lot of platforms have a mach/hardware.h file that defines the
-actual addresses, so maybe an asm/hardware.h would work as a
-place to keep definitions like this, and that includes the
-underlying mach/hardware.h.
-
-	Arnd
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
