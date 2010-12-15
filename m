@@ -1,56 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 15 Dec 2010 12:39:20 +0000
-Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
-In-Reply-To: <20101213162947.GA11730@n2100.arm.linux.org.uk>
-References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
-	<201012101159.21845.jkrzyszt@tis.icnet.pl>
-	<201012101203.09441.jkrzyszt@tis.icnet.pl>
-	<20101210170356.GA28472@n2100.arm.linux.org.uk>
-	<AANLkTimTVWVmVfppAWSosidqLmo6c+8rPhLg=oJAVoYH@mail.gmail.com>
-	<20101213162947.GA11730@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=ZYi=12k2vZMGp9AWNX8zofp6C-FnMu2egQOA1@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 15 Dec 2010 13:43:03 +0100
+Subject: [PATCH 01/11] OMAP4: PRCM: add OMAP4-specific
+	accessor/mutatorfunctions
+In-Reply-To: <alpine.DEB.2.00.1012142345050.15971@utopia.booyaka.com>
+References: <20101208061657.30541.79824.stgit@twilight.localdomain>
+	<20101208061829.30541.99531.stgit@twilight.localdomain>
+	<25f8b00ceea2d6945cf74024299e81a8@mail.gmail.com>
+	<alpine.DEB.2.00.1012142345050.15971@utopia.booyaka.com>
+Message-ID: <4D08B7D7.3090204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2010 16:29, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 13, 2010 at 03:52:20PM +0000, Catalin Marinas wrote:
->> On 10 December 2010 17:03, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
->> >> ?void __init omap1_camera_init(void *info)
->> >> ?{
->> >> ? ? ? struct platform_device *dev = &omap1_camera_device;
->> >> + ? ? dma_addr_t paddr = omap1_camera_phys_mempool_base;
->> >> + ? ? dma_addr_t size = omap1_camera_phys_mempool_size;
->> >> ? ? ? int ret;
->> >>
->> >> ? ? ? dev->dev.platform_data = info;
->> >>
->> >> + ? ? if (paddr) {
->> >> + ? ? ? ? ? ? if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
->> >
->> > Although this works, you're ending up with SDRAM being mapped via
->> > ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
->> > mapped as if it were a device.
->>
->> BTW, does the generic dma_declare_coherent_memory() does the correct
->> thing in using ioremap()?
+On 12/15/2010 7:48 AM, Paul Walmsley wrote:
+> Hi Rajendra
 >
-> I argue it doesn't, as I said above. ?It means we map SDRAM as device
-> memory, and as I understand the way interconnects work, it's entirely
-> possible that this may not result in the SDRAM being accessible.
-[...]
-> So, not only does this fail the kernel's own rules, but as we already know,
-> it fails the architecture's restrictions with multiple mappings of memory
-> when used with SDRAM, and it also maps main memory as a device. ?I wonder
-> how many more things this broken API needs to do wrong before it's current
-> implementation is consigned to the circular filing cabinet.
+> On Wed, 8 Dec 2010, Rajendra Nayak wrote:
+>
+>> Would it help if we can avoid one more level of function
+>> indirection (given that these are low level apis) and store
+>> the Partition offsets in the tables above (instead of func
+>> pointers) and do some thing like this.
+>>
+>>        return __raw_readl(OMAP2_L4_IO_ADDRESS(cm_read_offset[part],
+>> module, idx));
+>>
+>> with the table entries of cm_read_offset looking something like
+>>> +   [OMAP4430_PRM_PARTITION]                = OMAP4430_PRM_BASE,
+>>> +   [OMAP4430_CM1_PARTITION]                = OMAP4430_CM1_BASE,
+>>> +   [OMAP4430_CM2_PARTITION]                = OMAP4430_CM2_BASE,
+>
+> I did a version of this patch without the extra level of indirection.
+> I'm not sure if it's better or worse.  The original seems conceptually
+> cleaner to me, but this revised version is probably slightly more
+> efficient.  Do you (or anyone else) have a strong preference?
 
-Should we not try to fix the generic code and still allow platforms to
-use dma_declare_coherent_memory() in a safer way? I guess it may need
-some arguing/explanation on linux-arch.
+I do not have a strong but a slight preference for that. It is a little 
+bit more readable that function pointers for my point of view.
 
--- 
-Catalin
+On the other hand, the function pointers might allow to handle tricky 
+differences that this solution will not.
+
+Regards,
+Benoit
