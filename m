@@ -1,44 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 14 Dec 2010 23:32:32 -0200
-Subject: ulpi_check_integrity returning error
-In-Reply-To: <AANLkTikjJ9y=t6=3RHtt+NF8SQbGdTkZfSfpi_L-61ex@mail.gmail.com>
-References: <AANLkTinxLr10X-EBGQHdhC5JyxbJOqcUz_+UMOCo+OFA@mail.gmail.com>
-	<4D076E49.3020805@compulab.co.il>
-	<AANLkTintiOa5mhcF_viNCzC5q1EEHjgTLHhYsJc5Un-5@mail.gmail.com>
-	<87d3p4e6r1.fsf@lechat.rtp-net.org>
-	<AANLkTimUSdV-0L+BSLumTJCDeFOgYNhw6azLjWuK4uX6@mail.gmail.com>
-	<877hfce2xd.fsf@lechat.rtp-net.org>
-	<AANLkTikjJ9y=t6=3RHtt+NF8SQbGdTkZfSfpi_L-61ex@mail.gmail.com>
-Message-ID: <AANLkTincTSTjtvtngA=n5GrXxOc4GUZy5V9gn4pPyOXe@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Dec 2010 02:29:36 +0100
+Subject: [PATCH v2] USB: atmel_usba_udc: fix freeing irq in
+	usba_udc_remove()
+In-Reply-To: <1292349630-3610-1-git-send-email-nicolas.ferre@atmel.com>
+References: <636999.52551.qm@web180309.mail.gq1.yahoo.com>
+	<1292349630-3610-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20101215012936.GR19897@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
+On 19:00 Tue 14 Dec     , Nicolas Ferre wrote:
+> From: Rob Emanuele <rje@crystalfontz.com>
+> 
+> Add a free_irq() call on vbus gpio when we remove udc so that the
+> vbus irq is properly released.
+> 
+> Signed-off-by: Rob Emanuele <rje@crystalfontz.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-On Tue, Dec 14, 2010 at 8:17 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Arnaud,
->
-> On Tue, Dec 14, 2010 at 2:26 PM, Arnaud Patard
-> <arnaud.patard@rtp-net.org> wrote:
-> ...
->>
->> Please, read again what I said. I'm not talking of .portsc but of
->> .init. To reach the ulpi, the portsc register should be set to ulpi mode
->> _before_ calling otg_init() in ehci_mxc_drv_probe() but the code is using
->> .portsc/setting portsc in ehci_mxc_setup() which is afaik _after_
->> ehci_mxc_drv_probe().
->
-> Ok, I understand what you mean now and I confirmed what you said:
-> current code is setting the portsc register after writing to the OTG
-> viewport.
->
-> The MX31 is by default configured for a USB serial phy, so like you
-> stated we need first to setup portsc to work in ULPI mode and after
-> that we can read/write the OTG viewport.
-
-I implemented your suggestion and it worked fine on my board. Will
-submit a patch shortly, so that others can comment and test it.
-
-Thanks,
-
-Fabio Estevam
+Best Regards,
+J.
