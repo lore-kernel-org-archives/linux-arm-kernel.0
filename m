@@ -1,47 +1,57 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Wed, 15 Dec 2010 14:23:33 +0200
-Subject: [PATCH 13/14] OMAP2/3: PRCM: split OMAP2/3-specific PRCM code
-	into OMAP2/3-specific files
-In-Reply-To: <alpine.DEB.2.00.1012142147040.15971@utopia.booyaka.com>
-References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-	<20101207012516.3708.87606.stgit@twilight.localdomain>
-	<alpine.DEB.2.00.1012142147040.15971@utopia.booyaka.com>
-Message-ID: <AANLkTimTtdMeaz=k6H=GQMNTGciJ5uc+GGUnC1RdR_f2@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Dec 2010 12:35:18 +0000
+Subject: [PATCH v5 5/5] msm: add SMP support for msm
+In-Reply-To: <1292302233-16194-6-git-send-email-johlstei@codeaurora.org>
+References: <1292302233-16194-1-git-send-email-johlstei@codeaurora.org>
+	<1292302233-16194-6-git-send-email-johlstei@codeaurora.org>
+Message-ID: <AANLkTimnuTcv+5cWNzvV-Z=1LHsAmTojDSBJMjjOs7K+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 14 December 2010 04:50, Jeff Ohlstein <johlstei@codeaurora.org> wrote:
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/headsmp.S
+[...]
+> +ENTRY(msm_secondary_startup)
+> + ? ? ? mrc ? ? p15, 0, r0, c0, c0, 5 ? @ MPIDR
+> + ? ? ? and ? ? r0, r0, #15 ? ? ? ? ? ? @ What CPU am I
+> + ? ? ? adr ? ? r4, 1f ? ? ? ? ? ? ? ? ?@ address of
+> + ? ? ? ldmia ? r4, {r5, r6} ? ? ? ? ? ?@ load curr addr and pen_rel addr
+> + ? ? ? sub ? ? r4, r4, r5 ? ? ? ? ? ? ?@ determine virtual/phys offsets
+> + ? ? ? add ? ? r6, r6, r4 ? ? ? ? ? ? ?@ apply
+> +pen:
+> + ? ? ? wfe
+> + ? ? ? dsb ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ ensure subsequent access is
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ after event
 
-On Wed, Dec 15, 2010 at 6:50 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Mon, 6 Dec 2010, Paul Walmsley wrote:
->
->> In preparation for adding OMAP4-specific PRCM accessor/mutator
->> functions, split the existing OMAP2/3 PRCM code into OMAP2/3-specific
->> files. ?Most of what was in mach-omap2/{cm,prm}.{c,h} has now been
->> moved into mach-omap2/{cm,prm}2xxx_3xxx.{c,h}, since it was
->> OMAP2xxx/3xxx-specific.
->>
->> This process also requires the #includes in each of these files to be
->> changed to reference the new file name. ?As part of doing so, add some
->> comments into plat-omap/sram.c and plat-omap/mcbsp.c, which use
->> "sideways includes", to indicate that these users of the PRM/CM includes
->> should not be doing so.
->
-> This patch has been updated to also take care of getting DSPBridge to
-> build again. ?Omar, Felipe, could you please take a look at the
-> mach-omap2/dsp.c and _tiomap.h changes and ack them?
+As I wrote in a different e-mail, this DSB isn't actually needed as
+the processor shouldn't speculate beyond the WFE. But it's harmless
+anyway.
 
-I would prefer the XX comments in a separate chunk:
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/platsmp.c
+[...]
+> +int boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +{
+> + ? ? ? static int cold_boot_done;
+> + ? ? ? unsigned long timeout;
+> + ? ? ? printk(KERN_DEBUG "Starting secondary CPU %d\n", cpu);
+> +
+> + ? ? ? if (cold_boot_done == false) {
+> + ? ? ? ? ? ? ? prepare_cold_cpu(cpu);
+> + ? ? ? ? ? ? ? cold_boot_done = true;
+> + ? ? ? }
+> +
+> + ? ? ? pen_release = cpu;
+> + ? ? ? __cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
+> + ? ? ? outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+> + ? ? ? __asm__("sev");
+> + ? ? ? dsb();
 
-/*
- * license notice
- */
+What's the need for the dsb() here (one before SEV maybe)?
 
-/*
- * XXX
- */
-
-But otherwise it's ok.
+Also, do we need to add a "memory" clobber to the SEV asm, not sure
+whether the compiler would try to reorder the code.
 
 -- 
-Felipe Contreras
+Catalin
