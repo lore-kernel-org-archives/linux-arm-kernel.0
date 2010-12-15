@@ -1,73 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Dec 2010 08:56:46 +0000
-Subject: [PATCH] OMAP: omap_device: use pdev as parameter to get rt_va
-In-Reply-To: <alpine.DEB.2.00.1012141710260.15971@utopia.booyaka.com>
-References: <1292024742-27319-1-git-send-email-omar.ramirez@ti.com>
-	<4D05D586.6090408@ti.com>
-	<AANLkTik667cW19eCVNNLf3_dc9efFYms0H2z-fGU24Ob@mail.gmail.com>
-	<alpine.DEB.2.00.1012141710260.15971@utopia.booyaka.com>
-Message-ID: <20101215085646.GA5222@n2100.arm.linux.org.uk>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Wed, 15 Dec 2010 10:10:26 +0100
+Subject: [PATCH 02/16] ARM: Remove dependency of plat-orion GPIO code on
+	mach directory includes.
+In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009FE148BBBCFC@IL-MB01.marvell.com>
+References: <cover.1292377339.git.buytenh@wantstofly.org>
+	<20101215020233.GU15575@mail.wantstofly.org>
+	<FCBE654890C0334289D0AD3AF4EF009FE148BBBCFC@IL-MB01.marvell.com>
+Message-ID: <20101215091025.GK15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 05:17:28PM -0700, Paul Walmsley wrote:
-> Hello Omar
-> 
-> On Mon, 13 Dec 2010, Ramirez Luna, Omar wrote:
-> 
-> > On Mon, Dec 13, 2010 at 2:12 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> > > On 12/11/2010 12:45 AM, Ramirez Luna, Omar wrote:
-> > >>
-> > >> Make the parameter received by omap_device_get_mpu_rt_va
-> > >> consistent with the functions meant to be called by drivers.
-> > >>
-> > >> Also move its header declaration to appear in the set of
-> > >> functions to be used by drivers, as per the comment there.
-> > >
-> > > Please note that even if Paul submitted this API upon request from Santosh,
-> > > we do not want driver to us it most of the time.
-> > 
-> > Oh, ok. Yes, I was under the impression that this ioremap was internal
-> > to hwmod, and drivers should do their own one but then I noticed that
-> > API and since it was under the "public functions through struct
-> > platform data", I thought it was easier to pass pdev than od.
-> > 
-> > > All drivers should us the generic Linux way to get physical mem resource and
-> > > then ioremap it.
-> > 
-> > Then I guess this function belongs to the "public for core code" and
-> > not for drivers along with the omap_device_get_pwrdm.
-> > 
-> > > I assume that if you want to update this API, you are probably already using
-> > > it.
-> > > Why cannot you use the generic way?
-> > 
-> > I can leave the generic way along with ioremap, the purpose was to use
-> > omap_device APIs as much as possible.
-> 
-> The above isn't quite it.  What I'd suggest you do in your code is this:
-> 
-> - In your driver-to-core-OMAP integration code in arch/arm/*omap*, call 
-> omap_hwmod_get_mpu_rt_va(), and pass that to the driver via an entry in 
-> the struct platform_data.
-> 
-> - In your driver code in drivers/*, test to see if that struct 
-> platform_data entry is NULL.  If it is, only then should your driver 
-> ioremap().  Otherwise, it should use the address from the struct 
-> platform_data.
-> 
-> This is because it's not guaranteed that ioremap() on OMAP will continue 
-> to reuse the current static mapping in the future.  We've heard from some 
-> mobile OS vendors that they are under significant address space 
-> constraints, so on those distributions it might make sense to only map 
-> devices that are actually in use, and take the additional TLB entry cost.
-> 
-> Does this make sense?
+On Wed, Dec 15, 2010 at 10:08:51AM +0200, Saeed Bishara wrote:
 
-No it doesn't - this is not a valid reason to bugger about with drivers
-to make them non-standard.
+> >diff --git a/arch/arm/mach-dove/include/mach/dove.h 
+> >b/arch/arm/mach-dove/include/mach/dove.h
+> >index f6a0839..df51131 100644
+> >--- a/arch/arm/mach-dove/include/mach/dove.h
+> >+++ b/arch/arm/mach-dove/include/mach/dove.h
+> >@@ -130,7 +130,8 @@
+> > #define DOVE_PMU_MPP_GENERAL_CTRL (DOVE_MPP_VIRT_BASE + 0x10)
+> > #define DOVE_RESET_SAMPLE_LO	(DOVE_MPP_VIRT_BASE | 0x014)
+> > #define DOVE_RESET_SAMPLE_HI	(DOVE_MPP_VIRT_BASE | 0x018)
+> >-#define DOVE_GPIO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0400)
+> >+#define DOVE_GPIO_LO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
+> >| 0xd0400)
+> >+#define DOVE_GPIO_HI_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
+> >| 0xd0420)
+> > #define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
+> >| 0xe803c)
+> > #define  DOVE_AU1_SPDIFO_GPIO_EN	(1 << 1)
+> > #define  DOVE_NAND_GPIO_EN		(1 << 0)
+> >diff --git a/arch/arm/mach-dove/include/mach/gpio.h 
+> >b/arch/arm/mach-dove/include/mach/gpio.h
+> >index 0ee70ff..e7e5101 100644
+> >--- a/arch/arm/mach-dove/include/mach/gpio.h
+> >+++ b/arch/arm/mach-dove/include/mach/gpio.h
+> 
+> Lennert, this patch conflicts with 2 paches sent by Mike that deal with dove gpio/mpp
+> [PATCH v4 1/2] [ARM] Dove: add support for GPIOs 64-71
+> [PATCH v3 2/2] [ARM] Dove: add support for multi-purpose pins configuration
+> 
+> Nico, I've acked those patches but didn't notice that it wasn't merged in the orion git.
+> Can you please merge it.
 
-omap_ioremap() can be improved to retain its re-use of static mappings
-by having some kind of tree structure or something like that - ioremap
-is after all not a performance critical path.  There's no need to start
-passing virtual addresses to drivers.
+OK, I'll rework this patch once they are merged.
