@@ -1,59 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 14 Dec 2010 21:44:14 -0500 (EST)
-Subject: [PATCH 01/16] ARM: Remove dependency of plat-orion time code on
-	mach directory includes.
-In-Reply-To: <20101215020228.GT15575@mail.wantstofly.org>
-References: <cover.1292377339.git.buytenh@wantstofly.org>
-	<20101215020228.GT15575@mail.wantstofly.org>
-Message-ID: <alpine.LFD.2.00.1012142121560.10437@xanadu.home>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Tue, 14 Dec 2010 19:49:14 -0800
+Subject: [PATCH 0/7] msm: Support for Qualcomm MSM8960
+Message-ID: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Dec 2010, Lennert Buytenhek wrote:
+Add initial support for the Qualcomm MSM8960 target.
 
-> This patch makes the various mach dirs that use the plat-orion time
-> code pass in timer and bridge addresses explicitly, instead of having
-> plat-orion get those values by including a mach dir include file --
-> the latter mechanism is problematic if you want to support multiple
-> ARM platforms in the same kernel image.
-> 
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-[...]
-> @@ -57,8 +71,11 @@ static unsigned long tclk2ns_scale;
->  
->  unsigned long long sched_clock(void)
->  {
-> -	unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
-> -	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
-> +	unsigned long val;
-> +
-> +	val = ~readl(timer_base + TIMER0_VAL_OFF);
-> +
-> +	return (cnt32_to_63(val) * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
->  }
+Stepan Moskovchenko (7):
+  msm: io: I/O register definitions for MSM8960
+  msm: Physical offset for MSM8960
+  msm: irqs-8960: Interrupt map for MSM8960
+  msm: Board file for MSM8960 simulator
+  msm: timer: Timer support for MSM8960
+  msm: Makefile cleanup
+  msm: Build support for the MSM8960 target
 
-This is wrong.
+ arch/arm/mach-msm/Kconfig                       |   16 ++
+ arch/arm/mach-msm/Makefile                      |   20 +-
+ arch/arm/mach-msm/board-msm8960.c               |   71 ++++++
+ arch/arm/mach-msm/include/mach/io.h             |    1 +
+ arch/arm/mach-msm/include/mach/irqs-8960.h      |  293 +++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/irqs.h           |    2 +
+ arch/arm/mach-msm/include/mach/memory.h         |    2 +
+ arch/arm/mach-msm/include/mach/msm_iomap-8960.h |   55 +++++
+ arch/arm/mach-msm/include/mach/msm_iomap.h      |    2 +
+ arch/arm/mach-msm/io.c                          |   14 +
+ arch/arm/mach-msm/timer.c                       |    3 +-
+ 11 files changed, 466 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/mach-msm/board-msm8960.c
+ create mode 100644 arch/arm/mach-msm/include/mach/irqs-8960.h
+ create mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8960.h
 
-The implementation of cnt32_to_63() looks like this:
-
-#define cnt32_to_63(cnt_lo) \
-({ \
-        static u32 __m_cnt_hi; \
-        union cnt32_to_63 __x; \
-        __x.hi = __m_cnt_hi; \
-        smp_rmb(); \
-        __x.lo = (cnt_lo); \
-[...]
-
-Notice the smp_rmb() _before_ the cnt_lo argument is evaluated, and 
-_after_ __m_cnt_hi is retrieved. Tthis ordering is important for the 
-lockless algorithm used here, otherwise a racing thread could make the 
-hardware counter look like it went backward, or that it actually jumped 
-ahead almost one full period.  If you are caching the hardware counter 
-value in a variable then you are defeating the algorithm.
-
-I realize that this constraint is not properly documented in 
-cnt32_to_63.h so I should fix that.
-
-
-Nicolas
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
