@@ -1,51 +1,27 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 15 Dec 2010 10:34:45 -0500 (EST)
-Subject: [PATCH 02/16] ARM: Remove dependency of plat-orion GPIO code on
-	mach directory includes.
-In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009FE148BBBCFC@IL-MB01.marvell.com>
-References: <cover.1292377339.git.buytenh@wantstofly.org>
-	<20101215020233.GU15575@mail.wantstofly.org>
-	<FCBE654890C0334289D0AD3AF4EF009FE148BBBCFC@IL-MB01.marvell.com>
-Message-ID: <alpine.LFD.2.00.1012151031180.10437@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Dec 2010 16:34:53 +0100
+Subject: [PATCH 7/7] msm: Build support for the MSM8960 target
+In-Reply-To: <1292384961-8851-8-git-send-email-stepanm@codeaurora.org>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1292384961-8851-8-git-send-email-stepanm@codeaurora.org>
+Message-ID: <201012151634.53301.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Dec 2010, Saeed Bishara wrote:
-
-> >diff --git a/arch/arm/mach-dove/include/mach/dove.h 
-> >b/arch/arm/mach-dove/include/mach/dove.h
-> >index f6a0839..df51131 100644
-> >--- a/arch/arm/mach-dove/include/mach/dove.h
-> >+++ b/arch/arm/mach-dove/include/mach/dove.h
-> >@@ -130,7 +130,8 @@
-> > #define DOVE_PMU_MPP_GENERAL_CTRL (DOVE_MPP_VIRT_BASE + 0x10)
-> > #define DOVE_RESET_SAMPLE_LO	(DOVE_MPP_VIRT_BASE | 0x014)
-> > #define DOVE_RESET_SAMPLE_HI	(DOVE_MPP_VIRT_BASE | 0x018)
-> >-#define DOVE_GPIO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0400)
-> >+#define DOVE_GPIO_LO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
-> >| 0xd0400)
-> >+#define DOVE_GPIO_HI_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
-> >| 0xd0420)
-> > #define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE 
-> >| 0xe803c)
-> > #define  DOVE_AU1_SPDIFO_GPIO_EN	(1 << 1)
-> > #define  DOVE_NAND_GPIO_EN		(1 << 0)
-> >diff --git a/arch/arm/mach-dove/include/mach/gpio.h 
-> >b/arch/arm/mach-dove/include/mach/gpio.h
-> >index 0ee70ff..e7e5101 100644
-> >--- a/arch/arm/mach-dove/include/mach/gpio.h
-> >+++ b/arch/arm/mach-dove/include/mach/gpio.h
+On Wednesday 15 December 2010, Stepan Moskovchenko wrote:
+> Add the Kconfig options and Makefile options needed to
+> build for the MSM8960 target. Only the simulator is
+> supported at this time.
 > 
-> Lennert, this patch conflicts with 2 paches sent by Mike that deal with dove gpio/mpp
-> [PATCH v4 1/2] [ARM] Dove: add support for GPIOs 64-71
-> [PATCH v3 2/2] [ARM] Dove: add support for multi-purpose pins configuration
-> 
-> Nico, I've acked those patches but didn't notice that it wasn't merged in the orion git.
-> Can you please merge it.
+> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 
-Oops, sorry.  They are merged now.
+There is no need to split the Makefile/Kconfig changes
+from the actual files implementing the functionality.
+It's better to keep these together, since neither of the
+patches does anything meaningful by itself.
 
-BTW don't hesitate to ping me if things don't appear in a timely manner.
+Splitting out the cleanup as you did is good though, it
+helps with review and with possible bisection or rebase
+of the patches.
 
-
-Nicolas
+	Arnd
