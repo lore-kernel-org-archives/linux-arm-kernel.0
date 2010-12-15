@@ -1,83 +1,33 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Tue, 14 Dec 2010 19:54:17 -0600
-Subject: [PATCHv7 0/4] omap: iovmm - fixes for iovmm module
-In-Reply-To: <1292374443-4055-1-git-send-email-fernando.lugo@ti.com>
-References: <1292374443-4055-1-git-send-email-fernando.lugo@ti.com>
-Message-ID: <AANLkTi=CCVe0ST0UiwMrfy8RsP-xfS9gCxUewv1q5Vu=@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Dec 2010 17:55:13 -0800
+Subject: [PATCH v1 0/9] OMAP: DMA: hwmod and DMA as platform device
+In-Reply-To: <87tyifn7ed.fsf@deeprootsystems.com>
+References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
+	<87tyifn7ed.fsf@deeprootsystems.com>
+Message-ID: <20101215015512.GF3190@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fernando,
+* Kevin Hilman <khilman@deeprootsystems.com> [101214 17:37]:
+> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> 
+> > Patch series to convert DMA library into platform driver using platform
+> > device model and adapting hwmod for omap2+.
+> 
+> After the OMAP1 fixup for PATCH 7/9,
+> 
+> Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-For omap patches, follow the convention
+I guess here you mean Signed-off-by for this patch since
+you wrote some code? Assuming Signed-off-by, let me know
+if you want to change that.
+ 
+> and
+> 
+> Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-OMAP: iommu: <subject>
-OMAP: iovmm: <subject>
+Adding this to the others in the series.
 
-Ref: http://www.spinics.net/lists/linux-omap/msg39956.html
+Regards,
 
-
-On Tue, Dec 14, 2010 at 6:53 PM, Fernando Guzman Lugo
-<fernando.lugo@ti.com> wrote:
-> Misc fixes found while working with iovmm module. They are
-> needed in order to tidspbridge can work properly along with
-> iovmm module.
->
-> Version 7:
-> * Change 4/4 patch base on Felipe Contreras comments about
-> ?having start/end in platform data and struct iommu.
->
-> Version 6:
-> * Rebase on Russell King branch.
-> ?- for details see:
-> ?http://marc.info/?l=linux-omap&m=129228495723001&w=2
->
-> Version 5:
-> * Changes in "iommu: create new api to set valid da range"
-> ?- Change range variables to platform data structure.
->
-> Version 4:
-> * Changes in "iommu: create new api to set valid da range"
-> ?- Validate range for fixed address.
-> ?- Change way of change boundaries to avoid possible overflow
-> ?instead of style :
-> ? ? start + bytes >= end ? ? which start + end can overflow
-> ?use style:
-> ? ? end - start < bytes
->
-> Version 3:
-> * change patch 2 base on Felipe Contreras' comments,
-> ?now it uses min_t and I deleted some blank lines.
-> * patch "create new api to set valid da range" is base on
-> ?"iovmm: IVA2 MMU range is from 0x11000000 to 0xFFFFFFFF"
-> ?patch and on Hiroshi's comments and now it is added to
-> ?this set.
->
-> Version 2:
-> * Removed "iovmm: fixes for iovmm module" that patch was already
-> ?sent.
-> * Modified "iovmm: fix roundup for next area and end check for the
-> ?last area" patch, base on Davin Cohen's comments and rename it
-> ?to a proper name that describes what it is doing now.
->
->
-> Guzman Lugo, Fernando (4):
-> ?omap: iovmm - no gap checking for fixed address
-> ?omap: iovmm - add superpages support to fixed da address
-> ?omap: iovmm - replace __iounmap with iounmap
-> ?omap: iommu - create new api to set valid da range
->
-> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ?| ? ?8 +++
-> ?arch/arm/plat-omap/include/plat/iommu.h | ? ?5 ++
-> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 24 +++++++++
-> ?arch/arm/plat-omap/iovmm.c ? ? ? ? ? ? ?| ? 81 +++++++++++++++++-------------
-> ?4 files changed, 83 insertions(+), 35 deletions(-)
->
->
-
-
-
--- 
-Thank you,
-Best regards,
-Hari Kanigeri
+Tony
