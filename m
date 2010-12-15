@@ -1,67 +1,55 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Wed, 15 Dec 2010 03:03:38 +0100
-Subject: [PATCH 08/16] ARM: at91: Switch over to gpiolib ->to_irq() and
+Date: Wed, 15 Dec 2010 03:03:43 +0100
+Subject: [PATCH 10/16] ARM: gemini: Switch over to gpiolib ->to_irq() and
 	__gpio_to_irq().
 In-Reply-To: <cover.1292377339.git.buytenh@wantstofly.org>
 References: <cover.1292377339.git.buytenh@wantstofly.org>
-Message-ID: <20101215020338.GA15575@mail.wantstofly.org>
+Message-ID: <20101215020343.GC15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 ---
- arch/arm/mach-at91/gpio.c              |    7 +++++++
- arch/arm/mach-at91/include/mach/gpio.h |    6 +-----
- 2 files changed, 8 insertions(+), 5 deletions(-)
+ arch/arm/mach-gemini/gpio.c              |    6 ++++++
+ arch/arm/mach-gemini/include/mach/gpio.h |    2 +-
+ 2 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index ae4772e..efcfe8b 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -44,6 +44,7 @@ static int at91_gpiolib_direction_output(struct gpio_chip *chip,
- 					 unsigned offset, int val);
- static int at91_gpiolib_direction_input(struct gpio_chip *chip,
- 					unsigned offset);
-+static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
- 
- #define AT91_GPIO_CHIP(name, base_gpio, nr_gpio)			\
- 	{								\
-@@ -53,6 +54,7 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
- 			.direction_output = at91_gpiolib_direction_output, \
- 			.get		  = at91_gpiolib_get,		\
- 			.set		  = at91_gpiolib_set,		\
-+			.to_irq		  = at91_gpiolib_to_irq,	\
- 			.dbg_show	  = at91_gpiolib_dbg_show,	\
- 			.base		  = base_gpio,			\
- 			.ngpio		  = nr_gpio,			\
-@@ -586,6 +588,11 @@ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
- 	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
+index fe3bd5a..40259b7 100644
+--- a/arch/arm/mach-gemini/gpio.c
++++ b/arch/arm/mach-gemini/gpio.c
+@@ -197,12 +197,18 @@ static int gemini_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
+ 	return 0;
  }
  
-+static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset)
++static int gemini_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 +{
-+	return chip->base + offset;
++	return GPIO_IRQ_BASE + offset;
 +}
 +
- static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- {
- 	int i;
-diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
-index bfdd8ab..1e557f4 100644
---- a/arch/arm/mach-at91/include/mach/gpio.h
-+++ b/arch/arm/mach-at91/include/mach/gpio.h
-@@ -219,11 +219,7 @@ extern void at91_gpio_resume(void);
+ static struct gpio_chip gemini_gpio_chip = {
+ 	.label			= "Gemini",
+ 	.direction_input	= gemini_gpio_direction_input,
+ 	.get			= gemini_gpio_get,
+ 	.direction_output	= gemini_gpio_direction_output,
+ 	.set			= gemini_gpio_set,
++	.to_irq			= gemini_gpio_to_irq,
+ 	.base			= 0,
+ 	.ngpio			= GPIO_PORT_NUM * 32,
+ };
+diff --git a/arch/arm/mach-gemini/include/mach/gpio.h b/arch/arm/mach-gemini/include/mach/gpio.h
+index 3bc2c70..41f8f6a 100644
+--- a/arch/arm/mach-gemini/include/mach/gpio.h
++++ b/arch/arm/mach-gemini/include/mach/gpio.h
+@@ -18,8 +18,8 @@
  #define gpio_get_value	__gpio_get_value
  #define gpio_set_value	__gpio_set_value
  #define gpio_cansleep	__gpio_cansleep
--
--static inline int gpio_to_irq(unsigned gpio)
--{
--	return gpio;
--}
 +#define gpio_to_irq	__gpio_to_irq
  
- static inline int irq_to_gpio(unsigned irq)
- {
+-#define gpio_to_irq(x)	((x) + GPIO_IRQ_BASE)
+ #define irq_to_gpio(x)	((x) - GPIO_IRQ_BASE)
+ 
+ #endif /* __MACH_GPIO_H__ */
 -- 
 1.7.1
