@@ -1,37 +1,36 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 15 Dec 2010 16:17:48 +0300
-Subject: [PATCH 2/7] msm: Physical offset for MSM8960
-In-Reply-To: <1292384961-8851-3-git-send-email-stepanm@codeaurora.org>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1292384961-8851-3-git-send-email-stepanm@codeaurora.org>
-Message-ID: <4D08BFFC.3020103@ru.mvista.com>
+Date: Wed, 15 Dec 2010 16:25:28 +0300
+Subject: [PATCH] MTD: m25p80: add debugging trace in sst_write()
+In-Reply-To: <1292414372-17085-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1292414372-17085-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4D08C1C8.3090100@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 15-12-2010 6:49, Stepan Moskovchenko wrote:
+On 15-12-2010 14:59, Nicolas Ferre wrote:
 
-> Add the physical memory offset value for the Qualcomm
-> MSM8960 chip.
+> Add a DEBUG(MTD_DEBUG_LEVEL2, ..) trace at beginning of sst_write() function as
+> it is done in m25p80_write() function.
 
-> Signed-off-by: Stepan Moskovchenko<stepanm@codeaurora.org>
+> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
 [...]
 
-> diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
-> index 070e17d..014bbd3 100644
-> --- a/arch/arm/mach-msm/include/mach/memory.h
-> +++ b/arch/arm/mach-msm/include/mach/memory.h
-> @@ -25,6 +25,8 @@
->  #define PHYS_OFFSET		UL(0x00200000)
->  #elif defined(CONFIG_ARCH_MSM8X60)
->  #define PHYS_OFFSET		UL(0x40200000)
-> +#elif defined(CONFIG_ARCH_MSM8960)
-> +#define PHYS_OFFSET		UL(0x40200000)
+> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+> index bf5a002..e6b5707 100644
+> --- a/drivers/mtd/devices/m25p80.c
+> +++ b/drivers/mtd/devices/m25p80.c
+> @@ -482,6 +482,10 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
+>   	size_t actual;
+>   	int cmd_sz, ret;
+>
+> +	DEBUG(MTD_DEBUG_LEVEL2, "%s: %s %s 0x%08x, len %zd\n",
+> +			dev_name(&flash->spi->dev), __func__, "to",
 
-    Why not:
+    What's the point of printing "to" as variable? :-)
 
--#elif defined(CONFIG_ARCH_MSM8X60)
-+#elif defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960)
+> +			(u32)to, len);
+> +
 
 WBR, Sergei
