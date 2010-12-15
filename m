@@ -1,36 +1,43 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Wed, 15 Dec 2010 14:49:12 +0200
-Subject: [PATCH 2/2] arm: mach-omap2: Kconfig: devkit8000 should select needed
-	options
-In-Reply-To: <1292417352-18082-1-git-send-email-aaro.koskinen@nokia.com>
-References: <1292417352-18082-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1292417352-18082-2-git-send-email-aaro.koskinen@nokia.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 15 Dec 2010 16:13:03 +0300
+Subject: [PATCH 04/16] ARM: Dove: Remove PXA compatibility IRQ defines.
+In-Reply-To: <20101215020306.GW15575@mail.wantstofly.org>
+References: <cover.1292377339.git.buytenh@wantstofly.org>
+	<20101215020306.GW15575@mail.wantstofly.org>
+Message-ID: <4D08BEDF.3060700@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's not possible to compile a kernel for this board without I2C,
-MFD_SUPPORT and TWL4030_CORE, so those should be selected. This will
-prevent build errors when trying out different configurations.
+Hello.
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
----
- arch/arm/mach-omap2/Kconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+On 15-12-2010 5:03, Lennert Buytenhek wrote:
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index db20351..bb32f35 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -129,6 +129,10 @@ config MACH_DEVKIT8000
- 	default y
- 	select OMAP_PACKAGE_CUS
- 	select OMAP_MUX
-+	select I2C
-+	select I2C_OMAP
-+	select MFD_SUPPORT
-+	select TWL4030_CORE
- 
- config MACH_OMAP_LDP
- 	bool "OMAP3 LDP board"
--- 
-1.5.6.5
+> These are not currently used anywhere, but when the relevant
+> peripherals are enabled on the Dove port, the IRQ numbers should be
+> passed into the drivers via platform device resources rather than
+> having the drivers get them from platform headers directly.
+
+> Signed-off-by: Lennert Buytenhek<buytenh@secretlab.ca>
+[...]
+
+> diff --git a/arch/arm/mach-dove/include/mach/irqs.h b/arch/arm/mach-dove/include/mach/irqs.h
+> index 4668146..03d401d 100644
+> --- a/arch/arm/mach-dove/include/mach/irqs.h
+> +++ b/arch/arm/mach-dove/include/mach/irqs.h
+> @@ -92,10 +92,5 @@
+>
+>   #define NR_IRQS			(IRQ_DOVE_PMU_START + NR_PMU_IRQS)
+>
+> -/* Required for compatability with PXA AC97 driver.	*/
+> -#define IRQ_AC97		IRQ_DOVE_AC97
+> -/* Required for compatability with PXA DMA driver.	*/
+> -#define IRQ_DMA			IRQ_DOVE_PDMA
+> -/* Required for compatability with PXA NAND driver 	*/
+> -#define IRQ_NAND		IRQ_DOVE_NAND
+> +
+
+    The second new line is not needed here.
+
+>   #endif
+
+WBR, Sergei
