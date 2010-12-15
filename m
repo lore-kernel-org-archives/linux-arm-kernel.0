@@ -1,68 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Dec 2010 18:08:41 +0100
-Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
-In-Reply-To: <20101215164757.GF9937@n2100.arm.linux.org.uk>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-	<201012151722.21939.arnd@arndb.de>
-	<20101215164757.GF9937@n2100.arm.linux.org.uk>
-Message-ID: <201012151808.41969.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Dec 2010 17:12:46 +0000
+Subject: [PATCH 1/9] ARM i.MX51: Add ipu clock support
+In-Reply-To: <201012151749.59488.arnd@arndb.de>
+References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
+	<201012151640.03789.arnd@arndb.de>
+	<20101215163445.GE9937@n2100.arm.linux.org.uk>
+	<201012151749.59488.arnd@arndb.de>
+Message-ID: <20101215171246.GG9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 December 2010, Russell King - ARM Linux wrote:
-> Err, no - you're not understanding its purpose.  It's used like so:
+On Wed, Dec 15, 2010 at 05:49:59PM +0100, Arnd Bergmann wrote:
+> On Wednesday 15 December 2010, Russell King - ARM Linux wrote:
+> > Lastly, I don't see where atomicity comes into it - __raw_writel vs writel
+> > have the same atomicity.  Both are single access atomic provided they're
+> > naturally aligned.  Misaligned device accesses are not predictable.
 > 
-> #define FOO_BASE                IOMEM(0xf0000000)
-> 
-> in headers, which means you can use FOO_BASE both in C code (and it'll
-> be correctly typed) and also use it in assembly code (where it will be
-> an assembly expression.)
-> 
-> The alternative is we end up with:
-> 
-> #define FOO_ASM_BASE            0xf0000000
-> #define FOO_C_BASE              ((void __force __iomem *)0xf0000000)
+> This is just what gcc turns it into today. In theory, a future gcc or
+> a future cpu might change that. If you mark a pointer as
+> '__attribute__((packed))', it probably already does, even for aligned
+> pointers, while it does not when using writel_{,relaxed}. The point is
+> that __raw_* means just that -- we don't give any guarantees on what
+> happens on the bus, so people should not use it.
 
-But isn't a hardwire virtual I/O address something that should be
-used only very rarely?
+No.  It does give guarantees on what happens on the bus.  The kind of
+pointer you pass in has no bearing on what happens on the bus because it's
+casted away immediately.
 
-I would assume that we only need to have the base address of the
-mapping window defined somewhere and then use offsets:
+__raw_writel(v, ptr) doesn't just do *(ptr) = v - that doesn't work when
+ptr is void.  Instead, it has to do a cast to ensure that we have a valid
+C dereference (void pointers are illegal to dereference):
 
-#ifdef __ASSEMBLY__
-#define IOMEM_BASE	0xf0000000
-#else
-#define IOMEM_BASE	((void __iomem *)0xf0000000)
-#endif
+#define __raw_writel(v,a)  (__chk_io_ptr(a), \
+	*(volatile unsigned int __force   *)(a) = (v))
 
-#define FOO_BASE	IOMEM_BASE + 0x18000
-#define BAR_BASE	IOMEM_BASE + 0x20000
+Doesn't matter if 'a' was marked as packed or not - that's all casted away.
+That's not something that should ever change - otherwise we'll all be
+screwed as you could never cast away pointer attributes.
 
-> Or worse still, we end up with stuff like:
-> 
-> #define FOO_BASE                0xf0000000
-> 
-> struct blah {
->         unsigned long base;
-> };
-> 
-> unsigned int blah(struct blah *b, unsigned int reg)
-> {
->         return readl(b->base + reg);
-> }
-> 
-> Having IOMEM(), which can be audited to only be used in header files
-> defining registers gets around such problems, and ensures that the C
-> code is written more correctly than it otherwise would be.
+It _may_ possible that the compiler decides that accessing an 'unsigned int'
+will not be done as a single word load, in which case we have exactly the
+same problems with writel() too.
 
-With the autiting, it certainly isn't that bad. One problem
-I still see is that it's defined in the platform directory,
-rather than somewhere in arch/arm/include/asm/, where it could
-be mandated for use across all (or all new) platforms.
-
-Introducing generic infrastructure at a platform level seems
-problematic because the good parts will need to get copied
-everywhere while the bad parts get stuck in obsolete platforms
-forever.
-
-	Arnd
+And in any case, if __raw_writel() was as you're suggesting, then it would
+serve absolutely no purpose at all.
