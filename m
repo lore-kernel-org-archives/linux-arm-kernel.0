@@ -1,5 +1,5 @@
-From: smuckle@codeaurora.org (Steve Muckle)
-Date: Wed, 15 Dec 2010 09:53:43 -0800
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 15 Dec 2010 09:55:28 -0800
 Subject: [PATCH 2/7] msm: Physical offset for MSM8960
 In-Reply-To: <20101215153837.GB15817@huya.qualcomm.com>
 References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
@@ -8,32 +8,53 @@ References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
 	<20101215135508.GB8682@huya.qualcomm.com>
 	<1292424054.13887.5.camel@m0nster>
 	<20101215153837.GB15817@huya.qualcomm.com>
-Message-ID: <4D0900A7.8070405@codeaurora.org>
+Message-ID: <1292435728.7789.8.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/10 07:38, David Brown wrote:
+On Wed, 2010-12-15 at 07:38 -0800, David Brown wrote:
+> On Wed, Dec 15, 2010 at 06:40:54AM -0800, Daniel Walker wrote:
+> 
+> > > > -#elif defined(CONFIG_ARCH_MSM8X60)
+> > > > +#elif defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960)
+> > > 
+> > > I guess it's a matter of style, and what one is trying to emphasize.
+> > > Having each one listed makes it easier to change them individually.
+> > > The file is just a listing of the addresses of each chip, so I don't
+> > > see much reason to try and compact it.
+> > 
+> > It just shows a deeper issue, that the namespace needs work. There's too
+> > much duplication here vs. 8x60 .. If you look over this whole patchset
+> > it looks very much like 8x60 was just copied over.
+> 
 > There's not very much copying here, in fact there isn't very much to
 > the 8960 support to begin with.  Despite the confusing names, 8960 is
 > quite a bit different from 8[26]60.  I agree we would probably be best
 > with different names, which might help make the difference clearer.
 
-A couple more comments here...
+The board file is very similar, plus the ifdefs. The code differences
+are the io and irq's .. The naming issue and the duplication can be
+simplified just by combining 8960 and 8660 .. If you create two new
+Kconfig options,
 
-Currently it is the case that there is a lot of similarity between 8960
-and 8660, however the two are expected to diverge as 8960 support
-matures. This may include things like the physical offset so IMO it is
-better to leave this things as per-ARCH rather than combining them.
+config MACH_MSM8660
+	bool
+config MACH_MSM8960
+	bool
 
-During some previous discussions on the naming situation, one idea which
-was floated was renaming 8x60 to 8660, which would help clarify the
-difference from 8960. The only issue with that is that 8260, which is
-for purposes of the kernel the same as 8660, would be left out and
-probably just have to be mentioned in the Kconfig help text for 8660.
+and use ARCH_MSM8X60 for all the duplication .. That gives you the
+ability to leverage the similarities, and enough macros to distinguish
+between the two for the differences. If there's no duplication (but we
+know there is) then you just don't use ARCH_MSM8X60. You could also have
+board-msm8660.c and board-msm8960.c to hold board file differences and
+board-msm8x60.c to hold the similarities.
 
-thanks,
-Steve
+I haven't explored this in great detail, but it seems like a better
+naming scheme than what you have here.
+
+Daniel
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
