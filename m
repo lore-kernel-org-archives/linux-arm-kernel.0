@@ -1,76 +1,48 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 15 Dec 2010 14:51:43 +0100
-Subject: [PATCH v2 7/7] OMAP2430: hwmod data: Use common dev_attr for i2c1 and
-	i2c2
-In-Reply-To: <1292421103-19282-1-git-send-email-b-cousson@ti.com>
-References: <1292421103-19282-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1292421103-19282-8-git-send-email-b-cousson@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 15 Dec 2010 05:55:08 -0800
+Subject: [PATCH 2/7] msm: Physical offset for MSM8960
+In-Reply-To: <4D08BFFC.3020103@ru.mvista.com>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1292384961-8851-3-git-send-email-stepanm@codeaurora.org>
+	<4D08BFFC.3020103@ru.mvista.com>
+Message-ID: <20101215135508.GB8682@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since i2c1 and i2c2 are using the same data, remove the two previous
-instances and use a common i2c_dev_attr one.
+On Wed, Dec 15, 2010 at 04:17:48PM +0300, Sergei Shtylyov wrote:
 
-Moreover, that will fix the following warning:
-arch/arm/mach-omap2/omap_hwmod_2430_data.c:485:
-warning: 'i2c_dev_attr' defined but not used
+> On 15-12-2010 6:49, Stepan Moskovchenko wrote:
+> 
+> > Add the physical memory offset value for the Qualcomm
+> > MSM8960 chip.
+> 
+> > Signed-off-by: Stepan Moskovchenko<stepanm@codeaurora.org>
+> [...]
+> 
+> > diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
+> > index 070e17d..014bbd3 100644
+> > --- a/arch/arm/mach-msm/include/mach/memory.h
+> > +++ b/arch/arm/mach-msm/include/mach/memory.h
+> > @@ -25,6 +25,8 @@
+> >  #define PHYS_OFFSET		UL(0x00200000)
+> >  #elif defined(CONFIG_ARCH_MSM8X60)
+> >  #define PHYS_OFFSET		UL(0x40200000)
+> > +#elif defined(CONFIG_ARCH_MSM8960)
+> > +#define PHYS_OFFSET		UL(0x40200000)
+> 
+>     Why not:
+> 
+> -#elif defined(CONFIG_ARCH_MSM8X60)
+> +#elif defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960)
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Acked-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Charulatha V <charu@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |   16 +++++-----------
- 1 files changed, 5 insertions(+), 11 deletions(-)
+I guess it's a matter of style, and what one is trying to emphasize.
+Having each one listed makes it easier to change them individually.
+The file is just a listing of the addresses of each chip, so I don't
+see much reason to try and compact it.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 0f87736..eb73e5c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -482,14 +482,12 @@ static struct omap_hwmod_class i2c_class = {
- 	.sysc		= &i2c_sysc,
- };
- 
--static struct omap_i2c_dev_attr i2c_dev_attr;
--
--/* I2C1 */
--
--static struct omap_i2c_dev_attr i2c1_dev_attr = {
-+static struct omap_i2c_dev_attr i2c_dev_attr = {
- 	.fifo_depth	= 8, /* bytes */
- };
- 
-+/* I2C1 */
-+
- static struct omap_hwmod_irq_info i2c1_mpu_irqs[] = {
- 	{ .irq = INT_24XX_I2C1_IRQ, },
- };
-@@ -530,16 +528,12 @@ static struct omap_hwmod omap2430_i2c1_hwmod = {
- 	.slaves		= omap2430_i2c1_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap2430_i2c1_slaves),
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c1_dev_attr,
-+	.dev_attr	= &i2c_dev_attr,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
- };
- 
- /* I2C2 */
- 
--static struct omap_i2c_dev_attr i2c2_dev_attr = {
--	.fifo_depth	= 8, /* bytes */
--};
--
- static struct omap_hwmod_irq_info i2c2_mpu_irqs[] = {
- 	{ .irq = INT_24XX_I2C2_IRQ, },
- };
-@@ -572,7 +566,7 @@ static struct omap_hwmod omap2430_i2c2_hwmod = {
- 	.slaves		= omap2430_i2c2_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap2430_i2c2_slaves),
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c2_dev_attr,
-+	.dev_attr	= &i2c_dev_attr,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
- };
- 
+Thanks,
+David
+
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
