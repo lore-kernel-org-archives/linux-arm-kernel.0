@@ -1,45 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Dec 2010 16:49:45 +0100
-Subject: [PATCH 6/9] ARM i.MX51: Add IPU device support
-In-Reply-To: <1291902441-24712-7-git-send-email-s.hauer@pengutronix.de>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-7-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <201012151649.45199.arnd@arndb.de>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 15 Dec 2010 21:23:33 +0530
+Subject: [PATCH v1 4/9] OMAP2430: hwmod data: add system DMA
+In-Reply-To: <alpine.DEB.2.00.1012150814250.15971@utopia.booyaka.com>
+References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
+	<1291434246-30716-5-git-send-email-manjugk@ti.com>
+	<alpine.DEB.2.00.1012141925300.15971@utopia.booyaka.com>
+	<20101215105953.GC11931@GLPP-machine>
+	<alpine.DEB.2.00.1012150814250.15971@utopia.booyaka.com>
+Message-ID: <20101215155333.GA28354@GLPP-machine>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 December 2010, Sascha Hauer wrote:
-> +#define imx51_add_ipuv3(pdata) \
-> +       imx_add_ipuv3(&imx51_ipuv3_data, pdata)
+On Wed, Dec 15, 2010 at 08:14:49AM -0700, Paul Walmsley wrote:
+> On Wed, 15 Dec 2010, G, Manjunath Kondaiah wrote:
+> 
+> > On Tue, Dec 14, 2010 at 07:27:33PM -0700, Paul Walmsley wrote:
+> > > On Sat, 4 Dec 2010, G, Manjunath Kondaiah wrote:
+> > > 
+> > > > Add OMAP2430 DMA hwmod data and also add required
+> > > > DMA device attributes.
+> > > 
+> > > ...
+> > > 
+> > > > +/* dma_system -> L3 */
+> > > > +static struct omap_hwmod_ocp_if omap2430_dma_system__l3 = {
+> > > > +	.master		= &omap2430_dma_system_hwmod,
+> > > > +	.slave		= &omap2430_l3_main_hwmod,
+> > > > +	.clk		= "l3_div_ck",
+> > > 
+> > > This clock does not exist on OMAP2430.  Did you test this on OMAP2430?
+> > 
+> > Yes. I have tested this on SDP2430. For confirmation, I tested again now.
+> > It boots up without any issues and all DMA test cases are passing.
+> 
+> Don't you see warnings in the boot messages that this clock cannot be 
+> found?
 
-This looks  like a pointless abstraction, it does not make
-the code smaller or easier to read. I know it's sometimes
-tempting to use macros, but in most cases, you should try
-not to.
+No. I don't see any warnings in boot log. May missing during early
+prints?
 
-> +#define imx51_ipuv3_data_entry_single(soc)				\
-> +	{								\
-> +		.iobase = soc ## _IPU_CTRL_BASE_ADDR,			\
-> +		.irq_err = soc ## _INT_IPU_ERR,				\
-> +		.irq = soc ## _INT_IPU_SYN,				\
-> +	}
-> +
-> +#ifdef CONFIG_SOC_IMX51
-> +const struct imx_ipuv3_data imx51_ipuv3_data __initconst =
-> +	imx51_ipuv3_data_entry_single(MX51);
-> +#endif /* ifdef CONFIG_SOC_IMX35 */
-
-This looks really strange: You define a macro that is used
-in only a single place, and the only user is a data structure
-that references data from other files and is used elsewhere
-as well.
-
-Avoiding the macro would make it easier to grep for the use
-of the identifiers.
-
-If you put the data structure in the place where it is used,
-you can avoid the #ifdef and make it static.
-
-Also, the comment on the #endif does not match the #if.
-
-	Arnd
+-Manjunath
