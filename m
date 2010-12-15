@@ -1,34 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Dec 2010 17:04:00 -0800
-Subject: [PATCH v1 7/9] OMAP1: DMA: Implement in platform device model
-In-Reply-To: <87aak7onvu.fsf@deeprootsystems.com>
-References: <1291434246-30716-1-git-send-email-manjugk@ti.com>
-	<1291434246-30716-8-git-send-email-manjugk@ti.com>
-	<87d3p3q35h.fsf@deeprootsystems.com>
-	<87aak7onvu.fsf@deeprootsystems.com>
-Message-ID: <20101215010400.GC3190@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 14 Dec 2010 18:07:30 -0700 (MST)
+Subject: [PATCH 0/5] OMAP4: hwmod data fixes and update
+In-Reply-To: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
+References: <1291937615-18571-1-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1012141804450.15971@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [101214 16:55]:
-> Kevin Hilman <khilman@deeprootsystems.com> writes:
-> 
-> [...]
-> 
-> >
-> > Using the patch below which fixes up the interrupt numbers to match the
-> > original code, the memory-to-memory test is now working on OSK.
-> 
-> Tony, if you prefer just to fold this into the original, feel free to
-> add
-> 
-> [khilman at deeprootsystems.com]: fixed IRQ numbers to match original code
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+On Fri, 10 Dec 2010, Benoit Cousson wrote:
 
-OK thanks, will fold it in and let's merge them into linux-omap
-master branch for few days for testing. Then if everything looks
-good, I'll queue these for the 2.6.38 next merge window.
+> Here is a small set of OMAP4 hwmod data updates.
+> 
+> Re-order properly the data that were a little bit shuffled during
+> the previous merge window.
+> Add the new reset flags introduced in 2.6.37 and that were not
+> used in the hwmod data. The OMAP2 and OMAP3 fixes should come soon.
+> Fix some missing field in the GPIO OMAP4 hwmod data that I missed
+> during the review.
+> IVA and DSP are added just to allow the processors device creation
+> at boot time and avoid the warnings.
+> 
+> Thanks to Charu for testing the GPIO / WD_TIMER changes.
+> Thanks to Govindraj for testing the UART changes. 
+> 
+> The series is based on lo/for-next (v2.6.37-rc5-66-ga2814df) and is
+> available here:
+> git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod_data
+> 
+> Please note that there is a slight dependency with the following patch
+> due to the name change of the iva fclk:
+> OMAP4: clock data: Add missing DPLL x2 clock node
+> https://patchwork.kernel.org/patch/396612/
+> 
+> Tested on sdp4430 + ES2.0/ES2.1.
+> 
+> Regards,
+> Benoit
+>
+> 
+> Benoit Cousson (5):
+>   OMAP4: hwmod data: Fix hwmod entries order
+>   OMAP4: hwmod data: Add SYSS_HAS_RESET_STATUS flag
+>   OMAP4: hwmod data: Fix missing address in DMM and EMIF_FW
+>   OMAP4: hwmod data: Add IVA and DSP
+>   OMAP4: hwmod & clock data: Fix GPIO opt_clks and ocp_if iclk
 
-Regards,
+Thanks, queued for 2.6.38 with some tweaks.  I've replied to the original 
+patches with the details.
 
-Tony
+The current integration tag that contains these patches is 
+'integration-2.6.38-20101214-010' available from 
+git://git.pwsan.com/linux-integration
+
+
+- Paul
