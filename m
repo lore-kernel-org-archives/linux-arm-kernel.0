@@ -1,33 +1,62 @@
-From: davidsin@ti.com (David Sin)
-Date: Thu, 16 Dec 2010 13:02:08 -0600
-Subject: [PATCH 0/9] TI DMM-TILER driver
-In-Reply-To: <201012161843.48262.arnd@arndb.de>
-References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
-	<20101216172531.GG29435@lba0869738>
-	<20101216173737.GA6767@lba0869738>
-	<201012161843.48262.arnd@arndb.de>
-Message-ID: <20101216190207.GC6767@lba0869738>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Dec 2010 19:13:07 +0000
+Subject: [PATCH] Fix rounding in clocks_calc_mult_shift()
+Message-ID: <20101216191307.GV9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 06:43:48PM +0100, Arnd Bergmann wrote:
-> As far as I can tell, both DMM and GEM at a high level manage objects
-> in video memory. The IOMMU that you have on the Omap hardware seems
-> to resemble the GART that sits between PC-style video cards and main
-> memory.
-> 
-> I don't know any details, but google quickly finds
-> http://lwn.net/Articles/283798/ with a description of the
-> initial GEM design. My main thought when looking over the
-> DMM code was that this should not be tied too closely to a
-> specific hardware, and GEM seems to be an existing abstraction
-> that may fit what you need.
-> 
-> 	Arnd
-Thanks for the pointer, Arnd.  I also found a nice readme file in 
-the gpu/drm directory, which points to a wiki and source code.  
-I'll read into this and get back to you.
+From: John Stultz <john.stultz@linaro.org>
 
-BR,
+Russell King reports:
+| On the ARM dev boards, we have a 32-bit counter running at 24MHz.  Calling
+| clocks_calc_mult_shift(&mult, &shift, 24MHz, NSEC_PER_SEC, 60) gives
+| us a multiplier of 2796202666 and a shift of 26.
+|
+| Over a large counter delta, this produces an error - lets take a count
+| from 362976315 to 4280663372:
+|
+| (4280663372-362976315) * 2796202666 / 2^26 - (4280663372-362976315) * (1000/24)
+|  => -38.91872422891230269990
+|
+| Can we do better?
+|
+| (4280663372-362976315) * 2796202667 / 2^26 - (4280663372-362976315) * (1000/24)
+| 19.45936211449532822051
+|
+| which is about twice as good as the 2796202666 multiplier.
+|
+| Looking at the equivalent divisions obtained, 2796202666 / 2^26 gives
+| 41.66666665673255920410ns per tick, whereas 2796202667 / 2^26 gives
+| 41.66666667163372039794ns.  The actual value wanted is 1000/24 =
+| 41.66666666666666666666ns.
+
+Fix this by ensuring we round to nearest when calculating the
+multiplier.
+
+Signed-off-by: John Stultz <john.stultz@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+
+This is the final piece for my sched_clock() patches, which is required
+by the patches to operate correctly with the known-constants-at-compile-
+time platforms to avoid the kernel complaining that the constants are
+wrong.  The above changelog was written by me, patch was from John, and
+I tweaked the spacing to match the kernel style.
+
+ kernel/time/clocksource.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
+index c18d7ef..df140cd 100644
+--- a/kernel/time/clocksource.c
++++ b/kernel/time/clocksource.c
+@@ -152,6 +152,7 @@ clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 minsec)
+ 	 */
+ 	for (sft = 32; sft > 0; sft--) {
+ 		tmp = (u64) to << sft;
++		tmp += from / 2;
+ 		do_div(tmp, from);
+ 		if ((tmp >> sftacc) == 0)
+ 			break;
 -- 
-David Sin
+1.6.2.5
