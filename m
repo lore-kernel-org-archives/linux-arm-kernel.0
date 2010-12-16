@@ -1,28 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 10:14:45 +0000
-Subject: [PATCH 04/13] ARM: pxa: convert sched_clock() to use new
-	infrastructure
-In-Reply-To: <20101216100523.GI1940@pengutronix.de>
-References: <20101216092527.GL9937@n2100.arm.linux.org.uk>
-	<E1PTA8m-00079T-Ce@rmk-PC.arm.linux.org.uk>
-	<20101216100523.GI1940@pengutronix.de>
-Message-ID: <20101216101444.GM9937@n2100.arm.linux.org.uk>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Thu, 16 Dec 2010 18:26:30 +0800
+Subject: [PATCH v6 08/15] ARM: mxs: Add iomux support
+In-Reply-To: <20101216095105.GG1940@pengutronix.de>
+References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+	<1292244903-30392-6-git-send-email-shawn.guo@freescale.com>
+	<20101216095105.GG1940@pengutronix.de>
+Message-ID: <AANLkTim=p=bDTAwyPQxdnte29t6m5xQp306ghz2pNpoe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 11:05:23AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-> 
-> a very minor nit ...
-> 
-> On Thu, Dec 16, 2010 at 09:28:48AM +0000, Russell King - ARM Linux wrote:
-> > +	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
-> The value of ~0 is compiler implementation defined, so in general
-> ~((u32)0) is saver.  (Though I admit that on arm ~0 will probably always
-> be -1, still I think using the save construct doesn't hurt here.)
+Hi Uwe,
 
-I've been debating about using something like CLOCKSOURCE_MASK() here,
-but haven't yet decided it to be worth it.  I also toyed with the idea
-of storing the mask in the struct, but that adds extra expense when
-it's not needed - everyone should know how many bits are in their
-counter at build time, and if not, they shouldn't penalize those who do.
+2010/12/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+[...]
+>
+> Can we please have a defined order for these definitions? ?I suggest to
+> sort by the arguments to MXS_IOMUX_PAD.
+>
+> Moreover to be able to benefit from iomux_cfg_t being an integer type it
+> would be great to have the generic defines use PAD_VOL_NONE, PAD_MA_NONE
+> and PAD_NOPULL and let these constants have the value 0 to be able to
+> simply say:
+>
+> ? ? ? ?static const mxs_iomux_cfg_t my_pads[] = {
+> ? ? ? ? ? ? ? ?MX28_PAD_SSP1_DATA3__GPIO_2_15 | PAD_PULLUP,
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ?};
+>
+> And it would be nice to get all pad definitions at once generated from
+> the Freescale Excel sheet. ?Lothar Wa?mann already did that based on one
+> of your first versions of this series. ?I can provide it to you via
+> private mail if you think this might be easier for you. ?For plat-mxc
+
+OK. Please send me.
+
+> starting with the complete definitions prooved to be the better approach
+> because otherwise you get many merge conflicts and typing errors.
+>
+> BTW, when Lothar did the conversion he found one mismatch between your
+> patch and the Excel sheet. ?You had MX28_PAD_ENET_CLK__ENET_CLK while
+> the table had MX28_PAD_ENET_CLK__CLKCTRL_ENET. ?I didn't check which of
+> these is consistent with the reference manual.
+>
+
+Excel is correct.
+
+> (Most of these suggestions are from Lothar, I'm just the messenger here,
+> but I'm of the same mind.)
+>
+
+Thanks, both.
+
+
+-- 
+Regards,
+Shawn
