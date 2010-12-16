@@ -1,9 +1,9 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 16 Dec 2010 16:05:36 -0500
-Subject: [PATCH 2/3] ARM: fix cache-xsc3l2 after stack based kmap_atomic()
+Date: Thu, 16 Dec 2010 16:05:37 -0500
+Subject: [PATCH 3/3] ARM: fix cache-feroceon-l2 after stack based kmap_atomic()
 In-Reply-To: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
 References: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1292533537-26760-3-git-send-email-nico@fluxnic.net>
+Message-ID: <1292533537-26760-4-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,182 +11,112 @@ Since commit 3e4d3af501 "mm: stack based kmap_atomic()", it is actively
 wrong to rely on fixed kmap type indices (namely KM_L2_CACHE) as
 kmap_atomic() totally ignores them and a concurrent instance of it may
 happily reuse any slot for any purpose.  Because kmap_atomic() is now
-able to deal with reentrancy, we can get rid of the ad hoc mapping here,
-and we even don't have to disable IRQs anymore (highmem case).
+able to deal with reentrancy, we can get rid of the ad hoc mapping here.
 
 While the code is made much simpler, there is a needless cache flush
 introduced by the usage of __kunmap_atomic().  It is not clear if the
 performance difference to remove that is worth the cost in code
 maintenance (I don't think there are that many highmem users on that
-platform if at all anyway).
+platform anyway) but that should be reconsidered when/if someone cares
+enough to do some measurements.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mm/cache-xsc3l2.c |   57 ++++++++++++++++---------------------------
- 1 files changed, 21 insertions(+), 36 deletions(-)
+ arch/arm/mm/cache-feroceon-l2.c |   37 +++++++++++++++++++------------------
+ 1 files changed, 19 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mm/cache-xsc3l2.c b/arch/arm/mm/cache-xsc3l2.c
-index c315492..5a32020 100644
---- a/arch/arm/mm/cache-xsc3l2.c
-+++ b/arch/arm/mm/cache-xsc3l2.c
-@@ -17,14 +17,10 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index 6e77c04..e0b0e7a 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -13,13 +13,9 @@
   */
+ 
  #include <linux/init.h>
 +#include <linux/highmem.h>
- #include <asm/system.h>
- #include <asm/cputype.h>
  #include <asm/cacheflush.h>
 -#include <asm/kmap_types.h>
 -#include <asm/fixmap.h>
 -#include <asm/pgtable.h>
 -#include <asm/tlbflush.h>
+ #include <plat/cache-feroceon-l2.h>
 -#include "mm.h"
  
- #define CR_L2	(1 << 26)
+ /*
+  * Low-level cache maintenance operations.
+@@ -39,27 +35,30 @@
+  * between which we don't want to be preempted.
+  */
  
-@@ -71,16 +67,15 @@ static inline void xsc3_l2_inv_all(void)
- 	dsb();
- }
- 
-+static inline void l2_unmap_va(unsigned long va)
-+{
- #ifdef CONFIG_HIGHMEM
--#define l2_map_save_flags(x)		raw_local_save_flags(x)
--#define l2_map_restore_flags(x)		raw_local_irq_restore(x)
--#else
--#define l2_map_save_flags(x)		((x) = 0)
--#define l2_map_restore_flags(x)		((void)(x))
-+	if (va != -1)
-+		kunmap_atomic((void *)va);
- #endif
-+}
- 
--static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va,
--				      unsigned long flags)
-+static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va)
+-static inline unsigned long l2_start_va(unsigned long paddr)
++static inline unsigned long l2_get_va(unsigned long paddr)
  {
  #ifdef CONFIG_HIGHMEM
- 	unsigned long va = prev_va & PAGE_MASK;
-@@ -89,17 +84,10 @@ static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va,
- 		/*
- 		 * Switching to a new page.  Because cache ops are
- 		 * using virtual addresses only, we must put a mapping
--		 * in place for it.  We also enable interrupts for a
--		 * short while and disable them again to protect this
--		 * mapping.
-+		 * in place for it.
- 		 */
--		unsigned long idx;
--		raw_local_irq_restore(flags);
--		idx = KM_L2_CACHE + KM_TYPE_NR * smp_processor_id();
--		va = __fix_to_virt(FIX_KMAP_BEGIN + idx);
--		raw_local_irq_restore(flags | PSR_I_BIT);
--		set_pte_ext(TOP_PTE(va), pfn_pte(pa >> PAGE_SHIFT, PAGE_KERNEL), 0);
--		local_flush_tlb_kernel_page(va);
-+		l2_unmap_va(prev_va);
-+		va = (unsigned long)kmap_atomic_pfn(pa >> PAGE_SHIFT);
- 	}
- 	return va + (pa_offset >> (32 - PAGE_SHIFT));
- #else
-@@ -109,7 +97,7 @@ static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va,
- 
- static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
- {
--	unsigned long vaddr, flags;
-+	unsigned long vaddr;
- 
- 	if (start == 0 && end == -1ul) {
- 		xsc3_l2_inv_all();
-@@ -117,13 +105,12 @@ static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
- 	}
- 
- 	vaddr = -1;  /* to force the first mapping */
--	l2_map_save_flags(flags);
- 
  	/*
- 	 * Clean and invalidate partial first cache line.
+-	 * Let's do our own fixmap stuff in a minimal way here.
+ 	 * Because range ops can't be done on physical addresses,
+ 	 * we simply install a virtual mapping for it only for the
+ 	 * TLB lookup to occur, hence no need to flush the untouched
+-	 * memory mapping.  This is protected with the disabling of
+-	 * interrupts by the caller.
++	 * memory mapping afterwards (note: a cache flush may happen
++	 * in some circumstances depending on the path taken in kunmap_atomic).
  	 */
- 	if (start & (CACHE_LINE_SIZE - 1)) {
--		vaddr = l2_map_va(start & ~(CACHE_LINE_SIZE - 1), vaddr, flags);
-+		vaddr = l2_map_va(start & ~(CACHE_LINE_SIZE - 1), vaddr);
- 		xsc3_l2_clean_mva(vaddr);
- 		xsc3_l2_inv_mva(vaddr);
- 		start = (start | (CACHE_LINE_SIZE - 1)) + 1;
-@@ -133,7 +120,7 @@ static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
- 	 * Invalidate all full cache lines between 'start' and 'end'.
- 	 */
- 	while (start < (end & ~(CACHE_LINE_SIZE - 1))) {
--		vaddr = l2_map_va(start, vaddr, flags);
-+		vaddr = l2_map_va(start, vaddr);
- 		xsc3_l2_inv_mva(vaddr);
- 		start += CACHE_LINE_SIZE;
- 	}
-@@ -142,31 +129,30 @@ static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
- 	 * Clean and invalidate partial last cache line.
- 	 */
- 	if (start < end) {
--		vaddr = l2_map_va(start, vaddr, flags);
-+		vaddr = l2_map_va(start, vaddr);
- 		xsc3_l2_clean_mva(vaddr);
- 		xsc3_l2_inv_mva(vaddr);
- 	}
- 
--	l2_map_restore_flags(flags);
-+	l2_unmap_va(vaddr);
- 
- 	dsb();
+-	unsigned long idx = KM_L2_CACHE + KM_TYPE_NR * smp_processor_id();
+-	unsigned long vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+-	set_pte_ext(TOP_PTE(vaddr), pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL), 0);
+-	local_flush_tlb_kernel_page(vaddr);
+-	return vaddr + (paddr & ~PAGE_MASK);
++	void *vaddr = kmap_atomic_pfn(paddr >> PAGE_SHIFT);
++	return (unsigned long)vaddr + (paddr & ~PAGE_MASK);
+ #else
+ 	return __phys_to_virt(paddr);
+ #endif
  }
  
- static void xsc3_l2_clean_range(unsigned long start, unsigned long end)
++static inline void l2_put_va(unsigned long vaddr)
++{
++#ifdef CONFIG_HIGHMEM
++	kunmap_atomic((void *)vaddr);
++#endif
++}
++
+ static inline void l2_clean_pa(unsigned long addr)
  {
--	unsigned long vaddr, flags;
-+	unsigned long vaddr;
+ 	__asm__("mcr p15, 1, %0, c15, c9, 3" : : "r" (addr));
+@@ -76,13 +75,14 @@ static inline void l2_clean_pa_range(unsigned long start, unsigned long end)
+ 	 */
+ 	BUG_ON((start ^ end) >> PAGE_SHIFT);
  
- 	vaddr = -1;  /* to force the first mapping */
--	l2_map_save_flags(flags);
- 
- 	start &= ~(CACHE_LINE_SIZE - 1);
- 	while (start < end) {
--		vaddr = l2_map_va(start, vaddr, flags);
-+		vaddr = l2_map_va(start, vaddr);
- 		xsc3_l2_clean_mva(vaddr);
- 		start += CACHE_LINE_SIZE;
- 	}
- 
--	l2_map_restore_flags(flags);
-+	l2_unmap_va(vaddr);
- 
- 	dsb();
+-	raw_local_irq_save(flags);
+-	va_start = l2_start_va(start);
++	va_start = l2_get_va(start);
+ 	va_end = va_start + (end - start);
++	raw_local_irq_save(flags);
+ 	__asm__("mcr p15, 1, %0, c15, c9, 4\n\t"
+ 		"mcr p15, 1, %1, c15, c9, 5"
+ 		: : "r" (va_start), "r" (va_end));
+ 	raw_local_irq_restore(flags);
++	l2_put_va(va_start);
  }
-@@ -193,7 +179,7 @@ static inline void xsc3_l2_flush_all(void)
  
- static void xsc3_l2_flush_range(unsigned long start, unsigned long end)
- {
--	unsigned long vaddr, flags;
-+	unsigned long vaddr;
+ static inline void l2_clean_inv_pa(unsigned long addr)
+@@ -106,13 +106,14 @@ static inline void l2_inv_pa_range(unsigned long start, unsigned long end)
+ 	 */
+ 	BUG_ON((start ^ end) >> PAGE_SHIFT);
  
- 	if (start == 0 && end == -1ul) {
- 		xsc3_l2_flush_all();
-@@ -201,17 +187,16 @@ static void xsc3_l2_flush_range(unsigned long start, unsigned long end)
- 	}
- 
- 	vaddr = -1;  /* to force the first mapping */
--	l2_map_save_flags(flags);
- 
- 	start &= ~(CACHE_LINE_SIZE - 1);
- 	while (start < end) {
--		vaddr = l2_map_va(start, vaddr, flags);
-+		vaddr = l2_map_va(start, vaddr);
- 		xsc3_l2_clean_mva(vaddr);
- 		xsc3_l2_inv_mva(vaddr);
- 		start += CACHE_LINE_SIZE;
- 	}
- 
--	l2_map_restore_flags(flags);
-+	l2_unmap_va(vaddr);
- 
- 	dsb();
+-	raw_local_irq_save(flags);
+-	va_start = l2_start_va(start);
++	va_start = l2_get_va(start);
+ 	va_end = va_start + (end - start);
++	raw_local_irq_save(flags);
+ 	__asm__("mcr p15, 1, %0, c15, c11, 4\n\t"
+ 		"mcr p15, 1, %1, c15, c11, 5"
+ 		: : "r" (va_start), "r" (va_end));
+ 	raw_local_irq_restore(flags);
++	l2_put_va(va_start);
  }
+ 
+ static inline void l2_inv_all(void)
 -- 
 1.7.3.2.193.g78bbb
