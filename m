@@ -1,62 +1,152 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 16 Dec 2010 13:58:07 +0530
-Subject: [PATCH v4 5/5] OMAP: mailbox: use runtime pm for clk and sysc
-	handling
-In-Reply-To: <1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
-References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
-	<1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
-Message-ID: <AANLkTi=RE3ZEuoe=jMRLiFZ7iVgvuXMrgqfXMAYa92=z@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Thu, 16 Dec 2010 19:30:17 +1100
+Subject: [PATCHv2] mc13xxx: Add i2c support for mc13xxx-core
+In-Reply-To: <20101216074730.GD1940@pengutronix.de>
+References: <1292449675-20308-1-git-send-email-marc@cpdesign.com.au>
+	<20101216074730.GD1940@pengutronix.de>
+Message-ID: <201012161930.17299.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 12:17, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
-> Use runtime pm APIs to enable/disable mailbox clocks and
-> to configure SYSC register.
->
-> Based on the patch sent by Felipe Contreras:
-> https://patchwork.kernel.org/patch/101662/
->
-> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
-> ---
-> ?arch/arm/mach-omap2/mailbox.c | ? 27 +++++----------------------
-> ?1 files changed, 5 insertions(+), 22 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-> index 40ddeca..f5f72ba 100644
-> --- a/arch/arm/mach-omap2/mailbox.c
-> +++ b/arch/arm/mach-omap2/mailbox.c
-> @@ -14,6 +14,7 @@
-> ?#include <linux/err.h>
-> ?#include <linux/platform_device.h>
-> ?#include <linux/io.h>
-> +#include <linux/pm_runtime.h>
-> ?#include <plat/mailbox.h>
-> ?#include <mach/irqs.h>
->
-> @@ -34,12 +35,8 @@
-> ?#define MAILBOX_IRQ_NOTFULL(m) ? ? ? ? (1 << (2 * (m) + 1))
->
-> ?/* SYSCONFIG: register bit definition */
-> -#define AUTOIDLE ? ? ? (1 << 0)
-> ?#define SOFTRESET ? ? ?(1 << 1)
-> -#define SMARTIDLE ? ? ?(2 << 3)
-> ?#define OMAP4_SOFTRESET ? ? ? ?(1 << 0)
-> -#define OMAP4_NOIDLE ? (1 << 2)
-> -#define OMAP4_SMARTIDLE ? ? ? ?(2 << 2)
->
-> ?/* SYSSTATUS: register bit definition */
-> ?#define RESETDONE ? ? ?(1 << 0)
+Hi Uwe,
 
-Is this still required?
+Thanks for your comments. I have a couple of questions, but agree with all 
+your comments on the whole.
 
-> @@ -70,8 +67,6 @@ struct omap_mbox2_priv {
-> ? ? ? ?unsigned long irqdisable;
-> ?};
->
-> -static struct clk *mbox_ick_handle;
-> -
-> ?static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_type_t irq);
->
+> > 
+> > -	struct spi_device *spidev;
+> > +	union {
+> > +		struct spi_device *spidev;
+> > +		struct i2c_client *i2cclient;
+> > +	};
+> > +	struct device *pdev;
+> 
+> pdev is a usual name for 'struct platform_device's, so can you please
+> use 'dev'?
 
-<<snip>>
+no worries. 
+(My old habit of putting a 'p' in front of every pointer name. But let's leave 
+that there.. :)
+
+> 
+> > +	enum mc13xxx_id ictype;
+> > +
+> > 
+> >  	struct mutex lock;
+> >  	int irq;
+> 
+> Before your patch this member was unused.  And AFAICT you don't really
+> need it.  (Whenever you need the number contained in it, you are in an
+> spi or i2c specific function so you can use spidev->irq or
+> i2cclient->irq.)  So can you please just drop this member?
+
+no worries. (Last round of comments you suggested to do in a different patch).
+
+> 
+> > +	int (*read_dev)(struct mc13xxx*, unsigned int, u32*);
+> > +	int (*write_dev)(struct mc13xxx*, unsigned int, u32);
+> 
+> space between type and asterisk?
+
+Not sure which asterisk you're talking about. (Checkpatch.pl resulted in no 
+errors/warnings, so I'm ignorant past that)
+
+
+> > 
+> > +	unsigned char buff[3] = {0, 0, 0};
+> 
+> buf is more usual I think
+
+no worries.
+
+
+> > 
+> > +	/* get the generation ID from register 46, as apparently some older
+> > +	 * ic revisions only have this info at this location. Newer ICs seem to
+> > +	 * have both.
+> > +	 * */
+> 
+> please put /* and */ on lines for themself, see chapter 8 in
+> Documentation/CodingStyle
+
+no worries. (have read, just forget :)
+
+
+
+> > +	devid = spi_get_device_id(mc13xxx->spidev);
+> > +	if (!devid || devid->driver_data != mc13xxx->ictype)
+> > +		dev_warn(mc13xxx->pdev, "device id doesn't "
+> > +					"match auto detection!\n");
+> 
+> Don't linebreak error strings please.
+
+no worries.
+
+
+> > +
+> > +	dev_set_drvdata(&client->dev, mc13xxx);
+> > +	mc13xxx->pdev = &client->dev;
+> > +	mc13xxx->i2cclient = client;
+> > +	mc13xxx->read_dev = mc13xxx_i2c_reg_read;
+> > +	mc13xxx->write_dev = mc13xxx_i2c_reg_write;
+> > +	mc13xxx->irq = client->irq;
+> 
+> I think that starting here the rest of the function can go to
+> common_probe, doesn't it?  (OK, apart from the irq number, that would
+> then go as a parameter to common_probe.)
+
+agree.
+
+
+> 
+> > +
+> > +	mutex_init(&mc13xxx->lock);
+> > +	mc13xxx_lock(mc13xxx);
+> > +
+> > +	ret = mc13xxx_identify(mc13xxx);
+> > +	if (ret || (mc13xxx->ictype == MC13XXX_ID_INVALID))
+> > +		goto err_revision;
+> > +
+> > +	if (id->driver_data != mc13xxx->ictype)
+> > +		dev_warn(mc13xxx->pdev, "device id doesn't "
+> > +					"match auto detection!\n");
+> 
+> linebroken error string
+
+no worries.
+
+
+> >  static int __init mc13xxx_init(void)
+> >  {
+> > 
+> > -	return spi_register_driver(&mc13xxx_driver);
+> > +	int i2cret;
+> > +	int spiret;
+> > +	i2cret = i2c_add_driver(&mc13xxx_i2c_driver);
+> > +	spiret = spi_register_driver(&mc13xxx_driver);
+> > +
+> > +	return (i2cret == 0) && (spiret == 0);
+> 
+> If i2c_add_driver succeeds but spi_register_driver you return
+> -ESOMETHING, and the module is discarded while the i2c core keeps a
+> reference to &mc13xxx_i2c_driver.  This is bad.
+> I think you need to do:
+> 
+> 	ret = i2c_add_driver(..)
+> 	if (ret)
+> 		return ret;
+> 
+> 	ret = spi_register_driver(...)
+> 	if (ret)
+> 		i2c_del_driver(...)
+> 
+> 	return ret;
+> 
+
+This was my biggest reservation with this code too. I think it should try to 
+register both, but should clean appropriately if one fails. (What to return 
+from mc13xxx_init() in that case? Or maybe should it be split into separate 
+files?).
+
+Cheers
+Marc
