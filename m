@@ -1,38 +1,20 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 16 Dec 2010 11:01:53 -0600
-Subject: [PATCH v4 5/5] OMAP: mailbox: use runtime pm for clk and sysc
-	handling
-In-Reply-To: <AANLkTinJOFMF=eC2MQB92e2XUsyyjNRRz7Bm_cyXEmp6@mail.gmail.com>
-References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
-	<1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
-	<AANLkTinJOFMF=eC2MQB92e2XUsyyjNRRz7Bm_cyXEmp6@mail.gmail.com>
-Message-ID: <AANLkTik6GLJkhyg0t77wQrfA6p-SmWXLFfGci0uskJ43@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Dec 2010 17:03:01 +0000
+Subject: [PATCH] ARM: ensure all sched_clock() implementations are
+	notrace marked
+In-Reply-To: <AANLkTikLoU-L4YF_FtG4Q8Qh+66zToun5p2LhgYyiyrv@mail.gmail.com>
+References: <E1PT92Y-0004Ba-64@rmk-PC.arm.linux.org.uk>
+	<AANLkTimGHSqO=QwESp98UBK28yawdiq+kURU=nwau27G@mail.gmail.com>
+	<20101216155750.GA28126@n2100.arm.linux.org.uk>
+	<AANLkTikLoU-L4YF_FtG4Q8Qh+66zToun5p2LhgYyiyrv@mail.gmail.com>
+Message-ID: <20101216170301.GU9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 16, 2010 at 09:52:56PM +0530, Rabin Vincent wrote:
+> Yes, I now see U300 no longer needs the notrace addition.  It still
+> could do with the #include <linux/sched.h> addition though, which was
+> also being done as part of that patch.
 
-On Thu, Dec 16, 2010 at 10:32 AM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
->> @@ -130,12 +120,6 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
->> ? ? ? ?l = mbox_read_reg(MAILBOX_REVISION);
->> ? ? ? ?pr_debug("omap mailbox rev %d.%d\n", (l & 0xf0) >> 4, (l & 0x0f));
->>
->> - ? ? ? if (cpu_is_omap44xx())
->> - ? ? ? ? ? ? ? l = OMAP4_SMARTIDLE;
->> - ? ? ? else
->> - ? ? ? ? ? ? ? l = SMARTIDLE | AUTOIDLE;
->> - ? ? ? mbox_write_reg(l, MAILBOX_SYSCONFIG);
->> -
->
-> The OMAP4 mailbox sysconfig register bits are laid out differently
-> from previous OMAP mailbox's. Example is smart idle bit location is
-> different from previous OMAPs. Can I know as how are you handling this
-> aspect in hwmod code ?
-
-hwmod framework provides definition for both IP models
-(omap_hwmod_sysc_type1for omap2/3 or omap_hwmod_sysc_type2 for omap4),
-these are located at arch/arm/mach-omap2/omap_hwmod_common_data.c
-
-Regards,
-
-Omar
+Okay, added to u300, tegra, iop, and omap which weren't including
+linux/sched.h explicitly.
