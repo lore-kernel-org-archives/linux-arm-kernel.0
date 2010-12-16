@@ -1,33 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 20:10:42 +0000
-Subject: OMAP3: Warning: swp{b} use is deprecated for this architecture
-In-Reply-To: <AANLkTinXBx5F-wQC_eJPftsqgbaFUg9R8z5FxTFR+gTy@mail.gmail.com>
-References: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
-	<20101216115657.GP9937@n2100.arm.linux.org.uk>
-	<AANLkTi=-ERvBARQ3bzOMZPx0s-OPuZHgXqjRet1aUxGw@mail.gmail.com>
-	<AANLkTink3TJonOC+cnpRUKKu9_+OBhJKDQ25yvrZZsrQ@mail.gmail.com>
-	<6188477658179778436@unknownmsgid>
-	<AANLkTinL3oonBvkZwZFr=Wh2m_EYQ1WVudV9cxNqKRBx@mail.gmail.com>
-	<AANLkTinXBx5F-wQC_eJPftsqgbaFUg9R8z5FxTFR+gTy@mail.gmail.com>
-Message-ID: <20101216201042.GW9937@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 16 Dec 2010 22:42:37 +0200
+Subject: [PATCH v3 0/4] Introduce hardware spinlock framework
+In-Reply-To: <AANLkTi=q=QMQ_Abxb8eUWT_qGG8K=pc892ZB-mqgt_mh@mail.gmail.com>
+References: <1291420247-18171-1-git-send-email-ohad@wizery.com>
+	<AANLkTin1fd=Kei7Fo6G+uR+270HdTkc71fvsA6qjBjcA@mail.gmail.com>
+	<20101214170656.GA3832@kroah.com>
+	<AANLkTi=q=QMQ_Abxb8eUWT_qGG8K=pc892ZB-mqgt_mh@mail.gmail.com>
+Message-ID: <AANLkTi=JUxc+eOTAkFFjEXoqQEaXgyT7n6qtxW-7MzRv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 08:04:41PM +0000, Dave Martin wrote:
-> Note that the above bit of code is similar/identical to a bit of code
-> already present in the OMAP BSP... so this still needs to be
-> addressed.
-> 
-> See arch/arm/mach-omap2/sleep34xx.S:lock_scratchpad_sem
+On Tue, Dec 14, 2010 at 8:40 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Tue, Dec 14, 2010 at 7:06 PM, Greg KH <greg@kroah.com> wrote:
+>> ?Like the most important one, why is this generic code if
+>> ?it's only for one specific platform?
+>
+> We started out with an omap-specific driver, but Tony preferred that we
+> make this a platform-agnostic framework, in order to keep the IPC drivers that
+> will use it generic, and assuming that more users will show up for
+> such framework.
 
-That's odd.
+I was just told about additional users for this (thanks Mugdha):
 
-| The following warning is issued by the compiler (gcc version 4.4.1
-| (Sourcery G++ Lite 2010q1-202):
-| arch/arm/mach-omap2/sleep34xx.S:87: Warning: swp{b} use is deprecated
-| for this architecture
+1) There are several platforms (such as omap3530 and omapl1xx) that
+have no such hardware support, but would still need to use the same
+IPC drivers (to communicate with their DSP).
 
-It seems we're discussing the same code!
+The only way to achieve mutual exclusion on those platforms is by
+using a shared-memory synchronization algorithm called Peterson's
+Algorithm [1]. We would still need the same hwspinlock framework for
+that - the busy looping, the timeout, the various locking schemes, the
+resource allocation - are all still valid. The only difference is the
+actual lock implementation.
 
-As has been pointed out, and as Jean points out, this code is not called
-at the moment, so can be removed to resolve the problem.
+2) The C6474, which is a multi-core DSP device [2], have Linux running
+on one of its cores, and would be using the same IPC drivers, too.
+C6474 has hardware support for synchronization, which would also
+benefit from such hwspinlock module (btw the C6474 has a richer
+hardware module that would need more than the hwspinlock framework
+offer today - it also supports queuing, owner semantics and interrupt
+notification to let a processor know when it acquires a lock, so it
+wouldn't have to spin..)
+
+Thanks,
+Ohad.
+
+[1] http://en.wikipedia.org/wiki/Peterson's_algorithm
+[2] http://focus.ti.com/docs/prod/folders/print/tms320c6474.html
+
+> To me it sounds reasonable, but both ways (framework / omap-specific
+> driver) will work for us just fine, and I can switch back to a misc
+> driver if this is preferred.
+>
+> The complete discussion of v1 is at:
+> http://comments.gmane.org/gmane.linux.kernel/1049802
+>
+> We also discussed this at v2 of the patches with David, see the
+> complete discussion at:
+> http://comments.gmane.org/gmane.linux.kernel/1067016
+>
+> Thanks,
+> Ohad.
+>
+>>
+>> thanks,
+>>
+>> greg k-h
+>>
+>
