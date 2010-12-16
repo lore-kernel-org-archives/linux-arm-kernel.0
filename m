@@ -1,33 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 Dec 2010 10:27:55 -0800
-Subject: [PATCH] OMAP: RM-680: fix omap2_init_common_hw compile break
-In-Reply-To: <20101216180514.GA31322@n2100.arm.linux.org.uk>
-References: <1292520438-29122-1-git-send-email-omar.ramirez@ti.com>
-	<20101216180514.GA31322@n2100.arm.linux.org.uk>
-Message-ID: <20101216182755.GI5941@atomide.com>
+From: davidsin@ti.com (David Sin)
+Date: Thu, 16 Dec 2010 13:02:08 -0600
+Subject: [PATCH 0/9] TI DMM-TILER driver
+In-Reply-To: <201012161843.48262.arnd@arndb.de>
+References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
+	<20101216172531.GG29435@lba0869738>
+	<20101216173737.GA6767@lba0869738>
+	<201012161843.48262.arnd@arndb.de>
+Message-ID: <20101216190207.GC6767@lba0869738>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101216 10:05]:
-> On Thu, Dec 16, 2010 at 11:27:18AM -0600, Omar Ramirez Luna wrote:
-> > diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-> > index 8ba4047..781ed25 100644
-> > --- a/arch/arm/mach-omap2/board-am3517crane.c
-> > +++ b/arch/arm/mach-omap2/board-am3517crane.c
-> > @@ -47,7 +47,8 @@ static void __init am3517_crane_init_irq(void)
-> >  	omap_board_config = am3517_crane_config;
-> >  	omap_board_config_size = ARRAY_SIZE(am3517_crane_config);
-> >  
-> > -	omap2_init_common_hw(NULL, NULL);
-> > +	omap2_init_common_infrastructure();
-> > +	omap2_init_common_devices(NULL, NULL);
-> >  	omap_init_irq();
+On Thu, Dec 16, 2010 at 06:43:48PM +0100, Arnd Bergmann wrote:
+> As far as I can tell, both DMM and GEM at a high level manage objects
+> in video memory. The IOMMU that you have on the Omap hardware seems
+> to resemble the GART that sits between PC-style video cards and main
+> memory.
 > 
-> Once I have the init_early() sorted, hopefully most of the abuse in
-> these callbacks can be moved into the init_early() callback.
+> I don't know any details, but google quickly finds
+> http://lwn.net/Articles/283798/ with a description of the
+> initial GEM design. My main thought when looking over the
+> DMM code was that this should not be tied too closely to a
+> specific hardware, and GEM seems to be an existing abstraction
+> that may fit what you need.
+> 
+> 	Arnd
+Thanks for the pointer, Arnd.  I also found a nice readme file in 
+the gpu/drm directory, which points to a wiki and source code.  
+I'll read into this and get back to you.
 
-Sounds good to me.
-
-Thanks,
-
-Tony
+BR,
+-- 
+David Sin
