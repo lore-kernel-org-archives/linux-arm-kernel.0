@@ -1,44 +1,30 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 16 Dec 2010 22:44:49 +0100
-Subject: OMAP3: Warning: swp{b} use is deprecated for this architecture
-In-Reply-To: <20101216201042.GW9937@n2100.arm.linux.org.uk>
-References: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
-	<20101216115657.GP9937@n2100.arm.linux.org.uk>
-	<AANLkTi=-ERvBARQ3bzOMZPx0s-OPuZHgXqjRet1aUxGw@mail.gmail.com>
-	<AANLkTink3TJonOC+cnpRUKKu9_+OBhJKDQ25yvrZZsrQ@mail.gmail.com>
-	<6188477658179778436@unknownmsgid>
-	<AANLkTinL3oonBvkZwZFr=Wh2m_EYQ1WVudV9cxNqKRBx@mail.gmail.com>
-	<AANLkTinXBx5F-wQC_eJPftsqgbaFUg9R8z5FxTFR+gTy@mail.gmail.com>
-	<20101216201042.GW9937@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimaC3WaWAF8QNgs+3qza2WmBPXGbo5eKsooMT_o@mail.gmail.com>
+From: darkstar6262@gmail.com (Cory Maccarrone)
+Date: Thu, 16 Dec 2010 14:16:28 -0800
+Subject: [PATCH] OMAP1: clock_data: use runtime cpu / machine checks
+In-Reply-To: <alpine.DEB.2.00.1012130220430.15971@utopia.booyaka.com>
+References: <201012112150.33831.jkrzyszt@tis.icnet.pl>
+	<alpine.DEB.2.00.1012130220430.15971@utopia.booyaka.com>
+Message-ID: <AANLkTik88QZoNeCKZwUYDjq6oEiiyZE+_fmo+YoE+f85@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 9:10 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Dec 16, 2010 at 08:04:41PM +0000, Dave Martin wrote:
->> Note that the above bit of code is similar/identical to a bit of code
->> already present in the OMAP BSP... so this still needs to be
->> addressed.
->>
->> See arch/arm/mach-omap2/sleep34xx.S:lock_scratchpad_sem
+On Mon, Dec 13, 2010 at 1:24 AM, Paul Walmsley <paul@pwsan.com> wrote:
 >
-> That's odd.
+> Hello Janusz, Cory,
 >
-> | The following warning is issued by the compiler (gcc version 4.4.1
-> | (Sourcery G++ Lite 2010q1-202):
-> | arch/arm/mach-omap2/sleep34xx.S:87: Warning: swp{b} use is deprecated
-> | for this architecture
+> On Sat, 11 Dec 2010, Janusz Krzysztofik wrote:
 >
-> It seems we're discussing the same code!
+> > Otherwise multi-omap1 configurations may set wrong clock speed.
+> >
+> > Created and tested against l-o master on Amstrad Delta.
+> >
+> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 >
-> As has been pointed out, and as Jean points out, this code is not called
-> at the moment, so can be removed to resolve the problem.
+> Thanks, this is a significant step forward in building a good
+> omap1_defconfig. ?Cory, do you mind testing this out? ?If it works for you
+> also, let's plan to take this for 2.6.38.
 >
-Exactly! It is actually planned for removal, cf.
-http://marc.info/?l=linux-omap&m=129252188012958&w=2
 
-A better solution will be needed at the time the API will be in use.
+Sure, no problem, I'll add it to my testing queue.
 
-Thanks,
-Jean
+- Cory
