@@ -1,32 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Dec 2010 18:43:48 +0100
-Subject: [PATCH 0/9] TI DMM-TILER driver
-In-Reply-To: <20101216173737.GA6767@lba0869738>
-References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
-	<20101216172531.GG29435@lba0869738>
-	<20101216173737.GA6767@lba0869738>
-Message-ID: <201012161843.48262.arnd@arndb.de>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Thu, 16 Dec 2010 18:50:51 +0100
+Subject: [PATCH 0/7 v4] OMAP3: clean up ASM sleep code
+Message-ID: <1292521858-3810-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 December 2010 18:37:38 David Sin wrote:
-> I'm not sure exactly how DRM/GEM works..  What functionality do you think is 
-> overlapping?  The main feature, aside from reduced page accesses, of the DMM 
-> hw block is to provide physically contiguous 2 dimensional memory blocks for 
-> image and video processing.  This hw sits between the interconnect and the 
-> ext memory interface in the OMAP, and contains an MMU-like address traslator 
-> for "virtually" physically contiguous memory and sdram pages.
+From: Jean Pihet <j-pihet@ti.com>
 
-As far as I can tell, both DMM and GEM at a high level manage objects
-in video memory. The IOMMU that you have on the Omap hardware seems
-to resemble the GART that sits between PC-style video cards and main
-memory.
+This patch only contains clean-ups and cosmetic changes,
+no functional change.
 
-I don't know any details, but google quickly finds
-http://lwn.net/Articles/283798/ with a description of the
-initial GEM design. My main thought when looking over the
-DMM code was that this should not be tied too closely to a
-specific hardware, and GEM seems to be an existing abstraction
-that may fit what you need.
+Clean-up of the ASM sleep code, for better readability and
+easier maintenance.
 
-	Arnd
+Applies on top of Nishant's latest idle path errata fixes step 2,
+cf. http://marc.info/?l=linux-omap&m=129139584919242&w=2
+
+Jean Pihet (7):
+  OMAP2+: use global values for the SRAM PA addresses
+  OMAP3: remove hardcoded values from the ASM sleep code
+  OMAP3: re-organize the ASM sleep code
+  OMAP3: rework of the ASM sleep code execution paths
+  OMAP3: add comments for low power code errata
+  OMAP3: ASM sleep code format rework
+  OMAP3: remove unused code from the ASM sleep code
+
+ arch/arm/mach-omap2/control.c   |   10 +-
+ arch/arm/mach-omap2/control.h   |    2 +
+ arch/arm/mach-omap2/pm.h        |    1 -
+ arch/arm/mach-omap2/pm34xx.c    |    4 +-
+ arch/arm/mach-omap2/sdrc.h      |    7 +
+ arch/arm/mach-omap2/sleep34xx.S |  714 +++++++++++++++++++++------------------
+ arch/arm/plat-omap/sram.c       |    7 +-
+ 7 files changed, 401 insertions(+), 344 deletions(-)
