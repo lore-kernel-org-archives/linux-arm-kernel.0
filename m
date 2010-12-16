@@ -1,67 +1,42 @@
 From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 16 Dec 2010 08:11:51 -0600
-Subject: [PATCH v4 5/5] OMAP: mailbox: use runtime pm for clk and sysc
-	handling
-In-Reply-To: <AANLkTi=RE3ZEuoe=jMRLiFZ7iVgvuXMrgqfXMAYa92=z@mail.gmail.com>
+Date: Thu, 16 Dec 2010 08:21:54 -0600
+Subject: [PATCH v4 4/5] OMAP: mailbox: build device using
+	omap_device/omap_hwmod
+In-Reply-To: <20101216084446.GB10883@n2100.arm.linux.org.uk>
 References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
-	<1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
-	<AANLkTi=RE3ZEuoe=jMRLiFZ7iVgvuXMrgqfXMAYa92=z@mail.gmail.com>
-Message-ID: <AANLkTinPpj5Po4yPjc8hG1Kjs2wM3b62-hRGMY+U_UjN@mail.gmail.com>
+	<1292482079-2226-5-git-send-email-omar.ramirez@ti.com>
+	<AANLkTik4K3LEovr-wJiv_PG+ivHNj8hxPT7QPua-ytVf@mail.gmail.com>
+	<20101216084446.GB10883@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=VyX4M6j7Zd-ZJq+djs8AoJ_dMaWmPVX2eiFoD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Dec 16, 2010 at 2:28 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
-> On Thu, Dec 16, 2010 at 12:17, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
->> Use runtime pm APIs to enable/disable mailbox clocks and
->> to configure SYSC register.
+On Thu, Dec 16, 2010 at 2:44 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 16, 2010 at 02:08:11PM +0530, Varadarajan, Charulatha wrote:
+>> > + ? ? ? oh = omap_hwmod_lookup("mailbox");
+>> > + ? ? ? if (!oh) {
+>> > + ? ? ? ? ? ? ? pr_err("%s: unable to find hwmod\n", __func__);
+>> > + ? ? ? ? ? ? ? return;
+>> > + ? ? ? }
+>> > +
+>> > + ? ? ? od = omap_device_build("omap-mailbox", -1, oh,
+>> > + ? ? ? ? ? ? ? ? ? ? ? NULL, 0,
+>> > + ? ? ? ? ? ? ? ? ? ? ? mbox_latencies, ARRAY_SIZE(mbox_latencies),
+>> > + ? ? ? ? ? ? ? ? ? ? ? 0);
+>> > + ? ? ? if (!od) {
 >>
->> Based on the patch sent by Felipe Contreras:
->> https://patchwork.kernel.org/patch/101662/
+>> Check for IS_ERR(od).
 >>
->> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
->> ---
->> ?arch/arm/mach-omap2/mailbox.c | ? 27 +++++----------------------
->> ?1 files changed, 5 insertions(+), 22 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
->> index 40ddeca..f5f72ba 100644
->> --- a/arch/arm/mach-omap2/mailbox.c
->> +++ b/arch/arm/mach-omap2/mailbox.c
->> @@ -14,6 +14,7 @@
->> ?#include <linux/err.h>
->> ?#include <linux/platform_device.h>
->> ?#include <linux/io.h>
->> +#include <linux/pm_runtime.h>
->> ?#include <plat/mailbox.h>
->> ?#include <mach/irqs.h>
->>
->> @@ -34,12 +35,8 @@
->> ?#define MAILBOX_IRQ_NOTFULL(m) ? ? ? ? (1 << (2 * (m) + 1))
->>
->> ?/* SYSCONFIG: register bit definition */
->> -#define AUTOIDLE ? ? ? (1 << 0)
->> ?#define SOFTRESET ? ? ?(1 << 1)
->> -#define SMARTIDLE ? ? ?(2 << 3)
->> ?#define OMAP4_SOFTRESET ? ? ? ?(1 << 0)
->> -#define OMAP4_NOIDLE ? (1 << 2)
->> -#define OMAP4_SMARTIDLE ? ? ? ?(2 << 2)
->>
->> ?/* SYSSTATUS: register bit definition */
->> ?#define RESETDONE ? ? ?(1 << 0)
+>> > + ? ? ? ? ? ? ? pr_err("%s: could not build device\n", __func__);
 >
-> Is this still required?
+> If you have an API which returns errors, and you're bothering to print
+> something when an error occurs, it's often useful to print the returned
+> error code, so that people can find out _why_ the error occurred.
+>
 
-Yes, mailbox uses the softreset every time it is requested (and that
-it has no current users at the time), it does it before configuring
-sysc, as opossed to what this patch does (where clk is enabled, sysc
-configured, and then softreset), but no harm was seen with this
-sequence.
+Agree.
 
-AFAIK, enabling/disabling hwmod handles prm reset but not softreset
-bit, that's why I left it there.
-
-Regards,
+Thanks,
 
 Omar
