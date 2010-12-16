@@ -1,95 +1,92 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Thu, 16 Dec 2010 10:32:41 -0600
-Subject: [PATCH v4 5/5] OMAP: mailbox: use runtime pm for clk and sysc
-	handling
-In-Reply-To: <1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
-References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
-	<1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
-Message-ID: <AANLkTinJOFMF=eC2MQB92e2XUsyyjNRRz7Bm_cyXEmp6@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 16 Dec 2010 08:45:34 -0800
+Subject: [PATCH v2 1/5] OMAP4: PM: Use the low-power state change feature
+	on OMAP4
+In-Reply-To: <1292503605-14523-1-git-send-email-rnayak@ti.com> (Rajendra
+	Nayak's message of "Thu, 16 Dec 2010 18:16:44 +0530")
+References: <1292503605-14523-1-git-send-email-rnayak@ti.com>
+Message-ID: <87d3p1hdjl.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Omar,
+Rajendra Nayak <rnayak@ti.com> writes:
 
-On Thu, Dec 16, 2010 at 12:47 AM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
-> Use runtime pm APIs to enable/disable mailbox clocks and
-> to configure SYSC register.
+> For pwrdm's which support LOWPOWERSTATECHANGE, do not try waking
+> up the domain to put it back to deeper sleep state.
 >
-> Based on the patch sent by Felipe Contreras:
-> https://patchwork.kernel.org/patch/101662/
->
-> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+
 > ---
-> ?arch/arm/mach-omap2/mailbox.c | ? 27 +++++----------------------
-> ?1 files changed, 5 insertions(+), 22 deletions(-)
+> Changes in v2:
+> Changed implementation for better readability and code
+> reuse as suggested here
+> http://marc.info/?l=linux-omap&m=129245686306262&w=2
 >
-> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-> index 40ddeca..f5f72ba 100644
-> --- a/arch/arm/mach-omap2/mailbox.c
-> +++ b/arch/arm/mach-omap2/mailbox.c
-> @@ -14,6 +14,7 @@
-> ?#include <linux/err.h>
-> ?#include <linux/platform_device.h>
-> ?#include <linux/io.h>
-> +#include <linux/pm_runtime.h>
-> ?#include <plat/mailbox.h>
-> ?#include <mach/irqs.h>
+> The below branch is updated with this version of the patch
+> git://gitorious.org/omap-pm/linux.git for_2.6.38/power
 >
-> @@ -34,12 +35,8 @@
-> ?#define MAILBOX_IRQ_NOTFULL(m) ? ? ? ? (1 << (2 * (m) + 1))
+>  arch/arm/mach-omap2/pm.c |   28 ++++++++++++++++++++++------
+>  1 file changed, 22 insertions(+), 6 deletions(-)
 >
-> ?/* SYSCONFIG: register bit definition */
-> -#define AUTOIDLE ? ? ? (1 << 0)
-> ?#define SOFTRESET ? ? ?(1 << 1)
-> -#define SMARTIDLE ? ? ?(2 << 3)
-> ?#define OMAP4_SOFTRESET ? ? ? ?(1 << 0)
-> -#define OMAP4_NOIDLE ? (1 << 2)
-> -#define OMAP4_SMARTIDLE ? ? ? ?(2 << 2)
->
-> ?/* SYSSTATUS: register bit definition */
-> ?#define RESETDONE ? ? ?(1 << 0)
-> @@ -70,8 +67,6 @@ struct omap_mbox2_priv {
-> ? ? ? ?unsigned long irqdisable;
-> ?};
->
-> -static struct clk *mbox_ick_handle;
-> -
-> ?static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_type_t irq);
->
-> @@ -91,13 +86,8 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
-> ? ? ? ?u32 l;
-> ? ? ? ?unsigned long timeout;
->
-> - ? ? ? mbox_ick_handle = clk_get(NULL, "mailboxes_ick");
-> - ? ? ? if (IS_ERR(mbox_ick_handle)) {
-> - ? ? ? ? ? ? ? printk(KERN_ERR "Could not get mailboxes_ick: %ld\n",
-> - ? ? ? ? ? ? ? ? ? ? ? PTR_ERR(mbox_ick_handle));
-> - ? ? ? ? ? ? ? return PTR_ERR(mbox_ick_handle);
-> - ? ? ? }
-> - ? ? ? clk_enable(mbox_ick_handle);
-> + ? ? ? pm_runtime_enable(mbox->dev->parent);
-> + ? ? ? pm_runtime_get_sync(mbox->dev->parent);
->
-> ? ? ? ?if (cpu_is_omap44xx()) {
-> ? ? ? ? ? ? ? ?mbox_write_reg(OMAP4_SOFTRESET, MAILBOX_SYSCONFIG);
-> @@ -130,12 +120,6 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
-> ? ? ? ?l = mbox_read_reg(MAILBOX_REVISION);
-> ? ? ? ?pr_debug("omap mailbox rev %d.%d\n", (l & 0xf0) >> 4, (l & 0x0f));
->
-> - ? ? ? if (cpu_is_omap44xx())
-> - ? ? ? ? ? ? ? l = OMAP4_SMARTIDLE;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? l = SMARTIDLE | AUTOIDLE;
-> - ? ? ? mbox_write_reg(l, MAILBOX_SYSCONFIG);
-> -
-
-The OMAP4 mailbox sysconfig register bits are laid out differently
-from previous OMAP mailbox's. Example is smart idle bit location is
-different from previous OMAPs. Can I know as how are you handling this
-aspect in hwmod code ?
-
-
-Thank you,
-Best regards,
-Hari Kanigeri
+> Index: linux/arch/arm/mach-omap2/pm.c
+> ===================================================================
+> --- linux.orig/arch/arm/mach-omap2/pm.c	2010-12-15 17:29:42.361228780 +0530
+> +++ linux/arch/arm/mach-omap2/pm.c	2010-12-15 20:19:48.321228780 +0530
+> @@ -89,6 +89,10 @@
+>  	}
+>  }
+>  
+> +/* Types of sleep_switch used in omap_set_pwrdm_state */
+> +#define FORCEWAKEUP_SWITCH	0
+> +#define LOWPOWERSTATE_SWITCH	1
+> +
+>  /*
+>   * This sets pwrdm state (other than mpu & core. Currently only ON &
+>   * RET are supported. Function is assuming that clkdm doesn't have
+> @@ -114,9 +118,14 @@
+>  		return ret;
+>  
+>  	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
+> -		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
+> -		sleep_switch = 1;
+> -		pwrdm_wait_transition(pwrdm);
+> +		if ((pwrdm_read_pwrst(pwrdm) > state) &&
+> +			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+> +			sleep_switch = LOWPOWERSTATE_SWITCH;
+> +		} else {
+> +			omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
+> +			pwrdm_wait_transition(pwrdm);
+> +			sleep_switch = FORCEWAKEUP_SWITCH;
+> +		}
+>  	}
+>  
+>  	ret = pwrdm_set_next_pwrst(pwrdm, state);
+> @@ -126,12 +135,19 @@
+>  		goto err;
+>  	}
+>  
+> -	if (sleep_switch) {
+> +	switch (sleep_switch) {
+> +	case FORCEWAKEUP_SWITCH:
+>  		omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
+> -		pwrdm_wait_transition(pwrdm);
+> -		pwrdm_state_switch(pwrdm);
+> +		break;
+> +	case LOWPOWERSTATE_SWITCH:
+> +		pwrdm_set_lowpwrstchange(pwrdm);
+> +		break;
+> +	default:
+> +		return ret;
+>  	}
+>  
+> +	pwrdm_wait_transition(pwrdm);
+> +	pwrdm_state_switch(pwrdm);
+>  err:
+>  	return ret;
+>  }
