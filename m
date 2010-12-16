@@ -1,604 +1,143 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 16 Dec 2010 08:47:31 +0100
-Subject: [PATCHv2] mc13xxx: Add i2c support for mc13xxx-core
-In-Reply-To: <1292449675-20308-1-git-send-email-marc@cpdesign.com.au>
-References: <1292449675-20308-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20101216074730.GD1940@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Dec 2010 08:18:18 +0000
+Subject: [PATCH] ARM: ensure all sched_clock() implementations are notrace
+	marked
+Message-ID: <E1PT92Y-0004Ba-64@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marc,
+ftrace requires sched_clock() to be notrace.  Ensure that all
+implementations are so marked.
 
-On Thu, Dec 16, 2010 at 08:47:55AM +1100, Marc Reilly wrote:
-> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
-> ---
->  drivers/mfd/mc13xxx-core.c |  331 +++++++++++++++++++++++++++++++-------------
->  1 files changed, 236 insertions(+), 95 deletions(-)
-> 
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index a2ac2ed..d355433 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -9,7 +9,6 @@
->   * the terms of the GNU General Public License version 2 as published by the
->   * Free Software Foundation.
->   */
-> -
->  #include <linux/slab.h>
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> @@ -18,12 +17,28 @@
->  #include <linux/spi/spi.h>
->  #include <linux/mfd/core.h>
->  #include <linux/mfd/mc13xxx.h>
-> +#include <linux/i2c.h>
-> +
-> +enum mc13xxx_id {
-> +	MC13XXX_ID_MC13783,
-> +	MC13XXX_ID_MC13892,
-> +	MC13XXX_ID_INVALID,
-> +};
->  
->  struct mc13xxx {
-> -	struct spi_device *spidev;
-> +	union {
-> +		struct spi_device *spidev;
-> +		struct i2c_client *i2cclient;
-> +	};
-> +	struct device *pdev;
-pdev is a usual name for 'struct platform_device's, so can you please
-use 'dev'?
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-ixp4xx/common.c         |    2 +-
+ arch/arm/mach-mmp/time.c              |    2 +-
+ arch/arm/mach-pxa/time.c              |    2 +-
+ arch/arm/mach-sa1100/generic.c        |    2 +-
+ arch/arm/mach-tegra/timer.c           |    2 +-
+ arch/arm/plat-iop/time.c              |    2 +-
+ arch/arm/plat-omap/counter_32k.c      |    2 +-
+ arch/arm/plat-orion/time.c            |    2 +-
+ arch/arm/plat-versatile/sched-clock.c |    2 +-
+ 9 files changed, 9 insertions(+), 9 deletions(-)
 
-> +	enum mc13xxx_id ictype;
-> +
->  	struct mutex lock;
->  	int irq;
-Before your patch this member was unused.  And AFAICT you don't really
-need it.  (Whenever you need the number contained in it, you are in an
-spi or i2c specific function so you can use spidev->irq or
-i2cclient->irq.)  So can you please just drop this member?
-
->  
-> +	int (*read_dev)(struct mc13xxx*, unsigned int, u32*);
-> +	int (*write_dev)(struct mc13xxx*, unsigned int, u32);
-space between type and asterisk?
-
-> +
->  	irq_handler_t irqhandler[MC13XXX_NUM_IRQ];
->  	void *irqdata[MC13XXX_NUM_IRQ];
->  };
-> @@ -150,36 +165,47 @@ EXPORT_SYMBOL(mc13783_to_mc13xxx);
->  void mc13xxx_lock(struct mc13xxx *mc13xxx)
->  {
->  	if (!mutex_trylock(&mc13xxx->lock)) {
-> -		dev_dbg(&mc13xxx->spidev->dev, "wait for %s from %pf\n",
-> +		dev_dbg(mc13xxx->pdev, "wait for %s from %pf\n",
->  				__func__, __builtin_return_address(0));
->  
->  		mutex_lock(&mc13xxx->lock);
->  	}
-> -	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
-> +	dev_dbg(mc13xxx->pdev, "%s from %pf\n",
->  			__func__, __builtin_return_address(0));
->  }
->  EXPORT_SYMBOL(mc13xxx_lock);
->  
->  void mc13xxx_unlock(struct mc13xxx *mc13xxx)
->  {
-> -	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
-> +	dev_dbg(mc13xxx->pdev, "%s from %pf\n",
->  			__func__, __builtin_return_address(0));
->  	mutex_unlock(&mc13xxx->lock);
->  }
->  EXPORT_SYMBOL(mc13xxx_unlock);
->  
-> -#define MC13XXX_REGOFFSET_SHIFT 25
->  int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
->  {
-> -	struct spi_transfer t;
-> -	struct spi_message m;
->  	int ret;
-> -
->  	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
->  
->  	if (offset > MC13XXX_NUMREGS)
->  		return -EINVAL;
->  
-> +	ret = mc13xxx->read_dev(mc13xxx, offset, val);
-> +	dev_vdbg(mc13xxx->pdev, "[0x%02x] -> 0x%06x\n", offset, *val);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(mc13xxx_reg_read);
-> +
-> +#define MC13XXX_REGOFFSET_SHIFT 25
-> +static int mc13xxx_spi_reg_read(struct mc13xxx *mc13xxx,
-> +				unsigned int offset, u32 *val)
-> +{
-> +	struct spi_transfer t;
-> +	struct spi_message m;
-> +	int ret;
-> +
->  	*val = offset << MC13XXX_REGOFFSET_SHIFT;
->  
->  	memset(&t, 0, sizeof(t));
-> @@ -201,26 +227,42 @@ int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
->  
->  	*val &= 0xffffff;
->  
-> -	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
-> -
->  	return 0;
->  }
-> -EXPORT_SYMBOL(mc13xxx_reg_read);
->  
-> -int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
-> +static int mc13xxx_i2c_reg_read(struct mc13xxx *mc13xxx, unsigned int offset,
-> +		u32 *val)
->  {
-> -	u32 buf;
-> -	struct spi_transfer t;
-> -	struct spi_message m;
->  	int ret;
-> +	unsigned char buff[3] = {0, 0, 0};
-buf is more usual I think
-
->  
-> -	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
-> +	ret = i2c_smbus_read_i2c_block_data(mc13xxx->i2cclient,
-> +			offset, 3, buff);
-> +	*val = buff[0] << 16 | buff[1] << 8 | buff[2];
->  
-> -	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] <- 0x%06x\n", offset, val);
-> +	return ret == 3 ? 0 : ret;
-> +}
-> +
-> +int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
-> +{
-> +	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
-> +	dev_vdbg(mc13xxx->pdev, "[0x%02x] <- 0x%06x\n", offset, val);
->  
->  	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
->  		return -EINVAL;
->  
-> +	return mc13xxx->write_dev(mc13xxx, offset, val);
-> +}
-> +EXPORT_SYMBOL(mc13xxx_reg_write);
-> +
-> +static int mc13xxx_spi_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
-> +		u32 val)
-> +{
-> +	u32 buf;
-> +	struct spi_transfer t;
-> +	struct spi_message m;
-> +	int ret;
-> +
->  	buf = 1 << 31 | offset << MC13XXX_REGOFFSET_SHIFT | val;
->  
->  	memset(&t, 0, sizeof(t));
-> @@ -241,7 +283,22 @@ int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
->  
->  	return 0;
->  }
-> -EXPORT_SYMBOL(mc13xxx_reg_write);
-> +
-> +static int mc13xxx_i2c_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
-> +		u32 val)
-> +{
-> +	int ret;
-> +	unsigned char buff[3];
-> +
-> +	buff[0] = (val >> 16) & 0xff;
-> +	buff[1] = (val >> 8) & 0xff;
-> +	buff[2] = val & 0xff;
-ditto
-
-> +
-> +	ret = i2c_smbus_write_i2c_block_data(mc13xxx->i2cclient,
-> +			offset, 3, buff);
-> +
-> +	return ret;
-> +}
->  
->  int mc13xxx_reg_rmw(struct mc13xxx *mc13xxx, unsigned int offset,
->  		u32 mask, u32 val)
-> @@ -445,7 +502,7 @@ static int mc13xxx_irq_handle(struct mc13xxx *mc13xxx,
->  			if (handled == IRQ_HANDLED)
->  				num_handled++;
->  		} else {
-> -			dev_err(&mc13xxx->spidev->dev,
-> +			dev_err(mc13xxx->pdev,
->  					"BUG: irq %u but no handler\n",
->  					baseirq + irq);
->  
-> @@ -481,11 +538,6 @@ static irqreturn_t mc13xxx_irq_thread(int irq, void *data)
->  	return IRQ_RETVAL(handled);
->  }
->  
-> -enum mc13xxx_id {
-> -	MC13XXX_ID_MC13783,
-> -	MC13XXX_ID_MC13892,
-> -	MC13XXX_ID_INVALID,
-> -};
->  
->  const char *mc13xxx_chipname[] = {
->  	[MC13XXX_ID_MC13783] = "mc13783",
-> @@ -493,13 +545,16 @@ const char *mc13xxx_chipname[] = {
->  };
->  
->  #define maskval(reg, mask)	(((reg) & (mask)) >> __ffs(mask))
-> -static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
-> +static int mc13xxx_identify(struct mc13xxx *mc13xxx)
->  {
->  	u32 icid;
->  	u32 revision;
-> -	const char *name;
->  	int ret;
->  
-> +	/* get the generation ID from register 46, as apparently some older
-> +	 * ic revisions only have this info at this location. Newer ICs seem to
-> +	 * have both.
-> +	 * */
-please put /* and */ on lines for themself, see chapter 8 in
-Documentation/CodingStyle
-
->  	ret = mc13xxx_reg_read(mc13xxx, 46, &icid);
->  	if (ret)
->  		return ret;
-> @@ -508,26 +563,22 @@ static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
->  
->  	switch (icid) {
->  	case 2:
-> -		*id = MC13XXX_ID_MC13783;
-> -		name = "mc13783";
-> +		mc13xxx->ictype = MC13XXX_ID_MC13783;
->  		break;
->  	case 7:
-> -		*id = MC13XXX_ID_MC13892;
-> -		name = "mc13892";
-> +		mc13xxx->ictype = MC13XXX_ID_MC13892;
->  		break;
->  	default:
-> -		*id = MC13XXX_ID_INVALID;
-> +		mc13xxx->ictype = MC13XXX_ID_INVALID;
->  		break;
->  	}
->  
-> -	if (*id == MC13XXX_ID_MC13783 || *id == MC13XXX_ID_MC13892) {
-> +	if (mc13xxx->ictype == MC13XXX_ID_MC13783 ||
-> +			mc13xxx->ictype == MC13XXX_ID_MC13892) {
->  		ret = mc13xxx_reg_read(mc13xxx, MC13XXX_REVISION, &revision);
-> -		if (ret)
-> -			return ret;
-> -
-> -		dev_info(&mc13xxx->spidev->dev, "%s: rev: %d.%d, "
-> +		dev_info(mc13xxx->pdev, "%s: rev: %d.%d, "
->  				"fin: %d, fab: %d, icid: %d/%d\n",
-> -				mc13xxx_chipname[*id],
-> +				mc13xxx_chipname[mc13xxx->ictype],
->  				maskval(revision, MC13XXX_REVISION_REVFULL),
->  				maskval(revision, MC13XXX_REVISION_REVMETAL),
->  				maskval(revision, MC13XXX_REVISION_FIN),
-> @@ -536,26 +587,12 @@ static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
->  				maskval(revision, MC13XXX_REVISION_ICIDCODE));
->  	}
->  
-> -	if (*id != MC13XXX_ID_INVALID) {
-> -		const struct spi_device_id *devid =
-> -			spi_get_device_id(mc13xxx->spidev);
-> -		if (!devid || devid->driver_data != *id)
-> -			dev_warn(&mc13xxx->spidev->dev, "device id doesn't "
-> -					"match auto detection!\n");
-> -	}
-> -
->  	return 0;
->  }
->  
->  static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
->  {
-> -	const struct spi_device_id *devid =
-> -		spi_get_device_id(mc13xxx->spidev);
-> -
-> -	if (!devid)
-> -		return NULL;
-> -
-> -	return mc13xxx_chipname[devid->driver_data];
-> +	return mc13xxx_chipname[mc13xxx->ictype];
->  }
->  
->  #include <linux/mfd/mc13783.h>
-> @@ -563,7 +600,7 @@ static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
->  int mc13xxx_get_flags(struct mc13xxx *mc13xxx)
->  {
->  	struct mc13xxx_platform_data *pdata =
-> -		dev_get_platdata(&mc13xxx->spidev->dev);
-> +		dev_get_platdata(mc13xxx->pdev);
->  
->  	return pdata->flags;
->  }
-> @@ -601,7 +638,7 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
->  	};
->  	init_completion(&adcdone_data.done);
->  
-> -	dev_dbg(&mc13xxx->spidev->dev, "%s\n", __func__);
-> +	dev_dbg(mc13xxx->pdev, "%s\n", __func__);
->  
->  	mc13xxx_lock(mc13xxx);
->  
-> @@ -643,7 +680,7 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
->  		return -EINVAL;
->  	}
->  
-> -	dev_dbg(&mc13783->mc13xxx.spidev->dev, "%s: request irq\n", __func__);
-> +	dev_dbg(mc13783->mc13xxx.pdev, "%s: request irq\n", __func__);
->  	mc13xxx_irq_request(mc13xxx, MC13783_IRQ_ADCDONE,
->  			mc13783_handler_adcdone, __func__, &adcdone_data);
->  	mc13xxx_irq_ack(mc13xxx, MC13783_IRQ_ADCDONE);
-> @@ -701,7 +738,7 @@ static int mc13xxx_add_subdevice_pdata(struct mc13xxx *mc13xxx,
->  	if (!cell.name)
->  		return -ENOMEM;
->  
-> -	return mfd_add_devices(&mc13xxx->spidev->dev, -1, &cell, 1, NULL, 0);
-> +	return mfd_add_devices(mc13xxx->pdev, -1, &cell, 1, NULL, 0);
->  }
->  
->  static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
-> @@ -709,11 +746,44 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
->  	return mc13xxx_add_subdevice_pdata(mc13xxx, format, NULL, 0);
->  }
->  
-> -static int mc13xxx_probe(struct spi_device *spi)
-> +static int mc13xxx_common_probe(struct mc13xxx *mc13xxx,
-> +				struct mc13xxx_platform_data *pdata)
-> +{
-> +	if (pdata->flags & MC13XXX_USE_ADC)
-> +		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
-> +
-> +	if (pdata->flags & MC13XXX_USE_CODEC)
-> +		mc13xxx_add_subdevice(mc13xxx, "%s-codec");
-> +
-> +	if (pdata->flags & MC13XXX_USE_REGULATOR) {
-> +		struct mc13xxx_regulator_platform_data regulator_pdata = {
-> +			.num_regulators = pdata->num_regulators,
-> +			.regulators = pdata->regulators,
-> +		};
-> +
-> +		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
-> +				&regulator_pdata, sizeof(regulator_pdata));
-> +	}
-> +
-> +	if (pdata->flags & MC13XXX_USE_RTC)
-> +		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
-> +
-> +	if (pdata->flags & MC13XXX_USE_TOUCHSCREEN)
-> +		mc13xxx_add_subdevice(mc13xxx, "%s-ts");
-> +
-> +	if (pdata->flags & MC13XXX_USE_LED) {
-> +		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
-> +					pdata->leds, sizeof(*pdata->leds));
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int mc13xxx_spi_probe(struct spi_device *spi)
->  {
->  	struct mc13xxx *mc13xxx;
->  	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
-> -	enum mc13xxx_id id;
-> +	const struct spi_device_id *devid;
->  	int ret;
->  
->  	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-> @@ -725,15 +795,24 @@ static int mc13xxx_probe(struct spi_device *spi)
->  	spi->bits_per_word = 32;
->  	spi_setup(spi);
->  
-> +	mc13xxx->pdev = &spi->dev;
->  	mc13xxx->spidev = spi;
-> +	mc13xxx->read_dev = mc13xxx_spi_reg_read;
-> +	mc13xxx->write_dev = mc13xxx_spi_reg_write;
-> +	mc13xxx->irq = spi->irq;
->  
->  	mutex_init(&mc13xxx->lock);
->  	mc13xxx_lock(mc13xxx);
->  
-> -	ret = mc13xxx_identify(mc13xxx, &id);
-> -	if (ret || id == MC13XXX_ID_INVALID)
-> +	ret = mc13xxx_identify(mc13xxx);
-> +	if (ret || (mc13xxx->ictype == MC13XXX_ID_INVALID))
->  		goto err_revision;
->  
-> +	devid = spi_get_device_id(mc13xxx->spidev);
-> +	if (!devid || devid->driver_data != mc13xxx->ictype)
-> +		dev_warn(mc13xxx->pdev, "device id doesn't "
-> +					"match auto detection!\n");
-Don't linebreak error strings please.
-
-> +
->  	/* mask all irqs */
->  	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK0, 0x00ffffff);
->  	if (ret)
-> @@ -743,7 +822,7 @@ static int mc13xxx_probe(struct spi_device *spi)
->  	if (ret)
->  		goto err_mask;
->  
-> -	ret = request_threaded_irq(spi->irq, NULL, mc13xxx_irq_thread,
-> +	ret = request_threaded_irq(mc13xxx->irq, NULL, mc13xxx_irq_thread,
->  			IRQF_ONESHOT | IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx);
->  
->  	if (ret) {
-> @@ -757,41 +836,15 @@ err_revision:
->  
->  	mc13xxx_unlock(mc13xxx);
->  
-> -	if (pdata->flags & MC13XXX_USE_ADC)
-> -		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
-> -
-> -	if (pdata->flags & MC13XXX_USE_CODEC)
-> -		mc13xxx_add_subdevice(mc13xxx, "%s-codec");
-> -
-> -	if (pdata->flags & MC13XXX_USE_REGULATOR) {
-> -		struct mc13xxx_regulator_platform_data regulator_pdata = {
-> -			.num_regulators = pdata->num_regulators,
-> -			.regulators = pdata->regulators,
-> -		};
-> -
-> -		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
-> -				&regulator_pdata, sizeof(regulator_pdata));
-> -	}
-> -
-> -	if (pdata->flags & MC13XXX_USE_RTC)
-> -		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
-> -
-> -	if (pdata->flags & MC13XXX_USE_TOUCHSCREEN)
-> -		mc13xxx_add_subdevice(mc13xxx, "%s-ts");
-> -
-> -	if (pdata->flags & MC13XXX_USE_LED) {
-> -		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
-> -					pdata->leds, sizeof(*pdata->leds));
-> -	}
-> -
-> -	return 0;
-> +	return mc13xxx_common_probe(mc13xxx, pdata);
->  }
->  
-> -static int __devexit mc13xxx_remove(struct spi_device *spi)
-> +
-> +static int __devexit mc13xxx_spi_remove(struct spi_device *spi)
->  {
->  	struct mc13xxx *mc13xxx = dev_get_drvdata(&spi->dev);
->  
-> -	free_irq(mc13xxx->spidev->irq, mc13xxx);
-> +	free_irq(mc13xxx->irq, mc13xxx);
->  
->  	mfd_remove_devices(&spi->dev);
->  
-> @@ -819,18 +872,106 @@ static struct spi_driver mc13xxx_driver = {
->  		.bus = &spi_bus_type,
->  		.owner = THIS_MODULE,
->  	},
-> -	.probe = mc13xxx_probe,
-> -	.remove = __devexit_p(mc13xxx_remove),
-> +	.probe = mc13xxx_spi_probe,
-> +	.remove = __devexit_p(mc13xxx_spi_remove),
-> +};
-> +
-> +static int mc13xxx_i2c_probe(struct i2c_client *client,
-> +			     const struct i2c_device_id *id)
-> +{
-> +	struct mc13xxx *mc13xxx;
-> +	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-> +	int ret;
-> +
-> +	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-> +	if (!mc13xxx)
-> +		return -ENOMEM;
-> +
-> +	dev_set_drvdata(&client->dev, mc13xxx);
-> +	mc13xxx->pdev = &client->dev;
-> +	mc13xxx->i2cclient = client;
-> +	mc13xxx->read_dev = mc13xxx_i2c_reg_read;
-> +	mc13xxx->write_dev = mc13xxx_i2c_reg_write;
-> +	mc13xxx->irq = client->irq;
-I think that starting here the rest of the function can go to
-common_probe, doesn't it?  (OK, apart from the irq number, that would
-then go as a parameter to common_probe.)
-
-> +
-> +	mutex_init(&mc13xxx->lock);
-> +	mc13xxx_lock(mc13xxx);
-> +
-> +	ret = mc13xxx_identify(mc13xxx);
-> +	if (ret || (mc13xxx->ictype == MC13XXX_ID_INVALID))
-> +		goto err_revision;
-> +
-> +	if (id->driver_data != mc13xxx->ictype)
-> +		dev_warn(mc13xxx->pdev, "device id doesn't "
-> +					"match auto detection!\n");
-linebroken error string
-
-> +
-> +	/* mask all irqs */
-> +	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK0, 0x00ffffff);
-> +	if (ret)
-> +		goto err_mask;
-> +
-> +	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK1, 0x00ffffff);
-> +	if (ret)
-> +		goto err_mask;
-> +
-> +	ret = request_threaded_irq(mc13xxx->irq, NULL, mc13xxx_irq_thread,
-> +			IRQF_ONESHOT | IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx);
-> +
-> +	if (ret) {
-> +err_mask:
-> +err_revision:
-> +		mutex_unlock(&mc13xxx->lock);
-> +		kfree(mc13xxx);
-> +		return ret;
-> +	}
-> +
-> +	mc13xxx_unlock(mc13xxx);
-> +
-> +	return mc13xxx_common_probe(mc13xxx, pdata);
-> +}
-> +
-> +static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-> +{
-> +	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-> +
-> +	free_irq(mc13xxx->irq, mc13xxx);
-> +
-> +	mfd_remove_devices(&client->dev);
-> +
-> +	kfree(mc13xxx);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct i2c_device_id mc13xxx_i2c_idtable[] = {
-> +	{ "mc13892", MC13XXX_ID_MC13892},
-> +	{ }
-> +};
-> +
-> +static struct i2c_driver mc13xxx_i2c_driver = {
-> +	.driver = {
-> +		.owner = THIS_MODULE,
-> +		.name = "mc13xxx-i2c"
-> +	},
-> +	.id_table = mc13xxx_i2c_idtable,
-> +	.probe = mc13xxx_i2c_probe,
-> +	.remove = __devexit_p(mc13xxx_i2c_remove),
->  };
->  
->  static int __init mc13xxx_init(void)
->  {
-> -	return spi_register_driver(&mc13xxx_driver);
-> +	int i2cret;
-> +	int spiret;
-> +	i2cret = i2c_add_driver(&mc13xxx_i2c_driver);
-> +	spiret = spi_register_driver(&mc13xxx_driver);
-> +
-> +	return (i2cret == 0) && (spiret == 0);
-If i2c_add_driver succeeds but spi_register_driver you return
--ESOMETHING, and the module is discarded while the i2c core keeps a
-reference to &mc13xxx_i2c_driver.  This is bad.
-I think you need to do:
-
-	ret = i2c_add_driver(..)
-	if (ret)
-		return ret;
-
-	ret = spi_register_driver(...)
-	if (ret)
-		i2c_del_driver(...)
-
-	return ret;
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 82fc003..e0b91d8 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -424,7 +424,7 @@ static void __init ixp4xx_clocksource_init(void)
+ /*
+  * sched_clock()
+  */
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	cycle_t cyc = ixp4xx_get_cycles(NULL);
+ 	struct clocksource *cs = &clocksource_ixp4xx;
+diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+index 0c0ab09..a2ea33d 100644
+--- a/arch/arm/mach-mmp/time.c
++++ b/arch/arm/mach-mmp/time.c
+@@ -75,7 +75,7 @@ static inline uint32_t timer_read(void)
+ 	return __raw_readl(TIMERS_VIRT_BASE + TMR_CVWR(0));
+ }
+ 
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	unsigned long long v = cnt32_to_63(timer_read());
+ 	return (v * tcr2ns_scale) >> TCR2NS_SCALE_FACTOR;
+diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
+index caf92c0..b8d9dff 100644
+--- a/arch/arm/mach-pxa/time.c
++++ b/arch/arm/mach-pxa/time.c
+@@ -51,7 +51,7 @@ static void __init set_oscr2ns_scale(unsigned long oscr_rate)
+ 		oscr2ns_scale++;
+ }
+ 
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	unsigned long long v = cnt32_to_63(OSCR);
+ 	return (v * oscr2ns_scale) >> OSCR2NS_SCALE_FACTOR;
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 3c1fcd6..33b4969 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -119,7 +119,7 @@ unsigned int sa11x0_getspeed(unsigned int cpu)
+  *
+  *  ( * 1E9 / 3686400 => * 78125 / 288)
+  */
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	unsigned long long v = cnt32_to_63(OSCR);
+ 
+diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+index b49f2f5..19a6f7e 100644
+--- a/arch/arm/mach-tegra/timer.c
++++ b/arch/arm/mach-tegra/timer.c
+@@ -110,7 +110,7 @@ static struct clocksource tegra_clocksource = {
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	return cnt32_to_63(timer_readl(TIMERUS_CNTR_1US)) * 1000;
+ }
+diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
+index cd6d54f..2bb7db4 100644
+--- a/arch/arm/plat-iop/time.c
++++ b/arch/arm/plat-iop/time.c
+@@ -52,7 +52,7 @@ static struct clocksource iop_clocksource = {
+ /*
+  * IOP sched_clock() implementation via its clocksource.
+  */
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	cycle_t cyc = iop_clocksource_read(NULL);
+ 	struct clocksource *cs = &iop_clocksource;
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index 8f149f5..0de0583 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -109,7 +109,7 @@ static struct clocksource clocksource_32k = {
+  * Returns current time from boot in nsecs. It's OK for this to wrap
+  * around for now, as it's just a relative time stamp.
+  */
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	return clocksource_cyc2ns(clocksource_32k.read(&clocksource_32k),
+ 				  clocksource_32k.mult, clocksource_32k.shift);
+diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
+index 11e2583..123f96f 100644
+--- a/arch/arm/plat-orion/time.c
++++ b/arch/arm/plat-orion/time.c
+@@ -55,7 +55,7 @@ static u32 ticks_per_jiffy;
+ 
+ static unsigned long tclk2ns_scale;
+ 
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
+ 	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
+diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
+index 9696ddc..42efd14 100644
+--- a/arch/arm/plat-versatile/sched-clock.c
++++ b/arch/arm/plat-versatile/sched-clock.c
+@@ -42,7 +42,7 @@
+  * long as there is always less than 89 seconds between successive
+  * calls to this function.
+  */
+-unsigned long long sched_clock(void)
++unsigned long long notrace sched_clock(void)
+ {
+ 	unsigned long long v = cnt32_to_63(readl(REFCOUNTER));
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.2.5
