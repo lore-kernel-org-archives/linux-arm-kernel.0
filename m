@@ -1,111 +1,195 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 09:31:22 +0000
-Subject: [PATCH 11/13] ARM: orion: convert sched_clock() to use new
+Date: Thu, 16 Dec 2010 09:31:43 +0000
+Subject: [PATCH 12/13] ARM: versatile: convert sched_clock() to use new
 	infrastructure
 In-Reply-To: <20101216092527.GL9937@n2100.arm.linux.org.uk>
 References: <20101216092527.GL9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTABG-00079w-Sl@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTABb-0007A0-AN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert orion platforms to use the new sched_clock() infrastructure for
-extending 32bit counters to full 64-bit nanoseconds.
+Convert versatile platforms to use the new sched_clock() infrastructure
+for extending 32bit counters to full 64-bit nanoseconds.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig           |    1 +
- arch/arm/plat-orion/time.c |   44 +++++++++-----------------------------------
- 2 files changed, 10 insertions(+), 35 deletions(-)
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/mach-realview/core.c                      |   10 ++++
+ arch/arm/mach-versatile/core.c                     |   10 ++++
+ arch/arm/plat-versatile/include/plat/sched_clock.h |    6 +++
+ arch/arm/plat-versatile/sched-clock.c              |   48 +++++++++++---------
+ 5 files changed, 54 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm/plat-versatile/include/plat/sched_clock.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 726279f..92e8c01 100644
+index 92e8c01..34311f4 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -997,6 +997,7 @@ config PLAT_IOP
- 
- config PLAT_ORION
- 	bool
+@@ -236,6 +236,7 @@ config ARCH_REALVIEW
+ 	bool "ARM Ltd. RealView family"
+ 	select ARM_AMBA
+ 	select COMMON_CLKDEV
 +	select HAVE_SCHED_CLOCK
+ 	select ICST
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+@@ -250,6 +251,7 @@ config ARCH_VERSATILE
+ 	select ARM_AMBA
+ 	select ARM_VIC
+ 	select COMMON_CLKDEV
++	select HAVE_SCHED_CLOCK
+ 	select ICST
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 07c0815..3d653e0 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -52,6 +52,8 @@
+ #include <mach/irqs.h>
+ #include <plat/timer-sp.h>
  
- config PLAT_PXA
- 	bool
-diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
-index 123f96f..c3da247 100644
---- a/arch/arm/plat-orion/time.c
-+++ b/arch/arm/plat-orion/time.c
-@@ -13,11 +13,11 @@
++#include <plat/sched_clock.h>
++
+ #include "core.h"
  
- #include <linux/kernel.h>
- #include <linux/sched.h>
--#include <linux/cnt32_to_63.h>
- #include <linux/timer.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <asm/sched_clock.h>
- #include <asm/mach/time.h>
- #include <mach/bridge-regs.h>
- #include <mach/hardware.h>
-@@ -44,52 +44,26 @@ static u32 ticks_per_jiffy;
+ /* used by entry-macro.S and platsmp.c */
+@@ -658,6 +660,12 @@ void realview_leds_event(led_event_t ledevt)
+ #endif	/* CONFIG_LEDS */
  
  /*
-  * Orion's sched_clock implementation. It has a resolution of
-- * at least 7.5ns (133MHz TCLK) and a maximum value of 834 days.
-- *
-- * Because the hardware timer period is quite short (21 secs if
-- * 200MHz TCLK) and because cnt32_to_63() needs to be called at
-- * least once per half period to work properly, a kernel timer is
-- * set up to ensure this requirement is always met.
-+ * at least 7.5ns (133MHz TCLK).
++ * The sched_clock counter
++ */
++#define REFCOUNTER		(__io_address(REALVIEW_SYS_BASE) + \
++				 REALVIEW_SYS_24MHz_OFFSET)
++
++/*
+  * Where is the timer (VA)?
   */
--#define TCLK2NS_SCALE_FACTOR 8
--
--static unsigned long tclk2ns_scale;
-+static DEFINE_CLOCK_DATA(cd);
+ void __iomem *timer0_va_base;
+@@ -672,6 +680,8 @@ void __init realview_timer_init(unsigned int timer_irq)
+ {
+ 	u32 val;
  
++	versatile_sched_clock_init(REFCOUNTER, 24000000);
++
+ 	/* 
+ 	 * set clock frequency: 
+ 	 *	REALVIEW_REFCLK is 32KHz
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index e38acb0..56cdc22 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -51,6 +51,8 @@
+ #include <mach/platform.h>
+ #include <plat/timer-sp.h>
+ 
++#include <plat/sched_clock.h>
++
+ #include "core.h"
+ 
+ /*
+@@ -886,6 +888,12 @@ void __init versatile_init(void)
+ }
+ 
+ /*
++ * The sched_clock counter
++ */
++#define REFCOUNTER		(__io_address(VERSATILE_SYS_BASE) + \
++				 VERSATILE_SYS_24MHz_OFFSET)
++
++/*
+  * Where is the timer (VA)?
+  */
+ #define TIMER0_VA_BASE		 __io_address(VERSATILE_TIMER0_1_BASE)
+@@ -900,6 +908,8 @@ static void __init versatile_timer_init(void)
+ {
+ 	u32 val;
+ 
++	versatile_sched_clock_init(REFCOUNTER, 24000000);
++
+ 	/* 
+ 	 * set clock frequency: 
+ 	 *	VERSATILE_REFCLK is 32KHz
+diff --git a/arch/arm/plat-versatile/include/plat/sched_clock.h b/arch/arm/plat-versatile/include/plat/sched_clock.h
+new file mode 100644
+index 0000000..5c3e4fc
+--- /dev/null
++++ b/arch/arm/plat-versatile/include/plat/sched_clock.h
+@@ -0,0 +1,6 @@
++#ifndef ARM_PLAT_SCHED_CLOCK_H
++#define ARM_PLAT_SCHED_CLOCK_H
++
++void versatile_sched_clock_init(void __iomem *, unsigned long);
++
++#endif
+diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
+index 42efd14..3d6a4c2 100644
+--- a/arch/arm/plat-versatile/sched-clock.c
++++ b/arch/arm/plat-versatile/sched-clock.c
+@@ -18,37 +18,41 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-#include <linux/cnt32_to_63.h>
+ #include <linux/io.h>
+ #include <linux/sched.h>
+-#include <asm/div64.h>
+ 
+-#include <mach/hardware.h>
+-#include <mach/platform.h>
++#include <asm/sched_clock.h>
++#include <plat/sched_clock.h>
+ 
+-#ifdef VERSATILE_SYS_BASE
+-#define REFCOUNTER	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_24MHz_OFFSET)
+-#endif
+-
+-#ifdef REALVIEW_SYS_BASE
+-#define REFCOUNTER	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_24MHz_OFFSET)
+-#endif
++static DEFINE_CLOCK_DATA(cd);
++static void __iomem *ctr;
+ 
+ /*
+- * This is the Realview and Versatile sched_clock implementation.  This
+- * has a resolution of 41.7ns, and a maximum value of about 35583 days.
+- *
+- * The return value is guaranteed to be monotonic in that range as
+- * long as there is always less than 89 seconds between successive
+- * calls to this function.
++ * Constants generated by clocks_calc_mult_shift(m, s, 24MHz, NSEC_PER_SEC, 60).
++ * This gives a resolution of about 41ns and a wrap period of about 178s.
+  */
++#define SC_MULT		2796202667u
++#define SC_SHIFT	26
++
  unsigned long long notrace sched_clock(void)
  {
--	unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
--	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
-+	u32 cyc = 0xffffffff - readl(TIMER0_VAL);
-+	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
- }
+-	unsigned long long v = cnt32_to_63(readl(REFCOUNTER));
++	if (ctr) {
++		u32 cyc = readl(ctr);
++		return cyc_to_fixed_sched_clock(&cd, cyc, (u32)~0,
++						SC_MULT, SC_SHIFT);
++	} else
++		return 0;
++}
  
--static struct timer_list cnt32_to_63_keepwarm_timer;
- 
--static void cnt32_to_63_keepwarm(unsigned long data)
-+static void notrace orion_update_sched_clock(void)
- {
--	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
--	(void) sched_clock();
-+	u32 cyc = 0xffffffff - readl(TIMER0_VAL);
+-	/* the <<1 gets rid of the cnt_32_to_63 top bit saving on a bic insn */
+-	v *= 125<<1;
+-	do_div(v, 3<<1);
++static void notrace versatile_update_sched_clock(void)
++{
++	u32 cyc = readl(ctr);
 +	update_sched_clock(&cd, cyc, (u32)~0);
- }
++}
  
- static void __init setup_sched_clock(unsigned long tclk)
- {
--	unsigned long long v;
--	unsigned long data;
--
--	v = NSEC_PER_SEC;
--	v <<= TCLK2NS_SCALE_FACTOR;
--	v += tclk/2;
--	do_div(v, tclk);
--	/*
--	 * We want an even value to automatically clear the top bit
--	 * returned by cnt32_to_63() without an additional run time
--	 * instruction. So if the LSB is 1 then round it up.
--	 */
--	if (v & 1)
--		v++;
--	tclk2ns_scale = v;
--
--	data = (0xffffffffUL / tclk / 2 - 2) * HZ;
--	setup_timer(&cnt32_to_63_keepwarm_timer, cnt32_to_63_keepwarm, data);
--	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
-+	init_sched_clock(&cd, orion_update_sched_clock, 32, tclk);
+-	return v;
++void __init versatile_sched_clock_init(void __iomem *reg, unsigned long rate)
++{
++	ctr = reg;
++	init_fixed_sched_clock(&cd, versatile_update_sched_clock,
++			       32, rate, SC_MULT, SC_SHIFT);
  }
- 
- /*
 -- 
 1.6.2.5
