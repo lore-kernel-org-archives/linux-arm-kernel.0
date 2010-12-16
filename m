@@ -1,55 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 13:04:11 +0000
-Subject: [PATCH 0/13] 64-bit sched_clock
-In-Reply-To: <20101216092527.GL9937@n2100.arm.linux.org.uk>
-References: <20101216092527.GL9937@n2100.arm.linux.org.uk>
-Message-ID: <20101216130411.GR9937@n2100.arm.linux.org.uk>
+Date: Thu, 16 Dec 2010 13:06:59 +0000
+Subject: arm cortex_a9_mpcore timer: local timer and global timer
+In-Reply-To: <AANLkTikt+CzkLBR5OCnjPUSLaLtuuBvGFSJVj+t0rRc2@mail.gmail.com>
+References: <AAD1C6EB06EE3649B35B7E026785068D15345BE603@SC-VEXCH2.marvell.com>
+	<AANLkTikt+CzkLBR5OCnjPUSLaLtuuBvGFSJVj+t0rRc2@mail.gmail.com>
+Message-ID: <20101216130659.GS9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is one issue which remains with this code - that is the
-initialization ordering.
+On Thu, Dec 16, 2010 at 12:59:13PM +0000, Catalin Marinas wrote:
+> On 16 December 2010 02:02, Chao Xie <cxie4@marvell.com> wrote:
+> > In the latest arm kernel, I find that smp_twd.c has implemented local timer for cortex a9 MPcore. In the spec, there is global timer that shared by all MPcore. I did not find any implements in the arm kernel. What is the strategy of using these two kinds of timer? I find that some SOCs have additional timer which is not the local timer or global timer in MPcore. Then what is the strategy of using this kind of timer with local timer and global timer in the kernel? Thanks.
+> 
+> We currently don't have any support for the global timer available on
+> Cortex-A9. It is on our to-do list but not sure when we'll have time
+> (unless someone else does it before :)).
+> 
+> On the current smp_twd.c implementation, a global timer is required to
+> calibrate the local timers. So far we use the SP804 on the RealView
+> and Versatile Express boards but we could, at some point, move to the
+> global timer on A9.
 
-init/main.c:
-
-	setup_arch(&command_line);
-	...
-	sched_init();
-	...
-	early_irq_init();
-	init_IRQ();
-	...
-	timekeeping_init();
-	time_init();
-
-sched_init() calls init_idle() which calls sched_clock() to set the
-start time for the idle thread.  However, our sched_clock() is not
-initialized (in general) until init/main.c calls time_init().
-
-This results in a big step in the sched_clock() return value during
-boot, which is probably not desirable.  At the moment, I work around
-this by explicitly setting the epoch_ns to zero after the first update
-callback - but this means that sched_clock() will only start at this
-point, which may not be desirable for everyone.
-
-Some sched_clock() implementations rely upon clocksource code (they
-use the clocksource read function) and this is only initialized when
-the clocksource is registered.  There's also the matter of the clock
-rate.
-
-It's probably not a good idea to register clocksources before
-timekeeping_init() has happened either.
-
-I can provide an init_early() method in the machine description which
-setup_arch() can call as the last thing it does - this will happen
-after the ->reserve and ->map_io callbacks, but before interrupts and
-timers have been setup.  This is the ideal time to setup the
-sched_clock().  However, that means digging through lots of arch code
-to sort out what can be moved where, and that's going to be inherently
-unreliable.
-
-I think init_early() has merit in other ways - it'll allow us to remove
-crap from the ->map_io callbacks which is doing stuff like registering
-clk structures and so forth.
-
-Any other suggestions?
+MSM brings up an interesting point through - it only has local timers.
