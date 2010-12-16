@@ -1,152 +1,68 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Thu, 16 Dec 2010 19:30:17 +1100
-Subject: [PATCHv2] mc13xxx: Add i2c support for mc13xxx-core
-In-Reply-To: <20101216074730.GD1940@pengutronix.de>
-References: <1292449675-20308-1-git-send-email-marc@cpdesign.com.au>
-	<20101216074730.GD1940@pengutronix.de>
-Message-ID: <201012161930.17299.marc@cpdesign.com.au>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 16 Dec 2010 14:08:11 +0530
+Subject: [PATCH v4 4/5] OMAP: mailbox: build device using
+	omap_device/omap_hwmod
+In-Reply-To: <1292482079-2226-5-git-send-email-omar.ramirez@ti.com>
+References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
+	<1292482079-2226-5-git-send-email-omar.ramirez@ti.com>
+Message-ID: <AANLkTik4K3LEovr-wJiv_PG+ivHNj8hxPT7QPua-ytVf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+couple of comments.
 
-Thanks for your comments. I have a couple of questions, but agree with all 
-your comments on the whole.
+On Thu, Dec 16, 2010 at 12:17, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+> From: Felipe Contreras <felipe.contreras@gmail.com>
+>
+> Remove static platform_device and resource data within
+> omap mailbox driver; use the one defined in the hwmod
+> database along with omap_device framework for device
+> build and registration.
+>
+> Add device latency functions to be used, so clock can be
+> enabled and sysconfig is configured.
+>
+> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+> ---
+> ?arch/arm/mach-omap2/devices.c | ?102 ++++++++---------------------------------
+> ?1 files changed, 20 insertions(+), 82 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index b5cafd3..7493c30 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -142,95 +142,33 @@ static inline void omap_init_camera(void)
+> ?#endif
 
-> > 
-> > -	struct spi_device *spidev;
-> > +	union {
-> > +		struct spi_device *spidev;
-> > +		struct i2c_client *i2cclient;
-> > +	};
-> > +	struct device *pdev;
-> 
-> pdev is a usual name for 'struct platform_device's, so can you please
-> use 'dev'?
+<<snip>>
 
-no worries. 
-(My old habit of putting a 'p' in front of every pointer name. But let's leave 
-that there.. :)
+> +
+> + ? ? ? oh = omap_hwmod_lookup("mailbox");
+> + ? ? ? if (!oh) {
+> + ? ? ? ? ? ? ? pr_err("%s: unable to find hwmod\n", __func__);
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> +
+> + ? ? ? od = omap_device_build("omap-mailbox", -1, oh,
+> + ? ? ? ? ? ? ? ? ? ? ? NULL, 0,
+> + ? ? ? ? ? ? ? ? ? ? ? mbox_latencies, ARRAY_SIZE(mbox_latencies),
+> + ? ? ? ? ? ? ? ? ? ? ? 0);
+> + ? ? ? if (!od) {
 
-> 
-> > +	enum mc13xxx_id ictype;
-> > +
-> > 
-> >  	struct mutex lock;
-> >  	int irq;
-> 
-> Before your patch this member was unused.  And AFAICT you don't really
-> need it.  (Whenever you need the number contained in it, you are in an
-> spi or i2c specific function so you can use spidev->irq or
-> i2cclient->irq.)  So can you please just drop this member?
+Check for IS_ERR(od).
 
-no worries. (Last round of comments you suggested to do in a different patch).
+> + ? ? ? ? ? ? ? pr_err("%s: could not build device\n", __func__);
+> ? ? ? ? ? ? ? ?return;
 
-> 
-> > +	int (*read_dev)(struct mc13xxx*, unsigned int, u32*);
-> > +	int (*write_dev)(struct mc13xxx*, unsigned int, u32);
-> 
-> space between type and asterisk?
+This "return" can be removed.
 
-Not sure which asterisk you're talking about. (Checkpatch.pl resulted in no 
-errors/warnings, so I'm ignorant past that)
-
-
-> > 
-> > +	unsigned char buff[3] = {0, 0, 0};
-> 
-> buf is more usual I think
-
-no worries.
-
-
-> > 
-> > +	/* get the generation ID from register 46, as apparently some older
-> > +	 * ic revisions only have this info at this location. Newer ICs seem to
-> > +	 * have both.
-> > +	 * */
-> 
-> please put /* and */ on lines for themself, see chapter 8 in
-> Documentation/CodingStyle
-
-no worries. (have read, just forget :)
-
-
-
-> > +	devid = spi_get_device_id(mc13xxx->spidev);
-> > +	if (!devid || devid->driver_data != mc13xxx->ictype)
-> > +		dev_warn(mc13xxx->pdev, "device id doesn't "
-> > +					"match auto detection!\n");
-> 
-> Don't linebreak error strings please.
-
-no worries.
-
-
-> > +
-> > +	dev_set_drvdata(&client->dev, mc13xxx);
-> > +	mc13xxx->pdev = &client->dev;
-> > +	mc13xxx->i2cclient = client;
-> > +	mc13xxx->read_dev = mc13xxx_i2c_reg_read;
-> > +	mc13xxx->write_dev = mc13xxx_i2c_reg_write;
-> > +	mc13xxx->irq = client->irq;
-> 
-> I think that starting here the rest of the function can go to
-> common_probe, doesn't it?  (OK, apart from the irq number, that would
-> then go as a parameter to common_probe.)
-
-agree.
-
-
-> 
-> > +
-> > +	mutex_init(&mc13xxx->lock);
-> > +	mc13xxx_lock(mc13xxx);
-> > +
-> > +	ret = mc13xxx_identify(mc13xxx);
-> > +	if (ret || (mc13xxx->ictype == MC13XXX_ID_INVALID))
-> > +		goto err_revision;
-> > +
-> > +	if (id->driver_data != mc13xxx->ictype)
-> > +		dev_warn(mc13xxx->pdev, "device id doesn't "
-> > +					"match auto detection!\n");
-> 
-> linebroken error string
-
-no worries.
-
-
-> >  static int __init mc13xxx_init(void)
-> >  {
-> > 
-> > -	return spi_register_driver(&mc13xxx_driver);
-> > +	int i2cret;
-> > +	int spiret;
-> > +	i2cret = i2c_add_driver(&mc13xxx_i2c_driver);
-> > +	spiret = spi_register_driver(&mc13xxx_driver);
-> > +
-> > +	return (i2cret == 0) && (spiret == 0);
-> 
-> If i2c_add_driver succeeds but spi_register_driver you return
-> -ESOMETHING, and the module is discarded while the i2c core keeps a
-> reference to &mc13xxx_i2c_driver.  This is bad.
-> I think you need to do:
-> 
-> 	ret = i2c_add_driver(..)
-> 	if (ret)
-> 		return ret;
-> 
-> 	ret = spi_register_driver(...)
-> 	if (ret)
-> 		i2c_del_driver(...)
-> 
-> 	return ret;
-> 
-
-This was my biggest reservation with this code too. I think it should try to 
-register both, but should clean appropriately if one fails. (What to return 
-from mc13xxx_init() in that case? Or maybe should it be split into separate 
-files?).
-
-Cheers
-Marc
+> ? ? ? ?}
+> - ? ? ? platform_device_register(&mbox_device);
+> ?}
+> ?#else
+> ?static inline void omap_init_mbox(void) { }
+> --
+> 1.7.1
+>
+>
