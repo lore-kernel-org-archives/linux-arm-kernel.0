@@ -1,70 +1,9 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Thu, 16 Dec 2010 09:37:21 +0800
-Subject: [PATCH v6 01/15] ARM: mxs: Add core definitions
-In-Reply-To: <20101215170636.GJ28971@pengutronix.de>
-References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
-	<201012151722.21939.arnd@arndb.de>
-	<20101215164046.GH28971@pengutronix.de>
-	<201012151758.42896.arnd@arndb.de>
-	<20101215170636.GJ28971@pengutronix.de>
-Message-ID: <AANLkTinXj7iOVLCgm98oEz5zzXV-bdbyEE8NaDb_j8oW@mail.gmail.com>
+From: cxie4@marvell.com (Chao Xie)
+Date: Wed, 15 Dec 2010 18:02:31 -0800
+Subject: arm cortex_a9_mpcore timer: local timer and global timer
+Message-ID: <AAD1C6EB06EE3649B35B7E026785068D15345BE603@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-I thought you had started your vacation, since I have not seen any
-message from you in the past two days.  That's why I'm holding the v7.
- So glad to see your message, the v7 will be out later today.  I'm
-struggling to get the patch series accepted before your New Year
-Holiday.
-
-I have one comment embedded below.
-
-2010/12/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Arnd,
->
-> On Wed, Dec 15, 2010 at 05:58:42PM +0100, Arnd Bergmann wrote:
->> On Wednesday 15 December 2010, Uwe Kleine-K?nig wrote:
->> > On Wed, Dec 15, 2010 at 05:22:21PM +0100, Arnd Bergmann wrote:
->> > > > +
->> > > > +#ifndef __ASSEMBLER__
->> > > > +static inline void __mxs_setl(u32 mask, void __iomem *reg)
->> > > > +{
->> > > > + ? ? ? __raw_writel(mask, reg + MXS_SET_ADDR);
->> > > > +}
->> > > > +
->> > > > +static inline void __mxs_clrl(u32 mask, void __iomem *reg)
->> > > > +{
->> > > > + ? ? ? __raw_writel(mask, reg + MXS_CLR_ADDR);
->> > > > +}
->> > > > +
->> > > > +static inline void __mxs_togl(u32 mask, void __iomem *reg)
->> > > > +{
->> > > > + ? ? ? __raw_writel(mask, reg + MXS_TOG_ADDR);
->> > > > +}
->> > > > +#endif
->> > >
->> > > Why __raw_writel()? All regular I/O accesses should use
->> > > readl/writel etc, not the internal helpers.
->> > nak, readl does little endian accesses, __raw_readl native endian. ?So
->> > for platform use __raw_readl is most of the time the better one.
->>
->> Then we should define a proper function for this with well-defined
->> behaviour. I would suggest defining a mxs_readl/mxs_writel here,
->> that is defined to have the same endianess as the mxs SOC, but
->> otherwise has the same properties as readl/writel.
-> I don't get your point here. ?What are the properties of readl/writel
-> you want here? ?The barrier? ?__mem_pci?
->
-> For me __mxs_setl is a proper function with well-defined behaviour, no?
-> (One thing I currently consider to argue is to make these .c file local
-> because different IPs might have different offsets for SET, CLR and TOG
-> or not support it at all, but other than that I'm happy with it.)
->
-Though some IPs do not have SET/CLR/TOG registers, all IPs having them
-share the same offset.
-
--- 
-Regards,
-Shawn
+Hi
+In the latest arm kernel, I find that smp_twd.c has implemented local timer for cortex a9 MPcore. In the spec, there is global timer that shared by all MPcore. I did not find any implements in the arm kernel. What is the strategy of using these two kinds of timer? I find that some SOCs have additional timer which is not the local timer or global timer in MPcore. Then what is the strategy of using this kind of timer with local timer and global timer in the kernel? Thanks.
