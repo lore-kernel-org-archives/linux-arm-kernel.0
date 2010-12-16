@@ -1,27 +1,28 @@
-From: scaudle@codeaurora.org (Stephen Caudle)
-Date: Thu, 16 Dec 2010 10:08:28 -0500
-Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores
-	during IRQ enable
-In-Reply-To: <20101216150357.GT9937@n2100.arm.linux.org.uk>
-References: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
-	<20101130180718.GB8521@n2100.arm.linux.org.uk>
-	<4CF6797A.2010807@codeaurora.org>
-	<20101201171425.GA29347@n2100.arm.linux.org.uk>
-	<4D0102B3.8010302@codeaurora.org> <4D0A281F.1090705@codeaurora.org>
-	<20101216150357.GT9937@n2100.arm.linux.org.uk>
-Message-ID: <4D0A2B6C.1000400@codeaurora.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 16 Dec 2010 20:42:23 +0530
+Subject: [PATCH] ARM: ensure all sched_clock() implementations are notrace
+	marked
+In-Reply-To: <E1PT92Y-0004Ba-64@rmk-PC.arm.linux.org.uk>
+References: <E1PT92Y-0004Ba-64@rmk-PC.arm.linux.org.uk>
+Message-ID: <AANLkTimGHSqO=QwESp98UBK28yawdiq+kURU=nwau27G@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2010 10:03 AM, Russell King - ARM Linux wrote:
-> I've not changed my thoughts on this.  PPIs should not be handled by
-> genirq - it just doesn't make sense for them to be.
+On Thu, Dec 16, 2010 at 1:48 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> ftrace requires sched_clock() to be notrace. ?Ensure that all
+> implementations are so marked.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Understood.  I will work on a patch to perf events to support the MSM
-performance monitor PPI on SMP.
+It does seem better to have all of them explicity annotated anyway, even
+if it not required in most of the cases because they include
+<linux/sched.h> and the annotation in the declaration takes effect.
 
-~Stephen
+Note that in order for this to be fully effective, all functions called
+from sched_clock() need to be notrace too.  OMAP and u300 miss this.
+The following patches fix them up; perhaps you can fold them into this
+one.  If not, I will rebase them later after this series is merged:
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+http://www.spinics.net/lists/arm-kernel/msg104616.html
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38911.html
