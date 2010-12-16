@@ -1,122 +1,40 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 16 Dec 2010 16:05:37 -0500
-Subject: [PATCH 3/3] ARM: fix cache-feroceon-l2 after stack based kmap_atomic()
-In-Reply-To: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
-References: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1292533537-26760-4-git-send-email-nico@fluxnic.net>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 16 Dec 2010 13:08:37 -0800
+Subject: [PATCH v3 0/4] Introduce hardware spinlock framework
+In-Reply-To: <AANLkTi=q=QMQ_Abxb8eUWT_qGG8K=pc892ZB-mqgt_mh@mail.gmail.com>
+References: <1291420247-18171-1-git-send-email-ohad@wizery.com>
+	<AANLkTin1fd=Kei7Fo6G+uR+270HdTkc71fvsA6qjBjcA@mail.gmail.com>
+	<20101214170656.GA3832@kroah.com>
+	<AANLkTi=q=QMQ_Abxb8eUWT_qGG8K=pc892ZB-mqgt_mh@mail.gmail.com>
+Message-ID: <20101216210837.GA22895@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 3e4d3af501 "mm: stack based kmap_atomic()", it is actively
-wrong to rely on fixed kmap type indices (namely KM_L2_CACHE) as
-kmap_atomic() totally ignores them and a concurrent instance of it may
-happily reuse any slot for any purpose.  Because kmap_atomic() is now
-able to deal with reentrancy, we can get rid of the ad hoc mapping here.
+On Tue, Dec 14, 2010 at 08:40:28PM +0200, Ohad Ben-Cohen wrote:
+> On Tue, Dec 14, 2010 at 7:06 PM, Greg KH <greg@kroah.com> wrote:
+> >> Can you please have a look and say if this looks OK ?
+> >
+> > Look at what, I don't see a patch here.
+> 
+> Here's the complete patchset:
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39833.html
+> 
+> If you prefer, I can resubmit.
+> 
+> >
+> > I've seen a lot of discussion about this, are all of the review comments
+> > now addressed?
+> 
+> Yes, all comments were addressed in this v3 iteration, and this thread
+> has been idle for about 10 days.
 
-While the code is made much simpler, there is a needless cache flush
-introduced by the usage of __kunmap_atomic().  It is not clear if the
-performance difference to remove that is worth the cost in code
-maintenance (I don't think there are that many highmem users on that
-platform anyway) but that should be reconsidered when/if someone cares
-enough to do some measurements.
+That's because we are all busy with other things :(
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/mm/cache-feroceon-l2.c |   37 +++++++++++++++++++------------------
- 1 files changed, 19 insertions(+), 18 deletions(-)
+Sorry, I really don't have the time at the moment to review this code,
+nor does it seem to affect areas that I maintain, so I don't understand
+what you are looking for from me.
 
-diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
-index 6e77c04..e0b0e7a 100644
---- a/arch/arm/mm/cache-feroceon-l2.c
-+++ b/arch/arm/mm/cache-feroceon-l2.c
-@@ -13,13 +13,9 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/highmem.h>
- #include <asm/cacheflush.h>
--#include <asm/kmap_types.h>
--#include <asm/fixmap.h>
--#include <asm/pgtable.h>
--#include <asm/tlbflush.h>
- #include <plat/cache-feroceon-l2.h>
--#include "mm.h"
- 
- /*
-  * Low-level cache maintenance operations.
-@@ -39,27 +35,30 @@
-  * between which we don't want to be preempted.
-  */
- 
--static inline unsigned long l2_start_va(unsigned long paddr)
-+static inline unsigned long l2_get_va(unsigned long paddr)
- {
- #ifdef CONFIG_HIGHMEM
- 	/*
--	 * Let's do our own fixmap stuff in a minimal way here.
- 	 * Because range ops can't be done on physical addresses,
- 	 * we simply install a virtual mapping for it only for the
- 	 * TLB lookup to occur, hence no need to flush the untouched
--	 * memory mapping.  This is protected with the disabling of
--	 * interrupts by the caller.
-+	 * memory mapping afterwards (note: a cache flush may happen
-+	 * in some circumstances depending on the path taken in kunmap_atomic).
- 	 */
--	unsigned long idx = KM_L2_CACHE + KM_TYPE_NR * smp_processor_id();
--	unsigned long vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
--	set_pte_ext(TOP_PTE(vaddr), pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL), 0);
--	local_flush_tlb_kernel_page(vaddr);
--	return vaddr + (paddr & ~PAGE_MASK);
-+	void *vaddr = kmap_atomic_pfn(paddr >> PAGE_SHIFT);
-+	return (unsigned long)vaddr + (paddr & ~PAGE_MASK);
- #else
- 	return __phys_to_virt(paddr);
- #endif
- }
- 
-+static inline void l2_put_va(unsigned long vaddr)
-+{
-+#ifdef CONFIG_HIGHMEM
-+	kunmap_atomic((void *)vaddr);
-+#endif
-+}
-+
- static inline void l2_clean_pa(unsigned long addr)
- {
- 	__asm__("mcr p15, 1, %0, c15, c9, 3" : : "r" (addr));
-@@ -76,13 +75,14 @@ static inline void l2_clean_pa_range(unsigned long start, unsigned long end)
- 	 */
- 	BUG_ON((start ^ end) >> PAGE_SHIFT);
- 
--	raw_local_irq_save(flags);
--	va_start = l2_start_va(start);
-+	va_start = l2_get_va(start);
- 	va_end = va_start + (end - start);
-+	raw_local_irq_save(flags);
- 	__asm__("mcr p15, 1, %0, c15, c9, 4\n\t"
- 		"mcr p15, 1, %1, c15, c9, 5"
- 		: : "r" (va_start), "r" (va_end));
- 	raw_local_irq_restore(flags);
-+	l2_put_va(va_start);
- }
- 
- static inline void l2_clean_inv_pa(unsigned long addr)
-@@ -106,13 +106,14 @@ static inline void l2_inv_pa_range(unsigned long start, unsigned long end)
- 	 */
- 	BUG_ON((start ^ end) >> PAGE_SHIFT);
- 
--	raw_local_irq_save(flags);
--	va_start = l2_start_va(start);
-+	va_start = l2_get_va(start);
- 	va_end = va_start + (end - start);
-+	raw_local_irq_save(flags);
- 	__asm__("mcr p15, 1, %0, c15, c11, 4\n\t"
- 		"mcr p15, 1, %1, c15, c11, 5"
- 		: : "r" (va_start), "r" (va_end));
- 	raw_local_irq_restore(flags);
-+	l2_put_va(va_start);
- }
- 
- static inline void l2_inv_all(void)
--- 
-1.7.3.2.193.g78bbb
+confused,
+
+greg k-h
