@@ -1,108 +1,97 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Thu, 16 Dec 2010 17:00:01 +0800
-Subject: [PATCH 11/16] ARM: mxc: Switch over to gpiolib ->to_irq() and
-	__gpio_to_irq().
-In-Reply-To: <20101215142232.GC29833@pengutronix.de>
-References: <cover.1292377339.git.buytenh@wantstofly.org>
-	<20101215020345.GD15575@mail.wantstofly.org>
-	<20101215142232.GC29833@pengutronix.de>
-Message-ID: <AANLkTinPBJuhUFRNWzVXZBnqEUY-nsardOM046Ad-pnY@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 16 Dec 2010 10:02:10 +0100
+Subject: [PATCHv2] mc13xxx: Add i2c support for mc13xxx-core
+In-Reply-To: <201012161930.17299.marc@cpdesign.com.au>
+References: <1292449675-20308-1-git-send-email-marc@cpdesign.com.au>
+	<20101216074730.GD1940@pengutronix.de>
+	<201012161930.17299.marc@cpdesign.com.au>
+Message-ID: <20101216090210.GE1940@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hello Marc,
 
-Do I need to pick this up in my v7 of mxs patch-set?
+> > pdev is a usual name for 'struct platform_device's, so can you please
+> > use 'dev'?
+> 
+> no worries. 
+> (My old habit of putting a 'p' in front of every pointer name. But let's leave 
+> that there.. :)
+You're not working for Microsoft, are you?
 
-On Wed, Dec 15, 2010 at 10:22 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Lennert,
->
-> [added Eric B?nard to Cc]
->
-> On Wed, Dec 15, 2010 at 03:03:45AM +0100, Lennert Buytenhek wrote:
->> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
->
-> Generally Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
->
-> We have some static initializers in the tree though which do not work
-> with this patch:
->
-> arch/arm/mach-mx3/mach-cpuimx35.c:71: ? ? ? ? ? .irq ? ? ? ? ? ?= gpio_to_irq(TSC2007_IRQGPIO),
-> arch/arm/mach-mx5/board-cpuimx51sd.c:139: ? ? ? ? ? ? ? .irq = gpio_to_irq(TSC2007_IRQGPIO),
-> arch/arm/mach-mx5/board-cpuimx51sd.c:250: ? ? ? ? ? ? ? .irq = gpio_to_irq(CAN_IRQGPIO)
->
-> Sascha
->
->> ---
->> ?arch/arm/plat-mxc/gpio.c ? ? ? ? ? ? ?| ? ?9 +++++++++
->> ?arch/arm/plat-mxc/include/mach/gpio.h | ? ?2 +-
->> ?2 files changed, 10 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
->> index 9c3e362..8e97976 100644
->> --- a/arch/arm/plat-mxc/gpio.c
->> +++ b/arch/arm/plat-mxc/gpio.c
->> @@ -272,6 +272,14 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
->> ? ? ? spin_unlock_irqrestore(&port->lock, flags);
->> ?}
->>
->> +static int mxc_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->> +{
->> + ? ? struct mxc_gpio_port *port =
->> + ? ? ? ? ? ? container_of(chip, struct mxc_gpio_port, chip);
->> +
->> + ? ? return port->virtual_irq_start + offset;
->> +}
->> +
->> ?static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
->> ?{
->> ? ? ? struct mxc_gpio_port *port =
->> @@ -320,6 +328,7 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
->> ? ? ? ? ? ? ? port[i].chip.direction_output = mxc_gpio_direction_output;
->> ? ? ? ? ? ? ? port[i].chip.get = mxc_gpio_get;
->> ? ? ? ? ? ? ? port[i].chip.set = mxc_gpio_set;
->> + ? ? ? ? ? ? port[i].chip.to_irq = mxc_gpio_to_irq;
->> ? ? ? ? ? ? ? port[i].chip.base = i * 32;
->> ? ? ? ? ? ? ? port[i].chip.ngpio = 32;
->>
->> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
->> index af33b74..9062fe3 100644
->> --- a/arch/arm/plat-mxc/include/mach/gpio.h
->> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
->> @@ -27,8 +27,8 @@
->> ?#define gpio_get_value ? ? ? ? ? ? ? __gpio_get_value
->> ?#define gpio_set_value ? ? ? ? ? ? ? __gpio_set_value
->> ?#define gpio_cansleep ? ? ? ? ? ? ? ?__gpio_cansleep
->> +#define gpio_to_irq ? ? ? ? ?__gpio_to_irq
->>
->> -#define gpio_to_irq(gpio) ? ?(MXC_GPIO_IRQ_START + (gpio))
->> ?#define irq_to_gpio(irq) ? ? ((irq) - MXC_GPIO_IRQ_START)
->>
->> ?struct mxc_gpio_port {
->> --
->> 1.7.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> > > +	enum mc13xxx_id ictype;
+> > > +
+> > > 
+> > >  	struct mutex lock;
+> > >  	int irq;
+> > 
+> > Before your patch this member was unused.  And AFAICT you don't really
+> > need it.  (Whenever you need the number contained in it, you are in an
+> > spi or i2c specific function so you can use spidev->irq or
+> > i2cclient->irq.)  So can you please just drop this member?
+> 
+> no worries. (Last round of comments you suggested to do in a different patch).
+Both is fine IMHO.  If you do it in one patch you should just note it in
+the commit log.
 
+> > > +	int (*read_dev)(struct mc13xxx*, unsigned int, u32*);
+> > > +	int (*write_dev)(struct mc13xxx*, unsigned int, u32);
+> > 
+> > space between type and asterisk?
+> 
+> Not sure which asterisk you're talking about. (Checkpatch.pl resulted in no 
+> errors/warnings, so I'm ignorant past that)
+I want
+int (*read_dev)(struct mc13xxx *, unsigned int, u32 *);
 
+> > >  static int __init mc13xxx_init(void)
+> > >  {
+> > > 
+> > > -	return spi_register_driver(&mc13xxx_driver);
+> > > +	int i2cret;
+> > > +	int spiret;
+> > > +	i2cret = i2c_add_driver(&mc13xxx_i2c_driver);
+> > > +	spiret = spi_register_driver(&mc13xxx_driver);
+> > > +
+> > > +	return (i2cret == 0) && (spiret == 0);
+> > 
+> > If i2c_add_driver succeeds but spi_register_driver you return
+> > -ESOMETHING, and the module is discarded while the i2c core keeps a
+> > reference to &mc13xxx_i2c_driver.  This is bad.
+> > I think you need to do:
+> > 
+> > 	ret = i2c_add_driver(..)
+> > 	if (ret)
+> > 		return ret;
+> > 
+> > 	ret = spi_register_driver(...)
+> > 	if (ret)
+> > 		i2c_del_driver(...)
+> > 
+> > 	return ret;
+> > 
+> 
+> This was my biggest reservation with this code too. I think it should try to 
+> register both, but should clean appropriately if one fails. (What to return 
+> from mc13xxx_init() in that case? Or maybe should it be split into separate 
+> files?).
+Don't split, in general your approach is fine.  And there are two
+possibilities to handle spi vs. i2c:
+
+  a) (as suggested above) do both, if at least one fails, do none
+     This is easier and probably OK.
+  b) You could still succeed if at least one registration doesn't fail.
+     Then you need to remember which was successful and only clean this
+     one up in the remove callback.  You could then even depend on I2C
+     || SPI.
+     (BTW, did you fix the dependencies?  Currently you need to depend
+     on I2C && SPI.  (Not sure these are the correct names, you may want
+     to double check that.))
+     This is more flexible but IMHO not worth the effort.
+
+Best regards
+Uwe
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
