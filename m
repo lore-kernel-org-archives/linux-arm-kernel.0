@@ -1,35 +1,189 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 16 Dec 2010 16:05:34 -0500
-Subject: [PATCH 0/3] fix for issues resulting from the stack based kmap_atomic
-Message-ID: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
+Date: Thu, 16 Dec 2010 16:05:35 -0500
+Subject: [PATCH 1/3] ARM: get rid of kmap_high_l1_vipt()
+In-Reply-To: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
+References: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
+Message-ID: <1292533537-26760-2-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is for the current -rc kernel.
+Since commit 3e4d3af501 "mm: stack based kmap_atomic()", it is no longer
+necessary to carry an ad hoc version of kmap_atomic() added in commit
+7e5a69e83b "ARM: 6007/1: fix highmem with VIPT cache and DMA" to cope
+with reentrancy.
 
-The stack based kmap_atomic made the various KM_* fixed values
-irrelevant to kmap_atomic(), however some ad hoc mapping functions
-used for cache maintenance purposes are still using those fixed values
-which may clash with the dynamically assigned entries in kmap_atomic().
-Let's solve this issue by getting rid of those ad hoc mapping functions
-which are largely unneeded now anyway.
+In fact, it is now actively wrong to rely on fixed kmap type indices
+(namely KM_L1_CACHE) as kmap_atomic() totally ignores them now and a
+concurrent instance of it may reuse any slot for any purpose.
 
-In the Feroceon and XSC3 cases, this might introduce a slight performance
-hit in the form of a needless cache flush for an empty cache.  Keeping the
-exact same behavior as before is not straight forward, and it is not clear
-if this is worth the trouble either.  So let's care about correctness for
-now, and see if someone actually cares about this possible performance
-impact later, if any.
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/include/asm/highmem.h |    3 -
+ arch/arm/mm/dma-mapping.c      |    7 ++-
+ arch/arm/mm/flush.c            |    7 ++-
+ arch/arm/mm/highmem.c          |   87 ----------------------------------------
+ 4 files changed, 8 insertions(+), 96 deletions(-)
 
-In the meantime, the cleanup factor is non negligible:
-
- arch/arm/include/asm/highmem.h  |    3 -
- arch/arm/mm/cache-feroceon-l2.c |   37 +++++++-------
- arch/arm/mm/cache-xsc3l2.c      |   57 ++++++++--------------
- arch/arm/mm/dma-mapping.c       |    7 ++-
- arch/arm/mm/flush.c             |    7 ++-
- arch/arm/mm/highmem.c           |   87 ---------------------------------
- 6 files changed, 48 insertions(+), 150 deletions(-)
-
-
-Nicolas
+diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
+index 1fc684e..7080e2c 100644
+--- a/arch/arm/include/asm/highmem.h
++++ b/arch/arm/include/asm/highmem.h
+@@ -25,9 +25,6 @@ extern void *kmap_high(struct page *page);
+ extern void *kmap_high_get(struct page *page);
+ extern void kunmap_high(struct page *page);
+ 
+-extern void *kmap_high_l1_vipt(struct page *page, pte_t *saved_pte);
+-extern void kunmap_high_l1_vipt(struct page *page, pte_t saved_pte);
+-
+ /*
+  * The following functions are already defined by <linux/highmem.h>
+  * when CONFIG_HIGHMEM is not set.
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index ac6a361..809f1bf 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -17,6 +17,7 @@
+ #include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/highmem.h>
+ 
+ #include <asm/memory.h>
+ #include <asm/highmem.h>
+@@ -480,10 +481,10 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 				op(vaddr, len, dir);
+ 				kunmap_high(page);
+ 			} else if (cache_is_vipt()) {
+-				pte_t saved_pte;
+-				vaddr = kmap_high_l1_vipt(page, &saved_pte);
++				/* unmapped pages might still be cached */
++				vaddr = kmap_atomic(page);
+ 				op(vaddr + offset, len, dir);
+-				kunmap_high_l1_vipt(page, saved_pte);
++				kunmap_atomic(vaddr);
+ 			}
+ 		} else {
+ 			vaddr = page_address(page) + offset;
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 391ffae..c29f283 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -10,6 +10,7 @@
+ #include <linux/module.h>
+ #include <linux/mm.h>
+ #include <linux/pagemap.h>
++#include <linux/highmem.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cachetype.h>
+@@ -180,10 +181,10 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+ 			kunmap_high(page);
+ 		} else if (cache_is_vipt()) {
+-			pte_t saved_pte;
+-			addr = kmap_high_l1_vipt(page, &saved_pte);
++			/* unmapped pages might still be cached */
++			addr = kmap_atomic(page);
+ 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+-			kunmap_high_l1_vipt(page, saved_pte);
++			kunmap_atomic(addr);
+ 		}
+ 	}
+ 
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index c435fd9..807c057 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -140,90 +140,3 @@ struct page *kmap_atomic_to_page(const void *ptr)
+ 	pte = TOP_PTE(vaddr);
+ 	return pte_page(*pte);
+ }
+-
+-#ifdef CONFIG_CPU_CACHE_VIPT
+-
+-#include <linux/percpu.h>
+-
+-/*
+- * The VIVT cache of a highmem page is always flushed before the page
+- * is unmapped. Hence unmapped highmem pages need no cache maintenance
+- * in that case.
+- *
+- * However unmapped pages may still be cached with a VIPT cache, and
+- * it is not possible to perform cache maintenance on them using physical
+- * addresses unfortunately.  So we have no choice but to set up a temporary
+- * virtual mapping for that purpose.
+- *
+- * Yet this VIPT cache maintenance may be triggered from DMA support
+- * functions which are possibly called from interrupt context. As we don't
+- * want to keep interrupt disabled all the time when such maintenance is
+- * taking place, we therefore allow for some reentrancy by preserving and
+- * restoring the previous fixmap entry before the interrupted context is
+- * resumed.  If the reentrancy depth is 0 then there is no need to restore
+- * the previous fixmap, and leaving the current one in place allow it to
+- * be reused the next time without a TLB flush (common with DMA).
+- */
+-
+-static DEFINE_PER_CPU(int, kmap_high_l1_vipt_depth);
+-
+-void *kmap_high_l1_vipt(struct page *page, pte_t *saved_pte)
+-{
+-	unsigned int idx, cpu;
+-	int *depth;
+-	unsigned long vaddr, flags;
+-	pte_t pte, *ptep;
+-
+-	if (!in_interrupt())
+-		preempt_disable();
+-
+-	cpu = smp_processor_id();
+-	depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
+-
+-	idx = KM_L1_CACHE + KM_TYPE_NR * cpu;
+-	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+-	ptep = TOP_PTE(vaddr);
+-	pte = mk_pte(page, kmap_prot);
+-
+-	raw_local_irq_save(flags);
+-	(*depth)++;
+-	if (pte_val(*ptep) == pte_val(pte)) {
+-		*saved_pte = pte;
+-	} else {
+-		*saved_pte = *ptep;
+-		set_pte_ext(ptep, pte, 0);
+-		local_flush_tlb_kernel_page(vaddr);
+-	}
+-	raw_local_irq_restore(flags);
+-
+-	return (void *)vaddr;
+-}
+-
+-void kunmap_high_l1_vipt(struct page *page, pte_t saved_pte)
+-{
+-	unsigned int idx, cpu = smp_processor_id();
+-	int *depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
+-	unsigned long vaddr, flags;
+-	pte_t pte, *ptep;
+-
+-	idx = KM_L1_CACHE + KM_TYPE_NR * cpu;
+-	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+-	ptep = TOP_PTE(vaddr);
+-	pte = mk_pte(page, kmap_prot);
+-
+-	BUG_ON(pte_val(*ptep) != pte_val(pte));
+-	BUG_ON(*depth <= 0);
+-
+-	raw_local_irq_save(flags);
+-	(*depth)--;
+-	if (*depth != 0 && pte_val(pte) != pte_val(saved_pte)) {
+-		set_pte_ext(ptep, saved_pte, 0);
+-		local_flush_tlb_kernel_page(vaddr);
+-	}
+-	raw_local_irq_restore(flags);
+-
+-	if (!in_interrupt())
+-		preempt_enable();
+-}
+-
+-#endif  /* CONFIG_CPU_CACHE_VIPT */
+-- 
+1.7.3.2.193.g78bbb
