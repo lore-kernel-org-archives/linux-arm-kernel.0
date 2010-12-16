@@ -1,70 +1,110 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Thu, 16 Dec 2010 00:47:54 -0600
-Subject: [PATCH v4 0/5] omap: mailbox: hwmod support
-Message-ID: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
+Date: Thu, 16 Dec 2010 00:47:56 -0600
+Subject: [PATCH v4 2/5] OMAP3: hwmod data: add mailbox data
+In-Reply-To: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
+References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1292482079-2226-3-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on 3430, based of pm-core branch. Patches affecting mailbox code
-may require rebase once the mailbox git pull is made.
+From: Felipe Contreras <felipe.contreras@gmail.com>
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39719.html
+Mailbox hwmod data for omap3.
 
-** v4 **
-- Merged device latency info with previous patch in series.
-- Removed usage of omap_device_enable_clocks and replaced for
-  omap_device_[enable|disable]_hwmods to handle sysc setup and
-  clocks.
-- Fixed pm_runtime usage by adding its enable/disable functions,
-  and now handling sysc register with it, because of changes in
-  device latency functions.
-- For pm_runtime, instead of adding a global variable to make use
-  of pdev->dev, use 'parent' inside of 'dev' returned by device_create
-  and which is stored inside omap_mbox struct, in future cleanup consider
-  cleaning omap_mbox struct. 
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   71 ++++++++++++++++++++++++++++
+ 1 files changed, 71 insertions(+), 0 deletions(-)
 
-** v3 **
-- Taken mailbox hwmod as is from Benoit original branch.
-- Put back numbers for irq, addresses instead of considering them
- as magic numbers.
-- Follow the declaration layout for omap4 hwmods.
-- Using pm_runtime to enable the clocks.
-
-** v2 **
-- Added omap4 hwmod support.
-- Moved "mailbox_ick" from hwmod to hwmod_if (omap 2/3)
-- Declared sysc classes for omap 2/3
-
-** v1 **
-1. omap: mailbox: initial hwmod support for omap3
-Changes were made to:
-- Rebase to latest code.
-- Detect the hwmod by filling prcm union for omap2, without
- this it was unable to build the hwmod at runtime.
-- Replace magic number for defines.
-- Use ioremap again instead of relying on the one made by hwmod,
- as noted in http://patchwork.kernel.org/patch/101661/
-
-2. omap: mailbox: initial hwmod support for omap2
-Was only compiled tested!! Unfortunately I don't have the HW for it.
-
-Benoit Cousson (1):
-  OMAP4: hwmod data: add mailbox data
-
-Felipe Contreras (2):
-  OMAP3: hwmod data: add mailbox data
-  OMAP: mailbox: build device using omap_device/omap_hwmod
-
-Omar Ramirez Luna (1):
-  OMAP: mailbox: use runtime pm for clk and sysc handling
-
-omar ramirez (1):
-  OMAP2: hwmod data: add mailbox data
-
- arch/arm/mach-omap2/devices.c              |  102 ++++++----------------------
- arch/arm/mach-omap2/mailbox.c              |   27 ++------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |   73 ++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |   72 +++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   71 +++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   67 ++++++++++++++++++
- 6 files changed, 308 insertions(+), 104 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 8eb81b4..9ce347e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1089,6 +1089,74 @@ static struct omap_hwmod omap3xxx_gpio6_hwmod = {
+ 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_gpio6_slaves),
+ 	.class		= &omap3xxx_gpio_hwmod_class,
+ 	.dev_attr	= &gpio_dev_attr,
++	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++};
++
++/*
++ * 'mailbox' class
++ * mailbox module allowing communication between the on-chip processors
++ * using a queued mailbox-interrupt mechanism.
++ */
++
++static struct omap_hwmod_class_sysconfig omap3xxx_mailbox_sysc = {
++	.rev_offs	= 0x000,
++	.sysc_offs	= 0x010,
++	.syss_offs	= 0x014,
++	.sysc_flags	= (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
++				SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
++	.sysc_fields	= &omap_hwmod_sysc_type1,
++};
++
++static struct omap_hwmod_class omap3xxx_mailbox_hwmod_class = {
++	.name = "mailbox",
++	.sysc = &omap3xxx_mailbox_sysc,
++};
++
++static struct omap_hwmod omap3xxx_mailbox_hwmod;
++static struct omap_hwmod_irq_info omap3xxx_mailbox_irqs[] = {
++	{ .name = "dsp", .irq = 26, },
++};
++
++static struct omap_hwmod_addr_space omap3xxx_mailbox_addrs[] = {
++	{
++		.pa_start	= 0x48094000,
++		.pa_end		= 0x480941ff,
++		.flags		= ADDR_TYPE_RT,
++	},
++};
++
++/* l4_core -> mailbox */
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__mailbox = {
++	.master		= &omap3xxx_l4_core_hwmod,
++	.slave		= &omap3xxx_mailbox_hwmod,
++	.clk		= "mailboxes_ick",
++	.addr		= omap3xxx_mailbox_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap3xxx_mailbox_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* mailbox slave ports */
++static struct omap_hwmod_ocp_if *omap3xxx_mailbox_slaves[] = {
++	&omap3xxx_l4_core__mailbox,
++};
++
++static struct omap_hwmod omap3xxx_mailbox_hwmod = {
++	.name		= "mailbox",
++	.class		= &omap3xxx_mailbox_hwmod_class,
++	.mpu_irqs	= omap3xxx_mailbox_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_mailbox_irqs),
++	.prcm		= {
++		.omap2 = {
++			.prcm_reg_id = 1,
++			.module_bit = OMAP3430_EN_MAILBOXES_SHIFT,
++			.module_offs = CORE_MOD,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP3430_ST_MAILBOXES_SHIFT,
++		},
++	},
++	.slaves		= omap3xxx_mailbox_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap3xxx_mailbox_slaves),
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+ };
+ 
+@@ -1115,6 +1183,9 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 	&omap3xxx_gpio4_hwmod,
+ 	&omap3xxx_gpio5_hwmod,
+ 	&omap3xxx_gpio6_hwmod,
++
++	/* mailbox class */
++	&omap3xxx_mailbox_hwmod,
+ 	NULL,
+ };
+ 
+-- 
+1.7.1
