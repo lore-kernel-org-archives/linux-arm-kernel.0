@@ -1,189 +1,192 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 16 Dec 2010 16:05:35 -0500
-Subject: [PATCH 1/3] ARM: get rid of kmap_high_l1_vipt()
+Date: Thu, 16 Dec 2010 16:05:36 -0500
+Subject: [PATCH 2/3] ARM: fix cache-xsc3l2 after stack based kmap_atomic()
 In-Reply-To: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
 References: <1292533537-26760-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1292533537-26760-2-git-send-email-nico@fluxnic.net>
+Message-ID: <1292533537-26760-3-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 3e4d3af501 "mm: stack based kmap_atomic()", it is no longer
-necessary to carry an ad hoc version of kmap_atomic() added in commit
-7e5a69e83b "ARM: 6007/1: fix highmem with VIPT cache and DMA" to cope
-with reentrancy.
+Since commit 3e4d3af501 "mm: stack based kmap_atomic()", it is actively
+wrong to rely on fixed kmap type indices (namely KM_L2_CACHE) as
+kmap_atomic() totally ignores them and a concurrent instance of it may
+happily reuse any slot for any purpose.  Because kmap_atomic() is now
+able to deal with reentrancy, we can get rid of the ad hoc mapping here,
+and we even don't have to disable IRQs anymore (highmem case).
 
-In fact, it is now actively wrong to rely on fixed kmap type indices
-(namely KM_L1_CACHE) as kmap_atomic() totally ignores them now and a
-concurrent instance of it may reuse any slot for any purpose.
+While the code is made much simpler, there is a needless cache flush
+introduced by the usage of __kunmap_atomic().  It is not clear if the
+performance difference to remove that is worth the cost in code
+maintenance (I don't think there are that many highmem users on that
+platform if at all anyway).
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/include/asm/highmem.h |    3 -
- arch/arm/mm/dma-mapping.c      |    7 ++-
- arch/arm/mm/flush.c            |    7 ++-
- arch/arm/mm/highmem.c          |   87 ----------------------------------------
- 4 files changed, 8 insertions(+), 96 deletions(-)
+ arch/arm/mm/cache-xsc3l2.c |   57 ++++++++++++++++---------------------------
+ 1 files changed, 21 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
-index 1fc684e..7080e2c 100644
---- a/arch/arm/include/asm/highmem.h
-+++ b/arch/arm/include/asm/highmem.h
-@@ -25,9 +25,6 @@ extern void *kmap_high(struct page *page);
- extern void *kmap_high_get(struct page *page);
- extern void kunmap_high(struct page *page);
- 
--extern void *kmap_high_l1_vipt(struct page *page, pte_t *saved_pte);
--extern void kunmap_high_l1_vipt(struct page *page, pte_t saved_pte);
--
- /*
-  * The following functions are already defined by <linux/highmem.h>
-  * when CONFIG_HIGHMEM is not set.
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ac6a361..809f1bf 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -17,6 +17,7 @@
+diff --git a/arch/arm/mm/cache-xsc3l2.c b/arch/arm/mm/cache-xsc3l2.c
+index c315492..5a32020 100644
+--- a/arch/arm/mm/cache-xsc3l2.c
++++ b/arch/arm/mm/cache-xsc3l2.c
+@@ -17,14 +17,10 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  */
  #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/dma-mapping.h>
 +#include <linux/highmem.h>
- 
- #include <asm/memory.h>
- #include <asm/highmem.h>
-@@ -480,10 +481,10 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
- 				op(vaddr, len, dir);
- 				kunmap_high(page);
- 			} else if (cache_is_vipt()) {
--				pte_t saved_pte;
--				vaddr = kmap_high_l1_vipt(page, &saved_pte);
-+				/* unmapped pages might still be cached */
-+				vaddr = kmap_atomic(page);
- 				op(vaddr + offset, len, dir);
--				kunmap_high_l1_vipt(page, saved_pte);
-+				kunmap_atomic(vaddr);
- 			}
- 		} else {
- 			vaddr = page_address(page) + offset;
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 391ffae..c29f283 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -10,6 +10,7 @@
- #include <linux/module.h>
- #include <linux/mm.h>
- #include <linux/pagemap.h>
-+#include <linux/highmem.h>
- 
+ #include <asm/system.h>
+ #include <asm/cputype.h>
  #include <asm/cacheflush.h>
- #include <asm/cachetype.h>
-@@ -180,10 +181,10 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
- 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
- 			kunmap_high(page);
- 		} else if (cache_is_vipt()) {
--			pte_t saved_pte;
--			addr = kmap_high_l1_vipt(page, &saved_pte);
-+			/* unmapped pages might still be cached */
-+			addr = kmap_atomic(page);
- 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
--			kunmap_high_l1_vipt(page, saved_pte);
-+			kunmap_atomic(addr);
- 		}
+-#include <asm/kmap_types.h>
+-#include <asm/fixmap.h>
+-#include <asm/pgtable.h>
+-#include <asm/tlbflush.h>
+-#include "mm.h"
+ 
+ #define CR_L2	(1 << 26)
+ 
+@@ -71,16 +67,15 @@ static inline void xsc3_l2_inv_all(void)
+ 	dsb();
+ }
+ 
++static inline void l2_unmap_va(unsigned long va)
++{
+ #ifdef CONFIG_HIGHMEM
+-#define l2_map_save_flags(x)		raw_local_save_flags(x)
+-#define l2_map_restore_flags(x)		raw_local_irq_restore(x)
+-#else
+-#define l2_map_save_flags(x)		((x) = 0)
+-#define l2_map_restore_flags(x)		((void)(x))
++	if (va != -1)
++		kunmap_atomic((void *)va);
+ #endif
++}
+ 
+-static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va,
+-				      unsigned long flags)
++static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va)
+ {
+ #ifdef CONFIG_HIGHMEM
+ 	unsigned long va = prev_va & PAGE_MASK;
+@@ -89,17 +84,10 @@ static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va,
+ 		/*
+ 		 * Switching to a new page.  Because cache ops are
+ 		 * using virtual addresses only, we must put a mapping
+-		 * in place for it.  We also enable interrupts for a
+-		 * short while and disable them again to protect this
+-		 * mapping.
++		 * in place for it.
+ 		 */
+-		unsigned long idx;
+-		raw_local_irq_restore(flags);
+-		idx = KM_L2_CACHE + KM_TYPE_NR * smp_processor_id();
+-		va = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+-		raw_local_irq_restore(flags | PSR_I_BIT);
+-		set_pte_ext(TOP_PTE(va), pfn_pte(pa >> PAGE_SHIFT, PAGE_KERNEL), 0);
+-		local_flush_tlb_kernel_page(va);
++		l2_unmap_va(prev_va);
++		va = (unsigned long)kmap_atomic_pfn(pa >> PAGE_SHIFT);
+ 	}
+ 	return va + (pa_offset >> (32 - PAGE_SHIFT));
+ #else
+@@ -109,7 +97,7 @@ static inline unsigned long l2_map_va(unsigned long pa, unsigned long prev_va,
+ 
+ static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
+ {
+-	unsigned long vaddr, flags;
++	unsigned long vaddr;
+ 
+ 	if (start == 0 && end == -1ul) {
+ 		xsc3_l2_inv_all();
+@@ -117,13 +105,12 @@ static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
  	}
  
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index c435fd9..807c057 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -140,90 +140,3 @@ struct page *kmap_atomic_to_page(const void *ptr)
- 	pte = TOP_PTE(vaddr);
- 	return pte_page(*pte);
+ 	vaddr = -1;  /* to force the first mapping */
+-	l2_map_save_flags(flags);
+ 
+ 	/*
+ 	 * Clean and invalidate partial first cache line.
+ 	 */
+ 	if (start & (CACHE_LINE_SIZE - 1)) {
+-		vaddr = l2_map_va(start & ~(CACHE_LINE_SIZE - 1), vaddr, flags);
++		vaddr = l2_map_va(start & ~(CACHE_LINE_SIZE - 1), vaddr);
+ 		xsc3_l2_clean_mva(vaddr);
+ 		xsc3_l2_inv_mva(vaddr);
+ 		start = (start | (CACHE_LINE_SIZE - 1)) + 1;
+@@ -133,7 +120,7 @@ static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
+ 	 * Invalidate all full cache lines between 'start' and 'end'.
+ 	 */
+ 	while (start < (end & ~(CACHE_LINE_SIZE - 1))) {
+-		vaddr = l2_map_va(start, vaddr, flags);
++		vaddr = l2_map_va(start, vaddr);
+ 		xsc3_l2_inv_mva(vaddr);
+ 		start += CACHE_LINE_SIZE;
+ 	}
+@@ -142,31 +129,30 @@ static void xsc3_l2_inv_range(unsigned long start, unsigned long end)
+ 	 * Clean and invalidate partial last cache line.
+ 	 */
+ 	if (start < end) {
+-		vaddr = l2_map_va(start, vaddr, flags);
++		vaddr = l2_map_va(start, vaddr);
+ 		xsc3_l2_clean_mva(vaddr);
+ 		xsc3_l2_inv_mva(vaddr);
+ 	}
+ 
+-	l2_map_restore_flags(flags);
++	l2_unmap_va(vaddr);
+ 
+ 	dsb();
  }
--
--#ifdef CONFIG_CPU_CACHE_VIPT
--
--#include <linux/percpu.h>
--
--/*
-- * The VIVT cache of a highmem page is always flushed before the page
-- * is unmapped. Hence unmapped highmem pages need no cache maintenance
-- * in that case.
-- *
-- * However unmapped pages may still be cached with a VIPT cache, and
-- * it is not possible to perform cache maintenance on them using physical
-- * addresses unfortunately.  So we have no choice but to set up a temporary
-- * virtual mapping for that purpose.
-- *
-- * Yet this VIPT cache maintenance may be triggered from DMA support
-- * functions which are possibly called from interrupt context. As we don't
-- * want to keep interrupt disabled all the time when such maintenance is
-- * taking place, we therefore allow for some reentrancy by preserving and
-- * restoring the previous fixmap entry before the interrupted context is
-- * resumed.  If the reentrancy depth is 0 then there is no need to restore
-- * the previous fixmap, and leaving the current one in place allow it to
-- * be reused the next time without a TLB flush (common with DMA).
-- */
--
--static DEFINE_PER_CPU(int, kmap_high_l1_vipt_depth);
--
--void *kmap_high_l1_vipt(struct page *page, pte_t *saved_pte)
--{
--	unsigned int idx, cpu;
--	int *depth;
+ 
+ static void xsc3_l2_clean_range(unsigned long start, unsigned long end)
+ {
 -	unsigned long vaddr, flags;
--	pte_t pte, *ptep;
--
--	if (!in_interrupt())
--		preempt_disable();
--
--	cpu = smp_processor_id();
--	depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
--
--	idx = KM_L1_CACHE + KM_TYPE_NR * cpu;
--	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
--	ptep = TOP_PTE(vaddr);
--	pte = mk_pte(page, kmap_prot);
--
--	raw_local_irq_save(flags);
--	(*depth)++;
--	if (pte_val(*ptep) == pte_val(pte)) {
--		*saved_pte = pte;
--	} else {
--		*saved_pte = *ptep;
--		set_pte_ext(ptep, pte, 0);
--		local_flush_tlb_kernel_page(vaddr);
--	}
--	raw_local_irq_restore(flags);
--
--	return (void *)vaddr;
--}
--
--void kunmap_high_l1_vipt(struct page *page, pte_t saved_pte)
--{
--	unsigned int idx, cpu = smp_processor_id();
--	int *depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
++	unsigned long vaddr;
+ 
+ 	vaddr = -1;  /* to force the first mapping */
+-	l2_map_save_flags(flags);
+ 
+ 	start &= ~(CACHE_LINE_SIZE - 1);
+ 	while (start < end) {
+-		vaddr = l2_map_va(start, vaddr, flags);
++		vaddr = l2_map_va(start, vaddr);
+ 		xsc3_l2_clean_mva(vaddr);
+ 		start += CACHE_LINE_SIZE;
+ 	}
+ 
+-	l2_map_restore_flags(flags);
++	l2_unmap_va(vaddr);
+ 
+ 	dsb();
+ }
+@@ -193,7 +179,7 @@ static inline void xsc3_l2_flush_all(void)
+ 
+ static void xsc3_l2_flush_range(unsigned long start, unsigned long end)
+ {
 -	unsigned long vaddr, flags;
--	pte_t pte, *ptep;
--
--	idx = KM_L1_CACHE + KM_TYPE_NR * cpu;
--	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
--	ptep = TOP_PTE(vaddr);
--	pte = mk_pte(page, kmap_prot);
--
--	BUG_ON(pte_val(*ptep) != pte_val(pte));
--	BUG_ON(*depth <= 0);
--
--	raw_local_irq_save(flags);
--	(*depth)--;
--	if (*depth != 0 && pte_val(pte) != pte_val(saved_pte)) {
--		set_pte_ext(ptep, saved_pte, 0);
--		local_flush_tlb_kernel_page(vaddr);
--	}
--	raw_local_irq_restore(flags);
--
--	if (!in_interrupt())
--		preempt_enable();
--}
--
--#endif  /* CONFIG_CPU_CACHE_VIPT */
++	unsigned long vaddr;
+ 
+ 	if (start == 0 && end == -1ul) {
+ 		xsc3_l2_flush_all();
+@@ -201,17 +187,16 @@ static void xsc3_l2_flush_range(unsigned long start, unsigned long end)
+ 	}
+ 
+ 	vaddr = -1;  /* to force the first mapping */
+-	l2_map_save_flags(flags);
+ 
+ 	start &= ~(CACHE_LINE_SIZE - 1);
+ 	while (start < end) {
+-		vaddr = l2_map_va(start, vaddr, flags);
++		vaddr = l2_map_va(start, vaddr);
+ 		xsc3_l2_clean_mva(vaddr);
+ 		xsc3_l2_inv_mva(vaddr);
+ 		start += CACHE_LINE_SIZE;
+ 	}
+ 
+-	l2_map_restore_flags(flags);
++	l2_unmap_va(vaddr);
+ 
+ 	dsb();
+ }
 -- 
 1.7.3.2.193.g78bbb
