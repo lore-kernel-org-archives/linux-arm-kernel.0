@@ -1,30 +1,64 @@
-From: darkstar6262@gmail.com (Cory Maccarrone)
-Date: Thu, 16 Dec 2010 14:16:28 -0800
-Subject: [PATCH] OMAP1: clock_data: use runtime cpu / machine checks
-In-Reply-To: <alpine.DEB.2.00.1012130220430.15971@utopia.booyaka.com>
-References: <201012112150.33831.jkrzyszt@tis.icnet.pl>
-	<alpine.DEB.2.00.1012130220430.15971@utopia.booyaka.com>
-Message-ID: <AANLkTik88QZoNeCKZwUYDjq6oEiiyZE+_fmo+YoE+f85@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Thu, 16 Dec 2010 17:09:48 -0600
+Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
+In-Reply-To: <20101216113407.GO9937@n2100.arm.linux.org.uk>
+References: <AANLkTinM524ozYQhHSpCN49LvZLePO6faHJrqxKBtyJe@mail.gmail.com>
+	<20101216113407.GO9937@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikJFdxbXjvWUMmEXoAG4xR8G9jq30ox90Bo4SWe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 1:24 AM, Paul Walmsley <paul@pwsan.com> wrote:
+On Thu, Dec 16, 2010 at 5:34 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 >
-> Hello Janusz, Cory,
->
-> On Sat, 11 Dec 2010, Janusz Krzysztofik wrote:
->
-> > Otherwise multi-omap1 configurations may set wrong clock speed.
+> On Wed, Dec 15, 2010 at 05:45:13PM -0600, Andrei Warkentin wrote:
+> > This is my first time on linux-arm-kernel, and while I've read the
+> > FAQ, hopefully I don't screw up too badly :).
 > >
-> > Created and tested against l-o master on Amstrad Delta.
-> >
-> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> > Anyway, we're on a dual-core ARMv7 running 2.6.36, and during
+> > stability stress testing saw the following:
+> > 1) After a number hotplug iterations, CPU1 fails to set its online bit
+> > quickly enough and __cpu_up() times-out.
+> > 2) CPU1 eventually completes its startup and sets the bit, however,
+> > since _cpu_up() failed, CPU1's active bit is never set.
 >
-> Thanks, this is a significant step forward in building a good
-> omap1_defconfig. ?Cory, do you mind testing this out? ?If it works for you
-> also, let's plan to take this for 2.6.38.
+> Why is your CPU taking soo long to come up? ?We wait one second in the
+> generic code, which is the time taken from the platform code being happy
+> that it has successfully started the CPU. ?Normally, platforms wait an
+> additional second to detect the CPU entering the kernel.
+
+It seems twd_calibrate_rate is the culprit (although in our case,
+since the clock is the same to both CPUs, there is no point in
+calibrating).
+We've seen this only when the device was under stress test load.
+
+>
+> > 2) Additionally I ensure that if the CPU comes up later than it were
+> > supposed to (shouldn't, but...), then it will not start initializing
+> > behind cpu_up's back (which is not really undoable). This solves the
+> > problem with both cpu_up+secondary_start_kernel races and with
+> > platform_cpu_kill+secondary_start_kernel races.
+>
+> Why would you have platform_cpu_kill() running at the same time - firstly,
+> hotplug events are serialized, and secondly the platform_cpu_kill() path
+> should wait up to five seconds for the CPU to go offline. ?If it doesn't
+> go offline within five seconds it's dead (and maybe we should mark it
+> not present.)
 >
 
-Sure, no problem, I'll add it to my testing queue.
+That's the platform_cpu_kill I invoke when I time out waiting for the
+online bit. Sorry, wasn't being clear. Just trying
+to show I didn't introduce any races :).
 
-- Cory
+See, the SMP logic is sensitive to system load at the moment. Since
+boot_secondary is supposed to return failure on failing
+to up the secondary, maybe there is no point doing a timed wait for
+the online bit, since you are guaranteed to get there.
+But right now, you end up in a situation where there is a timeout, but
+the CPU is up and running and registered.
+And this causes bad behavior later when you try to down it.
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
