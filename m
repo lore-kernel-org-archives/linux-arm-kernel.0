@@ -1,264 +1,148 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Wed, 15 Dec 2010 22:54:16 -0800
-Subject: [PATCH v5 5/5] msm: add SMP support for msm
-In-Reply-To: <1292482456-22690-1-git-send-email-johlstei@codeaurora.org>
-References: <1292482456-22690-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1292482456-22690-6-git-send-email-johlstei@codeaurora.org>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Thu, 16 Dec 2010 00:47:58 -0600
+Subject: [PATCH v4 4/5] OMAP: mailbox: build device using
+	omap_device/omap_hwmod
+In-Reply-To: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
+References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1292482079-2226-5-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
----
- arch/arm/mach-msm/Kconfig   |    1 +
- arch/arm/mach-msm/Makefile  |    1 +
- arch/arm/mach-msm/headsmp.S |   40 ++++++++++
- arch/arm/mach-msm/platsmp.c |  166 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 208 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/headsmp.S
- create mode 100644 arch/arm/mach-msm/platsmp.c
+From: Felipe Contreras <felipe.contreras@gmail.com>
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index ab5338f..8c57425 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -40,6 +40,7 @@ config ARCH_MSM8X60
- 	bool "MSM8X60"
- 	select MACH_MSM8X60_SURF if (!MACH_MSM8X60_RUMI3 && !MACH_MSM8X60_SIM \
- 				  && !MACH_MSM8X60_FFA)
-+	select ARCH_MSM_SCORPIONMP
- 	select ARM_GIC
- 	select CPU_V7
- 	select MSM_V2_TLMM
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 7a11b4a..1945f9c 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
- obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
+Remove static platform_device and resource data within
+omap mailbox driver; use the one defined in the hwmod
+database along with omap_device framework for device
+build and registration.
+
+Add device latency functions to be used, so clock can be
+enabled and sysconfig is configured.
+
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ arch/arm/mach-omap2/devices.c |  102 ++++++++---------------------------------
+ 1 files changed, 20 insertions(+), 82 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index b5cafd3..7493c30 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -142,95 +142,33 @@ static inline void omap_init_camera(void)
+ #endif
  
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-+obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+ #if defined(CONFIG_OMAP_MBOX_FWK) || defined(CONFIG_OMAP_MBOX_FWK_MODULE)
+-
+-#define MBOX_REG_SIZE   0x120
+-
+-#ifdef CONFIG_ARCH_OMAP2
+-static struct resource omap2_mbox_resources[] = {
+-	{
+-		.start		= OMAP24XX_MAILBOX_BASE,
+-		.end		= OMAP24XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+-		.flags		= IORESOURCE_MEM,
+-	},
+-	{
+-		.start		= INT_24XX_MAIL_U0_MPU,
+-		.flags		= IORESOURCE_IRQ,
+-		.name		= "dsp",
+-	},
+-	{
+-		.start		= INT_24XX_MAIL_U3_MPU,
+-		.flags		= IORESOURCE_IRQ,
+-		.name		= "iva",
+-	},
+-};
+-static int omap2_mbox_resources_sz = ARRAY_SIZE(omap2_mbox_resources);
+-#else
+-#define omap2_mbox_resources		NULL
+-#define omap2_mbox_resources_sz		0
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP3
+-static struct resource omap3_mbox_resources[] = {
+-	{
+-		.start		= OMAP34XX_MAILBOX_BASE,
+-		.end		= OMAP34XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+-		.flags		= IORESOURCE_MEM,
+-	},
+-	{
+-		.start		= INT_24XX_MAIL_U0_MPU,
+-		.flags		= IORESOURCE_IRQ,
+-		.name		= "dsp",
+-	},
+-};
+-static int omap3_mbox_resources_sz = ARRAY_SIZE(omap3_mbox_resources);
+-#else
+-#define omap3_mbox_resources		NULL
+-#define omap3_mbox_resources_sz		0
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP4
+-
+-#define OMAP4_MBOX_REG_SIZE	0x130
+-static struct resource omap4_mbox_resources[] = {
+-	{
+-		.start          = OMAP44XX_MAILBOX_BASE,
+-		.end            = OMAP44XX_MAILBOX_BASE +
+-					OMAP4_MBOX_REG_SIZE - 1,
+-		.flags          = IORESOURCE_MEM,
+-	},
+-	{
+-		.start          = OMAP44XX_IRQ_MAIL_U0,
+-		.flags          = IORESOURCE_IRQ,
+-		.name		= "mbox",
++static struct omap_device_pm_latency mbox_latencies[] = {
++	[0] = {
++		.activate_func = omap_device_enable_hwmods,
++		.deactivate_func = omap_device_idle_hwmods,
++		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+ 	},
+ };
+-static int omap4_mbox_resources_sz = ARRAY_SIZE(omap4_mbox_resources);
+-#else
+-#define omap4_mbox_resources		NULL
+-#define omap4_mbox_resources_sz		0
+-#endif
+-
+-static struct platform_device mbox_device = {
+-	.name		= "omap-mailbox",
+-	.id		= -1,
+-};
  
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
-diff --git a/arch/arm/mach-msm/headsmp.S b/arch/arm/mach-msm/headsmp.S
-new file mode 100644
-index 0000000..d0c2143
---- /dev/null
-+++ b/arch/arm/mach-msm/headsmp.S
-@@ -0,0 +1,40 @@
-+/*
-+ *  linux/arch/arm/mach-realview/headsmp.S
-+ *
-+ *  Copyright (c) 2003 ARM Limited
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/linkage.h>
-+#include <linux/init.h>
+ static inline void omap_init_mbox(void)
+ {
+-	if (cpu_is_omap24xx()) {
+-		mbox_device.resource = omap2_mbox_resources;
+-		mbox_device.num_resources = omap2_mbox_resources_sz;
+-	} else if (cpu_is_omap34xx()) {
+-		mbox_device.resource = omap3_mbox_resources;
+-		mbox_device.num_resources = omap3_mbox_resources_sz;
+-	} else if (cpu_is_omap44xx()) {
+-		mbox_device.resource = omap4_mbox_resources;
+-		mbox_device.num_resources = omap4_mbox_resources_sz;
+-	} else {
+-		pr_err("%s: platform not supported\n", __func__);
++	struct omap_hwmod *oh;
++	struct omap_device *od;
 +
-+	__INIT
-+
-+/*
-+ * MSM specific entry point for secondary CPUs.  This provides
-+ * a "holding pen" into which all secondary cores are held until we're
-+ * ready for them to initialise.
-+ */
-+ENTRY(msm_secondary_startup)
-+	mrc	p15, 0, r0, c0, c0, 5
-+	and	r0, r0, #15
-+	adr	r4, 1f
-+	ldmia	r4, {r5, r6}
-+	sub	r4, r4, r5
-+	add	r6, r6, r4
-+pen:	ldr	r7, [r6]
-+	cmp	r7, r0
-+	bne	pen
-+
-+	/*
-+	 * we've been released from the holding pen: secondary_stack
-+	 * should now contain the SVC stack for this core
-+	 */
-+	b	secondary_startup
-+
-+	.align
-+1:	.long	.
-+	.long	pen_release
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-new file mode 100644
-index 0000000..83a1f3f
---- /dev/null
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -0,0 +1,166 @@
-+/*
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
-+ *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/errno.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/jiffies.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+
-+#include <asm/hardware/gic.h>
-+#include <asm/cacheflush.h>
-+#include <asm/mach-types.h>
-+
-+#include <mach/msm_iomap.h>
-+
-+#include "scm-boot.h"
-+
-+#define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
-+#define SCSS_CPU1CORE_RESET 0xD80
-+#define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
-+
-+/* Mask for edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
-+#define GIC_PPI_EDGE_MASK 0xFFFFD7FF
-+
-+extern void msm_secondary_startup(void);
-+/*
-+ * control for which core is the next to come out of the secondary
-+ * boot "holding pen".
-+ */
-+volatile int pen_release = -1;
-+
-+static DEFINE_SPINLOCK(boot_lock);
-+
-+void __cpuinit platform_secondary_init(unsigned int cpu)
-+{
-+	/* Configure edge-triggered PPIs */
-+	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
-+	/*
-+	 * if any interrupts are already enabled for the primary
-+	 * core (e.g. timer irq), then they will not have been enabled
-+	 * for us: do so
-+	 */
-+	gic_secondary_init(0);
-+
-+	/*
-+	 * let the primary processor know we're out of the
-+	 * pen, then head off into the C entry point
-+	 */
-+	pen_release = -1;
-+	smp_wmb();
-+
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
-+}
-+
-+static __init void prepare_cold_cpu(unsigned int cpu)
-+{
-+	int ret;
-+	ret = scm_set_boot_addr((void *)
-+				virt_to_phys(msm_secondary_startup),
-+				SCM_FLAG_COLDBOOT_CPU1);
-+	if (ret == 0) {
-+		void *sc1_base_ptr;
-+		sc1_base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
-+		if (sc1_base_ptr) {
-+			writel(0, sc1_base_ptr + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
-+			writel(0, sc1_base_ptr + SCSS_CPU1CORE_RESET);
-+			writel(3, sc1_base_ptr + SCSS_DBG_STATUS_CORE_PWRDUP);
-+			iounmap(sc1_base_ptr);
-+		}
-+	} else
-+		printk(KERN_DEBUG "Failed to set secondary core boot "
-+				  "address\n");
-+}
-+
-+int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	unsigned long timeout;
-+	static int cold_boot_done;
-+
-+	/* Only need to bring cpu out of reset this way once */
-+	if (cold_boot_done == false) {
-+		prepare_cold_cpu(cpu);
-+		cold_boot_done = true;
++	oh = omap_hwmod_lookup("mailbox");
++	if (!oh) {
++		pr_err("%s: unable to find hwmod\n", __func__);
++		return;
 +	}
 +
-+	/*
-+	 * set synchronisation state between this boot processor
-+	 * and the secondary one
-+	 */
-+	spin_lock(&boot_lock);
-+
-+	/*
-+	 * The secondary processor is waiting to be released from
-+	 * the holding pen - release it, then wait for it to flag
-+	 * that it has been released by resetting pen_release.
-+	 *
-+	 * Note that "pen_release" is the hardware CPU ID, whereas
-+	 * "cpu" is Linux's internal ID.
-+	 */
-+	pen_release = cpu;
-+	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
-+	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
-+
-+	/*
-+	 * Send the secondary CPU a soft interrupt, thereby causing
-+	 * the boot monitor to read the system wide flags register,
-+	 * and branch to the address found there.
-+	 */
-+	smp_cross_call(cpumask_of(cpu), 1);
-+
-+	timeout = jiffies + (1 * HZ);
-+	while (time_before(jiffies, timeout)) {
-+		smp_rmb();
-+		if (pen_release == -1)
-+			break;
-+
-+		udelay(10);
-+	}
-+
-+	/*
-+	 * now the secondary core is starting up let it run its
-+	 * calibrations, then wait for it to finish
-+	 */
-+	spin_unlock(&boot_lock);
-+
-+	return pen_release != -1 ? -ENOSYS : 0;
-+}
-+
-+/*
-+ * Initialise the CPU possible map early - this describes the CPUs
-+ * which may be present or become present in the system. The msm8x60
-+ * does not support the ARM SCU, so just set the possible cpu mask to
-+ * NR_CPUS.
-+ */
-+void __init smp_init_cpus(void)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < NR_CPUS; i++)
-+		set_cpu_possible(i, true);
-+}
-+
-+void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	int i;
-+
-+	/*
-+	 * Initialise the present map, which describes the set of CPUs
-+	 * actually populated@the present time.
-+	 */
-+	for (i = 0; i < max_cpus; i++)
-+		set_cpu_present(i, true);
-+}
++	od = omap_device_build("omap-mailbox", -1, oh,
++			NULL, 0,
++			mbox_latencies, ARRAY_SIZE(mbox_latencies),
++			0);
++	if (!od) {
++		pr_err("%s: could not build device\n", __func__);
+ 		return;
+ 	}
+-	platform_device_register(&mbox_device);
+ }
+ #else
+ static inline void omap_init_mbox(void) { }
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
