@@ -1,56 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 Dec 2010 13:20:29 +0000
-Subject: arm cortex_a9_mpcore timer: local timer and global timer
-In-Reply-To: <20101216130659.GS9937@n2100.arm.linux.org.uk>
-References: <AAD1C6EB06EE3649B35B7E026785068D15345BE603@SC-VEXCH2.marvell.com>
-	<AANLkTikt+CzkLBR5OCnjPUSLaLtuuBvGFSJVj+t0rRc2@mail.gmail.com>
-	<20101216130659.GS9937@n2100.arm.linux.org.uk>
-Message-ID: <1292505629.13150.69.camel@e102109-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Dec 2010 14:22:47 +0100
+Subject: dma_cache_sync replacement call
+In-Reply-To: <AANLkTi=XVZLcGut44xO8_MM=MH=VbiDtks5MATG5BSyq@mail.gmail.com>
+References: <AANLkTi=p3eaVKUNvxLCThhDC534j_SX+TUtxYgGfu40Q@mail.gmail.com>
+	<20101215225903.GJ9937@n2100.arm.linux.org.uk>
+	<AANLkTi=XVZLcGut44xO8_MM=MH=VbiDtks5MATG5BSyq@mail.gmail.com>
+Message-ID: <201012161422.47667.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-12-16 at 13:06 +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 16, 2010 at 12:59:13PM +0000, Catalin Marinas wrote:
-> > On 16 December 2010 02:02, Chao Xie <cxie4@marvell.com> wrote:
-> > > In the latest arm kernel, I find that smp_twd.c has implemented
-> local timer for cortex a9 MPcore. In the spec, there is global timer
-> that shared by all MPcore. I did not find any implements in the arm
-> kernel. What is the strategy of using these two kinds of timer? I find
-> that some SOCs have additional timer which is not the local timer or
-> global timer in MPcore. Then what is the strategy of using this kind
-> of timer with local timer and global timer in the kernel? Thanks.
-> >
-> > We currently don't have any support for the global timer available on
-> > Cortex-A9. It is on our to-do list but not sure when we'll have time
-> > (unless someone else does it before :)).
-> >
-> > On the current smp_twd.c implementation, a global timer is required to
-> > calibrate the local timers. So far we use the SP804 on the RealView
-> > and Versatile Express boards but we could, at some point, move to the
-> > global timer on A9.
+On Thursday 16 December 2010, y bhanu wrote:
+> Alternative for dma_cache_sync:
+>  dma_sync_single_for_cpu()  and dma_unmap_single()
+>  These do the same operation of (i.e.__dma_single_dev_to_cpu ) to
+> trasfer the buffer ownership.
 > 
-> MSM brings up an interesting point through - it only has local timers.
-> From what I can see, it's using the CPU0 local timer as a global timer.
+> But, I really dont understand what is the differnec between
+> dma_sync_single_for_cpu()  and dma_unmap_single()? (Is it is just to
+> make the name clear?)
+> I think  dma_sync_single_for_cpu() bests suites to situation.
 
-Yes, it's a different v7 implementation. We actually have something
-similar with Cortex-A15 - it has the new architected timers and they are
-local. As long as you know the frequency they are running at, you don't
-need a global timer.
+The difference is mainly on platforms with an IOMMU, where you have
+to explicitly manage the bus addresses using dma_map_* / dma_unmap_*.
 
-> I think an interesting exercise would be to allow platforms to only
-> have local timers without any global timer.
+dma_sync_single_for_cpu is for cases where you have a long-lived
+(mapping with multiple accesses from both CPU and device, e.g. doing
 
-I think that's possible. Even in the current configurations, the local
-timers have higher priority and the global is no longer used.
+dma_map_single(); /* gives returns a dma address
+		     and allows the device to access it */
 
-We'll do this exercise for A15 on top of VE (well, only software model
-at the moment).
-> 
-> It also means that if we do have local timers configured, we don't need
-> to support a global timer (unless we need it for sleep wakeup.)
+while (running) {
+	dma_sync_single_for_cpu(); /* lets the CPU access the buffer */
 
-I'm not entirely sure about the sleep wake-up. I recall OMAP had issues
-as the local timers couldn't wake up a CPU.
+	dma_sync_single_for_device(); /* lets the device access the buffer */
+}
 
--- 
-Catalin
+dma_unmap_single(); /*  invalidates the dma address and returns it
+			to the CPU */
+
+If the device only accesses the buffer once, you don't need to do an
+explicit sync at all, just unmap after the access is done.
+
+	Arnd
