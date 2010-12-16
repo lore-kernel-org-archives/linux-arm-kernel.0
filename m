@@ -1,49 +1,95 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 16 Dec 2010 21:52:56 +0530
-Subject: [PATCH] ARM: ensure all sched_clock() implementations are notrace
-	marked
-In-Reply-To: <20101216155750.GA28126@n2100.arm.linux.org.uk>
-References: <E1PT92Y-0004Ba-64@rmk-PC.arm.linux.org.uk>
-	<AANLkTimGHSqO=QwESp98UBK28yawdiq+kURU=nwau27G@mail.gmail.com>
-	<20101216155750.GA28126@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikLoU-L4YF_FtG4Q8Qh+66zToun5p2LhgYyiyrv@mail.gmail.com>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Thu, 16 Dec 2010 10:32:41 -0600
+Subject: [PATCH v4 5/5] OMAP: mailbox: use runtime pm for clk and sysc
+	handling
+In-Reply-To: <1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
+References: <1292482079-2226-1-git-send-email-omar.ramirez@ti.com>
+	<1292482079-2226-6-git-send-email-omar.ramirez@ti.com>
+Message-ID: <AANLkTinJOFMF=eC2MQB92e2XUsyyjNRRz7Bm_cyXEmp6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 9:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Dec 16, 2010 at 08:42:23PM +0530, Rabin Vincent wrote:
->> On Thu, Dec 16, 2010 at 1:48 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > ftrace requires sched_clock() to be notrace. ?Ensure that all
->> > implementations are so marked.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>
->> It does seem better to have all of them explicity annotated anyway, even
->> if it not required in most of the cases because they include
->> <linux/sched.h> and the annotation in the declaration takes effect.
->
-> Firstly, we shouldn't be relying upon that, and secondly, everywhere which
-> defines sched_clock() should already be including linux/sched.h to avoid
-> the sparse error. ?It sounds like there's also an exercise to make sure
-> that is the case.
+Omar,
 
-Yes.  I believe I identified all the ones which weren't including the
-header in the last notrace series I sent out (versatile, plat-iop, omap,
-and u300 IIRC), but there's been some changes in various platforms'
-sched_clocks() and of course new platforms since then.
+On Thu, Dec 16, 2010 at 12:47 AM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+> Use runtime pm APIs to enable/disable mailbox clocks and
+> to configure SYSC register.
+>
+> Based on the patch sent by Felipe Contreras:
+> https://patchwork.kernel.org/patch/101662/
+>
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+> ---
+> ?arch/arm/mach-omap2/mailbox.c | ? 27 +++++----------------------
+> ?1 files changed, 5 insertions(+), 22 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+> index 40ddeca..f5f72ba 100644
+> --- a/arch/arm/mach-omap2/mailbox.c
+> +++ b/arch/arm/mach-omap2/mailbox.c
+> @@ -14,6 +14,7 @@
+> ?#include <linux/err.h>
+> ?#include <linux/platform_device.h>
+> ?#include <linux/io.h>
+> +#include <linux/pm_runtime.h>
+> ?#include <plat/mailbox.h>
+> ?#include <mach/irqs.h>
+>
+> @@ -34,12 +35,8 @@
+> ?#define MAILBOX_IRQ_NOTFULL(m) ? ? ? ? (1 << (2 * (m) + 1))
+>
+> ?/* SYSCONFIG: register bit definition */
+> -#define AUTOIDLE ? ? ? (1 << 0)
+> ?#define SOFTRESET ? ? ?(1 << 1)
+> -#define SMARTIDLE ? ? ?(2 << 3)
+> ?#define OMAP4_SOFTRESET ? ? ? ?(1 << 0)
+> -#define OMAP4_NOIDLE ? (1 << 2)
+> -#define OMAP4_SMARTIDLE ? ? ? ?(2 << 2)
+>
+> ?/* SYSSTATUS: register bit definition */
+> ?#define RESETDONE ? ? ?(1 << 0)
+> @@ -70,8 +67,6 @@ struct omap_mbox2_priv {
+> ? ? ? ?unsigned long irqdisable;
+> ?};
+>
+> -static struct clk *mbox_ick_handle;
+> -
+> ?static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_type_t irq);
+>
+> @@ -91,13 +86,8 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
+> ? ? ? ?u32 l;
+> ? ? ? ?unsigned long timeout;
+>
+> - ? ? ? mbox_ick_handle = clk_get(NULL, "mailboxes_ick");
+> - ? ? ? if (IS_ERR(mbox_ick_handle)) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "Could not get mailboxes_ick: %ld\n",
+> - ? ? ? ? ? ? ? ? ? ? ? PTR_ERR(mbox_ick_handle));
+> - ? ? ? ? ? ? ? return PTR_ERR(mbox_ick_handle);
+> - ? ? ? }
+> - ? ? ? clk_enable(mbox_ick_handle);
+> + ? ? ? pm_runtime_enable(mbox->dev->parent);
+> + ? ? ? pm_runtime_get_sync(mbox->dev->parent);
+>
+> ? ? ? ?if (cpu_is_omap44xx()) {
+> ? ? ? ? ? ? ? ?mbox_write_reg(OMAP4_SOFTRESET, MAILBOX_SYSCONFIG);
+> @@ -130,12 +120,6 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
+> ? ? ? ?l = mbox_read_reg(MAILBOX_REVISION);
+> ? ? ? ?pr_debug("omap mailbox rev %d.%d\n", (l & 0xf0) >> 4, (l & 0x0f));
+>
+> - ? ? ? if (cpu_is_omap44xx())
+> - ? ? ? ? ? ? ? l = OMAP4_SMARTIDLE;
+> - ? ? ? else
+> - ? ? ? ? ? ? ? l = SMARTIDLE | AUTOIDLE;
+> - ? ? ? mbox_write_reg(l, MAILBOX_SYSCONFIG);
+> -
 
->
->> Note that in order for this to be fully effective, all functions called
->> from sched_clock() need to be notrace too. ?OMAP and u300 miss this.
->
-> Yes, OMAP still suffers from this.
->
-> However, I assume you haven't looked at the u300 sched_clock conversion
-> patch which is part of a follow-on series on lakml? ?It sorts u300 out
-> in that regard.
+The OMAP4 mailbox sysconfig register bits are laid out differently
+from previous OMAP mailbox's. Example is smart idle bit location is
+different from previous OMAPs. Can I know as how are you handling this
+aspect in hwmod code ?
 
-Yes, I now see U300 no longer needs the notrace addition.  It still
-could do with the #include <linux/sched.h> addition though, which was
-also being done as part of that patch.
+
+Thank you,
+Best regards,
+Hari Kanigeri
