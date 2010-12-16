@@ -1,44 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 11:56:57 +0000
-Subject: OMAP3: Warning: swp{b} use is deprecated for this architecture
-In-Reply-To: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
-References: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
-Message-ID: <20101216115657.GP9937@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 16 Dec 2010 18:16:44 +0530
+Subject: [PATCH v2 1/5] OMAP4: PM: Use the low-power state change feature on
+	OMAP4
+Message-ID: <1292503605-14523-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 12:49:43PM +0100, Jean Pihet wrote:
-> Hi,
-> 
-> The following warning is issued by the compiler (gcc version 4.4.1
-> (Sourcery G++ Lite 2010q1-202):
-> arch/arm/mach-omap2/sleep34xx.S:87: Warning: swp{b} use is deprecated
-> for this architecture
-> 
-> Does this need fixing? If so any hint on how to do it?
-> 
-> Here is the offending code excerpt:
-> 
-> wait_sem:
->         mov     r0,#1
->         ldr     r1, sdrc_scratchpad_sem
-> wait_loop:
->         ldr     r2, [r1]        @ load the lock value
->         cmp     r2, r0          @ is the lock free ?
->         beq     wait_loop       @ not free...
->         swp     r2, r0, [r1]    @ semaphore free so lock it and proceed
->         cmp     r2, r0          @ did we succeed ?
->         beq     wait_sem        @ no - try again
+For pwrdm's which support LOWPOWERSTATECHANGE, do not try waking
+up the domain to put it back to deeper sleep state.
 
-(untested, as my LDP is useless because of OMAP regressions.)
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
+Changes in v2:
+Changed implementation for better readability and code
+reuse as suggested here
+http://marc.info/?l=linux-omap&m=129245686306262&w=2
 
-wait_sem:
-	mov	r0, #1
-	ldr	r1, sdrc_scratchpad_sem
-wait_loop:
-	ldrex	r2, [r1]	@ load lock value
-	teq	r2, r0		@ is lock free ( != 1)
-	beq	wait_loop	@ no, try again
-	strex	r2, r0, [r1]	@ try to lock
-	teq	r2, #0		@ did store succeed?
-	bne	wait_loop	@ no, try again
+The below branch is updated with this version of the patch
+git://gitorious.org/omap-pm/linux.git for_2.6.38/power
+
+ arch/arm/mach-omap2/pm.c |   28 ++++++++++++++++++++++------
+ 1 file changed, 22 insertions(+), 6 deletions(-)
+
+Index: linux/arch/arm/mach-omap2/pm.c
+===================================================================
+--- linux.orig/arch/arm/mach-omap2/pm.c	2010-12-15 17:29:42.361228780 +0530
++++ linux/arch/arm/mach-omap2/pm.c	2010-12-15 20:19:48.321228780 +0530
+@@ -89,6 +89,10 @@
+ 	}
+ }
+ 
++/* Types of sleep_switch used in omap_set_pwrdm_state */
++#define FORCEWAKEUP_SWITCH	0
++#define LOWPOWERSTATE_SWITCH	1
++
+ /*
+  * This sets pwrdm state (other than mpu & core. Currently only ON &
+  * RET are supported. Function is assuming that clkdm doesn't have
+@@ -114,9 +118,14 @@
+ 		return ret;
+ 
+ 	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
+-		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
+-		sleep_switch = 1;
+-		pwrdm_wait_transition(pwrdm);
++		if ((pwrdm_read_pwrst(pwrdm) > state) &&
++			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
++			sleep_switch = LOWPOWERSTATE_SWITCH;
++		} else {
++			omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
++			pwrdm_wait_transition(pwrdm);
++			sleep_switch = FORCEWAKEUP_SWITCH;
++		}
+ 	}
+ 
+ 	ret = pwrdm_set_next_pwrst(pwrdm, state);
+@@ -126,12 +135,19 @@
+ 		goto err;
+ 	}
+ 
+-	if (sleep_switch) {
++	switch (sleep_switch) {
++	case FORCEWAKEUP_SWITCH:
+ 		omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
+-		pwrdm_wait_transition(pwrdm);
+-		pwrdm_state_switch(pwrdm);
++		break;
++	case LOWPOWERSTATE_SWITCH:
++		pwrdm_set_lowpwrstchange(pwrdm);
++		break;
++	default:
++		return ret;
+ 	}
+ 
++	pwrdm_wait_transition(pwrdm);
++	pwrdm_state_switch(pwrdm);
+ err:
+ 	return ret;
+ }
