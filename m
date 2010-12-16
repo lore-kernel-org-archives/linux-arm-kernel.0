@@ -1,41 +1,27 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Thu, 16 Dec 2010 13:40:37 -0800
-Subject: [PATCH v5 4/5] msm: hotplug: support cpu hotplug on msm
-In-Reply-To: <AANLkTinzVP4rjOZM0PZQGYBNm+z-O=S0h6vo1QVoh+ps@mail.gmail.com>
-References: <1292482456-22690-1-git-send-email-johlstei@codeaurora.org>	<1292482456-22690-5-git-send-email-johlstei@codeaurora.org>
-	<AANLkTinzVP4rjOZM0PZQGYBNm+z-O=S0h6vo1QVoh+ps@mail.gmail.com>
-Message-ID: <4D0A8755.9080408@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Dec 2010 21:44:20 +0000
+Subject: [PATCH v5 5/5] msm: add SMP support for msm
+In-Reply-To: <1292482456-22690-6-git-send-email-johlstei@codeaurora.org>
+References: <1292482456-22690-1-git-send-email-johlstei@codeaurora.org>
+	<1292482456-22690-6-git-send-email-johlstei@codeaurora.org>
+Message-ID: <20101216214420.GX9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> On 16 December 2010 06:54, Jeff Ohlstein <johlstei@codeaurora.org> wrote:
->> --- /dev/null
->> +++ b/arch/arm/mach-msm/hotplug.c
-> [...]
->> +static inline void platform_do_lowpower(unsigned int cpu)
->> +{
->> +       /* Just enter wfi for now. TODO: Properly shut off the cpu. */
->> +       for (;;) {
->> +               /*
->> +                * here's the WFI
->> +                */
->> +               asm(".word      0xe320f003\n"
->> +                   :
->> +                   :
->> +                   : "memory", "cc");
->
-> Is this for an ARMv7 platform? If yes, you could just use the WFI
-> instruction directly (and it would also work if compiling the kernel
-> to Thumb-2 mode).
->   
+On Wed, Dec 15, 2010 at 10:54:16PM -0800, Jeff Ohlstein wrote:
+> +void __cpuinit platform_secondary_init(unsigned int cpu)
+> +{
+> +	/* Configure edge-triggered PPIs */
+> +	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
 
-I was trying to make the code as similar to the realview code as I
-reasonably could. There are several instances of that, we could fix all
-of them in one go.
+At some point we should really clean this up so we don't have code
+writing directly to the GIC registers like this.
 
--Jeff
+> +static __init void prepare_cold_cpu(unsigned int cpu)
+> +{
+> +	int ret;
+> +	ret = scm_set_boot_addr((void *)
+> +				virt_to_phys(msm_secondary_startup),
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+It seems wrong to cast a physical address to a pointer - physical
+addresses should not be pointer-like.  Can it stay as an integer?
