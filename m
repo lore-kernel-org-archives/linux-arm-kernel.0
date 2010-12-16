@@ -1,69 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 09:32:03 +0000
-Subject: [PATCH 13/13] ARM: vexpress: add sched_clock() for Versatile Express
-In-Reply-To: <20101216092527.GL9937@n2100.arm.linux.org.uk>
-References: <20101216092527.GL9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTABv-0007A4-OF@rmk-PC.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 16 Dec 2010 10:51:05 +0100
+Subject: [PATCH v6 08/15] ARM: mxs: Add iomux support
+In-Reply-To: <1292244903-30392-6-git-send-email-shawn.guo@freescale.com>
+References: <1292244903-30392-1-git-send-email-shawn.guo@freescale.com>
+	<1292244903-30392-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101216095105.GG1940@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sched_clock() implementation to Versatile Express using the new
-sched_clock() infrastructure for extending 32bit counters to full
-64-bit nanoseconds.
+Hello Shawn,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/Kconfig                 |    1 +
- arch/arm/mach-vexpress/v2m.c     |    4 ++++
- arch/arm/plat-versatile/Makefile |    4 +---
- 3 files changed, 6 insertions(+), 3 deletions(-)
+On Mon, Dec 13, 2010 at 08:55:02PM +0800, Shawn Guo wrote:
+> +/*
+> + * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
+> + * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
+> + * See also iomux.h
+> + *
+> + *							    BANK PIN     MUX            VOL          MA            PULL
+> + */
+> +/* DUART */
+> +#define MX28_PAD_PWM0__DUART_RX			MXS_IOMUX_PAD(3, 16, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
+> +#define MX28_PAD_PWM1__DUART_TX			MXS_IOMUX_PAD(3, 17, PAD_MUXSEL_2,    PAD_3V3,     PAD_4MA,      PAD_NOPULL)
+> +
+> +/* FEC */
+> +#define MX28_PAD_ENET0_MDC__ENET0_MDC		MXS_IOMUX_PAD(4, 0,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET0_MDIO__ENET0_MDIO		MXS_IOMUX_PAD(4, 1,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN	MXS_IOMUX_PAD(4, 2,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET0_RXD0__ENET0_RXD0		MXS_IOMUX_PAD(4, 3,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET0_RXD1__ENET0_RXD1		MXS_IOMUX_PAD(4, 4,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN	MXS_IOMUX_PAD(4, 6,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET0_TXD0__ENET0_TXD0		MXS_IOMUX_PAD(4, 7,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET0_TXD1__ENET0_TXD1		MXS_IOMUX_PAD(4, 8,  PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +#define MX28_PAD_ENET_CLK__ENET_CLK		MXS_IOMUX_PAD(4, 16, PAD_MUXSEL_0,    PAD_3V3,     PAD_8MA,      PAD_PULLUP)
+> +
+> +/* GPIO */
+> +#define MX28_PAD_SSP1_DATA3__GPIO_2_15		MXS_IOMUX_PAD(2, 15, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
+> +#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13	MXS_IOMUX_PAD(4, 13, PAD_MUXSEL_GPIO, PAD_3V3,     PAD_4MA,      PAD_NOPULL)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34311f4..17b5ff0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -268,6 +268,7 @@ config ARCH_VEXPRESS
- 	select COMMON_CLKDEV
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
-+	select HAVE_SCHED_CLOCK
- 	select ICST
- 	select PLAT_VERSATILE
- 	help
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 7eaa232..8c28310 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -22,6 +22,8 @@
- #include <mach/clkdev.h>
- #include <mach/motherboard.h>
- 
-+#include <plat/sched_clock.h>
-+
- #include <plat/timer-sp.h>
- 
- #include "core.h"
-@@ -50,6 +52,8 @@ void __init v2m_map_io(struct map_desc *tile, size_t num)
- 
- static void __init v2m_timer_init(void)
- {
-+	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
-+
- 	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
- 	writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
- 
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 5cf88e8..230eb37 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -1,7 +1,5 @@
--obj-y	:= clock.o
-+obj-y	:= clock.o sched-clock.o
- obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
--obj-$(CONFIG_ARCH_REALVIEW) += sched-clock.o
--obj-$(CONFIG_ARCH_VERSATILE) += sched-clock.o
- ifeq ($(CONFIG_LEDS_CLASS),y)
- obj-$(CONFIG_ARCH_REALVIEW) += leds.o
- obj-$(CONFIG_ARCH_VERSATILE) += leds.o
+Can we please have a defined order for these definitions?  I suggest to
+sort by the arguments to MXS_IOMUX_PAD.
+
+Moreover to be able to benefit from iomux_cfg_t being an integer type it
+would be great to have the generic defines use PAD_VOL_NONE, PAD_MA_NONE
+and PAD_NOPULL and let these constants have the value 0 to be able to
+simply say:
+
+	static const mxs_iomux_cfg_t my_pads[] = {
+		MX28_PAD_SSP1_DATA3__GPIO_2_15 | PAD_PULLUP,
+		...
+	};
+
+And it would be nice to get all pad definitions at once generated from
+the Freescale Excel sheet.  Lothar Wa?mann already did that based on one
+of your first versions of this series.  I can provide it to you via
+private mail if you think this might be easier for you.  For plat-mxc
+starting with the complete definitions prooved to be the better approach
+because otherwise you get many merge conflicts and typing errors.
+
+BTW, when Lothar did the conversion he found one mismatch between your
+patch and the Excel sheet.  You had MX28_PAD_ENET_CLK__ENET_CLK while
+the table had MX28_PAD_ENET_CLK__CLKCTRL_ENET.  I didn't check which of
+these is consistent with the reference manual.
+
+(Most of these suggestions are from Lothar, I'm just the messenger here,
+but I'm of the same mind.)
+
+Best regards,
+Uwe
+
 -- 
-1.6.2.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
