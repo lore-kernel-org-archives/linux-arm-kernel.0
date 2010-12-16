@@ -1,54 +1,52 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 16 Dec 2010 18:16:45 +0530
-Subject: [PATCH v2 2/5] OMAP4: PM: Do not assume clkdm supports hw transitions
-In-Reply-To: <1292503605-14523-1-git-send-email-rnayak@ti.com>
-References: <1292503605-14523-1-git-send-email-rnayak@ti.com>
-Message-ID: <1292503605-14523-2-git-send-email-rnayak@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 Dec 2010 12:47:30 +0000
+Subject: OMAP3: Warning: swp{b} use is deprecated for this architecture
+In-Reply-To: <20101216115657.GP9937@n2100.arm.linux.org.uk>
+References: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
+	<20101216115657.GP9937@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=-ERvBARQ3bzOMZPx0s-OPuZHgXqjRet1aUxGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_set_pwrdm_state today assumes a clkdm supports hw_auto
-transitions and hence leaves some which do not support this
-in sw wkup state preventing low power transitions.
+On 16 December 2010 11:56, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 16, 2010 at 12:49:43PM +0100, Jean Pihet wrote:
+>> The following warning is issued by the compiler (gcc version 4.4.1
+>> (Sourcery G++ Lite 2010q1-202):
+>> arch/arm/mach-omap2/sleep34xx.S:87: Warning: swp{b} use is deprecated
+>> for this architecture
+>>
+>> Does this need fixing? If so any hint on how to do it?
+>>
+>> Here is the offending code excerpt:
+>>
+>> wait_sem:
+>> ? ? ? ? mov ? ? r0,#1
+>> ? ? ? ? ldr ? ? r1, sdrc_scratchpad_sem
+>> wait_loop:
+>> ? ? ? ? ldr ? ? r2, [r1] ? ? ? ?@ load the lock value
+>> ? ? ? ? cmp ? ? r2, r0 ? ? ? ? ?@ is the lock free ?
+>> ? ? ? ? beq ? ? wait_loop ? ? ? @ not free...
+>> ? ? ? ? swp ? ? r2, r0, [r1] ? ?@ semaphore free so lock it and proceed
+>> ? ? ? ? cmp ? ? r2, r0 ? ? ? ? ?@ did we succeed ?
+>> ? ? ? ? beq ? ? wait_sem ? ? ? ?@ no - try again
+>
+> (untested, as my LDP is useless because of OMAP regressions.)
+>
+> wait_sem:
+> ? ? ? ?mov ? ? r0, #1
+> ? ? ? ?ldr ? ? r1, sdrc_scratchpad_sem
+> wait_loop:
+> ? ? ? ?ldrex ? r2, [r1] ? ? ? ?@ load lock value
+> ? ? ? ?teq ? ? r2, r0 ? ? ? ? ?@ is lock free ( != 1)
+> ? ? ? ?beq ? ? wait_loop ? ? ? @ no, try again
+> ? ? ? ?strex ? r2, r0, [r1] ? ?@ try to lock
+> ? ? ? ?teq ? ? r2, #0 ? ? ? ? ?@ did store succeed?
+> ? ? ? ?bne ? ? wait_loop ? ? ? @ no, try again
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
-Changes in v2:
-Rebased the patch on the previous patch in the series
+I'm not familiar with the OMAP code but I recall they needed swp for
+some synchronisation with external processor (DSP). Is this still the
+case?
 
-The below branch is updated with this version of the patch
-git://gitorious.org/omap-pm/linux.git for_2.6.38/power
-
- arch/arm/mach-omap2/pm.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-Index: linux/arch/arm/mach-omap2/pm.c
-===================================================================
---- linux.orig/arch/arm/mach-omap2/pm.c	2010-12-16 11:47:35.000000000 +0530
-+++ linux/arch/arm/mach-omap2/pm.c	2010-12-16 11:48:49.073228787 +0530
-@@ -95,8 +95,7 @@
- 
- /*
-  * This sets pwrdm state (other than mpu & core. Currently only ON &
-- * RET are supported. Function is assuming that clkdm doesn't have
-- * hw_sup mode enabled.
-+ * RET are supported.
-  */
- int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
- {
-@@ -137,7 +136,10 @@
- 
- 	switch (sleep_switch) {
- 	case FORCEWAKEUP_SWITCH:
--		omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
-+		if (pwrdm->pwrdm_clkdms[0]->flags & CLKDM_CAN_ENABLE_AUTO)
-+			omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
-+		else
-+			omap2_clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
- 		break;
- 	case LOWPOWERSTATE_SWITCH:
- 		pwrdm_set_lowpwrstchange(pwrdm);
+-- 
+Catalin
