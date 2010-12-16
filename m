@@ -1,39 +1,41 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 16 Dec 2010 23:34:40 +0200
-Subject: [PATCH v3 0/4] Introduce hardware spinlock framework
-In-Reply-To: <20101216210837.GA22895@kroah.com>
-References: <1291420247-18171-1-git-send-email-ohad@wizery.com>
-	<AANLkTin1fd=Kei7Fo6G+uR+270HdTkc71fvsA6qjBjcA@mail.gmail.com>
-	<20101214170656.GA3832@kroah.com>
-	<AANLkTi=q=QMQ_Abxb8eUWT_qGG8K=pc892ZB-mqgt_mh@mail.gmail.com>
-	<20101216210837.GA22895@kroah.com>
-Message-ID: <AANLkTi=s_Urcin4SAp1mXrKmoyzR2=6YuS3aU+OYYgqK@mail.gmail.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Thu, 16 Dec 2010 13:40:37 -0800
+Subject: [PATCH v5 4/5] msm: hotplug: support cpu hotplug on msm
+In-Reply-To: <AANLkTinzVP4rjOZM0PZQGYBNm+z-O=S0h6vo1QVoh+ps@mail.gmail.com>
+References: <1292482456-22690-1-git-send-email-johlstei@codeaurora.org>	<1292482456-22690-5-git-send-email-johlstei@codeaurora.org>
+	<AANLkTinzVP4rjOZM0PZQGYBNm+z-O=S0h6vo1QVoh+ps@mail.gmail.com>
+Message-ID: <4D0A8755.9080408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 11:08 PM, Greg KH <greg@kroah.com> wrote:
->> > I've seen a lot of discussion about this, are all of the review comments
->> > now addressed?
->>
->> Yes, all comments were addressed in this v3 iteration, and this thread
->> has been idle for about 10 days.
+Catalin Marinas wrote:
+> On 16 December 2010 06:54, Jeff Ohlstein <johlstei@codeaurora.org> wrote:
+>> --- /dev/null
+>> +++ b/arch/arm/mach-msm/hotplug.c
+> [...]
+>> +static inline void platform_do_lowpower(unsigned int cpu)
+>> +{
+>> +       /* Just enter wfi for now. TODO: Properly shut off the cpu. */
+>> +       for (;;) {
+>> +               /*
+>> +                * here's the WFI
+>> +                */
+>> +               asm(".word      0xe320f003\n"
+>> +                   :
+>> +                   :
+>> +                   : "memory", "cc");
 >
-> That's because we are all busy with other things :(
+> Is this for an ARMv7 platform? If yes, you could just use the WFI
+> instruction directly (and it would also work if compiling the kernel
+> to Thumb-2 mode).
+>   
 
-Oh sure, my intention was only positive (to demonstrate that there are
-no outstanding comments), sorry if it sounded differently than
-intended.
+I was trying to make the code as similar to the realview code as I
+reasonably could. There are several instances of that, we could fix all
+of them in one go.
 
-> Sorry, I really don't have the time at the moment to review this code,
-> nor does it seem to affect areas that I maintain, so I don't understand
-> what you are looking for from me.
+-Jeff
 
-Sorry for the noise - I contacted you because you maintain the driver
-core, in the hope you could suggest where this can go through.
-
-Tony, Andrew, can you please have a look ?
-
-Any comment or suggestion is appreciated.
-
-Thanks,
-Ohad.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
