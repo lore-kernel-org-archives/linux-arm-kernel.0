@@ -1,62 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 19:13:07 +0000
-Subject: [PATCH] Fix rounding in clocks_calc_mult_shift()
-Message-ID: <20101216191307.GV9937@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 16 Dec 2010 20:04:41 +0000
+Subject: OMAP3: Warning: swp{b} use is deprecated for this architecture
+In-Reply-To: <AANLkTinL3oonBvkZwZFr=Wh2m_EYQ1WVudV9cxNqKRBx@mail.gmail.com>
+References: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
+	<20101216115657.GP9937@n2100.arm.linux.org.uk>
+	<AANLkTi=-ERvBARQ3bzOMZPx0s-OPuZHgXqjRet1aUxGw@mail.gmail.com>
+	<AANLkTink3TJonOC+cnpRUKKu9_+OBhJKDQ25yvrZZsrQ@mail.gmail.com>
+	<6188477658179778436@unknownmsgid>
+	<AANLkTinL3oonBvkZwZFr=Wh2m_EYQ1WVudV9cxNqKRBx@mail.gmail.com>
+Message-ID: <AANLkTinXBx5F-wQC_eJPftsqgbaFUg9R8z5FxTFR+gTy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: John Stultz <john.stultz@linaro.org>
+On Thu, Dec 16, 2010 at 5:16 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Hi Will,
+>
+> On Thu, Dec 16, 2010 at 6:05 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Jean,
+>>
+>>> >>> Here is the offending code excerpt:
+>>> >>>
+>>> >>> wait_sem:
+>>> >>> ? ? ? ? mov ? ? r0,#1
+>>> >>> ? ? ? ? ldr ? ? r1, sdrc_scratchpad_sem
+>>> >>> wait_loop:
+>>> >>> ? ? ? ? ldr ? ? r2, [r1] ? ? ? ?@ load the lock value
+>>> >>> ? ? ? ? cmp ? ? r2, r0 ? ? ? ? ?@ is the lock free ?
+>>> >>> ? ? ? ? beq ? ? wait_loop ? ? ? @ not free...
+>>> >>> ? ? ? ? swp ? ? r2, r0, [r1] ? ?@ semaphore free so lock it and proceed
+>>> >>> ? ? ? ? cmp ? ? r2, r0 ? ? ? ? ?@ did we succeed ?
+>>> >>> ? ? ? ? beq ? ? wait_sem ? ? ? ?@ no - try again
+>>> >>
+>>> >> (untested, as my LDP is useless because of OMAP regressions.)
+>>> >>
+>>> >> wait_sem:
+>>> >> ? ? ? ?mov ? ? r0, #1
+>>> >> ? ? ? ?ldr ? ? r1, sdrc_scratchpad_sem
+>>> >> wait_loop:
+>>> >> ? ? ? ?ldrex ? r2, [r1] ? ? ? ?@ load lock value
+>>> >> ? ? ? ?teq ? ? r2, r0 ? ? ? ? ?@ is lock free ( != 1)
+>>> >> ? ? ? ?beq ? ? wait_loop ? ? ? @ no, try again
+>>> >> ? ? ? ?strex ? r2, r0, [r1] ? ?@ try to lock
+>>> >> ? ? ? ?teq ? ? r2, #0 ? ? ? ? ?@ did store succeed?
+>>> >> ? ? ? ?bne ? ? wait_loop ? ? ? @ no, try again
+>>> >
+>>> > I'm not familiar with the OMAP code but I recall they needed swp for
+>>> > some synchronisation with external processor (DSP). Is this still the
+>>> > case?
+>>> This code is meant to be used by the new DVFS code which is not merged in yet.
+>>
+>> I don't know what you do with this lock held or what the contention
+>> is like, but you probably want a memory barrier immediately after you've
+>> acquired it and another one before you release it.
+> OK, thanks for the suggestion.
+>
+> Since this code is not used at the moment it will be removed.
+> It shall be added back, fixed and tested later when the API will be in real use.
 
-Russell King reports:
-| On the ARM dev boards, we have a 32-bit counter running at 24MHz.  Calling
-| clocks_calc_mult_shift(&mult, &shift, 24MHz, NSEC_PER_SEC, 60) gives
-| us a multiplier of 2796202666 and a shift of 26.
-|
-| Over a large counter delta, this produces an error - lets take a count
-| from 362976315 to 4280663372:
-|
-| (4280663372-362976315) * 2796202666 / 2^26 - (4280663372-362976315) * (1000/24)
-|  => -38.91872422891230269990
-|
-| Can we do better?
-|
-| (4280663372-362976315) * 2796202667 / 2^26 - (4280663372-362976315) * (1000/24)
-| 19.45936211449532822051
-|
-| which is about twice as good as the 2796202666 multiplier.
-|
-| Looking at the equivalent divisions obtained, 2796202666 / 2^26 gives
-| 41.66666665673255920410ns per tick, whereas 2796202667 / 2^26 gives
-| 41.66666667163372039794ns.  The actual value wanted is 1000/24 =
-| 41.66666666666666666666ns.
+Note that the above bit of code is similar/identical to a bit of code
+already present in the OMAP BSP... so this still needs to be
+addressed.
 
-Fix this by ensuring we round to nearest when calculating the
-multiplier.
+See arch/arm/mach-omap2/sleep34xx.S:lock_scratchpad_sem
 
-Signed-off-by: John Stultz <john.stultz@linaro.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
 
-This is the final piece for my sched_clock() patches, which is required
-by the patches to operate correctly with the known-constants-at-compile-
-time platforms to avoid the kernel complaining that the constants are
-wrong.  The above changelog was written by me, patch was from John, and
-I tweaked the spacing to match the kernel style.
+I encountered the same problem when trying to build this code for
+Thumb-2 -- though there it's an error, not a warning since Thumb-2 has
+no instruction encoding for SWP at all.
 
- kernel/time/clocksource.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I suspect that an actual atomic swap is needed on the bus to
+synchronise safely with some piece of hardware in these cases -- I
+don't know whether there's a workaround. Some with knowledge about the
+hardware will need to comment.
 
-diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
-index c18d7ef..df140cd 100644
---- a/kernel/time/clocksource.c
-+++ b/kernel/time/clocksource.c
-@@ -152,6 +152,7 @@ clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 minsec)
- 	 */
- 	for (sft = 32; sft > 0; sft--) {
- 		tmp = (u64) to << sft;
-+		tmp += from / 2;
- 		do_div(tmp, from);
- 		if ((tmp >> sftacc) == 0)
- 			break;
--- 
-1.6.2.5
+If the SWP must be used, there are a few options: use ",arch armv5" in
+the assembler file; use -march=armv5 for the whole file; or use .long
+0xe1012090.  Unfortunately, none of these alternatives is pretty :/
+
+Will is probably correct regarding the need for barriers, also.
+
+Cheers
+---Dave
