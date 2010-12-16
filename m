@@ -1,55 +1,74 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 16 Dec 2010 19:17:04 +0100
-Subject: [PATCH v3] OMAP3: clean up ASM idle code
-In-Reply-To: <20101214224214.GB14990@atomide.com>
-References: <1292347603-17703-1-git-send-email-j-pihet@ti.com>
-	<20101214224214.GB14990@atomide.com>
-Message-ID: <AANLkTina03chWbrBUAQXxb03s_h-JCbJA-Hz+sdv2wzD@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 16 Dec 2010 10:17:18 -0800
+Subject: [PATCH 0/7 v2] OMAP: McSPI: Hwmod adaptation + runtime conversion
+In-Reply-To: <AANLkTikgzMjU9wfzzMjEXzFCUvRz6hKtv=N8dKXf10YM@mail.gmail.com>
+	(Govindraj Raja's message of "Thu, 16 Dec 2010 14:57:46 +0530")
+References: <33183.10.24.255.18.1291212072.squirrel@dbdmail.itg.ti.com>
+	<87d3p3kobt.fsf@deeprootsystems.com>
+	<AANLkTikgzMjU9wfzzMjEXzFCUvRz6hKtv=N8dKXf10YM@mail.gmail.com>
+Message-ID: <874oadfuq9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Govindraj,
 
-On Tue, Dec 14, 2010 at 11:42 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Jean,
->
-> * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [101214 09:28]:
->> From: Jean Pihet <j-pihet@ti.com>
->>
->> This patch only contains clean-ups and cosmetic changes,
->> no functional change.
->>
->> Clean up of the ASM code:
->> - reorganized the code in logical sections: defines, API
->> ? ?functions, internal functions and variables,
->> - reworked and simplified the execution paths, for better
->> ? ?readability and to avoid duplication of code,
->> - added comments on the entry and exit points and the interaction
->> ? ?with the ROM code for OFF mode restore,
->> - reworked the existing comments for better readability,
->> - reworked the code formating, alignment and white spaces,
->> - added comments for the i443 erratum workarounds,
->> - changed the hardcoded values in favor of existing macros
->> ? ?from include files,
->> - clean up of non used symbols.
->
-> Can you please split it further, it's not obvious from reading it
-> that it does not change anything.
-That makes sense indeed.
+"Raja, Govindraj" <govindraj.raja@ti.com> writes:
 
-> How about first do one or more patches to move the code around.
-> Then rework the comments and formatting.
-I just re-sent the changes as a series '[PATCH 0/7 v4] OMAP3: clean up
-ASM sleep code'.
-The patches are now much more readable and it also allowed me to solve
-issues in a more generic way, cf. for example '[PATCH 2/7] OMAP2+: use
-global values for the SRAM PA addresses'.
+> On Wed, Dec 15, 2010 at 9:42 PM, Kevin Hilman <khilman@deeprootsystems.com>
+> wrote:
+>
+>     "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>     > Changes invloves:
+>     > ----------------
+>     > 1) Addition of hwmod data for omap2/3/4.
+>     > 1) McSPI driver hwmod adaptation with cleanup of base address
+>     > ? ?macros and using omap-device API's.
+>     > 2) Runtime Conversion of McSPI driver
+>     >
+>     > Changes from v1:
+>     > ---------------
+>     > 1) Fixing patch 5/5 comments for hwmod+runtime
+>     > ? ?Split the patch 5/5 to hwmod adaptation
+>     > ? ?and then runtime conversion
+>     > ? ?http://www.mail-archive.com/linux-omap at vger.kernel.org/msg33387.html
+>     >
+>     > Testing Updates:
+>     > ----------------
+>     > Was tested using data transfer test module available at:
+>     > http://dev.omapzoom.org/?p=richo/device_driver_test.git;a=blob;f=mcspi/
+>     test_code/
+>     > utils/mcspi_modules/omap_mcspi_datatest.c;
+>     > h=e42ec10c5c844abdde6a7175a268b379fbbdb655;
+>     > hb=5d9a755d50e58de861c5e8991f2f607bc49b5dc3
+>
+>     Can you summarize what this test does?
+>
+>     On what platforms was this tested?
+>
+>     How was it tested for OMAP1 and OMAP2?
+>
+>
+>
+> Using the above mentioned test module we had done some
+> data transfer tests.
+> Platforms used used where :
+> 1) OMAP2430 SDP.
+> 2) OMAP3 (ZOOM boards zoom2/3).
+> 3) OMAP4430 SDP [ Here even basic?Ethernet?functionality?was checked which is
+> over SPI interface]
 
->
-> Thanks,
->
-> Tony
->
+Can you describe a little more about the testing please?  What exactly
+does the data transfer test do?  Is it a loopback test?  Does it use
+on-board SPI peripherals?  If so, which ones, etc.
 
-Thanks,
-Jean
+> We boot tested on 2420/n800.
+>
+> Coming to omap1,
+>
+> This driver[omap2_mcspi.c] is applicable only from omap2_plus
+> for omap1?omap_uwire.c is the spi driver file.
+
+OK, thanks for clarification.
+
+Kevin
