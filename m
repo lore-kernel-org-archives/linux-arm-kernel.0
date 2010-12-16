@@ -1,66 +1,49 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 16 Dec 2010 08:52:04 +0200
-Subject: [PATCH] omap: boards w/ wl12xx should select
-	REGULATOR_FIXED_VOLTAGE
-In-Reply-To: <1290593090-6288-1-git-send-email-ohad@wizery.com>
-References: <1290593090-6288-1-git-send-email-ohad@wizery.com>
-Message-ID: <AANLkTik+PBarJzgyR67dzgzjB_H17O1+=9_T50qp6jD0@mail.gmail.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Wed, 15 Dec 2010 22:54:11 -0800
+Subject: [PATCH v5 0/5] SMP support for msm
+Message-ID: <1292482456-22690-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+This series adds support for SMP on msm targets, and specifically adds
+support for SMP on the msm8x60. This version is rebased on top of
+Russell's SMP and gic patches, and has fixes for hotplug and smp.
 
-On Wed, Nov 24, 2010 at 12:04 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Power to the wl12xx wlan device is controlled by a fixed regulator.
->
-> Boards that have the wl12xx should select REGULATOR_FIXED_VOLTAGE so
-> users will not be baffled.
+This version changes the hotplug and smp code to be more similar to
+the realview implementation.
 
-Not sure if you picked this up ?
+Jeff Ohlstein (3):
+  msm: timer: SMP timer support for msm
+  msm: hotplug: support cpu hotplug on msm
+  msm: add SMP support for msm
 
-We need it because otherwise new wl12xx users can spend many hours
-until they figure out what's the problem..
+Stepan Moskovchenko (1):
+  msm: scm-boot: Support for setting cold/warm boot addresses
 
-Please tell me if there's any problem with this one.
+Stephen Boyd (1):
+  msm: Secure Channel Manager (SCM) support
 
-Thanks,
-Ohad.
+ arch/arm/mach-msm/Kconfig                       |    5 +
+ arch/arm/mach-msm/Makefile                      |    4 +
+ arch/arm/mach-msm/headsmp.S                     |   40 ++++
+ arch/arm/mach-msm/hotplug.c                     |   91 +++++++
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    6 +-
+ arch/arm/mach-msm/io.c                          |    1 +
+ arch/arm/mach-msm/platsmp.c                     |  166 +++++++++++++
+ arch/arm/mach-msm/scm-boot.c                    |   39 +++
+ arch/arm/mach-msm/scm-boot.h                    |   38 +++
+ arch/arm/mach-msm/scm.c                         |  287 +++++++++++++++++++++++
+ arch/arm/mach-msm/scm.h                         |   41 ++++
+ arch/arm/mach-msm/timer.c                       |  137 +++++++++--
+ 12 files changed, 831 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/mach-msm/headsmp.S
+ create mode 100644 arch/arm/mach-msm/hotplug.c
+ create mode 100644 arch/arm/mach-msm/platsmp.c
+ create mode 100644 arch/arm/mach-msm/scm-boot.c
+ create mode 100644 arch/arm/mach-msm/scm-boot.h
+ create mode 100644 arch/arm/mach-msm/scm.c
+ create mode 100644 arch/arm/mach-msm/scm.h
 
->
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> ---
-> ?arch/arm/mach-omap2/Kconfig | ? ?3 +++
-> ?1 files changed, 3 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index fc3a181..cc386da 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -190,6 +190,7 @@ config MACH_OMAP3_PANDORA
-> ? ? ? ?depends on ARCH_OMAP3
-> ? ? ? ?default y
-> ? ? ? ?select OMAP_PACKAGE_CBB
-> + ? ? ? select REGULATOR_FIXED_VOLTAGE
->
-> ?config MACH_OMAP3_TOUCHBOOK
-> ? ? ? ?bool "OMAP3 Touch Book"
-> @@ -235,6 +236,7 @@ config MACH_OMAP_ZOOM2
-> ? ? ? ?select SERIAL_8250
-> ? ? ? ?select SERIAL_CORE_CONSOLE
-> ? ? ? ?select SERIAL_8250_CONSOLE
-> + ? ? ? select REGULATOR_FIXED_VOLTAGE
->
-> ?config MACH_OMAP_ZOOM3
-> ? ? ? ?bool "OMAP3630 Zoom3 board"
-> @@ -244,6 +246,7 @@ config MACH_OMAP_ZOOM3
-> ? ? ? ?select SERIAL_8250
-> ? ? ? ?select SERIAL_CORE_CONSOLE
-> ? ? ? ?select SERIAL_8250_CONSOLE
-> + ? ? ? select REGULATOR_FIXED_VOLTAGE
->
-> ?config MACH_CM_T35
-> ? ? ? ?bool "CompuLab CM-T35 module"
-> --
-> 1.7.0.4
->
->
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
