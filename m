@@ -1,110 +1,36 @@
-From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
-Date: Thu, 16 Dec 2010 20:55:12 +0530
-Subject: [Patch v4] AM35xx: Craneboard: Add USB EHCI support
-In-Reply-To: <[PATCH] AM35xx-Craneboard-Add-USB-EHCI-support>
-References: <[PATCH] AM35xx-Craneboard-Add-USB-EHCI-support>
-Message-ID: <1292513112-12471-1-git-send-email-srinath@mistralsolutions.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Dec 2010 15:57:50 +0000
+Subject: [PATCH] ARM: ensure all sched_clock() implementations are
+	notrace marked
+In-Reply-To: <AANLkTimGHSqO=QwESp98UBK28yawdiq+kURU=nwau27G@mail.gmail.com>
+References: <E1PT92Y-0004Ba-64@rmk-PC.arm.linux.org.uk>
+	<AANLkTimGHSqO=QwESp98UBK28yawdiq+kURU=nwau27G@mail.gmail.com>
+Message-ID: <20101216155750.GA28126@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath <srinath@mistralsolutions.com>
+On Thu, Dec 16, 2010 at 08:42:23PM +0530, Rabin Vincent wrote:
+> On Thu, Dec 16, 2010 at 1:48 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > ftrace requires sched_clock() to be notrace. ?Ensure that all
+> > implementations are so marked.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> It does seem better to have all of them explicity annotated anyway, even
+> if it not required in most of the cases because they include
+> <linux/sched.h> and the annotation in the declaration takes effect.
 
-AM3517/05 Craneboard has one EHCI interface on board using port1.
+Firstly, we shouldn't be relying upon that, and secondly, everywhere which
+defines sched_clock() should already be including linux/sched.h to avoid
+the sparse error.  It sounds like there's also an exercise to make sure
+that is the case.
 
-GPIO35 is used as power enable.
-GPIO38 is used as port1 PHY reset.
+> Note that in order for this to be fully effective, all functions called
+> from sched_clock() need to be notrace too.  OMAP and u300 miss this.
 
-History:
-http://marc.info/?l=linux-omap&w=2&r=1&s=Craneboard%3A+Add+USB+EHCI+support&q=t
+Yes, OMAP still suffers from this.
 
-Signed-off-by: Srinath <srinath@mistralsolutions.com>
----
- arch/arm/mach-omap2/board-am3517crane.c |   53 +++++++++++++++++++++++++++++++
- 1 files changed, 53 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index 8ba4047..1a80175 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/gpio.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -27,8 +28,14 @@
- 
- #include <plat/board.h>
- #include <plat/common.h>
-+#include <plat/usb.h>
- 
- #include "mux.h"
-+#include "control.h"
-+
-+#define GPIO_USB_POWER		35
-+#define GPIO_USB_NRESET		38
-+
- 
- /* Board initialization */
- static struct omap_board_config_kernel am3517_crane_config[] __initdata = {
-@@ -51,10 +58,56 @@ static void __init am3517_crane_init_irq(void)
- 	omap_init_irq();
- }
- 
-+static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
-+	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-+	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-+	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-+
-+	.phy_reset  = true,
-+	.reset_gpio_port[0]  = GPIO_USB_NRESET,
-+	.reset_gpio_port[1]  = -EINVAL,
-+	.reset_gpio_port[2]  = -EINVAL
-+};
-+
- static void __init am3517_crane_init(void)
- {
-+	int ret;
-+
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_serial_init();
-+
-+	/* Configure GPIO for EHCI port */
-+	if (omap_mux_init_gpio(GPIO_USB_NRESET, OMAP_PIN_OUTPUT)) {
-+		pr_err("Can not cofigure mux for GPIO_USB_NRESET %d\n",
-+			GPIO_USB_NRESET);
-+		return;
-+	}
-+
-+	if (omap_mux_init_gpio(GPIO_USB_POWER, OMAP_PIN_OUTPUT)) {
-+		pr_err("Can not cofigure mux for GPIO_USB_POWER %d\n",
-+
-+			GPIO_USB_POWER);
-+		return;
-+	}
-+
-+	ret = gpio_request(GPIO_USB_POWER, "usb_ehci_enable");
-+	if (ret < 0) {
-+		pr_err("Cannot request GPIO %d\n", GPIO_USB_POWER);
-+		return;
-+	}
-+
-+	ret = gpio_direction_output(GPIO_USB_POWER, 1);
-+	if (ret < 0)
-+		goto err;
-+
-+
-+	usb_ehci_init(&ehci_pdata);
-+	return;
-+
-+err:
-+	gpio_free(GPIO_USB_POWER);
-+	pr_err("Unable to initialize EHCI power\n");
-+	return;
- }
- 
- MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
--- 
-1.7.1.226.g770c5
+However, I assume you haven't looked at the u300 sched_clock conversion
+patch which is part of a follow-on series on lakml?  It sorts u300 out
+in that regard.
