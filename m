@@ -1,27 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Dec 2010 21:44:20 +0000
-Subject: [PATCH v5 5/5] msm: add SMP support for msm
-In-Reply-To: <1292482456-22690-6-git-send-email-johlstei@codeaurora.org>
-References: <1292482456-22690-1-git-send-email-johlstei@codeaurora.org>
-	<1292482456-22690-6-git-send-email-johlstei@codeaurora.org>
-Message-ID: <20101216214420.GX9937@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 16 Dec 2010 22:44:49 +0100
+Subject: OMAP3: Warning: swp{b} use is deprecated for this architecture
+In-Reply-To: <20101216201042.GW9937@n2100.arm.linux.org.uk>
+References: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
+	<20101216115657.GP9937@n2100.arm.linux.org.uk>
+	<AANLkTi=-ERvBARQ3bzOMZPx0s-OPuZHgXqjRet1aUxGw@mail.gmail.com>
+	<AANLkTink3TJonOC+cnpRUKKu9_+OBhJKDQ25yvrZZsrQ@mail.gmail.com>
+	<6188477658179778436@unknownmsgid>
+	<AANLkTinL3oonBvkZwZFr=Wh2m_EYQ1WVudV9cxNqKRBx@mail.gmail.com>
+	<AANLkTinXBx5F-wQC_eJPftsqgbaFUg9R8z5FxTFR+gTy@mail.gmail.com>
+	<20101216201042.GW9937@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimaC3WaWAF8QNgs+3qza2WmBPXGbo5eKsooMT_o@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 10:54:16PM -0800, Jeff Ohlstein wrote:
-> +void __cpuinit platform_secondary_init(unsigned int cpu)
-> +{
-> +	/* Configure edge-triggered PPIs */
-> +	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
+On Thu, Dec 16, 2010 at 9:10 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 16, 2010 at 08:04:41PM +0000, Dave Martin wrote:
+>> Note that the above bit of code is similar/identical to a bit of code
+>> already present in the OMAP BSP... so this still needs to be
+>> addressed.
+>>
+>> See arch/arm/mach-omap2/sleep34xx.S:lock_scratchpad_sem
+>
+> That's odd.
+>
+> | The following warning is issued by the compiler (gcc version 4.4.1
+> | (Sourcery G++ Lite 2010q1-202):
+> | arch/arm/mach-omap2/sleep34xx.S:87: Warning: swp{b} use is deprecated
+> | for this architecture
+>
+> It seems we're discussing the same code!
+>
+> As has been pointed out, and as Jean points out, this code is not called
+> at the moment, so can be removed to resolve the problem.
+>
+Exactly! It is actually planned for removal, cf.
+http://marc.info/?l=linux-omap&m=129252188012958&w=2
 
-At some point we should really clean this up so we don't have code
-writing directly to the GIC registers like this.
+A better solution will be needed at the time the API will be in use.
 
-> +static __init void prepare_cold_cpu(unsigned int cpu)
-> +{
-> +	int ret;
-> +	ret = scm_set_boot_addr((void *)
-> +				virt_to_phys(msm_secondary_startup),
-
-It seems wrong to cast a physical address to a pointer - physical
-addresses should not be pointer-like.  Can it stay as an integer?
+Thanks,
+Jean
