@@ -1,55 +1,45 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 17 Dec 2010 15:14:35 -0800 (PST)
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <AANLkTinsgqLDe3=KX59n1UAp9v0ErXQzxj+A+qQ8TRj_@mail.gmail.com>
-References: <4CF94DDD.8000409@codeaurora.org>
-	<20101203203653.GB10245@n2100.arm.linux.org.uk>
-	<4CFDD297.4020600@codeaurora.org>
-	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
-	<20101209103835.GA31465@n2100.arm.linux.org.uk>
-	<4D017B45.4000805@codeaurora.org>
-	<AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
-	<4D045692.4050607@codeaurora.org>
-	<AANLkTimwqC6DqN8ft10EyRbPh9XvibN1fA-Cug4OdS5m@mail.gmail.com>
-	<8c67e174d807416f0c6c190cc72d3f5a.squirrel@www.codeaurora.org>
-	<20101217094818.GA9937@n2100.arm.linux.org.uk>
-	<99eb693af85e07b01d81d45f1bc77f64.squirrel@www.codeaurora.org>
-	<AANLkTinsgqLDe3=KX59n1UAp9v0ErXQzxj+A+qQ8TRj_@mail.gmail.com>
-Message-ID: <7276921204ba82a2065faa61548f1699.squirrel@www.codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 17 Dec 2010 17:22:03 -0600
+Subject: [PATCH 0/7 v5] OMAP3: clean up ASM sleep code
+In-Reply-To: <AANLkTi=4XhE+fYDa9BYqk+1yb08Kiu3ppYNqEfW2w5Hf@mail.gmail.com>
+References: <1292580506-4421-1-git-send-email-j-pihet@ti.com>	<87bp4k6m1d.fsf@deeprootsystems.com>
+	<AANLkTi=4XhE+fYDa9BYqk+1yb08Kiu3ppYNqEfW2w5Hf@mail.gmail.com>
+Message-ID: <4D0BF09B.5050709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
->> Russell,
+Jean Pihet had written, on 12/17/2010 05:07 PM, the following:
+> Hi Kevin,
+> 
+> On Sat, Dec 18, 2010 at 12:02 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> Hi Jean,
 >>
->> I agree with your point about using an API for purpose and not property.
->> But I read Catalin's proposal as, let's treat secure domain as another
->> DMA
->> "device". If we make a conscious agreement to do that, then using the
->> DMA
->> API for secure domain would be "using it for its purpose" and we will
->> make
->> an effort to not break it with future updates. Of course, if we don't
->> agree on that proposal, then we can't use the DMA API for secure domain
->> stuff.
->
-> If there is no better proposal, I'm for such extension to the DMA API.
-> From the kernel perspecitve, the secure side is just another entity
-> that accesses the RAM directly. It's not a physically separate device
-> indeed but from a direct memory access perspective it can be treated
-> as any other device.
->
-> In the DMA API we can fall back to the non-coherent ops when a NULL
-> struct device is passed. I assume in your code you already pass a NULL
-> device to dma_alloc_coherent().
+>> jean.pihet at newoldbits.com writes:
+>>
+>>> From: Jean Pihet <j-pihet@ti.com>
+>>>
+>>> This patch only contains clean-ups and cosmetic changes,
+>>> no functional change.
+>>>
+>>> Clean-up of the ASM sleep code, for better readability and
+>>> easier maintenance.
+>>>
+>>> Applies on top of Nishant's latest idle path errata fixes step 2,
+>>> cf. http://marc.info/?l=linux-omap&m=129139584919242&w=2
+>> Can you do one more spin of this series in order to collect the
+>> reviewed-by/tested-by tags posted, and address some of Nishanth's
+>> comments.  Since we are reaching a merge window deadline, I'll leave it
+>> to your discretion to decide which of Nishanth's suggestions to address
+>> now and which to address later.
+> Sure I will post a new version tomorrow.
+> This will include some fixes after Nishant's comments. The rest can be
+> done later after we agree on the future changes.
+Sounds good to me as well.. the minor cleanups should be easy to do..
+will help with testing tomorrow on the new series if there are any 
+functional changes. I will post out my revamped series as well 2morrow.
 
-Russell,
 
-Would the extension of the DMA API as described above be acceptable to
-you? If not, can you please suggest an alternative that's acceptable to
-you?
-
--Saravana
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Nishanth Menon
