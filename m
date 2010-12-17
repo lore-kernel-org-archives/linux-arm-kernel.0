@@ -1,206 +1,192 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Dec 2010 16:49:45 -0800
-Subject: [PATCH 01/22] msm: clock: Remove unused code and definitions
+Date: Thu, 16 Dec 2010 16:49:50 -0800
+Subject: [PATCH 06/22] msm: clock-7x30: Update clock table
 In-Reply-To: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
 References: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1292547006-19741-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1292547006-19741-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove dead code and push out clock-7x30.h and clock-pcom.h to
-where they are actually used.
+Mark clocks with CLK_7X30 to indicate they have the potential to
+be locally controllable. If it's determined at runtime that these
+clocks are not locally owned, revert the clocks to proc_comm
+control. Mark clocks with CLK_PCOM when we know that they can't
+be locally controlled.
 
 Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/board-msm8x60.c   |    5 ----
- arch/arm/mach-msm/clock-pcom.c      |    1 +
- arch/arm/mach-msm/clock.c           |   21 ++--------------
- arch/arm/mach-msm/clock.h           |   45 -----------------------------------
- arch/arm/mach-msm/devices-msm7x30.c |    1 +
- arch/arm/mach-msm/devices-qsd8x50.c |    1 +
- 6 files changed, 6 insertions(+), 68 deletions(-)
+ arch/arm/mach-msm/devices-msm7x30.c |  147 ++++++++++++++++++++---------------
+ 1 files changed, 85 insertions(+), 62 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index 7486a68..852428b 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -30,11 +30,6 @@
- 
- void __iomem *gic_cpu_base_addr;
- 
--unsigned long clk_get_max_axi_khz(void)
--{
--	return 0;
--}
--
- static void __init msm8x60_map_io(void)
- {
- 	msm_map_msm8x60_io();
-diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-index a3b4562..8c4e867 100644
---- a/arch/arm/mach-msm/clock-pcom.c
-+++ b/arch/arm/mach-msm/clock-pcom.c
-@@ -20,6 +20,7 @@
- 
- #include "proc_comm.h"
- #include "clock.h"
-+#include "clock-pcom.h"
- 
- /*
-  * glue for the proc_comm interface
-diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index 2069bfa..8f71f8d 100644
---- a/arch/arm/mach-msm/clock.c
-+++ b/arch/arm/mach-msm/clock.c
-@@ -29,6 +29,7 @@
- #include "clock.h"
- #include "proc_comm.h"
- #include "clock-7x30.h"
-+#include "clock-pcom.h"
- 
- static DEFINE_MUTEX(clocks_mutex);
- static DEFINE_SPINLOCK(clocks_lock);
-@@ -37,13 +38,6 @@ struct clk *msm_clocks;
- unsigned msm_num_clocks;
- 
- /*
-- * Bitmap of enabled clocks, excluding ACPU which is always
-- * enabled
-- */
--static DECLARE_BITMAP(clock_map_enabled, NR_CLKS);
--static DEFINE_SPINLOCK(clock_map_lock);
--
--/*
-  * Standard clock functions defined in include/linux/clk.h
-  */
- struct clk *clk_get(struct device *dev, const char *id)
-@@ -77,12 +71,8 @@ int clk_enable(struct clk *clk)
- 	unsigned long flags;
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	clk->count++;
--	if (clk->count == 1) {
-+	if (clk->count == 1)
- 		clk->ops->enable(clk->id);
--		spin_lock(&clock_map_lock);
--		clock_map_enabled[BIT_WORD(clk->id)] |= BIT_MASK(clk->id);
--		spin_unlock(&clock_map_lock);
--	}
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- 	return 0;
- }
-@@ -94,12 +84,8 @@ void clk_disable(struct clk *clk)
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	BUG_ON(clk->count == 0);
- 	clk->count--;
--	if (clk->count == 0) {
-+	if (clk->count == 0)
- 		clk->ops->disable(clk->id);
--		spin_lock(&clock_map_lock);
--		clock_map_enabled[BIT_WORD(clk->id)] &= ~BIT_MASK(clk->id);
--		spin_unlock(&clock_map_lock);
--	}
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- EXPORT_SYMBOL(clk_disable);
-@@ -196,7 +182,6 @@ void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks)
- {
- 	unsigned n;
- 
--	spin_lock_init(&clocks_lock);
- 	mutex_lock(&clocks_mutex);
- 	msm_clocks = clock_tbl;
- 	msm_num_clocks = num_clocks;
-diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
-index c270b55..6a0cade 100644
---- a/arch/arm/mach-msm/clock.h
-+++ b/arch/arm/mach-msm/clock.h
-@@ -20,9 +20,6 @@
- #include <linux/list.h>
- #include <mach/clk.h>
- 
--#include "clock-pcom.h"
--#include "clock-7x30.h"
--
- #define CLKFLAG_INVERT			0x00000001
- #define CLKFLAG_NOINVERT		0x00000002
- #define CLKFLAG_NONEST			0x00000004
-@@ -59,51 +56,9 @@ struct clk {
- 	struct device *dev;
- };
- 
--#define A11S_CLK_CNTL_ADDR		(MSM_CSR_BASE + 0x100)
--#define A11S_CLK_SEL_ADDR		(MSM_CSR_BASE + 0x104)
--#define A11S_VDD_SVS_PLEVEL_ADDR	(MSM_CSR_BASE + 0x124)
--
--#ifdef CONFIG_DEBUG_FS
--#define CLOCK_DBG_NAME(x) .dbg_name = x,
--#else
--#define CLOCK_DBG_NAME(x)
--#endif
--
--#define CLOCK(clk_name, clk_id, clk_dev, clk_flags) {	\
--	.name = clk_name, \
--	.id = clk_id, \
--	.flags = clk_flags, \
--	.dev = clk_dev, \
--	 CLOCK_DBG_NAME(#clk_id) \
--	}
--
- #define OFF CLKFLAG_AUTO_OFF
- #define CLK_MIN CLKFLAG_MIN
- #define CLK_MAX CLKFLAG_MAX
- #define CLK_MINMAX (CLK_MIN | CLK_MAX)
--#define NR_CLKS	P_NR_CLKS
--
--enum {
--	PLL_0 = 0,
--	PLL_1,
--	PLL_2,
--	PLL_3,
--	PLL_4,
--	PLL_5,
--	PLL_6,
--	NUM_PLL
--};
--
--enum clkvote_client {
--	CLKVOTE_ACPUCLK = 0,
--	CLKVOTE_PMQOS,
--	CLKVOTE_MAX,
--};
--
--int msm_clock_require_tcxo(unsigned long *reason, int nbits);
--int msm_clock_get_name(uint32_t id, char *name, uint32_t size);
--int ebi1_clk_set_min_rate(enum clkvote_client client, unsigned long rate);
--unsigned long clk_get_max_axi_khz(void);
- 
- #endif
--
 diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
-index 7fcf2e3..2a9958f 100644
+index 2816be3..55382c4 100644
 --- a/arch/arm/mach-msm/devices-msm7x30.c
 +++ b/arch/arm/mach-msm/devices-msm7x30.c
-@@ -28,6 +28,7 @@
- #include <asm/mach/flash.h>
+@@ -58,78 +58,101 @@ struct platform_device msm_device_smd = {
+ };
  
- #include "clock-pcom.h"
-+#include "clock-7x30.h"
+ struct clk msm_clocks_7x30[] = {
+-	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
+ 	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
+ 	CLK_PCOM("cam_m_clk",	CAM_M_CLK,	NULL, 0),
+ 	CLK_PCOM("camif_pad_pclk",	CAMIF_PAD_P_CLK,	NULL, OFF),
+-	CLK_PCOM("ce_clk",	CE_CLK,	NULL, 0),
+ 	CLK_PCOM("codec_ssbi_clk",	CODEC_SSBI_CLK,	NULL, 0),
+ 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
+ 	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
+-	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
+-	CLK_PCOM("emdh_pclk",	EMDH_P_CLK,	NULL, OFF),
+ 	CLK_PCOM("gp_clk",	GP_CLK,		NULL, 0),
+-	CLK_PCOM("grp_2d_clk",	GRP_2D_CLK,	NULL, 0),
+-	CLK_PCOM("grp_2d_pclk",	GRP_2D_P_CLK,	NULL, 0),
+-	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, 0),
+-	CLK_PCOM("grp_pclk",	GRP_3D_P_CLK,	NULL, 0),
+-	CLK_7X30S("grp_src_clk", GRP_3D_SRC_CLK, GRP_3D_CLK,	NULL, 0),
+-	CLK_PCOM("hdmi_clk",	HDMI_CLK,	NULL, 0),
+-	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
+-	CLK_PCOM("jpeg_clk",	JPEG_CLK,	NULL, OFF),
+-	CLK_PCOM("jpeg_pclk",	JPEG_P_CLK,	NULL, OFF),
+-	CLK_PCOM("lpa_codec_clk",	LPA_CODEC_CLK,		NULL, 0),
+-	CLK_PCOM("lpa_core_clk",	LPA_CORE_CLK,		NULL, 0),
+-	CLK_PCOM("lpa_pclk",		LPA_P_CLK,		NULL, 0),
+-	CLK_PCOM("mdc_clk",	MDC_CLK,	NULL, 0),
+-	CLK_PCOM("mddi_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
+-	CLK_PCOM("mddi_pclk",	PMDH_P_CLK,	NULL, 0),
+-	CLK_PCOM("mdp_clk",	MDP_CLK,	NULL, OFF),
+-	CLK_PCOM("mdp_pclk",	MDP_P_CLK,	NULL, 0),
+-	CLK_PCOM("mdp_lcdc_pclk_clk", MDP_LCDC_PCLK_CLK, NULL, 0),
+-	CLK_PCOM("mdp_lcdc_pad_pclk_clk", MDP_LCDC_PAD_PCLK_CLK, NULL, 0),
+-	CLK_PCOM("mdp_vsync_clk",	MDP_VSYNC_CLK,  NULL, 0),
+-	CLK_PCOM("mfc_clk",		MFC_CLK,		NULL, 0),
+-	CLK_PCOM("mfc_div2_clk",	MFC_DIV2_CLK,		NULL, 0),
+-	CLK_PCOM("mfc_pclk",		MFC_P_CLK,		NULL, 0),
+-	CLK_PCOM("mi2s_m_clk",		MI2S_M_CLK,  		NULL, 0),
+-	CLK_PCOM("mi2s_s_clk",		MI2S_S_CLK,  		NULL, 0),
+-	CLK_PCOM("mi2s_codec_rx_m_clk",	MI2S_CODEC_RX_M_CLK,  NULL, 0),
+-	CLK_PCOM("mi2s_codec_rx_s_clk",	MI2S_CODEC_RX_S_CLK,  NULL, 0),
+-	CLK_PCOM("mi2s_codec_tx_m_clk",	MI2S_CODEC_TX_M_CLK,  NULL, 0),
+-	CLK_PCOM("mi2s_codec_tx_s_clk",	MI2S_CODEC_TX_S_CLK,  NULL, 0),
+-	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, CLK_MIN),
+-	CLK_PCOM("pcm_clk",	PCM_CLK,	NULL, 0),
+-	CLK_PCOM("rotator_clk",	AXI_ROTATOR_CLK,		NULL, 0),
+-	CLK_PCOM("rotator_imem_clk",	ROTATOR_IMEM_CLK,	NULL, OFF),
+-	CLK_PCOM("rotator_pclk",	ROTATOR_P_CLK,		NULL, OFF),
+-	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
+-	CLK_PCOM("spi_clk",	SPI_CLK,	NULL, 0),
+-	CLK_PCOM("spi_pclk",	SPI_P_CLK,	NULL, 0),
+-	CLK_7X30S("tv_src_clk",	TV_CLK, 	TV_ENC_CLK,	NULL, 0),
+-	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
+-	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
+-	CLK_PCOM("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, 0),
+-	CLK_PCOM("usb_hs_clk",		USB_HS_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs_pclk",		USB_HS_P_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs_core_clk",	USB_HS_CORE_CLK,	NULL, OFF),
+-	CLK_PCOM("usb_hs2_clk",		USB_HS2_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs2_pclk",	USB_HS2_P_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs2_core_clk",	USB_HS2_CORE_CLK,	NULL, OFF),
+-	CLK_PCOM("usb_hs3_clk",		USB_HS3_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs3_pclk",	USB_HS3_P_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs3_core_clk",	USB_HS3_CORE_CLK,	NULL, OFF),
++	CLK_PCOM("uart_clk",	UART3_CLK,	NULL, OFF),
++	CLK_PCOM("usb_phy_clk",	USB_PHY_CLK,	NULL, 0),
+ 	CLK_PCOM("vdc_clk",	VDC_CLK,	NULL, OFF | CLK_MIN),
+-	CLK_PCOM("vfe_camif_clk",	VFE_CAMIF_CLK, 	NULL, 0),
+-	CLK_PCOM("vfe_clk",	VFE_CLK,	NULL, 0),
+-	CLK_PCOM("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, 0),
+-	CLK_PCOM("vfe_pclk",	VFE_P_CLK,	NULL, OFF),
+-	CLK_PCOM("vpe_clk",	VPE_CLK,	NULL, 0),
++	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, CLK_MIN),
++
++	CLK_7X30("adm_clk",	ADM_CLK,	NULL, 0),
++	CLK_7X30L("adm_pclk",   ADM_P_CLK,       NULL, 0),
++	CLK_7X30("cam_m_clk",	CAM_M_CLK,	NULL, 0),
++	CLK_7X30("camif_pad_pclk",	CAMIF_PAD_P_CLK,	NULL, OFF),
++	CLK_7X30("ce_clk",	CE_CLK,		NULL, 0),
++	CLK_7X30("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
++	CLK_7X30("emdh_pclk",	EMDH_P_CLK,	NULL, OFF),
++	CLK_7X30("grp_2d_clk",	GRP_2D_CLK,	NULL, 0),
++	CLK_7X30("grp_2d_pclk",	GRP_2D_P_CLK,	NULL, 0),
++	CLK_7X30("grp_clk",	GRP_3D_CLK,	NULL, 0),
++	CLK_7X30("grp_pclk",	GRP_3D_P_CLK,	NULL, 0),
++	CLK_7X30S("grp_src_clk", GRP_3D_SRC_CLK, GRP_3D_CLK,	NULL, 0),
++	CLK_7X30("hdmi_clk",	HDMI_CLK,	NULL, 0),
++	CLK_7X30("i2c_clk",	I2C_CLK,	NULL, 0),
++	CLK_7X30("i2c_clk",	I2C_2_CLK,	NULL, 0),
++	CLK_7X30("imem_clk",	IMEM_CLK,	NULL, OFF),
++	CLK_7X30("jpeg_clk",	JPEG_CLK,	NULL, OFF),
++	CLK_7X30("jpeg_pclk",	JPEG_P_CLK,	NULL, OFF),
++	CLK_7X30("lpa_codec_clk",	LPA_CODEC_CLK,		NULL, 0),
++	CLK_7X30("lpa_core_clk",	LPA_CORE_CLK,		NULL, 0),
++	CLK_7X30("lpa_pclk",		LPA_P_CLK,		NULL, 0),
++	CLK_7X30("mdc_clk",	MDC_CLK,	NULL, 0),
++	CLK_7X30("mddi_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
++	CLK_7X30("mddi_pclk",	PMDH_P_CLK,	NULL, 0),
++	CLK_7X30("mdp_clk",	MDP_CLK,	NULL, OFF),
++	CLK_7X30("mdp_pclk",	MDP_P_CLK,	NULL, 0),
++	CLK_7X30("mdp_lcdc_pclk_clk", MDP_LCDC_PCLK_CLK, NULL, 0),
++	CLK_7X30("mdp_lcdc_pad_pclk_clk", MDP_LCDC_PAD_PCLK_CLK, NULL, 0),
++	CLK_7X30("mdp_vsync_clk",	MDP_VSYNC_CLK,  NULL, OFF),
++	CLK_7X30("mfc_clk",		MFC_CLK,		NULL, 0),
++	CLK_7X30("mfc_div2_clk",	MFC_DIV2_CLK,		NULL, 0),
++	CLK_7X30("mfc_pclk",		MFC_P_CLK,		NULL, 0),
++	CLK_7X30("mi2s_codec_rx_m_clk",	MI2S_CODEC_RX_M_CLK,  NULL, 0),
++	CLK_7X30("mi2s_codec_rx_s_clk",	MI2S_CODEC_RX_S_CLK,  NULL, 0),
++	CLK_7X30("mi2s_codec_tx_m_clk",	MI2S_CODEC_TX_M_CLK,  NULL, 0),
++	CLK_7X30("mi2s_codec_tx_s_clk",	MI2S_CODEC_TX_S_CLK,  NULL, 0),
++	CLK_7X30("mi2s_m_clk",		MI2S_M_CLK,		NULL, 0),
++	CLK_7X30("mi2s_s_clk",		MI2S_S_CLK,		NULL, 0),
++	CLK_7X30("qup_clk",	QUP_I2C_CLK,	NULL, 0),
++	CLK_7X30("rotator_clk",	AXI_ROTATOR_CLK,		NULL, 0),
++	CLK_7X30("rotator_imem_clk",	ROTATOR_IMEM_CLK,	NULL, OFF),
++	CLK_7X30("rotator_pclk",	ROTATOR_P_CLK,		NULL, OFF),
++	CLK_7X30("sdac_clk",	SDAC_CLK,	NULL, OFF),
++	CLK_7X30("sdc_clk",	SDC1_CLK,	NULL, OFF),
++	CLK_7X30("sdc_pclk",	SDC1_P_CLK,	NULL, OFF),
++	CLK_7X30("sdc_clk",	SDC2_CLK,	NULL, OFF),
++	CLK_7X30("sdc_pclk",	SDC2_P_CLK,	NULL, OFF),
++	CLK_7X30("sdc_clk",	SDC3_CLK,	NULL, OFF),
++	CLK_7X30("sdc_pclk",	SDC3_P_CLK,	NULL, OFF),
++	CLK_7X30("sdc_clk",	SDC4_CLK,	NULL, OFF),
++	CLK_7X30("sdc_pclk",	SDC4_P_CLK,	NULL, OFF),
++	CLK_7X30("spi_clk",	SPI_CLK,	NULL, 0),
++	CLK_7X30("spi_pclk",	SPI_P_CLK,	NULL, 0),
++	CLK_7X30("tsif_ref_clk", TSIF_REF_CLK,	NULL, 0),
++	CLK_7X30("tsif_pclk",	TSIF_P_CLK,	NULL, 0),
++	CLK_7X30("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
++	CLK_7X30("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
++	CLK_7X30S("tv_src_clk",	TV_CLK,		TV_ENC_CLK,	NULL, 0),
++	CLK_7X30("uart_clk",	UART1_CLK,	NULL, OFF),
++	CLK_7X30("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, 0),
++	CLK_7X30("uartdm_clk",	UART1DM_CLK,	NULL, OFF),
++	CLK_7X30L("uartdm_pclk", UART1DM_P_CLK,	NULL, 0),
++	CLK_7X30("uartdm_clk",	UART2DM_CLK,	NULL, 0),
++	CLK_7X30L("uartdm_pclk", UART2DM_P_CLK,	NULL, 0),
++	CLK_7X30("usb_hs_clk",		USB_HS_CLK,		NULL, OFF),
++	CLK_7X30("usb_hs_pclk",		USB_HS_P_CLK,		NULL, OFF),
++	CLK_7X30("usb_hs_core_clk",	USB_HS_CORE_CLK,	NULL, OFF),
++	CLK_7X30("usb_hs2_clk",		USB_HS2_CLK,		NULL, OFF),
++	CLK_7X30("usb_hs2_pclk",	USB_HS2_P_CLK,		NULL, OFF),
++	CLK_7X30("usb_hs2_core_clk",	USB_HS2_CORE_CLK,	NULL, OFF),
++	CLK_7X30("usb_hs3_clk",		USB_HS3_CLK,		NULL, OFF),
++	CLK_7X30("usb_hs3_pclk",	USB_HS3_P_CLK,		NULL, OFF),
++	CLK_7X30("usb_hs3_core_clk",	USB_HS3_CORE_CLK,	NULL, OFF),
++	CLK_7X30("vfe_camif_clk",	VFE_CAMIF_CLK, NULL, 0),
++	CLK_7X30("vfe_clk",	VFE_CLK,	NULL, 0),
++	CLK_7X30("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, 0),
++	CLK_7X30("vfe_pclk",	VFE_P_CLK,	NULL, OFF),
++	CLK_7X30("vpe_clk",	VPE_CLK,	NULL, 0),
  
- #include <mach/mmc.h>
+ 	/* 7x30 v2 hardware only. */
+-	CLK_PCOM("csi_clk",	CSI0_CLK,	NULL, 0),
+-	CLK_PCOM("csi_pclk",	CSI0_P_CLK,	NULL, 0),
+-	CLK_PCOM("csi_vfe_clk",	CSI0_VFE_CLK,	NULL, 0),
++	CLK_7X30("csi_clk",	CSI0_CLK,	NULL, 0),
++	CLK_7X30("csi_pclk",	CSI0_P_CLK,	NULL, 0),
++	CLK_7X30("csi_vfe_clk",	CSI0_VFE_CLK,	NULL, 0),
+ };
  
-diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
-index 6fe67c5..f92c5c2 100644
---- a/arch/arm/mach-msm/devices-qsd8x50.c
-+++ b/arch/arm/mach-msm/devices-qsd8x50.c
-@@ -27,6 +27,7 @@
- #include <asm/mach/flash.h>
- 
- #include <mach/mmc.h>
-+#include "clock-pcom.h"
- 
- static struct resource resources_uart3[] = {
- 	{
+ unsigned msm_num_clocks_7x30 = ARRAY_SIZE(msm_clocks_7x30);
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
