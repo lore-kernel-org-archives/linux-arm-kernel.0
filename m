@@ -1,252 +1,267 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:47:12 +0000
-Subject: [PATCH 26/40] ARM: ensure all sched_clock() implementations are
-	notrace marked
+Date: Fri, 17 Dec 2010 11:47:52 +0000
+Subject: [PATCH 28/40] ARM: sched_clock: provide common infrastructure for
+	sched_clock()
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYmG-0006jK-5r@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYmu-0006jS-Na@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ftrace requires sched_clock() to be notrace.  Ensure that all
-implementations are so marked.  Also make sure that they include
-linux/sched.h
+Provide common sched_clock() infrastructure for platforms to use to
+create a 64-bit ns based sched_clock() implementation from a counter
+running at a non-variable clock rate.
 
-Also ensure OMAP clocksource read functions are marked notrace as
-they're used for sched_clock() too.
+This implementation is based upon maintaining an epoch for the counter
+and an epoch for the nanosecond time.  When we desire a sched_clock()
+time, we calculate the number of counter ticks since the last epoch
+update, convert this to nanoseconds and add to the epoch nanoseconds.
 
+We regularly refresh these epochs within the counter wrap interval.
+We perform a similar calculation as above, and store the new epochs.
+
+We read and write the epochs in such a way that sched_clock() can easily
+(and locklessly) detect when an update is in progress, and repeat the
+loading of these constants when they're known not to be stable.  The
+one caveat is that sched_clock() is not called in the middle of an
+update.
+
+Finally, if the clock rate is known at compile time, the counter to ns
+conversion factors can be specified, allowing sched_clock() to be tightly
+optimized.  We ensure that these factors are correct by providing an
+initialization function which performs a run-time check.
+
+Acked-by: Peter Zijlstra <peterz@infradead.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ixp4xx/common.c         |    2 +-
- arch/arm/mach-mmp/time.c              |    2 +-
- arch/arm/mach-pxa/time.c              |    2 +-
- arch/arm/mach-sa1100/generic.c        |    2 +-
- arch/arm/mach-tegra/timer.c           |    3 ++-
- arch/arm/mach-u300/timer.c            |    1 +
- arch/arm/plat-iop/time.c              |    3 ++-
- arch/arm/plat-nomadik/timer.c         |    1 +
- arch/arm/plat-omap/counter_32k.c      |   15 ++++++++-------
- arch/arm/plat-orion/time.c            |    2 +-
- arch/arm/plat-versatile/sched-clock.c |    2 +-
- 11 files changed, 20 insertions(+), 15 deletions(-)
+ arch/arm/Kconfig                   |    3 +
+ arch/arm/include/asm/sched_clock.h |  115 ++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/Makefile           |    1 +
+ arch/arm/kernel/sched_clock.c      |   69 +++++++++++++++++++++
+ 4 files changed, 188 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/sched_clock.h
+ create mode 100644 arch/arm/kernel/sched_clock.c
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 82fc003..e0b91d8 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -424,7 +424,7 @@ static void __init ixp4xx_clocksource_init(void)
- /*
-  * sched_clock()
-  */
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	cycle_t cyc = ixp4xx_get_cycles(NULL);
- 	struct clocksource *cs = &clocksource_ixp4xx;
-diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index 0c0ab09..a2ea33d 100644
---- a/arch/arm/mach-mmp/time.c
-+++ b/arch/arm/mach-mmp/time.c
-@@ -75,7 +75,7 @@ static inline uint32_t timer_read(void)
- 	return __raw_readl(TIMERS_VIRT_BASE + TMR_CVWR(0));
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 49778bb..ed7a0a7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -38,6 +38,9 @@ config HAVE_PWM
+ config SYS_SUPPORTS_APM_EMULATION
+ 	bool
  
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	unsigned long long v = cnt32_to_63(timer_read());
- 	return (v * tcr2ns_scale) >> TCR2NS_SCALE_FACTOR;
-diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
-index caf92c0..b8d9dff 100644
---- a/arch/arm/mach-pxa/time.c
-+++ b/arch/arm/mach-pxa/time.c
-@@ -51,7 +51,7 @@ static void __init set_oscr2ns_scale(unsigned long oscr_rate)
- 		oscr2ns_scale++;
- }
++config HAVE_SCHED_CLOCK
++	bool
++
+ config GENERIC_GPIO
+ 	bool
  
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	unsigned long long v = cnt32_to_63(OSCR);
- 	return (v * oscr2ns_scale) >> OSCR2NS_SCALE_FACTOR;
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index 3c1fcd6..33b4969 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -119,7 +119,7 @@ unsigned int sa11x0_getspeed(unsigned int cpu)
-  *
-  *  ( * 1E9 / 3686400 => * 78125 / 288)
-  */
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	unsigned long long v = cnt32_to_63(OSCR);
- 
-diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-index b49f2f5..c52bd84 100644
---- a/arch/arm/mach-tegra/timer.c
-+++ b/arch/arm/mach-tegra/timer.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/init.h>
+diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
+new file mode 100644
+index 0000000..82d4d3f
+--- /dev/null
++++ b/arch/arm/include/asm/sched_clock.h
+@@ -0,0 +1,115 @@
++/*
++ * sched_clock.h: support for extending counters to full 64-bit ns counter
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef ASM_SCHED_CLOCK
++#define ASM_SCHED_CLOCK
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++
++struct clock_data {
++	u64 epoch_ns;
++	u32 epoch_cyc;
++	u32 epoch_cyc_copy;
++	u32 mult;
++	u32 shift;
++};
++
++#define DEFINE_CLOCK_DATA(name)	struct clock_data name
++
++static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
++{
++	return (cyc * mult) >> shift;
++}
++
++/*
++ * Atomically update the sched_clock epoch.  Your update callback will
++ * be called from a timer before the counter wraps - read the current
++ * counter value, and call this function to safely move the epochs
++ * forward.
++ */
++static inline void update_sched_clock(struct clock_data *cd, u32 cyc, u32 mask)
++{
++	u64 ns = cd->epoch_ns +
++		cyc_to_ns((cyc - cd->epoch_cyc) & mask, cd->mult, cd->shift);
++
++	/*
++	 * Write epoch_cyc and epoch_ns in a way that the update is
++	 * detectable in cyc_to_fixed_sched_clock().
++	 */
++	cd->epoch_cyc = cyc;
++	smp_wmb();
++	cd->epoch_ns = ns;
++	smp_wmb();
++	cd->epoch_cyc_copy = cyc;
++}
++
++/*
++ * If your clock rate is known at compile time, using this will allow
++ * you to optimize the mult/shift loads away.  This is paired with
++ * init_fixed_sched_clock() to ensure that your mult/shift are correct.
++ */
++static inline unsigned long long cyc_to_fixed_sched_clock(struct clock_data *cd,
++	u32 cyc, u32 mask, u32 mult, u32 shift)
++{
++	u64 epoch_ns;
++	u32 epoch_cyc;
++
++	/*
++	 * Load the epoch_cyc and epoch_ns atomically.  We do this by
++	 * ensuring that we always write epoch_cyc, epoch_ns and
++	 * epoch_cyc_copy in strict order, and read them in strict order.
++	 * If epoch_cyc and epoch_cyc_copy are not equal, then we're in
++	 * the middle of an update, and we should repeat the load.
++	 */
++	do {
++		epoch_cyc = cd->epoch_cyc;
++		smp_rmb();
++		epoch_ns = cd->epoch_ns;
++		smp_rmb();
++	} while (epoch_cyc != cd->epoch_cyc_copy);
++
++	return epoch_ns + cyc_to_ns((cyc - epoch_cyc) & mask, mult, shift);
++}
++
++/*
++ * Otherwise, you need to use this, which will obtain the mult/shift
++ * from the clock_data structure.  Use init_sched_clock() with this.
++ */
++static inline unsigned long long cyc_to_sched_clock(struct clock_data *cd,
++	u32 cyc, u32 mask)
++{
++	return cyc_to_fixed_sched_clock(cd, cyc, mask, cd->mult, cd->shift);
++}
++
++/*
++ * Initialize the clock data - calculate the appropriate multiplier
++ * and shift.  Also setup a timer to ensure that the epoch is refreshed
++ * at the appropriate time interval, which will call your update
++ * handler.
++ */
++void init_sched_clock(struct clock_data *, void (*)(void),
++	unsigned int, unsigned long);
++
++/*
++ * Use this initialization function rather than init_sched_clock() if
++ * you're using cyc_to_fixed_sched_clock, which will warn if your
++ * constants are incorrect.
++ */
++static inline void init_fixed_sched_clock(struct clock_data *cd,
++	void (*update)(void), unsigned int bits, unsigned long rate,
++	u32 mult, u32 shift)
++{
++	init_sched_clock(cd, update, bits, rate);
++	if (cd->mult != mult || cd->shift != shift) {
++		pr_crit("sched_clock: wrong multiply/shift: %u>>%u vs calculated %u>>%u\n"
++			"sched_clock: fix multiply/shift to avoid scheduler hiccups\n",
++			mult, shift, cd->mult, cd->shift);
++	}
++}
++
++#endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 679851a..fd3ec49 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -29,6 +29,7 @@ obj-$(CONFIG_MODULES)		+= armksyms.o module.o
+ obj-$(CONFIG_ARTHUR)		+= arthur.o
+ obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
+ obj-$(CONFIG_PCI)		+= bios32.o isa.o
++obj-$(CONFIG_HAVE_SCHED_CLOCK)	+= sched_clock.o
+ obj-$(CONFIG_SMP)		+= smp.o
+ obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
+ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+new file mode 100644
+index 0000000..2cdcc92
+--- /dev/null
++++ b/arch/arm/kernel/sched_clock.c
+@@ -0,0 +1,69 @@
++/*
++ * sched_clock.c: support for extending counters to full 64-bit ns counter
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/clocksource.h>
++#include <linux/init.h>
++#include <linux/jiffies.h>
++#include <linux/kernel.h>
 +#include <linux/sched.h>
- #include <linux/time.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-@@ -110,7 +111,7 @@ static struct clocksource tegra_clocksource = {
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	return cnt32_to_63(timer_readl(TIMERUS_CNTR_1US)) * 1000;
- }
-diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
-index 377ff7f..6c68fe7 100644
---- a/arch/arm/mach-u300/timer.c
-+++ b/arch/arm/mach-u300/timer.c
-@@ -9,6 +9,7 @@
-  * Author: Linus Walleij <linus.walleij@stericsson.com>
-  */
- #include <linux/interrupt.h>
-+#include <linux/sched.h>
- #include <linux/time.h>
- #include <linux/timex.h>
- #include <linux/clockchips.h>
-diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-index cd6d54f..0c6da54 100644
---- a/arch/arm/plat-iop/time.c
-+++ b/arch/arm/plat-iop/time.c
-@@ -17,6 +17,7 @@
- #include <linux/interrupt.h>
- #include <linux/time.h>
- #include <linux/init.h>
-+#include <linux/sched.h>
- #include <linux/timex.h>
- #include <linux/io.h>
- #include <linux/clocksource.h>
-@@ -52,7 +53,7 @@ static struct clocksource iop_clocksource = {
- /*
-  * IOP sched_clock() implementation via its clocksource.
-  */
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	cycle_t cyc = iop_clocksource_read(NULL);
- 	struct clocksource *cs = &iop_clocksource;
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index b0bd6df..c3b8a22 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -19,6 +19,7 @@
- #include <linux/err.h>
- #include <linux/cnt32_to_63.h>
- #include <linux/timer.h>
-+#include <linux/sched.h>
- #include <asm/mach/time.h>
- 
- #include <plat/mtu.h>
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index 8f149f5..aed301b 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/sched.h>
- 
- #include <plat/common.h>
- #include <plat/board.h>
-@@ -44,7 +45,7 @@
- static u32 offset_32k __read_mostly;
- 
- #ifdef CONFIG_ARCH_OMAP16XX
--static cycle_t omap16xx_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap16xx_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
- }
-@@ -53,7 +54,7 @@ static cycle_t omap16xx_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP2420
--static cycle_t omap2420_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap2420_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-@@ -62,7 +63,7 @@ static cycle_t omap2420_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP2430
--static cycle_t omap2430_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap2430_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-@@ -71,7 +72,7 @@ static cycle_t omap2430_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP3
--static cycle_t omap34xx_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap34xx_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-@@ -80,7 +81,7 @@ static cycle_t omap34xx_32k_read(struct clocksource *cs)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--static cycle_t omap44xx_32k_read(struct clocksource *cs)
-+static cycle_t notrace omap44xx_32k_read(struct clocksource *cs)
- {
- 	return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
- }
-@@ -92,7 +93,7 @@ static cycle_t omap44xx_32k_read(struct clocksource *cs)
-  * Kernel assumes that sched_clock can be called early but may not have
-  * things ready yet.
-  */
--static cycle_t omap_32k_read_dummy(struct clocksource *cs)
-+static cycle_t notrace omap_32k_read_dummy(struct clocksource *cs)
- {
- 	return 0;
- }
-@@ -109,7 +110,7 @@ static struct clocksource clocksource_32k = {
-  * Returns current time from boot in nsecs. It's OK for this to wrap
-  * around for now, as it's just a relative time stamp.
-  */
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	return clocksource_cyc2ns(clocksource_32k.read(&clocksource_32k),
- 				  clocksource_32k.mult, clocksource_32k.shift);
-diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
-index 11e2583..123f96f 100644
---- a/arch/arm/plat-orion/time.c
-+++ b/arch/arm/plat-orion/time.c
-@@ -55,7 +55,7 @@ static u32 ticks_per_jiffy;
- 
- static unsigned long tclk2ns_scale;
- 
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
- 	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
-diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
-index 9696ddc..42efd14 100644
---- a/arch/arm/plat-versatile/sched-clock.c
-+++ b/arch/arm/plat-versatile/sched-clock.c
-@@ -42,7 +42,7 @@
-  * long as there is always less than 89 seconds between successive
-  * calls to this function.
-  */
--unsigned long long sched_clock(void)
-+unsigned long long notrace sched_clock(void)
- {
- 	unsigned long long v = cnt32_to_63(readl(REFCOUNTER));
- 
++#include <linux/timer.h>
++
++#include <asm/sched_clock.h>
++
++static void sched_clock_poll(unsigned long wrap_ticks);
++static DEFINE_TIMER(sched_clock_timer, sched_clock_poll, 0, 0);
++static void (*sched_clock_update_fn)(void);
++
++static void sched_clock_poll(unsigned long wrap_ticks)
++{
++	mod_timer(&sched_clock_timer, round_jiffies(jiffies + wrap_ticks));
++	sched_clock_update_fn();
++}
++
++void __init init_sched_clock(struct clock_data *cd, void (*update)(void),
++	unsigned int clock_bits, unsigned long rate)
++{
++	unsigned long r, w;
++	u64 res, wrap;
++	char r_unit;
++
++	sched_clock_update_fn = update;
++
++	/* calculate the mult/shift to convert counter ticks to ns. */
++	clocks_calc_mult_shift(&cd->mult, &cd->shift, rate, NSEC_PER_SEC, 60);
++
++	r = rate;
++	if (r >= 4000000) {
++		r /= 1000000;
++		r_unit = 'M';
++	} else {
++		r /= 1000;
++		r_unit = 'k';
++	}
++
++	/* calculate how many ns until we wrap */
++	wrap = cyc_to_ns((1ULL << clock_bits) - 1, cd->mult, cd->shift);
++	do_div(wrap, NSEC_PER_MSEC);
++	w = wrap;
++
++	/* calculate the ns resolution of this counter */
++	res = cyc_to_ns(1ULL, cd->mult, cd->shift);
++	pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lums\n",
++		clock_bits, r, r_unit, res, w);
++
++	/*
++	 * Start the timer to keep sched_clock() properly updated and
++	 * sets the initial epoch.
++	 */
++	sched_clock_timer.data = msecs_to_jiffies(w - (w / 10));
++	sched_clock_poll(sched_clock_timer.data);
++
++	/*
++	 * Ensure that sched_clock() starts off at 0ns
++	 */
++	cd->epoch_ns = 0;
++}
 -- 
 1.6.2.5
