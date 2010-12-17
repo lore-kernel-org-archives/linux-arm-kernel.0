@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:39:23 +0000
-Subject: [PATCH 12/40] ARM: PXA: update clock source registration
+Date: Fri, 17 Dec 2010 11:38:43 +0000
+Subject: [PATCH 10/40] ARM: ns9xxx: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYeh-0006iQ-Vu@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYe3-0006iI-3x@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,34 +12,32 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-pxa/time.c |    6 +-----
+ arch/arm/mach-ns9xxx/time-ns9360.c |    6 +-----
  1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
-index 293e40a..caf92c0 100644
---- a/arch/arm/mach-pxa/time.c
-+++ b/arch/arm/mach-pxa/time.c
-@@ -127,7 +127,6 @@ static struct clocksource cksrc_pxa_oscr0 = {
- 	.rating         = 200,
- 	.read           = pxa_read_oscr,
- 	.mask           = CLOCKSOURCE_MASK(32),
--	.shift          = 20,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+diff --git a/arch/arm/mach-ns9xxx/time-ns9360.c b/arch/arm/mach-ns9xxx/time-ns9360.c
+index 7728126..9ca32f5 100644
+--- a/arch/arm/mach-ns9xxx/time-ns9360.c
++++ b/arch/arm/mach-ns9xxx/time-ns9360.c
+@@ -35,7 +35,6 @@ static struct clocksource ns9360_clocksource = {
+ 	.rating	= 300,
+ 	.read	= ns9360_clocksource_read,
+ 	.mask	= CLOCKSOURCE_MASK(32),
+-	.shift	= 20,
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -155,12 +154,9 @@ static void __init pxa_timer_init(void)
- 		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_pxa_osmr0) + 1;
- 	ckevt_pxa_osmr0.cpumask = cpumask_of(0);
+@@ -148,10 +147,7 @@ static void __init ns9360_timer_init(void)
  
--	cksrc_pxa_oscr0.mult =
--		clocksource_hz2mult(clock_tick_rate, cksrc_pxa_oscr0.shift);
+ 	__raw_writel(tc, SYS_TC(TIMER_CLOCKSOURCE));
+ 
+-	ns9360_clocksource.mult = clocksource_hz2mult(ns9360_cpuclock(),
+-			ns9360_clocksource.shift);
 -
- 	setup_irq(IRQ_OST0, &pxa_ost0_irq);
+-	clocksource_register(&ns9360_clocksource);
++	clocksource_register_hz(&ns9360_clocksource, ns9360_cpuclock());
  
--	clocksource_register(&cksrc_pxa_oscr0);
-+	clocksource_register_hz(&cksrc_pxa_oscr0, clock_tick_rate);
- 	clockevents_register_device(&ckevt_pxa_osmr0);
- }
+ 	latch = SH_DIV(ns9360_cpuclock(), HZ, 0);
  
 -- 
 1.6.2.5
