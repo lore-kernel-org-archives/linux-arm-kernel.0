@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:37:00 +0000
-Subject: [PATCH 05/40] ARM: ixp4xx: update clock source registration
+Date: Fri, 17 Dec 2010 11:37:21 +0000
+Subject: [PATCH 06/40] ARM: lpc32xx: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYcO-0006hx-UO@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYcj-0006i1-CS@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +12,31 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ixp4xx/common.c |    6 +-----
- 1 files changed, 1 insertions(+), 5 deletions(-)
+ arch/arm/mach-lpc32xx/timer.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 0bce097..82fc003 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -411,7 +411,6 @@ static struct clocksource clocksource_ixp4xx = {
- 	.rating		= 200,
- 	.read		= ixp4xx_get_cycles,
- 	.mask		= CLOCKSOURCE_MASK(32),
--	.shift 		= 20,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
+diff --git a/arch/arm/mach-lpc32xx/timer.c b/arch/arm/mach-lpc32xx/timer.c
+index 630dd4a..6162ac3 100644
+--- a/arch/arm/mach-lpc32xx/timer.c
++++ b/arch/arm/mach-lpc32xx/timer.c
+@@ -38,7 +38,6 @@ static cycle_t lpc32xx_clksrc_read(struct clocksource *cs)
  
-@@ -419,10 +418,7 @@ unsigned long ixp4xx_timer_freq = FREQ;
- EXPORT_SYMBOL(ixp4xx_timer_freq);
- static void __init ixp4xx_clocksource_init(void)
- {
--	clocksource_ixp4xx.mult =
--		clocksource_hz2mult(ixp4xx_timer_freq,
--				    clocksource_ixp4xx.shift);
--	clocksource_register(&clocksource_ixp4xx);
-+	clocksource_register_hz(&clocksource_ixp4xx, ixp4xx_timer_freq);
+ static struct clocksource lpc32xx_clksrc = {
+ 	.name	= "lpc32xx_clksrc",
+-	.shift	= 24,
+ 	.rating	= 300,
+ 	.read	= lpc32xx_clksrc_read,
+ 	.mask	= CLOCKSOURCE_MASK(32),
+@@ -171,9 +170,7 @@ static void __init lpc32xx_timer_init(void)
+ 	__raw_writel(0, LCP32XX_TIMER_MCR(LPC32XX_TIMER1_BASE));
+ 	__raw_writel(LCP32XX_TIMER_CNTR_TCR_EN,
+ 		LCP32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
+-	lpc32xx_clksrc.mult = clocksource_hz2mult(clkrate,
+-		lpc32xx_clksrc.shift);
+-	clocksource_register(&lpc32xx_clksrc);
++	clocksource_register_hz(&lpc32xx_clksrc, clkrate);
  }
  
- /*
+ struct sys_timer lpc32xx_timer = {
 -- 
 1.6.2.5
