@@ -1,350 +1,271 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Dec 2010 16:49:55 -0800
-Subject: [PATCH 11/22] msm: clock Add debugfs interface to measure clock rates
+Date: Thu, 16 Dec 2010 16:49:54 -0800
+Subject: [PATCH 10/22] msm: Move 8x60 to the real clock driver
 In-Reply-To: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
 References: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1292547006-19741-12-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1292547006-19741-11-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Wagantall <mattw@codeaurora.org>
-
-Use the SoC's ring oscillator hardware to measure the clock rate
-of locally-controlled clocks. This allows for the development of
-more comprehensive end-to-end clock tests.
-
-A 'measure' debugfs node is created for each clock to perform the
-measurement and retrieve the result. soc_clk_measure_rate() should
-*only* be used for debug purposes since it busy-loops while the
-measurement takes place (~15 ms).
-
-Clock rates are in units of Hz. Clocks that are not locally
-controlled or do not support rate measurement will return -1.
+The dummy clock driver was added to make 8x60 compile due to
+proc_comm references in clock.c. Now that those references are
+gone we can compile the original clock.c with no errors and
+support clocks on 8x60.
 
 Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
-Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-7x30.c  |   90 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-msm/clock-8x60.c  |  101 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-msm/clock-debug.c |   15 ++++++
- arch/arm/mach-msm/clock-pcom.c  |    7 +++
- arch/arm/mach-msm/clock.h       |    1 +
- 5 files changed, 214 insertions(+), 0 deletions(-)
+ arch/arm/mach-msm/Makefile          |    7 +-
+ arch/arm/mach-msm/board-msm8x60.c   |    3 +
+ arch/arm/mach-msm/devices-msm8x60.c |  180 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/devices.h         |    3 +
+ 4 files changed, 189 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-msm/devices-msm8x60.c
 
-diff --git a/arch/arm/mach-msm/clock-7x30.c b/arch/arm/mach-msm/clock-7x30.c
-index 994104f..e13de24 100644
---- a/arch/arm/mach-msm/clock-7x30.c
-+++ b/arch/arm/mach-msm/clock-7x30.c
-@@ -89,6 +89,10 @@
- #define VPE_NS_REG		REG(0x015C)
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index fa01510..fb44992 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -1,7 +1,6 @@
+ obj-y += io.o idle.o timer.o
+-ifdef CONFIG_MSM_PROC_COMM
++obj-y += clock.o
+ obj-$(CONFIG_DEBUG_FS) += clock-debug.o
+-endif
+ obj-$(CONFIG_ARCH_MSM7X30) += clock-local.o
+ obj-$(CONFIG_ARCH_MSM8X60) += clock-local.o
+ obj-$(CONFIG_ARCH_MSM7X30) += clock-7x30.o
+@@ -19,9 +18,9 @@ obj-y += irq.o
+ endif
+ endif
  
- /* Registers in the base (non-shadow) region. */
-+#define CLK_TEST_BASE_REG	REG_BASE(0x011C)
-+#define CLK_TEST_2_BASE_REG	REG_BASE(0x0384)
-+#define MISC_CLK_CTL_BASE_REG	REG_BASE(0x0110)
-+#define PRPH_WEB_NS_BASE_REG	REG_BASE(0x0080)
- #define PLL0_STATUS_BASE_REG	REG_BASE(0x0318)
- #define PLL1_STATUS_BASE_REG	REG_BASE(0x0334)
- #define PLL2_STATUS_BASE_REG	REG_BASE(0x0350)
-@@ -96,12 +100,15 @@
- #define PLL4_STATUS_BASE_REG	REG_BASE(0x0254)
- #define PLL5_STATUS_BASE_REG	REG_BASE(0x0258)
- #define PLL6_STATUS_BASE_REG	REG_BASE(0x04EC)
-+#define RINGOSC_CNT_BASE_REG	REG_BASE(0x00FC)
- #define SH2_OWN_APPS1_BASE_REG	REG_BASE(0x040C)
- #define SH2_OWN_APPS2_BASE_REG	REG_BASE(0x0414)
- #define SH2_OWN_APPS3_BASE_REG	REG_BASE(0x0444)
- #define SH2_OWN_GLBL_BASE_REG	REG_BASE(0x0404)
- #define SH2_OWN_ROW1_BASE_REG	REG_BASE(0x041C)
- #define SH2_OWN_ROW2_BASE_REG	REG_BASE(0x0424)
-+#define TCXO_CNT_BASE_REG	REG_BASE(0x00F8)
-+#define TCXO_CNT_DONE_BASE_REG	REG_BASE(0x00F8)
+-obj-$(CONFIG_ARCH_MSM8X60) += clock-dummy.o iommu.o iommu_dev.o devices-msm8x60-iommu.o
++obj-$(CONFIG_ARCH_MSM8X60) += iommu.o iommu_dev.o devices-msm8x60-iommu.o
++obj-$(CONFIG_ARCH_MSM8X60) += devices-msm8x60.o
+ obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
+-obj-$(CONFIG_MSM_PROC_COMM) += clock.o
+ obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
+ obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
+ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 852428b..a584d38 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -28,6 +28,8 @@
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
  
++#include "devices.h"
++
+ void __iomem *gic_cpu_base_addr;
  
- /* MUX source input identifiers. */
-@@ -687,6 +694,88 @@ int soc_set_pwr_rail(unsigned id, int enable)
- 	return 0;
+ static void __init msm8x60_map_io(void)
+@@ -64,6 +66,7 @@ static void __init msm8x60_init_irq(void)
+ 
+ static void __init msm8x60_init(void)
+ {
++	msm_clock_init(msm_clocks_8x60, msm_num_clocks_8x60);
  }
  
-+/* Sample clock for 'tcxo4_ticks' reference clock ticks. */
-+static uint32_t run_measurement(unsigned tcxo4_ticks)
-+{
-+	/* TCXO4_CNT_EN and RINGOSC_CNT_EN register values. */
-+	uint32_t reg_val_enable = readl(MISC_CLK_CTL_BASE_REG) | 0x3;
-+	uint32_t reg_val_disable = reg_val_enable & ~0x3;
+ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+diff --git a/arch/arm/mach-msm/devices-msm8x60.c b/arch/arm/mach-msm/devices-msm8x60.c
+new file mode 100644
+index 0000000..1f2b189
+--- /dev/null
++++ b/arch/arm/mach-msm/devices-msm8x60.c
+@@ -0,0 +1,180 @@
++/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ */
 +
-+	/* Stop counters and set the TCXO4 counter start value. */
-+	writel(reg_val_disable, MISC_CLK_CTL_BASE_REG);
-+	writel(tcxo4_ticks, TCXO_CNT_BASE_REG);
++#include <linux/kernel.h>
++#include <linux/clk.h>
 +
-+	/* Run measurement and wait for completion. */
-+	writel(reg_val_enable, MISC_CLK_CTL_BASE_REG);
-+	while (readl(TCXO_CNT_DONE_BASE_REG) == 0)
-+		cpu_relax();
++#include "clock.h"
++#include "clock-8x60.h"
 +
-+	/* Stop counters. */
-+	writel(reg_val_disable, MISC_CLK_CTL_BASE_REG);
++struct clk msm_clocks_8x60[] = {
++	CLK_8X60("ce_clk",		CE2_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI1_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI2_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI3_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI4_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI5_UART_CLK,		NULL, OFF),
++	CLK_8X60("uartdm_clk",		GSBI6_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI7_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI8_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI9_UART_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI10_UART_CLK,	NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI11_UART_CLK,	NULL, OFF),
++	CLK_8X60("gsbi_uart_clk",	GSBI12_UART_CLK,	NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI1_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI2_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI3_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI4_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI5_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI6_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI7_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI8_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI9_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI10_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI11_QUP_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_qup_clk",	GSBI12_QUP_CLK,		NULL, OFF),
++	CLK_8X60("pdm_clk",		PDM_CLK,		NULL, OFF),
++	CLK_8X60("pmem_clk",		PMEM_CLK,		NULL, OFF),
++	CLK_8X60("prng_clk",		PRNG_CLK,		NULL, OFF),
++	CLK_8X60("sdc_clk",		SDC1_CLK,		NULL, OFF),
++	CLK_8X60("sdc_clk",		SDC2_CLK,		NULL, OFF),
++	CLK_8X60("sdc_clk",		SDC3_CLK,		NULL, OFF),
++	CLK_8X60("sdc_clk",		SDC4_CLK,		NULL, OFF),
++	CLK_8X60("sdc_clk",		SDC5_CLK,		NULL, OFF),
++	CLK_8X60("tsif_ref_clk",	TSIF_REF_CLK,		NULL, OFF),
++	CLK_8X60("tssc_clk",		TSSC_CLK,		NULL, OFF),
++	CLK_8X60("usb_hs_clk",		USB_HS1_XCVR_CLK,	NULL, OFF),
++	CLK_8X60("usb_phy_clk",		USB_PHY0_CLK,		NULL, OFF),
++	CLK_8X60("usb_fs_src_clk",	USB_FS1_SRC_CLK,	NULL, OFF),
++	CLK_8X60("usb_fs_clk",		USB_FS1_XCVR_CLK,	NULL, OFF),
++	CLK_8X60("usb_fs_sys_clk",	USB_FS1_SYS_CLK,	NULL, OFF),
++	CLK_8X60("usb_fs_src_clk",	USB_FS2_SRC_CLK,	NULL, OFF),
++	CLK_8X60("usb_fs_clk",		USB_FS2_XCVR_CLK,	NULL, OFF),
++	CLK_8X60("usb_fs_sys_clk",	USB_FS2_SYS_CLK,	NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI1_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI2_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI3_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI4_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI5_P_CLK,		NULL, OFF),
++	CLK_8X60("uartdm_pclk",		GSBI6_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI7_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI8_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI9_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI10_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI11_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI12_P_CLK,		NULL, OFF),
++	CLK_8X60("gsbi_pclk",		GSBI12_P_CLK,		NULL, OFF),
++	CLK_8X60("ppss_pclk",		PPSS_P_CLK,		NULL, OFF),
++	CLK_8X60("tsif_pclk",		TSIF_P_CLK,		NULL, OFF),
++	CLK_8X60("usb_fs_pclk",		USB_FS1_P_CLK,		NULL, OFF),
++	CLK_8X60("usb_fs_pclk",		USB_FS2_P_CLK,		NULL, OFF),
++	CLK_8X60("usb_hs_pclk",		USB_HS1_P_CLK,		NULL, OFF),
++	CLK_8X60("sdc_pclk",		SDC1_P_CLK,		NULL, OFF),
++	CLK_8X60("sdc_pclk",		SDC2_P_CLK,		NULL, OFF),
++	CLK_8X60("sdc_pclk",		SDC3_P_CLK,		NULL, OFF),
++	CLK_8X60("sdc_pclk",		SDC4_P_CLK,		NULL, OFF),
++	CLK_8X60("sdc_pclk",		SDC5_P_CLK,		NULL, OFF),
++	CLK_8X60("adm_clk",		ADM0_CLK,		NULL, OFF),
++	CLK_8X60("adm_pclk",		ADM0_P_CLK,		NULL, OFF),
++	CLK_8X60("adm_clk",		ADM1_CLK,		NULL, OFF),
++	CLK_8X60("adm_pclk",		ADM1_P_CLK,		NULL, OFF),
++	CLK_8X60("modem_ahb1_pclk",	MODEM_AHB1_P_CLK,	NULL, OFF),
++	CLK_8X60("modem_ahb2_pclk",	MODEM_AHB2_P_CLK,	NULL, OFF),
++	CLK_8X60("pmic_arb_pclk",	PMIC_ARB0_P_CLK,	NULL, OFF),
++	CLK_8X60("pmic_arb_pclk",	PMIC_ARB1_P_CLK,	NULL, OFF),
++	CLK_8X60("pmic_ssbi2",		PMIC_SSBI2_CLK,		NULL, OFF),
++	CLK_8X60("rpm_msg_ram_pclk",	RPM_MSG_RAM_P_CLK,	NULL, OFF),
++	CLK_8X60("amp_clk",		AMP_CLK,		NULL, OFF),
++	CLK_8X60("cam_clk",		CAM_CLK,		NULL, OFF),
++	CLK_8X60("csi_src_clk",		CSI_SRC_CLK,		NULL, OFF),
++	CLK_8X60("csi_clk",		CSI0_CLK,		NULL, OFF),
++	CLK_8X60("csi_clk",		CSI1_CLK,		NULL, OFF),
++	CLK_8X60("dsi_byte_div_clk",	DSI_BYTE_CLK,		NULL, OFF),
++	CLK_8X60("dsi_esc_clk",		DSI_ESC_CLK,		NULL, OFF),
++	CLK_8X60("gfx2d0_clk",		GFX2D0_CLK,		NULL, OFF),
++	CLK_8X60("gfx2d1_clk",		GFX2D1_CLK,		NULL, OFF),
++	CLK_8X60("gfx3d_clk",		GFX3D_CLK,		NULL, OFF),
++	CLK_8X60("ijpeg_clk",		IJPEG_CLK,		NULL, OFF),
++	CLK_8X60("imem_clk",		IMEM_CLK,		NULL, OFF),
++	CLK_8X60("jpegd_clk",		JPEGD_CLK,		NULL, OFF),
++	CLK_8X60("mdp_clk",		MDP_CLK,		NULL, OFF),
++	CLK_8X60("mdp_vsync_clk",	MDP_VSYNC_CLK,		NULL, OFF),
++	CLK_8X60("pixel_mdp_clk",	PIXEL_MDP_CLK,		NULL, OFF),
++	CLK_8X60("pixel_lcdc_clk",	PIXEL_LCDC_CLK,		NULL, OFF),
++	CLK_8X60("rot_clk",		ROT_CLK,		NULL, OFF),
++	CLK_8X60("tv_src_clk",		TV_SRC_CLK,		NULL, OFF),
++	CLK_8X60("tv_enc_clk",		TV_ENC_CLK,		NULL, OFF),
++	CLK_8X60("tv_dac_clk",		TV_DAC_CLK,		NULL, OFF),
++	CLK_8X60("vcodec_clk",		VCODEC_CLK,		NULL, OFF),
++	CLK_8X60("mdp_tv_clk",		MDP_TV_CLK,		NULL, OFF),
++	CLK_8X60("hdmi_clk",		HDMI_TV_CLK,		NULL, OFF),
++	CLK_8X60("hdmi_app_clk",	HDMI_APP_CLK,		NULL, OFF),
++	CLK_8X60("vpe_clk",		VPE_CLK,		NULL, OFF),
++	CLK_8X60("vfe_clk",		VFE_CLK,		NULL, OFF),
++	CLK_8X60("csi_vfe_clk",		CSI0_VFE_CLK,		NULL, OFF),
++	CLK_8X60("csi_vfe_clk",		CSI1_VFE_CLK,		NULL, OFF),
++	CLK_8X60("smmu_jpegd_clk",	JPEGD_AXI_CLK,		NULL, OFF),
++	CLK_8X60("smmu_vfe_clk",	VFE_AXI_CLK,		NULL, OFF),
++	CLK_8X60("vfe_axi_clk",		VFE_AXI_CLK,		NULL, OFF),
++	CLK_8X60("ijpeg_axi_clk",	IJPEG_AXI_CLK,		NULL, OFF),
++	CLK_8X60("mdp_axi_clk",		MDP_AXI_CLK,		NULL, OFF),
++	CLK_8X60("rot_axi_clk",		ROT_AXI_CLK,		NULL, OFF),
++	CLK_8X60("vcodec_axi_clk",	VCODEC_AXI_CLK,		NULL, OFF),
++	CLK_8X60("vpe_axi_clk",		VPE_AXI_CLK,		NULL, OFF),
++	CLK_8X60("amp_pclk",		AMP_P_CLK,		NULL, OFF),
++	CLK_8X60("csi_pclk",		CSI0_P_CLK,		NULL, OFF),
++	CLK_8X60("csi_pclk",		CSI1_P_CLK,		NULL, OFF),
++	CLK_8X60("dsi_m_pclk",		DSI_M_P_CLK,		NULL, OFF),
++	CLK_8X60("dsi_s_pclk",		DSI_S_P_CLK,		NULL, OFF),
++	CLK_8X60("gfx2d0_pclk",		GFX2D0_P_CLK,		NULL, OFF),
++	CLK_8X60("gfx2d1_pclk",		GFX2D1_P_CLK,		NULL, OFF),
++	CLK_8X60("gfx3d_pclk",		GFX3D_P_CLK,		NULL, OFF),
++	CLK_8X60("hdmi_m_pclk",		HDMI_M_P_CLK,		NULL, OFF),
++	CLK_8X60("hdmi_s_pclk",		HDMI_S_P_CLK,		NULL, OFF),
++	CLK_8X60("ijpeg_pclk",		IJPEG_P_CLK,		NULL, OFF),
++	CLK_8X60("jpegd_pclk",		JPEGD_P_CLK,		NULL, OFF),
++	CLK_8X60("imem_pclk",		IMEM_P_CLK,		NULL, OFF),
++	CLK_8X60("mdp_pclk",		MDP_P_CLK,		NULL, OFF),
++	CLK_8X60("smmu_pclk",		SMMU_P_CLK,		NULL, OFF),
++	CLK_8X60("rotator_pclk",	ROT_P_CLK,		NULL, OFF),
++	CLK_8X60("tv_enc_pclk",		TV_ENC_P_CLK,		NULL, OFF),
++	CLK_8X60("vcodec_pclk",		VCODEC_P_CLK,		NULL, OFF),
++	CLK_8X60("vfe_pclk",		VFE_P_CLK,		NULL, OFF),
++	CLK_8X60("vpe_pclk",		VPE_P_CLK,		NULL, OFF),
++	CLK_8X60("mi2s_osr_clk",	MI2S_OSR_CLK,		NULL, OFF),
++	CLK_8X60("mi2s_bit_clk",	MI2S_BIT_CLK,		NULL, OFF),
++	CLK_8X60("i2s_mic_osr_clk",	CODEC_I2S_MIC_OSR_CLK,	NULL, OFF),
++	CLK_8X60("i2s_mic_bit_clk",	CODEC_I2S_MIC_BIT_CLK,	NULL, OFF),
++	CLK_8X60("i2s_mic_osr_clk",	SPARE_I2S_MIC_OSR_CLK,	NULL, OFF),
++	CLK_8X60("i2s_mic_bit_clk",	SPARE_I2S_MIC_BIT_CLK,	NULL, OFF),
++	CLK_8X60("i2s_spkr_osr_clk",	CODEC_I2S_SPKR_OSR_CLK,	NULL, OFF),
++	CLK_8X60("i2s_spkr_bit_clk",	CODEC_I2S_SPKR_BIT_CLK,	NULL, OFF),
++	CLK_8X60("i2s_spkr_osr_clk",	SPARE_I2S_SPKR_OSR_CLK,	NULL, OFF),
++	CLK_8X60("i2s_spkr_bit_clk",	SPARE_I2S_SPKR_BIT_CLK,	NULL, OFF),
++	CLK_8X60("pcm_clk",		PCM_CLK,		NULL, OFF),
++	CLK_8X60("iommu_clk",           JPEGD_AXI_CLK, NULL, 0),
++	CLK_8X60("iommu_clk",           VFE_AXI_CLK, NULL, 0),
++	CLK_8X60("iommu_clk",           VCODEC_AXI_CLK, NULL, 0),
++	CLK_8X60("iommu_clk",           VCODEC_AXI_CLK, NULL, 0),
++	CLK_8X60("iommu_clk",           GFX3D_CLK, NULL, 0),
++	CLK_8X60("iommu_clk",           GFX2D0_CLK, NULL, 0),
++	CLK_8X60("iommu_clk",           GFX2D1_CLK, NULL, 0),
++};
 +
-+	return readl(RINGOSC_CNT_BASE_REG);
-+}
++unsigned msm_num_clocks_8x60 = ARRAY_SIZE(msm_clocks_8x60);
 +
-+/* Perform a hardware rate measurement for a given clock.
-+   FOR DEBUG USE ONLY: Measurements take ~15 ms! */
-+signed soc_clk_measure_rate(unsigned id)
-+{
-+	struct clk_local *t = &soc_clk_local_tbl[id];
-+	unsigned long flags;
-+	uint32_t regval, prph_web_reg_old;
-+	uint64_t raw_count_short, raw_count_full;
-+	signed ret;
-+
-+	if (t->test_vector == 0)
-+		return -EPERM;
-+
-+	spin_lock_irqsave(&local_clock_reg_lock, flags);
-+
-+	/* Program test vector. */
-+	if (t->test_vector <= 0xFF) {
-+		/* Select CLK_TEST_2 */
-+		writel(0x4D40, CLK_TEST_BASE_REG);
-+		writel(t->test_vector, CLK_TEST_2_BASE_REG);
-+	} else
-+		writel(t->test_vector, CLK_TEST_BASE_REG);
-+
-+	/* Enable TCXO4 clock branch and root. */
-+	prph_web_reg_old = readl(PRPH_WEB_NS_BASE_REG);
-+	regval = prph_web_reg_old | B(9) | B(11);
-+	local_src_enable(TCXO);
-+	writel(regval, PRPH_WEB_NS_BASE_REG);
-+
-+	/*
-+	 * The ring oscillator counter will not reset if the measured clock
-+	 * is not running.  To detect this, run a short measurement before
-+	 * the full measurement.  If the raw results of the two are the same
-+	 * then the clock must be off.
-+	 */
-+
-+	/* Run a short measurement. (~1 ms) */
-+	raw_count_short = run_measurement(0x1000);
-+	/* Run a full measurement. (~14 ms) */
-+	raw_count_full = run_measurement(0x10000);
-+
-+	/* Disable TCXO4 clock branch and root. */
-+	writel(prph_web_reg_old, PRPH_WEB_NS_BASE_REG);
-+	local_src_disable(TCXO);
-+
-+	/* Return 0 if the clock is off. */
-+	if (raw_count_full == raw_count_short)
-+		ret = 0;
-+	else {
-+		/* Compute rate in Hz. */
-+		raw_count_full = ((raw_count_full * 10) + 15) * 4800000;
-+		do_div(raw_count_full, ((0x10000 * 10) + 35));
-+		ret = (signed)raw_count_full;
-+	}
-+
-+	spin_unlock_irqrestore(&local_clock_reg_lock, flags);
-+
-+	return ret;
-+}
-+
- /* Implementation for clk_set_flags(). */
- int soc_clk_set_flags(unsigned id, unsigned clk_flags)
- {
-@@ -1072,4 +1161,5 @@ struct clk_ops soc_clk_ops_7x30 = {
- 	.reset = pc_clk_reset,
- 	.set_flags = soc_clk_set_flags,
- 	.is_local = local_clk_is_local,
-+	.measure_rate = soc_clk_measure_rate,
- };
-diff --git a/arch/arm/mach-msm/clock-8x60.c b/arch/arm/mach-msm/clock-8x60.c
-index e1f3c6f..6972001 100644
---- a/arch/arm/mach-msm/clock-8x60.c
-+++ b/arch/arm/mach-msm/clock-8x60.c
-@@ -1621,6 +1621,106 @@ int soc_set_pwr_rail(unsigned id, int enable)
- 	return 0;
- }
+diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
+index 68b8075..81d2b5d8 100644
+--- a/arch/arm/mach-msm/devices.h
++++ b/arch/arm/mach-msm/devices.h
+@@ -48,4 +48,7 @@ extern unsigned msm_num_clocks_7x30;
+ extern struct clk msm_clocks_8x50[];
+ extern unsigned msm_num_clocks_8x50;
  
-+/* Sample clock for 'ticks' reference clock ticks. */
-+static uint32_t run_measurement(unsigned ticks)
-+{
-+	/* Stop counters and set the XO4 counter start value. */
-+	writel(0x0, RINGOSC_TCXO_CTL_REG);
-+	writel(ticks, RINGOSC_TCXO_CTL_REG);
++extern struct clk msm_clocks_8x60[];
++extern unsigned msm_num_clocks_8x60;
 +
-+	/* Wait for timer to become ready. */
-+	while ((readl(RINGOSC_STATUS_REG) & B(25)) != 0)
-+		cpu_relax();
-+
-+	/* Run measurement and wait for completion. */
-+	writel(B(20)|ticks, RINGOSC_TCXO_CTL_REG);
-+	while ((readl(RINGOSC_STATUS_REG) & B(25)) == 0)
-+		cpu_relax();
-+
-+	/* Stop counters. */
-+	writel(0x0, RINGOSC_TCXO_CTL_REG);
-+
-+	/* Return measured ticks. */
-+	return readl(RINGOSC_STATUS_REG) & BM(24, 0);
-+}
-+
-+/* Perform a hardware rate measurement for a given clock.
-+   FOR DEBUG USE ONLY: Measurements take ~15 ms! */
-+int soc_clk_measure_rate(unsigned id)
-+{
-+	struct clk_local *clk = &soc_clk_local_tbl[id];
-+	unsigned long flags;
-+	uint32_t clk_sel, pdm_reg_backup, ringosc_reg_backup;
-+	uint64_t raw_count_short, raw_count_full;
-+	int ret;
-+
-+	spin_lock_irqsave(&local_clock_reg_lock, flags);
-+
-+	/* Program the test vector. */
-+	clk_sel = clk->test_vector & TEST_CLK_SEL_MASK;
-+	switch (clk->test_vector >> TEST_TYPE_SHIFT) {
-+	case TEST_TYPE_PER_LS:
-+		writel(0x4030D00|BVAL(7, 0, clk_sel), CLK_TEST_REG);
-+		break;
-+	case TEST_TYPE_PER_HS:
-+		writel(0x4020000|BVAL(16, 10, clk_sel), CLK_TEST_REG);
-+		break;
-+	case TEST_TYPE_MM_LS:
-+		writel(0x4030D97, CLK_TEST_REG);
-+		writel(BVAL(6, 1, clk_sel)|B(0), DBG_CFG_REG_LS_REG);
-+		break;
-+	case TEST_TYPE_MM_HS:
-+		writel(0x402B800, CLK_TEST_REG);
-+		writel(BVAL(6, 1, clk_sel)|B(0), DBG_CFG_REG_HS_REG);
-+		break;
-+	case TEST_TYPE_LPA:
-+		writel(0x4030D98, CLK_TEST_REG);
-+		writel(BVAL(6, 1, clk_sel)|B(0), LCC_CLK_LS_DEBUG_CFG_REG);
-+		break;
-+	default:
-+		ret = -EPERM;
-+		goto err;
-+	}
-+
-+	/* Enable CXO/4 and RINGOSC branch and root. */
-+	pdm_reg_backup = readl(PDM_CLK_NS_REG);
-+	ringosc_reg_backup = readl(RINGOSC_NS_REG);
-+	writel(0x2898, PDM_CLK_NS_REG);
-+	writel(0xA00, RINGOSC_NS_REG);
-+
-+	/*
-+	 * The ring oscillator counter will not reset if the measured clock
-+	 * is not running.  To detect this, run a short measurement before
-+	 * the full measurement.  If the raw results of the two are the same
-+	 * then the clock must be off.
-+	 */
-+
-+	/* Run a short measurement. (~1 ms) */
-+	raw_count_short = run_measurement(0x1000);
-+	/* Run a full measurement. (~14 ms) */
-+	raw_count_full = run_measurement(0x10000);
-+
-+	writel(ringosc_reg_backup, RINGOSC_NS_REG);
-+	writel(pdm_reg_backup, PDM_CLK_NS_REG);
-+
-+	/* Return 0 if the clock is off. */
-+	if (raw_count_full == raw_count_short)
-+		ret = 0;
-+	else {
-+		/* Compute rate in Hz. */
-+		raw_count_full = ((raw_count_full * 10) + 15) * 4800000;
-+		do_div(raw_count_full, ((0x10000 * 10) + 35));
-+		ret = (int)raw_count_full;
-+	}
-+
-+	/* Route dbg_hs_clk to PLLTEST.  300mV single-ended amplitude. */
-+	writel(0x3CF8, PLLTEST_PAD_CFG_REG);
-+err:
-+	spin_unlock_irqrestore(&local_clock_reg_lock, flags);
-+
-+	return ret;
-+}
-+
- /* Implementation for clk_set_flags(). */
- int soc_clk_set_flags(unsigned id, unsigned flags)
- {
-@@ -1800,4 +1900,5 @@ struct clk_ops soc_clk_ops_8x60 = {
- 	.reset = soc_clk_reset,
- 	.set_flags = soc_clk_set_flags,
- 	.is_local = local_clk_is_local,
-+	.measure_rate = soc_clk_measure_rate,
- };
-diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
-index 4886404..73ef9cc 100644
---- a/arch/arm/mach-msm/clock-debug.c
-+++ b/arch/arm/mach-msm/clock-debug.c
-@@ -49,6 +49,16 @@ static int clock_debug_rate_get(void *data, u64 *val)
- DEFINE_SIMPLE_ATTRIBUTE(clock_rate_fops, clock_debug_rate_get,
- 			clock_debug_rate_set, "%llu\n");
- 
-+static int clock_debug_measure_get(void *data, u64 *val)
-+{
-+	struct clk *clock = data;
-+	*val = clock->ops->measure_rate(clock->id);
-+	return 0;
-+}
-+
-+DEFINE_SIMPLE_ATTRIBUTE(clock_measure_fops, clock_debug_measure_get,
-+			NULL, "%lld\n");
-+
- static int clock_debug_enable_set(void *data, u64 val)
- {
- 	struct clk *clock = data;
-@@ -123,6 +133,11 @@ int __init clock_debug_add(struct clk *clock)
- 	if (!debugfs_create_file("is_local", S_IRUGO, clk_dir, clock,
- 				&clock_local_fops))
- 		goto error;
-+
-+	if (!debugfs_create_file("measure", S_IRUGO, clk_dir,
-+				clock, &clock_measure_fops))
-+		goto error;
-+
- 	return 0;
- error:
- 	debugfs_remove_recursive(clk_dir);
-diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-index 63b7113..2f9d0d4 100644
---- a/arch/arm/mach-msm/clock-pcom.c
-+++ b/arch/arm/mach-msm/clock-pcom.c
-@@ -102,6 +102,12 @@ unsigned pc_clk_get_rate(unsigned id)
- 		return id;
- }
- 
-+int pc_clk_measure_rate(unsigned id)
-+{
-+	/* Not supported. */
-+	return -EPERM;
-+}
-+
- unsigned pc_clk_is_enabled(unsigned id)
- {
- 	if (msm_proc_comm(PCOM_CLKCTL_RPC_ENABLED, &id, NULL))
-@@ -132,6 +138,7 @@ struct clk_ops clk_ops_pcom = {
- 	.set_max_rate = pc_clk_set_max_rate,
- 	.set_flags = pc_clk_set_flags,
- 	.get_rate = pc_clk_get_rate,
-+	.measure_rate = pc_clk_measure_rate,
- 	.is_enabled = pc_clk_is_enabled,
- 	.round_rate = pc_clk_round_rate,
- 	.is_local = pc_clk_is_local,
-diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
-index b74ba3e..f09e01b 100644
---- a/arch/arm/mach-msm/clock.h
-+++ b/arch/arm/mach-msm/clock.h
-@@ -41,6 +41,7 @@ struct clk_ops {
- 	int (*set_max_rate)(unsigned id, unsigned rate);
- 	int (*set_flags)(unsigned id, unsigned flags);
- 	unsigned (*get_rate)(unsigned id);
-+	int (*measure_rate)(unsigned id);
- 	unsigned (*is_enabled)(unsigned id);
- 	long (*round_rate)(unsigned id, unsigned rate);
- 	bool (*is_local)(unsigned id);
+ #endif
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
