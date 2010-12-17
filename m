@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:36:20 +0000
-Subject: [PATCH 03/40] ARM: davinci: update clock source registration
+Date: Fri, 17 Dec 2010 11:36:40 +0000
+Subject: [PATCH 04/40] ARM: integrator: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYbk-0006hp-13@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYc4-0006ht-FT@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,33 +12,30 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-davinci/time.c |    7 ++-----
- 1 files changed, 2 insertions(+), 5 deletions(-)
+ arch/arm/mach-integrator/integrator_ap.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-index 0f21c36..c148671 100644
---- a/arch/arm/mach-davinci/time.c
-+++ b/arch/arm/mach-davinci/time.c
-@@ -276,7 +276,6 @@ static struct clocksource clocksource_davinci = {
- 	.rating		= 300,
- 	.read		= read_cycles,
- 	.mask		= CLOCKSOURCE_MASK(32),
--	.shift		= 24,
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 548208f..2774df8 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -372,7 +372,6 @@ static struct clocksource clocksource_timersp = {
+ 	.rating		= 200,
+ 	.read		= timersp_read,
+ 	.mask		= CLOCKSOURCE_MASK(16),
+-	.shift		= 16,
  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -378,10 +377,8 @@ static void __init davinci_timer_init(void)
+@@ -390,8 +389,7 @@ static void integrator_clocksource_init(u32 khz)
+ 	writel(ctrl, base + TIMER_CTRL);
+ 	writel(0xffff, base + TIMER_LOAD);
  
- 	/* setup clocksource */
- 	clocksource_davinci.name = id_to_name[clocksource_id];
--	clocksource_davinci.mult =
--		clocksource_khz2mult(davinci_clock_tick_rate/1000,
--				     clocksource_davinci.shift);
--	if (clocksource_register(&clocksource_davinci))
-+	if (clocksource_register_hz(&clocksource_davinci,
-+				    davinci_clock_tick_rate))
- 		printk(err, clocksource_davinci.name);
+-	cs->mult = clocksource_khz2mult(khz, cs->shift);
+-	clocksource_register(cs);
++	clocksource_register_khz(cs, khz);
+ }
  
- 	/* setup clockevent */
+ static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
 -- 
 1.6.2.5
