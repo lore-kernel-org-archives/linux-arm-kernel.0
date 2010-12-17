@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:35:39 +0000
-Subject: [PATCH 01/40] ARM: AT91: update clock source registration
+Date: Fri, 17 Dec 2010 11:35:59 +0000
+Subject: [PATCH 02/40] ARM: bcmring: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYb5-0006hh-Di@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYbP-0006hl-JG@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,57 +10,57 @@ In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
 interfaces were added which simplify (and optimize) the selection of the
 divisor shift/mult constants.  Switch over to using this new interface.
 
+Acked-By: Scott Branden <sbranden@broadcom.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-at91/at91rm9200_time.c  |    4 +---
- arch/arm/mach-at91/at91sam926x_time.c |    4 +---
- 2 files changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/mach-bcmring/core.c |   14 ++++----------
+ 1 files changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index 2500f41..1dd69c8 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -101,7 +101,6 @@ static struct clocksource clk32k = {
- 	.rating		= 150,
- 	.read		= read_clk32k,
- 	.mask		= CLOCKSOURCE_MASK(20),
--	.shift		= 10,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index d3f959e..b91b1b0 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -294,7 +294,6 @@ static struct clocksource clocksource_bcmring_timer1 = {
+ 	.rating = 200,
+ 	.read = bcmring_get_cycles_timer1,
+ 	.mask = CLOCKSOURCE_MASK(32),
+-	.shift = 20,
+ 	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -201,8 +200,7 @@ void __init at91rm9200_timer_init(void)
- 	clockevents_register_device(&clkevt);
+@@ -303,7 +302,6 @@ static struct clocksource clocksource_bcmring_timer3 = {
+ 	.rating = 100,
+ 	.read = bcmring_get_cycles_timer3,
+ 	.mask = CLOCKSOURCE_MASK(32),
+-	.shift = 20,
+ 	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+ };
  
- 	/* register clocksource */
--	clk32k.mult = clocksource_hz2mult(AT91_SLOW_CLOCK, clk32k.shift);
--	clocksource_register(&clk32k);
-+	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
+@@ -316,10 +314,8 @@ static int __init bcmring_clocksource_init(void)
+ 	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+ 	       TIMER1_VA_BASE + TIMER_CTRL);
+ 
+-	clocksource_bcmring_timer1.mult =
+-	    clocksource_khz2mult(TIMER1_FREQUENCY_MHZ * 1000,
+-				 clocksource_bcmring_timer1.shift);
+-	clocksource_register(&clocksource_bcmring_timer1);
++	clocksource_register_khz(&clocksource_bcmring_timer1,
++				 TIMER1_FREQUENCY_MHZ * 1000);
+ 
+ 	/* setup timer3 as free-running clocksource */
+ 	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
+@@ -328,10 +324,8 @@ static int __init bcmring_clocksource_init(void)
+ 	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+ 	       TIMER3_VA_BASE + TIMER_CTRL);
+ 
+-	clocksource_bcmring_timer3.mult =
+-	    clocksource_khz2mult(TIMER3_FREQUENCY_KHZ,
+-				 clocksource_bcmring_timer3.shift);
+-	clocksource_register(&clocksource_bcmring_timer3);
++	clocksource_register_khz(&clocksource_bcmring_timer3,
++				 TIMER3_FREQUENCY_KHZ);
+ 
+ 	return 0;
  }
- 
- struct sys_timer at91rm9200_timer = {
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 608a632..4ba8549 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -51,7 +51,6 @@ static struct clocksource pit_clk = {
- 	.name		= "pit",
- 	.rating		= 175,
- 	.read		= read_pit_clk,
--	.shift		= 20,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-@@ -163,10 +162,9 @@ static void __init at91sam926x_pit_init(void)
- 	 * Register clocksource.  The high order bits of PIV are unused,
- 	 * so this isn't a 32-bit counter unless we get clockevent irqs.
- 	 */
--	pit_clk.mult = clocksource_hz2mult(pit_rate, pit_clk.shift);
- 	bits = 12 /* PICNT */ + ilog2(pit_cycle) /* PIV */;
- 	pit_clk.mask = CLOCKSOURCE_MASK(bits);
--	clocksource_register(&pit_clk);
-+	clocksource_register_hz(&pit_clk, pit_rate);
- 
- 	/* Set up irq handler */
- 	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
 -- 
 1.6.2.5
