@@ -1,41 +1,69 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 17 Dec 2010 14:00:08 +0900
-Subject: [PATCH 07/17] ARM: SMDK6440: Enable I2S device to work
-In-Reply-To: <1292561925-19586-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1292561925-19586-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <1292562008-19812-1-git-send-email-jassisinghbrar@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 17 Dec 2010 14:40:21 +0900
+Subject: [PATCH 40/54] ARM: Samsung SoCs: irq_data conversion.
+In-Reply-To: <20101214221055.GA16079@mail.wantstofly.org>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130134112.GO15575@mail.wantstofly.org>
+	<015801cb92e1$117861b0$34692510$%kim@samsung.com>
+	<20101214221055.GA16079@mail.wantstofly.org>
+Message-ID: <003201cb9dac$e78fae40$b6af0ac0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jassi.brar@samsung.com>
+Lennert Buytenhek wrote:
+> 
+> On Fri, Dec 03, 2010 at 08:56:03PM +0900, Kukjin Kim wrote:
+> 
+> > Hi Lennert,
+> 
+> Hi again,
+> 
+Hi :-)
 
-Add missing virtual ASoC DMA device and WM8580 as I2C slave, so
-that the I2S can work on SMDK.
+> 
+> > (Added Mark Brown in Cc)
+> >
+> > Looks ok to me but there are some comments.
+> >
+> > Firstly, how about to separate this to regarding S3C24XX(mach-s3c24xx
+and
+> > plat-s3c24xx), S5P(mach-s5pxxxx and plat-s5p) and plat-samsung?
+> > (Actually, already applied S3C64XX changes so that we can drop that in
+your
+> > patch.)
+> >
+> > As you know, I already applied some changes which is from Mark Brown in
+my
+> > tree.
+> > You can find that in
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > #for-next
+> >
+> > So could you please re-work this based on that?
+> 
+> I've reworked the patch I had in my tree on top of your git tree
+> (latest commit "Merge branch 'next-s5p64x0' into for-next"), and came
+> up with the three attached patches.  I've incorporated the whitespace
+> changes you requested, and changed the struct irq_data * variable
+> names from 'd' to 'data' to match Mark's earlier patches.
+> 
+Ok...thanks.
 
-Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
----
- arch/arm/mach-s5p64x0/mach-smdk6440.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+> Caveat emptor -- uncompiled, and totally untested.
+> 
+> How's this look?
+> 
+Looks ok to me ;-)
 
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-index 87c3f03..e5beb84 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-@@ -95,6 +95,7 @@ static struct platform_device *smdk6440_devices[] __initdata = {
- 	&s3c_device_i2c1,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
-+	&samsung_asoc_dma,
- 	&s5p6440_device_iis,
- };
- 
-@@ -117,6 +118,7 @@ static struct s3c2410_platform_i2c s5p6440_i2c1_data __initdata = {
- 
- static struct i2c_board_info smdk6440_i2c_devs0[] __initdata = {
- 	{ I2C_BOARD_INFO("24c08", 0x50), },
-+	{ I2C_BOARD_INFO("wm8580", 0x1b), },
- };
- 
- static struct i2c_board_info smdk6440_i2c_devs1[] __initdata = {
--- 
-1.6.2.5
+> Feel free to merge this via your tree -- I'll drop the Samsung patch
+> from my tree then.
+> 
+Ok...will apply after some tests and if any problems, let you know.
+
+Thanks again.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
