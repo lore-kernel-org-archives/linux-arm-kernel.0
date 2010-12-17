@@ -1,33 +1,34 @@
 From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Fri, 17 Dec 2010 21:18:23 +0200
-Subject: [PATCH 1/3] omap: rx51: Remove __initdata from rx51_tpa6130a2_data
-Message-ID: <1292613505-10113-1-git-send-email-jhnikula@gmail.com>
+Date: Fri, 17 Dec 2010 21:18:24 +0200
+Subject: [PATCH 2/3] omap: rx51: Remove extra tlv320aic3x.h inclusion
+In-Reply-To: <1292613505-10113-1-git-send-email-jhnikula@gmail.com>
+References: <1292613505-10113-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <1292613505-10113-2-git-send-email-jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the TPA6130 is compiled as module the id and power_gpio values are
-arbitrary at module probing time since the rx51_tpa6130a2_data was marked as
-__initdata.
+Remove second tlv320aic3x.h inclusion that came along the commit f0fba2a
+"ASoC: multi-component - ASoC Multi-Component Support".
 
 Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+Cc: Liam Girdwood <lrg@slimlogic.co.uk>
 ---
-For 2.6.38 as the TPA6130 is not used in 2.6.37.
+Clearly for 2.6.38 as harmless issue.
 ---
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index 126b724..cde6847 100644
+index cde6847..6114e47 100644
 --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
 +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -719,7 +719,7 @@ static struct twl4030_platform_data rx51_twldata __initdata = {
- 	.vio			= &rx51_vio,
- };
+@@ -23,7 +23,6 @@
+ #include <linux/gpio.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/mmc/host.h>
+-#include <sound/tlv320aic3x.h>
  
--static struct tpa6130a2_platform_data rx51_tpa6130a2_data __initdata = {
-+static struct tpa6130a2_platform_data rx51_tpa6130a2_data = {
- 	.id			= TPA6130A2,
- 	.power_gpio		= 98,
- };
+ #include <plat/mcspi.h>
+ #include <plat/board.h>
 -- 
 1.7.2.3
