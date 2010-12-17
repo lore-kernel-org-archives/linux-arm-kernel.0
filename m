@@ -1,35 +1,45 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 17 Dec 2010 20:39:15 +0900
-Subject: [PATCH 01/03] ARM: mach-shmobile: SMP base support
-In-Reply-To: <20101217084211.GZ9937@n2100.arm.linux.org.uk>
-References: <20101214075647.11275.25933.sendpatchset@t400s>
-	<20101214075655.11275.95963.sendpatchset@t400s>
-	<20101217084211.GZ9937@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=ziv-ejjEbQaV-vKj8mytHNesjxL_+-H9iu4ey@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Dec 2010 11:39:23 +0000
+Subject: [PATCH 12/40] ARM: PXA: update clock source registration
+References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+Message-ID: <E1PTYeh-0006iQ-Vu@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 17, 2010 at 5:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 14, 2010 at 04:56:55PM +0900, Magnus Damm wrote:
->> +/*
->> + * Reset vector for secondary CPUs.
->> + * This will be mapped at address 0 by SBAR register.
->> + * We need _long_ jump to the physical address.
->> + */
->> + ? ? .align ?12
->> +ENTRY(shmobile_secondary_vector)
->> + ? ? ldr ? ? pc, 1f
->> +1: ? .long ? secondary_startup - CONFIG_PAGE_OFFSET + CONFIG_MEMORY_START
->
-> BTW, why not use - PAGE_OFFSET + PHYS_OFFSET here? ?Both these macros
-> are available for use in assembly code - just include asm/memory.h.
+In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
+interfaces were added which simplify (and optimize) the selection of the
+divisor shift/mult constants.  Switch over to using this new interface.
 
-Sure, good point. This was actually the only part of this series that
-I wasn't 100% satisfied with.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-pxa/time.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-Will send a patch on top of this series during early next week.
-
-Thanks,
-
-/ magnus
+diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
+index 293e40a..caf92c0 100644
+--- a/arch/arm/mach-pxa/time.c
++++ b/arch/arm/mach-pxa/time.c
+@@ -127,7 +127,6 @@ static struct clocksource cksrc_pxa_oscr0 = {
+ 	.rating         = 200,
+ 	.read           = pxa_read_oscr,
+ 	.mask           = CLOCKSOURCE_MASK(32),
+-	.shift          = 20,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+@@ -155,12 +154,9 @@ static void __init pxa_timer_init(void)
+ 		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_pxa_osmr0) + 1;
+ 	ckevt_pxa_osmr0.cpumask = cpumask_of(0);
+ 
+-	cksrc_pxa_oscr0.mult =
+-		clocksource_hz2mult(clock_tick_rate, cksrc_pxa_oscr0.shift);
+-
+ 	setup_irq(IRQ_OST0, &pxa_ost0_irq);
+ 
+-	clocksource_register(&cksrc_pxa_oscr0);
++	clocksource_register_hz(&cksrc_pxa_oscr0, clock_tick_rate);
+ 	clockevents_register_device(&ckevt_pxa_osmr0);
+ }
+ 
+-- 
+1.6.2.5
