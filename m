@@ -1,63 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 09:48:18 +0000
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <8c67e174d807416f0c6c190cc72d3f5a.squirrel@www.codeaurora.org>
-References: <4CF94DDD.8000409@codeaurora.org>
-	<20101203203653.GB10245@n2100.arm.linux.org.uk>
-	<4CFDD297.4020600@codeaurora.org>
-	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
-	<20101209103835.GA31465@n2100.arm.linux.org.uk>
-	<4D017B45.4000805@codeaurora.org>
-	<AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
-	<4D045692.4050607@codeaurora.org>
-	<AANLkTimwqC6DqN8ft10EyRbPh9XvibN1fA-Cug4OdS5m@mail.gmail.com>
-	<8c67e174d807416f0c6c190cc72d3f5a.squirrel@www.codeaurora.org>
-Message-ID: <20101217094818.GA9937@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 Dec 2010 10:55:35 +0100
+Subject: [PATCH 08/16] ARM: at91: Switch over to gpiolib ->to_irq() and
+	__gpio_to_irq().
+In-Reply-To: <20101215020338.GA15575@mail.wantstofly.org>
+References: <cover.1292377339.git.buytenh@wantstofly.org>
+	<20101215020338.GA15575@mail.wantstofly.org>
+Message-ID: <4D0B3397.7000002@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 06:55:06PM -0800, Saravana Kannan wrote:
+Le 15/12/2010 03:03, Lennert Buytenhek :
+> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  arch/arm/mach-at91/gpio.c              |    7 +++++++
+>  arch/arm/mach-at91/include/mach/gpio.h |    6 +-----
+>  2 files changed, 8 insertions(+), 5 deletions(-)
 > 
-> > On 12 December 2010 04:58, Saravana Kannan <skannan@codeaurora.org> wrote:
-> >> As you and James suggested, having the NS bit set by the secure world is
-> >> definitely a solution that would work. But IMHO, the explicit cache
-> >> flush/invalidate approach keeps the design simple and easy to maintain.
-> >
-> > That is indeed an approach to the problem. But it depends on whether
-> > we consider the DMA API appropriate for this. We can view the secure
-> > world as a non-coherent agent accessing the memory and could try to
-> > justify the use of the DMA API in Linux.
-> >
-> > At some point we'll probably have platforms supporting cacheable DMA
-> > (e.g. via the ARM coherency port) and the DMA API would no longer give
-> > you what you need. But it is also possible that platforms with ACP
-> > would only have 1 or 2 devices on that port (some HD LCD controller
-> > for example) and the rest of devices non-coherent. In this case, we
-> > need to have different DMA operations depending on the bus/device (via
-> > get_dma_ops) and thus we can allow your scenario via dedicated DMA
-> > ops.
-> 
-> Catalin,
-> 
-> Looks like you agree with our approach. If that's the case, would you mind
-> Acking Jeff's initial patch that this thread is based on?
+> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+> index ae4772e..efcfe8b 100644
+> --- a/arch/arm/mach-at91/gpio.c
+> +++ b/arch/arm/mach-at91/gpio.c
+> @@ -44,6 +44,7 @@ static int at91_gpiolib_direction_output(struct gpio_chip *chip,
+>  					 unsigned offset, int val);
+>  static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+>  					unsigned offset);
+> +static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+>  
+>  #define AT91_GPIO_CHIP(name, base_gpio, nr_gpio)			\
+>  	{								\
+> @@ -53,6 +54,7 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+>  			.direction_output = at91_gpiolib_direction_output, \
+>  			.get		  = at91_gpiolib_get,		\
+>  			.set		  = at91_gpiolib_set,		\
+> +			.to_irq		  = at91_gpiolib_to_irq,	\
+>  			.dbg_show	  = at91_gpiolib_dbg_show,	\
+>  			.base		  = base_gpio,			\
+>  			.ngpio		  = nr_gpio,			\
+> @@ -586,6 +588,11 @@ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+>  	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+>  }
+>  
+> +static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset)
+> +{
+> +	return chip->base + offset;
+> +}
+> +
+>  static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  {
+>  	int i;
+> diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
+> index bfdd8ab..1e557f4 100644
+> --- a/arch/arm/mach-at91/include/mach/gpio.h
+> +++ b/arch/arm/mach-at91/include/mach/gpio.h
+> @@ -219,11 +219,7 @@ extern void at91_gpio_resume(void);
+>  #define gpio_get_value	__gpio_get_value
+>  #define gpio_set_value	__gpio_set_value
+>  #define gpio_cansleep	__gpio_cansleep
+> -
+> -static inline int gpio_to_irq(unsigned gpio)
+> -{
+> -	return gpio;
+> -}
+> +#define gpio_to_irq	__gpio_to_irq
+>  
+>  static inline int irq_to_gpio(unsigned irq)
+>  {
 
-I read Catalin's reply as agreeing with me.
 
-> Russell,
-> 
-> Does Catalin's proposal sound acceptable to you?
-
-Catalin's proposal for get_dma_ops doesn't work for you because you
-don't have a struct device for your CPUs - and as we don't have anything
-supporting ACP at the moment, there's little point engineering it in.
-
-The basic point here is that using the DMA API to achieve DMA coherency
-with something that is not DMA is going to be prone to failure, because
-we aren't going to guarantee that it'll do what you want.  There's
-already a history of people abusing the DMA API, and then when we fix
-stuff in the DMA API, they complain that their drivers have broken.
-
-What I've been saying is never use it for its properties (for its uncached
-memory) as that is _not_ guaranteed - use it for its purpose instead
-(which is to provide coherent memory for DMA devices) which is guaranteed.
+-- 
+Nicolas Ferre
