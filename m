@@ -1,64 +1,82 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 17 Dec 2010 21:21:04 +0800
-Subject: [PATCH 17/40] ARM: nuc: update clock source registration
-In-Reply-To: <E1PTYgL-0006ik-RX@rmk-PC.arm.linux.org.uk>
-References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-	<E1PTYgL-0006ik-RX@rmk-PC.arm.linux.org.uk>
-Message-ID: <AANLkTin6Z6NXY+rF4_PUmnhuomzuSQrCzUKvD9tXk19H@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 17 Dec 2010 07:34:37 -0600
+Subject: [PATCH 2/7] OMAP2+: use global values for the SRAM PA addresses
+In-Reply-To: <1292580506-4421-3-git-send-email-j-pihet@ti.com>
+References: <1292580506-4421-1-git-send-email-j-pihet@ti.com>
+	<1292580506-4421-3-git-send-email-j-pihet@ti.com>
+Message-ID: <4D0B66ED.8030302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/17 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
-> interfaces were added which simplify (and optimize) the selection of the
-> divisor shift/mult constants. ?Switch over to using this new interface.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+jean.pihet at newoldbits.com had written, on 12/17/2010 04:08 AM, the 
+following:
+> From: Jean Pihet <j-pihet@ti.com>
+> 
+> The SRAM PA addresses are locally defined and used at
+> different places, i.e. SRAM management code and idle sleep code.
+> 
+> The macros are now defined at a centralized place, for
+> easier maintenance.
+> 
+> Tested on N900 and Beagleboard with full RET and OFF modes,
+> using cpuidle and suspend.
+> 
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 > ---
-> ?arch/arm/mach-w90x900/time.c | ? ?5 +----
-> ?1 files changed, 1 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-> index b80f769..4b089cb 100644
-> --- a/arch/arm/mach-w90x900/time.c
-> +++ b/arch/arm/mach-w90x900/time.c
-> @@ -153,7 +153,6 @@ static struct clocksource clocksource_nuc900 = {
-> ? ? ? ?.rating = 200,
-> ? ? ? ?.read ? = nuc900_get_cycles,
-> ? ? ? ?.mask ? = CLOCKSOURCE_MASK(TDR_SHIFT),
-> - ? ? ? .shift ?= 10,
-> ? ? ? ?.flags ?= CLOCK_SOURCE_IS_CONTINUOUS,
-> ?};
->
-> @@ -176,9 +175,7 @@ static void __init nuc900_clocksource_init(void)
-> ? ? ? ?val |= (COUNTEN | PERIOD | PRESCALE);
-> ? ? ? ?__raw_writel(val, REG_TCSR1);
->
-> - ? ? ? clocksource_nuc900.mult =
-> - ? ? ? ? ? ? ? clocksource_khz2mult((rate / 1000), clocksource_nuc900.shift);
-> - ? ? ? clocksource_register(&clocksource_nuc900);
-> + ? ? ? clocksource_register_hz(&clocksource_nuc900, rate);
-> ?}
->
-> ?static void __init nuc900_timer_init(void)
+>  arch/arm/mach-omap2/sdrc.h             |    1 -
+>  arch/arm/mach-omap2/sleep34xx.S        |    1 +
+>  arch/arm/plat-omap/include/plat/sram.h |   11 +++++++++++
+>  arch/arm/plat-omap/sram.c              |    7 ++-----
+>  4 files changed, 14 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/sdrc.h b/arch/arm/mach-omap2/sdrc.h
+> index 68f57bb..b3f8379 100644
+> --- a/arch/arm/mach-omap2/sdrc.h
+> +++ b/arch/arm/mach-omap2/sdrc.h
+> @@ -74,5 +74,4 @@ static inline u32 sms_read_reg(u16 reg)
+>   */
+>  #define SDRC_MPURATE_LOOPS		96
+>  
+> -
+spurious change.
 
-Acked-by: Wan zongshun <mcuos.com@gmail.com>
+[...]
 
-> --
-> 1.6.2.5
->
->
+> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> index 819ea0c..1a686c8 100644
+> --- a/arch/arm/plat-omap/sram.c
+> +++ b/arch/arm/plat-omap/sram.c
+> @@ -41,15 +41,12 @@
+>  
+>  #define OMAP1_SRAM_PA		0x20000000
+>  #define OMAP1_SRAM_VA		VMALLOC_END
+> -#define OMAP2_SRAM_PA		0x40200000
+> -#define OMAP2_SRAM_PUB_PA	0x4020f800
+> +#define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
+>  #define OMAP2_SRAM_VA		0xfe400000
+>  #define OMAP2_SRAM_PUB_VA	(OMAP2_SRAM_VA + 0x800)
+> -#define OMAP3_SRAM_PA           0x40200000
+>  #define OMAP3_SRAM_VA           0xfe400000
+> -#define OMAP3_SRAM_PUB_PA       0x40208000
+> +#define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
+Though not directly related to the patch, information sake: the PUB 
+physical address on a GP device != public SRAM address on a HS/EMU 
+device - in theory PPA can reconfigure how much is available for a 
+HS/EMU device here.
 
+>  #define OMAP3_SRAM_PUB_VA       (OMAP3_SRAM_VA + 0x8000)
+> -#define OMAP4_SRAM_PA		0x40300000
+>  #define OMAP4_SRAM_VA		0xfe400000
+>  #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+>  #define OMAP4_SRAM_PUB_VA	(OMAP4_SRAM_VA + 0x4000)
 
+Tested-by: Nishanth Menon<nm@ti.com>
+Tested on:
+SDP3630
+SDP3430
+Test script:
+http://pastebin.mozilla.org/889933
 
 -- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Regards,
+Nishanth Menon
