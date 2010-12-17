@@ -1,155 +1,380 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Dec 2010 16:49:53 -0800
-Subject: [PATCH 09/22] msm: clock: Remove references to clk_ops_pcom
+Date: Thu, 16 Dec 2010 16:49:46 -0800
+Subject: [PATCH 02/22] msm: clock: Move debugfs code from clock.c to
+	clock-debug.c
 In-Reply-To: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
 References: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1292547006-19741-10-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1292547006-19741-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all devices use proc_comm. The soc_clk_set_ops() function was
-unused. Determining if a clock is local vs. remote is fragile
-when done by comparing clk_ops pointers. Instead, implement an
-is_local() function for all clk_ops to determine if the clock is
-local. Once we do this we can compile clock.c with
-CONFIG_MSM_PROC_COMM=n.
+From: Matt Wagantall <mattw@codeaurora.org>
+
+The clock debugfs code is large enough, and easy enough to separate,
+that it deserves its own file which is compiled only when
+CONFIG_DEBUG_FS is enabled.
+
+Also, cleanup header file #includes that are no longer required.
 
 Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-7x30.c  |    1 +
- arch/arm/mach-msm/clock-8x60.c  |    1 +
- arch/arm/mach-msm/clock-debug.c |    3 +--
- arch/arm/mach-msm/clock-local.c |    5 +++++
- arch/arm/mach-msm/clock-local.h |    1 +
- arch/arm/mach-msm/clock-pcom.c  |    6 ++++++
- arch/arm/mach-msm/clock.c       |    5 -----
- arch/arm/mach-msm/clock.h       |    1 +
- 8 files changed, 16 insertions(+), 7 deletions(-)
+ arch/arm/mach-msm/Makefile      |    3 +
+ arch/arm/mach-msm/clock-debug.c |  133 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/clock.c       |  127 ++-----------------------------------
+ arch/arm/mach-msm/clock.h       |    9 +++
+ 4 files changed, 150 insertions(+), 122 deletions(-)
+ create mode 100644 arch/arm/mach-msm/clock-debug.c
 
-diff --git a/arch/arm/mach-msm/clock-7x30.c b/arch/arm/mach-msm/clock-7x30.c
-index 0637bee..994104f 100644
---- a/arch/arm/mach-msm/clock-7x30.c
-+++ b/arch/arm/mach-msm/clock-7x30.c
-@@ -1071,4 +1071,5 @@ struct clk_ops soc_clk_ops_7x30 = {
- 	.round_rate = local_clk_round_rate,
- 	.reset = pc_clk_reset,
- 	.set_flags = soc_clk_set_flags,
-+	.is_local = local_clk_is_local,
- };
-diff --git a/arch/arm/mach-msm/clock-8x60.c b/arch/arm/mach-msm/clock-8x60.c
-index 5bbc8bb..e1f3c6f 100644
---- a/arch/arm/mach-msm/clock-8x60.c
-+++ b/arch/arm/mach-msm/clock-8x60.c
-@@ -1799,4 +1799,5 @@ struct clk_ops soc_clk_ops_8x60 = {
- 	.round_rate = local_clk_round_rate,
- 	.reset = soc_clk_reset,
- 	.set_flags = soc_clk_set_flags,
-+	.is_local = local_clk_is_local,
- };
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 59646bb..dc8ef08 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -1,4 +1,7 @@
+ obj-y += io.o idle.o timer.o
++ifdef CONFIG_MSM_PROC_COMM
++obj-$(CONFIG_DEBUG_FS) += clock-debug.o
++endif
+ ifndef CONFIG_ARCH_MSM8X60
+ obj-y += acpuclock-arm11.o
+ obj-y += dma.o
 diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
-index b67b9e82..4886404 100644
---- a/arch/arm/mach-msm/clock-debug.c
+new file mode 100644
+index 0000000..6f603ed
+--- /dev/null
 +++ b/arch/arm/mach-msm/clock-debug.c
-@@ -19,7 +19,6 @@
- #include <linux/debugfs.h>
- #include <linux/clk.h>
- #include "clock.h"
--#include "clock-pcom.h"
- 
- static int clock_debug_rate_set(void *data, u64 val)
- {
-@@ -79,7 +78,7 @@ static int clock_debug_local_get(void *data, u64 *val)
- {
- 	struct clk *clock = data;
- 
--	*val = clock->ops != &clk_ops_pcom;
-+	*val = clock->ops->is_local(clock->id);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-msm/clock-local.c b/arch/arm/mach-msm/clock-local.c
-index d6eb6c6..44e0778 100644
---- a/arch/arm/mach-msm/clock-local.c
-+++ b/arch/arm/mach-msm/clock-local.c
-@@ -677,3 +677,8 @@ long local_clk_round_rate(unsigned id, unsigned rate)
- 
- 	return -EPERM;
- }
+@@ -0,0 +1,133 @@
++/*
++ * Copyright (C) 2007 Google, Inc.
++ * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+bool local_clk_is_local(unsigned id)
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/ctype.h>
++#include <linux/debugfs.h>
++#include <linux/clk.h>
++#include "clock.h"
++#include "clock-pcom.h"
++
++static int clock_debug_rate_set(void *data, u64 val)
 +{
-+	return true;
-+}
-diff --git a/arch/arm/mach-msm/clock-local.h b/arch/arm/mach-msm/clock-local.h
-index c168985..3083369 100644
---- a/arch/arm/mach-msm/clock-local.h
-+++ b/arch/arm/mach-msm/clock-local.h
-@@ -211,6 +211,7 @@ int local_clk_set_max_rate(unsigned id, unsigned rate);
- unsigned local_clk_get_rate(unsigned id);
- unsigned local_clk_is_enabled(unsigned id);
- long local_clk_round_rate(unsigned id, unsigned rate);
-+bool local_clk_is_local(unsigned id);
- 
- /*
-  * Required SoC-specific functions, implemented for every supported SoC
-diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-index 8c4e867..63b7113 100644
---- a/arch/arm/mach-msm/clock-pcom.c
-+++ b/arch/arm/mach-msm/clock-pcom.c
-@@ -117,6 +117,11 @@ long pc_clk_round_rate(unsigned id, unsigned rate)
- 	return rate;
- }
- 
-+static bool pc_clk_is_local(unsigned id)
-+{
-+	return false;
++	struct clk *clock = data;
++	int ret;
++
++	/* Only increases to max rate will succeed, but that's actually good
++	 * for debugging purposes so we don't check for error. */
++	if (clock->flags & CLK_MAX)
++		clk_set_max_rate(clock, val);
++	if (clock->flags & CLK_MIN)
++		ret = clk_set_min_rate(clock, val);
++	else
++		ret = clk_set_rate(clock, val);
++	if (ret != 0)
++		printk(KERN_ERR "clk_set%s_rate failed (%d)\n",
++			(clock->flags & CLK_MIN) ? "_min" : "", ret);
++	return ret;
 +}
 +
- struct clk_ops clk_ops_pcom = {
- 	.enable = pc_clk_enable,
- 	.disable = pc_clk_disable,
-@@ -129,4 +134,5 @@ struct clk_ops clk_ops_pcom = {
- 	.get_rate = pc_clk_get_rate,
- 	.is_enabled = pc_clk_is_enabled,
- 	.round_rate = pc_clk_round_rate,
-+	.is_local = pc_clk_is_local,
- };
++static int clock_debug_rate_get(void *data, u64 *val)
++{
++	struct clk *clock = data;
++	*val = clk_get_rate(clock);
++	return 0;
++}
++
++DEFINE_SIMPLE_ATTRIBUTE(clock_rate_fops, clock_debug_rate_get,
++			clock_debug_rate_set, "%llu\n");
++
++static int clock_debug_enable_set(void *data, u64 val)
++{
++	struct clk *clock = data;
++	int rc = 0;
++
++	if (val)
++		rc = clock->ops->enable(clock->id);
++	else
++		clock->ops->disable(clock->id);
++
++	return rc;
++}
++
++static int clock_debug_enable_get(void *data, u64 *val)
++{
++	struct clk *clock = data;
++
++	*val = clock->ops->is_enabled(clock->id);
++
++	return 0;
++}
++
++DEFINE_SIMPLE_ATTRIBUTE(clock_enable_fops, clock_debug_enable_get,
++			clock_debug_enable_set, "%llu\n");
++
++static int clock_debug_local_get(void *data, u64 *val)
++{
++	struct clk *clock = data;
++
++	*val = clock->ops != &clk_ops_pcom;
++
++	return 0;
++}
++
++DEFINE_SIMPLE_ATTRIBUTE(clock_local_fops, clock_debug_local_get,
++			NULL, "%llu\n");
++
++static struct dentry *dent_rate, *dent_enable, *dent_local;
++
++int __init clock_debug_init(void)
++{
++	dent_rate = debugfs_create_dir("clk_rate", 0);
++	if (!dent_rate)
++		goto err;
++
++	dent_enable = debugfs_create_dir("clk_enable", 0);
++	if (!dent_enable)
++		goto err;
++
++	dent_local = debugfs_create_dir("clk_local", NULL);
++	if (!dent_local)
++		goto err;
++
++	return 0;
++err:
++	debugfs_remove(dent_local);
++	debugfs_remove(dent_enable);
++	debugfs_remove(dent_rate);
++	return -ENOMEM;
++}
++
++int __init clock_debug_add(struct clk *clock)
++{
++	char temp[50], *ptr;
++
++	if (!dent_rate || !dent_enable || !dent_local)
++		return -ENOMEM;
++
++	strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
++	for (ptr = temp; *ptr; ptr++)
++		*ptr = tolower(*ptr);
++
++	debugfs_create_file(temp, S_IRUGO | S_IWUSR, dent_rate,
++			    clock, &clock_rate_fops);
++	debugfs_create_file(temp, S_IRUGO | S_IWUSR, dent_enable,
++			    clock, &clock_enable_fops);
++	debugfs_create_file(temp, S_IRUGO, dent_local,
++			    clock, &clock_local_fops);
++
++	return 0;
++}
 diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index 56c7549..06cd313 100644
+index 8f71f8d..8c2b4dd 100644
 --- a/arch/arm/mach-msm/clock.c
 +++ b/arch/arm/mach-msm/clock.c
-@@ -21,9 +21,6 @@
+@@ -15,16 +15,10 @@
+  */
+ 
+ #include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/module.h>
+ #include <linux/list.h>
+ #include <linux/err.h>
+-#include <linux/clk.h>
+ #include <linux/spinlock.h>
+-#include <linux/debugfs.h>
+-#include <linux/ctype.h>
  #include <linux/pm_qos_params.h>
+-#include <mach/clk.h>
  
  #include "clock.h"
--#include "proc_comm.h"
--#include "clock-7x30.h"
--#include "clock-pcom.h"
- 
+ #include "proc_comm.h"
+@@ -34,8 +28,6 @@
  static DEFINE_MUTEX(clocks_mutex);
  static DEFINE_SPINLOCK(clocks_lock);
-@@ -84,8 +81,6 @@ EXPORT_SYMBOL(clk_disable);
+ static LIST_HEAD(clocks);
+-struct clk *msm_clocks;
+-unsigned msm_num_clocks;
  
- int clk_reset(struct clk *clk, enum clk_reset_action action)
- {
--	if (!clk->ops->reset)
--		clk->ops->reset = &pc_clk_reset;
- 	return clk->ops->reset(clk->remote_id, action);
+ /*
+  * Standard clock functions defined in include/linux/clk.h
+@@ -183,11 +175,9 @@ void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks)
+ 	unsigned n;
+ 
+ 	mutex_lock(&clocks_mutex);
+-	msm_clocks = clock_tbl;
+-	msm_num_clocks = num_clocks;
+-	for (n = 0; n < msm_num_clocks; n++) {
+-		set_clock_ops(&msm_clocks[n]);
+-		list_add_tail(&msm_clocks[n].list, &clocks);
++	for (n = 0; n < num_clocks; n++) {
++		set_clock_ops(&clock_tbl[n]);
++		list_add_tail(&clock_tbl[n].list, &clocks);
+ 	}
+ 	mutex_unlock(&clocks_mutex);
+ 
+@@ -196,115 +186,6 @@ void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks)
+ 
  }
- EXPORT_SYMBOL(clk_reset);
+ 
+-#if defined(CONFIG_DEBUG_FS)
+-static struct clk *msm_clock_get_nth(unsigned index)
+-{
+-	if (index < msm_num_clocks)
+-		return msm_clocks + index;
+-	else
+-		return 0;
+-}
+-
+-static int clock_debug_rate_set(void *data, u64 val)
+-{
+-	struct clk *clock = data;
+-	int ret;
+-
+-	/* Only increases to max rate will succeed, but that's actually good
+-	 * for debugging purposes. So we don't check for error. */
+-	if (clock->flags & CLK_MAX)
+-		clk_set_max_rate(clock, val);
+-	if (clock->flags & CLK_MIN)
+-		ret = clk_set_min_rate(clock, val);
+-	else
+-		ret = clk_set_rate(clock, val);
+-	if (ret != 0)
+-		printk(KERN_ERR "clk_set%s_rate failed (%d)\n",
+-			(clock->flags & CLK_MIN) ? "_min" : "", ret);
+-	return ret;
+-}
+-
+-static int clock_debug_rate_get(void *data, u64 *val)
+-{
+-	struct clk *clock = data;
+-	*val = clk_get_rate(clock);
+-	return 0;
+-}
+-
+-static int clock_debug_enable_set(void *data, u64 val)
+-{
+-	struct clk *clock = data;
+-	int rc = 0;
+-
+-	if (val)
+-		rc = clock->ops->enable(clock->id);
+-	else
+-		clock->ops->disable(clock->id);
+-
+-	return rc;
+-}
+-
+-static int clock_debug_enable_get(void *data, u64 *val)
+-{
+-	struct clk *clock = data;
+-
+-	*val = clock->ops->is_enabled(clock->id);
+-
+-	return 0;
+-}
+-
+-static int clock_debug_local_get(void *data, u64 *val)
+-{
+-	struct clk *clock = data;
+-
+-	*val = clock->ops != &clk_ops_pcom;
+-
+-	return 0;
+-}
+-
+-DEFINE_SIMPLE_ATTRIBUTE(clock_rate_fops, clock_debug_rate_get,
+-			clock_debug_rate_set, "%llu\n");
+-DEFINE_SIMPLE_ATTRIBUTE(clock_enable_fops, clock_debug_enable_get,
+-			clock_debug_enable_set, "%llu\n");
+-DEFINE_SIMPLE_ATTRIBUTE(clock_local_fops, clock_debug_local_get,
+-			NULL, "%llu\n");
+-
+-static int __init clock_debug_init(void)
+-{
+-	struct dentry *dent_rate, *dent_enable, *dent_local;
+-	struct clk *clock;
+-	unsigned n = 0;
+-	char temp[50], *ptr;
+-
+-	dent_rate = debugfs_create_dir("clk_rate", 0);
+-	if (IS_ERR(dent_rate))
+-		return PTR_ERR(dent_rate);
+-
+-	dent_enable = debugfs_create_dir("clk_enable", 0);
+-	if (IS_ERR(dent_enable))
+-		return PTR_ERR(dent_enable);
+-
+-	dent_local = debugfs_create_dir("clk_local", NULL);
+-	if (IS_ERR(dent_local))
+-		return PTR_ERR(dent_local);
+-
+-	while ((clock = msm_clock_get_nth(n++)) != 0) {
+-		strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
+-		for (ptr = temp; *ptr; ptr++)
+-			*ptr = tolower(*ptr);
+-		debugfs_create_file(temp, 0644, dent_rate,
+-				    clock, &clock_rate_fops);
+-		debugfs_create_file(temp, 0644, dent_enable,
+-				    clock, &clock_enable_fops);
+-		debugfs_create_file(temp, S_IRUGO, dent_local,
+-				    clock, &clock_local_fops);
+-	}
+-	return 0;
+-}
+-
+-device_initcall(clock_debug_init);
+-#endif
+-
+ /* The bootloader and/or AMSS may have left various clocks enabled.
+  * Disable any clocks that belong to us (CLKFLAG_AUTO_OFF) but have
+  * not been explicitly enabled by a clk_enable() call.
+@@ -315,8 +196,10 @@ static int __init clock_late_init(void)
+ 	struct clk *clk;
+ 	unsigned count = 0;
+ 
++	clock_debug_init();
+ 	mutex_lock(&clocks_mutex);
+ 	list_for_each_entry(clk, &clocks, list) {
++		clock_debug_add(clk);
+ 		if (clk->flags & CLKFLAG_AUTO_OFF) {
+ 			spin_lock_irqsave(&clocks_lock, flags);
+ 			if (!clk->count) {
 diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
-index 44a6dd6..b74ba3e 100644
+index 6a0cade..70216b0 100644
 --- a/arch/arm/mach-msm/clock.h
 +++ b/arch/arm/mach-msm/clock.h
-@@ -43,6 +43,7 @@ struct clk_ops {
- 	unsigned (*get_rate)(unsigned id);
- 	unsigned (*is_enabled)(unsigned id);
- 	long (*round_rate)(unsigned id, unsigned rate);
-+	bool (*is_local)(unsigned id);
- };
+@@ -17,6 +17,7 @@
+ #ifndef __ARCH_ARM_MACH_MSM_CLOCK_H
+ #define __ARCH_ARM_MACH_MSM_CLOCK_H
  
- struct clk {
++#include <linux/init.h>
+ #include <linux/list.h>
+ #include <mach/clk.h>
+ 
+@@ -61,4 +62,12 @@ struct clk {
+ #define CLK_MAX CLKFLAG_MAX
+ #define CLK_MINMAX (CLK_MIN | CLK_MAX)
+ 
++#ifdef CONFIG_DEBUG_FS
++int __init clock_debug_init(void);
++int __init clock_debug_add(struct clk *clock);
++#else
++static inline int __init clock_debug_init(void) { return 0; }
++static inline int __init clock_debug_add(struct clk *clock) { return 0; }
++#endif
++
+ #endif
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
