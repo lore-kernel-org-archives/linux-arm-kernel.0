@@ -1,75 +1,53 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 17 Dec 2010 11:18:11 +0100
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 17 Dec 2010 15:50:59 +0530
 Subject: [PATCH 0/7 v4] OMAP3: clean up ASM sleep code
-In-Reply-To: <f3afb9340d4f1d0c8d2936d9faea79c8@mail.gmail.com>
-References: <1292521858-3810-1-git-send-email-j-pihet@ti.com>
-	<f3afb9340d4f1d0c8d2936d9faea79c8@mail.gmail.com>
-Message-ID: <AANLkTi=968TjtNn_M5FV54xF-E8Xw=3xohN0g+iJZ04Z@mail.gmail.com>
+In-Reply-To: <AANLkTi=968TjtNn_M5FV54xF-E8Xw=3xohN0g+iJZ04Z@mail.gmail.com>
+References: <1292521858-3810-1-git-send-email-j-pihet@ti.com><f3afb9340d4f1d0c8d2936d9faea79c8@mail.gmail.com>
+	<AANLkTi=968TjtNn_M5FV54xF-E8Xw=3xohN0g+iJZ04Z@mail.gmail.com>
+Message-ID: <e2e2e2d15f146b8ab9f973335f6da14e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh, Kevin,
-
-On Fri, Dec 17, 2010 at 6:05 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Jean,
->
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of jean.pihet at newoldbits.com
->> Sent: Thursday, December 16, 2010 11:21 PM
->> To: linux-omap at vger.kernel.org
->> Cc: khilman at deeprootsystems.com; linux-arm-kernel at lists.infradead.org;
->> Jean Pihet
->> Subject: [PATCH 0/7 v4] OMAP3: clean up ASM sleep code
->>
->> From: Jean Pihet <j-pihet@ti.com>
->>
->> This patch only contains clean-ups and cosmetic changes,
->> no functional change.
->>
->> Clean-up of the ASM sleep code, for better readability and
->> easier maintenance.
->>
->> Applies on top of Nishant's latest idle path errata fixes step 2,
->> cf. http://marc.info/?l=linux-omap&m=129139584919242&w=2
->>
-> Thanks for cleanup. Have few minor comments on these patches.
-
-Thanks for the review.
-I fixed the issues and reposted the series as '[PATCH 0/7 v5] OMAP3:
-clean up ASM sleep code'.
-
-Regards,
+> -----Original Message-----
+> From: Jean Pihet [mailto:jean.pihet at newoldbits.com]
+> Sent: Friday, December 17, 2010 3:48 PM
+> To: Santosh Shilimkar; khilman at deeprootsystems.com
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
 Jean
-
+> Pihet-XID
+> Subject: Re: [PATCH 0/7 v4] OMAP3: clean up ASM sleep code
 >
->> Jean Pihet (7):
->> ? OMAP2+: use global values for the SRAM PA addresses
->> ? OMAP3: remove hardcoded values from the ASM sleep code
->> ? OMAP3: re-organize the ASM sleep code
->> ? OMAP3: rework of the ASM sleep code execution paths
->> ? OMAP3: add comments for low power code errata
->> ? OMAP3: ASM sleep code format rework
->> ? OMAP3: remove unused code from the ASM sleep code
->>
->> ?arch/arm/mach-omap2/control.c ? | ? 10 +-
->> ?arch/arm/mach-omap2/control.h ? | ? ?2 +
->> ?arch/arm/mach-omap2/pm.h ? ? ? ?| ? ?1 -
->> ?arch/arm/mach-omap2/pm34xx.c ? ?| ? ?4 +-
->> ?arch/arm/mach-omap2/sdrc.h ? ? ?| ? ?7 +
->> ?arch/arm/mach-omap2/sleep34xx.S | ?714
-> +++++++++++++++++++++-------------
->> -----
->> ?arch/arm/plat-omap/sram.c ? ? ? | ? ?7 +-
->> ?7 files changed, 401 insertions(+), 344 deletions(-)
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Hi Santosh, Kevin,
 >
+> On Fri, Dec 17, 2010 at 6:05 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> > Jean,
+> >
+> >> -----Original Message-----
+> >> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> >> owner at vger.kernel.org] On Behalf Of jean.pihet at newoldbits.com
+> >> Sent: Thursday, December 16, 2010 11:21 PM
+> >> To: linux-omap at vger.kernel.org
+> >> Cc: khilman at deeprootsystems.com;
+linux-arm-kernel at lists.infradead.org;
+> >> Jean Pihet
+> >> Subject: [PATCH 0/7 v4] OMAP3: clean up ASM sleep code
+> >>
+> >> From: Jean Pihet <j-pihet@ti.com>
+> >>
+> >> This patch only contains clean-ups and cosmetic changes,
+> >> no functional change.
+> >>
+> >> Clean-up of the ASM sleep code, for better readability and
+> >> easier maintenance.
+> >>
+> >> Applies on top of Nishant's latest idle path errata fixes step 2,
+> >> cf. http://marc.info/?l=linux-omap&m=129139584919242&w=2
+> >>
+> > Thanks for cleanup. Have few minor comments on these patches.
+>
+> Thanks for the review.
+> I fixed the issues and reposted the series as '[PATCH 0/7 v5] OMAP3:
+> clean up ASM sleep code'.
+>
+Thanks. I checked it. Will ack your patches
