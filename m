@@ -1,58 +1,138 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Dec 2010 11:31:03 +0000
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <99eb693af85e07b01d81d45f1bc77f64.squirrel@www.codeaurora.org>
-References: <4CF94DDD.8000409@codeaurora.org>
-	<20101203203653.GB10245@n2100.arm.linux.org.uk>
-	<4CFDD297.4020600@codeaurora.org>
-	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
-	<20101209103835.GA31465@n2100.arm.linux.org.uk>
-	<4D017B45.4000805@codeaurora.org>
-	<AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
-	<4D045692.4050607@codeaurora.org>
-	<AANLkTimwqC6DqN8ft10EyRbPh9XvibN1fA-Cug4OdS5m@mail.gmail.com>
-	<8c67e174d807416f0c6c190cc72d3f5a.squirrel@www.codeaurora.org>
-	<20101217094818.GA9937@n2100.arm.linux.org.uk>
-	<99eb693af85e07b01d81d45f1bc77f64.squirrel@www.codeaurora.org>
-Message-ID: <AANLkTinsgqLDe3=KX59n1UAp9v0ErXQzxj+A+qQ8TRj_@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 17 Dec 2010 20:36:38 +0900
+Subject: [PATCH] ARM: Subarch IRQ handler macros V3
+Message-ID: <20101217113638.15505.99479.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 December 2010 10:26, Saravana Kannan <skannan@codeaurora.org> wrote:
->>> Looks like you agree with our approach. If that's the case, would you
->>> mind
->>> Acking Jeff's initial patch that this thread is based on?
->>
->> I read Catalin's reply as agreeing with me.
->
-> Catalin, Can you clarify?
+From: Magnus Damm <damm@opensource.se>
 
-I'll try but I started my holidays and I'll only be online occasionally.
+Per subarch interrupt handler macros V3.
 
-Just to clarify, even if I ack Jeff's patch, it is for Russell to
-decide what gets merged. Now, Jeff's patch doesn't show anything about
-how the dma_alloc_coherent is used, just suggests something in the
-commit log, so I don't see it critical to this discussion. I wouldn't
-ack it without agreement on the extension of the DMA API (which can
-only have a no-op get_dma_ops at this point).
+This patch breaks out code from the irq_handler macro
+into arch_irq_handler and arch_irq_handler_default.
 
-I agree with Russell's points that just using the DMA API as it is may
-break in the future, hence a proposal to treat it slightly different.
+The macros are put in the header file "entry-macro-multi.S"
 
-People in ARM working on a generic state save/restore mechanism face
-the same problem - they need some non-cacheable memory for
-synchronisation. I'm not sure whether they managed to find an
-alternative algorithm with cached memory and cache flushing and I also
-haven't followed the development to give more details.
+The arch_irq_handler_default macro is designed to be
+used by irq_handler in entry-armv.S while arch_irq_handler
+is suitable for per-subarch use.
 
-> Russell,
->
-> I agree with your point about using an API for purpose and not property.
-> But I read Catalin's proposal as, let's treat secure domain as another DMA
-> "device". If we make a conscious agreement to do that, then using the DMA
-> API for secure domain would be "using it for its purpose" and we will make
-> an effort to not break it with future updates. Of course, if we don't
-> agree on that proposal, then we can't use the DMA API for secure domain
-> stuff.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-If there is no better proposal, I'm for such extension to the DMA API.
+ Changes since V2:
+ - Rebased patch to fit on top of linux-2.6-arm git devel-stable + 6532/1
+ - Tested on mackerel board with local patch similar to V1 [PATCH 02/02]
+
+ Changes since V1:
+ - Dropped the RFC tag and the example code
+ - Rebased on top of latest
+   "[PATCH] ARM: Allow machine to specify it's own IRQ handlers at run-time"
+ - Moved the "#include <asm/entry-macro-multi.S>" to fix SMP compile
+ - Tested the code on SH-Mobile ARM
+ - Added return address saving to arch_irq_handler, r4 seems ok
+
+ Have a look at the V1 posted as RFC for example code:
+ "[PATCH 00/02][RFC] ARM: Subarch IRQ handler macro support"
+
+ Please test and let me know if keeping the return address in r4 is wrong.
+
+ arch/arm/include/asm/entry-macro-multi.S |   44 ++++++++++++++++++++++++++++++
+ arch/arm/kernel/entry-armv.S             |   31 +--------------------
+ 2 files changed, 46 insertions(+), 29 deletions(-)
+
+--- /dev/null
++++ work/arch/arm/include/asm/entry-macro-multi.S	2010-12-17 19:52:59.000000000 +0900
+@@ -0,0 +1,44 @@
++/*
++ * Interrupt handling.  Preserves r7, r8, r9
++ */
++	.macro	arch_irq_handler_default
++	get_irqnr_preamble r5, lr
++1:	get_irqnr_and_base r0, r6, r5, lr
++	movne	r1, sp
++	@
++	@ routine called with r0 = irq number, r1 = struct pt_regs *
++	@
++	adrne	lr, BSYM(1b)
++	bne	asm_do_IRQ
++
++#ifdef CONFIG_SMP
++	/*
++	 * XXX
++	 *
++	 * this macro assumes that irqstat (r6) and base (r5) are
++	 * preserved from get_irqnr_and_base above
++	 */
++	ALT_SMP(test_for_ipi r0, r6, r5, lr)
++	ALT_UP_B(9997f)
++	movne	r0, sp
++	adrne	lr, BSYM(1b)
++	bne	do_IPI
++
++#ifdef CONFIG_LOCAL_TIMERS
++	test_for_ltirq r0, r6, r5, lr
++	movne	r0, sp
++	adrne	lr, BSYM(1b)
++	bne	do_local_timer
++#endif
++#endif
++9997:
++	.endm
++
++	.macro	arch_irq_handler, symbol_name
++	.align	5
++	.global \symbol_name
++\symbol_name:
++	mov	r4, lr
++	arch_irq_handler_default
++	mov     pc, r4
++	.endm
+--- 0004/arch/arm/kernel/entry-armv.S
++++ work/arch/arm/kernel/entry-armv.S	2010-12-17 19:56:38.000000000 +0900
+@@ -25,6 +25,7 @@
+ #include <asm/tls.h>
+ 
+ #include "entry-header.S"
++#include <asm/entry-macro-multi.S>
+ 
+ /*
+  * Interrupt handling.  Preserves r7, r8, r9
+@@ -38,35 +39,7 @@
+ 	teq	r5, #0
+ 	movne	pc, r5
+ #endif
+-	get_irqnr_preamble r5, lr
+-1:	get_irqnr_and_base r0, r6, r5, lr
+-	movne	r1, sp
+-	@
+-	@ routine called with r0 = irq number, r1 = struct pt_regs *
+-	@
+-	adrne	lr, BSYM(1b)
+-	bne	asm_do_IRQ
+-
+-#ifdef CONFIG_SMP
+-	/*
+-	 * XXX
+-	 *
+-	 * this macro assumes that irqstat (r6) and base (r5) are
+-	 * preserved from get_irqnr_and_base above
+-	 */
+-	ALT_SMP(test_for_ipi r0, r6, r5, lr)
+-	ALT_UP_B(9997f)
+-	movne	r0, sp
+-	adrne	lr, BSYM(1b)
+-	bne	do_IPI
+-
+-#ifdef CONFIG_LOCAL_TIMERS
+-	test_for_ltirq r0, r6, r5, lr
+-	movne	r0, sp
+-	adrne	lr, BSYM(1b)
+-	bne	do_local_timer
+-#endif
+-#endif
++	arch_irq_handler_default
+ 9997:
+ 	.endm
+ 
