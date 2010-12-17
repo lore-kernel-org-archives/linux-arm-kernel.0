@@ -1,54 +1,105 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 16 Dec 2010 16:16:58 -0800
-Subject: [PATCH 1/7] msm: io: I/O register definitions for MSM8960
-In-Reply-To: <201012152337.19475.arnd@arndb.de>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<201012151740.24933.arnd@arndb.de>
-	<20101215220317.GA22394@huya.qualcomm.com>
-	<201012152337.19475.arnd@arndb.de>
-Message-ID: <20101217001658.GA5880@huya.qualcomm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 16 Dec 2010 16:49:44 -0800
+Subject: [PATCH 00/22] MSM clock driver updates
+Message-ID: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15, 2010 at 11:37:19PM +0100, Arnd Bergmann wrote:
+This series of patches syncs the MSM clock code in Linus' tree with 
+the MSM tree @ codeaurora.org. They're prepared against the msm-core
+tree (git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-core).
 
-> Yes, I understand that it's hard for many reasons, but my impression
-> is that there is a general agreement on the idea. As I said, I don't
-> expect you to fix it all at once, but it shouldn't be too hard
-> to take care when adding new code.
-> 
-> We already have infrastructure that deals with different CPU cores
-> in one kernel binary, at least from v5 to v7, and some platforms
-> like omap and realview can already be built for a variety of very
-> different machines without such problems.
+ * 1 - 4 are cleanups and minor additions to the existing clock driver
 
-I agree with this goal, and I think I have a plan to get us there.
+ * 5 - 6 add support for the 7x30 local clock driver
 
-For example, the iomap constants.  To fix this, this data needs to be
-moved into platform data, or something similar.  It seems to me to
-make the most sense to move the individual devices out of the iomap
-until at least the devices used so far on 8960 are all done
-dynamically.  Then at least these constants aren't needed for this
-target.
+ * 7 - 10 add support for the 8x60 local clock driver; refactor the
+          7x30 driver into a generic driver and remove the dummy clock
+	  driver in use by 8x60
 
-There are similar things that need to be done for irqs, and timer
-offsets.
+ * 11 - 12 add debugfs aides for locally controlled clocks
 
-I'm not sure really what to do about PHYS_OFFSET.  This is kind of the
-big thing that has kept us so far from making our SOCs multiply
-selectable.  I could move this into a Kconfig option, but it would
-still need to be selected by the SOC.  It is unfortunate that most of
-our SOCs have different enough memory configurations that these are
-mostly different.  Even 8960/8660 will probably have future variants
-that are at different addresses.
+ * 13 - 17 implement clock rate voting for clocks with multiple
+           consumers where each consumer requires different minimum rates
 
-My question, then is, should we hold off on getting 8960 support into
-the kernel until enough things are improved to get rid of the 8960
-ifdefs?  We can certainly do it that way, but it will keep the code
-out of the kernel longer.
+ * 18 moves the clock driver to clkdev
 
-Thanks,
-David
+ * 19 - 22 moves the iommu driver to proper usage of the clock driver
+
+I understand the diffstat is rather large, but please review. All feedback
+is welcome.
+
+Matt Wagantall (5):
+  msm: clock: Move debugfs code from clock.c to clock-debug.c
+  msm: clock: Refactor clock-7x30 into generic clock-local driver
+  msm: clock-8x60: Add msm8x60 local clock driver
+  msm: clock Add debugfs interface to measure clock rates
+  msm: clock: Add list_rate debugfs nodes for locally-controlled clocks
+
+Saravana Kannan (1):
+  msm: clock-7x30: Add 7x30 local clock driver
+
+Stepan Moskovchenko (3):
+  msm: iommu: Add bus clocks to platform data
+  msm: iommu: Clock control for the IOMMU driver
+  msm: iommu: Rework clock logic and add IOMMU bus clock control
+
+Stephen Boyd (13):
+  msm: clock: Remove unused code and definitions
+  msm: clock: Invert debugfs directory layout
+  msm: clock: Add support for more proc_comm clocks
+  msm: clock-7x30: Update clock table
+  msm: clock: Remove references to clk_ops_pcom
+  msm: Move 8x60 to the real clock driver
+  msm: clock: Push down clock count and locking into sub drivers
+  msm: clock: Support clk_set_parent() clk_ops
+  msm: clock-pcom: Add pbus specific clock ops
+  msm: clock: Implement rate voting
+  msm: Migrate to clock rate voting
+  msm: clock: Migrate to clkdev
+  msm: clock-8x60: Don't keep IOMMU clocks on at boot
+
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/mach-msm/Makefile                      |   10 +-
+ arch/arm/mach-msm/board-msm8x60.c               |    8 +-
+ arch/arm/mach-msm/clock-7x30.c                  | 1166 ++++++++++++++
+ arch/arm/mach-msm/clock-7x30.h                  |  265 ++--
+ arch/arm/mach-msm/clock-8x60.c                  | 1896 +++++++++++++++++++++++
+ arch/arm/mach-msm/clock-8x60.h                  |  218 +++
+ arch/arm/mach-msm/clock-debug.c                 |  176 +++
+ arch/arm/mach-msm/clock-local.c                 |  696 +++++++++
+ arch/arm/mach-msm/clock-local.h                 |  233 +++
+ arch/arm/mach-msm/clock-pcom.c                  |  102 ++-
+ arch/arm/mach-msm/clock-pcom.h                  |   21 +-
+ arch/arm/mach-msm/clock-voter.c                 |  202 +++
+ arch/arm/mach-msm/clock-voter.h                 |   54 +
+ arch/arm/mach-msm/clock.c                       |  244 +---
+ arch/arm/mach-msm/clock.h                       |   70 +-
+ arch/arm/mach-msm/devices-msm7x00.c             |   32 +-
+ arch/arm/mach-msm/devices-msm7x30.c             |  170 ++-
+ arch/arm/mach-msm/devices-msm8x60-iommu.c       |    5 -
+ arch/arm/mach-msm/devices-msm8x60.c             |  183 +++
+ arch/arm/mach-msm/devices-qsd8x50.c             |   29 +-
+ arch/arm/mach-msm/devices.h                     |    9 +-
+ arch/arm/mach-msm/include/mach/board.h          |    4 +-
+ arch/arm/mach-msm/include/mach/clkdev.h         |   23 +
+ arch/arm/mach-msm/include/mach/iommu.h          |   12 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |   12 +
+ arch/arm/mach-msm/io.c                          |    3 +
+ arch/arm/mach-msm/iommu.c                       |   57 +-
+ arch/arm/mach-msm/iommu_dev.c                   |  204 ++-
+ arch/arm/mach-msm/proc_comm.h                   |    1 +
+ 30 files changed, 5524 insertions(+), 582 deletions(-)
+ create mode 100644 arch/arm/mach-msm/clock-7x30.c
+ create mode 100644 arch/arm/mach-msm/clock-8x60.c
+ create mode 100644 arch/arm/mach-msm/clock-8x60.h
+ create mode 100644 arch/arm/mach-msm/clock-debug.c
+ create mode 100644 arch/arm/mach-msm/clock-local.c
+ create mode 100644 arch/arm/mach-msm/clock-local.h
+ create mode 100644 arch/arm/mach-msm/clock-voter.c
+ create mode 100644 arch/arm/mach-msm/clock-voter.h
+ create mode 100644 arch/arm/mach-msm/devices-msm8x60.c
+ create mode 100644 arch/arm/mach-msm/include/mach/clkdev.h
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
