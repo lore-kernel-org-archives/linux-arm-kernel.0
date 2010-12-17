@@ -1,112 +1,38 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 17 Dec 2010 07:51:48 -0600
-Subject: [PATCH 3/7] OMAP3: remove hardcoded values from the ASM sleep code
-In-Reply-To: <1292580506-4421-4-git-send-email-j-pihet@ti.com>
-References: <1292580506-4421-1-git-send-email-j-pihet@ti.com>
-	<1292580506-4421-4-git-send-email-j-pihet@ti.com>
-Message-ID: <4D0B6AF4.1050600@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 17 Dec 2010 19:34:11 +0530
+Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
+In-Reply-To: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+Message-ID: <e267a5979c1e20671daa063110dc9a1c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-jean.pihet at newoldbits.com had written, on 12/17/2010 04:08 AM, the 
-following:
-> From: Jean Pihet <j-pihet@ti.com>
-> 
-> Using macros from existing include files for registers addresses.
-> 
-> Tested on N900 and Beagleboard with full RET and OFF modes,
-> using cpuidle and suspend.
-> 
-> Based on original patch from Vishwa.
-> 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> Cc: Vishwanath BS <vishwanath.bs@ti.com>
-> ---
->  arch/arm/mach-omap2/control.h   |    2 ++
->  arch/arm/mach-omap2/sleep34xx.S |   29 ++++++++++++++++++-----------
->  2 files changed, 20 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-> index d7911c5..72efefb 100644
-> --- a/arch/arm/mach-omap2/control.h
-> +++ b/arch/arm/mach-omap2/control.h
-> @@ -274,6 +274,8 @@
->  #define OMAP343X_SCRATCHPAD_ROM		(OMAP343X_CTRL_BASE + 0x860)
->  #define OMAP343X_SCRATCHPAD		(OMAP343X_CTRL_BASE + 0x910)
->  #define OMAP343X_SCRATCHPAD_ROM_OFFSET	0x19C
-> +#define OMAP343X_SCRATCHPAD_REGADDR(reg)	OMAP2_L4_IO_ADDRESS(\
-> +						OMAP343X_SCRATCHPAD + reg)
-+ (reg)) please. I am not convinced that we should call this REGADDR 
-though scratchpad region in DDR is still DDR, not a register.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
+> Sent: Friday, December 17, 2010 5:02 PM
+> To: Alessandro Rubini; Bryan Huntsman; Colin Cross; Daniel Walker; David
+> Brown; Eric Miao; Erik Gilling; Hans J. Koch; Imre Kaloz; Kevin Hilman;
+> Krzysztof Halasa; Kukjin Kim; Lennert Buytenhek; Jiandong Zheng; Linus
+> Walleij; linux-arm-msm at vger.kernel.org; linux-omap at vger.kernel.org;
+linux-
+> samsung-soc at vger.kernel.org; linux-tegra at vger.kernel.org; Nicolas Pitre;
+> Olof Johansson; Sascha Hauer; Scott Branden; STEricsson; Tony Lindgren;
+> Viresh Kumar; Wan ZongShun
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
+>
+> Here is the entire set of clocksource and sched_clock patches which
+> have been previously posted.  There's a couple of small tweaks in a
+> few of the patches (such as adding notrace to OMAP clocksource read
+> functions), and this also shows the proper ordering of these patches.
+>
+> Still looking for acks or tested-by's for these patches.
 
->  
->  /* AM35XX_CONTROL_IPSS_CLK_CTRL bits */
->  #define AM35XX_USBOTG_VBUSP_CLK_SHIFT   0
-> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-> index 406cd2a..8e9f38f 100644
-> --- a/arch/arm/mach-omap2/sleep34xx.S
-> +++ b/arch/arm/mach-omap2/sleep34xx.S
-> @@ -34,20 +34,27 @@
->  #include "sdrc.h"
->  #include "control.h"
->  
-> -#define SDRC_SCRATCHPAD_SEM_V	0xfa00291c
-> -
-> -#define PM_PREPWSTST_CORE_P	0x48306AE8
-> +/*
-> + * Registers access definitions
-> + */
-err.. technically sdrc scratchpad is not really a register ;) nor is 
-sram_base ;)
-> +#define SDRC_SCRATCHPAD_SEM_OFFS	0xc
-> +#define SDRC_SCRATCHPAD_SEM_V	OMAP343X_SCRATCHPAD_REGADDR\
-> +					(SDRC_SCRATCHPAD_SEM_OFFS)
-> +#define PM_PREPWSTST_CORE_P	OMAP3430_PRM_BASE + CORE_MOD +\
-> +					OMAP3430_PM_PREPWSTST
-please use () for wrapping up a macro with multiple defines.
+Have boot tested this series on OMAP4430 SDP and OMAP3630
+ZOOM.
 
->  #define PM_PWSTCTRL_MPU_P	OMAP3430_PRM_BASE + MPU_MOD + OMAP2_PM_PWSTCTRL
->  #define CM_IDLEST1_CORE_V	OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST1)
->  #define CM_IDLEST_CKGEN_V	OMAP34XX_CM_REGADDR(PLL_MOD, CM_IDLEST)
-> -#define SRAM_BASE_P		0x40200000
-> -#define CONTROL_STAT		0x480022F0
-> -#define CONTROL_MEM_RTA_CTRL	(OMAP343X_CTRL_BASE\
-> -					+ OMAP36XX_CONTROL_MEM_RTA_CTRL)
-not sure what changed here.
-> -#define SCRATCHPAD_MEM_OFFS	0x310 /* Move this as correct place is
-> -				       * available */
-this change I am guessing is a clean up of /* */ comment - might help if 
-you could do formatting changes in a single patch - easier to check if 
-there are functionality issues during reviews in the current patch that 
-way. my suggestion will be to do the functional changes first followed 
-by a formatting cleanup patch at the very end..
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-> -#define SCRATCHPAD_BASE_P	(OMAP343X_CTRL_BASE + OMAP343X_CONTROL_MEM_WKUP\
-> -						+ SCRATCHPAD_MEM_OFFS)
-again, not sure what changed here.
-> +#define SRAM_BASE_P		OMAP3_SRAM_PA
-Why not just replace the usage of SRAM_BASE_P with OMAP3_SRAM_PA?
-
-> +#define CONTROL_STAT		OMAP343X_CTRL_BASE + OMAP343X_CONTROL_STATUS
-> +#define CONTROL_MEM_RTA_CTRL	(OMAP343X_CTRL_BASE +\
-> +					OMAP36XX_CONTROL_MEM_RTA_CTRL)
-> +
-> +/* Move this as correct place is available */
-> +#define SCRATCHPAD_MEM_OFFS	0x310
-> +#define SCRATCHPAD_BASE_P	(OMAP343X_CTRL_BASE +\
-> +					OMAP343X_CONTROL_MEM_WKUP +\
-> +					SCRATCHPAD_MEM_OFFS)
->  #define SDRC_POWER_V		OMAP34XX_SDRC_REGADDR(SDRC_POWER)
->  #define SDRC_SYSCONFIG_P	(OMAP343X_SDRC_BASE + SDRC_SYSCONFIG)
->  #define SDRC_MR_0_P		(OMAP343X_SDRC_BASE + SDRC_MR_0)
-Tested-by: Nishanth Menon <nm@ti.com>
-Tested on:
-SDP3630
-SDP3430
-Test script:
-http://pastebin.mozilla.org/889933
-
-
--- 
 Regards,
-Nishanth Menon
+Santosh
