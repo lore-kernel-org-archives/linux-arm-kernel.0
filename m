@@ -1,44 +1,51 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Fri, 17 Dec 2010 17:44:34 +1100
-Subject: [PATCHv2] mc13xxx: Add i2c support for mc13xxx-core
-In-Reply-To: <20101216092032.GA4209@pengutronix.de>
-References: <1292449675-20308-1-git-send-email-marc@cpdesign.com.au>
-	<20101216090210.GE1940@pengutronix.de>
-	<20101216092032.GA4209@pengutronix.de>
-Message-ID: <201012171744.34075.marc@cpdesign.com.au>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Fri, 17 Dec 2010 00:28:43 -0800
+Subject: [PATCH v6 0/5] SMP support for msm
+Message-ID: <1292574528-13310-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series adds support for SMP on msm targets, and specifically adds
+support for SMP on the msm8x60. This version is rebased on top of
+Russell's SMP and gic patches, and has fixes for hotplug and smp.
 
-> >      (BTW, did you fix the dependencies?  Currently you need to depend
-> >      on I2C && SPI.  (Not sure these are the correct names, you may want
-> >      to double check that.))
-> 
-> Be careful, this is a subtle issue. You will get unresolved symbols if your
-> chip is connected via SPI, and <driver>=y, SPI=y, together with I2C=m. Been
-> there.
-> 
-How quickly a "simple" patch gets complicated. :)
+v5: Changes the hotplug and smp code to be more similar to
+the realview implementation.
+v6: Changes .word to wfi instruction, changes physical address type from
+void* to phys_addr_t.
 
-Am I right in thinking that in the above scenario (assuming it was coerced 
-into compiling) the mc13xxx i2c driver would never get registered even after 
-the i2c module is insmod'ed?
+Jeff Ohlstein (3):
+  msm: timer: SMP timer support for msm
+  msm: hotplug: support cpu hotplug on msm
+  msm: add SMP support for msm
 
-Sounds like the only way to handle this is by splitting the spi and i2c... 
+Stepan Moskovchenko (1):
+  msm: scm-boot: Support for setting cold/warm boot addresses
 
-> >      This is more flexible but IMHO not worth the effort.
-> 
-> I had to do it back then :( I wondered if there couldn't be a generic way
-> to deal with SPI+I2C-drivers, never got to investigate it, though.
-> 
+Stephen Boyd (1):
+  msm: Secure Channel Manager (SCM) support
 
-Looking at some of the other mfd drivers, it seems that's the way they've gone 
-too.
+ arch/arm/mach-msm/Kconfig                       |    5 +
+ arch/arm/mach-msm/Makefile                      |    4 +
+ arch/arm/mach-msm/headsmp.S                     |   40 ++++
+ arch/arm/mach-msm/hotplug.c                     |   91 +++++++
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    6 +-
+ arch/arm/mach-msm/io.c                          |    1 +
+ arch/arm/mach-msm/platsmp.c                     |  166 +++++++++++++
+ arch/arm/mach-msm/scm-boot.c                    |   39 +++
+ arch/arm/mach-msm/scm-boot.h                    |   38 +++
+ arch/arm/mach-msm/scm.c                         |  287 +++++++++++++++++++++++
+ arch/arm/mach-msm/scm.h                         |   41 ++++
+ arch/arm/mach-msm/timer.c                       |  137 +++++++++--
+ 12 files changed, 831 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/mach-msm/headsmp.S
+ create mode 100644 arch/arm/mach-msm/hotplug.c
+ create mode 100644 arch/arm/mach-msm/platsmp.c
+ create mode 100644 arch/arm/mach-msm/scm-boot.c
+ create mode 100644 arch/arm/mach-msm/scm-boot.h
+ create mode 100644 arch/arm/mach-msm/scm.c
+ create mode 100644 arch/arm/mach-msm/scm.h
 
-> Also, be sure to CC i2c- and spi-lists when you do the next version.
-
-Will do.
-
-Cheers,
-Marc
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
