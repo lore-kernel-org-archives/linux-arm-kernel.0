@@ -1,53 +1,79 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 16 Dec 2010 18:55:06 -0800 (PST)
-Subject: [PATCH] arm: dma-mapping: move consistent_init to early_initcall
-In-Reply-To: <AANLkTimwqC6DqN8ft10EyRbPh9XvibN1fA-Cug4OdS5m@mail.gmail.com>
-References: <1291327879-28073-1-git-send-email-johlstei@codeaurora.org>
-	<20101202221909.GK29347@n2100.arm.linux.org.uk>
-	<4CF94DDD.8000409@codeaurora.org>
-	<20101203203653.GB10245@n2100.arm.linux.org.uk>
-	<4CFDD297.4020600@codeaurora.org>
-	<15d23d63900e4545a40555961c49c421.squirrel@codeaurora.org>
-	<20101209103835.GA31465@n2100.arm.linux.org.uk>
-	<4D017B45.4000805@codeaurora.org>
-	<AANLkTi=PnnT8rVKMxK0tVTdKnKdcKf71fsX2o594Qx3e@mail.gmail.com>
-	<4D045692.4050607@codeaurora.org>
-	<AANLkTimwqC6DqN8ft10EyRbPh9XvibN1fA-Cug4OdS5m@mail.gmail.com>
-Message-ID: <8c67e174d807416f0c6c190cc72d3f5a.squirrel@www.codeaurora.org>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Fri, 17 Dec 2010 12:56:19 +0900
+Subject: [RFCv2,0/8] mm: vcm: The Virtual Memory Manager for multiple IOMMUs
+Message-ID: <1292558187-17348-1-git-send-email-pullip.cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-> On 12 December 2010 04:58, Saravana Kannan <skannan@codeaurora.org> wrote:
->> As you and James suggested, having the NS bit set by the secure world is
->> definitely a solution that would work. But IMHO, the explicit cache
->> flush/invalidate approach keeps the design simple and easy to maintain.
->
-> That is indeed an approach to the problem. But it depends on whether
-> we consider the DMA API appropriate for this. We can view the secure
-> world as a non-coherent agent accessing the memory and could try to
-> justify the use of the DMA API in Linux.
->
-> At some point we'll probably have platforms supporting cacheable DMA
-> (e.g. via the ARM coherency port) and the DMA API would no longer give
-> you what you need. But it is also possible that platforms with ACP
-> would only have 1 or 2 devices on that port (some HD LCD controller
-> for example) and the rest of devices non-coherent. In this case, we
-> need to have different DMA operations depending on the bus/device (via
-> get_dma_ops) and thus we can allow your scenario via dedicated DMA
-> ops.
+The VCM is a framework to deal with multiple IOMMUs in a system 
+with intuitive and abstract objects
+These patches are the bugfix and enhanced version of previous RFC by Michal Nazarewicz.
+(https://patchwork.kernel.org/patch/157451/)
 
-Catalin,
+It is introduced by Zach Pfeffer and implemented by Michal Nazarewicz.
+These patches include entirely new implementation of VCM than the one submitted by Zach Pfeffer.
 
-Looks like you agree with our approach. If that's the case, would you mind
-Acking Jeff's initial patch that this thread is based on?
+The prerequisites of these patches are the followings by Michal Nazarewicz:
+https://patchwork.kernel.org/patch/340281/
+https://patchwork.kernel.org/patch/414381/
+https://patchwork.kernel.org/patch/414541/
 
-Russell,
+In addition to the above patches, 
+the prerequisites of "[RFCv2,7/8] mm: vcm: vcm-cma: VCM CMA driver added" is
+CMA RFCv8 introduced by Michal Nazarewicz:
+https://patchwork.kernel.org/patch/414351/
 
-Does Catalin's proposal sound acceptable to you?
+The VCM also works correctly without "[RFC,6/7] mm: vcm: vcm-cma: VCM CMA driver added"
 
-Thanks,
-Saravana
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+The last patch, "[RFC,7/7] mm: vcm: Sample driver added" is not the one to be submitted
+but is an example to show how to use the VCM.
+
+The VCM provides generic interfaces and objects to deal with IOMMUs in various architectures
+especially the ones that embed multiple IOMMUs including GART.
+
+Chagelog:
+v2:  1. Added reference counting on a reservation.
+	When vcm_reserve() creates a reservation, it sets the reference counter
+	of the reservation to 1. The ownership of the reservation is only owned by
+	the caller of vcm_reserve. If the caller passes the reservation to another
+	callee functions, the callee functions must increment the reference counter
+	with vcm_ref_reserve() to set the ownership of the reservation.
+	To release the ownership, just call vcm_unreserve(). vcm_unreserve decrements
+	the reference counter of the given reservation. vcm_unreserve() eventually
+	unreserves the reservation when its reference counter becomes 0.
+     2. Applied the design changes of CMA by Michal Nazarewicz.
+	Since it is dramatically changed, vcm-cma also followed.
+
+Patch list:
+[RFCv2,1/8] mm: vcm: Virtual Contiguous Memory framework added
+[RFCv2,2/8] mm: vcm: reference counting on a reservation added
+[RFCv2,3/8] mm: vcm: physical memory allocator added
+[RFCv2,4/8] mm: vcm: VCM VMM driver added
+[RFCv2,5/8] mm: vcm: VCM MMU wrapper added
+[RFCv2,6/8] mm: vcm: VCM One-to-One wrapper added
+[RFCv2,7/8] mm: vcm: vcm-cma: VCM CMA driver added
+[RFCv2,8/8] mm: vcm: Sample driver added
+
+Summery:
+Documentation/00-INDEX                      |    2 +
+Documentation/virtual-contiguous-memory.txt |  940 +++++++++++++++++++++++++
+include/linux/vcm-cma.h                     |   38 +
+include/linux/vcm-drv.h                     |  326 +++++++++
+include/linux/vcm-sample.h                  |   30 +
+include/linux/vcm.h                         |  311 +++++++++
+mm/Kconfig                                  |   79 +++
+mm/Makefile                                 |    3 +
+mm/vcm-cma.c                                |   99 +++
+mm/vcm-sample.c                             |  119 ++++
+mm/vcm.c                                    |  987 +++++++++++++++++++++++++++
+11 files changed, 2934 insertions(+), 0 deletions(-)
+create mode 100644 Documentation/virtual-contiguous-memory.txt
+create mode 100644 include/linux/vcm-cma.h
+create mode 100644 include/linux/vcm-drv.h
+create mode 100644 include/linux/vcm-sample.h
+create mode 100644 include/linux/vcm.h
+create mode 100644 mm/vcm-cma.c
+create mode 100644 mm/vcm-sample.c
+create mode 100644 mm/vcm.c
