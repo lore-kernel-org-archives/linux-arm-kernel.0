@@ -1,85 +1,58 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Dec 2010 10:18:39 +0530
-Subject: [PATCH 2/7] OMAP2+: use global values for the SRAM PA addresses
-In-Reply-To: <1292521858-3810-3-git-send-email-j-pihet@ti.com>
-References: <1292521858-3810-1-git-send-email-j-pihet@ti.com>
-	<1292521858-3810-3-git-send-email-j-pihet@ti.com>
-Message-ID: <252f6bd3f3d077d771418d374eee173d@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 17 Dec 2010 13:49:39 +0900
+Subject: [PATCH 13/24] ARM: s5pv310: update clock source registration
+In-Reply-To: <E1PSDvg-0008D8-6F@rmk-PC.arm.linux.org.uk>
+References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
+	<E1PSDvg-0008D8-6F@rmk-PC.arm.linux.org.uk>
+Message-ID: <002f01cb9da5$d30eac70$792c0550$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of jean.pihet at newoldbits.com
-> Sent: Thursday, December 16, 2010 11:21 PM
-> To: linux-omap at vger.kernel.org
-> Cc: khilman at deeprootsystems.com; linux-arm-kernel at lists.infradead.org;
-> Jean Pihet
-> Subject: [PATCH 2/7] OMAP2+: use global values for the SRAM PA addresses
->
-> From: Jean Pihet <j-pihet@ti.com>
->
-> The SRAM PA addresses are locally defined and used in both the
-> SRAM management code and the idle sleep code.
-> A global macro defines the values at a centralized place, for
-> easier maintenance.
->
-> Tested on N900 and Beagleboard with full RET and OFF modes,
-> using cpuidle and suspend.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> ---
->  arch/arm/mach-omap2/sdrc.h |    7 +++++++
->  arch/arm/plat-omap/sram.c  |    7 ++-----
->  2 files changed, 9 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/sdrc.h b/arch/arm/mach-omap2/sdrc.h
-> index 68f57bb..ada596b 100644
-> --- a/arch/arm/mach-omap2/sdrc.h
-> +++ b/arch/arm/mach-omap2/sdrc.h
-> @@ -74,5 +74,12 @@ static inline u32 sms_read_reg(u16 reg)
->   */
->  #define SDRC_MPURATE_LOOPS		96
->
-> +/*
-> + * OMAP2+: define the SRAM PA addresses.
-> + * Used by the SRAM management code and the idle sleep code.
-> + */
-> +#define OMAP2_SRAM_PA		0x40200000
-> +#define OMAP3_SRAM_PA           0x40200000
-> +#define OMAP4_SRAM_PA		0x40300000
->
-Header choice is wrong. Certainly SDRC is not the place.
-Right place should be "#include <plat/sram.h>"
-OMAP4 doesn't even have SDRC IP
+Russell King wrote:
+> 
+> In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
+> interfaces were added which simplify (and optimize) the selection of the
+> divisor shift/mult constants.  Switch over to using this new interface.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
->  #endif
-> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-> index 819ea0c..1a686c8 100644
-> --- a/arch/arm/plat-omap/sram.c
-> +++ b/arch/arm/plat-omap/sram.c
-> @@ -41,15 +41,12 @@
->
->  #define OMAP1_SRAM_PA		0x20000000
->  #define OMAP1_SRAM_VA		VMALLOC_END
-> -#define OMAP2_SRAM_PA		0x40200000
-> -#define OMAP2_SRAM_PUB_PA	0x4020f800
-> +#define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
->  #define OMAP2_SRAM_VA		0xfe400000
->  #define OMAP2_SRAM_PUB_VA	(OMAP2_SRAM_VA + 0x800)
-> -#define OMAP3_SRAM_PA           0x40200000
->  #define OMAP3_SRAM_VA           0xfe400000
-> -#define OMAP3_SRAM_PUB_PA       0x40208000
-> +#define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
->  #define OMAP3_SRAM_PUB_VA       (OMAP3_SRAM_VA + 0x8000)
-> -#define OMAP4_SRAM_PA		0x40300000
->  #define OMAP4_SRAM_VA		0xfe400000
->  #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
->  #define OMAP4_SRAM_PUB_VA	(OMAP4_SRAM_VA + 0x4000)
+> ---
+>  arch/arm/mach-s5pv310/time.c |    6 +-----
+>  1 files changed, 1 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv310/time.c b/arch/arm/mach-s5pv310/time.c
+> index 01b012a..b262d46 100644
+> --- a/arch/arm/mach-s5pv310/time.c
+> +++ b/arch/arm/mach-s5pv310/time.c
+> @@ -211,7 +211,6 @@ struct clocksource pwm_clocksource = {
+>  	.rating		= 250,
+>  	.read		= s5pv310_pwm4_read,
+>  	.mask		= CLOCKSOURCE_MASK(32),
+> -	.shift		= 20,
+>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS ,
+>  };
+> 
+> @@ -230,10 +229,7 @@ static void __init s5pv310_clocksource_init(void)
+>  	s5pv310_pwm_init(4, ~0);
+>  	s5pv310_pwm_start(4, 1);
+> 
+> -	pwm_clocksource.mult =
+> -		clocksource_khz2mult(clock_rate/1000,
+pwm_clocksource.shift);
+> -
+> -	if (clocksource_register(&pwm_clocksource))
+> +	if (clocksource_register_hz(&pwm_clocksource, clock_rate))
+>  		panic("%s: can't register clocksource\n",
+> pwm_clocksource.name);
+>  }
+> 
 > --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
