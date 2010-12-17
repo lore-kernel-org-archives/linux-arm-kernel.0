@@ -1,79 +1,85 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Fri, 17 Dec 2010 12:56:19 +0900
-Subject: [RFCv2,0/8] mm: vcm: The Virtual Memory Manager for multiple IOMMUs
-Message-ID: <1292558187-17348-1-git-send-email-pullip.cho@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 17 Dec 2010 10:18:39 +0530
+Subject: [PATCH 2/7] OMAP2+: use global values for the SRAM PA addresses
+In-Reply-To: <1292521858-3810-3-git-send-email-j-pihet@ti.com>
+References: <1292521858-3810-1-git-send-email-j-pihet@ti.com>
+	<1292521858-3810-3-git-send-email-j-pihet@ti.com>
+Message-ID: <252f6bd3f3d077d771418d374eee173d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of jean.pihet at newoldbits.com
+> Sent: Thursday, December 16, 2010 11:21 PM
+> To: linux-omap at vger.kernel.org
+> Cc: khilman at deeprootsystems.com; linux-arm-kernel at lists.infradead.org;
+> Jean Pihet
+> Subject: [PATCH 2/7] OMAP2+: use global values for the SRAM PA addresses
+>
+> From: Jean Pihet <j-pihet@ti.com>
+>
+> The SRAM PA addresses are locally defined and used in both the
+> SRAM management code and the idle sleep code.
+> A global macro defines the values at a centralized place, for
+> easier maintenance.
+>
+> Tested on N900 and Beagleboard with full RET and OFF modes,
+> using cpuidle and suspend.
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> ---
+>  arch/arm/mach-omap2/sdrc.h |    7 +++++++
+>  arch/arm/plat-omap/sram.c  |    7 ++-----
+>  2 files changed, 9 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/sdrc.h b/arch/arm/mach-omap2/sdrc.h
+> index 68f57bb..ada596b 100644
+> --- a/arch/arm/mach-omap2/sdrc.h
+> +++ b/arch/arm/mach-omap2/sdrc.h
+> @@ -74,5 +74,12 @@ static inline u32 sms_read_reg(u16 reg)
+>   */
+>  #define SDRC_MPURATE_LOOPS		96
+>
+> +/*
+> + * OMAP2+: define the SRAM PA addresses.
+> + * Used by the SRAM management code and the idle sleep code.
+> + */
+> +#define OMAP2_SRAM_PA		0x40200000
+> +#define OMAP3_SRAM_PA           0x40200000
+> +#define OMAP4_SRAM_PA		0x40300000
+>
+Header choice is wrong. Certainly SDRC is not the place.
+Right place should be "#include <plat/sram.h>"
+OMAP4 doesn't even have SDRC IP
 
-The VCM is a framework to deal with multiple IOMMUs in a system 
-with intuitive and abstract objects
-These patches are the bugfix and enhanced version of previous RFC by Michal Nazarewicz.
-(https://patchwork.kernel.org/patch/157451/)
-
-It is introduced by Zach Pfeffer and implemented by Michal Nazarewicz.
-These patches include entirely new implementation of VCM than the one submitted by Zach Pfeffer.
-
-The prerequisites of these patches are the followings by Michal Nazarewicz:
-https://patchwork.kernel.org/patch/340281/
-https://patchwork.kernel.org/patch/414381/
-https://patchwork.kernel.org/patch/414541/
-
-In addition to the above patches, 
-the prerequisites of "[RFCv2,7/8] mm: vcm: vcm-cma: VCM CMA driver added" is
-CMA RFCv8 introduced by Michal Nazarewicz:
-https://patchwork.kernel.org/patch/414351/
-
-The VCM also works correctly without "[RFC,6/7] mm: vcm: vcm-cma: VCM CMA driver added"
-
-The last patch, "[RFC,7/7] mm: vcm: Sample driver added" is not the one to be submitted
-but is an example to show how to use the VCM.
-
-The VCM provides generic interfaces and objects to deal with IOMMUs in various architectures
-especially the ones that embed multiple IOMMUs including GART.
-
-Chagelog:
-v2:  1. Added reference counting on a reservation.
-	When vcm_reserve() creates a reservation, it sets the reference counter
-	of the reservation to 1. The ownership of the reservation is only owned by
-	the caller of vcm_reserve. If the caller passes the reservation to another
-	callee functions, the callee functions must increment the reference counter
-	with vcm_ref_reserve() to set the ownership of the reservation.
-	To release the ownership, just call vcm_unreserve(). vcm_unreserve decrements
-	the reference counter of the given reservation. vcm_unreserve() eventually
-	unreserves the reservation when its reference counter becomes 0.
-     2. Applied the design changes of CMA by Michal Nazarewicz.
-	Since it is dramatically changed, vcm-cma also followed.
-
-Patch list:
-[RFCv2,1/8] mm: vcm: Virtual Contiguous Memory framework added
-[RFCv2,2/8] mm: vcm: reference counting on a reservation added
-[RFCv2,3/8] mm: vcm: physical memory allocator added
-[RFCv2,4/8] mm: vcm: VCM VMM driver added
-[RFCv2,5/8] mm: vcm: VCM MMU wrapper added
-[RFCv2,6/8] mm: vcm: VCM One-to-One wrapper added
-[RFCv2,7/8] mm: vcm: vcm-cma: VCM CMA driver added
-[RFCv2,8/8] mm: vcm: Sample driver added
-
-Summery:
-Documentation/00-INDEX                      |    2 +
-Documentation/virtual-contiguous-memory.txt |  940 +++++++++++++++++++++++++
-include/linux/vcm-cma.h                     |   38 +
-include/linux/vcm-drv.h                     |  326 +++++++++
-include/linux/vcm-sample.h                  |   30 +
-include/linux/vcm.h                         |  311 +++++++++
-mm/Kconfig                                  |   79 +++
-mm/Makefile                                 |    3 +
-mm/vcm-cma.c                                |   99 +++
-mm/vcm-sample.c                             |  119 ++++
-mm/vcm.c                                    |  987 +++++++++++++++++++++++++++
-11 files changed, 2934 insertions(+), 0 deletions(-)
-create mode 100644 Documentation/virtual-contiguous-memory.txt
-create mode 100644 include/linux/vcm-cma.h
-create mode 100644 include/linux/vcm-drv.h
-create mode 100644 include/linux/vcm-sample.h
-create mode 100644 include/linux/vcm.h
-create mode 100644 mm/vcm-cma.c
-create mode 100644 mm/vcm-sample.c
-create mode 100644 mm/vcm.c
+>  #endif
+> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> index 819ea0c..1a686c8 100644
+> --- a/arch/arm/plat-omap/sram.c
+> +++ b/arch/arm/plat-omap/sram.c
+> @@ -41,15 +41,12 @@
+>
+>  #define OMAP1_SRAM_PA		0x20000000
+>  #define OMAP1_SRAM_VA		VMALLOC_END
+> -#define OMAP2_SRAM_PA		0x40200000
+> -#define OMAP2_SRAM_PUB_PA	0x4020f800
+> +#define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
+>  #define OMAP2_SRAM_VA		0xfe400000
+>  #define OMAP2_SRAM_PUB_VA	(OMAP2_SRAM_VA + 0x800)
+> -#define OMAP3_SRAM_PA           0x40200000
+>  #define OMAP3_SRAM_VA           0xfe400000
+> -#define OMAP3_SRAM_PUB_PA       0x40208000
+> +#define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
+>  #define OMAP3_SRAM_PUB_VA       (OMAP3_SRAM_VA + 0x8000)
+> -#define OMAP4_SRAM_PA		0x40300000
+>  #define OMAP4_SRAM_VA		0xfe400000
+>  #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+>  #define OMAP4_SRAM_PUB_VA	(OMAP4_SRAM_VA + 0x4000)
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
