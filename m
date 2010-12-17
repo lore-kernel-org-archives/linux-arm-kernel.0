@@ -1,89 +1,97 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:48:13 +0000
-Subject: [PATCH 29/40] ARM: ixp4xx: convert sched_clock() to use new
+Date: Fri, 17 Dec 2010 11:48:33 +0000
+Subject: [PATCH 30/40] ARM: mmp: convert sched_clock() to use new
 	infrastructure
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYnF-0006jW-5k@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYnZ-0006ja-JI@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert ixp4xx to use the new sched_clock() infrastructure for
-extending 32bit counters to full 64-bit nanoseconds.
+Convert mmp to use the new sched_clock() infrastructure for extending
+32bit counters to full 64-bit nanoseconds.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig              |    1 +
- arch/arm/mach-ixp4xx/common.c |   31 ++++++++++++++++++++-----------
- 2 files changed, 21 insertions(+), 11 deletions(-)
+ arch/arm/Kconfig         |    1 +
+ arch/arm/mach-mmp/time.c |   32 +++++++++++---------------------
+ 2 files changed, 12 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ed7a0a7..6f58bce 100644
+index 6f58bce..0208e1e 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -437,6 +437,7 @@ config ARCH_IXP4XX
- 	select CPU_XSCALE
- 	select GENERIC_GPIO
+@@ -513,6 +513,7 @@ config ARCH_MMP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select COMMON_CLKDEV
  	select GENERIC_CLOCKEVENTS
 +	select HAVE_SCHED_CLOCK
- 	select DMABOUNCE if PCI
- 	help
- 	  Support for Intel's IXP4XX (XScale) family of processors.
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index e0b91d8..4dbfcbb 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -35,6 +35,7 @@
- #include <asm/pgtable.h>
- #include <asm/page.h>
- #include <asm/irq.h>
-+#include <asm/sched_clock.h>
+ 	select TICK_ONESHOT
+ 	select PLAT_PXA
+ 	select SPARSE_IRQ
+diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+index a2ea33d..aeb9ae2 100644
+--- a/arch/arm/mach-mmp/time.c
++++ b/arch/arm/mach-mmp/time.c
+@@ -26,8 +26,8 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/sched.h>
+-#include <linux/cnt32_to_63.h>
  
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
-@@ -399,6 +400,23 @@ void __init ixp4xx_sys_init(void)
- }
++#include <asm/sched_clock.h>
+ #include <mach/addr-map.h>
+ #include <mach/regs-timers.h>
+ #include <mach/regs-apbc.h>
+@@ -42,23 +42,7 @@
+ #define MAX_DELTA		(0xfffffffe)
+ #define MIN_DELTA		(16)
+ 
+-#define TCR2NS_SCALE_FACTOR	10
+-
+-static unsigned long tcr2ns_scale;
+-
+-static void __init set_tcr2ns_scale(unsigned long tcr_rate)
+-{
+-	unsigned long long v = 1000000000ULL << TCR2NS_SCALE_FACTOR;
+-	do_div(v, tcr_rate);
+-	tcr2ns_scale = v;
+-	/*
+-	 * We want an even value to automatically clear the top bit
+-	 * returned by cnt32_to_63() without an additional run time
+-	 * instruction. So if the LSB is 1 then round it up.
+-	 */
+-	if (tcr2ns_scale & 1)
+-		tcr2ns_scale++;
+-}
++static DEFINE_CLOCK_DATA(cd);
  
  /*
-+ * sched_clock()
-+ */
-+static DEFINE_CLOCK_DATA(cd);
-+
-+unsigned long long notrace sched_clock(void)
-+{
-+	u32 cyc = *IXP4XX_OSTS;
+  * FIXME: the timer needs some delay to stablize the counter capture
+@@ -77,8 +61,14 @@ static inline uint32_t timer_read(void)
+ 
+ unsigned long long notrace sched_clock(void)
+ {
+-	unsigned long long v = cnt32_to_63(timer_read());
+-	return (v * tcr2ns_scale) >> TCR2NS_SCALE_FACTOR;
++	u32 cyc = timer_read();
 +	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
 +}
 +
-+static void notrace ixp4xx_update_sched_clock(void)
++static void notrace mmp_update_sched_clock(void)
 +{
-+	u32 cyc = *IXP4XX_OSTS;
++	u32 cyc = timer_read();
 +	update_sched_clock(&cd, cyc, (u32)~0);
-+}
-+
-+/*
-  * clocksource
-  */
- static cycle_t ixp4xx_get_cycles(struct clocksource *cs)
-@@ -418,18 +436,9 @@ unsigned long ixp4xx_timer_freq = FREQ;
- EXPORT_SYMBOL(ixp4xx_timer_freq);
- static void __init ixp4xx_clocksource_init(void)
- {
--	clocksource_register_hz(&clocksource_ixp4xx, ixp4xx_timer_freq);
--}
--
--/*
-- * sched_clock()
-- */
--unsigned long long notrace sched_clock(void)
--{
--	cycle_t cyc = ixp4xx_get_cycles(NULL);
--	struct clocksource *cs = &clocksource_ixp4xx;
-+	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
- 
--	return clocksource_cyc2ns(cyc, cs->mult, cs->shift);
-+	clocksource_register_hz(&clocksource_ixp4xx, ixp4xx_timer_freq);
  }
  
- /*
+ static irqreturn_t timer_interrupt(int irq, void *dev_id)
+@@ -185,7 +175,7 @@ void __init timer_init(int irq)
+ {
+ 	timer_config();
+ 
+-	set_tcr2ns_scale(CLOCK_TICK_RATE);
++	init_sched_clock(&cd, mmp_update_sched_clock, 32, CLOCK_TICK_RATE);
+ 
+ 	ckevt.mult = div_sc(CLOCK_TICK_RATE, NSEC_PER_SEC, ckevt.shift);
+ 	ckevt.max_delta_ns = clockevent_delta2ns(MAX_DELTA, &ckevt);
 -- 
 1.6.2.5
