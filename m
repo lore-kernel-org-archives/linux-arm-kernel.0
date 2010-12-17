@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:37:21 +0000
-Subject: [PATCH 06/40] ARM: lpc32xx: update clock source registration
+Date: Fri, 17 Dec 2010 11:38:02 +0000
+Subject: [PATCH 08/40] ARM: MSM: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYcj-0006i1-CS@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYdO-0006i9-8H@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,33 +10,41 @@ In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
 interfaces were added which simplify (and optimize) the selection of the
 divisor shift/mult constants.  Switch over to using this new interface.
 
+Tested-By: Jeff Ohlstein <johlstei@codeaurora.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-lpc32xx/timer.c |    5 +----
+ arch/arm/mach-msm/timer.c |    5 +----
  1 files changed, 1 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/timer.c b/arch/arm/mach-lpc32xx/timer.c
-index 630dd4a..6162ac3 100644
---- a/arch/arm/mach-lpc32xx/timer.c
-+++ b/arch/arm/mach-lpc32xx/timer.c
-@@ -38,7 +38,6 @@ static cycle_t lpc32xx_clksrc_read(struct clocksource *cs)
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 950100f..595be7f 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -137,7 +137,6 @@ static struct msm_clock msm_clocks[] = {
+ 			.rating         = 200,
+ 			.read           = msm_gpt_read,
+ 			.mask           = CLOCKSOURCE_MASK(32),
+-			.shift          = 17,
+ 			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+ 		},
+ 		.irq = {
+@@ -164,7 +163,6 @@ static struct msm_clock msm_clocks[] = {
+ 			.rating         = 300,
+ 			.read           = msm_dgt_read,
+ 			.mask           = CLOCKSOURCE_MASK((32 - MSM_DGT_SHIFT)),
+-			.shift          = 24 - MSM_DGT_SHIFT,
+ 			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+ 		},
+ 		.irq = {
+@@ -205,8 +203,7 @@ static void __init msm_timer_init(void)
+ 		ce->min_delta_ns = clockevent_delta2ns(4, ce);
+ 		ce->cpumask = cpumask_of(0);
  
- static struct clocksource lpc32xx_clksrc = {
- 	.name	= "lpc32xx_clksrc",
--	.shift	= 24,
- 	.rating	= 300,
- 	.read	= lpc32xx_clksrc_read,
- 	.mask	= CLOCKSOURCE_MASK(32),
-@@ -171,9 +170,7 @@ static void __init lpc32xx_timer_init(void)
- 	__raw_writel(0, LCP32XX_TIMER_MCR(LPC32XX_TIMER1_BASE));
- 	__raw_writel(LCP32XX_TIMER_CNTR_TCR_EN,
- 		LCP32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
--	lpc32xx_clksrc.mult = clocksource_hz2mult(clkrate,
--		lpc32xx_clksrc.shift);
--	clocksource_register(&lpc32xx_clksrc);
-+	clocksource_register_hz(&lpc32xx_clksrc, clkrate);
- }
- 
- struct sys_timer lpc32xx_timer = {
+-		cs->mult = clocksource_hz2mult(clock->freq, cs->shift);
+-		res = clocksource_register(cs);
++		res = clocksource_register_hz(cs, clock->freq);
+ 		if (res)
+ 			printk(KERN_ERR "msm_timer_init: clocksource_register "
+ 			       "failed for %s\n", cs->name);
 -- 
 1.6.2.5
