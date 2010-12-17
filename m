@@ -1,5 +1,5 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 17 Dec 2010 14:34:49 -0500 (EST)
+Date: Fri, 17 Dec 2010 14:37:41 -0500 (EST)
 Subject: [PATCH 28/40] ARM: sched_clock: provide common infrastructure for
 	sched_clock()
 In-Reply-To: <20101217191857.GA24940@n2100.arm.linux.org.uk>
@@ -8,7 +8,7 @@ References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1012171334530.10437@xanadu.home>
 	<20101217190554.GD9937@n2100.arm.linux.org.uk>
 	<20101217191857.GA24940@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1012171432300.10437@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1012171436100.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,13 +25,7 @@ On Fri, 17 Dec 2010, Russell King - ARM Linux wrote:
 >                         spin_unlock_irq(&base->lock);
 >                         call_timer_fn(timer, fn, data);
 >                         spin_lock_irq(&base->lock);
-
-Right.  Might be worth putting the above in the commit log too.
-
-With that change you may add:
-
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
+> 
 > diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
 > index 82d4d3f..5643cb0 100644
 > --- a/arch/arm/include/asm/sched_clock.h
@@ -50,13 +44,9 @@ Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 >  	 * detectable in cyc_to_fixed_sched_clock().
 >  	 */
 > +	local_irq_disable();
->  	cd->epoch_cyc = cyc;
->  	smp_wmb();
->  	cd->epoch_ns = ns;
->  	smp_wmb();
->  	cd->epoch_cyc_copy = cyc;
-> +	local_irq_enable();
->  }
->  
->  /*
-> 
+
+Actually, wouldn't it be better to use raw_local_irq_disable() here so 
+this is safe with a RT kernel as well?
+
+
+Nicolas
