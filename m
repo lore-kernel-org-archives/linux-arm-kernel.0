@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:38:43 +0000
-Subject: [PATCH 10/40] ARM: ns9xxx: update clock source registration
+Date: Fri, 17 Dec 2010 11:40:04 +0000
+Subject: [PATCH 14/40] ARM: SA11x0: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYe3-0006iI-3x@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYfM-0006iY-SC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +12,34 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ns9xxx/time-ns9360.c |    6 +-----
+ arch/arm/mach-sa1100/time.c |    6 +-----
  1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ns9xxx/time-ns9360.c b/arch/arm/mach-ns9xxx/time-ns9360.c
-index 7728126..9ca32f5 100644
---- a/arch/arm/mach-ns9xxx/time-ns9360.c
-+++ b/arch/arm/mach-ns9xxx/time-ns9360.c
-@@ -35,7 +35,6 @@ static struct clocksource ns9360_clocksource = {
- 	.rating	= 300,
- 	.read	= ns9360_clocksource_read,
- 	.mask	= CLOCKSOURCE_MASK(32),
--	.shift	= 20,
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
+index 74b6e0e..96154f5 100644
+--- a/arch/arm/mach-sa1100/time.c
++++ b/arch/arm/mach-sa1100/time.c
+@@ -81,7 +81,6 @@ static struct clocksource cksrc_sa1100_oscr = {
+ 	.rating		= 200,
+ 	.read		= sa1100_read_oscr,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+-	.shift		= 20,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
  };
  
-@@ -148,10 +147,7 @@ static void __init ns9360_timer_init(void)
+@@ -105,12 +104,9 @@ static void __init sa1100_timer_init(void)
+ 		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_sa1100_osmr0) + 1;
+ 	ckevt_sa1100_osmr0.cpumask = cpumask_of(0);
  
- 	__raw_writel(tc, SYS_TC(TIMER_CLOCKSOURCE));
- 
--	ns9360_clocksource.mult = clocksource_hz2mult(ns9360_cpuclock(),
--			ns9360_clocksource.shift);
+-	cksrc_sa1100_oscr.mult =
+-		clocksource_hz2mult(CLOCK_TICK_RATE, cksrc_sa1100_oscr.shift);
 -
--	clocksource_register(&ns9360_clocksource);
-+	clocksource_register_hz(&ns9360_clocksource, ns9360_cpuclock());
+ 	setup_irq(IRQ_OST0, &sa1100_timer_irq);
  
- 	latch = SH_DIV(ns9360_cpuclock(), HZ, 0);
+-	clocksource_register(&cksrc_sa1100_oscr);
++	clocksource_register_hz(&cksrc_sa1100_oscr, CLOCK_TICK_RATE);
+ 	clockevents_register_device(&ckevt_sa1100_osmr0);
+ }
  
 -- 
 1.6.2.5
