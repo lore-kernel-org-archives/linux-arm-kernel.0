@@ -1,87 +1,108 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 17 Dec 2010 15:45:28 +0300
-Subject: [Patch v4] AM35xx: Craneboard: Add USB EHCI support
-In-Reply-To: <1292513112-12471-1-git-send-email-srinath@mistralsolutions.com>
-References: <[PATCH] AM35xx-Craneboard-Add-USB-EHCI-support>
-	<1292513112-12471-1-git-send-email-srinath@mistralsolutions.com>
-Message-ID: <4D0B5B68.5040706@ru.mvista.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Fri, 17 Dec 2010 18:22:47 +0530
+Subject: [PATCH 0/7 v2] OMAP: McSPI: Hwmod adaptation + runtime conversion
+In-Reply-To: <874oadfuq9.fsf@deeprootsystems.com>
+References: <33183.10.24.255.18.1291212072.squirrel@dbdmail.itg.ti.com>
+	<87d3p3kobt.fsf@deeprootsystems.com>
+	<AANLkTikgzMjU9wfzzMjEXzFCUvRz6hKtv=N8dKXf10YM@mail.gmail.com>
+	<874oadfuq9.fsf@deeprootsystems.com>
+Message-ID: <AANLkTinBafsUsNuxc25sTEBPX=fD-=StRHF8-jL+mqCc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Dec 16, 2010 at 11:47 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Hi Govindraj,
+>
+> "Raja, Govindraj" <govindraj.raja@ti.com> writes:
+>
+>> On Wed, Dec 15, 2010 at 9:42 PM, Kevin Hilman <khilman@deeprootsystems.com>
+>> wrote:
+>>
+>> ? ? "Govindraj.R" <govindraj.raja@ti.com> writes:
+>>
+>> ? ? > Changes invloves:
+>> ? ? > ----------------
+>> ? ? > 1) Addition of hwmod data for omap2/3/4.
+>> ? ? > 1) McSPI driver hwmod adaptation with cleanup of base address
+>> ? ? > ? ?macros and using omap-device API's.
+>> ? ? > 2) Runtime Conversion of McSPI driver
+>> ? ? >
+>> ? ? > Changes from v1:
+>> ? ? > ---------------
+>> ? ? > 1) Fixing patch 5/5 comments for hwmod+runtime
+>> ? ? > ? ?Split the patch 5/5 to hwmod adaptation
+>> ? ? > ? ?and then runtime conversion
+>> ? ? > ? ?http://www.mail-archive.com/linux-omap at vger.kernel.org/msg33387.html
+>> ? ? >
+>> ? ? > Testing Updates:
+>> ? ? > ----------------
+>> ? ? > Was tested using data transfer test module available at:
+>> ? ? > http://dev.omapzoom.org/?p=richo/device_driver_test.git;a=blob;f=mcspi/
+>> ? ? test_code/
+>> ? ? > utils/mcspi_modules/omap_mcspi_datatest.c;
+>> ? ? > h=e42ec10c5c844abdde6a7175a268b379fbbdb655;
+>> ? ? > hb=5d9a755d50e58de861c5e8991f2f607bc49b5dc3
+>>
+>> ? ? Can you summarize what this test does?
+>>
+>> ? ? On what platforms was this tested?
+>>
+>> ? ? How was it tested for OMAP1 and OMAP2?
+>>
+>>
+>>
+>> Using the above mentioned test module we had done some
+>> data transfer tests.
+>> Platforms used used where :
+>> 1) OMAP2430 SDP.
+>> 2) OMAP3 (ZOOM boards zoom2/3).
+>> 3) OMAP4430 SDP [ Here even basic?Ethernet?functionality?was checked which is
+>> over SPI interface]
+>
+> Can you describe a little more about the testing please? ?What exactly
+> does the data transfer test do? ?Is it a loopback test? ?Does it use
+> on-board SPI peripherals? ?If so, which ones, etc.
+>
 
-On 16-12-2010 18:25, srinath at mistralsolutions.com wrote:
+Yes its an loopback test based on SPI interface available from
+development board expansion connector.
 
-> From: Srinath <srinath@mistralsolutions.com>
+MISO <---> MOSI [Loopback test]
 
-> AM3517/05 Craneboard has one EHCI interface on board using port1.
+So basically looking into the Board schematics we decide
+which SPI interface is available on the board expansion connector
+and use SPI interface available.
 
-> GPIO35 is used as power enable.
-> GPIO38 is used as port1 PHY reset.
+On zoom boards SPI3 was available on expansion connector
+and same was used. On 4430SDP SPI2 interface was used.
+On 2430SDP SPI2.
 
-> History:
-> http://marc.info/?l=linux-omap&w=2&r=1&s=Craneboard%3A+Add+USB+EHCI+support&q=t
+Also for testing, spi_board_info was populated in board file
+and spi_register_board_info was done, here bus info was populated
+based on spi bus available on the board. In spi_board_info structure
+we initialize spi_bus and name as spitst and speed and chip-select
+later once test module is loaded word-length, speed etc is modified
+from proc interface available from the test module and data test
+is done.
 
-> Signed-off-by: Srinath <srinath@mistralsolutions.com>
-> ---
->   arch/arm/mach-omap2/board-am3517crane.c |   53 +++++++++++++++++++++++++++++++
->   1 files changed, 53 insertions(+), 0 deletions(-)
+--
+Thanks,
+Govindraj.R
 
-> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-> index 8ba4047..1a80175 100644
-> --- a/arch/arm/mach-omap2/board-am3517crane.c
-> +++ b/arch/arm/mach-omap2/board-am3517crane.c
-[...]
-> @@ -51,10 +58,56 @@ static void __init am3517_crane_init_irq(void)
-[...]
->   static void __init am3517_crane_init(void)
->   {
-> +	int ret;
-> +
->   	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->   	omap_serial_init();
-> +
-> +	/* Configure GPIO for EHCI port */
-> +	if (omap_mux_init_gpio(GPIO_USB_NRESET, OMAP_PIN_OUTPUT)) {
-> +		pr_err("Can not cofigure mux for GPIO_USB_NRESET %d\n",
-> +			GPIO_USB_NRESET);
-> +		return;
-> +	}
-> +
-> +	if (omap_mux_init_gpio(GPIO_USB_POWER, OMAP_PIN_OUTPUT)) {
-> +		pr_err("Can not cofigure mux for GPIO_USB_POWER %d\n",
-> +
 
-    Empty line not needed here...
-
-> +			GPIO_USB_POWER);
-> +		return;
-> +	}
-> +
-> +	ret = gpio_request(GPIO_USB_POWER, "usb_ehci_enable");
-> +	if (ret < 0) {
-> +		pr_err("Cannot request GPIO %d\n", GPIO_USB_POWER);
-> +		return;
-> +	}
-> +
-> +	ret = gpio_direction_output(GPIO_USB_POWER, 1);
-> +	if (ret < 0)
-> +		goto err;
-> +
-> +
-
-    Too  many empty lines here...
-
-> +	usb_ehci_init(&ehci_pdata);
-> +	return;
-> +
-> +err:
-
-    There's no need for *goto* and label.
-
-> +	gpio_free(GPIO_USB_POWER);
-> +	pr_err("Unable to initialize EHCI power\n");
-> +	return;
->   }
-
-WBR, Sergei
+>> We boot tested on 2420/n800.
+>>
+>> Coming to omap1,
+>>
+>> This driver[omap2_mcspi.c] is applicable only from omap2_plus
+>> for omap1?omap_uwire.c is the spi driver file.
+>
+> OK, thanks for clarification.
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
