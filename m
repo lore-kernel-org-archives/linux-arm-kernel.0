@@ -1,162 +1,41 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Dec 2010 16:50:04 -0800
-Subject: [PATCH 20/22] msm: iommu: Clock control for the IOMMU driver
+Date: Thu, 16 Dec 2010 16:50:06 -0800
+Subject: [PATCH 22/22] msm: clock-8x60: Don't keep IOMMU clocks on at boot
 In-Reply-To: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
 References: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1292547006-19741-21-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1292547006-19741-23-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stepan Moskovchenko <stepanm@codeaurora.org>
+Now that the IOMMU driver properly handles its clocks we can stop
+keeping the clocks it requires to be on during early boot.
 
-Add clock control to the IOMMU driver. The IOMMU bus clock
-(and potentially an AXI clock) need to be on to gain access
-to IOMMU registers. Actively control these clocks when
-needed instead of leaving them on.
-
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/iommu.c |   57 +++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 55 insertions(+), 2 deletions(-)
+ arch/arm/mach-msm/clock-8x60.c |    9 ---------
+ 1 files changed, 0 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-msm/iommu.c b/arch/arm/mach-msm/iommu.c
-index e2d58e4..c6d52ee 100644
---- a/arch/arm/mach-msm/iommu.c
-+++ b/arch/arm/mach-msm/iommu.c
-@@ -26,6 +26,7 @@
- #include <linux/spinlock.h>
- #include <linux/slab.h>
- #include <linux/iommu.h>
-+#include <linux/clk.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/sizes.h>
-@@ -50,6 +51,30 @@ struct msm_priv {
- 	struct list_head list_attached;
- };
- 
-+static int __enable_clocks(struct msm_iommu_drvdata *drvdata)
-+{
-+	int ret;
-+
-+	ret = clk_enable(drvdata->pclk);
-+	if (ret)
-+		goto fail;
-+
-+	if (drvdata->clk) {
-+		ret = clk_enable(drvdata->clk);
-+		if (ret)
-+			clk_disable(drvdata->pclk);
-+	}
-+fail:
-+	return ret;
-+}
-+
-+static void __disable_clocks(struct msm_iommu_drvdata *drvdata)
-+{
-+	if (drvdata->clk)
-+		clk_disable(drvdata->clk);
-+	clk_disable(drvdata->pclk);
-+}
-+
- static int __flush_iotlb(struct iommu_domain *domain)
- {
- 	struct msm_priv *priv = domain->priv;
-@@ -77,9 +102,17 @@ static int __flush_iotlb(struct iommu_domain *domain)
- 			BUG();
- 
- 		iommu_drvdata = dev_get_drvdata(ctx_drvdata->pdev->dev.parent);
-+		if (!iommu_drvdata)
-+			BUG();
-+
-+		ret = __enable_clocks(iommu_drvdata);
-+		if (ret)
-+			goto fail;
-+
- 		SET_CTX_TLBIALL(iommu_drvdata->base, ctx_drvdata->num, 0);
-+		__disable_clocks(iommu_drvdata);
- 	}
+diff --git a/arch/arm/mach-msm/clock-8x60.c b/arch/arm/mach-msm/clock-8x60.c
+index 28017b7..78f33ef 100644
+--- a/arch/arm/mach-msm/clock-8x60.c
++++ b/arch/arm/mach-msm/clock-8x60.c
+@@ -1851,15 +1851,6 @@ static void reg_init(void)
+ 	/* Set the dsi_byte_clk src to the DSI PHY PLL,
+ 	 * dsi_esc_clk to PXO/2, and the hdmi_app_clk src to PXO */
+ 	rmwreg(0x400001, MISC_CC2_REG, 0x424003);
 -
-+fail:
- 	return ret;
+-	/*
+-	 * Turn on clocks required by the SMMU driver until it properly
+-	 * controls its own clocks.
+-	 */
+-	local_clk_enable(C(SMMU_P));
+-	local_clk_enable(C(JPEGD_AXI));
+-	local_clk_enable(C(VFE_AXI));
+-	local_clk_enable(C(VCODEC_AXI));
  }
  
-@@ -265,9 +298,14 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 			goto fail;
- 		}
- 
-+	ret = __enable_clocks(iommu_drvdata);
-+	if (ret)
-+		goto fail;
-+
- 	__program_context(iommu_drvdata->base, ctx_dev->num,
- 			  __pa(priv->pgtable));
- 
-+	__disable_clocks(iommu_drvdata);
- 	list_add(&(ctx_drvdata->attached_elm), &priv->list_attached);
- 	ret = __flush_iotlb(domain);
- 
-@@ -303,7 +341,12 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
- 	if (ret)
- 		goto fail;
- 
-+	ret = __enable_clocks(iommu_drvdata);
-+	if (ret)
-+		goto fail;
-+
- 	__reset_context(iommu_drvdata->base, ctx_dev->num);
-+	__disable_clocks(iommu_drvdata);
- 	list_del_init(&ctx_drvdata->attached_elm);
- 
- fail:
-@@ -532,6 +575,10 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
- 	base = iommu_drvdata->base;
- 	ctx = ctx_drvdata->num;
- 
-+	ret = __enable_clocks(iommu_drvdata);
-+	if (ret)
-+		goto fail;
-+
- 	/* Invalidate context TLB */
- 	SET_CTX_TLBIALL(base, ctx, 0);
- 	SET_V2PPR_VA(base, ctx, va >> V2Pxx_VA_SHIFT);
-@@ -547,6 +594,7 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
- 	if (GET_FAULT(base, ctx))
- 		ret = 0;
- 
-+	__disable_clocks(iommu_drvdata);
- fail:
- 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
- 	return ret;
-@@ -590,7 +638,7 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
- 	struct msm_iommu_drvdata *drvdata = dev_id;
- 	void __iomem *base;
- 	unsigned int fsr;
--	int ncb, i;
-+	int ncb, i, ret;
- 
- 	spin_lock(&msm_iommu_lock);
- 
-@@ -604,6 +652,10 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
- 	pr_err("Unexpected IOMMU page fault!\n");
- 	pr_err("base = %08x\n", (unsigned int) base);
- 
-+	ret = __enable_clocks(drvdata);
-+	if (ret)
-+		goto fail;
-+
- 	ncb = GET_NCB(base)+1;
- 	for (i = 0; i < ncb; i++) {
- 		fsr = GET_FSR(base, i);
-@@ -614,6 +666,7 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
- 			SET_FSR(base, i, 0x4000000F);
- 		}
- 	}
-+	__disable_clocks(drvdata);
- fail:
- 	spin_unlock(&msm_iommu_lock);
- 	return 0;
+ /* Local clock driver initialization. */
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
