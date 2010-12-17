@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:40:45 +0000
-Subject: [PATCH 16/40] ARM: U300: update clock source registration
+Date: Fri, 17 Dec 2010 11:41:05 +0000
+Subject: [PATCH 17/40] ARM: nuc: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYg1-0006ig-DR@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYgL-0006ik-RX@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,26 +10,33 @@ In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
 interfaces were added which simplify (and optimize) the selection of the
 divisor shift/mult constants.  Switch over to using this new interface.
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-u300/timer.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/mach-w90x900/time.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
-index 3fc4472..377ff7f 100644
---- a/arch/arm/mach-u300/timer.c
-+++ b/arch/arm/mach-u300/timer.c
-@@ -412,9 +412,7 @@ static void __init u300_timer_init(void)
- 	writel(U300_TIMER_APP_EGPT2_TIMER_ENABLE,
- 		U300_TIMER_APP_VBASE + U300_TIMER_APP_EGPT2);
+diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
+index b80f769..4b089cb 100644
+--- a/arch/arm/mach-w90x900/time.c
++++ b/arch/arm/mach-w90x900/time.c
+@@ -153,7 +153,6 @@ static struct clocksource clocksource_nuc900 = {
+ 	.rating	= 200,
+ 	.read	= nuc900_get_cycles,
+ 	.mask	= CLOCKSOURCE_MASK(TDR_SHIFT),
+-	.shift	= 10,
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
  
--	clocksource_calc_mult_shift(&clocksource_u300_1mhz,
--				    rate, APPTIMER_MIN_RANGE);
--	if (clocksource_register(&clocksource_u300_1mhz))
-+	if (clocksource_register_hz(&clocksource_u300_1mhz, rate))
- 		printk(KERN_ERR "timer: failed to initialize clock "
- 		       "source %s\n", clocksource_u300_1mhz.name);
+@@ -176,9 +175,7 @@ static void __init nuc900_clocksource_init(void)
+ 	val |= (COUNTEN | PERIOD | PRESCALE);
+ 	__raw_writel(val, REG_TCSR1);
  
+-	clocksource_nuc900.mult =
+-		clocksource_khz2mult((rate / 1000), clocksource_nuc900.shift);
+-	clocksource_register(&clocksource_nuc900);
++	clocksource_register_hz(&clocksource_nuc900, rate);
+ }
+ 
+ static void __init nuc900_timer_init(void)
 -- 
 1.6.2.5
