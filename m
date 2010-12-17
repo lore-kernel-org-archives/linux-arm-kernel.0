@@ -1,38 +1,193 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Dec 2010 19:34:11 +0530
-Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
-In-Reply-To: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <e267a5979c1e20671daa063110dc9a1c@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 17 Dec 2010 08:05:22 -0600
+Subject: [PATCH 4/7] OMAP3: re-organize the ASM sleep code
+In-Reply-To: <1292580506-4421-5-git-send-email-j-pihet@ti.com>
+References: <1292580506-4421-1-git-send-email-j-pihet@ti.com>
+	<1292580506-4421-5-git-send-email-j-pihet@ti.com>
+Message-ID: <4D0B6E22.7000902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
-> Sent: Friday, December 17, 2010 5:02 PM
-> To: Alessandro Rubini; Bryan Huntsman; Colin Cross; Daniel Walker; David
-> Brown; Eric Miao; Erik Gilling; Hans J. Koch; Imre Kaloz; Kevin Hilman;
-> Krzysztof Halasa; Kukjin Kim; Lennert Buytenhek; Jiandong Zheng; Linus
-> Walleij; linux-arm-msm at vger.kernel.org; linux-omap at vger.kernel.org;
-linux-
-> samsung-soc at vger.kernel.org; linux-tegra at vger.kernel.org; Nicolas Pitre;
-> Olof Johansson; Sascha Hauer; Scott Branden; STEricsson; Tony Lindgren;
-> Viresh Kumar; Wan ZongShun
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
->
-> Here is the entire set of clocksource and sched_clock patches which
-> have been previously posted.  There's a couple of small tweaks in a
-> few of the patches (such as adding notrace to OMAP clocksource read
-> functions), and this also shows the proper ordering of these patches.
->
-> Still looking for acks or tested-by's for these patches.
+jean.pihet at newoldbits.com had written, on 12/17/2010 04:08 AM, the 
+following:
+> From: Jean Pihet <j-pihet@ti.com>
+> 
+> Organize the code in the following sections:
+> - register access macros,
+> - API functions,
+> - internal functions.
+> 
+> Tested on N900 and Beagleboard with full RET and OFF modes,
+> using cpuidle and suspend.
+> 
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> ---
+>  arch/arm/mach-omap2/sleep34xx.S |  114 +++++++++++++++++++++------------------
+>  1 files changed, 61 insertions(+), 53 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index 8e9f38f..beeb682 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -79,6 +79,7 @@ ENTRY(get_restore_pointer)
+>          ldmfd   sp!, {pc}     @ restore regs and return
+>  ENTRY(get_restore_pointer_sz)
+>          .word   . - get_restore_pointer
+> +
+formatting change - recommend a separate patch collating other 
+formatting changes from other patches as well.
 
-Have boot tested this series on OMAP4430 SDP and OMAP3630
-ZOOM.
+>  	.text
+>  /* Function call to get the restore pointer for 3630 resume from OFF */
+>  ENTRY(get_omap3630_restore_pointer)
+> @@ -89,9 +90,18 @@ ENTRY(get_omap3630_restore_pointer_sz)
+>          .word   . - get_omap3630_restore_pointer
+>  
+>  	.text
+> +/* Function call to get the restore pointer for ES3 to resume from OFF */
+> +ENTRY(get_es3_restore_pointer)
+> +	stmfd	sp!, {lr}	@ save registers on stack
+> +	adr	r0, restore_es3
+> +	ldmfd	sp!, {pc}	@ restore regs and return
+> +ENTRY(get_es3_restore_pointer_sz)
+> +	.word	. - get_es3_restore_pointer
+> +
+> +	.text
+btw, if you prefer me to introduce the enable_omap3630_l2_on_restore 
+toggle after get_es3_restore_pointer, I can do that.
+>  /*
+>   * L2 cache needs to be toggled for stable OFF mode functionality on 3630.
+> - * This function sets up a fflag that will allow for this toggling to take
+> + * This function sets up a flag that will allow for this toggling to take
+Thanks on the fflag/flag :) - but this probably belongs to my patch ;) 
+could you comment on my latest rev, I will fix it there.
 
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>   * place on 3630. Hopefully some version in the future maynot need this
+>   */
+>  ENTRY(enable_omap3630_toggle_l2_on_restore)
+> @@ -101,58 +111,6 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
+>  	str	r1, l2dis_3630
+>          ldmfd   sp!, {pc}     @ restore regs and return
+>  
+> -	.text
+> -/* Function call to get the restore pointer for for ES3 to resume from OFF */
+> -ENTRY(get_es3_restore_pointer)
+> -	stmfd	sp!, {lr}	@ save registers on stack
+> -	adr	r0, restore_es3
+> -	ldmfd	sp!, {pc}	@ restore regs and return
+> -ENTRY(get_es3_restore_pointer_sz)
+> -	.word	. - get_es3_restore_pointer
+> -
+> -ENTRY(es3_sdrc_fix)
+> -	ldr	r4, sdrc_syscfg		@ get config addr
+> -	ldr	r5, [r4]		@ get value
+> -	tst	r5, #0x100		@ is part access blocked
+> -	it	eq
+> -	biceq	r5, r5, #0x100		@ clear bit if set
+> -	str	r5, [r4]		@ write back change
+> -	ldr	r4, sdrc_mr_0		@ get config addr
+> -	ldr	r5, [r4]		@ get value
+> -	str	r5, [r4]		@ write back change
+> -	ldr	r4, sdrc_emr2_0		@ get config addr
+> -	ldr	r5, [r4]		@ get value
+> -	str	r5, [r4]		@ write back change
+> -	ldr	r4, sdrc_manual_0	@ get config addr
+> -	mov	r5, #0x2		@ autorefresh command
+> -	str	r5, [r4]		@ kick off refreshes
+> -	ldr	r4, sdrc_mr_1		@ get config addr
+> -	ldr	r5, [r4]		@ get value
+> -	str	r5, [r4]		@ write back change
+> -	ldr	r4, sdrc_emr2_1		@ get config addr
+> -	ldr	r5, [r4]		@ get value
+> -	str	r5, [r4]		@ write back change
+> -	ldr	r4, sdrc_manual_1	@ get config addr
+> -	mov	r5, #0x2		@ autorefresh command
+> -	str	r5, [r4]		@ kick off refreshes
+> -	bx	lr
+> -sdrc_syscfg:
+> -	.word	SDRC_SYSCONFIG_P
+> -sdrc_mr_0:
+> -	.word	SDRC_MR_0_P
+> -sdrc_emr2_0:
+> -	.word	SDRC_EMR2_0_P
+> -sdrc_manual_0:
+> -	.word	SDRC_MANUAL_0_P
+> -sdrc_mr_1:
+> -	.word	SDRC_MR_1_P
+> -sdrc_emr2_1:
+> -	.word	SDRC_EMR2_1_P
+> -sdrc_manual_1:
+> -	.word	SDRC_MANUAL_1_P
+> -ENTRY(es3_sdrc_fix_sz)
+> -	.word	. - es3_sdrc_fix
+> -
+>  /* Function to call rom code to save secure ram context */
+>  ENTRY(save_secure_ram_context)
+>  	stmfd	sp!, {r1-r12, lr}	@ save registers on stack
+> @@ -577,6 +535,56 @@ skip_l2_inval:
+>  	/* restore regs and return */
+>  	ldmfd   sp!, {r0-r12, pc}
+>  
+> +
+> +/*
+> + * Internal functions
+> + */
+> +
+> +	.text
+> +ENTRY(es3_sdrc_fix)
+> +	ldr	r4, sdrc_syscfg		@ get config addr
+> +	ldr	r5, [r4]		@ get value
+> +	tst	r5, #0x100		@ is part access blocked
+> +	it	eq
+> +	biceq	r5, r5, #0x100		@ clear bit if set
+> +	str	r5, [r4]		@ write back change
+> +	ldr	r4, sdrc_mr_0		@ get config addr
+> +	ldr	r5, [r4]		@ get value
+> +	str	r5, [r4]		@ write back change
+> +	ldr	r4, sdrc_emr2_0		@ get config addr
+> +	ldr	r5, [r4]		@ get value
+> +	str	r5, [r4]		@ write back change
+> +	ldr	r4, sdrc_manual_0	@ get config addr
+> +	mov	r5, #0x2		@ autorefresh command
+> +	str	r5, [r4]		@ kick off refreshes
+> +	ldr	r4, sdrc_mr_1		@ get config addr
+> +	ldr	r5, [r4]		@ get value
+> +	str	r5, [r4]		@ write back change
+> +	ldr	r4, sdrc_emr2_1		@ get config addr
+> +	ldr	r5, [r4]		@ get value
+> +	str	r5, [r4]		@ write back change
+> +	ldr	r4, sdrc_manual_1	@ get config addr
+> +	mov	r5, #0x2		@ autorefresh command
+> +	str	r5, [r4]		@ kick off refreshes
+> +	bx	lr
+> +
+> +sdrc_syscfg:
+> +	.word	SDRC_SYSCONFIG_P
+> +sdrc_mr_0:
+> +	.word	SDRC_MR_0_P
+> +sdrc_emr2_0:
+> +	.word	SDRC_EMR2_0_P
+> +sdrc_manual_0:
+> +	.word	SDRC_MANUAL_0_P
+> +sdrc_mr_1:
+> +	.word	SDRC_MR_1_P
+> +sdrc_emr2_1:
+> +	.word	SDRC_EMR2_1_P
+> +sdrc_manual_1:
+> +	.word	SDRC_MANUAL_1_P
+> +ENTRY(es3_sdrc_fix_sz)
+> +	.word	. - es3_sdrc_fix
+> +
+>  /* Make sure SDRC accesses are ok */
+>  wait_sdrc_ok:
+>  
+Tested-by: Nishanth Menon <nm@ti.com>
+Tested on:
+SDP3630
+SDP3430
+Test script:
+http://pastebin.mozilla.org/889933
 
+-- 
 Regards,
-Santosh
+Nishanth Menon
