@@ -1,194 +1,68 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:51:37 +0000
-Subject: [PATCH 39/40] ARM: versatile: convert sched_clock() to use new
-	infrastructure
+Date: Fri, 17 Dec 2010 11:51:57 +0000
+Subject: [PATCH 40/40] ARM: vexpress: add sched_clock() for Versatile Express
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYqX-0006kA-7S@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYqr-0006kE-Bf@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert versatile platforms to use the new sched_clock() infrastructure
-for extending 32bit counters to full 64-bit nanoseconds.
+Add a sched_clock() implementation to Versatile Express using the new
+sched_clock() infrastructure for extending 32bit counters to full
+64-bit nanoseconds.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig                                   |    2 +
- arch/arm/mach-realview/core.c                      |   10 ++++
- arch/arm/mach-versatile/core.c                     |   10 ++++
- arch/arm/plat-versatile/include/plat/sched_clock.h |    6 +++
- arch/arm/plat-versatile/sched-clock.c              |   48 +++++++++++---------
- 5 files changed, 54 insertions(+), 22 deletions(-)
- create mode 100644 arch/arm/plat-versatile/include/plat/sched_clock.h
+ arch/arm/Kconfig                 |    1 +
+ arch/arm/mach-vexpress/v2m.c     |    4 ++++
+ arch/arm/plat-versatile/Makefile |    4 +---
+ 3 files changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 92e8c01..34311f4 100644
+index 34311f4..17b5ff0 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -236,6 +236,7 @@ config ARCH_REALVIEW
- 	bool "ARM Ltd. RealView family"
- 	select ARM_AMBA
+@@ -268,6 +268,7 @@ config ARCH_VEXPRESS
  	select COMMON_CLKDEV
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
 +	select HAVE_SCHED_CLOCK
  	select ICST
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-@@ -250,6 +251,7 @@ config ARCH_VERSATILE
- 	select ARM_AMBA
- 	select ARM_VIC
- 	select COMMON_CLKDEV
-+	select HAVE_SCHED_CLOCK
- 	select ICST
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 07c0815..3d653e0 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -52,6 +52,8 @@
- #include <mach/irqs.h>
+ 	select PLAT_VERSATILE
+ 	help
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 7eaa232..8c28310 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -22,6 +22,8 @@
+ #include <mach/clkdev.h>
+ #include <mach/motherboard.h>
+ 
++#include <plat/sched_clock.h>
++
  #include <plat/timer-sp.h>
  
-+#include <plat/sched_clock.h>
-+
  #include "core.h"
+@@ -50,6 +52,8 @@ void __init v2m_map_io(struct map_desc *tile, size_t num)
  
- /* used by entry-macro.S and platsmp.c */
-@@ -658,6 +660,12 @@ void realview_leds_event(led_event_t ledevt)
- #endif	/* CONFIG_LEDS */
- 
- /*
-+ * The sched_clock counter
-+ */
-+#define REFCOUNTER		(__io_address(REALVIEW_SYS_BASE) + \
-+				 REALVIEW_SYS_24MHz_OFFSET)
-+
-+/*
-  * Where is the timer (VA)?
-  */
- void __iomem *timer0_va_base;
-@@ -672,6 +680,8 @@ void __init realview_timer_init(unsigned int timer_irq)
+ static void __init v2m_timer_init(void)
  {
- 	u32 val;
- 
-+	versatile_sched_clock_init(REFCOUNTER, 24000000);
++	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
 +
- 	/* 
- 	 * set clock frequency: 
- 	 *	REALVIEW_REFCLK is 32KHz
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index e38acb0..56cdc22 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -51,6 +51,8 @@
- #include <mach/platform.h>
- #include <plat/timer-sp.h>
+ 	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
+ 	writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
  
-+#include <plat/sched_clock.h>
-+
- #include "core.h"
- 
- /*
-@@ -886,6 +888,12 @@ void __init versatile_init(void)
- }
- 
- /*
-+ * The sched_clock counter
-+ */
-+#define REFCOUNTER		(__io_address(VERSATILE_SYS_BASE) + \
-+				 VERSATILE_SYS_24MHz_OFFSET)
-+
-+/*
-  * Where is the timer (VA)?
-  */
- #define TIMER0_VA_BASE		 __io_address(VERSATILE_TIMER0_1_BASE)
-@@ -900,6 +908,8 @@ static void __init versatile_timer_init(void)
- {
- 	u32 val;
- 
-+	versatile_sched_clock_init(REFCOUNTER, 24000000);
-+
- 	/* 
- 	 * set clock frequency: 
- 	 *	VERSATILE_REFCLK is 32KHz
-diff --git a/arch/arm/plat-versatile/include/plat/sched_clock.h b/arch/arm/plat-versatile/include/plat/sched_clock.h
-new file mode 100644
-index 0000000..5c3e4fc
---- /dev/null
-+++ b/arch/arm/plat-versatile/include/plat/sched_clock.h
-@@ -0,0 +1,6 @@
-+#ifndef ARM_PLAT_SCHED_CLOCK_H
-+#define ARM_PLAT_SCHED_CLOCK_H
-+
-+void versatile_sched_clock_init(void __iomem *, unsigned long);
-+
-+#endif
-diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
-index 42efd14..3d6a4c2 100644
---- a/arch/arm/plat-versatile/sched-clock.c
-+++ b/arch/arm/plat-versatile/sched-clock.c
-@@ -18,37 +18,41 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
--#include <linux/cnt32_to_63.h>
- #include <linux/io.h>
- #include <linux/sched.h>
--#include <asm/div64.h>
- 
--#include <mach/hardware.h>
--#include <mach/platform.h>
-+#include <asm/sched_clock.h>
-+#include <plat/sched_clock.h>
- 
--#ifdef VERSATILE_SYS_BASE
--#define REFCOUNTER	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_24MHz_OFFSET)
--#endif
--
--#ifdef REALVIEW_SYS_BASE
--#define REFCOUNTER	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_24MHz_OFFSET)
--#endif
-+static DEFINE_CLOCK_DATA(cd);
-+static void __iomem *ctr;
- 
- /*
-- * This is the Realview and Versatile sched_clock implementation.  This
-- * has a resolution of 41.7ns, and a maximum value of about 35583 days.
-- *
-- * The return value is guaranteed to be monotonic in that range as
-- * long as there is always less than 89 seconds between successive
-- * calls to this function.
-+ * Constants generated by clocks_calc_mult_shift(m, s, 24MHz, NSEC_PER_SEC, 60).
-+ * This gives a resolution of about 41ns and a wrap period of about 178s.
-  */
-+#define SC_MULT		2796202667u
-+#define SC_SHIFT	26
-+
- unsigned long long notrace sched_clock(void)
- {
--	unsigned long long v = cnt32_to_63(readl(REFCOUNTER));
-+	if (ctr) {
-+		u32 cyc = readl(ctr);
-+		return cyc_to_fixed_sched_clock(&cd, cyc, (u32)~0,
-+						SC_MULT, SC_SHIFT);
-+	} else
-+		return 0;
-+}
- 
--	/* the <<1 gets rid of the cnt_32_to_63 top bit saving on a bic insn */
--	v *= 125<<1;
--	do_div(v, 3<<1);
-+static void notrace versatile_update_sched_clock(void)
-+{
-+	u32 cyc = readl(ctr);
-+	update_sched_clock(&cd, cyc, (u32)~0);
-+}
- 
--	return v;
-+void __init versatile_sched_clock_init(void __iomem *reg, unsigned long rate)
-+{
-+	ctr = reg;
-+	init_fixed_sched_clock(&cd, versatile_update_sched_clock,
-+			       32, rate, SC_MULT, SC_SHIFT);
- }
+diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
+index 5cf88e8..230eb37 100644
+--- a/arch/arm/plat-versatile/Makefile
++++ b/arch/arm/plat-versatile/Makefile
+@@ -1,7 +1,5 @@
+-obj-y	:= clock.o
++obj-y	:= clock.o sched-clock.o
+ obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
+-obj-$(CONFIG_ARCH_REALVIEW) += sched-clock.o
+-obj-$(CONFIG_ARCH_VERSATILE) += sched-clock.o
+ ifeq ($(CONFIG_LEDS_CLASS),y)
+ obj-$(CONFIG_ARCH_REALVIEW) += leds.o
+ obj-$(CONFIG_ARCH_VERSATILE) += leds.o
 -- 
 1.6.2.5
