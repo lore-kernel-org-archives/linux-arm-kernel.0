@@ -1,106 +1,155 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Dec 2010 16:49:47 -0800
-Subject: [PATCH 03/22] msm: clock: Invert debugfs directory layout
+Date: Thu, 16 Dec 2010 16:49:53 -0800
+Subject: [PATCH 09/22] msm: clock: Remove references to clk_ops_pcom
 In-Reply-To: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
 References: <1292547006-19741-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1292547006-19741-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1292547006-19741-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are currently 3 separate directories for clock debugging in
-debugfs: clk_enable, clk_rate, and clk_local. Each of these
-directories contains a list of clocks. This is rather annoying
-when you are focusing on one clock and want to enable/disable it
-and then check its rate. You either have to cd to the other
-directory or cat ../clk_rate/<clk>.
-
-Invert the layout so that there is one clock directory containing
-a directory for each clock. Inside each respective clock
-directory place an enable, rate, and is_local file relating to
-the clk_enable, clk_disable, and clk_local directories that exist
-today.
+Not all devices use proc_comm. The soc_clk_set_ops() function was
+unused. Determining if a clock is local vs. remote is fragile
+when done by comparing clk_ops pointers. Instead, implement an
+is_local() function for all clk_ops to determine if the clock is
+local. Once we do this we can compile clock.c with
+CONFIG_MSM_PROC_COMM=n.
 
 Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-debug.c |   48 ++++++++++++++++++--------------------
- 1 files changed, 23 insertions(+), 25 deletions(-)
+ arch/arm/mach-msm/clock-7x30.c  |    1 +
+ arch/arm/mach-msm/clock-8x60.c  |    1 +
+ arch/arm/mach-msm/clock-debug.c |    3 +--
+ arch/arm/mach-msm/clock-local.c |    5 +++++
+ arch/arm/mach-msm/clock-local.h |    1 +
+ arch/arm/mach-msm/clock-pcom.c  |    6 ++++++
+ arch/arm/mach-msm/clock.c       |    5 -----
+ arch/arm/mach-msm/clock.h       |    1 +
+ 8 files changed, 16 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/mach-msm/clock-7x30.c b/arch/arm/mach-msm/clock-7x30.c
+index 0637bee..994104f 100644
+--- a/arch/arm/mach-msm/clock-7x30.c
++++ b/arch/arm/mach-msm/clock-7x30.c
+@@ -1071,4 +1071,5 @@ struct clk_ops soc_clk_ops_7x30 = {
+ 	.round_rate = local_clk_round_rate,
+ 	.reset = pc_clk_reset,
+ 	.set_flags = soc_clk_set_flags,
++	.is_local = local_clk_is_local,
+ };
+diff --git a/arch/arm/mach-msm/clock-8x60.c b/arch/arm/mach-msm/clock-8x60.c
+index 5bbc8bb..e1f3c6f 100644
+--- a/arch/arm/mach-msm/clock-8x60.c
++++ b/arch/arm/mach-msm/clock-8x60.c
+@@ -1799,4 +1799,5 @@ struct clk_ops soc_clk_ops_8x60 = {
+ 	.round_rate = local_clk_round_rate,
+ 	.reset = soc_clk_reset,
+ 	.set_flags = soc_clk_set_flags,
++	.is_local = local_clk_is_local,
+ };
 diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
-index 6f603ed..b67b9e82 100644
+index b67b9e82..4886404 100644
 --- a/arch/arm/mach-msm/clock-debug.c
 +++ b/arch/arm/mach-msm/clock-debug.c
-@@ -87,47 +87,45 @@ static int clock_debug_local_get(void *data, u64 *val)
- DEFINE_SIMPLE_ATTRIBUTE(clock_local_fops, clock_debug_local_get,
- 			NULL, "%llu\n");
+@@ -19,7 +19,6 @@
+ #include <linux/debugfs.h>
+ #include <linux/clk.h>
+ #include "clock.h"
+-#include "clock-pcom.h"
  
--static struct dentry *dent_rate, *dent_enable, *dent_local;
-+static struct dentry *debugfs_base;
- 
- int __init clock_debug_init(void)
+ static int clock_debug_rate_set(void *data, u64 val)
  {
--	dent_rate = debugfs_create_dir("clk_rate", 0);
--	if (!dent_rate)
--		goto err;
--
--	dent_enable = debugfs_create_dir("clk_enable", 0);
--	if (!dent_enable)
--		goto err;
--
--	dent_local = debugfs_create_dir("clk_local", NULL);
--	if (!dent_local)
--		goto err;
--
-+	debugfs_base = debugfs_create_dir("clk", NULL);
-+	if (!debugfs_base)
-+		return -ENOMEM;
+@@ -79,7 +78,7 @@ static int clock_debug_local_get(void *data, u64 *val)
+ {
+ 	struct clk *clock = data;
+ 
+-	*val = clock->ops != &clk_ops_pcom;
++	*val = clock->ops->is_local(clock->id);
+ 
  	return 0;
--err:
--	debugfs_remove(dent_local);
--	debugfs_remove(dent_enable);
--	debugfs_remove(dent_rate);
--	return -ENOMEM;
+ }
+diff --git a/arch/arm/mach-msm/clock-local.c b/arch/arm/mach-msm/clock-local.c
+index d6eb6c6..44e0778 100644
+--- a/arch/arm/mach-msm/clock-local.c
++++ b/arch/arm/mach-msm/clock-local.c
+@@ -677,3 +677,8 @@ long local_clk_round_rate(unsigned id, unsigned rate)
+ 
+ 	return -EPERM;
+ }
++
++bool local_clk_is_local(unsigned id)
++{
++	return true;
++}
+diff --git a/arch/arm/mach-msm/clock-local.h b/arch/arm/mach-msm/clock-local.h
+index c168985..3083369 100644
+--- a/arch/arm/mach-msm/clock-local.h
++++ b/arch/arm/mach-msm/clock-local.h
+@@ -211,6 +211,7 @@ int local_clk_set_max_rate(unsigned id, unsigned rate);
+ unsigned local_clk_get_rate(unsigned id);
+ unsigned local_clk_is_enabled(unsigned id);
+ long local_clk_round_rate(unsigned id, unsigned rate);
++bool local_clk_is_local(unsigned id);
+ 
+ /*
+  * Required SoC-specific functions, implemented for every supported SoC
+diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
+index 8c4e867..63b7113 100644
+--- a/arch/arm/mach-msm/clock-pcom.c
++++ b/arch/arm/mach-msm/clock-pcom.c
+@@ -117,6 +117,11 @@ long pc_clk_round_rate(unsigned id, unsigned rate)
+ 	return rate;
  }
  
- int __init clock_debug_add(struct clk *clock)
++static bool pc_clk_is_local(unsigned id)
++{
++	return false;
++}
++
+ struct clk_ops clk_ops_pcom = {
+ 	.enable = pc_clk_enable,
+ 	.disable = pc_clk_disable,
+@@ -129,4 +134,5 @@ struct clk_ops clk_ops_pcom = {
+ 	.get_rate = pc_clk_get_rate,
+ 	.is_enabled = pc_clk_is_enabled,
+ 	.round_rate = pc_clk_round_rate,
++	.is_local = pc_clk_is_local,
+ };
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index 56c7549..06cd313 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -21,9 +21,6 @@
+ #include <linux/pm_qos_params.h>
+ 
+ #include "clock.h"
+-#include "proc_comm.h"
+-#include "clock-7x30.h"
+-#include "clock-pcom.h"
+ 
+ static DEFINE_MUTEX(clocks_mutex);
+ static DEFINE_SPINLOCK(clocks_lock);
+@@ -84,8 +81,6 @@ EXPORT_SYMBOL(clk_disable);
+ 
+ int clk_reset(struct clk *clk, enum clk_reset_action action)
  {
- 	char temp[50], *ptr;
-+	struct dentry *clk_dir;
- 
--	if (!dent_rate || !dent_enable || !dent_local)
-+	if (!debugfs_base)
- 		return -ENOMEM;
- 
- 	strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
- 	for (ptr = temp; *ptr; ptr++)
- 		*ptr = tolower(*ptr);
- 
--	debugfs_create_file(temp, S_IRUGO | S_IWUSR, dent_rate,
--			    clock, &clock_rate_fops);
--	debugfs_create_file(temp, S_IRUGO | S_IWUSR, dent_enable,
--			    clock, &clock_enable_fops);
--	debugfs_create_file(temp, S_IRUGO, dent_local,
--			    clock, &clock_local_fops);
-+	clk_dir = debugfs_create_dir(temp, debugfs_base);
-+	if (!clk_dir)
-+		return -ENOMEM;
-+
-+	if (!debugfs_create_file("rate", S_IRUGO | S_IWUSR, clk_dir,
-+				clock, &clock_rate_fops))
-+		goto error;
- 
-+	if (!debugfs_create_file("enable", S_IRUGO | S_IWUSR, clk_dir,
-+				clock, &clock_enable_fops))
-+		goto error;
-+
-+	if (!debugfs_create_file("is_local", S_IRUGO, clk_dir, clock,
-+				&clock_local_fops))
-+		goto error;
- 	return 0;
-+error:
-+	debugfs_remove_recursive(clk_dir);
-+	return -ENOMEM;
+-	if (!clk->ops->reset)
+-		clk->ops->reset = &pc_clk_reset;
+ 	return clk->ops->reset(clk->remote_id, action);
  }
+ EXPORT_SYMBOL(clk_reset);
+diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
+index 44a6dd6..b74ba3e 100644
+--- a/arch/arm/mach-msm/clock.h
++++ b/arch/arm/mach-msm/clock.h
+@@ -43,6 +43,7 @@ struct clk_ops {
+ 	unsigned (*get_rate)(unsigned id);
+ 	unsigned (*is_enabled)(unsigned id);
+ 	long (*round_rate)(unsigned id, unsigned rate);
++	bool (*is_local)(unsigned id);
+ };
+ 
+ struct clk {
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
