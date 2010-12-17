@@ -1,162 +1,79 @@
-From: stf_xl@wp.pl (Stanislaw Gruszka)
-Date: Fri, 17 Dec 2010 00:51:53 +0100
-Subject: [PATCH v2] ide: at91_ide.c bugfix for high master clock
-In-Reply-To: <20101213213549.GA2077@r2bh72.net.upc.cz>
-References: <1292100326-637-1-git-send-email-plyatov@gmail.com>
-	<20101213213549.GA2077@r2bh72.net.upc.cz>
-Message-ID: <20101216235153.GA3793@r2bh72.net.upc.cz>
+From: murali@embeddedwireless.com (murali at embeddedwireless.com)
+Date: Fri, 17 Dec 2010 00:11:52 +0000
+Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
+In-Reply-To: <AANLkTikJFdxbXjvWUMmEXoAG4xR8G9jq30ox90Bo4SWe@mail.gmail.com>
+References: <AANLkTinM524ozYQhHSpCN49LvZLePO6faHJrqxKBtyJe@mail.gmail.com><20101216113407.GO9937@n2100.arm.linux.org.uk><AANLkTikJFdxbXjvWUMmEXoAG4xR8G9jq30ox90Bo4SWe@mail.gmail.com>
+Message-ID: <601836471-1292544654-cardhu_decombobulator_blackberry.rim.net-1859917571-@b4.c1.bise3.blackberry>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 10:35:49PM +0100, Stanislaw Gruszka wrote:
-> On Sat, Dec 11, 2010 at 11:45:26PM +0300, Igor Plyatov wrote:
-> > The AT91SAM9 microcontrollers with master clock higher then 105 MHz
-> > and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
-> > lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
-> > does not detect IDE device.
-> 
-> The overflow happens because MSB (bit 6) is multiplied by 256.
-> NCS pulse length = 256*NCS_RD_PULSE[6] + NCS_RD_PULSE[5:0] clock
-> cycles. So NCS_RD_PULSE 0x41 gives 257 clock cycles not 65 as we
-> expected before. Static memory controller behaviour is undefined
-> when pulse length is bigger than cycle length, so things not work.
-> 
-> > +	u16 ncs_rd_pulse;
-> >  	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
-> >  			     AT91_SMC_BAT_SELECT;
-> >  
-> > @@ -81,19 +84,29 @@ static void set_smc_timings(const u8 chipselect, const u16 cycle,
-> >  	if (data_float)
-> >  		mode |= AT91_SMC_TDF_(data_float);
-> >  
-> > +	ncs_rd_pulse = cycle;
-> > +	if (ncs_rd_pulse > NCS_RD_PULSE_LIMIT) {
-> > +		ncs_rd_pulse = NCS_RD_PULSE_LIMIT;
-> > +		pr_warn(DRV_NAME ": ncs_rd_pulse limited to maximal value %d\n",
-> > +			ncs_rd_pulse);
-> > +	}
-> 
-> I'm fine with that fix. We can possibly still have problems with higher
-> frequencies, but I'm not sure if someone will use that hardware with 
-> faster clocks. 
 
-I looked at patch again and change mind, I'm not ok with it. EBI NCS in
-this case controls compact flash CS0, CS1 signals, so NCS pulse define
-a cycle on IDE bus. IDE cycle length can not be smaller than t0 (from
-PIO Mode Timing Diagram), otherwise we do not conform spec.
+Sent by Maxis from my BlackBerry? smartphone
 
-IMHO what should be done in case of overflow is increase NCS pulse time
-(IDE cycle) and in consequence overall SMC cycle time. Below draw patch
-how this could be done. I do not even tried to compile it (give up with
-that since I do not have hardware to test anyway), just idea how things
-could be possibly done.
+-----Original Message-----
+From: Andrei Warkentin <andreiw@motorola.com>
+Sender: linux-arm-kernel-bounces at lists.infradead.org
+Date: Thu, 16 Dec 2010 17:09:48 
+To: Russell King - ARM Linux<linux@arm.linux.org.uk>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Subject: Re: [RFC] Make SMP secondary CPU up more resilient to failure.
 
-diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
-index 000a78e..277224c 100644
---- a/drivers/ide/at91_ide.c
-+++ b/drivers/ide/at91_ide.c
-@@ -66,9 +66,8 @@
- 
- #define leave_16bit(cs, mode) at91_sys_write(AT91_SMC_MODE(cs), mode);
- 
--static void set_smc_timings(const u8 chipselect, const u16 cycle,
--			    const u16 setup, const u16 pulse,
--			    const u16 data_float, int use_iordy)
-+static void set_smc_timings(const u8 chipselect, u16 cycle, u16 cs_cycle,
-+			    u16 setup, u16 pulse, u16 data_float, int use_iordy)
- {
- 	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
- 			     AT91_SMC_BAT_SELECT;
-@@ -89,9 +88,9 @@ static void set_smc_timings(const u8 chipselect, const u16 cycle,
- 						   AT91_SMC_NRDSETUP_(setup) |
- 						   AT91_SMC_NCS_RDSETUP_(0));
- 	at91_sys_write(AT91_SMC_PULSE(chipselect), AT91_SMC_NWEPULSE_(pulse) |
--						   AT91_SMC_NCS_WRPULSE_(cycle) |
-+						   AT91_SMC_NCS_WRPULSE_(cs_cycle) |
- 						   AT91_SMC_NRDPULSE_(pulse) |
--						   AT91_SMC_NCS_RDPULSE_(cycle));
-+						   AT91_SMC_NCS_RDPULSE_(cs_cycle));
- 	at91_sys_write(AT91_SMC_CYCLE(chipselect), AT91_SMC_NWECYCLE_(cycle) |
- 						   AT91_SMC_NRDCYCLE_(cycle));
- }
-@@ -106,11 +105,44 @@ static unsigned int calc_mck_cycles(unsigned int ns, unsigned int mck_hz)
- 	return (unsigned int) tmp;
- }
- 
-+/*
-+ * In SMC registers values are coded in form:
-+ *
-+ * mul * ((val & (limit + 1)) ? 1 : 0) + (val & limit)
-+ *
-+ * where limit can be 0x1f, 0x3f or 0x7f, and  mul can be 128 or 256
-+ */
-+static int code_smc_values(int *val, const int limit, const int mul)
-+{
-+	int tmp;
-+
-+	if (*val <= limit)
-+		return 0;
-+
-+	/* limit < val < mul */
-+	tmp = mul - *val;
-+	if (tmp > 0) {
-+		*val = limit + 1;
-+		return tmp;
-+	}
-+
-+	/* mul + limit < val */
-+	if (WARN_ON(*val - mul > limit)) {
-+		/* it's not possible to code that value - set max */
-+		*val = (limit + 1) | limit;
-+		return 0;
-+	}
-+
-+	/* mul <= val <= mul + limit */
-+	*val = (limit + 1) | (*val - mul);
-+	return 0;
-+}
-+
- static void apply_timings(const u8 chipselect, const u8 pio,
- 			  const struct ide_timing *timing, int use_iordy)
- {
- 	unsigned int t0, t1, t2, t6z;
--	unsigned int cycle, setup, pulse, data_float;
-+	unsigned int cycle, cs_cycle, setup, pulse, data_float;
- 	unsigned int mck_hz;
- 	struct clk *mck;
- 
-@@ -133,11 +165,29 @@ static void apply_timings(const u8 chipselect, const u8 pio,
- 	setup = calc_mck_cycles(t1, mck_hz);
- 	pulse = calc_mck_cycles(t2, mck_hz);
- 	data_float = calc_mck_cycles(t6z, mck_hz);
--
--	pdbg("cycle=%u setup=%u pulse=%u data_float=%u\n",
--	     cycle, setup, pulse, data_float);
--
--	set_smc_timings(chipselect, cycle, setup, pulse, data_float, use_iordy);
-+	cs_cycle = cycle;
-+
-+	pdbg("cycle=%u cs_cycle=%u setup=%u pulse=%u data_float=%u\n",
-+	     cycle, cs_cycle, setup, pulse, data_float);
-+
-+	/* SMC use special coding scheme, see "Coding and Range of Timing
-+	 * Parameters" table from AT91SAM926x datasheets.
-+	 *
-+	 *		SETUP = 128*setup[5] + setup[4:0]
-+	 *		PULSE = 256*pulse[6] + pulse[5:0]
-+	 *		CYCLE = 256*cycle[8:7] + cycle[6:0]
-+	 */
-+	cycle += code_smc_values(&setup, 31, 128);
-+	cycle += code_smc_values(&pulse, 63, 256);
-+	/* cs_cycle is a full pulse wave, setup and hold times are 0 */
-+	cycle += code_smc_values(&cs_cycle, 63, 256);
-+	code_cmc_values(&cycle, 127, 256);
-+
-+	pdbg("cycle=0x%x cs_cycle=0x%x setup=0x%x pulse=0x%x data_float=0x%x\n",
-+	     cycle, cs_cycle, setup, pulse, data_float);
-+
-+	set_smc_timings(chipselect, cycle, cs_cycle, setup, pulse, data_float,
-+			use_iordy);
- }
- 
- static void at91_ide_input_data(ide_drive_t *drive, struct ide_cmd *cmd,
+On Thu, Dec 16, 2010 at 5:34 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>
+> On Wed, Dec 15, 2010 at 05:45:13PM -0600, Andrei Warkentin wrote:
+> > This is my first time on linux-arm-kernel, and while I've read the
+> > FAQ, hopefully I don't screw up too badly :).
+> >
+> > Anyway, we're on a dual-core ARMv7 running 2.6.36, and during
+> > stability stress testing saw the following:
+> > 1) After a number hotplug iterations, CPU1 fails to set its online bit
+> > quickly enough and__cpu_up() times-out.
+> > 2) CPU1 eventually completes its startup and sets the bit, however,
+> > since_cpu_up() failed, CPU1's active bit is never set.
+>
+> Why is your CPU taking soo long to come up? ?We wait one second in the
+> generic code, which is the time taken from the platform code being happy
+> that it has successfully started the CPU. ?Normally, platforms wait an
+> additional second to detect the CPU entering the kernel.
+
+It seems twd_calibrate_rate is the culprit (although in our case,
+since the clock is the same to both CPUs, there is no point in
+calibrating).
+We've seen this only when the device was under stress test load.
+
+>
+> > 2) Additionally I ensure that if the CPU comes up later than it were
+> > supposed to (shouldn't, but...), then it will not start initializing
+> > behind cpu_up's back (which is not really undoable). This solves the
+> > problem with both cpu_up+secondary_start_kernel races and with
+> > platform_cpu_kill+secondary_start_kernel races.
+>
+> Why would you have platform_cpu_kill() running at the same time - firstly,
+> hotplug events are serialized, and secondly the platform_cpu_kill() path
+> should wait up to five seconds for the CPU to go offline. ?If it doesn't
+> go offline within five seconds it's dead (and maybe we should mark it
+> not present.)
+>
+
+That's the platform_cpu_kill I invoke when I time out waiting for the
+online bit. Sorry, wasn't being clear. Just trying
+to show I didn't introduce any races :).
+
+See, the SMP logic is sensitive to system load at the moment. Since
+boot_secondary is supposed to return failure on failing
+to up the secondary, maybe there is no point doing a timed wait for
+the online bit, since you are guaranteed to get there.
+But right now, you end up in a situation where there is a timeout, but
+the CPU is up and running and registered.
+And this causes bad behavior later when you try to down it.
+
+>_______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
