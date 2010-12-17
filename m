@@ -1,53 +1,118 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 19:40:26 +0000
-Subject: [PATCH 28/40] ARM: sched_clock: provide common infrastructure
-	for sched_clock()
-In-Reply-To: <alpine.LFD.2.00.1012171436100.10437@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 17 Dec 2010 14:49:31 -0500 (EST)
+Subject: [PATCH 38/40] ARM: orion: convert sched_clock() to use new
+	infrastructure
+In-Reply-To: <E1PTYqC-0006k6-Q9@rmk-PC.arm.linux.org.uk>
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-	<E1PTYmu-0006jS-Na@rmk-PC.arm.linux.org.uk>
-	<alpine.LFD.2.00.1012171334530.10437@xanadu.home>
-	<20101217190554.GD9937@n2100.arm.linux.org.uk>
-	<20101217191857.GA24940@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1012171436100.10437@xanadu.home>
-Message-ID: <20101217194026.GE9937@n2100.arm.linux.org.uk>
+	<E1PTYqC-0006k6-Q9@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1012171448220.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 17, 2010 at 02:37:41PM -0500, Nicolas Pitre wrote:
-> On Fri, 17 Dec 2010, Russell King - ARM Linux wrote:
-> 
-> > On Fri, Dec 17, 2010 at 07:05:54PM +0000, Russell King - ARM Linux wrote:
-> > > Yes, you're right, it should disable local IRQs across the update.  Thanks
-> > > for spotting.
-> > 
-> > Here's the incremental patch for it.  Note that we can safely explicitly
-> > disable and re-enable IRQs as the timer subsystem ensures that we will
-> > always be called with IRQs enabled:
-> > 
-> >                         spin_unlock_irq(&base->lock);
-> >                         call_timer_fn(timer, fn, data);
-> >                         spin_lock_irq(&base->lock);
-> > 
-> > diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-> > index 82d4d3f..5643cb0 100644
-> > --- a/arch/arm/include/asm/sched_clock.h
-> > +++ b/arch/arm/include/asm/sched_clock.h
-> > @@ -30,7 +30,7 @@ static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
-> >   * Atomically update the sched_clock epoch.  Your update callback will
-> >   * be called from a timer before the counter wraps - read the current
-> >   * counter value, and call this function to safely move the epochs
-> > - * forward.
-> > + * forward.  Only use this from the update callback.
-> >   */
-> >  static inline void update_sched_clock(struct clock_data *cd, u32 cyc, u32 mask)
-> >  {
-> > @@ -41,11 +41,13 @@ static inline void update_sched_clock(struct clock_data *cd, u32 cyc, u32 mask)
-> >  	 * Write epoch_cyc and epoch_ns in a way that the update is
-> >  	 * detectable in cyc_to_fixed_sched_clock().
-> >  	 */
-> > +	local_irq_disable();
-> 
-> Actually, wouldn't it be better to use raw_local_irq_disable() here so 
-> this is safe with a RT kernel as well?
+On Fri, 17 Dec 2010, Russell King - ARM Linux wrote:
 
-Grr, there's too many different combinations of stuff... yes, it should be.
+> Convert orion platforms to use the new sched_clock() infrastructure for
+> extending 32bit counters to full 64-bit nanoseconds.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
+
+> ---
+>  arch/arm/Kconfig           |    1 +
+>  arch/arm/plat-orion/time.c |   44 +++++++++-----------------------------------
+>  2 files changed, 10 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 726279f..92e8c01 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -997,6 +997,7 @@ config PLAT_IOP
+>  
+>  config PLAT_ORION
+>  	bool
+> +	select HAVE_SCHED_CLOCK
+>  
+>  config PLAT_PXA
+>  	bool
+> diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
+> index 123f96f..c3da247 100644
+> --- a/arch/arm/plat-orion/time.c
+> +++ b/arch/arm/plat-orion/time.c
+> @@ -13,11 +13,11 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/sched.h>
+> -#include <linux/cnt32_to_63.h>
+>  #include <linux/timer.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> +#include <asm/sched_clock.h>
+>  #include <asm/mach/time.h>
+>  #include <mach/bridge-regs.h>
+>  #include <mach/hardware.h>
+> @@ -44,52 +44,26 @@ static u32 ticks_per_jiffy;
+>  
+>  /*
+>   * Orion's sched_clock implementation. It has a resolution of
+> - * at least 7.5ns (133MHz TCLK) and a maximum value of 834 days.
+> - *
+> - * Because the hardware timer period is quite short (21 secs if
+> - * 200MHz TCLK) and because cnt32_to_63() needs to be called at
+> - * least once per half period to work properly, a kernel timer is
+> - * set up to ensure this requirement is always met.
+> + * at least 7.5ns (133MHz TCLK).
+>   */
+> -#define TCLK2NS_SCALE_FACTOR 8
+> -
+> -static unsigned long tclk2ns_scale;
+> +static DEFINE_CLOCK_DATA(cd);
+>  
+>  unsigned long long notrace sched_clock(void)
+>  {
+> -	unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
+> -	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
+> +	u32 cyc = 0xffffffff - readl(TIMER0_VAL);
+> +	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
+>  }
+>  
+> -static struct timer_list cnt32_to_63_keepwarm_timer;
+>  
+> -static void cnt32_to_63_keepwarm(unsigned long data)
+> +static void notrace orion_update_sched_clock(void)
+>  {
+> -	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
+> -	(void) sched_clock();
+> +	u32 cyc = 0xffffffff - readl(TIMER0_VAL);
+> +	update_sched_clock(&cd, cyc, (u32)~0);
+>  }
+>  
+>  static void __init setup_sched_clock(unsigned long tclk)
+>  {
+> -	unsigned long long v;
+> -	unsigned long data;
+> -
+> -	v = NSEC_PER_SEC;
+> -	v <<= TCLK2NS_SCALE_FACTOR;
+> -	v += tclk/2;
+> -	do_div(v, tclk);
+> -	/*
+> -	 * We want an even value to automatically clear the top bit
+> -	 * returned by cnt32_to_63() without an additional run time
+> -	 * instruction. So if the LSB is 1 then round it up.
+> -	 */
+> -	if (v & 1)
+> -		v++;
+> -	tclk2ns_scale = v;
+> -
+> -	data = (0xffffffffUL / tclk / 2 - 2) * HZ;
+> -	setup_timer(&cnt32_to_63_keepwarm_timer, cnt32_to_63_keepwarm, data);
+> -	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
+> +	init_sched_clock(&cd, orion_update_sched_clock, 32, tclk);
+>  }
+>  
+>  /*
+> -- 
+> 1.6.2.5
+> 
