@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Dec 2010 11:41:05 +0000
-Subject: [PATCH 17/40] ARM: nuc: update clock source registration
+Date: Fri, 17 Dec 2010 11:37:41 +0000
+Subject: [PATCH 07/40] ARM: mmp: update clock source registration
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <E1PTYgL-0006ik-RX@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PTYd3-0006i5-QN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,31 +12,32 @@ divisor shift/mult constants.  Switch over to using this new interface.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-w90x900/time.c |    5 +----
+ arch/arm/mach-mmp/time.c |    5 +----
  1 files changed, 1 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-index b80f769..4b089cb 100644
---- a/arch/arm/mach-w90x900/time.c
-+++ b/arch/arm/mach-w90x900/time.c
-@@ -153,7 +153,6 @@ static struct clocksource clocksource_nuc900 = {
- 	.rating	= 200,
- 	.read	= nuc900_get_cycles,
- 	.mask	= CLOCKSOURCE_MASK(TDR_SHIFT),
--	.shift	= 10,
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
+diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+index 6652819..0c0ab09 100644
+--- a/arch/arm/mach-mmp/time.c
++++ b/arch/arm/mach-mmp/time.c
+@@ -146,7 +146,6 @@ static cycle_t clksrc_read(struct clocksource *cs)
  
-@@ -176,9 +175,7 @@ static void __init nuc900_clocksource_init(void)
- 	val |= (COUNTEN | PERIOD | PRESCALE);
- 	__raw_writel(val, REG_TCSR1);
+ static struct clocksource cksrc = {
+ 	.name		= "clocksource",
+-	.shift		= 20,
+ 	.rating		= 200,
+ 	.read		= clksrc_read,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+@@ -193,10 +192,8 @@ void __init timer_init(int irq)
+ 	ckevt.min_delta_ns = clockevent_delta2ns(MIN_DELTA, &ckevt);
+ 	ckevt.cpumask = cpumask_of(0);
  
--	clocksource_nuc900.mult =
--		clocksource_khz2mult((rate / 1000), clocksource_nuc900.shift);
--	clocksource_register(&clocksource_nuc900);
-+	clocksource_register_hz(&clocksource_nuc900, rate);
+-	cksrc.mult = clocksource_hz2mult(CLOCK_TICK_RATE, cksrc.shift);
+-
+ 	setup_irq(irq, &timer_irq);
+ 
+-	clocksource_register(&cksrc);
++	clocksource_register_hz(&cksrc, CLOCK_TICK_RATE);
+ 	clockevents_register_device(&ckevt);
  }
- 
- static void __init nuc900_timer_init(void)
 -- 
 1.6.2.5
