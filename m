@@ -1,32 +1,41 @@
 From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 17 Dec 2010 14:00:05 +0900
-Subject: [PATCH 03/17] ARM: SMDK6442: Enable I2S device to work
+Date: Fri, 17 Dec 2010 14:00:09 +0900
+Subject: [PATCH 08/17] ARM: SMDK6450: Enable I2S device to work
 In-Reply-To: <1292561925-19586-1-git-send-email-jassisinghbrar@gmail.com>
 References: <1292561925-19586-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <1292562005-19684-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <1292562009-19844-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Add missing virtual ASoC DMA device.
+Add missing virtual ASoC DMA device and WM8580 as I2C slave, so
+that the I2S can work on SMDK.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s5p6442/mach-smdk6442.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5p64x0/mach-smdk6450.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5p6442/mach-smdk6442.c b/arch/arm/mach-s5p6442/mach-smdk6442.c
-index e69f137..eaf6b9c 100644
---- a/arch/arm/mach-s5p6442/mach-smdk6442.c
-+++ b/arch/arm/mach-s5p6442/mach-smdk6442.c
-@@ -68,6 +68,7 @@ static struct s3c2410_uartcfg smdk6442_uartcfgs[] __initdata = {
- 
- static struct platform_device *smdk6442_devices[] __initdata = {
- 	&s3c_device_i2c0,
-+	&samsung_asoc_dma,
- 	&s5p6442_device_iis0,
+diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+index d609f5a..3a20de0 100644
+--- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
++++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+@@ -113,6 +113,7 @@ static struct platform_device *smdk6450_devices[] __initdata = {
+ 	&s3c_device_i2c1,
+ 	&s3c_device_ts,
  	&s3c_device_wdt,
++	&samsung_asoc_dma,
+ 	&s5p6450_device_iis0,
+ 	/* s5p6450_device_spi0 will be added */
  };
+@@ -135,6 +136,7 @@ static struct s3c2410_platform_i2c s5p6450_i2c1_data __initdata = {
+ };
+ 
+ static struct i2c_board_info smdk6450_i2c_devs0[] __initdata = {
++	{ I2C_BOARD_INFO("wm8580", 0x1b), },
+ 	{ I2C_BOARD_INFO("24c08", 0x50), },	/* Samsung KS24C080C EEPROM */
+ };
+ 
 -- 
 1.6.2.5
