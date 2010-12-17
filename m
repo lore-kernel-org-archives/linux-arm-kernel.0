@@ -1,69 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 17 Dec 2010 14:40:21 +0900
-Subject: [PATCH 40/54] ARM: Samsung SoCs: irq_data conversion.
-In-Reply-To: <20101214221055.GA16079@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130134112.GO15575@mail.wantstofly.org>
-	<015801cb92e1$117861b0$34692510$%kim@samsung.com>
-	<20101214221055.GA16079@mail.wantstofly.org>
-Message-ID: <003201cb9dac$e78fae40$b6af0ac0$%kim@samsung.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 17 Dec 2010 14:44:26 +0900
+Subject: [PATCH 14/17] ARM: S5PV310: Define I2S clocks
+In-Reply-To: <1292562014-20036-1-git-send-email-jassisinghbrar@gmail.com>
+References: <1292561925-19586-1-git-send-email-jassisinghbrar@gmail.com>
+	<1292562014-20036-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <AANLkTi=sh4if3FhU2-yUrFCUAtjWm4mDaMcf_JSTU8ia@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lennert Buytenhek wrote:
-> 
-> On Fri, Dec 03, 2010 at 08:56:03PM +0900, Kukjin Kim wrote:
-> 
-> > Hi Lennert,
-> 
-> Hi again,
-> 
-Hi :-)
+Hi,
 
-> 
-> > (Added Mark Brown in Cc)
-> >
-> > Looks ok to me but there are some comments.
-> >
-> > Firstly, how about to separate this to regarding S3C24XX(mach-s3c24xx
-and
-> > plat-s3c24xx), S5P(mach-s5pxxxx and plat-s5p) and plat-samsung?
-> > (Actually, already applied S3C64XX changes so that we can drop that in
-your
-> > patch.)
-> >
-> > As you know, I already applied some changes which is from Mark Brown in
-my
-> > tree.
-> > You can find that in
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > #for-next
-> >
-> > So could you please re-work this based on that?
-> 
-> I've reworked the patch I had in my tree on top of your git tree
-> (latest commit "Merge branch 'next-s5p64x0' into for-next"), and came
-> up with the three attached patches.  I've incorporated the whitespace
-> changes you requested, and changed the struct irq_data * variable
-> names from 'd' to 'data' to match Mark's earlier patches.
-> 
-Ok...thanks.
+Don't you use the i2s instead of iis?
 
-> Caveat emptor -- uncompiled, and totally untested.
-> 
-> How's this look?
-> 
-Looks ok to me ;-)
+Thank you,
+Kyungmin Park
 
-> Feel free to merge this via your tree -- I'll drop the Samsung patch
-> from my tree then.
-> 
-Ok...will apply after some tests and if any problems, let you know.
-
-Thanks again.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+On Fri, Dec 17, 2010 at 2:00 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> From: Jassi Brar <jassi.brar@samsung.com>
+>
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> ---
+> ?arch/arm/mach-s5pv310/clock.c | ? 15 +++++++++++++++
+> ?1 files changed, 15 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
+> index 189198a..6d22c43 100644
+> --- a/arch/arm/mach-s5pv310/clock.c
+> +++ b/arch/arm/mach-s5pv310/clock.c
+> @@ -517,6 +517,21 @@ static struct clk init_clocks_disable[] = {
+> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1 << 18),
+> ? ? ? ?}, {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "iis",
+> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 0,
+> + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 19),
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "iis",
+> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 20),
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "iis",
+> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 2,
+> + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 21),
+> + ? ? ? }, {
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "ac97",
+> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = -1,
+> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> --
+> 1.6.2.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
