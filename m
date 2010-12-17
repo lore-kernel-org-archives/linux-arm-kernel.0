@@ -1,58 +1,64 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 17 Dec 2010 13:20:54 +0000
-Subject: OMAP3: Warning: swp{b} use is deprecated for this architecture
-In-Reply-To: <AANLkTimaC3WaWAF8QNgs+3qza2WmBPXGbo5eKsooMT_o@mail.gmail.com>
-References: <AANLkTinmg4SyQNz5ide40YYC7k_MRQ6Q-j=WKN7jLC68@mail.gmail.com>
-	<20101216115657.GP9937@n2100.arm.linux.org.uk>
-	<AANLkTi=-ERvBARQ3bzOMZPx0s-OPuZHgXqjRet1aUxGw@mail.gmail.com>
-	<AANLkTink3TJonOC+cnpRUKKu9_+OBhJKDQ25yvrZZsrQ@mail.gmail.com>
-	<6188477658179778436@unknownmsgid>
-	<AANLkTinL3oonBvkZwZFr=Wh2m_EYQ1WVudV9cxNqKRBx@mail.gmail.com>
-	<AANLkTinXBx5F-wQC_eJPftsqgbaFUg9R8z5FxTFR+gTy@mail.gmail.com>
-	<20101216201042.GW9937@n2100.arm.linux.org.uk>
-	<AANLkTimaC3WaWAF8QNgs+3qza2WmBPXGbo5eKsooMT_o@mail.gmail.com>
-Message-ID: <AANLkTimyJ0VOJvxJs5f8Q6W4FxkR8HFic7futTGD-ApB@mail.gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 17 Dec 2010 21:21:04 +0800
+Subject: [PATCH 17/40] ARM: nuc: update clock source registration
+In-Reply-To: <E1PTYgL-0006ik-RX@rmk-PC.arm.linux.org.uk>
+References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+	<E1PTYgL-0006ik-RX@rmk-PC.arm.linux.org.uk>
+Message-ID: <AANLkTin6Z6NXY+rF4_PUmnhuomzuSQrCzUKvD9tXk19H@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Dec 16, 2010 at 9:44 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> On Thu, Dec 16, 2010 at 9:10 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Dec 16, 2010 at 08:04:41PM +0000, Dave Martin wrote:
->>> Note that the above bit of code is similar/identical to a bit of code
->>> already present in the OMAP BSP... so this still needs to be
->>> addressed.
->>>
->>> See arch/arm/mach-omap2/sleep34xx.S:lock_scratchpad_sem
->>
->> That's odd.
->>
->> | The following warning is issued by the compiler (gcc version 4.4.1
->> | (Sourcery G++ Lite 2010q1-202):
->> | arch/arm/mach-omap2/sleep34xx.S:87: Warning: swp{b} use is deprecated
->> | for this architecture
->>
->> It seems we're discussing the same code!
-
-Hmmm, guess I didn't look closely enough in the filename from the
-original post(!)
-
->>
->> As has been pointed out, and as Jean points out, this code is not called
->> at the moment, so can be removed to resolve the problem.
->>
-> Exactly! It is actually planned for removal, cf.
-> http://marc.info/?l=linux-omap&m=129252188012958&w=2
-
-Well, that solves the problem nicely, for now...
-
-Cheers
----Dave
-
-> A better solution will be needed at the time the API will be in use.
+2010/12/17 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
+> interfaces were added which simplify (and optimize) the selection of the
+> divisor shift/mult constants. ?Switch over to using this new interface.
 >
-> Thanks,
-> Jean
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> ?arch/arm/mach-w90x900/time.c | ? ?5 +----
+> ?1 files changed, 1 insertions(+), 4 deletions(-)
 >
+> diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
+> index b80f769..4b089cb 100644
+> --- a/arch/arm/mach-w90x900/time.c
+> +++ b/arch/arm/mach-w90x900/time.c
+> @@ -153,7 +153,6 @@ static struct clocksource clocksource_nuc900 = {
+> ? ? ? ?.rating = 200,
+> ? ? ? ?.read ? = nuc900_get_cycles,
+> ? ? ? ?.mask ? = CLOCKSOURCE_MASK(TDR_SHIFT),
+> - ? ? ? .shift ?= 10,
+> ? ? ? ?.flags ?= CLOCK_SOURCE_IS_CONTINUOUS,
+> ?};
+>
+> @@ -176,9 +175,7 @@ static void __init nuc900_clocksource_init(void)
+> ? ? ? ?val |= (COUNTEN | PERIOD | PRESCALE);
+> ? ? ? ?__raw_writel(val, REG_TCSR1);
+>
+> - ? ? ? clocksource_nuc900.mult =
+> - ? ? ? ? ? ? ? clocksource_khz2mult((rate / 1000), clocksource_nuc900.shift);
+> - ? ? ? clocksource_register(&clocksource_nuc900);
+> + ? ? ? clocksource_register_hz(&clocksource_nuc900, rate);
+> ?}
+>
+> ?static void __init nuc900_timer_init(void)
+
+Acked-by: Wan zongshun <mcuos.com@gmail.com>
+
+> --
+> 1.6.2.5
+>
+>
+
+
+
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
