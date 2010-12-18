@@ -1,40 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Dec 2010 16:03:45 -0800
-Subject: [PATCH 1/7] omap3630: nand: fix device size to work in polled mode
-In-Reply-To: <1290785677-16005-2-git-send-email-s-ghorai@ti.com>
-References: <1290785677-16005-1-git-send-email-s-ghorai@ti.com>
-	<1290785677-16005-2-git-send-email-s-ghorai@ti.com>
-Message-ID: <20101218000344.GV5941@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 17 Dec 2010 16:04:42 -0800
+Subject: [PATCH 01/11] ARM: Add SZ_128
+In-Reply-To: <1292622090-21896-2-git-send-email-swarren@nvidia.com>
+References: <1292622090-21896-1-git-send-email-swarren@nvidia.com>
+	<1292622090-21896-2-git-send-email-swarren@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF030FD788B5@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sukumar Ghorai <s-ghorai@ti.com> [101126 07:25]:
-> zoom3 and 3630-sdp having the x16 nand device.
-> This patch configure gpmc as x16 and select the currect function in driver
-> for polled mode (without prefetch enable) transfer.
-> 
-> Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
-> ---
->  arch/arm/mach-omap2/board-flash.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-> index fd38c05..001c605 100644
-> --- a/arch/arm/mach-omap2/board-flash.c
-> +++ b/arch/arm/mach-omap2/board-flash.c
-> @@ -145,6 +145,9 @@ __init board_nand_init(struct mtd_partition *nand_parts, u8 nr_parts, u8 cs)
->  	board_nand_data.parts		= nand_parts;
->  	board_nand_data.nr_parts		= nr_parts;
->  
-> +	if (cpu_is_omap3630())
-> +		board_nand_data.devsize = 1;
-> +
->  	gpmc_nand_init(&board_nand_data);
->  }
->  #else
+Sorry, resending this so that it reaches the ARM kernel mailing list; I
+used an old address last time around.
 
-I guess this is board specific for the size, not omap specific?
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+CC: linux-arm at lists.arm.linux.org.uk
 
-Regards,
+---
+ arch/arm/include/asm/sizes.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Tony
+diff --git a/arch/arm/include/asm/sizes.h b/arch/arm/include/asm/sizes.h
+index 4fc1565..98348c3 100644
+--- a/arch/arm/include/asm/sizes.h
++++ b/arch/arm/include/asm/sizes.h
+@@ -25,6 +25,7 @@
+
+ /* handy sizes */
+ #define SZ_16				0x00000010
++#define SZ_128				0x00000080
+ #define SZ_256				0x00000100
+ #define SZ_512				0x00000200
+
+-- 
+1.7.0.4
+nvpublic
