@@ -1,38 +1,106 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 18 Dec 2010 21:39:34 +0800
-Subject: [PATCH v7 13/15] ARM: mxs: Add initial mx23evk support
+Date: Sat, 18 Dec 2010 21:39:29 +0800
+Subject: [PATCH v7 05/15] ARM: mxs: Add low-level debug UART support
 In-Reply-To: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
 References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1292679575-2635-9-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1292679575-2635-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial mx23evk support with duart.
+ - DEBUG_LL support, which is incompatible with multi-soc MXS image
+   because of different DUART base address on MX23 and MX28
+ - uncompress message support
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
 Changes for v7:
- - Define mx23evk pads using naked pad "OR" mA/vol/pull configurations
+ - Add namespace for uart_base and UART()
 
 Changes for v3:
- - Remove inclusion of hardware.h
- - Add __initconst for mx23evk_pads[]
+ - debug-macro.S: change inclusion of hardware.h to mx23.h plus mx28.h
+ - Remove #define __MXS_BOOT_UNCOMPRESS
+ - Add namespace MXS_DUART_ for macros
+ - Add comment "If it's not, the output is simply discarded."
 
 Changes for v2:
- - Remove boot_params
+ - Remove incorrect comments
 
- arch/arm/mach-mxs/mach-mx23evk.c |   59 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/mach-mx23evk.c
+ arch/arm/mach-mxs/include/mach/debug-macro.S |   52 ++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
+ 2 files changed, 128 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
 
-diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
 new file mode 100644
-index 0000000..2aa77cc
+index 0000000..a1522fd
 --- /dev/null
-+++ b/arch/arm/mach-mxs/mach-mx23evk.c
-@@ -0,0 +1,59 @@
++++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+@@ -0,0 +1,52 @@
++/* arch/arm/mach-mxs/include/mach/debug-macro.S
++ *
++ * Debugging macro include header
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <mach/mx23.h>
++#include <mach/mx28.h>
++
++#ifdef CONFIG_SOC_IMX23
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX23_DUART_BASE_ADDR
++#endif
++
++#ifdef CONFIG_SOC_IMX28
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX28_DUART_BASE_ADDR
++#endif
++
++#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
++
++		.macro	addruart, rp, rv
++		ldr	\rp, =UART_PADDR	@ physical
++		ldr	\rv, =UART_VADDR	@ virtual
++		.endm
++
++		.macro	senduart, rd, rx
++		str	\rd, [\rx, #0x0]	@ DR
++		.endm
++
++		.macro	waituart, rd, rx
++1001:		ldr	\rd, [\rx, #0x18]	@ FR
++		tst	\rd, #1 << 5		@ FR_TXFF
++		bne	1001b
++		.endm
++
++		.macro	busyuart, rd, rx
++1002:		ldr	\rd, [\rx, #0x18]	@ FR
++		tst	\rd, #1 << 3		@ FR_BUSY
++		beq	1002b
++		.endm
+diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+new file mode 100644
+index 0000000..a005e76
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+@@ -0,0 +1,76 @@
 +/*
-+ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  arch/arm/mach-mxs/include/mach/uncompress.h
++ *
++ *  Copyright (C) 1999 ARM Limited
++ *  Copyright (C) Shane Nay (shane@minirl.com)
++ *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -44,51 +112,64 @@ index 0000000..2aa77cc
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
-+
-+#include <linux/delay.h>
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/irq.h>
++#ifndef __MACH_MXS_UNCOMPRESS_H__
++#define __MACH_MXS_UNCOMPRESS_H__
 +
 +#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
 +
-+#include <mach/common.h>
-+#include <mach/iomux-mx23.h>
++static unsigned long mxs_duart_base;
 +
-+#include "devices-mx23.h"
++#define MXS_DUART(x)	(*(volatile unsigned long *)(mxs_duart_base + (x)))
 +
-+static const iomux_cfg_t mx23evk_pads[] __initconst = {
-+	/* duart */
-+	MX23_PAD_PWM0__DUART_RX |
-+		MXS_PAD_4MA,
-+	MX23_PAD_PWM1__DUART_TX |
-+		MXS_PAD_4MA,
-+};
++#define MXS_DUART_DR		0x00
++#define MXS_DUART_FR		0x18
++#define MXS_DUART_FR_TXFE	(1 << 7)
++#define MXS_DUART_CR		0x30
++#define MXS_DUART_CR_UARTEN	(1 << 0)
 +
-+static void __init mx23evk_init(void)
++/*
++ * The following code assumes the serial port has already been
++ * initialized by the bootloader. If it's not, the output is
++ * simply discarded.
++ */
++
++static void putc(int ch)
 +{
-+	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
++	if (!mxs_duart_base)
++		return;
++	if (!(MXS_DUART(MXS_DUART_CR) & MXS_DUART_CR_UARTEN))
++		return;
 +
-+	mx23_add_duart();
++	while (!(MXS_DUART(MXS_DUART_FR) & MXS_DUART_FR_TXFE))
++		barrier();
++
++	MXS_DUART(MXS_DUART_DR) = ch;
 +}
 +
-+static void __init mx23evk_timer_init(void)
++static inline void flush(void)
 +{
-+	mx23_clocks_init();
 +}
 +
-+static struct sys_timer mx23evk_timer = {
-+	.init	= mx23evk_timer_init,
-+};
++#define MX23_DUART_BASE_ADDR	0x80070000
++#define MX28_DUART_BASE_ADDR	0x80074000
 +
-+MACHINE_START(MX23EVK, "Freescale MX23 EVK")
-+	/* Maintainer: Freescale Semiconductor, Inc. */
-+	.map_io		= mx23_map_io,
-+	.init_irq	= mx23_init_irq,
-+	.init_machine	= mx23evk_init,
-+	.timer		= &mx23evk_timer,
-+MACHINE_END
++static inline void __arch_decomp_setup(unsigned long arch_id)
++{
++	switch (arch_id) {
++	case MACH_TYPE_MX23EVK:
++		mxs_duart_base = MX23_DUART_BASE_ADDR;
++		break;
++	case MACH_TYPE_MX28EVK:
++		mxs_duart_base = MX28_DUART_BASE_ADDR;
++		break;
++	default:
++		break;
++	}
++}
++
++#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
++#define arch_decomp_wdog()
++
++#endif /* __MACH_MXS_UNCOMPRESS_H__ */
 -- 
 1.7.1
