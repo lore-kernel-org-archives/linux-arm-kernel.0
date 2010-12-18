@@ -1,51 +1,48 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 18 Dec 2010 21:39:27 +0800
-Subject: [PATCH v7 03/15] ARM: mxs: Add reset routines
+Date: Sat, 18 Dec 2010 21:39:28 +0800
+Subject: [PATCH v7 04/15] ARM: mxs: Add interrupt support
 In-Reply-To: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
 References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1292679575-2635-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1292679575-2635-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- - The mxs wdog is implemented in RTC block.
- - There is a generic software reset routine for most modules on mxs.
+Add Interrupt Collector (ICOLL) support for MXS-based.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
-Changes for v7:
- - Use CLKCTRL_RESET_CHIP over RTC_WATCHDOG to implement arch_reset
-
-Changes for v6:
- - Use __mxs_setl() and __mxs_clrl() for bit set/clear
-
-Changes for v4:
- - Add blank line above comment to make the code easy to read
- - Tell compiler unlikely(ret)
- - Make mxs_arch_reset_init __initcall
+Change for v7:
+ - Add namespace for ICOLL_VBASE
 
 Changes for v3:
- - Change wdog timeout to 10ms for safety
- - Simplify function mxs_reset_block() to get it look better
+ - icoll.c: add #include <linux/io.h> as it's removed from mx23.h
+   and mx28.h
+ - Change inclusion of hardware.h to mxs.h
+ - Move writing to HW_ICOLL_VECTOR from icoll.c icoll_ack_irq()
+   into entry-macro.S get_irqnr_and_base
+ - icoll.c: add more words into comments for level 0 irq ack
+ - mx23 and mx28 share the same icoll base address, so hard-coding
+   of the address is ok
+ - entry-macro.S: define and use HW_ICOLL_STAT_OFFSET over 0x70
 
 Changes for v2:
- - Move rtc clock enabling from arch_reset() into mxs_arch_reset_init()
+ - Get icoll base in get_irqnr_preamble
+ - Check the case of single SoC build and use hard-coding address if possible
 
- arch/arm/mach-mxs/include/mach/system.h |   27 ++++++
- arch/arm/mach-mxs/system.c              |  137 +++++++++++++++++++++++++++++++
- 2 files changed, 164 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/system.h
- create mode 100644 arch/arm/mach-mxs/system.c
+ arch/arm/mach-mxs/icoll.c                    |   81 ++++++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/entry-macro.S |   41 +++++++++++++
+ 2 files changed, 122 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/icoll.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/entry-macro.S
 
-diff --git a/arch/arm/mach-mxs/include/mach/system.h b/arch/arm/mach-mxs/include/mach/system.h
+diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
 new file mode 100644
-index 0000000..0e42823
+index 0000000..5dd43ba
 --- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/system.h
-@@ -0,0 +1,27 @@
++++ b/arch/arm/mach-mxs/icoll.c
+@@ -0,0 +1,81 @@
 +/*
-+ *  Copyright (C) 1999 ARM Limited
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -56,161 +53,121 @@ index 0000000..0e42823
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_MXS_SYSTEM_H__
-+#define __MACH_MXS_SYSTEM_H__
-+
-+static inline void arch_idle(void)
-+{
-+	cpu_do_idle();
-+}
-+
-+void arch_reset(char mode, const char *cmd);
-+
-+#endif /* __MACH_MXS_SYSTEM_H__ */
-diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-new file mode 100644
-index 0000000..9343d7e
---- /dev/null
-+++ b/arch/arm/mach-mxs/system.c
-@@ -0,0 +1,137 @@
-+/*
-+ * Copyright (C) 1999 ARM Limited
-+ * Copyright (C) 2000 Deep Blue Solutions Ltd
-+ * Copyright 2006-2007,2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-+ * Copyright 2009 Ilya Yanok, Emcraft Systems Ltd, yanok at emcraft.com
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
 +
 +#include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/delay.h>
 +#include <linux/init.h>
-+
-+#include <asm/proc-fns.h>
-+#include <asm/system.h>
++#include <linux/irq.h>
++#include <linux/io.h>
 +
 +#include <mach/mxs.h>
 +#include <mach/common.h>
 +
-+#define MX23_CLKCTRL_RESET_OFFSET	0x120
-+#define MX28_CLKCTRL_RESET_OFFSET	0x1e0
-+#define MXS_CLKCTRL_RESET_CHIP		(1 << 1)
++#define HW_ICOLL_VECTOR				0x0000
++#define HW_ICOLL_LEVELACK			0x0010
++#define HW_ICOLL_CTRL				0x0020
++#define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
++#define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
++#define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
++#define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
 +
-+#define MXS_MODULE_CLKGATE		(1 << 30)
-+#define MXS_MODULE_SFTRST		(1 << 31)
++static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
 +
-+static void __iomem *mxs_clkctrl_reset_addr;
-+
-+/*
-+ * Reset the system. It is called by machine_restart().
-+ */
-+void arch_reset(char mode, const char *cmd)
++static void icoll_ack_irq(unsigned int irq)
 +{
-+	/* reset the chip */
-+	__mxs_setl(MXS_CLKCTRL_RESET_CHIP, mxs_clkctrl_reset_addr);
-+
-+	pr_err("Failed to assert the chip reset\n");
-+
-+	/* Delay to allow the serial port to show the message */
-+	mdelay(50);
-+
-+	/* We'll take a jump through zero as a poor second */
-+	cpu_reset(0);
++	/*
++	 * The Interrupt Collector is able to prioritize irqs.
++	 * Currently only level 0 is used. So acking can use
++	 * BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0 unconditionally.
++	 */
++	__raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
++			icoll_base + HW_ICOLL_LEVELACK);
 +}
 +
-+static int __init mxs_arch_reset_init(void)
++static void icoll_mask_irq(unsigned int irq)
 +{
-+	struct clk *clk;
-+
-+	mxs_clkctrl_reset_addr = MXS_IO_ADDRESS(MXS_CLKCTRL_BASE_ADDR) +
-+				(cpu_is_mx23() ? MX23_CLKCTRL_RESET_OFFSET :
-+						 MX28_CLKCTRL_RESET_OFFSET);
-+
-+	clk = clk_get_sys("rtc", NULL);
-+	if (!IS_ERR(clk))
-+		clk_enable(clk);
-+
-+	return 0;
++	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
++			icoll_base + HW_ICOLL_INTERRUPTn_CLR(irq));
 +}
-+core_initcall(mxs_arch_reset_init);
 +
-+/*
-+ * Clear the bit and poll it cleared.  This is usually called with
-+ * a reset address and mask being either SFTRST(bit 31) or CLKGATE
-+ * (bit 30).
-+ */
-+static int clear_poll_bit(void __iomem *addr, u32 mask)
++static void icoll_unmask_irq(unsigned int irq)
 +{
-+	int timeout = 0x400;
++	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
++			icoll_base + HW_ICOLL_INTERRUPTn_SET(irq));
++}
 +
-+	/* clear the bit */
-+	__mxs_clrl(mask, addr);
++static struct irq_chip mxs_icoll_chip = {
++	.ack = icoll_ack_irq,
++	.mask = icoll_mask_irq,
++	.unmask = icoll_unmask_irq,
++};
++
++void __init icoll_init_irq(void)
++{
++	int i;
 +
 +	/*
-+	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
-+	 * recommends to wait 1us.
++	 * Interrupt Collector reset, which initializes the priority
++	 * for each irq to level 0.
 +	 */
-+	udelay(1);
++	mxs_reset_block(icoll_base + HW_ICOLL_CTRL);
 +
-+	/* poll the bit becoming clear */
-+	while ((__raw_readl(addr) & mask) && --timeout)
-+		/* nothing */;
-+
-+	return !timeout;
++	for (i = 0; i < MXS_INTERNAL_IRQS; i++) {
++		set_irq_chip(i, &mxs_icoll_chip);
++		set_irq_handler(i, handle_level_irq);
++		set_irq_flags(i, IRQF_VALID);
++	}
 +}
+diff --git a/arch/arm/mach-mxs/include/mach/entry-macro.S b/arch/arm/mach-mxs/include/mach/entry-macro.S
+new file mode 100644
+index 0000000..9f0da12
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/entry-macro.S
+@@ -0,0 +1,41 @@
++/*
++ * Low-level IRQ helper macros for Freescale MXS-based
++ *
++ * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
 +
-+int mxs_reset_block(void __iomem *reset_addr)
-+{
-+	int ret;
-+	int timeout = 0x400;
++#include <mach/mxs.h>
 +
-+	/* clear and poll SFTRST */
-+	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
-+	if (unlikely(ret))
-+		goto error;
++#define MXS_ICOLL_VBASE		MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR)
++#define HW_ICOLL_STAT_OFFSET	0x70
 +
-+	/* clear CLKGATE */
-+	__mxs_clrl(MXS_MODULE_CLKGATE, reset_addr);
++	.macro	disable_fiq
++	.endm
 +
-+	/* set SFTRST to reset the block */
-+	__mxs_setl(MXS_MODULE_SFTRST, reset_addr);
-+	udelay(1);
++	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
++	ldr	\irqnr, [\base, #HW_ICOLL_STAT_OFFSET]
++	cmp	\irqnr, #0x7F
++	strne	\irqnr, [\base]
++	moveqs	\irqnr, #0
++	.endm
 +
-+	/* poll CLKGATE becoming set */
-+	while ((!(__raw_readl(reset_addr) & MXS_MODULE_CLKGATE)) && --timeout)
-+		/* nothing */;
-+	if (unlikely(!timeout))
-+		goto error;
++	.macro  get_irqnr_preamble, base, tmp
++	ldr	\base, =MXS_ICOLL_VBASE
++	.endm
 +
-+	/* clear and poll SFTRST */
-+	ret = clear_poll_bit(reset_addr, MXS_MODULE_SFTRST);
-+	if (unlikely(ret))
-+		goto error;
-+
-+	/* clear and poll CLKGATE */
-+	ret = clear_poll_bit(reset_addr, MXS_MODULE_CLKGATE);
-+	if (unlikely(ret))
-+		goto error;
-+
-+	return 0;
-+
-+error:
-+	pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
-+	return -ETIMEDOUT;
-+}
++	.macro  arch_ret_to_user, tmp1, tmp2
++	.endm
 -- 
 1.7.1
