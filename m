@@ -1,40 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Dec 2010 16:24:39 -0800
-Subject: [PATCH 1/3] omap: rx51: Remove __initdata from rx51_tpa6130a2_data
-In-Reply-To: <1292613505-10113-1-git-send-email-jhnikula@gmail.com>
-References: <1292613505-10113-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <20101218002439.GA5941@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 18 Dec 2010 00:36:10 +0000
+Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
+In-Reply-To: <20101218000828.GG9937@n2100.arm.linux.org.uk>
+References: <AANLkTinM524ozYQhHSpCN49LvZLePO6faHJrqxKBtyJe@mail.gmail.com>
+	<20101216113407.GO9937@n2100.arm.linux.org.uk>
+	<AANLkTikJFdxbXjvWUMmEXoAG4xR8G9jq30ox90Bo4SWe@mail.gmail.com>
+	<20101216232849.GY9937@n2100.arm.linux.org.uk>
+	<AANLkTimxY0ufwR-nUT_Hx=NkG=9vcuGFrKOBgYpGtvoi@mail.gmail.com>
+	<20101217231449.GF9937@n2100.arm.linux.org.uk>
+	<AANLkTi=-foyb9c5F4tFpGK6KzQnP9htJW8GwYoUHVK0r@mail.gmail.com>
+	<20101218000828.GG9937@n2100.arm.linux.org.uk>
+Message-ID: <20101218003610.GH9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jhnikula@gmail.com> [101217 11:16]:
-> If the TPA6130 is compiled as module the id and power_gpio values are
-> arbitrary at module probing time since the rx51_tpa6130a2_data was marked as
-> __initdata.
-> 
-> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-> ---
-> For 2.6.38 as the TPA6130 is not used in 2.6.37.
-> ---
->  arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-> index 126b724..cde6847 100644
-> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-> @@ -719,7 +719,7 @@ static struct twl4030_platform_data rx51_twldata __initdata = {
->  	.vio			= &rx51_vio,
->  };
->  
-> -static struct tpa6130a2_platform_data rx51_tpa6130a2_data __initdata = {
-> +static struct tpa6130a2_platform_data rx51_tpa6130a2_data = {
->  	.id			= TPA6130A2,
->  	.power_gpio		= 98,
->  };
+On Sat, Dec 18, 2010 at 12:08:28AM +0000, Russell King - ARM Linux wrote:
+> The first bug I've spotted in that area would be VFP - which is not
+> hotplug aware.  VFP needs to register into the hotplug notifier system
+> so that vfp_enable() can be called.  I'll have a patch for that before
+> this weekend is out.
 
-How about __initdata_or_module instead of __initdata?
+This patch ensures that VFP is correctly re-initialized when the CPU
+restarts.
 
-Regards,
+ arch/arm/vfp/vfpmodule.c |   21 ++++++++++++++++++++-
+ 1 files changed, 20 insertions(+), 1 deletions(-)
 
-Tony
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 8063a32..b865a53 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -10,9 +10,12 @@
+  */
+ #include <linux/module.h>
+ #include <linux/types.h>
++#include <linux/cpu.h>
+ #include <linux/kernel.h>
++#include <linux/notifier.h>
+ #include <linux/signal.h>
+ #include <linux/sched.h>
++#include <linux/smp.h>
+ #include <linux/init.h>
+ 
+ #include <asm/cputype.h>
+@@ -484,7 +487,19 @@ void vfp_flush_hwstate(struct thread_info *thread)
+ 	put_cpu();
+ }
+ 
+-#include <linux/smp.h>
++#ifdef CONFIG_HOTPLUG_CPU
++static int vfp_hotplug_notifier(struct notifier_block *b, unsigned long action,
++				void *data)
++{
++	if (action == CPU_STARTING)
++		vfp_enable(NULL);
++	return NOTIFY_OK;
++}
++
++static struct notifier_block vfp_hotplug_nb = {
++	.notifier_call = vfp_hotplug_notifier,
++};
++#endif
+ 
+ /*
+  * VFP support code initialisation.
+@@ -514,6 +529,10 @@ static int __init vfp_init(void)
+ 	else if (vfpsid & FPSID_NODOUBLE) {
+ 		printk("no double precision support\n");
+ 	} else {
++#ifdef CONFIG_HOTPLUG_CPU
++		register_cpu_notifier(&vfp_hotplug_nb);
++#endif
++
+ 		smp_call_function(vfp_enable, NULL, 1);
+ 
+ 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
