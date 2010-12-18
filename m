@@ -1,41 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Dec 2010 18:09:53 -0800
-Subject: [PATCH v2 resend] OMAP4: Pandaboard: Add omap_reserve
-	functionality
-In-Reply-To: <1291793964-26769-1-git-send-email-raghuveer.murthy@ti.com>
-References: <1291793964-26769-1-git-send-email-raghuveer.murthy@ti.com>
-Message-ID: <20101218020952.GO5941@atomide.com>
+Date: Fri, 17 Dec 2010 19:05:15 -0800
+Subject: [PATCH 0/6] Misc omap board patches for v2.6.38 merge window
+Message-ID: <20101218030406.10251.73118.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Raghuveer Murthy <raghuveer.murthy@ti.com> [101207 23:31]:
-> This patch adds omap_reserve functionality to board-omap4panda.c.
-> Helps in the reserving boot time memory in SDRAM, used here for
-> framebuffer allocation.
-> 
-> This patch is in similar lines to commit id 71ee7dad9b6991, from
-> Russell king
-> 
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
-> ---
->  arch/arm/mach-omap2/board-omap4panda.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> index da24745..0ccc24f 100644
-> --- a/arch/arm/mach-omap2/board-omap4panda.c
-> +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> @@ -393,6 +393,7 @@ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
->  	/* Maintainer: David Anders - Texas Instruments Inc */
->  	.boot_params	= 0x80000100,
->  	.map_io		= omap4_panda_map_io,
-> +	.reserve	= omap_reserve,
->  	.init_irq	= omap4_panda_init_irq,
->  	.init_machine	= omap4_panda_init,
->  	.timer		= &omap_timer,
+Hi,
 
-Thanks applying.
+The following set contains some patches for the v2.6.38 merge window.
+
+Regards,
 
 Tony
+
+---
+
+Hemanth V (2):
+      omap4: Add platform changes for Ambient Light sensor
+      omap4: Add platform changes for PWM LED
+
+Laurent Pinchart (2):
+      omap3: igepv2: Don't call gpio_set_value right aftergpio_direction_output
+      omap3: igepv2: LED gpio-led:green:d1 is active low
+
+Raghuveer Murthy (1):
+      OMAP4: Pandaboard: Add omap_reserve functionality
+
+Tony Lindgren (1):
+      omap1: Fix innovator FPGA init for multi-omap
+
+
+ arch/arm/mach-omap1/board-innovator.c  |    7 ++-----
+ arch/arm/mach-omap1/fpga.c             |   10 ++++++----
+ arch/arm/mach-omap2/board-4430sdp.c    |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-omap2/board-igep0020.c   |   21 +++++++++------------
+ arch/arm/mach-omap2/board-omap4panda.c |    1 +
+ arch/arm/plat-omap/include/plat/fpga.h |    4 ----
+ 6 files changed, 45 insertions(+), 25 deletions(-)
+
+-- 
+Signature
