@@ -1,77 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Dec 2010 00:36:10 +0000
-Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
-In-Reply-To: <20101218000828.GG9937@n2100.arm.linux.org.uk>
-References: <AANLkTinM524ozYQhHSpCN49LvZLePO6faHJrqxKBtyJe@mail.gmail.com>
-	<20101216113407.GO9937@n2100.arm.linux.org.uk>
-	<AANLkTikJFdxbXjvWUMmEXoAG4xR8G9jq30ox90Bo4SWe@mail.gmail.com>
-	<20101216232849.GY9937@n2100.arm.linux.org.uk>
-	<AANLkTimxY0ufwR-nUT_Hx=NkG=9vcuGFrKOBgYpGtvoi@mail.gmail.com>
-	<20101217231449.GF9937@n2100.arm.linux.org.uk>
-	<AANLkTi=-foyb9c5F4tFpGK6KzQnP9htJW8GwYoUHVK0r@mail.gmail.com>
-	<20101218000828.GG9937@n2100.arm.linux.org.uk>
-Message-ID: <20101218003610.GH9937@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Dec 2010 16:53:11 -0800
+Subject: [PATCH v3 0/4] Introduce hardware spinlock framework
+In-Reply-To: <AANLkTi=s_Urcin4SAp1mXrKmoyzR2=6YuS3aU+OYYgqK@mail.gmail.com>
+References: <1291420247-18171-1-git-send-email-ohad@wizery.com>
+	<AANLkTin1fd=Kei7Fo6G+uR+270HdTkc71fvsA6qjBjcA@mail.gmail.com>
+	<20101214170656.GA3832@kroah.com>
+	<AANLkTi=q=QMQ_Abxb8eUWT_qGG8K=pc892ZB-mqgt_mh@mail.gmail.com>
+	<20101216210837.GA22895@kroah.com>
+	<AANLkTi=s_Urcin4SAp1mXrKmoyzR2=6YuS3aU+OYYgqK@mail.gmail.com>
+Message-ID: <20101218005311.GE5941@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 18, 2010 at 12:08:28AM +0000, Russell King - ARM Linux wrote:
-> The first bug I've spotted in that area would be VFP - which is not
-> hotplug aware.  VFP needs to register into the hotplug notifier system
-> so that vfp_enable() can be called.  I'll have a patch for that before
-> this weekend is out.
+* Ohad Ben-Cohen <ohad@wizery.com> [101216 13:34]:
+> On Thu, Dec 16, 2010 at 11:08 PM, Greg KH <greg@kroah.com> wrote:
+> >> > I've seen a lot of discussion about this, are all of the review comments
+> >> > now addressed?
+> >>
+> >> Yes, all comments were addressed in this v3 iteration, and this thread
+> >> has been idle for about 10 days.
+> >
+> > That's because we are all busy with other things :(
+> 
+> Oh sure, my intention was only positive (to demonstrate that there are
+> no outstanding comments), sorry if it sounded differently than
+> intended.
+> 
+> > Sorry, I really don't have the time at the moment to review this code,
+> > nor does it seem to affect areas that I maintain, so I don't understand
+> > what you are looking for from me.
+> 
+> Sorry for the noise - I contacted you because you maintain the driver
+> core, in the hope you could suggest where this can go through.
+> 
+> Tony, Andrew, can you please have a look ?
+> 
+> Any comment or suggestion is appreciated.
 
-This patch ensures that VFP is correctly re-initialized when the CPU
-restarts.
+Looks sane to me from omap point of view and it seems the locks
+are now all timeout based:
 
- arch/arm/vfp/vfpmodule.c |   21 ++++++++++++++++++++-
- 1 files changed, 20 insertions(+), 1 deletions(-)
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 8063a32..b865a53 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -10,9 +10,12 @@
-  */
- #include <linux/module.h>
- #include <linux/types.h>
-+#include <linux/cpu.h>
- #include <linux/kernel.h>
-+#include <linux/notifier.h>
- #include <linux/signal.h>
- #include <linux/sched.h>
-+#include <linux/smp.h>
- #include <linux/init.h>
- 
- #include <asm/cputype.h>
-@@ -484,7 +487,19 @@ void vfp_flush_hwstate(struct thread_info *thread)
- 	put_cpu();
- }
- 
--#include <linux/smp.h>
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int vfp_hotplug_notifier(struct notifier_block *b, unsigned long action,
-+				void *data)
-+{
-+	if (action == CPU_STARTING)
-+		vfp_enable(NULL);
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block vfp_hotplug_nb = {
-+	.notifier_call = vfp_hotplug_notifier,
-+};
-+#endif
- 
- /*
-  * VFP support code initialisation.
-@@ -514,6 +529,10 @@ static int __init vfp_init(void)
- 	else if (vfpsid & FPSID_NODOUBLE) {
- 		printk("no double precision support\n");
- 	} else {
-+#ifdef CONFIG_HOTPLUG_CPU
-+		register_cpu_notifier(&vfp_hotplug_nb);
-+#endif
-+
- 		smp_call_function(vfp_enable, NULL, 1);
- 
- 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
+Regards,
+
+Tony
