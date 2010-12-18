@@ -1,69 +1,117 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Dec 2010 11:04:45 +0000
-Subject: [PATCH] ARM: VFP: re-initialize VFP coprocessor access enables on CPU
-	hotplug
-Message-ID: <E1PTuaj-0000Fp-JS@rmk-PC.arm.linux.org.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sat, 18 Dec 2010 12:31:38 +0100
+Subject: [PATCH] Keyboard: omap-keypad: use matrix_keypad.h
+In-Reply-To: <20101218060104.GA1623@core.coreip.homeip.net>
+References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+	<20101218060104.GA1623@core.coreip.homeip.net>
+Message-ID: <201012181231.40665.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can not guarantee that VFP will be enabled when CPU hotplug brings
-a CPU back online from a reset state.  Add a hotplug CPU notifier to
-ensure that the VFP coprocessor access is enabled whenever a CPU comes
-back online.
+Saturday 18 December 2010 07:01:04 Dmitry Torokhov napisa?(a):
+> Hi Janusz,
+>
+> On Fri, Dec 17, 2010 at 11:32:04PM +0100, Janusz Krzysztofik wrote:
+> > Most keypad drivers make use of the <linux/input/matrix_keypad.h>
+> > defined macros, structures and inline functions.
+> >
+> > Convert omap-keypad driver to use those as well, as suggested by a
+> > compile time warning, hardcoded into the OMAP <palt/keypad.h>.
+>
+> Looks nice, couple of comments.
+>
+> >  struct omap_kp_platform_data {
+> >  	int rows;
+> >  	int cols;
+> > -	int *keymap;
+> > -	unsigned int keymapsize;
+> > +	const struct matrix_keymap_data *keymap_data;
+> >  	unsigned int rep:1;
+> >  	unsigned long delay;
+> >  	unsigned int dbounce:1;
+>
+> Since you are updating all boards maybe also change rep and dbounce
+> to bool?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/vfp/vfpmodule.c |   21 ++++++++++++++++++++-
- 1 files changed, 20 insertions(+), 1 deletions(-)
+OK.
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 8063a32..b865a53 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -10,9 +10,12 @@
-  */
- #include <linux/module.h>
- #include <linux/types.h>
-+#include <linux/cpu.h>
- #include <linux/kernel.h>
-+#include <linux/notifier.h>
- #include <linux/signal.h>
- #include <linux/sched.h>
-+#include <linux/smp.h>
- #include <linux/init.h>
- 
- #include <asm/cputype.h>
-@@ -484,7 +487,19 @@ void vfp_flush_hwstate(struct thread_info *thread)
- 	put_cpu();
- }
- 
--#include <linux/smp.h>
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int vfp_hotplug_notifier(struct notifier_block *b, unsigned long action,
-+				void *data)
-+{
-+	if (action == CPU_STARTING)
-+		vfp_enable(NULL);
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block vfp_hotplug_nb = {
-+	.notifier_call = vfp_hotplug_notifier,
-+};
-+#endif
- 
- /*
-  * VFP support code initialisation.
-@@ -514,6 +529,10 @@ static int __init vfp_init(void)
- 	else if (vfpsid & FPSID_NODOUBLE) {
- 		printk("no double precision support\n");
- 	} else {
-+#ifdef CONFIG_HOTPLUG_CPU
-+		register_cpu_notifier(&vfp_hotplug_nb);
-+#endif
-+
- 		smp_call_function(vfp_enable, NULL, 1);
- 
- 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
--- 
-1.6.2.5
+> > ---
+> > linux-2.6.37-rc5/drivers/input/keyboard/omap-keypad.c.orig	2010-12-
+> >09 23:08:09.000000000 +0100 +++
+> > linux-2.6.37-rc5/drivers/input/keyboard/omap-keypad.c	2010-12-16
+> > 21:04:07.000000000 +0100 @@ -65,7 +65,6 @@ struct omap_kp {
+> >
+> >  static DECLARE_TASKLET_DISABLED(kp_tasklet, omap_kp_tasklet, 0);
+> >
+> > -static int *keymap;
+> >  static unsigned int *row_gpios;
+> >  static unsigned int *col_gpios;
+> >
+> > @@ -162,20 +161,11 @@ static void omap_kp_scan_keypad(struct o
+> >  	}
+> >  }
+> >
+> > -static inline int omap_kp_find_key(int col, int row)
+> > -{
+> > -	int i, key;
+> > -
+> > -	key = KEY(col, row, 0);
+> > -	for (i = 0; keymap[i] != 0; i++)
+> > -		if ((keymap[i] & 0xff000000) == key)
+> > -			return keymap[i] & 0x00ffffff;
+> > -	return -1;
+> > -}
+> > -
+> >  static void omap_kp_tasklet(unsigned long data)
+> >  {
+> >  	struct omap_kp *omap_kp_data = (struct omap_kp *) data;
+> > +	unsigned short *keycodes = omap_kp_data->input->keycode;
+> > +	unsigned int row_shift = get_count_order(omap_kp_data->cols);
+> >  	unsigned char new_state[8], changed, key_down = 0;
+> >  	int col, row;
+> >  	int spurious = 0;
+> > @@ -199,7 +189,7 @@ static void omap_kp_tasklet(unsigned lon
+> >  			       row, (new_state[col] & (1 << row)) ?
+> >  			       "pressed" : "released");
+> >  #else
+> > -			key = omap_kp_find_key(col, row);
+> > +			key = keycodes[MATRIX_SCAN_CODE(row, col, row_shift)];
+> >  			if (key < 0) {
+> >  				printk(KERN_WARNING
+> >  				      "omap-keypad: Spurious key event %d-%d\n",
+> > @@ -298,16 +288,22 @@ static int __devinit omap_kp_probe(struc
+> >  	struct input_dev *input_dev;
+> >  	struct omap_kp_platform_data *pdata =  pdev->dev.platform_data;
+> >  	int i, col_idx, row_idx, irq_idx, ret;
+> > +	unsigned short *keycodes;
+> > +	unsigned int row_shift;
+> >
+> > -	if (!pdata->rows || !pdata->cols || !pdata->keymap) {
+> > -		printk(KERN_ERR "No rows, cols or keymap from pdata\n");
+> > +	if (!pdata->rows || !pdata->cols || !pdata->keymap_data) {
+> > +		printk(KERN_ERR "No rows, cols or keymap_data from pdata\n");
+> >  		return -EINVAL;
+> >  	}
+> >
+> >  	omap_kp = kzalloc(sizeof(struct omap_kp), GFP_KERNEL);
+> > +	row_shift = get_count_order(pdata->cols);
+> > +	keycodes = kzalloc((pdata->rows << row_shift) *
+> > sizeof(*keycodes), +			GFP_KERNEL);
+> >  	input_dev = input_allocate_device();
+> > -	if (!omap_kp || !input_dev) {
+> > +	if (!omap_kp || !keycodes || !input_dev) {
+> >  		kfree(omap_kp);
+> > +		kfree(keycodes);
+>
+> I do not see where you freeing keycodes in case something else fails
+> nor in omap_kp_remove(). 
+
+Yeah, I missed that, thanks.
+
+> But why don't you put keycodes at the end of 
+> struct omap_kp and allocate it in one shot?
+
+Perhaps because of blindly following a matrix_keypad.c pattern ;-).
+I'll do as you suggest, thank you.
+
+Janusz
