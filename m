@@ -1,68 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Dec 2010 19:05:41 -0800
-Subject: [PATCH 6/6] omap4: Add platform changes for PWM LED
-In-Reply-To: <20101218030406.10251.73118.stgit@baageli.muru.com>
-References: <20101218030406.10251.73118.stgit@baageli.muru.com>
-Message-ID: <20101218030541.10251.37326.stgit@baageli.muru.com>
+Date: Fri, 17 Dec 2010 19:10:04 -0800
+Subject: [PATCH] Keyboard: omap-keypad: use matrix_keypad.h
+In-Reply-To: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+Message-ID: <20101218031003.GP5941@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hemanth V <hemanthv@ti.com>
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [101217 14:33]:
+> Most keypad drivers make use of the <linux/input/matrix_keypad.h> 
+> defined macros, structures and inline functions.
+> 
+> Convert omap-keypad driver to use those as well, as suggested by a 
+> compile time warning, hardcoded into the OMAP <palt/keypad.h>.
+> 
+> Created against linux-2.6.37-rc5.
+> Tested on Amstrad Delta.
+> Compile tested with omap1_defconfig and omap2plus_defconfig shrinked to 
+> board-h4.
 
-Register TWL6030 PWM, which is used as charging LED
+Great, good to get rid of those annoying warnings!
 
-Signed-off-by: Hemanth V <hemanthv@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-4430sdp.c |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+>  drivers/input/keyboard/omap-keypad.c     |   36 ++++----
+>  include/linux/input/matrix_keypad.h      |    2
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 66f8943..33b1f73 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -23,6 +23,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/regulator/machine.h>
- #include <linux/leds.h>
-+#include <linux/leds_pwm.h>
- 
- #include <mach/hardware.h>
- #include <mach/omap4-common.h>
-@@ -97,6 +98,28 @@ static struct gpio_led_platform_data sdp4430_led_data = {
- 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
- };
- 
-+static struct led_pwm sdp4430_pwm_leds[] = {
-+	{
-+		.name		= "omap4:green:chrg",
-+		.pwm_id		= 1,
-+		.max_brightness	= 255,
-+		.pwm_period_ns	= 7812500,
-+	},
-+};
-+
-+static struct led_pwm_platform_data sdp4430_pwm_data = {
-+	.num_leds	= ARRAY_SIZE(sdp4430_pwm_leds),
-+	.leds		= sdp4430_pwm_leds,
-+};
-+
-+static struct platform_device sdp4430_leds_pwm = {
-+	.name	= "leds_pwm",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data = &sdp4430_pwm_data,
-+	},
-+};
-+
- static int omap_prox_activate(struct device *dev)
- {
- 	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
-@@ -204,6 +227,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
- 	&sdp4430_lcd_device,
- 	&sdp4430_gpio_keys_device,
- 	&sdp4430_leds_gpio,
-+	&sdp4430_leds_pwm,
- };
- 
- static struct omap_lcd_config sdp4430_lcd_config __initdata = {
+We also need Dmitry's ack for these changes.
+
+Regards,
+
+Tony
