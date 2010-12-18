@@ -1,42 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Dec 2010 19:05:36 -0800
-Subject: [PATCH 4/6] omap3: igepv2: LED gpio-led:green:d1 is active low
+Date: Fri, 17 Dec 2010 19:05:39 -0800
+Subject: [PATCH 5/6] omap4: Add platform changes for Ambient Light sensor
 In-Reply-To: <20101218030406.10251.73118.stgit@baageli.muru.com>
 References: <20101218030406.10251.73118.stgit@baageli.muru.com>
-Message-ID: <20101218030536.10251.87298.stgit@baageli.muru.com>
+Message-ID: <20101218030539.10251.20653.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+From: Hemanth V <hemanthv@ti.com>
 
-Make sure the LED is turned off at boot time, and configure the GPIO LED
-device as active low.
+Register BH1780GLI Ambient light sensor, which is an I2C device
+for 4430SDP board.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+Signed-off-by: Hemanth V <hemanthv@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-igep0020.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 77e2db7..c5bd537 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -352,6 +352,7 @@ static struct gpio_led igep2_gpio_leds[] = {
- 		.name			= "gpio-led:green:d1",
- 		.default_trigger	= "heartbeat",
- 		.gpio			= -EINVAL, /* gets replaced */
-+		.active_low		= 1,
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 8842ec5..66f8943 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -464,6 +464,9 @@ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("tmp105", 0x48),
  	},
++	{
++		I2C_BOARD_INFO("bh1780", 0x29),
++	},
  };
- 
-@@ -423,7 +424,7 @@ static int igep2_twl_gpio_setup(struct device *dev,
- 	/* TWL4030_GPIO_MAX + 1 == ledB (out, active low LED) */
- #if !defined(CONFIG_LEDS_GPIO) && !defined(CONFIG_LEDS_GPIO_MODULE)
- 	if ((gpio_request(gpio+TWL4030_GPIO_MAX+1, "gpio-led:green:d1") == 0)
--	    && (gpio_direction_output(gpio + TWL4030_GPIO_MAX + 1, 0) == 0))
-+	    && (gpio_direction_output(gpio + TWL4030_GPIO_MAX + 1, 1) == 0))
- 		gpio_export(gpio + TWL4030_GPIO_MAX + 1, 0);
- 	else
- 		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED1_GREEN\n");
+ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
+ 	{
