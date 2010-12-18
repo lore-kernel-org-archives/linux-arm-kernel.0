@@ -1,34 +1,68 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Dec 2010 19:05:39 -0800
-Subject: [PATCH 5/6] omap4: Add platform changes for Ambient Light sensor
+Date: Fri, 17 Dec 2010 19:05:41 -0800
+Subject: [PATCH 6/6] omap4: Add platform changes for PWM LED
 In-Reply-To: <20101218030406.10251.73118.stgit@baageli.muru.com>
 References: <20101218030406.10251.73118.stgit@baageli.muru.com>
-Message-ID: <20101218030539.10251.20653.stgit@baageli.muru.com>
+Message-ID: <20101218030541.10251.37326.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hemanth V <hemanthv@ti.com>
 
-Register BH1780GLI Ambient light sensor, which is an I2C device
-for 4430SDP board.
+Register TWL6030 PWM, which is used as charging LED
 
 Signed-off-by: Hemanth V <hemanthv@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 8842ec5..66f8943 100644
+index 66f8943..33b1f73 100644
 --- a/arch/arm/mach-omap2/board-4430sdp.c
 +++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -464,6 +464,9 @@ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
- 	{
- 		I2C_BOARD_INFO("tmp105", 0x48),
- 	},
-+	{
-+		I2C_BOARD_INFO("bh1780", 0x29),
-+	},
+@@ -23,6 +23,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/leds.h>
++#include <linux/leds_pwm.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/omap4-common.h>
+@@ -97,6 +98,28 @@ static struct gpio_led_platform_data sdp4430_led_data = {
+ 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
  };
- static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
- 	{
+ 
++static struct led_pwm sdp4430_pwm_leds[] = {
++	{
++		.name		= "omap4:green:chrg",
++		.pwm_id		= 1,
++		.max_brightness	= 255,
++		.pwm_period_ns	= 7812500,
++	},
++};
++
++static struct led_pwm_platform_data sdp4430_pwm_data = {
++	.num_leds	= ARRAY_SIZE(sdp4430_pwm_leds),
++	.leds		= sdp4430_pwm_leds,
++};
++
++static struct platform_device sdp4430_leds_pwm = {
++	.name	= "leds_pwm",
++	.id	= -1,
++	.dev	= {
++		.platform_data = &sdp4430_pwm_data,
++	},
++};
++
+ static int omap_prox_activate(struct device *dev)
+ {
+ 	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
+@@ -204,6 +227,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
+ 	&sdp4430_lcd_device,
+ 	&sdp4430_gpio_keys_device,
+ 	&sdp4430_leds_gpio,
++	&sdp4430_leds_pwm,
+ };
+ 
+ static struct omap_lcd_config sdp4430_lcd_config __initdata = {
