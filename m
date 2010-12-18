@@ -1,35 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Dec 2010 16:21:31 -0800
-Subject: [PATCH 2/2] arm: mach-omap2: Kconfig: devkit8000 should select
-	needed options
-In-Reply-To: <alpine.DEB.1.10.1012171424030.13087@esdhcp041196.research.nokia.com>
-References: <1292417352-18082-1-git-send-email-aaro.koskinen@nokia.com>
-	<1292417352-18082-2-git-send-email-aaro.koskinen@nokia.com>
-	<20101215173709.GB8406@atomide.com>
-	<alpine.DEB.1.10.1012171424030.13087@esdhcp041196.research.nokia.com>
-Message-ID: <20101218002131.GZ5941@atomide.com>
+Date: Fri, 17 Dec 2010 16:24:39 -0800
+Subject: [PATCH 1/3] omap: rx51: Remove __initdata from rx51_tpa6130a2_data
+In-Reply-To: <1292613505-10113-1-git-send-email-jhnikula@gmail.com>
+References: <1292613505-10113-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <20101218002439.GA5941@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@nokia.com> [101217 04:41]:
-> Hi,
+* Jarkko Nikula <jhnikula@gmail.com> [101217 11:16]:
+> If the TPA6130 is compiled as module the id and power_gpio values are
+> arbitrary at module probing time since the rx51_tpa6130a2_data was marked as
+> __initdata.
 > 
-> On Wed, 15 Dec 2010, Tony Lindgren wrote:
-> >* Aaro Koskinen <aaro.koskinen@nokia.com> [101215 04:48]:
-> >>It's not possible to compile a kernel for this board without I2C,
-> >>MFD_SUPPORT and TWL4030_CORE, so those should be selected. This will
-> >>prevent build errors when trying out different configurations.
-> >
-> >This one I'm not so convinced about. We should be able to compile
-> >support for each board and enable and disable these kind of options
-> >just fine if CONFIG_ARCH_OMAP2PLUS_TYPICAL is disabled.
+> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+> ---
+> For 2.6.38 as the TPA6130 is not used in 2.6.37.
+> ---
+>  arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> So in this case we should move the stuff with special dependencies from
-> the board file into e.g. board-devkit8000-peripherals, which would be
-> a kernel module?
+> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> index 126b724..cde6847 100644
+> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
+> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> @@ -719,7 +719,7 @@ static struct twl4030_platform_data rx51_twldata __initdata = {
+>  	.vio			= &rx51_vio,
+>  };
+>  
+> -static struct tpa6130a2_platform_data rx51_tpa6130a2_data __initdata = {
+> +static struct tpa6130a2_platform_data rx51_tpa6130a2_data = {
+>  	.id			= TPA6130A2,
+>  	.power_gpio		= 98,
+>  };
 
-Or how about just have them in ifdef CONFIG_I2C_OMAP and TWL4030_CORE
-in the board-devkit8000.c file?
+How about __initdata_or_module instead of __initdata?
 
 Regards,
 
