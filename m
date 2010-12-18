@@ -1,135 +1,35 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Sat, 18 Dec 2010 16:53:31 -0600
-Subject: [PATCH v4 1/7] OMAP3: PM: Update clean_l2 to use v7_flush_dcache_all
-In-Reply-To: <1292712817-24999-1-git-send-email-nm@ti.com>
-References: <1292712817-24999-1-git-send-email-nm@ti.com>
-Message-ID: <1292712817-24999-2-git-send-email-nm@ti.com>
+Date: Sat, 18 Dec 2010 16:56:36 -0600
+Subject: [PATCH 0/7 v6] OMAP3: clean up ASM sleep code
+In-Reply-To: <1292687087-22983-1-git-send-email-j-pihet@ti.com>
+References: <1292687087-22983-1-git-send-email-j-pihet@ti.com>
+Message-ID: <4D0D3C24.4020503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Woodruff <r-woodruff2@ti.com>
+jean.pihet at newoldbits.com had written, on 12/18/2010 09:44 AM, the 
+following:
+> 
+> Applies on top of Nishant's latest idle path errata fixes step 2,
+> cf. http://marc.info/?l=linux-omap&m=129139584919242&w=2
+> 
+> Jean Pihet (7):
+>   OMAP3: remove unused code from the ASM sleep code
+>   OMAP2+: use global values for the SRAM PA addresses
+>   OMAP3: remove hardcoded values from the ASM sleep code
+>   OMAP3: re-organize the ASM sleep code
+>   OMAP3: rework of the ASM sleep code execution paths
+>   OMAP3: add comments for low power code errata
+>   OMAP3: ASM sleep code format rework
+> 
 
-Analysis in TI kernel with ETM showed that using cache mapped flush
-in kernel instead of SO mapped flush cost drops by 65% (3.39mS down
-to 1.17mS) for clean_l2 which is used during sleep sequences.
-Overall:
-	- speed up
-	- unfortunately there isn't a good alternative flush method today
-	- code reduction and less maintenance and potential bug in
-	  unmaintained code
+just FYI - tested the series v6 as well with:
+SDP3430 and SDP3630 with script:
+http://elinux.org/OMAP_Power_Management#Quick_verification_of_suspend-idle_functionality
 
-This also fixes the bug with the clean_l2 function usage.
+Tested against v4 of my series. I have ensured that your series still 
+applies cleanly on top of my new series.
 
-Reported-by: Tony Lindgren <tony@atomide.com>
-
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Tony Lindgren <tony@atomide.com>
-
-[nm at ti.com: ported rkw's proposal to 2.6.37-rc2]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Richard Woodruff <r-woodruff2@ti.com>
----
-(no change in this series, posted for completeness)
-v2: https://patchwork.kernel.org/patch/365222/
-v1: http://marc.info/?l=linux-omap&m=129013171325210&w=2
- arch/arm/mach-omap2/sleep34xx.S |   79 ++++++--------------------------------
- 1 files changed, 13 insertions(+), 66 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index 2fb205a..2c20fcf 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -520,72 +520,17 @@ clean_caches:
- 	cmp	r9, #1 /* Check whether L2 inval is required or not*/
- 	bne	skip_l2_inval
- clean_l2:
--	/* read clidr */
--	mrc     p15, 1, r0, c0, c0, 1
--	/* extract loc from clidr */
--	ands    r3, r0, #0x7000000
--	/* left align loc bit field */
--	mov     r3, r3, lsr #23
--	/* if loc is 0, then no need to clean */
--	beq     finished
--	/* start clean at cache level 0 */
--	mov     r10, #0
--loop1:
--	/* work out 3x current cache level */
--	add     r2, r10, r10, lsr #1
--	/* extract cache type bits from clidr*/
--	mov     r1, r0, lsr r2
--	/* mask of the bits for current cache only */
--	and     r1, r1, #7
--	/* see what cache we have at this level */
--	cmp     r1, #2
--	/* skip if no cache, or just i-cache */
--	blt     skip
--	/* select current cache level in cssr */
--	mcr     p15, 2, r10, c0, c0, 0
--	/* isb to sych the new cssr&csidr */
--	isb
--	/* read the new csidr */
--	mrc     p15, 1, r1, c0, c0, 0
--	/* extract the length of the cache lines */
--	and     r2, r1, #7
--	/* add 4 (line length offset) */
--	add     r2, r2, #4
--	ldr     r4, assoc_mask
--	/* find maximum number on the way size */
--	ands    r4, r4, r1, lsr #3
--	/* find bit position of way size increment */
--	clz     r5, r4
--	ldr     r7, numset_mask
--	/* extract max number of the index size*/
--	ands    r7, r7, r1, lsr #13
--loop2:
--	mov     r9, r4
--	/* create working copy of max way size*/
--loop3:
--	/* factor way and cache number into r11 */
--	orr     r11, r10, r9, lsl r5
--	/* factor index number into r11 */
--	orr     r11, r11, r7, lsl r2
--	/*clean & invalidate by set/way */
--	mcr     p15, 0, r11, c7, c10, 2
--	/* decrement the way*/
--	subs    r9, r9, #1
--	bge     loop3
--	/*decrement the index */
--	subs    r7, r7, #1
--	bge     loop2
--skip:
--	add     r10, r10, #2
--	/* increment cache number */
--	cmp     r3, r10
--	bgt     loop1
--finished:
--	/*swith back to cache level 0 */
--	mov     r10, #0
--	/* select current cache level in cssr */
--	mcr     p15, 2, r10, c0, c0, 0
--	isb
-+	/*
-+	 * Jump out to kernel flush routine
-+	 *  - reuse that code is better
-+	 *  - it executes in a cached space so is faster than refetch per-block
-+	 *  - should be faster and will change with kernel
-+	 *  - 'might' have to copy address, load and jump to it
-+	 */
-+	ldr r1, kernel_flush
-+	mov lr, pc
-+	bx  r1
-+
- skip_l2_inval:
- 	/* Data memory barrier and Data sync barrier */
- 	mov     r1, #0
-@@ -668,5 +613,7 @@ cache_pred_disable_mask:
- 	.word	0xFFFFE7FB
- control_stat:
- 	.word	CONTROL_STAT
-+kernel_flush:
-+	.word v7_flush_dcache_all
- ENTRY(omap34xx_cpu_suspend_sz)
- 	.word	. - omap34xx_cpu_suspend
 -- 
-1.6.3.3
+Regards,
+Nishanth Menon
