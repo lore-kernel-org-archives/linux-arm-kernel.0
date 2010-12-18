@@ -1,47 +1,136 @@
-From: darkstar6262@gmail.com (Cory Maccarrone)
-Date: Fri, 17 Dec 2010 21:14:53 -0800
-Subject: [PATCH] OMAP1: clock_data: use runtime cpu / machine checks
-In-Reply-To: <alpine.DEB.2.00.1012130220430.15971@utopia.booyaka.com>
-References: <201012112150.33831.jkrzyszt@tis.icnet.pl>
-	<alpine.DEB.2.00.1012130220430.15971@utopia.booyaka.com>
-Message-ID: <AANLkTi=t4gpG-+PV04+cJ35nSn_QeaZyQXDrMeCCqQYH@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 17 Dec 2010 21:16:25 -0800
+Subject: [PATCH] hvc_dcc: Simplify assembly for v6 and v7 ARM
+In-Reply-To: <20101201192856.GA731@suse.de>
+References: <20101201192856.GA731@suse.de>
+Message-ID: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 13, 2010 at 1:24 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hello Janusz, Cory,
->
-> On Sat, 11 Dec 2010, Janusz Krzysztofik wrote:
->
->> Otherwise multi-omap1 configurations may set wrong clock speed.
->>
->> Created and tested against l-o master on Amstrad Delta.
->>
->> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
->
-> Thanks, this is a significant step forward in building a good
-> omap1_defconfig. ?Cory, do you mind testing this out? ?If it works for you
-> also, let's plan to take this for 2.6.38.
->
-> However:
->
->> Tested with omap1_defconfig after dropping
->> CONFIG_OMAP_CLOCKS_SET_BY_BOOTLOADER=y and those of 12MHz xtal based
->> clock speeds which are too high for my board.
->
-> This is also key. ?Until the board files can somehow indicate which rate
-> sets are usable for their boards at runtime -- which is what the
-> CONFIG_OMAP_ARM* KConfig options used to do at KConfig-time -- I don't
-> think omap1_defconfig is possible yet.
->
-> Volunteers to tackle that project are gladly welcome :-)
->
->
-> - Paul
->
+The inline assembly differences for v6 vs. v7 in the hvc_dcc
+driver are purely optimizations. On a v7 processor, an mrc with
+the pc sets the condition codes to the 28-31 bits of the register
+being read. It just so happens that the TX/RX full bits the DCC
+driver is testing for are high enough in the register to be put
+into the condition codes. On a v6 processor, this "feature" isn't
+implemented and thus we have to do the usual read, mask, test
+operations to check for TX/RX full.
 
-This doesn't seem to work for me.  Using my own config, it'll boot
-fine, but the omap1_defconfig, even after making the above changes,
-still fails to boot.  I'll see if I can figure out what makes it stop.
+Since we already test the RX/TX full bits before calling
+__dcc_getchar() and __dcc_putchar() we don't actually need to do
+anything special for v7 over v6. The only difference is in
+hvc_dcc_get_chars(). We would test RX full, poll RX full, and
+then read a character from the buffer, whereas now we will test
+RX full, read a character from the buffer, and then test RX full
+again for the second iteration of the loop. It doesn't seem
+possible for the buffer to go from full to empty between testing
+the RX full and reading a character. Therefore, replace the v7
+versions with the v6 versions and everything works the same.
 
-- Cory
+While we're here, cleanup the for loops a bit and mark the inline
+assembly as volatile. Not marking it volatile causes GCC to cache
+the results of the status and RX buffer registers causing
+lockups.
+
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Daniel Walker <dwalker@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/char/hvc_dcc.c |   43 +++++++------------------------------------
+ 1 files changed, 7 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/char/hvc_dcc.c b/drivers/char/hvc_dcc.c
+index 6470f63..435f6fa 100644
+--- a/drivers/char/hvc_dcc.c
++++ b/drivers/char/hvc_dcc.c
+@@ -33,54 +33,29 @@
+ static inline u32 __dcc_getstatus(void)
+ {
+ 	u32 __ret;
+-
+-	asm("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
++	asm volatile("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
+ 		: "=r" (__ret) : : "cc");
+ 
+ 	return __ret;
+ }
+ 
+ 
+-#if defined(CONFIG_CPU_V7)
+ static inline char __dcc_getchar(void)
+ {
+ 	char __c;
+ 
+-	asm("get_wait:	mrc p14, 0, pc, c0, c1, 0                          \n\
+-			bne get_wait                                       \n\
+-			mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+-		: "=r" (__c) : : "cc");
+-
+-	return __c;
+-}
+-#else
+-static inline char __dcc_getchar(void)
+-{
+-	char __c;
+-
+-	asm("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
++	asm volatile("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+ 		: "=r" (__c));
+ 
+ 	return __c;
+ }
+-#endif
+ 
+-#if defined(CONFIG_CPU_V7)
+-static inline void __dcc_putchar(char c)
+-{
+-	asm("put_wait:	mrc p14, 0, pc, c0, c1, 0                 \n\
+-			bcs put_wait                              \n\
+-			mcr p14, 0, %0, c0, c5, 0                   "
+-	: : "r" (c) : "cc");
+-}
+-#else
+ static inline void __dcc_putchar(char c)
+ {
+-	asm("mcr p14, 0, %0, c0, c5, 0	@ write a char"
++	asm volatile("mcr p14, 0, %0, c0, c5, 0	@ write a char"
+ 		: /* no output register */
+ 		: "r" (c));
+ }
+-#endif
+ 
+ static int hvc_dcc_put_chars(uint32_t vt, const char *buf, int count)
+ {
+@@ -90,7 +65,7 @@ static int hvc_dcc_put_chars(uint32_t vt, const char *buf, int count)
+ 		while (__dcc_getstatus() & DCC_STATUS_TX)
+ 			cpu_relax();
+ 
+-		__dcc_putchar((char)(buf[i] & 0xFF));
++		__dcc_putchar(buf[i]);
+ 	}
+ 
+ 	return count;
+@@ -100,15 +75,11 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < count; ++i) {
+-		int c = -1;
+-
++	for (i = 0; i < count; ++i)
+ 		if (__dcc_getstatus() & DCC_STATUS_RX)
+-			c = __dcc_getchar();
+-		if (c < 0)
++			buf[i] = __dcc_getchar();
++		else
+ 			break;
+-		buf[i] = c;
+-	}
+ 
+ 	return i;
+ }
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
