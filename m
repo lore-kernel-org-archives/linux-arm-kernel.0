@@ -1,32 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Dec 2010 14:49:50 +0000
-Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
-In-Reply-To: <19726.4420.289089.490319@pilspetsen.it.uu.se>
-References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-	<19725.57447.256528.883703@pilspetsen.it.uu.se>
-	<20101219105209.GN9937@n2100.arm.linux.org.uk>
-	<19725.64412.395353.947407@pilspetsen.it.uu.se>
-	<20101219125508.GG3047@n2100.arm.linux.org.uk>
-	<19726.4420.289089.490319@pilspetsen.it.uu.se>
-Message-ID: <20101219144950.GH3047@n2100.arm.linux.org.uk>
+Date: Sun, 19 Dec 2010 16:00:59 +0000
+Subject: [PATCH] mmci: drop superfluous regulator #ifdef
+In-Reply-To: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
+References: <1291297018-3074-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101219160059.GP9937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 19, 2010 at 03:05:56PM +0100, Mikael Pettersson wrote:
-> tmr = timer mode register
-> tcr = timer counter register
-> trr = timer reload register
-> 
-> When a timer is in periodic mode it reloads itself from its reload
-> register when the counter register decrements to zero.
+On Thu, Dec 02, 2010 at 02:36:58PM +0100, Linus Walleij wrote:
+> The regulator and MMC frameworks provide the proper stub functions
+> for the regulator functions anyway, get rid of this.
 
-Ok.
+I'm dropping this patch - it's wrong, because on platforms without
+regulator support, it stamps over the provided platform values:
 
->  >  Does trr need to be written in
->  > ->set_mode (if so that's another bug in this code)?
-> 
-> trr{0,1} need not and should not be changed after iop_time_init().
+mmci-pl18x mb:mmci: Provided ocr_mask/setpower will not be used (using regulator instead)
 
-It sounds like trr0 needs to be written in ->set_mode's
-CLOCK_EVT_MODE_PERIODIC path then, because with my patch, we never set
-this register.  Or will trr0 be updated when we write tcr0 ?
+# CONFIG_REGULATOR is not set
+
+So the ifdefs have to stay until some other solution for this is found.
+Maybe the:
+
+        if (IS_ERR(host->vcc))
+                host->vcc = NULL;
+        else {
+
+should be:
+
+        if (IS_ERR(host->vcc) || host->vcc == NULL)
+                host->vcc = NULL;
+        else {
+
+or maybe:
+
+        if (IS_ERR(host->vcc))
+                host->vcc = NULL;
+        else if (host->vcc) {
