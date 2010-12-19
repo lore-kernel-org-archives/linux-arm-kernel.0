@@ -1,112 +1,32 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sun, 19 Dec 2010 15:05:56 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Dec 2010 14:49:50 +0000
 Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
-In-Reply-To: <20101219125508.GG3047@n2100.arm.linux.org.uk>
+In-Reply-To: <19726.4420.289089.490319@pilspetsen.it.uu.se>
 References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
 	<19725.57447.256528.883703@pilspetsen.it.uu.se>
 	<20101219105209.GN9937@n2100.arm.linux.org.uk>
 	<19725.64412.395353.947407@pilspetsen.it.uu.se>
 	<20101219125508.GG3047@n2100.arm.linux.org.uk>
-Message-ID: <19726.4420.289089.490319@pilspetsen.it.uu.se>
+	<19726.4420.289089.490319@pilspetsen.it.uu.se>
+Message-ID: <20101219144950.GH3047@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux writes:
- > > We take an early timer interrupt and call NULL in the
- > > 
- > > 	evt->event_handler(evt);
- > > 
- > > statement in iop_timer_interrupt(). Apparently the evt (dev_id) passed
- > > to the interrupt handler isn't initialized at this point.
- > 
- > evt is initialized, it's done statically:
- > 
- > static struct irqaction iop_timer_irq = {
- >         .dev_id         = &iop_clockevent,
- > };
- > 
- > What isn't initialized at this early point is evt->event_handler.
- > 
- > > The most visible change the sched_clock patches did in plat-iop was to add
- > > a call to init_sched_clock() at the very start of iop_init_time(), before
- > > the timer IRQ, clockevent, and clocksource have been set up. Moving that call
- > > to the very end of iop_init_time() [see below] made the kernel boot again,
- > > and the interactivity problems were also solved.
- > 
- > I think this is a bug just waiting to happen, and the sched_clock patch
- > just gives it a helping hand (by accidentally enabling interrupts early
- > - and that's something which also needs fixing.)
- > 
- > Here's the event device setup code:
- > 
- >         write_tmr0(timer_ctl & ~IOP_TMR_EN);
- >         setup_irq(IRQ_IOP_TIMER0, &iop_timer_irq);
- >         clockevents_calc_mult_shift(&iop_clockevent,
- >                                     tick_rate, IOP_MIN_RANGE);
- >         iop_clockevent.max_delta_ns =
- >                 clockevent_delta2ns(0xfffffffe, &iop_clockevent);
- >         iop_clockevent.min_delta_ns =
- >                 clockevent_delta2ns(0xf, &iop_clockevent);
- >         iop_clockevent.cpumask = cpumask_of(0);
- >         clockevents_register_device(&iop_clockevent);
- >         write_trr0(ticks_per_jiffy - 1);
- >         write_tcr0(ticks_per_jiffy - 1);
- >         write_tmr0(timer_ctl);
- > 
- > First thing is that although the timer is stopped before the IRQ is
- > registered, there is no clearing of any pending timer interrupt at that
- > time.  As we don't know what state the timer was in, we can't be sure
- > that the interrupt isn't already pending.
- > 
- > Second thing is why is the timer being enabled by this code after it's
- > been registered.  This is something which should be done by the
- > clockevents code when it's ready via the ->set_mode callback, not when
- > the platform decides to do so - otherwise you can call the interrupt
- > handler when evt->event_handler has not been setup.
+On Sun, Dec 19, 2010 at 03:05:56PM +0100, Mikael Pettersson wrote:
+> tmr = timer mode register
+> tcr = timer counter register
+> trr = timer reload register
+> 
+> When a timer is in periodic mode it reloads itself from its reload
+> register when the counter register decrements to zero.
 
-When I did the IOP clockevents conversion I didn't know that the
-timer should be disabled, so I probably just kept the previous code
-to enable it.
+Ok.
 
- > So, I think this will solve the IOP misbehaviour.  What I don't know
- > is what the cryptic txx0() suffixes on these write statements are
- > (what's the difference between trr and tcr?  tcr = timer counter
- > register, trr = timer ? register?
+>  >  Does trr need to be written in
+>  > ->set_mode (if so that's another bug in this code)?
+> 
+> trr{0,1} need not and should not be changed after iop_time_init().
 
-tmr = timer mode register
-tcr = timer counter register
-trr = timer reload register
-
-When a timer is in periodic mode it reloads itself from its reload
-register when the counter register decrements to zero.
-
- >  Does trr need to be written in
- > ->set_mode (if so that's another bug in this code)?
-
-trr{0,1} need not and should not be changed after iop_time_init().
-
- > diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
- > index 0ca000d..e937e5d 100644
- > --- a/arch/arm/plat-iop/time.c
- > +++ b/arch/arm/plat-iop/time.c
- > @@ -162,6 +162,7 @@ void __init iop_init_time(unsigned long tick_rate)
- >  	 * Set up interrupting clockevent timer 0.
- >  	 */
- >  	write_tmr0(timer_ctl & ~IOP_TMR_EN);
- > +	write_tisr(1);
- >  	setup_irq(IRQ_IOP_TIMER0, &iop_timer_irq);
- >  	clockevents_calc_mult_shift(&iop_clockevent,
- >  				    tick_rate, IOP_MIN_RANGE);
- > @@ -171,9 +172,6 @@ void __init iop_init_time(unsigned long tick_rate)
- >  		clockevent_delta2ns(0xf, &iop_clockevent);
- >  	iop_clockevent.cpumask = cpumask_of(0);
- >  	clockevents_register_device(&iop_clockevent);
- > -	write_trr0(ticks_per_jiffy - 1);
- > -	write_tcr0(ticks_per_jiffy - 1);
- > -	write_tmr0(timer_ctl);
- >  
- >  	/*
- >  	 * Set up free-running clocksource timer 1.
-
-Yes, this seems correct. Tested in a vanilla kernel w/o sched_clock patches,
-and in a kernel with the sched_clock patches it eliminated the boot hang.
+It sounds like trr0 needs to be written in ->set_mode's
+CLOCK_EVT_MODE_PERIODIC path then, because with my patch, we never set
+this register.  Or will trr0 be updated when we write tcr0 ?
