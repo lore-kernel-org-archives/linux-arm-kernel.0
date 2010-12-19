@@ -1,30 +1,34 @@
-From: manningc2@actrix.gen.nz (Charles Manning)
-Date: Mon, 20 Dec 2010 10:45:53 +1300
-Subject: [PATCH v6 0/7] nand prefetch-irq support and ecc layout chanage
-In-Reply-To: <1290785677-16005-1-git-send-email-s-ghorai@ti.com>
-References: <1290785677-16005-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <201012201045.53688.manningc2@actrix.gen.nz>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sun, 19 Dec 2010 23:23:02 +0100
+Subject: [PATCH 0/13] 64-bit sched_clock
+In-Reply-To: <20101216130411.GR9937@n2100.arm.linux.org.uk>
+References: <20101216092527.GL9937@n2100.arm.linux.org.uk>
+	<20101216130411.GR9937@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik0zkpUUvrv8YmxGd_=vMaKR42KbJnd4BqHqias@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 November 2010 04:34:30 Sukumar Ghorai wrote:
-> The following set of patches applies on linux-2.6.
+2010/12/16 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+
+> I can provide an init_early() method in the machine description which
+> setup_arch() can call as the last thing it does - this will happen
+> after the ->reserve and ->map_io callbacks, but before interrupts and
+> timers have been setup. ?This is the ideal time to setup the
+> sched_clock(). ?However, that means digging through lots of arch code
+> to sort out what can be moved where, and that's going to be inherently
+> unreliable.
 >
-> The main motivations behind this patch series are -
->         1. support NAND I/O in irq mode.
->         2. support of different ECC schema.
->         3. also to make ecc layout as like in romcode ecc layout
+> I think init_early() has merit in other ways - it'll allow us to remove
+> crap from the ->map_io callbacks which is doing stuff like registering
+> clk structures and so forth.
 
-Why change the ECC layout?
+I agree. I was contemplating a clock_init() or similar a way back
+for setting up clock trees early. We would have to move clock tree
+registration in front of the init_sched_clock() call in the init_early()
+handler in many cases since the rate often comes from the clock
+framework, but this is indeed where it belongs.
 
-Be very careful when you change ECC layouts. This can break production 
-systems.
+So a clear ACK for this approach.
 
-For example if people are running something earlier and then want to deliver a 
-new kernel with 2.6.37 then their existing NAND file systems will no longer 
-be readable.
-
-Changes to ECC should only be done for very good reasons and should be 
-controlled with a Kconfig with the default being the existing ECC layout.
-
--- Charles
+Yours,
+Linus Walleij
