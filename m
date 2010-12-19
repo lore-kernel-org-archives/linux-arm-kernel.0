@@ -1,39 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Dec 2010 11:09:13 +0000
-Subject: [PATCH v4 3/6] ARM: U8500 core machine support
-In-Reply-To: <1259279756.13327.72.camel@vinay-desktop>
-References: <1259279756.13327.72.camel@vinay-desktop>
-Message-ID: <20101219110913.GA23979@n2100.arm.linux.org.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sun, 19 Dec 2010 12:46:13 +0100
+Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
+In-Reply-To: <20101215170142.GA10883@n2100.arm.linux.org.uk>
+References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
+	<AANLkTi=ZYi=12k2vZMGp9AWNX8zofp6C-FnMu2egQOA1@mail.gmail.com>
+	<20101215170142.GA10883@n2100.arm.linux.org.uk>
+Message-ID: <201012191246.17064.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... going back to this patch...
+Wednesday 15 December 2010 18:01:42 Russell King - ARM Linux wrote:
+> On Wed, Dec 15, 2010 at 12:39:20PM +0000, Catalin Marinas wrote:
+> >
+> > Should we not try to fix the generic code and still allow platforms
+> > to use dma_declare_coherent_memory() in a safer way? I guess it may
+> > need some arguing/explanation on linux-arch.
+>
+> I think so - 
 
-On Fri, Nov 27, 2009 at 05:25:56AM +0530, srinidhi kasagar wrote:
-> +/*
-> + * U8500 specific entry point for secondary CPUs.
-> + */
-> +ENTRY(u8500_secondary_startup)
-> +	mrc	p15, 0, r0, c0, c0, 5
-> +	and	r0, r0, #15
-> +	adr	r4, 1f
-> +	ldmia	r4, {r5, r6}
-> +	sub	r4, r4, r5
-> +	add	r6, r6, r4
-> +	dsb
+Hi Russel,
+I've already started implementing what you've suggested, with an already 
+working result, but have two questions:
 
-Can you please explain why you added a dsb here, whereas most other
-platforms don't require it?
+1. Is it save to leave iounmap() being called on virtual addresses not 
+   obtained with ioremap()? This would make things less complicated.
 
-> +pen:	ldr	r7, [r6]
-> +	cmp	r7, r0
-> +	bne	pen
-> +
-> +	/*
-> +	 * we've been released from the holding pen: secondary_stack
-> +	 * should now contain the SVC stack for this core
-> +	 */
-> +	b	secondary_startup
-> +
-> +1:	.long	.
-> +	.long	pen_release
+2. Can I quote your full explanation, just like it looks below, in my 
+   commit message?
+
+Thanks,
+Janusz
+
+Wednesday 15 December 2010 18:01:42 Russell King - ARM Linux wrote:
+> ... one of the issues with dma_declare_coherent_memory() is 
+> that it's original intention (as I understand it) was to allow
+> drivers to use on-device dma coherent memory.
+>
+> Eg, a network controller with its own local SRAM which it can fetch
+> DMA descriptors from, which tells it where in the bus address space
+> to fetch packets from.  This SRAM is not part of the hosts memory,
+> but is on the peripheral's bus, and so ioremap() (or maybe
+> ioremap_wc()) would be appropriate for it.
+>
+> However, ioremap() on system RAM (even that which has been taken out
+> on the memory map) may be problematical.
+>
+> I think the correct solution would be to revise the interface so it
+> takes a void * pointer, which can be handed out by
+> dma_alloc_coherent() directly without the API having to worry about
+> how to map the memory.  IOW, push the mapping of that memory up a
+> level to the caller of
+> dma_declare_coherent_memory().
+>
+> We can then sanely do preallocations via dma_coherent_alloc() and
+> caching them back into dma_declare_coherent_memory() without creating
+> additional mappings which cause architectural violations.
