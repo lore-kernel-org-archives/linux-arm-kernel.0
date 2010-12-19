@@ -1,20 +1,38 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 19 Dec 2010 23:26:20 +0100
-Subject: [PATCH 34/40] ARM: u300: convert sched_clock() to use new
-	infrastructure
-In-Reply-To: <E1PTYot-0006jq-1t@rmk-PC.arm.linux.org.uk>
-References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-	<E1PTYot-0006jq-1t@rmk-PC.arm.linux.org.uk>
-Message-ID: <AANLkTinHw8MBpEZ5UECWCN+ugV2C06yNHSw+53ZgNmP+@mail.gmail.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Mon, 20 Dec 2010 00:33:36 +0200
+Subject: [PATCH] omap: pandora: fix wifi support
+Message-ID: <1292798016-11098-1-git-send-email-notasas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/17 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+After commit ed919b0 "mmc: sdio: fix runtime PM anomalies by introducing
+MMC_CAP_POWER_OFF_CARD" it is required to specify MMC_CAP_POWER_OFF_CARD
+to have runtime PM support. As the wl1251 driver expects card to be
+powered down when it's not used, wifi will no longer work after interface
+is brought down at least once without functioning runtime PM.
 
-> Convert u300 to use the new sched_clock() infrastructure for extending
-> 32bit counters to full 64-bit nanoseconds.
+Fix this by declaring MMC_CAP_POWER_OFF_CARD for MMC3.
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+---
+this is a fix but can go for 2.6.38 as wl1251 runtime PM support
+is only queued for .38 .
 
-Yours,
-Linus Walleij
+ arch/arm/mach-omap2/board-omap3pandora.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 89ed1be..12c0bbb 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -293,7 +293,7 @@ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
+ 	},
+ 	{
+ 		.mmc		= 3,
+-		.caps		= MMC_CAP_4_BIT_DATA,
++		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+ 		.init_card	= pandora_wl1251_init_card,
+-- 
+1.6.3.3
