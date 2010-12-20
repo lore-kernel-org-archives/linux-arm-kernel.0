@@ -1,54 +1,33 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 20 Dec 2010 14:55:35 +0100
-Subject: [PATCH v7 05/15] ARM: mxs: Add low-level debug UART support
-In-Reply-To: <20101220132147.GB16497@freescale.com>
-References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
-	<1292679575-2635-4-git-send-email-shawn.guo@freescale.com>
-	<20101220115059.GA8885@pengutronix.de>
-	<20101220132147.GB16497@freescale.com>
-Message-ID: <20101220135535.GB8885@pengutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 20 Dec 2010 08:16:55 -0600
+Subject: [PATCH v4 2/7] OMAP3: PM: Erratum i581 support: dll kick strategy
+In-Reply-To: <ff992259ca9324925ce680a11cae0245@mail.gmail.com>
+References: <1292712817-24999-1-git-send-email-nm@ti.com>
+	<1292712817-24999-3-git-send-email-nm@ti.com>
+	<ff992259ca9324925ce680a11cae0245@mail.gmail.com>
+Message-ID: <4D0F6557.2090101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > We should use asm/hardware/debug-pl01x.S, like the other users:
-> 
-> Just tested it, and it works.  Will do in v8.  Thanks for the comment.
-
-Cool.
-
-> > 
-> > >  arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
-> > 
-> > Auto-detection could be used here, too?
-> > 
-> I'm afraid not.  How do you expect the detection is done, by reading
-> some register like we are doing in system.c?
-
-I am not sure which register you mean in system.c?
-
-> Which register specifically?
-
-The signature of the amba device (base + size - 0x20). You can check
-drivers/amba/bus.c how it checks for the signature.
-
-> If the register gets different address between
-> mx23 and mx28, we need to utilize the current mechanism to
-> distinguish the address anyway.
-
-We could simply test both locations and see where it is present?
-
-Kind regards,
-
-   Wolfram
+Santosh Shilimkar had written, on 12/20/2010 12:47 AM, the following:
+[..]
+>> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-
+>> omap2/sleep34xx.S
+>> index 2c20fcf..3fbd1e5 100644
+>> --- a/arch/arm/mach-omap2/sleep34xx.S
+>> +++ b/arch/arm/mach-omap2/sleep34xx.S
+>> @@ -42,6 +42,7 @@
+>>  				OMAP3430_PM_PREPWSTST)
+>>  #define PM_PWSTCTRL_MPU_P	OMAP3430_PRM_BASE + MPU_MOD +
+>> OMAP2_PM_PWSTCTRL
+>>  #define CM_IDLEST1_CORE_V	OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST1)
+>> +#define CM_IDLEST_CKGEN_V	OMAP34XX_CM_REGADDR(PLL_MOD, CM_IDLEST)
+> We need to avoid these macro's calculating VA directly. But I guess
+> it needs to be done more than just this line and hence can be done
+> in a separate patch.
+yes - with the cleanups planned for this file, we could probably add it 
+to that set I guess.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101220/73f23c53/attachment.sig>
+Regards,
+Nishanth Menon
