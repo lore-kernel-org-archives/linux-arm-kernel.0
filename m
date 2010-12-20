@@ -1,65 +1,136 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Dec 2010 16:50:53 +0000
-Subject: [PATCH] ARM: Fix subtle race in CPU pen_release hotplug code
-In-Reply-To: <AANLkTi=vp_jWMn98+cDs=+r9D7Don9iz+NvuOB6iCv42@mail.gmail.com>
-References: <E1PTuaP-0000Fl-EF@rmk-PC.arm.linux.org.uk>
-	<AANLkTi=vp_jWMn98+cDs=+r9D7Don9iz+NvuOB6iCv42@mail.gmail.com>
-Message-ID: <20101220165053.GF28157@n2100.arm.linux.org.uk>
+From: thara@ti.com (Thara Gopinath)
+Date: Mon, 20 Dec 2010 22:29:07 +0530
+Subject: [PATCH v6 00/10] OMAP: Adding Smartreflex and Voltage driver support
+Message-ID: <1292864357-13939-1-git-send-email-thara@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 04:39:07PM +0000, Catalin Marinas wrote:
-> On 18 December 2010 11:04, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > There is a subtle race in the CPU hotplug code, where a CPU which has
-> > been offlined can online itself before being requested, which results
-> > in things going astray on the next online/offline cycle.
-> [...]
-> > --- a/arch/arm/mach-realview/platsmp.c
-> > +++ b/arch/arm/mach-realview/platsmp.c
-> > @@ -36,6 +36,19 @@ extern void realview_secondary_startup(void);
-> > ?*/
-> > ?volatile int __cpuinitdata pen_release = -1;
-> >
-> > +/*
-> > + * Write pen_release in a way that is guaranteed to be visible to all
-> > + * observers, irrespective of whether they're taking part in coherency
-> > + * or not. ?This is necessary for the hotplug code to work reliably.
-> > + */
-> > +static void write_pen_release(int val)
-> > +{
-> > + ? ? ? pen_release = val;
-> > + ? ? ? smp_wmb();
-> > + ? ? ? __cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
-> > + ? ? ? outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
-> > +}
-> 
-> Just a minor thing - I don't think we need any barrier here. According
-> to the ARM ARM B2.2.7:
-> 
-> "Any data cache or unified cache maintenance operation by MVA must be
-> executed in program order
-> relative to any explicit load or store on the same processor to an
-> address covered by the MVA of the
-> cache operation."
+This patch series introduces smartreflex and voltage driver support
+for OMAP3430 and OMAP3630. SmartReflex modules do adaptive voltage
+control for real-time voltage adjustments.
 
-Right, I had been thinking about that.  I think the barrier came from the
-original ARM implementation, and I added the cache flushes.
+Originally all the functionalities introduced in this patch
+were present in arch/arm/mach-omap2/smartreflex.c file in Kevin's
+pm tree. This patch series does a major rewrite of this file
+and introduces a separate voltage driver. Major contributors
+to the original driver are
 
-> We also have a corresponding smp_rmb() in boot_secondary(), I don't
-> think it has any use either.
+Eduardo Valentin (1):
+      OMAP3: PM: SmartReflex: Fix scheduled while atomic problem
 
-I think you're right, but it looks a little unsafe without:
+Kalle Jokiniemi (1):
+      OMAP3: PM: SmartReflex driver integration
 
-        timeout = jiffies + (1 * HZ);
-        while (time_before(jiffies, timeout)) {
-                if (pen_release == -1)
-                        break;
+Kevin Hilman (2):
+      temp: SR: IO_ADDRESS conversion
+      OMAP: SR: OPP interfaces removed from OMAP PM layer
 
-                udelay(10);
-        }
+Nishanth Menon (1):
+      omap3: pm: sr: replace get_opp with freq_to_opp
 
-I don't think it makes much odds if the pen_release check gets
-re-ordered, especially as we do a final pen_release check after we
-unlock.  However, could the loop end up waiting additional 10us
-without the smp_rmb() ?
+Paul Walmsley (2):
+      OMAP SR: use opp_find_opp_by_opp_id()
+      OMAP SR: use OPP API for OPP ID, remove direct access
+
+Phil Carmody (2):
+      OMAP3: PM: Don't do unnecessary searches in omap_sr_vdd*_autocomp_store
+      OMAP3: PM: Early exit on invalid parameters
+
+Rajendra Nayak (9):
+      OMAP3: SR: Fix init voltage on OPP change
+      OMAP3: SR: Update VDD1/2 voltages at boot
+      OMAP3: SR: Use sysclk for SR CLKLENGTH calc
+      OMAP3: SR: Reset voltage level on SR disable
+      OMAP3: SR: Replace printk's with pr_* calls
+      OMAP3: SR: Remove redundant defines
+      OMAP3: SR: Fix SR driver to check for omap-pm return values
+      OMAP3: PM: Put optimal SMPS stabilization delay
+      OMAP3: SR: Wait for VP idle before a VP disable
+
+Roger Quadros (4):
+      OMAP3: PM: Fix Smartreflex when used with PM_NOOP layer
+      OMAP3: PM: Make Smartreflex driver independent of SRF
+      OMAP3: PM: Do not Enable SmartReflex if OPP tables not defined
+      OMAP3: PM: Smartreflex: Fix VDD2 OPP determining logic
+
+Romit Dasgupta (1):
+      omap: pm: SR: use enum for OPP types
+
+Teerth Reddy (1):
+      OMAP3: SR: Replace SR_PASS/FAIL,SR_TRUE/FALSE
+
+Tero Kristo (1):
+      Smartreflex: Avoid unnecessary spam
+
+This patch series is against pm-core branch of Kevin Hilman's 
+OMAP PM tree with the following additional patch applied.
+	https://patchwork.kernel.org/patch/421351/
+
+The entire series with the dependencies are available at
+        http://dev.omapzoom.org/?p=thara/omap-dvfs.git;a=summary
+        head: kevin-pm-sr
+
+This patch series has been tested on OMAP3430 SDP with omap2plus_defconfig
+with the following menuconfig options enabled.
+System type -> TI OMAP Implementations -> Smartreflex Support
+System type -> TI OMAP Implementations ->
+                Class 3 mode of Smartreflex Implementation
+
+Major Changes in v6
+	-Rebased to pm-core branch of Kevin Hilman's OMAP PM tree.
+
+Major Changes in v5
+	- Rebased to k.org 2.6.37-rc3
+	- Rebased to Nishant Menon's latest opp patches
+	- Voltage pmic info structure extended to include a
+		vast set of PMIC dependent parameters.
+	- Smartreflex software n-target values support
+		removed from the kernel. Instead n-target
+		values are exposed as debugfs entries which can
+		be written into by the user if needed.
+	- Introduced a new file arch/arm/mach-omap2/omap_twl.c
+		for specifying OMAP and TWL related info for
+		the voltage layer.
+	- Remove default enabling of smartreflex autocompensation
+		during boot on OMAP3430 ES3.1 chips. Instead
+		an API is provided that can be called from
+		board files in case autocompensation needs
+		to be enabled during boot up itself.
+	- Other review comments on v4
+
+Thara Gopinath (10):
+  OMAP3: PM: Adding voltage driver support.
+  OMAP: Introduce voltage domain information in the hwmod structures
+  OMAP3: PM: Adding smartreflex driver support.
+  OMAP3: PM: Adding smartreflex device file.
+  OMAP3: PM: Adding smartreflex hwmod data
+  OMAP3: PM: Adding smartreflex class3 driver
+  OMAP3: PM: Adding T2 enabling of smartreflex support
+  OMAP3: PM: Register TWL4030 pmic info with the voltage driver.
+  OMAP3: PM: Adding debug support to Voltage and Smartreflex drivers
+  OMAP3: PM: Program correct init voltages for VDD1 and VDD2
+
+ arch/arm/mach-omap2/Makefile                  |    7 +-
+ arch/arm/mach-omap2/control.h                 |   17 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |  176 ++++
+ arch/arm/mach-omap2/omap_twl.c                |  111 +++
+ arch/arm/mach-omap2/pm.c                      |   90 ++
+ arch/arm/mach-omap2/pm.h                      |   23 +
+ arch/arm/mach-omap2/smartreflex-class3.c      |   59 ++
+ arch/arm/mach-omap2/smartreflex.c             | 1025 ++++++++++++++++++++
+ arch/arm/mach-omap2/sr_device.c               |  131 +++
+ arch/arm/mach-omap2/voltage.c                 | 1292 +++++++++++++++++++++++++
+ arch/arm/plat-omap/Kconfig                    |   31 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    5 +
+ arch/arm/plat-omap/include/plat/smartreflex.h |  245 +++++
+ arch/arm/plat-omap/include/plat/voltage.h     |  134 +++
+ drivers/mfd/twl-core.c                        |   13 +
+ include/linux/i2c/twl.h                       |   11 +
+ 16 files changed, 3369 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap_twl.c
+ create mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
+ create mode 100644 arch/arm/mach-omap2/smartreflex.c
+ create mode 100644 arch/arm/mach-omap2/sr_device.c
+ create mode 100644 arch/arm/mach-omap2/voltage.c
+ create mode 100644 arch/arm/plat-omap/include/plat/smartreflex.h
+ create mode 100644 arch/arm/plat-omap/include/plat/voltage.h
