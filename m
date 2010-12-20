@@ -1,212 +1,63 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Mon, 20 Dec 2010 18:42:21 +0530
-Subject: [PATCH v2 6/9] OMAP4: hwmod data: add system DMA
-In-Reply-To: <4D0F3E43.6090207@ti.com>
-References: <1292600388-13094-1-git-send-email-manjugk@ti.com>
-	<1292600388-13094-7-git-send-email-manjugk@ti.com>
-	<4D0F3E43.6090207@ti.com>
-Message-ID: <20101220131221.GB15602@GLPP-machine>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 20 Dec 2010 21:22:01 +0800
+Subject: [PATCH v7 05/15] ARM: mxs: Add low-level debug UART support
+In-Reply-To: <20101220115059.GA8885@pengutronix.de>
+References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
+	<1292679575-2635-4-git-send-email-shawn.guo@freescale.com>
+	<20101220115059.GA8885@pengutronix.de>
+Message-ID: <20101220132147.GB16497@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 12:30:11PM +0100, Cousson, Benoit wrote:
-> On 12/17/2010 4:39 PM, G, Manjunath Kondaiah wrote:
-> >From: Benoit Cousson<b-cousson@ti.com>
-> >
-> >Add OMAP4 DMA hwmod data
-> >
-> >Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> >Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+On Mon, Dec 20, 2010 at 12:50:59PM +0100, Wolfram Sang wrote:
+> Hi Shawn,
 > 
-> It will be good to explicitly list the changes you did compared to
-> the original generated version. Even if these are some minor
-> changes.
-
-I can add if it is informative.
-
-> I thought it was the original patch and it appears it is not the case :-(
-
-Indeed, it is original patch. Only device attributes and no idlest flags
-are added.
-
+> I discovered this weekend that the DUART is just an amba-pl011 which
+> is already supported in mainline. So we should use the existing
+> infrastructure here.
 > 
-> The general minor commestic comment is you should try to keep the
-> original order of the structures. That does not changes anything,
-> but that will keep the file in sync with the generated one.
-
-The order might have slightly changed when I am rebasing every time. I
-can restore the order from full hwmod db if you want maintain
-consistency.
-
+> On Sat, Dec 18, 2010 at 09:39:29PM +0800, Shawn Guo wrote:
 > 
-> >Tested-by: Kevin Hilman<khilman@deeprootsystems.com>
-> >Acked-by: Kevin Hilman<khilman@deeprootsystems.com>
-> >---
-> >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  101 ++++++++++++++++++++++++++++
-> >  1 files changed, 101 insertions(+), 0 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> >index d258936..50c00d6 100644
-> >--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> >+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> >@@ -23,6 +23,7 @@
-> >  #include<plat/omap_hwmod.h>
-> >  #include<plat/cpu.h>
-> >  #include<plat/gpio.h>
-> >+#include<plat/dma.h>
-> >
-> >  #include "omap_hwmod_common_data.h"
-> >
-> >@@ -36,6 +37,7 @@
-> >  #define OMAP44XX_DMA_REQ_START  1
-> >
-> >  /* Backward references (IPs with Bus Master capability) */
-> >+static struct omap_hwmod omap44xx_dma_system_hwmod;
-> >  static struct omap_hwmod omap44xx_dmm_hwmod;
-> >  static struct omap_hwmod omap44xx_emif_fw_hwmod;
-> >  static struct omap_hwmod omap44xx_l3_instr_hwmod;
-> >@@ -216,6 +218,14 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_1__l3_main_2 = {
-> >  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> >  };
-> >
-> >+/* dma_system ->  l3_main_2 */
-> >+static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
-> >+	.master		=&omap44xx_dma_system_hwmod,
-> >+	.slave		=&omap44xx_l3_main_2_hwmod,
-> >+	.clk		= "l3_div_ck",
-> >+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> >+};
-> >+
-> >  /* l4_cfg ->  l3_main_2 */
-> >  static struct omap_hwmod_ocp_if omap44xx_l4_cfg__l3_main_2 = {
-> >  	.master		=&omap44xx_l4_cfg_hwmod,
-> >@@ -227,6 +237,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__l3_main_2 = {
-> >  /* l3_main_2 slave ports */
-> >  static struct omap_hwmod_ocp_if *omap44xx_l3_main_2_slaves[] = {
-> >  	&omap44xx_l3_main_1__l3_main_2,
-> >+	&omap44xx_dma_system__l3_main_2,
-> >  	&omap44xx_l4_cfg__l3_main_2,
-> >  };
-> >
-> >@@ -1376,6 +1387,93 @@ static struct omap_hwmod omap44xx_gpio6_hwmod = {
-> >  	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio6_slaves),
-> >  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> >  };
-> >+
-> >+/*
-> >+ * 'dma' class
-> >+ * dma controller for data exchange between memory to memory (i.e. internal or
-> >+ * external memory) and gp peripherals to memory or memory to gp peripherals
-> >+ */
-> >+
-> >+static struct omap_hwmod_class_sysconfig omap44xx_dma_sysc = {
-> >+	.rev_offs	= 0x0000,
-> >+	.sysc_offs	= 0x002c,
-> >+	.syss_offs	= 0x0028,
-> >+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-> >+			   SYSC_HAS_MIDLEMODE | SYSC_HAS_CLOCKACTIVITY |
-> >+			   SYSC_HAS_EMUFREE | SYSC_HAS_AUTOIDLE),
+> >  - DEBUG_LL support, which is incompatible with multi-soc MXS image
+> >    because of different DUART base address on MX23 and MX28
 > 
-> A new flag was introduce in 2.6.37 to handle properly the softreset
-> (SYSS_HAS_RESET_STATUS). You should use it otherwise the reset might
-> not work properly. The generated hwmod data was updated accordingly
-> at that time (git://gitorious.org/omap-pm/linux.git
-> hwmods-omap4-full)
+> We should be able to use the AMBA identification signature to distinguish at
+> runtime, no?
+> 
+> >  - uncompress message support
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> 
+> >  arch/arm/mach-mxs/include/mach/debug-macro.S |   52 ++++++++++++++++++
+> 
+> We should use asm/hardware/debug-pl01x.S, like the other users:
+> 
+> wsa at katana:~/Kernel/linux-2.6/arch/arm$ g debug-pl01x
+> include/asm/hardware/debug-pl01x.S:1:/* arch/arm/include/asm/hardware/debug-pl01x.S
+> mach-cns3xxx/include/mach/debug-macro.S:19:#include <asm/hardware/debug-pl01x.S>
+> mach-ep93xx/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
+> mach-integrator/include/mach/debug-macro.S:20:#include <asm/hardware/debug-pl01x.S>
+> mach-nomadik/include/mach/debug-macro.S:20:#include <asm/hardware/debug-pl01x.S>
+> mach-realview/include/mach/debug-macro.S:42:#include <asm/hardware/debug-pl01x.S>
+> mach-u300/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
+> mach-ux500/include/mach/debug-macro.S:26:#include <asm/hardware/debug-pl01x.S>
+> mach-versatile/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
+> mach-vexpress/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
+> 
 
-ok.
+Just tested it, and it works.  Will do in v8.  Thanks for the comment.
 
 > 
-> Here are the proper data:
+> >  arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
 > 
-> +static struct omap_hwmod_class_sysconfig omap44xx_dma_sysc = {
-> +       .rev_offs       = 0x0000,
-> +       .sysc_offs      = 0x002c,
-> +       .syss_offs      = 0x0028,
-> +       .sysc_flags     = (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-> +                          SYSC_HAS_EMUFREE | SYSC_HAS_MIDLEMODE |
-> +                          SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-> +                          SYSS_HAS_RESET_STATUS),
+> Auto-detection could be used here, too?
 > 
-> >+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> >+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-> >+	.sysc_fields	=&omap_hwmod_sysc_type1,
-> >+};
-> >+
-> >+static struct omap_hwmod_class omap44xx_dma_hwmod_class = {
-> >+	.name = "dma",
-> >+	.sysc =&omap44xx_dma_sysc,
-> >+};
-> >+
-> >+/* dma attributes */
-> >+static struct omap_dma_dev_attr dma_dev_attr = {
-> >+	.dev_caps  = RESERVE_CHANNEL | DMA_LINKED_LCH | GLOBAL_PRIORITY |
-> >+				IS_CSSA_32 | IS_CDSA_32 | IS_RW_PRIORITY,
-> >+	.lch_count = 32,
-> >+};
-> >+
-> >+/* dma_system */
-> >+static struct omap_hwmod_irq_info omap44xx_dma_system_irqs[] = {
-> >+	{ .name = "0", .irq = 12 + OMAP44XX_IRQ_GIC_START },
-> >+	{ .name = "1", .irq = 13 + OMAP44XX_IRQ_GIC_START },
-> >+	{ .name = "2", .irq = 14 + OMAP44XX_IRQ_GIC_START },
-> >+	{ .name = "3", .irq = 15 + OMAP44XX_IRQ_GIC_START },
-> >+};
-> >+
-> >+static struct omap_hwmod_addr_space omap44xx_dma_system_addrs[] = {
-> >+	{
-> >+		.pa_start	= 0x4a056000,
-> >+		.pa_end		= 0x4a0560ff,
-> >+		.flags		= ADDR_TYPE_RT
-> >+	},
-> >+};
-> >+
-> >+/* dma_system master ports */
-> >+static struct omap_hwmod_ocp_if *omap44xx_dma_system_masters[] = {
-> >+	&omap44xx_dma_system__l3_main_2,
-> >+};
-> >+
-> >+/* l4_cfg ->  dma_system */
-> >+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__dma_system = {
-> >+	.master		=&omap44xx_l4_cfg_hwmod,
-> >+	.slave		=&omap44xx_dma_system_hwmod,
-> >+	.clk		= "l4_div_ck",
-> >+	.addr		= omap44xx_dma_system_addrs,
-> >+	.addr_cnt	= ARRAY_SIZE(omap44xx_dma_system_addrs),
-> >+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> >+};
-> >+
-> >+/* dma_system slave ports */
-> >+static struct omap_hwmod_ocp_if *omap44xx_dma_system_slaves[] = {
-> >+	&omap44xx_l4_cfg__dma_system,
-> >+};
-> >+
-> >+static struct omap_hwmod omap44xx_dma_system_hwmod = {
-> >+	.name		= "dma_system",
-> >+	.class		=&omap44xx_dma_hwmod_class,
-> >+	.mpu_irqs	= omap44xx_dma_system_irqs,
-> >+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_dma_system_irqs),
-> >+	.main_clk	= "l3_div_ck",
-> >+	.prcm = {
-> >+		.omap4 = {
-> >+			.clkctrl_reg = OMAP4430_CM_SDMA_SDMA_CLKCTRL,
-> >+		},
-> >+	},
-> >+	.slaves		= omap44xx_dma_system_slaves,
-> >+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dma_system_slaves),
-> >+	.masters	= omap44xx_dma_system_masters,
-> >+	.masters_cnt	= ARRAY_SIZE(omap44xx_dma_system_masters),
-> >+	.dev_attr	=&dma_dev_attr,
-> >+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> >+	.flags		= HWMOD_NO_IDLEST,
-> 
-> That one is wrong! It was the case on OMAP 2& 3, but we do have an
-> IDLEST on OMAP4.
-> TRM vM page 958: Table 3-1210. CM_SDMA_SDMA_CLKCTRL.IDLEST
-> 
-> It might not work, but that's another story. Why did you add that?
+I'm afraid not.  How do you expect the detection is done, by reading
+some register like we are doing in system.c?  Which register
+specifically?  If the register gets different address between
+mx23 and mx28, we need to utilize the current mechanism to
+distinguish the address anyway.
 
-When we were discussing omap3 idlest issue, I was under impression that,
-it is applicable to omap4 also. If that is not the case, I will remove
-this entry.
-
--Manjunath
+-- 
+Regards,
+Shawn
