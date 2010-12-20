@@ -1,593 +1,909 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:58:19 +0530
-Subject: [PATCH V3 16/63 resend] rtc: Adding support for spear rtc
+Date: Mon, 20 Dec 2010 13:56:16 +0530
+Subject: [PATCH V3 56/63] ST SPEAr: Appending spear3** with global structures
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <cffdbf80fd07e204c2b41b546b6ec6259e400373.1292833228.git.viresh.kumar@st.com>
+Message-ID: <f25e926e7bad4b47c4125b7011fec2b8cfb6a110.1292833229.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/rtc/Kconfig     |    8 +
- drivers/rtc/Makefile    |    1 +
- drivers/rtc/rtc-spear.c |  534 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 543 insertions(+), 0 deletions(-)
- create mode 100644 drivers/rtc/rtc-spear.c
+ arch/arm/mach-spear3xx/include/mach/generic.h |  138 ++++++++++++------------
+ arch/arm/mach-spear3xx/spear300.c             |   42 ++++----
+ arch/arm/mach-spear3xx/spear300_evb.c         |   39 ++++----
+ arch/arm/mach-spear3xx/spear310.c             |   16 ++--
+ arch/arm/mach-spear3xx/spear310_evb.c         |   33 +++---
+ arch/arm/mach-spear3xx/spear320.c             |   32 +++---
+ arch/arm/mach-spear3xx/spear320_evb.c         |   46 +++++----
+ arch/arm/mach-spear3xx/spear3xx.c             |   18 ++--
+ 8 files changed, 184 insertions(+), 180 deletions(-)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 2883428..4dc0801 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -636,6 +636,14 @@ config RTC_DRV_WM8350
- 	  This driver can also be built as a module. If so, the module
- 	  will be called "rtc-wm8350".
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index ffe9854..1fcdcaf 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -31,15 +31,15 @@
+ #define SPEAR_GPT0_CHAN1_IRQ	SPEAR3XX_IRQ_CPU_GPT1_2
  
-+config RTC_DRV_SPEAR
-+	tristate "SPEAR ST RTC"
-+	depends on PLAT_SPEAR
-+	default y
-+	help
-+	 If you say Y here you will get support for the RTC found on
-+	 spear
-+
- config RTC_DRV_PCF50633
- 	depends on MFD_PCF50633
- 	tristate "NXP PCF50633 RTC"
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 4c2832d..8dddb8e 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -88,6 +88,7 @@ obj-$(CONFIG_RTC_DRV_S35390A)	+= rtc-s35390a.o
- obj-$(CONFIG_RTC_DRV_S3C)	+= rtc-s3c.o
- obj-$(CONFIG_RTC_DRV_SA1100)	+= rtc-sa1100.o
- obj-$(CONFIG_RTC_DRV_SH)	+= rtc-sh.o
-+obj-$(CONFIG_RTC_DRV_SPEAR)	+= rtc-spear.o
- obj-$(CONFIG_RTC_DRV_STARFIRE)	+= rtc-starfire.o
- obj-$(CONFIG_RTC_DRV_STK17TA8)	+= rtc-stk17ta8.o
- obj-$(CONFIG_RTC_DRV_STMP)	+= rtc-stmp3xxx.o
-diff --git a/drivers/rtc/rtc-spear.c b/drivers/rtc/rtc-spear.c
-new file mode 100644
-index 0000000..893bac2
---- /dev/null
-+++ b/drivers/rtc/rtc-spear.c
-@@ -0,0 +1,534 @@
-+/*
-+ * drivers/rtc/rtc-spear.c
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/bcd.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+/* RTC registers */
-+#define TIME_REG		0x00
-+#define DATE_REG		0x04
-+#define ALARM_TIME_REG		0x08
-+#define ALARM_DATE_REG		0x0C
-+#define CTRL_REG		0x10
-+#define STATUS_REG		0x14
-+
-+/* TIME_REG & ALARM_TIME_REG */
-+#define SECONDS_UNITS		(0xf<<0)	/* seconds units position */
-+#define SECONDS_TENS		(0x7<<4)	/* seconds tens position */
-+#define MINUTES_UNITS		(0xf<<8)	/* minutes units position */
-+#define MINUTES_TENS		(0x7<<12)	/* minutes tens position */
-+#define HOURS_UNITS		(0xf<<16)	/* hours units position */
-+#define HOURS_TENS		(0x3<<20)	/* hours tens position */
-+
-+/* DATE_REG & ALARM_DATE_REG */
-+#define DAYS_UNITS		(0xf<<0)	/* days units position */
-+#define DAYS_TENS		(0x3<<4)	/* days tens position */
-+#define MONTHS_UNITS		(0xf<<8)	/* months units position */
-+#define MONTHS_TENS		(0x1<<12)	/* months tens position */
-+#define YEARS_UNITS		(0xf<<16)	/* years units position */
-+#define YEARS_TENS		(0xf<<20)	/* years tens position */
-+#define YEARS_HUNDREDS		(0xf<<24)	/* years hundereds position */
-+#define YEARS_MILLENIUMS	(0xf<<28)	/* years millenium position */
-+
-+/* MASK SHIFT TIME_REG & ALARM_TIME_REG*/
-+#define SECOND_SHIFT		0x00		/* seconds units */
-+#define MINUTE_SHIFT		0x08		/* minutes units position */
-+#define HOUR_SHIFT		0x10		/* hours units position */
-+#define MDAY_SHIFT		0x00		/* Month day shift */
-+#define MONTH_SHIFT		0x08		/* Month shift */
-+#define YEAR_SHIFT		0x10		/* Year shift */
-+
-+#define SECOND_MASK		0x7F
-+#define MIN_MASK		0x7F
-+#define HOUR_MASK		0x3F
-+#define DAY_MASK		0x3F
-+#define MONTH_MASK		0x7F
-+#define YEAR_MASK		0xFFFF
-+
-+/* date reg equal to time reg, for debug only */
-+#define TIME_BYP		(1<<9)
-+#define INT_ENABLE		(1<<31)		/* interrupt enable */
-+
-+/* STATUS_REG */
-+#define CLK_UNCONNECTED		(1<<0)
-+#define PEND_WR_TIME		(1<<2)
-+#define PEND_WR_DATE		(1<<3)
-+#define LOST_WR_TIME		(1<<4)
-+#define LOST_WR_DATE		(1<<5)
-+#define RTC_INT_MASK		(1<<31)
-+#define STATUS_BUSY		(PEND_WR_TIME | PEND_WR_DATE)
-+#define STATUS_FAIL		(LOST_WR_TIME | LOST_WR_DATE)
-+
-+struct spear_rtc_config {
-+	struct clk *clk;
-+	spinlock_t lock;
-+	void __iomem *ioaddr;
-+};
-+
-+static inline void spear_rtc_clear_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	val = readl(config->ioaddr + STATUS_REG);
-+	val |= RTC_INT_MASK;
-+	writel(val, config->ioaddr + STATUS_REG);
-+	spin_unlock_irqrestore(&config->lock, flags);
-+}
-+
-+static inline void spear_rtc_enable_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+
-+	val = readl(config->ioaddr + CTRL_REG);
-+	if (!(val & INT_ENABLE)) {
-+		spear_rtc_clear_interrupt(config);
-+		val |= INT_ENABLE;
-+		writel(val, config->ioaddr + CTRL_REG);
-+	}
-+}
-+
-+static inline void spear_rtc_disable_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+
-+	val = readl(config->ioaddr + CTRL_REG);
-+	if (val & INT_ENABLE) {
-+		val &= ~INT_ENABLE;
-+		writel(val, config->ioaddr + CTRL_REG);
-+	}
-+}
-+
-+static inline int is_write_complete(struct spear_rtc_config *config)
-+{
-+	int ret = 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	if ((readl(config->ioaddr + STATUS_REG)) & STATUS_FAIL)
-+		ret = -EIO;
-+	spin_unlock_irqrestore(&config->lock, flags);
-+
-+	return ret;
-+}
-+
-+static void rtc_wait_not_busy(struct spear_rtc_config *config)
-+{
-+	int status, count = 0;
-+	unsigned long flags;
-+
-+	/* Assuming BUSY may stay active for 80 msec) */
-+	for (count = 0; count < 80; count++) {
-+		spin_lock_irqsave(&config->lock, flags);
-+		status = readl(config->ioaddr + STATUS_REG);
-+		spin_unlock_irqrestore(&config->lock, flags);
-+		if ((status & STATUS_BUSY) == 0)
-+			break;
-+		/* check status busy, after each msec */
-+		msleep(1);
-+	}
-+}
-+
-+static irqreturn_t spear_rtc_irq(int irq, void *dev_id)
-+{
-+	struct rtc_device *rtc = (struct rtc_device *)dev_id;
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned long flags, events = 0;
-+	unsigned int irq_data;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	irq_data = readl(config->ioaddr + STATUS_REG);
-+	spin_unlock_irqrestore(&config->lock, flags);
-+
-+	if ((irq_data & RTC_INT_MASK)) {
-+		spear_rtc_clear_interrupt(config);
-+		events = RTC_IRQF | RTC_AF;
-+		rtc_update_irq(rtc, 1, events);
-+		return IRQ_HANDLED;
-+	} else
-+		return IRQ_NONE;
-+
-+}
-+
-+static int tm2bcd(struct rtc_time *tm)
-+{
-+	if (rtc_valid_tm(tm) != 0)
-+		return -EINVAL;
-+	tm->tm_sec = bin2bcd(tm->tm_sec);
-+	tm->tm_min = bin2bcd(tm->tm_min);
-+	tm->tm_hour = bin2bcd(tm->tm_hour);
-+	tm->tm_mday = bin2bcd(tm->tm_mday);
-+	tm->tm_mon = bin2bcd(tm->tm_mon + 1);
-+	tm->tm_year = bin2bcd(tm->tm_year);
-+
-+	return 0;
-+}
-+
-+static void bcd2tm(struct rtc_time *tm)
-+{
-+	tm->tm_sec = bcd2bin(tm->tm_sec);
-+	tm->tm_min = bcd2bin(tm->tm_min);
-+	tm->tm_hour = bcd2bin(tm->tm_hour);
-+	tm->tm_mday = bcd2bin(tm->tm_mday);
-+	tm->tm_mon = bcd2bin(tm->tm_mon) - 1;
-+	/* epoch == 1900 */
-+	tm->tm_year = bcd2bin(tm->tm_year);
-+}
-+
-+/*
-+ * spear_rtc_read_time - set the time
-+ * @dev: rtc device in use
-+ * @tm: holds date and time
-+ *
-+ * This function read time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date;
-+
-+	/* we don't report wday/yday/isdst ... */
-+	rtc_wait_not_busy(config);
-+
-+	time = readl(config->ioaddr + TIME_REG);
-+	date = readl(config->ioaddr + DATE_REG);
-+	tm->tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
-+	tm->tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
-+	tm->tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
-+	tm->tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
-+	tm->tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
-+	tm->tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
-+
-+	bcd2tm(tm);
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_set_time - set the time
-+ * @dev: rtc device in use
-+ * @tm: holds date and time
-+ *
-+ * This function set time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date, err = 0;
-+
-+	if (tm2bcd(tm) < 0)
-+		return -EINVAL;
-+
-+	rtc_wait_not_busy(config);
-+	time = (tm->tm_sec << SECOND_SHIFT) | (tm->tm_min << MINUTE_SHIFT) |
-+		(tm->tm_hour << HOUR_SHIFT);
-+	date = (tm->tm_mday << MDAY_SHIFT) | (tm->tm_mon << MONTH_SHIFT) |
-+		(tm->tm_year << YEAR_SHIFT);
-+	writel(time, config->ioaddr + TIME_REG);
-+	writel(date, config->ioaddr + DATE_REG);
-+	err = is_write_complete(config);
-+	if (err < 0)
-+		return err;
-+
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_read_alarm - read the alarm time
-+ * @dev: rtc device in use
-+ * @alm: holds alarm date and time
-+ *
-+ * This function read alarm time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date;
-+
-+	rtc_wait_not_busy(config);
-+
-+	time = readl(config->ioaddr + ALARM_TIME_REG);
-+	date = readl(config->ioaddr + ALARM_DATE_REG);
-+	alm->time.tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
-+	alm->time.tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
-+	alm->time.tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
-+	alm->time.tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
-+	alm->time.tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
-+	alm->time.tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
-+
-+	bcd2tm(&alm->time);
-+	alm->enabled = readl(config->ioaddr + CTRL_REG) & INT_ENABLE;
-+
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_set_alarm - set the alarm time
-+ * @dev: rtc device in use
-+ * @alm: holds alarm date and time
-+ *
-+ * This function set alarm time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date, err = 0;
-+
-+	if (tm2bcd(&alm->time) < 0)
-+		return -EINVAL;
-+
-+	rtc_wait_not_busy(config);
-+
-+	time = (alm->time.tm_sec << SECOND_SHIFT) | (alm->time.tm_min <<
-+			MINUTE_SHIFT) |	(alm->time.tm_hour << HOUR_SHIFT);
-+	date = (alm->time.tm_mday << MDAY_SHIFT) | (alm->time.tm_mon <<
-+			MONTH_SHIFT) | (alm->time.tm_year << YEAR_SHIFT);
-+
-+	writel(time, config->ioaddr + ALARM_TIME_REG);
-+	writel(date, config->ioaddr + ALARM_DATE_REG);
-+	err = is_write_complete(config);
-+	if (err < 0)
-+		return err;
-+
-+	if (alm->enabled)
-+		spear_rtc_enable_interrupt(config);
-+	else
-+		spear_rtc_disable_interrupt(config);
-+
-+	return 0;
-+}
-+static struct rtc_class_ops spear_rtc_ops = {
-+	.read_time = spear_rtc_read_time,
-+	.set_time = spear_rtc_set_time,
-+	.read_alarm = spear_rtc_read_alarm,
-+	.set_alarm = spear_rtc_set_alarm,
-+};
-+
-+static int __devinit spear_rtc_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct rtc_device *rtc;
-+	struct spear_rtc_config *config;
-+	unsigned int status = 0;
-+	int irq;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "no resource defined\n");
-+		return -EBUSY;
-+	}
-+	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
-+		dev_err(&pdev->dev, "rtc region already claimed\n");
-+		return -EBUSY;
-+	}
-+
-+	config = kzalloc(sizeof(*config), GFP_KERNEL);
-+	if (!config) {
-+		dev_err(&pdev->dev, "out of memory\n");
-+		status = -ENOMEM;
-+		goto err_release_region;
-+	}
-+
-+	config->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(config->clk)) {
-+		status = PTR_ERR(config->clk);
-+		goto err_kfree;
-+	}
-+
-+	status = clk_enable(config->clk);
-+	if (status < 0)
-+		goto err_clk_put;
-+
-+	config->ioaddr = ioremap(res->start, resource_size(res));
-+	if (!config->ioaddr) {
-+		dev_err(&pdev->dev, "ioremap fail\n");
-+		status = -ENOMEM;
-+		goto err_disable_clock;
-+	}
-+
-+	spin_lock_init(&config->lock);
-+
-+	rtc = rtc_device_register(pdev->name, &pdev->dev, &spear_rtc_ops,
-+			THIS_MODULE);
-+	if (IS_ERR(rtc)) {
-+		dev_err(&pdev->dev, "can't register RTC device, err %ld\n",
-+				PTR_ERR(rtc));
-+		status = PTR_ERR(rtc);
-+		goto err_iounmap;
-+	}
-+
-+	platform_set_drvdata(pdev, rtc);
-+	dev_set_drvdata(&rtc->dev, config);
-+
-+	/* alarm irqs */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "no update irq?\n");
-+		status = irq;
-+		goto err_clear_platdata;
-+	}
-+
-+	status = request_irq(irq, spear_rtc_irq, 0, pdev->name, rtc);
-+	if (status) {
-+		dev_err(&pdev->dev, "Alarm interrupt IRQ%d already \
-+				claimed\n", irq);
-+		goto err_clear_platdata;
-+	}
-+
-+	if (!device_can_wakeup(&pdev->dev))
-+		device_init_wakeup(&pdev->dev, 1);
-+
-+	return 0;
-+
-+err_clear_platdata:
-+	platform_set_drvdata(pdev, NULL);
-+	dev_set_drvdata(&rtc->dev, NULL);
-+	rtc_device_unregister(rtc);
-+err_iounmap:
-+	iounmap(config->ioaddr);
-+err_disable_clock:
-+	clk_disable(config->clk);
-+err_clk_put:
-+	clk_put(config->clk);
-+err_kfree:
-+	kfree(config);
-+err_release_region:
-+	release_mem_region(res->start, resource_size(res));
-+
-+	return status;
-+}
-+
-+static int __devexit spear_rtc_remove(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+	struct resource *res;
-+
-+	/* leave rtc running, but disable irqs */
-+	spear_rtc_disable_interrupt(config);
-+	device_init_wakeup(&pdev->dev, 0);
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq)
-+		free_irq(irq, pdev);
-+	clk_disable(config->clk);
-+	clk_put(config->clk);
-+	iounmap(config->ioaddr);
-+	kfree(config);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res)
-+		release_mem_region(res->start, resource_size(res));
-+	platform_set_drvdata(pdev, NULL);
-+	dev_set_drvdata(&rtc->dev, NULL);
-+	rtc_device_unregister(rtc);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+
-+static int spear_rtc_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (device_may_wakeup(&pdev->dev))
-+		enable_irq_wake(irq);
-+	else {
-+		spear_rtc_disable_interrupt(config);
-+		clk_disable(config->clk);
-+	}
-+
-+	return 0;
-+}
-+
-+static int spear_rtc_resume(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+
-+	irq = platform_get_irq(pdev, 0);
-+
-+	if (device_may_wakeup(&pdev->dev))
-+		disable_irq_wake(irq);
-+	else {
-+		clk_enable(config->clk);
-+		spear_rtc_enable_interrupt(config);
-+	}
-+
-+	return 0;
-+}
-+
-+#else
-+#define spear_rtc_suspend	NULL
-+#define spear_rtc_resume	NULL
-+#endif
-+
-+static void spear_rtc_shutdown(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+
-+	spear_rtc_disable_interrupt(config);
-+	clk_disable(config->clk);
-+}
-+
-+static struct platform_driver spear_rtc_driver = {
-+	.probe = spear_rtc_probe,
-+	.remove = __devexit_p(spear_rtc_remove),
-+	.suspend = spear_rtc_suspend,
-+	.resume = spear_rtc_resume,
-+	.shutdown = spear_rtc_shutdown,
-+	.driver = {
-+		.name = "rtc-spear",
-+	},
-+};
-+
-+static int __init rtc_init(void)
-+{
-+	return platform_driver_register(&spear_rtc_driver);
-+}
-+module_init(rtc_init);
-+
-+static void __exit rtc_exit(void)
-+{
-+	platform_driver_unregister(&spear_rtc_driver);
-+}
-+module_exit(rtc_exit);
-+
-+MODULE_ALIAS("platform:rtc-spear");
-+MODULE_AUTHOR("Rajeev Kumar <rajeev-dlh.kumar@st.com>");
-+MODULE_DESCRIPTION("ST SPEAr Realtime Clock Driver (RTC)");
-+MODULE_LICENSE("GPL");
+ /* Add spear3xx family device structure declarations here */
+-extern struct amba_device gpio_device;
+-extern struct amba_device ssp0_device;
+-extern struct amba_device uart_device;
+-extern struct amba_device wdt_device;
+-extern struct platform_device ehci_device;
+-extern struct platform_device i2c_device;
+-extern struct platform_device ohci0_device;
+-extern struct platform_device ohci1_device;
+-extern struct platform_device rtc_device;
++extern struct amba_device spear3xx_gpio_device;
++extern struct amba_device spear3xx_ssp0_device;
++extern struct amba_device spear3xx_uart_device;
++extern struct amba_device spear3xx_wdt_device;
++extern struct platform_device spear3xx_ehci_device;
++extern struct platform_device spear3xx_i2c_device;
++extern struct platform_device spear3xx_ohci0_device;
++extern struct platform_device spear3xx_ohci1_device;
++extern struct platform_device spear3xx_rtc_device;
+ extern struct sys_timer spear3xx_timer;
+ 
+ /* Add spear3xx family function declarations here */
+@@ -87,49 +87,49 @@ extern struct pmx_dev spear3xx_pmx_timer_1_2;
+ 
+ #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
+ /* padmux plgpio devices */
+-extern struct pmx_dev pmx_plgpio_0_1;
+-extern struct pmx_dev pmx_plgpio_2_3;
+-extern struct pmx_dev pmx_plgpio_4_5;
+-extern struct pmx_dev pmx_plgpio_6_9;
+-extern struct pmx_dev pmx_plgpio_10_27;
+-extern struct pmx_dev pmx_plgpio_28;
+-extern struct pmx_dev pmx_plgpio_29;
+-extern struct pmx_dev pmx_plgpio_30;
+-extern struct pmx_dev pmx_plgpio_31;
+-extern struct pmx_dev pmx_plgpio_32;
+-extern struct pmx_dev pmx_plgpio_33;
+-extern struct pmx_dev pmx_plgpio_34_36;
+-extern struct pmx_dev pmx_plgpio_37_42;
+-extern struct pmx_dev pmx_plgpio_43_44_47_48;
+-extern struct pmx_dev pmx_plgpio_45_46_49_50;
++extern struct pmx_dev spear3xx_pmx_plgpio_0_1;
++extern struct pmx_dev spear3xx_pmx_plgpio_2_3;
++extern struct pmx_dev spear3xx_pmx_plgpio_4_5;
++extern struct pmx_dev spear3xx_pmx_plgpio_6_9;
++extern struct pmx_dev spear3xx_pmx_plgpio_10_27;
++extern struct pmx_dev spear3xx_pmx_plgpio_28;
++extern struct pmx_dev spear3xx_pmx_plgpio_29;
++extern struct pmx_dev spear3xx_pmx_plgpio_30;
++extern struct pmx_dev spear3xx_pmx_plgpio_31;
++extern struct pmx_dev spear3xx_pmx_plgpio_32;
++extern struct pmx_dev spear3xx_pmx_plgpio_33;
++extern struct pmx_dev spear3xx_pmx_plgpio_34_36;
++extern struct pmx_dev spear3xx_pmx_plgpio_37_42;
++extern struct pmx_dev spear3xx_pmx_plgpio_43_44_47_48;
++extern struct pmx_dev spear3xx_pmx_plgpio_45_46_49_50;
+ #endif
+ 
+ /* spear300 declarations */
+ #ifdef CONFIG_MACH_SPEAR300
+ /* Add spear300 machine device structure declarations here */
+-extern struct amba_device clcd_device;
+-extern struct amba_device gpio1_device;
+-extern struct platform_device kbd_device;
+-extern struct platform_device nand0_device;
+-extern struct platform_device nand1_device;
+-extern struct platform_device nand2_device;
+-extern struct platform_device nand3_device;
+-extern struct platform_device sdhci_device;
++extern struct amba_device spear300_clcd_device;
++extern struct amba_device spear300_gpio1_device;
++extern struct platform_device spear300_kbd_device;
++extern struct platform_device spear300_nand0_device;
++extern struct platform_device spear300_nand1_device;
++extern struct platform_device spear300_nand2_device;
++extern struct platform_device spear300_nand3_device;
++extern struct platform_device spear300_sdhci_device;
+ 
+ /* pad mux modes */
+-extern struct pmx_mode nand_mode;
+-extern struct pmx_mode nor_mode;
+-extern struct pmx_mode photo_frame_mode;
+-extern struct pmx_mode lend_ip_phone_mode;
+-extern struct pmx_mode hend_ip_phone_mode;
+-extern struct pmx_mode lend_wifi_phone_mode;
+-extern struct pmx_mode hend_wifi_phone_mode;
+-extern struct pmx_mode ata_pabx_wi2s_mode;
+-extern struct pmx_mode ata_pabx_i2s_mode;
+-extern struct pmx_mode caml_lcdw_mode;
+-extern struct pmx_mode camu_lcd_mode;
+-extern struct pmx_mode camu_wlcd_mode;
+-extern struct pmx_mode caml_lcd_mode;
++extern struct pmx_mode spear300_nand_mode;
++extern struct pmx_mode spear300_nor_mode;
++extern struct pmx_mode spear300_photo_frame_mode;
++extern struct pmx_mode spear300_lend_ip_phone_mode;
++extern struct pmx_mode spear300_hend_ip_phone_mode;
++extern struct pmx_mode spear300_lend_wifi_phone_mode;
++extern struct pmx_mode spear300_hend_wifi_phone_mode;
++extern struct pmx_mode spear300_ata_pabx_wi2s_mode;
++extern struct pmx_mode spear300_ata_pabx_i2s_mode;
++extern struct pmx_mode spear300_caml_lcdw_mode;
++extern struct pmx_mode spear300_camu_lcd_mode;
++extern struct pmx_mode spear300_camu_wlcd_mode;
++extern struct pmx_mode spear300_caml_lcd_mode;
+ 
+ /* pad mux devices */
+ extern struct pmx_dev spear300_pmx_fsmc_2_chips;
+@@ -165,14 +165,14 @@ extern struct clcd_board clcd_plat_data;
+ /* spear310 declarations */
+ #if defined(CONFIG_MACH_SPEAR310)
+ /* Add spear310 machine device structure declarations here */
+-extern struct amba_device uart1_device;
+-extern struct amba_device uart2_device;
+-extern struct amba_device uart3_device;
+-extern struct amba_device uart4_device;
+-extern struct amba_device uart5_device;
+-extern struct platform_device emi_nor_device;
+-extern struct platform_device plgpio_device;
+-extern struct platform_device nand_device;
++extern struct amba_device spear310_uart1_device;
++extern struct amba_device spear310_uart2_device;
++extern struct amba_device spear310_uart3_device;
++extern struct amba_device spear310_uart4_device;
++extern struct amba_device spear310_uart5_device;
++extern struct platform_device spear310_emi_nor_device;
++extern struct platform_device spear310_plgpio_device;
++extern struct platform_device spear310_nand_device;
+ 
+ /* pad mux devices */
+ extern struct pmx_dev spear310_pmx_emi_cs_0_1_4_5;
+@@ -193,24 +193,24 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ /* spear320 declarations */
+ #if defined(CONFIG_MACH_SPEAR320)
+ /* Add spear320 machine device structure declarations here */
+-extern struct amba_device clcd_device;
+-extern struct amba_device ssp_device[];
+-extern struct amba_device uart1_device;
+-extern struct amba_device uart2_device;
+-extern struct platform_device can0_device;
+-extern struct platform_device can1_device;
+-extern struct platform_device emi_nor_device;
+-extern struct platform_device i2c1_device;
+-extern struct platform_device nand_device;
+-extern struct platform_device plgpio_device;
+-extern struct platform_device pwm_device;
+-extern struct platform_device sdhci_device;
++extern struct amba_device spear320_clcd_device;
++extern struct amba_device spear320_ssp_device[];
++extern struct amba_device spear320_uart1_device;
++extern struct amba_device spear320_uart2_device;
++extern struct platform_device spear320_can0_device;
++extern struct platform_device spear320_can1_device;
++extern struct platform_device spear320_emi_nor_device;
++extern struct platform_device spear320_i2c1_device;
++extern struct platform_device spear320_nand_device;
++extern struct platform_device spear320_plgpio_device;
++extern struct platform_device spear320_pwm_device;
++extern struct platform_device spear320_sdhci_device;
+ 
+ /* pad mux modes */
+-extern struct pmx_mode auto_net_smii_mode;
+-extern struct pmx_mode auto_net_mii_mode;
+-extern struct pmx_mode auto_exp_mode;
+-extern struct pmx_mode small_printers_mode;
++extern struct pmx_mode spear320_auto_net_smii_mode;
++extern struct pmx_mode spear320_auto_net_mii_mode;
++extern struct pmx_mode spear320_auto_exp_mode;
++extern struct pmx_mode spear320_small_printers_mode;
+ 
+ /* pad mux devices */
+ extern struct pmx_dev spear320_pmx_clcd;
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index c5bf528..f780ad1 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -36,79 +36,79 @@
+ #define CAML_LCD_MODE			(1 << 12)
+ #define ALL_MODES			0x1FFF
+ 
+-struct pmx_mode nand_mode = {
++struct pmx_mode spear300_nand_mode = {
+ 	.id = NAND_MODE,
+ 	.name = "nand mode",
+ 	.value = 0x00,
+ };
+ 
+-struct pmx_mode nor_mode = {
++struct pmx_mode spear300_nor_mode = {
+ 	.id = NOR_MODE,
+ 	.name = "nor mode",
+ 	.value = 0x01,
+ };
+ 
+-struct pmx_mode photo_frame_mode = {
++struct pmx_mode spear300_photo_frame_mode = {
+ 	.id = PHOTO_FRAME_MODE,
+ 	.name = "photo frame mode",
+ 	.value = 0x02,
+ };
+ 
+-struct pmx_mode lend_ip_phone_mode = {
++struct pmx_mode spear300_lend_ip_phone_mode = {
+ 	.id = LEND_IP_PHONE_MODE,
+ 	.name = "lend ip phone mode",
+ 	.value = 0x03,
+ };
+ 
+-struct pmx_mode hend_ip_phone_mode = {
++struct pmx_mode spear300_hend_ip_phone_mode = {
+ 	.id = HEND_IP_PHONE_MODE,
+ 	.name = "hend ip phone mode",
+ 	.value = 0x04,
+ };
+ 
+-struct pmx_mode lend_wifi_phone_mode = {
++struct pmx_mode spear300_lend_wifi_phone_mode = {
+ 	.id = LEND_WIFI_PHONE_MODE,
+ 	.name = "lend wifi phone mode",
+ 	.value = 0x05,
+ };
+ 
+-struct pmx_mode hend_wifi_phone_mode = {
++struct pmx_mode spear300_hend_wifi_phone_mode = {
+ 	.id = HEND_WIFI_PHONE_MODE,
+ 	.name = "hend wifi phone mode",
+ 	.value = 0x06,
+ };
+ 
+-struct pmx_mode ata_pabx_wi2s_mode = {
++struct pmx_mode spear300_ata_pabx_wi2s_mode = {
+ 	.id = ATA_PABX_WI2S_MODE,
+ 	.name = "ata pabx wi2s mode",
+ 	.value = 0x07,
+ };
+ 
+-struct pmx_mode ata_pabx_i2s_mode = {
++struct pmx_mode spear300_ata_pabx_i2s_mode = {
+ 	.id = ATA_PABX_I2S_MODE,
+ 	.name = "ata pabx i2s mode",
+ 	.value = 0x08,
+ };
+ 
+-struct pmx_mode caml_lcdw_mode = {
++struct pmx_mode spear300_caml_lcdw_mode = {
+ 	.id = CAML_LCDW_MODE,
+ 	.name = "caml lcdw mode",
+ 	.value = 0x0C,
+ };
+ 
+-struct pmx_mode camu_lcd_mode = {
++struct pmx_mode spear300_camu_lcd_mode = {
+ 	.id = CAMU_LCD_MODE,
+ 	.name = "camu lcd mode",
+ 	.value = 0x0D,
+ };
+ 
+-struct pmx_mode camu_wlcd_mode = {
++struct pmx_mode spear300_camu_wlcd_mode = {
+ 	.id = CAMU_WLCD_MODE,
+ 	.name = "camu wlcd mode",
+ 	.value = 0x0E,
+ };
+ 
+-struct pmx_mode caml_lcd_mode = {
++struct pmx_mode spear300_caml_lcd_mode = {
+ 	.id = CAML_LCD_MODE,
+ 	.name = "caml lcd mode",
+ 	.value = 0x0F,
+@@ -526,7 +526,7 @@ static struct pmx_driver pmx_driver = {
+ /* Add spear300 specific devices here */
+ 
+ /* CLCD device registration */
+-struct amba_device clcd_device = {
++struct amba_device spear300_clcd_device = {
+ 	.dev = {
+ 		.init_name = "clcd",
+ 		.coherent_dma_mask = ~0,
+@@ -547,7 +547,7 @@ static struct pl061_platform_data gpio1_plat_data = {
+ 	.irq_base	= SPEAR300_GPIO1_INT_BASE,
+ };
+ 
+-struct amba_device gpio1_device = {
++struct amba_device spear300_gpio1_device = {
+ 	.dev = {
+ 		.init_name = "gpio1",
+ 		.platform_data = &gpio1_plat_data,
+@@ -572,7 +572,7 @@ static struct resource kbd_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device kbd_device = {
++struct platform_device spear300_kbd_device = {
+ 	.name = "keyboard",
+ 	.id = -1,
+ 	.num_resources = ARRAY_SIZE(kbd_resources),
+@@ -596,7 +596,7 @@ static struct resource nand0_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device nand0_device = {
++struct platform_device spear300_nand0_device = {
+ 	.name = "nand",
+ 	.id = 0,
+ 	.resource = nand0_resources,
+@@ -620,7 +620,7 @@ static struct resource nand1_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device nand1_device = {
++struct platform_device spear300_nand1_device = {
+ 	.name = "nand",
+ 	.id = 1,
+ 	.resource = nand1_resources,
+@@ -644,7 +644,7 @@ static struct resource nand2_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device nand2_device = {
++struct platform_device spear300_nand2_device = {
+ 	.name = "nand",
+ 	.id = 2,
+ 	.resource = nand2_resources,
+@@ -668,7 +668,7 @@ static struct resource nand3_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device nand3_device = {
++struct platform_device spear300_nand3_device = {
+ 	.name = "nand",
+ 	.id = 3,
+ 	.resource = nand3_resources,
+@@ -688,7 +688,7 @@ static struct resource sdhci_resources[] = {
+ 	}
+ };
+ 
+-struct platform_device sdhci_device = {
++struct platform_device spear300_sdhci_device = {
+ 	.dev = {
+ 		.coherent_dma_mask = ~0,
+ 	},
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 97ae62b..5ac948a 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -43,28 +43,28 @@ static struct pmx_dev *pmx_devs[] = {
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&gpio_device,
+-	&ssp0_device,
+-	&uart_device,
+-	&wdt_device,
++	&spear3xx_gpio_device,
++	&spear3xx_ssp0_device,
++	&spear3xx_uart_device,
++	&spear3xx_wdt_device,
+ 
+ 	/* spear300 specific devices */
+-	&clcd_device,
+-	&gpio1_device,
++	&spear300_clcd_device,
++	&spear300_gpio1_device,
+ };
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&ehci_device,
+-	&i2c_device,
+-	&nand0_device,
+-	&ohci0_device,
+-	&ohci1_device,
+-	&rtc_device,
++	&spear3xx_ehci_device,
++	&spear3xx_i2c_device,
++	&spear3xx_ohci0_device,
++	&spear3xx_ohci1_device,
++	&spear3xx_rtc_device,
+ 
+ 	/* spear300 specific devices */
+-	&kbd_device,
+-	&sdhci_device,
++	&spear300_kbd_device,
++	&spear300_nand0_device,
++	&spear300_sdhci_device,
+ };
+ 
+ /* sdhci board specific information */
+@@ -115,20 +115,21 @@ static void __init spear300_evb_init(void)
+ 	unsigned int i;
+ 
+ 	/* set keyboard plat data */
+-	kbd_set_plat_data(&kbd_device, &kbd_data);
++	kbd_set_plat_data(&spear300_kbd_device, &kbd_data);
+ 
+ 	/* set nand0 device's plat data */
+-	fsmc_nand_set_plat_data(&nand0_device, NULL, 0, NAND_SKIP_BBTSCAN,
+-			FSMC_NAND_BW8);
++	fsmc_nand_set_plat_data(&spear300_nand0_device, NULL, 0,
++			NAND_SKIP_BBTSCAN, FSMC_NAND_BW8);
+ 
+ 	/* set sdhci device platform data */
+-	sdhci_set_plat_data(&sdhci_device, &sdhci_plat_data);
++	sdhci_set_plat_data(&spear300_sdhci_device, &sdhci_plat_data);
+ 
+ 	/* Enable sdhci memory */
+ 	sdhci_i2s_mem_enable(SDHCI_MEM_ENB);
+ 
+ 	/* call spear300 machine init function */
+-	spear300_init(&photo_frame_mode, pmx_devs, ARRAY_SIZE(pmx_devs));
++	spear300_init(&spear300_photo_frame_mode, pmx_devs,
++			ARRAY_SIZE(pmx_devs));
+ 
+ 	/* Register slave devices on the I2C buses */
+ 	i2c_register_board_devices();
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index 49cb6d0..1acd7a8 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -196,7 +196,7 @@ static struct pmx_driver pmx_driver;
+ 
+ /* Add spear310 specific devices here */
+ /* uart1 device registeration */
+-struct amba_device uart1_device = {
++struct amba_device spear310_uart1_device = {
+ 	.dev = {
+ 		.init_name = "uart1",
+ 	},
+@@ -209,7 +209,7 @@ struct amba_device uart1_device = {
+ };
+ 
+ /* uart2 device registeration */
+-struct amba_device uart2_device = {
++struct amba_device spear310_uart2_device = {
+ 	.dev = {
+ 		.init_name = "uart2",
+ 	},
+@@ -222,7 +222,7 @@ struct amba_device uart2_device = {
+ };
+ 
+ /* uart3 device registeration */
+-struct amba_device uart3_device = {
++struct amba_device spear310_uart3_device = {
+ 	.dev = {
+ 		.init_name = "uart3",
+ 	},
+@@ -235,7 +235,7 @@ struct amba_device uart3_device = {
+ };
+ 
+ /* uart4 device registeration */
+-struct amba_device uart4_device = {
++struct amba_device spear310_uart4_device = {
+ 	.dev = {
+ 		.init_name = "uart4",
+ 	},
+@@ -248,7 +248,7 @@ struct amba_device uart4_device = {
+ };
+ 
+ /* uart5 device registeration */
+-struct amba_device uart5_device = {
++struct amba_device spear310_uart5_device = {
+ 	.dev = {
+ 		.init_name = "uart5",
+ 	},
+@@ -277,7 +277,7 @@ static struct resource nand_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device nand_device = {
++struct platform_device spear310_nand_device = {
+ 	.name = "nand",
+ 	.id = -1,
+ 	.resource = nand_resources,
+@@ -323,7 +323,7 @@ int spear300_o2p(int offset)
+ 
+ /* emi nor flash device registeration */
+ static struct physmap_flash_data emi_norflash_data;
+-struct platform_device emi_nor_device = {
++struct platform_device spear310_emi_nor_device = {
+ 	.name	= "physmap-flash",
+ 	.id	= -1,
+ 	.dev.platform_data = &emi_norflash_data,
+@@ -351,7 +351,7 @@ static struct resource plgpio_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device plgpio_device = {
++struct platform_device spear310_plgpio_device = {
+ 	.name = "plgpio",
+ 	.id = -1,
+ 	.dev = {
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index 7d5a74b..695a5ae 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -68,26 +68,26 @@ static struct pmx_dev *pmx_devs[] = {
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&gpio_device,
+-	&ssp0_device,
+-	&uart_device,
+-	&wdt_device,
++	&spear3xx_gpio_device,
++	&spear3xx_ssp0_device,
++	&spear3xx_uart_device,
++	&spear3xx_wdt_device,
+ 
+ 	/* spear310 specific devices */
+ };
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&ehci_device,
+-	&emi_nor_device,
+-	&i2c_device,
+-	&nand_device,
+-	&ohci0_device,
+-	&ohci1_device,
+-	&rtc_device,
++	&spear3xx_ehci_device,
++	&spear3xx_i2c_device,
++	&spear3xx_ohci0_device,
++	&spear3xx_ohci1_device,
++	&spear3xx_rtc_device,
+ 
+ 	/* spear310 specific devices */
+-	&plgpio_device,
++	&spear310_emi_nor_device,
++	&spear310_nand_device,
++	&spear310_plgpio_device,
+ };
+ 
+ /* spi board information */
+@@ -130,8 +130,8 @@ static void __init spear310_evb_init(void)
+ 	unsigned int i;
+ 
+ 	/* set nand device's plat data */
+-	fsmc_nand_set_plat_data(&nand_device, NULL, 0, NAND_SKIP_BBTSCAN,
+-			FSMC_NAND_BW8);
++	fsmc_nand_set_plat_data(&spear310_nand_device, NULL, 0,
++			NAND_SKIP_BBTSCAN, FSMC_NAND_BW8);
+ 
+ 	/* call spear310 machine init function */
+ 	spear310_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
+@@ -140,7 +140,7 @@ static void __init spear310_evb_init(void)
+ 	i2c_register_board_devices();
+ 
+ 	/* initialize emi related data in emi plat data */
+-	emi_init_board_info(&emi_nor_device, emi_nor_resources,
++	emi_init_board_info(&spear310_emi_nor_device, emi_nor_resources,
+ 			ARRAY_SIZE(emi_nor_resources), partition_info,
+ 			ARRAY_SIZE(partition_info), EMI_FLASH_WIDTH32);
+ 
+@@ -152,7 +152,8 @@ static void __init spear310_evb_init(void)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
+ 
+ 	/* Initialize emi regiters */
+-	emi_init(&emi_nor_device, SPEAR310_EMI_REG_BASE, 0, EMI_FLASH_WIDTH32);
++	emi_init(&spear310_emi_nor_device, SPEAR310_EMI_REG_BASE, 0,
++			EMI_FLASH_WIDTH32);
+ 
+ 	spi_init();
+ }
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index ff5df20..e40b3f1 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -30,25 +30,25 @@
+ #define SMALL_PRINTERS_MODE	(1 << 3)
+ #define ALL_MODES		0xF
+ 
+-struct pmx_mode auto_net_smii_mode = {
++struct pmx_mode spear320_auto_net_smii_mode = {
+ 	.id = AUTO_NET_SMII_MODE,
+ 	.name = "Automation Networking SMII Mode",
+ 	.value = 0x00,
+ };
+ 
+-struct pmx_mode auto_net_mii_mode = {
++struct pmx_mode spear320_auto_net_mii_mode = {
+ 	.id = AUTO_NET_MII_MODE,
+ 	.name = "Automation Networking MII Mode",
+ 	.value = 0x01,
+ };
+ 
+-struct pmx_mode auto_exp_mode = {
++struct pmx_mode spear320_auto_exp_mode = {
+ 	.id = AUTO_EXP_MODE,
+ 	.name = "Automation Expanded Mode",
+ 	.value = 0x02,
+ };
+ 
+-struct pmx_mode small_printers_mode = {
++struct pmx_mode spear320_small_printers_mode = {
+ 	.id = SMALL_PRINTERS_MODE,
+ 	.name = "Small Printers Mode",
+ 	.value = 0x03,
+@@ -594,7 +594,7 @@ static struct pmx_driver pmx_driver = {
+ 
+ /* Add spear320 specific devices here */
+ /* CLCD device registration */
+-struct amba_device clcd_device = {
++struct amba_device spear320_clcd_device = {
+ 	.dev = {
+ 		.init_name = "clcd",
+ 		.coherent_dma_mask = ~0,
+@@ -622,7 +622,7 @@ static struct pl022_ssp_controller ssp_platform_data[] = {
+ 	}
+ };
+ 
+-struct amba_device ssp_device[] = {
++struct amba_device spear320_ssp_device[] = {
+ 	{
+ 		.dev = {
+ 			.coherent_dma_mask = ~0,
+@@ -651,7 +651,7 @@ struct amba_device ssp_device[] = {
+ };
+ 
+ /* uart1 device registeration */
+-struct amba_device uart1_device = {
++struct amba_device spear320_uart1_device = {
+ 	.dev = {
+ 		.init_name = "uart1",
+ 	},
+@@ -664,7 +664,7 @@ struct amba_device uart1_device = {
+ };
+ 
+ /* uart2 device registeration */
+-struct amba_device uart2_device = {
++struct amba_device spear320_uart2_device = {
+ 	.dev = {
+ 		.init_name = "uart2",
+ 	},
+@@ -678,7 +678,7 @@ struct amba_device uart2_device = {
+ 
+ /* emi nor flash device registeration */
+ static struct physmap_flash_data emi_norflash_data;
+-struct platform_device emi_nor_device = {
++struct platform_device spear320_emi_nor_device = {
+ 	.name	= "physmap-flash",
+ 	.id	= -1,
+ 	.dev.platform_data = &emi_norflash_data,
+@@ -703,7 +703,7 @@ static struct resource can0_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device can0_device = {
++struct platform_device spear320_can0_device = {
+ 	.name = "spear_can",
+ 	.id = 0,
+ 	.num_resources = ARRAY_SIZE(can0_resources),
+@@ -721,7 +721,7 @@ static struct resource can1_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device can1_device = {
++struct platform_device spear320_can1_device = {
+ 	.name = "spear_can",
+ 	.id = 1,
+ 	.num_resources = ARRAY_SIZE(can1_resources),
+@@ -740,7 +740,7 @@ static struct resource i2c1_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device i2c1_device = {
++struct platform_device spear320_i2c1_device = {
+ 	.name = "i2c_designware",
+ 	.id = 1,
+ 	.dev = {
+@@ -767,7 +767,7 @@ static struct resource nand_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device nand_device = {
++struct platform_device spear320_nand_device = {
+ 	.name = "nand",
+ 	.id = -1,
+ 	.resource = nand_resources,
+@@ -786,7 +786,7 @@ static struct resource plgpio_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device plgpio_device = {
++struct platform_device spear320_plgpio_device = {
+ 	.name = "plgpio",
+ 	.id = -1,
+ 	.dev = {
+@@ -805,7 +805,7 @@ static struct resource pwm_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device pwm_device = {
++struct platform_device spear320_pwm_device = {
+ 	.name = "pwm",
+ 	.id = -1,
+ 	.num_resources = ARRAY_SIZE(pwm_resources),
+@@ -824,7 +824,7 @@ static struct resource sdhci_resources[] = {
+ 	}
+ };
+ 
+-struct platform_device sdhci_device = {
++struct platform_device spear320_sdhci_device = {
+ 	.dev = {
+ 		.coherent_dma_mask = ~0,
+ 	},
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 7ea8d87..1909a36 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -66,30 +66,30 @@ static struct pmx_dev *pmx_devs[] = {
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&gpio_device,
+-	&uart_device,
+-	&wdt_device,
++	&spear3xx_gpio_device,
++	&spear3xx_uart_device,
++	&spear3xx_wdt_device,
+ 
+ 	/* spear320 specific devices */
+-	&clcd_device,
++	&spear320_clcd_device,
+ };
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&ehci_device,
+-	&i2c_device,
+-	&nand_device,
+-	&ohci0_device,
+-	&ohci1_device,
+-	&rtc_device,
++	&spear3xx_ehci_device,
++	&spear3xx_i2c_device,
++	&spear3xx_ohci0_device,
++	&spear3xx_ohci1_device,
++	&spear3xx_rtc_device,
+ 
+ 	/* spear320 specific devices */
+-	&can0_device,
+-	&can1_device,
+-	&i2c1_device,
+-	&plgpio_device,
+-	&pwm_device,
+-	&sdhci_device,
++	&spear320_can0_device,
++	&spear320_can1_device,
++	&spear320_i2c1_device,
++	&spear320_nand_device,
++	&spear320_plgpio_device,
++	&spear320_pwm_device,
++	&spear320_sdhci_device,
+ };
+ 
+ /* sdhci board specific information */
+@@ -113,20 +113,21 @@ static void __init spear320_evb_init(void)
+ 	unsigned int i;
+ 
+ 	/* set sdhci device platform data */
+-	sdhci_set_plat_data(&sdhci_device, &sdhci_plat_data);
++	sdhci_set_plat_data(&spear320_sdhci_device, &sdhci_plat_data);
+ 
+ 	/* set nand device's plat data */
+-	fsmc_nand_set_plat_data(&nand_device, NULL, 0, NAND_SKIP_BBTSCAN,
+-			FSMC_NAND_BW8);
++	fsmc_nand_set_plat_data(&spear320_nand_device, NULL, 0,
++			NAND_SKIP_BBTSCAN, FSMC_NAND_BW8);
+ 
+ 	/* call spear320 machine init function */
+-	spear320_init(&auto_net_mii_mode, pmx_devs, ARRAY_SIZE(pmx_devs));
++	spear320_init(&spear320_auto_net_mii_mode, pmx_devs,
++			ARRAY_SIZE(pmx_devs));
+ 
+ 	/* Register slave devices on the I2C buses */
+ 	i2c_register_board_devices();
+ 
+ 	/* initialize emi related data in emi plat data */
+-	emi_init_board_info(&emi_nor_device, emi_nor_resources,
++	emi_init_board_info(&spear320_emi_nor_device, emi_nor_resources,
+ 			ARRAY_SIZE(emi_nor_resources), partition_info,
+ 			ARRAY_SIZE(partition_info), EMI_FLASH_WIDTH16);
+ 
+@@ -138,7 +139,8 @@ static void __init spear320_evb_init(void)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
+ 
+ 	/* Initialize emi regiters */
+-	emi_init(&emi_nor_device, SPEAR320_EMI_CTRL_BASE, 0, EMI_FLASH_WIDTH16);
++	emi_init(&spear320_emi_nor_device, SPEAR320_EMI_CTRL_BASE, 0,
++			EMI_FLASH_WIDTH16);
+ 
+ 	spi_init();
+ }
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index ea8d00d..796434b 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -32,7 +32,7 @@ static struct pl061_platform_data gpio_plat_data = {
+ 	.irq_base	= SPEAR3XX_GPIO_INT_BASE,
+ };
+ 
+-struct amba_device gpio_device = {
++struct amba_device spear3xx_gpio_device = {
+ 	.dev = {
+ 		.init_name = "gpio",
+ 		.platform_data = &gpio_plat_data,
+@@ -61,7 +61,7 @@ static struct pl022_ssp_controller ssp_platform_data = {
+ 	.num_chipselect = 2,
+ };
+ 
+-struct amba_device ssp0_device = {
++struct amba_device spear3xx_ssp0_device = {
+ 	.dev = {
+ 		.coherent_dma_mask = ~0,
+ 		.init_name = "ssp-pl022.0",
+@@ -76,7 +76,7 @@ struct amba_device ssp0_device = {
+ };
+ 
+ /* uart device registeration */
+-struct amba_device uart_device = {
++struct amba_device spear3xx_uart_device = {
+ 	.dev = {
+ 		.init_name = "uart",
+ 	},
+@@ -89,7 +89,7 @@ struct amba_device uart_device = {
+ };
+ 
+ /* watchdog device registeration */
+-struct amba_device wdt_device = {
++struct amba_device spear3xx_wdt_device = {
+ 	.dev = {
+ 		.init_name = "wdt",
+ 	},
+@@ -112,7 +112,7 @@ static struct resource i2c_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device i2c_device = {
++struct platform_device spear3xx_i2c_device = {
+ 	.name = "i2c_designware",
+ 	.id = 0,
+ 	.dev = {
+@@ -162,7 +162,7 @@ static struct resource ohci1_resources[] = {
+ static u64 ehci_dmamask = ~0;
+ static int usbh_id = -1;
+ 
+-struct platform_device ehci_device = {
++struct platform_device spear3xx_ehci_device = {
+ 	.name = "spear-ehci",
+ 	.id = -1,
+ 	.dev = {
+@@ -176,7 +176,7 @@ struct platform_device ehci_device = {
+ 
+ static u64 ohci0_dmamask = ~0;
+ 
+-struct platform_device ohci0_device = {
++struct platform_device spear3xx_ohci0_device = {
+ 	.name = "spear-ohci",
+ 	.id = 0,
+ 	.dev = {
+@@ -190,7 +190,7 @@ struct platform_device ohci0_device = {
+ 
+ static u64 ohci1_dmamask = ~0;
+ 
+-struct platform_device ohci1_device = {
++struct platform_device spear3xx_ohci1_device = {
+ 	.name = "spear-ohci",
+ 	.id = 1,
+ 	.dev = {
+@@ -214,7 +214,7 @@ static struct resource rtc_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device rtc_device = {
++struct platform_device spear3xx_rtc_device = {
+ 	.name = "rtc-spear",
+ 	.id = -1,
+ 	.num_resources = ARRAY_SIZE(rtc_resources),
 -- 
 1.7.2.2
