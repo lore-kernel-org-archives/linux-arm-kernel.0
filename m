@@ -1,57 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Dec 2010 12:08:37 -0800
-Subject: [PATCH 2/3] hvc_dcc: Simplify put_chars()/get_chars() loops
-In-Reply-To: <1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
-References: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
-	<1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1292875718-7980-3-git-send-email-sboyd@codeaurora.org>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 20 Dec 2010 21:21:45 +0100
+Subject: [PATCH v2] Keyboard: omap-keypad: use matrix_keypad.h
+In-Reply-To: <BC214410FD04D84F9079A624236597070C1680@008-AM1MPN1-003.mgdnok.nokia.com>
+References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+	<201012201832.24243.jkrzyszt@tis.icnet.pl>
+	<BC214410FD04D84F9079A624236597070C1680@008-AM1MPN1-003.mgdnok.nokia.com>
+Message-ID: <201012202121.47976.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Casting and anding with 0xff is unnecessary in
-hvc_dcc_put_chars() since buf is already a char[].
-__dcc_get_char() can't return an int less than 0 since it only
-returns a char. Simplify the if statement in hvc_dcc_get_chars()
-to take this into account.
+Monday 20 December 2010 20:03:58 aaro.koskinen at nokia.com wrote:
+>
+> I'm using the latest sparse from:
+>
+>    git://git.kernel.org/pub/scm/devel/sparse/sparse.git
+>
+> I don't know about OpenEmbedded, but I've noticed that at least
+> Debian ships with some old version that is missing many checks...
 
-Cc: Daniel Walker <dwalker@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/char/hvc_dcc.c |   12 ++++--------
- 1 files changed, 4 insertions(+), 8 deletions(-)
+Aaro,
+Both you and Dmitry were right: an old sparse version. Once upgraded 
+from 0.4.1 to 0.4.2 (Gentoo ebuild - OpenEmbedded doesn't build its own 
+sparse binary, but uses a host provided one), now I get that issue 
+reported. No more sparse warnings from me, I hope (until my sparse gets 
+too old again ;).
 
-diff --git a/drivers/char/hvc_dcc.c b/drivers/char/hvc_dcc.c
-index 155ec10..ad23cc8 100644
---- a/drivers/char/hvc_dcc.c
-+++ b/drivers/char/hvc_dcc.c
-@@ -89,7 +89,7 @@ static int hvc_dcc_put_chars(uint32_t vt, const char *buf, int count)
- 		while (__dcc_getstatus() & DCC_STATUS_TX)
- 			cpu_relax();
- 
--		__dcc_putchar((char)(buf[i] & 0xFF));
-+		__dcc_putchar(buf[i]);
- 	}
- 
- 	return count;
-@@ -99,15 +99,11 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
- {
- 	int i;
- 
--	for (i = 0; i < count; ++i) {
--		int c = -1;
--
-+	for (i = 0; i < count; ++i)
- 		if (__dcc_getstatus() & DCC_STATUS_RX)
--			c = __dcc_getchar();
--		if (c < 0)
-+			buf[i] = __dcc_getchar();
-+		else
- 			break;
--		buf[i] = c;
--	}
- 
- 	return i;
- }
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Janusz
