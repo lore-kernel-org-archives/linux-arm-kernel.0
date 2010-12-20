@@ -1,87 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 20 Dec 2010 21:31:34 +0530
-Subject: [PATCH v4 2/2] davinci: am18x/da850/omap-l138 evm: add support for
-	higher speed grades
-In-Reply-To: <1292860894-3961-1-git-send-email-nsekhar@ti.com>
-References: <1292860894-3961-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1292860894-3961-2-git-send-email-nsekhar@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 20 Dec 2010 08:07:36 -0800
+Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
+	omap_i2c
+In-Reply-To: <20101218015507.GL5941@atomide.com> (Tony Lindgren's message of
+	"Fri, 17 Dec 2010 17:55:07 -0800")
+References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
+	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
+	<878vzydgxr.fsf@deeprootsystems.com>
+	<20101209190110.GR20097@trinity.fluff.org>
+	<87wrni7jys.fsf@deeprootsystems.com>
+	<BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
+	<4D01E4B5.1010703@ti.com> <20101218015507.GL5941@atomide.com>
+Message-ID: <87oc8g5sxj.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apart from the regular AM18x/DA850/OMAP-L138 SoC operating
-at 300MHz, these SoCs have variants that can operate at a
-maximum of 456MHz. Variants at 408Mhz and 375 Mhz are available
-as well.
+Tony Lindgren <tony@atomide.com> writes:
 
-Not all silicon is qualified to run at higher speeds and
-unfortunately the maximum speed the chip can support can only
-be determined from the label on the package (not software
-readable).
+> * Cousson, Benoit <b-cousson@ti.com> [101210 00:29]:
+>> On 12/9/2010 11:18 PM, aaro.koskinen at nokia.com wrote:
+>> >Hi,
+>> >
+>> >Kevin Hilman [khilman at deeprootsystems.com]:
+>> >>Ben Dooks<ben-i2c@fluff.org>  writes:
+>> >>>Renaming stuff like this is going to have an impact on the userspace
+>> >>>as anyone looking through /sys's driver heirarchy is going to miss the
+>> >>>old name...
+>> >>>
+>> >>>It all depends if you really want to go ahead with this...
+>> >>
+>> >>Yes, we are aware of the userspace impact, but this name change makes
+>> >>all devices on OMAP have consistent names and actually improves the
+>> >>ability to have userspace tools have consistent naming as well.
+>> >
+>> >So there are no imporant users, or if there is, they are prepared for this change?
+>> 
+>> Well, I do not know any user of that today. Do you have some in mind?
+>
+> Sounds like it's safe for me to take these two.
 
-The EVM hardware for all these variants is the same (except
-for the actual SoC populated).
+These should probably go via Paul's integration branch to avoid
+conflicts with the other omap_device/omap_hwmod code.
 
-U-Boot on the EVM sets up ATAG_REVISION to inform the OS
-regarding the speed grade supported by the silicon. We use
-this information to pass on the speed grade information to
-the SoC code.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
-No change in version since last post.
-
- arch/arm/mach-davinci/board-da850-evm.c |   25 +++++++++++++++++++++++--
- 1 files changed, 23 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index f89b0b7..893d9be 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -540,7 +540,7 @@ static struct regulator_init_data tps65070_regulator_data[] = {
- 	{
- 		.constraints = {
- 			.min_uV = 950000,
--			.max_uV = 1320000,
-+			.max_uV = 1350000,
- 			.valid_ops_mask = (REGULATOR_CHANGE_VOLTAGE |
- 				REGULATOR_CHANGE_STATUS),
- 			.boot_on = 1,
-@@ -736,6 +736,27 @@ static struct edma_rsv_info *da850_edma_rsv[2] = {
- 	&da850_edma_cc1_rsv,
- };
- 
-+#ifdef CONFIG_CPU_FREQ
-+static __init int da850_evm_init_cpufreq(void)
-+{
-+	switch (system_rev & 0xF) {
-+	case 3:
-+		da850_max_speed = 456000;
-+		break;
-+	case 2:
-+		da850_max_speed = 408000;
-+		break;
-+	case 1:
-+		da850_max_speed = 372000;
-+		break;
-+	}
-+
-+	return da850_register_cpufreq("pll0_sysclk3");
-+}
-+#else
-+static __init int da850_evm_init_cpufreq(void) { return 0; }
-+#endif
-+
- static __init void da850_evm_init(void)
- {
- 	int ret;
-@@ -836,7 +857,7 @@ static __init void da850_evm_init(void)
- 	if (ret)
- 		pr_warning("da850_evm_init: rtc setup failed: %d\n", ret);
- 
--	ret = da850_register_cpufreq("pll0_sysclk3");
-+	ret = da850_evm_init_cpufreq();
- 	if (ret)
- 		pr_warning("da850_evm_init: cpufreq registration failed: %d\n",
- 				ret);
--- 
-1.7.3.2
+Kevin
