@@ -1,1258 +1,413 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:55:58 +0530
-Subject: [PATCH V3 38/63] SPEAr Power Management: Added the support for
-	Standby mode.
+Date: Mon, 20 Dec 2010 13:56:05 +0530
+Subject: [PATCH V3 45/63] SPEAr: Adding and Updating Clock definitions
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <89a564b3e3e036170a05108235c6df2f25c91146.1292833229.git.viresh.kumar@st.com>
+Message-ID: <3009d8935427eaeffe1e71ffae5462d4b27ba0a8.1292833229.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
-
-OPEN POINTS: 	1. Suspend to RAM support needs to be added.
-		2. The basic framework added for S2R.
-		3. SPEAr13xx: The power domains need to be added.
-		4. Extensive testing needs to be done.
-		5. For SPEAr13xx: PLL-4 has not been switch off while moving
-		into sleep. There is some problem in getting the pll back to on.
-		6. Not functional on SPEAr6XX
-
 Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/Makefile               |    1 +
- arch/arm/mach-spear13xx/include/mach/suspend.h |   47 +++
- arch/arm/mach-spear13xx/pm.c                   |  107 ++++++
- arch/arm/mach-spear13xx/sleep.S                |  435 ++++++++++++++++++++++++
- arch/arm/mach-spear13xx/spear13xx.c            |    5 +
- arch/arm/mach-spear3xx/include/mach/suspend.h  |   44 +++
- arch/arm/mach-spear3xx/spear3xx.c              |    5 +-
- arch/arm/mach-spear6xx/include/mach/suspend.h  |   44 +++
- arch/arm/mach-spear6xx/spear6xx.c              |    9 +-
- arch/arm/plat-spear/Makefile                   |    6 +
- arch/arm/plat-spear/pm.c                       |  104 ++++++
- arch/arm/plat-spear/sleep.S                    |  288 ++++++++++++++++
- 12 files changed, 1093 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-spear13xx/include/mach/suspend.h
- create mode 100644 arch/arm/mach-spear13xx/pm.c
- create mode 100644 arch/arm/mach-spear13xx/sleep.S
- create mode 100644 arch/arm/mach-spear3xx/include/mach/suspend.h
- create mode 100644 arch/arm/mach-spear6xx/include/mach/suspend.h
- create mode 100644 arch/arm/plat-spear/pm.c
- create mode 100644 arch/arm/plat-spear/sleep.S
+ arch/arm/mach-spear13xx/clock.c                  |  210 ++++++++++++++++++++-
+ arch/arm/mach-spear13xx/include/mach/misc_regs.h |   19 ++
+ arch/arm/mach-spear3xx/clock.c                   |    6 +-
+ arch/arm/mach-spear6xx/clock.c                   |    4 +-
+ 4 files changed, 224 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
-index 9312fcd..799eefa 100644
---- a/arch/arm/mach-spear13xx/Makefile
-+++ b/arch/arm/mach-spear13xx/Makefile
-@@ -7,6 +7,7 @@ obj-y					+= spear13xx.o clock.o fsmc-nor.o
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
- obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
- obj-$(CONFIG_PCIEPORTBUS)		+= pcie.o
-+obj-$(CONFIG_PM)			+= pm.o sleep.o
- 
- # spear1300 specific files
- obj-$(CONFIG_MACH_SPEAR1300)		+= spear1300.o
-diff --git a/arch/arm/mach-spear13xx/include/mach/suspend.h b/arch/arm/mach-spear13xx/include/mach/suspend.h
-new file mode 100644
-index 0000000..c8d13e6
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/include/mach/suspend.h
-@@ -0,0 +1,47 @@
-+/*
-+ * arch/arm/mach-spear13xx/include/mach/suspend.h
-+ *
-+ * Sleep mode defines for SPEAr13xx machine family
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_SUSPEND_H
-+#define __MACH_SUSPEND_H
-+
-+#include <mach/spear.h>
-+
-+#ifndef __ASSEMBLER__
-+extern void spear_sleep_mode(suspend_state_t state);
-+extern unsigned int spear_sleep_mode_sz;
-+extern void spear_wakeup(void);
-+extern unsigned int spear_wakeup_sz;
-+#endif
-+
-+/* SRAM related defines*/
-+#define SRAM_STACK_STRT_OFF	0x500
-+#define SRAM_STACK_SCR_OFFS	0xF00
-+#define SPEAR_START_SRAM	SPEAR13XX_SYSRAM1_BASE
-+#define SPEAR_LIMIT_SRAM	(SPEAR_START_SRAM + SZ_4K - 1)
-+#define SPEAR_SRAM_STACK_PA	(SPEAR_START_SRAM + SRAM_STACK_STRT_OFF)
-+#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
-+/* SPEAr subsystem physical addresses */
-+#define MPMC_BASE_PA		SPEAR13XX_MPMC_BASE
-+#define MISC_BASE_PA		SPEAR13XX_MISC_BASE
-+
-+/* ARM Modes of Operation */
-+#define MODE_USR_32		0x10
-+#define MODE_FIQ_32		0x11
-+#define MODE_IRQ_32		0x12
-+#define MODE_SVC_32		0x13
-+#define MODE_ABT_32		0x17
-+#define MODE_UND_32		0x1B
-+#define MODE_SYS_32		0x1F
-+#define MODE_BITS		0x1F
-+
-+#endif /* __MACH_SUSPEND_H */
-diff --git a/arch/arm/mach-spear13xx/pm.c b/arch/arm/mach-spear13xx/pm.c
-new file mode 100644
-index 0000000..6152043
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/pm.c
-@@ -0,0 +1,107 @@
-+/*
-+ * arch/arm/mach-spear13xx/pm.c
-+ *
-+ * SPEAr13xx Power Management source file
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/suspend.h>
-+#include <linux/sysfs.h>
-+#include <linux/module.h>
-+#include <asm/cacheflush.h>
-+#include <mach/irqs.h>
-+#include <mach/suspend.h>
-+#include <mach/hardware.h>
-+
-+static int spear_pm_sleep(suspend_state_t state)
-+{
-+	void (*spear_sram_sleep)(suspend_state_t state) = NULL;
-+	void (*spear_sram_wake)(void) = NULL;
-+	void *sram_dest = (void *)IO_ADDRESS(SPEAR_START_SRAM);
-+
-+	if (state == PM_SUSPEND_MEM) {
-+		spear_sram_wake = memcpy(sram_dest, (void *)spear_wakeup,
-+				spear_wakeup_sz);
-+		/* Increment destination pointer by the size copied*/
-+		sram_dest += roundup(spear_wakeup_sz, 4);
-+	}
-+
-+	/* Copy the Sleep code on to the SRAM*/
-+	spear_sram_sleep = memcpy(sram_dest, (void *)spear_sleep_mode,
-+			spear_sleep_mode_sz);
-+	flush_cache_all();
-+	/* Jump to the suspend routines in sram */
-+	spear_sram_sleep(state);
-+	return 0;
-+}
-+
-+/*
-+ *	spear_pm_prepare - Do preliminary suspend work.
-+ *
-+ */
-+static int spear_pm_prepare(void)
-+{
-+	/* We cannot sleep in idle until we have resumed */
-+	disable_hlt();
-+	return 0;
-+}
-+
-+/*
-+ *	spear_pm_enter - Actually enter a sleep state.
-+ *	@state:		State we're entering.
-+ *
-+ */
-+static int spear_pm_enter(suspend_state_t state)
-+{
-+	int ret;
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+	case PM_SUSPEND_MEM:
-+		ret = spear_pm_sleep(state);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ *	spear_pm_finish - Finish up suspend sequence.
-+ *
-+ *	This is called after we wake back up (or if entering the sleep state
-+ *	failed).
-+ */
-+static void spear_pm_finish(void)
-+{
-+	enable_hlt();
-+}
-+
-+static struct platform_suspend_ops spear_pm_ops = {
-+	.prepare	= spear_pm_prepare,
-+	.enter		= spear_pm_enter,
-+	.finish		= spear_pm_finish,
-+	.valid		= suspend_valid_only_mem,
-+};
-+
-+static int __init spear_pm_init(void)
-+{
-+	void * sram_limit_va = (void *)IO_ADDRESS(SPEAR_LIMIT_SRAM);
-+	void * sram_st_va = (void *)IO_ADDRESS(SPEAR_START_SRAM);
-+
-+	/* In case the suspend code size is more than sram size return */
-+	if (spear_sleep_mode_sz > (sram_limit_va - sram_st_va))
-+		return	-ENOMEM;
-+
-+	suspend_set_ops(&spear_pm_ops);
-+
-+	return 0;
-+}
-+arch_initcall(spear_pm_init);
-diff --git a/arch/arm/mach-spear13xx/sleep.S b/arch/arm/mach-spear13xx/sleep.S
-new file mode 100644
-index 0000000..9c7f12b
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/sleep.S
-@@ -0,0 +1,435 @@
-+/*
-+ * linux/arch/arm/mach-spear13xx/sleep.S
-+ *
-+ * SPEAR13xx specific functions that will run in internal SRAM.
-+ * The functions are used in power management.
-+ *
-+ * Copyright (C) 2010 ST MicroElectronics
-+ * Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <mach/hardware.h>
-+#include <mach/suspend.h>
-+
-+/* #define DDR_PLL_SREFRESH */
-+/* #define TEST_PWRDOMAINS */
-+.text
-+ENTRY(spear_wakeup)
-+
-+spear_wakeup:
-+	b	spear_wakeup
-+	adr	r0, spear_sleep_restore
-+	bx	r0
-+
-+ENTRY(spear_wakeup_sz)
-+	.word	. - spear_wakeup
-+/*
-+ * spear_sleep_mode()
-+ * Forces SPEAr into sleep
-+ */
-+ENTRY(spear_sleep_mode)
-+	stmfd	sp!, {r0-r12, lr}		@ save registers on stack
-+	/* Store Stack address in r8 */
-+	ldr	r8, SRAM_STACK_VA
-+
-+	/* Store sp and spsr to SDRAM */
-+	mov	r4, sp
-+	mrs	r5, spsr
-+	mov	r6, lr
-+	stmia	r8!, {r4-r6}
-+
-+	/* Save all ARM registers */
-+	/* Coprocessor access control register */
-+	mrc	p15, 0, r6, c1, c0, 2
-+	stmia	r8!, {r6}
-+	/* TTBR0, TTBR1 and Translation table base control */
-+	mrc	p15, 0, r4, c2, c0, 0
-+	mrc	p15, 0, r5, c2, c0, 1
-+	mrc	p15, 0, r6, c2, c0, 2
-+	stmia	r8!, {r4-r6}
-+	/*
-+	 * Domain access control register, data fault status register,
-+	 * and instruction fault status register
-+	 */
-+	mrc	p15, 0, r4, c3, c0, 0
-+	mrc	p15, 0, r5, c5, c0, 0
-+	mrc	p15, 0, r6, c5, c0, 1
-+	stmia	r8!, {r4-r6}
-+	/*
-+	 * Data aux fault status register, instruction aux fault status,
-+	 * data fault address register and instruction fault address register
-+	 */
-+	mrc	p15, 0, r4, c5, c1, 0
-+	mrc	p15, 0, r5, c5, c1, 1
-+	mrc	p15, 0, r6, c6, c0, 0
-+	mrc	p15, 0, r7, c6, c0, 2
-+	stmia	r8!, {r4-r7}
-+	/*
-+	 * user r/w thread and process ID, user r/o thread and process ID,
-+	 * priv only thread and process ID, cache size selection
-+	 */
-+	mrc	p15, 0, r4, c13, c0, 2
-+	mrc	p15, 0, r5, c13, c0, 3
-+	mrc	p15, 0, r6, c13, c0, 4
-+	mrc	p15, 2, r7, c0, c0, 0
-+	stmia	r8!, {r4-r7}
-+	/* Data TLB lockdown, instruction TLB lockdown registers */
-+	mrc	p15, 0, r5, c10, c0, 0
-+	mrc	p15, 0, r6, c10, c0, 1
-+	stmia	r8!, {r5-r6}
-+	/* Secure or non secure vector base address, FCSE PID, Context PID*/
-+	mrc	p15, 0, r4, c12, c0, 0
-+	mrc	p15, 0, r5, c13, c0, 0
-+	mrc	p15, 0, r6, c13, c0, 1
-+	stmia	r8!, {r4-r6}
-+	/* Primary remap, normal remap registers */
-+	mrc	p15, 0, r4, c10, c2, 0
-+	mrc	p15, 0, r5, c10, c2, 1
-+	stmia	r8!, {r4-r5}
-+	/* Store current cpsr*/
-+	mrs	r2, cpsr
-+	stmia	r8!, {r2}
-+	mrc	p15, 0, r4, c1, c0, 0
-+	/* save control register */
-+	stmia	r8!, {r4}
-+	/* Data memory barrier and Data sync barrier */
-+	mov	r1, #0
-+	mcr	p15, 0, r1, c7, c10, 4
-+	mcr	p15, 0, r1, c7, c10, 5
-+	dsb
-+	isb
-+	/* Extract the physical address to jump to */
-+	adr	r0, mmu_off
-+	mov	r1, #0xcfffffff
-+	and	r0, r0, r1
-+	ldr	r1, =0x20000000
-+	orr	r0, r0, r1
-+	mov	r2, r0
-+
-+	/* Disable MMU */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	ldr	r1, DISABLE_I_C_M_V
-+	bic	r0, r0, r1
-+	mcr	p15, 0, r0, c1, c0, 0
-+	/* Move the Physical address into PC */
-+	bx	r2
-+	nop
-+mmu_off:
-+	/* Put the DDR in self refresh mode */
-+	ldr	r6, MISC_BASE_P
-+	/* Program MPMC Control Status register in Misc Space */
-+	ldr	r0, [r6, #0x334]
-+	/* Set srefresh_enter bit(2) */
-+	orr	r0, r0, #0x4
-+	str	r0, [r6, #0x334]
-+wait_till_srefresh_on:
-+	ldr	r0, [r6, #0x334]
-+	/* check for cke_status bit(13) */
-+	tst	r0, #0x2000
-+	beq	wait_till_srefresh_on
-+
-+	/* Put the system in slow mode */
-+	ldr	r0, [r6, #0x200]
-+	bic	r0, r0, #0x4
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	orr	r0, r0, #0x2
-+	str	r0, [r6, #0x200]	/* System is now in slow mode */
-+wait_till_slow_mode:
-+	ldr	r0, [r6, #0x200]
-+	/* Wait for the mode to be updated */
-+	and	r0, r0, #0xF0000
-+	/* Poll the SCCTRL register status bits (6:3) */
-+	cmp	r0, #0xA0000
-+	bne wait_till_slow_mode
-+
-+	/*
-+	 * Put the all the system pll's to off state
-+	 * The loop of count 3 is provided below to
-+	 * switch off the pll-1/2/3.
-+	 * r1 contains the offset for the pll control
-+	 * registers in the misc space.
-+	 * DDR pll-4 requires different processing.
-+	 */
-+	ldr	r1, MISC_PLL_OFFS
-+	ldr	r2, =0x0	/* PLL Counter 1, 2, 3, 4 */
-+swoff_pll:
-+	ldr	r0, [r6, r1]
-+	/* Clear pll_enable bit(1) of PLL1_CTR register in Misc registers */
-+	bic	r0, r0, #0x02
-+	str	r0, [r6, r1]
-+	add	r1, #0xc
-+	add	r2, #0x1
-+	cmp	r2, #0x3	/* Switch off pll-1/2/3 */
-+	bne	swoff_pll
-+
-+#ifdef DDR_PLL_SREFRESH
-+	/* Switch off pll-4 */
-+	ldr	r0, [r6, r1]
-+	/* Clear pll_enable bit(2) of PLL1_CTR register in Misc registers */
-+	bic	r0, r0, #0x04
-+	str	r0, [r6, r1]
-+#endif
-+
-+#ifdef TEST_PWRDOMAINS
-+	/* Switch off the undesired PLL's */
-+	nop
-+	ldr	r6, MISC_BASE_P
-+	ldr	r0, [r6, #0x200]
-+	bic	r0, r0, #0x7
-+	orr	r0, r0, #0x2
-+	str	r0, [r6, #0x200	]
-+wait_ack0:
-+	ldr	r0, [r6, #0x200]
-+	and	r0, r0, #0xF0000
-+	cmp	r0, #0xA0000
-+	bne	wait_ack0
-+	ldr	r6, MISC_BASE_P
-+	ldr	r0, [r6, #0x100]
-+
-+	/*
-+	 * Switch off the power domains.
-+	 * Clear the ack bit
-+	 */
-+	bic	r0, r0, #0xc000
-+	str	r0, [r6, #0x100]
-+
-+	bic	r0, r0, #0x1000
-+	str	r0, [r6, #0x100]
-+
-+wait_ack1:
-+	ldr	r0, [r6, #0x100]
-+	tst	r0, #0x4000
-+	beq	wait_ack1
-+
-+	/* Clear the ack bit */
-+	bic	r0, r0, #0xc000
-+	str	r0, [r6, #0x100]
-+
-+	bic	r0, r0, #0x0800
-+	str	r0, [r6, #0x100]
-+wait_ack2:
-+	ldr	r0, [r6, #0x100]
-+	tst	r0, #0x4000
-+	beq	wait_ack2
-+
-+	/* Clear the ack bit */
-+	bic	r0, r0, #0xc000
-+	str	r0, [r6, #0x100]
-+
-+	bic	r0, r0, #0x2400
-+	str	r0, [r6, #0x100]
-+wait_ack3:
-+	ldr	r0, [r6, #0x100]
-+	tst	r0, #0x4000
-+	beq	wait_ack3
-+#endif
-+	wfi				@ wait for interrupt
-+	nop
-+spear_sleep_restore:
-+	/*
-+	 * Reenable the switched off pll's. The Pll's are
-+	 * enabled using loop count of 4 to activalte all the
-+	 * pll-1/2/3/4.
-+	 * The strobing is done for pll-4 only.
-+	 */
-+
-+	ldr	r6, MISC_BASE_P
-+	ldr	r1, MISC_PLL_OFFS
-+	ldr	r2, =0x0	/* PLL Counter 1, 2, 3, 4 */
-+swon_pll_1_3:
-+	/* Switch on Pll-1/2/3 */
-+	ldr	r0, [r6, r1]
-+	orr	r0, r0, #0x2
-+	str	r0, [r6, r1]
-+pll_lock_1_3:
-+	/* Set the pll_lock bit(0) in PLLX_CTR register in misc space*/
-+	ldr	r5, [r6, r1]
-+	and	r5, r5, #0x1
-+	/* Wait for pll lock status */
-+	cmp	r5, #0x1
-+	bne	pll_lock_1_3
-+
-+	/* Loop for all the pll's */
-+	add	r1, #0xc
-+	add	r2, #0x1
-+	cmp	r2, #0x3	/* Switch on till pll-3 */
-+	bne	swon_pll_1_3
-+
-+#ifdef DDR_PLL_SREFRESH
-+	/* Switch on PLL-4, strobe the pll also */
-+	ldr	r0, [r6, r1]
-+	ldr	r0, PLL_VAL1
-+	str	r0, [r6, r1]
-+	ldr	r0, PLL_VAL2
-+	str	r0, [r6, r1]
-+	ldr	r0, PLL_VAL3
-+	str	r0, [r6, r1]
-+	ldr	r0, PLL_VAL2
-+	str	r0, [r6, r1]
-+pll_lock_4:
-+	/* Set the pll_lock bit(0) in PLLX_CTR register in misc space*/
-+	ldr	r5, [r6, r1]
-+	and	r5, r5, #0x1
-+	/* Wait for pll lock status */
-+	cmp	r5, #0x1
-+	bne	pll_lock_4
-+#endif
-+
-+	/* Put the system in normal mode */
-+	ldr	r0, [r6, #0x200]
-+	bic	r0, r0, #0x7
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	orr	r0, r0, #0x4
-+	str	r0, [r6, #0x200]	/* System is now in slow mode */
-+wait_till_normal_mode:
-+	ldr	r0, [r6, #0x200]
-+	/* Wait for the mode to be updated */
-+	and	r0, r0, #0xF0000
-+	/* Poll the SCCTRL register status bits (6:3) */
-+	cmp	r0, #0xf0000
-+	bne wait_till_normal_mode
-+
-+	/*
-+	 * Invalidate all instruction caches to PoU
-+	 * and flush branch target cache
-+	 */
-+	mov	r1, #0
-+	mcr	p15, 0, r1, c7, c5, 0
-+
-+	ldr	r3, SRAM_STACK_PA
-+	ldmia	r3!, {r4-r6}
-+	mov	sp, r4
-+	msr	spsr_cxsf, r5
-+	mov	lr, r6
-+
-+	ldmia	r3!, {r4-r9}
-+	/* Coprocessor access Control Register */
-+	mcr	p15, 0, r4, c1, c0, 2
-+
-+	/* TTBR0 */
-+	mcr	p15, 0, r5, c2, c0, 0
-+	/* TTBR1 */
-+	mcr	p15, 0, r6, c2, c0, 1
-+	/* Translation table base control register */
-+	mcr	p15, 0, r7, c2, c0, 2
-+	/*domain access Control Register */
-+	mcr	p15, 0, r8, c3, c0, 0
-+	/* data fault status Register */
-+	mcr	p15, 0, r9, c5, c0, 0
-+
-+	ldmia	r3!, {r4-r8}
-+	/* instruction fault status Register */
-+	mcr	p15, 0, r4, c5, c0, 1
-+	/*Data Auxiliary Fault Status Register */
-+	mcr	p15, 0, r5, c5, c1, 0
-+	/*Instruction Auxiliary Fault Status Register*/
-+	mcr	p15, 0, r6, c5, c1, 1
-+	/*Data Fault Address Register */
-+	mcr	p15, 0, r7, c6, c0, 0
-+	/*Instruction Fault Address Register*/
-+	mcr	p15, 0, r8, c6, c0, 2
-+	ldmia	r3!, {r4-r7}
-+
-+	/* user r/w thread and process ID */
-+	mcr	p15, 0, r4, c13, c0, 2
-+	/* user ro thread and process ID */
-+	mcr	p15, 0, r5, c13, c0, 3
-+	/*Privileged only thread and process ID */
-+	mcr	p15, 0, r6, c13, c0, 4
-+	/* cache size selection */
-+	mcr	p15, 2, r7, c0, c0, 0
-+	ldmia	r3!, {r4-r8}
-+	/* Data TLB lockdown registers */
-+	mcr	p15, 0, r4, c10, c0, 0
-+	/* Instruction TLB lockdown registers */
-+	mcr	p15, 0, r5, c10, c0, 1
-+	/* Secure or Nonsecure Vector Base Address */
-+	mcr	p15, 0, r6, c12, c0, 0
-+	/* FCSE PID */
-+	mcr	p15, 0, r7, c13, c0, 0
-+	/* Context PID */
-+	mcr	p15, 0, r8, c13, c0, 1
-+
-+	ldmia	r3!, {r4-r5}
-+	/* primary memory remap register */
-+	mcr	p15, 0, r4, c10, c2, 0
-+	/*normal memory remap register */
-+	mcr	p15, 0, r5, c10, c2, 1
-+
-+	/* Restore cpsr */
-+	ldmfd	r3!, {r4}	/*load CPSR from SDRAM*/
-+	msr	cpsr, r4	/*store cpsr */
-+	dsb
-+	isb
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c5, 4	@ Flush prefetch buffer
-+	mcr	p15, 0, r0, c7, c5, 6	@ Invalidate branch predictor array
-+	mcr	p15, 0, r0, c8, c5, 0	@ Invalidate instruction TLB
-+	mcr	p15, 0, r0, c8, c6, 0	@ Invalidate data TLB
-+
-+	adr	r5, mmu_on
-+	mov	r1, #0xcfffffff
-+	and	r5, r5, r1
-+	ldr	r1, =0x30000000
-+	orr	r5, r5, r1
-+	mov	r4, r5
-+
-+	/* Move the DDR out of self refresh mode */
-+	ldr	r6, MISC_BASE_P
-+	ldr	r7, MPMC_BASE_P
-+	/* Program MPMC Control Status register in Misc Space */
-+	ldr	r0, [r6, #0x334]
-+	/* Clear srefresh_enter bit(2) */
-+	bic	r0, r0, #0x4
-+	str	r0, [r6, #0x334]
-+	/* Additional clearance is required in the mpmc space */
-+	ldr	r0, [r7, #0x2c]
-+	/*
-+	 * Clear bit srefresh bit (2) of MPMC_11 register
-+	 * The misc wrapper does not works fine by itself till
-+	 * this bit is also cleared.
-+	 */
-+	bic	r0, r0, #0x10000
-+	str	r0, [r7, #0x2c]
-+wait_for_refresh_exit:
-+	ldr	r0, [r6, #0x334]
-+	tst	r0, #0x2000
-+	bne	wait_for_refresh_exit
-+
-+	ldmfd	r3!, {r2}
-+	/* restore the MMU control register from stack to enable mmu */
-+	mcr	p15, 0, r2, c1, c0, 0
-+	bx	r4
-+
-+mmu_on:
-+	ldmfd	sp!, {r0-r12, pc}		@ restore regs and return
-+	nop
-+
-+MPMC_BASE_P :
-+	.word MPMC_BASE_PA
-+MISC_BASE_P :
-+	.word MISC_BASE_PA
-+SRAM_STACK_VA :
-+	.word IO_ADDRESS(SPEAR_SRAM_STACK_PA)
-+SRAM_STACK_PA :
-+	.word SPEAR_SRAM_STACK_PA
-+DISABLE_I_C_M_V:
-+	.word 0x1805
-+MISC_PLL_OFFS:
-+	.word 0x214
-+#ifdef DDR_PLL_SREFRESH
-+PLL_VAL1:
-+	.word 0x060a
-+PLL_VAL2:
-+	.word 0x060e
-+PLL_VAL3:
-+	.word 0x0606
-+#endif
-+ENTRY(spear_sleep_mode_sz)
-+	.word	. - spear_sleep_mode
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index a218d15..2a37a0d 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -445,6 +445,11 @@ struct map_desc spear13xx_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM0_BASE),
- 		.length		= SZ_32K,
- 		.type		= MT_DEVICE
-+	}, {
-+		.virtual	= IO_ADDRESS(SPEAR13XX_SYSRAM1_BASE),
-+		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM1_BASE),
-+		.length		= SZ_1M,
-+		.type		= MT_MEMORY_NONCACHED
- 	},
+diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+index 2bd4c38..b1988a3 100644
+--- a/arch/arm/mach-spear13xx/clock.c
++++ b/arch/arm/mach-spear13xx/clock.c
+@@ -355,6 +355,7 @@ static struct aux_clk_config uart_synth_config = {
+ /* aux rate configuration table, in ascending order of rates */
+ struct aux_rate_tbl aux_rtbl[] = {
+ 	/* For PLL1div2 = 500 MHz */
++	{.xscale = 2, .yscale = 21, .eq = 1}, /* 48 MHz */
+ 	{.xscale = 1, .yscale = 6, .eq = 1}, /* 83 MHz */
+ 	{.xscale = 1, .yscale = 4, .eq = 1}, /* 125 MHz */
+ 	{.xscale = 1, .yscale = 3, .eq = 1}, /* 166 MHz */
+@@ -369,7 +370,7 @@ static struct clk uart_synth_clk = {
+ 	.calc_rate = &aux_calc_rate,
+ 	.recalc = &aux_clk_recalc,
+ 	.set_rate = &aux_clk_set_rate,
+-	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
++	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 1},
+ 	.private_data = &uart_synth_config,
  };
  
-diff --git a/arch/arm/mach-spear3xx/include/mach/suspend.h b/arch/arm/mach-spear3xx/include/mach/suspend.h
-new file mode 100644
-index 0000000..a525173
---- /dev/null
-+++ b/arch/arm/mach-spear3xx/include/mach/suspend.h
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/mach-spear3xx/include/mach/suspend.h
-+ *
-+ * Sleep mode defines for SPEAr3xx machine family
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_SUSPEND_H
-+#define __MACH_SUSPEND_H
-+
-+#include <mach/spear.h>
-+
-+#ifndef __ASSEMBLER__
-+extern void spear_sleep_mode(suspend_state_t state);
-+extern unsigned int spear_sleep_mode_sz;
-+#endif
-+
-+/* SRAM related defines*/
-+#define SRAM_STACK_SCR_OFFS	0xF00
-+#define SPEAR_START_SRAM	SPEAR3XX_ICM1_SRAM_BASE
-+#define SPEAR_SRAM_SIZE		SZ_4K
-+#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
-+/* SPEAr subsystem physical addresses */
-+#define SYS_CTRL_BASE_PA	SPEAR3XX_ICM3_SYS_CTRL_BASE
-+#define MPMC_BASE_PA		SPEAR3XX_ICM3_SDRAM_CTRL_BASE
-+#define MISC_BASE_PA		SPEAR3XX_ICM3_MISC_REG_BASE
-+
-+/* ARM Modes of Operation */
-+#define MODE_USR_32		0x10
-+#define MODE_FIQ_32		0x11
-+#define MODE_IRQ_32		0x12
-+#define MODE_SVC_32		0x13
-+#define MODE_ABT_32		0x17
-+#define MODE_UND_32		0x1B
-+#define MODE_SYS_32		0x1F
-+#define MODE_BITS		0x1F
-+
-+#endif /* __MACH_SUSPEND_H */
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 1817e93..278efb7 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -22,6 +22,8 @@
- #include <mach/generic.h>
- #include <mach/spear.h>
+@@ -415,7 +416,7 @@ static struct clk sdhci_synth_clk = {
+ 	.calc_rate = &aux_calc_rate,
+ 	.recalc = &aux_clk_recalc,
+ 	.set_rate = &aux_clk_set_rate,
+-	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 2},
++	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
+ 	.private_data = &sdhci_synth_config,
+ };
  
-+#define SPEAR3XX_WKUP_SRCS	(1 << IRQ_MAC_1 | 1 << IRQ_USB_DEV | \
-+				1 << IRQ_BASIC_RTC | 1 << IRQ_BASIC_GPIO)
- /* Add spear3xx machines common devices here */
- /* gpio device registeration */
- static struct pl061_platform_data gpio_plat_data = {
-@@ -227,7 +229,8 @@ void __init spear3xx_init(void)
- /* This will initialize vic */
- void __init spear3xx_init_irq(void)
- {
--	vic_init((void __iomem *)VA_SPEAR3XX_ML1_VIC_BASE, 0, ~0, 0);
-+	vic_init((void __iomem *)VA_SPEAR3XX_ML1_VIC_BASE, 0, ~0,
-+			SPEAR3XX_WKUP_SRCS);
- }
+@@ -441,7 +442,7 @@ static struct clk cfxd_synth_clk = {
+ 	.calc_rate = &aux_calc_rate,
+ 	.recalc = &aux_clk_recalc,
+ 	.set_rate = &aux_clk_set_rate,
+-	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 2},
++	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
+ 	.private_data = &cfxd_synth_config,
+ };
  
- /* Following will create static virtual/physical mappings */
-diff --git a/arch/arm/mach-spear6xx/include/mach/suspend.h b/arch/arm/mach-spear6xx/include/mach/suspend.h
-new file mode 100644
-index 0000000..e98e831
---- /dev/null
-+++ b/arch/arm/mach-spear6xx/include/mach/suspend.h
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/mach-spear6xx/include/mach/suspend.h
-+ *
-+ * Sleep mode defines for SPEAr6xx machine family
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_SUSPEND_H
-+#define __MACH_SUSPEND_H
-+
-+#include <mach/spear.h>
-+
-+#ifndef __ASSEMBLER__
-+extern void spear_sleep_mode(suspend_state_t state);
-+extern unsigned int spear_sleep_mode_sz;
-+#endif
-+
-+/* SRAM related defines*/
-+#define SRAM_STACK_SCR_OFFS	0xF00
-+#define SPEAR_START_SRAM	SPEAR6XX_ICM1_SRAM_BASE
-+#define SPEAR_SRAM_SIZE		SZ_4K
-+#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
-+/* SPEAr subsystem physical addresses */
-+#define SYS_CTRL_BASE_PA	SPEAR6XX_ICM3_SYS_CTRL_BASE
-+#define MPMC_BASE_PA		SPEAR6XX_ICM3_SDRAM_CTRL_BASE
-+#define MISC_BASE_PA		SPEAR6XX_ICM3_MISC_REG_BASE
-+
-+/* ARM Modes of Operation */
-+#define MODE_USR_32		0x10
-+#define MODE_FIQ_32		0x11
-+#define MODE_IRQ_32		0x12
-+#define MODE_SVC_32		0x13
-+#define MODE_ABT_32		0x17
-+#define MODE_UND_32		0x1B
-+#define MODE_SYS_32		0x1F
-+#define MODE_BITS		0x1F
-+
-+#endif /* __MACH_SUSPEND_H */
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 416d463..0c8c442 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -24,6 +24,12 @@
- #include <mach/generic.h>
- #include <mach/spear.h>
+@@ -467,7 +468,7 @@ static struct clk c3_synth_clk = {
+ 	.calc_rate = &aux_calc_rate,
+ 	.recalc = &aux_clk_recalc,
+ 	.set_rate = &aux_clk_set_rate,
+-	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
++	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 1},
+ 	.private_data = &c3_synth_config,
+ };
  
-+/* The wake sources are routed through vic-2 */
-+#define SPEAR6XX_WKUP_SRCS_VIC2		(1 << (IRQ_GMAC_1 - 32) | \
-+					1 << (IRQ_USB_DEV - 32) | \
-+					1 << (IRQ_BASIC_RTC - 32) |\
-+					1 << (IRQ_BASIC_GPIO - 32))
-+
- /* Add spear6xx machines common devices here */
+@@ -579,7 +580,7 @@ static struct pclk_sel gmac_phy_pclk_sel = {
+ };
  
- /* CLCD device registration */
-@@ -381,7 +387,8 @@ void __init spear6xx_init(void)
- void __init spear6xx_init_irq(void)
- {
- 	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_PRI_BASE, 0, ~0, 0);
--	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0, 0);
-+	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0,
-+			SPEAR6XX_WKUP_SRCS_VIC2);
- }
+ /* gmac phy clock */
+-static struct clk gmac_phy_clk = {
++static struct clk gmac_phy0_clk = {
+ 	.flags = ALWAYS_ENABLED,
+ 	.pclk_sel = &gmac_phy_pclk_sel,
+ 	.pclk_sel_shift = GMAC_PHY_CLK_SHIFT,
+@@ -697,8 +698,8 @@ static struct clk jpeg_clk = {
+ 	.recalc = &follow_parent,
+ };
  
- /* Following will create static virtual/physical mappings */
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 6ff3eb7..4c28f01 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -6,6 +6,7 @@
- obj-y	:= clcd.o clock.o pll_clk.o time.o
+-/* gmac clock */
+-static struct clk gmac_clk = {
++/* gmac clock :Fixed Part*/
++static struct clk gmac0_clk = {
+ 	.pclk = &ahb_clk,
+ 	.en_reg = PERIP1_CLK_ENB,
+ 	.en_reg_bit = GMAC_CLK_ENB,
+@@ -839,6 +840,92 @@ static struct clk kbd_clk = {
+ 	.recalc = &follow_parent,
+ };
  
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
-+
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
- obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
-@@ -16,3 +17,8 @@ obj-$(CONFIG_BOARD_SPEAR300_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR310_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR320_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR600_EVB)	+= i2c_eval_board.o
-+
-+ifeq ($(CONFIG_PM),y)
-+obj-$(CONFIG_ARCH_SPEAR3XX)	+= pm.o sleep.o
-+obj-$(CONFIG_ARCH_SPEAR6XX)	+= pm.o sleep.o
-+endif
-diff --git a/arch/arm/plat-spear/pm.c b/arch/arm/plat-spear/pm.c
-new file mode 100644
-index 0000000..0cb2d0c
---- /dev/null
-+++ b/arch/arm/plat-spear/pm.c
-@@ -0,0 +1,104 @@
-+/*
-+ * arch/arm/plat-spear/pm.c
-+ *
-+ * SPEAr3xx & SPEAr6xx Power Management source file
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/suspend.h>
-+#include <linux/sysfs.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <asm/cacheflush.h>
-+#include <mach/irqs.h>
-+#include <mach/suspend.h>
-+
-+static void (*saved_idle)(void);
-+static void __iomem *spear_sram_base;
-+
-+static int spear_pm_sleep(suspend_state_t state)
-+{
-+	void (*spear_sram_sleep)(suspend_state_t state) = NULL;
-+
-+	/* Copy the Sleep code on to the SRAM*/
-+	spear_sram_sleep = memcpy((void *)spear_sram_base,
-+			(void *)spear_sleep_mode, spear_sleep_mode_sz);
-+	flush_cache_all();
-+	/* Jump to the suspend routines in sram */
-+	spear_sram_sleep(state);
-+	return 0;
-+}
-+
-+/*
-+ *	spear_pm_prepare - Do preliminary suspend work.
-+ *
-+ */
-+static int spear_pm_prepare(void)
-+{
-+	/* We cannot sleep in idle until we have resumed */
-+	saved_idle = pm_idle;
-+	pm_idle = NULL;
-+	return 0;
-+}
-+
-+/*
-+ *	spear_pm_enter - Actually enter a sleep state.
-+ *	@state:		State we're entering.
-+ *
-+ */
-+static int spear_pm_enter(suspend_state_t state)
-+{
-+	int ret;
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+	case PM_SUSPEND_MEM:
-+		ret = spear_pm_sleep(state);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ *	spear_pm_finish - Finish up suspend sequence.
-+ *
-+ *	This is called after we wake back up (or if entering the sleep state
-+ *	failed).
-+ */
-+static void spear_pm_finish(void)
-+{
-+	pm_idle = saved_idle;
-+}
-+
-+static struct platform_suspend_ops spear_pm_ops = {
-+	.prepare	= spear_pm_prepare,
-+	.enter		= spear_pm_enter,
-+	.finish		= spear_pm_finish,
-+	.valid		= suspend_valid_only_mem,
++/* RAS CLOCKS */
++/* pll3 generated clock */
++static struct clk ras_pll3_clk = {
++	.pclk = &pll3_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = PLL3_CLK_ENB,
++	.recalc = &follow_parent,
 +};
 +
-+static int __init spear_pm_init(void)
-+{
++/* pll2 generated clock */
++static struct clk ras_pll2_clk = {
++	.pclk = &pll2_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = PLL2_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+	spear_sram_base = ioremap(SPEAR_START_SRAM, SPEAR_SRAM_SIZE);
++/* 125MHz clock generated on Tx pad */
++static struct clk ras_tx125_clk = {
++	.pclk = &gmii_txclk125_pad,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = C125_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+	if (!spear_sram_base)
-+		return -ENOMEM;
++/* 30 MHz clock generated by USB PHy Pll */
++static struct clk ras_30Mhz_clk = {
++	.rate = 30000000,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = C30_CLK_ENB,
++};
 +
-+	/* In case the suspend code size is more than sram size return */
-+	if (spear_sleep_mode_sz > (SPEAR_SRAM_SIZE))
-+		return	-ENOMEM;
++/* 48 MHz clock generated by USB PHy Pll */
++static struct clk ras_48Mhz_clk = {
++	.pclk = &pll5_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = C48_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+	suspend_set_ops(&spear_pm_ops);
-+	return 0;
-+}
-+arch_initcall(spear_pm_init);
-diff --git a/arch/arm/plat-spear/sleep.S b/arch/arm/plat-spear/sleep.S
-new file mode 100644
-index 0000000..5347789
---- /dev/null
-+++ b/arch/arm/plat-spear/sleep.S
-@@ -0,0 +1,288 @@
-+/*
-+ * arch/arm/plat-spear/sleep.S
-+ *
-+ * SPEAR3xx and SPEAR6xx specific functions that will run in
-+ * internal SRAM. The functions are used in power management.
-+ *
-+ * Copyright (ST) 2010 Deepak Sikri <deepak.sikri@.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
++/* osc3 generated clock */
++static struct clk ras_osc3_clk = {
++	.pclk = &ahb_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = OSC3_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <mach/hardware.h>
-+#include <mach/suspend.h>
++/* osc2 generated clock */
++static struct clk ras_osc2_clk = {
++	.pclk = &osc2_32k_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = OSC2_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+.text
-+ENTRY(spear_sleep_mode)
-+	stmfd	sp!, {r0-r12, lr}
++/* osc1 generated clock */
++static struct clk ras_osc1_clk = {
++	.pclk = &osc1_24m_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = OSC1_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+	/* Latch some of MMU registers on to stack */
-+	mrc	p15, 0, r0, c5, c0, 0 /* FSR--Domain Fault */
-+	mrc	p15, 0, r1, c5, c0, 1 /* FSR--Instruction Fault */
-+	mrc	p15, 0, r2, c6, c0, 0 /* FAR */
-+	mrc	p15, 0, r3, c9, c0, 0 /* Read Dcache Lockdown */
-+	mrc	p15, 0, r4, c9, c0, 1 /* Read ICache Lockdown */
-+	mrc	p15, 0, r5, c9, c1, 0 /* Read Data TLB */
-+	mrc	p15, 0, r6, c9, c1, 1 /* Read Instr TCM region register */
++/* apb generated clock */
++static struct clk ras_pclk_clk = {
++	.pclk = &apb_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = PCLK_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+	mrc	p15, 0, r7, c10, c0, 0 /* Data TLBLock Down operation */
-+	mrc	p15, 0, r8, c13, c0, 0 /* FCSE--PID */
-+	mrc	p15, 0, r9, c13, c0, 1 /* Context-ID */
++/* ahb generated clock */
++static struct clk ras_aclk_clk = {
++	.pclk = &ahb_clk,
++	.en_reg = RAS_CLK_ENB,
++	.en_reg_bit = ACLK_CLK_ENB,
++	.recalc = &follow_parent,
++};
 +
-+	/* Save all these registers onto the stack */
-+	stmfd	sp!, {r0-r9}
-+	/* Save the stack pointer */
-+	mov	r3, sp
-+	/* Store the two mode registers */
-+	stmfd	r3!, {sp, lr}
-+	/* Save the current mode with irq disabled */
-+	mrs	r0, cpsr
-+	stmfd	r3!, {r0}
-+	/*
-+	 * Save the MMU registers on the SRAM Stack
-+	 * Domain Register on Back-up RAM structure
-+	 */
-+	mrc	p15, 0, r2, c3, c0, 0
-+	/* TTB Register */
-+	mrc	p15, 0, r1, c2, c0, 0
-+	/* MMU Enable Register */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	stmfd	r3!, {r0, r1, r2}
-+	/*
-+	 * Capture the Physical Address.
-+	 * This will be used once MMU is Off
-+	 */
-+	adr	r0, mmu_off
-+	adr	r1, spear_sleep_mode
-+	/* Store the virtual address on to DDR */
-+	stmfd	r3!, {r1}
-+	sub	r1, r0, r1
-+	ldr	r0, SRAM_START_P
-+	add	r2, r1, r0
++/* External pad 50 MHz clock for phy operation */
++static struct clk ras_tx50_clk = {
++	.flags = ALWAYS_ENABLED,
++	.rate = 50000000,
++};
 +
-+	/* Disable MMU */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	ldr	r1, DISABLE_I_C_M_V
-+	bic	r0, r0, r1
-+	mcr	p15, 0, r0, c1, c0, 0
-+	/* Move the Physical address into PC */
-+	bx	r2
+ /* spear1300 machine specific clock structures */
+ #ifdef CONFIG_MACH_SPEAR1300
+ 
+@@ -859,10 +946,92 @@ static struct clk can1_clk = {
+ 	.pclk = &apb_clk,
+ 	.recalc = &follow_parent,
+ };
 +
-+	/*
-+	 * This portion of code is executed from SRAM
-+	 * post MMU has been turned off
-+	 */
-+mmu_off:
-+	/* Store the DDR stack address onto scratch pad location */
-+	ldr	r0, SCRATCH_PAD
-+	str	r3, [r0]
++/* gmac clocks :RAS part*/
++static struct clk gmac_ras1_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &ras_aclk_clk,
++	.recalc = &follow_parent,
++};
 +
-+	ldr	r6, MISC_BASE_P
-+	ldr	r7, MPMC_BASE_P
-+	ldr	r8, SYS_CTRL_BASE_P
++static struct clk gmac_ras2_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &ras_aclk_clk,
++	.recalc = &follow_parent,
++};
 +
-+	/*
-+	 * Put SDRAM in self-refresh mode
-+	 * Clear START bit(24) of MEMCTL_GP_03 register in MPMC
-+	 */
-+	ldr	r0, [r7, #0x1c]
-+	ldr	r4, =0x1000000
-+	/* Begin the command processing in controller */
-+	bic	r0, r0, r4
-+	str	r0, [r7, #0x1c]
-+	ldr	r0, [r7, #0x1c]
-+	/* set the SREFRESH bit(16) */
-+	ldr	r4, =0x10000
-+	orr	r0, r0, r4
-+	str	r0, [r7, #0x1c]
++static struct clk gmac_ras3_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &ras_aclk_clk,
++	.recalc = &follow_parent,
++};
 +
-+	/* Put the DDR into low power mode */
-+	ldr	r0, [r6, #0xf0]
-+	ldr	r4, =0x00000001
-+	/* Clear DDR_LOW_POWER_DDR2_MODE bit(1) of DDR_PAD register */
-+	bic	r0, r0, r4
-+	str	r0, [r6, #0xf0]
++static struct clk gmac_ras4_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &ras_aclk_clk,
++	.recalc = &follow_parent,
++};
 +
-+	/* Put the system in slow mode, use system controller */
-+	ldr	r0, [r8]
-+	bic	r0, r0, #0x4
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	orr	r0, r0, #0x2
-+	str	r0, [r8]	/* System is now in slow mode */
++/* phy clock parent select */
++static struct pclk_info phy_pclk_info[] = {
++	{
++		.pclk = &ras_pll2_clk,
++		.pclk_val = 0x8,
++	}, {
++		.pclk = &ras_tx125_clk,
++		.pclk_val = 0x4,
++	}, {
++		.pclk = &ras_tx50_clk,
++		.pclk_val = 0x0,
++	},
++};
 +
-+wait_till_slow_mode:
-+	ldr	r0, [r8]
-+	and	r0, r0, #0x78	/* Wait for the mode to be updated */
-+	cmp	r0, #0x10	/* Poll the SCCTRL register status bits (6:3) */
-+	bne wait_till_slow_mode
++static struct pclk_sel phy_pclk_sel = {
++	.pclk_info = phy_pclk_info,
++	.pclk_count = ARRAY_SIZE(phy_pclk_info),
++	.pclk_sel_reg = (unsigned int *)(IO_ADDRESS(SPEAR1310_RAS_CTRL_REG1)),
++	.pclk_sel_mask = SPEAR1310_PHY_CLK_MASK,
++};
 +
-+	/* Put the Pll-1 to off. */
-+	ldr	r0, [r6, #0x08]
-+	/* Clear pll_enable bit(2) of PLL1_CTR register in Misc registers */
-+	bic	r0, r0, #0x04
-+	str	r0, [r6, #0x08]
++/* Phy 1 Clock */
++struct clk gmac_phy1_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk_sel = &phy_pclk_sel,
++	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
++	.recalc = &follow_parent,
++};
 +
-+	/* Put the Pll-2 to off */
-+	ldr	r0, [r6, #0x14]
-+	/* Clear pll_enable bit(2) of PLL2_CTR register in Misc registers */
-+	bic	r0, r0, #0x04
-+	str	r0, [r6, #0x14]
-+	mov	r2, #0
-+	/* Put the system in sleep */
-+	ldr	r0, [r8]
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	bic	r0, r0, #0x7
-+#ifdef TEST_SLOW
-+	orr	r0, r0, #0x2 /* Slow Mode */
-+#endif
-+	str	r0, [r8]
-+	/* Put system in WFI */
-+	mcr	p15, 0, r2, c7, c0, 4
-+wakeup_addr:
-+	ldr	r6, MISC_BASE_P
-+	ldr	r7, MPMC_BASE_P
-+	ldr	r8, SYS_CTRL_BASE_P
-+	/* Reenable pll1 and pll2 */
-+	ldr	r0, PLL_VAL1
-+	str	r0, [r6, #0x08]
-+	str	r0, [r6, #0x14]
-+	ldr	r0, PLL_VAL2
-+	str	r0, [r6, #0x08]
-+	str	r0, [r6, #0x14]
-+	/* Strobe */
-+	ldr	r2, PLL_VAL3
-+	str	r2, [r6, #0x08]
-+	str	r2, [r6, #0x14]
-+	ldr	r2, PLL_VAL2
-+	str	r2, [r6, #0x08]
-+	str	r2, [r6, #0x14]
-+pll1_lock_1:
-+	/* Set the pll_lock bit(0) in PLL1_CTR register in misc space*/
-+	ldr	r2, [r6, #0x08]
-+	and	r2, r2, #0x1
-+	/* Wait for pll-1 lock status */
-+	cmp	r2, #0x1
-+	bne	pll1_lock_1
++/* Phy 2 Clock */
++static struct clk gmac_phy2_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk_sel = &phy_pclk_sel,
++	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
++	.recalc = &follow_parent,
++};
 +
-+pll2_lock_2:
-+	/* Set the pll_lock bit(0) in PLL2_CTR register in misc space*/
-+	ldr	r2, [r6, #0x14]
-+	and	r2, r2, #0x1
-+	/* Wait for pll-2 lock status */
-+	cmp	r2, #0x1
-+	bne	pll2_lock_2
++/* Phy 3 Clock */
++static struct clk gmac_phy3_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk_sel = &phy_pclk_sel,
++	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
++	.recalc = &follow_parent,
++};
 +
-+	/* Move the system in Normal mode, use system controller */
-+	ldr	r3, [r8]
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	bic	r3, r3, #0x7
-+	orr	r3, r3, #0x4
-+	str	r3, [r8]
++/* Phy 4 Clock */
++static struct clk gmac_phy4_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk_sel = &phy_pclk_sel,
++	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
++	.recalc = &follow_parent,
++};
 +
-+wait_till_norm_mode:
-+	ldr	r3, [r8]
-+	and	r3, r3, #0x78
-+	cmp	r3, #0x20	/* Poll the SCCTRL register status bits (6:3) */
-+	bne	wait_till_norm_mode
+ #endif
+ 
++static struct clk dummy_apb_pclk;
 +
-+	/* Resume the DDR from Low power mode. */
-+	ldr	r0, [r6, #0xf0]
-+	/* Set DDR_LOW_POWER_DDR2_MODE bit(1) of DDR_PAD register */
-+	orr	r0, r0, #0x01
-+	str	r0, [r6, #0xf0]
+ /* array of all spear 13xx clock lookups */
+ static struct clk_lookup spear_clk_lookups[] = {
++	{ .con_id = "apb_pclk",		.clk = &dummy_apb_pclk},
+ 	/* root clks */
+ 	{.con_id = "osc1_24m_clk",	.clk = &osc1_24m_clk},
+ 	{.con_id = "osc2_32k_clk",	.clk = &osc2_32k_clk},
+@@ -896,7 +1065,20 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{.con_id = "cfxd_synth_clk",		.clk = &cfxd_synth_clk},
+ 	{.con_id = "gmac_phy_input_clk",	.clk = &gmac_phy_input_clk},
+ 	{.con_id = "gmac_phy_synth_clk",	.clk = &gmac_phy_synth_clk},
+-	{.con_id = "gmac_phy_clk",		.clk = &gmac_phy_clk},
++	{.dev_id = "stmmacphy.0",		.clk = &gmac_phy0_clk},
 +
-+	/* Exit DDR-SDRAM from self-refresh mode */
-+	ldr	r1, [r7, #0x1c]
-+	/* clear the SREFRESH bit(16) */
-+	ldr	r4, =0x10000
-+	bic	r1, r1, r4
-+	str	r1, [r7, #0x1c]
-+
-+	/* Begin the command processing in controller */
-+	ldr	r4, =0x1000000
-+	/* Set START bit(24) of MEMCTL_GP_03 register in MPMC*/
-+	orr	r1, r1, r4
-+	str	r1, [r7, #0x1c]
-+
-+	mov	r0, r0
-+	/* Start the Restore Processing */
-+	ldr	r0, SCRATCH_PAD
-+	ldr	r6, [r0]
-+
-+	/* Restore the Virtual Address to be used */
-+	/* Once MMU is made on */
-+	ldr	r0, SRAM_START_P
-+	adr	r1, mmu_on
-+	sub	r0, r1, r0
-+	/* Get the physical Address */
-+	mov	r3, #0xc0000000
-+	sub	r6, r6, r3
-+	/* Fetch the sram virtual address */
-+	ldmfd	r6!, {r1}
-+	add	r4, r1, r0
-+
-+	/* Fetch the MMU Related information latched on SDRAM */
-+	ldmfd	r6!, {r0, r1, r2}
-+	/* Enable the MMU */
-+	mcr	p15, 0, r2, c3, c0, 0
-+	mcr	p15, 0, r1, c2, c0, 0
-+	mcr	p15, 0, r0, c1, c0, 0
-+	bx	r4
-+mmu_on:
-+	add	r6, r6, r3
-+	/* Store the value of cpsr in R0 */
-+	mrs	r0, cpsr
-+	bic	r0, r0, #MODE_BITS
-+
-+	/* Here we will restore our cpsr IRQ/FIQ Disabled */
-+	ldr	r0, [r6]
-+	msr	cpsr_cxsf, r0
-+	add	r6, r6, #4
-+
-+	/* Now only two user-mode registers are left */
-+	ldmfd	r6!, {sp, lr}
-+	mov	r0, r0
-+
-+	/* Restore stack pointer for the current mode */
-+	mov	sp, r6
-+
-+	ldmfd	sp!, {r0-r9}
-+	mcr	p15, 0, r0, c5, c0, 0 /* FSR--Domain Fault */
-+	mcr	p15, 0, r1, c5, c0, 1 /* FSR--Instruction Fault */
-+	mcr	p15, 0, r2, c6, c0, 0 /* FAR */
-+	mcr	p15, 0, r3, c9, c0, 0 /* Read Dcache Lockdown */
-+	mcr	p15, 0, r4, c9, c0, 1 /* Read ICache Lockdown */
-+	mcr 	p15, 0, r5, c9, c1, 0 /* Read Data TLB */
-+	mcr	p15, 0, r6, c9, c1, 1 /* Read Instruction Lockdown */
-+
-+	mcr	p15, 0, r7, c10, c0, 0 /* Data TLB LockDown operation */
-+	mcr	p15, 0, r8, c13, c0, 0 /* FCSE--PID */
-+	mcr	p15, 0, r9, c13, c0, 1 /* Context-ID */
-+
-+	mov	r0, #0
-+	ldmfd	sp!, {r0-r12, pc}
-+
-+SYS_CTRL_BASE_P :
-+	.word SYS_CTRL_BASE_PA
-+MPMC_BASE_P :
-+	.word MPMC_BASE_PA
-+MISC_BASE_P :
-+	.word MISC_BASE_PA
-+SRAM_START_P:
-+	.word SPEAR_START_SRAM
-+SCRATCH_PAD:
-+	.word SPEAR_SRAM_SCR_REG
-+DISABLE_I_C_M_V:
-+	.word 0x1005
-+PLL_VAL1:
-+	.word 0x1c0a
-+PLL_VAL2:
-+	.word 0x1c0e
-+PLL_VAL3:
-+	.word 0x1c06
-+ENTRY(spear_sleep_mode_sz)
-+	.word . - spear_sleep_mode
++	/* RAS clocks */
++	{.con_id = "ras_pll3_clk",		.clk = &ras_pll3_clk},
++	{.con_id = "ras_pll2_clk",		.clk = &ras_pll2_clk},
++	{.con_id = "ras_tx125_clk",		.clk = &ras_tx125_clk},
++	{.con_id = "ras_30Mhz_clk",		.clk = &ras_30Mhz_clk},
++	{.con_id = "ras_48Mhz_clk",		.clk = &ras_48Mhz_clk},
++	{.con_id = "ras_osc3_clk",		.clk = &ras_osc3_clk},
++	{.con_id = "ras_osc2_clk",		.clk = &ras_osc2_clk},
++	{.con_id = "ras_osc1_clk",		.clk = &ras_osc1_clk},
++	{.con_id = "ras_pclk_clk",		.clk = &ras_pclk_clk},
++	{.con_id = "ras_aclk_clk",		.clk = &ras_aclk_clk},
++	{.con_id = "ras_tx50_clk",		.clk = &ras_tx50_clk},
+ 
+ 	/* clocks having multiple parent source from above clocks */
+ 	{.dev_id = "clcd",		.clk = &clcd_clk},
+@@ -910,12 +1092,12 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{.dev_id = "smi",		.clk = &smi_clk},
+ 	{.con_id = "usbh.0_clk",	.clk = &uhci0_clk},
+ 	{.con_id = "usbh.1_clk",	.clk = &uhci1_clk},
+-	{.dev_id = "usbd",		.clk = &usbd_clk},
++	{.dev_id = "designware_udc",	.clk = &usbd_clk},
+ 	{.dev_id = "i2c_designware.0",	.clk = &i2c_clk},
+ 	{.dev_id = "dma0",		.clk = &dma0_clk},
+ 	{.dev_id = "dma1",		.clk = &dma1_clk},
+ 	{.dev_id = "jpeg",		.clk = &jpeg_clk},
+-	{.dev_id = "gmac",		.clk = &gmac_clk},
++	{.dev_id = "stmmaceth.0",	.clk = &gmac0_clk},
+ 	{.dev_id = "c3",		.clk = &c3_clk},
+ 	{.dev_id = "pcie0",		.clk = &pcie0_clk},
+ 	{.dev_id = "pcie1",		.clk = &pcie1_clk},
+@@ -944,6 +1126,14 @@ static struct clk_lookup spear_clk_lookups[] = {
+ #ifdef CONFIG_MACH_SPEAR1310
+ 	{.dev_id = "spear_can.0",	.clk = &can0_clk},
+ 	{.dev_id = "spear_can.1",	.clk = &can1_clk},
++	{.dev_id = "stmmaceth.1",	.clk = &gmac_ras1_clk},
++	{.dev_id = "stmmaceth.2",	.clk = &gmac_ras2_clk},
++	{.dev_id = "stmmaceth.3",	.clk = &gmac_ras3_clk},
++	{.dev_id = "stmmaceth.4",	.clk = &gmac_ras4_clk},
++	{.dev_id = "stmmacphy.1",	.clk = &gmac_phy1_clk},
++	{.dev_id = "stmmacphy.2",	.clk = &gmac_phy2_clk},
++	{.dev_id = "stmmacphy.3",	.clk = &gmac_phy3_clk},
++	{.dev_id = "stmmacphy.4",	.clk = &gmac_phy4_clk},
+ #endif
+ };
+ 
+diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+index 3cfd4fc..ea6096f 100644
+--- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
++++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+@@ -191,6 +191,25 @@
+ 	#define JPEG_SOF_RST		28
+ #define PERIP2_SW_RST		((unsigned int *)(MISC_BASE + 0x280))
+ #define RAS_CLK_ENB		((unsigned int *)(MISC_BASE + 0x284))
++	/* RAS_CLK_ENB register masks */
++	#define ACLK_CLK_ENB		0
++	#define PCLK_CLK_ENB		1
++	#define OSC1_CLK_ENB		2
++	#define OSC2_CLK_ENB		3
++	#define OSC3_CLK_ENB		4
++	#define C48_CLK_ENB		5
++	#define C30_CLK_ENB		6
++	#define C125_CLK_ENB		7
++	#define PLL2_CLK_ENB		8
++	#define PLL3_CLK_ENB		9
++	#define PCLK0_CLK_ENB		10
++	#define PCLK1_CLK_ENB		11
++	#define PCLK2_CLK_ENB		12
++	#define PCLK3_CLK_ENB		13
++	#define SYN0_CLK_ENB		14
++	#define SYN1_CLK_ENB		15
++	#define SYN2_CLK_ENB		16
++	#define SYN3_CLK_ENB		17
+ #define RAS_SW_RST		((unsigned int *)(MISC_BASE + 0x288))
+ #define PLL1_SYNT		((unsigned int *)(MISC_BASE + 0x28c))
+ #define I2S_CLK_CFG		((unsigned int *)(MISC_BASE + 0x290))
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index 412bf52..775dc9e 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -713,7 +713,7 @@ static struct clk pwm_clk = {
+ 
+ /* array of all spear 3xx clock lookups */
+ static struct clk_lookup spear_clk_lookups[] = {
+-	{ .con_id = "apb_pclk",	.clk = &dummy_apb_pclk},
++	{ .con_id = "apb_pclk",		.clk = &dummy_apb_pclk},
+ 	/* root clks */
+ 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
+ 	{ .con_id = "osc_24m_clk",	.clk = &osc_24m_clk},
+@@ -738,8 +738,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "gpt1",		.clk = &gpt1_clk},
+ 	{ .dev_id = "gpt2",		.clk = &gpt2_clk},
+ 	/* clock derived from pll3 clk */
++	{ .dev_id = "designware_udc",   .clk = &usbd_clk},
+ 	{ .con_id = "usbh_clk",		.clk = &usbh_clk},
+-	{ .dev_id = "usbd",		.clk = &usbd_clk},
+ 	/* clock derived from ahb clk */
+ 	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
+ 	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
+@@ -755,7 +755,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
+ 	{ .dev_id = "gpio",		.clk = &gpio_clk},
+ #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
+-	{ .dev_id = "physmap-flash",	.clk = &emi_clk},
++	{ .dev_id = "emi",		.clk = &emi_clk},
+ #endif
+ #if defined(CONFIG_MACH_SPEAR300) || defined(CONFIG_MACH_SPEAR310) || \
+ 	defined(CONFIG_MACH_SPEAR320)
+diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+index 0a38e16..f304102 100644
+--- a/arch/arm/mach-spear6xx/clock.c
++++ b/arch/arm/mach-spear6xx/clock.c
+@@ -685,7 +685,7 @@ static struct clk dummy_apb_pclk;
+ 
+ /* array of all spear 6xx clock lookups */
+ static struct clk_lookup spear_clk_lookups[] = {
+-	{ .con_id = "apb_pclk",	.clk = &dummy_apb_pclk},
++	{ .con_id = "apb_pclk",		.clk = &dummy_apb_pclk},
+ 	/* root clks */
+ 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
+ 	{ .con_id = "osc_30m_clk",	.clk = &osc_30m_clk},
+@@ -714,9 +714,9 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "gpt2",		.clk = &gpt2_clk},
+ 	{ .dev_id = "gpt3",		.clk = &gpt3_clk},
+ 	/* clock derived from pll3 clk */
++	{ .dev_id = "designware_udc",	.clk = &usbd_clk},
+ 	{ .con_id = "usbh.0_clk",	.clk = &usbh0_clk},
+ 	{ .con_id = "usbh.1_clk",	.clk = &usbh1_clk},
+-	{ .dev_id = "usbd",		.clk = &usbd_clk},
+ 	/* clock derived from ahb clk */
+ 	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
+ 	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
 -- 
 1.7.2.2
