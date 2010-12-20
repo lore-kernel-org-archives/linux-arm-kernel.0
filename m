@@ -1,42 +1,52 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 20 Dec 2010 23:10:15 +0800
-Subject: [PATCH 12/24] ARM: PXA: update clock source registration
-In-Reply-To: <20101216103829.GN9937@n2100.arm.linux.org.uk>
-References: <20101213191437.GN8665@n2100.arm.linux.org.uk>
-	<E1PSDvL-0008D4-Oi@rmk-PC.arm.linux.org.uk>
-	<AANLkTi=tdaVXTk+0H1_w3kvsfVBi6P7H5STS9NhSU7cC@mail.gmail.com>
-	<20101216103829.GN9937@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTin_qmX=bAWROPc0DPwPT5vHfoZjJedU1tY=c+Tf@mail.gmail.com>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Mon, 20 Dec 2010 17:29:32 +0200 (EET)
+Subject: [PATCH v2] Keyboard: omap-keypad: use matrix_keypad.h
+In-Reply-To: <201012181639.29820.jkrzyszt@tis.icnet.pl>
+References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+	<20101218060104.GA1623@core.coreip.homeip.net>
+	<201012181639.29820.jkrzyszt@tis.icnet.pl>
+Message-ID: <alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 16, 2010 at 6:38 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 14, 2010 at 11:09:21AM +0800, Eric Miao wrote:
->> On Tue, Dec 14, 2010 at 3:19 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
->> > interfaces were added which simplify (and optimize) the selection of the
->> > divisor shift/mult constants. ?Switch over to using this new interface.
->> >
->>
->> Russell,
->>
->> This has been already addressed in Haojian's previous patch posted and
->> merged in my tree:
->>
->> http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commitdiff;h=ee5ed917c3c412e0e13d1c198b5f09f82c03eea4
->>
->> I'll send the pull request out early today to sort this out.
->
-> That's not quite the same. ?clocksource_calc_mult_shift() was introduced
-> in November 2009, whereas clocksource_register_hz() was introduced in
-> May 2010. ?I'm updating everything to the latest interface.
->
-> The newer interface removes the burden of having to figure out what to
-> pass as the 'minsec' parameter, as well as simplifying the clocksource
-> registration code down to one line.
->
->
+Hello,
 
-OK. I'll drop the patch from my queue.
+On Sat, 18 Dec 2010, Janusz Krzysztofik wrote:
+> Most keypad drivers make use of the <linux/input/matrix_keypad.h>
+> defined macros, structures and inline functions.
+>
+> Convert omap-keypad driver to use those as well, as suggested by a
+> compile time warning, hardcoded into the OMAP <palt/keypad.h>.
+>
+> Created against linux-2.6.37-rc5.
+> Tested on Amstrad Delta.
+> Compile tested with omap1_defconfig and omap2plus_defconfig shrinked to
+> board-h4.
+>
+> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+
+[...]
+
+> --- linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c.orig 2010-12-09 23:07:35.000000000 +0100
+> +++ linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c      2010-12-18 16:23:29.000000000 +0100
+> @@ -46,81 +46,79 @@ static u16 ams_delta_latch2_reg;
+> static int ams_delta_keymap[] = {
+
+[...]
+
+> +static const struct matrix_keymap_data ams_delta_keymap_data = {
+> +       .keymap         = ams_delta_keymap,
+> +       .keymap_size    = ARRAY_SIZE(ams_delta_keymap),
+> +};
+
+You should update the ams_delta_keymap type as well, otherwise this patch
+will introduce the following sparse warning:
+
+   CHECK   arch/arm/mach-omap1/board-ams-delta.c
+arch/arm/mach-omap1/board-ams-delta.c:191:27: warning: incorrect type in initializer (different signedness)
+arch/arm/mach-omap1/board-ams-delta.c:191:27:    expected unsigned int const [usertype] *keymap
+arch/arm/mach-omap1/board-ams-delta.c:191:27:    got int static [toplevel] *<noident>
+
+I only checked E3, so other boards should be checked as well.
+
+A.
