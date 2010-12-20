@@ -1,89 +1,174 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 20 Dec 2010 11:18:32 +0100
-Subject: [PATCH v4 3/7] omap3: pm: introduce errata handling
-In-Reply-To: <1292712817-24999-4-git-send-email-nm@ti.com>
+Date: Mon, 20 Dec 2010 11:19:14 +0100
+Subject: [PATCH v4 1/7] OMAP3: PM: Update clean_l2 to use
+	v7_flush_dcache_all
+In-Reply-To: <9ad7cd880801fcc6f63435ec2c8dcd3d@mail.gmail.com>
 References: <1292712817-24999-1-git-send-email-nm@ti.com>
-	<1292712817-24999-4-git-send-email-nm@ti.com>
-Message-ID: <AANLkTimXTxZ1=9wKYAo7rUGkwdzRpL4-mF-R7-qLNTLF@mail.gmail.com>
+	<1292712817-24999-2-git-send-email-nm@ti.com>
+	<9ad7cd880801fcc6f63435ec2c8dcd3d@mail.gmail.com>
+Message-ID: <AANLkTim1MKkHkyi9c2+R8c8Nj-C8RWVeDsyOarime5et@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishant,
+On Mon, Dec 20, 2010 at 7:43 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+>> owner at vger.kernel.org] On Behalf Of Nishanth Menon
+>> Sent: Sunday, December 19, 2010 4:24 AM
+>> To: linux-omap; linux-arm
+>> Cc: Jean Pihet; Kevin; Tony
+>> Subject: [PATCH v4 1/7] OMAP3: PM: Update clean_l2 to use
+>> v7_flush_dcache_all
+>>
+>> From: Richard Woodruff <r-woodruff2@ti.com>
+>>
+>> Analysis in TI kernel with ETM showed that using cache mapped flush
+>> in kernel instead of SO mapped flush cost drops by 65% (3.39mS down
+>> to 1.17mS) for clean_l2 which is used during sleep sequences.
+>> Overall:
+>> ? ? ? - speed up
+>> ? ? ? - unfortunately there isn't a good alternative flush method today
+>> ? ? ? - code reduction and less maintenance and potential bug in
+>> ? ? ? ? unmaintained code
+>>
+>> This also fixes the bug with the clean_l2 function usage.
+>>
+>> Reported-by: Tony Lindgren <tony@atomide.com>
+>>
+>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>>
+>> [nm at ti.com: ported rkw's proposal to 2.6.37-rc2]
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Richard Woodruff <r-woodruff2@ti.com>
+>> ---
+>> (no change in this series, posted for completeness)
+>> v2: https://patchwork.kernel.org/patch/365222/
+>> v1: http://marc.info/?l=linux-omap&m=129013171325210&w=2
+>> ?arch/arm/mach-omap2/sleep34xx.S | ? 79
+> ++++++----------------------------
+>> ----
+>> ?1 files changed, 13 insertions(+), 66 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-
+>> omap2/sleep34xx.S
+>> index 2fb205a..2c20fcf 100644
+>> --- a/arch/arm/mach-omap2/sleep34xx.S
+>> +++ b/arch/arm/mach-omap2/sleep34xx.S
+>> @@ -520,72 +520,17 @@ clean_caches:
+>> ? ? ? cmp ? ? r9, #1 /* Check whether L2 inval is required or not*/
+>> ? ? ? bne ? ? skip_l2_inval
+>> ?clean_l2:
+>> - ? ? /* read clidr */
+>> - ? ? mrc ? ? p15, 1, r0, c0, c0, 1
+>> - ? ? /* extract loc from clidr */
+>> - ? ? ands ? ?r3, r0, #0x7000000
+>> - ? ? /* left align loc bit field */
+>> - ? ? mov ? ? r3, r3, lsr #23
+>> - ? ? /* if loc is 0, then no need to clean */
+>> - ? ? beq ? ? finished
+>> - ? ? /* start clean at cache level 0 */
+>> - ? ? mov ? ? r10, #0
+>> -loop1:
+>> - ? ? /* work out 3x current cache level */
+>> - ? ? add ? ? r2, r10, r10, lsr #1
+>> - ? ? /* extract cache type bits from clidr*/
+>> - ? ? mov ? ? r1, r0, lsr r2
+>> - ? ? /* mask of the bits for current cache only */
+>> - ? ? and ? ? r1, r1, #7
+>> - ? ? /* see what cache we have at this level */
+>> - ? ? cmp ? ? r1, #2
+>> - ? ? /* skip if no cache, or just i-cache */
+>> - ? ? blt ? ? skip
+>> - ? ? /* select current cache level in cssr */
+>> - ? ? mcr ? ? p15, 2, r10, c0, c0, 0
+>> - ? ? /* isb to sych the new cssr&csidr */
+>> - ? ? isb
+>> - ? ? /* read the new csidr */
+>> - ? ? mrc ? ? p15, 1, r1, c0, c0, 0
+>> - ? ? /* extract the length of the cache lines */
+>> - ? ? and ? ? r2, r1, #7
+>> - ? ? /* add 4 (line length offset) */
+>> - ? ? add ? ? r2, r2, #4
+>> - ? ? ldr ? ? r4, assoc_mask
+>> - ? ? /* find maximum number on the way size */
+>> - ? ? ands ? ?r4, r4, r1, lsr #3
+>> - ? ? /* find bit position of way size increment */
+>> - ? ? clz ? ? r5, r4
+>> - ? ? ldr ? ? r7, numset_mask
+>> - ? ? /* extract max number of the index size*/
+>> - ? ? ands ? ?r7, r7, r1, lsr #13
+>> -loop2:
+>> - ? ? mov ? ? r9, r4
+>> - ? ? /* create working copy of max way size*/
+>> -loop3:
+>> - ? ? /* factor way and cache number into r11 */
+>> - ? ? orr ? ? r11, r10, r9, lsl r5
+>> - ? ? /* factor index number into r11 */
+>> - ? ? orr ? ? r11, r11, r7, lsl r2
+>> - ? ? /*clean & invalidate by set/way */
+>> - ? ? mcr ? ? p15, 0, r11, c7, c10, 2
+>> - ? ? /* decrement the way*/
+>> - ? ? subs ? ?r9, r9, #1
+>> - ? ? bge ? ? loop3
+>> - ? ? /*decrement the index */
+>> - ? ? subs ? ?r7, r7, #1
+>> - ? ? bge ? ? loop2
+>> -skip:
+>> - ? ? add ? ? r10, r10, #2
+>> - ? ? /* increment cache number */
+>> - ? ? cmp ? ? r3, r10
+>> - ? ? bgt ? ? loop1
+>> -finished:
+>> - ? ? /*swith back to cache level 0 */
+>> - ? ? mov ? ? r10, #0
+>> - ? ? /* select current cache level in cssr */
+>> - ? ? mcr ? ? p15, 2, r10, c0, c0, 0
+>> - ? ? isb
+>> + ? ? /*
+>> + ? ? ?* Jump out to kernel flush routine
+>> + ? ? ?* ?- reuse that code is better
+>> + ? ? ?* ?- it executes in a cached space so is faster than refetch per-
+>> block
+>> + ? ? ?* ?- should be faster and will change with kernel
+>> + ? ? ?* ?- 'might' have to copy address, load and jump to it
+> Would be good to clarify that this is needed to maintain the 'lr'
+> when code is executed from SRAM
+>
+Agree on that. Some comments have been posted at
+http://marc.info/?l=linux-omap&m=129016170719489&w=2.
 
-Here a few minor remarks about typos:
+>> + ? ? ?*/
+>> + ? ? ldr r1, kernel_flush
+>> + ? ? mov lr, pc
+>> + ? ? bx ?r1
+>> +
+>> ?skip_l2_inval:
+>> ? ? ? /* Data memory barrier and Data sync barrier */
+>> ? ? ? mov ? ? r1, #0
+>> @@ -668,5 +613,7 @@ cache_pred_disable_mask:
+>> ? ? ? .word ? 0xFFFFE7FB
+>> ?control_stat:
+>> ? ? ? .word ? CONTROL_STAT
+>> +kernel_flush:
+>> + ? ? .word v7_flush_dcache_all
+>> ?ENTRY(omap34xx_cpu_suspend_sz)
+>> ? ? ? .word ? . - omap34xx_cpu_suspend
+>
+> O.w
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-On Sat, Dec 18, 2010 at 11:53 PM, Nishanth Menon <nm@ti.com> wrote:
-> Introduce errata handling for omap3. This patch introduces
-Use caps for OMAP3
-
-> errata variable and and stub for initialization which will be
-and and -> and
-
-> filled up by followon patches.
-followon -> follow-on?
+Acked-by: Jean Pihet <j-pihet@ti.com>
 
 >
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> Splitting the errata introduction out into it's own separate patch
->
-> ?arch/arm/mach-omap2/pm.h ? ? | ? ?7 +++++++
-> ?arch/arm/mach-omap2/pm34xx.c | ? ?9 +++++++++
-> ?2 files changed, 16 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index 0d75bfd..0348fd7 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -85,4 +85,11 @@ extern unsigned int save_secure_ram_context_sz;
-> ?extern unsigned int omap24xx_cpu_suspend_sz;
-> ?extern unsigned int omap34xx_cpu_suspend_sz;
->
-> +#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
-> +extern u16 pm34xx_errata;
-> +#define IS_PM34XX_ERRATUM(id) ? ? ? ? ?(pm34xx_errata & (id))
-> +#else
-> +#define IS_PM34XX_ERRATUM(id) ? ? ? ? ?0
-> +#endif ? ? ? ? /* defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3) */
-> +
-> ?#endif
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 648b8c5..5702f41 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -68,6 +68,9 @@ static inline bool is_suspending(void)
-> ?#define OMAP343X_TABLE_VALUE_OFFSET ? ? ? 0xc0
-> ?#define OMAP343X_CONTROL_REG_VALUE_OFFSET ?0xc8
->
-> +/* pm34xx errata defined in pm.h */
-> +u16 pm34xx_errata;
-> +
-> ?struct power_state {
-> ? ? ? ?struct powerdomain *pwrdm;
-> ? ? ? ?u32 next_state;
-> @@ -1002,6 +1005,10 @@ void omap_push_sram_idle(void)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?save_secure_ram_context_sz);
-> ?}
->
-> +static void __init pm_errata_configure(void)
-> +{
-> +}
-> +
-> ?static int __init omap3_pm_init(void)
-> ?{
-> ? ? ? ?struct power_state *pwrst, *tmp;
-> @@ -1011,6 +1018,8 @@ static int __init omap3_pm_init(void)
-> ? ? ? ?if (!cpu_is_omap34xx())
-> ? ? ? ? ? ? ? ?return -ENODEV;
->
-> + ? ? ? pm_errata_configure();
-> +
-> ? ? ? ?printk(KERN_ERR "Power Management for TI OMAP3.\n");
->
-> ? ? ? ?/* XXX prcm_setup_regs needs to be before enabling hw
-> --
-> 1.6.3.3
->
+>> --
+>> 1.6.3.3
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
 
 Jean
