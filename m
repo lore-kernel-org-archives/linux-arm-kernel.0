@@ -1,63 +1,84 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Dec 2010 14:20:29 -0800
-Subject: [PATCHv4 0/4] ARM: Fixing udelay() for SMP and non-SMP systems
-Message-ID: <1292883633-19553-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 20 Dec 2010 14:20:33 -0800
+Subject: [PATCHv4 4/4] msm: timer: Migrate to timer based __delay()
+In-Reply-To: <1292883633-19553-1-git-send-email-sboyd@codeaurora.org>
+References: <1292883633-19553-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1292883633-19553-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches fix the udelay() issue pointed out on
-arm-lkml[1][2]. A quick recap: some SMP machines can scale
-their CPU frequencies independent of one another. loops_per_jiffy
-is calibrated globally and used in __const_udelay(). If one CPU
-is running faster than what the loops_per_jiffy is calculated
-(or scaled) for, udelay() will be incorrect and not wait long
-enough (or too long). A similar problem occurs if the cpu
-frequency is scaled during a udelay() call.
+We have to provide a dummy set_mode for the DGT since we don't
+want it to ever turn off.
 
-We could fix this issue a couple ways, wholesale replacement
-of __udelay() and __const_udelay() (see [2] for that approach),
-or replacement of __delay() (this series). Option 1 can fail if
-anybody uses udelay() before memory is mapped and also duplicates
-most of the code in asm/delay.h. It also needs to hardcode the
-timer tick frequency, which can sometimes be inaccurate. The
-benefit is that loops_per_jiffy stays the same and thus BogoMIPS
-is unchanged.  Option 2 can't fail since the __delay() loop is
-replaced after memory is mapped in, but it suffers from a low
-BogoMIPS when timers are clocked slowly. It also more accurately
-calculates the timer tick frequency through the use of
-calibrate_delay_direct().
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
--- Reference --
-[1] http://article.gmane.org/gmane.linux.kernel/977567
-[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/78496 
+This is more of an illustration patch. This code needs to be
+fixed to always leave clocksources running.
 
-Changes since v3:
- * Inlined set_delay_fn()
-
-Changes since v2:
- * Additional patch using the timer based delay
-
-Changes since v1:
- * likely() in delay.c
- * comment fixup for read_current_timer_delay_loop()
- * cosmetic improvements to commit text
-
-Stephen Boyd (4):
-  ARM: Translate delay.S into (mostly) C
-  ARM: Allow machines to override __delay()
-  ARM: Implement a timer based __delay() loop
-  msm: timer: Migrate to timer based __delay()
-
- arch/arm/include/asm/delay.h           |   11 ++++-
- arch/arm/kernel/armksyms.c             |    4 --
- arch/arm/lib/delay.S                   |   65 -------------------------
- arch/arm/lib/delay.c                   |   81 ++++++++++++++++++++++++++++++++
  arch/arm/mach-msm/include/mach/timex.h |    1 +
- arch/arm/mach-msm/timer.c              |   16 ++++++-
- 6 files changed, 107 insertions(+), 71 deletions(-)
- delete mode 100644 arch/arm/lib/delay.S
- create mode 100644 arch/arm/lib/delay.c
+ arch/arm/mach-msm/timer.c              |   16 +++++++++++++++-
+ 2 files changed, 16 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-msm/include/mach/timex.h b/arch/arm/mach-msm/include/mach/timex.h
+index a62e6b2..52b602b 100644
+--- a/arch/arm/mach-msm/include/mach/timex.h
++++ b/arch/arm/mach-msm/include/mach/timex.h
+@@ -17,5 +17,6 @@
+ #define __ASM_ARCH_MSM_TIMEX_H
+ 
+ #define CLOCK_TICK_RATE		1000000
++#define ARCH_HAS_READ_CURRENT_TIMER
+ 
+ #endif
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 950100f..9da4908 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -84,6 +84,12 @@ static cycle_t msm_dgt_read(struct clocksource *cs)
+ 	return readl(MSM_DGT_BASE + TIMER_COUNT_VAL) >> MSM_DGT_SHIFT;
+ }
+ 
++int read_current_timer(unsigned long *timer_val)
++{
++	*timer_val = readl(MSM_DGT_BASE + TIMER_COUNT_VAL);
++	return 0;
++}
++
+ static int msm_timer_set_next_event(unsigned long cycles,
+ 				    struct clock_event_device *evt)
+ {
+@@ -122,6 +128,12 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
+ 	}
+ }
+ 
++static void msm_timer_set_mode_nop(enum clock_event_mode mode,
++				struct clock_event_device *evt)
++{
++	/* The timer is always ticking so do nothing */
++}
++
+ static struct msm_clock msm_clocks[] = {
+ 	{
+ 		.clockevent = {
+@@ -157,7 +169,7 @@ static struct msm_clock msm_clocks[] = {
+ 			.shift          = 32 + MSM_DGT_SHIFT,
+ 			.rating         = 300,
+ 			.set_next_event = msm_timer_set_next_event,
+-			.set_mode       = msm_timer_set_mode,
++			.set_mode       = msm_timer_set_mode_nop,
+ 		},
+ 		.clocksource = {
+ 			.name           = "dg_timer",
+@@ -218,6 +230,8 @@ static void __init msm_timer_init(void)
+ 
+ 		clockevents_register_device(ce);
+ 	}
++	writel(TIMER_ENABLE_EN, MSM_DGT_BASE + TIMER_ENABLE);
++	set_delay_fn(read_current_timer_delay_loop);
+ }
+ 
+ struct sys_timer msm_timer = {
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
