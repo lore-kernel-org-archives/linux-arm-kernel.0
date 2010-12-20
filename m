@@ -1,20 +1,164 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 20 Dec 2010 22:57:41 +0800
-Subject: [PATCH v8 00/15] ARM: mxs: Add initial support for MX23 and MX28
-Message-ID: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
+Date: Mon, 20 Dec 2010 22:57:42 +0800
+Subject: [PATCH v8 05/15] ARM: mxs: Add low-level debug UART support
+In-Reply-To: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
+References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1292857064-5032-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ - DEBUG_LL support, which is incompatible with multi-soc MXS image
+   because of different DUART base address on MX23 and MX28
+ - uncompress message support
+
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
 Changes for v8:
  - Reuse debug-pl01x.S as mxs DUART is just an amba-pl011
- - Remove extra space in iomux.c
- - Remove uncessary line breaker in mach-mx23evk.c
 
- [PATCH v8 05/15] ARM: mxs: Add low-level debug UART support
- [PATCH v8 08/15] ARM: mxs: Add iomux support
- [PATCH v8 13/15] ARM: mxs: Add initial mx23evk support
+Changes for v7:
+ - Add namespace for uart_base and UART()
 
-Thanks for the review comments.
+Changes for v3:
+ - debug-macro.S: change inclusion of hardware.h to mx23.h plus mx28.h
+ - Remove #define __MXS_BOOT_UNCOMPRESS
+ - Add namespace MXS_DUART_ for macros
+ - Add comment "If it's not, the output is simply discarded."
 
-Regards,
-Shawn
+Changes for v2:
+ - Remove incorrect comments
+
+ arch/arm/mach-mxs/include/mach/debug-macro.S |   38 +++++++++++++
+ arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
+
+diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+new file mode 100644
+index 0000000..79650a1
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+@@ -0,0 +1,38 @@
++/* arch/arm/mach-mxs/include/mach/debug-macro.S
++ *
++ * Debugging macro include header
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <mach/mx23.h>
++#include <mach/mx28.h>
++
++#ifdef CONFIG_SOC_IMX23
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX23_DUART_BASE_ADDR
++#endif
++
++#ifdef CONFIG_SOC_IMX28
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX28_DUART_BASE_ADDR
++#endif
++
++#define UART_VADDR	MXS_IO_ADDRESS(UART_PADDR)
++
++		.macro	addruart, rp, rv
++		ldr	\rp, =UART_PADDR	@ physical
++		ldr	\rv, =UART_VADDR	@ virtual
++		.endm
++
++#include <asm/hardware/debug-pl01x.S>
+diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+new file mode 100644
+index 0000000..a005e76
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+@@ -0,0 +1,76 @@
++/*
++ *  arch/arm/mach-mxs/include/mach/uncompress.h
++ *
++ *  Copyright (C) 1999 ARM Limited
++ *  Copyright (C) Shane Nay (shane at minirl.com)
++ *  Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __MACH_MXS_UNCOMPRESS_H__
++#define __MACH_MXS_UNCOMPRESS_H__
++
++#include <asm/mach-types.h>
++
++static unsigned long mxs_duart_base;
++
++#define MXS_DUART(x)	(*(volatile unsigned long *)(mxs_duart_base + (x)))
++
++#define MXS_DUART_DR		0x00
++#define MXS_DUART_FR		0x18
++#define MXS_DUART_FR_TXFE	(1 << 7)
++#define MXS_DUART_CR		0x30
++#define MXS_DUART_CR_UARTEN	(1 << 0)
++
++/*
++ * The following code assumes the serial port has already been
++ * initialized by the bootloader. If it's not, the output is
++ * simply discarded.
++ */
++
++static void putc(int ch)
++{
++	if (!mxs_duart_base)
++		return;
++	if (!(MXS_DUART(MXS_DUART_CR) & MXS_DUART_CR_UARTEN))
++		return;
++
++	while (!(MXS_DUART(MXS_DUART_FR) & MXS_DUART_FR_TXFE))
++		barrier();
++
++	MXS_DUART(MXS_DUART_DR) = ch;
++}
++
++static inline void flush(void)
++{
++}
++
++#define MX23_DUART_BASE_ADDR	0x80070000
++#define MX28_DUART_BASE_ADDR	0x80074000
++
++static inline void __arch_decomp_setup(unsigned long arch_id)
++{
++	switch (arch_id) {
++	case MACH_TYPE_MX23EVK:
++		mxs_duart_base = MX23_DUART_BASE_ADDR;
++		break;
++	case MACH_TYPE_MX28EVK:
++		mxs_duart_base = MX28_DUART_BASE_ADDR;
++		break;
++	default:
++		break;
++	}
++}
++
++#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
++#define arch_decomp_wdog()
++
++#endif /* __MACH_MXS_UNCOMPRESS_H__ */
+-- 
+1.7.1
