@@ -1,143 +1,74 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:55:43 +0530
-Subject: [PATCH V3 23/63] ST SPEAr: Adding Watchdog support
+Date: Mon, 20 Dec 2010 13:55:45 +0530
+Subject: [PATCH V3 25/63] Newly erased page read workaround
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <cfde23b37a779944a4deab5d0cec0a952e153890.1292833228.git.viresh.kumar@st.com>
+Message-ID: <6187de0568d1ea8a6aeb6c3ca54ac6684bee9973.1292833228.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
----
- arch/arm/mach-spear3xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear3xx/spear300_evb.c         |    1 +
- arch/arm/mach-spear3xx/spear310_evb.c         |    1 +
- arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
- arch/arm/mach-spear3xx/spear3xx.c             |   12 ++++++++++++
- arch/arm/mach-spear6xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear6xx/spear600_evb.c         |    1 +
- arch/arm/mach-spear6xx/spear6xx.c             |   12 ++++++++++++
- 8 files changed, 30 insertions(+), 0 deletions(-)
+From: Vipin Kumar <vipin.kumar@st.com>
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 447de7e..3a64846 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -33,6 +33,7 @@
- /* Add spear3xx family device structure declarations here */
- extern struct amba_device gpio_device;
- extern struct amba_device uart_device;
-+extern struct amba_device wdt_device;
- extern struct platform_device ehci_device;
- extern struct platform_device i2c_device;
- extern struct platform_device ohci0_device;
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index b4dca98..a4a854e 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -37,6 +37,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 	&gpio_device,
- 	&uart_device,
-+	&wdt_device,
+A newly erased page contains ff in data as well as spare area. While reading an
+erased page, the read out ecc from spare area does not match the ecc generated
+by fsmc ecc hardware accelarator. This is because ecc of data ff ff is not ff
+ff. This leads to errors when jffs2 fs erases and reads back the pages to
+ensure consistency.
+
+This patch adds a software workaround to ensure that the ecc check is not
+performed for erased pages. An erased page is checked by checking data as ff ff.
+
+Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/mtd/nand/fsmc_nand.c |   28 ++++++++++++++++++++++------
+ 1 files changed, 22 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+index 02edfba..d3f0d8d 100644
+--- a/drivers/mtd/nand/fsmc_nand.c
++++ b/drivers/mtd/nand/fsmc_nand.c
+@@ -385,7 +385,7 @@ static int fsmc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
+ 	struct fsmc_nand_data *host = container_of(mtd,
+ 					struct fsmc_nand_data, mtd);
+ 	struct fsmc_eccplace *ecc_place = host->ecc_place;
+-	int i, j, s, stat, eccsize = chip->ecc.size;
++	int i, j, k, s, stat, eccsize = chip->ecc.size;
+ 	int eccbytes = chip->ecc.bytes;
+ 	int eccsteps = chip->ecc.steps;
+ 	uint8_t *p = buf;
+@@ -425,11 +425,27 @@ static int fsmc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
+ 		memcpy(&ecc_code[i], oob, 13);
+ 		chip->ecc.calculate(mtd, p, &ecc_calc[i]);
  
- 	/* spear300 specific devices */
- 	&clcd_device,
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index d523040..f9f467f 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -44,6 +44,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 	&gpio_device,
- 	&uart_device,
-+	&wdt_device,
- 
- 	/* spear310 specific devices */
- };
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 943eddc..6ce37af 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -41,6 +41,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 	&gpio_device,
- 	&uart_device,
-+	&wdt_device,
- 
- 	/* spear320 specific devices */
- 	&clcd_device,
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 61d607b..6271c32 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -54,6 +54,18 @@ struct amba_device uart_device = {
- 	.irq = {IRQ_UART, NO_IRQ},
- };
- 
-+/* watchdog device registeration */
-+struct amba_device wdt_device = {
-+	.dev = {
-+		.init_name = "wdt",
-+	},
-+	.res = {
-+		.start = SPEAR3XX_ICM3_WDT_BASE,
-+		.end = SPEAR3XX_ICM3_WDT_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
+-		stat = chip->ecc.correct(mtd, p, &ecc_code[i], &ecc_calc[i]);
+-		if (stat < 0)
+-			mtd->ecc_stats.failed++;
+-		else
+-			mtd->ecc_stats.corrected += stat;
++		/*
++		 * This is a temporary erase check. A newly erased page read
++		 * would result in an ecc error because the oob data is also
++		 * erased to FF and the calculated ecc for an FF data is not
++		 * FF..FF.
++		 * This is a workaround to skip performing correction in case
++		 * data is FF..FF
++		 */
++		for (k = 0; k < eccsize; k++) {
++			if (*(p + k) != 0xff)
++				break;
++		}
 +
- /* i2c device registeration */
- static struct resource i2c_resources[] = {
- 	{
-diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
-index 3b15289..c185b6c 100644
---- a/arch/arm/mach-spear6xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear6xx/include/mach/generic.h
-@@ -32,6 +32,7 @@
- extern struct amba_device clcd_device;
- extern struct amba_device gpio_device[];
- extern struct amba_device uart_device[];
-+extern struct amba_device wdt_device;
- extern struct platform_device ehci0_device;
- extern struct platform_device ehci1_device;
- extern struct platform_device i2c_device;
-diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
-index b4dfd25..f77aea8 100644
---- a/arch/arm/mach-spear6xx/spear600_evb.c
-+++ b/arch/arm/mach-spear6xx/spear600_evb.c
-@@ -23,6 +23,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&gpio_device[2],
- 	&uart_device[0],
- 	&uart_device[1],
-+	&wdt_device,
- };
- 
- static struct platform_device *plat_devs[] __initdata = {
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index e78c2e5..f594fa4 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -118,6 +118,18 @@ struct amba_device gpio_device[] = {
++		if (k < eccsize) {
++			stat = chip->ecc.correct(mtd, p, &ecc_code[i],
++					&ecc_calc[i]);
++			if (stat < 0)
++				mtd->ecc_stats.failed++;
++			else
++				mtd->ecc_stats.corrected += stat;
++		}
  	}
- };
  
-+/* watchdog device registeration */
-+struct amba_device wdt_device = {
-+	.dev = {
-+		.init_name = "wdt",
-+	},
-+	.res = {
-+		.start = SPEAR6XX_ICM3_WDT_BASE,
-+		.end = SPEAR6XX_ICM3_WDT_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
- /* i2c device registeration */
- static struct resource i2c_resources[] = {
- 	{
+ 	return 0;
 -- 
 1.7.2.2
