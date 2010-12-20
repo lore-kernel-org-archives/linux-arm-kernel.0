@@ -1,244 +1,200 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:55:24 +0530
-Subject: [PATCH V3 03/63] ST SPEAr: Padmux code Updated
+Date: Mon, 20 Dec 2010 13:55:34 +0530
+Subject: [PATCH V3 13/63] ST SPEAr: Adding Debugfs support on clock framework
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <bf2135f2a0999ff9ee41aa1bad1f5ae89426d00b.1292833228.git.viresh.kumar@st.com>
+Message-ID: <6919440f8cf3e08fd43810aea2e15dcdfdf3c63c.1292833228.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- compiling padmux only for spear3xx
-- padmux initialization code rearranged in evaluation board and machine files.
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |    7 -------
- arch/arm/mach-spear3xx/spear300.c             |   14 ++++++++++----
- arch/arm/mach-spear3xx/spear300_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear310.c             |   11 ++++++-----
- arch/arm/mach-spear3xx/spear310_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear320.c             |   11 ++++++-----
- arch/arm/mach-spear3xx/spear320_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear3xx.c             |   21 ---------------------
- arch/arm/plat-spear/Makefile                  |    4 ++--
- 9 files changed, 36 insertions(+), 59 deletions(-)
+ arch/arm/plat-spear/clock.c              |  116 ++++++++++++++++++++++++++++++
+ arch/arm/plat-spear/include/plat/clock.h |    8 ++
+ 2 files changed, 124 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index af7e02c..c16d2f8 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -40,7 +40,6 @@ void __init clk_init(void);
- void __init spear3xx_map_io(void);
- void __init spear3xx_init_irq(void);
- void __init spear3xx_init(void);
--void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size);
+diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+index 8de7cf6..7d3338f 100644
+--- a/arch/arm/plat-spear/clock.c
++++ b/arch/arm/plat-spear/clock.c
+@@ -13,6 +13,7 @@
  
- /* pad mux declarations */
- #define PMX_FIRDA_MASK		(1 << 14)
-@@ -133,8 +132,6 @@ extern struct pmx_dev pmx_telecom_sdio_4bit;
- extern struct pmx_dev pmx_telecom_sdio_8bit;
- extern struct pmx_dev pmx_gpio1;
+ #include <linux/bug.h>
+ #include <linux/clk.h>
++#include <linux/debugfs.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/list.h>
+@@ -22,8 +23,14 @@
  
--void spear300_pmx_init(void);
--
- /* Add spear300 machine function declarations here */
- void __init spear300_init(void);
+ static DEFINE_SPINLOCK(clocks_lock);
+ static LIST_HEAD(root_clks);
++#ifdef CONFIG_DEBUG_FS
++static LIST_HEAD(clocks);
++#endif
  
-@@ -154,8 +151,6 @@ extern struct pmx_dev pmx_fsmc;
- extern struct pmx_dev pmx_rs485_0_1;
- extern struct pmx_dev pmx_tdm0;
+ static void propagate_rate(struct clk *, int on_init);
++#ifdef CONFIG_DEBUG_FS
++static int clk_debugfs_reparent(struct clk *);
++#endif
  
--void spear310_pmx_init(void);
--
- /* Add spear310 machine function declarations here */
- void __init spear310_init(void);
+ static int generic_clk_enable(struct clk *clk)
+ {
+@@ -96,6 +103,10 @@ static void clk_reparent(struct clk *clk, struct pclk_info *pclk_info)
  
-@@ -195,8 +190,6 @@ extern struct pmx_dev pmx_smii0;
- extern struct pmx_dev pmx_smii1;
- extern struct pmx_dev pmx_i2c1;
+ 	clk->pclk = pclk_info->pclk;
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
++
++#ifdef CONFIG_DEBUG_FS
++	clk_debugfs_reparent(clk);
++#endif
+ }
  
--void spear320_pmx_init(void);
--
- /* Add spear320 machine function declarations here */
- void __init spear320_init(void);
+ static void do_clk_disable(struct clk *clk)
+@@ -336,6 +347,12 @@ void clk_register(struct clk_lookup *cl)
  
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index 3560f8c..19c2daf 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -459,10 +459,16 @@ void __init spear300_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ\n");
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
+ 
++	/* debugfs specific */
++#ifdef CONFIG_DEBUG_FS
++	list_add(&clk->node, &clocks);
++	clk->cl = cl;
++#endif
++
+ 	/* add clock to arm clockdev framework */
+ 	clkdev_add(cl);
+ }
+@@ -855,3 +872,102 @@ void recalc_root_clocks(void)
  	}
--}
- 
--void spear300_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR300_SOC_CONFIG_BASE,
-+	/* pmx initialization */
-+	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE,
- 			SPEAR300_SOC_CONFIG_SIZE);
-+	if (pmx_driver.base) {
-+		ret = pmx_register(&pmx_driver);
-+		if (ret)
-+			printk(KERN_ERR "padmux: registeration failed. err no"
-+					": %d\n", ret);
-+		/* Free Mapping, device selection already done */
-+		iounmap(pmx_driver.base);
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
+ }
++
++#ifdef CONFIG_DEBUG_FS
++/*
++ *	debugfs support to trace clock tree hierarchy and attributes
++ */
++static struct dentry *clk_debugfs_root;
++static int clk_debugfs_register_one(struct clk *c)
++{
++	int err;
++	struct dentry *d, *child;
++	struct clk *pa = c->pclk;
++	char s[255];
++	char *p = s;
++
++	if (c) {
++		if (c->cl->con_id)
++			p += sprintf(p, "%s", c->cl->con_id);
++		if (c->cl->dev_id)
++			p += sprintf(p, "%s", c->cl->dev_id);
 +	}
- }
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index bb21db1..2c90663 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -51,14 +51,13 @@ static void __init spear300_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear300 machine init function */
--	spear300_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear300_init */
- 	pmx_driver.mode = &photo_frame_mode;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear300_pmx_init();
++	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
++	if (!d)
++		return -ENOMEM;
++	c->dent = d;
 +
-+	/* call spear300 machine init function */
-+	spear300_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 96a1ab8..576bc57 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -293,10 +293,11 @@ void __init spear310_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
--}
- 
--void spear310_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR310_SOC_CONFIG_BASE,
--			SPEAR310_SOC_CONFIG_SIZE);
-+	/* pmx initialization */
-+	pmx_driver.base = base;
-+	ret = pmx_register(&pmx_driver);
-+	if (ret)
-+		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
-+				ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index 7facf66..4e55e55 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -58,14 +58,13 @@ static void __init spear310_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear310 machine init function */
--	spear310_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear310_init */
- 	pmx_driver.mode = NULL;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear310_pmx_init();
++	d = debugfs_create_u32("usage_count", S_IRUGO, c->dent,
++			(u32 *)&c->usage_count);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	d = debugfs_create_x32("flags", S_IRUGO, c->dent, (u32 *)&c->flags);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	return 0;
 +
-+	/* call spear310 machine init function */
-+	spear310_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 6a12195..2886bb2 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -540,10 +540,11 @@ void __init spear320_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
--}
- 
--void spear320_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR320_SOC_CONFIG_BASE,
--			SPEAR320_SOC_CONFIG_SIZE);
-+	/* pmx initialization */
-+	pmx_driver.base = base;
-+	ret = pmx_register(&pmx_driver);
-+	if (ret)
-+		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
-+				ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 62ac685..7083a06 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -55,14 +55,13 @@ static void __init spear320_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear320 machine init function */
--	spear320_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear320_init */
- 	pmx_driver.mode = &auto_net_mii_mode;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear320_pmx_init();
++err_out:
++	d = c->dent;
++	list_for_each_entry(child, &d->d_subdirs, d_u.d_child)
++		debugfs_remove(child);
++	debugfs_remove(c->dent);
++	return err;
++}
 +
-+	/* call spear320 machine init function */
-+	spear320_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index e87313a..efd2e17 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -525,24 +525,3 @@ struct pmx_dev pmx_plgpio_45_46_49_50 = {
++static int clk_debugfs_register(struct clk *c)
++{
++	int err;
++	struct clk *pa = c->pclk;
++
++	if (pa && !pa->dent) {
++		err = clk_debugfs_register(pa);
++		if (err)
++			return err;
++	}
++
++	if (!c->dent) {
++		err = clk_debugfs_register_one(c);
++		if (err)
++			return err;
++	}
++	return 0;
++}
++
++static int __init clk_debugfs_init(void)
++{
++	struct clk *c;
++	struct dentry *d;
++	int err;
++
++	d = debugfs_create_dir("clock", NULL);
++	if (!d)
++		return -ENOMEM;
++	clk_debugfs_root = d;
++
++	list_for_each_entry(c, &clocks, node) {
++		err = clk_debugfs_register(c);
++		if (err)
++			goto err_out;
++	}
++	return 0;
++err_out:
++	debugfs_remove_recursive(clk_debugfs_root);
++	return err;
++}
++late_initcall(clk_debugfs_init);
++
++static int clk_debugfs_reparent(struct clk *c)
++{
++	debugfs_remove(c->dent);
++	return clk_debugfs_register_one(c);
++}
++#endif /* CONFIG_DEBUG_FS */
+diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
+index f7b4b5a..621c17c 100644
+--- a/arch/arm/plat-spear/include/plat/clock.h
++++ b/arch/arm/plat-spear/include/plat/clock.h
+@@ -88,6 +88,9 @@ struct rate_config {
+  * @children: list for childrens or this clock
+  * @sibling: node for list of clocks having same parents
+  * @private_data: clock specific private data
++ * @node: list to maintain clocks linearly
++ * @cl: clocklook up assoicated with this clock
++ * @dent: object for debugfs
+  */
+ struct clk {
+ 	unsigned int usage_count;
+@@ -109,6 +112,11 @@ struct clk {
+ 	struct list_head children;
+ 	struct list_head sibling;
+ 	void *private_data;
++#ifdef CONFIG_DEBUG_FS
++	struct list_head node;
++	struct clk_lookup *cl;
++	struct dentry *dent;
++#endif
  };
  
- #endif
--
--/* spear padmux initialization function */
--void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size)
--{
--	int ret = 0;
--
--	/* pad mux initialization */
--	pmx_driver->base = ioremap(base, size);
--	if (!pmx_driver->base) {
--		ret = -ENOMEM;
--		goto pmx_fail;
--	}
--
--	ret = pmx_register(pmx_driver);
--	iounmap(pmx_driver->base);
--
--pmx_fail:
--	if (ret)
--		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
--				ret);
--}
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index eb89540..b4f340b 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -3,6 +3,6 @@
- #
- 
- # Common support
--obj-y	:= clock.o padmux.o time.o
-+obj-y	:= clock.o time.o
- 
--obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o
-+obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+ /* pll configuration structure */
 -- 
 1.7.2.2
