@@ -1,75 +1,64 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 20 Dec 2010 11:45:29 +0100
-Subject: [GIT] pull request: DMA hwmod changes
-In-Reply-To: <20101219035948.GC15568@GLPP-machine>
-References: <20101219035948.GC15568@GLPP-machine>
-Message-ID: <4D0F33C9.40402@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 20 Dec 2010 18:17:10 +0800
+Subject: [PATCH v7 13/15] ARM: mxs: Add initial mx23evk support
+In-Reply-To: <20101220094801.GU1940@pengutronix.de>
+References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
+	<1292679575-2635-9-git-send-email-shawn.guo@freescale.com>
+	<20101220094801.GU1940@pengutronix.de>
+Message-ID: <20101220101709.GA16497@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
+Hi Uwe,
 
-I still have 2 comments on the patch #6: OMAP4: hwmod data: add system DMA.
+On Mon, Dec 20, 2010 at 10:48:01AM +0100, Uwe Kleine-K?nig wrote:
+> Hello Shawn,
+> 
+> On Sat, Dec 18, 2010 at 09:39:34PM +0800, Shawn Guo wrote:
+> > Add initial mx23evk support with duart.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> > Changes for v7:
+> >  - Define mx23evk pads using naked pad "OR" mA/vol/pull configurations
+> > 
+> > Changes for v3:
+> >  - Remove inclusion of hardware.h
+> >  - Add __initconst for mx23evk_pads[]
+> > 
+> > Changes for v2:
+> >  - Remove boot_params
+> > 
+> >  arch/arm/mach-mxs/mach-mx23evk.c |   59 ++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 59 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-mxs/mach-mx23evk.c
+> > 
+> > diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+> > new file mode 100644
+> > index 0000000..2aa77cc
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+> > @@ -0,0 +1,59 @@
+> > [...]
+> > +static const iomux_cfg_t mx23evk_pads[] __initconst = {
+> > +	/* duart */
+> > +	MX23_PAD_PWM0__DUART_RX |
+> > +		MXS_PAD_4MA,
+> > +	MX23_PAD_PWM1__DUART_TX |
+> > +		MXS_PAD_4MA,
+> > +};
+> I would keep these on a single line.  YMMV, so for me no need for a v8.
+> 
+> I will test this series later on hardware, and if no show stoppers
+> appear I'd say this is ready to be merged.  The (maybe) remaining issues
+> can then be resolved in follow up patches.
+> 
+My intension was to keep the pad configuration on different line from
+the naked pad.  I will keep this comment and that extra space one
+in mind, and address them later.
 
-I'll sent them in a couple of minutes.
+Thanks for the review and test effort. 
 
+-- 
 Regards,
-Benoit
-
-On 12/19/2010 4:59 AM, G, Manjunath Kondaiah wrote:
-> Hi Tony,
-> Please pull the following dma hwmod changes into linux omap master
-> branch.
->
-> This pull request includes
-> v2[http://thread.gmane.org/gmane.linux.ports.arm.omap/48695]
-> +
-> paul's sidle mode comments incorporated
-> +
-> acks for patch 3 and 4.
->
-> The final series is boot tested on:
-> OMAP3530(Beagle)
-> N800
-> SDP2430
-> OMAP4430SDP(ES2.1)
->
-> Full testing is done once again for SDP2430 and logs can be accessed at:
-> http://pastebin.com/aJZGjdar
->
-> The following changes since commit
-> 205e4d6e8d892176d791b77a974efe7f561ca4c3:
->
->    Merge branch 'for-next' (2010-12-17 19:32:47 -0800)
->
-> are available in the git repository at:
->
->    git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git dma_hwmod
->
-> Benoit Cousson (1):
->        OMAP4: hwmod data: add system DMA
->
-> G, Manjunath Kondaiah (8):
->        OMAP: DMA: Replace read/write macros with functions
->        OMAP: DMA: Introduce errata handling feature
->        OMAP2420: hwmod data: add system DMA
->        OMAP2430: hwmod data: add system DMA
->        OMAP3: hwmod data: add system DMA
->        OMAP1: DMA: Implement in platform device model
->        OMAP2+: DMA: hwmod: Device registration
->        OMAP: DMA: Convert DMA library into platform driver
->
->   arch/arm/mach-omap1/Makefile               |    2 +-
->   arch/arm/mach-omap1/dma.c                  |  390 ++++++++++++++++
->   arch/arm/mach-omap2/Makefile               |    2 +-
->   arch/arm/mach-omap2/dma.c                  |  297 ++++++++++++
->   arch/arm/mach-omap2/omap_hwmod_2420_data.c |   86 ++++
->   arch/arm/mach-omap2/omap_hwmod_2430_data.c |   86 ++++
->   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   97 ++++
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  101 ++++
->   arch/arm/plat-omap/dma.c                   |  697
-> ++++++++++++----------------
->   arch/arm/plat-omap/include/plat/dma.h      |  232 ++++------
->   10 files changed, 1450 insertions(+), 540 deletions(-)
->   create mode 100644 arch/arm/mach-omap1/dma.c
->   create mode 100644 arch/arm/mach-omap2/dma.c
+Shawn
