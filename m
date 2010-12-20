@@ -1,38 +1,72 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 20 Dec 2010 17:45:48 +0530
-Subject: [PATCH v4 4/7] OMAP3630: PM: Erratum i608: disable RTA
-In-Reply-To: <4D0F3CC2.3010407@ti.com>
-References: <1292712817-24999-1-git-send-email-nm@ti.com>
-	<1292712817-24999-5-git-send-email-nm@ti.com>
-	<c8819161924787cb5de43492278c4e36@mail.gmail.com>
-	<4D0F3CC2.3010407@ti.com>
-Message-ID: <0ea9388e5895225e9365f29ca4054262@mail.gmail.com>
+Date: Mon, 20 Dec 2010 17:50:37 +0530
+Subject: [PATCH V3 39/63] GIC: Added dummy handlers for Power
+	ManagementSuspend Resume
+In-Reply-To: <20101220114948.GC28157@n2100.arm.linux.org.uk>
+References: <cover.1292833228.git.viresh.kumar@st.com><674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com><20101220111056.GB28157@n2100.arm.linux.org.uk><4D0F3EC1.5030207@st.com>
+	<20101220114948.GC28157@n2100.arm.linux.org.uk>
+Message-ID: <53375b410d360c4155c4c4e978be9d78@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Nishanth Menon [mailto:nm at ti.com]
-> Sent: Monday, December 20, 2010 4:54 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap; linux-arm; Jean Pihet; Kevin; Tony
-> Subject: Re: [PATCH v4 4/7] OMAP3630: PM: Erratum i608: disable RTA
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
+Linux
+> Sent: Monday, December 20, 2010 5:20 PM
+> To: viresh kumar
+> Cc: Rajeev KUMAR; Armando VISCONTI; Vipin KUMAR; Shiraz HASHIM; Amit
+> VIRDI; Vipul Kumar SAMAR; Deepak SIKRI; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH V3 39/63] GIC: Added dummy handlers for Power
+> ManagementSuspend Resume
 >
-> Santosh Shilimkar wrote, on 12/20/2010 12:59 AM:
-> [..]
-> >> index 3fbd1e5..cc3507b 100644
-> >> --- a/arch/arm/mach-omap2/sleep34xx.S
-> >> +++ b/arch/arm/mach-omap2/sleep34xx.S
-> >> @@ -45,6 +45,8 @@
-> >>   #define CM_IDLEST_CKGEN_V	OMAP34XX_CM_REGADDR(PLL_MOD,
-> CM_IDLEST)
-> >>   #define SRAM_BASE_P		0x40200000
-> >>   #define CONTROL_STAT		0x480022F0
-> >> +#define CONTROL_MEM_RTA_CTRL	(OMAP343X_CTRL_BASE\
-> >> +					+ OMAP36XX_CONTROL_MEM_RTA_CTRL)
-> > Just a clarification. This register is not part of HW SAR SCM
-> > Registers, right ?
-> Right.
+> On Mon, Dec 20, 2010 at 05:02:17PM +0530, viresh kumar wrote:
+> > On 12/20/2010 04:40 PM, Russell King - ARM Linux wrote:
+> > > And still this patch gets reposted a few more times despite my
+> > > objections:
+> > >
+> > >
 >
-> [..]
-Thanks.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+http://lists.arm.linux.org.uk/lurker/message/20100920.150749.c97eda0d.en.h
+> tml
+> >
+> > Russell,
+> >
+> > Actually, when we discussed all this, we didn't came to any
+conclusion,
+> > and so i asked you: should we go ahead with this patch or drop it?
+>
+> Yes, I didn't bother replying any further because it seemed that no one
+> was listening to me.
+>
+> I think over the four or five emails my position on the patch was pretty
+> clear: I do _not_ like it one bit, and I still do not like it.
+>
+> It is a hack, plain and simple.  You're adding code to misrepresent what
+> the hardware can do.  You're fooling the system into thinking that the
+> GIC can control wake-up sources, when in fact the GIC has zero wakeup
+> capabilities what so ever.
+>
+> As I pointed out in the message above, if you do this, then drivers have
+> NO WAY to detect whether the interrupt controller they're connected to
+> is wake-up capable or not.
+>
+>
+http://lists.arm.linux.org.uk/lurker/message/20100920.134808.634d6ea1.en.h
+> tml
+>
+> I still don't know what your driver code looks like, yet I've given you
+> a suggestion to solve your problem in a subsequent reply (see the URL
+> at the top of this message) which never really got a reply from you.
+>
+> It seems to me that as soon as I asked for driver code, ST lost all
+> interest in discussing the issue any further, as there was no further
+> technical discussion coming from _any_ ST people.
+>
+Just for information, we did found a serial driver BUG
+is similar aspect. Below is the thread.
+http://ns3.spinics.net/lists/linux-omap/msg41240.html
+
+Regards,
+Santosh
