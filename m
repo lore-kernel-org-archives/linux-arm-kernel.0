@@ -1,37 +1,75 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 20 Dec 2010 13:43:35 +0300
-Subject: [PATCH v4 1/2 (REPOST)] davinci: am18x/da850/omap-l138: add
-	support for higher speed grades
-In-Reply-To: <1292840911-16325-1-git-send-email-nsekhar@ti.com>
-References: <1292840911-16325-1-git-send-email-nsekhar@ti.com>
-Message-ID: <4D0F3357.8060905@mvista.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 20 Dec 2010 11:45:29 +0100
+Subject: [GIT] pull request: DMA hwmod changes
+In-Reply-To: <20101219035948.GC15568@GLPP-machine>
+References: <20101219035948.GC15568@GLPP-machine>
+Message-ID: <4D0F33C9.40402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Manju,
 
-On 20-12-2010 13:28, Sekhar Nori wrote:
+I still have 2 comments on the patch #6: OMAP4: hwmod data: add system DMA.
 
-> AM18x/DA850/OMAP-L138 SoCs have variants that can operate
-> at a maximum of 456 MHz at 1.3V operating point. Also the
-> 1.2V operating point has a variant that can support a maximum
-> of 375 MHz.
+I'll sent them in a couple of minutes.
 
-> This patch adds three new OPPs (456 MHz, 408 MHz and 372 MHz)
-> to the list of DA850 OPPs.
+Regards,
+Benoit
 
-> Not all silicon is qualified to run at higher speeds and
-> unfortunately the maximum speed the chip can support can only
-> be determined from the label on the package (not software
-> readable).
-
-> Because of this, we depend on the maximum speed grade information
-> to be provided to us in some board specific way. The board informs
-> the maximum speed grade information to the SoC by calling the
-> da850_set_max_speed() function.
-
-    This sentence no longer applies. You've reduced the function to a variable.
-
-> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
-
-WBR, Sergei
+On 12/19/2010 4:59 AM, G, Manjunath Kondaiah wrote:
+> Hi Tony,
+> Please pull the following dma hwmod changes into linux omap master
+> branch.
+>
+> This pull request includes
+> v2[http://thread.gmane.org/gmane.linux.ports.arm.omap/48695]
+> +
+> paul's sidle mode comments incorporated
+> +
+> acks for patch 3 and 4.
+>
+> The final series is boot tested on:
+> OMAP3530(Beagle)
+> N800
+> SDP2430
+> OMAP4430SDP(ES2.1)
+>
+> Full testing is done once again for SDP2430 and logs can be accessed at:
+> http://pastebin.com/aJZGjdar
+>
+> The following changes since commit
+> 205e4d6e8d892176d791b77a974efe7f561ca4c3:
+>
+>    Merge branch 'for-next' (2010-12-17 19:32:47 -0800)
+>
+> are available in the git repository at:
+>
+>    git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git dma_hwmod
+>
+> Benoit Cousson (1):
+>        OMAP4: hwmod data: add system DMA
+>
+> G, Manjunath Kondaiah (8):
+>        OMAP: DMA: Replace read/write macros with functions
+>        OMAP: DMA: Introduce errata handling feature
+>        OMAP2420: hwmod data: add system DMA
+>        OMAP2430: hwmod data: add system DMA
+>        OMAP3: hwmod data: add system DMA
+>        OMAP1: DMA: Implement in platform device model
+>        OMAP2+: DMA: hwmod: Device registration
+>        OMAP: DMA: Convert DMA library into platform driver
+>
+>   arch/arm/mach-omap1/Makefile               |    2 +-
+>   arch/arm/mach-omap1/dma.c                  |  390 ++++++++++++++++
+>   arch/arm/mach-omap2/Makefile               |    2 +-
+>   arch/arm/mach-omap2/dma.c                  |  297 ++++++++++++
+>   arch/arm/mach-omap2/omap_hwmod_2420_data.c |   86 ++++
+>   arch/arm/mach-omap2/omap_hwmod_2430_data.c |   86 ++++
+>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   97 ++++
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  101 ++++
+>   arch/arm/plat-omap/dma.c                   |  697
+> ++++++++++++----------------
+>   arch/arm/plat-omap/include/plat/dma.h      |  232 ++++------
+>   10 files changed, 1450 insertions(+), 540 deletions(-)
+>   create mode 100644 arch/arm/mach-omap1/dma.c
+>   create mode 100644 arch/arm/mach-omap2/dma.c
