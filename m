@@ -1,169 +1,171 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:56:15 +0530
-Subject: [PATCH V3 55/63] SPEAr3xx: Replace defconfigs with single unified
-	defconfig
+Date: Mon, 20 Dec 2010 13:56:20 +0530
+Subject: [PATCH V3 60/63] ST SPEAr13xx: Pass default padmux settings as
+	parameter to spear13**_init routine
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <846ee8d8ad77f25c778e42c70c392345edd7db21.1292833229.git.viresh.kumar@st.com>
+Message-ID: <78c0ce7b70ef17be917477d34b10184d7c2c0543.1292833229.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryan Mallon <ryan@bluewatersys.com>
+This patch makes pmx_driver static to spear1300.c and spear1310.c, also now
+default setting of padmux are sent to spear1300_init and spear1310_init routines
 
-We only need one defconfig for SPEAr3xx now since we can build all
-three boards into one kernel.
-
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/configs/spear310_defconfig                |   52 --------------------
- arch/arm/configs/spear320_defconfig                |   52 --------------------
- .../{spear300_defconfig => spear3xx_defconfig}     |    4 +-
- 3 files changed, 3 insertions(+), 105 deletions(-)
- delete mode 100644 arch/arm/configs/spear310_defconfig
- delete mode 100644 arch/arm/configs/spear320_defconfig
- rename arch/arm/configs/{spear300_defconfig => spear3xx_defconfig} (93%)
+ arch/arm/mach-spear13xx/include/mach/generic.h |    8 ++++----
+ arch/arm/mach-spear13xx/spear1300.c            |    9 +++++++--
+ arch/arm/mach-spear13xx/spear1300_evb.c        |    7 +------
+ arch/arm/mach-spear13xx/spear1310.c            |    9 +++++++--
+ arch/arm/mach-spear13xx/spear1310_evb.c        |    7 +------
+ 5 files changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/configs/spear310_defconfig b/arch/arm/configs/spear310_defconfig
-deleted file mode 100644
-index 824e444..0000000
---- a/arch/arm/configs/spear310_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR310=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear320_defconfig b/arch/arm/configs/spear320_defconfig
-deleted file mode 100644
-index 842f7f3..0000000
---- a/arch/arm/configs/spear320_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR320=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear300_defconfig b/arch/arm/configs/spear3xx_defconfig
-similarity index 93%
-rename from arch/arm/configs/spear300_defconfig
-rename to arch/arm/configs/spear3xx_defconfig
-index cf29f3e..fea7e1f 100644
---- a/arch/arm/configs/spear300_defconfig
-+++ b/arch/arm/configs/spear3xx_defconfig
-@@ -7,6 +7,9 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_PLAT_SPEAR=y
-+CONFIG_BOARD_SPEAR300_EVB=y
-+CONFIG_BOARD_SPEAR310_EVB=y
-+CONFIG_BOARD_SPEAR320_EVB=y
- CONFIG_BINFMT_MISC=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
-@@ -24,7 +27,6 @@ CONFIG_MAX_RAW_DEVS=8192
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PL061=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_EXT2_FS=y
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index 63b2173..b286cc2 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -220,8 +220,6 @@ extern struct pmx_dev pmx_uart1_modem;
+ #define SPEAR_GPT0_CHAN0_IRQ	IRQ_GPT0_TMR0
+ #define SPEAR_GPT0_CHAN1_IRQ	IRQ_GPT0_TMR1
+ 
+-extern struct pmx_driver pmx_driver;
+-
+ /* Add spear13xx family device structure declarations here */
+ extern struct amba_device spear13xx_gpio_device[];
+ extern struct amba_device spear13xx_ssp_device;
+@@ -251,7 +249,8 @@ void spear13xx_secondary_startup(void);
+ /* spear1300 declarations */
+ #ifdef CONFIG_MACH_SPEAR1300
+ /* Add spear1300 machine function declarations here */
+-void __init spear1300_init(void);
++void __init spear1300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
++		u8 pmx_dev_count);
+ 
+ #endif /* CONFIG_MACH_SPEAR1300 */
+ 
+@@ -262,7 +261,8 @@ extern struct platform_device spear1310_can0_device;
+ extern struct platform_device spear1310_can1_device;
+ 
+ /* Add spear1310 machine function declarations here */
+-void __init spear1310_init(void);
++void __init spear1310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
++		u8 pmx_dev_count);
+ 
+ #endif /* CONFIG_MACH_SPEAR1310 */
+ 
+diff --git a/arch/arm/mach-spear13xx/spear1300.c b/arch/arm/mach-spear13xx/spear1300.c
+index 28822a3..b10f7a0 100644
+--- a/arch/arm/mach-spear13xx/spear1300.c
++++ b/arch/arm/mach-spear13xx/spear1300.c
+@@ -15,11 +15,12 @@
+ #include <mach/spear.h>
+ 
+ /* pmx driver structure */
+-struct pmx_driver pmx_driver;
++static struct pmx_driver pmx_driver;
+ 
+ /* Add spear1300 specific devices here */
+ 
+-void __init spear1300_init(void)
++void __init spear1300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
++		u8 pmx_dev_count)
+ {
+ 	int ret;
+ 
+@@ -27,6 +28,10 @@ void __init spear1300_init(void)
+ 	spear13xx_init();
+ 
+ 	/* pmx initialization */
++	pmx_driver.mode = pmx_mode;
++	pmx_driver.devs = pmx_devs;
++	pmx_driver.devs_count = pmx_dev_count;
++
+ 	ret = pmx_register(&pmx_driver);
+ 	if (ret)
+ 		pr_err("padmux: registeration failed. err no: %d\n", ret);
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index 316062e..1de93fd 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -122,11 +122,6 @@ static void __init spear1300_evb_init(void)
+ {
+ 	unsigned int i;
+ 
+-	/* padmux initialization, must be done before spear1300_init */
+-	pmx_driver.mode = NULL;
+-	pmx_driver.devs = pmx_devs;
+-	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
+-
+ 	/* set keyboard plat data */
+ 	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
+ 
+@@ -136,7 +131,7 @@ static void __init spear1300_evb_init(void)
+ 	nand_mach_init(FSMC_NAND_BW8);
+ 
+ 	/* call spear1300 machine init function */
+-	spear1300_init();
++	spear1300_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
+ 
+ 	/* Register slave devices on the I2C buses */
+ 	i2c_register_board_devices();
+diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
+index 39ea491..375f5b2 100644
+--- a/arch/arm/mach-spear13xx/spear1310.c
++++ b/arch/arm/mach-spear13xx/spear1310.c
+@@ -17,7 +17,7 @@
+ #include <mach/hardware.h>
+ 
+ /* pmx driver structure */
+-struct pmx_driver pmx_driver;
++static struct pmx_driver pmx_driver;
+ 
+ /* Pad multiplexing for uart1_modem device */
+ static struct pmx_mux_reg pmx_uart1_modem_mux[] = {
+@@ -393,7 +393,8 @@ struct platform_device spear1310_can1_device = {
+ 	.resource = can1_resources,
+ };
+ 
+-void __init spear1310_init(void)
++void __init spear1310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
++		u8 pmx_dev_count)
+ {
+ 	int ret;
+ 
+@@ -401,6 +402,10 @@ void __init spear1310_init(void)
+ 	spear13xx_init();
+ 
+ 	/* pmx initialization */
++	pmx_driver.mode = pmx_mode;
++	pmx_driver.devs = pmx_devs;
++	pmx_driver.devs_count = pmx_dev_count;
++
+ 	ret = pmx_register(&pmx_driver);
+ 	if (ret)
+ 		pr_err("padmux: registeration failed. err no: %d\n", ret);
+diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c b/arch/arm/mach-spear13xx/spear1310_evb.c
+index 42f6986..4e91e59 100644
+--- a/arch/arm/mach-spear13xx/spear1310_evb.c
++++ b/arch/arm/mach-spear13xx/spear1310_evb.c
+@@ -133,11 +133,6 @@ static void __init spear1310_evb_init(void)
+ {
+ 	unsigned int i;
+ 
+-	/* padmux initialization, must be done before spear1300_init */
+-	pmx_driver.mode = NULL;
+-	pmx_driver.devs = pmx_devs;
+-	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
+-
+ 	/* set keyboard plat data */
+ 	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
+ 
+@@ -147,7 +142,7 @@ static void __init spear1310_evb_init(void)
+ 	nand_mach_init(FSMC_NAND_BW8);
+ 
+ 	/* call spear1310 machine init function */
+-	spear1310_init();
++	spear1310_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
+ 
+ 	/* Register slave devices on the I2C buses */
+ 	i2c_register_board_devices();
 -- 
 1.7.2.2
