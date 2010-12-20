@@ -1,140 +1,69 @@
 From: marc@cpdesign.com.au (Marc Reilly)
-Date: Mon, 20 Dec 2010 14:50:54 +1100
-Subject: [PATCHv3 3/4] mc13xxx: Add i2c driver
+Date: Mon, 20 Dec 2010 14:50:55 +1100
+Subject: [PATCHv3 4/4] mc13xxx: Add i2c and spi drivers to Kconfig and Makefile
 In-Reply-To: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
 References: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1292817055-17715-4-git-send-email-marc@cpdesign.com.au>
+Message-ID: <1292817055-17715-5-git-send-email-marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds i2c specific code for mc13xxx.
-
 Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
 ---
- drivers/mfd/mc13xxx-i2c.c |  115 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 115 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mfd/mc13xxx-i2c.c
+ drivers/mfd/Kconfig  |   22 ++++++++++++++--------
+ drivers/mfd/Makefile |    2 ++
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-new file mode 100644
-index 0000000..f7ceed8
---- /dev/null
-+++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright 2009-2010 Creative Product Design
-+ * Marc Reilly marc at cpdesign.com.au
-+ *
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+#include <linux/mfd/core.h>
-+#include <linux/mfd/mc13xxx.h>
-+#include <linux/i2c.h>
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 3a1493b..6980cf2 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -424,20 +424,26 @@ config MFD_PCF50633
+ 	  facilities, and registers devices for the various functions
+ 	  so that function-specific drivers can bind to them.
+ 
+-config MFD_MC13783
+-	tristate
+-
+ config MFD_MC13XXX
+-	tristate "Support Freescale MC13783 and MC13892"
+-	depends on SPI_MASTER
++	tristate "Support Freescale MC13XXX"
++	depends on SPI_MASTER || I2C
+ 	select MFD_CORE
+-	select MFD_MC13783
+ 	help
+ 	  Support for the Freescale (Atlas) PMIC and audio CODECs
+ 	  MC13783 and MC13892.
+-	  This driver provides common support for accessing  the device,
++	  This driver provides common support for accessing the device,
+ 	  additional drivers must be enabled in order to use the
+-	  functionality of the device.
++	  functionality of these devices.
 +
-+static int mc13xxx_i2c_reg_read(struct mc13xxx *mc13xxx, unsigned int offset,
-+		u32 *val)
-+{
-+	int ret;
-+	unsigned char buf[3] = {0, 0, 0};
++config MFD_MC13XXX_SPI
++	tristate "Support for MC13XXX via SPI"
++	depends on SPI_MASTER
++	select MFD_MC13XXX
 +
-+	ret = i2c_smbus_read_i2c_block_data(mc13xxx->i2cclient,
-+			offset, 3, buf);
-+	*val = buf[0] << 16 | buf[1] << 8 | buf[2];
-+
-+	return ret == 3 ? 0 : ret;
-+}
-+
-+static int mc13xxx_i2c_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
-+		u32 val)
-+{
-+	int ret;
-+	unsigned char buf[3];
-+
-+	buf[0] = (val >> 16) & 0xff;
-+	buf[1] = (val >> 8) & 0xff;
-+	buf[2] = val & 0xff;
-+
-+	ret = i2c_smbus_write_i2c_block_data(mc13xxx->i2cclient,
-+			offset, 3, buf);
-+
-+	return ret;
-+}
-+
-+static int mc13xxx_i2c_probe(struct i2c_client *client,
-+			     const struct i2c_device_id *id)
-+{
-+	struct mc13xxx *mc13xxx;
-+	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-+	int ret;
-+
-+	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-+	if (!mc13xxx)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&client->dev, mc13xxx);
-+	mc13xxx->dev = &client->dev;
-+	mc13xxx->i2cclient = client;
-+	mc13xxx->read_dev = mc13xxx_i2c_reg_read;
-+	mc13xxx->write_dev = mc13xxx_i2c_reg_write;
-+
-+	ret = mc13xxx_common_init(mc13xxx, pdata, client->irq);
-+
-+	if (ret == 0 && (id->driver_data != mc13xxx->ictype))
-+		dev_warn(mc13xxx->dev,
-+				"device id doesn't match auto detection!\n");
-+
-+	return ret;
-+}
-+
-+static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-+{
-+	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-+
-+	free_irq(client->irq, mc13xxx);
-+
-+	mfd_remove_devices(&client->dev);
-+
-+	kfree(mc13xxx);
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id mc13xxx_i2c_idtable[] = {
-+	{ "mc13892", MC13XXX_ID_MC13892},
-+	{ }
-+};
-+
-+static struct i2c_driver mc13xxx_i2c_driver = {
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "mc13xxx-i2c"
-+	},
-+	.id_table = mc13xxx_i2c_idtable,
-+	.probe = mc13xxx_i2c_probe,
-+	.remove = __devexit_p(mc13xxx_i2c_remove),
-+};
-+
-+static int __init mc13xxx_i2c_init(void)
-+{
-+	return i2c_add_driver(&mc13xxx_i2c_driver);
-+}
-+subsys_initcall(mc13xxx_i2c_init);
-+
-+static void __exit mc13xxx_i2c_exit(void)
-+{
-+	i2c_del_driver(&mc13xxx_i2c_driver);
-+}
-+module_exit(mc13xxx_i2c_exit);
-+
-+MODULE_DESCRIPTION("i2c driver for Freescale MC13XXX PMIC");
-+MODULE_AUTHOR("Marc Reilly <marc@cpdesign.com.au");
-+MODULE_LICENSE("GPL v2");
++config MFD_MC13XXX_I2C
++	tristate "Support for MC13XXX via I2C"
++	depends on I2C
++	select MFD_MC13XXX
+ 
+ config PCF50633_ADC
+ 	tristate "Support for NXP PCF50633 ADC"
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index f54b365..b7d774f 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -42,6 +42,8 @@ obj-$(CONFIG_TWL4030_CODEC)	+= twl4030-codec.o
+ obj-$(CONFIG_TWL6030_PWM)	+= twl6030-pwm.o
+ 
+ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
++obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
++obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
+ 
+ obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
+ 
 -- 
 1.7.1
