@@ -1,52 +1,22 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Mon, 20 Dec 2010 17:29:32 +0200 (EET)
-Subject: [PATCH v2] Keyboard: omap-keypad: use matrix_keypad.h
-In-Reply-To: <201012181639.29820.jkrzyszt@tis.icnet.pl>
-References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
-	<20101218060104.GA1623@core.coreip.homeip.net>
-	<201012181639.29820.jkrzyszt@tis.icnet.pl>
-Message-ID: <alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 20 Dec 2010 16:48:53 +0100
+Subject: [patch 0/5] iMX51 usb fixes
+Message-ID: <20101220154853.254931637@rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Sat, 18 Dec 2010, Janusz Krzysztofik wrote:
-> Most keypad drivers make use of the <linux/input/matrix_keypad.h>
-> defined macros, structures and inline functions.
->
-> Convert omap-keypad driver to use those as well, as suggested by a
-> compile time warning, hardcoded into the OMAP <palt/keypad.h>.
->
-> Created against linux-2.6.37-rc5.
-> Tested on Amstrad Delta.
-> Compile tested with omap1_defconfig and omap2plus_defconfig shrinked to
-> board-h4.
->
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-[...]
+This patchset aims at fixing several issues I found in the usb support for
+iMX51 while working on the Genesis EFIKAMX/EFIKASB systems. The most
+"annoying" one is the usb clock patch. I found out that when the clocks are
+not properly enabled my system just hangs when trying to read a usb register.
+So far, I guess only luck (or different bootloader behaviour) may explain that
+nobody got hit by this.
 
-> --- linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c.orig 2010-12-09 23:07:35.000000000 +0100
-> +++ linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c      2010-12-18 16:23:29.000000000 +0100
-> @@ -46,81 +46,79 @@ static u16 ams_delta_latch2_reg;
-> static int ams_delta_keymap[] = {
+Warning:
+It has been tested on both devices against Sascha's imx-for-2.6.38 branch.
+It's possible that some of them apply against current mainline but I can't
+test such a configuration.
 
-[...]
-
-> +static const struct matrix_keymap_data ams_delta_keymap_data = {
-> +       .keymap         = ams_delta_keymap,
-> +       .keymap_size    = ARRAY_SIZE(ams_delta_keymap),
-> +};
-
-You should update the ams_delta_keymap type as well, otherwise this patch
-will introduce the following sparse warning:
-
-   CHECK   arch/arm/mach-omap1/board-ams-delta.c
-arch/arm/mach-omap1/board-ams-delta.c:191:27: warning: incorrect type in initializer (different signedness)
-arch/arm/mach-omap1/board-ams-delta.c:191:27:    expected unsigned int const [usertype] *keymap
-arch/arm/mach-omap1/board-ams-delta.c:191:27:    got int static [toplevel] *<noident>
-
-I only checked E3, so other boards should be checked as well.
-
-A.
+Arnaud
