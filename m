@@ -1,141 +1,96 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 20 Dec 2010 14:05:03 -0600
-Subject: [PATCH v5 1/7] OMAP3: PM: Update clean_l2 to use v7_flush_dcache_all
+Date: Mon, 20 Dec 2010 14:05:08 -0600
+Subject: [PATCH v5 6/7] OMAP3: PM: make omap3_cpuidle_update_states
+	independent of enable_off_mode
 In-Reply-To: <1292875509-9896-1-git-send-email-nm@ti.com>
 References: <1292875509-9896-1-git-send-email-nm@ti.com>
-Message-ID: <1292875509-9896-2-git-send-email-nm@ti.com>
+Message-ID: <1292875509-9896-7-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Woodruff <r-woodruff2@ti.com>
-
-Analysis in TI kernel with ETM showed that using cache mapped flush
-in kernel instead of SO mapped flush cost drops by 65% (3.39mS down
-to 1.17mS) for clean_l2 which is used during sleep sequences.
-Overall:
-	- speed up
-	- unfortunately there isn't a good alternative flush method today
-	- code reduction and less maintenance and potential bug in
-	  unmaintained code
-
-This also fixes the bug with the clean_l2 function usage.
-
-Reported-by: Tony Lindgren <tony@atomide.com>
-
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Tony Lindgren <tony@atomide.com>
+Currently omap3_cpuidle_update_states makes whole sale decision
+on which C states to update based on enable_off_mode variable
+Instead, achieve the same functionality by independently providing
+mpu and core deepest states the system is allowed to achieve and
+update the idle states accordingly.
 
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Jean Pihet <j-pihet@ti.com>
 
-[nm at ti.com: ported rkw's proposal to 2.6.37-rc2]
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Richard Woodruff <r-woodruff2@ti.com>
 ---
-v3: modified comment to add remark that lr is used since we are running in SRAM
-    currently - this is to help developers transition this code eventually to
-    SDRAM.
-v2: https://patchwork.kernel.org/patch/365222/
+v2: proto is used as (u32, u32) + added the acks collected
+v1: original version
+ arch/arm/mach-omap2/cpuidle34xx.c |   19 ++++++++++---------
+ arch/arm/mach-omap2/pm.h          |    2 +-
+ arch/arm/mach-omap2/pm34xx.c      |    2 +-
+ 3 files changed, 12 insertions(+), 11 deletions(-)
 
- arch/arm/mach-omap2/sleep34xx.S |   80 +++++++--------------------------------
- 1 files changed, 14 insertions(+), 66 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index 2fb205a..aa43da5 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -520,72 +520,18 @@ clean_caches:
- 	cmp	r9, #1 /* Check whether L2 inval is required or not*/
- 	bne	skip_l2_inval
- clean_l2:
--	/* read clidr */
--	mrc     p15, 1, r0, c0, c0, 1
--	/* extract loc from clidr */
--	ands    r3, r0, #0x7000000
--	/* left align loc bit field */
--	mov     r3, r3, lsr #23
--	/* if loc is 0, then no need to clean */
--	beq     finished
--	/* start clean at cache level 0 */
--	mov     r10, #0
--loop1:
--	/* work out 3x current cache level */
--	add     r2, r10, r10, lsr #1
--	/* extract cache type bits from clidr*/
--	mov     r1, r0, lsr r2
--	/* mask of the bits for current cache only */
--	and     r1, r1, #7
--	/* see what cache we have at this level */
--	cmp     r1, #2
--	/* skip if no cache, or just i-cache */
--	blt     skip
--	/* select current cache level in cssr */
--	mcr     p15, 2, r10, c0, c0, 0
--	/* isb to sych the new cssr&csidr */
--	isb
--	/* read the new csidr */
--	mrc     p15, 1, r1, c0, c0, 0
--	/* extract the length of the cache lines */
--	and     r2, r1, #7
--	/* add 4 (line length offset) */
--	add     r2, r2, #4
--	ldr     r4, assoc_mask
--	/* find maximum number on the way size */
--	ands    r4, r4, r1, lsr #3
--	/* find bit position of way size increment */
--	clz     r5, r4
--	ldr     r7, numset_mask
--	/* extract max number of the index size*/
--	ands    r7, r7, r1, lsr #13
--loop2:
--	mov     r9, r4
--	/* create working copy of max way size*/
--loop3:
--	/* factor way and cache number into r11 */
--	orr     r11, r10, r9, lsl r5
--	/* factor index number into r11 */
--	orr     r11, r11, r7, lsl r2
--	/*clean & invalidate by set/way */
--	mcr     p15, 0, r11, c7, c10, 2
--	/* decrement the way*/
--	subs    r9, r9, #1
--	bge     loop3
--	/*decrement the index */
--	subs    r7, r7, #1
--	bge     loop2
--skip:
--	add     r10, r10, #2
--	/* increment cache number */
--	cmp     r3, r10
--	bgt     loop1
--finished:
--	/*swith back to cache level 0 */
--	mov     r10, #0
--	/* select current cache level in cssr */
--	mcr     p15, 2, r10, c0, c0, 0
--	isb
-+	/*
-+	 * Jump out to kernel flush routine
-+	 *  - reuse that code is better
-+	 *  - it executes in a cached space so is faster than refetch per-block
-+	 *  - should be faster and will change with kernel
-+	 *  - 'might' have to copy address, load and jump to it
-+	 *  - lr is used since we are running in SRAM currently.
-+	 */
-+	ldr r1, kernel_flush
-+	mov lr, pc
-+	bx  r1
-+
- skip_l2_inval:
- 	/* Data memory barrier and Data sync barrier */
- 	mov     r1, #0
-@@ -668,5 +614,7 @@ cache_pred_disable_mask:
- 	.word	0xFFFFE7FB
- control_stat:
- 	.word	CONTROL_STAT
-+kernel_flush:
-+	.word v7_flush_dcache_all
- ENTRY(omap34xx_cpu_suspend_sz)
- 	.word	. - omap34xx_cpu_suspend
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index 0d50b45..f80d3f6 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -293,25 +293,26 @@ select_state:
+ DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+ 
+ /**
+- * omap3_cpuidle_update_states - Update the cpuidle states.
++ * omap3_cpuidle_update_states() - Update the cpuidle states
++ * @mpu_deepest_state:	Enable states upto and including this for mpu domain
++ * @core_deepest_state:	Enable states upto and including this for core domain
+  *
+- * Currently, this function toggles the validity of idle states based upon
+- * the flag 'enable_off_mode'. When the flag is set all states are valid.
+- * Else, states leading to OFF state set to be invalid.
++ * This goes through the list of states available and enables and disables the
++ * validity of C states based on deepest state that can be achieved for the
++ * variable domain
+  */
+-void omap3_cpuidle_update_states(void)
++void omap3_cpuidle_update_states(u32 mpu_deepest_state, u32 core_deepest_state)
+ {
+ 	int i;
+ 
+ 	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
+ 		struct omap3_processor_cx *cx = &omap3_power_states[i];
+ 
+-		if (enable_off_mode) {
++		if ((cx->mpu_state >= mpu_deepest_state) &&
++		    (cx->core_state >= core_deepest_state)) {
+ 			cx->valid = 1;
+ 		} else {
+-			if ((cx->mpu_state == PWRDM_POWER_OFF) ||
+-				(cx->core_state	== PWRDM_POWER_OFF))
+-				cx->valid = 0;
++			cx->valid = 0;
+ 		}
+ 	}
+ }
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 5e0bee9..29663cc 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -58,7 +58,7 @@ extern u32 sleep_while_idle;
+ #endif
+ 
+ #if defined(CONFIG_CPU_IDLE)
+-extern void omap3_cpuidle_update_states(void);
++extern void omap3_cpuidle_update_states(u32, u32);
+ #endif
+ 
+ #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index feb1bd9..ca3b134 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -928,7 +928,7 @@ void omap3_pm_off_mode_enable(int enable)
+ 		state = PWRDM_POWER_RET;
+ 
+ #ifdef CONFIG_CPU_IDLE
+-	omap3_cpuidle_update_states();
++	omap3_cpuidle_update_states(state, state);
+ #endif
+ 
+ 	list_for_each_entry(pwrst, &pwrst_list, node) {
 -- 
 1.6.3.3
