@@ -1,174 +1,149 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 20 Dec 2010 11:19:14 +0100
-Subject: [PATCH v4 1/7] OMAP3: PM: Update clean_l2 to use
-	v7_flush_dcache_all
-In-Reply-To: <9ad7cd880801fcc6f63435ec2c8dcd3d@mail.gmail.com>
-References: <1292712817-24999-1-git-send-email-nm@ti.com>
-	<1292712817-24999-2-git-send-email-nm@ti.com>
-	<9ad7cd880801fcc6f63435ec2c8dcd3d@mail.gmail.com>
-Message-ID: <AANLkTim1MKkHkyi9c2+R8c8Nj-C8RWVeDsyOarime5et@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Mon, 20 Dec 2010 21:22:31 +1100
+Subject: [PATCHv3 4/4] mc13xxx: Add i2c and spi drivers to Kconfig and
+	Makefile
+In-Reply-To: <20101220083839.GQ1940@pengutronix.de>
+References: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
+	<1292817055-17715-5-git-send-email-marc@cpdesign.com.au>
+	<20101220083839.GQ1940@pengutronix.de>
+Message-ID: <201012202122.31582.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 7:43 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of Nishanth Menon
->> Sent: Sunday, December 19, 2010 4:24 AM
->> To: linux-omap; linux-arm
->> Cc: Jean Pihet; Kevin; Tony
->> Subject: [PATCH v4 1/7] OMAP3: PM: Update clean_l2 to use
->> v7_flush_dcache_all
->>
->> From: Richard Woodruff <r-woodruff2@ti.com>
->>
->> Analysis in TI kernel with ETM showed that using cache mapped flush
->> in kernel instead of SO mapped flush cost drops by 65% (3.39mS down
->> to 1.17mS) for clean_l2 which is used during sleep sequences.
->> Overall:
->> ? ? ? - speed up
->> ? ? ? - unfortunately there isn't a good alternative flush method today
->> ? ? ? - code reduction and less maintenance and potential bug in
->> ? ? ? ? unmaintained code
->>
->> This also fixes the bug with the clean_l2 function usage.
->>
->> Reported-by: Tony Lindgren <tony@atomide.com>
->>
->> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->>
->> [nm at ti.com: ported rkw's proposal to 2.6.37-rc2]
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Richard Woodruff <r-woodruff2@ti.com>
->> ---
->> (no change in this series, posted for completeness)
->> v2: https://patchwork.kernel.org/patch/365222/
->> v1: http://marc.info/?l=linux-omap&m=129013171325210&w=2
->> ?arch/arm/mach-omap2/sleep34xx.S | ? 79
-> ++++++----------------------------
->> ----
->> ?1 files changed, 13 insertions(+), 66 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-
->> omap2/sleep34xx.S
->> index 2fb205a..2c20fcf 100644
->> --- a/arch/arm/mach-omap2/sleep34xx.S
->> +++ b/arch/arm/mach-omap2/sleep34xx.S
->> @@ -520,72 +520,17 @@ clean_caches:
->> ? ? ? cmp ? ? r9, #1 /* Check whether L2 inval is required or not*/
->> ? ? ? bne ? ? skip_l2_inval
->> ?clean_l2:
->> - ? ? /* read clidr */
->> - ? ? mrc ? ? p15, 1, r0, c0, c0, 1
->> - ? ? /* extract loc from clidr */
->> - ? ? ands ? ?r3, r0, #0x7000000
->> - ? ? /* left align loc bit field */
->> - ? ? mov ? ? r3, r3, lsr #23
->> - ? ? /* if loc is 0, then no need to clean */
->> - ? ? beq ? ? finished
->> - ? ? /* start clean at cache level 0 */
->> - ? ? mov ? ? r10, #0
->> -loop1:
->> - ? ? /* work out 3x current cache level */
->> - ? ? add ? ? r2, r10, r10, lsr #1
->> - ? ? /* extract cache type bits from clidr*/
->> - ? ? mov ? ? r1, r0, lsr r2
->> - ? ? /* mask of the bits for current cache only */
->> - ? ? and ? ? r1, r1, #7
->> - ? ? /* see what cache we have at this level */
->> - ? ? cmp ? ? r1, #2
->> - ? ? /* skip if no cache, or just i-cache */
->> - ? ? blt ? ? skip
->> - ? ? /* select current cache level in cssr */
->> - ? ? mcr ? ? p15, 2, r10, c0, c0, 0
->> - ? ? /* isb to sych the new cssr&csidr */
->> - ? ? isb
->> - ? ? /* read the new csidr */
->> - ? ? mrc ? ? p15, 1, r1, c0, c0, 0
->> - ? ? /* extract the length of the cache lines */
->> - ? ? and ? ? r2, r1, #7
->> - ? ? /* add 4 (line length offset) */
->> - ? ? add ? ? r2, r2, #4
->> - ? ? ldr ? ? r4, assoc_mask
->> - ? ? /* find maximum number on the way size */
->> - ? ? ands ? ?r4, r4, r1, lsr #3
->> - ? ? /* find bit position of way size increment */
->> - ? ? clz ? ? r5, r4
->> - ? ? ldr ? ? r7, numset_mask
->> - ? ? /* extract max number of the index size*/
->> - ? ? ands ? ?r7, r7, r1, lsr #13
->> -loop2:
->> - ? ? mov ? ? r9, r4
->> - ? ? /* create working copy of max way size*/
->> -loop3:
->> - ? ? /* factor way and cache number into r11 */
->> - ? ? orr ? ? r11, r10, r9, lsl r5
->> - ? ? /* factor index number into r11 */
->> - ? ? orr ? ? r11, r11, r7, lsl r2
->> - ? ? /*clean & invalidate by set/way */
->> - ? ? mcr ? ? p15, 0, r11, c7, c10, 2
->> - ? ? /* decrement the way*/
->> - ? ? subs ? ?r9, r9, #1
->> - ? ? bge ? ? loop3
->> - ? ? /*decrement the index */
->> - ? ? subs ? ?r7, r7, #1
->> - ? ? bge ? ? loop2
->> -skip:
->> - ? ? add ? ? r10, r10, #2
->> - ? ? /* increment cache number */
->> - ? ? cmp ? ? r3, r10
->> - ? ? bgt ? ? loop1
->> -finished:
->> - ? ? /*swith back to cache level 0 */
->> - ? ? mov ? ? r10, #0
->> - ? ? /* select current cache level in cssr */
->> - ? ? mcr ? ? p15, 2, r10, c0, c0, 0
->> - ? ? isb
->> + ? ? /*
->> + ? ? ?* Jump out to kernel flush routine
->> + ? ? ?* ?- reuse that code is better
->> + ? ? ?* ?- it executes in a cached space so is faster than refetch per-
->> block
->> + ? ? ?* ?- should be faster and will change with kernel
->> + ? ? ?* ?- 'might' have to copy address, load and jump to it
-> Would be good to clarify that this is needed to maintain the 'lr'
-> when code is executed from SRAM
->
-Agree on that. Some comments have been posted at
-http://marc.info/?l=linux-omap&m=129016170719489&w=2.
+Hi,
 
->> + ? ? ?*/
->> + ? ? ldr r1, kernel_flush
->> + ? ? mov lr, pc
->> + ? ? bx ?r1
->> +
->> ?skip_l2_inval:
->> ? ? ? /* Data memory barrier and Data sync barrier */
->> ? ? ? mov ? ? r1, #0
->> @@ -668,5 +613,7 @@ cache_pred_disable_mask:
->> ? ? ? .word ? 0xFFFFE7FB
->> ?control_stat:
->> ? ? ? .word ? CONTROL_STAT
->> +kernel_flush:
->> + ? ? .word v7_flush_dcache_all
->> ?ENTRY(omap34xx_cpu_suspend_sz)
->> ? ? ? .word ? . - omap34xx_cpu_suspend
->
-> O.w
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Monday, December 20, 2010 07:38:39 pm Uwe Kleine-K?nig wrote:
+> On Mon, Dec 20, 2010 at 02:50:55PM +1100, Marc Reilly wrote:
+> > Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
+> > ---
+> > 
+> >  drivers/mfd/Kconfig  |   22 ++++++++++++++--------
+> >  drivers/mfd/Makefile |    2 ++
+> >  2 files changed, 16 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> > index 3a1493b..6980cf2 100644
+> > --- a/drivers/mfd/Kconfig
+> > +++ b/drivers/mfd/Kconfig
+> > @@ -424,20 +424,26 @@ config MFD_PCF50633
+> > 
+> >  	  facilities, and registers devices for the various functions
+> >  	  so that function-specific drivers can bind to them.
+> > 
+> > -config MFD_MC13783
+> > -	tristate
+> > -
+> 
+> this needs at least a note in the commit log.  And $(git grep
+> MFD_MC13783 drivers) shows that you don't want to remove that yet.
 
-Acked-by: Jean Pihet <j-pihet@ti.com>
+I didn't get anything... which makes me think I'm doing it wrong.
 
->
->> --
->> 1.6.3.3
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> 
+> >  config MFD_MC13XXX
+> > 
+> > -	tristate "Support Freescale MC13783 and MC13892"
+> > -	depends on SPI_MASTER
+> > +	tristate "Support Freescale MC13XXX"
+> 
+> Hmm, I'd prefer to have the supported numbers.  Consider FSL releasing
+> an MC13991.  Then it's unclear if MFD_MC13XXX supports it.
 
-Jean
+I started with similar thinking, but then thought that if a new IC is released 
+in the family and it's not compatible then it can be changed (the file names 
+themselves would also be misleading). Until then, all the family so far come 
+under the mc13xxx umbrella.
+The help file also explains which are supported.
+
+> 
+> > +	depends on SPI_MASTER || I2C
+> > 
+> >  	select MFD_CORE
+> > 
+> > -	select MFD_MC13783
+> > 
+> >  	help
+> >  	
+> >  	  Support for the Freescale (Atlas) PMIC and audio CODECs
+> >  	  MC13783 and MC13892.
+> > 
+> > -	  This driver provides common support for accessing  the device,
+> > +	  This driver provides common support for accessing the device,
+> > 
+> >  	  additional drivers must be enabled in order to use the
+> > 
+> > -	  functionality of the device.
+> > +	  functionality of these devices.
+> > +
+> > +config MFD_MC13XXX_SPI
+> > +	tristate "Support for MC13XXX via SPI"
+> > +	depends on SPI_MASTER
+> > +	select MFD_MC13XXX
+> > +
+> > +config MFD_MC13XXX_I2C
+> > +	tristate "Support for MC13XXX via I2C"
+> 
+> and only mc13892 can do i2c, so writing MC13XXX doesn't make sense here.
+> 
+> > +	depends on I2C
+> > +	select MFD_MC13XXX
+> 
+> Hmm, that means that MFD_MC13XXX alone doesn't do anything useful,
+> right?  IMHO either do:
+> 
+> 	config MFD_MC13XXX_SPI
+> 		tristate
+> 
+> 	config MFD_MC13XXX_I2C
+> 		tristate
+> 
+> 	config MFD_MC13XXX
+> 		tristate "..."
+> 		select MFD_MC13XXX_SPI if SPI_MASTER
+> 		select MFD_MC13XXX_I2C if I2C
+> 		...
+> 
+> or
+> 
+> 	config MFD_MC13XXX
+> 		tristate
+> 		...
+> 
+> 	config MFD_MC13XXX_SPI
+> 		tristate "..."
+> 		select MFD_MC13XXX
+> 		...
+> 	config MFD_MC13XXX_I2C
+> 		tristate "..."
+> 		select MFD_MC13XXX
+> 		...
+
+It would need to be the second one, but OK.
+
+> 
+> >  config PCF50633_ADC
+> >  
+> >  	tristate "Support for NXP PCF50633 ADC"
+> > 
+> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> > index f54b365..b7d774f 100644
+> > --- a/drivers/mfd/Makefile
+> > +++ b/drivers/mfd/Makefile
+> > @@ -42,6 +42,8 @@ obj-$(CONFIG_TWL4030_CODEC)	+= twl4030-codec.o
+> > 
+> >  obj-$(CONFIG_TWL6030_PWM)	+= twl6030-pwm.o
+> >  
+> >  obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
+> > 
+> > +obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
+> > +obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
+> > 
+> >  obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
+> 
+> Best regards
+> Uwe
+
+Thanks again.
+
+Cheers
+Marc
