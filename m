@@ -1,29 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Dec 2010 22:48:14 +0000
-Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
-In-Reply-To: <AANLkTimarRAf-_ykQNLgzXd3TtUHhSw+gZ6cZ5pW=Y-9@mail.gmail.com>
-References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-	<AANLkTimarRAf-_ykQNLgzXd3TtUHhSw+gZ6cZ5pW=Y-9@mail.gmail.com>
-Message-ID: <20101220224814.GJ28157@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Dec 2010 15:00:17 -0800
+Subject: [PATCH] msm: qsd8x50: Platform data isn't init data
+Message-ID: <1292886017-23511-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 11:32:21AM +0800, Eric Miao wrote:
-> On Fri, Dec 17, 2010 at 7:32 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Here is the entire set of clocksource and sched_clock patches which
-> > have been previously posted. ?There's a couple of small tweaks in a
-> > few of the patches (such as adding notrace to OMAP clocksource read
-> > functions), and this also shows the proper ordering of these patches.
-> >
-> > Still looking for acks or tested-by's for these patches.
-> >
-> 
-> Hi Russell,
-> 
-> Sorry for late feedback. Tested the branch 'clksrc' on Littleton/PXA3xx,
-> seems to be good.
-> 
-> Tested-by: Eric Miao <eric.y.miao@gmail.com>
+Remove the SMC91x platform and resource data from initdata.  These
+will continue to be accessed after init, and must remain available.
 
-Ok, I'll add that to the PXA and generic patches, thanks.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/board-qsd8x50.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index 5a557f3..c295f8a 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -45,7 +45,7 @@ static const unsigned        qsd8x50_surf_smc91x_gpio __initdata = 156;
+  * at run-time: they vary from board to board, and the true
+  * configuration won't be known until boot.
+  */
+-static struct resource smc91x_resources[] __initdata = {
++static struct resource smc91x_resources[] = {
+ 	[0] = {
+ 		.flags = IORESOURCE_MEM,
+ 	},
+@@ -54,7 +54,7 @@ static struct resource smc91x_resources[] __initdata = {
+ 	},
+ };
+ 
+-static struct platform_device smc91x_device __initdata = {
++static struct platform_device smc91x_device = {
+ 	.name           = "smc91x",
+ 	.id             = 0,
+ 	.num_resources  = ARRAY_SIZE(smc91x_resources),
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
