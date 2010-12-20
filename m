@@ -1,80 +1,45 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Mon, 20 Dec 2010 20:02:17 +0300
-Subject: [PATCH 1/1] ARM: cns3xxx: ahci: Fixup for softwreset failures
-	with direct connected disks with CONFIG_SATA_PMP enabled.
-In-Reply-To: <1291481021-23317-1-git-send-email-mkl0301@gmail.com>
-References: <1291481021-23317-1-git-send-email-mkl0301@gmail.com>
-Message-ID: <20101220170217.GA1333@oksana.dev.rtsoft.ru>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Dec 2010 17:08:49 +0000
+Subject: [PATCH v4 3/6] ARM: U8500 core machine support
+In-Reply-To: <C832F8F5D375BD43BFA11E82E0FE9FE00829A2FDB7@EXDCVYMBSTM005.EQ1STM.local>
+References: <1259279756.13327.72.camel@vinay-desktop>
+	<20101219110913.GA23979@n2100.arm.linux.org.uk>
+	<C832F8F5D375BD43BFA11E82E0FE9FE00829A2FDB7@EXDCVYMBSTM005.EQ1STM.local>
+Message-ID: <20101220170849.GG28157@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 05, 2010 at 12:43:41AM +0800, mkl0301 at gmail.com wrote:
-[...]
+On Mon, Dec 20, 2010 at 05:47:25AM +0100, Srinidhi KASAGAR wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Sunday, December 19, 2010 4:39 PM
+> > To: Srinidhi KASAGAR
+> > Cc: linux-arm-kernel at lists.infradead.org; STEricsson_nomadik_linux;
+> > Andrea GALLO; rubini at unipv.it
+> > Subject: Re: [PATCH v4 3/6] ARM: U8500 core machine support
+> > 
+> > ... going back to this patch...
+> > 
+> > On Fri, Nov 27, 2009 at 05:25:56AM +0530, srinidhi kasagar wrote:
+> > > +/*
+> > > + * U8500 specific entry point for secondary CPUs.
+> > > + */
+> > > +ENTRY(u8500_secondary_startup)
+> > > +	mrc	p15, 0, r0, c0, c0, 5
+> > > +	and	r0, r0, #15
+> > > +	adr	r4, 1f
+> > > +	ldmia	r4, {r5, r6}
+> > > +	sub	r4, r4, r5
+> > > +	add	r6, r6, r4
+> > > +	dsb
+> > 
+> > Can you please explain why you added a dsb here, whereas most other
+> > platforms don't require it?
+> 
+> No reason, you can safely ignore this. I can send a patch to remove this
+> if you need.
 
-Thanks for the patch!
+It would be better to have all the pen_release implementations without
+spurious differences when the differences aren't necessary.
 
-There are few issues though.
-
-> +static int cns3xxx_ahci_init(struct device *dev, void __iomem *addr)
-> +{
-> +	u32 tmp;
-> +
-> +	DPRINTK("ENTER\n");
-> +
-> +	tmp = __raw_readl(MISC_SATA_POWER_MODE);
-> +	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
-> +	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
-> +	__raw_writel(tmp, MISC_SATA_POWER_MODE);
-> +
-> +	/* Enable SATA PHY */
-> +	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
-> +	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
-> +
-> +	/* Enable SATA Clock */
-> +	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
-> +
-> +	/* De-Asscer SATA Reset */
-> +	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
-> +
-> +	return 0;
-> +}
-> +
-[...]
-> -void __init cns3xxx_ahci_init(void)
-> -{
-> -	u32 tmp;
-> -
-> -	tmp = __raw_readl(MISC_SATA_POWER_MODE);
-> -	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
-> -	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
-> -	__raw_writel(tmp, MISC_SATA_POWER_MODE);
-> -
-> -	/* Enable SATA PHY */
-> -	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
-> -	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
-> -
-> -	/* Enable SATA Clock */
-> -	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
-> -
-> -	/* De-Asscer SATA Reset */
-> -	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
-> -
-> -	platform_device_register(&cns3xxx_ahci_pdev);
-> -}
-
-This is not good because cns3xxx_pwr_*() calls aren't thread-safe.
-We must use them only from the "single-threaded" platform code,
-i.e. very early.
-
-Once we add proper clocks (clkapi) and power management (regulators)
-support for CNS3xxx, we may move this into ahci->init() callback.
-
-Plus, unfortunately this patch breaks build when AHCI_PLATFORM is
-set to =m.
-
-arch/arm/mach-cns3xxx/built-in.o: In function 'cns3xxx_ahci_softreset':
-cns3420vb.c:(.text+0x36c): undefined reference to 'ahci_do_softreset'
-cns3420vb.c:(.text+0x390): undefined reference to 'ahci_do_softreset'
-cns3420vb.c:(.text+0x3a0): undefined reference to 'ahci_check_ready'
-arch/arm/mach-cns3xxx/built-in.o:(.data+0x35c): undefined reference to 'ahci_ops'
-make: *** [.tmp_vmlinux1] Error 1
+So, yes please.
