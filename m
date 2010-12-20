@@ -1,591 +1,344 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:55:25 +0530
-Subject: [PATCH V3 04/63] ST SPEAr: Making clock functions more generic
+Date: Mon, 20 Dec 2010 13:55:40 +0530
+Subject: [PATCH V3 20/63] ST SPEAr: Adding machine support for keyboard
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <2a5bfc9d0f832d065f097a7ec2a8f3f29e9ba2a5.1292833228.git.viresh.kumar@st.com>
+Message-ID: <9580e01fad7d3ff8ac33e0ce5e2d9a81f0b39513.1292833228.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modifications include:
- - Adding dummy clk_set_rate function. Required for compilation of few drivers
- - Making function present in plat-spear/clock.c more generic over all platforms
- - Added div_factor filed in struct clk for clks with .recalc = follow_parent
+From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/clock.c           |   66 ++++++++++++++++++++++++++----
- arch/arm/mach-spear6xx/clock.c           |   67 ++++++++++++++++++++++++++----
- arch/arm/plat-spear/clock.c              |   59 ++++++++++++++++++--------
- arch/arm/plat-spear/include/plat/clock.h |   64 ++++++++++++++++++++++++----
- 4 files changed, 212 insertions(+), 44 deletions(-)
+ arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
+ arch/arm/mach-spear13xx/spear1300_evb.c        |   17 +++
+ arch/arm/mach-spear13xx/spear13xx.c            |   19 +++
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    1 +
+ arch/arm/mach-spear3xx/spear300.c              |   19 +++
+ arch/arm/mach-spear3xx/spear300_evb.c          |   17 +++
+ arch/arm/plat-spear/include/plat/keyboard.h    |  143 ++++++++++++++++++++++++
+ 7 files changed, 217 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-spear/include/plat/keyboard.h
 
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 18febf9..7ea8749 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -39,10 +39,25 @@ static struct clk rtc_clk = {
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index a75ed3a..fd9f9a6 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -33,6 +33,7 @@ extern struct amba_device spear13xx_uart_device;
+ extern struct platform_device spear13xx_ehci0_device;
+ extern struct platform_device spear13xx_ehci1_device;
+ extern struct platform_device spear13xx_i2c_device;
++extern struct platform_device spear13xx_kbd_device;
+ extern struct platform_device spear13xx_ohci0_device;
+ extern struct platform_device spear13xx_ohci1_device;
+ extern struct platform_device spear13xx_rtc_device;
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index 9f53361..24fe8e6 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -16,6 +16,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
++#include <plat/keyboard.h>
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	&spear13xx_uart_device,
+@@ -25,15 +26,31 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&spear13xx_ehci0_device,
+ 	&spear13xx_ehci1_device,
+ 	&spear13xx_i2c_device,
++	&spear13xx_kbd_device,
+ 	&spear13xx_ohci0_device,
+ 	&spear13xx_ohci1_device,
+ 	&spear13xx_rtc_device,
  };
  
- /* clock derived from 24 MHz osc clk */
-+/* pll masks structure */
-+static struct pll_clk_masks pll1_masks = {
-+	.mode_mask = PLL_MODE_MASK,
-+	.mode_shift = PLL_MODE_SHIFT,
-+	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
-+	.norm_fdbk_m_shift = PLL_NORM_FDBK_M_SHIFT,
-+	.dith_fdbk_m_mask = PLL_DITH_FDBK_M_MASK,
-+	.dith_fdbk_m_shift = PLL_DITH_FDBK_M_SHIFT,
-+	.div_p_mask = PLL_DIV_P_MASK,
-+	.div_p_shift = PLL_DIV_P_SHIFT,
-+	.div_n_mask = PLL_DIV_N_MASK,
-+	.div_n_shift = PLL_DIV_N_SHIFT,
++/* keyboard specific platform data */
++static DECLARE_KEYMAP(keymap);
++static struct matrix_keymap_data keymap_data = {
++	.keymap = keymap,
++	.keymap_size = ARRAY_SIZE(keymap),
 +};
 +
- /* pll1 configuration structure */
- static struct pll_clk_config pll1_config = {
- 	.mode_reg = PLL1_CTR,
- 	.cfg_reg = PLL1_FRQ,
-+	.masks = &pll1_masks,
- };
- 
- /* PLL1 clock */
-@@ -50,7 +65,7 @@ static struct clk pll1_clk = {
- 	.pclk = &osc_24m_clk,
- 	.en_reg = PLL1_CTR,
- 	.en_reg_bit = PLL_ENABLE,
--	.recalc = &pll1_clk_recalc,
-+	.recalc = &pll_clk_recalc,
- 	.private_data = &pll1_config,
- };
- 
-@@ -76,11 +91,16 @@ static struct clk cpu_clk = {
- 	.recalc = &follow_parent,
- };
- 
-+/* ahb masks structure */
-+static struct bus_clk_masks ahb_masks = {
-+	.mask = PLL_HCLK_RATIO_MASK,
-+	.shift = PLL_HCLK_RATIO_SHIFT,
++static struct kbd_platform_data kbd_data = {
++	.keymap = &keymap_data,
++	.rep = 1,
 +};
 +
- /* ahb configuration structure */
- static struct bus_clk_config ahb_config = {
- 	.reg = CORE_CLK_CFG,
--	.mask = PLL_HCLK_RATIO_MASK,
--	.shift = PLL_HCLK_RATIO_SHIFT,
-+	.masks = &ahb_masks,
+ static void __init spear1300_evb_init(void)
+ {
+ 	unsigned int i;
+ 
++	/* set keyboard plat data */
++	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
++
+ 	/* call spear1300 machine init function */
+ 	spear1300_init();
+ 
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index c201e31..d19e325 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -166,6 +166,25 @@ struct platform_device spear13xx_ohci1_device = {
+ 	.resource = ohci1_resources,
  };
  
- /* ahb clock */
-@@ -91,9 +111,22 @@ static struct clk ahb_clk = {
- 	.private_data = &ahb_config,
- };
- 
-+/* auxiliary synthesizers masks */
-+static struct aux_clk_masks aux_masks = {
-+	.eq_sel_mask = AUX_EQ_SEL_MASK,
-+	.eq_sel_shift = AUX_EQ_SEL_SHIFT,
-+	.eq1_mask = AUX_EQ1_SEL,
-+	.eq2_mask = AUX_EQ2_SEL,
-+	.xscale_sel_mask = AUX_XSCALE_MASK,
-+	.xscale_sel_shift = AUX_XSCALE_SHIFT,
-+	.yscale_sel_mask = AUX_YSCALE_MASK,
-+	.yscale_sel_shift = AUX_YSCALE_SHIFT,
++/* keyboard device registration */
++static struct resource kbd_resources[] = {
++	{
++		.start = SPEAR13XX_KBD_BASE,
++		.end = SPEAR13XX_KBD_BASE + SZ_1K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_KBD,
++		.flags = IORESOURCE_IRQ,
++	},
 +};
 +
- /* uart configurations */
- static struct aux_clk_config uart_config = {
- 	.synth_reg = UART_CLK_SYNT,
-+	.masks = &aux_masks,
- };
- 
- /* uart parents */
-@@ -130,6 +163,7 @@ static struct clk uart_clk = {
- /* firda configurations */
- static struct aux_clk_config firda_config = {
- 	.synth_reg = FIRDA_CLK_SYNT,
-+	.masks = &aux_masks,
- };
- 
- /* firda parents */
-@@ -184,9 +218,18 @@ static struct pclk_sel gpt_pclk_sel = {
- 	.pclk_sel_mask = GPT_CLK_MASK,
- };
- 
-+/* gpt synthesizer masks */
-+static struct gpt_clk_masks gpt_masks = {
-+	.mscale_sel_mask = GPT_MSCALE_MASK,
-+	.mscale_sel_shift = GPT_MSCALE_SHIFT,
-+	.nscale_sel_mask = GPT_NSCALE_MASK,
-+	.nscale_sel_shift = GPT_NSCALE_SHIFT,
++struct platform_device spear13xx_kbd_device = {
++	.name = "keyboard",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(kbd_resources),
++	.resource = kbd_resources,
 +};
 +
- /* gpt0 configurations */
--static struct aux_clk_config gpt0_config = {
-+static struct gpt_clk_config gpt0_config = {
- 	.synth_reg = PRSC1_CLK_CFG,
-+	.masks = &gpt_masks,
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 3eb2737..70f7ee2 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -108,6 +108,7 @@ extern struct pmx_driver pmx_driver;
+ /* Add spear300 machine device structure declarations here */
+ extern struct amba_device clcd_device;
+ extern struct amba_device gpio1_device;
++extern struct platform_device kbd_device;
+ 
+ /* pad mux modes */
+ extern struct pmx_mode nand_mode;
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index fb7d5f1..44ba52e 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -407,6 +407,25 @@ struct amba_device gpio1_device = {
+ 	.irq = {VIRQ_GPIO1, NO_IRQ},
  };
  
- /* gpt0 timer clock */
-@@ -199,8 +242,9 @@ static struct clk gpt0_clk = {
- };
- 
- /* gpt1 configurations */
--static struct aux_clk_config gpt1_config = {
-+static struct gpt_clk_config gpt1_config = {
- 	.synth_reg = PRSC2_CLK_CFG,
-+	.masks = &gpt_masks,
- };
- 
- /* gpt1 timer clock */
-@@ -214,8 +258,9 @@ static struct clk gpt1_clk = {
- };
- 
- /* gpt2 configurations */
--static struct aux_clk_config gpt2_config = {
-+static struct gpt_clk_config gpt2_config = {
- 	.synth_reg = PRSC3_CLK_CFG,
-+	.masks = &gpt_masks,
- };
- 
- /* gpt2 timer clock */
-@@ -253,11 +298,16 @@ static struct clk clcd_clk = {
- };
- 
- /* clock derived from ahb clk */
-+/* apb masks structure */
-+static struct bus_clk_masks apb_masks = {
-+	.mask = HCLK_PCLK_RATIO_MASK,
-+	.shift = HCLK_PCLK_RATIO_SHIFT,
++/* keyboard device registration */
++static struct resource kbd_resources[] = {
++	{
++		.start = SPEAR300_KEYBOARD_BASE,
++		.end = SPEAR300_KEYBOARD_BASE + SZ_1K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = VIRQ_KEYBOARD,
++		.flags = IORESOURCE_IRQ,
++	},
 +};
 +
- /* apb configuration structure */
- static struct bus_clk_config apb_config = {
- 	.reg = CORE_CLK_CFG,
--	.mask = HCLK_PCLK_RATIO_MASK,
--	.shift = HCLK_PCLK_RATIO_SHIFT,
-+	.masks = &apb_masks,
- };
- 
- /* apb clock */
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 36ff056..ef88922 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -39,10 +39,25 @@ static struct clk rtc_clk = {
- };
- 
- /* clock derived from 30 MHz osc clk */
-+/* pll masks structure */
-+static struct pll_clk_masks pll1_masks = {
-+	.mode_mask = PLL_MODE_MASK,
-+	.mode_shift = PLL_MODE_SHIFT,
-+	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
-+	.norm_fdbk_m_shift = PLL_NORM_FDBK_M_SHIFT,
-+	.dith_fdbk_m_mask = PLL_DITH_FDBK_M_MASK,
-+	.dith_fdbk_m_shift = PLL_DITH_FDBK_M_SHIFT,
-+	.div_p_mask = PLL_DIV_P_MASK,
-+	.div_p_shift = PLL_DIV_P_SHIFT,
-+	.div_n_mask = PLL_DIV_N_MASK,
-+	.div_n_shift = PLL_DIV_N_SHIFT,
++struct platform_device kbd_device = {
++	.name = "keyboard",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(kbd_resources),
++	.resource = kbd_resources,
 +};
 +
- /* pll1 configuration structure */
- static struct pll_clk_config pll1_config = {
- 	.mode_reg = PLL1_CTR,
- 	.cfg_reg = PLL1_FRQ,
-+	.masks = &pll1_masks,
- };
+ /* spear3xx shared irq */
+ struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 3b3c6ce..b4dca98 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -15,6 +15,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
++#include <plat/keyboard.h>
  
- /* PLL1 clock */
-@@ -50,7 +65,7 @@ static struct clk pll1_clk = {
- 	.pclk = &osc_30m_clk,
- 	.en_reg = PLL1_CTR,
- 	.en_reg_bit = PLL_ENABLE,
--	.recalc = &pll1_clk_recalc,
-+	.recalc = &pll_clk_recalc,
- 	.private_data = &pll1_config,
- };
+ /* padmux devices to enable */
+ static struct pmx_dev *pmx_devs[] = {
+@@ -51,6 +52,19 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&rtc_device,
  
-@@ -76,11 +91,16 @@ static struct clk cpu_clk = {
- 	.recalc = &follow_parent,
- };
- 
-+/* ahb masks structure */
-+static struct bus_clk_masks ahb_masks = {
-+	.mask = PLL_HCLK_RATIO_MASK,
-+	.shift = PLL_HCLK_RATIO_SHIFT,
+ 	/* spear300 specific devices */
++	&kbd_device,
 +};
 +
- /* ahb configuration structure */
- static struct bus_clk_config ahb_config = {
- 	.reg = CORE_CLK_CFG,
--	.mask = PLL_HCLK_RATIO_MASK,
--	.shift = PLL_HCLK_RATIO_SHIFT,
-+	.masks = &ahb_masks,
- };
- 
- /* ahb clock */
-@@ -112,9 +132,22 @@ static struct pclk_sel uart_pclk_sel = {
- 	.pclk_sel_mask = UART_CLK_MASK,
- };
- 
-+/* auxiliary synthesizers masks */
-+static struct aux_clk_masks aux_masks = {
-+	.eq_sel_mask = AUX_EQ_SEL_MASK,
-+	.eq_sel_shift = AUX_EQ_SEL_SHIFT,
-+	.eq1_mask = AUX_EQ1_SEL,
-+	.eq2_mask = AUX_EQ2_SEL,
-+	.xscale_sel_mask = AUX_XSCALE_MASK,
-+	.xscale_sel_shift = AUX_XSCALE_SHIFT,
-+	.yscale_sel_mask = AUX_YSCALE_MASK,
-+	.yscale_sel_shift = AUX_YSCALE_SHIFT,
++/* keyboard specific platform data */
++static DECLARE_KEYMAP(keymap);
++static struct matrix_keymap_data keymap_data = {
++	.keymap = keymap,
++	.keymap_size = ARRAY_SIZE(keymap),
 +};
 +
- /* uart configurations */
- static struct aux_clk_config uart_config = {
- 	.synth_reg = UART_CLK_SYNT,
-+	.masks = &aux_masks,
++static struct kbd_platform_data kbd_data = {
++	.keymap = &keymap_data,
++	.rep = 1,
  };
  
- /* uart0 clock */
-@@ -140,6 +173,7 @@ static struct clk uart1_clk = {
- /* firda configurations */
- static struct aux_clk_config firda_config = {
- 	.synth_reg = FIRDA_CLK_SYNT,
-+	.masks = &aux_masks,
- };
+ static void __init spear300_evb_init(void)
+@@ -62,6 +76,9 @@ static void __init spear300_evb_init(void)
+ 	pmx_driver.devs = pmx_devs;
+ 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
  
- /* firda parents */
-@@ -176,6 +210,7 @@ static struct clk firda_clk = {
- /* clcd configurations */
- static struct aux_clk_config clcd_config = {
- 	.synth_reg = CLCD_CLK_SYNT,
-+	.masks = &aux_masks,
- };
- 
- /* clcd parents */
-@@ -230,9 +265,18 @@ static struct pclk_sel gpt_pclk_sel = {
- 	.pclk_sel_mask = GPT_CLK_MASK,
- };
- 
-+/* gpt synthesizer masks */
-+static struct gpt_clk_masks gpt_masks = {
-+	.mscale_sel_mask = GPT_MSCALE_MASK,
-+	.mscale_sel_shift = GPT_MSCALE_SHIFT,
-+	.nscale_sel_mask = GPT_NSCALE_MASK,
-+	.nscale_sel_shift = GPT_NSCALE_SHIFT,
-+};
++	/* set keyboard plat data */
++	kbd_set_plat_data(&kbd_device, &kbd_data);
 +
- /* gpt0_1 configurations */
--static struct aux_clk_config gpt0_1_config = {
-+static struct gpt_clk_config gpt0_1_config = {
- 	.synth_reg = PRSC1_CLK_CFG,
-+	.masks = &gpt_masks,
- };
+ 	/* call spear300 machine init function */
+ 	spear300_init();
  
- /* gpt0 ARM1 subsystem timer clock */
-@@ -254,8 +298,9 @@ static struct clk gpt1_clk = {
- };
- 
- /* gpt2 configurations */
--static struct aux_clk_config gpt2_config = {
-+static struct gpt_clk_config gpt2_config = {
- 	.synth_reg = PRSC2_CLK_CFG,
-+	.masks = &gpt_masks,
- };
- 
- /* gpt2 timer clock */
-@@ -269,8 +314,9 @@ static struct clk gpt2_clk = {
- };
- 
- /* gpt3 configurations */
--static struct aux_clk_config gpt3_config = {
-+static struct gpt_clk_config gpt3_config = {
- 	.synth_reg = PRSC3_CLK_CFG,
-+	.masks = &gpt_masks,
- };
- 
- /* gpt3 timer clock */
-@@ -309,11 +355,16 @@ static struct clk usbd_clk = {
- };
- 
- /* clock derived from ahb clk */
-+/* apb masks structure */
-+static struct bus_clk_masks apb_masks = {
-+	.mask = HCLK_PCLK_RATIO_MASK,
-+	.shift = HCLK_PCLK_RATIO_SHIFT,
-+};
-+
- /* apb configuration structure */
- static struct bus_clk_config apb_config = {
- 	.reg = CORE_CLK_CFG,
--	.mask = HCLK_PCLK_RATIO_MASK,
--	.shift = HCLK_PCLK_RATIO_SHIFT,
-+	.masks = &apb_masks,
- };
- 
- /* apb clock */
-diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
-index ee4f90e..f1cf832 100644
---- a/arch/arm/plat-spear/clock.c
-+++ b/arch/arm/plat-spear/clock.c
-@@ -17,7 +17,6 @@
- #include <linux/list.h>
- #include <linux/module.h>
- #include <linux/spinlock.h>
--#include <mach/misc_regs.h>
- #include <plat/clock.h>
- 
- static DEFINE_SPINLOCK(clocks_lock);
-@@ -187,6 +186,20 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- }
- EXPORT_SYMBOL(clk_set_parent);
- 
-+/**
-+ * clk_set_rate - set the clock rate for a clock source
-+ * @clk: clock source
-+ * @rate: desired clock rate in Hz
+diff --git a/arch/arm/plat-spear/include/plat/keyboard.h b/arch/arm/plat-spear/include/plat/keyboard.h
+new file mode 100644
+index 0000000..bc4e5a6
+--- /dev/null
++++ b/arch/arm/plat-spear/include/plat/keyboard.h
+@@ -0,0 +1,143 @@
++/*
++ * arch/arm/plat-spear/include/plat/keyboard.h
 + *
-+ * Returns success (0) or negative errno.
++ * Copyright (C) 2010 ST Microelectronics
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+int clk_set_rate(struct clk *clk, unsigned long rate)
++
++#ifndef __PLAT_KEYBOARD_H
++#define __PLAT_KEYBOARD_H
++
++#include <linux/bitops.h>
++#include <linux/input.h>
++#include <linux/input/matrix_keypad.h>
++#include <linux/types.h>
++
++#define DECLARE_KEYMAP(name) \
++int name[] = {\
++	KEY(0, 0, KEY_ESC), \
++	KEY(0, 1, KEY_1), \
++	KEY(0, 2, KEY_2), \
++	KEY(0, 3, KEY_3), \
++	KEY(0, 4, KEY_4), \
++	KEY(0, 5, KEY_5), \
++	KEY(0, 6, KEY_6), \
++	KEY(0, 7, KEY_7), \
++	KEY(0, 8, KEY_8), \
++	KEY(1, 0, KEY_9), \
++	KEY(1, 1, KEY_MINUS), \
++	KEY(1, 2, KEY_EQUAL), \
++	KEY(1, 3, KEY_BACKSPACE), \
++	KEY(1, 4, KEY_TAB), \
++	KEY(1, 5, KEY_Q), \
++	KEY(1, 6, KEY_W), \
++	KEY(1, 7, KEY_E), \
++	KEY(1, 8, KEY_R), \
++	KEY(2, 0, KEY_T), \
++	KEY(2, 1, KEY_Y), \
++	KEY(2, 2, KEY_U), \
++	KEY(2, 3, KEY_I), \
++	KEY(2, 4, KEY_O), \
++	KEY(2, 5, KEY_P), \
++	KEY(2, 6, KEY_LEFTBRACE), \
++	KEY(2, 7, KEY_RIGHTBRACE), \
++	KEY(2, 8, KEY_ENTER), \
++	KEY(3, 0, KEY_LEFTCTRL), \
++	KEY(3, 1, KEY_A), \
++	KEY(3, 2, KEY_S), \
++	KEY(3, 3, KEY_D), \
++	KEY(3, 4, KEY_F), \
++	KEY(3, 5, KEY_G), \
++	KEY(3, 6, KEY_H), \
++	KEY(3, 7, KEY_J), \
++	KEY(3, 8, KEY_K), \
++	KEY(4, 0, KEY_L), \
++	KEY(4, 1, KEY_SEMICOLON), \
++	KEY(4, 2, KEY_APOSTROPHE), \
++	KEY(4, 3, KEY_GRAVE), \
++	KEY(4, 4, KEY_LEFTSHIFT), \
++	KEY(4, 5, KEY_BACKSLASH), \
++	KEY(4, 6, KEY_Z), \
++	KEY(4, 7, KEY_X), \
++	KEY(4, 8, KEY_C), \
++	KEY(4, 0, KEY_L), \
++	KEY(4, 1, KEY_SEMICOLON), \
++	KEY(4, 2, KEY_APOSTROPHE), \
++	KEY(4, 3, KEY_GRAVE), \
++	KEY(4, 4, KEY_LEFTSHIFT), \
++	KEY(4, 5, KEY_BACKSLASH), \
++	KEY(4, 6, KEY_Z), \
++	KEY(4, 7, KEY_X), \
++	KEY(4, 8, KEY_C), \
++	KEY(4, 0, KEY_L), \
++	KEY(4, 1, KEY_SEMICOLON), \
++	KEY(4, 2, KEY_APOSTROPHE), \
++	KEY(4, 3, KEY_GRAVE), \
++	KEY(4, 4, KEY_LEFTSHIFT), \
++	KEY(4, 5, KEY_BACKSLASH), \
++	KEY(4, 6, KEY_Z), \
++	KEY(4, 7, KEY_X), \
++	KEY(4, 8, KEY_C), \
++	KEY(5, 0, KEY_V), \
++	KEY(5, 1, KEY_B), \
++	KEY(5, 2, KEY_N), \
++	KEY(5, 3, KEY_M), \
++	KEY(5, 4, KEY_COMMA), \
++	KEY(5, 5, KEY_DOT), \
++	KEY(5, 6, KEY_SLASH), \
++	KEY(5, 7, KEY_RIGHTSHIFT), \
++	KEY(5, 8, KEY_KPASTERISK), \
++	KEY(6, 0, KEY_LEFTALT), \
++	KEY(6, 1, KEY_SPACE), \
++	KEY(6, 2, KEY_CAPSLOCK), \
++	KEY(6, 3, KEY_F1), \
++	KEY(6, 4, KEY_F2), \
++	KEY(6, 5, KEY_F3), \
++	KEY(6, 6, KEY_F4), \
++	KEY(6, 7, KEY_F5), \
++	KEY(6, 8, KEY_F6), \
++	KEY(7, 0, KEY_F7), \
++	KEY(7, 1, KEY_F8), \
++	KEY(7, 2, KEY_F9), \
++	KEY(7, 3, KEY_F10), \
++	KEY(7, 4, KEY_NUMLOCK), \
++	KEY(7, 5, KEY_SCROLLLOCK), \
++	KEY(7, 6, KEY_KP7), \
++	KEY(7, 7, KEY_KP8), \
++	KEY(7, 8, KEY_KP9), \
++	KEY(8, 0, KEY_KPMINUS), \
++	KEY(8, 1, KEY_KP4), \
++	KEY(8, 2, KEY_KP5), \
++	KEY(8, 3, KEY_KP6), \
++	KEY(8, 4, KEY_KPPLUS), \
++	KEY(8, 5, KEY_KP1), \
++	KEY(8, 6, KEY_KP2), \
++	KEY(8, 7, KEY_KP3), \
++	KEY(8, 8, KEY_KP0), \
++};
++/**
++ * struct kbd_platform_data - keymap for spear keyboards
++ * keymap: pointer to array of values encoded with KEY() macro representing
++ * keymap
++ * keymapsize: number of entries (initialized) in this keymap
++ * rep: current values for autorepeat parameters
++ *
++ * This structure is supposed to be used by platform code to supply
++ * keymaps to drivers that implement keyboards.
++ */
++struct kbd_platform_data {
++	const struct matrix_keymap_data *keymap;
++	bool rep;
++};
++
++/* This function is used to set platform data field of pdev->dev */
++static inline void
++kbd_set_plat_data(struct platform_device *pdev, struct kbd_platform_data *data)
 +{
-+	/* TODO */
-+	return -EINVAL;
++	pdev->dev.platform_data = data;
 +}
-+EXPORT_SYMBOL(clk_set_rate);
-+
- /* registers clock in platform clock framework */
- void clk_register(struct clk_lookup *cl)
- {
-@@ -212,6 +225,7 @@ void clk_register(struct clk_lookup *cl)
- 		list_add(&clk->sibling, &clk->pclk->children);
- 	} else {
- 		/* add clocks with > 1 parent to 1st parent's children list */
-+		clk->pclk = clk->pclk_sel->pclk_info[0].pclk;
- 		list_add(&clk->sibling,
- 			 &clk->pclk_sel->pclk_info[0].pclk->children);
- 	}
-@@ -283,29 +297,31 @@ static void change_parent(struct clk *cclk, struct clk *pclk)
-  * In Dithered mode
-  * rate = (2 * M[15:0] * Fin)/(256 * N * 2^P)
-  */
--void pll1_clk_recalc(struct clk *clk)
-+void pll_clk_recalc(struct clk *clk)
- {
- 	struct pll_clk_config *config = clk->private_data;
- 	unsigned int num = 2, den = 0, val, mode = 0;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
--	mode = (readl(config->mode_reg) >> PLL_MODE_SHIFT) &
--		PLL_MODE_MASK;
-+	mode = (readl(config->mode_reg) >> config->masks->mode_shift) &
-+		config->masks->mode_mask;
- 
- 	val = readl(config->cfg_reg);
- 	/* calculate denominator */
--	den = (val >> PLL_DIV_P_SHIFT) & PLL_DIV_P_MASK;
-+	den = (val >> config->masks->div_p_shift) & config->masks->div_p_mask;
- 	den = 1 << den;
--	den *= (val >> PLL_DIV_N_SHIFT) & PLL_DIV_N_MASK;
-+	den *= (val >> config->masks->div_n_shift) & config->masks->div_n_mask;
- 
- 	/* calculate numerator & denominator */
- 	if (!mode) {
- 		/* Normal mode */
--		num *= (val >> PLL_NORM_FDBK_M_SHIFT) & PLL_NORM_FDBK_M_MASK;
-+		num *= (val >> config->masks->norm_fdbk_m_shift) &
-+			config->masks->norm_fdbk_m_mask;
- 	} else {
- 		/* Dithered mode */
--		num *= (val >> PLL_DITH_FDBK_M_SHIFT) & PLL_DITH_FDBK_M_MASK;
-+		num *= (val >> config->masks->dith_fdbk_m_shift) &
-+			config->masks->dith_fdbk_m_mask;
- 		den *= 256;
- 	}
- 
-@@ -321,7 +337,8 @@ void bus_clk_recalc(struct clk *clk)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
--	div = ((readl(config->reg) >> config->shift) & config->mask) + 1;
-+	div = ((readl(config->reg) >> config->masks->shift) &
-+			config->masks->mask) + 1;
- 	clk->rate = (unsigned long)clk->pclk->rate / div;
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
-@@ -359,15 +376,18 @@ void aux_clk_recalc(struct clk *clk)
- 	if (pclk_info->scalable) {
- 		val = readl(config->synth_reg);
- 
--		eqn = (val >> AUX_EQ_SEL_SHIFT) & AUX_EQ_SEL_MASK;
--		if (eqn == AUX_EQ1_SEL)
-+		eqn = (val >> config->masks->eq_sel_shift) &
-+			config->masks->eq_sel_mask;
-+		if (eqn == config->masks->eq1_mask)
- 			den *= 2;
- 
- 		/* calculate numerator */
--		num = (val >> AUX_XSCALE_SHIFT) & AUX_XSCALE_MASK;
-+		num = (val >> config->masks->xscale_sel_shift) &
-+			config->masks->xscale_sel_mask;
- 
- 		/* calculate denominator */
--		den *= (val >> AUX_YSCALE_SHIFT) & AUX_YSCALE_MASK;
-+		den *= (val >> config->masks->yscale_sel_shift) &
-+			config->masks->yscale_sel_mask;
- 		val = (((clk->pclk->rate/10000) * num) / den) * 10000;
- 	} else
- 		val = clk->pclk->rate;
-@@ -383,7 +403,7 @@ void aux_clk_recalc(struct clk *clk)
-  */
- void gpt_clk_recalc(struct clk *clk)
- {
--	struct aux_clk_config *config = clk->private_data;
-+	struct gpt_clk_config *config = clk->private_data;
- 	struct pclk_info *pclk_info = NULL;
- 	unsigned int div = 1, val;
- 	unsigned long flags;
-@@ -402,8 +422,10 @@ void gpt_clk_recalc(struct clk *clk)
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	if (pclk_info->scalable) {
- 		val = readl(config->synth_reg);
--		div += (val >> GPT_MSCALE_SHIFT) & GPT_MSCALE_MASK;
--		div *= 1 << (((val >> GPT_NSCALE_SHIFT) & GPT_NSCALE_MASK) + 1);
-+		div += (val >> config->masks->mscale_sel_shift) &
-+			config->masks->mscale_sel_mask;
-+		div *= 1 << (((val >> config->masks->nscale_sel_shift) &
-+					config->masks->nscale_sel_mask) + 1);
- 	}
- 
- 	clk->rate = (unsigned long)clk->pclk->rate / div;
-@@ -411,15 +433,16 @@ void gpt_clk_recalc(struct clk *clk)
- }
- 
- /*
-- * Used for clocks that always have same value as the parent clock divided by a
-+ * Used for clocks that always have value as the parent clock divided by a
-  * fixed divisor
-  */
- void follow_parent(struct clk *clk)
- {
- 	unsigned long flags;
-+	unsigned int div_factor = (clk->div_factor < 1) ? 1 : clk->div_factor;
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
--	clk->rate = clk->pclk->rate;
-+	clk->rate = clk->pclk->rate/div_factor;
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- 
-diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
-index 298bafc..e08b58c 100644
---- a/arch/arm/plat-spear/include/plat/clock.h
-+++ b/arch/arm/plat-spear/include/plat/clock.h
-@@ -67,6 +67,7 @@ struct pclk_sel {
-  * @en_reg_bit: clk enable/disable bit
-  * @ops: clk enable/disable ops - generic_clkops selected if NULL
-  * @recalc: pointer to clock rate recalculate function
-+ * @div_factor: division factor to parent clock. Only for recalc = follow_parent
-  * @pclk: current parent clk
-  * @pclk_sel: pointer to parent selection structure
-  * @pclk_sel_shift: register shift for selecting parent of this clock
-@@ -82,6 +83,7 @@ struct clk {
- 	u8 en_reg_bit;
- 	const struct clkops *ops;
- 	void (*recalc) (struct clk *);
-+	unsigned int div_factor;
- 
- 	struct clk *pclk;
- 	struct pclk_sel *pclk_sel;
-@@ -93,23 +95,65 @@ struct clk {
- };
- 
- /* pll configuration structure */
-+struct pll_clk_masks {
-+	u32 mode_mask;
-+	u32 mode_shift;
-+
-+	u32 norm_fdbk_m_mask;
-+	u32 norm_fdbk_m_shift;
-+	u32 dith_fdbk_m_mask;
-+	u32 dith_fdbk_m_shift;
-+	u32 div_p_mask;
-+	u32 div_p_shift;
-+	u32 div_n_mask;
-+	u32 div_n_shift;
-+};
-+
- struct pll_clk_config {
--	unsigned int *mode_reg;
--	unsigned int *cfg_reg;
-+	u32 *mode_reg;
-+	u32 *cfg_reg;
-+	struct pll_clk_masks *masks;
- };
- 
- /* ahb and apb bus configuration structure */
-+struct bus_clk_masks {
-+	u32 mask;
-+	u32 shift;
-+};
-+
- struct bus_clk_config {
--	unsigned int *reg;
--	unsigned int mask;
--	unsigned int shift;
-+	u32 *reg;
-+	struct bus_clk_masks *masks;
-+};
-+
-+/* Aux clk configuration structure: applicable to UART and FIRDA */
-+struct aux_clk_masks {
-+	u32 eq_sel_mask;
-+	u32 eq_sel_shift;
-+	u32 eq1_mask;
-+	u32 eq2_mask;
-+	u32 xscale_sel_mask;
-+	u32 xscale_sel_shift;
-+	u32 yscale_sel_mask;
-+	u32 yscale_sel_shift;
- };
- 
--/*
-- * Aux clk configuration structure: applicable to GPT, UART and FIRDA
-- */
- struct aux_clk_config {
--	unsigned int *synth_reg;
-+	u32 *synth_reg;
-+	struct aux_clk_masks *masks;
-+};
-+
-+/* GPT clk configuration structure */
-+struct gpt_clk_masks {
-+	u32 mscale_sel_mask;
-+	u32 mscale_sel_shift;
-+	u32 nscale_sel_mask;
-+	u32 nscale_sel_shift;
-+};
-+
-+struct gpt_clk_config {
-+	u32 *synth_reg;
-+	struct gpt_clk_masks *masks;
- };
- 
- /* platform specific clock functions */
-@@ -118,7 +162,7 @@ void recalc_root_clocks(void);
- 
- /* clock recalc functions */
- void follow_parent(struct clk *clk);
--void pll1_clk_recalc(struct clk *clk);
-+void pll_clk_recalc(struct clk *clk);
- void bus_clk_recalc(struct clk *clk);
- void gpt_clk_recalc(struct clk *clk);
- void aux_clk_recalc(struct clk *clk);
++#endif /* __PLAT_KEYBOARD_H */
 -- 
 1.7.2.2
