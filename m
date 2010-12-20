@@ -1,106 +1,43 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 20 Dec 2010 15:41:17 -0800
-Subject: [PATCH v5 6/7] OMAP3: PM: make omap3_cpuidle_update_states
-	independent of enable_off_mode
-In-Reply-To: <1292875509-9896-7-git-send-email-nm@ti.com> (Nishanth Menon's
-	message of "Mon, 20 Dec 2010 14:05:08 -0600")
-References: <1292875509-9896-1-git-send-email-nm@ti.com>
-	<1292875509-9896-7-git-send-email-nm@ti.com>
-Message-ID: <87hbe83tcy.fsf@deeprootsystems.com>
+Date: Mon, 20 Dec 2010 15:49:05 -0800
+Subject: [PATCH v1] OMAP: GPIO: Correct IP version message during boot
+In-Reply-To: <AANLkTimUrDAR1Wc4oJf74iYKhpxHKkGKLQOEuSNpcBXo@mail.gmail.com>
+	(Charulatha Varadarajan's message of "Fri, 17 Dec 2010 09:15:03
+	-0500")
+References: <1292508586-21651-1-git-send-email-charu@ti.com>
+	<8739pxhdcz.fsf@deeprootsystems.com>
+	<AANLkTimUrDAR1Wc4oJf74iYKhpxHKkGKLQOEuSNpcBXo@mail.gmail.com>
+Message-ID: <87zks02efi.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-> Currently omap3_cpuidle_update_states makes whole sale decision
-> on which C states to update based on enable_off_mode variable
-> Instead, achieve the same functionality by independently providing
-> mpu and core deepest states the system is allowed to achieve and
-> update the idle states accordingly.
+> Kevin,
 >
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Jean Pihet <j-pihet@ti.com>
+> On Thu, Dec 16, 2010 at 11:49, Kevin Hilman <khilman@deeprootsystems.com> wrote:
+>> "Varadarajan, Charulatha" <charu@ti.com> writes:
+>>
+>>> With the commit 9a748053f5f58a77cd71864f1d7b804175b0e47d whose subject is
+>>> "OMAP: GPIO: Make omap_gpio_show_rev bank specific" (see [1]),
+>>> the IP version information for all the banks are shown during bootup,
+>>> but it does not show the bank number.
+>>>
+>>> Use dev_info instead of printk in omap_gpio_show_rev() so that the
+>>> bank id is displayed along with the IP version
+>>>
+>>> [1] http://www.spinics.net/lists/arm-kernel/msg105872.html
+>>
+>> A related question, the commit above also changed the GPIO revision
+>> display from one-time to once per bank. ?Do we need to know the GPIO HW
+>> revision for each bank, or can we assume it's the same for all banks?
 >
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> The IP version is the same for all the gpio banks in all OMAP2+ CPUs.
+> But I am not sure about OMAP16xx.
+>
 
-This patch doesnt' compile with CPUidle enabled.
-
-You missed one other caller of the update_states function inside
-cpuidle34xx.c which is only there when CONFIG_CPU_IDLE=y
+OK, then I suggest we switch this back to just printing the GPIO
+revision once.   Maybe after all banks are found, just print the
+revision for bank 1.
 
 Kevin
-
-> ---
-> v2: proto is used as (u32, u32) + added the acks collected
-> v1: original version
->  arch/arm/mach-omap2/cpuidle34xx.c |   19 ++++++++++---------
->  arch/arm/mach-omap2/pm.h          |    2 +-
->  arch/arm/mach-omap2/pm34xx.c      |    2 +-
->  3 files changed, 12 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 0d50b45..f80d3f6 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -293,25 +293,26 @@ select_state:
->  DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
->  
->  /**
-> - * omap3_cpuidle_update_states - Update the cpuidle states.
-> + * omap3_cpuidle_update_states() - Update the cpuidle states
-> + * @mpu_deepest_state:	Enable states upto and including this for mpu domain
-> + * @core_deepest_state:	Enable states upto and including this for core domain
->   *
-> - * Currently, this function toggles the validity of idle states based upon
-> - * the flag 'enable_off_mode'. When the flag is set all states are valid.
-> - * Else, states leading to OFF state set to be invalid.
-> + * This goes through the list of states available and enables and disables the
-> + * validity of C states based on deepest state that can be achieved for the
-> + * variable domain
->   */
-> -void omap3_cpuidle_update_states(void)
-> +void omap3_cpuidle_update_states(u32 mpu_deepest_state, u32 core_deepest_state)
->  {
->  	int i;
->  
->  	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
->  		struct omap3_processor_cx *cx = &omap3_power_states[i];
->  
-> -		if (enable_off_mode) {
-> +		if ((cx->mpu_state >= mpu_deepest_state) &&
-> +		    (cx->core_state >= core_deepest_state)) {
->  			cx->valid = 1;
->  		} else {
-> -			if ((cx->mpu_state == PWRDM_POWER_OFF) ||
-> -				(cx->core_state	== PWRDM_POWER_OFF))
-> -				cx->valid = 0;
-> +			cx->valid = 0;
->  		}
->  	}
->  }
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index 5e0bee9..29663cc 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -58,7 +58,7 @@ extern u32 sleep_while_idle;
->  #endif
->  
->  #if defined(CONFIG_CPU_IDLE)
-> -extern void omap3_cpuidle_update_states(void);
-> +extern void omap3_cpuidle_update_states(u32, u32);
->  #endif
->  
->  #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index feb1bd9..ca3b134 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -928,7 +928,7 @@ void omap3_pm_off_mode_enable(int enable)
->  		state = PWRDM_POWER_RET;
->  
->  #ifdef CONFIG_CPU_IDLE
-> -	omap3_cpuidle_update_states();
-> +	omap3_cpuidle_update_states(state, state);
->  #endif
->  
->  	list_for_each_entry(pwrst, &pwrst_list, node) {
