@@ -1,206 +1,80 @@
-From: thara@ti.com (Thara Gopinath)
-Date: Mon, 20 Dec 2010 22:30:36 +0530
-Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex modules.
-In-Reply-To: <1292864437-15353-1-git-send-email-thara@ti.com>
-References: <1292864437-15353-1-git-send-email-thara@ti.com>
-Message-ID: <1292864437-15353-5-git-send-email-thara@ti.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Mon, 20 Dec 2010 20:02:17 +0300
+Subject: [PATCH 1/1] ARM: cns3xxx: ahci: Fixup for softwreset failures
+	with direct connected disks with CONFIG_SATA_PMP enabled.
+In-Reply-To: <1291481021-23317-1-git-send-email-mkl0301@gmail.com>
+References: <1291481021-23317-1-git-send-email-mkl0301@gmail.com>
+Message-ID: <20101220170217.GA1333@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+On Sun, Dec 05, 2010 at 12:43:41AM +0800, mkl0301 at gmail.com wrote:
+[...]
 
-This patch adds the hwmod details for OMAP4 smartreflex modules.
+Thanks for the patch!
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  168 ++++++++++++++++++++++++++++
- 1 files changed, 168 insertions(+), 0 deletions(-)
+There are few issues though.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 7367648..0a6e674 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1740,6 +1740,169 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
- };
- 
-+/*
-+ * 'smartreflex' class
-+ * smartreflex module (monitor silicon performance and outputs a measure of
-+ * performance error)
-+ */
-+
-+/* The IP is not compliant to type1 / type2 scheme */
-+static struct omap_hwmod_sysc_fields omap_hwmod_sysc_type_smartreflex = {
-+	.sidle_shift	= 24,
-+	.enwkup_shift	= 26,
-+};
-+
-+static struct omap_hwmod_class_sysconfig omap44xx_smartreflex_sysc = {
-+	.sysc_offs	= 0x0038,
-+	.sysc_flags	= (SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type_smartreflex,
-+};
-+
-+static struct omap_hwmod_class omap44xx_smartreflex_hwmod_class = {
-+	.name = "smartreflex",
-+	.sysc = &omap44xx_smartreflex_sysc,
-+	.rev  = 2,
-+};
-+
-+/* smartreflex_core */
-+static struct omap_hwmod omap44xx_smartreflex_core_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_smartreflex_core_irqs[] = {
-+	{ .irq = 19 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_smartreflex_core_addrs[] = {
-+	{
-+		.pa_start	= 0x4a0dd000,
-+		.pa_end		= 0x4a0dd03f,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_cfg -> smartreflex_core */
-+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__smartreflex_core = {
-+	.master		= &omap44xx_l4_cfg_hwmod,
-+	.slave		= &omap44xx_smartreflex_core_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_smartreflex_core_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_smartreflex_core_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* smartreflex_core slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_smartreflex_core_slaves[] = {
-+	&omap44xx_l4_cfg__smartreflex_core,
-+};
-+
-+static struct omap_hwmod omap44xx_smartreflex_core_hwmod = {
-+	.name		= "smartreflex_core",
-+	.class		= &omap44xx_smartreflex_hwmod_class,
-+	.mpu_irqs	= omap44xx_smartreflex_core_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_smartreflex_core_irqs),
-+	.main_clk	= "smartreflex_core_fck",
-+	.vdd_name	= "core",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_smartreflex_core_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_core_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/* smartreflex_iva */
-+static struct omap_hwmod omap44xx_smartreflex_iva_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_smartreflex_iva_irqs[] = {
-+	{ .irq = 102 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_smartreflex_iva_addrs[] = {
-+	{
-+		.pa_start	= 0x4a0db000,
-+		.pa_end		= 0x4a0db03f,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_cfg -> smartreflex_iva */
-+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__smartreflex_iva = {
-+	.master		= &omap44xx_l4_cfg_hwmod,
-+	.slave		= &omap44xx_smartreflex_iva_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_smartreflex_iva_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* smartreflex_iva slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_smartreflex_iva_slaves[] = {
-+	&omap44xx_l4_cfg__smartreflex_iva,
-+};
-+
-+static struct omap_hwmod omap44xx_smartreflex_iva_hwmod = {
-+	.name		= "smartreflex_iva",
-+	.class		= &omap44xx_smartreflex_hwmod_class,
-+	.mpu_irqs	= omap44xx_smartreflex_iva_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_irqs),
-+	.main_clk	= "smartreflex_iva_fck",
-+	.vdd_name	= "iva",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_smartreflex_iva_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/* smartreflex_mpu */
-+static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_smartreflex_mpu_irqs[] = {
-+	{ .irq = 18 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_smartreflex_mpu_addrs[] = {
-+	{
-+		.pa_start	= 0x4a0d9000,
-+		.pa_end		= 0x4a0d903f,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_cfg -> smartreflex_mpu */
-+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__smartreflex_mpu = {
-+	.master		= &omap44xx_l4_cfg_hwmod,
-+	.slave		= &omap44xx_smartreflex_mpu_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_smartreflex_mpu_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_smartreflex_mpu_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* smartreflex_mpu slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_smartreflex_mpu_slaves[] = {
-+	&omap44xx_l4_cfg__smartreflex_mpu,
-+};
-+
-+static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod = {
-+	.name		= "smartreflex_mpu",
-+	.class		= &omap44xx_smartreflex_hwmod_class,
-+	.mpu_irqs	= omap44xx_smartreflex_mpu_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_smartreflex_mpu_irqs),
-+	.main_clk	= "smartreflex_mpu_fck",
-+	.vdd_name	= "mpu",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_smartreflex_mpu_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_mpu_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
- static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	/* dmm class */
- 	&omap44xx_dmm_hwmod,
-@@ -1798,6 +1961,11 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_wd_timer2_hwmod,
- 	&omap44xx_wd_timer3_hwmod,
- 
-+	/* smartreflex class */
-+	&omap44xx_smartreflex_core_hwmod,
-+	&omap44xx_smartreflex_iva_hwmod,
-+	&omap44xx_smartreflex_mpu_hwmod,
-+
- 	NULL,
- };
- 
--- 
-1.7.0.4
+> +static int cns3xxx_ahci_init(struct device *dev, void __iomem *addr)
+> +{
+> +	u32 tmp;
+> +
+> +	DPRINTK("ENTER\n");
+> +
+> +	tmp = __raw_readl(MISC_SATA_POWER_MODE);
+> +	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
+> +	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
+> +	__raw_writel(tmp, MISC_SATA_POWER_MODE);
+> +
+> +	/* Enable SATA PHY */
+> +	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
+> +	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
+> +
+> +	/* Enable SATA Clock */
+> +	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
+> +
+> +	/* De-Asscer SATA Reset */
+> +	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
+> +
+> +	return 0;
+> +}
+> +
+[...]
+> -void __init cns3xxx_ahci_init(void)
+> -{
+> -	u32 tmp;
+> -
+> -	tmp = __raw_readl(MISC_SATA_POWER_MODE);
+> -	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
+> -	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
+> -	__raw_writel(tmp, MISC_SATA_POWER_MODE);
+> -
+> -	/* Enable SATA PHY */
+> -	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
+> -	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
+> -
+> -	/* Enable SATA Clock */
+> -	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
+> -
+> -	/* De-Asscer SATA Reset */
+> -	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
+> -
+> -	platform_device_register(&cns3xxx_ahci_pdev);
+> -}
+
+This is not good because cns3xxx_pwr_*() calls aren't thread-safe.
+We must use them only from the "single-threaded" platform code,
+i.e. very early.
+
+Once we add proper clocks (clkapi) and power management (regulators)
+support for CNS3xxx, we may move this into ahci->init() callback.
+
+Plus, unfortunately this patch breaks build when AHCI_PLATFORM is
+set to =m.
+
+arch/arm/mach-cns3xxx/built-in.o: In function 'cns3xxx_ahci_softreset':
+cns3420vb.c:(.text+0x36c): undefined reference to 'ahci_do_softreset'
+cns3420vb.c:(.text+0x390): undefined reference to 'ahci_do_softreset'
+cns3420vb.c:(.text+0x3a0): undefined reference to 'ahci_check_ready'
+arch/arm/mach-cns3xxx/built-in.o:(.data+0x35c): undefined reference to 'ahci_ops'
+make: *** [.tmp_vmlinux1] Error 1
