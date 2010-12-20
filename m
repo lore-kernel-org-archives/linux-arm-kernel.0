@@ -1,134 +1,85 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 20 Dec 2010 14:05:09 -0600
-Subject: [PATCH v5 7/7] OMAP3630: PM: Erratum i583: disable coreoff if < ES1.2
-In-Reply-To: <1292875509-9896-1-git-send-email-nm@ti.com>
-References: <1292875509-9896-1-git-send-email-nm@ti.com>
-Message-ID: <1292875509-9896-8-git-send-email-nm@ti.com>
+Date: Mon, 20 Dec 2010 14:05:02 -0600
+Subject: [PATCH v5 0/7] OMAP: idle path errata fixes
+Message-ID: <1292875509-9896-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eduardo Valentin <eduardo.valentin@nokia.com>
+Hi,
+as discussed in [1], here is step 2 - idle path errata fixes.
+this is the next rev incorporating comments from V4 of this series.
 
-Limitation i583: Self_Refresh Exit issue after OFF mode
+Rebased to: 2.6.37-rc6 (k.org vanilla)
 
-Issue:
-When device is waking up from OFF mode, then SDRC state machine sends
-inappropriate sequence violating JEDEC standards.
+Tested:
+this series:
+	SDP3430
+	SDP3630
+this series + ASM cleanup series[2]
+	SDP3430
+	SDP3630
+Test Script:
+http://elinux.org/OMAP_Power_Management#Quick_verification_of_suspend-idle_functionality
 
-Impact:
-OMAP3630 < ES1.2 is impacted as follows depending on the platform:
-CS0: for 38.4MHz as internal sysclk, DDR content seen to be stable, while
-	for all other sysclk frequencies, varied levels of instability
-	seen based on varied parameters.
-CS1: impacted
+v4: http://marc.info/?l=linux-omap&m=129271283307741&w=2
+V3: http://marc.info/?t=129140247800030&r=1&w=2
+V2: http://marc.info/?l=linux-omap&m=129106200408109&w=2
 
-This patch takes option #3 as recommended by the Silicon erratum:
-Avoid core power domain transitioning to OFF mode. Power consumption
-impact is expected in this case.
-To do this, we route core OFF requests to RET request on the impacted
-revisions of silicon.
+Major change in V5:
+	comment updates, minor typo cleanups
+	collated acks
 
-Acked-by: Jean Pihet <j-pihet@ti.com>
+Eduardo Valentin (1):
+  OMAP3630: PM: Erratum i583: disable coreoff if < ES1.2
 
-[nm at ti.com: rebased the code to 2.6.37-rc2- short circuit code changed a bit]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+Nishanth Menon(3):
+  OMAP3: pm: introduce errata handling
+  OMAP3630: PM: Erratum i608: disable RTA
+  OMAP3: PM: make omap3_cpuidle_update_states independent of
+    enable_off_mode
+
+Peter 'p2' De Schrijver (2):
+  OMAP3: PM: Erratum i581 support: dll kick strategy
+  OMAP3630: PM: Disable L2 cache while invalidating L2 cache
+
+Richard Woodruff (1):
+  OMAP3: PM: Update clean_l2 to use v7_flush_dcache_all
+
+ arch/arm/mach-omap2/control.c     |   13 +++-
+ arch/arm/mach-omap2/control.h     |    7 +-
+ arch/arm/mach-omap2/cpuidle34xx.c |   31 ++++--
+ arch/arm/mach-omap2/pm.h          |   15 +++-
+ arch/arm/mach-omap2/pm34xx.c      |   47 +++++++++-
+ arch/arm/mach-omap2/sleep34xx.S   |  191 +++++++++++++++++++++++--------------
+ 6 files changed, 218 insertions(+), 86 deletions(-)
+
+bloat-o-meter report Vs 2.6.37-rc6
+add/remove: 2/0 grow/shrink: 8/1 up/down: 330/-1 (329)
+function                                     old     new   delta
+omap3_pm_off_mode_enable                      80     192    +112
+omap3_pm_init                               1792    1872     +80
+omap3630_ctrl_disable_rta                      -      44     +44
+omap3_save_scratchpad_contents               732     760     +28
+static.__func__                            13783   13808     +25
+vermagic                                      45      60     +15
+linux_banner                                 132     147     +15
+prcm_interrupt_handler                       268     276      +8
+pm34xx_errata                                  -       2      +2
+static.__warned                              238     239      +1
+kernel_config_data                         13718   13717      -1
+
+
+[1] http://marc.info/?l=linux-omap&m=129045338806957&w=2
+[2] http://marc.info/?l=linux-omap&m=129268746417556&w=2
+
+Cc: Charulatha Varadarajan <charu@ti.com>
+Cc: Jean Pihet <jean.pihet@newoldbits.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Tao Hu <tghk48@motorola.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
+
 ---
-v5: used WARN_ONCE to warn user for the required paths
-v4: idle state control changed a bit -we wont register or enable
-    the states which cannot be enabled.
-v3: http://marc.info/?t=129140247800027&r=1&w=2
-    no functional change in erratum wa implementation, just registration of
- 	erratum is collated to a single cpu detection and version check
-v2: https://patchwork.kernel.org/patch/365262/
-    rebased to this patch series instead of depending on hs changes
-    fix typo for macro definition
-v1: http://marc.info/?l=linux-omap&m=129013173425266&w=2
- arch/arm/mach-omap2/cpuidle34xx.c |   12 ++++++++++++
- arch/arm/mach-omap2/pm.h          |    1 +
- arch/arm/mach-omap2/pm34xx.c      |   25 ++++++++++++++++++++++---
- 3 files changed, 35 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index f80d3f6..ab4c862 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -453,6 +453,18 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C7].core_state = PWRDM_POWER_OFF;
- 	omap3_power_states[OMAP3_STATE_C7].flags = CPUIDLE_FLAG_TIME_VALID |
- 				CPUIDLE_FLAG_CHECK_BM;
-+
-+	/*
-+	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
-+	 * enable OFF mode in a stable form for previous revisions.
-+	 * we disable C7 state as a result.
-+	 */
-+	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583)) {
-+		omap3_power_states[OMAP3_STATE_C7].valid = 0;
-+		cpuidle_params_table[OMAP3_STATE_C7].valid = 0;
-+		WARN_ONCE(1, "%s: core off state C7 disabled due to i583\n",
-+				__func__);
-+	}
- }
- 
- struct cpuidle_driver omap3_idle_driver = {
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 2c1cbbd..ed2357a 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -87,6 +87,7 @@ extern unsigned int omap24xx_cpu_suspend_sz;
- extern unsigned int omap34xx_cpu_suspend_sz;
- 
- #define PM_RTA_ERRATUM_i608		(1 << 0)
-+#define PM_SDRC_WAKEUP_ERRATUM_i583	(1 << 1)
- 
- #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
- extern u16 pm34xx_errata;
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index ca3b134..652d6f5 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -928,12 +928,29 @@ void omap3_pm_off_mode_enable(int enable)
- 		state = PWRDM_POWER_RET;
- 
- #ifdef CONFIG_CPU_IDLE
--	omap3_cpuidle_update_states(state, state);
-+	/*
-+	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
-+	 * enable OFF mode in a stable form for previous revisions, restrict
-+	 * instead to RET
-+	 */
-+	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
-+		omap3_cpuidle_update_states(state, PWRDM_POWER_RET);
-+	else
-+		omap3_cpuidle_update_states(state, state);
- #endif
- 
- 	list_for_each_entry(pwrst, &pwrst_list, node) {
--		pwrst->next_state = state;
--		omap_set_pwrdm_state(pwrst->pwrdm, state);
-+		if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583) &&
-+				pwrst->pwrdm == core_pwrdm &&
-+				state == PWRDM_POWER_OFF) {
-+			pwrst->next_state = PWRDM_POWER_RET;
-+			WARN_ONCE(1,
-+				"%s: Core OFF disabled due to errata i583\n",
-+				__func__);
-+		} else {
-+			pwrst->next_state = state;
-+		}
-+		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
- 	}
- }
- 
-@@ -1011,6 +1028,8 @@ static void __init pm_errata_configure(void)
- 		pm34xx_errata |= PM_RTA_ERRATUM_i608;
- 		/* Enable the l2 cache toggling in sleep logic */
- 		enable_omap3630_toggle_l2_on_restore();
-+		if (omap_rev() < OMAP3630_REV_ES1_2)
-+			pm34xx_errata |= PM_SDRC_WAKEUP_ERRATUM_i583;
- 	}
- }
- 
--- 
-1.6.3.3
+Regards,
+Nishanth Menon
