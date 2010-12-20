@@ -1,42 +1,25 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Mon, 20 Dec 2010 10:41:55 +0800
-Subject: [PATCH] Change the register name definitions for mc13783
-In-Reply-To: <20101220010330.GD3206@sortiz-mobl>
-References: <1292300416-16770-1-git-send-email-yong.shen@freescale.com>
-	<1292300416-16770-2-git-send-email-yong.shen@freescale.com>
-	<20101220010330.GD3206@sortiz-mobl>
-Message-ID: <AANLkTi=NWd6OxXfoh0ZqaE0y5bzeQjcx5kTd2U3dEUOd@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 20 Dec 2010 11:32:21 +0800
+Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
+In-Reply-To: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimarRAf-_ykQNLgzXd3TtUHhSw+gZ6cZ5pW=Y-9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liam,
+On Fri, Dec 17, 2010 at 7:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Here is the entire set of clocksource and sched_clock patches which
+> have been previously posted. ?There's a couple of small tweaks in a
+> few of the patches (such as adding notrace to OMAP clocksource read
+> functions), and this also shows the proper ordering of these patches.
+>
+> Still looking for acks or tested-by's for these patches.
+>
 
-Could you please also add "Acked-by: Samuel Ortiz
-<sameo@linux.intel.com>" to this patch for Samuel?
+Hi Russell,
 
-Thanks
-Yong
+Sorry for late feedback. Tested the branch 'clksrc' on Littleton/PXA3xx,
+seems to be good.
 
-On Mon, Dec 20, 2010 at 9:03 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> Hi Yong,
->
-> On Tue, Dec 14, 2010 at 12:20:16PM +0800, yong.shen at freescale.com wrote:
->> From: Yong Shen <yong.shen@linaro.org>
->>
->> To make mc13783 and mc13892 share code, the register names should be
->> changed to fit the new macro definitions in the comming patch.
->>
->> Signed-off-by: Yong Shen <yong.shen@linaro.org>
->> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
->> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> You can add my:
->
-> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
->
-> Cheers,
-> Samuel.
->
-> --
-> Intel Open Source Technology Centre
-> http://oss.intel.com/
->
+Tested-by: Eric Miao <eric.y.miao@gmail.com>
