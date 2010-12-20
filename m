@@ -1,149 +1,152 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Mon, 20 Dec 2010 21:22:31 +1100
-Subject: [PATCHv3 4/4] mc13xxx: Add i2c and spi drivers to Kconfig and
-	Makefile
-In-Reply-To: <20101220083839.GQ1940@pengutronix.de>
-References: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
-	<1292817055-17715-5-git-send-email-marc@cpdesign.com.au>
-	<20101220083839.GQ1940@pengutronix.de>
-Message-ID: <201012202122.31582.marc@cpdesign.com.au>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 20 Dec 2010 11:23:27 +0100
+Subject: [PATCH v4 2/7] OMAP3: PM: Erratum i581 support: dll kick strategy
+In-Reply-To: <1292712817-24999-3-git-send-email-nm@ti.com>
+References: <1292712817-24999-1-git-send-email-nm@ti.com>
+	<1292712817-24999-3-git-send-email-nm@ti.com>
+Message-ID: <AANLkTi=4DJAnXcTZ37rcmr9Kz2CmXx6uhPqNThnoR2gu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Dec 18, 2010 at 11:53 PM, Nishanth Menon <nm@ti.com> wrote:
+> From: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+>
+> Erratum i581 impacts OMAP3 platforms.
+> PRCM DPLL control FSM removes SDRC_IDLEREQ before DPLL3 locks causing
+> the DPLL not to be locked at times.
+>
+> IMPORTANT:
+> *) This is not a complete workaround implementation as recommended
+> by the silicon erratum. this is a support logic for detecting lockups and
+> attempting to recover where possible and is known to provide stability
+> in multiple platforms.
+> *) This code is mostly important for inactive and retention. The ROM code
+> waits for the maximum dll lock time when resuming from off mode. So for
+> off mode this code isn't really needed.
+>
+> This should eventually get refactored as part of cleanups to sleep34xx.S
+>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+>
+> Signed-off-by: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+> ---
+> (no change done, posting for completeness of the series)
+> v2: https://patchwork.kernel.org/patch/365252/
+> ? ? ? ?typo correction- erratum, support, added comment from Peter from the
+> ? ? ? ?thread to commit message
+> v1: http://marc.info/?l=linux-omap&m=129013172525234&w=2
+> ?arch/arm/mach-omap2/sleep34xx.S | ? 52 +++++++++++++++++++++++++++++++++++---
+> ?1 files changed, 47 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index 2c20fcf..3fbd1e5 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -42,6 +42,7 @@
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP3430_PM_PREPWSTST)
+> ?#define PM_PWSTCTRL_MPU_P ? ? ?OMAP3430_PRM_BASE + MPU_MOD + OMAP2_PM_PWSTCTRL
+> ?#define CM_IDLEST1_CORE_V ? ? ?OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST1)
+> +#define CM_IDLEST_CKGEN_V ? ? ?OMAP34XX_CM_REGADDR(PLL_MOD, CM_IDLEST)
+> ?#define SRAM_BASE_P ? ? ? ? ? ?0x40200000
+> ?#define CONTROL_STAT ? ? ? ? ? 0x480022F0
+> ?#define SCRATCHPAD_MEM_OFFS ? ?0x310 /* Move this as correct place is
+> @@ -554,31 +555,67 @@ skip_l2_inval:
+>
+> ?/* Make sure SDRC accesses are ok */
+> ?wait_sdrc_ok:
+> +
+> +/* DPLL3 must be locked before accessing the SDRC. Maybe the HW ensures this. */
+> + ? ? ? ldr ? ? r4, cm_idlest_ckgen
+> +wait_dpll3_lock:
+> + ? ? ? ldr ? ? r5, [r4]
+> + ? ? ? tst ? ? r5, #1
+> + ? ? ? beq ? ? wait_dpll3_lock
+> +
+> ? ? ? ? ldr ? ? r4, cm_idlest1_core
+> +wait_sdrc_ready:
+> ? ? ? ? ldr ? ? r5, [r4]
+> - ? ? ? ?and ? ? r5, r5, #0x2
+> - ? ? ? ?cmp ? ? r5, #0
+> - ? ? ? ?bne ? ? wait_sdrc_ok
+> + ? ? ? ?tst ? ? r5, #0x2
+> + ? ? ? ?bne ? ? wait_sdrc_ready
+> + ? ? ? /* allow DLL powerdown upon hw idle req */
+> ? ? ? ? ldr ? ? r4, sdrc_power
+> ? ? ? ? ldr ? ? r5, [r4]
+> ? ? ? ? bic ? ? r5, r5, #0x40
+> ? ? ? ? str ? ? r5, [r4]
+> -wait_dll_lock:
+> +is_dll_in_lock_mode:
+> +
+> ? ? ? ? /* Is dll in lock mode? */
+> ? ? ? ? ldr ? ? r4, sdrc_dlla_ctrl
+> ? ? ? ? ldr ? ? r5, [r4]
+> ? ? ? ? tst ? ? r5, #0x4
+> ? ? ? ? bxne ? ?lr
+> ? ? ? ? /* wait till dll locks */
+> - ? ? ? ?ldr ? ? r4, sdrc_dlla_status
+> +wait_dll_lock_timed:
+> + ? ? ? ldr ? ? r4, wait_dll_lock_counter
+> + ? ? ? add ? ? r4, r4, #1
+> + ? ? ? str ? ? r4, wait_dll_lock_counter
+> + ? ? ? ldr ? ? r4, sdrc_dlla_status
+> + ? ? ? ?mov ? ?r6, #8 ? ? ? ? ?/* Wait 20uS for lock */
+> +wait_dll_lock:
+> + ? ? ? subs ? ?r6, r6, #0x1
+> + ? ? ? beq ? ? kick_dll
 
-On Monday, December 20, 2010 07:38:39 pm Uwe Kleine-K?nig wrote:
-> On Mon, Dec 20, 2010 at 02:50:55PM +1100, Marc Reilly wrote:
-> > Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
-> > ---
-> > 
-> >  drivers/mfd/Kconfig  |   22 ++++++++++++++--------
-> >  drivers/mfd/Makefile |    2 ++
-> >  2 files changed, 16 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> > index 3a1493b..6980cf2 100644
-> > --- a/drivers/mfd/Kconfig
-> > +++ b/drivers/mfd/Kconfig
-> > @@ -424,20 +424,26 @@ config MFD_PCF50633
-> > 
-> >  	  facilities, and registers devices for the various functions
-> >  	  so that function-specific drivers can bind to them.
-> > 
-> > -config MFD_MC13783
-> > -	tristate
-> > -
-> 
-> this needs at least a note in the commit log.  And $(git grep
-> MFD_MC13783 drivers) shows that you don't want to remove that yet.
+It would be good to have more comments on the code flow here:
+- what are wait_dll_lock_counter and kick_counter used for?
+- what is the timing based on? Why 20uS for the wait time?
+- jumping back and forth to kick_dll and wait_dll_lock_timed is confusing.
 
-I didn't get anything... which makes me think I'm doing it wrong.
+> ? ? ? ? ldr ? ? r5, [r4]
+> ? ? ? ? and ? ? r5, r5, #0x4
+> ? ? ? ? cmp ? ? r5, #0x4
+> ? ? ? ? bne ? ? wait_dll_lock
+> ? ? ? ? bx ? ? ?lr
+>
+> + ? ? ? /* disable/reenable DLL if not locked */
+> +kick_dll:
+> + ? ? ? ldr ? ? r4, sdrc_dlla_ctrl
+> + ? ? ? ldr ? ? r5, [r4]
+> + ? ? ? mov ? ? r6, r5
+> + ? ? ? bic ? ? r6, #(1<<3) ? ? /* disable dll */
+> + ? ? ? str ? ? r6, [r4]
+> + ? ? ? dsb
+> + ? ? ? orr ? ? r6, r6, #(1<<3) /* enable dll */
+> + ? ? ? str ? ? r6, [r4]
+> + ? ? ? dsb
+> + ? ? ? ldr ? ? r4, kick_counter
+> + ? ? ? add ? ? r4, r4, #1
+> + ? ? ? str ? ? r4, kick_counter
+> + ? ? ? b ? ? ? wait_dll_lock_timed
+> +
+> ?cm_idlest1_core:
+> ? ? ? ?.word ? CM_IDLEST1_CORE_V
+> +cm_idlest_ckgen:
+> + ? ? ? .word ? CM_IDLEST_CKGEN_V
+> ?sdrc_dlla_status:
+> ? ? ? ?.word ? SDRC_DLLA_STATUS_V
+> ?sdrc_dlla_ctrl:
+> @@ -615,5 +652,10 @@ control_stat:
+> ? ? ? ?.word ? CONTROL_STAT
+> ?kernel_flush:
+> ? ? ? ?.word v7_flush_dcache_all
+> + ? ? ? /* these 2 words need to be at the end !!! */
+> +kick_counter:
+> + ? ? ? .word ? 0
+> +wait_dll_lock_counter:
+> + ? ? ? .word ? 0
+Why do they need to be at the end? Also, at the end of what do they need to be?
 
-> 
-> >  config MFD_MC13XXX
-> > 
-> > -	tristate "Support Freescale MC13783 and MC13892"
-> > -	depends on SPI_MASTER
-> > +	tristate "Support Freescale MC13XXX"
-> 
-> Hmm, I'd prefer to have the supported numbers.  Consider FSL releasing
-> an MC13991.  Then it's unclear if MFD_MC13XXX supports it.
+> ?ENTRY(omap34xx_cpu_suspend_sz)
+> ? ? ? ?.word ? . - omap34xx_cpu_suspend
+> --
+> 1.6.3.3
+>
+>
 
-I started with similar thinking, but then thought that if a new IC is released 
-in the family and it's not compatible then it can be changed (the file names 
-themselves would also be misleading). Until then, all the family so far come 
-under the mc13xxx umbrella.
-The help file also explains which are supported.
-
-> 
-> > +	depends on SPI_MASTER || I2C
-> > 
-> >  	select MFD_CORE
-> > 
-> > -	select MFD_MC13783
-> > 
-> >  	help
-> >  	
-> >  	  Support for the Freescale (Atlas) PMIC and audio CODECs
-> >  	  MC13783 and MC13892.
-> > 
-> > -	  This driver provides common support for accessing  the device,
-> > +	  This driver provides common support for accessing the device,
-> > 
-> >  	  additional drivers must be enabled in order to use the
-> > 
-> > -	  functionality of the device.
-> > +	  functionality of these devices.
-> > +
-> > +config MFD_MC13XXX_SPI
-> > +	tristate "Support for MC13XXX via SPI"
-> > +	depends on SPI_MASTER
-> > +	select MFD_MC13XXX
-> > +
-> > +config MFD_MC13XXX_I2C
-> > +	tristate "Support for MC13XXX via I2C"
-> 
-> and only mc13892 can do i2c, so writing MC13XXX doesn't make sense here.
-> 
-> > +	depends on I2C
-> > +	select MFD_MC13XXX
-> 
-> Hmm, that means that MFD_MC13XXX alone doesn't do anything useful,
-> right?  IMHO either do:
-> 
-> 	config MFD_MC13XXX_SPI
-> 		tristate
-> 
-> 	config MFD_MC13XXX_I2C
-> 		tristate
-> 
-> 	config MFD_MC13XXX
-> 		tristate "..."
-> 		select MFD_MC13XXX_SPI if SPI_MASTER
-> 		select MFD_MC13XXX_I2C if I2C
-> 		...
-> 
-> or
-> 
-> 	config MFD_MC13XXX
-> 		tristate
-> 		...
-> 
-> 	config MFD_MC13XXX_SPI
-> 		tristate "..."
-> 		select MFD_MC13XXX
-> 		...
-> 	config MFD_MC13XXX_I2C
-> 		tristate "..."
-> 		select MFD_MC13XXX
-> 		...
-
-It would need to be the second one, but OK.
-
-> 
-> >  config PCF50633_ADC
-> >  
-> >  	tristate "Support for NXP PCF50633 ADC"
-> > 
-> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> > index f54b365..b7d774f 100644
-> > --- a/drivers/mfd/Makefile
-> > +++ b/drivers/mfd/Makefile
-> > @@ -42,6 +42,8 @@ obj-$(CONFIG_TWL4030_CODEC)	+= twl4030-codec.o
-> > 
-> >  obj-$(CONFIG_TWL6030_PWM)	+= twl6030-pwm.o
-> >  
-> >  obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
-> > 
-> > +obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
-> > +obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
-> > 
-> >  obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
-> 
-> Best regards
-> Uwe
-
-Thanks again.
-
-Cheers
-Marc
+Regards,
+Jean
