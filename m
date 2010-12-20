@@ -1,72 +1,78 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Dec 2010 12:21:28 +0000
-Subject: [PATCH 3/5] msm: timer: SMP timer support for msm
-In-Reply-To: <20101207081701.GA18336@n2100.arm.linux.org.uk>
-References: <1291619778-30289-1-git-send-email-johlstei@codeaurora.org>
-	<1291619778-30289-4-git-send-email-johlstei@codeaurora.org>
-	<alpine.LFD.2.00.1012061025240.2653@localhost6.localdomain6>
-	<20101207081701.GA18336@n2100.arm.linux.org.uk>
-Message-ID: <20101220122128.GD28157@n2100.arm.linux.org.uk>
+Date: Mon, 20 Dec 2010 12:28:58 +0000
+Subject: [PATCH V3 39/63] GIC: Added dummy handlers for Power
+	ManagementSuspend Resume
+In-Reply-To: <53375b410d360c4155c4c4e978be9d78@mail.gmail.com>
+References: <cover.1292833228.git.viresh.kumar@st.com>
+	<674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
+	<20101220111056.GB28157@n2100.arm.linux.org.uk>
+	<4D0F3EC1.5030207@st.com>
+	<20101220114948.GC28157@n2100.arm.linux.org.uk>
+	<53375b410d360c4155c4c4e978be9d78@mail.gmail.com>
+Message-ID: <20101220122858.GE28157@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 07, 2010 at 08:17:01AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 06, 2010 at 10:56:14AM +0100, Thomas Gleixner wrote:
-> > On Sun, 5 Dec 2010, Jeff Ohlstein wrote:
-> > > +#ifdef CONFIG_HOTPLUG_CPU
-> > > +void __cpuexit local_timer_stop(void)
-> > > +{
-> > > +	local_clock_event->set_mode(CLOCK_EVT_MODE_SHUTDOWN, local_clock_event);
-> > 
-> > Aarg. No. The generic code already handles cpu hotplug. 
-> 
-> Can you show where this is handled by the generic code?  I can't find
-> where this is handled.
+On Mon, Dec 20, 2010 at 05:50:37PM +0530, Santosh Shilimkar wrote:
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> > kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
+> Linux
+> > Sent: Monday, December 20, 2010 5:20 PM
+> > To: viresh kumar
+> > Cc: Rajeev KUMAR; Armando VISCONTI; Vipin KUMAR; Shiraz HASHIM; Amit
+> > VIRDI; Vipul Kumar SAMAR; Deepak SIKRI; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: [PATCH V3 39/63] GIC: Added dummy handlers for Power
+> > ManagementSuspend Resume
+> >
+> > On Mon, Dec 20, 2010 at 05:02:17PM +0530, viresh kumar wrote:
+> > > On 12/20/2010 04:40 PM, Russell King - ARM Linux wrote:
+> > > > And still this patch gets reposted a few more times despite my
+> > > > objections:
+> > > >
+> > > >
+> >
+> http://lists.arm.linux.org.uk/lurker/message/20100920.150749.c97eda0d.en.h
+> > tml
+> > >
+> > > Russell,
+> > >
+> > > Actually, when we discussed all this, we didn't came to any
+> conclusion,
+> > > and so i asked you: should we go ahead with this patch or drop it?
+> >
+> > Yes, I didn't bother replying any further because it seemed that no one
+> > was listening to me.
+> >
+> > I think over the four or five emails my position on the patch was pretty
+> > clear: I do _not_ like it one bit, and I still do not like it.
+> >
+> > It is a hack, plain and simple.  You're adding code to misrepresent what
+> > the hardware can do.  You're fooling the system into thinking that the
+> > GIC can control wake-up sources, when in fact the GIC has zero wakeup
+> > capabilities what so ever.
+> >
+> > As I pointed out in the message above, if you do this, then drivers have
+> > NO WAY to detect whether the interrupt controller they're connected to
+> > is wake-up capable or not.
+> >
+> >
+> http://lists.arm.linux.org.uk/lurker/message/20100920.134808.634d6ea1.en.h
+> > tml
+> >
+> > I still don't know what your driver code looks like, yet I've given you
+> > a suggestion to solve your problem in a subsequent reply (see the URL
+> > at the top of this message) which never really got a reply from you.
+> >
+> > It seems to me that as soon as I asked for driver code, ST lost all
+> > interest in discussing the issue any further, as there was no further
+> > technical discussion coming from _any_ ST people.
+> >
+> Just for information, we did found a serial driver BUG
+> is similar aspect. Below is the thread.
+> http://ns3.spinics.net/lists/linux-omap/msg41240.html
 
-Having checked this on Versatile Express with a printk in the ->set_mode
-callback, the generic code does not handle shutting down clock event
-devices on CPU hot-unplug.
-
-I've analyzed why this is:
-
-The hrtimer() code hooks into the hotplug notifier list, and when it
-receives a CPU_DEAD or CPU_DEAD_FROZEN message, it calls 
-clockevents_notify(CLOCK_EVT_NOTIFY_CPU_DEAD).
-
-The clockevents code calls its own notifier list, which ultimately calls
-tick_notify().  This eventually calls tick_shutdown().
-
-tick_shutdown() looks up the per-cpu tick device, uncouples the clock
-event device from the tick device, and sets the clock event device mode
-to CLOCK_EVT_MODE_UNUSED.  Note this comment:
-
-                /*
-                 * Prevent that the clock events layer tries to call
-                 * the set mode function!
-                 */
-                dev->mode = CLOCK_EVT_MODE_UNUSED;
-
-translating that into English:
-
-	"Prevent the clock events layer calling the set_mode function"
-
-That might be it - to confirm:
-
-It then calls clockevents_exchange_device(dev, NULL).
-
-clockevents_exchange_device(old,new) calls
-clockevents_set_mode(old, CLOCK_EVT_MODE_UNUSED), which then does:
-
-        if (dev->mode != mode) {
-
-However, as dev->mode was set to CLOCK_EVT_MODE_UNUSED, and mode is
-CLOCK_EVT_MODE_UNUSED, we don't call into the code which supplies the
-clock event device at all, leaving it with no way to fully shutdown
-its hardware.  It seems this is done on purpose, though it's not clear
-why.
-
-This is why arch code, such as ARM, has to implement its own solution
-to shutdown clock event devices external to the generic clockevents code.
-Until we have a generic solution, I think I'm going to take the above
-code extract into the ARM generic local timer code and kill off the
-local_timer_stop() function.
+So, the serial_core layer isn't properly tracking whether enable_irq_wake()
+succeeded, and is then calling disable_irq_wake().  That's a bug in
+the serial_core layer which needs fixing.
