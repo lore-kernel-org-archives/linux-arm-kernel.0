@@ -1,47 +1,101 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 20 Dec 2010 09:51:01 -0800
-Subject: [PATCH] hvc_dcc: Simplify assembly for v6 and v7 ARM
-In-Reply-To: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
-References: <20101201192856.GA731@suse.de>
-	<1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1292867461.27552.15.camel@m0nster>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 Dec 2010 18:08:31 +0000
+Subject: [PATCH] ARM: Fix subtle race in CPU pen_release hotplug code
+In-Reply-To: <20101220165053.GF28157@n2100.arm.linux.org.uk>
+References: <E1PTuaP-0000Fl-EF@rmk-PC.arm.linux.org.uk>
+	<AANLkTi=vp_jWMn98+cDs=+r9D7Don9iz+NvuOB6iCv42@mail.gmail.com>
+	<20101220165053.GF28157@n2100.arm.linux.org.uk>
+Message-ID: <1292868512.10292.49.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-12-17 at 21:16 -0800, Stephen Boyd wrote:
-> The inline assembly differences for v6 vs. v7 in the hvc_dcc
-> driver are purely optimizations. On a v7 processor, an mrc with
-> the pc sets the condition codes to the 28-31 bits of the register
-> being read. It just so happens that the TX/RX full bits the DCC
-> driver is testing for are high enough in the register to be put
-> into the condition codes. On a v6 processor, this "feature" isn't
-> implemented and thus we have to do the usual read, mask, test
-> operations to check for TX/RX full.
+On Mon, 2010-12-20 at 16:50 +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 20, 2010 at 04:39:07PM +0000, Catalin Marinas wrote:
+> > On 18 December 2010 11:04, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > There is a subtle race in the CPU hotplug code, where a CPU which has
+> > > been offlined can online itself before being requested, which results
+> > > in things going astray on the next online/offline cycle.
+> > [...]
+> > > --- a/arch/arm/mach-realview/platsmp.c
+> > > +++ b/arch/arm/mach-realview/platsmp.c
+> > > @@ -36,6 +36,19 @@ extern void realview_secondary_startup(void);
+> > >  */
+> > >  volatile int __cpuinitdata pen_release = -1;
+> > >
+> > > +/*
+> > > + * Write pen_release in a way that is guaranteed to be visible to all
+> > > + * observers, irrespective of whether they're taking part in coherency
+> > > + * or not.  This is necessary for the hotplug code to work reliably.
+> > > + */
+> > > +static void write_pen_release(int val)
+> > > +{
+> > > +       pen_release = val;
+> > > +       smp_wmb();
+> > > +       __cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
+> > > +       outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+> > > +}
+> >
+> > Just a minor thing - I don't think we need any barrier here. According
+> > to the ARM ARM B2.2.7:
+> >
+> > "Any data cache or unified cache maintenance operation by MVA must be
+> > executed in program order
+> > relative to any explicit load or store on the same processor to an
+> > address covered by the MVA of the
+> > cache operation."
 > 
-> Since we already test the RX/TX full bits before calling
-> __dcc_getchar() and __dcc_putchar() we don't actually need to do
-> anything special for v7 over v6. The only difference is in
-> hvc_dcc_get_chars(). We would test RX full, poll RX full, and
-> then read a character from the buffer, whereas now we will test
-> RX full, read a character from the buffer, and then test RX full
-> again for the second iteration of the loop. It doesn't seem
-> possible for the buffer to go from full to empty between testing
-> the RX full and reading a character. Therefore, replace the v7
-> versions with the v6 versions and everything works the same.
+> Right, I had been thinking about that.  I think the barrier came from the
+> original ARM implementation, and I added the cache flushes.
+
+I think the original smp_wmb() was there to prevent the pen_release
+update not being visible to the primary CPU before the spin_lock() loop
+on the secondary, leading to a deadlock.
+
+The smp_wmb() is no longer needed with your patch as we do explicit
+cache flushing which contains a DSB. But for clarity, you may still want
+to keep it as a separate call in platform_secondary_init() rather than
+write_pen_release():
+
+ 	 * let the primary processor know we're out of the
+ 	 * pen, then head off into the C entry point
+ 	 */
+-	pen_release = -1;
++	write_pen_release(-1);
+ 	smp_wmb();
+ 
+ 	/*
+ 	 * Synchronise with the boot thread.
+
+> > We also have a corresponding smp_rmb() in boot_secondary(), I don't
+> > think it has any use either.
 > 
-> While we're here, cleanup the for loops a bit and mark the inline
-> assembly as volatile. Not marking it volatile causes GCC to cache
-> the results of the status and RX buffer registers causing
-> lockups.
+> I think you're right, but it looks a little unsafe without:
+> 
+>         timeout = jiffies + (1 * HZ);
+>         while (time_before(jiffies, timeout)) {
+>                 if (pen_release == -1)
+>                         break;
+> 
+>                 udelay(10);
+>         }
+> 
+> I don't think it makes much odds if the pen_release check gets
+> re-ordered, especially as we do a final pen_release check after we
+> unlock.  However, could the loop end up waiting additional 10us
+> without the smp_rmb() ?
 
-I would expect to see three patches. One that adds volatile, which
-appears to be a good fix. Another patch that changes the assembly lines,
-and another that does the clean up. The last two are more controversial
-ones.
+Looking through A3.8.2, there is only a "control dependency" between
+reading the jiffies and reading the pen_release. My understanding is
+that these reads could happen in any order, so to avoid an additional
+10us wait the barrier is still useful.
 
-Daniel
+This smp_rmb() was supposed to work in pair with the smp_wmb() above but
+that's only by following the memory-barriers.txt document. From an ARM
+perspective, we could simply have an smp_mb() in boot_secondary().
+
+If we keep the smp_wmb() in platform_secondary_init() for clarity, we
+could keep the smp_rmb() here as well. I think I prefer this option.
 
 -- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Catalin
