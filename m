@@ -1,93 +1,89 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 20 Dec 2010 11:17:41 +0100
-Subject: [PATCH v4 0/7] OMAP: idle path errata fixes
-In-Reply-To: <1292712817-24999-1-git-send-email-nm@ti.com>
+Date: Mon, 20 Dec 2010 11:18:32 +0100
+Subject: [PATCH v4 3/7] omap3: pm: introduce errata handling
+In-Reply-To: <1292712817-24999-4-git-send-email-nm@ti.com>
 References: <1292712817-24999-1-git-send-email-nm@ti.com>
-Message-ID: <AANLkTi=Bnn9PAN75NmqgqNTiMkTfG6sZkUEdSVz0_EFE@mail.gmail.com>
+	<1292712817-24999-4-git-send-email-nm@ti.com>
+Message-ID: <AANLkTimXTxZ1=9wKYAo7rUGkwdzRpL4-mF-R7-qLNTLF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Nishant,
+
+Here a few minor remarks about typos:
+
 On Sat, Dec 18, 2010 at 11:53 PM, Nishanth Menon <nm@ti.com> wrote:
-> Hi,
-> as discussed in [1], here is step 2 - idle path errata fixes.
-> this is the next rev incorporating comments from V2 post
-> of this series.
->
-> Tested:
-> this series:
-> ? ? ? ?SDP3430
-> ? ? ? ?SDP3630
-> this series + ASM cleanup series[2]
-> ? ? ? ?SDP3430
-> ? ? ? ?SDP3630
-> Test Script:
-> http://elinux.org/OMAP_Power_Management#Quick_verification_of_suspend-idle_functionality
+> Introduce errata handling for omap3. This patch introduces
+Use caps for OMAP3
 
-This series + ASM cleanup series[2]:
-Tested OK on Beagleboard with full RET and OFF modes,
-using cpuidle.
+> errata variable and and stub for initialization which will be
+and and -> and
 
-Tested-by: Jean Pihet <j-pihet@ti.com>
+> filled up by followon patches.
+followon -> follow-on?
 
 >
-> V3: http://marc.info/?t=129140247800030&r=1&w=2
->
-> V2: http://marc.info/?l=linux-omap&m=129106200408109&w=2
->
-> Major change in V3:
-> ? ? ? ?Erratas are now handled per silicon - it is much cleaner :)
-> ? ? ? ?no more redundant cpu_is_omap34xx check anymore
-> ? ? ? ?errata configure is __init as it should be
->
-> Eduardo Valentin (1):
-> ?OMAP3630: PM: Erratum i583: disable coreoff if < ES1.2
->
-> Nishanth Menon (3):
-> ?omap3: pm: introduce errata handling
-> ?OMAP3630: PM: Erratum i608: disable RTA
-> ?OMAP3: PM: make omap3_cpuidle_update_states independent of
-> ? ?enable_off_mode
->
-> Peter 'p2' De Schrijver (2):
-> ?OMAP3: PM: Erratum i581 support: dll kick strategy
-> ?OMAP3630: PM: Disable L2 cache while invalidating L2 cache
->
-> Richard Woodruff (1):
-> ?OMAP3: PM: Update clean_l2 to use v7_flush_dcache_all
->
-> ?arch/arm/mach-omap2/control.c ? ? | ? 13 +++-
-> ?arch/arm/mach-omap2/control.h ? ? | ? ?7 +-
-> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 29 ++++--
-> ?arch/arm/mach-omap2/pm.h ? ? ? ? ?| ? 15 +++-
-> ?arch/arm/mach-omap2/pm34xx.c ? ? ?| ? 46 +++++++++-
-> ?arch/arm/mach-omap2/sleep34xx.S ? | ?187 +++++++++++++++++++++++--------------
-> ?6 files changed, 211 insertions(+), 86 deletions(-)
->
-> bloat-o-meter report Vs 2.6.37-rc6
-> add/remove: 2/0 grow/shrink: 7/0 up/down: 297/0 (297)
-> function ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? old ? ? new ? delta
-> omap3_pm_off_mode_enable ? ? ? ? ? ? ? ? ? ? ?80 ? ? 160 ? ? +80
-> omap3_pm_init ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1792 ? ?1872 ? ? +80
-> omap3630_ctrl_disable_rta ? ? ? ? ? ? ? ? ? ? ?- ? ? ?44 ? ? +44
-> omap3_save_scratchpad_contents ? ? ? ? ? ? ? 732 ? ? 760 ? ? +28
-> static.__func__ ? ? ? ? ? ? ? ? ? ? ? ? ? ?13783 ? 13808 ? ? +25
-> vermagic ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?45 ? ? ?60 ? ? +15
-> linux_banner ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 132 ? ? 147 ? ? +15
-> prcm_interrupt_handler ? ? ? ? ? ? ? ? ? ? ? 268 ? ? 276 ? ? ?+8
-> pm34xx_errata ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?- ? ? ? 2 ? ? ?+2
->
-> [1] http://marc.info/?l=linux-omap&m=129045338806957&w=2
-> [2] http://marc.info/?l=linux-omap&m=129268746417556&w=2
->
-> Cc: Charulatha Varadarajan <charu@ti.com>
-> Cc: Jean Pihet <jean.pihet@newoldbits.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Tao Hu <tghk48@motorola.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
->
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
-> Regards,
-> Nishanth Menon
+> Splitting the errata introduction out into it's own separate patch
 >
+> ?arch/arm/mach-omap2/pm.h ? ? | ? ?7 +++++++
+> ?arch/arm/mach-omap2/pm34xx.c | ? ?9 +++++++++
+> ?2 files changed, 16 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index 0d75bfd..0348fd7 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -85,4 +85,11 @@ extern unsigned int save_secure_ram_context_sz;
+> ?extern unsigned int omap24xx_cpu_suspend_sz;
+> ?extern unsigned int omap34xx_cpu_suspend_sz;
+>
+> +#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+> +extern u16 pm34xx_errata;
+> +#define IS_PM34XX_ERRATUM(id) ? ? ? ? ?(pm34xx_errata & (id))
+> +#else
+> +#define IS_PM34XX_ERRATUM(id) ? ? ? ? ?0
+> +#endif ? ? ? ? /* defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3) */
+> +
+> ?#endif
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 648b8c5..5702f41 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -68,6 +68,9 @@ static inline bool is_suspending(void)
+> ?#define OMAP343X_TABLE_VALUE_OFFSET ? ? ? 0xc0
+> ?#define OMAP343X_CONTROL_REG_VALUE_OFFSET ?0xc8
+>
+> +/* pm34xx errata defined in pm.h */
+> +u16 pm34xx_errata;
+> +
+> ?struct power_state {
+> ? ? ? ?struct powerdomain *pwrdm;
+> ? ? ? ?u32 next_state;
+> @@ -1002,6 +1005,10 @@ void omap_push_sram_idle(void)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?save_secure_ram_context_sz);
+> ?}
+>
+> +static void __init pm_errata_configure(void)
+> +{
+> +}
+> +
+> ?static int __init omap3_pm_init(void)
+> ?{
+> ? ? ? ?struct power_state *pwrst, *tmp;
+> @@ -1011,6 +1018,8 @@ static int __init omap3_pm_init(void)
+> ? ? ? ?if (!cpu_is_omap34xx())
+> ? ? ? ? ? ? ? ?return -ENODEV;
+>
+> + ? ? ? pm_errata_configure();
+> +
+> ? ? ? ?printk(KERN_ERR "Power Management for TI OMAP3.\n");
+>
+> ? ? ? ?/* XXX prcm_setup_regs needs to be before enabling hw
+> --
+> 1.6.3.3
+>
+>
+
+Jean
