@@ -1,31 +1,43 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 20 Dec 2010 19:49:26 +0100
-Subject: [PATCH v2] Keyboard: omap-keypad: use matrix_keypad.h
-In-Reply-To: <20101220180207.GD9353@core.coreip.homeip.net>
-References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
-	<201012201832.24243.jkrzyszt@tis.icnet.pl>
-	<20101220180207.GD9353@core.coreip.homeip.net>
-Message-ID: <201012201949.28639.jkrzyszt@tis.icnet.pl>
+From: dick@softplc.com (Dick Hollenbeck)
+Date: Mon, 20 Dec 2010 13:37:51 -0600
+Subject: ks8695_gettimeoffset
+In-Reply-To: <20101220193049.GI28157@n2100.arm.linux.org.uk>
+References: <4D0FA9FB.3060309@softplc.com>
+	<20101220193049.GI28157@n2100.arm.linux.org.uk>
+Message-ID: <4D0FB08F.9060007@softplc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Monday 20 December 2010 19:02:08 Dmitry Torokhov wrote:
+On 12/20/2010 01:30 PM, Russell King - ARM Linux wrote:
+> On Mon, Dec 20, 2010 at 01:09:47PM -0600, Dick Hollenbeck wrote:
+>> >From userspace, printing the return values from a rapid looping
+>> sequence of calls to
+>>
+>>    clock_gettime( CLOCK_MONOTONIC, &now );
+>>
+>> leads me to believe that kernel function ks8695_gettimeoffset() is
+>> not worth anything.
+> That'll be because clock_gettime(CLOCK_MONOTONIC) doesn't use the old
+> gettimeoffset() method to correct the returned time - none of the POSIX
+> timers use the old gettimeoffset() stuff, only gettimeofday() does.
 >
-> Not sure why exactly your sparse does not pick it up (too old maybe?)
-> but the following:
+> Platforms really should be using the clocksource/clockevents code
+> where ever possible, rather than selecting ARCH_USES_GETTIMEOFFSET.
 >
-> --- linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c.orig 2010-12-09 23:07:35.000000000 +0100
-> +++ linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c 2010-12-18
-> 16:23:29.000000000 +0100
-> @@ -46,81 +46,79 @@ static u16 ams_delta_latch2_reg;
->  static int ams_delta_keymap[] = {
->         KEY(0, 0, KEY_F1),              /* Advert    */
->
-> should be
->
->  static const unisgned int ams_delta_keymap[] = {
->
-> Same goes for the rest of keymaps.
+> Does someone with a KS8695-based platform want to have a go at
+> converting it over to clocksource/clockevents?
 
-Sure, thanks.
-Janusz
+Thanks Russell. 
+
+    As a quick aside, I posted the same question twice because web archive does not show the email
+content getting through:
+
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/035978.html
+
+If no one with more experience in this area steps up, I can do some work on this, but I would need
+considerable hand holding since I have not been following the names of these major subsystems within
+the kernel as of late. 
+
+Let's wait, and then I may have to raise the issue again if no one steps up.
+
+Dick
