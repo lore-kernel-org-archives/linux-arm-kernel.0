@@ -1,28 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 20 Dec 2010 11:48:12 +0000
-Subject: [PATCHv3 1/4] mc13xxx-core: Consolidate common code to prepare
-	for separate i2c and spi
-In-Reply-To: <201012202100.29212.marc@cpdesign.com.au>
-References: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
-	<1292817055-17715-2-git-send-email-marc@cpdesign.com.au>
-	<20101220083120.GP1940@pengutronix.de>
-	<201012202100.29212.marc@cpdesign.com.au>
-Message-ID: <20101220114811.GA14986@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Dec 2010 11:49:48 +0000
+Subject: [PATCH V3 39/63] GIC: Added dummy handlers for Power Management
+	Suspend Resume
+In-Reply-To: <4D0F3EC1.5030207@st.com>
+References: <cover.1292833228.git.viresh.kumar@st.com>
+	<674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
+	<20101220111056.GB28157@n2100.arm.linux.org.uk>
+	<4D0F3EC1.5030207@st.com>
+Message-ID: <20101220114948.GC28157@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 09:00:29PM +1100, Marc Reilly wrote:
-> On Monday, December 20, 2010 07:31:20 pm Uwe Kleine-K?nig wrote:
+On Mon, Dec 20, 2010 at 05:02:17PM +0530, viresh kumar wrote:
+> On 12/20/2010 04:40 PM, Russell King - ARM Linux wrote:
+> > And still this patch gets reposted a few more times despite my
+> > objections:
+> > 
+> > http://lists.arm.linux.org.uk/lurker/message/20100920.150749.c97eda0d.en.html
+> 
+> Russell,
+> 
+> Actually, when we discussed all this, we didn't came to any conclusion,
+> and so i asked you: should we go ahead with this patch or drop it?
 
-> > This list isn't complete, but see below.
+Yes, I didn't bother replying any further because it seemed that no one
+was listening to me.
 
-> Do you mean the list above is incomplete? I should have said "Changes to the 
-> struct _include_". 
-> I'm ignorant of "patch summary etiquette" (or what people otherwise like to 
-> see) but I had just assumed that the patch comments were more like a 
-> highlights reel - the real info is in the patch itself.
+I think over the four or five emails my position on the patch was pretty
+clear: I do _not_ like it one bit, and I still do not like it.
 
-No, the patch summary should generally be complete - if your patch is
-changing so many things that it's getting tedious to list them all then
-that's usually a sign that it should be split up into a series of
-changes.
+It is a hack, plain and simple.  You're adding code to misrepresent what
+the hardware can do.  You're fooling the system into thinking that the
+GIC can control wake-up sources, when in fact the GIC has zero wakeup
+capabilities what so ever.
+
+As I pointed out in the message above, if you do this, then drivers have
+NO WAY to detect whether the interrupt controller they're connected to
+is wake-up capable or not.
+
+http://lists.arm.linux.org.uk/lurker/message/20100920.134808.634d6ea1.en.html
+
+I still don't know what your driver code looks like, yet I've given you
+a suggestion to solve your problem in a subsequent reply (see the URL
+at the top of this message) which never really got a reply from you.
+
+It seems to me that as soon as I asked for driver code, ST lost all
+interest in discussing the issue any further, as there was no further
+technical discussion coming from _any_ ST people.
