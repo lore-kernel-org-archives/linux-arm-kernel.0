@@ -1,32 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 20 Dec 2010 08:21:19 -0600
-Subject: [PATCH v4 2/7] OMAP3: PM: Erratum i581 support: dll kick strategy
-In-Reply-To: <20101220113322.GS31404@nokia.com>
-References: <1292712817-24999-1-git-send-email-nm@ti.com>
-	<1292712817-24999-3-git-send-email-nm@ti.com>
-	<AANLkTi=4DJAnXcTZ37rcmr9Kz2CmXx6uhPqNThnoR2gu@mail.gmail.com>
-	<20101220113322.GS31404@nokia.com>
-Message-ID: <4D0F665F.8050804@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 20 Dec 2010 22:25:17 +0800
+Subject: [PATCH v7 05/15] ARM: mxs: Add low-level debug UART support
+In-Reply-To: <20101220135535.GB8885@pengutronix.de>
+References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
+	<1292679575-2635-4-git-send-email-shawn.guo@freescale.com>
+	<20101220115059.GA8885@pengutronix.de>
+	<20101220132147.GB16497@freescale.com>
+	<20101220135535.GB8885@pengutronix.de>
+Message-ID: <20101220142516.GC16497@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter 'p2' De Schrijver had written, on 12/20/2010 05:33 AM, the following:
-[..]
->>> +       /* these 2 words need to be at the end !!! */
->>> +kick_counter:
->>> +       .word   0
->>> +wait_dll_lock_counter:
->>> +       .word   0
->> Why do they need to be at the end? Also, at the end of what do they need to be?
->>
+Hi Wolfram,
+
+On Mon, Dec 20, 2010 at 02:55:35PM +0100, Wolfram Sang wrote:
 > 
-> At the end of omap34xx_cpu_suspend. As we don't know where in SRAM the
-> counters will be, the code accessing those counters addresses them
-> relative from (_omap_sram_idle + omap34xx_cpu_suspend_sz). Not sure if
-> this part of the code made it to linux-omap though.
-I have not posted the change needed to expose these counters to 
-userspace waiting for the churn in sleep34xx.S to settle down.
+> > > We should use asm/hardware/debug-pl01x.S, like the other users:
+> > 
+> > Just tested it, and it works.  Will do in v8.  Thanks for the comment.
+> 
+> Cool.
+> 
+> > > 
+> > > >  arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
+> > > 
+> > > Auto-detection could be used here, too?
+> > > 
+> > I'm afraid not.  How do you expect the detection is done, by reading
+> > some register like we are doing in system.c?
+> 
+> I am not sure which register you mean in system.c?
+> 
+> > Which register specifically?
+> 
+> The signature of the amba device (base + size - 0x20). You can check
+> drivers/amba/bus.c how it checks for the signature.
+> 
+> > If the register gets different address between
+> > mx23 and mx28, we need to utilize the current mechanism to
+> > distinguish the address anyway.
+> 
+> We could simply test both locations and see where it is present?
+> 
+Is there any problem of simply using arch_id here? I do not see
+significant benefit of using the detection you suggest here
+over the current way.
 
 -- 
 Regards,
-Nishanth Menon
+Shawn
