@@ -1,96 +1,212 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 20 Dec 2010 14:05:08 -0600
-Subject: [PATCH v5 6/7] OMAP3: PM: make omap3_cpuidle_update_states
-	independent of enable_off_mode
+Date: Mon, 20 Dec 2010 14:05:06 -0600
+Subject: [PATCH v5 4/7] OMAP3630: PM: Erratum i608: disable RTA
 In-Reply-To: <1292875509-9896-1-git-send-email-nm@ti.com>
 References: <1292875509-9896-1-git-send-email-nm@ti.com>
-Message-ID: <1292875509-9896-7-git-send-email-nm@ti.com>
+Message-ID: <1292875509-9896-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently omap3_cpuidle_update_states makes whole sale decision
-on which C states to update based on enable_off_mode variable
-Instead, achieve the same functionality by independently providing
-mpu and core deepest states the system is allowed to achieve and
-update the idle states accordingly.
+Erratum id: i608
+RTA (Retention Till Access) feature is not supported and leads to device
+stability issues when enabled. This impacts modules with embedded memories
+on OMAP3630
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Workaround is to disable RTA on boot and coming out of core off.
+For disabling RTA coming out of off mode, we do this by overriding the
+restore pointer for 3630 as the first point of entry before caches are
+touched and is common for GP and HS devices. To disable earlier than
+this could be possible by modifying the PPA for HS devices, but not for
+GP devices.
+
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Tony Lindgren <tony@atomide.com>
+
 Acked-by: Jean Pihet <j-pihet@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
+[ambresh at ti.com: co-developer]
+Signed-off-by: Ambresh K <ambresh@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-v2: proto is used as (u32, u32) + added the acks collected
-v1: original version
- arch/arm/mach-omap2/cpuidle34xx.c |   19 ++++++++++---------
- arch/arm/mach-omap2/pm.h          |    2 +-
- arch/arm/mach-omap2/pm34xx.c      |    2 +-
- 3 files changed, 12 insertions(+), 11 deletions(-)
+v5: minor correction in commit message, RTA is used with caps
+v4:
+	control register handling moved to control.c
+	errata handling framework introduction split out
+	into a separate patch
+v3: http://marc.info/?t=129140247800026&r=1&w=2
+	additional comment to explain Ambresh's contrib
+	removed the redundant check for cpu_is34xx - it is already
+		done by pm_init
+	pm_errata_configure is __init
+v2: https://patchwork.kernel.org/patch/365242/
+	fixed missing b restore for 3430 es3.1 code.
+	introduced erratum handling logic here splitting it out of uart errata
+	typo fixes for erratum
+v1: http://marc.info/?l=linux-omap&m=129013172825240&w=2
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 0d50b45..f80d3f6 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -293,25 +293,26 @@ select_state:
- DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+ arch/arm/mach-omap2/control.c   |   13 ++++++++++++-
+ arch/arm/mach-omap2/control.h   |    7 ++++++-
+ arch/arm/mach-omap2/pm.h        |    2 ++
+ arch/arm/mach-omap2/pm34xx.c    |   10 ++++++++++
+ arch/arm/mach-omap2/sleep34xx.S |   26 ++++++++++++++++++++++++++
+ 5 files changed, 56 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 1fa3294..27ed558 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -241,7 +241,10 @@ void omap3_save_scratchpad_contents(void)
  
- /**
-- * omap3_cpuidle_update_states - Update the cpuidle states.
-+ * omap3_cpuidle_update_states() - Update the cpuidle states
-+ * @mpu_deepest_state:	Enable states upto and including this for mpu domain
-+ * @core_deepest_state:	Enable states upto and including this for core domain
-  *
-- * Currently, this function toggles the validity of idle states based upon
-- * the flag 'enable_off_mode'. When the flag is set all states are valid.
-- * Else, states leading to OFF state set to be invalid.
-+ * This goes through the list of states available and enables and disables the
-+ * validity of C states based on deepest state that can be achieved for the
-+ * variable domain
-  */
--void omap3_cpuidle_update_states(void)
-+void omap3_cpuidle_update_states(u32 mpu_deepest_state, u32 core_deepest_state)
- {
- 	int i;
- 
- 	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
- 		struct omap3_processor_cx *cx = &omap3_power_states[i];
- 
--		if (enable_off_mode) {
-+		if ((cx->mpu_state >= mpu_deepest_state) &&
-+		    (cx->core_state >= core_deepest_state)) {
- 			cx->valid = 1;
- 		} else {
--			if ((cx->mpu_state == PWRDM_POWER_OFF) ||
--				(cx->core_state	== PWRDM_POWER_OFF))
--				cx->valid = 0;
-+			cx->valid = 0;
- 		}
- 	}
+ 	/* Populate the Scratchpad contents */
+ 	scratchpad_contents.boot_config_ptr = 0x0;
+-	if (omap_rev() != OMAP3430_REV_ES3_0 &&
++	if (cpu_is_omap3630())
++		scratchpad_contents.public_restore_ptr =
++			virt_to_phys(get_omap3630_restore_pointer());
++	else if (omap_rev() != OMAP3430_REV_ES3_0 &&
+ 					omap_rev() != OMAP3430_REV_ES3_1)
+ 		scratchpad_contents.public_restore_ptr =
+ 			virt_to_phys(get_restore_pointer());
+@@ -474,4 +477,12 @@ void omap3_control_restore_context(void)
+ 	omap_ctrl_writel(control_context.csi, OMAP343X_CONTROL_CSI);
+ 	return;
  }
++
++void omap3630_ctrl_disable_rta(void)
++{
++	if (!cpu_is_omap3630())
++		return;
++	omap_ctrl_writel(OMAP36XX_RTA_DISABLE, OMAP36XX_CONTROL_MEM_RTA_CTRL);
++}
++
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index b6c6b7c..ec98dd7 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -204,6 +204,10 @@
+ #define OMAP343X_CONTROL_WKUP_DEBOBS3 (OMAP343X_CONTROL_GENERAL_WKUP + 0x014)
+ #define OMAP343X_CONTROL_WKUP_DEBOBS4 (OMAP343X_CONTROL_GENERAL_WKUP + 0x018)
+ 
++/* 36xx-only RTA - Retention till Accesss control registers and bits */
++#define OMAP36XX_CONTROL_MEM_RTA_CTRL	0x40C
++#define OMAP36XX_RTA_DISABLE		0x0
++
+ /* 34xx D2D idle-related pins, handled by PM core */
+ #define OMAP3_PADCONF_SAD2D_MSTANDBY   0x250
+ #define OMAP3_PADCONF_SAD2D_IDLEACK    0x254
+@@ -347,10 +351,11 @@ extern void omap3_save_scratchpad_contents(void);
+ extern void omap3_clear_scratchpad_contents(void);
+ extern u32 *get_restore_pointer(void);
+ extern u32 *get_es3_restore_pointer(void);
++extern u32 *get_omap3630_restore_pointer(void);
+ extern u32 omap3_arm_context[128];
+ extern void omap3_control_save_context(void);
+ extern void omap3_control_restore_context(void);
+-
++extern void omap3630_ctrl_disable_rta(void);
+ #else
+ #define omap_ctrl_base_get()		0
+ #define omap_ctrl_readb(x)		0
 diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 5e0bee9..29663cc 100644
+index 0348fd7..8d9aa3e 100644
 --- a/arch/arm/mach-omap2/pm.h
 +++ b/arch/arm/mach-omap2/pm.h
-@@ -58,7 +58,7 @@ extern u32 sleep_while_idle;
- #endif
+@@ -85,6 +85,8 @@ extern unsigned int save_secure_ram_context_sz;
+ extern unsigned int omap24xx_cpu_suspend_sz;
+ extern unsigned int omap34xx_cpu_suspend_sz;
  
- #if defined(CONFIG_CPU_IDLE)
--extern void omap3_cpuidle_update_states(void);
-+extern void omap3_cpuidle_update_states(u32, u32);
- #endif
- 
- #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
++#define PM_RTA_ERRATUM_i608		(1 << 0)
++
+ #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+ extern u16 pm34xx_errata;
+ #define IS_PM34XX_ERRATUM(id)		(pm34xx_errata & (id))
 diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index feb1bd9..ca3b134 100644
+index 5702f41..a404387 100644
 --- a/arch/arm/mach-omap2/pm34xx.c
 +++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -928,7 +928,7 @@ void omap3_pm_off_mode_enable(int enable)
- 		state = PWRDM_POWER_RET;
+@@ -1007,6 +1007,8 @@ void omap_push_sram_idle(void)
  
- #ifdef CONFIG_CPU_IDLE
--	omap3_cpuidle_update_states();
-+	omap3_cpuidle_update_states(state, state);
- #endif
+ static void __init pm_errata_configure(void)
+ {
++	if (cpu_is_omap3630())
++		pm34xx_errata |= PM_RTA_ERRATUM_i608;
+ }
  
- 	list_for_each_entry(pwrst, &pwrst_list, node) {
+ static int __init omap3_pm_init(void)
+@@ -1067,6 +1069,14 @@ static int __init omap3_pm_init(void)
+ 	pm_idle = omap3_pm_idle;
+ 	omap3_idle_init();
+ 
++	/*
++	 * RTA is disabled during initialization as per erratum i608
++	 * it is safer to disable RTA by the bootloader, but we would like
++	 * to be doubly sure here and prevent any mishaps.
++	 */
++	if (IS_PM34XX_ERRATUM(PM_RTA_ERRATUM_i608))
++		omap3630_ctrl_disable_rta();
++
+ 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
+ 	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+ 		omap3_secure_ram_storage =
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index 24ecb0a..4abf447 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -45,6 +45,8 @@
+ #define CM_IDLEST_CKGEN_V	OMAP34XX_CM_REGADDR(PLL_MOD, CM_IDLEST)
+ #define SRAM_BASE_P		0x40200000
+ #define CONTROL_STAT		0x480022F0
++#define CONTROL_MEM_RTA_CTRL	(OMAP343X_CTRL_BASE\
++					+ OMAP36XX_CONTROL_MEM_RTA_CTRL)
+ #define SCRATCHPAD_MEM_OFFS	0x310 /* Move this as correct place is
+ 				       * available */
+ #define SCRATCHPAD_BASE_P	(OMAP343X_CTRL_BASE + OMAP343X_CONTROL_MEM_WKUP\
+@@ -99,6 +101,14 @@ ENTRY(get_restore_pointer)
+         ldmfd   sp!, {pc}     @ restore regs and return
+ ENTRY(get_restore_pointer_sz)
+         .word   . - get_restore_pointer
++	.text
++/* Function call to get the restore pointer for 3630 resume from OFF */
++ENTRY(get_omap3630_restore_pointer)
++        stmfd   sp!, {lr}     @ save registers on stack
++	adr	r0, restore_3630
++        ldmfd   sp!, {pc}     @ restore regs and return
++ENTRY(get_omap3630_restore_pointer_sz)
++        .word   . - get_omap3630_restore_pointer
+ 
+ 	.text
+ /* Function call to get the restore pointer for for ES3 to resume from OFF */
+@@ -246,6 +256,20 @@ copy_to_sram:
+ 	bne	copy_to_sram
+ 	ldr	r1, sram_base
+ 	blx	r1
++	b	restore
++
++restore_3630:
++	/*b restore_es3630*/		@ Enable to debug restore code
++	ldr	r1, pm_prepwstst_core_p
++	ldr	r2, [r1]
++	and	r2, r2, #0x3
++	cmp	r2, #0x0	@ Check if previous power state of CORE is OFF
++	bne	restore
++	/* Disable RTA before giving control */
++	ldr	r1, control_mem_rta
++	mov	r2, #OMAP36XX_RTA_DISABLE
++	str	r2, [r1]
++	/* Fall thru for the remaining logic */
+ restore:
+ 	/* b restore*/  @ Enable to debug restore code
+         /* Check what was the reason for mpu reset and store the reason in r9*/
+@@ -651,6 +675,8 @@ cache_pred_disable_mask:
+ 	.word	0xFFFFE7FB
+ control_stat:
+ 	.word	CONTROL_STAT
++control_mem_rta:
++	.word	CONTROL_MEM_RTA_CTRL
+ kernel_flush:
+ 	.word v7_flush_dcache_all
+ 	/*
 -- 
 1.6.3.3
