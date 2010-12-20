@@ -1,45 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Dec 2010 17:08:49 +0000
-Subject: [PATCH v4 3/6] ARM: U8500 core machine support
-In-Reply-To: <C832F8F5D375BD43BFA11E82E0FE9FE00829A2FDB7@EXDCVYMBSTM005.EQ1STM.local>
-References: <1259279756.13327.72.camel@vinay-desktop>
-	<20101219110913.GA23979@n2100.arm.linux.org.uk>
-	<C832F8F5D375BD43BFA11E82E0FE9FE00829A2FDB7@EXDCVYMBSTM005.EQ1STM.local>
-Message-ID: <20101220170849.GG28157@n2100.arm.linux.org.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 20 Dec 2010 18:32:22 +0100
+Subject: [PATCH v2] Keyboard: omap-keypad: use matrix_keypad.h
+In-Reply-To: <alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
+References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+	<201012181639.29820.jkrzyszt@tis.icnet.pl>
+	<alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
+Message-ID: <201012201832.24243.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 05:47:25AM +0100, Srinidhi KASAGAR wrote:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Sent: Sunday, December 19, 2010 4:39 PM
-> > To: Srinidhi KASAGAR
-> > Cc: linux-arm-kernel at lists.infradead.org; STEricsson_nomadik_linux;
-> > Andrea GALLO; rubini at unipv.it
-> > Subject: Re: [PATCH v4 3/6] ARM: U8500 core machine support
-> > 
-> > ... going back to this patch...
-> > 
-> > On Fri, Nov 27, 2009 at 05:25:56AM +0530, srinidhi kasagar wrote:
-> > > +/*
-> > > + * U8500 specific entry point for secondary CPUs.
-> > > + */
-> > > +ENTRY(u8500_secondary_startup)
-> > > +	mrc	p15, 0, r0, c0, c0, 5
-> > > +	and	r0, r0, #15
-> > > +	adr	r4, 1f
-> > > +	ldmia	r4, {r5, r6}
-> > > +	sub	r4, r4, r5
-> > > +	add	r6, r6, r4
-> > > +	dsb
-> > 
-> > Can you please explain why you added a dsb here, whereas most other
-> > platforms don't require it?
-> 
-> No reason, you can safely ignore this. I can send a patch to remove this
-> if you need.
+Monday 20 December 2010 16:29:32 Aaro Koskinen wrote:
+> Hello,
+>
+> On Sat, 18 Dec 2010, Janusz Krzysztofik wrote:
+> > Most keypad drivers make use of the <linux/input/matrix_keypad.h>
+> > defined macros, structures and inline functions.
+> >
+> > Convert omap-keypad driver to use those as well, as suggested by a
+> > compile time warning, hardcoded into the OMAP <palt/keypad.h>.
+> >
+> > Created against linux-2.6.37-rc5.
+> > Tested on Amstrad Delta.
+> > Compile tested with omap1_defconfig and omap2plus_defconfig
+> > shrinked to board-h4.
+> >
+> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+>
+> [...]
+>
+> > --- linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c.orig
+> > 2010-12-09 23:07:35.000000000 +0100 +++
+> > linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c     
+> > 2010-12-18 16:23:29.000000000 +0100 @@ -46,81 +46,79 @@ static u16
+> > ams_delta_latch2_reg;
+> > static int ams_delta_keymap[] = {
+>
+> [...]
+>
+> > +static const struct matrix_keymap_data ams_delta_keymap_data = {
+> > +       .keymap         = ams_delta_keymap,
+> > +       .keymap_size    = ARRAY_SIZE(ams_delta_keymap),
+> > +};
+>
+> You should update the ams_delta_keymap type as well, otherwise this
+> patch will introduce the following sparse warning:
+>
+>    CHECK   arch/arm/mach-omap1/board-ams-delta.c
+> arch/arm/mach-omap1/board-ams-delta.c:191:27: warning: incorrect type in initializer (different signedness)
+> arch/arm/mach-omap1/board-ams-delta.c:191:27:    expected unsigned int const [usertype] *keymap
+> arch/arm/mach-omap1/board-ams-delta.c:191:27:    got int static [toplevel] *<noident>
 
-It would be better to have all the pen_release implementations without
-spurious differences when the differences aren't necessary.
+Hi Aaro,
+How did you get this output? I'm using OpenEmbedded as my development 
+environment. Running make with "C=1" (EXTRA_OEMAKE=" C=1 ") displays a 
+lot but the above. Running sparse by hand breaks with "unable to 
+open 'linux/init.h'". Any advice?
 
-So, yes please.
+Thanks,
+Janusz
