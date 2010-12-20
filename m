@@ -1,108 +1,163 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 20 Dec 2010 18:04:14 +0530
-Subject: [PATCH V3 39/63] GIC: Added dummy handlers for
-	PowerManagementSuspend Resume
-In-Reply-To: <20101220122858.GE28157@n2100.arm.linux.org.uk>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
-	<20101220111056.GB28157@n2100.arm.linux.org.uk>
-	<4D0F3EC1.5030207@st.com>
-	<20101220114948.GC28157@n2100.arm.linux.org.uk>
-	<53375b410d360c4155c4c4e978be9d78@mail.gmail.com>
-	<20101220122858.GE28157@n2100.arm.linux.org.uk>
-Message-ID: <3f7fa8ffdb0ccbbdd018360e6e334b85@mail.gmail.com>
+From: arden.jay@gmail.com (arden jay)
+Date: Mon, 20 Dec 2010 20:35:18 +0800
+Subject: [PATCH 9/9] ARM i.MX51 babbage: Add framebuffer support
+In-Reply-To: <1292842127-21406-10-git-send-email-s.hauer@pengutronix.de>
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+	<1292842127-21406-10-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <AANLkTi=Rx46Jf4Nmxzr9O1me+EHg=6XF9HiWx43ebDsj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Monday, December 20, 2010 5:59 PM
-> To: Santosh Shilimkar
-> Cc: viresh kumar; Rajeev KUMAR; Armando VISCONTI; Vipin KUMAR; Shiraz
-> HASHIM; Amit VIRDI; Vipul Kumar SAMAR; Deepak SIKRI; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH V3 39/63] GIC: Added dummy handlers for
-> PowerManagementSuspend Resume
->
-> On Mon, Dec 20, 2010 at 05:50:37PM +0530, Santosh Shilimkar wrote:
-> > > -----Original Message-----
-> > > From: linux-arm-kernel-bounces at lists.infradead.org
-[mailto:linux-arm-
-> > > kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
-> > Linux
-> > > Sent: Monday, December 20, 2010 5:20 PM
-> > > To: viresh kumar
-> > > Cc: Rajeev KUMAR; Armando VISCONTI; Vipin KUMAR; Shiraz HASHIM; Amit
-> > > VIRDI; Vipul Kumar SAMAR; Deepak SIKRI; linux-arm-
-> > > kernel at lists.infradead.org
-> > > Subject: Re: [PATCH V3 39/63] GIC: Added dummy handlers for Power
-> > > ManagementSuspend Resume
-> > >
-> > > On Mon, Dec 20, 2010 at 05:02:17PM +0530, viresh kumar wrote:
-> > > > On 12/20/2010 04:40 PM, Russell King - ARM Linux wrote:
-> > > > > And still this patch gets reposted a few more times despite my
-> > > > > objections:
-> > > > >
-> > > > >
-> > >
-> >
->
-http://lists.arm.linux.org.uk/lurker/message/20100920.150749.c97eda0d.en.h
-> > > tml
-> > > >
-> > > > Russell,
-> > > >
-> > > > Actually, when we discussed all this, we didn't came to any
-> > conclusion,
-> > > > and so i asked you: should we go ahead with this patch or drop it?
-> > >
-> > > Yes, I didn't bother replying any further because it seemed that no
-> one
-> > > was listening to me.
-> > >
-> > > I think over the four or five emails my position on the patch was
-> pretty
-> > > clear: I do _not_ like it one bit, and I still do not like it.
-> > >
-> > > It is a hack, plain and simple.  You're adding code to misrepresent
-> what
-> > > the hardware can do.  You're fooling the system into thinking that
-the
-> > > GIC can control wake-up sources, when in fact the GIC has zero
-wakeup
-> > > capabilities what so ever.
-> > >
-> > > As I pointed out in the message above, if you do this, then drivers
-> have
-> > > NO WAY to detect whether the interrupt controller they're connected
-to
-> > > is wake-up capable or not.
-> > >
-> > >
-> >
->
-http://lists.arm.linux.org.uk/lurker/message/20100920.134808.634d6ea1.en.h
-> > > tml
-> > >
-> > > I still don't know what your driver code looks like, yet I've given
-> you
-> > > a suggestion to solve your problem in a subsequent reply (see the
-URL
-> > > at the top of this message) which never really got a reply from you.
-> > >
-> > > It seems to me that as soon as I asked for driver code, ST lost all
-> > > interest in discussing the issue any further, as there was no
-further
-> > > technical discussion coming from _any_ ST people.
-> > >
-> > Just for information, we did found a serial driver BUG
-> > is similar aspect. Below is the thread.
-> > http://ns3.spinics.net/lists/linux-omap/msg41240.html
->
-> So, the serial_core layer isn't properly tracking whether
-> enable_irq_wake()
-> succeeded, and is then calling disable_irq_wake().  That's a bug in
-> the serial_core layer which needs fixing.
-Patch is already posted for this on serial list.
+Hi Sascha,
 
-http://www.spinics.net/lists/linux-serial/msg03156.html
+2010/12/20 Sascha Hauer <s.hauer@pengutronix.de>:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-mx5/board-mx51_babbage.c | ? 74 ++++++++++++++++++++++++++++++++
+> ?2 files changed, 75 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index 5011f42..2a936b7 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -22,6 +22,7 @@ config MACH_MX51_BABBAGE
+> ? ? ? ?select IMX_HAVE_PLATFORM_IMX_UART
+> ? ? ? ?select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+> ? ? ? ?select IMX_HAVE_PLATFORM_SPI_IMX
+> + ? ? ? select IMX_HAVE_PLATFORM_IMX_IPUV3
+> ? ? ? ?help
+> ? ? ? ? ?Include support for MX51 Babbage platform, also known as MX51EVK in
+> ? ? ? ? ?u-boot. This includes specific configurations for the board and its
+> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+> index 368a315..6c1576c 100644
+> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+> @@ -22,11 +22,13 @@
+> ?#include <linux/input.h>
+> ?#include <linux/spi/flash.h>
+> ?#include <linux/spi/spi.h>
+> +#include <linux/mfd/imx-ipu-v3.h>
+>
+> ?#include <mach/common.h>
+> ?#include <mach/hardware.h>
+> ?#include <mach/iomux-mx51.h>
+> ?#include <mach/mxc_ehci.h>
+> +#include <mach/ipu-v3.h>
+>
+Why it needs imx-ipu-v3.h and ipu-v3.h?
+
+> ?#include <asm/irq.h>
+> ?#include <asm/setup.h>
+> @@ -158,6 +160,41 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+> ? ? ? ?MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
+> ? ? ? ?MX51_PAD_CSPI1_SS0__GPIO_4_24,
+> ? ? ? ?MX51_PAD_CSPI1_SS1__GPIO_4_25,
+> +
+> + ? ? ? /* Display */
+> + ? ? ? MX51_PAD_DISPB2_SER_DIN__GPIO_3_5,
+> + ? ? ? MX51_PAD_DISPB2_SER_DIO__GPIO_3_6,
+> + ? ? ? MX51_PAD_NANDF_D12__GPIO_3_28,
+> +
+> + ? ? ? MX51_PAD_DISP1_DAT0__DISP1_DAT0,
+> + ? ? ? MX51_PAD_DISP1_DAT1__DISP1_DAT1,
+> + ? ? ? MX51_PAD_DISP1_DAT2__DISP1_DAT2,
+> + ? ? ? MX51_PAD_DISP1_DAT3__DISP1_DAT3,
+> + ? ? ? MX51_PAD_DISP1_DAT4__DISP1_DAT4,
+> + ? ? ? MX51_PAD_DISP1_DAT5__DISP1_DAT5,
+> + ? ? ? MX51_PAD_DISP1_DAT6__DISP1_DAT6,
+> + ? ? ? MX51_PAD_DISP1_DAT7__DISP1_DAT7,
+> + ? ? ? MX51_PAD_DISP1_DAT8__DISP1_DAT8,
+> + ? ? ? MX51_PAD_DISP1_DAT9__DISP1_DAT9,
+> + ? ? ? MX51_PAD_DISP1_DAT10__DISP1_DAT10,
+> + ? ? ? MX51_PAD_DISP1_DAT11__DISP1_DAT11,
+> + ? ? ? MX51_PAD_DISP1_DAT12__DISP1_DAT12,
+> + ? ? ? MX51_PAD_DISP1_DAT13__DISP1_DAT13,
+> + ? ? ? MX51_PAD_DISP1_DAT14__DISP1_DAT14,
+> + ? ? ? MX51_PAD_DISP1_DAT15__DISP1_DAT15,
+> + ? ? ? MX51_PAD_DISP1_DAT16__DISP1_DAT16,
+> + ? ? ? MX51_PAD_DISP1_DAT17__DISP1_DAT17,
+> + ? ? ? MX51_PAD_DISP1_DAT18__DISP1_DAT18,
+> + ? ? ? MX51_PAD_DISP1_DAT19__DISP1_DAT19,
+> + ? ? ? MX51_PAD_DISP1_DAT20__DISP1_DAT20,
+> + ? ? ? MX51_PAD_DISP1_DAT21__DISP1_DAT21,
+> + ? ? ? MX51_PAD_DISP1_DAT22__DISP1_DAT22,
+> + ? ? ? MX51_PAD_DISP1_DAT23__DISP1_DAT23,
+> +#define MX51_PAD_DI_GP4__IPU_DI2_PIN15 ? ? ? ? ? ? ? ? IOMUX_PAD(0x758, 0x350, 4, 0x0, ? 0, NO_PAD_CTRL)
+> + ? ? ? MX51_PAD_DI_GP4__IPU_DI2_PIN15,
+> +
+> + ? ? ? /* I2C DVI enable */
+> + ? ? ? MX51_PAD_CSI2_HSYNC__GPIO_4_14,
+> ?};
+>
+> ?/* Serial ports */
+> @@ -346,6 +383,23 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
+> ? ? ? ?.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
+> ?};
+>
+> +static struct ipuv3_fb_platform_data babbage_fb0_data = {
+> + ? ? ? .interface_pix_fmt = IPU_PIX_FMT_RGB24,
+> + ? ? ? .flags = IMX_IPU_FB_USE_MODEDB | IMX_IPU_FB_USE_OVERLAY,
+> + ? ? ? .display = 0,
+> +};
+> +
+> +static struct ipuv3_fb_platform_data babbage_fb1_data = {
+> + ? ? ? .interface_pix_fmt = IPU_PIX_FMT_RGB565,
+> + ? ? ? .flags = IMX_IPU_FB_USE_MODEDB,
+> + ? ? ? .display = 1,
+> +};
+> +
+> +static struct imx_ipuv3_platform_data ipu_data = {
+> + ? ? ? .fb_head0_platform_data = &babbage_fb0_data,
+> + ? ? ? .fb_head1_platform_data = &babbage_fb1_data,
+> +};
+> +
+> ?/*
+> ?* Board specific initialization.
+> ?*/
+> @@ -392,6 +446,26 @@ static void __init mxc_board_init(void)
+> ? ? ? ? ? ? ? ?ARRAY_SIZE(mx51_babbage_spi_board_info));
+> ? ? ? ?imx51_add_ecspi(0, &mx51_babbage_spi_pdata);
+> ? ? ? ?imx51_add_imx2_wdt(0, NULL);
+> +
+> +#define GPIO_DVI_DETECT ? ? ? ?(2 * 32 + 28)
+> +#define GPIO_DVI_RESET (2 * 32 + 5)
+> +#define GPIO_DVI_PWRDN (2 * 32 + 6)
+> +#define GPIO_DVI_I2C ? (3 * 32 + 14)
+This should be in board-xxx.h.
+
+> +
+> + ? ? ? /* DVI Detect */
+> + ? ? ? gpio_request(GPIO_DVI_DETECT, "dvi detect");
+> + ? ? ? gpio_direction_input(GPIO_DVI_DETECT);
+> + ? ? ? /* DVI Reset - Assert for i2c disabled mode */
+> + ? ? ? gpio_request(GPIO_DVI_RESET, "dvi reset");
+> + ? ? ? gpio_direction_output(GPIO_DVI_RESET, 0);
+> + ? ? ? /* DVI Power-down */
+> + ? ? ? gpio_request(GPIO_DVI_PWRDN, "dvi pwdn");
+> + ? ? ? gpio_direction_output(GPIO_DVI_PWRDN, 1);
+> +
+> + ? ? ? gpio_request(GPIO_DVI_I2C, "dvi i2c");
+> + ? ? ? gpio_direction_output(GPIO_DVI_I2C, 0);
+> +
+Can this implement as function, and passes to specified driver who needs it?
+
+> + ? ? ? imx51_add_ipuv3(&ipu_data);
+> ?}
+>
+> ?static void __init mx51_babbage_timer_init(void)
+> --
+> 1.7.2.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
+
+
+
+-- 
+cheers,
+jay
