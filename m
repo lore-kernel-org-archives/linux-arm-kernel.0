@@ -1,33 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Dec 2010 19:15:32 +0100
-Subject: [PATCH 1/6 v8] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <20101219174017.GA31832@alchark-u3s>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<20101111234957.GA28735@n2100.arm.linux.org.uk>
-	<20101219174017.GA31832@alchark-u3s>
-Message-ID: <201012201915.32851.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Dec 2010 10:39:42 -0800
+Subject: [PATCH] hvc_dcc: Simplify assembly for v6 and v7 ARM
+In-Reply-To: <1292867461.27552.15.camel@m0nster>
+References: <20101201192856.GA731@suse.de>	
+	<1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
+	<1292867461.27552.15.camel@m0nster>
+Message-ID: <4D0FA2EE.90703@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 December 2010 18:40:17 Alexey Charkov wrote:
-> This adds support for the family of Systems-on-Chip produced initially
-> by VIA and now its subsidiary WonderMedia that have recently become
-> widespread in lower-end Chinese ARM-based tablets and netbooks.
-> 
-> Support is included for both VT8500 and WM8505. Suitable code is
-> selected (if compiled in) at early initialization time by reading a
-> platform-specific identification register, as current bootloaders
-> do not provide any reliable machine id to the kernel.
-> 
-> Included are basic machine initialization files, register and
-> interrupt definitions, support for the on-chip interrupt controller,
-> high-precision OS timer, GPIO lines, necessary macros for early debug,
-> pulse-width-modulated outputs control, as well as platform device
-> configurations for the specific drivers implemented elsewhere.
-> 
-> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+On 12/20/2010 09:51 AM, Daniel Walker wrote:
+>
+> I would expect to see three patches. One that adds volatile, which
+> appears to be a good fix. Another patch that changes the assembly lines,
+> and another that does the clean up. The last two are more controversial
+> ones
 
-Looks good to me, thanks for addressing all my previous concerns.
+Ok. I'll send a series later today to give some more time for feedback.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
