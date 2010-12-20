@@ -1,160 +1,129 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 20 Dec 2010 22:29:55 +0100
-Subject: [PATCH v8 00/15] ARM: mxs: Add initial support for MX23 and MX28
-In-Reply-To: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
-References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101220212955.GC14221@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Dec 2010 16:39:10 -0500 (EST)
+Subject: [PATCH 1/3] hvc_dcc: Fix bad code generation by marking assembly
+	volatile
+In-Reply-To: <1292875718-7980-2-git-send-email-sboyd@codeaurora.org>
+References: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
+	<1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
+	<1292875718-7980-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1012201638150.10437@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 10:57:41PM +0800, Shawn Guo wrote:
-> Changes for v8:
->  - Reuse debug-pl01x.S as mxs DUART is just an amba-pl011
-So shouldn't "ARM: mxs: Dynamically allocate duart devices" create an
-amba-pl011 device?
+On Mon, 20 Dec 2010, Stephen Boyd wrote:
 
->  - Remove extra space in iomux.c
->  - Remove uncessary line breaker in mach-mx23evk.c
+> Without marking the asm __dcc_getstatus() volatile my compiler
+> decides it can cache the value of __ret in a register and then
+> check the value of it continually in hvc_dcc_put_chars() (I had
+> to replace get_wait/put_wait with 1 and fixup the branch
+> otherwise my disassembler barfed on __dcc_(get|put)char).
 > 
->  [PATCH v8 05/15] ARM: mxs: Add low-level debug UART support
->  [PATCH v8 08/15] ARM: mxs: Add iomux support
->  [PATCH v8 13/15] ARM: mxs: Add initial mx23evk support
+> 00000000 <hvc_dcc_put_chars>:
+>    0:   ee103e11        mrc     14, 0, r3, cr0, cr1, {0}
+>    4:   e3a0c000        mov     ip, #0  ; 0x0
+>    8:   e2033202        and     r3, r3, #536870912      ; 0x20000000
+>    c:   ea000006        b       2c <hvc_dcc_put_chars+0x2c>
+>   10:   e3530000        cmp     r3, #0  ; 0x0
+>   14:   1afffffd        bne     10 <hvc_dcc_put_chars+0x10>
+>   18:   e7d1000c        ldrb    r0, [r1, ip]
+>   1c:   ee10fe11        mrc     14, 0, pc, cr0, cr1, {0}
+>   20:   2afffffd        bcs     1c <hvc_dcc_put_chars+0x1c>
+>   24:   ee000e15        mcr     14, 0, r0, cr0, cr5, {0}
+>   28:   e28cc001        add     ip, ip, #1      ; 0x1
+>   2c:   e15c0002        cmp     ip, r2
+>   30:   bafffff6        blt     10 <hvc_dcc_put_chars+0x10>
+>   34:   e1a00002        mov     r0, r2
+>   38:   e12fff1e        bx      lr
+> 
+> As you can see, the value of the mrc is checked against
+> DCC_STATUS_TX (bit 29) and then stored in r3 for later use.
+> Marking the asm volatile produces the following:
+> 
+> 00000000 <hvc_dcc_put_chars>:
+>    0:   e3a03000        mov     r3, #0  ; 0x0
+>    4:   ea000007        b       28 <hvc_dcc_put_chars+0x28>
+>    8:   ee100e11        mrc     14, 0, r0, cr0, cr1, {0}
+>    c:   e3100202        tst     r0, #536870912  ; 0x20000000
+>   10:   1afffffc        bne     8 <hvc_dcc_put_chars+0x8>
+>   14:   e7d10003        ldrb    r0, [r1, r3]
+>   18:   ee10fe11        mrc     14, 0, pc, cr0, cr1, {0}
+>   1c:   2afffffd        bcs     18 <hvc_dcc_put_chars+0x18>
+>   20:   ee000e15        mcr     14, 0, r0, cr0, cr5, {0}
+>   24:   e2833001        add     r3, r3, #1      ; 0x1
+>   28:   e1530002        cmp     r3, r2
+>   2c:   bafffff5        blt     8 <hvc_dcc_put_chars+0x8>
+>   30:   e1a00002        mov     r0, r2
+>   34:   e12fff1e        bx      lr
+> 
+> which looks better and actually works. Mark all the inline
+> assembly in this file as volatile since we don't want the
+> compiler to optimize away these statements or move them around
+> in any way.
+> 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Daniel Walker <dwalker@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-I was not yet able to boot a machine with an imx28 because of a missing
-rootfs (no flash, no ethernet driver) but up to there it looks good.
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-I suggest to let Sascha take the current series to get it into the next
-merge window and to be able to start patching based on something.  (Well
-unless Russell or Sascha still have objections.)
 
-I already have a few (simple) patches; I will clean them up and send
-them in reply to this mail.
-
-My next step is to look into the fec driver to make it work on mx28, so
-if anyone already has something and wants to stop me doing duplicate
-work, please tell me.
-
-The following changes since commit 81e8d2162566379adcf4b3700f03845c62577145:
-
-  Merge branch 'irq-fixes-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/linux-2.6-tip (2010-12-07 08:14:28 -0800)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/ukl/linux-2.6.git sgu/mxs-core-v8
-
-Shawn Guo (15):
-      ARM: mxs: Add core definitions
-      ARM: mxs: Add helper definition and function
-      ARM: mxs: Add reset routines
-      ARM: mxs: Add interrupt support
-      ARM: mxs: Add low-level debug UART support
-      ARM: mxs: Add timer support
-      ARM: mxs: Add gpio support
-      ARM: mxs: Add iomux support
-      ARM: mxs: Add clock support
-      ARM: mxs: Add static memory mapping
-      ARM: mxs: Dynamically allocate duart devices
-      ARM: mxs: Dynamically allocate fec devices
-      ARM: mxs: Add initial mx23evk support
-      ARM: mxs: Add initial mx28evk support
-      ARM: mxs: Add build configuration for mxs
-
- arch/arm/Kconfig                                |   10 +
- arch/arm/Makefile                               |    1 +
- arch/arm/mach-mxs/Kconfig                       |   34 +
- arch/arm/mach-mxs/Makefile                      |   10 +
- arch/arm/mach-mxs/Makefile.boot                 |    1 +
- arch/arm/mach-mxs/clock-mx23.c                  |  526 ++++++++++++++++
- arch/arm/mach-mxs/clock-mx28.c                  |  734 +++++++++++++++++++++++
- arch/arm/mach-mxs/clock.c                       |  200 ++++++
- arch/arm/mach-mxs/devices-mx23.h                |   16 +
- arch/arm/mach-mxs/devices-mx28.h                |   20 +
- arch/arm/mach-mxs/devices.c                     |   75 +++
- arch/arm/mach-mxs/devices/Kconfig               |    5 +
- arch/arm/mach-mxs/devices/Makefile              |    2 +
- arch/arm/mach-mxs/devices/platform-duart.c      |   48 ++
- arch/arm/mach-mxs/devices/platform-fec.c        |   50 ++
- arch/arm/mach-mxs/gpio.c                        |  325 ++++++++++
- arch/arm/mach-mxs/gpio.h                        |   34 +
- arch/arm/mach-mxs/icoll.c                       |   81 +++
- arch/arm/mach-mxs/include/mach/clkdev.h         |    7 +
- arch/arm/mach-mxs/include/mach/clock.h          |   64 ++
- arch/arm/mach-mxs/include/mach/common.h         |   31 +
- arch/arm/mach-mxs/include/mach/debug-macro.S    |   38 ++
- arch/arm/mach-mxs/include/mach/devices-common.h |   46 ++
- arch/arm/mach-mxs/include/mach/entry-macro.S    |   41 ++
- arch/arm/mach-mxs/include/mach/gpio.h           |   35 ++
- arch/arm/mach-mxs/include/mach/hardware.h       |   29 +
- arch/arm/mach-mxs/include/mach/io.h             |   22 +
- arch/arm/mach-mxs/include/mach/iomux-mx23.h     |  355 +++++++++++
- arch/arm/mach-mxs/include/mach/iomux-mx28.h     |  537 +++++++++++++++++
- arch/arm/mach-mxs/include/mach/iomux.h          |  165 +++++
- arch/arm/mach-mxs/include/mach/irqs.h           |   32 +
- arch/arm/mach-mxs/include/mach/memory.h         |   24 +
- arch/arm/mach-mxs/include/mach/mx23.h           |  145 +++++
- arch/arm/mach-mxs/include/mach/mx28.h           |  188 ++++++
- arch/arm/mach-mxs/include/mach/mxs.h            |  105 ++++
- arch/arm/mach-mxs/include/mach/system.h         |   27 +
- arch/arm/mach-mxs/include/mach/timex.h          |   21 +
- arch/arm/mach-mxs/include/mach/uncompress.h     |   76 +++
- arch/arm/mach-mxs/include/mach/vmalloc.h        |   22 +
- arch/arm/mach-mxs/iomux.c                       |  101 ++++
- arch/arm/mach-mxs/mach-mx23evk.c                |   57 ++
- arch/arm/mach-mxs/mach-mx28evk.c                |  138 +++++
- arch/arm/mach-mxs/mm-mx23.c                     |   45 ++
- arch/arm/mach-mxs/mm-mx28.c                     |   45 ++
- arch/arm/mach-mxs/regs-clkctrl-mx23.h           |  455 ++++++++++++++
- arch/arm/mach-mxs/regs-clkctrl-mx28.h           |  663 ++++++++++++++++++++
- arch/arm/mach-mxs/system.c                      |  137 +++++
- arch/arm/mach-mxs/timer.c                       |  296 +++++++++
- 48 files changed, 6119 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/Kconfig
- create mode 100644 arch/arm/mach-mxs/Makefile
- create mode 100644 arch/arm/mach-mxs/Makefile.boot
- create mode 100644 arch/arm/mach-mxs/clock-mx23.c
- create mode 100644 arch/arm/mach-mxs/clock-mx28.c
- create mode 100644 arch/arm/mach-mxs/clock.c
- create mode 100644 arch/arm/mach-mxs/devices-mx23.h
- create mode 100644 arch/arm/mach-mxs/devices-mx28.h
- create mode 100644 arch/arm/mach-mxs/devices.c
- create mode 100644 arch/arm/mach-mxs/devices/Kconfig
- create mode 100644 arch/arm/mach-mxs/devices/Makefile
- create mode 100644 arch/arm/mach-mxs/devices/platform-duart.c
- create mode 100644 arch/arm/mach-mxs/devices/platform-fec.c
- create mode 100644 arch/arm/mach-mxs/gpio.c
- create mode 100644 arch/arm/mach-mxs/gpio.h
- create mode 100644 arch/arm/mach-mxs/icoll.c
- create mode 100644 arch/arm/mach-mxs/include/mach/clkdev.h
- create mode 100644 arch/arm/mach-mxs/include/mach/clock.h
- create mode 100644 arch/arm/mach-mxs/include/mach/common.h
- create mode 100644 arch/arm/mach-mxs/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-mxs/include/mach/devices-common.h
- create mode 100644 arch/arm/mach-mxs/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-mxs/include/mach/gpio.h
- create mode 100644 arch/arm/mach-mxs/include/mach/hardware.h
- create mode 100644 arch/arm/mach-mxs/include/mach/io.h
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx23.h
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx28.h
- create mode 100644 arch/arm/mach-mxs/include/mach/iomux.h
- create mode 100644 arch/arm/mach-mxs/include/mach/irqs.h
- create mode 100644 arch/arm/mach-mxs/include/mach/memory.h
- create mode 100644 arch/arm/mach-mxs/include/mach/mx23.h
- create mode 100644 arch/arm/mach-mxs/include/mach/mx28.h
- create mode 100644 arch/arm/mach-mxs/include/mach/mxs.h
- create mode 100644 arch/arm/mach-mxs/include/mach/system.h
- create mode 100644 arch/arm/mach-mxs/include/mach/timex.h
- create mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-mxs/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-mxs/iomux.c
- create mode 100644 arch/arm/mach-mxs/mach-mx23evk.c
- create mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
- create mode 100644 arch/arm/mach-mxs/mm-mx23.c
- create mode 100644 arch/arm/mach-mxs/mm-mx28.c
- create mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx23.h
- create mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx28.h
- create mode 100644 arch/arm/mach-mxs/system.c
- create mode 100644 arch/arm/mach-mxs/timer.c
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ---
+>  drivers/char/hvc_dcc.c |   11 +++++------
+>  1 files changed, 5 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/char/hvc_dcc.c b/drivers/char/hvc_dcc.c
+> index 6470f63..155ec10 100644
+> --- a/drivers/char/hvc_dcc.c
+> +++ b/drivers/char/hvc_dcc.c
+> @@ -33,8 +33,7 @@
+>  static inline u32 __dcc_getstatus(void)
+>  {
+>  	u32 __ret;
+> -
+> -	asm("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
+> +	asm volatile("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
+>  		: "=r" (__ret) : : "cc");
+>  
+>  	return __ret;
+> @@ -46,7 +45,7 @@ static inline char __dcc_getchar(void)
+>  {
+>  	char __c;
+>  
+> -	asm("get_wait:	mrc p14, 0, pc, c0, c1, 0                          \n\
+> +	asm volatile("get_wait:	mrc p14, 0, pc, c0, c1, 0                  \n\
+>  			bne get_wait                                       \n\
+>  			mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+>  		: "=r" (__c) : : "cc");
+> @@ -58,7 +57,7 @@ static inline char __dcc_getchar(void)
+>  {
+>  	char __c;
+>  
+> -	asm("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+> +	asm volatile("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+>  		: "=r" (__c));
+>  
+>  	return __c;
+> @@ -68,7 +67,7 @@ static inline char __dcc_getchar(void)
+>  #if defined(CONFIG_CPU_V7)
+>  static inline void __dcc_putchar(char c)
+>  {
+> -	asm("put_wait:	mrc p14, 0, pc, c0, c1, 0                 \n\
+> +	asm volatile("put_wait:	mrc p14, 0, pc, c0, c1, 0         \n\
+>  			bcs put_wait                              \n\
+>  			mcr p14, 0, %0, c0, c5, 0                   "
+>  	: : "r" (c) : "cc");
+> @@ -76,7 +75,7 @@ static inline void __dcc_putchar(char c)
+>  #else
+>  static inline void __dcc_putchar(char c)
+>  {
+> -	asm("mcr p14, 0, %0, c0, c5, 0	@ write a char"
+> +	asm volatile("mcr p14, 0, %0, c0, c5, 0	@ write a char"
+>  		: /* no output register */
+>  		: "r" (c));
+>  }
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
