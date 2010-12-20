@@ -1,69 +1,115 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Dec 2010 11:10:56 +0000
-Subject: [PATCH V3 39/63] GIC: Added dummy handlers for Power
-	Management Suspend Resume
-In-Reply-To: <674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
-Message-ID: <20101220111056.GB28157@n2100.arm.linux.org.uk>
+From: vishwanath.bs@ti.com (Vishwanath Sripathy)
+Date: Mon, 20 Dec 2010 16:50:30 +0530
+Subject: [PATCH 3/7] OMAP3: remove hardcoded values from the ASM sleep code
+In-Reply-To: <1292687087-22983-4-git-send-email-j-pihet@ti.com>
+References: <1292687087-22983-1-git-send-email-j-pihet@ti.com>
+	<1292687087-22983-4-git-send-email-j-pihet@ti.com>
+Message-ID: <be2c576b16eebdfc1b2b83c31b40a8dc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And still this patch gets reposted a few more times despite my
-objections:
-
-http://lists.arm.linux.org.uk/lurker/message/20100920.150749.c97eda0d.en.html
-
-On Mon, Dec 20, 2010 at 01:55:59PM +0530, Viresh Kumar wrote:
-> From: Deepak Sikri <deepak.sikri@st.com>
-> 
-> enable_irq_wake() has a callback for interrupt controllers.
-> But since gic handler did not had this call back associated, it was always
-> returning -ENXIO, which was breaking the existing drivers. This patch
-> adds dummy handlers in gic in order to avoid breaking of existing drivers.
-> 
-> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> -----Original Message-----
+> From: jean.pihet at newoldbits.com [mailto:jean.pihet at newoldbits.com]
+> Sent: Saturday, December 18, 2010 9:15 PM
+> To: linux-omap at vger.kernel.org
+> Cc: khilman at deeprootsystems.com; linux-arm-
+> kernel at lists.infradead.org; Jean Pihet; Vishwanath BS
+> Subject: [PATCH 3/7] OMAP3: remove hardcoded values from the ASM
+> sleep code
+>
+> From: Jean Pihet <j-pihet@ti.com>
+>
+> Using macros from existing include files for registers addresses.
+>
+> Tested on N900 and Beagleboard with full RET and OFF modes,
+> using cpuidle and suspend.
+>
+> Based on original patch from Vishwa.
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> Cc: Vishwanath BS <vishwanath.bs@ti.com>
+Acked-by: Vishwanath BS <vishwanath.bs@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Tested-by: Nishanth Menon <nm@ti.com>
 > ---
->  arch/arm/common/gic.c |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index e6388dc..f5561b7 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -193,6 +193,18 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
->  	chip->unmask(irq);
->  }
->  
-> +#ifdef CONFIG_PM
+>  arch/arm/mach-omap2/control.h   |    2 ++
+>  arch/arm/mach-omap2/sleep34xx.S |   29
+> ++++++++++++++++++-----------
+>  2 files changed, 20 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-
+> omap2/control.h
+> index d7911c5..72efefb 100644
+> --- a/arch/arm/mach-omap2/control.h
+> +++ b/arch/arm/mach-omap2/control.h
+> @@ -274,6 +274,8 @@
+>  #define OMAP343X_SCRATCHPAD_ROM
+> 	(OMAP343X_CTRL_BASE + 0x860)
+>  #define OMAP343X_SCRATCHPAD		(OMAP343X_CTRL_BASE +
+> 0x910)
+>  #define OMAP343X_SCRATCHPAD_ROM_OFFSET	0x19C
+> +#define OMAP343X_SCRATCHPAD_REGADDR(reg)
+> 	OMAP2_L4_IO_ADDRESS(\
+> +						OMAP343X_SCRATCHPAD +
+> reg)
+>
+>  /* AM35XX_CONTROL_IPSS_CLK_CTRL bits */
+>  #define AM35XX_USBOTG_VBUSP_CLK_SHIFT   0
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-
+> omap2/sleep34xx.S
+> index 406cd2a..8e9f38f 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -34,20 +34,27 @@
+>  #include "sdrc.h"
+>  #include "control.h"
+>
+> -#define SDRC_SCRATCHPAD_SEM_V	0xfa00291c
+> -
+> -#define PM_PREPWSTST_CORE_P	0x48306AE8
+> +/*
+> + * Registers access definitions
+> + */
+> +#define SDRC_SCRATCHPAD_SEM_OFFS	0xc
+> +#define SDRC_SCRATCHPAD_SEM_V
+> 	OMAP343X_SCRATCHPAD_REGADDR\
+> +					(SDRC_SCRATCHPAD_SEM_OFFS)
+> +#define PM_PREPWSTST_CORE_P	OMAP3430_PRM_BASE + CORE_MOD
+> +\
+> +					OMAP3430_PM_PREPWSTST
+>  #define PM_PWSTCTRL_MPU_P	OMAP3430_PRM_BASE + MPU_MOD
+> + OMAP2_PM_PWSTCTRL
+>  #define CM_IDLEST1_CORE_V
+> 	OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST1)
+>  #define CM_IDLEST_CKGEN_V	OMAP34XX_CM_REGADDR(PLL_MOD,
+> CM_IDLEST)
+> -#define SRAM_BASE_P		0x40200000
+> -#define CONTROL_STAT		0x480022F0
+> -#define CONTROL_MEM_RTA_CTRL	(OMAP343X_CTRL_BASE\
+> -					+
+> OMAP36XX_CONTROL_MEM_RTA_CTRL)
+> -#define SCRATCHPAD_MEM_OFFS	0x310 /* Move this as correct place is
+> -				       * available */
+> -#define SCRATCHPAD_BASE_P	(OMAP343X_CTRL_BASE +
+> OMAP343X_CONTROL_MEM_WKUP\
+> -						+ SCRATCHPAD_MEM_OFFS)
+> +#define SRAM_BASE_P		OMAP3_SRAM_PA
+> +#define CONTROL_STAT		OMAP343X_CTRL_BASE +
+> OMAP343X_CONTROL_STATUS
+> +#define CONTROL_MEM_RTA_CTRL	(OMAP343X_CTRL_BASE +\
 > +
-> +static int gic_set_wake(unsigned int irq, unsigned int on)
-> +{
-> +	return 0;
-> +}
+> 	OMAP36XX_CONTROL_MEM_RTA_CTRL)
 > +
-> +#else
-> +
-> +#define gic_set_wake NULL
-> +#endif
-> +
->  static struct irq_chip gic_chip = {
->  	.name		= "GIC",
->  	.ack		= gic_ack_irq,
-> @@ -202,6 +214,7 @@ static struct irq_chip gic_chip = {
->  #ifdef CONFIG_SMP
->  	.set_affinity	= gic_set_cpu,
->  #endif
-> +	.set_wake	= gic_set_wake,
->  };
->  
->  void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
-> -- 
-> 1.7.2.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +/* Move this as correct place is available */
+> +#define SCRATCHPAD_MEM_OFFS	0x310
+> +#define SCRATCHPAD_BASE_P	(OMAP343X_CTRL_BASE +\
+> +					OMAP343X_CONTROL_MEM_WKUP +\
+> +					SCRATCHPAD_MEM_OFFS)
+>  #define SDRC_POWER_V
+> 	OMAP34XX_SDRC_REGADDR(SDRC_POWER)
+>  #define SDRC_SYSCONFIG_P	(OMAP343X_SDRC_BASE +
+> SDRC_SYSCONFIG)
+>  #define SDRC_MR_0_P		(OMAP343X_SDRC_BASE +
+> SDRC_MR_0)
+> --
+> 1.7.2.3
