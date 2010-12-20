@@ -1,159 +1,42 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Mon, 20 Dec 2010 11:08:00 +0900
-Subject: [PATCH v4 2/2] sdhci-s3c: Add support no internal clock divider
-	in host controller
-In-Reply-To: <1286776076-24970-1-git-send-email-kgene.kim@samsung.com>
-References: <1286776076-24970-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTinJE0GOFbVEWNdTxwpv2Dwi6im0ipkPsf8jEhU1@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Mon, 20 Dec 2010 10:41:55 +0800
+Subject: [PATCH] Change the register name definitions for mc13783
+In-Reply-To: <20101220010330.GD3206@sortiz-mobl>
+References: <1292300416-16770-1-git-send-email-yong.shen@freescale.com>
+	<1292300416-16770-2-git-send-email-yong.shen@freescale.com>
+	<20101220010330.GD3206@sortiz-mobl>
+Message-ID: <AANLkTi=NWd6OxXfoh0ZqaE0y5bzeQjcx5kTd2U3dEUOd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Liam,
 
-Unfortunately it's not merged your tree.
-It's required for s5pc210 board. can you merge it for 37-rc6 or later?
+Could you please also add "Acked-by: Samuel Ortiz
+<sameo@linux.intel.com>" to this patch for Samuel?
 
-Thank you,
-Kyungmin Park
+Thanks
+Yong
 
-On Mon, Oct 11, 2010 at 2:47 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Jeongbae Seo <jeongbae.seo@samsung.com>
+On Mon, Dec 20, 2010 at 9:03 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> Hi Yong,
 >
-> This patch adds to support no internal clock divider in SDHCI.
-> The external clock divider can be used to make a proper clock
-> because SDHCI doesn't support internal clock divider by itself.
+> On Tue, Dec 14, 2010 at 12:20:16PM +0800, yong.shen at freescale.com wrote:
+>> From: Yong Shen <yong.shen@linaro.org>
+>>
+>> To make mc13783 and mc13892 share code, the register names should be
+>> changed to fit the new macro definitions in the comming patch.
+>>
+>> Signed-off-by: Yong Shen <yong.shen@linaro.org>
+>> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> You can add my:
 >
-> If external clock divider type is selected, some functions related
-> with clock control will be overridened by other functions.
+> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 >
-> The current clock control index is added to let you know which
-> clock bus is used for SDHCI when using overriding functions.
->
-> The checking functions is added into sdhci_s3c_consider_clock,
-> because clock divider step is different from that of host controller.
->
-> Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> Changes since v3:
-> - Modified comparision condition as per Kyungmin Park's suggestion
->
-> Changes since v2:
-> - Changed clock control method to overriding from using quirk
-> - This patch is referred from that of Jaehoon Chung's support non-standard clock setting
->
-> Changes since v1:
-> - Separated to each topic
->
-> NOTE :
-> - This patch depends on following.
-> ?[PATCH 4/5] ARM: SAMSUNG : Add clock types into platform data
->
-> ?drivers/mmc/host/sdhci-s3c.c | ? 62 ++++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 62 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index a7710f5..e7208f6 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -130,6 +130,15 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
-> ? ? ? ?if (!clksrc)
-> ? ? ? ? ? ? ? ?return UINT_MAX;
->
-> + ? ? ? /*
-> + ? ? ? ?* Clock divider's step is different as 1 from that of host controller
-> + ? ? ? ?* when 'clk_type' is S3C_SDHCI_CLK_DIV_EXTERNAL.
-> + ? ? ? ?*/
-> + ? ? ? if (ourhost->pdata->clk_type == S3C_SDHCI_CLK_DIV_EXTERNAL) {
-> + ? ? ? ? ? ? ? rate = clk_round_rate(clksrc, wanted);
-> + ? ? ? ? ? ? ? return wanted - rate;
-> + ? ? ? }
-> +
-> ? ? ? ?rate = clk_get_rate(clksrc);
->
-> ? ? ? ?for (div = 1; div < 256; div *= 2) {
-> @@ -232,6 +241,42 @@ static unsigned int sdhci_s3c_get_min_clock(struct sdhci_host *host)
-> ? ? ? ?return min;
-> ?}
->
-> +/* sdhci_cmu_get_max_clk - callback to get maximum clock frequency.*/
-> +static unsigned int sdhci_cmu_get_max_clock(struct sdhci_host *host)
-> +{
-> + ? ? ? struct sdhci_s3c *ourhost = to_s3c(host);
-> +
-> + ? ? ? return clk_round_rate(ourhost->clk_bus[ourhost->cur_clk], UINT_MAX);
-> +}
-> +
-> +/* sdhci_cmu_get_min_clock - callback to get minimal supported clock value. */
-> +static unsigned int sdhci_cmu_get_min_clock(struct sdhci_host *host)
-> +{
-> + ? ? ? struct sdhci_s3c *ourhost = to_s3c(host);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* initial clock can be in the frequency range of
-> + ? ? ? ?* 100KHz-400KHz, so we set it as max value.
-> + ? ? ? ?*/
-> + ? ? ? return clk_round_rate(ourhost->clk_bus[ourhost->cur_clk], 400000);
-> +}
-> +
-> +/* sdhci_cmu_set_clock - callback on clock change.*/
-> +static void sdhci_cmu_set_clock(struct sdhci_host *host, unsigned int clock)
-> +{
-> + ? ? ? struct sdhci_s3c *ourhost = to_s3c(host);
-> +
-> + ? ? ? /* don't bother if the clock is going off */
-> + ? ? ? if (clock == 0)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? sdhci_s3c_set_clock(host, clock);
-> +
-> + ? ? ? clk_set_rate(ourhost->clk_bus[ourhost->cur_clk], clock);
-> +
-> + ? ? ? host->clock = clock;
-> +}
-> +
-> ?static struct sdhci_ops sdhci_s3c_ops = {
-> ? ? ? ?.get_max_clock ? ? ? ? ?= sdhci_s3c_get_max_clk,
-> ? ? ? ?.set_clock ? ? ? ? ? ? ?= sdhci_s3c_set_clock,
-> @@ -361,6 +406,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->
-> ? ? ? ? ? ? ? ?clks++;
-> ? ? ? ? ? ? ? ?sc->clk_bus[ptr] = clk;
-> +
-> + ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ?* save current clock index to know which clock bus
-> + ? ? ? ? ? ? ? ?* is used later in overriding functions.
-> + ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? sc->cur_clk = ptr;
-> +
-> ? ? ? ? ? ? ? ?clk_enable(clk);
->
-> ? ? ? ? ? ? ? ?dev_info(dev, "clock source %d: %s (%ld Hz)\n",
-> @@ -427,6 +479,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
-> ? ? ? ?/* HSMMC on Samsung SoCs uses SDCLK as timeout clock */
-> ? ? ? ?host->quirks |= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
->
-> + ? ? ? /*
-> + ? ? ? ?* If controller does not have internal clock divider,
-> + ? ? ? ?* we can use overriding functions instead of default.
-> + ? ? ? ?*/
-> + ? ? ? if (pdata->clk_type) {
-> + ? ? ? ? ? ? ? sdhci_s3c_ops.set_clock = sdhci_cmu_set_clock;
-> + ? ? ? ? ? ? ? sdhci_s3c_ops.get_min_clock = sdhci_cmu_get_min_clock;
-> + ? ? ? ? ? ? ? sdhci_s3c_ops.get_max_clock = sdhci_cmu_get_max_clock;
-> + ? ? ? }
-> +
-> ? ? ? ?/* It supports additional host capabilities if needed */
-> ? ? ? ?if (pdata->host_caps)
-> ? ? ? ? ? ? ? ?host->mmc->caps |= pdata->host_caps;
-> --
-> 1.6.2.5
+> Cheers,
+> Samuel.
 >
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Intel Open Source Technology Centre
+> http://oss.intel.com/
 >
