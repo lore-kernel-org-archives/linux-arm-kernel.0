@@ -1,49 +1,63 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 20 Dec 2010 17:10:20 -0500 (EST)
-Subject: [PATCH 1/3] hvc_dcc: Fix bad code generation by marking assembly
-	volatile
-In-Reply-To: <4D0FD02E.3080901@codeaurora.org>
-References: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
-	<1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
-	<1292875718-7980-2-git-send-email-sboyd@codeaurora.org>
-	<AANLkTi=8F3keaAQ2o+V8gNncNM02c9k9=DRtd5GyP_LH@mail.gmail.com>
-	<4D0FD02E.3080901@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1012201702540.10437@xanadu.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Dec 2010 14:20:29 -0800
+Subject: [PATCHv4 0/4] ARM: Fixing udelay() for SMP and non-SMP systems
+Message-ID: <1292883633-19553-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Dec 2010, Stephen Boyd wrote:
+These patches fix the udelay() issue pointed out on
+arm-lkml[1][2]. A quick recap: some SMP machines can scale
+their CPU frequencies independent of one another. loops_per_jiffy
+is calibrated globally and used in __const_udelay(). If one CPU
+is running faster than what the loops_per_jiffy is calculated
+(or scaled) for, udelay() will be incorrect and not wait long
+enough (or too long). A similar problem occurs if the cpu
+frequency is scaled during a udelay() call.
 
-> On 12/20/2010 01:49 PM, Arnaud Lacombe wrote:
-> > Hi,
-> >
-> > On Mon, Dec 20, 2010 at 3:08 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> Without marking the asm __dcc_getstatus() volatile my compiler
-> >> decides [...]
-> > What compiler ? That might be a usefull information to know,
-> > espectially 5 years from now when tracing code history. There has been
-> > similar issue with gcc 4.5 recently. AFAIK, in the same idea, the
-> > final change has been to mark the asm volatile.
-> 
-> Sure, we can replace "my compiler" with "my compiler (arm-eabi-gcc (GCC)
-> 4.4.0)".
+We could fix this issue a couple ways, wholesale replacement
+of __udelay() and __const_udelay() (see [2] for that approach),
+or replacement of __delay() (this series). Option 1 can fail if
+anybody uses udelay() before memory is mapped and also duplicates
+most of the code in asm/delay.h. It also needs to hardcode the
+timer tick frequency, which can sometimes be inaccurate. The
+benefit is that loops_per_jiffy stays the same and thus BogoMIPS
+is unchanged.  Option 2 can't fail since the __delay() loop is
+replaced after memory is mapped in, but it suffers from a low
+BogoMIPS when timers are clocked slowly. It also more accurately
+calculates the timer tick frequency through the use of
+calibrate_delay_direct().
 
-Compiler version doesn't matter -- this is a simple correctness issue.
+-- Reference --
+[1] http://article.gmane.org/gmane.linux.kernel/977567
+[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/78496 
 
-If an inline asm statement provides an output value then the compiler is 
-free to cache that value in a register, unless the inline asm is marked 
-so that the value may change from one invocation to another.  Also, the 
-compiler is free to eliminate the inline asm statement entirely as well 
-if the output value provided by that inline asm is never used... unless 
-if the inline asm is marked as having side effects.  In both cases the 
-volatile qualifier does indicate that the returned value may change 
-(new status flag state) and 
-that the asm code therein has side effects (e.g. pop a character off a 
-FIFO).
+Changes since v3:
+ * Inlined set_delay_fn()
 
-Sometimes the desired effect can be indicated by clever usage of 
-parameter constraints, but in this case the volatile keyword is most 
-appropriate.
+Changes since v2:
+ * Additional patch using the timer based delay
 
+Changes since v1:
+ * likely() in delay.c
+ * comment fixup for read_current_timer_delay_loop()
+ * cosmetic improvements to commit text
 
-Nicolas
+Stephen Boyd (4):
+  ARM: Translate delay.S into (mostly) C
+  ARM: Allow machines to override __delay()
+  ARM: Implement a timer based __delay() loop
+  msm: timer: Migrate to timer based __delay()
+
+ arch/arm/include/asm/delay.h           |   11 ++++-
+ arch/arm/kernel/armksyms.c             |    4 --
+ arch/arm/lib/delay.S                   |   65 -------------------------
+ arch/arm/lib/delay.c                   |   81 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/timex.h |    1 +
+ arch/arm/mach-msm/timer.c              |   16 ++++++-
+ 6 files changed, 107 insertions(+), 71 deletions(-)
+ delete mode 100644 arch/arm/lib/delay.S
+ create mode 100644 arch/arm/lib/delay.c
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
