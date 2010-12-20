@@ -1,555 +1,93 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:55:53 +0530
-Subject: [PATCH V3 33/63] ST SPEAr 13xx : Adding support for SPEAr1310
+Date: Mon, 20 Dec 2010 13:55:49 +0530
+Subject: [PATCH V3 29/63] ST SPEAr: Changing resource size of amba devices to
+	SZ_4K
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <d4da45edd2f0285977e8ab071de5fb69c0312f9c.1292833228.git.viresh.kumar@st.com>
+Message-ID: <2fa3f3b8ba7498dc8fc09962f4631ded0621ff69.1292833228.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bhupesh Sharma <bhupesh.sharma@st.com>
-
-This patch adds support for SPEAr1310 Machine and evaluation board
-
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/Makefile                                |    1 +
- arch/arm/configs/spear13xx_defconfig             |    1 +
- arch/arm/mach-spear13xx/Kconfig                  |   11 ++
- arch/arm/mach-spear13xx/Makefile                 |    6 +
- arch/arm/mach-spear13xx/include/mach/generic.h   |   21 +++-
- arch/arm/mach-spear13xx/include/mach/irqs.h      |   37 ++++++
- arch/arm/mach-spear13xx/include/mach/spear.h     |    1 +
- arch/arm/mach-spear13xx/include/mach/spear1310.h |   31 +++++
- arch/arm/mach-spear13xx/spear1310.c              |   62 +++++++++
- arch/arm/mach-spear13xx/spear1310_evb.c          |  148 ++++++++++++++++++++++
- arch/arm/mach-spear3xx/include/mach/generic.h    |    2 +
- arch/arm/mach-spear3xx/spear320.c                |   37 ++++++
- arch/arm/mach-spear3xx/spear320_evb.c            |    2 +
- arch/arm/plat-spear/Makefile                     |    1 +
- 14 files changed, 358 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1310.h
- create mode 100644 arch/arm/mach-spear13xx/spear1310.c
- create mode 100644 arch/arm/mach-spear13xx/spear1310_evb.c
+ arch/arm/mach-spear3xx/spear300.c |    2 +-
+ arch/arm/mach-spear3xx/spear320.c |    2 +-
+ arch/arm/mach-spear3xx/spear3xx.c |    2 +-
+ arch/arm/mach-spear6xx/spear6xx.c |    8 +++-----
+ 4 files changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 39f0e93..3eec793 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -193,6 +193,7 @@ machine-$(CONFIG_ARCH_W90X900)		:= w90x900
- machine-$(CONFIG_ARCH_NUC93X)		:= nuc93x
- machine-$(CONFIG_FOOTBRIDGE)		:= footbridge
- machine-$(CONFIG_MACH_SPEAR1300)	:= spear13xx
-+machine-$(CONFIG_MACH_SPEAR1310)	:= spear13xx
- machine-$(CONFIG_MACH_SPEAR300)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR310)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-index 10b1cf5..9f3baf8 100644
---- a/arch/arm/configs/spear13xx_defconfig
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -9,6 +9,7 @@ CONFIG_MODVERSIONS=y
- CONFIG_PLAT_SPEAR=y
- CONFIG_ARCH_SPEAR13XX=y
- CONFIG_BOARD_SPEAR1300_EVB=y
-+CONFIG_BOARD_SPEAR1310_EVB=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_AEABI=y
-diff --git a/arch/arm/mach-spear13xx/Kconfig b/arch/arm/mach-spear13xx/Kconfig
-index 3ea463d..229ef93 100644
---- a/arch/arm/mach-spear13xx/Kconfig
-+++ b/arch/arm/mach-spear13xx/Kconfig
-@@ -11,6 +11,12 @@ config BOARD_SPEAR1300_EVB
- 	help
- 	  Supports ST SPEAr1300 Evaluation Board
- 
-+config BOARD_SPEAR1310_EVB
-+	bool "SPEAr1310 Evaluation Board"
-+	select MACH_SPEAR1310
-+	help
-+	  Supports ST SPEAr1310 Evaluation Board
-+
- endmenu
- 
- config MACH_SPEAR1300
-@@ -18,4 +24,9 @@ config MACH_SPEAR1300
- 	help
- 	  Supports ST SPEAr1300 Machine
- 
-+config MACH_SPEAR1310
-+	bool "SPEAr1310"
-+	help
-+	  Supports ST SPEAr1310 Machine
-+
- endif #ARCH_SPEAR13XX
-diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
-index 4f1cbc5..838405a 100644
---- a/arch/arm/mach-spear13xx/Makefile
-+++ b/arch/arm/mach-spear13xx/Makefile
-@@ -13,3 +13,9 @@ obj-$(CONFIG_MACH_SPEAR1300)		+= spear1300.o
- 
- # spear1300 boards files
- obj-$(CONFIG_BOARD_SPEAR1300_EVB)	+= spear1300_evb.o
-+
-+# spear1310 specific files
-+obj-$(CONFIG_MACH_SPEAR1310)		+= spear1310.o
-+
-+# spear1310 boards files
-+obj-$(CONFIG_BOARD_SPEAR1310_EVB)	+= spear1310_evb.o
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index b636df5..2cdd17d 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -43,17 +43,32 @@ extern struct platform_device spear13xx_rtc_device;
- extern struct platform_device spear13xx_sdhci_device;
- extern struct sys_timer spear13xx_timer;
- 
--/* Add spear1300 machine device structure declarations here */
--
- /* Add spear13xx family function declarations here */
- void __init clk_init(void);
- void __init i2c_register_board_devices(void);
- void __init spear_setup_timer(void);
--void __init spear1300_init(void);
- void __init spear13xx_map_io(void);
- void __init spear13xx_init_irq(void);
- void __init spear13xx_init(void);
- void __init nand_mach_init(u32 busw);
- void spear13xx_secondary_startup(void);
- 
-+/* spear1300 declarations */
-+#ifdef CONFIG_MACH_SPEAR1300
-+/* Add spear1300 machine function declarations here */
-+void __init spear1300_init(void);
-+
-+#endif /* CONFIG_MACH_SPEAR1300 */
-+
-+/* spear1310 declarations */
-+#ifdef CONFIG_MACH_SPEAR1310
-+/* Add spear1310 machine device structure declarations here */
-+extern struct platform_device spear1310_can0_device;
-+extern struct platform_device spear1310_can1_device;
-+
-+/* Add spear1310 machine function declarations here */
-+void __init spear1310_init(void);
-+
-+#endif /* CONFIG_MACH_SPEAR1310 */
-+
- #endif /* __MACH_GENERIC_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
-index d2bfbb1..1ca70a6 100644
---- a/arch/arm/mach-spear13xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
-@@ -5,6 +5,7 @@
-  *
-  * Copyright (C) 2010 ST Microelectronics
-  * Shiraz Hashim <shiraz.hashim@st.com>
-+ * Bhupesh Sharma <bhupesh.sharma@st.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2. This program is licensed "as is" without any
-@@ -84,6 +85,42 @@
- #define IRQ_PCIE1		(IRQ_SHPI_START + 69)
- #define IRQ_PCIE2		(IRQ_SHPI_START + 70)
- 
-+/* Add spear1310 specific IRQs here */
-+#ifdef CONFIG_MACH_SPEAR1310
-+#define IRQ_FSMC_PC1		(IRQ_SHPI_START + 76)
-+#define IRQ_FSMC_PC2		(IRQ_SHPI_START + 77)
-+#define IRQ_FSMC_PC3		(IRQ_SHPI_START + 78)
-+#define IRQ_FSMC_PC4		(IRQ_SHPI_START + 79)
-+#define IRQ_RS4850		(IRQ_SHPI_START + 80)
-+#define IRQ_RS4851		(IRQ_SHPI_START + 81)
-+#define IRQ_CCAN0		(IRQ_SHPI_START + 82)
-+#define IRQ_CCAN1		(IRQ_SHPI_START + 83)
-+#define IRQ_TDM0		(IRQ_SHPI_START + 84)
-+#define IRQ_TDM1		(IRQ_SHPI_START + 85)
-+#define IRQ_UART0		(IRQ_SHPI_START + 86)
-+#define IRQ_UART1		(IRQ_SHPI_START + 87)
-+#define IRQ_UART2		(IRQ_SHPI_START + 88)
-+#define IRQ_UART3		(IRQ_SHPI_START + 89)
-+#define IRQ_UART4		(IRQ_SHPI_START + 90)
-+#define IRQ_I2C_CNTR		(IRQ_SHPI_START + 91)
-+#define IRQ_GMAC0_SBD		(IRQ_SHPI_START + 92)
-+#define IRQ_GMAC0_PMT		(IRQ_SHPI_START + 93)
-+#define IRQ_GMAC1_SBD		(IRQ_SHPI_START + 94)
-+#define IRQ_GMAC1_PMT		(IRQ_SHPI_START + 95)
-+#define IRQ_GMAC2_SBD		(IRQ_SHPI_START + 96)
-+#define IRQ_GMAC2_PMT		(IRQ_SHPI_START + 97)
-+#define IRQ_GMAC3_SBD		(IRQ_SHPI_START + 98)
-+#define IRQ_GMAC3_PMT		(IRQ_SHPI_START + 99)
-+#define IRQ_GPIO		(IRQ_SHPI_START + 100)
-+#define IRQ_PCI_BRDG_HOST_FATAL (IRQ_SHPI_START + 101)
-+#define IRQ_PCI_INTA		(IRQ_SHPI_START + 102)
-+#define IRQ_PCI_INTB		(IRQ_SHPI_START + 103)
-+#define IRQ_PCI_INTC		(IRQ_SHPI_START + 104)
-+#define IRQ_PCI_INTD		(IRQ_SHPI_START + 105)
-+#define IRQ_PCI_ME_TO_ARM	(IRQ_SHPI_START + 106)
-+#define IRQ_PCI_SERR_TO_ARM	(IRQ_SHPI_START + 107)
-+#endif /* CONFIG_MACH_SPEAR1310 */
-+
- #define IRQ_GIC_END		(IRQ_SHPI_START + 128)
- 
- #define VIRQ_START		IRQ_GIC_END
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
-index 1a1af72..cf25eb5 100644
---- a/arch/arm/mach-spear13xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear13xx/include/mach/spear.h
-@@ -16,6 +16,7 @@
- 
- #include <asm/memory.h>
- #include <mach/spear1300.h>
-+#include <mach/spear1310.h>
- 
- #define SPEAR13XX_L2CC_BASE		UL(0xED000000)
- 
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear1310.h b/arch/arm/mach-spear13xx/include/mach/spear1310.h
-new file mode 100644
-index 0000000..e57c99a
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/include/mach/spear1310.h
-@@ -0,0 +1,31 @@
-+/*
-+ * arch/arm/mach-spear13xx/include/mach/spear1310.h
-+ *
-+ * SPEAr1310 Machine specific definition
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Bhupesh Sharma <bhupesh.sharma@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifdef CONFIG_MACH_SPEAR1310
-+
-+#ifndef __MACH_SPEAR1310_H
-+#define __MACH_SPEAR1310_H
-+
-+#define SPEAR1310_CAN0_BASE		UL(0x6DA00000)
-+#define SPEAR1310_CAN1_BASE		UL(0x6DB00000)
-+#define SPEAR1310_RAS_BASE		UL(0x6C800000)
-+
-+/* RAS Area Control Register */
-+#define SPEAR1310_RAS_CTRL_REG0		(SPEAR1310_RAS_BASE + 0x0)
-+#define SPEAR1310_RAS_CTRL_REG1		(SPEAR1310_RAS_BASE + 0x4)
-+#define SPEAR1310_PHY_CLK_MASK		0xF
-+#define SPEAR1310_PHY_CLK_SHIFT		0
-+
-+#endif /* __MACH_SPEAR1310_H */
-+
-+#endif /* CONFIG_MACH_SPEAR1310 */
-diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
-new file mode 100644
-index 0000000..648dabc
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/spear1310.c
-@@ -0,0 +1,62 @@
-+/*
-+ * arch/arm/mach-spear13xx/spear1310.c
-+ *
-+ * SPEAr1310 machine source file
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Bhupesh Sharma <bhupesh.sharma@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/ptrace.h>
-+#include <asm/irq.h>
-+#include <mach/generic.h>
-+#include <mach/hardware.h>
-+
-+/* Add spear1310 specific devices here */
-+
-+/* CAN device registeration */
-+static struct resource can0_resources[] = {
-+	{
-+		.start = SPEAR1310_CAN0_BASE,
-+		.end = SPEAR1310_CAN0_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_CCAN0,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device spear1310_can0_device = {
-+	.name = "spear_can",
-+	.id = 0,
-+	.num_resources = ARRAY_SIZE(can0_resources),
-+	.resource = can0_resources,
-+};
-+
-+static struct resource can1_resources[] = {
-+	{
-+		.start = SPEAR1310_CAN1_BASE,
-+		.end = SPEAR1310_CAN1_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_CCAN1,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device spear1310_can1_device = {
-+	.name = "spear_can",
-+	.id = 1,
-+	.num_resources = ARRAY_SIZE(can1_resources),
-+	.resource = can1_resources,
-+};
-+
-+void __init spear1310_init(void)
-+{
-+	/* call spear13xx family common init function */
-+	spear13xx_init();
-+}
-diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c b/arch/arm/mach-spear13xx/spear1310_evb.c
-new file mode 100644
-index 0000000..0c190b7
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/spear1310_evb.c
-@@ -0,0 +1,148 @@
-+/*
-+ * arch/arm/mach-spear13xx/spear1310_evb.c
-+ *
-+ * SPEAr1310 evaluation board source file
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Bhupesh Sharma <bhupesh.sharma@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/gpio.h>
-+#include <linux/mtd/nand.h>
-+#include <linux/mtd/fsmc.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/spi.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+#include <mach/generic.h>
-+#include <mach/spear.h>
-+#include <mach/pcie.h>
-+#include <plat/keyboard.h>
-+#include <plat/fsmc.h>
-+#include <plat/spi.h>
-+
-+static struct amba_device *amba_devs[] __initdata = {
-+	/* spear13xx specific devices */
-+	&spear13xx_gpio_device[0],
-+	&spear13xx_gpio_device[1],
-+	&spear13xx_ssp_device,
-+	&spear13xx_uart_device,
-+};
-+
-+static struct platform_device *plat_devs[] __initdata = {
-+	/* spear13xx specific devices */
-+	&spear13xx_ehci0_device,
-+	&spear13xx_ehci1_device,
-+	&spear13xx_i2c_device,
-+	&spear13xx_kbd_device,
-+	&spear13xx_nand_device,
-+	&spear13xx_ohci0_device,
-+	&spear13xx_ohci1_device,
-+	&spear13xx_rtc_device,
-+	&spear13xx_sdhci_device,
-+
-+	/* spear1310 specific devices */
-+	&spear1310_can0_device,
-+	&spear1310_can1_device,
-+};
-+
-+/* keyboard specific platform data */
-+static DECLARE_KEYMAP(keymap);
-+static struct matrix_keymap_data keymap_data = {
-+	.keymap = keymap,
-+	.keymap_size = ARRAY_SIZE(keymap),
-+};
-+
-+static struct kbd_platform_data kbd_data = {
-+	.keymap = &keymap_data,
-+	.rep = 1,
-+};
-+
-+static struct spi_board_info __initdata spi_board_info[] = {
-+};
-+
-+static void __init spi_init(void)
-+{
-+	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
-+}
-+
-+#ifdef CONFIG_PCIEPORTBUS
-+/* this function is needed for PCIE host and device driver. Same
-+ * controller can not be programmed as host as well as device. So host
-+ * driver must call this function and if this function returns 1 then
-+ * only host should add that particular port as RC.
-+ * A port to be added as device, one must also add device's information
-+ * in plat_devs array defined in this file.
-+ * it is the responsibility of calling function to not send port number
-+ * greter than max no of controller(3)
-+ */
-+int spear1310_pcie_port_is_host(int port)
-+{
-+	switch (port) {
-+	case 0:
-+		return 0;
-+	case 1:
-+		return 1;
-+	case 2:
-+		return 1;
-+	}
-+	return -EINVAL;
-+}
-+#endif
-+
-+static void __init spear1310_evb_init(void)
-+{
-+	unsigned int i;
-+
-+	/* set keyboard plat data */
-+	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
-+
-+	/* set nand device's plat data */
-+	fsmc_nand_set_plat_data(&spear13xx_nand_device, NULL, 0,
-+			NAND_SKIP_BBTSCAN, FSMC_NAND_BW8);
-+	nand_mach_init(FSMC_NAND_BW8);
-+
-+	/* call spear1310 machine init function */
-+	spear1310_init();
-+
-+	/* Register slave devices on the I2C buses */
-+	i2c_register_board_devices();
-+
-+	/* initialize fsmc related data in fsmc plat data */
-+	fsmc_init_board_info(&spear13xx_fsmc_nor_device, partition_info,
-+			ARRAY_SIZE(partition_info), FSMC_FLASH_WIDTH8);
-+	fsmc_init_board_info(&spear1310_ras_fsmc_nor_device, NULL,
-+			0, FSMC_FLASH_WIDTH16);
-+
-+	/* Initialize fsmc regiters */
-+	fsmc_nor_init(&spear13xx_fsmc_nor_device, SPEAR13XX_FSMC_BASE, 0,
-+			FSMC_FLASH_WIDTH8);
-+
-+#ifdef CONFIG_PCIEPORTBUS
-+	/* Enable PCIE0 clk */
-+	enable_pcie0_clk();
-+	pcie_init(&spear1310_pcie_port_is_host);
-+#endif
-+
-+	/* Add Platform Devices */
-+	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-+
-+	/* Add Amba Devices */
-+	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
-+		amba_device_register(amba_devs[i], &iomem_resource);
-+
-+	spi_init();
-+}
-+
-+MACHINE_START(SPEAR1310, "ST-SPEAR1310-EVB")
-+	.boot_params	=	0x00000100,
-+	.map_io		=	spear13xx_map_io,
-+	.init_irq	=	spear13xx_init_irq,
-+	.timer		=	&spear13xx_timer,
-+	.init_machine	=	spear1310_evb_init,
-+MACHINE_END
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index e29648d..5da1fc5 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -188,6 +188,8 @@ extern struct amba_device clcd_device;
- extern struct amba_device ssp_device[];
- extern struct amba_device uart1_device;
- extern struct amba_device uart2_device;
-+extern struct platform_device can0_device;
-+extern struct platform_device can1_device;
- extern struct platform_device i2c1_device;
- extern struct platform_device nand_device;
- extern struct platform_device plgpio_device;
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 66fd6e2..59b87cd 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -382,7 +382,7 @@ struct amba_device clcd_device = {
+ 	},
+ 	.res = {
+ 		.start = SPEAR300_CLCD_BASE,
+-		.end = SPEAR300_CLCD_BASE + SPEAR300_CLCD_SIZE - 1,
++		.end = SPEAR300_CLCD_BASE + SZ_4K - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	.dma_mask = ~0,
 diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index a935c14..b595741 100644
+index 56261a6..dffbebc 100644
 --- a/arch/arm/mach-spear3xx/spear320.c
 +++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -480,6 +480,43 @@ static struct plgpio_platform_data plgpio_plat_data = {
- 	.gpio_count = SPEAR_PLGPIO_COUNT,
- };
- 
-+/* CAN device registeration */
-+static struct resource can0_resources[] = {
-+	{
-+		.start = SPEAR320_CAN0_BASE,
-+		.end = SPEAR320_CAN0_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = VIRQ_CANU,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device can0_device = {
-+	.name = "spear_can",
-+	.id = 0,
-+	.num_resources = ARRAY_SIZE(can0_resources),
-+	.resource = can0_resources,
-+};
-+
-+static struct resource can1_resources[] = {
-+	{
-+		.start = SPEAR320_CAN1_BASE,
-+		.end = SPEAR320_CAN1_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = VIRQ_CANL,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device can1_device = {
-+	.name = "spear_can",
-+	.id = 1,
-+	.num_resources = ARRAY_SIZE(can1_resources),
-+	.resource = can1_resources,
-+};
-+
- /* i2c1 device registeration */
- static struct resource i2c1_resources[] = {
- 	{
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 031c307..7c510cf 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -65,6 +65,8 @@ static struct platform_device *plat_devs[] __initdata = {
- 	&rtc_device,
- 
- 	/* spear320 specific devices */
-+	&can0_device,
-+	&can1_device,
- 	&i2c1_device,
- 	&plgpio_device,
- 	&pwm_device,
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 0e29587..37a61cc 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
- obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
- 
-+obj-$(CONFIG_BOARD_SPEAR1310_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR1300_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR300_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR310_EVB)	+= i2c_eval_board.o
+@@ -399,7 +399,7 @@ struct amba_device clcd_device = {
+ 	},
+ 	.res = {
+ 		.start = SPEAR320_CLCD_BASE,
+-		.end = SPEAR320_CLCD_BASE + SPEAR320_CLCD_SIZE - 1,
++		.end = SPEAR320_CLCD_BASE + SZ_4K - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	.dma_mask = ~0,
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 1444604..d0c3570 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -79,7 +79,7 @@ struct amba_device uart_device = {
+ 	},
+ 	.res = {
+ 		.start = SPEAR3XX_ICM1_UART_BASE,
+-		.end = SPEAR3XX_ICM1_UART_BASE + SPEAR3XX_ICM1_UART_SIZE - 1,
++		.end = SPEAR3XX_ICM1_UART_BASE + SZ_4K - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	.irq = {IRQ_UART, NO_IRQ},
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index bbd5078..6a69556 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -35,7 +35,7 @@ struct amba_device clcd_device = {
+ 	},
+ 	.res = {
+ 		.start = SPEAR6XX_ICM3_CLCD_BASE,
+-		.end = SPEAR6XX_ICM3_CLCD_BASE + SPEAR6XX_ICM3_CLCD_SIZE - 1,
++		.end = SPEAR6XX_ICM3_CLCD_BASE + SZ_4K - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	.dma_mask = ~0,
+@@ -117,8 +117,7 @@ struct amba_device uart_device[] = {
+ 		},
+ 		.res = {
+ 			.start = SPEAR6XX_ICM1_UART0_BASE,
+-			.end = SPEAR6XX_ICM1_UART0_BASE +
+-				SPEAR6XX_ICM1_UART0_SIZE - 1,
++			.end = SPEAR6XX_ICM1_UART0_BASE + SZ_4K - 1,
+ 			.flags = IORESOURCE_MEM,
+ 		},
+ 		.irq = {IRQ_UART_0, NO_IRQ},
+@@ -128,8 +127,7 @@ struct amba_device uart_device[] = {
+ 		},
+ 		.res = {
+ 			.start = SPEAR6XX_ICM1_UART1_BASE,
+-			.end = SPEAR6XX_ICM1_UART1_BASE +
+-				SPEAR6XX_ICM1_UART1_SIZE - 1,
++			.end = SPEAR6XX_ICM1_UART1_BASE + SZ_4K - 1,
+ 			.flags = IORESOURCE_MEM,
+ 		},
+ 		.irq = {IRQ_UART_1, NO_IRQ},
 -- 
 1.7.2.2
