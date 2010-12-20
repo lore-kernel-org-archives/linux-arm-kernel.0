@@ -1,59 +1,125 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 20 Dec 2010 11:48:42 +0100
-Subject: [PATCH 4/9] fb: export fb mode db table
+Date: Mon, 20 Dec 2010 11:48:44 +0100
+Subject: [PATCH 6/9] ARM i.MX51: Add IPU device support
 In-Reply-To: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
 References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1292842127-21406-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1292842127-21406-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The different modes can be useful for drivers. Currently there is
-no way to expose the modes to sysfs, so export them.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/video/modedb.c |    7 ++++++-
- include/linux/fb.h     |    3 +++
- 2 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx5/devices-imx51.h               |    4 ++
+ arch/arm/plat-mxc/devices/Kconfig               |    4 ++
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-imx_ipuv3.c  |   47 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   10 +++++
+ 5 files changed, 66 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
 
-diff --git a/drivers/video/modedb.c b/drivers/video/modedb.c
-index 0a4dbdc..82122a9 100644
---- a/drivers/video/modedb.c
-+++ b/drivers/video/modedb.c
-@@ -36,7 +36,7 @@ EXPORT_SYMBOL_GPL(fb_mode_option);
-      *  Standard video mode definitions (taken from XFree86)
-      */
- 
--static const struct fb_videomode modedb[] = {
-+const struct fb_videomode modedb[] = {
-     {
- 	/* 640x400 @ 70 Hz, 31.5 kHz hsync */
- 	NULL, 70, 640, 400, 39721, 40, 24, 39, 9, 96, 2,
-@@ -277,6 +277,11 @@ static const struct fb_videomode modedb[] = {
-     },
- };
- 
-+const struct fb_videomode *fb_modes = modedb;
-+EXPORT_SYMBOL(fb_modes);
-+const int num_fb_modes = ARRAY_SIZE(modedb);
-+EXPORT_SYMBOL(num_fb_modes);
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+index 6302e46..851c114 100644
+--- a/arch/arm/mach-mx5/devices-imx51.h
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -47,3 +47,7 @@ extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
+ extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data[] __initconst;
+ #define imx51_add_imx2_wdt(id, pdata)	\
+ 	imx_add_imx2_wdt(&imx51_imx2_wdt_data[id])
 +
- #ifdef CONFIG_FB_MODE_HELPERS
- const struct fb_videomode vesa_modes[] = {
- 	/* 0 640x350-85 VESA */
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index d1631d3..e006172 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -1151,6 +1151,9 @@ struct fb_videomode {
- extern const char *fb_mode_option;
- extern const struct fb_videomode vesa_modes[];
++extern const struct imx_ipuv3_data imx51_ipuv3_data __initconst;
++#define imx51_add_ipuv3(pdata)	\
++	imx_add_ipuv3(&imx51_ipuv3_data, pdata)
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index 2537166..262d9c5 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -71,3 +71,7 @@ config IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
  
-+extern const struct fb_videomode *fb_modes;
-+extern const int num_fb_modes;
+ config IMX_HAVE_PLATFORM_SPI_IMX
+ 	bool
 +
- struct fb_modelist {
- 	struct list_head list;
- 	struct fb_videomode mode;
++config IMX_HAVE_PLATFORM_IMX_IPUV3
++	bool
++
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 75cd2ec..0a6be0a 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -22,3 +22,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_IPUV3) +=  platform-imx_ipuv3.o
+diff --git a/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
+new file mode 100644
+index 0000000..2c6b913
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++
++#define imx51_ipuv3_data_entry_single(soc)				\
++	{								\
++		.iobase = soc ## _IPU_CTRL_BASE_ADDR,			\
++		.irq_err = soc ## _INT_IPU_ERR,				\
++		.irq = soc ## _INT_IPU_SYN,				\
++	}
++
++#ifdef CONFIG_SOC_IMX51
++const struct imx_ipuv3_data imx51_ipuv3_data __initconst =
++	imx51_ipuv3_data_entry_single(MX51);
++#endif /* ifdef CONFIG_SOC_IMX35 */
++
++struct platform_device *__init imx_add_ipuv3(
++		const struct imx_ipuv3_data *data,
++		const struct imx_ipuv3_platform_data *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = data->iobase,
++			.end = data->iobase + SZ_512M - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = data->irq_err,
++			.end = data->irq_err,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq,
++			.end = data->irq,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
++	return imx_add_platform_device("imx-ipuv3", -1,
++			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
++}
++
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 8658c9c..8f5197f 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -264,3 +264,13 @@ struct imx_spi_imx_data {
+ struct platform_device *__init imx_add_spi_imx(
+ 		const struct imx_spi_imx_data *data,
+ 		const struct spi_imx_master *pdata);
++
++#include <mach/ipu-v3.h>
++struct imx_ipuv3_data {
++	resource_size_t iobase;
++	resource_size_t irq_err;
++	resource_size_t irq;
++};
++struct platform_device *__init imx_add_ipuv3(
++		const struct imx_ipuv3_data *data,
++		const struct imx_ipuv3_platform_data *pdata);
 -- 
 1.7.2.3
