@@ -1,49 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Dec 2010 11:49:48 +0000
-Subject: [PATCH V3 39/63] GIC: Added dummy handlers for Power Management
-	Suspend Resume
-In-Reply-To: <4D0F3EC1.5030207@st.com>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
-	<20101220111056.GB28157@n2100.arm.linux.org.uk>
-	<4D0F3EC1.5030207@st.com>
-Message-ID: <20101220114948.GC28157@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 20 Dec 2010 12:50:59 +0100
+Subject: [PATCH v7 05/15] ARM: mxs: Add low-level debug UART support
+In-Reply-To: <1292679575-2635-4-git-send-email-shawn.guo@freescale.com>
+References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
+	<1292679575-2635-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101220115059.GA8885@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 05:02:17PM +0530, viresh kumar wrote:
-> On 12/20/2010 04:40 PM, Russell King - ARM Linux wrote:
-> > And still this patch gets reposted a few more times despite my
-> > objections:
-> > 
-> > http://lists.arm.linux.org.uk/lurker/message/20100920.150749.c97eda0d.en.html
+Hi Shawn,
+
+I discovered this weekend that the DUART is just an amba-pl011 which
+is already supported in mainline. So we should use the existing
+infrastructure here.
+
+On Sat, Dec 18, 2010 at 09:39:29PM +0800, Shawn Guo wrote:
+
+>  - DEBUG_LL support, which is incompatible with multi-soc MXS image
+>    because of different DUART base address on MX23 and MX28
+
+We should be able to use the AMBA identification signature to distinguish at
+runtime, no?
+
+>  - uncompress message support
 > 
-> Russell,
-> 
-> Actually, when we discussed all this, we didn't came to any conclusion,
-> and so i asked you: should we go ahead with this patch or drop it?
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-Yes, I didn't bother replying any further because it seemed that no one
-was listening to me.
+>  arch/arm/mach-mxs/include/mach/debug-macro.S |   52 ++++++++++++++++++
 
-I think over the four or five emails my position on the patch was pretty
-clear: I do _not_ like it one bit, and I still do not like it.
+We should use asm/hardware/debug-pl01x.S, like the other users:
 
-It is a hack, plain and simple.  You're adding code to misrepresent what
-the hardware can do.  You're fooling the system into thinking that the
-GIC can control wake-up sources, when in fact the GIC has zero wakeup
-capabilities what so ever.
+wsa at katana:~/Kernel/linux-2.6/arch/arm$ g debug-pl01x
+include/asm/hardware/debug-pl01x.S:1:/* arch/arm/include/asm/hardware/debug-pl01x.S
+mach-cns3xxx/include/mach/debug-macro.S:19:#include <asm/hardware/debug-pl01x.S>
+mach-ep93xx/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
+mach-integrator/include/mach/debug-macro.S:20:#include <asm/hardware/debug-pl01x.S>
+mach-nomadik/include/mach/debug-macro.S:20:#include <asm/hardware/debug-pl01x.S>
+mach-realview/include/mach/debug-macro.S:42:#include <asm/hardware/debug-pl01x.S>
+mach-u300/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
+mach-ux500/include/mach/debug-macro.S:26:#include <asm/hardware/debug-pl01x.S>
+mach-versatile/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
+mach-vexpress/include/mach/debug-macro.S:21:#include <asm/hardware/debug-pl01x.S>
 
-As I pointed out in the message above, if you do this, then drivers have
-NO WAY to detect whether the interrupt controller they're connected to
-is wake-up capable or not.
 
-http://lists.arm.linux.org.uk/lurker/message/20100920.134808.634d6ea1.en.html
+>  arch/arm/mach-mxs/include/mach/uncompress.h  |   76 ++++++++++++++++++++++++++
 
-I still don't know what your driver code looks like, yet I've given you
-a suggestion to solve your problem in a subsequent reply (see the URL
-at the top of this message) which never really got a reply from you.
+Auto-detection could be used here, too?
 
-It seems to me that as soon as I asked for driver code, ST lost all
-interest in discussing the issue any further, as there was no further
-technical discussion coming from _any_ ST people.
+Kind regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101220/da1846e6/attachment.sig>
