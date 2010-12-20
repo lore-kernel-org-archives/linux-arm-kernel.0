@@ -1,60 +1,53 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 20 Dec 2010 10:44:09 +0100
-Subject: [PATCH v7 08/15] ARM: mxs: Add iomux support
-In-Reply-To: <1292679575-2635-7-git-send-email-shawn.guo@freescale.com>
+Date: Mon, 20 Dec 2010 10:48:01 +0100
+Subject: [PATCH v7 13/15] ARM: mxs: Add initial mx23evk support
+In-Reply-To: <1292679575-2635-9-git-send-email-shawn.guo@freescale.com>
 References: <1292679575-2635-1-git-send-email-shawn.guo@freescale.com>
-	<1292679575-2635-7-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101220094409.GT1940@pengutronix.de>
+	<1292679575-2635-9-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101220094801.GU1940@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn
+Hello Shawn,
 
-On Sat, Dec 18, 2010 at 09:39:32PM +0800, Shawn Guo wrote:
-> MXS-based SoCs implements iomux functions in block PINCTRL.
+On Sat, Dec 18, 2010 at 09:39:34PM +0800, Shawn Guo wrote:
+> Add initial mx23evk support with duart.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
-> [...]
-> diff --git a/arch/arm/mach-mxs/iomux.c b/arch/arm/mach-mxs/iomux.c
+> Changes for v7:
+>  - Define mx23evk pads using naked pad "OR" mA/vol/pull configurations
+> 
+> Changes for v3:
+>  - Remove inclusion of hardware.h
+>  - Add __initconst for mx23evk_pads[]
+> 
+> Changes for v2:
+>  - Remove boot_params
+> 
+>  arch/arm/mach-mxs/mach-mx23evk.c |   59 ++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 59 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/mach-mx23evk.c
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
 > new file mode 100644
-> index 0000000..8c8cbf2
+> index 0000000..2aa77cc
 > --- /dev/null
-> +++ b/arch/arm/mach-mxs/iomux.c
-> @@ -0,0 +1,101 @@
-> +[...]
-> +/*
-> + * configures a single pad in the iomuxer
-> + */
-> +int mxs_iomux_setup_pad(iomux_cfg_t pad)
-> +{
-> +	u32 reg, ofs, bp, bm;
-> +	void __iomem *iomux_base = MXS_IO_ADDRESS(MXS_PINCTRL_BASE_ADDR);
-> +
-> +	/* muxsel */
-> +	ofs = 0x100;
-> +	ofs += PAD_BANK(pad) * 0x20 + PAD_PIN(pad) / 16 * 0x10;
-> +	bp = PAD_PIN(pad) % 16 * 2;
-> +	bm = 0x3 << bp;
-> +	reg = __raw_readl(iomux_base + ofs);
-> +	reg &= ~bm;
-> +	reg |= PAD_MUXSEL(pad) << bp;
-> +	__raw_writel(reg, iomux_base + ofs);
-> +
-> +	/* drive */
-> +	ofs = cpu_is_mx23() ? 0x200 : 0x300;
-> +	ofs += PAD_BANK(pad) * 0x40 + PAD_PIN(pad) / 8 * 0x10;
-> +	/* mA */
-> +	if (PAD_MA_VALID(pad)) {
-> +		bp = PAD_PIN(pad) % 8 * 4;
-> +		bm = 0x3 << bp;
-> +		reg = __raw_readl(iomux_base + ofs);
-> +		reg &= ~bm;
-> +		reg |= PAD_MA(pad)  << bp;
-s/  / /
-This wasn't here before
+> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+> @@ -0,0 +1,59 @@
+> [...]
+> +static const iomux_cfg_t mx23evk_pads[] __initconst = {
+> +	/* duart */
+> +	MX23_PAD_PWM0__DUART_RX |
+> +		MXS_PAD_4MA,
+> +	MX23_PAD_PWM1__DUART_TX |
+> +		MXS_PAD_4MA,
+> +};
+I would keep these on a single line.  YMMV, so for me no need for a v8.
 
-I'm not sure if this is worth a v8.
+I will test this series later on hardware, and if no show stoppers
+appear I'd say this is ready to be merged.  The (maybe) remaining issues
+can then be resolved in follow up patches.
 
 Uwe
 
