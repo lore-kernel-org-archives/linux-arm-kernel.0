@@ -1,122 +1,251 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 20 Dec 2010 12:46:22 +0530
-Subject: [PATCH v4 6/7] OMAP3: PM: make omap3_cpuidle_update_states
-	independent of enable_off_mode
-In-Reply-To: <1292712817-24999-7-git-send-email-nm@ti.com>
-References: <1292712817-24999-1-git-send-email-nm@ti.com>
-	<1292712817-24999-7-git-send-email-nm@ti.com>
-Message-ID: <21f9d2f64e7fbcdb4134e04393d42e40@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 20 Dec 2010 13:55:26 +0530
+Subject: [PATCH V3 05/63] ST SPEAr: Formalized timer support
+In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
+References: <cover.1292833228.git.viresh.kumar@st.com>
+Message-ID: <c7718f038dc1e157d73b89f6ceb76beeb6e738ca.1292833228.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Nishanth Menon
-> Sent: Sunday, December 19, 2010 4:24 AM
-> To: linux-omap; linux-arm
-> Cc: Jean Pihet; Kevin; Tony
-> Subject: [PATCH v4 6/7] OMAP3: PM: make omap3_cpuidle_update_states
-> independent of enable_off_mode
->
-> Currently omap3_cpuidle_update_states makes whole sale decision
-> on which C states to update based on enable_off_mode variable
-> Instead, achieve the same functionality by independently providing
-> mpu and core deepest states the system is allowed to achieve and
-> update the idle states accordingly.
->
-Thanks Nishant for this change. Indeed it's better than using the debug
-related flag.
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+Arch specific timer initialization code is moved into Arch specific file.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/mach-spear3xx/include/mach/generic.h |    3 +-
+ arch/arm/mach-spear3xx/spear300_evb.c         |    2 +-
+ arch/arm/mach-spear3xx/spear310_evb.c         |    2 +-
+ arch/arm/mach-spear3xx/spear320_evb.c         |    2 +-
+ arch/arm/mach-spear3xx/spear3xx.c             |   32 ++++++++++++++++++++++++-
+ arch/arm/mach-spear6xx/include/mach/generic.h |    3 +-
+ arch/arm/mach-spear6xx/spear600_evb.c         |    3 +-
+ arch/arm/mach-spear6xx/spear6xx.c             |   31 ++++++++++++++++++++++++
+ arch/arm/plat-spear/time.c                    |   21 ++++++----------
+ 9 files changed, 79 insertions(+), 20 deletions(-)
 
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |   19 ++++++++++---------
->  arch/arm/mach-omap2/pm.h          |    3 ++-
->  arch/arm/mach-omap2/pm34xx.c      |    2 +-
->  3 files changed, 13 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-
-> omap2/cpuidle34xx.c
-> index 0d50b45..f80d3f6 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -293,25 +293,26 @@ select_state:
->  DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
->
->  /**
-> - * omap3_cpuidle_update_states - Update the cpuidle states.
-> + * omap3_cpuidle_update_states() - Update the cpuidle states
-> + * @mpu_deepest_state:	Enable states upto and including this for
-mpu
-> domain
-> + * @core_deepest_state:	Enable states upto and including this for
-> core domain
->   *
-> - * Currently, this function toggles the validity of idle states based
-> upon
-> - * the flag 'enable_off_mode'. When the flag is set all states are
-valid.
-> - * Else, states leading to OFF state set to be invalid.
-> + * This goes through the list of states available and enables and
-> disables the
-> + * validity of C states based on deepest state that can be achieved for
-> the
-> + * variable domain
->   */
-> -void omap3_cpuidle_update_states(void)
-> +void omap3_cpuidle_update_states(u32 mpu_deepest_state, u32
-> core_deepest_state)
->  {
->  	int i;
->
->  	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
->  		struct omap3_processor_cx *cx = &omap3_power_states[i];
->
-> -		if (enable_off_mode) {
-> +		if ((cx->mpu_state >= mpu_deepest_state) &&
-> +		    (cx->core_state >= core_deepest_state)) {
->  			cx->valid = 1;
->  		} else {
-> -			if ((cx->mpu_state == PWRDM_POWER_OFF) ||
-> -				(cx->core_state	== PWRDM_POWER_OFF))
-> -				cx->valid = 0;
-> +			cx->valid = 0;
->  		}
->  	}
->  }
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index 5e0bee9..92ef400 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -58,7 +58,8 @@ extern u32 sleep_while_idle;
->  #endif
->
->  #if defined(CONFIG_CPU_IDLE)
-> -extern void omap3_cpuidle_update_states(void);
-> +extern void omap3_cpuidle_update_states(u32 core_deepest_state,
-> +		u32 core_deepest_state);
->  #endif
->
->  #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 4ba7a06..21cd36e 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -928,7 +928,7 @@ void omap3_pm_off_mode_enable(int enable)
->  		state = PWRDM_POWER_RET;
->
->  #ifdef CONFIG_CPU_IDLE
-> -	omap3_cpuidle_update_states();
-> +	omap3_cpuidle_update_states(state, state);
->  #endif
->
->  	list_for_each_entry(pwrst, &pwrst_list, node) {
-> --
-> 1.6.3.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index c16d2f8..e7d2de8 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -33,10 +33,11 @@
+ /* Add spear3xx family device structure declarations here */
+ extern struct amba_device gpio_device;
+ extern struct amba_device uart_device;
+-extern struct sys_timer spear_sys_timer;
++extern struct sys_timer spear3xx_timer;
+ 
+ /* Add spear3xx family function declarations here */
+ void __init clk_init(void);
++void __init spear_setup_timer(void);
+ void __init spear3xx_map_io(void);
+ void __init spear3xx_init_irq(void);
+ void __init spear3xx_init(void);
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 2c90663..cd23c98 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -71,6 +71,6 @@ MACHINE_START(SPEAR300, "ST-SPEAR300-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear3xx_map_io,
+ 	.init_irq	=	spear3xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear300_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index 4e55e55..3855431 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -78,6 +78,6 @@ MACHINE_START(SPEAR310, "ST-SPEAR310-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear3xx_map_io,
+ 	.init_irq	=	spear3xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear310_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 7083a06..4a7ce35 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -75,6 +75,6 @@ MACHINE_START(SPEAR320, "ST-SPEAR320-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear3xx_map_io,
+ 	.init_irq	=	spear3xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear320_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index efd2e17..34de574 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -523,5 +523,35 @@ struct pmx_dev pmx_plgpio_45_46_49_50 = {
+ 	.mode_count = ARRAY_SIZE(pmx_plgpio_45_46_49_50_modes),
+ 	.enb_on_reset = 1,
+ };
++#endif /* CONFIG_MACH_SPEAR310 || CONFIG_MACH_SPEAR320 */
+ 
+-#endif
++static void __init spear3xx_timer_init(void)
++{
++	char pclk_name[] = "pll3_48m_clk";
++	struct clk *gpt_clk, *pclk;
++
++	/* get the system timer clock */
++	gpt_clk = clk_get_sys("gpt0", NULL);
++	if (!gpt_clk) {
++		pr_err("%s:couldn't get clk for gpt\n", __func__);
++		BUG();
++	}
++
++	/* get the suitable parent clock for timer*/
++	pclk = clk_get(NULL, pclk_name);
++	if (!pclk) {
++		pr_err("%s:couldn't get %s as parent for gpt\n",
++				__func__, pclk_name);
++		BUG();
++	}
++
++	clk_set_parent(gpt_clk, pclk);
++	clk_put(gpt_clk);
++	clk_put(pclk);
++
++	spear_setup_timer();
++}
++
++struct sys_timer spear3xx_timer = {
++	.init = spear3xx_timer_init,
++};
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index 16205a5..e5967ed 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -31,9 +31,10 @@
+ /* Add spear6xx family device structure declarations here */
+ extern struct amba_device gpio_device[];
+ extern struct amba_device uart_device[];
+-extern struct sys_timer spear_sys_timer;
++extern struct sys_timer spear6xx_timer;
+ 
+ /* Add spear6xx family function declarations here */
++void __init spear_setup_timer(void);
+ void __init spear6xx_map_io(void);
+ void __init spear6xx_init_irq(void);
+ void __init spear6xx_init(void);
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+index daff8d0..bdd5b76 100644
+--- a/arch/arm/mach-spear6xx/spear600_evb.c
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -42,10 +42,11 @@ static void __init spear600_evb_init(void)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
+ }
+ 
++
+ MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear6xx_map_io,
+ 	.init_irq	=	spear6xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear6xx_timer,
+ 	.init_machine	=	spear600_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index baf6bcc..e0bf51e 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -155,3 +155,34 @@ void __init spear6xx_map_io(void)
+ 	/* This will initialize clock framework */
+ 	clk_init();
+ }
++
++static void __init spear6xx_timer_init(void)
++{
++	char pclk_name[] = "pll3_48m_clk";
++	struct clk *gpt_clk, *pclk;
++
++	/* get the system timer clock */
++	gpt_clk = clk_get_sys("gpt0", NULL);
++	if (!gpt_clk) {
++		pr_err("%s:couldn't get clk for gpt\n", __func__);
++		BUG();
++	}
++
++	/* get the suitable parent clock for timer*/
++	pclk = clk_get(NULL, pclk_name);
++	if (!pclk) {
++		pr_err("%s:couldn't get %s as parent for gpt\n",
++				__func__, pclk_name);
++		BUG();
++	}
++
++	clk_set_parent(gpt_clk, pclk);
++	clk_put(gpt_clk);
++	clk_put(pclk);
++
++	spear_setup_timer();
++}
++
++struct sys_timer spear6xx_timer = {
++	.init = spear6xx_timer_init,
++};
+diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
+index ab21165..7a038c9 100644
+--- a/arch/arm/plat-spear/time.c
++++ b/arch/arm/plat-spear/time.c
+@@ -1,7 +1,7 @@
+ /*
+  * arch/arm/plat-spear/time.c
+  *
+- * Copyright (C) 2009 ST Microelectronics
++ * Copyright (C) 2010 ST Microelectronics
+  * Shiraz Hashim<shiraz.hashim@st.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+@@ -215,7 +215,7 @@ static void __init spear_clockevent_init(void)
+ 
+ void __init spear_setup_timer(void)
+ {
+-	struct clk *pll3_clk;
++	int ret;
+ 
+ 	if (!request_mem_region(SPEAR_GPT0_BASE, SZ_1K, "gpt0")) {
+ 		pr_err("%s:cannot get IO addr\n", __func__);
+@@ -234,26 +234,21 @@ void __init spear_setup_timer(void)
+ 		goto err_iomap;
+ 	}
+ 
+-	pll3_clk = clk_get(NULL, "pll3_48m_clk");
+-	if (!pll3_clk) {
+-		pr_err("%s:couldn't get PLL3 as parent for gpt\n", __func__);
+-		goto err_iomap;
++	ret = clk_enable(gpt_clk);
++	if (ret < 0) {
++		pr_err("%s:couldn't enable gpt clock\n", __func__);
++		goto err_clk;
+ 	}
+ 
+-	clk_set_parent(gpt_clk, pll3_clk);
+-
+ 	spear_clockevent_init();
+ 	spear_clocksource_init();
+ 
+ 	return;
+ 
++err_clk:
++	clk_put(gpt_clk);
+ err_iomap:
+ 	iounmap(gpt_base);
+-
+ err_mem:
+ 	release_mem_region(SPEAR_GPT0_BASE, SZ_1K);
+ }
+-
+-struct sys_timer spear_sys_timer = {
+-	.init = spear_setup_timer,
+-};
+-- 
+1.7.2.2
