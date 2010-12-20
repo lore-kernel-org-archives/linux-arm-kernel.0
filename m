@@ -1,171 +1,105 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:56:20 +0530
-Subject: [PATCH V3 60/63] ST SPEAr13xx: Pass default padmux settings as
-	parameter to spear13**_init routine
+Date: Mon, 20 Dec 2010 13:56:22 +0530
+Subject: [PATCH V3 62/63] ST SPEAr: Adding information in Documentation/ and
+	MAINTAINERS
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <78c0ce7b70ef17be917477d34b10184d7c2c0543.1292833229.git.viresh.kumar@st.com>
+Message-ID: <3160ddccdce5ea96d68f03b42c4bbea17fcc45a1.1292833229.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes pmx_driver static to spear1300.c and spear1310.c, also now
-default setting of padmux are sent to spear1300_init and spear1310_init routines
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/include/mach/generic.h |    8 ++++----
- arch/arm/mach-spear13xx/spear1300.c            |    9 +++++++--
- arch/arm/mach-spear13xx/spear1300_evb.c        |    7 +------
- arch/arm/mach-spear13xx/spear1310.c            |    9 +++++++--
- arch/arm/mach-spear13xx/spear1310_evb.c        |    7 +------
- 5 files changed, 20 insertions(+), 20 deletions(-)
+ Documentation/arm/SPEAr/overview.txt |   34 +++++++++++++++++++++++-----------
+ MAINTAINERS                          |    6 ++++++
+ 2 files changed, 29 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 63b2173..b286cc2 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -220,8 +220,6 @@ extern struct pmx_dev pmx_uart1_modem;
- #define SPEAR_GPT0_CHAN0_IRQ	IRQ_GPT0_TMR0
- #define SPEAR_GPT0_CHAN1_IRQ	IRQ_GPT0_TMR1
+diff --git a/Documentation/arm/SPEAr/overview.txt b/Documentation/arm/SPEAr/overview.txt
+index 253a35c..4e510061 100644
+--- a/Documentation/arm/SPEAr/overview.txt
++++ b/Documentation/arm/SPEAr/overview.txt
+@@ -9,8 +9,9 @@ Introduction
  
--extern struct pmx_driver pmx_driver;
--
- /* Add spear13xx family device structure declarations here */
- extern struct amba_device spear13xx_gpio_device[];
- extern struct amba_device spear13xx_ssp_device;
-@@ -251,7 +249,8 @@ void spear13xx_secondary_startup(void);
- /* spear1300 declarations */
- #ifdef CONFIG_MACH_SPEAR1300
- /* Add spear1300 machine function declarations here */
--void __init spear1300_init(void);
-+void __init spear1300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count);
+   The ST Microelectronics SPEAr range of ARM9/CortexA9 System-on-Chip CPUs are
+   supported by the 'spear' platform of ARM Linux. Currently SPEAr300,
+-  SPEAr310, SPEAr320 and SPEAr600 SOCs are supported. Support for the SPEAr13XX
+-  series is in progress.
++  SPEAr310, SPEAr320, SPEAr600, SPEAr1300 and SPEAr1310 SOCs are supported.
++  SPEAr3XX and SPEAr6XX are based on ARM9 whereas SPEAr13XX is based on latest
++  ARM Cortex A9 CPUs.
  
- #endif /* CONFIG_MACH_SPEAR1300 */
+   Hierarchy in SPEAr is as follows:
  
-@@ -262,7 +261,8 @@ extern struct platform_device spear1310_can0_device;
- extern struct platform_device spear1310_can1_device;
+@@ -27,16 +28,25 @@ Introduction
+ 			- SPEAr600_EVB (Evaluation Board)
+ 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
+ 		- SPEAr1300 (SOC)
++			- SPEAr1300_EVB (Evaluation Board)
++		- SPEAr1310 (SOC)
++			- SPEAr1310_EVB (Evaluation Board)
  
- /* Add spear1310 machine function declarations here */
--void __init spear1310_init(void);
-+void __init spear1310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count);
+   Configuration
+   -------------
  
- #endif /* CONFIG_MACH_SPEAR1310 */
- 
-diff --git a/arch/arm/mach-spear13xx/spear1300.c b/arch/arm/mach-spear13xx/spear1300.c
-index 28822a3..b10f7a0 100644
---- a/arch/arm/mach-spear13xx/spear1300.c
-+++ b/arch/arm/mach-spear13xx/spear1300.c
-@@ -15,11 +15,12 @@
- #include <mach/spear.h>
- 
- /* pmx driver structure */
--struct pmx_driver pmx_driver;
-+static struct pmx_driver pmx_driver;
- 
- /* Add spear1300 specific devices here */
- 
--void __init spear1300_init(void)
-+void __init spear1300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count)
- {
- 	int ret;
- 
-@@ -27,6 +28,10 @@ void __init spear1300_init(void)
- 	spear13xx_init();
- 
- 	/* pmx initialization */
-+	pmx_driver.mode = pmx_mode;
-+	pmx_driver.devs = pmx_devs;
-+	pmx_driver.devs_count = pmx_dev_count;
+-  A generic configuration is provided for each machine, and can be used as the
++  A generic configuration is provided for each machine family, and can be used as the
+   default by
+-	make spear600_defconfig
+-	make spear300_defconfig
+-	make spear310_defconfig
+-	make spear320_defconfig
++	#make ARCH=arm spear13xx_defconfig
++	#make ARCH=arm spear3xx_defconfig
++	#make ARCH=arm spear6xx_defconfig
 +
- 	ret = pmx_register(&pmx_driver);
- 	if (ret)
- 		pr_err("padmux: registeration failed. err no: %d\n", ret);
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 316062e..1de93fd 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -122,11 +122,6 @@ static void __init spear1300_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* padmux initialization, must be done before spear1300_init */
--	pmx_driver.mode = NULL;
--	pmx_driver.devs = pmx_devs;
--	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--
- 	/* set keyboard plat data */
- 	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
- 
-@@ -136,7 +131,7 @@ static void __init spear1300_evb_init(void)
- 	nand_mach_init(FSMC_NAND_BW8);
- 
- 	/* call spear1300 machine init function */
--	spear1300_init();
-+	spear1300_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
- 
- 	/* Register slave devices on the I2C buses */
- 	i2c_register_board_devices();
-diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
-index 39ea491..375f5b2 100644
---- a/arch/arm/mach-spear13xx/spear1310.c
-+++ b/arch/arm/mach-spear13xx/spear1310.c
-@@ -17,7 +17,7 @@
- #include <mach/hardware.h>
- 
- /* pmx driver structure */
--struct pmx_driver pmx_driver;
-+static struct pmx_driver pmx_driver;
- 
- /* Pad multiplexing for uart1_modem device */
- static struct pmx_mux_reg pmx_uart1_modem_mux[] = {
-@@ -393,7 +393,8 @@ struct platform_device spear1310_can1_device = {
- 	.resource = can1_resources,
- };
- 
--void __init spear1310_init(void)
-+void __init spear1310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count)
- {
- 	int ret;
- 
-@@ -401,6 +402,10 @@ void __init spear1310_init(void)
- 	spear13xx_init();
- 
- 	/* pmx initialization */
-+	pmx_driver.mode = pmx_mode;
-+	pmx_driver.devs = pmx_devs;
-+	pmx_driver.devs_count = pmx_dev_count;
++  Compilation
++  -----------
 +
- 	ret = pmx_register(&pmx_driver);
- 	if (ret)
- 		pr_err("padmux: registeration failed. err no: %d\n", ret);
-diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c b/arch/arm/mach-spear13xx/spear1310_evb.c
-index 42f6986..4e91e59 100644
---- a/arch/arm/mach-spear13xx/spear1310_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1310_evb.c
-@@ -133,11 +133,6 @@ static void __init spear1310_evb_init(void)
- {
- 	unsigned int i;
++  After applying default configuration, Linux kernel for SPEAr architecture
++  can be compiled as
++	#make ARCH=arm CROSS_COMPILE=arm-linux- uImage
  
--	/* padmux initialization, must be done before spear1300_init */
--	pmx_driver.mode = NULL;
--	pmx_driver.devs = pmx_devs;
--	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--
- 	/* set keyboard plat data */
- 	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
+   Layout
+   ------
+@@ -48,13 +58,15 @@ Introduction
+   Each machine series have a directory with name arch/arm/mach-spear followed by
+   series name. Like mach-spear3xx, mach-spear6xx and mach-spear13xx.
  
-@@ -147,7 +142,7 @@ static void __init spear1310_evb_init(void)
- 	nand_mach_init(FSMC_NAND_BW8);
+-  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c and for
+-  spear6xx is mach-spear6xx/spear6xx.c. mach-spear* also contain soc/machine
++  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c, for
++  spear6xx is mach-spear6xx/spear6xx.c and similarly for spear13xx is
++  mach-spear13xx/spear13xx.c. mach-spear* also contain soc/machine
+   specific files, like spear300.c, spear310.c, spear320.c and spear600.c.
+-  mach-spear* also contains board specific files for each machine type.
++  Board specific files for each machine type is also contained in mach-spear*
++  folder.
  
- 	/* call spear1310 machine init function */
--	spear1310_init();
-+	spear1310_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
  
- 	/* Register slave devices on the I2C buses */
- 	i2c_register_board_devices();
+   Document Author
+   ---------------
+ 
+-  Viresh Kumar, (c) 2010 ST Microelectronics
++  Viresh Kumar, Shiraz Hashim (c) 2010 ST Microelectronics
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6a58887..bf9cd3a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5597,6 +5597,12 @@ W:	http://www.st.com/spear
+ S:	Maintained
+ F:	arch/arm/plat-spear/
+ 
++SPEAR13XX MACHINE SUPPORT
++M:	Shiraz Hashim <shiraz.hashim@st.com>
++W:	http://www.st.com/spear
++S:	Maintained
++F:	arch/arm/mach-spear13xx/
++
+ SPEAR3XX MACHINE SUPPORT
+ M:	Viresh Kumar <viresh.kumar@st.com>
+ W:	http://www.st.com/spear
 -- 
 1.7.2.2
