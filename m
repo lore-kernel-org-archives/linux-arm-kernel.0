@@ -1,45 +1,23 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 20 Dec 2010 08:07:36 -0800
-Subject: [PATCH v2 1/2] I2C: i2c-omap: Change device name: i2c_omap ->
-	omap_i2c
-In-Reply-To: <20101218015507.GL5941@atomide.com> (Tony Lindgren's message of
-	"Fri, 17 Dec 2010 17:55:07 -0800")
-References: <1291904657-32729-1-git-send-email-b-cousson@ti.com>
-	<1291904657-32729-2-git-send-email-b-cousson@ti.com>
-	<878vzydgxr.fsf@deeprootsystems.com>
-	<20101209190110.GR20097@trinity.fluff.org>
-	<87wrni7jys.fsf@deeprootsystems.com>
-	<BC214410FD04D84F9079A6242365970707D4FA@008-AM1MPN1-001.mgdnok.nokia.com>
-	<4D01E4B5.1010703@ti.com> <20101218015507.GL5941@atomide.com>
-Message-ID: <87oc8g5sxj.fsf@deeprootsystems.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 21 Dec 2010 01:15:55 +0900
+Subject: [PATCH] ARM: mach-shmobile: Clean up headsmp.S
+In-Reply-To: <20101220110450.6824.92672.sendpatchset@t400s>
+References: <20101220110450.6824.92672.sendpatchset@t400s>
+Message-ID: <20101220161555.GB30700@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-> * Cousson, Benoit <b-cousson@ti.com> [101210 00:29]:
->> On 12/9/2010 11:18 PM, aaro.koskinen at nokia.com wrote:
->> >Hi,
->> >
->> >Kevin Hilman [khilman at deeprootsystems.com]:
->> >>Ben Dooks<ben-i2c@fluff.org>  writes:
->> >>>Renaming stuff like this is going to have an impact on the userspace
->> >>>as anyone looking through /sys's driver heirarchy is going to miss the
->> >>>old name...
->> >>>
->> >>>It all depends if you really want to go ahead with this...
->> >>
->> >>Yes, we are aware of the userspace impact, but this name change makes
->> >>all devices on OMAP have consistent names and actually improves the
->> >>ability to have userspace tools have consistent naming as well.
->> >
->> >So there are no imporant users, or if there is, they are prepared for this change?
->> 
->> Well, I do not know any user of that today. Do you have some in mind?
->
-> Sounds like it's safe for me to take these two.
-
-These should probably go via Paul's integration branch to avoid
-conflicts with the other omap_device/omap_hwmod code.
-
-Kevin
+On Mon, Dec 20, 2010 at 08:04:50PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Use PAGE_OFFSET and PHYS_OFFSET for secondary_startup
+> entry point as recommended by Russell King.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Tested on the AG5EVB board using the sh73a0 processor.
+> 
+>  Applies on top of the rmobile/smp topic branch in sh-2.6 git.
+> 
+Applied, thanks.
