@@ -1,1110 +1,1310 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 20 Dec 2010 13:55:54 +0530
-Subject: [PATCH V3 34/63] ST SPEAr: Adding support for DDR in clock framework
+Date: Mon, 20 Dec 2010 13:55:46 +0530
+Subject: [PATCH V3 26/63] ST SPEAr: Added PCIE host controller base driver
+	support.
 In-Reply-To: <cover.1292833228.git.viresh.kumar@st.com>
 References: <cover.1292833228.git.viresh.kumar@st.com>
-Message-ID: <6d2bbbd4d859be9311eb1a4effe94d0dc4424ffb.1292833228.git.viresh.kumar@st.com>
+Message-ID: <e890777dfaa104be4000bbc3b428183a8737610c.1292833228.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing rate of clk, which is ancestor of DDR requires to put DDR in refresh
-mode before changing parents rate. For this DDR support is added in clock
-framework. Now at boot time all ancestors of DDR is marked specially and
-changing their rate must be first acked by ddr (i.e. ddr will run on that
-clock). This patch adds support for this.
+From: Pratyush Anand <pratyush.anand@st.com>
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+SPEAr13xx family contains Synopsys designware PCIE version 3.30a. This
+patch adds support for this PCIE module for spear platform.
+
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/clock.c                  |   69 ++++++++---
- arch/arm/mach-spear13xx/include/mach/generic.h   |    2 +-
- arch/arm/mach-spear13xx/include/mach/misc_regs.h |    4 +
- arch/arm/mach-spear13xx/spear13xx.c              |    2 +-
- arch/arm/mach-spear3xx/clock.c                   |  105 ++++++++++++++----
- arch/arm/mach-spear3xx/include/mach/generic.h    |    2 +-
- arch/arm/mach-spear3xx/include/mach/misc_regs.h  |    7 +
- arch/arm/mach-spear3xx/spear3xx.c                |    2 +-
- arch/arm/mach-spear6xx/clock.c                   |  105 ++++++++++++++----
- arch/arm/mach-spear6xx/include/mach/generic.h    |    2 +-
- arch/arm/mach-spear6xx/include/mach/misc_regs.h  |    7 +
- arch/arm/mach-spear6xx/spear6xx.c                |    2 +-
- arch/arm/plat-spear/clock.c                      |  133 ++++++++++++++++++---
- arch/arm/plat-spear/include/plat/clock.h         |   42 +++++--
- 14 files changed, 385 insertions(+), 99 deletions(-)
+ arch/arm/Kconfig                                 |    5 +-
+ arch/arm/mach-spear13xx/Makefile                 |    1 +
+ arch/arm/mach-spear13xx/include/mach/hardware.h  |    7 +
+ arch/arm/mach-spear13xx/include/mach/irqs.h      |   25 +-
+ arch/arm/mach-spear13xx/include/mach/misc_regs.h |   20 +
+ arch/arm/mach-spear13xx/include/mach/pcie.h      |  170 +++++
+ arch/arm/mach-spear13xx/pcie.c                   |  861 ++++++++++++++++++++++
+ arch/arm/mach-spear13xx/spear1300_evb.c          |   31 +
+ arch/arm/mach-spear13xx/spear13xx.c              |   28 +
+ arch/arm/plat-spear/Kconfig                      |    1 +
+ 10 files changed, 1144 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/pcie.h
+ create mode 100644 arch/arm/mach-spear13xx/pcie.c
 
-diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index ca80c46..4f320fa 100644
---- a/arch/arm/mach-spear13xx/clock.c
-+++ b/arch/arm/mach-spear13xx/clock.c
-@@ -23,19 +23,19 @@
- /* root clks */
- /* 24 MHz oscillator clock */
- static struct clk osc1_24m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 24000000,
- };
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7c8ba2c..28223ff 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1164,7 +1164,9 @@ config ISA_DMA_API
+ 	bool
  
- /* 32 KHz oscillator clock */
- static struct clk osc2_32k_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 32000,
- };
+ config PCI
+-	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
++	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||\
++	ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX ||\
++	ARCH_SPEAR13XX
+ 	help
+ 	  Find out whether you have a PCI motherboard. PCI is the name of a
+ 	  bus system, i.e. the way the CPU talks to the other stuff inside
+@@ -1191,6 +1193,7 @@ config PCI_HOST_ITE8152
+ 	select DMABOUNCE
  
- /* 25 MHz MIPHY oscillator clock */
- static struct clk osc3_25m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 25000000,
- };
+ source "drivers/pci/Kconfig"
++source "drivers/pci/pcie/Kconfig"
  
-@@ -99,7 +99,7 @@ struct pll_rate_tbl pll_rtbl[] = {
+ source "drivers/pcmcia/Kconfig"
  
- /* pll1 clock */
- static struct clk pll1_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk_sel = &pll_pclk_sel,
- 	.pclk_sel_shift = PLL1_CLK_SHIFT,
- 	.en_reg = PLL1_CTR,
-@@ -113,7 +113,7 @@ static struct clk pll1_clk = {
+diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
+index cb5ae9e..4f1cbc5 100644
+--- a/arch/arm/mach-spear13xx/Makefile
++++ b/arch/arm/mach-spear13xx/Makefile
+@@ -6,6 +6,7 @@
+ obj-y					+= spear13xx.o clock.o
+ obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
+ obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
++obj-$(CONFIG_PCIEPORTBUS)		+= pcie.o
  
- /* pll1div2 clock */
- static struct clk pll1div2_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 2,
- 	.recalc = &follow_parent,
-@@ -121,7 +121,7 @@ static struct clk pll1div2_clk = {
+ # spear1300 specific files
+ obj-$(CONFIG_MACH_SPEAR1300)		+= spear1300.o
+diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
+index 0047d75..4abc2c0 100644
+--- a/arch/arm/mach-spear13xx/include/mach/hardware.h
++++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
+@@ -22,4 +22,11 @@
+ /* typesafe io address */
+ #define __io_address(n)		__io(IO_ADDRESS(n))
  
- /* pll1div4 clock */
- static struct clk pll1div4_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 4,
- 	.recalc = &follow_parent,
-@@ -136,6 +136,7 @@ static struct pll_clk_config pll2_config = {
- 
- /* pll2 clock */
- static struct clk pll2_clk = {
-+	.flags = SYSTEM_CLK,
- 	.pclk_sel = &pll_pclk_sel,
- 	.pclk_sel_shift = PLL2_CLK_SHIFT,
- 	.en_reg = PLL2_CTR,
-@@ -156,6 +157,7 @@ static struct pll_clk_config pll3_config = {
- 
- /* pll3 clock */
- static struct clk pll3_clk = {
-+	.flags = SYSTEM_CLK,
- 	.pclk_sel = &pll_pclk_sel,
- 	.pclk_sel_shift = PLL3_CLK_SHIFT,
- 	.en_reg = PLL3_CTR,
-@@ -184,7 +186,7 @@ struct pll_rate_tbl pll4_rtbl[] = {
- 
- /* pll4 (DDR) clock */
- static struct clk pll4_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk = &osc1_24m_clk,
- 	.en_reg = PLL4_CTR,
- 	.en_reg_bit = PLL_ENABLE,
-@@ -197,22 +199,54 @@ static struct clk pll4_clk = {
- 
- /* pll5 USB 48 MHz clock */
- static struct clk pll5_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc1_24m_clk,
- 	.rate = 48000000,
- };
- 
- /* pll6 (MIPHY) clock */
- static struct clk pll6_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc3_25m_clk,
- 	.rate = 25000000,
- };
- 
- /* clocks derived from pll1 clk */
-+/* ddr clock */
-+struct ddr_rate_tbl ddr_rate_tbl = {
-+	.minrate = 332000000,
-+	.maxrate = 500000000,
-+};
++#if defined(CONFIG_PCI)
++#define PCIBIOS_MIN_IO		0
++#define PCIBIOS_MIN_MEM		0
++#define pcibios_assign_all_busses()	0
++#endif
 +
-+static struct pclk_info ddr_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_val = MCTR_CLK_PLL1_VAL,
-+	}, {
-+		.pclk = &pll4_clk,
-+		.pclk_val = MCTR_CLK_PLL4_VAL,
-+	},
-+};
 +
-+/* ddr parent select structure */
-+static struct pclk_sel ddr_pclk_sel = {
-+	.pclk_info = ddr_pclk_info,
-+	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = MCTR_CLK_MASK,
-+};
+ #endif /* __MACH_HARDWARE_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
+index 10b64c1..d2bfbb1 100644
+--- a/arch/arm/mach-spear13xx/include/mach/irqs.h
++++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
+@@ -80,9 +80,9 @@
+ #define IRQ_USBH_OHCI0		(IRQ_SHPI_START + 65)
+ #define IRQ_USBH_EHCI1		(IRQ_SHPI_START + 66)
+ #define IRQ_USBH_OHCI1		(IRQ_SHPI_START + 67)
+-#define IRQ_PCIE1		(IRQ_SHPI_START + 68)
+-#define IRQ_PCIE2		(IRQ_SHPI_START + 69)
+-#define IRQ_PCIE3		(IRQ_SHPI_START + 70)
++#define IRQ_PCIE0		(IRQ_SHPI_START + 68)
++#define IRQ_PCIE1		(IRQ_SHPI_START + 69)
++#define IRQ_PCIE2		(IRQ_SHPI_START + 70)
+ 
+ #define IRQ_GIC_END		(IRQ_SHPI_START + 128)
+ 
+@@ -93,7 +93,24 @@
+ #define SPEAR_GPIO1_INT_BASE	(SPEAR_GPIO0_INT_BASE + 8)
+ #define SPEAR_GPIO_INT_END	(SPEAR_GPIO1_INT_BASE + 8)
+ 
+-#define VIRQ_END		SPEAR_GPIO_INT_END
++/* PCIE MSI virtual irqs */
++#define SPEAR_NUM_MSI_IRQS	64
++#define SPEAR_MSI0_INT_BASE	(SPEAR_GPIO_INT_END + 0)
++#define SPEAR_MSI0_INT_END	(SPEAR_MSI0_INT_BASE + SPEAR_NUM_MSI_IRQS)
++#define SPEAR_MSI1_INT_BASE	(SPEAR_MSI0_INT_END + 0)
++#define SPEAR_MSI1_INT_END	(SPEAR_MSI1_INT_BASE + SPEAR_NUM_MSI_IRQS)
++#define SPEAR_MSI2_INT_BASE	(SPEAR_MSI1_INT_END + 0)
++#define SPEAR_MSI2_INT_END	(SPEAR_MSI2_INT_BASE + SPEAR_NUM_MSI_IRQS)
 +
-+static struct clk ddr_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.recalc = &follow_parent,
-+	.pclk_sel = &ddr_pclk_sel,
-+	.pclk_sel_shift = MCTR_CLK_SHIFT,
-+	.private_data = &ddr_rate_tbl,
-+};
++#define SPEAR_NUM_INTX_IRQS	4
++#define SPEAR_INTX0_BASE	(SPEAR_MSI2_INT_END + 0)
++#define SPEAR_INTX0_END		(SPEAR_INTX0_BASE + SPEAR_NUM_INTX_IRQS)
++#define SPEAR_INTX1_BASE	(SPEAR_INTX0_END + 0)
++#define SPEAR_INTX1_END		(SPEAR_INTX1_BASE + SPEAR_NUM_INTX_IRQS)
++#define SPEAR_INTX2_BASE	(SPEAR_INTX1_END + 0)
++#define SPEAR_INTX2_END		(SPEAR_INTX2_BASE + SPEAR_NUM_INTX_IRQS)
 +
- /* cpu clock */
- static struct clk cpu_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 2,
- 	.recalc = &follow_parent,
-@@ -220,7 +254,7 @@ static struct clk cpu_clk = {
++#define VIRQ_END		SPEAR_INTX2_END
+ #define NR_IRQS			VIRQ_END
  
- /* ahb clock */
- static struct clk ahb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 6,
- 	.recalc = &follow_parent,
-@@ -228,7 +262,7 @@ static struct clk ahb_clk = {
- 
- /* apb clock */
- static struct clk apb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 12,
- 	.recalc = &follow_parent,
-@@ -845,6 +879,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{.con_id = "pll6_clk",		.clk = &pll6_clk},
- 
- 	/* clock derived from pll1 clk */
-+	{.con_id = "ddr_clk",		.clk = &ddr_clk},
- 	{.con_id = "cpu_clk",		.clk = &cpu_clk},
- 	{.con_id = "ahb_clk",		.clk = &ahb_clk},
- 	{.con_id = "apb_clk",		.clk = &apb_clk},
-@@ -911,12 +946,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- #endif
- };
- 
--void __init clk_init(void)
-+/* machine clk init */
-+void __init spear13xx_clk_init(void)
- {
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
--		clk_register(&spear_clk_lookups[i]);
--
--	recalc_root_clocks();
-+	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
- }
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 2cdd17d..5cbf131 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -44,7 +44,7 @@ extern struct platform_device spear13xx_sdhci_device;
- extern struct sys_timer spear13xx_timer;
- 
- /* Add spear13xx family function declarations here */
--void __init clk_init(void);
-+void __init spear13xx_clk_init(void);
- void __init i2c_register_board_devices(void);
- void __init spear_setup_timer(void);
- void __init spear13xx_map_io(void);
+ #endif /* __MACH_IRQS_H */
 diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-index a7ba6cb..3cfd4fc 100644
+index e6823db..a7ba6cb 100644
 --- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
 +++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-@@ -98,6 +98,10 @@
- 	#define CLCD_CLK_SHIFT		2
- 	#define C3_CLK_MASK		1
- 	#define C3_CLK_SHIFT		1
-+	#define MCTR_CLK_SHIFT		10
-+	#define MCTR_CLK_MASK		0x1
-+	#define MCTR_CLK_PLL1_VAL	0x0
-+	#define MCTR_CLK_PLL4_VAL	0x1
- 
- #define GMAC_CLK_CFG		((unsigned int *)(MISC_BASE + 0x248))
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 853a0e8..630e004 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -434,7 +434,7 @@ void __init spear13xx_map_io(void)
- 	iotable_init(spear13xx_io_desc, ARRAY_SIZE(spear13xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear13xx_clk_init();
- }
- 
- static void __init spear13xx_timer_init(void)
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 0a7a548..4f049fe 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -19,13 +19,13 @@
- /* root clks */
- /* 32 KHz oscillator clock */
- static struct clk osc_32k_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 32000,
- };
- 
- /* 24 MHz oscillator clock */
- static struct clk osc_24m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 24000000,
- };
- 
-@@ -40,7 +40,7 @@ static struct clk rtc_clk = {
- 
- /* clock derived from 24 MHz osc clk */
- /* pll masks structure */
--static struct pll_clk_masks pll1_masks = {
-+static struct pll_clk_masks pll_masks = {
- 	.mode_mask = PLL_MODE_MASK,
- 	.mode_shift = PLL_MODE_SHIFT,
- 	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
-@@ -53,22 +53,22 @@ static struct pll_clk_masks pll1_masks = {
- 	.div_n_shift = PLL_DIV_N_SHIFT,
- };
- 
--/* pll1 configuration structure */
--static struct pll_clk_config pll1_config = {
--	.mode_reg = PLL1_CTR,
--	.cfg_reg = PLL1_FRQ,
--	.masks = &pll1_masks,
--};
--
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
- 
-+/* pll1 configuration structure */
-+static struct pll_clk_config pll1_config = {
-+	.mode_reg = PLL1_CTR,
-+	.cfg_reg = PLL1_FRQ,
-+	.masks = &pll_masks,
-+};
+@@ -202,6 +202,26 @@
+ #define USBPHY_P2_CFG		((unsigned int *)(MISC_BASE + 0x31c))
+ #define USBPHY_P3_CFG		((unsigned int *)(MISC_BASE + 0x320))
+ #define PCIE_CFG		((unsigned int *)(MISC_BASE + 0x324))
++	/* PCIE CFG MASks */
++	#define PCIE2_CFG_AUX_CLK	(1 << 0)
++	#define PCIE1_CFG_AUX_CLK	(1 << 1)
++	#define PCIE0_CFG_AUX_CLK	(1 << 2)
++	#define PCIE2_CFG_CORE_CLK	(1 << 3)
++	#define PCIE1_CFG_CORE_CLK	(1 << 4)
++	#define PCIE0_CFG_CORE_CLK	(1 << 5)
++	#define PCIE2_CFG_POWERUP_RESET	(1 << 6)
++	#define PCIE1_CFG_POWERUP_RESET	(1 << 7)
++	#define PCIE0_CFG_POWERUP_RESET	(1 << 8)
++	#define PCIE2_CFG_DEVICE_PRESENT	(1 << 9)
++	#define PCIE1_CFG_DEVICE_PRESENT	(1 << 10)
++	#define PCIE0_CFG_DEVICE_PRESENT	(1 << 11)
++	#define PCIE0_CFG_VAL	(PCIE0_CFG_AUX_CLK | PCIE0_CFG_CORE_CLK \
++			| PCIE0_CFG_POWERUP_RESET | PCIE0_CFG_DEVICE_PRESENT)
++	#define PCIE1_CFG_VAL	(PCIE1_CFG_AUX_CLK | PCIE1_CFG_CORE_CLK \
++			| PCIE1_CFG_POWERUP_RESET | PCIE1_CFG_DEVICE_PRESENT)
++	#define PCIE2_CFG_VAL	(PCIE2_CFG_AUX_CLK | PCIE2_CFG_CORE_CLK \
++			| PCIE2_CFG_POWERUP_RESET | PCIE2_CFG_DEVICE_PRESENT)
 +
- /* PLL1 clock */
- static struct clk pll1_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk = &osc_24m_clk,
- 	.en_reg = PLL1_CTR,
- 	.en_reg_bit = PLL_ENABLE,
-@@ -79,9 +79,29 @@ static struct clk pll1_clk = {
- 	.private_data = &pll1_config,
- };
- 
-+/* pll2 configuration structure */
-+static struct pll_clk_config pll2_config = {
-+	.mode_reg = PLL2_CTR,
-+	.cfg_reg = PLL2_FRQ,
-+	.masks = &pll_masks,
-+};
-+
-+/* PLL2 clock */
-+static struct clk pll2_clk = {
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
-+	.pclk = &osc_24m_clk,
-+	.en_reg = PLL2_CTR,
-+	.en_reg_bit = PLL_ENABLE,
-+	.calc_rate = &pll_calc_rate,
-+	.recalc = &pll_clk_recalc,
-+	.set_rate = &pll_clk_set_rate,
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.private_data = &pll2_config,
-+};
-+
- /* PLL3 48 MHz clock */
- static struct clk pll3_48m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc_24m_clk,
- 	.rate = 48000000,
- };
-@@ -96,7 +116,7 @@ static struct clk wdt_clk = {
- /* clock derived from pll1 clk */
- /* cpu clock */
- static struct clk cpu_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.recalc = &follow_parent,
- };
-@@ -123,7 +143,7 @@ struct bus_rate_tbl bus_rtbl[] = {
- 
- /* ahb clock */
- static struct clk ahb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -410,6 +430,48 @@ static struct clk usbd_clk = {
- };
- 
- /* clock derived from ahb clk */
-+/* ahb multiplied by 2 clock */
-+static struct clk ahbmult2_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.pclk = &ahb_clk,
-+	.recalc = &ahbmult2_clk_recalc,
-+};
-+
-+/* ddr clock */
-+struct ddr_rate_tbl ddr_rate_tbl = {
-+	.minrate = 166000000,
-+	.maxrate = 332000000,
-+};
-+
-+static struct pclk_info ddr_pclk_info[] = {
-+	{
-+		.pclk = &ahb_clk,
-+		.pclk_val = MCTR_CLK_HCLK_VAL,
-+	}, {
-+		.pclk = &ahbmult2_clk,
-+		.pclk_val = MCTR_CLK_2HCLK_VAL,
-+	}, {
-+		.pclk = &pll2_clk,
-+		.pclk_val = MCTR_CLK_PLL2_VAL,
-+	},
-+};
-+
-+/* ddr parent select structure */
-+static struct pclk_sel ddr_pclk_sel = {
-+	.pclk_info = ddr_pclk_info,
-+	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
-+	.pclk_sel_reg = PLL_CLK_CFG,
-+	.pclk_sel_mask = MCTR_CLK_MASK,
-+};
-+
-+static struct clk ddr_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.recalc = &follow_parent,
-+	.pclk_sel = &ddr_pclk_sel,
-+	.pclk_sel_shift = MCTR_CLK_SHIFT,
-+	.private_data = &ddr_rate_tbl,
-+};
-+
- /* apb masks structure */
- static struct bus_clk_masks apb_masks = {
- 	.mask = HCLK_PCLK_RATIO_MASK,
-@@ -424,7 +486,7 @@ static struct bus_clk_config apb_config = {
- 
- /* apb clock */
- static struct clk apb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &ahb_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -658,6 +720,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
- 	/* clock derived from 24 MHz osc clk */
- 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
-+	{ .con_id = "pll2_clk",		.clk = &pll2_clk},
- 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
- 	{ .dev_id = "wdt",		.clk = &wdt_clk},
- 	/* clock derived from pll1 clk */
-@@ -677,6 +740,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .con_id = "usbh_clk",		.clk = &usbh_clk},
- 	{ .dev_id = "usbd",		.clk = &usbd_clk},
- 	/* clock derived from ahb clk */
-+	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
-+	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
- 	{ .con_id = "apb_clk",		.clk = &apb_clk},
- 	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{ .dev_id = "dma",		.clk = &dma_clk},
-@@ -732,12 +797,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- #endif
- };
- 
--void __init clk_init(void)
-+/* machine clk init */
-+void __init spear3xx_clk_init(void)
- {
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
--		clk_register(&spear_clk_lookups[i]);
--
--	recalc_root_clocks();
-+	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
- }
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 5da1fc5..e92d024 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -43,7 +43,7 @@ extern struct platform_device rtc_device;
- extern struct sys_timer spear3xx_timer;
- 
- /* Add spear3xx family function declarations here */
--void __init clk_init(void);
-+void __init spear3xx_clk_init(void);
- void __init i2c_register_board_devices(void);
- void __init spear_setup_timer(void);
- void __init spear3xx_map_io(void);
-diff --git a/arch/arm/mach-spear3xx/include/mach/misc_regs.h b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
-index 6cb4f3c..6316900 100644
---- a/arch/arm/mach-spear3xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
-@@ -46,6 +46,13 @@
- 
- #define PLL2_MOD		((unsigned int *)(MISC_BASE + 0x01C))
- #define PLL_CLK_CFG		((unsigned int *)(MISC_BASE + 0x020))
-+/* PLL_CLK_CFG register masks */
-+#define MCTR_CLK_SHIFT		28
-+#define MCTR_CLK_MASK		0x7
-+#define MCTR_CLK_HCLK_VAL	0x0
-+#define MCTR_CLK_2HCLK_VAL	0x1
-+#define MCTR_CLK_PLL2_VAL	0x3
-+
- #define CORE_CLK_CFG		((unsigned int *)(MISC_BASE + 0x024))
- /* CORE CLK CFG register masks */
- #define PLL_HCLK_RATIO_SHIFT	10
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 55ba94f..b6de8f7 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -261,7 +261,7 @@ void __init spear3xx_map_io(void)
- 	iotable_init(spear3xx_io_desc, ARRAY_SIZE(spear3xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear3xx_clk_init();
- }
- 
- /* pad multiplexing support */
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 9171952..99cc21d 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -19,13 +19,13 @@
- /* root clks */
- /* 32 KHz oscillator clock */
- static struct clk osc_32k_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 32000,
- };
- 
- /* 30 MHz oscillator clock */
- static struct clk osc_30m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 30000000,
- };
- 
-@@ -40,7 +40,7 @@ static struct clk rtc_clk = {
- 
- /* clock derived from 30 MHz osc clk */
- /* pll masks structure */
--static struct pll_clk_masks pll1_masks = {
-+static struct pll_clk_masks pll_masks = {
- 	.mode_mask = PLL_MODE_MASK,
- 	.mode_shift = PLL_MODE_SHIFT,
- 	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
-@@ -53,22 +53,22 @@ static struct pll_clk_masks pll1_masks = {
- 	.div_n_shift = PLL_DIV_N_SHIFT,
- };
- 
--/* pll1 configuration structure */
--static struct pll_clk_config pll1_config = {
--	.mode_reg = PLL1_CTR,
--	.cfg_reg = PLL1_FRQ,
--	.masks = &pll1_masks,
--};
--
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
- 
-+/* pll1 configuration structure */
-+static struct pll_clk_config pll1_config = {
-+	.mode_reg = PLL1_CTR,
-+	.cfg_reg = PLL1_FRQ,
-+	.masks = &pll_masks,
-+};
-+
- /* PLL1 clock */
- static struct clk pll1_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk = &osc_30m_clk,
- 	.en_reg = PLL1_CTR,
- 	.en_reg_bit = PLL_ENABLE,
-@@ -79,9 +79,29 @@ static struct clk pll1_clk = {
- 	.private_data = &pll1_config,
- };
- 
-+/* pll2 configuration structure */
-+static struct pll_clk_config pll2_config = {
-+	.mode_reg = PLL2_CTR,
-+	.cfg_reg = PLL2_FRQ,
-+	.masks = &pll_masks,
-+};
-+
-+/* PLL2 clock */
-+static struct clk pll2_clk = {
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
-+	.pclk = &osc_30m_clk,
-+	.en_reg = PLL2_CTR,
-+	.en_reg_bit = PLL_ENABLE,
-+	.calc_rate = &pll_calc_rate,
-+	.recalc = &pll_clk_recalc,
-+	.set_rate = &pll_clk_set_rate,
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.private_data = &pll2_config,
-+};
-+
- /* PLL3 48 MHz clock */
- static struct clk pll3_48m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc_30m_clk,
- 	.rate = 48000000,
- };
-@@ -96,7 +116,7 @@ static struct clk wdt_clk = {
- /* clock derived from pll1 clk */
- /* cpu clock */
- static struct clk cpu_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.recalc = &follow_parent,
- };
-@@ -123,7 +143,7 @@ struct bus_rate_tbl bus_rtbl[] = {
- 
- /* ahb clock */
- static struct clk ahb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -491,6 +511,48 @@ static struct clk usbd_clk = {
- };
- 
- /* clock derived from ahb clk */
-+/* ahb multiplied by 2 clock */
-+static struct clk ahbmult2_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.pclk = &ahb_clk,
-+	.recalc = &ahbmult2_clk_recalc,
-+};
-+
-+/* ddr clock */
-+struct ddr_rate_tbl ddr_rate_tbl = {
-+	.minrate = 166000000,
-+	.maxrate = 332000000,
-+};
-+
-+static struct pclk_info ddr_pclk_info[] = {
-+	{
-+		.pclk = &ahb_clk,
-+		.pclk_val = MCTR_CLK_HCLK_VAL,
-+	}, {
-+		.pclk = &ahbmult2_clk,
-+		.pclk_val = MCTR_CLK_2HCLK_VAL,
-+	}, {
-+		.pclk = &pll2_clk,
-+		.pclk_val = MCTR_CLK_PLL2_VAL,
-+	},
-+};
-+
-+/* ddr parent select structure */
-+static struct pclk_sel ddr_pclk_sel = {
-+	.pclk_info = ddr_pclk_info,
-+	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
-+	.pclk_sel_reg = PLL_CLK_CFG,
-+	.pclk_sel_mask = MCTR_CLK_MASK,
-+};
-+
-+static struct clk ddr_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.recalc = &follow_parent,
-+	.pclk_sel = &ddr_pclk_sel,
-+	.pclk_sel_shift = MCTR_CLK_SHIFT,
-+	.private_data = &ddr_rate_tbl,
-+};
-+
- /* apb masks structure */
- static struct bus_clk_masks apb_masks = {
- 	.mask = HCLK_PCLK_RATIO_MASK,
-@@ -505,7 +567,7 @@ static struct bus_clk_config apb_config = {
- 
- /* apb clock */
- static struct clk apb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &ahb_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -630,6 +692,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
- 	/* clock derived from 30 MHz os		 clk */
- 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
-+	{ .con_id = "pll2_clk",		.clk = &pll2_clk},
- 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
- 	{ .dev_id = "wdt",		.clk = &wdt_clk},
- 	/* clock derived from pll1 clk */
-@@ -654,6 +717,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .con_id = "usbh.1_clk",	.clk = &usbh1_clk},
- 	{ .dev_id = "usbd",		.clk = &usbd_clk},
- 	/* clock derived from ahb clk */
-+	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
-+	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
- 	{ .con_id = "apb_clk",		.clk = &apb_clk},
- 	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{ .dev_id = "dma",		.clk = &dma_clk},
-@@ -671,12 +736,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "gpio2",		.clk = &gpio2_clk},
- };
- 
--void __init clk_init(void)
-+/* machine clk init */
-+void __init spear6xx_clk_init(void)
- {
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
--		clk_register(&spear_clk_lookups[i]);
--
--	recalc_root_clocks();
-+	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
- }
-diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
-index f5f4d7c..59528ef 100644
---- a/arch/arm/mach-spear6xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear6xx/include/mach/generic.h
-@@ -50,7 +50,7 @@ void __init spear6xx_map_io(void);
- void __init spear6xx_init_irq(void);
- void __init spear6xx_init(void);
- void __init spear600_init(void);
--void __init clk_init(void);
-+void __init spear6xx_clk_init(void);
- 
- /* Add spear600 machine device structure declarations here */
- 
-diff --git a/arch/arm/mach-spear6xx/include/mach/misc_regs.h b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
-index bd71e72..0f4562b 100644
---- a/arch/arm/mach-spear6xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
-@@ -47,6 +47,13 @@
- #define PLL2_MOD		((unsigned int *)(MISC_BASE + 0x01C))
- #define PLL_CLK_CFG		((unsigned int *)(MISC_BASE + 0x020))
- #define CORE_CLK_CFG		((unsigned int *)(MISC_BASE + 0x024))
-+/* PLL_CLK_CFG register masks */
-+#define MCTR_CLK_SHIFT		28
-+#define MCTR_CLK_MASK		0x7
-+#define MCTR_CLK_HCLK_VAL	0x0
-+#define MCTR_CLK_2HCLK_VAL	0x1
-+#define MCTR_CLK_PLL2_VAL	0x3
-+
- /* CORE CLK CFG register masks */
- #define PLL_HCLK_RATIO_SHIFT	10
- #define PLL_HCLK_RATIO_MASK	0x3
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 7545e99..daafee6 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -420,7 +420,7 @@ void __init spear6xx_map_io(void)
- 	iotable_init(spear6xx_io_desc, ARRAY_SIZE(spear6xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear6xx_clk_init();
- }
- 
- static void __init spear6xx_timer_init(void)
-diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
-index 7d3338f..fb1c87b 100644
---- a/arch/arm/plat-spear/clock.c
-+++ b/arch/arm/plat-spear/clock.c
-@@ -21,6 +21,8 @@
- #include <linux/spinlock.h>
- #include <plat/clock.h>
- 
-+/* pointer to ddr clock structure */
-+static struct clk *ddr_clk;
- static DEFINE_SPINLOCK(clocks_lock);
- static LIST_HEAD(root_clks);
- #ifdef CONFIG_DEBUG_FS
-@@ -160,7 +162,7 @@ static int do_clk_enable(struct clk *clk)
- 		 * time please reclac
- 		 */
- 		if (clk->recalc) {
--			ret = clk->recalc(clk);
-+			ret = clk->recalc(clk, &clk->rate, clk->pclk->rate);
- 			if (ret)
- 				goto err;
- 		}
-@@ -298,7 +300,16 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 			propagate_rate(clk, 0);
- 		spin_unlock_irqrestore(&clocks_lock, flags);
- 	} else if (clk->pclk) {
--		u32 mult = clk->div_factor ? clk->div_factor : 1;
-+		u32 mult;
-+		/*
-+		 * if pclk is SYSTEM_CLK and clk is not SYSTEM_CLK then return
-+		 * error
-+		 */
-+		if (clk->pclk->flags & SYSTEM_CLK)
-+			if (!(clk->flags & SYSTEM_CLK))
-+				return -EPERM;
-+
-+		mult = clk->div_factor ? clk->div_factor : 1;
- 		ret = clk_set_rate(clk->pclk, mult * rate);
- 	}
- 
-@@ -371,7 +382,7 @@ void propagate_rate(struct clk *pclk, int on_init)
- 
- 	list_for_each_entry_safe(clk, _temp, &pclk->children, sibling) {
- 		if (clk->recalc) {
--			ret = clk->recalc(clk);
-+			ret = clk->recalc(clk, &clk->rate, clk->pclk->rate);
- 			/*
- 			 * recalc will return error if clk out is not programmed
- 			 * In this case configure default rate.
-@@ -390,6 +401,47 @@ void propagate_rate(struct clk *pclk, int on_init)
- 	}
- }
- 
-+/* updates "rate" pointer with current_clk's output for input "rate" */
-+static void rate_calc(struct clk *current_clk, struct clk *ancestor_clk,
-+		unsigned long *rate)
-+{
-+	if (current_clk->pclk != ancestor_clk)
-+		rate_calc(current_clk->pclk, ancestor_clk, rate);
-+
-+	if (current_clk->recalc)
-+		current_clk->recalc(current_clk, rate, *rate);
-+}
-+
+ #define PCIE_MIPHY_CFG		((unsigned int *)(MISC_BASE + 0x328))
+ #define PERIP_CFG		((unsigned int *)(MISC_BASE + 0x32c))
+ 	#define MCIF_SEL_SHIFT	3
+diff --git a/arch/arm/mach-spear13xx/include/mach/pcie.h b/arch/arm/mach-spear13xx/include/mach/pcie.h
+new file mode 100644
+index 0000000..fa302e5
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/pcie.h
+@@ -0,0 +1,170 @@
 +/*
-+ * Check if ancestor clk rate is acceptable to ddr or not.
-+ * This will call recursive rate_calc function, starting from ddr upto ancestor
-+ * clk mentioned. This will calculate divisions / multiplications by all
-+ * intermediate ancestor clocks and return the final rate of ddr if ancestor clk
-+ * sets its rate to "rate", value passed in function.
++ * arch/arm/mach-spear13xx/include/mach/pcie.h
++ *
++ * Spear SoC PCIe handling.
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Pratyush Anand <pratyush.anand@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+static int ddr_rate_acceptable(struct clk *aclk, unsigned long rate)
++
++#ifndef __MACH_PCIE_H
++#define __MACH_PCIE_H
++
++extern int (*pcie_port_is_host)(int port);
++extern int enable_pcie0_clk(void);
++
++
++struct pcie_port {
++	u8			port;
++	u8			root_bus_nr;
++	void __iomem		*base;
++	void __iomem		*app_base;
++	void __iomem		*va_app_base;
++	void __iomem		*va_dbi_base;
++	void __iomem		*va_cfg0_base;
++	spinlock_t		conf_lock;
++	char			mem_space_name[16];
++	char			io_space_name[16];
++	struct resource		res[2];
++};
++
++struct pcie_app_reg {
++	u32	app_ctrl_0;		/*cr0*/
++	u32	app_ctrl_1;		/*cr1*/
++	u32	app_status_0;		/*cr2*/
++	u32	app_status_1;		/*cr3*/
++	u32	msg_status;		/*cr4*/
++	u32	msg_payload;		/*cr5*/
++	u32	int_sts;		/*cr6*/
++	u32	int_clr;		/*cr7*/
++	u32	int_mask;		/*cr8*/
++	u32	mst_bmisc;		/*cr9*/
++	u32	phy_ctrl;		/*cr10*/
++	u32	phy_status;		/*cr11*/
++	u32	cxpl_debug_info_0;	/*cr12*/
++	u32	cxpl_debug_info_1;	/*cr13*/
++	u32	ven_msg_ctrl_0;		/*cr14*/
++	u32	ven_msg_ctrl_1;		/*cr15*/
++	u32	ven_msg_data_0;		/*cr16*/
++	u32	ven_msg_data_1;		/*cr17*/
++	u32	ven_msi_0;		/*cr18*/
++	u32	ven_msi_1;		/*cr19*/
++	u32	mst_rmisc;		/*cr 20*/
++	u32	slv_awmisc;		/*cr 21*/
++	u32	slv_armisc;		/*cr 22*/
++	u32	pom0_mem_addr_start;	/*cr23*/
++	u32	pom1_mem_addr_start;	/*cr24*/
++	u32	pom_io_addr_start;	/*cr25*/
++	u32	pom_cfg0_addr_start;	/*cr26*/
++	u32	pom_cfg1_addr_start;	/*cr27*/
++	u32	in0_mem_addr_start;	/*cr28*/
++	u32	in1_mem_addr_start;	/*cr29*/
++	u32	in_io_addr_start;	/*cr30*/
++	u32	in_cfg0_addr_start;	/*cr31*/
++	u32	in_cfg1_addr_start;	/*cr32*/
++	u32	in_msg_addr_start;	/*cr33*/
++	u32	in0_mem_addr_limit;	/*cr34*/
++	u32	in1_mem_addr_limit;	/*cr35*/
++	u32	in_io_addr_limit;	/*cr36*/
++	u32	in_cfg0_addr_limit;	/*cr37*/
++	u32	in_cfg1_addr_limit;	/*cr38*/
++	u32	in_msg_addr_limit;	/*cr39*/
++	u32	mem0_addr_offset_limit;	/*cr40*/
++	u32	pim0_mem_addr_start;	/*cr41*/
++	u32	pim1_mem_addr_start;	/*cr42*/
++	u32	pim_io_addr_start;	/*cr43*/
++	u32	pim_rom_addr_start;	/*cr44*/
++};
++
++/*CR0 ID*/
++#define RX_LANE_FLIP_EN_ID	0
++#define TX_LANE_FLIP_EN_ID	1
++#define SYS_AUX_PWR_DET_ID	2
++#define APP_LTSSM_ENABLE_ID	3
++#define SYS_ATTEN_BUTTON_PRESSED_ID	4
++#define SYS_MRL_SENSOR_STATE_ID 5
++#define SYS_PWR_FAULT_DET_ID	6
++#define SYS_MRL_SENSOR_CHGED_ID 7
++#define SYS_PRE_DET_CHGED_ID	8
++#define SYS_CMD_CPLED_INT_ID	9
++#define APP_INIT_RST_0_ID	11
++#define APP_REQ_ENTR_L1_ID	12
++#define APP_READY_ENTR_L23_ID	13
++#define APP_REQ_EXIT_L1_ID	14
++#define DEVICE_TYPE_EP		(0 << 25)
++#define DEVICE_TYPE_LEP		(1 << 25)
++#define DEVICE_TYPE_RC		(4 << 25)
++#define SYS_INT_ID		29
++#define MISCTRL_EN_ID		30
++#define REG_TRANSLATION_ENABLE	31
++
++/*CR1 ID*/
++#define APPS_PM_XMT_TURNOFF_ID	2
++#define APPS_PM_XMT_PME_ID	5
++
++/*CR3 ID*/
++#define XMLH_LTSSM_STATE_ID	0
++#define XMLH_LTSSM_STATE_L0	((u32)0x11 << XMLH_LTSSM_STATE_ID)
++#define XMLH_LTSSM_STATE_MASK	((u32)0x1F << XMLH_LTSSM_STATE_ID)
++#define XMLH_LINK_UP_ID	5
++
++/*CR4 ID*/
++#define CFG_MSI_EN_ID	18
++
++/*CR6*/
++#define INTA_CTRL_INT	(1 << 7)
++#define INTB_CTRL_INT	(1 << 8)
++#define INTC_CTRL_INT	(1 << 9)
++#define INTD_CTRL_INT	(1 << 10)
++#define MSI_CTRL_INT	(1 << 26)
++
++/*CR19 ID*/
++#define VEN_MSI_REQ_ID	11
++#define VEN_MSI_FUN_NUM_ID	8
++#define VEN_MSI_TC_ID	5
++#define VEN_MSI_VECTOR_ID	0
++#define VEN_MSI_REQ_EN	((u32)0x1 << VEN_MSI_REQ_ID)
++#define VEN_MSI_FUN_NUM_MASK	((u32)0x7 << VEN_MSI_FUN_NUM_ID)
++#define VEN_MSI_TC_MASK	((u32)0x7 << VEN_MSI_TC_ID)
++#define VEN_MSI_VECTOR_MASK	((u32)0x1F << VEN_MSI_VECTOR_ID)
++#endif
++
++/*CE21-22 ID*/
++/*ID definitio of ARMISC*/
++#define AXI_OP_TYPE_ID	0
++#define AXI_OP_BCM_ID	5
++#define AXI_OP_EP_ID	6
++#define AXI_OP_TD_ID	7
++#define AXI_OP_ATTRIBUTE_ID	8
++#define AXI_OP_TC_ID	10
++#define AXI_OP_MSG_CODE_ID	13
++#define AXI_OP_DBI_ACCESS_ID	21
++#define AXI_OP_TYPE_MASK	0x1F
++#define AXI_OP_TYPE_MEM_RDRW	0
++#define AXI_OP_TYPE_MEM_RDRW_LOCKED	1
++#define AXI_OP_TYPE_IO_RDRW	2
++#define AXI_OP_TYPE_CONFIG_RDRW_TYPE0	4
++#define AXI_OP_TYPE_CONFIG_RDRW_TYPE1	5
++#define AXI_OP_TYPE_MSG_REQ	16
++#define AXI_OP_TYPE_COMPLETION	10
++#define AXI_OP_TYPE_COMPLETION_LOCKED	11
++#define AXI_OP_TYPE_DBI_ELBI_ENABLE	1
++
++/* synopsis specific PCIE configuration registers*/
++#define PCIE_MSI_ADDR_LO	0x820	/* 32 bits */
++#define PCIE_MSI_ADDR_HI	0x824	/* 32 bits */
++#define PCIE_MSI_INTR0_ENABLE	0x828	/* 32 bits */
++#define PCIE_MSI_INTR0_MASK	0x82C	/* 32 bits */
++#define PCIE_MSI_INTR0_STATUS	0x830	/* 32 bits */
++
++/*BAR MASK registers*/
++#define PCIE_BAR0_MASK_REG	0x1010
++
++static inline void pcie_init(int (*fptr)(int port))
 +{
-+	struct ddr_rate_tbl *tbl = ddr_clk->private_data;
++	pcie_port_is_host = fptr;
++}
+diff --git a/arch/arm/mach-spear13xx/pcie.c b/arch/arm/mach-spear13xx/pcie.c
+new file mode 100644
+index 0000000..869175e
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/pcie.c
+@@ -0,0 +1,861 @@
++/*
++ * arch/arm/mach-spear13xx/pcie.c
++ *
++ * PCIe functions for SPEAr 13xx SoCs
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Pratyush Anand <pratyush.anand@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+	rate_calc(ddr_clk, aclk, &rate);
-+	if ((rate >= tbl->minrate) && (rate <= tbl->maxrate))
-+		return true;
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/kernel.h>
++#include <linux/pci.h>
++#include <linux/msi.h>
++#include <linux/mbus.h>
++#include <linux/sched.h>
++#include <asm/irq.h>
++#include <asm/mach/pci.h>
++#include <asm/mach/irq.h>
++#include <mach/pcie.h>
++#include <mach/irqs.h>
++#include <mach/misc_regs.h>
 +
-+	return false;
++#define NUM_PCIE_PORTS	3
++
++/* Sum of all these space can maximum be 256MB*/
++#define IN0_MEM_SIZE	(200 * 1024 * 1024 - 1)
++/* In current implementation address translation is done using IN0 only.
++ * So IN1 start address and IN0 end address has been kept same
++*/
++#define IN1_MEM_SIZE	(0 * 1024 * 1024 - 1)
++#define IN_IO_SIZE	(20 * 1024 * 1024 - 1)
++#define IN_CFG0_SIZE	(1 * 1024 * 1024 - 1)
++#define IN_CFG1_SIZE	(1 * 1024 * 1024 - 1)
++#define IN_MSG_SIZE	(1 * 1024 * 1024 - 1)
++
++#define MAX_LINK_UP_WAIT_JIFFIES	10
++
++int (*pcie_port_is_host)(int port);
++static struct pcie_port pcie_port[NUM_PCIE_PORTS];
++static u32 spr_pcie_base[NUM_PCIE_PORTS] = {
++	SPEAR13XX_PCIE0_BASE,
++	SPEAR13XX_PCIE1_BASE,
++	SPEAR13XX_PCIE2_BASE,
++};
++static u32 spr_pcie_app_base[NUM_PCIE_PORTS] = {
++	SPEAR13XX_PCIE0_APP_BASE,
++	SPEAR13XX_PCIE1_APP_BASE,
++	SPEAR13XX_PCIE2_APP_BASE,
++};
++
++/* Keeping all DDR area of 256MB accesible for inbound transaction */
++#define INBOUND_ADDR_MASK	0xFFFFFFF
++
++#ifdef CONFIG_PCI_MSI
++static DECLARE_BITMAP(msi_irq_in_use[NUM_PCIE_PORTS], SPEAR_NUM_MSI_IRQS);
++static unsigned int spear_msi_data[NUM_PCIE_PORTS];
++
++static void spear13xx_msi_init(struct pcie_port *pp);
++#endif
++
++static void spear_pcie_int_handler(unsigned int irq, struct irq_desc *desc);
++
++static void enable_dbi_access(struct pcie_app_reg *app_reg)
++{
++	/* Enable DBI access */
++	writel(readl(&app_reg->slv_armisc) | (1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_armisc);
++	writel(readl(&app_reg->slv_awmisc) | (1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_awmisc);
++
 +}
 +
-+/* mark all ddr ancestors with DDR_ANCESTOR flag */
-+static void mark_ddr_ancestors(struct clk *dclk)
++static void disable_dbi_access(struct pcie_app_reg *app_reg)
 +{
-+	struct clk *clk = dclk->pclk;
++	/* disable DBI access */
++	writel(readl(&app_reg->slv_armisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_armisc);
++	writel(readl(&app_reg->slv_awmisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_awmisc);
 +
-+	/* mark all ancestors of DDR */
-+	while (clk != NULL) {
-+		clk->flags |= DDR_ANCESTOR;
-+		clk = clk->pclk;
-+	}
 +}
 +
- /**
-  * round_rate - Returns index of closest programmable rate in rate_config tbl
-  * @clk: ptr to clock structure
-@@ -475,7 +527,7 @@ unsigned long pll_calc_rate(struct clk *clk, int index)
-  * In Dithered mode
-  * rate = (2 * M[15:0] * Fin)/(256 * N * 2^P)
-  */
--int pll_clk_recalc(struct clk *clk)
-+int pll_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct pll_clk_config *config = clk->private_data;
- 	unsigned int num = 2, den = 0, val, mode = 0;
-@@ -504,7 +556,7 @@ int pll_clk_recalc(struct clk *clk)
- 	if (!den)
- 		return -EINVAL;
- 
--	clk->rate = (((clk->pclk->rate/10000) * num) / den) * 10000;
-+	*rate = (((prate/10000) * num) / den) * 10000;
- 	return 0;
- }
- 
-@@ -522,6 +574,25 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
- 	if (i < 0)
- 		return i;
- 
-+	/* if clk is ddrs ancestor, check if rate is acceptable to ddr */
-+	if (ddr_clk && (clk->flags & DDR_ANCESTOR)) {
-+		int ret;
-+
-+		ret = ddr_rate_acceptable(clk, rate);
-+		if (ret == false)
-+			return -EPERM;
-+		else {
-+			/*
-+			 * call routine to put ddr in refresh mode, and
-+			 * configure pll.
-+			 */
-+			/* TBD */
-+			clk->rate = rate;
-+		}
-+
-+		return ret;
-+	}
-+
- 	val = readl(config->mode_reg) &
- 		~(config->masks->mode_mask << config->masks->mode_shift);
- 	val |= (tbls[i].mode & config->masks->mode_mask) <<
-@@ -563,7 +634,7 @@ unsigned long bus_calc_rate(struct clk *clk, int index)
- }
- 
- /* calculates current programmed rate of ahb or apb bus */
--int bus_clk_recalc(struct clk *clk)
-+int bus_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct bus_clk_config *config = clk->private_data;
- 	unsigned int div;
-@@ -574,7 +645,7 @@ int bus_clk_recalc(struct clk *clk)
- 	if (!div)
- 		return -EINVAL;
- 
--	clk->rate = (unsigned long)clk->pclk->rate / div;
-+	*rate = prate / div;
- 	return 0;
- }
- 
-@@ -600,6 +671,14 @@ int bus_clk_set_rate(struct clk *clk, unsigned long desired_rate)
- 	return 0;
- }
- 
-+/* calculates current programmed rate of ahbmult2 */
-+int
-+ahbmult2_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
++static void spear_dbi_read_reg(struct pcie_port *pp, int where, int size,
++		u32 *val)
 +{
-+	*rate = prate * 2;
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 va_address;
++
++	/* Enable DBI access */
++	enable_dbi_access(app_reg);
++
++	va_address = (u32)pp->va_dbi_base + (where & ~0x3);
++
++	*val = readl(va_address);
++
++	if (size == 1)
++		*val = (*val >> (8 * (where & 3))) & 0xff;
++	else if (size == 2)
++		*val = (*val >> (8 * (where & 3))) & 0xffff;
++
++	/* Disable DBI access */
++	disable_dbi_access(app_reg);
++}
++
++static void spear_dbi_write_reg(struct pcie_port *pp, int where, int size,
++		u32 val)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 va_address;
++
++	/* Enable DBI access */
++	enable_dbi_access(app_reg);
++
++	va_address = (u32)pp->va_dbi_base + (where & ~0x3);
++
++	if (size == 4)
++		writel(val, va_address);
++	else if (size == 2)
++		writew(val, va_address + (where & 2));
++	else if (size == 1)
++		writeb(val, va_address + (where & 3));
++
++	/* Disable DBI access */
++	disable_dbi_access(app_reg);
++}
++
++static int spear13xx_pcie_link_up(void __iomem *va_app_base)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) va_app_base;
++	unsigned long deadline = jiffies + MAX_LINK_UP_WAIT_JIFFIES;
++
++	do {
++		if (readl(&app_reg->app_status_1) &
++				((u32)1 << XMLH_LINK_UP_ID))
++			return 1;
++
++		cond_resched();
++	} while (!time_after_eq(jiffies, deadline));
++
 +	return 0;
 +}
 +
- /*
-  * gives rate for different values of eq, x and y
-  *
-@@ -627,7 +706,7 @@ unsigned long aux_calc_rate(struct clk *clk, int index)
-  *
-  * Selection of eqn 1 or 2 is programmed in register
-  */
--int aux_clk_recalc(struct clk *clk)
-+int aux_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct aux_clk_config *config = clk->private_data;
- 	unsigned int num = 1, den = 1, val, eqn;
-@@ -650,7 +729,7 @@ int aux_clk_recalc(struct clk *clk)
- 	if (!den)
- 		return -EINVAL;
- 
--	clk->rate = (((clk->pclk->rate/10000) * num) / den) * 10000;
-+	*rate = (((prate / 10000) * num) / den) * 10000;
- 	return 0;
- }
- 
-@@ -704,7 +783,7 @@ unsigned long gpt_calc_rate(struct clk *clk, int index)
-  * Fout from synthesizer can be given from below equations:
-  * Fout= Fin/((2 ^ (N+1)) * (M+1))
-  */
--int gpt_clk_recalc(struct clk *clk)
-+int gpt_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct gpt_clk_config *config = clk->private_data;
- 	unsigned int div = 1, val;
-@@ -718,7 +797,7 @@ int gpt_clk_recalc(struct clk *clk)
- 	if (!div)
- 		return -EINVAL;
- 
--	clk->rate = (unsigned long)clk->pclk->rate / div;
-+	*rate = prate / div;
- 	return 0;
- }
- 
-@@ -786,11 +865,10 @@ unsigned long clcd_calc_rate(struct clk *clk, int index)
-  * complete div (including fractional part) and then right shift the
-  * result by 14 places.
-  */
--int clcd_clk_recalc(struct clk *clk)
-+int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct clcd_clk_config *config = clk->private_data;
- 	unsigned int div = 1;
--	unsigned long prate;
- 	unsigned int val;
- 
- 	val = readl(config->synth_reg);
-@@ -800,10 +878,10 @@ int clcd_clk_recalc(struct clk *clk)
- 	if (!div)
- 		return -EINVAL;
- 
--	prate = clk->pclk->rate / 1000; /* first level division, make it KHz */
-+	prate = prate / 1000; /* first level division, make it KHz */
- 
--	clk->rate = (((unsigned long)prate << 12) / (2 * div)) >> 12;
--	clk->rate *= 1000;
-+	*rate = (((unsigned long)prate << 12) / (2 * div)) >> 12;
-+	*rate *= 1000;
- 	return 0;
- }
- 
-@@ -834,11 +912,11 @@ int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate)
-  * Used for clocks that always have value as the parent clock divided by a
-  * fixed divisor
-  */
--int follow_parent(struct clk *clk)
-+int follow_parent(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	unsigned int div_factor = (clk->div_factor < 1) ? 1 : clk->div_factor;
- 
--	clk->rate = clk->pclk->rate/div_factor;
-+	*rate = prate / div_factor;
- 	return 0;
- }
- 
-@@ -857,7 +935,7 @@ void recalc_root_clocks(void)
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	list_for_each_entry(pclk, &root_clks, sibling) {
- 		if (pclk->recalc) {
--			ret = pclk->recalc(pclk);
-+			ret = pclk->recalc(pclk, &pclk->rate, pclk->pclk->rate);
- 			/*
- 			 * recalc will return error if clk out is not programmed
- 			 * In this case configure default clock.
-@@ -873,6 +951,23 @@ void recalc_root_clocks(void)
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- 
-+void __init
-+clk_init(struct clk_lookup *clk_lookups, u32 count, struct clk *dclk)
++static void spear13xx_pcie_host_init(struct pcie_port *pp)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++
++	/*setup registers for outbound translation */
++
++	writel(pp->base, &app_reg->in0_mem_addr_start);
++	writel(app_reg->in0_mem_addr_start + IN0_MEM_SIZE,
++			&app_reg->in0_mem_addr_limit);
++	writel(app_reg->in0_mem_addr_limit + 1, &app_reg->in1_mem_addr_start);
++	writel(app_reg->in1_mem_addr_start + IN1_MEM_SIZE,
++			&app_reg->in1_mem_addr_limit);
++	writel(app_reg->in1_mem_addr_limit + 1, &app_reg->in_io_addr_start);
++	writel(app_reg->in_io_addr_start + IN_IO_SIZE,
++			&app_reg->in_io_addr_limit);
++	writel(app_reg->in_io_addr_limit + 1, &app_reg->in_cfg0_addr_start);
++	writel(app_reg->in_cfg0_addr_start + IN_CFG0_SIZE,
++			&app_reg->in_cfg0_addr_limit);
++	writel(app_reg->in_cfg0_addr_limit + 1, &app_reg->in_cfg1_addr_start);
++	writel(app_reg->in_cfg1_addr_start + IN_CFG1_SIZE,
++			&app_reg->in_cfg1_addr_limit);
++	writel(app_reg->in_cfg1_addr_limit + 1, &app_reg->in_msg_addr_start);
++	writel(app_reg->in_msg_addr_start + IN_MSG_SIZE,
++			&app_reg->in_msg_addr_limit);
++
++	writel(app_reg->in0_mem_addr_start, &app_reg->pom0_mem_addr_start);
++	writel(app_reg->in1_mem_addr_start, &app_reg->pom1_mem_addr_start);
++	writel(app_reg->in_io_addr_start, &app_reg->pom_io_addr_start);
++
++	/*setup registers for inbound translation */
++
++	writel(INBOUND_ADDR_MASK + 1, &app_reg->mem0_addr_offset_limit);
++	writel(0, &app_reg->pim0_mem_addr_start);
++	writel(0, &app_reg->pim1_mem_addr_start);
++	spear_dbi_write_reg(pp, PCIE_BAR0_MASK_REG, 4, INBOUND_ADDR_MASK);
++	spear_dbi_write_reg(pp, PCI_BASE_ADDRESS_0, 4, 0);
++
++	writel(0x0, &app_reg->pim_io_addr_start);
++	writel(0x0, &app_reg->pim_io_addr_start);
++	writel(0x0, &app_reg->pim_rom_addr_start);
++
++	writel(DEVICE_TYPE_RC | (1 << MISCTRL_EN_ID)
++			| (1 << APP_LTSSM_ENABLE_ID)
++			| ((u32)1 << REG_TRANSLATION_ENABLE),
++			&app_reg->app_ctrl_0);
++}
++
++static void __init spear13xx_pcie_preinit(void)
 +{
 +	int i;
++	struct pcie_port *pp;
++	struct pcie_app_reg *app_reg;
 +
-+	for (i = 0; i < count; i++)
-+		clk_register(&clk_lookups[i]);
++	for (i = 0; i < NUM_PCIE_PORTS; i++) {
++		pp = pcie_port + i;
++		app_reg = (struct pcie_app_reg *) (pp->va_app_base);
 +
-+	recalc_root_clocks();
++		if (!(*pcie_port_is_host)(i))
++			continue;
++		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
++			"PCIe %d MEM", pp->port);
++		pp->mem_space_name[sizeof(pp->mem_space_name) - 1] = 0;
++		pp->res[0].name = pp->mem_space_name;
++		pp->res[0].start = app_reg->in0_mem_addr_start;
++		pp->res[0].end = app_reg->in0_mem_addr_limit;
++		pp->res[0].flags = IORESOURCE_MEM;
 +
-+	/* Mark all ancestors of DDR with special flag */
-+	if (dclk) {
-+		ddr_clk = dclk;
-+		mark_ddr_ancestors(dclk);
++		snprintf(pp->io_space_name, sizeof(pp->io_space_name),
++			"PCIe %d I/O", pp->port);
++		pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
++		pp->res[1].name = pp->io_space_name;
++		pp->res[1].start = app_reg->in_io_addr_start;
++		pp->res[1].end = app_reg->in_io_addr_limit;
++		pp->res[1].flags = IORESOURCE_IO;
++
++		if (request_resource(&iomem_resource, &pp->res[0]))
++			panic("can't allocate PCIe I/O space");
++		if (request_resource(&iomem_resource, &pp->res[1]))
++			panic("can't allocate PCIe MEM space");
 +	}
 +}
 +
- #ifdef CONFIG_DEBUG_FS
- /*
-  *	debugfs support to trace clock tree hierarchy and attributes
-diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
-index 621c17c..6ddcf93 100644
---- a/arch/arm/plat-spear/include/plat/clock.h
-+++ b/arch/arm/plat-spear/include/plat/clock.h
-@@ -19,9 +19,12 @@
- #include <asm/clkdev.h>
- 
- /* clk structure flags */
--#define	ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
--#define	RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
--#define	ENABLED_ON_INIT		(1 << 2) /* clocks enabled at init */
-+#define ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
-+#define RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
-+#define ENABLED_ON_INIT		(1 << 2) /* clocks enabled@init */
-+/* Only System clocks can call other sytem clocks set rate function */
-+#define SYSTEM_CLK		(1 << 3)
-+#define DDR_ANCESTOR		(1 << 4) /* ancestor clks of DDR */
- 
- /**
-  * struct clkops - clock operations
-@@ -99,8 +102,9 @@ struct clk {
- 	unsigned int *en_reg;
- 	u8 en_reg_bit;
- 	const struct clkops *ops;
--	int (*recalc) (struct clk *);
--	int (*set_rate) (struct clk *, unsigned long rate);
-+	int (*recalc) (struct clk *clk, unsigned long *rate,
-+			unsigned long prate);
-+	int (*set_rate) (struct clk *clk, unsigned long rate);
- 	unsigned long (*calc_rate)(struct clk *, int index);
- 	struct rate_config rate_config;
- 	unsigned int div_factor;
-@@ -223,26 +227,42 @@ struct clcd_rate_tbl {
- 	u16 div;
- };
- 
-+/* ddr min, max clk rate table */
-+struct ddr_rate_tbl {
-+	unsigned long minrate;
-+	unsigned long maxrate;
++static int __init spear13xx_pcie_setup(int nr, struct pci_sys_data *sys)
++{
++	struct pcie_port *pp;
++	u32 val = 0;
++
++	if (nr >= NUM_PCIE_PORTS)
++		return 0;
++
++	if (!(*pcie_port_is_host)(nr))
++		return 0;
++
++	pp = &pcie_port[nr];
++	if (!spear13xx_pcie_link_up((void __iomem *)pp->va_app_base))
++		return 0;
++	pp->root_bus_nr = sys->busnr;
++
++	/* Generic PCIe unit setup.*/
++
++	/* Enable own BME. It is necessary to enable own BME to do a
++	 * memory transaction on a downstream device
++	 */
++	spear_dbi_read_reg(pp, PCI_COMMAND, 2, &val);
++	val |= (PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER
++			| PCI_COMMAND_PARITY | PCI_COMMAND_SERR);
++	spear_dbi_write_reg(pp, PCI_COMMAND, 2, val);
++
++	/* Need to come back here*/
++
++	sys->resource[0] = &pp->res[0];
++	sys->resource[1] = &pp->res[1];
++	sys->resource[2] = NULL;
++
++	return 1;
++}
++
++static struct pcie_port *bus_to_port(int bus)
++{
++	int i;
++
++	for (i = NUM_PCIE_PORTS - 1; i >= 0; i--) {
++		int rbus = pcie_port[i].root_bus_nr;
++		if (!(*pcie_port_is_host)(i))
++			continue;
++		if (rbus != -1 && rbus <= bus)
++			break;
++	}
++
++	return i >= 0 ? pcie_port + i : NULL;
++}
++
++static int pcie_valid_config(struct pcie_port *pp, int bus, int dev)
++{
++	/*If there is no link, then there is no device*/
++	if (!spear13xx_pcie_link_up((void __iomem *)pp->va_app_base))
++		return 0;
++	/*
++	 * Don't go out when trying to access nonexisting devices
++	 * on the local bus.
++	 * we have only one slot on each root port.
++	 */
++	if (bus == pp->root_bus_nr && dev > 0)
++		return 0;
++	return 1;
++}
++
++static int spear13xx_pcie_rd_conf(struct pcie_port *pp, struct pci_bus *bus,
++		u32 devfn, int where, int size, u32 *val)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 address = (u32)pp->va_cfg0_base | (PCI_FUNC(devfn) << 16)
++		| (where & 0xFFFC);
++
++	writel((bus->number << 24) | (PCI_SLOT(devfn) << 19),
++			&app_reg->pom_cfg0_addr_start);
++	writel(readl(&app_reg->slv_armisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_armisc);
++	writel(readl(&app_reg->slv_armisc) | AXI_OP_TYPE_CONFIG_RDRW_TYPE0,
++			&app_reg->slv_armisc);
++
++	*val = readl(address);
++	if (size == 1)
++		*val = (*val >> (8 * (where & 3))) & 0xff;
++	else if (size == 2)
++		*val = (*val >> (8 * (where & 3))) & 0xffff;
++
++	writel(readl(&app_reg->slv_armisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_armisc);
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static int pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
++			int size, u32 *val)
++{
++	struct pcie_port *pp = bus_to_port(bus->number);
++	unsigned long flags;
++	int ret;
++
++	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0) {
++		*val = 0xffffffff;
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	}
++
++	spin_lock_irqsave(&pp->conf_lock, flags);
++	ret = spear13xx_pcie_rd_conf(pp, bus, devfn, where, size, val);
++	spin_unlock_irqrestore(&pp->conf_lock, flags);
++
++	return ret;
++}
++
++static int spear13xx_pcie_wr_conf(struct pcie_port *pp, struct pci_bus *bus,
++		u32 devfn, int where, int size, u32 val)
++{
++	int ret = PCIBIOS_SUCCESSFUL;
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 address = (u32)pp->va_cfg0_base | (PCI_FUNC(devfn) << 16)
++			| (where & 0xFFFC);
++
++	writel((bus->number << 24) | (PCI_SLOT(devfn) << 19),
++			&app_reg->pom_cfg0_addr_start);
++	writel(readl(&app_reg->slv_awmisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_awmisc);
++	writel(readl(&app_reg->slv_awmisc) | AXI_OP_TYPE_CONFIG_RDRW_TYPE0,
++			&app_reg->slv_awmisc);
++	if (size == 4)
++		writel(val, address);
++	else if (size == 2)
++		writew(val, address + (where & 2));
++	else if (size == 1)
++		writeb(val, address + (where & 3));
++	else
++		ret = PCIBIOS_BAD_REGISTER_NUMBER;
++	writel(readl(&app_reg->slv_awmisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_awmisc);
++	return ret;
++}
++
++static int pcie_wr_conf(struct pci_bus *bus, u32 devfn,
++			int where, int size, u32 val)
++{
++	struct pcie_port *pp = bus_to_port(bus->number);
++	unsigned long flags;
++	int ret;
++
++	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++
++	spin_lock_irqsave(&pp->conf_lock, flags);
++	ret = spear13xx_pcie_wr_conf(pp, bus, devfn, where, size, val);
++	spin_unlock_irqrestore(&pp->conf_lock, flags);
++
++	return ret;
++}
++
++static struct pci_ops pcie_ops = {
++	.read = pcie_rd_conf,
++	.write = pcie_wr_conf,
 +};
 +
- /* platform specific clock functions */
-+/*
-+ * must be called from machine clock.c file, dclk is pointer to ddr_clk
-+ * strucutre. Which is required by clock framework.
-+ *
-+ * Actually before changing rate of DDRs ancestor, we must put ddr in refresh
-+ * state and then change parent.
++static struct pci_bus __init *
++spear13xx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
++{
++	struct pci_bus *bus;
++
++	if ((nr < NUM_PCIE_PORTS) && (*pcie_port_is_host)(nr)) {
++		bus = pci_scan_bus(sys->busnr, &pcie_ops, sys);
++	} else {
++		bus = NULL;
++		BUG();
++	}
++
++	return bus;
++}
++
++static int __init spear13xx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
++{
++	struct pcie_port *pp = bus_to_port(dev->bus->number);
++	int irq = (SPEAR_INTX0_BASE + pp->port * SPEAR_NUM_INTX_IRQS + pin - 1);
++
++	return irq;
++}
++
++static struct hw_pci spear13xx_pci __initdata = {
++	.nr_controllers	= NUM_PCIE_PORTS,
++	.preinit	= spear13xx_pcie_preinit,
++	.swizzle	= pci_std_swizzle,
++	.setup		= spear13xx_pcie_setup,
++	.scan		= spear13xx_pcie_scan_bus,
++	.map_irq	= spear13xx_pcie_map_irq,
++};
++
++void mask_intx_irq(unsigned int irq)
++{
++	int irq_offset = (irq - SPEAR_INTX0_BASE) % SPEAR_NUM_INTX_IRQS;
++	int port = (irq - SPEAR_INTX0_BASE) / SPEAR_NUM_INTX_IRQS;
++	struct pcie_port *pp = &pcie_port[port];
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++
++	switch (irq_offset) {
++	case 0:
++		writel(readl(&app_reg->int_mask) & ~INTA_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 1:
++		writel(readl(&app_reg->int_mask) & ~INTB_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 2:
++		writel(readl(&app_reg->int_mask) & ~INTC_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 3:
++		writel(readl(&app_reg->int_mask) & ~INTD_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	}
++}
++
++void unmask_intx_irq(unsigned int irq)
++{
++	int irq_offset = (irq - SPEAR_INTX0_BASE) % SPEAR_NUM_INTX_IRQS;
++	int port = (irq - SPEAR_INTX0_BASE) / SPEAR_NUM_INTX_IRQS;
++	struct pcie_port *pp = &pcie_port[port];
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++
++	switch (irq_offset) {
++	case 0:
++		writel(readl(&app_reg->int_mask) | INTA_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 1:
++		writel(readl(&app_reg->int_mask) | INTB_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 2:
++		writel(readl(&app_reg->int_mask) | INTC_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 3:
++		writel(readl(&app_reg->int_mask) | INTD_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	}
++}
++
++static struct irq_chip spear13xx_intx_chip = {
++	.name = "PCI-INTX",
++	.mask = mask_intx_irq,
++	.unmask = unmask_intx_irq,
++};
++
++static void spear13xx_int_init(struct pcie_port *pp)
++{
++	int i, irq;
++	struct pcie_app_reg *app_reg;
++
++	set_irq_chained_handler(IRQ_PCIE0 + pp->port, spear_pcie_int_handler);
++
++#ifdef CONFIG_PCI_MSI
++	spear13xx_msi_init(pp);
++#endif
++	/* Enbale INTX interrupt*/
++	app_reg = (struct pcie_app_reg *)pp->va_app_base;
++	writel(readl(&app_reg->int_mask) | INTA_CTRL_INT
++			| INTB_CTRL_INT	| INTC_CTRL_INT
++			| INTD_CTRL_INT, &app_reg->int_mask);
++
++	/* initilize INTX chip here only. MSI chip will be
++	 * initilized dynamically.*/
++	irq = (SPEAR_INTX0_BASE + pp->port * SPEAR_NUM_INTX_IRQS);
++	for (i = 0; i < SPEAR_NUM_INTX_IRQS; i++) {
++		set_irq_chip_and_handler(irq + i, &spear13xx_intx_chip,
++				handle_simple_irq);
++		set_irq_flags(irq + i, IRQF_VALID);
++	}
++}
++
++static void __init add_pcie_port(int port, u32 base, u32 app_base)
++{
++	struct pcie_port *pp = &pcie_port[port];
++	struct pcie_app_reg *app_reg;
++
++	pp->port = port;
++	pp->root_bus_nr = -1;
++	pp->base = (void __iomem *)base;
++	pp->app_base = (void __iomem *)app_base;
++	pp->va_app_base = (void __iomem *) ioremap(app_base, 0x200);
++	if (!pp->va_app_base) {
++		pr_err("error with ioremap in function %s\n", __func__);
++		return;
++	}
++	pp->va_dbi_base = (void __iomem *) ioremap(base, 0x2000);
++	if (!pp->va_dbi_base) {
++		pr_err("error with ioremap in function %s\n", __func__);
++		return;
++	}
++	spin_lock_init(&pp->conf_lock);
++	memset(pp->res, 0, sizeof(pp->res));
++	pr_info("spear13xx PCIe port %d\n", port);
++	if (spear13xx_pcie_link_up((void __iomem *)pp->va_app_base)) {
++		pr_info("link up in bios\n");
++	} else {
++		pr_info("link down in bios\n");
++		spear13xx_pcie_host_init(pp);
++		spear13xx_int_init(pp);
++		app_reg = (struct pcie_app_reg *)pp->va_app_base;
++		pp->va_cfg0_base = (void __iomem *)
++			ioremap(app_reg->in_cfg0_addr_start, IN_CFG0_SIZE);
++		if (!pp->va_cfg0_base) {
++			pr_err("error with ioremap in function %s\n", __func__);
++			return;
++		}
++
++	}
++}
++
++static int __init spear13xx_pcie_init(void)
++{
++	int port;
++	struct clk *clk;
++
++	for (port = 0; port < NUM_PCIE_PORTS; port++) {
++		/* do not enable clock if it is PCIE0. Ideally , all controller
++		 * should have been independent from others with respect to
++		 * clock. But PCIE1 and 2 depends on PCIE0.So PCIE0 clk
++		 * is provided during board init.*/
++		if (port == 1) {
++			/* Ideally CFG Clock should have been also enabled
++			 * here. But it is done currently during board
++			 * init routne*/
++			clk = clk_get_sys("pcie1", NULL);
++			if (!clk) {
++				pr_err("%s:couldn't get clk for pcie1\n",
++						__func__);
++				continue;
++			}
++			if (clk_enable(clk)) {
++				pr_err("%s:couldn't enable clk for pcie1\n",
++						__func__);
++				continue;
++			}
++		} else if (port == 2) {
++			/* Ideally CFG Clock should have been also enabled
++			 * here. But it is done currently during board
++			 * init routne*/
++			clk = clk_get_sys("pcie2", NULL);
++			if (!clk) {
++				pr_err("%s:couldn't get clk for pcie2\n",
++						__func__);
++				continue;
++			}
++			if (clk_enable(clk)) {
++				pr_err("%s:couldn't enable clk for pcie2\n",
++						__func__);
++				continue;
++			}
++		}
++
++		if ((*pcie_port_is_host)(port))
++			add_pcie_port(port, spr_pcie_base[port],
++					spr_pcie_app_base[port]);
++	}
++
++	pci_common_init(&spear13xx_pci);
++
++	return 0;
++}
++subsys_initcall(spear13xx_pcie_init);
++
++#ifdef CONFIG_PCI_MSI
++/* MSI int handler
 + */
-+void clk_init(struct clk_lookup *clk_lookups, u32 count, struct clk *dclk);
- void clk_register(struct clk_lookup *cl);
- void recalc_root_clocks(void);
++static void handle_msi(struct pcie_port *pp)
++{
++	unsigned long val;
++	int i, pos;
++
++	for (i = 0; i < 8; i++) {
++		spear_dbi_read_reg(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
++				(u32 *)&val);
++		if (val) {
++			pos = 0;
++			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
++				generic_handle_irq(SPEAR_MSI0_INT_BASE
++					+ pp->port * SPEAR_NUM_MSI_IRQS
++					+ (i * 32) + pos);
++				pos++;
++			}
++		}
++		spear_dbi_write_reg(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4, val);
++	}
++}
++#else
++static void handle_msi(struct pcie_port *pp)
++{
++}
++#endif
++
++static void spear_pcie_int_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct pcie_port *pp = &pcie_port[irq - IRQ_PCIE0];
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++	unsigned int status;
++
++	status = readl(&app_reg->int_sts);
++
++	desc->chip->ack(irq);
++
++	if (status & MSI_CTRL_INT) {
++		handle_msi(pp);
++		writel(MSI_CTRL_INT, &app_reg->int_clr);
++	} else if (status & INTA_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS);
++	else if (status & INTB_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS + 1);
++	else if (status & INTC_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS + 2);
++	else if (status & INTD_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS + 3);
++	else
++		writel(status, &app_reg->int_clr);
++
++	desc->chip->unmask(irq);
++}
++
++#ifdef CONFIG_PCI_MSI
++static int find_valid_pos0(int port, int nvec, int pos, int *pos0)
++{
++	int flag = 1;
++	do {
++		pos = find_next_zero_bit(msi_irq_in_use[port],
++				SPEAR_NUM_MSI_IRQS, pos);
++		/*if you have reached to the end then get out from here.*/
++		if (pos == SPEAR_NUM_MSI_IRQS)
++			return -ENOSPC;
++		/* Check if this position is at correct offset.nvec is always a
++		 * power of two. pos0 must be nvec bit alligned.
++		 */
++		if (pos % nvec)
++			pos += nvec - (pos % nvec);
++		else
++			flag = 0;
++	} while (flag);
++
++	*pos0 = pos;
++	return 0;
++}
++
++static void spear13xx_msi_nop(unsigned int irq)
++{
++	return;
++}
++
++static struct irq_chip spear13xx_msi_chip = {
++	.name = "PCI-MSI",
++	.ack = spear13xx_msi_nop,
++	.irq_enable = unmask_msi_irq,
++	.irq_disable = mask_msi_irq,
++	.irq_mask = mask_msi_irq,
++	.irq_unmask = unmask_msi_irq,
++};
++
++/*
++ * Dynamic irq allocate and deallocation
++ */
++static int get_irq(int nvec, struct msi_desc *desc, int *pos)
++{
++	int res, bit, irq, pos0, pos1, i;
++	u32 val;
++	struct pcie_port *pp = bus_to_port(desc->dev->bus->number);
++
++	pos0 = find_first_zero_bit(msi_irq_in_use[pp->port],
++			SPEAR_NUM_MSI_IRQS);
++	if (pos0 % nvec) {
++		if (find_valid_pos0(pp->port, nvec, pos0, &pos0))
++			goto no_valid_irq;
++	}
++	if (nvec > 1) {
++		pos1 = find_next_bit(msi_irq_in_use[pp->port],
++				SPEAR_NUM_MSI_IRQS, pos0);
++		/* there must be nvec number of consecutive free bits */
++		while ((pos1 - pos0) < nvec) {
++			if (find_valid_pos0(pp->port, nvec, pos1, &pos0))
++				goto no_valid_irq;
++			pos1 = find_next_bit(msi_irq_in_use[pp->port],
++					SPEAR_NUM_MSI_IRQS, pos0);
++		}
++	}
++
++	irq = (SPEAR_MSI0_INT_BASE + (pp->port * SPEAR_NUM_MSI_IRQS)) + pos0;;
++
++	if ((irq + nvec) > (SPEAR_MSI0_INT_END
++				+ (pp->port * SPEAR_NUM_MSI_IRQS)))
++		goto no_valid_irq;
++
++	i = 0;
++	while (i < nvec) {
++		set_bit(pos0 + i, msi_irq_in_use[pp->port]);
++		dynamic_irq_init(irq + i);
++		set_irq_msi(irq + i, desc);
++		set_irq_chip_and_handler(irq + i, &spear13xx_msi_chip,
++				handle_simple_irq);
++
++		/* Enable corresponding interrupt on MSI interrupt
++		 * controller.
++		 */
++		res = ((pos0 + i) / 32) * 12;
++		bit = (pos0 + i) % 32;
++		spear_dbi_read_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++		val |= 1 << bit;
++		spear_dbi_write_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++
++		i++;
++	}
++
++	*pos = pos0;
++	return irq;
++no_valid_irq:
++	*pos = pos0;
++	return -ENOSPC;
++}
++
++static void clean_irq(unsigned int irq)
++{
++	int res, bit, val, pos;
++	struct irq_desc *desc = irq_to_desc(irq);
++	struct pcie_port *pp = bus_to_port(desc->msi_desc->dev->bus->number);
++
++	pos = irq - (SPEAR_MSI0_INT_BASE + (pp->port * SPEAR_NUM_MSI_IRQS));
++
++	dynamic_irq_cleanup(irq);
++
++	clear_bit(pos, msi_irq_in_use[pp->port]);
++
++	/* Disable corresponding interrupt on MSI interrupt
++	 * controller.
++	 */
++	res = (pos / 32) * 12;
++	bit = pos % 32;
++	spear_dbi_read_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++	val &= ~(1 << bit);
++	spear_dbi_write_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++
++}
++
++int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
++{
++	int cvec, rvec, irq, pos;
++	struct msi_msg msg;
++	uint16_t control;
++	struct pcie_port *pp = bus_to_port(pdev->bus->number);
++
++	/*
++	 * Read the MSI config to figure out how many IRQs this device
++	 * wants.Most devices only want 1, which will give
++	 * configured_private_bits and request_private_bits equal 0.
++	 */
++	pci_read_config_word(pdev, desc->msi_attrib.pos + PCI_MSI_FLAGS,
++			&control);
++
++	/*
++	 * If the number of private bits has been configured then use
++	 * that value instead of the requested number. This gives the
++	 * driver the chance to override the number of interrupts
++	 * before calling pci_enable_msi().
++	 */
++
++	cvec = (control & PCI_MSI_FLAGS_QSIZE) >> 4;
++
++	if (cvec == 0) {
++		/* Nothing is configured, so use the hardware requested size */
++		rvec = (control & PCI_MSI_FLAGS_QMASK) >> 1;
++	} else {
++		/*
++		 * Use the number of configured bits, assuming the
++		 * driver wanted to override the hardware request
++		 * value.
++		 */
++		rvec = cvec;
++	}
++
++	/*
++	 * The PCI 2.3 spec mandates that there are at most 32
++	 * interrupts. If this device asks for more, only give it one.
++	 */
++	if (rvec > 5)
++		rvec = 0;
++
++	irq = get_irq((1 << rvec), desc, &pos);
++
++	 if (irq < 0)
++		return irq;
++
++	 /* Update the number of IRQs the device has available to it */
++	 control &= ~PCI_MSI_FLAGS_QSIZE;
++	 control |= rvec << 4;
++	 pci_write_config_word(pdev, desc->msi_attrib.pos + PCI_MSI_FLAGS,
++			 control);
++	 desc->msi_attrib.multiple = rvec;
++
++	/* An EP will modify lower 8 bits(max) of msi data while
++	 * sending any msi interrupt
++	 */
++	msg.address_hi = 0x0;
++	msg.address_lo = __virt_to_phys((u32)(&spear_msi_data[pp->port]));
++	msg.data = pos;
++	write_msi_msg(irq, &msg);
++
++	return 0;
++}
++
++void arch_teardown_msi_irq(unsigned int irq)
++{
++	clean_irq(irq);
++}
++
++static void spear13xx_msi_init(struct pcie_port *pp)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++
++	spear_dbi_write_reg(pp, PCIE_MSI_ADDR_LO, 4,
++			__virt_to_phys((u32)(&spear_msi_data[pp->port])));
++	spear_dbi_write_reg(pp, PCIE_MSI_ADDR_HI, 4, 0);
++	/* Enbale MSI interrupt*/
++	writel(readl(&app_reg->int_mask) | MSI_CTRL_INT,
++			&app_reg->int_mask);
++}
++#endif
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index 7ab1c11d0..0d1b01d 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -18,6 +18,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
++#include <mach/pcie.h>
+ #include <plat/keyboard.h>
+ #include <plat/fsmc.h>
  
- /* clock recalc & set rate functions */
--int follow_parent(struct clk *clk);
-+int follow_parent(struct clk *clk, unsigned long *rate, unsigned long prate);
- unsigned long pll_calc_rate(struct clk *clk, int index);
--int pll_clk_recalc(struct clk *clk);
-+int pll_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate);
- unsigned long bus_calc_rate(struct clk *clk, int index);
--int bus_clk_recalc(struct clk *clk);
-+int bus_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int bus_clk_set_rate(struct clk *clk, unsigned long desired_rate);
-+int ahbmult2_clk_recalc(struct clk *clk, unsigned long *rate,
-+		unsigned long prate);
- unsigned long gpt_calc_rate(struct clk *clk, int index);
--int gpt_clk_recalc(struct clk *clk);
-+int gpt_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int gpt_clk_set_rate(struct clk *clk, unsigned long desired_rate);
- unsigned long aux_calc_rate(struct clk *clk, int index);
--int aux_clk_recalc(struct clk *clk);
-+int aux_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int aux_clk_set_rate(struct clk *clk, unsigned long desired_rate);
- unsigned long clcd_calc_rate(struct clk *clk, int index);
--int clcd_clk_recalc(struct clk *clk);
-+int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate);
+@@ -50,6 +51,30 @@ static struct kbd_platform_data kbd_data = {
+ 	.rep = 1,
+ };
  
- #endif /* __PLAT_CLOCK_H */
++#ifdef CONFIG_PCIEPORTBUS
++/* this function is needed for PCIE host and device driver. Same
++ * controller can not be programmed as host as well as device. So host
++ * driver must call this function and if this function returns 1 then
++ * only host should add that particular port as RC.
++ * A port to be added as device, one must also add device's information
++ * in plat_devs array defined in this file.
++ * it is the responsibility of calling function to not send port number
++ * greter than max no of controller(3)
++ */
++static int spear1300_pcie_port_is_host(int port)
++{
++	switch (port) {
++	case 0:
++		return 0;
++	case 1:
++		return 1;
++	case 2:
++		return 1;
++	}
++	return -EINVAL;
++}
++#endif
++
+ static void __init spear1300_evb_init(void)
+ {
+ 	unsigned int i;
+@@ -68,6 +93,12 @@ static void __init spear1300_evb_init(void)
+ 	/* Register slave devices on the I2C buses */
+ 	i2c_register_board_devices();
+ 
++#ifdef CONFIG_PCIEPORTBUS
++	/* Enable PCIE0 clk */
++	enable_pcie0_clk();
++	pcie_init(&spear1300_pcie_port_is_host);
++#endif
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index 27ad1a3..e6b00ea 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -299,6 +299,34 @@ struct platform_device spear13xx_rtc_device = {
+ 	.resource = rtc_resources,
+ };
+ 
++#ifdef CONFIG_PCIEPORTBUS
++/* PCIE0 clock always needs to be enabled if any of the three PCIE port
++ * have to be used. So call this function from the board initilization
++ * file. Ideally , all controller should have been independent from
++ * others with respect to clock.
++ */
++int enable_pcie0_clk(void)
++{
++	struct clk *clk;
++	/*Enable all CLK in CFG registers here only. Idealy only PCIE0
++	 * should have been enabled. But Controler does not work
++	 * properly if PCIE1 and PCIE2's CFG CLK is enabled in stages.
++	 */
++	writel(PCIE0_CFG_VAL | PCIE1_CFG_VAL | PCIE2_CFG_VAL, PCIE_CFG);
++	clk = clk_get_sys("pcie0", NULL);
++	if (!clk) {
++		pr_err("%s:couldn't get clk for pcie0\n", __func__);
++		return -ENODEV;
++	}
++	if (clk_enable(clk)) {
++		pr_err("%s:couldn't enable clk for pcie0\n", __func__);
++		return -ENODEV;
++	}
++
++	return 0;
++}
++#endif
++
+ /* Do spear13xx familiy common initialization part here */
+ void __init spear13xx_init(void)
+ {
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 80f402b..b8e4988 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -12,6 +12,7 @@ config ARCH_SPEAR13XX
+ 	bool "SPEAr13XX"
+ 	select ARM_GIC
+ 	select CPU_V7
++	select ARCH_SUPPORTS_MSI
+ 	help
+ 	  Supports for ARM's SPEAR13XX family
+ 
 -- 
 1.7.2.2
