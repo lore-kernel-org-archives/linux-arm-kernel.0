@@ -1,7 +1,7 @@
 From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Mon, 20 Dec 2010 15:21:52 +0900
+Date: Mon, 20 Dec 2010 15:23:07 +0900
 Subject: [PATCH] drivers: ld9040 amoled driver support
-Message-ID: <1292826112-17734-1-git-send-email-dh09.lee@samsung.com>
+Message-ID: <1292826187-17758-1-git-send-email-dh09.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
