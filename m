@@ -1,80 +1,47 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 20 Dec 2010 10:02:08 -0800
-Subject: [PATCH v2] Keyboard: omap-keypad: use matrix_keypad.h
-In-Reply-To: <201012201832.24243.jkrzyszt@tis.icnet.pl>
-References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
-	<201012181639.29820.jkrzyszt@tis.icnet.pl>
-	<alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
-	<201012201832.24243.jkrzyszt@tis.icnet.pl>
-Message-ID: <20101220180207.GD9353@core.coreip.homeip.net>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 20 Dec 2010 09:51:01 -0800
+Subject: [PATCH] hvc_dcc: Simplify assembly for v6 and v7 ARM
+In-Reply-To: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
+References: <20101201192856.GA731@suse.de>
+	<1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1292867461.27552.15.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 06:32:22PM +0100, Janusz Krzysztofik wrote:
-> Monday 20 December 2010 16:29:32 Aaro Koskinen wrote:
-> > Hello,
-> >
-> > On Sat, 18 Dec 2010, Janusz Krzysztofik wrote:
-> > > Most keypad drivers make use of the <linux/input/matrix_keypad.h>
-> > > defined macros, structures and inline functions.
-> > >
-> > > Convert omap-keypad driver to use those as well, as suggested by a
-> > > compile time warning, hardcoded into the OMAP <palt/keypad.h>.
-> > >
-> > > Created against linux-2.6.37-rc5.
-> > > Tested on Amstrad Delta.
-> > > Compile tested with omap1_defconfig and omap2plus_defconfig
-> > > shrinked to board-h4.
-> > >
-> > > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> >
-> > [...]
-> >
-> > > --- linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c.orig
-> > > 2010-12-09 23:07:35.000000000 +0100 +++
-> > > linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c     
-> > > 2010-12-18 16:23:29.000000000 +0100 @@ -46,81 +46,79 @@ static u16
-> > > ams_delta_latch2_reg;
-> > > static int ams_delta_keymap[] = {
-> >
-> > [...]
-> >
-> > > +static const struct matrix_keymap_data ams_delta_keymap_data = {
-> > > +       .keymap         = ams_delta_keymap,
-> > > +       .keymap_size    = ARRAY_SIZE(ams_delta_keymap),
-> > > +};
-> >
-> > You should update the ams_delta_keymap type as well, otherwise this
-> > patch will introduce the following sparse warning:
-> >
-> >    CHECK   arch/arm/mach-omap1/board-ams-delta.c
-> > arch/arm/mach-omap1/board-ams-delta.c:191:27: warning: incorrect type in initializer (different signedness)
-> > arch/arm/mach-omap1/board-ams-delta.c:191:27:    expected unsigned int const [usertype] *keymap
-> > arch/arm/mach-omap1/board-ams-delta.c:191:27:    got int static [toplevel] *<noident>
+On Fri, 2010-12-17 at 21:16 -0800, Stephen Boyd wrote:
+> The inline assembly differences for v6 vs. v7 in the hvc_dcc
+> driver are purely optimizations. On a v7 processor, an mrc with
+> the pc sets the condition codes to the 28-31 bits of the register
+> being read. It just so happens that the TX/RX full bits the DCC
+> driver is testing for are high enough in the register to be put
+> into the condition codes. On a v6 processor, this "feature" isn't
+> implemented and thus we have to do the usual read, mask, test
+> operations to check for TX/RX full.
 > 
-> Hi Aaro,
-> How did you get this output? I'm using OpenEmbedded as my development 
-> environment. Running make with "C=1" (EXTRA_OEMAKE=" C=1 ") displays a 
-> lot but the above. Running sparse by hand breaks with "unable to 
-> open 'linux/init.h'". Any advice?
+> Since we already test the RX/TX full bits before calling
+> __dcc_getchar() and __dcc_putchar() we don't actually need to do
+> anything special for v7 over v6. The only difference is in
+> hvc_dcc_get_chars(). We would test RX full, poll RX full, and
+> then read a character from the buffer, whereas now we will test
+> RX full, read a character from the buffer, and then test RX full
+> again for the second iteration of the loop. It doesn't seem
+> possible for the buffer to go from full to empty between testing
+> the RX full and reading a character. Therefore, replace the v7
+> versions with the v6 versions and everything works the same.
 > 
+> While we're here, cleanup the for loops a bit and mark the inline
+> assembly as volatile. Not marking it volatile causes GCC to cache
+> the results of the status and RX buffer registers causing
+> lockups.
 
-Not sure why exactly your sparse does not pick it up (too old maybe?)
-but the following:
+I would expect to see three patches. One that adds volatile, which
+appears to be a good fix. Another patch that changes the assembly lines,
+and another that does the clean up. The last two are more controversial
+ones.
 
---- linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c.orig 2010-12-09 23:07:35.000000000 +0100
-+++ linux-2.6.37-rc5/arch/arm/mach-omap1/board-ams-delta.c 2010-12-18 16:23:29.000000000 +0100
-@@ -46,81 +46,79 @@ static u16 ams_delta_latch2_reg;
- static int ams_delta_keymap[] = {
-        KEY(0, 0, KEY_F1),              /* Advert    */
-
-should be
-
- static const unisgned int ams_delta_keymap[] = {
-
-Same goes for the rest of keymaps.
-
-Thanks.
+Daniel
 
 -- 
-Dmitry
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
