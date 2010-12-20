@@ -1,35 +1,134 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 20 Dec 2010 20:56:02 +0100
-Subject: [Patch 0/0] Add Epit clocks to the iMx25.
-In-Reply-To: <BLU0-SMTP512CFC79B1E0DAC0A8EEB8B8190@phx.gbl>
-References: <BLU0-SMTP512CFC79B1E0DAC0A8EEB8B8190@phx.gbl>
-Message-ID: <20101220195601.GB14221@pengutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 20 Dec 2010 14:05:09 -0600
+Subject: [PATCH v5 7/7] OMAP3630: PM: Erratum i583: disable coreoff if < ES1.2
+In-Reply-To: <1292875509-9896-1-git-send-email-nm@ti.com>
+References: <1292875509-9896-1-git-send-email-nm@ti.com>
+Message-ID: <1292875509-9896-8-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 01:47:56PM -0500, Bill Pringlemeir wrote:
-> 
-> Allow use of 'epit.0' and 'epit.1' to set clock source on the iMx25
-> platform for associated timers.
-> 
-> Signed-off-by: Bill Pringlemeir <bpringle@sympatico.ca>
-> 
+From: Eduardo Valentin <eduardo.valentin@nokia.com>
 
-Content-Description: Updates for EPIT clocks.
-> diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-> index 40c7cc4..c1446d2 100644
-> --- a/arch/arm/mach-mx25/clock.c
-> +++ b/arch/arm/mach-mx25/clock.c
-In Sascha's tree this file doesn't exist anymore, so he will probably
-ask you to rework your patch to change arch/arm/mach-imx/clock-imx25.c
-instead.
+Limitation i583: Self_Refresh Exit issue after OFF mode
 
-(Or maybe he will ask you to wait until it is switched to Jeremy's
-common clk approach.)
+Issue:
+When device is waking up from OFF mode, then SDRC state machine sends
+inappropriate sequence violating JEDEC standards.
 
-Best regards
-Uwe
+Impact:
+OMAP3630 < ES1.2 is impacted as follows depending on the platform:
+CS0: for 38.4MHz as internal sysclk, DDR content seen to be stable, while
+	for all other sysclk frequencies, varied levels of instability
+	seen based on varied parameters.
+CS1: impacted
 
+This patch takes option #3 as recommended by the Silicon erratum:
+Avoid core power domain transitioning to OFF mode. Power consumption
+impact is expected in this case.
+To do this, we route core OFF requests to RET request on the impacted
+revisions of silicon.
+
+Acked-by: Jean Pihet <j-pihet@ti.com>
+
+[nm at ti.com: rebased the code to 2.6.37-rc2- short circuit code changed a bit]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+---
+v5: used WARN_ONCE to warn user for the required paths
+v4: idle state control changed a bit -we wont register or enable
+    the states which cannot be enabled.
+v3: http://marc.info/?t=129140247800027&r=1&w=2
+    no functional change in erratum wa implementation, just registration of
+ 	erratum is collated to a single cpu detection and version check
+v2: https://patchwork.kernel.org/patch/365262/
+    rebased to this patch series instead of depending on hs changes
+    fix typo for macro definition
+v1: http://marc.info/?l=linux-omap&m=129013173425266&w=2
+ arch/arm/mach-omap2/cpuidle34xx.c |   12 ++++++++++++
+ arch/arm/mach-omap2/pm.h          |    1 +
+ arch/arm/mach-omap2/pm34xx.c      |   25 ++++++++++++++++++++++---
+ 3 files changed, 35 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index f80d3f6..ab4c862 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -453,6 +453,18 @@ void omap_init_power_states(void)
+ 	omap3_power_states[OMAP3_STATE_C7].core_state = PWRDM_POWER_OFF;
+ 	omap3_power_states[OMAP3_STATE_C7].flags = CPUIDLE_FLAG_TIME_VALID |
+ 				CPUIDLE_FLAG_CHECK_BM;
++
++	/*
++	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
++	 * enable OFF mode in a stable form for previous revisions.
++	 * we disable C7 state as a result.
++	 */
++	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583)) {
++		omap3_power_states[OMAP3_STATE_C7].valid = 0;
++		cpuidle_params_table[OMAP3_STATE_C7].valid = 0;
++		WARN_ONCE(1, "%s: core off state C7 disabled due to i583\n",
++				__func__);
++	}
+ }
+ 
+ struct cpuidle_driver omap3_idle_driver = {
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 2c1cbbd..ed2357a 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -87,6 +87,7 @@ extern unsigned int omap24xx_cpu_suspend_sz;
+ extern unsigned int omap34xx_cpu_suspend_sz;
+ 
+ #define PM_RTA_ERRATUM_i608		(1 << 0)
++#define PM_SDRC_WAKEUP_ERRATUM_i583	(1 << 1)
+ 
+ #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+ extern u16 pm34xx_errata;
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index ca3b134..652d6f5 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -928,12 +928,29 @@ void omap3_pm_off_mode_enable(int enable)
+ 		state = PWRDM_POWER_RET;
+ 
+ #ifdef CONFIG_CPU_IDLE
+-	omap3_cpuidle_update_states(state, state);
++	/*
++	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
++	 * enable OFF mode in a stable form for previous revisions, restrict
++	 * instead to RET
++	 */
++	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
++		omap3_cpuidle_update_states(state, PWRDM_POWER_RET);
++	else
++		omap3_cpuidle_update_states(state, state);
+ #endif
+ 
+ 	list_for_each_entry(pwrst, &pwrst_list, node) {
+-		pwrst->next_state = state;
+-		omap_set_pwrdm_state(pwrst->pwrdm, state);
++		if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583) &&
++				pwrst->pwrdm == core_pwrdm &&
++				state == PWRDM_POWER_OFF) {
++			pwrst->next_state = PWRDM_POWER_RET;
++			WARN_ONCE(1,
++				"%s: Core OFF disabled due to errata i583\n",
++				__func__);
++		} else {
++			pwrst->next_state = state;
++		}
++		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+ 	}
+ }
+ 
+@@ -1011,6 +1028,8 @@ static void __init pm_errata_configure(void)
+ 		pm34xx_errata |= PM_RTA_ERRATUM_i608;
+ 		/* Enable the l2 cache toggling in sleep logic */
+ 		enable_omap3630_toggle_l2_on_restore();
++		if (omap_rev() < OMAP3630_REV_ES1_2)
++			pm34xx_errata |= PM_SDRC_WAKEUP_ERRATUM_i583;
+ 	}
+ }
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.3.3
