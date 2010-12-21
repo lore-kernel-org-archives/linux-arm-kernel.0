@@ -1,46 +1,34 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 21 Dec 2010 21:26:36 +0800
-Subject: [PATCH v8 00/15] ARM: mxs: Add initial support for MX23 and MX28
-In-Reply-To: <20101220212955.GC14221@pengutronix.de>
-References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
-	<20101220212955.GC14221@pengutronix.de>
-Message-ID: <20101221132635.GH16497@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Dec 2010 13:44:43 +0000
+Subject: [PATCH v2 2/3] ARM: timer-sp: support timer clock freq other
+	than 1MHz
+In-Reply-To: <1286030086-25556-3-git-send-email-robherring2@gmail.com>
+References: <1286030086-25556-1-git-send-email-robherring2@gmail.com>
+	<1286030086-25556-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20101221134443.GA1556@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Sat, Oct 02, 2010 at 09:34:45AM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@smooth-stone.com>
+> 
+> The timer-sp code is fixed to 1MHz timer clock. Add clock api
+> calls to get the timer clock frequency and support for independent
+> clock frequencies.
+> 
+> Rename timer names for clocksource and clockevent to timer-sp or
+> the clock connection ID string if provided.
+> 
+> Signed-off-by: Rob Herring <rob.herring@smooth-stone.com>
 
-On Mon, Dec 20, 2010 at 10:29:55PM +0100, Uwe Kleine-K?nig wrote:
-> On Mon, Dec 20, 2010 at 10:57:41PM +0800, Shawn Guo wrote:
-> > Changes for v8:
-> >  - Reuse debug-pl01x.S as mxs DUART is just an amba-pl011
-> So shouldn't "ARM: mxs: Dynamically allocate duart devices" create an
-> amba-pl011 device?
-> 
-> >  - Remove extra space in iomux.c
-> >  - Remove uncessary line breaker in mach-mx23evk.c
-> > 
-> >  [PATCH v8 05/15] ARM: mxs: Add low-level debug UART support
-> >  [PATCH v8 08/15] ARM: mxs: Add iomux support
-> >  [PATCH v8 13/15] ARM: mxs: Add initial mx23evk support
-> 
-> I was not yet able to boot a machine with an imx28 because of a missing
-> rootfs (no flash, no ethernet driver) but up to there it looks good.
-> 
-> I suggest to let Sascha take the current series to get it into the next
-> merge window and to be able to start patching based on something.  (Well
-> unless Russell or Sascha still have objections.)
-> 
-> I already have a few (simple) patches; I will clean them up and send
-> them in reply to this mail.
-> 
-> My next step is to look into the fec driver to make it work on mx28, so
-> if anyone already has something and wants to stop me doing duplicate
-> work, please tell me.
-> 
-I already have a workable fec driver to mount nfs.  If you do not mind,
-I would continue the effort to send out a patch in the next a few days.
+As mentioned in the previous few days on the mailing list, rather than
+having this code half-heartedly use the clk API, I'd much rather we did
+a proper conversion.  That means having the clk API up and running
+earlier than we currently do on the ARM platforms.
 
--- 
-Regards,
-Shawn
+In order to allow this to happen, I've queued an addition to the mdesc
+record which provides an early hook which can be used for this kind of
+early platform initialization.
+
+So, after the next merge window, could you have another look at this
+please?
