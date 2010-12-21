@@ -1,72 +1,27 @@
-From: weber@corscience.de (Thomas Weber)
-Date: Tue, 21 Dec 2010 10:16:13 +0100
-Subject: [PATCH] OMAP2: Devkit8000: Use _cansleep GPIO functions for
-	display reset lines
-In-Reply-To: <AANLkTi=XEvW3iYLdaR_w+Mi_+Rpan+6QDC2qq8DnG_WH@mail.gmail.com>
-References: <AANLkTi=XEvW3iYLdaR_w+Mi_+Rpan+6QDC2qq8DnG_WH@mail.gmail.com>
-Message-ID: <4D10705D.1060904@corscience.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 21 Dec 2010 07:26:47 -0200
+Subject: [PATCH 2/2] ARM i.MX53: Make MX53 EVK bootable
+In-Reply-To: <1292902651-26636-2-git-send-email-yong.shen@freescale.com>
+References: <1292902651-26636-1-git-send-email-yong.shen@freescale.com>
+	<1292902651-26636-2-git-send-email-yong.shen@freescale.com>
+Message-ID: <AANLkTinq_kZBC3SDUhuSZCzeqVbqNHJpo3J1HgCcLfQS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.12.2010 08:47, schrieb Daniel Morsing:
-> The display reset lines are connected to a TPS65930 which may sleep
-> when changing GPIO values. Use the appropriate function to silence
-> a nasty warning from gpiolib.
->
-> Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
-> ---
->  arch/arm/mach-omap2/board-devkit8000.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-devkit8000.c
-> b/arch/arm/mach-omap2/board-devkit8000.c
-> index 53ac762..f1f58f5 100644
-> --- a/arch/arm/mach-omap2/board-devkit8000.c
-> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> @@ -118,27 +118,27 @@ static int devkit8000_panel_enable_lcd(struct
-> omap_dss_device *dssdev)
->  	twl_i2c_write_u8(TWL4030_MODULE_LED, 0x0, 0x0);
->
->  	if (gpio_is_valid(dssdev->reset_gpio))
-> -		gpio_set_value(dssdev->reset_gpio, 1);
-> +		gpio_set_value_cansleep(dssdev->reset_gpio, 1);
->  	return 0;
->  }
->
->  static void devkit8000_panel_disable_lcd(struct omap_dss_device *dssdev)
->  {
->  	if (gpio_is_valid(dssdev->reset_gpio))
-> -		gpio_set_value(dssdev->reset_gpio, 0);
-> +		gpio_set_value_cansleep(dssdev->reset_gpio, 0);
->  }
->
->  static int devkit8000_panel_enable_dvi(struct omap_dss_device *dssdev)
->  {
->  	if (gpio_is_valid(dssdev->reset_gpio))
-> -		gpio_set_value(dssdev->reset_gpio, 1);
-> +		gpio_set_value_cansleep(dssdev->reset_gpio, 1);
->  	return 0;
->  }
->
->  static void devkit8000_panel_disable_dvi(struct omap_dss_device *dssdev)
->  {
->  	if (gpio_is_valid(dssdev->reset_gpio))
-> -		gpio_set_value(dssdev->reset_gpio, 0);
-> +		gpio_set_value_cansleep(dssdev->reset_gpio, 0);
->  }
->
->  static struct regulator_consumer_supply devkit8000_vmmc1_supply =
-Hello Daniel,
+Hi Yong,
 
-Your patch is destroyed by gmail.
-Please read Documentation/email-clients.txt
+On Tue, Dec 21, 2010 at 1:37 AM,  <yong.shen@freescale.com> wrote:
+...
+> +
+> +static void __init mx53_evk_timer_init(void)
+> +{
+> + ? ? ? mx53_clocks_init(32768, 24000000, 22579200, 24576000);
+> +}
 
-I have the same patch on my list.
+The 24.576MHz clock is not populated on MX53EVK. so this should be:
 
-So you can add an
-
-Acked-by: Thomas Weber <weber@corscience.de>
-
+mx53_clocks_init(32768, 24000000, 22579200, 0);
 
 Regards,
-Thomas
+
+Fabio Estevam
