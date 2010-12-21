@@ -1,47 +1,71 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 21 Dec 2010 14:58:35 -0800
-Subject: [GIT PULL] OMAP OPP support for 2.6.38
-Message-ID: <87zkryvilg.fsf@deeprootsystems.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 21 Dec 2010 16:03:16 -0700 (MST)
+Subject: [PATCH v2 0/7] OMAP4: hwmod data fixes and update
+In-Reply-To: <1292421103-19282-1-git-send-email-b-cousson@ti.com>
+References: <1292421103-19282-1-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1012211556480.1446@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Beno?t
 
-The main OPP driver is already in manline, here is the OMAP-specific
-implementation of OPPs.   Targeted for 2.6.38 and based on your
-omap-for-linus branch due to dependencies.
+On Wed, 15 Dec 2010, Benoit Cousson wrote:
 
-Kevin
+> Here is a small set of OMAP4 hwmod data updates.
+> 
+> Re-order properly the data that were a little bit shuffled during
+> the previous merge window.
+> Add the new reset flags introduced in 2.6.37 and that were not
+> used in the hwmod data. The OMAP2 and OMAP3 fixes should come soon...
+> ...maybe not that soon :-)
+> Fix some missing field in the GPIO OMAP4 hwmod data that I missed
+> during the review.
+> IVA and DSP are added just to allow the processors device creation
+> at boot time and avoid the warnings.
+> 
+> Thanks to Charu for testing the GPIO / WD_TIMER changes.
+> Thanks to Govindraj for testing the UART changes. 
+> 
+> The series is based on your clk_a_2.6.38 branch from your integration tree
+> (git://git.pwsan.com/linux-integration) and is available here:
+> git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod_data
+> 
+> Please note that there is a slight dependency with the following patch
+> due to the name change of the iva fclk:
+> OMAP4: clock data: Add missing DPLL x2 clock node
+> https://patchwork.kernel.org/patch/396612/
+> 
+> Tested on sdp4430 + ES2.0/ES2.1.
+> 
+> Regards,
+> Benoit
+> 
+> 
+> Changes since v1:
+>     http://www.spinics.net/lists/arm-kernel/msg107082.html:
+>     - Include the changelog fixes from Paul
+>     - Fix the order of the dsp hwmod data
+>     - Fix OMAP2430 i2c dev_attr warning (minor fix, but not tested)
+>     - Include Kevin's patch to fix wakeup in hwmod core
+>     
+> 
+> Benoit Cousson (6):
+>   OMAP4: hwmod data: Fix hwmod entries order
+>   OMAP4: hwmod data: Add SYSS_HAS_RESET_STATUS flag
+>   OMAP4: hwmod data: Fix missing address in DMM and EMIF_FW
+>   OMAP4: hwmod data: Add IVA and DSP
+>   OMAP4: hwmod & clock data: Fix GPIO opt_clks and ocp_if iclk
+>   OMAP2430: hwmod data: Use common dev_attr for i2c1 and i2c2
+> 
+> Kevin Hilman (1):
+>   OMAP2+: omap_hwmod: fix wakeup enable/disable for consistency
+
+Thanks, I've updated the hwmod_b_2.6.38 branch with these changes.
+
+The 'integration-2.6.38-20101221-002' tag on 
+git://git.pwsan.com/linux-integration contains the updated patches, as 
+well as previous dependencies, based on Tony's current omap-for-linus 
+branch.
 
 
-The following changes since commit 4584acc3ee236424b5d0b52f143d980cae3c2be5:
-
-  Merge branches 'devel-iommu-mailbox' and 'devel-l2x0' into omap-for-linus (2010-12-20 19:13:40 -0800)
-
-are available in the git repository at:
-
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git pm-opp
-
-Kevin Hilman (1):
-      OMAP3: remove OPP interfaces from OMAP PM layer
-
-Nishanth Menon (2):
-      omap: opp: add OMAP3 OPP table data and common init
-      omap4: opp: add OPP table data
-
- Documentation/arm/OMAP/omap_pm            |   25 +++++++
- arch/arm/mach-omap2/Kconfig               |    4 +
- arch/arm/mach-omap2/Makefile              |    7 ++
- arch/arm/mach-omap2/io.c                  |    3 +-
- arch/arm/mach-omap2/omap_opp_data.h       |   72 +++++++++++++++++++
- arch/arm/mach-omap2/opp.c                 |   93 +++++++++++++++++++++++++
- arch/arm/mach-omap2/opp3xxx_data.c        |  107 +++++++++++++++++++++++++++++
- arch/arm/mach-omap2/opp4xxx_data.c        |   57 +++++++++++++++
- arch/arm/mach-omap2/pm.h                  |   14 ++++
- arch/arm/plat-omap/include/plat/omap-pm.h |   31 +++------
- arch/arm/plat-omap/omap-pm-noop.c         |   11 +---
- 11 files changed, 391 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap_opp_data.h
- create mode 100644 arch/arm/mach-omap2/opp.c
- create mode 100644 arch/arm/mach-omap2/opp3xxx_data.c
- create mode 100644 arch/arm/mach-omap2/opp4xxx_data.c
+- Paul
