@@ -1,47 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Dec 2010 10:55:14 -0800
-Subject: [PATCH v6 00/10] OMAP: Adding Smartreflex and Voltage driver
-	support
-In-Reply-To: <87lj3jyua2.fsf@deeprootsystems.com>
-References: <1292864357-13939-1-git-send-email-thara@ti.com>
-	<877hf45414.fsf@deeprootsystems.com>
-	<20101221022329.GC5829@atomide.com>
-	<87lj3jyua2.fsf@deeprootsystems.com>
-Message-ID: <20101221185514.GF5829@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 21 Dec 2010 11:23:53 -0800
+Subject: [PATCH 03/40] ARM: davinci: update clock source registration
+In-Reply-To: <E1PTYbk-0006hp-13@rmk-PC.arm.linux.org.uk> (Russell King's
+	message of "Fri, 17 Dec 2010 11:36:20 +0000")
+References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+	<E1PTYbk-0006hp-13@rmk-PC.arm.linux.org.uk>
+Message-ID: <87tyi7x73q.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [101221 08:17]:
-> Tony Lindgren <tony@atomide.com> writes:
-> 
-> > * Kevin Hilman <khilman@deeprootsystems.com> [101220 17:05]:
-> >> Thara Gopinath <thara@ti.com> writes:
-> >> 
-> >> > This patch series introduces smartreflex and voltage driver support
-> >> > for OMAP3430 and OMAP3630. SmartReflex modules do adaptive voltage
-> >> > control for real-time voltage adjustments.
-> >> 
-> >> Thanks Thara, these are looking good for 2.6.38.
-> >> 
-> >> Tony, unless there are major objections, I'll be queuing these two SR
-> >> series for 2.6.38.  They have dependencies on Paul's integration branch
-> >
-> > Well looking at patch 3/6 I think it should live under drivers somewhere
-> > and mostly be compiled as a module. Probably the only change needed
-> > for that is to not call cpu_is_omapxxxx but instead use some flags
-> > passed in the platform_data. Otherwise the whole series looks OK to me.
-> 
-> Moving this to be a regulator driver is part of the medium-term plan,
-> and is already under development.  For this phase, we just split up the
-> current driver into device and driver code and left under mach-omap2.
-> We are investigating (and making) changes to the regulator core so that
-> SmartReflex can be converted into a real regulator driver, but that is
-> still under development.
-> 
-> So, in the mean time, I'd like to merge this version so that other
-> development that depends on this (the regulator work mentioned above,
-> the DVFS work, etc.) can have a stable starting point.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-OK up to you.
+> In d7e81c2 (clocksource: Add clocksource_register_hz/khz interface) new
+> interfaces were added which simplify (and optimize) the selection of the
+> divisor shift/mult constants.  Switch over to using this new interface.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Tony
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+
+> ---
+>  arch/arm/mach-davinci/time.c |    7 ++-----
+>  1 files changed, 2 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+> index 0f21c36..c148671 100644
+> --- a/arch/arm/mach-davinci/time.c
+> +++ b/arch/arm/mach-davinci/time.c
+> @@ -276,7 +276,6 @@ static struct clocksource clocksource_davinci = {
+>  	.rating		= 300,
+>  	.read		= read_cycles,
+>  	.mask		= CLOCKSOURCE_MASK(32),
+> -	.shift		= 24,
+>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>  };
+>  
+> @@ -378,10 +377,8 @@ static void __init davinci_timer_init(void)
+>  
+>  	/* setup clocksource */
+>  	clocksource_davinci.name = id_to_name[clocksource_id];
+> -	clocksource_davinci.mult =
+> -		clocksource_khz2mult(davinci_clock_tick_rate/1000,
+> -				     clocksource_davinci.shift);
+> -	if (clocksource_register(&clocksource_davinci))
+> +	if (clocksource_register_hz(&clocksource_davinci,
+> +				    davinci_clock_tick_rate))
+>  		printk(err, clocksource_davinci.name);
+>  
+>  	/* setup clockevent */
