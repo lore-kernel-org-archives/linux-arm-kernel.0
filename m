@@ -1,47 +1,40 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 21 Dec 2010 08:14:34 -0600
-Subject: [PATCH v2] OMAP4: Pandaboard: Fix MMC card detect gpio line
-Message-ID: <1292940874-21419-1-git-send-email-nm@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 21 Dec 2010 08:14:57 -0600
+Subject: [PATCH v2 2/3] ARM: timer-sp: support timer clock freq other
+	than 1MHz
+In-Reply-To: <20101221134443.GA1556@n2100.arm.linux.org.uk>
+References: <1286030086-25556-1-git-send-email-robherring2@gmail.com>
+	<1286030086-25556-3-git-send-email-robherring2@gmail.com>
+	<20101221134443.GA1556@n2100.arm.linux.org.uk>
+Message-ID: <4D10B661.6070809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Raghuveer Murthy <raghuveer.murthy@ti.com>
+On 12/21/2010 07:44 AM, Russell King - ARM Linux wrote:
+> On Sat, Oct 02, 2010 at 09:34:45AM -0500, Rob Herring wrote:
+>> From: Rob Herring<rob.herring@smooth-stone.com>
+>>
+>> The timer-sp code is fixed to 1MHz timer clock. Add clock api
+>> calls to get the timer clock frequency and support for independent
+>> clock frequencies.
+>>
+>> Rename timer names for clocksource and clockevent to timer-sp or
+>> the clock connection ID string if provided.
+>>
+>> Signed-off-by: Rob Herring<rob.herring@smooth-stone.com>
+>
+> As mentioned in the previous few days on the mailing list, rather than
+> having this code half-heartedly use the clk API, I'd much rather we did
+> a proper conversion.  That means having the clk API up and running
+> earlier than we currently do on the ARM platforms.
+>
+> In order to allow this to happen, I've queued an addition to the mdesc
+> record which provides an early hook which can be used for this kind of
+> early platform initialization.
+>
+> So, after the next merge window, could you have another look at this
+> please?
 
-commit bf56f0a6668cd (2.6.37-rc1), from Nishanth Menon attempted
-to fix card detection for PandaBoard, unfortunately, the fix missed
-to initialize .gpio_cd member of omap2_hsmmc_info. This results
-in a default value of '0', which is a valid GPIO line.
-On PandaBoard, the side effect of this is that GPIO line 0 controls
-the powering TFP410 DVI chip, and without the fix DVI chip is
-inadvertently powered.
+Sure, no problem.
 
-Tested-by: David Anders <x0132446@ti.com>
-
-Acked-by: Nishanth Menon <nm@ti.com>
-
-Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
-Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
----
-v2: updated comment description to point out the potential regression.
-   it might be nice to have this in .37 rc cycle as the change was
-   introduced in .37-rc1, however, the DVI functionality(which is impacted
-   as a side effect) is not enabled in .37 rc.
-
-v1: http://marc.info/?t=129172419600002&r=1&w=2
- arch/arm/mach-omap2/board-omap4panda.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 1ecd0a6..da24745 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -142,6 +142,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
- 		.gpio_wp	= -EINVAL,
-+		.gpio_cd	= -EINVAL,
- 	},
- 	{}	/* Terminator */
- };
--- 
-1.6.3.3
+Rob
