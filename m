@@ -1,36 +1,73 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Tue, 21 Dec 2010 18:02:06 +0800
-Subject: [PATCH 2/2] ARM i.MX53: Make MX53 EVK bootable
-In-Reply-To: <AANLkTinq_kZBC3SDUhuSZCzeqVbqNHJpo3J1HgCcLfQS@mail.gmail.com>
-References: <1292902651-26636-1-git-send-email-yong.shen@freescale.com>
-	<1292902651-26636-2-git-send-email-yong.shen@freescale.com>
-	<AANLkTinq_kZBC3SDUhuSZCzeqVbqNHJpo3J1HgCcLfQS@mail.gmail.com>
-Message-ID: <AANLkTikK=NCiuMoMS+QTkQW4xOf5=v1rd-9e7LsVGsyO@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 Dec 2010 19:03:45 +0900
+Subject: [PATCH 40/54] ARM: Samsung SoCs: irq_data conversion.
+In-Reply-To: <20101214221055.GA16079@mail.wantstofly.org>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130134112.GO15575@mail.wantstofly.org>
+	<015801cb92e1$117861b0$34692510$%kim@samsung.com>
+	<20101214221055.GA16079@mail.wantstofly.org>
+Message-ID: <01b901cba0f6$5d0f16a0$172d43e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Lennert Buytenhek wrote:
+> 
+> On Fri, Dec 03, 2010 at 08:56:03PM +0900, Kukjin Kim wrote:
+> 
+> > Hi Lennert,
+> 
+> Hi again,
+> 
+> 
+> > (Added Mark Brown in Cc)
+> >
+> > Looks ok to me but there are some comments.
+> >
+> > Firstly, how about to separate this to regarding S3C24XX(mach-s3c24xx
+and
+> > plat-s3c24xx), S5P(mach-s5pxxxx and plat-s5p) and plat-samsung?
+> > (Actually, already applied S3C64XX changes so that we can drop that in
+your
+> > patch.)
+> >
+> > As you know, I already applied some changes which is from Mark Brown in
+my
+> > tree.
+> > You can find that in
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > #for-next
+> >
+> > So could you please re-work this based on that?
+> 
+> I've reworked the patch I had in my tree on top of your git tree
+> (latest commit "Merge branch 'next-s5p64x0' into for-next"), and came
+> up with the three attached patches.  I've incorporated the whitespace
+> changes you requested, and changed the struct irq_data * variable
+> names from 'd' to 'data' to match Mark's earlier patches.
+> 
+> Caveat emptor -- uncompiled, and totally untested.
+> 
+> How's this look?
+> 
+> Feel free to merge this via your tree -- I'll drop the Samsung patch
+> from my tree then.
+> 
 
-Thanks for reminding.
+Hi Lennert :-)
 
-Yong
+I found your different e-mail in your patch like following.
 
-On Tue, Dec 21, 2010 at 5:26 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Yong,
->
-> On Tue, Dec 21, 2010 at 1:37 AM, ?<yong.shen@freescale.com> wrote:
-> ...
->> +
->> +static void __init mx53_evk_timer_init(void)
->> +{
->> + ? ? ? mx53_clocks_init(32768, 24000000, 22579200, 24576000);
->> +}
->
-> The 24.576MHz clock is not populated on MX53EVK. so this should be:
->
-> mx53_clocks_init(32768, 24000000, 22579200, 0);
->
-> Regards,
->
-> Fabio Estevam
->
+"From: Lennert Buytenhek <buytenh@wantstofly.org>"
+...
+"Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>"
+
+I think, should be used same e-mail address.
+Which one do you want to use?...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
