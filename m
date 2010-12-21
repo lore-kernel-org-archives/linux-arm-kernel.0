@@ -1,79 +1,86 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Tue, 21 Dec 2010 19:46:01 +0200
-Subject: [PATCH] omap: rx51: Remove tvout code that plays with gpio 40
-Message-ID: <1292953561-22979-1-git-send-email-jhnikula@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Dec 2010 18:20:37 +0000
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20101221182037.GA4783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 60d24ee "Added video data to support tvout on rx51" added code that
-tries to assign gpio 40 as OMAP DSS reset_gpio for tvout. This is wrong
-since this gpio has nothing to do with OMAP DSS but it is used to control
-one switch that selects is the audio jack connected to tvout or audio
-circuitry.
+Having just looked at this while trying to undo the DMA API abuses
+in the PL011 UART driver, I'm getting rather frustrated with this
+code.
 
-This switch is already supported by the RX51 ASoC driver so there is no need
-to control it elsewhere. Switch is contolled with ALSA control
-'Jack Function' and tvout can be selected with following example:
+What's wrong with the PL08x DMA engine driver?  Well, in the PL011
+UART driver, you do this:
 
-	amixer -D hw:0 set 'Jack Function' 'TV-OUT'
++static void pl011_dma_tx_callback(void *data)
++{
+...
++       /* Refill the TX if the buffer is not empty */
++       if (!uart_circ_empty(xmit)) {
++               ret = pl011_dma_tx_refill(uap);
+...
++static int pl011_dma_tx_refill(struct uart_amba_port *uap)
++{
+...
++       /* Prepare the scatterlist */
++       desc = chan->device->device_prep_slave_sg(chan,
++                                                 &dmatx->scatter,
++                                                 1,
++                                                 DMA_TO_DEVICE,
++                                                 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+...
++       /* Some data to go along to the callback */
++       desc->callback = pl011_dma_tx_callback;
++       desc->callback_param = uap;
 
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-Cc: Srikar <ext-srikar.1.bhavanarayana@nokia.com>
----
- arch/arm/mach-omap2/board-rx51-video.c |   20 --------------------
- 1 files changed, 0 insertions(+), 20 deletions(-)
+Note that this calls the channel device_prep_slave_sg() from the
+callback.  This seems reasonable.
 
-diff --git a/arch/arm/mach-omap2/board-rx51-video.c b/arch/arm/mach-omap2/board-rx51-video.c
-index 9919581..acd6700 100644
---- a/arch/arm/mach-omap2/board-rx51-video.c
-+++ b/arch/arm/mach-omap2/board-rx51-video.c
-@@ -24,9 +24,6 @@
- #include "mux.h"
- 
- #define RX51_LCD_RESET_GPIO	90
--/* REVISIT  to verify with rx51.c at sound/soc/omap */
--#define RX51_TVOUT_SEL_GPIO	40
--
- 
- #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
- 
-@@ -41,17 +38,6 @@ static void rx51_lcd_disable(struct omap_dss_device *dssdev)
- 	gpio_set_value(dssdev->reset_gpio, 0);
- }
- 
--static int rx51_tvout_enable(struct omap_dss_device *dssdev)
--{
--	gpio_set_value(dssdev->reset_gpio, 1);
--	return 0;
--}
--
--static void rx51_tvout_disable(struct omap_dss_device *dssdev)
--{
--	gpio_set_value(dssdev->reset_gpio, 0);
--}
--
- static struct omap_dss_device rx51_lcd_device = {
- 	.name			= "lcd",
- 	.driver_name		= "panel-acx565akm",
-@@ -67,9 +53,6 @@ static struct omap_dss_device  rx51_tv_device = {
- 	.type			= OMAP_DISPLAY_TYPE_VENC,
- 	.driver_name		= "venc",
- 	.phy.venc.type	        = OMAP_DSS_VENC_TYPE_COMPOSITE,
--	.reset_gpio	        = RX51_TVOUT_SEL_GPIO,
--	.platform_enable        = rx51_tvout_enable,
--	.platform_disable       = rx51_tvout_disable,
- };
- 
- static struct omap_dss_device *rx51_dss_devices[] = {
-@@ -112,9 +95,6 @@ static int __init rx51_video_init(void)
- 
- 	gpio_direction_output(RX51_LCD_RESET_GPIO, 1);
- 
--	/* REVISIT  to verify with rx51.c at sound/soc/omap */
--	gpio_direction_output(RX51_TVOUT_SEL_GPIO, 1);
--
- 	platform_add_devices(rx51_video_devices,
- 				ARRAY_SIZE(rx51_video_devices));
- 	return 0;
--- 
-1.7.2.3
+Right, now let's look at this driver (from the latest kernel):
+
+static void pl08x_tasklet(unsigned long data)
+{
+...
+        spin_lock(&plchan->lock);
+...
+                dma_async_tx_callback callback =
+                        plchan->at->tx.callback;
+                void *callback_param =
+                        plchan->at->tx.callback_param;
+...
+                /*
+                 * Callback to signal completion
+                 */
+                if (callback)
+                        callback(callback_param);
+
+Note that the callback is called with the channel lock held.
+
+struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+                struct dma_chan *chan, struct scatterlist *sgl,
+                unsigned int sg_len, enum dma_data_direction direction,
+                unsigned long flags)
+{
+...
+        ret = pl08x_prep_channel_resources(plchan, txd);
+        if (ret)
+                return NULL;
+        /*
+         * NB: the channel lock is held at this point so tx_submit()
+         * must be called in direct succession.
+         */
+
+XXXXXXXX DEADLOCK XXXXXXXX
+
+Has anyone reviewed the locking in the AMBA PL08x DMA driver?
+
+It also seems to do nothing with the DMA_COMPL_* flags - it's unclear
+whether it should, but if a user were to specify one of these flags
+and the DMA engine driver ignored it, things would get stuffed as far
+as the DMA API goes.
+
+These seem to be some really basic errors - and as such I'm far from
+happy with even attempting to use this driver to the point that I'm
+thinking about starting again with it.
