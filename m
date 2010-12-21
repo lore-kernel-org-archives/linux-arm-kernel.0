@@ -1,21 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 20 Dec 2010 17:14:02 -0800
-Subject: [PATCHv2] omap: rx51: Switch rx51_tpa6130a2_data __initdata to
-	__initdata_or_module
-In-Reply-To: <1292696230-31901-1-git-send-email-jhnikula@gmail.com>
-References: <20101218002439.GA5941@atomide.com>
-	<1292696230-31901-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <20101221011402.GF5941@atomide.com>
+Date: Mon, 20 Dec 2010 17:14:44 -0800
+Subject: [PATCH] omap: pandora: fix wifi support
+In-Reply-To: <1292798016-11098-1-git-send-email-notasas@gmail.com>
+References: <1292798016-11098-1-git-send-email-notasas@gmail.com>
+Message-ID: <20101221011444.GG5941@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jhnikula@gmail.com> [101218 10:17]:
-> If the TPA6130 is compiled as module the id and power_gpio values are
-> arbitrary at module probing time since the rx51_tpa6130a2_data was marked as
-> __initdata. Fix this by using __initdata_or_module. Then __initdata is
-> defined only if the kernel is built without CONFIG_MODULES and omitted
-> otherwise.
+* Grazvydas Ignotas <notasas@gmail.com> [101219 14:33]:
+> After commit ed919b0 "mmc: sdio: fix runtime PM anomalies by introducing
+> MMC_CAP_POWER_OFF_CARD" it is required to specify MMC_CAP_POWER_OFF_CARD
+> to have runtime PM support. As the wl1251 driver expects card to be
+> powered down when it's not used, wifi will no longer work after interface
+> is brought down at least once without functioning runtime PM.
+> 
+> Fix this by declaring MMC_CAP_POWER_OFF_CARD for MMC3.
+> 
+> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+> ---
+> this is a fix but can go for 2.6.38 as wl1251 runtime PM support
+> is only queued for .38 .
 
-Thanks applying.
+Thanks queuing for the merge window.
+
+Regards,
 
 Tony
