@@ -1,63 +1,79 @@
 From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Tue, 21 Dec 2010 19:25:35 +0200
-Subject: [PATCH 2/2] omap: rx51: Add vdda_dac supply for tvout
-In-Reply-To: <1292952335-21314-1-git-send-email-jhnikula@gmail.com>
-References: <1292952335-21314-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <1292952335-21314-3-git-send-email-jhnikula@gmail.com>
+Date: Tue, 21 Dec 2010 19:46:01 +0200
+Subject: [PATCH] omap: rx51: Remove tvout code that plays with gpio 40
+Message-ID: <1292953561-22979-1-git-send-email-jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commmit 60d24ee "Added video data to support tvout on rx51" broke the DSS
-on RX51/N900 since it added DSS VENC support but a patch adding needed
-supply is missing from tree and no framebuffers are initialized.
+Commit 60d24ee "Added video data to support tvout on rx51" added code that
+tries to assign gpio 40 as OMAP DSS reset_gpio for tvout. This is wrong
+since this gpio has nothing to do with OMAP DSS but it is used to control
+one switch that selects is the audio jack connected to tvout or audio
+circuitry.
 
-This patch is basically cleaned up version of original one:
-http://marc.info/?l=linux-omap&m=129070041402418&w=2
+This switch is already supported by the RX51 ASoC driver so there is no need
+to control it elsewhere. Switch is contolled with ALSA control
+'Jack Function' and tvout can be selected with following example:
+
+	amixer -D hw:0 set 'Jack Function' 'TV-OUT'
 
 Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
 Cc: Srikar <ext-srikar.1.bhavanarayana@nokia.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
-Mark cc'edd since he had comments to the original patch what this patch is
-trying to address.
----
- arch/arm/mach-omap2/board-rx51-peripherals.c |   11 +++++++++--
- 1 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-rx51-video.c |   20 --------------------
+ 1 files changed, 0 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index 768f0dc..e75e240 100644
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -363,6 +363,10 @@ static struct regulator_consumer_supply rx51_vaux1_consumers[] = {
- 	REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
+diff --git a/arch/arm/mach-omap2/board-rx51-video.c b/arch/arm/mach-omap2/board-rx51-video.c
+index 9919581..acd6700 100644
+--- a/arch/arm/mach-omap2/board-rx51-video.c
++++ b/arch/arm/mach-omap2/board-rx51-video.c
+@@ -24,9 +24,6 @@
+ #include "mux.h"
+ 
+ #define RX51_LCD_RESET_GPIO	90
+-/* REVISIT  to verify with rx51.c at sound/soc/omap */
+-#define RX51_TVOUT_SEL_GPIO	40
+-
+ 
+ #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
+ 
+@@ -41,17 +38,6 @@ static void rx51_lcd_disable(struct omap_dss_device *dssdev)
+ 	gpio_set_value(dssdev->reset_gpio, 0);
+ }
+ 
+-static int rx51_tvout_enable(struct omap_dss_device *dssdev)
+-{
+-	gpio_set_value(dssdev->reset_gpio, 1);
+-	return 0;
+-}
+-
+-static void rx51_tvout_disable(struct omap_dss_device *dssdev)
+-{
+-	gpio_set_value(dssdev->reset_gpio, 0);
+-}
+-
+ static struct omap_dss_device rx51_lcd_device = {
+ 	.name			= "lcd",
+ 	.driver_name		= "panel-acx565akm",
+@@ -67,9 +53,6 @@ static struct omap_dss_device  rx51_tv_device = {
+ 	.type			= OMAP_DISPLAY_TYPE_VENC,
+ 	.driver_name		= "venc",
+ 	.phy.venc.type	        = OMAP_DSS_VENC_TYPE_COMPOSITE,
+-	.reset_gpio	        = RX51_TVOUT_SEL_GPIO,
+-	.platform_enable        = rx51_tvout_enable,
+-	.platform_disable       = rx51_tvout_disable,
  };
  
-+static struct regulator_consumer_supply rx51_vdac_supply[] = {
-+	REGULATOR_SUPPLY("vdda_dac", "omapdss"),
-+};
-+
- static struct regulator_init_data rx51_vaux1 = {
- 	.constraints = {
- 		.name			= "V28",
-@@ -480,14 +484,17 @@ static struct regulator_init_data rx51_vsim = {
+ static struct omap_dss_device *rx51_dss_devices[] = {
+@@ -112,9 +95,6 @@ static int __init rx51_video_init(void)
  
- static struct regulator_init_data rx51_vdac = {
- 	.constraints = {
-+		.name			= "VDAC",
- 		.min_uV			= 1800000,
- 		.max_uV			= 1800000,
-+		.apply_uV		= true,
- 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
- 					| REGULATOR_MODE_STANDBY,
--		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
--					| REGULATOR_CHANGE_MODE
-+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= rx51_vdac_supply,
- };
+ 	gpio_direction_output(RX51_LCD_RESET_GPIO, 1);
  
- static struct regulator_init_data rx51_vio = {
+-	/* REVISIT  to verify with rx51.c at sound/soc/omap */
+-	gpio_direction_output(RX51_TVOUT_SEL_GPIO, 1);
+-
+ 	platform_add_devices(rx51_video_devices,
+ 				ARRAY_SIZE(rx51_video_devices));
+ 	return 0;
 -- 
 1.7.2.3
