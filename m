@@ -1,64 +1,218 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 21 Dec 2010 10:31:32 +0100
-Subject: [patch 1/5] ehci-mxc: Enable vbus later
-In-Reply-To: <20101220155810.708379512@rtp-net.org>
-References: <20101220154853.254931637@rtp-net.org>
-	<20101220155810.708379512@rtp-net.org>
-Message-ID: <20101221093132.GZ6017@pengutronix.de>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Tue, 21 Dec 2010 13:00:43 +0300
+Subject: [PATCH 1/6 v9] ARM: Add basic architecture support for
+	VIA/WonderMedia 85xx SoC's
+In-Reply-To: <4D1011CF.9080800@bluewatersys.com>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<20101107165745.GB1759@n2100.arm.linux.org.uk>
+	<AANLkTimFJ=Brx4pDiUqZOKDfABaDg0s_yFC7EkZGi7D8@mail.gmail.com>
+	<20101107171726.GF1759@n2100.arm.linux.org.uk>
+	<20101108171930.GA1471@alchark-u3s.lan>
+	<20101111212322.GA15533@alchark-u3s.lan>
+	<20101111234957.GA28735@n2100.arm.linux.org.uk>
+	<20101219174017.GA31832@alchark-u3s>
+	<20101220191549.GH28157@n2100.arm.linux.org.uk>
+	<20101220195423.GA14509@alchark-u3s>
+	<4D0FC1AE.2050708@bluewatersys.com>
+	<AANLkTin4XqbGwznp56Xjt_zest6rxNmir0QDJWTySY4+@mail.gmail.com>
+	<4D0FD747.9020700@bluewatersys.com>
+	<AANLkTikAWjK7ACyt=LedhyyrhsCk1WCiyWz182CXMe9C@mail.gmail.com>
+	<4D0FE546.7050302@bluewatersys.com>
+	<AANLkTinyYKrhTcBMMCE4A2oFQHm11cqSZQozytGu+d6o@mail.gmail.com>
+	<4D1011CF.9080800@bluewatersys.com>
+Message-ID: <AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 04:48:54PM +0100, Arnaud Patard wrote:
-> vbus should be enabled after usb_add_hcd() otherwise USB is not working
-> on my efikamx.
+2010/12/21 Ryan Mallon <ryan@bluewatersys.com>:
+> On 12/21/2010 12:49 PM, Alexey Charkov wrote:
+>> 2010/12/21 Ryan Mallon <ryan@bluewatersys.com>:
+>>> On 12/21/2010 12:00 PM, Alexey Charkov wrote:
+>>>> 2010/12/21 Ryan Mallon <ryan@bluewatersys.com>:
+>>>>> On 12/21/2010 10:48 AM, Alexey Charkov wrote:
+>>>>>> 2010/12/20 Ryan Mallon <ryan@bluewatersys.com>:
+>>>>>>> On 12/21/2010 08:54 AM, Alexey Charkov wrote:
+>>>>>>>> This adds support for the family of Systems-on-Chip produced initially
+>>>>>>>> by VIA and now its subsidiary WonderMedia that have recently become
+>>>>>>>> widespread in lower-end Chinese ARM-based tablets and netbooks.
+>>>>>>>>
+>>>>>>>> Support is included for both VT8500 and WM8505, selectable by a
+>>>>>>>> configuration switch at kernel build time.
+>>>>>>>>
+>>>>>>>> Included are basic machine initialization files, register and
+>>>>>>>> interrupt definitions, support for the on-chip interrupt controller,
+>>>>>>>> high-precision OS timer, GPIO lines, necessary macros for early debug,
+>>>>>>>> pulse-width-modulated outputs control, as well as platform device
+>>>>>>>> configurations for the specific drivers implemented elsewhere.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+>>>>>>>
+>>>>>>> Hi Alexey,
+>>>>>>>
+>>>>>>> Quick review below.
+>>>>>
+>>>>>> <snip>
+>>>>>>>> +void __init wmt_set_resources(void)
+>>>>>>>> +{
+>>>>>>>> + ? ? resources_lcdc[0].start = wmt_current_regs->lcdc;
+>>>>>>>> + ? ? resources_lcdc[0].end = wmt_current_regs->lcdc + SZ_1K - 1;
+>>>>>>>> + ? ? resources_lcdc[1].start = wmt_current_irqs->lcdc;
+>>>>>>>> + ? ? resources_lcdc[1].end = wmt_current_irqs->lcdc;
+>>>>>>>
+>>>>>>> Ah, this makes more sense. But why have all the indirection? The
+>>>>>>> wmt_regmaps table could just be replaced with #defines and then have
+>>>>>>> separate device files for the VT8500 and the WM8505. This would also
+>>>>>>> make clearer which variants have which peripherals.
+>>>>>>>
+>>>>>>
+>>>>>> This was the way I implemented it originally. However, Arnd made quite
+>>>>>> a valid suggestion to allow runtime selection of the chip variant,
+>>>>>> thus registers and interrupts need to be held in an indexed data type
+>>>>>> instead of just compile-time macros. In addition, there is now some
+>>>>>> overall movement towards unification of binary kernel images for
+>>>>>> different ARM variants (as far as I can see), so this would be
+>>>>>> required in any case.
+>>>>>>
+>>>>>> Furthermore, as with many unbranded Chinese products, it's somewhat
+>>>>>> difficult to reliably determine the exact chip version used in your
+>>>>>> netbook without disassembling it. Reading a hardware register for
+>>>>>> identification is easier :)
+>>>>>
+>>>>> Okay, that makes sense. I still think there must be a better way than
+>>>>> having a massive indirect table with all the values. Why not detect the
+>>>>> variant in the core code and then have something like:
+>>>>>
+>>>>> int init_devices(void)
+>>>>> {
+>>>>> ? ? ? ?int board_type = detect_board_type();
+>>>>>
+>>>>> ? ? ? ?switch (board_type) {
+>>>>> ? ? ? ?case BOARD_TYPE_VT8500:
+>>>>> ? ? ? ? ? ? ? ?return vt8500_init_devices();
+>>>>>
+>>>>> ? ? ? ?case BOARD_TYPE_WM8505:
+>>>>> ? ? ? ? ? ? ? ?return wm8500_init_devices();
+>>>>> ? ? ? ?}
+>>>>>
+>>>>> ? ? ? ?pr_err("Unknown board type\n");
+>>>>> ? ? ? ?BUG(); /* panic()? */
+>>>>> ? ? ? ?while (1)
+>>>>> ? ? ? ? ? ? ? ?;
+>>>>> }
+>>>>>
+>>>>> Then you can have the peripheral setup for each of the variants in their
+>>>>> own files and use #defines. It may get tricky in a couple of places if
+>>>>> you need to be able to access some value directly which is different on
+>>>>> each of the variants, but that can be handled on a case by case basis.
+>>>>> The majority of the numbers will be passed into drivers via the resource
+>>>>> structs.
+>>>>>
+>>>>
+>>>> This is more or less what I'm doing right now - except for the
+>>>> separation between different files. I tried to avoid duplication of
+>>>> similar things here. Is the indirect table really a big issue? I'm a
+>>>> bit reluctant to copy about the whole devices.c for each chip variant,
+>>>> which would be otherwise required. Further, it would add more
+>>>> complexity to the timer, irq, gpio, i8042 and probably some other
+>>>> places.
+>>>
+>>> Yeah, agreed about the duplication. My approach would require the common
+>>> peripherals to be defined for each variant. I'm not entirely against the
+>>> indirect table (and am even starting to think it may be the best overall
+>>> solution), it's just that it can be a bit difficult to follow because to
+>>> add a device you need to do the following:
+>>>
+>>> ?- Add a partially empty resource/platform_device struct
+>>> ?- Add resource entries to the resource table definition
+>>> ?- Add resource values to the resource table
+>>> ?- Add assignment of resource values to device init code
+>>>
+>>
+>> That's actually only one step more than what machines with static
+>> resource definitions require (the last one). Flexibility does come at
+>> a cost, so there should be a mathematical limit to optimization of
+>> this thing :)
+>
+> No it isn't. You don't have the massive table, which requires
+> modifications to both the definition and declaration, on machines with
+> static resource definitions.
+>
+> How about using the resource structures directly rather than introducing
+> the table which is effectively holding the same information? Something
+> like this?
+>
+> In vt8500_resources.c (and similarly for wm8505_resources.c):
+>
+> static struct resource vt8500_resources_uart0[] __initdata = {
+> ? ? ? ?[0] = {
+> ? ? ? ? ? ? ? ?.flags ?= IORESOURCE_MEM,
+> ? ? ? ? ? ? ? ?.start ?= VT8500_UART0_PHYS_BASE,
+> ? ? ? ? ? ? ? ?.end ? ?= VT8500_UART0_PHYS_BASE + 0xff,
+> ? ? ? ?},
+> ? ? ? ?[1] = {
+> ? ? ? ? ? ? ? ?.flags ?= IORESOURCE_IRQ,
+> ? ? ? ? ? ? ? ?.start ?= VT8500_UART0_IRQ,
+> ? ? ? ? ? ? ? ?.end ? ?= VT8500_UART0_IRQ,
+> ? ? ? ?},
+> };
+>
+> struct resource *vt8500_resources[] __initdata = {
+> ? ? ? ?[VT8500_UART0] = &vt8500_resources_uart0,
+> ? ? ? ?...
+> };
+>
+> In devices.c:
+>
+> extern struct resource *vt8500_resources;
+> extern struct resource *wm8505_resources;
+>
+> /* Set this pointer according to board variant */
+> static struct resource *resources;
+>
+> void __init wmt_set_resources(void)
+> {
+> ? ? ? ?vt8500_device_uart0.resource = resources[VT8500_UART0];
+> ? ? ? ?...
+> }
+>
+> This way we only have a single externed resource structure per
+> board-variant, there is no additional table needed, and the resource
+> definitions can be read clearly. Alternatively the wmt_regmaps/wmt_irqs
+> tables could be modified to use struct resource rather than individual
+> fields which would simplify the assignments later.
 
-There is really something wrong with the way we handle initialization of
-the mxc ehci controller. There are frequently patches posted trying to
-change this order, and I think we are at a point where we can't move
-anymore without possibly breaking some other board. Should this be
-completely board dependend in the end?
+This way we will again duplicate quite much: those files will mostly
+differ in just the macro definitions of specific registers/irqs.
 
-Sascha
+What if I just move all the initializations inside my runtime helper
+function, and add a macro to save space and improve readability?
+Something along the lines of:
 
-> 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: tst-usb/drivers/usb/host/ehci-mxc.c
-> ===================================================================
-> --- tst-usb.orig/drivers/usb/host/ehci-mxc.c	2010-12-20 15:38:41.000000000 +0100
-> +++ tst-usb/drivers/usb/host/ehci-mxc.c	2010-12-20 15:38:43.000000000 +0100
-> @@ -210,11 +210,6 @@
->  			ret = -ENODEV;
->  			goto err_add;
->  		}
-> -		ret = otg_set_vbus(pdata->otg, 1);
-> -		if (ret) {
-> -			dev_err(dev, "unable to enable vbus on transceiver\n");
-> -			goto err_add;
-> -		}
->  	}
->  
->  	priv->hcd = hcd;
-> @@ -224,6 +219,14 @@
->  	if (ret)
->  		goto err_add;
->  
-> +	if (pdata->otg) {
-> +		ret = otg_set_vbus(pdata->otg, 1);
-> +		if (ret) {
-> +			dev_err(dev, "unable to enable vbus on transceiver\n");
-> +			goto err_add;
-> +		}
-> +	}
-> +
->  	return 0;
->  
->  err_add:
-> 
-> 
-> 
+static struct resource resources_lcdc[2] __initdata;
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+#define WMT_MMIO_RES(__start, __size) \
+{\
+        .flags = IORESOURCE_MEM,\
+        .start = __start,\
+        .end = __start + __size - 1,\
+}
+#define WMT_IRQ_RES(__irq) \
+{\
+        .flags = IORESOURCE_IRQ,\
+        .start = __irq,\
+        .end = __irq,\
+}
+
+void __init wmt_set_resources(void)
+{
+     resources_lcdc[0] = WMT_MMIO_RES(wmt_current_regs->lcdc, SZ_1K);
+     resources_lcdc[1] = WMT_IRQ_RES(wmt_current_irqs->lcdc);
+...
+}
+
+Then there will be no half-empty initializations scattered around
+separate from the other assignments (which is probably the worst thing
+in current configuration).
+
+Best regards,
+Alexey
