@@ -1,60 +1,68 @@
-From: daniel.morsing@gmail.com (Daniel Morsing)
-Date: Tue, 21 Dec 2010 11:23:13 +0100
-Subject: [PATCH v2] OMAP2: Devkit8000: Use _cansleep GPIO functions for
-	display reset lines
-Message-ID: <1292926993.9611.10.camel@morsing>
+From: buytenh@wantstofly.org ('Lennert Buytenhek')
+Date: Tue, 21 Dec 2010 11:24:10 +0100
+Subject: [PATCH 40/54] ARM: Samsung SoCs: irq_data conversion.
+In-Reply-To: <01b901cba0f6$5d0f16a0$172d43e0$%kim@samsung.com>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130134112.GO15575@mail.wantstofly.org>
+	<015801cb92e1$117861b0$34692510$%kim@samsung.com>
+	<20101214221055.GA16079@mail.wantstofly.org>
+	<01b901cba0f6$5d0f16a0$172d43e0$%kim@samsung.com>
+Message-ID: <20101221102410.GA15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display reset lines are connected to a TPS65930 which may sleep
-when changing GPIO values. Use the appropriate function to silence
-a nasty warning from gpiolib.
+On Tue, Dec 21, 2010 at 07:03:45PM +0900, Kukjin Kim wrote:
 
-Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
-Acked-by: Thomas Weber <weber@corscience.de>
----
+> > > (Added Mark Brown in Cc)
+> > >
+> > > Looks ok to me but there are some comments.
+> > >
+> > > Firstly, how about to separate this to regarding S3C24XX(mach-s3c24xx
+> and
+> > > plat-s3c24xx), S5P(mach-s5pxxxx and plat-s5p) and plat-samsung?
+> > > (Actually, already applied S3C64XX changes so that we can drop that in
+> your
+> > > patch.)
+> > >
+> > > As you know, I already applied some changes which is from Mark Brown in
+> my
+> > > tree.
+> > > You can find that in
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > > #for-next
+> > >
+> > > So could you please re-work this based on that?
+> > 
+> > I've reworked the patch I had in my tree on top of your git tree
+> > (latest commit "Merge branch 'next-s5p64x0' into for-next"), and came
+> > up with the three attached patches.  I've incorporated the whitespace
+> > changes you requested, and changed the struct irq_data * variable
+> > names from 'd' to 'data' to match Mark's earlier patches.
+> > 
+> > Caveat emptor -- uncompiled, and totally untested.
+> > 
+> > How's this look?
+> > 
+> > Feel free to merge this via your tree -- I'll drop the Samsung patch
+> > from my tree then.
+> 
+> Hi Lennert :-)
 
-Gmail destroyed the previous patch send, so resending with a sane client.
+Hello,
 
----
- arch/arm/mach-omap2/board-devkit8000.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 53ac762..f1f58f5 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -118,27 +118,27 @@ static int devkit8000_panel_enable_lcd(struct omap_dss_device *dssdev)
- 	twl_i2c_write_u8(TWL4030_MODULE_LED, 0x0, 0x0);
- 
- 	if (gpio_is_valid(dssdev->reset_gpio))
--		gpio_set_value(dssdev->reset_gpio, 1);
-+		gpio_set_value_cansleep(dssdev->reset_gpio, 1);
- 	return 0;
- }
- 
- static void devkit8000_panel_disable_lcd(struct omap_dss_device *dssdev)
- {
- 	if (gpio_is_valid(dssdev->reset_gpio))
--		gpio_set_value(dssdev->reset_gpio, 0);
-+		gpio_set_value_cansleep(dssdev->reset_gpio, 0);
- }
- 
- static int devkit8000_panel_enable_dvi(struct omap_dss_device *dssdev)
- {
- 	if (gpio_is_valid(dssdev->reset_gpio))
--		gpio_set_value(dssdev->reset_gpio, 1);
-+		gpio_set_value_cansleep(dssdev->reset_gpio, 1);
- 	return 0;
- }
- 
- static void devkit8000_panel_disable_dvi(struct omap_dss_device *dssdev)
- {
- 	if (gpio_is_valid(dssdev->reset_gpio))
--		gpio_set_value(dssdev->reset_gpio, 0);
-+		gpio_set_value_cansleep(dssdev->reset_gpio, 0);
- }
- 
- static struct regulator_consumer_supply devkit8000_vmmc1_supply =
--- 
-1.7.3.3
+> I found your different e-mail in your patch like following.
+> 
+> "From: Lennert Buytenhek <buytenh@wantstofly.org>"
+> ...
+> "Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>"
+> 
+> I think, should be used same e-mail address.
+> Which one do you want to use?...
+
+I don't think there is a requirement to use the same one for both,
+but if it bothers you, please use the latter one.
+
+
+thanks,
+Lennert
