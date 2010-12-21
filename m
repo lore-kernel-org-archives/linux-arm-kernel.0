@@ -1,27 +1,64 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 21 Dec 2010 07:26:47 -0200
-Subject: [PATCH 2/2] ARM i.MX53: Make MX53 EVK bootable
-In-Reply-To: <1292902651-26636-2-git-send-email-yong.shen@freescale.com>
-References: <1292902651-26636-1-git-send-email-yong.shen@freescale.com>
-	<1292902651-26636-2-git-send-email-yong.shen@freescale.com>
-Message-ID: <AANLkTinq_kZBC3SDUhuSZCzeqVbqNHJpo3J1HgCcLfQS@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 21 Dec 2010 10:31:32 +0100
+Subject: [patch 1/5] ehci-mxc: Enable vbus later
+In-Reply-To: <20101220155810.708379512@rtp-net.org>
+References: <20101220154853.254931637@rtp-net.org>
+	<20101220155810.708379512@rtp-net.org>
+Message-ID: <20101221093132.GZ6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+On Mon, Dec 20, 2010 at 04:48:54PM +0100, Arnaud Patard wrote:
+> vbus should be enabled after usb_add_hcd() otherwise USB is not working
+> on my efikamx.
 
-On Tue, Dec 21, 2010 at 1:37 AM,  <yong.shen@freescale.com> wrote:
-...
+There is really something wrong with the way we handle initialization of
+the mxc ehci controller. There are frequently patches posted trying to
+change this order, and I think we are at a point where we can't move
+anymore without possibly breaking some other board. Should this be
+completely board dependend in the end?
+
+Sascha
+
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Index: tst-usb/drivers/usb/host/ehci-mxc.c
+> ===================================================================
+> --- tst-usb.orig/drivers/usb/host/ehci-mxc.c	2010-12-20 15:38:41.000000000 +0100
+> +++ tst-usb/drivers/usb/host/ehci-mxc.c	2010-12-20 15:38:43.000000000 +0100
+> @@ -210,11 +210,6 @@
+>  			ret = -ENODEV;
+>  			goto err_add;
+>  		}
+> -		ret = otg_set_vbus(pdata->otg, 1);
+> -		if (ret) {
+> -			dev_err(dev, "unable to enable vbus on transceiver\n");
+> -			goto err_add;
+> -		}
+>  	}
+>  
+>  	priv->hcd = hcd;
+> @@ -224,6 +219,14 @@
+>  	if (ret)
+>  		goto err_add;
+>  
+> +	if (pdata->otg) {
+> +		ret = otg_set_vbus(pdata->otg, 1);
+> +		if (ret) {
+> +			dev_err(dev, "unable to enable vbus on transceiver\n");
+> +			goto err_add;
+> +		}
+> +	}
 > +
-> +static void __init mx53_evk_timer_init(void)
-> +{
-> + ? ? ? mx53_clocks_init(32768, 24000000, 22579200, 24576000);
-> +}
+>  	return 0;
+>  
+>  err_add:
+> 
+> 
+> 
 
-The 24.576MHz clock is not populated on MX53EVK. so this should be:
-
-mx53_clocks_init(32768, 24000000, 22579200, 0);
-
-Regards,
-
-Fabio Estevam
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
