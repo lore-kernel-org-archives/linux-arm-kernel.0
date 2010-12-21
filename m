@@ -1,47 +1,29 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 21 Dec 2010 11:01:35 +0000
-Subject: [PATCH 1/2] ARM: convert dma-mapping to asm-generic API
-In-Reply-To: <20101221103652.GL28157@n2100.arm.linux.org.uk>
-References: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
-	<20101221103652.GL28157@n2100.arm.linux.org.uk>
-Message-ID: <20101221110135.GE2822@pulham.picochip.com>
+From: weber@corscience.de (Thomas Weber)
+Date: Tue, 21 Dec 2010 12:07:09 +0100
+Subject: [PATCH] OMAP3: Devkit8000: Add DEBUG_LL support
+Message-ID: <1292929629-3396-1-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 21, 2010 at 10:36:52AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 21, 2010 at 10:20:01AM +0000, Jamie Iles wrote:
-> > Note: this patch also requires "ARM: dmabounce: fix partial sync in
-> > dma_sync_single_* API" from FUJITA Tomonori:
-> > 
-> > 	http://www.spinics.net/lists/netdev/msg126826.html
-> > 
-> > which allows us to do fuzzy matching of the buffers when using
-> > dmabounce.
-> 
-> Which I've already said no to.
+Add support for DEBUG_LL for Devkit8000.
+Devkit8000 uses uart 3 for debug output.
 
-Ok, perhaps I missed some other posts. From that thread the only objections I 
-found were to do with the indentation style and they were fixed up.
+Signed-off-by: Thomas Weber <weber@corscience.de>
+---
+ arch/arm/plat-omap/include/plat/uncompress.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-> I don't believe that the direction taken there is anywhere near the right
-> one - the approach we have (implementing the whole buffer sync in terms
-> of the partial buffer sync) is the far more logical, simpler and safer
-> way, and doesn't lead to the possibility of two partially overlapping
-> mappings causing the wrong one to be operated upon.
-> 
-> The debug code doesn't check for overlapping mappings in any way, so we
-> can't say that they never occur.
->
-> With the way that the DMA API has gone, I view the "generic" stuff as
-> a disaster.
-
-Ok I can't disagree with that. I've had a look at some of the other arches and 
-I can't see an obvious reason why we couldn't change the generic 
-implementation to do the sync in the way you describe. Perhaps I'll have a 
-look at that after the holidays.
-
-With regards to the API debug, any objections to adding the necessary calls 
-into the existing ARM implementation? Perhaps it'll catch some misuses of the 
-API.
-
-Jamie
+diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
+index 7bbc074..ad98b85 100644
+--- a/arch/arm/plat-omap/include/plat/uncompress.h
++++ b/arch/arm/plat-omap/include/plat/uncompress.h
+@@ -146,6 +146,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		DEBUG_LL_OMAP3(3, cm_t35);
+ 		DEBUG_LL_OMAP3(3, cm_t3517);
+ 		DEBUG_LL_OMAP3(3, craneboard);
++		DEBUG_LL_OMAP3(3, devkit8000);
+ 		DEBUG_LL_OMAP3(3, igep0020);
+ 		DEBUG_LL_OMAP3(3, igep0030);
+ 		DEBUG_LL_OMAP3(3, nokia_rm680);
+-- 
+1.7.3.4
