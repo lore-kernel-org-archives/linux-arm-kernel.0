@@ -1,42 +1,27 @@
-From: nvishwan@codeaurora.org (nvishwan at codeaurora.org)
-Date: Tue, 21 Dec 2010 15:45:45 -0800 (PST)
-Subject: [PATCH] msm: rmnet: msm rmnet smd virtual ethernet driver
-In-Reply-To: <20101215134406.3a634aa8@nehalam>
-References: <1292437866-11652-1-git-send-email-nvishwan@codeaurora.org>
-	<20101215134406.3a634aa8@nehalam>
-Message-ID: <2c27ccc1dd4db9a31cd961f0ffaed886.squirrel@www.codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 21 Dec 2010 16:51:28 -0700 (MST)
+Subject: [PATCH] OMAP3: clocks: Update clock domain name for mcspi fck
+In-Reply-To: <51292.10.24.255.18.1292591498.squirrel@dbdmail.itg.ti.com>
+References: <51292.10.24.255.18.1292591498.squirrel@dbdmail.itg.ti.com>
+Message-ID: <alpine.DEB.2.00.1012211648500.1446@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, 15 Dec 2010 10:31:06 -0800
-> Niranjana Vishwanathapura <nvishwan@codeaurora.org> wrote:
->
->> +
->> +static DECLARE_TASKLET(smd_net_data_tasklet, smd_net_data_handler, 0);
->> +
->> +static void smd_net_notify(void *_dev, unsigned event)
->> +{
->> +	if (event != SMD_EVENT_DATA)
->> +		return;
->> +
->> +	smd_net_data_tasklet.data = (unsigned long) _dev;
->> +
->> +	tasklet_schedule(&smd_net_data_tasklet);
->> +}
->> +
->
-> Rather than having private tasklet, maybe using NAPI
-> would be better?
->
-> Also since you are already in tasklet, no need to call netif_rx()
-> when receiving packet; instead use netif_receive_skb directly.
->
-> --
->
+On Fri, 17 Dec 2010, Govindraj.R wrote:
 
-NAPI will not buy much as the SMD transport doesn't provide a machanism to
-stop interrupts.  I will consider using NAPI in the future (it requires
-performance testing on lot of different targets).
+> From: Charulatha V <charu@ti.com>
+> 
+> Update clock3xxx_data for mcspi1-4 with appropriate clock domain name.
+> 
+> Signed-off-by: Charulatha V <charu@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
 
-However, I can replace netif_rx() by netif_receive_skb() and send out new
-patch
+Thanks, queued for 2.6.38 in the 'clk_b_2.6.38' branch on 
+git://git.pwsan.com/linux-2.6
+
+It has also been added to the integration tree as part of tag 
+'integration-2.6.38-20101221-004' on git://git.pwsan.com/linux-integration
+
+
+- Paul
