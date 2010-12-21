@@ -1,28 +1,44 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 21 Dec 2010 09:47:50 +0530
-Subject: [PATCH V3 39/63] GIC: Added dummy handlers for Power Management
-	Suspend Resume
-In-Reply-To: <20101220114948.GC28157@n2100.arm.linux.org.uk>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
-	<20101220111056.GB28157@n2100.arm.linux.org.uk>
-	<4D0F3EC1.5030207@st.com>
-	<20101220114948.GC28157@n2100.arm.linux.org.uk>
-Message-ID: <4D102A6E.6020604@st.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 20 Dec 2010 21:39:46 -0700
+Subject: [PATCH] ARM: Add missing SZ_{32,64,128}
+In-Reply-To: <20101220093017.GS1940@pengutronix.de>
+References: <20101220093017.GS1940@pengutronix.de>
+Message-ID: <1292906386-15195-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2010 05:19 PM, Russell King - ARM Linux wrote:
-> It is a hack, plain and simple.  You're adding code to misrepresent what
-> the hardware can do.  You're fooling the system into thinking that the
-> GIC can control wake-up sources, when in fact the GIC has zero wakeup
-> capabilities what so ever.
+... and also remove misleading comment stating that this header is
+auto-generated.
 
-Ok, understood.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/include/asm/sizes.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-I will drop this patch while sending this patchset to your patch tracker.
-Also we will send driver fixes separately to respective mailing lists, in 
-which we find issue, similar to serial_core.c.
-
+diff --git a/arch/arm/include/asm/sizes.h b/arch/arm/include/asm/sizes.h
+index 4fc1565..316bb2b 100644
+--- a/arch/arm/include/asm/sizes.h
++++ b/arch/arm/include/asm/sizes.h
+@@ -13,9 +13,6 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-/* DO NOT EDIT!! - this file automatically generated
+- *                 from .s file by awk -f s2h.awk
+- */
+ /*  Size definitions
+  *  Copyright (C) ARM Limited 1998. All rights reserved.
+  */
+@@ -25,6 +22,9 @@
+ 
+ /* handy sizes */
+ #define SZ_16				0x00000010
++#define SZ_32				0x00000020
++#define SZ_64				0x00000040
++#define SZ_128				0x00000080
+ #define SZ_256				0x00000100
+ #define SZ_512				0x00000200
+ 
 -- 
-viresh
+1.7.2.3
+nvpublic
