@@ -1,36 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 20 Dec 2010 19:48:36 -0800
-Subject: [GIT] pull request: DMA hwmod changes
-In-Reply-To: <20101221021152.GA18883@manju-desktop>
-References: <20101219035948.GC15568@GLPP-machine> <4D0F33C9.40402@ti.com>
-	<20101221021152.GA18883@manju-desktop>
-Message-ID: <20101221034836.GE5829@atomide.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 21 Dec 2010 09:47:50 +0530
+Subject: [PATCH V3 39/63] GIC: Added dummy handlers for Power Management
+	Suspend Resume
+In-Reply-To: <20101220114948.GC28157@n2100.arm.linux.org.uk>
+References: <cover.1292833228.git.viresh.kumar@st.com>
+	<674f9b1ab90602072d7adcd856453380ed21872b.1292833229.git.viresh.kumar@st.com>
+	<20101220111056.GB28157@n2100.arm.linux.org.uk>
+	<4D0F3EC1.5030207@st.com>
+	<20101220114948.GC28157@n2100.arm.linux.org.uk>
+Message-ID: <4D102A6E.6020604@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/20/2010 05:19 PM, Russell King - ARM Linux wrote:
+> It is a hack, plain and simple.  You're adding code to misrepresent what
+> the hardware can do.  You're fooling the system into thinking that the
+> GIC can control wake-up sources, when in fact the GIC has zero wakeup
+> capabilities what so ever.
 
-* G, Manjunath Kondaiah <manjugk@ti.com> [101220 18:11]:
-> Hi Tony,
-> Benoit comments are taken care and new pull request is generated as
-> below. The omap4 hwmod database for dma is rearranged as per Benoit's
-> convention + no idlest flag entry is removed + sysc_flags are barrowed
-> from latest omap4 hwmod data base.
+Ok, understood.
 
-OK great, I've applied them now.
- 
-> The following changes since commit 205e4d6e8d892176d791b77a974efe7f561ca4c3:
-> 
->   Merge branch 'for-next' (2010-12-17 19:32:47 -0800)
+I will drop this patch while sending this patchset to your patch tracker.
+Also we will send driver fixes separately to respective mailing lists, in 
+which we find issue, similar to serial_core.c.
 
-I ended up cherry picking them. For next time, note that you should not
-do any git branches to pull against anything but mainline tags. Otherwise
-tons of non-mainline history would get merged..
-
-If you cannot base your branch on some recent mainline tag because of
-conflicts, then you should use some branch that will stay around,
-like what we have queued into omap-for-linus.
-
-Cheers,
-
-Tony
+-- 
+viresh
