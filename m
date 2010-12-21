@@ -1,65 +1,31 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 20 Dec 2010 20:11:29 -0600
-Subject: [PATCH v5 6/7] OMAP3: PM: make omap3_cpuidle_update_states
-	independent of enable_off_mode
-In-Reply-To: <87mxo02bv9.fsf@deeprootsystems.com>
-References: <1292875509-9896-1-git-send-email-nm@ti.com>	<1292875509-9896-7-git-send-email-nm@ti.com>	<87hbe83tcy.fsf@deeprootsystems.com>
-	<87mxo02bv9.fsf@deeprootsystems.com>
-Message-ID: <4D100CD1.8000100@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Dec 2010 18:23:30 -0800
+Subject: [PATCH v6 00/10] OMAP: Adding Smartreflex and Voltage driver
+	support
+In-Reply-To: <877hf45414.fsf@deeprootsystems.com>
+References: <1292864357-13939-1-git-send-email-thara@ti.com>
+	<877hf45414.fsf@deeprootsystems.com>
+Message-ID: <20101221022329.GC5829@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman wrote, on 12/20/2010 06:44 PM:
-> Kevin Hilman<khilman@deeprootsystems.com>  writes:
->
->> Nishanth Menon<nm@ti.com>  writes:
->>
->>> Currently omap3_cpuidle_update_states makes whole sale decision
->>> on which C states to update based on enable_off_mode variable
->>> Instead, achieve the same functionality by independently providing
->>> mpu and core deepest states the system is allowed to achieve and
->>> update the idle states accordingly.
->>>
->>> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>> Acked-by: Jean Pihet<j-pihet@ti.com>
->>>
->>> Signed-off-by: Nishanth Menon<nm@ti.com>
->>
->> This patch doesnt' compile with CPUidle enabled.
->>
->> You missed one other caller of the update_states function inside
->> cpuidle34xx.c which is only there when CONFIG_CPU_IDLE=y
->>
->
-> Something like the following folded into this patch makes it compile and
-> work as before.
->
-> If this looks OK to you, I'll fold it in.
->
+* Kevin Hilman <khilman@deeprootsystems.com> [101220 17:05]:
+> Thara Gopinath <thara@ti.com> writes:
+> 
+> > This patch series introduces smartreflex and voltage driver support
+> > for OMAP3430 and OMAP3630. SmartReflex modules do adaptive voltage
+> > control for real-time voltage adjustments.
+> 
+> Thanks Thara, these are looking good for 2.6.38.
+> 
+> Tony, unless there are major objections, I'll be queuing these two SR
+> series for 2.6.38.  They have dependencies on Paul's integration branch
 
-Kevin,
-thanks. apologies on missing this. looks fine to me.
+Well looking at patch 3/6 I think it should live under drivers somewhere
+and mostly be compiled as a module. Probably the only change needed
+for that is to not call cpu_is_omapxxxx but instead use some flags
+passed in the platform_data. Otherwise the whole series looks OK to me.
 
-> Kevin
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx
-> index ab4c862..0fb619c 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -517,7 +517,10 @@ int __init omap3_idle_init(void)
->                  return -EINVAL;
->          dev->state_count = count;
->
-> -       omap3_cpuidle_update_states();
-> +       if (enable_off_mode)
-> +               omap3_cpuidle_update_states(PWRDM_POWER_OFF, PWRDM_POWER_OFF);
-> +       else
-> +               omap3_cpuidle_update_states(PWRDM_POWER_RET, PWRDM_POWER_RET);
->
->          if (cpuidle_register_device(dev)) {
->                  printk(KERN_ERR "%s: CPUidle register device failed\n",
-
-
--- 
 Regards,
-Nishanth Menon
+
+Tony
