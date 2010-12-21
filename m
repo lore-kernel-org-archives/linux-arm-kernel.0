@@ -1,57 +1,27 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 20 Dec 2010 16:44:26 -0800
-Subject: [PATCH v5 6/7] OMAP3: PM: make omap3_cpuidle_update_states
-	independent of enable_off_mode
-In-Reply-To: <87hbe83tcy.fsf@deeprootsystems.com> (Kevin Hilman's message of
-	"Mon, 20 Dec 2010 15:41:17 -0800")
-References: <1292875509-9896-1-git-send-email-nm@ti.com>
-	<1292875509-9896-7-git-send-email-nm@ti.com>
-	<87hbe83tcy.fsf@deeprootsystems.com>
-Message-ID: <87mxo02bv9.fsf@deeprootsystems.com>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Mon, 20 Dec 2010 19:54:35 -0500
+Subject: iMx25 Register defines. [was: [Patch 0/0] Add Epit clocks to the
+	iMx25.]
+In-Reply-To: <20101220195601.GB14221@pengutronix.de> (Uwe =?iso-8859-1?Q?K?=
+	=?iso-8859-1?Q?leine-K=F6nig's?=
+	message of "Mon, 20 Dec 2010 20:56:02 +0100")
+References: <BLU0-SMTP512CFC79B1E0DAC0A8EEB8B8190@phx.gbl>
+	<20101220195601.GB14221@pengutronix.de>
+Message-ID: <BLU0-SMTP14BBC0E025F8C91149528FB81A0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@deeprootsystems.com> writes:
 
-> Nishanth Menon <nm@ti.com> writes:
->
->> Currently omap3_cpuidle_update_states makes whole sale decision
->> on which C states to update based on enable_off_mode variable
->> Instead, achieve the same functionality by independently providing
->> mpu and core deepest states the system is allowed to achieve and
->> update the idle states accordingly.
->>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Acked-by: Jean Pihet <j-pihet@ti.com>
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->
-> This patch doesnt' compile with CPUidle enabled.
->
-> You missed one other caller of the update_states function inside
-> cpuidle34xx.c which is only there when CONFIG_CPU_IDLE=y
->
+On 20 Dec 2010, u.kleine-koenig at pengutronix.de wrote:
 
-Something like the following folded into this patch makes it compile and
-work as before.
+> In Sascha's tree this file doesn't exist anymore, so he will
+> probably ask you to rework your patch to change
+> arch/arm/mach-imx/clock-imx25.c instead.
 
-If this looks OK to you, I'll fold it in.
+> (Or maybe he will ask you to wait until it is switched to Jeremy's
+> common clk approach.)
 
-Kevin
+Ok.  Thx.
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx
-index ab4c862..0fb619c 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -517,7 +517,10 @@ int __init omap3_idle_init(void)
-                return -EINVAL;
-        dev->state_count = count;
- 
--       omap3_cpuidle_update_states();
-+       if (enable_off_mode)
-+               omap3_cpuidle_update_states(PWRDM_POWER_OFF, PWRDM_POWER_OFF);
-+       else
-+               omap3_cpuidle_update_states(PWRDM_POWER_RET, PWRDM_POWER_RET);
- 
-        if (cpuidle_register_device(dev)) {
-                printk(KERN_ERR "%s: CPUidle register device failed\n",
+-- 
+If swimming is so good for your figure, how do you explain whales?
