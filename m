@@ -1,38 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Dec 2010 10:51:49 +0000
-Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with
-	high frequency clocks
-In-Reply-To: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
-References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
-Message-ID: <20101221105149.GO28157@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Dec 2010 11:54:08 +0100
+Subject: [PATCH 1/2] ARM: convert dma-mapping to asm-generic API
+In-Reply-To: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
+References: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <201012211154.08821.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 08:21:41PM -0500, Nicolas Pitre wrote:
+On Tuesday 21 December 2010 11:20:01 Jamie Iles wrote:
+> This converts ARM to use the asm-generic/dma-mapping-common API for
+> the DMA API. As a side effect, this also allows us to take advantage
+> of DMA API debugging (CONFIG_DMA_API_DEBUG).
 > 
-> The minsec argument to clocks_calc_mult_shift() [ which appears to be
-> misnamed by the way ] is used to clamp the magnitude of the mult factor
-> so that the given range won't overflow a 64 bit result.  The mult factor
-> is itself already limited to a maximum of 32 bits.  Given that the largest
-> clock tick range we may have is also 32 bits, there is no way our usage of
-> any computed mult factor would ever overflow 64 bits.
+> We have dma_map_ops for normal, non-coherent architectures, fully
+> coherent architectures and architectures that require dmabounce
+> support. A dma_ops field is added to struct dev_archdata so platforms
+> using an ACP can override the dma operations for that device to be
+> fully coherent e.g.
 > 
-> The choice of 60 seconds here for minsec is rather arbitrary.  If the
-> mult factor wasn't already limited to 32 bits, this value of 60 would
-> create overflows for clocks which take more than 60 seconds to wrap.
+>         struct device *my_coherent_device;
+>         my_coherent_device->dev_archdata.dma_ops = &coherent_dma_ops;
 
-60 seconds was arbitary, chosen from the selection of clock rates which
-I had available at the time (the highest of which was 24MHz).
+I think what's more important here is the ability to use an IOMMU on
+some devices while other devices are mapped statically.
 
-> And for clocks which take less than 60 seconds to wrap then we do lose
-> precision as the mult factor is made smaller (fewer bits) to be adjusted
-> to a range which is larger than what we actually use.  This currently
-> affects clocks faster than 71MHz.
-> 
-> We could use minsec = 0 instead of 60 and a good 32-bit mult factor would
-> be computed in all cases.  But let's be formal and provide the actual
-> range to clocks_calc_mult_shift(). None of the cyc_to_fixed_sched_clock()
-> users are affected as they all are using clocks < 71MHz.
+I believe at the moment, at least MSM and OMAP support an IOMMU, but
+we don't provide support for that in the DMA mapping interface yet.
 
-Maybe __clocksource_updatefreq_scale() needs a similar fix too, instead
-of assuming 5 seconds?  It also has access to the mask and rate.
+	Arnd
