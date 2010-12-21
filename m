@@ -1,86 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Dec 2010 18:20:37 +0000
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20101221182037.GA4783@n2100.arm.linux.org.uk>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 21 Dec 2010 16:38:21 -0200
+Subject: [PATCH v2 1/2] ARM: mx3/mx31_3ds: Add support for OTG host mode
+Message-ID: <1292956702-14645-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having just looked at this while trying to undo the DMA API abuses
-in the PL011 UART driver, I'm getting rather frustrated with this
-code.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
 
-What's wrong with the PL08x DMA engine driver?  Well, in the PL011
-UART driver, you do this:
+- Added USB related entries into Kconfig
 
-+static void pl011_dma_tx_callback(void *data)
+ arch/arm/mach-mx3/Kconfig         |    2 ++
+ arch/arm/mach-mx3/mach-mx31_3ds.c |   36 +++++++++++++++++++++++++++++++++++-
+ 2 files changed, 37 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 9037c4e..0717f88 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -96,8 +96,10 @@ config MACH_MX31_3DS
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_MXC_EHCI
+ 	select IMX_HAVE_PLATFORM_MXC_NAND
+ 	select IMX_HAVE_PLATFORM_SPI_IMX
++	select MXC_ULPI if USB_ULPI
+ 	help
+ 	  Include support for MX31PDK (3DS) platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+index c488491..fd7b722 100644
+--- a/arch/arm/mach-mx3/mach-mx31_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+@@ -22,6 +22,8 @@
+ #include <linux/mfd/mc13783.h>
+ #include <linux/spi/spi.h>
+ #include <linux/regulator/machine.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -32,6 +34,7 @@
+ #include <mach/common.h>
+ #include <mach/iomux-mx3.h>
+ #include <mach/3ds_debugboard.h>
++#include <mach/ulpi.h>
+ 
+ #include "devices-imx31.h"
+ #include "devices.h"
+@@ -212,11 +215,33 @@ usbotg_free_reset:
+ 	return err;
+ }
+ 
++#if defined(CONFIG_USB_ULPI)
++static struct mxc_usbh_platform_data otg_pdata __initdata = {
++	.portsc	= MXC_EHCI_MODE_ULPI,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
++};
++#endif
++
+ static const struct fsl_usb2_platform_data usbotg_pdata __initconst = {
+ 	.operating_mode = FSL_USB2_DR_DEVICE,
+ 	.phy_mode	= FSL_USB2_PHY_ULPI,
+ };
+ 
++static int otg_mode_host;
++
++static int __init mx31_3ds_otg_mode(char *options)
 +{
-...
-+       /* Refill the TX if the buffer is not empty */
-+       if (!uart_circ_empty(xmit)) {
-+               ret = pl011_dma_tx_refill(uap);
-...
-+static int pl011_dma_tx_refill(struct uart_amba_port *uap)
-+{
-...
-+       /* Prepare the scatterlist */
-+       desc = chan->device->device_prep_slave_sg(chan,
-+                                                 &dmatx->scatter,
-+                                                 1,
-+                                                 DMA_TO_DEVICE,
-+                                                 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-...
-+       /* Some data to go along to the callback */
-+       desc->callback = pl011_dma_tx_callback;
-+       desc->callback_param = uap;
-
-Note that this calls the channel device_prep_slave_sg() from the
-callback.  This seems reasonable.
-
-Right, now let's look at this driver (from the latest kernel):
-
-static void pl08x_tasklet(unsigned long data)
-{
-...
-        spin_lock(&plchan->lock);
-...
-                dma_async_tx_callback callback =
-                        plchan->at->tx.callback;
-                void *callback_param =
-                        plchan->at->tx.callback_param;
-...
-                /*
-                 * Callback to signal completion
-                 */
-                if (callback)
-                        callback(callback_param);
-
-Note that the callback is called with the channel lock held.
-
-struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
-                struct dma_chan *chan, struct scatterlist *sgl,
-                unsigned int sg_len, enum dma_data_direction direction,
-                unsigned long flags)
-{
-...
-        ret = pl08x_prep_channel_resources(plchan, txd);
-        if (ret)
-                return NULL;
-        /*
-         * NB: the channel lock is held at this point so tx_submit()
-         * must be called in direct succession.
-         */
-
-XXXXXXXX DEADLOCK XXXXXXXX
-
-Has anyone reviewed the locking in the AMBA PL08x DMA driver?
-
-It also seems to do nothing with the DMA_COMPL_* flags - it's unclear
-whether it should, but if a user were to specify one of these flags
-and the DMA engine driver ignored it, things would get stuffed as far
-as the DMA API goes.
-
-These seem to be some really basic errors - and as such I'm far from
-happy with even attempting to use this driver to the point that I'm
-thinking about starting again with it.
++	if (!strcmp(options, "host"))
++		otg_mode_host = 1;
++	else if (!strcmp(options, "device"))
++		otg_mode_host = 0;
++	else
++		pr_info("otg_mode neither \"host\" nor \"device\". "
++			"Defaulting to device\n");
++	return 0;
++}
++__setup("otg_mode=", mx31_3ds_otg_mode);
++
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+@@ -247,7 +272,16 @@ static void __init mxc_board_init(void)
+ 	imx31_add_imx_keypad(&mx31_3ds_keymap_data);
+ 
+ 	mx31_3ds_usbotg_init();
+-	imx31_add_fsl_usb2_udc(&usbotg_pdata);
++#if defined(CONFIG_USB_ULPI)
++	if (otg_mode_host) {
++		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
++				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
++
++		imx31_add_mxc_ehci_otg(&otg_pdata);
++	}
++#endif
++	if (!otg_mode_host)
++		imx31_add_fsl_usb2_udc(&usbotg_pdata);
+ 
+ 	if (mxc_expio_init(MX31_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+ 		printk(KERN_WARNING "Init of the debug board failed, all "
+-- 
+1.6.0.4
