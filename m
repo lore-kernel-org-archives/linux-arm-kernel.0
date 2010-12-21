@@ -1,26 +1,38 @@
-From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Tue, 21 Dec 2010 17:23:34 +0530
-Subject: [PATCH] ux500: remove unnecessary barrier from the secondary startup
-Message-ID: <1292932414-21714-1-git-send-email-srinidhi.kasagar@stericsson.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Dec 2010 13:05:06 +0100
+Subject: [PATCH 1/6 v9] ARM: Add basic architecture support for
+	VIA/WonderMedia 85xx SoC's
+In-Reply-To: <AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<4D1011CF.9080800@bluewatersys.com>
+	<AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>
+Message-ID: <201012211305.06344.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
----
- arch/arm/mach-ux500/headsmp.S |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+On Tuesday 21 December 2010 11:00:43 Alexey Charkov wrote:
+> #define WMT_IRQ_RES(__irq) \
+> {\
+>         .flags = IORESOURCE_IRQ,\
+>         .start = __irq,\
+>         .end = __irq,\
+> }
+> 
+> void __init wmt_set_resources(void)
+> {
+>      resources_lcdc[0] = WMT_MMIO_RES(wmt_current_regs->lcdc, SZ_1K);
+>      resources_lcdc[1] = WMT_IRQ_RES(wmt_current_irqs->lcdc);
+> ...
+> }
+> 
+> Then there will be no half-empty initializations scattered around
+> separate from the other assignments (which is probably the worst thing
+> in current configuration).
 
-diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
-index a6be2cd..64fa451 100644
---- a/arch/arm/mach-ux500/headsmp.S
-+++ b/arch/arm/mach-ux500/headsmp.S
-@@ -23,7 +23,6 @@ ENTRY(u8500_secondary_startup)
- 	ldmia	r4, {r5, r6}
- 	sub	r4, r4, r5
- 	add	r6, r6, r4
--	dsb
- pen:	ldr	r7, [r6]
- 	cmp	r7, r0
- 	bne	pen
--- 
-1.7.2.dirty
+If you use platform_device_add_resources() to add the resource
+at a later point, or platform_device_register_simple, you don't
+even need to statically allocate the resource structure, which may
+also make this simpler because you can keep all the data structures
+local to the function filling them out.
+
+	Arnd
