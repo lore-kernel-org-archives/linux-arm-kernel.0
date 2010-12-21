@@ -1,32 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Dec 2010 08:58:09 +0200
-Subject: [Patch v5] AM35xx: Craneboard: Add USB EHCI support
-In-Reply-To: <1292850523-14583-1-git-send-email-srinath@mistralsolutions.com>
-References: <[PATCH]AM35xx-Craneboard-Add-USB-EHCI-support>
-	<1292850523-14583-1-git-send-email-srinath@mistralsolutions.com>
-Message-ID: <20101221065809.GB2921@legolas.emea.dhcp.ti.com>
+From: daniel.morsing@gmail.com (Daniel Morsing)
+Date: Tue, 21 Dec 2010 08:47:49 +0100
+Subject: [PATCH] OMAP2: Devkit8000: Use _cansleep GPIO functions for display
+	reset lines
+Message-ID: <AANLkTi=XEvW3iYLdaR_w+Mi_+Rpan+6QDC2qq8DnG_WH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 06:38:43PM +0530, srinath at mistralsolutions.com wrote:
->From: Srinath <srinath@mistralsolutions.com>
->
->AM3517/05 Craneboard has one EHCI interface on board using port1.
->
->GPIO35 is used as power enable.
->GPIO38 is used as port1 PHY reset.
->
->History:
->http://marc.info/?l=linux-omap&w=2&r=1&s=Craneboard%253A%2BAdd%2BUSB%2BEHCI%2Bsupport&q=b
->
->Signed-off-by: Srinath <srinath@mistralsolutions.com>
+The display reset lines are connected to a TPS65930 which may sleep
+when changing GPIO values. Use the appropriate function to silence
+a nasty warning from gpiolib.
 
-Tony, do you want to make a pull request for you ? I guess this would
-only go on next merge window.
+Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
+---
+ arch/arm/mach-omap2/board-devkit8000.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-If you want to take yourself, here's my acked-by:
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c
+b/arch/arm/mach-omap2/board-devkit8000.c
+index 53ac762..f1f58f5 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -118,27 +118,27 @@ static int devkit8000_panel_enable_lcd(struct
+omap_dss_device *dssdev)
+ 	twl_i2c_write_u8(TWL4030_MODULE_LED, 0x0, 0x0);
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+ 	if (gpio_is_valid(dssdev->reset_gpio))
+-		gpio_set_value(dssdev->reset_gpio, 1);
++		gpio_set_value_cansleep(dssdev->reset_gpio, 1);
+ 	return 0;
+ }
 
+ static void devkit8000_panel_disable_lcd(struct omap_dss_device *dssdev)
+ {
+ 	if (gpio_is_valid(dssdev->reset_gpio))
+-		gpio_set_value(dssdev->reset_gpio, 0);
++		gpio_set_value_cansleep(dssdev->reset_gpio, 0);
+ }
+
+ static int devkit8000_panel_enable_dvi(struct omap_dss_device *dssdev)
+ {
+ 	if (gpio_is_valid(dssdev->reset_gpio))
+-		gpio_set_value(dssdev->reset_gpio, 1);
++		gpio_set_value_cansleep(dssdev->reset_gpio, 1);
+ 	return 0;
+ }
+
+ static void devkit8000_panel_disable_dvi(struct omap_dss_device *dssdev)
+ {
+ 	if (gpio_is_valid(dssdev->reset_gpio))
+-		gpio_set_value(dssdev->reset_gpio, 0);
++		gpio_set_value_cansleep(dssdev->reset_gpio, 0);
+ }
+
+ static struct regulator_consumer_supply devkit8000_vmmc1_supply =
 -- 
-balbi
+1.7.3.3
