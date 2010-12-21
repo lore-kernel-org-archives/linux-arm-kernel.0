@@ -1,30 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Dec 2010 10:59:46 +0000
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 21 Dec 2010 11:01:35 +0000
 Subject: [PATCH 1/2] ARM: convert dma-mapping to asm-generic API
-In-Reply-To: <201012211154.08821.arnd@arndb.de>
+In-Reply-To: <20101221103652.GL28157@n2100.arm.linux.org.uk>
 References: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
-	<201012211154.08821.arnd@arndb.de>
-Message-ID: <20101221105946.GP28157@n2100.arm.linux.org.uk>
+	<20101221103652.GL28157@n2100.arm.linux.org.uk>
+Message-ID: <20101221110135.GE2822@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 21, 2010 at 11:54:08AM +0100, Arnd Bergmann wrote:
-> On Tuesday 21 December 2010 11:20:01 Jamie Iles wrote:
-> > This converts ARM to use the asm-generic/dma-mapping-common API for
-> > the DMA API. As a side effect, this also allows us to take advantage
-> > of DMA API debugging (CONFIG_DMA_API_DEBUG).
+On Tue, Dec 21, 2010 at 10:36:52AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 21, 2010 at 10:20:01AM +0000, Jamie Iles wrote:
+> > Note: this patch also requires "ARM: dmabounce: fix partial sync in
+> > dma_sync_single_* API" from FUJITA Tomonori:
 > > 
-> > We have dma_map_ops for normal, non-coherent architectures, fully
-> > coherent architectures and architectures that require dmabounce
-> > support. A dma_ops field is added to struct dev_archdata so platforms
-> > using an ACP can override the dma operations for that device to be
-> > fully coherent e.g.
+> > 	http://www.spinics.net/lists/netdev/msg126826.html
 > > 
-> >         struct device *my_coherent_device;
-> >         my_coherent_device->dev_archdata.dma_ops = &coherent_dma_ops;
+> > which allows us to do fuzzy matching of the buffers when using
+> > dmabounce.
 > 
-> I think what's more important here is the ability to use an IOMMU on
-> some devices while other devices are mapped statically.
+> Which I've already said no to.
+
+Ok, perhaps I missed some other posts. From that thread the only objections I 
+found were to do with the indentation style and they were fixed up.
+
+> I don't believe that the direction taken there is anywhere near the right
+> one - the approach we have (implementing the whole buffer sync in terms
+> of the partial buffer sync) is the far more logical, simpler and safer
+> way, and doesn't lead to the possibility of two partially overlapping
+> mappings causing the wrong one to be operated upon.
 > 
-> I believe at the moment, at least MSM and OMAP support an IOMMU, but
-> we don't provide support for that in the DMA mapping interface yet.
+> The debug code doesn't check for overlapping mappings in any way, so we
+> can't say that they never occur.
+>
+> With the way that the DMA API has gone, I view the "generic" stuff as
+> a disaster.
+
+Ok I can't disagree with that. I've had a look at some of the other arches and 
+I can't see an obvious reason why we couldn't change the generic 
+implementation to do the sync in the way you describe. Perhaps I'll have a 
+look at that after the holidays.
+
+With regards to the API debug, any objections to adding the necessary calls 
+into the existing ARM implementation? Perhaps it'll catch some misuses of the 
+API.
+
+Jamie
