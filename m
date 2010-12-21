@@ -1,29 +1,30 @@
-From: weber@corscience.de (Thomas Weber)
-Date: Tue, 21 Dec 2010 12:07:09 +0100
-Subject: [PATCH] OMAP3: Devkit8000: Add DEBUG_LL support
-Message-ID: <1292929629-3396-1-git-send-email-weber@corscience.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Dec 2010 11:11:21 +0000
+Subject: [PATCH 2/2] ARM: use cached memory in dma_alloc_coherent() if
+	possible
+In-Reply-To: <20101221103057.GK28157@n2100.arm.linux.org.uk>
+References: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
+	<1292926802-12326-2-git-send-email-jamie@jamieiles.com>
+	<20101221103057.GK28157@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=sEJi92UBNR-vqsC2cpniOJVSLTHoq-rj75QZM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DEBUG_LL for Devkit8000.
-Devkit8000 uses uart 3 for debug output.
+On Tuesday, 21 December 2010, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 21, 2010 at 10:20:02AM +0000, Jamie Iles wrote:
+>> For fully coherent architectures or systems using the ARM ACP to provide
+>> coherency to individual device, use cached memory as the coherent
+>> backing rather than noncached or simply bufferable memory.
+>
+> As has already been covered by Catalin, as far as we know, no one uses
+> the ACP yet. ?Do you have a system which does?
 
-Signed-off-by: Thomas Weber <weber@corscience.de>
----
- arch/arm/plat-omap/include/plat/uncompress.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I'm not sure there is any publicly available system yet. This may be
+present in future systems, though only a few peripherals would
+probably be connected to the ACP (like an HD LCD controller). So I
+don't think we'll get a completely coherent system and a better
+approach may be to add per-device DMA operations.
 
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index 7bbc074..ad98b85 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -146,6 +146,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		DEBUG_LL_OMAP3(3, cm_t35);
- 		DEBUG_LL_OMAP3(3, cm_t3517);
- 		DEBUG_LL_OMAP3(3, craneboard);
-+		DEBUG_LL_OMAP3(3, devkit8000);
- 		DEBUG_LL_OMAP3(3, igep0020);
- 		DEBUG_LL_OMAP3(3, igep0030);
- 		DEBUG_LL_OMAP3(3, nokia_rm680);
 -- 
-1.7.3.4
+Catalin
