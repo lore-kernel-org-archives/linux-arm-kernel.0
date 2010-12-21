@@ -1,73 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 21 Dec 2010 19:03:45 +0900
-Subject: [PATCH 40/54] ARM: Samsung SoCs: irq_data conversion.
-In-Reply-To: <20101214221055.GA16079@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130134112.GO15575@mail.wantstofly.org>
-	<015801cb92e1$117861b0$34692510$%kim@samsung.com>
-	<20101214221055.GA16079@mail.wantstofly.org>
-Message-ID: <01b901cba0f6$5d0f16a0$172d43e0$%kim@samsung.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 21 Dec 2010 10:20:02 +0000
+Subject: [PATCH 2/2] ARM: use cached memory in dma_alloc_coherent() if possible
+In-Reply-To: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
+References: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <1292926802-12326-2-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lennert Buytenhek wrote:
-> 
-> On Fri, Dec 03, 2010 at 08:56:03PM +0900, Kukjin Kim wrote:
-> 
-> > Hi Lennert,
-> 
-> Hi again,
-> 
-> 
-> > (Added Mark Brown in Cc)
-> >
-> > Looks ok to me but there are some comments.
-> >
-> > Firstly, how about to separate this to regarding S3C24XX(mach-s3c24xx
-and
-> > plat-s3c24xx), S5P(mach-s5pxxxx and plat-s5p) and plat-samsung?
-> > (Actually, already applied S3C64XX changes so that we can drop that in
-your
-> > patch.)
-> >
-> > As you know, I already applied some changes which is from Mark Brown in
-my
-> > tree.
-> > You can find that in
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > #for-next
-> >
-> > So could you please re-work this based on that?
-> 
-> I've reworked the patch I had in my tree on top of your git tree
-> (latest commit "Merge branch 'next-s5p64x0' into for-next"), and came
-> up with the three attached patches.  I've incorporated the whitespace
-> changes you requested, and changed the struct irq_data * variable
-> names from 'd' to 'data' to match Mark's earlier patches.
-> 
-> Caveat emptor -- uncompiled, and totally untested.
-> 
-> How's this look?
-> 
-> Feel free to merge this via your tree -- I'll drop the Samsung patch
-> from my tree then.
-> 
+For fully coherent architectures or systems using the ARM ACP to provide
+coherency to individual device, use cached memory as the coherent
+backing rather than noncached or simply bufferable memory.
 
-Hi Lennert :-)
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/mm/dma-mapping.c |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-I found your different e-mail in your patch like following.
-
-"From: Lennert Buytenhek <buytenh@wantstofly.org>"
-...
-"Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>"
-
-I think, should be used same e-mail address.
-Which one do you want to use?...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index b90f323..2d3c8e4 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -579,6 +579,34 @@ int coherent_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+ }
+ 
+ /*
++ * For fully coherent systems/devices we can use normal, cached memory so just
++ * get some free pages.
++ */
++static void *coherent_alloc(struct device *dev, size_t size,
++			    dma_addr_t *dma_handle, gfp_t gfp)
++{
++	void *ret;
++	u64 mask = get_coherent_dma_mask(dev);
++
++	if (!dev || mask >= 0xffffffffUL)
++		gfp &= ~GFP_DMA;
++
++	ret = (void *)__get_free_pages(gfp, get_order(size));
++	if (ret) {
++		memset(ret, 0, size);
++		*dma_handle = virt_to_phys(ret);
++	}
++
++	return ret;
++}
++
++static void coherent_free(struct device *dev, size_t size, void *virt,
++			  dma_addr_t dma_handle)
++{
++	free_pages((unsigned long)dma_handle, get_order(size));
++}
++
++/*
+  * Coherent DMA ops. These can either be used for the whole system
+  * automatically if arch_is_coherent() is true or on a per device basis if the
+  * device is connected to the ACP port to provide coherency for that device.
+@@ -586,6 +614,8 @@ int coherent_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+  * dev->archdata.dma_ops
+  */
+ struct dma_map_ops coherent_dma_ops = {
++	.alloc_coherent		= coherent_alloc,
++	.free_coherent		= coherent_free,
+ 	.map_page		= coherent_map_page,
+ 	.map_sg			= coherent_map_sg,
+ };
+-- 
+1.7.2.3
