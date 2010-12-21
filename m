@@ -1,55 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Dec 2010 10:43:45 +0000
-Subject: [PATCH] ARM: Add missing SZ_{32,64,128}
-In-Reply-To: <1292906386-15195-1-git-send-email-swarren@nvidia.com>
-References: <20101220093017.GS1940@pengutronix.de>
-	<1292906386-15195-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20101221104345.GN28157@n2100.arm.linux.org.uk>
+Date: Tue, 21 Dec 2010 10:51:49 +0000
+Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with
+	high frequency clocks
+In-Reply-To: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
+References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
+Message-ID: <20101221105149.GO28157@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 20, 2010 at 09:39:46PM -0700, Stephen Warren wrote:
-> ... and also remove misleading comment stating that this header is
-> auto-generated.
+On Mon, Dec 20, 2010 at 08:21:41PM -0500, Nicolas Pitre wrote:
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> The minsec argument to clocks_calc_mult_shift() [ which appears to be
+> misnamed by the way ] is used to clamp the magnitude of the mult factor
+> so that the given range won't overflow a 64 bit result.  The mult factor
+> is itself already limited to a maximum of 32 bits.  Given that the largest
+> clock tick range we may have is also 32 bits, there is no way our usage of
+> any computed mult factor would ever overflow 64 bits.
+> 
+> The choice of 60 seconds here for minsec is rather arbitrary.  If the
+> mult factor wasn't already limited to 32 bits, this value of 60 would
+> create overflows for clocks which take more than 60 seconds to wrap.
 
-Ok, can go to the patch system, thanks.
+60 seconds was arbitary, chosen from the selection of clock rates which
+I had available at the time (the highest of which was 24MHz).
 
-> ---
->  arch/arm/include/asm/sizes.h |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+> And for clocks which take less than 60 seconds to wrap then we do lose
+> precision as the mult factor is made smaller (fewer bits) to be adjusted
+> to a range which is larger than what we actually use.  This currently
+> affects clocks faster than 71MHz.
 > 
-> diff --git a/arch/arm/include/asm/sizes.h b/arch/arm/include/asm/sizes.h
-> index 4fc1565..316bb2b 100644
-> --- a/arch/arm/include/asm/sizes.h
-> +++ b/arch/arm/include/asm/sizes.h
-> @@ -13,9 +13,6 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
->   */
-> -/* DO NOT EDIT!! - this file automatically generated
-> - *                 from .s file by awk -f s2h.awk
-> - */
->  /*  Size definitions
->   *  Copyright (C) ARM Limited 1998. All rights reserved.
->   */
-> @@ -25,6 +22,9 @@
->  
->  /* handy sizes */
->  #define SZ_16				0x00000010
-> +#define SZ_32				0x00000020
-> +#define SZ_64				0x00000040
-> +#define SZ_128				0x00000080
->  #define SZ_256				0x00000100
->  #define SZ_512				0x00000200
->  
-> -- 
-> 1.7.2.3
-> nvpublic
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> We could use minsec = 0 instead of 60 and a good 32-bit mult factor would
+> be computed in all cases.  But let's be formal and provide the actual
+> range to clocks_calc_mult_shift(). None of the cyc_to_fixed_sched_clock()
+> users are affected as they all are using clocks < 71MHz.
+
+Maybe __clocksource_updatefreq_scale() needs a similar fix too, instead
+of assuming 5 seconds?  It also has access to the mask and rate.
