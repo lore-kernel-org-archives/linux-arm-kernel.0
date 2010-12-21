@@ -1,38 +1,44 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 21 Dec 2010 16:04:49 +0000
-Subject: [PATCH 1/2] ARM: convert dma-mapping to asm-generic API
-In-Reply-To: <20101221110135.GE2822@pulham.picochip.com>
-References: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
-	<20101221103652.GL28157@n2100.arm.linux.org.uk>
-	<20101221110135.GE2822@pulham.picochip.com>
-Message-ID: <20101221160449.GB23586@pulham.picochip.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 21 Dec 2010 08:17:57 -0800
+Subject: [PATCH v6 00/10] OMAP: Adding Smartreflex and Voltage driver
+	support
+In-Reply-To: <20101221022329.GC5829@atomide.com> (Tony Lindgren's message of
+	"Mon, 20 Dec 2010 18:23:30 -0800")
+References: <1292864357-13939-1-git-send-email-thara@ti.com>
+	<877hf45414.fsf@deeprootsystems.com>
+	<20101221022329.GC5829@atomide.com>
+Message-ID: <87lj3jyua2.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 21, 2010 at 11:01:35AM +0000, Jamie Iles wrote:
-> On Tue, Dec 21, 2010 at 10:36:52AM +0000, Russell King - ARM Linux wrote:
-> > I don't believe that the direction taken there is anywhere near the right
-> > one - the approach we have (implementing the whole buffer sync in terms
-> > of the partial buffer sync) is the far more logical, simpler and safer
-> > way, and doesn't lead to the possibility of two partially overlapping
-> > mappings causing the wrong one to be operated upon.
-> > 
-> > The debug code doesn't check for overlapping mappings in any way, so we
-> > can't say that they never occur.
-> >
-> > With the way that the DMA API has gone, I view the "generic" stuff as
-> > a disaster.
-> 
-> Ok I can't disagree with that. I've had a look at some of the other 
-> arches and I can't see an obvious reason why we couldn't change the 
-> generic implementation to do the sync in the way you describe. Perhaps 
-> I'll have a look at that after the holidays.
+Tony Lindgren <tony@atomide.com> writes:
 
-As an alternative, how about we add sync_single_range_for_{cpu,device}() 
-methods to struct dma_map_ops and if they aren't populated, fall back to 
-the non-range variants with an offset of 0?  Then for ARM we can specify 
-the _range_* versions and we don't need the fuzziness in the dmabounce 
-code. Or is this just not worth doing and keeping the ARM version 
-specific?
+> * Kevin Hilman <khilman@deeprootsystems.com> [101220 17:05]:
+>> Thara Gopinath <thara@ti.com> writes:
+>> 
+>> > This patch series introduces smartreflex and voltage driver support
+>> > for OMAP3430 and OMAP3630. SmartReflex modules do adaptive voltage
+>> > control for real-time voltage adjustments.
+>> 
+>> Thanks Thara, these are looking good for 2.6.38.
+>> 
+>> Tony, unless there are major objections, I'll be queuing these two SR
+>> series for 2.6.38.  They have dependencies on Paul's integration branch
+>
+> Well looking at patch 3/6 I think it should live under drivers somewhere
+> and mostly be compiled as a module. Probably the only change needed
+> for that is to not call cpu_is_omapxxxx but instead use some flags
+> passed in the platform_data. Otherwise the whole series looks OK to me.
 
-Jamie
+Moving this to be a regulator driver is part of the medium-term plan,
+and is already under development.  For this phase, we just split up the
+current driver into device and driver code and left under mach-omap2.
+We are investigating (and making) changes to the regulator core so that
+SmartReflex can be converted into a real regulator driver, but that is
+still under development.
+
+So, in the mean time, I'd like to merge this version so that other
+development that depends on this (the regulator work mentioned above,
+the DVFS work, etc.) can have a stable starting point.
+
+Kevin
