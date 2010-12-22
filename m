@@ -1,46 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Dec 2010 10:57:17 -0800
-Subject: [PATCH 0/2] omap: rx51: Fix broken fb on RX51/N900
-In-Reply-To: <1293011118.6829.0.camel@tubuntu>
-References: <1292952335-21314-1-git-send-email-jhnikula@gmail.com>
-	<20101221202133.GJ5829@atomide.com>
-	<20101222085638.226a1269.jhnikula@gmail.com>
-	<1293011118.6829.0.camel@tubuntu>
-Message-ID: <20101222185717.GA7771@atomide.com>
+Date: Wed, 22 Dec 2010 10:57:55 -0800
+Subject: [PATCH] omap: rx51: Remove tvout code that plays with gpio 40
+In-Reply-To: <1293012004.6829.2.camel@tubuntu>
+References: <1292953561-22979-1-git-send-email-jhnikula@gmail.com>
+	<1293012004.6829.2.camel@tubuntu>
+Message-ID: <20101222185755.GB7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@nokia.com> [101222 01:45]:
-> On Wed, 2010-12-22 at 08:56 +0200, ext Jarkko Nikula wrote:
-> > On Tue, 21 Dec 2010 12:21:33 -0800
-> > Tony Lindgren <tony@atomide.com> wrote:
+* Tomi Valkeinen <tomi.valkeinen@nokia.com> [101222 01:59]:
+> On Tue, 2010-12-21 at 19:46 +0200, ext Jarkko Nikula wrote:
+> > Commit 60d24ee "Added video data to support tvout on rx51" added code that
+> > tries to assign gpio 40 as OMAP DSS reset_gpio for tvout. This is wrong
+> > since this gpio has nothing to do with OMAP DSS but it is used to control
+> > one switch that selects is the audio jack connected to tvout or audio
+> > circuitry.
 > > 
-> > > * Jarkko Nikula <jhnikula@gmail.com> [101221 09:25]:
-> > > > Hi
-> > > > 
-> > > > Commit 60d24ee "Added video data to support tvout on rx51" broke the
-> > > > framebuffer on N900. Here are two patches where 1st one does a little cleanup
-> > > > to be sync with the 2nd fixing the issue. I've tested that both tvout and lcd
-> > > > are working.
-> > > 
-> > > Tomi, do you want to pick these three DSS/video related patches from Jarkko?
-> > > 
-> > > If so:
-> > > 
-> > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > else please ack and let me know if you want me to take them.
-> > > 
-> > I think these should go to linux-omap since the breakage is there and
-> > anyway touch only the rx51 board files.
+> > This switch is already supported by the RX51 ASoC driver so there is no need
+> > to control it elsewhere. Switch is contolled with ALSA control
+> > 'Jack Function' and tvout can be selected with following example:
+> > 
+> > 	amixer -D hw:0 set 'Jack Function' 'TV-OUT'
 > 
-> I agree, I don't have that commit in my tree. So Tony, please take the
-> patches.
+> Looks good. platform_enable/disable and reset_gpio fields should anyway
+> be removed from the omap_dss_device struct, so this goes into right
+> direction.
 > 
-> For both patches:
+> Tony, can you take this patch also, as (I guess) it depends on the
+> previous rx51 patches from Jarkko?
 > 
 > Acked-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 
-OK, thanks will queue.
+Queuing this one too.
 
 Tony
