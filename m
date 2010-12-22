@@ -1,55 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 23 Dec 2010 07:49:01 +0900
-Subject: [PATCH] rfc v3: ARM: mach-shmobile: mackerel: Add zboot support
-In-Reply-To: <1291855635-30882-1-git-send-email-horms@verge.net.au>
-References: <1291855635-30882-1-git-send-email-horms@verge.net.au>
-Message-ID: <20101222224901.GA16187@verge.net.au>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 22 Dec 2010 14:51:38 -0800
+Subject: [GIT PULL v2] OMAP SmartReflex/voltage core for 2.6.38
+Message-ID: <87mxnxmnet.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 09:47:15AM +0900, Simon Horman wrote:
-> When CONFIG_ZBOOT_ROM is selected, the resulting zImage file will be small
-> boot loader and may be burned to rom or flash.
-> 
-> Compile tested only.
+Tony,
 
-I now have access to a Mackerel board and have verified that
-this patch works.
+The following pull request is for the SmartReflex/voltage core for
+2.6.38.  
 
-My verification method was to usa a hack; I removed the
-SDRAM initialisation portion of head-mackerel.txt and
-then booting the resulting zImage from uboot using:
+It is updated to include a build fix and exclude a boot breakage on
+OMAP2.
 
-=> bootp
-=> go 0x42000000
+Kevin
 
-This is the same method that I used to test the AP4 variant of this change.
+The following changes since commit f17f9726c27c3921e00a5750e85070e6dd7e1ff7:
 
-Morimoto-san, could you test this by burning an image (without the above
-hack) to Flash? I can provide an image or tree if that helps.
+  OMAP4: clock data: Add missing fixed divisors (2010-12-22 10:12:46 -0700)
 
-> This patch assumes that head-mackerel.txt will be the same as head-ap4evb.txt.
-> I am waiting for verification of this.
-> 
-> This patch depends on
-> * ARM: 6515/1: Add zboot support for SuperH Mobile ARM
->   (merged into the devel branch of Russel King's linux-2.6-arm tree)
-> * ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
->   (merged into the devel branch of Russel King's linux-2.6-arm tree)
-> * MACH_MACKEREL (3211) being present in arch/arm/tools/mach-types
-> 
-> v2:
-> * Use head-mackerel.txt for Mackerel.
->   head-ap4evb.txt was used by mistake.
-> 
-> v3:
-> * Actually make the change to use head-mackerel.txt
-> 
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> ---
->  .../mach-shmobile/include/mach/head-mackerel.txt   |   87 ++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/zboot.h        |    3 +
->  2 files changed, 90 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-shmobile/include/mach/head-mackerel.txt
-> 
+are available in the git repository at:
+  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git pm-sr
+
+Benoit Cousson (1):
+      OMAP4: hwmod: Add inital data for smartreflex modules.
+
+Thara Gopinath (13):
+      OMAP3: PM: Adding voltage driver support.
+      OMAP: Introduce voltage domain information in the hwmod structures
+      OMAP3: PM: Adding smartreflex driver support.
+      OMAP3: PM: Adding smartreflex device file.
+      OMAP3: PM: Adding smartreflex hwmod data
+      OMAP3: PM: Adding smartreflex class3 driver
+      OMAP3: PM: Register TWL4030 pmic info with the voltage driver.
+      OMAP3: PM: Adding debug support to Voltage and Smartreflex drivers
+      OMAP3: PM: Program correct init voltages for VDD1 and VDD2
+      OMAP4: Register voltage PMIC parameters with the voltage layer
+      OMAP4: Adding voltage driver support
+      OMAP4: PM: Program correct init voltages for scalable VDDs
+      OMAP4: Smartreflex framework extensions
+
+ arch/arm/mach-omap2/Makefile                  |   11 +-
+ arch/arm/mach-omap2/control.h                 |   29 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |  175 +++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |  168 +++
+ arch/arm/mach-omap2/omap_twl.c                |  277 +++++
+ arch/arm/mach-omap2/pm.c                      |  102 ++
+ arch/arm/mach-omap2/pm.h                      |   28 +
+ arch/arm/mach-omap2/smartreflex-class3.c      |   59 +
+ arch/arm/mach-omap2/smartreflex.c             | 1029 ++++++++++++++++
+ arch/arm/mach-omap2/sr_device.c               |  146 +++
+ arch/arm/mach-omap2/voltage.c                 | 1571 +++++++++++++++++++++++++
+ arch/arm/plat-omap/Kconfig                    |   31 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    5 +
+ arch/arm/plat-omap/include/plat/smartreflex.h |  245 ++++
+ arch/arm/plat-omap/include/plat/voltage.h     |  146 +++
+ 15 files changed, 4019 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap_twl.c
+ create mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
+ create mode 100644 arch/arm/mach-omap2/smartreflex.c
+ create mode 100644 arch/arm/mach-omap2/sr_device.c
+ create mode 100644 arch/arm/mach-omap2/voltage.c
+ create mode 100644 arch/arm/plat-omap/include/plat/smartreflex.h
+ create mode 100644 arch/arm/plat-omap/include/plat/voltage.h
