@@ -1,170 +1,87 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Dec 2010 21:38:19 -0700 (MST)
-Subject: [PATCH 3/3] OMAP: PM noop: implement context loss count for
-	non-omap_devices
-In-Reply-To: <1292634855-14728-3-git-send-email-khilman@deeprootsystems.com>
-References: <1292634855-14728-1-git-send-email-khilman@deeprootsystems.com>
-	<1292634855-14728-3-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <alpine.DEB.2.00.1012212136210.1446@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 22 Dec 2010 13:39:02 +0900
+Subject: [PATCH 00/17] Samsung: Enable Audio Devices
+In-Reply-To: <AANLkTinQ9zVY+0SBhHFJMRD6TVjnThEAy1zMwT_eHj5-@mail.gmail.com>
+References: <1292561925-19586-1-git-send-email-jassisinghbrar@gmail.com>
+	<019301cba0ae$24902050$6db060f0$%kim@samsung.com>
+	<AANLkTinQ9zVY+0SBhHFJMRD6TVjnThEAy1zMwT_eHj5-@mail.gmail.com>
+Message-ID: <01fc01cba192$2b282720$81787560$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin
-
-On Fri, 17 Dec 2010, Kevin Hilman wrote:
-
-> For devices which have not (yet) been converted to use omap_device,
-> implement the context loss counter using the "brutal method" as
-> originally proposed by Paul Walmsley[1].
+Jassi Brar wrote:
 > 
-> The dummy context loss counter is incremented every time it is
-> checked, but only when off-mode is enabled.  When off-mode is
-> disabled, the dummy counter stops incrementing.
+> On Tue, Dec 21, 2010 at 10:26 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Jassi Brar wrote:
+> >>
+> >> From: Jassi Brar <jassi.brar@samsung.com>
+> >>
+> >> Hi,
+> >>   Next come patches that lay ground to enable audio devices on
+> >> various latest SMDKS like 6440, 6442, 6450, C110, V210, V310 and C210.
+> >> Actual enabing of these devices will be done by patchset to be sent to
+> >> ASoC tree.
+> >>
+> > Hi Jassi,
+> >
+> > To apply your patches happen following build error in my for-next.
+> >
+> > 'error: 'samsung_asoc_dma' undeclared here (not in a function)'
+> >
+> > How can prevent build error?
 > 
-> Tested on 36xx/Zoom3 using MMC driver, which is currently the
-> only in-tree user of this API.
-> 
-> This patch should be reverted after all devices are converted to using
-> omap_device.
+> hmmm... your tree doesn't have the commit 'ARM: Samsung: Define common
+> audio-dma
+> device' that I submitted to Mark.
 
-just FYI this patch generated a compile warning:
+Ok :-)
 
-arch/arm/plat-omap/omap-pm-noop.c: In function 'omap_pm_get_dev_context_loss_count':
-arch/arm/plat-omap/omap-pm-noop.c:322: warning: too many arguments for format
+Mark,
 
-Updated to fix that; here's the version that I merged.
+As a note, I did 'cherry-pick' following 2 commits in my tree for avoiding build error.
+I couldn?t 'merge' into my tree because there is no suitable branch in your tree...
 
+--
 
-- Paul
+commit 83e37b8e400ca51cc97946815b3055daacd92fa8
+Author: Jassi Brar <jassi.brar@samsung.com>
+Date:   Mon Nov 22 15:35:53 2010 +0900
 
-From: Kevin Hilman <khilman@deeprootsystems.com>
-Date: Tue, 21 Dec 2010 21:31:55 -0700
-Subject: [PATCH] OMAP: PM noop: implement context loss count for non-omap_devices
+    ARM: Samsung: Define common audio-dma device
 
-For devices which have not (yet) been converted to use omap_device,
-implement the context loss counter using the "brutal method" as
-originally proposed by Paul Walmsley[1].
+    The ASoC uses common DMA driver for Audio devices. So it makes
+    sense to a common audio-dma device shared across all platforms.
 
-The dummy context loss counter is incremented every time it is
-checked, but only when off-mode is enabled.  When off-mode is
-disabled, the dummy counter stops incrementing.
+    Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+    Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+    Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+    Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Tested on 36xx/Zoom3 using MMC driver, which is currently the
-only in-tree user of this API.
+commit 58bb4072132c54d832082cc6eac396a6db009cbd
+Author: Jassi Brar <jassi.brar@samsung.com>
+Date:   Mon Nov 22 15:35:50 2010 +0900
 
-This patch should be reverted after all devices are converted to using
-omap_device.
+    ASoC: Samsung: Rename DMA device
 
-[1] http://marc.info/?l=linux-omap&m=129176260000626&w=2
+    Some Samsung SoCs have a PCM(DSP) controller. So the name
+    s3c24xx-pcm-audio for DMA driver is not very appropraite.
+    This patch moves :-
+        s3c24xx-pcm-audio -> samsung-audio
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-[paul at pwsan.com: fixed compile warning]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/pm-debug.c            |    5 ++++
- arch/arm/plat-omap/include/plat/omap-pm.h |    2 +
- arch/arm/plat-omap/omap-pm-noop.c         |   37 +++++++++++++++++++++++++++-
- 3 files changed, 42 insertions(+), 2 deletions(-)
+    Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+    Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+    Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+    Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index e535082..125f565 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -32,6 +32,7 @@
- #include "powerdomain.h"
- #include "clockdomain.h"
- #include <plat/dmtimer.h>
-+#include <plat/omap-pm.h>
- 
- #include "cm2xxx_3xxx.h"
- #include "prm2xxx_3xxx.h"
-@@ -581,6 +582,10 @@ static int option_set(void *data, u64 val)
- 	*option = val;
- 
- 	if (option == &enable_off_mode) {
-+		if (val)
-+			omap_pm_enable_off_mode();
-+		else
-+			omap_pm_disable_off_mode();
- 		if (cpu_is_omap34xx())
- 			omap3_pm_off_mode_enable(val);
- 	}
-diff --git a/arch/arm/plat-omap/include/plat/omap-pm.h b/arch/arm/plat-omap/include/plat/omap-pm.h
-index c07bb44..c0a7520 100644
---- a/arch/arm/plat-omap/include/plat/omap-pm.h
-+++ b/arch/arm/plat-omap/include/plat/omap-pm.h
-@@ -354,5 +354,7 @@ unsigned long omap_pm_cpu_get_freq(void);
-  */
- u32 omap_pm_get_dev_context_loss_count(struct device *dev);
- 
-+void omap_pm_enable_off_mode(void);
-+void omap_pm_disable_off_mode(void);
- 
- #endif
-diff --git a/arch/arm/plat-omap/omap-pm-noop.c b/arch/arm/plat-omap/omap-pm-noop.c
-index af58dad..0287ae7 100644
---- a/arch/arm/plat-omap/omap-pm-noop.c
-+++ b/arch/arm/plat-omap/omap-pm-noop.c
-@@ -26,6 +26,9 @@
- #include <plat/omap-pm.h>
- #include <plat/omap_device.h>
- 
-+static bool off_mode_enabled;
-+static u32 dummy_context_loss_counter;
-+
- /*
-  * Device-driver-originated constraints (via board-*.c files)
-  */
-@@ -280,10 +283,31 @@ unsigned long omap_pm_cpu_get_freq(void)
- 	return 0;
- }
- 
-+/**
-+ * omap_pm_enable_off_mode - notify OMAP PM that off-mode is enabled
-+ *
-+ * Intended for use only by OMAP PM core code to notify this layer
-+ * that off mode has been enabled.
-+ */
-+void omap_pm_enable_off_mode(void)
-+{
-+	off_mode_enabled = true;
-+}
-+
-+/**
-+ * omap_pm_disable_off_mode - notify OMAP PM that off-mode is disabled
-+ *
-+ * Intended for use only by OMAP PM core code to notify this layer
-+ * that off mode has been disabled.
-+ */
-+void omap_pm_disable_off_mode(void)
-+{
-+	off_mode_enabled = false;
-+}
-+
- /*
-  * Device context loss tracking
-  */
--
- u32 omap_pm_get_dev_context_loss_count(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
-@@ -292,7 +316,16 @@ u32 omap_pm_get_dev_context_loss_count(struct device *dev)
- 	if (WARN_ON(!dev))
- 		return 0;
- 
--	count = omap_device_get_context_loss_count(pdev);
-+	if (dev->parent == &omap_device_parent) {
-+		count = omap_device_get_context_loss_count(pdev);
-+	} else {
-+		WARN_ONCE(off_mode_enabled, "omap_pm: using dummy context loss counter; device %s should be converted to omap_device",
-+			  dev_name(dev));
-+		if (off_mode_enabled)
-+			dummy_context_loss_counter++;
-+		count = dummy_context_loss_counter;
-+	}
-+
- 	pr_debug("OMAP PM: context loss count for dev %s = %d\n",
- 		 dev_name(dev), count);
- 
--- 
-1.7.2.3
+--
+
+If any problems, please let me know :-)
+
+Thanks.
+Merry Christmas ;-)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
