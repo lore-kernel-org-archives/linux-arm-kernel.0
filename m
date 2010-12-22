@@ -1,148 +1,42 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 22 Dec 2010 12:25:31 -0200
-Subject: [PATCH v2 2/3] ARM: imx/mx27_3ds: Add USB OTG support
-In-Reply-To: <1293027932-13201-1-git-send-email-fabio.estevam@freescale.com>
-References: <1293027932-13201-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1293027932-13201-2-git-send-email-fabio.estevam@freescale.com>
+From: davidsin@ti.com (David Sin)
+Date: Wed, 22 Dec 2010 08:33:52 -0600
+Subject: [PATCH 0/9] TI DMM-TILER driver
+In-Reply-To: <AANLkTikZwm45Mkj_A=zzULeGBuYpLyP9N1bSJSFWegWV@mail.gmail.com>
+References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
+	<20101216172531.GG29435@lba0869738>
+	<20101216173737.GA6767@lba0869738>
+	<201012161843.48262.arnd@arndb.de>
+	<20101216190207.GC6767@lba0869738>
+	<AANLkTikZwm45Mkj_A=zzULeGBuYpLyP9N1bSJSFWegWV@mail.gmail.com>
+Message-ID: <20101222143350.GA27503@lba0869738>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig         |    3 ++
- arch/arm/mach-imx/mach-mx27_3ds.c |   71 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index fed3ee5..9a715ce 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -235,10 +235,13 @@ endchoice
- config MACH_MX27_3DS
- 	bool "MX27PDK platform"
- 	select SOC_IMX27
-+	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
- 	select IMX_HAVE_PLATFORM_IMX_UART
-+	select IMX_HAVE_PLATFORM_MXC_EHCI
- 	select IMX_HAVE_PLATFORM_MXC_MMC
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for MX27PDK platform. This includes specific
- 	  configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 1a7e879..0ed2fcc 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -23,16 +23,22 @@
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/irq.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ulpi.h>
-+#include <linux/delay.h>
-+
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
-+#include <mach/ulpi.h>
+On Fri, Dec 17, 2010 at 09:28:07AM +1000, Dave Airlie wrote:
+> On Fri, Dec 17, 2010 at 5:02 AM, David Sin <davidsin@ti.com> wrote:
+> I get the impression with the ARM graphics, that you just have a lot
+> of separate drivers for separate IP blocks all providing some misc
+> random interfaces to userspace where some binary driver binds all the
+> functionality together into a useful whole, which seems like a really
+> bad design.
+> 
+> Generally on x86, the tiling hw is part of the GPU and is exposed as
+> part of a coherent GPU driver.
+> 
+> I'm just wonder what the use-cases for this tiler are and what open
+> apps can use it for?
+> 
+> Dave.
+Yes -- on the omap4 soc, the dmm-tiler hw block is separate from the 
+gpu.  I've had some, but not much, past discusions on hw designs 
+where graphics/video related ip blocks are part of the same core.  It's 
+a good point that you bring up and it certainly makes sense to me.  
+I will bring it up with some omap hw folks that I know, and see if 
+something that can be considered in future omap versions.
  
- #include "devices-imx27.h"
- 
- #define SD1_EN_GPIO (GPIO_PORTB + 25)
-+#define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
- 
- static const int mx27pdk_pins[] __initconst = {
- 	/* UART1 */
-@@ -67,6 +73,20 @@ static const int mx27pdk_pins[] __initconst = {
- 	PE22_PF_SD1_CMD,
- 	PE23_PF_SD1_CLK,
- 	SD1_EN_GPIO | GPIO_GPIO | GPIO_OUT,
-+	/* OTG */
-+	OTG_PHY_RESET_GPIO | GPIO_GPIO | GPIO_OUT,
-+	PC7_PF_USBOTG_DATA5,
-+	PC8_PF_USBOTG_DATA6,
-+	PC9_PF_USBOTG_DATA0,
-+	PC10_PF_USBOTG_DATA2,
-+	PC11_PF_USBOTG_DATA1,
-+	PC12_PF_USBOTG_DATA4,
-+	PC13_PF_USBOTG_DATA3,
-+	PE0_PF_USBOTG_NXT,
-+	PE1_PF_USBOTG_STP,
-+	PE2_PF_USBOTG_DIR,
-+	PE24_PF_USBOTG_CLK,
-+	PE25_PF_USBOTG_DATA7,
- };
- 
- static const struct imxuart_platform_data uart_pdata __initconst = {
-@@ -118,6 +138,45 @@ static void mx27_3ds_sdhc1_enable_level_translator(void)
- 	gpio_direction_output(SD1_EN_GPIO, 1);
- }
- 
-+
-+static int otg_phy_init(void)
-+{
-+	gpio_request(OTG_PHY_RESET_GPIO, "usb-otg-reset");
-+	gpio_direction_output(OTG_PHY_RESET_GPIO, 0);
-+	mdelay(1);
-+	gpio_set_value(OTG_PHY_RESET_GPIO, 1);
-+	return 0;
-+}
-+
-+#if defined(CONFIG_USB_ULPI)
-+
-+static struct mxc_usbh_platform_data otg_pdata __initdata = {
-+	.portsc	= MXC_EHCI_MODE_ULPI,
-+	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
-+};
-+#endif
-+
-+static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
-+	.operating_mode = FSL_USB2_DR_DEVICE,
-+	.phy_mode       = FSL_USB2_PHY_ULPI,
-+};
-+
-+static int otg_mode_host;
-+
-+static int __init mx27_3ds_otg_mode(char *options)
-+{
-+	if (!strcmp(options, "host"))
-+		otg_mode_host = 1;
-+	else if (!strcmp(options, "device"))
-+		otg_mode_host = 0;
-+	else
-+		pr_info("otg_mode neither \"host\" nor \"device\". "
-+			"Defaulting to device\n");
-+	return 0;
-+}
-+__setup("otg_mode=", mx27_3ds_otg_mode);
-+
-+
- static void __init mx27pdk_init(void)
- {
- 	mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
-@@ -128,6 +187,18 @@ static void __init mx27pdk_init(void)
- 	imx27_add_imx_keypad(&mx27_3ds_keymap_data);
- 	imx27_add_mxc_mmc(0, &sdhc1_pdata);
- 	imx27_add_imx2_wdt(NULL);
-+	otg_phy_init();
-+#if defined(CONFIG_USB_ULPI)
-+	if (otg_mode_host) {
-+		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
-+
-+		imx27_add_mxc_ehci_otg(&otg_pdata);
-+	}
-+#endif
-+	if (!otg_mode_host)
-+		imx27_add_fsl_usb2_udc(&otg_device_pdata);
-+
- }
- 
- static void __init mx27pdk_timer_init(void)
+Some of the use-cases are HD video decoding and encoding.  Also, 
+hi-res image capture -- I believe 12MP or greater.  OpenMax IL components 
+and other multimedia frameworks can allocate video memory 
+through a user space tiler library.  Thanks for your comments, Dave.  
 -- 
-1.6.0.4
+David Sin
