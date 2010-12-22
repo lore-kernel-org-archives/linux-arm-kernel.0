@@ -1,86 +1,170 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 22 Dec 2010 14:29:35 -0800
-Subject: [PATCH v6 01/10] OMAP3: PM: Adding voltage driver support.
-In-Reply-To: <1292864357-13939-2-git-send-email-thara@ti.com> (Thara
-	Gopinath's message of "Mon, 20 Dec 2010 22:29:08 +0530")
-References: <1292864357-13939-1-git-send-email-thara@ti.com>
-	<1292864357-13939-2-git-send-email-thara@ti.com>
-Message-ID: <87hbe5o300.fsf@deeprootsystems.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 23 Dec 2010 11:32:17 +1300
+Subject: [PATCH 1/6 v10] ARM: Add basic architecture support for
+	VIA/WonderMedia 85xx SoC's
+In-Reply-To: <AANLkTinZEhJ8aUe63yc_BNdifn_5g8U=iStwwXEU-+V9@mail.gmail.com>
+References: <20101220195423.GA14509@alchark-u3s>	<4D0FC1AE.2050708@bluewatersys.com>	<AANLkTin4XqbGwznp56Xjt_zest6rxNmir0QDJWTySY4+@mail.gmail.com>	<4D0FD747.9020700@bluewatersys.com>	<AANLkTikAWjK7ACyt=LedhyyrhsCk1WCiyWz182CXMe9C@mail.gmail.com>	<4D0FE546.7050302@bluewatersys.com>	<AANLkTinyYKrhTcBMMCE4A2oFQHm11cqSZQozytGu+d6o@mail.gmail.com>	<4D1011CF.9080800@bluewatersys.com>	<AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>	<4D110269.9030805@bluewatersys.com>	<20101222211815.GA31054@alchark-u3s>	<4D12730B.2030909@bluewatersys.com>
+	<AANLkTinZEhJ8aUe63yc_BNdifn_5g8U=iStwwXEU-+V9@mail.gmail.com>
+Message-ID: <4D127C71.5040301@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thara Gopinath <thara@ti.com> writes:
+On 12/23/2010 11:02 AM, Alexey Charkov wrote:
+> 2010/12/23 Ryan Mallon <ryan@bluewatersys.com>:
+>> On 12/23/2010 10:18 AM, Alexey Charkov wrote:
+>>> This adds support for the family of Systems-on-Chip produced initially
+>>> by VIA and now its subsidiary WonderMedia that have recently become
+>>> widespread in lower-end Chinese ARM-based tablets and netbooks.
+>>>
+>>> Support is included for both VT8500 and WM8505, selectable by a
+>>> configuration switch at kernel build time.
+>>>
+>>> Included are basic machine initialization files, register and
+>>> interrupt definitions, support for the on-chip interrupt controller,
+>>> high-precision OS timer, GPIO lines, necessary macros for early debug,
+>>> pulse-width-modulated outputs control, as well as platform device
+>>> configurations for the specific drivers implemented elsewhere.
+>>>
+>>> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+>>> ---
+>>>
+>>> Welcome the jubilee tenth revision of this patch ;-)
+>>>
+>>> I've tried to incorporate the suggestions by Ryan and Arnd, hope that
+>>> there is nothing left out. There was a massive reorganization of code
+>>> to remove less-than-obvious magic with MMIO registers and irqs being
+>>> held in huge structs, now they are again macro definitions. Those
+>>> macros are, however, only included in single isolated files, and
+>>> actual values to use are chosen at runtime by calling the respective
+>>> routines at machine initialization. There are also stylistic changes
+>>> all around, where Ryan suggested.
+>>>
+>>> As a result, i8042 should again be adjusted a bit to reflect the new
+>>> place to find respective register/irq definitions, that one will be
+>>> sent in the respective thread shortly.
+>>>
+>>> Best regards,
+>>> Alexey
+>>
+>> <snip>
+>>
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-vt8500/devices-vt8500.c
+>>> @@ -0,0 +1,117 @@
+>>> +/* linux/arch/arm/mach-vt8500/devices-vt8500.c
+>>> + *
+>>> + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+>>> + *
+>>> + * This software is licensed under the terms of the GNU General Public
+>>> + * License version 2, as published by the Free Software Foundation, and
+>>> + * may be copied, distributed, and modified under those terms.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + */
+>>> +
+>>> +#include <linux/platform_device.h>
+>>> +
+>>> +#include <mach/vt8500_regs.h>
+>>> +#include <mach/vt8500_irqs.h>
+>>> +#include <mach/i8042.h>
+>>> +#include "devices.h"
+>>> +
+>>> +static inline struct resource WMT_MMIO_RES(u32 start, u32 size)
+>>> +{
+>>> +     struct resource tmp = {
+>>> +             .flags = IORESOURCE_MEM,
+>>> +             .start = start,
+>>> +             .end = start + size - 1,
+>>> +     };
+>>> +
+>>> +     return tmp;
+>>> +}
+>>
+>> These functions can be marked __init (though I guess they already are if
+>> marked inline?). They should also have lower case names since they are
+>> proper functions.
+> 
+> As inline functions are unrolled into the caller at compile time, and
+> the caller is __init, I would expect their code to be freed after init
+> as well. I could be wrong, though :)
 
-> This patch adds voltage driver support for OMAP3. The driver
-> allows  configuring the voltage controller and voltage
-> processors during init and exports APIs to enable/disable
-> voltage processors, scale voltage and reset voltage.
-> The driver maintains the global voltage table on a per
-> VDD basis which contains the various voltages supported by the
-> VDD along with per voltage dependent data like smartreflex
-> efuse offset, errminlimit and voltage processor errorgain.
-> The driver also allows the voltage parameters dependent on the
-> PMIC to be passed from the PMIC file through an API.
-> The driver allows scaling of VDD voltages either through
-> "vc bypass method" or through "vp forceupdate method" the
-> choice being configurable through the board file.
->
-> This patch contains code originally in linux omap pm branch
-> smartreflex driver.  Major contributors to this driver are
-> Lesly A M, Rajendra Nayak, Kalle Jokiniemi, Paul Walmsley,
-> Nishant Menon, Kevin Hilman. The separation of PMIC parameters
-> into a separate structure which can be populated from
-> the PMIC file is based on the work of Lun Chang from Motorola
-> in an internal tree.
->
-> Signed-off-by: Thara Gopinath <thara@ti.com>
-> ---
-> This patch has 14 checkpatch.pl above 80-chars warnings for
-> the definitions of omap34xx_vddmpu_volt_data, omap36xx_vddmpu_volt_data,
-> omap34xx_vddcore_volt_data and omap36xx_vddcore_volt_data structures.
-> IMHO splitting of the entries in these structures affects
-> readability and looks very ugly. Hence they are left as is.
->
->  arch/arm/mach-omap2/Makefile              |    3 +-
->  arch/arm/mach-omap2/control.h             |   17 +
->  arch/arm/mach-omap2/pm.c                  |    8 +
->  arch/arm/mach-omap2/voltage.c             | 1226 +++++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/voltage.h |  134 ++++
->  5 files changed, 1387 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/voltage.c
->  create mode 100644 arch/arm/plat-omap/include/plat/voltage.h
->
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 7c79683..5034797 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -57,7 +57,8 @@ endif
->  ifeq ($(CONFIG_PM),y)
->  obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
->  obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o
-> -obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o cpuidle34xx.o pm_bus.o
-> +obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o voltage.o \
-> +					   cpuidle34xx.o pm_bus.o
+If the compiler decided not to inline them for whatever reason they
+would stick around. They should also probably be marked __init to make
+it clear that they are not permanent functions.
 
-This will not link when building OMAP2 only (common for n8x0 testing due
-to kernel size limitation.)  In this config, voltage.o is not compiled,
-but its functions are still called from the common pm.c.
+>> Do these functions generate warnings about returning temporary values
+>> off the stack? If so, they could be rewritten as:
+>>
+> 
+> Should those be compile-time or run-time? I did not see any.
 
-Will fold the following diff into this patch.
+I thought you might get compile time warnings. Returning things off the
+stack in general is error prone. I think passing a pointer to the
+resource into the function (as below) maybe a bit better.
 
-Kevin
+>> static __init void wmt_mmio_res(struct resource *res,
+>>                                u32 start, u32 size)
+>> {
+>>        res->flags = IORESOURCE_MEM;
+>>        res->start = start;
+>>        res->end   = start + size - 1;
+>> }
+>>
+>> You could also make these functions static inline in devices.h to avoid
+>> having to define them for each board.
+>>
+> 
+> Agreed.
+> 
+>>> +
+>>> +static inline struct resource WMT_IRQ_RES(int irq)
+>>> +{
+>>> +     struct resource tmp = {
+>>> +             .flags = IORESOURCE_IRQ,
+>>> +             .start = irq,
+>>> +             .end = irq,
+>>> +     };
+>>> +
+>>> +     return tmp;
+>>> +}
+>>> +
+>>> +#define WMT_RES_ADD(__device, __resource, __num) \
+>>> +if (platform_device_add_resources(__device, __resource, __num)) \
+>>> +     pr_err("Failed to assign resources to __device##\n");
+>>
+>> This could be written as a proper function. The resource add is unlikely
+>> to fail. Maybe keep the warning but don't worry about printing the
+>> device name?
+>>
+> 
+> There is memory allocation inside platform_device_add_resources, so
+> probably there is scope for failure. I could add unlikely(), though.
 
+I meant more in terms of losing the device name in the error which seems
+to be the sole point of the macro. i.e it could be rewritten as:
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 91c9b60..4ab82f6 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -59,7 +59,7 @@ endif
- # Power Management
- ifeq ($(CONFIG_PM),y)
- obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
--obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o
-+obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o voltage.o
- obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o voltage.o \
- 					   cpuidle34xx.o pm_bus.o
- obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o voltage.o pm_bus.o
+static void wmt_add_resource(struct platform_device *pdev,
+				const struct resource *res,
+				unsigned num)
+{
+	if (platform_device_add_resources(pdev, res, num))
+		pr_err("Failed to add device resource\n");
+}
+
+Because the add resource failing would indicate some serious problem you
+may even want to BUG().
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
