@@ -1,32 +1,39 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Wed, 22 Dec 2010 12:00:04 +0200
-Subject: [PATCH] omap: rx51: Remove tvout code that plays with gpio 40
-In-Reply-To: <1292953561-22979-1-git-send-email-jhnikula@gmail.com>
-References: <1292953561-22979-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <1293012004.6829.2.camel@tubuntu>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 22 Dec 2010 02:16:57 -0800
+Subject: [PATCH v3] Keyboard: omap-keypad: use matrix_keypad.h
+In-Reply-To: <alpine.DEB.1.10.1012211150410.22164@esdhcp041196.research.nokia.com>
+References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+	<201012181639.29820.jkrzyszt@tis.icnet.pl>
+	<alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
+	<201012202209.24068.jkrzyszt@tis.icnet.pl>
+	<alpine.DEB.1.10.1012211150410.22164@esdhcp041196.research.nokia.com>
+Message-ID: <20101222101657.GD22590@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-12-21 at 19:46 +0200, ext Jarkko Nikula wrote:
-> Commit 60d24ee "Added video data to support tvout on rx51" added code that
-> tries to assign gpio 40 as OMAP DSS reset_gpio for tvout. This is wrong
-> since this gpio has nothing to do with OMAP DSS but it is used to control
-> one switch that selects is the audio jack connected to tvout or audio
-> circuitry.
+On Tue, Dec 21, 2010 at 01:20:35PM +0200, Aaro Koskinen wrote:
+> Hi,
 > 
-> This switch is already supported by the RX51 ASoC driver so there is no need
-> to control it elsewhere. Switch is contolled with ALSA control
-> 'Jack Function' and tvout can be selected with following example:
+> On Mon, 20 Dec 2010, Janusz Krzysztofik wrote:
+> >Most keypad drivers make use of the <linux/input/matrix_keypad.h>
+> >defined macros, structures and inline functions.
+> >
+> >Convert omap-keypad driver to use those as well, as suggested by a
+> >compile time warning, hardcoded into the OMAP <palt/keypad.h>.
+> >
+> >Created against linux-2.6.37-rc5.
+> >Tested on Amstrad Delta.
+> >Compile tested with omap1_defconfig and omap2plus_defconfig shrinked to
+> >board-h4.
+> >
+> >Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 > 
-> 	amixer -D hw:0 set 'Jack Function' 'TV-OUT'
+> Reviewed-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> 
 
-Looks good. platform_enable/disable and reset_gpio fields should anyway
-be removed from the omap_dss_device struct, so this goes into right
-direction.
+Acked-by: Dmitry Torokhov <dtor@mail.ru>
 
-Tony, can you take this patch also, as (I guess) it depends on the
-previous rx51 patches from Jarkko?
+Thanks for making the changes.
 
-Acked-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-
- Tomi
+-- 
+Dmitry
