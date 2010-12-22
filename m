@@ -1,44 +1,71 @@
 From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Wed, 22 Dec 2010 13:13:13 +0530
-Subject: [PATCH v6 0/7] nand prefetch-irq support and ecc layout chanage
-In-Reply-To: <201012201045.53688.manningc2@actrix.gen.nz>
+Date: Wed, 22 Dec 2010 13:22:12 +0530
+Subject: [PATCH 2/7] omap3: nand: configurable transfer type per board
+In-Reply-To: <20101218000845.GW5941@atomide.com>
 References: <1290785677-16005-1-git-send-email-s-ghorai@ti.com>
-	<201012201045.53688.manningc2@actrix.gen.nz>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036A3B0397@dbde02.ent.ti.com>
+	<1290785677-16005-3-git-send-email-s-ghorai@ti.com>
+	<20101218000845.GW5941@atomide.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036A3B03A5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 > -----Original Message-----
-> From: Charles Manning [mailto:manningc2 at actrix.gen.nz]
-> Sent: Monday, December 20, 2010 3:16 AM
-> To: linux-mtd at lists.infradead.org
-> Cc: Ghorai, Sukumar; linux-omap at vger.kernel.org; linux-arm-
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Saturday, December 18, 2010 5:39 AM
+> To: Ghorai, Sukumar
+> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
 > kernel at lists.infradead.org
-> Subject: Re: [PATCH v6 0/7] nand prefetch-irq support and ecc layout
-> chanage
+> Subject: Re: [PATCH 2/7] omap3: nand: configurable transfer type per board
 > 
-> On Saturday 27 November 2010 04:34:30 Sukumar Ghorai wrote:
-> > The following set of patches applies on linux-2.6.
+> * Sukumar Ghorai <s-ghorai@ti.com> [101126 07:25]:
+> > nand transfer type (sDMA, Polled, prefetch) can be select from board
+> file,
+> > enabling all transfer type in driver, by default.
 > >
-> > The main motivations behind this patch series are -
-> >         1. support NAND I/O in irq mode.
-> >         2. support of different ECC schema.
-> >         3. also to make ecc layout as like in romcode ecc layout
+> > this helps in multi-omap build and to select different transfer type for
+> > different board.
+> >
+> > Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+> > ---
+> >  arch/arm/plat-omap/include/plat/nand.h |    7 +++
+> >  drivers/mtd/nand/Kconfig               |   17 ------
+> >  drivers/mtd/nand/omap2.c               |   92 +++++++++++--------------
+> ------
+> >  3 files changed, 40 insertions(+), 76 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-omap/include/plat/nand.h b/arch/arm/plat-
+> omap/include/plat/nand.h
+> > index 6562cd0..78c0bdb 100644
+> > --- a/arch/arm/plat-omap/include/plat/nand.h
+> > +++ b/arch/arm/plat-omap/include/plat/nand.h
+> > @@ -10,6 +10,12 @@
+> >
+> >  #include <linux/mtd/partitions.h>
+> >
+> > +enum nand_io {
+> > +	NAND_OMAP_PREFETCH_POLLED = 0,	/* prefetch polled mode, default
+> */
+> > +	NAND_OMAP_POLLED,		/* polled mode, without prefetch */
+> > +	NAND_OMAP_PREFETCH_DMA		/* prefetch enabled sDMA mode */
+> > +};
+> > +
+> >  struct omap_nand_platform_data {
+> >  	unsigned int		options;
+> >  	int			cs;
+> > @@ -20,6 +26,7 @@ struct omap_nand_platform_data {
+> >  	int			(*nand_setup)(void);
+> >  	int			(*dev_ready)(struct omap_nand_platform_data *);
+> >  	int			dma_channel;
+> > +	enum nand_io		xfer_type;
+> >  	unsigned long		phys_base;
+> >  	int			devsize;
+> >  };
 > 
-> Why change the ECC layout?
-> 
-> Be very careful when you change ECC layouts. This can break production
-> systems.
-> 
-> For example if people are running something earlier and then want to
-> deliver a
-> new kernel with 2.6.37 then their existing NAND file systems will no
-> longer
-> be readable.
-> 
-> Changes to ECC should only be done for very good reasons and should be
-> controlled with a Kconfig with the default being the existing ECC layout.
-> 
-[Ghorai] we are just adding few ecc-layout(s) and based on the request from different customer. The default ecc-layout is the old one for backward compatibility and selection of ecc-layput is exposed form board file.  
+> So maybe the devsize in patch 1/7 should be handled with this too?
+
+[Ghorai] patch 1/7 [1] is to select the NAND type i.e. x8 or x16 NAND; 
+So I am keeping as separate patch. And let me know if I am missing anything.
+ 
+[1] https://patchwork.kernel.org/patch/359092/
