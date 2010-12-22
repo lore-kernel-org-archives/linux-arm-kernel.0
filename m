@@ -1,103 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Dec 2010 19:06:00 -0700 (MST)
-Subject: [PATCH 1/3] OMAP2+: powerdomain: add API to get context loss count
-In-Reply-To: <1292634855-14728-1-git-send-email-khilman@deeprootsystems.com>
-References: <1292634855-14728-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <alpine.DEB.2.00.1012211904290.1446@utopia.booyaka.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 22 Dec 2010 10:10:50 +0800
+Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
+In-Reply-To: <20101221203121.GB31617@pengutronix.de>
+References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
+	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
+	<20101221203121.GB31617@pengutronix.de>
+Message-ID: <20101222021049.GI16497@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin
+Hi Wolfram,
 
-On Fri, 17 Dec 2010, Kevin Hilman wrote:
+Thanks for the review.
 
-> Add new powerdomain API
+On Tue, Dec 21, 2010 at 09:31:21PM +0100, Wolfram Sang wrote:
+> Hi Shawn,
 > 
->     u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
+> On Tue, Dec 21, 2010 at 09:12:10PM +0800, Shawn Guo wrote:
+> > The mxs duart is actually an amba-pl011 device. This commit changes
+> > the duart device code to dynamically allocate amba-pl011 device,
+> > so that drivers/serial/amba-pl011.c can be used on mxs.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > 
-> for checking how many times the powerdomain has lost context.  The
-> loss count is the sum sum of the powerdomain off-mode counter, the
-> logic off counter and the per-bank memory off counter.
+> Great that it works!
 > 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+[...]
+> >  static struct clk_lookup lookups[] = {
+> > -	_REGISTER_CLOCK("mxs-duart.0", NULL, uart_clk)
+> > +	_REGISTER_CLOCK("uart", NULL, uart_clk)
+> 
+> Maybe "duart"?
+> 
+I was thinking about the naming "uart" vs "duart" here, and decided to
+pick the "uart", because this is the name of clock "uart_clk", which
+is the clock for uart domain, not only duart.
 
-I've updated this patch to tweak the function's comments and to remove the 
-negative return code from a function returning an u32.  Updated patch is 
-below.
+[...]
 
+> > +#include <mach/mx23.h>
+> > +#include <mach/mx28.h>
+> > +#include <mach/devices-common.h>
+> > +
+> > +#define MXS_AMBA_DEVICE(name, soc)				\
+> 
+> Maybe MXS_AMBA_DUART_DEVICE? It now sounds more generic than it actually is ;)
+> 
+OK. Will change.
 
-- Paul
-
-From: Kevin Hilman <khilman@deeprootsystems.com>
-Date: Fri, 17 Dec 2010 17:14:13 -0800
-Subject: [PATCH] OMAP2+: powerdomain: add API to get context loss count
-
-Add new powerdomain API
-
-    u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
-
-for checking how many times the powerdomain has lost context.  The
-loss count is the sum of the powerdomain off-mode counter, the
-logic off counter and the per-bank memory off counter.
-
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-[paul at pwsan.com: removed bogus return value on error; improved kerneldoc;
- tweaked commit message]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/powerdomain.c |   29 +++++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h |    1 +
- 2 files changed, 30 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 06ef60ee..eaed0df 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -909,3 +909,32 @@ int pwrdm_post_transition(void)
- 	pwrdm_for_each(_pwrdm_post_transition_cb, NULL);
- 	return 0;
- }
-+
-+/**
-+ * pwrdm_get_context_loss_count - get powerdomain's context loss count
-+ * @pwrdm: struct powerdomain * to wait for
-+ *
-+ * Context loss count is the sum of powerdomain off-mode counter, the
-+ * logic off counter and the per-bank memory off counter.  Returns 0
-+ * (and WARNs) upon error, otherwise, returns the context loss count.
-+ */
-+u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
-+{
-+	int i, count;
-+
-+	if (!pwrdm) {
-+		WARN(1, "powerdomain: %s: pwrdm is null\n", __func__);
-+		return 0;
-+	}
-+
-+	count = pwrdm->state_counter[PWRDM_POWER_OFF];
-+	count += pwrdm->ret_logic_off_counter;
-+
-+	for (i = 0; i < pwrdm->banks; i++)
-+		count += pwrdm->ret_mem_off_counter[i];
-+
-+	pr_debug("powerdomain: %s: context loss count = %u\n",
-+		 pwrdm->name, count);
-+
-+	return count;
-+}
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 35b5b48..c66431e 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -211,6 +211,7 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm);
- int pwrdm_pre_transition(void);
- int pwrdm_post_transition(void);
- int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
-+u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
- 
- extern void omap2xxx_powerdomains_init(void);
- extern void omap3xxx_powerdomains_init(void);
 -- 
-1.7.2.3
+Regards,
+Shawn
