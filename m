@@ -1,142 +1,40 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 22 Dec 2010 12:46:39 -0500
-Subject: [PATCH] davinci: Support various speedgrades for MityDSP-L138 and
-	MityARM-1808 SoMs
-Message-ID: <1293039999-20239-1-git-send-email-michael.williamson@criticallink.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 22 Dec 2010 12:14:36 -0600
+Subject: [PATCH] OMAP3: fix typo in OMAP3_IVA_MASK
+Message-ID: <1293041676-1206-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
-from the part number string read from the factory configuration block on
-the on-board I2C PROM.  Configure the maximum CPU speed based on this
-information.
+From: Arno Steffen <arno.steffen@googlemail.com>
 
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+OMAP3_IVA_MASK should use OMAP3_IVA_SHIFT instead of OMAP3_SGX_SHIFT
+
+Signed-off-by: Arno Steffen <arno.steffen@googlemail.com>
 ---
- arch/arm/mach-davinci/board-mityomapl138.c |   76 +++++++++++++++++++++++++---
- 1 files changed, 68 insertions(+), 8 deletions(-)
+Tony,
+	looking at head:
+	http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=blob;f=arch/arm/mach-omap2/control.h/control.h;h=6e5f7e512ff7da063dbeb9448670f38cefd486e6;hb=HEAD
+	This is a missing fix we have'nt incorporated yet.
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 0bb5f0c..9d30c01 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -44,38 +44,102 @@ struct factory_config {
+V2: posted to l-o and l-a and rebased to 2.6.37-rc7
+
+V1: http://marc.info/?t=129077184800003&r=1&w=2
+
+ arch/arm/mach-omap2/control.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index b6c6b7c..5325297 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -309,7 +309,7 @@
+ #define		FEAT_SGX_NONE		2
  
- static struct factory_config factory_config;
+ #define OMAP3_IVA_SHIFT			12
+-#define OMAP3_IVA_MASK			(1 << OMAP3_SGX_SHIFT)
++#define OMAP3_IVA_MASK			(1 << OMAP3_IVA_SHIFT)
+ #define		FEAT_IVA		0
+ #define		FEAT_IVA_NONE		1
  
-+struct part_no_info {
-+	const char	*part_no;  /* part number string of interest */
-+	int		max_freq; /* khz */
-+};
-+
-+static struct part_no_info part_no_info[] = {
-+	{
-+		.part_no	= "L138-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "L138-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "L138-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1808-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "1808-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "1808-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1810-D",
-+		.max_freq	= 375000,
-+	},
-+};
-+
- static void read_factory_config(struct memory_accessor *a, void *context)
- {
- 	int ret;
-+#ifdef CONFIG_CPU_FREQ
-+	int i;
-+#endif
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
- 	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
- 	if (ret != sizeof(struct factory_config)) {
- 		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
- 				ret);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
- 		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
- 				factory_config.magic);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.version != FACTORY_CONFIG_VERSION) {
- 		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
- 				factory_config.version);
--		return;
-+		goto bad_config;
- 	}
- 
- 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
--	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
- 	if (is_valid_ether_addr(factory_config.mac))
- 		memcpy(soc_info->emac_pdata->mac_addr,
- 			factory_config.mac, ETH_ALEN);
- 	else
- 		pr_warning("MityOMAPL138: Invalid MAC found "
- 				"in factory config block\n");
-+
-+	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
-+
-+#ifdef CONFIG_CPU_FREQ
-+	for (i = 0; i < ARRAY_SIZE(part_no_info); i++) {
-+		/*
-+		 * the part number has additional characters beyond what is
-+		 * stored in the table.  This information is not needed for
-+		 * determining the speed grade, and would require several
-+		 * more table entries.  Only check the first N characters
-+		 * for a match.
-+		 */
-+		if (!strncmp(factory_config.partnum, part_no_info[i].part_no,
-+			strlen(part_no_info[i].part_no))) {
-+			da850_max_speed = part_no_info[i].max_freq;
-+			break;
-+		}
-+	}
-+#endif
-+
-+bad_config:
-+#ifdef CONFIG_CPU_FREQ
-+	ret = da850_register_cpufreq("pll0_sysclk3");
-+	if (ret)
-+		pr_warning("cpufreq registration failed: %d\n", ret);
-+#endif
- }
- 
- static struct at24_platform_data mityomapl138_fd_chip = {
-@@ -383,10 +447,6 @@ static void __init mityomapl138_init(void)
- 	if (ret)
- 		pr_warning("rtc setup failed: %d\n", ret);
- 
--	ret = da850_register_cpufreq("pll0_sysclk3");
--	if (ret)
--		pr_warning("cpufreq registration failed: %d\n", ret);
--
- 	ret = da8xx_register_cpuidle();
- 	if (ret)
- 		pr_warning("cpuidle registration failed: %d\n", ret);
 -- 
-1.7.0.4
+1.6.3.3
