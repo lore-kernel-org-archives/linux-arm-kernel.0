@@ -1,67 +1,31 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Wed, 22 Dec 2010 14:58:08 +0300
-Subject: [PATCH 1/1] ARM: cns3xxx: ahci: Fixup for softwreset failures
-	with direct connected disks with CONFIG_SATA_PMP enabled.
-In-Reply-To: <AANLkTi=Lk1vAxxTJQpXNvtbLCFs0Gy+ZAJadxv_mLQ6C@mail.gmail.com>
-References: <1291481021-23317-1-git-send-email-mkl0301@gmail.com>
-	<20101220170217.GA1333@oksana.dev.rtsoft.ru>
-	<AANLkTi=Lk1vAxxTJQpXNvtbLCFs0Gy+ZAJadxv_mLQ6C@mail.gmail.com>
-Message-ID: <20101222115808.GA458@oksana.dev.rtsoft.ru>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 22 Dec 2010 13:03:18 +0100
+Subject: [PATCH v3 1/1] input/tc3589x: add tc3589x keypad support
+In-Reply-To: <20101222102050.GE22590@core.coreip.homeip.net>
+References: <1292927011-6898-1-git-send-email-sundar.iyer@stericsson.com>
+	<20101222102050.GE22590@core.coreip.homeip.net>
+Message-ID: <AANLkTimc4aT+NzQgcY+-Wm0oyFqqO9Fi3qREjPvcT1B0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 22, 2010 at 05:27:20PM +0800, Lin Mac wrote:
-[...]
-> > This is not good because cns3xxx_pwr_*() calls aren't thread-safe.
-> > We must use them only from the "single-threaded" platform code,
-> > i.e. very early.
-> > Once we add proper clocks (clkapi) and power management (regulators)
-> > support for CNS3xxx, we may move this into ahci->init() callback.
-> Almost every device driver needs to change those power/clk/reset bits,
-> and it's strange to enable everything on init phase. BTW, the  EHCI
-> and OHCI that I sent previously also used these cns3xxx_pwr_*() calls.
-> 
-> Would they be supported in near future? If not, I would like look into those.
+2010/12/22 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
+> On Tue, Dec 21, 2010 at 03:53:31PM +0530, Sundar Iyer wrote:
+>> Add support for the keypad controller module found on the
+>> TC3589X devices. This driver default adds the support for
+>> TC35893 device.
+>>
+>> Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
+>> ---
+>> Changes:
+>> ?- v3: introduced keypad_stopped flag to check suspend/resume/open/close
+>> ? ? ? ?operations
+>
+> Acked-by: Dmitry Torokhov <dtor@mail.ru>
+>
+> Thanks for making the changes.
 
-Currently I do not work on adding these features, so feel free
-look into it.
+I've applied it to the ux500-core branch and pushed so
+it gets tested in -next with the rest of the tc3589x stuff...
 
-> > Plus, unfortunately this patch breaks build when AHCI_PLATFORM is
-> > set to =m.
-> > arch/arm/mach-cns3xxx/built-in.o: In function 'cns3xxx_ahci_softreset':
-> > cns3420vb.c:(.text+0x36c): undefined reference to 'ahci_do_softreset'
-> > cns3420vb.c:(.text+0x390): undefined reference to 'ahci_do_softreset'
-> > cns3420vb.c:(.text+0x3a0): undefined reference to 'ahci_check_ready'
-> > arch/arm/mach-cns3xxx/built-in.o:(.data+0x35c): undefined reference to 'ahci_ops'
-> > make: *** [.tmp_vmlinux1] Error 1
-> Sorry that I didn't notice this. I was trying to reuse ahci-platform
-> as possible.
-> Building platform device as module seems strange to me, therefore I
-> would add a new ahci-platform alike platform driver.
-
-Yep. But please make it similar to the SDHCI platform driver
-approach. I.e., see these commits:
-
-commit 20b1597bcf4a76ccab232fa032f5f9ad30069167
-Author: Anton Vorontsov <avorontsov@mvista.com>
-Date:   Tue Aug 10 18:01:49 2010 -0700
-
-    sdhci-pltfm: add support for CNS3xxx SoC devices
-
-commit 845e3f4f06f9b1d34f39601cb6b7abfb8f40653c
-Author: Anton Vorontsov <avorontsov@mvista.com>
-Date:   Tue Aug 10 18:01:49 2010 -0700
-
-    sdhci-pltfm: reorganize Makefile entries to support SoC devices
-
-commit 515033f97c0b5a1bce13fa93e09704d95b44f376
-Author: Anton Vorontsov <avorontsov@mvista.com>
-Date:   Tue Aug 10 18:01:47 2010 -0700
-
-    sdhci-pltfm: switch to module device table matching
-
-Thanks,
-
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+Yours,
+Linus Walleij
