@@ -1,43 +1,42 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 22 Dec 2010 14:24:21 -0500
-Subject: [PATCH] davinci: Support various speedgrades for MityDSP-L138
-	and MityARM-1808 SoMs
-In-Reply-To: <4D124ECE.8030900@mvista.com>
-References: <1293039999-20239-1-git-send-email-michael.williamson@criticallink.com>
-	<4D124ECE.8030900@mvista.com>
-Message-ID: <4D125065.3020606@criticallink.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Dec 2010 11:25:54 -0800
+Subject: [PATCH v3] Keyboard: omap-keypad: use matrix_keypad.h
+In-Reply-To: <20101222101657.GD22590@core.coreip.homeip.net>
+References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
+	<201012181639.29820.jkrzyszt@tis.icnet.pl>
+	<alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
+	<201012202209.24068.jkrzyszt@tis.icnet.pl>
+	<alpine.DEB.1.10.1012211150410.22164@esdhcp041196.research.nokia.com>
+	<20101222101657.GD22590@core.coreip.homeip.net>
+Message-ID: <20101222192554.GE7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2010 2:17 PM, Sergei Shtylyov wrote:
+* Dmitry Torokhov <dmitry.torokhov@gmail.com> [101222 02:16]:
+> On Tue, Dec 21, 2010 at 01:20:35PM +0200, Aaro Koskinen wrote:
+> > Hi,
+> > 
+> > On Mon, 20 Dec 2010, Janusz Krzysztofik wrote:
+> > >Most keypad drivers make use of the <linux/input/matrix_keypad.h>
+> > >defined macros, structures and inline functions.
+> > >
+> > >Convert omap-keypad driver to use those as well, as suggested by a
+> > >compile time warning, hardcoded into the OMAP <palt/keypad.h>.
+> > >
+> > >Created against linux-2.6.37-rc5.
+> > >Tested on Amstrad Delta.
+> > >Compile tested with omap1_defconfig and omap2plus_defconfig shrinked to
+> > >board-h4.
+> > >
+> > >Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> > 
+> > Reviewed-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> > 
+> 
+> Acked-by: Dmitry Torokhov <dtor@mail.ru>
+> 
+> Thanks for making the changes.
 
-> Hello.
-> 
-> Michael Williamson wrote:
-> 
->> For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
->> from the part number string read from the factory configuration block on
->> the on-board I2C PROM.  Configure the maximum CPU speed based on this
->> information.
-> 
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-> [...]
-> 
->> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
->> index 0bb5f0c..9d30c01 100644
->> --- a/arch/arm/mach-davinci/board-mityomapl138.c
->> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
->> @@ -44,38 +44,102 @@ struct factory_config {
->>  
->>  static struct factory_config factory_config;
->>  
->> +struct part_no_info {
->> +    const char    *part_no;  /* part number string of interest */
->> +    int        max_freq; /* khz */
-> 
->    Why not align the comments (and do it with a tab)?
-> 
-> WBR, Sergei
+Thanks everybody, applying.
 
-
-I'd be happy to.  Thanks for the comment.
+Tony
