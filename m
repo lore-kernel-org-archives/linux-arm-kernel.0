@@ -1,10 +1,7 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 22 Dec 2010 12:25:32 -0200
-Subject: [PATCH v2 3/3] ARM: imx/mx25_3ds: Add USB support
-In-Reply-To: <1293027932-13201-2-git-send-email-fabio.estevam@freescale.com>
-References: <1293027932-13201-1-git-send-email-fabio.estevam@freescale.com>
-	<1293027932-13201-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1293027932-13201-3-git-send-email-fabio.estevam@freescale.com>
+Date: Wed, 22 Dec 2010 12:25:30 -0200
+Subject: [PATCH v2 1/3] ARM: mx3/mx35_3ds: Add USB OTG Host mode
+Message-ID: <1293027932-13201-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,59 +10,70 @@ Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 Changes since v1:
 - removed ULPI dependencies
 
- arch/arm/mach-imx/Kconfig         |    1 +
- arch/arm/mach-imx/mach-mx25_3ds.c |   14 +++++++++++++-
- 2 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx3/mach-mx35_3ds.c |   27 ++++++++++++++++++++++++++-
+ 1 files changed, 26 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index fed3ee5..b19fb54 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -97,6 +97,7 @@ comment "MX25 platforms:"
- config MACH_MX25_3DS
- 	bool "Support MX25PDK (3DS) Platform"
- 	select SOC_IMX25
-+	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMXDI_RTC
- 	select IMX_HAVE_PLATFORM_IMX_FB
-diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
-index 8b8e75b..aa76cfd 100644
---- a/arch/arm/mach-imx/mach-mx25_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx25_3ds.c
-@@ -30,6 +30,7 @@
- #include <linux/gpio.h>
+diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
+index 8bd8992..b1963f2 100644
+--- a/arch/arm/mach-mx3/mach-mx35_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
+@@ -26,6 +26,7 @@
  #include <linux/platform_device.h>
- #include <linux/input/matrix_keypad.h>
+ #include <linux/memory.h>
+ #include <linux/gpio.h>
 +#include <linux/usb/otg.h>
  
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -184,13 +185,24 @@ static const struct matrix_keymap_data mx25pdk_keymap_data __initdata = {
- 	.keymap_size	= ARRAY_SIZE(mx25pdk_keymap),
+ #include <linux/mtd/physmap.h>
+ 
+@@ -125,6 +126,11 @@ static const struct fsl_usb2_platform_data usb_otg_pdata __initconst = {
+ 	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
  };
  
-+static const struct mxc_usbh_platform_data usbh2_pdata __initconst = {
-+	.portsc	= MXC_EHCI_MODE_SERIAL,
++static struct mxc_usbh_platform_data otg_pdata __initdata = {
++	.portsc	= MXC_EHCI_MODE_UTMI,
 +	.flags	= MXC_EHCI_INTERNAL_PHY,
 +};
 +
-+static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
-+	.operating_mode = FSL_USB2_DR_DEVICE,
-+	.phy_mode       = FSL_USB2_PHY_UTMI,
-+};
-+
- static void __init mx25pdk_init(void)
- {
- 	mxc_iomux_v3_setup_multiple_pads(mx25pdk_pads,
- 			ARRAY_SIZE(mx25pdk_pads));
+ /* USB HOST config */
+ static const struct mxc_usbh_platform_data usb_host_pdata __initconst = {
+ 	.portsc		= MXC_EHCI_MODE_SERIAL,
+@@ -132,6 +138,21 @@ static const struct mxc_usbh_platform_data usb_host_pdata __initconst = {
+ 			  MXC_EHCI_INTERNAL_PHY,
+ };
  
- 	imx25_add_imx_uart0(&uart_pdata);
--	imx25_add_mxc_ehci_hs(NULL);
-+	imx25_add_fsl_usb2_udc(&otg_device_pdata);
-+	imx25_add_mxc_ehci_hs(&usbh2_pdata);
- 	imx25_add_mxc_nand(&mx25pdk_nand_board_info);
- 	imx25_add_imxdi_rtc(NULL);
- 	imx25_add_imx_fb(&mx25pdk_fb_pdata);
++static int otg_mode_host;
++
++static int __init mx35_3ds_otg_mode(char *options)
++{
++	if (!strcmp(options, "host"))
++		otg_mode_host = 1;
++	else if (!strcmp(options, "device"))
++		otg_mode_host = 0;
++	else
++		pr_info("otg_mode neither \"host\" nor \"device\". "
++			"Defaulting to device\n");
++	return 0;
++}
++__setup("otg_mode=", mx35_3ds_otg_mode);
++
+ /*
+  * Board specific initialization.
+  */
+@@ -145,10 +166,14 @@ static void __init mxc_board_init(void)
+ 
+ 	imx35_add_imx_uart0(&uart_pdata);
+ 
+-	imx35_add_fsl_usb2_udc(&usb_otg_pdata);
++	if (otg_mode_host)
++		imx35_add_mxc_ehci_otg(&otg_pdata);
+ 
+ 	imx35_add_mxc_ehci_hs(&usb_host_pdata);
+ 
++	if (!otg_mode_host)
++		imx35_add_fsl_usb2_udc(&usb_otg_pdata);
++
+ 	imx35_add_mxc_nand(&mx35pdk_nand_board_info);
+ 	imx35_add_sdhci_esdhc_imx(0, NULL);
+ 
 -- 
 1.6.0.4
