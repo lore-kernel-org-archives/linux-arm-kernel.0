@@ -1,81 +1,40 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 22 Dec 2010 12:24:53 -0800
-Subject: [GIT PULL] OMAP SmartReflex/voltage core for 2.6.38
-In-Reply-To: <87fwtptyaf.fsf@deeprootsystems.com> (Kevin Hilman's message of
-	"Wed, 22 Dec 2010 11:14:48 -0800")
-References: <87fwtptyaf.fsf@deeprootsystems.com>
-Message-ID: <878vzhsgh6.fsf@deeprootsystems.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 22 Dec 2010 21:25:42 +0100
+Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
+In-Reply-To: <1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
+References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
+	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101222202542.GT14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@deeprootsystems.com> writes:
+Hello Shawn,
 
-> Tony,
->
-> The following pull request is for the SmartReflex/voltage core for
-> 2.6.38.  
->
-> It is based on Paul's latest integration-2.6.38-for-tony branch, so
-> should be pulled only after pulling from Paul.
->
+On Tue, Dec 21, 2010 at 09:12:10PM +0800, Shawn Guo wrote:
+> The mxs duart is actually an amba-pl011 device. This commit changes
+> the duart device code to dynamically allocate amba-pl011 device,
+> so that drivers/serial/amba-pl011.c can be used on mxs.
+I have problems using this.  The problem I found up to now is that
+during probe of the device (triggered by mxs_add_duart ->
+amba_device_register -> amba_put_disable_pclk) the uart clock is
+disabled.  This happens because initially its usage count is 0 but the
+clock is enabled by barebox.  clk_enable doesn't hurt, but in the
+matching clk_disable the usage count drops to zero again and so the
+clock is disabled in hardware.  After that no further outputs can be
+seen.
 
-Retracting this pull request.  It actually breaks boot on 2430SDP.
+I assume the machine dies with a circular exception while trying to
+write something out (e.g. that it cannot write to the console :-), but I
+havn't checked that.
 
-More details in replies to the last posting of this series.
+My first try to put an clk_enable(&uart_clk) after it is registered
+didn't help.
 
-Kevin
+Did you face the same problem?
 
+Best regards
+Uwe
 
->
->
-> The following changes since commit f17f9726c27c3921e00a5750e85070e6dd7e1ff7:
->
->   OMAP4: clock data: Add missing fixed divisors (2010-12-22 10:12:46 -0700)
->
-> are available in the git repository at:
->   ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git pm-sr
->
-> Benoit Cousson (1):
->       OMAP4: hwmod: Add inital data for smartreflex modules.
->
-> Thara Gopinath (14):
->       OMAP3: PM: Adding voltage driver support.
->       OMAP: Introduce voltage domain information in the hwmod structures
->       OMAP3: PM: Adding smartreflex driver support.
->       OMAP3: PM: Adding smartreflex device file.
->       OMAP3: PM: Adding smartreflex hwmod data
->       OMAP3: PM: Adding smartreflex class3 driver
->       OMAP3: PM: Adding T2 enabling of smartreflex support
->       OMAP3: PM: Register TWL4030 pmic info with the voltage driver.
->       OMAP3: PM: Adding debug support to Voltage and Smartreflex drivers
->       OMAP3: PM: Program correct init voltages for VDD1 and VDD2
->       OMAP4: Register voltage PMIC parameters with the voltage layer
->       OMAP4: Adding voltage driver support
->       OMAP4: PM: Program correct init voltages for scalable VDDs
->       OMAP4: Smartreflex framework extensions
->
->  arch/arm/mach-omap2/Makefile                  |    9 +-
->  arch/arm/mach-omap2/control.h                 |   29 +
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |  175 +++
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |  168 +++
->  arch/arm/mach-omap2/omap_twl.c                |  277 +++++
->  arch/arm/mach-omap2/pm.c                      |  102 ++
->  arch/arm/mach-omap2/pm.h                      |   28 +
->  arch/arm/mach-omap2/smartreflex-class3.c      |   59 +
->  arch/arm/mach-omap2/smartreflex.c             | 1029 ++++++++++++++++
->  arch/arm/mach-omap2/sr_device.c               |  146 +++
->  arch/arm/mach-omap2/voltage.c                 | 1571 +++++++++++++++++++++++++
->  arch/arm/plat-omap/Kconfig                    |   31 +
->  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    5 +
->  arch/arm/plat-omap/include/plat/smartreflex.h |  245 ++++
->  arch/arm/plat-omap/include/plat/voltage.h     |  146 +++
->  drivers/mfd/twl-core.c                        |   13 +
->  include/linux/i2c/twl.h                       |   11 +
->  17 files changed, 4042 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/omap_twl.c
->  create mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
->  create mode 100644 arch/arm/mach-omap2/smartreflex.c
->  create mode 100644 arch/arm/mach-omap2/sr_device.c
->  create mode 100644 arch/arm/mach-omap2/voltage.c
->  create mode 100644 arch/arm/plat-omap/include/plat/smartreflex.h
->  create mode 100644 arch/arm/plat-omap/include/plat/voltage.h
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
