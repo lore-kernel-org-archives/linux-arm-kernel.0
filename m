@@ -1,27 +1,25 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Dec 2010 21:10:16 -0700 (MST)
-Subject: [PATCH 13/14] OMAP2/3: PRCM: split OMAP2/3-specific PRCM code
-	into OMAP2/3-specific files
-In-Reply-To: <AANLkTikhp8157yegSb1G3gXAxF_SLo0Q1OEgsf2Bt0Cm@mail.gmail.com>
-References: <20101207012242.3708.45451.stgit@twilight.localdomain>
-	<20101207012516.3708.87606.stgit@twilight.localdomain>
-	<alpine.DEB.2.00.1012142147040.15971@utopia.booyaka.com>
-	<AANLkTikhp8157yegSb1G3gXAxF_SLo0Q1OEgsf2Bt0Cm@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1012212109320.1446@utopia.booyaka.com>
+Date: Tue, 21 Dec 2010 21:25:13 -0700 (MST)
+Subject: [PATCH] OMAP4: clocks: add dummy clock for mailbox
+In-Reply-To: <1290108000-16835-1-git-send-email-h-kanigeri2@ti.com>
+References: <1290108000-16835-1-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <alpine.DEB.2.00.1012212121380.1446@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Omar,
+On Thu, 18 Nov 2010, Hari Kanigeri wrote:
 
-On Wed, 15 Dec 2010, Ramirez Luna, Omar wrote:
+> In omap4, there is no explicit configuration register to enable mailbox clocks.
+> Defining dummy clock for mailbox clock module to keep the mailbox driver
+> backward compatible with previous omaps.
+> 
+> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 
-> I don't have a preference, I guess part of the license header makes
-> them even more noticeable.
+Thanks, queued for 2.6.38 as part of the "clk_b_2.6.38" branch on 
+git://git.pwsan.com/linux-2.6
 
-I wound up moving those comments below, per Felipe's comment.
+This patch appears in the integration tree as part of tag 
+'integration-2.6.38-20101221-011' at git://git.pwsan.com/linux-integration
 
-> Acked-by: Omar Ramirez Luna <omar.ramirez@ti.com>
-
-Thanks, ack added to the patch.
 
 - Paul
