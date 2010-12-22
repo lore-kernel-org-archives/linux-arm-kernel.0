@@ -1,147 +1,81 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 22 Dec 2010 14:49:41 -0500
-Subject: [PATCH v1] davinci: Support various speedgrades for MityDSP-L138 and
-	MityARM-1808 SoMs
-Message-ID: <1293047381-21384-1-git-send-email-michael.williamson@criticallink.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 22 Dec 2010 12:24:53 -0800
+Subject: [GIT PULL] OMAP SmartReflex/voltage core for 2.6.38
+In-Reply-To: <87fwtptyaf.fsf@deeprootsystems.com> (Kevin Hilman's message of
+	"Wed, 22 Dec 2010 11:14:48 -0800")
+References: <87fwtptyaf.fsf@deeprootsystems.com>
+Message-ID: <878vzhsgh6.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
-from the part number string read from the factory configuration block on
-the on-board I2C PROM.  Configure the maximum CPU speed based on this
-information.
+Kevin Hilman <khilman@deeprootsystems.com> writes:
 
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
----
-This is against davinci-linux tree.
+> Tony,
+>
+> The following pull request is for the SmartReflex/voltage core for
+> 2.6.38.  
+>
+> It is based on Paul's latest integration-2.6.38-for-tony branch, so
+> should be pulled only after pulling from Paul.
+>
 
-Changes since v0:
- aligned comments using tabs not spaces.
+Retracting this pull request.  It actually breaks boot on 2430SDP.
 
- arch/arm/mach-davinci/board-mityomapl138.c |   76 +++++++++++++++++++++++++---
- 1 files changed, 68 insertions(+), 8 deletions(-)
+More details in replies to the last posting of this series.
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 0bb5f0c..06b6d2f 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -44,38 +44,102 @@ struct factory_config {
- 
- static struct factory_config factory_config;
- 
-+struct part_no_info {
-+	const char	*part_no;	/* part number string of interest */
-+	int		max_freq;	/* khz */
-+};
-+
-+static struct part_no_info part_no_info[] = {
-+	{
-+		.part_no	= "L138-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "L138-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "L138-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1808-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "1808-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "1808-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1810-D",
-+		.max_freq	= 375000,
-+	},
-+};
-+
- static void read_factory_config(struct memory_accessor *a, void *context)
- {
- 	int ret;
-+#ifdef CONFIG_CPU_FREQ
-+	int i;
-+#endif
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
- 	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
- 	if (ret != sizeof(struct factory_config)) {
- 		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
- 				ret);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
- 		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
- 				factory_config.magic);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.version != FACTORY_CONFIG_VERSION) {
- 		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
- 				factory_config.version);
--		return;
-+		goto bad_config;
- 	}
- 
- 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
--	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
- 	if (is_valid_ether_addr(factory_config.mac))
- 		memcpy(soc_info->emac_pdata->mac_addr,
- 			factory_config.mac, ETH_ALEN);
- 	else
- 		pr_warning("MityOMAPL138: Invalid MAC found "
- 				"in factory config block\n");
-+
-+	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
-+
-+#ifdef CONFIG_CPU_FREQ
-+	for (i = 0; i < ARRAY_SIZE(part_no_info); i++) {
-+		/*
-+		 * the part number has additional characters beyond what is
-+		 * stored in the table.  This information is not needed for
-+		 * determining the speed grade, and would require several
-+		 * more table entries.  Only check the first N characters
-+		 * for a match.
-+		 */
-+		if (!strncmp(factory_config.partnum, part_no_info[i].part_no,
-+			strlen(part_no_info[i].part_no))) {
-+			da850_max_speed = part_no_info[i].max_freq;
-+			break;
-+		}
-+	}
-+#endif
-+
-+bad_config:
-+#ifdef CONFIG_CPU_FREQ
-+	ret = da850_register_cpufreq("pll0_sysclk3");
-+	if (ret)
-+		pr_warning("cpufreq registration failed: %d\n", ret);
-+#endif
- }
- 
- static struct at24_platform_data mityomapl138_fd_chip = {
-@@ -383,10 +447,6 @@ static void __init mityomapl138_init(void)
- 	if (ret)
- 		pr_warning("rtc setup failed: %d\n", ret);
- 
--	ret = da850_register_cpufreq("pll0_sysclk3");
--	if (ret)
--		pr_warning("cpufreq registration failed: %d\n", ret);
--
- 	ret = da8xx_register_cpuidle();
- 	if (ret)
- 		pr_warning("cpuidle registration failed: %d\n", ret);
--- 
-1.7.0.4
+Kevin
+
+
+>
+>
+> The following changes since commit f17f9726c27c3921e00a5750e85070e6dd7e1ff7:
+>
+>   OMAP4: clock data: Add missing fixed divisors (2010-12-22 10:12:46 -0700)
+>
+> are available in the git repository at:
+>   ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git pm-sr
+>
+> Benoit Cousson (1):
+>       OMAP4: hwmod: Add inital data for smartreflex modules.
+>
+> Thara Gopinath (14):
+>       OMAP3: PM: Adding voltage driver support.
+>       OMAP: Introduce voltage domain information in the hwmod structures
+>       OMAP3: PM: Adding smartreflex driver support.
+>       OMAP3: PM: Adding smartreflex device file.
+>       OMAP3: PM: Adding smartreflex hwmod data
+>       OMAP3: PM: Adding smartreflex class3 driver
+>       OMAP3: PM: Adding T2 enabling of smartreflex support
+>       OMAP3: PM: Register TWL4030 pmic info with the voltage driver.
+>       OMAP3: PM: Adding debug support to Voltage and Smartreflex drivers
+>       OMAP3: PM: Program correct init voltages for VDD1 and VDD2
+>       OMAP4: Register voltage PMIC parameters with the voltage layer
+>       OMAP4: Adding voltage driver support
+>       OMAP4: PM: Program correct init voltages for scalable VDDs
+>       OMAP4: Smartreflex framework extensions
+>
+>  arch/arm/mach-omap2/Makefile                  |    9 +-
+>  arch/arm/mach-omap2/control.h                 |   29 +
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |  175 +++
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |  168 +++
+>  arch/arm/mach-omap2/omap_twl.c                |  277 +++++
+>  arch/arm/mach-omap2/pm.c                      |  102 ++
+>  arch/arm/mach-omap2/pm.h                      |   28 +
+>  arch/arm/mach-omap2/smartreflex-class3.c      |   59 +
+>  arch/arm/mach-omap2/smartreflex.c             | 1029 ++++++++++++++++
+>  arch/arm/mach-omap2/sr_device.c               |  146 +++
+>  arch/arm/mach-omap2/voltage.c                 | 1571 +++++++++++++++++++++++++
+>  arch/arm/plat-omap/Kconfig                    |   31 +
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    5 +
+>  arch/arm/plat-omap/include/plat/smartreflex.h |  245 ++++
+>  arch/arm/plat-omap/include/plat/voltage.h     |  146 +++
+>  drivers/mfd/twl-core.c                        |   13 +
+>  include/linux/i2c/twl.h                       |   11 +
+>  17 files changed, 4042 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/omap_twl.c
+>  create mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
+>  create mode 100644 arch/arm/mach-omap2/smartreflex.c
+>  create mode 100644 arch/arm/mach-omap2/sr_device.c
+>  create mode 100644 arch/arm/mach-omap2/voltage.c
+>  create mode 100644 arch/arm/plat-omap/include/plat/smartreflex.h
+>  create mode 100644 arch/arm/plat-omap/include/plat/voltage.h
