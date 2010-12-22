@@ -1,170 +1,55 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 23 Dec 2010 11:32:17 +1300
-Subject: [PATCH 1/6 v10] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <AANLkTinZEhJ8aUe63yc_BNdifn_5g8U=iStwwXEU-+V9@mail.gmail.com>
-References: <20101220195423.GA14509@alchark-u3s>	<4D0FC1AE.2050708@bluewatersys.com>	<AANLkTin4XqbGwznp56Xjt_zest6rxNmir0QDJWTySY4+@mail.gmail.com>	<4D0FD747.9020700@bluewatersys.com>	<AANLkTikAWjK7ACyt=LedhyyrhsCk1WCiyWz182CXMe9C@mail.gmail.com>	<4D0FE546.7050302@bluewatersys.com>	<AANLkTinyYKrhTcBMMCE4A2oFQHm11cqSZQozytGu+d6o@mail.gmail.com>	<4D1011CF.9080800@bluewatersys.com>	<AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>	<4D110269.9030805@bluewatersys.com>	<20101222211815.GA31054@alchark-u3s>	<4D12730B.2030909@bluewatersys.com>
-	<AANLkTinZEhJ8aUe63yc_BNdifn_5g8U=iStwwXEU-+V9@mail.gmail.com>
-Message-ID: <4D127C71.5040301@bluewatersys.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 23 Dec 2010 07:49:01 +0900
+Subject: [PATCH] rfc v3: ARM: mach-shmobile: mackerel: Add zboot support
+In-Reply-To: <1291855635-30882-1-git-send-email-horms@verge.net.au>
+References: <1291855635-30882-1-git-send-email-horms@verge.net.au>
+Message-ID: <20101222224901.GA16187@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2010 11:02 AM, Alexey Charkov wrote:
-> 2010/12/23 Ryan Mallon <ryan@bluewatersys.com>:
->> On 12/23/2010 10:18 AM, Alexey Charkov wrote:
->>> This adds support for the family of Systems-on-Chip produced initially
->>> by VIA and now its subsidiary WonderMedia that have recently become
->>> widespread in lower-end Chinese ARM-based tablets and netbooks.
->>>
->>> Support is included for both VT8500 and WM8505, selectable by a
->>> configuration switch at kernel build time.
->>>
->>> Included are basic machine initialization files, register and
->>> interrupt definitions, support for the on-chip interrupt controller,
->>> high-precision OS timer, GPIO lines, necessary macros for early debug,
->>> pulse-width-modulated outputs control, as well as platform device
->>> configurations for the specific drivers implemented elsewhere.
->>>
->>> Signed-off-by: Alexey Charkov <alchark@gmail.com>
->>> ---
->>>
->>> Welcome the jubilee tenth revision of this patch ;-)
->>>
->>> I've tried to incorporate the suggestions by Ryan and Arnd, hope that
->>> there is nothing left out. There was a massive reorganization of code
->>> to remove less-than-obvious magic with MMIO registers and irqs being
->>> held in huge structs, now they are again macro definitions. Those
->>> macros are, however, only included in single isolated files, and
->>> actual values to use are chosen at runtime by calling the respective
->>> routines at machine initialization. There are also stylistic changes
->>> all around, where Ryan suggested.
->>>
->>> As a result, i8042 should again be adjusted a bit to reflect the new
->>> place to find respective register/irq definitions, that one will be
->>> sent in the respective thread shortly.
->>>
->>> Best regards,
->>> Alexey
->>
->> <snip>
->>
->>> --- /dev/null
->>> +++ b/arch/arm/mach-vt8500/devices-vt8500.c
->>> @@ -0,0 +1,117 @@
->>> +/* linux/arch/arm/mach-vt8500/devices-vt8500.c
->>> + *
->>> + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
->>> + *
->>> + * This software is licensed under the terms of the GNU General Public
->>> + * License version 2, as published by the Free Software Foundation, and
->>> + * may be copied, distributed, and modified under those terms.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + */
->>> +
->>> +#include <linux/platform_device.h>
->>> +
->>> +#include <mach/vt8500_regs.h>
->>> +#include <mach/vt8500_irqs.h>
->>> +#include <mach/i8042.h>
->>> +#include "devices.h"
->>> +
->>> +static inline struct resource WMT_MMIO_RES(u32 start, u32 size)
->>> +{
->>> +     struct resource tmp = {
->>> +             .flags = IORESOURCE_MEM,
->>> +             .start = start,
->>> +             .end = start + size - 1,
->>> +     };
->>> +
->>> +     return tmp;
->>> +}
->>
->> These functions can be marked __init (though I guess they already are if
->> marked inline?). They should also have lower case names since they are
->> proper functions.
+On Thu, Dec 09, 2010 at 09:47:15AM +0900, Simon Horman wrote:
+> When CONFIG_ZBOOT_ROM is selected, the resulting zImage file will be small
+> boot loader and may be burned to rom or flash.
 > 
-> As inline functions are unrolled into the caller at compile time, and
-> the caller is __init, I would expect their code to be freed after init
-> as well. I could be wrong, though :)
+> Compile tested only.
 
-If the compiler decided not to inline them for whatever reason they
-would stick around. They should also probably be marked __init to make
-it clear that they are not permanent functions.
+I now have access to a Mackerel board and have verified that
+this patch works.
 
->> Do these functions generate warnings about returning temporary values
->> off the stack? If so, they could be rewritten as:
->>
+My verification method was to usa a hack; I removed the
+SDRAM initialisation portion of head-mackerel.txt and
+then booting the resulting zImage from uboot using:
+
+=> bootp
+=> go 0x42000000
+
+This is the same method that I used to test the AP4 variant of this change.
+
+Morimoto-san, could you test this by burning an image (without the above
+hack) to Flash? I can provide an image or tree if that helps.
+
+> This patch assumes that head-mackerel.txt will be the same as head-ap4evb.txt.
+> I am waiting for verification of this.
 > 
-> Should those be compile-time or run-time? I did not see any.
-
-I thought you might get compile time warnings. Returning things off the
-stack in general is error prone. I think passing a pointer to the
-resource into the function (as below) maybe a bit better.
-
->> static __init void wmt_mmio_res(struct resource *res,
->>                                u32 start, u32 size)
->> {
->>        res->flags = IORESOURCE_MEM;
->>        res->start = start;
->>        res->end   = start + size - 1;
->> }
->>
->> You could also make these functions static inline in devices.h to avoid
->> having to define them for each board.
->>
+> This patch depends on
+> * ARM: 6515/1: Add zboot support for SuperH Mobile ARM
+>   (merged into the devel branch of Russel King's linux-2.6-arm tree)
+> * ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
+>   (merged into the devel branch of Russel King's linux-2.6-arm tree)
+> * MACH_MACKEREL (3211) being present in arch/arm/tools/mach-types
 > 
-> Agreed.
+> v2:
+> * Use head-mackerel.txt for Mackerel.
+>   head-ap4evb.txt was used by mistake.
 > 
->>> +
->>> +static inline struct resource WMT_IRQ_RES(int irq)
->>> +{
->>> +     struct resource tmp = {
->>> +             .flags = IORESOURCE_IRQ,
->>> +             .start = irq,
->>> +             .end = irq,
->>> +     };
->>> +
->>> +     return tmp;
->>> +}
->>> +
->>> +#define WMT_RES_ADD(__device, __resource, __num) \
->>> +if (platform_device_add_resources(__device, __resource, __num)) \
->>> +     pr_err("Failed to assign resources to __device##\n");
->>
->> This could be written as a proper function. The resource add is unlikely
->> to fail. Maybe keep the warning but don't worry about printing the
->> device name?
->>
+> v3:
+> * Actually make the change to use head-mackerel.txt
 > 
-> There is memory allocation inside platform_device_add_resources, so
-> probably there is scope for failure. I could add unlikely(), though.
-
-I meant more in terms of losing the device name in the error which seems
-to be the sole point of the macro. i.e it could be rewritten as:
-
-static void wmt_add_resource(struct platform_device *pdev,
-				const struct resource *res,
-				unsigned num)
-{
-	if (platform_device_add_resources(pdev, res, num))
-		pr_err("Failed to add device resource\n");
-}
-
-Because the add resource failing would indicate some serious problem you
-may even want to BUG().
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> ---
+>  .../mach-shmobile/include/mach/head-mackerel.txt   |   87 ++++++++++++++++++++
+>  arch/arm/mach-shmobile/include/mach/zboot.h        |    3 +
+>  2 files changed, 90 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-shmobile/include/mach/head-mackerel.txt
+> 
