@@ -1,47 +1,45 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Wed, 22 Dec 2010 14:58:14 -0800
-Subject: [PATCH 15/23]  Alternative mmc structure to support pxa168,
-	pxa910, mmp2 family SD
-In-Reply-To: <201012221510.36878.arnd@arndb.de>
-References: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
-	<201012221510.36878.arnd@arndb.de>
-Message-ID: <037EAE31-B07C-4134-B810-A5A1E83517B8@marvell.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 22 Dec 2010 15:04:17 -0800
+Subject: [PATCH] OMAP2: PM: fix compile error when !CONFIG_SUSPEND
+Message-ID: <1293059057-16490-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When CONFIG_SUSPEND is not enabled, none of the system PM methods are
+used, so do not compile them in.
 
-On Dec 22, 2010, at 6:10 AM, Arnd Bergmann wrote:
+Thanks to Charles Manning for reporting the problem and proposing
+an initial patch.
 
-> On Wednesday 22 December 2010 08:09:58 Philip Rakity wrote:
->> The PXA168, PXA910, and MMP2 are not the same SOC.  The family
->> of embedded processors have slightly different internal blocks
->> for SD, I2C, etc.  Sometimes it is important to know which SOC
->> is being used due to differences in the silicon.  Sometimes it
->> is important to know evaluation boards should be selected based
->> on the SOC on the board.
-> 
-> This looks like you're moving in the wrong direction.
-> 
-> If the chips are just slightly different, you'd certainly
-> want to make sure that you can detect the difference at runtime,
-> and be able to use the same kernel on all of the variants.
+Reported-by: Charles Manning <manningc2@actrix.gen.nz>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+Applies on Tony's omap-for-linus branch.
 
-MMP2 used PJ4 core --- PXA168/PXA910 use PJ1 so rather different architecture.
+ arch/arm/mach-omap2/pm24xx.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-PXA168/PXA910 have slightly different internal peripherals with different quirks.
-Certainly possible to tell this apart at runtime but not all peripherals are the same
-and startup files ARE different.
-
-
-> 
-> Instead, you promote each of the SOCs to a top-level family
-> in this patch, which makes it impossible to build a kernel
-> for more than one of them at a time.
-
-That was the intent to handle the case of development board selection.
-it is meaningless to select MMP2 development board with say PXA168 SoC.
-
-Open to other way to handle this problem.  Suggestions welcome.
-
-> 
-> 	Arnd
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 2844b84..dac2d1d 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -299,6 +299,7 @@ out:
+ 	local_irq_enable();
+ }
+ 
++#ifdef CONFIG_SUSPEND
+ static int omap2_pm_begin(suspend_state_t state)
+ {
+ 	disable_hlt();
+@@ -355,6 +356,9 @@ static struct platform_suspend_ops omap_pm_ops = {
+ 	.end		= omap2_pm_end,
+ 	.valid		= suspend_valid_only_mem,
+ };
++#else
++static const struct platform_suspend_ops __initdata omap_pm_ops;
++#endif /* CONFIG_SUSPEND */
+ 
+ /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
+ static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
+-- 
+1.7.3.4
