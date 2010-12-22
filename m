@@ -1,130 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Dec 2010 23:09:49 +0000
-Subject: [PATCH 4/6] ARM: PL011: Allow better handling of vendor data
-Message-ID: <E1PVXob-0007II-AG@rmk-PC.arm.linux.org.uk>
+From: prakity@marvell.com (Philip Rakity)
+Date: Wed, 22 Dec 2010 15:06:51 -0800
+Subject: Fwd: [PATCH 7/23]  Alternative mmc structure to support pxa168,
+	pxa910, mmp2 family SD
+References: <C8F2F5E1-E72D-4679-AB8F-748CBE736262@marvell.com>
+Message-ID: <C514DA21-446D-4153-B5B9-E4AE4D0A06CA@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than copying all vendor data into the port structure, copy
-just that which is frequently used, and keep a pointer to the
-remaining vendor data structure.  This makes it easier to add
-vendor quirks in the future.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/serial/amba-pl011.c |   51 ++++++++++++++++++++++--------------------
- 1 files changed, 27 insertions(+), 24 deletions(-)
+Resend adding correct name and e-mail for
+Signed-off-by:
 
-diff --git a/drivers/serial/amba-pl011.c b/drivers/serial/amba-pl011.c
-index 1aa7d45..ab0ab45 100644
---- a/drivers/serial/amba-pl011.c
-+++ b/drivers/serial/amba-pl011.c
-@@ -63,22 +63,6 @@
- #define UART_DR_ERROR		(UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
- #define UART_DUMMY_DR_RX	(1 << 16)
- 
--/*
-- * We wrap our port structure around the generic uart_port.
-- */
--struct uart_amba_port {
--	struct uart_port	port;
--	struct clk		*clk;
--	unsigned int		im;		/* interrupt mask */
--	unsigned int		old_status;
--	unsigned int		ifls;		/* vendor-specific */
--	unsigned int		lcrh_tx;	/* vendor-specific */
--	unsigned int		lcrh_rx;	/* vendor-specific */
--	unsigned int		fifosize;	/* vendor-specific */
--	bool			oversampling;   /* vendor-specific */
--	bool			autorts;
--};
--
- /* There is by now@least one vendor with differing details, so handle it */
- struct vendor_data {
- 	unsigned int		ifls;
-@@ -104,6 +88,21 @@ static struct vendor_data vendor_st = {
- 	.oversampling		= true,
- };
- 
-+/*
-+ * We wrap our port structure around the generic uart_port.
-+ */
-+struct uart_amba_port {
-+	struct uart_port	port;
-+	struct clk		*clk;
-+	const struct vendor_data *vendor;
-+	unsigned int		im;		/* interrupt mask */
-+	unsigned int		old_status;
-+	unsigned int		fifosize;	/* vendor-specific */
-+	unsigned int		lcrh_tx;	/* vendor-specific */
-+	unsigned int		lcrh_rx;	/* vendor-specific */
-+	bool			autorts;
-+};
-+
- static void pl011_stop_tx(struct uart_port *port)
- {
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-@@ -398,7 +397,7 @@ static int pl011_startup(struct uart_port *port)
- 	if (retval)
- 		goto clk_dis;
- 
--	writew(uap->ifls, uap->port.membase + UART011_IFLS);
-+	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
- 
- 	/*
- 	 * Provoke TX FIFO interrupt into asserting.
-@@ -504,13 +503,18 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
- 	unsigned int lcr_h, old_cr;
- 	unsigned long flags;
--	unsigned int baud, quot;
-+	unsigned int baud, quot, clkdiv;
-+
-+	if (uap->vendor->oversampling)
-+		clkdiv = 8;
-+	else
-+		clkdiv = 16;
- 
- 	/*
- 	 * Ask the core to calculate the divisor for us.
- 	 */
- 	baud = uart_get_baud_rate(port, termios, old, 0,
--				  port->uartclk/(uap->oversampling ? 8 : 16));
-+				  port->uartclk / clkdiv);
- 
- 	if (baud > port->uartclk/16)
- 		quot = DIV_ROUND_CLOSEST(port->uartclk * 8, baud);
-@@ -594,8 +598,8 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 		uap->autorts = false;
- 	}
- 
--	if (uap->oversampling) {
--		if (baud > port->uartclk/16)
-+	if (uap->vendor->oversampling) {
-+		if (baud > port->uartclk / 16)
- 			old_cr |= ST_UART011_CR_OVSFACT;
- 		else
- 			old_cr &= ~ST_UART011_CR_OVSFACT;
-@@ -767,7 +771,7 @@ pl011_console_get_options(struct uart_amba_port *uap, int *baud,
- 
- 		*baud = uap->port.uartclk * 4 / (64 * ibrd + fbrd);
- 
--		if (uap->oversampling) {
-+		if (uap->vendor->oversampling) {
- 			if (readw(uap->port.membase + UART011_CR)
- 				  & ST_UART011_CR_OVSFACT)
- 				*baud *= 2;
-@@ -864,10 +868,9 @@ static int pl011_probe(struct amba_device *dev, struct amba_id *id)
- 		goto unmap;
- 	}
- 
--	uap->ifls = vendor->ifls;
-+	uap->vendor = vendor;
- 	uap->lcrh_rx = vendor->lcrh_rx;
- 	uap->lcrh_tx = vendor->lcrh_tx;
--	uap->oversampling = vendor->oversampling;
- 	uap->fifosize = vendor->fifosize;
- 	uap->port.dev = &dev->dev;
- 	uap->port.mapbase = dev->res.start;
--- 
-1.6.2.5
+Begin forwarded message:
+
+From: Philip Rakity <prakity at marvell.com<mailto:prakity@marvell.com>>
+Date: December 21, 2010 11:08:35 PM PST
+To: "linux-mmc at vger.kernel.org<mailto:linux-mmc@vger.kernel.org>" <linux-mmc at vger.kernel.org<mailto:linux-mmc@vger.kernel.org>>, "linux-arm-kernel at lists.infradead.org<mailto:linux-arm-kernel@lists.infradead.org>" <linux-arm-kernel at lists.infradead.org<mailto:linux-arm-kernel@lists.infradead.org>>
+Cc: Mark Brown <markb at marvell.com<mailto:markb@marvell.com>>
+Subject: [PATCH 7/23] Alternative mmc structure to support pxa168, pxa910, mmp2 family SD
