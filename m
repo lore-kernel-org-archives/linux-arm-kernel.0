@@ -1,40 +1,96 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 22 Dec 2010 21:25:42 +0100
-Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
-In-Reply-To: <1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
-References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
-	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20101222202542.GT14221@pengutronix.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 22 Dec 2010 12:30:35 -0800
+Subject: [PATCH v6 07/10] OMAP3: PM: Adding T2 enabling of smartreflex
+	support
+In-Reply-To: <1292864357-13939-8-git-send-email-thara@ti.com> (Thara
+	Gopinath's message of "Mon, 20 Dec 2010 22:29:14 +0530")
+References: <1292864357-13939-1-git-send-email-thara@ti.com>
+	<1292864357-13939-8-git-send-email-thara@ti.com>
+Message-ID: <87mxnxr1n8.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+Hi Thara,
 
-On Tue, Dec 21, 2010 at 09:12:10PM +0800, Shawn Guo wrote:
-> The mxs duart is actually an amba-pl011 device. This commit changes
-> the duart device code to dynamically allocate amba-pl011 device,
-> so that drivers/serial/amba-pl011.c can be used on mxs.
-I have problems using this.  The problem I found up to now is that
-during probe of the device (triggered by mxs_add_duart ->
-amba_device_register -> amba_put_disable_pclk) the uart clock is
-disabled.  This happens because initially its usage count is 0 but the
-clock is enabled by barebox.  clk_enable doesn't hurt, but in the
-matching clk_disable the usage count drops to zero again and so the
-clock is disabled in hardware.  After that no further outputs can be
-seen.
+Thara Gopinath <thara@ti.com> writes:
 
-I assume the machine dies with a circular exception while trying to
-write something out (e.g. that it cannot write to the console :-), but I
-havn't checked that.
+> This patch adds support in the twl4030 driver to enable smartreflex.
+> The smartreflex bit on twl4030 needs to be enabled by default irrespective
+> of whether smartreflex module is enabled on the OMAP side or not.
+> This is because without this bit enabled the voltage scaling through
+> vp forceupdate does not function properly.
 
-My first try to put an clk_enable(&uart_clk) after it is registered
-didn't help.
+Is this true for OMAP2 as well?  
 
-Did you face the same problem?
+This patch actually hangs the boot on 2430SDP.  
 
-Best regards
-Uwe
+For now, I'll be dropping this patch from my pull request.  Also, this patch
+will also need an Ack from the MFD maintainers, or possibly even merge 
+through their tree.  Please also Cc the MFD list on the fix.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+While fixing this issue, another CodingStyle comment below...
+
+> Signed-off-by: Thara Gopinath <thara@ti.com>
+> ---
+>  drivers/mfd/twl-core.c  |   13 +++++++++++++
+>  include/linux/i2c/twl.h |   11 +++++++++++
+>  2 files changed, 24 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index 35275ba..b895ceb 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -1046,6 +1046,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  	/* Disable TWL4030/TWL5030 I2C Pull-up on I2C1 and I2C4(SR) interface.
+>  	 * Program I2C_SCL_CTRL_PU(bit 0)=0, I2C_SDA_CTRL_PU (bit 2)=0,
+>  	 * SR_I2C_SCL_CTRL_PU(bit 4)=0 and SR_I2C_SDA_CTRL_PU(bit 6)=0.
+> +	 * Also enable the smartreflex I2S bit.
+>  	 */
+>  
+>  	if (twl_class_is_4030()) {
+> @@ -1053,6 +1054,18 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  		temp &= ~(SR_I2C_SDA_CTRL_PU | SR_I2C_SCL_CTRL_PU | \
+>  		I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
+>  		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+> +
+> +		/* The smartreflex bit on twl4030 needs to be enabled by
+> +		 * default irrespective of whether smartreflex module is
+> +		 * enabled on the OMAP side or not. This is because without
+> +		 * this bit enabled the voltage scaling through
+> +		 * vp forceupdate does not function properly.
+> +		 */
+
+please update multi-line coding style.
+
+Kevin
+
+> +		twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
+> +			TWL4030_PM_RECEIVER_DCDC_GLOBAL_CFG);
+> +		temp |= SMARTREFLEX_ENABLE;
+> +		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
+> +			TWL4030_PM_RECEIVER_DCDC_GLOBAL_CFG);
+>  	}
+>  
+>  	status = add_children(pdata, id->driver_data);
+> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+> index c760991..d392f06 100644
+> --- a/include/linux/i2c/twl.h
+> +++ b/include/linux/i2c/twl.h
+> @@ -434,6 +434,17 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
+>  
+>  /*----------------------------------------------------------------------*/
+>  
+> +/*
+> + * PM Receiver module register offsets (use TWL4030_MODULE_PM_RECEIVER)
+> + */
+> +
+> +#define TWL4030_PM_RECEIVER_DCDC_GLOBAL_CFG	0x06
+> +
+> +/* Smartreflex I2S bus enable/ vmode enable bit */
+> +#define SMARTREFLEX_ENABLE			BIT(3)
+> +
+> +/*----------------------------------------------------------------------*/
+> +
+>  /* Power bus message definitions */
+>  
+>  /* The TWL4030/5030 splits its power-management resources (the various
