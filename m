@@ -1,23 +1,43 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 22 Dec 2010 10:59:18 +0000
-Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
-In-Reply-To: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
-Message-ID: <20101222105918.GA2838@pulham.picochip.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 22 Dec 2010 12:41:48 +0100
+Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
+In-Reply-To: <20101222021049.GI16497@freescale.com>
+References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
+	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
+	<20101221203121.GB31617@pengutronix.de>
+	<20101222021049.GI16497@freescale.com>
+Message-ID: <20101222114148.GB4368@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 17, 2010 at 11:32:23AM +0000, Russell King - ARM Linux wrote:
-> Here is the entire set of clocksource and sched_clock patches which
-> have been previously posted.  There's a couple of small tweaks in a
-> few of the patches (such as adding notrace to OMAP clocksource read
-> functions), and this also shows the proper ordering of these patches.
-> 
-> Still looking for acks or tested-by's for these patches.
+Hi Shawn,
 
-Don't know if it helps, but I've tested the core patches on my picoxcell 
-series with the fixed versions and it works nicely.
+On Wed, Dec 22, 2010 at 10:10:50AM +0800, Shawn Guo wrote:
 
-Tested-by: Jamie Iles <jamie@jamieiles.com>
+> [...]
+> > >  static struct clk_lookup lookups[] = {
+> > > -	_REGISTER_CLOCK("mxs-duart.0", NULL, uart_clk)
+> > > +	_REGISTER_CLOCK("uart", NULL, uart_clk)
+> > 
+> > Maybe "duart"?
+> > 
+> I was thinking about the naming "uart" vs "duart" here, and decided to
+> pick the "uart", because this is the name of clock "uart_clk", which
+> is the clock for uart domain, not only duart.
 
-Jamie
+Makes sense.
+
+Thanks,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101222/aab050cb/attachment.sig>
