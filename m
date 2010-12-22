@@ -1,28 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Dec 2010 10:59:24 -0800
-Subject: [PATCH] OMAP3: fix typo in OMAP3_IVA_MASK
-In-Reply-To: <1293041676-1206-1-git-send-email-nm@ti.com>
-References: <1293041676-1206-1-git-send-email-nm@ti.com>
-Message-ID: <20101222185924.GC7771@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 22 Dec 2010 22:09:33 +0300
+Subject: [PATCH] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs
+In-Reply-To: <1293039967-20165-1-git-send-email-michael.williamson@criticallink.com>
+References: <1293039967-20165-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <4D124CED.8090603@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [101222 10:14]:
-> From: Arno Steffen <arno.steffen@googlemail.com>
-> 
-> OMAP3_IVA_MASK should use OMAP3_IVA_SHIFT instead of OMAP3_SGX_SHIFT
-> 
-> Signed-off-by: Arno Steffen <arno.steffen@googlemail.com>
+Hello.
+
+Michael Williamson wrote:
+
+> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+> In addition, the variant code for the AM-1808 SoC appears to match
+> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+> these chips.
+
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 > ---
-> Tony,
-> 	looking at head:
-> 	http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=blob;f=arch/arm/mach-omap2/control.h/control.h;h=6e5f7e512ff7da063dbeb9448670f38cefd486e6;hb=HEAD
-> 	This is a missing fix we have'nt incorporated yet.
-> 
-> V2: posted to l-o and l-a and rebased to 2.6.37-rc7
-> 
-> V1: http://marc.info/?t=129077184800003&r=1&w=2
+> There are two whitespace fix-ups that were needed to pass checkpatch.pl
 
-Thanks, will queue.
+   You mean for the file to pass the checkpatch.pl, not for your patch, I hope?
 
-Tony
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 78b5ae2..3f888b3 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+[...]
+> @@ -814,7 +821,7 @@ static void da850_set_async3_src(int pllnum)
+>  			WARN(ret, "DA850: unable to re-parent clock %s",
+>  								clk->name);
+>  		}
+> -       }
+> +	}
+>  
+>  	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+>  	if (pllnum)
+> @@ -895,7 +902,7 @@ static const struct da850_opp da850_opp_96 = {
+>  	.cvdd_max	= 1050000,
+>  };
+>  
+> -#define OPP(freq) 		\
+> +#define OPP(freq)	\
+>  	{				\
+>  		.index = (unsigned int) &da850_opp_##freq,	\
+>  		.frequency = freq * 1000, \
+
+    Please send the white space changes in another patch.
+
+WBR, Sergei
