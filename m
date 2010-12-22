@@ -1,42 +1,48 @@
-From: davidsin@ti.com (David Sin)
-Date: Wed, 22 Dec 2010 08:33:52 -0600
-Subject: [PATCH 0/9] TI DMM-TILER driver
-In-Reply-To: <AANLkTikZwm45Mkj_A=zzULeGBuYpLyP9N1bSJSFWegWV@mail.gmail.com>
-References: <1291674446-10766-1-git-send-email-davidsin@ti.com>
-	<20101216172531.GG29435@lba0869738>
-	<20101216173737.GA6767@lba0869738>
-	<201012161843.48262.arnd@arndb.de>
-	<20101216190207.GC6767@lba0869738>
-	<AANLkTikZwm45Mkj_A=zzULeGBuYpLyP9N1bSJSFWegWV@mail.gmail.com>
-Message-ID: <20101222143350.GA27503@lba0869738>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Dec 2010 15:25:10 +0100
+Subject: [PATCH 1/23]  Alternative mmc structure to support pxa168, pxa910,
+	mmp2 family SD
+In-Reply-To: <98992407-793C-4545-AAB3-9C80BE5BCEF5@marvell.com>
+References: <98992407-793C-4545-AAB3-9C80BE5BCEF5@marvell.com>
+Message-ID: <201012221525.10232.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 17, 2010 at 09:28:07AM +1000, Dave Airlie wrote:
-> On Fri, Dec 17, 2010 at 5:02 AM, David Sin <davidsin@ti.com> wrote:
-> I get the impression with the ARM graphics, that you just have a lot
-> of separate drivers for separate IP blocks all providing some misc
-> random interfaces to userspace where some binary driver binds all the
-> functionality together into a useful whole, which seems like a really
-> bad design.
+On Wednesday 22 December 2010 08:07:20 Philip Rakity wrote:
+> From 14d9d5e1854684af8daef80d948107d2b59ccdd8 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Thu, 25 Nov 2010 11:33:13 +0800
+> Subject: [PATCH] ARM: mmp: append brownstone support
 > 
-> Generally on x86, the tiling hw is part of the GPU and is exposed as
-> part of a coherent GPU driver.
-> 
-> I'm just wonder what the use-cases for this tiler are and what open
-> apps can use it for?
-> 
-> Dave.
-Yes -- on the omap4 soc, the dmm-tiler hw block is separate from the 
-gpu.  I've had some, but not much, past discusions on hw designs 
-where graphics/video related ip blocks are part of the same core.  It's 
-a good point that you bring up and it certainly makes sense to me.  
-I will bring it up with some omap hw folks that I know, and see if 
-something that can be considered in future omap versions.
- 
-Some of the use-cases are HD video decoding and encoding.  Also, 
-hi-res image capture -- I believe 12MP or greater.  OpenMax IL components 
-and other multimedia frameworks can allocate video memory 
-through a user space tiler library.  Thanks for your comments, Dave.  
--- 
-David Sin
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+You need to work on your email setup, this does not look like what
+you intended, for many reasons:
+
+* All the mails have the same subject
+* You have extra headers (From 14d..., Date, Subject) in the
+  changelog section, where it doesn't belong
+* There is a 'From: ' header even in those patches that you
+  wrote yourself (this is harmless, but unnecessary).
+* The mails are sent as attachments, not inline
+* There is no threading, better make all of the patches 
+  replies to a first [PATCH 0/23] mail describing the
+  overall intentions of the patch set.
+* 23 patches is a lot, some of them are obvious candidates
+  for merging, because they make no sense on their own, e.g.
+  12 and 13, or 19 and 21.
+* Many of the patches are lacking detailed changelog information.
+* Some patches don't have a Signed-off-by line from you, the submitter
+* Some other patches have a S-o-b from you, but it's not the last
+  one in the list.
+* Please Cc the people that you have in the Signed-off-by or
+  other headers.
+
+Using git-send-email will take care of some of these issues.
+Please fix and re-send.
+
+Content-wise, the patches look good to me, except for the comment
+I made on patch 15.
+
+	Arnd
