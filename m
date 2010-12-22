@@ -1,141 +1,141 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Thu, 23 Dec 2010 00:41:41 +0300
-Subject: [PATCH 3/6 v3] input: Add support for VIA VT8500 and compatibles in
-	i8042
-In-Reply-To: <20101112233013.GA30946@core.coreip.homeip.net>
-References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
-	<1289147348-31969-3-git-send-email-alchark@gmail.com>
-	<AANLkTi=zvGxpukjAv-XFAMLpKYiqqKD=p9S5FtGowdDu@mail.gmail.com>
-	<20101112233013.GA30946@core.coreip.homeip.net>
-Message-ID: <20101222214141.GA31173@alchark-u3s>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 23 Dec 2010 10:52:11 +1300
+Subject: [PATCH 1/6 v10] ARM: Add basic architecture support for
+	VIA/WonderMedia 85xx SoC's
+In-Reply-To: <20101222211815.GA31054@alchark-u3s>
+References: <20101220195423.GA14509@alchark-u3s>
+	<4D0FC1AE.2050708@bluewatersys.com>
+	<AANLkTin4XqbGwznp56Xjt_zest6rxNmir0QDJWTySY4+@mail.gmail.com>
+	<4D0FD747.9020700@bluewatersys.com>
+	<AANLkTikAWjK7ACyt=LedhyyrhsCk1WCiyWz182CXMe9C@mail.gmail.com>
+	<4D0FE546.7050302@bluewatersys.com>
+	<AANLkTinyYKrhTcBMMCE4A2oFQHm11cqSZQozytGu+d6o@mail.gmail.com>
+	<4D1011CF.9080800@bluewatersys.com>
+	<AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>
+	<4D110269.9030805@bluewatersys.com>
+	<20101222211815.GA31054@alchark-u3s>
+Message-ID: <4D12730B.2030909@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VIA and WonderMedia Systems-on-Chip feature a standard i8042-compatible
-keyboard and mouse controller. This adds necessary glue to enable use
-of the standard driver with these systems.
+On 12/23/2010 10:18 AM, Alexey Charkov wrote:
+> This adds support for the family of Systems-on-Chip produced initially
+> by VIA and now its subsidiary WonderMedia that have recently become
+> widespread in lower-end Chinese ARM-based tablets and netbooks.
+> 
+> Support is included for both VT8500 and WM8505, selectable by a
+> configuration switch at kernel build time.
+> 
+> Included are basic machine initialization files, register and
+> interrupt definitions, support for the on-chip interrupt controller,
+> high-precision OS timer, GPIO lines, necessary macros for early debug,
+> pulse-width-modulated outputs control, as well as platform device
+> configurations for the specific drivers implemented elsewhere.
+> 
+> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+> ---
+> 
+> Welcome the jubilee tenth revision of this patch ;-)
+> 
+> I've tried to incorporate the suggestions by Ryan and Arnd, hope that
+> there is nothing left out. There was a massive reorganization of code
+> to remove less-than-obvious magic with MMIO registers and irqs being
+> held in huge structs, now they are again macro definitions. Those
+> macros are, however, only included in single isolated files, and
+> actual values to use are chosen at runtime by calling the respective
+> routines at machine initialization. There are also stylistic changes
+> all around, where Ryan suggested.
+> 
+> As a result, i8042 should again be adjusted a bit to reflect the new
+> place to find respective register/irq definitions, that one will be
+> sent in the respective thread shortly.
+> 
+> Best regards,
+> Alexey
 
-Signed-off-by: Alexey Charkov <alchark@gmail.com>
----
+<snip>
 
-This version of the patch introduces yet another trivial update to
-follow changes in arch code (namely variables that hold the register
-and interrupt numbers). Otherwise it is identical to v2.
+> --- /dev/null
+> +++ b/arch/arm/mach-vt8500/devices-vt8500.c
+> @@ -0,0 +1,117 @@
+> +/* linux/arch/arm/mach-vt8500/devices-vt8500.c
+> + *
+> + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +
+> +#include <mach/vt8500_regs.h>
+> +#include <mach/vt8500_irqs.h>
+> +#include <mach/i8042.h>
+> +#include "devices.h"
+> +
+> +static inline struct resource WMT_MMIO_RES(u32 start, u32 size)
+> +{
+> +	struct resource tmp = {
+> +		.flags = IORESOURCE_MEM,
+> +		.start = start,
+> +		.end = start + size - 1,
+> +	};
+> +
+> +	return tmp;
+> +}
 
-Best regards,
-Alexey
+These functions can be marked __init (though I guess they already are if
+marked inline?). They should also have lower case names since they are
+proper functions.
 
- drivers/input/serio/Kconfig        |    3 +-
- drivers/input/serio/i8042-vt8500.h |   73 ++++++++++++++++++++++++++++++++++++
- drivers/input/serio/i8042.h        |    2 +
- 3 files changed, 77 insertions(+), 1 deletions(-)
- create mode 100644 drivers/input/serio/i8042-vt8500.h
+Do these functions generate warnings about returning temporary values
+off the stack? If so, they could be rewritten as:
 
-diff --git a/drivers/input/serio/Kconfig b/drivers/input/serio/Kconfig
-index 6256233..ff799f3 100644
---- a/drivers/input/serio/Kconfig
-+++ b/drivers/input/serio/Kconfig
-@@ -21,7 +21,8 @@ if SERIO
- config SERIO_I8042
- 	tristate "i8042 PC Keyboard controller" if EMBEDDED || !X86
- 	default y
--	depends on !PARISC && (!ARM || ARCH_SHARK || FOOTBRIDGE_HOST) && \
-+	depends on !PARISC && \
-+		  (!ARM || ARCH_SHARK || ARCH_VT8500 || FOOTBRIDGE_HOST) && \
- 		   (!SUPERH || SH_CAYMAN) && !M68K && !BLACKFIN
- 	help
- 	  i8042 is the chip over which the standard AT keyboard and PS/2
-diff --git a/drivers/input/serio/i8042-vt8500.h b/drivers/input/serio/i8042-vt8500.h
-new file mode 100644
-index 0000000..a7e6673
---- /dev/null
-+++ b/drivers/input/serio/i8042-vt8500.h
-@@ -0,0 +1,73 @@
-+#ifndef _I8042_VT8500_H
-+#define _I8042_VT8500_H
-+
-+#include <mach/i8042.h>
-+
-+/*
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ */
-+
-+static void __iomem *regbase;
-+
-+/*
-+ * Names.
-+ */
-+
-+#define I8042_KBD_PHYS_DESC "vt8500ps2/serio0"
-+#define I8042_AUX_PHYS_DESC "vt8500ps2/serio1"
-+#define I8042_MUX_PHYS_DESC "vt8500ps2/serio%d"
-+
-+/*
-+ * IRQs.
-+ */
-+
-+#define I8042_KBD_IRQ	(wmt_i8042_kbd_irq)
-+#define I8042_AUX_IRQ	(wmt_i8042_aux_irq)
-+
-+
-+/*
-+ * Register numbers.
-+ */
-+
-+#define I8042_COMMAND_REG	(regbase + 0x4)
-+#define I8042_STATUS_REG	(regbase + 0x4)
-+#define I8042_DATA_REG		(regbase + 0x0)
-+
-+static inline int i8042_read_data(void)
-+{
-+	return readl(I8042_DATA_REG);
-+}
-+
-+static inline int i8042_read_status(void)
-+{
-+	return readl(I8042_STATUS_REG);
-+}
-+
-+static inline void i8042_write_data(int val)
-+{
-+	writel(val, I8042_DATA_REG);
-+}
-+
-+static inline void i8042_write_command(int val)
-+{
-+	writel(val, I8042_COMMAND_REG);
-+}
-+
-+static inline int i8042_platform_init(void)
-+{
-+	i8042_reset = true;
-+	regbase = ioremap(wmt_i8042_base, SZ_1K);
-+	if (!regbase)
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+
-+static inline void i8042_platform_exit(void)
-+{
-+	iounmap(regbase);
-+}
-+
-+#endif /* _I8042_VT8500_H */
-diff --git a/drivers/input/serio/i8042.h b/drivers/input/serio/i8042.h
-index cbc1beb..bdb2aeb 100644
---- a/drivers/input/serio/i8042.h
-+++ b/drivers/input/serio/i8042.h
-@@ -16,6 +16,8 @@
- 
- #if defined(CONFIG_MACH_JAZZ)
- #include "i8042-jazzio.h"
-+#elif defined(CONFIG_ARCH_VT8500)
-+#include "i8042-vt8500.h"
- #elif defined(CONFIG_SGI_HAS_I8042)
- #include "i8042-ip22io.h"
- #elif defined(CONFIG_SNI_RM)
+static __init void wmt_mmio_res(struct resource *res,
+				u32 start, u32 size)
+{
+	res->flags = IORESOURCE_MEM;
+	res->start = start;
+	res->end   = start + size - 1;
+}
+
+You could also make these functions static inline in devices.h to avoid
+having to define them for each board.
+
+> +
+> +static inline struct resource WMT_IRQ_RES(int irq)
+> +{
+> +	struct resource tmp = {
+> +		.flags = IORESOURCE_IRQ,
+> +		.start = irq,
+> +		.end = irq,
+> +	};
+> +
+> +	return tmp;
+> +}
+> +
+> +#define WMT_RES_ADD(__device, __resource, __num) \
+> +if (platform_device_add_resources(__device, __resource, __num)) \
+> +	pr_err("Failed to assign resources to __device##\n");
+
+This could be written as a proper function. The resource add is unlikely
+to fail. Maybe keep the warning but don't worry about printing the
+device name?
+
+~Ryan
+
 -- 
-1.7.3.4
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
