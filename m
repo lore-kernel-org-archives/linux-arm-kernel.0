@@ -1,96 +1,102 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 22 Dec 2010 12:30:35 -0800
-Subject: [PATCH v6 07/10] OMAP3: PM: Adding T2 enabling of smartreflex
-	support
-In-Reply-To: <1292864357-13939-8-git-send-email-thara@ti.com> (Thara
-	Gopinath's message of "Mon, 20 Dec 2010 22:29:14 +0530")
-References: <1292864357-13939-1-git-send-email-thara@ti.com>
-	<1292864357-13939-8-git-send-email-thara@ti.com>
-Message-ID: <87mxnxr1n8.fsf@deeprootsystems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Dec 2010 20:34:39 +0000
+Subject: [PATCH] ARM: add PrimeCell generic DMA to PL011
+In-Reply-To: <20101222182041.GE14693@n2100.arm.linux.org.uk>
+References: <1286357526-5570-1-git-send-email-linus.walleij@stericsson.com>
+	<20101222141006.GA19852@n2100.arm.linux.org.uk>
+	<AANLkTi=uhMyDySAxbZK4XKU6Z4AbkjVc29L4idc0sxLf@mail.gmail.com>
+	<20101222182041.GE14693@n2100.arm.linux.org.uk>
+Message-ID: <20101222203439.GF14693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thara,
+On Wed, Dec 22, 2010 at 06:20:41PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 22, 2010 at 06:09:22PM +0100, Linus Walleij wrote:
+> > 2010/12/22 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > > On Wed, Oct 06, 2010 at 11:32:06AM +0200, Linus Walleij wrote:
+> > >> ? ? ? /*
+> > >> - ? ? ?* Finally, enable interrupts
+> > >> + ? ? ?* Finally, enable interrupts, only timeouts when using DMA
+> > >> + ? ? ?* if initial RX DMA job failed, start in interrupt mode
+> > >> + ? ? ?* as well.
+> > >> ? ? ? ?*/
+> > >> ? ? ? spin_lock_irq(&uap->port.lock);
+> > >> - ? ? uap->im = UART011_RXIM | UART011_RTIM;
+> > >> + ? ? if (uap->enable_dma && uap->rx_dma_running)
+> > >> + ? ? ? ? ? ? uap->im = UART011_RTIM;
+> > >> + ? ? else
+> > >> + ? ? ? ? ? ? uap->im = UART011_RXIM | UART011_RTIM;
+> > >> ? ? ? writew(uap->im, uap->port.membase + UART011_IMSC);
+> > >
+> > > There's a big hole here, using DMA on the receive path.
+> > >
+> > > | 3.4.4 UARTRTINTR
+> > > | The receive timeout interrupt is asserted when the receive FIFO is not
+> > > | empty, and no further data is received over a 32-bit period. The receive
+> > > | timeout interrupt is cleared either when the FIFO becomes empty through
+> > > | reading all the data (or by reading the holding register), or when a 1
+> > > | is written to the corresponding bit of the UARTICR register.
+> > >
+> > > There must be unread data in the FIFO for us to get a RT interrupt. ?The
+> > > problem is that if we have DMA enabled, then the received characters are
+> > > read from the FIFO as soon as they appear, and so the FIFO becomes empty,
+> > > which negates the conditions required for the RT interrupt to be
+> > > generated.
+> > 
+> > The DMA on the RX channel will not read single bytes at all,
+> > instead it waits until it can retrieve a burst, which is set to half
+> > a FIFO: src_maxburst = uap->fifosize >> 1,
+> 
+> I refer you to section 2.7, which describes the DMA interface.
+> 
+> UARTRXDMASREQ
+> Single character DMA transfer request, asserted by the UART. For
+> receive, one character consists of up to 12 bits. This signal is asserted
+> when the receive FIFO contains at least one character.
+> 
+> UARTRXDMABREQ
+> Burst DMA transfer request, asserted by the UART. This signal is
+> asserted when the receive FIFO contains more characters than the
+> programmed watermark level. You can program the watermark level for
+> each FIFO through the UARTIFLS register.
+> 
+> If your DMA controller is using UARTRXDMASREQ, then you'll end up DMAing
+> single bytes as long as the FIFO contains any bytes - thereby causing
+> it to be emptied completely.  As 3.4.4 says, if the FIFO is empty, you
+> don't get the timeout.
+> 
+> The PB926 doesn't specify whether it connects the burst or single-
+> character DMA request signal to the DMA controller - from the behaviour
+> I observe, I suspect it's the single character request which is.
 
-Thara Gopinath <thara@ti.com> writes:
+And here's what /proc/interrupts reports:
 
-> This patch adds support in the twl4030 driver to enable smartreflex.
-> The smartreflex bit on twl4030 needs to be enabled by default irrespective
-> of whether smartreflex module is enabled on the OMAP side or not.
-> This is because without this bit enabled the voltage scaling through
-> vp forceupdate does not function properly.
+ 12:         38         VIC  uart-pl011
 
-Is this true for OMAP2 as well?  
+Now, I send exactly one 'o' to the port:
 
-This patch actually hangs the boot on 2430SDP.  
+ 12:         38         VIC  uart-pl011
 
-For now, I'll be dropping this patch from my pull request.  Also, this patch
-will also need an Ack from the MFD maintainers, or possibly even merge 
-through their tree.  Please also Cc the MFD list on the fix.
+no interrupt received.  If I extend PL08x's debugfs output to include
+a register dump (src, dest, lli, ctrl, conf):
 
-While fixing this issue, another CodingStyle comment below...
+0               uart0rx
+                [101f1000 019c4007 0111c011 1a0123f9 0000d01d]
 
-> Signed-off-by: Thara Gopinath <thara@ti.com>
-> ---
->  drivers/mfd/twl-core.c  |   13 +++++++++++++
->  include/linux/i2c/twl.h |   11 +++++++++++
->  2 files changed, 24 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> index 35275ba..b895ceb 100644
-> --- a/drivers/mfd/twl-core.c
-> +++ b/drivers/mfd/twl-core.c
-> @@ -1046,6 +1046,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  	/* Disable TWL4030/TWL5030 I2C Pull-up on I2C1 and I2C4(SR) interface.
->  	 * Program I2C_SCL_CTRL_PU(bit 0)=0, I2C_SDA_CTRL_PU (bit 2)=0,
->  	 * SR_I2C_SCL_CTRL_PU(bit 4)=0 and SR_I2C_SDA_CTRL_PU(bit 6)=0.
-> +	 * Also enable the smartreflex I2S bit.
->  	 */
->  
->  	if (twl_class_is_4030()) {
-> @@ -1053,6 +1054,18 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  		temp &= ~(SR_I2C_SDA_CTRL_PU | SR_I2C_SCL_CTRL_PU | \
->  		I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
->  		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
-> +
-> +		/* The smartreflex bit on twl4030 needs to be enabled by
-> +		 * default irrespective of whether smartreflex module is
-> +		 * enabled on the OMAP side or not. This is because without
-> +		 * this bit enabled the voltage scaling through
-> +		 * vp forceupdate does not function properly.
-> +		 */
+now if I send three characters:
 
-please update multi-line coding style.
+0               uart0rx
+                [101f1000 019c400a 0111c011 1a0123f6 0000d01d]
 
-Kevin
+Note that the address has increased by three, and the count has
+decremented by three.  This confirms that the DMA is reading the data as
+the UART FIFO fills - rather than DMA waiting for the FIFO to partially
+fill before starting a request.
 
-> +		twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
-> +			TWL4030_PM_RECEIVER_DCDC_GLOBAL_CFG);
-> +		temp |= SMARTREFLEX_ENABLE;
-> +		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
-> +			TWL4030_PM_RECEIVER_DCDC_GLOBAL_CFG);
->  	}
->  
->  	status = add_children(pdata, id->driver_data);
-> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-> index c760991..d392f06 100644
-> --- a/include/linux/i2c/twl.h
-> +++ b/include/linux/i2c/twl.h
-> @@ -434,6 +434,17 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
->  
->  /*----------------------------------------------------------------------*/
->  
-> +/*
-> + * PM Receiver module register offsets (use TWL4030_MODULE_PM_RECEIVER)
-> + */
-> +
-> +#define TWL4030_PM_RECEIVER_DCDC_GLOBAL_CFG	0x06
-> +
-> +/* Smartreflex I2S bus enable/ vmode enable bit */
-> +#define SMARTREFLEX_ENABLE			BIT(3)
-> +
-> +/*----------------------------------------------------------------------*/
-> +
->  /* Power bus message definitions */
->  
->  /* The TWL4030/5030 splits its power-management resources (the various
+This emptying of the RX UART FIFO of all received data prevents the RX
+timeout condition being satisfied, which in turn prevents any reasonable
+use of the UART port.
+
+I think the answer here is to allow the platform to supply just the TX
+DMA channel, so when a UART is wired up to use the single-character
+request, RX DMA support can be omitted.
