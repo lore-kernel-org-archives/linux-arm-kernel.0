@@ -1,40 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 22 Dec 2010 11:46:04 -0800
-Subject: [PATCH v5 1/2] davinci: am18x/da850/omap-l138: add support for
-	higher speed grades
-In-Reply-To: <1292860894-3961-1-git-send-email-nsekhar@ti.com> (Sekhar Nori's
-	message of "Mon, 20 Dec 2010 21:31:33 +0530")
-References: <1292860894-3961-1-git-send-email-nsekhar@ti.com>
-Message-ID: <8739pptwub.fsf@deeprootsystems.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Wed, 22 Dec 2010 14:49:23 -0500
+Subject: [PATCH v1] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs
+Message-ID: <1293047363-21353-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+In addition, the variant code for the AM-1808 SoC appears to match
+the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+these chips.
 
-> AM18x/DA850/OMAP-L138 SoCs have variants that can operate
-> at a maximum of 456 MHz at 1.3V operating point. Also the
-> 1.2V operating point has a variant that can support a maximum
-> of 375 MHz.
->
-> This patch adds three new OPPs (456 MHz, 408 MHz and 372 MHz)
-> to the list of DA850 OPPs.
->
-> Not all silicon is qualified to run at higher speeds and
-> unfortunately the maximum speed the chip can support can only
-> be determined from the label on the package (not software
-> readable).
->
-> Because of this, we depend on the maximum speed grade information
-> to be provided to us in some board specific way. The board informs
-> the maximum speed grade information by setting the da850_max_speed
-> variable.
->
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-> Since v4, the patch decription has been updated to match the code.
-> No code change has been made.
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+---
+This is against davinci-linux tree.
+Changes since v0, removed whitespace fixups not related to patch.
 
-Thanks, I updated davinci-next branch with these versions.  Queuing for
-2.6.38.
+ arch/arm/mach-davinci/da850.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Kevin
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 78b5ae2..2d0bba5 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+ 		.cpu_id		= DAVINCI_CPU_ID_DA850,
+ 		.name		= "da850/omap-l138",
+ 	},
++	{
++		.variant	= 0x1,
++		.part_no	= 0xb7d1,
++		.manufacturer	= 0x017,	/* 0x02f >> 1 */
++		.cpu_id		= DAVINCI_CPU_ID_DA850,
++		.name		= "da850/omap-l138/am18xx",
++	},
+ };
+ 
+ static struct davinci_timer_instance da850_timer_instance[4] = {
+-- 
+1.7.0.4
