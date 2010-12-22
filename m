@@ -1,39 +1,31 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 22 Dec 2010 02:16:57 -0800
-Subject: [PATCH v3] Keyboard: omap-keypad: use matrix_keypad.h
-In-Reply-To: <alpine.DEB.1.10.1012211150410.22164@esdhcp041196.research.nokia.com>
-References: <201012172332.06480.jkrzyszt@tis.icnet.pl>
-	<201012181639.29820.jkrzyszt@tis.icnet.pl>
-	<alpine.DEB.1.10.1012201720470.13087@esdhcp041196.research.nokia.com>
-	<201012202209.24068.jkrzyszt@tis.icnet.pl>
-	<alpine.DEB.1.10.1012211150410.22164@esdhcp041196.research.nokia.com>
-Message-ID: <20101222101657.GD22590@core.coreip.homeip.net>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 22 Dec 2010 11:17:59 +0100
+Subject: [PATCH v2] i.MX51 Framebuffer support
+In-Reply-To: <87bp4eb5r5.fsf@lechat.rtp-net.org> (Arnaud Patard's message of
+	"Wed, 22 Dec 2010 08:56:14 +0100")
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+	<87bp4eb5r5.fsf@lechat.rtp-net.org>
+Message-ID: <87ipymun54.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 21, 2010 at 01:20:35PM +0200, Aaro Koskinen wrote:
-> Hi,
-> 
-> On Mon, 20 Dec 2010, Janusz Krzysztofik wrote:
-> >Most keypad drivers make use of the <linux/input/matrix_keypad.h>
-> >defined macros, structures and inline functions.
-> >
-> >Convert omap-keypad driver to use those as well, as suggested by a
-> >compile time warning, hardcoded into the OMAP <palt/keypad.h>.
-> >
-> >Created against linux-2.6.37-rc5.
-> >Tested on Amstrad Delta.
-> >Compile tested with omap1_defconfig and omap2plus_defconfig shrinked to
-> >board-h4.
-> >
-> >Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> 
-> Reviewed-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> 
+>>>>> "Arnaud" == Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> writes:
 
-Acked-by: Dmitry Torokhov <dtor@mail.ru>
+ Arnaud> Sascha Hauer <s.hauer@pengutronix.de> writes:
+ Arnaud> Hi,
 
-Thanks for making the changes.
+ >> The following series adds i.MX51 framebuffer support based on the
+ >> IPUv3. It is not perfect but I decided it is good enough to open it
+ >> for a wider audience and collect first reviews. I tested this on a
+ >> babbage board using both outputs (VGA/DVI) with different
+ >> resolutions up to 1680x1050 and different colour depths.  I also
+ >> tested it on one custom board using a fixed display setting.
+
+ Arnaud> After adding code to my efika sb machine file and your patchset, I've
+ Arnaud> seen the light. Err, no. It was a penguin and a login prompt.  I guess
+ Arnaud> it means your patchset is working here.
+
+Cool. Care to submit that machine file support?
 
 -- 
-Dmitry
+Bye, Peter Korsgaard
