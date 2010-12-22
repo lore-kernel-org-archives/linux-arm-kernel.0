@@ -1,53 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 22 Dec 2010 10:10:50 +0800
-Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
-In-Reply-To: <20101221203121.GB31617@pengutronix.de>
-References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
-	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
-	<20101221203121.GB31617@pengutronix.de>
-Message-ID: <20101222021049.GI16497@freescale.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Wed, 22 Dec 2010 11:57:05 +0900
+Subject: [PATCH 1/2] ARM: convert dma-mapping to asm-generic API
+In-Reply-To: <20101221110135.GE2822@pulham.picochip.com>
+References: <1292926802-12326-1-git-send-email-jamie@jamieiles.com>
+	<20101221103652.GL28157@n2100.arm.linux.org.uk>
+	<20101221110135.GE2822@pulham.picochip.com>
+Message-ID: <20101222115705W.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Tue, 21 Dec 2010 11:01:35 +0000
+Jamie Iles <jamie@jamieiles.com> wrote:
 
-Thanks for the review.
-
-On Tue, Dec 21, 2010 at 09:31:21PM +0100, Wolfram Sang wrote:
-> Hi Shawn,
-> 
-> On Tue, Dec 21, 2010 at 09:12:10PM +0800, Shawn Guo wrote:
-> > The mxs duart is actually an amba-pl011 device. This commit changes
-> > the duart device code to dynamically allocate amba-pl011 device,
-> > so that drivers/serial/amba-pl011.c can be used on mxs.
+> On Tue, Dec 21, 2010 at 10:36:52AM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Dec 21, 2010 at 10:20:01AM +0000, Jamie Iles wrote:
+> > > Note: this patch also requires "ARM: dmabounce: fix partial sync in
+> > > dma_sync_single_* API" from FUJITA Tomonori:
+> > > 
+> > > 	http://www.spinics.net/lists/netdev/msg126826.html
+> > > 
+> > > which allows us to do fuzzy matching of the buffers when using
+> > > dmabounce.
 > > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > Which I've already said no to.
 > 
-> Great that it works!
+> Ok, perhaps I missed some other posts. From that thread the only objections I 
+> found were to do with the indentation style and they were fixed up.
 > 
-[...]
-> >  static struct clk_lookup lookups[] = {
-> > -	_REGISTER_CLOCK("mxs-duart.0", NULL, uart_clk)
-> > +	_REGISTER_CLOCK("uart", NULL, uart_clk)
+> > I don't believe that the direction taken there is anywhere near the right
+> > one - the approach we have (implementing the whole buffer sync in terms
+> > of the partial buffer sync) is the far more logical, simpler and safer
+> > way, and doesn't lead to the possibility of two partially overlapping
+> > mappings causing the wrong one to be operated upon.
+> > 
+> > The debug code doesn't check for overlapping mappings in any way, so we
+> > can't say that they never occur.
+> >
+> > With the way that the DMA API has gone, I view the "generic" stuff as
+> > a disaster.
 > 
-> Maybe "duart"?
-> 
-I was thinking about the naming "uart" vs "duart" here, and decided to
-pick the "uart", because this is the name of clock "uart_clk", which
-is the clock for uart domain, not only duart.
+> Ok I can't disagree with that. I've had a look at some of the other arches and 
+> I can't see an obvious reason why we couldn't change the generic 
+> implementation to do the sync in the way you describe. Perhaps I'll have a 
+> look at that after the holidays.
 
-[...]
-
-> > +#include <mach/mx23.h>
-> > +#include <mach/mx28.h>
-> > +#include <mach/devices-common.h>
-> > +
-> > +#define MXS_AMBA_DEVICE(name, soc)				\
-> 
-> Maybe MXS_AMBA_DUART_DEVICE? It now sounds more generic than it actually is ;)
-> 
-OK. Will change.
-
--- 
-Regards,
-Shawn
+You need to examine all the network drivers and fix some of them.
