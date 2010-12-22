@@ -1,41 +1,147 @@
 From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 22 Dec 2010 14:49:23 -0500
-Subject: [PATCH v1] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-Message-ID: <1293047363-21353-1-git-send-email-michael.williamson@criticallink.com>
+Date: Wed, 22 Dec 2010 14:49:41 -0500
+Subject: [PATCH v1] davinci: Support various speedgrades for MityDSP-L138 and
+	MityARM-1808 SoMs
+Message-ID: <1293047381-21384-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
-In addition, the variant code for the AM-1808 SoC appears to match
-the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
-these chips.
+For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
+from the part number string read from the factory configuration block on
+the on-board I2C PROM.  Configure the maximum CPU speed based on this
+information.
 
 Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
 This is against davinci-linux tree.
-Changes since v0, removed whitespace fixups not related to patch.
 
- arch/arm/mach-davinci/da850.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+Changes since v0:
+ aligned comments using tabs not spaces.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 78b5ae2..2d0bba5 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
- 		.cpu_id		= DAVINCI_CPU_ID_DA850,
- 		.name		= "da850/omap-l138",
- 	},
-+	{
-+		.variant	= 0x1,
-+		.part_no	= 0xb7d1,
-+		.manufacturer	= 0x017,	/* 0x02f >> 1 */
-+		.cpu_id		= DAVINCI_CPU_ID_DA850,
-+		.name		= "da850/omap-l138/am18xx",
-+	},
- };
+ arch/arm/mach-davinci/board-mityomapl138.c |   76 +++++++++++++++++++++++++---
+ 1 files changed, 68 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 0bb5f0c..06b6d2f 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -44,38 +44,102 @@ struct factory_config {
  
- static struct davinci_timer_instance da850_timer_instance[4] = {
+ static struct factory_config factory_config;
+ 
++struct part_no_info {
++	const char	*part_no;	/* part number string of interest */
++	int		max_freq;	/* khz */
++};
++
++static struct part_no_info part_no_info[] = {
++	{
++		.part_no	= "L138-C",
++		.max_freq	= 300000,
++	},
++	{
++		.part_no	= "L138-D",
++		.max_freq	= 375000,
++	},
++	{
++		.part_no	= "L138-F",
++		.max_freq	= 456000,
++	},
++	{
++		.part_no	= "1808-C",
++		.max_freq	= 300000,
++	},
++	{
++		.part_no	= "1808-D",
++		.max_freq	= 375000,
++	},
++	{
++		.part_no	= "1808-F",
++		.max_freq	= 456000,
++	},
++	{
++		.part_no	= "1810-D",
++		.max_freq	= 375000,
++	},
++};
++
+ static void read_factory_config(struct memory_accessor *a, void *context)
+ {
+ 	int ret;
++#ifdef CONFIG_CPU_FREQ
++	int i;
++#endif
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+ 
+ 	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
+ 	if (ret != sizeof(struct factory_config)) {
+ 		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
+ 				ret);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
+ 		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
+ 				factory_config.magic);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	if (factory_config.version != FACTORY_CONFIG_VERSION) {
+ 		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
+ 				factory_config.version);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
+-	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
+ 	if (is_valid_ether_addr(factory_config.mac))
+ 		memcpy(soc_info->emac_pdata->mac_addr,
+ 			factory_config.mac, ETH_ALEN);
+ 	else
+ 		pr_warning("MityOMAPL138: Invalid MAC found "
+ 				"in factory config block\n");
++
++	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
++
++#ifdef CONFIG_CPU_FREQ
++	for (i = 0; i < ARRAY_SIZE(part_no_info); i++) {
++		/*
++		 * the part number has additional characters beyond what is
++		 * stored in the table.  This information is not needed for
++		 * determining the speed grade, and would require several
++		 * more table entries.  Only check the first N characters
++		 * for a match.
++		 */
++		if (!strncmp(factory_config.partnum, part_no_info[i].part_no,
++			strlen(part_no_info[i].part_no))) {
++			da850_max_speed = part_no_info[i].max_freq;
++			break;
++		}
++	}
++#endif
++
++bad_config:
++#ifdef CONFIG_CPU_FREQ
++	ret = da850_register_cpufreq("pll0_sysclk3");
++	if (ret)
++		pr_warning("cpufreq registration failed: %d\n", ret);
++#endif
+ }
+ 
+ static struct at24_platform_data mityomapl138_fd_chip = {
+@@ -383,10 +447,6 @@ static void __init mityomapl138_init(void)
+ 	if (ret)
+ 		pr_warning("rtc setup failed: %d\n", ret);
+ 
+-	ret = da850_register_cpufreq("pll0_sysclk3");
+-	if (ret)
+-		pr_warning("cpufreq registration failed: %d\n", ret);
+-
+ 	ret = da8xx_register_cpuidle();
+ 	if (ret)
+ 		pr_warning("cpuidle registration failed: %d\n", ret);
 -- 
 1.7.0.4
