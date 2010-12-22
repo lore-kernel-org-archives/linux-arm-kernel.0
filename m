@@ -1,54 +1,92 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Wed, 22 Dec 2010 14:54:07 +0530
-Subject: [PATCH 1/7] omap3630: nand: fix device size to work in polled mode
-In-Reply-To: <20101218000344.GV5941@atomide.com>
-References: <1290785677-16005-1-git-send-email-s-ghorai@ti.com>
-	<1290785677-16005-2-git-send-email-s-ghorai@ti.com>
-	<20101218000344.GV5941@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036A3B0463@dbde02.ent.ti.com>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Wed, 22 Dec 2010 17:27:20 +0800
+Subject: [PATCH 1/1] ARM: cns3xxx: ahci: Fixup for softwreset failures
+	with direct connected disks with CONFIG_SATA_PMP enabled.
+In-Reply-To: <20101220170217.GA1333@oksana.dev.rtsoft.ru>
+References: <1291481021-23317-1-git-send-email-mkl0301@gmail.com>
+	<20101220170217.GA1333@oksana.dev.rtsoft.ru>
+Message-ID: <AANLkTi=Lk1vAxxTJQpXNvtbLCFs0Gy+ZAJadxv_mLQ6C@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2010/12/21 Anton Vorontsov <cbouatmailru@gmail.com>:
+> On Sun, Dec 05, 2010 at 12:43:41AM +0800, mkl0301 at gmail.com wrote:
+> [...]
+>
+> Thanks for the patch!
+>
+> There are few issues though.
+>
+>> +static int cns3xxx_ahci_init(struct device *dev, void __iomem *addr)
+>> +{
+>> + ? ? u32 tmp;
+>> +
+>> + ? ? DPRINTK("ENTER\n");
+>> +
+>> + ? ? tmp = __raw_readl(MISC_SATA_POWER_MODE);
+>> + ? ? tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
+>> + ? ? tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
+>> + ? ? __raw_writel(tmp, MISC_SATA_POWER_MODE);
+>> +
+>> + ? ? /* Enable SATA PHY */
+>> + ? ? cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
+>> + ? ? cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
+>> +
+>> + ? ? /* Enable SATA Clock */
+>> + ? ? cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
+>> +
+>> + ? ? /* De-Asscer SATA Reset */
+>> + ? ? cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
+>> +
+>> + ? ? return 0;
+>> +}
+>> +
+> [...]
+>> -void __init cns3xxx_ahci_init(void)
+>> -{
+>> - ? ? u32 tmp;
+>> -
+>> - ? ? tmp = __raw_readl(MISC_SATA_POWER_MODE);
+>> - ? ? tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
+>> - ? ? tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
+>> - ? ? __raw_writel(tmp, MISC_SATA_POWER_MODE);
+>> -
+>> - ? ? /* Enable SATA PHY */
+>> - ? ? cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
+>> - ? ? cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
+>> -
+>> - ? ? /* Enable SATA Clock */
+>> - ? ? cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
+>> -
+>> - ? ? /* De-Asscer SATA Reset */
+>> - ? ? cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
+>> -
+>> - ? ? platform_device_register(&cns3xxx_ahci_pdev);
+>> -}
+>
+> This is not good because cns3xxx_pwr_*() calls aren't thread-safe.
+> We must use them only from the "single-threaded" platform code,
+> i.e. very early.
+> Once we add proper clocks (clkapi) and power management (regulators)
+> support for CNS3xxx, we may move this into ahci->init() callback.
+Almost every device driver needs to change those power/clk/reset bits,
+and it's strange to enable everything on init phase. BTW, the  EHCI
+and OHCI that I sent previously also used these cns3xxx_pwr_*() calls.
 
+Would they be supported in near future? If not, I would like look into those.
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Saturday, December 18, 2010 5:34 AM
-> To: Ghorai, Sukumar
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/7] omap3630: nand: fix device size to work in polled
-> mode
-> 
-> * Sukumar Ghorai <s-ghorai@ti.com> [101126 07:25]:
-> > zoom3 and 3630-sdp having the x16 nand device.
-> > This patch configure gpmc as x16 and select the currect function in
-> driver
-> > for polled mode (without prefetch enable) transfer.
-> >
-> > Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/board-flash.c |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-
-> omap2/board-flash.c
-> > index fd38c05..001c605 100644
-> > --- a/arch/arm/mach-omap2/board-flash.c
-> > +++ b/arch/arm/mach-omap2/board-flash.c
-> > @@ -145,6 +145,9 @@ __init board_nand_init(struct mtd_partition
-> *nand_parts, u8 nr_parts, u8 cs)
-> >  	board_nand_data.parts		= nand_parts;
-> >  	board_nand_data.nr_parts		= nr_parts;
-> >
-> > +	if (cpu_is_omap3630())
-> > +		board_nand_data.devsize = 1;
-> > +
-> >  	gpmc_nand_init(&board_nand_data);
-> >  }
-> >  #else
-> 
-> I guess this is board specific for the size, not omap specific?
-[Ghorai] Agree, the NAND type (i.e. x8 NAND or x16 NAND) is a board specific,
-So I will change the definition of board_nand_init() to pass the devsize form board file.
-And I will submit the patch-series again.
+> Plus, unfortunately this patch breaks build when AHCI_PLATFORM is
+> set to =m.
+> arch/arm/mach-cns3xxx/built-in.o: In function 'cns3xxx_ahci_softreset':
+> cns3420vb.c:(.text+0x36c): undefined reference to 'ahci_do_softreset'
+> cns3420vb.c:(.text+0x390): undefined reference to 'ahci_do_softreset'
+> cns3420vb.c:(.text+0x3a0): undefined reference to 'ahci_check_ready'
+> arch/arm/mach-cns3xxx/built-in.o:(.data+0x35c): undefined reference to 'ahci_ops'
+> make: *** [.tmp_vmlinux1] Error 1
+Sorry that I didn't notice this. I was trying to reuse ahci-platform
+as possible.
+Building platform device as module seems strange to me, therefore I
+would add a new ahci-platform alike platform driver.
+
+Best Regards,
+Mac Lin
