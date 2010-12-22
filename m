@@ -1,78 +1,130 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 22 Dec 2010 18:09:41 -0500
-Subject: [PATCH v1] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-In-Reply-To: <87aajxpin1.fsf@deeprootsystems.com>
-References: <1293047363-21353-1-git-send-email-michael.williamson@criticallink.com>
-	<87aajxpin1.fsf@deeprootsystems.com>
-Message-ID: <4D128535.1000807@criticallink.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Dec 2010 23:09:49 +0000
+Subject: [PATCH 4/6] ARM: PL011: Allow better handling of vendor data
+Message-ID: <E1PVXob-0007II-AG@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2010 05:06 PM, Kevin Hilman wrote:
-> Michael Williamson <michael.williamson@criticallink.com> writes:
-> 
->> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
->> In addition, the variant code for the AM-1808 SoC appears to match
->> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
->> these chips.
-> 
-> Tested on?  
-> 
-> I'm assuming on the Mity platforms, right?
-> 
+Rather than copying all vendor data into the port structure, copy
+just that which is frequently used, and keep a pointer to the
+remaining vendor data structure.  This makes it easier to add
+vendor quirks in the future.
 
-I tested this using an AM-1808 (456 MHz speedgrade) on a MityARM-1808
-configured SoM.  I don't have a rev-2.0 silicon OMAP-L138 to try, but
-according to the Rev B datasheet the variant will change as described.
-It doesn't break the Rev 1 OMAP-L138 silicon MityDSP-L138F SoM.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/serial/amba-pl011.c |   51 ++++++++++++++++++++++--------------------
+ 1 files changed, 27 insertions(+), 24 deletions(-)
 
-There was a thread about this in this list (link below) and I also 
-have some background on an e2e link at TI (link below).  
-
-I had forgotten that I pulled this patch from Sudhakar Rajashekhara on the arago 
-omapl PSP kernel (link to patch below).  It's really his work.
-
-I can resubmit (with tested-by and correct authorship) unless someone at TI
-is prepping the same patch?  I sent it because the AM-1808 fails to boot without
-it.  Thanks.
-
--Mike
-
-davinci thread:
-http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
-
-e2e thread:
-http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
-
-arago kernel patch:
-http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
-
-> Kevin
-> 
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->> ---
->> This is against davinci-linux tree.
->> Changes since v0, removed whitespace fixups not related to patch.
->>
->>  arch/arm/mach-davinci/da850.c |    7 +++++++
->>  1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->> index 78b5ae2..2d0bba5 100644
->> --- a/arch/arm/mach-davinci/da850.c
->> +++ b/arch/arm/mach-davinci/da850.c
->> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
->>  		.cpu_id		= DAVINCI_CPU_ID_DA850,
->>  		.name		= "da850/omap-l138",
->>  	},
->> +	{
->> +		.variant	= 0x1,
->> +		.part_no	= 0xb7d1,
->> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
->> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
->> +		.name		= "da850/omap-l138/am18xx",
->> +	},
->>  };
->>  
->>  static struct davinci_timer_instance da850_timer_instance[4] = {
+diff --git a/drivers/serial/amba-pl011.c b/drivers/serial/amba-pl011.c
+index 1aa7d45..ab0ab45 100644
+--- a/drivers/serial/amba-pl011.c
++++ b/drivers/serial/amba-pl011.c
+@@ -63,22 +63,6 @@
+ #define UART_DR_ERROR		(UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
+ #define UART_DUMMY_DR_RX	(1 << 16)
+ 
+-/*
+- * We wrap our port structure around the generic uart_port.
+- */
+-struct uart_amba_port {
+-	struct uart_port	port;
+-	struct clk		*clk;
+-	unsigned int		im;		/* interrupt mask */
+-	unsigned int		old_status;
+-	unsigned int		ifls;		/* vendor-specific */
+-	unsigned int		lcrh_tx;	/* vendor-specific */
+-	unsigned int		lcrh_rx;	/* vendor-specific */
+-	unsigned int		fifosize;	/* vendor-specific */
+-	bool			oversampling;   /* vendor-specific */
+-	bool			autorts;
+-};
+-
+ /* There is by now@least one vendor with differing details, so handle it */
+ struct vendor_data {
+ 	unsigned int		ifls;
+@@ -104,6 +88,21 @@ static struct vendor_data vendor_st = {
+ 	.oversampling		= true,
+ };
+ 
++/*
++ * We wrap our port structure around the generic uart_port.
++ */
++struct uart_amba_port {
++	struct uart_port	port;
++	struct clk		*clk;
++	const struct vendor_data *vendor;
++	unsigned int		im;		/* interrupt mask */
++	unsigned int		old_status;
++	unsigned int		fifosize;	/* vendor-specific */
++	unsigned int		lcrh_tx;	/* vendor-specific */
++	unsigned int		lcrh_rx;	/* vendor-specific */
++	bool			autorts;
++};
++
+ static void pl011_stop_tx(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+@@ -398,7 +397,7 @@ static int pl011_startup(struct uart_port *port)
+ 	if (retval)
+ 		goto clk_dis;
+ 
+-	writew(uap->ifls, uap->port.membase + UART011_IFLS);
++	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
+ 	/*
+ 	 * Provoke TX FIFO interrupt into asserting.
+@@ -504,13 +503,18 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+ 	unsigned int lcr_h, old_cr;
+ 	unsigned long flags;
+-	unsigned int baud, quot;
++	unsigned int baud, quot, clkdiv;
++
++	if (uap->vendor->oversampling)
++		clkdiv = 8;
++	else
++		clkdiv = 16;
+ 
+ 	/*
+ 	 * Ask the core to calculate the divisor for us.
+ 	 */
+ 	baud = uart_get_baud_rate(port, termios, old, 0,
+-				  port->uartclk/(uap->oversampling ? 8 : 16));
++				  port->uartclk / clkdiv);
+ 
+ 	if (baud > port->uartclk/16)
+ 		quot = DIV_ROUND_CLOSEST(port->uartclk * 8, baud);
+@@ -594,8 +598,8 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		uap->autorts = false;
+ 	}
+ 
+-	if (uap->oversampling) {
+-		if (baud > port->uartclk/16)
++	if (uap->vendor->oversampling) {
++		if (baud > port->uartclk / 16)
+ 			old_cr |= ST_UART011_CR_OVSFACT;
+ 		else
+ 			old_cr &= ~ST_UART011_CR_OVSFACT;
+@@ -767,7 +771,7 @@ pl011_console_get_options(struct uart_amba_port *uap, int *baud,
+ 
+ 		*baud = uap->port.uartclk * 4 / (64 * ibrd + fbrd);
+ 
+-		if (uap->oversampling) {
++		if (uap->vendor->oversampling) {
+ 			if (readw(uap->port.membase + UART011_CR)
+ 				  & ST_UART011_CR_OVSFACT)
+ 				*baud *= 2;
+@@ -864,10 +868,9 @@ static int pl011_probe(struct amba_device *dev, struct amba_id *id)
+ 		goto unmap;
+ 	}
+ 
+-	uap->ifls = vendor->ifls;
++	uap->vendor = vendor;
+ 	uap->lcrh_rx = vendor->lcrh_rx;
+ 	uap->lcrh_tx = vendor->lcrh_tx;
+-	uap->oversampling = vendor->oversampling;
+ 	uap->fifosize = vendor->fifosize;
+ 	uap->port.dev = &dev->dev;
+ 	uap->port.mapbase = dev->res.start;
+-- 
+1.6.2.5
