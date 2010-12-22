@@ -1,29 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Dec 2010 15:10:36 +0100
-Subject: [PATCH 15/23]  Alternative mmc structure to support pxa168, pxa910,
-	mmp2 family SD
-In-Reply-To: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
-References: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
-Message-ID: <201012221510.36878.arnd@arndb.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 22 Dec 2010 12:25:32 -0200
+Subject: [PATCH v2 3/3] ARM: imx/mx25_3ds: Add USB support
+In-Reply-To: <1293027932-13201-2-git-send-email-fabio.estevam@freescale.com>
+References: <1293027932-13201-1-git-send-email-fabio.estevam@freescale.com>
+	<1293027932-13201-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1293027932-13201-3-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 December 2010 08:09:58 Philip Rakity wrote:
-> The PXA168, PXA910, and MMP2 are not the same SOC.  The family
-> of embedded processors have slightly different internal blocks
-> for SD, I2C, etc.  Sometimes it is important to know which SOC
-> is being used due to differences in the silicon.  Sometimes it
-> is important to know evaluation boards should be selected based
-> on the SOC on the board.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- removed ULPI dependencies
 
-This looks like you're moving in the wrong direction.
+ arch/arm/mach-imx/Kconfig         |    1 +
+ arch/arm/mach-imx/mach-mx25_3ds.c |   14 +++++++++++++-
+ 2 files changed, 14 insertions(+), 1 deletions(-)
 
-If the chips are just slightly different, you'd certainly
-want to make sure that you can detect the difference at runtime,
-and be able to use the same kernel on all of the variants.
-
-Instead, you promote each of the SOCs to a top-level family
-in this patch, which makes it impossible to build a kernel
-for more than one of them at a time.
-
-	Arnd
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index fed3ee5..b19fb54 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -97,6 +97,7 @@ comment "MX25 platforms:"
+ config MACH_MX25_3DS
+ 	bool "Support MX25PDK (3DS) Platform"
+ 	select SOC_IMX25
++	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMXDI_RTC
+ 	select IMX_HAVE_PLATFORM_IMX_FB
+diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
+index 8b8e75b..aa76cfd 100644
+--- a/arch/arm/mach-imx/mach-mx25_3ds.c
++++ b/arch/arm/mach-imx/mach-mx25_3ds.c
+@@ -30,6 +30,7 @@
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/input/matrix_keypad.h>
++#include <linux/usb/otg.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -184,13 +185,24 @@ static const struct matrix_keymap_data mx25pdk_keymap_data __initdata = {
+ 	.keymap_size	= ARRAY_SIZE(mx25pdk_keymap),
+ };
+ 
++static const struct mxc_usbh_platform_data usbh2_pdata __initconst = {
++	.portsc	= MXC_EHCI_MODE_SERIAL,
++	.flags	= MXC_EHCI_INTERNAL_PHY,
++};
++
++static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
++	.operating_mode = FSL_USB2_DR_DEVICE,
++	.phy_mode       = FSL_USB2_PHY_UTMI,
++};
++
+ static void __init mx25pdk_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx25pdk_pads,
+ 			ARRAY_SIZE(mx25pdk_pads));
+ 
+ 	imx25_add_imx_uart0(&uart_pdata);
+-	imx25_add_mxc_ehci_hs(NULL);
++	imx25_add_fsl_usb2_udc(&otg_device_pdata);
++	imx25_add_mxc_ehci_hs(&usbh2_pdata);
+ 	imx25_add_mxc_nand(&mx25pdk_nand_board_info);
+ 	imx25_add_imxdi_rtc(NULL);
+ 	imx25_add_imx_fb(&mx25pdk_fb_pdata);
+-- 
+1.6.0.4
