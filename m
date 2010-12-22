@@ -1,150 +1,50 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Thu, 23 Dec 2010 01:02:11 +0300
-Subject: [PATCH 1/6 v10] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <4D12730B.2030909@bluewatersys.com>
-References: <20101220195423.GA14509@alchark-u3s>
-	<4D0FC1AE.2050708@bluewatersys.com>
-	<AANLkTin4XqbGwznp56Xjt_zest6rxNmir0QDJWTySY4+@mail.gmail.com>
-	<4D0FD747.9020700@bluewatersys.com>
-	<AANLkTikAWjK7ACyt=LedhyyrhsCk1WCiyWz182CXMe9C@mail.gmail.com>
-	<4D0FE546.7050302@bluewatersys.com>
-	<AANLkTinyYKrhTcBMMCE4A2oFQHm11cqSZQozytGu+d6o@mail.gmail.com>
-	<4D1011CF.9080800@bluewatersys.com>
-	<AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>
-	<4D110269.9030805@bluewatersys.com>
-	<20101222211815.GA31054@alchark-u3s>
-	<4D12730B.2030909@bluewatersys.com>
-Message-ID: <AANLkTinZEhJ8aUe63yc_BNdifn_5g8U=iStwwXEU-+V9@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 22 Dec 2010 14:06:26 -0800
+Subject: [PATCH v1] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs
+In-Reply-To: <1293047363-21353-1-git-send-email-michael.williamson@criticallink.com>
+	(Michael Williamson's message of "Wed, 22 Dec 2010 14:49:23 -0500")
+References: <1293047363-21353-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <87aajxpin1.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/23 Ryan Mallon <ryan@bluewatersys.com>:
-> On 12/23/2010 10:18 AM, Alexey Charkov wrote:
->> This adds support for the family of Systems-on-Chip produced initially
->> by VIA and now its subsidiary WonderMedia that have recently become
->> widespread in lower-end Chinese ARM-based tablets and netbooks.
->>
->> Support is included for both VT8500 and WM8505, selectable by a
->> configuration switch at kernel build time.
->>
->> Included are basic machine initialization files, register and
->> interrupt definitions, support for the on-chip interrupt controller,
->> high-precision OS timer, GPIO lines, necessary macros for early debug,
->> pulse-width-modulated outputs control, as well as platform device
->> configurations for the specific drivers implemented elsewhere.
->>
->> Signed-off-by: Alexey Charkov <alchark@gmail.com>
->> ---
->>
->> Welcome the jubilee tenth revision of this patch ;-)
->>
->> I've tried to incorporate the suggestions by Ryan and Arnd, hope that
->> there is nothing left out. There was a massive reorganization of code
->> to remove less-than-obvious magic with MMIO registers and irqs being
->> held in huge structs, now they are again macro definitions. Those
->> macros are, however, only included in single isolated files, and
->> actual values to use are chosen at runtime by calling the respective
->> routines at machine initialization. There are also stylistic changes
->> all around, where Ryan suggested.
->>
->> As a result, i8042 should again be adjusted a bit to reflect the new
->> place to find respective register/irq definitions, that one will be
->> sent in the respective thread shortly.
->>
->> Best regards,
->> Alexey
->
-> <snip>
->
->> --- /dev/null
->> +++ b/arch/arm/mach-vt8500/devices-vt8500.c
->> @@ -0,0 +1,117 @@
->> +/* linux/arch/arm/mach-vt8500/devices-vt8500.c
->> + *
->> + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
->> + *
->> + * This software is licensed under the terms of the GNU General Public
->> + * License version 2, as published by the Free Software Foundation, and
->> + * may be copied, distributed, and modified under those terms.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
->> + * GNU General Public License for more details.
->> + *
->> + */
->> +
->> +#include <linux/platform_device.h>
->> +
->> +#include <mach/vt8500_regs.h>
->> +#include <mach/vt8500_irqs.h>
->> +#include <mach/i8042.h>
->> +#include "devices.h"
->> +
->> +static inline struct resource WMT_MMIO_RES(u32 start, u32 size)
->> +{
->> + ? ? struct resource tmp = {
->> + ? ? ? ? ? ? .flags = IORESOURCE_MEM,
->> + ? ? ? ? ? ? .start = start,
->> + ? ? ? ? ? ? .end = start + size - 1,
->> + ? ? };
->> +
->> + ? ? return tmp;
->> +}
->
-> These functions can be marked __init (though I guess they already are if
-> marked inline?). They should also have lower case names since they are
-> proper functions.
->
+Michael Williamson <michael.williamson@criticallink.com> writes:
 
-As inline functions are unrolled into the caller at compile time, and
-the caller is __init, I would expect their code to be freed after init
-as well. I could be wrong, though :)
+> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+> In addition, the variant code for the AM-1808 SoC appears to match
+> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+> these chips.
 
-> Do these functions generate warnings about returning temporary values
-> off the stack? If so, they could be rewritten as:
+Tested on?  
+
+I'm assuming on the Mity platforms, right?
+
+Kevin
+
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+> ---
+> This is against davinci-linux tree.
+> Changes since v0, removed whitespace fixups not related to patch.
 >
-
-Should those be compile-time or run-time? I did not see any.
-
-> static __init void wmt_mmio_res(struct resource *res,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 start, u32 size)
-> {
-> ? ? ? ?res->flags = IORESOURCE_MEM;
-> ? ? ? ?res->start = start;
-> ? ? ? ?res->end ? = start + size - 1;
-> }
+>  arch/arm/mach-davinci/da850.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
 >
-> You could also make these functions static inline in devices.h to avoid
-> having to define them for each board.
->
-
-Agreed.
-
->> +
->> +static inline struct resource WMT_IRQ_RES(int irq)
->> +{
->> + ? ? struct resource tmp = {
->> + ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
->> + ? ? ? ? ? ? .start = irq,
->> + ? ? ? ? ? ? .end = irq,
->> + ? ? };
->> +
->> + ? ? return tmp;
->> +}
->> +
->> +#define WMT_RES_ADD(__device, __resource, __num) \
->> +if (platform_device_add_resources(__device, __resource, __num)) \
->> + ? ? pr_err("Failed to assign resources to __device##\n");
->
-> This could be written as a proper function. The resource add is unlikely
-> to fail. Maybe keep the warning but don't worry about printing the
-> device name?
->
-
-There is memory allocation inside platform_device_add_resources, so
-probably there is scope for failure. I could add unlikely(), though.
-
-Thanks,
-Alexey
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 78b5ae2..2d0bba5 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+>  		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>  		.name		= "da850/omap-l138",
+>  	},
+> +	{
+> +		.variant	= 0x1,
+> +		.part_no	= 0xb7d1,
+> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
+> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
+> +		.name		= "da850/omap-l138/am18xx",
+> +	},
+>  };
+>  
+>  static struct davinci_timer_instance da850_timer_instance[4] = {
