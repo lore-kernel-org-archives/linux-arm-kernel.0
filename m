@@ -1,76 +1,47 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 23 Dec 2010 11:59:38 +1300
-Subject: [PATCH 1/6 v11] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <20101222222501.GA32693@alchark-u3s>
-References: <AANLkTin4XqbGwznp56Xjt_zest6rxNmir0QDJWTySY4+@mail.gmail.com>
-	<4D0FD747.9020700@bluewatersys.com>
-	<AANLkTikAWjK7ACyt=LedhyyrhsCk1WCiyWz182CXMe9C@mail.gmail.com>
-	<4D0FE546.7050302@bluewatersys.com>
-	<AANLkTinyYKrhTcBMMCE4A2oFQHm11cqSZQozytGu+d6o@mail.gmail.com>
-	<4D1011CF.9080800@bluewatersys.com>
-	<AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>
-	<4D110269.9030805@bluewatersys.com>
-	<20101222211815.GA31054@alchark-u3s>
-	<4D12730B.2030909@bluewatersys.com>
-	<20101222222501.GA32693@alchark-u3s>
-Message-ID: <4D1282DA.4020804@bluewatersys.com>
+From: prakity@marvell.com (Philip Rakity)
+Date: Wed, 22 Dec 2010 14:58:14 -0800
+Subject: [PATCH 15/23]  Alternative mmc structure to support pxa168,
+	pxa910, mmp2 family SD
+In-Reply-To: <201012221510.36878.arnd@arndb.de>
+References: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
+	<201012221510.36878.arnd@arndb.de>
+Message-ID: <037EAE31-B07C-4134-B810-A5A1E83517B8@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2010 11:25 AM, Alexey Charkov wrote:
-> This adds support for the family of Systems-on-Chip produced initially
-> by VIA and now its subsidiary WonderMedia that have recently become
-> widespread in lower-end Chinese ARM-based tablets and netbooks.
+
+On Dec 22, 2010, at 6:10 AM, Arnd Bergmann wrote:
+
+> On Wednesday 22 December 2010 08:09:58 Philip Rakity wrote:
+>> The PXA168, PXA910, and MMP2 are not the same SOC.  The family
+>> of embedded processors have slightly different internal blocks
+>> for SD, I2C, etc.  Sometimes it is important to know which SOC
+>> is being used due to differences in the silicon.  Sometimes it
+>> is important to know evaluation boards should be selected based
+>> on the SOC on the board.
 > 
-> Support is included for both VT8500 and WM8505, selectable by a
-> configuration switch at kernel build time.
+> This looks like you're moving in the wrong direction.
 > 
-> Included are basic machine initialization files, register and
-> interrupt definitions, support for the on-chip interrupt controller,
-> high-precision OS timer, GPIO lines, necessary macros for early debug,
-> pulse-width-modulated outputs control, as well as platform device
-> configurations for the specific drivers implemented elsewhere.
+> If the chips are just slightly different, you'd certainly
+> want to make sure that you can detect the difference at runtime,
+> and be able to use the same kernel on all of the variants.
+
+MMP2 used PJ4 core --- PXA168/PXA910 use PJ1 so rather different architecture.
+
+PXA168/PXA910 have slightly different internal peripherals with different quirks.
+Certainly possible to tell this apart at runtime but not all peripherals are the same
+and startup files ARE different.
+
+
 > 
-> Signed-off-by: Alexey Charkov <alchark@gmail.com>
-> ---
+> Instead, you promote each of the SOCs to a top-level family
+> in this patch, which makes it impossible to build a kernel
+> for more than one of them at a time.
+
+That was the intent to handle the case of development board selection.
+it is meaningless to select MMP2 development board with say PXA168 SoC.
+
+Open to other way to handle this problem.  Suggestions welcome.
+
 > 
-> This incorporates latest comments by Ryan regarding helper inlines
-> in devices-{vt8500,wm8505}.c
-> 
-> Best regards,
-> Alexey
-
-One final nitpick :-).
-
-> +static int vt8500_muxed_gpio_direction_input(struct gpio_chip *chip,
-> +				       unsigned offset)
-> +{
-> +	struct vt8500_gpio_chip *vt8500_chip = to_vt8500(chip);
-> +	unsigned val = readl(regbase + 0x20 + vt8500_chip->regoff);
-> +
-> +	val &= ~(1 << vt8500_chip->shift << offset);
-> +	writel(val, regbase + 0x20 + vt8500_chip->regoff);
-
-The magic numbers (0x20) in the gpio functions should probably be
-#defined as register names. I'm guessing this is the input enable
-register? Often people do helper functions for this, i.e:
-
-static inline void gpio_write_reg(struct vt8500_gpio_chip *chip,
-				  unsigned val, unsigned reg)
-{
-	writel(val, regbase + chip->regoff + reg);
-}
-
-Other than that, looks good.
-
-Reviewed-by: Ryan Mallon <ryan@bluewatersys.com>
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+> 	Arnd
