@@ -1,48 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Dec 2010 15:25:10 +0100
-Subject: [PATCH 1/23]  Alternative mmc structure to support pxa168, pxa910,
-	mmp2 family SD
-In-Reply-To: <98992407-793C-4545-AAB3-9C80BE5BCEF5@marvell.com>
-References: <98992407-793C-4545-AAB3-9C80BE5BCEF5@marvell.com>
-Message-ID: <201012221525.10232.arnd@arndb.de>
+Date: Wed, 22 Dec 2010 16:33:20 +0100
+Subject: [PATCH 3/6] ARM Realview PCIX map include file changes
+In-Reply-To: <20101222140409.29725.82642.stgit@e102602-lin.cambridge.arm.com>
+References: <20101222140305.29725.50845.stgit@e102602-lin.cambridge.arm.com>
+	<20101222140409.29725.82642.stgit@e102602-lin.cambridge.arm.com>
+Message-ID: <201012221633.20748.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 December 2010 08:07:20 Philip Rakity wrote:
-> From 14d9d5e1854684af8daef80d948107d2b59ccdd8 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Thu, 25 Nov 2010 11:33:13 +0800
-> Subject: [PATCH] ARM: mmp: append brownstone support
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+On Wednesday 22 December 2010 15:04:09 Colin Tuckley wrote:
 
-You need to work on your email setup, this does not look like what
-you intended, for many reasons:
+> #define REALVIEW_PB11MP_PCI_IO_SIZE            0x1000          /* 4 Kb */
 
-* All the mails have the same subject
-* You have extra headers (From 14d..., Date, Subject) in the
-  changelog section, where it doesn't belong
-* There is a 'From: ' header even in those patches that you
-  wrote yourself (this is harmless, but unnecessary).
-* The mails are sent as attachments, not inline
-* There is no threading, better make all of the patches 
-  replies to a first [PATCH 0/23] mail describing the
-  overall intentions of the patch set.
-* 23 patches is a lot, some of them are obvious candidates
-  for merging, because they make no sense on their own, e.g.
-  12 and 13, or 19 and 21.
-* Many of the patches are lacking detailed changelog information.
-* Some patches don't have a Signed-off-by line from you, the submitter
-* Some other patches have a S-o-b from you, but it's not the last
-  one in the list.
-* Please Cc the people that you have in the Signed-off-by or
-  other headers.
+Is the I/O space really just 4 kb? This may easily cause problems,
+because the first 4 kb of I/O space are usually reserved for PCI-ISA
+bridges and the like. At least the public documentation for PB-X
+describes a 64 kb space, which is also what everyone else has.
 
-Using git-send-email will take care of some of these issues.
-Please fix and re-send.
+> +static inline unsigned int pcibios_min_io(void)
+> +{
+> +       if (machine_is_realview_pb11mp() || machine_is_realview_pba8() ||
+> +           machine_is_realview_pbx())
+> +               return REALVIEW_PB_PCI_IO_BASE;
+> +       else
+> +               return 0;
+> +}
+...
+> +
+>  #define IO_SPACE_LIMIT 0xffffffff
+>  
+> -#define __io(a)                __typesafe_io(a)
+> +static inline void __iomem *__io(unsigned long addr)
+> +{
+> +#ifdef CONFIG_PCI
+> +       /* check for PCI I/O space */
+> +       if (addr >= REALVIEW_PB_PCI_IO_BASE && addr <= REALVIEW_PB_PCI_IO_LIMIT)
+> +               return (void __iomem *)((addr - REALVIEW_PB_PCI_IO_BASE) + REALVIEW_PCI_IO_VBASE);
+> +       else
+> +               return (void __iomem *)addr;
+> +#else
+> +       return (void __iomem *)addr;
+> +#endif
+> +}
 
-Content-wise, the patches look good to me, except for the comment
-I made on patch 15.
+The I/O space handling still looks really wrong. Why not simply do this:
+
+#define PCIBIOS_MIN_IO 0x1000  /* skip the first 4kb */
+#define IO_SPACE_LIMIT 0xffff  /* regular 64 kb I/O space */
+#define __io(a) (REALVIEW_PCI_IO_VBASE + (a & IO_SPACE_LIMIT)
+
+If you start the I/O space at REALVIEW_PB_PCI_IO_BASE instead of 0x1000
+or 0, you get into all sorts of trouble, e.g. when using /dev/ioport.
 
 	Arnd
