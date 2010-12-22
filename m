@@ -1,43 +1,30 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 22 Dec 2010 22:55:38 +0100
-Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
-In-Reply-To: <20101221155935.GV28157@n2100.arm.linux.org.uk>
-References: <1286358159-6994-1-git-send-email-linus.walleij@stericsson.com>
-	<20101219163240.GA27929@n2100.arm.linux.org.uk>
-	<20101219195959.GA28157@n2100.arm.linux.org.uk>
-	<20101221135421.GS28157@n2100.arm.linux.org.uk>
-	<20101221155935.GV28157@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
+From: jdzheng@broadcom.com (JD (Jiandong) Zheng)
+Date: Wed, 22 Dec 2010 13:59:44 -0800
+Subject: [PATCH 0/40] Complete set of clocksource/sched_clock
+ patches
+In-Reply-To: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+References: <20101217113223.GC9937@n2100.arm.linux.org.uk>
+Message-ID: <8628FE4E7912BF47A96AE7DD7BAC0AADDDEFDDD15E@SJEXCHCCR02.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+Add my ack to [PATCH 02/40] ARM: bcmring: update clock source registration:
 
-> This also contains a few other tweaks on top of your original patch too.
-> All the DMA conditionals get optimized out when we're not building with
-> a DMA engine enabled platform.
+Acked-By: Jiandong Zheng <jdzheng@broadcom.com>
 
-Thanks.
+Thanks,
+Jiandong Zheng
 
-> Note that in your original code, mmci_dma_data_error() is always followed
-> by a call to mmci_dma_data_end(), and that resulted in dma_unmap_sg()
-> being called twice for the same buffer.
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Friday, December 17, 2010 3:32 AM
+To: Alessandro Rubini; Bryan Huntsman; Colin Cross; Daniel Walker; David Brown; Eric Miao; Erik Gilling; Hans J. Koch; Imre Kaloz; Kevin Hilman; Krzysztof Halasa; Kukjin Kim; Lennert Buytenhek; JD (Jiandong) Zheng; Linus Walleij; linux-arm-msm at vger.kernel.org; linux-omap at vger.kernel.org; linux-samsung-soc at vger.kernel.org; linux-tegra at vger.kernel.org; Nicolas Pitre; Olof Johansson; Sascha Hauer; Scott Branden; STEricsson; Tony Lindgren; Viresh Kumar; Wan ZongShun
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: [PATCH 0/40] Complete set of clocksource/sched_clock patches
 
-Ulf Hansson notified me on this too, last week or so.
-Sorry for not fixing in time.
+Here is the entire set of clocksource and sched_clock patches which
+have been previously posted.  There's a couple of small tweaks in a
+few of the patches (such as adding notrace to OMAP clocksource read
+functions), and this also shows the proper ordering of these patches.
 
-> Also, dma_map_sg() returns the number of physical entries mapped, or zero
-> on failure. ?Should we have a DMA mapping implementation which coalesces
-> entries, the returned number will be less than data->nr_sg, and it is the
-> number of coalesced entries which should be passed to the DMA engine driver.
-
-Per F?rlin reported this one as well.
-Sorry again.
-
-> You have this bug in the PL022 driver too, so I suspect that your other
-> drivers need fixing for this.
-
-Fixing patches for PL022 now, thanks a lot Russell.
-
-Yours,
-Linus Walleij
+Still looking for acks or tested-by's for these patches.
