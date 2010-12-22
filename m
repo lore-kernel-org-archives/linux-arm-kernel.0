@@ -1,46 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Dec 2010 23:09:29 +0000
-Subject: [PATCH 3/6] ARM: PL011: Ensure IRQs are disabled in UART interrupt
-	handler
-Message-ID: <E1PVXoH-0007ID-6E@rmk-PC.arm.linux.org.uk>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Wed, 22 Dec 2010 18:09:41 -0500
+Subject: [PATCH v1] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs
+In-Reply-To: <87aajxpin1.fsf@deeprootsystems.com>
+References: <1293047363-21353-1-git-send-email-michael.williamson@criticallink.com>
+	<87aajxpin1.fsf@deeprootsystems.com>
+Message-ID: <4D128535.1000807@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the DMA support introduces a separate interrupt-time callback, our
-interrupt handler will not be the only handler which takes the port
-lock, so we need to ensure that IRQs are disabled.  We must use the
-_irqsave variant so we don't inadvertently enable interrupts.
+On 12/22/2010 05:06 PM, Kevin Hilman wrote:
+> Michael Williamson <michael.williamson@criticallink.com> writes:
+> 
+>> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+>> In addition, the variant code for the AM-1808 SoC appears to match
+>> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+>> these chips.
+> 
+> Tested on?  
+> 
+> I'm assuming on the Mity platforms, right?
+> 
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/serial/amba-pl011.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+I tested this using an AM-1808 (456 MHz speedgrade) on a MityARM-1808
+configured SoM.  I don't have a rev-2.0 silicon OMAP-L138 to try, but
+according to the Rev B datasheet the variant will change as described.
+It doesn't break the Rev 1 OMAP-L138 silicon MityDSP-L138F SoM.
 
-diff --git a/drivers/serial/amba-pl011.c b/drivers/serial/amba-pl011.c
-index 11cfa90..1aa7d45 100644
---- a/drivers/serial/amba-pl011.c
-+++ b/drivers/serial/amba-pl011.c
-@@ -247,10 +247,11 @@ static void pl011_modem_status(struct uart_amba_port *uap)
- static irqreturn_t pl011_int(int irq, void *dev_id)
- {
- 	struct uart_amba_port *uap = dev_id;
-+	unsigned long flags;
- 	unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
- 	int handled = 0;
- 
--	spin_lock(&uap->port.lock);
-+	spin_lock_irqsave(&uap->port.lock, flags);
- 
- 	status = readw(uap->port.membase + UART011_MIS);
- 	if (status) {
-@@ -275,7 +276,7 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 		handled = 1;
- 	}
- 
--	spin_unlock(&uap->port.lock);
-+	spin_unlock_irqrestore(&uap->port.lock, flags);
- 
- 	return IRQ_RETVAL(handled);
- }
--- 
-1.6.2.5
+There was a thread about this in this list (link below) and I also 
+have some background on an e2e link at TI (link below).  
+
+I had forgotten that I pulled this patch from Sudhakar Rajashekhara on the arago 
+omapl PSP kernel (link to patch below).  It's really his work.
+
+I can resubmit (with tested-by and correct authorship) unless someone at TI
+is prepping the same patch?  I sent it because the AM-1808 fails to boot without
+it.  Thanks.
+
+-Mike
+
+davinci thread:
+http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
+
+e2e thread:
+http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
+
+arago kernel patch:
+http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
+
+> Kevin
+> 
+>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+>> ---
+>> This is against davinci-linux tree.
+>> Changes since v0, removed whitespace fixups not related to patch.
+>>
+>>  arch/arm/mach-davinci/da850.c |    7 +++++++
+>>  1 files changed, 7 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index 78b5ae2..2d0bba5 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+>>  		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>>  		.name		= "da850/omap-l138",
+>>  	},
+>> +	{
+>> +		.variant	= 0x1,
+>> +		.part_no	= 0xb7d1,
+>> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
+>> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>> +		.name		= "da850/omap-l138/am18xx",
+>> +	},
+>>  };
+>>  
+>>  static struct davinci_timer_instance da850_timer_instance[4] = {
