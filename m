@@ -1,30 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 22 Dec 2010 11:25:01 -0200
-Subject: [PATCH 1/3] ARM: mx3/mx35_3ds: Add USB OTG Host mode
-In-Reply-To: <4D11A2AA.80300@compulab.co.il>
-References: <1292961521-31539-1-git-send-email-fabio.estevam@freescale.com>
-	<4D11A2AA.80300@compulab.co.il>
-Message-ID: <AANLkTinaKUgsc+wPSQtJRMKr3zzhRgkDOGMa58pJAyc4@mail.gmail.com>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Wed, 22 Dec 2010 14:03:52 +0000
+Subject: [PATCH 0/6] Series short description
+Message-ID: <20101222140305.29725.50845.stgit@e102602-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor,
+The following series implements...
 
-On Wed, Dec 22, 2010 at 5:03 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-...
->> +#if defined(CONFIG_USB_ULPI)
->> +static struct mxc_usbh_platform_data otg_pdata __initdata = {
->> + ? ? .portsc = MXC_EHCI_MODE_UTMI,
->> + ? ? .flags ?= MXC_EHCI_INTERNAL_PHY,
->> +};
->> +
->
-> I don't know much about mx3, but the above looks confusing. A typo?
+---
 
-You are right. It does not depend on ULPI. Will remove the ULPI dependencies.
+Colin Tuckley (6):
+      ARM Realview PCIX build file changes
+      ARM Realview PCIX board file changes
+      ARM Realview PCIX IRQ include file changes
+      ARM Realview PCIX map include file changes
+      Realview PCIX support - add main support module code
+      ARM: enable bridges in pci_common_init.
 
-Same applies for the other patch you commented.
 
-Thanks,
+ arch/arm/Kconfig                                   |    6 
+ arch/arm/kernel/bios32.c                           |    5 
+ arch/arm/mach-realview/Makefile                    |    6 
+ arch/arm/mach-realview/include/mach/board-pb11mp.h |   11 
+ arch/arm/mach-realview/include/mach/board-pba8.h   |   11 
+ arch/arm/mach-realview/include/mach/board-pbx.h    |   11 
+ arch/arm/mach-realview/include/mach/hardware.h     |   53 ++
+ arch/arm/mach-realview/include/mach/io.h           |   18 +
+ arch/arm/mach-realview/include/mach/irqs-pb11mp.h  |   11 
+ arch/arm/mach-realview/include/mach/irqs-pba8.h    |    7 
+ arch/arm/mach-realview/include/mach/irqs-pbx.h     |    7 
+ arch/arm/mach-realview/include/mach/platform.h     |   15 -
+ arch/arm/mach-realview/pcix.c                      |  503 ++++++++++++++++++++
+ arch/arm/mach-realview/realview_pb11mp.c           |   18 +
+ arch/arm/mach-realview/realview_pba8.c             |   18 +
+ arch/arm/mach-realview/realview_pbx.c              |   16 +
+ 16 files changed, 659 insertions(+), 57 deletions(-)
+ create mode 100755 arch/arm/mach-realview/pcix.c
 
-Fabio Estevam
+-- 
+Signature
