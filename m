@@ -1,303 +1,71 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Thu, 23 Dec 2010 20:58:26 +0530
-Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
-	modules.
-In-Reply-To: <4D133B78.5030807@ti.com>
-References: <1292864437-15353-1-git-send-email-thara@ti.com>
-	<1292864437-15353-5-git-send-email-thara@ti.com>
-	<4D133B78.5030807@ti.com>
-Message-ID: <a58103fd01d89decba08fcdf282b7f70@mail.gmail.com>
+From: t.fujak@samsung.com (Tomasz Fujak)
+Date: Thu, 23 Dec 2010 16:35:30 +0100
+Subject: [PATCHv8 00/12] Contiguous Memory Allocator
+In-Reply-To: <20101223142053.GN3636@n2100.arm.linux.org.uk>
+References: <cover.1292443200.git.m.nazarewicz@samsung.com>
+	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
+	<20101223100642.GD3636@n2100.arm.linux.org.uk>
+	<87k4j0ehdl.fsf@erwin.mina86.com>
+	<20101223135120.GL3636@n2100.arm.linux.org.uk>
+	<4D1357D5.9000507@samsung.com>
+	<20101223142053.GN3636@n2100.arm.linux.org.uk>
+Message-ID: <4D136C42.6090601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On 2010-12-23 15:20, Russell King - ARM Linux wrote:
+> On Thu, Dec 23, 2010 at 03:08:21PM +0100, Tomasz Fujak wrote:
+>> On 2010-12-23 14:51, Russell King - ARM Linux wrote:
+>>> On Thu, Dec 23, 2010 at 02:41:26PM +0100, Michal Nazarewicz wrote:
+>>>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>>>>> Has anyone addressed my issue with it that this is wide-open for
+>>>>> abuse by allocating large chunks of memory, and then remapping
+>>>>> them in some way with different attributes, thereby violating the
+>>>>> ARM architecture specification?
+>>>>>
+>>>>> In other words, do we _actually_ have a use for this which doesn't
+>>>>> involve doing something like allocating 32MB of memory from it,
+>>>>> remapping it so that it's DMA coherent, and then performing DMA
+>>>>> on the resulting buffer?
+>>>> Huge pages.
+>>>>
+>>>> Also, don't treat it as coherent memory and just flush/clear/invalidate
+>>>> cache before and after each DMA transaction.  I never understood what's
+>>>> wrong with that approach.
+>>> If you've ever used an ARM system with a VIVT cache, you'll know what's
+>>> wrong with this approach.
+>>>
+>>> ARM systems with VIVT caches have extremely poor task switching
+>>> performance because they flush the entire data cache at every task switch
+>>> - to the extent that it makes system performance drop dramatically when
+>>> they become loaded.
+>>>
+>>> Doing that for every DMA operation will kill the advantage we've gained
+>>> from having VIPT caches and ASIDs stone dead.
+>> This statement effectively means: don't map dma-able memory to the CPU
+>> unless it's uncached. Have I missed anything?
+> I'll give you another solution to the problem - lobby ARM Ltd to have
+> this restriction lifted from the architecture specification, which
+> will probably result in the speculative prefetching also having to be
+> removed.
+>
+Isn't disabling Speculative Accesses forwarding to the AXI bus the
+solution to our woes?
+At least on the A8, which happens to be paired with non-IOMMU capable
+IPs on our SoCs.
+On A9 the bit is gone (or has it moved?), but we have IOMMU here so the
+CMA isn't needed.
 
-> -----Original Message-----
-> From: Cousson, Benoit [mailto:b-cousson at ti.com]
-> Sent: Thursday, December 23, 2010 5:37 PM
-> To: Gopinath, Thara
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> khilman at deeprootsystems.com; paul at pwsan.com; Sripathy,
-> Vishwanath; Sawant, Anand; Menon, Nishanth
-> Subject: Re: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for
-> smartreflex modules.
->
-> Hi Thara,
->
-> On 12/20/2010 6:00 PM, Gopinath, Thara wrote:
-> > From: Benoit Cousson<b-cousson@ti.com>
-> >
-> > This patch adds the hwmod details for OMAP4 smartreflex modules.
-> >
-> > Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->
-> You're s-o-b is missing, along with the changed you did to the patch.
->
-> > ---
-> >   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  168
-> ++++++++++++++++++++++++++++
-> >   1 files changed, 168 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > index 7367648..0a6e674 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > @@ -1740,6 +1740,169 @@ static struct omap_hwmod
-> omap44xx_wd_timer3_hwmod = {
-> >   	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> >   };
-> >
-> > +/*
-> > + * 'smartreflex' class
-> > + * smartreflex module (monitor silicon performance and outputs a
-> measure of
-> > + * performance error)
-> > + */
-> > +
-> > +/* The IP is not compliant to type1 / type2 scheme */
-> > +static struct omap_hwmod_sysc_fields
-> omap_hwmod_sysc_type_smartreflex = {
-> > +	.sidle_shift	= 24,
-> > +	.enwkup_shift	= 26,
-> > +};
-> > +
-> > +static struct omap_hwmod_class_sysconfig
-> omap44xx_smartreflex_sysc = {
-> > +	.sysc_offs	= 0x0038,
-> > +	.sysc_flags	= (SYSC_HAS_ENAWAKEUP |
-> SYSC_HAS_SIDLEMODE),
-> > +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
->
-> The newly added SIDLE_SMART_WKUP flag is missing.
->
-> > +	.sysc_fields	=&omap_hwmod_sysc_type_smartreflex,
-> > +};
-> > +
-> > +static struct omap_hwmod_class
-> omap44xx_smartreflex_hwmod_class = {
-> > +	.name = "smartreflex",
-> > +	.sysc =&omap44xx_smartreflex_sysc,
-> > +	.rev  = 2,
-> > +};
-> > +
-> > +/* smartreflex_core */
-> > +static struct omap_hwmod omap44xx_smartreflex_core_hwmod;
-> > +static struct omap_hwmod_irq_info
-> omap44xx_smartreflex_core_irqs[] = {
-> > +	{ .irq = 19 + OMAP44XX_IRQ_GIC_START },
-> > +};
-> > +
-> > +static struct omap_hwmod_addr_space
-> omap44xx_smartreflex_core_addrs[] = {
-> > +	{
-> > +		.pa_start	= 0x4a0dd000,
-> > +		.pa_end		= 0x4a0dd03f,
-> > +		.flags		= ADDR_TYPE_RT
-> > +	},
-> > +};
-> > +
-> > +/* l4_cfg ->  smartreflex_core */
-> > +static struct omap_hwmod_ocp_if
-> omap44xx_l4_cfg__smartreflex_core = {
-> > +	.master		=&omap44xx_l4_cfg_hwmod,
-> > +	.slave		=&omap44xx_smartreflex_core_hwmod,
-> > +	.clk		= "l4_div_ck",
-> > +	.addr		= omap44xx_smartreflex_core_addrs,
-> > +	.addr_cnt	=
-> ARRAY_SIZE(omap44xx_smartreflex_core_addrs),
-> > +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> > +};
-> > +
-> > +/* smartreflex_core slave ports */
-> > +static struct omap_hwmod_ocp_if
-> *omap44xx_smartreflex_core_slaves[] = {
-> > +	&omap44xx_l4_cfg__smartreflex_core,
-> > +};
-> > +
-> > +static struct omap_hwmod omap44xx_smartreflex_core_hwmod = {
-> > +	.name		= "smartreflex_core",
-> > +	.class		=&omap44xx_smartreflex_hwmod_class,
-> > +	.mpu_irqs	= omap44xx_smartreflex_core_irqs,
-> > +	.mpu_irqs_cnt	=
-> ARRAY_SIZE(omap44xx_smartreflex_core_irqs),
-> > +	.main_clk	= "smartreflex_core_fck",
-> > +	.vdd_name	= "core",
-> > +	.prcm = {
-> > +		.omap4 = {
-> > +			.clkctrl_reg =
-> OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
-> > +		},
-> > +	},
-> > +	.slaves		= omap44xx_smartreflex_core_slaves,
-> > +	.slaves_cnt	=
-> ARRAY_SIZE(omap44xx_smartreflex_core_slaves),
-> > +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> > +};
-> > +
-> > +/* smartreflex_iva */
-> > +static struct omap_hwmod omap44xx_smartreflex_iva_hwmod;
-> > +static struct omap_hwmod_irq_info
-> omap44xx_smartreflex_iva_irqs[] = {
-> > +	{ .irq = 102 + OMAP44XX_IRQ_GIC_START },
-> > +};
-> > +
-> > +static struct omap_hwmod_addr_space
-> omap44xx_smartreflex_iva_addrs[] = {
-> > +	{
-> > +		.pa_start	= 0x4a0db000,
-> > +		.pa_end		= 0x4a0db03f,
-> > +		.flags		= ADDR_TYPE_RT
-> > +	},
-> > +};
-> > +
-> > +/* l4_cfg ->  smartreflex_iva */
-> > +static struct omap_hwmod_ocp_if
-> omap44xx_l4_cfg__smartreflex_iva = {
-> > +	.master		=&omap44xx_l4_cfg_hwmod,
-> > +	.slave		=&omap44xx_smartreflex_iva_hwmod,
-> > +	.clk		= "l4_div_ck",
-> > +	.addr		= omap44xx_smartreflex_iva_addrs,
-> > +	.addr_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_addrs),
-> > +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> > +};
-> > +
-> > +/* smartreflex_iva slave ports */
-> > +static struct omap_hwmod_ocp_if
-> *omap44xx_smartreflex_iva_slaves[] = {
-> > +	&omap44xx_l4_cfg__smartreflex_iva,
-> > +};
-> > +
-> > +static struct omap_hwmod omap44xx_smartreflex_iva_hwmod = {
-> > +	.name		= "smartreflex_iva",
-> > +	.class		=&omap44xx_smartreflex_hwmod_class,
-> > +	.mpu_irqs	= omap44xx_smartreflex_iva_irqs,
-> > +	.mpu_irqs_cnt	=
-> ARRAY_SIZE(omap44xx_smartreflex_iva_irqs),
-> > +	.main_clk	= "smartreflex_iva_fck",
-> > +	.vdd_name	= "iva",
-> > +	.prcm = {
-> > +		.omap4 = {
-> > +			.clkctrl_reg =
-> OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
-> > +		},
-> > +	},
-> > +	.slaves		= omap44xx_smartreflex_iva_slaves,
-> > +	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_slaves),
-> > +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> > +};
-> > +
-> > +/* smartreflex_mpu */
-> > +static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod;
-> > +static struct omap_hwmod_irq_info
-> omap44xx_smartreflex_mpu_irqs[] = {
-> > +	{ .irq = 18 + OMAP44XX_IRQ_GIC_START },
-> > +};
-> > +
-> > +static struct omap_hwmod_addr_space
-> omap44xx_smartreflex_mpu_addrs[] = {
-> > +	{
-> > +		.pa_start	= 0x4a0d9000,
-> > +		.pa_end		= 0x4a0d903f,
-> > +		.flags		= ADDR_TYPE_RT
-> > +	},
-> > +};
-> > +
-> > +/* l4_cfg ->  smartreflex_mpu */
-> > +static struct omap_hwmod_ocp_if
-> omap44xx_l4_cfg__smartreflex_mpu = {
-> > +	.master		=&omap44xx_l4_cfg_hwmod,
-> > +	.slave		=&omap44xx_smartreflex_mpu_hwmod,
-> > +	.clk		= "l4_div_ck",
-> > +	.addr		= omap44xx_smartreflex_mpu_addrs,
-> > +	.addr_cnt	=
-> ARRAY_SIZE(omap44xx_smartreflex_mpu_addrs),
-> > +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> > +};
-> > +
-> > +/* smartreflex_mpu slave ports */
-> > +static struct omap_hwmod_ocp_if
-> *omap44xx_smartreflex_mpu_slaves[] = {
-> > +	&omap44xx_l4_cfg__smartreflex_mpu,
-> > +};
-> > +
-> > +static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod = {
-> > +	.name		= "smartreflex_mpu",
-> > +	.class		=&omap44xx_smartreflex_hwmod_class,
-> > +	.mpu_irqs	= omap44xx_smartreflex_mpu_irqs,
-> > +	.mpu_irqs_cnt	=
-> ARRAY_SIZE(omap44xx_smartreflex_mpu_irqs),
-> > +	.main_clk	= "smartreflex_mpu_fck",
-> > +	.vdd_name	= "mpu",
-> > +	.prcm = {
-> > +		.omap4 = {
-> > +			.clkctrl_reg =
-> OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
-> > +		},
-> > +	},
-> > +	.slaves		= omap44xx_smartreflex_mpu_slaves,
-> > +	.slaves_cnt	=
-> ARRAY_SIZE(omap44xx_smartreflex_mpu_slaves),
-> > +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> > +};
-> > +
-> >   static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
-> >   	/* dmm class */
-> >   	&omap44xx_dmm_hwmod,
-> > @@ -1798,6 +1961,11 @@ static __initdata struct omap_hwmod
-> *omap44xx_hwmods[] = {
-> >   	&omap44xx_wd_timer2_hwmod,
-> >   	&omap44xx_wd_timer3_hwmod,
-> >
-> > +	/* smartreflex class */
-> > +	&omap44xx_smartreflex_core_hwmod,
-> > +	&omap44xx_smartreflex_iva_hwmod,
-> > +	&omap44xx_smartreflex_mpu_hwmod,
-> > +
->
-> The alphabetical order is not respected. Smartreflex should be before
-> wd_timer.
->
-> Since Tony already pull that from Kevin's tree, I'll send a patch to
-Tony
-> to fix these issues.
->
-> Please note the following log when enabling SR in Class 3 on an
-> OMAP4430/sdp:
->
-> [    2.362182] omap2_set_init_voltage: unable to find boot up OPP for
-> vdd_mpu
-> [    2.369384] omap2_set_init_voltage: Unable to put vdd_mpu to its init
-> voltage
-> [    2.369384]
-> [    2.378875] omap2_set_init_voltage: unable to find boot up OPP for
-> vdd_iva
-> [    2.386108] omap2_set_init_voltage: Unable to put vdd_iva to its init
-> voltage
-> [    2.386108]
-> [    2.396484] Power Management for TI OMAP4.
-> [    2.401031] sr_init: No PMIC hook to init smartreflex
-> [    2.406494] smartreflex smartreflex.0: omap_sr_probe: SmartReflex
-> driver initialized
-> [    2.414825] smartreflex smartreflex.1: omap_sr_probe: SmartReflex
-> driver initialized
-> [    2.423187] smartreflex smartreflex.2: omap_sr_probe: SmartReflex
-> driver initialized
-> [    2.431732] SmartReflex Class3 initialized
->
-> Is it expected?
-> Why do we have that blank line in-between?
+http://infocenter.arm.com/
+Cortex-A8 Technical Reference Manual    Revision: r3p2
+3.2.26. c1, Auxiliary Control Register
+CP15, c1, c0, bit 4: Enables speculative accesses on AXI
 
-I think turbo OPPs are disabled by default in OPP table where as uboot is
-setting mpu and iva to turbo OPP. That's why you are getting this error.
-You should not get this error if you enable turbo opps in opp table.
-
-Regarding blank line, it's because of this print (note \n\n)
-printk(KERN_ERR "%s: Unable to put vdd_%s to its init voltage\n\n",
-
-Vishwa
->
-> Regards,
-> Benoit
->
+> That would be my preferred solution if I had the power to do so, but
+> I have to live with what ARM Ltd (and their partners such as yourselves)
+> decide should end up in the architecture specification.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
