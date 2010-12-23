@@ -1,66 +1,36 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 23 Dec 2010 14:09:44 +0100
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <20101223121917.GG3636@n2100.arm.linux.org.uk>
-References: <cover.1292443200.git.m.nazarewicz@samsung.com>
-	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
-	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-	<20101223121917.GG3636@n2100.arm.linux.org.uk>
-Message-ID: <00ec01cba2a2$af20b8b0$0d622a10$%szyprowski@samsung.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 23 Dec 2010 07:25:42 -0600
+Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
+	modules.
+In-Reply-To: <4D133B78.5030807@ti.com>
+References: <1292864437-15353-1-git-send-email-thara@ti.com>
+	<1292864437-15353-5-git-send-email-thara@ti.com>
+	<4D133B78.5030807@ti.com>
+Message-ID: <AANLkTi=P-3aQSk3Q2WyAAp-8WwwtxC_aOGLW+7WGd4mj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Dec 23, 2010 at 06:07, Cousson, Benoit <b-cousson@ti.com> wrote:
 
-On Thursday, December 23, 2010 1:19 PM Russell King - ARM Linux wrote:
-
-> On Thu, Dec 23, 2010 at 11:58:08AM +0100, Marek Szyprowski wrote:
-> > Actually this contiguous memory allocator is a better replacement for
-> > alloc_pages() which is used by dma_alloc_coherent(). It is a generic
-> > framework that is not tied only to ARM architecture.
-> 
-> ... which is open to abuse.  What I'm trying to find out is - if it
-> can't be used for DMA, what is it to be used for?
-> 
-> Or are we inventing an everything-but-ARM framework?
-
-We are trying to get something that really works and SOLVES some of the
-problems with real devices that require contiguous memory for DMA.
-
-> > > In other words, do we _actually_ have a use for this which doesn't
-> > > involve doing something like allocating 32MB of memory from it,
-> > > remapping it so that it's DMA coherent, and then performing DMA
-> > > on the resulting buffer?
-> >
-> > This is an arm specific problem, also related to dma_alloc_coherent()
-> > allocator. To be 100% conformant with ARM specification we would
-> > probably need to unmap all pages used by the dma_coherent allocator
-> > from the LOW MEM area. This is doable, but completely not related
-> > to the CMA and this patch series.
-> 
-> You've already been told why we can't unmap pages from the kernel
-> direct mapping.
-
-It requires some amount of work but I see no reason why we shouldn't be
-able to unmap that pages to stay 100% conformant with ARM spec.
-
-Please notice that there are also use cases where the memory will not be
-accessed by the CPU at all (like DMA transfers between multimedia devices
-and the system memory).
-
-> Okay, so I'm just going to assume that CMA has _no_ _business_ being
-> used on ARM, and is not something that should interest anyone in the
-> ARM community.
-
-Go ahead! Remeber to remove dma_coherent because it also breaks the spec. :)
-Oh, I forgot. We can also remove all device drivers that might use DMA. :)
+>
+> Please note the following log when enabling SR in Class 3 on an OMAP4430/sdp:
+>
+> [ ? ?2.362182] omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
+> [ ? ?2.369384] omap2_set_init_voltage: Unable to put vdd_mpu to its init voltage
+> [ ? ?2.369384]
+> [ ? ?2.378875] omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
+> [ ? ?2.386108] omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
+> [ ? ?2.386108]
+> [ ? ?2.396484] Power Management for TI OMAP4.
+> [ ? ?2.401031] sr_init: No PMIC hook to init smartreflex
+> [ ? ?2.406494] smartreflex smartreflex.0: omap_sr_probe: SmartReflex driver initialized
+> [ ? ?2.414825] smartreflex smartreflex.1: omap_sr_probe: SmartReflex driver initialized
+> [ ? ?2.423187] smartreflex smartreflex.2: omap_sr_probe: SmartReflex driver initialized
+> [ ? ?2.431732] SmartReflex Class3 initialized
+>
+Dumb question: how are you testing this? just boot log? or additional
+patch for DVFS?
 
 
-
-Merry Christmas and Happy New Year for everyone! :)
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+Regards,
+Nishanth Menon
