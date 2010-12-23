@@ -1,40 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Dec 2010 13:51:20 +0000
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <87k4j0ehdl.fsf@erwin.mina86.com>
-References: <cover.1292443200.git.m.nazarewicz@samsung.com>
-	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
-	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<87k4j0ehdl.fsf@erwin.mina86.com>
-Message-ID: <20101223135120.GL3636@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 23 Dec 2010 15:02:31 +0100
+Subject: Last OMAP4 hwmod data cleanup for 2.6.38
+Message-ID: <4D135677.1080200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 02:41:26PM +0100, Michal Nazarewicz wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > Has anyone addressed my issue with it that this is wide-open for
-> > abuse by allocating large chunks of memory, and then remapping
-> > them in some way with different attributes, thereby violating the
-> > ARM architecture specification?
-> >
-> > In other words, do we _actually_ have a use for this which doesn't
-> > involve doing something like allocating 32MB of memory from it,
-> > remapping it so that it's DMA coherent, and then performing DMA
-> > on the resulting buffer?
-> 
-> Huge pages.
-> 
-> Also, don't treat it as coherent memory and just flush/clear/invalidate
-> cache before and after each DMA transaction.  I never understood what's
-> wrong with that approach.
+Hi Tony,
 
-If you've ever used an ARM system with a VIVT cache, you'll know what's
-wrong with this approach.
+The merge of both SDMA series from Manju and SR series from Thara 
+changed the expected order of the hwmod data structures for OMAP4.
+In order to have a clean base for 2.6.38, and to avoid starting 2.6.39 
+with a cleanup patch again, I'd like to fix that right now.
+Even if, I do agree, this is not a big deal.
 
-ARM systems with VIVT caches have extremely poor task switching
-performance because they flush the entire data cache at every task switch
-- to the extent that it makes system performance drop dramatically when
-they become loaded.
+I squeezed the 3 original small fixes I did (SDMA, SR and alignment) 
+into one to avoid overloading your mailbox 2 days before Xmas.
 
-Doing that for every DMA operation will kill the advantage we've gained
-from having VIPT caches and ASIDs stone dead.
+The patch will be available here, based on omap-for-linus.
+git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod_fixes
+
+It should not affect any functionality, and it is boot tested on 
+OMAP4430/sdp.
+
+Thanks,
+Benoit
