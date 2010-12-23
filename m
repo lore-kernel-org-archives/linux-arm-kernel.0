@@ -1,38 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Dec 2010 14:49:49 +0000
-Subject: Git pull request: ux500-core for the v2.6.38 merge window
-In-Reply-To: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
-References: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
-Message-ID: <20101223144949.GO3636@n2100.arm.linux.org.uk>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 23 Dec 2010 16:02:07 +0100
+Subject: [PATCHv8 00/12] Contiguous Memory Allocator
+In-Reply-To: <AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
+	(Felipe Contreras's message of "Thu, 23 Dec 2010 16:42:57 +0200")
+References: <cover.1292443200.git.m.nazarewicz@samsung.com>
+	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
+	<20101223100642.GD3636@n2100.arm.linux.org.uk>
+	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
+	<20101223121917.GG3636@n2100.arm.linux.org.uk>
+	<4D135004.3070904@samsung.com>
+	<20101223134838.GK3636@n2100.arm.linux.org.uk>
+	<4D1356D7.2000008@samsung.com>
+	<20101223141608.GM3636@n2100.arm.linux.org.uk>
+	<AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
+Message-ID: <87d3osedn4.fsf@erwin.mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 08:48:26AM +0100, Linus Walleij wrote:
-> Russell, could you please pull:
-> 
->        git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> for-rmk
-> 
-> This is based on your devel branch due to the dependencies on the GIC
-> cleanup patches
+>> On Thu, Dec 23, 2010 at 03:04:07PM +0100, Tomasz Fujak wrote:
+>>> In other words, should we take your response as yet another NAK?
+>>> Or would you try harder and at least point us to some direction that
+>>> would not doom the effort from the very beginning.
 
-Basing stuff on the devel branch really doesn't work, especially as I'm
-still getting a trickle of acks and tested-by's for the clksrc stuff.
-Of course, I could chose not to publish such stuff in my devel branch,
-thereby preventing it appearing in linux-next until the last moment
-before the merge window.  Or I could just not ask for acks etc...
+> On Thu, Dec 23, 2010 at 4:16 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> What the fsck do you think I've been doing? ?This is NOT THE FIRST time
+>> I've raised this issue. ?I gave up raising it after the first couple
+>> of attempts because I wasn't being listened to.
+>>
+>> You say about _me_ not being very helpful. ?How about the CMA proponents
+>> start taking the issue I've raised seriously, and try to work out how
+>> to solve it? ?And how about blaming them for the months of wasted time
+>> on this issue _because_ _they_ have chosen to ignore it?
 
-> as well as dependencies on some SMP consolidation patches hitting
-> platsmp.c.
+Felipe Contreras <felipe.contreras@gmail.com> writes:
+> I've also raised the issue for ARM. However, I don't see what is the
+> big problem.
+>
+> A generic solution (that I think I already proposed) would be to
+> reserve a chunk of memory for the CMA that can be removed from the
+> normally mapped kernel memory through memblock at boot time. The size
+> of this memory region would be configurable through kconfig. Then, the
+> CMA would have a "dma" flag or something, 
 
-Is it possible to split this stuff up into two topic branches - one set
-which doesn't depend on my GIC and SMP changes, and then we'll see what
-can be done about the remainder?
+Having exactly that usage in mind, in v8 I've added notion of private
+CMA contexts which can be used for DMA coherent RAM as well as memory
+mapped devices.
 
-What I'm thinking is maybe if I merge the GIC and SMP changes together,
-and provide you with that as a basis for your dependents?
+> and take chunks out of it until there's no more, and then return
+> errors. That would work for ARM.
 
-First, I need to make absolutely sure that the GIC and SMP changes are
-100% ready and up to date with acks etc.  I think there may be patches
-at the top of the SMP branch which haven't been posted to the list yet
-(or they have but have no acks.)
+-- 
+Best regards,                                         _     _
+ .o. | Liege of Serenly Enlightened Majesty of      o' \,=./ `o
+ ..o | Computer Science,  Michal "mina86" Nazarewicz   (o o)
+ ooo +--<mina86-tlen.pl>--<jid:mina86-jabber.org>--ooO--(_)--Ooo--
