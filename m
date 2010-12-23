@@ -1,46 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Dec 2010 23:54:03 +0000
+Date: Thu, 23 Dec 2010 00:10:12 +0000
 Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
 In-Reply-To: <AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
 References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
 	<20101221182037.GA4783@n2100.arm.linux.org.uk>
 	<20101222122904.GC14693@n2100.arm.linux.org.uk>
 	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-Message-ID: <20101222235403.GE29368@n2100.arm.linux.org.uk>
+Message-ID: <20101223001012.GF29368@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Dec 22, 2010 at 03:45:39PM -0800, Dan Williams wrote:
-> This is listed in the dmaengine documentation [1], but I obviously
-> missed this before merging.  This also would have been caught by
-> lockdep as required by SubmitChecklist.  As far as corrective action
-> before 2.6.37-final.  It looks like this driver needs a full scrub
-> which seems unreasonable to complete and test over the holidays before
-> .37 lands.  Linus we either need to mark this "depends on BROKEN" or
-> revert it.
-> 
-> Support for the DMA_COMPL flags are necessary if the DMA_MEMCPY
-> capability is advertised, yes this driver got this wrong.  I'll update
-> the documentation to make this requirement clear, and audit the other
-> drivers.  With slave-only drivers the only usage model is one where
-> the client driver owns dma-mapping.  In the non-slave (opportunistic
-> memcpy offload) case the client is unaware of the engine so the driver
-> owns unmapping.  The minimal fix is to disable memcpy offload.
-> 
-> --
-> Dan
-> 
-> [1]
 > 3.6 Constraints:
 > 1/ Calls to async_<operation> are not permitted in IRQ context.  Other
 >    contexts are permitted provided constraint #2 is not violated.
-> 2/ Completion callback routines cannot submit new operations.  This
->    results in recursion in the synchronous case and spin_locks being
->    acquired twice in the asynchronous case.
 
-(2) seems to be more than a little annoying - it seems that DMA engine
-drivers use a tasklet for running their DMA cleanup, which calls drivers
-callbacks, and we're going to have to have a whole pile of taskets
-in drivers just to be triggered from the completion callback.  I can
-see this adding an additional layer of complexity and a nice fine set
-of shiney new races to deal with.
+BTW, this is misleading.  Have the functions been renamed dma_async_xxx(),
+eg dma_async_memcpy_buf_to_buf etc, or are you referring just to:
+
+	async_dmaengine_get
+	async_dmaengine_put
+	async_dma_find_channel
+	async_dma_find_channel
+	async_tx_ack
+	async_tx_clear_ack
+	async_tx_test_ack
+
+Beware of just renaming it to dma_async_<operation> as there's other
+functions in that namespace which may not be appropriate.
+
+Eg, is it really illegal to issue call dma_async_issue_pending() from
+IRQ context?  That'd make it exceedingly difficult to use the DMA
+engine with the slave API in a lot of device drivers.
