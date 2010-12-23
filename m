@@ -1,105 +1,303 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 23 Dec 2010 16:21:22 +0100
-Subject: [PATCH] serial/amba-pl011: enable uart clk in setup for console
-In-Reply-To: <20101223150234.GW14221@pengutronix.de>
-References: <20101223150234.GW14221@pengutronix.de>
-Message-ID: <1293117682-18505-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: vishwanath.bs@ti.com (Vishwanath Sripathy)
+Date: Thu, 23 Dec 2010 20:58:26 +0530
+Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
+	modules.
+In-Reply-To: <4D133B78.5030807@ti.com>
+References: <1292864437-15353-1-git-send-email-thara@ti.com>
+	<1292864437-15353-5-git-send-email-thara@ti.com>
+	<4D133B78.5030807@ti.com>
+Message-ID: <a58103fd01d89decba08fcdf282b7f70@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .write callback for console drivers must not sleep.  So
-pl011_console_write must call clk_enable that is allowed to sleep (and
-does sleep on mxs).
+Benoit,
 
-So enable the clock in the .setup callback instead of .write.
+> -----Original Message-----
+> From: Cousson, Benoit [mailto:b-cousson at ti.com]
+> Sent: Thursday, December 23, 2010 5:37 PM
+> To: Gopinath, Thara
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> khilman at deeprootsystems.com; paul at pwsan.com; Sripathy,
+> Vishwanath; Sawant, Anand; Menon, Nishanth
+> Subject: Re: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for
+> smartreflex modules.
+>
+> Hi Thara,
+>
+> On 12/20/2010 6:00 PM, Gopinath, Thara wrote:
+> > From: Benoit Cousson<b-cousson@ti.com>
+> >
+> > This patch adds the hwmod details for OMAP4 smartreflex modules.
+> >
+> > Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>
+> You're s-o-b is missing, along with the changed you did to the patch.
+>
+> > ---
+> >   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  168
+> ++++++++++++++++++++++++++++
+> >   1 files changed, 168 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > index 7367648..0a6e674 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > @@ -1740,6 +1740,169 @@ static struct omap_hwmod
+> omap44xx_wd_timer3_hwmod = {
+> >   	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+> >   };
+> >
+> > +/*
+> > + * 'smartreflex' class
+> > + * smartreflex module (monitor silicon performance and outputs a
+> measure of
+> > + * performance error)
+> > + */
+> > +
+> > +/* The IP is not compliant to type1 / type2 scheme */
+> > +static struct omap_hwmod_sysc_fields
+> omap_hwmod_sysc_type_smartreflex = {
+> > +	.sidle_shift	= 24,
+> > +	.enwkup_shift	= 26,
+> > +};
+> > +
+> > +static struct omap_hwmod_class_sysconfig
+> omap44xx_smartreflex_sysc = {
+> > +	.sysc_offs	= 0x0038,
+> > +	.sysc_flags	= (SYSC_HAS_ENAWAKEUP |
+> SYSC_HAS_SIDLEMODE),
+> > +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+>
+> The newly added SIDLE_SMART_WKUP flag is missing.
+>
+> > +	.sysc_fields	=&omap_hwmod_sysc_type_smartreflex,
+> > +};
+> > +
+> > +static struct omap_hwmod_class
+> omap44xx_smartreflex_hwmod_class = {
+> > +	.name = "smartreflex",
+> > +	.sysc =&omap44xx_smartreflex_sysc,
+> > +	.rev  = 2,
+> > +};
+> > +
+> > +/* smartreflex_core */
+> > +static struct omap_hwmod omap44xx_smartreflex_core_hwmod;
+> > +static struct omap_hwmod_irq_info
+> omap44xx_smartreflex_core_irqs[] = {
+> > +	{ .irq = 19 + OMAP44XX_IRQ_GIC_START },
+> > +};
+> > +
+> > +static struct omap_hwmod_addr_space
+> omap44xx_smartreflex_core_addrs[] = {
+> > +	{
+> > +		.pa_start	= 0x4a0dd000,
+> > +		.pa_end		= 0x4a0dd03f,
+> > +		.flags		= ADDR_TYPE_RT
+> > +	},
+> > +};
+> > +
+> > +/* l4_cfg ->  smartreflex_core */
+> > +static struct omap_hwmod_ocp_if
+> omap44xx_l4_cfg__smartreflex_core = {
+> > +	.master		=&omap44xx_l4_cfg_hwmod,
+> > +	.slave		=&omap44xx_smartreflex_core_hwmod,
+> > +	.clk		= "l4_div_ck",
+> > +	.addr		= omap44xx_smartreflex_core_addrs,
+> > +	.addr_cnt	=
+> ARRAY_SIZE(omap44xx_smartreflex_core_addrs),
+> > +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> > +};
+> > +
+> > +/* smartreflex_core slave ports */
+> > +static struct omap_hwmod_ocp_if
+> *omap44xx_smartreflex_core_slaves[] = {
+> > +	&omap44xx_l4_cfg__smartreflex_core,
+> > +};
+> > +
+> > +static struct omap_hwmod omap44xx_smartreflex_core_hwmod = {
+> > +	.name		= "smartreflex_core",
+> > +	.class		=&omap44xx_smartreflex_hwmod_class,
+> > +	.mpu_irqs	= omap44xx_smartreflex_core_irqs,
+> > +	.mpu_irqs_cnt	=
+> ARRAY_SIZE(omap44xx_smartreflex_core_irqs),
+> > +	.main_clk	= "smartreflex_core_fck",
+> > +	.vdd_name	= "core",
+> > +	.prcm = {
+> > +		.omap4 = {
+> > +			.clkctrl_reg =
+> OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
+> > +		},
+> > +	},
+> > +	.slaves		= omap44xx_smartreflex_core_slaves,
+> > +	.slaves_cnt	=
+> ARRAY_SIZE(omap44xx_smartreflex_core_slaves),
+> > +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+> > +};
+> > +
+> > +/* smartreflex_iva */
+> > +static struct omap_hwmod omap44xx_smartreflex_iva_hwmod;
+> > +static struct omap_hwmod_irq_info
+> omap44xx_smartreflex_iva_irqs[] = {
+> > +	{ .irq = 102 + OMAP44XX_IRQ_GIC_START },
+> > +};
+> > +
+> > +static struct omap_hwmod_addr_space
+> omap44xx_smartreflex_iva_addrs[] = {
+> > +	{
+> > +		.pa_start	= 0x4a0db000,
+> > +		.pa_end		= 0x4a0db03f,
+> > +		.flags		= ADDR_TYPE_RT
+> > +	},
+> > +};
+> > +
+> > +/* l4_cfg ->  smartreflex_iva */
+> > +static struct omap_hwmod_ocp_if
+> omap44xx_l4_cfg__smartreflex_iva = {
+> > +	.master		=&omap44xx_l4_cfg_hwmod,
+> > +	.slave		=&omap44xx_smartreflex_iva_hwmod,
+> > +	.clk		= "l4_div_ck",
+> > +	.addr		= omap44xx_smartreflex_iva_addrs,
+> > +	.addr_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_addrs),
+> > +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> > +};
+> > +
+> > +/* smartreflex_iva slave ports */
+> > +static struct omap_hwmod_ocp_if
+> *omap44xx_smartreflex_iva_slaves[] = {
+> > +	&omap44xx_l4_cfg__smartreflex_iva,
+> > +};
+> > +
+> > +static struct omap_hwmod omap44xx_smartreflex_iva_hwmod = {
+> > +	.name		= "smartreflex_iva",
+> > +	.class		=&omap44xx_smartreflex_hwmod_class,
+> > +	.mpu_irqs	= omap44xx_smartreflex_iva_irqs,
+> > +	.mpu_irqs_cnt	=
+> ARRAY_SIZE(omap44xx_smartreflex_iva_irqs),
+> > +	.main_clk	= "smartreflex_iva_fck",
+> > +	.vdd_name	= "iva",
+> > +	.prcm = {
+> > +		.omap4 = {
+> > +			.clkctrl_reg =
+> OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
+> > +		},
+> > +	},
+> > +	.slaves		= omap44xx_smartreflex_iva_slaves,
+> > +	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_slaves),
+> > +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+> > +};
+> > +
+> > +/* smartreflex_mpu */
+> > +static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod;
+> > +static struct omap_hwmod_irq_info
+> omap44xx_smartreflex_mpu_irqs[] = {
+> > +	{ .irq = 18 + OMAP44XX_IRQ_GIC_START },
+> > +};
+> > +
+> > +static struct omap_hwmod_addr_space
+> omap44xx_smartreflex_mpu_addrs[] = {
+> > +	{
+> > +		.pa_start	= 0x4a0d9000,
+> > +		.pa_end		= 0x4a0d903f,
+> > +		.flags		= ADDR_TYPE_RT
+> > +	},
+> > +};
+> > +
+> > +/* l4_cfg ->  smartreflex_mpu */
+> > +static struct omap_hwmod_ocp_if
+> omap44xx_l4_cfg__smartreflex_mpu = {
+> > +	.master		=&omap44xx_l4_cfg_hwmod,
+> > +	.slave		=&omap44xx_smartreflex_mpu_hwmod,
+> > +	.clk		= "l4_div_ck",
+> > +	.addr		= omap44xx_smartreflex_mpu_addrs,
+> > +	.addr_cnt	=
+> ARRAY_SIZE(omap44xx_smartreflex_mpu_addrs),
+> > +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> > +};
+> > +
+> > +/* smartreflex_mpu slave ports */
+> > +static struct omap_hwmod_ocp_if
+> *omap44xx_smartreflex_mpu_slaves[] = {
+> > +	&omap44xx_l4_cfg__smartreflex_mpu,
+> > +};
+> > +
+> > +static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod = {
+> > +	.name		= "smartreflex_mpu",
+> > +	.class		=&omap44xx_smartreflex_hwmod_class,
+> > +	.mpu_irqs	= omap44xx_smartreflex_mpu_irqs,
+> > +	.mpu_irqs_cnt	=
+> ARRAY_SIZE(omap44xx_smartreflex_mpu_irqs),
+> > +	.main_clk	= "smartreflex_mpu_fck",
+> > +	.vdd_name	= "mpu",
+> > +	.prcm = {
+> > +		.omap4 = {
+> > +			.clkctrl_reg =
+> OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
+> > +		},
+> > +	},
+> > +	.slaves		= omap44xx_smartreflex_mpu_slaves,
+> > +	.slaves_cnt	=
+> ARRAY_SIZE(omap44xx_smartreflex_mpu_slaves),
+> > +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+> > +};
+> > +
+> >   static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+> >   	/* dmm class */
+> >   	&omap44xx_dmm_hwmod,
+> > @@ -1798,6 +1961,11 @@ static __initdata struct omap_hwmod
+> *omap44xx_hwmods[] = {
+> >   	&omap44xx_wd_timer2_hwmod,
+> >   	&omap44xx_wd_timer3_hwmod,
+> >
+> > +	/* smartreflex class */
+> > +	&omap44xx_smartreflex_core_hwmod,
+> > +	&omap44xx_smartreflex_iva_hwmod,
+> > +	&omap44xx_smartreflex_mpu_hwmod,
+> > +
+>
+> The alphabetical order is not respected. Smartreflex should be before
+> wd_timer.
+>
+> Since Tony already pull that from Kevin's tree, I'll send a patch to
+Tony
+> to fix these issues.
+>
+> Please note the following log when enabling SR in Class 3 on an
+> OMAP4430/sdp:
+>
+> [    2.362182] omap2_set_init_voltage: unable to find boot up OPP for
+> vdd_mpu
+> [    2.369384] omap2_set_init_voltage: Unable to put vdd_mpu to its init
+> voltage
+> [    2.369384]
+> [    2.378875] omap2_set_init_voltage: unable to find boot up OPP for
+> vdd_iva
+> [    2.386108] omap2_set_init_voltage: Unable to put vdd_iva to its init
+> voltage
+> [    2.386108]
+> [    2.396484] Power Management for TI OMAP4.
+> [    2.401031] sr_init: No PMIC hook to init smartreflex
+> [    2.406494] smartreflex smartreflex.0: omap_sr_probe: SmartReflex
+> driver initialized
+> [    2.414825] smartreflex smartreflex.1: omap_sr_probe: SmartReflex
+> driver initialized
+> [    2.423187] smartreflex smartreflex.2: omap_sr_probe: SmartReflex
+> driver initialized
+> [    2.431732] SmartReflex Class3 initialized
+>
+> Is it expected?
+> Why do we have that blank line in-between?
 
-This fixes bugs like:
+I think turbo OPPs are disabled by default in OPP table where as uboot is
+setting mpu and iva to turbo OPP. That's why you are getting this error.
+You should not get this error if you enable turbo opps in opp table.
 
-	udevd (74): /proc/74/oom_adj is deprecated, please use /proc/74/oom_score_adj instead.
-	BUG: sleeping function called from invalid context at /ptx/work/octopus/WORK_2_A/ukl/backup/gsrc/linux-2.6/kernel/mutex.c:278
-	in_atomic(): 0, irqs_disabled(): 128, pid: 74, name: udevd
-	2 locks held by udevd/74:
-	 #0:  (&(&p->alloc_lock)->rlock){+.+...}, at: [<c0132ff8>] oom_adjust_write+0xf8/0x290
-	 #1:  (&(&sighand->siglock)->rlock){......}, at: [<c005d1ec>] __lock_task_sighand+0x64/0xac
-	irq event stamp: 673
-	hardirqs last  enabled at (672): [<c0033fdc>] vector_swi+0x3c/0x90
-	hardirqs last disabled at (673): [<c02882e0>] _raw_spin_lock_irqsave+0x30/0x64
-	softirqs last  enabled at (0): [<c004a000>] copy_process+0x3a8/0xf90
-	softirqs last disabled at (0): [<  (null)>]   (null)
-	Backtrace:
-	[<c0037b54>] (dump_backtrace+0x0/0x110) from [<c02853a4>] (dump_stack+0x1c/0x20)
-	 r7:c79f0000 r6:c003dd00 r5:c030ce72 r4:c79f0000
-	[<c0285388>] (dump_stack+0x0/0x20) from [<c0046a58>] (__might_sleep+0x100/0x120)
-	[<c0046958>] (__might_sleep+0x0/0x120) from [<c0287054>] (mutex_lock_nested+0x3c/0x2b4)
-	 r5:00000000 r4:00000000
-	[<c0287018>] (mutex_lock_nested+0x0/0x2b4) from [<c003dd00>] (clk_enable+0x30/0x58)
-	[<c003dcd0>] (clk_enable+0x0/0x58) from [<c01d9888>] (pl011_console_write+0x30/0x8c)
-	 r4:00000066
-	[<c01d9858>] (pl011_console_write+0x0/0x8c) from [<c004b9a4>] (__call_console_drivers+0x68/0x84)
-	 r6:00000066 r5:00007401 r4:c0372950
-	[<c004b93c>] (__call_console_drivers+0x0/0x84) from [<c004ba48>] (_call_console_drivers+0x88/0x9c)
-	 r8:ffff8b99 r7:60000093 r6:c0352c24 r5:c0352ba0 r4:00007467
-	[<c004b9c0>] (_call_console_drivers+0x0/0x9c) from [<c004c040>] (release_console_sem+0x158/0x244)
-	 r5:00007467 r4:00007467
-	[<c004bee8>] (release_console_sem+0x0/0x244) from [<c004c7fc>] (vprintk+0x388/0x404)
-	[<c004c474>] (vprintk+0x0/0x404) from [<c0285560>] (printk+0x20/0x28)
-	[<c0285540>] (printk+0x0/0x28) from [<c01330f0>] (oom_adjust_write+0x1f0/0x290)
-	 r3:0000004a r2:0000004a r1:c795595c r0:c031998c
-	[<c0132f00>] (oom_adjust_write+0x0/0x290) from [<c00eb008>] (vfs_write+0xb8/0x18c)
-	 r8:0001a4ac r7:c79f1f70 r6:0001a4ac r5:00000003 r4:c79dbc00
-	[<c00eaf50>] (vfs_write+0x0/0x18c) from [<c00eb1a8>] (sys_write+0x48/0x74)
-	 r8:0001a4ac r7:00000003 r6:c79dbc00 r5:00000000 r4:00000000
-	[<c00eb160>] (sys_write+0x0/0x74) from [<c0033e80>] (ret_fast_syscall+0x0/0x38)
-	 r8:c0034088 r7:00000004 r6:00000000 r5:00000003 r4:00000003
+Regarding blank line, it's because of this print (note \n\n)
+printk(KERN_ERR "%s: Unable to put vdd_%s to its init voltage\n\n",
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Steven Rostedt <rostedt@goodmis.org>
----
- drivers/serial/amba-pl011.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/serial/amba-pl011.c b/drivers/serial/amba-pl011.c
-index 6ca7a44..e890ae8 100644
---- a/drivers/serial/amba-pl011.c
-+++ b/drivers/serial/amba-pl011.c
-@@ -710,8 +710,6 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
- 	struct uart_amba_port *uap = amba_ports[co->index];
- 	unsigned int status, old_cr, new_cr;
- 
--	clk_enable(uap->clk);
--
- 	/*
- 	 *	First save the CR then disable the interrupts
- 	 */
-@@ -730,8 +728,6 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
- 		status = readw(uap->port.membase + UART01x_FR);
- 	} while (status & UART01x_FR_BUSY);
- 	writew(old_cr, uap->port.membase + UART011_CR);
--
--	clk_disable(uap->clk);
- }
- 
- static void __init
-@@ -776,6 +772,7 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	int bits = 8;
- 	int parity = 'n';
- 	int flow = 'n';
-+	int ret;
- 
- 	/*
- 	 * Check whether an invalid uart number has been specified, and
-@@ -788,6 +785,10 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	if (!uap)
- 		return -ENODEV;
- 
-+	ret = clk_enable(uap->clk);
-+	if (ret)
-+		return ret;
-+
- 	uap->port.uartclk = clk_get_rate(uap->clk);
- 
- 	if (options)
--- 
-1.7.2.3
+Vishwa
+>
+> Regards,
+> Benoit
+>
+>
