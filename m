@@ -1,35 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Dec 2010 13:06:49 -0800
-Subject: linux-next: omap2plus_defconfig not building
-In-Reply-To: <20101223203046.GR3636@n2100.arm.linux.org.uk>
-References: <4CBD707F.6050204@ti.com>
-	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
-	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
-	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
-	<20101223195503.GN7771@atomide.com>
-	<20101223203046.GR3636@n2100.arm.linux.org.uk>
-Message-ID: <20101223210649.GT7771@atomide.com>
+From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
+Date: Thu, 23 Dec 2010 23:13:41 +0100
+Subject: [PATCH] ARM: colibri-pxa300: use correct SD detect pin
+In-Reply-To: <201012232157.03218.marek.vasut@gmail.com>
+References: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
+	<201012231715.36442.marek.vasut@gmail.com>
+	<AANLkTik-ZE-9mvZ7PN1QZx8OJpHcynNz6-0RqcTS=x+y@mail.gmail.com>
+	<201012232157.03218.marek.vasut@gmail.com>
+Message-ID: <AANLkTikSK_+NcvoBxWWyaOOz6u8oLk-jMj9FzKW_mUhC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101223 12:30]:
-> 
-> It's also queued for 2.6.38, but there is an issue with the latest gcc
-> stuffing a .armv7 directive (or whatever) at the beginning of its
-> output, thereby overriding the -Wa,-march=armv7-a on the command line.
-> I think someone's looking at fixing GCC.
-> 
-> This stuff _is_ in linux-next, and has been in linux-next for ages.
+2010/12/23 Marek Vasut <marek.vasut@gmail.com>:
+> On Thursday 23 December 2010 17:59:40 Bj?rn Forsman wrote:
+>> Hi Marek,
+>>
+>> 2010/12/23 Marek Vasut <marek.vasut@gmail.com>:
+>> > On Thursday 23 December 2010 16:01:02 Bj?rn Forsman wrote:
+>> >> The use of wrong SD detect pin was introduced by this commit:
+>> >>
+>> >> ? ARM: pxa: Push Colibri evalboard MFP into module files
+>> >>
+>> >> This fixes it.
+>> >
+>> > Ah, one more thing -- CC linux-arm-kernel (done)
+>>
+>> I didn't CC linux-arm-kernel because the patch was meant for
+>> Eric Miao's pxa-linux-2.6.git tree (devel branch). I doesn't apply
+>> to mainline.
+>>
+>> As Eric anyways uses 'git rebase' on his tree every -rc cycle
+>> I suggested that he could squash my patch into your original
+>> patch so that we get nice bisectable history.
+>
+> No, no, no ... regarding arm patches, you always CC linux-arm-kernel.
 
-Yes, but that's a different patch :) Sorry I should have provided a link
-for the one I'm talking about, it's the patch that changes the options
-for SWP_EMULATE to have "depends on CPU_V7 && !CPU_V6":
+Ok.
 
-http://marc.info/?l=linux-arm-kernel&m=128748874510144&w=2
+When the patch is not against mainline, where is appropriate
+place to say what tree it applies to? As a reply to the patch thread?
 
-That's still needed until we have the assembly in a separate .S file,
-or have the GCC options changed.
-
-Regards,
-
-Tony
+Best regards,
+Bj?rn Forsman
