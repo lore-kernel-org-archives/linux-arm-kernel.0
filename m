@@ -1,59 +1,58 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Thu, 23 Dec 2010 14:24:48 -0500
-Subject: [PATCH v2] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-Message-ID: <1293132288-22325-1-git-send-email-michael.williamson@criticallink.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Dec 2010 11:55:03 -0800
+Subject: linux-next: omap2plus_defconfig not building
+In-Reply-To: <1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
+References: <4CBD707F.6050204@ti.com>
+	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
+	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
+	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20101223195503.GN7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+* Catalin Marinas <catalin.marinas@arm.com> [101108 01:38]:
+> On Mon, 2010-11-08 at 06:05 +0000, Anand Gadiyar wrote:
+> > Catalin Marinas wrote:
+> > > On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
+> > > > Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
+> > > > processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
+> > > > gets compiled when the omap2plus_defconfig is built - the
+> > > > omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
+> > > > image, and has CPU_V6 and CPU_V7 both enabled.
+> > >
+> > > This patch should fix it:
+> > >
+> > >
+> > > ARM: Do not enable SWP emulation if CPU_V6 && CPU_V7
+> > >
+> > > From: Catalin Marinas <catalin.marinas@arm.com>
+> > >
+> > > This option uses LDREXB/STREXB to emulate SWPB but these instructions
+> > > are not supported on all the ARMv6 processors.
+> > >
+> > > Reported-by: Anand Gadiyar <gadiyar@ti.com>
+> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Leif Lindholm <Leif.Lindholm@arm.com>
+> > 
+> > I can't find this patch in linux-next. Hope we haven't missed it.
+> > Tony acked this btw.
+> > 
+> > Strangely, the omap2plus_defconfig in v2.6.37-rc1 no longer gets
+> > CONFIG_SWP_EMULATE enabled even without this patch - I can't figure
+> > out why.
+> 
+> Russell had a better idea for handling this, not sure whether it went
+> into -next. It was basically adding -march=armv7-a to
+> CFLAGS_swp_emulate.o in arch/arm/kernel/Makefile since we can't trigger
+> an undef fault for SWP on ARMv6 anyway.
+> 
+> If it's not in yet, I can submit a patch.
 
-The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
-In addition, the variant code for the AM-1808 SoC appears to match
-the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
-these chips.
+Catalin, you patch is still needed until we have a better solution.
 
-This patch is orignally from a patch on the arago project, here:
-http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
+Looks like the long term solution is to move the _user_swpX_asm
+into a separate .S file and set the v7 instructions for it.
 
-Further information related to the need for this patch can be located at
-http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
-http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
+Regards,
 
-This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
-was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
-
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-Tested-by: Michael Williamson <michael.williamson@criticallink.com>
-Reported-by: Nicolas Luna <luna.id@gmail.com>
----
-This is against davinci-linux tree.
-Changes since v1:
- - Changed "from" author to Sudhakar Rajashekhara
- - Added Nicolas Luna as reporter.
- - Added Test information.
- - Added reference links in description
-
- arch/arm/mach-davinci/da850.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 78b5ae2..2d0bba5 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
- 		.cpu_id		= DAVINCI_CPU_ID_DA850,
- 		.name		= "da850/omap-l138",
- 	},
-+	{
-+		.variant	= 0x1,
-+		.part_no	= 0xb7d1,
-+		.manufacturer	= 0x017,	/* 0x02f >> 1 */
-+		.cpu_id		= DAVINCI_CPU_ID_DA850,
-+		.name		= "da850/omap-l138/am18xx",
-+	},
- };
- 
- static struct davinci_timer_instance da850_timer_instance[4] = {
--- 
-1.7.0.4
+Tony
