@@ -1,42 +1,60 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 23 Dec 2010 15:17:51 -0200
-Subject: [PATCH] video: imxfb: Fix the maximum value for yres
-Message-ID: <1293124671-29426-1-git-send-email-fabio.estevam@freescale.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 23 Dec 2010 09:15:10 -0800
+Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
+	modules.
+In-Reply-To: <a58103fd01d89decba08fcdf282b7f70@mail.gmail.com> (Vishwanath
+	Sripathy's message of "Thu, 23 Dec 2010 20:58:26 +0530")
+References: <1292864437-15353-1-git-send-email-thara@ti.com>
+	<1292864437-15353-5-git-send-email-thara@ti.com>
+	<4D133B78.5030807@ti.com>
+	<a58103fd01d89decba08fcdf282b7f70@mail.gmail.com>
+Message-ID: <87d3osl8bl.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX27 and MX25 have 10 bits in the YMAX field of LCDC Size Register.
+Vishwanath Sripathy <vishwanath.bs@ti.com> writes:
 
-Fix the maximum value for yres.
+[...]
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/video/imxfb.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+>>
+>> Please note the following log when enabling SR in Class 3 on an
+>> OMAP4430/sdp:
+>>
+>> [    2.362182] omap2_set_init_voltage: unable to find boot up OPP for
+>> vdd_mpu
+>> [    2.369384] omap2_set_init_voltage: Unable to put vdd_mpu to its init
+>> voltage
+>> [    2.369384]
+>> [    2.378875] omap2_set_init_voltage: unable to find boot up OPP for
+>> vdd_iva
+>> [    2.386108] omap2_set_init_voltage: Unable to put vdd_iva to its init
+>> voltage
+>> [    2.386108]
+>> [    2.396484] Power Management for TI OMAP4.
+>> [    2.401031] sr_init: No PMIC hook to init smartreflex
+>> [    2.406494] smartreflex smartreflex.0: omap_sr_probe: SmartReflex
+>> driver initialized
+>> [    2.414825] smartreflex smartreflex.1: omap_sr_probe: SmartReflex
+>> driver initialized
+>> [    2.423187] smartreflex smartreflex.2: omap_sr_probe: SmartReflex
+>> driver initialized
+>> [    2.431732] SmartReflex Class3 initialized
+>>
+>> Is it expected?
+>> Why do we have that blank line in-between?
+>
+> I think turbo OPPs are disabled by default in OPP table where as uboot is
+> setting mpu and iva to turbo OPP. That's why you are getting this error.
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 5c363d0..5d2d337 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -55,8 +55,10 @@
- 
- #ifdef CONFIG_ARCH_MX1
- #define SIZE_YMAX(y)	((y) & 0x1ff)
-+#define YMAX_MASK	0x1ff
- #else
- #define SIZE_YMAX(y)	((y) & 0x3ff)
-+#define YMAX_MASK	0x3ff
- #endif
- 
- #define LCDC_VPW	0x08
-@@ -623,7 +625,7 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
- 	if (var->right_margin > 255)
- 		printk(KERN_ERR "%s: invalid right_margin %d\n",
- 			info->fix.id, var->right_margin);
--	if (var->yres < 1 || var->yres > 511)
-+	if (var->yres < 1 || var->yres > YMAX_MASK)
- 		printk(KERN_ERR "%s: invalid yres %d\n",
- 			info->fix.id, var->yres);
- 	if (var->vsync_len > 100)
--- 
-1.6.0.4
+That explains the MPU OPPs, but only raises more questions.  On what
+platforms was this tested?  with *and* without turbo OPPs enabled?  Does
+the voltage layer properly initialized if the boot up OPP is not found,
+and the initial voltage is not set?
+
+> You should not get this error if you enable turbo opps in opp table.
+
+You would still get missing boot up OPP for IVA, as there are currenly
+no OMAP4 OPPs for IVA.  Again, begging the question... how was this
+tested.
+
+Kevin
