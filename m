@@ -1,40 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Dec 2010 13:48:38 +0000
+Date: Thu, 23 Dec 2010 13:51:20 +0000
 Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <4D135004.3070904@samsung.com>
+In-Reply-To: <87k4j0ehdl.fsf@erwin.mina86.com>
 References: <cover.1292443200.git.m.nazarewicz@samsung.com>
 	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
 	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-	<20101223121917.GG3636@n2100.arm.linux.org.uk>
-	<4D135004.3070904@samsung.com>
-Message-ID: <20101223134838.GK3636@n2100.arm.linux.org.uk>
+	<87k4j0ehdl.fsf@erwin.mina86.com>
+Message-ID: <20101223135120.GL3636@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 02:35:00PM +0100, Tomasz Fujak wrote:
-> Dear Mr. King,
+On Thu, Dec 23, 2010 at 02:41:26PM +0100, Michal Nazarewicz wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> > Has anyone addressed my issue with it that this is wide-open for
+> > abuse by allocating large chunks of memory, and then remapping
+> > them in some way with different attributes, thereby violating the
+> > ARM architecture specification?
+> >
+> > In other words, do we _actually_ have a use for this which doesn't
+> > involve doing something like allocating 32MB of memory from it,
+> > remapping it so that it's DMA coherent, and then performing DMA
+> > on the resulting buffer?
 > 
-> AFAIK the CMA is the fourth attempt since 2008 taken to solve the
-> multimedia memory allocation issue on some embedded devices. Most
-> notably on ARM, that happens to be present in the SoCs we care about
-> along the IOMMU-incapable multimedia IPs.
+> Huge pages.
 > 
-> I understand that you have your guidelines taken from the ARM
-> specification, but this approach is not helping us.
+> Also, don't treat it as coherent memory and just flush/clear/invalidate
+> cache before and after each DMA transaction.  I never understood what's
+> wrong with that approach.
 
-I'm sorry you feel like that, but I'm living in reality.  If we didn't
-have these architecture restrictions then we wouldn't have this problem
-in the first place.
+If you've ever used an ARM system with a VIVT cache, you'll know what's
+wrong with this approach.
 
-What I'm trying to do here is to ensure that we remain _legal_ to the
-architecture specification - which for this issue means that we avoid
-corrupting people's data.
+ARM systems with VIVT caches have extremely poor task switching
+performance because they flush the entire data cache at every task switch
+- to the extent that it makes system performance drop dramatically when
+they become loaded.
 
-Maybe you like having a system which randomly corrupts people's data?
-I most certainly don't.  But that's the way CMA is heading at the moment
-on ARM.
-
-It is not up to me to solve these problems - that's for the proposer of
-the new API to do so.  So, please, don't try to lump this problem on
-my shoulders.  It's not my problem to sort out.
+Doing that for every DMA operation will kill the advantage we've gained
+from having VIPT caches and ASIDs stone dead.
