@@ -1,44 +1,27 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 23 Dec 2010 10:04:51 -0800
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
-	(Felipe Contreras's message of "Thu, 23 Dec 2010 16:42:57 +0200")
-References: <cover.1292443200.git.m.nazarewicz@samsung.com>
-	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
-	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-	<20101223121917.GG3636@n2100.arm.linux.org.uk>
-	<4D135004.3070904@samsung.com>
-	<20101223134838.GK3636@n2100.arm.linux.org.uk>
-	<4D1356D7.2000008@samsung.com>
-	<20101223141608.GM3636@n2100.arm.linux.org.uk>
-	<AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
-Message-ID: <8yasjxobc1o.fsf@huya.qualcomm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 23 Dec 2010 12:06:32 -0600
+Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
+	modules.
+In-Reply-To: <3f3f455d44f6ee5009a9ea387f35376c@mail.gmail.com>
+References: <1292864437-15353-1-git-send-email-thara@ti.com>	<1292864437-15353-5-git-send-email-thara@ti.com>	<4D133B78.5030807@ti.com>	<a58103fd01d89decba08fcdf282b7f70@mail.gmail.com>
+	<87d3osl8bl.fsf@deeprootsystems.com> <4D1385D6.6090407@ti.com>
+	<3f3f455d44f6ee5009a9ea387f35376c@mail.gmail.com>
+Message-ID: <4D138FA8.9030109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Contreras <felipe.contreras@gmail.com> writes:
-
-> On Thu, Dec 23, 2010 at 4:16 PM, Russell King - ARM Linux
-
-> A generic solution (that I think I already proposed) would be to
-> reserve a chunk of memory for the CMA that can be removed from the
-> normally mapped kernel memory through memblock at boot time. The size
-> of this memory region would be configurable through kconfig. Then, the
-> CMA would have a "dma" flag or something, and take chunks out of it
-> until there's no more, and then return errors. That would work for
-> ARM.
-
-That sounds an awful lot like the Android kernel's pmem implementation.
-
-Solving this problem is important for us as well, but, I'm not sure I
-see a better solution that something like Felipe suggests.
-
-The disadvantage, of course, being that the memory isn't available for
-the system when the user isn't doing the multi-media.
-
-David
+Vishwanath Sripathy had written, on 12/23/2010 11:36 AM, the following:
+[..]
+>> Further, why is SR enabled by default on this platform if it does not
+>> have all domains available to be enabled (e.x. we dont have it on
+>> PandaBoard even though it is OMAP4 rt?)
+> Why do you think SR is enabled by default? The above log says that SR
+> Module is initialized. However sr auto compensation is not started by
+> default.
+oops.. my bad. Apologies, I missed that this is part of probe path not 
+part of sr_classX_init path. looking at the code, I will refrain from 
+commenting further on probe function at this point.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Nishanth Menon
