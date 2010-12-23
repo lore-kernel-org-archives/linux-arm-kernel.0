@@ -1,62 +1,44 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 23 Dec 2010 09:49:43 -0800
-Subject: [GIT PULL] davinci updates for 2.6.38
-Message-ID: <87tyi4js5k.fsf@deeprootsystems.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 23 Dec 2010 10:04:51 -0800
+Subject: [PATCHv8 00/12] Contiguous Memory Allocator
+In-Reply-To: <AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
+	(Felipe Contreras's message of "Thu, 23 Dec 2010 16:42:57 +0200")
+References: <cover.1292443200.git.m.nazarewicz@samsung.com>
+	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
+	<20101223100642.GD3636@n2100.arm.linux.org.uk>
+	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
+	<20101223121917.GG3636@n2100.arm.linux.org.uk>
+	<4D135004.3070904@samsung.com>
+	<20101223134838.GK3636@n2100.arm.linux.org.uk>
+	<4D1356D7.2000008@samsung.com>
+	<20101223141608.GM3636@n2100.arm.linux.org.uk>
+	<AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
+Message-ID: <8yasjxobc1o.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Felipe Contreras <felipe.contreras@gmail.com> writes:
 
-Please pull the following changes for the TI DaVinci family of SoCs for
-the 2.6.38 merge window.
+> On Thu, Dec 23, 2010 at 4:16 PM, Russell King - ARM Linux
 
-Thanks,
+> A generic solution (that I think I already proposed) would be to
+> reserve a chunk of memory for the CMA that can be removed from the
+> normally mapped kernel memory through memblock at boot time. The size
+> of this memory region would be configurable through kconfig. Then, the
+> CMA would have a "dma" flag or something, and take chunks out of it
+> until there's no more, and then return errors. That would work for
+> ARM.
 
-Kevin
+That sounds an awful lot like the Android kernel's pmem implementation.
 
+Solving this problem is important for us as well, but, I'm not sure I
+see a better solution that something like Felipe suggests.
 
-The following changes since commit cf7d7e5a1980d1116ee152d25dac382b112b9c17:
+The disadvantage, of course, being that the memory isn't available for
+the system when the user isn't doing the multi-media.
 
-  Linux 2.6.37-rc5 (2010-12-06 20:09:04 -0800)
+David
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git davinci-next
-
-Andreas Gaeer (1):
-      davinci: Implement sched_clock()
-
-Ben Gardiner (7):
-      davinci: da850-evm: UI expander gpio_set_value can sleep, use _cansleep
-      da850-evm: allow pca953x module build
-      da850-evm, trivial: use da850_evm prefix for consistency
-      da850-evm: add UI Expander pushbuttons
-      da850-evm: extract defines for SEL{A,B,C} pins in UI expander
-      da850-evm: add baseboard GPIO expander buttons, switches and LEDs
-      da850-evm: KEYBOARD_GPIO_POLLED Kconfig conditional
-
-Cyril Chemparathy (2):
-      davinci: use divide ratio limits from pll_data
-      davinci: minor tnetv107x clock tree fixes
-
-Kevin Hilman (1):
-      davinci: kconfig: select at24 eeprom for selected boards
-
-Nicolas Kaiser (2):
-      davinci: psc: simplify if-statement
-      davinci: aemif: signedness bug in davinci_aemif_setup_timing()
-
-Sekhar Nori (2):
-      davinci: am18x/da850/omap-l138: add support for higher speed grades
-      davinci: am18x/da850/omap-l138 evm: add support for higher speed grades
-
- arch/arm/mach-davinci/Kconfig              |   19 ++-
- arch/arm/mach-davinci/aemif.c              |    2 +-
- arch/arm/mach-davinci/board-da850-evm.c    |  339 ++++++++++++++++++++++++++--
- arch/arm/mach-davinci/clock.c              |    4 +-
- arch/arm/mach-davinci/da850.c              |   75 +++++--
- arch/arm/mach-davinci/devices-tnetv107x.c  |   15 ++-
- arch/arm/mach-davinci/include/mach/da8xx.h |    7 +
- arch/arm/mach-davinci/psc.c                |   13 +-
- arch/arm/mach-davinci/time.c               |   24 ++-
- arch/arm/mach-davinci/tnetv107x.c          |   23 +-
- 10 files changed, 462 insertions(+), 59 deletions(-)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
