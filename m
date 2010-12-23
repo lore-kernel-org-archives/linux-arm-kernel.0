@@ -1,32 +1,21 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 23 Dec 2010 21:15:41 +0100
-Subject: [patch 1/5] ehci-mxc: Enable vbus later
-In-Reply-To: <20101221093132.GZ6017@pengutronix.de> (Sascha Hauer's message of
-	"Tue, 21 Dec 2010 10:31:32 +0100")
-References: <20101220154853.254931637@rtp-net.org>
-	<20101220155810.708379512@rtp-net.org>
-	<20101221093132.GZ6017@pengutronix.de>
-Message-ID: <871v58b5zm.fsf@lechat.rtp-net.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Dec 2010 12:15:51 -0800
+Subject: linux-next: omap2plus_defconfig not building
+In-Reply-To: <20101223195503.GN7771@atomide.com>
+References: <4CBD707F.6050204@ti.com>
+	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
+	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
+	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
+	<20101223195503.GN7771@atomide.com>
+Message-ID: <20101223201551.GP7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+* Tony Lindgren <tony@atomide.com> [101223 12:01]:
+> 
+> Looks like the long term solution is to move the _user_swpX_asm
+> into a separate .S file and set the v7 instructions for it.
 
-> On Mon, Dec 20, 2010 at 04:48:54PM +0100, Arnaud Patard wrote:
->> vbus should be enabled after usb_add_hcd() otherwise USB is not working
->> on my efikamx.
->
-> There is really something wrong with the way we handle initialization of
-> the mxc ehci controller. There are frequently patches posted trying to
-> change this order, and I think we are at a point where we can't move
-> anymore without possibly breaking some other board. Should this be
-> completely board dependend in the end?
+I mean set the v7 compiler flags for it..
 
-I'm not aware of any other bug except the postsc setting one (which was
-that any code trying to read the ulpi register without making sure that
-portsc is configured for ulpi is buggy). Moreover, the change is
-following the fsl bsp. I know it's not necessary the best code of the
-world but I believe it has been tested on a lot of imx platforms.
-
-
-Arnaud
+Tony
