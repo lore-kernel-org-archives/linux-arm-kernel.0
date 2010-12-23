@@ -1,30 +1,44 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 23 Dec 2010 10:15:16 -0800
-Subject: Git pull request: ux500-core for the v2.6.38 merge window
-In-Reply-To: <20101223144949.GO3636@n2100.arm.linux.org.uk> (Russell King's
-	message of "Thu, 23 Dec 2010 14:49:49 +0000")
-References: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
-	<20101223144949.GO3636@n2100.arm.linux.org.uk>
-Message-ID: <8yak4j0bbkb.fsf@huya.qualcomm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 23 Dec 2010 21:42:22 +0300
+Subject: [PATCH] video: imxfb: Fix the maximum value for yres
+In-Reply-To: <1293124671-29426-1-git-send-email-fabio.estevam@freescale.com>
+References: <1293124671-29426-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <4D13980E.4010500@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Hello.
 
-> On Thu, Dec 23, 2010 at 08:48:26AM +0100, Linus Walleij wrote:
+Fabio Estevam wrote:
 
-> First, I need to make absolutely sure that the GIC and SMP changes are
-> 100% ready and up to date with acks etc.  I think there may be patches
-> at the top of the SMP branch which haven't been posted to the list yet
-> (or they have but have no acks.)
+> MX27 and MX25 have 10 bits in the YMAX field of LCDC Size Register.
 
-Jeff Ohlstein also posted some MSM SMP patches which also depend on the
-SMP changes.  I haven't put them in linux-next yet because they depend
-on your devel tree.
+> Fix the maximum value for yres.
 
-I was intending to wait until the merge window opens, and then base the
-patches off of what does end up going into the merge window.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+[...]
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 5c363d0..5d2d337 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -55,8 +55,10 @@
+>  
+>  #ifdef CONFIG_ARCH_MX1
+>  #define SIZE_YMAX(y)	((y) & 0x1ff)
+> +#define YMAX_MASK	0x1ff
+>  #else
+>  #define SIZE_YMAX(y)	((y) & 0x3ff)
+> +#define YMAX_MASK	0x3ff
+>  #endif
+
+    I'd done the following, to avoid the code duplication:
+
+#ifdef CONFIG_ARCH_MX1
+#define YMAX_MASK	0x1ff
+#else
+#define YMAX_MASK	0x3ff
+#endif
+#define SIZE_YMAX(y)	((y) & YMAX_MASK)
+
+WBR, Sergei
