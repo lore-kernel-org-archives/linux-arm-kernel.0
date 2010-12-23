@@ -1,62 +1,32 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 23 Dec 2010 17:15:36 +0100
+From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
+Date: Thu, 23 Dec 2010 17:59:40 +0100
 Subject: [PATCH] ARM: colibri-pxa300: use correct SD detect pin
-In-Reply-To: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
+In-Reply-To: <201012231715.36442.marek.vasut@gmail.com>
 References: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
-Message-ID: <201012231715.36442.marek.vasut@gmail.com>
+	<201012231715.36442.marek.vasut@gmail.com>
+Message-ID: <AANLkTik-ZE-9mvZ7PN1QZx8OJpHcynNz6-0RqcTS=x+y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 December 2010 16:01:02 Bj?rn Forsman wrote:
-> The use of wrong SD detect pin was introduced by this commit:
-> 
->   ARM: pxa: Push Colibri evalboard MFP into module files
-> 
-> This fixes it.
+Hi Marek,
 
-Ah, one more thing -- CC linux-arm-kernel (done)
-> ---
->  arch/arm/mach-pxa/colibri-evalboard.c    |    2 +-
->  arch/arm/mach-pxa/colibri-pxa300.c       |    2 +-
->  arch/arm/mach-pxa/include/mach/colibri.h |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/colibri-evalboard.c
-> b/arch/arm/mach-pxa/colibri-evalboard.c index 6b2c800..28f667e 100644
-> --- a/arch/arm/mach-pxa/colibri-evalboard.c
-> +++ b/arch/arm/mach-pxa/colibri-evalboard.c
-> @@ -50,7 +50,7 @@ static void __init colibri_mmc_init(void)
->  			GPIO0_COLIBRI_PXA270_SD_DETECT;
->  	if (machine_is_colibri300())	/* PXA300 Colibri */
->  		colibri_mci_platform_data.gpio_card_detect =
-> -			GPIO39_COLIBRI_PXA300_SD_DETECT;
-> +			GPIO13_COLIBRI_PXA300_SD_DETECT;
->  	else				/* PXA320 Colibri */
->  		colibri_mci_platform_data.gpio_card_detect =
->  			GPIO28_COLIBRI_PXA320_SD_DETECT;
-> diff --git a/arch/arm/mach-pxa/colibri-pxa300.c
-> b/arch/arm/mach-pxa/colibri-pxa300.c index fddb16d..66dd81c 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa300.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa300.c
-> @@ -41,7 +41,7 @@ static mfp_cfg_t colibri_pxa300_evalboard_pin_config[]
-> __initdata = { GPIO4_MMC1_DAT1,
->  	GPIO5_MMC1_DAT2,
->  	GPIO6_MMC1_DAT3,
-> -	GPIO39_GPIO,	/* SD detect */
-> +	GPIO13_GPIO,	/* GPIO13_COLIBRI_PXA300_SD_DETECT */
-> 
->  	/* UHC */
->  	GPIO0_2_USBH_PEN,
-> diff --git a/arch/arm/mach-pxa/include/mach/colibri.h
-> b/arch/arm/mach-pxa/include/mach/colibri.h index 388a96f..cb4236e 100644
-> --- a/arch/arm/mach-pxa/include/mach/colibri.h
-> +++ b/arch/arm/mach-pxa/include/mach/colibri.h
-> @@ -60,7 +60,7 @@ static inline void colibri_pxa3xx_init_nand(void) {}
->  #define GPIO113_COLIBRI_PXA270_TS_IRQ	113
-> 
->  /* GPIO definitions for Colibri PXA300/310 */
-> -#define GPIO39_COLIBRI_PXA300_SD_DETECT	39
-> +#define GPIO13_COLIBRI_PXA300_SD_DETECT	13
-> 
->  /* GPIO definitions for Colibri PXA320 */
->  #define GPIO28_COLIBRI_PXA320_SD_DETECT	28
+2010/12/23 Marek Vasut <marek.vasut@gmail.com>:
+> On Thursday 23 December 2010 16:01:02 Bj?rn Forsman wrote:
+>> The use of wrong SD detect pin was introduced by this commit:
+>>
+>> ? ARM: pxa: Push Colibri evalboard MFP into module files
+>>
+>> This fixes it.
+>
+> Ah, one more thing -- CC linux-arm-kernel (done)
+
+I didn't CC linux-arm-kernel because the patch was meant for
+Eric Miao's pxa-linux-2.6.git tree (devel branch). I doesn't apply
+to mainline.
+
+As Eric anyways uses 'git rebase' on his tree every -rc cycle
+I suggested that he could squash my patch into your original
+patch so that we get nice bisectable history.
+
+Best regards,
+Bj?rn Forsman
