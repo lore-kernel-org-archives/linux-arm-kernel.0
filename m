@@ -1,100 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Dec 2010 08:48:26 +0100
-Subject: Git pull request: ux500-core for the v2.6.38 merge window
-Message-ID: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 23 Dec 2010 09:17:07 +0100
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<20101221182037.GA4783@n2100.arm.linux.org.uk>
+	<20101222122904.GC14693@n2100.arm.linux.org.uk>
+	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+Message-ID: <AANLkTinOMOkY6AUW8Z6FWMMWU9u0_sNjA2r_31u9-A8v@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, could you please pull:
+2010/12/23 Dan Williams <dan.j.williams@intel.com>:
+> On Wed, Dec 22, 2010 at 4:29 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> As described above in my code analysis, pl08x_tasklet takes the spinlock,
+>> calls pl011_dma_tx_callback and eventually back to pl08x_prep_slave_sg
+>> and pl08x_prep_channel_resources which then try to take the spinlock
+>> again, leading to deadlock.
+>
+> This is listed in the dmaengine documentation [1], but I obviously
+> missed this before merging. ?This also would have been caught by
+> lockdep as required by SubmitChecklist.
 
-       git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-for-rmk
+Yeah, my bad. I'll get better at this... :-(
+(I blame it partially on inaccessible hardware, sob sob. I do like to
+run lockdep.)
 
-This is based on your devel branch due to the dependencies on the GIC
-cleanup patches, as well as dependencies on some SMP consolidation
-patches hitting platsmp.c. (I tried just taking the GIC stuff but failed
-due to that, if you want me to take some special approach just tell me.)
+>?It looks like this driver needs a full scrub
+> which seems unreasonable to complete and test over the holidays before
+> .37 lands. ?Linus we either need to mark this "depends on BROKEN" or
+> revert it.
 
-If basing this on devel is unacceptable then please
-pull this instead:
+Isn't it really as simple as to release the spinlock during callbacks?
+That lock is only intended to protect the plchan variables, not to block
+anyone from queueing new stuff during the callback (as happens now).
 
-       git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-ux500-core
+It can release that lock, make a callback where a new descriptor
+gets queued, and then take it again and start looking at the queue,
+at which point it discovers the new desc and process it.
 
-The branch include a number of MFD patches and one input patch
-that we have agreed with Samiel Ortiz and Dmitry Torokhov to try to take
-through this route in order to avoid cross-subsystem dependencies and
-associated trouble. They all have their Acked-by.
+So something like this:
 
-All patches have been sent to the list for review.
-All patches except the 2 input patches and the last 5 based off
-devel in for-rmk have been tested for some time in Rothwell's
-linux-next.
 
-(This will affect the platform data for DMA in the patch tracker:
-I will update that patch.)
+From: Linus Walleij <linus.walleij@stericsson.com>
+Date: Thu, 23 Dec 2010 09:06:14 +0100
+Subject: [PATCH] dma: release pl08x channel lock during callback
 
-Shortlog:
+The spinlock is not really safeguarding any resources during the
+callback, so let's release it before that and take it back
+afterwards so as to avoid deadlocks.
 
-Carl-Johan Irekvist (1):
-      ux500: fix uncompressor UART address for U5500
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/dma/amba-pl08x.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-Jonas Aaberg (1):
-      ux500: platsmp: Fix section mismatch
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index b605cc9..7879a22 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1651,8 +1651,11 @@ static void pl08x_tasklet(unsigned long data)
+ 		/*
+ 		 * Callback to signal completion
+ 		 */
+-		if (callback)
+-			callback(callback_param);
++		if (callback) {
++                        spin_unlock(&plchan->lock);
++                        callback(callback_param);
++                        spin_lock(&plchan->lock);
++                }
 
-Linus Walleij (3):
-      ux500: use _cansleep GPIO functions
-      ux500: minor revision to the eMMC/SD config
-      ux500: rename modem IRQ and MBOX files
-
-Martin Persson (2):
-      ux500: Add prcmu support for operating points
-      ux500: Add cpufreq support for u8500
-
-Mattias Wallin (2):
-      ARM: ux500: prcmu db8500 v2 support
-      mach-ux500: AB8500 irqs is taken from header file
-
-Per Forlin (3):
-      ux500: Call prmcu_init only for u8500
-      ux500: Add eMMC support in U5500.
-      ux500: Add DMA support for U5500
-
-Rabin Vincent (12):
-      ux500: mop500: add TC35892 and MicroSD slot support
-      ux500: rework device registration
-      nomadik-gpio: allow sleep mode dir/pull to differ from normal mode
-      nomadik-gpio: use dev name if no name is specified
-      ux500: rework gpio registration
-      ux500: remove ambiguous irq macros
-      ux500: fix 5500 PER6 clock rate
-      ux500: remove build-time changing macros
-      ux500: rename MOP board Kconfig
-      ux500: dynamic SOC detection
-      ux500: modem_irq is only for 5500
-      ux500: allow 5500 and 8500 to be built together
-
-Samuel Ortiz (1):
-      mfd: Use dummy_irq_chip for tc3589x
-
-Sundar Iyer (14):
-      mach-ux500: explicit enable MTU TCR in the kernel
-      mach-ux500: clean up checkpatch spits
-      mach-ux500: deprecate spi support for ab8500
-      mfd/tc35892: rename tc35892 header to tc3589x
-      mfd/tc35892: rename tc35892 core driver to tc3589x
-      mfd/tc3589x: rename tc35892 structs/registers to tc359x
-      mfd/tc3589x: add block identifier for multiple child devices
-      mfd/tc3589x: fix random interrupt misses
-      mfd/tc3589x: undo gpio module reset during chip init
-      mfd/tc3589x: add suspend/resume support
-      mach-ux500: move keymaps to new file
-      mach-ux500: add STMPE1601 platform data
-      input/tc3589x: add tc3589x keypad support
-      ux500: add TC35893 keypad platform data
-
-Vincent Guittot (1):
-      ux500: add debugfs support for powerdebug
+ 		/*
+ 		 * Device callbacks should NOT clear
+-- 
+1.7.2.3
 
 Yours,
 Linus Walleij
