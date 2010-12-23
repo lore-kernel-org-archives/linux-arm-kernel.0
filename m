@@ -1,36 +1,94 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Thu, 23 Dec 2010 07:25:42 -0600
-Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
-	modules.
-In-Reply-To: <4D133B78.5030807@ti.com>
-References: <1292864437-15353-1-git-send-email-thara@ti.com>
-	<1292864437-15353-5-git-send-email-thara@ti.com>
-	<4D133B78.5030807@ti.com>
-Message-ID: <AANLkTi=P-3aQSk3Q2WyAAp-8WwwtxC_aOGLW+7WGd4mj@mail.gmail.com>
+From: t.fujak@samsung.com (Tomasz Fujak)
+Date: Thu, 23 Dec 2010 14:35:00 +0100
+Subject: [PATCHv8 00/12] Contiguous Memory Allocator
+In-Reply-To: <20101223121917.GG3636@n2100.arm.linux.org.uk>
+References: <cover.1292443200.git.m.nazarewicz@samsung.com>
+	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
+	<20101223100642.GD3636@n2100.arm.linux.org.uk>
+	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
+	<20101223121917.GG3636@n2100.arm.linux.org.uk>
+Message-ID: <4D135004.3070904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 06:07, Cousson, Benoit <b-cousson@ti.com> wrote:
+Dear Mr. King,
 
->
-> Please note the following log when enabling SR in Class 3 on an OMAP4430/sdp:
->
-> [ ? ?2.362182] omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
-> [ ? ?2.369384] omap2_set_init_voltage: Unable to put vdd_mpu to its init voltage
-> [ ? ?2.369384]
-> [ ? ?2.378875] omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
-> [ ? ?2.386108] omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
-> [ ? ?2.386108]
-> [ ? ?2.396484] Power Management for TI OMAP4.
-> [ ? ?2.401031] sr_init: No PMIC hook to init smartreflex
-> [ ? ?2.406494] smartreflex smartreflex.0: omap_sr_probe: SmartReflex driver initialized
-> [ ? ?2.414825] smartreflex smartreflex.1: omap_sr_probe: SmartReflex driver initialized
-> [ ? ?2.423187] smartreflex smartreflex.2: omap_sr_probe: SmartReflex driver initialized
-> [ ? ?2.431732] SmartReflex Class3 initialized
->
-Dumb question: how are you testing this? just boot log? or additional
-patch for DVFS?
+AFAIK the CMA is the fourth attempt since 2008 taken to solve the
+multimedia memory allocation issue on some embedded devices. Most
+notably on ARM, that happens to be present in the SoCs we care about
+along the IOMMU-incapable multimedia IPs.
 
+I understand that you have your guidelines taken from the ARM
+specification, but this approach is not helping us. The mainline kernel
+is server- and desktop-centric for various reasons I am not going to
+dwell into. We're trying hard to solve the physical memory fragmentation
+issue for some time now, only to hear "this is not acceptable, go
+somewhere else". So we did - the CMA is targeted towards mm, NOT the
+ARM. While I do not exactly know how you see your role in ARM kernel
+development, we have shown a few times that this issue is important for
+us, and we'd like to solve it. So if you could give a glimpse of what is
+acceptable, given the existing circumstances, we could possibly help
+developing that solution. Namely:
+1. ARM-compatible SoC
+2. Multimedia IP blocks requiring large amounts of contiguous memory
+2. No IOMMU or SG in said blocks
+4. Unused memory reserved for said multimedia drivers should  be used by
+the kernel
+5. Multimedia allocation scenarios must always be working (under some
+constraints of course), within sane time limit
+6. The solution shall have minimal delta to upstream linux (none?)
 
-Regards,
-Nishanth Menon
+While the obvious CMA uses are the ones you'd mostly like to avoid, we
+haven't tried to post anything like that along.
+This way no obvious spec abuse is made, and we minimize the delta to the
+upstream - it's even better than current state, when you have dma
+coherent memory doing exactly what you claim is forbidden (unpredictable
+results could possibly happen).
+
+As the feedback from the first CMA patches confirm, the issue we're
+trying to solve here is real. Yet no real solution exists to my
+knowledge. I understand the ARM holding my try to just wait till all the
+relevant chips do have an IOMMU, but here and now there is a SOC we are
+going to use. No IMOMMU, no SG. So would you please help us - or if for
+some reason you can't, just not make our work any harder?
+
+BTW why is the lowmem unmap not feasible? Is it the section entries in
+the page tables scattered throughout the system? I was unable to find
+the answer so far.
+
+Best regards
+-- 
+Tomasz Fujak
+Samsung Electronics Poland R&D
+
+On 2010-12-23 13:19, Russell King - ARM Linux wrote:
+> On Thu, Dec 23, 2010 at 11:58:08AM +0100, Marek Szyprowski wrote:
+>> Actually this contiguous memory allocator is a better replacement for
+>> alloc_pages() which is used by dma_alloc_coherent(). It is a generic
+>> framework that is not tied only to ARM architecture.
+> ... which is open to abuse.  What I'm trying to find out is - if it
+> can't be used for DMA, what is it to be used for?
+>
+> Or are we inventing an everything-but-ARM framework?
+>
+>>> In other words, do we _actually_ have a use for this which doesn't
+>>> involve doing something like allocating 32MB of memory from it,
+>>> remapping it so that it's DMA coherent, and then performing DMA
+>>> on the resulting buffer?
+>> This is an arm specific problem, also related to dma_alloc_coherent()
+>> allocator. To be 100% conformant with ARM specification we would
+>> probably need to unmap all pages used by the dma_coherent allocator
+>> from the LOW MEM area. This is doable, but completely not related
+>> to the CMA and this patch series.
+> You've already been told why we can't unmap pages from the kernel
+> direct mapping.
+>
+> Okay, so I'm just going to assume that CMA has _no_ _business_ being
+> used on ARM, and is not something that should interest anyone in the
+> ARM community.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
