@@ -1,58 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Dec 2010 11:55:03 -0800
-Subject: linux-next: omap2plus_defconfig not building
-In-Reply-To: <1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
-References: <4CBD707F.6050204@ti.com>
-	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
-	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
-	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20101223195503.GN7771@atomide.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 23 Dec 2010 21:11:03 +0100
+Subject: [patch 2/5] ulpi: handle ULPI_OTG_CTRL_CHRGVBUS
+In-Reply-To: <4D109C47.6020704@compulab.co.il> (Igor Grinberg's message of
+	"Tue, 21 Dec 2010 14:23:35 +0200")
+References: <20101220154853.254931637@rtp-net.org>
+	<20101220155812.122749841@rtp-net.org>
+	<4D109C47.6020704@compulab.co.il>
+Message-ID: <8762ukb67c.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Catalin Marinas <catalin.marinas@arm.com> [101108 01:38]:
-> On Mon, 2010-11-08 at 06:05 +0000, Anand Gadiyar wrote:
-> > Catalin Marinas wrote:
-> > > On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
-> > > > Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
-> > > > processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
-> > > > gets compiled when the omap2plus_defconfig is built - the
-> > > > omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
-> > > > image, and has CPU_V6 and CPU_V7 both enabled.
-> > >
-> > > This patch should fix it:
-> > >
-> > >
-> > > ARM: Do not enable SWP emulation if CPU_V6 && CPU_V7
-> > >
-> > > From: Catalin Marinas <catalin.marinas@arm.com>
-> > >
-> > > This option uses LDREXB/STREXB to emulate SWPB but these instructions
-> > > are not supported on all the ARMv6 processors.
-> > >
-> > > Reported-by: Anand Gadiyar <gadiyar@ti.com>
-> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Leif Lindholm <Leif.Lindholm@arm.com>
-> > 
-> > I can't find this patch in linux-next. Hope we haven't missed it.
-> > Tony acked this btw.
-> > 
-> > Strangely, the omap2plus_defconfig in v2.6.37-rc1 no longer gets
-> > CONFIG_SWP_EMULATE enabled even without this patch - I can't figure
-> > out why.
-> 
-> Russell had a better idea for handling this, not sure whether it went
-> into -next. It was basically adding -march=armv7-a to
-> CFLAGS_swp_emulate.o in arch/arm/kernel/Makefile since we can't trigger
-> an undef fault for SWP on ARMv6 anyway.
-> 
-> If it's not in yet, I can submit a patch.
+Igor Grinberg <grinberg@compulab.co.il> writes:
 
-Catalin, you patch is still needed until we have a better solution.
+> Hi Arnaud,
+>
+> On 12/20/10 17:48, Arnaud Patard (Rtp) wrote:
+>> Current code doesn't handle setting CHRGVBUS when enabling vbus.
+>> Add support for it
+>>
+>>
+>>
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> Index: tst-usb/drivers/usb/otg/ulpi.c
+>> ===================================================================
+>> --- tst-usb.orig/drivers/usb/otg/ulpi.c	2010-12-20 15:38:41.000000000 +0100
+>> +++ tst-usb/drivers/usb/otg/ulpi.c	2010-12-20 15:38:57.000000000 +0100
+>> @@ -234,7 +234,8 @@
+>>  {
+>>  	unsigned int flags = otg_io_read(otg, ULPI_OTG_CTRL);
+>>  
+>> -	flags &= ~(ULPI_OTG_CTRL_DRVVBUS | ULPI_OTG_CTRL_DRVVBUS_EXT);
+>> +	flags &= ~(ULPI_OTG_CTRL_DRVVBUS | ULPI_OTG_CTRL_DRVVBUS_EXT |
+>> +			ULPI_OTG_CTRL_CHRGVBUS);
+>>  
+>>  	if (on) {
+>>  		if (otg->flags & ULPI_OTG_DRVVBUS)
+>> @@ -242,6 +243,9 @@
+>>  
+>>  		if (otg->flags & ULPI_OTG_DRVVBUS_EXT)
+>>  			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
+>> +
+>> +		if (otg->flags & ULPI_OTG_CHRGVBUS)
+>> +			flags |= ULPI_OTG_CTRL_CHRGVBUS;
+>>  	}
+>>  
+>>  	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
+>
+> I think this is a wrong place to set the ChrgVbus bit.
+> As for ULPI spec. 1.1:
+> "3.8.7.1 Session Request Protocol (SRP)
+> ULPI provides full SRP support. The Link uses the ChrgVbus and DischrgVbus bits
+> in the OTG Control register to begin and end a session."
+>
+> So it is used for SRP.
+> May be it is better to implement
+> int    (*start_srp)(struct otg_transceiver *otg);
+> method for setting this bit?
+>
+I was not sure on where to put this so I took the same approach as the
+fsl bsp which was to set it in this function and to call this function
+_after_ usb_add_hcd() [ see my previous patch ]. Indeed, it fixed my
+issue so I believe it not so bad given that there has already been some
+troubles on the ehci-mxc init.
 
-Looks like the long term solution is to move the _user_swpX_asm
-into a separate .S file and set the v7 instructions for it.
-
-Regards,
-
-Tony
+Arnaud
