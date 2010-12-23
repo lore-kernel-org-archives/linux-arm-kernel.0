@@ -1,53 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Dec 2010 14:20:53 +0000
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Thu, 23 Dec 2010 16:42:57 +0200
 Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <4D1357D5.9000507@samsung.com>
+In-Reply-To: <20101223141608.GM3636@n2100.arm.linux.org.uk>
 References: <cover.1292443200.git.m.nazarewicz@samsung.com>
 	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
 	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<87k4j0ehdl.fsf@erwin.mina86.com>
-	<20101223135120.GL3636@n2100.arm.linux.org.uk>
-	<4D1357D5.9000507@samsung.com>
-Message-ID: <20101223142053.GN3636@n2100.arm.linux.org.uk>
+	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
+	<20101223121917.GG3636@n2100.arm.linux.org.uk>
+	<4D135004.3070904@samsung.com>
+	<20101223134838.GK3636@n2100.arm.linux.org.uk>
+	<4D1356D7.2000008@samsung.com>
+	<20101223141608.GM3636@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 03:08:21PM +0100, Tomasz Fujak wrote:
-> On 2010-12-23 14:51, Russell King - ARM Linux wrote:
-> > On Thu, Dec 23, 2010 at 02:41:26PM +0100, Michal Nazarewicz wrote:
-> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> >>> Has anyone addressed my issue with it that this is wide-open for
-> >>> abuse by allocating large chunks of memory, and then remapping
-> >>> them in some way with different attributes, thereby violating the
-> >>> ARM architecture specification?
-> >>>
-> >>> In other words, do we _actually_ have a use for this which doesn't
-> >>> involve doing something like allocating 32MB of memory from it,
-> >>> remapping it so that it's DMA coherent, and then performing DMA
-> >>> on the resulting buffer?
-> >> Huge pages.
-> >>
-> >> Also, don't treat it as coherent memory and just flush/clear/invalidate
-> >> cache before and after each DMA transaction.  I never understood what's
-> >> wrong with that approach.
-> > If you've ever used an ARM system with a VIVT cache, you'll know what's
-> > wrong with this approach.
-> >
-> > ARM systems with VIVT caches have extremely poor task switching
-> > performance because they flush the entire data cache at every task switch
-> > - to the extent that it makes system performance drop dramatically when
-> > they become loaded.
-> >
-> > Doing that for every DMA operation will kill the advantage we've gained
-> > from having VIPT caches and ASIDs stone dead.
-> This statement effectively means: don't map dma-able memory to the CPU
-> unless it's uncached. Have I missed anything?
+On Thu, Dec 23, 2010 at 4:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 23, 2010 at 03:04:07PM +0100, Tomasz Fujak wrote:
+>> In other words, should we take your response as yet another NAK?
+>> Or would you try harder and at least point us to some direction that
+>> would not doom the effort from the very beginning.
+>
+> What the fsck do you think I've been doing? ?This is NOT THE FIRST time
+> I've raised this issue. ?I gave up raising it after the first couple
+> of attempts because I wasn't being listened to.
+>
+> You say about _me_ not being very helpful. ?How about the CMA proponents
+> start taking the issue I've raised seriously, and try to work out how
+> to solve it? ?And how about blaming them for the months of wasted time
+> on this issue _because_ _they_ have chosen to ignore it?
 
-I'll give you another solution to the problem - lobby ARM Ltd to have
-this restriction lifted from the architecture specification, which
-will probably result in the speculative prefetching also having to be
-removed.
+I've also raised the issue for ARM. However, I don't see what is the
+big problem.
 
-That would be my preferred solution if I had the power to do so, but
-I have to live with what ARM Ltd (and their partners such as yourselves)
-decide should end up in the architecture specification.
+A generic solution (that I think I already proposed) would be to
+reserve a chunk of memory for the CMA that can be removed from the
+normally mapped kernel memory through memblock at boot time. The size
+of this memory region would be configurable through kconfig. Then, the
+CMA would have a "dma" flag or something, and take chunks out of it
+until there's no more, and then return errors. That would work for
+ARM.
+
+Cheers.
+
+-- 
+Felipe Contreras
