@@ -1,39 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Dec 2010 20:30:46 +0000
-Subject: linux-next: omap2plus_defconfig not building
-In-Reply-To: <20101223195503.GN7771@atomide.com>
-References: <4CBD707F.6050204@ti.com>
-	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
-	<eace9c309e371630528bc9f8fa208705@mail.gmail.com>
-	<1289209693.3538.5.camel@e102109-lin.cambridge.arm.com>
-	<20101223195503.GN7771@atomide.com>
-Message-ID: <20101223203046.GR3636@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Dec 2010 12:39:20 -0800
+Subject: [GIT PULL] OMAP USB Changes for Merge Window
+In-Reply-To: <20101223084734.GA3149@legolas.emea.dhcp.ti.com>
+References: <20101223084734.GA3149@legolas.emea.dhcp.ti.com>
+Message-ID: <20101223203920.GQ7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 11:55:03AM -0800, Tony Lindgren wrote:
-> * Catalin Marinas <catalin.marinas@arm.com> [101108 01:38]:
-> > On Mon, 2010-11-08 at 06:05 +0000, Anand Gadiyar wrote:
-> > > I can't find this patch in linux-next. Hope we haven't missed it.
-> > > Tony acked this btw.
-> > > 
-> > > Strangely, the omap2plus_defconfig in v2.6.37-rc1 no longer gets
-> > > CONFIG_SWP_EMULATE enabled even without this patch - I can't figure
-> > > out why.
+* Felipe Balbi <balbi@ti.com> [101223 00:47]:
+> Hi Tony,
+> 
+> please queue the following two patches for Merge Window.
+> 
+> The following changes since commit b79540fcbbcf9b379c9197f63c5a883bbe3adfd4:
+> 
+>    Linux-omap rebuilt: Merged branches from Paul and Kevin and mux changes (2010-12-22 19:13:33 -0800)
 
-That'll be because swap emulation isn't in v2.6.37-rc1.  It's queued
-for 2.6.38's merge window.
+This can't be pulled as it would pull in tons of non-mainline
+commits from the linux-omap master branch.
 
-> > Russell had a better idea for handling this, not sure whether it went
-> > into -next. It was basically adding -march=armv7-a to
-> > CFLAGS_swp_emulate.o in arch/arm/kernel/Makefile since we can't trigger
-> > an undef fault for SWP on ARMv6 anyway.
-> > 
-> > If it's not in yet, I can submit a patch.
+Everybody, all the pullable branches must be based on something
+in the mainline kernel, like a recent -rc tag. If that won't work,
+then some commit needs to be agreed on separately that will go
+to mainline, like the omap-for-linus branch.
 
-It's also queued for 2.6.38, but there is an issue with the latest gcc
-stuffing a .armv7 directive (or whatever) at the beginning of its
-output, thereby overriding the -Wa,-march=armv7-a on the command line.
-I think someone's looking at fixing GCC.
+Further, please wait few days before sending the pull request
+in case somebody wants to ack your patches. Sending a pull request
+with the patches to be reviewed is kind of pointless.. Sure in this
+case these are pretty trivial patches, but still.
 
-This stuff _is_ in linux-next, and has been in linux-next for ages.
+Anyways, I'll apply these into a temporary branch and will
+merge into omap-for-linus within next few days assuming no
+problems.
+
+Regards,
+
+Tony
