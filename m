@@ -1,32 +1,62 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Thu, 23 Dec 2010 21:33:19 +0530
-Subject: Last OMAP4 hwmod data cleanup for 2.6.38
-In-Reply-To: <4D135677.1080200@ti.com>
-References: <4D135677.1080200@ti.com>
-Message-ID: <20101223160319.GB1863@GLPP-machine>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 23 Dec 2010 17:15:36 +0100
+Subject: [PATCH] ARM: colibri-pxa300: use correct SD detect pin
+In-Reply-To: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
+References: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
+Message-ID: <201012231715.36442.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 03:02:31PM +0100, Cousson, Benoit wrote:
-> Hi Tony,
+On Thursday 23 December 2010 16:01:02 Bj?rn Forsman wrote:
+> The use of wrong SD detect pin was introduced by this commit:
 > 
-> The merge of both SDMA series from Manju and SR series from Thara
-> changed the expected order of the hwmod data structures for OMAP4.
-> In order to have a clean base for 2.6.38, and to avoid starting
-> 2.6.39 with a cleanup patch again, I'd like to fix that right now.
-> Even if, I do agree, this is not a big deal.
+>   ARM: pxa: Push Colibri evalboard MFP into module files
 > 
-> I squeezed the 3 original small fixes I did (SDMA, SR and alignment)
-> into one to avoid overloading your mailbox 2 days before Xmas.
-> 
-> The patch will be available here, based on omap-for-linus.
-> git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod_fixes
-> 
-> It should not affect any functionality, and it is boot tested on
-> OMAP4430/sdp.
+> This fixes it.
 
-Boot tested on SDP4430 and all DMA tests passes as expected.
-
-Tested-by: G, Manjunath Kondaiah <manjugk@ti.com>
-
--Manjunath
+Ah, one more thing -- CC linux-arm-kernel (done)
+> ---
+>  arch/arm/mach-pxa/colibri-evalboard.c    |    2 +-
+>  arch/arm/mach-pxa/colibri-pxa300.c       |    2 +-
+>  arch/arm/mach-pxa/include/mach/colibri.h |    2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/colibri-evalboard.c
+> b/arch/arm/mach-pxa/colibri-evalboard.c index 6b2c800..28f667e 100644
+> --- a/arch/arm/mach-pxa/colibri-evalboard.c
+> +++ b/arch/arm/mach-pxa/colibri-evalboard.c
+> @@ -50,7 +50,7 @@ static void __init colibri_mmc_init(void)
+>  			GPIO0_COLIBRI_PXA270_SD_DETECT;
+>  	if (machine_is_colibri300())	/* PXA300 Colibri */
+>  		colibri_mci_platform_data.gpio_card_detect =
+> -			GPIO39_COLIBRI_PXA300_SD_DETECT;
+> +			GPIO13_COLIBRI_PXA300_SD_DETECT;
+>  	else				/* PXA320 Colibri */
+>  		colibri_mci_platform_data.gpio_card_detect =
+>  			GPIO28_COLIBRI_PXA320_SD_DETECT;
+> diff --git a/arch/arm/mach-pxa/colibri-pxa300.c
+> b/arch/arm/mach-pxa/colibri-pxa300.c index fddb16d..66dd81c 100644
+> --- a/arch/arm/mach-pxa/colibri-pxa300.c
+> +++ b/arch/arm/mach-pxa/colibri-pxa300.c
+> @@ -41,7 +41,7 @@ static mfp_cfg_t colibri_pxa300_evalboard_pin_config[]
+> __initdata = { GPIO4_MMC1_DAT1,
+>  	GPIO5_MMC1_DAT2,
+>  	GPIO6_MMC1_DAT3,
+> -	GPIO39_GPIO,	/* SD detect */
+> +	GPIO13_GPIO,	/* GPIO13_COLIBRI_PXA300_SD_DETECT */
+> 
+>  	/* UHC */
+>  	GPIO0_2_USBH_PEN,
+> diff --git a/arch/arm/mach-pxa/include/mach/colibri.h
+> b/arch/arm/mach-pxa/include/mach/colibri.h index 388a96f..cb4236e 100644
+> --- a/arch/arm/mach-pxa/include/mach/colibri.h
+> +++ b/arch/arm/mach-pxa/include/mach/colibri.h
+> @@ -60,7 +60,7 @@ static inline void colibri_pxa3xx_init_nand(void) {}
+>  #define GPIO113_COLIBRI_PXA270_TS_IRQ	113
+> 
+>  /* GPIO definitions for Colibri PXA300/310 */
+> -#define GPIO39_COLIBRI_PXA300_SD_DETECT	39
+> +#define GPIO13_COLIBRI_PXA300_SD_DETECT	13
+> 
+>  /* GPIO definitions for Colibri PXA320 */
+>  #define GPIO28_COLIBRI_PXA320_SD_DETECT	28
