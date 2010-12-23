@@ -1,93 +1,62 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Thu, 23 Dec 2010 23:06:22 +0530
-Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
-	modules.
-In-Reply-To: <4D1385D6.6090407@ti.com>
-References: <1292864437-15353-1-git-send-email-thara@ti.com>
-	<1292864437-15353-5-git-send-email-thara@ti.com>	<4D133B78.5030807@ti.com>
-	<a58103fd01d89decba08fcdf282b7f70@mail.gmail.com>
-	<87d3osl8bl.fsf@deeprootsystems.com> <4D1385D6.6090407@ti.com>
-Message-ID: <3f3f455d44f6ee5009a9ea387f35376c@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 23 Dec 2010 09:49:43 -0800
+Subject: [GIT PULL] davinci updates for 2.6.38
+Message-ID: <87tyi4js5k.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishant,
+Russell,
 
-> -----Original Message-----
-> From: Nishanth Menon [mailto:nm at ti.com]
-> Sent: Thursday, December 23, 2010 10:55 PM
-> To: Kevin Hilman
-> Cc: Vishwanath Sripathy; Benoit Cousson; Thara Gopinath; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> paul at pwsan.com; Anand Sawant
-> Subject: Re: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for
-> smartreflex modules.
->
-> Kevin Hilman had written, on 12/23/2010 11:15 AM, the following:
-> > Vishwanath Sripathy <vishwanath.bs@ti.com> writes:
-> >
-> > [...]
-> >
-> >>> Please note the following log when enabling SR in Class 3 on an
-> >>> OMAP4430/sdp:
-> >>>
-> >>> [    2.362182] omap2_set_init_voltage: unable to find boot up OPP
-> for
-> >>> vdd_mpu
-> >>> [    2.369384] omap2_set_init_voltage: Unable to put vdd_mpu to
-> its init
-> >>> voltage
-> >>> [    2.369384]
-> >>> [    2.378875] omap2_set_init_voltage: unable to find boot up OPP
-> for
-> >>> vdd_iva
-> >>> [    2.386108] omap2_set_init_voltage: Unable to put vdd_iva to its
-> init
-> >>> voltage
-> >>> [    2.386108]
-> >>> [    2.396484] Power Management for TI OMAP4.
-> >>> [    2.401031] sr_init: No PMIC hook to init smartreflex
-> >>> [    2.406494] smartreflex smartreflex.0: omap_sr_probe:
-> SmartReflex
-> >>> driver initialized
-> >>> [    2.414825] smartreflex smartreflex.1: omap_sr_probe:
-> SmartReflex
-> >>> driver initialized
-> >>> [    2.423187] smartreflex smartreflex.2: omap_sr_probe:
-> SmartReflex
-> >>> driver initialized
-> >>> [    2.431732] SmartReflex Class3 initialized
-> >>>
-> >>> Is it expected?
-> >>> Why do we have that blank line in-between?
-> >> I think turbo OPPs are disabled by default in OPP table where as
-> uboot is
-> >> setting mpu and iva to turbo OPP. That's why you are getting this
-> error.
-> > That explains the MPU OPPs, but only raises more questions.  On what
-> > platforms was this tested?  with *and* without turbo OPPs enabled?
-> Does
-> > the voltage layer properly initialized if the boot up OPP is not
-found,
-> > and the initial voltage is not set?
-> >
-> >> You should not get this error if you enable turbo opps in opp table.
-> If the platform SDP4430 is capable of booting up in higher (turbo) OPP,
-> that OPP should have been enabled in the board file! I have'nt seen a
-> patch for that yet
->
-> > You would still get missing boot up OPP for IVA, as there are currenly
-> > no OMAP4 OPPs for IVA.  Again, begging the question... how was this
-> > tested.
-> Further, why is SR enabled by default on this platform if it does not
-> have all domains available to be enabled (e.x. we dont have it on
-> PandaBoard even though it is OMAP4 rt?)
-Why do you think SR is enabled by default? The above log says that SR
-Module is initialized. However sr auto compensation is not started by
-default.
+Please pull the following changes for the TI DaVinci family of SoCs for
+the 2.6.38 merge window.
 
-Vishwa
->
-> --
-> Regards,
-> Nishanth Menon
+Thanks,
+
+Kevin
+
+
+The following changes since commit cf7d7e5a1980d1116ee152d25dac382b112b9c17:
+
+  Linux 2.6.37-rc5 (2010-12-06 20:09:04 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git davinci-next
+
+Andreas Gaeer (1):
+      davinci: Implement sched_clock()
+
+Ben Gardiner (7):
+      davinci: da850-evm: UI expander gpio_set_value can sleep, use _cansleep
+      da850-evm: allow pca953x module build
+      da850-evm, trivial: use da850_evm prefix for consistency
+      da850-evm: add UI Expander pushbuttons
+      da850-evm: extract defines for SEL{A,B,C} pins in UI expander
+      da850-evm: add baseboard GPIO expander buttons, switches and LEDs
+      da850-evm: KEYBOARD_GPIO_POLLED Kconfig conditional
+
+Cyril Chemparathy (2):
+      davinci: use divide ratio limits from pll_data
+      davinci: minor tnetv107x clock tree fixes
+
+Kevin Hilman (1):
+      davinci: kconfig: select at24 eeprom for selected boards
+
+Nicolas Kaiser (2):
+      davinci: psc: simplify if-statement
+      davinci: aemif: signedness bug in davinci_aemif_setup_timing()
+
+Sekhar Nori (2):
+      davinci: am18x/da850/omap-l138: add support for higher speed grades
+      davinci: am18x/da850/omap-l138 evm: add support for higher speed grades
+
+ arch/arm/mach-davinci/Kconfig              |   19 ++-
+ arch/arm/mach-davinci/aemif.c              |    2 +-
+ arch/arm/mach-davinci/board-da850-evm.c    |  339 ++++++++++++++++++++++++++--
+ arch/arm/mach-davinci/clock.c              |    4 +-
+ arch/arm/mach-davinci/da850.c              |   75 +++++--
+ arch/arm/mach-davinci/devices-tnetv107x.c  |   15 ++-
+ arch/arm/mach-davinci/include/mach/da8xx.h |    7 +
+ arch/arm/mach-davinci/psc.c                |   13 +-
+ arch/arm/mach-davinci/time.c               |   24 ++-
+ arch/arm/mach-davinci/tnetv107x.c          |   23 +-
+ 10 files changed, 462 insertions(+), 59 deletions(-)
