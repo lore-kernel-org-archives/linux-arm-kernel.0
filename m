@@ -1,74 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 23 Dec 2010 16:42:52 +0100
-Subject: bug in PL011 console
-In-Reply-To: <20101223150841.GP3636@n2100.arm.linux.org.uk>
-References: <20101223150234.GW14221@pengutronix.de>
-	<20101223150841.GP3636@n2100.arm.linux.org.uk>
-Message-ID: <20101223154252.GX14221@pengutronix.de>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Thu, 23 Dec 2010 21:33:19 +0530
+Subject: Last OMAP4 hwmod data cleanup for 2.6.38
+In-Reply-To: <4D135677.1080200@ti.com>
+References: <4D135677.1080200@ti.com>
+Message-ID: <20101223160319.GB1863@GLPP-machine>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 03:08:41PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 23, 2010 at 04:02:34PM +0100, Uwe Kleine-K?nig wrote:
-> > Steven told me on irc that sleeping was not allowed in the console write
-> > callback.  Maybe this didn't show up earlier because not all clk
-> > implementations sleep as mxs' does.
-> > 
-> > I think the only possible fix is to do the clk_enable in the setup
-> > callback instead of per-write.
-> > 
-> > Will send a patch as follow up.
+On Thu, Dec 23, 2010 at 03:02:31PM +0100, Cousson, Benoit wrote:
+> Hi Tony,
 > 
-> We really need to sort out what's expected from the CLK API.  The drivers
-> I write assume that it's absolutely fine to call clk_enable/clk_disable
-> from IRQ context, and for the platforms I implemented the CLK API for,
-> that's absolutely true.
-The common struct clk patch[1] by Jeremy Kerr sleeps, too.  And I think
-most people who commented to this series thought that this is the right
-behaviour.
+> The merge of both SDMA series from Manju and SR series from Thara
+> changed the expected order of the hwmod data structures for OMAP4.
+> In order to have a clean base for 2.6.38, and to avoid starting
+> 2.6.39 with a cleanup patch again, I'd like to fix that right now.
+> Even if, I do agree, this is not a big deal.
+> 
+> I squeezed the 3 original small fixes I did (SDMA, SR and alignment)
+> into one to avoid overloading your mailbox 2 days before Xmas.
+> 
+> The patch will be available here, based on omap-for-linus.
+> git://gitorious.org/omap-pm/linux.git for_2.6.38/hwmod_fixes
+> 
+> It should not affect any functionality, and it is boot tested on
+> OMAP4430/sdp.
 
-> I'd lobby for it because it allows for proper power saving management of
-> clocks for devices - PL011 only enables the clock when either the port is
-> open or it's actually sending data out the port.  So it's doing absolutely
-> the best power management that can be done with UARTs.
-Yeah, that makes fine-grained clk enabling harder/impossible.  So
-ideally we'd have something that only makes clk_enable sleep iff
-that's sensible for that clk.  And if you have a clock that can be
-enabled "fast" it would not sleep.
+Boot tested on SDP4430 and all DMA tests passes as expected.
 
-Don't know if that works, maybe something like that:
+Tested-by: G, Manjunath Kondaiah <manjugk@ti.com>
 
-	int clk_enable(struct clk *clk)
-	{
-		spin_lock(something);
-		if (clk->flags & (SOME|FLAGS))
-			goto out_busy;
-		clk->flags |= ENABLING;
-		spin_unlock(something);
-
-		ret = clk->really_enable(...);
-
-		spin_lock(something);
-		clk->flags &= ~ENABLING;
-		spin_unlock(something);
-	}
-
-Some things that need careful consideration are:
-
-	- clk->flags already has ENABLING when clk_enable is entered.
-	  (needs to sleep/poll then?)
-	- clk->usecount already > 0
-	  (early return unless clk->flags & DISABLING)
-	- do we need the irqsaving spinlock variants?
-	  (I assume yes)
-
-Probably there are more.
-
-Best regards
-Uwe
-
-[1] last submission: http://thread.gmane.org/gmane.linux.kernel/1073751
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-Manjunath
