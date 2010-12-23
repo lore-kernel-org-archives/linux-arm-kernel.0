@@ -1,54 +1,45 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 22 Dec 2010 17:11:24 -0800
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <20101223001012.GF29368@n2100.arm.linux.org.uk>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-	<20101221182037.GA4783@n2100.arm.linux.org.uk>
-	<20101222122904.GC14693@n2100.arm.linux.org.uk>
-	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-	<20101223001012.GF29368@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimirgsuoM2che_ocrkvCZqGu6xEJjrjdmt9-69p@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 23 Dec 2010 10:25:49 +0900
+Subject: [PATCH] rfc v3: ARM: mach-shmobile: mackerel: Add zboot support
+In-Reply-To: <20101222230450.GA21134@verge.net.au>
+References: <1291855635-30882-1-git-send-email-horms@verge.net.au>
+	<20101222224901.GA16187@verge.net.au>
+	<20101222230450.GA21134@verge.net.au>
+Message-ID: <20101223012549.GA20530@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 22, 2010 at 4:10 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Dec 22, 2010 at 03:45:39PM -0800, Dan Williams wrote:
->> 3.6 Constraints:
->> 1/ Calls to async_<operation> are not permitted in IRQ context. ?Other
->> ? ?contexts are permitted provided constraint #2 is not violated.
->
-> BTW, this is misleading. ?Have the functions been renamed dma_async_xxx(),
-> eg dma_async_memcpy_buf_to_buf etc, or are you referring just to:
->
-> ? ? ? ?async_dmaengine_get
-> ? ? ? ?async_dmaengine_put
-> ? ? ? ?async_dma_find_channel
-> ? ? ? ?async_dma_find_channel
-> ? ? ? ?async_tx_ack
-> ? ? ? ?async_tx_clear_ack
-> ? ? ? ?async_tx_test_ack
->
-> Beware of just renaming it to dma_async_<operation> as there's other
-> functions in that namespace which may not be appropriate.
->
-> Eg, is it really illegal to issue call dma_async_issue_pending() from
-> IRQ context? ?That'd make it exceedingly difficult to use the DMA
-> engine with the slave API in a lot of device drivers.
+On Thu, Dec 23, 2010 at 08:04:51AM +0900, Simon Horman wrote:
+> On Thu, Dec 23, 2010 at 07:49:01AM +0900, Simon Horman wrote:
+> > On Thu, Dec 09, 2010 at 09:47:15AM +0900, Simon Horman wrote:
+> > > When CONFIG_ZBOOT_ROM is selected, the resulting zImage file will be small
+> > > boot loader and may be burned to rom or flash.
+> > > 
+> > > Compile tested only.
+> > 
+> > I now have access to a Mackerel board and have verified that
+> > this patch works.
+> > 
+> > My verification method was to usa a hack; I removed the
+> > SDRAM initialisation portion of head-mackerel.txt and
+> > then booting the resulting zImage from uboot using:
+> > 
+> > => bootp
+> > => go 0x42000000
+> > 
+> > This is the same method that I used to test the AP4 variant of this change.
+> > 
+> > Morimoto-san, could you test this by burning an image (without the above
+> > hack) to Flash? I can provide an image or tree if that helps.
+> 
+> I have now verified the .txt file by booting from the MMCIF
+> hardware block using "[PATCH] rfc v1: ARM: mach-shmobile: mackerel: Add
+> zboot MMCIF support".
+> 
+> Paul, I think that it should be pretty safe to merge both this patch and
+> the "... MMCIF support" patch into your tree from a feature point of view.
+> I'm unsure what you want to do about dependencies.
 
-This is generic offload (async_{memcpy|xor|etc...}) versus the slave
-usage confusion .  In the async_<operation> case the client (md/raid5)
-has no idea if a dmaengine is offloading the operation behind the
-scenes and should not make any assumptions about submission context
-beyond what is allowed in the document.  In the slave case the client
-driver knows that it is talking to a specific dma driver.  The
-contract between the client driver and dma driver is undocumented.
-The slave usage model really is a "I want to use dmaengine to find my
-dma device driver / manage channels, and I want a common prep / submit
-mechanism, but otherwise stay out of my way".  Drivers that do not
-want to meet the constraints expected by the opportunistic offload
-clients should do what ste_dma40 does and add "depends on !(NET_DMA ||
-ASYNC_TX_DMA)"
-
---
-Dan
+Actually, the LED code in "rfc v1: ARM: mach-shmobile: mackerel: Add zboot
+MMCIF support" is bogus - I can see that now that I have a mackerel to test.
+I will post a fixed version shortly.
