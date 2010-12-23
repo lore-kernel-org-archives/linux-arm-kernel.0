@@ -1,65 +1,41 @@
-From: t.fujak@samsung.com (Tomasz Fujak)
-Date: Thu, 23 Dec 2010 15:04:07 +0100
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <20101223134838.GK3636@n2100.arm.linux.org.uk>
-References: <cover.1292443200.git.m.nazarewicz@samsung.com>
-	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
-	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-	<20101223121917.GG3636@n2100.arm.linux.org.uk>
-	<4D135004.3070904@samsung.com>
-	<20101223134838.GK3636@n2100.arm.linux.org.uk>
-Message-ID: <4D1356D7.2000008@samsung.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 23 Dec 2010 15:05:03 +0100
+Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
+	modules.
+In-Reply-To: <AANLkTi=P-3aQSk3Q2WyAAp-8WwwtxC_aOGLW+7WGd4mj@mail.gmail.com>
+References: <1292864437-15353-1-git-send-email-thara@ti.com>
+	<1292864437-15353-5-git-send-email-thara@ti.com>
+	<4D133B78.5030807@ti.com>
+	<AANLkTi=P-3aQSk3Q2WyAAp-8WwwtxC_aOGLW+7WGd4mj@mail.gmail.com>
+Message-ID: <4D13570F.9050503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-12-23 14:48, Russell King - ARM Linux wrote:
-> On Thu, Dec 23, 2010 at 02:35:00PM +0100, Tomasz Fujak wrote:
->> Dear Mr. King,
->>
->> AFAIK the CMA is the fourth attempt since 2008 taken to solve the
->> multimedia memory allocation issue on some embedded devices. Most
->> notably on ARM, that happens to be present in the SoCs we care about
->> along the IOMMU-incapable multimedia IPs.
->>
->> I understand that you have your guidelines taken from the ARM
->> specification, but this approach is not helping us.
-> I'm sorry you feel like that, but I'm living in reality.  If we didn't
-> have these architecture restrictions then we wouldn't have this problem
-> in the first place.
-Do we really have them, or just the documents say they exist?
-> What I'm trying to do here is to ensure that we remain _legal_ to the
-> architecture specification - which for this issue means that we avoid
-> corrupting people's data.
-As legal as the mentioned dma_coherent?
-> Maybe you like having a system which randomly corrupts people's data?
-> I most certainly don't.  But that's the way CMA is heading at the moment
-> on ARM.
-Has this been experienced? I had some ARM-compatible boards on my desk
-(xscale, v6 and v7) and none of them crashed due to this behavior. And
-we *do* have multiple memory mappings, with different attributes.
-> It is not up to me to solve these problems - that's for the proposer of
-> the new API to do so.  So, please, don't try to lump this problem on
-> my shoulders.  It's not my problem to sort out.
-Just great. Nothing short of spectacular - this way the IA32 is going to
-take the embedded market piece by piece once the big two advance their
-foundry processes.
-Despite having the translator, so much burden in the legacy ISA and the
-fact that most of the embedded engineers from the high end are
-accustomed to the ARM.
-
-In other words, should we take your response as yet another NAK?
-Or would you try harder and at least point us to some direction that
-would not doom the effort from the very beginning.
-I understand that the role of an oracle is so much easier, but the time
-is running and devising subsequent solutions is not the use of
-engineers' time.
-
-Best regards
----
-Tomasz Fujak
-
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On 12/23/2010 2:25 PM, Menon, Nishanth wrote:
+> On Thu, Dec 23, 2010 at 06:07, Cousson, Benoit<b-cousson@ti.com>  wrote:
 >
+>>
+>> Please note the following log when enabling SR in Class 3 on an OMAP4430/sdp:
+>>
+>> [    2.362182] omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
+>> [    2.369384] omap2_set_init_voltage: Unable to put vdd_mpu to its init voltage
+>> [    2.369384]
+>> [    2.378875] omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
+>> [    2.386108] omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
+>> [    2.386108]
+>> [    2.396484] Power Management for TI OMAP4.
+>> [    2.401031] sr_init: No PMIC hook to init smartreflex
+>> [    2.406494] smartreflex smartreflex.0: omap_sr_probe: SmartReflex driver initialized
+>> [    2.414825] smartreflex smartreflex.1: omap_sr_probe: SmartReflex driver initialized
+>> [    2.423187] smartreflex smartreflex.2: omap_sr_probe: SmartReflex driver initialized
+>> [    2.431732] SmartReflex Class3 initialized
+>>
+> Dumb question: how are you testing this? just boot log? or additional
+> patch for DVFS?
+
+Unfortunately, it is just a boot log since I do not have any DVFS code 
+on top of it :-(
+
+That's why I was not expecting any errors at that time.
+
+Benoit
