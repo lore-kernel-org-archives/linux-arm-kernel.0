@@ -1,26 +1,68 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Dec 2010 12:22:35 +0000
-Subject: [PATCH] ARM: S5PV310: Implement kernel timers using MCT
-In-Reply-To: <003e01cba28c$5517dee0$ff479ca0$%kim@samsung.com>
-References: <1293017221-31037-1-git-send-email-kgene.kim@samsung.com>
-	<20101222225555.GH14693@n2100.arm.linux.org.uk>
-	<003e01cba28c$5517dee0$ff479ca0$%kim@samsung.com>
-Message-ID: <20101223122235.GH3636@n2100.arm.linux.org.uk>
+Date: Thu, 23 Dec 2010 12:30:28 +0000
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTinOMOkY6AUW8Z6FWMMWU9u0_sNjA2r_31u9-A8v@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<20101221182037.GA4783@n2100.arm.linux.org.uk>
+	<20101222122904.GC14693@n2100.arm.linux.org.uk>
+	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+	<AANLkTinOMOkY6AUW8Z6FWMMWU9u0_sNjA2r_31u9-A8v@mail.gmail.com>
+Message-ID: <20101223123028.GI3636@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 07:29:48PM +0900, Kukjin Kim wrote:
-> Russell King - ARM Linux wrote:
-> > This looks like it's supporting SMP - is there some reason not to use
-> > the localtimer support built into SMP, which also supports hotplug CPU
-> > (the above doesn't because the local clockevents will be automatically
-> > unregistered.)
-> > 
-> As I know, to use the localtimer support, it needs to support PPI.
-> Unfortunately the MCT of S5PV310 supports SPI. For hotplug CPU, I'm looking
-> for the methods to register clockevents again at CPU hotplug-in.
+On Thu, Dec 23, 2010 at 09:17:07AM +0100, Linus Walleij wrote:
+> 2010/12/23 Dan Williams <dan.j.williams@intel.com>:
+> >?It looks like this driver needs a full scrub
+> > which seems unreasonable to complete and test over the holidays before
+> > .37 lands. ?Linus we either need to mark this "depends on BROKEN" or
+> > revert it.
+> 
+> Isn't it really as simple as to release the spinlock during callbacks?
+> That lock is only intended to protect the plchan variables, not to block
+> anyone from queueing new stuff during the callback (as happens now).
+> 
+> It can release that lock, make a callback where a new descriptor
+> gets queued, and then take it again and start looking at the queue,
+> at which point it discovers the new desc and process it.
 
-We can avoid that - nothing forces you to use the PPI interrupt.
-Just register your interrupt handler in the normal way.
+Is it actually safe to do this?  The answer seems to be no - if we happen
+to terminate all transfers (as your PL011 uart code does) when we fail to
+setup a new DMA transaction, then bad stuff happens due to this:
 
-There's really no need to reinvent the wheel.
+                /*
+                 * Device callbacks should NOT clear
+                 * the current transaction on the channel
+                 * Linus: sometimes they should?
+                 */
+                if (!plchan->at)
+                        BUG();
+
+We really need a saner approach here - maybe the list approach described
+by Jassie.
+
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index b605cc9..7879a22 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -1651,8 +1651,11 @@ static void pl08x_tasklet(unsigned long data)
+>  		/*
+>  		 * Callback to signal completion
+>  		 */
+> -		if (callback)
+> -			callback(callback_param);
+> +		if (callback) {
+> +                        spin_unlock(&plchan->lock);
+> +                        callback(callback_param);
+> +                        spin_lock(&plchan->lock);
+
+Plus, of course, that tasklets run with IRQs enabled.  This means we're
+taking this spinlock in an interruptible context.  If we have some other
+path which also takes this lock from an IRQ context, then we're asking
+for deadlock.  See my previous mails on this subject.
+
+I'm currently splitting my dirty patch, and attacking this driver to
+clean up some of it into a more reasonable shape, so this is one area
+which I'm going to be sorting out.
+
+Patches later.
