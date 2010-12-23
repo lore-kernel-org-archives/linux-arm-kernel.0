@@ -1,39 +1,26 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Dec 2010 12:19:18 +0000
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-References: <cover.1292443200.git.m.nazarewicz@samsung.com>
-	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
-	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-Message-ID: <20101223121917.GG3636@n2100.arm.linux.org.uk>
+Date: Thu, 23 Dec 2010 12:22:35 +0000
+Subject: [PATCH] ARM: S5PV310: Implement kernel timers using MCT
+In-Reply-To: <003e01cba28c$5517dee0$ff479ca0$%kim@samsung.com>
+References: <1293017221-31037-1-git-send-email-kgene.kim@samsung.com>
+	<20101222225555.GH14693@n2100.arm.linux.org.uk>
+	<003e01cba28c$5517dee0$ff479ca0$%kim@samsung.com>
+Message-ID: <20101223122235.GH3636@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 11:58:08AM +0100, Marek Szyprowski wrote:
-> Actually this contiguous memory allocator is a better replacement for
-> alloc_pages() which is used by dma_alloc_coherent(). It is a generic
-> framework that is not tied only to ARM architecture.
+On Thu, Dec 23, 2010 at 07:29:48PM +0900, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> > This looks like it's supporting SMP - is there some reason not to use
+> > the localtimer support built into SMP, which also supports hotplug CPU
+> > (the above doesn't because the local clockevents will be automatically
+> > unregistered.)
+> > 
+> As I know, to use the localtimer support, it needs to support PPI.
+> Unfortunately the MCT of S5PV310 supports SPI. For hotplug CPU, I'm looking
+> for the methods to register clockevents again at CPU hotplug-in.
 
-... which is open to abuse.  What I'm trying to find out is - if it
-can't be used for DMA, what is it to be used for?
+We can avoid that - nothing forces you to use the PPI interrupt.
+Just register your interrupt handler in the normal way.
 
-Or are we inventing an everything-but-ARM framework?
-
-> > In other words, do we _actually_ have a use for this which doesn't
-> > involve doing something like allocating 32MB of memory from it,
-> > remapping it so that it's DMA coherent, and then performing DMA
-> > on the resulting buffer?
-> 
-> This is an arm specific problem, also related to dma_alloc_coherent()
-> allocator. To be 100% conformant with ARM specification we would
-> probably need to unmap all pages used by the dma_coherent allocator
-> from the LOW MEM area. This is doable, but completely not related
-> to the CMA and this patch series.
-
-You've already been told why we can't unmap pages from the kernel
-direct mapping.
-
-Okay, so I'm just going to assume that CMA has _no_ _business_ being
-used on ARM, and is not something that should interest anyone in the
-ARM community.
+There's really no need to reinvent the wheel.
