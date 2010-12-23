@@ -1,38 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Dec 2010 12:39:20 -0800
-Subject: [GIT PULL] OMAP USB Changes for Merge Window
-In-Reply-To: <20101223084734.GA3149@legolas.emea.dhcp.ti.com>
-References: <20101223084734.GA3149@legolas.emea.dhcp.ti.com>
-Message-ID: <20101223203920.GQ7771@atomide.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 23 Dec 2010 21:45:23 +0100
+Subject: [PATCH v2] i.MX51 Framebuffer support
+In-Reply-To: <87ipymun54.fsf@macbook.be.48ers.dk> (Peter Korsgaard's message
+	of "Wed, 22 Dec 2010 11:17:59 +0100")
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+	<87bp4eb5r5.fsf@lechat.rtp-net.org>
+	<87ipymun54.fsf@macbook.be.48ers.dk>
+Message-ID: <87wrn09q1o.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [101223 00:47]:
-> Hi Tony,
-> 
-> please queue the following two patches for Merge Window.
-> 
-> The following changes since commit b79540fcbbcf9b379c9197f63c5a883bbe3adfd4:
-> 
->    Linux-omap rebuilt: Merged branches from Paul and Kevin and mux changes (2010-12-22 19:13:33 -0800)
+Peter Korsgaard <jacmet@sunsite.dk> writes:
+Hi,
 
-This can't be pulled as it would pull in tons of non-mainline
-commits from the linux-omap master branch.
+>>>>>> "Arnaud" == Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> writes:
+>
+>  Arnaud> Sascha Hauer <s.hauer@pengutronix.de> writes:
+>  Arnaud> Hi,
+>
+>  >> The following series adds i.MX51 framebuffer support based on the
+>  >> IPUv3. It is not perfect but I decided it is good enough to open it
+>  >> for a wider audience and collect first reviews. I tested this on a
+>  >> babbage board using both outputs (VGA/DVI) with different
+>  >> resolutions up to 1680x1050 and different colour depths.  I also
+>  >> tested it on one custom board using a fixed display setting.
+>
+>  Arnaud> After adding code to my efika sb machine file and your patchset, I've
+>  Arnaud> seen the light. Err, no. It was a penguin and a login prompt.  I guess
+>  Arnaud> it means your patchset is working here.
+>
+> Cool. Care to submit that machine file support?
 
-Everybody, all the pullable branches must be based on something
-in the mainline kernel, like a recent -rc tag. If that won't work,
-then some commit needs to be agreed on separately that will go
-to mainline, like the omap-for-linus branch.
+Yes, I will (of course) but ... I'd like to see the usb issues I found
+fixed because they're the only way to get usb on the sb and without usb,
+you have no network, no keyboard, no way to connect any external device,
+which makes the sb pretty useless. In the mean time, you can use my
+patchset once I've added the fb support in it.
 
-Further, please wait few days before sending the pull request
-in case somebody wants to ack your patches. Sending a pull request
-with the patches to be reviewed is kind of pointless.. Sure in this
-case these are pretty trivial patches, but still.
-
-Anyways, I'll apply these into a temporary branch and will
-merge into omap-for-linus within next few days assuming no
-problems.
-
-Regards,
-
-Tony
+Arnaud
