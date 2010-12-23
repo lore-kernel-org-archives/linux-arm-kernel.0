@@ -1,26 +1,91 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 22 Dec 2010 17:31:25 -0800
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <AANLkTimirgsuoM2che_ocrkvCZqGu6xEJjrjdmt9-69p@mail.gmail.com>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-	<20101221182037.GA4783@n2100.arm.linux.org.uk>
-	<20101222122904.GC14693@n2100.arm.linux.org.uk>
-	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-	<20101223001012.GF29368@n2100.arm.linux.org.uk>
-	<AANLkTimirgsuoM2che_ocrkvCZqGu6xEJjrjdmt9-69p@mail.gmail.com>
-Message-ID: <AANLkTikP+JZkN7AjqaNfHY8jZ7bVsV-af=YR=MTdfnNU@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 23 Dec 2010 10:48:11 +0900
+Subject: [PATCH] [patch v2] ARM: mach-shmobile: mackerel: Add zboot MMCIF
+	support
+Message-ID: <1293068891-25526-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 22, 2010 at 5:11 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> Drivers that do not
-> want to meet the constraints expected by the opportunistic offload
-> clients should do what ste_dma40 does and add "depends on !(NET_DMA ||
-> ASYNC_TX_DMA)"
+This patch wires up LED debugging for the MMCIF boot
+on the mackerel, which is all that is required to get MMCIF
+boot functioning.
 
-Sorry I was looking at a local change it does not do this today, but I
-recommended it to workaround the broken >64k transfer support that was
-reported recently.
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+This patch depends on:
+* ARM: 6515/1: Add zboot support for SuperH Mobile ARM
+  (merged into the devel branch of Russel King's linux-2.6-arm tree)
+* ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
+  (merged into the devel branch of Russel King's linux-2.6-arm tree)
+* MACH_MACKEREL (3211) being present in arch/arm/tools/mach-types
+* ARM: mach-shmobile: mackerel: Add zboot support
+* rfc v3: mmc, ARM: Add zboot from MMC support for SuperH Mobile ARM,
+  which depends on
+  * mmc, sh: Remove sh_mmcif_boot_slurp()
+    (merged into the common/mmcif branch of Paul Mundt's sh-2.6 tree)
+  * sh, mmc: Use defines when setting CE_CLK_CTRL
+    (merged into the common/mmcif branch of Paul Mundt's sh-2.6 tree)
+  * mmc, sh: Move MMCIF_PROGRESS_* into sh_mmcif.h
+    (merged into the common/mmcif branch of Paul Mundt's sh-2.6 tree)
 
---
-Dan
+v2
+* Use correct GPIO ports
+  - my previous assumptions turned out to be incorrect
+---
+ .../mach-shmobile/include/mach/mmcif-mackerel.h    |   29 ++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/mmcif.h        |    2 +
+ 2 files changed, 31 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h
+
+diff --git a/arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h b/arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h
+new file mode 100644
+index 0000000..34253c1
+--- /dev/null
++++ b/arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h
+@@ -0,0 +1,29 @@
++#ifndef MMCIF_MACKEREL_H
++#define MMCIF_MACKEREL_H
++
++#define PORT0CR      0xe6051001
++#define PORT1CR      0xe6051002
++#define PORT2CR      0xe6051003
++#define PORT3CR      0xe6051004
++
++#define PORTR031_000DR 0xe6055000
++
++static inline void mmcif_init_progress(void)
++{
++       /* Initialise LEDS0-3
++        * registers: PORT0CR-PORT1CR (LED0-LED3 Control)
++        * value:     0x10 - enable output
++        */
++       __raw_writeb(0x10, PORT0CR);
++       __raw_writeb(0x10, PORT1CR);
++       __raw_writeb(0x10, PORT2CR);
++       __raw_writeb(0x10, PORT3CR);
++}
++
++static inline void mmcif_update_progress(int n)
++{
++	__raw_writel((__raw_readl(PORTR031_000DR) & 0xf) |
++		     (1 << n), PORTR031_000DR);
++}
++
++#endif /* MMCIF_MACKEREL_H */
+diff --git a/arch/arm/mach-shmobile/include/mach/mmcif.h b/arch/arm/mach-shmobile/include/mach/mmcif.h
+index 0812f1e..f4dc327 100644
+--- a/arch/arm/mach-shmobile/include/mach/mmcif.h
++++ b/arch/arm/mach-shmobile/include/mach/mmcif.h
+@@ -9,6 +9,8 @@
+ 
+ #ifdef CONFIG_MACH_AP4EVB
+ #include "mach/mmcif-ap4eb.h"
++#elif CONFIG_MACH_MACKEREL
++#include "mach/mmcif-mackerel.h"
+ #else
+ #error "unsupported board."
+ #endif
+-- 
+1.7.2.3
