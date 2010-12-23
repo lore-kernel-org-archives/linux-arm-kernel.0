@@ -1,27 +1,30 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 23 Dec 2010 12:06:32 -0600
-Subject: [PATCH v5 4/5] OMAP4: hwmod: Add inital data for smartreflex
-	modules.
-In-Reply-To: <3f3f455d44f6ee5009a9ea387f35376c@mail.gmail.com>
-References: <1292864437-15353-1-git-send-email-thara@ti.com>	<1292864437-15353-5-git-send-email-thara@ti.com>	<4D133B78.5030807@ti.com>	<a58103fd01d89decba08fcdf282b7f70@mail.gmail.com>
-	<87d3osl8bl.fsf@deeprootsystems.com> <4D1385D6.6090407@ti.com>
-	<3f3f455d44f6ee5009a9ea387f35376c@mail.gmail.com>
-Message-ID: <4D138FA8.9030109@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 23 Dec 2010 10:15:16 -0800
+Subject: Git pull request: ux500-core for the v2.6.38 merge window
+In-Reply-To: <20101223144949.GO3636@n2100.arm.linux.org.uk> (Russell King's
+	message of "Thu, 23 Dec 2010 14:49:49 +0000")
+References: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
+	<20101223144949.GO3636@n2100.arm.linux.org.uk>
+Message-ID: <8yak4j0bbkb.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vishwanath Sripathy had written, on 12/23/2010 11:36 AM, the following:
-[..]
->> Further, why is SR enabled by default on this platform if it does not
->> have all domains available to be enabled (e.x. we dont have it on
->> PandaBoard even though it is OMAP4 rt?)
-> Why do you think SR is enabled by default? The above log says that SR
-> Module is initialized. However sr auto compensation is not started by
-> default.
-oops.. my bad. Apologies, I missed that this is part of probe path not 
-part of sr_classX_init path. looking at the code, I will refrain from 
-commenting further on probe function at this point.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+
+> On Thu, Dec 23, 2010 at 08:48:26AM +0100, Linus Walleij wrote:
+
+> First, I need to make absolutely sure that the GIC and SMP changes are
+> 100% ready and up to date with acks etc.  I think there may be patches
+> at the top of the SMP branch which haven't been posted to the list yet
+> (or they have but have no acks.)
+
+Jeff Ohlstein also posted some MSM SMP patches which also depend on the
+SMP changes.  I haven't put them in linux-next yet because they depend
+on your devel tree.
+
+I was intending to wait until the merge window opens, and then base the
+patches off of what does end up going into the merge window.
 
 -- 
-Regards,
-Nishanth Menon
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
