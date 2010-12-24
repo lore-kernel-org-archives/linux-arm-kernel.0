@@ -1,85 +1,89 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Fri, 24 Dec 2010 17:05:01 +0200
-Subject: [patch 2/5] ulpi: handle ULPI_OTG_CTRL_CHRGVBUS
-In-Reply-To: <8762ukb67c.fsf@lechat.rtp-net.org>
-References: <20101220154853.254931637@rtp-net.org>	<20101220155812.122749841@rtp-net.org>	<4D109C47.6020704@compulab.co.il>
-	<8762ukb67c.fsf@lechat.rtp-net.org>
-Message-ID: <4D14B69D.4030506@compulab.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Dec 2010 15:41:20 +0000
+Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
+In-Reply-To: <201012241455.30430.jkrzyszt@tis.icnet.pl>
+References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
+	<20101224130200.GG20587@n2100.arm.linux.org.uk>
+	<201012241455.30430.jkrzyszt@tis.icnet.pl>
+Message-ID: <20101224154120.GH20587@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/10 22:11, Arnaud Patard (Rtp) wrote:
-> Igor Grinberg <grinberg@compulab.co.il> writes:
->
->> Hi Arnaud,
->>
->> On 12/20/10 17:48, Arnaud Patard (Rtp) wrote:
->>> Current code doesn't handle setting CHRGVBUS when enabling vbus.
->>> Add support for it
->>>
->>>
->>>
->>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->>> Index: tst-usb/drivers/usb/otg/ulpi.c
->>> ===================================================================
->>> --- tst-usb.orig/drivers/usb/otg/ulpi.c	2010-12-20 15:38:41.000000000 +0100
->>> +++ tst-usb/drivers/usb/otg/ulpi.c	2010-12-20 15:38:57.000000000 +0100
->>> @@ -234,7 +234,8 @@
->>>  {
->>>  	unsigned int flags = otg_io_read(otg, ULPI_OTG_CTRL);
->>>  
->>> -	flags &= ~(ULPI_OTG_CTRL_DRVVBUS | ULPI_OTG_CTRL_DRVVBUS_EXT);
->>> +	flags &= ~(ULPI_OTG_CTRL_DRVVBUS | ULPI_OTG_CTRL_DRVVBUS_EXT |
->>> +			ULPI_OTG_CTRL_CHRGVBUS);
->>>  
->>>  	if (on) {
->>>  		if (otg->flags & ULPI_OTG_DRVVBUS)
->>> @@ -242,6 +243,9 @@
->>>  
->>>  		if (otg->flags & ULPI_OTG_DRVVBUS_EXT)
->>>  			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
->>> +
->>> +		if (otg->flags & ULPI_OTG_CHRGVBUS)
->>> +			flags |= ULPI_OTG_CTRL_CHRGVBUS;
->>>  	}
->>>  
->>>  	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
->> I think this is a wrong place to set the ChrgVbus bit.
->> As for ULPI spec. 1.1:
->> "3.8.7.1 Session Request Protocol (SRP)
->> ULPI provides full SRP support. The Link uses the ChrgVbus and DischrgVbus bits
->> in the OTG Control register to begin and end a session."
->>
->> So it is used for SRP.
->> May be it is better to implement
->> int    (*start_srp)(struct otg_transceiver *otg);
->> method for setting this bit?
->>
-> I was not sure on where to put this so I took the same approach as the
-> fsl bsp which was to set it in this function and to call this function
-> _after_ usb_add_hcd() [ see my previous patch ]. Indeed, it fixed my
-> issue so I believe it not so bad given that there has already been some
-> troubles on the ehci-mxc init.
+On Fri, Dec 24, 2010 at 02:55:25PM +0100, Janusz Krzysztofik wrote:
+> Friday 24 December 2010 14:02:00 Russell King - ARM Linux wrote:
+> > On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik wrote:
+> > > The patch tries to implement a solution suggested by Russell King,
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December
+> > >/035264.html. It is expected to solve video buffer allocation issues
+> > > for at least a few soc_camera I/O memory less host interface
+> > > drivers, designed around the videobuf_dma_contig layer, which
+> > > allocates video buffers using dma_alloc_coherent().
+> > >
+> > > Created against linux-2.6.37-rc5.
+> > >
+> > > Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera
+> > > patch, patterned upon two mach-mx3 machine types which already try
+> > > to use the dma_declare_coherent_memory() method for reserving a
+> > > region of system RAM preallocated with another
+> > > dma_alloc_coherent(). Compile tested for all modified files except
+> > > arch/sh/drivers/pci/fixups-dreamcast.c.
+> >
+> > Another note: with the pair of patches I've sent to the
+> > linux-arm-kernel list earlier today changing the DMA coherent
+> > allocator to steal memory from the system at boot.
+> >
+> > This means there's less need to pre-allocate DMA memory - if there's
+> > sufficient contiguous space in the DMA region to satisfy the
+> > allocation, then the allocation will succeed.  It's also independent
+> > of the maximum page size from the kernel's memory allocators too.
+> >
+> > So I suspect that mach-mx3 (and others) no longer need to do their
+> > own pre-allocation anymore if both of these patches go in.
+> 
+> Then, my rationale will no longer be valid. So, either drop my patch if 
+> you think you have finally come out with a better solution which 
+> doesn't touch any system-wide API, or suggest a new justification for 
+> use in the commit log if you think still the patch solves something 
+> important.
 
-Well, the problem is that this is supposed to be a generic driver and it should
-somehow follow the ULPI spec.
-This patch makes it more like mxc specific.
+No.  It's not clear whether my pair of patches are both going to make it
+into the kernel, or even what timeframe they're going to make it in.
 
-As far as I understand, Session Request Protocol (SRP) allows a B-device (Peripheral)
-to nudge an A-device (Host) to turn on the USB's Vbus.
-This patch enables SRP along with Vbus, which seems incorrect completely.
-ulpi_set_vbus() should set the Vbus (as its name says) and that's it.
+Irrespective of that, we do need a solution to this problem so that this
+stuff starts working again.
 
-Have you tried without this patch or have you just applied it along with other
-patches from the fsl bsp?
+In any case, your patch makes complete sense through and through:
 
-Also, if this specific patch (2/5) makes your USB (Host as I understand) work,
-it makes me think that there could be some problem with your Vbus supply.
-Have you checked that?
+1. if other architecture/machine wants to reserve a chunk of DMA-able
+   memory for a specific device (eg, because of a restriction on the
+   number of DMA address bits available) and it's completely DMA
+   coherent, it shouldn't have to go through the pains of having that
+   memory unconditionally ioremap'd.
 
-> Arnaud
->
+2. What if the memory being provided from some source where you already
+   have the mapping setup in a specific way for a reason?
 
--- 
-Regards,
-Igor.
+For example, say I have an ARM design, and all peripherals are in a
+single 256MB memory region, which includes a chunk of SRAM set aside
+for DMA purposes.  Let's say I can map that really efficiently by a
+few page table entries, which means relatively little TLB usage for
+accessing this region.
+
+With the current API, it becomes difficult to pass that mapping through
+the dma_declare_coherent_memory() because the physical address goes
+through ioremap(), which obfuscates what's going on.  However, if I
+could pass the bus and virtual address, then there's no ambiguity over
+what I want to do.
+
+What if I want to declare memory to the DMA coherent allocator with
+attributes different from what ioremap() gives me, maybe with write
+combining properties (because it happens to be safe for the specific
+device) ?
+
+Passing the virtual address allows the API to become much more flexible.
+Not only that, it allows it to be used on ARM, rather than becoming (as
+it currently stands) prohibited on ARM.
+
+I believe that putting ioremap() inside this API was the wrong thing to
+do, and moving it outside makes the API much more flexible and usable.
+It's something I still fully support.
