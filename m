@@ -1,54 +1,76 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 24 Dec 2010 19:04:47 +0300
-Subject: [PATCH v2] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-In-Reply-To: <4D14A2DB.7080907@criticallink.com>
-References: <1293132288-22325-1-git-send-email-michael.williamson@criticallink.com>
-	<4D148335.8070209@mvista.com> <4D14A2DB.7080907@criticallink.com>
-Message-ID: <4D14C49F.8060007@mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 24 Dec 2010 17:35:32 +0000
+Subject: [PATCH V2] S5PC210: universal: update support pmic for c210
+	universal board
+In-Reply-To: <1293168299-11552-1-git-send-email-dh09.lee@samsung.com>
+References: <1293168299-11552-1-git-send-email-dh09.lee@samsung.com>
+Message-ID: <20101224173531.GA26913@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Dec 24, 2010 at 02:24:59PM +0900, Donghwa Lee wrote:
 
-Michael Williamson wrote:
+> +	select HAVE_SPARSE_IRQ
+> +	select HAVE_GENERIC_HARDIRQS
 
->>> From: Sudhakar Rajashekhara<sudhakar.raj@ti.com>
+I really would expect to see these controlled by the generic support for
+the CPU or CPU architecture rather than by an individual machine -
+they're properties of the core IRQ infrastructure for the system.
 
->>> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
->>> In addition, the variant code for the AM-1808 SoC appears to match
->>> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
->>> these chips.
+> +/* I2C5: PMICs LP3974, MAX8952 */
+> +static struct regulator_consumer_supply max8952_consumer[] = {
+> +	{
+> +		.supply		= "varm_1.2v_c210",
+> +	}, {
+> +		.supply		= "vdd_arm",
+> +	},
 
->>> This patch is orignally from a patch on the arago project, here:
->>> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
->>> Further information related to the need for this patch can be located at
->>> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
->>> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
+This looks very suspicious - you've got two supplies, both of which look
+like the CPU core rail provided by the same regulator, one of which
+looks like it's got the name of the supply hard coded into it.  What are
+these two supplies exactly?
 
->>> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
->>> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
+> +	.reg_data		= {
+> +		.constraints	= {
+> +			.name		= "VARM_1.2V",
+> +			.min_uV		= 770000,
+> +			.max_uV		= 1400000,
+> +			.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
 
->>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->>> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
->>> Reported-by: Nicolas Luna <luna.id@gmail.com>
+Interesting name for a supply that can change voltage :)
 
->>    I saw that the original patch was signed off by Sudhakar -- why you omitted that?
+> +static struct regulator_consumer_supply lp3974_buck2_consumer[] = {
+> +	{
+> +		.supply		= "vg3d_1.2v_c210",
+> +	},
+> +};
 
-> Ignorance, mostly...
+This and most of the other consumers you're defining look like they're
+actually the names for the relevant rails rather than supplies for
+individual devices.  You shouldn't do this, supplies should be actual
+supplies on individual consumers - probably most of these consumers
+should just be removed.  You can name the supplies for UI purposes using
+the .name field in the constraints.
 
-> That patch was for the Arago project, and not the mainline, and I wasn't sure if 
-> I could add a sign-off with express instruction from Sudhakar.  Wasn't trying to 
-> slight anyone...
+> +static struct regulator_consumer_supply lp3974_ldo13_consumer[] = {
+> +	REGULATOR_SUPPLY("vhsic", NULL),
+> +};
+> +
+> +static struct regulator_consumer_supply lp3974_ldo14_consumer[] = {
+> +	{
+> +		.supply		= "cam_i_host_1.8v",
+> +	},
 
-> I will add Sudhakar's sign-off, assuming that is OK with Sudhakar.
+There's also a mix of regulator_consumer_supply and open coding, please
+be consistent.
 
-> Should I remove my sign-off? 
+> +static struct regulator_init_data lp3974_buck1_data = {
+> +	.constraints	= {
+> +		.name		= "VINT_1.1V",
+> +		.min_uV		= 750000,
+> +		.max_uV		= 1500000,
+> +		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE |
+> +			REGULATOR_CHANGE_STATUS,
 
-    No.
-
-> Thanks for the help.
-
-> -Mike
-
-WBR, Sergei
+Can you really turn off the VINT regulator at runtime?  I'd expect that
+to crash the processor.  Similarly for many of the other supplies.
