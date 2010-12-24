@@ -1,36 +1,47 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 24 Dec 2010 09:31:54 +0530
-Subject: [PATCH V3 00/63] Updating SPEAr Support
-In-Reply-To: <20101223121357.GF3636@n2100.arm.linux.org.uk>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<20101223121357.GF3636@n2100.arm.linux.org.uk>
-Message-ID: <4D141B32.6060206@st.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Fri, 24 Dec 2010 13:15:54 +0900
+Subject: [patch v3] mmc,
+	ARM: Add zboot from MMC support for SuperH Mobile ARM
+In-Reply-To: <1292137027-17779-1-git-send-email-horms@verge.net.au>
+	<20101222230450.GA21134@verge.net.au>
+	<1291855635-30882-1-git-send-email-horms@verge.net.au>
+	<20101208221653.GA25239@verge.net.au>
+References: <1292137027-17779-1-git-send-email-horms@verge.net.au>
+	<1291855635-30882-1-git-send-email-horms@verge.net.au>
+	<20101222224901.GA16187@verge.net.au>
+	<20101222230450.GA21134@verge.net.au>
+	<1291855635-30882-1-git-send-email-horms@verge.net.au>
+	<20101208221653.GA25239@verge.net.au>
+Message-ID: <20101224041553.GA9152@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2010 05:43 PM, Russell King - ARM Linux wrote:
-> You've just submitted this entire set to the patch system.  I suspect
-> you're rushing to get these in so you can go away on vacation and hope
-> that someone merges them for you.
+On Thu, Dec 09, 2010 at 07:16:53AM +0900, Simon Horman wrote:
+> This allows a ROM-able zImage to be written to MMC and
+> for SuperH Mobile ARM to boot directly from the MMCIF
+> hardware block.
 > 
-> It's Christmas time, many people are probably not around or are otherwise
-> busy, and probably haven't looked at this patches.
+> This is achieved by the MaskROM loading the first portion
+> of the image into MERAM and then jumping to it. This portion
+> contains loader code which copies the entire image to SDRAM
+> and jumps to it. From there the zImage boot code proceeds
+> as normal, uncompressing the image into its final location
+> and then jumping to it.
 > 
-> I certainly haven't been over them again because I've spent the last four
-> days trying to get PL08x DMA support working properly - and I'm not looking
-> at them until the new year - I am entitied to a holiday too!
-> 
-> Now that you've buried everyone elses patches way down in the patch system,
-> I'm probably not going to even bother looking at the patch system again
-> until this coming merge window has been and gone.
+> This patch depends on:
+> * "ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM"
+>   which has been merged into the devel branch of Russell King's
+>   linux-2.6-arm tree.
+> * "mmc, sh: Move MMCIF_PROGRESS_* into sh_mmcif.h"
+>   which has been merged into the common/mmcif branch of
+>   Paul Mundt's sh-2.6 tree
+> * "mmc, sh: Remove sh_mmcif_boot_slurp()"
+>   which has been merged into the common/mmcif branch of
+>   Paul Mundt's sh-2.6 tree
 
-Russell,
-
-Actually, we didn't get much review comments on V2 and V3 was almost V2,
-(just few patches are removed and some already got into mainline), so we
-thought we could submit V3 to patch tracker.
-
-Merry Christmas.
-
--- 
-viresh
+This one at least should go through Russell's tree. The dependencies from
+my side will be sorted out early in the merge window, so you should be
+able to submit this to Russell's patch tracker after that for a late -rc1
+merge, or for -rc2. After that's done, there don't seem to be any more
+outstanding dependencies, so at that point I'll be able to take care of
+the remaining patches.
