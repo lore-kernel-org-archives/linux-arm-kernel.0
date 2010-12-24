@@ -1,40 +1,195 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 24 Dec 2010 11:53:46 +0100
-Subject: [PATCH 01/20] mfd/ab8500: remove spi support
-In-Reply-To: <AANLkTikG7CY9hcuSy6+na+xrjbJYdKE3tRysT0FKw5kD@mail.gmail.com>
-References: <1291388753-14662-1-git-send-email-sundar.iyer@stericsson.com>
-	<1291388753-14662-2-git-send-email-sundar.iyer@stericsson.com>
-	<20101209142912.GM8884@sortiz-mobl>
-	<33A307AF30D7BF4F811B1568FE7A9B18047C7D405F@EXDCVYMBSTM006.EQ1STM.local>
-	<20101209153634.GQ8884@sortiz-mobl>
-	<AANLkTikG7CY9hcuSy6+na+xrjbJYdKE3tRysT0FKw5kD@mail.gmail.com>
-Message-ID: <20101224105345.GC27832@sortiz-mobl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Dec 2010 11:11:25 +0000
+Subject: [PATCH] Replace page_to_dma()/dma_to_page() with
+	pfn_to_dma()/dma_to_pfn()
+Message-ID: <20101224111125.GD20587@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Replace the page_to_dma() and dma_to_page() macros with their PFN
+equivalents.  This allows us to map parts of memory which do not have
+a struct page allocated to them to bus addresses.  This will be used
+internally by dma_alloc_coherent()/dma_alloc_writecombine().
 
-On Sun, Dec 19, 2010 at 09:48:46PM +0100, Linus Walleij wrote:
-> 2010/12/9 Samuel Ortiz <sameo@linux.intel.com>:
-> 
-> >> [Sundar]
-> >> >> Since the Ab8500 v1.0, the SPI support is deprecated on the HW.
-> >> >I'm fine with that, but you really don't want to be able to support pre 1.0
-> >> >devices ?
-> >>
-> >> AFAIK, there aren't active pieces of those outside STE :)
-> > Ok, that's a good reason. Please add my:
-> > Acked-by: Samuel Ortiz <sameo@linux.intel.com>
-> 
-> This better be merged through the MFD tree. It touches a line in
-> the Makefile that has been changed since, the fixup is trivial but
-> it's orthogonal to the stuff I have in ux500-core anyway so Sam,
-> can you merge this into MFD?
-Sure, patch applied now.
+Build tested on Versatile, OMAP1, IOP13xx and KS8695.
 
-Cheers,
-Samuel.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/dma-mapping.h          |   34 +++++++++++++++------------
+ arch/arm/mach-iop13xx/include/mach/memory.h |    6 ++--
+ arch/arm/mach-ks8695/include/mach/memory.h  |    8 +++---
+ arch/arm/mm/dma-mapping.c                   |    4 +-
+ arch/arm/plat-omap/include/plat/memory.h    |    8 +++---
+ 5 files changed, 32 insertions(+), 28 deletions(-)
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index c568da7..8f69b98 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -9,20 +9,24 @@
+ #include <asm-generic/dma-coherent.h>
+ #include <asm/memory.h>
+ 
++#ifdef __arch_page_to_dma
++#error Please update to __arch_pfn_to_dma
++#endif
++
+ /*
+- * page_to_dma/dma_to_virt/virt_to_dma are architecture private functions
+- * used internally by the DMA-mapping API to provide DMA addresses. They
+- * must not be used by drivers.
++ * dma_to_pfn/pfn_to_dma/dma_to_virt/virt_to_dma are architecture private
++ * functions used internally by the DMA-mapping API to provide DMA
++ * addresses. They must not be used by drivers.
+  */
+-#ifndef __arch_page_to_dma
+-static inline dma_addr_t page_to_dma(struct device *dev, struct page *page)
++#ifndef __arch_pfn_to_dma
++static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+ {
+-	return (dma_addr_t)__pfn_to_bus(page_to_pfn(page));
++	return (dma_addr_t)__pfn_to_bus(pfn);
+ }
+ 
+-static inline struct page *dma_to_page(struct device *dev, dma_addr_t addr)
++static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+ {
+-	return pfn_to_page(__bus_to_pfn(addr));
++	return __bus_to_pfn(addr);
+ }
+ 
+ static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+@@ -35,14 +39,14 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+ 	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+ }
+ #else
+-static inline dma_addr_t page_to_dma(struct device *dev, struct page *page)
++static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+ {
+-	return __arch_page_to_dma(dev, page);
++	return __arch_pfn_to_dma(dev, pfn);
+ }
+ 
+-static inline struct page *dma_to_page(struct device *dev, dma_addr_t addr)
++static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+ {
+-	return __arch_dma_to_page(dev, addr);
++	return __arch_dma_to_pfn(dev, addr);
+ }
+ 
+ static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+@@ -368,7 +372,7 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
+ 
+ 	__dma_page_cpu_to_dev(page, offset, size, dir);
+ 
+-	return page_to_dma(dev, page) + offset;
++	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+ }
+ 
+ /**
+@@ -408,8 +412,8 @@ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
+ static inline void dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir)
+ {
+-	__dma_page_dev_to_cpu(dma_to_page(dev, handle), handle & ~PAGE_MASK,
+-		size, dir);
++	__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
++		handle & ~PAGE_MASK, size, dir);
+ }
+ #endif /* CONFIG_DMABOUNCE */
+ 
+diff --git a/arch/arm/mach-iop13xx/include/mach/memory.h b/arch/arm/mach-iop13xx/include/mach/memory.h
+index 7415e43..3ad4553 100644
+--- a/arch/arm/mach-iop13xx/include/mach/memory.h
++++ b/arch/arm/mach-iop13xx/include/mach/memory.h
+@@ -58,13 +58,13 @@ static inline unsigned long __lbus_to_virt(dma_addr_t x)
+ 		__dma;							\
+ 	})
+ 
+-#define __arch_page_to_dma(dev, page)					\
++#define __arch_pfn_to_dma(dev, pfn)					\
+ 	({								\
+ 		/* __is_lbus_virt() can never be true for RAM pages */	\
+-		(dma_addr_t)page_to_phys(page);				\
++		(dma_addr_t)__pfn_to_phys(pfn);				\
+ 	})
+ 
+-#define __arch_dma_to_page(dev, addr)	phys_to_page(addr)
++#define __arch_dma_to_pfn(dev, addr)	__phys_to_pfn(addr)
+ 
+ #endif /* CONFIG_ARCH_IOP13XX */
+ #endif /* !ASSEMBLY */
+diff --git a/arch/arm/mach-ks8695/include/mach/memory.h b/arch/arm/mach-ks8695/include/mach/memory.h
+index ffa19aa..bace9a6 100644
+--- a/arch/arm/mach-ks8695/include/mach/memory.h
++++ b/arch/arm/mach-ks8695/include/mach/memory.h
+@@ -35,17 +35,17 @@ extern struct bus_type platform_bus_type;
+ 					__phys_to_virt(x) : __bus_to_virt(x)); })
+ #define __arch_virt_to_dma(dev, x)	({ is_lbus_device(dev) ? \
+ 					(dma_addr_t)__virt_to_phys(x) : (dma_addr_t)__virt_to_bus(x); })
+-#define __arch_page_to_dma(dev, x)	\
+-	({ dma_addr_t __dma = page_to_phys(page); \
++#define __arch_pfn_to_dma(dev, pfn)	\
++	({ dma_addr_t __dma = __pfn_to_phys(pfn); \
+ 	   if (!is_lbus_device(dev)) \
+ 		__dma = __dma - PHYS_OFFSET + KS8695_PCIMEM_PA; \
+ 	   __dma; })
+ 
+-#define __arch_dma_to_page(dev, x)	\
++#define __arch_dma_to_pfn(dev, x)	\
+ 	({ dma_addr_t __dma = x;				\
+ 	   if (!is_lbus_device(dev))				\
+ 		__dma += PHYS_OFFSET - KS8695_PCIMEM_PA;	\
+-	   phys_to_page(__dma);					\
++	   __phys_to_pfn(__dma);				\
+ 	})
+ 
+ #endif
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 1ccc303..1c5c570 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -321,7 +321,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
+ 		addr = page_address(page);
+ 
+ 	if (addr)
+-		*handle = page_to_dma(dev, page);
++		*handle = pfn_to_dma(dev, page_to_pfn(page));
+ 
+ 	return addr;
+ }
+@@ -416,7 +416,7 @@ void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr
+ 	if (!arch_is_coherent())
+ 		__dma_free_remap(cpu_addr, size);
+ 
+-	__dma_free_buffer(dma_to_page(dev, handle), size);
++	__dma_free_buffer(pfn_to_page(dma_to_pfn(dev, handle)), size);
+ }
+ EXPORT_SYMBOL(dma_free_coherent);
+ 
+diff --git a/arch/arm/plat-omap/include/plat/memory.h b/arch/arm/plat-omap/include/plat/memory.h
+index d5306be..f8d922f 100644
+--- a/arch/arm/plat-omap/include/plat/memory.h
++++ b/arch/arm/plat-omap/include/plat/memory.h
+@@ -61,17 +61,17 @@
+ #define lbus_to_virt(x)		((x) - OMAP1510_LB_OFFSET + PAGE_OFFSET)
+ #define is_lbus_device(dev)	(cpu_is_omap15xx() && dev && (strncmp(dev_name(dev), "ohci", 4) == 0))
+ 
+-#define __arch_page_to_dma(dev, page)	\
+-	({ dma_addr_t __dma = page_to_phys(page); \
++#define __arch_pfn_to_dma(dev, pfn)	\
++	({ dma_addr_t __dma = __pfn_to_phys(pfn); \
+ 	   if (is_lbus_device(dev)) \
+ 		__dma = __dma - PHYS_OFFSET + OMAP1510_LB_OFFSET; \
+ 	   __dma; })
+ 
+-#define __arch_dma_to_page(dev, addr)	\
++#define __arch_dma_to_pfn(dev, addr)	\
+ 	({ dma_addr_t __dma = addr;				\
+ 	   if (is_lbus_device(dev))				\
+ 		__dma += PHYS_OFFSET - OMAP1510_LB_OFFSET;	\
+-	   phys_to_page(__dma);					\
++	   __phys_to_pfn(__dma);				\
+ 	})
+ 
+ #define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
