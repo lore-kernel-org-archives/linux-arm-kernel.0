@@ -1,132 +1,94 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Dec 2010 10:25:31 +0000
-Subject: [PATCH 4/6] ARM: PL011: Allow better handling of vendor data
+Date: Fri, 24 Dec 2010 10:26:11 +0000
+Subject: [PATCH 6/6] ARM: PL011: add DMA burst threshold support for ST
+	variants
 In-Reply-To: <20101224102359.GC20587@n2100.arm.linux.org.uk>
 References: <20101224102359.GC20587@n2100.arm.linux.org.uk>
-Message-ID: <E1PW4q3-0006GO-0m@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PW4qh-0006GW-SV@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than copying all vendor data into the port structure, copy
-just that which is frequently used, and keep a pointer to the
-remaining vendor data structure.  This makes it easier to add
-vendor quirks in the future.
+ST Micro variants has some specific dma burst threshold compensation,
+which allows them to make better use of a DMA controller.  Add support
+to set this up.
+
+Based on a patch from Linus Walleij.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/serial/amba-pl011.c |   51 ++++++++++++++++++++++--------------------
- 1 files changed, 27 insertions(+), 24 deletions(-)
+ drivers/serial/amba-pl011.c |   12 ++++++++++++
+ include/linux/amba/serial.h |   15 +++++++++++++++
+ 2 files changed, 27 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/serial/amba-pl011.c b/drivers/serial/amba-pl011.c
-index 1aa7d45..ab0ab45 100644
+index a67bbdb..e0d9e0a 100644
 --- a/drivers/serial/amba-pl011.c
 +++ b/drivers/serial/amba-pl011.c
-@@ -63,22 +63,6 @@
- #define UART_DR_ERROR		(UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
- #define UART_DUMMY_DR_RX	(1 << 16)
- 
--/*
-- * We wrap our port structure around the generic uart_port.
-- */
--struct uart_amba_port {
--	struct uart_port	port;
--	struct clk		*clk;
--	unsigned int		im;		/* interrupt mask */
--	unsigned int		old_status;
--	unsigned int		ifls;		/* vendor-specific */
--	unsigned int		lcrh_tx;	/* vendor-specific */
--	unsigned int		lcrh_rx;	/* vendor-specific */
--	unsigned int		fifosize;	/* vendor-specific */
--	bool			oversampling;   /* vendor-specific */
--	bool			autorts;
--};
--
- /* There is by now@least one vendor with differing details, so handle it */
- struct vendor_data {
- 	unsigned int		ifls;
-@@ -104,6 +88,21 @@ static struct vendor_data vendor_st = {
- 	.oversampling		= true,
+@@ -74,6 +74,7 @@ struct vendor_data {
+ 	unsigned int		lcrh_tx;
+ 	unsigned int		lcrh_rx;
+ 	bool			oversampling;
++	bool			dma_threshold;
  };
  
-+/*
-+ * We wrap our port structure around the generic uart_port.
-+ */
-+struct uart_amba_port {
-+	struct uart_port	port;
-+	struct clk		*clk;
-+	const struct vendor_data *vendor;
-+	unsigned int		im;		/* interrupt mask */
-+	unsigned int		old_status;
-+	unsigned int		fifosize;	/* vendor-specific */
-+	unsigned int		lcrh_tx;	/* vendor-specific */
-+	unsigned int		lcrh_rx;	/* vendor-specific */
-+	bool			autorts;
-+};
+ static struct vendor_data vendor_arm = {
+@@ -82,6 +83,7 @@ static struct vendor_data vendor_arm = {
+ 	.lcrh_tx		= UART011_LCRH,
+ 	.lcrh_rx		= UART011_LCRH,
+ 	.oversampling		= false,
++	.dma_threshold		= false,
+ };
+ 
+ static struct vendor_data vendor_st = {
+@@ -90,6 +92,7 @@ static struct vendor_data vendor_st = {
+ 	.lcrh_tx		= ST_UART011_LCRH_TX,
+ 	.lcrh_rx		= ST_UART011_LCRH_RX,
+ 	.oversampling		= true,
++	.dma_threshold		= true,
+ };
+ 
+ /* Deals with DMA transactions */
+@@ -530,6 +533,15 @@ static void pl011_dma_startup(struct uart_amba_port *uap)
+ 	/* Turn on DMA error (RX/TX will be enabled on demand) */
+ 	uap->dmacr |= UART011_DMAONERR;
+ 	writew(uap->dmacr, uap->port.membase + UART011_DMACR);
 +
- static void pl011_stop_tx(struct uart_port *port)
- {
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-@@ -398,7 +397,7 @@ static int pl011_startup(struct uart_port *port)
- 	if (retval)
- 		goto clk_dis;
++	/*
++	 * ST Micro variants has some specific dma burst threshold
++	 * compensation. Set this to 16 bytes, so burst will only
++	 * be issued above/below 16 bytes.
++	 */
++	if (uap->vendor->dma_threshold)
++		writew(ST_UART011_DMAWM_RX_16 | ST_UART011_DMAWM_TX_16,
++			       uap->port.membase + ST_UART011_DMAWM);
+ }
  
--	writew(uap->ifls, uap->port.membase + UART011_IFLS);
-+	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ static void pl011_dma_shutdown(struct uart_amba_port *uap)
+diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
+index a307ded..47c176c 100644
+--- a/include/linux/amba/serial.h
++++ b/include/linux/amba/serial.h
+@@ -113,6 +113,21 @@
+ #define UART01x_LCRH_PEN	0x02
+ #define UART01x_LCRH_BRK	0x01
  
- 	/*
- 	 * Provoke TX FIFO interrupt into asserting.
-@@ -504,13 +503,18 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
- 	unsigned int lcr_h, old_cr;
- 	unsigned long flags;
--	unsigned int baud, quot;
-+	unsigned int baud, quot, clkdiv;
++#define ST_UART011_DMAWM_RX_1	(0 << 3)
++#define ST_UART011_DMAWM_RX_2	(1 << 3)
++#define ST_UART011_DMAWM_RX_4	(2 << 3)
++#define ST_UART011_DMAWM_RX_8	(3 << 3)
++#define ST_UART011_DMAWM_RX_16	(4 << 3)
++#define ST_UART011_DMAWM_RX_32	(5 << 3)
++#define ST_UART011_DMAWM_RX_48	(6 << 3)
++#define ST_UART011_DMAWM_TX_1	0
++#define ST_UART011_DMAWM_TX_2	1
++#define ST_UART011_DMAWM_TX_4	2
++#define ST_UART011_DMAWM_TX_8	3
++#define ST_UART011_DMAWM_TX_16	4
++#define ST_UART011_DMAWM_TX_32	5
++#define ST_UART011_DMAWM_TX_48	6
 +
-+	if (uap->vendor->oversampling)
-+		clkdiv = 8;
-+	else
-+		clkdiv = 16;
- 
- 	/*
- 	 * Ask the core to calculate the divisor for us.
- 	 */
- 	baud = uart_get_baud_rate(port, termios, old, 0,
--				  port->uartclk/(uap->oversampling ? 8 : 16));
-+				  port->uartclk / clkdiv);
- 
- 	if (baud > port->uartclk/16)
- 		quot = DIV_ROUND_CLOSEST(port->uartclk * 8, baud);
-@@ -594,8 +598,8 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 		uap->autorts = false;
- 	}
- 
--	if (uap->oversampling) {
--		if (baud > port->uartclk/16)
-+	if (uap->vendor->oversampling) {
-+		if (baud > port->uartclk / 16)
- 			old_cr |= ST_UART011_CR_OVSFACT;
- 		else
- 			old_cr &= ~ST_UART011_CR_OVSFACT;
-@@ -767,7 +771,7 @@ pl011_console_get_options(struct uart_amba_port *uap, int *baud,
- 
- 		*baud = uap->port.uartclk * 4 / (64 * ibrd + fbrd);
- 
--		if (uap->oversampling) {
-+		if (uap->vendor->oversampling) {
- 			if (readw(uap->port.membase + UART011_CR)
- 				  & ST_UART011_CR_OVSFACT)
- 				*baud *= 2;
-@@ -864,10 +868,9 @@ static int pl011_probe(struct amba_device *dev, struct amba_id *id)
- 		goto unmap;
- 	}
- 
--	uap->ifls = vendor->ifls;
-+	uap->vendor = vendor;
- 	uap->lcrh_rx = vendor->lcrh_rx;
- 	uap->lcrh_tx = vendor->lcrh_tx;
--	uap->oversampling = vendor->oversampling;
- 	uap->fifosize = vendor->fifosize;
- 	uap->port.dev = &dev->dev;
- 	uap->port.mapbase = dev->res.start;
+ #define UART010_IIR_RTIS	0x08
+ #define UART010_IIR_TIS		0x04
+ #define UART010_IIR_RIS		0x02
 -- 
 1.6.2.5
