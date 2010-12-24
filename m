@@ -1,48 +1,43 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 24 Dec 2010 14:55:25 +0100
-Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
-In-Reply-To: <20101224130200.GG20587@n2100.arm.linux.org.uk>
-References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
-	<20101224130200.GG20587@n2100.arm.linux.org.uk>
-Message-ID: <201012241455.30430.jkrzyszt@tis.icnet.pl>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Fri, 24 Dec 2010 16:27:06 +0200
+Subject: [PATCH] ARM: colibri-pxa300: use correct SD detect pin
+In-Reply-To: <AANLkTikSK_+NcvoBxWWyaOOz6u8oLk-jMj9FzKW_mUhC@mail.gmail.com>
+References: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>	<201012231715.36442.marek.vasut@gmail.com>	<AANLkTik-ZE-9mvZ7PN1QZx8OJpHcynNz6-0RqcTS=x+y@mail.gmail.com>	<201012232157.03218.marek.vasut@gmail.com>
+	<AANLkTikSK_+NcvoBxWWyaOOz6u8oLk-jMj9FzKW_mUhC@mail.gmail.com>
+Message-ID: <4D14ADBA.7070709@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Friday 24 December 2010 14:02:00 Russell King - ARM Linux wrote:
-> On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik wrote:
-> > The patch tries to implement a solution suggested by Russell King,
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December
-> >/035264.html. It is expected to solve video buffer allocation issues
-> > for at least a few soc_camera I/O memory less host interface
-> > drivers, designed around the videobuf_dma_contig layer, which
-> > allocates video buffers using dma_alloc_coherent().
-> >
-> > Created against linux-2.6.37-rc5.
-> >
-> > Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera
-> > patch, patterned upon two mach-mx3 machine types which already try
-> > to use the dma_declare_coherent_memory() method for reserving a
-> > region of system RAM preallocated with another
-> > dma_alloc_coherent(). Compile tested for all modified files except
-> > arch/sh/drivers/pci/fixups-dreamcast.c.
+On 12/24/10 00:13, Bj?rn Forsman wrote:
+> 2010/12/23 Marek Vasut <marek.vasut@gmail.com>:
+>> On Thursday 23 December 2010 17:59:40 Bj?rn Forsman wrote:
+>>> Hi Marek,
+>>>
+>>> 2010/12/23 Marek Vasut <marek.vasut@gmail.com>:
+>>>> On Thursday 23 December 2010 16:01:02 Bj?rn Forsman wrote:
+>>>>> The use of wrong SD detect pin was introduced by this commit:
+>>>>>
+>>>>>   ARM: pxa: Push Colibri evalboard MFP into module files
+>>>>>
+>>>>> This fixes it.
+>>>> Ah, one more thing -- CC linux-arm-kernel (done)
+>>> I didn't CC linux-arm-kernel because the patch was meant for
+>>> Eric Miao's pxa-linux-2.6.git tree (devel branch). I doesn't apply
+>>> to mainline.
+>>>
+>>> As Eric anyways uses 'git rebase' on his tree every -rc cycle
+>>> I suggested that he could squash my patch into your original
+>>> patch so that we get nice bisectable history.
+>> No, no, no ... regarding arm patches, you always CC linux-arm-kernel.
+> Ok.
 >
-> Another note: with the pair of patches I've sent to the
-> linux-arm-kernel list earlier today changing the DMA coherent
-> allocator to steal memory from the system at boot.
->
-> This means there's less need to pre-allocate DMA memory - if there's
-> sufficient contiguous space in the DMA region to satisfy the
-> allocation, then the allocation will succeed.  It's also independent
-> of the maximum page size from the kernel's memory allocators too.
->
-> So I suspect that mach-mx3 (and others) no longer need to do their
-> own pre-allocation anymore if both of these patches go in.
+> When the patch is not against mainline, where is appropriate
+> place to say what tree it applies to? As a reply to the patch thread?
 
-Then, my rationale will no longer be valid. So, either drop my patch if 
-you think you have finally come out with a better solution which 
-doesn't touch any system-wide API, or suggest a new justification for 
-use in the commit log if you think still the patch solves something 
-important.
+You can write the explanation in the cover letter, or
+if it is just a small single patch without the cover letter,
+then beneath the "---" line, but before the "diff ...."
 
-Thanks,
-Janusz
+-- 
+Regards,
+Igor.
