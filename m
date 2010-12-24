@@ -1,50 +1,36 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 24 Dec 2010 10:28:24 -0200
-Subject: [PATCH v3] video: imxfb: Fix the maximum value for yres
-Message-ID: <1293193704-2855-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Dec 2010 13:02:00 +0000
+Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
+In-Reply-To: <201012240020.37208.jkrzyszt@tis.icnet.pl>
+References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
+Message-ID: <20101224130200.GG20587@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX27 and MX25 have 10 bits in the YMAX field of LCDC Size Register.
+On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik wrote:
+> The patch tries to implement a solution suggested by Russell King, 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/035264.html. 
+> It is expected to solve video buffer allocation issues for at least a 
+> few soc_camera I/O memory less host interface drivers, designed around 
+> the videobuf_dma_contig layer, which allocates video buffers using 
+> dma_alloc_coherent().
+> 
+> Created against linux-2.6.37-rc5.
+> 
+> Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera patch, 
+> patterned upon two mach-mx3 machine types which already try to use the 
+> dma_declare_coherent_memory() method for reserving a region of system 
+> RAM preallocated with another dma_alloc_coherent(). Compile tested for 
+> all modified files except arch/sh/drivers/pci/fixups-dreamcast.c.
 
-Fix the maximum value for yres.
+Another note: with the pair of patches I've sent to the linux-arm-kernel
+list earlier today changing the DMA coherent allocator to steal memory
+from the system at boot.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Perform run-time detection of CPU time
+This means there's less need to pre-allocate DMA memory - if there's
+sufficient contiguous space in the DMA region to satisfy the allocation,
+then the allocation will succeed.  It's also independent of the maximum
+page size from the kernel's memory allocators too.
 
-Changes since v1:
-- factor out SIZE_YMAX definition
- drivers/video/imxfb.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 5c363d0..1ab2c25 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -53,11 +53,8 @@
- #define LCDC_SIZE	0x04
- #define SIZE_XMAX(x)	((((x) >> 4) & 0x3f) << 20)
- 
--#ifdef CONFIG_ARCH_MX1
--#define SIZE_YMAX(y)	((y) & 0x1ff)
--#else
--#define SIZE_YMAX(y)	((y) & 0x3ff)
--#endif
-+#define YMAX_MASK       (cpu_is_mx1() ? 0x1ff : 0x3ff)
-+#define SIZE_YMAX(y)	((y) & YMAX_MASK)
- 
- #define LCDC_VPW	0x08
- #define VPW_VPW(x)	((x) & 0x3ff)
-@@ -623,7 +620,7 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
- 	if (var->right_margin > 255)
- 		printk(KERN_ERR "%s: invalid right_margin %d\n",
- 			info->fix.id, var->right_margin);
--	if (var->yres < 1 || var->yres > 511)
-+	if (var->yres < 1 || var->yres > YMAX_MASK)
- 		printk(KERN_ERR "%s: invalid yres %d\n",
- 			info->fix.id, var->yres);
- 	if (var->vsync_len > 100)
--- 
-1.6.0.4
+So I suspect that mach-mx3 (and others) no longer need to do their own
+pre-allocation anymore if both of these patches go in.
