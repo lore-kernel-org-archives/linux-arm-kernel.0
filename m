@@ -1,15 +1,15 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 24 Dec 2010 13:49:16 +0800
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 24 Dec 2010 15:35:30 +0900
 Subject: bug in PL011 console
 In-Reply-To: <20101223154252.GX14221@pengutronix.de>
 References: <20101223150234.GW14221@pengutronix.de>
 	<20101223150841.GP3636@n2100.arm.linux.org.uk>
 	<20101223154252.GX14221@pengutronix.de>
-Message-ID: <AANLkTim9h16LpAaV+dZazJva9UE5NsRwWvxPizV39dYK@mail.gmail.com>
+Message-ID: <AANLkTimXa_amsei4GQVmG0XceyyMisDZ5fQ4NZPXEquk@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+2010/12/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
 > On Thu, Dec 23, 2010 at 03:08:41PM +0000, Russell King - ARM Linux wrote:
 >> On Thu, Dec 23, 2010 at 04:02:34PM +0100, Uwe Kleine-K?nig wrote:
 >> > Steven told me on irc that sleeping was not allowed in the console write
@@ -28,58 +28,14 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > The common struct clk patch[1] by Jeremy Kerr sleeps, too. ?And I think
 > most people who commented to this series thought that this is the right
 > behaviour.
-I vote atomic clock. All pure clock operations are atomic. I suggest
-voltage change is not included in clock API. If we need a finegrained
-power management, when we open a device, we can first request some
-power conditions and release the power conditions when we close it.
-Mixing sleepy and tomic functions together is likely making mess.
 
-Thanks
-Richard
->
->> I'd lobby for it because it allows for proper power saving management of
->> clocks for devices - PL011 only enables the clock when either the port is
->> open or it's actually sending data out the port. ?So it's doing absolutely
->> the best power management that can be done with UARTs.
-> Yeah, that makes fine-grained clk enabling harder/impossible. ?So
-> ideally we'd have something that only makes clk_enable sleep iff
-> that's sensible for that clk. ?And if you have a clock that can be
-> enabled "fast" it would not sleep.
->
-> Don't know if that works, maybe something like that:
->
-> ? ? ? ?int clk_enable(struct clk *clk)
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?spin_lock(something);
-> ? ? ? ? ? ? ? ?if (clk->flags & (SOME|FLAGS))
-> ? ? ? ? ? ? ? ? ? ? ? ?goto out_busy;
-> ? ? ? ? ? ? ? ?clk->flags |= ENABLING;
-> ? ? ? ? ? ? ? ?spin_unlock(something);
->
-> ? ? ? ? ? ? ? ?ret = clk->really_enable(...);
->
-> ? ? ? ? ? ? ? ?spin_lock(something);
-> ? ? ? ? ? ? ? ?clk->flags &= ~ENABLING;
-> ? ? ? ? ? ? ? ?spin_unlock(something);
-> ? ? ? ?}
->
-> Some things that need careful consideration are:
->
-> ? ? ? ?- clk->flags already has ENABLING when clk_enable is entered.
-> ? ? ? ? ?(needs to sleep/poll then?)
-> ? ? ? ?- clk->usecount already > 0
-> ? ? ? ? ?(early return unless clk->flags & DISABLING)
-> ? ? ? ?- do we need the irqsaving spinlock variants?
-> ? ? ? ? ?(I assume yes)
->
-> Probably there are more.
->
-> Best regards
-> Uwe
->
-> [1] last submission: http://thread.gmane.org/gmane.linux.kernel/1073751
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+Personally, I am not as against atomic clocks as having two versions
+of the clock - atomic
+and sleepable, in the API.
+I favor sleepable version because with the clock hierarchies becoming so complex
+in latest SoCs, it would be difficult to write a 'smart' clock
+management sub-system
+that could setup and enable all 'parent' clocks upon enabling a clock.
+Especially, managing mux'es at levels much lower than pll. FWIK,
+drivers have tough
+time managing such parent clocks.
