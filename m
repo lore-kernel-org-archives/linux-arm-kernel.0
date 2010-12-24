@@ -1,42 +1,84 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Fri, 24 Dec 2010 16:27:06 +0200
-Subject: [PATCH] ARM: colibri-pxa300: use correct SD detect pin
-In-Reply-To: <AANLkTikSK_+NcvoBxWWyaOOz6u8oLk-jMj9FzKW_mUhC@mail.gmail.com>
-References: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>	<201012231715.36442.marek.vasut@gmail.com>	<AANLkTik-ZE-9mvZ7PN1QZx8OJpHcynNz6-0RqcTS=x+y@mail.gmail.com>	<201012232157.03218.marek.vasut@gmail.com>
-	<AANLkTikSK_+NcvoBxWWyaOOz6u8oLk-jMj9FzKW_mUhC@mail.gmail.com>
-Message-ID: <4D14ADBA.7070709@compulab.co.il>
+Date: Fri, 24 Dec 2010 17:05:01 +0200
+Subject: [patch 2/5] ulpi: handle ULPI_OTG_CTRL_CHRGVBUS
+In-Reply-To: <8762ukb67c.fsf@lechat.rtp-net.org>
+References: <20101220154853.254931637@rtp-net.org>	<20101220155812.122749841@rtp-net.org>	<4D109C47.6020704@compulab.co.il>
+	<8762ukb67c.fsf@lechat.rtp-net.org>
+Message-ID: <4D14B69D.4030506@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/24/10 00:13, Bj?rn Forsman wrote:
-> 2010/12/23 Marek Vasut <marek.vasut@gmail.com>:
->> On Thursday 23 December 2010 17:59:40 Bj?rn Forsman wrote:
->>> Hi Marek,
->>>
->>> 2010/12/23 Marek Vasut <marek.vasut@gmail.com>:
->>>> On Thursday 23 December 2010 16:01:02 Bj?rn Forsman wrote:
->>>>> The use of wrong SD detect pin was introduced by this commit:
->>>>>
->>>>>   ARM: pxa: Push Colibri evalboard MFP into module files
->>>>>
->>>>> This fixes it.
->>>> Ah, one more thing -- CC linux-arm-kernel (done)
->>> I didn't CC linux-arm-kernel because the patch was meant for
->>> Eric Miao's pxa-linux-2.6.git tree (devel branch). I doesn't apply
->>> to mainline.
->>>
->>> As Eric anyways uses 'git rebase' on his tree every -rc cycle
->>> I suggested that he could squash my patch into your original
->>> patch so that we get nice bisectable history.
->> No, no, no ... regarding arm patches, you always CC linux-arm-kernel.
-> Ok.
+On 12/23/10 22:11, Arnaud Patard (Rtp) wrote:
+> Igor Grinberg <grinberg@compulab.co.il> writes:
 >
-> When the patch is not against mainline, where is appropriate
-> place to say what tree it applies to? As a reply to the patch thread?
+>> Hi Arnaud,
+>>
+>> On 12/20/10 17:48, Arnaud Patard (Rtp) wrote:
+>>> Current code doesn't handle setting CHRGVBUS when enabling vbus.
+>>> Add support for it
+>>>
+>>>
+>>>
+>>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>>> Index: tst-usb/drivers/usb/otg/ulpi.c
+>>> ===================================================================
+>>> --- tst-usb.orig/drivers/usb/otg/ulpi.c	2010-12-20 15:38:41.000000000 +0100
+>>> +++ tst-usb/drivers/usb/otg/ulpi.c	2010-12-20 15:38:57.000000000 +0100
+>>> @@ -234,7 +234,8 @@
+>>>  {
+>>>  	unsigned int flags = otg_io_read(otg, ULPI_OTG_CTRL);
+>>>  
+>>> -	flags &= ~(ULPI_OTG_CTRL_DRVVBUS | ULPI_OTG_CTRL_DRVVBUS_EXT);
+>>> +	flags &= ~(ULPI_OTG_CTRL_DRVVBUS | ULPI_OTG_CTRL_DRVVBUS_EXT |
+>>> +			ULPI_OTG_CTRL_CHRGVBUS);
+>>>  
+>>>  	if (on) {
+>>>  		if (otg->flags & ULPI_OTG_DRVVBUS)
+>>> @@ -242,6 +243,9 @@
+>>>  
+>>>  		if (otg->flags & ULPI_OTG_DRVVBUS_EXT)
+>>>  			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
+>>> +
+>>> +		if (otg->flags & ULPI_OTG_CHRGVBUS)
+>>> +			flags |= ULPI_OTG_CTRL_CHRGVBUS;
+>>>  	}
+>>>  
+>>>  	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
+>> I think this is a wrong place to set the ChrgVbus bit.
+>> As for ULPI spec. 1.1:
+>> "3.8.7.1 Session Request Protocol (SRP)
+>> ULPI provides full SRP support. The Link uses the ChrgVbus and DischrgVbus bits
+>> in the OTG Control register to begin and end a session."
+>>
+>> So it is used for SRP.
+>> May be it is better to implement
+>> int    (*start_srp)(struct otg_transceiver *otg);
+>> method for setting this bit?
+>>
+> I was not sure on where to put this so I took the same approach as the
+> fsl bsp which was to set it in this function and to call this function
+> _after_ usb_add_hcd() [ see my previous patch ]. Indeed, it fixed my
+> issue so I believe it not so bad given that there has already been some
+> troubles on the ehci-mxc init.
 
-You can write the explanation in the cover letter, or
-if it is just a small single patch without the cover letter,
-then beneath the "---" line, but before the "diff ...."
+Well, the problem is that this is supposed to be a generic driver and it should
+somehow follow the ULPI spec.
+This patch makes it more like mxc specific.
+
+As far as I understand, Session Request Protocol (SRP) allows a B-device (Peripheral)
+to nudge an A-device (Host) to turn on the USB's Vbus.
+This patch enables SRP along with Vbus, which seems incorrect completely.
+ulpi_set_vbus() should set the Vbus (as its name says) and that's it.
+
+Have you tried without this patch or have you just applied it along with other
+patches from the fsl bsp?
+
+Also, if this specific patch (2/5) makes your USB (Host as I understand) work,
+it makes me think that there could be some problem with your Vbus supply.
+Have you checked that?
+
+> Arnaud
+>
 
 -- 
 Regards,
