@@ -1,85 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Dec 2010 10:07:44 +0000
-Subject: [PATCH 05/11] ARM: PL08x: rename lli.next to lli.lli
+Date: Fri, 24 Dec 2010 10:09:05 +0000
+Subject: [PATCH 09/11] ARM: PL08x: fix locking in tasklet
 In-Reply-To: <20101224100550.GB20587@n2100.arm.linux.org.uk>
 References: <20101224100550.GB20587@n2100.arm.linux.org.uk>
-Message-ID: <E1PW4Yq-0006DW-Bw@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PW4a9-0006Dm-MU@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LLI pointer in the documentation is placed into the LLI register,
-so name it LLI rather than 'next'.
+Tasklets are run from an interruptible context.  The slave DMA functions
+can be called from within IRQ handlers.  Taking the spinlock without
+disabling interrupts allows an interrupt handler to run, which may try
+to take the spinlock again, resulting in deadlock.  Fix this by using
+the irqsave spinlocks.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/dma/amba-pl08x.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index c6a8283..f365878 100644
+index 79a8679..c0cf46f 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -103,7 +103,7 @@ struct vendor_data {
- struct lli {
- 	u32 src;
- 	u32 dst;
--	u32 next;
-+	u32 lli;
- 	u32 cctl;
- };
+@@ -1626,11 +1626,12 @@ static void pl08x_tasklet(unsigned long data)
+ 	struct pl08x_dma_chan *plchan = (struct pl08x_dma_chan *) data;
+ 	struct pl08x_phy_chan *phychan = plchan->phychan;
+ 	struct pl08x_driver_data *pl08x = plchan->host;
++	unsigned long flags;
  
-@@ -367,7 +367,7 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
- 				/*
- 				 * A LLI pointer of 0 terminates the LLI list
- 				 */
--				clli = llis_va[i].next;
-+				clli = llis_va[i].lli;
- 				i++;
- 			}
- 		}
-@@ -569,7 +569,7 @@ int pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
- 	 * memory. So we don't manipulate this bit currently.
- 	 */
+ 	if (!plchan)
+ 		BUG();
  
--	llis_va[num_llis].next =
-+	llis_va[num_llis].lli =
- 		(dma_addr_t)((u32) &(llis_bus[num_llis + 1]));
+-	spin_lock(&plchan->lock);
++	spin_lock_irqsave(&plchan->lock, flags);
  
- 	if (cctl & PL080_CONTROL_SRC_INCR)
-@@ -936,14 +936,14 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		 * Loop the circular buffer so that the next element
- 		 * points back to the beginning of the LLI.
- 		 */
--		llis_va[num_llis - 1].next =
-+		llis_va[num_llis - 1].lli =
- 			(dma_addr_t)((unsigned int)&(llis_bus[0]));
- 	} else {
- 		/*
- 		 * On non-circular buffers, the final LLI terminates
- 		 * the LLI.
- 		 */
--		llis_va[num_llis - 1].next = 0;
-+		llis_va[num_llis - 1].lli = 0;
- 		/*
- 		 * The final LLI element shall also fire an interrupt
- 		 */
-@@ -954,7 +954,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 	txd->csrc = llis_va[0].src;
- 	txd->cdst = llis_va[0].dst;
- 	if (num_llis > 1)
--		txd->clli = llis_va[0].next;
-+		txd->clli = llis_va[0].lli;
- 	else
- 		txd->clli = 0;
- 
-@@ -973,7 +973,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 				 llis_va[i].src,
- 				 llis_va[i].dst,
- 				 llis_va[i].cctl,
--				 llis_va[i].next
-+				 llis_va[i].lli
- 				);
+ 	if (plchan->at) {
+ 		dma_async_tx_callback callback =
+@@ -1728,7 +1729,7 @@ static void pl08x_tasklet(unsigned long data)
  		}
  	}
+ 
+-	spin_unlock(&plchan->lock);
++	spin_unlock_irqrestore(&plchan->lock, flags);
+ }
+ 
+ static irqreturn_t pl08x_irq(int irq, void *dev)
 -- 
 1.6.2.5
