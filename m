@@ -1,36 +1,23 @@
-From: bgamari.foss@gmail.com (Ben Gamari)
-Date: Thu, 23 Dec 2010 21:48:09 -0500
-Subject: [PATCH] omap2: Make OMAP2PLUS select OMAP_DM_TIMER
-Message-ID: <1293158889-9708-1-git-send-email-bgamari.foss@gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Fri, 24 Dec 2010 12:37:43 +0900
+Subject: [PATCH] drivers: ld9040 amoled driver support
+In-Reply-To: <1292826187-17758-1-git-send-email-dh09.lee@samsung.com>
+References: <1292826187-17758-1-git-send-email-dh09.lee@samsung.com>
+Message-ID: <20101224033743.GK28151@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears that arch/arm/mach-omap2/timer-gp.o is needed by OMAP2PLUS.
-Since timer-gp.o has direct dependencies on omap_dm_timer_*, it seems
-correct for the architecture to depend upon OMAP_DM_TIMER, otherwise
-unsuspecting integrators will be faced with a whole bunch of linker
-errors at the end of their kernel build:
-
-arch/arm/mach-omap2/built-in.o: In function `omap2_gp_timer_set_mode':
-/home/bgamari/trees/linux-2.6/arch/arm/mach-omap2/timer-gp.c:84: undefined reference to `omap_dm_timer_stop'
-/home/bgamari/trees/linux-2.6/arch/arm/mach-omap2/timer-gp.c:88: undefined reference to `omap_dm_timer_get_fclk'
-/home/bgamari/trees/linux-2.6/arch/arm/mach-omap2/timer-gp.c:90: undefined reference to `omap_dm_timer_set_load_start'
-...
----
- arch/arm/plat-omap/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 92c5bb7..784c06c 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -18,6 +18,7 @@ config ARCH_OMAP1
- config ARCH_OMAP2PLUS
- 	bool "TI OMAP2/3/4"
- 	select COMMON_CLKDEV
-+	select OMAP_DM_TIMER
- 	help
- 	  "Systems based on OMAP2, OMAP3 or OMAP4"
- 
--- 
-1.7.1
+On Mon, Dec 20, 2010 at 03:23:07PM +0900, Donghwa Lee wrote:
+> This patch is ld9040 amoled panel driver using RGB interface. I resend it
+> because there was no comment.
+> 
+> ld9040 panel is 4 ~ 4.5 inch real WVGA model. It is similar to s6e63m0 panel
+> driver and use spi gpio to send panel information.
+> 
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> 
+The backlight subsystem alleges to have a maintainer, so I'd rather avoid
+taking backlight-related patches through the fbdev tree. I can of course
+take them with Richard's Acked-by, though.
