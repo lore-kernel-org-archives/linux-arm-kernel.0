@@ -1,55 +1,48 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Fri, 24 Dec 2010 08:40:43 -0500
-Subject: [PATCH v2] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-In-Reply-To: <4D148335.8070209@mvista.com>
-References: <1293132288-22325-1-git-send-email-michael.williamson@criticallink.com>
-	<4D148335.8070209@mvista.com>
-Message-ID: <4D14A2DB.7080907@criticallink.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Fri, 24 Dec 2010 14:55:25 +0100
+Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
+In-Reply-To: <20101224130200.GG20587@n2100.arm.linux.org.uk>
+References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
+	<20101224130200.GG20587@n2100.arm.linux.org.uk>
+Message-ID: <201012241455.30430.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+Friday 24 December 2010 14:02:00 Russell King - ARM Linux wrote:
+> On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik wrote:
+> > The patch tries to implement a solution suggested by Russell King,
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December
+> >/035264.html. It is expected to solve video buffer allocation issues
+> > for at least a few soc_camera I/O memory less host interface
+> > drivers, designed around the videobuf_dma_contig layer, which
+> > allocates video buffers using dma_alloc_coherent().
+> >
+> > Created against linux-2.6.37-rc5.
+> >
+> > Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera
+> > patch, patterned upon two mach-mx3 machine types which already try
+> > to use the dma_declare_coherent_memory() method for reserving a
+> > region of system RAM preallocated with another
+> > dma_alloc_coherent(). Compile tested for all modified files except
+> > arch/sh/drivers/pci/fixups-dreamcast.c.
+>
+> Another note: with the pair of patches I've sent to the
+> linux-arm-kernel list earlier today changing the DMA coherent
+> allocator to steal memory from the system at boot.
+>
+> This means there's less need to pre-allocate DMA memory - if there's
+> sufficient contiguous space in the DMA region to satisfy the
+> allocation, then the allocation will succeed.  It's also independent
+> of the maximum page size from the kernel's memory allocators too.
+>
+> So I suspect that mach-mx3 (and others) no longer need to do their
+> own pre-allocation anymore if both of these patches go in.
 
-On 12/24/2010 06:25 AM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 23-12-2010 22:24, Michael Williamson wrote:
-> 
->> From: Sudhakar Rajashekhara<sudhakar.raj@ti.com>
-> 
->> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
->> In addition, the variant code for the AM-1808 SoC appears to match
->> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
->> these chips.
-> 
->> This patch is orignally from a patch on the arago project, here:
->> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
-> 
->> Further information related to the need for this patch can be located at
->> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
->> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
-> 
->> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
->> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
-> 
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
->> Reported-by: Nicolas Luna <luna.id@gmail.com>
-> 
->    I saw that the original patch was signed off by Sudhakar -- why you omitted that?
-> 
+Then, my rationale will no longer be valid. So, either drop my patch if 
+you think you have finally come out with a better solution which 
+doesn't touch any system-wide API, or suggest a new justification for 
+use in the commit log if you think still the patch solves something 
+important.
 
-Ignorance, mostly...
-
-That patch was for the Arago project, and not the mainline, and I wasn't sure if 
-I could add a sign-off with express instruction from Sudhakar.  Wasn't trying to 
-slight anyone...
-
-I will add Sudhakar's sign-off, assuming that is OK with Sudhakar.
-
-Should I remove my sign-off? 
-
-Thanks for the help.
-
--Mike
+Thanks,
+Janusz
