@@ -1,33 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Dec 2010 19:18:55 +0000
-Subject: [PATCH] TWD: enable one-shot mode
-Message-ID: <20101224191855.GJ20587@n2100.arm.linux.org.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sat, 25 Dec 2010 00:24:34 +0100
+Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
+In-Reply-To: <20101224154120.GH20587@n2100.arm.linux.org.uk>
+References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
+	<201012241455.30430.jkrzyszt@tis.icnet.pl>
+	<20101224154120.GH20587@n2100.arm.linux.org.uk>
+Message-ID: <201012250024.38576.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow one shot timer mode to be used with the TWD.  This allows
-NOHZ mode to be used on SMP systems using the TWD localtimer.
+Friday 24 December 2010 16:41:20 Russell King - ARM Linux napisa?(a):
+> On Fri, Dec 24, 2010 at 02:55:25PM +0100, Janusz Krzysztofik wrote:
+> > Friday 24 December 2010 14:02:00 Russell King - ARM Linux wrote:
+> > > On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik 
+wrote:
+> > > > The patch tries to implement a solution suggested by Russell
+> > > > King,
+> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-Dece
+> > > >mber /035264.html. It is expected to solve video buffer
+> > > > allocation issues for at least a few soc_camera I/O memory less
+> > > > host interface drivers, designed around the videobuf_dma_contig
+> > > > layer, which allocates video buffers using
+> > > > dma_alloc_coherent().
+> > > >
+> > > > Created against linux-2.6.37-rc5.
+> > > >
+> > > > Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera
+> > > > patch, patterned upon two mach-mx3 machine types which already
+> > > > try to use the dma_declare_coherent_memory() method for
+> > > > reserving a region of system RAM preallocated with another
+> > > > dma_alloc_coherent(). Compile tested for all modified files
+> > > > except arch/sh/drivers/pci/fixups-dreamcast.c.
+> > >
+> > > Another note: with the pair of patches I've sent to the
+> > > linux-arm-kernel list earlier today changing the DMA coherent
+> > > allocator to steal memory from the system at boot.
+> > >
+> > > This means there's less need to pre-allocate DMA memory - if
+> > > there's sufficient contiguous space in the DMA region to satisfy
+> > > the allocation, then the allocation will succeed.  It's also
+> > > independent of the maximum page size from the kernel's memory
+> > > allocators too.
+> > >
+> > > So I suspect that mach-mx3 (and others) no longer need to do
+> > > their own pre-allocation anymore if both of these patches go in.
+> >
+> > Then, my rationale will no longer be valid. So, either drop my
+> > patch if you think you have finally come out with a better solution
+> > which doesn't touch any system-wide API, or suggest a new
+> > justification for use in the commit log if you think still the
+> > patch solves something important.
+>
+> No.  It's not clear whether my pair of patches are both going to make
+> it into the kernel, or even what timeframe they're going to make it
+> in.
+>
+> Irrespective of that, we do need a solution to this problem so that
+> this stuff starts working again.
+>
+> In any case, your patch makes complete sense through and through:
+>
+> 1. if other architecture/machine wants to reserve a chunk of DMA-able
+>    memory for a specific device (eg, because of a restriction on the
+>    number of DMA address bits available) and it's completely DMA
+>    coherent, it shouldn't have to go through the pains of having that
+>    memory unconditionally ioremap'd.
+>
+> 2. What if the memory being provided from some source where you
+> already have the mapping setup in a specific way for a reason?
+>
+> For example, say I have an ARM design, and all peripherals are in a
+> single 256MB memory region, which includes a chunk of SRAM set aside
+> for DMA purposes.  Let's say I can map that really efficiently by a
+> few page table entries, which means relatively little TLB usage for
+> accessing this region.
+>
+> With the current API, it becomes difficult to pass that mapping
+> through the dma_declare_coherent_memory() because the physical
+> address goes through ioremap(), which obfuscates what's going on. 
+> However, if I could pass the bus and virtual address, then there's no
+> ambiguity over what I want to do.
+>
+> What if I want to declare memory to the DMA coherent allocator with
+> attributes different from what ioremap() gives me, maybe with write
+> combining properties (because it happens to be safe for the specific
+> device) ?
+>
+> Passing the virtual address allows the API to become much more
+> flexible. Not only that, it allows it to be used on ARM, rather than
+> becoming (as it currently stands) prohibited on ARM.
+>
+> I believe that putting ioremap() inside this API was the wrong thing
+> to do, and moving it outside makes the API much more flexible and
+> usable. It's something I still fully support.
 
-Tested on Versatile Express.
+Thanks, this is what I was missing, having my point of view rather my 
+machine centric, with not much wider experience. I'll quote your 
+argumentation in next iteration of this patch if required.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-Acks/Tested-by's would be appreciated, thanks.
-
-Merry Christmas.
-
- arch/arm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5634dce..4a6c4d7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1282,6 +1282,7 @@ config HAVE_ARM_SCU
- config HAVE_ARM_TWD
- 	bool
- 	depends on SMP
-+	select TICK_ONESHOT
- 	help
- 	  This options enables support for the ARM timer and watchdog unit
- 
+Thanks,
+Janusz
