@@ -1,36 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Dec 2010 13:02:00 +0000
-Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
-In-Reply-To: <201012240020.37208.jkrzyszt@tis.icnet.pl>
-References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
-Message-ID: <20101224130200.GG20587@n2100.arm.linux.org.uk>
+From: damjan.marion@gmail.com (Damjan Marion)
+Date: Fri, 24 Dec 2010 14:17:11 +0100
+Subject: Bogus machine-type from bootloader
+In-Reply-To: <20101224112908.GF20587@n2100.arm.linux.org.uk>
+References: <BF43E57B-EE45-49B1-AE2A-96F8CBFD40FE@gmail.com>
+	<20101224112908.GF20587@n2100.arm.linux.org.uk>
+Message-ID: <BB8BA91F-29A3-46C5-A118-7ED736D7DBD4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik wrote:
-> The patch tries to implement a solution suggested by Russell King, 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/035264.html. 
-> It is expected to solve video buffer allocation issues for at least a 
-> few soc_camera I/O memory less host interface drivers, designed around 
-> the videobuf_dma_contig layer, which allocates video buffers using 
-> dma_alloc_coherent().
+On Dec 24, 2010, at 12:29 PM, Russell King - ARM Linux wrote:
+> On Fri, Dec 24, 2010 at 12:19:25PM +0100, Damjan Marion wrote:
+>> Is there any "proper" way if fixing bogus machine type sent by
+>> bootloader (ofcourse except fixing bootloader itself)?
+>> 
+>> I'm looking into code where author did following:
+>> 
+>> 
+>> +++ a/arch/arm/boot/compressed/head-str9100.S	2009-01-20 04:26:26.000000000 +0100
+>> @@ -0,0 +1,7 @@
+>> +#include <asm/mach-types.h>
+>> +
+>> +		.section	".start", "ax"
+>> +
+>> +__str9100_start:
+>> +		mov	r7, #(MACH_TYPE_STR9100 & 0xFF00)
+>> +		orr	r7, r7, #(MACH_TYPE_STR9100 & 0x00FF)
+>> 
+>> I assume this is not something acceptable for having in official kernel source.
 > 
-> Created against linux-2.6.37-rc5.
-> 
-> Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera patch, 
-> patterned upon two mach-mx3 machine types which already try to use the 
-> dma_declare_coherent_memory() method for reserving a region of system 
-> RAM preallocated with another dma_alloc_coherent(). Compile tested for 
-> all modified files except arch/sh/drivers/pci/fixups-dreamcast.c.
+> From what I remember looking at the patch URL you posted, they also
+> added entries for ID 2000 to their mach-types file, which have long
+> since been taken by other people.
 
-Another note: with the pair of patches I've sent to the linux-arm-kernel
-list earlier today changing the DMA coherent allocator to steal memory
-from the system at boot.
+Yes, i fixed that
 
-This means there's less need to pre-allocate DMA memory - if there's
-sufficient contiguous space in the DMA region to satisfy the allocation,
-then the allocation will succeed.  It's also independent of the maximum
-page size from the kernel's memory allocators too.
+# bdinfo
+arch_number = 0x00000CBA
 
-So I suspect that mach-mx3 (and others) no longer need to do their own
-pre-allocation anymore if both of these patches go in.
+but kernel still complains:
+
+Error: unrecognized/unsupported machine ID (r1 = 0x00e6dca8).
