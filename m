@@ -1,93 +1,101 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Dec 2010 10:09:26 +0000
-Subject: [PATCH 10/11] ARM: PL08x: move callback outside spinlock'd region.
+Date: Fri, 24 Dec 2010 10:08:04 +0000
+Subject: [PATCH 06/11] ARM: PL08x: clean up LLI lookup
 In-Reply-To: <20101224100550.GB20587@n2100.arm.linux.org.uk>
 References: <20101224100550.GB20587@n2100.arm.linux.org.uk>
-Message-ID: <E1PW4aU-0006Dq-3n@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PW4ZA-0006Da-PF@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling the callback handler with spinlocks in the tasklet held leads
-to deadlock when dmaengine functions are called:
+As the LLI list is an array, we can use maths to locate which LLI
+index we're currently at, and then sum up the remaining LLI entries
+until we reach the end of the list.
 
-BUG: spinlock lockup on CPU#0, sh/417, c1870a08
-Backtrace:
-...
-[<c017b408>] (do_raw_spin_lock+0x0/0x154) from [<c02c4b98>] (_raw_spin_lock_irqsave+0x54/0x60)
-[<c02c4b44>] (_raw_spin_lock_irqsave+0x0/0x60) from [<c01f5828>] (pl08x_prep_channel_resources+0x718/0x8b4)
-[<c01f5110>] (pl08x_prep_channel_resources+0x0/0x8b4) from [<c01f5bb4>] (pl08x_prep_slave_sg+0x120/0x19c)
-[<c01f5a94>] (pl08x_prep_slave_sg+0x0/0x19c) from [<c01be7a0>] (pl011_dma_tx_refill+0x164/0x224)
-[<c01be63c>] (pl011_dma_tx_refill+0x0/0x224) from [<c01bf1c8>] (pl011_dma_tx_callback+0x7c/0xc4)
-[<c01bf14c>] (pl011_dma_tx_callback+0x0/0xc4) from [<c01f4d34>] (pl08x_tasklet+0x60/0x368)
-[<c01f4cd4>] (pl08x_tasklet+0x0/0x368) from [<c004d978>] (tasklet_action+0xa0/0x100)
-
-Dan quoted the documentation:
-> 2/ Completion callback routines cannot submit new operations. ?This
-> ? ?results in recursion in the synchronous case and spin_locks being
-> ? ?acquired twice in the asynchronous case.
-
-but then followed up to say:
-> I should clarify, this is the async_memcpy() api requirement which is
-> not used outside of md/raid5.  DMA drivers can and do allow new
-> submissions from callbacks, and the ones that do so properly move the
-> callback outside of the driver lock.
-
-So let's fix it by moving the callback out of the spinlocked region.
+This makes the code much easier to read, and much less susceptible
+to falling off the end of the array.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   18 ++++++++----------
- 1 files changed, 8 insertions(+), 10 deletions(-)
+ drivers/dma/amba-pl08x.c |   37 ++++++++++++++++++++-----------------
+ 1 files changed, 20 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index c0cf46f..a87fc8f 100644
+index f365878..04c3350 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -1626,6 +1626,8 @@ static void pl08x_tasklet(unsigned long data)
- 	struct pl08x_dma_chan *plchan = (struct pl08x_dma_chan *) data;
- 	struct pl08x_phy_chan *phychan = plchan->phychan;
- 	struct pl08x_driver_data *pl08x = plchan->host;
-+	dma_async_tx_callback callback = NULL;
-+	void *callback_param = NULL;
+@@ -332,53 +332,56 @@ static inline u32 get_bytes_in_cctl(u32 cctl)
+ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+ {
+ 	struct pl08x_phy_chan *ch;
+-	struct pl08x_txd *txdi = NULL;
+ 	struct pl08x_txd *txd;
  	unsigned long flags;
+ 	u32 bytes = 0;
  
- 	if (!plchan)
-@@ -1634,10 +1636,8 @@ static void pl08x_tasklet(unsigned long data)
  	spin_lock_irqsave(&plchan->lock, flags);
- 
- 	if (plchan->at) {
--		dma_async_tx_callback callback =
--			plchan->at->tx.callback;
--		void *callback_param =
--			plchan->at->tx.callback_param;
-+		callback = plchan->at->tx.callback;
-+		callback_param = plchan->at->tx.callback_param;
- 
- 		/*
- 		 * Update last completed
-@@ -1646,12 +1646,6 @@ static void pl08x_tasklet(unsigned long data)
- 			(plchan->at->tx.cookie);
- 
- 		/*
--		 * Callback to signal completion
--		 */
--		if (callback)
--			callback(callback_param);
 -
--		/*
- 		 * Device callbacks should NOT clear
- 		 * the current transaction on the channel
- 		 * Linus: sometimes they should?
-@@ -1730,6 +1724,10 @@ static void pl08x_tasklet(unsigned long data)
+ 	ch = plchan->phychan;
+ 	txd = plchan->at;
+ 
+ 	/*
+-	 * Next follow the LLIs to get the number of pending bytes in the
+-	 * currently active transaction.
++	 * Follow the LLIs to get the number of remaining
++	 * bytes in the currently active transaction.
+ 	 */
+ 	if (ch && txd) {
+-		struct lli *llis_va = txd->llis_va;
+-		struct lli *llis_bus = (struct lli *) txd->llis_bus;
+ 		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
+ 
+-		/* First get the bytes in the current active LLI */
++		/* First get the remaining bytes in the active transfer */
+ 		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
+ 
+ 		if (clli) {
+-			int i = 0;
++			struct lli *llis_va = txd->llis_va;
++			dma_addr_t llis_bus = txd->llis_bus;
++			int index;
+ 
+-			/* Forward to the LLI pointed to by clli */
+-			while ((clli != (u32) &(llis_bus[i])) &&
+-			       (i < MAX_NUM_TSFR_LLIS))
+-				i++;
++			BUG_ON(clli < llis_bus || clli >= llis_bus +
++				sizeof(struct lli) * MAX_NUM_TSFR_LLIS);
++
++			/*
++			 * Locate the next LLI - as this is an array,
++			 * it's simple maths to find.
++			 */
++			index = (clli - llis_bus) / sizeof(struct lli);
++
++			for (; index < MAX_NUM_TSFR_LLIS; index++) {
++				bytes += get_bytes_in_cctl(llis_va[index].cctl);
+ 
+-			while (clli) {
+-				bytes += get_bytes_in_cctl(llis_va[i].cctl);
+ 				/*
+ 				 * A LLI pointer of 0 terminates the LLI list
+ 				 */
+-				clli = llis_va[i].lli;
+-				i++;
++				if (!llis_va[index].lli)
++					break;
+ 			}
+ 		}
+ 	}
+ 
+ 	/* Sum up all queued transactions */
+ 	if (!list_empty(&plchan->desc_list)) {
++		struct pl08x_txd *txdi;
+ 		list_for_each_entry(txdi, &plchan->desc_list, node) {
+ 			bytes += txdi->len;
+ 		}
+-
  	}
  
  	spin_unlock_irqrestore(&plchan->lock, flags);
-+
-+	/* Callback to signal completion */
-+	if (callback)
-+		callback(callback_param);
- }
- 
- static irqreturn_t pl08x_irq(int irq, void *dev)
 -- 
 1.6.2.5
