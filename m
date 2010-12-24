@@ -1,13 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Dec 2010 10:06:43 +0000
-Subject: [PATCH 02/11] ARM: PL08x: constify vendor name field
+Date: Fri, 24 Dec 2010 10:07:24 +0000
+Subject: [PATCH 04/11] ARM: PL08x: don't assume that the LLI pointer has the
+	bus bit clear
 In-Reply-To: <20101224100550.GB20587@n2100.arm.linux.org.uk>
 References: <20101224100550.GB20587@n2100.arm.linux.org.uk>
-Message-ID: <E1PW4Xr-0006DK-Dk@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PW4YW-0006DS-8X@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's a string which we should never overwrite.  So make it const.
+We only want use the address of the LLI pointer when locating the
+corresponding structure in memory, so clear the master bus selection
+bit.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
@@ -15,17 +18,17 @@ Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
  1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 3da49ed..14c024f 100644
+index 53ca6a9..c6a8283 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -89,7 +89,7 @@
-  * or not.
-  */
- struct vendor_data {
--	char *name;
-+	const char *name;
- 	u8 channels;
- 	bool dualmaster;
- };
+@@ -349,7 +349,7 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+ 	if (ch && txd) {
+ 		struct lli *llis_va = txd->llis_va;
+ 		struct lli *llis_bus = (struct lli *) txd->llis_bus;
+-		u32 clli = readl(ch->base + PL080_CH_LLI);
++		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
+ 
+ 		/* First get the bytes in the current active LLI */
+ 		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
 -- 
 1.6.2.5
