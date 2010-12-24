@@ -1,48 +1,789 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 24 Dec 2010 14:12:37 +0900
-Subject: [patch v3] mmc, ARM: Add zboot from MMC support for SuperH
-	Mobile ARM
-In-Reply-To: <20101224041553.GA9152@linux-sh.org>
-References: <1292137027-17779-1-git-send-email-horms@verge.net.au>
-	<1291855635-30882-1-git-send-email-horms@verge.net.au>
-	<20101222224901.GA16187@verge.net.au>
-	<20101222230450.GA21134@verge.net.au>
-	<1291855635-30882-1-git-send-email-horms@verge.net.au>
-	<20101208221653.GA25239@verge.net.au>
-	<20101224041553.GA9152@linux-sh.org>
-Message-ID: <20101224051236.GC15696@verge.net.au>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Fri, 24 Dec 2010 14:24:59 +0900
+Subject: [PATCH V2] S5PC210: universal: update support pmic for c210 universal
+	board
+Message-ID: <1293168299-11552-1-git-send-email-dh09.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 24, 2010 at 01:15:54PM +0900, Paul Mundt wrote:
-> On Thu, Dec 09, 2010 at 07:16:53AM +0900, Simon Horman wrote:
-> > This allows a ROM-able zImage to be written to MMC and
-> > for SuperH Mobile ARM to boot directly from the MMCIF
-> > hardware block.
-> > 
-> > This is achieved by the MaskROM loading the first portion
-> > of the image into MERAM and then jumping to it. This portion
-> > contains loader code which copies the entire image to SDRAM
-> > and jumps to it. From there the zImage boot code proceeds
-> > as normal, uncompressing the image into its final location
-> > and then jumping to it.
-> > 
-> > This patch depends on:
-> > * "ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM"
-> >   which has been merged into the devel branch of Russell King's
-> >   linux-2.6-arm tree.
-> > * "mmc, sh: Move MMCIF_PROGRESS_* into sh_mmcif.h"
-> >   which has been merged into the common/mmcif branch of
-> >   Paul Mundt's sh-2.6 tree
-> > * "mmc, sh: Remove sh_mmcif_boot_slurp()"
-> >   which has been merged into the common/mmcif branch of
-> >   Paul Mundt's sh-2.6 tree
-> 
-> This one at least should go through Russell's tree. The dependencies from
-> my side will be sorted out early in the merge window, so you should be
-> able to submit this to Russell's patch tracker after that for a late -rc1
-> merge, or for -rc2. After that's done, there don't seem to be any more
-> outstanding dependencies, so at that point I'll be able to take care of
-> the remaining patches.
+This patch supports pmic for c210 universal board.
+I modified to c210 irqs style and removed useless header file.
 
-Thanks, will do. I agree that Russell's tree is appropriate for this change.
+Thank you,
+Donghwa Lee
+
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Kyungmin Park  <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv310/Kconfig               |    5 +
+ arch/arm/mach-s5pv310/mach-universal_c210.c |  690 +++++++++++++++++++++++++++
+ 2 files changed, 695 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+index c6d735c..8898442 100644
+--- a/arch/arm/mach-s5pv310/Kconfig
++++ b/arch/arm/mach-s5pv310/Kconfig
+@@ -87,7 +87,12 @@ config MACH_UNIVERSAL_C210
+ 	select S3C_DEV_HSMMC3
+ 	select S5PV310_SETUP_SDHCI
+ 	select S3C_DEV_I2C1
++	select S3C_DEV_I2C5
+ 	select S5PV310_SETUP_I2C1
++	select S5PV310_SETUP_I2C5
++	select SPARSE_IRQ
++	select HAVE_SPARSE_IRQ
++	select HAVE_GENERIC_HARDIRQS
+ 	help
+ 	  Machine support for Samsung Mobile Universal S5PC210 Reference
+ 	  Board. S5PC210(MCP) is one of package option of S5PV310
+diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
+index 766e3ab..652aaad 100644
+--- a/arch/arm/mach-s5pv310/mach-universal_c210.c
++++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
+@@ -11,10 +11,13 @@
+ #include <linux/serial_core.h>
+ #include <linux/input.h>
+ #include <linux/i2c.h>
++#include <linux/i2c-gpio.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/gpio.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
++#include <linux/regulator/max8952.h>
++#include <linux/mfd/max8998.h>
+ #include <linux/mmc/host.h>
+ 
+ #include <asm/mach/arch.h>
+@@ -25,8 +28,13 @@
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/sdhci.h>
++#include <plat/gpio-cfg.h>
++#include <plat/gpio-core.h>
++#include <plat/clock.h>
++#include <plat/iic.h>
+ 
+ #include <mach/map.h>
++#include <mach/regs-clock.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define UNIVERSAL_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -42,6 +50,9 @@
+ 				 S5PV210_UFCON_TXTRIG256 |	\
+ 				 S5PV210_UFCON_RXTRIG256)
+ 
++#define UNIVERSAL_C210_IRQ_START	NR_IRQS
++#define UNIVERSAL_C210_IRQ_SIZE		100
++
+ static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
+ 	[0] = {
+ 		.hwport		= 0,
+@@ -69,6 +80,679 @@ static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
+ 	},
+ };
+ 
++/* I2C5: PMICs LP3974, MAX8952 */
++static struct regulator_consumer_supply max8952_consumer[] = {
++	{
++		.supply		= "varm_1.2v_c210",
++	}, {
++		.supply		= "vdd_arm",
++	},
++};
++
++static struct max8952_platform_data universal_max8952_pdata = {
++	.gpio_vid0		= S5PV310_GPX0(3),
++	.gpio_vid1		= S5PV310_GPX0(4),
++	.gpio_en		= -1, /* Not controllable, set "Always High" */
++	.default_mode		= 3, /* vid0 = 1, vid1 = 1 */
++	.dvs_mode		= { 18, 28, 43, 33 },
++		/*
++		 * 	0.95 1.05 1.20 1.10V (Defaule: 1.10V)
++		 * 1.10V is 0x3 so that we can reduce current at sleep
++		 * because there are pull-up's at vid0 and vid1 and 1.10V is
++		 * the default voltage (cpufreq is supposed to set at the
++		 * default voltage/frequency during suspend).
++		 */
++	.sync_freq		= 0, /* default: fastest */
++	.ramp_speed		= 0, /* default: fastest */
++
++	.reg_data		= {
++		.constraints	= {
++			.name		= "VARM_1.2V",
++			.min_uV		= 770000,
++			.max_uV		= 1400000,
++			.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
++			.always_on	= 1,
++			.state_mem	= {
++				.enabled	= 1,
++				.disabled	= 0,
++				/*
++				 * MAX8952's EN is connected to an
++				 * uncontrollable pin. Assume it is
++				 * "ON".
++				 */
++			}
++		},
++		.num_consumer_supplies	= ARRAY_SIZE(max8952_consumer),
++		.consumer_supplies	= max8952_consumer,
++	},
++};
++
++static struct regulator_consumer_supply lp3974_buck1_consumer[] = {
++	{
++		.supply		= "vint_1.1v_c210",
++	}, {
++		.supply		= "vdd_int",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_buck2_consumer[] = {
++	{
++		.supply		= "vg3d_1.2v_c210",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_buck3_consumer[] = {
++	{
++		.supply		= "vcc_1.8v_pda",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_buck4_consumer[] = {
++	{
++		.supply		= "vmem_1.2v_c210",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_ldo2_consumer[] = {
++	REGULATOR_SUPPLY("valive", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo3_consumer[] = {
++	REGULATOR_SUPPLY("vusb_a", NULL),
++	REGULATOR_SUPPLY("vmipi_1.1v", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo4_consumer[] = {
++	REGULATOR_SUPPLY("vadc", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo5_consumer[] = {
++	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"),
++};
++
++static struct regulator_consumer_supply lp3974_ldo7_consumer[] = {
++	REGULATOR_SUPPLY("vmipi_1.8v", NULL),
++	REGULATOR_SUPPLY("vlcd_1.8v", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo8_consumer[] = {
++	REGULATOR_SUPPLY("vusb_d", NULL),
++	REGULATOR_SUPPLY("vdac", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo9_consumer[] = {
++	REGULATOR_SUPPLY("vcc_2.8v_pda", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo10_consumer[] = {
++	REGULATOR_SUPPLY("vpll", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo11_consumer[] = {
++	{
++		.supply		= "cam_af_3.3v",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_ldo12_consumer[] = {
++	{
++		.supply		= "ps_2.8v",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_ldo13_consumer[] = {
++	REGULATOR_SUPPLY("vhsic", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_ldo14_consumer[] = {
++	{
++		.supply		= "cam_i_host_1.8v",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_ldo15_consumer[] = {
++	{
++		.supply		= "cam_s_dig_1.2v",
++	}, {
++		.supply		= "fm33_core_1.2v",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_ldo16_consumer[] = {
++	{
++		.supply		= "cam_s_ana_2.8v",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_ldo17_consumer[] = {
++	REGULATOR_SUPPLY("vlcd_3.0v", NULL),
++};
++
++static struct regulator_consumer_supply lp3974_esafeout1_consumer[] = {
++	{
++		.supply         = "usb_vbus_ap_5v",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_esafeout2_consumer[] = {
++	{
++		.supply         = "usb_vbus_cp_5v",
++	},
++};
++
++static struct regulator_consumer_supply lp3974_charger_consumer[] = {
++	{
++		.supply         = "battery_charger",
++	},
++};
++
++static struct regulator_init_data lp3974_buck1_data = {
++	.constraints	= {
++		.name		= "VINT_1.1V",
++		.min_uV		= 750000,
++		.max_uV		= 1500000,
++		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE |
++			REGULATOR_CHANGE_STATUS,
++		.boot_on	= 1,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies = ARRAY_SIZE(lp3974_buck1_consumer),
++	.consumer_supplies = lp3974_buck1_consumer,
++};
++
++static struct regulator_init_data lp3974_buck2_data = {
++	.constraints	= {
++		.name		= "VG3D_1.2V",
++		.min_uV		= 1200000,
++		.max_uV		= 1200000,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.apply_uV	= 1,
++		.boot_on	= 0,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies = ARRAY_SIZE(lp3974_buck2_consumer),
++	.consumer_supplies = lp3974_buck2_consumer,
++};
++
++static struct regulator_init_data lp3974_buck3_data = {
++	.constraints	= {
++		.name		= "VCC_1.8V",
++		.min_uV		= 1800000,
++		.max_uV		= 1800000,
++		.apply_uV	= 1,
++		.always_on	= 1,
++		.state_mem	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++	},
++	.num_consumer_supplies = ARRAY_SIZE(lp3974_buck3_consumer),
++	.consumer_supplies = lp3974_buck3_consumer,
++};
++
++static struct regulator_init_data lp3974_buck4_data = {
++	.constraints	= {
++		.name		= "VMEM_1.2V",
++		.min_uV		= 1200000,
++		.max_uV		= 1200000,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.boot_on	= 1,
++		.apply_uV	= 1,
++		.state_mem	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_buck4_consumer),
++	.consumer_supplies	= lp3974_buck4_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo2_data = {
++	.constraints	= {
++		.name		= "VALIVE_1.2V",
++		.min_uV		= 1200000,
++		.max_uV		= 1200000,
++		.apply_uV	= 1,
++		.always_on	= 1,
++		.state_mem	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo2_consumer),
++	.consumer_supplies	= lp3974_ldo2_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo3_data = {
++	.constraints	= {
++		.name		= "VUSB/MIPI_1.1V",
++		.min_uV		= 1100000,
++		.max_uV		= 1100000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo3_consumer),
++	.consumer_supplies	= lp3974_ldo3_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo4_data = {
++	.constraints	= {
++		.name		= "VADC_3.3V",
++		.min_uV		= 3300000,
++		.max_uV		= 3300000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo4_consumer),
++	.consumer_supplies	= lp3974_ldo4_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo5_data = {
++	.constraints	= {
++		.name		= "VTF_2.8V",
++		.min_uV		= 2800000,
++		.max_uV		= 2800000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo5_consumer),
++	.consumer_supplies	= lp3974_ldo5_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo6_data = {
++	.constraints	= {
++		.name		= "LDO6",
++		.min_uV		= 2000000,
++		.max_uV		= 2000000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++};
++
++static struct regulator_init_data lp3974_ldo7_data = {
++	.constraints	= {
++		.name		= "VLCD/VMIPI_1.8V",
++		.min_uV		= 1800000,
++		.max_uV		= 1800000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo7_consumer),
++	.consumer_supplies	= lp3974_ldo7_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo8_data = {
++	.constraints	= {
++		.name		= "VUSB/VDAC_3.3V",
++		.min_uV		= 3300000,
++		.max_uV		= 3300000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo8_consumer),
++	.consumer_supplies	= lp3974_ldo8_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo9_data = {
++	.constraints	= {
++		.name		= "VCC_2.8V",
++		.min_uV		= 2800000,
++		.max_uV		= 2800000,
++		.apply_uV	= 1,
++		.always_on	= 1,
++		.state_mem	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo9_consumer),
++	.consumer_supplies	= lp3974_ldo9_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo10_data = {
++	.constraints	= {
++		.name		= "VPLL_1.1V",
++		.min_uV		= 1100000,
++		.max_uV		= 1100000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo10_consumer),
++	.consumer_supplies	= lp3974_ldo10_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo11_data = {
++	.constraints	= {
++		.name		= "CAM_AF_3.3V",
++		.min_uV		= 3300000,
++		.max_uV		= 3300000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo11_consumer),
++	.consumer_supplies	= lp3974_ldo11_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo12_data = {
++	.constraints	= {
++		.name		= "PS_2.8V",
++		.min_uV		= 2800000,
++		.max_uV		= 2800000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo12_consumer),
++	.consumer_supplies	= lp3974_ldo12_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo13_data = {
++	.constraints	= {
++		.name		= "VHSIC_1.2V",
++		.min_uV		= 1200000,
++		.max_uV		= 1200000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo13_consumer),
++	.consumer_supplies	= lp3974_ldo13_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo14_data = {
++	.constraints	= {
++		.name		= "CAM_I_HOST_1.8V",
++		.min_uV		= 1800000,
++		.max_uV		= 1800000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo14_consumer),
++	.consumer_supplies	= lp3974_ldo14_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo15_data = {
++	.constraints	= {
++		.name		= "CAM_S_DIG/FM33_CORE_1.2V",
++		.min_uV		= 1200000,
++		.max_uV		= 1200000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo15_consumer),
++	.consumer_supplies	= lp3974_ldo15_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo16_data = {
++	.constraints	= {
++		.name		= "CAM_S_ANA_2.8V",
++		.min_uV		= 2800000,
++		.max_uV		= 2800000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo16_consumer),
++	.consumer_supplies	= lp3974_ldo16_consumer,
++};
++
++static struct regulator_init_data lp3974_ldo17_data = {
++	.constraints	= {
++		.name		= "VCC_3.0V_LCD",
++		.min_uV		= 3000000,
++		.max_uV		= 3000000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_ldo17_consumer),
++	.consumer_supplies	= lp3974_ldo17_consumer,
++};
++
++static struct regulator_init_data lp3974_32khz_ap_data = {
++	.constraints	= {
++		.name		= "32KHz AP",
++		.always_on	= 1,
++		.state_mem	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++	},
++};
++
++static struct regulator_init_data lp3974_32khz_cp_data = {
++	.constraints	= {
++		.name		= "32KHz CP",
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++};
++
++static struct regulator_init_data lp3974_vichg_data = {
++	.constraints	= {
++		.name		= "VICHG",
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++};
++
++static struct regulator_init_data lp3974_esafeout1_data = {
++	.constraints	= {
++		.name		= "SAFEOUT1",
++		.min_uV		= 4800000,
++		.max_uV		= 4800000,
++		.apply_uV	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_esafeout1_consumer),
++	.consumer_supplies	= lp3974_esafeout1_consumer,
++};
++
++static struct regulator_init_data lp3974_esafeout2_data = {
++	.constraints	= {
++		.name		= "SAFEOUT2",
++		.min_uV		= 4800000,
++		.max_uV		= 4800000,
++		.apply_uV	= 1,
++		.boot_on	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		.state_mem	= {
++			.enabled = 0,
++			.disabled = 1,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_esafeout2_consumer),
++	.consumer_supplies	= lp3974_esafeout2_consumer,
++};
++
++static struct regulator_init_data lp3974_charger_data = {
++	.constraints	= {
++		.name		= "CHARGER",
++		.min_uA		= 100000,
++		.max_uA		= 800000,
++		.boot_on	= 1,
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS |
++			REGULATOR_CHANGE_CURRENT,
++		.state_mem	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++		/* Charger may be turned on anytime */
++		.state_disk	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++		.state_standby	= {
++			.enabled = 1,
++			.disabled = 0,
++		},
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(lp3974_charger_consumer),
++	.consumer_supplies	= lp3974_charger_consumer,
++};
++
++static struct max8998_regulator_data lp3974_regulators[] = {
++	{ MAX8998_LDO2,  &lp3974_ldo2_data },
++	{ MAX8998_LDO3,  &lp3974_ldo3_data },
++	{ MAX8998_LDO4,  &lp3974_ldo4_data },
++	{ MAX8998_LDO5,  &lp3974_ldo5_data },
++	{ MAX8998_LDO6,  &lp3974_ldo6_data },
++	{ MAX8998_LDO7,  &lp3974_ldo7_data },
++	{ MAX8998_LDO8,  &lp3974_ldo8_data },
++	{ MAX8998_LDO9,  &lp3974_ldo9_data },
++	{ MAX8998_LDO10, &lp3974_ldo10_data },
++	{ MAX8998_LDO11, &lp3974_ldo11_data },
++	{ MAX8998_LDO12, &lp3974_ldo12_data },
++	{ MAX8998_LDO13, &lp3974_ldo13_data },
++	{ MAX8998_LDO14, &lp3974_ldo14_data },
++	{ MAX8998_LDO15, &lp3974_ldo15_data },
++	{ MAX8998_LDO16, &lp3974_ldo16_data },
++	{ MAX8998_LDO17, &lp3974_ldo17_data },
++	{ MAX8998_BUCK1, &lp3974_buck1_data },
++	{ MAX8998_BUCK2, &lp3974_buck2_data },
++	{ MAX8998_BUCK3, &lp3974_buck3_data },
++	{ MAX8998_BUCK4, &lp3974_buck4_data },
++	{ MAX8998_EN32KHZ_AP, &lp3974_32khz_ap_data },
++	{ MAX8998_EN32KHZ_CP, &lp3974_32khz_cp_data },
++	{ MAX8998_ENVICHG, &lp3974_vichg_data },
++	{ MAX8998_ESAFEOUT1, &lp3974_esafeout1_data },
++	{ MAX8998_ESAFEOUT2, &lp3974_esafeout2_data },
++	{ MAX8998_CHARGER, &lp3974_charger_data },
++};
++
++#define IRQ_MAX8998_BASE	UNIVERSAL_C210_IRQ_START + UNIVERSAL_C210_IRQ_SIZE
++
++static struct max8998_platform_data universal_lp3974_pdata = {
++	.irq_base		= IRQ_MAX8998_BASE,
++	.num_regulators		= ARRAY_SIZE(lp3974_regulators),
++	.regulators		= lp3974_regulators,
++	.buck1_set1             = -1,
++	.buck1_set2             = -1,
++	.buck2_set3             = -1,
++	.wakeup			= true,
++	.eoc			= 150,
++	.restart		= 100,
++	.timeout		= 5,
++};
++
++static void __init universal_pmic_init(void)
++{
++	int gpio;
++
++	gpio = S5PV310_GPE2(0);
++	gpio_request(gpio, "BUCK2_EN");
++	gpio_direction_output(gpio, 0);
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	gpio = S5PV310_GPX0(3);
++	gpio_request(gpio, "ARM_OUTPUT_SEL_A");
++	gpio_direction_output(gpio, universal_max8952_pdata.default_mode % 2);
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	gpio = S5PV310_GPX0(4);
++	gpio_request(gpio, "ARM_OUTPUT_SEL_B");
++	gpio_direction_output(gpio, (universal_max8952_pdata.default_mode / 2) % 2);
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	gpio = S5PV310_GPX0(5);
++	gpio_request(gpio, "BUCK1_EN_A");
++	gpio_direction_output(gpio, 0);
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	gpio = S5PV310_GPX0(6);
++	gpio_request(gpio, "BUCK1_EN_B");
++	gpio_direction_output(gpio, 0);
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	gpio = S5PV310_GPX0(7);
++	gpio_request(gpio, "AP_PMIC_IRQ");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	/* TO BE ENABLED LATER
++	regulator_has_full_constraints();
++	*/
++}
++
++/* GPIO I2C 5 (PMIC) */
++enum { I2C5_MAX8952, I2C5_LP3974 };
++static struct i2c_board_info i2c5_devs[] __initdata = {
++	[I2C5_MAX8952] = {
++		I2C_BOARD_INFO("max8952", 0xC0 >> 1),
++		.platform_data	= &universal_max8952_pdata,
++	},
++	[I2C5_LP3974] = {
++		I2C_BOARD_INFO("lp3974-regerr", 0xCC >> 1),
++		.platform_data	= &universal_lp3974_pdata,
++	},
++};
++
+ static struct gpio_keys_button universal_gpio_keys_tables[] = {
+ 	{
+ 		.code			= KEY_VOLUMEUP,
+@@ -200,6 +884,7 @@ static struct i2c_board_info i2c1_devs[] __initdata = {
+ 
+ static struct platform_device *universal_devices[] __initdata = {
+ 	/* Samsung Platform Devices */
++	&s3c_device_i2c5,
+ 	&mmc0_fixed_voltage,
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc2,
+@@ -224,6 +909,10 @@ static void __init universal_machine_init(void)
+ 	i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
+ 	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
+ 
++	universal_pmic_init();
++	s3c_i2c5_set_platdata(NULL);
++	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
++
+ 	/* Last */
+ 	platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
+ }
+@@ -231,6 +920,7 @@ static void __init universal_machine_init(void)
+ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+ 	.boot_params	= S5P_PA_SDRAM + 0x100,
++	.nr_irqs	= UNIVERSAL_C210_IRQ_START + UNIVERSAL_C210_IRQ_SIZE,
+ 	.init_irq	= s5pv310_init_irq,
+ 	.map_io		= universal_map_io,
+ 	.init_machine	= universal_machine_init,
+-- 
+1.6.0.4
