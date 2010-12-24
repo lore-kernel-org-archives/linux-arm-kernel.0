@@ -1,101 +1,103 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Dec 2010 10:08:04 +0000
-Subject: [PATCH 06/11] ARM: PL08x: clean up LLI lookup
+Date: Fri, 24 Dec 2010 10:09:46 +0000
+Subject: [PATCH 11/11] ARM: PL08x: fix atomic_t usage and tx_submit() return
+	value
 In-Reply-To: <20101224100550.GB20587@n2100.arm.linux.org.uk>
 References: <20101224100550.GB20587@n2100.arm.linux.org.uk>
-Message-ID: <E1PW4ZA-0006Da-PF@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PW4ao-0006Du-7T@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the LLI list is an array, we can use maths to locate which LLI
-index we're currently at, and then sum up the remaining LLI entries
-until we reach the end of the list.
+The last_issued variable uses an atomic type, which is only
+incremented inside a protected region, and then read.  Every
+where else only reads the value, so it isn't using atomic_t
+correctly.  It doesn't even need to.  Convert it to a dma_cookie_t.
 
-This makes the code much easier to read, and much less susceptible
-to falling off the end of the array.
+Also, fix dma_cookie_t when it wraps negative - negative returns
+from tx_submit() mean failure, yet in reality we always succeed.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   37 ++++++++++++++++++++-----------------
- 1 files changed, 20 insertions(+), 17 deletions(-)
+ drivers/dma/amba-pl08x.c   |   18 +++++++++---------
+ include/linux/amba/pl08x.h |    2 +-
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index f365878..04c3350 100644
+index a87fc8f..ac42208 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -332,53 +332,56 @@ static inline u32 get_bytes_in_cctl(u32 cctl)
- static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+@@ -74,7 +74,6 @@
+ #include <asm/hardware/pl080.h>
+ #include <asm/dma.h>
+ #include <asm/mach/dma.h>
+-#include <asm/atomic.h>
+ #include <asm/processor.h>
+ #include <asm/cacheflush.h>
+ 
+@@ -1081,8 +1080,10 @@ static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
  {
- 	struct pl08x_phy_chan *ch;
--	struct pl08x_txd *txdi = NULL;
- 	struct pl08x_txd *txd;
- 	unsigned long flags;
- 	u32 bytes = 0;
+ 	struct pl08x_dma_chan *plchan = to_pl08x_chan(tx->chan);
  
- 	spin_lock_irqsave(&plchan->lock, flags);
--
- 	ch = plchan->phychan;
- 	txd = plchan->at;
+-	atomic_inc(&plchan->last_issued);
+-	tx->cookie = atomic_read(&plchan->last_issued);
++	plchan->last_issued += 1;
++	if (plchan->last_issued < 0)
++		plchan->last_issued = 0;
++	tx->cookie = plchan->last_issued;
+ 	/* This unlock follows the lock in the prep() function */
+ 	spin_unlock_irqrestore(&plchan->lock, plchan->lockflags);
  
+@@ -1114,7 +1115,7 @@ pl08x_dma_tx_status(struct dma_chan *chan,
+ 	enum dma_status ret;
+ 	u32 bytesleft = 0;
+ 
+-	last_used = atomic_read(&plchan->last_issued);
++	last_used = plchan->last_issued;
+ 	last_complete = plchan->lc;
+ 
+ 	ret = dma_async_is_complete(cookie, last_complete, last_used);
+@@ -1130,7 +1131,7 @@ pl08x_dma_tx_status(struct dma_chan *chan,
  	/*
--	 * Next follow the LLIs to get the number of pending bytes in the
--	 * currently active transaction.
-+	 * Follow the LLIs to get the number of remaining
-+	 * bytes in the currently active transaction.
+ 	 * This cookie not complete yet
  	 */
- 	if (ch && txd) {
--		struct lli *llis_va = txd->llis_va;
--		struct lli *llis_bus = (struct lli *) txd->llis_bus;
- 		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
+-	last_used = atomic_read(&plchan->last_issued);
++	last_used = plchan->last_issued;
+ 	last_complete = plchan->lc;
  
--		/* First get the bytes in the current active LLI */
-+		/* First get the remaining bytes in the active transfer */
- 		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
+ 	/* Get number of bytes left in the active transactions and queue */
+@@ -1642,8 +1643,7 @@ static void pl08x_tasklet(unsigned long data)
+ 		/*
+ 		 * Update last completed
+ 		 */
+-		plchan->lc =
+-			(plchan->at->tx.cookie);
++		plchan->lc = plchan->at->tx.cookie;
  
- 		if (clli) {
--			int i = 0;
-+			struct lli *llis_va = txd->llis_va;
-+			dma_addr_t llis_bus = txd->llis_bus;
-+			int index;
+ 		/*
+ 		 * Device callbacks should NOT clear
+@@ -1819,8 +1819,8 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+ 			 chan->name);
  
--			/* Forward to the LLI pointed to by clli */
--			while ((clli != (u32) &(llis_bus[i])) &&
--			       (i < MAX_NUM_TSFR_LLIS))
--				i++;
-+			BUG_ON(clli < llis_bus || clli >= llis_bus +
-+				sizeof(struct lli) * MAX_NUM_TSFR_LLIS);
-+
-+			/*
-+			 * Locate the next LLI - as this is an array,
-+			 * it's simple maths to find.
-+			 */
-+			index = (clli - llis_bus) / sizeof(struct lli);
-+
-+			for (; index < MAX_NUM_TSFR_LLIS; index++) {
-+				bytes += get_bytes_in_cctl(llis_va[index].cctl);
+ 		chan->chan.device = dmadev;
+-		atomic_set(&chan->last_issued, 0);
+-		chan->lc = atomic_read(&chan->last_issued);
++		chan->last_issued = 0;
++		chan->lc = 0;
  
--			while (clli) {
--				bytes += get_bytes_in_cctl(llis_va[i].cctl);
- 				/*
- 				 * A LLI pointer of 0 terminates the LLI list
- 				 */
--				clli = llis_va[i].lli;
--				i++;
-+				if (!llis_va[index].lli)
-+					break;
- 			}
- 		}
- 	}
- 
- 	/* Sum up all queued transactions */
- 	if (!list_empty(&plchan->desc_list)) {
-+		struct pl08x_txd *txdi;
- 		list_for_each_entry(txdi, &plchan->desc_list, node) {
- 			bytes += txdi->len;
- 		}
--
- 	}
- 
- 	spin_unlock_irqrestore(&plchan->lock, flags);
+ 		spin_lock_init(&chan->lock);
+ 		INIT_LIST_HEAD(&chan->desc_list);
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 521a0f8..bc272c2 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -174,7 +174,7 @@ struct pl08x_dma_chan {
+ 	struct pl08x_channel_data *cd;
+ 	dma_addr_t runtime_addr;
+ 	enum dma_data_direction	runtime_direction;
+-	atomic_t last_issued;
++	dma_cookie_t last_issued;
+ 	dma_cookie_t lc;
+ 	struct list_head desc_list;
+ 	struct pl08x_txd *at;
 -- 
 1.6.2.5
