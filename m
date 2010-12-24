@@ -1,46 +1,125 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 24 Dec 2010 09:39:13 +0900
-Subject: [PATCH v2] video: imxfb: Fix the maximum value for yres
-In-Reply-To: <1293131490-2747-1-git-send-email-fabio.estevam@freescale.com>
-References: <1293131490-2747-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20101224003913.GE28151@linux-sh.org>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Fri, 24 Dec 2010 02:08:03 +0100
+Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
+In-Reply-To: <20101223235434.GA20587@n2100.arm.linux.org.uk>
+References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
+	<20101223235434.GA20587@n2100.arm.linux.org.uk>
+Message-ID: <201012240208.08365.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 05:11:30PM -0200, Fabio Estevam wrote:
-> MX27 and MX25 have 10 bits in the YMAX field of LCDC Size Register.
-> 
-> Fix the maximum value for yres.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - factor out SIZE_YMAX definition
->  drivers/video/imxfb.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index 5c363d0..4cddd3b 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -54,10 +54,11 @@
->  #define SIZE_XMAX(x)	((((x) >> 4) & 0x3f) << 20)
->  
->  #ifdef CONFIG_ARCH_MX1
-> -#define SIZE_YMAX(y)	((y) & 0x1ff)
-> +#define YMAX_MASK	0x1ff
->  #else
-> -#define SIZE_YMAX(y)	((y) & 0x3ff)
-> +#define YMAX_MASK	0x3ff
->  #endif
-> +#define SIZE_YMAX(y)	((y) & YMAX_MASK)
->  
->  #define LCDC_VPW	0x08
->  #define VPW_VPW(x)	((x) & 0x3ff)
+Friday 24 December 2010 00:54:34 Russell King - ARM Linux napisa?(a):
+> On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik wrote:
+> > The patch tries to implement a solution suggested by Russell King,
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December
+> >/035264.html. It is expected to solve video buffer allocation issues
+> > for at least a few soc_camera I/O memory less host interface
+> > drivers, designed around the videobuf_dma_contig layer, which
+> > allocates video buffers using dma_alloc_coherent().
+> >
+> > Created against linux-2.6.37-rc5.
+> >
+> > Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera
+> > patch, patterned upon two mach-mx3 machine types which already try
+> > to use the dma_declare_coherent_memory() method for reserving a
+> > region of system RAM preallocated with another
+> > dma_alloc_coherent(). Compile tested for all modified files except
+> > arch/sh/drivers/pci/fixups-dreamcast.c.
+> >
+> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> > ---
+> > I intended to quote Russell in my commit message and even asked him
+> > for his permission, but since he didn't respond, I decided to
+> > include a link to his original message only.
+>
+> There's no problem quoting messages which were sent to public mailing
+> lists, especially when there's a record of what was said in public
+> archives too.
+>
+> I think this is definitely a step forward.
+>
+> > ---
+> > linux-2.6.37-rc5/arch/arm/mach-mx3/mach-pcm037.c.orig	2010-12-09
+> > 23:07:34.000000000 +0100 +++
+> > linux-2.6.37-rc5/arch/arm/mach-mx3/mach-pcm037.c	2010-12-23
+> > 18:32:24.000000000 +0100 @@ -431,7 +431,7 @@ static int __init
+> > pcm037_camera_alloc_dm memset(buf, 0, buf_size);
+> >
+> >  	dma = dma_declare_coherent_memory(&mx3_camera.dev,
+> > -					dma_handle, dma_handle, buf_size,
+> > +					buf, dma_handle, buf_size,
+> >  					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+> >
+> >  	/* The way we call dma_declare_coherent_memory only a malloc can
+> > fail */ ---
+> > linux-2.6.37-rc5/arch/arm/mach-mx3/mach-mx31moboard.c.orig	2010-12-
+> >09 23:07:34.000000000 +0100 +++
+> > linux-2.6.37-rc5/arch/arm/mach-mx3/mach-mx31moboard.c	2010-12-23
+> > 18:32:24.000000000 +0100 @@ -486,7 +486,7 @@ static int __init
+> > mx31moboard_cam_alloc_ memset(buf, 0, buf_size);
+> >
+> >  	dma = dma_declare_coherent_memory(&mx3_camera.dev,
+> > -					dma_handle, dma_handle, buf_size,
+> > +					buf, dma_handle, buf_size,
+> >  					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+> >
+> >  	/* The way we call dma_declare_coherent_memory only a malloc can
+> > fail */
+>
+> A side note for the mx3 folk: although it's not specified in DMA-API,
+> memory allocated from dma_alloc_coherent() on ARM is already memset
+> to zero by the allocation function.
+>
+> > --- linux-2.6.37-rc5/drivers/base/dma-coherent.c.orig	2010-12-09
+> > 23:08:03.000000000 +0100 +++
+> > linux-2.6.37-rc5/drivers/base/dma-coherent.c	2010-12-23
+> > 18:32:24.000000000 +0100 @@ -14,10 +14,9 @@ struct dma_coherent_mem
+> > {
+> >  	unsigned long	*bitmap;
+> >  };
+> >
+> > -int dma_declare_coherent_memory(struct device *dev, dma_addr_t
+> > bus_addr, +int dma_declare_coherent_memory(struct device *dev, void
+> > *virt_addr, dma_addr_t device_addr, size_t size, int flags)
+> >  {
+> > -	void __iomem *mem_base = NULL;
+> >  	int pages = size >> PAGE_SHIFT;
+> >  	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
+> >
+> > @@ -30,10 +29,6 @@ int dma_declare_coherent_memory(struct d
+> >
+> >  	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN
+> > */
+> >
+> > -	mem_base = ioremap(bus_addr, size);
+> > -	if (!mem_base)
+> > -		goto out;
+> > -
+> >  	dev->dma_mem = kzalloc(sizeof(struct dma_coherent_mem),
+> > GFP_KERNEL); if (!dev->dma_mem)
+> >  		goto out;
+> > @@ -41,7 +36,7 @@ int dma_declare_coherent_memory(struct d
+> >  	if (!dev->dma_mem->bitmap)
+> >  		goto free1_out;
+> >
+> > -	dev->dma_mem->virt_base = mem_base;
+> > +	dev->dma_mem->virt_base = virt_addr;
+>
+> I didn't see anything changing the dev->dma_mem->virt_base type to
+> drop the __iomem attribute (which I suspect shouldn't be there -
+> we're returning it via a void pointer anyway, so I think the whole
+> coherent part of the DMA API should be __iomem-less.
 
-Do you really want to restrict this by the build-time check? Presumably
-you could just do this as:
+There was no __iomem attribute specified for the .virt_base member of 
+the struct dma_coherent_mem, pure (void *), so nothing to be changed 
+there.
 
-#define YMAX_MASK	(cpu_is_mx1() ? 0x1ff : 0x3ff)
+Thanks,
+Janusz
 
-to support multiple configurations.
+> It also pushes the sparse address space warnings to the right place
+> IMHO too.
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+> linux-media" in the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
