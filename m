@@ -1,36 +1,78 @@
 From: sw.youn@samsung.com (Seungwhan Youn)
-Date: Fri, 24 Dec 2010 15:26:05 +0900
-Subject: [PATCH 0/4] Modify configures to support Samsung ASoC dependancyless
-Message-ID: <1293171965-24416-1-git-send-email-sw.youn@samsung.com>
+Date: Fri, 24 Dec 2010 15:36:09 +0900
+Subject: [PATCH 1/4] ARM: Kconfig: Add audio support dependency
+In-Reply-To: <1293171965-24416-1-git-send-email-sw.youn@samsung.com>
+References: <1293171965-24416-1-git-send-email-sw.youn@samsung.com>
+Message-ID: <1293172569-21465-1-git-send-email-sw.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds Samsung ASoC audio support dependency for Samsung SoCs.
 
-These patches modify configuration to make audio support configurations on
-platform(or arch) from sound/soc/samsung. This prevents that audio config
-consider which board(or arch) can(or should) support ASoC audio driver, and
-also prevents audio config dependancy on future Samsung SoCs.
+Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
+---
+ arch/arm/Kconfig |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-
-These patches are modify below features:-
- o Add audio configurations on plat(or arch).
- o Modify audio configuration depends on plat(or arch) selection on ASoC.
-
-This patch-set is based on two different branches that :-
- o ARM patches are based on Kukjin Kim's git branch 'for-next'
-   (commit id - 30fb9a94ec22435add3d2ea2d1b01c1a5ad6164c)
- o ASoC patches are based on Mark Brown's git branch 'for-next'
-   (commit id - 722bc28384accb67c0bfbbe1914fd82d4d0c996a)
-
-This patch-set contains followings :-
- o To Kukjin Kim, Ben Dooks and Russell King,
-  - [PATCH 1/4] ARM: Kconfig: Add audio support dependency
-  - [PATCH 2/4] ARM: SAMSUNG: Add SMDK audio configuration
- o To Jassi Brar, Mark Brown and Liam Girdwood,
-  - [PATCH 3/4] ASoC: SAMSUNG: Modify to indepedant depends on configuration
-  - [PATCH 4/4] ASoC: SAMSUNG: Apply modifications for SMDK audio configuations
-
-
-Marry X-mas,
-Claude(Seungwhan Youn)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d56d21c..ef32a61 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -647,6 +647,7 @@ config ARCH_S3C2410
+ 	select HAVE_CLK
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select HAVE_S3C2410_I2C if I2C
++	select ASOC_SAMSUNG if SND_SOC
+ 	help
+ 	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
+ 	  BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
+@@ -678,6 +679,7 @@ config ARCH_S3C64XX
+ 	select SAMSUNG_GPIOLIB_4BIT
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select ASOC_SAMSUNG if SND_SOC
+ 	help
+ 	  Samsung S3C64XX series based systems
+ 
+@@ -690,6 +692,7 @@ config ARCH_S5P64X0
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C_RTC if RTC_CLASS
++	select ASOC_SAMSUNG if SND_SOC
+ 	help
+ 	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
+ 	  SMDK6450.
+@@ -701,6 +704,7 @@ config ARCH_S5P6442
+ 	select HAVE_CLK
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select ASOC_SAMSUNG if SND_SOC
+ 	help
+ 	  Samsung S5P6442 CPU based systems
+ 
+@@ -714,6 +718,7 @@ config ARCH_S5PC100
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select ASOC_SAMSUNG if SND_SOC
+ 	help
+ 	  Samsung S5PC100 series based systems
+ 
+@@ -729,6 +734,7 @@ config ARCH_S5PV210
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select ASOC_SAMSUNG if SND_SOC
+ 	help
+ 	  Samsung S5PV210/S5PC110 series based systems
+ 
+@@ -742,6 +748,7 @@ config ARCH_S5PV310
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select ASOC_SAMSUNG if SND_SOC
+ 	help
+ 	  Samsung S5PV310 series based systems
+ 
+-- 
+1.6.2.5
