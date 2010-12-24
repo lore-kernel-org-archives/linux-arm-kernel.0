@@ -1,21 +1,36 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 24 Dec 2010 10:58:59 +0900
-Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
-In-Reply-To: <201012240020.37208.jkrzyszt@tis.icnet.pl>
-References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
-Message-ID: <20101224015858.GG28151@linux-sh.org>
+From: bgamari.foss@gmail.com (Ben Gamari)
+Date: Thu, 23 Dec 2010 21:48:09 -0500
+Subject: [PATCH] omap2: Make OMAP2PLUS select OMAP_DM_TIMER
+Message-ID: <1293158889-9708-1-git-send-email-bgamari.foss@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 24, 2010 at 12:20:32AM +0100, Janusz Krzysztofik wrote:
-> Tested on ARM OMAP1 based Amstrad Delta with a WIP OMAP1 camera patch, 
-> patterned upon two mach-mx3 machine types which already try to use the 
-> dma_declare_coherent_memory() method for reserving a region of system 
-> RAM preallocated with another dma_alloc_coherent(). Compile tested for 
-> all modified files except arch/sh/drivers/pci/fixups-dreamcast.c.
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+It appears that arch/arm/mach-omap2/timer-gp.o is needed by OMAP2PLUS.
+Since timer-gp.o has direct dependencies on omap_dm_timer_*, it seems
+correct for the architecture to depend upon OMAP_DM_TIMER, otherwise
+unsuspecting integrators will be faced with a whole bunch of linker
+errors at the end of their kernel build:
 
-The arch/sh/drivers/pci/fixups-dreamcast.c build fine.
+arch/arm/mach-omap2/built-in.o: In function `omap2_gp_timer_set_mode':
+/home/bgamari/trees/linux-2.6/arch/arm/mach-omap2/timer-gp.c:84: undefined reference to `omap_dm_timer_stop'
+/home/bgamari/trees/linux-2.6/arch/arm/mach-omap2/timer-gp.c:88: undefined reference to `omap_dm_timer_get_fclk'
+/home/bgamari/trees/linux-2.6/arch/arm/mach-omap2/timer-gp.c:90: undefined reference to `omap_dm_timer_set_load_start'
+...
+---
+ arch/arm/plat-omap/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Acked-by: Paul Mundt <lethal@linux-sh.org>
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 92c5bb7..784c06c 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -18,6 +18,7 @@ config ARCH_OMAP1
+ config ARCH_OMAP2PLUS
+ 	bool "TI OMAP2/3/4"
+ 	select COMMON_CLKDEV
++	select OMAP_DM_TIMER
+ 	help
+ 	  "Systems based on OMAP2, OMAP3 or OMAP4"
+ 
+-- 
+1.7.1
