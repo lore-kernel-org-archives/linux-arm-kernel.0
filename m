@@ -1,40 +1,63 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Sat, 25 Dec 2010 10:40:58 -0800
-Subject: [PATCH 1/7] msm: io: I/O register definitions for MSM8960
-In-Reply-To: <201012241429.28901.arnd@arndb.de> (Arnd Bergmann's message of
-	"Fri, 24 Dec 2010 14:29:28 +0100")
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<201012152337.19475.arnd@arndb.de>
-	<20101217001658.GA5880@huya.qualcomm.com>
-	<201012241429.28901.arnd@arndb.de>
-Message-ID: <8yaaajtd7b9.fsf@huya.qualcomm.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sun, 26 Dec 2010 16:38:31 +0100
+Subject: [PATCH V3 36/63] ST SPEAr : FSMC (Flexible Static Memory
+	Controller) NOR interface driver
+In-Reply-To: <187ed7b3996c7f37ce782d847d3ecc761c3e52b8.1292833228.git.viresh.kumar@st.com>
+References: <cover.1292833228.git.viresh.kumar@st.com>
+	<187ed7b3996c7f37ce782d847d3ecc761c3e52b8.1292833228.git.viresh.kumar@st.com>
+Message-ID: <AANLkTik_NXigwhRH3KMjV3qmu-GB7m+6hzzdGY8RjBof@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+2010/12/20 Viresh Kumar <viresh.kumar@st.com>:
 
-> On Friday 17 December 2010, David Brown wrote:
-
->> My question, then is, should we hold off on getting 8960 support into
->> the kernel until enough things are improved to get rid of the 8960
->> ifdefs?  We can certainly do it that way, but it will keep the code
->> out of the kernel longer.
+> SPEAr1300 SoC supports FSMC to interface with various memories
+> (NOR/NAND/SRAM). This patch adds the support for FSMC over NOR interface.
 >
-> My personal recommendation would be to fix all the places that you
-> can do without significant reworks of the existing code, and
-> just add TODO comments in the other places, so we can find them
-> easily. There is no reason to hold up merging the code too long for
-> this, but I wouldn't add code now that I know needs to be changed
-> soon to something that can already be done easily.
+> The driver being used is driver/mtd/maps/physmap.c
 
-Sounds like a good plan.  I've already started going through the IO
-mapping defines to make them not-ifdef based.  It's not that significant
-of a change.  Of course, everyone is on break here who will be able to
-test things, so we'll have this stuff early January.
+OK..
 
-Thanks,
-David
+(...)
+> diff --git a/arch/arm/mach-spear13xx/fsmc-nor.c b/arch/arm/mach-spear13xx/fsmc-nor.c
+> new file mode 100644
+> index 0000000..03234b6
+> --- /dev/null
+> +++ b/arch/arm/mach-spear13xx/fsmc-nor.c
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+What is this file doing in mach-spear13xx? Several other platforms
+like U300 and Nomadik use the same NOR controller.
+
+This should be in drivers/mtd/* somewhere I believe?
+
+> @@ -0,0 +1,85 @@
+> +/*
+> + * arch/arm/mach-spear13xx/fsmc-nor.c
+> + *
+> + * FSMC (Flexible Static Memory Controller) interface for NOR
+> + *
+> + * Copyright (C) 2010 ST Microelectronics
+> + * Vipin Kumar<vipin.kumar@st.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <plat/fsmc.h>
+
+Use <linux/mtd/fsmc.h> as include file, get rid of plat/fsmc.h.
+Extend that .h file with the stuff you need.
+
+We need to keep definitions for MTD NOR, NAND and OneNAND using FSMC
+in this file so as to keep things simple. One header file is enough, and it's
+very generic too, FSMC is not for plat-spear/* but also U300, Nomadik and
+Ux500.
+
+Yours,
+Linus Walleij
