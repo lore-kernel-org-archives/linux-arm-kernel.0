@@ -1,63 +1,179 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 26 Dec 2010 16:38:31 +0100
-Subject: [PATCH V3 36/63] ST SPEAr : FSMC (Flexible Static Memory
-	Controller) NOR interface driver
-In-Reply-To: <187ed7b3996c7f37ce782d847d3ecc761c3e52b8.1292833228.git.viresh.kumar@st.com>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<187ed7b3996c7f37ce782d847d3ecc761c3e52b8.1292833228.git.viresh.kumar@st.com>
-Message-ID: <AANLkTik_NXigwhRH3KMjV3qmu-GB7m+6hzzdGY8RjBof@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 27 Dec 2010 00:36:09 +0800
+Subject: S3C OTG udc driver isochronous support
+Message-ID: <AANLkTi=ssBu9FQp3svPBk3i3dPZTd-Dd03h9EyrO0waH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/20 Viresh Kumar <viresh.kumar@st.com>:
+Hi All,
+After checking the S3C OTG udc drivers in drivers/usb/gadget, i didn't
+find it can support isochronous endpoint. According to datasheet of
+S3C6410, EPtype field of DIEPCTLn and DOEPCTLn is read-only. Current
+S3C OTG udc driver list ep0~ep9, which are control endpoint and
+bulk/int endpoint according to the source codes:
+static struct s3c_udc memory = {
+	.usb_address = 0,
 
-> SPEAr1300 SoC supports FSMC to interface with various memories
-> (NOR/NAND/SRAM). This patch adds the support for FSMC over NOR interface.
->
-> The driver being used is driver/mtd/maps/physmap.c
+	.gadget = {
+		   .ops = &s3c_udc_ops,
+		   .ep0 = &memory.ep[0].ep,
+		   .name = driver_name,
+		   .dev = {
+			   .bus_id = "gadget",
+			   .release = nop_release,
+			   },
+		   },
 
-OK..
+	/* control endpoint */
+	.ep[0] = {
+		  .ep = {
+			 .name = ep0name,
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP0_FIFO_SIZE,
+			 },
+		  .dev = &memory,
 
-(...)
-> diff --git a/arch/arm/mach-spear13xx/fsmc-nor.c b/arch/arm/mach-spear13xx/fsmc-nor.c
-> new file mode 100644
-> index 0000000..03234b6
-> --- /dev/null
-> +++ b/arch/arm/mach-spear13xx/fsmc-nor.c
+		  .bEndpointAddress = 0,
+		  .bmAttributes = 0,
 
-What is this file doing in mach-spear13xx? Several other platforms
-like U300 and Nomadik use the same NOR controller.
+		  .ep_type = ep_control,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP0_FIFO,
+		  },
 
-This should be in drivers/mtd/* somewhere I believe?
+	/* first group of endpoints */
+	.ep[1] = {
+		  .ep = {
+			 .name = "ep1-bulk",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
 
-> @@ -0,0 +1,85 @@
-> +/*
-> + * arch/arm/mach-spear13xx/fsmc-nor.c
-> + *
-> + * FSMC (Flexible Static Memory Controller) interface for NOR
-> + *
-> + * Copyright (C) 2010 ST Microelectronics
-> + * Vipin Kumar<vipin.kumar@st.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <plat/fsmc.h>
+		  .bEndpointAddress = USB_DIR_OUT | 1,
+		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
 
-Use <linux/mtd/fsmc.h> as include file, get rid of plat/fsmc.h.
-Extend that .h file with the stuff you need.
+		  .ep_type = ep_bulk_out,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP1_FIFO,
+		  },
 
-We need to keep definitions for MTD NOR, NAND and OneNAND using FSMC
-in this file so as to keep things simple. One header file is enough, and it's
-very generic too, FSMC is not for plat-spear/* but also U300, Nomadik and
-Ux500.
+	.ep[2] = {
+		  .ep = {
+			 .name = "ep2-bulk",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
 
-Yours,
-Linus Walleij
+		  .bEndpointAddress = USB_DIR_IN | 2,
+		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
+
+		  .ep_type = ep_bulk_in,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP2_FIFO,
+		  },
+
+	.ep[3] = {
+		  .ep = {
+			 .name = "ep3-int",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
+
+		  .bEndpointAddress = USB_DIR_IN | 3,
+		  .bmAttributes = USB_ENDPOINT_XFER_INT,
+
+		  .ep_type = ep_interrupt,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP3_FIFO,
+		  },
+	.ep[4] = {
+		  .ep = {
+			 .name = "ep4-bulk",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
+
+		  .bEndpointAddress = USB_DIR_OUT | 4,
+		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
+
+		  .ep_type = ep_bulk_out,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP4_FIFO,
+		  },
+	.ep[5] = {
+		  .ep = {
+			 .name = "ep5-bulk",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
+
+		  .bEndpointAddress = USB_DIR_IN | 5,
+		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
+
+		  .ep_type = ep_bulk_in,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP5_FIFO,
+		  },
+	.ep[6] = {
+		  .ep = {
+			 .name = "ep6-int",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
+
+		  .bEndpointAddress = USB_DIR_IN | 6,
+		  .bmAttributes = USB_ENDPOINT_XFER_INT,
+
+		  .ep_type = ep_interrupt,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP6_FIFO,
+		  },
+	.ep[7] = {
+		  .ep = {
+			 .name = "ep7-bulk",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
+
+		  .bEndpointAddress = USB_DIR_OUT | 7,
+		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
+
+		  .ep_type = ep_bulk_out,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP7_FIFO,
+		  },
+	.ep[8] = {
+		  .ep = {
+			 .name = "ep8-bulk",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
+
+		  .bEndpointAddress = USB_DIR_IN | 8,
+		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
+
+		  .ep_type = ep_bulk_in,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP8_FIFO,
+		  },
+	.ep[9] = {
+		  .ep = {
+			 .name = "ep9-int",
+			 .ops = &s3c_ep_ops,
+			 .maxpacket = EP_FIFO_SIZE,
+			 },
+		  .dev = &memory,
+
+		  .bEndpointAddress = USB_DIR_IN | 9,
+		  .bmAttributes = USB_ENDPOINT_XFER_INT,
+
+		  .ep_type = ep_interrupt,
+		  .fifo = (unsigned int) S3C_UDC_OTG_EP9_FIFO,
+		  },
+};
+ep10~ep14 are not in the list. So is it possible ep10~ep14 are iso
+endpoints? I guess only samsung engineers can answer this question.
+And has anybody improved the udc driver to support ISO mode? Here i
+want to use this mode to support g_webcam gadget.
+
+Thanks
+Barry
