@@ -1,45 +1,58 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 26 Dec 2010 18:45:00 +0100 (CET)
-Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
-In-Reply-To: <201012250024.38576.jkrzyszt@tis.icnet.pl>
-References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
-	<201012241455.30430.jkrzyszt@tis.icnet.pl>
-	<20101224154120.GH20587@n2100.arm.linux.org.uk>
-	<201012250024.38576.jkrzyszt@tis.icnet.pl>
-Message-ID: <Pine.LNX.4.64.1012261837450.20458@axis700.grange>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Sun, 26 Dec 2010 14:56:56 -0500
+Subject: [PATCH v3] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs
+Message-ID: <1293393416-12850-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Dec 2010, Janusz Krzysztofik wrote:
+From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
 
-[snip]
+The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+In addition, the variant code for the AM-1808 SoC appears to match
+the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+these chips.
 
-> > Passing the virtual address allows the API to become much more
-> > flexible. Not only that, it allows it to be used on ARM, rather than
-> > becoming (as it currently stands) prohibited on ARM.
-> >
-> > I believe that putting ioremap() inside this API was the wrong thing
-> > to do, and moving it outside makes the API much more flexible and
-> > usable. It's something I still fully support.
-> 
-> Thanks, this is what I was missing, having my point of view rather my 
-> machine centric, with not much wider experience. I'll quote your 
-> argumentation in next iteration of this patch if required.
+This patch is originally from a patch on the arago project, here:
+http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
 
-AFAIU, this patch is similar to the previous two attempts:
+Further information related to the need for this patch can be located at
+http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
+http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
 
-http://www.spinics.net/lists/linux-sh/msg05482.html
-and
-http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/22271
+This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
+was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
 
-but is even more intrusive, because those two previous attempts added new 
-functions, whereas this one is modifying an existing one. Both those two 
-attempts have been NACKed by FUJITA Tomonori, btw, he is not on the 
-otherwise extensive CC list for this patch.
-
-Thanks
-Guennadi
+Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+Reported-by: Nicolas Luna <luna.id@gmail.com>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+This is against davinci-linux tree.
+Changes since v2:
+ - Added Sudhakar's sign-off.
+ - Fix spelling error in description.
+
+ arch/arm/mach-davinci/da850.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 78b5ae2..2d0bba5 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+ 		.cpu_id		= DAVINCI_CPU_ID_DA850,
+ 		.name		= "da850/omap-l138",
+ 	},
++	{
++		.variant	= 0x1,
++		.part_no	= 0xb7d1,
++		.manufacturer	= 0x017,	/* 0x02f >> 1 */
++		.cpu_id		= DAVINCI_CPU_ID_DA850,
++		.name		= "da850/omap-l138/am18xx",
++	},
+ };
+ 
+ static struct davinci_timer_instance da850_timer_instance[4] = {
+-- 
+1.7.0.4
