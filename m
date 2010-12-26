@@ -1,179 +1,45 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 27 Dec 2010 00:36:09 +0800
-Subject: S3C OTG udc driver isochronous support
-Message-ID: <AANLkTi=ssBu9FQp3svPBk3i3dPZTd-Dd03h9EyrO0waH@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sun, 26 Dec 2010 18:45:00 +0100 (CET)
+Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
+In-Reply-To: <201012250024.38576.jkrzyszt@tis.icnet.pl>
+References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
+	<201012241455.30430.jkrzyszt@tis.icnet.pl>
+	<20101224154120.GH20587@n2100.arm.linux.org.uk>
+	<201012250024.38576.jkrzyszt@tis.icnet.pl>
+Message-ID: <Pine.LNX.4.64.1012261837450.20458@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-After checking the S3C OTG udc drivers in drivers/usb/gadget, i didn't
-find it can support isochronous endpoint. According to datasheet of
-S3C6410, EPtype field of DIEPCTLn and DOEPCTLn is read-only. Current
-S3C OTG udc driver list ep0~ep9, which are control endpoint and
-bulk/int endpoint according to the source codes:
-static struct s3c_udc memory = {
-	.usb_address = 0,
+On Sat, 25 Dec 2010, Janusz Krzysztofik wrote:
 
-	.gadget = {
-		   .ops = &s3c_udc_ops,
-		   .ep0 = &memory.ep[0].ep,
-		   .name = driver_name,
-		   .dev = {
-			   .bus_id = "gadget",
-			   .release = nop_release,
-			   },
-		   },
+[snip]
 
-	/* control endpoint */
-	.ep[0] = {
-		  .ep = {
-			 .name = ep0name,
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP0_FIFO_SIZE,
-			 },
-		  .dev = &memory,
+> > Passing the virtual address allows the API to become much more
+> > flexible. Not only that, it allows it to be used on ARM, rather than
+> > becoming (as it currently stands) prohibited on ARM.
+> >
+> > I believe that putting ioremap() inside this API was the wrong thing
+> > to do, and moving it outside makes the API much more flexible and
+> > usable. It's something I still fully support.
+> 
+> Thanks, this is what I was missing, having my point of view rather my 
+> machine centric, with not much wider experience. I'll quote your 
+> argumentation in next iteration of this patch if required.
 
-		  .bEndpointAddress = 0,
-		  .bmAttributes = 0,
+AFAIU, this patch is similar to the previous two attempts:
 
-		  .ep_type = ep_control,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP0_FIFO,
-		  },
+http://www.spinics.net/lists/linux-sh/msg05482.html
+and
+http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/22271
 
-	/* first group of endpoints */
-	.ep[1] = {
-		  .ep = {
-			 .name = "ep1-bulk",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_OUT | 1,
-		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
-
-		  .ep_type = ep_bulk_out,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP1_FIFO,
-		  },
-
-	.ep[2] = {
-		  .ep = {
-			 .name = "ep2-bulk",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_IN | 2,
-		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
-
-		  .ep_type = ep_bulk_in,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP2_FIFO,
-		  },
-
-	.ep[3] = {
-		  .ep = {
-			 .name = "ep3-int",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_IN | 3,
-		  .bmAttributes = USB_ENDPOINT_XFER_INT,
-
-		  .ep_type = ep_interrupt,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP3_FIFO,
-		  },
-	.ep[4] = {
-		  .ep = {
-			 .name = "ep4-bulk",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_OUT | 4,
-		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
-
-		  .ep_type = ep_bulk_out,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP4_FIFO,
-		  },
-	.ep[5] = {
-		  .ep = {
-			 .name = "ep5-bulk",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_IN | 5,
-		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
-
-		  .ep_type = ep_bulk_in,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP5_FIFO,
-		  },
-	.ep[6] = {
-		  .ep = {
-			 .name = "ep6-int",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_IN | 6,
-		  .bmAttributes = USB_ENDPOINT_XFER_INT,
-
-		  .ep_type = ep_interrupt,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP6_FIFO,
-		  },
-	.ep[7] = {
-		  .ep = {
-			 .name = "ep7-bulk",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_OUT | 7,
-		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
-
-		  .ep_type = ep_bulk_out,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP7_FIFO,
-		  },
-	.ep[8] = {
-		  .ep = {
-			 .name = "ep8-bulk",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_IN | 8,
-		  .bmAttributes = USB_ENDPOINT_XFER_BULK,
-
-		  .ep_type = ep_bulk_in,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP8_FIFO,
-		  },
-	.ep[9] = {
-		  .ep = {
-			 .name = "ep9-int",
-			 .ops = &s3c_ep_ops,
-			 .maxpacket = EP_FIFO_SIZE,
-			 },
-		  .dev = &memory,
-
-		  .bEndpointAddress = USB_DIR_IN | 9,
-		  .bmAttributes = USB_ENDPOINT_XFER_INT,
-
-		  .ep_type = ep_interrupt,
-		  .fifo = (unsigned int) S3C_UDC_OTG_EP9_FIFO,
-		  },
-};
-ep10~ep14 are not in the list. So is it possible ep10~ep14 are iso
-endpoints? I guess only samsung engineers can answer this question.
-And has anybody improved the udc driver to support ISO mode? Here i
-want to use this mode to support g_webcam gadget.
+but is even more intrusive, because those two previous attempts added new 
+functions, whereas this one is modifying an existing one. Both those two 
+attempts have been NACKed by FUJITA Tomonori, btw, he is not on the 
+otherwise extensive CC list for this patch.
 
 Thanks
-Barry
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
