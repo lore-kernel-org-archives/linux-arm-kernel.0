@@ -1,51 +1,70 @@
-From: t.fujak@samsung.com (Tomasz Fujak)
-Date: Mon, 27 Dec 2010 11:56:15 +0100
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <8yasjxobc1o.fsf@huya.qualcomm.com>
-References: <cover.1292443200.git.m.nazarewicz@samsung.com>
-	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
-	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-	<20101223121917.GG3636@n2100.arm.linux.org.uk>
-	<4D135004.3070904@samsung.com>
-	<20101223134838.GK3636@n2100.arm.linux.org.uk>
-	<4D1356D7.2000008@samsung.com>
-	<20101223141608.GM3636@n2100.arm.linux.org.uk>
-	<AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
-	<8yasjxobc1o.fsf@huya.qualcomm.com>
-Message-ID: <4D1870CF.6030601@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Dec 2010 11:24:30 +0000
+Subject: [PATCH V2] S5PC210: universal: update support pmic for c210
+	universal board
+In-Reply-To: <4D18174F.8060804@samsung.com>
+References: <1293168299-11552-1-git-send-email-dh09.lee@samsung.com>
+	<20101224173531.GA26913@sirena.org.uk>
+	<4D18174F.8060804@samsung.com>
+Message-ID: <20101227112429.GA25753@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-12-23 19:04, David Brown wrote:
-> Felipe Contreras <felipe.contreras@gmail.com> writes:
->
->> A generic solution (that I think I already proposed) would be to
->> reserve a chunk of memory for the CMA that can be removed from the
->> normally mapped kernel memory through memblock at boot time. The size
->> of this memory region would be configurable through kconfig. Then, the
->> CMA would have a "dma" flag or something, and take chunks out of it
->> until there's no more, and then return errors. That would work for
->> ARM.
-> That sounds an awful lot like the Android kernel's pmem implementation.
->
-> Solving this problem is important for us as well, but, I'm not sure I
-> see a better solution that something like Felipe suggests.
->
-Alas, until  the multiple mapping problem is solved, we're stuck. Right
-now, as brought to us by Russell, dma-able memory must be uncached.
-Can't see reasonable use of such a memory in system-wide manner yet, at
-least on A8.
-A9 has PIPT caches in the data hierarchy, so some workaround could be
-not to use such memory for program text. But could it really?
+On Mon, Dec 27, 2010 at 01:34:23PM +0900, Donghwa Lee wrote:
+>  On 2010-12-25 ?? 2:35 , Mark Brown wrote:
+> > On Fri, Dec 24, 2010 at 02:24:59PM +0900, Donghwa Lee wrote:
 
-Any ideas?
-> The disadvantage, of course, being that the memory isn't available for
-> the system when the user isn't doing the multi-media.
->
-The CMA is intended to do this: multimedia memory doubles as movable
-zone, but again - according to RMK the problem is real (we just haven't
-run into it yet though). And it's no fun when the device goes to a crawl
-due to swapping while a third of the physical memory lies unused.
-> David
->
+> >> +static struct regulator_consumer_supply max8952_consumer[] = {
+> >> +	{
+> >> +		.supply		= "varm_1.2v_c210",
+> >> +	}, {
+> >> +		.supply		= "vdd_arm",
+> >> +	},
+> > This looks very suspicious - you've got two supplies, both of which look
+> > like the CPU core rail provided by the same regulator, one of which
+> > looks like it's got the name of the supply hard coded into it.  What are
+> > these two supplies exactly?
+
+>  I will remove "vdd_arm" next patch.
+
+I think that's the wrong one to remove; see below.
+
+> >> +			.name		= "VARM_1.2V",
+
+> > Interesting name for a supply that can change voltage :)
+
+> 1.2V is default voltage. If it is needed , volatage can be changed.
+> Is the name changed?
+
+The name is fine, it's just amusing.
+
+> >> +static struct regulator_consumer_supply lp3974_buck2_consumer[] = {
+> >> +	{
+> >> +		.supply		= "vg3d_1.2v_c210",
+> >> +	},
+
+> > This and most of the other consumers you're defining look like they're
+> > actually the names for the relevant rails rather than supplies for
+> > individual devices.  You shouldn't do this, supplies should be actual
+> > supplies on individual consumers - probably most of these consumers
+> > should just be removed.  You can name the supplies for UI purposes using
+> > the .name field in the constraints.
+
+> Supplies name of this patch is defined in the schematic diagram.
+> Could you suggest the name for UI purposes?
+
+You're misunderstanding what supplies are.  The supplies define how the
+regulators are connected to the other devices on the board, they allow
+other devices to request supplies in terms of the name the device itself
+uses for the supply (eg, "DBVDD") rather than in terms of a board
+specific name (like what you've got above).  This is why there's a
+device field - it's to specify the device that the supplies are in terms
+of.
+
+> > Can you really turn off the VINT regulator at runtime?  I'd expect that
+> > to crash the processor.  Similarly for many of the other supplies.
+
+> If it turns off at run time, it would be crash the processor, but, it will be turn off
+> only when executing SLEEP, maybe no problem.
+
+That's a separate thing, no need to enable change status for that.
