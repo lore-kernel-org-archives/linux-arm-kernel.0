@@ -1,53 +1,51 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 27 Dec 2010 11:29:36 +0100
-Subject: [PATCH] dma_declare_coherent_memory: push ioremap() up to caller
-In-Reply-To: <Pine.LNX.4.64.1012261837450.20458@axis700.grange>
-References: <201012240020.37208.jkrzyszt@tis.icnet.pl>
-	<201012250024.38576.jkrzyszt@tis.icnet.pl>
-	<Pine.LNX.4.64.1012261837450.20458@axis700.grange>
-Message-ID: <201012271129.44434.jkrzyszt@tis.icnet.pl>
+From: t.fujak@samsung.com (Tomasz Fujak)
+Date: Mon, 27 Dec 2010 11:56:15 +0100
+Subject: [PATCHv8 00/12] Contiguous Memory Allocator
+In-Reply-To: <8yasjxobc1o.fsf@huya.qualcomm.com>
+References: <cover.1292443200.git.m.nazarewicz@samsung.com>
+	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
+	<20101223100642.GD3636@n2100.arm.linux.org.uk>
+	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
+	<20101223121917.GG3636@n2100.arm.linux.org.uk>
+	<4D135004.3070904@samsung.com>
+	<20101223134838.GK3636@n2100.arm.linux.org.uk>
+	<4D1356D7.2000008@samsung.com>
+	<20101223141608.GM3636@n2100.arm.linux.org.uk>
+	<AANLkTinzsOom5awOr6Y8e7PKRbCWYQOqEbdw9is6HroR@mail.gmail.com>
+	<8yasjxobc1o.fsf@huya.qualcomm.com>
+Message-ID: <4D1870CF.6030601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sunday 26 December 2010 18:45:00 Guennadi Liakhovetski wrote:
-> On Sat, 25 Dec 2010, Janusz Krzysztofik wrote:
+On 2010-12-23 19:04, David Brown wrote:
+> Felipe Contreras <felipe.contreras@gmail.com> writes:
 >
-> [snip]
+>> A generic solution (that I think I already proposed) would be to
+>> reserve a chunk of memory for the CMA that can be removed from the
+>> normally mapped kernel memory through memblock at boot time. The size
+>> of this memory region would be configurable through kconfig. Then, the
+>> CMA would have a "dma" flag or something, and take chunks out of it
+>> until there's no more, and then return errors. That would work for
+>> ARM.
+> That sounds an awful lot like the Android kernel's pmem implementation.
 >
-> > > Passing the virtual address allows the API to become much more
-> > > flexible. Not only that, it allows it to be used on ARM, rather
-> > > than becoming (as it currently stands) prohibited on ARM.
-> > >
-> > > I believe that putting ioremap() inside this API was the wrong
-> > > thing to do, and moving it outside makes the API much more
-> > > flexible and usable. It's something I still fully support.
-> >
-> > Thanks, this is what I was missing, having my point of view rather
-> > my machine centric, with not much wider experience. I'll quote your
-> > argumentation in next iteration of this patch if required.
+> Solving this problem is important for us as well, but, I'm not sure I
+> see a better solution that something like Felipe suggests.
 >
-> AFAIU, this patch is similar to the previous two attempts:
->
-> http://www.spinics.net/lists/linux-sh/msg05482.html
-> and
-> http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructur
->e/22271
->
-> but is even more intrusive, because those two previous attempts added
-> new functions, whereas this one is modifying an existing one. Both
-> those two attempts have been NACKed by FUJITA Tomonori, btw, he is 
-> not on the otherwise extensive CC list for this patch.
+Alas, until  the multiple mapping problem is solved, we're stuck. Right
+now, as brought to us by Russell, dma-able memory must be uncached.
+Can't see reasonable use of such a memory in system-wide manner yet, at
+least on A8.
+A9 has PIPT caches in the data hierarchy, so some workaround could be
+not to use such memory for program text. But could it really?
 
-Hi Guennadi,
-I composed that extensive CC list based on what I was able to find in 
-MAINTAINERS for any files being modified, additionally adding Catalin 
-Marinas as one of the idea promoters. FUJITA Tomonori's name was not 
-specified there, nor was he mentioned as an author of any of those 
-files. Adding him per your advice.
-
-NB, the rationale quoted above is provided by courtesy of Russell King, 
-and not of my authoriship, as it may look like at a first glance from 
-your snip result.
-
-Thanks,
-Janusz
+Any ideas?
+> The disadvantage, of course, being that the memory isn't available for
+> the system when the user isn't doing the multi-media.
+>
+The CMA is intended to do this: multimedia memory doubles as movable
+zone, but again - according to RMK the problem is real (we just haven't
+run into it yet though). And it's no fun when the device goes to a crawl
+due to swapping while a third of the physical memory lies unused.
+> David
+>
