@@ -1,104 +1,76 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Mon, 27 Dec 2010 19:21:45 +0100
-Subject: [PATCH] sa1100: Update platform device registration
-Message-ID: <1293474105-14300-1-git-send-email-jochen@scram.de>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Mon, 27 Dec 2010 18:25:18 +0000
+Subject: [PATCH] i.MX51: Full iomux support
+References: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
+	<87y67rcdnf.fsf@lechat.rtp-net.org>	<19720.55896.197553.407321@ipc1.ka-ro>
+	<87tyifcajm.fsf@lechat.rtp-net.org>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA067FCB@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace some magic numbers with constants and add interrupt definitions.
+Hi,
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- arch/arm/mach-sa1100/generic.c |   41 ++++++++++++++++++++++++++++++++-------
- 1 files changed, 33 insertions(+), 8 deletions(-)
+>-----Original Message-----
+>From: Nguyen Dinh-R00091
+>Sent: Monday, December 27, 2010 11:47 AM
+>To: 'Arnaud Patard'; Lothar Wa?mann
+>Cc: Sascha Hauer; linux-arm-kernel at lists.infradead.org; Richard Zhao; Jason Wang
+>Subject: RE: [PATCH] i.MX51: Full iomux support
+>
+>Hi,
+>
+>>-----Original Message-----
+>>From: Arnaud Patard [mailto:arnaud.patard at rtp-net.org]
+>>Sent: Wednesday, December 15, 2010 9:37 AM
+>>To: Lothar Wa?mann
+>>Cc: Sascha Hauer; linux-arm-kernel at lists.infradead.org; Richard Zhao; Nguyen Dinh-R00091; Jason Wang
+>>Subject: Re: [PATCH] i.MX51: Full iomux support
+>>
+>>Lothar Wa?mann <LW@KARO-electronics.de> writes:
+>>
+>>> Hi,
+>>>
+>>> Arnaud Patard (Rtp) writes:
+>>>> Sascha Hauer <s.hauer@pengutronix.de> writes:
+>>> [...]
+>>>> > The following series picks up the patch from Lothar Wa?mann replacing
+>>>> > the struct pad_desc with a 64bit variable and adds full i.MX51 iomux
+>>>> > support based on this patch.
+>>>> > The iomux configurations are taken from the Freescale pinmux tool, so the
+>>>> > definitions should be rather complete. Anyway, there are some modes
+>>>> > not present in the tool.
+>>>> > I took the padmux settings from the old iomux support where present.
+>>>>
+>>>> I'm seeing a lot of changes in the iomux file and I have a patch [1]
+>>>> setting the SION bit for all gpios configuration so that reading the PSR
+>>>> value is giving usefull results when the gpio is configured as output. I
+>>>> wanted to send it this week but it will obviously conflict with
+>>>> this. Should I test your patchset first and if it's working, wait
+>>>> for its merge or should I send it anyway ? How do you want to deal with
+>>>> this (as long as you're fine with setting the SION bit for all gpios) ?
+>>>>
+>>> I had done the same, but had some trouble with this.
+>>> E.g. on our board GPIO1_7 is used as a generic GPIO to enable an
+>>> external clock oscillator for the USBH1 ULPI PHY. When the SION bit
+>>> for this pad was set, I got strange errors on the USBH1 port
+>>> (disconnecting low speed devices behind a hub would stall the
+>>> bus). When I removed the SION bit for that pin everything worked
+>>> well.
+>>
+>>wow. Would be nice to have feedback from fsl. I was fearing of bad
+>>effects but I didn't think they could actually break something so
+>>badly. After all, the manual doesn't warn about possible side effects of
+>>the SION bit iirc. This would mean this will have to be dealt on a board
+>>basis. It would be... erm... not really "efficient".
+>>
+>>Arnaud
+>
+>You cannot blindly set the SION bit for all GPIO's. I have to dig through my email history for a more
+>technical explanation.
+>
+>Thanks,
+>Dinh
 
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index 3c1fcd6..3555d61 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -163,10 +163,15 @@ static void sa11x0_register_device(struct platform_device *dev, void *data)
- 
- static struct resource sa11x0udc_resources[] = {
- 	[0] = {
--		.start	= 0x80000000,
--		.end	= 0x8000ffff,
-+		.start	= __PREG(Ser0UDCCR),
-+		.end	= __PREG(Ser0UDCCR) + 0xffff,
- 		.flags	= IORESOURCE_MEM,
- 	},
-+	[1] = {
-+		.start	= IRQ_Ser0UDC,
-+		.end	= IRQ_Ser0UDC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
- };
- 
- static u64 sa11x0udc_dma_mask = 0xffffffffUL;
-@@ -184,10 +189,15 @@ static struct platform_device sa11x0udc_device = {
- 
- static struct resource sa11x0uart1_resources[] = {
- 	[0] = {
--		.start	= 0x80010000,
--		.end	= 0x8001ffff,
-+		.start	= __PREG(Ser1UTCR0),
-+		.end	= __PREG(Ser1UTCR0) + 0xffff,
- 		.flags	= IORESOURCE_MEM,
- 	},
-+	[1] = {
-+		.start	= IRQ_Ser1UART,
-+		.end	= IRQ_Ser1UART,
-+		.flags	= IORESOURCE_IRQ,
-+	},
- };
- 
- static struct platform_device sa11x0uart1_device = {
-@@ -199,10 +209,15 @@ static struct platform_device sa11x0uart1_device = {
- 
- static struct resource sa11x0uart3_resources[] = {
- 	[0] = {
--		.start	= 0x80050000,
--		.end	= 0x8005ffff,
-+		.start	= __PREG(Ser3UTCR0),
-+		.end	= __PREG(Ser3UTCR0) + 0xffff,
- 		.flags	= IORESOURCE_MEM,
- 	},
-+	[1] = {
-+		.start	= IRQ_Ser3UART,
-+		.end	= IRQ_Ser3UART,
-+		.flags	= IORESOURCE_IRQ,
-+	},
- };
- 
- static struct platform_device sa11x0uart3_device = {
-@@ -214,10 +229,15 @@ static struct platform_device sa11x0uart3_device = {
- 
- static struct resource sa11x0mcp_resources[] = {
- 	[0] = {
--		.start	= 0x80060000,
--		.end	= 0x8006ffff,
-+		.start	= __PREG(Ser4MCCR0),
-+		.end	= __PREG(Ser4MCCR0) + 0xffff,
- 		.flags	= IORESOURCE_MEM,
- 	},
-+	[1] = {
-+		.start	= IRQ_Ser4MCP,
-+		.end	= IRQ_Ser4MCP,
-+		.flags	= IORESOURCE_IRQ,
-+	},
- };
- 
- static u64 sa11x0mcp_dma_mask = 0xffffffffUL;
-@@ -244,6 +264,11 @@ static struct resource sa11x0ssp_resources[] = {
- 		.end	= 0x8007ffff,
- 		.flags	= IORESOURCE_MEM,
- 	},
-+	[1] = {
-+		.start	= IRQ_Ser4SSP,
-+		.end	= IRQ_Ser4SSP,
-+		.flags	= IORESOURCE_IRQ,
-+	},
- };
- 
- static u64 sa11x0ssp_dma_mask = 0xffffffffUL;
--- 
-1.7.2.3
+The SION bit is a "Software Input On" bit. Basically, if you set the GPIO as an output, you cannot set the SION bit.
+
+Dinh
