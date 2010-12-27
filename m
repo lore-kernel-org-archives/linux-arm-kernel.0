@@ -1,58 +1,56 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Sun, 26 Dec 2010 14:56:56 -0500
-Subject: [PATCH v3] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-Message-ID: <1293393416-12850-1-git-send-email-michael.williamson@criticallink.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 27 Dec 2010 10:00:33 +0900
+Subject: bug in PL011 console
+In-Reply-To: <AANLkTi=4WOv=uHEqw-BUDaoa5LMX_YnbjNMfKLXSoFfm@mail.gmail.com>
+References: <20101223150234.GW14221@pengutronix.de>
+	<20101223150841.GP3636@n2100.arm.linux.org.uk>
+	<20101223154252.GX14221@pengutronix.de>
+	<AANLkTimXa_amsei4GQVmG0XceyyMisDZ5fQ4NZPXEquk@mail.gmail.com>
+	<AANLkTi=4WOv=uHEqw-BUDaoa5LMX_YnbjNMfKLXSoFfm@mail.gmail.com>
+Message-ID: <AANLkTik98tzyX9sRr4TabbL5dfopiUXb6CWUOHQ9CB1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+On Fri, Dec 24, 2010 at 4:10 PM, Richard Zhao <linuxzsc@gmail.com> wrote:
+> 2010/12/24 Jassi Brar <jassisinghbrar@gmail.com>:
+>> 2010/12/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>>> On Thu, Dec 23, 2010 at 03:08:41PM +0000, Russell King - ARM Linux wrote:
+>>>> On Thu, Dec 23, 2010 at 04:02:34PM +0100, Uwe Kleine-K?nig wrote:
+>>>> > Steven told me on irc that sleeping was not allowed in the console write
+>>>> > callback. ?Maybe this didn't show up earlier because not all clk
+>>>> > implementations sleep as mxs' does.
+>>>> >
+>>>> > I think the only possible fix is to do the clk_enable in the setup
+>>>> > callback instead of per-write.
+>>>> >
+>>>> > Will send a patch as follow up.
+>>>>
+>>>> We really need to sort out what's expected from the CLK API. ?The drivers
+>>>> I write assume that it's absolutely fine to call clk_enable/clk_disable
+>>>> from IRQ context, and for the platforms I implemented the CLK API for,
+>>>> that's absolutely true.
+>>> The common struct clk patch[1] by Jeremy Kerr sleeps, too. ?And I think
+>>> most people who commented to this series thought that this is the right
+>>> behaviour.
+>>
+>> Personally, I am not as against atomic clocks as having two versions
+>> of the clock - atomic
+>> and sleepable, in the API.
+>> I favor sleepable version because with the clock hierarchies becoming so complex
+>> in latest SoCs, it would be difficult to write a 'smart' clock
+>> management sub-system
+> Can you let some intermediate clock on to shorten the time? It might
+> be better to use some new global power state management to let clock
+> become smart. Clock itself becomes simple.
 
-The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
-In addition, the variant code for the AM-1808 SoC appears to match
-the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
-these chips.
+Isn't a very neat way, imho. Who decides which clocks are enabled by
+default - Platform or Machine code? Not to forget, power saving is one
+of the intended benefits of
+being able to manage clocks atomically and here we would be forced to keep
+clocks enabled due to that very 'feature'.
 
-This patch is originally from a patch on the arago project, here:
-http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
-
-Further information related to the need for this patch can be located at
-http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
-http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
-
-This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
-was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
-
-Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-Tested-by: Michael Williamson <michael.williamson@criticallink.com>
-Reported-by: Nicolas Luna <luna.id@gmail.com>
----
-This is against davinci-linux tree.
-Changes since v2:
- - Added Sudhakar's sign-off.
- - Fix spelling error in description.
-
- arch/arm/mach-davinci/da850.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 78b5ae2..2d0bba5 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
- 		.cpu_id		= DAVINCI_CPU_ID_DA850,
- 		.name		= "da850/omap-l138",
- 	},
-+	{
-+		.variant	= 0x1,
-+		.part_no	= 0xb7d1,
-+		.manufacturer	= 0x017,	/* 0x02f >> 1 */
-+		.cpu_id		= DAVINCI_CPU_ID_DA850,
-+		.name		= "da850/omap-l138/am18xx",
-+	},
- };
- 
- static struct davinci_timer_instance da850_timer_instance[4] = {
--- 
-1.7.0.4
+Also, please remember that some intermediate clock sources (eg. scalars)
+could provide to more than one peripheral, and it would be nice to have
+mechanism to figure out if and when a peripheral can safely modify the clock to
+its own need. And for that, AFAICT, we need to poll other users of the clock and
+see if they can manage working with different speeds.
