@@ -1,65 +1,54 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 27 Dec 2010 11:33:18 +0530
-Subject: [PATCH v3] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-In-Reply-To: <1293393416-12850-1-git-send-email-michael.williamson@criticallink.com>
-References: <1293393416-12850-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930247FAF663@dbde02.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 27 Dec 2010 11:22:42 +0200
+Subject: [GIT PULL] OMAP USB Changes for Merge Window
+In-Reply-To: <20101223203920.GQ7771@atomide.com>
+References: <20101223084734.GA3149@legolas.emea.dhcp.ti.com>
+	<20101223203920.GQ7771@atomide.com>
+Message-ID: <20101227092242.GC2301@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 27, 2010 at 01:26:56, Michael Williamson wrote:
-> From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
->
-> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
-> In addition, the variant code for the AM-1808 SoC appears to match
-> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
-> these chips.
->
-> This patch is originally from a patch on the arago project, here:
-> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
->
-> Further information related to the need for this patch can be located at
-> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
-> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
->
-> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
-> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
->
-> Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
-> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
-> Reported-by: Nicolas Luna <luna.id@gmail.com>
-> ---
-> This is against davinci-linux tree.
-> Changes since v2:
->  - Added Sudhakar's sign-off.
->  - Fix spelling error in description.
->
->  arch/arm/mach-davinci/da850.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 78b5ae2..2d0bba5 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
->               .cpu_id         = DAVINCI_CPU_ID_DA850,
->               .name           = "da850/omap-l138",
+Hi,
 
-Should have "/am18x" here. That should have been part
-of my patches adding AM1x support. It should now be a
-separate patch.
+On Thu, Dec 23, 2010 at 12:39:20PM -0800, Tony Lindgren wrote:
+>* Felipe Balbi <balbi@ti.com> [101223 00:47]:
+>> Hi Tony,
+>>
+>> please queue the following two patches for Merge Window.
+>>
+>> The following changes since commit b79540fcbbcf9b379c9197f63c5a883bbe3adfd4:
+>>
+>>    Linux-omap rebuilt: Merged branches from Paul and Kevin and mux changes (2010-12-22 19:13:33 -0800)
+>
+>This can't be pulled as it would pull in tons of non-mainline
+>commits from the linux-omap master branch.
 
->       },
-> +     {
-> +             .variant        = 0x1,
-> +             .part_no        = 0xb7d1,
-> +             .manufacturer   = 0x017,        /* 0x02f >> 1 */
-> +             .cpu_id         = DAVINCI_CPU_ID_DA850,
-> +             .name           = "da850/omap-l138/am18xx",
+heh, my bad. Craneboard wasn't in mainline then I rebased on top of your
+tree.
 
-Just "am18x".
+>Everybody, all the pullable branches must be based on something
+>in the mainline kernel, like a recent -rc tag. If that won't work,
+>then some commit needs to be agreed on separately that will go
+>to mainline, like the omap-for-linus branch.
 
-Thanks,
-Sekhar
+Makes sense.
+
+>Further, please wait few days before sending the pull request
+>in case somebody wants to ack your patches. Sending a pull request
+>with the patches to be reviewed is kind of pointless.. Sure in this
+
+the patches were actually for reference, much like Greg does with the
+USB patches.
+
+>case these are pretty trivial patches, but still.
+
+patch 1 was pending on l-o for weeks, only patch 2 is new.
+
+>Anyways, I'll apply these into a temporary branch and will
+>merge into omap-for-linus within next few days assuming no
+>problems.
+
+good, thanks.
+
+-- 
+balbi
