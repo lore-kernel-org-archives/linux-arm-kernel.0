@@ -1,54 +1,24 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 27 Dec 2010 11:22:42 +0200
-Subject: [GIT PULL] OMAP USB Changes for Merge Window
-In-Reply-To: <20101223203920.GQ7771@atomide.com>
-References: <20101223084734.GA3149@legolas.emea.dhcp.ti.com>
-	<20101223203920.GQ7771@atomide.com>
-Message-ID: <20101227092242.GC2301@legolas.emea.dhcp.ti.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 27 Dec 2010 15:29:16 +0530
+Subject: [PATCH v10 4/6] davinci: MMC/SD support for Omapl138-Hawkboard
+In-Reply-To: <AANLkTikAQJ6fdqqUBxR4sGu0VMNE4WRiWM8RC9yRzCwb@mail.gmail.com>
+References: <1291760089-5818-1-git-send-email-vm.rod25@gmail.com>
+	<1291760089-5818-5-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930247C470AD@dbde02.ent.ti.com>
+	<AANLkTi=VZQAhC=Hm7dGB8tW38FA-SqLUc-GCiNUX7iSw@mail.gmail.com>
+	<AANLkTiktxX3X+qTmentd+gDE3zPSqkry72P8GE6SLvf9@mail.gmail.com>
+	<AANLkTikAQJ6fdqqUBxR4sGu0VMNE4WRiWM8RC9yRzCwb@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024806D3E5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Victor,
 
-On Thu, Dec 23, 2010 at 12:39:20PM -0800, Tony Lindgren wrote:
->* Felipe Balbi <balbi@ti.com> [101223 00:47]:
->> Hi Tony,
->>
->> please queue the following two patches for Merge Window.
->>
->> The following changes since commit b79540fcbbcf9b379c9197f63c5a883bbe3adfd4:
->>
->>    Linux-omap rebuilt: Merged branches from Paul and Kevin and mux changes (2010-12-22 19:13:33 -0800)
->
->This can't be pulled as it would pull in tons of non-mainline
->commits from the linux-omap master branch.
+On Tue, Dec 14, 2010 at 21:09:55, Victor Rodriguez wrote:
 
-heh, my bad. Craneboard wasn't in mainline then I rebased on top of your
-tree.
+> Hi Sekhar and Kevin  I will resend the patches again with this changes is ok?
 
->Everybody, all the pullable branches must be based on something
->in the mainline kernel, like a recent -rc tag. If that won't work,
->then some commit needs to be agreed on separately that will go
->to mainline, like the omap-for-linus branch.
+Yes, please post the patches again. I guess we are almost there.
 
-Makes sense.
-
->Further, please wait few days before sending the pull request
->in case somebody wants to ack your patches. Sending a pull request
->with the patches to be reviewed is kind of pointless.. Sure in this
-
-the patches were actually for reference, much like Greg does with the
-USB patches.
-
->case these are pretty trivial patches, but still.
-
-patch 1 was pending on l-o for weeks, only patch 2 is new.
-
->Anyways, I'll apply these into a temporary branch and will
->merge into omap-for-linus within next few days assuming no
->problems.
-
-good, thanks.
-
--- 
-balbi
+Thanks,
+Sekhar
