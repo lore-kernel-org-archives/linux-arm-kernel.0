@@ -1,63 +1,44 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Mon, 27 Dec 2010 17:47:16 +0000
-Subject: [PATCH] i.MX51: Full iomux support
-In-Reply-To: <87tyifcajm.fsf@lechat.rtp-net.org>
-References: <1292421691-14615-1-git-send-email-s.hauer@pengutronix.de>
-	<87y67rcdnf.fsf@lechat.rtp-net.org>	<19720.55896.197553.407321@ipc1.ka-ro>
-	<87tyifcajm.fsf@lechat.rtp-net.org>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA06763A@039-SN1MPN1-004.039d.mgd.msft.net>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Mon, 27 Dec 2010 18:49:30 +0100
+Subject: [PATCH 2.6.37 RESEND] sa1100: Fix platform device registration
+Message-ID: <1293472170-14130-1-git-send-email-jochen@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since commit 7a5b4e16c880f8350d255dc188f81622905618c1, simpad devices don't
+boot anymore, since platform devices are registered too early. Fix by moving
+the registration from map_io to arch_initcall as done on other sa1100 boards.
 
->-----Original Message-----
->From: Arnaud Patard [mailto:arnaud.patard at rtp-net.org]
->Sent: Wednesday, December 15, 2010 9:37 AM
->To: Lothar Wa?mann
->Cc: Sascha Hauer; linux-arm-kernel at lists.infradead.org; Richard Zhao; Nguyen Dinh-R00091; Jason Wang
->Subject: Re: [PATCH] i.MX51: Full iomux support
->
->Lothar Wa?mann <LW@KARO-electronics.de> writes:
->
->> Hi,
->>
->> Arnaud Patard (Rtp) writes:
->>> Sascha Hauer <s.hauer@pengutronix.de> writes:
->> [...]
->>> > The following series picks up the patch from Lothar Wa?mann replacing
->>> > the struct pad_desc with a 64bit variable and adds full i.MX51 iomux
->>> > support based on this patch.
->>> > The iomux configurations are taken from the Freescale pinmux tool, so the
->>> > definitions should be rather complete. Anyway, there are some modes
->>> > not present in the tool.
->>> > I took the padmux settings from the old iomux support where present.
->>>
->>> I'm seeing a lot of changes in the iomux file and I have a patch [1]
->>> setting the SION bit for all gpios configuration so that reading the PSR
->>> value is giving usefull results when the gpio is configured as output. I
->>> wanted to send it this week but it will obviously conflict with
->>> this. Should I test your patchset first and if it's working, wait
->>> for its merge or should I send it anyway ? How do you want to deal with
->>> this (as long as you're fine with setting the SION bit for all gpios) ?
->>>
->> I had done the same, but had some trouble with this.
->> E.g. on our board GPIO1_7 is used as a generic GPIO to enable an
->> external clock oscillator for the USBH1 ULPI PHY. When the SION bit
->> for this pad was set, I got strange errors on the USBH1 port
->> (disconnecting low speed devices behind a hub would stall the
->> bus). When I removed the SION bit for that pin everything worked
->> well.
->
->wow. Would be nice to have feedback from fsl. I was fearing of bad
->effects but I didn't think they could actually break something so
->badly. After all, the manual doesn't warn about possible side effects of
->the SION bit iirc. This would mean this will have to be dealt on a board
->basis. It would be... erm... not really "efficient".
->
->Arnaud
+Signed-off-by: Jochen Friedrich <jochen@scram.de>
+Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+---
+ arch/arm/mach-sa1100/simpad.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-You cannot blindly set the SION bit for all GPIO's. I have to dig through my email history for a more technical explanation.
-
-Thanks,
-Dinh
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index 27692d0..cfb7607 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -166,9 +166,6 @@ static void __init simpad_map_io(void)
+ 	PCFR = 0;
+ 	PSDR = 0;
+ 
+-	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
+-			      ARRAY_SIZE(simpad_flash_resources));
+-	sa11x0_register_mcp(&simpad_mcp_data);
+ }
+ 
+ static void simpad_power_off(void)
+@@ -216,6 +213,10 @@ static int __init simpad_init(void)
+ 
+ 	pm_power_off = simpad_power_off;
+ 
++	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
++			      ARRAY_SIZE(simpad_flash_resources));
++	sa11x0_register_mcp(&simpad_mcp_data);
++
+ 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	if(ret)
+ 		printk(KERN_WARNING "simpad: Unable to register mq200 framebuffer device");
+-- 
+1.7.2.3
