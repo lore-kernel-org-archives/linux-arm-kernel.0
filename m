@@ -1,72 +1,61 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Mon, 27 Dec 2010 06:45:24 -0500
-Subject: [PATCH v3] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930247FAF663@dbde02.ent.ti.com>
-References: <1293393416-12850-1-git-send-email-michael.williamson@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930247FAF663@dbde02.ent.ti.com>
-Message-ID: <4D187C54.205@criticallink.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 27 Dec 2010 19:49:40 +0800
+Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
+In-Reply-To: <20101222202542.GT14221@pengutronix.de>
+References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
+	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
+	<20101222202542.GT14221@pengutronix.de>
+Message-ID: <20101227114938.GA13154@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/27/2010 01:03 AM, Nori, Sekhar wrote:
-> On Mon, Dec 27, 2010 at 01:26:56, Michael Williamson wrote:
->> From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
->>
->> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
->> In addition, the variant code for the AM-1808 SoC appears to match
->> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
->> these chips.
->>
->> This patch is originally from a patch on the arago project, here:
->> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
->>
->> Further information related to the need for this patch can be located at
->> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
->> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
->>
->> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
->> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
->>
->> Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
->> Reported-by: Nicolas Luna <luna.id@gmail.com>
->> ---
->> This is against davinci-linux tree.
->> Changes since v2:
->>  - Added Sudhakar's sign-off.
->>  - Fix spelling error in description.
->>
->>  arch/arm/mach-davinci/da850.c |    7 +++++++
->>  1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->> index 78b5ae2..2d0bba5 100644
->> --- a/arch/arm/mach-davinci/da850.c
->> +++ b/arch/arm/mach-davinci/da850.c
->> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
->>               .cpu_id         = DAVINCI_CPU_ID_DA850,
->>               .name           = "da850/omap-l138",
-> 
-> Should have "/am18x" here. That should have been part
-> of my patches adding AM1x support. It should now be a
-> separate patch.
-> 
+Hi Uwe,
 
-I will add this.
-
->>       },
->> +     {
->> +             .variant        = 0x1,
->> +             .part_no        = 0xb7d1,
->> +             .manufacturer   = 0x017,        /* 0x02f >> 1 */
->> +             .cpu_id         = DAVINCI_CPU_ID_DA850,
->> +             .name           = "da850/omap-l138/am18xx",
+On Wed, Dec 22, 2010 at 09:25:42PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Shawn,
 > 
-> Just "am18x".
+> On Tue, Dec 21, 2010 at 09:12:10PM +0800, Shawn Guo wrote:
+> > The mxs duart is actually an amba-pl011 device. This commit changes
+> > the duart device code to dynamically allocate amba-pl011 device,
+> > so that drivers/serial/amba-pl011.c can be used on mxs.
+> I have problems using this.  The problem I found up to now is that
+> during probe of the device (triggered by mxs_add_duart ->
+> amba_device_register -> amba_put_disable_pclk) the uart clock is
+> disabled.  This happens because initially its usage count is 0 but the
+> clock is enabled by barebox.  clk_enable doesn't hurt, but in the
+> matching clk_disable the usage count drops to zero again and so the
+> clock is disabled in hardware.  After that no further outputs can be
+> seen.
+> 
+I did not see this problem. It's true that the clock is turned off
+in amba_device_register. But later, the clock will be turned on
+again by amba_probe -> amba_get_enable_pclk very soon.
+
+But we should add something like below in mx28_clocks_init to reflect
+the clock status and get usecount updated.
+
+	clk_enable(&uart_clk)
+
+I ran into similar problem with fec driver, and would cover that in
+fec patch set.
+
+> I assume the machine dies with a circular exception while trying to
+> write something out (e.g. that it cannot write to the console :-), but I
+> havn't checked that.
+> 
+> My first try to put an clk_enable(&uart_clk) after it is registered
+> didn't help.
+> 
+> Did you face the same problem?
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 > 
 
-I will correct and resubmit.  Thanks.
-
--Mike
+-- 
+Regards,
+Shawn
