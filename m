@@ -1,260 +1,563 @@
 From: sawant@ti.com (Anand Sawant)
-Date: Tue, 28 Dec 2010 22:37:49 +0530
-Subject: [PATCH v6 09/10] OMAP3: PM: Adding debug support to Voltage and
-	Smartreflex drivers
-In-Reply-To: <1292864357-13939-10-git-send-email-thara@ti.com>
-References: <1292864357-13939-1-git-send-email-thara@ti.com>
-	<1292864357-13939-10-git-send-email-thara@ti.com>
-Message-ID: <1b7fd98d1f8cf358cdc712da05f30a34@mail.gmail.com>
+Date: Tue, 28 Dec 2010 23:02:33 +0530
+Subject: [PATCH v5 2/5] OMAP4: Adding voltage driver support
+In-Reply-To: <1292864437-15353-3-git-send-email-thara@ti.com>
+References: <1292864437-15353-1-git-send-email-thara@ti.com>
+	<1292864437-15353-3-git-send-email-thara@ti.com>
+Message-ID: <bd7dd944fd71f6fedc012bf6ccdc8dd8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Thara,
 
-Few comments on the changes in voltage layer ...
-
 > -----Original Message-----
 > From: Thara Gopinath [mailto:thara at ti.com]
-> Sent: Monday, December 20, 2010 10:29 PM
+> Sent: Monday, December 20, 2010 10:31 PM
 > To: linux-omap at vger.kernel.org; linux-arm-
 > kernel at lists.infradead.org
 > Cc: khilman at deeprootsystems.com; paul at pwsan.com; b-
 > cousson at ti.com; vishwanath.bs at ti.com; sawant at ti.com;
 > nm at ti.com; Thara Gopinath
-> Subject: [PATCH v6 09/10] OMAP3: PM: Adding debug support to
-> Voltage and Smartreflex drivers
+> Subject: [PATCH v5 2/5] OMAP4: Adding voltage driver support
 >
-> This patch adds debug support to the voltage and smartreflex
-> drivers.
-> This means a whole bunch of voltage processor and
-> smartreflex
-> parameters are now visible through the pm debugfs.
-> The voltage parameters can be viewed at
->         /debug/voltage/vdd_<x>/<parameter>
-> and the smartreflex parameters can be viewed at
->         /debug/voltage/vdd_<x>/smartreflex/<parameter>
->
-> Also smartreflex n-target values are now exposed out at
-> 	/debug/voltage/vdd_<x>/smartreflex/nvalue/<voltage>
->
-> The interface to access smartreflex n-target values is a
-> read-write interface which means user has the flexibility
-> to change the n-target values for any opp.
+> OMAP4 has three scalable voltage domains vdd_mpu, vdd_iva
+> and vdd_core. This patch adds the voltage tables and other
+> configurable voltage processor and voltage controller
+> settings to control these three scalable domains in OMAP4.
 >
 > Signed-off-by: Thara Gopinath <thara@ti.com>
 > ---
->  arch/arm/mach-omap2/smartreflex.c |   46
-> ++++++++++++++++++++++++-
->  arch/arm/mach-omap2/voltage.c     |   66
-> +++++++++++++++++++++++++++++++++++++
->  2 files changed, 110 insertions(+), 2 deletions(-)
+> This patch has 9 checkpatch.pl above 80-chars warnings for
+> the definitions of omap44xx_vdd_mpu_volt_data,
+> omap44xx_vdd_iva_volt_data
+> and omap44xx_vdd_core_volt_data.
+> IMHO splitting of the entries in these structures affects
+> readability and looks very ugly. Hence they are left as is.
 >
-> diff --git a/arch/arm/mach-omap2/smartreflex.c
-> b/arch/arm/mach-omap2/smartreflex.c
-> index eee23d0..52a05b3 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -31,6 +31,7 @@
->  #include "pm.h"
+>  arch/arm/mach-omap2/Makefile              |    2 +-
+>  arch/arm/mach-omap2/control.h             |   12 ++
+>  arch/arm/mach-omap2/voltage.c             |  279
+> +++++++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/voltage.h |   12 ++
+>  4 files changed, 304 insertions(+), 1 deletions(-)
 >
->  #define SMARTREFLEX_NAME_LEN	16
-> +#define NVALUE_NAME_LEN		40
->  #define SR_DISABLE_TIMEOUT	200
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
+> omap2/Makefile
+> index ae29a00..9a73b82 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -61,7 +61,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+=
+> pm24xx.o
+>  obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o
+>  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+> voltage.o \
+>  					   cpuidle34xx.o pm_bus.o
+> -obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o pm_bus.o
+> +obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o voltage.o
+> pm_bus.o
+>  obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+>  obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o
+> smartreflex.o
+>  obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-
+> class3.o
+> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-
+> omap2/control.h
+> index 9fe32dc..81940ef 100644
+> --- a/arch/arm/mach-omap2/control.h
+> +++ b/arch/arm/mach-omap2/control.h
+> @@ -181,6 +181,18 @@
+>  #define OMAP3630_CONTROL_FUSE_OPP50_VDD2
+> (OMAP2_CONTROL_GENERAL + 0x0128)
+>  #define OMAP3630_CONTROL_FUSE_OPP100_VDD2
+> (OMAP2_CONTROL_GENERAL + 0x012C)
 >
->  struct omap_sr {
-> @@ -817,8 +818,9 @@ static int __init omap_sr_probe(struct
-> platform_device *pdev)
->  	struct omap_sr *sr_info = kzalloc(sizeof(struct
-> omap_sr), GFP_KERNEL);
->  	struct omap_sr_data *pdata = pdev->dev.platform_data;
->  	struct resource *mem, *irq;
-> -	struct dentry *vdd_dbg_dir, *dbg_dir;
-> -	int ret = 0;
-> +	struct dentry *vdd_dbg_dir, *dbg_dir, *nvalue_dir;
-> +	struct omap_volt_data *volt_data;
-> +	int i, ret = 0;
->
->  	if (!sr_info) {
->  		dev_err(&pdev->dev, "%s: unable to allocate
-> sr_info\n",
-> @@ -897,6 +899,46 @@ static int __init omap_sr_probe(struct
-> platform_device *pdev)
->
->  	(void) debugfs_create_file("autocomp", S_IRUGO |
-> S_IWUGO, dbg_dir,
->  				(void *)sr_info, &pm_sr_fops);
-> +	(void) debugfs_create_x32("errweight", S_IRUGO,
-> dbg_dir,
-> +			&sr_info->err_weight);
-> +	(void) debugfs_create_x32("errmaxlimit", S_IRUGO,
-> dbg_dir,
-> +			&sr_info->err_maxlimit);
-> +	(void) debugfs_create_x32("errminlimit", S_IRUGO,
-> dbg_dir,
-> +			&sr_info->err_minlimit);
+> +/* OMAP44xx control efuse offsets */
+> +#define OMAP44XX_CONTROL_FUSE_IVA_OPP50		0x22C
+> +#define OMAP44XX_CONTROL_FUSE_IVA_OPP100	0x22F
+> +#define OMAP44XX_CONTROL_FUSE_IVA_OPPTURBO	0x232
+> +#define OMAP44XX_CONTROL_FUSE_IVA_OPPNITRO	0x235
+> +#define OMAP44XX_CONTROL_FUSE_MPU_OPP50		0x240
+> +#define OMAP44XX_CONTROL_FUSE_MPU_OPP100	0x243
+> +#define OMAP44XX_CONTROL_FUSE_MPU_OPPTURBO	0x246
+> +#define OMAP44XX_CONTROL_FUSE_MPU_OPPNITRO	0x249
+> +#define OMAP44XX_CONTROL_FUSE_CORE_OPP50	0x254
+> +#define OMAP44XX_CONTROL_FUSE_CORE_OPP100	0x257
 > +
-> +	nvalue_dir = debugfs_create_dir("nvalue", dbg_dir);
-> +	if (IS_ERR(nvalue_dir)) {
-> +		dev_err(&pdev->dev, "%s: Unable to create
-> debugfs directory"
-> +			"for n-values\n", __func__);
-> +		return PTR_ERR(nvalue_dir);
-> +	}
-> +
-> +	omap_voltage_get_volttable(sr_info->voltdm,
-> &volt_data);
-> +	if (!volt_data) {
-> +		dev_warn(&pdev->dev, "%s: No Voltage table for
-> the"
-> +			" corresponding vdd vdd_%s. Cannot create
-> debugfs"
-> +			"entries for n-values\n",
-> +			__func__, sr_info->voltdm->name);
-> +		return -ENODATA;
-> +	}
-> +
-> +	for (i = 0; i < sr_info->nvalue_count; i++) {
-> +		char *name;
-> +		char volt_name[32];
-> +
-> +		name = kzalloc(NVALUE_NAME_LEN + 1, GFP_KERNEL);
-> +		if (!name) {
-> +			dev_err(&pdev->dev, "%s: Unable to
-> allocate memory"
-> +				" for n-value directory name\n",
-> __func__);
-> +			return -ENOMEM;
-> +		}
-> +
-> +		strcpy(name, "volt_");
-> +		sprintf(volt_name, "%d",
-> volt_data[i].volt_nominal);
-> +		strcat(name, volt_name);
-> +		(void) debugfs_create_x32(name, S_IRUGO |
-> S_IWUGO, nvalue_dir,
-> +				&(sr_info->nvalue_table[i].nvalue));
-> +	}
->
->  	return ret;
->
+>  /* AM35XX only CONTROL_GENERAL register offsets */
+>  #define AM35XX_CONTROL_MSUSPENDMUX_6
+> (OMAP2_CONTROL_GENERAL + 0x0038)
+>  #define AM35XX_CONTROL_DEVCONF2
+> (OMAP2_CONTROL_GENERAL + 0x0310)
 > diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-
 > omap2/voltage.c
-> index 875667f..b27fa4f 100644
+> index b27fa4f..ed6079c 100644
 > --- a/arch/arm/mach-omap2/voltage.c
 > +++ b/arch/arm/mach-omap2/voltage.c
-> @@ -250,6 +250,47 @@ static void omap3_voltage_write_reg(u32
+> @@ -29,6 +29,10 @@
+>  #include <plat/voltage.h>
+>
+>  #include "prm-regbits-34xx.h"
+> +#include "prm-regbits-44xx.h"
+> +#include "prm44xx.h"
+> +#include "prcm44xx.h"
+> +#include "prminst44xx.h"
+>  #include "control.h"
+>
+>  #define VP_IDLE_TIMEOUT		200
+> @@ -190,6 +194,51 @@ static struct omap_vdd_info
+> omap3_vdd_info[] = {
+>
+>  #define OMAP3_NR_SCALABLE_VDD ARRAY_SIZE(omap3_vdd_info)
+>
+
+My comments on the patch
+
+[PATCH v6 01/10] OMAP3: PM: Adding voltage driver support
+
+are applicable here. Please refer to
+
+http://marc.info/?l=linux-omap&m=129355306112127&w=2
+
+for more details.
+
+Best Regards,
+
+Anand S Sawant
+
+> +/* OMAP4 VDD sturctures */
+> +static struct omap_vdd_info omap4_vdd_info[] = {
+> +	{
+> +		.vp_offs = {
+> +			.vpconfig =
+> OMAP4_PRM_VP_MPU_CONFIG_OFFSET,
+> +			.vstepmin =
+> OMAP4_PRM_VP_MPU_VSTEPMIN_OFFSET,
+> +			.vstepmax =
+> OMAP4_PRM_VP_MPU_VSTEPMAX_OFFSET,
+> +			.vlimitto =
+> OMAP4_PRM_VP_MPU_VLIMITTO_OFFSET,
+> +			.vstatus = OMAP4_PRM_VP_MPU_STATUS_OFFSET,
+> +			.voltage =
+> OMAP4_PRM_VP_MPU_VOLTAGE_OFFSET,
+> +		},
+> +		.voltdm = {
+> +			.name = "mpu",
+> +		},
+> +	},
+> +	{
+> +		.vp_offs = {
+> +			.vpconfig =
+> OMAP4_PRM_VP_IVA_CONFIG_OFFSET,
+> +			.vstepmin =
+> OMAP4_PRM_VP_IVA_VSTEPMIN_OFFSET,
+> +			.vstepmax =
+> OMAP4_PRM_VP_IVA_VSTEPMAX_OFFSET,
+> +			.vlimitto =
+> OMAP4_PRM_VP_IVA_VLIMITTO_OFFSET,
+> +			.vstatus = OMAP4_PRM_VP_IVA_STATUS_OFFSET,
+> +			.voltage =
+> OMAP4_PRM_VP_IVA_VOLTAGE_OFFSET,
+> +		},
+> +		.voltdm = {
+> +			.name = "iva",
+> +		},
+> +	},
+> +	{
+> +		.vp_offs = {
+> +			.vpconfig =
+> OMAP4_PRM_VP_CORE_CONFIG_OFFSET,
+> +			.vstepmin =
+> OMAP4_PRM_VP_CORE_VSTEPMIN_OFFSET,
+> +			.vstepmax =
+> OMAP4_PRM_VP_CORE_VSTEPMAX_OFFSET,
+> +			.vlimitto =
+> OMAP4_PRM_VP_CORE_VLIMITTO_OFFSET,
+> +			.vstatus =
+> OMAP4_PRM_VP_CORE_STATUS_OFFSET,
+> +			.voltage =
+> OMAP4_PRM_VP_CORE_VOLTAGE_OFFSET,
+> +		},
+> +		.voltdm = {
+> +			.name = "core",
+> +		},
+> +	},
+> +};
+> +
+> +#define OMAP4_NR_SCALABLE_VDD ARRAY_SIZE(omap4_vdd_info)
+> +
+>  /*
+>   * Structures containing OMAP3430/OMAP3630 voltage
+> supported and various
+>   * voltage dependent data for each VDD.
+> @@ -234,6 +283,31 @@ static struct omap_volt_data
+> omap36xx_vddcore_volt_data[] = {
+>  	VOLT_DATA_DEFINE(0, 0, 0, 0),
+>  };
+>
+> +/*
+> + * Structures containing OMAP4430 voltage supported and
+> various
+> + * voltage dependent data for each VDD.
+> + */
+> +static struct omap_volt_data omap44xx_vdd_mpu_volt_data[] =
+> {
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPP50_UV,
+> OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c),
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPP100_UV,
+> OMAP44XX_CONTROL_FUSE_MPU_OPP100, 0xf9, 0x16),
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPPTURBO_UV,
+> OMAP44XX_CONTROL_FUSE_MPU_OPPTURBO, 0xfa, 0x23),
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPPNITRO_UV,
+> OMAP44XX_CONTROL_FUSE_MPU_OPPNITRO, 0xfa, 0x27),
+> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
+> +};
+> +
+> +static struct omap_volt_data omap44xx_vdd_iva_volt_data[] =
+> {
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPP50_UV,
+> OMAP44XX_CONTROL_FUSE_IVA_OPP50, 0xf4, 0x0c),
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPP100_UV,
+> OMAP44XX_CONTROL_FUSE_IVA_OPP100, 0xf9, 0x16),
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPPTURBO_UV,
+> OMAP44XX_CONTROL_FUSE_IVA_OPPTURBO, 0xfa, 0x23),
+> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
+> +};
+> +
+> +static struct omap_volt_data omap44xx_vdd_core_volt_data[]
+> = {
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_CORE_OPP50_UV,
+> OMAP44XX_CONTROL_FUSE_CORE_OPP50, 0xf4, 0x0c),
+> +	VOLT_DATA_DEFINE(OMAP4430_VDD_CORE_OPP100_UV,
+> OMAP44XX_CONTROL_FUSE_CORE_OPP100, 0xf9, 0x16),
+> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
+> +};
+> +
+>  static struct dentry *voltage_dir;
+>
+>  /* Init function pointers */
+> @@ -250,6 +324,17 @@ static void omap3_voltage_write_reg(u32
 > val, u16 mod, u8 offset)
 >  	omap2_prm_write_mod_reg(val, mod, offset);
 >  }
 >
-> +/* Voltage debugfs support */
-
-Add comment for the function.
-
-> +static int vp_volt_debug_get(void *data, u64 *val)
+> +static u32 omap4_voltage_read_reg(u16 mod, u8 offset)
 > +{
-> +	struct omap_vdd_info *vdd = (struct omap_vdd_info *)
-> data;
-> +	u8 vsel;
-> +
-> +	if (!vdd) {
-> +		pr_warning("Wrong paramater passed\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	vsel = vdd->read_reg(vdd->vp_reg.prm_mod, vdd-
-> >vp_offs.voltage);
-> +	pr_notice("curr_vsel = %x\n", vsel);
-> +
-> +	if (!vdd->pmic_info->vsel_to_uv) {
-> +		pr_warning("PMIC function to convert vsel to
-> voltage"
-> +			"in uV not registerd\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	*val = vdd->pmic_info->vsel_to_uv(vsel);
-> +	return 0;
+> +	return
+> omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+> +					mod, offset);
 > +}
 > +
-
-Add comment for the function.
-
-> +static int nom_volt_debug_get(void *data, u64 *val)
+> +static void omap4_voltage_write_reg(u32 val, u16 mod, u8
+> offset)
 > +{
-> +	struct omap_vdd_info *vdd = (struct omap_vdd_info *)
-> data;
-> +
-> +	if (!vdd) {
-> +		pr_warning("Wrong paramater passed\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	*val = omap_voltage_get_nom_volt(&vdd->voltdm);
-> +
-> +	return 0;
+> +	omap4_prminst_write_inst_reg(val,
+> OMAP4430_PRM_PARTITION, mod, offset);
 > +}
 > +
-> +DEFINE_SIMPLE_ATTRIBUTE(vp_volt_debug_fops,
-> vp_volt_debug_get, NULL, "%llu\n");
-> +DEFINE_SIMPLE_ATTRIBUTE(nom_volt_debug_fops,
-> nom_volt_debug_get, NULL,
-> +								"%llu\n");
->  static void vp_latch_vsel(struct omap_vdd_info *vdd)
+>  /* Voltage debugfs support */
+>  static int vp_volt_debug_get(void *data, u64 *val)
 >  {
->  	u32 vpconfig;
-> @@ -349,7 +390,32 @@ static void __init
-> vdd_debugfs_init(struct omap_vdd_info *vdd)
->  		pr_warning("%s: Unable to create debugfs
-> directory for"
->  			" vdd_%s\n", __func__, vdd->voltdm.name);
->  		vdd->debug_dir = NULL;
-> +		return;
->  	}
-> +
-> +	(void) debugfs_create_x16("vp_errorgain", S_IRUGO,
-> vdd->debug_dir,
-> +				&(vdd->vp_reg.vpconfig_errorgain));
-> +	(void) debugfs_create_x16("vp_smpswaittimemin",
-> S_IRUGO,
-> +				vdd->debug_dir,
-> +				&(vdd-
-> >vp_reg.vstepmin_smpswaittimemin));
-> +	(void) debugfs_create_x8("vp_stepmin", S_IRUGO, vdd-
-> >debug_dir,
-> +				&(vdd->vp_reg.vstepmin_stepmin));
-> +	(void) debugfs_create_x16("vp_smpswaittimemax",
-> S_IRUGO,
-> +				vdd->debug_dir,
-> +				&(vdd-
-> >vp_reg.vstepmax_smpswaittimemax));
-> +	(void) debugfs_create_x8("vp_stepmax", S_IRUGO, vdd-
-> >debug_dir,
-> +				&(vdd->vp_reg.vstepmax_stepmax));
-> +	(void) debugfs_create_x8("vp_vddmax", S_IRUGO, vdd-
-> >debug_dir,
-> +				&(vdd->vp_reg.vlimitto_vddmax));
-> +	(void) debugfs_create_x8("vp_vddmin", S_IRUGO, vdd-
-> >debug_dir,
-> +				&(vdd->vp_reg.vlimitto_vddmin));
-> +	(void) debugfs_create_x16("vp_timeout", S_IRUGO, vdd-
-> >debug_dir,
-> +				&(vdd->vp_reg.vlimitto_timeout));
-> +	(void) debugfs_create_file("curr_vp_volt", S_IRUGO,
-> vdd->debug_dir,
-> +				(void *) vdd, &vp_volt_debug_fops);
-> +	(void) debugfs_create_file("curr_nominal_volt",
-> S_IRUGO,
-> +				vdd->debug_dir, (void *) vdd,
-> +				&nom_volt_debug_fops);
-
-Recommend to add support for vc cmdval & vc bypass_val.
-
-Best Regards,
-
-Anand Sawant
+> @@ -841,6 +926,195 @@ static int __init
+> omap3_vdd_data_configure(struct omap_vdd_info *vdd)
+>  	return 0;
 >  }
 >
->  /* Voltage scale and accessory APIs */
+> +/* OMAP4 specific voltage init functions */
+> +static void __init omap4_vc_init(struct omap_vdd_info *vdd)
+> +{
+> +	u32 vc_val;
+> +	u16 mod;
+> +	static bool is_initialized;
+> +
+> +	if (!vdd->pmic_info || !vdd->pmic_info->uv_to_vsel) {
+> +		pr_err("%s: PMIC info requried to configure vc
+> for"
+> +			"vdd_%s not populated.Hence cannot
+> initialize vc\n",
+> +			__func__, vdd->voltdm.name);
+> +		return;
+> +	}
+> +
+> +	if (!vdd->read_reg || !vdd->write_reg) {
+> +		pr_err("%s: No read/write API for accessing
+> vdd_%s regs\n",
+> +			__func__, vdd->voltdm.name);
+> +		return;
+> +	}
+> +
+> +	mod = vdd->vc_reg.prm_mod;
+> +
+> +	/* Set up the SMPS_SA(i2c slave address in VC */
+> +	vc_val = vdd->read_reg(mod, vdd->vc_reg.smps_sa_reg);
+> +	vc_val &= ~vdd->vc_reg.smps_sa_mask;
+> +	vc_val |= vdd->pmic_info->i2c_slave_addr << vdd-
+> >vc_reg.smps_sa_shift;
+> +	vdd->write_reg(vc_val, mod, vdd->vc_reg.smps_sa_reg);
+> +
+> +	/* Setup the VOLRA(pmic reg addr) in VC */
+> +	vc_val = vdd->read_reg(mod, vdd-
+> >vc_reg.smps_volra_reg);
+> +	vc_val &= ~vdd->vc_reg.smps_volra_mask;
+> +	vc_val |= vdd->pmic_info->pmic_reg << vdd-
+> >vc_reg.smps_volra_shift;
+> +	vdd->write_reg(vc_val, mod, vdd-
+> >vc_reg.smps_volra_reg);
+> +
+> +	/* TODO: Configure setup times and CMD_VAL values*/
+> +
+> +	if (is_initialized)
+> +		return;
+> +
+> +	/* Generic VC parameters init */
+> +	vc_val = (OMAP4430_RAV_VDD_MPU_L_MASK |
+> OMAP4430_CMD_VDD_MPU_L_MASK |
+> +		OMAP4430_RAV_VDD_IVA_L_MASK |
+> OMAP4430_CMD_VDD_IVA_L_MASK |
+> +		OMAP4430_RAV_VDD_CORE_L_MASK |
+> OMAP4430_CMD_VDD_CORE_L_MASK);
+> +	vdd->write_reg(vc_val, mod,
+> OMAP4_PRM_VC_CFG_CHANNEL_OFFSET);
+> +
+> +	vc_val = (0x60 << OMAP4430_SCLL_SHIFT | 0x26 <<
+> OMAP4430_SCLH_SHIFT);
+> +	vdd->write_reg(vc_val, mod,
+> OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
+> +
+> +	is_initialized = true;
+> +}
+> +
+> +/* Sets up all the VDD related info for OMAP4 */
+> +static int __init omap4_vdd_data_configure(struct
+> omap_vdd_info *vdd)
+> +{
+> +	struct clk *sys_ck;
+> +	u32 sys_clk_speed, timeout_val, waittime;
+> +
+> +	if (!vdd->pmic_info) {
+> +		pr_err("%s: PMIC info requried to configure
+> vdd_%s not"
+> +			"populated.Hence cannot initialize
+> vdd_%s\n",
+> +			__func__, vdd->voltdm.name, vdd-
+> >voltdm.name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (!strcmp(vdd->voltdm.name, "mpu")) {
+> +		vdd->volt_data = omap44xx_vdd_mpu_volt_data;
+> +		vdd->vp_reg.tranxdone_status =
+> +				OMAP4430_VP_MPU_TRANXDONE_ST_MASK;
+> +		vdd->vc_reg.cmdval_reg =
+> OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET;
+> +		vdd->vc_reg.smps_sa_shift =
+> +
+> 	OMAP4430_SA_VDD_MPU_L_PRM_VC_SMPS_SA_SHIFT;
+> +		vdd->vc_reg.smps_sa_mask =
+> +
+> 	OMAP4430_SA_VDD_MPU_L_PRM_VC_SMPS_SA_MASK;
+> +		vdd->vc_reg.smps_volra_shift =
+> OMAP4430_VOLRA_VDD_MPU_L_SHIFT;
+> +		vdd->vc_reg.smps_volra_mask =
+> OMAP4430_VOLRA_VDD_MPU_L_MASK;
+> +		vdd->vc_reg.voltsetup_reg =
+> +
+> 	OMAP4_PRM_VOLTSETUP_MPU_RET_SLEEP_OFFSET;
+> +		vdd->prm_irqst_reg =
+> OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET;
+> +	} else if (!strcmp(vdd->voltdm.name, "core")) {
+> +		vdd->volt_data = omap44xx_vdd_core_volt_data;
+> +		vdd->vp_reg.tranxdone_status =
+> +				OMAP4430_VP_CORE_TRANXDONE_ST_MASK;
+> +		vdd->vc_reg.cmdval_reg =
+> +
+> 	OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET;
+> +		vdd->vc_reg.smps_sa_shift =
+> OMAP4430_SA_VDD_CORE_L_0_6_SHIFT;
+> +		vdd->vc_reg.smps_sa_mask =
+> OMAP4430_SA_VDD_CORE_L_0_6_MASK;
+> +		vdd->vc_reg.smps_volra_shift =
+> OMAP4430_VOLRA_VDD_CORE_L_SHIFT;
+> +		vdd->vc_reg.smps_volra_mask =
+> OMAP4430_VOLRA_VDD_CORE_L_MASK;
+> +		vdd->vc_reg.voltsetup_reg =
+> +
+> 	OMAP4_PRM_VOLTSETUP_CORE_RET_SLEEP_OFFSET;
+> +		vdd->prm_irqst_reg =
+> OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
+> +	} else if (!strcmp(vdd->voltdm.name, "iva")) {
+> +		vdd->volt_data = omap44xx_vdd_iva_volt_data;
+> +		vdd->vp_reg.tranxdone_status =
+> +				OMAP4430_VP_IVA_TRANXDONE_ST_MASK;
+> +		vdd->vc_reg.cmdval_reg =
+> OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET;
+> +		vdd->vc_reg.smps_sa_shift =
+> +
+> 	OMAP4430_SA_VDD_IVA_L_PRM_VC_SMPS_SA_SHIFT;
+> +		vdd->vc_reg.smps_sa_mask =
+> +
+> 	OMAP4430_SA_VDD_IVA_L_PRM_VC_SMPS_SA_MASK;
+> +		vdd->vc_reg.smps_volra_shift =
+> OMAP4430_VOLRA_VDD_IVA_L_SHIFT;
+> +		vdd->vc_reg.smps_volra_mask =
+> OMAP4430_VOLRA_VDD_IVA_L_MASK;
+> +		vdd->vc_reg.voltsetup_reg =
+> +
+> 	OMAP4_PRM_VOLTSETUP_IVA_RET_SLEEP_OFFSET;
+> +		vdd->prm_irqst_reg =
+> OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
+> +	} else {
+> +		pr_warning("%s: vdd_%s does not exisit in
+> OMAP4\n",
+> +			__func__, vdd->voltdm.name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/*
+> +	 * Sys clk rate is require to calculate vp timeout
+> value and
+> +	 * smpswaittimemin and smpswaittimemax.
+> +	 */
+> +	sys_ck = clk_get(NULL, "sys_clkin_ck");
+> +	if (IS_ERR(sys_ck)) {
+> +		pr_warning("%s: Could not get the sys clk to
+> calculate"
+> +			"various vdd_%s params\n", __func__, vdd-
+> >voltdm.name);
+> +		return -EINVAL;
+> +	}
+> +	sys_clk_speed = clk_get_rate(sys_ck);
+> +	clk_put(sys_ck);
+> +	/* Divide to avoid overflow */
+> +	sys_clk_speed /= 1000;
+> +
+> +	/* Generic voltage parameters */
+> +	vdd->curr_volt = 1200000;
+> +	vdd->ocp_mod = OMAP4430_PRM_OCP_SOCKET_INST;
+> +	vdd->read_reg = omap4_voltage_read_reg;
+> +	vdd->write_reg = omap4_voltage_write_reg;
+> +	vdd->volt_scale = vp_forceupdate_scale_voltage;
+> +	vdd->vp_enabled = false;
+> +
+> +	/* VC parameters */
+> +	vdd->vc_reg.prm_mod = OMAP4430_PRM_DEVICE_INST;
+> +	vdd->vc_reg.smps_sa_reg = OMAP4_PRM_VC_SMPS_SA_OFFSET;
+> +	vdd->vc_reg.smps_volra_reg =
+> OMAP4_PRM_VC_VAL_SMPS_RA_VOL_OFFSET;
+> +	vdd->vc_reg.bypass_val_reg =
+> OMAP4_PRM_VC_VAL_BYPASS_OFFSET;
+> +	vdd->vc_reg.data_shift = OMAP4430_DATA_SHIFT;
+> +	vdd->vc_reg.slaveaddr_shift =
+> OMAP4430_SLAVEADDR_SHIFT;
+> +	vdd->vc_reg.regaddr_shift = OMAP4430_REGADDR_SHIFT;
+> +	vdd->vc_reg.valid = OMAP4430_VALID_MASK;
+> +	vdd->vc_reg.cmd_on_shift = OMAP4430_ON_SHIFT;
+> +	vdd->vc_reg.cmd_on_mask = OMAP4430_ON_MASK;
+> +	vdd->vc_reg.cmd_onlp_shift = OMAP4430_ONLP_SHIFT;
+> +	vdd->vc_reg.cmd_ret_shift = OMAP4430_RET_SHIFT;
+> +	vdd->vc_reg.cmd_off_shift = OMAP4430_OFF_SHIFT;
+> +
+> +	vdd->vp_reg.prm_mod = OMAP4430_PRM_DEVICE_INST;
+> +
+> +	/* VPCONFIG bit fields */
+> +	vdd->vp_reg.vpconfig_erroroffset = (vdd->pmic_info-
+> >vp_erroroffset <<
+> +				 OMAP4430_ERROROFFSET_SHIFT);
+> +	vdd->vp_reg.vpconfig_errorgain_mask =
+> OMAP4430_ERRORGAIN_MASK;
+> +	vdd->vp_reg.vpconfig_errorgain_shift =
+> OMAP4430_ERRORGAIN_SHIFT;
+> +	vdd->vp_reg.vpconfig_initvoltage_shift =
+> OMAP4430_INITVOLTAGE_SHIFT;
+> +	vdd->vp_reg.vpconfig_initvoltage_mask =
+> OMAP4430_INITVOLTAGE_MASK;
+> +	vdd->vp_reg.vpconfig_timeouten =
+> OMAP4430_TIMEOUTEN_MASK;
+> +	vdd->vp_reg.vpconfig_initvdd = OMAP4430_INITVDD_MASK;
+> +	vdd->vp_reg.vpconfig_forceupdate =
+> OMAP4430_FORCEUPDATE_MASK;
+> +	vdd->vp_reg.vpconfig_vpenable =
+> OMAP4430_VPENABLE_MASK;
+> +
+> +	/* VSTEPMIN VSTEPMAX bit fields */
+> +	waittime = ((vdd->pmic_info->step_size / vdd-
+> >pmic_info->slew_rate) *
+> +				sys_clk_speed) / 1000;
+> +	vdd->vp_reg.vstepmin_smpswaittimemin = waittime;
+> +	vdd->vp_reg.vstepmax_smpswaittimemax = waittime;
+> +	vdd->vp_reg.vstepmin_stepmin = vdd->pmic_info-
+> >vp_vstepmin;
+> +	vdd->vp_reg.vstepmax_stepmax = vdd->pmic_info-
+> >vp_vstepmax;
+> +	vdd->vp_reg.vstepmin_smpswaittimemin_shift =
+> +			OMAP4430_SMPSWAITTIMEMIN_SHIFT;
+> +	vdd->vp_reg.vstepmax_smpswaittimemax_shift =
+> +			OMAP4430_SMPSWAITTIMEMAX_SHIFT;
+> +	vdd->vp_reg.vstepmin_stepmin_shift =
+> OMAP4430_VSTEPMIN_SHIFT;
+> +	vdd->vp_reg.vstepmax_stepmax_shift =
+> OMAP4430_VSTEPMAX_SHIFT;
+> +
+> +	/* VLIMITTO bit fields */
+> +	timeout_val = (sys_clk_speed * vdd->pmic_info-
+> >vp_timeout_us) / 1000;
+> +	vdd->vp_reg.vlimitto_timeout = timeout_val;
+> +	vdd->vp_reg.vlimitto_vddmin = vdd->pmic_info-
+> >vp_vddmin;
+> +	vdd->vp_reg.vlimitto_vddmax = vdd->pmic_info-
+> >vp_vddmax;
+> +	vdd->vp_reg.vlimitto_vddmin_shift =
+> OMAP4430_VDDMIN_SHIFT;
+> +	vdd->vp_reg.vlimitto_vddmax_shift =
+> OMAP4430_VDDMAX_SHIFT;
+> +	vdd->vp_reg.vlimitto_timeout_shift =
+> OMAP4430_TIMEOUT_SHIFT;
+> +
+> +	return 0;
+> +}
+> +
+>  /* Public functions */
+>  /**
+>   * omap_voltage_get_nom_volt() - Gets the current non-auto-
+> compensated voltage
+> @@ -1283,6 +1557,11 @@ static int __init
+> omap_voltage_early_init(void)
+>  		nr_scalable_vdd = OMAP3_NR_SCALABLE_VDD;
+>  		vc_init = omap3_vc_init;
+>  		vdd_data_configure = omap3_vdd_data_configure;
+> +	} else if (cpu_is_omap44xx()) {
+> +		vdd_info = omap4_vdd_info;
+> +		nr_scalable_vdd = OMAP4_NR_SCALABLE_VDD;
+> +		vc_init = omap4_vc_init;
+> +		vdd_data_configure = omap4_vdd_data_configure;
+>  	} else {
+>  		pr_warning("%s: voltage driver support not
+> added\n", __func__);
+>  	}
+> diff --git a/arch/arm/plat-omap/include/plat/voltage.h
+> b/arch/arm/plat-omap/include/plat/voltage.h
+> index 2f4f59a..0ff1233 100644
+> --- a/arch/arm/plat-omap/include/plat/voltage.h
+> +++ b/arch/arm/plat-omap/include/plat/voltage.h
+> @@ -44,6 +44,18 @@
+>  #define OMAP3630_VDD_CORE_OPP50_UV		1000000
+>  #define OMAP3630_VDD_CORE_OPP100_UV		1200000
+>
+> +#define OMAP4430_VDD_MPU_OPP50_UV		930000
+> +#define OMAP4430_VDD_MPU_OPP100_UV		1100000
+> +#define OMAP4430_VDD_MPU_OPPTURBO_UV		1260000
+> +#define OMAP4430_VDD_MPU_OPPNITRO_UV		1350000
+> +
+> +#define OMAP4430_VDD_IVA_OPP50_UV		930000
+> +#define OMAP4430_VDD_IVA_OPP100_UV		1100000
+> +#define OMAP4430_VDD_IVA_OPPTURBO_UV		1260000
+> +
+> +#define OMAP4430_VDD_CORE_OPP50_UV		930000
+> +#define OMAP4430_VDD_CORE_OPP100_UV		1100000
+> +
+>  /**
+>   * struct voltagedomain - omap voltage domain global
+> structure.
+>   * @name:	Name of the voltage domain which can be used as
+> a unique
 > --
 > 1.7.0.4
