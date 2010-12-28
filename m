@@ -1,25 +1,39 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 28 Dec 2010 01:33:54 +0100
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <20101223123028.GI3636@n2100.arm.linux.org.uk>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-	<20101221182037.GA4783@n2100.arm.linux.org.uk>
-	<20101222122904.GC14693@n2100.arm.linux.org.uk>
-	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-	<AANLkTinOMOkY6AUW8Z6FWMMWU9u0_sNjA2r_31u9-A8v@mail.gmail.com>
-	<20101223123028.GI3636@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimomORGDf7yoyraiSnXy4OJciPud-POxk24eRGE@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 28 Dec 2010 00:57:01 +0000
+Subject: [PATCH] ARM: S5PV310: Implement kernel timers using MCT
+In-Reply-To: <003d01cba28b$a2388cc0$e6a9a640$%kim@samsung.com>
+References: <1293017221-31037-1-git-send-email-kgene.kim@samsung.com>
+	<20101222123502.GB2838@pulham.picochip.com>
+	<003d01cba28b$a2388cc0$e6a9a640$%kim@samsung.com>
+Message-ID: <20101228005701.GA2835@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Thu, Dec 23, 2010 at 07:24:48PM +0900, Kukjin Kim wrote:
+> Jamie Iles wrote:
+> > > +irqreturn_t s5pv310_mct0_event_isr(int irq, void *dev_id)
+> > > +{
+> > > +	struct clock_event_device *evt;
+> > > +
+> > > +	/* Clear the MCT tick interrupt */
+> > > +
+> > > +	evt = &mct_tick0_device;
+> > > +	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+> > > +		s5pv310_mct_tick_stop(MCT_TICK0);
+> > 
+> > I don't think you need to stop the timer here, the clockevents layer
+> > will handle this for you.
+> > 
+> This is to support One-shot mode using MCT. Because basically MCT local
+> timer only supports periodic mode.
+> But will be added comment.
 
-> I'm currently splitting my dirty patch, and attacking this driver to
-> clean up some of it into a more reasonable shape, so this is one area
-> which I'm going to be sorting out.
+Actually I think you can simply remove the s5pv310_mct_tick_stop() 
+altogether. The onestop event handlers should schedule the next expiry 
+and will respect the min and max deltas so after the event the timer 
+will be correctly programmed for the next event.
 
-Thanks Russell, much appreciated. I'll be quick to review and ACK
-any patches hopefully.
+I had to try this on hardware to convince myself (the timers on my 
+platform have the same behaviour) but it does work!
 
-Yours,
-Linus Walleij
+Jamie
