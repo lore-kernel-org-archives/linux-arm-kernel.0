@@ -1,77 +1,83 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 28 Dec 2010 22:55:47 +0800
-Subject: [PATCH 02/10] net/fec: remove the use of "index" which is legacy
+Date: Tue, 28 Dec 2010 22:55:55 +0800
+Subject: [PATCH 10/10] ARM: mxs: add initial pm support
 In-Reply-To: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1293548155-16328-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1293548155-16328-11-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "index" becomes legacy since fep->pdev->id starts working
-to identify the instance.
-
-Moreover, the call of fec_enet_init(ndev, 0) always passes 0
-to fep->index. This makes the following code in fec_get_mac buggy.
-
-	/* Adjust MAC if using default MAC address */
-	if (iap == fec_mac_default)
-		dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->index;
-
-It may be the time to remove "index" and use fep->pdev->id instead.
+This is a very initial pm support and basically does nothing.
+With this pm support entry, drivers can start testing their own
+pm functions.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- drivers/net/fec.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/mach-mxs/Makefile |    2 +-
+ arch/arm/mach-mxs/pm.c     |   44 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/pm.c
 
-diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-index 52e9ca8..47f6b3b 100644
---- a/drivers/net/fec.c
-+++ b/drivers/net/fec.c
-@@ -186,7 +186,6 @@ struct fec_enet_private {
- 	int     mii_timeout;
- 	uint    phy_speed;
- 	phy_interface_t	phy_interface;
--	int	index;
- 	int	link;
- 	int	full_duplex;
- 	struct	completion mdio_done;
-@@ -566,7 +565,7 @@ static void __inline__ fec_get_mac(struct net_device *dev)
+diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+index f23ebbd..020547d 100644
+--- a/arch/arm/mach-mxs/Makefile
++++ b/arch/arm/mach-mxs/Makefile
+@@ -1,5 +1,5 @@
+ # Common support
+-obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
++obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o pm.o system.o timer.o
  
- 	/* Adjust MAC if using default MAC address */
- 	if (iap == fec_mac_default)
--		 dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->index;
-+		 dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->pdev->id;
- }
- #endif
- 
-@@ -1067,9 +1066,8 @@ static const struct net_device_ops fec_netdev_ops = {
-  /*
-   * XXX:  We need to clean up on failure exits here.
-   *
--  * index is only used in legacy code
-   */
--static int fec_enet_init(struct net_device *dev, int index)
-+static int fec_enet_init(struct net_device *dev)
- {
- 	struct fec_enet_private *fep = netdev_priv(dev);
- 	struct bufdesc *cbd_base;
-@@ -1086,7 +1084,6 @@ static int fec_enet_init(struct net_device *dev, int index)
- 
- 	spin_lock_init(&fep->hw_lock);
- 
--	fep->index = index;
- 	fep->hwp = (void __iomem *)dev->base_addr;
- 	fep->netdev = dev;
- 
-@@ -1316,7 +1313,7 @@ fec_probe(struct platform_device *pdev)
- 	}
- 	clk_enable(fep->clk);
- 
--	ret = fec_enet_init(ndev, 0);
-+	ret = fec_enet_init(ndev);
- 	if (ret)
- 		goto failed_init;
- 
+ obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
+new file mode 100644
+index 0000000..e4f4e31
+--- /dev/null
++++ b/arch/arm/mach-mxs/pm.c
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++#include <mach/system.h>
++
++static int mxs_suspend_enter(suspend_state_t state)
++{
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		arch_idle();
++		break;
++
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static struct platform_suspend_ops mxs_suspend_ops = {
++	.enter = mxs_suspend_enter,
++	.valid = suspend_valid_only_mem,
++};
++
++static int __init mxs_pm_init(void)
++{
++	suspend_set_ops(&mxs_suspend_ops);
++	return 0;
++}
++
++device_initcall(mxs_pm_init);
 -- 
 1.7.1
