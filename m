@@ -1,93 +1,77 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 28 Dec 2010 22:55:54 +0800
-Subject: [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
+Date: Tue, 28 Dec 2010 22:55:47 +0800
+Subject: [PATCH 02/10] net/fec: remove the use of "index" which is legacy
 In-Reply-To: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1293548155-16328-10-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1293548155-16328-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read fec mac address from ocotp and save it into fec_platform_data
-mac field for fec driver to use.
+The "index" becomes legacy since fep->pdev->id starts working
+to identify the instance.
+
+Moreover, the call of fec_enet_init(ndev, 0) always passes 0
+to fep->index. This makes the following code in fec_get_mac buggy.
+
+	/* Adjust MAC if using default MAC address */
+	if (iap == fec_mac_default)
+		dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->index;
+
+It may be the time to remove "index" and use fep->pdev->id instead.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/devices/platform-fec.c        |    2 +-
- arch/arm/mach-mxs/include/mach/devices-common.h |    2 +-
- arch/arm/mach-mxs/mach-mx28evk.c                |   31 +++++++++++++++++++++++
- 3 files changed, 33 insertions(+), 2 deletions(-)
+ drivers/net/fec.c |    9 +++------
+ 1 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/devices/platform-fec.c b/arch/arm/mach-mxs/devices/platform-fec.c
-index c08168c..dc978ee 100644
---- a/arch/arm/mach-mxs/devices/platform-fec.c
-+++ b/arch/arm/mach-mxs/devices/platform-fec.c
-@@ -31,7 +31,7 @@ const struct mxs_fec_data mx28_fec_data[] __initconst = {
+diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+index 52e9ca8..47f6b3b 100644
+--- a/drivers/net/fec.c
++++ b/drivers/net/fec.c
+@@ -186,7 +186,6 @@ struct fec_enet_private {
+ 	int     mii_timeout;
+ 	uint    phy_speed;
+ 	phy_interface_t	phy_interface;
+-	int	index;
+ 	int	link;
+ 	int	full_duplex;
+ 	struct	completion mdio_done;
+@@ -566,7 +565,7 @@ static void __inline__ fec_get_mac(struct net_device *dev)
  
- struct platform_device *__init mxs_add_fec(
- 		const struct mxs_fec_data *data,
--		const struct fec_platform_data *pdata)
-+		struct fec_platform_data *pdata)
+ 	/* Adjust MAC if using default MAC address */
+ 	if (iap == fec_mac_default)
+-		 dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->index;
++		 dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->pdev->id;
+ }
+ #endif
+ 
+@@ -1067,9 +1066,8 @@ static const struct net_device_ops fec_netdev_ops = {
+  /*
+   * XXX:  We need to clean up on failure exits here.
+   *
+-  * index is only used in legacy code
+   */
+-static int fec_enet_init(struct net_device *dev, int index)
++static int fec_enet_init(struct net_device *dev)
  {
- 	struct resource res[] = {
- 		{
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-index fca0551..d206e0a 100644
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -38,4 +38,4 @@ struct mxs_fec_data {
- };
- struct platform_device *__init mxs_add_fec(
- 		const struct mxs_fec_data *data,
--		const struct fec_platform_data *pdata);
-+		struct fec_platform_data *pdata);
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index def6519..d133733 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -129,6 +129,36 @@ static struct fec_platform_data mx28_fec_pdata[] = {
- 	},
- };
+ 	struct fec_enet_private *fep = netdev_priv(dev);
+ 	struct bufdesc *cbd_base;
+@@ -1086,7 +1084,6 @@ static int fec_enet_init(struct net_device *dev, int index)
  
-+static int __init mx28evk_fec_get_mac(void)
-+{
-+	int i, ret;
-+	u32 val;
-+
-+	/*
-+	 * OCOTP only stores the last 4 octets for each mac address,
-+	 * so hard-coding the first two octets as Freescale OUI (00:04:9f)
-+	 * is needed.
-+	 */
-+	for (i = 0; i < 2; i++) {
-+		ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
-+		if (ret)
-+			goto error;
-+
-+		mx28_fec_pdata[i].mac[0] = 0x00;
-+		mx28_fec_pdata[i].mac[1] = 0x04;
-+		mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
-+		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
-+		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
-+		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
-+	}
-+
-+	return 0;
-+
-+error:
-+	pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
-+	return -ETIMEDOUT;
-+}
-+
- static void __init mx28evk_init(void)
- {
- 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
-@@ -136,6 +166,7 @@ static void __init mx28evk_init(void)
- 	mx28_add_duart();
+ 	spin_lock_init(&fep->hw_lock);
  
- 	mx28evk_fec_reset();
-+	mx28evk_fec_get_mac();
- 	mx28_add_fec(0, &mx28_fec_pdata[0]);
- #ifdef CONFIG_FEC2
- 	mx28_add_fec(1, &mx28_fec_pdata[1]);
+-	fep->index = index;
+ 	fep->hwp = (void __iomem *)dev->base_addr;
+ 	fep->netdev = dev;
+ 
+@@ -1316,7 +1313,7 @@ fec_probe(struct platform_device *pdev)
+ 	}
+ 	clk_enable(fep->clk);
+ 
+-	ret = fec_enet_init(ndev, 0);
++	ret = fec_enet_init(ndev);
+ 	if (ret)
+ 		goto failed_init;
+ 
 -- 
 1.7.1
