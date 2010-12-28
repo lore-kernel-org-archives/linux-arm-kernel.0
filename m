@@ -1,39 +1,34 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 28 Dec 2010 00:57:01 +0000
-Subject: [PATCH] ARM: S5PV310: Implement kernel timers using MCT
-In-Reply-To: <003d01cba28b$a2388cc0$e6a9a640$%kim@samsung.com>
-References: <1293017221-31037-1-git-send-email-kgene.kim@samsung.com>
-	<20101222123502.GB2838@pulham.picochip.com>
-	<003d01cba28b$a2388cc0$e6a9a640$%kim@samsung.com>
-Message-ID: <20101228005701.GA2835@pulham.picochip.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 28 Dec 2010 02:17:42 +0100
+Subject: [PATCH] TWD: enable one-shot mode
+In-Reply-To: <20101224191855.GJ20587@n2100.arm.linux.org.uk>
+References: <20101224191855.GJ20587@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinU+x2uV34SCO=p2K4z6BO_DSYy2+1BRU5eAgHO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 23, 2010 at 07:24:48PM +0900, Kukjin Kim wrote:
-> Jamie Iles wrote:
-> > > +irqreturn_t s5pv310_mct0_event_isr(int irq, void *dev_id)
-> > > +{
-> > > +	struct clock_event_device *evt;
-> > > +
-> > > +	/* Clear the MCT tick interrupt */
-> > > +
-> > > +	evt = &mct_tick0_device;
-> > > +	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
-> > > +		s5pv310_mct_tick_stop(MCT_TICK0);
-> > 
-> > I don't think you need to stop the timer here, the clockevents layer
-> > will handle this for you.
-> > 
-> This is to support One-shot mode using MCT. Because basically MCT local
-> timer only supports periodic mode.
-> But will be added comment.
+2010/12/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> Allow one shot timer mode to be used with the TWD. ?This allows
+> NOHZ mode to be used on SMP systems using the TWD localtimer.
+>
+> Tested on Versatile Express.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> Acks/Tested-by's would be appreciated, thanks.
 
-Actually I think you can simply remove the s5pv310_mct_tick_stop() 
-altogether. The onestop event handlers should schedule the next expiry 
-and will respect the min and max deltas so after the event the timer 
-will be correctly programmed for the next event.
+Tested on the U8500 and doesn't seem to break anything...
 
-I had to try this on hardware to convince myself (the timers on my 
-platform have the same behaviour) but it does work!
+Local interrupts after a few minutes of use before patching
+(and enabling NO_HZ):
+LOC:       8203       8224
 
-Jamie
+After patching;
+LOC:        233        322
+
+Looks like it's working, too.
+
+Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Yours,
+Linus Walleij
