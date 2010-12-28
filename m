@@ -1,66 +1,93 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 28 Dec 2010 22:55:49 +0800
-Subject: [PATCH 04/10] net/fec: improve pm for better suspend/resume
+Date: Tue, 28 Dec 2010 22:55:54 +0800
+Subject: [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
 In-Reply-To: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1293548155-16328-5-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1293548155-16328-10-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following commit made a fix to use fec_enet_open/fec_enet_close
-over fec_enet_init/fec_stop for suspend/resume, because fec_enet_init
-does not allow to have a working network interface at resume.
-
-  e3fe8558c7fc182972c3d947d88744482111f304
-  net/fec: fix pm to survive to suspend/resume
-
-This fix works for i.mx/mxc fec controller, but fails on mx28 fec
-which gets a different interrupt logic design. On i.mx fec, interrupt
-can be triggered even bit ETHER_EN of ECR register is not set. But
-on mx28 fec, ETHER_EN must be set to get interrupt work. Meanwhile,
-MII interrupt is mandatory to resume the driver, because MDIO
-read/write changed to interrupt mode by commit below.
-
-  97b72e4320a9aaa4a7f1592ee7d2da7e2c9bd349
-  fec: use interrupt for MDIO completion indication
-
-fec_restart/fec_stop comes out as the solution working for both
-cases.
+Read fec mac address from ocotp and save it into fec_platform_data
+mac field for fec driver to use.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- drivers/net/fec.c |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/mach-mxs/devices/platform-fec.c        |    2 +-
+ arch/arm/mach-mxs/include/mach/devices-common.h |    2 +-
+ arch/arm/mach-mxs/mach-mx28evk.c                |   31 +++++++++++++++++++++++
+ 3 files changed, 33 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-index cd59814..f147508 100644
---- a/drivers/net/fec.c
-+++ b/drivers/net/fec.c
-@@ -1387,8 +1387,10 @@ fec_suspend(struct device *dev)
+diff --git a/arch/arm/mach-mxs/devices/platform-fec.c b/arch/arm/mach-mxs/devices/platform-fec.c
+index c08168c..dc978ee 100644
+--- a/arch/arm/mach-mxs/devices/platform-fec.c
++++ b/arch/arm/mach-mxs/devices/platform-fec.c
+@@ -31,7 +31,7 @@ const struct mxs_fec_data mx28_fec_data[] __initconst = {
  
- 	if (ndev) {
- 		fep = netdev_priv(ndev);
--		if (netif_running(ndev))
--			fec_enet_close(ndev);
-+		if (netif_running(ndev)) {
-+			fec_stop(ndev);
-+			netif_device_detach(ndev);
-+		}
- 		clk_disable(fep->clk);
- 	}
- 	return 0;
-@@ -1403,8 +1405,10 @@ fec_resume(struct device *dev)
- 	if (ndev) {
- 		fep = netdev_priv(ndev);
- 		clk_enable(fep->clk);
--		if (netif_running(ndev))
--			fec_enet_open(ndev);
-+		if (netif_running(ndev)) {
-+			fec_restart(ndev, fep->full_duplex);
-+			netif_device_attach(ndev);
-+		}
- 	}
- 	return 0;
- }
+ struct platform_device *__init mxs_add_fec(
+ 		const struct mxs_fec_data *data,
+-		const struct fec_platform_data *pdata)
++		struct fec_platform_data *pdata)
+ {
+ 	struct resource res[] = {
+ 		{
+diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+index fca0551..d206e0a 100644
+--- a/arch/arm/mach-mxs/include/mach/devices-common.h
++++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+@@ -38,4 +38,4 @@ struct mxs_fec_data {
+ };
+ struct platform_device *__init mxs_add_fec(
+ 		const struct mxs_fec_data *data,
+-		const struct fec_platform_data *pdata);
++		struct fec_platform_data *pdata);
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index def6519..d133733 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -129,6 +129,36 @@ static struct fec_platform_data mx28_fec_pdata[] = {
+ 	},
+ };
+ 
++static int __init mx28evk_fec_get_mac(void)
++{
++	int i, ret;
++	u32 val;
++
++	/*
++	 * OCOTP only stores the last 4 octets for each mac address,
++	 * so hard-coding the first two octets as Freescale OUI (00:04:9f)
++	 * is needed.
++	 */
++	for (i = 0; i < 2; i++) {
++		ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
++		if (ret)
++			goto error;
++
++		mx28_fec_pdata[i].mac[0] = 0x00;
++		mx28_fec_pdata[i].mac[1] = 0x04;
++		mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
++		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
++		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
++		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
++	}
++
++	return 0;
++
++error:
++	pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
++	return -ETIMEDOUT;
++}
++
+ static void __init mx28evk_init(void)
+ {
+ 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
+@@ -136,6 +166,7 @@ static void __init mx28evk_init(void)
+ 	mx28_add_duart();
+ 
+ 	mx28evk_fec_reset();
++	mx28evk_fec_get_mac();
+ 	mx28_add_fec(0, &mx28_fec_pdata[0]);
+ #ifdef CONFIG_FEC2
+ 	mx28_add_fec(1, &mx28_fec_pdata[1]);
 -- 
 1.7.1
