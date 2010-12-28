@@ -1,44 +1,182 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Tue, 28 Dec 2010 17:52:45 +0300
-Subject: [PATCH 1/6 v12] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <20101222233821.GA20893@alchark-u3s>
-References: <AANLkTikAWjK7ACyt=LedhyyrhsCk1WCiyWz182CXMe9C@mail.gmail.com>
-	<4D0FE546.7050302@bluewatersys.com>
-	<AANLkTinyYKrhTcBMMCE4A2oFQHm11cqSZQozytGu+d6o@mail.gmail.com>
-	<4D1011CF.9080800@bluewatersys.com>
-	<AANLkTi=7O-HwQRcybnLSt+r+A64g=D7rZY7NbdEMFys3@mail.gmail.com>
-	<4D110269.9030805@bluewatersys.com>
-	<20101222211815.GA31054@alchark-u3s>
-	<4D12730B.2030909@bluewatersys.com>
-	<20101222222501.GA32693@alchark-u3s>
-	<4D1282DA.4020804@bluewatersys.com>
-	<20101222233821.GA20893@alchark-u3s>
-Message-ID: <AANLkTik1tcL_ABdnq5r=MCxmLJtdP0nhOzA8irP1n0CC@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 28 Dec 2010 22:55:48 +0800
+Subject: [PATCH 03/10] net/fec: add mac field into platform data and
+	consolidate fec_get_mac
+In-Reply-To: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
+References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/23 Alexey Charkov <alchark@gmail.com>:
-> This adds support for the family of Systems-on-Chip produced initially
-> by VIA and now its subsidiary WonderMedia that have recently become
-> widespread in lower-end Chinese ARM-based tablets and netbooks.
->
-> Support is included for both VT8500 and WM8505, selectable by a
-> configuration switch at kernel build time.
->
-> Included are basic machine initialization files, register and
-> interrupt definitions, support for the on-chip interrupt controller,
-> high-precision OS timer, GPIO lines, necessary macros for early debug,
-> pulse-width-modulated outputs control, as well as platform device
-> configurations for the specific drivers implemented elsewhere.
->
-> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+Add mac field into fec_platform_data and consolidate function
+fec_get_mac to get mac address in following order.
 
-Russell, will you take this for .38? Please note that the last
-revision of this patch was also submitted to the ARM Linux patch
-tracking system:
+ 1) kernel command line fec_mac=xx:xx:xx...
+ 2) from flash in case of CONFIG_M5272 or fec_platform_data mac
+    field for others, which typically have mac stored in fuse
+ 3) fec mac address registers set by bootloader
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6597/1
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ drivers/net/fec.c   |   90 ++++++++++++++++++++++++++++----------------------
+ include/linux/fec.h |    2 +
+ 2 files changed, 52 insertions(+), 40 deletions(-)
 
-Best regards,
-Alexey
+diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+index 47f6b3b..cd59814 100644
+--- a/drivers/net/fec.c
++++ b/drivers/net/fec.c
+@@ -59,15 +59,9 @@
+ #define FEC_ALIGNMENT	0x3
+ #endif
+ 
+-/*
+- * Define the fixed address of the FEC hardware.
+- */
+-#if defined(CONFIG_M5272)
+-
+-static unsigned char	fec_mac_default[] = {
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-};
++static unsigned char fec_mac_default[ETH_ALEN];
+ 
++#if defined(CONFIG_M5272)
+ /*
+  * Some hardware gets it MAC address out of local flash memory.
+  * if this is non-zero then assume it is the address to get MAC from.
+@@ -537,27 +531,40 @@ rx_processing_done:
+ }
+ 
+ /* ------------------------------------------------------------------------- */
+-#ifdef CONFIG_M5272
+ static void __inline__ fec_get_mac(struct net_device *dev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(dev);
++	struct fec_platform_data *pdata = fep->pdev->dev.platform_data;
+ 	unsigned char *iap, tmpaddr[ETH_ALEN];
+ 
+-	if (FEC_FLASHMAC) {
+-		/*
+-		 * Get MAC address from FLASH.
+-		 * If it is all 1's or 0's, use the default.
+-		 */
+-		iap = (unsigned char *)FEC_FLASHMAC;
+-		if ((iap[0] == 0) && (iap[1] == 0) && (iap[2] == 0) &&
+-		    (iap[3] == 0) && (iap[4] == 0) && (iap[5] == 0))
+-			iap = fec_mac_default;
+-		if ((iap[0] == 0xff) && (iap[1] == 0xff) && (iap[2] == 0xff) &&
+-		    (iap[3] == 0xff) && (iap[4] == 0xff) && (iap[5] == 0xff))
+-			iap = fec_mac_default;
+-	} else {
+-		*((unsigned long *) &tmpaddr[0]) = readl(fep->hwp + FEC_ADDR_LOW);
+-		*((unsigned short *) &tmpaddr[4]) = (readl(fep->hwp + FEC_ADDR_HIGH) >> 16);
++	/*
++	 * try to get mac address in following order:
++	 *
++	 * 1) kernel command line fec_mac=xx:xx:xx...
++	 */
++	iap = fec_mac_default;
++
++	/*
++	 * 2) from flash or fuse (via platform data)
++	 */
++	if (!is_valid_ether_addr(iap)) {
++#ifdef CONFIG_M5272
++		if (FEC_FLASHMAC)
++			iap = (unsigned char *)FEC_FLASHMAC;
++#else
++		if (pdata)
++			memcpy(iap, pdata->mac, ETH_ALEN);
++#endif
++	}
++
++	/*
++	 * 3) FEC mac registers set by bootloader
++	 */
++	if (!is_valid_ether_addr(iap)) {
++		*((unsigned long *) &tmpaddr[0]) =
++			be32_to_cpu(readl(fep->hwp + FEC_ADDR_LOW));
++		*((unsigned short *) &tmpaddr[4]) =
++			be16_to_cpu(readl(fep->hwp + FEC_ADDR_HIGH) >> 16);
+ 		iap = &tmpaddr[0];
+ 	}
+ 
+@@ -567,7 +574,6 @@ static void __inline__ fec_get_mac(struct net_device *dev)
+ 	if (iap == fec_mac_default)
+ 		 dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->pdev->id;
+ }
+-#endif
+ 
+ /* ------------------------------------------------------------------------- */
+ 
+@@ -1063,6 +1069,24 @@ static const struct net_device_ops fec_netdev_ops = {
+ 	.ndo_do_ioctl           = fec_enet_ioctl,
+ };
+ 
++static int __init fec_mac_addr_setup(char *mac_addr)
++{
++	int i;
++	unsigned int tmp;
++
++	for (i = 0; i < ETH_ALEN; i++) {
++		if (sscanf(mac_addr + 3*i, "%2x", &tmp) != 1) {
++			printk(KERN_WARNING "Malformed fec mac address\n");
++			return 0;
++		}
++		fec_mac_default[i] = tmp;
++	}
++
++	return 1;
++}
++
++__setup("fec_mac=", fec_mac_addr_setup);
++
+  /*
+   * XXX:  We need to clean up on failure exits here.
+   *
+@@ -1087,22 +1111,8 @@ static int fec_enet_init(struct net_device *dev)
+ 	fep->hwp = (void __iomem *)dev->base_addr;
+ 	fep->netdev = dev;
+ 
+-	/* Set the Ethernet address */
+-#ifdef CONFIG_M5272
++	/* Get the Ethernet address */
+ 	fec_get_mac(dev);
+-#else
+-	{
+-		unsigned long l;
+-		l = readl(fep->hwp + FEC_ADDR_LOW);
+-		dev->dev_addr[0] = (unsigned char)((l & 0xFF000000) >> 24);
+-		dev->dev_addr[1] = (unsigned char)((l & 0x00FF0000) >> 16);
+-		dev->dev_addr[2] = (unsigned char)((l & 0x0000FF00) >> 8);
+-		dev->dev_addr[3] = (unsigned char)((l & 0x000000FF) >> 0);
+-		l = readl(fep->hwp + FEC_ADDR_HIGH);
+-		dev->dev_addr[4] = (unsigned char)((l & 0xFF000000) >> 24);
+-		dev->dev_addr[5] = (unsigned char)((l & 0x00FF0000) >> 16);
+-	}
+-#endif
+ 
+ 	/* Set receive and transmit descriptor base. */
+ 	fep->rx_bd_base = cbd_base;
+diff --git a/include/linux/fec.h b/include/linux/fec.h
+index 5d3523d..bf0c69f 100644
+--- a/include/linux/fec.h
++++ b/include/linux/fec.h
+@@ -1,6 +1,7 @@
+ /* include/linux/fec.h
+  *
+  * Copyright (c) 2009 Orex Computed Radiography
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
+  *   Baruch Siach <baruch@tkos.co.il>
+  *
+  * Header file for the FEC platform data
+@@ -16,6 +17,7 @@
+ 
+ struct fec_platform_data {
+ 	phy_interface_t phy;
++	unsigned char mac[ETH_ALEN];
+ };
+ 
+ #endif
+-- 
+1.7.1
