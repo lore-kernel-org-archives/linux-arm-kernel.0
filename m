@@ -1,125 +1,81 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Dec 2010 13:45:06 +0100
-Subject: [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
-In-Reply-To: <20101229121354.GJ19347@freescale.com>
-References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-10-git-send-email-shawn.guo@freescale.com>
-	<20101229105328.GX14221@pengutronix.de>
-	<20101229121354.GJ19347@freescale.com>
-Message-ID: <20101229124506.GE14221@pengutronix.de>
+From: s-ghorai@ti.com (Sukumar Ghorai)
+Date: Wed, 29 Dec 2010 19:02:19 +0530
+Subject: [PATCH v7 0/7] nand prefetch-irq support and ecc layout chanage
+Message-ID: <1293629546-18831-1-git-send-email-s-ghorai@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+The following set of patches applies on linux-2.6.
 
-On Wed, Dec 29, 2010 at 08:13:55PM +0800, Shawn Guo wrote:
-> On Wed, Dec 29, 2010 at 11:53:28AM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Dec 28, 2010 at 10:55:54PM +0800, Shawn Guo wrote:
-> > > Read fec mac address from ocotp and save it into fec_platform_data
-> > > mac field for fec driver to use.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > ---
-> > >  arch/arm/mach-mxs/devices/platform-fec.c        |    2 +-
-> > >  arch/arm/mach-mxs/include/mach/devices-common.h |    2 +-
-> > >  arch/arm/mach-mxs/mach-mx28evk.c                |   31 +++++++++++++++++++++++
-> > >  3 files changed, 33 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-mxs/devices/platform-fec.c b/arch/arm/mach-mxs/devices/platform-fec.c
-> > > index c08168c..dc978ee 100644
-> > > --- a/arch/arm/mach-mxs/devices/platform-fec.c
-> > > +++ b/arch/arm/mach-mxs/devices/platform-fec.c
-> > > @@ -31,7 +31,7 @@ const struct mxs_fec_data mx28_fec_data[] __initconst = {
-> > >  
-> > >  struct platform_device *__init mxs_add_fec(
-> > >  		const struct mxs_fec_data *data,
-> > > -		const struct fec_platform_data *pdata)
-> > > +		struct fec_platform_data *pdata)
-> > >  {
-> > >  	struct resource res[] = {
-> > >  		{
-> > > diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > index fca0551..d206e0a 100644
-> > > --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > @@ -38,4 +38,4 @@ struct mxs_fec_data {
-> > >  };
-> > >  struct platform_device *__init mxs_add_fec(
-> > >  		const struct mxs_fec_data *data,
-> > > -		const struct fec_platform_data *pdata);
-> > > +		struct fec_platform_data *pdata);
-> > Why that?
-> > 
-> pdata->mac needs to get assigned by ocotp read function.
-... which is done before mxs_add_fec is called.
+The main motivations behind this patch series are -
+        1. support NAND I/O in irq mode.
+        2. support of different ECC schema.
+        3. also add support ecc layout as like in romcode ecc layout, but not enabled
 
-> > > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > index def6519..d133733 100644
-> > > --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> > > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > @@ -129,6 +129,36 @@ static struct fec_platform_data mx28_fec_pdata[] = {
-> > >  	},
-> > >  };
-> > >  
-> > > +static int __init mx28evk_fec_get_mac(void)
-> > > +{
-> > > +	int i, ret;
-> > > +	u32 val;
-> > > +
-> > > +	/*
-> > > +	 * OCOTP only stores the last 4 octets for each mac address,
-> > > +	 * so hard-coding the first two octets as Freescale OUI (00:04:9f)
-> > > +	 * is needed.
-> > > +	 */
-> > > +	for (i = 0; i < 2; i++) {
-> > > +		ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
-> > > +		if (ret)
-> > > +			goto error;
-> > > +
-> > > +		mx28_fec_pdata[i].mac[0] = 0x00;
-> > > +		mx28_fec_pdata[i].mac[1] = 0x04;
-> > > +		mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
-> > > +		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
-> > > +		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
-> > > +		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +
-> > > +error:
-> > > +	pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
-> > > +	return -ETIMEDOUT;
-> > return ret please.
-> > 
-> OK.
-> 
-> > > +}
-> > I think this should be defined in a more generic place.
-> > 
-> Necessary?
-I just rechecked with the reference manual and it's not documented that
-0x20 and 0x30 are used to hold the mac address.  Then it's probably OK
-to keep this function machine-local.
+v7: NAND type (x16 or x8) is board specific and not omap specific; this passed form board file.
+    
+v6: configurable transfer type from board file; 
+    #define irq number used for nand-irq
+    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39397.html
+    
+v5: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35860.html
+This address the input as to support the irq_chained in GPMC.
+And resend of
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35848.html
 
-> > > +
-> > >  static void __init mx28evk_init(void)
-> > >  {
-> > >  	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
-> > > @@ -136,6 +166,7 @@ static void __init mx28evk_init(void)
-> > >  	mx28_add_duart();
-> > >  
-> > >  	mx28evk_fec_reset();
-> > > +	mx28evk_fec_get_mac();
-> > You ignore the return value here.  Intended?
-> > 
-> Not intended.  Will check and give a warning.
-> 
-> > >  	mx28_add_fec(0, &mx28_fec_pdata[0]);
-... and maybe skip the call to add_fec?  Up to you.
+v4: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg34882.html
+and resend of
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32689.html
 
-Best regards
-Uwe
+v3: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32071.html
+Rebase on latest codebase and previous patch(posted).
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31963.html
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+v2: Rebase on latest codebase and previous patch(posted).
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31471.html
+
+v1: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg26666.html
+
+Sukumar Ghorai (7):
+  omap3630: nand: fix device size to work in polled mode
+  omap3: nand: configurable transfer type per board
+  omap: gpmc: enable irq mode in gpmc
+  omap3: nand: prefetch in irq mode support
+  omap3: nand: configurable fifo threshold to gain the throughput
+  omap3: nand: ecc layout select from board file
+  omap3: nand: making ecc layout as compatible with romcode ecc
+
+ arch/arm/mach-omap2/board-2430sdp.c        |    1 +
+ arch/arm/mach-omap2/board-3430sdp.c        |    3 +-
+ arch/arm/mach-omap2/board-3630sdp.c        |    4 +-
+ arch/arm/mach-omap2/board-4430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +
+ arch/arm/mach-omap2/board-apollon.c        |    1 +
+ arch/arm/mach-omap2/board-cm-t35.c         |    1 +
+ arch/arm/mach-omap2/board-devkit8000.c     |    1 +
+ arch/arm/mach-omap2/board-flash.c          |   13 +-
+ arch/arm/mach-omap2/board-flash.h          |    4 +-
+ arch/arm/mach-omap2/board-generic.c        |    2 +
+ arch/arm/mach-omap2/board-h4.c             |    1 +
+ arch/arm/mach-omap2/board-igep0020.c       |    1 +
+ arch/arm/mach-omap2/board-ldp.c            |    3 +-
+ arch/arm/mach-omap2/board-n8x0.c           |    2 +
+ arch/arm/mach-omap2/board-omap3beagle.c    |    1 +
+ arch/arm/mach-omap2/board-omap3evm.c       |    2 +
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +
+ arch/arm/mach-omap2/board-omap3stalker.c   |    1 +
+ arch/arm/mach-omap2/board-omap3touchbook.c |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c     |    2 +
+ arch/arm/mach-omap2/board-overo.c          |    1 +
+ arch/arm/mach-omap2/board-rx51.c           |    1 +
+ arch/arm/mach-omap2/board-zoom2.c          |    7 +-
+ arch/arm/mach-omap2/board-zoom3.c          |    7 +-
+ arch/arm/mach-omap2/gpmc-nand.c            |    7 +-
+ arch/arm/mach-omap2/gpmc.c                 |   50 ++++-
+ arch/arm/mach-omap2/io.c                   |    2 -
+ arch/arm/plat-omap/include/plat/gpmc.h     |   17 ++-
+ arch/arm/plat-omap/include/plat/irqs.h     |    9 +-
+ arch/arm/plat-omap/include/plat/nand.h     |   11 +
+ drivers/mtd/nand/Kconfig                   |   17 --
+ drivers/mtd/nand/omap2.c                   |  336 +++++++++++++++++++++-------
+ 33 files changed, 396 insertions(+), 119 deletions(-)
