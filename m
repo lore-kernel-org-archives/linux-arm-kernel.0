@@ -1,57 +1,39 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 29 Dec 2010 00:40:33 -0700
-Subject: [PATCHv3 1/4] mc13xxx-core: Consolidate common code to prepare
-	for separate i2c and spi
-In-Reply-To: <20101220083120.GP1940@pengutronix.de>
-References: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
-	<1292817055-17715-2-git-send-email-marc@cpdesign.com.au>
-	<20101220083120.GP1940@pengutronix.de>
-Message-ID: <20101229074033.GJ8172@angua.secretlab.ca>
+Date: Wed, 29 Dec 2010 01:10:51 -0700
+Subject: [sodaville] SPI support for CE4100, v2
+In-Reply-To: <4D01074A.2020106@linutronix.de>
+References: <1291312057-7933-1-git-send-email-bigeasy@linutronix.de>
+	<4D01074A.2020106@linutronix.de>
+Message-ID: <20101229081051.GL8172@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc and Uwe,
-
-On Mon, Dec 20, 2010 at 09:31:20AM +0100, Uwe Kleine-K?nig wrote:
-> On Mon, Dec 20, 2010 at 02:50:52PM +1100, Marc Reilly wrote:
-> > This patch moves common mc13xxx definitions to the header file in
-> > preparation for separate i2c and spi driver modules.
-> > spi specific functions are also removed.
-> > 
-> > Changes to the mc13xxx struct are:
-> > removing the redundant irq member,
-> > adding driver read/write function ptrs,
-> > adding ictype
-> This list isn't complete, but see below.
+On Thu, Dec 09, 2010 at 05:43:54PM +0100, Sebastian Andrzej Siewior wrote:
+> Sebastian Andrzej Siewior wrote:
+> >The SPI core inside CE4100 is very much the same as in PXA25x.
+> >I Cc the ARM folks because patch 4 reorganizes some files so that they
+> >can be access from x86. Yes, CE4100 is a x86 SoC :)
+> >The SPI device is behind a PCI bus. The PCI probe code simply creates a
+> >platform device so we don't have much changes to the platform driver.
+> >There is no clock framework on x86 and the peripherals don't support
+> >changing their clocks or to enable/disable them. So I provided dummy
+> >function which keep the driver happy.
+> >
+> >History:
+> >v1: initial post
+> >v2: - the patch touching subys_inticall() got removed.
+> >    - platform_driver_probe() is replaced with platform_driver_register()
+> >    - there are no files created in include/asm.
+> >
+> >The patch series has been created with the -M option so file moves can
+> >be easily noticed. The whole series is also available at
+> >  git://git.linutronix.de/users/bigeasy/soda.git spi
 > 
-> I don't like that after this patch the driver isn't functional, because
-> you removed the spi functionality which breaks bisection.
+> It's been week since I posted this and nobody commented on it. Is this
+> patchset missing something or is it good to go?
 
-Ugh, yes.  Breaking bisection is absolutely a no-no.  I'll wait for
-the next version of this series before I do a full review.
+I've just picked it up into my test branch, and I'll push it out to
+git.secretlab.ca in the morning if everything checks out with the
+sanity build.
 
-> 
-> > Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
-> > ---
-> >  drivers/mfd/mc13xxx-core.c  |  207 +++++++-----------------------------------
-> >  include/linux/mfd/mc13xxx.h |   77 +++++++++++-----
-> >  2 files changed, 87 insertions(+), 197 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> > index a2ac2ed..3367a40 100644
-> > --- a/drivers/mfd/mc13xxx-core.c
-> > +++ b/drivers/mfd/mc13xxx-core.c
-> > @@ -9,24 +9,14 @@
-> >   * the terms of the GNU General Public License version 2 as published by the
-> >   * Free Software Foundation.
-> >   */
-> > -
-> (hmm.  I think there is no style guide for that, but I know people who
-> think that this nl should be there.  So IMHO don't touch this.)
-
-A better comment is: don't make unrelated, non-functional whitespace
-changes in patches for something else.  They add noise that make it
-harder to review.
-
-Cheers,
 g.
