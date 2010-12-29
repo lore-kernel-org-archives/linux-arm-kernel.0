@@ -1,31 +1,35 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 29 Dec 2010 17:33:03 +0800
-Subject: [PATCH v2 1/8] ARM: mx5: use config to define boot related
-	addresses
-In-Reply-To: <20101229092526.GQ14221@pengutronix.de>
-References: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
-	<20101229092526.GQ14221@pengutronix.de>
-Message-ID: <20101229093302.GA16730@shlinux1.ap.freescale.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 29 Dec 2010 17:51:48 +0800
+Subject: [PATCH 03/10] net/fec: add mac field into platform data and
+	consolidate fec_get_mac
+In-Reply-To: <4D1AC71D.9020305@snapgear.com>
+References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
+	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
+	<4D1AC71D.9020305@snapgear.com>
+Message-ID: <20101229095147.GA19347@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 29, 2010 at 10:25:26AM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Dec 29, 2010 at 03:30:23PM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> > Because common clock is change, I don't send out mx50 clock and board level code.
-> > But sure I tested the patch series using the clock/board code.
-> IMHO you can already add the board code and make it depend on BROKEN
-> with an accompanying comment about the missing clock support.
-Great!
+Hi Greg,
 
-Thanks
-Richard
+On Wed, Dec 29, 2010 at 03:29:01PM +1000, Greg Ungerer wrote:
+> Hi Shawn,
 > 
-> Best regards
-> Uwe
+> On 29/12/10 00:55, Shawn Guo wrote:
+> >Add mac field into fec_platform_data and consolidate function
+> >fec_get_mac to get mac address in following order.
+> >
+> >  1) kernel command line fec_mac=xx:xx:xx...
+> >  2) from flash in case of CONFIG_M5272 or fec_platform_data mac
+> >     field for others, which typically have mac stored in fuse
 > 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Looking at this we can move that 5272 specific code into its
+> arch code with these changes. I can do that later if you don't
+> want to do it in this series.
 > 
+It would be great if you can do that, since I do not have the
+the platform to test anyway.
+
+-- 
+Regards,
+Shawn
