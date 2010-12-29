@@ -1,77 +1,68 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 29 Dec 2010 18:05:21 +0800
-Subject: [PATCH 03/10] net/fec: add mac field into platform data and
-	consolidate fec_get_mac
-In-Reply-To: <20101229065329.GB31010@jasper.tkos.co.il>
+Date: Wed, 29 Dec 2010 18:14:42 +0800
+Subject: [PATCH 06/10] ARM: mx28: update clocks for dual fec support
+In-Reply-To: <20101229081044.GK14221@pengutronix.de>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
-	<20101229065329.GB31010@jasper.tkos.co.il>
-Message-ID: <20101229100520.GB19347@freescale.com>
+	<1293548155-16328-7-git-send-email-shawn.guo@freescale.com>
+	<20101229065734.GC31010@jasper.tkos.co.il>
+	<20101229081044.GK14221@pengutronix.de>
+Message-ID: <20101229101441.GC19347@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Hi Uwe,
 
-On Wed, Dec 29, 2010 at 08:53:30AM +0200, Baruch Siach wrote:
-> Hi Shawn,
-> 
-> Please add netdev at vger.kernel.org to the Cc of all your fec driver patches.
-> 
-> On Tue, Dec 28, 2010 at 10:55:48PM +0800, Shawn Guo wrote:
-> > Add mac field into fec_platform_data and consolidate function
-> > fec_get_mac to get mac address in following order.
+On Wed, Dec 29, 2010 at 09:10:44AM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Dec 29, 2010 at 08:57:34AM +0200, Baruch Siach wrote:
+> > Hi Shawn,
 > > 
-> >  1) kernel command line fec_mac=xx:xx:xx...
+> > On Tue, Dec 28, 2010 at 10:55:51PM +0800, Shawn Guo wrote:
+> > > * Change fec clock registration to use con_id only for looking up,
+> > >   so that dual fec driver can find the same clock for both fec0
+> > >   and fec1.
+> > > 
+> > > * Explicitly call clk_enable for some clocks that have been on to
+> > >   reflect the clock status and get usecount updated. Otherwise,
+> > >   clocks could be turned off by pair call of clk_enable/clk_disable
+> > >   in drivers, because of the incorrect initial usecount.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  arch/arm/mach-mxs/clock-mx28.c |    7 ++++++-
+> > >  1 files changed, 6 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> > > index dd6d158..6b77aff 100644
+> > > --- a/arch/arm/mach-mxs/clock-mx28.c
+> > > +++ b/arch/arm/mach-mxs/clock-mx28.c
+> > > @@ -603,7 +603,7 @@ _DEFINE_CLOCK(fec_clk, ENET, DISABLE, &hbus_clk);
+> > >  
+> > >  static struct clk_lookup lookups[] = {
+> > >  	_REGISTER_CLOCK("uart", NULL, uart_clk)
+> > > -	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> > > +	_REGISTER_CLOCK(NULL, "fec_clk", fec_clk)
+> > 
+> > Looks like a wrong use of the clk API. You should define define two clocks 
+> > "fec.0" and "fec.1".
+> The commit log suggests that both should enable the same (hardware)
+> clock.  Still I agree with Baruch that in this case clk_get() should
+> just return the same clock for both fec.0 and fec.1.
+> I think it's a bit more work than just adding
+> 	_REGISTER_CLOCK("fec.1", NULL, fec_clk)
 > 
-> In the case of dual MAC that you later add support for, the address which one 
-> is being set? Is there a way to set both in kernel command line?
+I originally had what you suggest above. But when I found fec driver
+only calls clk_get like below, I change the code to current one to 
+save one line code.
+
+	fep->clk = clk_get(&pdev->dev, "fec_clk");
+
+But it looks people use dev_id to address clock as the preference.
+Will change it back.
+
+> , maybe just define fec1_clk as a dummy clk with parent=fec_clk?
 > 
-The fec0 gets fec_mac and fec1 gets fec_mac + 1. The following code
-in function fec_get_mac takes care of it.
-
-	/* Adjust MAC if using default MAC address */
-	if (iap == fec_mac_default)
-		dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->pdev->id;
-
-
-> Also, instead of inventing another kernel command line parameter, it is better 
-> IMO to use the module parameters mechanism. The greth NIC driver already uses 
-> this method for setting MAC address. Look for 'macaddr' in 
-> drivers/net/greth.c, and the explanation at the beginning of 
-> Documentation/kernel-parameters.txt.
+> (And IMHO don't inlude "_clk" in clknames, that's implicit.)
 > 
-Sounds good. Thanks.
-
-[...]
-
-> > +	/*
-> > +	 * try to get mac address in following order:
-> > +	 *
-> > +	 * 1) kernel command line fec_mac=xx:xx:xx...
-> > +	 */
-> > +	iap = fec_mac_default;
-> > +
-> > +	/*
-> > +	 * 2) from flash or fuse (via platform data)
-> > +	 */
-> 
-> Again, how do you handle the dual MAC case?
-> 
-See above, please.
-
-[...]
-
-> > @@ -1,6 +1,7 @@
-> >  /* include/linux/fec.h
-> >   *
-> >   * Copyright (c) 2009 Orex Computed Radiography
-> > + * Copyright (C) 2010 Freescale Semiconductor, Inc.
-> >   *   Baruch Siach <baruch@tkos.co.il>
-> 
-> This breaks the original copyright notice. Please move the Freescale copyright 
-> notice below the original one.
-> 
-Sorry. Will fix it.
 
 -- 
 Regards,
