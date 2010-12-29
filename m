@@ -1,39 +1,58 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 29 Dec 2010 01:10:51 -0700
-Subject: [sodaville] SPI support for CE4100, v2
-In-Reply-To: <4D01074A.2020106@linutronix.de>
-References: <1291312057-7933-1-git-send-email-bigeasy@linutronix.de>
-	<4D01074A.2020106@linutronix.de>
-Message-ID: <20101229081051.GL8172@angua.secretlab.ca>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 29 Dec 2010 09:10:44 +0100
+Subject: [PATCH 06/10] ARM: mx28: update clocks for dual fec support
+In-Reply-To: <20101229065734.GC31010@jasper.tkos.co.il>
+References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
+	<1293548155-16328-7-git-send-email-shawn.guo@freescale.com>
+	<20101229065734.GC31010@jasper.tkos.co.il>
+Message-ID: <20101229081044.GK14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 09, 2010 at 05:43:54PM +0100, Sebastian Andrzej Siewior wrote:
-> Sebastian Andrzej Siewior wrote:
-> >The SPI core inside CE4100 is very much the same as in PXA25x.
-> >I Cc the ARM folks because patch 4 reorganizes some files so that they
-> >can be access from x86. Yes, CE4100 is a x86 SoC :)
-> >The SPI device is behind a PCI bus. The PCI probe code simply creates a
-> >platform device so we don't have much changes to the platform driver.
-> >There is no clock framework on x86 and the peripherals don't support
-> >changing their clocks or to enable/disable them. So I provided dummy
-> >function which keep the driver happy.
-> >
-> >History:
-> >v1: initial post
-> >v2: - the patch touching subys_inticall() got removed.
-> >    - platform_driver_probe() is replaced with platform_driver_register()
-> >    - there are no files created in include/asm.
-> >
-> >The patch series has been created with the -M option so file moves can
-> >be easily noticed. The whole series is also available at
-> >  git://git.linutronix.de/users/bigeasy/soda.git spi
+On Wed, Dec 29, 2010 at 08:57:34AM +0200, Baruch Siach wrote:
+> Hi Shawn,
 > 
-> It's been week since I posted this and nobody commented on it. Is this
-> patchset missing something or is it good to go?
+> On Tue, Dec 28, 2010 at 10:55:51PM +0800, Shawn Guo wrote:
+> > * Change fec clock registration to use con_id only for looking up,
+> >   so that dual fec driver can find the same clock for both fec0
+> >   and fec1.
+> > 
+> > * Explicitly call clk_enable for some clocks that have been on to
+> >   reflect the clock status and get usecount updated. Otherwise,
+> >   clocks could be turned off by pair call of clk_enable/clk_disable
+> >   in drivers, because of the incorrect initial usecount.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/clock-mx28.c |    7 ++++++-
+> >  1 files changed, 6 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> > index dd6d158..6b77aff 100644
+> > --- a/arch/arm/mach-mxs/clock-mx28.c
+> > +++ b/arch/arm/mach-mxs/clock-mx28.c
+> > @@ -603,7 +603,7 @@ _DEFINE_CLOCK(fec_clk, ENET, DISABLE, &hbus_clk);
+> >  
+> >  static struct clk_lookup lookups[] = {
+> >  	_REGISTER_CLOCK("uart", NULL, uart_clk)
+> > -	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> > +	_REGISTER_CLOCK(NULL, "fec_clk", fec_clk)
+> 
+> Looks like a wrong use of the clk API. You should define define two clocks 
+> "fec.0" and "fec.1".
+The commit log suggests that both should enable the same (hardware)
+clock.  Still I agree with Baruch that in this case clk_get() should
+just return the same clock for both fec.0 and fec.1.
+I think it's a bit more work than just adding
+	_REGISTER_CLOCK("fec.1", NULL, fec_clk)
 
-I've just picked it up into my test branch, and I'll push it out to
-git.secretlab.ca in the morning if everything checks out with the
-sanity build.
+, maybe just define fec1_clk as a dummy clk with parent=fec_clk?
 
-g.
+(And IMHO don't inlude "_clk" in clknames, that's implicit.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
