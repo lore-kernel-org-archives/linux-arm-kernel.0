@@ -1,39 +1,72 @@
-From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Wed, 29 Dec 2010 13:01:31 +0200
-Subject: [PATCH] OMAP: GPIO: fix _set_gpio_triggering() for OMAP2+
-Message-ID: <1293620491-7201-1-git-send-email-ext-mika.1.westerberg@nokia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 29 Dec 2010 12:10:19 +0100
+Subject: [PATCH 03/10] net/fec: add mac field into platform data and
+	consolidate fec_get_mac
+In-Reply-To: <20101229110828.GE19347@freescale.com>
+References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
+	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
+	<20101229065329.GB31010@jasper.tkos.co.il>
+	<20101229103014.GD19347@freescale.com>
+	<20101229103758.GU14221@pengutronix.de>
+	<20101229110828.GE19347@freescale.com>
+Message-ID: <20101229111019.GA14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case on OMAP2+ we call set_24xx_gpio_triggering() instead of
-updating reg and l values. However, at the end of the function we
-perform a write:
+Hi Shawn,
 
-	__raw_writel(l, reg);
+On Wed, Dec 29, 2010 at 07:08:29PM +0800, Shawn Guo wrote:
+> On Wed, Dec 29, 2010 at 11:37:58AM +0100, Uwe Kleine-K?nig wrote:
+> > On Wed, Dec 29, 2010 at 06:30:15PM +0800, Shawn Guo wrote:
+> > > > On Tue, Dec 28, 2010 at 10:55:48PM +0800, Shawn Guo wrote:
+> > > [...]
+> > > > > +	/*
+> > > > > +	 * try to get mac address in following order:
+> > > > > +	 *
+> > > > > +	 * 1) kernel command line fec_mac=xx:xx:xx...
+> > > > > +	 */
+> > > > > +	iap = fec_mac_default;
+> > > > > +
+> > > > > +	/*
+> > > > > +	 * 2) from flash or fuse (via platform data)
+> > > > > +	 */
+> > > > 
+> > > > Again, how do you handle the dual MAC case?
+> > > > 
+> > > For the platform data case, the following patch reads both mac
+> > > addresses.
+> > > 
+> > > [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
+> > > 
+> > > +static int __init mx28evk_fec_get_mac(void)
+> > > +{
+> > > +       int i, ret;
+> > > +       u32 val;
+> > > +
+> > > +       /*
+> > > +        * OCOTP only stores the last 4 octets for each mac address,
+> > > +        * so hard-coding the first two octets as Freescale OUI (00:04:9f)
+> > > +        * is needed.
+> > > +        */
+> > > +       for (i = 0; i < 2; i++) {
+> > > +               ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
+> > > +               if (ret)
+> > > +                       goto error;
+> > > +
+> > > +               mx28_fec_pdata[i].mac[0] = 0x00;
+> > > +               mx28_fec_pdata[i].mac[1] = 0x04;
+> > > +               mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
+> > > +               mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
+> > > +               mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
+> > > +               mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
+> > uuh.  Is ((val >> 24) & 0xff) supposed to be 0x9f?  If not this might
+> > have unwanted effects (practical, don't know about legal ones).
+> Yes, it is 0x9f.
+Then maybe hardcode that, or at least warn if it's not?
 
-So on OMAP2+ we end up writing 0 to the bank->base which is not
-correct (typically this points to GPIO_REVISION register).
+Best regards
+Uwe
 
-Fix this by returning immediately after call to
-set_24xx_gpio_triggering().
-
-Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
----
- arch/arm/plat-omap/gpio.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index c05c653..4dcb66f 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -867,7 +867,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
- 	case METHOD_GPIO_24XX:
- 	case METHOD_GPIO_44XX:
- 		set_24xx_gpio_triggering(bank, gpio, trigger);
--		break;
-+		return 0;
- #endif
- 	default:
- 		goto bad;
 -- 
-1.7.3.2
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
