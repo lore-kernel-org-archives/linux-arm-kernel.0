@@ -1,40 +1,117 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Dec 2010 09:38:35 +0100
-Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
-In-Reply-To: <20101227114938.GA13154@freescale.com>
-References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
-	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
-	<20101222202542.GT14221@pengutronix.de>
-	<20101227114938.GA13154@freescale.com>
-Message-ID: <20101229083835.GO14221@pengutronix.de>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 29 Dec 2010 16:52:16 +0800
+Subject: [PATCH v2 5/8] arm: mxc: move IOMUX_CONFIG_XXXX definitions to
+	iomux-v3.h
+In-Reply-To: <20101229081328.GL14221@pengutronix.de>
+References: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
+	<1293607828-21213-2-git-send-email-richard.zhao@freescale.com>
+	<1293607828-21213-3-git-send-email-richard.zhao@freescale.com>
+	<1293607828-21213-4-git-send-email-richard.zhao@freescale.com>
+	<1293607828-21213-5-git-send-email-richard.zhao@freescale.com>
+	<20101229081328.GL14221@pengutronix.de>
+Message-ID: <20101229085216.GB8701@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
-
-On Mon, Dec 27, 2010 at 07:49:40PM +0800, Shawn Guo wrote:
-> On Wed, Dec 22, 2010 at 09:25:42PM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Dec 21, 2010 at 09:12:10PM +0800, Shawn Guo wrote:
-> > > The mxs duart is actually an amba-pl011 device. This commit changes
-> > > the duart device code to dynamically allocate amba-pl011 device,
-> > > so that drivers/serial/amba-pl011.c can be used on mxs.
-> > I have problems using this.  The problem I found up to now is that
-> > during probe of the device (triggered by mxs_add_duart ->
-> > amba_device_register -> amba_put_disable_pclk) the uart clock is
-> > disabled.  This happens because initially its usage count is 0 but the
-> > clock is enabled by barebox.  clk_enable doesn't hurt, but in the
-> > matching clk_disable the usage count drops to zero again and so the
-> > clock is disabled in hardware.  After that no further outputs can be
-> > seen.
+On Wed, Dec 29, 2010 at 09:13:28AM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Dec 29, 2010 at 03:30:27PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/plat-mxc/include/mach/iomux-mx51.h |   16 ----------------
+> >  arch/arm/plat-mxc/include/mach/iomux-mx53.h |   16 ----------------
+> >  arch/arm/plat-mxc/include/mach/iomux-v3.h   |   15 +++++++++++++++
+> >  3 files changed, 15 insertions(+), 32 deletions(-)
 > > 
-> I did not see this problem. It's true that the clock is turned off
-> in amba_device_register. But later, the clock will be turned on
-> again by amba_probe -> amba_get_enable_pclk very soon.
-This is only a problem with DEBUG_LL I guess.
+> > diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > index e1600f3..31af1f5 100644
+> > --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > @@ -15,22 +15,6 @@
+> >  
+> >  #include <mach/iomux-v3.h>
+> >  
+> > -/*
+> > - * various IOMUX alternate output functions (1-7)
+> > - */
+> > -typedef enum iomux_config {
+> > -	IOMUX_CONFIG_ALT0,
+> > -	IOMUX_CONFIG_ALT1,
+> > -	IOMUX_CONFIG_ALT2,
+> > -	IOMUX_CONFIG_ALT3,
+> > -	IOMUX_CONFIG_ALT4,
+> > -	IOMUX_CONFIG_ALT5,
+> > -	IOMUX_CONFIG_ALT6,
+> > -	IOMUX_CONFIG_ALT7,
+> > -	IOMUX_CONFIG_GPIO,      /* added to help user use GPIO mode */
+> > -	IOMUX_CONFIG_SION = 0x1 << 4,   /* LOOPBACK:MUX SION bit */
+> > -} iomux_pin_cfg_t;
+> > -
+> >  /* Pad control groupings */
+> >  #define MX51_UART1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
+> >  				PAD_CTL_DSE_HIGH)
+> > diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> > index 80cb3c5..4155124 100644
+> > --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> > +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> > @@ -21,22 +21,6 @@
+> >  
+> >  #include <mach/iomux-v3.h>
+> >  
+> > -/*
+> > - * various IOMUX alternate output functions (1-7)
+> > - */
+> > -typedef enum iomux_config {
+> > -	IOMUX_CONFIG_ALT0,
+> > -	IOMUX_CONFIG_ALT1,
+> > -	IOMUX_CONFIG_ALT2,
+> > -	IOMUX_CONFIG_ALT3,
+> > -	IOMUX_CONFIG_ALT4,
+> > -	IOMUX_CONFIG_ALT5,
+> > -	IOMUX_CONFIG_ALT6,
+> > -	IOMUX_CONFIG_ALT7,
+> > -	IOMUX_CONFIG_GPIO, /* added to help user use GPIO mode */
+> > -	IOMUX_CONFIG_SION = 0x1 << 4, /* LOOPBACK:MUX SION bit */
+> > -} iomux_pin_cfg_t;
+> > -
+> >  /* These 2 defines are for pins that may not have a mux register, but could
+> >   * have a pad setting register, and vice-versa. */
+> >  #define NON_MUX_I	0x00
+> > diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> > index 811716f..e1fd71b 100644
+> > --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> > +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> > @@ -54,6 +54,21 @@ typedef struct deprecated_pad_desc {
+> >  	unsigned select_input:3;
+> >  } iomux_v3_cfg_t;
+> >  
+> > +/*
+> > + * various IOMUX alternate output functions (1-7)
+> > + */
+> > +enum iomux_config {
+> > +	IOMUX_CONFIG_ALT0,
+> > +	IOMUX_CONFIG_ALT1,
+> > +	IOMUX_CONFIG_ALT2,
+> > +	IOMUX_CONFIG_ALT3,
+> > +	IOMUX_CONFIG_ALT4,
+> > +	IOMUX_CONFIG_ALT5,
+> > +	IOMUX_CONFIG_ALT6,
+> > +	IOMUX_CONFIG_ALT7,
+> > +	IOMUX_CONFIG_SION = 0x1 << 4,	/* LOOPBACK:MUX SION bit */
+> You didn't add IOMUX_CONFIG_GPIO here which existed in both iomux-mx51.h
+> and iomux-mx53.h.  Either you should add it or note in the commit log
+> why you choosed not to do it.
+IOMUX_CONFIG_GPIO meant to define a virtual alternative (none in physical) to
+help define GPIO pads conveniently. It was used by freescale old iomux routines.
+We don't use it in iomux v3.
+I'll add the reason to commit log.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+Richard
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
