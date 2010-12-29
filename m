@@ -1,30 +1,57 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 29 Dec 2010 01:50:37 +0100
-Subject: [PATCH 5/6] ARM: PL011: Add support for transmit DMA
-In-Reply-To: <E1PW4qN-0006GS-EM@rmk-PC.arm.linux.org.uk>
-References: <20101224102359.GC20587@n2100.arm.linux.org.uk>
-	<E1PW4qN-0006GS-EM@rmk-PC.arm.linux.org.uk>
-Message-ID: <AANLkTikkjd-j5MUcP254chPpWKpiQ_nh3ZjWz2OPEJVA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 29 Dec 2010 09:50:38 +0900
+Subject: [PATCH 1/5] S5PC110: add MIPI-DSI system register definitions.
+In-Reply-To: <1293535562-24715-1-git-send-email-inki.dae@samsung.com>
+References: <1293535562-24715-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <003201cba6f2$6b532a60$41f97f20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+Inki Dae wrote:
+> 
+Please keep myself in Cc on this. I already noticed that to you before.
+I think you should check whether mail loop is suitable or not...
 
-> - remove RX DMA support. ?As PL011 doesn't give us receive timeout
-> ?interrupts, we only get notified of received data when the RX DMA
-> ?has completed. ?This rather sucks for interactive use of the TTY.
+And would be better if you could add #0 patch to understand your patches.
 
-True for use with PL08x.
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/include/mach/regs-clock.h |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+b/arch/arm/mach-
+> s5pv210/include/mach/regs-clock.h
+> index ebaabe0..09680d9 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+> @@ -146,6 +146,7 @@
+>  #define S5P_OM_STAT		S5P_CLKREG(0xE100)
+>  #define S5P_USB_PHY_CONTROL	S5P_CLKREG(0xE80C)
+>  #define S5P_DAC_CONTROL		S5P_CLKREG(0xE810)
+> +#define S5P_MIPI_DPHY_CONTROL		S5P_CLKREG(0xE814)
+> 
+>  #define S5P_INFORM0		S5P_CLKREG(0xF000)
+>  #define S5P_INFORM1		S5P_CLKREG(0xF004)
+> @@ -196,7 +197,10 @@
+>  #define S5P_OTHERS_USB_SIG_MASK		(1 << 16)
+> 
+>  /* MIPI */
+> -#define S5P_MIPI_DPHY_EN		(3)
+> +#define S5P_MIPI_DPHY_EN		(3 << 0)
+> +
+> +/* S5P_MIPI_PHY_CON0 */
+> +#define S5P_MIPI_M_RESETN		(1 << 1)
+> 
+>  /* S5P_DAC_CONTROL */
+>  #define S5P_DAC_ENABLE			(1)
+> --
 
-But for the systems U300 and Ux500 that have (only) burst
-transfer support (such is the nature of their DMA engines) it will
-likely work.
 
-However it's OK for the time being, this is such a large step
-forward for us anyway, and we can surely put in a new
-patch for this only and discuss it... My idea would be not to
-supply any RX channel playform data for hardware that cannot
-handle this and in that case fall back to PIO for RX.
+Thanks.
 
-Yours,
-Linus Walleij
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
