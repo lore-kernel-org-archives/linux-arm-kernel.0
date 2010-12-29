@@ -1,102 +1,27 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 29 Dec 2010 15:30:27 +0800
-Subject: [PATCH v2 5/8] arm: mxc: move IOMUX_CONFIG_XXXX definitions to
-	iomux-v3.h
-In-Reply-To: <1293607828-21213-4-git-send-email-richard.zhao@freescale.com>
-References: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-2-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-3-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-4-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1293607828-21213-5-git-send-email-richard.zhao@freescale.com>
+Date: Wed, 29 Dec 2010 15:30:23 +0800
+Subject: [PATCH v2 1/8] ARM: mx5: use config to define boot related addresses
+Message-ID: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |   16 ----------------
- arch/arm/plat-mxc/include/mach/iomux-mx53.h |   16 ----------------
- arch/arm/plat-mxc/include/mach/iomux-v3.h   |   15 +++++++++++++++
- 3 files changed, 15 insertions(+), 32 deletions(-)
+Because common clock is change, I don't send out mx50 clock and board level code.
+But sure I tested the patch series using the clock/board code.
+ arch/arm/mach-mx5/Makefile.boot |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index e1600f3..31af1f5 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -15,22 +15,6 @@
- 
- #include <mach/iomux-v3.h>
- 
--/*
-- * various IOMUX alternate output functions (1-7)
-- */
--typedef enum iomux_config {
--	IOMUX_CONFIG_ALT0,
--	IOMUX_CONFIG_ALT1,
--	IOMUX_CONFIG_ALT2,
--	IOMUX_CONFIG_ALT3,
--	IOMUX_CONFIG_ALT4,
--	IOMUX_CONFIG_ALT5,
--	IOMUX_CONFIG_ALT6,
--	IOMUX_CONFIG_ALT7,
--	IOMUX_CONFIG_GPIO,      /* added to help user use GPIO mode */
--	IOMUX_CONFIG_SION = 0x1 << 4,   /* LOOPBACK:MUX SION bit */
--} iomux_pin_cfg_t;
--
- /* Pad control groupings */
- #define MX51_UART1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
- 				PAD_CTL_DSE_HIGH)
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-index 80cb3c5..4155124 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-@@ -21,22 +21,6 @@
- 
- #include <mach/iomux-v3.h>
- 
--/*
-- * various IOMUX alternate output functions (1-7)
-- */
--typedef enum iomux_config {
--	IOMUX_CONFIG_ALT0,
--	IOMUX_CONFIG_ALT1,
--	IOMUX_CONFIG_ALT2,
--	IOMUX_CONFIG_ALT3,
--	IOMUX_CONFIG_ALT4,
--	IOMUX_CONFIG_ALT5,
--	IOMUX_CONFIG_ALT6,
--	IOMUX_CONFIG_ALT7,
--	IOMUX_CONFIG_GPIO, /* added to help user use GPIO mode */
--	IOMUX_CONFIG_SION = 0x1 << 4, /* LOOPBACK:MUX SION bit */
--} iomux_pin_cfg_t;
--
- /* These 2 defines are for pins that may not have a mux register, but could
-  * have a pad setting register, and vice-versa. */
- #define NON_MUX_I	0x00
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-index 811716f..e1fd71b 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-@@ -54,6 +54,21 @@ typedef struct deprecated_pad_desc {
- 	unsigned select_input:3;
- } iomux_v3_cfg_t;
- 
-+/*
-+ * various IOMUX alternate output functions (1-7)
-+ */
-+enum iomux_config {
-+	IOMUX_CONFIG_ALT0,
-+	IOMUX_CONFIG_ALT1,
-+	IOMUX_CONFIG_ALT2,
-+	IOMUX_CONFIG_ALT3,
-+	IOMUX_CONFIG_ALT4,
-+	IOMUX_CONFIG_ALT5,
-+	IOMUX_CONFIG_ALT6,
-+	IOMUX_CONFIG_ALT7,
-+	IOMUX_CONFIG_SION = 0x1 << 4,	/* LOOPBACK:MUX SION bit */
-+};
-+
- static inline unsigned int MUX_CTRL_OFS(iomux_v3_cfg_t *pad)
- {
- 	return pad->mux_ctrl_ofs;
+diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+index 9939a19..388d2e8 100644
+--- a/arch/arm/mach-mx5/Makefile.boot
++++ b/arch/arm/mach-mx5/Makefile.boot
+@@ -1,3 +1,3 @@
+-   zreladdr-y	:= 0x90008000
+-params_phys-y	:= 0x90000100
+-initrd_phys-y	:= 0x90800000
++   zreladdr-$(CONFIG_SOC_IMX51)	:= 0x90008000
++params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
++initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
 -- 
 1.6.3.3
