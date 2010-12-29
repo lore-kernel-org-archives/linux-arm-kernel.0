@@ -1,144 +1,37 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Wed, 29 Dec 2010 18:34:43 +0200
-Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
-Message-ID: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Wed, 29 Dec 2010 09:00:36 -0800 (PST)
+Subject: [PATCH 1/9] spi/pxa2xx: register driver properly
+In-Reply-To: <20101229081120.GN8172@angua.secretlab.ca>
+Message-ID: <349566.41372.qm@web180301.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make !CONFIG_SUSPEND init declarations identical on all OMAPs and
-eliminate some ifdefs.
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
----
- arch/arm/mach-omap2/pm.h     |    4 ++++
- arch/arm/mach-omap2/pm24xx.c |   16 ++++++++--------
- arch/arm/mach-omap2/pm34xx.c |   16 ++++++++--------
- arch/arm/mach-omap2/pm44xx.c |   17 +++++++++--------
- 4 files changed, 29 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 1c1b0ab..704766b 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -138,4 +138,8 @@ static inline int omap4_twl_init(void)
- }
- #endif
- 
-+#ifndef CONFIG_SUSPEND
-+#define omap_pm_ops NULL
-+#endif
-+
- #endif
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index dac2d1d..e65b329 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -350,14 +350,14 @@ static void omap2_pm_end(void)
- 	enable_hlt();
- }
- 
--static struct platform_suspend_ops omap_pm_ops = {
--	.begin		= omap2_pm_begin,
--	.enter		= omap2_pm_enter,
--	.end		= omap2_pm_end,
--	.valid		= suspend_valid_only_mem,
-+static const struct platform_suspend_ops omap_pm_ops[] = {
-+	{
-+		.begin		= omap2_pm_begin,
-+		.enter		= omap2_pm_enter,
-+		.end		= omap2_pm_end,
-+		.valid		= suspend_valid_only_mem,
-+	}
- };
--#else
--static const struct platform_suspend_ops __initdata omap_pm_ops;
- #endif /* CONFIG_SUSPEND */
- 
- /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
-@@ -582,7 +582,7 @@ static int __init omap2_pm_init(void)
- 						    omap24xx_cpu_suspend_sz);
- 	}
- 
--	suspend_set_ops(&omap_pm_ops);
-+	suspend_set_ops(omap_pm_ops);
- 	pm_idle = omap2_pm_idle;
- 
- 	return 0;
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 5b323f2..a4c9283 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -605,11 +605,13 @@ static void omap3_pm_end(void)
- 	return;
- }
- 
--static struct platform_suspend_ops omap_pm_ops = {
--	.begin		= omap3_pm_begin,
--	.end		= omap3_pm_end,
--	.enter		= omap3_pm_enter,
--	.valid		= suspend_valid_only_mem,
-+static const struct platform_suspend_ops omap_pm_ops[] = {
-+	{
-+		.begin		= omap3_pm_begin,
-+		.end		= omap3_pm_end,
-+		.enter		= omap3_pm_enter,
-+		.valid		= suspend_valid_only_mem,
-+	}
- };
- #endif /* CONFIG_SUSPEND */
- 
-@@ -1067,9 +1069,7 @@ static int __init omap3_pm_init(void)
- 	core_clkdm = clkdm_lookup("core_clkdm");
- 
- 	omap_push_sram_idle();
--#ifdef CONFIG_SUSPEND
--	suspend_set_ops(&omap_pm_ops);
--#endif /* CONFIG_SUSPEND */
-+	suspend_set_ops(omap_pm_ops);
- 
- 	pm_idle = omap3_pm_idle;
- 	omap3_idle_init();
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index e9f4862..6022c0a 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -16,6 +16,7 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- 
-+#include "pm.h"
- #include "powerdomain.h"
- #include <mach/omap4-common.h>
- 
-@@ -65,11 +66,13 @@ static void omap4_pm_end(void)
- 	return;
- }
- 
--static struct platform_suspend_ops omap_pm_ops = {
--	.begin		= omap4_pm_begin,
--	.end		= omap4_pm_end,
--	.enter		= omap4_pm_enter,
--	.valid		= suspend_valid_only_mem,
-+static const struct platform_suspend_ops omap_pm_ops[] = {
-+	{
-+		.begin		= omap4_pm_begin,
-+		.end		= omap4_pm_end,
-+		.enter		= omap4_pm_enter,
-+		.valid		= suspend_valid_only_mem,
-+	}
- };
- #endif /* CONFIG_SUSPEND */
- 
-@@ -113,9 +116,7 @@ static int __init omap4_pm_init(void)
- 	}
- #endif
- 
--#ifdef CONFIG_SUSPEND
--	suspend_set_ops(&omap_pm_ops);
--#endif /* CONFIG_SUSPEND */
-+	suspend_set_ops(omap_pm_ops);
- 
- err2:
- 	return ret;
--- 
-1.5.6.5
+> Date: Wednesday, December 29, 2010, 12:11 AM
+> On Thu, Dec 02, 2010 at 06:47:29PM
+> +0100, Sebastian Andrzej Siewior wrote:
+> > use platform_driver_register instead of
+> platform_driver_probe. The
+> > latter only checks available devices at the time of
+> calling. So if a
+> > device gets inserter at a later point in time then the
+> driver will never
+> > play with it.
+
+
+I detect an effort to change the classic model for board initialization in Linux:  first set up
+and register all system/platform devices on each
+board then do the same for their drivers.  ("hardware first" ... "software second".
+
+(Without such a change, there's no need for
+ patches like this (of which I've recently
+seen a few).
+
+I've not seen discussion about the desirability
+of such a change.
+
+- Dave
+
+
+Has this change
