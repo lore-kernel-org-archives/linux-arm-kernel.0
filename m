@@ -1,34 +1,39 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 29 Dec 2010 21:33:48 +0100
-Subject: [PATCH 2/2] arm/pxa: buildfix for pam27x without fb
-In-Reply-To: <1293654828-24661-1-git-send-email-bigeasy@linutronix.de>
-References: <1293654828-24661-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1293654828-24661-2-git-send-email-bigeasy@linutronix.de>
+Date: Wed, 29 Dec 2010 21:33:47 +0100
+Subject: [PATCH 1/2] arm/pxa: fix build of it8152
+Message-ID: <1293654828-24661-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-|arch/arm/mach-pxa/palmld.c: In function ?palmld_init?:
-|arch/arm/mach-pxa/palmld.c:330: error: ?palm_320x480_lcd_mode? undeclared (first use in this function)
-|arch/arm/mach-pxa/palmld.c:330: error: (Each undeclared identifier is reported only once
-|arch/arm/mach-pxa/palmld.c:330: error: for each function it appears in.)
+Probably since 6ac6b817 aka ("ARM: pxa: encode IRQ number into
+.nr_irqs") the build fails with:
+|   CC      arch/arm/common/it8152.o
+| arch/arm/common/it8152.c: In function ?it8152_init_irq?:
+| arch/arm/common/it8152.c:86: error: ?IT8152_LAST_IRQ? undeclared (first use in this function)
+| arch/arm/common/it8152.c:86: error: (Each undeclared identifier is reported only once
+| arch/arm/common/it8152.c:86: error: for each function it appears in.)
+
+Before that commit IT8152_LAST_IRQ was (IRQ_BOARD_END + 40) with the
+first IRQ beeing IRQ_BOARD_START. This change als adds +40 so I hope
+this works (I have no HW to verify).
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- arch/arm/mach-pxa/include/mach/palm27x.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/hardware/it8152.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h b/arch/arm/mach-pxa/include/mach/palm27x.h
-index 0a5e5ea..7b7927c 100644
---- a/arch/arm/mach-pxa/include/mach/palm27x.h
-+++ b/arch/arm/mach-pxa/include/mach/palm27x.h
-@@ -34,7 +34,7 @@ extern struct pxafb_mode_info palm_320x320_new_lcd_mode;
- extern void __init palm27x_lcd_init(int power,
- 					struct pxafb_mode_info *mode);
- #else
--static inline void palm27x_lcd_init(int power, struct pxafb_mode_info *mode) {}
-+#define palm27x_lcd_init(power, mode)	do { } while (0)
- #endif
+diff --git a/arch/arm/include/asm/hardware/it8152.h b/arch/arm/include/asm/hardware/it8152.h
+index 21fa272..e3931a9 100644
+--- a/arch/arm/include/asm/hardware/it8152.h
++++ b/arch/arm/include/asm/hardware/it8152.h
+@@ -81,6 +81,8 @@ extern unsigned long it8152_base_address;
+ #define IT8152_LD_IRQ_COUNT     9
+ #define IT8152_LP_IRQ_COUNT     16
+ #define IT8152_PD_IRQ_COUNT     15
++#define IT8152_LAST_IRQ		(IT8152_IRQ(0) + IT8152_LD_IRQ_COUNT + \
++				IT8152_LP_IRQ_COUNT + IT8152_PD_IRQ_COUNT)
  
- #if	defined(CONFIG_USB_GADGET_PXA27X) || \
+ /* Priorities: */
+ #define IT8152_PD_IRQ(i)        IT8152_IRQ(i)
 -- 
 1.7.3.2
