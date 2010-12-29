@@ -1,39 +1,27 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 29 Dec 2010 21:33:47 +0100
-Subject: [PATCH 1/2] arm/pxa: fix build of it8152
-Message-ID: <1293654828-24661-1-git-send-email-bigeasy@linutronix.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 29 Dec 2010 12:37:40 -0800
+Subject: (arm-)global platform device registration functions
+In-Reply-To: <20101229162512.GI14221@pengutronix.de>
+References: <20101229162512.GI14221@pengutronix.de>
+Message-ID: <20101229123740.c39238f8.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probably since 6ac6b817 aka ("ARM: pxa: encode IRQ number into
-.nr_irqs") the build fails with:
-|   CC      arch/arm/common/it8152.o
-| arch/arm/common/it8152.c: In function ?it8152_init_irq?:
-| arch/arm/common/it8152.c:86: error: ?IT8152_LAST_IRQ? undeclared (first use in this function)
-| arch/arm/common/it8152.c:86: error: (Each undeclared identifier is reported only once
-| arch/arm/common/it8152.c:86: error: for each function it appears in.)
+On Wed, 29 Dec 2010 17:25:12 +0100
+Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
 
-Before that commit IT8152_LAST_IRQ was (IRQ_BOARD_END + 40) with the
-first IRQ beeing IRQ_BOARD_START. This change als adds +40 so I hope
-this works (I have no HW to verify).
+> Hello,
+> 
+> some time ago I started to dynamically allocate platform_devices for
+> arm/plat-mxc.  For that purpose I added many functions, see
+> arch/arm/plat-mxc/include/mach/devices-common.h [1].  Now arm/arch-mxs
+> want to do the same, so I wonder if it would be sensible to do something
+> like this more globally (either for arm or better kernel global).
+> 
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- arch/arm/include/asm/hardware/it8152.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Sounds sensible to me, although I don't really understand what you've
+done - didn't platform_device_alloc() already "dynamically allocate
+platform_devices"?
 
-diff --git a/arch/arm/include/asm/hardware/it8152.h b/arch/arm/include/asm/hardware/it8152.h
-index 21fa272..e3931a9 100644
---- a/arch/arm/include/asm/hardware/it8152.h
-+++ b/arch/arm/include/asm/hardware/it8152.h
-@@ -81,6 +81,8 @@ extern unsigned long it8152_base_address;
- #define IT8152_LD_IRQ_COUNT     9
- #define IT8152_LP_IRQ_COUNT     16
- #define IT8152_PD_IRQ_COUNT     15
-+#define IT8152_LAST_IRQ		(IT8152_IRQ(0) + IT8152_LD_IRQ_COUNT + \
-+				IT8152_LP_IRQ_COUNT + IT8152_PD_IRQ_COUNT)
- 
- /* Priorities: */
- #define IT8152_PD_IRQ(i)        IT8152_IRQ(i)
--- 
-1.7.3.2
+If you were to implement this common infrastructure, there may be
+already-existing code which could use it.  How would we locate that?
