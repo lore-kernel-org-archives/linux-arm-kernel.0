@@ -1,79 +1,108 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Dec 2010 11:37:58 +0100
-Subject: [PATCH 03/10] net/fec: add mac field into platform data and
-	consolidate fec_get_mac
-In-Reply-To: <20101229103014.GD19347@freescale.com>
+Date: Wed, 29 Dec 2010 11:47:45 +0100
+Subject: [PATCH 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <1293548155-16328-9-git-send-email-shawn.guo@freescale.com>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
-	<20101229065329.GB31010@jasper.tkos.co.il>
-	<20101229103014.GD19347@freescale.com>
-Message-ID: <20101229103758.GU14221@pengutronix.de>
+	<1293548155-16328-9-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20101229104745.GV14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Shawn,
 
-On Wed, Dec 29, 2010 at 06:30:15PM +0800, Shawn Guo wrote:
-> Sorry, Baruch.  I missed two comments in the last reply.
+On Tue, Dec 28, 2010 at 10:55:53PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mxs/Makefile              |    2 +-
+>  arch/arm/mach-mxs/include/mach/common.h |    1 +
+>  arch/arm/mach-mxs/ocotp.c               |   52 +++++++++++++++++++++++++++++++
+>  3 files changed, 54 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/ocotp.c
 > 
-> On Wed, Dec 29, 2010 at 08:53:30AM +0200, Baruch Siach wrote:
-> > Hi Shawn,
-> > 
-> > Please add netdev at vger.kernel.org to the Cc of all your fec driver patches.
-> > 
-> I was aware of this after I sent out the patch set last night.
-> Can I just resend all the patches in v2 and get netdev at vger.kernel.org
-> included?
-[I just added netdev for this reply.  I think adding it for v2 is OK
-then.  For those interested, the whole series can be found at
+> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> index 39d3f9c..f23ebbd 100644
+> --- a/arch/arm/mach-mxs/Makefile
+> +++ b/arch/arm/mach-mxs/Makefile
+> @@ -1,5 +1,5 @@
+>  # Common support
+> -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
+> +obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
+>  
+>  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+>  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+> diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+> index 59133eb..cf02552 100644
+> --- a/arch/arm/mach-mxs/include/mach/common.h
+> +++ b/arch/arm/mach-mxs/include/mach/common.h
+> @@ -13,6 +13,7 @@
+>  
+>  struct clk;
+>  
+> +extern int mxs_read_ocotp(int offset, int count, u32 *values);
+>  extern int mxs_reset_block(void __iomem *);
+>  extern void mxs_timer_init(struct clk *, int);
+>  
+> diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+> new file mode 100644
+> index 0000000..24457d7
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/ocotp.c
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +
+> +#include <mach/mxs.h>
+> +
+> +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
+> +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
+> +
+> +int mxs_read_ocotp(int offset, int count, u32 *values)
+Maybe use size_t as type for count?  unsigned for offset?
 
-	http://thread.gmane.org/gmane.linux.ports.arm.kernel/100902
-
-.]
- 
-> > On Tue, Dec 28, 2010 at 10:55:48PM +0800, Shawn Guo wrote:
-> [...]
-> > > +	/*
-> > > +	 * try to get mac address in following order:
-> > > +	 *
-> > > +	 * 1) kernel command line fec_mac=xx:xx:xx...
-> > > +	 */
-> > > +	iap = fec_mac_default;
-> > > +
-> > > +	/*
-> > > +	 * 2) from flash or fuse (via platform data)
-> > > +	 */
-> > 
-> > Again, how do you handle the dual MAC case?
-> > 
-> For the platform data case, the following patch reads both mac
-> addresses.
-> 
-> [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
-> 
-> +static int __init mx28evk_fec_get_mac(void)
 > +{
-> +       int i, ret;
-> +       u32 val;
+> +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
+> +	int i, timeout = 0x400;
 > +
-> +       /*
-> +        * OCOTP only stores the last 4 octets for each mac address,
-> +        * so hard-coding the first two octets as Freescale OUI (00:04:9f)
-> +        * is needed.
-> +        */
-> +       for (i = 0; i < 2; i++) {
-> +               ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
-> +               if (ret)
-> +                       goto error;
+> +	/* open OCOTP banks for read */
+> +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
 > +
-> +               mx28_fec_pdata[i].mac[0] = 0x00;
-> +               mx28_fec_pdata[i].mac[1] = 0x04;
-> +               mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
-> +               mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
-> +               mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
-> +               mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
-uuh.  Is ((val >> 24) & 0xff) supposed to be 0x9f?  If not this might
-have unwanted effects (practical, don't know about legal ones).
+> +	/* approximately wait 32 hclk cycles */
+> +	udelay(1);
+> +
+> +	/* poll BUSY bit becoming cleared */
+> +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
+> +		/* nothing */;
+> +
+> +	if (unlikely(!timeout))
+> +		goto error;
+> +
+> +	for (i = 0; i < count; i++, offset += 4)
+> +		*values++ = __raw_readl(ocotp_base + offset);
+> +
+> +	/* close banks for power saving */
+> +	__mxs_clrl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+> +
+> +	return 0;
+> +
+> +error:
+> +	pr_err("%s: timeout in reading OCOTP\n", __func__);
+> +	return -ETIMEDOUT;
+> +}
+does this need locking?
 
 Best regards
 Uwe
