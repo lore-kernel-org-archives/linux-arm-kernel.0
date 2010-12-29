@@ -1,58 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Dec 2010 01:59:09 +0100
-Subject: Git pull request: ux500-core for the v2.6.38 merge window
-In-Reply-To: <20101223144949.GO3636@n2100.arm.linux.org.uk>
-References: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
-	<20101223144949.GO3636@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikDhyqcQ_=jCusJcVHrRp6hxjJ7x2W2-qbTM4jp@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 29 Dec 2010 10:03:44 +0900
+Subject: [PATCH 1/5] S5PC110: add MIPI-DSI system register definitions.
+In-Reply-To: <1293535562-24715-1-git-send-email-inki.dae@samsung.com>
+References: <1293535562-24715-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <003301cba6f4$3f6b2a90$be417fb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+Inki Dae wrote:
+> 
+One more comment.
 
-> On Thu, Dec 23, 2010 at 08:48:26AM +0100, Linus Walleij wrote:
->> Russell, could you please pull:
->>
->> ? ? ? ?git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
->> for-rmk
->>
->> This is based on your devel branch due to the dependencies on the GIC
->> cleanup patches
->
-> Basing stuff on the devel branch really doesn't work, especially as I'm
-> still getting a trickle of acks and tested-by's for the clksrc stuff.
+Please work on S5P SoCs based on maintainer's latest for-next.
+You can find the reason in below.
 
-Yeah I was sort of thinking that...
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/include/mach/regs-clock.h |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+b/arch/arm/mach-
+> s5pv210/include/mach/regs-clock.h
+> index ebaabe0..09680d9 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+> @@ -146,6 +146,7 @@
+>  #define S5P_OM_STAT		S5P_CLKREG(0xE100)
+>  #define S5P_USB_PHY_CONTROL	S5P_CLKREG(0xE80C)
+>  #define S5P_DAC_CONTROL		S5P_CLKREG(0xE810)
+> +#define S5P_MIPI_DPHY_CONTROL		S5P_CLKREG(0xE814)
+> 
+Already added by Sylwester's patch.
 
-> Of course, I could chose not to publish such stuff in my devel branch,
-> thereby preventing it appearing in linux-next until the last moment
-> before the merge window. ?Or I could just not ask for acks etc...
+>  #define S5P_INFORM0		S5P_CLKREG(0xF000)
+>  #define S5P_INFORM1		S5P_CLKREG(0xF004)
+> @@ -196,7 +197,10 @@
+>  #define S5P_OTHERS_USB_SIG_MASK		(1 << 16)
+> 
+>  /* MIPI */
+> -#define S5P_MIPI_DPHY_EN		(3)
 
-I think Rabin was writing these patches based on the -next tree,
-not the devel branch directly.
+Oops, already removed because not used anywhere at that time.
 
-> Is it possible to split this stuff up into two topic branches - one set
-> which doesn't depend on my GIC and SMP changes, and then we'll see what
-> can be done about the remainder?
+> +#define S5P_MIPI_DPHY_EN		(3 << 0)
+> +
+> +/* S5P_MIPI_PHY_CON0 */
+> +#define S5P_MIPI_M_RESETN		(1 << 1)
+> 
+>  /* S5P_DAC_CONTROL */
+>  #define S5P_DAC_ENABLE			(1)
+> --
 
-Yes, as mentioned in the original post:
-If basing this on devel is unacceptable then please
-pull this instead:
+Please re-work your all patches.
 
-      git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-ux500-core
+Thanks.
 
-This brings in everything except the 5 patches from Rabin
-that require the GIC+SMP changes. I've frozen that tree
-until you pull it.
-
-> What I'm thinking is maybe if I merge the GIC and SMP changes together,
-> and provide you with that as a basis for your dependents?
-
-Perfect!
-
-I will try to fix it ASAP if you prepare this, and if I fail I bet
-Rabin will help me sort it out.
-
-Yours,
-Linus Walleij
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
