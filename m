@@ -1,68 +1,76 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 29 Dec 2010 18:14:42 +0800
-Subject: [PATCH 06/10] ARM: mx28: update clocks for dual fec support
-In-Reply-To: <20101229081044.GK14221@pengutronix.de>
+Date: Wed, 29 Dec 2010 18:30:15 +0800
+Subject: [PATCH 03/10] net/fec: add mac field into platform data and
+	consolidate fec_get_mac
+In-Reply-To: <20101229065329.GB31010@jasper.tkos.co.il>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-7-git-send-email-shawn.guo@freescale.com>
-	<20101229065734.GC31010@jasper.tkos.co.il>
-	<20101229081044.GK14221@pengutronix.de>
-Message-ID: <20101229101441.GC19347@freescale.com>
+	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
+	<20101229065329.GB31010@jasper.tkos.co.il>
+Message-ID: <20101229103014.GD19347@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Sorry, Baruch.  I missed two comments in the last reply.
 
-On Wed, Dec 29, 2010 at 09:10:44AM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Dec 29, 2010 at 08:57:34AM +0200, Baruch Siach wrote:
-> > Hi Shawn,
-> > 
-> > On Tue, Dec 28, 2010 at 10:55:51PM +0800, Shawn Guo wrote:
-> > > * Change fec clock registration to use con_id only for looking up,
-> > >   so that dual fec driver can find the same clock for both fec0
-> > >   and fec1.
-> > > 
-> > > * Explicitly call clk_enable for some clocks that have been on to
-> > >   reflect the clock status and get usecount updated. Otherwise,
-> > >   clocks could be turned off by pair call of clk_enable/clk_disable
-> > >   in drivers, because of the incorrect initial usecount.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > ---
-> > >  arch/arm/mach-mxs/clock-mx28.c |    7 ++++++-
-> > >  1 files changed, 6 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> > > index dd6d158..6b77aff 100644
-> > > --- a/arch/arm/mach-mxs/clock-mx28.c
-> > > +++ b/arch/arm/mach-mxs/clock-mx28.c
-> > > @@ -603,7 +603,7 @@ _DEFINE_CLOCK(fec_clk, ENET, DISABLE, &hbus_clk);
-> > >  
-> > >  static struct clk_lookup lookups[] = {
-> > >  	_REGISTER_CLOCK("uart", NULL, uart_clk)
-> > > -	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> > > +	_REGISTER_CLOCK(NULL, "fec_clk", fec_clk)
-> > 
-> > Looks like a wrong use of the clk API. You should define define two clocks 
-> > "fec.0" and "fec.1".
-> The commit log suggests that both should enable the same (hardware)
-> clock.  Still I agree with Baruch that in this case clk_get() should
-> just return the same clock for both fec.0 and fec.1.
-> I think it's a bit more work than just adding
-> 	_REGISTER_CLOCK("fec.1", NULL, fec_clk)
+On Wed, Dec 29, 2010 at 08:53:30AM +0200, Baruch Siach wrote:
+> Hi Shawn,
 > 
-I originally had what you suggest above. But when I found fec driver
-only calls clk_get like below, I change the code to current one to 
-save one line code.
-
-	fep->clk = clk_get(&pdev->dev, "fec_clk");
-
-But it looks people use dev_id to address clock as the preference.
-Will change it back.
-
-> , maybe just define fec1_clk as a dummy clk with parent=fec_clk?
+> Please add netdev at vger.kernel.org to the Cc of all your fec driver patches.
 > 
-> (And IMHO don't inlude "_clk" in clknames, that's implicit.)
+I was aware of this after I sent out the patch set last night.
+Can I just resend all the patches in v2 and get netdev at vger.kernel.org
+included?
+
+> On Tue, Dec 28, 2010 at 10:55:48PM +0800, Shawn Guo wrote:
+[...]
+> > +	/*
+> > +	 * try to get mac address in following order:
+> > +	 *
+> > +	 * 1) kernel command line fec_mac=xx:xx:xx...
+> > +	 */
+> > +	iap = fec_mac_default;
+> > +
+> > +	/*
+> > +	 * 2) from flash or fuse (via platform data)
+> > +	 */
 > 
+> Again, how do you handle the dual MAC case?
+> 
+For the platform data case, the following patch reads both mac
+addresses.
+
+[PATCH 09/10] ARM: mx28: read fec mac address from ocotp
+
++static int __init mx28evk_fec_get_mac(void)
++{
++       int i, ret;
++       u32 val;
++
++       /*
++        * OCOTP only stores the last 4 octets for each mac address,
++        * so hard-coding the first two octets as Freescale OUI (00:04:9f)
++        * is needed.
++        */
++       for (i = 0; i < 2; i++) {
++               ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
++               if (ret)
++                       goto error;
++
++               mx28_fec_pdata[i].mac[0] = 0x00;
++               mx28_fec_pdata[i].mac[1] = 0x04;
++               mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
++               mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
++               mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
++               mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
++       }
++
++       return 0;
++
++error:
++       pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
++       return -ETIMEDOUT;
++}
++
 
 -- 
 Regards,
