@@ -1,41 +1,56 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 29 Dec 2010 09:06:26 +0200
-Subject: [PATCH] [ARM] it8152: add IT8152_LAST_IRQ definition to fix build
-	error
-Message-ID: <1293606386-17388-1-git-send-email-mike@compulab.co.il>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 29 Dec 2010 15:30:26 +0800
+Subject: [PATCH v2 4/8] arm: mx5: mx51/53 have different mxc_cpu_type
+	definition
+In-Reply-To: <1293607828-21213-3-git-send-email-richard.zhao@freescale.com>
+References: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
+	<1293607828-21213-2-git-send-email-richard.zhao@freescale.com>
+	<1293607828-21213-3-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1293607828-21213-4-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 6ac6b817f3f4c23c5febd960d8deb343e13af5f3 (ARM: pxa: encode
-IRQ number into .nr_irqs) removed definition of ITE_LAST_IRQ which
-caused the following build error:
-
-CC      arch/arm/common/it8152.o
-arch/arm/common/it8152.c: In function 'it8152_init_irq':
-arch/arm/common/it8152.c:86: error: 'IT8152_LAST_IRQ' undeclared (first use in this function)
-arch/arm/common/it8152.c:86: error: (Each undeclared identifier is reported only once
-arch/arm/common/it8152.c:86: error: for each function it appears in.)
-make[2]: *** [arch/arm/common/it8152.o] Error 1
-
-Defining the IT8152_LAST_IRQ in the arch/arm/include/hardware/it8152.c
-fixes the build.
-
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/include/asm/hardware/it8152.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/include/mach/mxc.h |   15 +++++++++++++--
+ 1 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/it8152.h b/arch/arm/include/asm/hardware/it8152.h
-index 21fa272..b2f95c7 100644
---- a/arch/arm/include/asm/hardware/it8152.h
-+++ b/arch/arm/include/asm/hardware/it8152.h
-@@ -76,6 +76,7 @@ extern unsigned long it8152_base_address;
-   IT8152_PD_IRQ(0)  Audio controller (ACR)
-  */
- #define IT8152_IRQ(x)   (IRQ_BOARD_START + (x))
-+#define IT8152_LAST_IRQ	(IRQ_BOARD_START + 40)
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 4abbdd1..eca8f83 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -126,7 +126,7 @@ extern unsigned int __mxc_cpu_type;
+ # define cpu_is_mx35()		(0)
+ #endif
  
- /* IRQ-sources in 3 groups - local devices, LPC (serial), and external PCI */
- #define IT8152_LD_IRQ_COUNT     9
+-#ifdef CONFIG_ARCH_MX5
++#ifdef CONFIG_ARCH_MX51
+ # ifdef mxc_cpu_type
+ #  undef mxc_cpu_type
+ #  define mxc_cpu_type __mxc_cpu_type
+@@ -134,11 +134,22 @@ extern unsigned int __mxc_cpu_type;
+ #  define mxc_cpu_type MXC_CPU_MX51
+ # endif
+ # define cpu_is_mx51()		(mxc_cpu_type == MXC_CPU_MX51)
+-# define cpu_is_mx53()		(mxc_cpu_type == MXC_CPU_MX53)
+ #else
+ # define cpu_is_mx51()		(0)
+ #endif
+ 
++#ifdef CONFIG_ARCH_MX53
++# ifdef mxc_cpu_type
++#  undef mxc_cpu_type
++#  define mxc_cpu_type __mxc_cpu_type
++# else
++#  define mxc_cpu_type MXC_CPU_MX53
++# endif
++# define cpu_is_mx53()		(mxc_cpu_type == MXC_CPU_MX53)
++#else
++# define cpu_is_mx53()		(0)
++#endif
++
+ #ifdef CONFIG_ARCH_MXC91231
+ # ifdef mxc_cpu_type
+ #  undef mxc_cpu_type
 -- 
-1.6.4.4
+1.6.3.3
