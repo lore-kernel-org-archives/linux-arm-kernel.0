@@ -1,57 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Dec 2010 14:47:10 +0100
-Subject: [PATCH 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20101229120822.GI19347@freescale.com>
-References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-9-git-send-email-shawn.guo@freescale.com>
-	<20101229104745.GV14221@pengutronix.de>
-	<20101229120822.GI19347@freescale.com>
-Message-ID: <20101229134710.GF14221@pengutronix.de>
+From: mreimer@sdgsystems.com (Matt Reimer)
+Date: Wed, 29 Dec 2010 11:18:29 -0500
+Subject: [PATCH] [ARM] pxa: fix page table corruption on resume
+In-Reply-To: <4CF6A7F2.80206@sdgsystems.com>
+References: <4CF6A7F2.80206@sdgsystems.com>
+Message-ID: <1293639509-9373-1-git-send-email-mreimer@sdgsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+From: Aric D. Blumer <aric@sdgsystems.com>
 
-On Wed, Dec 29, 2010 at 08:08:23PM +0800, Shawn Guo wrote:
-> On Wed, Dec 29, 2010 at 11:47:45AM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Dec 28, 2010 at 10:55:53PM +0800, Shawn Guo wrote:
-> > > +{
-> > > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
-> > > +	int i, timeout = 0x400;
-> > > +
-> > > +	/* open OCOTP banks for read */
-> > > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-> > > +
-> > > +	/* approximately wait 32 hclk cycles */
-> > > +	udelay(1);
-> > > +
-> > > +	/* poll BUSY bit becoming cleared */
-> > > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
-> > > +		/* nothing */;
-> > > +
-> > > +	if (unlikely(!timeout))
-> > > +		goto error;
-> > > +
-> > > +	for (i = 0; i < count; i++, offset += 4)
-> > > +		*values++ = __raw_readl(ocotp_base + offset);
-> > > +
-> > > +	/* close banks for power saving */
-> > > +	__mxs_clrl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-> > > +
-> > > +	return 0;
-> > > +
-> > > +error:
-> > > +	pr_err("%s: timeout in reading OCOTP\n", __func__);
-> > > +	return -ETIMEDOUT;
-> > > +}
-> > does this need locking?
-> > 
-> You are suggesting mutex or spinlock?
-This isn't time critical, so I'd advice to use a mutex.
+Before this patch, the following error would sometimes occur after a
+resume on pxa3xx:
 
-Best regards
-Uwe
+    /path/to/mm/memory.c:144: bad pmd 8040542e.
 
+The problem was that a temporary page table mapping was being improperly
+restored.
+
+The PXA3xx resume code creates a temporary mapping of resume_turn_on_mmu
+to avoid a prefetch abort.  The pxa3xx_resume_after_mmu code requires
+that the r1 register holding the address of this mapping not be
+modified, however, resume_turn_on_mmu does modify it. It is mostly
+correct in that r1 receives the base table address, but it may also
+get other bits in 13:0.  This results in pxa3xx_resume_after_mmu
+restoring the original mapping to the wrong place, corrupting memory
+and leaving the temporary mapping in place.
+
+Signed-off-by: Matt Reimer <mreimer@sdgsystems.com>
+---
+ arch/arm/mach-pxa/sleep.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/sleep.S b/arch/arm/mach-pxa/sleep.S
+index 52c30b0..ae00811 100644
+--- a/arch/arm/mach-pxa/sleep.S
++++ b/arch/arm/mach-pxa/sleep.S
+@@ -353,8 +353,8 @@ resume_turn_on_mmu:
+ 
+ 	@ Let us ensure we jump to resume_after_mmu only when the mcr above
+ 	@ actually took effect.  They call it the "cpwait" operation.
+-	mrc	p15, 0, r1, c2, c0, 0		@ queue a dependency on CP15
+-	sub	pc, r2, r1, lsr #32		@ jump to virtual addr
++	mrc	p15, 0, r0, c2, c0, 0		@ queue a dependency on CP15
++	sub	pc, r2, r0, lsr #32		@ jump to virtual addr
+ 	nop
+ 	nop
+ 	nop
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.0.4
