@@ -1,22 +1,58 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 29 Dec 2010 01:53:00 +0100
-Subject: [PATCH 0/6] PL011 DMA support
-In-Reply-To: <20101224102359.GC20587@n2100.arm.linux.org.uk>
-References: <20101224102359.GC20587@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=bTjw2rKe0A4J6eMp1rgDBdcAvXGCYux6GYT6L@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Dec 2010 01:59:09 +0100
+Subject: Git pull request: ux500-core for the v2.6.38 merge window
+In-Reply-To: <20101223144949.GO3636@n2100.arm.linux.org.uk>
+References: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
+	<20101223144949.GO3636@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikDhyqcQ_=jCusJcVHrRp6hxjJ7x2W2-qbTM4jp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+2010/12/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-> Re-post of the previous set, but using writew() instead of writew_relaxed().
-> writew_relaxed() is not part of the MMIO accessor API, and so should
-> not be used in drivers which may be used on other architectures.
+> On Thu, Dec 23, 2010 at 08:48:26AM +0100, Linus Walleij wrote:
+>> Russell, could you please pull:
+>>
+>> ? ? ? ?git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+>> for-rmk
+>>
+>> This is based on your devel branch due to the dependencies on the GIC
+>> cleanup patches
+>
+> Basing stuff on the devel branch really doesn't work, especially as I'm
+> still getting a trickle of acks and tested-by's for the clksrc stuff.
 
-Comments on RX but nothing that big that it cannot be discussed
-separately at a later point.
+Yeah I was sort of thinking that...
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+> Of course, I could chose not to publish such stuff in my devel branch,
+> thereby preventing it appearing in linux-next until the last moment
+> before the merge window. ?Or I could just not ask for acks etc...
+
+I think Rabin was writing these patches based on the -next tree,
+not the devel branch directly.
+
+> Is it possible to split this stuff up into two topic branches - one set
+> which doesn't depend on my GIC and SMP changes, and then we'll see what
+> can be done about the remainder?
+
+Yes, as mentioned in the original post:
+If basing this on devel is unacceptable then please
+pull this instead:
+
+      git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+ux500-core
+
+This brings in everything except the 5 patches from Rabin
+that require the GIC+SMP changes. I've frozen that tree
+until you pull it.
+
+> What I'm thinking is maybe if I merge the GIC and SMP changes together,
+> and provide you with that as a basis for your dependents?
+
+Perfect!
+
+I will try to fix it ASAP if you prepare this, and if I fail I bet
+Rabin will help me sort it out.
 
 Yours,
 Linus Walleij
