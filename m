@@ -1,63 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 Dec 2010 10:03:44 +0900
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Wed, 29 Dec 2010 10:45:44 +0900
 Subject: [PATCH 1/5] S5PC110: add MIPI-DSI system register definitions.
-In-Reply-To: <1293535562-24715-1-git-send-email-inki.dae@samsung.com>
+In-Reply-To: <003301cba6f4$3f6b2a90$be417fb0$%kim@samsung.com>
 References: <1293535562-24715-1-git-send-email-inki.dae@samsung.com>
-Message-ID: <003301cba6f4$3f6b2a90$be417fb0$%kim@samsung.com>
+	<003301cba6f4$3f6b2a90$be417fb0$%kim@samsung.com>
+Message-ID: <AANLkTi=o=7heymK2Aj4GfiTNvAW8nmq+=SeqqF5PcRM=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inki Dae wrote:
-> 
-One more comment.
+On Wed, Dec 29, 2010 at 10:03 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Inki Dae wrote:
+>>
+> One more comment.
+>
+> Please work on S5P SoCs based on maintainer's latest for-next.
+> You can find the reason in below.
+>
+>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+>> ---
+>> ?arch/arm/mach-s5pv210/include/mach/regs-clock.h | ? ?6 +++++-
+>> ?1 files changed, 5 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+> b/arch/arm/mach-
+>> s5pv210/include/mach/regs-clock.h
+>> index ebaabe0..09680d9 100644
+>> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+>> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+>> @@ -146,6 +146,7 @@
+>> ?#define S5P_OM_STAT ? ? ? ? ?S5P_CLKREG(0xE100)
+>> ?#define S5P_USB_PHY_CONTROL ?S5P_CLKREG(0xE80C)
+>> ?#define S5P_DAC_CONTROL ? ? ? ? ? ? ?S5P_CLKREG(0xE810)
+>> +#define S5P_MIPI_DPHY_CONTROL ? ? ? ? ? ? ? ?S5P_CLKREG(0xE814)
+>>
+> Already added by Sylwester's patch.
+>
+>> ?#define S5P_INFORM0 ? ? ? ? ?S5P_CLKREG(0xF000)
+>> ?#define S5P_INFORM1 ? ? ? ? ?S5P_CLKREG(0xF004)
+>> @@ -196,7 +197,10 @@
+>> ?#define S5P_OTHERS_USB_SIG_MASK ? ? ? ? ? ? ?(1 << 16)
+>>
+>> ?/* MIPI */
+>> -#define S5P_MIPI_DPHY_EN ? ? ? ? ? ? (3)
+>
+> Oops, already removed because not used anywhere at that time.
+>
+>> +#define S5P_MIPI_DPHY_EN ? ? ? ? ? ? (3 << 0)
+>> +
+>> +/* S5P_MIPI_PHY_CON0 */
+>> +#define S5P_MIPI_M_RESETN ? ? ? ? ? ?(1 << 1)
+>>
+>> ?/* S5P_DAC_CONTROL */
+>> ?#define S5P_DAC_ENABLE ? ? ? ? ? ? ? ? ? ? ? (1)
+>> --
+>
+> Please re-work your all patches.
 
-Please work on S5P SoCs based on maintainer's latest for-next.
-You can find the reason in below.
+Before re-work, give technical comments instead of patch submit.
+You mean others are looks good except these one?
 
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/include/mach/regs-clock.h |    6 +++++-
->  1 files changed, 5 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-b/arch/arm/mach-
-> s5pv210/include/mach/regs-clock.h
-> index ebaabe0..09680d9 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> @@ -146,6 +146,7 @@
->  #define S5P_OM_STAT		S5P_CLKREG(0xE100)
->  #define S5P_USB_PHY_CONTROL	S5P_CLKREG(0xE80C)
->  #define S5P_DAC_CONTROL		S5P_CLKREG(0xE810)
-> +#define S5P_MIPI_DPHY_CONTROL		S5P_CLKREG(0xE814)
-> 
-Already added by Sylwester's patch.
-
->  #define S5P_INFORM0		S5P_CLKREG(0xF000)
->  #define S5P_INFORM1		S5P_CLKREG(0xF004)
-> @@ -196,7 +197,10 @@
->  #define S5P_OTHERS_USB_SIG_MASK		(1 << 16)
-> 
->  /* MIPI */
-> -#define S5P_MIPI_DPHY_EN		(3)
-
-Oops, already removed because not used anywhere at that time.
-
-> +#define S5P_MIPI_DPHY_EN		(3 << 0)
-> +
-> +/* S5P_MIPI_PHY_CON0 */
-> +#define S5P_MIPI_M_RESETN		(1 << 1)
-> 
->  /* S5P_DAC_CONTROL */
->  #define S5P_DAC_ENABLE			(1)
-> --
-
-Please re-work your all patches.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thank you,
+Kyungmin Park
