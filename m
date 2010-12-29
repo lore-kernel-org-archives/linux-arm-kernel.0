@@ -1,43 +1,59 @@
-From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Wed, 29 Dec 2010 09:32:29 +0530
-Subject: S3C OTG udc driver isochronous support
-In-Reply-To: <AANLkTi=ssBu9FQp3svPBk3i3dPZTd-Dd03h9EyrO0waH@mail.gmail.com>
-References: <AANLkTi=ssBu9FQp3svPBk3i3dPZTd-Dd03h9EyrO0waH@mail.gmail.com>
-Message-ID: <AANLkTi=nKqX4VQug_rk3TiV2w=UW7ayoDFiHp37qDgyq@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 29 Dec 2010 12:51:23 +0800
+Subject: bad pmd
+In-Reply-To: <AANLkTinP=1opPSDMULHn9DDBMVfT15RaZ0K_WAh7JJuz@mail.gmail.com>
+References: <4CF6A7F2.80206@sdgsystems.com>
+	<20101201201440.GD29347@n2100.arm.linux.org.uk>
+	<4CF70607.1010905@sdgsystems.com> <4CFE6E55.1080308@sdgsystems.com>
+	<20101208140210.GC9777@n2100.arm.linux.org.uk>
+	<AANLkTinP=1opPSDMULHn9DDBMVfT15RaZ0K_WAh7JJuz@mail.gmail.com>
+Message-ID: <AANLkTimatgB15ZLyD_ryVOSfg4s6pHUa0hmRZ9DAmUXP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 26, 2010 at 10:06 PM, Barry Song <21cnbao@gmail.com> wrote:
-> Hi All,
-> After checking the S3C OTG udc drivers in drivers/usb/gadget, i didn't
-> find it can support isochronous endpoint. According to datasheet of
-> S3C6410, EPtype field of DIEPCTLn and DOEPCTLn is read-only. Current
-> S3C OTG udc driver list ep0~ep9, which are control endpoint and
-> bulk/int endpoint according to the source codes:
+On Tue, Dec 14, 2010 at 11:08 PM, Matt Reimer <mreimer@sdgsystems.com> wrote:
+> On Wed, Dec 8, 2010 at 9:02 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Dec 07, 2010 at 12:26:45PM -0500, Aric D. Blumer wrote:
+>>> Matt Reimer and I believe we have found what is going on here. ?I've put
+>>> in a fix (no failures yet), but I wanted to bounce it off anyone interested.
+>>>
+>>> The PXA platform does not use the "bad pmd" mapping that Russell
+>>> describes above under normal circumstances, but the PXA resume code
+>>> (arch/arm/mach-pxa/sleep.S) does on resume:
+>>
+>> Good find.
+>>
+>>> I'm using the patch below as a fix for now, but it's hard to know what
+>>> registers are available. ?Might be better to just mask it off the lower
+>>> bits in r1 again.
+>>>
+>>> ? ? ? ? @ Let us ensure we jump to resume_after_mmu only when the mcr above
+>>> ? ? ? ? @ actually took effect. ?They call it the "cpwait" operation.
+>>> - ? ? ? mrc ? ? p15, 0, r1, c2, c0, 0 ? ? ? ? ? @ queue a dependency on CP15
+>>> - ? ? ? sub ? ? pc, r2, r1, lsr #32 ? ? ? ? ? ? @ jump to virtual addr
+>>> + ? ? ? mrc ? ? p15, 0, r0, c2, c0, 0 ? ? ? ? ? @ queue a dependency on CP15
+>>> + ? ? ? sub ? ? pc, r2, r0, lsr #32 ? ? ? ? ? ? @ jump to virtual addr
+>>
+>> I don't see anything wrong with this. ?Any PXA people want to ack this?
 
-Iso transfer type is not yet supported in the s3c otg driver. But the
-EPtype field can be programmed as bulk, interrupt or iso endpoint. Iso
-transfers have been used on 6410 but that support is not yet posted.
+Me neither.
 
-> static struct s3c_udc memory = {
-> ? ? ? ?.usb_address = 0,
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+
 >
-> ? ? ? ?.gadget = {
-> ? ? ? ? ? ? ? ? ? .ops = &s3c_udc_ops,
-> ? ? ? ? ? ? ? ? ? .ep0 = &memory.ep[0].ep,
-
-<snip>
-
-The drivers/usb/gadget/s3c-hsotg.c file is the s3c usb otg gadget
-driver. Are you referring to some other file.
-
-> ep10~ep14 are not in the list. So is it possible ep10~ep14 are iso
-> endpoints? I guess only samsung engineers can answer this question.
-> And has anybody improved the udc driver to support ISO mode? Here i
-> want to use this mode to support g_webcam gadget.
-
+> This patch fixes the problem for us. We have yet to see a failure with
+> this patch applied.
 >
-> Thanks
-> Barry
+> Eric, do you concur that this is a proper fix?
 >
-<snip>
+
+This patch is good. Thanks for figuring this out. My bad replying so
+late.
+
+Russell,
+
+Still time for this fix to get into .37?
+
+> Matt
+>
