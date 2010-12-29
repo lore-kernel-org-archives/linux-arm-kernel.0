@@ -1,58 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Dec 2010 09:10:44 +0100
-Subject: [PATCH 06/10] ARM: mx28: update clocks for dual fec support
-In-Reply-To: <20101229065734.GC31010@jasper.tkos.co.il>
-References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-7-git-send-email-shawn.guo@freescale.com>
-	<20101229065734.GC31010@jasper.tkos.co.il>
-Message-ID: <20101229081044.GK14221@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 29 Dec 2010 01:11:20 -0700
+Subject: [PATCH 1/9] spi/pxa2xx: register driver properly
+In-Reply-To: <1291312057-7933-2-git-send-email-bigeasy@linutronix.de>
+References: <1291312057-7933-1-git-send-email-bigeasy@linutronix.de>
+	<1291312057-7933-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20101229081120.GN8172@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 29, 2010 at 08:57:34AM +0200, Baruch Siach wrote:
-> Hi Shawn,
+On Thu, Dec 02, 2010 at 06:47:29PM +0100, Sebastian Andrzej Siewior wrote:
+> use platform_driver_register instead of platform_driver_probe. The
+> latter only checks available devices at the time of calling. So if a
+> device gets inserter at a later point in time then the driver will never
+> play with it.
 > 
-> On Tue, Dec 28, 2010 at 10:55:51PM +0800, Shawn Guo wrote:
-> > * Change fec clock registration to use con_id only for looking up,
-> >   so that dual fec driver can find the same clock for both fec0
-> >   and fec1.
-> > 
-> > * Explicitly call clk_enable for some clocks that have been on to
-> >   reflect the clock status and get usecount updated. Otherwise,
-> >   clocks could be turned off by pair call of clk_enable/clk_disable
-> >   in drivers, because of the incorrect initial usecount.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/mach-mxs/clock-mx28.c |    7 ++++++-
-> >  1 files changed, 6 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> > index dd6d158..6b77aff 100644
-> > --- a/arch/arm/mach-mxs/clock-mx28.c
-> > +++ b/arch/arm/mach-mxs/clock-mx28.c
-> > @@ -603,7 +603,7 @@ _DEFINE_CLOCK(fec_clk, ENET, DISABLE, &hbus_clk);
-> >  
-> >  static struct clk_lookup lookups[] = {
-> >  	_REGISTER_CLOCK("uart", NULL, uart_clk)
-> > -	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> > +	_REGISTER_CLOCK(NULL, "fec_clk", fec_clk)
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
+
+picked up for -next via merge
+
+g.
+
+> ---
+>  drivers/spi/pxa2xx_spi.c |    7 ++++---
+>  1 files changed, 4 insertions(+), 3 deletions(-)
 > 
-> Looks like a wrong use of the clk API. You should define define two clocks 
-> "fec.0" and "fec.1".
-The commit log suggests that both should enable the same (hardware)
-clock.  Still I agree with Baruch that in this case clk_get() should
-just return the same clock for both fec.0 and fec.1.
-I think it's a bit more work than just adding
-	_REGISTER_CLOCK("fec.1", NULL, fec_clk)
-
-, maybe just define fec1_clk as a dummy clk with parent=fec_clk?
-
-(And IMHO don't inlude "_clk" in clknames, that's implicit.)
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> index e76b1af..4e169b5 100644
+> --- a/drivers/spi/pxa2xx_spi.c
+> +++ b/drivers/spi/pxa2xx_spi.c
+> @@ -1366,7 +1366,7 @@ static void cleanup(struct spi_device *spi)
+>  	kfree(chip);
+>  }
+>  
+> -static int __init init_queue(struct driver_data *drv_data)
+> +static int __devinit init_queue(struct driver_data *drv_data)
+>  {
+>  	INIT_LIST_HEAD(&drv_data->queue);
+>  	spin_lock_init(&drv_data->lock);
+> @@ -1454,7 +1454,7 @@ static int destroy_queue(struct driver_data *drv_data)
+>  	return 0;
+>  }
+>  
+> -static int __init pxa2xx_spi_probe(struct platform_device *pdev)
+> +static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct pxa2xx_spi_master *platform_info;
+> @@ -1723,13 +1723,14 @@ static struct platform_driver driver = {
+>  		.pm	= &pxa2xx_spi_pm_ops,
+>  #endif
+>  	},
+> +	.probe = pxa2xx_spi_probe,
+>  	.remove = pxa2xx_spi_remove,
+>  	.shutdown = pxa2xx_spi_shutdown,
+>  };
+>  
+>  static int __init pxa2xx_spi_init(void)
+>  {
+> -	return platform_driver_probe(&driver, pxa2xx_spi_probe);
+> +	return platform_driver_register(&driver);
+>  }
+>  subsys_initcall(pxa2xx_spi_init);
+>  
+> -- 
+> 1.7.3.2
+> 
