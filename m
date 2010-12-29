@@ -1,35 +1,79 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Dec 2010 11:31:38 +0100
+Date: Wed, 29 Dec 2010 11:37:58 +0100
 Subject: [PATCH 03/10] net/fec: add mac field into platform data and
 	consolidate fec_get_mac
-In-Reply-To: <20101229100520.GB19347@freescale.com>
+In-Reply-To: <20101229103014.GD19347@freescale.com>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
 	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
 	<20101229065329.GB31010@jasper.tkos.co.il>
-	<20101229100520.GB19347@freescale.com>
-Message-ID: <20101229103138.GT14221@pengutronix.de>
+	<20101229103014.GD19347@freescale.com>
+Message-ID: <20101229103758.GU14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+Hello,
 
-On Wed, Dec 29, 2010 at 06:05:21PM +0800, Shawn Guo wrote:
+On Wed, Dec 29, 2010 at 06:30:15PM +0800, Shawn Guo wrote:
+> Sorry, Baruch.  I missed two comments in the last reply.
+> 
 > On Wed, Dec 29, 2010 at 08:53:30AM +0200, Baruch Siach wrote:
 > > Hi Shawn,
-> > In the case of dual MAC that you later add support for, the address which one 
-> > is being set? Is there a way to set both in kernel command line?
 > > 
-> The fec0 gets fec_mac and fec1 gets fec_mac + 1. The following code
-> in function fec_get_mac takes care of it.
-> 
-> 	/* Adjust MAC if using default MAC address */
-default MAC address means the address passed via cmdline?  Sounds
-confusing to me.
+> > Please add netdev at vger.kernel.org to the Cc of all your fec driver patches.
+> > 
+> I was aware of this after I sent out the patch set last night.
+> Can I just resend all the patches in v2 and get netdev at vger.kernel.org
+> included?
+[I just added netdev for this reply.  I think adding it for v2 is OK
+then.  For those interested, the whole series can be found at
 
-> 	if (iap == fec_mac_default)
-> 		dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->pdev->id;
-Can this overflow?  (I didn't check the code, so my concern might be
-completely stupid here.)
+	http://thread.gmane.org/gmane.linux.ports.arm.kernel/100902
+
+.]
+ 
+> > On Tue, Dec 28, 2010 at 10:55:48PM +0800, Shawn Guo wrote:
+> [...]
+> > > +	/*
+> > > +	 * try to get mac address in following order:
+> > > +	 *
+> > > +	 * 1) kernel command line fec_mac=xx:xx:xx...
+> > > +	 */
+> > > +	iap = fec_mac_default;
+> > > +
+> > > +	/*
+> > > +	 * 2) from flash or fuse (via platform data)
+> > > +	 */
+> > 
+> > Again, how do you handle the dual MAC case?
+> > 
+> For the platform data case, the following patch reads both mac
+> addresses.
+> 
+> [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
+> 
+> +static int __init mx28evk_fec_get_mac(void)
+> +{
+> +       int i, ret;
+> +       u32 val;
+> +
+> +       /*
+> +        * OCOTP only stores the last 4 octets for each mac address,
+> +        * so hard-coding the first two octets as Freescale OUI (00:04:9f)
+> +        * is needed.
+> +        */
+> +       for (i = 0; i < 2; i++) {
+> +               ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
+> +               if (ret)
+> +                       goto error;
+> +
+> +               mx28_fec_pdata[i].mac[0] = 0x00;
+> +               mx28_fec_pdata[i].mac[1] = 0x04;
+> +               mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
+> +               mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
+> +               mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
+> +               mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
+uuh.  Is ((val >> 24) & 0xff) supposed to be 0x9f?  If not this might
+have unwanted effects (practical, don't know about legal ones).
 
 Best regards
 Uwe
