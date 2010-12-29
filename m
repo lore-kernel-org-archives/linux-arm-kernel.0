@@ -1,41 +1,32 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 29 Dec 2010 15:30:24 +0800
-Subject: [PATCH v2 2/8] arm: plat-mxc: add full parameter macro to define gpio
-	port
-In-Reply-To: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
+Date: Wed, 29 Dec 2010 15:30:25 +0800
+Subject: [PATCH v2 3/8] arm: mx51: define mx51's own MXC_GPIO_IRQS
+In-Reply-To: <1293607828-21213-2-git-send-email-richard.zhao@freescale.com>
 References: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1293607828-21213-2-git-send-email-richard.zhao@freescale.com>
+	<1293607828-21213-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1293607828-21213-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+mx5 SoCs have different GPIO port count.
+
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/plat-mxc/gpio.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/plat-mxc/include/mach/irqs.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 93a8d93..dd4f813 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -350,15 +350,18 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 	return 0;
- }
- 
--#define DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, _irq)			\
-+#define DEFINE_IMX_GPIO_PORT_IRQ_HIGH(soc, _id, _hwid, _irq, _irq_high)	\
- 	{								\
- 		.chip.label = "gpio-" #_id,				\
- 		.irq = _irq,						\
-+		.irq_high = _irq_high,					\
- 		.base = soc ## _IO_ADDRESS(				\
- 				soc ## _GPIO ## _hwid ## _BASE_ADDR),	\
- 		.virtual_irq_start = MXC_GPIO_IRQ_START + (_id) * 32,	\
- 	}
- 
-+#define DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, _irq)			\
-+	DEFINE_IMX_GPIO_PORT_IRQ_HIGH(soc, _id, _hwid, _irq, 0)
- #define DEFINE_IMX_GPIO_PORT(soc, _id, _hwid)				\
- 	DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, 0)
- 
+diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+index 86781f7..769a137 100644
+--- a/arch/arm/plat-mxc/include/mach/irqs.h
++++ b/arch/arm/plat-mxc/include/mach/irqs.h
+@@ -29,7 +29,7 @@
+ #define MXC_GPIO_IRQS		(32 * 4)
+ #elif defined CONFIG_ARCH_MX25
+ #define MXC_GPIO_IRQS		(32 * 4)
+-#elif defined CONFIG_ARCH_MX5
++#elif defined CONFIG_ARCH_MX51
+ #define MXC_GPIO_IRQS		(32 * 4)
+ #elif defined CONFIG_ARCH_MXC91231
+ #define MXC_GPIO_IRQS		(32 * 4)
 -- 
 1.6.3.3
