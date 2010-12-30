@@ -1,71 +1,113 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 30 Dec 2010 10:46:36 +0100
-Subject: [PATCH v3 7/8] arm: mx50: add mx50 reference design board support
-In-Reply-To: <1293684968-7338-7-git-send-email-richard.zhao@freescale.com>
-References: <1293684968-7338-1-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-2-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-3-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-4-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-5-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-6-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-7-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20101230094636.GU14221@pengutronix.de>
+Date: Thu, 30 Dec 2010 10:51:42 +0100
+Subject: [PATCH v2 2/2] ARM i.MX53: Make MX53 EVK bootable
+In-Reply-To: <1293686881-15046-3-git-send-email-yong.shen@freescale.com>
+References: <1293686881-15046-1-git-send-email-yong.shen@freescale.com>
+	<1293686881-15046-3-git-send-email-yong.shen@freescale.com>
+Message-ID: <20101230095142.GV14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Richard,
+Hello Yong,
 
-On Thu, Dec 30, 2010 at 12:56:08PM +0800, Richard Zhao wrote:
-> Add basic function and uart device support.
+On Thu, Dec 30, 2010 at 01:28:01PM +0800, yong.shen at freescale.com wrote:
+> From: Yong Shen <yong.shen@linaro.org>
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> 1. Add entries to Kconfig
+> 2. Add machine definition
+> 3. Add Uart platform data, pad setting and base address
+> 4. Adjust GPIO irq number
+> 
+> Signed-off-by: Yong Shen <yong.shen@linaro.org>
 > ---
->  arch/arm/mach-mx5/Kconfig                   |   11 ++
->  arch/arm/mach-mx5/Makefile                  |    1 +
->  arch/arm/mach-mx5/board-mx50_rdp.c          |  206 +++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/uncompress.h |    4 +
->  4 files changed, 222 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/board-mx50_rdp.c
+>  arch/arm/mach-mx5/Kconfig                     |   17 +++++
+>  arch/arm/mach-mx5/Makefile                    |    1 +
+>  arch/arm/mach-mx5/Makefile.boot               |    9 ++-
+>  arch/arm/mach-mx5/board-mx53_evk.c            |   90 +++++++++++++++++++++++++
+>  arch/arm/mach-mx5/devices-imx53.h             |   13 ++++
+>  arch/arm/plat-mxc/devices/platform-imx-uart.c |   10 +++
+>  arch/arm/plat-mxc/include/mach/iomux-mx53.h   |   20 ++++++
+>  arch/arm/plat-mxc/include/mach/irqs.h         |    4 +-
+>  arch/arm/plat-mxc/include/mach/uncompress.h   |    4 +
+>  9 files changed, 164 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/mach-mx5/board-mx53_evk.c
+>  create mode 100644 arch/arm/mach-mx5/devices-imx53.h
 > 
 > diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index 8e04a68..12073a7 100644
+> index 5011f42..97ac558 100644
 > --- a/arch/arm/mach-mx5/Kconfig
 > +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -111,4 +111,15 @@ config MACH_MX51_EFIKAMX
+> @@ -4,6 +4,9 @@ if ARCH_MX5
+>  config ARCH_MX51
+>  	bool
+>  
+> +config ARCH_MX53
+> +	bool
+> +
+>  config	SOC_IMX51
+>  	bool
+>  	select MXC_TZIC
+> @@ -12,6 +15,12 @@ config	SOC_IMX51
+>  	select ARCH_HAS_CPUFREQ
+>  	select ARCH_MX51
+>  
+> +config	SOC_IMX53
+> +	bool
+> +	select MXC_TZIC
+> +	select ARCH_MXC_IOMUX_V3
+> +	select ARCH_MX53
+> +
+>  comment "MX5 platforms:"
+>  
+>  config MACH_MX51_BABBAGE
+> @@ -100,4 +109,12 @@ config MACH_MX51_EFIKAMX
 >  	  Include support for Genesi Efika MX nettop. This includes specific
 >  	  configurations for the board and its peripherals.
 >  
-> +config MACH_MX50_RDP
-> +	bool "Support MX50 reference design platform"
-	depends on BROKEN
-
-> +	select SOC_IMX50
-> +	select IMX_HAVE_PLATFORM_IMX_I2C
+> +config MACH_MX53_EVK
+> +	bool "Support MX53 EVK platforms"
+> +	select SOC_IMX53
 > +	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
-> +	select IMX_HAVE_PLATFORM_SPI_IMX
 > +	help
-> +	  Include support for MX50 reference design platform (RDP) board. This
-> +	  includes specific configurations for the board and its peripherals.
+> +	  Include support for MX53 EVK platform. This includes specific
+> +	  configurations for the board and its peripherals.
 > +
 >  endif
 > diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> index e059c30..d99d7ab 100644
+> index 026cd85..d631a4d 100644
 > --- a/arch/arm/mach-mx5/Makefile
 > +++ b/arch/arm/mach-mx5/Makefile
-> @@ -14,3 +14,4 @@ obj-$(CONFIG_MACH_EUKREA_MBIMX51_BASEBOARD) += eukrea_mbimx51-baseboard.o
+> @@ -8,6 +8,7 @@ obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o
+>  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+>  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+>  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+> +obj-$(CONFIG_MACH_MX53_EVK) += board-mx53_evk.o
+>  obj-$(CONFIG_MACH_EUKREA_CPUIMX51) += board-cpuimx51.o
+>  obj-$(CONFIG_MACH_EUKREA_MBIMX51_BASEBOARD) += eukrea_mbimx51-baseboard.o
 >  obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += board-cpuimx51sd.o
->  obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd-baseboard.o
->  obj-$(CONFIG_MACH_MX51_EFIKAMX) += board-mx51_efikamx.o
-> +obj-$(CONFIG_MACH_MX50_RDP) += board-mx50_rdp.o
-> diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
+> diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+> index 9939a19..845aa01 100644
+> --- a/arch/arm/mach-mx5/Makefile.boot
+> +++ b/arch/arm/mach-mx5/Makefile.boot
+> @@ -1,3 +1,6 @@
+> -   zreladdr-y	:= 0x90008000
+> -params_phys-y	:= 0x90000100
+> -initrd_phys-y	:= 0x90800000
+> +   zreladdr-$(CONFIG_SOC_IMX51)        := 0x90008000
+> +params_phys-$(CONFIG_SOC_IMX51)        := 0x90000100
+> +initrd_phys-$(CONFIG_SOC_IMX51)        := 0x90800000
+> +   zreladdr-$(CONFIG_SOC_IMX53)        := 0x70008000
+> +params_phys-$(CONFIG_SOC_IMX53)        := 0x70000100
+> +initrd_phys-$(CONFIG_SOC_IMX53)        := 0x70800000
+> diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
 > new file mode 100644
-> index 0000000..9a031ea
+> index 0000000..84ff63a
 > --- /dev/null
-> +++ b/arch/arm/mach-mx5/board-mx50_rdp.c
-> @@ -0,0 +1,206 @@
+> +++ b/arch/arm/mach-mx5/board-mx53_evk.c
+> @@ -0,0 +1,90 @@
 > +/*
 > + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + * Copyright (C) 2010 Yong Shen. <Yong.Shen@linaro.org>
 > + */
 > +
 > +/*
@@ -85,216 +127,181 @@ On Thu, Dec 30, 2010 at 12:56:08PM +0800, Richard Zhao wrote:
 > + */
 > +
 > +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/gpio.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/fsl_devices.h>
-> +
+> +#include <linux/clk.h>
 > +#include <mach/common.h>
 > +#include <mach/hardware.h>
-> +#include <mach/iomux-mx50.h>
-> +
-> +#include <asm/irq.h>
-> +#include <asm/setup.h>
 > +#include <asm/mach-types.h>
 > +#include <asm/mach/arch.h>
 > +#include <asm/mach/time.h>
+> +#include <mach/imx-uart.h>
+> +#include <mach/iomux-mx53.h>
 > +
-> +#include "devices-mx50.h"
+> +#include "crm_regs.h"
+> +#include "devices-imx53.h"
 > +
-> +static iomux_v3_cfg_t mx50rdp_pads[] __initdata = {
-can you use either mx50_rdp or mx50rdp as prefix please?  I'd prefer the
-former because it matches the machid.
+> +static iomux_v3_cfg_t mx53evk_pads[] = {
+mx53_evk_pads to match MX53_EVK
 
-> +	/* SD1 */
-> +	MX50_PAD_ECSPI2_SS0__GPIO_4_19,
-> +	MX50_PAD_EIM_CRE__GPIO_1_27,
-> +	MX50_PAD_SD1_CMD__SD1_CMD,
+> +	MX53_PAD_CSI0_D10__UART1_TXD,
+> +	MX53_PAD_CSI0_D11__UART1_RXD,
+> +	MX53_PAD_ATA_DIOW__UART1_TXD,
+> +	MX53_PAD_ATA_DMACK__UART1_RXD,
 > +
-> +	MX50_PAD_SD1_CLK__SD1_CLK,
-> +	MX50_PAD_SD1_D0__SD1_D0,
-> +	MX50_PAD_SD1_D1__SD1_D1,
-> +	MX50_PAD_SD1_D2__SD1_D2,
-> +	MX50_PAD_SD1_D3__SD1_D3,
+> +	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
+> +	MX53_PAD_ATA_DMARQ__UART2_TXD,
+> +	MX53_PAD_ATA_DIOR__UART2_RTS,
+> +	MX53_PAD_ATA_INTRQ__UART2_CTS,
 > +
-> +	/* SD2 */
-> +	MX50_PAD_SD2_CD__GPIO_5_17,
-> +	MX50_PAD_SD2_WP__GPIO_5_16,
-> +	MX50_PAD_SD2_CMD__SD2_CMD,
-> +	MX50_PAD_SD2_CLK__SD2_CLK,
-> +	MX50_PAD_SD2_D0__SD2_D0,
-> +	MX50_PAD_SD2_D1__SD2_D1,
-> +	MX50_PAD_SD2_D2__SD2_D2,
-> +	MX50_PAD_SD2_D3__SD2_D3,
-> +	MX50_PAD_SD2_D4__SD2_D4,
-> +	MX50_PAD_SD2_D5__SD2_D5,
-> +	MX50_PAD_SD2_D6__SD2_D6,
-> +	MX50_PAD_SD2_D7__SD2_D7,
-> +
-> +	/* SD3 */
-> +	MX50_PAD_SD3_CMD__SD3_CMD,
-> +	MX50_PAD_SD3_CLK__SD3_CLK,
-> +	MX50_PAD_SD3_D0__SD3_D0,
-> +	MX50_PAD_SD3_D1__SD3_D1,
-> +	MX50_PAD_SD3_D2__SD3_D2,
-> +	MX50_PAD_SD3_D3__SD3_D3,
-> +	MX50_PAD_SD3_D4__SD3_D4,
-> +	MX50_PAD_SD3_D5__SD3_D5,
-> +	MX50_PAD_SD3_D6__SD3_D6,
-> +	MX50_PAD_SD3_D7__SD3_D7,
-> +
-> +	/* PWR_INT */
-> +	MX50_PAD_ECSPI2_MISO__GPIO_4_18,
-> +
-> +	/* UART pad setting */
-> +	MX50_PAD_UART1_TXD__UART1_TXD,
-> +	MX50_PAD_UART1_RXD__UART1_RXD,
-> +	MX50_PAD_UART1_RTS__UART1_RTS,
-> +	MX50_PAD_UART2_TXD__UART2_TXD,
-> +	MX50_PAD_UART2_RXD__UART2_RXD,
-> +	MX50_PAD_UART2_CTS__UART2_CTS,
-> +	MX50_PAD_UART2_RTS__UART2_RTS,
-> +
-> +	MX50_PAD_I2C1_SCL__I2C1_SCL,
-> +	MX50_PAD_I2C1_SDA__I2C1_SDA,
-> +	MX50_PAD_I2C2_SCL__I2C2_SCL,
-> +	MX50_PAD_I2C2_SDA__I2C2_SDA,
-> +
-> +	MX50_PAD_EPITO__USBH1_PWR,
-> +	/* Need to comment below line if
-> +	 * one needs to debug owire.
-> +	 */
-> +	MX50_PAD_OWIRE__USBH1_OC,
-> +	/* using gpio to control otg pwr */
-> +	MX50_PAD_PWM2__GPIO_6_25,
-> +	MX50_PAD_I2C3_SCL__USBOTG_OC,
-> +
-> +	MX50_PAD_SSI_RXC__FEC_MDIO,
-> +	MX50_PAD_SSI_RXC__FEC_MDIO,
-> +	MX50_PAD_DISP_D0__FEC_TXCLK,
-> +	MX50_PAD_DISP_D1__FEC_RX_ER,
-> +	MX50_PAD_DISP_D2__FEC_RX_DV,
-> +	MX50_PAD_DISP_D3__FEC_RXD1,
-> +	MX50_PAD_DISP_D4__FEC_RXD0,
-> +	MX50_PAD_DISP_D5__FEC_TX_EN,
-> +	MX50_PAD_DISP_D6__FEC_TXD1,
-> +	MX50_PAD_DISP_D7__FEC_TXD0,
-> +	MX50_PAD_SSI_RXFS__FEC_MDC,
-> +	MX50_PAD_I2C3_SDA__GPIO_6_23,
-> +	MX50_PAD_ECSPI1_SCLK__GPIO_4_12,
-> +
-> +	MX50_PAD_CSPI_SS0__CSPI_SS0,
-> +	MX50_PAD_ECSPI1_MOSI__CSPI_SS1,
-> +	MX50_PAD_CSPI_MOSI__CSPI_MOSI,
-> +	MX50_PAD_CSPI_MISO__CSPI_MISO,
-> +
-> +	/* SGTL500_OSC_EN */
-> +	MX50_PAD_UART1_CTS__GPIO_6_8,
-> +
-> +	/* SGTL_AMP_SHDN */
-> +	MX50_PAD_UART3_RXD__GPIO_6_15,
-> +
-> +	/* Keypad */
-> +	MX50_PAD_KEY_COL0__KEY_COL0,
-> +	MX50_PAD_KEY_ROW0__KEY_ROW0,
-> +	MX50_PAD_KEY_COL1__KEY_COL1,
-> +	MX50_PAD_KEY_ROW1__KEY_ROW1,
-> +	MX50_PAD_KEY_COL2__KEY_COL2,
-> +	MX50_PAD_KEY_ROW2__KEY_ROW2,
-> +	MX50_PAD_KEY_COL3__KEY_COL3,
-> +	MX50_PAD_KEY_ROW3__KEY_ROW3,
-> +	MX50_PAD_EIM_DA0__KEY_COL4,
-> +	MX50_PAD_EIM_DA1__KEY_ROW4,
-> +	MX50_PAD_EIM_DA2__KEY_COL5,
-> +	MX50_PAD_EIM_DA3__KEY_ROW5,
-> +	MX50_PAD_EIM_DA4__KEY_COL6,
-> +	MX50_PAD_EIM_DA5__KEY_ROW6,
-> +	MX50_PAD_EIM_DA6__KEY_COL7,
-> +	MX50_PAD_EIM_DA7__KEY_ROW7,
-> +	/*EIM pads */
-> +	MX50_PAD_EIM_DA8__GPIO_1_8,
-> +	MX50_PAD_EIM_DA9__GPIO_1_9,
-> +	MX50_PAD_EIM_DA10__GPIO_1_10,
-> +	MX50_PAD_EIM_DA11__GPIO_1_11,
-> +	MX50_PAD_EIM_DA12__GPIO_1_12,
-> +	MX50_PAD_EIM_DA13__GPIO_1_13,
-> +	MX50_PAD_EIM_DA14__GPIO_1_14,
-> +	MX50_PAD_EIM_DA15__GPIO_1_15,
-> +	MX50_PAD_EIM_CS2__GPIO_1_16,
-> +	MX50_PAD_EIM_CS1__GPIO_1_17,
-> +	MX50_PAD_EIM_CS0__GPIO_1_18,
-> +	MX50_PAD_EIM_EB0__GPIO_1_19,
-> +	MX50_PAD_EIM_EB1__GPIO_1_20,
-> +	MX50_PAD_EIM_WAIT__GPIO_1_21,
-> +	MX50_PAD_EIM_BCLK__GPIO_1_22,
-> +	MX50_PAD_EIM_RDY__GPIO_1_23,
-> +	MX50_PAD_EIM_OE__GPIO_1_24,
+> +	MX53_PAD_ATA_CS_0__UART3_TXD,
+> +	MX53_PAD_ATA_CS_1__UART3_RXD,
+> +	MX53_PAD_ATA_DA_1__UART3_CTS,
+> +	MX53_PAD_ATA_DA_2__UART3_RTS,
 > +};
 > +
-> +/* Serial ports */
+> +#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
+I usually advocate unconditional device registration.
 > +static const struct imxuart_platform_data uart_pdata __initconst = {
+mx53_evk_uart_pdata please
+
 > +	.flags = IMXUART_HAVE_RTSCTS,
 > +};
 > +
 > +static inline void mxc_init_imx_uart(void)
-can you please rename the function to (say) mx50_rdp_init_imx_uart (or
-just fold it into mx50_rdp_board_init below.
-
 > +{
-> +	imx50_add_imx_uart(0, &uart_pdata);
-> +	imx50_add_imx_uart(1, &uart_pdata);
+> +	imx53_add_imx_uart(0, &uart_pdata);
+> +	imx53_add_imx_uart(1, &uart_pdata);
+> +	imx53_add_imx_uart(2, &uart_pdata);
 > +}
+> +#else /* !SERIAL_IMX */
+> +static inline void mxc_init_imx_uart(void)
+> +{
+> +}
+> +#endif /* SERIAL_IMX */
 > +
-> +/*
-> + * Board specific initialization.
-> + */
 > +static void __init mxc_board_init(void)
-mx50_rdp_board_init please
+please use a machine prefix (i.e. mx53_evk_board_init)
 
 > +{
-> +	mxc_iomux_v3_setup_multiple_pads(mx50rdp_pads,
-> +					ARRAY_SIZE(mx50rdp_pads));
+> +	mxc_iomux_v3_setup_multiple_pads(mx53evk_pads,
+> +					ARRAY_SIZE(mx53evk_pads));
 > +	mxc_init_imx_uart();
-> +
 > +}
 > +
-> +static void __init mx50_rdp_timer_init(void)
+> +static void __init mx53_evk_timer_init(void)
 > +{
-> +	/* TODO: call clock init here */
-If you ask me, add it here already.  This increases the chance that you
-only need to remove the depends on BROKEN above when the clock stuff is
-settled.
-
+> +	mx53_clocks_init(32768, 24000000, 22579200, 0);
 > +}
 > +
 > +static struct sys_timer mxc_timer = {
-machine prefix please
+mx53_evk_timer ...
 
-> +	.init	= mx50_rdp_timer_init,
+> +	.init	= mx53_evk_timer_init,
 > +};
 > +
-> +/*
-> + * The following uses standard kernel macros define in arch.h in order to
-> + * initialize __mach_desc_MX50_RDP data structure.
-hmm, this is pretty standard, IMHO this is not needed.
-
-> + */
-> +MACHINE_START(MX50_RDP, "Freescale MX50 Reference Design Platform")
-> +	.map_io = mx50_map_io,
-> +	.init_irq = mx50_init_irq,
+> +MACHINE_START(MX53_EVK, "Freescale MX53 EVK Board")
+> +	.map_io = mx53_map_io,
+> +	.init_irq = mx53_init_irq,
 > +	.init_machine = mxc_board_init,
 > +	.timer = &mxc_timer,
 > +MACHINE_END
+> diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+> new file mode 100644
+> index 0000000..9d0ec25
+> --- /dev/null
+> +++ b/arch/arm/mach-mx5/devices-imx53.h
+> @@ -0,0 +1,13 @@
+> +/*
+> + * Copyright (C) 2010 Yong Shen. <Yong.Shen@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <mach/mx53.h>
+> +#include <mach/devices-common.h>
+> +
+> +extern const struct imx_imx_uart_1irq_data imx53_imx_uart_data[] __initconst;
+> +#define imx53_add_imx_uart(id, pdata)	\
+> +	imx_add_imx_uart_1irq(&imx53_imx_uart_data[id], pdata)
+> diff --git a/arch/arm/plat-mxc/devices/platform-imx-uart.c b/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> index 7b45b78..3367706 100644
+> --- a/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> +++ b/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> @@ -104,6 +104,16 @@ const struct imx_imx_uart_1irq_data imx51_imx_uart_data[] __initconst = {
+>  };
+>  #endif /* ifdef CONFIG_SOC_IMX51 */
+>  
+> +#ifdef CONFIG_SOC_IMX53
+> +const struct imx_imx_uart_1irq_data imx53_imx_uart_data[] __initconst = {
+> +#define imx53_imx_uart_data_entry(_id, _hwid)				\
+> +	imx_imx_uart_1irq_data_entry(MX53, _id, _hwid, SZ_4K)
+> +	imx53_imx_uart_data_entry(0, 1),
+> +	imx53_imx_uart_data_entry(1, 2),
+> +	imx53_imx_uart_data_entry(2, 3),
+> +};
+> +#endif /* ifdef CONFIG_SOC_IMX53 */
+> +
+>  struct platform_device *__init imx_add_imx_uart_3irq(
+>  		const struct imx_imx_uart_3irq_data *data,
+>  		const struct imxuart_platform_data *pdata)
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> index 80cb3c5..5deee01 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> @@ -42,6 +42,26 @@ typedef enum iomux_config {
+>  #define NON_MUX_I	0x00
+>  #define NON_PAD_I	0x00
+>  
+> +#define MX53_UART_PAD_CTRL		(PAD_CTL_PKE | PAD_CTL_PUE |	\
+> +		PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST | PAD_CTL_HYS)
+> +/* UART1 */
+> +#define MX53_PAD_CSI0_D10__UART1_TXD	IOMUX_PAD(0x414, 0xE8, 2, 0x0, 0, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_CSI0_D11__UART1_RXD	IOMUX_PAD(0x418, 0xEC, 2, 0x878, 1, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_DIOW__UART1_TXD	IOMUX_PAD(0x5F0, 0x270, 3, 0x0,	0, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_DMACK__UART1_RXD	IOMUX_PAD(0x5F4, 0x274, 3, 0x880, 3, MX53_UART_PAD_CTRL)
+> +
+> +/* UART2 */
+> +#define MX53_PAD_ATA_BUFFER_EN__UART2_RXD	IOMUX_PAD(0x5FC, 0x27C, 3, 0x880, 3, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_DMARQ__UART2_TXD	IOMUX_PAD(0x5F8, 0x278, 3, 0x0, 0, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_DIOR__UART2_RTS	IOMUX_PAD(0x604, 0x284, 3, 0x87C, 3, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_INTRQ__UART2_CTS	IOMUX_PAD(0x600, 0x280, 3, 0x0, 0, MX53_UART_PAD_CTRL)
+> +
+> +/* UART3 */
+> +#define MX53_PAD_ATA_CS_0__UART3_TXD	IOMUX_PAD(0x61C, 0x29C, 4, 0x0, 0, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_CS_1__UART3_RXD	IOMUX_PAD(0x620, 0x2A0, 4, 0x888, 3, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_DA_1__UART3_CTS	IOMUX_PAD(0x614, 0x294, 4, 0x0, 0, MX53_UART_PAD_CTRL)
+> +#define MX53_PAD_ATA_DA_2__UART3_RTS	IOMUX_PAD(0x618, 0x298, 4, 0x884, 5, MX53_UART_PAD_CTRL)
+> +
+>  #define MX53_PAD_GPIO_19__GPIO_4_5		IOMUX_PAD(0x348, 0x20,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+>  #define MX53_PAD_KEY_COL0__GPIO_4_6		IOMUX_PAD(0x34C, 0x24,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+>  #define MX53_PAD_KEY_ROW0__GPIO_4_7		IOMUX_PAD(0x350, 0x28,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+> diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+> index 86781f7..8f11cfa 100644
+> --- a/arch/arm/plat-mxc/include/mach/irqs.h
+> +++ b/arch/arm/plat-mxc/include/mach/irqs.h
+> @@ -29,8 +29,10 @@
+>  #define MXC_GPIO_IRQS		(32 * 4)
+>  #elif defined CONFIG_ARCH_MX25
+>  #define MXC_GPIO_IRQS		(32 * 4)
+> -#elif defined CONFIG_ARCH_MX5
+> +#elif defined CONFIG_ARCH_MX51
+>  #define MXC_GPIO_IRQS		(32 * 4)
+> +#elif defined CONFIG_ARCH_MX53
+> +#define MXC_GPIO_IRQS		(32 * 7)
+You didn't read the comment before this block.
+
+>  #elif defined CONFIG_ARCH_MXC91231
+>  #define MXC_GPIO_IRQS		(32 * 4)
+>  #elif defined CONFIG_ARCH_MX3
 > diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
-> index 9dd9c20..5ccf3ef 100644
+> index 9dd9c20..ff034e0 100644
 > --- a/arch/arm/plat-mxc/include/mach/uncompress.h
 > +++ b/arch/arm/plat-mxc/include/mach/uncompress.h
 > @@ -63,6 +63,7 @@ static inline void flush(void)
 >  #define MX3X_UART1_BASE_ADDR	0x43F90000
 >  #define MX3X_UART2_BASE_ADDR	0x43F94000
 >  #define MX51_UART1_BASE_ADDR	0x73fbc000
-> +#define MX50_UART1_BASE_ADDR	0x53fbc000
+> +#define MX53_UART1_BASE_ADDR	0x53fbc000
 >  
 >  static __inline__ void __arch_decomp_setup(unsigned long arch_id)
 >  {
@@ -302,15 +309,13 @@ hmm, this is pretty standard, IMHO this is not needed.
 >  	case MACH_TYPE_EUKREA_CPUIMX51SD:
 >  		uart_base = MX51_UART1_BASE_ADDR;
 >  		break;
-> +	case MACH_TYPE_MX50_RDP:
-> +		uart_base = MX50_UART1_BASE_ADDR;
+> +	case MACH_TYPE_MX53_EVK:
+> +		uart_base = MX53_UART1_BASE_ADDR;
 > +		break;
 >  	default:
 >  		break;
 >  	}
-> -- 
-
-Thanks
+Best regards
 Uwe
 
 -- 
