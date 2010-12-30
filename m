@@ -1,61 +1,88 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 29 Dec 2010 20:31:58 -0500 (EST)
-Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with high
-	frequency clocks
-In-Reply-To: <20101221105149.GO28157@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
-	<20101221105149.GO28157@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1012291703300.10437@xanadu.home>
+From: david-b@pacbell.net (David Brownell)
+Date: Wed, 29 Dec 2010 17:55:30 -0800 (PST)
+Subject: [PATCH 1/9] spi/pxa2xx: register driver properly
+In-Reply-To: <20101229214054.GB15198@angua.secretlab.ca>
+Message-ID: <27128.99950.qm@web180304.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Dec 2010, Russell King - ARM Linux wrote:
 
-> On Mon, Dec 20, 2010 at 08:21:41PM -0500, Nicolas Pitre wrote:
+
+--- On Wed, 12/29/10, Grant Likely <grant.likely@secretlab.ca> wrote:
+
+> From: Grant Likely <grant.likely@secretlab.ca>
+> Subject: Re: [PATCH 1/9] spi/pxa2xx: register
+
+> > >I detect an effort to change the classic model for
+> board initialization in Linux:? first set up
+> > >and register all system/platform devices on each board then do the same for their drivers.?
+> ("hardware first" ... "software second".
 > > 
-> > The minsec argument to clocks_calc_mult_shift() [ which appears to be
-> > misnamed by the way ] is used to clamp the magnitude of the mult factor
-> > so that the given range won't overflow a 64 bit result.  The mult factor
-> > is itself already limited to a maximum of 32 bits.  Given that the largest
-> > clock tick range we may have is also 32 bits, there is no way our usage of
-> > any computed mult factor would ever overflow 64 bits.
-> > 
-> > The choice of 60 seconds here for minsec is rather arbitrary.  If the
-> > mult factor wasn't already limited to 32 bits, this value of 60 would
-> > create overflows for clocks which take more than 60 seconds to wrap.
+> > What are you suggesting? 
+
+Just what I said above.   The classic model
+sets up all of a board's platform devices and
+then their drivers get initialized ... simple
+interdependency management; sometimes fancier
+models are needed, but Linux does poorly with
+those common/fancier requirements, so far
+except via techniques some folk retch at.
+
+platform_driver_probe() does
+> not work with
+> > hotpluged devices.
+
+And was documented that way.  So if anyone
+writes code expecting hotplug support, that
+person has created a bug.  Their fault.
 > 
-> 60 seconds was arbitary, chosen from the selection of clock rates which
-> I had available at the time (the highest of which was 24MHz).
+> That assumption only holds for certain
+ devices on certain boards.
 
-Fair enough.  It is just not universally optimal given the different 
-clock ranges this code now covers.
+It's still classic;  it works very well for
+fixed-function SoC boards, no hotpluggable
+Platform devices. ... most of the
+time they're SoC-integrated, fixed in a
+chip.  Sometimes they're just hard-wired
+onto a board, (vs hard-wired into a chip).
+Such boards are extremely common.
 
-> > And for clocks which take less than 60 seconds to wrap then we do lose
-> > precision as the mult factor is made smaller (fewer bits) to be adjusted
-> > to a range which is larger than what we actually use.  This currently
-> > affects clocks faster than 71MHz.
-> > 
-> > We could use minsec = 0 instead of 60 and a good 32-bit mult factor would
-> > be computed in all cases.  But let's be formal and provide the actual
-> > range to clocks_calc_mult_shift(). None of the cyc_to_fixed_sched_clock()
-> > users are affected as they all are using clocks < 71MHz.
+Regardless, if a driver is going to be
+hotpluggable, it must be written with
+that in mind ... avoiding certain calls, and
+addressing various dynamic reconfig issues.
+
+> platform_device_probe() is a machine specific optimization
+
+It's not machine-specific at all, but it may not
+be used for those rare platform devices which
+are found in hotpluggable configurations.
+
+Even if you want modprobe/rmmod support from
+some driver ... that's not a machine issue;
+it's a development/support issue. Drivers can
+work just fine without being hotpluggable.
+
+
+
 > 
-> Maybe __clocksource_updatefreq_scale() needs a similar fix too, instead
-> of assuming 5 seconds?  It also has access to the mask and rate.
+> More and more likely all the time though.? Many
+> drivers use the model
+> of registering child platform_devices (for instance, multi
+> function
+> devices).
 
-There is a comment to that effect right above the 
-clocks_calc_mult_shift() indicating that this is a known issue in that 
-case already.  
+That's *Orthogonal* to hotpluggability..
 
-And looking at that code, it appears that there is a balance to be made 
-between cs->max_idle_ns and cs->mult, the former currently being 
-determined by the later.  But if cs->mult is maximized to 32 bits, that 
-leaves only 31 bits for cs->max_idle_ns which corresponds to approx 2 
-seconds only.
+Something you may be trying to avoid mentioning:
+That call can also be a useful way to get driver
+initialization sequencing sane, in the ongoing
+absence of robust ways for Linux to handle the
+interdependencies of drivers and devices.  I'm
+told some folk will be working on that someday;
+but that day isn't here yet.
 
-So this is not clear to me what would be the optimal mult/shift values 
-in the __clocksource_updatefreq_scale() context, while this is rather 
-obvious in the init_sched_clock() context.  Hence this patch.
+- Dave
 
 
-Nicolas
+> 
