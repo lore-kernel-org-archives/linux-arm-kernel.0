@@ -1,334 +1,65 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 30 Dec 2010 12:06:42 -0700
-Subject: [PATCH 4/7 v2] OMAP4: hwmod data: Add McSPI
-In-Reply-To: <33226.10.24.255.18.1291212098.squirrel@dbdmail.itg.ti.com>
-References: <33226.10.24.255.18.1291212098.squirrel@dbdmail.itg.ti.com>
-Message-ID: <20101230190642.GB2713@angua.secretlab.ca>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 30 Dec 2010 20:18:46 +0100
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <1293731992.4919.5.camel@heimdal.trondhjem.org>
+References: <20101230171453.GA5787@pengutronix.de>
+	<1293731992.4919.5.camel@heimdal.trondhjem.org>
+Message-ID: <20101230191846.GB14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 01, 2010 at 07:31:38PM +0530, Govindraj.R wrote:
-> From: Benoit Cousson <b-cousson@ti.com>
-> 
-> Update omap4 hwmod file with McSPI info.
+Hi Trond,
 
-Ditto here.  A lot of this data is identical to the OMAP2 data from
-patches 1 & 2.  It looks like this should be shared.
+On Thu, Dec 30, 2010 at 12:59:52PM -0500, Trond Myklebust wrote:
+> On Thu, 2010-12-30 at 18:14 +0100, Uwe Kleine-K?nig wrote: 
+> > I wonder if the nfs-stuff is considered to be solved, because I still
+> > see strange things.
+> > 
+> > During boot my machine sometimes (approx one out of two times) hangs with
+> > the output pasted below on Sysctl-l.  The irq 
+> > 
+> > I'm not 100% sure it's related, but at least it seems to hang in
+> > nfs_readdir.  (When the serial irq happend that triggered the sysrq the
+> > program counter was at 0xc014601c, which is fs/nfs/dir.c:647 for me.)
+> > 
+> > This is on 2.6.37-rc8 plus some patches for machine support on an ARM
+> > machine.
+> 
+> Ccing linux-nfs at vger.kernel.org
+Yeah, good idea.  I had that ~2min after sending my report during
+dinner, sorry :-\
+ 
+> What filesystem are you exporting on the server? What is the NFS
+> version? Is this nfsroot, autofs or an ordinary nfs mount?
+This is an nfsroot of /home/ukl/nfsroot/tx28 which is a symlink to a
+directory on a different partition.  I don't know the filesystem of my
+homedir as it resides on a server I have no access to, but I asked the
+admin, so I can follow up with this info later (I'd suspect ext3, too).
+The real root directory is on ext3 (rw,noatime).
 
-g.
+The serving nfs-server is Debian's nfs-kernel-server 1:1.2.2-1.
+nfs-related kernel parameters are
 
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  267 ++++++++++++++++++++++++++++
->  1 files changed, 267 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 0d5c6eb..c244840 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -22,6 +22,7 @@
-> 
->  #include <plat/omap_hwmod.h>
->  #include <plat/cpu.h>
-> +#include <plat/mcspi.h>
-> 
->  #include "omap_hwmod_common_data.h"
-> 
-> @@ -1043,6 +1044,265 @@ static struct omap_hwmod omap44xx_uart4_hwmod = {
->  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->  };
-> 
-> +/*
-> + * 'mcspi' class
-> + * multichannel serial port interface (mcspi) / master/slave synchronous serial
-> + * bus
-> + */
-> +
-> +static struct omap_hwmod_class_sysconfig omap44xx_mcspi_sysc = {
-> +	.rev_offs	= 0x0000,
-> +	.sysc_offs	= 0x0010,
-> +	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_EMUFREE |
-> +			   SYSC_HAS_SOFTRESET | SYSC_HAS_RESET_STATUS),
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-> +	.sysc_fields	= &omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class omap44xx_mcspi_hwmod_class = {
-> +	.name = "mcspi",
-> +	.sysc = &omap44xx_mcspi_sysc,
-> +	.rev = OMAP4_MCSPI_REV,
-> +};
-> +
-> +/* mcspi1 */
-> +static struct omap_hwmod omap44xx_mcspi1_hwmod;
-> +static struct omap_hwmod_irq_info omap44xx_mcspi1_irqs[] = {
-> +	{ .irq = 65 + OMAP44XX_IRQ_GIC_START },
-> +};
-> +
-> +static struct omap_hwmod_dma_info omap44xx_mcspi1_sdma_reqs[] = {
-> +	{ .name = "tx0", .dma_req = 34 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx0", .dma_req = 35 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "tx1", .dma_req = 36 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx1", .dma_req = 37 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "tx2", .dma_req = 38 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx2", .dma_req = 39 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "tx3", .dma_req = 40 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx3", .dma_req = 41 + OMAP44XX_DMA_REQ_START },
-> +};
-> +
-> +static struct omap_hwmod_addr_space omap44xx_mcspi1_addrs[] = {
-> +	{
-> +		.pa_start	= 0x48098000,
-> +		.pa_end		= 0x480981ff,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-> +};
-> +
-> +/* l4_per -> mcspi1 */
-> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi1 = {
-> +	.master		= &omap44xx_l4_per_hwmod,
-> +	.slave		= &omap44xx_mcspi1_hwmod,
-> +	.clk		= "l4_div_ck",
-> +	.addr		= omap44xx_mcspi1_addrs,
-> +	.addr_cnt	= ARRAY_SIZE(omap44xx_mcspi1_addrs),
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* mcspi1 slave ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_mcspi1_slaves[] = {
-> +	&omap44xx_l4_per__mcspi1,
-> +};
-> +
-> +static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
-> +	.num_chipselect = 4,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_mcspi1_hwmod = {
-> +	.name		= "mcspi1",
-> +	.class		= &omap44xx_mcspi_hwmod_class,
-> +	.mpu_irqs	= omap44xx_mcspi1_irqs,
-> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mcspi1_irqs),
-> +	.sdma_reqs	= omap44xx_mcspi1_sdma_reqs,
-> +	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_mcspi1_sdma_reqs),
-> +	.main_clk	= "mcspi1_fck",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI1_CLKCTRL,
-> +		},
-> +	},
-> +	.slaves		= omap44xx_mcspi1_slaves,
-> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi1_slaves),
-> +	.dev_attr       = &omap_mcspi1_dev_attr,
-> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> +};
-> +
-> +/* mcspi2 */
-> +static struct omap_hwmod omap44xx_mcspi2_hwmod;
-> +static struct omap_hwmod_irq_info omap44xx_mcspi2_irqs[] = {
-> +	{ .irq = 66 + OMAP44XX_IRQ_GIC_START },
-> +};
-> +
-> +static struct omap_hwmod_dma_info omap44xx_mcspi2_sdma_reqs[] = {
-> +	{ .name = "tx0", .dma_req = 42 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx0", .dma_req = 43 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "tx1", .dma_req = 44 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx1", .dma_req = 45 + OMAP44XX_DMA_REQ_START },
-> +};
-> +
-> +static struct omap_hwmod_addr_space omap44xx_mcspi2_addrs[] = {
-> +	{
-> +		.pa_start	= 0x4809a000,
-> +		.pa_end		= 0x4809a1ff,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-> +};
-> +
-> +/* l4_per -> mcspi2 */
-> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi2 = {
-> +	.master		= &omap44xx_l4_per_hwmod,
-> +	.slave		= &omap44xx_mcspi2_hwmod,
-> +	.clk		= "l4_div_ck",
-> +	.addr		= omap44xx_mcspi2_addrs,
-> +	.addr_cnt	= ARRAY_SIZE(omap44xx_mcspi2_addrs),
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* mcspi2 slave ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_mcspi2_slaves[] = {
-> +	&omap44xx_l4_per__mcspi2,
-> +};
-> +
-> +static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
-> +	.num_chipselect = 2,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_mcspi2_hwmod = {
-> +	.name		= "mcspi2",
-> +	.class		= &omap44xx_mcspi_hwmod_class,
-> +	.mpu_irqs	= omap44xx_mcspi2_irqs,
-> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mcspi2_irqs),
-> +	.sdma_reqs	= omap44xx_mcspi2_sdma_reqs,
-> +	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_mcspi2_sdma_reqs),
-> +	.main_clk	= "mcspi2_fck",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI2_CLKCTRL,
-> +		},
-> +	},
-> +	.slaves		= omap44xx_mcspi2_slaves,
-> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi2_slaves),
-> +	.dev_attr       = &omap_mcspi2_dev_attr,
-> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> +};
-> +
-> +/* mcspi3 */
-> +static struct omap_hwmod omap44xx_mcspi3_hwmod;
-> +static struct omap_hwmod_irq_info omap44xx_mcspi3_irqs[] = {
-> +	{ .irq = 91 + OMAP44XX_IRQ_GIC_START },
-> +};
-> +
-> +static struct omap_hwmod_dma_info omap44xx_mcspi3_sdma_reqs[] = {
-> +	{ .name = "tx0", .dma_req = 14 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx0", .dma_req = 15 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "tx1", .dma_req = 22 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx1", .dma_req = 23 + OMAP44XX_DMA_REQ_START },
-> +};
-> +
-> +static struct omap_hwmod_addr_space omap44xx_mcspi3_addrs[] = {
-> +	{
-> +		.pa_start	= 0x480b8000,
-> +		.pa_end		= 0x480b81ff,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-> +};
-> +
-> +/* l4_per -> mcspi3 */
-> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi3 = {
-> +	.master		= &omap44xx_l4_per_hwmod,
-> +	.slave		= &omap44xx_mcspi3_hwmod,
-> +	.clk		= "l4_div_ck",
-> +	.addr		= omap44xx_mcspi3_addrs,
-> +	.addr_cnt	= ARRAY_SIZE(omap44xx_mcspi3_addrs),
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* mcspi3 slave ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_mcspi3_slaves[] = {
-> +	&omap44xx_l4_per__mcspi3,
-> +};
-> +
-> +static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
-> +	.num_chipselect = 2,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_mcspi3_hwmod = {
-> +	.name		= "mcspi3",
-> +	.class		= &omap44xx_mcspi_hwmod_class,
-> +	.mpu_irqs	= omap44xx_mcspi3_irqs,
-> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mcspi3_irqs),
-> +	.sdma_reqs	= omap44xx_mcspi3_sdma_reqs,
-> +	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_mcspi3_sdma_reqs),
-> +	.main_clk	= "mcspi3_fck",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI3_CLKCTRL,
-> +		},
-> +	},
-> +	.slaves		= omap44xx_mcspi3_slaves,
-> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi3_slaves),
-> +	.dev_attr       = &omap_mcspi3_dev_attr,
-> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> +};
-> +
-> +/* mcspi4 */
-> +static struct omap_hwmod omap44xx_mcspi4_hwmod;
-> +static struct omap_hwmod_irq_info omap44xx_mcspi4_irqs[] = {
-> +	{ .irq = 48 + OMAP44XX_IRQ_GIC_START },
-> +};
-> +
-> +static struct omap_hwmod_dma_info omap44xx_mcspi4_sdma_reqs[] = {
-> +	{ .name = "tx0", .dma_req = 69 + OMAP44XX_DMA_REQ_START },
-> +	{ .name = "rx0", .dma_req = 70 + OMAP44XX_DMA_REQ_START },
-> +};
-> +
-> +static struct omap_hwmod_addr_space omap44xx_mcspi4_addrs[] = {
-> +	{
-> +		.pa_start	= 0x480ba000,
-> +		.pa_end		= 0x480ba1ff,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-> +};
-> +
-> +/* l4_per -> mcspi4 */
-> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi4 = {
-> +	.master		= &omap44xx_l4_per_hwmod,
-> +	.slave		= &omap44xx_mcspi4_hwmod,
-> +	.clk		= "l4_div_ck",
-> +	.addr		= omap44xx_mcspi4_addrs,
-> +	.addr_cnt	= ARRAY_SIZE(omap44xx_mcspi4_addrs),
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* mcspi4 slave ports */
-> +static struct omap_hwmod_ocp_if *omap44xx_mcspi4_slaves[] = {
-> +	&omap44xx_l4_per__mcspi4,
-> +};
-> +
-> +static struct omap2_mcspi_dev_attr omap_mcspi4_dev_attr = {
-> +	.num_chipselect = 1,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_mcspi4_hwmod = {
-> +	.name		= "mcspi4",
-> +	.class		= &omap44xx_mcspi_hwmod_class,
-> +	.mpu_irqs	= omap44xx_mcspi4_irqs,
-> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mcspi4_irqs),
-> +	.sdma_reqs	= omap44xx_mcspi4_sdma_reqs,
-> +	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_mcspi4_sdma_reqs),
-> +	.main_clk	= "mcspi4_fck",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI4_CLKCTRL,
-> +		},
-> +	},
-> +	.slaves		= omap44xx_mcspi4_slaves,
-> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi4_slaves),
-> +	.dev_attr       = &omap_mcspi4_dev_attr,
-> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-> +};
-> +
->  static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->  	/* dmm class */
->  	&omap44xx_dmm_hwmod,
-> @@ -1077,6 +1337,13 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->  	&omap44xx_uart2_hwmod,
->  	&omap44xx_uart3_hwmod,
->  	&omap44xx_uart4_hwmod,
-> +
-> +	/* mcspi class */
-> +	&omap44xx_mcspi1_hwmod,
-> +	&omap44xx_mcspi2_hwmod,
-> +	&omap44xx_mcspi3_hwmod,
-> +	&omap44xx_mcspi4_hwmod,
-> +
->  	NULL,
->  };
-> 
-> -- 
-> 1.7.1
-> 
-> 
-> 
-> ------------------------------------------------------------------------------
-> Increase Visibility of Your 3D Game App & Earn a Chance To Win $500!
-> Tap into the largest installed PC base & get more eyes on your game by
-> optimizing for Intel(R) Graphics Technology. Get started today with the
-> Intel(R) Software Partner Program. Five $500 cash prizes are up for grabs.
-> http://p.sf.net/sfu/intelisp-dev2dev
-> _______________________________________________
-> spi-devel-general mailing list
-> spi-devel-general at lists.sourceforge.net
-> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
+	ip=dhcp root=/dev/nfs nfsroot=192.168.23.2:/home/ukl/nfsroot/tx28,v3,tcp
+
+I hope this answers your questions.  If not, please ask.
+
+I tried without the symlink and saw some different errors, e.g.
+
+	starting splashutils daemon.../etc/rc.d/S00splashutils: line 50: //sbin/fbsplashd.static: Unknown error 521
+
+(this is the init script that hung before) and
+
+	[    6.160000] NFS: server 192.168.23.2 error: fileid changed
+	[    6.160000] fsid 0:c: expected fileid 0x33590a4, got 0x4d11bedc
+
+but no hang as before.  So maybe it's related to the symlink?  I don't
+know if testing that further would help or just waste of my time, so
+please let me know if I can help you and how.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
