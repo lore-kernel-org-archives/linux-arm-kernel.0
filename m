@@ -1,60 +1,65 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 29 Dec 2010 17:03:17 +0800
-Subject: [PATCH v2 6/8] arm: mx50: add core functions support except clock
-In-Reply-To: <20101229082627.GN14221@pengutronix.de>
-References: <1293607828-21213-1-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-2-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-3-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-4-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-5-git-send-email-richard.zhao@freescale.com>
-	<1293607828-21213-6-git-send-email-richard.zhao@freescale.com>
-	<20101229082627.GN14221@pengutronix.de>
-Message-ID: <20101229090317.GC8701@shlinux1.ap.freescale.net>
+Date: Thu, 30 Dec 2010 18:40:15 +0800
+Subject: [PATCH v3 6/8] arm: mx50: add core functions support except clock
+In-Reply-To: <20101230094010.GT14221@pengutronix.de>
+References: <1293684968-7338-1-git-send-email-richard.zhao@freescale.com>
+	<1293684968-7338-2-git-send-email-richard.zhao@freescale.com>
+	<1293684968-7338-3-git-send-email-richard.zhao@freescale.com>
+	<1293684968-7338-4-git-send-email-richard.zhao@freescale.com>
+	<1293684968-7338-5-git-send-email-richard.zhao@freescale.com>
+	<1293684968-7338-6-git-send-email-richard.zhao@freescale.com>
+	<20101230094010.GT14221@pengutronix.de>
+Message-ID: <20101230104013.GA14229@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 29, 2010 at 09:26:27AM +0100, Uwe Kleine-K?nig wrote:
 Hi Uwe,
+
+On Thu, Dec 30, 2010 at 10:40:10AM +0100, Uwe Kleine-K?nig wrote:
 > Hello Richard,
 > 
-> On Wed, Dec 29, 2010 at 03:30:28PM +0800, Richard Zhao wrote:
+> On Thu, Dec 30, 2010 at 12:56:07PM +0800, Richard Zhao wrote:
 > > Add core definitions and memory map, gpio, irq, iomux, uart device
 > > support.
 > >
 > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 > > ---
-> >  arch/arm/mach-mx5/Kconfig                     |   11 +
+> >  arch/arm/mach-mx5/Kconfig                     |   13 +-
 > >  arch/arm/mach-mx5/Makefile                    |    1 +
 > >  arch/arm/mach-mx5/Makefile.boot               |    3 +
 > >  arch/arm/mach-mx5/devices-mx50.h              |   26 +
 > >  arch/arm/mach-mx5/mm-mx50.c                   |   52 ++
 > >  arch/arm/plat-mxc/devices/platform-imx-uart.c |   12 +
 > >  arch/arm/plat-mxc/gpio.c                      |   14 +
-> >  arch/arm/plat-mxc/include/mach/common.h       |    4 +
-> >  arch/arm/plat-mxc/include/mach/hardware.h     |    1 +
-> >  arch/arm/plat-mxc/include/mach/iomux-mx50.h   |  980 +++++++++++++++++++++++++
+> >  arch/arm/plat-mxc/include/mach/common.h       |    2 +
+> >  arch/arm/plat-mxc/include/mach/hardware.h     |    6 +
+> >  arch/arm/plat-mxc/include/mach/iomux-mx50.h   |  979 +++++++++++++++++++++++++
 > >  arch/arm/plat-mxc/include/mach/irqs.h         |    2 +
 > >  arch/arm/plat-mxc/include/mach/memory.h       |    3 +
 > >  arch/arm/plat-mxc/include/mach/mx50.h         |  285 +++++++
 > >  arch/arm/plat-mxc/include/mach/mxc.h          |   15 +-
-> >  14 files changed, 1408 insertions(+), 1 deletions(-)
+> >  14 files changed, 1411 insertions(+), 2 deletions(-)
 > >  create mode 100644 arch/arm/mach-mx5/devices-mx50.h
 > >  create mode 100644 arch/arm/mach-mx5/mm-mx50.c
 > >  create mode 100644 arch/arm/plat-mxc/include/mach/iomux-mx50.h
 > >  create mode 100644 arch/arm/plat-mxc/include/mach/mx50.h
 > >
 > > diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> > index 5011f42..dc92c81 100644
+> > index 5011f42..8e04a68 100644
 > > --- a/arch/arm/mach-mx5/Kconfig
 > > +++ b/arch/arm/mach-mx5/Kconfig
+> > @@ -1,5 +1,5 @@
+> >  if ARCH_MX5
+> > -# ARCH_MX51 is left for compatibility
+> > +# ARCH_MX51 and ARCH_MX50 are left for compatibility
+> >
+> >  config ARCH_MX51
+> >       bool
 > > @@ -12,6 +12,17 @@ config     SOC_IMX51
 > >       select ARCH_HAS_CPUFREQ
 > >       select ARCH_MX51
 > >
 > > +config ARCH_MX50
-> please add a comment here about the intended usage.
-I'll add "ARCH_MX50 is left for compatibility" like others.
-> 
 > > +     bool
 > > +
 > > +config SOC_IMX50
@@ -64,6 +69,14 @@ I'll add "ARCH_MX50 is left for compatibility" like others.
 > > +     select ARCH_MXC_AUDMUX_V2
 > > +     select ARCH_HAS_CPUFREQ
 > > +     select ARCH_MX50
+> please put these before the MX51 defines, preferably in this order:
+> 
+>         ARCH_MX50
+>         ARCH_MX51
+>         SOC_IMX50
+>         SOC_IMX51
+ok
+> 
 > > +
 > >  comment "MX5 platforms:"
 > >
@@ -76,25 +89,22 @@ I'll add "ARCH_MX50 is left for compatibility" like others.
 > >
 > >  # Object file lists.
 > >  obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o
-> don't you want to exclude the mx51/mx53 files for an mx50 build?
-Do you need to rename cpu.c mmc.c and devices.c to add a postfix?
 > > +obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
 > >
 > >  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
 > >  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
 > > diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
-> > index 388d2e8..5f31bb7 100644
+> > index fec7cd9..d8db746 100644
 > > --- a/arch/arm/mach-mx5/Makefile.boot
 > > +++ b/arch/arm/mach-mx5/Makefile.boot
 > > @@ -1,3 +1,6 @@
-> >     zreladdr-$(CONFIG_SOC_IMX51)      := 0x90008000
-> >  params_phys-$(CONFIG_SOC_IMX51)      := 0x90000100
-> >  initrd_phys-$(CONFIG_SOC_IMX51)      := 0x90800000
-> > +   zreladdr-$(CONFIG_SOC_IMX50)      := 0x70008000
-> > +params_phys-$(CONFIG_SOC_IMX50)      := 0x70000100
-> > +initrd_phys-$(CONFIG_SOC_IMX50)      := 0x70800000
-> as before, please use ARCH_MX50 here.  (I might have mistyped the config
-> symbol name in my previous mail (ARCH vs. MACH).)
+> >     zreladdr-$(CONFIG_ARCH_MX51)      := 0x90008000
+> >  params_phys-$(CONFIG_ARCH_MX51)      := 0x90000100
+> >  initrd_phys-$(CONFIG_ARCH_MX51)      := 0x90800000
+> > +   zreladdr-$(CONFIG_ARCH_MX50)      := 0x70008000
+> > +params_phys-$(CONFIG_ARCH_MX50)      := 0x70000100
+> > +initrd_phys-$(CONFIG_ARCH_MX50)      := 0x70800000
+> ditto, please 50 before 51
 ok
 > 
 > > diff --git a/arch/arm/mach-mx5/devices-mx50.h b/arch/arm/mach-mx5/devices-mx50.h
@@ -131,7 +141,7 @@ ok
 > > +     imx_add_imx_uart_1irq(&imx50_imx_uart_data[id], pdata)
 > > diff --git a/arch/arm/mach-mx5/mm-mx50.c b/arch/arm/mach-mx5/mm-mx50.c
 > > new file mode 100644
-> > index 0000000..10093ca
+> > index 0000000..29b8672
 > > --- /dev/null
 > > +++ b/arch/arm/mach-mx5/mm-mx50.c
 > > @@ -0,0 +1,52 @@
@@ -144,6 +154,9 @@ ok
 > > + *
 > > + * http://www.opensource.org/licenses/gpl-license.html
 > > + * http://www.gnu.org/copyleft/gpl.html
+> again this strange header, why not use the same for all files?
+ok
+> 
 > > + *
 > > + * Create static mapping between physical to virtual memory.
 > > + */
@@ -162,13 +175,9 @@ ok
 > > + */
 > > +static struct map_desc mx50_io_desc[] __initdata = {
 > > +     imx_map_entry(MX50, TZIC, MT_DEVICE),
-> > +     imx_map_entry(MX50, AIPS1, MT_DEVICE),
 > > +     imx_map_entry(MX50, SPBA0, MT_DEVICE),
+> > +     imx_map_entry(MX50, AIPS1, MT_DEVICE),
 > > +     imx_map_entry(MX50, AIPS2, MT_DEVICE),
-> When this is merged we should add mx50 to the comment for IMX_IO_P2V.
-> Or alternatively add it with your patch.
-ok, I'll add map list there.
-> 
 > > +};
 > > +
 > > +/*
@@ -192,12 +201,12 @@ ok, I'll add map list there.
 > > +     imx50_register_gpios();
 > > +}
 > > diff --git a/arch/arm/plat-mxc/devices/platform-imx-uart.c b/arch/arm/plat-mxc/devices/platform-imx-uart.c
-> > index 7b45b78..8cc2e93 100644
+> > index 7b45b78..0c69fbc 100644
 > > --- a/arch/arm/plat-mxc/devices/platform-imx-uart.c
 > > +++ b/arch/arm/plat-mxc/devices/platform-imx-uart.c
-> > @@ -104,6 +104,18 @@ const struct imx_imx_uart_1irq_data imx51_imx_uart_data[] __initconst = {
+> > @@ -94,6 +94,18 @@ const struct imx_imx_uart_1irq_data imx35_imx_uart_data[] __initconst = {
 > >  };
-> >  #endif /* ifdef CONFIG_SOC_IMX51 */
+> >  #endif /* ifdef CONFIG_SOC_IMX35 */
 > >
 > > +#ifdef CONFIG_SOC_IMX50
 > > +const struct imx_imx_uart_1irq_data imx50_imx_uart_data[] __initconst = {
@@ -210,13 +219,10 @@ ok, I'll add map list there.
 > > +     imx50_imx_uart_data_entry(4, 5),
 > > +};
 > > +#endif /* ifdef CONFIG_SOC_IMX50 */
-> Maybe add this before the CONFIG_SOC_IMX51 section?
-ok
-> 
 > > +
-> >  struct platform_device *__init imx_add_imx_uart_3irq(
-> >               const struct imx_imx_uart_3irq_data *data,
-> >               const struct imxuart_platform_data *pdata)
+> >  #ifdef CONFIG_SOC_IMX51
+> >  const struct imx_imx_uart_1irq_data imx51_imx_uart_data[] __initconst = {
+> >  #define imx51_imx_uart_data_entry(_id, _hwid)                                \
 > > diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
 > > index dd4f813..bc2c7bc 100644
 > > --- a/arch/arm/plat-mxc/gpio.c
@@ -240,47 +246,42 @@ ok
 > > +
 > > +#endif /* if defined(CONFIG_SOC_IMX50) */
 > > diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-> > index 9d58ce5..748f09d 100644
+> > index 9d58ce5..aea2cd3 100644
 > > --- a/arch/arm/plat-mxc/include/mach/common.h
 > > +++ b/arch/arm/plat-mxc/include/mach/common.h
-> > @@ -22,6 +22,7 @@ extern void mx31_map_io(void);
+> > @@ -20,6 +20,7 @@ extern void mx25_map_io(void);
+> >  extern void mx27_map_io(void);
+> >  extern void mx31_map_io(void);
 > >  extern void mx35_map_io(void);
+> > +extern void mx50_map_io(void);
 > >  extern void mx51_map_io(void);
 > >  extern void mx53_map_io(void);
-> > +extern void mx50_map_io(void);
-> ditto
-ok
-> 
 > >  extern void mxc91231_map_io(void);
-> >  extern void mxc_init_irq(void __iomem *);
-> >  extern void tzic_init_irq(void __iomem *);
 > > @@ -31,6 +32,7 @@ extern void mx25_init_irq(void);
 > >  extern void mx27_init_irq(void);
 > >  extern void mx31_init_irq(void);
 > >  extern void mx35_init_irq(void);
 > > +extern void mx50_init_irq(void);
-> fine :-)
-> 
 > >  extern void mx51_init_irq(void);
 > >  extern void mx53_init_irq(void);
 > >  extern void mxc91231_init_irq(void);
-> > @@ -46,6 +48,8 @@ extern int mx51_clocks_init(unsigned long ckil, unsigned long osc,
-> >                       unsigned long ckih1, unsigned long ckih2);
-> >  extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
-> >                       unsigned long ckih1, unsigned long ckih2);
-> > +extern int mx50_clocks_init(unsigned long ckil, unsigned long osc,
-> > +                     unsigned long ckih1);
-> ditto
-I will remove it since clock file has not went in.
-> 
-> >  extern int mxc91231_clocks_init(unsigned long fref);
-> >  extern int mxc_register_gpios(void);
-> >  extern int mxc_register_device(struct platform_device *pdev, void *data);
 > > diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-> > index f9ed0ba..4eefc06 100644
+> > index f9ed0ba..26bb1ba 100644
 > > --- a/arch/arm/plat-mxc/include/mach/hardware.h
 > > +++ b/arch/arm/plat-mxc/include/mach/hardware.h
-> > @@ -100,6 +100,7 @@
+> > @@ -75,6 +75,11 @@
+> >   *   AVIC    0x68000000+0x100000     ->      0xf5800000+0x100000
+> >   *   X_MEMC  0xb8000000+0x010000     ->      0xf4c00000+0x010000
+> >   *   SPBA0   0x50000000+0x100000     ->      0xf5400000+0x100000
+> > + * mx50:
+> > + *   TZIC    0x0fffc000+0x004000     ->      0xf4bfc000+0x004000
+> > + *   SPBA0   0x50000000+0x100000     ->      0xf5400000+0x100000
+> > + *   AIPS1   0x53f00000+0x100000     ->      0xf5700000+0x100000
+> > + *   AIPS2   0x63f00000+0x100000     ->      0xf5300000+0x100000
+> >   * mx51:
+> >   *   IRAM    0x1ffe0000+0x020000     ->      0xf4fe0000+0x020000
+> >   *   DEBUG   0x60000000+0x100000     ->      0xf5000000+0x100000
+> > @@ -100,6 +105,7 @@
 > >  #define IMX_IO_ADDRESS(x)    IOMEM(IMX_IO_P2V(x))
 > >
 > >  #ifdef CONFIG_ARCH_MX5
@@ -290,10 +291,10 @@ I will remove it since clock file has not went in.
 > >  #endif
 > > diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx50.h b/arch/arm/plat-mxc/include/mach/iomux-mx50.h
 > > new file mode 100644
-> > index 0000000..e1f1f0f
+> > index 0000000..6e595d5
 > > --- /dev/null
 > > +++ b/arch/arm/plat-mxc/include/mach/iomux-mx50.h
-> > @@ -0,0 +1,980 @@
+> > @@ -0,0 +1,979 @@
 > > +/*
 > > + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 > > + *
@@ -318,6 +319,9 @@ I will remove it since clock file has not went in.
 > > +#include <mach/iomux-v3.h>
 > > +
 > > +#define IOMUX_TO_IRQ_V3(pin) (MXC_GPIO_IRQ_START + pin)
+> is this mx50 specific?  If not it should go to iomux-v3.h
+actually it's exactly gpio_to_irq. I'll remove this line.
+> 
 > > +
 > > +#define MX50_ELCDIF_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_DSE_HIGH)
 > > +
@@ -1272,11 +1276,7 @@ I will remove it since clock file has not went in.
 > > +#define MX50_PAD_EIM_CRE__WEIM_CRE   IOMUX_PAD(0x664, 0x2C8, 0, 0x0, 0, NO_PAD_CTRL)
 > > +#define MX50_PAD_EIM_CRE__GPIO_1_27  IOMUX_PAD(0x664, 0x2C8, 1, 0x0, 0, NO_PAD_CTRL)
 > > +
-> > +#endif /* __MACH_IOMUX_MX53_H__ */
-> > +
-> trailing empty line at eof.  I assume these definitions are complete?
-ok
-> 
+> > +#endif /* __MACH_IOMUX_MX50_H__ */
 > > diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
 > > index 769a137..064026b 100644
 > > --- a/arch/arm/plat-mxc/include/mach/irqs.h
@@ -1313,7 +1313,7 @@ ok
 > >  # elif defined CONFIG_ARCH_MX53
 > > diff --git a/arch/arm/plat-mxc/include/mach/mx50.h b/arch/arm/plat-mxc/include/mach/mx50.h
 > > new file mode 100644
-> > index 0000000..c572e2a
+> > index 0000000..f8ba445
 > > --- /dev/null
 > > +++ b/arch/arm/plat-mxc/include/mach/mx50.h
 > > @@ -0,0 +1,285 @@
@@ -1472,40 +1472,37 @@ ok
 > > +/*
 > > + * DMA request assignments
 > > + */
-> > +#define MX50_DMA_REQ_UART3_TX                43
-> > +#define MX50_DMA_REQ_UART3_RX                42
-> > +#define MX50_DMA_REQ_CSPI_TX         39
-> > +#define MX50_DMA_REQ_CSPI_RX         38
-> > +#define MX50_DMA_REQ_SSI1_TX1                29
-> > +#define MX50_DMA_REQ_SSI1_RX1                28
-> > +#define MX50_DMA_REQ_SSI1_TX2                27
-> > +#define MX50_DMA_REQ_SSI1_RX2                26
-> > +#define MX50_DMA_REQ_SSI2_TX1                25
-> > +#define MX50_DMA_REQ_SSI2_RX1                24
-> > +#define MX50_DMA_REQ_SSI2_TX2                23
-> > +#define MX50_DMA_REQ_SSI2_RX2                22
-> > +#define MX50_DMA_REQ_I2C2_SDHC2              21
-> > +#define MX50_DMA_REQ_I2C1_SDHC1              20
-> > +#define MX50_DMA_REQ_UART1_TX                19
-> > +#define MX50_DMA_REQ_UART1_RX                18
-> > +#define MX50_DMA_REQ_UART5_TX                17
-> > +#define MX50_DMA_REQ_UART5_RX                16
-> > +#define MX50_DMA_REQ_EXT1            15
-> > +#define MX50_DMA_REQ_EXT0            14
-> > +#define MX50_DMA_REQ_UART2_FIRI_TX   13
-> > +#define MX50_DMA_REQ_UART2_FIRI_RX   12
-> > +#define MX50_DMA_REQ_SDHC4           11
-> > +#define MX50_DMA_REQ_I2C3_SDHC3              10
-> > +#define MX50_DMA_REQ_CSPI2_TX                9
-> > +#define MX50_DMA_REQ_CSPI2_RX                8
-> > +#define MX50_DMA_REQ_CSPI1_TX                7
-> > +#define MX50_DMA_REQ_CSPI1_RX                6
-> > +#define MX50_DMA_REQ_ATA_UART4_TX    3
-> > +#define MX50_DMA_REQ_ATA_UART4_RX    2
 > > +#define MX50_DMA_REQ_GPC             1
-> Maybe reverse this list to have them in ascending order?
-ok
-> 
+> > +#define MX50_DMA_REQ_ATA_UART4_RX    2
+> > +#define MX50_DMA_REQ_ATA_UART4_TX    3
+> > +#define MX50_DMA_REQ_CSPI1_RX                6
+> > +#define MX50_DMA_REQ_CSPI1_TX                7
+> > +#define MX50_DMA_REQ_CSPI2_RX                8
+> > +#define MX50_DMA_REQ_CSPI2_TX                9
+> > +#define MX50_DMA_REQ_I2C3_SDHC3              10
+> > +#define MX50_DMA_REQ_SDHC4           11
+> > +#define MX50_DMA_REQ_UART2_FIRI_RX   12
+> > +#define MX50_DMA_REQ_UART2_FIRI_TX   13
+> > +#define MX50_DMA_REQ_EXT0            14
+> > +#define MX50_DMA_REQ_EXT1            15
+> > +#define MX50_DMA_REQ_UART5_RX                16
+> > +#define MX50_DMA_REQ_UART5_TX                17
+> > +#define MX50_DMA_REQ_UART1_RX                18
+> > +#define MX50_DMA_REQ_UART1_TX                19
+> > +#define MX50_DMA_REQ_I2C1_SDHC1              20
+> > +#define MX50_DMA_REQ_I2C2_SDHC2              21
+> > +#define MX50_DMA_REQ_SSI2_RX2                22
+> > +#define MX50_DMA_REQ_SSI2_TX2                23
+> > +#define MX50_DMA_REQ_SSI2_RX1                24
+> > +#define MX50_DMA_REQ_SSI2_TX1                25
+> > +#define MX50_DMA_REQ_SSI1_RX2                26
+> > +#define MX50_DMA_REQ_SSI1_TX2                27
+> > +#define MX50_DMA_REQ_SSI1_RX1                28
+> > +#define MX50_DMA_REQ_SSI1_TX1                29
+> > +#define MX50_DMA_REQ_CSPI_RX         38
+> > +#define MX50_DMA_REQ_CSPI_TX         39
+> > +#define MX50_DMA_REQ_UART3_RX                42
+> > +#define MX50_DMA_REQ_UART3_TX                43
 > > +
 > > +/*
 > > + * Interrupt numbers
@@ -1635,16 +1632,20 @@ ok
 > > +#endif
 > > +
 > > +#ifdef CONFIG_ARCH_MX5
+> CONFIG_ARCH_MX51?
+Yes. Sorry it might be caused by wrong git operation.
+> 
 > >  # ifdef mxc_cpu_type
 > >  #  undef mxc_cpu_type
 > >  #  define mxc_cpu_type __mxc_cpu_type
+> > --
+> > 1.6.3.3
 > 
 > Best regards
 > Uwe
-Thanks
-Richard
 > 
 > --
 > Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 > Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
+Thanks
+Richard
