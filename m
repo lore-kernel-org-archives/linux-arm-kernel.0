@@ -1,105 +1,41 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 30 Dec 2010 12:56:06 +0800
-Subject: [PATCH v3 5/8] arm: mxc: move IOMUX_CONFIG_XXXX definitions to
-	iomux-v3.h
-In-Reply-To: <1293684968-7338-4-git-send-email-richard.zhao@freescale.com>
+Date: Thu, 30 Dec 2010 12:56:03 +0800
+Subject: [PATCH v3 2/8] arm: plat-mxc: add full parameter macro to define gpio
+	port
+In-Reply-To: <1293684968-7338-1-git-send-email-richard.zhao@freescale.com>
 References: <1293684968-7338-1-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-2-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-3-git-send-email-richard.zhao@freescale.com>
-	<1293684968-7338-4-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1293684968-7338-5-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1293684968-7338-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMUX_CONFIG_GPIO is not for iomux-v3. It's for old freescale
-iomux routines. Remove it.
-
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |   16 ----------------
- arch/arm/plat-mxc/include/mach/iomux-mx53.h |   16 ----------------
- arch/arm/plat-mxc/include/mach/iomux-v3.h   |   15 +++++++++++++++
- 3 files changed, 15 insertions(+), 32 deletions(-)
+ arch/arm/plat-mxc/gpio.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index e1600f3..31af1f5 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -15,22 +15,6 @@
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index 93a8d93..dd4f813 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -350,15 +350,18 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+ 	return 0;
+ }
  
- #include <mach/iomux-v3.h>
+-#define DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, _irq)			\
++#define DEFINE_IMX_GPIO_PORT_IRQ_HIGH(soc, _id, _hwid, _irq, _irq_high)	\
+ 	{								\
+ 		.chip.label = "gpio-" #_id,				\
+ 		.irq = _irq,						\
++		.irq_high = _irq_high,					\
+ 		.base = soc ## _IO_ADDRESS(				\
+ 				soc ## _GPIO ## _hwid ## _BASE_ADDR),	\
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + (_id) * 32,	\
+ 	}
  
--/*
-- * various IOMUX alternate output functions (1-7)
-- */
--typedef enum iomux_config {
--	IOMUX_CONFIG_ALT0,
--	IOMUX_CONFIG_ALT1,
--	IOMUX_CONFIG_ALT2,
--	IOMUX_CONFIG_ALT3,
--	IOMUX_CONFIG_ALT4,
--	IOMUX_CONFIG_ALT5,
--	IOMUX_CONFIG_ALT6,
--	IOMUX_CONFIG_ALT7,
--	IOMUX_CONFIG_GPIO,      /* added to help user use GPIO mode */
--	IOMUX_CONFIG_SION = 0x1 << 4,   /* LOOPBACK:MUX SION bit */
--} iomux_pin_cfg_t;
--
- /* Pad control groupings */
- #define MX51_UART1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
- 				PAD_CTL_DSE_HIGH)
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-index 80cb3c5..4155124 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-@@ -21,22 +21,6 @@
++#define DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, _irq)			\
++	DEFINE_IMX_GPIO_PORT_IRQ_HIGH(soc, _id, _hwid, _irq, 0)
+ #define DEFINE_IMX_GPIO_PORT(soc, _id, _hwid)				\
+ 	DEFINE_IMX_GPIO_PORT_IRQ(soc, _id, _hwid, 0)
  
- #include <mach/iomux-v3.h>
- 
--/*
-- * various IOMUX alternate output functions (1-7)
-- */
--typedef enum iomux_config {
--	IOMUX_CONFIG_ALT0,
--	IOMUX_CONFIG_ALT1,
--	IOMUX_CONFIG_ALT2,
--	IOMUX_CONFIG_ALT3,
--	IOMUX_CONFIG_ALT4,
--	IOMUX_CONFIG_ALT5,
--	IOMUX_CONFIG_ALT6,
--	IOMUX_CONFIG_ALT7,
--	IOMUX_CONFIG_GPIO, /* added to help user use GPIO mode */
--	IOMUX_CONFIG_SION = 0x1 << 4, /* LOOPBACK:MUX SION bit */
--} iomux_pin_cfg_t;
--
- /* These 2 defines are for pins that may not have a mux register, but could
-  * have a pad setting register, and vice-versa. */
- #define NON_MUX_I	0x00
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-index 811716f..e1fd71b 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-@@ -54,6 +54,21 @@ typedef struct deprecated_pad_desc {
- 	unsigned select_input:3;
- } iomux_v3_cfg_t;
- 
-+/*
-+ * various IOMUX alternate output functions (1-7)
-+ */
-+enum iomux_config {
-+	IOMUX_CONFIG_ALT0,
-+	IOMUX_CONFIG_ALT1,
-+	IOMUX_CONFIG_ALT2,
-+	IOMUX_CONFIG_ALT3,
-+	IOMUX_CONFIG_ALT4,
-+	IOMUX_CONFIG_ALT5,
-+	IOMUX_CONFIG_ALT6,
-+	IOMUX_CONFIG_ALT7,
-+	IOMUX_CONFIG_SION = 0x1 << 4,	/* LOOPBACK:MUX SION bit */
-+};
-+
- static inline unsigned int MUX_CTRL_OFS(iomux_v3_cfg_t *pad)
- {
- 	return pad->mux_ctrl_ofs;
 -- 
 1.6.3.3
