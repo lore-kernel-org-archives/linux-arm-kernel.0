@@ -1,63 +1,115 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 30 Dec 2010 16:33:19 +0800
-Subject: [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
-In-Reply-To: <20101229124506.GE14221@pengutronix.de>
+Date: Thu, 30 Dec 2010 16:41:40 +0800
+Subject: [PATCH 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <20101229112208.GB14221@pengutronix.de>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-10-git-send-email-shawn.guo@freescale.com>
-	<20101229105328.GX14221@pengutronix.de>
-	<20101229121354.GJ19347@freescale.com>
-	<20101229124506.GE14221@pengutronix.de>
-Message-ID: <20101230083318.GB28246@freescale.com>
+	<1293548155-16328-9-git-send-email-shawn.guo@freescale.com>
+	<20101229112208.GB14221@pengutronix.de>
+Message-ID: <20101230084139.GC28246@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Wed, Dec 29, 2010 at 12:22:08PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Tue, Dec 28, 2010 at 10:55:53PM +0800, Shawn Guo wrote:
+> > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+> > new file mode 100644
+> > index 0000000..24457d7
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mxs/ocotp.c
+> > @@ -0,0 +1,52 @@
+> > +/*
+> > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/delay.h>
+> > +#include <linux/err.h>
+> > +
+> > +#include <mach/mxs.h>
+> > +
+> > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
+> > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
+> > +
+> > +int mxs_read_ocotp(int offset, int count, u32 *values)
+> > +{
+> > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
+> > +	int i, timeout = 0x400;
+> > +
+> > +	/* open OCOTP banks for read */
+> > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+> The reference manual specifies:
+> 	1. Program the HCLK to a frequency up to the maximum allowable HCLK
+> 	   frequency. [...]
+> 	2. Check that HW_OCOTP_CTRL_BUSY and HW_OCOTP_CTRL_ERROR are clear.
+> 	3. Set HW_OCOTP_CTRL_RD_BANK_OPEN. [...]
+> 
+> 1. isn't done (which is probably OK, or should it aquire a clk?)
+ocotp needs clk_h, which must be on when system is running.
 
-On Wed, Dec 29, 2010 at 01:45:06PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Shawn,
+> For 2. there is no check for HW_OCOTP_CTRL_ERROR which is not OK i
+> guess?!
 > 
-> On Wed, Dec 29, 2010 at 08:13:55PM +0800, Shawn Guo wrote:
-> > On Wed, Dec 29, 2010 at 11:53:28AM +0100, Uwe Kleine-K?nig wrote:
-> > > On Tue, Dec 28, 2010 at 10:55:54PM +0800, Shawn Guo wrote:
-> > > > Read fec mac address from ocotp and save it into fec_platform_data
-> > > > mac field for fec driver to use.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > > ---
-> > > >  arch/arm/mach-mxs/devices/platform-fec.c        |    2 +-
-> > > >  arch/arm/mach-mxs/include/mach/devices-common.h |    2 +-
-> > > >  arch/arm/mach-mxs/mach-mx28evk.c                |   31 +++++++++++++++++++++++
-> > > >  3 files changed, 33 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-mxs/devices/platform-fec.c b/arch/arm/mach-mxs/devices/platform-fec.c
-> > > > index c08168c..dc978ee 100644
-> > > > --- a/arch/arm/mach-mxs/devices/platform-fec.c
-> > > > +++ b/arch/arm/mach-mxs/devices/platform-fec.c
-> > > > @@ -31,7 +31,7 @@ const struct mxs_fec_data mx28_fec_data[] __initconst = {
-> > > >  
-> > > >  struct platform_device *__init mxs_add_fec(
-> > > >  		const struct mxs_fec_data *data,
-> > > > -		const struct fec_platform_data *pdata)
-> > > > +		struct fec_platform_data *pdata)
-> > > >  {
-> > > >  	struct resource res[] = {
-> > > >  		{
-> > > > diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > > index fca0551..d206e0a 100644
-> > > > --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > > +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > > @@ -38,4 +38,4 @@ struct mxs_fec_data {
-> > > >  };
-> > > >  struct platform_device *__init mxs_add_fec(
-> > > >  		const struct mxs_fec_data *data,
-> > > > -		const struct fec_platform_data *pdata);
-> > > > +		struct fec_platform_data *pdata);
-> > > Why that?
-> > > 
-> > pdata->mac needs to get assigned by ocotp read function.
-> ... which is done before mxs_add_fec is called.
-> 
-My bad. Will add it back.
+How does the new code look to you?
+
+static DEFINE_MUTEX(ocotp_mutex);
+
+int mxs_read_ocotp(unsigned offset, size_t count, u32 *values)
+{
+	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
+	int i, timeout = 0x400;
+
+	mutex_lock(&ocotp_mutex);
+
+	/* clear ERROR bit anyway */
+	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
+
+	/* check both BUSY and ERROR cleared */
+	while ((__raw_readl(ocotp_base) &
+		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
+		/* nothing */;
+
+	if (unlikely(!timeout))
+		goto error;
+
+	/* open OCOTP banks for read */
+	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+
+	/* approximately wait 32 hclk cycles */
+	udelay(1);
+
+	/* poll BUSY bit becoming cleared */
+	timeout = 0x400;
+	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
+		/* nothing */;
+
+	if (unlikely(!timeout))
+		goto error;
+
+	for (i = 0; i < count; i++, offset += 4)
+		*values++ = __raw_readl(ocotp_base + offset);
+
+	/* close banks for power saving */
+	__mxs_clrl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+
+	mutex_unlock(&ocotp_mutex);
+
+	return 0;
+
+error:
+	pr_err("%s: timeout in reading OCOTP\n", __func__);
+	return -ETIMEDOUT;
+}
 
 -- 
 Regards,
