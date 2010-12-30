@@ -1,128 +1,54 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 30 Dec 2010 10:19:12 +0800
-Subject: [PATCH 09/10] ARM: mx28: read fec mac address from ocotp
-In-Reply-To: <20101229124506.GE14221@pengutronix.de>
+Date: Thu, 30 Dec 2010 12:29:00 +0800
+Subject: [PATCH 03/10] net/fec: add mac field into platform data and
+	consolidate fec_get_mac
+In-Reply-To: <20101229100520.GB19347@freescale.com>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-10-git-send-email-shawn.guo@freescale.com>
-	<20101229105328.GX14221@pengutronix.de>
-	<20101229121354.GJ19347@freescale.com>
-	<20101229124506.GE14221@pengutronix.de>
-Message-ID: <20101230021911.GB20155@freescale.com>
+	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
+	<20101229065329.GB31010@jasper.tkos.co.il>
+	<20101229100520.GB19347@freescale.com>
+Message-ID: <20101230042858.GA20651@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Baruch,
 
-On Wed, Dec 29, 2010 at 01:45:06PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Shawn,
+On Wed, Dec 29, 2010 at 06:05:20PM +0800, Shawn Guo wrote:
+> Hi Baruch,
 > 
-> On Wed, Dec 29, 2010 at 08:13:55PM +0800, Shawn Guo wrote:
-> > On Wed, Dec 29, 2010 at 11:53:28AM +0100, Uwe Kleine-K?nig wrote:
-> > > On Tue, Dec 28, 2010 at 10:55:54PM +0800, Shawn Guo wrote:
-> > > > Read fec mac address from ocotp and save it into fec_platform_data
-> > > > mac field for fec driver to use.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > > ---
-> > > >  arch/arm/mach-mxs/devices/platform-fec.c        |    2 +-
-> > > >  arch/arm/mach-mxs/include/mach/devices-common.h |    2 +-
-> > > >  arch/arm/mach-mxs/mach-mx28evk.c                |   31 +++++++++++++++++++++++
-> > > >  3 files changed, 33 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-mxs/devices/platform-fec.c b/arch/arm/mach-mxs/devices/platform-fec.c
-> > > > index c08168c..dc978ee 100644
-> > > > --- a/arch/arm/mach-mxs/devices/platform-fec.c
-> > > > +++ b/arch/arm/mach-mxs/devices/platform-fec.c
-> > > > @@ -31,7 +31,7 @@ const struct mxs_fec_data mx28_fec_data[] __initconst = {
-> > > >  
-> > > >  struct platform_device *__init mxs_add_fec(
-> > > >  		const struct mxs_fec_data *data,
-> > > > -		const struct fec_platform_data *pdata)
-> > > > +		struct fec_platform_data *pdata)
-> > > >  {
-> > > >  	struct resource res[] = {
-> > > >  		{
-> > > > diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > > index fca0551..d206e0a 100644
-> > > > --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > > +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> > > > @@ -38,4 +38,4 @@ struct mxs_fec_data {
-> > > >  };
-> > > >  struct platform_device *__init mxs_add_fec(
-> > > >  		const struct mxs_fec_data *data,
-> > > > -		const struct fec_platform_data *pdata);
-> > > > +		struct fec_platform_data *pdata);
-> > > Why that?
-> > > 
-> > pdata->mac needs to get assigned by ocotp read function.
-> ... which is done before mxs_add_fec is called.
-> 
-> > > > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > > index def6519..d133733 100644
-> > > > --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> > > > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > > @@ -129,6 +129,36 @@ static struct fec_platform_data mx28_fec_pdata[] = {
-> > > >  	},
-> > > >  };
-> > > >  
-> > > > +static int __init mx28evk_fec_get_mac(void)
-> > > > +{
-> > > > +	int i, ret;
-> > > > +	u32 val;
-> > > > +
-> > > > +	/*
-> > > > +	 * OCOTP only stores the last 4 octets for each mac address,
-> > > > +	 * so hard-coding the first two octets as Freescale OUI (00:04:9f)
-> > > > +	 * is needed.
-> > > > +	 */
-> > > > +	for (i = 0; i < 2; i++) {
-> > > > +		ret = mxs_read_ocotp(0x20 + i * 0x10, 1, &val);
-> > > > +		if (ret)
-> > > > +			goto error;
-> > > > +
-> > > > +		mx28_fec_pdata[i].mac[0] = 0x00;
-> > > > +		mx28_fec_pdata[i].mac[1] = 0x04;
-> > > > +		mx28_fec_pdata[i].mac[2] = (val >> 24) & 0xff;
-> > > > +		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
-> > > > +		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
-> > > > +		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
-> > > > +	}
-> > > > +
-> > > > +	return 0;
-> > > > +
-> > > > +error:
-> > > > +	pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
-> > > > +	return -ETIMEDOUT;
-> > > return ret please.
-> > > 
-> > OK.
+> On Wed, Dec 29, 2010 at 08:53:30AM +0200, Baruch Siach wrote:
+> > Hi Shawn,
 > > 
-> > > > +}
-> > > I think this should be defined in a more generic place.
-> > > 
-> > Necessary?
-> I just rechecked with the reference manual and it's not documented that
-> 0x20 and 0x30 are used to hold the mac address.  Then it's probably OK
-> to keep this function machine-local.
-> 
-> > > > +
-> > > >  static void __init mx28evk_init(void)
-> > > >  {
-> > > >  	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
-> > > > @@ -136,6 +166,7 @@ static void __init mx28evk_init(void)
-> > > >  	mx28_add_duart();
-> > > >  
-> > > >  	mx28evk_fec_reset();
-> > > > +	mx28evk_fec_get_mac();
-> > > You ignore the return value here.  Intended?
-> > > 
-> > Not intended.  Will check and give a warning.
+> > Please add netdev at vger.kernel.org to the Cc of all your fec driver patches.
 > > 
-> > > >  	mx28_add_fec(0, &mx28_fec_pdata[0]);
-> ... and maybe skip the call to add_fec?  Up to you.
+> > On Tue, Dec 28, 2010 at 10:55:48PM +0800, Shawn Guo wrote:
+> > > Add mac field into fec_platform_data and consolidate function
+> > > fec_get_mac to get mac address in following order.
+> > > 
+> > >  1) kernel command line fec_mac=xx:xx:xx...
+> > 
+> > In the case of dual MAC that you later add support for, the address which one 
+> > is being set? Is there a way to set both in kernel command line?
+> > 
+> The fec0 gets fec_mac and fec1 gets fec_mac + 1. The following code
+> in function fec_get_mac takes care of it.
 > 
-I would not. fec driver still has the last chance to get mac
-address from fec mac registers which may set up by bootloader. 
+> 	/* Adjust MAC if using default MAC address */
+> 	if (iap == fec_mac_default)
+> 		dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->pdev->id;
+> 
+> 
+> > Also, instead of inventing another kernel command line parameter, it is better 
+> > IMO to use the module parameters mechanism. The greth NIC driver already uses 
+> > this method for setting MAC address. Look for 'macaddr' in 
+> > drivers/net/greth.c, and the explanation at the beginning of 
+> > Documentation/kernel-parameters.txt.
+> > 
+> Sounds good. Thanks.
+> 
+I just thought this over again. Module parameter might not be
+the best here. fec is usually used to mount nfs during boot,
+which requires a built-in driver other than module.
 
 -- 
 Regards,
