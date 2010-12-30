@@ -1,58 +1,98 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 30 Dec 2010 07:29:25 +0200
-Subject: [PATCH 03/10] net/fec: add mac field into platform data and
-	consolidate fec_get_mac
-In-Reply-To: <20101230042858.GA20651@freescale.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 30 Dec 2010 13:50:12 +0800
+Subject: [PATCH 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <20101229112208.GB14221@pengutronix.de>
 References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-4-git-send-email-shawn.guo@freescale.com>
-	<20101229065329.GB31010@jasper.tkos.co.il>
-	<20101229100520.GB19347@freescale.com>
-	<20101230042858.GA20651@freescale.com>
-Message-ID: <20101230052925.GA11160@jasper.tkos.co.il>
+	<1293548155-16328-9-git-send-email-shawn.guo@freescale.com>
+	<20101229112208.GB14221@pengutronix.de>
+Message-ID: <20101230055012.GB20651@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Uwe,
 
-On Thu, Dec 30, 2010 at 12:29:00PM +0800, Shawn Guo wrote:
-> On Wed, Dec 29, 2010 at 06:05:20PM +0800, Shawn Guo wrote:
-> > On Wed, Dec 29, 2010 at 08:53:30AM +0200, Baruch Siach wrote:
-> > > Please add netdev at vger.kernel.org to the Cc of all your fec driver 
-> > > patches.
-> > > 
-> > > On Tue, Dec 28, 2010 at 10:55:48PM +0800, Shawn Guo wrote:
-> > > > Add mac field into fec_platform_data and consolidate function
-> > > > fec_get_mac to get mac address in following order.
-> > > > 
-> > > >  1) kernel command line fec_mac=xx:xx:xx...
-> > > 
-> > > In the case of dual MAC that you later add support for, the address which one 
-> > > is being set? Is there a way to set both in kernel command line?
-> > > 
-> > The fec0 gets fec_mac and fec1 gets fec_mac + 1. The following code
-> > in function fec_get_mac takes care of it.
-> > 
-> > 	/* Adjust MAC if using default MAC address */
-> > 	if (iap == fec_mac_default)
-> > 		dev->dev_addr[ETH_ALEN-1] = fec_mac_default[ETH_ALEN-1] + fep->pdev->id;
-> > > Also, instead of inventing another kernel command line parameter, it is 
-> > > better IMO to use the module parameters mechanism. The greth NIC driver 
-> > > already uses this method for setting MAC address. Look for 'macaddr' in 
-> > > drivers/net/greth.c, and the explanation at the beginning of 
-> > > Documentation/kernel-parameters.txt.
-> > > 
-> > Sounds good. Thanks.
-> > 
-> I just thought this over again. Module parameter might not be
-> the best here. fec is usually used to mount nfs during boot,
-> which requires a built-in driver other than module.
+On Wed, Dec 29, 2010 at 12:22:08PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Tue, Dec 28, 2010 at 10:55:53PM +0800, Shawn Guo wrote:
+> > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+> > new file mode 100644
+> > index 0000000..24457d7
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mxs/ocotp.c
+> > @@ -0,0 +1,52 @@
+> > +/*
+> > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/delay.h>
+> > +#include <linux/err.h>
+> > +
+> > +#include <mach/mxs.h>
+> > +
+> > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
+> > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
+> > +
+> > +int mxs_read_ocotp(int offset, int count, u32 *values)
+> > +{
+> > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
+> > +	int i, timeout = 0x400;
+> > +
+> > +	/* open OCOTP banks for read */
+> > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+> The reference manual specifies:
+> 	1. Program the HCLK to a frequency up to the maximum allowable HCLK
+> 	   frequency. [...]
+> 	2. Check that HW_OCOTP_CTRL_BUSY and HW_OCOTP_CTRL_ERROR are clear.
+> 	3. Set HW_OCOTP_CTRL_RD_BANK_OPEN. [...]
+> 
+> 1. isn't done (which is probably OK, or should it aquire a clk?)
+> For 2. there is no check for HW_OCOTP_CTRL_ERROR which is not OK i
+> guess?!
+> 
+Will add the check. Thanks.
 
-See the explanation at the beginning of Documentation/kernel-parameters.txt.  
-You can give module parameters at the kernel command line.
+> (Independant of that, shouldn't the list use BM_ prefixes as you did in
+> the code?)
+> 
+Document description uses register name followed by bit-field name
+to mean the bit.
 
-baruch
+> > +
+> > +	/* approximately wait 32 hclk cycles */
+> > +	udelay(1);
+> > +
+> > +	/* poll BUSY bit becoming cleared */
+> > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
+> > +		/* nothing */;
+> > +
+> > +	if (unlikely(!timeout))
+> > +		goto error;
+> And I think you should recheck for BM_OCOTP_CTRL_RD_BANK_OPEN here (step
+> 4 from the reference manual).
+> 
+The RM says:
+
+Poll for HW_OCOTP_CTRL_BUSY clear. When HW_OCOTP_CTRL_BUSY is clear
+and HW_OCOTP_CTRL_RD_BANK_OPEN is set, read the data from the
+appropriate memory-mapped address.
+
+My understanding is we only need to poll busy bit clear. And the
+second sentence just tells that read operation should be working
+when bit busy clear and rd_bank_open set, which has been done
+in step 3. I also consulted the designer and was told that only
+busy clear polling is needed.
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Regards,
+Shawn
