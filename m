@@ -1,30 +1,39 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 30 Dec 2010 11:57:23 +0530
-Subject: [PATCH] GIC: Assign correct flow handler type in set_type callback
-In-Reply-To: <1293686960-12581-1-git-send-email-adharmap@codeaurora.org>
-References: <1293686960-12581-1-git-send-email-adharmap@codeaurora.org>
-Message-ID: <AANLkTimA8ZP4WL8u0Uvtt-0MWXPkGfjwQ7437pL-h0D-@mail.gmail.com>
+From: sundar.iyer@stericsson.com (Sundar Iyer)
+Date: Thu, 30 Dec 2010 12:01:15 +0530
+Subject: [PATCH] mach-ux500: fix ux500 build error
+Message-ID: <1293690675-14501-1-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 30, 2010 at 10:59 AM, Abhijeet Dharmapurikar
-<adharmap@codeaurora.org> wrote:
-> There are some interrupts that are true edge triggered in nature. If not
-> marked IRQ_PENDING, when disabled, they will be lost.
->
-> Use the set_type callback to assign the correct flow type handler for
-> shared peripheral interrupts.
->
-> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> ---
-> This came to light when a edge triggered interrupt was supposed to wakeup the
-> sytem. The flow handler was set to the default handle_level_irq. On the resume
-> path the flow handler was invoked right after the I bit was cleared but before
-> each individual interrupts were enabled. This made the handle_level_irq ignore
+Include ab8500 regulators for DB8500 SoC by default
+and fix build issues
 
-Why does the flow handler hit when the interrupt is disabled?  Have you set
-IRQF_NOSUSPEND on this interrupt?
+Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
+---
+ arch/arm/mach-ux500/Makefile |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-> the interrupt (mask_ack it) and it was lost. handle_edge_irq does the right
-> thing by marking the interrupt as IRQ_PENDING and when the resume code gets to
-> enabling each interrupt this interrupt is resent again.
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 12052e8..84dc03e 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -4,14 +4,14 @@
+ 
+ obj-y				:= clock.o cpu.o devices.o devices-common.o
+ obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o dma-db5500.o
+-obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o prcmu.o
++obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o prcmu.o \
++				   board-mop500-regulators.o
+ obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o board-mop500-sdi.o \
+-				board-mop500-keypads.o
++				   board-mop500-keypads.o
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+-obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
+ obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem-irq-db5500.o
+ obj-$(CONFIG_U5500_MBOX)	+= mbox-db5500.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+-- 
+1.7.2.dirty
