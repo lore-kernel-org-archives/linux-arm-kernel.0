@@ -1,33 +1,77 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 29 Dec 2010 14:40:55 -0700
-Subject: [PATCH 1/9] spi/pxa2xx: register driver properly
-In-Reply-To: <20101229212635.GA31347@www.tglx.de>
-References: <20101229081120.GN8172@angua.secretlab.ca>
-	<349566.41372.qm@web180301.mail.gq1.yahoo.com>
-	<20101229212635.GA31347@www.tglx.de>
-Message-ID: <20101229214054.GB15198@angua.secretlab.ca>
+From: daeinki@gmail.com (InKi Dae)
+Date: Thu, 30 Dec 2010 10:23:15 +0900
+Subject: [PATCH 1/5] S5PC110: add MIPI-DSI system register definitions.
+In-Reply-To: <003201cba6f2$6b532a60$41f97f20$%kim@samsung.com>
+References: <1293535562-24715-1-git-send-email-inki.dae@samsung.com>
+	<003201cba6f2$6b532a60$41f97f20$%kim@samsung.com>
+Message-ID: <AANLkTinL3tq7ZGmddBTv2Z=1Sxb+yt6nS7NS1Cu16tVc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 29, 2010 at 10:26:35PM +0100, Sebastian Andrzej Siewior wrote:
-> * David Brownell | 2010-12-29 09:00:36 [-0800]:
-> 
-> >I detect an effort to change the classic model for board initialization in Linux:  first set up
-> >and register all system/platform devices on each
-> >board then do the same for their drivers.  ("hardware first" ... "software second".
-> 
-> What are you suggesting? platform_driver_probe() does not work with
-> hotpluged devices.
+Hello, Mr. Kukjin.
 
-That assumption only holds for certain devices on certain boards.
-platform_device_probe() is a machine specific optimization that I will
-not hesitate to remove if it breaks the driver on other machines.
+I am on vacation until this sunday.
+Could you please give me your reviews?
 
-> I don't see a reason why it should be available to drivers. It is
-> unlikely that platform devices are hotlpluged but not impossible.
+If you give me your comments about my patch series then I will re-work
+them on Monday.
+by doing so, we could save the time.
 
-More and more likely all the time though.  Many drivers use the model
-of registering child platform_devices (for instance, multi function
-devices).
+thank you.
 
-g.
+2010/12/29 Kukjin Kim <kgene.kim@samsung.com>:
+> Inki Dae wrote:
+>>
+> Please keep myself in Cc on this. I already noticed that to you before.
+> I think you should check whether mail loop is suitable or not...
+>
+> And would be better if you could add #0 patch to understand your patches.
+>
+>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+>> ---
+>> ?arch/arm/mach-s5pv210/include/mach/regs-clock.h | ? ?6 +++++-
+>> ?1 files changed, 5 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+> b/arch/arm/mach-
+>> s5pv210/include/mach/regs-clock.h
+>> index ebaabe0..09680d9 100644
+>> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+>> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+>> @@ -146,6 +146,7 @@
+>> ?#define S5P_OM_STAT ? ? ? ? ?S5P_CLKREG(0xE100)
+>> ?#define S5P_USB_PHY_CONTROL ?S5P_CLKREG(0xE80C)
+>> ?#define S5P_DAC_CONTROL ? ? ? ? ? ? ?S5P_CLKREG(0xE810)
+>> +#define S5P_MIPI_DPHY_CONTROL ? ? ? ? ? ? ? ?S5P_CLKREG(0xE814)
+>>
+>> ?#define S5P_INFORM0 ? ? ? ? ?S5P_CLKREG(0xF000)
+>> ?#define S5P_INFORM1 ? ? ? ? ?S5P_CLKREG(0xF004)
+>> @@ -196,7 +197,10 @@
+>> ?#define S5P_OTHERS_USB_SIG_MASK ? ? ? ? ? ? ?(1 << 16)
+>>
+>> ?/* MIPI */
+>> -#define S5P_MIPI_DPHY_EN ? ? ? ? ? ? (3)
+>> +#define S5P_MIPI_DPHY_EN ? ? ? ? ? ? (3 << 0)
+>> +
+>> +/* S5P_MIPI_PHY_CON0 */
+>> +#define S5P_MIPI_M_RESETN ? ? ? ? ? ?(1 << 1)
+>>
+>> ?/* S5P_DAC_CONTROL */
+>> ?#define S5P_DAC_ENABLE ? ? ? ? ? ? ? ? ? ? ? (1)
+>> --
+>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
