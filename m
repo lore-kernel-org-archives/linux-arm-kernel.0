@@ -1,69 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 31 Dec 2010 15:57:41 +0900
-Subject: [PATCH 5/5] S5PC110: add MIPI-DSI based sample lcd panel driver.
-In-Reply-To: <1293535595-24861-1-git-send-email-inki.dae@samsung.com>
-References: <1293535595-24861-1-git-send-email-inki.dae@samsung.com>
-Message-ID: <014101cba8b8$06318ab0$1294a010$%kim@samsung.com>
+From: thara@ti.com (Gopinath, Thara)
+Date: Fri, 31 Dec 2010 13:31:56 +0530
+Subject: [PATCH v6 07/10] OMAP3: PM: Adding T2 enabling of smartreflex
+	support
+In-Reply-To: <87mxnxr1n8.fsf@deeprootsystems.com>
+References: <1292864357-13939-1-git-send-email-thara@ti.com>
+	<1292864357-13939-8-git-send-email-thara@ti.com>
+	<87mxnxr1n8.fsf@deeprootsystems.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0373BA283D@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inki Dae wrote:
-> 
-> this patch addes MIPI-DSI based sample panel driver.
-> to write MIPI-DSI based lcd panel driver, you can refer to
-> this sample driver.
-> 
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> ---
->  drivers/video/Kconfig           |    7 ++
->  drivers/video/Makefile          |    1 +
->  drivers/video/s5p_mipi_sample.c |  220
-> +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 228 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/video/s5p_mipi_sample.c
-> 
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index aa305c5..325ce86 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -2003,6 +2003,13 @@ config S5P_MIPI_DSI
->  	---help---
->  	  This enables support for MIPI-DSI device.
-> 
-> +config S5P_MIPI_SAMPLE
-> +	tristate "Samsung SoC MIPI-DSI based sample driver."
-> +	depends on S5P_MIPI_DSI && BACKLIGHT_LCD_SUPPORT
 
-Do we really need SAMPLE driver?...
-And is this MIPI SAMPLE not MIPI DSIM sample?
 
-> +	default n
-> +	---help---
-> +	  This enables support for MIPI-DSI based sample driver.
-> +
->  config FB_NUC900
->          bool "NUC900 LCD framebuffer support"
->          depends on FB && ARCH_W90X900
-> diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-> index f4baed6..c8ac591 100644
-> --- a/drivers/video/Makefile
-> +++ b/drivers/video/Makefile
-> @@ -117,6 +117,7 @@ obj-$(CONFIG_FB_S3C)		  += s3c-fb.o
->  obj-$(CONFIG_FB_S3C2410)	  += s3c2410fb.o
->  obj-$(CONFIG_S5P_MIPI_DSI)	  += s5p_mipi_dsi.o s5p_mipi_dsi_common.o \
->      					s5p_mipi_dsi_lowlevel.o
-> +obj-$(CONFIG_S5P_MIPI_SAMPLE)		+= s5p_mipi_sample.o
->  obj-$(CONFIG_FB_FSL_DIU)	  += fsl-diu-fb.o
->  obj-$(CONFIG_FB_COBALT)           += cobalt_lcdfb.o
->  obj-$(CONFIG_FB_PNX4008_DUM)	  += pnx4008/
+>>-----Original Message-----
+>>From: Kevin Hilman [mailto:khilman at deeprootsystems.com]
+>>Sent: Thursday, December 23, 2010 2:01 AM
+>>To: Gopinath, Thara
+>>Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>>paul at pwsan.com; Cousson, Benoit; Sripathy, Vishwanath; Sawant, Anand;
+>>Menon, Nishanth
+>>Subject: Re: [PATCH v6 07/10] OMAP3: PM: Adding T2 enabling of smartreflex
+>>support
+>>
+>>Hi Thara,
+>>
+>>Thara Gopinath <thara@ti.com> writes:
+>>
+>>> This patch adds support in the twl4030 driver to enable smartreflex.
+>>> The smartreflex bit on twl4030 needs to be enabled by default
+>>irrespective
+>>> of whether smartreflex module is enabled on the OMAP side or not.
+>>> This is because without this bit enabled the voltage scaling through
+>>> vp forceupdate does not function properly.
+>>
+>>Is this true for OMAP2 as well?
+>>
+>>This patch actually hangs the boot on 2430SDP.
 
-(snip)
+Hello Kevin,
 
-Happy New Year!
-Thanks.
+I tried the latest lo master with smartreflex module compiled in using
+omap2plus_defconfig and this patch on OMAP2430 SDP and it boots
+fine for me. Your pm-core branch does not boot for me with or without this
+patch on OMAP2430 SDP. But then I am not sure if this is needed for OMAP2
+also. Considering this might be a omap and twl4030 dependent setting, my idea is to move this code to mach-omap2/omap_twl.c. I will post a patch for the same shortly.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Thara
