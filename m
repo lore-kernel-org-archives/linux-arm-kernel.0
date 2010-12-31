@@ -1,128 +1,108 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 31 Dec 2010 17:11:41 +0100
-Subject: [PATCH 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20101231014354.GE28246@freescale.com>
-References: <1293548155-16328-1-git-send-email-shawn.guo@freescale.com>
-	<1293548155-16328-9-git-send-email-shawn.guo@freescale.com>
-	<20101229112208.GB14221@pengutronix.de>
-	<20101230055012.GB20651@freescale.com>
-	<20101230091541.GN14221@pengutronix.de>
-	<20101231014354.GE28246@freescale.com>
-Message-ID: <20101231161141.GF14221@pengutronix.de>
+Date: Fri, 31 Dec 2010 17:20:41 +0100
+Subject: [PATCH v2 1/2] ARM i.MX53: Some bug fix about MX53 MSL code
+In-Reply-To: <AANLkTimSKLMYix3NQVWbddCz+jxBhba-a-2U3eZxw7y6@mail.gmail.com>
+References: <1293686881-15046-1-git-send-email-yong.shen@freescale.com>
+	<1293686881-15046-2-git-send-email-yong.shen@freescale.com>
+	<20101230095401.GW14221@pengutronix.de>
+	<AANLkTimSKLMYix3NQVWbddCz+jxBhba-a-2U3eZxw7y6@mail.gmail.com>
+Message-ID: <20101231162041.GH14221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
-
-On Fri, Dec 31, 2010 at 09:43:55AM +0800, Shawn Guo wrote:
-> On Thu, Dec 30, 2010 at 10:15:41AM +0100, Uwe Kleine-K?nig wrote:
-> > Hello Shawn,
-> > 
-> > On Thu, Dec 30, 2010 at 01:50:12PM +0800, Shawn Guo wrote:
-> > > On Wed, Dec 29, 2010 at 12:22:08PM +0100, Uwe Kleine-K?nig wrote:
-> > > > On Tue, Dec 28, 2010 at 10:55:53PM +0800, Shawn Guo wrote:
-> > > > > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
-> > > > > new file mode 100644
-> > > > > index 0000000..24457d7
-> > > > > --- /dev/null
-> > > > > +++ b/arch/arm/mach-mxs/ocotp.c
-> > > > > @@ -0,0 +1,52 @@
-> > > > > +/*
-> > > > > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> > > > > + *
-> > > > > + * This program is free software; you can redistribute it and/or modify
-> > > > > + * it under the terms of the GNU General Public License as published by
-> > > > > + * the Free Software Foundation; either version 2 of the License, or
-> > > > > + * (at your option) any later version.
-> > > > > + *
-> > > > > + * This program is distributed in the hope that it will be useful,
-> > > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > > > + * GNU General Public License for more details.
-> > > > > + */
-> > > > > +
-> > > > > +#include <linux/delay.h>
-> > > > > +#include <linux/err.h>
-> > > > > +
-> > > > > +#include <mach/mxs.h>
-> > > > > +
-> > > > > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
-> > > > > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
-> > > > > +
-> > > > > +int mxs_read_ocotp(int offset, int count, u32 *values)
-> > > > > +{
-> > > > > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
-> > > > > +	int i, timeout = 0x400;
-> > > > > +
-> > > > > +	/* open OCOTP banks for read */
-> > > > > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-> > > > The reference manual specifies:
-> > > > 	1. Program the HCLK to a frequency up to the maximum allowable HCLK
-> > > > 	   frequency. [...]
-> > > > 	2. Check that HW_OCOTP_CTRL_BUSY and HW_OCOTP_CTRL_ERROR are clear.
-> > > > 	3. Set HW_OCOTP_CTRL_RD_BANK_OPEN. [...]
-> > > > 
-> > > > 1. isn't done (which is probably OK, or should it aquire a clk?)
-> > > > For 2. there is no check for HW_OCOTP_CTRL_ERROR which is not OK i
-> > > > guess?!
-> > > > 
-> > > Will add the check. Thanks.
-> > > 
-> > > > (Independant of that, shouldn't the list use BM_ prefixes as you did in
-> > > > the code?)
-> > > > 
-> > > Document description uses register name followed by bit-field name
-> > > to mean the bit.
-> > After rereading chapter 39.4 (Register Macro Usage/Naming Convention)
-> > I wonder if the BM_ values are shifted or not.  If they are not (as I
-> > think it is meant) your usage is inconsitent with the manual (but IMHO
-> > sane).  sigh.
-> > 
-> They are shifted. You can check regs-clkctrl-mx28.h as an example.
-> 
-> > > > > +	/* approximately wait 32 hclk cycles */
-> > > > > +	udelay(1);
-> > > > > +
-> > > > > +	/* poll BUSY bit becoming cleared */
-> > > > > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
-> > > > > +		/* nothing */;
-> > > > > +
-> > > > > +	if (unlikely(!timeout))
-> > > > > +		goto error;
-> > > > And I think you should recheck for BM_OCOTP_CTRL_RD_BANK_OPEN here (step
-> > > > 4 from the reference manual).
-> > > > 
-> > > The RM says:
-> > > 
-> > > Poll for HW_OCOTP_CTRL_BUSY clear. When HW_OCOTP_CTRL_BUSY is clear
-> > > and HW_OCOTP_CTRL_RD_BANK_OPEN is set, read the data from the
-> > > appropriate memory-mapped address.
-> > > 
-> > > My understanding is we only need to poll busy bit clear. And the
-> > > second sentence just tells that read operation should be working
-> > > when bit busy clear and rd_bank_open set, which has been done
-> > > in step 3. I also consulted the designer and was told that only
-> > > busy clear polling is needed.
-> > I expected to need this (shortend the names to improve readability):
-> > 
-> IMHO, BM_OCOTP_CTRL_BUSY is more readable than BUSY. Reader can
-> understand which bit it is more easily than BUSY.
-I only shortend it for the mail.  For a patch of course use the full
-name.
+Hi Yong[1],
+On Fri, Dec 31, 2010 at 10:31:30AM +0800, Yong Shen wrote:
+> 2010/12/30 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > On Thu, Dec 30, 2010 at 01:28:00PM +0800, yong.shen at freescale.com wrote:
+> >> From: Yong Shen <yong.shen@linaro.org>
+> >>
+> >> 1. pll_base address should return right value
+> >> 2. uart parent clk is from pll3
+> >> 3. add cpu_is_mx53 definition
+> >>
+> >> Signed-off-by: Yong Shen <yong.shen@linaro.org>
+> >> ---
+> >> ?arch/arm/mach-mx5/clock-mx51-mx53.c ?| ? ?7 ++++---
+> >> ?arch/arm/mach-mx5/crm_regs.h ? ? ? ? | ? ?4 ++++
+> >> ?arch/arm/plat-mxc/include/mach/mxc.h | ? 15 +++++++++++++--
+> >> ?3 files changed, 21 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> >> index 9fc65bb..6db69db 100644
+> >> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+> >> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> >> @@ -127,11 +127,11 @@ static inline u32 _get_mux(struct clk *parent, struct clk *m0,
+> >> ?static inline void __iomem *_get_pll_base(struct clk *pll)
+> >> ?{
+> >> ? ? ? if (pll == &pll1_main_clk)
+> >> - ? ? ? ? ? ? return MX51_DPLL1_BASE;
+> >> + ? ? ? ? ? ? return cpu_is_mx51() ? MX51_DPLL1_BASE : MX53_DPLL1_BASE;
+> >> ? ? ? else if (pll == &pll2_sw_clk)
+> >> - ? ? ? ? ? ? return MX51_DPLL2_BASE;
+> >> + ? ? ? ? ? ? return cpu_is_mx51() ? MX51_DPLL2_BASE : MX53_DPLL2_BASE;
+> >> ? ? ? else if (pll == &pll3_sw_clk)
+> >> - ? ? ? ? ? ? return MX51_DPLL3_BASE;
+> >> + ? ? ? ? ? ? return cpu_is_mx51() ? MX51_DPLL3_BASE : MX53_DPLL3_BASE;
+> >> ? ? ? else if (pll == &mx53_pll4_sw_clk)
+> >> ? ? ? ? ? ? ? return MX53_DPLL4_BASE;
+> >> ? ? ? else
+> > hmmm, not nice. ?I assume Sascha won't take that.
+> Since the file name is clock-mx51-mx53.c, so this file is supposed to
+> contain clock information either for mx51 or mx53. And you can find
+> cpu_is_mx5x() is widely used across the file for this purpose, which
+> is way I also adapt it in this function. So IMHO, I guess this is the
+> straight way to add it with little code changes. Please correct me.
+little code changes are not always the first goal.  Note that this code
+results in a runtime choice, it would be nicer to have a dedicated
+function for mx51 and mx53 each and set pointers to the respective
+function.  OTOH this is not a hot path.
  
-> > 	while (__raw_readl(ocotp_base) & BUSY) && --timeout);
-> > 
-> > 	if (unlikely((__raw_readl(ocotp_base) & (BUSY | RDBOPEN)) != RDBOPEN))
-> > 		goto error_unlock;
-> > 
-> I still did not get it. When we set bit RDBOPEN in step 3, it gets set.
-> That is it. Why do we still need to bother the unnecessary checking?
-That's how I interpret the hardware reference.  And note, registers are
-not memory.  Just because you write a value to it it doesn't mean it is
-set when you reread it.
+> >> --- a/arch/arm/plat-mxc/include/mach/mxc.h
+> >> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
+> >> @@ -126,7 +126,7 @@ extern unsigned int __mxc_cpu_type;
+> >> ?# define cpu_is_mx35() ? ? ? ? ? ? ? (0)
+> >> ?#endif
+> >>
+> >> -#ifdef CONFIG_ARCH_MX5
+> >> +#ifdef CONFIG_ARCH_MX51
+> >> ?# ifdef mxc_cpu_type
+> >> ?# ?undef mxc_cpu_type
+> >> ?# ?define mxc_cpu_type __mxc_cpu_type
+> >> @@ -134,11 +134,22 @@ extern unsigned int __mxc_cpu_type;
+> >> ?# ?define mxc_cpu_type MXC_CPU_MX51
+> >> ?# endif
+> >> ?# define cpu_is_mx51() ? ? ? ? ? ? ? (mxc_cpu_type == MXC_CPU_MX51)
+> >> -# define cpu_is_mx53() ? ? ? ? ? ? ? (mxc_cpu_type == MXC_CPU_MX53)
+> >> ?#else
+> >> ?# define cpu_is_mx51() ? ? ? ? ? ? ? (0)
+> >> ?#endif
+> >>
+> >> +#ifdef CONFIG_ARCH_MX53
+> >> +# ifdef mxc_cpu_type
+> >> +# ?undef mxc_cpu_type
+> >> +# ?define mxc_cpu_type __mxc_cpu_type
+> >> +# else
+> >> +# ?define mxc_cpu_type MXC_CPU_MX53
+> >> +# endif
+> >> +# define cpu_is_mx53() ? ? ? ? ? ? ? (mxc_cpu_type == MXC_CPU_MX53)
+> >> +#else
+> >> +# define cpu_is_mx53() ? ? ? ? ? ? ? (0)
+> >> +#endif
+> >> +
+> >> ?#ifdef CONFIG_ARCH_MXC91231
+> >> ?# ifdef mxc_cpu_type
+> >> ?# ?undef mxc_cpu_type
+> > This hunk is also included in one of Richard's patches for mx50.
+> Since Richard's patches are not in the tree so far, so I can not
+> develop my patch based on his code, which is why there are some
+> duplicated code here. But I guess it should not be an issue, since
+> maintainer can easily resolve this conflict when merging this patch.
+This was only meant as hint to make you, Richard and Sascha aware of it.
 
-Best regards and happy new year (don't know if you have that? :-)
+Best regards and happy new year,
 Uwe
+
+[1] I hope this is the right part of your name to address you.
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
