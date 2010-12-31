@@ -1,78 +1,128 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Dec 2010 18:23:25 +0000
-Subject: [PATCH] ARM: add PrimeCell generic DMA to PL011
-In-Reply-To: <AANLkTi=uhMyDySAxbZK4XKU6Z4AbkjVc29L4idc0sxLf@mail.gmail.com>
-References: <1286357526-5570-1-git-send-email-linus.walleij@stericsson.com>
-	<20101222141006.GA19852@n2100.arm.linux.org.uk>
-	<AANLkTi=uhMyDySAxbZK4XKU6Z4AbkjVc29L4idc0sxLf@mail.gmail.com>
-Message-ID: <20101231182325.GA5012@n2100.arm.linux.org.uk>
+Date: Fri, 31 Dec 2010 21:50:18 +0000
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTikP+JZkN7AjqaNfHY8jZ7bVsV-af=YR=MTdfnNU@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<20101221182037.GA4783@n2100.arm.linux.org.uk>
+	<20101222122904.GC14693@n2100.arm.linux.org.uk>
+	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+	<20101223001012.GF29368@n2100.arm.linux.org.uk>
+	<AANLkTimirgsuoM2che_ocrkvCZqGu6xEJjrjdmt9-69p@mail.gmail.com>
+	<AANLkTikP+JZkN7AjqaNfHY8jZ7bVsV-af=YR=MTdfnNU@mail.gmail.com>
+Message-ID: <20101231215018.GB5012@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 22, 2010 at 06:09:22PM +0100, Linus Walleij wrote:
-> There *may* be a corner case when you're transferring
-> an even multiple of the burst size though, then you can
-> *maybe* get into the situation you're describing. Such as
-> paste a buffer with n MOD 8 bytes, but I haven't
-> been able to provoke it :-/ (and no hardware here sadly).
+On Wed, Dec 22, 2010 at 05:31:25PM -0800, Dan Williams wrote:
+> On Wed, Dec 22, 2010 at 5:11 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> > Drivers that do not
+> > want to meet the constraints expected by the opportunistic offload
+> > clients should do what ste_dma40 does and add "depends on !(NET_DMA ||
+> > ASYNC_TX_DMA)"
+> 
+> Sorry I was looking at a local change it does not do this today, but I
+> recommended it to workaround the broken >64k transfer support that was
+> reported recently.
 
-This will only happen if you send all 8 bytes without triggering a
-RTIM interrupt, and your DMA controller reads all 8 bytes upon receiving
-the burst request.
+Dan,
 
-If you send 4 bytes, pause, 4 bytes, and your DMA is only transferring
-when 8 bytes have been received then you won't see the problem (as after
-the first four bytes are received, you'll get a RTIM interrupt, and
-another RTIM after the second group of four bytes.
+Is there any documentation on the DMA engine APIs than what's in
+crypto/async-tx-api.txt?
 
-I'm not sure that I'd trust pasting characters into a terminal to
-guarantee that we receive all 8 bytes as a single back-to-back burst.
+Reason for asking is that there's no way at the moment to tell what the
+expectations are from a lot of the DMA engine support code - and that is
+_very_ bad news if you want DMA engine drivers to behave the same.
 
-echo -n 01234567 >/dev/ttySn
+I can already see that drivers on both sides of the DMA engine API have
+different expectations between their respective implementations, and this
+is just adding to confusion.
 
-where /dev/ttySn is the uart on your host PC to which your terminal
-program is attached.  If you can't provoke it with fast baud rates,
-try slowing down the baud rate so the 32-bit period takes longer to
-expire - your DMA controller may not be reading all data from the
-FIFO before this period expires, thereby allowing the RTIM interrupt
-to occur.
+For instance, the sequence in a driver:
 
-Note: I've no idea how the ST Micro parts operate - you're setting the
-DMA threshold to 16 bytes, yet the FIFO is 64 bytes, but you're asking
-the DMA controller to do bursts of 32 bytes.  What's the effect of
-IFLS on the DMA thesholds too?  Does that result in the DMA BREQ
-signal only being activated after 32 bytes and the ST_UART011_DMAWM
-register being ignored?  If so that could mean you need to send 32
-bytes instead of 8.  Or maybe it's 16 bytes?
+	desc = dmadev->device_prep_slave_sg(chan, ...);
+	if (!desc)
+		/* what DMA engine cleanup is expected here? */
+
+	cookie = dmaengine_submit(desc);
+	if (dma_submit_error(cookie))
+		/* what DMA engine cleanup of desc is expected here? */
+
+Note: I don't trust what's written in 3.3 of async-tx-api.txt, because
+that seems to be talking about the the async_* APIs rather than the
+DMA engine API. (see below.)
+
+1. Is it valid to call dmaengine_terminate_all(chan) in those paths?
+
+2. What is the expectations wrt the callback of a previously submitted
+   job at the point that dmaengine_terminate_all() returns?
+
+3. What if the callback is running on a different CPU, waiting for a
+   spinlock you're holding at the time you call dmaengine_terminate_all()
+   within that very same spinlock?
+
+4. What if dmaengine_terminate_all() is running, but parallel with it
+   the tasklet runs on a different CPU, and queues another DMA job?
+
+These can all be solved by requiring that the termination implementations
+call tasklet_disable(), then clean up the DMA state, followed by
+tasklet_enable().  tasklet_disable() will prevent the tasklet being
+scheduled, and wait for the tasklet to finish running before proceeding.
+This means that (2) becomes "the tasklet will not be running", (3)
+becomes illegal (due to deadlock), and (4) becomes predictable as we
+know that after tasklet_disable() we have consistent DMA engine state
+and we can terminate everything that's been queued.
+
+That still leaves the issue of (1), and also what cleanup is expected.
 
 
-Anyway, this is easy to work around.  Let's assume a 16-byte FIFO for
-everything that follows.
+I'm not entirely clear about the usage of DMA_CTRL_ACK:
+ * @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the client
+ *  acknowledges receipt, i.e. has has a chance to establish any dependency
+ *  chains
 
-Set a threshold of 8 characters for the DMA burst request to be triggered
-in the PL011 and set the DMA to transfer a burst of 4 bytes.  This will
-guarantee that bytes are left in the PL011 FIFO, which means we have the
-conditions for the PL011 to generate a RTIM interrupt when there's a
-pause of 32 bit times in the transmission no matter what.
+Some DMA engine using drivers set DMA_CTRL_ACK, others don't.
 
-In your RTIM interrupt handler, you disable and read data from the DMA
-buffer as before.  However, you also check for characters in the FIFO
-and empty those into the TTY buffers before re-enabling DMA.
+Should drivers using prep_slave_sg() be requesting their descriptors
+with DMA_CTRL_ACK in the flags argument?  Doesn't that mean that the
+DMA engine driver is free to re-use this descriptor beneath the driver?
 
-What this means is that the DMA engine controller _absolutely_ _must_
-respect the requested burst size and never transfer anything but the
-requested burst size per burst request.  If the DMA engine controller
-it is unable to make this guarantee, we need some way of ensuring that
-the PL011 driver will never use RX DMA.
+Almost no one checks the result of dmaengine_submit() (or its open-coded
+equivalent).  Are all such drivers potentially leaking descriptors?  If
+not, how are the failed descriptors re-used?
 
-In other words:
-- if you make use of the PL011's SREQ signal for the RX path, you lose.
-- if you DMA 8 or more characters per BREQ for the RX path, you lose.
+Also, I think that the DMA engine core code needs to provide some
+essential helper functions to prevent buggy bodgerations such as
+what's happening in amba-pl08x.c, such as:
 
-Lastly, I've confirmed what's going on on the PB926 - the PL080 DMA
-controller is definitely violating the statement in B.4.1 below figure
-B-3.  However, it's rather iffy that this is in an appendix rather than
-the main text describing the behaviour of the DMA controller - given
-the observed behaviour I believe this paragraph has been accidentally
-left in the documentation.  This at least explains why it doesn't work
-- and can _never_ work on this platform.
+dma_cookie_t dmaengine_alloc_cookie(struct dma_async_tx_descriptor *tx)
+{
+	struct dma_chan *chan = tx->chan;
+
+	chan->cookie += 1;
+	if (chan->cookie < 0)
+		chan->cookie = 1;
+	return (tx->cookie = chan->cookie);
+}
+
+What should be the initial value of tx->cookie after a successful
+prep_slave_sg() call?
+
+Also a helper function for dmaengine drivers to call when a descriptor
+is complete to handle all the tx descriptor cleanup on completion, so
+that all dmaengine drivers don't have to re-implement the cleanup in
+their own ways, each with differing behaviour.  (Can the TX desciptor
+structure be expanded to hold all the information needed so that core
+code can implement the DMA unmapping for the asynctx stuff there?)
+
+I think that's enough to think about for the time being - I'm sure
+there's lots more...
+
+As it is, even if I thought trying to fix the PL08x driver was worth the
+effort (in spite of the hardware issues), I don't think there's enough
+documentation on the DMA engine API to be able to do so at the present
+time.
+
+So, given all these questions (some of which can lead to deadlocks), and
+we're now at -rc8, I see no way that I can sanely (or safely) queue up
+the PL011 UART and PL180 MMCI DMA engine code for this coming merge
+window.  (Sorry Linus.)
