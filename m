@@ -1,49 +1,41 @@
-From: thara@ti.com (Gopinath, Thara)
-Date: Fri, 31 Dec 2010 13:31:56 +0530
-Subject: [PATCH v6 07/10] OMAP3: PM: Adding T2 enabling of smartreflex
-	support
-In-Reply-To: <87mxnxr1n8.fsf@deeprootsystems.com>
-References: <1292864357-13939-1-git-send-email-thara@ti.com>
-	<1292864357-13939-8-git-send-email-thara@ti.com>
-	<87mxnxr1n8.fsf@deeprootsystems.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0373BA283D@dbde02.ent.ti.com>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Fri, 31 Dec 2010 02:39:25 -0800
+Subject: [PATCH] GIC: Assign correct flow handler type in set_type callback
+In-Reply-To: <AANLkTimA8ZP4WL8u0Uvtt-0MWXPkGfjwQ7437pL-h0D-@mail.gmail.com>
+References: <1293686960-12581-1-git-send-email-adharmap@codeaurora.org>
+	<AANLkTimA8ZP4WL8u0Uvtt-0MWXPkGfjwQ7437pL-h0D-@mail.gmail.com>
+Message-ID: <4D1DB2DD.3020701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
->>-----Original Message-----
->>From: Kevin Hilman [mailto:khilman at deeprootsystems.com]
->>Sent: Thursday, December 23, 2010 2:01 AM
->>To: Gopinath, Thara
->>Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->>paul at pwsan.com; Cousson, Benoit; Sripathy, Vishwanath; Sawant, Anand;
->>Menon, Nishanth
->>Subject: Re: [PATCH v6 07/10] OMAP3: PM: Adding T2 enabling of smartreflex
->>support
+On 12/29/2010 10:27 PM, Rabin Vincent wrote:
+> On Thu, Dec 30, 2010 at 10:59 AM, Abhijeet Dharmapurikar
+> <adharmap@codeaurora.org>  wrote:
+>> There are some interrupts that are true edge triggered in nature. If not
+>> marked IRQ_PENDING, when disabled, they will be lost.
 >>
->>Hi Thara,
+>> Use the set_type callback to assign the correct flow type handler for
+>> shared peripheral interrupts.
 >>
->>Thara Gopinath <thara@ti.com> writes:
->>
->>> This patch adds support in the twl4030 driver to enable smartreflex.
->>> The smartreflex bit on twl4030 needs to be enabled by default
->>irrespective
->>> of whether smartreflex module is enabled on the OMAP side or not.
->>> This is because without this bit enabled the voltage scaling through
->>> vp forceupdate does not function properly.
->>
->>Is this true for OMAP2 as well?
->>
->>This patch actually hangs the boot on 2430SDP.
+>> Signed-off-by: Abhijeet Dharmapurikar<adharmap@codeaurora.org>
+>> ---
+>> This came to light when a edge triggered interrupt was supposed to wakeup the
+>> sytem. The flow handler was set to the default handle_level_irq. On the resume
+>> path the flow handler was invoked right after the I bit was cleared but before
+>> each individual interrupts were enabled. This made the handle_level_irq ignore
+>
+> Why does the flow handler hit when the interrupt is disabled?  Have you set
+> IRQF_NOSUSPEND on this interrupt?
+>
+Since GIC doesnt have disable callback it implements lazy disabling. The 
+interrupt is only marked IRQ_DISABLED in the descriptor but is not 
+masked in the GIC. Hence the interrupt flow handler is hit.
 
-Hello Kevin,
+Now that I re-read the code setting IRQF_NO_SUSPEND would fix the issue. 
+But shouldnt set_irq_wake() do something similar?
 
-I tried the latest lo master with smartreflex module compiled in using
-omap2plus_defconfig and this patch on OMAP2430 SDP and it boots
-fine for me. Your pm-core branch does not boot for me with or without this
-patch on OMAP2430 SDP. But then I am not sure if this is needed for OMAP2
-also. Considering this might be a omap and twl4030 dependent setting, my idea is to move this code to mach-omap2/omap_twl.c. I will post a patch for the same shortly.
+Do I need to request IRQF_NO_SUSPEND for all the interrupts that could 
+possibly wakeup the system - seems a bit unnecessary. IMO the interrupt 
+should not be disabled if it is marked IRQF_NO_SUPEND || IRQ_WAKEUP is set.
 
-Regards
-Thara
+Abhijeet
