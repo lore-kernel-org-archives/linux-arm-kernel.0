@@ -1,52 +1,41 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 1 Jan 2011 19:58:03 +0530
-Subject: [PATCH] mmci: call flush_dcache_page() outside of atomic kmap
-In-Reply-To: <20110101120539.GA25924@n2100.arm.linux.org.uk>
-References: <1293878168-12741-1-git-send-email-rabin@rab.in>
-	<20110101120539.GA25924@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimhoS6iNVH-GMWJkyaLYarBapD3eL-OXVS58Xm-@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 1 Jan 2011 15:15:45 +0000
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<20101221182037.GA4783@n2100.arm.linux.org.uk>
+	<20101222122904.GC14693@n2100.arm.linux.org.uk>
+	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+Message-ID: <20110101151545.GC25924@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 1, 2011 at 5:35 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Jan 01, 2011 at 04:06:08PM +0530, Rabin Vincent wrote:
->> It's the WARN_ON(!irqs_disabled()) in sg_miter_stop():
->>
->> ? ? ? ? ? ? ? ? if (miter->__flags & SG_MITER_ATOMIC) {
->> ? ? ? ? ? ? ? ? ? ? ? ? WARN_ON(!irqs_disabled());
->> ? ? ? ? ? ? ? ? ? ? ? ? kunmap_atomic(miter->addr, KM_BIO_SRC_IRQ);
->> ? ? ? ? ? ? ? ? }
->>
->> This is because if the cache is VIVT, flush_dcache_page() calls
->> __flush_dcache_aliases() when a user space mapping exists. ?That
->> function uses flush_dcache_mmap_unlock() which is spin_unlock_irq(),
->> which enables interrupts. ? Fix this by calling flush_dcache_page() only
->> after the sg_miter is stopped.
->
-> I think there's some questions that need to be answered here first:
->
-> 1. Why does this not trigger on real PB926 hardware?
+On Wed, Dec 22, 2010 at 03:45:39PM -0800, Dan Williams wrote:
+> Support for the DMA_COMPL flags are necessary if the DMA_MEMCPY
+> capability is advertised, yes this driver got this wrong.  I'll update
+> the documentation to make this requirement clear, and audit the other
+> drivers.  With slave-only drivers the only usage model is one where
+> the client driver owns dma-mapping.  In the non-slave (opportunistic
+> memcpy offload) case the client is unaware of the engine so the driver
+> owns unmapping.  The minimal fix is to disable memcpy offload.
 
-Normal read/write does not trigger this, it only happens when a file on
-the SD card is executed (in my case it first happens when a page in
-init's data segment is faulted in) .  Has rootfs-on-SD been tried on
-real PB926 hardware after the conversion to the sg_miter API?
+As a side note, the DMA mapping for slaves should be done using the
+DMA struct device, not the struct device of the peripheral making use
+of the DMA engine.
 
-> 2. Why the hell is a page being submitted which is mapped into userspace
-> ? yet has not already been populated with data from the card?
->
-> (2) is a serious error, what it means is that userspace can access the
-> data which was _previously_ in the page before the page has been read
-> with the required data.
+Why?  The slave device has no knowledge of how the DMA engine is
+connected into the system, or the DMA parameters associated with the
+device performing the DMA, such as the DMA mask and boundaries.  (If
+there are several generic DMA agents in the system, it can't know
+which is the correct one to use until a channel has been allocated.)
+The only struct device which has this information is the one for the
+DMA engine itself.
 
-flush_dcache_page() checks mapping_mapped(page->mapping).  This returns
-true if any pages from the file are mapped into userspace, not only if
-this particular page is mapped.
+Therefore, the struct device which is passed into the DMA mapping APIs
+to prepare memory for DMA must always be the DMA engine struct device
+(chan->device->dev) and never the slave struct device.
 
-When init starts, its text section is mapped in to user space, after
-which any mapping_mapped() check on any pages from init will return
-true.  When init tries to access some data, the page is faulted in, and
-flush_dcache_page() on this page leads to __flush_dcache_aliases() being
-executed, because mapping_mapped() returned true.  This page is not
-mapped into userspace until later (as expected).
+This is no different from USB - consider the slave devices to be USB
+peripherals, and the DMA engine device to be the USB host controller.
+The USB host controller performs all the DMA, and DMA mappings are
+setup and torn down against the DMA host controller device structure.
