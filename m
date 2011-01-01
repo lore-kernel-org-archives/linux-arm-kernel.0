@@ -1,33 +1,57 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 2 Jan 2011 10:50:46 +0530
-Subject: [PATCH] mmci: call flush_dcache_page() outside of atomic kmap
-In-Reply-To: <AANLkTi=tt+thNTaPQCTYukpX6b0ZF5zVixDH27ZNwDMV@mail.gmail.com>
-References: <1293878168-12741-1-git-send-email-rabin@rab.in>
-	<20110101120539.GA25924@n2100.arm.linux.org.uk>
-	<AANLkTimhoS6iNVH-GMWJkyaLYarBapD3eL-OXVS58Xm-@mail.gmail.com>
-	<20110101221309.GA2653@n2100.arm.linux.org.uk>
-	<AANLkTikr6DFqq44aYuur_p5mJ0r3=d93ATBp=z71Aayz@mail.gmail.com>
-	<AANLkTi=tt+thNTaPQCTYukpX6b0ZF5zVixDH27ZNwDMV@mail.gmail.com>
-Message-ID: <AANLkTin0LrGBGDkMOaxQ4qw3Zbw_RLRzQSRd1EzHbpF7@mail.gmail.com>
+Date: Sat, 1 Jan 2011 15:42:34 +0530
+Subject: [PATCH] mmci: don't flush the dcache
+Message-ID: <mailman.101.1293945649.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 2, 2011 at 10:41 AM, Rabin Vincent <rabin@rab.in> wrote:
-> On Sun, Jan 2, 2011 at 10:08 AM, Rabin Vincent <rabin@rab.in> wrote:
->> On Sun, Jan 2, 2011 at 3:43 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> Err, hang on. ?The sg iter API uses flush_kernel_dcache_page(), not
->>> flush_dcache_page(). ?flush_kernel_dcache_page() is not expected to
->>> touch userspace mappings.
->>>
->>> On ARM, we don't implement flush_kernel_dcache_page() because it's
->>> not required (see commit f8b63c1.) ?Essentially, because we now consider
->>> freshly created page cache pages dirty, we always flush them before we
->>> map them into userspace, so a call to flush_kernel_dcache_page() has
->>> nothing to do.
->>
->> This email thread was never about the flush_kernel_dcache_page() in the
->> sg_miter API. ?It's about the flush_dcache_page() in MMCI.
->
-> This flush_dcache_page() can also be removed because of what you mention
-> above, right?
+Since freshly created page cache pages are considered dirty and are
+always flushed before they are mapped into userspace, and an
+already-mapped page will never be passed to be read into by the mmci
+driver, remove the flush_dcache_page() calls.
+
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ drivers/mmc/host/mmci.c |   19 -------------------
+ 1 files changed, 0 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 0814b88..ccbbc18 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -284,22 +284,6 @@ mmci_data_irq(struct mmci_host *host, struct
+mmc_data *data,
+ 		/* Force-complete the transaction */
+ 		host->blockend =3D true;
+ 		host->dataend =3D true;
+-
+-		/*
+-		 * We hit an error condition.  Ensure that any data
+-		 * partially written to a page is properly coherent.
+-		 */
+-		if (data->flags & MMC_DATA_READ) {
+-			struct sg_mapping_iter *sg_miter =3D &host->sg_miter;
+-			unsigned long flags;
+-
+-			local_irq_save(flags);
+-			if (sg_miter_next(sg_miter)) {
+-				flush_dcache_page(sg_miter->page);
+-				sg_miter_stop(sg_miter);
+-			}
+-			local_irq_restore(flags);
+-		}
+ 	}
+
+ 	/*
+@@ -530,9 +514,6 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id)
+ 		if (remain)
+ 			break;
+
+-		if (status & MCI_RXACTIVE)
+-			flush_dcache_page(sg_miter->page);
+-
+ 		status =3D readl(base + MMCISTATUS);
+ 	} while (1);
+
+--=20
+1.7.2.3
