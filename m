@@ -1,69 +1,64 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Jan 2011 15:36:40 +0000
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-	<20101221182037.GA4783@n2100.arm.linux.org.uk>
-	<20101222122904.GC14693@n2100.arm.linux.org.uk>
-	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-Message-ID: <20110101153640.GD25924@n2100.arm.linux.org.uk>
+Date: Sat, 1 Jan 2011 22:13:09 +0000
+Subject: [PATCH] mmci: call flush_dcache_page() outside of atomic kmap
+In-Reply-To: <AANLkTimhoS6iNVH-GMWJkyaLYarBapD3eL-OXVS58Xm-@mail.gmail.com>
+References: <1293878168-12741-1-git-send-email-rabin@rab.in>
+	<20110101120539.GA25924@n2100.arm.linux.org.uk>
+	<AANLkTimhoS6iNVH-GMWJkyaLYarBapD3eL-OXVS58Xm-@mail.gmail.com>
+Message-ID: <20110101221309.GA2653@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 22, 2010 at 03:45:39PM -0800, Dan Williams wrote:
-> Support for the DMA_COMPL flags are necessary if the DMA_MEMCPY
-> capability is advertised, yes this driver got this wrong.  I'll update
-> the documentation to make this requirement clear, and audit the other
-> drivers.  With slave-only drivers the only usage model is one where
-> the client driver owns dma-mapping.  In the non-slave (opportunistic
-> memcpy offload) case the client is unaware of the engine so the driver
-> owns unmapping.  The minimal fix is to disable memcpy offload.
+On Sat, Jan 01, 2011 at 07:58:03PM +0530, Rabin Vincent wrote:
+> On Sat, Jan 1, 2011 at 5:35 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Sat, Jan 01, 2011 at 04:06:08PM +0530, Rabin Vincent wrote:
+> >> It's the WARN_ON(!irqs_disabled()) in sg_miter_stop():
+> >>
+> >> ? ? ? ? ? ? ? ? if (miter->__flags & SG_MITER_ATOMIC) {
+> >> ? ? ? ? ? ? ? ? ? ? ? ? WARN_ON(!irqs_disabled());
+> >> ? ? ? ? ? ? ? ? ? ? ? ? kunmap_atomic(miter->addr, KM_BIO_SRC_IRQ);
+> >> ? ? ? ? ? ? ? ? }
+> >>
+> >> This is because if the cache is VIVT, flush_dcache_page() calls
+> >> __flush_dcache_aliases() when a user space mapping exists. ?That
+> >> function uses flush_dcache_mmap_unlock() which is spin_unlock_irq(),
+> >> which enables interrupts. ? Fix this by calling flush_dcache_page() only
+> >> after the sg_miter is stopped.
+> >
+> > I think there's some questions that need to be answered here first:
+> >
+> > 1. Why does this not trigger on real PB926 hardware?
+> 
+> Normal read/write does not trigger this, it only happens when a file on
+> the SD card is executed (in my case it first happens when a page in
+> init's data segment is faulted in) .  Has rootfs-on-SD been tried on
+> real PB926 hardware after the conversion to the sg_miter API?
+> 
+> > 2. Why the hell is a page being submitted which is mapped into userspace
+> > ? yet has not already been populated with data from the card?
+> >
+> > (2) is a serious error, what it means is that userspace can access the
+> > data which was _previously_ in the page before the page has been read
+> > with the required data.
+> 
+> flush_dcache_page() checks mapping_mapped(page->mapping).  This returns
+> true if any pages from the file are mapped into userspace, not only if
+> this particular page is mapped.
+> 
+> When init starts, its text section is mapped in to user space, after
+> which any mapping_mapped() check on any pages from init will return
+> true.  When init tries to access some data, the page is faulted in, and
+> flush_dcache_page() on this page leads to __flush_dcache_aliases() being
+> executed, because mapping_mapped() returned true.  This page is not
+> mapped into userspace until later (as expected).
 
-Another point - the example code in async-tx-api.txt section 3.7 is
-a very bad example.  It doesn't show how the result of one operation
-is passed to the next operation, as the source and destination for
-each operation is passed in separately.  It actually won't even
-compile because of this declaration:
+Err, hang on.  The sg iter API uses flush_kernel_dcache_page(), not
+flush_dcache_page().  flush_kernel_dcache_page() is not expected to
+touch userspace mappings.
 
-        addr_conv_t addr_conv[xor_src_cnt];
-        addr_conv_t addr_conv[NDISKS];
-
-Neither of these are used in the example.
-
-On the subject of chained operations, I really don't see how this can
-hope to work with the DMA API.  Using the example provided there:
-
-	async_xor(dst, src, ...)
-	async_memcpy
-	async_xor(dst, src, ...)
-	async_tx_issue_pending_all
-
-Let's assume that the operations start running when we call
-async_tx_issue_pending_all(), and the two XOR operations reuse the same
-buffers.
-
-The first async_xor() dma_map_page()'s the source and destination buffers.
-At this point, the ownership of these buffers passes to the DMA device.
-
-When we get to the second async_xor(), as we haven't started to run any
-of these operations, the source and destination buffers are still mapped.
-However, we ignore that and call dma_map_page() on them again - this is
-illegal because the CPU does not own these buffers.
-
-Moreover, when the first XOR operation completes, it will unmap the
-buffers (which returns ownership of the buffer to the CPU), but
-continues with the second XOR operation on a now unmapped buffer.
-
-If there is an IOMMU between the DMA engine peripheral and memory, then
-this is going to be really vile.  As it is, I don't think this is going
-to be reliable on ARM as we're destroying the ownership rules for DMA
-buffers which we rely heavily upon to prevent effects from speculative
-prefetching.
-
-Last point I've noticed reading through this example and the associated
-code is that the async_xor() maps the destination buffer using
-DMA_BIDIRECTIONAL.  The corresponding unmap (in the DMA engine driver)
-_must_ also be done with DMA_BIDIRECTIONAL (I don't see any drivers
-respecting this.)
-
-Sorry for the number of emails on DMA engine stuff recently...
+On ARM, we don't implement flush_kernel_dcache_page() because it's
+not required (see commit f8b63c1.)  Essentially, because we now consider
+freshly created page cache pages dirty, we always flush them before we
+map them into userspace, so a call to flush_kernel_dcache_page() has
+nothing to do.
