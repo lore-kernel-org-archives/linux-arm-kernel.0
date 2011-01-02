@@ -1,28 +1,26 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Sun, 2 Jan 2011 23:09:36 +0100
-Subject: zaurus bluetooth regression
-In-Reply-To: <20110102203023.GA1545@ucw.cz>
-References: <20110102204532.GA12860@elf.ucw.cz> <20110102203023.GA1545@ucw.cz>
-Message-ID: <AANLkTika7HAEc+BbqSnbo8viUt4nOqoeB69qWZs85-9s@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 2 Jan 2011 23:51:17 +0000
+Subject: bad pmd
+In-Reply-To: <AANLkTi=KiOWUUmdcOtd9uuEWWHunSxsi4bRjkk9aix=5@mail.gmail.com>
+References: <4CF6A7F2.80206@sdgsystems.com>
+	<20101201201440.GD29347@n2100.arm.linux.org.uk>
+	<4CF70607.1010905@sdgsystems.com> <4CFE6E55.1080308@sdgsystems.com>
+	<20101208140210.GC9777@n2100.arm.linux.org.uk>
+	<AANLkTinP=1opPSDMULHn9DDBMVfT15RaZ0K_WAh7JJuz@mail.gmail.com>
+	<AANLkTimatgB15ZLyD_ryVOSfg4s6pHUa0hmRZ9DAmUXP@mail.gmail.com>
+	<AANLkTi=KiOWUUmdcOtd9uuEWWHunSxsi4bRjkk9aix=5@mail.gmail.com>
+Message-ID: <20110102235117.GA17727@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Wed, Dec 29, 2010 at 11:23:18AM -0500, Matt Reimer wrote:
+> On Tue, Dec 28, 2010 at 11:51 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> > Russell,
+> >
+> > Still time for this fix to get into .37?
 
->> It seems this commit
->>
->> commit 7a56aa45982bb87bfca98a2832b5ae782c03364a
-> ...
->> ...is responsible for my bluetooth problems on zaurus -- at least
->> bisect pointed to it, ?as I use 16C950-based bluetooth card, it seems
->> very logical. I'll try 2.6.37-rc8 with that patch reverted...
->>
->
-> And yes, 37-rc8 with that reverted results in working bluetooth, so
-> yrs, that patch is responsible.
+Yes, if someone collects up the acks and queues it in the patch system.
 
-could you tell, what kind of problem you're encountering and if you
-could tell, which flag UART_CAP_EFR or UART_CAP_SLEEP causes the
-problem?
-
-Yegor
+> I've just resent the patch with a proper commit message.
+> 
+> Matt
