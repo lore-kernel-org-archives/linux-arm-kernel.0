@@ -1,37 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Jan 2011 23:54:49 +0000
-Subject: [PATCH RESEND] [ARM] Add missing include "asm/memory.h"
-In-Reply-To: <1293501397.32542.2.camel@mola>
-References: <1293501397.32542.2.camel@mola>
-Message-ID: <20110102235449.GB17727@n2100.arm.linux.org.uk>
+Date: Sun, 2 Jan 2011 23:59:21 +0000
+Subject: Git pull request: ux500-core for the v2.6.38 merge window
+In-Reply-To: <AANLkTikDhyqcQ_=jCusJcVHrRp6hxjJ7x2W2-qbTM4jp@mail.gmail.com>
+References: <AANLkTim7iBkvqHrraRkMfrvQJjPHVccmSh=01hZxSyu-@mail.gmail.com>
+	<20101223144949.GO3636@n2100.arm.linux.org.uk>
+	<AANLkTikDhyqcQ_=jCusJcVHrRp6hxjJ7x2W2-qbTM4jp@mail.gmail.com>
+Message-ID: <20110102235920.GC17727@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 28, 2010 at 09:56:37AM +0800, Axel Lin wrote:
-> This patch fixes below build error by adding the missing asm/memory.h,
-> which is needed for arch_is_coherent().
+On Wed, Dec 29, 2010 at 01:59:09AM +0100, Linus Walleij wrote:
+> Yes, as mentioned in the original post:
+> If basing this on devel is unacceptable then please
+> pull this instead:
 > 
-> $ make pxa3xx_defconfig; make
->   CC      init/do_mounts_rd.o
-> In file included from include/linux/list_bl.h:5,
->                  from include/linux/rculist_bl.h:7,
->                  from include/linux/dcache.h:7,
->                  from include/linux/fs.h:381,
->                  from init/do_mounts_rd.c:3:
-> include/linux/bit_spinlock.h: In function 'bit_spin_unlock':
-> include/linux/bit_spinlock.h:61: error: implicit declaration of function 'arch_is_coherent'
-> make[1]: *** [init/do_mounts_rd.o] Error 1
-> make: *** [init] Error 2
+>       git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> ux500-core
 > 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> Acked-by: Peter Huewe <peterhuewe@gmx.de>
-> ---
-> It was posted on https://lkml.org/lkml/2010/12/17/9 .
-> I still have the build error for today's linux-next tree.
-> CC Eric Miao, maybe he will take this patch.
+> This brings in everything except the 5 patches from Rabin
+> that require the GIC+SMP changes. I've frozen that tree
+> until you pull it.
 
-Normal practice is to send patches _to_ someone (or some group of people),
-and CC interested parties.  (It's even more important with pull requests,
-so that the person who should pull knows that's the case.)
+And this is what I get.  As you didn't provide me with a diffstat, I
+won't push this out until you've confirmed that the following diffstat
+from the merge is correct in case there's a problem.
 
-Patch is fine, but please throw it into my patch system, thanks.
+remote: Counting objects: 374, done.
+remote: Compressing objects: 100% (152/152), done.
+remote: Total 320 (delta 260), reused 212 (delta 155)
+Receiving objects: 100% (320/320), 61.64 KiB, done.
+Resolving deltas: 100% (260/260), completed with 48 local objects.
