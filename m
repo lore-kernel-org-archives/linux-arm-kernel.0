@@ -1,13 +1,34 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 2 Jan 2011 11:24:24 +0530
-Subject: mmci: bug in DATABLOCKEND handling?
-Message-ID: <AANLkTimdMfdOyj8bnfmYkuz89FFuWOirsVbyQ5jedDpZ@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 2 Jan 2011 06:20:13 +0000
+Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
+In-Reply-To: <AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
+References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
+	<20101208115510.GD10998@console-pimps.org>
+	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
+	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
+	<20101209064751.GA21128@void.printf.net>
+	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
+	<20101209160157.GA28586@void.printf.net>
+	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
+	<20101211192320.GA24430@void.printf.net>
+	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
+Message-ID: <20110102062013.GB18668@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In MMCI, on variants which use the DATABLOCKEND interrupt, if we cross
-more than one block boundary in the loop inside mmc_pio_read() or
-mmci_pio_write(), when the DATABLOCKEND irq is handled after interrupts
-are enabled in mmci_pio_irq(), won't the block count be incorrect
-because we would consider that only one block has been transferred, when
-in fact it has been two?  Or can this never happen for some reason?
+Hi Will,
+
+On Thu, Dec 16, 2010 at 05:04:36PM +0000, Will Newton wrote:
+> This adds the mmc host driver for the Synopsys DesignWare mmc
+> host controller, found in a number of embedded SoC designs.
+> 
+> Signed-off-by: Will Newton <will.newton@imgtec.com>
+
+Thanks, I've pushed this to mmc-next for .38 now after adding:
+
+Reviewed-by: Matt Fleming <matt@console-pimps.org>
+Reviewed-by: Chris Ball <cjb@laptop.org>
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
