@@ -1,120 +1,56 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 04 Jan 2011 03:20:08 -0500
-Subject: [PATCH 4/4] ARM: support for Thumb-2 instructions with
-	CONFIG_ARM_PATCH_PHYS_VIRT
-In-Reply-To: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
-References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1294129208-15201-5-git-send-email-nico@fluxnic.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jan 2011 22:29:43 +0000
+Subject: [PATCH 00/48] PL08x DMA
+Message-ID: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/Kconfig              |    3 +--
- arch/arm/include/asm/memory.h |    5 +++--
- arch/arm/kernel/head.S        |   31 +++++++++++++++++++++++++++----
- 3 files changed, 31 insertions(+), 8 deletions(-)
+Here's the current state of play with the PL08x driver - a massive 48
+patches.  The diffstat doesn't look too impresive:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 136ed9b..feb374a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -189,8 +189,7 @@ config VECTORS_BASE
- 
- config ARM_PATCH_PHYS_VIRT
- 	bool
--	depends on EXPERIMENTAL
--	depends on !XIP && !THUMB2_KERNEL
-+	depends on !XIP && EXPERIMENTAL
- 
- source "init/Kconfig"
- 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index f83be97..80a939d 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -157,14 +157,15 @@
- #error "this machine configuration uses complex __virt_to_phys/__phys_to_virt and cannot use CONFIG_ARM_PATCH_PHYS_VIRT"
- #endif
- 
-+/* the stub constant 0xff000000 is used to force the required insn encoding */
- #define __pv_stub(from,to,instr)			\
- 	__asm__(					\
--	"1:	" instr "\t%0, %1, %2\n"		\
-+	"1:	" instr "\t%0, %1, #0xff000000\n"	\
- 	"	.pushsection .pv_table,\"a\"\n"		\
- 	"	.long	1b\n"				\
- 	"	.popsection"				\
- 	: "=r" (to)					\
--	: "r" (from), "I" (1))
-+	: "r" (from))
- 
- static inline unsigned long __virt_to_phys(unsigned long x)
- {
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 621c792..397271d 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -447,11 +447,11 @@ __fixup_pv_table:
- 	adr	r0, 1f
- 	ldmia	r0, {r3-r5}
- 	sub	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
-+	movs	r6, r3, lsl #8	@ must be 16MiB aligned
-+	bne	__error
- 	add	r4, r4, r3
- 	add	r5, r5, r3
--	mov	r6, r3, lsr #24	@ constant for add/sub instructions
--	teq	r3, r6, lsl #24 @ must be 16MiB aligned
--	bne	__error
-+	mov	r6, r3
- 	b	__fixup_pv_table_loop
- ENDPROC(__fixup_phys_virt)
- 
-@@ -462,6 +462,8 @@ ENDPROC(__fixup_phys_virt)
- 	.pushsection .text
- 
- ENTRY(__fixup_pv_table_loop)
-+#ifndef CONFIG_THUMB2_KERNEL
-+	mov	r6, r6, lsr #24	@ constant for add/sub instructions
- 	orr	r6, r6, #0x400	@ mask in rotate right 8 bits
- 2:	cmp	r4, r5
- 	ldrlo	r7, [r4], #4
-@@ -471,6 +473,27 @@ ENTRY(__fixup_pv_table_loop)
- 	strlo	ip, [r7, r3]
- 	blo	2b
- 	mov	pc, lr
-+#else
-+	teq	r6, #0
-+	beq	2f
-+	clz	r7, r6
-+	lsr	r6, #24
-+	lsl	r6, r7
-+	bic	r6, r6, #0x3080
-+	lsrs	r7, #1
-+	orrcs	r6, r6, #0x80
-+	orr	r6, r6, r7, lsl #12
-+	orr	r6, r6, #0x4000
-+2:	cmp	r4, r5
-+	bxhs	lr
-+	ldr	r7, [r4], #4
-+	add	r7, r3
-+	ldr	ip, [r7, #2]
-+	and	ip, ip, #0x0f00
-+	orr	ip, ip, r6
-+	str	ip, [r7, #2]
-+	b	2b
-+#endif
- ENDPROC(__fixup_phys_virt_loop)
- 
- /*
-@@ -482,7 +505,7 @@ ENTRY(fixup_pv_table)
- 	mov	r3, #0		@ offset (zero as we're in virtual space)
- 	mov	r4, r0		@ loop start
- 	mov	r5, r1		@ loop end
--	mov     r6, r2, lsr #24	@ constant for add/sub instructions		
-+	mov     r6, r2		@ PHYS_OFFSET - PAGE_OFFSET
- 	bl      __fixup_pv_table_loop
- 	ldmfd	sp!, {r4 - r7, pc}
- ENDPROC(fixup_pv_table)
--- 
-1.7.3.2.193.g78bbb
+ drivers/dma/amba-pl08x.c   | 1040 +++++++++++++++++++++-----------------------
+ include/linux/amba/pl08x.h |   56 ++--
+ 2 files changed, 520 insertions(+), 576 deletions(-)
+
+except that the two files comprise some 2300 lines, so this covers
+about a quarter of the driver.
+
+The obvious fixes come first in the series, followed by the simpler
+changes, gradually progressing towards more and more invasive stuff.
+
+One thing I really don't like are APIs where a lock is held across two
+calls - especially when it can be easily worked around.  Patches 45
+and 46 which sort this are intentionally towards the end.
+
+Another thing to point out is that platforms can now control which
+buses the PL08x uses for transfers for memory, peripherals, etc.
+The logic in pl08x_select_bus() is intentionally non-symetric to
+prevent both source and destination transfers ending up on the same
+bus when both are available.  However, the logic is only well
+defined for non-zero values of the source and destination bus masks:
+
+src dst M1      M2
+01  01  SRC+DST
+01  10  SRC     DST
+01  11  SRC     DST
+10  01  DST     SRC
+10  10          SRC+DST
+10  11  DST     SRC
+11  01  DST     SRC
+11  10  SRC     DST
+11  11  SRC     DST
+
+(src/dst bit0 = M1 available, bit1 = M2 available)
+
+If they happen to be zero, then the result is:
+
+src dst M1      M2
+00  00          SRC+DST
+00  01  DST     SRC    
+00  10          SRC+DST
+00  11  DST     SRC    
+01  00  SRC     DST    
+10  00          SRC+DST
+11  00          SRC+DST
+
+so not quite what would be expected - so don't have zero bus masks.
