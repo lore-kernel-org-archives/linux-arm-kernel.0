@@ -1,97 +1,150 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:33:47 +0000
-Subject: [PATCH 11/48] ARM: PL08x: prefix hex numbers with 0x
+Date: Mon, 03 Jan 2011 22:39:13 +0000
+Subject: [PATCH 27/48] ARM: PL08x: avoid duplicating registers in txd and
+	phychan structures
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZsyJ-0001Oa-3P@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A driver which emits both decimal and hex numbers in its printk
-creates confusion as to what is what.  Prefix hex numbers with 0x.
+As we now have all the code accessing the phychan {csrc,cdst,clli,cctl,
+ccfg} members in one function, there's no point storing the data into
+the struct.  Get rid of the struct members.  Re-order the register dump
+in the dev_dbg() to reflect the order we write the registers to the DMA
+device.
+
+The txd {csrc,cdst,clli,cctl} values are duplicates of the lli[0]
+values, so there's no point duplicating these either.  Program the DMAC
+registers directly from the lli[0] values.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/dma/amba-pl08x.c   |   57 ++++++++++++++-----------------------------
+ include/linux/amba/pl08x.h |   13 ----------
+ 2 files changed, 19 insertions(+), 51 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 75ab4e4..c61774a 100644
+index c025a4b..a1a18bd 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -199,8 +199,8 @@ static void pl08x_set_cregs(struct pl08x_driver_data *pl08x,
- 		;
+@@ -193,33 +193,25 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
+ {
+ 	struct pl08x_driver_data *pl08x = plchan->host;
+ 	struct pl08x_phy_chan *phychan = plchan->phychan;
+-	u32 val;
++	struct pl08x_lli *lli = &txd->llis_va[0];
++	u32 val, ccfg;
+ 
+ 	plchan->at = txd;
+ 
+-	/* Copy the basic control register calculated at transfer config */
+-	phychan->csrc = txd->csrc;
+-	phychan->cdst = txd->cdst;
+-	phychan->clli = txd->clli;
+-	phychan->cctl = txd->cctl;
+-
+ 	/* Assign the signal to the proper control registers */
+-	phychan->ccfg = plchan->cd->ccfg;
+-	phychan->ccfg &= ~PL080_CONFIG_SRC_SEL_MASK;
+-	phychan->ccfg &= ~PL080_CONFIG_DST_SEL_MASK;
++	ccfg = plchan->cd->ccfg;
++	ccfg &= ~(PL080_CONFIG_SRC_SEL_MASK | PL080_CONFIG_DST_SEL_MASK);
++
+ 	/* If it wasn't set from AMBA, ignore it */
+ 	if (txd->direction == DMA_TO_DEVICE)
+ 		/* Select signal as destination */
+-		phychan->ccfg |=
+-			(phychan->signal << PL080_CONFIG_DST_SEL_SHIFT);
++		ccfg |= phychan->signal << PL080_CONFIG_DST_SEL_SHIFT;
+ 	else if (txd->direction == DMA_FROM_DEVICE)
+ 		/* Select signal as source */
+-		phychan->ccfg |=
+-			(phychan->signal << PL080_CONFIG_SRC_SEL_SHIFT);
+-	/* Always enable error interrupts */
+-	phychan->ccfg |= PL080_CONFIG_ERR_IRQ_MASK;
+-	/* Always enable terminal interrupts */
+-	phychan->ccfg |= PL080_CONFIG_TC_IRQ_MASK;
++		ccfg |= phychan->signal << PL080_CONFIG_SRC_SEL_SHIFT;
++
++	/* Always enable error and terminal interrupts */
++	ccfg |= PL080_CONFIG_ERR_IRQ_MASK | PL080_CONFIG_TC_IRQ_MASK;
+ 
+ 	/* Wait for channel inactive */
+ 	while (pl08x_phy_channel_busy(phychan))
+@@ -227,19 +219,15 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
  
  	dev_vdbg(&pl08x->adev->dev,
--		"WRITE channel %d: csrc=%08x, cdst=%08x, "
--		 "cctl=%08x, clli=%08x, ccfg=%08x\n",
-+		"WRITE channel %d: csrc=0x%08x, cdst=0x%08x, "
-+		 "cctl=0x%08x, clli=0x%08x, ccfg=0x%08x\n",
- 		ch->id,
- 		ch->csrc,
- 		ch->cdst,
-@@ -731,7 +731,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		while (remainder) {
- 			dev_vdbg(&pl08x->adev->dev,
- 				 "%s single byte LLIs for a transfer of "
--				 "less than a bus width (remain %08x)\n",
-+				 "less than a bus width (remain 0x%08x)\n",
- 				 __func__, remainder);
- 			cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
- 			num_llis =
-@@ -747,7 +747,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		while ((mbus->addr) % (mbus->buswidth)) {
- 			dev_vdbg(&pl08x->adev->dev,
- 				"%s adjustment lli for less than bus width "
--				 "(remain %08x)\n",
-+				 "(remain 0x%08x)\n",
- 				 __func__, remainder);
- 			cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
- 			num_llis = pl08x_fill_lli_for_desc
-@@ -865,7 +865,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 		"WRITE channel %d: csrc=0x%08x, cdst=0x%08x, "
+-		 "cctl=0x%08x, clli=0x%08x, ccfg=0x%08x\n",
+-		phychan->id,
+-		phychan->csrc,
+-		phychan->cdst,
+-		phychan->cctl,
+-		phychan->clli,
+-		phychan->ccfg);
+-
+-	writel(phychan->csrc, phychan->base + PL080_CH_SRC_ADDR);
+-	writel(phychan->cdst, phychan->base + PL080_CH_DST_ADDR);
+-	writel(phychan->clli, phychan->base + PL080_CH_LLI);
+-	writel(phychan->cctl, phychan->base + PL080_CH_CONTROL);
+-	writel(phychan->ccfg, phychan->base + PL080_CH_CONFIG);
++		"clli=0x%08x, cctl=0x%08x, ccfg=0x%08x\n",
++		phychan->id, lli->src, lli->dst, lli->lli, lli->cctl,
++		ccfg);
++
++	writel(lli->src, phychan->base + PL080_CH_SRC_ADDR);
++	writel(lli->dst, phychan->base + PL080_CH_DST_ADDR);
++	writel(lli->lli, phychan->base + PL080_CH_LLI);
++	writel(lli->cctl, phychan->base + PL080_CH_CONTROL);
++	writel(ccfg, phychan->base + PL080_CH_CONFIG);
  
- 				if (target_len != lli_len) {
- 					dev_vdbg(&pl08x->adev->dev,
--					"%s can't send what we want. Desired %08x, lli of %08x bytes in txd of %08x\n",
-+					"%s can't send what we want. Desired 0x%08x, lli of 0x%08x bytes in txd of 0x%08x\n",
- 					__func__, target_len, lli_len, txd->len);
- 				}
+ 	/* Enable the DMA channel */
+ 	/* Do not access config register until channel shows as disabled */
+@@ -920,13 +908,6 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	 */
+ 	llis_va[num_llis - 1].cctl |= PL080_CONTROL_TC_IRQ_EN;
  
-@@ -875,7 +875,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 						       tsize);
+-	/* Now store the channel register values */
+-	txd->csrc = llis_va[0].src;
+-	txd->cdst = llis_va[0].dst;
+-	txd->clli = llis_va[0].lli;
+-	txd->cctl = llis_va[0].cctl;
+-	/* ccfg will be set at physical channel allocation time */
+-
+ #ifdef VERBOSE_DEBUG
+ 	{
+ 		int i;
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 2c834ed..29d9745 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -95,11 +95,6 @@ struct pl08x_phy_chan {
+ 	spinlock_t lock;
+ 	int signal;
+ 	struct pl08x_dma_chan *serving;
+-	u32 csrc;
+-	u32 cdst;
+-	u32 clli;
+-	u32 cctl;
+-	u32 ccfg;
+ };
  
- 				dev_vdbg(&pl08x->adev->dev,
--					"%s fill lli with single lli chunk of size %08x (remainder %08x)\n",
-+					"%s fill lli with single lli chunk of size 0x%08x (remainder 0x%08x)\n",
- 					__func__, lli_len, remainder);
- 				num_llis = pl08x_fill_lli_for_desc(pl08x, txd,
- 						num_llis, lli_len, cctl,
-@@ -894,7 +894,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 						&& (remainder); j++) {
- 					cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
- 					dev_vdbg(&pl08x->adev->dev,
--						"%s align with boundary, single byte (remain %08x)\n",
-+						"%s align with boundary, single byte (remain 0x%08x)\n",
- 						__func__, remainder);
- 					num_llis =
- 						pl08x_fill_lli_for_desc(pl08x,
-@@ -979,7 +979,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ /**
+@@ -118,14 +113,6 @@ struct pl08x_txd {
+ 	void *llis_va;
+ 	struct pl08x_channel_data *cd;
+ 	bool active;
+-	/*
+-	 * Settings to be put into the physical channel when we
+-	 * trigger this txd
+-	 */
+-	u32 csrc;
+-	u32 cdst;
+-	u32 clli;
+-	u32 cctl;
+ };
  
- 		for (i = 0; i < num_llis; i++) {
- 			dev_vdbg(&pl08x->adev->dev,
--				 "lli %d @%p: csrc=%08x, cdst=%08x, cctl=%08x, clli=%08x\n",
-+				 "lli %d @%p: csrc=0x%08x, cdst=0x%08x, cctl=0x%08x, clli=0x%08x\n",
- 				 i,
- 				 &llis_va[i],
- 				 llis_va[i].src,
-@@ -1289,7 +1289,7 @@ static void dma_set_runtime_config(struct dma_chan *chan,
- 
- 	dev_dbg(&pl08x->adev->dev,
- 		"configured channel %s (%s) for %s, data width %d, "
--		"maxburst %d words, LE, CCTL=%08x, CCFG=%08x\n",
-+		"maxburst %d words, LE, CCTL=0x%08x, CCFG=0x%08x\n",
- 		dma_chan_name(chan), plchan->name,
- 		(config->direction == DMA_FROM_DEVICE) ? "RX" : "TX",
- 		addr_width,
+ /**
 -- 
 1.6.2.5
