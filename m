@@ -1,40 +1,98 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon,  3 Jan 2011 13:35:41 -0600
-Subject: [PATCH] OMAP3+: sr_device: include pm header
-Message-ID: <1294083341-32147-1-git-send-email-nm@ti.com>
+From: johnstul@us.ibm.com (john stultz)
+Date: Mon, 03 Jan 2011 11:47:29 -0800
+Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with
+	high frequency clocks
+In-Reply-To: <20110103003718.GF17727@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
+	<20101221105149.GO28157@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1012291703300.10437@xanadu.home>
+	<20110103003718.GF17727@n2100.arm.linux.org.uk>
+Message-ID: <1294084049.2571.30.camel@work-vm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_enable_smartreflex_on_init is meant to be used by boards
-which would like to have SR enabled by default on the platform, while
-omap_devinit_smartreflex is used by pm code, the protos are defined
-in pm.h. This header should be included to ensure that sr_device
-function definitions match the prototypes.
+On Mon, 2011-01-03 at 00:37 +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 29, 2010 at 08:31:58PM -0500, Nicolas Pitre wrote:
+> > On Tue, 21 Dec 2010, Russell King - ARM Linux wrote:
+> > 
+> > > On Mon, Dec 20, 2010 at 08:21:41PM -0500, Nicolas Pitre wrote:
+> > > > 
+> > > > The minsec argument to clocks_calc_mult_shift() [ which appears to be
+> > > > misnamed by the way ] is used to clamp the magnitude of the mult factor
+> > > > so that the given range won't overflow a 64 bit result.  The mult factor
+> > > > is itself already limited to a maximum of 32 bits.  Given that the largest
+> > > > clock tick range we may have is also 32 bits, there is no way our usage of
+> > > > any computed mult factor would ever overflow 64 bits.
+> > > > 
+> > > > The choice of 60 seconds here for minsec is rather arbitrary.  If the
+> > > > mult factor wasn't already limited to 32 bits, this value of 60 would
+> > > > create overflows for clocks which take more than 60 seconds to wrap.
+> > > 
+> > > 60 seconds was arbitary, chosen from the selection of clock rates which
+> > > I had available at the time (the highest of which was 24MHz).
+> > 
+> > Fair enough.  It is just not universally optimal given the different 
+> > clock ranges this code now covers.
+> > 
+> > > > And for clocks which take less than 60 seconds to wrap then we do lose
+> > > > precision as the mult factor is made smaller (fewer bits) to be adjusted
+> > > > to a range which is larger than what we actually use.  This currently
+> > > > affects clocks faster than 71MHz.
+> > > > 
+> > > > We could use minsec = 0 instead of 60 and a good 32-bit mult factor would
+> > > > be computed in all cases.  But let's be formal and provide the actual
+> > > > range to clocks_calc_mult_shift(). None of the cyc_to_fixed_sched_clock()
+> > > > users are affected as they all are using clocks < 71MHz.
+> > > 
+> > > Maybe __clocksource_updatefreq_scale() needs a similar fix too, instead
+> > > of assuming 5 seconds?  It also has access to the mask and rate.
+> > 
+> > There is a comment to that effect right above the 
+> > clocks_calc_mult_shift() indicating that this is a known issue in that 
+> > case already.  
+> > 
+> > And looking at that code, it appears that there is a balance to be made 
+> > between cs->max_idle_ns and cs->mult, the former currently being 
+> > determined by the later.  But if cs->mult is maximized to 32 bits, that 
+> > leaves only 31 bits for cs->max_idle_ns which corresponds to approx 2 
+> > seconds only.
+> > 
+> > So this is not clear to me what would be the optimal mult/shift values 
+> > in the __clocksource_updatefreq_scale() context, while this is rather 
+> > obvious in the init_sched_clock() context.  Hence this patch.
+> 
+> As clocksources are about precision (I believe it has been stated so in
+> the past) it seems that fudging the shift and multiplier to get an
+> extended period out of the clock is not the correct approach.
+> 
+> Maybe Thomas or John can shed some light on this?
 
-including pm.h fixes the sparse warnings (with CONFIG_OMAP_SMARTREFLEX=y):
-arch/arm/mach-omap2/sr_device.c:138:13: warning: symbol 'omap_enable_smartreflex_on_init' was not declared. Should it be static?
-arch/arm/mach-omap2/sr_device.c:143:12: warning: symbol 'omap_devinit_smartreflex' was not declared. Should it be static?
+Right, so there's conflicting goals of long idle times and fine-grained
+time accuracy that pull the clocksource mult/shift pair calculation in
+different directions.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Based on:
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
-branch: omap-for-linus
+Originally, the advice was pick a mult/shift pair that allows for a few
+seconds of time to accrue before we overflow. However this was a little
+vague and as the number of clocksources grew, and the desired idle times
+were increasing,  I started to see that the lack of consistency was
+going to give us troubles.
 
- arch/arm/mach-omap2/sr_device.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+So the clocksource_register_hz/khz interfaces try to consolidate that
+decision into one place, utilizing the MAX_UPDATE_LENGTH value
+(currently 5 seconds) as the max idle time. Clocksource driver writers
+don't have to worry about making the correct decision, the kernel should
+do it for you.
 
-diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
-index 786d685..b1e0af1 100644
---- a/arch/arm/mach-omap2/sr_device.c
-+++ b/arch/arm/mach-omap2/sr_device.c
-@@ -27,6 +27,7 @@
- #include <plat/voltage.h>
- 
- #include "control.h"
-+#include "pm.h"
- 
- static bool sr_enable_on_init;
- 
--- 
-1.6.3.3
+Now, at some point I expect folks to get grumpy about the max idle time
+being limited to 5 seconds, and we'll have to either push it out for
+everyone (at the cost of less accurate NTP steering), or make it a
+architecture specific config option.
+
+Now, for sched_clock, there are a different set of expectations with
+regards to accuracy and expected idle times, and we'll probably need a
+similar consolidation effort to make sure the mult/shift calculations
+are correct and the resulting limits are taken into account by the
+scheduler when going into NOHZ mode.
+
+thanks
+-john
