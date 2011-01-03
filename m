@@ -1,35 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:46:17 +0000
-Subject: [PATCH 48/48] ARM: PL08x: prevent dma_set_runtime_config()
-	reconfiguring memcpy channels
-In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZtAP-0003TD-SG@rmk-PC.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 03 Jan 2011 15:50:14 -0800
+Subject: [PATCH v5] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs From: Sudhakar Rajashekhara
+	<sudhakar.raj@ti.com>
+In-Reply-To: <4D22503A.7010709@criticallink.com> (Michael Williamson's message
+	of "Mon, 03 Jan 2011 17:39:54 -0500")
+References: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
+	<87ipy5d3da.fsf@deeprootsystems.com>
+	<4D22503A.7010709@criticallink.com>
+Message-ID: <878vz1bl8p.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevent dma_set_runtime_config() being used to alter the configuration
-supplied by the platform for memcpy channel configuration.  No one
-should be trying to change this configuration.
+Michael Williamson <michael.williamson@criticallink.com> writes:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/amba-pl08x.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+> On 01/03/2011 05:33 PM, Kevin Hilman wrote:
+>> Michael Williamson <michael.williamson@criticallink.com> writes:
+>> 
+>> I'm assuming the 'From:' line currently in the subject was supposed to
+>> go here?
+>> 
+>> Kevin
+>
+> Arg.  Yes.  Sorry about that; not sure how I lost the newline.  Do you need me
+> to resend?
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index c7f7b82..bebc678 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1129,6 +1129,9 @@ static int dma_set_runtime_config(struct dma_chan *chan,
- 	u32 cctl = 0;
- 	int i;
- 
-+	if (!plchan->slave)
-+		return -EINVAL;
-+
- 	/* Transfer direction */
- 	plchan->runtime_direction = config->direction;
- 	if (config->direction == DMA_TO_DEVICE) {
--- 
-1.6.2.5
+No biggie, I can take care of it.  Just wanted to let you know something
+got messed up on the sending side.
+
+Kevin
+
+>> 
+>>> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+>>> In addition, the variant code for the AM-1808 SoC appears to match
+>>> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+>>> these chips.
+>>>
+>>> This patch is originally from a patch on the arago project, here:
+>>> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
+>>>
+>>> Further information related to the need for this patch can be located at
+>>> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
+>>> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
+>>>
+>>> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
+>>> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
+>>>
+>>> Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+>>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+>>> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+>>> Reported-by: Nicolas Luna <luna.id@gmail.com>
+>>> ---
+>>> Built against linux-davinci tree.
+>>>
+>>> Changes since v4.
+>>>
+>>>  - removed am18x code from 0 variant per Sekhar's request.
+>>>
+>>>  arch/arm/mach-davinci/da850.c |    7 +++++++
+>>>  1 files changed, 7 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>>> index 78b5ae2..1550ac3 100644
+>>> --- a/arch/arm/mach-davinci/da850.c
+>>> +++ b/arch/arm/mach-davinci/da850.c
+>>> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+>>>  		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>>>  		.name		= "da850/omap-l138",
+>>>  	},
+>>> +	{
+>>> +		.variant	= 0x1,
+>>> +		.part_no	= 0xb7d1,
+>>> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
+>>> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>>> +		.name		= "da850/omap-l138/am18x",
+>>> +	},
+>>>  };
+>>>  
+>>>  static struct davinci_timer_instance da850_timer_instance[4] = {
