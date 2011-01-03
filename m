@@ -1,130 +1,101 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:34:48 +0000
-Subject: [PATCH 14/48] ARM: PL08x: remove circular buffer support
+Date: Mon, 03 Jan 2011 22:38:32 +0000
+Subject: [PATCH 25/48] ARM: PL08x: clean up LLI lookup
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZszI-0001Op-2P@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZt2u-0001QR-QO@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver already won't initialize a channel with a circular buffer;
-the check in pl08x_prep_channel_resources() sees to that.  Remove
-circular buffer support for the time being.
+As the LLI list is an array, we can use maths to locate which LLI
+index we're currently at, and then sum up the remaining LLI entries
+until we reach the end of the list.
+
+This makes the code much easier to read, and much less susceptible
+to falling off the end of the array.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   71 +++++++++++++---------------------------------
- 1 files changed, 20 insertions(+), 51 deletions(-)
+ drivers/dma/amba-pl08x.c |   37 ++++++++++++++++++++-----------------
+ 1 files changed, 20 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index b721ed2..74b3591 100644
+index a897315..202c9e2 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -927,39 +927,21 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 			__func__, (u32) MAX_NUM_TSFR_LLIS);
- 		return 0;
- 	}
-+
-+	llis_va = txd->llis_va;
+@@ -340,53 +340,56 @@ static inline u32 get_bytes_in_cctl(u32 cctl)
+ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+ {
+ 	struct pl08x_phy_chan *ch;
+-	struct pl08x_txd *txdi = NULL;
+ 	struct pl08x_txd *txd;
+ 	unsigned long flags;
+ 	size_t bytes = 0;
+ 
+ 	spin_lock_irqsave(&plchan->lock, flags);
+-
+ 	ch = plchan->phychan;
+ 	txd = plchan->at;
+ 
  	/*
--	 * Decide whether this is a loop or a terminated transfer
-+	 * The final LLI terminates the LLI.
+-	 * Next follow the LLIs to get the number of pending bytes in the
+-	 * currently active transaction.
++	 * Follow the LLIs to get the number of remaining
++	 * bytes in the currently active transaction.
  	 */
--	llis_va = txd->llis_va;
--	llis_bus = (struct lli *) txd->llis_bus;
--
--	if (cd->circular_buffer) {
--		/*
--		 * Loop the circular buffer so that the next element
--		 * points back to the beginning of the LLI.
--		 */
--		llis_va[num_llis - 1].next =
--			(dma_addr_t)((unsigned int)&(llis_bus[0]));
--	} else {
--		/*
--		 * On non-circular buffers, the final LLI terminates
--		 * the LLI.
--		 */
--		llis_va[num_llis - 1].next = 0;
--		/*
--		 * The final LLI element shall also fire an interrupt
--		 */
--		llis_va[num_llis - 1].cctl |= PL080_CONTROL_TC_IRQ_EN;
--	}
-+	llis_va[num_llis - 1].next = 0;
-+	/*
-+	 * The final LLI element shall also fire an interrupt
-+	 */
-+	llis_va[num_llis - 1].cctl |= PL080_CONTROL_TC_IRQ_EN;
+ 	if (ch && txd) {
+-		struct pl08x_lli *llis_va = txd->llis_va;
+-		struct pl08x_lli *llis_bus = (struct pl08x_lli *) txd->llis_bus;
+ 		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
  
- 	/* Now store the channel register values */
- 	txd->csrc = llis_va[0].src;
- 	txd->cdst = llis_va[0].dst;
--	if (num_llis > 1)
--		txd->clli = llis_va[0].next;
--	else
--		txd->clli = 0;
--
-+	txd->clli = llis_va[0].next;
- 	txd->cctl = llis_va[0].cctl;
- 	/* ccfg will be set at physical channel allocation time */
+-		/* First get the bytes in the current active LLI */
++		/* First get the remaining bytes in the active transfer */
+ 		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
  
-@@ -1334,19 +1316,7 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
+ 		if (clli) {
+-			int i = 0;
++			struct pl08x_lli *llis_va = txd->llis_va;
++			dma_addr_t llis_bus = txd->llis_bus;
++			int index;
  
- 	spin_lock_irqsave(&plchan->lock, plchan->lockflags);
+-			/* Forward to the LLI pointed to by clli */
+-			while ((clli != (u32) &(llis_bus[i])) &&
+-			       (i < MAX_NUM_TSFR_LLIS))
+-				i++;
++			BUG_ON(clli < llis_bus || clli >= llis_bus +
++				sizeof(struct pl08x_lli) * MAX_NUM_TSFR_LLIS);
++
++			/*
++			 * Locate the next LLI - as this is an array,
++			 * it's simple maths to find.
++			 */
++			index = (clli - llis_bus) / sizeof(struct pl08x_lli);
++
++			for (; index < MAX_NUM_TSFR_LLIS; index++) {
++				bytes += get_bytes_in_cctl(llis_va[index].cctl);
  
--	/*
--	 * If this device is not using a circular buffer then
--	 * queue this new descriptor for transfer.
--	 * The descriptor for a circular buffer continues
--	 * to be used until the channel is freed.
--	 */
--	if (txd->cd->circular_buffer)
--		dev_err(&pl08x->adev->dev,
--			"%s attempting to queue a circular buffer\n",
--			__func__);
--	else
--		list_add_tail(&txd->node,
--			      &plchan->desc_list);
-+	list_add_tail(&txd->node, &plchan->desc_list);
- 
- 	/*
- 	 * See if we already have a physical channel allocated,
-@@ -1643,18 +1613,10 @@ static void pl08x_tasklet(unsigned long data)
- 			callback(callback_param);
- 
- 		/*
--		 * Free the descriptor if it's not for a device
--		 * using a circular buffer
--		 */
--		if (!plchan->at->cd->circular_buffer) {
--			pl08x_free_txd(pl08x, plchan->at);
--			plchan->at = NULL;
--		}
--		/*
--		 * else descriptor for circular
--		 * buffers only freed when
--		 * client has disabled dma
-+		 * Free the descriptor
- 		 */
-+		pl08x_free_txd(pl08x, plchan->at);
-+		plchan->at = NULL;
- 	}
- 	/*
- 	 * If a new descriptor is queued, set it up
-@@ -1799,6 +1761,13 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
- 				return -ENOMEM;
+-			while (clli) {
+-				bytes += get_bytes_in_cctl(llis_va[i].cctl);
+ 				/*
+ 				 * A LLI pointer of 0 terminates the LLI list
+ 				 */
+-				clli = llis_va[i].lli;
+-				i++;
++				if (!llis_va[index].lli)
++					break;
  			}
  		}
-+		if (chan->cd->circular_buffer) {
-+			dev_err(&pl08x->adev->dev,
-+				"channel %s: circular buffers not supported\n",
-+				chan->name);
-+			kfree(chan);
-+			continue;
-+		}
- 		dev_info(&pl08x->adev->dev,
- 			 "initialize virtual channel \"%s\"\n",
- 			 chan->name);
+ 	}
+ 
+ 	/* Sum up all queued transactions */
+ 	if (!list_empty(&plchan->desc_list)) {
++		struct pl08x_txd *txdi;
+ 		list_for_each_entry(txdi, &plchan->desc_list, node) {
+ 			bytes += txdi->len;
+ 		}
+-
+ 	}
+ 
+ 	spin_unlock_irqrestore(&plchan->lock, flags);
 -- 
 1.6.2.5
