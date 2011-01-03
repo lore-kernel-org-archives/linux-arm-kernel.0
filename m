@@ -1,142 +1,107 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:45:37 +0000
-Subject: [PATCH 46/48] ARM: PL08x: fix locking between prepare function and
-	submit function
+Date: Mon, 03 Jan 2011 22:45:57 +0000
+Subject: [PATCH 47/48] ARM: PL08x: allow dma_set_runtime_config() to return
+	errors
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZt9l-0003Sk-Ll@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZtA5-0003Sx-Om@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL08x driver holds on to the channel lock with interrupts disabled
-between the prepare and the subsequent submit API functions.  This
-means that the locking state when the prepare function returns is
-dependent on whether it suceeeds or not.
+There are cases in dma_set_runtime_config() where we fail to perform
+the requested action - and we just issue a KERN_ERR message in that
+case.  We have the facility to return an error to the caller, so that
+is what we should do.
 
-It did this to ensure that the physical channel wasn't released, and
-as it used to add the descriptor onto the pending list at prepare time
-rather than submit time.
-
-Now that we have reorganized the code to remove those reasons, we can
-now safely release the spinlock at the end of preparation and reacquire
-it in our submit function.
+When we encounter an error due to invalid parameters, we should not
+modify driver state.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c   |   28 +++++++++-------------------
- include/linux/amba/pl08x.h |    4 ----
- 2 files changed, 9 insertions(+), 23 deletions(-)
+ drivers/dma/amba-pl08x.c |   23 +++++++++++++----------
+ 1 files changed, 13 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index bf6f7d0..1c9f712 100644
+index 1c9f712..c7f7b82 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -981,6 +981,9 @@ static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
+@@ -1117,13 +1117,14 @@ static const struct burst_table burst_sizes[] = {
+ 	},
+ };
+ 
+-static void dma_set_runtime_config(struct dma_chan *chan,
+-			       struct dma_slave_config *config)
++static int dma_set_runtime_config(struct dma_chan *chan,
++				  struct dma_slave_config *config)
  {
- 	struct pl08x_dma_chan *plchan = to_pl08x_chan(tx->chan);
- 	struct pl08x_txd *txd = to_pl08x_txd(tx);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&plchan->lock, flags);
- 
- 	plchan->chan.cookie += 1;
- 	if (plchan->chan.cookie < 0)
-@@ -1003,8 +1006,7 @@ static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
- 		plchan->phychan_hold--;
- 	}
- 
--	/* This unlock follows the lock in the prep() function */
--	spin_unlock_irqrestore(&plchan->lock, plchan->lockflags);
-+	spin_unlock_irqrestore(&plchan->lock, flags);
- 
- 	return tx->cookie;
- }
-@@ -1225,9 +1227,9 @@ static void pl08x_issue_pending(struct dma_chan *chan)
- static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
- 					struct pl08x_txd *txd)
- {
--	int num_llis;
+ 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
  	struct pl08x_driver_data *pl08x = plchan->host;
--	int ret;
-+	unsigned long flags;
-+	int num_llis, ret;
- 
- 	num_llis = pl08x_fill_llis_for_desc(pl08x, txd);
- 	if (!num_llis) {
-@@ -1235,7 +1237,7 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
- 		return -EINVAL;
+ 	struct pl08x_channel_data *cd = plchan->cd;
+ 	enum dma_slave_buswidth addr_width;
++	dma_addr_t addr;
+ 	u32 maxburst;
+ 	u32 cctl = 0;
+ 	int i;
+@@ -1131,17 +1132,17 @@ static void dma_set_runtime_config(struct dma_chan *chan,
+ 	/* Transfer direction */
+ 	plchan->runtime_direction = config->direction;
+ 	if (config->direction == DMA_TO_DEVICE) {
+-		plchan->runtime_addr = config->dst_addr;
++		addr = config->dst_addr;
+ 		addr_width = config->dst_addr_width;
+ 		maxburst = config->dst_maxburst;
+ 	} else if (config->direction == DMA_FROM_DEVICE) {
+-		plchan->runtime_addr = config->src_addr;
++		addr = config->src_addr;
+ 		addr_width = config->src_addr_width;
+ 		maxburst = config->src_maxburst;
+ 	} else {
+ 		dev_err(&pl08x->adev->dev,
+ 			"bad runtime_config: alien transfer direction\n");
+-		return;
++		return -EINVAL;
  	}
  
--	spin_lock_irqsave(&plchan->lock, plchan->lockflags);
-+	spin_lock_irqsave(&plchan->lock, flags);
+ 	switch (addr_width) {
+@@ -1160,7 +1161,7 @@ static void dma_set_runtime_config(struct dma_chan *chan,
+ 	default:
+ 		dev_err(&pl08x->adev->dev,
+ 			"bad runtime_config: alien address width\n");
+-		return;
++		return -EINVAL;
+ 	}
  
  	/*
- 	 * See if we already have a physical channel allocated,
-@@ -1258,7 +1260,7 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
- 		if (plchan->slave) {
- 			pl08x_free_txd_list(pl08x, plchan);
- 			pl08x_free_txd(pl08x, txd);
--			spin_unlock_irqrestore(&plchan->lock, plchan->lockflags);
-+			spin_unlock_irqrestore(&plchan->lock, flags);
- 			return -EBUSY;
- 		}
- 	} else
-@@ -1272,11 +1274,7 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
- 		if (plchan->state == PL08X_CHAN_IDLE)
- 			plchan->state = PL08X_CHAN_PAUSED;
+@@ -1179,6 +1180,8 @@ static void dma_set_runtime_config(struct dma_chan *chan,
+ 		cctl |= burst_sizes[i].reg;
+ 	}
  
--	/*
--	 * Notice that we leave plchan->lock locked on purpose:
--	 * it will be unlocked in the subsequent tx_submit()
--	 * call. This is a consequence of the current API.
--	 */
-+	spin_unlock_irqrestore(&plchan->lock, flags);
++	plchan->runtime_addr = addr;
++
+ 	/* Modify the default channel data to fit PrimeCell request */
+ 	cd->cctl = cctl;
  
- 	return 0;
+@@ -1190,6 +1193,8 @@ static void dma_set_runtime_config(struct dma_chan *chan,
+ 		addr_width,
+ 		maxburst,
+ 		cctl);
++
++	return 0;
  }
-@@ -1355,10 +1353,6 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
- 	ret = pl08x_prep_channel_resources(plchan, txd);
- 	if (ret)
- 		return NULL;
--	/*
--	 * NB: the channel lock is held at this point so tx_submit()
--	 * must be called in direct succession.
--	 */
  
- 	return &txd->tx;
- }
-@@ -1444,10 +1438,6 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 	ret = pl08x_prep_channel_resources(plchan, txd);
- 	if (ret)
- 		return NULL;
--	/*
--	 * NB: the channel lock is held at this point so tx_submit()
--	 * must be called in direct succession.
--	 */
+ /*
+@@ -1452,10 +1457,8 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
  
- 	return &txd->tx;
- }
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index 95b76ea..933b4ed 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -162,9 +162,6 @@ enum pl08x_dma_chan_state {
-  * @lc: last completed transaction on this channel
-  * @pend_list: queued transactions pending on this channel
-  * @at: active transaction on this channel
-- * @lockflags: sometimes we let a lock last between two function calls,
-- * especially prep/submit, and then we need to store the IRQ flags
-- * in the channel state, here
-  * @lock: a lock for this channel data
-  * @host: a pointer to the host (internal use)
-  * @state: whether the channel is idle, paused, running etc
-@@ -184,7 +181,6 @@ struct pl08x_dma_chan {
- 	dma_cookie_t lc;
- 	struct list_head pend_list;
- 	struct pl08x_txd *at;
--	unsigned long lockflags;
- 	spinlock_t lock;
- 	struct pl08x_driver_data *host;
- 	enum pl08x_dma_chan_state state;
+ 	/* Controls applicable to inactive channels */
+ 	if (cmd == DMA_SLAVE_CONFIG) {
+-		dma_set_runtime_config(chan,
+-				       (struct dma_slave_config *)
+-				       arg);
+-		return 0;
++		return dma_set_runtime_config(chan,
++					      (struct dma_slave_config *)arg);
+ 	}
+ 
+ 	/*
 -- 
 1.6.2.5
