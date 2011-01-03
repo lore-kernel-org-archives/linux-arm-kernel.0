@@ -1,147 +1,161 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 3 Jan 2011 11:16:39 -0200
-Subject: [PATCH] ARM: imx/mx27_3ds: Add PMIC support
-Message-ID: <1294060599-30309-1-git-send-email-fabio.estevam@freescale.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Mon,  3 Jan 2011 08:21:45 -0500
+Subject: [PATCH v4] davinci: Support various speedgrades for MityDSP-L138 and
+	MityARM-1808 SoMs
+Message-ID: <1294060905-14254-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX27_3DS board has a MC13783 PMIC connected to the CSPI2 port.
+For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
+from the part number string read from the factory configuration block on
+the on-board I2C PROM.  Configure the maximum CPU speed based on this
+information.
 
-Add support for the PMIC.
+This patch was tested using a MityDSP-L138 and MityARM-1808 at various
+speedgrades.  Also, for code coverage, a bogus configuration was tested
+as well as a configuration having an unknown part number.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Tested-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
- arch/arm/mach-imx/Kconfig         |    1 +
- arch/arm/mach-imx/mach-mx27_3ds.c |   77 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+), 0 deletions(-)
+Built against linux-davinci.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0449b80..17d2e60 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -242,6 +242,7 @@ config MACH_MX27_3DS
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
- 	select IMX_HAVE_PLATFORM_MXC_MMC
-+	select IMX_HAVE_PLATFORM_SPI_IMX
- 	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for MX27PDK platform. This includes specific
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 0ee7a73..6fd0f8f 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -26,6 +26,9 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
- #include <linux/delay.h>
-+#include <linux/mfd/mc13783.h>
-+#include <linux/spi/spi.h>
-+#include <linux/regulator/machine.h>
+Changes since v2 (v3 was sent in error, wrong file, sorry for the churn):
+
+ - reworked logic to use fall-through logic for mityomapl138_cpugreq_init call
+   per comments.
+
+ arch/arm/mach-davinci/board-mityomapl138.c |   83 +++++++++++++++++++++++++---
+ 1 files changed, 75 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 0bb5f0c..86d6229 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -44,38 +44,109 @@ struct factory_config {
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -39,6 +42,7 @@
+ static struct factory_config factory_config;
  
- #define SD1_EN_GPIO (GPIO_PORTB + 25)
- #define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
-+#define SPI2_SS0 (GPIO_PORTD + 21)
- 
- static const int mx27pdk_pins[] __initconst = {
- 	/* UART1 */
-@@ -87,6 +91,10 @@ static const int mx27pdk_pins[] __initconst = {
- 	PE2_PF_USBOTG_DIR,
- 	PE24_PF_USBOTG_CLK,
- 	PE25_PF_USBOTG_DATA7,
-+	/* CSPI2 */
-+	PD22_PF_CSPI2_SCLK,
-+	PD23_PF_CSPI2_MISO,
-+	PD24_PF_CSPI2_MOSI,
- };
- 
- static const struct imxuart_platform_data uart_pdata __initconst = {
-@@ -176,6 +184,72 @@ static int __init mx27_3ds_otg_mode(char *options)
- }
- __setup("otg_mode=", mx27_3ds_otg_mode);
- 
-+/* Regulators */
-+static struct regulator_consumer_supply vmmc1_consumers[] = {
-+	REGULATOR_SUPPLY("lcd_2v8", NULL),
++struct part_no_info {
++	const char	*part_no;	/* part number string of interest */
++	int		max_freq;	/* khz */
 +};
 +
-+static struct regulator_init_data vmmc1_init = {
-+	.constraints = {
-+		.min_uV	= 2800000,
-+		.max_uV = 2800000,
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(vmmc1_consumers),
-+	.consumer_supplies = vmmc1_consumers,
-+};
-+
-+static struct regulator_consumer_supply vgen_consumers[] = {
-+	REGULATOR_SUPPLY("vdd_lcdio", NULL),
-+};
-+
-+static struct regulator_init_data vgen_init = {
-+	.constraints = {
-+		.min_uV	= 1800000,
-+		.max_uV = 1800000,
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(vgen_consumers),
-+	.consumer_supplies = vgen_consumers,
-+};
-+
-+static struct mc13783_regulator_init_data mx27_3ds_regulators[] = {
++static struct part_no_info mityomapl138_pn_info[] = {
 +	{
-+		.id = MC13783_REGU_VMMC1,
-+		.init_data = &vmmc1_init,
-+	}, {
-+		.id = MC13783_REGU_VGEN,
-+		.init_data = &vgen_init,
++		.part_no	= "L138-C",
++		.max_freq	= 300000,
 +	},
-+};
-+
-+/* MC13783 */
-+static struct mc13783_platform_data mc13783_pdata __initdata = {
-+	.regulators = mx27_3ds_regulators,
-+	.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
-+	.flags  = MC13783_USE_REGULATOR,
-+};
-+
-+/* SPI */
-+static int spi2_internal_chipselect[] = {SPI2_SS0};
-+
-+static const struct spi_imx_master spi2_pdata __initconst = {
-+	.chipselect	= spi2_internal_chipselect,
-+	.num_chipselect	= ARRAY_SIZE(spi2_internal_chipselect),
-+};
-+
-+static struct spi_board_info mx27_3ds_spi_devs[] __initdata = {
 +	{
-+		.modalias	= "mc13783",
-+		.max_speed_hz	= 1000000,
-+		.bus_num	= 1,
-+		.chip_select	= 0, /* SS0 */
-+		.platform_data	= &mc13783_pdata,
-+		.irq = IRQ_GPIOC(14),
-+		.mode = SPI_CS_HIGH,
++		.part_no	= "L138-D",
++		.max_freq	= 375000,
++	},
++	{
++		.part_no	= "L138-F",
++		.max_freq	= 456000,
++	},
++	{
++		.part_no	= "1808-C",
++		.max_freq	= 300000,
++	},
++	{
++		.part_no	= "1808-D",
++		.max_freq	= 375000,
++	},
++	{
++		.part_no	= "1808-F",
++		.max_freq	= 456000,
++	},
++	{
++		.part_no	= "1810-D",
++		.max_freq	= 375000,
 +	},
 +};
 +
- 
- static void __init mx27pdk_init(void)
++#ifdef CONFIG_CPU_FREQ
++static void mityomapl138_cpufreq_init(const char *partnum)
++{
++	int i, ret;
++
++	for (i = 0; partnum && i < ARRAY_SIZE(mityomapl138_pn_info); i++) {
++		/*
++		 * the part number has additional characters beyond what is
++		 * stored in the table.  This information is not needed for
++		 * determining the speed grade, and would require several
++		 * more table entries.  Only check the first N characters
++		 * for a match.
++		 */
++		if (!strncmp(partnum, mityomapl138_pn_info[i].part_no,
++			strlen(mityomapl138_pn_info[i].part_no))) {
++			da850_max_speed = mityomapl138_pn_info[i].max_freq;
++			break;
++		}
++	}
++
++	ret = da850_register_cpufreq("pll0_sysclk3");
++	if (ret)
++		pr_warning("cpufreq registration failed: %d\n", ret);
++}
++#else
++static void mityomapl138_cpufreq_init(const char *partnum) { }
++#endif
++
+ static void read_factory_config(struct memory_accessor *a, void *context)
  {
-@@ -199,6 +273,9 @@ static void __init mx27pdk_init(void)
- 	if (!otg_mode_host)
- 		imx27_add_fsl_usb2_udc(&otg_device_pdata);
+ 	int ret;
++	const char *partnum = NULL;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
  
-+	imx27_add_spi_imx1(&spi2_pdata);
-+	spi_register_board_info(mx27_3ds_spi_devs,
-+						ARRAY_SIZE(mx27_3ds_spi_devs));
+ 	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
+ 	if (ret != sizeof(struct factory_config)) {
+ 		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
+ 				ret);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
+ 		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
+ 				factory_config.magic);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	if (factory_config.version != FACTORY_CONFIG_VERSION) {
+ 		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
+ 				factory_config.version);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
+-	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
+ 	if (is_valid_ether_addr(factory_config.mac))
+ 		memcpy(soc_info->emac_pdata->mac_addr,
+ 			factory_config.mac, ETH_ALEN);
+ 	else
+ 		pr_warning("MityOMAPL138: Invalid MAC found "
+ 				"in factory config block\n");
++
++	partnum = factory_config.partnum;
++	pr_info("MityOMAPL138: Part Number = %s\n", partnum);
++
++bad_config:
++	/* default maximum speed is valid for all platforms */
++	mityomapl138_cpufreq_init(partnum);
  }
  
- static void __init mx27pdk_timer_init(void)
+ static struct at24_platform_data mityomapl138_fd_chip = {
+@@ -383,10 +454,6 @@ static void __init mityomapl138_init(void)
+ 	if (ret)
+ 		pr_warning("rtc setup failed: %d\n", ret);
+ 
+-	ret = da850_register_cpufreq("pll0_sysclk3");
+-	if (ret)
+-		pr_warning("cpufreq registration failed: %d\n", ret);
+-
+ 	ret = da8xx_register_cpuidle();
+ 	if (ret)
+ 		pr_warning("cpuidle registration failed: %d\n", ret);
 -- 
-1.6.0.4
+1.7.0.4
