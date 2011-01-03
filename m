@@ -1,333 +1,82 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 3 Jan 2011 18:50:39 +0530
-Subject: [PATCH 2/7 v2] OMAP2430: hwmod data: Add McSPI
-In-Reply-To: <20101230190320.GA2713@angua.secretlab.ca>
-References: <33236.10.24.255.18.1291212082.squirrel@dbdmail.itg.ti.com>
-	<20101230190320.GA2713@angua.secretlab.ca>
-Message-ID: <AANLkTinvQOGhe-Y-6nECig3ZpKHkm1nJ8wNeTMgm4j2U@mail.gmail.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Mon, 03 Jan 2011 08:28:37 -0500
+Subject: [PATCH 1/2] davinci: Support disabling modem status interrupts
+	on SOC	UARTS
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024816D2D7@dbde02.ent.ti.com>
+References: <1293844317-11757-1-git-send-email-michael.williamson@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024816D2D7@dbde02.ent.ti.com>
+Message-ID: <4D21CF05.7010704@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 31, 2010 at 12:33 AM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> On Wed, Dec 01, 2010 at 07:31:22PM +0530, Govindraj.R wrote:
->> From: Charulatha V <charu@ti.com>
+On 1/3/2011 1:21 AM, Nori, Sekhar wrote:
+
+> Hi Michael,
+> 
+> On Sat, Jan 01, 2011 at 06:41:56, Michael Williamson wrote:
+>> On the da850/omap-l138/am18x family of SoCs, up to three on chip UARTS may be
+>> configured.  These peripherals support the standard Tx/Rx signals as well as
+>> CTS/RTS hardware flow control signals.  The pins on these SOC's associated with
+>> these signals are multiplexed; e.g., the pin providing UART0_TXD capability
+>> also provides SPI0 chip select line 5 output capability.  The configuration of
+>> the pin multiplexing occurs during platform initialization (or by earlier
+>> bootloader operations).
 >>
->> Update the 2430 hwmod data file with McSPI info.
+>> There is a problem with the multiplexing implementation on these SOCs.  Only
+>> the output and output enable portions of the I/O section of the pin are
+>> multiplexed.  All peripheral input functions remain connected to a given pin
+>> regardless of configuration.
 >>
->> Signed-off-by: Charulatha V <charu@ti.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->
-> Hmmm; this patch is virtually identical to the first patch in this
-> series which adds 2420 hwmod support. ?I see a large block of
-> identical data with minor differences. ?Surely support for these two
-> chips can share the common blocks of data.
->
-> Is this going to be a common situation for HWMOD data?
-
-Grant,
-
-Thanks for your Review comments.
-
-Currently we have four hwmod data files:
-2420, 2430 , 3xxx, 44xx
-
-We need to fill these four files with hw info data to be passed
-to driver there could be small info that might be duplicated.
-
-Currently we are updating all the four files.
-As Paul said there might be some changes done going forward.
-To handle the hwmod files.
-
-Hope this clarifies.
-
---
-Thanks,
-Govindraj.R
-
-
->
-> g.
->
+>> In many configurations of these parts, providing a UART with Tx/Rx capability
+>> is needed, but the HW flow control capability is not.  Furthermore, the pins
+>> associated with the CTS inputs on these UARTS are often configured to support
+>> a different peripheral, and they may be active/toggling during runtime.  This
+>> can result in false modem status (CTS) interrupts being asserted to the 8250
+>> driver controlling the associated Tx/Rx pins, and can impact system
+>> performance.  This is especially true if the CTS pin is shared with something
+>> like a clock line as is the case with UART1 CTS and the McASP AHCLKX.
+>>
+>> The 8250 serial driver platform data does not provide a direct mechanism to
+>> tell the driver to disable modem status (i.e., CTS) interrupts for a given
+>> port.  As a work-around, allow davinci platforms to override set_termios for
+>> configured UARTS that do not provide a true CTS input and ensure any request
+>> does not enable HW flow control.
+>>
+>> This patch was tested using a MityDSP-L138 SOM having UART1 enabled with the
+>> associated CTS pin connected to a clock (configured for the AHCLKX function).
+>>
+>> Background / problem reports related to this issue are captured in the links
+>> below:
+>> http://e2e.ti.com/support/dsp/omap_applications_processors/f/42/t/36701.aspx
+>> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg19524.html
+>>
+>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+>> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
 >> ---
->> ?arch/arm/mach-omap2/omap_hwmod_2430_data.c | ?219 ++++++++++++++++++++++++++++
->> ?1 files changed, 219 insertions(+), 0 deletions(-)
+>> This patch is against davinci-linux.
 >>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
->> index 7cf0d3a..bcdfb2b 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
->> @@ -17,6 +17,7 @@
->> ?#include <plat/dma.h>
->> ?#include <plat/serial.h>
->> ?#include <plat/i2c.h>
->> +#include <plat/mcspi.h>
->> ?#include <plat/omap24xx.h>
+>> I'm open to suggestions for reducing the patch description.
 >>
->> ?#include "omap_hwmod_common_data.h"
->> @@ -38,6 +39,9 @@ static struct omap_hwmod omap2430_iva_hwmod;
->> ?static struct omap_hwmod omap2430_l3_main_hwmod;
->> ?static struct omap_hwmod omap2430_l4_core_hwmod;
->> ?static struct omap_hwmod omap2430_wd_timer2_hwmod;
->> +static struct omap_hwmod omap2430_mcspi1_hwmod;
->> +static struct omap_hwmod omap2430_mcspi2_hwmod;
->> +static struct omap_hwmod omap2430_mcspi3_hwmod;
->>
->> ?/* L3 -> L4_CORE interface */
->> ?static struct omap_hwmod_ocp_if omap2430_l3_main__l4_core = {
->> @@ -216,6 +220,60 @@ static struct omap_hwmod_ocp_if *omap2430_l4_wkup_slaves[] = {
->> ?static struct omap_hwmod_ocp_if *omap2430_l4_wkup_masters[] = {
->> ?};
->>
->> +/* l4 core -> mcspi1 interface */
->> +static struct omap_hwmod_addr_space omap2430_mcspi1_addr_space[] = {
->> + ? ? {
->> + ? ? ? ? ? ? .pa_start ? ? ? = 0x48098000,
->> + ? ? ? ? ? ? .pa_end ? ? ? ? = 0x480980ff,
->> + ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT,
->> + ? ? },
->> +};
->> +
->> +static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi1 = {
->> + ? ? .master ? ? ? ? = &omap2430_l4_core_hwmod,
->> + ? ? .slave ? ? ? ? ?= &omap2430_mcspi1_hwmod,
->> + ? ? .clk ? ? ? ? ? ?= "mcspi1_ick",
->> + ? ? .addr ? ? ? ? ? = omap2430_mcspi1_addr_space,
->> + ? ? .addr_cnt ? ? ? = ARRAY_SIZE(omap2430_mcspi1_addr_space),
->> + ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
->> +};
->> +
->> +/* l4 core -> mcspi2 interface */
->> +static struct omap_hwmod_addr_space omap2430_mcspi2_addr_space[] = {
->> + ? ? {
->> + ? ? ? ? ? ? .pa_start ? ? ? = 0x4809a000,
->> + ? ? ? ? ? ? .pa_end ? ? ? ? = 0x4809a0ff,
->> + ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT,
->> + ? ? },
->> +};
->> +
->> +static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi2 = {
->> + ? ? .master ? ? ? ? = &omap2430_l4_core_hwmod,
->> + ? ? .slave ? ? ? ? ?= &omap2430_mcspi2_hwmod,
->> + ? ? .clk ? ? ? ? ? ?= "mcspi2_ick",
->> + ? ? .addr ? ? ? ? ? = omap2430_mcspi2_addr_space,
->> + ? ? .addr_cnt ? ? ? = ARRAY_SIZE(omap2430_mcspi2_addr_space),
->> + ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
->> +};
->> +
->> +/* l4 core -> mcspi3 interface */
->> +static struct omap_hwmod_addr_space omap2430_mcspi3_addr_space[] = {
->> + ? ? {
->> + ? ? ? ? ? ? .pa_start ? ? ? = 0x480b8000,
->> + ? ? ? ? ? ? .pa_end ? ? ? ? = 0x480b80ff,
->> + ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT,
->> + ? ? },
->> +};
->> +
->> +static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi3 = {
->> + ? ? .master ? ? ? ? = &omap2430_l4_core_hwmod,
->> + ? ? .slave ? ? ? ? ?= &omap2430_mcspi3_hwmod,
->> + ? ? .clk ? ? ? ? ? ?= "mcspi3_ick",
->> + ? ? .addr ? ? ? ? ? = omap2430_mcspi3_addr_space,
->> + ? ? .addr_cnt ? ? ? = ARRAY_SIZE(omap2430_mcspi3_addr_space),
->> + ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
->> +};
->> +
->> ?/* L4 WKUP */
->> ?static struct omap_hwmod omap2430_l4_wkup_hwmod = {
->> ? ? ? .name ? ? ? ? ? = "l4_wkup",
->> @@ -569,6 +627,162 @@ static struct omap_hwmod omap2430_i2c2_hwmod = {
->> ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
->> ?};
->>
->> +/*
->> + * 'mcspi' class
->> + * multichannel serial port interface (mcspi) / master/slave synchronous serial
->> + * bus
->> + */
->> +
->> +static struct omap_hwmod_class_sysconfig omap2430_mcspi_sysc = {
->> + ? ? .rev_offs ? ? ? = 0x0000,
->> + ? ? .sysc_offs ? ? ?= 0x0010,
->> + ? ? .syss_offs ? ? ?= 0x0014,
->> + ? ? .sysc_flags ? ? = (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? SYSC_HAS_AUTOIDLE),
->> + ? ? .idlemodes ? ? ?= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
->> + ? ? .sysc_fields ? ?= &omap_hwmod_sysc_type1,
->> +};
->> +
->> +static struct omap_hwmod_class omap2430_mcspi_class = {
->> + ? ? .name = "mcspi",
->> + ? ? .sysc = &omap2430_mcspi_sysc,
->> + ? ? .rev = OMAP2_MCSPI_REV,
->> +};
->> +
->> +/* mcspi1 */
->> +static struct omap_hwmod_irq_info omap2430_mcspi1_mpu_irqs[] = {
->> + ? ? { .irq = 65 },
->> +};
->> +
->> +static struct omap_hwmod_dma_info omap2430_mcspi1_sdma_reqs[] = {
->> + ? ? { .name = "tx0", .dma_req = 35 }, /* DMA_SPI1_TX0 */
->> + ? ? { .name = "rx0", .dma_req = 36 }, /* DMA_SPI1_RX0 */
->> + ? ? { .name = "tx1", .dma_req = 37 }, /* DMA_SPI1_TX1 */
->> + ? ? { .name = "rx1", .dma_req = 38 }, /* DMA_SPI1_RX1 */
->> + ? ? { .name = "tx2", .dma_req = 39 }, /* DMA_SPI1_TX2 */
->> + ? ? { .name = "rx2", .dma_req = 40 }, /* DMA_SPI1_RX2 */
->> + ? ? { .name = "tx3", .dma_req = 41 }, /* DMA_SPI1_TX3 */
->> + ? ? { .name = "rx3", .dma_req = 42 }, /* DMA_SPI1_RX3 */
->> +};
->> +
->> +static struct omap_hwmod_ocp_if *omap2430_mcspi1_slaves[] = {
->> + ? ? &omap2430_l4_core__mcspi1,
->> +};
->> +
->> +static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
->> + ? ? .num_chipselect = 4,
->> +};
->> +
->> +static struct omap_hwmod omap2430_mcspi1_hwmod = {
->> + ? ? .name ? ? ? ? ? = "mcspi1_hwmod",
->> + ? ? .mpu_irqs ? ? ? = omap2430_mcspi1_mpu_irqs,
->> + ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap2430_mcspi1_mpu_irqs),
->> + ? ? .sdma_reqs ? ? ?= omap2430_mcspi1_sdma_reqs,
->> + ? ? .sdma_reqs_cnt ?= ARRAY_SIZE(omap2430_mcspi1_sdma_reqs),
->> + ? ? .main_clk ? ? ? = "mcspi1_fck",
->> + ? ? .prcm ? ? ? ? ? = {
->> + ? ? ? ? ? ? .omap2 = {
->> + ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
->> + ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
->> + ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP24XX_EN_MCSPI1_SHIFT,
->> + ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
->> + ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP24XX_ST_MCSPI1_SHIFT,
->> + ? ? ? ? ? ? },
->> + ? ? },
->> + ? ? .slaves ? ? ? ? = omap2430_mcspi1_slaves,
->> + ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap2430_mcspi1_slaves),
->> + ? ? .class ? ? ? ? ?= &omap2430_mcspi_class,
->> + ? ? .dev_attr ? ? ? = &omap_mcspi1_dev_attr,
->> + ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
->> +};
->> +
->> +/* mcspi2 */
->> +static struct omap_hwmod_irq_info omap2430_mcspi2_mpu_irqs[] = {
->> + ? ? { .irq = 66 },
->> +};
->> +
->> +static struct omap_hwmod_dma_info omap2430_mcspi2_sdma_reqs[] = {
->> + ? ? { .name = "tx0", .dma_req = 43 }, /* DMA_SPI2_TX0 */
->> + ? ? { .name = "rx0", .dma_req = 44 }, /* DMA_SPI2_RX0 */
->> + ? ? { .name = "tx1", .dma_req = 45 }, /* DMA_SPI2_TX1 */
->> + ? ? { .name = "rx1", .dma_req = 46 }, /* DMA_SPI2_RX1 */
->> +};
->> +
->> +static struct omap_hwmod_ocp_if *omap2430_mcspi2_slaves[] = {
->> + ? ? &omap2430_l4_core__mcspi2,
->> +};
->> +
->> +static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
->> + ? ? .num_chipselect = 2,
->> +};
->> +
->> +static struct omap_hwmod omap2430_mcspi2_hwmod = {
->> + ? ? .name ? ? ? ? ? = "mcspi2_hwmod",
->> + ? ? .mpu_irqs ? ? ? = omap2430_mcspi2_mpu_irqs,
->> + ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap2430_mcspi2_mpu_irqs),
->> + ? ? .sdma_reqs ? ? ?= omap2430_mcspi2_sdma_reqs,
->> + ? ? .sdma_reqs_cnt ?= ARRAY_SIZE(omap2430_mcspi2_sdma_reqs),
->> + ? ? .main_clk ? ? ? = "mcspi2_fck",
->> + ? ? .prcm ? ? ? ? ? = {
->> + ? ? ? ? ? ? .omap2 = {
->> + ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
->> + ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
->> + ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP24XX_EN_MCSPI2_SHIFT,
->> + ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
->> + ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP24XX_ST_MCSPI2_SHIFT,
->> + ? ? ? ? ? ? },
->> + ? ? },
->> + ? ? .slaves ? ? ? ? = omap2430_mcspi2_slaves,
->> + ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap2430_mcspi2_slaves),
->> + ? ? .class ? ? ? ? ?= &omap2430_mcspi_class,
->> + ? ? .dev_attr ? ? ? = &omap_mcspi2_dev_attr,
->> + ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
->> +};
->> +
->> +/* mcspi3 */
->> +static struct omap_hwmod_irq_info omap2430_mcspi3_mpu_irqs[] = {
->> + ? ? { .irq = 91 },
->> +};
->> +
->> +static struct omap_hwmod_dma_info omap2430_mcspi3_sdma_reqs[] = {
->> + ? ? { .name = "tx0", .dma_req = 15 }, /* DMA_SPI3_TX0 */
->> + ? ? { .name = "rx0", .dma_req = 16 }, /* DMA_SPI3_RX0 */
->> + ? ? { .name = "tx1", .dma_req = 23 }, /* DMA_SPI3_TX1 */
->> + ? ? { .name = "rx1", .dma_req = 24 }, /* DMA_SPI3_RX1 */
->> +};
->> +
->> +static struct omap_hwmod_ocp_if *omap2430_mcspi3_slaves[] = {
->> + ? ? &omap2430_l4_core__mcspi3,
->> +};
->> +
->> +static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
->> + ? ? .num_chipselect = 2,
->> +};
->> +
->> +static struct omap_hwmod omap2430_mcspi3_hwmod = {
->> + ? ? .name ? ? ? ? ? = "mcspi3_hwmod",
->> + ? ? .mpu_irqs ? ? ? = omap2430_mcspi3_mpu_irqs,
->> + ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap2430_mcspi3_mpu_irqs),
->> + ? ? .sdma_reqs ? ? ?= omap2430_mcspi3_sdma_reqs,
->> + ? ? .sdma_reqs_cnt ?= ARRAY_SIZE(omap2430_mcspi3_sdma_reqs),
->> + ? ? .main_clk ? ? ? = "mcspi3_fck",
->> + ? ? .prcm ? ? ? ? ? = {
->> + ? ? ? ? ? ? .omap2 = {
->> + ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
->> + ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 2,
->> + ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP2430_EN_MCSPI3_SHIFT,
->> + ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 2,
->> + ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP2430_ST_MCSPI3_SHIFT,
->> + ? ? ? ? ? ? },
->> + ? ? },
->> + ? ? .slaves ? ? ? ? = omap2430_mcspi3_slaves,
->> + ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap2430_mcspi3_slaves),
->> + ? ? .class ? ? ? ? ?= &omap2430_mcspi_class,
->> + ? ? .dev_attr ? ? ? = &omap_mcspi3_dev_attr,
->> + ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
->> +};
->> +
->> ?static __initdata struct omap_hwmod *omap2430_hwmods[] = {
->> ? ? ? &omap2430_l3_main_hwmod,
->> ? ? ? &omap2430_l4_core_hwmod,
->> @@ -581,6 +795,11 @@ static __initdata struct omap_hwmod *omap2430_hwmods[] = {
->> ? ? ? &omap2430_uart3_hwmod,
->> ? ? ? &omap2430_i2c1_hwmod,
->> ? ? ? &omap2430_i2c2_hwmod,
->> +
->> + ? ? /* mcspi class */
->> + ? ? &omap2430_mcspi1_hwmod,
->> + ? ? &omap2430_mcspi2_hwmod,
->> + ? ? &omap2430_mcspi3_hwmod,
->> ? ? ? NULL,
->> ?};
->>
->> --
->> 1.7.1
->>
->>
->>
->> ------------------------------------------------------------------------------
->> Increase Visibility of Your 3D Game App & Earn a Chance To Win $500!
->> Tap into the largest installed PC base & get more eyes on your game by
->> optimizing for Intel(R) Graphics Technology. Get started today with the
->> Intel(R) Software Partner Program. Five $500 cash prizes are up for grabs.
->> http://p.sf.net/sfu/intelisp-dev2dev
->> _______________________________________________
->> spi-devel-general mailing list
->> spi-devel-general at lists.sourceforge.net
->> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+>> I'm open to alternatives to the solution below, outside of disabling the
+>> UARTs in question as is done on the DA850 evm and the hawkboard (both
+>> of which might be able to use this patch?).
+> 
+> Can you please CC linux-serial on this patch? Folks on that list
+> will have ideas on how best to work around this issue.
+> 
+> I think setting the UART_BUG_NOMSR in up->bugs for these ports
+> (as you previously implemented on your tree) is a better patch
+> since it utilizes an existing established mechanism. 
+> 
+> I understand there is no existing way to pass the bugs through
+> platform data, but may be that needs to be created (or may be
+> have a new port type for "DaVinci UART with no flow control" and
+> then setup up->bugs after checking for this port type).
+> 
+
+
+I will post to linux-serial and see what their take is on this issue.
+
+Thanks for the comments.
+
+-Mike
