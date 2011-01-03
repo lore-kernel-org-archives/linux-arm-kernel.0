@@ -1,102 +1,66 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 03 Jan 2011 11:28:38 +0900
-Subject: [PATCH 1/4] ARM: Kconfig: Add audio support dependency
-In-Reply-To: <1293172569-21465-1-git-send-email-sw.youn@samsung.com>
-References: <1293171965-24416-1-git-send-email-sw.youn@samsung.com>
-	<1293172569-21465-1-git-send-email-sw.youn@samsung.com>
-Message-ID: <019b01cbaaed$f0418d30$d0c4a790$%kim@samsung.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Mon, 3 Jan 2011 09:18:45 +0530
+Subject: [PATCH V3 36/63] ST SPEAr : FSMC (Flexible Static Memory
+	Controller) NOR interface driver
+In-Reply-To: <AANLkTik_NXigwhRH3KMjV3qmu-GB7m+6hzzdGY8RjBof@mail.gmail.com>
+References: <cover.1292833228.git.viresh.kumar@st.com>	<187ed7b3996c7f37ce782d847d3ecc761c3e52b8.1292833228.git.viresh.kumar@st.com>
+	<AANLkTik_NXigwhRH3KMjV3qmu-GB7m+6hzzdGY8RjBof@mail.gmail.com>
+Message-ID: <4D21471D.60705@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwhan Youn wrote:
-> 
-> This patch adds Samsung ASoC audio support dependency for Samsung SoCs.
-> 
-> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
-> ---
->  arch/arm/Kconfig |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d56d21c..ef32a61 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -647,6 +647,7 @@ config ARCH_S3C2410
->  	select HAVE_CLK
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_S3C2410_I2C if I2C
-> +	select ASOC_SAMSUNG if SND_SOC
->  	help
->  	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
->  	  BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940
-> or
-> @@ -678,6 +679,7 @@ config ARCH_S3C64XX
->  	select SAMSUNG_GPIOLIB_4BIT
->  	select HAVE_S3C2410_I2C if I2C
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> +	select ASOC_SAMSUNG if SND_SOC
->  	help
->  	  Samsung S3C64XX series based systems
-> 
-> @@ -690,6 +692,7 @@ config ARCH_S5P64X0
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_S3C2410_I2C if I2C
->  	select HAVE_S3C_RTC if RTC_CLASS
-> +	select ASOC_SAMSUNG if SND_SOC
->  	help
->  	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
->  	  SMDK6450.
-> @@ -701,6 +704,7 @@ config ARCH_S5P6442
->  	select HAVE_CLK
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> +	select ASOC_SAMSUNG if SND_SOC
->  	help
->  	  Samsung S5P6442 CPU based systems
-> 
-> @@ -714,6 +718,7 @@ config ARCH_S5PC100
->  	select HAVE_S3C2410_I2C if I2C
->  	select HAVE_S3C_RTC if RTC_CLASS
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> +	select ASOC_SAMSUNG if SND_SOC
->  	help
->  	  Samsung S5PC100 series based systems
-> 
-> @@ -729,6 +734,7 @@ config ARCH_S5PV210
->  	select HAVE_S3C2410_I2C if I2C
->  	select HAVE_S3C_RTC if RTC_CLASS
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> +	select ASOC_SAMSUNG if SND_SOC
->  	help
->  	  Samsung S5PV210/S5PC110 series based systems
-> 
-> @@ -742,6 +748,7 @@ config ARCH_S5PV310
->  	select HAVE_S3C_RTC if RTC_CLASS
->  	select HAVE_S3C2410_I2C if I2C
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> +	select ASOC_SAMSUNG if SND_SOC
->  	help
->  	  Samsung S5PV310 series based systems
-> 
-> --
 
-Hi everyone,
+Linus,
 
-Wow it's 2011, I hope you're happy :-)
+On 12/26/2010 09:08 PM, Linus Walleij wrote:
+> 2010/12/20 Viresh Kumar <viresh.kumar@st.com>:
+> 
 
-Hmm...sorry for late.
-Looks ok to me..but I know, you changed the name 'ASOC_SAMSUNG' to
-'SND_SOC_SAMSUNG'.
+(...)
 
-So I'm waiting for updated patch now.
+>> diff --git a/arch/arm/mach-spear13xx/fsmc-nor.c b/arch/arm/mach-spear13xx/fsmc-nor.c
+>> new file mode 100644
+>> index 0000000..03234b6
+>> --- /dev/null
+>> +++ b/arch/arm/mach-spear13xx/fsmc-nor.c
+> 
+> What is this file doing in mach-spear13xx? Several other platforms
+> like U300 and Nomadik use the same NOR controller.
+> 
+> This should be in drivers/mtd/* somewhere I believe?
+> 
+>> @@ -0,0 +1,85 @@
+>> +/*
+>> + * arch/arm/mach-spear13xx/fsmc-nor.c
+>> + *
+>> + * FSMC (Flexible Static Memory Controller) interface for NOR
+>> + *
+>> + * Copyright (C) 2010 ST Microelectronics
+>> + * Vipin Kumar<vipin.kumar@st.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +#include <linux/init.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <plat/fsmc.h>
+> 
+> Use <linux/mtd/fsmc.h> as include file, get rid of plat/fsmc.h.
+> Extend that .h file with the stuff you need.
+> 
+> We need to keep definitions for MTD NOR, NAND and OneNAND using FSMC
+> in this file so as to keep things simple. One header file is enough, and it's
+> very generic too, FSMC is not for plat-spear/* but also U300, Nomadik and
+> Ux500.
+> 
 
-Mr. Youn, could you please update your patch against on sound-2.6 tree?
-Or...Mark, what's your plan about this, please let me know.
+Yes i agree. I will remove patches related to fsmc from this patch series and will
+send them separately.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+viresh
