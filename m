@@ -1,18 +1,27 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 3 Jan 2011 09:28:24 +0800
-Subject: [PATCH RESEND] [ARM] Add missing include "asm/memory.h"
-In-Reply-To: <20110102235449.GB17727@n2100.arm.linux.org.uk>
-References: <1293501397.32542.2.camel@mola>
-	<20110102235449.GB17727@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTim7FFpoXoHSJxTS=HaNL5y9m+mo+yxrjB5CjMJx@mail.gmail.com>
+From: claude.youn@gmail.com (Seungwhan Youn)
+Date: Mon, 3 Jan 2011 10:30:05 +0900
+Subject: [alsa-devel] [PATCH 2/4] ARM: SAMSUNG: Add SMDK audio
+	configuration
+In-Reply-To: <20110102140129.GI4935@opensource.wolfsonmicro.com>
+References: <1293171965-24416-1-git-send-email-sw.youn@samsung.com>
+	<1293172938-23615-1-git-send-email-sw.youn@samsung.com>
+	<20110102140129.GI4935@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTi=yyE7X1Z-WSP6hj=vb2b38DW=BNm+A7Y=+k2wh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Patch is fine, but please throw it into my patch system, thanks.
+On Sun, Jan 2, 2011 at 11:01 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Fri, Dec 24, 2010 at 03:42:18PM +0900, Seungwhan Youn wrote:
+>> This patch adds SMDK audio select configurations based on platform dependacny.
+>> This helps more easyly and clearly to make sure about configuration on audio
+>> drivers support on platform side.
+>>
+>> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
 >
+> This doesn't apply against current ASoC; I suspect it needs to be merged
+> via the ARM tree.
 
-hi Russell,
-The patch is upload to your patch system now.
-
-Regards,
-Axel
+Yes, patch 1/4 and 2/4 was based on Mr. Kukjin Kim's for-next branch.
+So, I hope that Mr. Kukjin Kim sync with you, after he apply these 1,2
+patches.
