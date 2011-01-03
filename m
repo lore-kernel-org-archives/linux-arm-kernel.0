@@ -1,41 +1,21 @@
-From: Harald.Krammer@hkr.at (Harald Krammer)
-Date: Mon, 03 Jan 2011 09:31:27 +0100
-Subject: SRAM performance optimization (PXA270)
-Message-ID: <4D21895F.9090807@hkr.at>
+From: iban@fqingenieria.es (FQ | Iban Cerro)
+Date: Mon, 3 Jan 2011 09:56:12 +0100 (CET)
+Subject: [PATCH 00/04] ARM i.MX25 Add SIM driver support
+Message-ID: <2106.212.121.242.58.1294044972.squirrel@mail.fqingenieria.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-I am currently running a PXA270 520MHz system with a 104 MHz DRAM. Now I
-need to optimize my system. The analysis showed me (with the help of
-valgrind, gettimeofday, size,...) that a poor cache hit rate is present.
-So I came to the conclusion that the SRAM will help me, because it is
-clocked with 208 MHz.
+Hi,
 
-Now the question: how?
+The following series adds support for the Freescale i.MX SIM Module. These
+patches has been probed working on MX25 based platform (3DSPDK). Maybe it
+can be extended to MX51 platforms with some additional modifications.
 
-My first test was to map few data of my application into the SRAM via
-the mmap system call and so I got a performance boost of ~4%.  I know
-from my tests that the code-cache hit rate is poor too, so the code
-should be placed into the SRAM. How I can do that?
-My current idea is to write a so-library with code and load it into the
-SRAM.  The effort looks a little bit complex and  the disadvantages are
-debugging and  core file analysis (gdb needs also patches). So in case
-of any problems in the code it will be hard to find it.
-BTW, -fPIC code (position-independent code) costs around 3 % performance
-in my case. I have never thought about that, but it is logical.
+These patches has been applied against:
+git://git.pengutronix.de/git/imx/linux-2.6.git
+branch: imx-for-2.6.38
+commit: 28a4f908acb342350b9ecbfcdf0a999cb83e05aa
 
-Exists better solution?
-e.g. fixed map-address with modified loader ?, or exists a kernel patch
-to locate few parts of the kernel into SRAM?
+Any comments/reviews are welcome
 
-Thanks for any ideas or comments
-Nice greetings
-Harald
-
--- 
-
-Harald Krammer
-
-Mobil +43.(0) 664. 130 59 58
-Mail: Harald.Krammer (at) hkr.at
+Iban Cerro
