@@ -1,27 +1,44 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 3 Jan 2011 23:48:24 +0800
-Subject: [GIT PULL] pxa: 3 fixes for 2.6.37-rc8
-Message-ID: <AANLkTi=Xmv+jbhtu6+PPAuB9CETV74WsYe3oB1fj0D3Z@mail.gmail.com>
+Date: Mon, 3 Jan 2011 23:57:27 +0800
+Subject: [PATCH 2/2] arm/pxa: buildfix for pam27x without fb
+In-Reply-To: <1293654828-24661-2-git-send-email-bigeasy@linutronix.de>
+References: <1293654828-24661-1-git-send-email-bigeasy@linutronix.de>
+	<1293654828-24661-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <AANLkTi=mtu3VibUR5SC+GmsmJCwo-nN9=eoTmzUE9jS8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 387c31c7e5c9805b0aef8833d1731a5fe7bdea14:
+On Thu, Dec 30, 2010 at 4:33 AM, Sebastian Andrzej Siewior
+<bigeasy@linutronix.de> wrote:
+> |arch/arm/mach-pxa/palmld.c: In function ?palmld_init?:
+> |arch/arm/mach-pxa/palmld.c:330: error: ?palm_320x480_lcd_mode? undeclared (first use in this function)
+> |arch/arm/mach-pxa/palmld.c:330: error: (Each undeclared identifier is reported only once
+> |arch/arm/mach-pxa/palmld.c:330: error: for each function it appears in.)
+>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-  Linux 2.6.37-rc8 (2010-12-28 17:05:48 -0800)
+Marek,
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+I need your ack please.
 
-Aric D. Blumer (1):
-      ARM: pxa: fix page table corruption on resume
-
-Lennert Buytenhek (1):
-      ARM: pxa: PXA_ESERIES depends on FB_W100.
-
-Mike Rapoport (1):
-      ARM: it8152: add IT8152_LAST_IRQ definition to fix build error
-
- arch/arm/include/asm/hardware/it8152.h |    1 +
- arch/arm/mach-pxa/Kconfig              |    1 +
- arch/arm/mach-pxa/sleep.S              |    4 ++--
- 3 files changed, 4 insertions(+), 2 deletions(-)
+> ---
+> ?arch/arm/mach-pxa/include/mach/palm27x.h | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h b/arch/arm/mach-pxa/include/mach/palm27x.h
+> index 0a5e5ea..7b7927c 100644
+> --- a/arch/arm/mach-pxa/include/mach/palm27x.h
+> +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
+> @@ -34,7 +34,7 @@ extern struct pxafb_mode_info palm_320x320_new_lcd_mode;
+> ?extern void __init palm27x_lcd_init(int power,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct pxafb_mode_info *mode);
+> ?#else
+> -static inline void palm27x_lcd_init(int power, struct pxafb_mode_info *mode) {}
+> +#define palm27x_lcd_init(power, mode) ?do { } while (0)
+> ?#endif
+>
+> ?#if ? ?defined(CONFIG_USB_GADGET_PXA27X) || \
+> --
+> 1.7.3.2
+>
+>
