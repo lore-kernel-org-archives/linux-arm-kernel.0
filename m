@@ -1,58 +1,106 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:43:56 +0000
-Subject: [PATCH 41/48] ARM: PL08x: store prep_* flags in async_tx structure
+Date: Mon, 03 Jan 2011 22:44:16 +0000
+Subject: [PATCH 42/48] ARM: PL08x: implement unmapping of memcpy buffers
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZt88-0003S4-6A@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZt8S-0003S8-Jq@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like other DMA engine drivers do, store the passed flags into the
-async_tx structure, so they can be checked when the operation
-completes.
+The DMA engine API requires DMA engine implementations to unmap buffers
+passed into the non-slave DMA methods unless the relevant completion
+flag is set.  We aren't doing this, so implement this facility.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/dma/amba-pl08x.c |   52 ++++++++++++++++++++++++++++++++++-----------
+ 1 files changed, 39 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 8d8d33c..00058e3 100644
+index 00058e3..fb469de 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -1277,12 +1277,14 @@ static u32 pl08x_select_bus(struct pl08x_driver_data *pl08x, u8 src, u8 dst)
- 	return cctl;
+@@ -1527,13 +1527,33 @@ static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
+ 	writel(val, pl08x->base + PL080_CONFIG);
  }
  
--static struct pl08x_txd *pl08x_get_txd(struct pl08x_dma_chan *plchan)
-+static struct pl08x_txd *pl08x_get_txd(struct pl08x_dma_chan *plchan,
-+	unsigned long flags)
++static void pl08x_unmap_buffers(struct pl08x_txd *txd)
++{
++	struct device *dev = txd->tx.chan->device->dev;
++
++	if (!(txd->tx.flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
++		if (txd->tx.flags & DMA_COMPL_SRC_UNMAP_SINGLE)
++			dma_unmap_single(dev, txd->src_addr, txd->len,
++				DMA_TO_DEVICE);
++		else
++			dma_unmap_page(dev, txd->src_addr, txd->len,
++				DMA_TO_DEVICE);
++	}
++	if (!(txd->tx.flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
++		if (txd->tx.flags & DMA_COMPL_DEST_UNMAP_SINGLE)
++			dma_unmap_single(dev, txd->dst_addr, txd->len,
++				DMA_FROM_DEVICE);
++		else
++			dma_unmap_page(dev, txd->dst_addr, txd->len,
++				DMA_FROM_DEVICE);
++	}
++}
++
+ static void pl08x_tasklet(unsigned long data)
  {
- 	struct pl08x_txd *txd = kzalloc(sizeof(struct pl08x_txd), GFP_NOWAIT);
+ 	struct pl08x_dma_chan *plchan = (struct pl08x_dma_chan *) data;
+ 	struct pl08x_driver_data *pl08x = plchan->host;
+ 	struct pl08x_txd *txd;
+-	dma_async_tx_callback callback = NULL;
+-	void *callback_param = NULL;
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&plchan->lock, flags);
+@@ -1542,18 +1562,10 @@ static void pl08x_tasklet(unsigned long data)
+ 	plchan->at = NULL;
  
  	if (txd) {
- 		dma_async_tx_descriptor_init(&txd->tx, &plchan->chan);
-+		txd->tx.flags = flags;
- 		txd->tx.tx_submit = pl08x_tx_submit;
- 		INIT_LIST_HEAD(&txd->node);
+-		callback = txd->tx.callback;
+-		callback_param = txd->tx.callback_param;
+-
+ 		/*
+ 		 * Update last completed
+ 		 */
+ 		plchan->lc = txd->tx.cookie;
+-
+-		/*
+-		 * Free the descriptor
+-		 */
+-		pl08x_free_txd(pl08x, txd);
+ 	}
+ 	/*
+ 	 * If a new descriptor is queued, set it up
+@@ -1605,9 +1617,23 @@ static void pl08x_tasklet(unsigned long data)
  
-@@ -1305,7 +1307,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
- 	struct pl08x_txd *txd;
- 	int ret;
+ 	spin_unlock_irqrestore(&plchan->lock, flags);
  
--	txd = pl08x_get_txd(plchan);
-+	txd = pl08x_get_txd(plchan, flags);
- 	if (!txd) {
- 		dev_err(&pl08x->adev->dev,
- 			"%s no memory for descriptor\n", __func__);
-@@ -1363,7 +1365,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 	dev_dbg(&pl08x->adev->dev, "%s prepare transaction of %d bytes from %s\n",
- 		__func__, sgl->length, plchan->name);
+-	/* Callback to signal completion */
+-	if (callback)
+-		callback(callback_param);
++	if (txd) {
++		dma_async_tx_callback callback = txd->tx.callback;
++		void *callback_param = txd->tx.callback_param;
++
++		/* Don't try to unmap buffers on slave channels */
++		if (!plchan->slave)
++			pl08x_unmap_buffers(txd);
++
++		/* Free the descriptor */
++		spin_lock_irqsave(&plchan->lock, flags);
++		pl08x_free_txd(pl08x, txd);
++		spin_unlock_irqrestore(&plchan->lock, flags);
++
++		/* Callback to signal completion */
++		if (callback)
++			callback(callback_param);
++	}
+ }
  
--	txd = pl08x_get_txd(plchan);
-+	txd = pl08x_get_txd(plchan, flags);
- 	if (!txd) {
- 		dev_err(&pl08x->adev->dev, "%s no txd\n", __func__);
- 		return NULL;
+ static irqreturn_t pl08x_irq(int irq, void *dev)
 -- 
 1.6.2.5
