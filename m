@@ -1,27 +1,31 @@
 From: claude.youn@gmail.com (Seungwhan Youn)
-Date: Mon, 3 Jan 2011 10:30:05 +0900
-Subject: [alsa-devel] [PATCH 2/4] ARM: SAMSUNG: Add SMDK audio
-	configuration
-In-Reply-To: <20110102140129.GI4935@opensource.wolfsonmicro.com>
+Date: Mon, 3 Jan 2011 10:37:29 +0900
+Subject: [alsa-devel] [PATCH 1/4] ARM: Kconfig: Add audio support
+	dependency
+In-Reply-To: <20110102140517.GJ4935@opensource.wolfsonmicro.com>
 References: <1293171965-24416-1-git-send-email-sw.youn@samsung.com>
-	<1293172938-23615-1-git-send-email-sw.youn@samsung.com>
-	<20110102140129.GI4935@opensource.wolfsonmicro.com>
-Message-ID: <AANLkTi=yyE7X1Z-WSP6hj=vb2b38DW=BNm+A7Y=+k2wh@mail.gmail.com>
+	<1293172569-21465-1-git-send-email-sw.youn@samsung.com>
+	<20110102140517.GJ4935@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTinnzD+cB6QuFJ4NK+-ASLDoTw6EgJiXJBreuzTD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 2, 2011 at 11:01 PM, Mark Brown
+On Sun, Jan 2, 2011 at 11:05 PM, Mark Brown
 <broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Dec 24, 2010 at 03:42:18PM +0900, Seungwhan Youn wrote:
->> This patch adds SMDK audio select configurations based on platform dependacny.
->> This helps more easyly and clearly to make sure about configuration on audio
->> drivers support on platform side.
->>
+> On Fri, Dec 24, 2010 at 03:36:09PM +0900, Seungwhan Youn wrote:
+>
+>> This patch adds Samsung ASoC audio support dependency for Samsung SoCs.
+>
 >> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
 >
-> This doesn't apply against current ASoC; I suspect it needs to be merged
-> via the ARM tree.
+>> + ? ? select ASOC_SAMSUNG if SND_SOC
+>
+> Hrm, if we're going to do this we probably ought to be doing it for all
+> architectures. ?It's a good idea, we don't tend to have multiple
+> possible architectures supported for a given architecture. ?Since the
+> second patch didn't apply I'll leave this one too, and patches 3 and 4,
+> though they all look good.
 
-Yes, patch 1/4 and 2/4 was based on Mr. Kukjin Kim's for-next branch.
-So, I hope that Mr. Kukjin Kim sync with you, after he apply these 1,2
-patches.
+Yes, I think so, but I didn't think that far when I made these
+patches. If you don't mind, can I re-make this patch-set for all
+architectures with your 'Requested-by'?
