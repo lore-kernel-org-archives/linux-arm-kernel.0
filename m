@@ -1,45 +1,57 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 3 Jan 2011 16:29:39 +0100
-Subject: [PATCH 02/04] ARM i.MX25 Add SIM driver
-In-Reply-To: <4D21E53E.2050809@fqingenieria.es>
-References: <20736.212.121.242.58.1294045639.squirrel@mail.fqingenieria.es>
-	<20110103130551.GA24408@pengutronix.de>
-	<4D21E53E.2050809@fqingenieria.es>
-Message-ID: <20110103152939.GB24398@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 3 Jan 2011 16:42:14 +0100
+Subject: [PATCH 3/9] Add a mfd IPUv3 driver
+In-Reply-To: <1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+	<1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110103154214.GB11033@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 20, 2010 at 11:48:41AM +0100, Sascha Hauer wrote:
+> The IPU is the Image Processing Unit found on i.MX50/51/53 SoCs. It
+> features several units for image processing, this patch adds support
+> for the units needed for Framebuffer support, namely:
+>
+> - Display Controller (dc)
+> - Display Interface (di)
+> - Display Multi Fifo Controller (dmfc)
+> - Display Processor (dp)
+> - Image DMA Controller (idmac)
+>
+> This patch is based on the Freescale driver, but follows a different
+> approach. The Freescale code implements logical idmac channels and
+> the handling of the subunits is hidden in common idmac code pathes
+> in big switch/case statements. This patch instead just provides code
+> and resource management for the different subunits. The user, in this
+> case the framebuffer driver, decides how the different units play
+> together.
+>
+> The IPU has other units missing in this patch:
+>
+> - CMOS Sensor Interface (csi)
+> - Video Deinterlacer (vdi)
+> - Sensor Multi FIFO Controler (smfc)
+> - Image Converter (ic)
+> - Image Rotator (irt)
+>
+> So expect more files to come in this directory.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-> Regarding if this driver can fit into mainline, I agree that the
-> kernel is not the right place to contain a smartcard API. There are
-> other projects doing that quite well (muscle, opensc, ...). But in
-> fact, the idea of this driver is not to give a smartcard API but
-> support the I.MX25 SIM core, which is explicitly hardware dependant.
+Hello Samuel,
 
-Juergen Beisert also wrote a driver for it and you can read the
-discussions about mainlining strategies here:
+I see no further comments on this series. Does this mean you are ok with
+the patch or didn't you find the time looking at it?
 
-https://lkml.org/lkml/2010/5/7/214
-http://www.opensc-project.org/pipermail/opensc-devel/2010-May/014225.html
+This patch can go via the mfd tree or I can push this via my i.MX tree.
+Going via the i.MX tree makes life a bit easier for me because we do not
+run into merge order dependencies. Please let me know what you prefer.
 
-Patches for opensc:
-
-http://www.opensc-project.org/pipermail/opensc-devel/2010-May/014271.html
-
-IIRC the direction was okay, just some obstacles left.
-
-Kind regards,
-
-   Wolfram
+Sascha
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110103/5756d247/attachment.sig>
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
