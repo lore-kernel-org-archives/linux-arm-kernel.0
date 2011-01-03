@@ -1,43 +1,66 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jan 2011 00:33:40 +0000
-Subject: [PATCH 1/7] msm: io: I/O register definitions for MSM8960
-In-Reply-To: <alpine.LFD.2.00.1012251100340.10437@xanadu.home>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<201012152337.19475.arnd@arndb.de>
-	<20101217001658.GA5880@huya.qualcomm.com>
-	<201012241429.28901.arnd@arndb.de>
-	<alpine.LFD.2.00.1012251100340.10437@xanadu.home>
-Message-ID: <20110103003340.GE17727@n2100.arm.linux.org.uk>
+Date: Mon, 3 Jan 2011 00:37:18 +0000
+Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with
+	high frequency clocks
+In-Reply-To: <alpine.LFD.2.00.1012291703300.10437@xanadu.home>
+References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
+	<20101221105149.GO28157@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1012291703300.10437@xanadu.home>
+Message-ID: <20110103003718.GF17727@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 25, 2010 at 11:04:11AM -0500, Nicolas Pitre wrote:
-> On Fri, 24 Dec 2010, Arnd Bergmann wrote:
+On Wed, Dec 29, 2010 at 08:31:58PM -0500, Nicolas Pitre wrote:
+> On Tue, 21 Dec 2010, Russell King - ARM Linux wrote:
 > 
-> > On Friday 17 December 2010, David Brown wrote:
-> > > I'm not sure really what to do about PHYS_OFFSET.  This is kind of the
-> > > big thing that has kept us so far from making our SOCs multiply
-> > > selectable.  I could move this into a Kconfig option, but it would
-> > > still need to be selected by the SOC.  It is unfortunate that most of
-> > > our SOCs have different enough memory configurations that these are
-> > > mostly different.  Even 8960/8660 will probably have future variants
-> > > that are at different addresses.
+> > On Mon, Dec 20, 2010 at 08:21:41PM -0500, Nicolas Pitre wrote:
+> > > 
+> > > The minsec argument to clocks_calc_mult_shift() [ which appears to be
+> > > misnamed by the way ] is used to clamp the magnitude of the mult factor
+> > > so that the given range won't overflow a 64 bit result.  The mult factor
+> > > is itself already limited to a maximum of 32 bits.  Given that the largest
+> > > clock tick range we may have is also 32 bits, there is no way our usage of
+> > > any computed mult factor would ever overflow 64 bits.
+> > > 
+> > > The choice of 60 seconds here for minsec is rather arbitrary.  If the
+> > > mult factor wasn't already limited to 32 bits, this value of 60 would
+> > > create overflows for clocks which take more than 60 seconds to wrap.
 > > 
-> > I think there are people working on relocatable kernels already,
-> > and we definitely need this for the other work in progress of
-> > doing kernel binaries that work across different SoC families,
-> > as well as for doing a single kernel that can be used both for
-> > booting the system and for kdump.
-> > 
-> > You don't need to worry about PHYS_OFFSET at the platform level,
-> > we'll get there in a few months for all ARM platforms.
+> > 60 seconds was arbitary, chosen from the selection of clock rates which
+> > I had available at the time (the highest of which was 24MHz).
 > 
-> ... or in a few days even.  I'm currently working on the patch making 
-> PHYS_OFFSET patched into the kernel at run time.  I'm currently looking 
-> at what is needed to make it work also with Thumb2.
+> Fair enough.  It is just not universally optimal given the different 
+> clock ranges this code now covers.
+> 
+> > > And for clocks which take less than 60 seconds to wrap then we do lose
+> > > precision as the mult factor is made smaller (fewer bits) to be adjusted
+> > > to a range which is larger than what we actually use.  This currently
+> > > affects clocks faster than 71MHz.
+> > > 
+> > > We could use minsec = 0 instead of 60 and a good 32-bit mult factor would
+> > > be computed in all cases.  But let's be formal and provide the actual
+> > > range to clocks_calc_mult_shift(). None of the cyc_to_fixed_sched_clock()
+> > > users are affected as they all are using clocks < 71MHz.
+> > 
+> > Maybe __clocksource_updatefreq_scale() needs a similar fix too, instead
+> > of assuming 5 seconds?  It also has access to the mask and rate.
+> 
+> There is a comment to that effect right above the 
+> clocks_calc_mult_shift() indicating that this is a known issue in that 
+> case already.  
+> 
+> And looking at that code, it appears that there is a balance to be made 
+> between cs->max_idle_ns and cs->mult, the former currently being 
+> determined by the later.  But if cs->mult is maximized to 32 bits, that 
+> leaves only 31 bits for cs->max_idle_ns which corresponds to approx 2 
+> seconds only.
+> 
+> So this is not clear to me what would be the optimal mult/shift values 
+> in the __clocksource_updatefreq_scale() context, while this is rather 
+> obvious in the init_sched_clock() context.  Hence this patch.
 
-So where do we stand with:
+As clocksources are about precision (I believe it has been stated so in
+the past) it seems that fudging the shift and multiplier to get an
+extended period out of the clock is not the correct approach.
 
-http://lists.arm.linux.org.uk/lurker/message/20101110.175549.62a0b058.en.html
-
-Is this something which should be queued for this merge window?
+Maybe Thomas or John can shed some light on this?
