@@ -1,46 +1,19 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 03 Jan 2011 19:55:19 +0900
-Subject: [PATCH] ARM: S3C64xx: Clear DMA_HALT upon start
-In-Reply-To: <1294019615-18532-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1294019615-18532-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <01b501cbab34$b9b977e0$2d2c67a0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jan 2011 11:01:54 +0000
+Subject: [PATCH 0/7] PL011 DMA support
+In-Reply-To: <20110103100753.GB26785@n2100.arm.linux.org.uk>
+References: <20110103100753.GB26785@n2100.arm.linux.org.uk>
+Message-ID: <20110103110154.GJ26785@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
+On Mon, Jan 03, 2011 at 10:07:54AM +0000, Russell King - ARM Linux wrote:
+> This is another posting of the PL011 DMA patch set, with a new patch
+> to include the PL011 revision in the boot time messages, and fixups
+> to the DMA patch as a result of discussions with Dan.
 > 
-> From: Jassi Brar <jassi.brar@samsung.com>
-> 
-> The stop function sets the DMA_HALT bit, which prevents
-> the DMA transfer to resume after stop, for example during
-> audio PAUSE/PLAY cycle. Clear the HALT bit during start.
-> 
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
-> ---
->  arch/arm/mach-s3c64xx/dma.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-> index e7d03ab..d9aa072 100644
-> --- a/arch/arm/mach-s3c64xx/dma.c
-> +++ b/arch/arm/mach-s3c64xx/dma.c
-> @@ -212,6 +212,7 @@ static int s3c64xx_dma_start(struct s3c2410_dma_chan
-> *chan)
-> 
->  	config = readl(chan->regs + PL080S_CH_CONFIG);
->  	config |= PL080_CONFIG_ENABLE;
-> +	config &= ~PL080_CONFIG_HALT;
-> 
->  	pr_debug("%s: writing config %08x\n", __func__, config);
->  	writel(config, chan->regs + PL080S_CH_CONFIG);
-> --
+> Acks for patches 1 and 6 would be appreciated.
 
-Ok...will apply.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I'd like to have an ack from Linus for patches 1 and 6, and an ack from
+Dan for just patch 6.  Once I have those acks, I think PL011 TX DMA
+support is good to go for this merge window.
