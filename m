@@ -1,37 +1,61 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 3 Jan 2011 15:17:28 +0100
-Subject: zaurus bluetooth regression
-In-Reply-To: <AANLkTika7HAEc+BbqSnbo8viUt4nOqoeB69qWZs85-9s@mail.gmail.com>
-References: <20110102204532.GA12860@elf.ucw.cz> <20110102203023.GA1545@ucw.cz>
-	<AANLkTika7HAEc+BbqSnbo8viUt4nOqoeB69qWZs85-9s@mail.gmail.com>
-Message-ID: <20110103141727.GA1536@ucw.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 3 Jan 2011 15:38:32 +0100
+Subject: [patch 1/5] ehci-mxc: Enable vbus later
+In-Reply-To: <20101220155810.708379512@rtp-net.org>
+References: <20101220154853.254931637@rtp-net.org>
+	<20101220155810.708379512@rtp-net.org>
+Message-ID: <20110103143832.GM6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Dec 20, 2010 at 04:48:54PM +0100, Arnaud Patard wrote:
+> vbus should be enabled after usb_add_hcd() otherwise USB is not working
+> on my efikamx.
 
-> >> It seems this commit
-> >>
-> >> commit 7a56aa45982bb87bfca98a2832b5ae782c03364a
-> > ...
-> >> ...is responsible for my bluetooth problems on zaurus -- at least
-> >> bisect pointed to it, ?as I use 16C950-based bluetooth card, it seems
-> >> very logical. I'll try 2.6.37-rc8 with that patch reverted...
-> >>
-> >
-> > And yes, 37-rc8 with that reverted results in working bluetooth, so
-> > yrs, that patch is responsible.
+I have tested this on different i.MX27/31/35 based boards, the USB is
+still functional, so
+
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+
 > 
-> could you tell, what kind of problem you're encountering and if you
-> could tell, which flag UART_CAP_EFR or UART_CAP_SLEEP causes the
-> problem?
-
-Bluetooth will not work with 'tx command timeout', details should be
-in bugzilla.
-
-CAP_EFR seems to cause the problem.
-								Pavel
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Index: tst-usb/drivers/usb/host/ehci-mxc.c
+> ===================================================================
+> --- tst-usb.orig/drivers/usb/host/ehci-mxc.c	2010-12-20 15:38:41.000000000 +0100
+> +++ tst-usb/drivers/usb/host/ehci-mxc.c	2010-12-20 15:38:43.000000000 +0100
+> @@ -210,11 +210,6 @@
+>  			ret = -ENODEV;
+>  			goto err_add;
+>  		}
+> -		ret = otg_set_vbus(pdata->otg, 1);
+> -		if (ret) {
+> -			dev_err(dev, "unable to enable vbus on transceiver\n");
+> -			goto err_add;
+> -		}
+>  	}
+>  
+>  	priv->hcd = hcd;
+> @@ -224,6 +219,14 @@
+>  	if (ret)
+>  		goto err_add;
+>  
+> +	if (pdata->otg) {
+> +		ret = otg_set_vbus(pdata->otg, 1);
+> +		if (ret) {
+> +			dev_err(dev, "unable to enable vbus on transceiver\n");
+> +			goto err_add;
+> +		}
+> +	}
+> +
+>  	return 0;
+>  
+>  err_add:
+> 
+> 
+> 
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
