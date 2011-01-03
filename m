@@ -1,101 +1,176 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:38:32 +0000
-Subject: [PATCH 25/48] ARM: PL08x: clean up LLI lookup
+Date: Mon, 03 Jan 2011 22:38:52 +0000
+Subject: [PATCH 26/48] ARM: PL08x: combine functions to start DMA into one
+	function
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZt2u-0001QR-QO@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZt3E-0001ot-Tf@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the LLI list is an array, we can use maths to locate which LLI
-index we're currently at, and then sum up the remaining LLI entries
-until we reach the end of the list.
-
-This makes the code much easier to read, and much less susceptible
-to falling off the end of the array.
+There is no need for pl08x_config_phychan_for_txd(), pl08x_set_cregs()
+and pl08x_enable_phy_chan() to be separate - they are always called in
+sequence.  Combine them into one function.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   37 ++++++++++++++++++++-----------------
- 1 files changed, 20 insertions(+), 17 deletions(-)
+ drivers/dma/amba-pl08x.c |   98 ++++++++++++++++++----------------------------
+ 1 files changed, 38 insertions(+), 60 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index a897315..202c9e2 100644
+index 202c9e2..c025a4b 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -340,53 +340,56 @@ static inline u32 get_bytes_in_cctl(u32 cctl)
- static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+@@ -185,37 +185,17 @@ static int pl08x_phy_channel_busy(struct pl08x_phy_chan *ch)
+ /*
+  * Set the initial DMA register values i.e. those for the first LLI
+  * The next LLI pointer and the configuration interrupt bit have
+- * been set when the LLIs were constructed
++ * been set when the LLIs were constructed.  Poke them into the hardware
++ * and start the transfer.
+  */
+-static void pl08x_set_cregs(struct pl08x_driver_data *pl08x,
+-			    struct pl08x_phy_chan *ch)
++static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
++	struct pl08x_txd *txd)
  {
- 	struct pl08x_phy_chan *ch;
--	struct pl08x_txd *txdi = NULL;
- 	struct pl08x_txd *txd;
+-	/* Wait for channel inactive */
+-	while (pl08x_phy_channel_busy(ch))
+-		cpu_relax();
+-
+-	dev_vdbg(&pl08x->adev->dev,
+-		"WRITE channel %d: csrc=0x%08x, cdst=0x%08x, "
+-		 "cctl=0x%08x, clli=0x%08x, ccfg=0x%08x\n",
+-		ch->id,
+-		ch->csrc,
+-		ch->cdst,
+-		ch->cctl,
+-		ch->clli,
+-		ch->ccfg);
+-
+-	writel(ch->csrc, ch->base + PL080_CH_SRC_ADDR);
+-	writel(ch->cdst, ch->base + PL080_CH_DST_ADDR);
+-	writel(ch->clli, ch->base + PL080_CH_LLI);
+-	writel(ch->cctl, ch->base + PL080_CH_CONTROL);
+-	writel(ch->ccfg, ch->base + PL080_CH_CONFIG);
+-}
+-
+-static inline void pl08x_config_phychan_for_txd(struct pl08x_dma_chan *plchan)
+-{
+-	struct pl08x_channel_data *cd = plchan->cd;
++	struct pl08x_driver_data *pl08x = plchan->host;
+ 	struct pl08x_phy_chan *phychan = plchan->phychan;
+-	struct pl08x_txd *txd = plchan->at;
++	u32 val;
++
++	plchan->at = txd;
+ 
+ 	/* Copy the basic control register calculated at transfer config */
+ 	phychan->csrc = txd->csrc;
+@@ -224,7 +204,7 @@ static inline void pl08x_config_phychan_for_txd(struct pl08x_dma_chan *plchan)
+ 	phychan->cctl = txd->cctl;
+ 
+ 	/* Assign the signal to the proper control registers */
+-	phychan->ccfg = cd->ccfg;
++	phychan->ccfg = plchan->cd->ccfg;
+ 	phychan->ccfg &= ~PL080_CONFIG_SRC_SEL_MASK;
+ 	phychan->ccfg &= ~PL080_CONFIG_DST_SEL_MASK;
+ 	/* If it wasn't set from AMBA, ignore it */
+@@ -240,32 +220,38 @@ static inline void pl08x_config_phychan_for_txd(struct pl08x_dma_chan *plchan)
+ 	phychan->ccfg |= PL080_CONFIG_ERR_IRQ_MASK;
+ 	/* Always enable terminal interrupts */
+ 	phychan->ccfg |= PL080_CONFIG_TC_IRQ_MASK;
+-}
+ 
+-/*
+- * Enable the DMA channel
+- * Assumes all other configuration bits have been set
+- * as desired before this code is called
+- */
+-static void pl08x_enable_phy_chan(struct pl08x_driver_data *pl08x,
+-				  struct pl08x_phy_chan *ch)
+-{
+-	u32 val;
++	/* Wait for channel inactive */
++	while (pl08x_phy_channel_busy(phychan))
++		cpu_relax();
+ 
+-	/*
+-	 * Do not access config register until channel shows as disabled
+-	 */
+-	while (readl(pl08x->base + PL080_EN_CHAN) & (1 << ch->id))
++	dev_vdbg(&pl08x->adev->dev,
++		"WRITE channel %d: csrc=0x%08x, cdst=0x%08x, "
++		 "cctl=0x%08x, clli=0x%08x, ccfg=0x%08x\n",
++		phychan->id,
++		phychan->csrc,
++		phychan->cdst,
++		phychan->cctl,
++		phychan->clli,
++		phychan->ccfg);
++
++	writel(phychan->csrc, phychan->base + PL080_CH_SRC_ADDR);
++	writel(phychan->cdst, phychan->base + PL080_CH_DST_ADDR);
++	writel(phychan->clli, phychan->base + PL080_CH_LLI);
++	writel(phychan->cctl, phychan->base + PL080_CH_CONTROL);
++	writel(phychan->ccfg, phychan->base + PL080_CH_CONFIG);
++
++	/* Enable the DMA channel */
++	/* Do not access config register until channel shows as disabled */
++	while (readl(pl08x->base + PL080_EN_CHAN) & (1 << phychan->id))
+ 		cpu_relax();
+ 
+-	/*
+-	 * Do not access config register until channel shows as inactive
+-	 */
+-	val = readl(ch->base + PL080_CH_CONFIG);
++	/* Do not access config register until channel shows as inactive */
++	val = readl(phychan->base + PL080_CH_CONFIG);
+ 	while ((val & PL080_CONFIG_ACTIVE) || (val & PL080_CONFIG_ENABLE))
+-		val = readl(ch->base + PL080_CH_CONFIG);
++		val = readl(phychan->base + PL080_CH_CONFIG);
+ 
+-	writel(val | PL080_CONFIG_ENABLE, ch->base + PL080_CH_CONFIG);
++	writel(val | PL080_CONFIG_ENABLE, phychan->base + PL080_CH_CONFIG);
+ }
+ 
+ /*
+@@ -1278,7 +1264,6 @@ static void dma_set_runtime_config(struct dma_chan *chan,
+ static void pl08x_issue_pending(struct dma_chan *chan)
+ {
+ 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
+-	struct pl08x_driver_data *pl08x = plchan->host;
  	unsigned long flags;
- 	size_t bytes = 0;
  
  	spin_lock_irqsave(&plchan->lock, flags);
--
- 	ch = plchan->phychan;
- 	txd = plchan->at;
+@@ -1296,13 +1281,9 @@ static void pl08x_issue_pending(struct dma_chan *chan)
+ 					struct pl08x_txd,
+ 					node);
+ 		list_del(&next->node);
+-		plchan->at = next;
+ 		plchan->state = PL08X_CHAN_RUNNING;
  
- 	/*
--	 * Next follow the LLIs to get the number of pending bytes in the
--	 * currently active transaction.
-+	 * Follow the LLIs to get the number of remaining
-+	 * bytes in the currently active transaction.
- 	 */
- 	if (ch && txd) {
--		struct pl08x_lli *llis_va = txd->llis_va;
--		struct pl08x_lli *llis_bus = (struct pl08x_lli *) txd->llis_bus;
- 		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
- 
--		/* First get the bytes in the current active LLI */
-+		/* First get the remaining bytes in the active transfer */
- 		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
- 
- 		if (clli) {
--			int i = 0;
-+			struct pl08x_lli *llis_va = txd->llis_va;
-+			dma_addr_t llis_bus = txd->llis_bus;
-+			int index;
- 
--			/* Forward to the LLI pointed to by clli */
--			while ((clli != (u32) &(llis_bus[i])) &&
--			       (i < MAX_NUM_TSFR_LLIS))
--				i++;
-+			BUG_ON(clli < llis_bus || clli >= llis_bus +
-+				sizeof(struct pl08x_lli) * MAX_NUM_TSFR_LLIS);
-+
-+			/*
-+			 * Locate the next LLI - as this is an array,
-+			 * it's simple maths to find.
-+			 */
-+			index = (clli - llis_bus) / sizeof(struct pl08x_lli);
-+
-+			for (; index < MAX_NUM_TSFR_LLIS; index++) {
-+				bytes += get_bytes_in_cctl(llis_va[index].cctl);
- 
--			while (clli) {
--				bytes += get_bytes_in_cctl(llis_va[i].cctl);
- 				/*
- 				 * A LLI pointer of 0 terminates the LLI list
- 				 */
--				clli = llis_va[i].lli;
--				i++;
-+				if (!llis_va[index].lli)
-+					break;
- 			}
- 		}
- 	}
- 
- 	/* Sum up all queued transactions */
- 	if (!list_empty(&plchan->desc_list)) {
-+		struct pl08x_txd *txdi;
- 		list_for_each_entry(txdi, &plchan->desc_list, node) {
- 			bytes += txdi->len;
- 		}
--
+-		/* Configure the physical channel for the active txd */
+-		pl08x_config_phychan_for_txd(plchan);
+-		pl08x_set_cregs(pl08x, plchan->phychan);
+-		pl08x_enable_phy_chan(pl08x, plchan->phychan);
++		pl08x_start_txd(plchan, next);
  	}
  
  	spin_unlock_irqrestore(&plchan->lock, flags);
+@@ -1630,11 +1611,8 @@ static void pl08x_tasklet(unsigned long data)
+ 					struct pl08x_txd,
+ 					node);
+ 		list_del(&next->node);
+-		plchan->at = next;
+-		/* Configure the physical channel for the next txd */
+-		pl08x_config_phychan_for_txd(plchan);
+-		pl08x_set_cregs(pl08x, plchan->phychan);
+-		pl08x_enable_phy_chan(pl08x, plchan->phychan);
++
++		pl08x_start_txd(plchan, next);
+ 	} else {
+ 		struct pl08x_dma_chan *waiting = NULL;
+ 
 -- 
 1.6.2.5
