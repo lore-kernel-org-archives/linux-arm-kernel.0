@@ -1,27 +1,62 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jan 2011 22:36:56 +0000
-Subject: [PATCH 0/2] OMAP: TWL: sparse fixes
-In-Reply-To: <1294081110-23695-1-git-send-email-nm@ti.com>
-References: <1294081110-23695-1-git-send-email-nm@ti.com>
-Message-ID: <20110103223656.GA8414@n2100.arm.linux.org.uk>
+Date: Mon, 03 Jan 2011 22:37:10 +0000
+Subject: [PATCH 21/48] ARM: PL08x: don't try to use llis_bus as a pointer
+In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
+References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
+Message-ID: <E1PZt1a-0001PJ-PU@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 03, 2011 at 12:58:28PM -0600, Nishanth Menon wrote:
-> Source:
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
-> branch: omap-for-linus
-> 
-> Doing a rm arch/arm/mach-omap2/*.o;make C=1 arch/arm/mach-omap2/
-> resulted in the following sparse warnings:
-> http://pastebin.mozilla.org/907954
+llis_bus is the DMA address of the LLI array.  Casting it to be a
+pointer just to be able to use pointer arithmetic on it is not nice.
+We can trivially deal with the places where we do arithmetic on it,
+and it's actually cleaner this way.
 
-FYI, you may like to try:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/dma/amba-pl08x.c |    9 +++------
+ 1 files changed, 3 insertions(+), 6 deletions(-)
 
-make C=2 arch/arm/mach-omap2/
-
-instead of the two-step process:
-| Do a kernel make with "make C=1" to run sparse on all the C files that get
-| recompiled, or use "make C=2" to run sparse on the files whether they need to
-| be recompiled or not.  The latter is a fast way to check the whole tree if you
-| have already built it.
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 1081165..760b71e 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -559,7 +559,7 @@ static int pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
+ 			    u32 cctl, u32 *remainder)
+ {
+ 	struct pl08x_lli *llis_va = txd->llis_va;
+-	struct pl08x_lli *llis_bus = (struct pl08x_lli *) txd->llis_bus;
++	dma_addr_t llis_bus = txd->llis_bus;
+ 
+ 	BUG_ON(num_llis >= MAX_NUM_TSFR_LLIS);
+ 
+@@ -576,8 +576,7 @@ static int pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
+ 	 * memory. So we don't manipulate this bit currently.
+ 	 */
+ 
+-	llis_va[num_llis].next =
+-		(dma_addr_t)((u32) &(llis_bus[num_llis + 1]));
++	llis_va[num_llis].next = llis_bus + (num_llis + 1) * sizeof(struct pl08x_lli);
+ 
+ 	if (cctl & PL080_CONTROL_SRC_INCR)
+ 		txd->srcbus.addr += len;
+@@ -621,7 +620,6 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	int max_bytes_per_lli;
+ 	int total_bytes = 0;
+ 	struct pl08x_lli *llis_va;
+-	struct pl08x_lli *llis_bus;
+ 
+ 	txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT,
+ 				      &txd->llis_bus);
+@@ -971,8 +969,7 @@ static void pl08x_free_txd(struct pl08x_driver_data *pl08x,
+ 			   struct pl08x_txd *txd)
+ {
+ 	/* Free the LLI */
+-	dma_pool_free(pl08x->pool, txd->llis_va,
+-		      txd->llis_bus);
++	dma_pool_free(pl08x->pool, txd->llis_va, txd->llis_bus);
+ 
+ 	pl08x->pool_ctr--;
+ 
+-- 
+1.6.2.5
