@@ -1,31 +1,53 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 3 Jan 2011 22:44:17 +0200
+Date: Mon, 3 Jan 2011 22:49:52 +0200
 Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
-In-Reply-To: <19F8576C6E063C45BE387C64729E739404BD3F2C58@dbde02.ent.ti.com>
+In-Reply-To: <20110103171945.GA3839@n2100.arm.linux.org.uk>
 References: <201005152214.53993.sshtylyov@ru.mvista.com>
 	<4D21F3F2.6090302@mvista.com>
 	<20110103163447.GB2911@n2100.arm.linux.org.uk>
 	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
 	<4D220246.5020303@mvista.com>
-	<19F8576C6E063C45BE387C64729E739404BD3F2C58@dbde02.ent.ti.com>
-Message-ID: <20110103204416.GA2240@legolas.emea.dhcp.ti.com>
+	<20110103171945.GA3839@n2100.arm.linux.org.uk>
+Message-ID: <20110103204952.GB2240@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jan 03, 2011 at 10:45:35PM +0530, Gupta, Ajay Kumar wrote:
->> > Moreover, even Felipe also seems to move other musb
->> > DMAs (Inventra, CPPI3.0, TUSB) to drivers/dma.
->>
->>     Frankly speaking, I doubt that drivers/dma/ will have place for the
+On Mon, Jan 03, 2011 at 05:19:45PM +0000, Russell King - ARM Linux wrote:
+>>    Frankly speaking, I doubt that drivers/dma/ will have place for the
 >> purely MUSB specific DMA engines such as the named ones (there's no TUSB
->> DMA BTW it uses OMAP DMA).
->I think we will get more clarity once we start on this activity.
+>> DMA BTW -- it uses OMAP DMA).
+>
+>Long term, we need to kill off all these platform private DMA interfaces.
+>There's a growing amount of IP that's being shared not only between ARM
+>silicon vendors, but also across architectures, and having to re-implement
+>drivers because the underlying DMA engine is different is not feasible.
+>
+>For example, we're seeing ARMs primecells being used with various
+>different DMA controllers in various different ARM SoCs.  I've heard
+>rumours of them appearing in MIPS or PPC stuff as well.  We're seeing
+>PXA peripheral IP appearing in x86 stuff too.
+>
+>We can't have drivers tied to their SoC DMA engines, and we can't continue
+>having SoC DMA engines implementing their own unique APIs.  We do need to
+>get on top of this before it becomes a major problem (if it hasn't
+>already).
+>
+>The DMA engine API is still evolving, and should not be taken as concrete
+>- I've recently been bringing up a number of points with Dan on various
+>aspects of the API, some of which ultimately will lead to changes to the
+>async-tx API, and others which hopefully will mean that the DMA slave
+>API is better documented.
 
-I agree, but I personally don't see that many limiting factors.
-dmaengine is just a generic API for doing DMA transfers. If it's not
-enough for us currently, we extend it.
+I couldn't agree more with you Russell. If the API isn't enough
+currently, we can always propose an extension.
+
+Having all sorts of SoC-specific "APIs" has already caused enough
+problems and it still does (non-generic IRQ handling on
+twl?030, menelaus, cbus - which isn't in mainline yet -, etc,
+non-generic McBSP usage, non-generic GPMC usage, etc etc). So, if we can
+plan for making use of generic APIs, let's do so.
 
 -- 
 balbi
