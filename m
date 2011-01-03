@@ -1,32 +1,35 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 3 Jan 2011 16:42:18 +0530
-Subject: [PATCH 6/7] ARM: PL011: Add support for transmit DMA
-In-Reply-To: <E1PZhMW-0007pl-6b@rmk-PC.arm.linux.org.uk>
-References: <20110103100753.GB26785@n2100.arm.linux.org.uk>
-	<E1PZhMW-0007pl-6b@rmk-PC.arm.linux.org.uk>
-Message-ID: <AANLkTi=kRbUTtBFmaS6X8ybfsnN1Br8MGysx8dTFcvsw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jan 2011 11:14:46 +0000
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTiktQbR5cm6qKzrhCBEMqmxOq4WhryoZnQ-kge0g@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<20101221182037.GA4783@n2100.arm.linux.org.uk>
+	<20101222122904.GC14693@n2100.arm.linux.org.uk>
+	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+	<20101223001012.GF29368@n2100.arm.linux.org.uk>
+	<AANLkTimirgsuoM2che_ocrkvCZqGu6xEJjrjdmt9-69p@mail.gmail.com>
+	<AANLkTikP+JZkN7AjqaNfHY8jZ7bVsV-af=YR=MTdfnNU@mail.gmail.com>
+	<20101231215018.GB5012@n2100.arm.linux.org.uk>
+	<AANLkTiktQbR5cm6qKzrhCBEMqmxOq4WhryoZnQ-kge0g@mail.gmail.com>
+Message-ID: <20110103111446.GK26785@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 3, 2011 at 15:40, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> + ? ? ? if (dma_map_sg(dma_dev->dev, &dmatx->sg, 1, DMA_TO_DEVICE) != 1) {
-> + ? ? ? ? ? ? ? uap->dmatx.queued = false;
-> + ? ? ? ? ? ? ? dev_dbg(uap->port.dev, "unable to map TX DMA\n");
-> + ? ? ? ? ? ? ? return -EBUSY;
-> + ? ? ? }
-> +
-> + ? ? ? desc = dma_dev->device_prep_slave_sg(chan, &dmatx->sg, 1, DMA_TO_DEVICE,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> + ? ? ? if (!desc) {
-> + ? ? ? ? ? ? ? uap->dmatx.queued = false;
+On Sun, Jan 02, 2011 at 09:33:34PM +0100, Linus Walleij wrote:
+> As for the in-tree PL08x driver I'd say it's doing pretty well for
+> memcpy() so we could add platform data for that on supported
+> platforms, then for device transfers we need more elaborative
+> work.
 
-Doesn't dma_unmap_sg need to be called here?
+It has the issue that it's not unmapping the buffers after the memcpy()
+operation has completed, so on ARMv6+ we have the possibility for
+speculative prefetches to corrupt the destination buffer.
 
-> + ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ?* If DMA cannot be used right now, we complete this
-> + ? ? ? ? ? ? ? ?* transaction via IRQ and let the TTY layer retry.
-> + ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? dev_dbg(uap->port.dev, "TX DMA busy\n");
-> + ? ? ? ? ? ? ? return -EBUSY;
-> + ? ? ? }
+Neither are a number of the other DMA engine drivers.  This is why I'd
+like to see some common infrastructure in the DMA engine core for saying
+"this tx descriptor is now complete" so that DMA engine driver authors
+don't have to even think about whether they should be unmapping buffers.
+
+I'd also like to see DMA_COMPL_SKIP_*_UNMAP always set by prep_slave_sg()
+in tx->flags so we don't have to end up with "is this a slave operation"
+tests in the completion handler.
