@@ -1,104 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:31:04 +0000
-Subject: [PATCH 03/48] ARM: PL08x: fix atomic_t usage and tx_submit() return
-	value range
+Date: Mon, 03 Jan 2011 22:32:26 +0000
+Subject: [PATCH 07/48] ARM: PL08x: fix deadlock in terminate_all
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZsvg-0001O2-Ro@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZsx0-0001OK-0N@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last_issued variable uses an atomic type, which is only
-incremented inside a protected region, and then read.  Everywhere else
-only reads the value, so it isn't using atomic_t correctly, and it
-doesn't even need to.  Moreover, the DMA engine code provides us with
-a variable for this already - chan.cookie.  Use chan.cookie instead.
+Trying to disable a tasklet while holding a spinlock which the tasklet
+will take is a recipe for deadlock - tasklet_disable() will wait for the
+tasklet to finish running, which it will never do.  In any case, there
+is not a corresponding tasklet_enable(), so once the tasklet is disabled,
+it will never run again until reboot.
 
-Also, avoid negative dma_cookie_t values - negative returns from
-tx_submit() mean failure, yet in reality we always succeed.  Restart
-from cookie 1, just like other DMA engine drivers do.
+It's safe to just remove the tasklet_disable() as we remove all current
+and pending descriptors before releasing this spinlock.  This means that
+the tasklet will find no remaining work if it subsequently runs.
+
+The only remaining issue is that the callback for an already submitted
+txd may be in progress, or even called after terminate_all() returns.
+There's not much that can be done about that as waiting for the callback
+to complete before returning will also lead to deadlocks.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c   |   18 +++++++++---------
- include/linux/amba/pl08x.h |    1 -
- 2 files changed, 9 insertions(+), 10 deletions(-)
+ drivers/dma/amba-pl08x.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 0809810..5d9a156 100644
+index 9a8d445..4ca1eb1 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -74,7 +74,6 @@
- #include <asm/hardware/pl080.h>
- #include <asm/dma.h>
- #include <asm/mach/dma.h>
--#include <asm/atomic.h>
- #include <asm/processor.h>
- #include <asm/cacheflush.h>
- 
-@@ -1082,8 +1081,10 @@ static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
- {
- 	struct pl08x_dma_chan *plchan = to_pl08x_chan(tx->chan);
- 
--	atomic_inc(&plchan->last_issued);
--	tx->cookie = atomic_read(&plchan->last_issued);
-+	plchan->chan.cookie += 1;
-+	if (plchan->chan.cookie < 0)
-+		plchan->chan.cookie = 1;
-+	tx->cookie = plchan->chan.cookie;
- 	/* This unlock follows the lock in the prep() function */
- 	spin_unlock_irqrestore(&plchan->lock, plchan->lockflags);
- 
-@@ -1115,7 +1116,7 @@ pl08x_dma_tx_status(struct dma_chan *chan,
- 	enum dma_status ret;
- 	u32 bytesleft = 0;
- 
--	last_used = atomic_read(&plchan->last_issued);
-+	last_used = plchan->chan.cookie;
- 	last_complete = plchan->lc;
- 
- 	ret = dma_async_is_complete(cookie, last_complete, last_used);
-@@ -1131,7 +1132,7 @@ pl08x_dma_tx_status(struct dma_chan *chan,
- 	/*
- 	 * This cookie not complete yet
- 	 */
--	last_used = atomic_read(&plchan->last_issued);
-+	last_used = plchan->chan.cookie;
- 	last_complete = plchan->lc;
- 
- 	/* Get number of bytes left in the active transactions and queue */
-@@ -1641,8 +1642,7 @@ static void pl08x_tasklet(unsigned long data)
- 		/*
- 		 * Update last completed
- 		 */
--		plchan->lc =
--			(plchan->at->tx.cookie);
-+		plchan->lc = plchan->at->tx.cookie;
- 
- 		/*
- 		 * Callback to signal completion
-@@ -1820,8 +1820,8 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
- 			 chan->name);
- 
- 		chan->chan.device = dmadev;
--		atomic_set(&chan->last_issued, 0);
--		chan->lc = atomic_read(&chan->last_issued);
-+		chan->chan.cookie = 0;
-+		chan->lc = 0;
- 
- 		spin_lock_init(&chan->lock);
- 		INIT_LIST_HEAD(&chan->desc_list);
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index 521a0f8..4ae62b4 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -174,7 +174,6 @@ struct pl08x_dma_chan {
- 	struct pl08x_channel_data *cd;
- 	dma_addr_t runtime_addr;
- 	enum dma_data_direction	runtime_direction;
--	atomic_t last_issued;
- 	dma_cookie_t lc;
- 	struct list_head desc_list;
- 	struct pl08x_txd *at;
+@@ -1560,8 +1560,6 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 			pl08x_put_phy_channel(pl08x, plchan->phychan);
+ 			plchan->phychan = NULL;
+ 		}
+-		/* Stop any pending tasklet */
+-		tasklet_disable(&plchan->tasklet);
+ 		/* Dequeue jobs and free LLIs */
+ 		if (plchan->at) {
+ 			pl08x_free_txd(pl08x, plchan->at);
 -- 
 1.6.2.5
