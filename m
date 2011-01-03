@@ -1,98 +1,163 @@
-From: johnstul@us.ibm.com (john stultz)
-Date: Mon, 03 Jan 2011 11:56:52 -0800
-Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with
-	high frequency clocks
-In-Reply-To: <alpine.LFD.2.00.1101022004230.16090@xanadu.home>
-References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
-	<20101221105149.GO28157@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1012291703300.10437@xanadu.home>
-	<20110103003718.GF17727@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101022004230.16090@xanadu.home>
-Message-ID: <1294084612.2571.48.camel@work-vm>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 3 Jan 2011 21:17:56 +0100
+Subject: [PATCH] ARM: imx/mx27_3ds: Add PMIC support
+In-Reply-To: <1294060599-30309-1-git-send-email-fabio.estevam@freescale.com>
+References: <1294060599-30309-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110103201756.GB25121@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-01-02 at 20:21 -0500, Nicolas Pitre wrote:
-> On Mon, 3 Jan 2011, Russell King - ARM Linux wrote:
+Hello,
+
+On Mon, Jan 03, 2011 at 11:16:39AM -0200, Fabio Estevam wrote:
+> MX27_3DS board has a MC13783 PMIC connected to the CSPI2 port.
 > 
-> > On Wed, Dec 29, 2010 at 08:31:58PM -0500, Nicolas Pitre wrote:
-> > > On Tue, 21 Dec 2010, Russell King - ARM Linux wrote:
-> > > 
-> > > > On Mon, Dec 20, 2010 at 08:21:41PM -0500, Nicolas Pitre wrote:
-> > > > > 
-> > > > > The minsec argument to clocks_calc_mult_shift() [ which appears to be
-> > > > > misnamed by the way ] is used to clamp the magnitude of the mult factor
-> > > > > so that the given range won't overflow a 64 bit result.  The mult factor
-> > > > > is itself already limited to a maximum of 32 bits.  Given that the largest
-> > > > > clock tick range we may have is also 32 bits, there is no way our usage of
-> > > > > any computed mult factor would ever overflow 64 bits.
-> > > > > 
-> > > > > The choice of 60 seconds here for minsec is rather arbitrary.  If the
-> > > > > mult factor wasn't already limited to 32 bits, this value of 60 would
-> > > > > create overflows for clocks which take more than 60 seconds to wrap.
-> > > > 
-> > > > 60 seconds was arbitary, chosen from the selection of clock rates which
-> > > > I had available at the time (the highest of which was 24MHz).
-> > > 
-> > > Fair enough.  It is just not universally optimal given the different 
-> > > clock ranges this code now covers.
-> > > 
-> > > > > And for clocks which take less than 60 seconds to wrap then we do lose
-> > > > > precision as the mult factor is made smaller (fewer bits) to be adjusted
-> > > > > to a range which is larger than what we actually use.  This currently
-> > > > > affects clocks faster than 71MHz.
-> > > > > 
-> > > > > We could use minsec = 0 instead of 60 and a good 32-bit mult factor would
-> > > > > be computed in all cases.  But let's be formal and provide the actual
-> > > > > range to clocks_calc_mult_shift(). None of the cyc_to_fixed_sched_clock()
-> > > > > users are affected as they all are using clocks < 71MHz.
-> > > > 
-> > > > Maybe __clocksource_updatefreq_scale() needs a similar fix too, instead
-> > > > of assuming 5 seconds?  It also has access to the mask and rate.
-> > > 
-> > > There is a comment to that effect right above the 
-> > > clocks_calc_mult_shift() indicating that this is a known issue in that 
-> > > case already.  
-> > > 
-> > > And looking at that code, it appears that there is a balance to be made 
-> > > between cs->max_idle_ns and cs->mult, the former currently being 
-> > > determined by the later.  But if cs->mult is maximized to 32 bits, that 
-> > > leaves only 31 bits for cs->max_idle_ns which corresponds to approx 2 
-> > > seconds only.
-> > > 
-> > > So this is not clear to me what would be the optimal mult/shift values 
-> > > in the __clocksource_updatefreq_scale() context, while this is rather 
-> > > obvious in the init_sched_clock() context.  Hence this patch.
-> > 
-> > As clocksources are about precision (I believe it has been stated so in
-> > the past) it seems that fudging the shift and multiplier to get an
-> > extended period out of the clock is not the correct approach.
-> > 
-> > Maybe Thomas or John can shed some light on this?
+> Add support for the PMIC.
 > 
-> Sure.  My current understanding is that the core might be trying to play 
-> it safe as the mult and shift factors used to be provided by each clock 
-> source drivers, and they were often the result of some guessing from the 
-> authors of those drivers.  Now that those factors are programmatically 
-> determined via the clocksource_register_khz interface (is this the case 
-> for them all?) then it should be possible to tighten that code a bit and 
-> make it optimal.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig         |    1 +
+>  arch/arm/mach-imx/mach-mx27_3ds.c |   77 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 78 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 0449b80..17d2e60 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -242,6 +242,7 @@ config MACH_MX27_3DS
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+>  	select IMX_HAVE_PLATFORM_MXC_EHCI
+>  	select IMX_HAVE_PLATFORM_MXC_MMC
+> +	select IMX_HAVE_PLATFORM_SPI_IMX
+>  	select MXC_ULPI if USB_ULPI
+>  	help
+>  	  Include support for MX27PDK platform. This includes specific
+> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+> index 0ee7a73..6fd0f8f 100644
+> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+> @@ -26,6 +26,9 @@
+>  #include <linux/usb/otg.h>
+>  #include <linux/usb/ulpi.h>
+>  #include <linux/delay.h>
+> +#include <linux/mfd/mc13783.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/regulator/machine.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -39,6 +42,7 @@
+>  
+>  #define SD1_EN_GPIO (GPIO_PORTB + 25)
+>  #define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
+> +#define SPI2_SS0 (GPIO_PORTD + 21)
+>  
+>  static const int mx27pdk_pins[] __initconst = {
+>  	/* UART1 */
+> @@ -87,6 +91,10 @@ static const int mx27pdk_pins[] __initconst = {
+>  	PE2_PF_USBOTG_DIR,
+>  	PE24_PF_USBOTG_CLK,
+>  	PE25_PF_USBOTG_DATA7,
+> +	/* CSPI2 */
+> +	PD22_PF_CSPI2_SCLK,
+> +	PD23_PF_CSPI2_MISO,
+> +	PD24_PF_CSPI2_MOSI,
+>  };
+>  
+>  static const struct imxuart_platform_data uart_pdata __initconst = {
+> @@ -176,6 +184,72 @@ static int __init mx27_3ds_otg_mode(char *options)
+>  }
+>  __setup("otg_mode=", mx27_3ds_otg_mode);
+>  
+> +/* Regulators */
+> +static struct regulator_consumer_supply vmmc1_consumers[] = {
+> +	REGULATOR_SUPPLY("lcd_2v8", NULL),
+> +};
+> +
+> +static struct regulator_init_data vmmc1_init = {
+> +	.constraints = {
+> +		.min_uV	= 2800000,
+> +		.max_uV = 2800000,
+> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+> +	},
+> +	.num_consumer_supplies = ARRAY_SIZE(vmmc1_consumers),
+> +	.consumer_supplies = vmmc1_consumers,
+> +};
+> +
+> +static struct regulator_consumer_supply vgen_consumers[] = {
+> +	REGULATOR_SUPPLY("vdd_lcdio", NULL),
+> +};
+> +
+> +static struct regulator_init_data vgen_init = {
+> +	.constraints = {
+> +		.min_uV	= 1800000,
+> +		.max_uV = 1800000,
+> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+> +	},
+> +	.num_consumer_supplies = ARRAY_SIZE(vgen_consumers),
+> +	.consumer_supplies = vgen_consumers,
+> +};
+> +
+> +static struct mc13783_regulator_init_data mx27_3ds_regulators[] = {
+> +	{
+> +		.id = MC13783_REGU_VMMC1,
+> +		.init_data = &vmmc1_init,
+> +	}, {
+> +		.id = MC13783_REGU_VGEN,
+> +		.init_data = &vgen_init,
+> +	},
+> +};
+> +
+> +/* MC13783 */
+> +static struct mc13783_platform_data mc13783_pdata __initdata = {
+> +	.regulators = mx27_3ds_regulators,
+> +	.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
+> +	.flags  = MC13783_USE_REGULATOR,
+> +};
+> +
+> +/* SPI */
+> +static int spi2_internal_chipselect[] = {SPI2_SS0};
+I didn't check what CodingStyle says here, but I'd say
 
-Its not yet the case for all clocksources, I've had some trouble getting
-arch maintainers to pick up the conversion patches I've sent out so far
-(Russell jumped in and did the arm conversion for me, which lightens my
-load dramatically, so thanks again for that!). 
+	... = { SPI2_SS0 };
 
-And yes, the consolidation was done as I was seeing a lot of mult/shift
-copy-pasta in clocksources (which is my fault, as the advice on how to
-calculate it was poor), and as idle time lengths are growing I saw a
-potential hazard of breaking platforms as idle lengths grow, or users
-being frustrated that one platform might seemingly use more power then
-another due to the mult/shift pair needlessly limiting it.
+(and maybe add a comma between 0 and }).
 
-So the consolidation is mainly just to get the expectations unified and
-make it so changes don't have to be done on a clocksource by clocksource
-basis.
+> +
+> +static const struct spi_imx_master spi2_pdata __initconst = {
+> +	.chipselect	= spi2_internal_chipselect,
+> +	.num_chipselect	= ARRAY_SIZE(spi2_internal_chipselect),
+> +};
+> +
+> +static struct spi_board_info mx27_3ds_spi_devs[] __initdata = {
+> +	{
+> +		.modalias	= "mc13783",
+> +		.max_speed_hz	= 1000000,
+> +		.bus_num	= 1,
+> +		.chip_select	= 0, /* SS0 */
+> +		.platform_data	= &mc13783_pdata,
+> +		.irq = IRQ_GPIOC(14),
+> +		.mode = SPI_CS_HIGH,
+> +	},
+> +};
+> +
+>  
+>  static void __init mx27pdk_init(void)
+>  {
+> @@ -199,6 +273,9 @@ static void __init mx27pdk_init(void)
+>  	if (!otg_mode_host)
+>  		imx27_add_fsl_usb2_udc(&otg_device_pdata);
+>  
+> +	imx27_add_spi_imx1(&spi2_pdata);
+> +	spi_register_board_info(mx27_3ds_spi_devs,
+> +						ARRAY_SIZE(mx27_3ds_spi_devs));
+>  }
+>  
+>  static void __init mx27pdk_timer_init(void)
+Other than that I looks OK for me.
 
-thanks
--john
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
