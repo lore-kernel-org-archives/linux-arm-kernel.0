@@ -1,66 +1,36 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 3 Jan 2011 09:18:45 +0530
-Subject: [PATCH V3 36/63] ST SPEAr : FSMC (Flexible Static Memory
-	Controller) NOR interface driver
-In-Reply-To: <AANLkTik_NXigwhRH3KMjV3qmu-GB7m+6hzzdGY8RjBof@mail.gmail.com>
-References: <cover.1292833228.git.viresh.kumar@st.com>	<187ed7b3996c7f37ce782d847d3ecc761c3e52b8.1292833228.git.viresh.kumar@st.com>
-	<AANLkTik_NXigwhRH3KMjV3qmu-GB7m+6hzzdGY8RjBof@mail.gmail.com>
-Message-ID: <4D21471D.60705@st.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 2 Jan 2011 21:00:39 -0700 (MST)
+Subject: [PATCH 2/7 v2] OMAP2430: hwmod data: Add McSPI
+In-Reply-To: <20101230190320.GA2713@angua.secretlab.ca>
+References: <33236.10.24.255.18.1291212082.squirrel@dbdmail.itg.ti.com>
+	<20101230190320.GA2713@angua.secretlab.ca>
+Message-ID: <alpine.DEB.2.00.1101022039040.29630@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 30 Dec 2010, Grant Likely wrote:
 
-Linus,
+> On Wed, Dec 01, 2010 at 07:31:22PM +0530, Govindraj.R wrote:
+> > From: Charulatha V <charu@ti.com>
+> > 
+> > Update the 2430 hwmod data file with McSPI info.
+> > 
+> > Signed-off-by: Charulatha V <charu@ti.com>
+> > Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> 
+> Hmmm; this patch is virtually identical to the first patch in this
+> series which adds 2420 hwmod support.  I see a large block of
+> identical data with minor differences.  Surely support for these two
+> chips can share the common blocks of data.
 
-On 12/26/2010 09:08 PM, Linus Walleij wrote:
-> 2010/12/20 Viresh Kumar <viresh.kumar@st.com>:
-> 
+Yes, that's probably worth doing at some point, particularly for the chips 
+that don't have auto-generated SoC data (OMAP2420/2430/3xxx).  It's 
+probably possible also for the auto-generated SoC data but will require 
+some major changes to the auto-generation scripts.
 
-(...)
+In the medium term, Thomas's upcoming conditional section patches should 
+reduce the runtime memory usage for hwmod data unrelated to the 
+currently-booted SoC down to zero.
 
->> diff --git a/arch/arm/mach-spear13xx/fsmc-nor.c b/arch/arm/mach-spear13xx/fsmc-nor.c
->> new file mode 100644
->> index 0000000..03234b6
->> --- /dev/null
->> +++ b/arch/arm/mach-spear13xx/fsmc-nor.c
-> 
-> What is this file doing in mach-spear13xx? Several other platforms
-> like U300 and Nomadik use the same NOR controller.
-> 
-> This should be in drivers/mtd/* somewhere I believe?
-> 
->> @@ -0,0 +1,85 @@
->> +/*
->> + * arch/arm/mach-spear13xx/fsmc-nor.c
->> + *
->> + * FSMC (Flexible Static Memory Controller) interface for NOR
->> + *
->> + * Copyright (C) 2010 ST Microelectronics
->> + * Vipin Kumar<vipin.kumar@st.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <linux/init.h>
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <plat/fsmc.h>
-> 
-> Use <linux/mtd/fsmc.h> as include file, get rid of plat/fsmc.h.
-> Extend that .h file with the stuff you need.
-> 
-> We need to keep definitions for MTD NOR, NAND and OneNAND using FSMC
-> in this file so as to keep things simple. One header file is enough, and it's
-> very generic too, FSMC is not for plat-spear/* but also U300, Nomadik and
-> Ux500.
-> 
 
-Yes i agree. I will remove patches related to fsmc from this patch series and will
-send them separately.
-
--- 
-viresh
+- Paul
