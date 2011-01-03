@@ -1,42 +1,77 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:37:52 +0000
-Subject: [PATCH 23/48] ARM: PL08x: use 'u32' for LLI structure members,
-	not dma_addr_t
+Date: Mon, 03 Jan 2011 22:38:12 +0000
+Subject: [PATCH 24/48] ARM: PL08x: rename lli.next to lli.lli
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZt2G-0001PS-Cz@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZt2a-0001QD-Gl@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use 'u32' for the LLI structure members, which are defined by hardware
-to be 32-bit.  dma_addr_t is much more vague about its actual size.
+The LLI pointer in the documentation is placed into the LLI register,
+so name it LLI rather than 'next'.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+ drivers/dma/amba-pl08x.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index fa78697..a389df5 100644
+index a389df5..a897315 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -105,12 +105,13 @@ struct vendor_data {
- /*
-  * PL08X private data structures
-  * An LLI struct - see PL08x TRM.  Note that next uses bit[0] as a bus bit,
-- * start & end do not - their bus bit info is in cctl.
-+ * start & end do not - their bus bit info is in cctl.  Also note that these
-+ * are fixed 32-bit quantities.
-  */
+@@ -111,7 +111,7 @@ struct vendor_data {
  struct pl08x_lli {
--	dma_addr_t src;
--	dma_addr_t dst;
--	dma_addr_t next;
-+	u32 src;
-+	u32 dst;
-+	u32 next;
+ 	u32 src;
+ 	u32 dst;
+-	u32 next;
++	u32 lli;
  	u32 cctl;
  };
  
+@@ -375,7 +375,7 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+ 				/*
+ 				 * A LLI pointer of 0 terminates the LLI list
+ 				 */
+-				clli = llis_va[i].next;
++				clli = llis_va[i].lli;
+ 				i++;
+ 			}
+ 		}
+@@ -577,7 +577,7 @@ static int pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
+ 	 * memory. So we don't manipulate this bit currently.
+ 	 */
+ 
+-	llis_va[num_llis].next = llis_bus + (num_llis + 1) * sizeof(struct pl08x_lli);
++	llis_va[num_llis].lli = llis_bus + (num_llis + 1) * sizeof(struct pl08x_lli);
+ 
+ 	if (cctl & PL080_CONTROL_SRC_INCR)
+ 		txd->srcbus.addr += len;
+@@ -925,7 +925,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	/*
+ 	 * The final LLI terminates the LLI.
+ 	 */
+-	llis_va[num_llis - 1].next = 0;
++	llis_va[num_llis - 1].lli = 0;
+ 	/*
+ 	 * The final LLI element shall also fire an interrupt
+ 	 */
+@@ -934,7 +934,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	/* Now store the channel register values */
+ 	txd->csrc = llis_va[0].src;
+ 	txd->cdst = llis_va[0].dst;
+-	txd->clli = llis_va[0].next;
++	txd->clli = llis_va[0].lli;
+ 	txd->cctl = llis_va[0].cctl;
+ 	/* ccfg will be set at physical channel allocation time */
+ 
+@@ -950,7 +950,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 				 llis_va[i].src,
+ 				 llis_va[i].dst,
+ 				 llis_va[i].cctl,
+-				 llis_va[i].next
++				 llis_va[i].lli
+ 				);
+ 		}
+ 	}
 -- 
 1.6.2.5
