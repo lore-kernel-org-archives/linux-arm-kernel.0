@@ -1,76 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:39:53 +0000
-Subject: [PATCH 29/48] ARM: PL08x: assign ccfg DMA request signal in
-	prep_phy_channel()
-In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZt4D-0002hZ-8J@rmk-PC.arm.linux.org.uk>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Mon, 03 Jan 2011 17:39:54 -0500
+Subject: [PATCH v5] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs From: Sudhakar Rajashekhara
+	<sudhakar.raj@ti.com>
+In-Reply-To: <87ipy5d3da.fsf@deeprootsystems.com>
+References: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
+	<87ipy5d3da.fsf@deeprootsystems.com>
+Message-ID: <4D22503A.7010709@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to wait until we start processing a tx descriptor
-before setting up the DMA request selection in the ccfg register.
-We know which channel and request will be used in prep_phy_channel(),
-so setup the ccfg request selection at txd creation time in
-prep_phy_channel().
+On 01/03/2011 05:33 PM, Kevin Hilman wrote:
+> Michael Williamson <michael.williamson@criticallink.com> writes:
+> 
+> I'm assuming the 'From:' line currently in the subject was supposed to
+> go here?
+> 
+> Kevin
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/amba-pl08x.c |   20 +++++++++-----------
- 1 files changed, 9 insertions(+), 11 deletions(-)
+Arg.  Yes.  Sorry about that; not sure how I lost the newline.  Do you need me
+to resend?
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 75f9e2d..f0a2988 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -194,18 +194,10 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
- 	struct pl08x_driver_data *pl08x = plchan->host;
- 	struct pl08x_phy_chan *phychan = plchan->phychan;
- 	struct pl08x_lli *lli = &txd->llis_va[0];
--	u32 val, ccfg = txd->ccfg;
-+	u32 val;
- 
- 	plchan->at = txd;
- 
--	/* Assign the flow control signal to this channel */
--	if (txd->direction == DMA_TO_DEVICE)
--		/* Select signal as destination */
--		ccfg |= phychan->signal << PL080_CONFIG_DST_SEL_SHIFT;
--	else if (txd->direction == DMA_FROM_DEVICE)
--		/* Select signal as source */
--		ccfg |= phychan->signal << PL080_CONFIG_SRC_SEL_SHIFT;
--
- 	/* Wait for channel inactive */
- 	while (pl08x_phy_channel_busy(phychan))
- 		cpu_relax();
-@@ -214,13 +206,13 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
- 		"WRITE channel %d: csrc=0x%08x, cdst=0x%08x, "
- 		"clli=0x%08x, cctl=0x%08x, ccfg=0x%08x\n",
- 		phychan->id, lli->src, lli->dst, lli->lli, lli->cctl,
--		ccfg);
-+		txd->ccfg);
- 
- 	writel(lli->src, phychan->base + PL080_CH_SRC_ADDR);
- 	writel(lli->dst, phychan->base + PL080_CH_DST_ADDR);
- 	writel(lli->lli, phychan->base + PL080_CH_LLI);
- 	writel(lli->cctl, phychan->base + PL080_CH_CONTROL);
--	writel(ccfg, phychan->base + PL080_CH_CONFIG);
-+	writel(txd->ccfg, phychan->base + PL080_CH_CONFIG);
- 
- 	/* Enable the DMA channel */
- 	/* Do not access config register until channel shows as disabled */
-@@ -1001,6 +993,12 @@ static int prep_phy_channel(struct pl08x_dma_chan *plchan,
- 			return -EBUSY;
- 		}
- 		ch->signal = ret;
-+
-+		/* Assign the flow control signal to this channel */
-+		if (txd->direction == DMA_TO_DEVICE)
-+			txd->ccfg |= ch->signal << PL080_CONFIG_DST_SEL_SHIFT;
-+		else if (txd->direction == DMA_FROM_DEVICE)
-+			txd->ccfg |= ch->signal << PL080_CONFIG_SRC_SEL_SHIFT;
- 	}
- 
- 	dev_dbg(&pl08x->adev->dev, "allocated physical channel %d and signal %d for xfer on %s\n",
--- 
-1.6.2.5
+-Mike
+
+> 
+>> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+>> In addition, the variant code for the AM-1808 SoC appears to match
+>> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+>> these chips.
+>>
+>> This patch is originally from a patch on the arago project, here:
+>> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
+>>
+>> Further information related to the need for this patch can be located at
+>> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
+>> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
+>>
+>> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
+>> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
+>>
+>> Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+>> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+>> Reported-by: Nicolas Luna <luna.id@gmail.com>
+>> ---
+>> Built against linux-davinci tree.
+>>
+>> Changes since v4.
+>>
+>>  - removed am18x code from 0 variant per Sekhar's request.
+>>
+>>  arch/arm/mach-davinci/da850.c |    7 +++++++
+>>  1 files changed, 7 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index 78b5ae2..1550ac3 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+>>  		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>>  		.name		= "da850/omap-l138",
+>>  	},
+>> +	{
+>> +		.variant	= 0x1,
+>> +		.part_no	= 0xb7d1,
+>> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
+>> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>> +		.name		= "da850/omap-l138/am18x",
+>> +	},
+>>  };
+>>  
+>>  static struct davinci_timer_instance da850_timer_instance[4] = {
