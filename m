@@ -1,32 +1,102 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon,  3 Jan 2011 10:53:35 +0900
-Subject: [PATCH] ARM: S3C64xx: Clear DMA_HALT upon start
-Message-ID: <1294019615-18532-1-git-send-email-jassisinghbrar@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 03 Jan 2011 11:28:38 +0900
+Subject: [PATCH 1/4] ARM: Kconfig: Add audio support dependency
+In-Reply-To: <1293172569-21465-1-git-send-email-sw.youn@samsung.com>
+References: <1293171965-24416-1-git-send-email-sw.youn@samsung.com>
+	<1293172569-21465-1-git-send-email-sw.youn@samsung.com>
+Message-ID: <019b01cbaaed$f0418d30$d0c4a790$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jassi.brar@samsung.com>
+Seungwhan Youn wrote:
+> 
+> This patch adds Samsung ASoC audio support dependency for Samsung SoCs.
+> 
+> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
+> ---
+>  arch/arm/Kconfig |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index d56d21c..ef32a61 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -647,6 +647,7 @@ config ARCH_S3C2410
+>  	select HAVE_CLK
+>  	select ARCH_USES_GETTIMEOFFSET
+>  	select HAVE_S3C2410_I2C if I2C
+> +	select ASOC_SAMSUNG if SND_SOC
+>  	help
+>  	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
+>  	  BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940
+> or
+> @@ -678,6 +679,7 @@ config ARCH_S3C64XX
+>  	select SAMSUNG_GPIOLIB_4BIT
+>  	select HAVE_S3C2410_I2C if I2C
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> +	select ASOC_SAMSUNG if SND_SOC
+>  	help
+>  	  Samsung S3C64XX series based systems
+> 
+> @@ -690,6 +692,7 @@ config ARCH_S5P64X0
+>  	select ARCH_USES_GETTIMEOFFSET
+>  	select HAVE_S3C2410_I2C if I2C
+>  	select HAVE_S3C_RTC if RTC_CLASS
+> +	select ASOC_SAMSUNG if SND_SOC
+>  	help
+>  	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
+>  	  SMDK6450.
+> @@ -701,6 +704,7 @@ config ARCH_S5P6442
+>  	select HAVE_CLK
+>  	select ARCH_USES_GETTIMEOFFSET
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> +	select ASOC_SAMSUNG if SND_SOC
+>  	help
+>  	  Samsung S5P6442 CPU based systems
+> 
+> @@ -714,6 +718,7 @@ config ARCH_S5PC100
+>  	select HAVE_S3C2410_I2C if I2C
+>  	select HAVE_S3C_RTC if RTC_CLASS
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> +	select ASOC_SAMSUNG if SND_SOC
+>  	help
+>  	  Samsung S5PC100 series based systems
+> 
+> @@ -729,6 +734,7 @@ config ARCH_S5PV210
+>  	select HAVE_S3C2410_I2C if I2C
+>  	select HAVE_S3C_RTC if RTC_CLASS
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> +	select ASOC_SAMSUNG if SND_SOC
+>  	help
+>  	  Samsung S5PV210/S5PC110 series based systems
+> 
+> @@ -742,6 +748,7 @@ config ARCH_S5PV310
+>  	select HAVE_S3C_RTC if RTC_CLASS
+>  	select HAVE_S3C2410_I2C if I2C
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> +	select ASOC_SAMSUNG if SND_SOC
+>  	help
+>  	  Samsung S5PV310 series based systems
+> 
+> --
 
-The stop function sets the DMA_HALT bit, which prevents
-the DMA transfer to resume after stop, for example during
-audio PAUSE/PLAY cycle. Clear the HALT bit during start.
+Hi everyone,
 
-Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
----
- arch/arm/mach-s3c64xx/dma.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Wow it's 2011, I hope you're happy :-)
 
-diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-index e7d03ab..d9aa072 100644
---- a/arch/arm/mach-s3c64xx/dma.c
-+++ b/arch/arm/mach-s3c64xx/dma.c
-@@ -212,6 +212,7 @@ static int s3c64xx_dma_start(struct s3c2410_dma_chan *chan)
- 
- 	config = readl(chan->regs + PL080S_CH_CONFIG);
- 	config |= PL080_CONFIG_ENABLE;
-+	config &= ~PL080_CONFIG_HALT;
- 
- 	pr_debug("%s: writing config %08x\n", __func__, config);
- 	writel(config, chan->regs + PL080S_CH_CONFIG);
--- 
-1.6.2.5
+Hmm...sorry for late.
+Looks ok to me..but I know, you changed the name 'ASOC_SAMSUNG' to
+'SND_SOC_SAMSUNG'.
+
+So I'm waiting for updated patch now.
+
+Mr. Youn, could you please update your patch against on sound-2.6 tree?
+Or...Mark, what's your plan about this, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
