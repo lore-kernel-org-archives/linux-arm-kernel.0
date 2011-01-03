@@ -1,52 +1,34 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 3 Jan 2011 23:07:59 +0100
-Subject: [PATCH 2/2] arm/pxa: buildfix for pam27x without fb
-In-Reply-To: <AANLkTi=mtu3VibUR5SC+GmsmJCwo-nN9=eoTmzUE9jS8@mail.gmail.com>
-References: <1293654828-24661-1-git-send-email-bigeasy@linutronix.de>
-	<1293654828-24661-2-git-send-email-bigeasy@linutronix.de>
-	<AANLkTi=mtu3VibUR5SC+GmsmJCwo-nN9=eoTmzUE9jS8@mail.gmail.com>
-Message-ID: <201101032308.00036.marek.vasut@gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 03 Jan 2011 14:24:44 -0800
+Subject: [PATCH v11 0/6] Add Omapl138-Hawkboard support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024806D75D@dbde02.ent.ti.com>
+	(Sekhar Nori's message of "Tue, 28 Dec 2010 15:55:09 +0530")
+References: <1293489793-23312-1-git-send-email-vm.rod25@gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024806D75D@dbde02.ent.ti.com>
+Message-ID: <87mxnhd3rn.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 January 2011 16:57:27 Eric Miao wrote:
-> On Thu, Dec 30, 2010 at 4:33 AM, Sebastian Andrzej Siewior
-> 
-> <bigeasy@linutronix.de> wrote:
-> > |arch/arm/mach-pxa/palmld.c: In function ?palmld_init?:
-> > |arch/arm/mach-pxa/palmld.c:330: error: ?palm_320x480_lcd_mode?
-> > |undeclared (first use in this function) arch/arm/mach-pxa/palmld.c:330:
-> > |error: (Each undeclared identifier is reported only once
-> > |arch/arm/mach-pxa/palmld.c:330: error: for each function it appears
-> > |in.)
-> > 
-> > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> 
-> Marek,
-> 
-> I need your ack please.
+"Nori, Sekhar" <nsekhar@ti.com> writes:
 
-I don't like it being done with preprocessor macro. Maybe we should rather pull 
-palm_320x320_new_lcd_mode and others outside the #if defined() ?
+> Hi Victor,
+>
+> On Tue, Dec 28, 2010 at 04:13:07, vm.rod25 at gmail.com wrote:
+>> From: Victor Rodriguez <vm.rod25@gmail.com>
+>>
+>> This patch adds
+>> EMAC, EDMA, MMC/SD and USB OHCI
+>> support for the Hawkboard-L138 system
+>> It is under the machine name "omapl138_hawkboard".
+>> This system is based on the da850 davinci CPU architecture.
+>
+> These 6 patches look good to me. Thanks for your work on this.
+>
+> For all the 6 patches:
+>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>
 
-> 
-> > ---
-> >  arch/arm/mach-pxa/include/mach/palm27x.h |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h
-> > b/arch/arm/mach-pxa/include/mach/palm27x.h index 0a5e5ea..7b7927c 100644
-> > --- a/arch/arm/mach-pxa/include/mach/palm27x.h
-> > +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
-> > @@ -34,7 +34,7 @@ extern struct pxafb_mode_info
-> > palm_320x320_new_lcd_mode; extern void __init palm27x_lcd_init(int
-> > power,
-> >                                        struct pxafb_mode_info *mode);
-> >  #else
-> > -static inline void palm27x_lcd_init(int power, struct pxafb_mode_info
-> > *mode) {} +#define palm27x_lcd_init(power, mode)  do { } while (0)
-> >  #endif
-> > 
-> >  #if    defined(CONFIG_USB_GADGET_PXA27X) || \
-> > --
-> > 1.7.3.2
+OK, queuing these for the 2.6.39 merge window.
+
+Kevin
