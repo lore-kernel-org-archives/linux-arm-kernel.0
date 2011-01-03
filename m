@@ -1,105 +1,72 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:41:54 +0000
-Subject: [PATCH 35/48] ARM: PL08x: make pl08x_fill_lli_for_desc() return void
+Date: Mon, 03 Jan 2011 22:42:14 +0000
+Subject: [PATCH 36/48] ARM: PL08x: ensure pl08x_pre_boundary() works for any
+	value of addr
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZt6A-0003Rg-HZ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZt6U-0003Rk-LM@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need pl08x_fill_lli_for_desc() to return num_llis + 1 as
-we know that's what it always does.  We can just pass in num_llis
-and use post-increment in the caller.
+pl08x_pre_boundary() was unsafe with addresses towards the top of
+memory space:
 
-This makes the code slightly easier to read.
+	boundary = ((addr >> PL08X_BOUNDARY_SHIFT) + 1)
+			<< PL08X_BOUNDARY_SHIFT;
+
+This can overflow a 32-bit number, producing zero.  When it does:
+
+	if (boundary < addr + len)
+		return boundary - addr;
+	else
+		return len;
+
+results in (boundary - addr) returning either a large positive value.
+Also if addr + len overflows, this calculation also fails.
+
+We can fix this trivially as the only thing we're actually interested
+in is the value of the least significant PL08X_BOUNDARY_SHIFT bits:
+
+	boundary_len = PL08X_BOUNDARY_SIZE -
+		(addr & (PL08X_BOUNDARY_SIZE - 1));
+
+gives us the number of bytes before 'addr' becomes a multiple of
+PL08X_BOUNDARY_SIZE.  We can then just take the min() of the two
+calculated lengths.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   30 ++++++++++++------------------
- 1 files changed, 12 insertions(+), 18 deletions(-)
+ drivers/dma/amba-pl08x.c |   14 +++++---------
+ 1 files changed, 5 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 660165d..f619404 100644
+index f619404..7c327c3 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -521,9 +521,8 @@ static void pl08x_choose_master_bus(struct pl08x_bus_data *src_bus,
-  * Fills in one LLI for a certain transfer descriptor
-  * and advance the counter
-  */
--static int pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
--			    struct pl08x_txd *txd, int num_llis, int len,
--			    u32 cctl, u32 *remainder)
-+static void pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
-+	struct pl08x_txd *txd, int num_llis, int len, u32 cctl, u32 *remainder)
- {
- 	struct pl08x_lli *llis_va = txd->llis_va;
- 	dma_addr_t llis_bus = txd->llis_bus;
-@@ -545,8 +544,6 @@ static int pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
- 	BUG_ON(*remainder < len);
- 
- 	*remainder -= len;
--
--	return num_llis + 1;
+@@ -547,19 +547,15 @@ static void pl08x_fill_lli_for_desc(struct pl08x_driver_data *pl08x,
  }
  
  /*
-@@ -646,8 +643,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 				 "less than a bus width (remain 0x%08x)\n",
- 				 __func__, remainder);
- 			cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
--			num_llis =
--				pl08x_fill_lli_for_desc(pl08x, txd, num_llis, 1,
-+			pl08x_fill_lli_for_desc(pl08x, txd, num_llis++, 1,
- 					cctl, &remainder);
- 			total_bytes++;
- 		}
-@@ -662,8 +658,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 				 "(remain 0x%08x)\n",
- 				 __func__, remainder);
- 			cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
--			num_llis = pl08x_fill_lli_for_desc
--				(pl08x, txd, num_llis, 1, cctl, &remainder);
-+			pl08x_fill_lli_for_desc(pl08x, txd, num_llis++, 1,
-+					cctl, &remainder);
- 			total_bytes++;
- 		}
+- * Return number of bytes to fill to boundary, or len
++ * Return number of bytes to fill to boundary, or len.
++ * This calculation works for any value of addr.
+  */
+ static inline size_t pl08x_pre_boundary(u32 addr, size_t len)
+ {
+-	u32 boundary;
++	size_t boundary_len = PL08X_BOUNDARY_SIZE -
++			(addr & (PL08X_BOUNDARY_SIZE - 1));
  
-@@ -787,9 +783,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 				dev_vdbg(&pl08x->adev->dev,
- 					"%s fill lli with single lli chunk of size 0x%08zx (remainder 0x%08zx)\n",
- 					__func__, lli_len, remainder);
--				num_llis = pl08x_fill_lli_for_desc(pl08x, txd,
--						num_llis, lli_len, cctl,
--						&remainder);
-+				pl08x_fill_lli_for_desc(pl08x, txd, num_llis++,
-+						lli_len, cctl, &remainder);
- 				total_bytes += lli_len;
- 			}
+-	boundary = ((addr >> PL08X_BOUNDARY_SHIFT) + 1)
+-		<< PL08X_BOUNDARY_SHIFT;
+-
+-	if (boundary < addr + len)
+-		return boundary - addr;
+-	else
+-		return len;
++	return min(boundary_len, len);
+ }
  
-@@ -806,10 +801,9 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 					dev_vdbg(&pl08x->adev->dev,
- 						"%s align with boundary, single byte (remain 0x%08zx)\n",
- 						__func__, remainder);
--					num_llis =
--						pl08x_fill_lli_for_desc(pl08x,
--							txd, num_llis, 1,
--							cctl, &remainder);
-+					pl08x_fill_lli_for_desc(pl08x, txd,
-+							num_llis++, 1, cctl,
-+							&remainder);
- 					total_bytes++;
- 				}
- 			}
-@@ -823,8 +817,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 			dev_vdbg(&pl08x->adev->dev,
- 				"%s align with boundary, single odd byte (remain %zu)\n",
- 				__func__, remainder);
--			num_llis = pl08x_fill_lli_for_desc(pl08x, txd, num_llis,
--					1, cctl, &remainder);
-+			pl08x_fill_lli_for_desc(pl08x, txd, num_llis++, 1,
-+					cctl, &remainder);
- 			total_bytes++;
- 		}
- 	}
+ /*
 -- 
 1.6.2.5
