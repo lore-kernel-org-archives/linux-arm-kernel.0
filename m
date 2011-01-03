@@ -1,36 +1,49 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 2 Jan 2011 21:00:39 -0700 (MST)
-Subject: [PATCH 2/7 v2] OMAP2430: hwmod data: Add McSPI
-In-Reply-To: <20101230190320.GA2713@angua.secretlab.ca>
-References: <33236.10.24.255.18.1291212082.squirrel@dbdmail.itg.ti.com>
-	<20101230190320.GA2713@angua.secretlab.ca>
-Message-ID: <alpine.DEB.2.00.1101022039040.29630@utopia.booyaka.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 3 Jan 2011 06:50:15 +0100
+Subject: [PATCH 1/3] hvc_dcc: Fix bad code generation by marking
+	assembly volatile
+In-Reply-To: <8yazkrjkuo3.fsf@huya.qualcomm.com>
+References: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
+	<1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
+	<1292875718-7980-2-git-send-email-sboyd@codeaurora.org>
+	<alpine.LFD.2.00.1012201638150.10437@xanadu.home>
+	<20110102090019.GC32469@atrey.karlin.mff.cuni.cz>
+	<8yazkrjkuo3.fsf@huya.qualcomm.com>
+Message-ID: <20110103055015.GA19801@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Dec 2010, Grant Likely wrote:
-
-> On Wed, Dec 01, 2010 at 07:31:22PM +0530, Govindraj.R wrote:
-> > From: Charulatha V <charu@ti.com>
-> > 
-> > Update the 2430 hwmod data file with McSPI info.
-> > 
-> > Signed-off-by: Charulatha V <charu@ti.com>
-> > Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+On Sun 2011-01-02 10:49:32, David Brown wrote:
+> On Sun, Jan 02 2011, Pavel Machek wrote:
 > 
-> Hmmm; this patch is virtually identical to the first patch in this
-> series which adds 2420 hwmod support.  I see a large block of
-> identical data with minor differences.  Surely support for these two
-> chips can share the common blocks of data.
+> >> > diff --git a/drivers/char/hvc_dcc.c b/drivers/char/hvc_dcc.c
+> >> > index 6470f63..155ec10 100644
+> >> > --- a/drivers/char/hvc_dcc.c
+> >> > +++ b/drivers/char/hvc_dcc.c
+> >> > @@ -33,8 +33,7 @@
+> >> >  static inline u32 __dcc_getstatus(void)
+> >> >  {
+> >> >  	u32 __ret;
+> >> > -
+> >> > -	asm("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
+> >> > +	asm volatile("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
+> >> >  		: "=r" (__ret) : : "cc");
+> >> >  
+> >> >  	return __ret;
+> >
+> > Is volatile needed here? If __dcc_getstatus() return value is
+> > discarded, we want assembly discarded, right?
+> 
+> That's not really the issue being fixed.  Without the volatile, the
+> compiler is free to cache and reuse a previously loaded status value.
+> It is important that the status be read each time.
+> 
+> I don't think there is a way of indicating that assembly needs to happen
+> for each use, but that it is OK to discard if the value isn't used.
+> 'volatile' is a bit overloaded.
 
-Yes, that's probably worth doing at some point, particularly for the chips 
-that don't have auto-generated SoC data (OMAP2420/2430/3xxx).  It's 
-probably possible also for the auto-generated SoC data but will require 
-some major changes to the auto-generation scripts.
-
-In the medium term, Thomas's upcoming conditional section patches should 
-reduce the runtime memory usage for hwmod data unrelated to the 
-currently-booted SoC down to zero.
-
-
-- Paul
+Ok, thanks for explanation.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
