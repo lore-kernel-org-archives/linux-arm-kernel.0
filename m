@@ -1,51 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:33:06 +0000
-Subject: [PATCH 09/48] ARM: PL08x: add comment explaining the flow control
-	methods
-In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZsxe-0001OS-7R@rmk-PC.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 03 Jan 2011 14:33:21 -0800
+Subject: [PATCH v5] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs From: Sudhakar Rajashekhara
+	<sudhakar.raj@ti.com>
+In-Reply-To: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
+	(Michael Williamson's message of "Mon, 3 Jan 2011 08:03:27 -0500")
+References: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <87ipy5d3da.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Explain the two flow control methods which the PL08x implements, along
-with the problem which peripheral flow control presents.  This helps
-people understand why we are unable to use these DMA controllers with
-(eg) the MMCI.
+Michael Williamson <michael.williamson@criticallink.com> writes:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/amba-pl08x.c |   18 +++++++++++++++++-
- 1 files changed, 17 insertions(+), 1 deletions(-)
+I'm assuming the 'From:' line currently in the subject was supposed to
+go here?
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 74fa5a0..4b63fc3 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -53,7 +53,23 @@
-  *
-  * ASSUMES default (little) endianness for DMA transfers
-  *
-- * Only DMAC flow control is implemented
-+ * The PL08x has two flow control settings:
-+ *  - DMAC flow control: the transfer size defines the number of transfers
-+ *    which occur for the current LLI entry, and the DMAC raises TC at the
-+ *    end of every LLI entry.  Observed behaviour shows the DMAC listening
-+ *    to both the BREQ and SREQ signals (contrary to documented),
-+ *    transferring data if either is active.  The LBREQ and LSREQ signals
-+ *    are ignored.
-+ *
-+ *  - Peripheral flow control: the transfer size is ignored (and should be
-+ *    zero).  The data is transferred from the current LLI entry, until
-+ *    after the final transfer signalled by LBREQ or LSREQ.  The DMAC
-+ *    will then move to the next LLI entry.
-+ *
-+ * Only the former works sanely with scatter lists, so we only implement
-+ * the DMAC flow control method.  However, peripherals which use the LBREQ
-+ * and LSREQ signals (eg, MMCI) are unable to use this mode, which through
-+ * these hardware restrictions prevents them from using scatter DMA.
-  *
-  * Global TODO:
-  * - Break out common code from arch/arm/mach-s3c64xx and share
--- 
-1.6.2.5
+Kevin
+
+> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+> In addition, the variant code for the AM-1808 SoC appears to match
+> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+> these chips.
+>
+> This patch is originally from a patch on the arago project, here:
+> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
+>
+> Further information related to the need for this patch can be located at
+> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
+> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
+>
+> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
+> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
+>
+> Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+> Reported-by: Nicolas Luna <luna.id@gmail.com>
+> ---
+> Built against linux-davinci tree.
+>
+> Changes since v4.
+>
+>  - removed am18x code from 0 variant per Sekhar's request.
+>
+>  arch/arm/mach-davinci/da850.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 78b5ae2..1550ac3 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+>  		.cpu_id		= DAVINCI_CPU_ID_DA850,
+>  		.name		= "da850/omap-l138",
+>  	},
+> +	{
+> +		.variant	= 0x1,
+> +		.part_no	= 0xb7d1,
+> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
+> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
+> +		.name		= "da850/omap-l138/am18x",
+> +	},
+>  };
+>  
+>  static struct davinci_timer_instance da850_timer_instance[4] = {
