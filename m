@@ -1,171 +1,58 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 3 Jan 2011 17:55:30 +0530
-Subject: [PATCH v7 5/7] omap3: nand: configurable fifo threshold to gain
-	the	throughput
-In-Reply-To: <1293629546-18831-6-git-send-email-s-ghorai@ti.com>
-References: <1293629546-18831-1-git-send-email-s-ghorai@ti.com>
-	<1293629546-18831-6-git-send-email-s-ghorai@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024816D671@dbde02.ent.ti.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Mon,  3 Jan 2011 08:03:27 -0500
+Subject: [PATCH v5] davinci: Add additional JTAG code for AM-1808 and
+	OMAP-L138 Rev 2.0 SoCs From: Sudhakar Rajashekhara
+	<sudhakar.raj@ti.com>
+Message-ID: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sukumar,
+The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
+In addition, the variant code for the AM-1808 SoC appears to match
+the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
+these chips.
 
-On Wed, Dec 29, 2010 at 19:02:24, Ghorai, Sukumar wrote:
-> Configure the FIFO THREASHOLD value different for read and write to keep busy
-> both filling and to drain out of FIFO at reading and writing.
-> 
-> Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-> Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c             |   11 +++++++----
->  arch/arm/plat-omap/include/plat/gpmc.h |    5 ++++-
->  drivers/mtd/nand/omap2.c               |   22 ++++++++++++++--------
->  3 files changed, 25 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index cfaf357..b26b1a5 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -59,7 +59,6 @@
->  #define GPMC_CHUNK_SHIFT	24		/* 16 MB */
->  #define GPMC_SECTION_SHIFT	28		/* 128 MB */
->  
-> -#define PREFETCH_FIFOTHRESHOLD	(0x40 << 8)
->  #define CS_NUM_SHIFT		24
->  #define ENABLE_PREFETCH		(0x1 << 7)
->  #define DMA_MPU_MODE		2
-> @@ -595,15 +594,19 @@ EXPORT_SYMBOL(gpmc_nand_write);
->  /**
->   * gpmc_prefetch_enable - configures and starts prefetch transfer
->   * @cs: cs (chip select) number
-> + * @fifo_th: fifo threshold to be used for read/ write
->   * @dma_mode: dma mode enable (1) or disable (0)
->   * @u32_count: number of bytes to be transferred
->   * @is_write: prefetch read(0) or write post(1) mode
->   */
-> -int gpmc_prefetch_enable(int cs, int dma_mode,
-> +int gpmc_prefetch_enable(int cs, int fifo_th, int dma_mode,
->  				unsigned int u32_count, int is_write)
->  {
->  
-> -	if (!(gpmc_read_reg(GPMC_PREFETCH_CONTROL))) {
-> +	if (fifo_th > PREFETCH_FIFOTHRESHOLD_MAX) {
-> +		printk(KERN_ERR "PREFETCH Fifo Threshold is not supported\n");
-> +		return -1;
+This patch is originally from a patch on the arago project, here:
+http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
 
-Please consider using pr_err(). Also, adding function/device name 
-prefix helps locate which module caused the error from logs.
+Further information related to the need for this patch can be located at
+http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
+http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
 
-Also, is "operation not permitted" the best error we can give back 
-here?
+This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
+was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
 
-> +	} else if (!(gpmc_read_reg(GPMC_PREFETCH_CONTROL))) {
->  		/* Set the amount of bytes to be prefetched */
->  		gpmc_write_reg(GPMC_PREFETCH_CONFIG2, u32_count);
->  
-> @@ -611,7 +614,7 @@ int gpmc_prefetch_enable(int cs, int dma_mode,
->  		 * enable the engine. Set which cs is has requested for.
->  		 */
->  		gpmc_write_reg(GPMC_PREFETCH_CONFIG1, ((cs << CS_NUM_SHIFT) |
-> -					PREFETCH_FIFOTHRESHOLD |
-> +					PREFETCH_FIFOTHRESHOLD(fifo_th) |
->  					ENABLE_PREFETCH |
->  					(dma_mode << DMA_MPU_MODE) |
->  					(0x1 & is_write)));
-> diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-> index 054e704..fb82335 100644
-> --- a/arch/arm/plat-omap/include/plat/gpmc.h
-> +++ b/arch/arm/plat-omap/include/plat/gpmc.h
-> @@ -83,6 +83,9 @@
->  #define GPMC_IRQ_FIFOEVENTENABLE	0x01
->  #define GPMC_IRQ_COUNT_EVENT		0x02
->  
-> +#define PREFETCH_FIFOTHRESHOLD_MAX	0x40
-> +#define PREFETCH_FIFOTHRESHOLD(val)	(val << 8)
+Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+Reported-by: Nicolas Luna <luna.id@gmail.com>
+---
+Built against linux-davinci tree.
 
-Parenthesize val please.
+Changes since v4.
 
-> +
->  /*
->   * Note that all values in this struct are in nanoseconds, while
->   * the register values are in gpmc_fck cycles.
-> @@ -133,7 +136,7 @@ extern int gpmc_cs_request(int cs, unsigned long size, unsigned long *base);
->  extern void gpmc_cs_free(int cs);
->  extern int gpmc_cs_set_reserved(int cs, int reserved);
->  extern int gpmc_cs_reserved(int cs);
-> -extern int gpmc_prefetch_enable(int cs, int dma_mode,
-> +extern int gpmc_prefetch_enable(int cs, int fifo_th, int dma_mode,
->  					unsigned int u32_count, int is_write);
->  extern int gpmc_prefetch_reset(int cs);
->  extern void omap3_gpmc_save_context(void);
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index 007862e..384d89b 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -243,7 +243,8 @@ static void omap_read_buf_pref(struct mtd_info *mtd, u_char *buf, int len)
->  	}
->  
->  	/* configure and start prefetch transfer */
-> -	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
-> +	ret = gpmc_prefetch_enable(info->gpmc_cs,
-> +			PREFETCH_FIFOTHRESHOLD_MAX, 0x0, len, 0x0);
->  	if (ret) {
->  		/* PFPW engine is busy, use cpu copy method */
->  		if (info->nand.options & NAND_BUSWIDTH_16)
-> @@ -287,7 +288,8 @@ static void omap_write_buf_pref(struct mtd_info *mtd,
->  	}
->  
->  	/*  configure and start prefetch transfer */
-> -	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x1);
-> +	ret = gpmc_prefetch_enable(info->gpmc_cs,
-> +			PREFETCH_FIFOTHRESHOLD_MAX, 0x0, len, 0x1);
->  	if (ret) {
->  		/* PFPW engine is busy, use cpu copy method */
->  		if (info->nand.options & NAND_BUSWIDTH_16)
-> @@ -340,8 +342,9 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
->  	dma_addr_t dma_addr;
->  	int ret;
->  
-> -	/* The fifo depth is 64 bytes. We have a sync at each frame and frame
-> -	 * length is 64 bytes.
-> +	/* The fifo depth is 64 bytes max.
-> +	 * But configure the FIFO-threahold to 32 to get a sync at each frame
-> +	 * and frame length is 32 bytes.
->  	 */
->  	int buf_len = len >> 6;
->  
-> @@ -382,7 +385,8 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
->  					OMAP24XX_DMA_GPMC, OMAP_DMA_SRC_SYNC);
->  	}
->  	/*  configure and start prefetch transfer */
-> -	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x1, len, is_write);
-> +	ret = gpmc_prefetch_enable(info->gpmc_cs,
-> +			PREFETCH_FIFOTHRESHOLD_MAX, 0x1, len, is_write);
->  	if (ret)
->  		/* PFPW engine is busy, use cpu copy methode */
->  		goto out_copy;
-> @@ -518,7 +522,8 @@ static void omap_read_buf_irq_pref(struct mtd_info *mtd, u_char *buf, int len)
->  	init_completion(&info->comp);
->  
->  	/*  configure and start prefetch transfer */
-> -	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
-> +	ret = gpmc_prefetch_enable(info->gpmc_cs,
-> +			PREFETCH_FIFOTHRESHOLD_MAX/2, 0x0, len, 0x0);
->  	if (ret)
->  		/* PFPW engine is busy, use cpu copy methode */
->  		goto out_copy;
-> @@ -563,8 +568,9 @@ static void omap_write_buf_irq_pref(struct mtd_info *mtd,
->  	info->buf = (u_char *) buf;
->  	init_completion(&info->comp);
->  
-> -	/*  configure and start prefetch transfer */
-> -	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x1);
-> +	/* configure and start prefetch transfer : size=24 */
-> +	ret = gpmc_prefetch_enable(info->gpmc_cs,
-> +			(PREFETCH_FIFOTHRESHOLD_MAX*3)/8, 0x0, len, 0x1);
+ - removed am18x code from 0 variant per Sekhar's request.
 
-Spaces around binary '*'
+ arch/arm/mach-davinci/da850.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Thanks,
-Sekhar
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 78b5ae2..1550ac3 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
+ 		.cpu_id		= DAVINCI_CPU_ID_DA850,
+ 		.name		= "da850/omap-l138",
+ 	},
++	{
++		.variant	= 0x1,
++		.part_no	= 0xb7d1,
++		.manufacturer	= 0x017,	/* 0x02f >> 1 */
++		.cpu_id		= DAVINCI_CPU_ID_DA850,
++		.name		= "da850/omap-l138/am18x",
++	},
+ };
+ 
+ static struct davinci_timer_instance da850_timer_instance[4] = {
+-- 
+1.7.0.4
