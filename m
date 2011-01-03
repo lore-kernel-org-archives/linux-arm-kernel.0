@@ -1,50 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jan 2011 16:52:27 +0000
-Subject: dmaengine: fix dma_unmap (was: Re: [PATCH 06/13] DMAENGINE:
-	driver for the ARM PL080/PL081 PrimeCells)
-In-Reply-To: <AANLkTinJAULeb1EsWk=S=b32h69X1x-noRw73Ok0uyfx@mail.gmail.com>
-References: <AANLkTinJAULeb1EsWk=S=b32h69X1x-noRw73Ok0uyfx@mail.gmail.com>
-Message-ID: <20110103165227.GC32508@n2100.arm.linux.org.uk>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Mon, 3 Jan 2011 22:31:56 +0530
+Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
+In-Reply-To: <20110103163447.GB2911@n2100.arm.linux.org.uk>
+References: <201005152214.53993.sshtylyov@ru.mvista.com>
+	<4D21F3F2.6090302@mvista.com>
+	<20110103163447.GB2911@n2100.arm.linux.org.uk>
+Message-ID: <19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 03, 2011 at 08:36:00AM -0800, Dan Williams wrote:
-> For raid this will have implications for architectures that split
-> operation types on to different physical channels.  Preparing the
-> entire operation chain ahead of time is not possible on such
-> configuration because we need to remap the buffers for each channel
-> transition.
-
-That's not entirely true.  You will only need to remap buffers if
-old_chan->device != new_chan->device, as the underlying struct device
-will be the different and could possibly have a different IOMMU or
-DMA-able memory parameters.
-
-So, when changing channels, the optimization is not engine specific,
-but can be effected when the chan->device points to the same dma_device
-structure.  That means it should still be possible to chain several
-operations together, even if it means that they occur on different
-channels on the same device.
-
-One passing idea is the async_* operations need to chain buffers in
-terms of <virtual page+offset, len, dma_addr_t, struct dma_device *>, or
-maybe <struct dma_device *, scatterlist>.  If the dma_device pointer is
-initialized, the scatterlist is already mapped.  If this differs from
-the dma_device for the next selected operation, the previous operations
-need to be run, then unmap and remap for the new device.
-
-Does that sound possible?
-
-> > I'd also like to see DMA_COMPL_SKIP_*_UNMAP always set by prep_slave_sg()
-> > in tx->flags so we don't have to end up with "is this a slave operation"
-> > tests in the completion handler.
+Hi,
+> >> Add support for Texas Instuments Communication Port Programming
+> Interface 4.1
+> >> (CPPI 4.1) used on OMAP-L1x/DA8xx and AM35x.
+> >
+> >> At this moment, only the DMA controller and queue manager are supported.
+> >> Support for the buffer manager is lacking but these chips don't have it
+> anyway.
+> >
+> >> Signed-off-by: Sergei Shtylyov<sshtylyov@ru.mvista.com>
+> >> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+> >
+> >    Russell, you have recently discarded this patch from your patch
+> > system. Can we know the reason?
 > 
-> Longer term I do not see these flags surviving, but yes a 2.6.38
-> change along these lines makes sense.
+> It was recently discussed with TI, and various people raised concerns
+> about it.  I don't remember the exact details, and I wish they'd raise
+> them with the patch author directly.  It may have been that it's
+> inventing its own API rather than using something like the DMA engine
+> API.
+> 
+> Adding linux-omap to try to get a response there.
 
-Well, if the idea is to kill those flags, then it would be a good idea
-not to introduce new uses of them as that'll only complicate matters.
+Sergei,
+This issue was discussed recently at TI and proposal was to place it to
+drivers/dma folder. Moreover, even Felipe also seems to move other musb
+DMAs (Inventra, CPPI3.0, TUSB) to drivers/dma.
 
-I do have an untested patch which adds the unmap to pl08x, but I'm
-wondering if it's worth it, or whether to disable the memcpy support
-for the time being.
+Regards,
+Ajay
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
