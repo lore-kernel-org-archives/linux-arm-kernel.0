@@ -1,78 +1,70 @@
-From: iban@fqingenieria.es (FQ | Iban Cerro)
-Date: Mon, 3 Jan 2011 10:13:40 +0100 (CET)
-Subject: [PATCH 04/04] ARM i.MX25 Add SIM 3DS PDK
-Message-ID: <26139.212.121.242.58.1294046020.squirrel@mail.fqingenieria.es>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jan 2011 09:57:52 +0000
+Subject: [RFC PATCH] Avoid aliasing mappings in DMA coherent allocator
+In-Reply-To: <loom.20101228T203522-493@post.gmane.org>
+References: <20101224111125.GD20587@n2100.arm.linux.org.uk>
+	<20101224112413.GE20587@n2100.arm.linux.org.uk>
+	<loom.20101228T203522-493@post.gmane.org>
+Message-ID: <20110103095751.GA26785@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Includes driver into the corresponding platform
+On Tue, Dec 28, 2010 at 09:29:58PM +0000, Janusz Krzysztofik wrote:
+> Works fine on OMAP1 based Amstrad Delta, both default 2MB/2MB and shrinked
+> to 1MB/1MB configurations. No need to preallocate dma coherent memory for
+> camera video buffers on boot.
 
-Signed-off-by: Iban Cerro Galvez <iban@fqingenieria.es>
----
- arch/arm/mach-imx/mach-mx25_3ds.c |   35 +++++++++++++++++++++++++++++++++++
- 1 files changed, 35 insertions(+), 0 deletions(-)
+That's good news.
 
-diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c
-b/arch/arm/mach-imx/mach-mx25_3ds.c
-index 8b8e75b..2933452 100644
---- a/arch/arm/mach-imx/mach-mx25_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx25_3ds.c
-@@ -102,6 +102,18 @@ static iomux_v3_cfg_t mx25pdk_pads[] = {
- 	MX25_PAD_SD1_DATA1__SD1_DATA1,
- 	MX25_PAD_SD1_DATA2__SD1_DATA2,
- 	MX25_PAD_SD1_DATA3__SD1_DATA3,
-+
-+	/* SIM1 */
-+	MX25_PAD_CSI_D4__SIM1_VEN0,
-+	MX25_PAD_CSI_D5__SIM1_TX0,
-+	MX25_PAD_CSI_D3__SIM1_RST0,
-+	MX25_PAD_CSI_D2__SIM1_CLK0,
-+
-+	/* SIM2 */
-+	MX25_PAD_CSI_MCLK__SIM2_VEN0,
-+	MX25_PAD_CSI_VSYNC__SIM2_TX0,
-+	MX25_PAD_CSI_D9__SIM2_RST0,
-+	MX25_PAD_CSI_D8__SIM2_CLK0,
- };
+> However, in 1MB/1MB configuration it failed to allocate 600kB of
+> writecombined omapfb vram, required for double-buffering, and reserving
+> up to 4MB of machine's total 32MB seems too expensive.
 
- static const struct fec_platform_data mx25_fec_pdata __initconst = {
-@@ -160,6 +172,27 @@ static const struct imx_fb_platform_data
-mx25pdk_fb_pdata __initconst = {
- 	.dmacr		= 0x00020010,
- };
+Do you have other users of the writecombined memory?  If so, what size
+are they?
 
-+static struct mxc_sim_platform_data mx25_sim_data[] ={
-+	{
-+	.clk_rate = 5000000,
-+	.clock_sim = "mxc-sim.0",
-+	.power_sim = NULL,
-+	.init = NULL,
-+	.exit = NULL,
-+	.detect = 1,
-+	.sim_number = 0,
-+	},
-+	{
-+	.clk_rate = 5000000,
-+	.clock_sim = "mxc-sim.1",
-+	.power_sim = NULL,
-+	.init = NULL,
-+	.exit = NULL,
-+	.detect = 1,
-+	.sim_number = 1,
-+	}
-+};
-+
- static const uint32_t mx25pdk_keymap[] = {
- 	KEY(0, 0, KEY_UP),
- 	KEY(0, 1, KEY_DOWN),
-@@ -201,6 +234,8 @@ static void __init mx25pdk_init(void)
- 	imx25_add_imx_keypad(&mx25pdk_keymap_data);
+As the 600k allocation can only be satisfied at the beginning of the
+region, we could do top-down rather than bottom-up allocation (untested):
 
- 	imx25_add_sdhci_esdhc_imx(0, NULL);
-+	imx25_add_mxc_sim0(&mx25_sim_data[0]);
-+	imx25_add_mxc_sim1(&mx25_sim_data[1]);
- }
-
- static void __init mx25pdk_timer_init(void)
--- 
-1.5.4.3
+diff --git a/arch/arm/mm/vmregion.c b/arch/arm/mm/vmregion.c
+index 935993e..036fdbf 100644
+--- a/arch/arm/mm/vmregion.c
++++ b/arch/arm/mm/vmregion.c
+@@ -38,7 +38,7 @@ struct arm_vmregion *
+ arm_vmregion_alloc(struct arm_vmregion_head *head, size_t align,
+ 		   size_t size, gfp_t gfp)
+ {
+-	unsigned long addr = head->vm_start, end = head->vm_end - size;
++	unsigned long start = head->vm_start, addr = head->vm_end;
+ 	unsigned long flags;
+ 	struct arm_vmregion *c, *new;
+ 
+@@ -54,21 +54,20 @@ arm_vmregion_alloc(struct arm_vmregion_head *head, size_t align,
+ 
+ 	spin_lock_irqsave(&head->vm_lock, flags);
+ 
+-	list_for_each_entry(c, &head->vm_list, vm_list) {
+-		if ((addr + size) < addr)
+-			goto nospc;
+-		if ((addr + size) <= c->vm_start)
++	addr = rounddown(addr - size, align);
++	list_for_each_entry_reverse(c, &head->vm_list, vm_list) {
++		if (addr >= c->vm_end)
+ 			goto found;
+-		addr = ALIGN(c->vm_end, align);
+-		if (addr > end)
++		addr = rounddown(c->vm_start - size, align);
++		if (addr < start)
+ 			goto nospc;
+ 	}
+ 
+  found:
+ 	/*
+-	 * Insert this entry _before_ the one we found.
++	 * Insert this entry after the one we found.
+ 	 */
+-	list_add_tail(&new->vm_list, &c->vm_list);
++	list_add(&new->vm_list, &c->vm_list);
+ 	new->vm_start = addr;
+ 	new->vm_end = addr + size;
+ 	new->vm_active = 1;
