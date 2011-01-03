@@ -1,106 +1,115 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 03 Jan 2011 22:44:16 +0000
-Subject: [PATCH 42/48] ARM: PL08x: implement unmapping of memcpy buffers
+Date: Mon, 03 Jan 2011 22:44:36 +0000
+Subject: [PATCH 43/48] ARM: PL08x: rename 'desc_list' as 'pend_list'
 In-Reply-To: <20110103222943.GB4572@n2100.arm.linux.org.uk>
 References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-Message-ID: <E1PZt8S-0003S8-Jq@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PZt8m-0003SC-Nx@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA engine API requires DMA engine implementations to unmap buffers
-passed into the non-slave DMA methods unless the relevant completion
-flag is set.  We aren't doing this, so implement this facility.
+This 'desc_list' is actually a list of pending descriptors, so name
+it after its function (pending list) rather than what it contains
+(descriptors).
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   52 ++++++++++++++++++++++++++++++++++-----------
- 1 files changed, 39 insertions(+), 13 deletions(-)
+ drivers/dma/amba-pl08x.c   |   20 ++++++++++----------
+ include/linux/amba/pl08x.h |    4 ++--
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 00058e3..fb469de 100644
+index fb469de..433b9e7 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -1527,13 +1527,33 @@ static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
- 	writel(val, pl08x->base + PL080_CONFIG);
- }
- 
-+static void pl08x_unmap_buffers(struct pl08x_txd *txd)
-+{
-+	struct device *dev = txd->tx.chan->device->dev;
-+
-+	if (!(txd->tx.flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
-+		if (txd->tx.flags & DMA_COMPL_SRC_UNMAP_SINGLE)
-+			dma_unmap_single(dev, txd->src_addr, txd->len,
-+				DMA_TO_DEVICE);
-+		else
-+			dma_unmap_page(dev, txd->src_addr, txd->len,
-+				DMA_TO_DEVICE);
-+	}
-+	if (!(txd->tx.flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
-+		if (txd->tx.flags & DMA_COMPL_DEST_UNMAP_SINGLE)
-+			dma_unmap_single(dev, txd->dst_addr, txd->len,
-+				DMA_FROM_DEVICE);
-+		else
-+			dma_unmap_page(dev, txd->dst_addr, txd->len,
-+				DMA_FROM_DEVICE);
-+	}
-+}
-+
- static void pl08x_tasklet(unsigned long data)
- {
- 	struct pl08x_dma_chan *plchan = (struct pl08x_dma_chan *) data;
- 	struct pl08x_driver_data *pl08x = plchan->host;
- 	struct pl08x_txd *txd;
--	dma_async_tx_callback callback = NULL;
--	void *callback_param = NULL;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&plchan->lock, flags);
-@@ -1542,18 +1562,10 @@ static void pl08x_tasklet(unsigned long data)
- 	plchan->at = NULL;
- 
- 	if (txd) {
--		callback = txd->tx.callback;
--		callback_param = txd->tx.callback_param;
--
- 		/*
- 		 * Update last completed
- 		 */
- 		plchan->lc = txd->tx.cookie;
--
--		/*
--		 * Free the descriptor
--		 */
--		pl08x_free_txd(pl08x, txd);
+@@ -348,9 +348,9 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
  	}
+ 
+ 	/* Sum up all queued transactions */
+-	if (!list_empty(&plchan->desc_list)) {
++	if (!list_empty(&plchan->pend_list)) {
+ 		struct pl08x_txd *txdi;
+-		list_for_each_entry(txdi, &plchan->desc_list, node) {
++		list_for_each_entry(txdi, &plchan->pend_list, node) {
+ 			bytes += txdi->len;
+ 		}
+ 	}
+@@ -880,9 +880,9 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
+ 	struct pl08x_txd *txdi = NULL;
+ 	struct pl08x_txd *next;
+ 
+-	if (!list_empty(&plchan->desc_list)) {
++	if (!list_empty(&plchan->pend_list)) {
+ 		list_for_each_entry_safe(txdi,
+-					 next, &plchan->desc_list, node) {
++					 next, &plchan->pend_list, node) {
+ 			list_del(&txdi->node);
+ 			pl08x_free_txd(pl08x, txdi);
+ 		}
+@@ -1183,10 +1183,10 @@ static void pl08x_issue_pending(struct dma_chan *chan)
+ 	}
+ 
+ 	/* Take the first element in the queue and execute it */
+-	if (!list_empty(&plchan->desc_list)) {
++	if (!list_empty(&plchan->pend_list)) {
+ 		struct pl08x_txd *next;
+ 
+-		next = list_first_entry(&plchan->desc_list,
++		next = list_first_entry(&plchan->pend_list,
+ 					struct pl08x_txd,
+ 					node);
+ 		list_del(&next->node);
+@@ -1213,7 +1213,7 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
+ 
+ 	spin_lock_irqsave(&plchan->lock, plchan->lockflags);
+ 
+-	list_add_tail(&txd->node, &plchan->desc_list);
++	list_add_tail(&txd->node, &plchan->pend_list);
+ 
  	/*
+ 	 * See if we already have a physical channel allocated,
+@@ -1571,10 +1571,10 @@ static void pl08x_tasklet(unsigned long data)
  	 * If a new descriptor is queued, set it up
-@@ -1605,9 +1617,23 @@ static void pl08x_tasklet(unsigned long data)
+ 	 * plchan->at is NULL here
+ 	 */
+-	if (!list_empty(&plchan->desc_list)) {
++	if (!list_empty(&plchan->pend_list)) {
+ 		struct pl08x_txd *next;
  
- 	spin_unlock_irqrestore(&plchan->lock, flags);
+-		next = list_first_entry(&plchan->desc_list,
++		next = list_first_entry(&plchan->pend_list,
+ 					struct pl08x_txd,
+ 					node);
+ 		list_del(&next->node);
+@@ -1736,7 +1736,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+ 		chan->lc = 0;
  
--	/* Callback to signal completion */
--	if (callback)
--		callback(callback_param);
-+	if (txd) {
-+		dma_async_tx_callback callback = txd->tx.callback;
-+		void *callback_param = txd->tx.callback_param;
-+
-+		/* Don't try to unmap buffers on slave channels */
-+		if (!plchan->slave)
-+			pl08x_unmap_buffers(txd);
-+
-+		/* Free the descriptor */
-+		spin_lock_irqsave(&plchan->lock, flags);
-+		pl08x_free_txd(pl08x, txd);
-+		spin_unlock_irqrestore(&plchan->lock, flags);
-+
-+		/* Callback to signal completion */
-+		if (callback)
-+			callback(callback_param);
-+	}
- }
+ 		spin_lock_init(&chan->lock);
+-		INIT_LIST_HEAD(&chan->desc_list);
++		INIT_LIST_HEAD(&chan->pend_list);
+ 		tasklet_init(&chan->tasklet, pl08x_tasklet,
+ 			     (unsigned long) chan);
  
- static irqreturn_t pl08x_irq(int irq, void *dev)
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 4e9e718..08a9024 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -158,7 +158,7 @@ enum pl08x_dma_chan_state {
+  * @runtime_direction: current direction of this channel according to
+  * runtime config
+  * @lc: last completed transaction on this channel
+- * @desc_list: queued transactions pending on this channel
++ * @pend_list: queued transactions pending on this channel
+  * @at: active transaction on this channel
+  * @lockflags: sometimes we let a lock last between two function calls,
+  * especially prep/submit, and then we need to store the IRQ flags
+@@ -179,7 +179,7 @@ struct pl08x_dma_chan {
+ 	dma_addr_t runtime_addr;
+ 	enum dma_data_direction	runtime_direction;
+ 	dma_cookie_t lc;
+-	struct list_head desc_list;
++	struct list_head pend_list;
+ 	struct pl08x_txd *at;
+ 	unsigned long lockflags;
+ 	spinlock_t lock;
 -- 
 1.6.2.5
