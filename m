@@ -1,44 +1,26 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 3 Jan 2011 23:57:27 +0800
-Subject: [PATCH 2/2] arm/pxa: buildfix for pam27x without fb
-In-Reply-To: <1293654828-24661-2-git-send-email-bigeasy@linutronix.de>
-References: <1293654828-24661-1-git-send-email-bigeasy@linutronix.de>
-	<1293654828-24661-2-git-send-email-bigeasy@linutronix.de>
-Message-ID: <AANLkTi=mtu3VibUR5SC+GmsmJCwo-nN9=eoTmzUE9jS8@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 03 Jan 2011 19:06:10 +0300
+Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
+In-Reply-To: <201005152214.53993.sshtylyov@ru.mvista.com>
+References: <201005152214.53993.sshtylyov@ru.mvista.com>
+Message-ID: <4D21F3F2.6090302@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 30, 2010 at 4:33 AM, Sebastian Andrzej Siewior
-<bigeasy@linutronix.de> wrote:
-> |arch/arm/mach-pxa/palmld.c: In function ?palmld_init?:
-> |arch/arm/mach-pxa/palmld.c:330: error: ?palm_320x480_lcd_mode? undeclared (first use in this function)
-> |arch/arm/mach-pxa/palmld.c:330: error: (Each undeclared identifier is reported only once
-> |arch/arm/mach-pxa/palmld.c:330: error: for each function it appears in.)
->
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Hello.
 
-Marek,
+On 15-05-2010 22:14, Sergei Shtylyov wrote:
 
-I need your ack please.
+> Add support for Texas Instuments Communication Port Programming Interface 4.1
+> (CPPI 4.1) used on OMAP-L1x/DA8xx and AM35x.
 
-> ---
-> ?arch/arm/mach-pxa/include/mach/palm27x.h | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h b/arch/arm/mach-pxa/include/mach/palm27x.h
-> index 0a5e5ea..7b7927c 100644
-> --- a/arch/arm/mach-pxa/include/mach/palm27x.h
-> +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
-> @@ -34,7 +34,7 @@ extern struct pxafb_mode_info palm_320x320_new_lcd_mode;
-> ?extern void __init palm27x_lcd_init(int power,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct pxafb_mode_info *mode);
-> ?#else
-> -static inline void palm27x_lcd_init(int power, struct pxafb_mode_info *mode) {}
-> +#define palm27x_lcd_init(power, mode) ?do { } while (0)
-> ?#endif
->
-> ?#if ? ?defined(CONFIG_USB_GADGET_PXA27X) || \
-> --
-> 1.7.3.2
->
->
+> At this moment, only the DMA controller and queue manager are supported.
+> Support for the buffer manager is lacking but these chips don't have it anyway.
+
+> Signed-off-by: Sergei Shtylyov<sshtylyov@ru.mvista.com>
+> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+
+    Russell, you have recently discarded this patch from your patch system. 
+Can we know the reason?
+
+WBR, Sergei
