@@ -1,161 +1,333 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Mon,  3 Jan 2011 08:21:45 -0500
-Subject: [PATCH v4] davinci: Support various speedgrades for MityDSP-L138 and
-	MityARM-1808 SoMs
-Message-ID: <1294060905-14254-1-git-send-email-michael.williamson@criticallink.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 3 Jan 2011 18:50:39 +0530
+Subject: [PATCH 2/7 v2] OMAP2430: hwmod data: Add McSPI
+In-Reply-To: <20101230190320.GA2713@angua.secretlab.ca>
+References: <33236.10.24.255.18.1291212082.squirrel@dbdmail.itg.ti.com>
+	<20101230190320.GA2713@angua.secretlab.ca>
+Message-ID: <AANLkTinvQOGhe-Y-6nECig3ZpKHkm1nJ8wNeTMgm4j2U@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
-from the part number string read from the factory configuration block on
-the on-board I2C PROM.  Configure the maximum CPU speed based on this
-information.
+On Fri, Dec 31, 2010 at 12:33 AM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Wed, Dec 01, 2010 at 07:31:22PM +0530, Govindraj.R wrote:
+>> From: Charulatha V <charu@ti.com>
+>>
+>> Update the 2430 hwmod data file with McSPI info.
+>>
+>> Signed-off-by: Charulatha V <charu@ti.com>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>
+> Hmmm; this patch is virtually identical to the first patch in this
+> series which adds 2420 hwmod support. ?I see a large block of
+> identical data with minor differences. ?Surely support for these two
+> chips can share the common blocks of data.
+>
+> Is this going to be a common situation for HWMOD data?
 
-This patch was tested using a MityDSP-L138 and MityARM-1808 at various
-speedgrades.  Also, for code coverage, a bogus configuration was tested
-as well as a configuration having an unknown part number.
+Grant,
 
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-Tested-by: Michael Williamson <michael.williamson@criticallink.com>
----
-Built against linux-davinci.
+Thanks for your Review comments.
 
-Changes since v2 (v3 was sent in error, wrong file, sorry for the churn):
+Currently we have four hwmod data files:
+2420, 2430 , 3xxx, 44xx
 
- - reworked logic to use fall-through logic for mityomapl138_cpugreq_init call
-   per comments.
+We need to fill these four files with hw info data to be passed
+to driver there could be small info that might be duplicated.
 
- arch/arm/mach-davinci/board-mityomapl138.c |   83 +++++++++++++++++++++++++---
- 1 files changed, 75 insertions(+), 8 deletions(-)
+Currently we are updating all the four files.
+As Paul said there might be some changes done going forward.
+To handle the hwmod files.
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 0bb5f0c..86d6229 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -44,38 +44,109 @@ struct factory_config {
- 
- static struct factory_config factory_config;
- 
-+struct part_no_info {
-+	const char	*part_no;	/* part number string of interest */
-+	int		max_freq;	/* khz */
-+};
-+
-+static struct part_no_info mityomapl138_pn_info[] = {
-+	{
-+		.part_no	= "L138-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "L138-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "L138-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1808-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "1808-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "1808-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1810-D",
-+		.max_freq	= 375000,
-+	},
-+};
-+
-+#ifdef CONFIG_CPU_FREQ
-+static void mityomapl138_cpufreq_init(const char *partnum)
-+{
-+	int i, ret;
-+
-+	for (i = 0; partnum && i < ARRAY_SIZE(mityomapl138_pn_info); i++) {
-+		/*
-+		 * the part number has additional characters beyond what is
-+		 * stored in the table.  This information is not needed for
-+		 * determining the speed grade, and would require several
-+		 * more table entries.  Only check the first N characters
-+		 * for a match.
-+		 */
-+		if (!strncmp(partnum, mityomapl138_pn_info[i].part_no,
-+			strlen(mityomapl138_pn_info[i].part_no))) {
-+			da850_max_speed = mityomapl138_pn_info[i].max_freq;
-+			break;
-+		}
-+	}
-+
-+	ret = da850_register_cpufreq("pll0_sysclk3");
-+	if (ret)
-+		pr_warning("cpufreq registration failed: %d\n", ret);
-+}
-+#else
-+static void mityomapl138_cpufreq_init(const char *partnum) { }
-+#endif
-+
- static void read_factory_config(struct memory_accessor *a, void *context)
- {
- 	int ret;
-+	const char *partnum = NULL;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
- 	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
- 	if (ret != sizeof(struct factory_config)) {
- 		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
- 				ret);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
- 		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
- 				factory_config.magic);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.version != FACTORY_CONFIG_VERSION) {
- 		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
- 				factory_config.version);
--		return;
-+		goto bad_config;
- 	}
- 
- 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
--	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
- 	if (is_valid_ether_addr(factory_config.mac))
- 		memcpy(soc_info->emac_pdata->mac_addr,
- 			factory_config.mac, ETH_ALEN);
- 	else
- 		pr_warning("MityOMAPL138: Invalid MAC found "
- 				"in factory config block\n");
-+
-+	partnum = factory_config.partnum;
-+	pr_info("MityOMAPL138: Part Number = %s\n", partnum);
-+
-+bad_config:
-+	/* default maximum speed is valid for all platforms */
-+	mityomapl138_cpufreq_init(partnum);
- }
- 
- static struct at24_platform_data mityomapl138_fd_chip = {
-@@ -383,10 +454,6 @@ static void __init mityomapl138_init(void)
- 	if (ret)
- 		pr_warning("rtc setup failed: %d\n", ret);
- 
--	ret = da850_register_cpufreq("pll0_sysclk3");
--	if (ret)
--		pr_warning("cpufreq registration failed: %d\n", ret);
--
- 	ret = da8xx_register_cpuidle();
- 	if (ret)
- 		pr_warning("cpuidle registration failed: %d\n", ret);
--- 
-1.7.0.4
+Hope this clarifies.
+
+--
+Thanks,
+Govindraj.R
+
+
+>
+> g.
+>
+>> ---
+>> ?arch/arm/mach-omap2/omap_hwmod_2430_data.c | ?219 ++++++++++++++++++++++++++++
+>> ?1 files changed, 219 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+>> index 7cf0d3a..bcdfb2b 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+>> @@ -17,6 +17,7 @@
+>> ?#include <plat/dma.h>
+>> ?#include <plat/serial.h>
+>> ?#include <plat/i2c.h>
+>> +#include <plat/mcspi.h>
+>> ?#include <plat/omap24xx.h>
+>>
+>> ?#include "omap_hwmod_common_data.h"
+>> @@ -38,6 +39,9 @@ static struct omap_hwmod omap2430_iva_hwmod;
+>> ?static struct omap_hwmod omap2430_l3_main_hwmod;
+>> ?static struct omap_hwmod omap2430_l4_core_hwmod;
+>> ?static struct omap_hwmod omap2430_wd_timer2_hwmod;
+>> +static struct omap_hwmod omap2430_mcspi1_hwmod;
+>> +static struct omap_hwmod omap2430_mcspi2_hwmod;
+>> +static struct omap_hwmod omap2430_mcspi3_hwmod;
+>>
+>> ?/* L3 -> L4_CORE interface */
+>> ?static struct omap_hwmod_ocp_if omap2430_l3_main__l4_core = {
+>> @@ -216,6 +220,60 @@ static struct omap_hwmod_ocp_if *omap2430_l4_wkup_slaves[] = {
+>> ?static struct omap_hwmod_ocp_if *omap2430_l4_wkup_masters[] = {
+>> ?};
+>>
+>> +/* l4 core -> mcspi1 interface */
+>> +static struct omap_hwmod_addr_space omap2430_mcspi1_addr_space[] = {
+>> + ? ? {
+>> + ? ? ? ? ? ? .pa_start ? ? ? = 0x48098000,
+>> + ? ? ? ? ? ? .pa_end ? ? ? ? = 0x480980ff,
+>> + ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT,
+>> + ? ? },
+>> +};
+>> +
+>> +static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi1 = {
+>> + ? ? .master ? ? ? ? = &omap2430_l4_core_hwmod,
+>> + ? ? .slave ? ? ? ? ?= &omap2430_mcspi1_hwmod,
+>> + ? ? .clk ? ? ? ? ? ?= "mcspi1_ick",
+>> + ? ? .addr ? ? ? ? ? = omap2430_mcspi1_addr_space,
+>> + ? ? .addr_cnt ? ? ? = ARRAY_SIZE(omap2430_mcspi1_addr_space),
+>> + ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>> +/* l4 core -> mcspi2 interface */
+>> +static struct omap_hwmod_addr_space omap2430_mcspi2_addr_space[] = {
+>> + ? ? {
+>> + ? ? ? ? ? ? .pa_start ? ? ? = 0x4809a000,
+>> + ? ? ? ? ? ? .pa_end ? ? ? ? = 0x4809a0ff,
+>> + ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT,
+>> + ? ? },
+>> +};
+>> +
+>> +static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi2 = {
+>> + ? ? .master ? ? ? ? = &omap2430_l4_core_hwmod,
+>> + ? ? .slave ? ? ? ? ?= &omap2430_mcspi2_hwmod,
+>> + ? ? .clk ? ? ? ? ? ?= "mcspi2_ick",
+>> + ? ? .addr ? ? ? ? ? = omap2430_mcspi2_addr_space,
+>> + ? ? .addr_cnt ? ? ? = ARRAY_SIZE(omap2430_mcspi2_addr_space),
+>> + ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>> +/* l4 core -> mcspi3 interface */
+>> +static struct omap_hwmod_addr_space omap2430_mcspi3_addr_space[] = {
+>> + ? ? {
+>> + ? ? ? ? ? ? .pa_start ? ? ? = 0x480b8000,
+>> + ? ? ? ? ? ? .pa_end ? ? ? ? = 0x480b80ff,
+>> + ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT,
+>> + ? ? },
+>> +};
+>> +
+>> +static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi3 = {
+>> + ? ? .master ? ? ? ? = &omap2430_l4_core_hwmod,
+>> + ? ? .slave ? ? ? ? ?= &omap2430_mcspi3_hwmod,
+>> + ? ? .clk ? ? ? ? ? ?= "mcspi3_ick",
+>> + ? ? .addr ? ? ? ? ? = omap2430_mcspi3_addr_space,
+>> + ? ? .addr_cnt ? ? ? = ARRAY_SIZE(omap2430_mcspi3_addr_space),
+>> + ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>> ?/* L4 WKUP */
+>> ?static struct omap_hwmod omap2430_l4_wkup_hwmod = {
+>> ? ? ? .name ? ? ? ? ? = "l4_wkup",
+>> @@ -569,6 +627,162 @@ static struct omap_hwmod omap2430_i2c2_hwmod = {
+>> ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
+>> ?};
+>>
+>> +/*
+>> + * 'mcspi' class
+>> + * multichannel serial port interface (mcspi) / master/slave synchronous serial
+>> + * bus
+>> + */
+>> +
+>> +static struct omap_hwmod_class_sysconfig omap2430_mcspi_sysc = {
+>> + ? ? .rev_offs ? ? ? = 0x0000,
+>> + ? ? .sysc_offs ? ? ?= 0x0010,
+>> + ? ? .syss_offs ? ? ?= 0x0014,
+>> + ? ? .sysc_flags ? ? = (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? SYSC_HAS_AUTOIDLE),
+>> + ? ? .idlemodes ? ? ?= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+>> + ? ? .sysc_fields ? ?= &omap_hwmod_sysc_type1,
+>> +};
+>> +
+>> +static struct omap_hwmod_class omap2430_mcspi_class = {
+>> + ? ? .name = "mcspi",
+>> + ? ? .sysc = &omap2430_mcspi_sysc,
+>> + ? ? .rev = OMAP2_MCSPI_REV,
+>> +};
+>> +
+>> +/* mcspi1 */
+>> +static struct omap_hwmod_irq_info omap2430_mcspi1_mpu_irqs[] = {
+>> + ? ? { .irq = 65 },
+>> +};
+>> +
+>> +static struct omap_hwmod_dma_info omap2430_mcspi1_sdma_reqs[] = {
+>> + ? ? { .name = "tx0", .dma_req = 35 }, /* DMA_SPI1_TX0 */
+>> + ? ? { .name = "rx0", .dma_req = 36 }, /* DMA_SPI1_RX0 */
+>> + ? ? { .name = "tx1", .dma_req = 37 }, /* DMA_SPI1_TX1 */
+>> + ? ? { .name = "rx1", .dma_req = 38 }, /* DMA_SPI1_RX1 */
+>> + ? ? { .name = "tx2", .dma_req = 39 }, /* DMA_SPI1_TX2 */
+>> + ? ? { .name = "rx2", .dma_req = 40 }, /* DMA_SPI1_RX2 */
+>> + ? ? { .name = "tx3", .dma_req = 41 }, /* DMA_SPI1_TX3 */
+>> + ? ? { .name = "rx3", .dma_req = 42 }, /* DMA_SPI1_RX3 */
+>> +};
+>> +
+>> +static struct omap_hwmod_ocp_if *omap2430_mcspi1_slaves[] = {
+>> + ? ? &omap2430_l4_core__mcspi1,
+>> +};
+>> +
+>> +static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
+>> + ? ? .num_chipselect = 4,
+>> +};
+>> +
+>> +static struct omap_hwmod omap2430_mcspi1_hwmod = {
+>> + ? ? .name ? ? ? ? ? = "mcspi1_hwmod",
+>> + ? ? .mpu_irqs ? ? ? = omap2430_mcspi1_mpu_irqs,
+>> + ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap2430_mcspi1_mpu_irqs),
+>> + ? ? .sdma_reqs ? ? ?= omap2430_mcspi1_sdma_reqs,
+>> + ? ? .sdma_reqs_cnt ?= ARRAY_SIZE(omap2430_mcspi1_sdma_reqs),
+>> + ? ? .main_clk ? ? ? = "mcspi1_fck",
+>> + ? ? .prcm ? ? ? ? ? = {
+>> + ? ? ? ? ? ? .omap2 = {
+>> + ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
+>> + ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+>> + ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP24XX_EN_MCSPI1_SHIFT,
+>> + ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
+>> + ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP24XX_ST_MCSPI1_SHIFT,
+>> + ? ? ? ? ? ? },
+>> + ? ? },
+>> + ? ? .slaves ? ? ? ? = omap2430_mcspi1_slaves,
+>> + ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap2430_mcspi1_slaves),
+>> + ? ? .class ? ? ? ? ?= &omap2430_mcspi_class,
+>> + ? ? .dev_attr ? ? ? = &omap_mcspi1_dev_attr,
+>> + ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
+>> +};
+>> +
+>> +/* mcspi2 */
+>> +static struct omap_hwmod_irq_info omap2430_mcspi2_mpu_irqs[] = {
+>> + ? ? { .irq = 66 },
+>> +};
+>> +
+>> +static struct omap_hwmod_dma_info omap2430_mcspi2_sdma_reqs[] = {
+>> + ? ? { .name = "tx0", .dma_req = 43 }, /* DMA_SPI2_TX0 */
+>> + ? ? { .name = "rx0", .dma_req = 44 }, /* DMA_SPI2_RX0 */
+>> + ? ? { .name = "tx1", .dma_req = 45 }, /* DMA_SPI2_TX1 */
+>> + ? ? { .name = "rx1", .dma_req = 46 }, /* DMA_SPI2_RX1 */
+>> +};
+>> +
+>> +static struct omap_hwmod_ocp_if *omap2430_mcspi2_slaves[] = {
+>> + ? ? &omap2430_l4_core__mcspi2,
+>> +};
+>> +
+>> +static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
+>> + ? ? .num_chipselect = 2,
+>> +};
+>> +
+>> +static struct omap_hwmod omap2430_mcspi2_hwmod = {
+>> + ? ? .name ? ? ? ? ? = "mcspi2_hwmod",
+>> + ? ? .mpu_irqs ? ? ? = omap2430_mcspi2_mpu_irqs,
+>> + ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap2430_mcspi2_mpu_irqs),
+>> + ? ? .sdma_reqs ? ? ?= omap2430_mcspi2_sdma_reqs,
+>> + ? ? .sdma_reqs_cnt ?= ARRAY_SIZE(omap2430_mcspi2_sdma_reqs),
+>> + ? ? .main_clk ? ? ? = "mcspi2_fck",
+>> + ? ? .prcm ? ? ? ? ? = {
+>> + ? ? ? ? ? ? .omap2 = {
+>> + ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
+>> + ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+>> + ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP24XX_EN_MCSPI2_SHIFT,
+>> + ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
+>> + ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP24XX_ST_MCSPI2_SHIFT,
+>> + ? ? ? ? ? ? },
+>> + ? ? },
+>> + ? ? .slaves ? ? ? ? = omap2430_mcspi2_slaves,
+>> + ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap2430_mcspi2_slaves),
+>> + ? ? .class ? ? ? ? ?= &omap2430_mcspi_class,
+>> + ? ? .dev_attr ? ? ? = &omap_mcspi2_dev_attr,
+>> + ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
+>> +};
+>> +
+>> +/* mcspi3 */
+>> +static struct omap_hwmod_irq_info omap2430_mcspi3_mpu_irqs[] = {
+>> + ? ? { .irq = 91 },
+>> +};
+>> +
+>> +static struct omap_hwmod_dma_info omap2430_mcspi3_sdma_reqs[] = {
+>> + ? ? { .name = "tx0", .dma_req = 15 }, /* DMA_SPI3_TX0 */
+>> + ? ? { .name = "rx0", .dma_req = 16 }, /* DMA_SPI3_RX0 */
+>> + ? ? { .name = "tx1", .dma_req = 23 }, /* DMA_SPI3_TX1 */
+>> + ? ? { .name = "rx1", .dma_req = 24 }, /* DMA_SPI3_RX1 */
+>> +};
+>> +
+>> +static struct omap_hwmod_ocp_if *omap2430_mcspi3_slaves[] = {
+>> + ? ? &omap2430_l4_core__mcspi3,
+>> +};
+>> +
+>> +static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
+>> + ? ? .num_chipselect = 2,
+>> +};
+>> +
+>> +static struct omap_hwmod omap2430_mcspi3_hwmod = {
+>> + ? ? .name ? ? ? ? ? = "mcspi3_hwmod",
+>> + ? ? .mpu_irqs ? ? ? = omap2430_mcspi3_mpu_irqs,
+>> + ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap2430_mcspi3_mpu_irqs),
+>> + ? ? .sdma_reqs ? ? ?= omap2430_mcspi3_sdma_reqs,
+>> + ? ? .sdma_reqs_cnt ?= ARRAY_SIZE(omap2430_mcspi3_sdma_reqs),
+>> + ? ? .main_clk ? ? ? = "mcspi3_fck",
+>> + ? ? .prcm ? ? ? ? ? = {
+>> + ? ? ? ? ? ? .omap2 = {
+>> + ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
+>> + ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 2,
+>> + ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP2430_EN_MCSPI3_SHIFT,
+>> + ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 2,
+>> + ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP2430_ST_MCSPI3_SHIFT,
+>> + ? ? ? ? ? ? },
+>> + ? ? },
+>> + ? ? .slaves ? ? ? ? = omap2430_mcspi3_slaves,
+>> + ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap2430_mcspi3_slaves),
+>> + ? ? .class ? ? ? ? ?= &omap2430_mcspi_class,
+>> + ? ? .dev_attr ? ? ? = &omap_mcspi3_dev_attr,
+>> + ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
+>> +};
+>> +
+>> ?static __initdata struct omap_hwmod *omap2430_hwmods[] = {
+>> ? ? ? &omap2430_l3_main_hwmod,
+>> ? ? ? &omap2430_l4_core_hwmod,
+>> @@ -581,6 +795,11 @@ static __initdata struct omap_hwmod *omap2430_hwmods[] = {
+>> ? ? ? &omap2430_uart3_hwmod,
+>> ? ? ? &omap2430_i2c1_hwmod,
+>> ? ? ? &omap2430_i2c2_hwmod,
+>> +
+>> + ? ? /* mcspi class */
+>> + ? ? &omap2430_mcspi1_hwmod,
+>> + ? ? &omap2430_mcspi2_hwmod,
+>> + ? ? &omap2430_mcspi3_hwmod,
+>> ? ? ? NULL,
+>> ?};
+>>
+>> --
+>> 1.7.1
+>>
+>>
+>>
+>> ------------------------------------------------------------------------------
+>> Increase Visibility of Your 3D Game App & Earn a Chance To Win $500!
+>> Tap into the largest installed PC base & get more eyes on your game by
+>> optimizing for Intel(R) Graphics Technology. Get started today with the
+>> Intel(R) Software Partner Program. Five $500 cash prizes are up for grabs.
+>> http://p.sf.net/sfu/intelisp-dev2dev
+>> _______________________________________________
+>> spi-devel-general mailing list
+>> spi-devel-general at lists.sourceforge.net
+>> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
