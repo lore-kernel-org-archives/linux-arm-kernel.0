@@ -1,29 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jan 2011 10:35:39 +0000
+Date: Mon, 3 Jan 2011 10:39:13 +0000
 Subject: [PATCH] ARM: mxs: Change duart device to use amba-pl011
-In-Reply-To: <20101222202542.GT14221@pengutronix.de>
+In-Reply-To: <20101227114938.GA13154@freescale.com>
 References: <1292857064-5032-1-git-send-email-shawn.guo@freescale.com>
 	<1292937130-32155-1-git-send-email-shawn.guo@freescale.com>
 	<20101222202542.GT14221@pengutronix.de>
-Message-ID: <20110103103539.GD26785@n2100.arm.linux.org.uk>
+	<20101227114938.GA13154@freescale.com>
+Message-ID: <20110103103913.GE26785@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 22, 2010 at 09:25:42PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Shawn,
+On Mon, Dec 27, 2010 at 07:49:40PM +0800, Shawn Guo wrote:
+> I did not see this problem. It's true that the clock is turned off
+> in amba_device_register. But later, the clock will be turned on
+> again by amba_probe -> amba_get_enable_pclk very soon.
 > 
-> On Tue, Dec 21, 2010 at 09:12:10PM +0800, Shawn Guo wrote:
-> > The mxs duart is actually an amba-pl011 device. This commit changes
-> > the duart device code to dynamically allocate amba-pl011 device,
-> > so that drivers/serial/amba-pl011.c can be used on mxs.
-> I have problems using this.  The problem I found up to now is that
-> during probe of the device (triggered by mxs_add_duart ->
-> amba_device_register -> amba_put_disable_pclk) the uart clock is
-> disabled.
+> But we should add something like below in mx28_clocks_init to reflect
+> the clock status and get usecount updated.
+> 
+> 	clk_enable(&uart_clk)
+> 
+> I ran into similar problem with fec driver, and would cover that in
+> fec patch set.
 
-Which uart clock is disabled?  The PCLK or the UARTCLK (names as defined
-in the ARM PL011 TRM).
+This sounds like entirely the wrong approach.  Please take some time to
+understand that there are different clocks which do different things.
 
-If the pclk code is disabling the UARTCLK, then add a dummy apb_pclk to
-your clock lookups, which is what everyone else who can't control the
-APB PCLK does.
+The PCLK is the name ARM Ltd give to the APB bus clock.  This we name
+apb_pclk, and we expect platforms to provide it where possible.  This
+name will be looked up for every primecell device on the system.
+
+If you don't provide an apb_pclk, it will find the device specific
+function clock.  This in itself is no bad thing, unless you use the
+device outside of the AMBA driver (iow, before probe or after remove)
+and helps identify when you've forgotten to provide an apb_pclk.
