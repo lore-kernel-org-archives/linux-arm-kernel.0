@@ -1,73 +1,34 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Mon, 03 Jan 2011 17:39:54 -0500
-Subject: [PATCH v5] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs From: Sudhakar Rajashekhara
-	<sudhakar.raj@ti.com>
-In-Reply-To: <87ipy5d3da.fsf@deeprootsystems.com>
-References: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
-	<87ipy5d3da.fsf@deeprootsystems.com>
-Message-ID: <4D22503A.7010709@criticallink.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 03 Jan 2011 16:39:59 -0600
+Subject: [PATCH 0/2] OMAP: TWL: sparse fixes
+In-Reply-To: <20110103223656.GA8414@n2100.arm.linux.org.uk>
+References: <1294081110-23695-1-git-send-email-nm@ti.com>
+	<20110103223656.GA8414@n2100.arm.linux.org.uk>
+Message-ID: <4D22503F.9060100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2011 05:33 PM, Kevin Hilman wrote:
-> Michael Williamson <michael.williamson@criticallink.com> writes:
+Russell King - ARM Linux had written, on 01/03/2011 04:36 PM, the following:
+> On Mon, Jan 03, 2011 at 12:58:28PM -0600, Nishanth Menon wrote:
+>> Source:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+>> branch: omap-for-linus
+>>
+>> Doing a rm arch/arm/mach-omap2/*.o;make C=1 arch/arm/mach-omap2/
+>> resulted in the following sparse warnings:
+>> http://pastebin.mozilla.org/907954
 > 
-> I'm assuming the 'From:' line currently in the subject was supposed to
-> go here?
+> FYI, you may like to try:
 > 
-> Kevin
-
-Arg.  Yes.  Sorry about that; not sure how I lost the newline.  Do you need me
-to resend?
-
--Mike
-
+> make C=2 arch/arm/mach-omap2/
 > 
->> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
->> In addition, the variant code for the AM-1808 SoC appears to match
->> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
->> these chips.
->>
->> This patch is originally from a patch on the arago project, here:
->> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
->>
->> Further information related to the need for this patch can be located at
->> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
->> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
->>
->> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
->> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
->>
->> Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
->> Reported-by: Nicolas Luna <luna.id@gmail.com>
->> ---
->> Built against linux-davinci tree.
->>
->> Changes since v4.
->>
->>  - removed am18x code from 0 variant per Sekhar's request.
->>
->>  arch/arm/mach-davinci/da850.c |    7 +++++++
->>  1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->> index 78b5ae2..1550ac3 100644
->> --- a/arch/arm/mach-davinci/da850.c
->> +++ b/arch/arm/mach-davinci/da850.c
->> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
->>  		.cpu_id		= DAVINCI_CPU_ID_DA850,
->>  		.name		= "da850/omap-l138",
->>  	},
->> +	{
->> +		.variant	= 0x1,
->> +		.part_no	= 0xb7d1,
->> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
->> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
->> +		.name		= "da850/omap-l138/am18x",
->> +	},
->>  };
->>  
->>  static struct davinci_timer_instance da850_timer_instance[4] = {
+> instead of the two-step process:
+> | Do a kernel make with "make C=1" to run sparse on all the C files that get
+> | recompiled, or use "make C=2" to run sparse on the files whether they need to
+> | be recompiled or not.  The latter is a fast way to check the whole tree if you
+> | have already built it.
+Gee thanks. /me should update my old bash aliases :D
+
+-- 
+Regards,
+Nishanth Menon
