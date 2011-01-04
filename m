@@ -1,29 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 4 Jan 2011 21:32:55 -0200
-Subject: [PATCH v3 1/2] ARM i.MX53: Some bug fix about MX53 MSL code
-In-Reply-To: <AANLkTimhxmJNgC7=0kdr022VX605rsweiJ8_Nb-1zVNo@mail.gmail.com>
-References: <1294122176-26450-1-git-send-email-yong.shen@freescale.com>
-	<1294122176-26450-2-git-send-email-yong.shen@freescale.com>
-	<AANLkTimhxmJNgC7=0kdr022VX605rsweiJ8_Nb-1zVNo@mail.gmail.com>
-Message-ID: <AANLkTimD_HteeyhdHcGiJU6jashyPfoLGP_bWkWAj0Ap@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 4 Jan 2011 15:37:25 -0800
+Subject: [PATCH] leds/h1940: Use gpiolib for latch access / fix build
+	failure
+In-Reply-To: <201012100016.58130.anarsoul@gmail.com>
+References: <1291932292-16049-1-git-send-email-peterhuewe@gmx.de>
+	<201012100016.58130.anarsoul@gmail.com>
+Message-ID: <20110104153725.2f3fede2.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yong,
+On Fri, 10 Dec 2010 00:16:57 +0200
+Vasily Khoruzhick <anarsoul@gmail.com> wrote:
 
-On Tue, Jan 4, 2011 at 12:41 PM, Yong Shen <yong.shen@linaro.org> wrote:
-> Hi there,
->
-> Are there any more comments?
-> Because of the time difference, the review process is longer than it
-> should be. If no more comments, I am going to ask for merge, so more
-> works can be carry on based on this.
+> On Friday 10 December 2010 00:04:52 Peter Huewe wrote:
+> > This patch fixes a build failure by converting leds-h1940.c to use
+> > gpiolib for latch access introduced by 14477095abc6
+> > (ARM: h1940: Use gpiolib for latch access)
+> > 
+> > Unfortunately this driver was not converted back then.
+> 
+> I sent similar patch (however, my patch does gpio_request/gpio_free) ~month 
+> ago.
+> 
+> Here's link:
+> http://www.spinics.net/lists/arm-kernel/msg103429.html
+> 
 
-Looks like you haven?t checked Sascha?s tree:
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/imx-for-2.6.38
+So which patch to use?
 
-The patch is there ;-)
-
-Regards,
-
-Fabio Estevam
+I queued Peter's patch because it's simpler.  I queued it for
+2.6.38-rc1, taged for backporting into 2.6.37.x, so we have a bit of
+time to think about it.
