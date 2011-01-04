@@ -1,57 +1,69 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue,  4 Jan 2011 23:56:12 +0530
-Subject: [PATCH 1/5] omap2plus: clockdomain: Trivial fix for build break
-	because of clktrctrl_mask
-In-Reply-To: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Tue,  4 Jan 2011 23:56:15 +0530
+Subject: [PATCH 4/5] omap2plus: voltage: Trivial linking fix 'undefined
+	reference'
+In-Reply-To: <1294165576-15628-4-git-send-email-santosh.shilimkar@ti.com>
 References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1294165576-15628-2-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-2-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-3-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1294165576-15628-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct clockdomain member clktrctrl_mask is available for only for OMAP2
-and OMAP3 architectures. Technially it is also used only for these archs
-but this breaks the build with custom OMAP4 configuration.
+LD      init/built-in.o
+LD      .tmp_vmlinux1
+arch/arm/mach-omap2/built-in.o: In function `omap2_set_init_voltage':
+arch/arm/mach-omap2/pm.c:181: undefined reference to `omap_voltage_domain_lookup'
+arch/arm/mach-omap2/built-in.o: In function `omap4_twl_init':
+arch/arm/mach-omap2/omap_twl.c:244: undefined reference to `omap_voltage_domain_lookup'
+arch/arm/mach-omap2/omap_twl.c:247: undefined reference to `omap_voltage_domain_lookup'
+arch/arm/mach-omap2/omap_twl.c:250: undefined reference to `omap_voltage_domain_lookup'
+make: *** [.tmp_vmlinux1] Error 1
 
- CC      arch/arm/mach-omap2/clockdomain.o
-arch/arm/mach-omap2/clockdomain.c: In function '_enable_hwsup':
-arch/arm/mach-omap2/clockdomain.c:251: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:254: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function '_disable_hwsup':
-arch/arm/mach-omap2/clockdomain.c:277: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:280: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_sleep':
-arch/arm/mach-omap2/clockdomain.c:744: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_wakeup':
-arch/arm/mach-omap2/clockdomain.c:789: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_clk_enable':
-arch/arm/mach-omap2/clockdomain.c:922: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:926: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_clk_disable':
-arch/arm/mach-omap2/clockdomain.c:994: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:998: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-make[1]: *** [arch/arm/mach-omap2/clockdomain.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
-
-Fix the build break with use of ARCH_OMAP2PLUS instead of OMAP2 or OMAP3
+The error is reported when omap2plus_defconfig built with CONFIG_PM disabled
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Thara Gopinath <thara@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/clockdomain.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/include/plat/voltage.h |   10 +++++++---
+ 1 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index de3faa2..6fa82f5 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -103,7 +103,7 @@ struct clockdomain {
- 		const char *name;
- 		struct powerdomain *ptr;
- 	} pwrdm;
--#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
-+#ifdef CONFIG_ARCH_OMAP2PLUS
- 	const u16 clktrctrl_mask;
+diff --git a/arch/arm/plat-omap/include/plat/voltage.h b/arch/arm/plat-omap/include/plat/voltage.h
+index 710f4ea..c095351 100644
+--- a/arch/arm/plat-omap/include/plat/voltage.h
++++ b/arch/arm/plat-omap/include/plat/voltage.h
+@@ -65,9 +65,6 @@ struct voltagedomain {
+ 	char *name;
+ };
+ 
+-/* API to get the voltagedomain pointer */
+-struct voltagedomain *omap_voltage_domain_lookup(char *name);
+-
+ /**
+  * struct omap_volt_data - Omap voltage specific data.
+  * @voltage_nominal:	The possible voltage value in uV
+@@ -131,6 +128,9 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
+ 		struct omap_volt_pmic_info *pmic_info);
+ void omap_change_voltscale_method(struct voltagedomain *voltdm,
+ 		int voltscale_method);
++/* API to get the voltagedomain pointer */
++struct voltagedomain *omap_voltage_domain_lookup(char *name);
++
+ int omap_voltage_late_init(void);
+ #else
+ static inline int omap_voltage_register_pmic(struct voltagedomain *voltdm,
+@@ -144,6 +144,10 @@ static inline int omap_voltage_late_init(void)
+ {
+ 	return -EINVAL;
+ }
++static inline struct voltagedomain *omap_voltage_domain_lookup(char *name)
++{
++	return NULL;
++}
  #endif
- 	const u8 flags;
+ 
+ #endif
 -- 
 1.6.0.4
