@@ -1,102 +1,166 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 4 Jan 2011 15:26:01 -0200
-Subject: [PATCH v6 1/2] ARM: mx5: dynamically allocate pwm devices
-In-Reply-To: <AANLkTi=rTbL2SHCPtn5sGQ4O1x+DgOHfJOEi3fG7ZrZy@mail.gmail.com>
-References: <1291209107-2256-1-git-send-email-fabio.estevam@freescale.com>
-	<AANLkTi=rTbL2SHCPtn5sGQ4O1x+DgOHfJOEi3fG7ZrZy@mail.gmail.com>
-Message-ID: <AANLkTim_Ouees3GAejQuK6HLbjmxjMyFfuqfTc3i1koN@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 04 Jan 2011 09:30:17 -0800
+Subject: [PATCH v5] davinci: Support various speedgrades for MityDSP-L138
+	and MityARM-1808 SoMs
+In-Reply-To: <1294145423-18245-1-git-send-email-michael.williamson@criticallink.com>
+	(Michael Williamson's message of "Tue, 4 Jan 2011 07:50:23 -0500")
+References: <1294145423-18245-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <87hbdo7f12.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe/Sascha,
+Michael Williamson <michael.williamson@criticallink.com> writes:
 
-Any comments about this series?
+> For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
+> from the part number string read from the factory configuration block on
+> the on-board I2C PROM.  Configure the maximum CPU speed based on this
+> information.
+>
+> This patch was tested using a MityDSP-L138 and MityARM-1808 at various
+> speedgrades.  Also, for code coverage, a bogus configuration was tested
+> as well as a configuration having an unknown part number.
+>
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+> Changes since v4. 
+>
+> - Fixup indenting on if block per comments.
 
-Regards,
+Thanks, queuing this for 2.6.39.
 
-Fabio Estevam
+Kevin
 
-On Tue, Dec 7, 2010 at 5:20 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Uwe,
+>  arch/arm/mach-davinci/board-mityomapl138.c |   83 +++++++++++++++++++++++++---
+>  1 files changed, 75 insertions(+), 8 deletions(-)
 >
-> Does this series look OK now?
->
-> Thanks,
->
-> Fabio Estevam
->
->
-> On Wed, Dec 1, 2010 at 11:11 AM, Fabio Estevam
-> <fabio.estevam@freescale.com> wrote:
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> ?arch/arm/mach-mx5/devices-imx51.h ? ? ? ? ? ?| ? ?4 ++++
->> ?arch/arm/plat-mxc/devices/platform-mxc_pwm.c | ? ?9 +++++++++
->> ?arch/arm/plat-mxc/include/mach/mx51.h ? ? ? ?| ? ?4 ++--
->> ?3 files changed, 15 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
->> index 939d2e8..e4bc426 100644
->> --- a/arch/arm/mach-mx5/devices-imx51.h
->> +++ b/arch/arm/mach-mx5/devices-imx51.h
->> @@ -47,3 +47,7 @@ extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
->> ?extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data __initconst;
->> ?#define imx51_imx2_wdt_data(pdata) ? ? \
->> ? ? ? ?imx_add_imx2_wdt_data(&imx51_imx2_wdt_data, pdata)
->> +
->> +extern const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst;
->> +#define imx51_add_mxc_pwm(id, pdata) ? \
->> + ? ? ? imx_add_mxc_pwm(&imx51_mxc_pwm_data[id], pdata)
->> diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
->> index 3d8ebdb..b0c4ae2 100644
->> --- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
->> +++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
->> @@ -40,6 +40,15 @@ const struct imx_mxc_pwm_data imx27_mxc_pwm_data __initconst =
->> ? ? ? ?imx_mxc_pwm_data_entry_single(MX27, 0, , SZ_4K);
->> ?#endif /* ifdef CONFIG_SOC_IMX27 */
->>
->> +#ifdef CONFIG_SOC_IMX51
->> +const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
->> +#define imx51_mxc_pwm_data_entry(_id, _hwid) ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? imx_mxc_pwm_data_entry(MX51, _id, _hwid, SZ_16K)
->> + ? ? ? imx51_mxc_pwm_data_entry(0, 1),
->> + ? ? ? imx51_mxc_pwm_data_entry(1, 2),
->> +};
->> +#endif /* ifdef CONFIG_SOC_IMX51 */
->> +
->> ?struct platform_device *__init imx_add_mxc_pwm(
->> ? ? ? ? ? ? ? ?const struct imx_mxc_pwm_data *data)
->> ?{
->> diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
->> index 8fddfef..54b58a0 100644
->> --- a/arch/arm/plat-mxc/include/mach/mx51.h
->> +++ b/arch/arm/plat-mxc/include/mach/mx51.h
->> @@ -302,7 +302,7 @@
->> ?#define MX51_MXC_INT_WDOG1 ? ? ? ? ? ? 58
->> ?#define MX51_MXC_INT_WDOG2 ? ? ? ? ? ? 59
->> ?#define MX51_MXC_INT_KPP ? ? ? ? ? ? ? 60
->> -#define MX51_MXC_INT_PWM1 ? ? ? ? ? ? ?61
->> +#define MX51_INT_PWM1 ? ? ? ? ? ? ? ? ?61
->> ?#define MX51_INT_I2C1 ? ? ? ? ? ? ? ? ?62
->> ?#define MX51_INT_I2C2 ? ? ? ? ? ? ? ? ?63
->> ?#define MX51_MXC_INT_HS_I2C ? ? ? ? ? ?64
->> @@ -335,7 +335,7 @@
->> ?#define MX51_MXC_INT_SPDIF ? ? ? ? ? ? 91
->> ?#define MX51_MXC_INT_TVE ? ? ? ? ? ? ? 92
->> ?#define MX51_MXC_INT_FIRI ? ? ? ? ? ? ?93
->> -#define MX51_MXC_INT_PWM2 ? ? ? ? ? ? ?94
->> +#define MX51_INT_PWM2 ? ? ? ? ? ? ? ? ?94
->> ?#define MX51_MXC_INT_SLIM_EXP ? ? ? ? ?95
->> ?#define MX51_MXC_INT_SSI3 ? ? ? ? ? ? ?96
->> ?#define MX51_MXC_INT_EMI_BOOT ? ? ? ? ?97
->> --
->> 1.6.0.4
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+> index 0bb5f0c..0ea5932 100644
+> --- a/arch/arm/mach-davinci/board-mityomapl138.c
+> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> @@ -44,38 +44,109 @@ struct factory_config {
+>  
+>  static struct factory_config factory_config;
+>  
+> +struct part_no_info {
+> +	const char	*part_no;	/* part number string of interest */
+> +	int		max_freq;	/* khz */
+> +};
+> +
+> +static struct part_no_info mityomapl138_pn_info[] = {
+> +	{
+> +		.part_no	= "L138-C",
+> +		.max_freq	= 300000,
+> +	},
+> +	{
+> +		.part_no	= "L138-D",
+> +		.max_freq	= 375000,
+> +	},
+> +	{
+> +		.part_no	= "L138-F",
+> +		.max_freq	= 456000,
+> +	},
+> +	{
+> +		.part_no	= "1808-C",
+> +		.max_freq	= 300000,
+> +	},
+> +	{
+> +		.part_no	= "1808-D",
+> +		.max_freq	= 375000,
+> +	},
+> +	{
+> +		.part_no	= "1808-F",
+> +		.max_freq	= 456000,
+> +	},
+> +	{
+> +		.part_no	= "1810-D",
+> +		.max_freq	= 375000,
+> +	},
+> +};
+> +
+> +#ifdef CONFIG_CPU_FREQ
+> +static void mityomapl138_cpufreq_init(const char *partnum)
+> +{
+> +	int i, ret;
+> +
+> +	for (i = 0; partnum && i < ARRAY_SIZE(mityomapl138_pn_info); i++) {
+> +		/*
+> +		 * the part number has additional characters beyond what is
+> +		 * stored in the table.  This information is not needed for
+> +		 * determining the speed grade, and would require several
+> +		 * more table entries.  Only check the first N characters
+> +		 * for a match.
+> +		 */
+> +		if (!strncmp(partnum, mityomapl138_pn_info[i].part_no,
+> +			     strlen(mityomapl138_pn_info[i].part_no))) {
+> +			da850_max_speed = mityomapl138_pn_info[i].max_freq;
+> +			break;
+> +		}
+> +	}
+> +
+> +	ret = da850_register_cpufreq("pll0_sysclk3");
+> +	if (ret)
+> +		pr_warning("cpufreq registration failed: %d\n", ret);
+> +}
+> +#else
+> +static void mityomapl138_cpufreq_init(const char *partnum) { }
+> +#endif
+> +
+>  static void read_factory_config(struct memory_accessor *a, void *context)
+>  {
+>  	int ret;
+> +	const char *partnum = NULL;
+>  	struct davinci_soc_info *soc_info = &davinci_soc_info;
+>  
+>  	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
+>  	if (ret != sizeof(struct factory_config)) {
+>  		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
+>  				ret);
+> -		return;
+> +		goto bad_config;
+>  	}
+>  
+>  	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
+>  		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
+>  				factory_config.magic);
+> -		return;
+> +		goto bad_config;
+>  	}
+>  
+>  	if (factory_config.version != FACTORY_CONFIG_VERSION) {
+>  		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
+>  				factory_config.version);
+> -		return;
+> +		goto bad_config;
+>  	}
+>  
+>  	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
+> -	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
+>  	if (is_valid_ether_addr(factory_config.mac))
+>  		memcpy(soc_info->emac_pdata->mac_addr,
+>  			factory_config.mac, ETH_ALEN);
+>  	else
+>  		pr_warning("MityOMAPL138: Invalid MAC found "
+>  				"in factory config block\n");
+> +
+> +	partnum = factory_config.partnum;
+> +	pr_info("MityOMAPL138: Part Number = %s\n", partnum);
+> +
+> +bad_config:
+> +	/* default maximum speed is valid for all platforms */
+> +	mityomapl138_cpufreq_init(partnum);
+>  }
+>  
+>  static struct at24_platform_data mityomapl138_fd_chip = {
+> @@ -383,10 +454,6 @@ static void __init mityomapl138_init(void)
+>  	if (ret)
+>  		pr_warning("rtc setup failed: %d\n", ret);
+>  
+> -	ret = da850_register_cpufreq("pll0_sysclk3");
+> -	if (ret)
+> -		pr_warning("cpufreq registration failed: %d\n", ret);
+> -
+>  	ret = da8xx_register_cpuidle();
+>  	if (ret)
+>  		pr_warning("cpuidle registration failed: %d\n", ret);
