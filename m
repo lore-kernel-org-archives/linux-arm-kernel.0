@@ -1,90 +1,127 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 4 Jan 2011 11:47:58 +0100
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <20110103151944.GA32508@n2100.arm.linux.org.uk>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-	<20101221182037.GA4783@n2100.arm.linux.org.uk>
-	<20101222122904.GC14693@n2100.arm.linux.org.uk>
-	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-	<20110103151944.GA32508@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimfJZ7y-f9Tcd6PAmckiM9DxW7E10YhFwmMCLxM@mail.gmail.com>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Tue,  4 Jan 2011 11:54:44 +0100
+Subject: [PATCH 2/3] perf: add OMAP support for the new power events
+In-Reply-To: <1294136263-24020-1-git-send-email-j-pihet@ti.com>
+References: <1294136263-24020-1-git-send-email-j-pihet@ti.com>
+Message-ID: <1294138484-24729-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+From: Jean Pihet <j-pihet@ti.com>
 
-> Pausing an on-going transfer (which from what I read is a recent addition
-> to the API)
+The patch adds the new power management trace points for
+the OMAP architecture.
 
-Added by me to handle the PrimeCells actually, but also needed
-especially for good audio streaming.
+The trace points are for:
+- default idle handler. Since the cpuidle framework is
+  instrumented in the generic way there is no need to
+  add trace points in the OMAP specific cpuidle handler;
+- cpufreq (DVFS),
+- clocks changes (enable, disable, set_rate),
+- change of power domains next power states.
 
-> The problem comes when the peripheral stops requesting data from the
-> DMAC, and then you want to pause it. ?Current code sets the HALT bit,
-> and then spins indefinitely for the BUSY bit to clear - which it will
-> only ever do if the peripheral drains the FIFO. ?As a result of botched
-> DMA signal selection code for the Realview EB, the DMA signals never
-> went active, and on terminate_all() the CPU locked up solid (no
-> interrupts) spinning on the DMAC to clear the busy bit.
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c      |    7 +++++++
+ arch/arm/mach-omap2/powerdomain.c |    3 +++
+ arch/arm/plat-omap/clock.c        |   13 ++++++++++---
+ 3 files changed, 20 insertions(+), 3 deletions(-)
 
-Argh, how typical.
-
-BTW it's great that you have the EB up, I think it's very close or
-identical to PB11MPCore and PBA8/PBA9 in this regard.
-
-> It may be worth specifying that a pause followed by a resume is
-> expected to never lose data - and that drivers must check the result
-> of a request to pause the channel.
-
-Sounds reasonable.
-
-> If DMA engine drivers are unable
-> to pause the channel within a reasonable amount of time, they should
-> return -ETIMEOUT, so they know that there may still be data that
-> could still be transferred to the peripheral.
-
-So the -ETIMEOUT needs to have the semantic meaning
-"data is in flight". Doesn't -EBUSY fit better to describe that,
-though it will be caused by a spin-loop timeout?
-
-(OK maybe nitpicky, doesn't really matter as long as we specify
-*something*, but see below for the better semantic meaning of
-this when handling the error code.)
-
-> One important note about this condition is that with the DMA channel
-> marked BUSY+HALT and the channel being configured for M->P, the
-> peripheral can still transfer data from the DMAC to itself, and this
-> causes the transfer size value in the CNTL register to decrement (since
-> reading the CNTL register returns the number of transfers _to_ the
-> destination, not the number of transfers from the source.)
->
-> I've changed the comment against pl08x_pause_phy_chan() to this:
->
-> ?* Pause the channel by setting the HALT bit.
-> ?*
-> ?* For M->P transfers, pause the DMAC first and then stop the peripheral -
-> ?* the FIFO can only drain if the peripheral is still requesting data.
-> ?* (note: this can still timeout if the DMAC FIFO never drains of data.)
-> ?*
-> ?* For P->M transfers, disable the peripheral first to stop it filling
-> ?* the DMAC FIFO, and then pause the DMAC.
-
-This is exactly how it must work. Thanks Russell.
-
-> I've not decided whether it should be possible to resume an ETIMEOUT'd
-> pause request (in theory with pl08x, that's just a matter of clearing
-> the HALT bit) or whether an ETIMEOUT'd pause request should restore
-> the previous HALT bit setting (possibly re-enabling transfers on the
-> channel.) ?Allowing it to be re-enabled in some way would be the safest
-> thing in terms of data integrity for the reason mentioned in the
-> "important note" above.
-
-Hmhm. One part of me wants the DMAC to clear the state of that
-channel completely if this timeout happens and you return
--ETIMEOUT and not allow resuming, but if you return -EBUSY
-as per above, the pause has definately failed and there is
-nothing to resume, we're still in flight and the only way to
-really stop the transfer from that point is to TERMINATE_ALL.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 0ec8a04..0ee0b0e 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -29,6 +29,7 @@
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+ #include <linux/console.h>
++#include <trace/events/power.h>
+ 
+ #include <plat/sram.h>
+ #include <plat/clockdomain.h>
+@@ -506,8 +507,14 @@ static void omap3_pm_idle(void)
+ 	if (omap_irq_pending() || need_resched())
+ 		goto out;
+ 
++	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
++	trace_cpu_idle(1, smp_processor_id());
++
+ 	omap_sram_idle();
+ 
++	trace_power_end(smp_processor_id());
++	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
++
+ out:
+ 	local_fiq_enable();
+ 	local_irq_enable();
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 6527ec3..73cbe9a 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -23,6 +23,7 @@
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <trace/events/power.h>
+ 
+ #include <asm/atomic.h>
+ 
+@@ -440,6 +441,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
+ 		 pwrdm->name, pwrst);
+ 
++	trace_power_domain_target(pwrdm->name, pwrst, smp_processor_id());
++
+ 	prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
+ 			     (pwrst << OMAP_POWERSTATE_SHIFT),
+ 			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index fc62fb5..7cbb09b 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -21,6 +21,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/debugfs.h>
+ #include <linux/io.h>
++#include <trace/events/power.h>
+ 
+ #include <plat/clock.h>
+ 
+@@ -43,8 +44,10 @@ int clk_enable(struct clk *clk)
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&clockfw_lock, flags);
+-	if (arch_clock->clk_enable)
++	if (arch_clock->clk_enable) {
++		trace_clock_enable(clk->name, 1, smp_processor_id());
+ 		ret = arch_clock->clk_enable(clk);
++	}
+ 	spin_unlock_irqrestore(&clockfw_lock, flags);
+ 
+ 	return ret;
+@@ -66,8 +69,10 @@ void clk_disable(struct clk *clk)
+ 		goto out;
+ 	}
+ 
+-	if (arch_clock->clk_disable)
++	if (arch_clock->clk_disable) {
++		trace_clock_disable(clk->name, 0, smp_processor_id());
+ 		arch_clock->clk_disable(clk);
++	}
+ 
+ out:
+ 	spin_unlock_irqrestore(&clockfw_lock, flags);
+@@ -120,8 +125,10 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 		return ret;
+ 
+ 	spin_lock_irqsave(&clockfw_lock, flags);
+-	if (arch_clock->clk_set_rate)
++	if (arch_clock->clk_set_rate) {
++		trace_clock_set_rate(clk->name, rate, smp_processor_id());
+ 		ret = arch_clock->clk_set_rate(clk, rate);
++	}
+ 	if (ret == 0) {
+ 		if (clk->recalc)
+ 			clk->rate = clk->recalc(clk);
+-- 
+1.7.2.3
