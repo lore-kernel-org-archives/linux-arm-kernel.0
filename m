@@ -1,157 +1,63 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Tue,  4 Jan 2011 19:03:22 +0530
-Subject: [PATCH v8 5/7] omap3: nand: configurable fifo threshold to gain the
-	throughput
-In-Reply-To: <1294148004-10789-1-git-send-email-s-ghorai@ti.com>
-References: <1294148004-10789-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <1294148004-10789-6-git-send-email-s-ghorai@ti.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Tue,  4 Jan 2011 08:51:01 -0500
+Subject: [PATCH 1/2] serial: Provide capability to disable modem status
+	interrupts in 8250 driver
+Message-ID: <1294149062-31173-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the FIFO THREASHOLD value different for read and write to keep busy
-both filling and to drain out of FIFO at reading and writing.
+Certain SOC platforms utilize the 8250 serial UART core that do not provide
+valid modem control lines (in particular, CTS).  A mechanism is needed to
+allow platforms to configure the 8250 driver to disable modem status interrupts.
+Add a new UPF_NO_MSR flag and use it to check for the condition.
 
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+This patch was tested using a MityDSP-L138F platform having a UART CTS pin
+connected to a clock signal (and configured, via pinmux, as a clock input
+for another peripheral function).
+
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
- arch/arm/mach-omap2/gpmc.c             |   11 +++++++----
- arch/arm/plat-omap/include/plat/gpmc.h |    5 ++++-
- drivers/mtd/nand/omap2.c               |   22 ++++++++++++++--------
- 3 files changed, 25 insertions(+), 13 deletions(-)
+Tested against linux-davinci tree.
+Checked that patch against davinci-next was successful.
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index a2df8b1..117ab29 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -59,7 +59,6 @@
- #define GPMC_CHUNK_SHIFT	24		/* 16 MB */
- #define GPMC_SECTION_SHIFT	28		/* 128 MB */
+ drivers/serial/8250.c       |    3 ++-
+ include/linux/serial_core.h |    3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/serial/8250.c b/drivers/serial/8250.c
+index 09a5508..5b9e9f3 100644
+--- a/drivers/serial/8250.c
++++ b/drivers/serial/8250.c
+@@ -2613,7 +2613,8 @@ static void serial8250_config_port(struct uart_port *port, int flags)
+ 		autoconfig(up, probeflags);
  
--#define PREFETCH_FIFOTHRESHOLD	(0x40 << 8)
- #define CS_NUM_SHIFT		24
- #define ENABLE_PREFETCH		(0x1 << 7)
- #define DMA_MPU_MODE		2
-@@ -595,15 +594,19 @@ EXPORT_SYMBOL(gpmc_nand_write);
- /**
-  * gpmc_prefetch_enable - configures and starts prefetch transfer
-  * @cs: cs (chip select) number
-+ * @fifo_th: fifo threshold to be used for read/ write
-  * @dma_mode: dma mode enable (1) or disable (0)
-  * @u32_count: number of bytes to be transferred
-  * @is_write: prefetch read(0) or write post(1) mode
-  */
--int gpmc_prefetch_enable(int cs, int dma_mode,
-+int gpmc_prefetch_enable(int cs, int fifo_th, int dma_mode,
- 				unsigned int u32_count, int is_write)
- {
+ 	/* if access method is AU, it is a 16550 with a quirk */
+-	if (up->port.type == PORT_16550A && up->port.iotype == UPIO_AU)
++	if ((up->port.type == PORT_16550A && up->port.iotype == UPIO_AU) ||
++	     up->port.flags & UPF_NO_MSR)
+ 		up->bugs |= UART_BUG_NOMSR;
  
--	if (!(gpmc_read_reg(GPMC_PREFETCH_CONTROL))) {
-+	if (fifo_th > PREFETCH_FIFOTHRESHOLD_MAX) {
-+		pr_err("gpmc: fifo threshold is not supported\n");
-+		return -1;
-+	} else if (!(gpmc_read_reg(GPMC_PREFETCH_CONTROL))) {
- 		/* Set the amount of bytes to be prefetched */
- 		gpmc_write_reg(GPMC_PREFETCH_CONFIG2, u32_count);
+ 	if (up->port.type != PORT_UNKNOWN && flags & UART_CONFIG_IRQ)
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index 212eb4c..e76064e 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -339,6 +339,7 @@ struct uart_port {
+ #define UPF_BUGGY_UART		((__force upf_t) (1 << 14))
+ #define UPF_NO_TXEN_TEST	((__force upf_t) (1 << 15))
+ #define UPF_MAGIC_MULTIPLIER	((__force upf_t) (1 << 16))
++#define UPF_NO_MSR		((__force upf_t) (1 << 17))
+ #define UPF_CONS_FLOW		((__force upf_t) (1 << 23))
+ #define UPF_SHARE_IRQ		((__force upf_t) (1 << 24))
+ /* The exact UART type is known and should not be probed.  */
+@@ -348,7 +349,7 @@ struct uart_port {
+ #define UPF_DEAD		((__force upf_t) (1 << 30))
+ #define UPF_IOREMAP		((__force upf_t) (1 << 31))
  
-@@ -611,7 +614,7 @@ int gpmc_prefetch_enable(int cs, int dma_mode,
- 		 * enable the engine. Set which cs is has requested for.
- 		 */
- 		gpmc_write_reg(GPMC_PREFETCH_CONFIG1, ((cs << CS_NUM_SHIFT) |
--					PREFETCH_FIFOTHRESHOLD |
-+					PREFETCH_FIFOTHRESHOLD(fifo_th) |
- 					ENABLE_PREFETCH |
- 					(dma_mode << DMA_MPU_MODE) |
- 					(0x1 & is_write)));
-diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index 054e704..9e4dc7a 100644
---- a/arch/arm/plat-omap/include/plat/gpmc.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -83,6 +83,9 @@
- #define GPMC_IRQ_FIFOEVENTENABLE	0x01
- #define GPMC_IRQ_COUNT_EVENT		0x02
+-#define UPF_CHANGE_MASK		((__force upf_t) (0x17fff))
++#define UPF_CHANGE_MASK		((__force upf_t) (0x37fff))
+ #define UPF_USR_MASK		((__force upf_t) (UPF_SPD_MASK|UPF_LOW_LATENCY))
  
-+#define PREFETCH_FIFOTHRESHOLD_MAX	0x40
-+#define PREFETCH_FIFOTHRESHOLD(val)	((val) << 8)
-+
- /*
-  * Note that all values in this struct are in nanoseconds, while
-  * the register values are in gpmc_fck cycles.
-@@ -133,7 +136,7 @@ extern int gpmc_cs_request(int cs, unsigned long size, unsigned long *base);
- extern void gpmc_cs_free(int cs);
- extern int gpmc_cs_set_reserved(int cs, int reserved);
- extern int gpmc_cs_reserved(int cs);
--extern int gpmc_prefetch_enable(int cs, int dma_mode,
-+extern int gpmc_prefetch_enable(int cs, int fifo_th, int dma_mode,
- 					unsigned int u32_count, int is_write);
- extern int gpmc_prefetch_reset(int cs);
- extern void omap3_gpmc_save_context(void);
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index fbe8414..f1648fd 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -244,7 +244,8 @@ static void omap_read_buf_pref(struct mtd_info *mtd, u_char *buf, int len)
- 	}
- 
- 	/* configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX, 0x0, len, 0x0);
- 	if (ret) {
- 		/* PFPW engine is busy, use cpu copy method */
- 		if (info->nand.options & NAND_BUSWIDTH_16)
-@@ -289,7 +290,8 @@ static void omap_write_buf_pref(struct mtd_info *mtd,
- 	}
- 
- 	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x1);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX, 0x0, len, 0x1);
- 	if (ret) {
- 		/* PFPW engine is busy, use cpu copy method */
- 		if (info->nand.options & NAND_BUSWIDTH_16)
-@@ -345,8 +347,9 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
- 	int ret;
- 	unsigned long tim, limit;
- 
--	/* The fifo depth is 64 bytes. We have a sync at each frame and frame
--	 * length is 64 bytes.
-+	/* The fifo depth is 64 bytes max.
-+	 * But configure the FIFO-threahold to 32 to get a sync at each frame
-+	 * and frame length is 32 bytes.
- 	 */
- 	int buf_len = len >> 6;
- 
-@@ -387,7 +390,8 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
- 					OMAP24XX_DMA_GPMC, OMAP_DMA_SRC_SYNC);
- 	}
- 	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x1, len, is_write);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX, 0x1, len, is_write);
- 	if (ret)
- 		/* PFPW engine is busy, use cpu copy method */
- 		goto out_copy;
-@@ -522,7 +526,8 @@ static void omap_read_buf_irq_pref(struct mtd_info *mtd, u_char *buf, int len)
- 	init_completion(&info->comp);
- 
- 	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX/2, 0x0, len, 0x0);
- 	if (ret)
- 		/* PFPW engine is busy, use cpu copy method */
- 		goto out_copy;
-@@ -569,8 +574,9 @@ static void omap_write_buf_irq_pref(struct mtd_info *mtd,
- 	info->buf = (u_char *) buf;
- 	init_completion(&info->comp);
- 
--	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x1);
-+	/* configure and start prefetch transfer : size=24 */
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			(PREFETCH_FIFOTHRESHOLD_MAX * 3) / 8, 0x0, len, 0x1);
- 	if (ret)
- 		/* PFPW engine is busy, use cpu copy method */
- 		goto out_copy;
+ 	unsigned int		mctrl;			/* current modem ctrl settings */
 -- 
 1.7.0.4
