@@ -1,52 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 04 Jan 2011 09:52:37 -0800
-Subject: [PATCH] OMAP: GPIO: fix _set_gpio_triggering() for OMAP2+
-In-Reply-To: <1293620491-7201-1-git-send-email-ext-mika.1.westerberg@nokia.com>
-	(Mika Westerberg's message of "Wed, 29 Dec 2010 13:01:31 +0200")
-References: <1293620491-7201-1-git-send-email-ext-mika.1.westerberg@nokia.com>
-Message-ID: <87aajg7dzu.fsf@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 04 Jan 2011 12:54:15 -0500 (EST)
+Subject: [PATCH 2/4] ARM: make PHYS_OFFSET actually variable
+In-Reply-To: <20110104123049.GC16671@n2100.arm.linux.org.uk>
+References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
+	<1294129208-15201-3-git-send-email-nico@fluxnic.net>
+	<20110104123049.GC16671@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101041251500.22191@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika Westerberg <ext-mika.1.westerberg@nokia.com> writes:
+On Tue, 4 Jan 2011, Russell King - ARM Linux wrote:
 
-> In case on OMAP2+ we call set_24xx_gpio_triggering() instead of
-> updating reg and l values. However, at the end of the function we
-> perform a write:
->
-> 	__raw_writel(l, reg);
->
-> So on OMAP2+ we end up writing 0 to the bank->base which is not
-> correct (typically this points to GPIO_REVISION register).
->
-> Fix this by returning immediately after call to
-> set_24xx_gpio_triggering().
->
-> Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+> On Tue, Jan 04, 2011 at 03:20:06AM -0500, Nicolas Pitre wrote:
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 336f14e..7502bc1 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -703,8 +703,10 @@ static struct init_tags {
+> >  } init_tags __initdata = {
+> >  	{ tag_size(tag_core), ATAG_CORE },
+> >  	{ 1, PAGE_SIZE, 0xff },
+> > +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
+> >  	{ tag_size(tag_mem32), ATAG_MEM },
+> >  	{ MEM_SIZE, PHYS_OFFSET },
+> > +#endif
+> 
+> Removing the definition is not really on - it's there as a fallback and
+> removing fallbacks is not a good idea unless you can prove beyond doubt
+> that it'll never be used.
+> 
+> As that depends on the boot loader, it's something that can never be
+> proven.  So, arrange for it to be initialized at runtime, just like I
+> will be doing in my revised version I'm working on which I detailed in
+> a previous email.
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+Agreed.
 
-Tony, this should be added to omap-for-linus as it fixes a problem in
-the recently merged GPIO omap_device/hwmod conversion.
+I'll wait for that revised version before working on this further.
 
-Thanks,
 
-Kevin
-
-> ---
->  arch/arm/plat-omap/gpio.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-> index c05c653..4dcb66f 100644
-> --- a/arch/arm/plat-omap/gpio.c
-> +++ b/arch/arm/plat-omap/gpio.c
-> @@ -867,7 +867,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
->  	case METHOD_GPIO_24XX:
->  	case METHOD_GPIO_44XX:
->  		set_24xx_gpio_triggering(bank, gpio, trigger);
-> -		break;
-> +		return 0;
->  #endif
->  	default:
->  		goto bad;
+Nicolas
