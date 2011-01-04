@@ -1,55 +1,58 @@
-From: dick@softplc.com (Dick Hollenbeck)
-Date: Tue, 04 Jan 2011 00:26:50 -0600
-Subject: ks8695_gettimeoffset
-In-Reply-To: <AANLkTi=+9h20je24F+pnoZRFE-of-VZ5Xax8-tDzFs4=@mail.gmail.com>
-References: <4D0FA9FB.3060309@softplc.com>	<20101220193049.GI28157@n2100.arm.linux.org.uk>	<4D18B2B5.5000001@visionsystems.de>
-	<AANLkTi=+9h20je24F+pnoZRFE-of-VZ5Xax8-tDzFs4=@mail.gmail.com>
-Message-ID: <4D22BDAA.2030902@softplc.com>
+From: npiggin@kernel.dk (Nick Piggin)
+Date: Tue, 4 Jan 2011 17:30:50 +1100
+Subject: [PATCH RESEND] [ARM] Add missing include "asm/memory.h"
+In-Reply-To: <1293501397.32542.2.camel@mola>
+References: <1293501397.32542.2.camel@mola>
+Message-ID: <20110104063050.GE3402@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2011 01:55 PM, avictor.za at gmail.com wrote:
-> hi,
->
->> Is it possible at all to implement clocksource/clockevents for KS8695? As Dick and "Register Description" already said you cannot read the time register, so clocksource->read cannot be implemented to return ticks elapsed. Or do I see it wrong?
-> I'm pretty sure I tested this when I originally submitted the KS8685
-> processor support (May 2007), and the timer registers are readable.
-> I would of tested with a userspace program that sat in a tight loop
-> calling gettimeofday().
->
->
-> Regards,
->   Andrew Victor
->
+On Tue, Dec 28, 2010 at 09:56:37AM +0800, Axel Lin wrote:
+> This patch fixes below build error by adding the missing asm/memory.h,
+> which is needed for arch_is_coherent().
 
-Thanks Andrew.  Can you explain how this is supposed to be a duration, even
-if one of these two registers was a readable down counter?
+This is the right approach, but needs to go through ARM tree.
+ 
 
- elapsed = __raw_readl(KS8695_TMR_VA + KS8695_T1TC) + __raw_readl(KS8695_TMR_VA + KS8695_T1PD);
+> $ make pxa3xx_defconfig; make
+>   CC      init/do_mounts_rd.o
+> In file included from include/linux/list_bl.h:5,
+>                  from include/linux/rculist_bl.h:7,
+>                  from include/linux/dcache.h:7,
+>                  from include/linux/fs.h:381,
+>                  from init/do_mounts_rd.c:3:
+> include/linux/bit_spinlock.h: In function 'bit_spin_unlock':
+> include/linux/bit_spinlock.h:61: error: implicit declaration of function 'arch_is_coherent'
+> make[1]: *** [init/do_mounts_rd.o] Error 1
+> make: *** [init] Error 2
+> 
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> Acked-by: Peter Huewe <peterhuewe@gmx.de>
+> ---
+> It was posted on https://lkml.org/lkml/2010/12/17/9 .
+> I still have the build error for today's linux-next tree.
+> CC Eric Miao, maybe he will take this patch.
+> 
+> Axel
+> 
+>  arch/arm/include/asm/system.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index ec4327a..3222ab8 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -155,6 +155,7 @@ extern unsigned int user_debug;
+>  #define rmb()		dmb()
+>  #define wmb()		mb()
+>  #else
+> +#include <asm/memory.h>
+>  #define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+>  #define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+>  #define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
 
-
-Which of the two is a down counter, and why would it be added to one that is not, or is?
-
-While you are thinking about that, I have a userspace test program that can peek at the two registers using a memory mapped region pointer, and it will tell us if the value is changing over time.
-
-
-The register description PDF document says the values *are readable*, but that description does not specifically say what is being read back, the preload value or the dynamically down counting value.
-
-Doc Extraction:
-
-TOUT1PC aka T1PD offset 0xE40C
-
-This field specifies the duration that the TOUT1 pin is High in each
-timeout period. Writing zero to this register may cuase unpredictalbe
-behavior.
-
-TOUT1TC aka T1TC offset 0xE404
-
-This field specifies the duration that the TOUT1 pin is Low in each
-timeout period. Writing zero to this register may cuase unpredictalbe
-behavior.
-
-
-Thanks,
-
-Dick
+Is this matching ARM convention to pull includes down here. It
+usually ends up with more elusive dependency problems and strange
+bugs (eg. some headers define intermediate symbols for convenience
+and then undef them sometime later etc etc). Usual thing to avoid
+problems is to move includes up to the top.
