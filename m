@@ -1,49 +1,55 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 4 Jan 2011 15:05:29 +0530
-Subject: [PATCH v4] davinci: Support various speedgrades for
-	MityDSP-L138 and MityARM-1808 SoMs
-In-Reply-To: <1294060905-14254-1-git-send-email-michael.williamson@criticallink.com>
-References: <1294060905-14254-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024816DB2A@dbde02.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue,  4 Jan 2011 11:39:24 +0200
+Subject: [PATCH 0/2] IRQ-related changes
+Message-ID: <1294133966-20279-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 03, 2011 at 18:51:45, Michael Williamson wrote:
-> For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
-> from the part number string read from the factory configuration block on
-> the on-board I2C PROM.  Configure the maximum CPU speed based on this
-> information.
-> 
-> This patch was tested using a MityDSP-L138 and MityARM-1808 at various
-> speedgrades.  Also, for code coverage, a bogus configuration was tested
-> as well as a configuration having an unknown part number.
+Hi,
 
-Thanks for the extensive testing. This looks good to me, except,
-a whitespace nit below. But otherwise:
+The following two patches are enabling SPARSE_IRQ
+numbering scheme on OMAP. I lightly tested on a pandaboard
+and seems to be working fine so far:
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+# cat /proc/interrupts
+           CPU0       CPU1
+ 39:          1          0         GIC  TWL6030-PIH
+ 44:       1758          0         GIC  DMA
+ 69:       7615          0         GIC  gp timer
+ 88:        195          0         GIC  i2c_omap
+ 89:          0          0         GIC  i2c_omap
+ 93:          0          0         GIC  i2c_omap
+ 94:          0          0         GIC  i2c_omap
+102:          0          0         GIC  serial idle
+104:          0          0         GIC  serial idle
+105:          0          0         GIC  serial idle
+106:        743          0         GIC  serial idle, OMAP UART2
+115:       2356          0         GIC  mmc0
+160:          0          0        GPIO  mmc0
+376:          0          0     twl6030  twl4030_pwrbutton
+379:          0          0     twl6030  rtc0
+IPI:       1111       9537
+LOC:          0          0 
+Err:          0
 
-> +#ifdef CONFIG_CPU_FREQ
-> +static void mityomapl138_cpufreq_init(const char *partnum)
-> +{
-> +	int i, ret;
-> +
-> +	for (i = 0; partnum && i < ARRAY_SIZE(mityomapl138_pn_info); i++) {
-> +		/*
-> +		 * the part number has additional characters beyond what is
-> +		 * stored in the table.  This information is not needed for
-> +		 * determining the speed grade, and would require several
-> +		 * more table entries.  Only check the first N characters
-> +		 * for a match.
-> +		 */
-> +		if (!strncmp(partnum, mityomapl138_pn_info[i].part_no,
-> +			strlen(mityomapl138_pn_info[i].part_no))) {
-> +			da850_max_speed = mityomapl138_pn_info[i].max_freq;
-> +			break;
+The first patch just removes the direct access to irq_desc
+array and converts it to irq_to_desc(). Second patch simply
+selects HAVE_GENERIC_HARDIRQS and HAVE_SPARSE_IRQ. I boot
+tested with and without enabling:
 
-The indentation here makes it look like strlen is part of if()
-body. May be you can indent it substantially to the right. I will
-leave it to your judgment.
+ -> General setup
+  -> IRQ subsystem
+   -> SPARSE_IRQ
 
-Thanks,
-Sekhar
+and both kernels boot fine.
+
+Felipe Balbi (2):
+  arm: omap: gpio: don't access irq_desc array directly
+  arm: omap: select HAVE_SPARSE_IRQ
+
+ arch/arm/Kconfig          |    2 ++
+ arch/arm/plat-omap/gpio.c |   10 +++++++---
+ 2 files changed, 9 insertions(+), 3 deletions(-)
+
+-- 
+1.7.3.4.598.g85356
