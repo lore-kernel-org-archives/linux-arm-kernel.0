@@ -1,37 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 4 Jan 2011 13:52:08 +0200
-Subject: [PATCH 2/2] arm: omap: select HAVE_SPARSE_IRQ
-In-Reply-To: <20110104114207.GA19293@n2100.arm.linux.org.uk>
-References: <1294133966-20279-1-git-send-email-balbi@ti.com>
-	<1294133966-20279-3-git-send-email-balbi@ti.com>
-	<20110104095410.GA17298@n2100.arm.linux.org.uk>
-	<20110104103432.GM2656@legolas.emea.dhcp.ti.com>
-	<20110104114207.GA19293@n2100.arm.linux.org.uk>
-Message-ID: <20110104115208.GB24553@legolas.emea.dhcp.ti.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Tue, 4 Jan 2011 12:56:05 +0100
+Subject: zaurus bluetooth regression
+In-Reply-To: <20110103141727.GA1536@ucw.cz>
+References: <20110102204532.GA12860@elf.ucw.cz> <20110102203023.GA1545@ucw.cz>
+	<AANLkTika7HAEc+BbqSnbo8viUt4nOqoeB69qWZs85-9s@mail.gmail.com>
+	<20110103141727.GA1536@ucw.cz>
+Message-ID: <AANLkTimFTzHjLy1zSURiOdcDJUSa9b-ZU1kxL_qK+7-T@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jan 04, 2011 at 11:42:07AM +0000, Russell King - ARM Linux wrote:
->On Tue, Jan 04, 2011 at 12:34:32PM +0200, Felipe Balbi wrote:
->> do you mean:
+>> >> It seems this commit
+>> >>
+>> >> commit 7a56aa45982bb87bfca98a2832b5ae782c03364a
+>> > ...
+>> >> ...is responsible for my bluetooth problems on zaurus -- at least
+>> >> bisect pointed to it, ?as I use 16C950-based bluetooth card, it seems
+>> >> very logical. I'll try 2.6.37-rc8 with that patch reverted...
+>> >>
+>> >
+>> > And yes, 37-rc8 with that reverted results in working bluetooth, so
+>> > yrs, that patch is responsible.
+>>
+>> could you tell, what kind of problem you're encountering and if you
+>> could tell, which flag UART_CAP_EFR or UART_CAP_SLEEP causes the
+>> problem?
 >
->Yes, but without the breakage caused by your mailer - posting patches
-
-good, I'll re-send the series in a bit.
-
->with flowed formatting is a recipe for this kind of disaster:
+> Bluetooth will not work with 'tx command timeout', details should be
+> in bugzilla.
 >
->Content-Type: text/plain; charset=us-ascii; format=flowed
->
->You appear to be using mutt, so set:
->
->set text_flowed=no
->
->in your .muttrc to avoid this corruption.
+> CAP_EFR seems to cause the problem.
 
-sorry about that, fixed.
+Aside from sleep functions the only impact CAP_EFR makes is enabling
+automatic CTS flow control. Below the cite from 16C950 data sheet:
 
--- 
-balbi
+"EFR[7]: Enable automatic CTS flow control.
+logic 0 ?   CTS flow control is disabled (default).
+logic 1 ?   CTS flow control is enabled in Enhanced mode
+(i.e. EFR[4] = 1), where the data transmission is
+prevented  whenever  the  CTS#  pin  is  held
+inactive high. 650 and 950-mode drivers should
+use  this  bit  to  enable  CTS  flow  control.    750
+mode drivers should use MCR[5].
+
+When automatic CTS flow control is enabled and the CTS#
+input becomes active, the UART will disable transmission
+as soon as any current character transmission is complete.
+Transmission   is   resumed   whenever   the   CTS#   input
+becomes inactive. "
+
+I've tested with such an UART and transmitted some chunk of data with
+and without RTS/CTS flow control enabled at 460800 b/s. The test
+showed that in enabled state all data was transmitted correctly.
+Without RTS/CTS flow control enabled there was massive data loss, as
+expected. So the flow control function seems to work correctly.
+
+Regards,
+Yegor
