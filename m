@@ -1,42 +1,44 @@
-From: dick@softplc.com (Dick Hollenbeck)
-Date: Tue, 04 Jan 2011 00:32:30 -0600
-Subject: ks8695_gettimeoffset
-In-Reply-To: <4D22BDAA.2030902@softplc.com>
-References: <4D0FA9FB.3060309@softplc.com>	<20101220193049.GI28157@n2100.arm.linux.org.uk>	<4D18B2B5.5000001@visionsystems.de>
-	<AANLkTi=+9h20je24F+pnoZRFE-of-VZ5Xax8-tDzFs4=@mail.gmail.com>
-	<4D22BDAA.2030902@softplc.com>
-Message-ID: <4D22BEFE.4090001@softplc.com>
+From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
+Date: Tue,  4 Jan 2011 12:30:58 +0530
+Subject: [PATCH] ARM: pxa168: Add support for UART3
+Message-ID: <1294124458-4155-1-git-send-email-tanmay.upadhyay@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2011 12:26 AM, Dick Hollenbeck wrote:
-> On 01/03/2011 01:55 PM, avictor.za at gmail.com wrote:
->> hi,
->>
->>> Is it possible at all to implement clocksource/clockevents for KS8695? As Dick and "Register Description" already said you cannot read the time register, so clocksource->read cannot be implemented to return ticks elapsed. Or do I see it wrong?
->> I'm pretty sure I tested this when I originally submitted the KS8685
->> processor support (May 2007), and the timer registers are readable.
->> I would of tested with a userspace program that sat in a tight loop
->> calling gettimeofday().
->>
->>
->> Regards,
->>   Andrew Victor
->>
-> Thanks Andrew.  Can you explain how this is supposed to be a duration, even
-> if one of these two registers was a readable down counter?
->
->  elapsed = __raw_readl(KS8695_TMR_VA + KS8695_T1TC) + __raw_readl(KS8695_TMR_VA + KS8695_T1PD);
->
->
-> Which of the two is a down counter, and why would it be added to one that is not, or is?
->
-> While you are thinking about that, I have a userspace test program that can peek at the two registers using a memory mapped region pointer, and it will tell us if the value is changing over time.
+PXA168 has 3 onchip UARTs. Added support for the third one.
 
-Sorry, I should have just ran the program before posting.  Both registers
-are constant at 25000 while running.   So my original summary is correct,
-that this C function is not worth anything.
+Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+---
+ arch/arm/mach-mmp/pxa168.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Where do we go from here?
-
-Dick
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 7564739..499d656 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -66,6 +66,7 @@ void __init pxa168_init_irq(void)
+ /* APB peripheral clocks */
+ static APBC_CLK(uart1, PXA168_UART1, 1, 14745600);
+ static APBC_CLK(uart2, PXA168_UART2, 1, 14745600);
++static APBC_CLK(uart3, PXA168_UART3, 1, 14745600);
+ static APBC_CLK(twsi0, PXA168_TWSI0, 1, 33000000);
+ static APBC_CLK(twsi1, PXA168_TWSI1, 1, 33000000);
+ static APBC_CLK(pwm1, PXA168_PWM1, 1, 13000000);
+@@ -86,6 +87,7 @@ static APMU_CLK(lcd, LCD, 0x7f, 312000000);
+ static struct clk_lookup pxa168_clkregs[] = {
+ 	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
+ 	INIT_CLKREG(&clk_uart2, "pxa2xx-uart.1", NULL),
++	INIT_CLKREG(&clk_uart3, "pxa2xx-uart.2", NULL),
+ 	INIT_CLKREG(&clk_twsi0, "pxa2xx-i2c.0", NULL),
+ 	INIT_CLKREG(&clk_twsi1, "pxa2xx-i2c.1", NULL),
+ 	INIT_CLKREG(&clk_pwm1, "pxa168-pwm.0", NULL),
+@@ -149,6 +151,7 @@ void pxa168_clear_keypad_wakeup(void)
+ /* on-chip devices */
+ PXA168_DEVICE(uart1, "pxa2xx-uart", 0, UART1, 0xd4017000, 0x30, 19, 20);
+ PXA168_DEVICE(uart2, "pxa2xx-uart", 1, UART2, 0xd4018000, 0x30, 21, 22);
++PXA168_DEVICE(uart3, "pxa2xx-uart", 2, UART3, 0xd4026000, 0x30, 23, 24);
+ PXA168_DEVICE(twsi0, "pxa2xx-i2c", 0, TWSI0, 0xd4011000, 0x28);
+ PXA168_DEVICE(twsi1, "pxa2xx-i2c", 1, TWSI1, 0xd4025000, 0x28);
+ PXA168_DEVICE(pwm1, "pxa168-pwm", 0, NONE, 0xd401a000, 0x10);
+-- 
+1.7.0.4
