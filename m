@@ -1,22 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 4 Jan 2011 22:05:29 +0100
-Subject: [PATCH v6 1/2] ARM: mx5: dynamically allocate pwm devices
-In-Reply-To: <AANLkTim_Ouees3GAejQuK6HLbjmxjMyFfuqfTc3i1koN@mail.gmail.com>
-References: <1291209107-2256-1-git-send-email-fabio.estevam@freescale.com>
-	<AANLkTi=rTbL2SHCPtn5sGQ4O1x+DgOHfJOEi3fG7ZrZy@mail.gmail.com>
-	<AANLkTim_Ouees3GAejQuK6HLbjmxjMyFfuqfTc3i1koN@mail.gmail.com>
-Message-ID: <20110104210529.GG25121@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 04 Jan 2011 16:10:44 -0500 (EST)
+Subject: [RFC 1/5] ARM: P2V: separate PHYS_OFFSET from platform definitions
+In-Reply-To: <E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
+References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
+	<E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101041607110.22191@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04, 2011 at 03:26:01PM -0200, Fabio Estevam wrote:
-> Uwe/Sascha,
+On Tue, 4 Jan 2011, Russell King - ARM Linux wrote:
+
+> This uncouple PHYS_OFFSET from the platform definitions, thereby
+> facilitating run-time computation of the physical memory offset.
 > 
-> Any comments about this series?
-Looks good.  Ack for both and sorry for not replying earlier.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Uwe
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+This might even be a good time to merge such patch now even if the later 
+patches don't make it into the next merge window as this would produce 
+fewer conflicts later.
+
+
+Nicolas
