@@ -1,27 +1,40 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 04 Jan 2011 15:14:00 -0800
-Subject: [RFC 5/5] ARM: P2V: extend to 16-bit translation offsets
-In-Reply-To: <E1PaDPu-00023p-QG@rmk-PC.arm.linux.org.uk> (Russell King's
-	message of "Tue, 04 Jan 2011 20:23:38 +0000")
-References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDPu-00023p-QG@rmk-PC.arm.linux.org.uk>
-Message-ID: <8yalj30feiv.fsf@huya.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Jan 2011 15:17:21 -0800
+Subject: [PATCH] OMAP: GPIO: fix _set_gpio_triggering() for OMAP2+
+In-Reply-To: <1294181154.18162.39.camel@localhost>
+References: <1293620491-7201-1-git-send-email-ext-mika.1.westerberg@nokia.com>
+	<87aajg7dzu.fsf@ti.com> <1294181154.18162.39.camel@localhost>
+Message-ID: <20110104231721.GO7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04 2011, Russell King - ARM Linux wrote:
+* Kevin Hilman <khilman@ti.com> [110104 14:45]:
+> On Tue, 2011-01-04 at 09:52 -0800, Kevin Hilman wrote:
+> > Mika Westerberg <ext-mika.1.westerberg@nokia.com> writes:
+> > 
+> > > In case on OMAP2+ we call set_24xx_gpio_triggering() instead of
+> > > updating reg and l values. However, at the end of the function we
+> > > perform a write:
+> > >
+> > > 	__raw_writel(l, reg);
+> > >
+> > > So on OMAP2+ we end up writing 0 to the bank->base which is not
+> > > correct (typically this points to GPIO_REVISION register).
+> > >
+> > > Fix this by returning immediately after call to
+> > > set_24xx_gpio_triggering().
+> > >
+> > > Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+> > 
+> > Acked-by: Kevin Hilman <khilman@ti.com>
+> > 
+> > Tony, this should be added to omap-for-linus as it fixes a problem in
+> > the recently merged GPIO omap_device/hwmod conversion.
+> 
+> On second thought, it's a bit late for the main 2.6.38 window, so will
+> queue this in my pm-fixes branch for the .38-rc cycle.
 
-> MSM's memory is aligned to 2MB, which is more than we can do with our
-> existing method as we're limited to the upper 8 bits.  Extend this by
-> using two instructions to 16 bits, automatically selected when MSM is
-> enabled.
+Yeah let's not mess with omap-for-linus right now, but instead start
+queueing up fixes for -rc1.
 
-I've verified that the these 5 patches boot on an MSM QSD 8x50, both
-with and without ARM_PATCH_PHYS_VIRT enabled.  I haven't tried building
-with a different offset than it is running at, yet.
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Tony
