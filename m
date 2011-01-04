@@ -1,34 +1,80 @@
-From: me@felipebalbi.com (Felipe Balbi)
-Date: Tue, 04 Jan 2011 16:56:28 +0200
-Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
-In-Reply-To: <AANLkTi=JyoQuP-OQtV1yO0WR1GCM1LieHUj5Sn=ZfVim@mail.gmail.com>
-References: <201005152214.53993.sshtylyov@ru.mvista.com>
-	<4D21F3F2.6090302@mvista.com>
-	<20110103163447.GB2911@n2100.arm.linux.org.uk>
-	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
-	<4D220246.5020303@mvista.com>
-	<19F8576C6E063C45BE387C64729E739404BD3F2C58@dbde02.ent.ti.com>
-	<20110103204416.GA2240@legolas.emea.dhcp.ti.com>
-	<4D231B5F.7030607@mvista.com> <1294149984.1822.9.camel@eowin>
-	<AANLkTi=JyoQuP-OQtV1yO0WR1GCM1LieHUj5Sn=ZfVim@mail.gmail.com>
-Message-ID: <1294152988.1822.12.camel@eowin>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 4 Jan 2011 17:07:33 +0200
+Subject: [PATCH v2 05/10] net/fec: add dual fec support for mx28
+In-Reply-To: <20110104141259.GA21274@freescale.com>
+References: <1294133056-21195-1-git-send-email-shawn.guo@freescale.com>
+	<1294133056-21195-6-git-send-email-shawn.guo@freescale.com>
+	<20110104095916.GE2987@jasper.tkos.co.il>
+	<20110104141259.GA21274@freescale.com>
+Message-ID: <20110104150733.GF2987@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shawn,
 
-On Tue, 2011-01-04 at 22:40 +0800, Ming Lei wrote:
-> > The end goal is just to drop all these ad-hoc "APIs" for accessing DMA
-> > on musb code.
+On Tue, Jan 04, 2011 at 10:13:09PM +0800, Shawn Guo wrote:
+> On Tue, Jan 04, 2011 at 11:59:16AM +0200, Baruch Siach wrote:
+> > On Tue, Jan 04, 2011 at 05:24:11PM +0800, Shawn Guo wrote:
+
+[snip]
+
+> > > -#ifdef CONFIG_ARCH_MXC
+> > > -#include <mach/hardware.h>
+> > 
+> > Since you now remove mach/hardware.h for ARCH_MXC, does this build for all 
+> > i.MX variants?
+> > 
+> Did the test build for mx25, mx27, mx3 and mx51.
+
+This is surprising. It means that this include was not needed in the first 
+place. git blame says this was added in 196719ec (fec: Add support for 
+Freescale MX27) by Sascha.
+
+> > > +#ifdef CONFIG_SOC_IMX28
+> > > +/*
+> > > + * mx28 does not have MIIGSK registers
+> > > + */
+> > > +#undef FEC_MIIGSK_ENR
+> > > +#include <mach/mxs.h>
+> > > +#else
+> > > +#define cpu_is_mx28()	(0)
+> > > +#endif
+> > 
+> > This breaks kernels for multiple archs (e.g. i.MX28 and i.MX25). Please use 
+> > run-time detection of CPU type, and do the MII/RMII etc. configuration 
+> > accordingly.
+> > 
+> I do not find a good way to detect cpu type.  Neither adding a new
+> platform data field nor using __machine_arch_type to enumerate all
+> mx28 based machine (though there is only one currently) seems to be
+> good for me.
+
+How about:
+
+#ifdef CONFIG_SOC_IMX28
+#include <mach/mxs.h>
+#else
+#define cpu_is_mx28()    (0)
+#endif
+
+if (cpu_is_mx28() {
+    /* Do i.MX28 stuff */
+} else {
+    /* Do other i.MX stuff */
+}
+
+Note that the '#ifdef FEC_MIIGSK_ENR' section in fec_restart() is there only 
+to allow build for M5272 which does not have this define in fec.h. Physically, 
+i.MX27 does not have this register either.
+
+> I will try to manipulate some mx28 unique register to identify mx28
+> from other i.mx variants.  Hopefully, it will work.
 > 
-> If this kind of DMA controllers are only used by MUSB, seems not
-> necessary to convert to dmaengine API.  Any benefit we can get
-> from the convert?   MUSB is cross-platform already after all.
+> Thanks for the comments.
 
-<irony>
-correct, OMAP GPIO controller is only used on OMAPs, so why do we even
-bother having gpiolib, right ?
-</irony>
+baruch
 
 -- 
-balbi
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
