@@ -1,57 +1,33 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue,  4 Jan 2011 14:02:56 +0200
-Subject: [PATCH 3/4] arm: Kconfig: remove duplicated SPARSE_IRQ entry
+Date: Tue,  4 Jan 2011 14:02:57 +0200
+Subject: [PATCH 4/4] arm: Kconfig: allow OMAP to use sparse IRQ numbering
 In-Reply-To: <1294142577-28772-1-git-send-email-balbi@ti.com>
 References: <1294142577-28772-1-git-send-email-balbi@ti.com>
-Message-ID: <1294142577-28772-4-git-send-email-balbi@ti.com>
+Message-ID: <1294142577-28772-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPARSE_IRQ is defined under kernel/irq/Kconfig so
-it's safe to remove the duplicated entry.
+Select HAVE_SPARSE_IRQ to allow OMAP to use
+sparse IRQ numbering scheme. The main difference
+is that irq_descs will be added to a radix tree
+instead of a static array.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/Kconfig |   13 ++-----------
- 1 files changed, 2 insertions(+), 11 deletions(-)
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e6f0f8b..106d9f6 100644
+index 106d9f6..2413aa6 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -504,7 +504,7 @@ config ARCH_MMP
- 	select GENERIC_CLOCKEVENTS
- 	select TICK_ONESHOT
- 	select PLAT_PXA
--	select SPARSE_IRQ
+@@ -820,6 +820,7 @@ config ARCH_DAVINCI
+ config ARCH_OMAP
+ 	bool "TI OMAP"
+ 	select HAVE_CLK
 +	select HAVE_SPARSE_IRQ
- 	help
- 	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
- 
-@@ -583,7 +583,7 @@ config ARCH_PXA
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_HAS_CPUFREQ
  	select GENERIC_CLOCKEVENTS
- 	select TICK_ONESHOT
- 	select PLAT_PXA
--	select SPARSE_IRQ
-+	select HAVE_SPARSE_IRQ
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
- 
-@@ -1392,15 +1392,6 @@ config HW_PERF_EVENTS
- 	  Enable hardware performance counter support for perf events. If
- 	  disabled, perf events will use software events only.
- 
--config SPARSE_IRQ
--	def_bool n
--	help
--	  This enables support for sparse irqs. This is useful in general
--	  as most CPUs have a fairly sparse array of IRQ vectors, which
--	  the irq_desc then maps directly on to. Systems with a high
--	  number of off-chip IRQs will want to treat this as
--	  experimental until they have been independently verified.
--
- source "mm/Kconfig"
- 
- config FORCE_MAX_ZONEORDER
 -- 
 1.7.3.4.598.g85356
