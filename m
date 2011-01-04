@@ -1,159 +1,34 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Tue,  4 Jan 2011 07:50:23 -0500
-Subject: [PATCH v5] davinci: Support various speedgrades for MityDSP-L138 and
-	MityARM-1808 SoMs
-Message-ID: <1294145423-18245-1-git-send-email-michael.williamson@criticallink.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 04 Jan 2011 16:06:39 +0300
+Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
+In-Reply-To: <20110103204416.GA2240@legolas.emea.dhcp.ti.com>
+References: <201005152214.53993.sshtylyov@ru.mvista.com>	<4D21F3F2.6090302@mvista.com>	<20110103163447.GB2911@n2100.arm.linux.org.uk>	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>	<4D220246.5020303@mvista.com>	<19F8576C6E063C45BE387C64729E739404BD3F2C58@dbde02.ent.ti.com>
+	<20110103204416.GA2240@legolas.emea.dhcp.ti.com>
+Message-ID: <4D231B5F.7030607@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
-from the part number string read from the factory configuration block on
-the on-board I2C PROM.  Configure the maximum CPU speed based on this
-information.
+Hello.
 
-This patch was tested using a MityDSP-L138 and MityARM-1808 at various
-speedgrades.  Also, for code coverage, a bogus configuration was tested
-as well as a configuration having an unknown part number.
+On 03-01-2011 23:44, Felipe Balbi wrote:
 
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-Tested-by: Michael Williamson <michael.williamson@criticallink.com>
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
----
-Changes since v4. 
+>>> > Moreover, even Felipe also seems to move other musb
+>>> > DMAs (Inventra, CPPI3.0, TUSB) to drivers/dma.
 
-- Fixup indenting on if block per comments.
+>>> Frankly speaking, I doubt that drivers/dma/ will have place for the
+>>> purely MUSB specific DMA engines such as the named ones (there's no TUSB
+>>> DMA BTW it uses OMAP DMA).
 
- arch/arm/mach-davinci/board-mityomapl138.c |   83 +++++++++++++++++++++++++---
- 1 files changed, 75 insertions(+), 8 deletions(-)
+>> I think we will get more clarity once we start on this activity.
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 0bb5f0c..0ea5932 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -44,38 +44,109 @@ struct factory_config {
- 
- static struct factory_config factory_config;
- 
-+struct part_no_info {
-+	const char	*part_no;	/* part number string of interest */
-+	int		max_freq;	/* khz */
-+};
-+
-+static struct part_no_info mityomapl138_pn_info[] = {
-+	{
-+		.part_no	= "L138-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "L138-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "L138-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1808-C",
-+		.max_freq	= 300000,
-+	},
-+	{
-+		.part_no	= "1808-D",
-+		.max_freq	= 375000,
-+	},
-+	{
-+		.part_no	= "1808-F",
-+		.max_freq	= 456000,
-+	},
-+	{
-+		.part_no	= "1810-D",
-+		.max_freq	= 375000,
-+	},
-+};
-+
-+#ifdef CONFIG_CPU_FREQ
-+static void mityomapl138_cpufreq_init(const char *partnum)
-+{
-+	int i, ret;
-+
-+	for (i = 0; partnum && i < ARRAY_SIZE(mityomapl138_pn_info); i++) {
-+		/*
-+		 * the part number has additional characters beyond what is
-+		 * stored in the table.  This information is not needed for
-+		 * determining the speed grade, and would require several
-+		 * more table entries.  Only check the first N characters
-+		 * for a match.
-+		 */
-+		if (!strncmp(partnum, mityomapl138_pn_info[i].part_no,
-+			     strlen(mityomapl138_pn_info[i].part_no))) {
-+			da850_max_speed = mityomapl138_pn_info[i].max_freq;
-+			break;
-+		}
-+	}
-+
-+	ret = da850_register_cpufreq("pll0_sysclk3");
-+	if (ret)
-+		pr_warning("cpufreq registration failed: %d\n", ret);
-+}
-+#else
-+static void mityomapl138_cpufreq_init(const char *partnum) { }
-+#endif
-+
- static void read_factory_config(struct memory_accessor *a, void *context)
- {
- 	int ret;
-+	const char *partnum = NULL;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
- 	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
- 	if (ret != sizeof(struct factory_config)) {
- 		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
- 				ret);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
- 		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
- 				factory_config.magic);
--		return;
-+		goto bad_config;
- 	}
- 
- 	if (factory_config.version != FACTORY_CONFIG_VERSION) {
- 		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
- 				factory_config.version);
--		return;
-+		goto bad_config;
- 	}
- 
- 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
--	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
- 	if (is_valid_ether_addr(factory_config.mac))
- 		memcpy(soc_info->emac_pdata->mac_addr,
- 			factory_config.mac, ETH_ALEN);
- 	else
- 		pr_warning("MityOMAPL138: Invalid MAC found "
- 				"in factory config block\n");
-+
-+	partnum = factory_config.partnum;
-+	pr_info("MityOMAPL138: Part Number = %s\n", partnum);
-+
-+bad_config:
-+	/* default maximum speed is valid for all platforms */
-+	mityomapl138_cpufreq_init(partnum);
- }
- 
- static struct at24_platform_data mityomapl138_fd_chip = {
-@@ -383,10 +454,6 @@ static void __init mityomapl138_init(void)
- 	if (ret)
- 		pr_warning("rtc setup failed: %d\n", ret);
- 
--	ret = da850_register_cpufreq("pll0_sysclk3");
--	if (ret)
--		pr_warning("cpufreq registration failed: %d\n", ret);
--
- 	ret = da8xx_register_cpuidle();
- 	if (ret)
- 		pr_warning("cpuidle registration failed: %d\n", ret);
--- 
-1.7.0.4
+> I agree, but I personally don't see that many limiting factors.
+> dmaengine is just a generic API for doing DMA transfers. If it's not
+> enough for us currently, we extend it.
+
+    Putting MUSB DMA enignes into drivers/dma/ is the same as taking *any* 
+chip capable of bus-mastering DMA, "separating" its bus mastering related code 
+from its driver and putting this code into drivers/dma/. This doesn't make 
+sense, in my opinion. drivers/dma/ is for the dedicated DMA controllers (which 
+can *optionally* serve the slave devices).
+
+WBR, Sergei
