@@ -1,60 +1,32 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Tue, 04 Jan 2011 07:23:42 -0500
-Subject: [PATCH v4] davinci: Support various speedgrades for MityDSP-L138
-	and MityARM-1808 SoMs
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024816DB2A@dbde02.ent.ti.com>
-References: <1294060905-14254-1-git-send-email-michael.williamson@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024816DB2A@dbde02.ent.ti.com>
-Message-ID: <4D23114E.20003@criticallink.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Jan 2011 12:30:49 +0000
+Subject: [PATCH 2/4] ARM: make PHYS_OFFSET actually variable
+In-Reply-To: <1294129208-15201-3-git-send-email-nico@fluxnic.net>
+References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
+	<1294129208-15201-3-git-send-email-nico@fluxnic.net>
+Message-ID: <20110104123049.GC16671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/4/2011 4:35 AM, Nori, Sekhar wrote:
+On Tue, Jan 04, 2011 at 03:20:06AM -0500, Nicolas Pitre wrote:
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 336f14e..7502bc1 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -703,8 +703,10 @@ static struct init_tags {
+>  } init_tags __initdata = {
+>  	{ tag_size(tag_core), ATAG_CORE },
+>  	{ 1, PAGE_SIZE, 0xff },
+> +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
+>  	{ tag_size(tag_mem32), ATAG_MEM },
+>  	{ MEM_SIZE, PHYS_OFFSET },
+> +#endif
 
-> On Mon, Jan 03, 2011 at 18:51:45, Michael Williamson wrote:
->> For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
->> from the part number string read from the factory configuration block on
->> the on-board I2C PROM.  Configure the maximum CPU speed based on this
->> information.
->>
->> This patch was tested using a MityDSP-L138 and MityARM-1808 at various
->> speedgrades.  Also, for code coverage, a bogus configuration was tested
->> as well as a configuration having an unknown part number.
-> 
-> Thanks for the extensive testing. This looks good to me, except,
-> a whitespace nit below. But otherwise:
-> 
-> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-> 
->> +#ifdef CONFIG_CPU_FREQ
->> +static void mityomapl138_cpufreq_init(const char *partnum)
->> +{
->> +	int i, ret;
->> +
->> +	for (i = 0; partnum && i < ARRAY_SIZE(mityomapl138_pn_info); i++) {
->> +		/*
->> +		 * the part number has additional characters beyond what is
->> +		 * stored in the table.  This information is not needed for
->> +		 * determining the speed grade, and would require several
->> +		 * more table entries.  Only check the first N characters
->> +		 * for a match.
->> +		 */
->> +		if (!strncmp(partnum, mityomapl138_pn_info[i].part_no,
->> +			strlen(mityomapl138_pn_info[i].part_no))) {
->> +			da850_max_speed = mityomapl138_pn_info[i].max_freq;
->> +			break;
-> 
-> The indentation here makes it look like strlen is part of if()
-> body. May be you can indent it substantially to the right. I will
-> leave it to your judgment.
-> 
-> Thanks,
-> Sekhar
+Removing the definition is not really on - it's there as a fallback and
+removing fallbacks is not a good idea unless you can prove beyond doubt
+that it'll never be used.
 
-
-
-I will align the strlen up to the partnum argument above and resubmit.
-
-Thanks for the review.
-
--Mike
+As that depends on the boot loader, it's something that can never be
+proven.  So, arrange for it to be initialized at runtime, just like I
+will be doing in my revised version I'm working on which I detailed in
+a previous email.
