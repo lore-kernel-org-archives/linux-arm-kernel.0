@@ -1,39 +1,59 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 04 Jan 2011 11:00:05 -0800
-Subject: [PATCH 1/4] ARM: runtime patching of __virt_to_phys() and
-	__phys_to_virt()
-In-Reply-To: <alpine.LFD.2.00.1101041330450.22191@xanadu.home> (Nicolas
-	Pitre's message of "Tue, 04 Jan 2011 13:33:05 -0500 (EST)")
-References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
-	<1294129208-15201-2-git-send-email-nico@fluxnic.net>
-	<20110104084517.GA9791@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101040926100.22191@xanadu.home>
-	<20110104165347.GA24935@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101041225070.22191@xanadu.home>
-	<20110104180620.GC24935@n2100.arm.linux.org.uk>
-	<8yahbdoh6fs.fsf@huya.qualcomm.com>
-	<alpine.LFD.2.00.1101041330450.22191@xanadu.home>
-Message-ID: <8ya39p8h4ui.fsf@huya.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Jan 2011 11:12:36 -0800
+Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
+In-Reply-To: <20110103204952.GB2240@legolas.emea.dhcp.ti.com>
+References: <201005152214.53993.sshtylyov@ru.mvista.com>
+	<4D21F3F2.6090302@mvista.com>
+	<20110103163447.GB2911@n2100.arm.linux.org.uk>
+	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
+	<4D220246.5020303@mvista.com>
+	<20110103171945.GA3839@n2100.arm.linux.org.uk>
+	<20110103204952.GB2240@legolas.emea.dhcp.ti.com>
+Message-ID: <20110104191236.GG7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04 2011, Nicolas Pitre wrote:
+* Felipe Balbi <balbi@ti.com> [110103 12:49]:
+> Hi,
+> 
+> On Mon, Jan 03, 2011 at 05:19:45PM +0000, Russell King - ARM Linux wrote:
+> >>   Frankly speaking, I doubt that drivers/dma/ will have place for the
+> >>purely MUSB specific DMA engines such as the named ones (there's no TUSB
+> >>DMA BTW -- it uses OMAP DMA).
+> >
+> >Long term, we need to kill off all these platform private DMA interfaces.
+> >There's a growing amount of IP that's being shared not only between ARM
+> >silicon vendors, but also across architectures, and having to re-implement
+> >drivers because the underlying DMA engine is different is not feasible.
+> >
+> >For example, we're seeing ARMs primecells being used with various
+> >different DMA controllers in various different ARM SoCs.  I've heard
+> >rumours of them appearing in MIPS or PPC stuff as well.  We're seeing
+> >PXA peripheral IP appearing in x86 stuff too.
+> >
+> >We can't have drivers tied to their SoC DMA engines, and we can't continue
+> >having SoC DMA engines implementing their own unique APIs.  We do need to
+> >get on top of this before it becomes a major problem (if it hasn't
+> >already).
+> >
+> >The DMA engine API is still evolving, and should not be taken as concrete
+> >- I've recently been bringing up a number of points with Dan on various
+> >aspects of the API, some of which ultimately will lead to changes to the
+> >async-tx API, and others which hopefully will mean that the DMA slave
+> >API is better documented.
+> 
+> I couldn't agree more with you Russell. If the API isn't enough
+> currently, we can always propose an extension.
+> 
+> Having all sorts of SoC-specific "APIs" has already caused enough
+> problems and it still does (non-generic IRQ handling on
+> twl?030, menelaus, cbus - which isn't in mainline yet -, etc,
+> non-generic McBSP usage, non-generic GPMC usage, etc etc). So, if we can
+> plan for making use of generic APIs, let's do so.
 
-> On Tue, 4 Jan 2011, David Brown wrote:
->
->> Any idea how much it would hurt other targets to have the
->> __virt_to_phys() and __phys_to_virt() have a 16-bit fixup, even if only
->> the upper 8 bits are used?
->
-> Probably not that much.  But let's make it work satisfactorily for the 
-> general case first, and then we might consider and test variations that 
-> could accommodate msm.
+Yes I too agree with this. We just need to do whatever it takes to
+make the DMA engine suitable for all drivers.
 
-Sounds like a good plan.  We've got quite a few other things to clean up
-before we can build for more than one arch anyway.
+Regards,
 
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Tony
