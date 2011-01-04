@@ -1,73 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Jan 2011 10:49:04 -0800
-Subject: [PATCH 1/3] hvc_dcc: Fix bad code generation by marking
-	assembly volatile
-In-Reply-To: <alpine.LFD.2.00.1012201638150.10437@xanadu.home>
-References: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
-	<1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
-	<1292875718-7980-2-git-send-email-sboyd@codeaurora.org>
-	<alpine.LFD.2.00.1012201638150.10437@xanadu.home>
-Message-ID: <20110104184904.GC7771@atomide.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 04 Jan 2011 12:56:50 -0600
+Subject: [PATCH 5/5] omap2plus: voltage: Trivial linking fix for 'EINVAL'
+	undeclared
+In-Reply-To: <bd04d3678881a910a0639746ed04043d@mail.gmail.com>
+References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-2-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-3-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-4-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-5-git-send-email-santosh.shilimkar@ti.com>
+	<1294165576-15628-6-git-send-email-santosh.shilimkar@ti.com>
+	<4D236BA0.8010002@ti.com>
+	<bd04d3678881a910a0639746ed04043d@mail.gmail.com>
+Message-ID: <4D236D72.7080406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [101220 13:38]:
-> On Mon, 20 Dec 2010, Stephen Boyd wrote:
-> 
-> > Without marking the asm __dcc_getstatus() volatile my compiler
-> > decides it can cache the value of __ret in a register and then
-> > check the value of it continually in hvc_dcc_put_chars() (I had
-> > to replace get_wait/put_wait with 1 and fixup the branch
-> > otherwise my disassembler barfed on __dcc_(get|put)char).
-> > 
-> > 00000000 <hvc_dcc_put_chars>:
-> >    0:   ee103e11        mrc     14, 0, r3, cr0, cr1, {0}
-> >    4:   e3a0c000        mov     ip, #0  ; 0x0
-> >    8:   e2033202        and     r3, r3, #536870912      ; 0x20000000
-> >    c:   ea000006        b       2c <hvc_dcc_put_chars+0x2c>
-> >   10:   e3530000        cmp     r3, #0  ; 0x0
-> >   14:   1afffffd        bne     10 <hvc_dcc_put_chars+0x10>
-> >   18:   e7d1000c        ldrb    r0, [r1, ip]
-> >   1c:   ee10fe11        mrc     14, 0, pc, cr0, cr1, {0}
-> >   20:   2afffffd        bcs     1c <hvc_dcc_put_chars+0x1c>
-> >   24:   ee000e15        mcr     14, 0, r0, cr0, cr5, {0}
-> >   28:   e28cc001        add     ip, ip, #1      ; 0x1
-> >   2c:   e15c0002        cmp     ip, r2
-> >   30:   bafffff6        blt     10 <hvc_dcc_put_chars+0x10>
-> >   34:   e1a00002        mov     r0, r2
-> >   38:   e12fff1e        bx      lr
-> > 
-> > As you can see, the value of the mrc is checked against
-> > DCC_STATUS_TX (bit 29) and then stored in r3 for later use.
-> > Marking the asm volatile produces the following:
-> > 
-> > 00000000 <hvc_dcc_put_chars>:
-> >    0:   e3a03000        mov     r3, #0  ; 0x0
-> >    4:   ea000007        b       28 <hvc_dcc_put_chars+0x28>
-> >    8:   ee100e11        mrc     14, 0, r0, cr0, cr1, {0}
-> >    c:   e3100202        tst     r0, #536870912  ; 0x20000000
-> >   10:   1afffffc        bne     8 <hvc_dcc_put_chars+0x8>
-> >   14:   e7d10003        ldrb    r0, [r1, r3]
-> >   18:   ee10fe11        mrc     14, 0, pc, cr0, cr1, {0}
-> >   1c:   2afffffd        bcs     18 <hvc_dcc_put_chars+0x18>
-> >   20:   ee000e15        mcr     14, 0, r0, cr0, cr5, {0}
-> >   24:   e2833001        add     r3, r3, #1      ; 0x1
-> >   28:   e1530002        cmp     r3, r2
-> >   2c:   bafffff5        blt     8 <hvc_dcc_put_chars+0x8>
-> >   30:   e1a00002        mov     r0, r2
-> >   34:   e12fff1e        bx      lr
-> > 
-> > which looks better and actually works. Mark all the inline
-> > assembly in this file as volatile since we don't want the
-> > compiler to optimize away these statements or move them around
-> > in any way.
-> > 
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Cc: Daniel Walker <dwalker@codeaurora.org>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Santosh Shilimkar had written, on 01/04/2011 12:51 PM, the following:
+>> -----Original Message-----
+>> From: Nishanth Menon [mailto:nm at ti.com]
+>> Sent: Wednesday, January 05, 2011 12:19 AM
+>> To: Santosh Shilimkar
+>> Cc: linux-omap at vger.kernel.org; khilman at ti.com; tony at atomide.com;
+>> linux-arm-kernel at lists.infradead.org; Thara Gopinath; Kevin Hilman
+>> Subject: Re: [PATCH 5/5] omap2plus: voltage: Trivial linking fix for
+>> 'EINVAL' undeclared
+>>
+>> Santosh Shilimkar had written, on 01/04/2011 12:26 PM, the
+>> following:
+>>> CC      arch/arm/mach-omap2/omap_hwmod_common_data.o
+>>> In file included from arch/arm/plat-
+>> omap/include/plat/omap_hwmod.h:38,
+>>>                  from arch/arm/mach-
+>> omap2/omap_hwmod_common_data.c:20:
+>>> arch/arm/plat-omap/include/plat/voltage.h: In function
+>> 'omap_voltage_late_init':
+>>> arch/arm/plat-omap/include/plat/voltage.h:145: error: 'EINVAL'
+>> undeclared (first use in this function)
+>>> arch/arm/plat-omap/include/plat/voltage.h:145: error: (Each
+>> undeclared identifier is reported only once
+>>> arch/arm/plat-omap/include/plat/voltage.h:145: error: for each
+>> function it appears in.)
+>>> make[1]: *** [arch/arm/mach-omap2/omap_hwmod_common_data.o] Error
+>> 1
+>>> make: *** [arch/arm/mach-omap2] Error 2
+>>>
+>>> The error is reported when omap2plus_defconfig built with
+>> CONFIG_PM disabled
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Cc: Thara Gopinath <thara@ti.com>
+>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>>> ---
+>>>  arch/arm/plat-omap/include/plat/voltage.h |    2 ++
+>>>  1 files changed, 2 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/plat-omap/include/plat/voltage.h
+>> b/arch/arm/plat-omap/include/plat/voltage.h
+>>> index c095351..2b776f0 100644
+>>> --- a/arch/arm/plat-omap/include/plat/voltage.h
+>>> +++ b/arch/arm/plat-omap/include/plat/voltage.h
+>>> @@ -14,6 +14,8 @@
+>>>  #ifndef __ARCH_ARM_MACH_OMAP2_VOLTAGE_H
+>>>  #define __ARCH_ARM_MACH_OMAP2_VOLTAGE_H
+>>>
+>>> +#include <linux/err.h>
+>>> +
+>> Not sure if this is better OR including the err.h in c files is
+>> better,
+>> since the c file is the location where the error code is actually
+>> used..
+>>
+>> but no strong feelings about either personally.
+>>
+> The error is because of 'EINVAL' usage in header file. How
+> Will this error get fixed by including err.h is C file ?
+--- a/arch/arm/mach-omap2/omap_hwmod_common_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_common_data.c
+@@ -16,6 +16,7 @@
+   * data and their integration with other OMAP modules and Linux.
+   */
 
-Acked-by: Tony Lindgren <tony@atomide.com>
++#include <linux/err.h>
+  #include <plat/omap_hwmod.h>
+
+  #include "omap_hwmod_common_data.h"
+
+no?
+
+Basically, this points that omap_hwmod_common_data.c does not use the 
+error return values, which probably gets hidden by including err.h in 
+the header itself.. in this particular case, maynot be important, and 
+probably apis which should have return values checked should be marked 
+so.. anyways, just my 2 cents - no hard opinions about either as far as 
+I am concerned.
+
+-- 
+Regards,
+Nishanth Menon
