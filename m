@@ -1,94 +1,55 @@
-From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Tue, 4 Jan 2011 14:22:55 +0800
-Subject: [PATCH v3 1/2] ARM i.MX53: Some bug fix about MX53 MSL code
-In-Reply-To: <1294122176-26450-1-git-send-email-yong.shen@freescale.com>
-References: <1294122176-26450-1-git-send-email-yong.shen@freescale.com>
-Message-ID: <1294122176-26450-2-git-send-email-yong.shen@freescale.com>
+From: dick@softplc.com (Dick Hollenbeck)
+Date: Tue, 04 Jan 2011 00:26:50 -0600
+Subject: ks8695_gettimeoffset
+In-Reply-To: <AANLkTi=+9h20je24F+pnoZRFE-of-VZ5Xax8-tDzFs4=@mail.gmail.com>
+References: <4D0FA9FB.3060309@softplc.com>	<20101220193049.GI28157@n2100.arm.linux.org.uk>	<4D18B2B5.5000001@visionsystems.de>
+	<AANLkTi=+9h20je24F+pnoZRFE-of-VZ5Xax8-tDzFs4=@mail.gmail.com>
+Message-ID: <4D22BDAA.2030902@softplc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Shen <yong.shen@linaro.org>
+On 01/03/2011 01:55 PM, avictor.za at gmail.com wrote:
+> hi,
+>
+>> Is it possible at all to implement clocksource/clockevents for KS8695? As Dick and "Register Description" already said you cannot read the time register, so clocksource->read cannot be implemented to return ticks elapsed. Or do I see it wrong?
+> I'm pretty sure I tested this when I originally submitted the KS8685
+> processor support (May 2007), and the timer registers are readable.
+> I would of tested with a userspace program that sat in a tight loop
+> calling gettimeofday().
+>
+>
+> Regards,
+>   Andrew Victor
+>
 
-1. pll_base address should return right value
-2. uart parent clk is from pll3
+Thanks Andrew.  Can you explain how this is supposed to be a duration, even
+if one of these two registers was a readable down counter?
 
-Signed-off-by: Yong Shen <yong.shen@linaro.org>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |   25 ++++++++++++++++++++++++-
- arch/arm/mach-mx5/crm_regs.h        |    4 ++++
- 2 files changed, 28 insertions(+), 1 deletions(-)
+ elapsed = __raw_readl(KS8695_TMR_VA + KS8695_T1TC) + __raw_readl(KS8695_TMR_VA + KS8695_T1PD);
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 2f9eae2..b290f3f 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -124,7 +124,7 @@ static inline u32 _get_mux(struct clk *parent, struct clk *m0,
- 	return -EINVAL;
- }
- 
--static inline void __iomem *_get_pll_base(struct clk *pll)
-+static inline void __iomem *_mx51_get_pll_base(struct clk *pll)
- {
- 	if (pll == &pll1_main_clk)
- 		return MX51_DPLL1_BASE;
-@@ -132,6 +132,20 @@ static inline void __iomem *_get_pll_base(struct clk *pll)
- 		return MX51_DPLL2_BASE;
- 	else if (pll == &pll3_sw_clk)
- 		return MX51_DPLL3_BASE;
-+	else
-+		BUG();
-+
-+	return NULL;
-+}
-+
-+static inline void __iomem *_mx53_get_pll_base(struct clk *pll)
-+{
-+	if (pll == &pll1_main_clk)
-+		return MX53_DPLL1_BASE;
-+	else if (pll == &pll2_sw_clk)
-+		return MX53_DPLL2_BASE;
-+	else if (pll == &pll3_sw_clk)
-+		return MX53_DPLL3_BASE;
- 	else if (pll == &mx53_pll4_sw_clk)
- 		return MX53_DPLL4_BASE;
- 	else
-@@ -140,6 +154,14 @@ static inline void __iomem *_get_pll_base(struct clk *pll)
- 	return NULL;
- }
- 
-+static inline void __iomem *_get_pll_base(struct clk *pll)
-+{
-+	if (cpu_is_mx51())
-+		return _mx51_get_pll_base(pll);
-+	else
-+		return _mx53_get_pll_base(pll);
-+}
-+
- static unsigned long clk_pll_get_rate(struct clk *clk)
- {
- 	long mfi, mfn, mfd, pdf, ref_clk, mfn_abs;
-@@ -1243,6 +1265,7 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
- 
- 	clk_tree_init();
- 
-+	clk_set_parent(&uart_root_clk, &pll3_sw_clk);
- 	clk_enable(&cpu_clk);
- 	clk_enable(&main_bus_clk);
- 
-diff --git a/arch/arm/mach-mx5/crm_regs.h b/arch/arm/mach-mx5/crm_regs.h
-index 51ff9bb..b462c22 100644
---- a/arch/arm/mach-mx5/crm_regs.h
-+++ b/arch/arm/mach-mx5/crm_regs.h
-@@ -19,6 +19,10 @@
- #define MX51_GPC_BASE		MX51_IO_ADDRESS(MX51_GPC_BASE_ADDR)
- 
- /*MX53*/
-+#define MX53_CCM_BASE		MX53_IO_ADDRESS(MX53_CCM_BASE_ADDR)
-+#define MX53_DPLL1_BASE		MX53_IO_ADDRESS(MX53_PLL1_BASE_ADDR)
-+#define MX53_DPLL2_BASE		MX53_IO_ADDRESS(MX53_PLL2_BASE_ADDR)
-+#define MX53_DPLL3_BASE		MX53_IO_ADDRESS(MX53_PLL3_BASE_ADDR)
- #define MX53_DPLL4_BASE		MX53_IO_ADDRESS(MX53_PLL3_BASE_ADDR)
- 
- /* PLL Register Offsets */
--- 
-1.7.0.4
+
+Which of the two is a down counter, and why would it be added to one that is not, or is?
+
+While you are thinking about that, I have a userspace test program that can peek at the two registers using a memory mapped region pointer, and it will tell us if the value is changing over time.
+
+
+The register description PDF document says the values *are readable*, but that description does not specifically say what is being read back, the preload value or the dynamically down counting value.
+
+Doc Extraction:
+
+TOUT1PC aka T1PD offset 0xE40C
+
+This field specifies the duration that the TOUT1 pin is High in each
+timeout period. Writing zero to this register may cuase unpredictalbe
+behavior.
+
+TOUT1TC aka T1TC offset 0xE404
+
+This field specifies the duration that the TOUT1 pin is Low in each
+timeout period. Writing zero to this register may cuase unpredictalbe
+behavior.
+
+
+Thanks,
+
+Dick
