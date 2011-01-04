@@ -1,28 +1,29 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 04 Jan 2011 15:18:46 -0800
-Subject: [RFC 5/5] ARM: P2V: extend to 16-bit translation offsets
-In-Reply-To: <E1PaDPu-00023p-QG@rmk-PC.arm.linux.org.uk> (Russell King's
-	message of "Tue, 04 Jan 2011 20:23:38 +0000")
-References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDPu-00023p-QG@rmk-PC.arm.linux.org.uk>
-Message-ID: <8yabp3wfeax.fsf@huya.qualcomm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 4 Jan 2011 21:32:55 -0200
+Subject: [PATCH v3 1/2] ARM i.MX53: Some bug fix about MX53 MSL code
+In-Reply-To: <AANLkTimhxmJNgC7=0kdr022VX605rsweiJ8_Nb-1zVNo@mail.gmail.com>
+References: <1294122176-26450-1-git-send-email-yong.shen@freescale.com>
+	<1294122176-26450-2-git-send-email-yong.shen@freescale.com>
+	<AANLkTimhxmJNgC7=0kdr022VX605rsweiJ8_Nb-1zVNo@mail.gmail.com>
+Message-ID: <AANLkTimD_HteeyhdHcGiJU6jashyPfoLGP_bWkWAj0Ap@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04 2011, Russell King - ARM Linux wrote:
+Yong,
 
-> MSM's memory is aligned to 2MB, which is more than we can do with our
-> existing method as we're limited to the upper 8 bits.  Extend this by
-> using two instructions to 16 bits, automatically selected when MSM is
-> enabled.
+On Tue, Jan 4, 2011 at 12:41 PM, Yong Shen <yong.shen@linaro.org> wrote:
+> Hi there,
+>
+> Are there any more comments?
+> Because of the time difference, the review process is longer than it
+> should be. If no more comments, I am going to ask for merge, so more
+> works can be carry on based on this.
 
-I should also add that this series adds a warning to my build when
-CONFIG_ARM_PATCH_PHYS_VIRT is not defined:
+Looks like you haven?t checked Sascha?s tree:
+http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/imx-for-2.6.38
 
-  arch/arm/kernel/module.c:279: error: 'find_mod_section' defined but not used
+The patch is there ;-)
 
-David
+Regards,
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Fabio Estevam
