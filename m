@@ -1,127 +1,25 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Tue,  4 Jan 2011 11:54:44 +0100
-Subject: [PATCH 2/3] perf: add OMAP support for the new power events
-In-Reply-To: <1294136263-24020-1-git-send-email-j-pihet@ti.com>
-References: <1294136263-24020-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1294138484-24729-1-git-send-email-j-pihet@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Jan 2011 11:42:07 +0000
+Subject: [PATCH 2/2] arm: omap: select HAVE_SPARSE_IRQ
+In-Reply-To: <20110104103432.GM2656@legolas.emea.dhcp.ti.com>
+References: <1294133966-20279-1-git-send-email-balbi@ti.com>
+	<1294133966-20279-3-git-send-email-balbi@ti.com>
+	<20110104095410.GA17298@n2100.arm.linux.org.uk>
+	<20110104103432.GM2656@legolas.emea.dhcp.ti.com>
+Message-ID: <20110104114207.GA19293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On Tue, Jan 04, 2011 at 12:34:32PM +0200, Felipe Balbi wrote:
+> do you mean:
 
-The patch adds the new power management trace points for
-the OMAP architecture.
+Yes, but without the breakage caused by your mailer - posting patches
+with flowed formatting is a recipe for this kind of disaster:
 
-The trace points are for:
-- default idle handler. Since the cpuidle framework is
-  instrumented in the generic way there is no need to
-  add trace points in the OMAP specific cpuidle handler;
-- cpufreq (DVFS),
-- clocks changes (enable, disable, set_rate),
-- change of power domains next power states.
+Content-Type: text/plain; charset=us-ascii; format=flowed
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c      |    7 +++++++
- arch/arm/mach-omap2/powerdomain.c |    3 +++
- arch/arm/plat-omap/clock.c        |   13 ++++++++++---
- 3 files changed, 20 insertions(+), 3 deletions(-)
+You appear to be using mutt, so set:
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 0ec8a04..0ee0b0e 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -29,6 +29,7 @@
- #include <linux/delay.h>
- #include <linux/slab.h>
- #include <linux/console.h>
-+#include <trace/events/power.h>
- 
- #include <plat/sram.h>
- #include <plat/clockdomain.h>
-@@ -506,8 +507,14 @@ static void omap3_pm_idle(void)
- 	if (omap_irq_pending() || need_resched())
- 		goto out;
- 
-+	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
-+	trace_cpu_idle(1, smp_processor_id());
-+
- 	omap_sram_idle();
- 
-+	trace_power_end(smp_processor_id());
-+	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
-+
- out:
- 	local_fiq_enable();
- 	local_irq_enable();
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 6527ec3..73cbe9a 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -23,6 +23,7 @@
- #include <linux/errno.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <trace/events/power.h>
- 
- #include <asm/atomic.h>
- 
-@@ -440,6 +441,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
- 		 pwrdm->name, pwrst);
- 
-+	trace_power_domain_target(pwrdm->name, pwrst, smp_processor_id());
-+
- 	prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
- 			     (pwrst << OMAP_POWERSTATE_SHIFT),
- 			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index fc62fb5..7cbb09b 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -21,6 +21,7 @@
- #include <linux/cpufreq.h>
- #include <linux/debugfs.h>
- #include <linux/io.h>
-+#include <trace/events/power.h>
- 
- #include <plat/clock.h>
- 
-@@ -43,8 +44,10 @@ int clk_enable(struct clk *clk)
- 		return -EINVAL;
- 
- 	spin_lock_irqsave(&clockfw_lock, flags);
--	if (arch_clock->clk_enable)
-+	if (arch_clock->clk_enable) {
-+		trace_clock_enable(clk->name, 1, smp_processor_id());
- 		ret = arch_clock->clk_enable(clk);
-+	}
- 	spin_unlock_irqrestore(&clockfw_lock, flags);
- 
- 	return ret;
-@@ -66,8 +69,10 @@ void clk_disable(struct clk *clk)
- 		goto out;
- 	}
- 
--	if (arch_clock->clk_disable)
-+	if (arch_clock->clk_disable) {
-+		trace_clock_disable(clk->name, 0, smp_processor_id());
- 		arch_clock->clk_disable(clk);
-+	}
- 
- out:
- 	spin_unlock_irqrestore(&clockfw_lock, flags);
-@@ -120,8 +125,10 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 		return ret;
- 
- 	spin_lock_irqsave(&clockfw_lock, flags);
--	if (arch_clock->clk_set_rate)
-+	if (arch_clock->clk_set_rate) {
-+		trace_clock_set_rate(clk->name, rate, smp_processor_id());
- 		ret = arch_clock->clk_set_rate(clk, rate);
-+	}
- 	if (ret == 0) {
- 		if (clk->recalc)
- 			clk->rate = clk->recalc(clk);
--- 
-1.7.2.3
+set text_flowed=no
+
+in your .muttrc to avoid this corruption.
