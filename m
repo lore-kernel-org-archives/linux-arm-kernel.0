@@ -1,35 +1,57 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 04 Jan 2011 10:25:43 -0800
-Subject: [PATCH 1/4] ARM: runtime patching of __virt_to_phys() and
-	__phys_to_virt()
-In-Reply-To: <20110104180620.GC24935@n2100.arm.linux.org.uk> (Russell King's
-	message of "Tue, 4 Jan 2011 18:06:20 +0000")
-References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
-	<1294129208-15201-2-git-send-email-nico@fluxnic.net>
-	<20110104084517.GA9791@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101040926100.22191@xanadu.home>
-	<20110104165347.GA24935@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101041225070.22191@xanadu.home>
-	<20110104180620.GC24935@n2100.arm.linux.org.uk>
-Message-ID: <8yahbdoh6fs.fsf@huya.qualcomm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue,  4 Jan 2011 23:56:12 +0530
+Subject: [PATCH 1/5] omap2plus: clockdomain: Trivial fix for build break
+	because of clktrctrl_mask
+In-Reply-To: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1294165576-15628-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04 2011, Russell King - ARM Linux wrote:
+struct clockdomain member clktrctrl_mask is available for only for OMAP2
+and OMAP3 architectures. Technially it is also used only for these archs
+but this breaks the build with custom OMAP4 configuration.
 
-> On Tue, Jan 04, 2011 at 12:50:28PM -0500, Nicolas Pitre wrote:
+ CC      arch/arm/mach-omap2/clockdomain.o
+arch/arm/mach-omap2/clockdomain.c: In function '_enable_hwsup':
+arch/arm/mach-omap2/clockdomain.c:251: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c:254: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c: In function '_disable_hwsup':
+arch/arm/mach-omap2/clockdomain.c:277: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c:280: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_sleep':
+arch/arm/mach-omap2/clockdomain.c:744: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_wakeup':
+arch/arm/mach-omap2/clockdomain.c:789: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_clk_enable':
+arch/arm/mach-omap2/clockdomain.c:922: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c:926: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_clk_disable':
+arch/arm/mach-omap2/clockdomain.c:994: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+arch/arm/mach-omap2/clockdomain.c:998: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
+make[1]: *** [arch/arm/mach-omap2/clockdomain.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
 
-> You're making a mountain out of a mole hill.  At present, there is one
-> platform which defines its own complex v:p mapping and that is Realview,
-> but only when sparsemem is enabled.  As already mentioned, MSM is the
-> only other platform which can't use this method.  So that's a simple
-> dependency line against the config.
+Fix the build break with use of ARCH_OMAP2PLUS instead of OMAP2 or OMAP3
 
-This is unfortunate, however, for us, since it would keep us having all
-of our targets having to be built exclusively.
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/clockdomain.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Any idea how much it would hurt other targets to have the
-__virt_to_phys() and __phys_to_virt() have a 16-bit fixup, even if only
-the upper 8 bits are used?
-
-David
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index de3faa2..6fa82f5 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -103,7 +103,7 @@ struct clockdomain {
+ 		const char *name;
+ 		struct powerdomain *ptr;
+ 	} pwrdm;
+-#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
++#ifdef CONFIG_ARCH_OMAP2PLUS
+ 	const u16 clktrctrl_mask;
+ #endif
+ 	const u8 flags;
+-- 
+1.6.0.4
