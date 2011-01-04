@@ -1,28 +1,21 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 4 Jan 2011 09:41:02 +0900
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <20110103151944.GA32508@n2100.arm.linux.org.uk>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-	<20101221182037.GA4783@n2100.arm.linux.org.uk>
-	<20101222122904.GC14693@n2100.arm.linux.org.uk>
-	<AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
-	<20110103151944.GA32508@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTik2_qFoT-CUhhWL6o5PN9m8RyE-R+0t1HUo9+oq@mail.gmail.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Tue, 04 Jan 2011 01:01:50 +0000
+Subject: mc13xxx core support for i2c
+In-Reply-To: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
+References: <1292817055-17715-1-git-send-email-marc@cpdesign.com.au>
+Message-ID: <4D22717E.90003@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 4, 2011 at 12:19 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On 20/12/10 03:50, Marc Reilly wrote:
+> These patches add i2c support for the mc13xxx-core driver. This v3 improves the v2
+> (http://lists.arm.linux.org.uk/lurker/message/20101215.214755.b6bae366.en.html) by splitting
+> the driver up into core, spi and i2c files so that it can support one subsystem in the absence
+> of the other.
 
-> I've not decided whether it should be possible to resume an ETIMEOUT'd
-> pause request (in theory with pl08x, that's just a matter of clearing
-> the HALT bit) or whether an ETIMEOUT'd pause request should restore
-> the previous HALT bit setting (possibly re-enabling transfers on the
-> channel.) ?Allowing it to be re-enabled in some way would be the safest
-> thing in terms of data integrity for the reason mentioned in the
-> "important note" above.
+As noted by others, this needs to be re-worked so that the driver can
+always been built and used across bisections.
 
-Not sure if every DMAC could resume cleanly from exact pause point.
-Perhaps the upper layer of client driver should take care of that, just
-like ALSA which emulates pause/resume if the 'optional' capability is
-not advertised by the audio dma driver.
+A suggested approach would be to move items out into the header file
+first, and then maybe split the spi driver out of the core, and then
+add the I2c driver. It may also make the patch set easier to follow.
