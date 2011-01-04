@@ -1,37 +1,44 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 04 Jan 2011 21:50:43 +0300
-Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
-In-Reply-To: <20110104184244.GC2647@legolas.emea.dhcp.ti.com>
-References: <20110103163447.GB2911@n2100.arm.linux.org.uk>
-	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
-	<4D220246.5020303@mvista.com>
-	<19F8576C6E063C45BE387C64729E739404BD3F2C58@dbde02.ent.ti.com>
-	<20110103204416.GA2240@legolas.emea.dhcp.ti.com>
-	<4D231B5F.7030607@mvista.com> <1294149984.1822.9.camel@eowin>
-	<AANLkTi=JyoQuP-OQtV1yO0WR1GCM1LieHUj5Sn=ZfVim@mail.gmail.com>
-	<1294152988.1822.12.camel@eowin>
-	<AANLkTinPEpMofTX0YWbv18gSdWtPLVFa85S1E=+QxFT=@mail.gmail.com>
-	<20110104184244.GC2647@legolas.emea.dhcp.ti.com>
-Message-ID: <4D236C03.9040707@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Jan 2011 10:52:56 -0800
+Subject: [PATCH 3/3] hvc_dcc: Simplify assembly for v6 and v7 ARM
+In-Reply-To: <alpine.LFD.2.00.1012201644110.10437@xanadu.home>
+References: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
+	<1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
+	<1292875718-7980-4-git-send-email-sboyd@codeaurora.org>
+	<alpine.LFD.2.00.1012201644110.10437@xanadu.home>
+Message-ID: <20110104185256.GD7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Nicolas Pitre <nico@fluxnic.net> [101220 13:44]:
+> On Mon, 20 Dec 2010, Stephen Boyd wrote:
+> 
+> > The inline assembly differences for v6 vs. v7 in the hvc_dcc
+> > driver are purely optimizations. On a v7 processor, an mrc with
+> > the pc sets the condition codes to the 28-31 bits of the register
+> > being read. It just so happens that the TX/RX full bits the DCC
+> > driver is testing for are high enough in the register to be put
+> > into the condition codes. On a v6 processor, this "feature" isn't
+> > implemented and thus we have to do the usual read, mask, test
+> > operations to check for TX/RX full.
+> > 
+> > Since we already test the RX/TX full bits before calling
+> > __dcc_getchar() and __dcc_putchar() we don't actually need to do
+> > anything special for v7 over v6. The only difference is in
+> > hvc_dcc_get_chars(). We would test RX full, poll RX full, and
+> > then read a character from the buffer, whereas now we will test
+> > RX full, read a character from the buffer, and then test RX full
+> > again for the second iteration of the loop. It doesn't seem
+> > possible for the buffer to go from full to empty between testing
+> > the RX full and reading a character. Therefore, replace the v7
+> > versions with the v6 versions and everything works the same.
+> > 
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Cc: Daniel Walker <dwalker@codeaurora.org>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Felipe Balbi wrote:
-
-> On Tue, Jan 04, 2011 at 11:41:05PM +0800, Ming Lei wrote:
->> OMAP GPIOs have many usages or use cases, so we can use gpiolib
->> to simplify access to GPIOs.  If GPIOs has only one usage or use case,
->> it is not necessary to access GPIOs by gpiolib.
-
->> Now this kind of DMA controllers are only used by MUSB or only for
->> MUSB, so it doesn't matter to access them by dmaengine or not.
-
-> Not entirely true. TUSB uses OMAP system DMA and AFAICT CPPI is used
-> also for ethernet.
-
-    Yes, but the CPPI registers are not compatible between MUSB and EMAC, only 
-the descriptors are, AFAIK.
-
-WBR, Sergei
+Acked-by: Tony Lindgren <tony@atomide.com>
