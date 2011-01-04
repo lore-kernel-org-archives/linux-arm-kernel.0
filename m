@@ -1,128 +1,45 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 04 Jan 2011 16:09:22 +0100
-Subject: [PATCH/RFC 1/3] ARM: S5P: Add a platform callback for MIPI CSIS PHY
-	control
-In-Reply-To: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
-References: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1294153764-25006-2-git-send-email-s.nawrocki@samsung.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 4 Jan 2011 23:41:05 +0800
+Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
+In-Reply-To: <1294152988.1822.12.camel@eowin>
+References: <201005152214.53993.sshtylyov@ru.mvista.com>
+	<4D21F3F2.6090302@mvista.com>
+	<20110103163447.GB2911@n2100.arm.linux.org.uk>
+	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
+	<4D220246.5020303@mvista.com>
+	<19F8576C6E063C45BE387C64729E739404BD3F2C58@dbde02.ent.ti.com>
+	<20110103204416.GA2240@legolas.emea.dhcp.ti.com>
+	<4D231B5F.7030607@mvista.com> <1294149984.1822.9.camel@eowin>
+	<AANLkTi=JyoQuP-OQtV1yO0WR1GCM1LieHUj5Sn=ZfVim@mail.gmail.com>
+	<1294152988.1822.12.camel@eowin>
+Message-ID: <AANLkTinPEpMofTX0YWbv18gSdWtPLVFa85S1E=+QxFT=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy_enable callback in struct s5p_platform_mipi_csis is added
-to allow the CSIS driver to control its PHY enable and reset signals.
-This allows to use same MIPI CSIS driver across various SoCs.
+Hi,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/plat-s5p/dev-csis0.c              |    2 +-
- arch/arm/plat-s5p/dev-csis1.c              |    2 +-
- arch/arm/plat-s5p/include/plat/csis.h      |   28 --------------------
- arch/arm/plat-s5p/include/plat/mipi_csis.h |   39 ++++++++++++++++++++++++++++
- 4 files changed, 41 insertions(+), 30 deletions(-)
- delete mode 100644 arch/arm/plat-s5p/include/plat/csis.h
- create mode 100644 arch/arm/plat-s5p/include/plat/mipi_csis.h
+2011/1/4 Felipe Balbi <me@felipebalbi.com>:
+> Hi,
+>
+> On Tue, 2011-01-04 at 22:40 +0800, Ming Lei wrote:
+>> > The end goal is just to drop all these ad-hoc "APIs" for accessing DMA
+>> > on musb code.
+>>
+>> If this kind of DMA controllers are only used by MUSB, seems not
+>> necessary to convert to dmaengine API. ?Any benefit we can get
+>> from the convert? ? MUSB is cross-platform already after all.
+>
+> <irony>
+> correct, OMAP GPIO controller is only used on OMAPs, so why do we even
+> bother having gpiolib, right ?
 
-diff --git a/arch/arm/plat-s5p/dev-csis0.c b/arch/arm/plat-s5p/dev-csis0.c
-index dfab1c8..57efe9c 100644
---- a/arch/arm/plat-s5p/dev-csis0.c
-+++ b/arch/arm/plat-s5p/dev-csis0.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2010 Samsung Electronics
-+ * Copyright (C) 2010 Samsung Electronics Co., Ltd
-  *
-  * S5P series device definition for MIPI-CSIS channel 0
-  *
-diff --git a/arch/arm/plat-s5p/dev-csis1.c b/arch/arm/plat-s5p/dev-csis1.c
-index e3053f2..c61b46b 100644
---- a/arch/arm/plat-s5p/dev-csis1.c
-+++ b/arch/arm/plat-s5p/dev-csis1.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2010 Samsung Electronics
-+ * Copyright (C) 2010 Samsung Electronics Co., Ltd
-  *
-  * S5P series device definition for MIPI-CSIS channel 1
-  *
-diff --git a/arch/arm/plat-s5p/include/plat/csis.h b/arch/arm/plat-s5p/include/plat/csis.h
-deleted file mode 100644
-index 51e308c..0000000
---- a/arch/arm/plat-s5p/include/plat/csis.h
-+++ /dev/null
-@@ -1,28 +0,0 @@
--/*
-- * Copyright (C) 2010 Samsung Electronics
-- *
-- * S5P series MIPI CSI slave device support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef PLAT_S5P_CSIS_H_
--#define PLAT_S5P_CSIS_H_ __FILE__
--
--/**
-- * struct s5p_platform_mipi_csis - platform data for MIPI-CSIS
-- * @clk_rate: bus clock frequency
-- * @lanes: number of data lanes used
-- * @alignment: data alignment in bits
-- * @hs_settle: HS-RX settle time
-- */
--struct s5p_platform_mipi_csis {
--	unsigned long clk_rate;
--	u8 lanes;
--	u8 alignment;
--	u8 hs_settle;
--};
--
--#endif /* PLAT_S5P_CSIS_H_ */
-diff --git a/arch/arm/plat-s5p/include/plat/mipi_csis.h b/arch/arm/plat-s5p/include/plat/mipi_csis.h
-new file mode 100644
-index 0000000..0b22065
---- /dev/null
-+++ b/arch/arm/plat-s5p/include/plat/mipi_csis.h
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2010 Samsung Electronics, Co. Ltd
-+ *
-+ * S5P series MIPI CSI slave device support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef PLAT_S5P_MIPI_CSIS_H_
-+#define PLAT_S5P_MIPI_CSIS_H_ __FILE__
-+
-+struct platform_device;
-+
-+/**
-+ * struct s5p_platform_mipi_csis - platform data for MIPI-CSIS
-+ * @clk_rate: bus clock frequency
-+ * @lanes: number of data lanes used
-+ * @alignment: data alignment in bits
-+ * @hs_settle: HS-RX settle time
-+ */
-+struct s5p_platform_mipi_csis {
-+	unsigned long clk_rate;
-+	u8 lanes;
-+	u8 alignment;
-+	u8 hs_settle;
-+	int (*phy_enable)(struct platform_device *pdev, bool on);
-+};
-+
-+/**
-+ * struct s5p_csis_phy_control - global MIPI-CSIS PHY control
-+ * @pdev: platform device the mipi phy state is to be changed for
-+ * @on: true to enable CSIS PHY and assert its reset,
-+ *	false will disable the PHY and put into reset state
-+ */
-+int s5p_csis_phy_enable(struct platform_device *pdev, bool on);
-+
-+#endif /* PLAT_S5P_MIPI_CSIS_H_ */
+OMAP GPIOs have many usages or use cases, so we can use gpiolib
+to simplify access to GPIOs.  If GPIOs has only one usage or use case,
+it is not necessary to access GPIOs by gpiolib.
+
+Now this kind of DMA controllers are only used by MUSB or only for
+MUSB, so it doesn't matter to access them by dmaengine or not.
+
+thanks,
 -- 
-1.7.3.4
+Lei Ming
