@@ -1,37 +1,88 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 4 Jan 2011 17:24:12 +0800
-Subject: [PATCH v2 06/10] ARM: mx28: update clocks for dual fec support
+Date: Tue, 4 Jan 2011 17:24:16 +0800
+Subject: [PATCH v2 10/10] ARM: mxs: add initial pm support
 In-Reply-To: <1294133056-21195-1-git-send-email-shawn.guo@freescale.com>
 References: <1294133056-21195-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1294133056-21195-7-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1294133056-21195-11-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register clocks fec.0 and fec.1 for dual fec support.
+This is a very initial pm support and basically does nothing.
+With this pm support entry, drivers can start testing their own
+pm functions.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
 Changes for v2:
- - Rebase the patch against patch below which gets fundamental
-   clocks explicitly called in clk_enable.
-   [PATCH v4] ARM: mxs: Change duart device to use amba-pl011
- - Register clocks fec.0 and fec.1 respectively than use wildcard
-   NULL for both instances.
+ - Let build of pm.c depend on CONFIG_PM
+ - Remove the blank line above device_initcall in pm.c
 
- arch/arm/mach-mxs/clock-mx28.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/Makefile |    2 ++
+ arch/arm/mach-mxs/pm.c     |   43 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/pm.c
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index f20b254..f79587b 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -607,6 +607,7 @@ static struct clk_lookup lookups[] = {
- 	/* for amba-pl011 driver */
- 	_REGISTER_CLOCK("duart", NULL, uart_clk)
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-+	_REGISTER_CLOCK("fec.1", NULL, fec_clk)
- 	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
- 	_REGISTER_CLOCK("pll2", NULL, pll2_clk)
- 	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+index f23ebbd..45a2925 100644
+--- a/arch/arm/mach-mxs/Makefile
++++ b/arch/arm/mach-mxs/Makefile
+@@ -1,6 +1,8 @@
+ # Common support
+ obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
+ 
++obj-$(CONFIG_PM) += pm.o
++
+ obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+ 
+diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
+new file mode 100644
+index 0000000..fb042da
+--- /dev/null
++++ b/arch/arm/mach-mxs/pm.c
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++#include <mach/system.h>
++
++static int mxs_suspend_enter(suspend_state_t state)
++{
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		arch_idle();
++		break;
++
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static struct platform_suspend_ops mxs_suspend_ops = {
++	.enter = mxs_suspend_enter,
++	.valid = suspend_valid_only_mem,
++};
++
++static int __init mxs_pm_init(void)
++{
++	suspend_set_ops(&mxs_suspend_ops);
++	return 0;
++}
++device_initcall(mxs_pm_init);
 -- 
 1.7.1
