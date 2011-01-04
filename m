@@ -1,42 +1,33 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 04 Jan 2011 12:54:15 -0500 (EST)
-Subject: [PATCH 2/4] ARM: make PHYS_OFFSET actually variable
-In-Reply-To: <20110104123049.GC16671@n2100.arm.linux.org.uk>
-References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
-	<1294129208-15201-3-git-send-email-nico@fluxnic.net>
-	<20110104123049.GC16671@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101041251500.22191@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 04 Jan 2011 10:00:35 -0800
+Subject: [PATCH 0/2] OMAP: TWL: sparse fixes
+In-Reply-To: <1294081110-23695-1-git-send-email-nm@ti.com> (Nishanth Menon's
+	message of "Mon, 3 Jan 2011 12:58:28 -0600")
+References: <1294081110-23695-1-git-send-email-nm@ti.com>
+Message-ID: <8762u47dmk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Jan 2011, Russell King - ARM Linux wrote:
+Nishanth Menon <nm@ti.com> writes:
 
-> On Tue, Jan 04, 2011 at 03:20:06AM -0500, Nicolas Pitre wrote:
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 336f14e..7502bc1 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -703,8 +703,10 @@ static struct init_tags {
-> >  } init_tags __initdata = {
-> >  	{ tag_size(tag_core), ATAG_CORE },
-> >  	{ 1, PAGE_SIZE, 0xff },
-> > +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
-> >  	{ tag_size(tag_mem32), ATAG_MEM },
-> >  	{ MEM_SIZE, PHYS_OFFSET },
-> > +#endif
-> 
-> Removing the definition is not really on - it's there as a fallback and
-> removing fallbacks is not a good idea unless you can prove beyond doubt
-> that it'll never be used.
-> 
-> As that depends on the boot loader, it's something that can never be
-> proven.  So, arrange for it to be initialized at runtime, just like I
-> will be doing in my revised version I'm working on which I detailed in
-> a previous email.
+> Source:
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+> branch: omap-for-linus
+>
+> Doing a rm arch/arm/mach-omap2/*.o;make C=1 arch/arm/mach-omap2/
+> resulted in the following sparse warnings:
+> http://pastebin.mozilla.org/907954
+>
+> This series fixes the twl warnings
+> Nishanth Menon (2):
+>   OMAP2+: TWL: make conversion routines static
+>   OMAP2+: TWL: include pm header for init protos
+>
+>  arch/arm/mach-omap2/omap_twl.c |   10 ++++++----
+>  1 files changed, 6 insertions(+), 4 deletions(-)
 
-Agreed.
+Acked-by: Kevin Hilman <khilman@ti.com>
 
-I'll wait for that revised version before working on this further.
+Tony, these should probably queue for .38 if it's not too late.
 
-
-Nicolas
+Kevin
