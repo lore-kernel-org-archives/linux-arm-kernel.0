@@ -1,59 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Jan 2011 11:12:36 -0800
-Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
-In-Reply-To: <20110103204952.GB2240@legolas.emea.dhcp.ti.com>
-References: <201005152214.53993.sshtylyov@ru.mvista.com>
-	<4D21F3F2.6090302@mvista.com>
-	<20110103163447.GB2911@n2100.arm.linux.org.uk>
-	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
-	<4D220246.5020303@mvista.com>
-	<20110103171945.GA3839@n2100.arm.linux.org.uk>
-	<20110103204952.GB2240@legolas.emea.dhcp.ti.com>
-Message-ID: <20110104191236.GG7771@atomide.com>
+Date: Tue, 4 Jan 2011 11:17:33 -0800
+Subject: [PATCH] omap: boards w/ wl12xx should select
+	REGULATOR_FIXED_VOLTAGE
+In-Reply-To: <AANLkTinc1xopSYvaJmN_hHaQq1TP=i_HNy5vX_LhdQOh@mail.gmail.com>
+References: <1290593090-6288-1-git-send-email-ohad@wizery.com>
+	<AANLkTinc1xopSYvaJmN_hHaQq1TP=i_HNy5vX_LhdQOh@mail.gmail.com>
+Message-ID: <20110104191732.GI7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [110103 12:49]:
-> Hi,
+* Ohad Ben-Cohen <ohad@wizery.com> [110104 10:04]:
+> On Wed, Nov 24, 2010 at 12:04 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > Power to the wl12xx wlan device is controlled by a fixed regulator.
+> >
+> > Boards that have the wl12xx should select REGULATOR_FIXED_VOLTAGE so
+> > users will not be baffled.
+> >
+> > Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> > ---
 > 
-> On Mon, Jan 03, 2011 at 05:19:45PM +0000, Russell King - ARM Linux wrote:
-> >>   Frankly speaking, I doubt that drivers/dma/ will have place for the
-> >>purely MUSB specific DMA engines such as the named ones (there's no TUSB
-> >>DMA BTW -- it uses OMAP DMA).
-> >
-> >Long term, we need to kill off all these platform private DMA interfaces.
-> >There's a growing amount of IP that's being shared not only between ARM
-> >silicon vendors, but also across architectures, and having to re-implement
-> >drivers because the underlying DMA engine is different is not feasible.
-> >
-> >For example, we're seeing ARMs primecells being used with various
-> >different DMA controllers in various different ARM SoCs.  I've heard
-> >rumours of them appearing in MIPS or PPC stuff as well.  We're seeing
-> >PXA peripheral IP appearing in x86 stuff too.
-> >
-> >We can't have drivers tied to their SoC DMA engines, and we can't continue
-> >having SoC DMA engines implementing their own unique APIs.  We do need to
-> >get on top of this before it becomes a major problem (if it hasn't
-> >already).
-> >
-> >The DMA engine API is still evolving, and should not be taken as concrete
-> >- I've recently been bringing up a number of points with Dan on various
-> >aspects of the API, some of which ultimately will lead to changes to the
-> >async-tx API, and others which hopefully will mean that the DMA slave
-> >API is better documented.
+> Hi Tony,
 > 
-> I couldn't agree more with you Russell. If the API isn't enough
-> currently, we can always propose an extension.
-> 
-> Having all sorts of SoC-specific "APIs" has already caused enough
-> problems and it still does (non-generic IRQ handling on
-> twl?030, menelaus, cbus - which isn't in mainline yet -, etc,
-> non-generic McBSP usage, non-generic GPMC usage, etc etc). So, if we can
-> plan for making use of generic APIs, let's do so.
+> Gentle reminder,
 
-Yes I too agree with this. We just need to do whatever it takes to
-make the DMA engine suitable for all drivers.
-
-Regards,
+This is queued for 2.6.38 in omap-for-linus as commit
+7c50152f0851e44ef7491546a29fddbbea47735b?
 
 Tony
