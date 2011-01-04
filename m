@@ -1,25 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Jan 2011 11:42:07 +0000
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 4 Jan 2011 13:52:08 +0200
 Subject: [PATCH 2/2] arm: omap: select HAVE_SPARSE_IRQ
-In-Reply-To: <20110104103432.GM2656@legolas.emea.dhcp.ti.com>
+In-Reply-To: <20110104114207.GA19293@n2100.arm.linux.org.uk>
 References: <1294133966-20279-1-git-send-email-balbi@ti.com>
 	<1294133966-20279-3-git-send-email-balbi@ti.com>
 	<20110104095410.GA17298@n2100.arm.linux.org.uk>
 	<20110104103432.GM2656@legolas.emea.dhcp.ti.com>
-Message-ID: <20110104114207.GA19293@n2100.arm.linux.org.uk>
+	<20110104114207.GA19293@n2100.arm.linux.org.uk>
+Message-ID: <20110104115208.GB24553@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04, 2011 at 12:34:32PM +0200, Felipe Balbi wrote:
-> do you mean:
+Hi,
 
-Yes, but without the breakage caused by your mailer - posting patches
-with flowed formatting is a recipe for this kind of disaster:
+On Tue, Jan 04, 2011 at 11:42:07AM +0000, Russell King - ARM Linux wrote:
+>On Tue, Jan 04, 2011 at 12:34:32PM +0200, Felipe Balbi wrote:
+>> do you mean:
+>
+>Yes, but without the breakage caused by your mailer - posting patches
 
-Content-Type: text/plain; charset=us-ascii; format=flowed
+good, I'll re-send the series in a bit.
 
-You appear to be using mutt, so set:
+>with flowed formatting is a recipe for this kind of disaster:
+>
+>Content-Type: text/plain; charset=us-ascii; format=flowed
+>
+>You appear to be using mutt, so set:
+>
+>set text_flowed=no
+>
+>in your .muttrc to avoid this corruption.
 
-set text_flowed=no
+sorry about that, fixed.
 
-in your .muttrc to avoid this corruption.
+-- 
+balbi
