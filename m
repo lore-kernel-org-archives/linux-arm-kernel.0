@@ -1,103 +1,65 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 4 Jan 2011 23:01:39 +0530
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <20110104171928.GB24935@n2100.arm.linux.org.uk>
-References: <cover.1292443200.git.m.nazarewicz@samsung.com><AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com><20101223100642.GD3636@n2100.arm.linux.org.uk><C832F8F5D375BD43BFA11E82E0FE9FE00829C13EB2@EXDCVYMBSTM005.EQ1STM.local>
-	<20110104171928.GB24935@n2100.arm.linux.org.uk>
-Message-ID: <02a71d80302932190e8edfddf82b7895@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Jan 2011 17:33:01 +0000
+Subject: [PATCH 2/4] arm: Kconfig: remove duplicated GENERIC_HARDIRQS entry
+In-Reply-To: <20110104140031.GE25121@pengutronix.de>
+References: <1294142577-28772-1-git-send-email-balbi@ti.com>
+	<1294142577-28772-3-git-send-email-balbi@ti.com>
+	<20110104140031.GE25121@pengutronix.de>
+Message-ID: <20110104173301.GA25976@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King -
-> ARM Linux
-> Sent: Tuesday, January 04, 2011 10:49 PM
-> To: Johan MOSSBERG
-> Cc: Daniel Walker; Kyungmin Park; Mel Gorman; KAMEZAWA Hiroyuki;
-> Michal Nazarewicz; linux-kernel at vger.kernel.org; Michal Nazarewicz;
-> linux-mm at kvack.org; Ankita Garg; Andrew Morton; Marek Szyprowski;
-> linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
-> Subject: Re: [PATCHv8 00/12] Contiguous Memory Allocator
->
-> On Tue, Jan 04, 2011 at 05:23:37PM +0100, Johan MOSSBERG wrote:
-> > Russell King wrote:
-> > > Has anyone addressed my issue with it that this is wide-open for
-> > > abuse by allocating large chunks of memory, and then remapping
-> > > them in some way with different attributes, thereby violating
-> the
-> > > ARM architecture specification?
-> >
-> > I seem to have missed the previous discussion about this issue.
-> > Where in the specification (preferably ARMv7) can I find
-> > information about this?
->
-> Here's the extracts from the architecture reference manual:
->
-> * If the same memory locations are marked as having different
->   cacheability attributes, for example by the use of aliases in a
->   virtual to physical address mapping, behavior is UNPREDICTABLE.
->
-> A3.5.7 Memory access restrictions
->
-> Behavior is UNPREDICTABLE if the same memory location:
-> * is marked as Shareable Normal and Non-shareable Normal
-> * is marked as having different memory types (Normal, Device, or
->   Strongly-ordered)
-> * is marked as having different cacheability attributes
-> * is marked as being Shareable Device and Non-shareable Device
-> memory.
->
-> Such memory marking contradictions can occur, for example, by the
-> use of
-> aliases in a virtual to physical address mapping.
->
-> Glossary:
-> UNPREDICTABLE
-> Means the behavior cannot be relied upon. UNPREDICTABLE behavior
-> must not
-> represent security holes.  UNPREDICTABLE behavior must not halt or
-> hang
-> the processor, or any parts of the system. UNPREDICTABLE behavior
-> must not
-> be documented or promoted as having a defined effect.
->
-> > Is the problem that it is simply
-> > forbidden to map an address multiple times with different cache
-> > setting and if this is done the hardware might start failing? Or
-> > is the problem that having an address mapped cached means that
-> > speculative pre-fetch can read it into the cache at any time,
-> > possibly causing problems if an un-cached mapping exists? In my
-> > opinion option number two can be handled and I've made an attempt
-> > at doing that in hwmem (posted on linux-mm a while ago), look in
-> > cache_handler.c. Hwmem currently does not use cma but the next
-> > version probably will.
->
-> Given the extract from the architecture reference manual, do you
-> want
-> to run a system where you can't predict what the behaviour will be
-> if
-> you have two mappings present, one which is cacheable and one which
-> is
-> non-cacheable, and you're relying on the non-cacheable mapping to
-> never
-> return data from the cache?
->
-> What if during your testing, it appears to work correctly, but out
-> in
-> the field, someone's loaded a different application to your setup
-> resulting in different memory access patterns, causing cache lines
-> to
-> appear in the non-cacheable mapping, and then the CPU hits them on
-> subsequent accesses corrupting data...
->
-> You can't say that will never happen if you're relying on this
-> unpredictable behaviour.
->
-Just to add to Russell's point, we did land up in un-traceable
-CPU deadlocks while running the kernel which was violating some of
-the rules set by ARM ARM.
-The usecase use to work ~98% of the time.
+On Tue, Jan 04, 2011 at 03:00:31PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Jan 04, 2011 at 02:02:55PM +0200, Felipe Balbi wrote:
+> > GENERIC_HARDIRQS is defined under kernel/irq/Kconfig,
+> > so it's safe to drop the duplicated entry and simply
+> > select HAVE_GENERIC_HARDIRQS.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/Kconfig |    8 +-------
+> >  1 files changed, 1 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index d56d21c0..e6f0f8b 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -15,6 +15,7 @@ config ARM
+> >  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+> >  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+> >  	select HAVE_GENERIC_DMA_COHERENT
+> > +	select HAVE_GENERIC_HARDIRQS
+> >  	select HAVE_KERNEL_GZIP
+> >  	select HAVE_KERNEL_LZO
+> >  	select HAVE_KERNEL_LZMA
+> > @@ -88,10 +89,6 @@ config MCA
+> >  	  <file:Documentation/mca.txt> (and especially the web page given
+> >  	  there) before attempting to build an MCA bus kernel.
+> >  
+> > -config GENERIC_HARDIRQS
+> > -	bool
+> > -	default y
+> > -
+> >  config STACKTRACE_SUPPORT
+> >  	bool
+> >  	default y
+> > @@ -171,9 +168,6 @@ config FIQ
+> >  config ARCH_MTD_XIP
+> >  	bool
+> >  
+> > -config GENERIC_HARDIRQS_NO__DO_IRQ
+> > -	def_bool y
+> > -
+> You didn't mention this change in the commit log.  Is this duplicated,
+> too or did it just slip through?
 
-Regards,
-Santosh
+If you look at kernel/irq/Kconfig (as I did with the original patch)
+you'd notice kernel/irq/Kconfig defines both of these symbols being
+removed when HAVE_GENERIC_HARDIRQS is enabled.
+
+If you read the discussion in the previous version of this patch set,
+you'd notice that the removal of this was specifically requested.
+
+It's very tiresome to have to re-explain these things.  Please take
+some more time to research the points you bring up, rather than
+impulse-replying.
