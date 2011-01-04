@@ -1,112 +1,18 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 4 Jan 2011 11:59:16 +0200
-Subject: [PATCH v2 05/10] net/fec: add dual fec support for mx28
-In-Reply-To: <1294133056-21195-6-git-send-email-shawn.guo@freescale.com>
-References: <1294133056-21195-1-git-send-email-shawn.guo@freescale.com>
-	<1294133056-21195-6-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110104095916.GE2987@jasper.tkos.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Jan 2011 10:06:18 +0000
+Subject: [PATCH 3/4] ARM: module support for CONFIG_ARM_PATCH_PHYS_VIRT
+In-Reply-To: <1294129208-15201-4-git-send-email-nico@fluxnic.net>
+References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
+	<1294129208-15201-4-git-send-email-nico@fluxnic.net>
+Message-ID: <20110104100618.GA16671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Tue, Jan 04, 2011 at 05:24:11PM +0800, Shawn Guo wrote:
-> This patch is to add mx28 dual fec support. Here are some key notes
-> for mx28 fec controller.
+On Tue, Jan 04, 2011 at 03:20:07AM -0500, Nicolas Pitre wrote:
+> Thanks to Russell King for his contribution to this patch.
 > 
->  - mx28 fec design made an assumption that it runs on a
->    big-endian system, which is incorrect. As the result, the
->    driver has to swap every frame going to and coming from
->    the controller.
->  - external phys can only be configured by fec0, which means
->    fec1 can not work independently and both phys need to be
->    configured by mii_bus attached on fec0.
->  - mx28 fec reset will get mac address registers reset too.
->  - MII/RMII mode and 10M/100M speed are configured differently
->    from i.mx/mxs fec controller.
->  - ETHER_EN bit must be set to get interrupt work.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Changes for v2:
->  - Use module parameter fec.macaddr over new kernel command line
->    fec_mac to pass mac address
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Since you introduce this new kernel command line parameter in patch #3 of this 
-series, why not just make it right in the first place? This should make both 
-patches smaller and easier for review.
-
->  - Update comment in fec_get_mac() to stop using confusing word
->    "default"
->  - Fix copyright breakage in fec.h
-
-Ditto.
-
->  drivers/net/Kconfig |    7 ++-
->  drivers/net/fec.c   |  139 ++++++++++++++++++++++++++++++++++++++++----------
->  drivers/net/fec.h   |    5 +-
->  include/linux/fec.h |    3 +-
->  4 files changed, 120 insertions(+), 34 deletions(-)
-
-[snip]
-
-> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-> index f147508..b2b3e37 100644
-> --- a/drivers/net/fec.c
-> +++ b/drivers/net/fec.c
-> @@ -17,6 +17,8 @@
->   *
->   * Bug fixes and cleanup by Philippe De Muyter (phdm at macqel.be)
->   * Copyright (c) 2004-2006 Macq Electronique SA.
-> + *
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc.
->   */
->  
->  #include <linux/module.h>
-> @@ -45,21 +47,34 @@
->  
->  #include <asm/cacheflush.h>
->  
-> -#ifndef CONFIG_ARCH_MXC
-> +#if !defined(CONFIG_ARCH_MXC) && !defined(CONFIG_SOC_IMX28)
->  #include <asm/coldfire.h>
->  #include <asm/mcfsim.h>
->  #endif
->  
->  #include "fec.h"
->  
-> -#ifdef CONFIG_ARCH_MXC
-> -#include <mach/hardware.h>
-
-Since you now remove mach/hardware.h for ARCH_MXC, does this build for all 
-i.MX variants?
-
-> +#ifdef CONFIG_SOC_IMX28
-> +/*
-> + * mx28 does not have MIIGSK registers
-> + */
-> +#undef FEC_MIIGSK_ENR
-> +#include <mach/mxs.h>
-> +#else
-> +#define cpu_is_mx28()	(0)
-> +#endif
-
-This breaks kernels for multiple archs (e.g. i.MX28 and i.MX25). Please use 
-run-time detection of CPU type, and do the MII/RMII etc. configuration 
-accordingly.
-
-> +
-> +#if defined(CONFIG_ARCH_MXC) || defined(CONFIG_SOC_IMX28)
->  #define FEC_ALIGNMENT	0xf
->  #else
->  #define FEC_ALIGNMENT	0x3
->  #endif
-
-[snip]
-
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+This should all be part of the patch introducing the patching - without
+it you will end up with a kernel which has the dynamic P:V translation
+support but the modules will be buggered.
