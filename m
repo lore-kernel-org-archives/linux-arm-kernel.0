@@ -1,68 +1,57 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 03 Jan 2011 15:53:13 -0800
-Subject: [PATCH v5] davinci: Add additional JTAG code for AM-1808 and
-	OMAP-L138 Rev 2.0 SoCs From: Sudhakar Rajashekhara
-	<sudhakar.raj@ti.com>
-In-Reply-To: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
-	(Michael Williamson's message of "Mon, 3 Jan 2011 08:03:27 -0500")
-References: <1294059807-2723-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <87y671a6ja.fsf@deeprootsystems.com>
+From: Trond.Myklebust@netapp.com (Trond Myklebust)
+Date: Mon, 03 Jan 2011 19:22:38 -0500
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <20110103213850.GC25121@pengutronix.de>
+References: <20101230171453.GA5787@pengutronix.de>
+	<1293731992.4919.5.camel@heimdal.trondhjem.org>
+	<20101230191846.GB14221@pengutronix.de>
+	<20110103213850.GC25121@pengutronix.de>
+Message-ID: <1294100558.25100.8.camel@heimdal.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Williamson <michael.williamson@criticallink.com> writes:
+On Mon, 2011-01-03 at 22:38 +0100, Uwe Kleine-K?nig wrote: 
+> On Thu, Dec 30, 2010 at 08:18:46PM +0100, Uwe Kleine-K?nig wrote:
+> > On Thu, Dec 30, 2010 at 12:59:52PM -0500, Trond Myklebust wrote:
+> > > What filesystem are you exporting on the server? What is the NFS
+> > > version? Is this nfsroot, autofs or an ordinary nfs mount?
+> > This is an nfsroot of /home/ukl/nfsroot/tx28 which is a symlink to a
+> > directory on a different partition.  I don't know the filesystem of my
+> > homedir as it resides on a server I have no access to, but I asked the
+> > admin, so I can follow up with this info later (I'd suspect ext3, too).
+> Yes, it is ext3.
+> 
+> > The real root directory is on ext3 (rw,noatime).
+> > 
+> > The serving nfs-server is Debian's nfs-kernel-server 1:1.2.2-1.
+> If that matters, kernel is linux-image-2.6.32-5-amd64 (2.6.32-29)
+> provided by Debian.
+> 
+> >                                                                I don't
+> > know if testing that further would help or just waste of my time, so
+> > please let me know if I can help you and how.
+> This still applies
 
-> The JTAG variant code for Rev-2.0 silicon of the OMAP-L138 has changed.
-> In addition, the variant code for the AM-1808 SoC appears to match
-> the Rev-2.0 code for the OMAP-L138.  Add an additional entry to support
-> these chips.
->
-> This patch is originally from a patch on the arago project, here:
-> http://arago-project.org/git/projects/?p=linux-omapl1.git;a=commit;h=6157618435e313a444cdf059702bd34036a6e2b7
->
-> Further information related to the need for this patch can be located at
-> http://e2e.ti.com/support/embedded/f/354/p/67290/248486.aspx
-> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2010-November/021224.html
->
-> This patch was tested using an AM-1808 SoC on a MityARM-1808 SoM card.  It
-> was also tested using a Rev 1.0 silicon OMAP-L138 on a MityDSP-L138F card.
->
-> Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
-> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
-> Reported-by: Nicolas Luna <luna.id@gmail.com>
+I'm having trouble reproducing this with my own nfsroot setup (which is
+just a 'fedora 13 live' disk with NetworkManager turned firmly off).
 
-Thanks, queueing this for 2.6.39.
+However looking back at your report, you said that when you remove the
+symlink, you get an error message of the form:
 
-Also added a reviewed-by tag for Sekhar.
+"starting splashutils daemon.../etc/rc.d/S00splashutils: line
+50: //sbin/fbsplashd.static: Unknown error 521"
 
-Kevin
+Error 521 is EBADHANDLE, which basically means your client got a
+corrupted filehandle. The 'fileid changed' thing also indicates some
+form of corruption.
 
-> ---
-> Built against linux-davinci tree.
->
-> Changes since v4.
->
->  - removed am18x code from 0 variant per Sekhar's request.
->
->  arch/arm/mach-davinci/da850.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 78b5ae2..1550ac3 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -764,6 +764,13 @@ static struct davinci_id da850_ids[] = {
->  		.cpu_id		= DAVINCI_CPU_ID_DA850,
->  		.name		= "da850/omap-l138",
->  	},
-> +	{
-> +		.variant	= 0x1,
-> +		.part_no	= 0xb7d1,
-> +		.manufacturer	= 0x017,	/* 0x02f >> 1 */
-> +		.cpu_id		= DAVINCI_CPU_ID_DA850,
-> +		.name		= "da850/omap-l138/am18x",
-> +	},
->  };
->  
->  static struct davinci_timer_instance da850_timer_instance[4] = {
+The question is whether this is something happening on the server or the
+client. Does an older client kernel boot without any trouble?
+
+-- 
+Trond Myklebust
+Linux NFS client maintainer
+
+NetApp
+Trond.Myklebust at netapp.com
+www.netapp.com
