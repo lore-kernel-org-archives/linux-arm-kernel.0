@@ -1,48 +1,55 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 4 Jan 2011 14:58:18 +0100
-Subject: [PATCH v2 06/10] ARM: mx28: update clocks for dual fec support
-In-Reply-To: <1294133056-21195-7-git-send-email-shawn.guo@freescale.com>
-References: <1294133056-21195-1-git-send-email-shawn.guo@freescale.com>
-	<1294133056-21195-7-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110104135818.GD25121@pengutronix.de>
+Date: Tue, 4 Jan 2011 15:00:31 +0100
+Subject: [PATCH 2/4] arm: Kconfig: remove duplicated GENERIC_HARDIRQS entry
+In-Reply-To: <1294142577-28772-3-git-send-email-balbi@ti.com>
+References: <1294142577-28772-1-git-send-email-balbi@ti.com>
+	<1294142577-28772-3-git-send-email-balbi@ti.com>
+Message-ID: <20110104140031.GE25121@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
-
-On Tue, Jan 04, 2011 at 05:24:12PM +0800, Shawn Guo wrote:
-> Register clocks fec.0 and fec.1 for dual fec support.
+On Tue, Jan 04, 2011 at 02:02:55PM +0200, Felipe Balbi wrote:
+> GENERIC_HARDIRQS is defined under kernel/irq/Kconfig,
+> so it's safe to drop the duplicated entry and simply
+> select HAVE_GENERIC_HARDIRQS.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 > ---
-> Changes for v2:
->  - Rebase the patch against patch below which gets fundamental
->    clocks explicitly called in clk_enable.
->    [PATCH v4] ARM: mxs: Change duart device to use amba-pl011
->  - Register clocks fec.0 and fec.1 respectively than use wildcard
->    NULL for both instances.
+>  arch/arm/Kconfig |    8 +-------
+>  1 files changed, 1 insertions(+), 7 deletions(-)
 > 
->  arch/arm/mach-mxs/clock-mx28.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index f20b254..f79587b 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -607,6 +607,7 @@ static struct clk_lookup lookups[] = {
->  	/* for amba-pl011 driver */
->  	_REGISTER_CLOCK("duart", NULL, uart_clk)
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> +	_REGISTER_CLOCK("fec.1", NULL, fec_clk)
-Did you verify this works as intended?  I didn't and consider it
-possible that after
-
-	clk_enable("fec.0");
-	clk_enable("fec.1");
-	clk_disable("fec.1");
-
-the clk is off.  Probably it just works, just want to prevent hard to
-find bugs ...
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index d56d21c0..e6f0f8b 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -15,6 +15,7 @@ config ARM
+>  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+>  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+>  	select HAVE_GENERIC_DMA_COHERENT
+> +	select HAVE_GENERIC_HARDIRQS
+>  	select HAVE_KERNEL_GZIP
+>  	select HAVE_KERNEL_LZO
+>  	select HAVE_KERNEL_LZMA
+> @@ -88,10 +89,6 @@ config MCA
+>  	  <file:Documentation/mca.txt> (and especially the web page given
+>  	  there) before attempting to build an MCA bus kernel.
+>  
+> -config GENERIC_HARDIRQS
+> -	bool
+> -	default y
+> -
+>  config STACKTRACE_SUPPORT
+>  	bool
+>  	default y
+> @@ -171,9 +168,6 @@ config FIQ
+>  config ARCH_MTD_XIP
+>  	bool
+>  
+> -config GENERIC_HARDIRQS_NO__DO_IRQ
+> -	def_bool y
+> -
+You didn't mention this change in the commit log.  Is this duplicated,
+too or did it just slip through?
 
 Uwe
 
