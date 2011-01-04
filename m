@@ -1,32 +1,159 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Jan 2011 12:30:49 +0000
-Subject: [PATCH 2/4] ARM: make PHYS_OFFSET actually variable
-In-Reply-To: <1294129208-15201-3-git-send-email-nico@fluxnic.net>
-References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
-	<1294129208-15201-3-git-send-email-nico@fluxnic.net>
-Message-ID: <20110104123049.GC16671@n2100.arm.linux.org.uk>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Tue,  4 Jan 2011 07:50:23 -0500
+Subject: [PATCH v5] davinci: Support various speedgrades for MityDSP-L138 and
+	MityARM-1808 SoMs
+Message-ID: <1294145423-18245-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04, 2011 at 03:20:06AM -0500, Nicolas Pitre wrote:
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 336f14e..7502bc1 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -703,8 +703,10 @@ static struct init_tags {
->  } init_tags __initdata = {
->  	{ tag_size(tag_core), ATAG_CORE },
->  	{ 1, PAGE_SIZE, 0xff },
-> +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
->  	{ tag_size(tag_mem32), ATAG_MEM },
->  	{ MEM_SIZE, PHYS_OFFSET },
-> +#endif
+For the MityDSP-L138/MityARM-1808 SoMs, the speed grade can be determined
+from the part number string read from the factory configuration block on
+the on-board I2C PROM.  Configure the maximum CPU speed based on this
+information.
 
-Removing the definition is not really on - it's there as a fallback and
-removing fallbacks is not a good idea unless you can prove beyond doubt
-that it'll never be used.
+This patch was tested using a MityDSP-L138 and MityARM-1808 at various
+speedgrades.  Also, for code coverage, a bogus configuration was tested
+as well as a configuration having an unknown part number.
 
-As that depends on the boot loader, it's something that can never be
-proven.  So, arrange for it to be initialized at runtime, just like I
-will be doing in my revised version I'm working on which I detailed in
-a previous email.
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+---
+Changes since v4. 
+
+- Fixup indenting on if block per comments.
+
+ arch/arm/mach-davinci/board-mityomapl138.c |   83 +++++++++++++++++++++++++---
+ 1 files changed, 75 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 0bb5f0c..0ea5932 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -44,38 +44,109 @@ struct factory_config {
+ 
+ static struct factory_config factory_config;
+ 
++struct part_no_info {
++	const char	*part_no;	/* part number string of interest */
++	int		max_freq;	/* khz */
++};
++
++static struct part_no_info mityomapl138_pn_info[] = {
++	{
++		.part_no	= "L138-C",
++		.max_freq	= 300000,
++	},
++	{
++		.part_no	= "L138-D",
++		.max_freq	= 375000,
++	},
++	{
++		.part_no	= "L138-F",
++		.max_freq	= 456000,
++	},
++	{
++		.part_no	= "1808-C",
++		.max_freq	= 300000,
++	},
++	{
++		.part_no	= "1808-D",
++		.max_freq	= 375000,
++	},
++	{
++		.part_no	= "1808-F",
++		.max_freq	= 456000,
++	},
++	{
++		.part_no	= "1810-D",
++		.max_freq	= 375000,
++	},
++};
++
++#ifdef CONFIG_CPU_FREQ
++static void mityomapl138_cpufreq_init(const char *partnum)
++{
++	int i, ret;
++
++	for (i = 0; partnum && i < ARRAY_SIZE(mityomapl138_pn_info); i++) {
++		/*
++		 * the part number has additional characters beyond what is
++		 * stored in the table.  This information is not needed for
++		 * determining the speed grade, and would require several
++		 * more table entries.  Only check the first N characters
++		 * for a match.
++		 */
++		if (!strncmp(partnum, mityomapl138_pn_info[i].part_no,
++			     strlen(mityomapl138_pn_info[i].part_no))) {
++			da850_max_speed = mityomapl138_pn_info[i].max_freq;
++			break;
++		}
++	}
++
++	ret = da850_register_cpufreq("pll0_sysclk3");
++	if (ret)
++		pr_warning("cpufreq registration failed: %d\n", ret);
++}
++#else
++static void mityomapl138_cpufreq_init(const char *partnum) { }
++#endif
++
+ static void read_factory_config(struct memory_accessor *a, void *context)
+ {
+ 	int ret;
++	const char *partnum = NULL;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+ 
+ 	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
+ 	if (ret != sizeof(struct factory_config)) {
+ 		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
+ 				ret);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
+ 		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
+ 				factory_config.magic);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	if (factory_config.version != FACTORY_CONFIG_VERSION) {
+ 		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
+ 				factory_config.version);
+-		return;
++		goto bad_config;
+ 	}
+ 
+ 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
+-	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
+ 	if (is_valid_ether_addr(factory_config.mac))
+ 		memcpy(soc_info->emac_pdata->mac_addr,
+ 			factory_config.mac, ETH_ALEN);
+ 	else
+ 		pr_warning("MityOMAPL138: Invalid MAC found "
+ 				"in factory config block\n");
++
++	partnum = factory_config.partnum;
++	pr_info("MityOMAPL138: Part Number = %s\n", partnum);
++
++bad_config:
++	/* default maximum speed is valid for all platforms */
++	mityomapl138_cpufreq_init(partnum);
+ }
+ 
+ static struct at24_platform_data mityomapl138_fd_chip = {
+@@ -383,10 +454,6 @@ static void __init mityomapl138_init(void)
+ 	if (ret)
+ 		pr_warning("rtc setup failed: %d\n", ret);
+ 
+-	ret = da850_register_cpufreq("pll0_sysclk3");
+-	if (ret)
+-		pr_warning("cpufreq registration failed: %d\n", ret);
+-
+ 	ret = da8xx_register_cpuidle();
+ 	if (ret)
+ 		pr_warning("cpuidle registration failed: %d\n", ret);
+-- 
+1.7.0.4
