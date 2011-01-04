@@ -1,33 +1,81 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 4 Jan 2011 15:37:25 -0800
-Subject: [PATCH] leds/h1940: Use gpiolib for latch access / fix build
-	failure
-In-Reply-To: <201012100016.58130.anarsoul@gmail.com>
-References: <1291932292-16049-1-git-send-email-peterhuewe@gmx.de>
-	<201012100016.58130.anarsoul@gmail.com>
-Message-ID: <20110104153725.2f3fede2.akpm@linux-foundation.org>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Tue, 4 Jan 2011 23:51:59 +0000
+Subject: [PATCH] [ARM] orion5x: accelerate NAND on the TS-78xx
+Message-ID: <20110104235158.GQ12386@chipmunk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Dec 2010 00:16:57 +0200
-Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+The NAND supports 32bit reads and writes so lets stop shunting 8bit
+chunks across the bus.
 
-> On Friday 10 December 2010 00:04:52 Peter Huewe wrote:
-> > This patch fixes a build failure by converting leds-h1940.c to use
-> > gpiolib for latch access introduced by 14477095abc6
-> > (ARM: h1940: Use gpiolib for latch access)
-> > 
-> > Unfortunately this driver was not converted back then.
-> 
-> I sent similar patch (however, my patch does gpio_request/gpio_free) ~month 
-> ago.
-> 
-> Here's link:
-> http://www.spinics.net/lists/arm-kernel/msg103429.html
-> 
+Doing a dumb 'dd' benchmark, this increases performance roughly like so:
+ * read: 1.3MB/s to 3.4MB/s
+ * write: 614kB/s to 882kB/s
 
-So which patch to use?
+Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+---
+ arch/arm/mach-orion5x/ts78xx-setup.c |   42 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 42 insertions(+), 0 deletions(-)
 
-I queued Peter's patch because it's simpler.  I queued it for
-2.6.38-rc1, taged for backporting into 2.6.37.x, so we have a bit of
-time to think about it.
+diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+index 9a5d1ef..bcc21fe 100644
+--- a/arch/arm/mach-orion5x/ts78xx-setup.c
++++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+@@ -191,6 +191,46 @@ static int ts78xx_ts_nand_dev_ready(struct mtd_info *mtd)
+ 	return readb(TS_NAND_CTRL) & 0x20;
+ }
+ 
++static void ts78xx_ts_nand_write_buf(struct mtd_info *mtd,
++			const uint8_t *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	void __iomem *io_base = chip->IO_ADDR_W;
++	uint32_t *buf32;
++	int i = 0;
++
++	while (len && (unsigned int)buf & 3) {
++		writeb(*buf++, io_base);
++		len--;
++	}
++	buf32 = (uint32_t *)buf;
++	while (i < len/4)
++		writel(buf32[i++], io_base);
++	i *= 4;
++	while (i < len)
++		writeb(buf[i++], io_base);
++}
++
++static void ts78xx_ts_nand_read_buf(struct mtd_info *mtd,
++			uint8_t *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	void __iomem *io_base = chip->IO_ADDR_R;
++	uint32_t *buf32;
++	int i = 0;
++
++	while (len && (unsigned int)buf & 3) {
++		*buf++ = readb(io_base);
++		len--;
++	}
++	buf32 = (uint32_t *)buf;
++	while (i < len/4)
++		buf32[i++] = readl(io_base);
++	i *= 4;
++	while (i < len)
++		buf[i++] = readb(io_base);
++}
++
+ const char *ts_nand_part_probes[] = { "cmdlinepart", NULL };
+ 
+ static struct mtd_partition ts78xx_ts_nand_parts[] = {
+@@ -233,6 +273,8 @@ static struct platform_nand_data ts78xx_ts_nand_data = {
+ 		 */
+ 		.cmd_ctrl		= ts78xx_ts_nand_cmd_ctrl,
+ 		.dev_ready		= ts78xx_ts_nand_dev_ready,
++		.write_buf		= ts78xx_ts_nand_write_buf,
++		.read_buf		= ts78xx_ts_nand_read_buf,
+ 	},
+ };
+ 
+-- 
+1.7.2.3
