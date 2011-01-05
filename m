@@ -1,31 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 00:13:59 +0000
+Date: Wed, 5 Jan 2011 00:15:24 +0000
 Subject: [RFC 5/5] ARM: P2V: extend to 16-bit translation offsets
-In-Reply-To: <8yabp3wfeax.fsf@huya.qualcomm.com>
+In-Reply-To: <alpine.LFD.2.00.1101041628060.22191@xanadu.home>
 References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
 	<E1PaDPu-00023p-QG@rmk-PC.arm.linux.org.uk>
-	<8yabp3wfeax.fsf@huya.qualcomm.com>
-Message-ID: <20110105001359.GH24935@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101041628060.22191@xanadu.home>
+Message-ID: <20110105001524.GI24935@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04, 2011 at 03:18:46PM -0800, David Brown wrote:
-> On Tue, Jan 04 2011, Russell King - ARM Linux wrote:
+On Tue, Jan 04, 2011 at 04:41:34PM -0500, Nicolas Pitre wrote:
+> I'd suggest making the type argument into a mask instead, something 
+> like:
 > 
-> > MSM's memory is aligned to 2MB, which is more than we can do with our
-> > existing method as we're limited to the upper 8 bits.  Extend this by
-> > using two instructions to 16 bits, automatically selected when MSM is
-> > enabled.
+> 	__pv_stub(x, t, "add", 0xff000000);
+> #ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
+> 	__pv_stub(t, t, "add", 0x00ff0000);
+> #endif
 > 
-> I should also add that this series adds a warning to my build when
-> CONFIG_ARM_PATCH_PHYS_VIRT is not defined:
+> Reasons for this are multiple:
 > 
->   arch/arm/kernel/module.c:279: error: 'find_mod_section' defined but not used
+>  - This would simplifies the patching code as the rotation bitfield in 
+>    the instruction would already be set appropriately for the desired 
+>    value by the assembler.  Would only suffice to test one bit in that 
+>    field to determine the required constant to patch in.
+> 
+>  - For the Thumb2 build, we want the assembler to select the appropriate 
+>    encoding flavor for the add instruction from all the possibilities.  
+>    Giving it a constant with all bits set nicely solves this issue.
+> 
+> If further distinctions are needed in the future then we can use the 6 
+> middle bits to encode alternatives.
 
-Hmm, probably best to mark this with __maybe_unused.
-
-Also note that I messed up the 16-23 bit shift value in this patch - it
-needs:
-
--	orr	r0, r0, #0x400  @ mask in rotate right 8 bits
-+	orr	r0, r0, #0x800  @ mask in rotate right 16 bits
+Lets go with 0x81000000 and 0x0081000000 for the first then.  We can
+count up with the 6-bit value from there.
