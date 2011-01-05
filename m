@@ -1,326 +1,73 @@
-From: carmelo.amoroso@st.com (Carmelo AMOROSO)
-Date: Wed, 5 Jan 2011 12:59:18 +0100
-Subject: [PATCH 1/2] stackprotector: add stack smashing protector
-	generic implementation
-In-Reply-To: <1293111851-7175-1-git-send-email-filippo.arcidiacono@st.com>
-References: <1293111851-7175-1-git-send-email-filippo.arcidiacono@st.com>
-Message-ID: <4D245D16.5010702@st.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 05 Jan 2011 13:14:16 +0100
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <20110105112701.GA8638@n2100.arm.linux.org.uk>
+References: <20101230171453.GA5787@pengutronix.de>
+	<1293731992.4919.5.camel@heimdal.trondhjem.org>
+	<20101230191846.GB14221@pengutronix.de>
+	<20110103213850.GC25121@pengutronix.de>
+	<1294100558.25100.8.camel@heimdal.trondhjem.org>
+	<20110105084014.GN25121@pengutronix.de>
+	<20110105110517.GQ25121@pengutronix.de>
+	<20110105112701.GA8638@n2100.arm.linux.org.uk>
+Message-ID: <4D246098.50908@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-On 12/23/2010 2:44 PM, Filippo ARCIDIACONO wrote:
-> The current implementation of SSP used for ARM architecture is based
-> on the global variable __stack_chk_guard
-> (see commit c743f38013aeff58ef6252601e397b5ba281c633 by Nicolas Pitre).
-> This implementation should be generic enough to be used for all
-> architectures that rely upon that global variable (i.e. SH), so the
-> ARM code can be widely used for all those architectures.
-> The kbuild uses a script to check if the architecture does actually
-> need to define the __stack_chk_guard, so it will use the generic SSP
-> code, otherwise it will fall back to the architecture specific one
-> (i.e. x86, x86_64).
+On 01/05/2011 12:27 PM, Russell King - ARM Linux wrote:
+> On Wed, Jan 05, 2011 at 12:05:17PM +0100, Uwe Kleine-K?nig wrote:
+>> Hello Trond,
+>>
+>> On Wed, Jan 05, 2011 at 09:40:14AM +0100, Uwe Kleine-K?nig wrote:
+>>> On Mon, Jan 03, 2011 at 07:22:38PM -0500, Trond Myklebust wrote:
+>>>> The question is whether this is something happening on the server or the
+>>>> client. Does an older client kernel boot without any trouble?
+>>> I will set up a boot test with 2.6.37 (for statistics) and 2.6.36 to
+>>> compare with.  If you don't consider .36 to be old enough let me now.
+>>> Once the setup is done it should be easy to test .35 (say), too.
+>>>
+>> Marc (cc'd) saw similar[1] problems with .37, when using .36.2 the
+>> problems didn't occur.  This was more reliable to trigger and he was so
+>> kind to bisect the problem.
+>>
+>> When testing v2.6.36-rc3-51-gafa8ccc init hanged.
+>> (babddc72a9468884ce1a23db3c3d54b0afa299f0 is the first bad commit with
+>> this hang.)  Commit 56e4ebf877b6043c289bda32a5a7385b80c17dee makes the
+>> "init hangs" problem the "fileid changed on tab" problem.
+>>
+>> I could only reproduce that on armv5 machines (imx27, imx28 and at91)
+>> but not on armv6 (imx35).
 > 
-> Signed-off-by: Filippo Arcidiacono <filippo.arcidiacono@st.com>
-> Signed-off-by: Carmelo Amoroso <carmelo.amoroso@st.com>
-> ---
->  Makefile                                   |   14 ++++++++-
->  arch/Kconfig                               |   16 +++++++++++
->  arch/arm/Kconfig                           |   12 --------
->  arch/arm/Makefile                          |    4 ---
->  arch/arm/include/asm/stackprotector.h      |   38 ---------------------------
->  arch/arm/kernel/process.c                  |    6 ----
->  arch/x86/Kconfig                           |   16 -----------
->  include/asm-generic/stackprotector.h       |   39 ++++++++++++++++++++++++++++
->  include/linux/stackprotector.h             |    6 +++-
->  init/main.c                                |    5 +++
->  scripts/gcc-generic-has-stack-protector.sh |    9 ++++++
->  11 files changed, 86 insertions(+), 79 deletions(-)
->  delete mode 100644 arch/arm/include/asm/stackprotector.h
->  create mode 100644 include/asm-generic/stackprotector.h
->  create mode 100755 scripts/gcc-generic-has-stack-protector.sh
-> 
-> diff --git a/Makefile b/Makefile
-> index 77044b7..7530650 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -550,8 +550,18 @@ KBUILD_CFLAGS += $(call cc-option,-Wframe-larger-than=${CONFIG_FRAME_WARN})
->  endif
->  
->  # Force gcc to behave correct even for buggy distributions
-> -ifndef CONFIG_CC_STACKPROTECTOR
-> -KBUILD_CFLAGS += $(call cc-option, -fno-stack-protector)
-> +ifdef CONFIG_CC_STACKPROTECTOR
-> +stackp-y := $(call cc-option,-fstack-protector)
-> +ifeq ($(stackp-y),)
-> +  $(warning stack protector enabled but no compiler support)
-> +else
-> +cc_has_sp := $(srctree)/scripts/gcc-generic-has-stack-protector.sh
-> +ifeq ($(shell $(CONFIG_SHELL) $(cc_has_sp) $(CC)), y)
-> +  KBUILD_CFLAGS += $(stackp-y) -D__ARCH_WANT_STACK_CHK_GUARD
-> +endif
-> +endif
-> +else
-> +  KBUILD_CFLAGS += $(call cc-option, -fno-stack-protector)
->  endif
->  
->  ifdef CONFIG_FRAME_POINTER
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 8bf0fa6..083245d 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -175,4 +175,20 @@ config HAVE_PERF_EVENTS_NMI
->  config HAVE_ARCH_JUMP_LABEL
->  	bool
->  
-> +config CC_STACKPROTECTOR
-> +	bool "Enable -fstack-protector buffer overflow detection"
-> +	help
-> +	  This option turns on the -fstack-protector GCC feature. This
-> +	  feature puts, at the beginning of functions, a canary value on
-> +	  the stack just before the return address, and validates
-> +	  the value just before actually returning.  Stack based buffer
-> +	  overflows (that need to overwrite this return address) now also
-> +	  overwrite the canary, which gets detected and the attack is then
-> +	  neutralized via a kernel panic.
-> +
-> +	  This feature requires gcc version 4.2 or above, or a distribution
-> +	  gcc with the feature backported. Older versions are automatically
-> +	  detected and for those versions, this configuration option is
-> +	  ignored. (and a warning is printed during bootup)
-> +
->  source "kernel/gcov/Kconfig"
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d56d21c..58c29a5 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1522,18 +1522,6 @@ config SECCOMP
->  	  and the task is only allowed to execute a few safe syscalls
->  	  defined by each seccomp mode.
->  
-> -config CC_STACKPROTECTOR
-> -	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
-> -	help
-> -	  This option turns on the -fstack-protector GCC feature. This
-> -	  feature puts, at the beginning of functions, a canary value on
-> -	  the stack just before the return address, and validates
-> -	  the value just before actually returning.  Stack based buffer
-> -	  overflows (that need to overwrite this return address) now also
-> -	  overwrite the canary, which gets detected and the attack is then
-> -	  neutralized via a kernel panic.
-> -	  This feature requires gcc version 4.2 or above.
-> -
->  config DEPRECATED_PARAM_STRUCT
->  	bool "Provide old way to pass kernel parameters"
->  	help
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index b87aed0..ebbd003 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -37,10 +37,6 @@ ifeq ($(CONFIG_FRAME_POINTER),y)
->  KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
->  endif
->  
-> -ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
-> -KBUILD_CFLAGS	+=-fstack-protector
-> -endif
-> -
->  ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
->  KBUILD_CPPFLAGS	+= -mbig-endian
->  AS		+= -EB
-> diff --git a/arch/arm/include/asm/stackprotector.h b/arch/arm/include/asm/stackprotector.h
-> deleted file mode 100644
-> index de00332..0000000
-> --- a/arch/arm/include/asm/stackprotector.h
-> +++ /dev/null
-> @@ -1,38 +0,0 @@
-> -/*
-> - * GCC stack protector support.
-> - *
-> - * Stack protector works by putting predefined pattern at the start of
-> - * the stack frame and verifying that it hasn't been overwritten when
-> - * returning from the function.  The pattern is called stack canary
-> - * and gcc expects it to be defined by a global variable called
-> - * "__stack_chk_guard" on ARM.  This unfortunately means that on SMP
-> - * we cannot have a different canary value per task.
-> - */
-> -
-> -#ifndef _ASM_STACKPROTECTOR_H
-> -#define _ASM_STACKPROTECTOR_H 1
-> -
-> -#include <linux/random.h>
-> -#include <linux/version.h>
-> -
-> -extern unsigned long __stack_chk_guard;
-> -
-> -/*
-> - * Initialize the stackprotector canary value.
-> - *
-> - * NOTE: this must only be called from functions that never return,
-> - * and it must always be inlined.
-> - */
-> -static __always_inline void boot_init_stack_canary(void)
-> -{
-> -	unsigned long canary;
-> -
-> -	/* Try to get a semi random initial value. */
-> -	get_random_bytes(&canary, sizeof(canary));
-> -	canary ^= LINUX_VERSION_CODE;
-> -
-> -	current->stack_canary = canary;
-> -	__stack_chk_guard = current->stack_canary;
-> -}
-> -
-> -#endif	/* _ASM_STACKPROTECTOR_H */
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index e76fcaa..067b4de 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -39,12 +39,6 @@
->  #include <asm/stacktrace.h>
->  #include <asm/mach/time.h>
->  
-> -#ifdef CONFIG_CC_STACKPROTECTOR
-> -#include <linux/stackprotector.h>
-> -unsigned long __stack_chk_guard __read_mostly;
-> -EXPORT_SYMBOL(__stack_chk_guard);
-> -#endif
-> -
->  static const char *processor_modes[] = {
->    "USER_26", "FIQ_26" , "IRQ_26" , "SVC_26" , "UK4_26" , "UK5_26" , "UK6_26" , "UK7_26" ,
->    "UK8_26" , "UK9_26" , "UK10_26", "UK11_26", "UK12_26", "UK13_26", "UK14_26", "UK15_26",
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index e330da2..b8704dd 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -1455,22 +1455,6 @@ config SECCOMP
->  
->  	  If unsure, say Y. Only embedded should say N here.
->  
-> -config CC_STACKPROTECTOR
-> -	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
-> -	---help---
-> -	  This option turns on the -fstack-protector GCC feature. This
-> -	  feature puts, at the beginning of functions, a canary value on
-> -	  the stack just before the return address, and validates
-> -	  the value just before actually returning.  Stack based buffer
-> -	  overflows (that need to overwrite this return address) now also
-> -	  overwrite the canary, which gets detected and the attack is then
-> -	  neutralized via a kernel panic.
-> -
-> -	  This feature requires gcc version 4.2 or above, or a distribution
-> -	  gcc with the feature backported. Older versions are automatically
-> -	  detected and for those versions, this configuration option is
-> -	  ignored. (and a warning is printed during bootup)
-> -
->  source kernel/Kconfig.hz
->  
->  config KEXEC
-> diff --git a/include/asm-generic/stackprotector.h b/include/asm-generic/stackprotector.h
-> new file mode 100644
-> index 0000000..2cf9c65
-> --- /dev/null
-> +++ b/include/asm-generic/stackprotector.h
-> @@ -0,0 +1,39 @@
-> +/*
-> + * GCC stack protector support.
-> + * (Generic implementation based on __stack_chk_guard)
-> + *
-> + * Stack protector works by putting predefined pattern at the start of
-> + * the stack frame and verifying that it hasn't been overwritten when
-> + * returning from the function.  The pattern is called stack canary
-> + * and gcc expects it to be defined by a global variable called
-> + * "__stack_chk_guard". This unfortunately means that on SMP
-> + * we cannot have a different canary value per task.
-> + */
-> +
-> +#ifndef _LINUX_STACKPROTECTOR_H
-> +#error "Never use <asm-generic/stackprotector.h> directly; \
-> +include <linux/stackprotector.h> instead."
-> +#endif
-> +
-> +#include <linux/random.h>
-> +#include <linux/version.h>
-> +
-> +extern unsigned long __stack_chk_guard;
-> +
-> +/*
-> + * Initialize the stackprotector canary value.
-> + *
-> + * NOTE: this must only be called from functions that never return,
-> + * and it must always be inlined.
-> + */
-> +static __always_inline void boot_init_stack_canary(void)
-> +{
-> +	unsigned long canary;
-> +
-> +	/* Try to get a semi random initial value. */
-> +	get_random_bytes(&canary, sizeof(canary));
-> +	canary ^= LINUX_VERSION_CODE;
-> +
-> +	current->stack_canary = canary;
-> +	__stack_chk_guard = current->stack_canary;
-> +}
-> diff --git a/include/linux/stackprotector.h b/include/linux/stackprotector.h
-> index 6f3e54c..d71a437 100644
-> --- a/include/linux/stackprotector.h
-> +++ b/include/linux/stackprotector.h
-> @@ -6,7 +6,11 @@
->  #include <linux/random.h>
->  
->  #ifdef CONFIG_CC_STACKPROTECTOR
-> -# include <asm/stackprotector.h>
-> +#ifdef __ARCH_WANT_STACK_CHK_GUARD
-> +#include <asm-generic/stackprotector.h>
-> +#else
-> +#include <asm/stackprotector.h>
-> +#endif
->  #else
->  static inline void boot_init_stack_canary(void)
->  {
-> diff --git a/init/main.c b/init/main.c
-> index 8646401..8b2e070 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -78,6 +78,11 @@
->  #include <asm/smp.h>
->  #endif
->  
-> +#if defined CONFIG_CC_STACKPROTECTOR && defined __ARCH_WANT_STACK_CHK_GUARD
-> +unsigned long __stack_chk_guard __read_mostly;
-> +EXPORT_SYMBOL(__stack_chk_guard);
-> +#endif
-> +
->  static int kernel_init(void *);
->  
->  extern void init_IRQ(void);
-> diff --git a/scripts/gcc-generic-has-stack-protector.sh b/scripts/gcc-generic-has-stack-protector.sh
-> new file mode 100755
-> index 0000000..11cc914
-> --- /dev/null
-> +++ b/scripts/gcc-generic-has-stack-protector.sh
-> @@ -0,0 +1,9 @@
-> +#!/bin/sh
-> +
-> +echo "int foo(void) { char X[200]; return 3; }" | $1 -S -xc -c -O0 \
-> +-fstack-protector - -o - 2> /dev/null | grep -q __stack_chk_guard
-> +if [ "$?" -eq "0" ] ; then
-> +	echo y
-> +else
-> +	echo n
-> +fi
+> FYI, I've seen the "fileid changed" problem, and it looked like a 32-bit
+> truncation of the fileid.  It occurred several times on successive
+> reboots, so I tried to capture a tcpdump trace off the server (Linux
+> 2.6.23-rc8-ga64314e6 - its ancient because I've had issues with buggy
+> IDE drivers trying to move it forward.)  However, for the last couple
+> of weeks I've been unable to reproduce it.
 
-Is someone interested into this stuff ?
+We have the problem with nfs-root. From the kernel command line:
 
-Thanks,
-Carmelo
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.10 (MingW32)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+root=/dev/nfs
+nfsroot=192.168.23.2:/home/mkl/pengutronix/xxx/bsp/OSELAS.BSP-xxx-Grabowski-trunk/platform-Ronetix-PM9263/root,v3,tcp
 
-iEYEARECAAYFAk0kXRYACgkQoRq/3BrK1s+ZOwCfdZ80u8gdnA9fJikmL+uxsX5I
-RWkAn2KUqB4F/RSQ6stRj4ajoPgvCRCa
-=ub67
------END PGP SIGNATURE-----
+/home/mkl/pengutronix is a link which points to a link
+/ptx/work/octopus/mkl (which is a ext3-based) which points to
+WORK_1/mkl which is also ext3-based.
+
+The server is 2.6.32 and has been rebooted yesterday :), nfs-utils are
+1.2.2. I make a tcpdump if needed.
+
+Cheers, Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110105/eba9dcec/attachment.sig>
