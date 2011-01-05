@@ -1,7 +1,7 @@
-From: Trond.Myklebust@netapp.com (Trond Myklebust)
-Date: Wed, 05 Jan 2011 10:29:29 -0500
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 15:34:57 +0000
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294240457.3014.13.camel@heimdal.trondhjem.org>
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930248201279@dbde02.ent.ti.com>
 References: <20101230171453.GA5787@pengutronix.de>
 	<1293731992.4919.5.camel@heimdal.trondhjem.org>
 	<20101230191846.GB14221@pengutronix.de>
@@ -10,56 +10,22 @@ References: <20101230171453.GA5787@pengutronix.de>
 	<20110105084014.GN25121@pengutronix.de>
 	<20110105110517.GQ25121@pengutronix.de>
 	<20110105112701.GA8638@n2100.arm.linux.org.uk>
-	<20110105134045.GS25121@pengutronix.de>
-	<1294239193.3014.9.camel@heimdal.trondhjem.org>
-	<4D2487CA.5040501@pengutronix.de>
-	<1294240457.3014.13.camel@heimdal.trondhjem.org>
-Message-ID: <1294241369.3014.15.camel@heimdal.trondhjem.org>
+	<4D246098.50908@pengutronix.de>
+	<B85A65D85D7EB246BE421B3FB0FBB5930248201279@dbde02.ent.ti.com>
+Message-ID: <20110105153457.GB8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-05 at 10:14 -0500, Trond Myklebust wrote: 
-> OK. So,the new behaviour in 2.6.37 is that we're writing to a series of
-> pages via the usual kmap_atomic()/kunmap_atomic() and kmap()/kunmap()
-> interfaces, but we can end up reading them via a virtual address range
-> that gets set up via vm_map_ram() (that range gets set up before the
-> write occurs).
+On Wed, Jan 05, 2011 at 06:32:58PM +0530, Nori, Sekhar wrote:
+> Here are some logs:
 > 
-> Do we perhaps need an invalidate_kernel_vmap_range() before we can read
-> the data on ARM in this kind of scenario?
+> fileid changed fsid 0:c: expected fileid 0x2db61d, got 0x2dad20
+> 
+> fileid changed fsid 0:c: expected fileid 0x100000000000, got 0x7070000000000000
 
-IOW: Does something like the following patch fix the problem?
+Just to be clear, what I was seeing was things like:
 
-------------------------------------------------------------------------------- 
-From: Trond Myklebust <Trond.Myklebust@netapp.com>
-NFS: Ensure we clean the TLB cache in nfs_readdir_xdr_to_array
-    
-After calling nfs_readdir_xdr_filler(), we need a call to
-invalidate_kernel_vmap_range() before we can proceed to read
-the data back through the virtual address range.
-    
-Signed-off-by: Trond Myklebust <Trond.Myklebust@netapp.com>
----
-diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
-index 996dd89..4640470 100644
---- a/fs/nfs/dir.c
-+++ b/fs/nfs/dir.c
-@@ -587,6 +587,9 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page,
- 		if (status < 0)
- 			break;
- 		pglen = status;
-+
-+		invalidate_kernel_vmap_range(pages_ptr, pglen);
-+
- 		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
- 		if (status < 0) {
- 			if (status == -ENOSPC)
+expected fileid <32-bit number> got <64-bit number with same 32-bit LS bits>
 
-
--- 
-Trond Myklebust
-Linux NFS client maintainer
-
-NetApp
-Trond.Myklebust@netapp.com
-www.netapp.com
+so it looked like something was truncating a 64-bit fileid down
+to 32-bits.
