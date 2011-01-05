@@ -1,43 +1,43 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 5 Jan 2011 11:49:12 -0800
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 20:00:08 +0000
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
 In-Reply-To: <1294256169.16957.18.camel@mulgrave.site>
 References: <1294254337.16957.13.camel@mulgrave.site>
 	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
 	<1294256169.16957.18.camel@mulgrave.site>
-Message-ID: <AANLkTik214sj_wBJXhJMLRie34moG7ET1Xg62oQXsgxb@mail.gmail.com>
+Message-ID: <20110105200008.GJ8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/5 James Bottomley <James.Bottomley@hansenpartnership.com>:
->>
->> No, we really can't do that. Most of the time, the kmap() is the only
->> way we access the page anyway, so flushing things would just be
->> stupid. Why waste time and energy on doing something pointless?
->
-> It's hardly pointless. ?The kmap sets up an inequivalent alias in the
+On Wed, Jan 05, 2011 at 01:36:09PM -0600, James Bottomley wrote:
+> On Wed, 2011-01-05 at 11:18 -0800, Linus Torvalds wrote:
+> > On Wed, Jan 5, 2011 at 11:05 AM, James Bottomley
+> > <James.Bottomley@hansenpartnership.com> wrote:
+> > >
+> > > I think the solution for the kernel direct mapping problem is to take
+> > > the expected flushes and invalidates into kmap/kunmap[_atomic].
+> > 
+> > No, we really can't do that. Most of the time, the kmap() is the only
+> > way we access the page anyway, so flushing things would just be
+> > stupid. Why waste time and energy on doing something pointless?
+> 
+> It's hardly pointless.  The kmap sets up an inequivalent alias in the
 > cache.
 
-NO IT DOES NOT.
+No it doesn't.  For pages which are inaccessible, it sets up a mapping
+for those pages.  On aliasing cache architectures, when you tear down
+such a mapping, you have to flush the cache before you do so (otherwise
+you can end up with cache lines existing in the cache for inaccessible
+mappings.)
 
-Stop arguing, when you are so wrong.
+For lowmem pages, kmap() (should always) bypass the 'setup mapping' stage
+because all lowmem pages are already accessible.  So kunmap() doesn't
+do anything - just like the !HIGHMEM implementation for these macros.
 
-kmap() does not create any aliases. For low-memory, it just returns
-the physical address. No alias. And for high memory, there is no
-equivalent low memory address to alias _with_.
+So, for highmem-enabled systems:
 
-Now, when you actually mix multiple kmap's and you have a virtually
-based cache, then the kmap's obviously need to flush that particular
-page when switching between each other. But that has nothing to do
-with the actual page being kmap'ed, it's entirely an internal issue
-about the particular virtual memory area being re-used. And ARM (and
-any other virtually based CPU) already does that in __kunmap_atomic().
+	low_addr = kmap_atomic(lowmem_page);
+	high_addr = kmap_atomic(highmem_page);
 
-But notice the case of the low-mem. And understand that you are WRONG
-about the "inequivalent alias" thing.
-
-So I repeat: this has absolutely *NOTHING* to do with kmap(). Stop blathering.
-
-It's _purely_ an issue of vm_map_ram(). Nothing else.
-
-                          Linus
+results in low_addr in the kernel direct-mapped region, and high_addr
+in the kmap_atomic region.
