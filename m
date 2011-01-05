@@ -1,81 +1,67 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 05 Jan 2011 16:39:47 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 15:52:30 +0000
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294241369.3014.15.camel@heimdal.trondhjem.org>
-References: <20101230171453.GA5787@pengutronix.de>	
-	<1293731992.4919.5.camel@heimdal.trondhjem.org>	
-	<20101230191846.GB14221@pengutronix.de>	
-	<20110103213850.GC25121@pengutronix.de>	
-	<1294100558.25100.8.camel@heimdal.trondhjem.org>	
-	<20110105084014.GN25121@pengutronix.de>	
-	<20110105110517.GQ25121@pengutronix.de>	
-	<20110105112701.GA8638@n2100.arm.linux.org.uk>	
-	<20110105134045.GS25121@pengutronix.de>	
-	<1294239193.3014.9.camel@heimdal.trondhjem.org>	
-	<4D2487CA.5040501@pengutronix.de>	
+In-Reply-To: <1294240457.3014.13.camel@heimdal.trondhjem.org>
+References: <20101230191846.GB14221@pengutronix.de>
+	<20110103213850.GC25121@pengutronix.de>
+	<1294100558.25100.8.camel@heimdal.trondhjem.org>
+	<20110105084014.GN25121@pengutronix.de>
+	<20110105110517.GQ25121@pengutronix.de>
+	<20110105112701.GA8638@n2100.arm.linux.org.uk>
+	<20110105134045.GS25121@pengutronix.de>
+	<1294239193.3014.9.camel@heimdal.trondhjem.org>
+	<4D2487CA.5040501@pengutronix.de>
 	<1294240457.3014.13.camel@heimdal.trondhjem.org>
-	<1294241369.3014.15.camel@heimdal.trondhjem.org>
-Message-ID: <4D2490C3.4000407@pengutronix.de>
+Message-ID: <20110105155230.GC8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2011 04:29 PM, Trond Myklebust wrote:
-> On Wed, 2011-01-05 at 10:14 -0500, Trond Myklebust wrote: 
->> OK. So,the new behaviour in 2.6.37 is that we're writing to a series of
->> pages via the usual kmap_atomic()/kunmap_atomic() and kmap()/kunmap()
->> interfaces, but we can end up reading them via a virtual address range
->> that gets set up via vm_map_ram() (that range gets set up before the
->> write occurs).
->>
->> Do we perhaps need an invalidate_kernel_vmap_range() before we can read
->> the data on ARM in this kind of scenario?
-> 
-> IOW: Does something like the following patch fix the problem?
-> 
-> ------------------------------------------------------------------------------- 
-> From: Trond Myklebust <Trond.Myklebust@netapp.com>
-> NFS: Ensure we clean the TLB cache in nfs_readdir_xdr_to_array
->     
-> After calling nfs_readdir_xdr_filler(), we need a call to
-> invalidate_kernel_vmap_range() before we can proceed to read
-> the data back through the virtual address range.
->     
-> Signed-off-by: Trond Myklebust <Trond.Myklebust@netapp.com>
-> ---
-> diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
-> index 996dd89..4640470 100644
-> --- a/fs/nfs/dir.c
-> +++ b/fs/nfs/dir.c
-> @@ -587,6 +587,9 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page,
->  		if (status < 0)
->  			break;
->  		pglen = status;
-> +
-> +		invalidate_kernel_vmap_range(pages_ptr, pglen);
-> +
->  		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
->  		if (status < 0) {
->  			if (status == -ENOSPC)
+On Wed, Jan 05, 2011 at 10:14:17AM -0500, Trond Myklebust wrote:
+> OK. So,the new behaviour in 2.6.37 is that we're writing to a series of
+> pages via the usual kmap_atomic()/kunmap_atomic() and kmap()/kunmap()
+> interfaces, but we can end up reading them via a virtual address range
+> that gets set up via vm_map_ram() (that range gets set up before the
+> write occurs).
 
-\o/ - Works for me (at91, armv5)
+kmap of lowmem pages will always reuses the existing kernel direct
+mapping, so there won't be a problem there.
 
-Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Do we perhaps need an invalidate_kernel_vmap_range() before we can read
+> the data on ARM in this kind of scenario?
 
-This is a candidate for stable (Cc'd).
+Firstly, vm_map_ram() does no cache maintainence of any sort, nor does
+it take care of page colouring - so any architecture where cache aliasing
+can occur will see this problem.  It should not limited to ARM.
 
-Regards,
-Marc
+Secondly, no, invalidate_kernel_vmap_range() probably isn't sufficient.
+There's two problems here:
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+	addr = kmap(lowmem_page);
+	*addr = stuff;
+	kunmap(lowmem_page);
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110105/2804eb32/attachment.sig>
+Such lowmem pages are accessed through their kernel direct mapping.
+
+	ptr = vm_map_ram(lowmem_page);
+	read = *ptr;
+
+This creates a new mapping which can alias with the kernel direct mapping.
+Now, as this is a new mapping, there should be no cache lines associated
+with it.  (Looking at vm_unmap_ram(), it calls free_unmap_vmap_area_addr(),
+free_unmap_vmap_area(), which then calls flush_cache_vunmap() on the
+region.  vb_free() also calls flush_cache_vunmap() too.)
+
+If the write after kmap() hits an already present cache line, the cache
+line will be updated, but it won't be written back to memory.  So, on
+a subsequent vm_map_ram(), with any kind of aliasing cache, there's
+no guarantee that you'll hit that cache line and read the data just
+written there.
+
+The kernel direct mapping would need to be flushed.
+
+I'm really getting to the point of hating the poliferation of RAM
+remapping interfaces - it's going to (and is) causing nothing but lots
+of pain on virtual cache architectures, needing more and more cache
+flushing interfaces to be created.
+
+Is there any other solution to this?
