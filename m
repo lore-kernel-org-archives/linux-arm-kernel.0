@@ -1,40 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed,  5 Jan 2011 19:04:58 +0100
-Subject: [PATCH] MAINTAINERS: Update Atmel AT91 entry
-Message-ID: <1294250698-13275-1-git-send-email-nicolas.ferre@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 16:55:51 +0000
+Subject: Hit BUG_ON in dma-mapping.c:425
+In-Reply-To: <4D24A108.2080609@atmel.com>
+References: <4D24A108.2080609@atmel.com>
+Message-ID: <20110105165551.GE8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two co-maintainers and update the entry with new information.
+On Wed, Jan 05, 2011 at 05:49:12PM +0100, Nicolas Ferre wrote:
+> Hi,
+> 
+> While running mtd_stresstest on a dataflash (atmel_spi 
+> + mtd_dataflash drivers) I hit the BUG_ON directive that 
+> is at the beginning of ___dma_single_cpu_to_dev() function.
+> This function is called from the SPI driver that do a 
+> dma_map_single() before DMA operations on the buffer 
+> transmitted from upper layers.
+> 
+> It seems that this address is above "high_memory" limit because 
+> it is allocated by vmalloc (in mtd_stresstest.c:285)...
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Andrew Victor <linux@maxim.org.za>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- MAINTAINERS |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7585e9d..cb58500 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -552,11 +552,15 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
--ARM/ATMEL AT91RM9200 ARM ARCHITECTURE
-+ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
- M:	Andrew Victor <linux@maxim.org.za>
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-+M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://maxim.org.za/at91_26.html
--S:	Maintained
-+W:	http://www.linux4sam.org
-+S:	Supported
-+F:	arch/arm/mach-at91/
- 
- ARM/BCMRING ARM ARCHITECTURE
- M:	Jiandong Zheng <jdzheng@broadcom.com>
--- 
-1.7.3
+Well, its telling you is that you're not allowed to DMA to vmalloc
+addresses.  Whether that's the fault of the map driver or not is a
+question for mtd folk.
