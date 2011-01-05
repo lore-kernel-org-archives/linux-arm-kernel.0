@@ -1,44 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 18:35:09 +0000
-Subject: [PATCH v3 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110105175617.GD12222@shareable.org>
-References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
-	<1294236457-17476-9-git-send-email-shawn.guo@freescale.com>
-	<20110105161235.GA2112@gallagher>
-	<20110105164409.GV25121@pengutronix.de>
-	<20110105172501.GB2112@gallagher>
-	<20110105175617.GD12222@shareable.org>
-Message-ID: <20110105183509.GH8638@n2100.arm.linux.org.uk>
+From: Trond.Myklebust@netapp.com (Trond Myklebust)
+Date: Wed, 05 Jan 2011 13:55:05 -0500
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <20110105182753.GG8638@n2100.arm.linux.org.uk>
+References: <20110105110517.GQ25121@pengutronix.de>
+	<20110105112701.GA8638@n2100.arm.linux.org.uk>
+	<20110105134045.GS25121@pengutronix.de>
+	<1294239193.3014.9.camel@heimdal.trondhjem.org>
+	<4D2487CA.5040501@pengutronix.de>
+	<1294240457.3014.13.camel@heimdal.trondhjem.org>
+	<20110105155230.GC8638@n2100.arm.linux.org.uk>
+	<1294247847.2998.23.camel@heimdal.trondhjem.org>
+	<20110105172641.GF8638@n2100.arm.linux.org.uk>
+	<1294251145.3574.16.camel@heimdal.trondhjem.org>
+	<20110105182753.GG8638@n2100.arm.linux.org.uk>
+Message-ID: <1294253705.3574.21.camel@heimdal.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 05:56:17PM +0000, Jamie Lokier wrote:
-> cpu_relax() is a hint to the CPU to, for example, save power or be
-> less aggressive on the memory bus (to save power or be fairer).
+On Wed, 2011-01-05 at 18:27 +0000, Russell King - ARM Linux wrote: 
+> On Wed, Jan 05, 2011 at 01:12:25PM -0500, Trond Myklebust wrote:
+> > On Wed, 2011-01-05 at 17:26 +0000, Russell King - ARM Linux wrote: 
+> > > On Wed, Jan 05, 2011 at 12:17:27PM -0500, Trond Myklebust wrote:
+> > > > We should already be flushing the kernel direct mapping after writing by
+> > > > means of the calls to flush_dcache_page() in xdr_partial_copy_from_skb()
+> > > > and all the helpers in net/sunrpc/xdr.c.
+> > > 
+> > > Hmm, we're getting into the realms of what flush_dcache_page() is supposed
+> > > to do and what it's not supposed to do.
+> > > 
+> > > Is this page an associated with a mapping (iow, page_mapping(page) is non-
+> > > NULL)?  If not, flush_dcache_page() won't do anything, and from my
+> > > understanding, its flush_anon_page() which you want to be using there
+> > > instead.
+> > 
+> > Actually, none of these pages are ever mapped into userspace, nor are
+> > they mapped into the page cache.
+> > 
+> > They are allocated directly using alloc_page() by the thread that called
+> > the readdir() syscall, so afaics there should be no incoherent mappings
+> > other than the kernel direct mapping and the one created by
+> > vm_map_ram().
+> > 
+> > So, yes, you are right that we don't need the flush_dcache_page() here.
 > 
-> Currently these architectures do more than just a barrier in cpu_relax():
-> x86, IA64, PowerPC, Tile and S390.
-> 
-> Although it's just a hint on ARM at the moment, it might change in
-> future - especially with power mattering on so many ARM systems.
-> (Even now, just changing it to a very short udelay might save power
-> on existing ARMs without breaking drivers.)
+> I do still think you need _something_ there, otherwise data can remain
+> in the direct map alias and not be visible via the vmap alias.  I don't
+> see that we have anything in place to handle this at present though.
 
-I think that's a matter for what the loop is doing.  If it's polling
-a memory location then it probably has no effect what so ever.  If
-the loop is spinning on a device, then the CPU will have to wait for
-the read to complete which will slow it down.
+Is that perhaps what flush_kernel_dcache_page() is supposed to do?
 
-It's something that would need very careful evaluation, and is probably
-something that's very platform and loop specific.
+> jejb mentioned something about making kunmap_atomic() always flush the
+> cache, even for lowmem pages, but I think that's going to be exceedingly
+> painful, to the extent that I believe it will prevent our PIO-only MMC
+> drivers working - or we need a scatterlist API that will let drivers
+> iterate over the scatterlist without needing to continually kmap_atomic
+> and kunmap_atomic each page.
 
-> By the way, I see ARM defines cpu_relax as smp_mb() on arch >= 6.  Is
-> that correct and useful?  On other architectures*, barrier() is enough
-> of a barrier, but it's conceivable that smp_mb() would have some
-> ARM-specific fairness or bus activity benefit - in which case it
-> should probably be mb().
+-- 
+Trond Myklebust
+Linux NFS client maintainer
 
-See a discussion last year with Linus.  It's there to ensure that one CPU
-spinning on a variable can see a write by another CPU to that same
-variable.  Without the barrier, the visibility effects are unbounded on
-ARMv6 - and it's only like that for ARMv6, not >= ARMv6.
+NetApp
+Trond.Myklebust at netapp.com
+www.netapp.com
