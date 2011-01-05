@@ -1,75 +1,29 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 5 Jan 2011 18:32:58 +0530
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <4D246098.50908@pengutronix.de>
-References: <20101230171453.GA5787@pengutronix.de>
-	<1293731992.4919.5.camel@heimdal.trondhjem.org>
-	<20101230191846.GB14221@pengutronix.de>
-	<20110103213850.GC25121@pengutronix.de>
-	<1294100558.25100.8.camel@heimdal.trondhjem.org>
-	<20110105084014.GN25121@pengutronix.de>
-	<20110105110517.GQ25121@pengutronix.de>
-	<20110105112701.GA8638@n2100.arm.linux.org.uk>
-	<4D246098.50908@pengutronix.de>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930248201279@dbde02.ent.ti.com>
+From: julien.boibessot@free.fr (Julien Boibessot)
+Date: Wed, 05 Jan 2011 14:04:20 +0100
+Subject: [PATCH v2] i.MX51 Framebuffer support
+In-Reply-To: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4D246C54.9060503@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 17:44:16, Marc Kleine-Budde wrote:
-> On 01/05/2011 12:27 PM, Russell King - ARM Linux wrote:
-> > On Wed, Jan 05, 2011 at 12:05:17PM +0100, Uwe Kleine-K?nig wrote:
-> >> Hello Trond,
-> >>
-> >> On Wed, Jan 05, 2011 at 09:40:14AM +0100, Uwe Kleine-K?nig wrote:
-> >>> On Mon, Jan 03, 2011 at 07:22:38PM -0500, Trond Myklebust wrote:
-> >>>> The question is whether this is something happening on the server or the
-> >>>> client. Does an older client kernel boot without any trouble?
-> >>> I will set up a boot test with 2.6.37 (for statistics) and 2.6.36 to
-> >>> compare with.  If you don't consider .36 to be old enough let me now.
-> >>> Once the setup is done it should be easy to test .35 (say), too.
-> >>>
-> >> Marc (cc'd) saw similar[1] problems with .37, when using .36.2 the
-> >> problems didn't occur.  This was more reliable to trigger and he was so
-> >> kind to bisect the problem.
-> >>
-> >> When testing v2.6.36-rc3-51-gafa8ccc init hanged.
-> >> (babddc72a9468884ce1a23db3c3d54b0afa299f0 is the first bad commit with
-> >> this hang.)  Commit 56e4ebf877b6043c289bda32a5a7385b80c17dee makes the
-> >> "init hangs" problem the "fileid changed on tab" problem.
-> >>
-> >> I could only reproduce that on armv5 machines (imx27, imx28 and at91)
-> >> but not on armv6 (imx35).
-> > 
-> > FYI, I've seen the "fileid changed" problem, and it looked like a 32-bit
-> > truncation of the fileid.  It occurred several times on successive
-> > reboots, so I tried to capture a tcpdump trace off the server (Linux
-> > 2.6.23-rc8-ga64314e6 - its ancient because I've had issues with buggy
-> > IDE drivers trying to move it forward.)  However, for the last couple
-> > of weeks I've been unable to reproduce it.
-> 
-> We have the problem with nfs-root. From the kernel command line:
-> 
-> root=/dev/nfs
-> nfsroot=192.168.23.2:/home/mkl/pengutronix/xxx/bsp/OSELAS.BSP-xxx-Grabowski-trunk/platform-Ronetix-PM9263/root,v3,tcp
-> 
-> /home/mkl/pengutronix is a link which points to a link
-> /ptx/work/octopus/mkl (which is a ext3-based) which points to
-> WORK_1/mkl which is also ext3-based.
-> 
-> The server is 2.6.32 and has been rebooted yesterday :), nfs-utils are
-> 1.2.2. I make a tcpdump if needed.
+Hello,
 
-I see the issue too with an ARMv5 based DM355 board with the just released
-v2.6.37 tag (nfs client). I too see the issue when using bash tab completion.
+Sascha Hauer a ?crit :
+> The following series adds i.MX51 framebuffer support based on the IPUv3. It
+> is not perfect but I decided it is good enough to open it for a wider audience
+> and collect first reviews. I tested this on a babbage board using both outputs
+> (VGA/DVI) with different resolutions up to 1680x1050 and different colour depths.
+> I also tested it on one custom board using a fixed display setting.
+>   
+This driver is also working fine for me on a custom i.MX51 board with a
+800x480 18 bits TFT LCD (16bpp mode).
 
-Here are some logs:
+The only strange thing I noticed was a kind of uggly sprite/artefact
+(32x32, I would say) appearing at the same time as the Linux console. I
+think it may be related to a hardware cursor badly (?) initialised, but
+I didn't find a fix yet.
+It disappears when I launch a graphical application (Qt or SDL).
 
-fileid changed fsid 0:c: expected fileid 0x2db61d, got 0x2dad20
-
-fileid changed fsid 0:c: expected fileid 0x100000000000, got 0x7070000000000000
-
-I am using Fedora 8 (2.6.25 kernel) on the server side. I will try the latest
-Ubuntu release on the server side and test.
-
-Thanks,
-Sekhar
+Regards,
+Julien
