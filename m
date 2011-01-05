@@ -1,13 +1,14 @@
-From: a22381@motorola.com (ShiYong LI)
-Date: Wed, 5 Jan 2011 13:57:38 +0800
-Subject: [Oops] Kernel 2.6.35.7 Oops caused by might_sleep() on ARMv7
-In-Reply-To: <AANLkTikbEEUUoZ-+f7EGLrOQ+2n0+EaZXNSEH39bNFiY@mail.gmail.com>
+From: tghk48@motorola.com (TAO HU)
+Date: Wed, 5 Jan 2011 14:33:36 +0800
+Subject: Kernel 2.6.35.7 Oops caused by might_sleep() on ARMv7
+In-Reply-To: <AANLkTi=mrwX0UPH5H+XWYQ=D6D2jXhkEoqdrNgodsCmt@mail.gmail.com>
 References: <AANLkTikbEEUUoZ-+f7EGLrOQ+2n0+EaZXNSEH39bNFiY@mail.gmail.com>
-Message-ID: <AANLkTikDgQ=ChqqfW9AMy7x-ao4s05mCUAouJdHvkWKX@mail.gmail.com>
+	<AANLkTi=mrwX0UPH5H+XWYQ=D6D2jXhkEoqdrNgodsCmt@mail.gmail.com>
+Message-ID: <AANLkTi=cNV23Nu2WPEpukLAx3kodS6=jmMw2k9fUcBCj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, All
 
 I'm getting kernel run on OMAP4430 chip (ARMv7, dual core), and got an
 unexpected Oops caused by might_sleep() function. While that happened,
@@ -103,7 +104,3 @@ name: Thread-9
 <4>[35404.001739] 9fa0: afd0da0c c0045228 60000093 ffffffff
 <4>[35404.007019] [<c0044bec>] (__dabt_svc+0x4c/0x60) from
 [<c0045228>] (vector_swi+0x28/0x88)
-
---
-Thanks & Best Regards
-Shiyong
