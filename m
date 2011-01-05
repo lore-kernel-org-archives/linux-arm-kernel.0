@@ -1,111 +1,35 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Wed, 5 Jan 2011 21:51:59 +0000
-Subject: I2C support for CE4100, v3
-In-Reply-To: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
-References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20110105215159.GU817@trinity.fluff.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 22:03:49 +0000
+Subject: [PATCH v5 1/3] ARM: add CPPI 4.1 DMA support
+In-Reply-To: <4D231B5F.7030607@mvista.com>
+References: <201005152214.53993.sshtylyov@ru.mvista.com>
+	<4D21F3F2.6090302@mvista.com>
+	<20110103163447.GB2911@n2100.arm.linux.org.uk>
+	<19F8576C6E063C45BE387C64729E739404BD3F2C4D@dbde02.ent.ti.com>
+	<4D220246.5020303@mvista.com>
+	<19F8576C6E063C45BE387C64729E739404BD3F2C58@dbde02.ent.ti.com>
+	<20110103204416.GA2240@legolas.emea.dhcp.ti.com>
+	<4D231B5F.7030607@mvista.com>
+Message-ID: <20110105220349.GA22857@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 05:50:57PM +0100, Sebastian Andrzej Siewior wrote:
-> The I2C core inside CE4100 is very much the same as in PXA25x.
-> I Cc the ARM folks because patch 2 reorganizes some files so that they
-> can be accessed from x86.
-> The I2C device is behind a PCI bus. The PCI probe code simply creates
-> three platform devices so we don't have much changes to the platform
-> driver. There is no clock framework on x86 and the peripherals don't
-> support changing their clocks or to enable/disable them. So I provided
-> dummy function which keep the driver happy.
-> This series indirectly depends on the SPI series because both modify
-> include files and spi & i2c includes are sometimes too close to each
-> other.
-> 
-> History:
-> v1: Initial post
-> v2: - ISAR is still touched if not in SLAVE mode except on X86 where it
->       is not touched at all.
->     - There are no files created in include/asm
->     - register defines are in common code
->     - the PCI controller now requires a device tree. It is used to obtain
->       an id (which is used as device & i2c bus id).
->     - the PCI part now uses ARRAY_SIZE(). As it turns out pci_select_bars()
->       is not useable.
->     - the patch which resetted the chip if the i2c bus was not available
->       has been dropped.
-> v3: - introduced dynamic register mapping. With this change I can avoid
->       accessing the unavailable ISAR register without an #ifdef around
->       it.
->     - modified the DT part of the pci driver to address latest DT review
->       comments.
-> 
-> The patch series has been created with the -M option so file moves can
-> be easily noticed. The whole series (including the spi rename) is also
-> available at
->   git://git.linutronix.de/users/bigeasy/soda.git spi-i2c
-> 
-> Sebastian Andrzej Siewior (6):
->       i2c/pxa: use dynamic register layout
->       arm/pxa2xx: reorganize I2C files
->       i2c/pxa2xx: Add PCI support for PXA I2C controller
->       i2c/pxa2xx: add support for shared IRQ handler
->       i2c/pxa2xx: check timeout correctly
->       i2c/pxa2xx: pass of_node from platform driver to adapter and publish
+On Tue, Jan 04, 2011 at 04:06:39PM +0300, Sergei Shtylyov wrote:
+>    Putting MUSB DMA enignes into drivers/dma/ is the same as taking *any* 
+> chip capable of bus-mastering DMA, "separating" its bus mastering related 
+> code from its driver and putting this code into drivers/dma/. This 
+> doesn't make sense, in my opinion. drivers/dma/ is for the dedicated DMA 
+> controllers (which can *optionally* serve the slave devices).
 
-please rename these i2c-pxa2xx
-and for the ARM, use ARM: pxa2xx as the prefix
- 
->  arch/arm/mach-mmp/include/mach/mmp2.h              |    2 +-
->  arch/arm/mach-mmp/include/mach/pxa168.h            |    2 +-
->  arch/arm/mach-mmp/include/mach/pxa910.h            |    2 +-
->  arch/arm/mach-pxa/balloon3.c                       |    3 +-
->  arch/arm/mach-pxa/cm-x300.c                        |    2 +-
->  arch/arm/mach-pxa/colibri-pxa270-income.c          |    3 +-
->  arch/arm/mach-pxa/corgi.c                          |    2 +-
->  arch/arm/mach-pxa/csb726.c                         |    2 +-
->  arch/arm/mach-pxa/devices.c                        |    2 +-
->  arch/arm/mach-pxa/em-x270.c                        |    2 +-
->  arch/arm/mach-pxa/ezx.c                            |    2 +-
->  arch/arm/mach-pxa/hx4700.c                         |    2 +-
->  arch/arm/mach-pxa/littleton.c                      |    2 +-
->  arch/arm/mach-pxa/magician.c                       |    2 +-
->  arch/arm/mach-pxa/mainstone.c                      |    2 +-
->  arch/arm/mach-pxa/mioa701.c                        |    2 +-
->  arch/arm/mach-pxa/mxm8x10.c                        |    2 +-
->  arch/arm/mach-pxa/palm27x.c                        |    3 +-
->  arch/arm/mach-pxa/pcm990-baseboard.c               |    2 +-
->  arch/arm/mach-pxa/poodle.c                         |    2 +-
->  arch/arm/mach-pxa/pxa27x.c                         |    2 +-
->  arch/arm/mach-pxa/pxa3xx.c                         |    2 +-
->  arch/arm/mach-pxa/raumfeld.c                       |    2 +-
->  arch/arm/mach-pxa/saar.c                           |    2 +-
->  arch/arm/mach-pxa/spitz.c                          |    3 +-
->  arch/arm/mach-pxa/stargate2.c                      |    2 +-
->  arch/arm/mach-pxa/tavorevb3.c                      |    3 +-
->  arch/arm/mach-pxa/tosa.c                           |    2 +-
->  arch/arm/mach-pxa/trizeps4.c                       |    2 +-
->  arch/arm/mach-pxa/viper.c                          |    2 +-
->  arch/arm/mach-pxa/vpac270.c                        |    3 +-
->  arch/arm/mach-pxa/xcep.c                           |    3 +-
->  arch/arm/mach-pxa/z2.c                             |    3 +-
->  arch/arm/mach-pxa/zeus.c                           |    3 +-
->  arch/arm/mach-pxa/zylonite_pxa300.c                |    2 +-
->  drivers/i2c/busses/Kconfig                         |    7 +-
->  drivers/i2c/busses/Makefile                        |    1 +
->  drivers/i2c/busses/i2c-pxa-pci.c                   |  173 ++++++++++++++++++++
->  drivers/i2c/busses/i2c-pxa.c                       |  116 ++++++++++---
->  .../plat/i2c.h => include/linux/i2c/pxa-i2c.h      |    0
->  40 files changed, 304 insertions(+), 72 deletions(-)
->  create mode 100644 drivers/i2c/busses/i2c-pxa-pci.c
->  rename arch/arm/plat-pxa/include/plat/i2c.h => include/linux/i2c/pxa-i2c.h (100%)
-> 
-> Sebastian
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Then why is it already separated into its own self-contained driver?
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+If it's because the DMA engine is used for different peripherals (possibly
+re-used for different peripherals), then it does seem to make sense to
+have it separated via some API.  And if possible that API might should
+be something generic instead of specific.
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Even more reason to do this is if the device being fed by the DMA has
+been re-used with different DMA hardware (which I believe is the case
+with MUSB.)  What if this different DMA hardware then gets re-used for
+other devices?  Should they all implement the same custom API or try
+for a generic API?
