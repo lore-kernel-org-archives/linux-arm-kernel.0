@@ -1,76 +1,54 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 05 Jan 2011 09:53:07 -0800
-Subject: [PATCH] omap: wd_timer: Fix crash frm wdt_probe when
-	!CONFIG_RUNTIME_PM
-In-Reply-To: <68789fa8ba11b9427aa6321da55c9a8b@mail.gmail.com> (Santosh
-	Shilimkar's message of "Wed, 5 Jan 2011 19:23:07 +0530")
-References: <1294234855-6623-1-git-send-email-santosh.shilimkar@ti.com>
-	<68789fa8ba11b9427aa6321da55c9a8b@mail.gmail.com>
-Message-ID: <87aajfz18c.fsf@ti.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 5 Jan 2011 17:56:17 +0000
+Subject: [PATCH v3 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <20110105172501.GB2112@gallagher>
+References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
+	<1294236457-17476-9-git-send-email-shawn.guo@freescale.com>
+	<20110105161235.GA2112@gallagher>
+	<20110105164409.GV25121@pengutronix.de>
+	<20110105172501.GB2112@gallagher>
+Message-ID: <20110105175617.GD12222@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Jamie Iles wrote:
+> On Wed, Jan 05, 2011 at 05:44:09PM +0100, Uwe Kleine-K?nig wrote:
+> > Hello Jamie,
+> > On Wed, Jan 05, 2011 at 04:16:46PM +0000, Jamie Iles wrote:
+> > > On Wed, Jan 05, 2011 at 10:07:35PM +0800, Shawn Guo wrote:
+> > > > +	/* check both BUSY and ERROR cleared */
+> > > > +	while ((__raw_readl(ocotp_base) &
+> > > > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
+> > > > +		/* nothing */;
+> > > 
+> > > Is it worth using cpu_relax() in these polling loops?
+> > I don't know what cpu_relax does for other platforms, but on ARM it's
+> > just a memory barrier which AFAICT doesn't help here at all (which
+> > doesn't need to be correct).  Why do you think it would be better?
+> 
+> Well I don't see that there's anything broken without cpu_relax() but 
+> using cpu_relax() seems to be the most common way of doing busy polling 
+> loops that I've seen. It's also a bit easier to read than a comment and 
+> semi-colon. Perhaps it's just personal preference.
 
-> Commit ff2516fb 'wd_timer: disable on boot via hwmod postsetup mechanism'
-> introduced watchdog timer state state management using postsetup_state.
-> This was done to allow some board files to support watchdog coverage
-> throughout kernel initialization and it work as intended when RUNTIME_PM
-> is enabled.
->
-> With !CONFIG_RUNTIME_PM and no board is specifically requests watchdog
-> to remain enabled the omap_wdt_probe crashesh. This is because hwmod
-> in absense of runtime PM unable to turn watchdog clocks because it's
-> state is set to be disabled. For rest of the device, the state is
-> set as enabled in absense of RUNTIME_PM
->
-> [    1.372558] Unhandled fault: imprecise external abort (0x1406) at
-> 0xad733eeb
-> [    1.379913] Internal error: : 1406 [#1] SMP
-> [    1.384277] last sysfs file:
-> [    1.387359] Modules linked in:
-> [    1.390563] CPU: 0    Tainted: G        W
-> (2.6.37-rc7-00265-g4298a4c-dirty #23)
-> [    1.398468] PC is at omap_wdt_disable+0x2c/0x3c
-> [    1.403198] LR is at omap_wdt_probe+0x124/0x1e0
-> [    1.407928] pc : [<c02f5bf4>]    lr : [<c03be10c>]    psr: 60000013
-> [    1.407958] sp : df833f00  ip : 00000000  fp : 00000000
-> [    1.419921] r10: c0ac57ac  r9 : df959e00  r8 : 00000000
-> [    1.425384] r7 : df959e08  r6 : df8000c0  r5 : df95bebc  r4 : df87dde0
-> [    1.432189] r3 : fc314000  r2 : 00005555  r1 : fc314034  r0 : df87dde0
->
-> This patch make the default watchdog state to be enabled in case of
-> !CONFIG_RUNTIME_PM. This fixes the crash
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> ---
-> Paul, I am not too sure if it breaks your _shutdown idea of watchdog
-> timer.  Patch generated against 'omap-for-linus' branch and boot
-> tested on OMAP4 with and without CONFIG_OMAP_WATCHDOG.
->
->  arch/arm/mach-omap2/io.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index e66687b..b879a16 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -378,7 +378,11 @@ void __init omap2_init_common_infrastructure(void)
->  	 * XXX ideally we could detect whether the MPU WDT was currently
->  	 * enabled here and make this conditional
->  	 */
-> +#ifdef CONFIG_PM_RUNTIME
->  	postsetup_state = _HWMOD_STATE_DISABLED;
-> +#else
-> +	postsetup_state = _HWMOD_STATE_ENABLED;
-> +#endif
+cpu_relax() is a hint to the CPU to, for example, save power or be
+less aggressive on the memory bus (to save power or be fairer).
 
-You shouldn't need the 'else' part of this since the default a few lines
-above this code is already setting that for the !CONFIG_PM_RUNTIME case.
+Currently these architectures do more than just a barrier in cpu_relax():
+x86, IA64, PowerPC, Tile and S390.
 
-Kevin
+Although it's just a hint on ARM at the moment, it might change in
+future - especially with power mattering on so many ARM systems.
+(Even now, just changing it to a very short udelay might save power
+on existing ARMs without breaking drivers.)
 
->  	omap_hwmod_for_each_by_class("wd_timer",
->  				     _set_hwmod_postsetup_state,
->  				     &postsetup_state);
+
+By the way, I see ARM defines cpu_relax as smp_mb() on arch >= 6.  Is
+that correct and useful?  On other architectures*, barrier() is enough
+of a barrier, but it's conceivable that smp_mb() would have some
+ARM-specific fairness or bus activity benefit - in which case it
+should probably be mb().
+
+* - except Blackfin, which historically derived a lot from ARM headers.
+
+-- Jamie
