@@ -1,117 +1,84 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 05 Jan 2011 15:28:18 -0800
-Subject: [PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP
-In-Reply-To: <1294260576-20237-3-git-send-email-nm@ti.com> (Nishanth Menon's
-	message of "Wed, 5 Jan 2011 14:49:36 -0600")
-References: <1294260576-20237-1-git-send-email-nm@ti.com>
-	<1294260576-20237-3-git-send-email-nm@ti.com>
-Message-ID: <874o9nvskt.fsf@ti.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Wed, 05 Jan 2011 23:28:24 +0000
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <1294268808.2952.18.camel@heimdal.trondhjem.org>
+References: <1294254337.16957.13.camel@mulgrave.site>
+	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+	<1294256169.16957.18.camel@mulgrave.site>
+	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
+	<1294259637.16957.25.camel@mulgrave.site>
+	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+	<20110105210448.GM8638@n2100.arm.linux.org.uk>
+	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
+	<1294262208.2952.4.camel@heimdal.trondhjem.org>
+	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
+	<1294268808.2952.18.camel@heimdal.trondhjem.org>
+Message-ID: <1294270104.16957.73.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+On Wed, 2011-01-05 at 18:06 -0500, Trond Myklebust wrote:
+> On Wed, 2011-01-05 at 13:30 -0800, Linus Torvalds wrote: 
+> > On Wed, Jan 5, 2011 at 1:16 PM, Trond Myklebust
+> > <Trond.Myklebust@netapp.com> wrote:
+> > >
+> > > So what should be the preferred way to ensure data gets flushed when
+> > > you've written directly to a page, and then want to read through the
+> > > vm_map_ram() virtual range? Should we be adding new semantics to
+> > > flush_kernel_dcache_page()?
+> > 
+> > The "preferred way" is actually simple: "don't do that". IOW, if some
+> > page is accessed through a virtual mapping you've set up, then
+> > _always_ access it through that virtual mapping.
+> > 
+> > Now, when that is impossible (and yes, it sometimes is), then you
+> > should flush after doing all writes. And if you do the write through
+> > the regular kernel mapping, you should use flush_dcache_page(). And if
+> > you did it through the virtual mapping, you should use
+> > "flush_kernel_vmap_range()" or whatever.
+> > 
+> > NOTE! I really didn't look those up very closely, and if the accesses
+> > can happen concurrently you are basically screwed, so you do need to
+> > do locking or something else to guarantee that there is some nice
+> > sequential order.  And maybe I forgot something.  Which is why I do
+> > suggest "don't do that" as a primary approach to the problem if at all
+> > possible.
+> > 
+> > Oh, and you may need to flush before reading too (and many writes do
+> > end up being "read-modify-write" cycles) in case it's possible that
+> > you have stale data from a previous read that was then invalidated by
+> > a write to the aliasing address. Even if that write was flushed out,
+> > the stale read data may exist at the virtual address. I forget what
+> > all we required - in the end the only sane model is "virtual caches
+> > suck so bad that anybody who does them should be laughed at for being
+> > a retard".
+> 
+> Yes. The fix I sent out was a call to invalidate_kernel_vmap_range(),
+> which takes care of invalidating the cache prior to a virtual address
+> read.
+> 
+> My question was specifically about the write through the regular kernel
+> mapping: according to Russell and my reading of the cachetlb.txt
+> documentation, flush_dcache_page() is only guaranteed to have an effect
+> on page cache pages.
+> flush_kernel_dcache_page() (not to be confused with flush_dcache_page)
+> would appear to be the closest fit according to my reading of the
+> documentation, however the ARM implementation appears to be a no-op...
 
-> Beagle XM uses 3730 and the board design allows enabling 800MHz and 1GHz
-> OPPs. However, We need Smart reflex class 1.5 and ABB to enable 1GHz safely.
-> For the moment, we tweak the default table to allow for 800Mhz OPP usage.
+It depends on exactly what you're doing.  In the worst case, (ping pong
+reads and writes through both aliases) you have to flush and invalidate
+both alias 1 alias 2 each time you access on one and then another.
 
-Isn't this common to any board using 3730 (or 3630?)
+Can you explain how the code works? it looks to me like you read the xdr
+stuff through the vmap region then write it out directly to the pages?
+*if* this is just a conversion, *and* you never need to read the new
+data through the vmap alias, you might be able to get away with a
+flush_dcache_page in nfs_readdir_release_array().  If the access pattern
+is more complex, you'll need more stuff splashed through the loop
+(including vmap invalidation/flushing).
 
-IOW, what is Beagle specific about this?
+ Is there any way you could just rewrite nfs_readdir_add_to_array() to
+use the vmap address instead of doing a kmap?  That way everything will
+go through a single alias and not end up with this incoherency.
 
-Kevin
-
-> Reported-by: Koen Kooi <koen@beagleboard.org>
-> Tested-by: Koen Kooi <koen@beagleboard.org>
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  arch/arm/mach-omap2/board-omap3beagle.c |   50 +++++++++++++++++++++++++++++++
->  1 files changed, 50 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index 6c12760..0b99b80 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -23,6 +23,7 @@
->  #include <linux/gpio.h>
->  #include <linux/input.h>
->  #include <linux/gpio_keys.h>
-> +#include <linux/opp.h>
->  
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/partitions.h>
-> @@ -44,10 +45,12 @@
->  #include <plat/gpmc.h>
->  #include <plat/nand.h>
->  #include <plat/usb.h>
-> +#include <plat/omap_device.h>
->  
->  #include "mux.h"
->  #include "hsmmc.h"
->  #include "timer-gp.h"
-> +#include "pm.h"
->  
->  #define NAND_BLOCK_SIZE		SZ_128K
->  
-> @@ -556,6 +559,52 @@ static struct omap_musb_board_data musb_board_data = {
->  	.power			= 100,
->  };
->  
-> +static void __init beagle_opp_init(void)
-> +{
-> +	int r = 0;
-> +
-> +	/* Initialize the omap3 opp table */
-> +	if (omap3_opp_init()) {
-> +		pr_err("%s: opp default init failed\n", __func__);
-> +		return;
-> +	}
-> +
-> +	/* Custom OPP enabled for XM */
-> +	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
-> +		struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
-> +		struct omap_hwmod *dh = omap_hwmod_lookup("iva");
-> +		struct device *dev;
-> +
-> +		if (!mh || !dh) {
-> +			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
-> +				__func__, mh, dh);
-> +			r = -EINVAL;
-> +		} else {
-> +			/* Enable MPU 1GHz and lower opps */
-> +			dev = &mh->od->pdev.dev;
-> +			r = opp_enable(dev, 800000000);
-> +			/* TODO: MPU 1GHz needs SR and ABB */
-> +
-> +			/* Enable IVA 800MHz and lower opps */
-> +			dev = &dh->od->pdev.dev;
-> +			r |= opp_enable(dev, 660000000);
-> +			/* TODO: DSP 800MHz needs SR and ABB */
-> +		}
-> +		if (r) {
-> +			pr_err("%s: failed to enable higher opp %d\n",
-> +				__func__, r);
-> +			/*
-> +			 * Cleanup - disable the higher freqs - we dont care
-> +			 * about the results
-> +			 */
-> +			dev = &mh->od->pdev.dev;
-> +			opp_disable(dev, 800000000);
-> +			dev = &dh->od->pdev.dev;
-> +			opp_disable(dev, 660000000);
-> +		}
-> +	}
-> +}
-> +
->  static void __init omap3_beagle_init(void)
->  {
->  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-> @@ -579,6 +628,7 @@ static void __init omap3_beagle_init(void)
->  	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
->  
->  	beagle_display_init();
-> +	beagle_opp_init();
->  }
->  
->  MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+James
