@@ -1,64 +1,81 @@
-From: rees@umich.edu (Jim Rees)
-Date: Wed, 5 Jan 2011 10:38:29 -0500
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 05 Jan 2011 16:39:47 +0100
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <4D248343.2000407@pengutronix.de>
-References: <1293731992.4919.5.camel@heimdal.trondhjem.org>
-	<20101230191846.GB14221@pengutronix.de>
-	<20110103213850.GC25121@pengutronix.de>
-	<1294100558.25100.8.camel@heimdal.trondhjem.org>
-	<20110105084014.GN25121@pengutronix.de>
-	<20110105110517.GQ25121@pengutronix.de>
-	<20110105112701.GA8638@n2100.arm.linux.org.uk>
-	<20110105134045.GS25121@pengutronix.de>
-	<20110105142902.GA9278@merit.edu> <4D248343.2000407@pengutronix.de>
-Message-ID: <20110105153829.GB11608@merit.edu>
+In-Reply-To: <1294241369.3014.15.camel@heimdal.trondhjem.org>
+References: <20101230171453.GA5787@pengutronix.de>	
+	<1293731992.4919.5.camel@heimdal.trondhjem.org>	
+	<20101230191846.GB14221@pengutronix.de>	
+	<20110103213850.GC25121@pengutronix.de>	
+	<1294100558.25100.8.camel@heimdal.trondhjem.org>	
+	<20110105084014.GN25121@pengutronix.de>	
+	<20110105110517.GQ25121@pengutronix.de>	
+	<20110105112701.GA8638@n2100.arm.linux.org.uk>	
+	<20110105134045.GS25121@pengutronix.de>	
+	<1294239193.3014.9.camel@heimdal.trondhjem.org>	
+	<4D2487CA.5040501@pengutronix.de>	
+	<1294240457.3014.13.camel@heimdal.trondhjem.org>
+	<1294241369.3014.15.camel@heimdal.trondhjem.org>
+Message-ID: <4D2490C3.4000407@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Kleine-Budde wrote:
+On 01/05/2011 04:29 PM, Trond Myklebust wrote:
+> On Wed, 2011-01-05 at 10:14 -0500, Trond Myklebust wrote: 
+>> OK. So,the new behaviour in 2.6.37 is that we're writing to a series of
+>> pages via the usual kmap_atomic()/kunmap_atomic() and kmap()/kunmap()
+>> interfaces, but we can end up reading them via a virtual address range
+>> that gets set up via vm_map_ram() (that range gets set up before the
+>> write occurs).
+>>
+>> Do we perhaps need an invalidate_kernel_vmap_range() before we can read
+>> the data on ARM in this kind of scenario?
+> 
+> IOW: Does something like the following patch fix the problem?
+> 
+> ------------------------------------------------------------------------------- 
+> From: Trond Myklebust <Trond.Myklebust@netapp.com>
+> NFS: Ensure we clean the TLB cache in nfs_readdir_xdr_to_array
+>     
+> After calling nfs_readdir_xdr_filler(), we need a call to
+> invalidate_kernel_vmap_range() before we can proceed to read
+> the data back through the virtual address range.
+>     
+> Signed-off-by: Trond Myklebust <Trond.Myklebust@netapp.com>
+> ---
+> diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
+> index 996dd89..4640470 100644
+> --- a/fs/nfs/dir.c
+> +++ b/fs/nfs/dir.c
+> @@ -587,6 +587,9 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page,
+>  		if (status < 0)
+>  			break;
+>  		pglen = status;
+> +
+> +		invalidate_kernel_vmap_range(pages_ptr, pglen);
+> +
+>  		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
+>  		if (status < 0) {
+>  			if (status == -ENOSPC)
 
-  > Trond sent a fix to the nfs list on 27 Nov for "fileid changed" but I don't
-  > know if this is the same bug you're seeing.  The patch was to
-  > nfs_same_file() and I can send it if you want.  As far as I know the patch
-  > made it upstream.
-  
-  Are you sure it's in .37?
+\o/ - Works for me (at91, armv5)
 
-...
+Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-  Would you please be so kind and send the patch to this thread?
+This is a candidate for stable (Cc'd).
 
-This is the commit I'm thinking of:
+Regards,
+Marc
 
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=37a09f07459753e7c98d4e21f1c61e8756923f81
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-NFS: Fix a readdirplus bug
-
-When comparing filehandles in the helper nfs_same_file(), we should not be
-using 'strncmp()': filehandles are not null terminated strings.
-
-Instead, we should just use the existing helper nfs_compare_fh().
-
-Signed-off-by: Trond Myklebust <Trond.Myklebust@netapp.com>
-Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
----
-
-diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
-index 8ea4a41..f0a384e 100644
---- a/fs/nfs/dir.c
-+++ b/fs/nfs/dir.c
-@@ -395,13 +395,9 @@ int xdr_decode(nfs_readdir_descriptor_t *desc, struct nfs_entry *entry, struct x
- static
- int nfs_same_file(struct dentry *dentry, struct nfs_entry *entry)
- {
--	struct nfs_inode *node;
- 	if (dentry->d_inode == NULL)
- 		goto different;
--	node = NFS_I(dentry->d_inode);
--	if (node->fh.size != entry->fh->size)
--		goto different;
--	if (strncmp(node->fh.data, entry->fh->data, node->fh.size) != 0)
-+	if (nfs_compare_fh(entry->fh, NFS_FH(dentry->d_inode)) != 0)
- 		goto different;
- 	return 1;
- different:
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110105/2804eb32/attachment.sig>
