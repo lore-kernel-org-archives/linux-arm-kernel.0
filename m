@@ -1,31 +1,48 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 5 Jan 2011 11:18:14 -0800
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294254337.16957.13.camel@mulgrave.site>
-References: <1294254337.16957.13.camel@mulgrave.site>
-Message-ID: <AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Wed, 5 Jan 2011 21:24:25 +0200
+Subject: [PATCH 1/1] arm: omap: gpio: define .disable callback for gpio
+	irq chip
+In-Reply-To: <20110105181918.GB8717@n2100.arm.linux.org.uk>
+References: <1294250283-18182-1-git-send-email-eduardo.valentin@nokia.com>
+	<20110105181918.GB8717@n2100.arm.linux.org.uk>
+Message-ID: <20110105192425.GA24729@besouro.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 5, 2011 at 11:05 AM, James Bottomley
-<James.Bottomley@hansenpartnership.com> wrote:
->
-> I think the solution for the kernel direct mapping problem is to take
-> the expected flushes and invalidates into kmap/kunmap[_atomic].
+Hello Russell,
 
-No, we really can't do that. Most of the time, the kmap() is the only
-way we access the page anyway, so flushing things would just be
-stupid. Why waste time and energy on doing something pointless?
+On Wed, Jan 05, 2011 at 06:19:18PM +0000, Russell King wrote:
+> On Wed, Jan 05, 2011 at 07:58:03PM +0200, Eduardo Valentin wrote:
+> > Currently, if one calls disable_irq(gpio_irq), the irq
+> > won't get disabled.
+> > 
+> > This is happening because the omap gpio code defines only
+> > a .mask callback. And the default_disable function is just
+> > a stub. The result is that, when someone calls disable_irq
+> > for an irq in a gpio line, it will be kept enabled.
+> > 
+> > This patch solves this issue by setting the .disable
+> > callback to point to the same .mask callback.
+> 
+> Amd this is a problem because?
 
-In fact, kmap() here is a total non-issue. It's not the kmap() that
-introduces any virtual aliases, and never has been. It's the
-"vm_map_ram()" that is the problem. Unlike the kmap(), that really
-_does_ introduce a virtual alias, and is a problem for any virtual
-cache.
+errr.. because the interrupt is enabled when it was supposed to be disabled?
 
-So don't blame kmap(). It's innocent and irrelevant - the bug could
-happen entirely without it (think a 64-bit address space that doesn't
-even _have_ kmap, but has software that mixes vm_map_ram() with
-non-mapped accesses).
+> 
+> The way this works is that although it isn't disabled at that point,
+> if it never triggers, then everything remains happy.  However, if it
+> does trigger, the genirq code will then mask the interrupt and won't
+> call the handler.
 
-                           Linus
+Right.. I didn't see from this point. I will check how that gets unmasked.
+But even so, if I understood correctly what you described, it would still
+open a time window which the system would see at least 1 interrupt during
+the time it was not suppose to. And that can wakeup a system which  is in
+deep sleep mode, either via dynamic idle or static suspend.
+
+It is unlikely, I know. But it can still happen. And can be avoided.
+
+Regards,
+
+-- 
+Eduardo Valentin
