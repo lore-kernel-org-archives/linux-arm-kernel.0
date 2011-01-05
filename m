@@ -1,37 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 19:07:34 +0000
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294253705.3574.21.camel@heimdal.trondhjem.org>
-References: <20110105134045.GS25121@pengutronix.de>
-	<1294239193.3014.9.camel@heimdal.trondhjem.org>
-	<4D2487CA.5040501@pengutronix.de>
-	<1294240457.3014.13.camel@heimdal.trondhjem.org>
-	<20110105155230.GC8638@n2100.arm.linux.org.uk>
-	<1294247847.2998.23.camel@heimdal.trondhjem.org>
-	<20110105172641.GF8638@n2100.arm.linux.org.uk>
-	<1294251145.3574.16.camel@heimdal.trondhjem.org>
-	<20110105182753.GG8638@n2100.arm.linux.org.uk>
-	<1294253705.3574.21.camel@heimdal.trondhjem.org>
-Message-ID: <20110105190734.GI8638@n2100.arm.linux.org.uk>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Wed, 5 Jan 2011 18:35:04 +0000
+Subject: [PATCH] [ARM] orion5x: accelerate NAND on the TS-78xx
+References: <20110104235158.GQ12386@chipmunk>
+	<20110105003316.GJ24935@n2100.arm.linux.org.uk>
+Message-ID: <o7qev7-2en.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 01:55:05PM -0500, Trond Myklebust wrote:
-> On Wed, 2011-01-05 at 18:27 +0000, Russell King - ARM Linux wrote: 
-> > I do still think you need _something_ there, otherwise data can remain
-> > in the direct map alias and not be visible via the vmap alias.  I don't
-> > see that we have anything in place to handle this at present though.
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>
+> On Tue, Jan 04, 2011 at 11:51:59PM +0000, Alexander Clouter wrote:
+>> The NAND supports 32bit reads and writes so lets stop shunting 8bit
+>> chunks across the bus.
+>> 
+>> Doing a dumb 'dd' benchmark, this increases performance roughly like so:
+>>  * read: 1.3MB/s to 3.4MB/s
+>>  * write: 614kB/s to 882kB/s
 > 
-> Is that perhaps what flush_kernel_dcache_page() is supposed to do?
+> Try something like the below.  It's slightly more typing, but the
+> underlying string IO functions should improve your transfer speed.
+> Note that they won't do endian conversions.
+>
+I get roughly the same speeds with your approach...I am happy to swing 
+either your way or my original implementation; well actually it was 
+stolen from Nico's orion_nand implementation :)
 
-Well, given how we have things currently setup on ARM, this ends up
-being a no-op - as new page cache pages are marked dirty and their
-flushing done at the point when they're mapped into userspace.
+What should I submit?  These functions will at somestage get DMA support 
+added.
+ 
+Cheers
 
-I guess we could do the flushing there and mark the page clean, but
-it'd need some careful examination of various code paths to confirm
-that it's safe - we may be avoiding this because some ARM arch
-versions need to manually IPI cache flushes to other cores (which
-can only be done with IRQs enabled.)
-
-So, I don't think it'll do at the present time.
+-- 
+Alexander Clouter
+.sigmonster says: Live Free or Live in Massachusetts.
