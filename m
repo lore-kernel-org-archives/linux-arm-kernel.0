@@ -1,138 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 00:33:16 +0000
-Subject: [PATCH] [ARM] orion5x: accelerate NAND on the TS-78xx
-In-Reply-To: <20110104235158.GQ12386@chipmunk>
-References: <20110104235158.GQ12386@chipmunk>
-Message-ID: <20110105003316.GJ24935@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 04 Jan 2011 16:37:47 -0800
+Subject: [PATCH 0/5] omap2plus: Trivial build break fixes
+In-Reply-To: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Tue, 4 Jan 2011 23:56:11 +0530")
+References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <8762u4423o.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04, 2011 at 11:51:59PM +0000, Alexander Clouter wrote:
-> The NAND supports 32bit reads and writes so lets stop shunting 8bit
-> chunks across the bus.
-> 
-> Doing a dumb 'dd' benchmark, this increases performance roughly like so:
->  * read: 1.3MB/s to 3.4MB/s
->  * write: 614kB/s to 882kB/s
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Try something like the below.  It's slightly more typing, but the
-underlying string IO functions should improve your transfer speed.
-Note that they won't do endian conversions.
+> These are trivial build fixes which I found while doing some 
+> testing 'omap-for-linus' branch.
+>
+> The series is generated against the linux-omap 'omap-for-linus' branch
+> and boot tested on OMAP4430 SDP and OMAP3630 ZOOM.
 
-> 
-> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
-> ---
->  arch/arm/mach-orion5x/ts78xx-setup.c |   42 ++++++++++++++++++++++++++++++++++
->  1 files changed, 42 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-> index 9a5d1ef..bcc21fe 100644
-> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
-> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-> @@ -191,6 +191,46 @@ static int ts78xx_ts_nand_dev_ready(struct mtd_info *mtd)
->  	return readb(TS_NAND_CTRL) & 0x20;
->  }
->  
-> +static void ts78xx_ts_nand_write_buf(struct mtd_info *mtd,
-> +			const uint8_t *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	void __iomem *io_base = chip->IO_ADDR_W;
-> +	uint32_t *buf32;
-> +	int i = 0;
-> +
-> +	while (len && (unsigned int)buf & 3) {
-> +		writeb(*buf++, io_base);
-> +		len--;
-> +	}
-> +	buf32 = (uint32_t *)buf;
-> +	while (i < len/4)
-> +		writel(buf32[i++], io_base);
-> +	i *= 4;
-> +	while (i < len)
-> +		writeb(buf[i++], io_base);
+Minor nit in your git-send-email config.  
 
-	unsigned long off = ((unsigned long)buf & 3);
-	int sz;
+Can you add the following to your ~/.gitconfig, or update to newer git
+where this is now the default:
 
-	if (off) {
-		sz = min(4 - off, len);
-		writesb(io_base, buf, sz);
-		buf += sz;
-		len -= sz;
-	}
+[sendemail]
+	chainreplyto = false
 
-	sz = len >> 2;
-	if (sz) {
-		u32 *buf32 = (u32 *)buf;
-		writesl(io_base, buf32, sz);
-		buf += sz << 2;
-		len -= sz << 2;
-	}
+This will make all patches a reply to PATCH 0 instead of to the previous
+patch.
 
-	if (len)
-		writesb(io_base, buf, len);
+Thanks,
 
-> +}
-> +
-> +static void ts78xx_ts_nand_read_buf(struct mtd_info *mtd,
-> +			uint8_t *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	void __iomem *io_base = chip->IO_ADDR_R;
-> +	uint32_t *buf32;
-> +	int i = 0;
-> +
-> +	while (len && (unsigned int)buf & 3) {
-> +		*buf++ = readb(io_base);
-> +		len--;
-> +	}
-> +	buf32 = (uint32_t *)buf;
-> +	while (i < len/4)
-> +		buf32[i++] = readl(io_base);
-> +	i *= 4;
-> +	while (i < len)
-> +		buf[i++] = readb(io_base);
+Kevin
 
-	unsigned long off = ((unsigned long)buf & 3);
-	int sz;
-
-	if (off) {
-		sz = min(4 - off, len);
-		readsb(io_base, buf, sz);
-		buf += sz;
-		len -= sz;
-	}
-
-	sz = len >> 2;
-	if (sz) {
-		u32 *buf32 = (u32 *)buf;
-		readsl(io_base, buf32, sz);
-		buf += sz << 2;
-		len -= sz << 2;
-	}
-
-	if (len)
-		readsb(io_base, buf, len);
-
-> +}
-> +
->  const char *ts_nand_part_probes[] = { "cmdlinepart", NULL };
->  
->  static struct mtd_partition ts78xx_ts_nand_parts[] = {
-> @@ -233,6 +273,8 @@ static struct platform_nand_data ts78xx_ts_nand_data = {
->  		 */
->  		.cmd_ctrl		= ts78xx_ts_nand_cmd_ctrl,
->  		.dev_ready		= ts78xx_ts_nand_dev_ready,
-> +		.write_buf		= ts78xx_ts_nand_write_buf,
-> +		.read_buf		= ts78xx_ts_nand_read_buf,
->  	},
->  };
->  
-> -- 
-> 1.7.2.3
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+> The following changes since commit dc69d1af9e8d9cbbabff88bb35a6782187a22229:
+>   Ben Gamari (1):
+>         omap2: Make OMAP2PLUS select OMAP_DM_TIMER
+>
+>
+> Santosh Shilimkar (5):
+>       omap2plus: clockdomain: Trivial fix for build break because of clktrctrl_mask
+>       omap2plus: prm: Trvial build break fix for undefined reference to 'omap2_prm_read_mod_reg'
+>       omap2plus: voltage: Trivial warning fix 'no return statement'
+>       omap2plus: voltage: Trivial linking fix 'undefined reference'
+>       omap2plus: voltage: Trivial linking fix for 'EINVAL' undeclared
+>
+>  arch/arm/mach-omap2/Makefile              |    2 +-
+>  arch/arm/mach-omap2/clockdomain.h         |    2 +-
+>  arch/arm/mach-omap2/prm2xxx_3xxx.h        |   45 ++++++++++++++++++++++++++++-
+>  arch/arm/plat-omap/include/plat/voltage.h |   17 ++++++++--
+>  4 files changed, 59 insertions(+), 7 deletions(-)
