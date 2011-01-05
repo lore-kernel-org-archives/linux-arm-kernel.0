@@ -1,42 +1,117 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Wed, 5 Jan 2011 12:17:31 +0000
-Subject: [PATCH 1/6] i2c-pxa: move i2c_pxa_remove to __devexit instead
-	of just __exit
-In-Reply-To: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
-References: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20110105121731.GG817@trinity.fluff.org>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Wed,  5 Jan 2011 07:26:31 -0500
+Subject: [PATCH 1/2 v1] davinci: support disabling modem status interrupts on
+	SOC UARTS
+Message-ID: <1294230392-29564-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 05:05:05AM +0300, Dmitry Eremin-Solenikov wrote:
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: linux-i2c at vger.kernel.org
-> Cc: Ben Dooks <ben-linux@fluff.org>
+On the da850/omap-l138/am18x family of SoCs, up to three on chip UARTS may be
+configured.  These peripherals support the standard Tx/Rx signals as well as
+CTS/RTS hardware flow control signals.  The pins on these SOC's associated with
+these signals are multiplexed; e.g., the pin providing UART0_TXD capability
+also provides SPI0 chip select line 5 output capability.  The configuration of
+the pin multiplexing occurs during platform initialization (or by earlier
+bootloader operations).
 
-Please write a reasonable commit message, a null or almost empty commit
-message is simply unnaceptable. Please see the Documentation/SubmittingPatches
-or ask more about how to write good commit messages.
+There is a problem with the multiplexing implementation on these SOCs.  Only
+the output and output enable portions of the I/O section of the pin are
+multiplexed.  All peripheral input functions remain connected to a given pin
+regardless of configuration.
 
-Also, see Uwe's reply for a good example of how to write a commit message.
+In many configurations of these parts, providing a UART with Tx/Rx capability
+is needed, but the HW flow control capability is not.  Furthermore, the pins
+associated with the CTS inputs on these UARTS are often configured to support
+a different peripheral, and they may be active/toggling during runtime.  This
+can result in false modem status (CTS) interrupts being asserted to the 8250
+driver controlling the associated Tx/Rx pins, and will impact system
+performance.
 
-> -static int __exit i2c_pxa_remove(struct platform_device *dev)
-> +static int __devexit i2c_pxa_remove(struct platform_device *dev)
->  {
->  	struct pxa_i2c *i2c = platform_get_drvdata(dev);
->  
-> @@ -1169,7 +1169,7 @@ static const struct dev_pm_ops i2c_pxa_dev_pm_ops = {
->  
->  static struct platform_driver i2c_pxa_driver = {
->  	.probe		= i2c_pxa_probe,
-> -	.remove		= __exit_p(i2c_pxa_remove),
-> +	.remove		= __devexit_p(i2c_pxa_remove),
->  	.driver		= {
->  		.name	= "pxa2xx-i2c",
->  		.owner	= THIS_MODULE,
+The 8250 serial driver platform data does not provide a direct mechanism to
+tell the driver to disable modem status (i.e., CTS) interrupts for a given
+port.  As a work-around, intercept register writes to the IER and disable
+modem status interrupts.
 
-Right, I think this should fix any hotplug problems that you have.
+This patch was tested using a MityDSP-L138 SOM having UART1 enabled with the
+associated CTS pin connected to a clock (configured for the AHCLKX function).
 
+Background / problem reports related to this issue are captured in the links
+below:
+http://e2e.ti.com/support/dsp/omap_applications_processors/f/42/t/36701.aspx
+http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg19524.html
+
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+---
+This is against the linux-davinci tree.
+
+Changes from original proposed patch:
+- instead of overriding set_termios, now override serial_out driver hook
+  and intercept writes to the MSR.
+
+An alternate patch was proposed that modified the serial core driver and added a UPF_NO_MSR
+flag.  There was resistance to this patch.  The reasoning is that the core 8250 driver code
+should not continue to get muddied by platform hacks.
+
+I'm wondering, given this and the original proposed patch, if the set_termios
+override might be better?  This patch incurs a test penalty every time the UART
+is accessed; whereas the original patch only incurs a penalty on IOCTL calls.  The
+set_termios would at least report the proper IOCTL information for CRTSCTS 
+when probed, I think, instead of just quietly lying about it...
+
+ arch/arm/mach-davinci/include/mach/serial.h |    2 ++
+ arch/arm/mach-davinci/serial.c              |   19 +++++++++++++++++++
+ 2 files changed, 21 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/include/mach/serial.h b/arch/arm/mach-davinci/include/mach/serial.h
+index 8051110..8f7f5e5 100644
+--- a/arch/arm/mach-davinci/include/mach/serial.h
++++ b/arch/arm/mach-davinci/include/mach/serial.h
+@@ -49,6 +49,8 @@
+ struct davinci_uart_config {
+ 	/* Bit field of UARTs present; bit 0 --> UART1 */
+ 	unsigned int enabled_uarts;
++	/* Bit field of modem status interrupt disables; bit 0 -> UART1 */
++	unsigned int disable_msi;
+ };
+ 
+ extern int davinci_serial_init(struct davinci_uart_config *);
+diff --git a/arch/arm/mach-davinci/serial.c b/arch/arm/mach-davinci/serial.c
+index 1875740..83d44c0 100644
+--- a/arch/arm/mach-davinci/serial.c
++++ b/arch/arm/mach-davinci/serial.c
+@@ -31,6 +31,22 @@
+ #include <mach/serial.h>
+ #include <mach/cputype.h>
+ 
++static void davinci_serial_out_nomsi(struct uart_port *p, int offset, int value)
++{
++	int lcr, lcr_off;
++
++	if (offset == UART_IER) {
++		lcr_off = UART_LCR << p->regshift;
++		lcr = readb(p->membase + lcr_off);
++		/* don't override DLM setting, or probing operations */
++		if (!(lcr & UART_LCR_DLAB) && p->type != PORT_UNKNOWN)
++			value &= ~UART_IER_MSI;
++	}
++
++	offset <<= p->regshift;
++	writeb(value, p->membase + offset);
++}
++
+ static inline unsigned int serial_read_reg(struct plat_serial8250_port *up,
+ 					   int offset)
+ {
+@@ -109,6 +125,9 @@ int __init davinci_serial_init(struct davinci_uart_config *info)
+ 
+ 		if (p->membase && p->type != PORT_AR7)
+ 			davinci_serial_reset(p);
++
++		if (info->disable_msi & (1 << i))
++			p->serial_out = davinci_serial_out_nomsi;
+ 	}
+ 
+ 	return platform_device_register(soc_info->serial_dev);
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+1.7.0.4
