@@ -1,71 +1,105 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 5 Jan 2011 14:40:45 +0100
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <20110105112701.GA8638@n2100.arm.linux.org.uk>
-References: <20101230171453.GA5787@pengutronix.de>
-	<1293731992.4919.5.camel@heimdal.trondhjem.org>
-	<20101230191846.GB14221@pengutronix.de>
-	<20110103213850.GC25121@pengutronix.de>
-	<1294100558.25100.8.camel@heimdal.trondhjem.org>
-	<20110105084014.GN25121@pengutronix.de>
-	<20110105110517.GQ25121@pengutronix.de>
-	<20110105112701.GA8638@n2100.arm.linux.org.uk>
-Message-ID: <20110105134045.GS25121@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed,  5 Jan 2011 19:10:55 +0530
+Subject: [PATCH] omap: wd_timer: Fix crash frm wdt_probe when
+	!CONFIG_RUNTIME_PM
+Message-ID: <1294234855-6623-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Commit ff2516fb 'wd_timer: disable on boot via hwmod postsetup mechanism'
+introduced watchdog timer state state management using postsetup_state.
+This was done to allow some board files to support watchdog coverage
+throughout kernel initialization and it work as intended when RUNTIME_PM
+is enabled.
 
-On Wed, Jan 05, 2011 at 11:27:01AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 05, 2011 at 12:05:17PM +0100, Uwe Kleine-K?nig wrote:
-> > Hello Trond,
-> > 
-> > On Wed, Jan 05, 2011 at 09:40:14AM +0100, Uwe Kleine-K?nig wrote:
-> > > On Mon, Jan 03, 2011 at 07:22:38PM -0500, Trond Myklebust wrote:
-> > > > The question is whether this is something happening on the server or the
-> > > > client. Does an older client kernel boot without any trouble?
-> > > I will set up a boot test with 2.6.37 (for statistics) and 2.6.36 to
-> > > compare with.  If you don't consider .36 to be old enough let me now.
-> > > Once the setup is done it should be easy to test .35 (say), too.
-> > > 
-> > Marc (cc'd) saw similar[1] problems with .37, when using .36.2 the
-> > problems didn't occur.  This was more reliable to trigger and he was so
-> > kind to bisect the problem.
-> > 
-> > When testing v2.6.36-rc3-51-gafa8ccc init hanged.
-> > (babddc72a9468884ce1a23db3c3d54b0afa299f0 is the first bad commit with
-> > this hang.)  Commit 56e4ebf877b6043c289bda32a5a7385b80c17dee makes the
-> > "init hangs" problem the "fileid changed on tab" problem.
-> > 
-> > I could only reproduce that on armv5 machines (imx27, imx28 and at91)
-> > but not on armv6 (imx35).
-> 
-> FYI, I've seen the "fileid changed" problem, and it looked like a 32-bit
-> truncation of the fileid.  It occurred several times on successive
-> reboots, so I tried to capture a tcpdump trace off the server (Linux
-> 2.6.23-rc8-ga64314e6 - its ancient because I've had issues with buggy
-> IDE drivers trying to move it forward.)  However, for the last couple
-> of weeks I've been unable to reproduce it.
-> 
-> The client was based on 2.6.37-rc6.
-> 
-> The "fileid changed" messages popped up after mounting an export with
-> 'nolock,intr,rsize=4096,soft', and then trying to use bash completion
-> and 'ls' in a few subdirectories - and entries were missing from the
-> directory lists without 'ls' reporting any errors (which I think is bad
-> behaviour in itself.)
-There was a bug in at least -rc5[1] that was considered already fixed in
--rc4[2]. The later announcements didn't mention it anymore. 
+With !CONFIG_RUNTIME_PM and no board is specifically requests watchdog
+to remain enabled the omap_wdt_probe crashesh. This is because hwmod
+in absense of runtime PM unable to turn watchdog clocks because it's
+state is set to be disabled. For rest of the device, the state is
+set as enabled in absense of RUNTIME_PM
 
-> I don't know why it's stopped producing the errors, although once it
-> went I never investigated it any further (was far too busy trying to
-> get AMBA DMA support working.)
-It seems it was fixed for most users though. Trond?
+[    1.372558] Unhandled fault: imprecise external abort (0x1406) at 0xad733eeb
+[    1.379913] Internal error: : 1406 [#1] SMP
+[    1.384277] last sysfs file:
+[    1.387359] Modules linked in:
+[    1.390563] CPU: 0    Tainted: G        W    (2.6.37-rc7-00265-g4298a4c-dirty #23)
+[    1.398468] PC is at omap_wdt_disable+0x2c/0x3c
+[    1.403198] LR is at omap_wdt_probe+0x124/0x1e0
+[    1.407928] pc : [<c02f5bf4>]    lr : [<c03be10c>]    psr: 60000013
+[    1.407958] sp : df833f00  ip : 00000000  fp : 00000000
+[    1.419921] r10: c0ac57ac  r9 : df959e00  r8 : 00000000
+[    1.425384] r7 : df959e08  r6 : df8000c0  r5 : df95bebc  r4 : df87dde0
+[    1.432189] r3 : fc314000  r2 : 00005555  r1 : fc314034  r0 : df87dde0
 
-Uwe
+This patch make the default watchdog state to be enabled in case of
+!CONFIG_RUNTIME_PM. This fixes the crash
 
-[1] http://lwn.net/Articles/418963/
-[2] http://lwn.net/Articles/417704/
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
+Paul, I am not too sure if it breaks your _shutdown idea of watchdog
+timer.
+Patch generated against 'omap-for-linus' branch and boot tested on OMAP4
+with and without CONFIG_OMAP_WATCHDOG.
+
+ arch/arm/configs/omap2plus_defconfig |    2 +-
+ arch/arm/mach-omap2/Kconfig          |    1 -
+ arch/arm/mach-omap2/io.c             |    4 ++++
+ arch/arm/mach-omap2/omap_hwmod.c     |    1 +
+ 4 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index ccedde1..2d711d5 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -71,7 +71,7 @@ CONFIG_NEON=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_PM=y
+ CONFIG_PM_DEBUG=y
+-CONFIG_PM_RUNTIME=y
++# CONFIG_PM_RUNTIME is not set
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 3e8c9e8..077ce26 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -8,7 +8,6 @@ config ARCH_OMAP2PLUS_TYPICAL
+ 	select AEABI
+ 	select REGULATOR
+ 	select PM
+-	select PM_RUNTIME
+ 	select VFP
+ 	select NEON if ARCH_OMAP3 || ARCH_OMAP4
+ 	select SERIAL_OMAP
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index e66687b..b879a16 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -378,7 +378,11 @@ void __init omap2_init_common_infrastructure(void)
+ 	 * XXX ideally we could detect whether the MPU WDT was currently
+ 	 * enabled here and make this conditional
+ 	 */
++#ifdef CONFIG_PM_RUNTIME
+ 	postsetup_state = _HWMOD_STATE_DISABLED;
++#else
++	postsetup_state = _HWMOD_STATE_ENABLED;
++#endif
+ 	omap_hwmod_for_each_by_class("wd_timer",
+ 				     _set_hwmod_postsetup_state,
+ 				     &postsetup_state);
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e282e35..ccdb3fd 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1432,6 +1432,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
+ 	else if (postsetup_state != _HWMOD_STATE_ENABLED)
+ 		WARN(1, "hwmod: %s: unknown postsetup state %d! defaulting to enabled\n",
+ 		     oh->name, postsetup_state);
++	printk("POSTSETUP state: %s = %d\n", oh->name, postsetup_state);
+ 
+ 	return 0;
+ }
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.0.4
