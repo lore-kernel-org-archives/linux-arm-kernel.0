@@ -1,56 +1,48 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed,  5 Jan 2011 16:27:00 +0530
-Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build break
-	because of clktrctrl_mask
-Message-ID: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Wed, 5 Jan 2011 16:28:47 +0530
+Subject: [PATCH 0/5] omap2plus: Trivial build break fixes
+In-Reply-To: <8762u4423o.fsf@ti.com>
+References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+	<8762u4423o.fsf@ti.com>
+Message-ID: <6a39d0124306a5ac6b567edca88f0671@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct clockdomain member clktrctrl_mask is available for only for OMAP2
-and OMAP3 architectures. Technially it is also used only for these archs
-but this breaks the build with custom OMAP4 configuration.
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Wednesday, January 05, 2011 6:08 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 0/5] omap2plus: Trivial build break fixes
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+> > These are trivial build fixes which I found while doing some
+> > testing 'omap-for-linus' branch.
+> >
+> > The series is generated against the linux-omap 'omap-for-linus'
+> branch
+> > and boot tested on OMAP4430 SDP and OMAP3630 ZOOM.
+>
+> Minor nit in your git-send-email config.
+>
+> Can you add the following to your ~/.gitconfig, or update to newer
+> git
+> where this is now the default:
+>
+> [sendemail]
+> 	chainreplyto = false
+>
+> This will make all patches a reply to PATCH 0 instead of to the
+> previous
+> patch.
+>
+Have tried this in v2 I posted but it didn't appear to be a
+reply for PATCH 0.
 
- CC      arch/arm/mach-omap2/clockdomain.o
-arch/arm/mach-omap2/clockdomain.c: In function '_enable_hwsup':
-arch/arm/mach-omap2/clockdomain.c:251: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:254: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function '_disable_hwsup':
-arch/arm/mach-omap2/clockdomain.c:277: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:280: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_sleep':
-arch/arm/mach-omap2/clockdomain.c:744: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_wakeup':
-arch/arm/mach-omap2/clockdomain.c:789: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_clk_enable':
-arch/arm/mach-omap2/clockdomain.c:922: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:926: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c: In function 'omap2_clkdm_clk_disable':
-arch/arm/mach-omap2/clockdomain.c:994: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-arch/arm/mach-omap2/clockdomain.c:998: error: 'struct clockdomain' has no member named 'clktrctrl_mask'
-make[1]: *** [arch/arm/mach-omap2/clockdomain.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
 
-Fix the build break by dropping the #ifdef as suggested by Paul Walmsley
+May be I missed something.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/clockdomain.h |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index de3faa2..9b459c2 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -103,9 +103,7 @@ struct clockdomain {
- 		const char *name;
- 		struct powerdomain *ptr;
- 	} pwrdm;
--#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
- 	const u16 clktrctrl_mask;
--#endif
- 	const u8 flags;
- 	const u8 dep_bit;
- 	const u8 prcm_partition;
--- 
-1.6.0.4
+Regards,
+Santosh
