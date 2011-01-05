@@ -1,73 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Jan 2011 14:06:36 +0000
-Subject: [PATCH 4/8] ARM: VExpress: Use physmap driver instead of
-	integrator-flash
-In-Reply-To: <1294236400-22477-1-git-send-email-marc.zyngier@arm.com>
-References: <1294236400-22477-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1294236400-22477-5-git-send-email-marc.zyngier@arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 5 Jan 2011 19:44:31 +0530
+Subject: OMAP4 panda gets stuck during reboot
+In-Reply-To: <20110105140801.GC2304@legolas.emea.dhcp.ti.com>
+References: <20110105140801.GC2304@legolas.emea.dhcp.ti.com>
+Message-ID: <45ff6d061a3e0bdcaf676671bf447b3b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mach-vexpress/v2m.c |   22 ++++------------------
- 1 files changed, 4 insertions(+), 18 deletions(-)
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Felipe Balbi
+> Sent: Wednesday, January 05, 2011 7:38 PM
+> To: Russell King; Tony Lindgren
+> Cc: Linux ARM Kernel Mailing List; Linux OMAP Mailing List
+> Subject: OMAP4 panda gets stuck during reboot
+>
+> Hi,
+>
+> It seems like there's a bug on flush_pmd_entry() for multicore ARM
+> CPUs.
+>
+> I'm testing 2.6.37 with pandaboard and when running "reboot" it gets
+> stuck on:
+>
+> asm("mcr	p15, 0, %0, c7, c10, 1	@ flush_pmd"
+> 			: : "r" (pmd) : "cc");
+>
+> I added a few printk()s around the code to find the specific spot
+> where
+> the reset sequence was getting stuck and here's the output:
+>
+> [  112.497253] ===> kernel_restart (line 312)
+> [  112.501525] ===> kernel_restart_prepare (line 294)
+> [  112.506561] ===> device_shutdown (line 1661)
+> [  112.511871] ===> device_shutdown (line 1692)
+> [  112.516387] ===> sysdev_shutdown (line 323)
+> [  112.520782] ===> sysdev_shutdown (line 349)
+> [  112.525146] ===> kernel_restart_prepare (line 299)
+> [  112.530181] Restarting system.
+> [  112.533386] ===> machine_restart (line 254)
+> [  112.537750] ===> machine_shutdown (line 232)
+> [  112.542236] ===> machine_shutdown (line 236)
+> [  112.546722] ===> arm_machine_restart (line 96)
+> [  112.551391] ===> setup_mm_for_reboot (line 1059)
+> [  112.556213] ===> setup_mm_for_reboot (line 1066)
+> [  112.561035] ===> setup_mm_for_reboot (line 1071)
+> [  112.565856] ===> flush_pmd_entry (line 522)
+>
+> What could it be ? Any more debugging I could do to help ?
+>
+This is known and seems to OMAP specific issue. Test patch and
+relevant thread is here.
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 7eaa232..5ba07e9 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -11,10 +11,10 @@
- #include <linux/spinlock.h>
- #include <linux/sysdev.h>
- #include <linux/usb/isp1760.h>
-+#include <linux/mtd/physmap.h>
- 
- #include <asm/clkdev.h>
- #include <asm/sizes.h>
--#include <asm/mach/flash.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <asm/hardware/arm_timer.h>
-@@ -194,27 +194,13 @@ static struct platform_device v2m_usb_device = {
- 	.dev.platform_data = &v2m_usb_config,
- };
- 
--static int v2m_flash_init(void)
--{
--	writel(0, MMIO_P2V(V2M_SYS_FLASH));
--	return 0;
--}
--
--static void v2m_flash_exit(void)
--{
--	writel(0, MMIO_P2V(V2M_SYS_FLASH));
--}
--
--static void v2m_flash_set_vpp(int on)
-+static void v2m_flash_set_vpp(struct map_info *map, int on)
- {
- 	writel(on != 0, MMIO_P2V(V2M_SYS_FLASH));
- }
- 
--static struct flash_platform_data v2m_flash_data = {
--	.map_name	= "cfi_probe",
-+static struct physmap_flash_data v2m_flash_data = {
- 	.width		= 4,
--	.init		= v2m_flash_init,
--	.exit		= v2m_flash_exit,
- 	.set_vpp	= v2m_flash_set_vpp,
- };
- 
-@@ -231,7 +217,7 @@ static struct resource v2m_flash_resources[] = {
- };
- 
- static struct platform_device v2m_flash_device = {
--	.name		= "armflash",
-+	.name		= "physmap-flash",
- 	.id		= -1,
- 	.resource	= v2m_flash_resources,
- 	.num_resources	= ARRAY_SIZE(v2m_flash_resources),
--- 
-1.7.0.4
+http://www.spinics.net/lists/arm-kernel/msg103493.html
