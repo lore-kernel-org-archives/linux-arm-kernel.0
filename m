@@ -1,39 +1,32 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed,  5 Jan 2011 05:05:05 +0300
-Subject: [PATCH 1/6] i2c-pxa: move i2c_pxa_remove to __devexit instead of just
-	__exit
-Message-ID: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
+Date: Wed,  5 Jan 2011 05:05:06 +0300
+Subject: [PATCH 2/6] mfp-pxa27x: correct naming of GPIO13_KP_DKIN_7
+In-Reply-To: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
+References: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1294193110-23958-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: linux-i2c at vger.kernel.org
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- drivers/i2c/busses/i2c-pxa.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Correct naming of one of pin functions: it's GPIO13_KP_DKIN_7, not
+GPIO13_KP_KDIN_7.
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index f4c19a9..0f10955 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -1115,7 +1115,7 @@ emalloc:
- 	return ret;
- }
- 
--static int __exit i2c_pxa_remove(struct platform_device *dev)
-+static int __devexit i2c_pxa_remove(struct platform_device *dev)
- {
- 	struct pxa_i2c *i2c = platform_get_drvdata(dev);
- 
-@@ -1169,7 +1169,7 @@ static const struct dev_pm_ops i2c_pxa_dev_pm_ops = {
- 
- static struct platform_driver i2c_pxa_driver = {
- 	.probe		= i2c_pxa_probe,
--	.remove		= __exit_p(i2c_pxa_remove),
-+	.remove		= __devexit_p(i2c_pxa_remove),
- 	.driver		= {
- 		.name	= "pxa2xx-i2c",
- 		.owner	= THIS_MODULE,
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-pxa/include/mach/mfp-pxa27x.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h b/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
+index ec0f0b0..6553d62 100644
+--- a/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
++++ b/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
+@@ -300,7 +300,7 @@
+ #define GPIO97_KP_DKIN_4	MFP_CFG_IN(GPIO97, AF1)
+ #define GPIO98_KP_DKIN_5	MFP_CFG_IN(GPIO98, AF1)
+ #define GPIO99_KP_DKIN_6	MFP_CFG_IN(GPIO99, AF1)
+-#define GPIO13_KP_KDIN_7	MFP_CFG_IN(GPIO13, AF2)
++#define GPIO13_KP_DKIN_7	MFP_CFG_IN(GPIO13, AF2)
+ #define GPIO100_KP_MKIN_0	MFP_CFG_IN(GPIO100, AF1)
+ #define GPIO101_KP_MKIN_1	MFP_CFG_IN(GPIO101, AF1)
+ #define GPIO102_KP_MKIN_2	MFP_CFG_IN(GPIO102, AF1)
 -- 
 1.7.2.3
