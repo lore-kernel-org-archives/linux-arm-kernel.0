@@ -1,46 +1,34 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 5 Jan 2011 13:27:54 +0800
-Subject: Bug in arch-mmp board selection
-In-Reply-To: <AANLkTi=SX-KmcmP-cNN-59D+rSABQmSHEPQaYF0WFbGg@mail.gmail.com>
-References: <AANLkTi=SX-KmcmP-cNN-59D+rSABQmSHEPQaYF0WFbGg@mail.gmail.com>
-Message-ID: <AANLkTikSVano80-1U9p59+0XO2zY6a5mxJaGkmwwviCE@mail.gmail.com>
+From: mkl0301@gmail.com (mkl0301 at gmail.com)
+Date: Wed,  5 Jan 2011 13:43:04 +0800
+Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
+Message-ID: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 5, 2011 at 12:57 PM, Mark F. Brown <mark.brown314@gmail.com> wrote:
-> Hi Eric,
->
-> PXA168 and PXA910 are based on PJ1 which is an ARMv5 compatible architecture
-> MMP2 is a based on PJ4 which configured as ARMv6 currently (there are
-> ARMv7 versions as well)
->
-> Currently all SoCs are selectable under the "PXA168/910/MMP2" menu
-> option which allows you to then select PXA168, PXA910, and MMP2 boards
-> for one image. If you build this configuration this error occurs:
->
-> ?AS ? ? ?arch/arm/kernel/entry-armv.o
-> arch/arm/kernel/entry-armv.S: Assembler messages:
-> arch/arm/kernel/entry-armv.S:212: Error: selected processor does not
-> support `clrex'
-> arch/arm/kernel/entry-armv.S:244: Error: selected processor does not
-> support `clrex'
-> arch/arm/kernel/entry-armv.S:302: Error: selected processor does not
-> support `clrex'
-> arch/arm/kernel/entry-armv.S:338: Error: selected processor does not
-> support `clrex'
-> make[1]: *** [arch/arm/kernel/entry-armv.o] Error 1
-> make: *** [arch/arm/kernel] Error 2
->
-You must build PJ1 and PJ4 together. Actually, I plan to add
-ARCH_MMP2. So we can avoid this issue.
+From: Mac Lin <mkl0301@gmail.com>
 
-> I am aware we can resolve this by adding KConfig rules to prevent this
-> scenario, but it leads to a deeper question. Why does selecting the
-> board in turn select the CPU type instead of the user enabling the CPU
-> type and then providing a set of boards for selection?
->
-> e.g.
-> config MACH_ZYLONITE2
-> ? ? ? ?bool "Marvell's PXA168 Zylonite2 Development Board"
-> ? ? ? --> select CPU_PXA168
->
+v2:
+ - Switch ahci_platform to module device table matching to add SoC specific support
+
+v1: http://www.spinics.net/lists/arm-kernel/msg106236.html
+ - Add CNS3xxx SoC specific AHCI support
+
+This patchset is based on linux-2.6.37-rc2
+
+Mac Lin (3):
+      ahci_platform: rename to ahci_pltfm, but keep the original module name
+      ahci_pltfm: switch to module device table matching
+      ahci_platform: add support for CNS3xxx SoC devices
+
+ arch/arm/mach-cns3xxx/devices.c |    2 +-
+ drivers/ata/Kconfig             |   11 ++
+ drivers/ata/Makefile            |    5 +-
+ drivers/ata/ahci_cns3xxx.c      |   62 +++++++++++
+ drivers/ata/ahci_platform.c     |  197 ------------------------------------
+ drivers/ata/ahci_pltfm.c        |  212 +++++++++++++++++++++++++++++++++++++++
+ drivers/ata/ahci_pltfm.h        |   19 ++++
+ 7 files changed, 309 insertions(+), 199 deletions(-)
+ create mode 100644 drivers/ata/ahci_cns3xxx.c
+ delete mode 100644 drivers/ata/ahci_platform.c
+ create mode 100644 drivers/ata/ahci_pltfm.c
+ create mode 100644 drivers/ata/ahci_pltfm.h
