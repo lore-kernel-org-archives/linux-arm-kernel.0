@@ -1,58 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 5 Jan 2011 11:54:04 +0100
-Subject: [PATCH 6/6] Fix eseries compilation if w100fb is not compiled
-	in kernel
-In-Reply-To: <20110105082748.GM25121@pengutronix.de>
-References: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
-	<1294193110-23958-6-git-send-email-dbaryshkov@gmail.com>
-	<20110105082748.GM25121@pengutronix.de>
-Message-ID: <20110105105404.GP25121@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed,  5 Jan 2011 16:27:03 +0530
+Subject: [PATCH v2 4/5] omap2plus: voltage: Trivial linking fix 'undefined
+	reference'
+In-Reply-To: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1294225024-21857-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+LD      init/built-in.o
+LD      .tmp_vmlinux1
+arch/arm/mach-omap2/built-in.o: In function `omap2_set_init_voltage':
+arch/arm/mach-omap2/pm.c:181: undefined reference to `omap_voltage_domain_lookup'
+arch/arm/mach-omap2/built-in.o: In function `omap4_twl_init':
+arch/arm/mach-omap2/omap_twl.c:244: undefined reference to `omap_voltage_domain_lookup'
+arch/arm/mach-omap2/omap_twl.c:247: undefined reference to `omap_voltage_domain_lookup'
+arch/arm/mach-omap2/omap_twl.c:250: undefined reference to `omap_voltage_domain_lookup'
+make: *** [.tmp_vmlinux1] Error 1
 
-On Wed, Jan 05, 2011 at 09:27:49AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Dmitry,
-> 
-> On Wed, Jan 05, 2011 at 05:05:10AM +0300, Dmitry Eremin-Solenikov wrote:
-> > e800_tg_change depends on w100fb_gpio_read/write API which is only present
-> > if w100fb is compiled in kernel.
-> > 
-> > Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > Cc: Ian Molton <ian@mnementh.co.uk>
-> > ---
-> >  arch/arm/mach-pxa/eseries.c |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
-> > index b25690c..ed2c157 100644
-> > --- a/arch/arm/mach-pxa/eseries.c
-> > +++ b/arch/arm/mach-pxa/eseries.c
-> > @@ -829,6 +829,7 @@ static struct w100_mem_info e800_w100_mem_info = {
-> >  
-> >  static void e800_tg_change(struct w100fb_par *par)
-> >  {
-> > +#ifdef FB_W100
-> CONFIG_FB_W100?
-> 
-> >  	unsigned long tmp;
-> >  
-> >  	tmp = w100fb_gpio_read(W100_GPIO_PORT_A);
-> > @@ -837,6 +838,7 @@ static void e800_tg_change(struct w100fb_par *par)
-> >  	else
-> >  		tmp &= ~0x100;
-> >  	w100fb_gpio_write(W100_GPIO_PORT_A, tmp);
-> > +#endif
-> What happens if FB_W100=m?  The code isn't compiled in, would it still
-> be necessary?
-did you see commit a74b74a5555c741ed3df896096e33b853995631e?
+The error is reported when omap2plus_defconfig built with CONFIG_PM disabled
 
-http://git.kernel.org/linus/a74b74a5555c741ed3df896096e33b853995631e
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Thara Gopinath <thara@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/plat-omap/include/plat/voltage.h |   10 +++++++---
+ 1 files changed, 7 insertions(+), 3 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/plat-omap/include/plat/voltage.h b/arch/arm/plat-omap/include/plat/voltage.h
+index 9943c66..4b02227 100644
+--- a/arch/arm/plat-omap/include/plat/voltage.h
++++ b/arch/arm/plat-omap/include/plat/voltage.h
+@@ -65,9 +65,6 @@ struct voltagedomain {
+ 	char *name;
+ };
+ 
+-/* API to get the voltagedomain pointer */
+-struct voltagedomain *omap_voltage_domain_lookup(char *name);
+-
+ /**
+  * struct omap_volt_data - Omap voltage specific data.
+  * @voltage_nominal:	The possible voltage value in uV
+@@ -131,6 +128,9 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
+ 		struct omap_volt_pmic_info *pmic_info);
+ void omap_change_voltscale_method(struct voltagedomain *voltdm,
+ 		int voltscale_method);
++/* API to get the voltagedomain pointer */
++struct voltagedomain *omap_voltage_domain_lookup(char *name);
++
+ int omap_voltage_late_init(void);
+ #else
+ static inline int omap_voltage_register_pmic(struct voltagedomain *voltdm,
+@@ -144,6 +144,10 @@ static inline int omap_voltage_late_init(void)
+ {
+ 	return -EINVAL;
+ }
++static inline struct voltagedomain *omap_voltage_domain_lookup(char *name)
++{
++	return ERR_PTR(-EINVAL);
++}
+ #endif
+ 
+ #endif
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.0.4
