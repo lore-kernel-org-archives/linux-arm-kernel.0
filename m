@@ -1,96 +1,138 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 04 Jan 2011 16:32:24 -0800
-Subject: [PATCH 2/5] omap2plus: prm: Trvial build break fix for undefined
-	reference to 'omap2_prm_read_mod_reg'
-In-Reply-To: <cc76ecb39b950683cd12d254968e851c@mail.gmail.com> (Santosh
-	Shilimkar's message of "Wed, 5 Jan 2011 00:13:58 +0530")
-References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
-	<1294165576-15628-2-git-send-email-santosh.shilimkar@ti.com>
-	<1294165576-15628-3-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1101041139110.19319@utopia.booyaka.com>
-	<cc76ecb39b950683cd12d254968e851c@mail.gmail.com>
-Message-ID: <87d3oc42cn.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 00:33:16 +0000
+Subject: [PATCH] [ARM] orion5x: accelerate NAND on the TS-78xx
+In-Reply-To: <20110104235158.GQ12386@chipmunk>
+References: <20110104235158.GQ12386@chipmunk>
+Message-ID: <20110105003316.GJ24935@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Tue, Jan 04, 2011 at 11:51:59PM +0000, Alexander Clouter wrote:
+> The NAND supports 32bit reads and writes so lets stop shunting 8bit
+> chunks across the bus.
+> 
+> Doing a dumb 'dd' benchmark, this increases performance roughly like so:
+>  * read: 1.3MB/s to 3.4MB/s
+>  * write: 614kB/s to 882kB/s
 
->> -----Original Message-----
->> From: Paul Walmsley [mailto:paul at pwsan.com]
->> Sent: Wednesday, January 05, 2011 12:11 AM
->> To: Santosh Shilimkar
->> Cc: linux-omap at vger.kernel.org; khilman at ti.com; tony at atomide.com;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH 2/5] omap2plus: prm: Trvial build break fix for
->> undefined reference to 'omap2_prm_read_mod_reg'
->>
->> Hi Santosh,
->>
->> On Tue, 4 Jan 2011, Santosh Shilimkar wrote:
->>
->> > omap2plus_defocnfig build breaks when customised with only
->> ARCH_OMAP4
->> > selected. This is because common files make references to the
->> functions
->> > which are defined only for omap2xxx and omap3xxx.
->> >
->> >  LD      .tmp_vmlinux1
->> > arch/arm/mach-omap2/built-in.o: In function `pm_dbg_regset_store':
->> > arch/arm/mach-omap2/pm-debug.c:335: undefined reference to
->> `omap2_prm_read_mod_reg'
->> > arch/arm/mach-omap2/built-in.o: In function `omap2_pm_dump':
->> > arch/arm/mach-omap2/pm-debug.c:121: undefined reference to
->> `omap2_prm_read_mod_reg'
->> > arch/arm/mach-omap2/pm-debug.c:123: undefined reference to
->> `omap2_prm_read_mod_reg'
->> > arch/arm/mach-omap2/pm-debug.c:124: undefined reference to
->> `omap2_prm_read_mod_reg'
->> > arch/arm/mach-omap2/pm-debug.c:125: undefined reference to
->> `omap2_prm_read_mod_reg'
->> > arch/arm/mach-omap2/built-in.o: In function
->> `omap_prcm_arch_reset':
->> > arch/arm/mach-omap2/prcm.c:106: undefined reference to
->> `omap2_prm_set_mod_reg_bits'
->> > arch/arm/mach-omap2/prcm.c:108: undefined reference to
->> `omap2_prm_read_mod_reg'
->> > arch/arm/mach-omap2/built-in.o: In function
->> `omap_prcm_get_reset_sources':
->> > arch/arm/mach-omap2/prcm.c:53: undefined reference to
->> `omap2_prm_read_mod_reg'
->> > arch/arm/mach-omap2/built-in.o: In function
->> `clkdm_clear_all_wkdeps':
->> > arch/arm/mach-omap2/clockdomain.c:545: undefined reference to
->> `omap2_prm_clear_mod_reg_bits'
->> > arch/arm/mach-omap2/built-in.o: In function `clkdm_del_wkdep':
->> > arch/arm/mach-omap2/clockdomain.c:475: undefined reference to
->> `omap2_prm_clear_mod_reg_bits'
->> > arch/arm/mach-omap2/built-in.o: In function `clkdm_read_wkdep':
->> > arch/arm/mach-omap2/clockdomain.c:511: undefined reference to
->> `omap2_prm_read_mod_bits_shift'
->> > arch/arm/mach-omap2/built-in.o: In function `clkdm_add_wkdep':
->> > arch/arm/mach-omap2/clockdomain.c:440: undefined reference to
->> `omap2_prm_set_mod_reg_bits'
->> > make: *** [.tmp_vmlinux1] Error 1
->> >
->> > This patch adds stubs for these functions so that build continues
->> to work.
->> >
->> > Probably alternately  the build can be fixed as below but that not
->> seems to
->> > be the right way.
->>
->> Since these functions now return 0, maybe it would be better to call
->> WARN() or BUG() in these functions for OMAP4.  Otherwise, they are
->> going
->> to silently do the wrong thing, and someone needs to fix any usage
->> of
->> these functions where they shouldn't be used.  e.g., in mach-
->> omap2/prcm.c
->> or mach-omap2/pm-debug.c ...
->>
-> Good point. Will update the patch accordingly and repost.
+Try something like the below.  It's slightly more typing, but the
+underlying string IO functions should improve your transfer speed.
+Note that they won't do endian conversions.
 
-Please use WARN() instead of BUG() as this is not worthy of causing a
-panic() for the whole kernel.
+> 
+> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> ---
+>  arch/arm/mach-orion5x/ts78xx-setup.c |   42 ++++++++++++++++++++++++++++++++++
+>  1 files changed, 42 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+> index 9a5d1ef..bcc21fe 100644
+> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
+> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+> @@ -191,6 +191,46 @@ static int ts78xx_ts_nand_dev_ready(struct mtd_info *mtd)
+>  	return readb(TS_NAND_CTRL) & 0x20;
+>  }
+>  
+> +static void ts78xx_ts_nand_write_buf(struct mtd_info *mtd,
+> +			const uint8_t *buf, int len)
+> +{
+> +	struct nand_chip *chip = mtd->priv;
+> +	void __iomem *io_base = chip->IO_ADDR_W;
+> +	uint32_t *buf32;
+> +	int i = 0;
+> +
+> +	while (len && (unsigned int)buf & 3) {
+> +		writeb(*buf++, io_base);
+> +		len--;
+> +	}
+> +	buf32 = (uint32_t *)buf;
+> +	while (i < len/4)
+> +		writel(buf32[i++], io_base);
+> +	i *= 4;
+> +	while (i < len)
+> +		writeb(buf[i++], io_base);
 
-Kevin
+	unsigned long off = ((unsigned long)buf & 3);
+	int sz;
+
+	if (off) {
+		sz = min(4 - off, len);
+		writesb(io_base, buf, sz);
+		buf += sz;
+		len -= sz;
+	}
+
+	sz = len >> 2;
+	if (sz) {
+		u32 *buf32 = (u32 *)buf;
+		writesl(io_base, buf32, sz);
+		buf += sz << 2;
+		len -= sz << 2;
+	}
+
+	if (len)
+		writesb(io_base, buf, len);
+
+> +}
+> +
+> +static void ts78xx_ts_nand_read_buf(struct mtd_info *mtd,
+> +			uint8_t *buf, int len)
+> +{
+> +	struct nand_chip *chip = mtd->priv;
+> +	void __iomem *io_base = chip->IO_ADDR_R;
+> +	uint32_t *buf32;
+> +	int i = 0;
+> +
+> +	while (len && (unsigned int)buf & 3) {
+> +		*buf++ = readb(io_base);
+> +		len--;
+> +	}
+> +	buf32 = (uint32_t *)buf;
+> +	while (i < len/4)
+> +		buf32[i++] = readl(io_base);
+> +	i *= 4;
+> +	while (i < len)
+> +		buf[i++] = readb(io_base);
+
+	unsigned long off = ((unsigned long)buf & 3);
+	int sz;
+
+	if (off) {
+		sz = min(4 - off, len);
+		readsb(io_base, buf, sz);
+		buf += sz;
+		len -= sz;
+	}
+
+	sz = len >> 2;
+	if (sz) {
+		u32 *buf32 = (u32 *)buf;
+		readsl(io_base, buf32, sz);
+		buf += sz << 2;
+		len -= sz << 2;
+	}
+
+	if (len)
+		readsb(io_base, buf, len);
+
+> +}
+> +
+>  const char *ts_nand_part_probes[] = { "cmdlinepart", NULL };
+>  
+>  static struct mtd_partition ts78xx_ts_nand_parts[] = {
+> @@ -233,6 +273,8 @@ static struct platform_nand_data ts78xx_ts_nand_data = {
+>  		 */
+>  		.cmd_ctrl		= ts78xx_ts_nand_cmd_ctrl,
+>  		.dev_ready		= ts78xx_ts_nand_dev_ready,
+> +		.write_buf		= ts78xx_ts_nand_write_buf,
+> +		.read_buf		= ts78xx_ts_nand_read_buf,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.2.3
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
