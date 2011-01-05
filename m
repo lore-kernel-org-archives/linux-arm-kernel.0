@@ -1,113 +1,41 @@
-From: Trond.Myklebust@netapp.com (Trond Myklebust)
-Date: Wed, 05 Jan 2011 12:17:27 -0500
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <20110105155230.GC8638@n2100.arm.linux.org.uk>
-References: <20101230191846.GB14221@pengutronix.de>
-	<20110103213850.GC25121@pengutronix.de>
-	<1294100558.25100.8.camel@heimdal.trondhjem.org>
-	<20110105084014.GN25121@pengutronix.de>
-	<20110105110517.GQ25121@pengutronix.de>
-	<20110105112701.GA8638@n2100.arm.linux.org.uk>
-	<20110105134045.GS25121@pengutronix.de>
-	<1294239193.3014.9.camel@heimdal.trondhjem.org>
-	<4D2487CA.5040501@pengutronix.de>
-	<1294240457.3014.13.camel@heimdal.trondhjem.org>
-	<20110105155230.GC8638@n2100.arm.linux.org.uk>
-Message-ID: <1294247847.2998.23.camel@heimdal.trondhjem.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 05 Jan 2011 09:20:00 -0800
+Subject: [PATCH 0/5] omap2plus: Trivial build break fixes
+In-Reply-To: <6a39d0124306a5ac6b567edca88f0671@mail.gmail.com> (Santosh
+	Shilimkar's message of "Wed, 5 Jan 2011 16:28:47 +0530")
+References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
+	<8762u4423o.fsf@ti.com>
+	<6a39d0124306a5ac6b567edca88f0671@mail.gmail.com>
+Message-ID: <87r5crz2rj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-05 at 15:52 +0000, Russell King - ARM Linux wrote: 
-> On Wed, Jan 05, 2011 at 10:14:17AM -0500, Trond Myklebust wrote:
-> > OK. So,the new behaviour in 2.6.37 is that we're writing to a series of
-> > pages via the usual kmap_atomic()/kunmap_atomic() and kmap()/kunmap()
-> > interfaces, but we can end up reading them via a virtual address range
-> > that gets set up via vm_map_ram() (that range gets set up before the
-> > write occurs).
-> 
-> kmap of lowmem pages will always reuses the existing kernel direct
-> mapping, so there won't be a problem there.
-> 
-> > Do we perhaps need an invalidate_kernel_vmap_range() before we can read
-> > the data on ARM in this kind of scenario?
-> 
-> Firstly, vm_map_ram() does no cache maintainence of any sort, nor does
-> it take care of page colouring - so any architecture where cache aliasing
-> can occur will see this problem.  It should not limited to ARM.
-> 
-> Secondly, no, invalidate_kernel_vmap_range() probably isn't sufficient.
-> There's two problems here:
-> 
-> 	addr = kmap(lowmem_page);
-> 	*addr = stuff;
-> 	kunmap(lowmem_page);
-> 
-> Such lowmem pages are accessed through their kernel direct mapping.
-> 
-> 	ptr = vm_map_ram(lowmem_page);
-> 	read = *ptr;
-> 
-> This creates a new mapping which can alias with the kernel direct mapping.
-> Now, as this is a new mapping, there should be no cache lines associated
-> with it.  (Looking at vm_unmap_ram(), it calls free_unmap_vmap_area_addr(),
-> free_unmap_vmap_area(), which then calls flush_cache_vunmap() on the
-> region.  vb_free() also calls flush_cache_vunmap() too.)
-> 
-> If the write after kmap() hits an already present cache line, the cache
-> line will be updated, but it won't be written back to memory.  So, on
-> a subsequent vm_map_ram(), with any kind of aliasing cache, there's
-> no guarantee that you'll hit that cache line and read the data just
-> written there.
-> 
-> The kernel direct mapping would need to be flushed.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-We should already be flushing the kernel direct mapping after writing by
-means of the calls to flush_dcache_page() in xdr_partial_copy_from_skb()
-and all the helpers in net/sunrpc/xdr.c.
+[...]
 
-The only new thing is the read access through the virtual address
-mapping. That mapping is created outside the loop in
-nfs_readdir_xdr_to_array(), which is why I'm thinking we do need the
-invalidate_kernel_vmap_range(): we're essentially doing a series of
-writes through the kernel direct mapping (i.e. readdir RPC calls), then
-reading the results through the virtual mapping.
+>> Minor nit in your git-send-email config.
+>>
+>> Can you add the following to your ~/.gitconfig, or update to newer
+>> git
+>> where this is now the default:
+>>
+>> [sendemail]
+>> 	chainreplyto = false
+>>
+>> This will make all patches a reply to PATCH 0 instead of to the
+>> previous
+>> patch.
+>>
+> Have tried this in v2 I posted but it didn't appear to be a
+> reply for PATCH 0.
 
-i.e. we're doing
+You didn't have (or I didn't see) a PATCH 0 in your v2 version.  After
+patch 1, all patches are replies to patch 1 (using In-Reply-To: and
+References:) resulting in proper threading.
 
-ptr = vm_map_ram(lowmem_pages);
-while (need_more_data) {
+> May be I missed something.
 
-for (i = 0; i < npages; i++) {
-addr = kmap_atomic(lowmem_page[i]);
-*addr = rpc_stuff;
-flush_dcache_page(lowmem_page[i]);
-kunmap_atomic(lowmem_page[i]);
-}
+I don't think so, it looks right now.
 
-invalidate_kernel_vmap_range(ptr); // Needed here?
-
-read = *ptr;
-}
-vm_unmap_ram(lowmem_pages)
-
-> I'm really getting to the point of hating the poliferation of RAM
-> remapping interfaces - it's going to (and is) causing nothing but lots
-> of pain on virtual cache architectures, needing more and more cache
-> flushing interfaces to be created.
-> 
-> Is there any other solution to this?
-
-Arbitrary sized pages. :-)
-
-The problem here is that we want to read variable sized records (i.e.
-readdir() records) from a multi-page buffer. We could do that by copying
-those particular records that overlap with page boundaries, but that
-would make for a fairly intrusive rewrite too.
-
--- 
-Trond Myklebust
-Linux NFS client maintainer
-
-NetApp
-Trond.Myklebust at netapp.com
-www.netapp.com
+Kevin
