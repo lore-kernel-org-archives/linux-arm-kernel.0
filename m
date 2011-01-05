@@ -1,48 +1,168 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 5 Jan 2011 16:28:47 +0530
-Subject: [PATCH 0/5] omap2plus: Trivial build break fixes
-In-Reply-To: <8762u4423o.fsf@ti.com>
-References: <1294165576-15628-1-git-send-email-santosh.shilimkar@ti.com>
-	<8762u4423o.fsf@ti.com>
-Message-ID: <6a39d0124306a5ac6b567edca88f0671@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 5 Jan 2011 12:05:18 +0100
+Subject: [PATCH 2/3] perf: add OMAP support for the new power events
+In-Reply-To: <alpine.DEB.2.00.1101041146160.19319@utopia.booyaka.com>
+References: <1294136263-24020-1-git-send-email-j-pihet@ti.com>
+	<1294138484-24729-1-git-send-email-j-pihet@ti.com>
+	<alpine.DEB.2.00.1101041146160.19319@utopia.booyaka.com>
+Message-ID: <AANLkTi=3pek3+Vv+c1TCxBH2RJcoSXq8TL8CyK9ABMeu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Wednesday, January 05, 2011 6:08 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 0/5] omap2plus: Trivial build break fixes
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> > These are trivial build fixes which I found while doing some
-> > testing 'omap-for-linus' branch.
-> >
-> > The series is generated against the linux-omap 'omap-for-linus'
-> branch
-> > and boot tested on OMAP4430 SDP and OMAP3630 ZOOM.
->
-> Minor nit in your git-send-email config.
->
-> Can you add the following to your ~/.gitconfig, or update to newer
-> git
-> where this is now the default:
->
-> [sendemail]
-> 	chainreplyto = false
->
-> This will make all patches a reply to PATCH 0 instead of to the
-> previous
-> patch.
->
-Have tried this in v2 I posted but it didn't appear to be a
-reply for PATCH 0.
+Hi Paul,
 
+On Tue, Jan 4, 2011 at 7:48 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hello Jean,
+>
+> On Tue, 4 Jan 2011, jean.pihet at newoldbits.com wrote:
+>
+>> From: Jean Pihet <j-pihet@ti.com>
+>>
+>> The patch adds the new power management trace points for
+>> the OMAP architecture.
+>>
+>> The trace points are for:
+>> - default idle handler. Since the cpuidle framework is
+>> ? instrumented in the generic way there is no need to
+>> ? add trace points in the OMAP specific cpuidle handler;
+>> - cpufreq (DVFS),
+>> - clocks changes (enable, disable, set_rate),
+>
+> A question about these. ?Are these only meant to track calls to these
+> functions from outside the clock code? ?Or meant to track actual hardware
+> clock changes?
+The former: this is used to track the clock requests from outside the
+clock framework.
 
-May be I missed something.
+> If the latter, then it might make sense to put these
+> trace points into the functions that actually change the hardware
+> registers, e.g., omap2_dflt_clk_{enable,disable}(), etc., since a
+> clk_enable() on a leaf clock may result in many internal system clocks
+> being enabled up the clock tree.
+I agree with you it is better to track the actual clock changes instead.
+I propose to move the tracepoints to omap2_clk_{enable...} which
+enables all the clocks irrespectively of the installed handler.
+Note about the clock handlers: omap2_dflt_clk_enable happens to be the
+handler for all controllable clocks but could that change in the
+future?
 
-Regards,
-Santosh
+>
+>
+> - Paul
+
+Thanks,
+Jean
+
+>
+>> - change of power domains next power states.
+>>
+>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/pm34xx.c ? ? ?| ? ?7 +++++++
+>> ?arch/arm/mach-omap2/powerdomain.c | ? ?3 +++
+>> ?arch/arm/plat-omap/clock.c ? ? ? ?| ? 13 ++++++++++---
+>> ?3 files changed, 20 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>> index 0ec8a04..0ee0b0e 100644
+>> --- a/arch/arm/mach-omap2/pm34xx.c
+>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>> @@ -29,6 +29,7 @@
+>> ?#include <linux/delay.h>
+>> ?#include <linux/slab.h>
+>> ?#include <linux/console.h>
+>> +#include <trace/events/power.h>
+>>
+>> ?#include <plat/sram.h>
+>> ?#include <plat/clockdomain.h>
+>> @@ -506,8 +507,14 @@ static void omap3_pm_idle(void)
+>> ? ? ? if (omap_irq_pending() || need_resched())
+>> ? ? ? ? ? ? ? goto out;
+>>
+>> + ? ? trace_power_start(POWER_CSTATE, 1, smp_processor_id());
+>> + ? ? trace_cpu_idle(1, smp_processor_id());
+>> +
+>> ? ? ? omap_sram_idle();
+>>
+>> + ? ? trace_power_end(smp_processor_id());
+>> + ? ? trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+>> +
+>> ?out:
+>> ? ? ? local_fiq_enable();
+>> ? ? ? local_irq_enable();
+>> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+>> index 6527ec3..73cbe9a 100644
+>> --- a/arch/arm/mach-omap2/powerdomain.c
+>> +++ b/arch/arm/mach-omap2/powerdomain.c
+>> @@ -23,6 +23,7 @@
+>> ?#include <linux/errno.h>
+>> ?#include <linux/err.h>
+>> ?#include <linux/io.h>
+>> +#include <trace/events/power.h>
+>>
+>> ?#include <asm/atomic.h>
+>>
+>> @@ -440,6 +441,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+>> ? ? ? pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
+>> ? ? ? ? ? ? ? ?pwrdm->name, pwrst);
+>>
+>> + ? ? trace_power_domain_target(pwrdm->name, pwrst, smp_processor_id());
+>> +
+>> ? ? ? prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ?(pwrst << OMAP_POWERSTATE_SHIFT),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ?pwrdm->prcm_offs, pwrstctrl_reg_offs);
+>> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+>> index fc62fb5..7cbb09b 100644
+>> --- a/arch/arm/plat-omap/clock.c
+>> +++ b/arch/arm/plat-omap/clock.c
+>> @@ -21,6 +21,7 @@
+>> ?#include <linux/cpufreq.h>
+>> ?#include <linux/debugfs.h>
+>> ?#include <linux/io.h>
+>> +#include <trace/events/power.h>
+>>
+>> ?#include <plat/clock.h>
+>>
+>> @@ -43,8 +44,10 @@ int clk_enable(struct clk *clk)
+>> ? ? ? ? ? ? ? return -EINVAL;
+>>
+>> ? ? ? spin_lock_irqsave(&clockfw_lock, flags);
+>> - ? ? if (arch_clock->clk_enable)
+>> + ? ? if (arch_clock->clk_enable) {
+>> + ? ? ? ? ? ? trace_clock_enable(clk->name, 1, smp_processor_id());
+>> ? ? ? ? ? ? ? ret = arch_clock->clk_enable(clk);
+>> + ? ? }
+>> ? ? ? spin_unlock_irqrestore(&clockfw_lock, flags);
+>>
+>> ? ? ? return ret;
+>> @@ -66,8 +69,10 @@ void clk_disable(struct clk *clk)
+>> ? ? ? ? ? ? ? goto out;
+>> ? ? ? }
+>>
+>> - ? ? if (arch_clock->clk_disable)
+>> + ? ? if (arch_clock->clk_disable) {
+>> + ? ? ? ? ? ? trace_clock_disable(clk->name, 0, smp_processor_id());
+>> ? ? ? ? ? ? ? arch_clock->clk_disable(clk);
+>> + ? ? }
+>>
+>> ?out:
+>> ? ? ? spin_unlock_irqrestore(&clockfw_lock, flags);
+>> @@ -120,8 +125,10 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>> ? ? ? ? ? ? ? return ret;
+>>
+>> ? ? ? spin_lock_irqsave(&clockfw_lock, flags);
+>> - ? ? if (arch_clock->clk_set_rate)
+>> + ? ? if (arch_clock->clk_set_rate) {
+>> + ? ? ? ? ? ? trace_clock_set_rate(clk->name, rate, smp_processor_id());
+>> ? ? ? ? ? ? ? ret = arch_clock->clk_set_rate(clk, rate);
+>> + ? ? }
+>> ? ? ? if (ret == 0) {
+>> ? ? ? ? ? ? ? if (clk->recalc)
+>> ? ? ? ? ? ? ? ? ? ? ? clk->rate = clk->recalc(clk);
+>> --
+>> 1.7.2.3
+>>
+>
+>
+> - Paul
+>
