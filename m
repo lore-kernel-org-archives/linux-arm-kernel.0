@@ -1,168 +1,45 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 5 Jan 2011 12:05:18 +0100
-Subject: [PATCH 2/3] perf: add OMAP support for the new power events
-In-Reply-To: <alpine.DEB.2.00.1101041146160.19319@utopia.booyaka.com>
-References: <1294136263-24020-1-git-send-email-j-pihet@ti.com>
-	<1294138484-24729-1-git-send-email-j-pihet@ti.com>
-	<alpine.DEB.2.00.1101041146160.19319@utopia.booyaka.com>
-Message-ID: <AANLkTi=3pek3+Vv+c1TCxBH2RJcoSXq8TL8CyK9ABMeu@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 5 Jan 2011 12:05:17 +0100
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <20110105084014.GN25121@pengutronix.de>
+References: <20101230171453.GA5787@pengutronix.de>
+	<1293731992.4919.5.camel@heimdal.trondhjem.org>
+	<20101230191846.GB14221@pengutronix.de>
+	<20110103213850.GC25121@pengutronix.de>
+	<1294100558.25100.8.camel@heimdal.trondhjem.org>
+	<20110105084014.GN25121@pengutronix.de>
+Message-ID: <20110105110517.GQ25121@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hello Trond,
 
-On Tue, Jan 4, 2011 at 7:48 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hello Jean,
->
-> On Tue, 4 Jan 2011, jean.pihet at newoldbits.com wrote:
->
->> From: Jean Pihet <j-pihet@ti.com>
->>
->> The patch adds the new power management trace points for
->> the OMAP architecture.
->>
->> The trace points are for:
->> - default idle handler. Since the cpuidle framework is
->> ? instrumented in the generic way there is no need to
->> ? add trace points in the OMAP specific cpuidle handler;
->> - cpufreq (DVFS),
->> - clocks changes (enable, disable, set_rate),
->
-> A question about these. ?Are these only meant to track calls to these
-> functions from outside the clock code? ?Or meant to track actual hardware
-> clock changes?
-The former: this is used to track the clock requests from outside the
-clock framework.
+On Wed, Jan 05, 2011 at 09:40:14AM +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Jan 03, 2011 at 07:22:38PM -0500, Trond Myklebust wrote:
+> > The question is whether this is something happening on the server or the
+> > client. Does an older client kernel boot without any trouble?
+> I will set up a boot test with 2.6.37 (for statistics) and 2.6.36 to
+> compare with.  If you don't consider .36 to be old enough let me now.
+> Once the setup is done it should be easy to test .35 (say), too.
+> 
+Marc (cc'd) saw similar[1] problems with .37, when using .36.2 the
+problems didn't occur.  This was more reliable to trigger and he was so
+kind to bisect the problem.
 
-> If the latter, then it might make sense to put these
-> trace points into the functions that actually change the hardware
-> registers, e.g., omap2_dflt_clk_{enable,disable}(), etc., since a
-> clk_enable() on a leaf clock may result in many internal system clocks
-> being enabled up the clock tree.
-I agree with you it is better to track the actual clock changes instead.
-I propose to move the tracepoints to omap2_clk_{enable...} which
-enables all the clocks irrespectively of the installed handler.
-Note about the clock handlers: omap2_dflt_clk_enable happens to be the
-handler for all controllable clocks but could that change in the
-future?
+When testing v2.6.36-rc3-51-gafa8ccc init hanged.
+(babddc72a9468884ce1a23db3c3d54b0afa299f0 is the first bad commit with
+this hang.)  Commit 56e4ebf877b6043c289bda32a5a7385b80c17dee makes the
+"init hangs" problem the "fileid changed on tab" problem.
 
->
->
-> - Paul
+I could only reproduce that on armv5 machines (imx27, imx28 and at91)
+but not on armv6 (imx35).
 
-Thanks,
-Jean
+Best regards
+Uwe
 
->
->> - change of power domains next power states.
->>
->> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->> ---
->> ?arch/arm/mach-omap2/pm34xx.c ? ? ?| ? ?7 +++++++
->> ?arch/arm/mach-omap2/powerdomain.c | ? ?3 +++
->> ?arch/arm/plat-omap/clock.c ? ? ? ?| ? 13 ++++++++++---
->> ?3 files changed, 20 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->> index 0ec8a04..0ee0b0e 100644
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -29,6 +29,7 @@
->> ?#include <linux/delay.h>
->> ?#include <linux/slab.h>
->> ?#include <linux/console.h>
->> +#include <trace/events/power.h>
->>
->> ?#include <plat/sram.h>
->> ?#include <plat/clockdomain.h>
->> @@ -506,8 +507,14 @@ static void omap3_pm_idle(void)
->> ? ? ? if (omap_irq_pending() || need_resched())
->> ? ? ? ? ? ? ? goto out;
->>
->> + ? ? trace_power_start(POWER_CSTATE, 1, smp_processor_id());
->> + ? ? trace_cpu_idle(1, smp_processor_id());
->> +
->> ? ? ? omap_sram_idle();
->>
->> + ? ? trace_power_end(smp_processor_id());
->> + ? ? trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
->> +
->> ?out:
->> ? ? ? local_fiq_enable();
->> ? ? ? local_irq_enable();
->> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
->> index 6527ec3..73cbe9a 100644
->> --- a/arch/arm/mach-omap2/powerdomain.c
->> +++ b/arch/arm/mach-omap2/powerdomain.c
->> @@ -23,6 +23,7 @@
->> ?#include <linux/errno.h>
->> ?#include <linux/err.h>
->> ?#include <linux/io.h>
->> +#include <trace/events/power.h>
->>
->> ?#include <asm/atomic.h>
->>
->> @@ -440,6 +441,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
->> ? ? ? pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
->> ? ? ? ? ? ? ? ?pwrdm->name, pwrst);
->>
->> + ? ? trace_power_domain_target(pwrdm->name, pwrst, smp_processor_id());
->> +
->> ? ? ? prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ?(pwrst << OMAP_POWERSTATE_SHIFT),
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ?pwrdm->prcm_offs, pwrstctrl_reg_offs);
->> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
->> index fc62fb5..7cbb09b 100644
->> --- a/arch/arm/plat-omap/clock.c
->> +++ b/arch/arm/plat-omap/clock.c
->> @@ -21,6 +21,7 @@
->> ?#include <linux/cpufreq.h>
->> ?#include <linux/debugfs.h>
->> ?#include <linux/io.h>
->> +#include <trace/events/power.h>
->>
->> ?#include <plat/clock.h>
->>
->> @@ -43,8 +44,10 @@ int clk_enable(struct clk *clk)
->> ? ? ? ? ? ? ? return -EINVAL;
->>
->> ? ? ? spin_lock_irqsave(&clockfw_lock, flags);
->> - ? ? if (arch_clock->clk_enable)
->> + ? ? if (arch_clock->clk_enable) {
->> + ? ? ? ? ? ? trace_clock_enable(clk->name, 1, smp_processor_id());
->> ? ? ? ? ? ? ? ret = arch_clock->clk_enable(clk);
->> + ? ? }
->> ? ? ? spin_unlock_irqrestore(&clockfw_lock, flags);
->>
->> ? ? ? return ret;
->> @@ -66,8 +69,10 @@ void clk_disable(struct clk *clk)
->> ? ? ? ? ? ? ? goto out;
->> ? ? ? }
->>
->> - ? ? if (arch_clock->clk_disable)
->> + ? ? if (arch_clock->clk_disable) {
->> + ? ? ? ? ? ? trace_clock_disable(clk->name, 0, smp_processor_id());
->> ? ? ? ? ? ? ? arch_clock->clk_disable(clk);
->> + ? ? }
->>
->> ?out:
->> ? ? ? spin_unlock_irqrestore(&clockfw_lock, flags);
->> @@ -120,8 +125,10 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
->> ? ? ? ? ? ? ? return ret;
->>
->> ? ? ? spin_lock_irqsave(&clockfw_lock, flags);
->> - ? ? if (arch_clock->clk_set_rate)
->> + ? ? if (arch_clock->clk_set_rate) {
->> + ? ? ? ? ? ? trace_clock_set_rate(clk->name, rate, smp_processor_id());
->> ? ? ? ? ? ? ? ret = arch_clock->clk_set_rate(clk, rate);
->> + ? ? }
->> ? ? ? if (ret == 0) {
->> ? ? ? ? ? ? ? if (clk->recalc)
->> ? ? ? ? ? ? ? ? ? ? ? clk->rate = clk->recalc(clk);
->> --
->> 1.7.2.3
->>
->
->
-> - Paul
->
+[1] similar means: not during boot, but when hitting tab to get command
+completion in the shell.
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
