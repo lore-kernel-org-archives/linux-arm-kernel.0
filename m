@@ -1,25 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 16:55:51 +0000
-Subject: Hit BUG_ON in dma-mapping.c:425
-In-Reply-To: <4D24A108.2080609@atmel.com>
-References: <4D24A108.2080609@atmel.com>
-Message-ID: <20110105165551.GE8638@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 5 Jan 2011 11:04:43 -0600
+Subject: [RFC 1/5] ARM: P2V: separate PHYS_OFFSET from platform definitions
+In-Reply-To: <E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
+References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
+	<E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
+Message-ID: <0D753D10438DA54287A00B027084269764C3FB5B87@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 05:49:12PM +0100, Nicolas Ferre wrote:
-> Hi,
+On Tuesday, January 04, 2011 1:22 PM, Russell King wrote:
+> This uncouple PHYS_OFFSET from the platform definitions, thereby
+> facilitating run-time computation of the physical memory offset.
 > 
-> While running mtd_stresstest on a dataflash (atmel_spi 
-> + mtd_dataflash drivers) I hit the BUG_ON directive that 
-> is at the beginning of ___dma_single_cpu_to_dev() function.
-> This function is called from the SPI driver that do a 
-> dma_map_single() before DMA operations on the buffer 
-> transmitted from upper layers.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> It seems that this address is above "high_memory" limit because 
-> it is allocated by vmalloc (in mtd_stresstest.c:285)...
+> diff --git a/arch/arm/mach-ep93xx/include/mach/memory.h b/arch/arm/mach-ep93xx/include/mach/memory.h
+> index 554064e..c9400cf 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/memory.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/memory.h
+> @@ -6,15 +6,15 @@
+>  #define __ASM_ARCH_MEMORY_H
+>  
+>  #if defined(CONFIG_EP93XX_SDCE3_SYNC_PHYS_OFFSET)
+> -#define PHYS_OFFSET		UL(0x00000000)
+> +#define PLAT_PHYS_OFFSET		UL(0x00000000)
+>  #elif defined(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)
+> -#define PHYS_OFFSET		UL(0xc0000000)
+> +#define PLAT_PHYS_OFFSET		UL(0xc0000000)
+>  #elif defined(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)
+> -#define PHYS_OFFSET		UL(0xd0000000)
+> +#define PLAT_PHYS_OFFSET		UL(0xd0000000)
+>  #elif defined(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)
+> -#define PHYS_OFFSET		UL(0xe0000000)
+> +#define PLAT_PHYS_OFFSET		UL(0xe0000000)
+>  #elif defined(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)
+> -#define PHYS_OFFSET		UL(0xf0000000)
+> +#define PLAT_PHYS_OFFSET		UL(0xf0000000)
+>  #else
+>  #error "Kconfig bug: No EP93xx PHYS_OFFSET set"
+>  #endif
 
-Well, its telling you is that you're not allowed to DMA to vmalloc
-addresses.  Whether that's the fault of the map driver or not is a
-question for mtd folk.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
