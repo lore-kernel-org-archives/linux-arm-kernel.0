@@ -1,76 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 23:03:42 +0000
-Subject: [PATCH 3/6] i2c/pxa2xx: Add PCI support for PXA I2C controller
-In-Reply-To: <1294246263-31960-4-git-send-email-bigeasy@linutronix.de>
-References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
-	<1294246263-31960-4-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20110105230342.GO8638@n2100.arm.linux.org.uk>
+From: Trond.Myklebust@netapp.com (Trond Myklebust)
+Date: Wed, 05 Jan 2011 18:06:48 -0500
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
+References: <1294254337.16957.13.camel@mulgrave.site>
+	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+	<1294256169.16957.18.camel@mulgrave.site>
+	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
+	<1294259637.16957.25.camel@mulgrave.site>
+	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+	<20110105210448.GM8638@n2100.arm.linux.org.uk>
+	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
+	<1294262208.2952.4.camel@heimdal.trondhjem.org>
+	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
+Message-ID: <1294268808.2952.18.camel@heimdal.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 05:51:00PM +0100, Sebastian Andrzej Siewior wrote:
-> +static void plat_dev_release(struct device *dev)
-> +{
-> +	struct ce4100_i2c_device *sd = container_of(dev,
-> +			struct ce4100_i2c_device, pdev.dev);
-> +
-> +	of_device_node_put(&sd->pdev.dev);
-> +}
-> +static int add_i2c_device(struct pci_dev *dev, int bar,
-> +		struct ce4100_i2c_device *sd)
-> +{
-> +	struct platform_device *pdev = &sd->pdev;
-> +	struct i2c_pxa_platform_data *pdata = &sd->pdata;
-...
-> +	pdev->name = "ce4100-i2c";
-> +	pdev->dev.release = plat_dev_release;
-> +	pdev->dev.parent = &dev->dev;
-> +
-> +	pdev->dev.platform_data = pdata;
-> +	pdev->resource = sd->res;
-...
-> +static int __devinit ce4100_i2c_probe(struct pci_dev *dev,
-> +		const struct pci_device_id *ent)
-> +{
-> +	sds = kzalloc(sizeof(*sds), GFP_KERNEL);
-> +	if (!sds)
-> +		goto err_mem;
-> +
-> +	pci_set_drvdata(dev, sds);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(sds->sd); i++) {
-> +		ret = add_i2c_device(dev, i, &sds->sd[i]);
-> +		if (ret) {
-> +			while (--i >= 0)
-> +				platform_device_unregister(&sds->sd[i].pdev);
-...
-> +static void __devexit ce4100_i2c_remove(struct pci_dev *dev)
-...
-> +	for (i = 0; i < ARRAY_SIZE(sds->sd); i++)
-> +		platform_device_unregister(&sds->sd[i].pdev);
-> +
-> +	pci_disable_device(dev);
-> +	kfree(sds);
-> +}
+On Wed, 2011-01-05 at 13:30 -0800, Linus Torvalds wrote: 
+> On Wed, Jan 5, 2011 at 1:16 PM, Trond Myklebust
+> <Trond.Myklebust@netapp.com> wrote:
+> >
+> > So what should be the preferred way to ensure data gets flushed when
+> > you've written directly to a page, and then want to read through the
+> > vm_map_ram() virtual range? Should we be adding new semantics to
+> > flush_kernel_dcache_page()?
+> 
+> The "preferred way" is actually simple: "don't do that". IOW, if some
+> page is accessed through a virtual mapping you've set up, then
+> _always_ access it through that virtual mapping.
+> 
+> Now, when that is impossible (and yes, it sometimes is), then you
+> should flush after doing all writes. And if you do the write through
+> the regular kernel mapping, you should use flush_dcache_page(). And if
+> you did it through the virtual mapping, you should use
+> "flush_kernel_vmap_range()" or whatever.
+> 
+> NOTE! I really didn't look those up very closely, and if the accesses
+> can happen concurrently you are basically screwed, so you do need to
+> do locking or something else to guarantee that there is some nice
+> sequential order.  And maybe I forgot something.  Which is why I do
+> suggest "don't do that" as a primary approach to the problem if at all
+> possible.
+> 
+> Oh, and you may need to flush before reading too (and many writes do
+> end up being "read-modify-write" cycles) in case it's possible that
+> you have stale data from a previous read that was then invalidated by
+> a write to the aliasing address. Even if that write was flushed out,
+> the stale read data may exist at the virtual address. I forget what
+> all we required - in the end the only sane model is "virtual caches
+> suck so bad that anybody who does them should be laughed at for being
+> a retard".
 
-I see we're still repeating the same mistakes with lifetime rules of
-sysfs objects.
+Yes. The fix I sent out was a call to invalidate_kernel_vmap_range(),
+which takes care of invalidating the cache prior to a virtual address
+read.
 
-Any struct device which has been registered into the device model can
-remain indefinitely live after it's been unregistered (by, eg, if
-userspace holds a reference to it via sysfs.)
+My question was specifically about the write through the regular kernel
+mapping: according to Russell and my reading of the cachetlb.txt
+documentation, flush_dcache_page() is only guaranteed to have an effect
+on page cache pages.
+flush_kernel_dcache_page() (not to be confused with flush_dcache_page)
+would appear to be the closest fit according to my reading of the
+documentation, however the ARM implementation appears to be a no-op...
 
-Only once the release method has been called is it safe to give up the
-memory backing it - and that also goes for the code comprising the
-function implementing the release.
+-- 
+Trond Myklebust
+Linux NFS client maintainer
 
-This effectively prevents modules having release functions in them -
-while you can put module use count manipulation in to prevent unloading,
-it effectively prevents the module from being unloaded until you've
-unbound the device.
-
-I think you should be trying to use the platform_device_alloc()
-interfaces here, rather than trying to reinvent them.  The only issue I
-see with that is the of_device_node_put() call.  Maybe OF/DT/device model
-people can provide some pointers?  Adding Greg for the device model
-maintainer view.
+NetApp
+Trond.Myklebust at netapp.com
+www.netapp.com
