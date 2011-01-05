@@ -1,56 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Jan 2011 14:06:39 +0000
-Subject: [PATCH 7/8] ARM: aaec2000: Use physmap driver instead of
-	integrator-flash
-In-Reply-To: <1294236400-22477-1-git-send-email-marc.zyngier@arm.com>
-References: <1294236400-22477-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1294236400-22477-8-git-send-email-marc.zyngier@arm.com>
+Date: Wed,  5 Jan 2011 14:06:32 +0000
+Subject: [PATCH 0/8] Switch ARM platforms from integrator-flash to physmap
+Message-ID: <1294236400-22477-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Bellido <ml@acolin.be>
----
- arch/arm/mach-aaec2000/core.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+As the integrator-flash driver is mostly a duplicate of physmap,
+move all users of this driver to physmap and get rid of the
+then unused driver.
 
-diff --git a/arch/arm/mach-aaec2000/core.c b/arch/arm/mach-aaec2000/core.c
-index 3ef6833..100707c 100644
---- a/arch/arm/mach-aaec2000/core.c
-+++ b/arch/arm/mach-aaec2000/core.c
-@@ -21,12 +21,12 @@
- #include <linux/signal.h>
- #include <linux/clk.h>
- #include <linux/gfp.h>
-+#include <linux/mtd/physmap.h>
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
- #include <asm/sizes.h>
- 
--#include <asm/mach/flash.h>
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
-@@ -260,8 +260,7 @@ void __init aaec2000_set_clcd_plat_data(struct aaec2000_clcd_info *clcd)
- 	memcpy(&mach_clcd_panel, &clcd->panel, sizeof(struct clcd_panel));
- }
- 
--static struct flash_platform_data aaec2000_flash_data = {
--	.map_name	= "cfi_probe",
-+static struct physmap_flash_data aaec2000_flash_data = {
- 	.width		= 4,
- };
- 
-@@ -272,7 +271,7 @@ static struct resource aaec2000_flash_resource = {
- };
- 
- static struct platform_device aaec2000_flash_device = {
--	.name		= "armflash",
-+	.name		= "physmap-flash",
- 	.id		= 0,
- 	.dev		= {
- 		.platform_data	= &aaec2000_flash_data,
--- 
-1.7.0.4
+Marc Zyngier (8):
+  MTD: Add integrator-flash feature to physmap
+  ARM: Realview: Use physmap driver instead of integrator-flash
+  ARM: Versatile: Use physmap driver instead of integrator-flash
+  ARM: VExpress: Use physmap driver instead of integrator-flash
+  ARM: Integrator/AP: Use physmap driver instead of integrator-flash
+  ARM: Integrator/CP: Use physmap driver instead of integrator-flash
+  ARM: aaec2000: Use physmap driver instead of integrator-flash
+  MTD: Remove integrator-flash
+
+ arch/arm/configs/realview-smp_defconfig  |    2 +-
+ arch/arm/configs/realview_defconfig      |    2 +-
+ arch/arm/configs/versatile_defconfig     |    2 +-
+ arch/arm/mach-aaec2000/core.c            |    7 +-
+ arch/arm/mach-integrator/integrator_ap.c |   46 ++---
+ arch/arm/mach-integrator/integrator_cp.c |   35 +---
+ arch/arm/mach-realview/core.c            |   31 +---
+ arch/arm/mach-versatile/core.c           |   31 +---
+ arch/arm/mach-vexpress/v2m.c             |   22 +--
+ drivers/mtd/Kconfig                      |    3 +-
+ drivers/mtd/maps/Kconfig                 |    4 -
+ drivers/mtd/maps/Makefile                |    1 -
+ drivers/mtd/maps/integrator-flash.c      |  319 ------------------------------
+ drivers/mtd/maps/physmap.c               |    6 +-
+ 14 files changed, 46 insertions(+), 465 deletions(-)
+ delete mode 100644 drivers/mtd/maps/integrator-flash.c
