@@ -1,53 +1,37 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Wed, 05 Jan 2011 14:33:57 -0600
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <20110105200008.GJ8638@n2100.arm.linux.org.uk>
-References: <1294254337.16957.13.camel@mulgrave.site>
-	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
-	<1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-Message-ID: <1294259637.16957.25.camel@mulgrave.site>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 05 Jan 2011 22:39:25 +0200
+Subject: [PATCH 1/1] mtd: msm_nand: Add initial msm nand driver support.
+In-Reply-To: <1294247531.16744.0.camel@c-dwalke-linux.qualcomm.com>
+References: <1293785680-19850-1-git-send-email-mnalajal@codeaurora.org>
+	<1294216917.2179.11.camel@koala>
+	<1294247531.16744.0.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <1294259965.2179.23.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-05 at 20:00 +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 05, 2011 at 01:36:09PM -0600, James Bottomley wrote:
-> > On Wed, 2011-01-05 at 11:18 -0800, Linus Torvalds wrote:
-> > > On Wed, Jan 5, 2011 at 11:05 AM, James Bottomley
-> > > <James.Bottomley@hansenpartnership.com> wrote:
-> > > >
-> > > > I think the solution for the kernel direct mapping problem is to take
-> > > > the expected flushes and invalidates into kmap/kunmap[_atomic].
+On Wed, 2011-01-05 at 09:12 -0800, Daniel Walker wrote:
+> On Wed, 2011-01-05 at 10:41 +0200, Artem Bityutskiy wrote:
+> > On Fri, 2010-12-31 at 14:24 +0530, Murali Nalajala wrote:
+> > > From: Arve Hj?nnev?g <arve@android.com>
 > > > 
-> > > No, we really can't do that. Most of the time, the kmap() is the only
-> > > way we access the page anyway, so flushing things would just be
-> > > stupid. Why waste time and energy on doing something pointless?
+> > > Add initial msm nand driver support for Qualcomm MSM and QSD platforms.
+> > > This driver is currently capable of handling 2K page nand devices.
+> > > 
+> > > This driver is originally
+> > > developed by Google and its source is available at
+> > > http://android.git.kernel.org/?p=kernel/experimental.git
+> > > 
+> > > CC: Brian Swetland <swetland@google.com>
+> > > Signed-off-by: Arve Hj?nnev?g <arve@android.com>
+> > > Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
 > > 
-> > It's hardly pointless.  The kmap sets up an inequivalent alias in the
-> > cache.
+> > Pushed to l2-mtd-2.6.git.
 > 
-> No it doesn't.  For pages which are inaccessible, it sets up a mapping
-> for those pages.  On aliasing cache architectures, when you tear down
-> such a mapping, you have to flush the cache before you do so (otherwise
-> you can end up with cache lines existing in the cache for inaccessible
-> mappings.)
-> 
-> For lowmem pages, kmap() (should always) bypass the 'setup mapping' stage
-> because all lowmem pages are already accessible.  So kunmap() doesn't
-> do anything - just like the !HIGHMEM implementation for these macros.
+> This patch had incorrect authorship .. Can you replace it with the
+> second one that was sent ?
 
-well, that depends.  For us on parisc, kmap of a user page in !HIGHMEM
-sets up an inequivalent aliase still ... because the cache colour of the
-user and kernel virtual addresses are different.  Depending on the
-return path to userspace, we still usually have to flush to get the user
-to see the changes the kernel has made.
+Yes, I did that actually, noticed the second one later.
 
-James
-
-> So, for highmem-enabled systems:
-> 
-> 	low_addr = kmap_atomic(lowmem_page);
-> 	high_addr = kmap_atomic(highmem_page);
-> 
-> results in low_addr in the kernel direct-mapped region, and high_addr
-> in the kmap_atomic region.
+-- 
+Best Regards,
+Artem Bityutskiy (???????? ?????)
