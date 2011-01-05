@@ -1,67 +1,128 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed,  5 Jan 2011 16:27:03 +0530
-Subject: [PATCH v2 4/5] omap2plus: voltage: Trivial linking fix 'undefined
-	reference'
+Date: Wed,  5 Jan 2011 16:27:01 +0530
+Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix for undefined
+	reference to 'omap2_prm_read_mod_reg'
 In-Reply-To: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1294225024-21857-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LD      init/built-in.o
-LD      .tmp_vmlinux1
-arch/arm/mach-omap2/built-in.o: In function `omap2_set_init_voltage':
-arch/arm/mach-omap2/pm.c:181: undefined reference to `omap_voltage_domain_lookup'
-arch/arm/mach-omap2/built-in.o: In function `omap4_twl_init':
-arch/arm/mach-omap2/omap_twl.c:244: undefined reference to `omap_voltage_domain_lookup'
-arch/arm/mach-omap2/omap_twl.c:247: undefined reference to `omap_voltage_domain_lookup'
-arch/arm/mach-omap2/omap_twl.c:250: undefined reference to `omap_voltage_domain_lookup'
+omap2plus_defocnfig build breaks when customised with only ARCH_OMAP4
+selected. This is because common files make references to the functions
+which are defined only for omap2xxx and omap3xxx.
+
+ LD      .tmp_vmlinux1
+arch/arm/mach-omap2/built-in.o: In function `pm_dbg_regset_store':
+arch/arm/mach-omap2/pm-debug.c:335: undefined reference to `omap2_prm_read_mod_reg'
+arch/arm/mach-omap2/built-in.o: In function `omap2_pm_dump':
+arch/arm/mach-omap2/pm-debug.c:121: undefined reference to `omap2_prm_read_mod_reg'
+arch/arm/mach-omap2/pm-debug.c:123: undefined reference to `omap2_prm_read_mod_reg'
+arch/arm/mach-omap2/pm-debug.c:124: undefined reference to `omap2_prm_read_mod_reg'
+arch/arm/mach-omap2/pm-debug.c:125: undefined reference to `omap2_prm_read_mod_reg'
+arch/arm/mach-omap2/built-in.o: In function `omap_prcm_arch_reset':
+arch/arm/mach-omap2/prcm.c:106: undefined reference to `omap2_prm_set_mod_reg_bits'
+arch/arm/mach-omap2/prcm.c:108: undefined reference to `omap2_prm_read_mod_reg'
+arch/arm/mach-omap2/built-in.o: In function `omap_prcm_get_reset_sources':
+arch/arm/mach-omap2/prcm.c:53: undefined reference to `omap2_prm_read_mod_reg'
+arch/arm/mach-omap2/built-in.o: In function `clkdm_clear_all_wkdeps':
+arch/arm/mach-omap2/clockdomain.c:545: undefined reference to `omap2_prm_clear_mod_reg_bits'
+arch/arm/mach-omap2/built-in.o: In function `clkdm_del_wkdep':
+arch/arm/mach-omap2/clockdomain.c:475: undefined reference to `omap2_prm_clear_mod_reg_bits'
+arch/arm/mach-omap2/built-in.o: In function `clkdm_read_wkdep':
+arch/arm/mach-omap2/clockdomain.c:511: undefined reference to `omap2_prm_read_mod_bits_shift'
+arch/arm/mach-omap2/built-in.o: In function `clkdm_add_wkdep':
+arch/arm/mach-omap2/clockdomain.c:440: undefined reference to `omap2_prm_set_mod_reg_bits'
 make: *** [.tmp_vmlinux1] Error 1
 
-The error is reported when omap2plus_defconfig built with CONFIG_PM disabled
+This patch adds stubs for these functions so that build continues to work.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Thara Gopinath <thara@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Nishanth Menon <nm@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/plat-omap/include/plat/voltage.h |   10 +++++++---
- 1 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |   63 +++++++++++++++++++++++++++++++++++-
+ 1 files changed, 62 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/voltage.h b/arch/arm/plat-omap/include/plat/voltage.h
-index 9943c66..4b02227 100644
---- a/arch/arm/plat-omap/include/plat/voltage.h
-+++ b/arch/arm/plat-omap/include/plat/voltage.h
-@@ -65,9 +65,6 @@ struct voltagedomain {
- 	char *name;
- };
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index 53d44f6..843f329 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -228,7 +228,67 @@
  
--/* API to get the voltagedomain pointer */
--struct voltagedomain *omap_voltage_domain_lookup(char *name);
+ 
+ #ifndef __ASSEMBLER__
 -
- /**
-  * struct omap_volt_data - Omap voltage specific data.
-  * @voltage_nominal:	The possible voltage value in uV
-@@ -131,6 +128,9 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- 		struct omap_volt_pmic_info *pmic_info);
- void omap_change_voltscale_method(struct voltagedomain *voltdm,
- 		int voltscale_method);
-+/* API to get the voltagedomain pointer */
-+struct voltagedomain *omap_voltage_domain_lookup(char *name);
-+
- int omap_voltage_late_init(void);
- #else
- static inline int omap_voltage_register_pmic(struct voltagedomain *voltdm,
-@@ -144,6 +144,10 @@ static inline int omap_voltage_late_init(void)
- {
- 	return -EINVAL;
- }
-+static inline struct voltagedomain *omap_voltage_domain_lookup(char *name)
++/*
++ * Stub omap2xxx/omap3xxx functions so that common files
++ * continue to build when custom builds are used
++ */
++#if defined(CONFIG_ARCH_OMAP4) && !(defined(CONFIG_ARCH_OMAP2) ||	\
++					defined(CONFIG_ARCH_OMAP3))
++static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
 +{
-+	return ERR_PTR(-EINVAL);
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
 +}
++static inline void omap2_prm_write_mod_reg(u32 val, s16 module, u16 idx)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++}
++static inline u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits,
++		s16 module, s16 idx)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++static inline u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++static inline u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++static inline u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++static inline int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++static inline int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift)
++{
++	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
++#else
+ /* Power/reset management domain register get/set */
+ extern u32 omap2_prm_read_mod_reg(s16 module, u16 idx);
+ extern void omap2_prm_write_mod_reg(u32 val, s16 module, u16 idx);
+@@ -242,6 +302,7 @@ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+ extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
+ extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift);
+ 
++#endif	/* CONFIG_ARCH_OMAP4 */
  #endif
  
- #endif
+ /*
 -- 
 1.6.0.4
