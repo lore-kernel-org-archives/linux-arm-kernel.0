@@ -1,54 +1,35 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Wed, 5 Jan 2011 15:52:50 +0530
-Subject: [PATCH] OMAP: GPIO: fix _set_gpio_triggering() for OMAP2+
-In-Reply-To: <20110104231721.GO7771@atomide.com>
-References: <1293620491-7201-1-git-send-email-ext-mika.1.westerberg@nokia.com>
-	<87aajg7dzu.fsf@ti.com> <1294181154.18162.39.camel@localhost>
-	<20110104231721.GO7771@atomide.com>
-Message-ID: <AANLkTi=-9soJBeSGGUmcKNckzV651y=uJ9co9rByJyQB@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 05 Jan 2011 19:34:50 +0900
+Subject: [PATCH 1/2] s5pc110: add clock gate for MIPI-DSI controller.
+Message-ID: <1294223690-31860-1-git-send-email-inki.dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+the clock gate for MIPI-DSI controller is placed at CLK_GATE_IP1[2]
+so it adds a clock object to clock framework for MIPI-DSI clock gating.
 
-On Wed, Jan 5, 2011 at 04:47, Tony Lindgren <tony@atomide.com> wrote:
-> * Kevin Hilman <khilman@ti.com> [110104 14:45]:
->> On Tue, 2011-01-04 at 09:52 -0800, Kevin Hilman wrote:
->> > Mika Westerberg <ext-mika.1.westerberg@nokia.com> writes:
->> >
->> > > In case on OMAP2+ we call set_24xx_gpio_triggering() instead of
->> > > updating reg and l values. However, at the end of the function we
->> > > perform a write:
->> > >
->> > > ? __raw_writel(l, reg);
->> > >
->> > > So on OMAP2+ we end up writing 0 to the bank->base which is not
->> > > correct (typically this points to GPIO_REVISION register).
->> > >
->> > > Fix this by returning immediately after call to
->> > > set_24xx_gpio_triggering().
->> > >
->> > > Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
->> >
->> > Acked-by: Kevin Hilman <khilman@ti.com>
->> >
->> > Tony, this should be added to omap-for-linus as it fixes a problem in
->> > the recently merged GPIO omap_device/hwmod conversion.
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/clock.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-One clarification - This problem should be existing since the following commit
-92105bb70634abacc08bbe12bf6f888fbd7dad38
-which was introduced on Sep 7, 2005
-
-FYI, this part of the code remained untouched during GPIO omap_device/hwmod
-conversion.
-
--V Charulatha
-
->>
->> On second thought, it's a bit late for the main 2.6.38 window, so will
->> queue this in my pm-fixes branch for the .38-rc cycle.
->
-> Yeah let's not mess with omap-for-linus right now, but instead start
-> queueing up fixes for -rc1.
->
-> Tony
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index dab6ef3..a8d5235 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -365,6 +365,12 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip1_ctrl,
+ 		.ctrlbit	= (1<<0),
+ 	}, {
++		.name		= "dsim",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1<<2),
++	}, {
+ 		.name		= "cfcon",
+ 		.id		= 0,
+ 		.parent		= &clk_hclk_psys.clk,
+-- 
+1.7.0.4
