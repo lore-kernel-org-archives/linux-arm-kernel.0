@@ -1,95 +1,60 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed,  5 Jan 2011 17:50:57 +0100
-Subject: I2C support for CE4100, v3
-Message-ID: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+Date: Wed,  5 Jan 2011 17:51:01 +0100
+Subject: [PATCH 4/6] i2c/pxa2xx: add support for shared IRQ handler
+In-Reply-To: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1294246263-31960-5-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C core inside CE4100 is very much the same as in PXA25x.
-I Cc the ARM folks because patch 2 reorganizes some files so that they
-can be accessed from x86.
-The I2C device is behind a PCI bus. The PCI probe code simply creates
-three platform devices so we don't have much changes to the platform
-driver. There is no clock framework on x86 and the peripherals don't
-support changing their clocks or to enable/disable them. So I provided
-dummy function which keep the driver happy.
-This series indirectly depends on the SPI series because both modify
-include files and spi & i2c includes are sometimes too close to each
-other.
+Sodaville has three of them on a single IRQ. IRQF_DISABLED is removed
+because it is a NOP allready and scheduled for removal.
 
-History:
-v1: Initial post
-v2: - ISAR is still touched if not in SLAVE mode except on X86 where it
-      is not touched at all.
-    - There are no files created in include/asm
-    - register defines are in common code
-    - the PCI controller now requires a device tree. It is used to obtain
-      an id (which is used as device & i2c bus id).
-    - the PCI part now uses ARRAY_SIZE(). As it turns out pci_select_bars()
-      is not useable.
-    - the patch which resetted the chip if the i2c bus was not available
-      has been dropped.
-v3: - introduced dynamic register mapping. With this change I can avoid
-      accessing the unavailable ISAR register without an #ifdef around
-      it.
-    - modified the DT part of the pci driver to address latest DT review
-      comments.
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
+---
+ drivers/i2c/busses/i2c-pxa.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-The patch series has been created with the -M option so file moves can
-be easily noticed. The whole series (including the spi rename) is also
-available at
-  git://git.linutronix.de/users/bigeasy/soda.git spi-i2c
-
-Sebastian Andrzej Siewior (6):
-      i2c/pxa: use dynamic register layout
-      arm/pxa2xx: reorganize I2C files
-      i2c/pxa2xx: Add PCI support for PXA I2C controller
-      i2c/pxa2xx: add support for shared IRQ handler
-      i2c/pxa2xx: check timeout correctly
-      i2c/pxa2xx: pass of_node from platform driver to adapter and publish
-
- arch/arm/mach-mmp/include/mach/mmp2.h              |    2 +-
- arch/arm/mach-mmp/include/mach/pxa168.h            |    2 +-
- arch/arm/mach-mmp/include/mach/pxa910.h            |    2 +-
- arch/arm/mach-pxa/balloon3.c                       |    3 +-
- arch/arm/mach-pxa/cm-x300.c                        |    2 +-
- arch/arm/mach-pxa/colibri-pxa270-income.c          |    3 +-
- arch/arm/mach-pxa/corgi.c                          |    2 +-
- arch/arm/mach-pxa/csb726.c                         |    2 +-
- arch/arm/mach-pxa/devices.c                        |    2 +-
- arch/arm/mach-pxa/em-x270.c                        |    2 +-
- arch/arm/mach-pxa/ezx.c                            |    2 +-
- arch/arm/mach-pxa/hx4700.c                         |    2 +-
- arch/arm/mach-pxa/littleton.c                      |    2 +-
- arch/arm/mach-pxa/magician.c                       |    2 +-
- arch/arm/mach-pxa/mainstone.c                      |    2 +-
- arch/arm/mach-pxa/mioa701.c                        |    2 +-
- arch/arm/mach-pxa/mxm8x10.c                        |    2 +-
- arch/arm/mach-pxa/palm27x.c                        |    3 +-
- arch/arm/mach-pxa/pcm990-baseboard.c               |    2 +-
- arch/arm/mach-pxa/poodle.c                         |    2 +-
- arch/arm/mach-pxa/pxa27x.c                         |    2 +-
- arch/arm/mach-pxa/pxa3xx.c                         |    2 +-
- arch/arm/mach-pxa/raumfeld.c                       |    2 +-
- arch/arm/mach-pxa/saar.c                           |    2 +-
- arch/arm/mach-pxa/spitz.c                          |    3 +-
- arch/arm/mach-pxa/stargate2.c                      |    2 +-
- arch/arm/mach-pxa/tavorevb3.c                      |    3 +-
- arch/arm/mach-pxa/tosa.c                           |    2 +-
- arch/arm/mach-pxa/trizeps4.c                       |    2 +-
- arch/arm/mach-pxa/viper.c                          |    2 +-
- arch/arm/mach-pxa/vpac270.c                        |    3 +-
- arch/arm/mach-pxa/xcep.c                           |    3 +-
- arch/arm/mach-pxa/z2.c                             |    3 +-
- arch/arm/mach-pxa/zeus.c                           |    3 +-
- arch/arm/mach-pxa/zylonite_pxa300.c                |    2 +-
- drivers/i2c/busses/Kconfig                         |    7 +-
- drivers/i2c/busses/Makefile                        |    1 +
- drivers/i2c/busses/i2c-pxa-pci.c                   |  173 ++++++++++++++++++++
- drivers/i2c/busses/i2c-pxa.c                       |  116 ++++++++++---
- .../plat/i2c.h => include/linux/i2c/pxa-i2c.h      |    0
- 40 files changed, 304 insertions(+), 72 deletions(-)
- create mode 100644 drivers/i2c/busses/i2c-pxa-pci.c
- rename arch/arm/plat-pxa/include/plat/i2c.h => include/linux/i2c/pxa-i2c.h (100%)
-
-Sebastian
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index 225e9a5..e566f8c 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -956,11 +956,17 @@ static void i2c_pxa_irq_rxfull(struct pxa_i2c *i2c, u32 isr)
+ 	writel(icr, _ICR(i2c));
+ }
+ 
++#define VALID_INT_SOURCE	(ISR_SSD | ISR_ALD | ISR_ITE | ISR_IRF | \
++				ISR_SAD | ISR_BED)
+ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
+ {
+ 	struct pxa_i2c *i2c = dev_id;
+ 	u32 isr = readl(_ISR(i2c));
+ 
++	isr &= VALID_INT_SOURCE;
++	if (!isr)
++		return IRQ_NONE;
++
+ 	if (i2c_debug > 2 && 0) {
+ 		dev_dbg(&i2c->adap.dev, "%s: ISR=%08x, ICR=%08x, IBMR=%02x\n",
+ 			__func__, isr, readl(_ICR(i2c)), readl(_IBMR(i2c)));
+@@ -975,7 +981,7 @@ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
+ 	/*
+ 	 * Always clear all pending IRQs.
+ 	 */
+-	writel(isr & (ISR_SSD|ISR_ALD|ISR_ITE|ISR_IRF|ISR_SAD|ISR_BED), _ISR(i2c));
++	writel(isr, _ISR(i2c));
+ 
+ 	if (isr & ISR_SAD)
+ 		i2c_pxa_slave_start(i2c, isr);
+@@ -1120,7 +1126,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 		i2c->adap.algo = &i2c_pxa_pio_algorithm;
+ 	} else {
+ 		i2c->adap.algo = &i2c_pxa_algorithm;
+-		ret = request_irq(irq, i2c_pxa_handler, IRQF_DISABLED,
++		ret = request_irq(irq, i2c_pxa_handler, IRQF_SHARED,
+ 				  i2c->adap.name, i2c);
+ 		if (ret)
+ 			goto ereqirq;
+-- 
+1.7.3.2
