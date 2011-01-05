@@ -1,40 +1,67 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Wed, 5 Jan 2011 10:20:58 +0800
-Subject: [PATCH v3 1/2] ARM i.MX53: Some bug fix about MX53 MSL code
-In-Reply-To: <AANLkTimD_HteeyhdHcGiJU6jashyPfoLGP_bWkWAj0Ap@mail.gmail.com>
-References: <1294122176-26450-1-git-send-email-yong.shen@freescale.com>
-	<1294122176-26450-2-git-send-email-yong.shen@freescale.com>
-	<AANLkTimhxmJNgC7=0kdr022VX605rsweiJ8_Nb-1zVNo@mail.gmail.com>
-	<AANLkTimD_HteeyhdHcGiJU6jashyPfoLGP_bWkWAj0Ap@mail.gmail.com>
-Message-ID: <AANLkTikMrTF9tnU6gNWPQ8uCfcSt6nOvpxbA4K80uAwP@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 05 Jan 2011 11:18:55 +0800
+Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
+In-Reply-To: <1294197535.808797.65909636853.0.gpush@pororo>
+Message-ID: <1294197535.809592.532824691048.2.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Since most platforms will need a fixed-rate clock, add one. This will
+also serve as a basic example of an implementation of struct clk.
 
-:->. my bad. Since my network link is pretty slow, I normally update
-every git repo at night, which is why I missed it.
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-Thanks
-Yong
+---
+ include/linux/clk.h |   16 ++++++++++++++++
+ kernel/clk.c        |   14 ++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-On Wed, Jan 5, 2011 at 7:32 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Yong,
->
-> On Tue, Jan 4, 2011 at 12:41 PM, Yong Shen <yong.shen@linaro.org> wrote:
->> Hi there,
->>
->> Are there any more comments?
->> Because of the time difference, the review process is longer than it
->> should be. If no more comments, I am going to ask for merge, so more
->> works can be carry on based on this.
->
-> Looks like you haven?t checked Sascha?s tree:
-> http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/imx-for-2.6.38
->
-> The patch is there ;-)
->
-> Regards,
->
-> Fabio Estevam
->
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 95c49b1..6cef9fe 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -164,6 +164,22 @@ static inline void clk_common_init(struct clk *clk)
+ 		mutex_init(&clk->lock.mutex);
+ }
+ 
++/* Simple fixed-rate clock */
++struct clk_fixed {
++	struct clk	clk;
++	unsigned long	rate;
++};
++
++extern struct clk_ops clk_fixed_ops;
++
++#define INIT_CLK_FIXED(name, r) { \
++	.clk = INIT_CLK(name.clk, clk_fixed_ops), \
++	.rate = (r) \
++}
++
++#define DEFINE_CLK_FIXED(name, r) \
++	struct clk_fixed name = INIT_CLK_FIXED(name, r)
++
+ #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+ 
+ /*
+diff --git a/kernel/clk.c b/kernel/clk.c
+index 8de8fe3..6c38cc0 100644
+--- a/kernel/clk.c
++++ b/kernel/clk.c
+@@ -100,3 +100,17 @@ struct clk *clk_get_parent(struct clk *clk)
+ 	return ERR_PTR(-ENOSYS);
+ }
+ EXPORT_SYMBOL_GPL(clk_get_parent);
++
++/* clk_fixed support */
++
++#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
++
++static unsigned long clk_fixed_get_rate(struct clk *clk)
++{
++	return to_clk_fixed(clk)->rate;
++}
++
++struct clk_ops clk_fixed_ops = {
++	.get_rate = clk_fixed_get_rate,
++};
++EXPORT_SYMBOL_GPL(clk_fixed_ops);
