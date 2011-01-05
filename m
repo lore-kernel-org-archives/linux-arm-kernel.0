@@ -1,57 +1,114 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 5 Jan 2011 19:44:18 +0000
-Subject: [PATCH v3 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110105183509.GH8638@n2100.arm.linux.org.uk>
-References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
-	<1294236457-17476-9-git-send-email-shawn.guo@freescale.com>
-	<20110105161235.GA2112@gallagher>
-	<20110105164409.GV25121@pengutronix.de>
-	<20110105172501.GB2112@gallagher>
-	<20110105175617.GD12222@shareable.org>
-	<20110105183509.GH8638@n2100.arm.linux.org.uk>
-Message-ID: <20110105194418.GE12222@shareable.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  5 Jan 2011 11:47:25 -0800
+Subject: [PATCH] arm: mm: Poison freed init memory
+Message-ID: <1294256845-29517-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> > By the way, I see ARM defines cpu_relax as smp_mb() on arch >= 6.  Is
-> > that correct and useful?  On other architectures*, barrier() is enough
-> > of a barrier, but it's conceivable that smp_mb() would have some
-> > ARM-specific fairness or bus activity benefit - in which case it
-> > should probably be mb().
-> 
-> See a discussion last year with Linus.  It's there to ensure that one CPU
-> spinning on a variable can see a write by another CPU to that same
-> variable.  Without the barrier, the visibility effects are unbounded on
-> ARMv6 - and it's only like that for ARMv6, not >= ARMv6.
+Poisoning __init marked memory can be useful when tracking down
+obscure memory corruption bugs. When a pointer is 0xCCCCCCCC in an
+oops it's much more obvious that somebody is using __init marked
+memory after kernel initialization. This should help find
+incorrect __init markings earlier and mimics what other
+architectures are doing already.
 
-Ah, thanks.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-It might be relevant to this thread; I'm not sure.
+This is a minimal patch to get the idea across. I'm tempted to duplicate
+free_area() and rename it to free_init_area() and then have it take virtual
+addresses instead of pfns. Then the call sites could be cleaned up to pass
+virtual addresses in the case of init memory, and we could remove the NULL
+argument for the highpages and DMA users. Thoughts?
 
-'git show 534be1d5' explains how it works: cpu_relax() flushes buffered
-writes from _this_ CPU, so that other CPUs which are polling can make
-progress, which avoids this CPU getting stuck if there is an indirect
-dependency (no matter how convoluted) between what it's polling and which
-it wrote just before.
+ arch/arm/mm/init.c |   20 +++++++++++++-------
+ 1 files changed, 13 insertions(+), 7 deletions(-)
 
-So cpu_relax() is *essential* in some polling loops, not a hint.
-
-In principle that could happen for I/O polling, if (a) buffered memory
-writes are delayed by I/O read transactions, and (b) the device state we're
-waiting on depends on I/O yet to be done on another CPU, which could be
-polling memory first (e.g. a spinlock).
-
-I doubt (a) in practice - but what about buses that block during I/O read?
-(I have a chip like that here, but it's ARMv4T.)
-
-If so, readl() doesn't have a barrier that addresses the issue.
-
-(b) is conceivable, and if the memory is a spinlock, spin_unlock() does
-_not_ deal with this on ARMv6, as it has no barrier after the write.
-('git show c5113b61' doesn't really explain why.)
-
-It's convoluted and unlikely, but (imho) suggests cpu_relax() is good
-practice in polling loops, even if not needed.  It doesn't cost anything.
-
--- Jamie
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 5164069..b7535ec 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -19,6 +19,7 @@
+ #include <linux/gfp.h>
+ #include <linux/memblock.h>
+ #include <linux/sort.h>
++#include <linux/poison.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/sections.h>
+@@ -358,7 +359,8 @@ void __init bootmem_init(void)
+ 	max_pfn = max_high - PHYS_PFN_OFFSET;
+ }
+ 
+-static inline int free_area(unsigned long pfn, unsigned long end, char *s)
++static inline int free_area(unsigned long pfn, unsigned long end, char *s,
++		bool init_mem)
+ {
+ 	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
+ 
+@@ -366,6 +368,9 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+ 		struct page *page = pfn_to_page(pfn);
+ 		ClearPageReserved(page);
+ 		init_page_count(page);
++		if (init_mem)
++			memset(__va(__pfn_to_phys(pfn)), POISON_FREE_INITMEM,
++					PAGE_SIZE);
+ 		__free_page(page);
+ 		pages++;
+ 	}
+@@ -472,7 +477,7 @@ static void __init free_highpages(void)
+ 				res_end = end;
+ 			if (res_start != start)
+ 				totalhigh_pages += free_area(start, res_start,
+-							     NULL);
++							     NULL, false);
+ 			start = res_end;
+ 			if (start == end)
+ 				break;
+@@ -480,7 +485,7 @@ static void __init free_highpages(void)
+ 
+ 		/* And now free anything which remains */
+ 		if (start < end)
+-			totalhigh_pages += free_area(start, end, NULL);
++			totalhigh_pages += free_area(start, end, NULL, false);
+ 	}
+ 	totalram_pages += totalhigh_pages;
+ #endif
+@@ -512,7 +517,8 @@ void __init mem_init(void)
+ #ifdef CONFIG_SA1111
+ 	/* now that our DMA memory is actually so designated, we can free it */
+ 	totalram_pages += free_area(PHYS_PFN_OFFSET,
+-				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL);
++				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL,
++				    false);
+ #endif
+ 
+ 	free_highpages();
+@@ -644,13 +650,13 @@ void free_initmem(void)
+ 
+ 	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
+ 				    __phys_to_pfn(__pa(&__tcm_end)),
+-				    "TCM link");
++				    "TCM link", true);
+ #endif
+ 
+ 	if (!machine_is_integrator() && !machine_is_cintegrator())
+ 		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
+ 					    __phys_to_pfn(__pa(__init_end)),
+-					    "init");
++					    "init", true);
+ }
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+@@ -662,7 +668,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
+ 	if (!keep_initrd)
+ 		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
+ 					    __phys_to_pfn(__pa(end)),
+-					    "initrd");
++					    "initrd", true);
+ }
+ 
+ static int __init keepinitrd_setup(char *__unused)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
