@@ -1,32 +1,33 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 5 Jan 2011 17:25:01 +0000
-Subject: [PATCH v3 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110105164409.GV25121@pengutronix.de>
-References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
-	<1294236457-17476-9-git-send-email-shawn.guo@freescale.com>
-	<20110105161235.GA2112@gallagher>
-	<20110105164409.GV25121@pengutronix.de>
-Message-ID: <20110105172501.GB2112@gallagher>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 05 Jan 2011 18:26:21 +0100
+Subject: [PATCH 3/6] i2c/pxa2xx: Add PCI support for PXA I2C controller
+In-Reply-To: <201012141535.30589.ffainelli@freebox.fr>
+References: <1291320589-31570-1-git-send-email-bigeasy@linutronix.de>
+	<1291320589-31570-4-git-send-email-bigeasy@linutronix.de>
+	<201012141535.30589.ffainelli@freebox.fr>
+Message-ID: <4D24A9BD.6010200@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 05:44:09PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Jamie,
-> On Wed, Jan 05, 2011 at 04:16:46PM +0000, Jamie Iles wrote:
-> > On Wed, Jan 05, 2011 at 10:07:35PM +0800, Shawn Guo wrote:
-> > > +	/* check both BUSY and ERROR cleared */
-> > > +	while ((__raw_readl(ocotp_base) &
-> > > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
-> > > +		/* nothing */;
-> > 
-> > Is it worth using cpu_relax() in these polling loops?
-> I don't know what cpu_relax does for other platforms, but on ARM it's
-> just a memory barrier which AFAICT doesn't help here at all (which
-> doesn't need to be correct).  Why do you think it would be better?
+Florian Fainelli wrote:
+>> diff --git a/drivers/i2c/busses/i2c-pxa-pci.c
+>> b/drivers/i2c/busses/i2c-pxa-pci.c new file mode 100644
+>> index 0000000..f7b74b9
+>> --- /dev/null
+>> +++ b/drivers/i2c/busses/i2c-pxa-pci.c
+>> +
+>> +/*
+>> + * the number of bars is hardcoded because pci_select_bars() reports the
+>> + * wrong thing.
+>> + */
+>> +#define CE4100_PCI_I2C_DEVS	3
+> 
+> I am surprised of your comment about pci_select_bars, it works fine here on a 
+> CE4100 device, beware that it will report a bitmask of valid resources (7).
+> 
+> Changing it later would be quite simple anyway.
 
-Well I don't see that there's anything broken without cpu_relax() but 
-using cpu_relax() seems to be the most common way of doing busy polling 
-loops that I've seen. It's also a bit easier to read than a comment and 
-semi-colon. Perhaps it's just personal preference.
+yep, my bad. I removed the comment and we can make it fully dynamic once
+it is required.
 
-Jamie
+Sebastian
