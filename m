@@ -1,52 +1,111 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 5 Jan 2011 13:30:34 -0800
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294262208.2952.4.camel@heimdal.trondhjem.org>
-References: <1294254337.16957.13.camel@mulgrave.site>
-	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
-	<1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
-	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
-	<1294262208.2952.4.camel@heimdal.trondhjem.org>
-Message-ID: <AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Wed, 5 Jan 2011 21:51:59 +0000
+Subject: I2C support for CE4100, v3
+In-Reply-To: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20110105215159.GU817@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 5, 2011 at 1:16 PM, Trond Myklebust
-<Trond.Myklebust@netapp.com> wrote:
->
-> So what should be the preferred way to ensure data gets flushed when
-> you've written directly to a page, and then want to read through the
-> vm_map_ram() virtual range? Should we be adding new semantics to
-> flush_kernel_dcache_page()?
+On Wed, Jan 05, 2011 at 05:50:57PM +0100, Sebastian Andrzej Siewior wrote:
+> The I2C core inside CE4100 is very much the same as in PXA25x.
+> I Cc the ARM folks because patch 2 reorganizes some files so that they
+> can be accessed from x86.
+> The I2C device is behind a PCI bus. The PCI probe code simply creates
+> three platform devices so we don't have much changes to the platform
+> driver. There is no clock framework on x86 and the peripherals don't
+> support changing their clocks or to enable/disable them. So I provided
+> dummy function which keep the driver happy.
+> This series indirectly depends on the SPI series because both modify
+> include files and spi & i2c includes are sometimes too close to each
+> other.
+> 
+> History:
+> v1: Initial post
+> v2: - ISAR is still touched if not in SLAVE mode except on X86 where it
+>       is not touched at all.
+>     - There are no files created in include/asm
+>     - register defines are in common code
+>     - the PCI controller now requires a device tree. It is used to obtain
+>       an id (which is used as device & i2c bus id).
+>     - the PCI part now uses ARRAY_SIZE(). As it turns out pci_select_bars()
+>       is not useable.
+>     - the patch which resetted the chip if the i2c bus was not available
+>       has been dropped.
+> v3: - introduced dynamic register mapping. With this change I can avoid
+>       accessing the unavailable ISAR register without an #ifdef around
+>       it.
+>     - modified the DT part of the pci driver to address latest DT review
+>       comments.
+> 
+> The patch series has been created with the -M option so file moves can
+> be easily noticed. The whole series (including the spi rename) is also
+> available at
+>   git://git.linutronix.de/users/bigeasy/soda.git spi-i2c
+> 
+> Sebastian Andrzej Siewior (6):
+>       i2c/pxa: use dynamic register layout
+>       arm/pxa2xx: reorganize I2C files
+>       i2c/pxa2xx: Add PCI support for PXA I2C controller
+>       i2c/pxa2xx: add support for shared IRQ handler
+>       i2c/pxa2xx: check timeout correctly
+>       i2c/pxa2xx: pass of_node from platform driver to adapter and publish
 
-The "preferred way" is actually simple: "don't do that". IOW, if some
-page is accessed through a virtual mapping you've set up, then
-_always_ access it through that virtual mapping.
+please rename these i2c-pxa2xx
+and for the ARM, use ARM: pxa2xx as the prefix
+ 
+>  arch/arm/mach-mmp/include/mach/mmp2.h              |    2 +-
+>  arch/arm/mach-mmp/include/mach/pxa168.h            |    2 +-
+>  arch/arm/mach-mmp/include/mach/pxa910.h            |    2 +-
+>  arch/arm/mach-pxa/balloon3.c                       |    3 +-
+>  arch/arm/mach-pxa/cm-x300.c                        |    2 +-
+>  arch/arm/mach-pxa/colibri-pxa270-income.c          |    3 +-
+>  arch/arm/mach-pxa/corgi.c                          |    2 +-
+>  arch/arm/mach-pxa/csb726.c                         |    2 +-
+>  arch/arm/mach-pxa/devices.c                        |    2 +-
+>  arch/arm/mach-pxa/em-x270.c                        |    2 +-
+>  arch/arm/mach-pxa/ezx.c                            |    2 +-
+>  arch/arm/mach-pxa/hx4700.c                         |    2 +-
+>  arch/arm/mach-pxa/littleton.c                      |    2 +-
+>  arch/arm/mach-pxa/magician.c                       |    2 +-
+>  arch/arm/mach-pxa/mainstone.c                      |    2 +-
+>  arch/arm/mach-pxa/mioa701.c                        |    2 +-
+>  arch/arm/mach-pxa/mxm8x10.c                        |    2 +-
+>  arch/arm/mach-pxa/palm27x.c                        |    3 +-
+>  arch/arm/mach-pxa/pcm990-baseboard.c               |    2 +-
+>  arch/arm/mach-pxa/poodle.c                         |    2 +-
+>  arch/arm/mach-pxa/pxa27x.c                         |    2 +-
+>  arch/arm/mach-pxa/pxa3xx.c                         |    2 +-
+>  arch/arm/mach-pxa/raumfeld.c                       |    2 +-
+>  arch/arm/mach-pxa/saar.c                           |    2 +-
+>  arch/arm/mach-pxa/spitz.c                          |    3 +-
+>  arch/arm/mach-pxa/stargate2.c                      |    2 +-
+>  arch/arm/mach-pxa/tavorevb3.c                      |    3 +-
+>  arch/arm/mach-pxa/tosa.c                           |    2 +-
+>  arch/arm/mach-pxa/trizeps4.c                       |    2 +-
+>  arch/arm/mach-pxa/viper.c                          |    2 +-
+>  arch/arm/mach-pxa/vpac270.c                        |    3 +-
+>  arch/arm/mach-pxa/xcep.c                           |    3 +-
+>  arch/arm/mach-pxa/z2.c                             |    3 +-
+>  arch/arm/mach-pxa/zeus.c                           |    3 +-
+>  arch/arm/mach-pxa/zylonite_pxa300.c                |    2 +-
+>  drivers/i2c/busses/Kconfig                         |    7 +-
+>  drivers/i2c/busses/Makefile                        |    1 +
+>  drivers/i2c/busses/i2c-pxa-pci.c                   |  173 ++++++++++++++++++++
+>  drivers/i2c/busses/i2c-pxa.c                       |  116 ++++++++++---
+>  .../plat/i2c.h => include/linux/i2c/pxa-i2c.h      |    0
+>  40 files changed, 304 insertions(+), 72 deletions(-)
+>  create mode 100644 drivers/i2c/busses/i2c-pxa-pci.c
+>  rename arch/arm/plat-pxa/include/plat/i2c.h => include/linux/i2c/pxa-i2c.h (100%)
+> 
+> Sebastian
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Now, when that is impossible (and yes, it sometimes is), then you
-should flush after doing all writes. And if you do the write through
-the regular kernel mapping, you should use flush_dcache_page(). And if
-you did it through the virtual mapping, you should use
-"flush_kernel_vmap_range()" or whatever.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-NOTE! I really didn't look those up very closely, and if the accesses
-can happen concurrently you are basically screwed, so you do need to
-do locking or something else to guarantee that there is some nice
-sequential order.  And maybe I forgot something.  Which is why I do
-suggest "don't do that" as a primary approach to the problem if at all
-possible.
-
-Oh, and you may need to flush before reading too (and many writes do
-end up being "read-modify-write" cycles) in case it's possible that
-you have stale data from a previous read that was then invalidated by
-a write to the aliasing address. Even if that write was flushed out,
-the stale read data may exist at the virtual address. I forget what
-all we required - in the end the only sane model is "virtual caches
-suck so bad that anybody who does them should be laughed at for being
-a retard".
-
-                            Linus
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
