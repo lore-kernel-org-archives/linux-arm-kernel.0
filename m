@@ -1,24 +1,56 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 11:19:45 +0000
-Subject: [PATCH v2 5/5] omap2plus: voltage: Trivial linking fix for
-	'EINVAL' undeclared
-In-Reply-To: <1294225024-21857-5-git-send-email-santosh.shilimkar@ti.com>
-References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
-	<1294225024-21857-5-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20110105111945.GA8717@n2100.arm.linux.org.uk>
+Date: Wed, 5 Jan 2011 11:27:01 +0000
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <20110105110517.GQ25121@pengutronix.de>
+References: <20101230171453.GA5787@pengutronix.de>
+	<1293731992.4919.5.camel@heimdal.trondhjem.org>
+	<20101230191846.GB14221@pengutronix.de>
+	<20110103213850.GC25121@pengutronix.de>
+	<1294100558.25100.8.camel@heimdal.trondhjem.org>
+	<20110105084014.GN25121@pengutronix.de>
+	<20110105110517.GQ25121@pengutronix.de>
+Message-ID: <20110105112701.GA8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 04:27:04PM +0530, Santosh Shilimkar wrote:
-> CC      arch/arm/mach-omap2/omap_hwmod_common_data.o
-> In file included from arch/arm/plat-omap/include/plat/omap_hwmod.h:38,
->                  from arch/arm/mach-omap2/omap_hwmod_common_data.c:20:
-> arch/arm/plat-omap/include/plat/voltage.h: In function 'omap_voltage_late_init':
-> arch/arm/plat-omap/include/plat/voltage.h:145: error: 'EINVAL' undeclared (first use in this function)
-> arch/arm/plat-omap/include/plat/voltage.h:145: error: (Each undeclared identifier is reported only once
-> arch/arm/plat-omap/include/plat/voltage.h:145: error: for each function it appears in.)
-> make[1]: *** [arch/arm/mach-omap2/omap_hwmod_common_data.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
+On Wed, Jan 05, 2011 at 12:05:17PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Trond,
+> 
+> On Wed, Jan 05, 2011 at 09:40:14AM +0100, Uwe Kleine-K?nig wrote:
+> > On Mon, Jan 03, 2011 at 07:22:38PM -0500, Trond Myklebust wrote:
+> > > The question is whether this is something happening on the server or the
+> > > client. Does an older client kernel boot without any trouble?
+> > I will set up a boot test with 2.6.37 (for statistics) and 2.6.36 to
+> > compare with.  If you don't consider .36 to be old enough let me now.
+> > Once the setup is done it should be easy to test .35 (say), too.
+> > 
+> Marc (cc'd) saw similar[1] problems with .37, when using .36.2 the
+> problems didn't occur.  This was more reliable to trigger and he was so
+> kind to bisect the problem.
+> 
+> When testing v2.6.36-rc3-51-gafa8ccc init hanged.
+> (babddc72a9468884ce1a23db3c3d54b0afa299f0 is the first bad commit with
+> this hang.)  Commit 56e4ebf877b6043c289bda32a5a7385b80c17dee makes the
+> "init hangs" problem the "fileid changed on tab" problem.
+> 
+> I could only reproduce that on armv5 machines (imx27, imx28 and at91)
+> but not on armv6 (imx35).
 
-The correct include for this is linux/errno.h, not linux/err.h - you
-want the errno definitions, not the IS_ERR/PTR_ERR/ERR_PTR stuff.
+FYI, I've seen the "fileid changed" problem, and it looked like a 32-bit
+truncation of the fileid.  It occurred several times on successive
+reboots, so I tried to capture a tcpdump trace off the server (Linux
+2.6.23-rc8-ga64314e6 - its ancient because I've had issues with buggy
+IDE drivers trying to move it forward.)  However, for the last couple
+of weeks I've been unable to reproduce it.
+
+The client was based on 2.6.37-rc6.
+
+The "fileid changed" messages popped up after mounting an export with
+'nolock,intr,rsize=4096,soft', and then trying to use bash completion
+and 'ls' in a few subdirectories - and entries were missing from the
+directory lists without 'ls' reporting any errors (which I think is bad
+behaviour in itself.)
+
+I don't know why it's stopped producing the errors, although once it
+went I never investigated it any further (was far too busy trying to
+get AMBA DMA support working.)
