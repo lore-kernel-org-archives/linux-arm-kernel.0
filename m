@@ -1,91 +1,95 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 05 Jan 2011 17:49:12 +0100
-Subject: Hit BUG_ON in dma-mapping.c:425
-Message-ID: <4D24A108.2080609@atmel.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed,  5 Jan 2011 17:50:57 +0100
+Subject: I2C support for CE4100, v3
+Message-ID: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The I2C core inside CE4100 is very much the same as in PXA25x.
+I Cc the ARM folks because patch 2 reorganizes some files so that they
+can be accessed from x86.
+The I2C device is behind a PCI bus. The PCI probe code simply creates
+three platform devices so we don't have much changes to the platform
+driver. There is no clock framework on x86 and the peripherals don't
+support changing their clocks or to enable/disable them. So I provided
+dummy function which keep the driver happy.
+This series indirectly depends on the SPI series because both modify
+include files and spi & i2c includes are sometimes too close to each
+other.
 
-While running mtd_stresstest on a dataflash (atmel_spi 
-+ mtd_dataflash drivers) I hit the BUG_ON directive that 
-is at the beginning of ___dma_single_cpu_to_dev() function.
-This function is called from the SPI driver that do a 
-dma_map_single() before DMA operations on the buffer 
-transmitted from upper layers.
+History:
+v1: Initial post
+v2: - ISAR is still touched if not in SLAVE mode except on X86 where it
+      is not touched at all.
+    - There are no files created in include/asm
+    - register defines are in common code
+    - the PCI controller now requires a device tree. It is used to obtain
+      an id (which is used as device & i2c bus id).
+    - the PCI part now uses ARRAY_SIZE(). As it turns out pci_select_bars()
+      is not useable.
+    - the patch which resetted the chip if the i2c bus was not available
+      has been dropped.
+v3: - introduced dynamic register mapping. With this change I can avoid
+      accessing the unavailable ISAR register without an #ifdef around
+      it.
+    - modified the DT part of the pci driver to address latest DT review
+      comments.
 
-It seems that this address is above "high_memory" limit because 
-it is allocated by vmalloc (in mtd_stresstest.c:285)...
+The patch series has been created with the -M option so file moves can
+be easily noticed. The whole series (including the spi rename) is also
+available at
+  git://git.linutronix.de/users/bigeasy/soda.git spi-i2c
 
-The question is: where the bug is relying? Is there a 
-configuration that I must modify in AT91 Linux to be able 
-to modify this behavior or is this an error in the use of 
-dma_map_single() in the atmel_spi.c driver?
+Sebastian Andrzej Siewior (6):
+      i2c/pxa: use dynamic register layout
+      arm/pxa2xx: reorganize I2C files
+      i2c/pxa2xx: Add PCI support for PXA I2C controller
+      i2c/pxa2xx: add support for shared IRQ handler
+      i2c/pxa2xx: check timeout correctly
+      i2c/pxa2xx: pass of_node from platform driver to adapter and publish
 
-After searching the web, it seems it is quite common after 
-2.6.34 kernels... But I cannot figure out what is the issue.
+ arch/arm/mach-mmp/include/mach/mmp2.h              |    2 +-
+ arch/arm/mach-mmp/include/mach/pxa168.h            |    2 +-
+ arch/arm/mach-mmp/include/mach/pxa910.h            |    2 +-
+ arch/arm/mach-pxa/balloon3.c                       |    3 +-
+ arch/arm/mach-pxa/cm-x300.c                        |    2 +-
+ arch/arm/mach-pxa/colibri-pxa270-income.c          |    3 +-
+ arch/arm/mach-pxa/corgi.c                          |    2 +-
+ arch/arm/mach-pxa/csb726.c                         |    2 +-
+ arch/arm/mach-pxa/devices.c                        |    2 +-
+ arch/arm/mach-pxa/em-x270.c                        |    2 +-
+ arch/arm/mach-pxa/ezx.c                            |    2 +-
+ arch/arm/mach-pxa/hx4700.c                         |    2 +-
+ arch/arm/mach-pxa/littleton.c                      |    2 +-
+ arch/arm/mach-pxa/magician.c                       |    2 +-
+ arch/arm/mach-pxa/mainstone.c                      |    2 +-
+ arch/arm/mach-pxa/mioa701.c                        |    2 +-
+ arch/arm/mach-pxa/mxm8x10.c                        |    2 +-
+ arch/arm/mach-pxa/palm27x.c                        |    3 +-
+ arch/arm/mach-pxa/pcm990-baseboard.c               |    2 +-
+ arch/arm/mach-pxa/poodle.c                         |    2 +-
+ arch/arm/mach-pxa/pxa27x.c                         |    2 +-
+ arch/arm/mach-pxa/pxa3xx.c                         |    2 +-
+ arch/arm/mach-pxa/raumfeld.c                       |    2 +-
+ arch/arm/mach-pxa/saar.c                           |    2 +-
+ arch/arm/mach-pxa/spitz.c                          |    3 +-
+ arch/arm/mach-pxa/stargate2.c                      |    2 +-
+ arch/arm/mach-pxa/tavorevb3.c                      |    3 +-
+ arch/arm/mach-pxa/tosa.c                           |    2 +-
+ arch/arm/mach-pxa/trizeps4.c                       |    2 +-
+ arch/arm/mach-pxa/viper.c                          |    2 +-
+ arch/arm/mach-pxa/vpac270.c                        |    3 +-
+ arch/arm/mach-pxa/xcep.c                           |    3 +-
+ arch/arm/mach-pxa/z2.c                             |    3 +-
+ arch/arm/mach-pxa/zeus.c                           |    3 +-
+ arch/arm/mach-pxa/zylonite_pxa300.c                |    2 +-
+ drivers/i2c/busses/Kconfig                         |    7 +-
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-pxa-pci.c                   |  173 ++++++++++++++++++++
+ drivers/i2c/busses/i2c-pxa.c                       |  116 ++++++++++---
+ .../plat/i2c.h => include/linux/i2c/pxa-i2c.h      |    0
+ 40 files changed, 304 insertions(+), 72 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-pxa-pci.c
+ rename arch/arm/plat-pxa/include/plat/i2c.h => include/linux/i2c/pxa-i2c.h (100%)
 
-Here is the Oops output:
-root at at91sam9m10g45ek:~# insmod ../n/mtd_stresstest.ko dev=3
-
-=================================================
-mtd_stresstest: MTD device: 3
-mtd_stresstest: MTD device size 4325376, eraseblock size 528, page size 528, count of eraseblocks 8192, pages per eraseblock 1, OOB size 0
-mtd_stresstest: doing operations
-mtd_stresstest: 0 operations done
-kernel BUG at /home/nferre/workspace/linux/linux-2.6-arm/arch/arm/mm/dma-mapping.c:425!
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = c31bc000
-[00000000] *pgd=732b1031, *pte=00000000, *ppte=00000000
-Internal error: Oops: 817 [#1]
-last sysfs file: /sys/devices/platform/atmel-ehci/usb1/1-2/1-2:1.0/host0/target0:0:0/0:0:0:0/block/sda/size
-Modules linked in: mtd_stresstest(+)
-CPU: 0    Not tainted  (2.6.37+ #2)
-PC is at __bug+0x1c/0x28
-LR is at __bug+0x18/0x28
-pc : [<c0030374>]    lr : [<c0030370>]    psr: 20000093
-sp : c3b09df8  ip : 00000200  fp : 00601c00
-r10: c4886000  r9 : 00001807  r8 : 74886000
-r7 : c38d37a0  r6 : c39660e8  r5 : c3b09ebc  r4 : c3b09e98
-r3 : 00000000  r2 : c3b09dec  r1 : c02ef2c1  r0 : 0000005e
-Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 0005317f  Table: 731bc000  DAC: 00000015
-Process insmod (pid: 1649, stack limit = 0xc3b08270)
-Stack: (0xc3b09df8 to 0xc3b0a000)
-9de0:                                                       ffffffff c0032b1c
-9e00: c3b09e98 c01817c4 c3966000 c3b09e3c 00000000 c38d37a0 c3966000 c018070c
-9e20: 60000013 c3b09e3c 00000000 c018076c c3b09ebc c0180914 c38d37a0 00000000
-9e40: c3b09e40 c3b09e40 c3979e00 00000420 c3b09f2c 00000210 00601c00 c0179ba8
-9e60: 00100100 00318e70 c38d37a0 c3979e24 00000000 c3979e00 00000000 00000004
-9e80: 73979e00 ffffffff 00000000 00000000 c3b09eb4 c3b09ebc c4886000 00000000
-9ea0: 00000210 ffffffff ffffffff 00000000 00000000 c3b09ebc c3b09e90 c3b09e90
-9ec0: c3b09eb4 c38d37a0 00000000 c0180ab8 c3b09e3c 00000000 ffffff8d 00000000
-9ee0: 00000000 00000000 00000000 00000000 00000000 00001807 00000000 0000601c
-9f00: 00318e70 00000420 00001808 bf0034b0 00000420 c3b09f2c c4886000 00000001
-9f20: 00000000 00000000 00000000 00000000 0000002e bf0005fc bf003000 00012008
-9f40: 00000000 c002cfa8 c3b08000 00000000 00012008 c002740c c035ecf4 00000001
-9f60: bf0005fc 00000000 00012008 bf0005fc 00000000 00012008 00011d23 c002cfa8
-9f80: 00000000 c0062dec 00012018 00011d23 00012008 00000000 00012008 00020000
-9fa0: 00000080 c002ce00 00000000 00012008 00012018 00011d23 00012008 00000001
-9fc0: 00000000 00012008 00020000 00000080 bec09efb bec09ef4 00012018 00012008
-9fe0: 00000003 bec09c94 00008d77 401c0054 60000010 00012018 657a6973 69657700
-[<c0030374>] (__bug+0x1c/0x28) from [<c0032b1c>] (___dma_single_cpu_to_dev+0x34/0x5c)
-[<c0032b1c>] (___dma_single_cpu_to_dev+0x34/0x5c) from [<c01817c4>] (atmel_spi_transfer+0xc8/0x1c4)
-[<c01817c4>] (atmel_spi_transfer+0xc8/0x1c4) from [<c018070c>] (__spi_async+0x94/0xa0)
-[<c018070c>] (__spi_async+0x94/0xa0) from [<c018076c>] (spi_async_locked+0x14/0x2c)
-[<c018076c>] (spi_async_locked+0x14/0x2c) from [<c0180914>] (__spi_sync+0x5c/0x9c)
-[<c0180914>] (__spi_sync+0x5c/0x9c) from [<c0179ba8>] (dataflash_write+0x180/0x1fc)
-[<c0179ba8>] (dataflash_write+0x180/0x1fc) from [<bf0034b0>] (mtd_stresstest_init+0x4b0/0x604 [mtd_stresstest])
-[<bf0034b0>] (mtd_stresstest_init+0x4b0/0x604 [mtd_stresstest]) from [<c002740c>] (do_one_initcall+0xcc/0x1a8)
-[<c002740c>] (do_one_initcall+0xcc/0x1a8) from [<c0062dec>] (sys_init_module+0x90/0x1a4)
-[<c0062dec>] (sys_init_module+0x90/0x1a4) from [<c002ce00>] (ret_fast_syscall+0x0/0x2c)
-Code: e59f0010 e1a01003 eb0916de e3a03000 (e5833000)
----[ end trace 0f2f3786a6a31f57 ]---
-Segmentation fault
-
-This append on 2.6.37 kernel.
-
-Thanks for your help. Best regards,
-
--- 
-Nicolas Ferre
+Sebastian
