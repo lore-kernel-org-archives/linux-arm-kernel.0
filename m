@@ -1,46 +1,109 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 5 Jan 2011 12:48:32 -0800
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294259637.16957.25.camel@mulgrave.site>
-References: <1294254337.16957.13.camel@mulgrave.site>
-	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
-	<1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-Message-ID: <AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed,  5 Jan 2011 14:49:36 -0600
+Subject: [PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP
+In-Reply-To: <1294260576-20237-1-git-send-email-nm@ti.com>
+References: <1294260576-20237-1-git-send-email-nm@ti.com>
+Message-ID: <1294260576-20237-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 5, 2011 at 12:33 PM, James Bottomley
-<James.Bottomley@hansenpartnership.com> wrote:
->
-> well, that depends. ?For us on parisc, kmap of a user page in !HIGHMEM
-> sets up an inequivalent aliase still ... because the cache colour of the
-> user and kernel virtual addresses are different. ?Depending on the
-> return path to userspace, we still usually have to flush to get the user
-> to see the changes the kernel has made.
+Beagle XM uses 3730 and the board design allows enabling 800MHz and 1GHz
+OPPs. However, We need Smart reflex class 1.5 and ABB to enable 1GHz safely.
+For the moment, we tweak the default table to allow for 800Mhz OPP usage.
 
-Umm. Again, that has nothing to do with kmap().
+Reported-by: Koen Kooi <koen@beagleboard.org>
+Tested-by: Koen Kooi <koen@beagleboard.org>
 
-This time it's about the user space mapping.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/board-omap3beagle.c |   50 +++++++++++++++++++++++++++++++
+ 1 files changed, 50 insertions(+), 0 deletions(-)
 
-Repeat after me: even without the kmap(), the kernel access to that
-mapping would have caused cache aliases.
-
-See? Once more, the kmap() is entirely innocent. You can have a
-non-highmem mapping that you never use kmap for, and that you map into
-user space, and you'd see exactly the same aliases. Notice? Look ma,
-no kmap().
-
-So clearly kmap() is not the issue. The issue continues to be a
-totally separate virtual mapping. Whether it's a user mapping or
-vm_map_ram() is obviously immaterial - as far as the CPU is concerned,
-there is no difference between the two (apart from the trivial
-differences of virtual location and permissions).
-
-(You can also force the problem with vmalloc() an then following the
-kernel page tables, but I hope nobody does that any more. I suspect
-I'm wrong, though, there's probably code that mixes vmalloc and
-physical page accesses in various drivers)
-
-                    Linus
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 6c12760..0b99b80 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -23,6 +23,7 @@
+ #include <linux/gpio.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
++#include <linux/opp.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -44,10 +45,12 @@
+ #include <plat/gpmc.h>
+ #include <plat/nand.h>
+ #include <plat/usb.h>
++#include <plat/omap_device.h>
+ 
+ #include "mux.h"
+ #include "hsmmc.h"
+ #include "timer-gp.h"
++#include "pm.h"
+ 
+ #define NAND_BLOCK_SIZE		SZ_128K
+ 
+@@ -556,6 +559,52 @@ static struct omap_musb_board_data musb_board_data = {
+ 	.power			= 100,
+ };
+ 
++static void __init beagle_opp_init(void)
++{
++	int r = 0;
++
++	/* Initialize the omap3 opp table */
++	if (omap3_opp_init()) {
++		pr_err("%s: opp default init failed\n", __func__);
++		return;
++	}
++
++	/* Custom OPP enabled for XM */
++	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
++		struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
++		struct omap_hwmod *dh = omap_hwmod_lookup("iva");
++		struct device *dev;
++
++		if (!mh || !dh) {
++			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
++				__func__, mh, dh);
++			r = -EINVAL;
++		} else {
++			/* Enable MPU 1GHz and lower opps */
++			dev = &mh->od->pdev.dev;
++			r = opp_enable(dev, 800000000);
++			/* TODO: MPU 1GHz needs SR and ABB */
++
++			/* Enable IVA 800MHz and lower opps */
++			dev = &dh->od->pdev.dev;
++			r |= opp_enable(dev, 660000000);
++			/* TODO: DSP 800MHz needs SR and ABB */
++		}
++		if (r) {
++			pr_err("%s: failed to enable higher opp %d\n",
++				__func__, r);
++			/*
++			 * Cleanup - disable the higher freqs - we dont care
++			 * about the results
++			 */
++			dev = &mh->od->pdev.dev;
++			opp_disable(dev, 800000000);
++			dev = &dh->od->pdev.dev;
++			opp_disable(dev, 660000000);
++		}
++	}
++}
++
+ static void __init omap3_beagle_init(void)
+ {
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+@@ -579,6 +628,7 @@ static void __init omap3_beagle_init(void)
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+ 
+ 	beagle_display_init();
++	beagle_opp_init();
+ }
+ 
+ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+-- 
+1.6.3.3
