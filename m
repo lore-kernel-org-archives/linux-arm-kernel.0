@@ -1,7 +1,7 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 05 Jan 2011 15:42:11 +0100
+From: Trond.Myklebust@netapp.com (Trond Myklebust)
+Date: Wed, 05 Jan 2011 09:53:13 -0500
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <20110105142902.GA9278@merit.edu>
+In-Reply-To: <20110105134045.GS25121@pengutronix.de>
 References: <20101230171453.GA5787@pengutronix.de>
 	<1293731992.4919.5.camel@heimdal.trondhjem.org>
 	<20101230191846.GB14221@pengutronix.de>
@@ -11,63 +11,68 @@ References: <20101230171453.GA5787@pengutronix.de>
 	<20110105110517.GQ25121@pengutronix.de>
 	<20110105112701.GA8638@n2100.arm.linux.org.uk>
 	<20110105134045.GS25121@pengutronix.de>
-	<20110105142902.GA9278@merit.edu>
-Message-ID: <4D248343.2000407@pengutronix.de>
+Message-ID: <1294239193.3014.9.camel@heimdal.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2011 03:29 PM, Jim Rees wrote:
-> Uwe Kleine-K?nig wrote:
+On Wed, 2011-01-05 at 14:40 +0100, Uwe Kleine-K?nig wrote: 
+> Hi Russell,
 > 
->   > The "fileid changed" messages popped up after mounting an export with
->   > 'nolock,intr,rsize=4096,soft', and then trying to use bash completion
->   > and 'ls' in a few subdirectories - and entries were missing from the
->   > directory lists without 'ls' reporting any errors (which I think is bad
->   > behaviour in itself.)
->   There was a bug in at least -rc5[1] that was considered already fixed in
->   -rc4[2]. The later announcements didn't mention it anymore. 
->   
->   > I don't know why it's stopped producing the errors, although once it
->   > went I never investigated it any further (was far too busy trying to
->   > get AMBA DMA support working.)
->   It seems it was fixed for most users though. Trond?
+> On Wed, Jan 05, 2011 at 11:27:01AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 05, 2011 at 12:05:17PM +0100, Uwe Kleine-K?nig wrote:
+> > > Hello Trond,
+> > > 
+> > > On Wed, Jan 05, 2011 at 09:40:14AM +0100, Uwe Kleine-K?nig wrote:
+> > > > On Mon, Jan 03, 2011 at 07:22:38PM -0500, Trond Myklebust wrote:
+> > > > > The question is whether this is something happening on the server or the
+> > > > > client. Does an older client kernel boot without any trouble?
+> > > > I will set up a boot test with 2.6.37 (for statistics) and 2.6.36 to
+> > > > compare with.  If you don't consider .36 to be old enough let me now.
+> > > > Once the setup is done it should be easy to test .35 (say), too.
+> > > > 
+> > > Marc (cc'd) saw similar[1] problems with .37, when using .36.2 the
+> > > problems didn't occur.  This was more reliable to trigger and he was so
+> > > kind to bisect the problem.
+> > > 
+> > > When testing v2.6.36-rc3-51-gafa8ccc init hanged.
+> > > (babddc72a9468884ce1a23db3c3d54b0afa299f0 is the first bad commit with
+> > > this hang.)  Commit 56e4ebf877b6043c289bda32a5a7385b80c17dee makes the
+> > > "init hangs" problem the "fileid changed on tab" problem.
+> > > 
+> > > I could only reproduce that on armv5 machines (imx27, imx28 and at91)
+> > > but not on armv6 (imx35).
+> > 
+> > FYI, I've seen the "fileid changed" problem, and it looked like a 32-bit
+> > truncation of the fileid.  It occurred several times on successive
+> > reboots, so I tried to capture a tcpdump trace off the server (Linux
+> > 2.6.23-rc8-ga64314e6 - its ancient because I've had issues with buggy
+> > IDE drivers trying to move it forward.)  However, for the last couple
+> > of weeks I've been unable to reproduce it.
+> > 
+> > The client was based on 2.6.37-rc6.
+> > 
+> > The "fileid changed" messages popped up after mounting an export with
+> > 'nolock,intr,rsize=4096,soft', and then trying to use bash completion
+> > and 'ls' in a few subdirectories - and entries were missing from the
+> > directory lists without 'ls' reporting any errors (which I think is bad
+> > behaviour in itself.)
+> There was a bug in at least -rc5[1] that was considered already fixed in
+> -rc4[2]. The later announcements didn't mention it anymore. 
 > 
-> Trond sent a fix to the nfs list on 27 Nov for "fileid changed" but I don't
-> know if this is the same bug you're seeing.  The patch was to
-> nfs_same_file() and I can send it if you want.  As far as I know the patch
-> made it upstream.
+> > I don't know why it's stopped producing the errors, although once it
+> > went I never investigated it any further (was far too busy trying to
+> > get AMBA DMA support working.)
+> It seems it was fixed for most users though. Trond?
 
-Are you sure it's in .37?
+As I said, I can't reproduce it.
 
-The pick-axe just found one commit so far
-(although it's still searching):
-
-$ git log -Snfs_same_file
-commit d39ab9de3b80da5835049b1c3b49da4e84e01c07
-Author: Bryan Schumaker <bjschuma@netapp.com>
-Date:   Fri Sep 24 18:50:01 2010 -0400
-
-    NFS: re-add readdir plus
-
-    This patch adds readdir plus support to the cache array.
-
-    Signed-off-by: Bryan Schumaker <bjschuma@netapp.com>
-    Signed-off-by: Trond Myklebust <Trond.Myklebust@netapp.com>
-
-Would you please be so kind and send the patch to this thread?
-
-cheers, Marc
+I'm seeing a lot of mention of ARM above. Is anyone seeing this bug on
+x86, or does it appear to be architecture-specific?
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Trond Myklebust
+Linux NFS client maintainer
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110105/64f1ba04/attachment.sig>
+NetApp
+Trond.Myklebust at netapp.com
+www.netapp.com
