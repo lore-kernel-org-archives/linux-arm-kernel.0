@@ -1,58 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 17:26:41 +0000
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294247847.2998.23.camel@heimdal.trondhjem.org>
-References: <1294100558.25100.8.camel@heimdal.trondhjem.org>
-	<20110105084014.GN25121@pengutronix.de>
-	<20110105110517.GQ25121@pengutronix.de>
-	<20110105112701.GA8638@n2100.arm.linux.org.uk>
-	<20110105134045.GS25121@pengutronix.de>
-	<1294239193.3014.9.camel@heimdal.trondhjem.org>
-	<4D2487CA.5040501@pengutronix.de>
-	<1294240457.3014.13.camel@heimdal.trondhjem.org>
-	<20110105155230.GC8638@n2100.arm.linux.org.uk>
-	<1294247847.2998.23.camel@heimdal.trondhjem.org>
-Message-ID: <20110105172641.GF8638@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 05 Jan 2011 09:43:04 -0800
+Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build
+	break because of clktrctrl_mask
+In-Reply-To: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Wed, 5 Jan 2011 16:27:00 +0530")
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87fwt7z1p3.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 12:17:27PM -0500, Trond Myklebust wrote:
-> We should already be flushing the kernel direct mapping after writing by
-> means of the calls to flush_dcache_page() in xdr_partial_copy_from_skb()
-> and all the helpers in net/sunrpc/xdr.c.
+Hi Santosh,
 
-Hmm, we're getting into the realms of what flush_dcache_page() is supposed
-to do and what it's not supposed to do.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Is this page an associated with a mapping (iow, page_mapping(page) is non-
-NULL)?  If not, flush_dcache_page() won't do anything, and from my
-understanding, its flush_anon_page() which you want to be using there
-instead.
+> struct clockdomain member clktrctrl_mask is available for only for OMAP2
+> and OMAP3 architectures. Technially it is also used only for these archs
+> but this breaks the build with custom OMAP4 configuration.
 
-> The only new thing is the read access through the virtual address
-> mapping. That mapping is created outside the loop in
-> nfs_readdir_xdr_to_array(), which is why I'm thinking we do need the
-> invalidate_kernel_vmap_range(): we're essentially doing a series of
-> writes through the kernel direct mapping (i.e. readdir RPC calls), then
-> reading the results through the virtual mapping.
-> 
-> i.e. we're doing
-> 
-> ptr = vm_map_ram(lowmem_pages);
-> while (need_more_data) {
-> 
-> for (i = 0; i < npages; i++) {
-> addr = kmap_atomic(lowmem_page[i]);
-> *addr = rpc_stuff;
-> flush_dcache_page(lowmem_page[i]);
-> kunmap_atomic(lowmem_page[i]);
-> }
-> 
-> invalidate_kernel_vmap_range(ptr); // Needed here?
+I'll queue patches 3-5 for the 2.6.38-rc fixes cycle.
 
-Yes, you're going to need some cache maintainence in there to make it work,
-because accessing 'ptr' will load that data into the cache, and that won't
-be updated by the writes via kmap_atomic().
+With Paul's ack, I can queue the others too, or Paul can decide to take
+them via his tree.  Paul can decide.
 
-Provided you don't write to ptr, then using invalidate_kernel_vmap_range()
-will be safe.
+Kevin
