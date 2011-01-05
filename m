@@ -1,65 +1,35 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed,  5 Jan 2011 14:49:35 -0600
-Subject: [PATCH 1/2] omap3|4: opp: make omapx_opp_init non-static
-In-Reply-To: <1294260576-20237-1-git-send-email-nm@ti.com>
-References: <1294260576-20237-1-git-send-email-nm@ti.com>
-Message-ID: <1294260576-20237-2-git-send-email-nm@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 21:04:48 +0000
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+References: <1294254337.16957.13.camel@mulgrave.site>
+	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+	<1294256169.16957.18.camel@mulgrave.site>
+	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
+	<1294259637.16957.25.camel@mulgrave.site>
+	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+Message-ID: <20110105210448.GM8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap3 and omap4 opp_init should be made non-static to allow
-for platform specific opp table tweaking. making these static
-conflicts with the definition in pm.h(global) as well.
-we include pm.h as well to ensure that there are no such prototype
-conflicts with actual implementation in the future.
+On Wed, Jan 05, 2011 at 12:48:32PM -0800, Linus Torvalds wrote:
+> (You can also force the problem with vmalloc() an then following the
+> kernel page tables, but I hope nobody does that any more. I suspect
+> I'm wrong, though, there's probably code that mixes vmalloc and
+> physical page accesses in various drivers)
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/opp3xxx_data.c |    3 ++-
- arch/arm/mach-omap2/opp4xxx_data.c |    3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+Should vmalloc_to_page() (84 users)/vmalloc_to_pfn() (17 users) be
+deprecated then? ;)
 
-diff --git a/arch/arm/mach-omap2/opp3xxx_data.c b/arch/arm/mach-omap2/opp3xxx_data.c
-index 0486fce..fd3a1af 100644
---- a/arch/arm/mach-omap2/opp3xxx_data.c
-+++ b/arch/arm/mach-omap2/opp3xxx_data.c
-@@ -21,6 +21,7 @@
- #include <plat/cpu.h>
- 
- #include "omap_opp_data.h"
-+#include "pm.h"
- 
- static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
- 	/* MPU OPP1 */
-@@ -88,7 +89,7 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
- /**
-  * omap3_opp_init() - initialize omap3 opp table
-  */
--static int __init omap3_opp_init(void)
-+int __init omap3_opp_init(void)
- {
- 	int r = -ENODEV;
- 
-diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
-index a11fa56..f0e9939 100644
---- a/arch/arm/mach-omap2/opp4xxx_data.c
-+++ b/arch/arm/mach-omap2/opp4xxx_data.c
-@@ -22,6 +22,7 @@
- #include <plat/cpu.h>
- 
- #include "omap_opp_data.h"
-+#include "pm.h"
- 
- static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
- 	/* MPU OPP1 - OPP50 */
-@@ -42,7 +43,7 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
- /**
-  * omap4_opp_init() - initialize omap4 opp table
-  */
--static int __init omap4_opp_init(void)
-+int __init omap4_opp_init(void)
- {
- 	int r = -ENODEV;
- 
--- 
-1.6.3.3
+However, we seem have new ways of doing this - rather than asking
+vmalloc() for some memory, and then getting at the pages by following
+the page tables, we now have ways to create mappings using arrays of
+struct pages and access them via their already known mappings:
+
+- vm_map_ram(struct page **pages, unsigned int count, int node, pgprot_t prot)
+- map_kernel_range_noflush(unsigned long addr, unsigned long size, pgprot_t prot, struct page **pages)
+- map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
+- vmap(struct page **pages, unsigned int count, unsigned long flags, pgprot_t prot)
+
+So really it's the same problem, just created by some other easier
+to use methods.
