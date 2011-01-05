@@ -1,45 +1,28 @@
-From: jgarzik@pobox.com (Jeff Garzik)
-Date: Wed, 05 Jan 2011 13:15:24 -0500
-Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
-In-Reply-To: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
-References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
-Message-ID: <4D24B53C.4020009@pobox.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jan 2011 18:19:18 +0000
+Subject: [PATCH 1/1] arm: omap: gpio: define .disable callback for gpio
+	irq chip
+In-Reply-To: <1294250283-18182-1-git-send-email-eduardo.valentin@nokia.com>
+References: <1294250283-18182-1-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <20110105181918.GB8717@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2011 12:43 AM, mkl0301 at gmail.com wrote:
-> From: Mac Lin<mkl0301@gmail.com>
->
-> v2:
->   - Switch ahci_platform to module device table matching to add SoC specific support
->
-> v1: http://www.spinics.net/lists/arm-kernel/msg106236.html
->   - Add CNS3xxx SoC specific AHCI support
->
-> This patchset is based on linux-2.6.37-rc2
->
-> Mac Lin (3):
->        ahci_platform: rename to ahci_pltfm, but keep the original module name
->        ahci_pltfm: switch to module device table matching
->        ahci_platform: add support for CNS3xxx SoC devices
->
->   arch/arm/mach-cns3xxx/devices.c |    2 +-
->   drivers/ata/Kconfig             |   11 ++
->   drivers/ata/Makefile            |    5 +-
->   drivers/ata/ahci_cns3xxx.c      |   62 +++++++++++
->   drivers/ata/ahci_platform.c     |  197 ------------------------------------
->   drivers/ata/ahci_pltfm.c        |  212 +++++++++++++++++++++++++++++++++++++++
->   drivers/ata/ahci_pltfm.h        |   19 ++++
->   7 files changed, 309 insertions(+), 199 deletions(-)
->   create mode 100644 drivers/ata/ahci_cns3xxx.c
->   delete mode 100644 drivers/ata/ahci_platform.c
->   create mode 100644 drivers/ata/ahci_pltfm.c
->   create mode 100644 drivers/ata/ahci_pltfm.h
+On Wed, Jan 05, 2011 at 07:58:03PM +0200, Eduardo Valentin wrote:
+> Currently, if one calls disable_irq(gpio_irq), the irq
+> won't get disabled.
+> 
+> This is happening because the omap gpio code defines only
+> a .mask callback. And the default_disable function is just
+> a stub. The result is that, when someone calls disable_irq
+> for an irq in a gpio line, it will be kept enabled.
+> 
+> This patch solves this issue by setting the .disable
+> callback to point to the same .mask callback.
 
-It is overkill to rename the entirety of ahci_platform just for one 
-override function.
+Amd this is a problem because?
 
-This sort of thing I would have expected to be added directly to 
-ahci_platform.c.
-
-	Jeff
+The way this works is that although it isn't disabled at that point,
+if it never triggers, then everything remains happy.  However, if it
+does trigger, the genirq code will then mask the interrupt and won't
+call the handler.
