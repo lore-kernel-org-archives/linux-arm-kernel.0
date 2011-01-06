@@ -1,86 +1,83 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 15:48:52 +0000
-Subject: [PATCH 1/1] mtd: msm_nand: Add initial msm nand driver support.
-In-Reply-To: <1293785680-19850-1-git-send-email-mnalajal@codeaurora.org>
-References: <1293785680-19850-1-git-send-email-mnalajal@codeaurora.org>
-Message-ID: <20110106154852.GG31708@n2100.arm.linux.org.uk>
+Date: Thu, 6 Jan 2011 15:53:58 +0000
+Subject: [PATCH V2] ARM: S5PV310: Implement kernel timers using MCT
+In-Reply-To: <1294107527-27915-1-git-send-email-kgene.kim@samsung.com>
+References: <1294107527-27915-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110106155358.GH31708@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 31, 2010 at 02:24:40PM +0530, Murali Nalajala wrote:
-> +	info->msm_nand.dev = &pdev->dev;
-> +
-> +	init_waitqueue_head(&info->msm_nand.wait_queue);
-> +
-> +	info->msm_nand.dma_channel = res->start;
-> +	pr_debug("dma channel 0x%x\n", info->msm_nand.dma_channel);
-> +	info->msm_nand.dma_buffer =
-> +		dma_alloc_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
-> +				   &info->msm_nand.dma_addr, GFP_KERNEL);
+On Tue, Jan 04, 2011 at 11:18:47AM +0900, Kukjin Kim wrote:
+> From: Changhwan Youn <chaos.youn@samsung.com>
+> 
+> The Multi-Core Timer(MCT) of S5PV310 is designed for implementing
+> clock source timer and clock event timers. This patch implements
+> 1 clock source timer with 64 bit free running counter of MCT and
+> 2 clock event timers with two of 31-bit tick counters.
 
-Haven't you got a struct device for this (&pdev->dev) ?
+I want to wait until after this merge window before commenting too much
+on this; some of this patch will be impacted by changes in this merge
+window.
 
-> +	if (info->msm_nand.dma_buffer == NULL) {
-> +		err = -ENOMEM;
-> +		goto out_free_info;
-> +	}
+> +static void s5pv310_frc_suspend(struct clocksource *cs)
+> +{
+> +	time_suspended = s5pv310_frc_read(cs);
+> +};
 > +
-> +	pr_debug("allocated dma buffer at %p, dma_addr %x\n",
-> +		info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
-> +
-> +	info->mtd.name = dev_name(&pdev->dev);
-> +	info->mtd.priv = &info->msm_nand;
-> +	info->mtd.owner = THIS_MODULE;
-> +
-> +	if (msm_nand_scan(&info->mtd, 1)) {
-> +		err = -ENXIO;
-> +		goto out_free_dma_buffer;
-> +	}
-> +
-> +#ifdef CONFIG_MTD_PARTITIONS
-> +	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
-> +	if (err > 0)
-> +		err = add_mtd_partitions(&info->mtd, info->parts, err);
-> +	else if (err <= 0 && pdata && pdata->parts)
-> +		err = add_mtd_partitions(&info->mtd, pdata->parts,
-> +					 pdata->nr_parts);
-> +	else
-> +#endif
-> +		err = add_mtd_device(&info->mtd);
-> +
-> +	if (err != 0)
-> +		goto out_free_dma_buffer;
-> +
-> +	platform_set_drvdata(pdev, info);
-> +
-> +	return 0;
-> +
-> +out_free_dma_buffer:
-> +	dma_free_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
+> +static void s5pv310_frc_resume(struct clocksource *cs)
+> +{
+> +	s5pv310_mct_frc_start((u32)(time_suspended >> 32), (u32)time_suspended);
+> +};
 
-Ditto.
+Is this something which other clocksource drivers need to do, or does the
+core automatically deal with the clocksource being irregular across a
+suspend/resume event?
 
-> +			  info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
-> +out_free_info:
-> +	kfree(info);
+> +irqreturn_t s5pv310_mct_tick0_isr(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = dev_id;
 > +
-> +	return err;
+> +	/*
+> +	 * This is for supporting oneshot mode.
+> +	 * Mct would generate interrupt periodically
+> +	 * without explicit stopping.
+> +	 */
+> +	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+> +		s5pv310_mct_tick_stop(MCT_TICK0);
+> +
+> +	/* Clear the MCT tick0 interrupt */
+> +	s5pv310_mct_write(0x1, S5PV310_MCT_L0_INT_CSTAT);
+> +
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
 > +}
 > +
-> +static int __devexit msm_nand_remove(struct platform_device *pdev)
+> +irqreturn_t s5pv310_mct_tick1_isr(int irq, void *dev_id)
 > +{
-> +	struct msm_nand_info *info = platform_get_drvdata(pdev);
+> +	struct clock_event_device *evt = dev_id;
 > +
-> +	platform_set_drvdata(pdev, NULL);
+> +	/*
+> +	 * This is for supporting oneshot mode.
+> +	 * Mct would generate interrupt periodically
+> +	 * without explicit stopping.
+> +	 */
+> +	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+> +		s5pv310_mct_tick_stop(MCT_TICK1);
 > +
-> +#ifdef CONFIG_MTD_PARTITIONS
-> +	if (info->parts)
-> +		del_mtd_partitions(&info->mtd);
-> +	else
-> +#endif
-> +		del_mtd_device(&info->mtd);
+> +	/* Clear the MCT tick1 interrupt */
+> +	s5pv310_mct_write(0x1, S5PV310_MCT_L1_INT_CSTAT);
 > +
-> +	msm_nand_release(&info->mtd);
-> +	dma_free_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
 
-Ditto.
+Umm, why not wrap up the clock_event_device into your own structure,
+which then carries the base address of the MCT to be used - rather than
+duplicating the code just because the base address is different.  Eg,
+
+struct mct_clock_event_device {
+	struct clock_event_device evt;
+	void __iomem *base;
+};
