@@ -1,25 +1,47 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 6 Jan 2011 18:03:25 +0200
-Subject: [PATCH] leds/h1940: Use gpiolib for latch access / fix build
-	failure
-In-Reply-To: <20110104153725.2f3fede2.akpm@linux-foundation.org>
-References: <1291932292-16049-1-git-send-email-peterhuewe@gmx.de>
-	<201012100016.58130.anarsoul@gmail.com>
-	<20110104153725.2f3fede2.akpm@linux-foundation.org>
-Message-ID: <201101061803.26194.anarsoul@gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 6 Jan 2011 17:07:52 +0100
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <1294199462.348449.192344022926.1.gpush@pororo>
+References: <1294199462.347935.472473715866.0.gpush@pororo>
+	<1294199462.348449.192344022926.1.gpush@pororo>
+Message-ID: <20110106160752.GA2775@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 January 2011 01:37:25 Andrew Morton wrote:
+On Wed, Jan 05, 2011 at 11:51:02AM +0800, Jeremy Kerr wrote:
 
-> So which patch to use?
-> 
-> I queued Peter's patch because it's simpler.  I queued it for
-> 2.6.38-rc1, taged for backporting into 2.6.37.x, so we have a bit of
-> time to think about it.
+> + * The @lock member provides either a spinlock or a mutex to protect (at least)
+> + * @enable_count. The type of lock used will depend on @flags; if CLK_ATOMIC is
+> + * set, then the core clock code will use a spinlock, otherwise a mutex. This
+> + * lock will be acquired during clk_enable and clk_disable, so for atomic
+> + * clocks, these ops callbacks must not sleep.
+> + *
+> + * The choice of atomic or non-atomic clock depends on how the clock is enabled.
+> + * Typically, you'll want to use a non-atomic clock. For clocks that need to be
+> + * enabled/disabled in interrupt context, use CLK_ATOMIC. Note that atomic
+> + * clocks with parents will typically cascade enable/disable operations to
+> + * their parent, so the parent of an atomic clock *must* be atomic too.
 
-Anyway, it's time to drop leds-h1940 driver, I'll submit patch to support 
-H1940 leds via generic leds-gpio driver tonight.
+...
 
-Regards
-Vasily
+> +struct clk {
+> +	const struct clk_ops	*ops;
+> +	unsigned int		enable_count;
+> +	int			flags;
+> +	union {
+> +		struct mutex	mutex;
+> +		spinlock_t	spinlock;
+> +	} lock;
+> +};
+
+Here you have a "polymorphic" lock, where the clock instance knows
+which type it is supposed to be.  I got flak from David Miller and
+others trying to do the same thing with the mdio_bus:
+
+   http://kerneltrap.org/mailarchive/linux-netdev/2010/7/6/6280618
+
+The criticism, applied to your case, is that the clk_enable() caller
+cannot know whether it is safe to make the call or not. I was told,
+"there has got to be a better way."
+
+Richard
