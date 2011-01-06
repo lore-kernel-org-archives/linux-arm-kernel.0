@@ -1,60 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Jan 2011 11:04:16 +0100
-Subject: [PATCH 4/9] fb: export fb mode db table
-In-Reply-To: <20110106072658.GB15914@linux-sh.org>
-References: <1291902441-24712-1-git-send-email-s.hauer@pengutronix.de>
-	<1291902441-24712-5-git-send-email-s.hauer@pengutronix.de>
-	<20110106072658.GB15914@linux-sh.org>
-Message-ID: <20110106100416.GD26009@pengutronix.de>
+From: aaro.koskinen@nokia.com (aaro.koskinen at nokia.com)
+Date: Thu, 6 Jan 2011 10:15:50 +0000
+Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
+In-Reply-To: <874o9mvpxf.fsf@ti.com>
+References: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>,
+	<874o9mvpxf.fsf@ti.com>
+Message-ID: <BC214410FD04D84F9079A62423659707161C0C@008-AM1MPN1-003.mgdnok.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 04:26:58PM +0900, Paul Mundt wrote:
-> On Thu, Dec 09, 2010 at 02:47:16PM +0100, Sascha Hauer wrote:
-> > The different modes can be useful for drivers. Currently there is
-> > no way to expose the modes to sysfs, so export them.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> I'll admit I don't really like the idea of exposing the modedb to drivers
-> in this way, but given that we're already doing it for the vesa and cea
-> modes, allowing drivers to copy ranges in to their modelist from the
-> standard db is probably something we can live with.
-> 
-> The mode list dumping is basically a blatant sysfs abuse already though,
+Hi,
 
-You mean the available modes should not be exposed to sysfs? I found it
-quite convenient to have during development. Exporting the modedb seemed
-to be the only way to populate sysfs with a sane set of modes.
+Kevin Hilman [khilman at ti.com]:
+> Aaro Koskinen <aaro.koskinen@nokia.com> writes:
+>
+> > Make !CONFIG_SUSPEND init declarations identical on all OMAPs and
+> > eliminate some ifdefs.
+> >
+> > Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+>
+> I like this solution, but it introduces compiler warnings:
+>
+> [...]
+>
+> As you likely noticed, removing the const leads to checkpatch warnings:
+>
+> WARNING: struct platform_suspend_ops should normally be const
+>
+> so the choice is between a checkpatch warning or a bunch of compiler
+> warnings.
+>
+> Alternatively, I just posted a patch[1] to linux-pm propsing to fix this
+> at the source.  Let's see what happens there.  Merging $SUBJECT patch
+> will depend on how this is fixed upstream.
 
-> and it would be much cleaner simply to back the mode store with an
-> fb_find/try_mode() pair that grovels all the right places in addition to
-> doing a pass over the fb_info's modelist.
+Sorry, I should have mentioned this when I posted the patch. I was aware of
+this issue, but I thought this was already fixed in upstream. Check the following
+commit in linux-next:
 
-The kernel provides no way to query the modelist other than sysfs. So
-when the modelist dumping is a sysfs abuse, what purpose does the
-modelist have anyway?
+http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=2f55ac072f5344519348c0c94b3d2f4cca46847b
 
-Right now the behaviour is quite strange. Each time a new (formerly
-unknown) mode is selected the modelist magically gets a new entry. So
-the kernel normally starts with an empty (or one entry from startup)
-modelist and gets populated over time with the modes the user used.
+(suspend: constify platform_suspend_ops)
 
-I could understand when we say: "We do not keep the modelist in kernel,
-do this in userspace". I could also understand when we say "we keep a
-list of sane modes in the kernel, use fbset to switch to exotic modes".
-ATM we do the worst of both: We keep a list but we do not populate it
-with sane modes. Even worse, we use it to store the history of modes.
-
-I know much of this comes from the fact that the fb subsystem does not
-have a maintainer and nowadays the big desktop guys are not using the fb
-subsystem at all, but it's really hard to find a way through and every
-driver seems to have it's own idea of how things should work.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+A.
