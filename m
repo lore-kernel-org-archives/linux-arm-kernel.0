@@ -1,66 +1,98 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu,  6 Jan 2011 13:54:39 -0600
-Subject: [PATCH v3 3/3] omap3: beaglexm: power on DVI
-In-Reply-To: <1294343679-10605-1-git-send-email-nm@ti.com>
-References: <1294343679-10605-1-git-send-email-nm@ti.com>
-Message-ID: <1294343679-10605-4-git-send-email-nm@ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu,  6 Jan 2011 21:52:52 +0200
+Subject: [PATCH 7/7] ARM: S3C2442: RX1950: Add support for LED blinking
+In-Reply-To: <1294343572-28518-1-git-send-email-anarsoul@gmail.com>
+References: <1294343572-28518-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1294343572-28518-8-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Koen Kooi <koen@beagleboard.org>
+Add .gpio_set_blink callback to support HW blinking
+available on RX1950
 
-TFP410 DVI chip is used to provide display out.
-this chip is controlled by 2 lines:
-LDO which supplies the power is controlled over gpio + 2
-and the enable of the chip itself is done over gpio + 1
-NOTE: the LDO is necessary for LED, serial blocks as well.
-
-GPIO + 1 was used to sense USB overcurrent in vanilla beagle
-
-[nm at ti.com: helped split up the patch]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Koen Kooi <koen@beagleboard.org>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |   20 +++++++++++++++++---
- 1 files changed, 17 insertions(+), 3 deletions(-)
+ arch/arm/mach-s3c2440/mach-rx1950.c |   54 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 54 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index d628f5e..7c82730 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -293,9 +293,10 @@ static int beagle_twl_gpio_setup(struct device *dev,
- 	/* REVISIT: need ehci-omap hooks for external VBUS
- 	 * power switch and overcurrent detect
- 	 */
--
--	gpio_request(gpio + 1, "EHCI_nOC");
--	gpio_direction_input(gpio + 1);
-+	if (omap3_beagle_get_rev() != OMAP3BEAGLE_BOARD_XM) {
-+		gpio_request(gpio + 1, "EHCI_nOC");
-+		gpio_direction_input(gpio + 1);
-+	}
- 
- 	/*
- 	 * TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, XM active
-@@ -317,6 +318,19 @@ static int beagle_twl_gpio_setup(struct device *dev,
- 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
- 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
- 
-+	/*
-+	 * gpio + 1 on Xm controls the TFP410's enable line (active low)
-+	 * gpio + 2 control varies depending on the board rev as follows:
-+	 * P7/P8 revisions(prototype): Camera EN
-+	 * A2+ revisions (production): LDO (supplies DVI, serial, led blocks)
-+	 */
-+	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
-+		gpio_request(gpio + 1, "nDVI_PWR_EN");
-+		gpio_direction_output(gpio + 1, 0);
-+		gpio_request(gpio + 2, "DVI_LDO_EN");
-+		gpio_direction_output(gpio + 2, 1);
-+	}
-+
- 	return 0;
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index e7cc993..2d2f4e4 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -263,6 +263,52 @@ void rx1950_disable_charger(void)
+ 	gpio_direction_output(S3C2410_GPJ(3), 0);
  }
  
++DEFINE_SPINLOCK(rx1950_blink_spin);
++
++static int rx1950_led_blink_set(unsigned gpio, int state,
++	unsigned long *delay_on, unsigned long *delay_off)
++{
++	int blink_gpio, check_gpio;
++
++	switch (gpio) {
++	case S3C2410_GPA(6):
++		blink_gpio = S3C2410_GPA(4);
++		check_gpio = S3C2410_GPA(3);
++		break;
++	case S3C2410_GPA(7):
++		blink_gpio = S3C2410_GPA(3);
++		check_gpio = S3C2410_GPA(4);
++		break;
++	default:
++		return -EINVAL;
++		break;
++	}
++
++	if (delay_on && delay_off && !*delay_on && !*delay_off)
++		*delay_on = *delay_off = 500;
++
++	spin_lock(&rx1950_blink_spin);
++
++	switch (state) {
++	case GPIO_LED_NO_BLINK_LOW:
++	case GPIO_LED_NO_BLINK_HIGH:
++		if (!gpio_get_value(check_gpio))
++			gpio_set_value(S3C2410_GPJ(6), 0);
++		gpio_set_value(blink_gpio, 0);
++		gpio_set_value(gpio, state);
++		break;
++	case GPIO_LED_BLINK:
++		gpio_set_value(gpio, 0);
++		gpio_set_value(S3C2410_GPJ(6), 1);
++		gpio_set_value(blink_gpio, 1);
++		break;
++	}
++
++	spin_unlock(&rx1950_blink_spin);
++
++	return 0;
++}
++
+ static struct gpio_led rx1950_leds_desc[] = {
+ 	{
+ 		.name				= "Green",
+@@ -287,6 +333,7 @@ static struct gpio_led rx1950_leds_desc[] = {
+ static struct gpio_led_platform_data rx1950_leds_pdata = {
+ 	.num_leds	= ARRAY_SIZE(rx1950_leds_desc),
+ 	.leds		= rx1950_leds_desc,
++	.gpio_blink_set	= rx1950_led_blink_set,
+ };
+ 
+ static struct platform_device rx1950_leds = {
+@@ -774,6 +821,13 @@ static void __init rx1950_init_machine(void)
+ 
+ 	WARN_ON(gpio_request(S3C2410_GPB(1), "LCD power"));
+ 
++	WARN_ON(gpio_request(S3C2410_GPA(3), "Red blink"));
++	WARN_ON(gpio_request(S3C2410_GPA(4), "Green blink"));
++	WARN_ON(gpio_request(S3C2410_GPJ(6), "LED blink"));
++	gpio_direction_output(S3C2410_GPA(3), 0);
++	gpio_direction_output(S3C2410_GPA(4), 0);
++	gpio_direction_output(S3C2410_GPJ(6), 0);
++
+ 	platform_add_devices(rx1950_devices, ARRAY_SIZE(rx1950_devices));
+ 
+ 	i2c_register_board_info(0, rx1950_i2c_devices,
 -- 
-1.6.3.3
+1.7.3.2
