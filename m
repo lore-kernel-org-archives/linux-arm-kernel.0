@@ -1,37 +1,82 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 6 Jan 2011 12:18:53 -0800
-Subject: [PATCH V2] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <137dfad4a093ea0ac80396f5eb7fbf0c382be698.1294314772.git.viresh.kumar@st.com>
-References: <137dfad4a093ea0ac80396f5eb7fbf0c382be698.1294314772.git.viresh.kumar@st.com>
-Message-ID: <20110106121853.016fb990.akpm@linux-foundation.org>
+From: john@stoffel.org (John Stoffel)
+Date: Thu, 6 Jan 2011 15:19:33 -0500
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <1294335614.22825.154.camel@mulgrave.site>
+References: <1294254337.16957.13.camel@mulgrave.site>
+	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+	<1294256169.16957.18.camel@mulgrave.site>
+	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
+	<1294259637.16957.25.camel@mulgrave.site>
+	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+	<20110105210448.GM8638@n2100.arm.linux.org.uk>
+	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
+	<1294262208.2952.4.camel@heimdal.trondhjem.org>
+	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
+	<1294268808.2952.18.camel@heimdal.trondhjem.org>
+	<1294270104.16957.73.camel@mulgrave.site>
+	<1294335614.22825.154.camel@mulgrave.site>
+Message-ID: <19750.9173.909359.319214@quad.stoffel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Jan 2011 17:29:10 +0530
-Viresh Kumar <viresh.kumar@st.com> wrote:
+>>>>> "James" == James Bottomley <James.Bottomley@HansenPartnership.com> writes:
 
-> From: Pratyush Anand <pratyush.anand@st.com>
-> 
-> This is a configurable gadget. can be configured by sysfs interface. Any
-> IP available at PCIE bus can be programmed to be used by host
-> controller.It supoorts both INTX and MSI.
-> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
-> with size 0x1000
-> 
-> ...
->
-> --- /dev/null
-> +++ b/Documentation/misc-devices/spear-pcie-gadget.txt
+James> On Wed, 2011-01-05 at 23:28 +0000, James Bottomley wrote:
+>> Can you explain how the code works? it looks to me like you read the xdr
+>> stuff through the vmap region then write it out directly to the pages? 
 
-Please recheck this documentation file - it contains a number of simple
-typos.
+James> OK, I think I see how this is supposed to work: It's a
+James> sequential loop of reading in via the pages (i.e. through the
+James> kernel mapping) and then updating those pages via the vmap.  In
+James> which case, I think this patch is what you need.
 
->
-> ...
->
-> +	if (strict_strtoul(buf, 0, &config->requested_msi))
-> +		return -EINVAL;
+James> The theory of operation is that the readdir on pages actually
+James> uses the network DMA operations to perform, so when it's
+James> finished, the underlying page is up to date.  After this you
+James> invalidate the vmap range, so we have no cache lines above it
+James> (so it picks up the values from the uptodate page).  Finally,
+James> after the operation on the vmap region has finished, you flush
+James> it so that any updated contents go back to the pages themselves
+James> before the next iteration begins.
 
-It doesn't matter much, but the code really should propagate the
-strict_strtoul() return error code back to the caller, rather than
-overwriting it with -EINVAL.
+You need to re-spin this patch to include the above description into
+the magic steps your taking here, or at least document it more clearly
+somewhere why you need to make these funky steps.  
+
+John
+
+
+James> James
+
+James> ---
+
+James> diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
+James> index 996dd89..bde1911 100644
+James> --- a/fs/nfs/dir.c
+James> +++ b/fs/nfs/dir.c
+James> @@ -587,12 +587,16 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page,
+James>  		if (status < 0)
+James>  			break;
+James>  		pglen = status;
+James> +
+James> +		invalidate_kernel_vmap_range(pages_ptr, pglen);
+James> +
+James>  		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
+James>  		if (status < 0) {
+James>  			if (status == -ENOSPC)
+James>  				status = 0;
+James>  			break;
+James>  		}
+James> +		flush_kernel_vmap_range(pages_ptr, pglen);
+James>  	} while (array->eof_index < 0);
+ 
+James>  	nfs_readdir_free_large_page(pages_ptr, pages, array_size);
+
+
+James> --
+James> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+James> the body of a message to majordomo at vger.kernel.org
+James> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+James> Please read the FAQ at  http://www.tux.org/lkml/
+
+-- 
