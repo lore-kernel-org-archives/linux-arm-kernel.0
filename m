@@ -1,80 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 6 Jan 2011 20:08:21 +0530
-Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix for
-	undefined reference to 'omap2_prm_read_mod_reg'
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930248201A7E@dbde02.ent.ti.com>
-References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
-	<1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930248201A7E@dbde02.ent.ti.com>
-Message-ID: <65442ed447ba6e1fc8dab9f9d944c03a@mail.gmail.com>
+From: carmelo.amoroso@st.com (Carmelo AMOROSO)
+Date: Thu, 6 Jan 2011 15:43:33 +0100
+Subject: [PATCH 1/2] stackprotector: add stack smashing protector
+	generic implementation
+In-Reply-To: <20110106141946.GE31708@n2100.arm.linux.org.uk>
+References: <1293111851-7175-1-git-send-email-filippo.arcidiacono@st.com>
+	<4D245D16.5010702@st.com>
+	<20110106093940.GA31708@n2100.arm.linux.org.uk>
+	<4D25CEB9.7090205@st.com>
+	<20110106141946.GE31708@n2100.arm.linux.org.uk>
+Message-ID: <4D25D515.9060202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Premi, Sanjeev [mailto:premi at ti.com]
-> Sent: Thursday, January 06, 2011 8:03 PM
-> To: Shilimkar, Santosh; linux-omap at vger.kernel.org
-> Cc: Hilman, Kevin; tony at atomide.com; linux-arm-
-> kernel at lists.infradead.org; Shilimkar, Santosh; Paul Walmsley
-> Subject: RE: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix
-> for undefined reference to 'omap2_prm_read_mod_reg'
->
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org
-> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
-> > Santosh Shilimkar
-> > Sent: Wednesday, January 05, 2011 4:27 PM
-> > To: linux-omap at vger.kernel.org
-> > Cc: Hilman, Kevin; tony at atomide.com;
-> > linux-arm-kernel at lists.infradead.org; Shilimkar, Santosh;
-> > Paul Walmsley
-> > Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break
-> > fix for undefined reference to 'omap2_prm_read_mod_reg'
->
-> [snip]
->
-> >
-> >  #ifndef __ASSEMBLER__
-> > -
-> > +/*
-> > + * Stub omap2xxx/omap3xxx functions so that common files
-> > + * continue to build when custom builds are used
-> > + */
-> > +#if defined(CONFIG_ARCH_OMAP4) &&
-> > !(defined(CONFIG_ARCH_OMAP2) ||	\
-> > +					defined(CONFIG_ARCH_OMAP3))
-> > +static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
-> > +{
-> > +	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
-> > +		"not suppose to be used on omap4\n");
-> > +	return 0;
-> > +}
-> Looking forward, the warning of incorrect SOC may be required
-> for when kernel is build for one specific SOC.
->
-> Wouldn't it be easy/better to have common global function:
->
-> void wrong_soc(char* func, int soc_id)
-> {
-> 	WARN_ONCE(1, "Function %s cannot be used for %d", func,
-> soc_id);
-> }
->
-> OR we could have soc specific functions e.g.
->
-> void omap2xxx_only (char* func)
-> {
-> 	WARN_ONCE(1, "Function %s is specific to OMAP2XXX");
-> }
-> ..etc..
->
-> Later these functions can be called from the stubs.
->
-> This is prelim idea, will need to be worked upon.
->
-Not sure. May appear like over engineering considering it's a
-stub.
-Paul can comment.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Regards,
-Santosh
+On 1/6/2011 3:19 PM, Russell King - ARM Linux wrote:
+> On Thu, Jan 06, 2011 at 03:16:25PM +0100, Carmelo AMOROSO wrote:
+>  > Well, SH (in CC) does not have this support. Indeed we posted it
+>  > initially to linux-sh only. We got useful feedback from Paul, Mike and
+>  > Nicolas suggesting to promote the ARM/SH solution based on the global
+>  > __stack_chk_guard variable as a generic solution for all other
+>  > architectures. This is why I thought to post to the LKML instead of each
+>  > linux-<arch> list.
+> 
+> Have you thought about posting it to _the_ linux-arch list?
+> 
+I did not know this list. I'll do. Thanks.
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (MingW32)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEYEARECAAYFAk0l1RUACgkQoRq/3BrK1s8a1gCgpSdHez/S8cJ8BM5jVhYH0TKy
+84gAnRkeALaLGMoXJqtxdDRL7Xusc6JT
+=L6Oj
+-----END PGP SIGNATURE-----
