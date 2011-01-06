@@ -1,44 +1,41 @@
-From: aaro.koskinen@nokia.com (aaro.koskinen at nokia.com)
-Date: Thu, 6 Jan 2011 10:15:50 +0000
-Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
-In-Reply-To: <874o9mvpxf.fsf@ti.com>
-References: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>,
-	<874o9mvpxf.fsf@ti.com>
-Message-ID: <BC214410FD04D84F9079A62423659707161C0C@008-AM1MPN1-003.mgdnok.nokia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 6 Jan 2011 11:16:39 +0100
+Subject: [PATCH v4 5/8] arm: mxc: move IOMUX_CONFIG_XXXX definitions to
+	iomux-v3.h
+In-Reply-To: <20110106065935.GA15509@shlinux1.ap.freescale.net>
+References: <1293708306-20170-1-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-2-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-3-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-4-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-5-git-send-email-richard.zhao@freescale.com>
+	<20110106065935.GA15509@shlinux1.ap.freescale.net>
+Message-ID: <20110106101639.GE26009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 06, 2011 at 02:59:36PM +0800, Richard Zhao wrote:
+> Hello Sascha,
+> 
+> On Thu, Dec 30, 2010 at 07:25:04PM +0800, Richard Zhao wrote:
+> > IOMUX_CONFIG_GPIO is not for iomux-v3. It's for old freescale
+> > iomux routines. Remove it.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> If you don't have comments, could you please merge this patch?
+> It's causing arch/arm/plat-mxc/include/mach/iomux-mx50.h incomplete.
 
-Kevin Hilman [khilman at ti.com]:
-> Aaro Koskinen <aaro.koskinen@nokia.com> writes:
->
-> > Make !CONFIG_SUSPEND init declarations identical on all OMAPs and
-> > eliminate some ifdefs.
-> >
-> > Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
->
-> I like this solution, but it introduces compiler warnings:
->
-> [...]
->
-> As you likely noticed, removing the const leads to checkpatch warnings:
->
-> WARNING: struct platform_suspend_ops should normally be const
->
-> so the choice is between a checkpatch warning or a bunch of compiler
-> warnings.
->
-> Alternatively, I just posted a patch[1] to linux-pm propsing to fix this
-> at the source.  Let's see what happens there.  Merging $SUBJECT patch
-> will depend on how this is fixed upstream.
+I didn't apply it because it conflicts with current imx-for-2.6.38
+branch. Other than that I don't find the enum very useful at all,
+because we have problems with very long lines in these files and
+using IOMUX_CONFIG_ALT0 where we could use 0 does not exactly improve
+the situation.
 
-Sorry, I should have mentioned this when I posted the patch. I was aware of
-this issue, but I thought this was already fixed in upstream. Check the following
-commit in linux-next:
+Sascha
 
-http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=2f55ac072f5344519348c0c94b3d2f4cca46847b
 
-(suspend: constify platform_suspend_ops)
-
-A.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
