@@ -1,25 +1,96 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 5 Jan 2011 19:20:18 -0800
-Subject: [PATCH 0/3] hvc_dcc cleanups and fixes
-In-Reply-To: <4D251F9D.2070406@codeaurora.org>
-References: <1292649385-28771-1-git-send-email-sboyd@codeaurora.org>
-	<1292875718-7980-1-git-send-email-sboyd@codeaurora.org>
-	<4D251F9D.2070406@codeaurora.org>
-Message-ID: <20110106032018.GB19194@suse.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 6 Jan 2011 09:23:30 +0530
+Subject: [PATCH] omap: wd_timer: Fix crash frm wdt_probe when
+	!CONFIG_RUNTIME_PM
+In-Reply-To: <87aajfz18c.fsf@ti.com>
+References: <1294234855-6623-1-git-send-email-santosh.shilimkar@ti.com><68789fa8ba11b9427aa6321da55c9a8b@mail.gmail.com>
+	<87aajfz18c.fsf@ti.com>
+Message-ID: <c0f91e7569ebc4a218dc8e80b8729731@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 05:49:17PM -0800, Stephen Boyd wrote:
-> Greg,
-> 
-> On 12/20/2010 12:08 PM, Stephen Boyd wrote:
-> > Here are the split patches.
-> 
-> Should I resend these with the proper acks or can/have you picked these
-> patches up?
-
-They are in my to-apply queue after .38-rc1 is out.
-
-thanks,
-
-greg k-h
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Wednesday, January 05, 2011 11:23 PM
+> To: Santosh Shilimkar
+> Cc: Paul Walmsley; linux-arm-kernel at lists.infradead.org; linux-
+> omap at vger.kernel.org
+> Subject: Re: [PATCH] omap: wd_timer: Fix crash frm wdt_probe when
+> !CONFIG_RUNTIME_PM
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+> > Commit ff2516fb 'wd_timer: disable on boot via hwmod postsetup
+> mechanism'
+> > introduced watchdog timer state state management using
+> postsetup_state.
+> > This was done to allow some board files to support watchdog
+> coverage
+> > throughout kernel initialization and it work as intended when
+> RUNTIME_PM
+> > is enabled.
+> >
+> > With !CONFIG_RUNTIME_PM and no board is specifically requests
+> watchdog
+> > to remain enabled the omap_wdt_probe crashesh. This is because
+> hwmod
+> > in absense of runtime PM unable to turn watchdog clocks because
+> it's
+> > state is set to be disabled. For rest of the device, the state is
+> > set as enabled in absense of RUNTIME_PM
+> >
+> > [    1.372558] Unhandled fault: imprecise external abort (0x1406)
+> at
+> > 0xad733eeb
+> > [    1.379913] Internal error: : 1406 [#1] SMP
+> > [    1.384277] last sysfs file:
+> > [    1.387359] Modules linked in:
+> > [    1.390563] CPU: 0    Tainted: G        W
+> > (2.6.37-rc7-00265-g4298a4c-dirty #23)
+> > [    1.398468] PC is at omap_wdt_disable+0x2c/0x3c
+> > [    1.403198] LR is at omap_wdt_probe+0x124/0x1e0
+> > [    1.407928] pc : [<c02f5bf4>]    lr : [<c03be10c>]    psr:
+> 60000013
+> > [    1.407958] sp : df833f00  ip : 00000000  fp : 00000000
+> > [    1.419921] r10: c0ac57ac  r9 : df959e00  r8 : 00000000
+> > [    1.425384] r7 : df959e08  r6 : df8000c0  r5 : df95bebc  r4 :
+> df87dde0
+> > [    1.432189] r3 : fc314000  r2 : 00005555  r1 : fc314034  r0 :
+> df87dde0
+> >
+> > This patch make the default watchdog state to be enabled in case
+> of
+> > !CONFIG_RUNTIME_PM. This fixes the crash
+> >
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > ---
+> > Paul, I am not too sure if it breaks your _shutdown idea of
+> watchdog
+> > timer.  Patch generated against 'omap-for-linus' branch and boot
+> > tested on OMAP4 with and without CONFIG_OMAP_WATCHDOG.
+> >
+> >  arch/arm/mach-omap2/io.c |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> > index e66687b..b879a16 100644
+> > --- a/arch/arm/mach-omap2/io.c
+> > +++ b/arch/arm/mach-omap2/io.c
+> > @@ -378,7 +378,11 @@ void __init
+> omap2_init_common_infrastructure(void)
+> >  	 * XXX ideally we could detect whether the MPU WDT was
+> currently
+> >  	 * enabled here and make this conditional
+> >  	 */
+> > +#ifdef CONFIG_PM_RUNTIME
+> >  	postsetup_state = _HWMOD_STATE_DISABLED;
+> > +#else
+> > +	postsetup_state = _HWMOD_STATE_ENABLED;
+> > +#endif
+>
+> You shouldn't need the 'else' part of this since the default a few
+> lines
+> above this code is already setting that for the !CONFIG_PM_RUNTIME
+> case.
+Yep. Just 'CONFIG_PM_RUNTIME' wrapping is enough.
