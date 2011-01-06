@@ -1,33 +1,36 @@
-From: mkl0301@gmail.com (Lin Mac)
-Date: Fri, 7 Jan 2011 00:18:08 +0800
-Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
-In-Reply-To: <20110106105157.GA9560@oksana.dev.rtsoft.ru>
-References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
-	<4D24B53C.4020009@pobox.com>
-	<AANLkTinxNtzpzUn0=-iph_N7tffM6Nu++J9qNNhcp8pX@mail.gmail.com>
-	<20110106105157.GA9560@oksana.dev.rtsoft.ru>
-Message-ID: <AANLkTimWYUnO_MkawaOpJX3Sm9YZHsECgmotiNwkb8mN@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 6 Jan 2011 22:05:52 +0530
+Subject: [PATCH] omap: wd_timer: Fix crash frm
+	wdt_probewhen!CONFIG_RUNTIME_PM
+In-Reply-To: <20110106152638.GC1198@n2100.arm.linux.org.uk>
+References: <1294234855-6623-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110105221839.GD8717@n2100.arm.linux.org.uk>
+	<19b4a66bfdd4ef3e51fdb27bf43b9ce2@mail.gmail.com>
+	<20110106152638.GC1198@n2100.arm.linux.org.uk>
+Message-ID: <7a7e28065232cb3b196a3813a891225f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/6 Anton Vorontsov <cbouatmailru@gmail.com>:
-> On Thu, Jan 06, 2011 at 02:43:08PM +0800, Lin Mac wrote:
-> [...]
->> > It is overkill to rename the entirety of ahci_platform just for one override
->> > function.
->> > This sort of thing I would have expected to be added directly to
->> > ahci_platform.c.
->> It might be overkill for only one controller. but it is more clean and
->> readable to have different SoC specific changes in separate files,
->> especially when more SoCs need to make similar changes.
-> I think that renaming the file is not necessary. You can just
-> rename the module in the makefile.
-That is for consist end user experience. I wouldn't like to find my
-script not working anymore when changing to some linux version, simply
-because someone fix some issue on some platform I'm not using.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Thursday, January 06, 2011 8:57 PM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; Paul Walmsley; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] omap: wd_timer: Fix crash frm
+> wdt_probewhen!CONFIG_RUNTIME_PM
+>
+[.....]
 
-> Personally I like the current approach more than putting
-> controller-specific fixups directly into ahci_platform.
+> >
+> > Yes. That's managed through the shutdown part. Apart from that
+> there
+> > is another enhancement done in case some one wants to have WDT
+> running
+> > throughout the kernel boot.
+>
+> Good - and just to confirm, the fix for LDP watchdogging will be
+> submitted
+> in the current merge window?
 
-Best Regards,
-Mac Lin.
+Yes. It's in the queue already.
