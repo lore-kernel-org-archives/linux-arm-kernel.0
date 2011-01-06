@@ -1,31 +1,102 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 11 Jan 2011 17:55:03 -0600
-Subject: [PATCH v5 3/3] omap3: beaglexm: fix power on of DVI
-In-Reply-To: <20110111232329.GY4957@atomide.com>
-References: <1294766017-12182-4-git-send-email-nm@ti.com>
-	<20110111232329.GY4957@atomide.com>
-Message-ID: <4D2CEDD7.4020507@ti.com>
+From: koen@beagleboard.org (Koen Kooi)
+Date: Thu, 6 Jan 2011 13:29:18 -0600
+Subject: [PATCH v6 3/3] omap3: beaglexm: fix power on of DVI
+Message-ID: <mailman.116.1294790112.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren had written, on 01/11/2011 05:23 PM, the following:
-[..]
->> -
->> -	gpio_request(gpio + 1, "EHCI_nOC");
->> -	gpio_direction_input(gpio + 1);
->> +	if (omap3_beagle_get_rev() != OMAP3BEAGLE_BOARD_XM) {
->> +		gpio_request(gpio + 1, "EHCI_nOC");
->> +		gpio_direction_input(gpio + 1);
->> +	}
-> 
-> The return value for gpio_request must be checked.
-Ack.
-we can go down two paths:
-a) I can redo this patch as in v6.patch (attached)
-OR
-b) we take this patch and do another one cleaning the function up - 
-gpio-check.patch
+TFP410 DVI chip is used to provide display out.
+This chip is controlled by 2 lines:
+LDO which supplies the power is controlled over gpio + 2
+and the enable of the chip itself is done over gpio + 1
+NOTE: the LDO is necessary for LED, serial blocks as well.
 
+gpio + 1 was used to sense USB overcurrent in vanilla beagle.
+
+Without this fix, the display would not function as the LDO
+remains shut down.
+
+[nm at ti.com: split up, added descriptive changelogs]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Koen Kooi <koen@beagleboard.org>
+---
+ arch/arm/mach-omap2/board-omap3beagle.c |   42 ++++++++++++++++++++++++++++--
+ 1 files changed, 39 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 673deb9..28dfe8e 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -273,6 +273,8 @@ static struct gpio_led gpio_leds[];
+ static int beagle_twl_gpio_setup(struct device *dev,
+ 		unsigned gpio, unsigned ngpio)
+ {
++	int r;
++
+ 	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+ 		mmc[0].gpio_wp = -EINVAL;
+ 	} else if ((omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C1_3) ||
+@@ -293,9 +295,16 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	/* REVISIT: need ehci-omap hooks for external VBUS
+ 	 * power switch and overcurrent detect
+ 	 */
+-
+-	gpio_request(gpio + 1, "EHCI_nOC");
+-	gpio_direction_input(gpio + 1);
++	if (omap3_beagle_get_rev() != OMAP3BEAGLE_BOARD_XM) {
++		r = gpio_request(gpio + 1, "EHCI_nOC");
++		if (!r) {
++			r = gpio_direction_input(gpio + 1);
++			if (r)
++				gpio_free(gpio + 1);
++		}
++		if (r)
++			pr_err("%s: unable to configure EHCI_nOC\n", __func__);
++	}
+ 
+ 	/*
+ 	 * TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, XM active
+@@ -316,6 +325,33 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+ 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+ 
++	/*
++	 * gpio + 1 on Xm controls the TFP410's enable line (active low)
++	 * gpio + 2 control varies depending on the board rev as follows:
++	 * P7/P8 revisions(prototype): Camera EN
++	 * A2+ revisions (production): LDO (supplies DVI, serial, led blocks)
++	 */
++	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
++		r = gpio_request(gpio + 1, "nDVI_PWR_EN");
++		if (!r) {
++			r = gpio_direction_output(gpio + 1, 0);
++			if (r)
++				gpio_free(gpio + 1);
++		}
++		if (r)
++			pr_err("%s: unable to configure nDVI_PWR_EN\n",
++				__func__);
++		r = gpio_request(gpio + 2, "DVI_LDO_EN");
++		if (!r) {
++			r = gpio_direction_output(gpio + 2, 1);
++			if (r)
++				gpio_free(gpio + 1);
++		}
++		if (r)
++			pr_err("%s: unable to configure DVI_LDO_EN\n",
++				__func__);
++	}
++
+ 	return 0;
+ }
+ 
 -- 
-Regards,
-Nishanth Menon
+1.6.3.3
+
+
+--------------030608000406040903000005
+Content-Type: text/x-patch;
+ name="gpio-check.patch"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="gpio-check.patch"
