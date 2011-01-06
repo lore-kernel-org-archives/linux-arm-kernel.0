@@ -1,60 +1,48 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 6 Jan 2011 15:13:16 +0800
-Subject: [PATCH v4 08/10] ARM: mxs: add ocotp read function
+Date: Thu, 6 Jan 2011 15:13:18 +0800
+Subject: [PATCH v4 10/10] ARM: mxs: add initial pm support
 In-Reply-To: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
 References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1294297998-26930-9-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1294297998-26930-11-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is a very initial pm support and basically does nothing.
+With this pm support entry, drivers can start testing their own
+pm functions.
+
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
-Changes for v4:
- - Call cpu_relax() during polling
-
 Changes for v2:
- - Add mutex locking for mxs_read_ocotp()
- - Use type size_t for count and i
- - Add comment for clk_enable/disable skipping
- - Add ERROR bit clearing and polling step
+ - Let build of pm.c depend on CONFIG_PM
+ - Remove the blank line above device_initcall in pm.c
 
- arch/arm/mach-mxs/Makefile              |    2 +-
- arch/arm/mach-mxs/include/mach/common.h |    1 +
- arch/arm/mach-mxs/ocotp.c               |   79 +++++++++++++++++++++++++++++++
- 3 files changed, 81 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mxs/ocotp.c
+ arch/arm/mach-mxs/Makefile |    2 ++
+ arch/arm/mach-mxs/pm.c     |   43 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/pm.c
 
 diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index 39d3f9c..f23ebbd 100644
+index f23ebbd..45a2925 100644
 --- a/arch/arm/mach-mxs/Makefile
 +++ b/arch/arm/mach-mxs/Makefile
-@@ -1,5 +1,5 @@
+@@ -1,6 +1,8 @@
  # Common support
--obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
-+obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
+ obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
  
++obj-$(CONFIG_PM) += pm.o
++
  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
-diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-index 59133eb..cf02552 100644
---- a/arch/arm/mach-mxs/include/mach/common.h
-+++ b/arch/arm/mach-mxs/include/mach/common.h
-@@ -13,6 +13,7 @@
  
- struct clk;
- 
-+extern int mxs_read_ocotp(int offset, int count, u32 *values);
- extern int mxs_reset_block(void __iomem *);
- extern void mxs_timer_init(struct clk *, int);
- 
-diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
 new file mode 100644
-index 0000000..e2d39aa
+index 0000000..fb042da
 --- /dev/null
-+++ b/arch/arm/mach-mxs/ocotp.c
-@@ -0,0 +1,79 @@
++++ b/arch/arm/mach-mxs/pm.c
+@@ -0,0 +1,43 @@
 +/*
-+ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -67,70 +55,34 @@ index 0000000..e2d39aa
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/mutex.h>
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++#include <mach/system.h>
 +
-+#include <mach/mxs.h>
-+
-+#define BM_OCOTP_CTRL_BUSY		(1 << 8)
-+#define BM_OCOTP_CTRL_ERROR		(1 << 9)
-+#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
-+
-+static DEFINE_MUTEX(ocotp_mutex);
-+
-+int mxs_read_ocotp(unsigned offset, size_t count, u32 *values)
++static int mxs_suspend_enter(suspend_state_t state)
 +{
-+	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
-+	int timeout = 0x400;
-+	size_t i;
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		arch_idle();
++		break;
 +
-+	mutex_lock(&ocotp_mutex);
-+
-+	/*
-+	 * clk_enable(hbus_clk) for ocotp can be skipped
-+	 * as it must be on when system is running.
-+	 */
-+
-+	/* try to clear ERROR bit */
-+	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
-+
-+	/* check both BUSY and ERROR cleared */
-+	while ((__raw_readl(ocotp_base) &
-+		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout))
-+		goto error_unlock;
-+
-+	/* open OCOTP banks for read */
-+	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-+
-+	/* approximately wait 32 hclk cycles */
-+	udelay(1);
-+
-+	/* poll BUSY bit becoming cleared */
-+	timeout = 0x400;
-+	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout))
-+		goto error_unlock;
-+
-+	for (i = 0; i < count; i++, offset += 4)
-+		*values++ = __raw_readl(ocotp_base + offset);
-+
-+	/* close banks for power saving */
-+	__mxs_clrl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-+
-+	mutex_unlock(&ocotp_mutex);
-+
++	default:
++		return -EINVAL;
++	}
 +	return 0;
-+
-+error_unlock:
-+	mutex_unlock(&ocotp_mutex);
-+	pr_err("%s: timeout in reading OCOTP\n", __func__);
-+	return -ETIMEDOUT;
 +}
++
++static struct platform_suspend_ops mxs_suspend_ops = {
++	.enter = mxs_suspend_enter,
++	.valid = suspend_valid_only_mem,
++};
++
++static int __init mxs_pm_init(void)
++{
++	suspend_set_ops(&mxs_suspend_ops);
++	return 0;
++}
++device_initcall(mxs_pm_init);
 -- 
 1.7.1
