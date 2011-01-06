@@ -1,42 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Jan 2011 14:14:03 -0800
-Subject: [PATCH] arm: mach-omap2: mux: fix buffer overrun
-In-Reply-To: <1294245733-4126-1-git-send-email-aaro.koskinen@nokia.com>
-References: <1294245733-4126-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <20110106221402.GB7771@atomide.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 06 Jan 2011 14:15:23 -0800
+Subject: [PATCH v3 0/3] OMAP3: beaglexm: GPIO fixes
+In-Reply-To: <1294343679-10605-1-git-send-email-nm@ti.com> (Nishanth Menon's
+	message of "Thu, 6 Jan 2011 13:54:36 -0600")
+References: <1294343679-10605-1-git-send-email-nm@ti.com>
+Message-ID: <8739p5u1ac.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@nokia.com> [110105 08:39]:
-> memcpy() copies 8 bytes too much (omap_mux_entry vs. omap_mux). Correct
-> by replacing memcpy() with struct assignment, which is safer.
+Nishanth Menon <nm@ti.com> writes:
 
-Thanks will queue as a fix after the merge window.
+> Hi,
+> As discussed in the threads:
+> http://thread.gmane.org/gmane.linux.ports.arm.omap/47807/
+> http://marc.info/?t=121540030800004&r=1&w=2
+>
+> here is the split up series with commit message after discussion:
+> http://www.beagleboard.org/irclogs/index.php?date=2011-01-06#T19:12:21
+>
+> Koen Kooi (3):
+>   omap3: beaglexm: fix EHCI power up GPIO dir
+>   omap3: beaglexm: fix DVI reset GPIO
+>   omap3: beaglexm: power on DVI
+>
+>  arch/arm/mach-omap2/board-omap3beagle.c |   37 ++++++++++++++++++++++++++----
+>  1 files changed, 32 insertions(+), 5 deletions(-)
+>
+> v3:
+> 	split up the series, addressed review comments
 
-Tony
- 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> ---
->  arch/arm/mach-omap2/mux.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-> index 17bd639..df8d2f2 100644
-> --- a/arch/arm/mach-omap2/mux.c
-> +++ b/arch/arm/mach-omap2/mux.c
-> @@ -893,7 +893,7 @@ static struct omap_mux * __init omap_mux_list_add(
->  		return NULL;
->  
->  	m = &entry->mux;
-> -	memcpy(m, src, sizeof(struct omap_mux_entry));
-> +	entry->mux = *src;
->  
->  #ifdef CONFIG_OMAP_MUX
->  	if (omap_mux_copy_names(src, m)) {
-> -- 
-> 1.5.6.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks, queueing for the .38-rc cycle.
+
+Kevin
+
+> v2: http://marc.info/?t=129276977900002&r=1&w=2
+> 	Reenable the PMU stat LED
+> v1: http://marc.info/?t=129172571000001&r=1&w=2
+>
+> Regards,
+> Nishanth Menon
