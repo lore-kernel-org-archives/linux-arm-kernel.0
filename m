@@ -1,92 +1,74 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 06 Jan 2011 13:19:29 +0200
-Subject: Hit BUG_ON in dma-mapping.c:425
-In-Reply-To: <4D259B9C.6060409@atmel.com>
-References: <4D24A108.2080609@atmel.com>
-	<20110105165551.GE8638@n2100.arm.linux.org.uk>
-	<4D259B9C.6060409@atmel.com>
-Message-ID: <1294312769.2219.7.camel@koala>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Jan 2011 11:19:57 +0000
+Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
+In-Reply-To: <874o9mvpxf.fsf@ti.com>
+References: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>
+	<874o9mvpxf.fsf@ti.com>
+Message-ID: <20110106111957.GA1198@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-06 at 11:38 +0100, Nicolas Ferre wrote:
-> (I include MTD mailing-list now)
+On Wed, Jan 05, 2011 at 04:25:32PM -0800, Kevin Hilman wrote:
+> As you likely noticed, removing the const leads to checkpatch warnings:
 > 
-> Le 05/01/2011 17:55, Russell King - ARM Linux :
-> > On Wed, Jan 05, 2011 at 05:49:12PM +0100, Nicolas Ferre wrote:
-> >> Hi,
-> >>
-> >> While running mtd_stresstest on a dataflash (atmel_spi 
-> >> + mtd_dataflash drivers) I hit the BUG_ON directive that 
-> >> is at the beginning of ___dma_single_cpu_to_dev() function.
-> >> This function is called from the SPI driver that do a 
-> >> dma_map_single() before DMA operations on the buffer 
-> >> transmitted from upper layers.
-> >>
-> >> It seems that this address is above "high_memory" limit because 
-> >> it is allocated by vmalloc (in mtd_stresstest.c:285)...
-> > 
-> > Well, its telling you is that you're not allowed to DMA to vmalloc
-> > addresses.  Whether that's the fault of the map driver or not is a
-> > question for mtd folk.
+> WARNING: struct platform_suspend_ops should normally be const
 > 
-> So you mean that those vmalloc calls should be changed to kmalloc in
-> MTD like this:
-> 
-> --- a/drivers/mtd/tests/mtd_stresstest.c
-> +++ b/drivers/mtd/tests/mtd_stresstest.c
-> @@ -26,7 +26,6 @@
->  #include <linux/mtd/mtd.h>
->  #include <linux/slab.h>
->  #include <linux/sched.h>
-> -#include <linux/vmalloc.h>
->  
->  #define PRINT_PREF KERN_INFO "mtd_stresstest: "
->  
-> @@ -281,8 +280,8 @@ static int __init mtd_stresstest_init(void)
->         bufsize = mtd->erasesize * 2;
->  
->         err = -ENOMEM;
-> -       readbuf = vmalloc(bufsize);
-> -       writebuf = vmalloc(bufsize);
-> +       readbuf = kmalloc(bufsize, GFP_KERNEL);
-> +       writebuf = kmalloc(bufsize, GFP_KERNEL);
->         offsets = kmalloc(ebcnt * sizeof(int), GFP_KERNEL);
->         if (!readbuf || !writebuf || !offsets) {
->                 printk(PRINT_PREF "error: cannot allocate memory\n");
-> @@ -313,8 +312,8 @@ static int __init mtd_stresstest_init(void)
->  out:
->         kfree(offsets);
->         kfree(bbt);
-> -       vfree(writebuf);
-> -       vfree(readbuf);
-> +       kfree(writebuf);
-> +       kfree(readbuf);
->         put_mtd_device(mtd);
->         if (err)
->                 printk(PRINT_PREF "error %d occurred\n", err);
-> 
-> 
-> I also discovered the same issue while trying to write with "dd"
-> on /dev/mtdblockx
-> 
-> Same vmalloc'ed memory seems to be used in mtdblock_writesect():
-> mtdblk->cache_data = vmalloc(mtdblk->mbd.mtd->erasesize);
-> 
-> I know that using "dd" on a block device is not the common case but it
-> should work instead of not being able to transmit buffer with DMA...
-> So what it implies to switch this to kmalloc? Is it regression-free to
-> do this?
+> so the choice is between a checkpatch warning or a bunch of compiler
+> warnings.
 
-Unfortunatelly not. These are about allocating eraseblock-sized buffers,
-which may be as large as 512KiB, and kmalloc can easily fail, this is
-why vmalloc is used.
+checkpatch should not be checking that data declarations are const.
+That's a decision for those people declaring them to decide upon, as
+they may need to modify the structure before registration.
 
-What you should do instead is to change the code and make it use smaller
-kmalloc-ed buffers instead, in a loop. Or use an array of pointers, each
-pointing to smaller buffers, and teach mtd to understand them. Then we
-could reuse this infrastructure in UBI and UBIFS and JFFS2 as well.
+By doing so, we end up encouraging people to write more code - such
+as declaring it __initconst, and then kmalloc'ing, memcpy'ing and
+modifying that before registering it.
 
--- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+> > -static struct platform_suspend_ops omap_pm_ops = {
+> > -	.begin		= omap2_pm_begin,
+> > -	.enter		= omap2_pm_enter,
+> > -	.end		= omap2_pm_end,
+> > -	.valid		= suspend_valid_only_mem,
+> > +static const struct platform_suspend_ops omap_pm_ops[] = {
+> > +	{
+> > +		.begin		= omap2_pm_begin,
+> > +		.enter		= omap2_pm_enter,
+> > +		.end		= omap2_pm_end,
+> > +		.valid		= suspend_valid_only_mem,
+> > +	}
+> >  };
+> > -#else
+> > -static const struct platform_suspend_ops __initdata omap_pm_ops;
+> >  #endif /* CONFIG_SUSPEND */
+> >  
+> >  /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
+> > @@ -582,7 +582,7 @@ static int __init omap2_pm_init(void)
+> >  						    omap24xx_cpu_suspend_sz);
+> >  	}
+> >  
+> > -	suspend_set_ops(&omap_pm_ops);
+> > +	suspend_set_ops(omap_pm_ops);
+
+Utterly yuck.  Declaring it as a single element array just to avoid an
+ifdef.  That's worse than having an ifdef here.
+
+There's another solution.  Don't mess about with sticking such stuff in
+the header either.
+
+#ifdef WHATEVER
+static const struct platform_suspend_ops omap_pm_ops = {
+	.begin		= omap2_pm_begin,
+	.enter		= omap2_pm_enter,
+	.end		= omap2_pm_end,
+	.valid		= suspend_valid_only_mem,
+};
+#define PM_OPS omap_pm_ops
+#else
+#define PM_OPS NULL
+#endif
+...
+
+	suspend_set_ops(PM_OPS);
+
+That keeps it all nice and local, and you can see exactly what's going on
+without having it spread across many different random files.
