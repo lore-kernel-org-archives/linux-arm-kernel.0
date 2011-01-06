@@ -1,94 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Jan 2011 09:51:45 +0100
-Subject: [RFC 2/5] ARM: P2V: avoid initializers and assembly using
-	PHYS_OFFSET
-In-Reply-To: <E1PaDOv-00023d-Gi@rmk-PC.arm.linux.org.uk>
-References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDOv-00023d-Gi@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110106085145.GB26617@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Jan 2011 09:07:41 +0000
+Subject: [PATCH] arm: mm: Poison freed init memory
+In-Reply-To: <4D255263.7040106@codeaurora.org>
+References: <1294256845-29517-1-git-send-email-sboyd@codeaurora.org>
+	<20110105202645.GL8638@n2100.arm.linux.org.uk>
+	<4D255263.7040106@codeaurora.org>
+Message-ID: <20110106090741.GQ8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04, 2011 at 08:22:37PM +0000, Russell King - ARM Linux wrote:
-> As PHYS_OFFSET will be becoming a variable, we can't have it used in
-> initializers nor assembly code.  Replace those in generic code with
-> a run-time initialization.  Replace those in platform code using the
-> individual platform specific PLAT_PHYS_OFFSET.
+On Wed, Jan 05, 2011 at 09:25:55PM -0800, Stephen Boyd wrote:
+> On 01/05/2011 12:26 PM, Russell King - ARM Linux wrote:
+> > On Wed, Jan 05, 2011 at 11:47:25AM -0800, Stephen Boyd wrote:
+> >> Poisoning __init marked memory can be useful when tracking down
+> >> obscure memory corruption bugs. When a pointer is 0xCCCCCCCC in an
+> >
+> > That's a bad idea for a value.  With a 3GB page offset and 256MB or
+> > more memory, accesses to such an address will always succeed.
+> >
+> > There's two things to be considered when selecting a possible poison
+> > value:
+> >
+> > 1. what value is guaranteed to provoke an undefined instruction exception?
+> > 2. what value when used as an address and dereferenced is mostly always
+> >    going to abort?
+> >
+> > 1 for ARM mode implies an 0xe7fXXXfX value.  For Thumb mode 0xdeXX.  We
+> > use this space for breakpoints.
+> >
+> > 2 unfortunately depends on the platform. 
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/setup.c                  |    4 +++-
->  arch/arm/mach-msm/board-msm7x27.c        |    8 ++++----
->  arch/arm/mach-msm/board-msm7x30.c        |    6 +++---
->  arch/arm/mach-msm/board-qsd8x50.c        |    4 ++--
->  arch/arm/mach-msm/board-sapphire.c       |    2 +-
->  arch/arm/mach-mx5/board-cpuimx51.c       |    2 +-
->  arch/arm/mach-mx5/board-cpuimx51sd.c     |    2 +-
->  arch/arm/mach-mx5/board-mx51_3ds.c       |    2 +-
->  arch/arm/mach-pxa/balloon3.c             |    2 +-
->  arch/arm/mach-realview/realview_eb.c     |    2 +-
->  arch/arm/mach-realview/realview_pb1176.c |    2 +-
->  arch/arm/mach-realview/realview_pb11mp.c |    2 +-
->  arch/arm/mach-realview/realview_pba8.c   |    2 +-
->  arch/arm/mach-realview/realview_pbx.c    |    2 +-
->  arch/arm/mach-s5pv210/sleep.S            |    2 +-
->  arch/arm/mach-tcc8k/board-tcc8000-sdk.c  |    2 +-
->  arch/arm/mach-vexpress/ct-ca9x4.c        |    2 +-
->  17 files changed, 25 insertions(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> index 6a9792f..c4c3a9c 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> @@ -292,7 +292,7 @@ static struct sys_timer mxc_timer = {
->  
->  MACHINE_START(EUKREA_CPUIMX51, "Eukrea CPUIMX51 Module")
->  	/* Maintainer: Eric B??nard <eric@eukrea.com> */
-> -	.boot_params = PHYS_OFFSET + 0x100,
-> +	.boot_params = PLAT_PHYS_OFFSET + 0x100,
->  	.map_io = mx51_map_io,
->  	.init_irq = mx51_init_irq,
->  	.init_machine = eukrea_cpuimx51_init,
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> index 4b3a611..b887381 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51sd.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> @@ -323,7 +323,7 @@ static struct sys_timer mxc_timer = {
->  
->  MACHINE_START(EUKREA_CPUIMX51SD, "Eukrea CPUIMX51SD")
->  	/* Maintainer: Eric B??nard <eric@eukrea.com> */
-> -	.boot_params = PHYS_OFFSET + 0x100,
-> +	.boot_params = PLAT_PHYS_OFFSET + 0x100,
->  	.map_io = mx51_map_io,
->  	.init_irq = mx51_init_irq,
->  	.init_machine = eukrea_cpuimx51sd_init,
-> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-> index 79ce8dc..10e6ce3 100644
-> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
-> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-> @@ -186,7 +186,7 @@ static struct sys_timer mxc_timer = {
->  
->  MACHINE_START(MX51_3DS, "Freescale MX51 3-Stack Board")
->  	/* Maintainer: Freescale Semiconductor, Inc. */
-> -	.boot_params = PHYS_OFFSET + 0x100,
-> +	.boot_params = PLAT_PHYS_OFFSET + 0x100,
->  	.map_io = mx51_map_io,
->  	.init_irq = mx51_init_irq,
->  	.init_machine = mxc_board_init,
+> A coworker proposed we use a SWI instruction. We could do that if the
+> poison is 0xEF and then do something in the SWI handler where that
+> number causes us to blow up?
 
-As Russell noted this conflicts with the current i.MX branch. In current
-i.MX branch we have:
+Doesn't work with EABI - the comment field in the SWI instruction is
+ignored on EABI.
 
--       .boot_params = PHYS_OFFSET + 0x100,
-+       .boot_params = MX51_PHYS_OFFSET + 0x100,
+> If I'm following correctly, point 1 is about __init functions and point
+> 2 is about __initdata. I'm more concerned about __initdata because
+> __init functions called from non __init marked functions are usually
+> caught with section mismatch checks. Also, if we're jumping to
+> 0xCCCCCCCC we're probably not in the text section of the kernel with a
 
-PLAT_PHYS_OFFSET should be defined to MX51_PHYS_OFFSET, so it shouldn't
-matter which solution to the conflict we choose.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+But, as I pointed out, you don't know that 0xCCCCCCCC isn't a valid
+address _and_ on modern platforms it won't fault.  So it's pointless
+to use it as a poison value.
