@@ -1,40 +1,47 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 6 Jan 2011 13:53:22 +0300
-Subject: [PATCH v2 2/3] ahci_pltfm: switch to module device table matching
-In-Reply-To: <1294206187-11487-3-git-send-email-mkl0301@gmail.com>
-References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
-	<1294206187-11487-3-git-send-email-mkl0301@gmail.com>
-Message-ID: <20110106105322.GA10102@oksana.dev.rtsoft.ru>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu,  6 Jan 2011 14:01:22 +0300
+Subject: [PATCH] i2c-pxa: fix unbidding/rebidding of the device
+In-Reply-To: <20110105091915.GV27131@trinity.fluff.org>
+References: <20110105091915.GV27131@trinity.fluff.org>
+Message-ID: <1294311682-13287-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 01:43:06PM +0800, mkl0301 at gmail.com wrote:
-> From: Mac Lin <mkl0301@gmail.com>
-> 
-> Switch the driver to use module device table matching mechanism to add SoC-specific parts to the generic driver.
-> 
-> Signed-off-by: Mac Lin <mkl0301@gmail.com>
-> ---
->  drivers/ata/ahci_pltfm.c |   14 +++++++++++++-
->  drivers/ata/ahci_pltfm.h |   17 +++++++++++++++++
->  2 files changed, 30 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/ata/ahci_pltfm.h
-> 
-[..]
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef _DRIVERS_SATA_AHCI_PLTFM_H
-> +#define _DRIVERS_SATA_AHCI_PLTFM_H
-> +
-> +#endif /* _DRIVERS_SATA_AHCI_PLTFM_H */
-> +
-> --
+When a "pxa2xx-i2c" device was unbound (e.g. via sysfs) the remove
+callback was not called because it was discarded when linking the
+kernel.  Because of that the resources allocated in probe were not
+freed and so a clean unbind/rebind was impossible.
 
-No need for this empty line at the end of the file.
+Fix that by moving the remove callback to .devexit.text.
 
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: linux-i2c at vger.kernel.org
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ drivers/i2c/busses/i2c-pxa.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index f4c19a9..0f10955 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -1115,7 +1115,7 @@ emalloc:
+ 	return ret;
+ }
+ 
+-static int __exit i2c_pxa_remove(struct platform_device *dev)
++static int __devexit i2c_pxa_remove(struct platform_device *dev)
+ {
+ 	struct pxa_i2c *i2c = platform_get_drvdata(dev);
+ 
+@@ -1169,7 +1169,7 @@ static const struct dev_pm_ops i2c_pxa_dev_pm_ops = {
+ 
+ static struct platform_driver i2c_pxa_driver = {
+ 	.probe		= i2c_pxa_probe,
+-	.remove		= __exit_p(i2c_pxa_remove),
++	.remove		= __devexit_p(i2c_pxa_remove),
+ 	.driver		= {
+ 		.name	= "pxa2xx-i2c",
+ 		.owner	= THIS_MODULE,
 -- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+1.7.2.3
