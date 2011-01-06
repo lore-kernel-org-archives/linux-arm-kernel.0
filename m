@@ -1,79 +1,77 @@
-From: Trond.Myklebust@netapp.com (Trond Myklebust)
-Date: Thu, 06 Jan 2011 12:47:34 -0500
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294335614.22825.154.camel@mulgrave.site>
-References: <1294254337.16957.13.camel@mulgrave.site>
-	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
-	<1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
-	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
-	<1294262208.2952.4.camel@heimdal.trondhjem.org>
-	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
-	<1294268808.2952.18.camel@heimdal.trondhjem.org>
-	<1294270104.16957.73.camel@mulgrave.site>
-	<1294335614.22825.154.camel@mulgrave.site>
-Message-ID: <1294336054.2905.1.camel@heimdal.trondhjem.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 6 Jan 2011 09:49:51 -0800
+Subject: Current OMAP build failures
+In-Reply-To: <20110106171019.GF1198@n2100.arm.linux.org.uk>
+References: <20110106110336.GC31708@n2100.arm.linux.org.uk>
+	<878vyyx8s4.fsf@ti.com>
+	<20110106171019.GF1198@n2100.arm.linux.org.uk>
+Message-ID: <20110106174950.GU7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-06 at 11:40 -0600, James Bottomley wrote: 
-> On Wed, 2011-01-05 at 23:28 +0000, James Bottomley wrote:
-> > Can you explain how the code works? it looks to me like you read the xdr
-> > stuff through the vmap region then write it out directly to the pages? 
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110106 09:09]:
+> On Thu, Jan 06, 2011 at 09:05:15AM -0800, Kevin Hilman wrote:
+> > Hi Russell,
+> > 
+> > Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> > 
+> > > I've observed the following issues while building 2.6.37 + my devel
+> > > branch.  I don't believe any of them to be due to anything in my tree,
+> > > so would be in 2.6.37 as well.
+> > 
+> > What defconfig are you using for these builds?
 > 
-> OK, I think I see how this is supposed to work:  It's a sequential loop
-> of reading in via the pages (i.e. through the kernel mapping) and then
-> updating those pages via the vmap.  In which case, I think this patch is
-> what you need.
+> I couldn't say offhand because they're built from configs created a while
+> back.  I tend to just re-run the build with appropriate O= arguments to
+> test things.
 > 
-> The theory of operation is that the readdir on pages actually uses the
-> network DMA operations to perform, so when it's finished, the underlying
-> page is up to date.  After this you invalidate the vmap range, so we
-> have no cache lines above it (so it picks up the values from the
-> uptodate page).  Finally, after the operation on the vmap region has
-> finished, you flush it so that any updated contents go back to the pages
-> themselves before the next iteration begins.
-> 
-> Does this look right to people?  I've verified it fixes the issues on
-> parisc.
-> 
-> James
-> 
-> ---
-> 
-> diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
-> index 996dd89..bde1911 100644
-> --- a/fs/nfs/dir.c
-> +++ b/fs/nfs/dir.c
-> @@ -587,12 +587,16 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page,
->  		if (status < 0)
->  			break;
->  		pglen = status;
-> +
-> +		invalidate_kernel_vmap_range(pages_ptr, pglen);
-> +
->  		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
->  		if (status < 0) {
->  			if (status == -ENOSPC)
->  				status = 0;
->  			break;
->  		}
-> +		flush_kernel_vmap_range(pages_ptr, pglen);
+> I can send the defconfigs if it'd help.
 
-Why is this line needed? We're not writing through the virtual mapping.
+I have the following patch queued up as commit be40f7a3d7b53c1a44e11b376b4a395d6b91f58d
+which should fix the compile error you're seeing. This seems to be related
+to some option in the .config that's not happening with any of the
+defconfigs.
 
-We checked using just the invalidate_kernel_vmap_range(), and that
-appeared to suffice to fix the problem on ARM.
+Regards,
 
-Cheers
-  Trond
--- 
-Trond Myklebust
-Linux NFS client maintainer
+Tony
 
-NetApp
-Trond.Myklebust at netapp.com
-www.netapp.com
+
+commit be40f7a3d7b53c1a44e11b376b4a395d6b91f58d
+Author: Tony Lindgren <tony@atomide.com>
+Date:   Tue Dec 7 16:25:40 2010 -0800
+
+    omap: Fix undefined reference to omap2_i2c_mux_pins
+    
+    In some cases we can get error function `omap2_i2c_add_bus':
+    arch/arm/plat-omap/i2c.c:136: undefined reference to `omap2_i2c_mux_pins'
+    arch/arm/plat-omap/i2c.c:141: undefined reference to `omap_hwmod_lookup'
+    arch/arm/plat-omap/i2c.c:157: undefined reference to `omap_device_build'
+    
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index a6cf4e9..db9c4ef 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -130,6 +130,7 @@ static struct omap_device_pm_latency omap_i2c_latency[] = {
+ 	},
+ };
+ 
++#ifdef CONFIG_ARCH_OMAP2PLUS
+ static inline int omap2_i2c_add_bus(int bus_id)
+ {
+ 	int l;
+@@ -166,6 +167,12 @@ static inline int omap2_i2c_add_bus(int bus_id)
+ 
+ 	return PTR_ERR(od);
+ }
++#else
++static inline int omap2_i2c_add_bus(int bus_id)
++{
++	return 0;
++}
++#endif
+ 
+ static int __init omap_i2c_add_bus(int bus_id)
+ {
