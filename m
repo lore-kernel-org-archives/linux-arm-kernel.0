@@ -1,50 +1,41 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 6 Jan 2011 18:29:19 +0800
-Subject: [PATCH v4 5/8] arm: mxc: move IOMUX_CONFIG_XXXX definitions to
-	iomux-v3.h
-In-Reply-To: <20110106101639.GE26009@pengutronix.de>
-References: <1293708306-20170-1-git-send-email-richard.zhao@freescale.com>
-	<1293708306-20170-2-git-send-email-richard.zhao@freescale.com>
-	<1293708306-20170-3-git-send-email-richard.zhao@freescale.com>
-	<1293708306-20170-4-git-send-email-richard.zhao@freescale.com>
-	<1293708306-20170-5-git-send-email-richard.zhao@freescale.com>
-	<20110106065935.GA15509@shlinux1.ap.freescale.net>
-	<20110106101639.GE26009@pengutronix.de>
-Message-ID: <20110106102918.GA2349@shlinux1.ap.freescale.net>
+From: phorton@bitbox.co.uk (Peter Horton)
+Date: Thu, 06 Jan 2011 10:32:26 +0000
+Subject: [PATCH v2] i.MX51 Framebuffer support
+In-Reply-To: <20110106102310.GF26009@pengutronix.de>
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>	<4D246C54.9060503@free.fr>
+	<20110106102310.GF26009@pengutronix.de>
+Message-ID: <4D259A3A.7060104@bitbox.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 11:16:39AM +0100, Sascha Hauer wrote:
-> On Thu, Jan 06, 2011 at 02:59:36PM +0800, Richard Zhao wrote:
-> > Hello Sascha,
-> > 
-> > On Thu, Dec 30, 2010 at 07:25:04PM +0800, Richard Zhao wrote:
-> > > IOMUX_CONFIG_GPIO is not for iomux-v3. It's for old freescale
-> > > iomux routines. Remove it.
-> > > 
-> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > If you don't have comments, could you please merge this patch?
-> > It's causing arch/arm/plat-mxc/include/mach/iomux-mx50.h incomplete.
-> 
-> I didn't apply it because it conflicts with current imx-for-2.6.38
-> branch. Other than that I don't find the enum very useful at all,
-> because we have problems with very long lines in these files and
-> using IOMUX_CONFIG_ALT0 where we could use 0 does not exactly improve
-> the situation.
-Yes, correct. IOMUX_CONFIG_ALT0-7 is ok.  But IOMUX_CONFIG_SION is more
-readable than 0x1 << 4, isn't it? If you don't agree put IOMUX_CONFIG_SION
-in iomux-v3.h, shall I put it in iomux-mx50.h?
+On 06/01/2011 10:23, Sascha Hauer wrote:
+> On Wed, Jan 05, 2011 at 02:04:20PM +0100, Julien Boibessot wrote:
+>> Hello,
+>>
+>> Sascha Hauer a ?crit :
+>>> The following series adds i.MX51 framebuffer support based on the IPUv3. It
+>>> is not perfect but I decided it is good enough to open it for a wider audience
+>>> and collect first reviews. I tested this on a babbage board using both outputs
+>>> (VGA/DVI) with different resolutions up to 1680x1050 and different colour depths.
+>>> I also tested it on one custom board using a fixed display setting.
+>>>
+>> This driver is also working fine for me on a custom i.MX51 board with a
+>> 800x480 18 bits TFT LCD (16bpp mode).
+>>
+>> The only strange thing I noticed was a kind of uggly sprite/artefact
+>> (32x32, I would say) appearing at the same time as the Linux console. I
+>> think it may be related to a hardware cursor badly (?) initialised, but
+>> I didn't find a fix yet.
+>> It disappears when I launch a graphical application (Qt or SDL).
+>
+> It may be the penguin, but I remember a similar report also talkling
+> about hardware cursors. I can't reproduce this. You could search for
+> cursor in the IPU section of the manual and play with the corresponding
+> registers.
+>
 
-Thanks
-Richard
-> 
-> Sascha
-> 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
+We see this too, but only when increasing resolution from the kernel 
+default. We get a yellow square appear in the lower right quadrant of 
+the display.
+
+P.
