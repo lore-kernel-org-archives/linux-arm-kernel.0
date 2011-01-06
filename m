@@ -1,74 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 11:19:57 +0000
-Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
-In-Reply-To: <874o9mvpxf.fsf@ti.com>
-References: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>
-	<874o9mvpxf.fsf@ti.com>
-Message-ID: <20110106111957.GA1198@n2100.arm.linux.org.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 6 Jan 2011 12:50:26 +0100
+Subject: [PATCH 3/6] i2c/pxa2xx: Add PCI support for PXA I2C controller
+In-Reply-To: <20110106111231.GD31708@n2100.arm.linux.org.uk>
+References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+	<1294246263-31960-4-git-send-email-bigeasy@linutronix.de>
+	<20110105230342.GO8638@n2100.arm.linux.org.uk>
+	<20110105230834.GA26399@suse.de>
+	<20110106105051.GA12146@www.tglx.de>
+	<20110106111231.GD31708@n2100.arm.linux.org.uk>
+Message-ID: <20110106115026.GA18081@www.tglx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 04:25:32PM -0800, Kevin Hilman wrote:
-> As you likely noticed, removing the const leads to checkpatch warnings:
-> 
-> WARNING: struct platform_suspend_ops should normally be const
-> 
-> so the choice is between a checkpatch warning or a bunch of compiler
-> warnings.
+* Russell King - ARM Linux | 2011-01-06 11:12:31 [+0000]:
 
-checkpatch should not be checking that data declarations are const.
-That's a decision for those people declaring them to decide upon, as
-they may need to modify the structure before registration.
+>Please see my email where I described the lifetime rules.  Let's say
+>your module is removed.  In doing so, you call platform_device_unregister()
+>followed by kfree().  After this, your module is removed from the system
+>and the memory backing the module code is unmapped.
+>
+>If something holds a reference to the platform device, then that's just
+>waiting for an OOPS to happen.  When those references are finally given
+>up, your release function will be called - but the code has been unmapped.
 
-By doing so, we end up encouraging people to write more code - such
-as declaring it __initconst, and then kmalloc'ing, memcpy'ing and
-modifying that before registering it.
+I got that. That is why I'm going go to use allready provided functions
+(platform_device_register_resndata() in this case) so I'm no longer
+allocating any memory. So I'm only holding a struct which is pointing to
+the platform_device. Everything else is unmapped by the driver core.
 
-> > -static struct platform_suspend_ops omap_pm_ops = {
-> > -	.begin		= omap2_pm_begin,
-> > -	.enter		= omap2_pm_enter,
-> > -	.end		= omap2_pm_end,
-> > -	.valid		= suspend_valid_only_mem,
-> > +static const struct platform_suspend_ops omap_pm_ops[] = {
-> > +	{
-> > +		.begin		= omap2_pm_begin,
-> > +		.enter		= omap2_pm_enter,
-> > +		.end		= omap2_pm_end,
-> > +		.valid		= suspend_valid_only_mem,
-> > +	}
-> >  };
-> > -#else
-> > -static const struct platform_suspend_ops __initdata omap_pm_ops;
-> >  #endif /* CONFIG_SUSPEND */
-> >  
-> >  /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
-> > @@ -582,7 +582,7 @@ static int __init omap2_pm_init(void)
-> >  						    omap24xx_cpu_suspend_sz);
-> >  	}
-> >  
-> > -	suspend_set_ops(&omap_pm_ops);
-> > +	suspend_set_ops(omap_pm_ops);
+So I just have just to of_device_node_put() myself. Hmmm.
 
-Utterly yuck.  Declaring it as a single element array just to avoid an
-ifdef.  That's worse than having an ifdef here.
+Grant, who is calling of_device_node_put() on nodes assigned in 
+of_register_spi_devices() & of_i2c_register_devices()? I can't find any
+reference. The spi part is not putting the node or removing the irq
+mapping in error case so I guess there must be some magic triggered
+somewhere.
+Also adap->dev.of_node and master->dev.of_node has to be
+non-null for the device assignment to work. Who is putting these nodes
+back? I see drivers (i2c-cpm & i2c-mpc) taking refs but I fail to find a
+place where it is put back.
 
-There's another solution.  Don't mess about with sticking such stuff in
-the header either.
-
-#ifdef WHATEVER
-static const struct platform_suspend_ops omap_pm_ops = {
-	.begin		= omap2_pm_begin,
-	.enter		= omap2_pm_enter,
-	.end		= omap2_pm_end,
-	.valid		= suspend_valid_only_mem,
-};
-#define PM_OPS omap_pm_ops
-#else
-#define PM_OPS NULL
-#endif
-...
-
-	suspend_set_ops(PM_OPS);
-
-That keeps it all nice and local, and you can see exactly what's going on
-without having it spread across many different random files.
+Sebastian
