@@ -1,32 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 09:42:37 +0000
-Subject: [PATCH v2] i.MX51 Framebuffer support
-In-Reply-To: <4D246C54.9060503@free.fr>
-References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
-	<4D246C54.9060503@free.fr>
-Message-ID: <20110106094237.GB31708@n2100.arm.linux.org.uk>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Thu, 6 Jan 2011 17:45:11 +0800
+Subject: [PATCH] ARM i.MX53: enable fec driver on EVK board
+In-Reply-To: <20110106061647.GB30232@jasper.tkos.co.il>
+References: <1294292731-2896-1-git-send-email-yong.shen@freescale.com>
+	<20110106061647.GB30232@jasper.tkos.co.il>
+Message-ID: <AANLkTi=Bh7yrE-n0egTMPzhhfXNPrz11jJrnXd7h2J+e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 02:04:20PM +0100, Julien Boibessot wrote:
-> Hello,
-> 
-> Sascha Hauer a ?crit :
-> > The following series adds i.MX51 framebuffer support based on the IPUv3. It
-> > is not perfect but I decided it is good enough to open it for a wider audience
-> > and collect first reviews. I tested this on a babbage board using both outputs
-> > (VGA/DVI) with different resolutions up to 1680x1050 and different colour depths.
-> > I also tested it on one custom board using a fixed display setting.
-> >   
-> This driver is also working fine for me on a custom i.MX51 board with a
-> 800x480 18 bits TFT LCD (16bpp mode).
-> 
-> The only strange thing I noticed was a kind of uggly sprite/artefact
-> (32x32, I would say) appearing at the same time as the Linux console. I
-> think it may be related to a hardware cursor badly (?) initialised, but
-> I didn't find a fix yet.
-> It disappears when I launch a graphical application (Qt or SDL).
+Hi Baruch,
 
-In the top left corner?  That'll be the linux penguin logo, and if it's
-not coming out correctly, your framebuffer driver is badly broken.
-Maybe your RGB bitfield information or visual is wrong?
+Thanks for comments.
+
+>>
+>> +static inline void fec_reset(void)
+>
+> For the sake of clearer stack traces I prefer a less generic name for this
+> routine, something like mx53_evk_fec_reset().
+>
+Acked.
+>> +{
+>> + ? ? int ret;
+>> +
+>> + ? ? /* reset FEC PHY */
+>> + ? ? ret = gpio_request(SMD_FEC_PHY_RST, "fec-phy-reset");
+>> + ? ? if (ret) {
+>> + ? ? ? ? ? ? printk(KERN_ERR"failed to get GPIO_FEC_PHY_RESET: %d\n", ret);
+>> + ? ? ? ? ? ? return;
+>> + ? ? }
+>> + ? ? gpio_direction_output(SMD_FEC_PHY_RST, 0);
+>> + ? ? gpio_set_value(SMD_FEC_PHY_RST, 0);
+>
+> This seems to be redundant. gpio_direction_output() has already set the value
+> to 0.
+
+You are right. But, gpio_set_value is meant to be here to show the
+process of fec reset: first pull low and then pull high. And
+gpio_direction_output here is for direction configuration although it
+has the ability of configure output value.
+
+cheers
+Yong
