@@ -1,24 +1,78 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 09:08:55 +0000
-Subject: [RFC 2/5] ARM: P2V: avoid initializers and assembly using
-	PHYS_OFFSET
-In-Reply-To: <20110106085145.GB26617@pengutronix.de>
-References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDOv-00023d-Gi@rmk-PC.arm.linux.org.uk>
-	<20110106085145.GB26617@pengutronix.de>
-Message-ID: <20110106090855.GR8638@n2100.arm.linux.org.uk>
+Date: Thu, 6 Jan 2011 09:13:01 +0000
+Subject: [PATCH v3 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <20110106005052.GA4476@shareable.org>
+References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
+	<1294236457-17476-9-git-send-email-shawn.guo@freescale.com>
+	<20110105161235.GA2112@gallagher>
+	<20110105164409.GV25121@pengutronix.de>
+	<20110105172501.GB2112@gallagher>
+	<20110105175617.GD12222@shareable.org>
+	<20110105183509.GH8638@n2100.arm.linux.org.uk>
+	<20110105194418.GE12222@shareable.org>
+	<20110105201502.GK8638@n2100.arm.linux.org.uk>
+	<20110106005052.GA4476@shareable.org>
+Message-ID: <20110106091301.GS8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 09:51:45AM +0100, Sascha Hauer wrote:
-> As Russell noted this conflicts with the current i.MX branch. In current
-> i.MX branch we have:
+On Thu, Jan 06, 2011 at 12:50:52AM +0000, Jamie Lokier wrote:
+> Russell King - ARM Linux wrote:
+> > On Wed, Jan 05, 2011 at 07:44:18PM +0000, Jamie Lokier wrote:
+> > > 'git show 534be1d5' explains how it works: cpu_relax() flushes buffered
+> > > writes from _this_ CPU, so that other CPUs which are polling can make
+> > > progress, which avoids this CPU getting stuck if there is an indirect
+> > > dependency (no matter how convoluted) between what it's polling and which
+> > > it wrote just before.
+> > > 
+> > > So cpu_relax() is *essential* in some polling loops, not a hint.
+> > > 
+> > > In principle that could happen for I/O polling, if (a) buffered memory
+> > > writes are delayed by I/O read transactions, and (b) the device state we're
+> > > waiting on depends on I/O yet to be done on another CPU, which could be
+> > > polling memory first (e.g. a spinlock).
+> > > 
+> > > I doubt (a) in practice - but what about buses that block during I/O read?
+> > > (I have a chip like that here, but it's ARMv4T.)
+> > 
+> > Let's be clear - ARMv5 and below generally are well ordered architectures
+> > within the limits of caching.  There are cases where the write buffer
+> > allows two writes to pass each other.  However, for IO we generally map
+> > these - especially for ARMv4 and below - as 'uncacheable unbufferable'.
+> > So on these, if the program says "read this location" the pipeline will
+> > stall until the read has been issued - and if you use the result in the
+> > next instruction, it will stall until the data is available.  So really,
+> > it's not a problem here.
+> > 
+> > ARMv6 and above have a weakly ordered memory model with speculative
+> > prefetching, so memory reads/writes can be completely unordered.  Device
+> > accesses can pass memory accesses, but device accesses are always visible
+> > in program order with respect to each other.
+> > 
+> > So, if you're spinning in a loop reading an IO device, all previous IO
+> > accesses will be completed (in all ARM architectures) before the result
+> > of your read is evaluated.
 > 
-> -       .boot_params = PHYS_OFFSET + 0x100,
-> +       .boot_params = MX51_PHYS_OFFSET + 0x100,
+> No, that wasn't the scenario - it was:
 > 
-> PLAT_PHYS_OFFSET should be defined to MX51_PHYS_OFFSET, so it shouldn't
-> matter which solution to the conflict we choose.
+> You're spinning reading an IO device, whose state depends indirectly
+> on a *CPU memory* write that is forever buffered.
+> 
+> (Go and re-read 'git show 534be1d5' if you haven't already.)
 
-I've actually dropped my modifications to this files as your change
-to them makes more sense longer term.
+I know what that's about, and it's about memory based accesses _only_.
+
+What you're talking about is a programming error.  Such errors cause
+data corruption if you're talking about DMA stuff.
+
+At the moment, the solution to that is to put whatever's necessary into
+readl/writel to ensure that they behave as ordered operations with
+respect to everything else.  You'll find that on ARM, writel has a
+barrier before it to ensure memory writes are visible before the device
+write, and on readl there's a barrier to ensure that no memory read can
+happen before the IO device read.
+
+cpu_relax() has nothing to do with ensuring ordering with devices.
+
+With relaxed IO operations, the responsibility for ensuring proper ordering
+between memory and IO falls to the programmer.
