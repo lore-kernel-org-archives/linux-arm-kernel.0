@@ -1,81 +1,275 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Thu, 6 Jan 2011 08:24:04 +0200
-Subject: [PATCH 1/1] arm: omap: gpio: define .disable callback for gpio
-	irq chip
-In-Reply-To: <87aajfvstw.fsf@ti.com>
-References: <1294250283-18182-1-git-send-email-eduardo.valentin@nokia.com>
-	<20110105181918.GB8717@n2100.arm.linux.org.uk>
-	<20110105192425.GA24729@besouro.research.nokia.com>
-	<87aajfvstw.fsf@ti.com>
-Message-ID: <20110106062404.GA14141@besouro.research.nokia.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Thu, 6 Jan 2011 15:31:02 +0900
+Subject: [PATCH 5/5] S5PC110: add MIPI-DSI based sample lcd panel driver.
+In-Reply-To: <20110106051458.GP23889@linux-sh.org>
+References: <1293535595-24861-1-git-send-email-inki.dae@samsung.com>
+	<20110106051458.GP23889@linux-sh.org>
+Message-ID: <AANLkTinQznYQgw5Hf8jT=C0Tv2=T7AcGZuQgw398Q_a6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 03:22:51PM -0800, ext Kevin Hilman wrote:
-> Eduardo Valentin <eduardo.valentin@nokia.com> writes:
-> 
-> > Hello Russell,
-> >
-> > On Wed, Jan 05, 2011 at 06:19:18PM +0000, Russell King wrote:
-> >> On Wed, Jan 05, 2011 at 07:58:03PM +0200, Eduardo Valentin wrote:
-> >> > Currently, if one calls disable_irq(gpio_irq), the irq
-> >> > won't get disabled.
-> >> > 
-> >> > This is happening because the omap gpio code defines only
-> >> > a .mask callback. And the default_disable function is just
-> >> > a stub. The result is that, when someone calls disable_irq
-> >> > for an irq in a gpio line, it will be kept enabled.
-> >> > 
-> >> > This patch solves this issue by setting the .disable
-> >> > callback to point to the same .mask callback.
-> >> 
-> >> Amd this is a problem because?
-> >
-> > errr.. because the interrupt is enabled when it was supposed to be disabled?
-> >
-> 
-> As Russell pointed out, it's not actually "supposed" to be.
-> 
-> With lazy disable, what disable_irq() does is prevent the *handler* from
-> ever being called.  If another interrupt arrives, it will be caught by
-> the genirq core, marked as IRQ_PENDING and then masked.  This "don't
-> disable unless we really have to" is the desired behavior of the lazy
-> disable feature.
+thank you for your reviews.
 
-Right. I'm convinced that the handler won't be called because of the lazy
-disable mechanism.
+all the problems you  pointed out would be corrected for actual lcd
+panel driver.
+(this lcd panel driver has being worked locally and it will be posted
+in the future)
 
-> 
-> >> 
-> >> The way this works is that although it isn't disabled at that point,
-> >> if it never triggers, then everything remains happy.  However, if it
-> >> does trigger, the genirq code will then mask the interrupt and won't
-> >> call the handler.
-> >
-> > Right.. I didn't see from this point. I will check how that gets unmasked.
-> > But even so, if I understood correctly what you described, it would still
-> > open a time window which the system would see at least 1 interrupt during
-> > the time it was not suppose to. And that can wakeup a system which  is in
-> > deep sleep mode, either via dynamic idle or static suspend.
-> >
-> > It is unlikely, I know. But it can still happen. And can be avoided.
-> 
-> If the GPIO is configured as a wakeup source, then wouldn't you want
-> activity on that GPIO to wake up the system?
+after this patch, I posted next patches.
+refer to below please.
+http://permalink.gmane.org/gmane.linux.ports.arm.kernel/101521
 
-Yes I would want it.. of course, if the interrupt is enabled though..
+in this patch, I removed sample driver and also have code compacting
+and refactoring for MIPI-DSI driver. so could you please give me your
+review about this one?
 
-I'm still trying to find a valid situation where someone disables an irq
-but still wants its activity to be a wakeup source. I couldn't find so far..
-
-
-> 
-> If you don't want wakeups on that GPIO, then the driver should probably
-> be using disable_irq_wake().
-
-Yes. Let's take this situation. Let's assume a driver, at its suspend callback,
-explicitly reports to the system that its irq can be disabled and also should
-not be seen as a wakeup source, by calling disable_irq(gpio_irq) and
-disable_irq_wake(gpio_irq).
-
-What should be the expected system behavior when the user says echo mem > /sys/power/state?
+2011/1/6 Paul Mundt <lethal@linux-sh.org>:
+> On Tue, Dec 28, 2010 at 08:26:35PM +0900, Inki Dae wrote:
+>> this patch addes MIPI-DSI based sample panel driver.
+>> to write MIPI-DSI based lcd panel driver, you can refer to
+>> this sample driver.
+>>
+>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+>
+> Sample drivers are ok, but unless it has some sort of practical run-time
+> use you are probably better off just including this along with your
+> subsystem/platform documentation in Documentation somewhere. You can
+> search for .c files there to see how others are doing it.
+>
+> Having said that ..
+>
+>> diff --git a/drivers/video/s5p_mipi_sample.c b/drivers/video/s5p_mipi_sample.c
+>> new file mode 100644
+>> index 0000000..8a8abfe
+>> --- /dev/null
+>> +++ b/drivers/video/s5p_mipi_sample.c
+>> @@ -0,0 +1,220 @@
+>> +/* linux/drivers/video/sample.c
+>> + *
+> This is precisely why file comments are useless, since they invariably
+> fail to match up.
+>
+>> + * MIPI-DSI based sample AMOLED lcd panel driver.
+>> + *
+>> + * Inki Dae, <inki.dae@samsung.com>
+>> + *
+> No Copyright notice?
+>
+>> +static void sample_long_command(struct sample *lcd)
+>> +{
+>> + ? ? struct dsim_master_ops *ops = lcd_to_master_ops(lcd);
+>> + ? ? unsigned char data_to_send[5] = {
+>> + ? ? ? ? ? ? 0x00, 0x00, 0x00, 0x00, 0x00
+>> + ? ? };
+>> +
+>> + ? ? ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
+>> + ? ? ? ? ? ? (unsigned int) data_to_send, sizeof(data_to_send));
+>> +}
+>> +
+>> +static void sample_short_command(struct sample *lcd)
+>> +{
+>> + ? ? struct dsim_master_ops *ops = lcd_to_master_ops(lcd);
+>> +
+>> + ? ? ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_SHORT_WRITE_PARAM,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x00, 0x00);
+>> +}
+>> +
+> ops->cmd_write() can fail for any number of reasons, so you will want to
+> change these to make sure that you are actually handling the error cases.
+>
+>> +static int sample_panel_init(struct sample *lcd)
+>> +{
+>> + ? ? sample_long_command(lcd);
+>> + ? ? sample_short_command(lcd);
+>> +
+>> + ? ? return 0;
+>
+> At which point you can fail the initialization instead of just blowing up
+> later.
+>
+>> +static int sample_gamma_ctrl(struct sample *lcd, int gamma)
+>> +{
+>> + ? ? struct dsim_master_ops *ops = lcd_to_master_ops(lcd);
+>> +
+>> + ? ? /* change transfer mode to LP mode */
+>> + ? ? if (ops->change_dsim_transfer_mode)
+>> + ? ? ? ? ? ? ops->change_dsim_transfer_mode(lcd_to_master(lcd), 0);
+>> +
+> ops->change_dsim_transfer_mode() can also fail. You could do this more
+> cleanly as:
+>
+> enum { DSIM_XFER_LP, DSIM_XFER_HS };
+>
+> static inline int dsim_set_xfer_mode(struct mipi_dsim_device *dsim, int mode)
+> {
+> ? ? ? ?struct mipi_dsim_master_ops *ops = dsim->master_ops;
+>
+> ? ? ? ?if (!ops->change_dsim_transfer_mode)
+> ? ? ? ? ? ? ? ?return -ENOSYS; /* not implemented */
+>
+> ? ? ? ?return ops->change_dsim_transfer_mode(dsim, mode);
+> }
+>
+> Then simply do your sample_gamma_ctrl() as:
+>
+> ? ? ? ?ret = dsim_set_xfer_mode(dsim, DSIM_XFER_LP);
+> ? ? ? ?if (ret != 0)
+> ? ? ? ? ? ? ? ?return ret;
+>
+>> + ? ? /* update gamma table. */
+>> +
+>
+> ? ? ? ?return dsim_set_xfer_mode(dsim, DSIM_XFER_HS);
+>> +}
+>> +
+>
+> Or something similar. Your sample code should really be as
+> self-documenting and error-proof as possible. You don't really want to be
+> in a situation where subtle bugs leak through that then everyone who uses
+> this code as a reference will carry over!
+>
+>> +static int sample_set_brightness(struct backlight_device *bd)
+>> +{
+>> + ? ? int ret = 0, brightness = bd->props.brightness;
+>> + ? ? struct sample *lcd = bl_get_data(bd);
+>> +
+>> + ? ? if (brightness < MIN_BRIGHTNESS ||
+>> + ? ? ? ? ? ? brightness > bd->props.max_brightness) {
+>> + ? ? ? ? ? ? dev_err(lcd->dev, "lcd brightness should be %d to %d.\n",
+>> + ? ? ? ? ? ? ? ? ? ? MIN_BRIGHTNESS, MAX_BRIGHTNESS);
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>> +
+>> + ? ? ret = sample_gamma_ctrl(lcd, bd->props.brightness);
+>> + ? ? if (ret) {
+>> + ? ? ? ? ? ? dev_err(&bd->dev, "lcd brightness setting failed.\n");
+>> + ? ? ? ? ? ? return -EIO;
+>> + ? ? }
+>> +
+> With your current approach this error condition will never be reached,
+> for example.
+>
+>> +static int sample_probe(struct mipi_lcd_device *mipi_dev)
+>> +{
+>> + ? ? struct sample *lcd = NULL;
+>> + ? ? struct backlight_device *bd = NULL;
+>> +
+>> + ? ? lcd = kzalloc(sizeof(struct sample), GFP_KERNEL);
+>> + ? ? if (!lcd) {
+>> + ? ? ? ? ? ? dev_err(&mipi_dev->dev, "failed to allocate sample structure.\n");
+>> + ? ? ? ? ? ? return -ENOMEM;
+>> + ? ? }
+>> +
+>> + ? ? lcd->mipi_dev = mipi_dev;
+>> + ? ? lcd->ddi_pd =
+>> + ? ? ? ? ? ? (struct mipi_ddi_platform_data *)device_to_ddi_pd(mipi_dev);
+>
+> Does this really need to be casted?
+>
+>> + ? ? lcd->dev = &mipi_dev->dev;
+>> +
+>> + ? ? dev_set_drvdata(&mipi_dev->dev, lcd);
+>> +
+>> + ? ? bd = backlight_device_register("sample-bl", lcd->dev, lcd,
+>> + ? ? ? ? ? ? &sample_backlight_ops, NULL);
+>> +
+>> + ? ? lcd->bd = bd;
+>> +
+> And here you have no error checking for backlight registration, so you
+> will get a NULL pointer deref:
+>
+>> + ? ? bd->props.max_brightness = MAX_BRIGHTNESS;
+>> + ? ? bd->props.brightness = MAX_BRIGHTNESS;
+>> +
+> here. backlight_device_register() returns an ERR_PTR(), so you will want
+> to do an IS_ERR() check, which you can then map back with PTR_ERR() for a
+> more precise idea of why it failed.
+>
+>> + ? ? /* lcd power on */
+>> + ? ? if (lcd->ddi_pd->lcd_power_on)
+>> + ? ? ? ? ? ? lcd->ddi_pd->lcd_power_on(NULL, 1);
+>> +
+> You may wish to use enums for this too. It's not strictly necessary, but
+> it does help to clarify which is the on and which is the off position.
+>
+>> + ? ? mdelay(lcd->ddi_pd->reset_delay);
+>> +
+>> + ? ? /* lcd reset */
+>> + ? ? if (lcd->ddi_pd->lcd_reset)
+>> + ? ? ? ? ? ? lcd->ddi_pd->lcd_reset(NULL);
+>> +
+> Reset can fail?
+>
+>> + ? ? sample_panel_init(lcd);
+>> +
+>> + ? ? return 0;
+>> +}
+> sample_panel_init() can fail as well, and in both cases you will need to
+> clean up all of the above work.
+>
+>> +
+>> +#ifdef CONFIG_PM
+>> +static int sample_suspend(struct mipi_lcd_device *mipi_dev)
+>> +{
+>> + ? ? struct sample *lcd = dev_get_drvdata(&mipi_dev->dev);
+>> +
+>> + ? ? /* some work. */
+>> +
+>> + ? ? mdelay(lcd->ddi_pd->power_off_delay);
+>> +
+> Adding delays in the suspend/resume path sounds like a pretty bad idea,
+> is there a technical reason for it? If so, please document it, so people
+> get some idea of where their suspend/resume latencies are coming from,
+> and why.
+>
+>> +static struct mipi_lcd_driver sample_mipi_driver = {
+>> + ? ? .name = "sample",
+>> +
+>> + ? ? .probe = sample_probe,
+>
+> No remove?
+>
+>> + ? ? .suspend = sample_suspend,
+>> + ? ? .resume = sample_resume,
+>> +};
+>> +
+>> +static int sample_init(void)
+>> +{
+>> + ? ? s5p_mipi_register_lcd_driver(&sample_mipi_driver);
+>> +
+>> + ? ? return 0;
+>> +}
+>> +
+> This should be:
+>
+> ? ? ? ?return s5p_mipi_register_lcd_driver(&sample_mipi_driver);
+>
+> And sample_init should be __init annotated.
+>
+>> +static void sample_exit(void)
+>> +{
+>> + ? ? return;
+>> +}
+>> +
+> This should be balanced with a
+>
+> ? ? ? ?s5p_mipi_unregister_lcd_driver(&sample_mipi_driver);
+>
+>> +module_init(sample_init);
+>> +module_exit(sample_exit);
+>> +
+>> +MODULE_AUTHOR("Inki Dae <inki.dae@samsung.com>");
+>> +MODULE_DESCRIPTION("MIPI-DSI based sample AMOLED LCD Panel Driver");
+>> +MODULE_LICENSE("GPL");
+>
+> Since you have a fairly complex subsystem it's probably a good idea to
+> work out how your MODULE_ALIAS() is going to work, so that you can handle
+> autoprobe for these things via udev. The fact you have no exit path
+> definitely suggests you haven't tested this in a modular configuration,
+> so there is probably going to be quite a bit of work to do here.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
