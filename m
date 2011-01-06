@@ -1,80 +1,29 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 06 Jan 2011 11:51:35 -0600
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294336054.2905.1.camel@heimdal.trondhjem.org>
-References: <1294254337.16957.13.camel@mulgrave.site>
-	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
-	<1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
-	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
-	<1294262208.2952.4.camel@heimdal.trondhjem.org>
-	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
-	<1294268808.2952.18.camel@heimdal.trondhjem.org>
-	<1294270104.16957.73.camel@mulgrave.site>
-	<1294335614.22825.154.camel@mulgrave.site>
-	<1294336054.2905.1.camel@heimdal.trondhjem.org>
-Message-ID: <1294336295.22825.168.camel@mulgrave.site>
+From: mkl0301@gmail.com (mkl0301 at gmail.com)
+Date: Fri,  7 Jan 2011 01:53:11 +0800
+Subject: [PATCH v3 0/2] add CNS3xxx AHCI support
+Message-ID: <1294336393-920-1-git-send-email-mkl0301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-06 at 12:47 -0500, Trond Myklebust wrote:
-> On Thu, 2011-01-06 at 11:40 -0600, James Bottomley wrote: 
-> > On Wed, 2011-01-05 at 23:28 +0000, James Bottomley wrote:
-> > > Can you explain how the code works? it looks to me like you read the xdr
-> > > stuff through the vmap region then write it out directly to the pages? 
-> > 
-> > OK, I think I see how this is supposed to work:  It's a sequential loop
-> > of reading in via the pages (i.e. through the kernel mapping) and then
-> > updating those pages via the vmap.  In which case, I think this patch is
-> > what you need.
-> > 
-> > The theory of operation is that the readdir on pages actually uses the
-> > network DMA operations to perform, so when it's finished, the underlying
-> > page is up to date.  After this you invalidate the vmap range, so we
-> > have no cache lines above it (so it picks up the values from the
-> > uptodate page).  Finally, after the operation on the vmap region has
-> > finished, you flush it so that any updated contents go back to the pages
-> > themselves before the next iteration begins.
-> > 
-> > Does this look right to people?  I've verified it fixes the issues on
-> > parisc.
-> > 
-> > James
-> > 
-> > ---
-> > 
-> > diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
-> > index 996dd89..bde1911 100644
-> > --- a/fs/nfs/dir.c
-> > +++ b/fs/nfs/dir.c
-> > @@ -587,12 +587,16 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page,
-> >  		if (status < 0)
-> >  			break;
-> >  		pglen = status;
-> > +
-> > +		invalidate_kernel_vmap_range(pages_ptr, pglen);
-> > +
-> >  		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
-> >  		if (status < 0) {
-> >  			if (status == -ENOSPC)
-> >  				status = 0;
-> >  			break;
-> >  		}
-> > +		flush_kernel_vmap_range(pages_ptr, pglen);
-> 
-> Why is this line needed? We're not writing through the virtual mapping.
+From: Mac Lin <mkl0301@gmail.com>
 
-If you're not altering it, it isn't ... the problem on parisc is that
-invalidate is a nop for us because flush does it all, but I can fix
-that.
+v3:
+ - Make the SoC-specific changes into ahci_platform.c directly.
+ - Some cosmetic code changes
 
-James
+v2: http://www.spinics.net/lists/linux-ide/msg39766.html
+ - Switch ahci_platform to module device table matching to add SoC specific support
 
-> We checked using just the invalidate_kernel_vmap_range(), and that
-> appeared to suffice to fix the problem on ARM.
-> 
-> Cheers
->   Trond
+v1: http://www.spinics.net/lists/arm-kernel/msg106236.html
+ - Add CNS3xxx SoC specific AHCI support
+
+This patchset is based on linux-2.6.37
+
+Mac Lin (2):
+      ahci_platform: switch to module device table matching
+      ahci_platform: add support for CNS3xxx SoC devices
+
+ arch/arm/mach-cns3xxx/devices.c |    2 +-
+ drivers/ata/Kconfig             |   11 ++++++++
+ drivers/ata/ahci_platform.c     |   52 ++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 63 insertions(+), 2 deletions(-)
