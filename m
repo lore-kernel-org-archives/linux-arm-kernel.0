@@ -1,32 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 6 Jan 2011 11:02:02 -0700 (MST)
-Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build
-	break because of clktrctrl_mask
-In-Reply-To: <87fwt7z1p3.fsf@ti.com>
-References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
-	<87fwt7z1p3.fsf@ti.com>
-Message-ID: <alpine.DEB.2.00.1101061059590.22048@utopia.booyaka.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 06 Jan 2011 09:39:02 -0800
+Subject: [PATCH 1/1] mtd: msm_nand: Add initial msm nand driver support.
+In-Reply-To: <1294259965.2179.23.camel@koala>
+References: <1293785680-19850-1-git-send-email-mnalajal@codeaurora.org>
+	<1294216917.2179.11.camel@koala>
+	<1294247531.16744.0.camel@c-dwalke-linux.qualcomm.com>
+	<1294259965.2179.23.camel@koala>
+Message-ID: <1294335542.24440.4.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Jan 2011, Kevin Hilman wrote:
-
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Wed, 2011-01-05 at 22:39 +0200, Artem Bityutskiy wrote:
+> On Wed, 2011-01-05 at 09:12 -0800, Daniel Walker wrote:
+> > On Wed, 2011-01-05 at 10:41 +0200, Artem Bityutskiy wrote:
+> > > On Fri, 2010-12-31 at 14:24 +0530, Murali Nalajala wrote:
+> > > > From: Arve Hj?nnev?g <arve@android.com>
+> > > > 
+> > > > Add initial msm nand driver support for Qualcomm MSM and QSD platforms.
+> > > > This driver is currently capable of handling 2K page nand devices.
+> > > > 
+> > > > This driver is originally
+> > > > developed by Google and its source is available at
+> > > > http://android.git.kernel.org/?p=kernel/experimental.git
+> > > > 
+> > > > CC: Brian Swetland <swetland@google.com>
+> > > > Signed-off-by: Arve Hj?nnev?g <arve@android.com>
+> > > > Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
+> > > 
+> > > Pushed to l2-mtd-2.6.git.
+> > 
+> > This patch had incorrect authorship .. Can you replace it with the
+> > second one that was sent ?
 > 
-> > struct clockdomain member clktrctrl_mask is available for only for OMAP2
-> > and OMAP3 architectures. Technially it is also used only for these archs
-> > but this breaks the build with custom OMAP4 configuration.
-> 
-> I'll queue patches 3-5 for the 2.6.38-rc fixes cycle.
-> 
-> With Paul's ack, I can queue the others too, or Paul can decide to take
-> them via his tree.  Paul can decide.
+> Yes, I did that actually, noticed the second one later.
 
-I've acked one and requested minor changes on the other, after which it 
-can be acked by me.  You're welcome to take them at that point.  Just a 
-request, maybe you can post a branch with just these patches in them; that 
-way Rajendra and/or I can rebase his new clockdomain changes on it until 
--rc1 comes out.
+Is it too late for you to drop this ? It's got some additional issues
+that we need some time to address ..
+
+Daniel
 
 
-- Paul
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
