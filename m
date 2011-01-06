@@ -1,26 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 17:10:19 +0000
-Subject: Current OMAP build failures
-In-Reply-To: <878vyyx8s4.fsf@ti.com>
-References: <20110106110336.GC31708@n2100.arm.linux.org.uk>
-	<878vyyx8s4.fsf@ti.com>
-Message-ID: <20110106171019.GF1198@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 06 Jan 2011 09:03:28 -0800
+Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
+In-Reply-To: <BC214410FD04D84F9079A62423659707161C0C@008-AM1MPN1-003.mgdnok.nokia.com>
+	(aaro koskinen's message of "Thu, 6 Jan 2011 10:15:50 +0000")
+References: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>
+	<874o9mvpxf.fsf@ti.com>
+	<BC214410FD04D84F9079A62423659707161C0C@008-AM1MPN1-003.mgdnok.nokia.com>
+Message-ID: <87ei8qx8v3.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 09:05:15AM -0800, Kevin Hilman wrote:
-> Hi Russell,
-> 
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> > I've observed the following issues while building 2.6.37 + my devel
-> > branch.  I don't believe any of them to be due to anything in my tree,
-> > so would be in 2.6.37 as well.
-> 
-> What defconfig are you using for these builds?
+<aaro.koskinen@nokia.com> writes:
 
-I couldn't say offhand because they're built from configs created a while
-back.  I tend to just re-run the build with appropriate O= arguments to
-test things.
+> Hi,
+>
+> Kevin Hilman [khilman at ti.com]:
+>> Aaro Koskinen <aaro.koskinen@nokia.com> writes:
+>>
+>> > Make !CONFIG_SUSPEND init declarations identical on all OMAPs and
+>> > eliminate some ifdefs.
+>> >
+>> > Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+>>
+>> I like this solution, but it introduces compiler warnings:
+>>
+>> [...]
+>>
+>> As you likely noticed, removing the const leads to checkpatch warnings:
+>>
+>> WARNING: struct platform_suspend_ops should normally be const
+>>
+>> so the choice is between a checkpatch warning or a bunch of compiler
+>> warnings.
+>>
+>> Alternatively, I just posted a patch[1] to linux-pm propsing to fix this
+>> at the source.  Let's see what happens there.  Merging $SUBJECT patch
+>> will depend on how this is fixed upstream.
+>
+> Sorry, I should have mentioned this when I posted the patch. I was aware of
+> this issue, but I thought this was already fixed in upstream. Check the following
+> commit in linux-next:
+>
+> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=2f55ac072f5344519348c0c94b3d2f4cca46847b
+>
+> (suspend: constify platform_suspend_ops)
 
-I can send the defconfigs if it'd help.
+ah, thanks.  somehow I missed that one when looking to see if this was
+already fixed.
+
+Kevin
