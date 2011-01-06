@@ -1,63 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 07 Jan 2011 07:30:15 -0600
-Subject: [PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP
-In-Reply-To: <alpine.DEB.1.10.1101071457540.18906@esdhcp041196.research.nokia.com>
-References: <1294260576-20237-1-git-send-email-nm@ti.com>
-	<1294260576-20237-3-git-send-email-nm@ti.com>
-	<alpine.DEB.1.10.1101071457540.18906@esdhcp041196.research.nokia.com>
-Message-ID: <4D271567.2010105@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Jan 2011 20:29:45 +0100
+Subject: [PATCH 15/23] Alternative mmc structure to support pxa168, pxa910,
+	mmp2 family SD
+In-Reply-To: <7E0D4C72-717F-495B-98FE-35F40C7CDCAE@marvell.com>
+References: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
+	<AANLkTikmZ=c8LnOwxLqx9w6cXV07eVL7AZ0qQmXKojs9@mail.gmail.com>
+	<7E0D4C72-717F-495B-98FE-35F40C7CDCAE@marvell.com>
+Message-ID: <201101062029.45604.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen wrote, on 01/07/2011 07:04 AM:
+On Friday 31 December 2010, Philip Rakity wrote:
+> The patch selects ARCH-MMP (as now) but adds the ability
+> to also know which specific SoC was chosen.  (This is sort of done by choosing the development board today).
 
-> On Wed, 5 Jan 2011, Nishanth Menon wrote:
->> +static void __init beagle_opp_init(void)
->> +{
->> + int r = 0;
->> +
->> + /* Initialize the omap3 opp table */
->> + if (omap3_opp_init()) {
->> + pr_err("%s: opp default init failed\n", __func__);
->> + return;
->> + }
->> +
->> + /* Custom OPP enabled for XM */
->> + if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
->> + struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
->> + struct omap_hwmod *dh = omap_hwmod_lookup("iva");
->> + struct device *dev;
->> +
->> + if (!mh || !dh) {
->> + pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
->> + __func__, mh, dh);
->> + r = -EINVAL;
->> + } else {
->> + /* Enable MPU 1GHz and lower opps */
->> + dev = &mh->od->pdev.dev;
->> + r = opp_enable(dev, 800000000);
->> + /* TODO: MPU 1GHz needs SR and ABB */
->> +
->> + /* Enable IVA 800MHz and lower opps */
->> + dev = &dh->od->pdev.dev;
->> + r |= opp_enable(dev, 660000000);
->> + /* TODO: DSP 800MHz needs SR and ABB */
->> + }
->> + if (r) {
->> + pr_err("%s: failed to enable higher opp %d\n",
->> + __func__, r);
->> + /*
->> + * Cleanup - disable the higher freqs - we dont care
->> + * about the results
->> + */
->> + dev = &mh->od->pdev.dev;
->> + opp_disable(dev, 800000000);
->> + dev = &dh->od->pdev.dev;
->
-> This branch will be reached also when !mh || !dh, so it won't work.
+On a larger scale, we try to go in the opposite direction: make it possible to
+have kernels run on as many boards as possible by decreasing the code differences
+between SoCs and even SoC families.
+ 
+> > Your patches will make them mess.
+> 
+> suggest a solution.  
+> 
+> The current mechanism of having the development board select the CPU does not seem right.
+> One can select a development board for MMP2 and PXA168 and yet the arch files to support each CPU
+> are different and not compatible.  (for example cache handling).  
 
-arrgh.. thanks for catching it - will fix and repost.
+The optimal solution would be to make sure that working support for both CPUs can be built into
+a single kernel. There is a lot of infrastructure in arch/arm/mm/* that tries to do this, but
+I don't know of that actually works for the combination of CPU_MOHAWK and CPU_V6. It does
+work for some other combinations of CPU cores though, so it's certainly possible.
+For instance, arch/arm/include/asm/cacheflush.h has abstractions to select the cache handling
+at boot time.
 
--- 
-Regards,
-Nishanth Menon
+To go even further, it might make sense to combine the PXA and MMP platforms, since they already
+share some code through the plat-pxa directory.
+
+Getting it running for MMP with mohawk and v6 cores could be a significant amount of work if
+nobody has tries this in that platform, so for now, I would recommend you just keep ARCH_MMP as
+a global option in arch/arm/Kconfig for now and add another 'choice' statement in
+arch/arm/mach-mmp/Kconfig to select the CPU core, with the board selection depending on that.
+
+	Arnd
