@@ -1,37 +1,55 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Thu, 6 Jan 2011 18:09:48 +0000
-Subject: [PATCH v3 2/2] ahci_platform: add support for CNS3xxx SoC devices
-In-Reply-To: <AANLkTinO-feQkpfoZhmOV7VyPbyL=f8KV1_Qysps04ve@mail.gmail.com>
-References: <1294336393-920-1-git-send-email-mkl0301@gmail.com>
-	<1294336393-920-3-git-send-email-mkl0301@gmail.com>
-	<AANLkTinO-feQkpfoZhmOV7VyPbyL=f8KV1_Qysps04ve@mail.gmail.com>
-Message-ID: <20110106180948.GX27131@trinity.fluff.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 6 Jan 2011 11:25:31 -0700 (MST)
+Subject: [PATCH] omap: wd_timer: Fix crash frm wdt_probe when
+	!CONFIG_RUNTIME_PM
+In-Reply-To: <1294234855-6623-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1294234855-6623-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1101061120480.31961@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 07, 2011 at 02:04:33AM +0800, Lin Mac wrote:
-> Hi Jeff,
+Hi Santosh,
+
+On Wed, 5 Jan 2011, Santosh Shilimkar wrote:
+
+> Commit ff2516fb 'wd_timer: disable on boot via hwmod postsetup mechanism'
+> introduced watchdog timer state state management using postsetup_state.
+> This was done to allow some board files to support watchdog coverage
+> throughout kernel initialization and it work as intended when RUNTIME_PM
+> is enabled.
 > 
-> 2011/1/7  <mkl0301@gmail.com>:
-> > From: Mac Lin <mkl0301@gmail.com>
-> >
-> > CNS3xxx override the softreset function of ahci_platform ahci_softreset by
-> > cns3xxx_ahci_softreset, which would retry ahci_do_softreset again with pmp=0 if
-> > pmp=15 failed, for the controller has problem receiving D2H Reg FIS of the
-> > different PMP setting of the previous sent H2D Reg FIS.
-> >
-> > Following describe the isssue with original ahci_platform driver on
-> > linux-2.6.37-rc3, arm/cns3xxx.
-> >
-> > If CONFIG_SATA_PMP is enabled, while not using multiplier and connect the disks
-> > directly to the board, the disk cannot be found due to software reset always
+> With !CONFIG_RUNTIME_PM and no board is specifically requests watchdog
+> to remain enabled the omap_wdt_probe crashesh. This is because hwmod
+> in absense of runtime PM unable to turn watchdog clocks because it's
+> state is set to be disabled. For rest of the device, the state is
+> set as enabled in absense of RUNTIME_PM
+> 
+> [    1.372558] Unhandled fault: imprecise external abort (0x1406) at 0xad733eeb
+> [    1.379913] Internal error: : 1406 [#1] SMP
+> [    1.384277] last sysfs file:
+> [    1.387359] Modules linked in:
+> [    1.390563] CPU: 0    Tainted: G        W    (2.6.37-rc7-00265-g4298a4c-dirty #23)
+> [    1.398468] PC is at omap_wdt_disable+0x2c/0x3c
+> [    1.403198] LR is at omap_wdt_probe+0x124/0x1e0
+> [    1.407928] pc : [<c02f5bf4>]    lr : [<c03be10c>]    psr: 60000013
+> [    1.407958] sp : df833f00  ip : 00000000  fp : 00000000
+> [    1.419921] r10: c0ac57ac  r9 : df959e00  r8 : 00000000
+> [    1.425384] r7 : df959e08  r6 : df8000c0  r5 : df95bebc  r4 : df87dde0
+> [    1.432189] r3 : fc314000  r2 : 00005555  r1 : fc314034  r0 : df87dde0
+> 
+> This patch make the default watchdog state to be enabled in case of
+> !CONFIG_RUNTIME_PM. This fixes the crash
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> ---
+> Paul, I am not too sure if it breaks your _shutdown idea of watchdog
+> timer.
 
-> complicated if more SoC-specific code added.
-> I really prefer the original way.
+Maybe.  What happens in a case where the bootloader enables the watchdog, 
+but the booting kernel is compiled with !CONFIG_OMAP_WATCHDOG and 
+!CONFIG_PM_RUNTIME?  Won't the watchdog reset the MPU unexpectedly in that 
+case?  Or am I missing something...
 
-Is there a reference to the original?
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+- Paul
