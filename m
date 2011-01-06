@@ -1,72 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 06 Jan 2011 08:07:26 -0600
-Subject: [PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP
-In-Reply-To: <FAF33A33-767F-45DD-B0E4-1C173342CFB1@beagleboard.org>
-References: <1294260576-20237-1-git-send-email-nm@ti.com>	<1294260576-20237-3-git-send-email-nm@ti.com>
-	<874o9nvskt.fsf@ti.com> <4D25B482.3080709@ti.com>
-	<579AA000-EB86-4DD3-B3B7-29F7A72E0415@beagleboard.org>
-	<4D25C745.7060600@ti.com>
-	<FAF33A33-767F-45DD-B0E4-1C173342CFB1@beagleboard.org>
-Message-ID: <4D25CC9E.9080304@ti.com>
+From: carmelo.amoroso@st.com (Carmelo AMOROSO)
+Date: Thu, 6 Jan 2011 15:16:25 +0100
+Subject: [PATCH 1/2] stackprotector: add stack smashing protector
+	generic implementation
+In-Reply-To: <20110106093940.GA31708@n2100.arm.linux.org.uk>
+References: <1293111851-7175-1-git-send-email-filippo.arcidiacono@st.com>
+	<4D245D16.5010702@st.com>
+	<20110106093940.GA31708@n2100.arm.linux.org.uk>
+Message-ID: <4D25CEB9.7090205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Koen Kooi had written, on 01/06/2011 08:01 AM, the following:
-> Op 6 jan 2011, om 14:44 heeft Nishanth Menon het volgende geschreven:
-> 
->> Koen Kooi had written, on 01/06/2011 07:00 AM, the following:
->>> Op 6 jan 2011, om 13:24 heeft Nishanth Menon het volgende geschreven:
->>>> Kevin Hilman wrote, on 01/05/2011 05:28 PM:
->>>>> Nishanth Menon<nm@ti.com>  writes:
->>>>>
->>>>>> Beagle XM uses 3730 and the board design allows enabling 800MHz and 1GHz
->>>>>> OPPs. However, We need Smart reflex class 1.5 and ABB to enable 1GHz safely.
->>>>>> For the moment, we tweak the default table to allow for 800Mhz OPP usage.
->>>>> Isn't this common to any board using 3730 (or 3630?)
->>>> no it is not. only certain boards are capable of higher frequencies - there is a procedure called PDN analysis and vmin search that needs to be performed to guarentee this.
->>> What about the "new" 3530s that can run at 720MHz? Those have been speed binned and given a different SKU. I'm using the attached 4 patches (Tony master + beagle patches _+ dvfs: http://dominion.thruhere.net/git/cgit.cgi/linux-omap/log/?h=koen/beagle-next) on my beagle C4 and overo tide to get 720MHz. They don't really work:
->> for 3530, keep in mind that not *all* boards can support 720MHz (esp the old 3430 boards, like my poor SDP3430).
-> 
-> Right, that's why it's a different SKU and we can probe for it, see the 0002 patch I attached.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-please discuss with Sanjeev on patch ownership and post required series 
-using git send-email :)
+On 1/6/2011 10:39 AM, Russell King - ARM Linux wrote:
+> On Wed, Jan 05, 2011 at 12:59:18PM +0100, Carmelo AMOROSO wrote:
+>  > Is someone interested into this stuff ?
+> 
+> Looking at the CC list, you're asking the people who already have the
+> support in the kernel. I suspect they don't have that much of an
+> interest in it.
+> 
+> Maybe you should try asking other architecture maintainers who don't
+> support this yet? Not every architecture maintainer is subscribed to,
+> or reads LKML...
+> 
 
->> since we consider 3530 as 3430 as well, add a default disabled 720MHz OPP in the 3430 table
-> 
-> That's what 0001 does :)
-> 
->> and enable it:
->> a) if this has anything to do with board behavior (which, unlike 36xx, I dont think is the case for 35xx), enable similar to this patch on the required boards on a need basis (e.g. based on board rev)
-> 
-> That's what 0003 and 0004 are doing for overo and beagle
-then it is wrong. see below
+Hi Russel, thanks for your feedback.
+Well, SH (in CC) does not have this support. Indeed we posted it
+initially to linux-sh only. We got useful feedback from Paul, Mike and
+Nicolas suggesting to promote the ARM/SH solution based on the global
+__stack_chk_guard variable as a generic solution for all other
+architectures. This is why I thought to post to the LKML instead of each
+linux-<arch> list.
+The code is able to detect if the arch implementation is based on the
+global (if so the generic implementation should work cleanly), otherwise
+it will fail to compile when trying to include the
+linux/asm/stackprotector.h. This is an easy way to detect the lack of an
+arch specific implementation (but likely only x86 needs it... I don't know).
 
-> 
->> b) if this is a silicon behavior, then, you should modify the omap3_opp_init to ensure that for the right silicon this is enabled (e.g. only for 3530 rev X onwards or something similar) - but you will need some way to detect it in s/w (not through bootargs please!)
-> 
-> See 0002, it does it as an omap feature.
-if it is OMAP feature, you should be doing this in omap3_opp_init 
-instead of each and every board file! (basically patches 3 and 4 are 
-wrong!).
+So the idea is to use the ARM code as generic's one (tested on SH
+kernel). Mike Frysinger volunteered to try on blackfin for example.
 
-> 
->>> root at usrp-e1xx:~# cpufreq-set -f 720000
->>> [  104.976318] platform iva.0: omap_voltage_scale: Already at the requestedrate 430000000
->>> [  104.986236] platform mpu.0: omap_voltage_scale: Already at the requestedrate 600000000
->>> [  104.996032] platform iva.0: omap_voltage_scale: Already at the requestedrate 430000000
->>> [  105.006408] platform mpu.0: omap_voltage_scale: Already at the requestedrate 600000000
->> This is coz we dont have 720MHz and max enabled freq is 600MHz so it falls back to that freq.
-> 
-> Even after 0001 adds it to the table and 0004 enables it?
-a) have you checked if the clock framework has the required bits?
-b) voltage layer maintains it's own voltage table as well (surprise 
-:D).. so you need to add to that as well!
-see the secret table in arch/arm/mach-omap2/voltage.c - I prefer all 
-voltage and frequency information to be in a centralized location to 
-prevent mess like this from happening, but sorry we gotta merge these 
-two tables at some point ahead IMHO, we are not there yet.
+cheers
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (MingW32)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
 
--- 
-Regards,
-Nishanth Menon
+iEYEARECAAYFAk0lzrkACgkQoRq/3BrK1s/JhACdERr4TFBaGmf4XuQEUA/9X/Kt
+lz4An0fctncE+n9fhHvvZEbIZEilJKNO
+=5yFm
+-----END PGP SIGNATURE-----
