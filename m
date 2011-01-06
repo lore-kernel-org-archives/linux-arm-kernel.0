@@ -1,76 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 06 Jan 2011 11:38:20 +0100
-Subject: Hit BUG_ON in dma-mapping.c:425
-In-Reply-To: <20110105165551.GE8638@n2100.arm.linux.org.uk>
-References: <4D24A108.2080609@atmel.com>
-	<20110105165551.GE8638@n2100.arm.linux.org.uk>
-Message-ID: <4D259B9C.6060409@atmel.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 6 Jan 2011 18:43:59 +0800
+Subject: [PATCH v4 5/8] arm: mxc: move IOMUX_CONFIG_XXXX definitions to
+	iomux-v3.h
+In-Reply-To: <20110106103241.GG26009@pengutronix.de>
+References: <1293708306-20170-1-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-2-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-3-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-4-git-send-email-richard.zhao@freescale.com>
+	<1293708306-20170-5-git-send-email-richard.zhao@freescale.com>
+	<20110106065935.GA15509@shlinux1.ap.freescale.net>
+	<20110106101639.GE26009@pengutronix.de>
+	<20110106102918.GA2349@shlinux1.ap.freescale.net>
+	<20110106103241.GG26009@pengutronix.de>
+Message-ID: <20110106104359.GA25563@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(I include MTD mailing-list now)
-
-Le 05/01/2011 17:55, Russell King - ARM Linux :
-> On Wed, Jan 05, 2011 at 05:49:12PM +0100, Nicolas Ferre wrote:
->> Hi,
->>
->> While running mtd_stresstest on a dataflash (atmel_spi 
->> + mtd_dataflash drivers) I hit the BUG_ON directive that 
->> is at the beginning of ___dma_single_cpu_to_dev() function.
->> This function is called from the SPI driver that do a 
->> dma_map_single() before DMA operations on the buffer 
->> transmitted from upper layers.
->>
->> It seems that this address is above "high_memory" limit because 
->> it is allocated by vmalloc (in mtd_stresstest.c:285)...
+On Thu, Jan 06, 2011 at 11:32:41AM +0100, Sascha Hauer wrote:
+> On Thu, Jan 06, 2011 at 06:29:19PM +0800, Richard Zhao wrote:
+> > On Thu, Jan 06, 2011 at 11:16:39AM +0100, Sascha Hauer wrote:
+> > > On Thu, Jan 06, 2011 at 02:59:36PM +0800, Richard Zhao wrote:
+> > > > Hello Sascha,
+> > > > 
+> > > > On Thu, Dec 30, 2010 at 07:25:04PM +0800, Richard Zhao wrote:
+> > > > > IOMUX_CONFIG_GPIO is not for iomux-v3. It's for old freescale
+> > > > > iomux routines. Remove it.
+> > > > > 
+> > > > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > > > > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > If you don't have comments, could you please merge this patch?
+> > > > It's causing arch/arm/plat-mxc/include/mach/iomux-mx50.h incomplete.
+> > > 
+> > > I didn't apply it because it conflicts with current imx-for-2.6.38
+> > > branch. Other than that I don't find the enum very useful at all,
+> > > because we have problems with very long lines in these files and
+> > > using IOMUX_CONFIG_ALT0 where we could use 0 does not exactly improve
+> > > the situation.
+> > Yes, correct. IOMUX_CONFIG_ALT0-7 is ok.  But IOMUX_CONFIG_SION is more
+> > readable than 0x1 << 4, isn't it? If you don't agree put IOMUX_CONFIG_SION
+> > in iomux-v3.h, shall I put it in iomux-mx50.h?
 > 
-> Well, its telling you is that you're not allowed to DMA to vmalloc
-> addresses.  Whether that's the fault of the map driver or not is a
-> question for mtd folk.
+> IOMUX_CONFIG_SION is ok, but please drop the rest.
+ok to put it into iomux-v3.h? I will sent out one patch.
 
-So you mean that those vmalloc calls should be changed to kmalloc in MTD like this:
-
---- a/drivers/mtd/tests/mtd_stresstest.c
-+++ b/drivers/mtd/tests/mtd_stresstest.c
-@@ -26,7 +26,6 @@
- #include <linux/mtd/mtd.h>
- #include <linux/slab.h>
- #include <linux/sched.h>
--#include <linux/vmalloc.h>
- 
- #define PRINT_PREF KERN_INFO "mtd_stresstest: "
- 
-@@ -281,8 +280,8 @@ static int __init mtd_stresstest_init(void)
-        bufsize = mtd->erasesize * 2;
- 
-        err = -ENOMEM;
--       readbuf = vmalloc(bufsize);
--       writebuf = vmalloc(bufsize);
-+       readbuf = kmalloc(bufsize, GFP_KERNEL);
-+       writebuf = kmalloc(bufsize, GFP_KERNEL);
-        offsets = kmalloc(ebcnt * sizeof(int), GFP_KERNEL);
-        if (!readbuf || !writebuf || !offsets) {
-                printk(PRINT_PREF "error: cannot allocate memory\n");
-@@ -313,8 +312,8 @@ static int __init mtd_stresstest_init(void)
- out:
-        kfree(offsets);
-        kfree(bbt);
--       vfree(writebuf);
--       vfree(readbuf);
-+       kfree(writebuf);
-+       kfree(readbuf);
-        put_mtd_device(mtd);
-        if (err)
-                printk(PRINT_PREF "error %d occurred\n", err);
-
-
-I also discovered the same issue while trying to write with "dd" on /dev/mtdblockx
-
-Same vmalloc'ed memory seems to be used in mtdblock_writesect():
-mtdblk->cache_data = vmalloc(mtdblk->mbd.mtd->erasesize);
-
-I know that using "dd" on a block device is not the common case but it should work instead of not being able to transmit buffer with DMA... So what it implies to switch this to kmalloc? Is it regression-free to do this?
-
-Best regards,
--- 
-Nicolas Ferre
+Richard
+> 
+> Sascha
+> 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
