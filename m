@@ -1,35 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jan 2011 23:59:22 +0000
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <AANLkTi=SjMinMp+m726GS1iehj6cQgNy1RqSoUqKhjtv@mail.gmail.com>
-References: <1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
-	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
-	<1294262208.2952.4.camel@heimdal.trondhjem.org>
-	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
-	<1294268808.2952.18.camel@heimdal.trondhjem.org>
-	<AANLkTi=SjMinMp+m726GS1iehj6cQgNy1RqSoUqKhjtv@mail.gmail.com>
-Message-ID: <20110105235922.GP8638@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed,  5 Jan 2011 16:22:53 -0800
+Subject: [PATCH] PM: fix suspend_set_ops() to take const pointer
+Message-ID: <1294273373-8967-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 03:28:53PM -0800, Linus Torvalds wrote:
-> On Wed, Jan 5, 2011 at 3:06 PM, Trond Myklebust
-> <Trond.Myklebust@netapp.com> wrote:
-> >
-> > Yes. The fix I sent out was a call to invalidate_kernel_vmap_range(),
-> > which takes care of invalidating the cache prior to a virtual address
-> > read.
-> >
-> > My question was specifically about the write through the regular kernel
-> > mapping: according to Russell and my reading of the cachetlb.txt
-> > documentation, flush_dcache_page() is only guaranteed to have an effect
-> > on page cache pages.
-> 
-> I don't think that should ever matter. It's not like the hardware can
-> know whether it's a dcache page or not.
-> 
-> And if the sw implementation cares, it's doing something really odd.
+checkpatch warns that pointers for certain structs should be const,
+and platform_suspend_ops is one of those structs.  If you follow this
+suggestion you trade a checkpatch warning for a compiler warning of
+the form:
+
+   warning: passing argument 1 of 'suspend_set_ops' discards qualifiers from pointer target type
+
+Fix suspend_set_ops() to take a const pointer so everyone expects
+const.
+
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Applies to v2.6.37, but also applies cleanly to suspend-2.6/linux-next
+
+ include/linux/suspend.h |    4 ++--
+ kernel/power/suspend.c  |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+index 2669751..bb98383 100644
+--- a/include/linux/suspend.h
++++ b/include/linux/suspend.h
+@@ -122,7 +122,7 @@ struct platform_suspend_ops {
+  * suspend_set_ops - set platform dependent suspend operations
+  * @ops: The new suspend operations to set.
+  */
+-extern void suspend_set_ops(struct platform_suspend_ops *ops);
++extern void suspend_set_ops(const struct platform_suspend_ops *ops);
+ extern int suspend_valid_only_mem(suspend_state_t state);
+ 
+ /**
+@@ -147,7 +147,7 @@ extern int pm_suspend(suspend_state_t state);
+ #else /* !CONFIG_SUSPEND */
+ #define suspend_valid_only_mem	NULL
+ 
+-static inline void suspend_set_ops(struct platform_suspend_ops *ops) {}
++static inline void suspend_set_ops(const struct platform_suspend_ops *ops) {}
+ static inline int pm_suspend(suspend_state_t state) { return -ENOSYS; }
+ #endif /* !CONFIG_SUSPEND */
+ 
+diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
+index ecf7705..0c0af3d 100644
+--- a/kernel/power/suspend.c
++++ b/kernel/power/suspend.c
+@@ -36,7 +36,7 @@ static struct platform_suspend_ops *suspend_ops;
+  *	suspend_set_ops - Set the global suspend method table.
+  *	@ops:	Pointer to ops structure.
+  */
+-void suspend_set_ops(struct platform_suspend_ops *ops)
++void suspend_set_ops(const struct platform_suspend_ops *ops)
+ {
+ 	mutex_lock(&pm_mutex);
+ 	suspend_ops = ops;
+-- 
+1.7.3.4
