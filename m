@@ -1,69 +1,145 @@
-From: aaro.koskinen@nokia.com (aaro.koskinen at nokia.com)
-Date: Thu, 6 Jan 2011 12:05:51 +0000
-Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
-In-Reply-To: <20110106111957.GA1198@n2100.arm.linux.org.uk>
-References: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>
-	<874o9mvpxf.fsf@ti.com>, <20110106111957.GA1198@n2100.arm.linux.org.uk>
-Message-ID: <BC214410FD04D84F9079A62423659707164311@008-AM1MPN1-003.mgdnok.nokia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 6 Jan 2011 17:41:03 +0530
+Subject: Current OMAP build failures
+In-Reply-To: <20110106110336.GC31708@n2100.arm.linux.org.uk>
+References: <20110106110336.GC31708@n2100.arm.linux.org.uk>
+Message-ID: <3b65fe7bf98487ac1db721981f4c8bca@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Russell King - ARM Linux [linux at arm.linux.org.uk]:
-> > > -static struct platform_suspend_ops omap_pm_ops = {
-> > > -   .begin          = omap2_pm_begin,
-> > > -   .enter          = omap2_pm_enter,
-> > > -   .end            = omap2_pm_end,
-> > > -   .valid          = suspend_valid_only_mem,
-> > > +static const struct platform_suspend_ops omap_pm_ops[] = {
-> > > +   {
-> > > +           .begin          = omap2_pm_begin,
-> > > +           .enter          = omap2_pm_enter,
-> > > +           .end            = omap2_pm_end,
-> > > +           .valid          = suspend_valid_only_mem,
-> > > +   }
-> > >  };
-> > > -#else
-> > > -static const struct platform_suspend_ops __initdata omap_pm_ops;
-> > >  #endif /* CONFIG_SUSPEND */
-> > >
-> > >  /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
-> > > @@ -582,7 +582,7 @@ static int __init omap2_pm_init(void)
-> > >                                                 omap24xx_cpu_suspend_sz);
-> > >     }
-> > >
-> > > -   suspend_set_ops(&omap_pm_ops);
-> > > +   suspend_set_ops(omap_pm_ops);
+Russell,
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
+> Sent: Thursday, January 06, 2011 4:34 PM
+> To: Tony Lindgren
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Current OMAP build failures
 >
-> Utterly yuck.  Declaring it as a single element array just to avoid an
-> ifdef.  That's worse than having an ifdef here.
 
-Why it is worse? Reducing the amount of different preprocessor branches will
-result in better compile test / static analysis coverage.
+Have you used any custom build/ additional build flags
+for omap2/3/4 reported issues ?
+I just rebased Tony's 'omap-for-linus' branch with 2.6.37 and
+it not seems to report below issues. May be it's getting
+fixed as part of 2.6.38 omap queue or my build config is
+not same as yours. I used omap2plus_defconfig.
 
-> There's another solution.  Don't mess about with sticking such stuff in
-> the header either.
+> === omap2 ===
+> arch/arm/plat-omap/devices.c:253: warning: ?omap_init_wdt? defined
+> but not used
+> arch/arm/mach-omap2/irq.c:64: warning: ?intc_context? defined but
+> not used
+> arch/arm/mach-omap2/prcm.c:122: warning: ?prcm_context? defined but
+> not used
 >
-> #ifdef WHATEVER
-> static const struct platform_suspend_ops omap_pm_ops = {
->         .begin          = omap2_pm_begin,
->         .enter          = omap2_pm_enter,
->         .end            = omap2_pm_end,
->         .valid          = suspend_valid_only_mem,
-> };
-> #define PM_OPS omap_pm_ops
-> #else
-> #define PM_OPS NULL
-> #endif
-> ...
-> 
->         suspend_set_ops(PM_OPS);
+> Missing __maybe_unused or something else?
+These seems to be fixed in omap queue.
 >
-> That keeps it all nice and local, and you can see exactly what's going on
-> without having it spread across many different random files.
+> It also comes with three section mismatches:
+>
+> WARNING: vmlinux.o(.text+0x1f4c4): Section mismatch in reference
+> from the function omap_early_device_register() to the function
+> .init.text:early_platform_add_devices()
+> The function omap_early_device_register() references
+> the function __init early_platform_add_devices().
+> This is often because omap_early_device_register lacks a __init
+> annotation or the annotation of early_platform_add_devices is wrong.
+>
+> As early_platform_add_devices() is marked __init, so too should be
+> omap_early_device_register().
+I don't see this one. May be fixed
+>
+> WARNING: vmlinux.o(.text+0x1f6bc): Section mismatch in reference
+> from the function omap_device_build_ss() to the function
+> .init.text:early_platform_add_devices()
+> The function omap_device_build_ss() references
+> the function __init early_platform_add_devices().
+> This is often because omap_device_build_ss lacks a __init
+> annotation or the annotation of early_platform_add_devices is wrong.
+>
+> This looks like omap_early_device_register() has been inlined into
+> omap_device_build_ss(), and it doesn't look like it can be marked
+> __init.
+>
+> Rather than passing an 'is_early_device' into this function, split
+> out the common code into a separate function which takes a function
+> pointer to the registration function.  Then you can have two
+> additional
+> functions, one marked __init which uses omap_early_device_register()
+> and one not marked __init using omap_device_register().
+>
+> This also means that we get the init-section type checking further
+> up
+> the chain.
+This too
+>
+> WARNING: vmlinux.o(.data+0x6bd4): Section mismatch in reference from
+> the variable h4_config to the (unknown reference)
+> .init.data:(unknown)
+> The variable h4_config references
+> the (unknown reference) __initdata (unknown)
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the
+> variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
+>
+> Maybe it shouldn't be marked __initdata?
+This too
+>
+> === omap3 ===
+> WARNING: vmlinux.o(.text+0x1b780): Section mismatch in reference
+> from the function sdp3430_twl_gpio_setup() to the function
+> .init.text:omap2_hsmmc_init()
+> The function sdp3430_twl_gpio_setup() references
+> the function __init omap2_hsmmc_init().
+> This is often because sdp3430_twl_gpio_setup lacks a __init
+> annotation or the annotation of omap2_hsmmc_init is wrong.
+>
+> Missing __init on sdp3430_twl_gpio_setup ?
+This too
+>
+> WARNING: vmlinux.o(.text+0x1f714): Section mismatch in reference
+> from the function omap_early_device_register() to the function
+> .init.text:early_platform_add_devices()
+> The function omap_early_device_register() references
+> the function __init early_platform_add_devices().
+> This is often because omap_early_device_register lacks a __init
+> annotation or the annotation of early_platform_add_devices is wrong.
+>
+> As before.
+This too
+>
+> WARNING: vmlinux.o(.text+0x1f90c): Section mismatch in reference
+> from the function omap_device_build_ss() to the function
+> .init.text:early_platform_add_devices()
+> The function omap_device_build_ss() references
+> the function __init early_platform_add_devices().
+> This is often because omap_device_build_ss lacks a __init
+> annotation or the annotation of early_platform_add_devices is wrong.
+>
+> As before.
+This too
+>
+> WARNING: vmlinux.o(.data+0x20670): Section mismatch in reference
+> from the variable twl_driver to the function .init.text:twl_probe()
+> The variable twl_driver references
+> the function __init twl_probe()
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the
+> variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
+>
+> twl_probe shouldn't be __init ?
+>
+I only see the twl_probe section miss-match. Have attached full build
+log for reference.
 
-I don't think it's obviously better or simpler. There's already made a mistake in
-your example...
-
-A.
+Regards,
+Santosh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 2.6.37_omap_for_linus.tar.bz2
+Type: application/octet-stream
+Size: 8378 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110106/5786427a/attachment.obj>
