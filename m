@@ -1,44 +1,45 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu,  6 Jan 2011 21:52:51 +0200
-Subject: [PATCH 6/7] ARM: S3C2442: RX1950: Retain LEDs state in suspend
-In-Reply-To: <1294343572-28518-1-git-send-email-anarsoul@gmail.com>
-References: <1294343572-28518-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1294343572-28518-7-git-send-email-anarsoul@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu,  6 Jan 2011 13:54:37 -0600
+Subject: [PATCH v3 1/3] omap3: beaglexm: fix EHCI power up GPIO dir
+In-Reply-To: <1294343679-10605-1-git-send-email-nm@ti.com>
+References: <1294343679-10605-1-git-send-email-nm@ti.com>
+Message-ID: <1294343679-10605-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c_adc_battery uses LEDs to indicate charging process,
-retain LEDs state in suspend, otherwise user have no information if PDA
-battery is charging after he put it to suspend.
+From: Koen Kooi <koen@beagleboard.org>
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+EHCI enable power pin is inverted (active high) in comparison
+to vanilla beagle which is active low. Handle this case conditionally.
+
+[nm at ti.com: helped split up]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Koen Kooi <koen@beagleboard.org>
 ---
- arch/arm/mach-s3c2440/mach-rx1950.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
-index eab6ae5..e7cc993 100644
---- a/arch/arm/mach-s3c2440/mach-rx1950.c
-+++ b/arch/arm/mach-s3c2440/mach-rx1950.c
-@@ -268,16 +268,19 @@ static struct gpio_led rx1950_leds_desc[] = {
- 		.name				= "Green",
- 		.default_trigger	= "main-battery-charging-or-full",
- 		.gpio				= S3C2410_GPA(6),
-+		.retain_state_suspended		= 1,
- 	},
- 	{
- 		.name				= "Red",
- 		.default_trigger	= "main-battery-full",
- 		.gpio				= S3C2410_GPA(7),
-+		.retain_state_suspended		= 1,
- 	},
- 	{
- 		.name				= "Blue",
- 		.default_trigger	= "rx1950-acx-mem",
- 		.gpio				= S3C2410_GPA(11),
-+		.retain_state_suspended		= 1,
- 	},
- };
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 6c12760..1b5aa7a 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -297,9 +297,16 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	gpio_request(gpio + 1, "EHCI_nOC");
+ 	gpio_direction_input(gpio + 1);
  
+-	/* TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, active low) */
++	/*
++	 * TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, XM active
++	 * high / others active low)
++	 */
+ 	gpio_request(gpio + TWL4030_GPIO_MAX, "nEN_USB_PWR");
+ 	gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0);
++	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM)
++		gpio_direction_output(gpio + TWL4030_GPIO_MAX, 1);
++	else
++		gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0);
+ 
+ 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+ 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
 -- 
-1.7.3.2
+1.6.3.3
