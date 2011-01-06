@@ -1,55 +1,63 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 6 Jan 2011 09:55:30 -0800
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294336054.2905.1.camel@heimdal.trondhjem.org>
-References: <1294254337.16957.13.camel@mulgrave.site>
-	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
-	<1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
-	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
-	<1294262208.2952.4.camel@heimdal.trondhjem.org>
-	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
-	<1294268808.2952.18.camel@heimdal.trondhjem.org>
-	<1294270104.16957.73.camel@mulgrave.site>
-	<1294335614.22825.154.camel@mulgrave.site>
-	<1294336054.2905.1.camel@heimdal.trondhjem.org>
-Message-ID: <AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 6 Jan 2011 10:58:22 -0700 (MST)
+Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix for
+	undefined reference to 'omap2_prm_read_mod_reg'
+In-Reply-To: <1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+	<1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1101061056340.22048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 6, 2011 at 9:47 AM, Trond Myklebust
-<Trond.Myklebust@netapp.com> wrote:
->
-> Why is this line needed? We're not writing through the virtual mapping.
+Hi Santosh
 
-I haven't looked at the sequence of accesses, but you need to be
-_very_ aware that "write-through" is absolutely NOT sufficient for
-cache coherency.
+On Wed, 5 Jan 2011, Santosh Shilimkar wrote:
 
-In cache coherency, you have three options:
+> omap2plus_defocnfig build breaks when customised with only ARCH_OMAP4
+> selected. This is because common files make references to the functions
+> which are defined only for omap2xxx and omap3xxx.
 
- - true coherency (eg physically indexed/tagged caches)
+...
 
- - exclusion (eg virtual caches, but with an exclusion guarantee that
-guarantees that aliases cannot happen: either by using physical
-tagging or by not allowing cases that could cause virtual aliases)
+> 
+> This patch adds stubs for these functions so that build continues to work.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/prm2xxx_3xxx.h |   63 +++++++++++++++++++++++++++++++++++-
+>  1 files changed, 62 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+> index 53d44f6..843f329 100644
+> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
+> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+> @@ -228,7 +228,67 @@
+>  
+>  
+>  #ifndef __ASSEMBLER__
+> -
+> +/*
+> + * Stub omap2xxx/omap3xxx functions so that common files
+> + * continue to build when custom builds are used
+> + */
+> +#if defined(CONFIG_ARCH_OMAP4) && !(defined(CONFIG_ARCH_OMAP2) ||	\
+> +					defined(CONFIG_ARCH_OMAP3))
+> +static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
+> +{
+> +	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
+> +		"not suppose to be used on omap4\n");
+> +	return 0;
+> +}
 
- - write-through AND non-cached reads (ie "no caching at all").
+I think it would be best to use WARN() on these, rather than WARN_ONCE().  
+That's because these could be called from different parts of the code 
+base, and the stack backtrace will help someone figure out all the code 
+that needs to be fixed.
 
-You seem to be forgetting the "no cached reads" part. It's not
-sufficient to flush after a write - you need to make sure that you
-also don't have a cached copy of the alias for the read.
+Once you do that, this patch is
 
-So "We're not writing through the virtual mapping" is NOT a sufficient
-excuse. If you're reading through the virtual mapping, you need to
-make sure that the virtual mapping is flushed _after_ any writes
-through any other mapping and _before_ any reads through the virtual
-one.
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
-This is why you really really really generally don't want to have
-aliasing. Purely virtual caches are pure crap. Really.
 
-                       Linus
+- Paul
