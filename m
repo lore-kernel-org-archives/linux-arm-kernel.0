@@ -1,36 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 11:12:31 +0000
-Subject: [PATCH 3/6] i2c/pxa2xx: Add PCI support for PXA I2C controller
-In-Reply-To: <20110106105051.GA12146@www.tglx.de>
-References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
-	<1294246263-31960-4-git-send-email-bigeasy@linutronix.de>
-	<20110105230342.GO8638@n2100.arm.linux.org.uk>
-	<20110105230834.GA26399@suse.de>
-	<20110106105051.GA12146@www.tglx.de>
-Message-ID: <20110106111231.GD31708@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 06 Jan 2011 13:19:29 +0200
+Subject: Hit BUG_ON in dma-mapping.c:425
+In-Reply-To: <4D259B9C.6060409@atmel.com>
+References: <4D24A108.2080609@atmel.com>
+	<20110105165551.GE8638@n2100.arm.linux.org.uk>
+	<4D259B9C.6060409@atmel.com>
+Message-ID: <1294312769.2219.7.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 11:50:51AM +0100, Sebastian Andrzej Siewior wrote:
-> which functions are you talking about? I allocated one piece of memory
-> which contained a platform device, ressources, platform data. It looked
-> better than allocating multiple small chunks. I registered it with
-> platform_device_register() and platform_device_unregister() complained
-> about a missing ->release function.
+On Thu, 2011-01-06 at 11:38 +0100, Nicolas Ferre wrote:
+> (I include MTD mailing-list now)
+> 
+> Le 05/01/2011 17:55, Russell King - ARM Linux :
+> > On Wed, Jan 05, 2011 at 05:49:12PM +0100, Nicolas Ferre wrote:
+> >> Hi,
+> >>
+> >> While running mtd_stresstest on a dataflash (atmel_spi 
+> >> + mtd_dataflash drivers) I hit the BUG_ON directive that 
+> >> is at the beginning of ___dma_single_cpu_to_dev() function.
+> >> This function is called from the SPI driver that do a 
+> >> dma_map_single() before DMA operations on the buffer 
+> >> transmitted from upper layers.
+> >>
+> >> It seems that this address is above "high_memory" limit because 
+> >> it is allocated by vmalloc (in mtd_stresstest.c:285)...
+> > 
+> > Well, its telling you is that you're not allowed to DMA to vmalloc
+> > addresses.  Whether that's the fault of the map driver or not is a
+> > question for mtd folk.
+> 
+> So you mean that those vmalloc calls should be changed to kmalloc in
+> MTD like this:
+> 
+> --- a/drivers/mtd/tests/mtd_stresstest.c
+> +++ b/drivers/mtd/tests/mtd_stresstest.c
+> @@ -26,7 +26,6 @@
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/slab.h>
+>  #include <linux/sched.h>
+> -#include <linux/vmalloc.h>
+>  
+>  #define PRINT_PREF KERN_INFO "mtd_stresstest: "
+>  
+> @@ -281,8 +280,8 @@ static int __init mtd_stresstest_init(void)
+>         bufsize = mtd->erasesize * 2;
+>  
+>         err = -ENOMEM;
+> -       readbuf = vmalloc(bufsize);
+> -       writebuf = vmalloc(bufsize);
+> +       readbuf = kmalloc(bufsize, GFP_KERNEL);
+> +       writebuf = kmalloc(bufsize, GFP_KERNEL);
+>         offsets = kmalloc(ebcnt * sizeof(int), GFP_KERNEL);
+>         if (!readbuf || !writebuf || !offsets) {
+>                 printk(PRINT_PREF "error: cannot allocate memory\n");
+> @@ -313,8 +312,8 @@ static int __init mtd_stresstest_init(void)
+>  out:
+>         kfree(offsets);
+>         kfree(bbt);
+> -       vfree(writebuf);
+> -       vfree(readbuf);
+> +       kfree(writebuf);
+> +       kfree(readbuf);
+>         put_mtd_device(mtd);
+>         if (err)
+>                 printk(PRINT_PREF "error %d occurred\n", err);
+> 
+> 
+> I also discovered the same issue while trying to write with "dd"
+> on /dev/mtdblockx
+> 
+> Same vmalloc'ed memory seems to be used in mtdblock_writesect():
+> mtdblk->cache_data = vmalloc(mtdblk->mbd.mtd->erasesize);
+> 
+> I know that using "dd" on a block device is not the common case but it
+> should work instead of not being able to transmit buffer with DMA...
+> So what it implies to switch this to kmalloc? Is it regression-free to
+> do this?
 
-Please see my email where I described the lifetime rules.  Let's say
-your module is removed.  In doing so, you call platform_device_unregister()
-followed by kfree().  After this, your module is removed from the system
-and the memory backing the module code is unmapped.
+Unfortunatelly not. These are about allocating eraseblock-sized buffers,
+which may be as large as 512KiB, and kmalloc can easily fail, this is
+why vmalloc is used.
 
-If something holds a reference to the platform device, then that's just
-waiting for an OOPS to happen.  When those references are finally given
-up, your release function will be called - but the code has been unmapped.
-That's one source of OOPS.  The second source of OOPS is that the platform
-device will be dereferenced, but as you've already kfree'd it, the memory
-could be used for some other purpose - in which case this manipulation of
-what we think is still a platform device is going to corrupt some other
-user.
+What you should do instead is to change the code and make it use smaller
+kmalloc-ed buffers instead, in a loop. Or use an array of pointers, each
+pointing to smaller buffers, and teach mtd to understand them. Then we
+could reuse this infrastructure in UBI and UBIFS and JFFS2 as well.
 
-If it hasn't been re-used, hopefully it's been poisoned, so you'll get
-an OOPS from that instead.
+-- 
+Best Regards,
+Artem Bityutskiy (???????? ?????)
