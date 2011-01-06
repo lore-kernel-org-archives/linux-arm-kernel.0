@@ -1,117 +1,51 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Thu, 6 Jan 2011 00:50:52 +0000
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 6 Jan 2011 09:45:19 +0800
 Subject: [PATCH v3 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110105201502.GK8638@n2100.arm.linux.org.uk>
+In-Reply-To: <20110105175617.GD12222@shareable.org>
 References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
 	<1294236457-17476-9-git-send-email-shawn.guo@freescale.com>
 	<20110105161235.GA2112@gallagher>
 	<20110105164409.GV25121@pengutronix.de>
 	<20110105172501.GB2112@gallagher>
 	<20110105175617.GD12222@shareable.org>
-	<20110105183509.GH8638@n2100.arm.linux.org.uk>
-	<20110105194418.GE12222@shareable.org>
-	<20110105201502.GK8638@n2100.arm.linux.org.uk>
-Message-ID: <20110106005052.GA4476@shareable.org>
+Message-ID: <20110106014518.GA17891@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Wed, Jan 05, 2011 at 07:44:18PM +0000, Jamie Lokier wrote:
-> > 'git show 534be1d5' explains how it works: cpu_relax() flushes buffered
-> > writes from _this_ CPU, so that other CPUs which are polling can make
-> > progress, which avoids this CPU getting stuck if there is an indirect
-> > dependency (no matter how convoluted) between what it's polling and which
-> > it wrote just before.
+On Wed, Jan 05, 2011 at 05:56:17PM +0000, Jamie Lokier wrote:
+> Jamie Iles wrote:
+> > On Wed, Jan 05, 2011 at 05:44:09PM +0100, Uwe Kleine-K?nig wrote:
+> > > Hello Jamie,
+> > > On Wed, Jan 05, 2011 at 04:16:46PM +0000, Jamie Iles wrote:
+> > > > On Wed, Jan 05, 2011 at 10:07:35PM +0800, Shawn Guo wrote:
+> > > > > +	/* check both BUSY and ERROR cleared */
+> > > > > +	while ((__raw_readl(ocotp_base) &
+> > > > > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
+> > > > > +		/* nothing */;
+> > > > 
+> > > > Is it worth using cpu_relax() in these polling loops?
+> > > I don't know what cpu_relax does for other platforms, but on ARM it's
+> > > just a memory barrier which AFAICT doesn't help here at all (which
+> > > doesn't need to be correct).  Why do you think it would be better?
 > > 
-> > So cpu_relax() is *essential* in some polling loops, not a hint.
-> > 
-> > In principle that could happen for I/O polling, if (a) buffered memory
-> > writes are delayed by I/O read transactions, and (b) the device state we're
-> > waiting on depends on I/O yet to be done on another CPU, which could be
-> > polling memory first (e.g. a spinlock).
-> > 
-> > I doubt (a) in practice - but what about buses that block during I/O read?
-> > (I have a chip like that here, but it's ARMv4T.)
+> > Well I don't see that there's anything broken without cpu_relax() but 
+> > using cpu_relax() seems to be the most common way of doing busy polling 
+> > loops that I've seen. It's also a bit easier to read than a comment and 
+> > semi-colon. Perhaps it's just personal preference.
 > 
-> Let's be clear - ARMv5 and below generally are well ordered architectures
-> within the limits of caching.  There are cases where the write buffer
-> allows two writes to pass each other.  However, for IO we generally map
-> these - especially for ARMv4 and below - as 'uncacheable unbufferable'.
-> So on these, if the program says "read this location" the pipeline will
-> stall until the read has been issued - and if you use the result in the
-> next instruction, it will stall until the data is available.  So really,
-> it's not a problem here.
+> cpu_relax() is a hint to the CPU to, for example, save power or be
+> less aggressive on the memory bus (to save power or be fairer).
 > 
-> ARMv6 and above have a weakly ordered memory model with speculative
-> prefetching, so memory reads/writes can be completely unordered.  Device
-> accesses can pass memory accesses, but device accesses are always visible
-> in program order with respect to each other.
+> Currently these architectures do more than just a barrier in cpu_relax():
+> x86, IA64, PowerPC, Tile and S390.
 > 
-> So, if you're spinning in a loop reading an IO device, all previous IO
-> accesses will be completed (in all ARM architectures) before the result
-> of your read is evaluated.
+> Although it's just a hint on ARM at the moment, it might change in
+> future - especially with power mattering on so many ARM systems.
+> (Even now, just changing it to a very short udelay might save power
+> on existing ARMs without breaking drivers.)
+> 
+Sounds reasonable.  I would take the suggestion.  Thanks, both Jamie.
 
-No, that wasn't the scenario - it was:
-
-You're spinning reading an IO device, whose state depends indirectly
-on a *CPU memory* write that is forever buffered.
-
-(Go and re-read 'git show 534be1d5' if you haven't already.)
-
-The indirect dependence is that another CPU needs to see that write
-before it can tell the device to change state in whatever way the
-first CPU is polling for.
-
-It's probably clearer in code:
-
-CPU #1
-
-    spin_lock(&mydev->lock);
-    /* Look at state. */
-    spin_unlock(&mydev->lock);       <-- THIS MEMORY WRITE BUFFERED FOREVER
-
-    /* We expect this to be quick enough that polling is cool. */
-    while (readl(mydev->reg_status) & MYDEV_STATUS_BUSY) {
-        /* If only we had cpu_relax() */
-    }
-
-CPU #2
-
-    spin_lock(&mydev->lock);         <-- STUCK HERE
-    /* Look@state. */
-    spin_unlock(&mydev->lock);
-
-    writel(MYDEV_TRIGGER, mydev->reg_go);   /* Device is BUSY until this. */
-
-The deadlock in this code (might) happen when CPU #2 is waiting for
-the spinlock, and CPU #1's memory write remains in its write buffer
-during CPU #1's polling loop.
-
-If that can happen, it's fixed by adding cpu_relax() - to generic
-driver code with polling loops.
-
-It can only happen if any CPUs (i.e. ARMv6) that buffer writes due to
-prioritising continuous memory reads also have that effect for
-continuous IO reads.  This might even apply to non-ARM archs with
-non-trivial cpu_relax() definitions; I don't know as they don't always
-explain why.
-
-The above driver style isn't particularly obvious, but there are a lot
-of drivers with almost every conceivable access pattern.  If you use
-your imagination, especially if the second code is an interrupt
-handler, it's plausible.  Even though this example would be better
-sleeping and waiting normally - there's nothing inherently forbidden
-about the above pattern (except that cpu_relax() is needed).
-
-> (But, let's make you squirm some more - mb() on ARMv6 and above may
-> equate to a CPU memory barrier _plus_ a few IO accesses to the external
-> L2 cache controller - which will be ordered wrt other IO accesses of
-> course.)
-
-I squirm at all modern ARM architectures.  Omit the slightest highly
-version-specific thing, or run a kernel built with slightly wrong
-config options, and it's fine except for random, very rare memory or
-I/O corruption.  The workarounds and special bits seem to get more and
-more convoluted with each version.
-
--- Jamie
+-- 
+Regards,
+Shawn
