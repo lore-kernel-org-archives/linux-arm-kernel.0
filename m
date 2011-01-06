@@ -1,78 +1,90 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 09:13:01 +0000
-Subject: [PATCH v3 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110106005052.GA4476@shareable.org>
-References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
-	<1294236457-17476-9-git-send-email-shawn.guo@freescale.com>
-	<20110105161235.GA2112@gallagher>
-	<20110105164409.GV25121@pengutronix.de>
-	<20110105172501.GB2112@gallagher>
-	<20110105175617.GD12222@shareable.org>
-	<20110105183509.GH8638@n2100.arm.linux.org.uk>
-	<20110105194418.GE12222@shareable.org>
-	<20110105201502.GK8638@n2100.arm.linux.org.uk>
-	<20110106005052.GA4476@shareable.org>
-Message-ID: <20110106091301.GS8638@n2100.arm.linux.org.uk>
+Date: Thu, 6 Jan 2011 09:20:44 +0000
+Subject: [PATCH 3/6] i2c/pxa2xx: Add PCI support for PXA I2C controller
+In-Reply-To: <20110105230834.GA26399@suse.de>
+References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+	<1294246263-31960-4-git-send-email-bigeasy@linutronix.de>
+	<20110105230342.GO8638@n2100.arm.linux.org.uk>
+	<20110105230834.GA26399@suse.de>
+Message-ID: <20110106092044.GT8638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 12:50:52AM +0000, Jamie Lokier wrote:
-> Russell King - ARM Linux wrote:
-> > On Wed, Jan 05, 2011 at 07:44:18PM +0000, Jamie Lokier wrote:
-> > > 'git show 534be1d5' explains how it works: cpu_relax() flushes buffered
-> > > writes from _this_ CPU, so that other CPUs which are polling can make
-> > > progress, which avoids this CPU getting stuck if there is an indirect
-> > > dependency (no matter how convoluted) between what it's polling and which
-> > > it wrote just before.
-> > > 
-> > > So cpu_relax() is *essential* in some polling loops, not a hint.
-> > > 
-> > > In principle that could happen for I/O polling, if (a) buffered memory
-> > > writes are delayed by I/O read transactions, and (b) the device state we're
-> > > waiting on depends on I/O yet to be done on another CPU, which could be
-> > > polling memory first (e.g. a spinlock).
-> > > 
-> > > I doubt (a) in practice - but what about buses that block during I/O read?
-> > > (I have a chip like that here, but it's ARMv4T.)
+On Wed, Jan 05, 2011 at 03:08:34PM -0800, Greg KH wrote:
+> On Wed, Jan 05, 2011 at 11:03:42PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 05, 2011 at 05:51:00PM +0100, Sebastian Andrzej Siewior wrote:
+> > > +static void plat_dev_release(struct device *dev)
+> > > +{
+> > > +	struct ce4100_i2c_device *sd = container_of(dev,
+> > > +			struct ce4100_i2c_device, pdev.dev);
+> > > +
+> > > +	of_device_node_put(&sd->pdev.dev);
+> > > +}
+> > > +static int add_i2c_device(struct pci_dev *dev, int bar,
+> > > +		struct ce4100_i2c_device *sd)
+> > > +{
+> > > +	struct platform_device *pdev = &sd->pdev;
+> > > +	struct i2c_pxa_platform_data *pdata = &sd->pdata;
+> > ...
+> > > +	pdev->name = "ce4100-i2c";
+> > > +	pdev->dev.release = plat_dev_release;
+> > > +	pdev->dev.parent = &dev->dev;
+> > > +
+> > > +	pdev->dev.platform_data = pdata;
+> > > +	pdev->resource = sd->res;
+> > ...
+> > > +static int __devinit ce4100_i2c_probe(struct pci_dev *dev,
+> > > +		const struct pci_device_id *ent)
+> > > +{
+> > > +	sds = kzalloc(sizeof(*sds), GFP_KERNEL);
+> > > +	if (!sds)
+> > > +		goto err_mem;
+> > > +
+> > > +	pci_set_drvdata(dev, sds);
+> > > +
+> > > +	for (i = 0; i < ARRAY_SIZE(sds->sd); i++) {
+> > > +		ret = add_i2c_device(dev, i, &sds->sd[i]);
+> > > +		if (ret) {
+> > > +			while (--i >= 0)
+> > > +				platform_device_unregister(&sds->sd[i].pdev);
+> > ...
+> > > +static void __devexit ce4100_i2c_remove(struct pci_dev *dev)
+> > ...
+> > > +	for (i = 0; i < ARRAY_SIZE(sds->sd); i++)
+> > > +		platform_device_unregister(&sds->sd[i].pdev);
+> > > +
+> > > +	pci_disable_device(dev);
+> > > +	kfree(sds);
+> > > +}
 > > 
-> > Let's be clear - ARMv5 and below generally are well ordered architectures
-> > within the limits of caching.  There are cases where the write buffer
-> > allows two writes to pass each other.  However, for IO we generally map
-> > these - especially for ARMv4 and below - as 'uncacheable unbufferable'.
-> > So on these, if the program says "read this location" the pipeline will
-> > stall until the read has been issued - and if you use the result in the
-> > next instruction, it will stall until the data is available.  So really,
-> > it's not a problem here.
+> > I see we're still repeating the same mistakes with lifetime rules of
+> > sysfs objects.
 > > 
-> > ARMv6 and above have a weakly ordered memory model with speculative
-> > prefetching, so memory reads/writes can be completely unordered.  Device
-> > accesses can pass memory accesses, but device accesses are always visible
-> > in program order with respect to each other.
-> > 
-> > So, if you're spinning in a loop reading an IO device, all previous IO
-> > accesses will be completed (in all ARM architectures) before the result
-> > of your read is evaluated.
+> > Any struct device which has been registered into the device model can
+> > remain indefinitely live after it's been unregistered (by, eg, if
+> > userspace holds a reference to it via sysfs.)
 > 
-> No, that wasn't the scenario - it was:
-> 
-> You're spinning reading an IO device, whose state depends indirectly
-> on a *CPU memory* write that is forever buffered.
-> 
-> (Go and re-read 'git show 534be1d5' if you haven't already.)
+> Actually this race is almost not possible these days with the rework
+> that Tejun did on sysfs, so it's not easy to test for this anymore.
 
-I know what that's about, and it's about memory based accesses _only_.
+Is it wise to make such a problematical bug harder to trigger without
+completely preventing it triggering?
 
-What you're talking about is a programming error.  Such errors cause
-data corruption if you're talking about DMA stuff.
+A different approach was taken with IRQ handling where people were
+registering handlers before the driver was ready for it to be called -
+request_irq() would explicitly call the handler as soon as it was
+registered to provoke bugs.
 
-At the moment, the solution to that is to put whatever's necessary into
-readl/writel to ensure that they behave as ordered operations with
-respect to everything else.  You'll find that on ARM, writel has a
-barrier before it to ensure memory writes are visible before the device
-write, and on readl there's a barrier to ensure that no memory read can
-happen before the IO device read.
+Surely for these lifetime violations a similar approach should be taken.
+Make the kernel more likely to oops should a violation occur before the
+developer can get the code out the door.  One way I can think of doing
+that is when devices are unregistered but not yet released, place them
+on a list which is periodically scanned, and not only is the device
+dereferenced by also the release function.
 
-cpu_relax() has nothing to do with ensuring ordering with devices.
+When the use count drops to zero, don't immediately release, but wait
+a number of polls.
 
-With relaxed IO operations, the responsibility for ensuring proper ordering
-between memory and IO falls to the programmer.
+If either goes away before the device has been released, then we
+predictably oops, and the developer gets to know about his violation
+of the rules immediately.
