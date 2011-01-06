@@ -1,33 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jan 2011 18:05:30 +0000
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294335614.22825.154.camel@mulgrave.site>
-References: <20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
-	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
-	<1294262208.2952.4.camel@heimdal.trondhjem.org>
-	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
-	<1294268808.2952.18.camel@heimdal.trondhjem.org>
-	<1294270104.16957.73.camel@mulgrave.site>
-	<1294335614.22825.154.camel@mulgrave.site>
-Message-ID: <20110106180530.GI31708@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 06 Jan 2011 10:09:50 -0800
+Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix for
+	undefined reference to 'omap2_prm_read_mod_reg'
+In-Reply-To: <65442ed447ba6e1fc8dab9f9d944c03a@mail.gmail.com> (Santosh
+	Shilimkar's message of "Thu, 6 Jan 2011 20:08:21 +0530")
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+	<1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930248201A7E@dbde02.ent.ti.com>
+	<65442ed447ba6e1fc8dab9f9d944c03a@mail.gmail.com>
+Message-ID: <87wrmhvr81.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 11:40:13AM -0600, James Bottomley wrote:
-> On Wed, 2011-01-05 at 23:28 +0000, James Bottomley wrote:
-> > Can you explain how the code works? it looks to me like you read the xdr
-> > stuff through the vmap region then write it out directly to the pages? 
-> 
-> OK, I think I see how this is supposed to work:  It's a sequential loop
-> of reading in via the pages (i.e. through the kernel mapping) and then
-> updating those pages via the vmap.  In which case, I think this patch is
-> what you need.
-> 
-> The theory of operation is that the readdir on pages actually uses the
-> network DMA operations to perform, so when it's finished, the underlying
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-What network DMA operations - what if your NIC doesn't do DMA because
-it's an SMSC device?
+>> -----Original Message-----
+>> From: Premi, Sanjeev [mailto:premi at ti.com]
+>> Sent: Thursday, January 06, 2011 8:03 PM
+>> To: Shilimkar, Santosh; linux-omap at vger.kernel.org
+>> Cc: Hilman, Kevin; tony at atomide.com; linux-arm-
+>> kernel at lists.infradead.org; Shilimkar, Santosh; Paul Walmsley
+>> Subject: RE: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix
+>> for undefined reference to 'omap2_prm_read_mod_reg'
+>>
+>> > -----Original Message-----
+>> > From: linux-omap-owner at vger.kernel.org
+>> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
+>> > Santosh Shilimkar
+>> > Sent: Wednesday, January 05, 2011 4:27 PM
+>> > To: linux-omap at vger.kernel.org
+>> > Cc: Hilman, Kevin; tony at atomide.com;
+>> > linux-arm-kernel at lists.infradead.org; Shilimkar, Santosh;
+>> > Paul Walmsley
+>> > Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break
+>> > fix for undefined reference to 'omap2_prm_read_mod_reg'
+>>
+>> [snip]
+>>
+>> >
+>> >  #ifndef __ASSEMBLER__
+>> > -
+>> > +/*
+>> > + * Stub omap2xxx/omap3xxx functions so that common files
+>> > + * continue to build when custom builds are used
+>> > + */
+>> > +#if defined(CONFIG_ARCH_OMAP4) &&
+>> > !(defined(CONFIG_ARCH_OMAP2) ||	\
+>> > +					defined(CONFIG_ARCH_OMAP3))
+>> > +static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
+>> > +{
+>> > +	WARN_ONCE(1, "prm: omap2xxx/omap3xxx specific function and "
+>> > +		"not suppose to be used on omap4\n");
+>> > +	return 0;
+>> > +}
+>> Looking forward, the warning of incorrect SOC may be required
+>> for when kernel is build for one specific SOC.
+>>
+>> Wouldn't it be easy/better to have common global function:
+>>
+>> void wrong_soc(char* func, int soc_id)
+>> {
+>> 	WARN_ONCE(1, "Function %s cannot be used for %d", func,
+>> soc_id);
+>> }
+>>
+>> OR we could have soc specific functions e.g.
+>>
+>> void omap2xxx_only (char* func)
+>> {
+>> 	WARN_ONCE(1, "Function %s is specific to OMAP2XXX");
+>> }
+>> ..etc..
+>>
+>> Later these functions can be called from the stubs.
+>>
+>> This is prelim idea, will need to be worked upon.
+>>
+> Not sure. May appear like over engineering considering it's a
+> stub.
+> Paul can comment.
+
+I guess Sanjeev's approach is meant eliminate duplicate strings that
+waste space.
+
+Sanjeev, did you check whether multiple copies of the exact same string
+actually exist in the binary?  I'm wondering if gcc is smart enough to
+only have one copy of the string (but have doubts.)
+
+Kevin
