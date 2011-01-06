@@ -1,38 +1,71 @@
-From: koen@beagleboard.org (Koen Kooi)
-Date: Thu, 6 Jan 2011 20:57:45 +0100
-Subject: [PATCH v3 0/3] OMAP3: beaglexm: GPIO fixes
-In-Reply-To: <1294343679-10605-1-git-send-email-nm@ti.com>
-References: <1294343679-10605-1-git-send-email-nm@ti.com>
-Message-ID: <57D491AC-1370-455D-B425-FB047EB70634@beagleboard.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 6 Jan 2011 21:11:38 +0100
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <20110106160752.GA2775@riccoc20.at.omicron.at>
+References: <1294199462.347935.472473715866.0.gpush@pororo>
+	<1294199462.348449.192344022926.1.gpush@pororo>
+	<20110106160752.GA2775@riccoc20.at.omicron.at>
+Message-ID: <20110106201137.GY25121@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for splitting it up! Now I can work on the patches for xM rev C where the pins changed again :)
+On Thu, Jan 06, 2011 at 05:07:52PM +0100, Richard Cochran wrote:
+> On Wed, Jan 05, 2011 at 11:51:02AM +0800, Jeremy Kerr wrote:
+> 
+> > + * The @lock member provides either a spinlock or a mutex to protect (at least)
+> > + * @enable_count. The type of lock used will depend on @flags; if CLK_ATOMIC is
+> > + * set, then the core clock code will use a spinlock, otherwise a mutex. This
+> > + * lock will be acquired during clk_enable and clk_disable, so for atomic
+> > + * clocks, these ops callbacks must not sleep.
+> > + *
+> > + * The choice of atomic or non-atomic clock depends on how the clock is enabled.
+> > + * Typically, you'll want to use a non-atomic clock. For clocks that need to be
+> > + * enabled/disabled in interrupt context, use CLK_ATOMIC. Note that atomic
+> > + * clocks with parents will typically cascade enable/disable operations to
+> > + * their parent, so the parent of an atomic clock *must* be atomic too.
+> 
+> ...
+> 
+> > +struct clk {
+> > +	const struct clk_ops	*ops;
+> > +	unsigned int		enable_count;
+> > +	int			flags;
+> > +	union {
+> > +		struct mutex	mutex;
+> > +		spinlock_t	spinlock;
+> > +	} lock;
+> > +};
+> 
+> Here you have a "polymorphic" lock, where the clock instance knows
+> which type it is supposed to be.  I got flak from David Miller and
+> others trying to do the same thing with the mdio_bus:
+> 
+>    http://kerneltrap.org/mailarchive/linux-netdev/2010/7/6/6280618
+> 
+> The criticism, applied to your case, is that the clk_enable() caller
+> cannot know whether it is safe to make the call or not. I was told,
+> "there has got to be a better way."
+Note that this is not "new".  Currently there is no convention available
+if clk_enable sleeps or not.  See e.g.
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744
 
-Op 6 jan 2011, om 20:54 heeft Nishanth Menon het volgende geschreven:
+So if there is no consent and you want to introduce common code there is
+no choice.
 
-> Hi,
-> As discussed in the threads:
-> http://thread.gmane.org/gmane.linux.ports.arm.omap/47807/
-> http://marc.info/?t=121540030800004&r=1&w=2
-> 
-> here is the split up series with commit message after discussion:
-> http://www.beagleboard.org/irclogs/index.php?date=2011-01-06#T19:12:21
-> 
-> Koen Kooi (3):
->  omap3: beaglexm: fix EHCI power up GPIO dir
->  omap3: beaglexm: fix DVI reset GPIO
->  omap3: beaglexm: power on DVI
-> 
-> arch/arm/mach-omap2/board-omap3beagle.c |   37 ++++++++++++++++++++++++++----
-> 1 files changed, 32 insertions(+), 5 deletions(-)
-> 
-> v3:
-> 	split up the series, addressed review comments
-> 
-> v2: http://marc.info/?t=129276977900002&r=1&w=2
-> 	Reenable the PMU stat LED
-> v1: http://marc.info/?t=129172571000001&r=1&w=2
-> 
-> Regards,
-> Nishanth Menon
+I don't like it, too.  IMHO clk_enable should be allowed to sleep, but I
+see the concerns of the other camp, too.  If you know the better way
+that has to exists, please tell us.
+
+(Hmm, the way the gpio api does it comes to mind:
+
+	clk_enable_atomic
+	clk_enable_cansleep
+
+(where one of these can be named clk_enable).)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
