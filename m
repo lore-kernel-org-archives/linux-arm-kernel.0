@@ -1,51 +1,65 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 06 Jan 2011 09:03:28 -0800
-Subject: [PATCH] arm: mach-omap2: pm: cleanup !CONFIG_SUSPEND handling
-In-Reply-To: <BC214410FD04D84F9079A62423659707161C0C@008-AM1MPN1-003.mgdnok.nokia.com>
-	(aaro koskinen's message of "Thu, 6 Jan 2011 10:15:50 +0000")
-References: <1293640483-25610-1-git-send-email-aaro.koskinen@nokia.com>
-	<874o9mvpxf.fsf@ti.com>
-	<BC214410FD04D84F9079A62423659707161C0C@008-AM1MPN1-003.mgdnok.nokia.com>
-Message-ID: <87ei8qx8v3.fsf@ti.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 06 Jan 2011 11:40:13 -0600
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <1294270104.16957.73.camel@mulgrave.site>
+References: <1294254337.16957.13.camel@mulgrave.site>
+	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+	<1294256169.16957.18.camel@mulgrave.site>
+	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
+	<1294259637.16957.25.camel@mulgrave.site>
+	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+	<20110105210448.GM8638@n2100.arm.linux.org.uk>
+	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
+	<1294262208.2952.4.camel@heimdal.trondhjem.org>
+	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
+	<1294268808.2952.18.camel@heimdal.trondhjem.org>
+	<1294270104.16957.73.camel@mulgrave.site>
+Message-ID: <1294335614.22825.154.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<aaro.koskinen@nokia.com> writes:
+On Wed, 2011-01-05 at 23:28 +0000, James Bottomley wrote:
+> Can you explain how the code works? it looks to me like you read the xdr
+> stuff through the vmap region then write it out directly to the pages? 
 
-> Hi,
->
-> Kevin Hilman [khilman at ti.com]:
->> Aaro Koskinen <aaro.koskinen@nokia.com> writes:
->>
->> > Make !CONFIG_SUSPEND init declarations identical on all OMAPs and
->> > eliminate some ifdefs.
->> >
->> > Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
->>
->> I like this solution, but it introduces compiler warnings:
->>
->> [...]
->>
->> As you likely noticed, removing the const leads to checkpatch warnings:
->>
->> WARNING: struct platform_suspend_ops should normally be const
->>
->> so the choice is between a checkpatch warning or a bunch of compiler
->> warnings.
->>
->> Alternatively, I just posted a patch[1] to linux-pm propsing to fix this
->> at the source.  Let's see what happens there.  Merging $SUBJECT patch
->> will depend on how this is fixed upstream.
->
-> Sorry, I should have mentioned this when I posted the patch. I was aware of
-> this issue, but I thought this was already fixed in upstream. Check the following
-> commit in linux-next:
->
-> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=2f55ac072f5344519348c0c94b3d2f4cca46847b
->
-> (suspend: constify platform_suspend_ops)
+OK, I think I see how this is supposed to work:  It's a sequential loop
+of reading in via the pages (i.e. through the kernel mapping) and then
+updating those pages via the vmap.  In which case, I think this patch is
+what you need.
 
-ah, thanks.  somehow I missed that one when looking to see if this was
-already fixed.
+The theory of operation is that the readdir on pages actually uses the
+network DMA operations to perform, so when it's finished, the underlying
+page is up to date.  After this you invalidate the vmap range, so we
+have no cache lines above it (so it picks up the values from the
+uptodate page).  Finally, after the operation on the vmap region has
+finished, you flush it so that any updated contents go back to the pages
+themselves before the next iteration begins.
 
-Kevin
+Does this look right to people?  I've verified it fixes the issues on
+parisc.
+
+James
+
+---
+
+diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
+index 996dd89..bde1911 100644
+--- a/fs/nfs/dir.c
++++ b/fs/nfs/dir.c
+@@ -587,12 +587,16 @@ int nfs_readdir_xdr_to_array(nfs_readdir_descriptor_t *desc, struct page *page,
+ 		if (status < 0)
+ 			break;
+ 		pglen = status;
++
++		invalidate_kernel_vmap_range(pages_ptr, pglen);
++
+ 		status = nfs_readdir_page_filler(desc, &entry, pages_ptr, page, pglen);
+ 		if (status < 0) {
+ 			if (status == -ENOSPC)
+ 				status = 0;
+ 			break;
+ 		}
++		flush_kernel_vmap_range(pages_ptr, pglen);
+ 	} while (array->eof_index < 0);
+ 
+ 	nfs_readdir_free_large_page(pages_ptr, pages, array_size);
