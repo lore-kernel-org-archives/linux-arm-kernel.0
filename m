@@ -1,48 +1,66 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu,  6 Jan 2011 13:54:38 -0600
-Subject: [PATCH v3 2/3] omap3: beaglexm: fix DVI reset GPIO
+Date: Thu,  6 Jan 2011 13:54:39 -0600
+Subject: [PATCH v3 3/3] omap3: beaglexm: power on DVI
 In-Reply-To: <1294343679-10605-1-git-send-email-nm@ti.com>
 References: <1294343679-10605-1-git-send-email-nm@ti.com>
-Message-ID: <1294343679-10605-3-git-send-email-nm@ti.com>
+Message-ID: <1294343679-10605-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Koen Kooi <koen@beagleboard.org>
 
-GPIO reset line for Beagle XM is different from vanilla beagle
-so we populate it as part of gpio update routine.
+TFP410 DVI chip is used to provide display out.
+this chip is controlled by 2 lines:
+LDO which supplies the power is controlled over gpio + 2
+and the enable of the chip itself is done over gpio + 1
+NOTE: the LDO is necessary for LED, serial blocks as well.
 
+GPIO + 1 was used to sense USB overcurrent in vanilla beagle
+
+[nm at ti.com: helped split up the patch]
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Koen Kooi <koen@beagleboard.org>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c |   20 +++++++++++++++++---
+ 1 files changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 1b5aa7a..d628f5e 100644
+index d628f5e..7c82730 100644
 --- a/arch/arm/mach-omap2/board-omap3beagle.c
 +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -199,7 +199,7 @@ static struct omap_dss_device beagle_dvi_device = {
- 	.name = "dvi",
- 	.driver_name = "generic_panel",
- 	.phy.dpi.data_lines = 24,
--	.reset_gpio = 170,
-+	.reset_gpio = -EINVAL,
- 	.platform_enable = beagle_enable_dvi,
- 	.platform_disable = beagle_disable_dvi,
- };
-@@ -308,6 +308,12 @@ static int beagle_twl_gpio_setup(struct device *dev,
- 	else
- 		gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0);
+@@ -293,9 +293,10 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	/* REVISIT: need ehci-omap hooks for external VBUS
+ 	 * power switch and overcurrent detect
+ 	 */
+-
+-	gpio_request(gpio + 1, "EHCI_nOC");
+-	gpio_direction_input(gpio + 1);
++	if (omap3_beagle_get_rev() != OMAP3BEAGLE_BOARD_XM) {
++		gpio_request(gpio + 1, "EHCI_nOC");
++		gpio_direction_input(gpio + 1);
++	}
  
-+	/* DVI reset GPIO is different between beagle revisions */
-+	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM)
-+		beagle_dvi_device.reset_gpio = 129;
-+	else
-+		beagle_dvi_device.reset_gpio = 170;
-+
+ 	/*
+ 	 * TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, XM active
+@@ -317,6 +318,19 @@ static int beagle_twl_gpio_setup(struct device *dev,
  	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
  	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+ 
++	/*
++	 * gpio + 1 on Xm controls the TFP410's enable line (active low)
++	 * gpio + 2 control varies depending on the board rev as follows:
++	 * P7/P8 revisions(prototype): Camera EN
++	 * A2+ revisions (production): LDO (supplies DVI, serial, led blocks)
++	 */
++	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
++		gpio_request(gpio + 1, "nDVI_PWR_EN");
++		gpio_direction_output(gpio + 1, 0);
++		gpio_request(gpio + 2, "DVI_LDO_EN");
++		gpio_direction_output(gpio + 2, 1);
++	}
++
+ 	return 0;
+ }
  
 -- 
 1.6.3.3
