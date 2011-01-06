@@ -1,49 +1,137 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 05 Jan 2011 21:25:55 -0800
-Subject: [PATCH] arm: mm: Poison freed init memory
-In-Reply-To: <20110105202645.GL8638@n2100.arm.linux.org.uk>
-References: <1294256845-29517-1-git-send-email-sboyd@codeaurora.org>
-	<20110105202645.GL8638@n2100.arm.linux.org.uk>
-Message-ID: <4D255263.7040106@codeaurora.org>
+From: yong.shen@freescale.com (yong.shen at freescale.com)
+Date: Thu, 6 Jan 2011 13:45:31 +0800
+Subject: [PATCH] ARM i.MX53: enable fec driver on EVK board
+Message-ID: <1294292731-2896-1-git-send-email-yong.shen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2011 12:26 PM, Russell King - ARM Linux wrote:
-> On Wed, Jan 05, 2011 at 11:47:25AM -0800, Stephen Boyd wrote:
->> Poisoning __init marked memory can be useful when tracking down
->> obscure memory corruption bugs. When a pointer is 0xCCCCCCCC in an
->
-> That's a bad idea for a value.  With a 3GB page offset and 256MB or
-> more memory, accesses to such an address will always succeed.
->
-> There's two things to be considered when selecting a possible poison
-> value:
->
-> 1. what value is guaranteed to provoke an undefined instruction exception?
-> 2. what value when used as an address and dereferenced is mostly always
->    going to abort?
->
-> 1 for ARM mode implies an 0xe7fXXXfX value.  For Thumb mode 0xdeXX.  We
-> use this space for breakpoints.
->
-> 2 unfortunately depends on the platform. 
+From: Yong Shen <yong.shen@freescale.com>
 
-A coworker proposed we use a SWI instruction. We could do that if the
-poison is 0xEF and then do something in the SWI handler where that
-number causes us to blow up?
+1. Adjust FEC base address name to fit macro definition
+2. Add platform data and reset function for FEC
 
-If I'm following correctly, point 1 is about __init functions and point
-2 is about __initdata. I'm more concerned about __initdata because
-__init functions called from non __init marked functions are usually
-caught with section mismatch checks. Also, if we're jumping to
-0xCCCCCCCC we're probably not in the text section of the kernel with a
-3GB offset anymore, right? __initdata is easier to reference from
-anywhere (ignoring function pointers) and it would definitely be nice to
-find those invalid accesses quicker. For point 2, perhaps an unaligned
-access would trigger sometimes?
+Signed-off-by: Yong Shen <yong.shen@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_evk.c       |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-mx5/devices-imx53.h        |    4 ++++
+ arch/arm/plat-mxc/devices/Kconfig        |    2 +-
+ arch/arm/plat-mxc/devices/platform-fec.c |    5 +++++
+ arch/arm/plat-mxc/include/mach/mx53.h    |    2 +-
+ 5 files changed, 38 insertions(+), 2 deletions(-)
 
-Swapping the cheese for some cheese flavored poison is better than nothing.
-
+diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+index fa97d0d..b567ff0 100644
+--- a/arch/arm/mach-mx5/board-mx53_evk.c
++++ b/arch/arm/mach-mx5/board-mx53_evk.c
+@@ -21,14 +21,19 @@
+ 
+ #include <linux/init.h>
+ #include <linux/clk.h>
++#include <linux/fec.h>
++#include <linux/delay.h>
+ #include <mach/common.h>
+ #include <mach/hardware.h>
++#include <mach/gpio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx53.h>
+ 
++#define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
++
+ #include "crm_regs.h"
+ #include "devices-imx53.h"
+ 
+@@ -60,11 +65,33 @@ static inline void mx53_evk_init_uart(void)
+ 	imx53_add_imx_uart(2, &mx53_evk_uart_pdata);
+ }
+ 
++static inline void fec_reset(void)
++{
++	int ret;
++
++	/* reset FEC PHY */
++	ret = gpio_request(SMD_FEC_PHY_RST, "fec-phy-reset");
++	if (ret) {
++		printk(KERN_ERR"failed to get GPIO_FEC_PHY_RESET: %d\n", ret);
++		return;
++	}
++	gpio_direction_output(SMD_FEC_PHY_RST, 0);
++	gpio_set_value(SMD_FEC_PHY_RST, 0);
++	msleep(1);
++	gpio_set_value(SMD_FEC_PHY_RST, 1);
++}
++
++static struct fec_platform_data fec_pdata = {
++	.phy = PHY_INTERFACE_MODE_RMII,
++};
++
+ static void __init mx53_evk_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
+ 					ARRAY_SIZE(mx53_evk_pads));
+ 	mx53_evk_init_uart();
++	fec_reset();
++	imx53_add_fec(&fec_pdata);
+ }
+ 
+ static void __init mx53_evk_timer_init(void)
+diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+index 9d0ec25..dbf1989 100644
+--- a/arch/arm/mach-mx5/devices-imx53.h
++++ b/arch/arm/mach-mx5/devices-imx53.h
+@@ -8,6 +8,10 @@
+ #include <mach/mx53.h>
+ #include <mach/devices-common.h>
+ 
++extern const struct imx_fec_data imx53_fec_data __initconst;
++#define imx53_add_fec(pdata)   \
++	imx_add_fec(&imx53_fec_data, pdata)
++
+ extern const struct imx_imx_uart_1irq_data imx53_imx_uart_data[] __initconst;
+ #define imx53_add_imx_uart(id, pdata)	\
+ 	imx_add_imx_uart_1irq(&imx53_imx_uart_data[id], pdata)
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index 2537166..b9ab1d5 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -1,6 +1,6 @@
+ config IMX_HAVE_PLATFORM_FEC
+ 	bool
+-	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51
++	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
+ 
+ config IMX_HAVE_PLATFORM_FLEXCAN
+ 	select HAVE_CAN_FLEXCAN if CAN
+diff --git a/arch/arm/plat-mxc/devices/platform-fec.c b/arch/arm/plat-mxc/devices/platform-fec.c
+index 269ec78..b50c351 100644
+--- a/arch/arm/plat-mxc/devices/platform-fec.c
++++ b/arch/arm/plat-mxc/devices/platform-fec.c
+@@ -36,6 +36,11 @@ const struct imx_fec_data imx51_fec_data __initconst =
+ 	imx_fec_data_entry_single(MX51);
+ #endif
+ 
++#ifdef CONFIG_SOC_IMX53
++const struct imx_fec_data imx53_fec_data __initconst =
++	imx_fec_data_entry_single(MX53);
++#endif
++
+ struct platform_device *__init imx_add_fec(
+ 		const struct imx_fec_data *data,
+ 		const struct fec_platform_data *pdata)
+diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
+index 9577cdb..a35e0c7 100644
+--- a/arch/arm/plat-mxc/include/mach/mx53.h
++++ b/arch/arm/plat-mxc/include/mach/mx53.h
+@@ -136,7 +136,7 @@
+ #define MX53_MIPI_HSC_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000DC000)
+ #define MX53_MLB_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000E4000)
+ #define MX53_SSI3_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000E8000)
+-#define MX53_MXC_FEC_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000EC000)
++#define MX53_FEC_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000EC000)
+ #define MX53_TVE_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000F0000)
+ #define MX53_VPU_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000F4000)
+ #define MX53_SAHARA_BASE_ADDR	(MX53_AIPS2_BASE_ADDR + 0x000F8000)
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
