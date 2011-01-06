@@ -1,67 +1,42 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 06 Jan 2011 15:07:58 -0600
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294338341.22825.216.camel@mulgrave.site>
-References: <20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
-	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
-	<1294262208.2952.4.camel@heimdal.trondhjem.org>
-	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
-	<1294268808.2952.18.camel@heimdal.trondhjem.org>
-	<1294270104.16957.73.camel@mulgrave.site>
-	<1294335614.22825.154.camel@mulgrave.site>
-	<20110106180530.GI31708@n2100.arm.linux.org.uk>
-	<1294337670.22825.199.camel@mulgrave.site>
-	<1294338341.22825.216.camel@mulgrave.site>
-Message-ID: <1294348078.22825.346.camel@mulgrave.site>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 6 Jan 2011 14:14:03 -0800
+Subject: [PATCH] arm: mach-omap2: mux: fix buffer overrun
+In-Reply-To: <1294245733-4126-1-git-send-email-aaro.koskinen@nokia.com>
+References: <1294245733-4126-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20110106221402.GB7771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-06 at 12:25 -0600, James Bottomley wrote:
-> OK, so thinking about this, it seems that the only danger is actually
-> what NFS is doing: reading cache pages via a vmap.  In that case, since
-> the requirement is to invalidate the vmap range to prepare for read, we
-> could have invalidate_kernel_vmap_range loop over the underlying pages
-> and flush them through the kernel alias if the architecture specific
-> flag indicates their contents might be dirty.
-> 
-> The loop adds expense that is probably largely unnecessary to
-> invalidate_kernel_vmap_range() but the alternative is adding to the API
-> proliferation with something that only flushes the kernel pages if the
-> arch specific flag says they're dirty.
+* Aaro Koskinen <aaro.koskinen@nokia.com> [110105 08:39]:
+> memcpy() copies 8 bytes too much (omap_mux_entry vs. omap_mux). Correct
+> by replacing memcpy() with struct assignment, which is safer.
 
-This is what I think the arm patch would look like (example only: I
-can't compile it).  Is something like this too expensive? the loop can't
-be optimised away because of the need to check the pages (and
-vmalloc_to_page is a three level page table lookup).
+Thanks will queue as a fix after the merge window.
 
-James
-
----
-
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 3acd8fa..34469ca 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -414,8 +414,17 @@ static inline void flush_kernel_vmap_range(void *addr, int size)
- }
- static inline void invalidate_kernel_vmap_range(void *addr, int size)
- {
--	if ((cache_is_vivt() || cache_is_vipt_aliasing()))
--	  __cpuc_flush_dcache_area(addr, (size_t)size);
-+	if ((cache_is_vivt() || cache_is_vipt_aliasing())) {
-+		void *cursor = addr;
-+
-+		for ( ; cursor < addr + size; cursor += PAGE_SIZE) {
-+			struct page *page = vmalloc_to_page(cursor);
-+
-+			if (!test_and_set_bit(PG_dcache_clean, &page->flags))
-+				__flush_dcache_page(page_mapping(page), page);
-+		}
-+		__cpuc_flush_dcache_area(addr, (size_t)size);
-+	}
- }
+Tony
  
- #define ARCH_HAS_FLUSH_ANON_PAGE
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+>  arch/arm/mach-omap2/mux.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+> index 17bd639..df8d2f2 100644
+> --- a/arch/arm/mach-omap2/mux.c
+> +++ b/arch/arm/mach-omap2/mux.c
+> @@ -893,7 +893,7 @@ static struct omap_mux * __init omap_mux_list_add(
+>  		return NULL;
+>  
+>  	m = &entry->mux;
+> -	memcpy(m, src, sizeof(struct omap_mux_entry));
+> +	entry->mux = *src;
+>  
+>  #ifdef CONFIG_OMAP_MUX
+>  	if (omap_mux_copy_names(src, m)) {
+> -- 
+> 1.5.6.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
