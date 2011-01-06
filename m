@@ -1,30 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Jan 2011 14:43:26 -0800
-Subject: [PATCH 5/5] omap2+: pm_bus: make functions used as pointers as
-	static
-In-Reply-To: <87zkrg2nfa.fsf@ti.com>
-References: <1294171634-13943-1-git-send-email-nm@ti.com>
-	<1294171634-13943-6-git-send-email-nm@ti.com>
-	<87zkrg2nfa.fsf@ti.com>
-Message-ID: <20110106224326.GC7771@atomide.com>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Thu, 06 Jan 2011 18:17:56 -0500
+Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
+In-Reply-To: <20110106105157.GA9560@oksana.dev.rtsoft.ru>
+References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
+	<4D24B53C.4020009@pobox.com>
+	<AANLkTinxNtzpzUn0=-iph_N7tffM6Nu++J9qNNhcp8pX@mail.gmail.com>
+	<20110106105157.GA9560@oksana.dev.rtsoft.ru>
+Message-ID: <4D264DA4.6040308@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [110104 16:39]:
-> Nishanth Menon <nm@ti.com> writes:
-> 
-> > omap_pm_runtime_suspend and omap_pm_runtime_resume are used
-> > as function pointers and does not really need to be exposed
-> > to the world.
-> >
-> > Fixes sparse warnings:
-> > arch/arm/mach-omap2/pm_bus.c:23:5: warning: symbol 'omap_pm_runtime_suspend' was not declared. Should it be static?
-> > arch/arm/mach-omap2/pm_bus.c:40:5: warning: symbol 'omap_pm_runtime_resume' was not declared. Should it be static?
-> >
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> 
-> Thanks, will queue this one in my pm-fixes branch for 2.6.38-rc.
+On 01/06/2011 05:51 AM, Anton Vorontsov wrote:
+> On Thu, Jan 06, 2011 at 02:43:08PM +0800, Lin Mac wrote:
+> [...]
+>>> It is overkill to rename the entirety of ahci_platform just for one override
+>>> function.
+>>> This sort of thing I would have expected to be added directly to
+>>> ahci_platform.c.
+>> It might be overkill for only one controller. but it is more clean and
+>> readable to have different SoC specific changes in separate files,
+>> especially when more SoCs need to make similar changes.
+>
+> I think that renaming the file is not necessary. You can just
+> rename the module in the makefile.
+>
+> Personally I like the current approach more than putting
+> controller-specific fixups directly into ahci_platform.
 
-I'll take patches 1 - 4.
+My main objection is the renaming.  If ahci_platform wants to export 
+some symbols for SoC modules like ahci_platform_cns, that's ok.
 
-Tony
+In general, follow the library approach rather than linking modules 
+together in strange ways.
+
+	Jeff
