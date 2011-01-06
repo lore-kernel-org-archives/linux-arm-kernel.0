@@ -1,47 +1,33 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 6 Jan 2011 17:07:52 +0100
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <1294199462.348449.192344022926.1.gpush@pororo>
-References: <1294199462.347935.472473715866.0.gpush@pororo>
-	<1294199462.348449.192344022926.1.gpush@pororo>
-Message-ID: <20110106160752.GA2775@riccoc20.at.omicron.at>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Fri, 7 Jan 2011 00:18:08 +0800
+Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
+In-Reply-To: <20110106105157.GA9560@oksana.dev.rtsoft.ru>
+References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
+	<4D24B53C.4020009@pobox.com>
+	<AANLkTinxNtzpzUn0=-iph_N7tffM6Nu++J9qNNhcp8pX@mail.gmail.com>
+	<20110106105157.GA9560@oksana.dev.rtsoft.ru>
+Message-ID: <AANLkTimWYUnO_MkawaOpJX3Sm9YZHsECgmotiNwkb8mN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 05, 2011 at 11:51:02AM +0800, Jeremy Kerr wrote:
+2011/1/6 Anton Vorontsov <cbouatmailru@gmail.com>:
+> On Thu, Jan 06, 2011 at 02:43:08PM +0800, Lin Mac wrote:
+> [...]
+>> > It is overkill to rename the entirety of ahci_platform just for one override
+>> > function.
+>> > This sort of thing I would have expected to be added directly to
+>> > ahci_platform.c.
+>> It might be overkill for only one controller. but it is more clean and
+>> readable to have different SoC specific changes in separate files,
+>> especially when more SoCs need to make similar changes.
+> I think that renaming the file is not necessary. You can just
+> rename the module in the makefile.
+That is for consist end user experience. I wouldn't like to find my
+script not working anymore when changing to some linux version, simply
+because someone fix some issue on some platform I'm not using.
 
-> + * The @lock member provides either a spinlock or a mutex to protect (at least)
-> + * @enable_count. The type of lock used will depend on @flags; if CLK_ATOMIC is
-> + * set, then the core clock code will use a spinlock, otherwise a mutex. This
-> + * lock will be acquired during clk_enable and clk_disable, so for atomic
-> + * clocks, these ops callbacks must not sleep.
-> + *
-> + * The choice of atomic or non-atomic clock depends on how the clock is enabled.
-> + * Typically, you'll want to use a non-atomic clock. For clocks that need to be
-> + * enabled/disabled in interrupt context, use CLK_ATOMIC. Note that atomic
-> + * clocks with parents will typically cascade enable/disable operations to
-> + * their parent, so the parent of an atomic clock *must* be atomic too.
+> Personally I like the current approach more than putting
+> controller-specific fixups directly into ahci_platform.
 
-...
-
-> +struct clk {
-> +	const struct clk_ops	*ops;
-> +	unsigned int		enable_count;
-> +	int			flags;
-> +	union {
-> +		struct mutex	mutex;
-> +		spinlock_t	spinlock;
-> +	} lock;
-> +};
-
-Here you have a "polymorphic" lock, where the clock instance knows
-which type it is supposed to be.  I got flak from David Miller and
-others trying to do the same thing with the mdio_bus:
-
-   http://kerneltrap.org/mailarchive/linux-netdev/2010/7/6/6280618
-
-The criticism, applied to your case, is that the clk_enable() caller
-cannot know whether it is safe to make the call or not. I was told,
-"there has got to be a better way."
-
-Richard
+Best Regards,
+Mac Lin.
