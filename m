@@ -1,38 +1,56 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Jan 2011 14:09:52 +0000
-Subject: [PATCH v2 1/8] MTD: Add integrator-flash feature to physmap
+Date: Fri,  7 Jan 2011 14:09:58 +0000
+Subject: [PATCH v2 7/8] ARM: aaec2000: Use physmap driver instead of
+	integrator-flash
 In-Reply-To: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
 References: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1294409399-19245-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1294409399-19245-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the process of moving platforms away from integrator-flash
-(aka armflash), add optionnal probing for the AFS partition type.
-
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Nicolas Bellido <ml@acolin.be>
 ---
- drivers/mtd/maps/physmap.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/mach-aaec2000/core.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/maps/physmap.c b/drivers/mtd/maps/physmap.c
-index 4c18b98..221354d 100644
---- a/drivers/mtd/maps/physmap.c
-+++ b/drivers/mtd/maps/physmap.c
-@@ -79,7 +79,11 @@ static const char *rom_probe_types[] = {
- 					"map_rom",
- 					NULL };
- #ifdef CONFIG_MTD_PARTITIONS
--static const char *part_probe_types[] = { "cmdlinepart", "RedBoot", NULL };
-+static const char *part_probe_types[] = { "cmdlinepart", "RedBoot",
-+#ifdef CONFIG_MTD_AFS_PARTS
-+					  "afs",
-+#endif
-+					  NULL };
- #endif
+diff --git a/arch/arm/mach-aaec2000/core.c b/arch/arm/mach-aaec2000/core.c
+index 3ef6833..100707c 100644
+--- a/arch/arm/mach-aaec2000/core.c
++++ b/arch/arm/mach-aaec2000/core.c
+@@ -21,12 +21,12 @@
+ #include <linux/signal.h>
+ #include <linux/clk.h>
+ #include <linux/gfp.h>
++#include <linux/mtd/physmap.h>
  
- static int physmap_flash_probe(struct platform_device *dev)
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+ #include <asm/sizes.h>
+ 
+-#include <asm/mach/flash.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
+@@ -260,8 +260,7 @@ void __init aaec2000_set_clcd_plat_data(struct aaec2000_clcd_info *clcd)
+ 	memcpy(&mach_clcd_panel, &clcd->panel, sizeof(struct clcd_panel));
+ }
+ 
+-static struct flash_platform_data aaec2000_flash_data = {
+-	.map_name	= "cfi_probe",
++static struct physmap_flash_data aaec2000_flash_data = {
+ 	.width		= 4,
+ };
+ 
+@@ -272,7 +271,7 @@ static struct resource aaec2000_flash_resource = {
+ };
+ 
+ static struct platform_device aaec2000_flash_device = {
+-	.name		= "armflash",
++	.name		= "physmap-flash",
+ 	.id		= 0,
+ 	.dev		= {
+ 		.platform_data	= &aaec2000_flash_data,
 -- 
 1.7.0.4
