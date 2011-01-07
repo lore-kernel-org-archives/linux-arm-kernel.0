@@ -1,34 +1,32 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Jan 2011 14:09:57 +0000
-Subject: [PATCH v2 6/8] ARM: Integrator/CP: Use physmap driver instead of
+Date: Fri,  7 Jan 2011 14:09:56 +0000
+Subject: [PATCH v2 5/8] ARM: Integrator/AP: Use physmap driver instead of
 	integrator-flash
 In-Reply-To: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
 References: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1294409399-19245-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1294409399-19245-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Tested with an ARM-1136 core tile.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mach-integrator/integrator_cp.c |   35 +++++------------------------
- 1 files changed, 6 insertions(+), 29 deletions(-)
+ arch/arm/mach-integrator/integrator_ap.c |   46 ++++++++++-------------------
+ 1 files changed, 16 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 85e48a5..a9a10f8 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -22,6 +22,7 @@
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 2774df8..f5b22a3 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -31,6 +31,7 @@
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
  #include <linux/io.h>
- #include <linux/gfp.h>
- #include <linux/clkdev.h>
 +#include <linux/mtd/physmap.h>
  
  #include <mach/hardware.h>
  #include <mach/platform.h>
-@@ -35,7 +36,6 @@
+@@ -43,7 +44,6 @@
  #include <mach/lm.h>
  
  #include <asm/mach/arch.h>
@@ -36,62 +34,80 @@ index 85e48a5..a9a10f8 100644
  #include <asm/mach/irq.h>
  #include <asm/mach/map.h>
  #include <asm/mach/time.h>
-@@ -316,43 +316,20 @@ static struct clk_lookup cp_lookups[] = {
- /*
-  * Flash handling.
-  */
--static int intcp_flash_init(void)
--{
--	u32 val;
+@@ -247,51 +247,37 @@ device_initcall(irq_init_sysfs);
+ #define EBI_CSR1 (VA_EBI_BASE + INTEGRATOR_EBI_CSR1_OFFSET)
+ #define EBI_LOCK (VA_EBI_BASE + INTEGRATOR_EBI_LOCK_OFFSET)
+ 
+-static int ap_flash_init(void)
++static void ap_flash_set_vpp(struct map_info *map, int on)
+ {
++	unsigned long reg;
++	int needs_lock;
+ 	u32 tmp;
+ 
+ 	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
 -
--	val = readl(INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
--	val |= CINTEGRATOR_FLASHPROG_FLWREN;
--	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
+-	tmp = readl(EBI_CSR1) | INTEGRATOR_EBI_WRITE_ENABLE;
+-	writel(tmp, EBI_CSR1);
 -
+-	if (!(readl(EBI_CSR1) & INTEGRATOR_EBI_WRITE_ENABLE)) {
+-		writel(0xa05f, EBI_LOCK);
+-		writel(tmp, EBI_CSR1);
+-		writel(0, EBI_LOCK);
++	tmp = readl(EBI_CSR1);
++
++	if (on) {
++		reg = SC_CTRLS;
++		tmp |= INTEGRATOR_EBI_WRITE_ENABLE;
++	} else {
++		reg = SC_CTRLC;
++		tmp &= ~INTEGRATOR_EBI_WRITE_ENABLE;
+ 	}
 -	return 0;
 -}
--
--static void intcp_flash_exit(void)
+ 
+-static void ap_flash_exit(void)
 -{
--	u32 val;
+-	u32 tmp;
 -
--	val = readl(INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
--	val &= ~(CINTEGRATOR_FLASHPROG_FLVPPEN|CINTEGRATOR_FLASHPROG_FLWREN);
--	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
+-	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
+-
+-	tmp = readl(EBI_CSR1) & ~INTEGRATOR_EBI_WRITE_ENABLE;
+ 	writel(tmp, EBI_CSR1);
+ 
+-	if (readl(EBI_CSR1) & INTEGRATOR_EBI_WRITE_ENABLE) {
++	needs_lock = !!on ^ !!(readl(EBI_CSR1) & INTEGRATOR_EBI_WRITE_ENABLE);
++	if (needs_lock) {
+ 		writel(0xa05f, EBI_LOCK);
+ 		writel(tmp, EBI_CSR1);
+ 		writel(0, EBI_LOCK);
+ 	}
 -}
 -
--static void intcp_flash_set_vpp(int on)
-+static void intcp_flash_set_vpp(struct map_info *map, int on)
- {
- 	u32 val;
+-static void ap_flash_set_vpp(int on)
+-{
+-	unsigned long reg = on ? SC_CTRLS : SC_CTRLC;
  
- 	val = readl(INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
- 	if (on)
--		val |= CINTEGRATOR_FLASHPROG_FLVPPEN;
-+		val |= CINTEGRATOR_FLASHPROG_FLVPPEN | CINTEGRATOR_FLASHPROG_FLWREN;
- 	else
--		val &= ~CINTEGRATOR_FLASHPROG_FLVPPEN;
-+		val &= ~(CINTEGRATOR_FLASHPROG_FLVPPEN | CINTEGRATOR_FLASHPROG_FLWREN);
- 	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
+ 	writel(INTEGRATOR_SC_CTRL_nFLVPPEN, reg);
  }
  
--static struct flash_platform_data intcp_flash_data = {
+-static struct flash_platform_data ap_flash_data = {
 -	.map_name	= "cfi_probe",
-+static struct physmap_flash_data intcp_flash_data = {
++static struct physmap_flash_data ap_flash_data = {
  	.width		= 4,
--	.init		= intcp_flash_init,
--	.exit		= intcp_flash_exit,
- 	.set_vpp	= intcp_flash_set_vpp,
+-	.init		= ap_flash_init,
+-	.exit		= ap_flash_exit,
+ 	.set_vpp	= ap_flash_set_vpp,
  };
  
-@@ -363,7 +340,7 @@ static struct resource intcp_flash_resource = {
+@@ -302,7 +288,7 @@ static struct resource cfi_flash_resource = {
  };
  
- static struct platform_device intcp_flash_device = {
+ static struct platform_device cfi_flash_device = {
 -	.name		= "armflash",
 +	.name		= "physmap-flash",
  	.id		= 0,
  	.dev		= {
- 		.platform_data	= &intcp_flash_data,
+ 		.platform_data	= &ap_flash_data,
 -- 
 1.7.0.4
