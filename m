@@ -1,58 +1,41 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 07 Jan 2011 13:05:28 -0800
-Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build
-	break because of clktrctrl_mask
-In-Reply-To: <3f76fc53e9b50d75480bcfe1d2b6312e@mail.gmail.com> (Rajendra
-	Nayak's message of "Fri, 7 Jan 2011 14:10:50 +0530")
+Date: Fri, 07 Jan 2011 13:14:07 -0800
+Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix for
+	undefined reference to 'omap2_prm_read_mod_reg'
+In-Reply-To: <e194160102cb8b695465c81eea6582fc@mail.gmail.com> (Santosh
+	Shilimkar's message of "Fri, 7 Jan 2011 16:44:05 +0530")
 References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
-	<87fwt7z1p3.fsf@ti.com>
-	<alpine.DEB.2.00.1101061059590.22048@utopia.booyaka.com>
-	<87ipy1vqdi.fsf@ti.com>
-	<3f76fc53e9b50d75480bcfe1d2b6312e@mail.gmail.com>
-Message-ID: <874o9ko25j.fsf@ti.com>
+	<1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1101061056340.22048@utopia.booyaka.com>
+	<e194160102cb8b695465c81eea6582fc@mail.gmail.com>
+Message-ID: <87r5comn6o.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-[...]
+[...] 
 
-> Just another trivial fix.
->
-> From bb46b74d2b0ab3d35e72b760da7e123a891e6813 Mon Sep 17 00:00:00 2001
-> From: Rajendra Nayak <rnayak@ti.com>
-> Date: Fri, 7 Jan 2011 14:07:25 +0530
-> Subject: [PATCH] OMAP: powerdomain: remove unused func declaration
->
-> Trivial fix to remove the unused function declaration
-> from the powerdomain header.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/mach-omap2/powerdomain.h |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.h
-> b/arch/arm/mach-omap2/powerdomain.h
-> index c66431e..0b7a357 100644
-> --- a/arch/arm/mach-omap2/powerdomain.h
-> +++ b/arch/arm/mach-omap2/powerdomain.h
-> @@ -165,7 +165,6 @@ struct pwrdm_ops {
->  	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
->  };
->
-> -void pwrdm_fw_init(void);
->  void pwrdm_init(struct powerdomain **pwrdm_list, struct pwrdm_ops
-> *custom_funcs);
+>> I think it would be best to use WARN() on these, rather than
+>> WARN_ONCE().  That's because these could be called from different
+>> parts of the code base, and the stack backtrace will help someone
+>> figure out all the code that needs to be fixed.
+>>
+>> Once you do that, this patch is
+>>
+>> Acked-by: Paul Walmsley <paul@pwsan.com>
+>>
 
-Note this is line-wrapped. 
+> With WARN() instead of WARN_ONCE() and Paul's ack, here
+> is an updated patch.
 
-Looks like you need to get get-send-email setup so you can avoid having
-the patch sending problems.
+Thanks, will queue for .38-rc cycle.
 
->
->  struct powerdomain *pwrdm_lookup(const char *name);
+I'll again plead for working on your git-send-email setup.  It looks
+like your using outlook.  The inline patch is wrapped (as outlook almost
+always does.)  The attached version applied fine, but the strong
+preference is for a single inline patch.  
 
-In any case, with Paul's ack, I can queue this with the others.
+Thanks,
 
 Kevin
