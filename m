@@ -1,69 +1,48 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Wed, 05 Jan 2011 13:05:36 -0600
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-Message-ID: <1294254337.16957.13.camel@mulgrave.site>
+From: stanley.miao@windriver.com (stanley.miao)
+Date: Fri, 7 Jan 2011 17:38:11 +0800
+Subject: [PATCH V3 42/63] ST SPEAr: replace readl, writel with	__raw_readl,
+	__raw_writel in uncompress.h
+In-Reply-To: <20110107091720.GM31708@n2100.arm.linux.org.uk>
+References: <cover.1292833228.git.viresh.kumar@st.com>
+	<73a77c388f8d151ce5bc70000832fbb518babe3b.1292833229.git.viresh.kumar@st.com>
+	<4D2679D1.3080005@windriver.com>
+	<20110107091720.GM31708@n2100.arm.linux.org.uk>
+Message-ID: <4D26DF03.6050805@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[sorry for the unthreaded insertion.  We're seeing this on parisc too]
+Russell King - ARM Linux wrote:
+> On Fri, Jan 07, 2011 at 10:26:25AM +0800, stanley.miao wrote:
+>   
+>> Viresh Kumar wrote:
+>>     
+>>> readl also calls outer cache maintainance operations 
+>>>       
+>> I use readl here on spear13xx. It works fine.
+>> This is the definition of readl, could you tell me which code calls  
+>> outer cache maintainance ?
+>>
+>> #define readl(c) ({ __u32 __v = le32_to_cpu((__force __le32) \
+>>                                        __raw_readl(__mem_pci(c))); __v; })
+>>     
+>
+> #define readl(c)                ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+>
+> is how it's now defined, and __iormb() is defined to be rmb() on ARMv7+,
+> which translates to a dmb.
+>
+> writel() on the other hand is less straight forward.  It uses __iowmb()
+> which translates to a wmb() on ARMv7+, which is a dsb and an outer cache
+> sync operation.  This will fail in the decompressor code as there's no
+> outer cache support there.
+>
+>   
+Hi, Russell, Thanks for your patient explanation.
 
-> On Wed, Jan 05, 2011 at 10:14:17AM -0500, Trond Myklebust wrote:
-> > OK. So,the new behaviour in 2.6.37 is that we're writing to a series of
-> > pages via the usual kmap_atomic()/kunmap_atomic() and kmap()/kunmap()
-> > interfaces, but we can end up reading them via a virtual address range
-> > that gets set up via vm_map_ram() (that range gets set up before the
-> > write occurs).
-> 
-> kmap of lowmem pages will always reuses the existing kernel direct
-> mapping, so there won't be a problem there.
-> 
-> > Do we perhaps need an invalidate_kernel_vmap_range() before we can read
-> > the data on ARM in this kind of scenario?
-> 
-> Firstly, vm_map_ram() does no cache maintainence of any sort, nor does
-> it take care of page colouring - so any architecture where cache aliasing
-> can occur will see this problem.  It should not limited to ARM.
-> 
-> Secondly, no, invalidate_kernel_vmap_range() probably isn't sufficient.
-> There's two problems here:
-> 
-> 	addr = kmap(lowmem_page);
-> 	*addr = stuff;
-> 	kunmap(lowmem_page);
-> 
-> Such lowmem pages are accessed through their kernel direct mapping.
-> 
-> 	ptr = vm_map_ram(lowmem_page);
-> 	read = *ptr;
-> 
-> This creates a new mapping which can alias with the kernel direct mapping.
-> Now, as this is a new mapping, there should be no cache lines associated
-> with it.  (Looking at vm_unmap_ram(), it calls free_unmap_vmap_area_addr(),
-> free_unmap_vmap_area(), which then calls flush_cache_vunmap() on the
-> region.  vb_free() also calls flush_cache_vunmap() too.)
-> 
-> If the write after kmap() hits an already present cache line, the cache
-> line will be updated, but it won't be written back to memory.  So, on
-> a subsequent vm_map_ram(), with any kind of aliasing cache, there's
-> no guarantee that you'll hit that cache line and read the data just
-> written there.
-> 
-> The kernel direct mapping would need to be flushed.
-> 
-> I'm really getting to the point of hating the poliferation of RAM
-> remapping interfaces - it's going to (and is) causing nothing but lots
-> of pain on virtual cache architectures, needing more and more cache
-> flushing interfaces to be created.
-> 
-> Is there any other solution to this?
+With this in mind, I think readl_relaxed() should be better here.
 
-I think the solution for the kernel direct mapping problem is to take
-the expected flushes and invalidates into kmap/kunmap[_atomic].  I think
-the original reason for not doing this was efficiency:  the user should
-know what they did with the data (i.e. if they're only reading it, it
-doesn't need to be flushed on unmap).  However, the difficulty of
-getting all this right seems to outweigh the efficiency of only using
-the necessary flushing.  At least on some architectures, we can look at
-the TLB flags to see if the page was dirtied (and only flush if it was).
+Stanley.
 
-James
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110107/26ec7e42/attachment-0001.html>
