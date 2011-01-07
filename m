@@ -1,50 +1,81 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 7 Jan 2011 10:32:28 -0800
-Subject: [PATCH V2] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <4D26D55D.4010600@st.com>
-References: <137dfad4a093ea0ac80396f5eb7fbf0c382be698.1294314772.git.viresh.kumar@st.com>
-	<20110106184840.GA21672@kroah.com> <4D26D55D.4010600@st.com>
-Message-ID: <20110107183228.GB14638@kroah.com>
+From: Trond.Myklebust@netapp.com (Trond Myklebust)
+Date: Fri, 07 Jan 2011 13:53:25 -0500
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
+References: <1294254337.16957.13.camel@mulgrave.site>
+	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+	<1294256169.16957.18.camel@mulgrave.site>
+	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
+	<1294259637.16957.25.camel@mulgrave.site>
+	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+	<20110105210448.GM8638@n2100.arm.linux.org.uk>
+	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
+	<1294262208.2952.4.camel@heimdal.trondhjem.org>
+	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
+	<1294268808.2952.18.camel@heimdal.trondhjem.org>
+	<1294270104.16957.73.camel@mulgrave.site>
+	<1294335614.22825.154.camel@mulgrave.site>
+	<1294336054.2905.1.camel@heimdal.trondhjem.org>
+	<AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
+Message-ID: <1294426405.2929.23.camel@heimdal.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 07, 2011 at 02:27:01PM +0530, pratyush wrote:
-> On 1/7/2011 12:18 AM, Greg KH wrote:
-> > On Thu, Jan 06, 2011 at 05:29:10PM +0530, Viresh Kumar wrote:
-> >> From: Pratyush Anand <pratyush.anand@st.com>
-> >>
-> >> This is a configurable gadget. can be configured by sysfs interface. Any
-> >> IP available at PCIE bus can be programmed to be used by host
-> >> controller.It supoorts both INTX and MSI.
-> >> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
-> >> with size 0x1000
-> >>
-> >> Changes since V1:
-> >> - __iomem added for register addresses
-> >> - kerneldoc comment removed whereever not required.
-> >> - help node moved from sysfs to documentation/misc-devices
-> >> - strict_strtoul used instead of sscanf
-> >>
-> >> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> >> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> >> ---
-> >>  Documentation/misc-devices/spear-pcie-gadget.txt |  125 ++++
-> > 
-> > New sysfs entries require updates to the Documentation/ABI/ directory
-> > for them.
-> > 
-> > Please rework the patch to include these entries.
-> > 
+On Thu, 2011-01-06 at 09:55 -0800, Linus Torvalds wrote: 
+> On Thu, Jan 6, 2011 at 9:47 AM, Trond Myklebust
+> <Trond.Myklebust@netapp.com> wrote:
+> >
+> > Why is this line needed? We're not writing through the virtual mapping.
 > 
-> Ok..will send [Patch V3] with these modifications.
-> But, are these rework needed if I move this interface to configfs
-> as you have suggested below.
-> Or is there some different directory where documentation for configfs
-> node can be mentioned?
+> I haven't looked at the sequence of accesses, but you need to be
+> _very_ aware that "write-through" is absolutely NOT sufficient for
+> cache coherency.
+> 
+> In cache coherency, you have three options:
+> 
+>  - true coherency (eg physically indexed/tagged caches)
+> 
+>  - exclusion (eg virtual caches, but with an exclusion guarantee that
+> guarantees that aliases cannot happen: either by using physical
+> tagging or by not allowing cases that could cause virtual aliases)
+> 
+>  - write-through AND non-cached reads (ie "no caching at all").
+> 
+> You seem to be forgetting the "no cached reads" part. It's not
+> sufficient to flush after a write - you need to make sure that you
+> also don't have a cached copy of the alias for the read.
+> 
+> So "We're not writing through the virtual mapping" is NOT a sufficient
+> excuse. If you're reading through the virtual mapping, you need to
+> make sure that the virtual mapping is flushed _after_ any writes
+> through any other mapping and _before_ any reads through the virtual
+> one.
 
-Nope, same directory, you are still creating a user/kernel ABI by using
-configfs right?  It needs to be documented just as well.
+I'm aware of that. That part should be taken care of by the call to
+invalidate_kernel_vmap_range() which was in both James and my patch.
 
-thanks,
+There is already code in the SUNRPC layer that calls flush_dcache_page()
+after writing (although as Russell pointed out earlier, that is
+apparently a no-op for non-page cache pages such as these).
 
-greg k-h
+> This is why you really really really generally don't want to have
+> aliasing. Purely virtual caches are pure crap. Really.
+
+Well, it looks as if NOMMU is giving us problems due to the lack of a
+vm_map_ram() (see https://bugzilla.kernel.org/show_bug.cgi?id=26262).
+
+I'd still like to keep the existing code for those architectures that
+don't have problems, since that allows us to send 32k READDIR requests
+instead of being limited to 4k. For large directories, that is a clear
+win.
+For the NOMMU case we will just go back to using a single page for
+storage (and 4k READDIR requests only). Should I just do the same for
+architectures like ARM and PARISC?
+
+-- 
+Trond Myklebust
+Linux NFS client maintainer
+
+NetApp
+Trond.Myklebust at netapp.com
+www.netapp.com
