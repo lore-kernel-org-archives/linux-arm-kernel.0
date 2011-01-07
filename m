@@ -1,32 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Jan 2011 09:17:20 +0000
-Subject: [PATCH V3 42/63] ST SPEAr: replace readl, writel with
-	__raw_readl, __raw_writel in uncompress.h
-In-Reply-To: <4D2679D1.3080005@windriver.com>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<73a77c388f8d151ce5bc70000832fbb518babe3b.1292833229.git.viresh.kumar@st.com>
-	<4D2679D1.3080005@windriver.com>
-Message-ID: <20110107091720.GM31708@n2100.arm.linux.org.uk>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Fri, 7 Jan 2011 17:21:00 +0800
+Subject: [PATCH 1/1] arm: mxc: move IOMUX_CONFIG_SION definition to
+	iomux-v3.h
+In-Reply-To: <1294311939-15503-1-git-send-email-richard.zhao@freescale.com>
+References: <1294311939-15503-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <AANLkTinCEwZg7FRNzjAghoWsaWO0_viXEe9Jf6vXLQi8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 07, 2011 at 10:26:25AM +0800, stanley.miao wrote:
-> Viresh Kumar wrote:
->> readl also calls outer cache maintainance operations 
+Hi Sascha,
+On Thu, Jan 6, 2011 at 7:05 PM, Richard Zhao <richard.zhao@freescale.com> wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Will you accept this patch?
+
+Thanks
+Richard
+> ---
+> ?arch/arm/plat-mxc/include/mach/iomux-mx53.h | ? ?1 -
+> ?arch/arm/plat-mxc/include/mach/iomux-v3.h ? | ? ?1 +
+> ?2 files changed, 1 insertions(+), 1 deletions(-)
 >
-> I use readl here on spear13xx. It works fine.
-> This is the definition of readl, could you tell me which code calls  
-> outer cache maintainance ?
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> index 5deee01..2673007 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> @@ -34,7 +34,6 @@ typedef enum iomux_config {
+> ? ? ? ?IOMUX_CONFIG_ALT6,
+> ? ? ? ?IOMUX_CONFIG_ALT7,
+> ? ? ? ?IOMUX_CONFIG_GPIO, /* added to help user use GPIO mode */
+> - ? ? ? IOMUX_CONFIG_SION = 0x1 << 4, /* LOOPBACK:MUX SION bit */
+> ?} iomux_pin_cfg_t;
 >
-> #define readl(c) ({ __u32 __v = le32_to_cpu((__force __le32) \
->                                        __raw_readl(__mem_pci(c))); __v; })
-
-#define readl(c)                ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-
-is how it's now defined, and __iormb() is defined to be rmb() on ARMv7+,
-which translates to a dmb.
-
-writel() on the other hand is less straight forward.  It uses __iowmb()
-which translates to a wmb() on ARMv7+, which is a dsb and an outer cache
-sync operation.  This will fail in the decompressor code as there's no
-outer cache support there.
+> ?/* These 2 defines are for pins that may not have a mux register, but could
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> index 2277b01..82620af 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> @@ -105,6 +105,7 @@ typedef u64 iomux_v3_cfg_t;
+> ?#define PAD_CTL_SRE_FAST ? ? ? ? ? ? ? (1 << 0)
+> ?#define PAD_CTL_SRE_SLOW ? ? ? ? ? ? ? (0 << 0)
+>
+> +#define IOMUX_CONFIG_SION ? ? ? ? ? ? ?(0x1 << 4)
+>
+> ?#define MX51_NUM_GPIO_PORT ? ? 4
+>
+> --
+> 1.6.3.3
+>
+>
+>
