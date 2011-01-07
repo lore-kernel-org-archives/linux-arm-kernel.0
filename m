@@ -1,14 +1,8 @@
-From: Trond.Myklebust@netapp.com (Trond Myklebust)
-Date: Fri, 07 Jan 2011 13:53:25 -0500
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jan 2011 19:02:29 +0000
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
-References: <1294254337.16957.13.camel@mulgrave.site>
-	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
-	<1294256169.16957.18.camel@mulgrave.site>
-	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
-	<1294259637.16957.25.camel@mulgrave.site>
-	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
-	<20110105210448.GM8638@n2100.arm.linux.org.uk>
+In-Reply-To: <1294426405.2929.23.camel@heimdal.trondhjem.org>
+References: <20110105210448.GM8638@n2100.arm.linux.org.uk>
 	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
 	<1294262208.2952.4.camel@heimdal.trondhjem.org>
 	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
@@ -17,65 +11,26 @@ References: <1294254337.16957.13.camel@mulgrave.site>
 	<1294335614.22825.154.camel@mulgrave.site>
 	<1294336054.2905.1.camel@heimdal.trondhjem.org>
 	<AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
-Message-ID: <1294426405.2929.23.camel@heimdal.trondhjem.org>
+	<1294426405.2929.23.camel@heimdal.trondhjem.org>
+Message-ID: <20110107190229.GX31708@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-06 at 09:55 -0800, Linus Torvalds wrote: 
-> On Thu, Jan 6, 2011 at 9:47 AM, Trond Myklebust
-> <Trond.Myklebust@netapp.com> wrote:
-> >
-> > Why is this line needed? We're not writing through the virtual mapping.
-> 
-> I haven't looked at the sequence of accesses, but you need to be
-> _very_ aware that "write-through" is absolutely NOT sufficient for
-> cache coherency.
-> 
-> In cache coherency, you have three options:
-> 
->  - true coherency (eg physically indexed/tagged caches)
-> 
->  - exclusion (eg virtual caches, but with an exclusion guarantee that
-> guarantees that aliases cannot happen: either by using physical
-> tagging or by not allowing cases that could cause virtual aliases)
-> 
->  - write-through AND non-cached reads (ie "no caching at all").
-> 
-> You seem to be forgetting the "no cached reads" part. It's not
-> sufficient to flush after a write - you need to make sure that you
-> also don't have a cached copy of the alias for the read.
-> 
-> So "We're not writing through the virtual mapping" is NOT a sufficient
-> excuse. If you're reading through the virtual mapping, you need to
-> make sure that the virtual mapping is flushed _after_ any writes
-> through any other mapping and _before_ any reads through the virtual
-> one.
+On Fri, Jan 07, 2011 at 01:53:25PM -0500, Trond Myklebust wrote:
+> I'd still like to keep the existing code for those architectures that
+> don't have problems, since that allows us to send 32k READDIR requests
+> instead of being limited to 4k. For large directories, that is a clear
+> win.
+> For the NOMMU case we will just go back to using a single page for
+> storage (and 4k READDIR requests only). Should I just do the same for
+> architectures like ARM and PARISC?
 
-I'm aware of that. That part should be taken care of by the call to
-invalidate_kernel_vmap_range() which was in both James and my patch.
+I think you said that readdir reads via the vmalloc mapping of the
+group of pages, but XDR writes to the individual pages.
 
-There is already code in the SUNRPC layer that calls flush_dcache_page()
-after writing (although as Russell pointed out earlier, that is
-apparently a no-op for non-page cache pages such as these).
+As I understand NFS, you receive a packet, you then have to use XDR
+to unpack the data, which you presumably write into the set of
+struct page *'s using kmap?
 
-> This is why you really really really generally don't want to have
-> aliasing. Purely virtual caches are pure crap. Really.
-
-Well, it looks as if NOMMU is giving us problems due to the lack of a
-vm_map_ram() (see https://bugzilla.kernel.org/show_bug.cgi?id=26262).
-
-I'd still like to keep the existing code for those architectures that
-don't have problems, since that allows us to send 32k READDIR requests
-instead of being limited to 4k. For large directories, that is a clear
-win.
-For the NOMMU case we will just go back to using a single page for
-storage (and 4k READDIR requests only). Should I just do the same for
-architectures like ARM and PARISC?
-
--- 
-Trond Myklebust
-Linux NFS client maintainer
-
-NetApp
-Trond.Myklebust at netapp.com
-www.netapp.com
+Isn't a solution to have XDR write directly into the vmalloc mapping
+rather than using struct page * and kmap?
