@@ -1,72 +1,22 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Fri, 7 Jan 2011 17:30:28 +0800
-Subject: [patch 1/1] mx51: add support for pwm
-In-Reply-To: <20110107090656.517403682@rtp-net.org>
-References: <20110107090656.517403682@rtp-net.org>
-Message-ID: <AANLkTin7U0+sJ+Xz7BiJ2NbtiGXsyQbdVKejU9M5qrUp@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jan 2011 09:31:55 +0000
+Subject: [PATCH 0/2] ARM: Gemini: add RTC support for Gemini SoC
+In-Reply-To: <1292339307-14336-1-git-send-email-ulli.kroll@googlemail.com>
+References: <1292339307-14336-1-git-send-email-ulli.kroll@googlemail.com>
+Message-ID: <20110107093155.GN31708@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnaud,
+On Tue, Dec 14, 2010 at 04:08:25PM +0100, Hans Ulli Kroll wrote:
+> This patch adds the driver for the rtc chip on the Gemini SoC
 
-2011/1/7 Arnaud Patard <arnaud.patard@rtp-net.org>:
-> This patch is adding support for pwm1 and pwm2 devices found
-> on mx51.
-> [ this patch has been tested with pwm-backlight driver ]
->
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/clock-mx51-mx53.c ? 2011-01-04 11:36:15.000000000 +0100
-> +++ linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ?2011-01-04 11:39:55.000000000 +0100
-> @@ -1206,6 +1206,11 @@
-> ?DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
-> ? ? ? ?NULL, ?NULL, &ipg_clk, &gpt_ipg_clk);
->
-> +DEFINE_CLOCK(pwm1_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG6_OFFSET,
-> + ? ? ? NULL, NULL, &ipg_clk, NULL);
-> +DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
-> + ? ? ? NULL, NULL, &ipg_clk, NULL);
-> +
-> ?/* I2C */
-> ?DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
-> ? ? ? ?NULL, NULL, &ipg_clk, NULL);
-> @@ -1298,6 +1303,8 @@
-> ? ? ? ?_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
-> ? ? ? ?_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
-> ? ? ? ?_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> + ? ? ? _REGISTER_CLOCK("mxc_pwm.0", "pwm", pwm1_clk)
-> + ? ? ? _REGISTER_CLOCK("mxc_pwm.1", "pwm", pwm2_clk)
-> ? ? ? ?_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
-> ? ? ? ?_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
-> ? ? ? ?_REGISTER_CLOCK("imx-i2c.2", NULL, hsi2c_clk)
-> Index: linux-2.6-submit/arch/arm/mach-mx5/devices.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/devices.c ? 2011-01-04 11:11:43.000000000 +0100
-> +++ linux-2.6-submit/arch/arm/mach-mx5/devices.c ? ? ? ?2011-01-04 11:39:55.000000000 +0100
-> @@ -120,6 +120,44 @@
-> ? ? ? ?},
-> ?};
-[...]
-> +struct platform_device mxc_pwm2_device = {
-> + ? ? ? .name = "mxc_pwm",
-> + ? ? ? .id = 1,
-> + ? ? ? .num_resources = ARRAY_SIZE(pwm2_resources),
-> + ? ? ? .resource = pwm2_resources,
-> +};
-> +
+I'll take patch 2, but not patch 1.  There is no requirement for patch 1
+to come via my tree - it can be handled by the RTC people.
 
-Why not follow the arch/arm/plat-mxc/devices/platform-imx-xxx to add
-devices support?
-I saw that some devices was added in arch/arm/mach-mx5/devices.c, but
-most are in
- arch/arm/plat-mxc/devices/xx, what's the rule for it when we add
-device support?
+My tree is not for random driver code being merged into mainline just
+because it's used on some ARM platform somewhere.
 
-[...]
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+(I'm making this request as a result of feedback from Linus on last nights
+merge of the ARM tree.)
+
+Thanks.
