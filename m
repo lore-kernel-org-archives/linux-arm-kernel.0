@@ -1,81 +1,50 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Fri, 7 Jan 2011 22:47:43 +0530
-Subject: [PATCHv3] watchdog: add support for the Synopsys DesignWare WDT
-In-Reply-To: <20110107170808.GG2844@pulham.picochip.com>
-References: <1294401797-24158-1-git-send-email-jamie@jamieiles.com>
-	<AANLkTi=s4Wuj1YyALL7f1AK-MQjvPre8mvviLhw5TdPH@mail.gmail.com>
-	<20110107170808.GG2844@pulham.picochip.com>
-Message-ID: <AANLkTikrZj5yXi+PXViNyW_5NVLTH+x2E8SfAZd3sis6@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Jan 2011 18:51:54 +0100
+Subject: [PATCH 15/23] Alternative mmc structure to support pxa168, pxa910,
+	mmp2 family SD
+In-Reply-To: <ABCC071A-5598-48AA-9545-2712FA0BB624@marvell.com>
+References: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
+	<201101062029.45604.arnd@arndb.de>
+	<ABCC071A-5598-48AA-9545-2712FA0BB624@marvell.com>
+Message-ID: <201101071851.54872.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 7, 2011 at 10:38 PM, Jamie Iles <jamie@jamieiles.com> wrote:
->> > +static int dw_wdt_open(struct inode *inode, struct file *filp)
->> > +{
->> > + ? ? ? /* Make sure we don't get unloaded. */
->> > + ? ? ? __module_get(THIS_MODULE);
->> > +
->> > + ? ? ? spin_lock(&dw_wdt.lock);
->> > + ? ? ? if (!dw_wdt_is_enabled()) {
->> > + ? ? ? ? ? ? ? /*
->> > + ? ? ? ? ? ? ? ?* The watchdog is not currently enabled. Set the timeout to
->> > + ? ? ? ? ? ? ? ?* the maximum and then start it.
->> > + ? ? ? ? ? ? ? ?*/
->> > + ? ? ? ? ? ? ? dw_wdt_set_top(DW_WDT_MAX_TOP);
->>
->> shouldn't we check return value here??
+On Friday 07 January 2011, Philip Rakity wrote:
+> Thanks for the suggestion.  Let me see if I can implement this.  
+> 
+> A couple of points first
+> 
+> a) current implementation once PXA168/910 is selected will no longer show MMP2 boards so it is also broken.  Play around and you will see the issues
+
+I didn't see it on the version I'm looking at now, but if it's inconsistent or
+allows you to select combinationst that cannot be built, then it should be fixed.
+
+> My proposed patch did the following
+> a) ARCH_MMP is set when PXA168, PXA910 or MMP2 are selected (from arch/arm)
+> b) Board selection uses the PXA168/PXA910/MMP2 to show correct board.
+
+Yes, that is what I thought, but it is inconsistent with how other platforms do this.
+Usually, the top-level selection chooses one source directory, and anything specific
+to that platform is handled by that Kconfig.
+
+> If I understand what you are suggesting is the following
+> a) leave ARCH_MMP is system selection alone -- 
+> b) move speciific CPU selection to where board selection is now (cpu/arch/mach-mmp)
+
+Right.
+
+> c) what do with development boards ?  select all of them for the CPU Type ?  
 >
-> No, dw_wdt_set_top() can't fail, it just returns the timeout period that
-> it set in seconds. ?We use this when the user changes the timeout period
-> as we may not be able to select the exact timeout period they chose, but
-> here we just select the maximum timeout.
+> Point me to a Kconfig that does what you are suggesting as an example and I can try out the suggestion.
 
-Sorry, I missed that.
+Just put it below the CPU selection.
 
->> > +static int __devinit dw_wdt_drv_probe(struct platform_device *pdev)
->> > +{
->> > + ? ? ? int ret;
->> > + ? ? ? struct resource *mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> > +
->> > + ? ? ? if (!mem)
->> > + ? ? ? ? ? ? ? return -EINVAL;
->> > +
->> > + ? ? ? if (!devm_request_mem_region(&pdev->dev, mem->start, resource_size(mem),
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"iomem"))
->> > + ? ? ? ? ? ? ? return -ENOMEM;
->> > +
->> > + ? ? ? dw_wdt.regs = devm_ioremap(&pdev->dev, mem->start,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?resource_size(mem));
->> > + ? ? ? if (!dw_wdt.regs)
->> > + ? ? ? ? ? ? ? return -ENOMEM;
->>
->> should release mem_region in case of error.
->>
->> > +
->> > + ? ? ? dw_wdt.clk = clk_get(&pdev->dev, NULL);
->> > + ? ? ? if (IS_ERR_OR_NULL(dw_wdt.clk))
->> > + ? ? ? ? ? ? ? return -ENODEV;
->>
->> should release mem_region and free ioremaped space.
->
-> We're using devres for the ioremap and region request so that takes care
-> of the cleanup for us. ?This also means we don't need to iounmap and
-> release in the release method.
+OMAP does something like this -- you first select either OMAP1 or OMAP2/3/4, then
+the families in the latter case, and finally the boards.
 
-ok
+You can do the same by first giving the choice between ARMv6 and PXA168/910, and
+then showing the boards below the CPU. There are multiple ways of doing this
+that lead to the same result.
 
->
->> Also, may be we can continue here in case of error too.
->> Some platforms might nor support clock framework. You can enable and
->> disable clk's if dw_wdt.clk is !NULL
->
-> The DesignWare watchdog has 16 timeout periods and these are derived
-> from the clock frequency input to the WDT. ?If we don't have a clk then
-> we don't know how long the timeout periods. ?The only alternative would
-> be to have a 'struct dw_wdt_platform_data' that includes the input clock
-> frequency which we use if we can't get a clk and get the rate.
-
-That will be fine.
-
---
-viresh
+	Arnd
