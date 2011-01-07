@@ -1,20 +1,30 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 07 Jan 2011 01:33:32 +0000
-Subject: [PATCH 0/2] Common struct clk implementation, v10
-In-Reply-To: <1294199462.347935.472473715866.0.gpush@pororo>
-References: <1294199462.347935.472473715866.0.gpush@pororo>
-Message-ID: <4D266D6C.7050005@fluff.org>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Fri, 7 Jan 2011 10:37:25 +0900
+Subject: [PATCH] rfc v3: ARM: mach-shmobile: mackerel: Add zboot support
+In-Reply-To: <1291855635-30882-1-git-send-email-horms@verge.net.au>
+References: <1291855635-30882-1-git-send-email-horms@verge.net.au>
+Message-ID: <20110107013725.GB22477@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/11 03:51, Jeremy Kerr wrote:
-> Hi all,
+On Thu, Dec 09, 2010 at 09:47:15AM +0900, Simon Horman wrote:
+> When CONFIG_ZBOOT_ROM is selected, the resulting zImage file will be small
+> boot loader and may be burned to rom or flash.
 > 
-> These patches are an attempt to allow platforms to share clock code. At
-> present, the definitions of 'struct clk' are local to platform code,
-> which makes allocating and initialising cross-platform clock sources
-> difficult, and makes it impossible to compile a single image containing
-> support for two ARM platforms with different struct clks.
+> Compile tested only.
+> 
+> This patch assumes that head-mackerel.txt will be the same as head-ap4evb.txt.
+> I am waiting for verification of this.
+> 
+> This patch depends on
+> * ARM: 6515/1: Add zboot support for SuperH Mobile ARM
+>   (merged into the devel branch of Russel King's linux-2.6-arm tree)
+> * ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
+>   (merged into the devel branch of Russel King's linux-2.6-arm tree)
+> * MACH_MACKEREL (3211) being present in arch/arm/tools/mach-types
+> 
+Ok, I've applied this one now that the dependencies are out of the way.
 
-no, it doesn't actually. you could do run-time link and select
-the right arch support.
+I plan to send my rmobile updates to Linus today, at which point you
+should be able to submit the outstanding MMCIF patch to Russell's patch
+tracker.
