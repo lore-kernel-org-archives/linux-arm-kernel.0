@@ -1,54 +1,80 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 07 Jan 2011 15:29:03 -0800
-Subject: [GIT PULL] misc. fixes for 2.6.38-rc
-Message-ID: <87hbdkjnsw.fsf@ti.com>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Sat, 8 Jan 2011 07:44:29 +0800
+Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
+In-Reply-To: <20110107154714.GA27055@oksana.dev.rtsoft.ru>
+References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
+	<4D24B53C.4020009@pobox.com>
+	<AANLkTinxNtzpzUn0=-iph_N7tffM6Nu++J9qNNhcp8pX@mail.gmail.com>
+	<20110106105157.GA9560@oksana.dev.rtsoft.ru>
+	<4D264DA4.6040308@pobox.com>
+	<20110107154714.GA27055@oksana.dev.rtsoft.ru>
+Message-ID: <AANLkTikMZvCEjd86Rk9dXs4yGhtg0NUcj4BsCgH3XxwF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+2011/1/7 Anton Vorontsov <cbouatmailru@gmail.com>:
+> On Thu, Jan 06, 2011 at 06:17:56PM -0500, Jeff Garzik wrote:
+>> >[...]
+>> >>>It is overkill to rename the entirety of ahci_platform just for one override
+>> >>>function.
+>> >>>This sort of thing I would have expected to be added directly to
+>> >>>ahci_platform.c.
+>> >>It might be overkill for only one controller. but it is more clean and
+>> >>readable to have different SoC specific changes in separate files,
+>> >>especially when more SoCs need to make similar changes.
+>> >
+>> >I think that renaming the file is not necessary. You can just
+>> >rename the module in the makefile.
+>> >
+>> >Personally I like the current approach more than putting
+>> >controller-specific fixups directly into ahci_platform.
+>>
+>> My main objection is the renaming. ?If ahci_platform wants to export
+>> some symbols for SoC modules like ahci_platform_cns, that's ok.
+>>
+>> In general, follow the library approach rather than linking modules
+>> together in strange ways.
+>
+> In ahci_platform case there's almost nothing to factor out to a
+> library. Each platform just needs its own small "fixups" that we
+> normally pass via platform data.
+>
+> We would happily pass them via platform data, and initially Mac
+> did exactly this, see:
+>
+> http://ns3.spinics.net/lists/linux-ide/msg39554.html
+>
+> You may notice that all platform-specific quirks are in the
+> platform code, which is neat. But there is a problem: once
+> the platform code needs to use libata, then we have to
+> build libata into the kernel (no modules possible), i.e.
+>
+> http://ns3.spinics.net/lists/linux-ide/msg39656.html
+>
+> It's not something new, we have the same "problem" with SDHCI,
+> USB and plenty other drivers. But the solution is simple, for
+> example see drivers/mmc/host/sdhci-pltfm.c and sdhci-cns3xxx.c
+> (and sdhci-esdhc-imx.c as another example of platform-specific
+> hooks for sdhci-pltfm).
+>
+> Of course, we could make full-fledged platform driver just for
+> CNS3xxx, but that's kind of overkill. IMO, it's better to make
+> ahci_platform flexible and suitable for generic use.
 
-Here's a queue of misc. fixes for 2.6.38.  This branch is on top of your
-current omap-fixes branch.
+Thanks for explaining all this.
 
-Kevin
+> As for renaming, I agree that ahci_platform.c file does not
+> need to be renamed, I still think that we could just rename
+> the module (so far it is used only on CNS3xxx platforms, so
+> no big deal even if anybody rely on the module name, which
+> I doubt.)
+Yes, you're right.
+cns3xxx seems like the only platform that uses ahci_platform driver.
+Keeping the same module name is not necessary.
 
-The following changes since commit a9b365bdc328bd66e97087d0dba0b9a3d9eb1ac6:
+We could rename the module ahci_platform to ahci_platforms(?), into
+which link ahci_platform and SoC specific changes.
+Is it acceptable?
 
-  omap2+: wdt: trivial sparse fixes (2011-01-06 19:58:28 -0800)
-
-are available in the git repository at:
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git fixes-for-tony
-
-Felipe Balbi (1):
-      arm: omap: gpio: don't access irq_desc array directly
-
-Koen Kooi (3):
-      omap3: beaglexm: fix EHCI power up GPIO dir
-      omap3: beaglexm: fix DVI reset GPIO
-      omap3: beaglexm: fix power on of DVI
-
-Mika Westerberg (1):
-      OMAP: GPIO: fix _set_gpio_triggering() for OMAP2+
-
-Nishanth Menon (4):
-      OMAP3+: sr_device: include pm header
-      OMAP2+: TWL: make conversion routines static
-      OMAP2+: TWL: include pm header for init protos
-      omap2+: pm_bus: make functions used as pointers as static
-
-Santosh Shilimkar (5):
-      omap2plus: clockdomain: Trivial fix for build break because of clktrctrl_mask
-      omap2plus: voltage: Trivial warning fix 'no return statement'
-      omap2plus: voltage: Trivial linking fix 'undefined reference'
-      omap2plus: voltage: Trivial linking fix for 'EINVAL' undeclared
-      omap2plus: prm: Trvial build break fix for undefined reference to 'omap2_prm_read_mod_reg'
-
- arch/arm/mach-omap2/board-omap3beagle.c   |   37 +++++++++++++++--
- arch/arm/mach-omap2/clockdomain.h         |    2 -
- arch/arm/mach-omap2/omap_twl.c            |   10 +++--
- arch/arm/mach-omap2/pm_bus.c              |    4 +-
- arch/arm/mach-omap2/prm2xxx_3xxx.h        |   63 ++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/sr_device.c           |    1 +
- arch/arm/plat-omap/gpio.c                 |   12 ++++--
- arch/arm/plat-omap/include/plat/voltage.h |   17 ++++++--
- 8 files changed, 124 insertions(+), 22 deletions(-)
+Best Regards,
+Mac Lin
