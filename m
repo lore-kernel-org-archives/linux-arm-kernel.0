@@ -1,29 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 7 Jan 2011 14:55:50 -0200
-Subject: [patch 1/1] mx51: add support for pwm
-In-Reply-To: <20110107095839.GD25121@pengutronix.de>
-References: <20110107090656.517403682@rtp-net.org>
-	<AANLkTin7U0+sJ+Xz7BiJ2NbtiGXsyQbdVKejU9M5qrUp@mail.gmail.com>
-	<20110107095839.GD25121@pengutronix.de>
-Message-ID: <AANLkTimgYTCme5UtUiUpWH53c+FC1vC=PatGf0eoorsp@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 07 Jan 2011 17:57:45 +0100
+Subject: [PATCH] ARM: S5PV210: Add GONI board setup for CIF camera support
+Message-ID: <1294419468-13700-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
+Hello,
 
-2011/1/7 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-...
->> Why not follow the arch/arm/plat-mxc/devices/platform-imx-xxx to add
->> devices support?
-> good question. ?Note that arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-> already exists in Sascha's tree. ?(Maybe now even Linus'.)
+the following patch series introduces changes in GONI board setup file
+required for the CIF camera sensor driver.
+The first patch adds the I2C0 bus driver, the second one adds the regulator
+supply definitions and the third one just increases virtual size
+of the framebuffer window 0 for preview double buffering.
 
-I have submitted the following patch for dynamically registering the
-PWM on MX51:
-http://www.spinics.net/lists/arm-kernel/msg105828.html
 
-I got an ack from Uwe, so it should hit Sascha?s tree soon.
+The patch series contains:
+
+[PATCH 1/3] ARM: S5PV210: Enable I2C0 bus on GONI board
+[PATCH 2/3] ARM: S5PV210: Add supplies for CIF camera on GONI board
+[PATCH 3/3] ARM: S5PV210: Change framebuffer window 0 size on GONI
+
+Created against kgene-for-next branch at:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+
 
 Regards,
+Sylwester
 
-Fabio Estevam
+
+--
+Sylwester Nawrocki
+Samsung Poland R&D Center
