@@ -1,20 +1,20 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 07 Jan 2011 01:31:32 +0000
-Subject: mxc: i2c register mapped twice?
-In-Reply-To: <20110106122611.GA31718@shlinux1.ap.freescale.net>
-References: <20110106122611.GA31718@shlinux1.ap.freescale.net>
-Message-ID: <4D266CF4.9030009@fluff.org>
+Date: Fri, 07 Jan 2011 01:33:32 +0000
+Subject: [PATCH 0/2] Common struct clk implementation, v10
+In-Reply-To: <1294199462.347935.472473715866.0.gpush@pororo>
+References: <1294199462.347935.472473715866.0.gpush@pororo>
+Message-ID: <4D266D6C.7050005@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/11 12:26, Richard Zhao wrote:
-> Hi Sascha,
+On 05/01/11 03:51, Jeremy Kerr wrote:
+> Hi all,
 > 
-> I just realized i2c registers are mapped twice. It's first static mapped at
-> mx5x_io_desc and second mapped in driver.
-> Drivers always feel happy to receive physical address in resource, and ioremap
-> it itself. We might static map too many register regions in machine level?
-> I'm sure it's not just i2c.
+> These patches are an attempt to allow platforms to share clock code. At
+> present, the definitions of 'struct clk' are local to platform code,
+> which makes allocating and initialising cross-platform clock sources
+> difficult, and makes it impossible to compile a single image containing
+> support for two ARM platforms with different struct clks.
 
-either cleanup the mapping, or add a custom ioremap() to return this
-region for the drivers.
+no, it doesn't actually. you could do run-time link and select
+the right arch support.
