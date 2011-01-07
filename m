@@ -1,117 +1,72 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri,  7 Jan 2011 09:41:13 -0600
-Subject: [PATCH v2 2/2] OMAP3: beagle xm: enable upto 800MHz OPP
-In-Reply-To: <[PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP>
-References: <[PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP>
-Message-ID: <1294414873-22447-1-git-send-email-nm@ti.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Fri, 7 Jan 2011 18:47:14 +0300
+Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
+In-Reply-To: <4D264DA4.6040308@pobox.com>
+References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
+	<4D24B53C.4020009@pobox.com>
+	<AANLkTinxNtzpzUn0=-iph_N7tffM6Nu++J9qNNhcp8pX@mail.gmail.com>
+	<20110106105157.GA9560@oksana.dev.rtsoft.ru>
+	<4D264DA4.6040308@pobox.com>
+Message-ID: <20110107154714.GA27055@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMP3630 silicon can enable higher frequencies only depending on the board
-characteristics meeting the recommended standards, and has to be selectively
-toggled.
+On Thu, Jan 06, 2011 at 06:17:56PM -0500, Jeff Garzik wrote:
+> >[...]
+> >>>It is overkill to rename the entirety of ahci_platform just for one override
+> >>>function.
+> >>>This sort of thing I would have expected to be added directly to
+> >>>ahci_platform.c.
+> >>It might be overkill for only one controller. but it is more clean and
+> >>readable to have different SoC specific changes in separate files,
+> >>especially when more SoCs need to make similar changes.
+> >
+> >I think that renaming the file is not necessary. You can just
+> >rename the module in the makefile.
+> >
+> >Personally I like the current approach more than putting
+> >controller-specific fixups directly into ahci_platform.
+> 
+> My main objection is the renaming.  If ahci_platform wants to export
+> some symbols for SoC modules like ahci_platform_cns, that's ok.
+> 
+> In general, follow the library approach rather than linking modules
+> together in strange ways.
 
-Beagle XM uses 3730 variant and the board design allows enabling 800MHz and
-1GHz OPPs. However, We need Smart reflex class 1.5 and ABB to enable 1GHz
-safely.  For the moment, we tweak the default table to allow for 800Mhz OPP
-usage.
+In ahci_platform case there's almost nothing to factor out to a
+library. Each platform just needs its own small "fixups" that we
+normally pass via platform data.
 
-Reported-by: Koen Kooi <koen@beagleboard.org>
-Tested-by: Koen Kooi <koen@beagleboard.org>
+We would happily pass them via platform data, and initially Mac
+did exactly this, see:
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-v2: fixed issue when !mh || !dh, updated commit message to point on rationale
-    for board specific tweaking
-v1: http://marc.info/?t=129426060900008&r=1&w=2
- arch/arm/mach-omap2/board-omap3beagle.c |   50 +++++++++++++++++++++++++++++++
- 1 files changed, 50 insertions(+), 0 deletions(-)
+http://ns3.spinics.net/lists/linux-ide/msg39554.html
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 6c12760..7dc0397 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -23,6 +23,7 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/opp.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-@@ -44,10 +45,12 @@
- #include <plat/gpmc.h>
- #include <plat/nand.h>
- #include <plat/usb.h>
-+#include <plat/omap_device.h>
- 
- #include "mux.h"
- #include "hsmmc.h"
- #include "timer-gp.h"
-+#include "pm.h"
- 
- #define NAND_BLOCK_SIZE		SZ_128K
- 
-@@ -556,6 +559,52 @@ static struct omap_musb_board_data musb_board_data = {
- 	.power			= 100,
- };
- 
-+static void __init beagle_opp_init(void)
-+{
-+	int r = 0;
-+
-+	/* Initialize the omap3 opp table */
-+	if (omap3_opp_init()) {
-+		pr_err("%s: opp default init failed\n", __func__);
-+		return;
-+	}
-+
-+	/* Custom OPP enabled for XM */
-+	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
-+		struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
-+		struct omap_hwmod *dh = omap_hwmod_lookup("iva");
-+		struct device *dev;
-+
-+		if (!mh || !dh) {
-+			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
-+				__func__, mh, dh);
-+			return;
-+		}
-+		/* Enable MPU 1GHz and lower opps */
-+		dev = &mh->od->pdev.dev;
-+		r = opp_enable(dev, 800000000);
-+		/* TODO: MPU 1GHz needs SR and ABB */
-+
-+		/* Enable IVA 800MHz and lower opps */
-+		dev = &dh->od->pdev.dev;
-+		r |= opp_enable(dev, 660000000);
-+		/* TODO: DSP 800MHz needs SR and ABB */
-+		if (r) {
-+			pr_err("%s: failed to enable higher opp %d\n",
-+				__func__, r);
-+			/*
-+			 * Cleanup - disable the higher freqs - we dont care
-+			 * about the results
-+			 */
-+			dev = &mh->od->pdev.dev;
-+			opp_disable(dev, 800000000);
-+			dev = &dh->od->pdev.dev;
-+			opp_disable(dev, 660000000);
-+		}
-+	}
-+	return;
-+}
-+
- static void __init omap3_beagle_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-@@ -579,6 +628,7 @@ static void __init omap3_beagle_init(void)
- 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
- 
- 	beagle_display_init();
-+	beagle_opp_init();
- }
- 
- MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+You may notice that all platform-specific quirks are in the
+platform code, which is neat. But there is a problem: once
+the platform code needs to use libata, then we have to
+build libata into the kernel (no modules possible), i.e.
+
+http://ns3.spinics.net/lists/linux-ide/msg39656.html
+
+It's not something new, we have the same "problem" with SDHCI,
+USB and plenty other drivers. But the solution is simple, for
+example see drivers/mmc/host/sdhci-pltfm.c and sdhci-cns3xxx.c
+(and sdhci-esdhc-imx.c as another example of platform-specific
+hooks for sdhci-pltfm).
+
+Of course, we could make full-fledged platform driver just for
+CNS3xxx, but that's kind of overkill. IMO, it's better to make
+ahci_platform flexible and suitable for generic use.
+
+As for renaming, I agree that ahci_platform.c file does not
+need to be renamed, I still think that we could just rename
+the module (so far it is used only on CNS3xxx platforms, so
+no big deal even if anybody rely on the module name, which
+I doubt.)
+
+Thanks,
+
 -- 
-1.6.3.3
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
