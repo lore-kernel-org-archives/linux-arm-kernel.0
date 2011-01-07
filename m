@@ -1,8 +1,14 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Jan 2011 19:02:29 +0000
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Fri, 07 Jan 2011 13:05:00 -0600
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
 In-Reply-To: <1294426405.2929.23.camel@heimdal.trondhjem.org>
-References: <20110105210448.GM8638@n2100.arm.linux.org.uk>
+References: <1294254337.16957.13.camel@mulgrave.site>
+	<AANLkTi=VZUxNFd7n-qwf5aiOeK5rkk8qBmo+kOpgg7up@mail.gmail.com>
+	<1294256169.16957.18.camel@mulgrave.site>
+	<20110105200008.GJ8638@n2100.arm.linux.org.uk>
+	<1294259637.16957.25.camel@mulgrave.site>
+	<AANLkTimzzBsdtWcZtP5E_CH1hUZugGMoaHOiMdQJf764@mail.gmail.com>
+	<20110105210448.GM8638@n2100.arm.linux.org.uk>
 	<AANLkTi=EXXBTW7oWHq3D+PHsx=thF1CpkRjn0ax2p5rm@mail.gmail.com>
 	<1294262208.2952.4.camel@heimdal.trondhjem.org>
 	<AANLkTi=3Gu-rz=-OdNtUXn4qw60Df6=YePnzvB=s-+Ov@mail.gmail.com>
@@ -12,11 +18,35 @@ References: <20110105210448.GM8638@n2100.arm.linux.org.uk>
 	<1294336054.2905.1.camel@heimdal.trondhjem.org>
 	<AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
 	<1294426405.2929.23.camel@heimdal.trondhjem.org>
-Message-ID: <20110107190229.GX31708@n2100.arm.linux.org.uk>
+Message-ID: <1294427100.4895.58.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 07, 2011 at 01:53:25PM -0500, Trond Myklebust wrote:
+On Fri, 2011-01-07 at 13:53 -0500, Trond Myklebust wrote:
+> There is already code in the SUNRPC layer that calls flush_dcache_page()
+> after writing (although as Russell pointed out earlier, that is
+> apparently a no-op for non-page cache pages such as these).
+
+Actually (and possibly fortunately) none of our flush_dcache_page()
+implementations do this (check for an actual non page cache page and nop
+if they find one).  Although, they may according to the docs which say
+that flush_dcache_page() is only called on page cache pages.
+
+But it's definitely using the API outside its documented scope.  We have
+lots of places in the VFS where we don't call flush_dcache_page() even
+after altering a kernel page (even in the page cache) if we know the
+page will never be mapped to userspace.  The assumption here is that the
+kernel never sets up non-user aliases of these pages, so not doing the
+flushing is an optimisation since we only access them through the kernel
+address space.  Of course, setting up vmap areas of these pages within
+the kernel violates this assumption.
+
+> > This is why you really really really generally don't want to have
+> > aliasing. Purely virtual caches are pure crap. Really.
+> 
+> Well, it looks as if NOMMU is giving us problems due to the lack of a
+> vm_map_ram() (see https://bugzilla.kernel.org/show_bug.cgi?id=26262).
+> 
 > I'd still like to keep the existing code for those architectures that
 > don't have problems, since that allows us to send 32k READDIR requests
 > instead of being limited to 4k. For large directories, that is a clear
@@ -25,12 +55,8 @@ On Fri, Jan 07, 2011 at 01:53:25PM -0500, Trond Myklebust wrote:
 > storage (and 4k READDIR requests only). Should I just do the same for
 > architectures like ARM and PARISC?
 
-I think you said that readdir reads via the vmalloc mapping of the
-group of pages, but XDR writes to the individual pages.
+Well, that would include any VI architecture (like SPARC and others) as
+well.  However, I think we can just make the
+invalidate_kernel_vmap_range() work.
 
-As I understand NFS, you receive a packet, you then have to use XDR
-to unpack the data, which you presumably write into the set of
-struct page *'s using kmap?
-
-Isn't a solution to have XDR write directly into the vmalloc mapping
-rather than using struct page * and kmap?
+James
