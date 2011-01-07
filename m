@@ -1,45 +1,27 @@
-From: inki.dae@samsung.com (daeinki)
-Date: Fri, 07 Jan 2011 19:02:14 +0900
-Subject: Memory sharing issue by application on V4L2 based device driver
-	with system mmu.
-In-Reply-To: <1294390465.6019.212.camel@thor.local>
-References: <4D25BC22.6080803@samsung.com>
-	<AANLkTi=P8qY22saY9a_-rze1wsr-DLMgc6Lfa6qnfM7u@mail.gmail.com>
-	<002201cbadfd$6d59e490$480dadb0$%han@samsung.com>
-	<AANLkTinsduJkynwwEeM5K9f3D7C6jtBgkAyZ0-_0z2X-@mail.gmail.com>
-	<1294390465.6019.212.camel@thor.local>
-Message-ID: <4D26E4A6.2020103@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jan 2011 10:11:59 +0000
+Subject: [PATCH 1/1] arm: omap: gpio: define .disable callback for gpio
+	irq chip
+In-Reply-To: <20110107095609.GC6137@besouro.research.nokia.com>
+References: <1294250283-18182-1-git-send-email-eduardo.valentin@nokia.com>
+	<20110105181918.GB8717@n2100.arm.linux.org.uk>
+	<20110105192425.GA24729@besouro.research.nokia.com>
+	<87aajfvstw.fsf@ti.com>
+	<20110106062404.GA14141@besouro.research.nokia.com>
+	<878vyxx697.fsf@ti.com>
+	<20110107095609.GC6137@besouro.research.nokia.com>
+Message-ID: <20110107101159.GP31708@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michel D?nzer ? ?:
-> On Fre, 2011-01-07 at 11:17 +0900, InKi Dae wrote: 
->> thank you for your comments.
->>
->> your second comment has no any problem as I said before, user virtual
->> addess could be translated in page unit. but the problem, as you said,
->> is that when cpu access to the memory in user mode, the memory
->> allocated by malloc, page fault occurs so we can't find pfn to user
->> virtual address. I missed that. but I think we could resolve this one.
->>
->> as before, user application allocates memory through malloc function
->> and then send it to device driver(using userptr feature). if the pfn
->> is null when device driver translated user virtual address in page
->> unit then it allocates phsical memory in page unit using some
->> interface such as alloc_page() and then mapping them. when pfn is
->> null, to check it and allocate physical memory in page unit could be
->> processed by videobuf2.
->>
->> of course, videobuf2 has no any duty considered for system mmu. so
->> videobuf2 just provides callback for 3rd party and any platform with
->> system mmu such as Samsung SoC C210 implements the function(allocating
->> physical memory and mapping it) and registers it to callback of
->> videobuf2. by doing so, I think your first comment could be cleared.
+On Fri, Jan 07, 2011 at 11:56:09AM +0200, Eduardo Valentin wrote:
+> It is in wakeup-enable gpio. But the driver removes the wakeup
+> flag from the gpio on its suspend function right after disabling the irq.
+>  disable_irq(gpio_irq);
+>  disable_irq_wake(gpio_irq);
 > 
-> FWIW, TTM (drivers/gpu/drm/ttm, include/drm/ttm) is designed and used
-> for managing memory between CPU/GPU and kernel/userspace access. I
-> haven't looked at your requirements in detail, but if you haven't looked
-> at TTM yet, it sounds like it might be worth a look.
-> 
-> 
-Thank you for your advice. I would look at TTM driver.
+> In this case, the device uses gpio 61 as its irq line.
+
+I think the solution to this is to have genirq synchronize the hardware
+state with the lazy state on suspend transitions rather than trying to
+fix this on a case-by-case basis.
