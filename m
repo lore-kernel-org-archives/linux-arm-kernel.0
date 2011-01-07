@@ -1,369 +1,112 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri,  7 Jan 2011 12:03:17 +0000
-Subject: [PATCHv3] watchdog: add support for the Synopsys DesignWare WDT
-Message-ID: <1294401797-24158-1-git-send-email-jamie@jamieiles.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 07 Jan 2011 21:05:11 +0900
+Subject: [PATCH V2] ARM: S5PV310: Implement kernel timers using MCT
+In-Reply-To: <20110106155358.GH31708@n2100.arm.linux.org.uk>
+References: <1294107527-27915-1-git-send-email-kgene.kim@samsung.com>
+	<20110106155358.GH31708@n2100.arm.linux.org.uk>
+Message-ID: <019e01cbae63$2511a5e0$6f34f1a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Synopsys DesignWare watchdog is found in several ARM based systems
-and provides a choice of 16 timeout periods depending on the clock
-input. The watchdog cannot be disabled once started.
+Russell King - ARM Linux wrote:
+> 
+> On Tue, Jan 04, 2011 at 11:18:47AM +0900, Kukjin Kim wrote:
+> > From: Changhwan Youn <chaos.youn@samsung.com>
+> >
+> > The Multi-Core Timer(MCT) of S5PV310 is designed for implementing
+> > clock source timer and clock event timers. This patch implements
+> > 1 clock source timer with 64 bit free running counter of MCT and
+> > 2 clock event timers with two of 31-bit tick counters.
+> 
+> I want to wait until after this merge window before commenting too much
+> on this; some of this patch will be impacted by changes in this merge
+> window.
+> 
+Hmmm...Ok, I understood.
 
-v3:
-	- convert pm to dev_pm_ops
-	- use devres for resource allocation
+> > +static void s5pv310_frc_suspend(struct clocksource *cs)
+> > +{
+> > +	time_suspended = s5pv310_frc_read(cs);
+> > +};
+> > +
+> > +static void s5pv310_frc_resume(struct clocksource *cs)
+> > +{
+> > +	s5pv310_mct_frc_start((u32)(time_suspended >> 32),
+> (u32)time_suspended);
+> > +};
+> 
+> Is this something which other clocksource drivers need to do, or does the
+> core automatically deal with the clocksource being irregular across a
+> suspend/resume event?
+> 
+Normally this is not necessary because core deals with the irregularity of
+clocksource, but for sched_clock() implementation, clocksource had better be
+regular across a suspend/resume event. One example is "Show timing
+information on printks" kernel configuration. Without this code, timing
+information resets after suspend/resume event.
 
-v2:
-	- constify fops
-	- request_mem_region() before ioremap()
-	- disable clk if misc_register() fails
+Following is not submitted but will be submitted :-)
 
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- drivers/watchdog/Kconfig  |    9 ++
- drivers/watchdog/Makefile |    1 +
- drivers/watchdog/dw_wdt.c |  300 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 310 insertions(+), 0 deletions(-)
- create mode 100644 drivers/watchdog/dw_wdt.c
+unsigned long long sched_clock(void)
+{
+	struct clocksource *cs = &mct_frc;
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 8a3aa2f..0981aae 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -331,6 +331,15 @@ config IMX2_WDT
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called imx2_wdt.
- 
-+config DW_WATCHDOG
-+	tristate "Synopsys DesignWare watchdog"
-+        select WATCHDOG_NOWAYOUT
-+	help
-+	  Say Y here if to include support for the Synopsys DesignWare
-+	  watchdog timer found in many ARM chips.
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called dw_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 4b0ef38..3b3da4a 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -49,6 +49,7 @@ obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
- obj-$(CONFIG_ADX_WATCHDOG) += adx_wdt.o
- obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
- obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
-+obj-$(CONFIG_DW_WATCHDOG) += dw_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-new file mode 100644
-index 0000000..e0d0e377
---- /dev/null
-+++ b/drivers/watchdog/dw_wdt.c
-@@ -0,0 +1,300 @@
-+/*
-+ * Copyright 2010 Picochip Ltd., Jamie Iles
-+ * http://www.picochip.com
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ *
-+ * This file implements a driver for the Synopsys DesignWare watchdog device
-+ * in the many ARM subsystems. The watchdog has 16 different timeout periods
-+ * and these are a function of the input clock frequency.
-+ */
-+#define pr_fmt(fmt) "dw_wdt: " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/fs.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/miscdevice.h>
-+#include <linux/module.h>
-+#include <linux/pm.h>
-+#include <linux/platform_device.h>
-+#include <linux/spinlock.h>
-+#include <linux/uaccess.h>
-+#include <linux/watchdog.h>
-+
-+#define WDOG_CONTROL_REG_OFFSET             0x00
-+#define WDOG_TIMEOUT_RANGE_REG_OFFSET       0x04
-+#define WDOG_CURRENT_COUNT_REG_OFFSET       0x08
-+#define WDOG_COUNTER_RESTART_REG_OFFSET     0x0c
-+
-+/* The maximum TOP (timeout period) value that can be set in the watchdog. */
-+#define DW_WDT_MAX_TOP		15
-+
-+static struct {
-+	spinlock_t		lock;
-+	void __iomem		*regs;
-+	struct clk		*clk;
-+} dw_wdt;
-+
-+static inline int dw_wdt_is_enabled(void)
-+{
-+#define WDOG_CONTROL_REG_WDT_EN_MASK		0x01
-+	return readl(dw_wdt.regs + WDOG_CONTROL_REG_OFFSET) &
-+		WDOG_CONTROL_REG_WDT_EN_MASK;
-+}
-+
-+static inline int dw_wdt_top_in_seconds(unsigned top)
-+{
-+	/*
-+	 * There are 16 possible timeout values in 0..15 where the number of
-+	 * cycles is 2 ^ (16 + i) and the watchdog counts down.
-+	 */
-+	return (1 << (16 + top)) / clk_get_rate(dw_wdt.clk);
-+}
-+
-+static int dw_wdt_set_top(unsigned top_s)
-+{
-+	int i, top_val = -1;
-+
-+	/*
-+	 * Iterate over the timeout values until we find the closest match. We
-+	 * always look for >=.
-+	 */
-+	for (i = 0; i <= DW_WDT_MAX_TOP; ++i)
-+		if (dw_wdt_top_in_seconds(i) >= top_s) {
-+			top_val = i;
-+			break;
-+		}
-+
-+	/*
-+	 * If we didn't find a suitable value, it must have been too large. Go
-+	 * with the biggest that we can.
-+	 */
-+	if (top_val < 0)
-+		top_val = DW_WDT_MAX_TOP;
-+
-+	/* Set the new value in the watchdog. */
-+	writel(top_val, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
-+
-+	return dw_wdt_top_in_seconds(top_val);
-+}
-+
-+static int dw_wdt_get_top(void)
-+{
-+	int top = readl(dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET) & 0xF;
-+
-+	return dw_wdt_top_in_seconds(top);
-+}
-+
-+static void dw_wdt_keepalive(void)
-+{
-+#define WDOG_COUNTER_RESTART_KICK_VALUE	    0x76
-+	writel(WDOG_COUNTER_RESTART_KICK_VALUE, dw_wdt.regs +
-+	       WDOG_COUNTER_RESTART_REG_OFFSET);
-+}
-+
-+static int dw_wdt_open(struct inode *inode, struct file *filp)
-+{
-+	/* Make sure we don't get unloaded. */
-+	__module_get(THIS_MODULE);
-+
-+	spin_lock(&dw_wdt.lock);
-+	if (!dw_wdt_is_enabled()) {
-+		/*
-+		 * The watchdog is not currently enabled. Set the timeout to
-+		 * the maximum and then start it.
-+		 */
-+		dw_wdt_set_top(DW_WDT_MAX_TOP);
-+		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
-+		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
-+	}
-+	spin_unlock(&dw_wdt.lock);
-+
-+	return nonseekable_open(inode, filp);
-+}
-+
-+ssize_t dw_wdt_write(struct file *filp, const char __user *buf, size_t len,
-+		     loff_t *offset)
-+{
-+	dw_wdt_keepalive();
-+
-+	return len;
-+}
-+
-+static u32 dw_wdt_time_left(void)
-+{
-+	return readl(dw_wdt.regs + WDOG_CURRENT_COUNT_REG_OFFSET) /
-+		clk_get_rate(dw_wdt.clk);
-+}
-+
-+static const struct watchdog_info dw_wdt_ident = {
-+	.options	= WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT,
-+	.identity	= "Synopsys DesignWare Watchdog",
-+};
-+
-+static long dw_wdt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-+{
-+	unsigned long val;
-+
-+	switch (cmd) {
-+	case WDIOC_GETSUPPORT:
-+		return copy_to_user((struct watchdog_info *)arg, &dw_wdt_ident,
-+				    sizeof(dw_wdt_ident)) ? -EFAULT : 0;
-+
-+	case WDIOC_GETSTATUS:
-+	case WDIOC_GETBOOTSTATUS:
-+		return put_user(0, (int *)arg);
-+
-+	case WDIOC_KEEPALIVE:
-+		dw_wdt_keepalive();
-+		return 0;
-+
-+	case WDIOC_SETTIMEOUT:
-+		if (get_user(val, (int __user *)arg))
-+			return -EFAULT;
-+		return put_user(dw_wdt_set_top(val), (int __user *)arg);
-+
-+	case WDIOC_GETTIMEOUT:
-+		return put_user(dw_wdt_get_top(), (int __user *)arg);
-+
-+	case WDIOC_GETTIMELEFT:
-+		/* Get the time left until expiry. */
-+		if (get_user(val, (int __user *)arg))
-+			return -EFAULT;
-+		return put_user(dw_wdt_time_left(), (int __user *)arg);
-+
-+	default:
-+		return -ENOTTY;
-+	}
-+}
-+
-+static int dw_wdt_release(struct inode *inode, struct file *filp)
-+{
-+	pr_crit("WATCHDOG: device closed - timer will not stop\n");
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int dw_wdt_suspend(struct device *dev)
-+{
-+	clk_disable(dw_wdt.clk);
-+
-+	return 0;
-+}
-+
-+static int dw_wdt_resume(struct device *dev)
-+{
-+	int err = clk_enable(dw_wdt.clk);
-+
-+	if (err)
-+		return err;
-+
-+	dw_wdt_keepalive();
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops dw_wdt_pm_ops = {
-+	.suspend	= dw_wdt_suspend,
-+	.resume		= dw_wdt_resume,
-+};
-+
-+#define DW_WDT_PM_OPS	(&dw_wdt_pm_ops)
-+#else /* CONFIG_PM */
-+#define DW_WDT_PM_OPS	NULL
-+#endif /* CONFIG_PM */
-+
-+static const struct file_operations wdt_fops = {
-+	.owner		= THIS_MODULE,
-+	.llseek		= no_llseek,
-+	.open		= dw_wdt_open,
-+	.write		= dw_wdt_write,
-+	.unlocked_ioctl	= dw_wdt_ioctl,
-+	.release	= dw_wdt_release
-+};
-+
-+static struct miscdevice dw_wdt_miscdev = {
-+	.fops		= &wdt_fops,
-+	.name		= "watchdog",
-+	.minor		= WATCHDOG_MINOR,
-+};
-+
-+static int __devinit dw_wdt_drv_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct resource *mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	if (!mem)
-+		return -EINVAL;
-+
-+	if (!devm_request_mem_region(&pdev->dev, mem->start, resource_size(mem),
-+				     "iomem"))
-+		return -ENOMEM;
-+
-+	dw_wdt.regs = devm_ioremap(&pdev->dev, mem->start,
-+					     resource_size(mem));
-+	if (!dw_wdt.regs)
-+		return -ENOMEM;
-+
-+	dw_wdt.clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR_OR_NULL(dw_wdt.clk))
-+		return -ENODEV;
-+	clk_enable(dw_wdt.clk);
-+
-+	ret = misc_register(&dw_wdt_miscdev);
-+	if (ret)
-+		goto register_failed;
-+
-+	return 0;
-+
-+register_failed:
-+	clk_disable(dw_wdt.clk);
-+	clk_put(dw_wdt.clk);
-+
-+	return ret;
-+}
-+
-+static int __devexit dw_wdt_drv_remove(struct platform_device *pdev)
-+{
-+	clk_disable(dw_wdt.clk);
-+	clk_put(dw_wdt.clk);
-+
-+	misc_deregister(&dw_wdt_miscdev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver dw_wdt_driver = {
-+	.probe		= dw_wdt_drv_probe,
-+	.remove		= __devexit_p(dw_wdt_drv_remove),
-+	.driver		= {
-+		.name	= "dw_wdt",
-+		.owner	= THIS_MODULE,
-+		.pm	= DW_WDT_PM_OPS,
-+	},
-+};
-+
-+static int __init dw_wdt_watchdog_init(void)
-+{
-+	spin_lock_init(&dw_wdt.lock);
-+
-+	return platform_driver_register(&dw_wdt_driver);
-+}
-+
-+static void __exit dw_wdt_watchdog_exit(void)
-+{
-+	platform_driver_unregister(&dw_wdt_driver);
-+}
-+
-+module_init(dw_wdt_watchdog_init);
-+module_exit(dw_wdt_watchdog_exit);
-+
-+MODULE_AUTHOR("Jamie Iles");
-+MODULE_DESCRIPTION("Synopsys DesignWare Watchdog Driver");
-+MODULE_LICENSE("GPL");
--- 
-1.7.3.4
+	return clocksource_cyc2ns(cs->read(NULL), sched_mult, sched_shift);
+}
+
+> > +irqreturn_t s5pv310_mct_tick0_isr(int irq, void *dev_id)
+> > +{
+> > +	struct clock_event_device *evt = dev_id;
+> > +
+> > +	/*
+> > +	 * This is for supporting oneshot mode.
+> > +	 * Mct would generate interrupt periodically
+> > +	 * without explicit stopping.
+> > +	 */
+> > +	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+> > +		s5pv310_mct_tick_stop(MCT_TICK0);
+> > +
+> > +	/* Clear the MCT tick0 interrupt */
+> > +	s5pv310_mct_write(0x1, S5PV310_MCT_L0_INT_CSTAT);
+> > +
+> > +	evt->event_handler(evt);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +irqreturn_t s5pv310_mct_tick1_isr(int irq, void *dev_id)
+> > +{
+> > +	struct clock_event_device *evt = dev_id;
+> > +
+> > +	/*
+> > +	 * This is for supporting oneshot mode.
+> > +	 * Mct would generate interrupt periodically
+> > +	 * without explicit stopping.
+> > +	 */
+> > +	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+> > +		s5pv310_mct_tick_stop(MCT_TICK1);
+> > +
+> > +	/* Clear the MCT tick1 interrupt */
+> > +	s5pv310_mct_write(0x1, S5PV310_MCT_L1_INT_CSTAT);
+> > +
+> > +	evt->event_handler(evt);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> 
+> Umm, why not wrap up the clock_event_device into your own structure,
+> which then carries the base address of the MCT to be used - rather than
+> duplicating the code just because the base address is different.  Eg,
+> 
+> struct mct_clock_event_device {
+> 	struct clock_event_device evt;
+> 	void __iomem *base;
+> };
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
