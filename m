@@ -1,48 +1,34 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 7 Jan 2011 10:51:39 +0900
-Subject: [PATCH 00/03] ARM: mach-shmobile: Initial SMP support
-In-Reply-To: <20101214095703.GG14606@linux-sh.org>
-References: <20101214075647.11275.25933.sendpatchset@t400s>
-	<20101214095703.GG14606@linux-sh.org>
-Message-ID: <20110107015139.GE22477@linux-sh.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 7 Jan 2011 11:09:36 +0900
+Subject: [PATCH] rfc v3: ARM: mach-shmobile: mackerel: Add zboot support
+In-Reply-To: <20110107013725.GB22477@linux-sh.org>
+References: <1291855635-30882-1-git-send-email-horms@verge.net.au>
+	<20110107013725.GB22477@linux-sh.org>
+Message-ID: <20110107020935.GA9221@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 14, 2010 at 06:57:03PM +0900, Paul Mundt wrote:
-> On Tue, Dec 14, 2010 at 04:56:47PM +0900, Magnus Damm wrote:
-> > ARM: mach-shmobile: Initial SMP support
+On Fri, Jan 07, 2011 at 10:37:25AM +0900, Paul Mundt wrote:
+> On Thu, Dec 09, 2010 at 09:47:15AM +0900, Simon Horman wrote:
+> > When CONFIG_ZBOOT_ROM is selected, the resulting zImage file will be small
+> > boot loader and may be burned to rom or flash.
 > > 
-> > [PATCH 01/03] ARM: mach-shmobile: SMP base support 
-> > [PATCH 02/03] ARM: mach-shmobile: Enable SMP support
-> > [PATCH 03/03] ARM: mach-shmobile: sh73a0 SMP support
+> > Compile tested only.
 > > 
-> > These patches add SMP framework support for R-Mobile and
-> > SH-Mobile processors, together with hardware specific SMP
-> > support for the sh73a0 processor.
+> > This patch assumes that head-mackerel.txt will be the same as head-ap4evb.txt.
+> > I am waiting for verification of this.
 > > 
-> > Survives onlining and offlining of secondary processor cores
-> > through sysfs. Should compile and boot regardless of 
-> > CONFIG_SMP, CONFIG_HOTPLUG_CPU and CONFIG_LOCAL_TIMERS.
+> > This patch depends on
+> > * ARM: 6515/1: Add zboot support for SuperH Mobile ARM
+> >   (merged into the devel branch of Russel King's linux-2.6-arm tree)
+> > * ARM: 6514/1: mach-shmobile: Add zboot support for SuperH Mobile ARM
+> >   (merged into the devel branch of Russel King's linux-2.6-arm tree)
+> > * MACH_MACKEREL (3211) being present in arch/arm/tools/mach-types
 > > 
-> > I suggest that patch 1 and 3 are taken through sh-2.6 and
-> > patch 2 goes through the RMK patch tracker.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> Ok, I've applied this one now that the dependencies are out of the way.
 > 
-> Applied to rmobile/smp, thanks.
-> 
-> There are integration issues with regards to the GIC changes that I'll
-> have to take care of during the merge window regardless, so resolving the
-> CONFIG_SMP thing at that point should be pretty straightforward. My plan
-> is to wait until after Russell merges, merge your stuff on top of that,
-> and then send the updated bits to Linus in one shot.
-> 
-> In order to avoid clashes with -next for now however I won't be merging
-> the topic branch in to my -latest branch. Given that the number of boards
-> in the wild for this at the moment are in the single digits, I'm not too
-> worried about the amount of time these changes spend in -next so long as
-> no regressions are introduced for the other boards.
+> I plan to send my rmobile updates to Linus today, at which point you
+> should be able to submit the outstanding MMCIF patch to Russell's patch
+> tracker.
 
-I've now merged the rmobile/smp branch in to rmobile-latest, which
-resolves the minor clashes with Russell's merge as well as the
-entry-macro rework.
+Thanks
