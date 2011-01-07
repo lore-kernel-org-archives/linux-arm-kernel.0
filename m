@@ -1,65 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Jan 2011 00:32:05 +0000
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <201101070810.21398.jeremy.kerr@canonical.com>
-References: <1294199462.347935.472473715866.0.gpush@pororo>
-	<20110106160752.GA2775@riccoc20.at.omicron.at>
-	<20110106201137.GY25121@pengutronix.de>
-	<201101070810.21398.jeremy.kerr@canonical.com>
-Message-ID: <20110107003205.GL31708@n2100.arm.linux.org.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 07 Jan 2011 01:31:32 +0000
+Subject: mxc: i2c register mapped twice?
+In-Reply-To: <20110106122611.GA31718@shlinux1.ap.freescale.net>
+References: <20110106122611.GA31718@shlinux1.ap.freescale.net>
+Message-ID: <4D266CF4.9030009@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 07, 2011 at 08:10:20AM +0800, Jeremy Kerr wrote:
-> Hi Richard,
+On 06/01/11 12:26, Richard Zhao wrote:
+> Hi Sascha,
 > 
-> > > > +struct clk {
-> > > > +	const struct clk_ops	*ops;
-> > > > +	unsigned int		enable_count;
-> > > > +	int			flags;
-> > > > +	union {
-> > > > +		struct mutex	mutex;
-> > > > +		spinlock_t	spinlock;
-> > > > +	} lock;
-> > > > +};
-> > > 
-> > > Here you have a "polymorphic" lock, where the clock instance knows
-> > > which type it is supposed to be.  I got flak from David Miller and
-> > > 
-> > > others trying to do the same thing with the mdio_bus:
-> > >    http://kerneltrap.org/mailarchive/linux-netdev/2010/7/6/6280618
-> > > 
-> > > The criticism, applied to your case, is that the clk_enable() caller
-> > > cannot know whether it is safe to make the call or not. I was told,
-> > > "there has got to be a better way."
-> > 
-> > Note that this is not "new".  Currently there is no convention available
-> > if clk_enable sleeps or not.  See e.g.
-> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744
-> 
-> As Uwe says, the common clock does not change these semantics; I would prefer 
-> to keep the driver API changes at a minimum with these patches.
-> 
-> But yes, it would be a good idea to:
-> 
->  * introduce clk_enable_atomic, which requires clk->flags & CLK_ATOMIC
-> 
->  * add might_sleep to clk_enable(), encouraging clk uses in atomic contexts
->    to switch to clk_enable_atomic.
-> 
-> We'd still be able to handle CLK_ATOMIC clocks in clk_enable(), so the 
-> enforcement only needs to be one-way.
+> I just realized i2c registers are mapped twice. It's first static mapped at
+> mx5x_io_desc and second mapped in driver.
+> Drivers always feel happy to receive physical address in resource, and ioremap
+> it itself. We might static map too many register regions in machine level?
+> I'm sure it's not just i2c.
 
-I think the atomic stuff should be the norm through and through - otherwise
-we're going to end up with problems in drivers where they use the _atomic()
-stuff, but the clocks behind are coded to sleep.
-
-I hate the GPIO APIs for doing this _cansleep crap as the decision of
-whether to use the _cansleep or normal APIs normally can't be made at
-the time when the API is used, but sometime later.  Many people just use
-the non-_cansleep versions irrespective of the context they're in -
-which is unnecessarily restrictive - consider what happens if you then
-have that driver use a GPIO on an I2C peripheral...
-
-By inventing two interfaces, you're asking for the same thing to happen
-with clocks.
+either cleanup the mapping, or add a custom ioremap() to return this
+region for the drivers.
