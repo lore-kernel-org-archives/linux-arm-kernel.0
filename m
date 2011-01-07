@@ -1,53 +1,80 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 8 Jan 2011 02:52:33 +0530
-Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix for
-	undefined reference to 'omap2_prm_read_mod_reg'
-In-Reply-To: <87r5comn6o.fsf@ti.com>
-References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com><1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com><alpine.DEB.2.00.1101061056340.22048@utopia.booyaka.com><e194160102cb8b695465c81eea6582fc@mail.gmail.com>
-	<87r5comn6o.fsf@ti.com>
-Message-ID: <d252887d2246f5e31e3763666ddc4958@mail.gmail.com>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Fri,  7 Jan 2011 16:24:05 -0500
+Subject: [PATCH] ARM: vexpress: register platform PATA device.
+Message-ID: <1294435445-2020-1-git-send-email-nbowler@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Saturday, January 08, 2011 2:44 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
-> kernel at lists.infradead.org; Paul Walmsley
-> Subject: Re: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix
-> for undefined reference to 'omap2_prm_read_mod_reg'
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> [...]
->
-> >> I think it would be best to use WARN() on these, rather than
-> >> WARN_ONCE().  That's because these could be called from different
-> >> parts of the code base, and the stack backtrace will help someone
-> >> figure out all the code that needs to be fixed.
-> >>
-> >> Once you do that, this patch is
-> >>
-> >> Acked-by: Paul Walmsley <paul@pwsan.com>
-> >>
->
-> > With WARN() instead of WARN_ONCE() and Paul's ack, here
-> > is an updated patch.
->
-> Thanks, will queue for .38-rc cycle.
->
-> I'll again plead for working on your git-send-email setup.  It looks
-> like your using outlook.  The inline patch is wrapped (as outlook
-> almost
-> always does.)  The attached version applied fine, but the strong
-> preference is for a single inline patch.
->
-Its google mail now a days. I thought it will wrap and
-hence attached the version.
+The compactflash device on this platform is not usable simply because it
+is never registered with the kernel.  Fix that up.
 
-Fully agree with inline patch but as this one was minor
-update I skipped it.
+Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+---
+ arch/arm/Kconfig             |    1 +
+ arch/arm/mach-vexpress/v2m.c |   25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 0 deletions(-)
 
-Regards
-Santosh
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d56d21c..ee61039 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -264,6 +264,7 @@ config ARCH_VEXPRESS
+ 	select HAVE_CLK
+ 	select ICST
+ 	select PLAT_VERSATILE
++	select HAVE_PATA_PLATFORM
+ 	help
+ 	  This enables support for the ARM Ltd Versatile Express boards.
+ 
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 7eaa232..89ec45c 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -7,6 +7,7 @@
+ #include <linux/io.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
++#include <linux/ata_platform.h>
+ #include <linux/smsc911x.h>
+ #include <linux/spinlock.h>
+ #include <linux/sysdev.h>
+@@ -238,6 +239,29 @@ static struct platform_device v2m_flash_device = {
+ 	.dev.platform_data = &v2m_flash_data,
+ };
+ 
++static struct pata_platform_info v2m_pata_data = {
++	.ioport_shift	= 2,
++};
++
++static struct resource v2m_pata_resources[] = {
++	{
++		.start	= V2M_CF,
++		.end	= V2M_CF + 0xff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= V2M_CF + 0x100,
++		.end	= V2M_CF + SZ_4K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device v2m_cf_device = {
++	.name		= "pata_platform",
++	.id		= -1,
++	.resource       = v2m_pata_resources,
++	.num_resources  = ARRAY_SIZE(v2m_pata_resources),
++	.dev.platform_data = &v2m_pata_data,
++};
+ 
+ static unsigned int v2m_mmci_status(struct device *dev)
+ {
+@@ -352,6 +376,7 @@ static int __init v2m_init(void)
+ 	platform_device_register(&v2m_pcie_i2c_device);
+ 	platform_device_register(&v2m_ddc_i2c_device);
+ 	platform_device_register(&v2m_flash_device);
++	platform_device_register(&v2m_cf_device);
+ 	platform_device_register(&v2m_eth_device);
+ 	platform_device_register(&v2m_usb_device);
+ 
+-- 
+1.7.2.2
