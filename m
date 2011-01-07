@@ -1,47 +1,52 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 7 Jan 2011 15:00:57 +0800
-Subject: [PATCH v3 05/10] net/fec: add dual fec support for mx28
-In-Reply-To: <20110106071047.GW25121@pengutronix.de>
-References: <1294236457-17476-1-git-send-email-shawn.guo@freescale.com>
-	<1294236457-17476-6-git-send-email-shawn.guo@freescale.com>
-	<20110105163449.GU25121@pengutronix.de>
-	<20110106041457.GC17891@freescale.com>
-	<20110106071047.GW25121@pengutronix.de>
-Message-ID: <20110107070056.GA28358@freescale.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 7 Jan 2011 14:10:50 +0530
+Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build
+	break because of clktrctrl_mask
+In-Reply-To: <87ipy1vqdi.fsf@ti.com>
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com><87fwt7z1p3.fsf@ti.com><alpine.DEB.2.00.1101061059590.22048@utopia.booyaka.com>
+	<87ipy1vqdi.fsf@ti.com>
+Message-ID: <3f76fc53e9b50d75480bcfe1d2b6312e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org
+[mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Kevin Hilman
+> Sent: Thursday, January 06, 2011 11:58 PM
+> To: Paul Walmsley
+> Cc: Santosh Shilimkar; linux-omap at vger.kernel.org; tony at atomide.com;
+linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for
+build break because of clktrctrl_mask
+>
+> Paul Walmsley <paul@pwsan.com> writes:
+>
+> > On Wed, 5 Jan 2011, Kevin Hilman wrote:
+> >
+> >> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> >>
+> >> > struct clockdomain member clktrctrl_mask is available for only for
+OMAP2
+> >> > and OMAP3 architectures. Technially it is also used only for these
+archs
+> >> > but this breaks the build with custom OMAP4 configuration.
+> >>
+> >> I'll queue patches 3-5 for the 2.6.38-rc fixes cycle.
+> >>
+> >> With Paul's ack, I can queue the others too, or Paul can decide to
+take
+> >> them via his tree.  Paul can decide.
+> >
+> > I've acked one and requested minor changes on the other, after which
+it
+> > can be acked by me.  You're welcome to take them at that point.  Just
+a
+> > request, maybe you can post a branch with just these patches in them;
+that
+> > way Rajendra and/or I can rebase his new clockdomain changes on it
+until
+> > -rc1 comes out.
+>
+> Sure, will do.
 
-On Thu, Jan 06, 2011 at 08:10:47AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Shawn,
-> 
-[...]
-> > > > +     /*
-> > > > +      * enet-mac reset will reset mac address registers too,
-> > > > +      * so need to reconfigure it.
-> > > > +      */
-> > > > +     if (fec_is_enetmac) {
-> > > > +             memcpy(&temp_mac, dev->dev_addr, ETH_ALEN);
-> > 		  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> > > > +             writel(cpu_to_be32(temp_mac[0]), fep->hwp + FEC_ADDR_LOW);
-> > > > +             writel(cpu_to_be32(temp_mac[1]), fep->hwp + FEC_ADDR_HIGH);
-> > > where is the value saved to temp_mac[]?  For me it looks you write
-> > > uninitialized data into the mac registers.
-> > 
-> > memcpy above.
-> oops.  right.  I looked for something like
-> 
-> 	temp_mac[0] = dev->dev_addr[0] << $shiftfor0 | ...
-> 
-> which AFAIK is what you want here.  memcpy is sensible to (at least)
-> endian issues.  If you ask me factor out the setting of the mac address
-> in probe to a function and use that here, too.
-> 
-The memcpy of mac address is being widely used in fec and other
-network drivers, and I do not prefer to change something so common
-in this patch set.
-
--- 
-Regards,
-Shawn
+Just another trivial fix.
