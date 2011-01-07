@@ -1,50 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Jan 2011 18:51:54 +0100
-Subject: [PATCH 15/23] Alternative mmc structure to support pxa168, pxa910,
-	mmp2 family SD
-In-Reply-To: <ABCC071A-5598-48AA-9545-2712FA0BB624@marvell.com>
-References: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
-	<201101062029.45604.arnd@arndb.de>
-	<ABCC071A-5598-48AA-9545-2712FA0BB624@marvell.com>
-Message-ID: <201101071851.54872.arnd@arndb.de>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 7 Jan 2011 17:56:13 +0000
+Subject: [PATCHv3] watchdog: add support for the Synopsys DesignWare WDT
+In-Reply-To: <20110107165250.GU31708@n2100.arm.linux.org.uk>
+References: <1294401797-24158-1-git-send-email-jamie@jamieiles.com>
+	<AANLkTi=s4Wuj1YyALL7f1AK-MQjvPre8mvviLhw5TdPH@mail.gmail.com>
+	<20110107165250.GU31708@n2100.arm.linux.org.uk>
+Message-ID: <20110107175613.GH2844@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 January 2011, Philip Rakity wrote:
-> Thanks for the suggestion.  Let me see if I can implement this.  
+On Fri, Jan 07, 2011 at 04:52:50PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 07, 2011 at 10:13:50PM +0530, viresh kumar wrote:
+> > > +
+> > > + ? ? ? dw_wdt.clk = clk_get(&pdev->dev, NULL);
+> > > + ? ? ? if (IS_ERR_OR_NULL(dw_wdt.clk))
+> > > + ? ? ? ? ? ? ? return -ENODEV;
+> > 
+> > should release mem_region and free ioremaped space.
+> > Also, may be we can continue here in case of error too.
+> > Some platforms might nor support clock framework. You can enable and
+> > disable clk's
+> > if dw_wdt.clk is !NULL
 > 
-> A couple of points first
+> And some platforms have been known to return NULL for clk_get() as they
+> don't support more than one clock.
 > 
-> a) current implementation once PXA168/910 is selected will no longer show MMP2 boards so it is also broken.  Play around and you will see the issues
+> arch/arm/mach-aaec2000/core.c:struct clk *clk_get(struct device *dev, const char *id)
+> arch/arm/mach-aaec2000/core.c-{
+> arch/arm/mach-aaec2000/core.c-  return dev && strcmp(dev_name(dev), "mb:16") ==
+> 0 ? NULL : ERR_PTR(-ENOENT);
+> --
+> arch/arm/mach-at91/at91x40.c:struct clk *clk_get(struct device *dev, const char
+> *id)
+> arch/arm/mach-at91/at91x40.c-{
+> arch/arm/mach-at91/at91x40.c-   return NULL;
+> --
+> arch/arm/mach-netx/fb.c:struct clk *clk_get(struct device *dev, const char *id)
+> arch/arm/mach-netx/fb.c-{
+> arch/arm/mach-netx/fb.c-        return dev && strcmp(dev_name(dev), "fb") == 0 ? NULL : ERR_PTR(-ENOENT);
+> 
+> Please stick to the conventions of the API in the driver.  IS_ERR() values
+> mean we failed.  Anything else must be considered success.  Don't assume
+> NULL means we failed.
 
-I didn't see it on the version I'm looking at now, but if it's inconsistent or
-allows you to select combinationst that cannot be built, then it should be fixed.
+Ok, so I'll change the driver to get the clock rate of the watchdog 
+through platform data for those that don't provide a struct clk and 
+clk_get_rate() returns 0.
 
-> My proposed patch did the following
-> a) ARCH_MMP is set when PXA168, PXA910 or MMP2 are selected (from arch/arm)
-> b) Board selection uses the PXA168/PXA910/MMP2 to show correct board.
+Looking at mach-aaec2000 and mach-netx they don't provide a 
+clk_get_rate() which from linux/clk.h doesn't look like it's optional.  
+Should these platforms have some kind of stub clk_get_rate()?
 
-Yes, that is what I thought, but it is inconsistent with how other platforms do this.
-Usually, the top-level selection chooses one source directory, and anything specific
-to that platform is handled by that Kconfig.
-
-> If I understand what you are suggesting is the following
-> a) leave ARCH_MMP is system selection alone -- 
-> b) move speciific CPU selection to where board selection is now (cpu/arch/mach-mmp)
-
-Right.
-
-> c) what do with development boards ?  select all of them for the CPU Type ?  
->
-> Point me to a Kconfig that does what you are suggesting as an example and I can try out the suggestion.
-
-Just put it below the CPU selection.
-
-OMAP does something like this -- you first select either OMAP1 or OMAP2/3/4, then
-the families in the latter case, and finally the boards.
-
-You can do the same by first giving the choice between ARMv6 and PXA168/910, and
-then showing the boards below the CPU. There are multiple ways of doing this
-that lead to the same result.
-
-	Arnd
+Jamie
