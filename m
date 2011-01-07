@@ -1,27 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Jan 2011 10:11:59 +0000
-Subject: [PATCH 1/1] arm: omap: gpio: define .disable callback for gpio
-	irq chip
-In-Reply-To: <20110107095609.GC6137@besouro.research.nokia.com>
-References: <1294250283-18182-1-git-send-email-eduardo.valentin@nokia.com>
-	<20110105181918.GB8717@n2100.arm.linux.org.uk>
-	<20110105192425.GA24729@besouro.research.nokia.com>
-	<87aajfvstw.fsf@ti.com>
-	<20110106062404.GA14141@besouro.research.nokia.com>
-	<878vyxx697.fsf@ti.com>
-	<20110107095609.GC6137@besouro.research.nokia.com>
-Message-ID: <20110107101159.GP31708@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 7 Jan 2011 16:44:05 +0530
+Subject: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix for
+	undefined reference to 'omap2_prm_read_mod_reg'
+In-Reply-To: <alpine.DEB.2.00.1101061056340.22048@utopia.booyaka.com>
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+	<1294225024-21857-2-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1101061056340.22048@utopia.booyaka.com>
+Message-ID: <e194160102cb8b695465c81eea6582fc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 07, 2011 at 11:56:09AM +0200, Eduardo Valentin wrote:
-> It is in wakeup-enable gpio. But the driver removes the wakeup
-> flag from the gpio on its suspend function right after disabling the irq.
->  disable_irq(gpio_irq);
->  disable_irq_wake(gpio_irq);
-> 
-> In this case, the device uses gpio 61 as its irq line.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Thursday, January 06, 2011 11:28 PM
+Kevin,
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; khilman at ti.com; tony at atomide.com;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 2/5] omap2plus: prm: Trvial build break fix
+> for undefined reference to 'omap2_prm_read_mod_reg'
+>
+> Hi Santosh
+>
+[.....]
 
-I think the solution to this is to have genirq synchronize the hardware
-state with the lazy state on suspend transitions rather than trying to
-fix this on a case-by-case basis.
+>
+> I think it would be best to use WARN() on these, rather than
+> WARN_ONCE().
+> That's because these could be called from different parts of the
+> code
+> base, and the stack backtrace will help someone figure out all the
+> code
+> that needs to be fixed.
+>
+> Once you do that, this patch is
+>
+> Acked-by: Paul Walmsley <paul@pwsan.com>
+>
+>
+With WARN() instead of WARN_ONCE() and Paul's ack, here
+is an updated patch.
