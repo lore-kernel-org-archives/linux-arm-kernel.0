@@ -1,51 +1,72 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 7 Jan 2011 17:21:00 +0800
-Subject: [PATCH 1/1] arm: mxc: move IOMUX_CONFIG_SION definition to
-	iomux-v3.h
-In-Reply-To: <1294311939-15503-1-git-send-email-richard.zhao@freescale.com>
-References: <1294311939-15503-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <AANLkTinCEwZg7FRNzjAghoWsaWO0_viXEe9Jf6vXLQi8@mail.gmail.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Fri, 7 Jan 2011 17:30:28 +0800
+Subject: [patch 1/1] mx51: add support for pwm
+In-Reply-To: <20110107090656.517403682@rtp-net.org>
+References: <20110107090656.517403682@rtp-net.org>
+Message-ID: <AANLkTin7U0+sJ+Xz7BiJ2NbtiGXsyQbdVKejU9M5qrUp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-On Thu, Jan 6, 2011 at 7:05 PM, Richard Zhao <richard.zhao@freescale.com> wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Will you accept this patch?
+Hi, Arnaud,
 
-Thanks
-Richard
-> ---
-> ?arch/arm/plat-mxc/include/mach/iomux-mx53.h | ? ?1 -
-> ?arch/arm/plat-mxc/include/mach/iomux-v3.h ? | ? ?1 +
-> ?2 files changed, 1 insertions(+), 1 deletions(-)
+2011/1/7 Arnaud Patard <arnaud.patard@rtp-net.org>:
+> This patch is adding support for pwm1 and pwm2 devices found
+> on mx51.
+> [ this patch has been tested with pwm-backlight driver ]
 >
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> index 5deee01..2673007 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> @@ -34,7 +34,6 @@ typedef enum iomux_config {
-> ? ? ? ?IOMUX_CONFIG_ALT6,
-> ? ? ? ?IOMUX_CONFIG_ALT7,
-> ? ? ? ?IOMUX_CONFIG_GPIO, /* added to help user use GPIO mode */
-> - ? ? ? IOMUX_CONFIG_SION = 0x1 << 4, /* LOOPBACK:MUX SION bit */
-> ?} iomux_pin_cfg_t;
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Index: linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c
+> ===================================================================
+> --- linux-2.6-submit.orig/arch/arm/mach-mx5/clock-mx51-mx53.c ? 2011-01-04 11:36:15.000000000 +0100
+> +++ linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ?2011-01-04 11:39:55.000000000 +0100
+> @@ -1206,6 +1206,11 @@
+> ?DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
+> ? ? ? ?NULL, ?NULL, &ipg_clk, &gpt_ipg_clk);
 >
-> ?/* These 2 defines are for pins that may not have a mux register, but could
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> index 2277b01..82620af 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> @@ -105,6 +105,7 @@ typedef u64 iomux_v3_cfg_t;
-> ?#define PAD_CTL_SRE_FAST ? ? ? ? ? ? ? (1 << 0)
-> ?#define PAD_CTL_SRE_SLOW ? ? ? ? ? ? ? (0 << 0)
+> +DEFINE_CLOCK(pwm1_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG6_OFFSET,
+> + ? ? ? NULL, NULL, &ipg_clk, NULL);
+> +DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
+> + ? ? ? NULL, NULL, &ipg_clk, NULL);
+> +
+> ?/* I2C */
+> ?DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
+> ? ? ? ?NULL, NULL, &ipg_clk, NULL);
+> @@ -1298,6 +1303,8 @@
+> ? ? ? ?_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+> ? ? ? ?_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+> ? ? ? ?_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> + ? ? ? _REGISTER_CLOCK("mxc_pwm.0", "pwm", pwm1_clk)
+> + ? ? ? _REGISTER_CLOCK("mxc_pwm.1", "pwm", pwm2_clk)
+> ? ? ? ?_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
+> ? ? ? ?_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+> ? ? ? ?_REGISTER_CLOCK("imx-i2c.2", NULL, hsi2c_clk)
+> Index: linux-2.6-submit/arch/arm/mach-mx5/devices.c
+> ===================================================================
+> --- linux-2.6-submit.orig/arch/arm/mach-mx5/devices.c ? 2011-01-04 11:11:43.000000000 +0100
+> +++ linux-2.6-submit/arch/arm/mach-mx5/devices.c ? ? ? ?2011-01-04 11:39:55.000000000 +0100
+> @@ -120,6 +120,44 @@
+> ? ? ? ?},
+> ?};
+[...]
+> +struct platform_device mxc_pwm2_device = {
+> + ? ? ? .name = "mxc_pwm",
+> + ? ? ? .id = 1,
+> + ? ? ? .num_resources = ARRAY_SIZE(pwm2_resources),
+> + ? ? ? .resource = pwm2_resources,
+> +};
+> +
+
+Why not follow the arch/arm/plat-mxc/devices/platform-imx-xxx to add
+devices support?
+I saw that some devices was added in arch/arm/mach-mx5/devices.c, but
+most are in
+ arch/arm/plat-mxc/devices/xx, what's the rule for it when we add
+device support?
+
+[...]
 >
-> +#define IOMUX_CONFIG_SION ? ? ? ? ? ? ?(0x1 << 4)
->
-> ?#define MX51_NUM_GPIO_PORT ? ? 4
->
-> --
-> 1.6.3.3
->
->
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
