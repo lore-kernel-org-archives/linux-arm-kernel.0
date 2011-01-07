@@ -1,36 +1,56 @@
-From: jgarzik@pobox.com (Jeff Garzik)
-Date: Thu, 06 Jan 2011 18:17:56 -0500
-Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
-In-Reply-To: <20110106105157.GA9560@oksana.dev.rtsoft.ru>
-References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
-	<4D24B53C.4020009@pobox.com>
-	<AANLkTinxNtzpzUn0=-iph_N7tffM6Nu++J9qNNhcp8pX@mail.gmail.com>
-	<20110106105157.GA9560@oksana.dev.rtsoft.ru>
-Message-ID: <4D264DA4.6040308@pobox.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 7 Jan 2011 08:10:20 +0800
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <20110106201137.GY25121@pengutronix.de>
+References: <1294199462.347935.472473715866.0.gpush@pororo>
+	<20110106160752.GA2775@riccoc20.at.omicron.at>
+	<20110106201137.GY25121@pengutronix.de>
+Message-ID: <201101070810.21398.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2011 05:51 AM, Anton Vorontsov wrote:
-> On Thu, Jan 06, 2011 at 02:43:08PM +0800, Lin Mac wrote:
-> [...]
->>> It is overkill to rename the entirety of ahci_platform just for one override
->>> function.
->>> This sort of thing I would have expected to be added directly to
->>> ahci_platform.c.
->> It might be overkill for only one controller. but it is more clean and
->> readable to have different SoC specific changes in separate files,
->> especially when more SoCs need to make similar changes.
->
-> I think that renaming the file is not necessary. You can just
-> rename the module in the makefile.
->
-> Personally I like the current approach more than putting
-> controller-specific fixups directly into ahci_platform.
+Hi Richard,
 
-My main objection is the renaming.  If ahci_platform wants to export 
-some symbols for SoC modules like ahci_platform_cns, that's ok.
+> > > +struct clk {
+> > > +	const struct clk_ops	*ops;
+> > > +	unsigned int		enable_count;
+> > > +	int			flags;
+> > > +	union {
+> > > +		struct mutex	mutex;
+> > > +		spinlock_t	spinlock;
+> > > +	} lock;
+> > > +};
+> > 
+> > Here you have a "polymorphic" lock, where the clock instance knows
+> > which type it is supposed to be.  I got flak from David Miller and
+> > 
+> > others trying to do the same thing with the mdio_bus:
+> >    http://kerneltrap.org/mailarchive/linux-netdev/2010/7/6/6280618
+> > 
+> > The criticism, applied to your case, is that the clk_enable() caller
+> > cannot know whether it is safe to make the call or not. I was told,
+> > "there has got to be a better way."
+> 
+> Note that this is not "new".  Currently there is no convention available
+> if clk_enable sleeps or not.  See e.g.
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744
 
-In general, follow the library approach rather than linking modules 
-together in strange ways.
+As Uwe says, the common clock does not change these semantics; I would prefer 
+to keep the driver API changes at a minimum with these patches.
 
-	Jeff
+But yes, it would be a good idea to:
+
+ * introduce clk_enable_atomic, which requires clk->flags & CLK_ATOMIC
+
+ * add might_sleep to clk_enable(), encouraging clk uses in atomic contexts
+   to switch to clk_enable_atomic.
+
+We'd still be able to handle CLK_ATOMIC clocks in clk_enable(), so the 
+enforcement only needs to be one-way.
+
+However, I think these would be better as separate changes.
+
+Cheers,
+
+
+Jeremy
