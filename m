@@ -1,52 +1,63 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Jan 2011 21:15:02 +0800
-Subject: Bug in arch-mmp board selection
-In-Reply-To: <AANLkTi=SX-KmcmP-cNN-59D+rSABQmSHEPQaYF0WFbGg@mail.gmail.com>
-References: <AANLkTi=SX-KmcmP-cNN-59D+rSABQmSHEPQaYF0WFbGg@mail.gmail.com>
-Message-ID: <AANLkTimCasesYnoGL1tYX-Lz9fhk4im1bg_ntKrkO-bC@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 07 Jan 2011 07:30:15 -0600
+Subject: [PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP
+In-Reply-To: <alpine.DEB.1.10.1101071457540.18906@esdhcp041196.research.nokia.com>
+References: <1294260576-20237-1-git-send-email-nm@ti.com>
+	<1294260576-20237-3-git-send-email-nm@ti.com>
+	<alpine.DEB.1.10.1101071457540.18906@esdhcp041196.research.nokia.com>
+Message-ID: <4D271567.2010105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 5, 2011 at 12:57 PM, Mark F. Brown <mark.brown314@gmail.com> wrote:
-> Hi Eric,
->
-> PXA168 and PXA910 are based on PJ1 which is an ARMv5 compatible architecture
-> MMP2 is a based on PJ4 which configured as ARMv6 currently (there are
-> ARMv7 versions as well)
->
-> Currently all SoCs are selectable under the "PXA168/910/MMP2" menu
-> option which allows you to then select PXA168, PXA910, and MMP2 boards
-> for one image. If you build this configuration this error occurs:
->
-> ?AS ? ? ?arch/arm/kernel/entry-armv.o
-> arch/arm/kernel/entry-armv.S: Assembler messages:
-> arch/arm/kernel/entry-armv.S:212: Error: selected processor does not
-> support `clrex'
-> arch/arm/kernel/entry-armv.S:244: Error: selected processor does not
-> support `clrex'
-> arch/arm/kernel/entry-armv.S:302: Error: selected processor does not
-> support `clrex'
-> arch/arm/kernel/entry-armv.S:338: Error: selected processor does not
-> support `clrex'
-> make[1]: *** [arch/arm/kernel/entry-armv.o] Error 1
-> make: *** [arch/arm/kernel] Error 2
->
-> I am aware we can resolve this by adding KConfig rules to prevent this
-> scenario, but it leads to a deeper question. Why does selecting the
-> board in turn select the CPU type instead of the user enabling the CPU
-> type and then providing a set of boards for selection?
->
+Aaro Koskinen wrote, on 01/07/2011 07:04 AM:
 
-Because the board knows which SoC it's using, and the logic behind
-this is - if you select the board, the board select everything else applicable.
-
-And you are right, it's not able to select all boards in mach-mmp/ to
-make them built into a single image at this moment. However, that's
-possible theoretically. And that's the reason I'm keeping two separate
-_defconfig for pxa168_ and mmp2_.
-
-> e.g.
-> config MACH_ZYLONITE2
-> ? ? ? ?bool "Marvell's PXA168 Zylonite2 Development Board"
-> ? ? ? --> select CPU_PXA168
+> On Wed, 5 Jan 2011, Nishanth Menon wrote:
+>> +static void __init beagle_opp_init(void)
+>> +{
+>> + int r = 0;
+>> +
+>> + /* Initialize the omap3 opp table */
+>> + if (omap3_opp_init()) {
+>> + pr_err("%s: opp default init failed\n", __func__);
+>> + return;
+>> + }
+>> +
+>> + /* Custom OPP enabled for XM */
+>> + if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+>> + struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
+>> + struct omap_hwmod *dh = omap_hwmod_lookup("iva");
+>> + struct device *dev;
+>> +
+>> + if (!mh || !dh) {
+>> + pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
+>> + __func__, mh, dh);
+>> + r = -EINVAL;
+>> + } else {
+>> + /* Enable MPU 1GHz and lower opps */
+>> + dev = &mh->od->pdev.dev;
+>> + r = opp_enable(dev, 800000000);
+>> + /* TODO: MPU 1GHz needs SR and ABB */
+>> +
+>> + /* Enable IVA 800MHz and lower opps */
+>> + dev = &dh->od->pdev.dev;
+>> + r |= opp_enable(dev, 660000000);
+>> + /* TODO: DSP 800MHz needs SR and ABB */
+>> + }
+>> + if (r) {
+>> + pr_err("%s: failed to enable higher opp %d\n",
+>> + __func__, r);
+>> + /*
+>> + * Cleanup - disable the higher freqs - we dont care
+>> + * about the results
+>> + */
+>> + dev = &mh->od->pdev.dev;
+>> + opp_disable(dev, 800000000);
+>> + dev = &dh->od->pdev.dev;
 >
+> This branch will be reached also when !mh || !dh, so it won't work.
+
+arrgh.. thanks for catching it - will fix and repost.
+
+-- 
+Regards,
+Nishanth Menon
