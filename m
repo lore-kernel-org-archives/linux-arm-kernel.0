@@ -1,33 +1,117 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Fri, 7 Jan 2011 15:47:44 +0100 (CET)
-Subject: [PATCH 0/2] ARM: Gemini: add RTC support for Gemini SoC
-In-Reply-To: <20110107093155.GN31708@n2100.arm.linux.org.uk>
-References: <1292339307-14336-1-git-send-email-ulli.kroll@googlemail.com>
-	<20110107093155.GN31708@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LNX.2.00.1101071543230.8231@localhost>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri,  7 Jan 2011 09:41:13 -0600
+Subject: [PATCH v2 2/2] OMAP3: beagle xm: enable upto 800MHz OPP
+In-Reply-To: <[PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP>
+References: <[PATCH 2/2] OMAP3: beagle xm: enable upto 800MHz OPP>
+Message-ID: <1294414873-22447-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+OMP3630 silicon can enable higher frequencies only depending on the board
+characteristics meeting the recommended standards, and has to be selectively
+toggled.
 
+Beagle XM uses 3730 variant and the board design allows enabling 800MHz and
+1GHz OPPs. However, We need Smart reflex class 1.5 and ABB to enable 1GHz
+safely.  For the moment, we tweak the default table to allow for 800Mhz OPP
+usage.
 
-On Fri, 7 Jan 2011, Russell King - ARM Linux wrote:
+Reported-by: Koen Kooi <koen@beagleboard.org>
+Tested-by: Koen Kooi <koen@beagleboard.org>
 
-> On Tue, Dec 14, 2010 at 04:08:25PM +0100, Hans Ulli Kroll wrote:
-> > This patch adds the driver for the rtc chip on the Gemini SoC
-> 
-> I'll take patch 2, but not patch 1.  There is no requirement for patch 1
-> to come via my tree - it can be handled by the RTC people.
-> 
-> My tree is not for random driver code being merged into mainline just
-> because it's used on some ARM platform somewhere.
-> 
-> (I'm making this request as a result of feedback from Linus on last nights
-> merge of the ARM tree.)
-> 
-> Thanks.
-> 
-ACK
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+v2: fixed issue when !mh || !dh, updated commit message to point on rationale
+    for board specific tweaking
+v1: http://marc.info/?t=129426060900008&r=1&w=2
+ arch/arm/mach-omap2/board-omap3beagle.c |   50 +++++++++++++++++++++++++++++++
+ 1 files changed, 50 insertions(+), 0 deletions(-)
 
-I already imaged this, therefore I divided this into two parts.
-
-Ulli
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 6c12760..7dc0397 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -23,6 +23,7 @@
+ #include <linux/gpio.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
++#include <linux/opp.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -44,10 +45,12 @@
+ #include <plat/gpmc.h>
+ #include <plat/nand.h>
+ #include <plat/usb.h>
++#include <plat/omap_device.h>
+ 
+ #include "mux.h"
+ #include "hsmmc.h"
+ #include "timer-gp.h"
++#include "pm.h"
+ 
+ #define NAND_BLOCK_SIZE		SZ_128K
+ 
+@@ -556,6 +559,52 @@ static struct omap_musb_board_data musb_board_data = {
+ 	.power			= 100,
+ };
+ 
++static void __init beagle_opp_init(void)
++{
++	int r = 0;
++
++	/* Initialize the omap3 opp table */
++	if (omap3_opp_init()) {
++		pr_err("%s: opp default init failed\n", __func__);
++		return;
++	}
++
++	/* Custom OPP enabled for XM */
++	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
++		struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
++		struct omap_hwmod *dh = omap_hwmod_lookup("iva");
++		struct device *dev;
++
++		if (!mh || !dh) {
++			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
++				__func__, mh, dh);
++			return;
++		}
++		/* Enable MPU 1GHz and lower opps */
++		dev = &mh->od->pdev.dev;
++		r = opp_enable(dev, 800000000);
++		/* TODO: MPU 1GHz needs SR and ABB */
++
++		/* Enable IVA 800MHz and lower opps */
++		dev = &dh->od->pdev.dev;
++		r |= opp_enable(dev, 660000000);
++		/* TODO: DSP 800MHz needs SR and ABB */
++		if (r) {
++			pr_err("%s: failed to enable higher opp %d\n",
++				__func__, r);
++			/*
++			 * Cleanup - disable the higher freqs - we dont care
++			 * about the results
++			 */
++			dev = &mh->od->pdev.dev;
++			opp_disable(dev, 800000000);
++			dev = &dh->od->pdev.dev;
++			opp_disable(dev, 660000000);
++		}
++	}
++	return;
++}
++
+ static void __init omap3_beagle_init(void)
+ {
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+@@ -579,6 +628,7 @@ static void __init omap3_beagle_init(void)
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+ 
+ 	beagle_display_init();
++	beagle_opp_init();
+ }
+ 
+ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+-- 
+1.6.3.3
