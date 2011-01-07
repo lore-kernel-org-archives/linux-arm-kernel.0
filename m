@@ -1,116 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Jan 2011 14:09:53 +0000
-Subject: [PATCH v2 2/8] ARM: Realview: Use physmap driver instead of
+Date: Fri,  7 Jan 2011 14:09:55 +0000
+Subject: [PATCH v2 4/8] ARM: VExpress: Use physmap driver instead of
 	integrator-flash
 In-Reply-To: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
 References: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1294409399-19245-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1294409399-19245-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Tested on a PB11-MPCore.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/configs/realview-smp_defconfig |    2 +-
- arch/arm/configs/realview_defconfig     |    2 +-
- arch/arm/mach-realview/core.c           |   31 ++++---------------------------
- 3 files changed, 6 insertions(+), 29 deletions(-)
+ arch/arm/mach-vexpress/v2m.c |   22 ++++------------------
+ 1 files changed, 4 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
-index 5ca7a61..abe61bf 100644
---- a/arch/arm/configs/realview-smp_defconfig
-+++ b/arch/arm/configs/realview-smp_defconfig
-@@ -38,7 +38,7 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
--CONFIG_MTD_ARM_INTEGRATOR=y
-+CONFIG_MTD_PHYSMAP=y
- CONFIG_ARM_CHARLCD=y
- CONFIG_NETDEVICES=y
- CONFIG_SMSC_PHY=y
-diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
-index fcaa603..7079cbe 100644
---- a/arch/arm/configs/realview_defconfig
-+++ b/arch/arm/configs/realview_defconfig
-@@ -37,7 +37,7 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
--CONFIG_MTD_ARM_INTEGRATOR=y
-+CONFIG_MTD_PHYSMAP=y
- CONFIG_ARM_CHARLCD=y
- CONFIG_NETDEVICES=y
- CONFIG_SMSC_PHY=y
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 1c6602c..805cadd 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -31,6 +31,7 @@
- #include <linux/amba/mmci.h>
- #include <linux/gfp.h>
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index a9ed342..af96624 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -12,9 +12,9 @@
+ #include <linux/sysdev.h>
+ #include <linux/usb/isp1760.h>
  #include <linux/clkdev.h>
 +#include <linux/mtd/physmap.h>
  
- #include <asm/system.h>
- #include <mach/hardware.h>
-@@ -41,7 +42,6 @@
- #include <asm/hardware/icst.h>
- 
- #include <asm/mach/arch.h>
+ #include <asm/sizes.h>
 -#include <asm/mach/flash.h>
- #include <asm/mach/irq.h>
  #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/hardware/arm_timer.h>
+@@ -196,27 +196,13 @@ static struct platform_device v2m_usb_device = {
+ 	.dev.platform_data = &v2m_usb_config,
+ };
  
-@@ -76,27 +76,7 @@ void __init realview_adjust_zones(unsigned long *size, unsigned long *hole)
- 
- #define REALVIEW_FLASHCTRL    (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_FLASH_OFFSET)
- 
--static int realview_flash_init(void)
+-static int v2m_flash_init(void)
 -{
--	u32 val;
--
--	val = __raw_readl(REALVIEW_FLASHCTRL);
--	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
--	__raw_writel(val, REALVIEW_FLASHCTRL);
--
+-	writel(0, MMIO_P2V(V2M_SYS_FLASH));
 -	return 0;
 -}
 -
--static void realview_flash_exit(void)
+-static void v2m_flash_exit(void)
 -{
--	u32 val;
--
--	val = __raw_readl(REALVIEW_FLASHCTRL);
--	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
--	__raw_writel(val, REALVIEW_FLASHCTRL);
+-	writel(0, MMIO_P2V(V2M_SYS_FLASH));
 -}
 -
--static void realview_flash_set_vpp(int on)
-+static void realview_flash_set_vpp(struct map_info *map, int on)
+-static void v2m_flash_set_vpp(int on)
++static void v2m_flash_set_vpp(struct map_info *map, int on)
  {
- 	u32 val;
- 
-@@ -108,16 +88,13 @@ static void realview_flash_set_vpp(int on)
- 	__raw_writel(val, REALVIEW_FLASHCTRL);
+ 	writel(on != 0, MMIO_P2V(V2M_SYS_FLASH));
  }
  
--static struct flash_platform_data realview_flash_data = {
--	.map_name		= "cfi_probe",
-+static struct physmap_flash_data realview_flash_data = {
- 	.width			= 4,
--	.init			= realview_flash_init,
--	.exit			= realview_flash_exit,
- 	.set_vpp		= realview_flash_set_vpp,
+-static struct flash_platform_data v2m_flash_data = {
+-	.map_name	= "cfi_probe",
++static struct physmap_flash_data v2m_flash_data = {
+ 	.width		= 4,
+-	.init		= v2m_flash_init,
+-	.exit		= v2m_flash_exit,
+ 	.set_vpp	= v2m_flash_set_vpp,
  };
  
- struct platform_device realview_flash_device = {
--	.name			= "armflash",
-+	.name			= "physmap-flash",
- 	.id			= 0,
- 	.dev			= {
- 		.platform_data	= &realview_flash_data,
+@@ -233,7 +219,7 @@ static struct resource v2m_flash_resources[] = {
+ };
+ 
+ static struct platform_device v2m_flash_device = {
+-	.name		= "armflash",
++	.name		= "physmap-flash",
+ 	.id		= -1,
+ 	.resource	= v2m_flash_resources,
+ 	.num_resources	= ARRAY_SIZE(v2m_flash_resources),
 -- 
 1.7.0.4
