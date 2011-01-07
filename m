@@ -1,91 +1,27 @@
-From: pratyush.anand@st.com (pratyush)
-Date: Fri, 7 Jan 2011 14:27:01 +0530
-Subject: [PATCH V2] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <20110106184840.GA21672@kroah.com>
-References: <137dfad4a093ea0ac80396f5eb7fbf0c382be698.1294314772.git.viresh.kumar@st.com>
-	<20110106184840.GA21672@kroah.com>
-Message-ID: <4D26D55D.4010600@st.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Fri, 7 Jan 2011 01:00:44 -0800 (PST)
+Subject: [PATCH 1/1] arm: omap: gpio: define .disable callback for gpio
+	irq chip
+In-Reply-To: <20110105202939.GC8717@n2100.arm.linux.org.uk>
+Message-ID: <522801.72719.qm@web180309.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/7/2011 12:18 AM, Greg KH wrote:
-> On Thu, Jan 06, 2011 at 05:29:10PM +0530, Viresh Kumar wrote:
->> From: Pratyush Anand <pratyush.anand@st.com>
->>
->> This is a configurable gadget. can be configured by sysfs interface. Any
->> IP available at PCIE bus can be programmed to be used by host
->> controller.It supoorts both INTX and MSI.
->> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
->> with size 0x1000
->>
->> Changes since V1:
->> - __iomem added for register addresses
->> - kerneldoc comment removed whereever not required.
->> - help node moved from sysfs to documentation/misc-devices
->> - strict_strtoul used instead of sscanf
->>
->> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> ---
->>  Documentation/misc-devices/spear-pcie-gadget.txt |  125 ++++
-> 
-> New sysfs entries require updates to the Documentation/ABI/ directory
-> for them.
-> 
-> Please rework the patch to include these entries.
-> 
 
-Ok..will send [Patch V3] with these modifications.
-But, are these rework needed if I move this interface to configfs
-as you have suggested below.
-Or is there some different directory where documentation for configfs
-node can be mentioned?
+> o lazy-disable state
 
+This is an odd state, and confusion regularly
+comes up ... I've never been a fan of having the
+imperatively named disable_irq() act like a
 
->> +read behaviour of nodes:
->> +------------------------------
->> +link 		:gives ltssm status.
->> +int_type 	:type of supported interrupt
->> +no_of_msi read	:zero if MSI is not enabled by host.A positive value is the
->> +		number of MSI vector granted.
->> +vendor_id	:returns programmed vendor id (hex)
->> +device_id	:returns programmed device id(hex)
->> +bar0_size:	:retruns size of bar0 in hex.
->> +bar0_address	:returns address of bar0 mapped area in hex.
->> +bar0_rw_offset	:returns offset of bar0 for which bar0_data will return value.
->> +bar0_data	:returns data at bar0_rw_offset.
->> +
->> +write behaviour of nodes:
->> +------------------------------
->> +link 		:write UP to enable ltsmm DOWN to disable
->> +int_type	:write interrupt type to be configured and (int_type could be
->> +		INTA, MSI or NO_INT).select MSI only when you have programmed
->> +		no_of_msi node.
->> +no_of_msi	:number of MSI vector needed.
->> +inta		:write 1 to assert INTA and 0 to de-assert.
->> +send_msi	:write MSI vector to be send.
->> +vendor_id	:write vendor id(hex) to be programmed.
->> +device_id	:write device id(hex) to be programmed.
->> +bar0_size	:write size of bar0 in hex. default bar0 size is 1000 (hex)
->> +		bytes.
->> +bar0_address	:write	address of bar0 mapped area in hex. (default mapping of
->> +		bar0 is SYSRAM1(E0800000).Aalways program bar size before bar
->> +		address. kernel might modify bar size and address to align. So
->> +		read back bar size and address after writing to cross check.
->> +bar0_rw_offset	:write offset of bar0 for which	bar0_data will write value.
->> +bar0_data	:write data to be written at bar0_rw_offset.
-> 
-> Should you use configfs for this instead of sysfs?  It looks like that
-> is what you are looking for here.
-> 
+disable_irq_at a_random_later_time_ _but_nyet().  If
+one must have the latter function, clearer IMO
+to name it better and have disable_irq()
+do exactly that by the time it returns ... that
+is after all what folk expect given its name and conventional interpretation of "disable".
+ (ergo confusion when that's not what happens)
 
-configfs seems better option. Will do that in V3.
+lazy_disable_irq() would be accurate, butI'm not
+sure many folk would choose to use it.
 
-Regards
-Pratyush
-
-> thanks,
-> 
-> greg k-h
-> .
-> 
+- Dave
