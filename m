@@ -1,47 +1,27 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat,  8 Jan 2011 19:06:44 +0300
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 8 Jan 2011 17:18:28 +0100
 Subject: [PATCH] i2c-pxa: fix unbinding/rebinding of the device
-In-Reply-To: <20110106124028.GX25121@pengutronix.de>
+In-Reply-To: <1294502804-6580-1-git-send-email-dbaryshkov@gmail.com>
 References: <20110106124028.GX25121@pengutronix.de>
-Message-ID: <1294502804-6580-1-git-send-email-dbaryshkov@gmail.com>
+	<1294502804-6580-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20110108161828.GC8237@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a "pxa2xx-i2c" device was unbound (e.g. via sysfs) the remove
-callback was not called because it was discarded when linking the
-kernel.  Because of that the resources allocated in probe were not
-freed and so a clean unbind/rebind was impossible.
+On Sat, Jan 08, 2011 at 07:06:44PM +0300, Dmitry Eremin-Solenikov wrote:
+> When a "pxa2xx-i2c" device was unbound (e.g. via sysfs) the remove
+> callback was not called because it was discarded when linking the
+> kernel.  Because of that the resources allocated in probe were not
+> freed and so a clean unbind/rebind was impossible.
+> 
+> Fix that by moving the remove callback to .devexit.text.
+> 
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Fix that by moving the remove callback to .devexit.text.
+Thanks
+Uwe
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: linux-i2c at vger.kernel.org
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- drivers/i2c/busses/i2c-pxa.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index f4c19a9..0f10955 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -1115,7 +1115,7 @@ emalloc:
- 	return ret;
- }
- 
--static int __exit i2c_pxa_remove(struct platform_device *dev)
-+static int __devexit i2c_pxa_remove(struct platform_device *dev)
- {
- 	struct pxa_i2c *i2c = platform_get_drvdata(dev);
- 
-@@ -1169,7 +1169,7 @@ static const struct dev_pm_ops i2c_pxa_dev_pm_ops = {
- 
- static struct platform_driver i2c_pxa_driver = {
- 	.probe		= i2c_pxa_probe,
--	.remove		= __exit_p(i2c_pxa_remove),
-+	.remove		= __devexit_p(i2c_pxa_remove),
- 	.driver		= {
- 		.name	= "pxa2xx-i2c",
- 		.owner	= THIS_MODULE,
 -- 
-1.7.2.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
