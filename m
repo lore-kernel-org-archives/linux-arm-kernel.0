@@ -1,80 +1,64 @@
-From: mkl0301@gmail.com (Lin Mac)
-Date: Sat, 8 Jan 2011 07:44:29 +0800
-Subject: [PATCH v2 0/3] add CNS3xxx AHCI support
-In-Reply-To: <20110107154714.GA27055@oksana.dev.rtsoft.ru>
-References: <1294206187-11487-1-git-send-email-mkl0301@gmail.com>
-	<4D24B53C.4020009@pobox.com>
-	<AANLkTinxNtzpzUn0=-iph_N7tffM6Nu++J9qNNhcp8pX@mail.gmail.com>
-	<20110106105157.GA9560@oksana.dev.rtsoft.ru>
-	<4D264DA4.6040308@pobox.com>
-	<20110107154714.GA27055@oksana.dev.rtsoft.ru>
-Message-ID: <AANLkTikMZvCEjd86Rk9dXs4yGhtg0NUcj4BsCgH3XxwF@mail.gmail.com>
+From: nbowler@draconx.ca (Nick Bowler)
+Date: Fri,  7 Jan 2011 21:32:02 -0500
+Subject: [PATCH] pata_platform: Remove CONFIG_HAVE_PATA_PLATFORM's
+	dependencies.
+In-Reply-To: <20110107224348.GZ31708@n2100.arm.linux.org.uk>
+References: <20110107224348.GZ31708@n2100.arm.linux.org.uk>
+Message-ID: <1294453922-27602-1-git-send-email-nbowler@draconx.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/7 Anton Vorontsov <cbouatmailru@gmail.com>:
-> On Thu, Jan 06, 2011 at 06:17:56PM -0500, Jeff Garzik wrote:
->> >[...]
->> >>>It is overkill to rename the entirety of ahci_platform just for one override
->> >>>function.
->> >>>This sort of thing I would have expected to be added directly to
->> >>>ahci_platform.c.
->> >>It might be overkill for only one controller. but it is more clean and
->> >>readable to have different SoC specific changes in separate files,
->> >>especially when more SoCs need to make similar changes.
->> >
->> >I think that renaming the file is not necessary. You can just
->> >rename the module in the makefile.
->> >
->> >Personally I like the current approach more than putting
->> >controller-specific fixups directly into ahci_platform.
->>
->> My main objection is the renaming. ?If ahci_platform wants to export
->> some symbols for SoC modules like ahci_platform_cns, that's ok.
->>
->> In general, follow the library approach rather than linking modules
->> together in strange ways.
->
-> In ahci_platform case there's almost nothing to factor out to a
-> library. Each platform just needs its own small "fixups" that we
-> normally pass via platform data.
->
-> We would happily pass them via platform data, and initially Mac
-> did exactly this, see:
->
-> http://ns3.spinics.net/lists/linux-ide/msg39554.html
->
-> You may notice that all platform-specific quirks are in the
-> platform code, which is neat. But there is a problem: once
-> the platform code needs to use libata, then we have to
-> build libata into the kernel (no modules possible), i.e.
->
-> http://ns3.spinics.net/lists/linux-ide/msg39656.html
->
-> It's not something new, we have the same "problem" with SDHCI,
-> USB and plenty other drivers. But the solution is simple, for
-> example see drivers/mmc/host/sdhci-pltfm.c and sdhci-cns3xxx.c
-> (and sdhci-esdhc-imx.c as another example of platform-specific
-> hooks for sdhci-pltfm).
->
-> Of course, we could make full-fledged platform driver just for
-> CNS3xxx, but that's kind of overkill. IMO, it's better to make
-> ahci_platform flexible and suitable for generic use.
+From: Nick Bowler <nbowler@elliptictech.com>
 
-Thanks for explaining all this.
+CONFIG_HAVE_PATA_PLATFORM, by virtue of where its defined, has a
+dependency on CONFG_ATA and CONFIG_ATA_SFF.  This causes Kconfig
+warnings when it is selected by various architectures, such as
 
-> As for renaming, I agree that ahci_platform.c file does not
-> need to be renamed, I still think that we could just rename
-> the module (so far it is used only on CNS3xxx platforms, so
-> no big deal even if anybody rely on the module name, which
-> I doubt.)
-Yes, you're right.
-cns3xxx seems like the only platform that uses ahci_platform driver.
-Keeping the same module name is not necessary.
+  warning: (ARCH_VEXPRESS && <choice> || ARCH_RPC && <choice> || MACH_VPAC270 && ARCH_PXA || MACH_REALVIEW_PB11MP && ARCH_REALVIEW || MACH_REALVIEW_PBA8 && ARCH_REALVIEW || MACH_REALVIEW_PBX && ARCH_REALVIEW || MACH_BAST_IDE && ARCH_S3C2410 || MACH_ANUBIS && ARCH_S3C2410) selects HAVE_PATA_PLATFORM which has unmet direct dependencies (ATA && ATA_SFF)
 
-We could rename the module ahci_platform to ahci_platforms(?), into
-which link ahci_platform and SoC specific changes.
-Is it acceptable?
+Since this option is only used to control visibility of the
+CONFIG_PATA_PLATFORM option and isn't itself visible in the menu,
+it is straightforward to simply remove these dependencies rather
+than adjust all the architectures.
 
-Best Regards,
-Mac Lin
+Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+---
+ drivers/ata/Kconfig |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index 36e2319..b15254f 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -2,6 +2,14 @@
+ # SATA/PATA driver configuration
+ #
+ 
++config HAVE_PATA_PLATFORM
++	bool
++	help
++	  This is an internal configuration node for any machine that
++	  uses pata-platform driver to enable the relevant driver in the
++	  configuration structure without having to submit endless patches
++	  to update the PATA_PLATFORM entry.
++
+ menuconfig ATA
+ 	tristate "Serial ATA and Parallel ATA drivers"
+ 	depends on HAS_IOMEM
+@@ -765,14 +773,6 @@ config PATA_PCMCIA
+ 
+ 	  If unsure, say N.
+ 
+-config HAVE_PATA_PLATFORM
+-	bool
+-	help
+-	  This is an internal configuration node for any machine that
+-	  uses pata-platform driver to enable the relevant driver in the
+-	  configuration structure without having to submit endless patches
+-	  to update the PATA_PLATFORM entry.
+-
+ config PATA_PLATFORM
+ 	tristate "Generic platform device PATA support"
+ 	depends on EMBEDDED || PPC || HAVE_PATA_PLATFORM
+-- 
+1.7.2.2
