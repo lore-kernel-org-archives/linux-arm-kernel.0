@@ -1,18 +1,32 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Sat, 08 Jan 2011 17:42:05 +0000
-Subject: [PATCH 1/6] i2c-pxa: move i2c_pxa_remove to __devexit instead
-	of just	__exit
-In-Reply-To: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
-References: <1294193110-23958-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <4D28A1ED.90803@fluff.org>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Sat, 8 Jan 2011 20:52:59 +0100
+Subject: [PATCH] ep93xx: add framebuffer support to edb93xx boards
+In-Reply-To: <0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <AANLkTi=uw2sxizgDBSnDQVMaokikirDQgxt1w6sP4C05@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/11 02:05, Dmitry Eremin-Solenikov wrote:
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: linux-i2c at vger.kernel.org
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
+On Fri, Jan 7, 2011 at 11:38 PM, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
+> The ep9307, ep9312, and ep9315 variants of the ep93xx processor include the
+> raster engine needed for framebuffer support.
+>
+> This allows the EDB93xx boards with those processors to use the framebuffer
+> driver.
+>
+> Tested on an EDB9307A with the following kernel parameters:
+> ? ? ? ?video=640x480-16 at 60
+> ? ? ? ?video=1024x768-16 at 60
+>
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-this should be queued, and probably sent to Linus
-at the end of the weekend.
+The code looks good, but there are hardware bugs in the EP93XX that
+make the screen image jump a few pixels to the right once every few
+seconds.  We found that 800x600-16 and 1024x768-8 were the highest
+modes that are stable.
+Did you find 1024x768-16 to be stable, say when running X and moving a
+window? The effect was most visible on a phosphor CRT, less noticeable
+on an LCD.
+
+    M
