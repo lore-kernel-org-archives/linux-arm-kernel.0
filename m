@@ -1,76 +1,45 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sun, 9 Jan 2011 02:06:32 +0100
-Subject: [RFC PATCH] Avoid aliasing mappings in DMA coherent allocator
-In-Reply-To: <201101031928.37091.jkrzyszt@tis.icnet.pl>
-References: <20101224111125.GD20587@n2100.arm.linux.org.uk>
-	<20110103095751.GA26785@n2100.arm.linux.org.uk>
-	<201101031928.37091.jkrzyszt@tis.icnet.pl>
-Message-ID: <201101090206.34096.jkrzyszt@tis.icnet.pl>
+From: mkl0301@gmail.com (mkl0301 at gmail.com)
+Date: Sun,  9 Jan 2011 09:49:32 +0800
+Subject: [PATCH v4 0/3] add CNS3xxx AHCI support
+Message-ID: <1294537775-21714-1-git-send-email-mkl0301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Cc linux-omap, please refere to a copy of Russell's initial message:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/036463.html)
+From: Mac Lin <mkl0301@gmail.com>
 
-Monday 03 January 2011 19:28:36 Janusz Krzysztofik wrote:
-> I'll try to prepare for review a followup patch that updates those
-> <{mach,plat}/memory.h> and similiar include files which provided
-> their own non-default CONSISTENT_DMA_SIZE values.
+v4:
+ - v2 basically, which make SoC-specific changes into separate files
+ - Rename module ahci_platform to ahci_platforms, into which link the ahci_platform and the SoC-specific changes
+ - No rename of ahci_platform.c
+ - Some cosmetic code changes since v2
 
-Below is an example of how a build time configuration for OMAP could 
-be updated.
+v3: http://www.spinics.net/lists/arm-kernel/msg109924.html
+ - Make the SoC-specific changes into ahci_platform.c directly.
+ - Some cosmetic code changes
+=> ahci_platform.c is less readable due to SoC-specific changes and macro
 
-However, more looking at this, I think that a finer control of reserved 
-memory area sizes, yet better selected at run time for a specific 
-machine or board type, could be benefitial in case of kernels intended 
-to run on multiple board types, like those built with omap1_defconfig, 
-or even on multiple machine types, like in omap2plus_defconfig case.
+v2: http://www.spinics.net/lists/linux-ide/msg39766.html
+ - Renaming ahci_platform.c to ahci_pltfm.c for linking SoC specific changes into ahci_platform, while not changing the module name.
+ - Switch ahci_platform to module device table matching to add SoC specific support
+ - Add CNS3xxx SoC specific AHCI support to ahci_cns3xxx.c
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
+v1: http://www.spinics.net/lists/arm-kernel/msg106236.html
+ - Add CNS3xxx SoC specific AHCI support to arch/arm/mach-cns3xxx
+=> The changes depends on libahci and libata, i.e. both of them need to be built into kernel
 
---- linux-2.6.37-rc7/arch/arm/plat-omap/include/plat/memory.h.orig	2011-01-07 02:37:44.000000000 +0100
-+++ linux-2.6.37-rc7/arch/arm/plat-omap/include/plat/memory.h	2011-01-07 03:01:25.000000000 +0100
-@@ -86,17 +86,21 @@
- #endif	/* CONFIG_ARCH_OMAP15XX */
- 
- /* Override the ARM default */
--#ifdef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
-+#ifndef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
-+#define CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE 0
-+#endif
- 
--#if (CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE == 0)
-+#if (CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE == 0) && \
-+	(defined(CONFIG_SND_OMAP_SOC) || defined(CONFIG_SND_OMAP_SOC_MODULE))
- #undef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
--#define CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE 2
-+#define CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE 1
- #endif
- 
--#define CONSISTENT_DMA_SIZE \
--	(((CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE + 1) & ~1) * 1024 * 1024)
-+#define CONSISTENT_WC_SIZE \
-+	(CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE * 1024 * 1024)
- 
--#endif
-+#define CONSISTENT_DMA_SIZE \
-+	((CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE % 2 ? 1 : 2) * 1024 * 1024)
- 
- #endif
- 
---- linux-2.6.37-rc7/drivers/video/omap/Kconfig.orig	2010-12-24 13:42:46.000000000 +0100
-+++ linux-2.6.37-rc7/drivers/video/omap/Kconfig	2011-01-07 01:56:45.000000000 +0100
-@@ -85,9 +85,10 @@ config FB_OMAP_CONSISTENT_DMA_SIZE
-	range 1 14
-	default 2
- 	help
-- 	  Increase the DMA consistent memory size according to your video
-+ 	  Increase the DMA writecombine memory size according to your video
- 	  memory needs, for example if you want to use multiple planes.
--	  The size must be 2MB aligned.
-+	  Note that 256kB can be consumed by OMAP sound driver if active.
-+	  Specifying an odd number reduces DMA coherent memory from 2 to 1MB.
- 	  If unsure say 1.
- 
- config FB_OMAP_DMA_TUNE
+This patchset is based on linux-2.6.37
+
+Mac Lin (3):
+      ahci_platform: rename module ahci_platform to ahci_platforms
+      ahci_platform: switch to module device table matching
+      ahci_platforms: add support for CNS3xxx SoC devices
+
+ arch/arm/mach-cns3xxx/devices.c |    2 +-
+ drivers/ata/Kconfig             |   11 ++++++++
+ drivers/ata/Makefile            |    5 +++-
+ drivers/ata/ahci_cns3xxx.c      |   51 +++++++++++++++++++++++++++++++++++++++
+ drivers/ata/ahci_platform.c     |   17 ++++++++++++-
+ drivers/ata/ahci_platforms.h    |   18 +++++++++++++
+ 6 files changed, 101 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/ata/ahci_cns3xxx.c
+ create mode 100644 drivers/ata/ahci_platforms.h
