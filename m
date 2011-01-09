@@ -1,29 +1,49 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 10 Jan 2011 00:29:04 +0100
-Subject: [PATCH 3/5] ARM: pxa: Use cpu_has_ipr() consistently in irq.c
+Date: Mon, 10 Jan 2011 00:29:05 +0100
+Subject: [PATCH 4/5] ARM: pxa: Fix suspend/resume array index miscalculation
 In-Reply-To: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
 References: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1294615746-27668-3-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1294615746-27668-4-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/irq.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-pxa/irq.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 54e91c9..78f0e0c 100644
+index 78f0e0c..81edf97 100644
 --- a/arch/arm/mach-pxa/irq.c
 +++ b/arch/arm/mach-pxa/irq.c
-@@ -226,7 +226,7 @@ static int pxa_irq_resume(struct sys_device *dev)
+@@ -194,14 +194,14 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+ 
+ #ifdef CONFIG_PM
+ static unsigned long saved_icmr[MAX_INTERNAL_IRQS/32];
+-static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
++static unsigned long saved_ipr[MAX_INTERNAL_IRQS/32];
+ 
+ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
+-		void __iomem *base = irq_base(i);
++	for (i = 0; i < pxa_internal_irq_nr; i++) {
++		void __iomem *base = irq_base(i << 5);
+ 
+ 		saved_icmr[i] = __raw_readl(base + ICMR);
+ 		__raw_writel(0, base + ICMR);
+@@ -219,8 +219,8 @@ static int pxa_irq_resume(struct sys_device *dev)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
+-		void __iomem *base = irq_base(i);
++	for (i = 0; i < pxa_internal_irq_nr; i++) {
++		void __iomem *base = irq_base(i << 5);
+ 
+ 		__raw_writel(saved_icmr[i], base + ICMR);
  		__raw_writel(0, base + ICLR);
- 	}
- 
--	if (!cpu_is_pxa25x())
-+	if (cpu_has_ipr())
- 		for (i = 0; i < pxa_internal_irq_nr; i++)
- 			__raw_writel(saved_ipr[i], IRQ_BASE + IPR(i));
- 
 -- 
 1.7.2.3
