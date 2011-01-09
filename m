@@ -1,115 +1,132 @@
-From: dmitriyz@google.com (Dima Zavin)
-Date: Sun, 9 Jan 2011 14:53:01 -0800
-Subject: [PATCH 4/5 v4] msm: convert 7x30 to gpiomux.
-In-Reply-To: <1283015148-10747-4-git-send-email-gbean@codeaurora.org>
-References: <1283015148-10747-1-git-send-email-gbean@codeaurora.org>
-	<1283015148-10747-4-git-send-email-gbean@codeaurora.org>
-Message-ID: <AANLkTikrLnGxNSJgv3KDNAQ5kvjNd8aPrOEBwftiiyrQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 9 Jan 2011 23:12:39 +0000
+Subject: [PATCH] mmc, ARM: Add zboot from MMC support for SuperH Mobile ARM
+In-Reply-To: <20110109124928.GC25591@verge.net.au>
+References: <20110109124928.GC25591@verge.net.au>
+Message-ID: <20110109231239.GE31708@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+On Sun, Jan 09, 2011 at 09:49:28PM +0900, Simon Horman wrote:
+> diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
+> index 30973b7..de83c5a 100644
+> --- a/arch/arm/boot/compressed/head-shmobile.S
+> +++ b/arch/arm/boot/compressed/head-shmobile.S
+> @@ -25,6 +25,37 @@
+>  	/* load board-specific initialization code */
+>  #include <mach/zboot.h>
+>  
+> +#ifdef CONFIG_ZBOOT_ROM_MMCIF
+> +	/* Load image from MMC */
+> +	adr	sp, __tmp_stack
+> +	add	sp, sp, #128
 
-Just rebased on top of 2.6.37 and this patch is totally the wrong way
-to go about this.
+This can be replaced with:
 
-I should have commented at the appropriate time, so sorry for the late reply.
+	adr	sp, __tmp_stack + 128 ?
 
-Having this  msm_gpiomux_configs be always compiled in for all msm7x30
-devices makes this entire system completely inflexible since you have
-to modify common code to provide board specific initialization. The
-definition of "msm_gpiomux_configs" belongs in the board file, not in
-gpiomux-7x30.c. I think we need to delete this new file and move the
-definition back into board-msm7x30.c, but just use the new gpiomux
-APIs.
+> +	ldr	r0, __image_start
+> +	ldr	r1, __image_end
+> +	subs	r1, r1, r0
+> +	ldr	r0, __load_base
 
-I can provide a patch if you like.
+> +	mov	lr, pc
+> +	b	mmcif_loader
 
---Dima
+No need for a separate mov instruction - this will do both in one go:
+	bl	mmcif_loader
 
-On Sat, Aug 28, 2010 at 10:05 AM, Gregory Bean <gbean@codeaurora.org> wrote:
-> Change deprecated gpio_tlmm_config calls to gpiomux calls.
->
-> Signed-off-by: Gregory Bean <gbean@codeaurora.org>
-> ---
-> ?arch/arm/mach-msm/board-msm7x30.c | ? 20 --------------------
-> ?arch/arm/mach-msm/gpiomux-7x30.c ?| ? 21 ++++++++++++++++++++-
-> ?2 files changed, 20 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-> index e329819..74abb74 100644
-> --- a/arch/arm/mach-msm/board-msm7x30.c
-> +++ b/arch/arm/mach-msm/board-msm7x30.c
-> @@ -39,22 +39,6 @@
->
-> ?extern struct sys_timer msm_timer;
->
-> -#ifdef CONFIG_SERIAL_MSM_CONSOLE
-> -static struct msm_gpio uart2_config_data[] = {
-> - ? ? ? { GPIO_CFG(49, 2, GPIO_OUTPUT, ?GPIO_PULL_DOWN, GPIO_2MA), "UART2_RFR"},
-> - ? ? ? { GPIO_CFG(50, 2, GPIO_INPUT, ? GPIO_PULL_DOWN, GPIO_2MA), "UART2_CTS"},
-> - ? ? ? { GPIO_CFG(51, 2, GPIO_INPUT, ? GPIO_PULL_DOWN, GPIO_2MA), "UART2_Rx"},
-> - ? ? ? { GPIO_CFG(52, 2, GPIO_OUTPUT, ?GPIO_PULL_DOWN, GPIO_2MA), "UART2_Tx"},
-> -};
-> -
-> -static void msm7x30_init_uart2(void)
-> -{
-> - ? ? ? msm_gpios_request_enable(uart2_config_data,
-> - ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(uart2_config_data));
-> -
-> -}
-> -#endif
-> -
-> ?static struct platform_device *devices[] __initdata = {
-> ?#if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
-> ? ? ? ? &msm_device_uart2,
-> @@ -70,10 +54,6 @@ static void __init msm7x30_init_irq(void)
-> ?static void __init msm7x30_init(void)
-> ?{
-> ? ? ? ?platform_add_devices(devices, ARRAY_SIZE(devices));
-> -#ifdef CONFIG_SERIAL_MSM_CONSOLE
-> - ? ? ? msm7x30_init_uart2();
-> -#endif
-> -
-> ?}
->
-> ?static void __init msm7x30_map_io(void)
-> diff --git a/arch/arm/mach-msm/gpiomux-7x30.c b/arch/arm/mach-msm/gpiomux-7x30.c
-> index 7b380b3..6ce41c5 100644
-> --- a/arch/arm/mach-msm/gpiomux-7x30.c
-> +++ b/arch/arm/mach-msm/gpiomux-7x30.c
-> @@ -16,4 +16,23 @@
-> ?*/
-> ?#include "gpiomux.h"
->
-> -struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {};
-> +struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
-> +#ifdef CONFIG_SERIAL_MSM_CONSOLE
-> + ? ? ? [49] = { /* UART2 RFR */
-> + ? ? ? ? ? ? ? .suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-> + ? ? ? },
-> + ? ? ? [50] = { /* UART2 CTS */
-> + ? ? ? ? ? ? ? .suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-> + ? ? ? },
-> + ? ? ? [51] = { /* UART2 RX */
-> + ? ? ? ? ? ? ? .suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-> + ? ? ? },
-> + ? ? ? [52] = { /* UART2 TX */
-> + ? ? ? ? ? ? ? .suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-> + ? ? ? },
-> +#endif
-> +};
-> --
-> 1.7.0.4
->
-> /usr2/gbean/.signature.codeaurora.org
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+> +
+> +	/* Jump to loaded code */
+> +	ldr	r0, __loaded
+> +	ldr	r1, __image_start
+> +	sub	r0, r0, r1
+> +	ldr	r1, __load_base
+> +	add	pc, r0, r1
+
+	*__loaded - *__image_start + *__load_base
+
+	&__loaded - &_start + CONFIG_MEMORY_START + 0x02000000
+
+So this jumps to the '__loaded' label in the just loaded image - are you
+sure you want to jump to a location that contains an address rather than
+code?  I think you want the two changes below to correct that.
+
+> +
+> +__image_start:
+> +	.long	_start
+> +__image_end:
+> +	.long	_got_end
+> +__load_base:
+> +	.long	CONFIG_MEMORY_START + 0x02000000 @ Load at 32Mb into SDRAM
+> +__loaded:
+> +	.long	__loaded
+
+change to
+	.long	__continue
+
+> +	.align
+> +__tmp_stack:
+> +	.space	128
+
+add __continue
+
+> +#endif /* CONFIG_ZBOOT_ROM_MMCIF */
+> +
+>  	b	1f
+>  __atags:@ tag #1
+>  	.long	12			@ tag->hdr.size = tag_size(tag_core);
+> diff --git a/arch/arm/boot/compressed/mmcif-sh7372.c b/arch/arm/boot/compressed/mmcif-sh7372.c
+> new file mode 100644
+> index 0000000..c54df5c
+> --- /dev/null
+> +++ b/arch/arm/boot/compressed/mmcif-sh7372.c
+> @@ -0,0 +1,87 @@
+> +/*
+> + * sh7372 MMCIF loader
+> + *
+> + * Copyright (C) 2010 Magnus Damm
+> + * Copyright (C) 2010 Simon Horman
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + */
+> +
+> +#include <linux/mmc/sh_mmcif.h>
+> +#include <mach/mmcif.h>
+> +
+> +#define MMCIF_BASE      (void __iomem *)0xe6bd0000
+> +
+> +#define PORT84CR	0xe6050054
+> +#define PORT85CR	0xe6050055
+> +#define PORT86CR	0xe6050056
+> +#define PORT87CR	0xe6050057
+> +#define PORT88CR	0xe6050058
+> +#define PORT89CR	0xe6050059
+> +#define PORT90CR	0xe605005a
+> +#define PORT91CR	0xe605005b
+> +#define PORT92CR	0xe605005c
+> +#define PORT99CR	0xe6050063
+> +
+> +#define SMSTPCR3	0xe615013c
+
+These should also be (void __iomem *).
+
+> diff --git a/arch/arm/mach-shmobile/include/mach/mmcif-ap4eb.h b/arch/arm/mach-shmobile/include/mach/mmcif-ap4eb.h
+> new file mode 100644
+> index 0000000..c6b10ee
+> --- /dev/null
+> +++ b/arch/arm/mach-shmobile/include/mach/mmcif-ap4eb.h
+> @@ -0,0 +1,29 @@
+> +#ifndef MMCIF_AP4EB_H
+> +#define MMCIF_AP4EB_H
+> +
+> +#define PORT185CR      0xe60520b9
+> +#define PORT186CR      0xe60520ba
+> +#define PORT187CR      0xe60520bb
+> +#define PORT188CR      0xe60520bc
+> +
+> +#define PORTR191_160DR 0xe6056014
+
+Ditto.
