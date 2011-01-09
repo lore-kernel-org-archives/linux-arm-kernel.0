@@ -1,44 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 9 Jan 2011 08:14:59 +0100
-Subject: suspicious code in linux/arch/arm/common/sa1111.c
-In-Reply-To: <AANLkTin6QAr7=7-59aKzunh6nQGhCKPJ11OspBtC4NHB@mail.gmail.com>
-References: <20101116090705.GA29337@pma.sysgo.com>
-	<AANLkTin6QAr7=7-59aKzunh6nQGhCKPJ11OspBtC4NHB@mail.gmail.com>
-Message-ID: <20110109071459.GA1488@ucw.cz>
+From: mkl0301@gmail.com (mkl0301 at gmail.com)
+Date: Sun,  9 Jan 2011 15:26:07 +0800
+Subject: [PATCH v5 0/3] add CNS3xxx AHCI support
+Message-ID: <1294557970-654-1-git-send-email-mkl0301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2010-11-16 17:09:59, Eric Miao wrote:
-> On Tue, Nov 16, 2010 at 5:07 PM, Pavel Machek <pma@sysgo.com> wrote:
-> > Hi!
-> >
-> > Is this good idea?
-> >
-> > Signed-off-by: Pavel Machek <pma@sysgo.com>
-> 
-> Yep, obviously was a typo.
+From: Mac Lin <mkl0301@gmail.com>
 
-Can you apply the patch? Or should I re--generate one with better changelog?
+v5:
+ - Rename ahci_platforms.h to ahci_platform.h
+ - s/pltfm/platform/ in ahci_platform.c
 
-> > diff -ur linux.ofic//arch/arm/common/sa1111.c linux/arch/arm/common/sa1111.c
-> > --- linux.ofic//arch/arm/common/sa1111.c ? ? ? ?2010-10-17 20:31:13.000000000 +0200
-> > +++ linux/arch/arm/common/sa1111.c ? ? ?2010-11-05 10:44:17.000000000 +0100
-> > @@ -282,7 +312,7 @@
-> > ? ? ? ?for (i = 0; i < 8; i++) {
-> > ? ? ? ? ? ? ? ?sa1111_writel(ip0 ^ mask, mapbase + SA1111_INTPOL0);
-> > ? ? ? ? ? ? ? ?sa1111_writel(ip0, mapbase + SA1111_INTPOL0);
-> > - ? ? ? ? ? ? ? if (sa1111_readl(mapbase + SA1111_INTSTATCLR1) & mask)
-> > + ? ? ? ? ? ? ? if (sa1111_readl(mapbase + SA1111_INTSTATCLR0) & mask)
-> > ? ? ? ? ? ? ? ? ? ? ? ?break;
-> > ? ? ? ?}
-> >
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+v4: http://www.spinics.net/lists/linux-ide/msg39852.html
+ - v2 basically, which make SoC-specific changes into separate files
+ - Rename module ahci_platform to ahci_platforms, into which link the ahci_platform and the SoC-specific changes
+ - No rename of ahci_platform.c
+ - Some cosmetic code changes since v2
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+v3: http://www.spinics.net/lists/arm-kernel/msg109924.html
+ - Make the SoC-specific changes into ahci_platform.c directly.
+ - Some cosmetic code changes
+=> ahci_platform.c is less readable due to SoC-specific changes and macro
+
+v2: http://www.spinics.net/lists/linux-ide/msg39766.html
+ - Renaming ahci_platform.c to ahci_pltfm.c for linking SoC specific changes into ahci_platform, while not changing the module name.
+ - Switch ahci_platform to module device table matching to add SoC specific support
+ - Add CNS3xxx SoC specific AHCI support to ahci_cns3xxx.c
+
+v1: http://www.spinics.net/lists/arm-kernel/msg106236.html
+ - Add CNS3xxx SoC specific AHCI support to arch/arm/mach-cns3xxx
+=> The changes depends on libahci and libata, i.e. both of them need to be built into kernel
+
+This patchset is based on linux-2.6.37
