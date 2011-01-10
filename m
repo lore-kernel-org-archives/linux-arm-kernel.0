@@ -1,27 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Jan 2011 14:38:54 -0800
-Subject: [PATCH 0/3] IGEP board changes for .38 merge window
-In-Reply-To: <1294665974-10590-1-git-send-email-eballetbo@gmail.com>
-References: <1294665974-10590-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <20110110223854.GO4957@atomide.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 10 Jan 2011 16:38:54 -0600
+Subject: suspicious code in linux/arch/arm/common/sa1111.c
+In-Reply-To: <20110109071459.GA1488@ucw.cz>
+References: <20101116090705.GA29337@pma.sysgo.com>
+	<AANLkTin6QAr7=7-59aKzunh6nQGhCKPJ11OspBtC4NHB@mail.gmail.com>
+	<20110109071459.GA1488@ucw.cz>
+Message-ID: <AANLkTi=5gC3ton6tzYqM=NA9j8k37NO=y1QSYb5Oxvik@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Jan 9, 2011 at 1:14 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Tue 2010-11-16 17:09:59, Eric Miao wrote:
+>> On Tue, Nov 16, 2010 at 5:07 PM, Pavel Machek <pma@sysgo.com> wrote:
+>> > Hi!
+>> >
+>> > Is this good idea?
+>> >
+>> > Signed-off-by: Pavel Machek <pma@sysgo.com>
+>>
+>> Yep, obviously was a typo.
+>
+> Can you apply the patch? Or should I re--generate one with better changelog?
 
-* Enric Balletbo i Serra <eballetbo@gmail.com> [110110 05:25]:
-> Hi Tony,
-> 
-> Here's a new patches for IGEP boards. These patches are rebased on top of your 
-> for-next tree. Please consider adding for .38 merge window. Thanks.
+Applied with subject line as below, which I guess is more specific?
 
-I'll add these to the devel-board, let's see if we can get these and
-the beagle patches still in.
+Subject: ARM: sa1111: fix typo in sa1111_retrigger_lowirq()
 
-In general, everybody, please send in new code for each merge window
-by -rc6 so there's enough time for people to review and ack the code
-and also have it be sitting in for-next before the merge window opens.
 
-Regards,
-
-Tony
+>
+>> > diff -ur linux.ofic//arch/arm/common/sa1111.c linux/arch/arm/common/sa1111.c
+>> > --- linux.ofic//arch/arm/common/sa1111.c ? ? ? ?2010-10-17 20:31:13.000000000 +0200
+>> > +++ linux/arch/arm/common/sa1111.c ? ? ?2010-11-05 10:44:17.000000000 +0100
+>> > @@ -282,7 +312,7 @@
+>> > ? ? ? ?for (i = 0; i < 8; i++) {
+>> > ? ? ? ? ? ? ? ?sa1111_writel(ip0 ^ mask, mapbase + SA1111_INTPOL0);
+>> > ? ? ? ? ? ? ? ?sa1111_writel(ip0, mapbase + SA1111_INTPOL0);
+>> > - ? ? ? ? ? ? ? if (sa1111_readl(mapbase + SA1111_INTSTATCLR1) & mask)
+>> > + ? ? ? ? ? ? ? if (sa1111_readl(mapbase + SA1111_INTSTATCLR0) & mask)
+>> > ? ? ? ? ? ? ? ? ? ? ? ?break;
+>> > ? ? ? ?}
+>> >
+>> >
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at ?http://www.tux.org/lkml/
+>
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>
