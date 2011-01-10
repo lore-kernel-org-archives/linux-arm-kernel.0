@@ -1,69 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 10 Jan 2011 12:16:28 -0700 (MST)
-Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build
-	break because of clktrctrl_mask
-In-Reply-To: <874o9ko25j.fsf@ti.com>
-References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
-	<87fwt7z1p3.fsf@ti.com>
-	<alpine.DEB.2.00.1101061059590.22048@utopia.booyaka.com>
-	<87ipy1vqdi.fsf@ti.com>
-	<3f76fc53e9b50d75480bcfe1d2b6312e@mail.gmail.com>
-	<874o9ko25j.fsf@ti.com>
-Message-ID: <alpine.DEB.2.00.1101101214430.5731@utopia.booyaka.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 10 Jan 2011 20:23:42 +0100
+Subject: AT91: Fix power-saving in idle-mode on 926T processors
+In-Reply-To: <87fwt069ys.fsf@macbook.be.48ers.dk>
+References: <AANLkTimGTVybe4LmspxWj6vkM_zNnPcaUbk6sqvpJ032@mail.gmail.com>
+	<1294673540l.26200l.0l@i-dmzi_al.realan.de>
+	<87fwt069ys.fsf@macbook.be.48ers.dk>
+Message-ID: <20110110192342.GF24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin
+On Mon, Jan 10, 2011 at 04:43:07PM +0100, Peter Korsgaard wrote:
+> >>>>> "Anders" == Anders Larsen <al@alarsen.net> writes:
+> 
+> Hi,
+> 
+>  >> Is there a known interaction with this and the JTAG controller?
+> 
+>  Anders> indeed there is - disabling the processor clock blocks JTAG debugging.
+> 
+> Ok - And apparently it completely blocks the JTAG controller, so you
+> cannot even put it in bypass mode and access other devices on the same
+> JTAG chain.
+This is a quite usual violation of ieee-1949.1-2001 (i.e. the jtag
+standard (don't know if there is a newer version?)).  I really wonder
+why it's so hard to get this right.  There is the availability of
+"compiliance-enable patterns" that allow to say:  "My device is only
+jtaggable if this input is 1."  Why not power the jtag block with such an
+input?  Software doesn't need (and actually must not) have the ability
+to disable the jtag clock.  Moreover this way the chip doesn't need any
+current to keep jtag on and still a developer needing jtag doesn't need
+to change any source code, but only needs a jumper on his devboard.
 
-On Fri, 7 Jan 2011, Kevin Hilman wrote:
+It could be so easy when all people knew what they do.
 
-> Rajendra Nayak <rnayak@ti.com> writes:
-> 
-> [...]
-> 
-> > Just another trivial fix.
-> >
-> > From bb46b74d2b0ab3d35e72b760da7e123a891e6813 Mon Sep 17 00:00:00 2001
-> > From: Rajendra Nayak <rnayak@ti.com>
-> > Date: Fri, 7 Jan 2011 14:07:25 +0530
-> > Subject: [PATCH] OMAP: powerdomain: remove unused func declaration
-> >
-> > Trivial fix to remove the unused function declaration
-> > from the powerdomain header.
-> >
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/powerdomain.h |    1 -
-> >  1 files changed, 0 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/powerdomain.h
-> > b/arch/arm/mach-omap2/powerdomain.h
-> > index c66431e..0b7a357 100644
-> > --- a/arch/arm/mach-omap2/powerdomain.h
-> > +++ b/arch/arm/mach-omap2/powerdomain.h
-> > @@ -165,7 +165,6 @@ struct pwrdm_ops {
-> >  	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
-> >  };
-> >
-> > -void pwrdm_fw_init(void);
-> >  void pwrdm_init(struct powerdomain **pwrdm_list, struct pwrdm_ops
-> > *custom_funcs);
-> 
-> Note this is line-wrapped. 
-> 
-> Looks like you need to get get-send-email setup so you can avoid having
-> the patch sending problems.
-> 
-> >
-> >  struct powerdomain *pwrdm_lookup(const char *name);
-> 
-> In any case, with Paul's ack, I can queue this with the others.
-
-Normally I would wait for the .39 merge window with something like this, 
-but you're welcome to queue it for the -rc fixes if you feel it's 
-appropriate:
-
-Acked-by: Paul Walmsley <paul@pwsan.com>
+sigh
+Uwe
 
 
-- Paul
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
