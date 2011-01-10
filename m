@@ -1,27 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Jan 2011 11:07:18 -0800
-Subject: [PATCH] omap3: clocks: Fix build error 'CK_3430ES2' undeclared
-	here
-In-Reply-To: <alpine.DEB.2.00.1101101158360.5731@utopia.booyaka.com>
-References: <1294611373-1992-1-git-send-email-santosh.shilimkar@ti.com>
-	<4D2B0B86.3010201@ti.com>
-	<32cc9f4ba82187480f1e4d15d4e93dc0@mail.gmail.com>
-	<alpine.DEB.2.00.1101101156220.5731@utopia.booyaka.com>
-	<alpine.DEB.2.00.1101101158360.5731@utopia.booyaka.com>
-Message-ID: <20110110190718.GF4957@atomide.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 10 Jan 2011 13:13:17 -0600
+Subject: [PATCH v4 0/3] OMAP3: beaglexm: GPIO fixes
+In-Reply-To: <20110110190436.GE4957@atomide.com>
+References: <1294441282-17986-1-git-send-email-nm@ti.com>
+	<20110110190436.GE4957@atomide.com>
+Message-ID: <4D2B5A4D.5000300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110110 10:58]:
-> On Mon, 10 Jan 2011, Paul Walmsley wrote:
+Tony Lindgren had written, on 01/10/2011 01:04 PM, the following:
+> * Nishanth Menon <nm@ti.com> [110107 15:00]:
+>> Hi,
+>> As discussed in the threads:
+>> http://thread.gmane.org/gmane.linux.ports.arm.omap/47807/
+>> http://marc.info/?t=121540030800004&r=1&w=2
+>>
+>> here is the split up series with commit message after discussion:
+>> http://www.beagleboard.org/irclogs/index.php?date=2011-01-06#T19:12:21
+>>
+>> Koen Kooi (3):
+>>   omap3: beaglexm: fix EHCI power up GPIO dir
+>>   omap3: beaglexm: fix DVI reset GPIO
+>>   omap3: beaglexm: fix power on of DVI
 > 
-> > Looks good to me.  Tony, do you want to merge this one as part of the -rc 
-> > series?  If so then it is:
-> > 
-> > Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
-> (once Santosh reposts the updated fix, that is)
+> Dropping the earlier versions from omap-fixes, I want to get the
+> build fixes in ASAP. These can wait a bit until Aaro's comments
+> are addressed.
+Ack. will post a v5 after aligning. build breakages have higher priority 
+ofcourse ;)
 
-OK thanks will queue.
-
-Tony
+-- 
+Regards,
+Nishanth Menon
