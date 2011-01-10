@@ -1,34 +1,69 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 10 Jan 2011 13:13:17 -0600
-Subject: [PATCH v4 0/3] OMAP3: beaglexm: GPIO fixes
-In-Reply-To: <20110110190436.GE4957@atomide.com>
-References: <1294441282-17986-1-git-send-email-nm@ti.com>
-	<20110110190436.GE4957@atomide.com>
-Message-ID: <4D2B5A4D.5000300@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 10 Jan 2011 12:16:28 -0700 (MST)
+Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build
+	break because of clktrctrl_mask
+In-Reply-To: <874o9ko25j.fsf@ti.com>
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com>
+	<87fwt7z1p3.fsf@ti.com>
+	<alpine.DEB.2.00.1101061059590.22048@utopia.booyaka.com>
+	<87ipy1vqdi.fsf@ti.com>
+	<3f76fc53e9b50d75480bcfe1d2b6312e@mail.gmail.com>
+	<874o9ko25j.fsf@ti.com>
+Message-ID: <alpine.DEB.2.00.1101101214430.5731@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren had written, on 01/10/2011 01:04 PM, the following:
-> * Nishanth Menon <nm@ti.com> [110107 15:00]:
->> Hi,
->> As discussed in the threads:
->> http://thread.gmane.org/gmane.linux.ports.arm.omap/47807/
->> http://marc.info/?t=121540030800004&r=1&w=2
->>
->> here is the split up series with commit message after discussion:
->> http://www.beagleboard.org/irclogs/index.php?date=2011-01-06#T19:12:21
->>
->> Koen Kooi (3):
->>   omap3: beaglexm: fix EHCI power up GPIO dir
->>   omap3: beaglexm: fix DVI reset GPIO
->>   omap3: beaglexm: fix power on of DVI
-> 
-> Dropping the earlier versions from omap-fixes, I want to get the
-> build fixes in ASAP. These can wait a bit until Aaro's comments
-> are addressed.
-Ack. will post a v5 after aligning. build breakages have higher priority 
-ofcourse ;)
+Hi Kevin
 
--- 
-Regards,
-Nishanth Menon
+On Fri, 7 Jan 2011, Kevin Hilman wrote:
+
+> Rajendra Nayak <rnayak@ti.com> writes:
+> 
+> [...]
+> 
+> > Just another trivial fix.
+> >
+> > From bb46b74d2b0ab3d35e72b760da7e123a891e6813 Mon Sep 17 00:00:00 2001
+> > From: Rajendra Nayak <rnayak@ti.com>
+> > Date: Fri, 7 Jan 2011 14:07:25 +0530
+> > Subject: [PATCH] OMAP: powerdomain: remove unused func declaration
+> >
+> > Trivial fix to remove the unused function declaration
+> > from the powerdomain header.
+> >
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/powerdomain.h |    1 -
+> >  1 files changed, 0 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/powerdomain.h
+> > b/arch/arm/mach-omap2/powerdomain.h
+> > index c66431e..0b7a357 100644
+> > --- a/arch/arm/mach-omap2/powerdomain.h
+> > +++ b/arch/arm/mach-omap2/powerdomain.h
+> > @@ -165,7 +165,6 @@ struct pwrdm_ops {
+> >  	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
+> >  };
+> >
+> > -void pwrdm_fw_init(void);
+> >  void pwrdm_init(struct powerdomain **pwrdm_list, struct pwrdm_ops
+> > *custom_funcs);
+> 
+> Note this is line-wrapped. 
+> 
+> Looks like you need to get get-send-email setup so you can avoid having
+> the patch sending problems.
+> 
+> >
+> >  struct powerdomain *pwrdm_lookup(const char *name);
+> 
+> In any case, with Paul's ack, I can queue this with the others.
+
+Normally I would wait for the .39 merge window with something like this, 
+but you're welcome to queue it for the -rc fixes if you feel it's 
+appropriate:
+
+Acked-by: Paul Walmsley <paul@pwsan.com>
+
+
+- Paul
