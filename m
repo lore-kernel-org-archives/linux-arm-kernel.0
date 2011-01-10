@@ -1,66 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Jan 2011 14:30:44 -0800
-Subject: [PATCH] omap3: clocks: Fix build error 'CK_3430ES2' undeclared
-	here
-In-Reply-To: <20110110190718.GF4957@atomide.com>
-References: <1294611373-1992-1-git-send-email-santosh.shilimkar@ti.com>
-	<4D2B0B86.3010201@ti.com>
-	<32cc9f4ba82187480f1e4d15d4e93dc0@mail.gmail.com>
-	<alpine.DEB.2.00.1101101156220.5731@utopia.booyaka.com>
-	<alpine.DEB.2.00.1101101158360.5731@utopia.booyaka.com>
-	<20110110190718.GF4957@atomide.com>
-Message-ID: <20110110223044.GN4957@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 10 Jan 2011 23:31:49 +0100
+Subject: [PATCH 1/1] ARM i.MX50: Rename devices-mx50.h
+In-Reply-To: <1294695869-6653-1-git-send-email-r64343@freescale.com>
+References: <1294695869-6653-1-git-send-email-r64343@freescale.com>
+Message-ID: <20110110223149.GK24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110110 11:06]:
-> * Paul Walmsley <paul@pwsan.com> [110110 10:58]:
-> > On Mon, 10 Jan 2011, Paul Walmsley wrote:
-> > 
-> > > Looks good to me.  Tony, do you want to merge this one as part of the -rc 
-> > > series?  If so then it is:
-> > > 
-> > > Acked-by: Paul Walmsley <paul@pwsan.com>
-> > 
-> > (once Santosh reposts the updated fix, that is)
+On Tue, Jan 11, 2011 at 05:44:29AM +0800, Jason Liu wrote:
+> There are devices-imx51.h and devices-imx53.h under
+> arch/arm/mach-mx5 directory. So, had better rename
+> devices-mx50.h to devices-imx50.h to follow the same
+> naming convention with imx51 and imx53 part.
 > 
-> OK thanks will queue.
+> Signed-off-by: Jason Liu <r64343@freescale.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-mx5/board-mx50_rdp.c                 |    2 +-
+>  .../mach-mx5/{devices-mx50.h => devices-imx50.h}   |    0
+>  2 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
+> index fd32e4c..e5bb600 100644
+> --- a/arch/arm/mach-mx5/board-mx50_rdp.c
+> +++ b/arch/arm/mach-mx5/board-mx50_rdp.c
+> @@ -35,7 +35,7 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+>  
+> -#include "devices-mx50.h"
+> +#include "devices-imx50.h"
+>  
+>  static iomux_v3_cfg_t mx50_rdp_pads[] __initdata = {
+>  	/* SD1 */
+> diff --git a/arch/arm/mach-mx5/devices-mx50.h b/arch/arm/mach-mx5/devices-imx50.h
+> similarity index 100%
+> rename from arch/arm/mach-mx5/devices-mx50.h
+> rename to arch/arm/mach-mx5/devices-imx50.h
+> -- 
+> 1.7.0.4
+> 
+> 
+> 
 
-I've queued the following updated version.
-
-Regards,
-
-Tony
-
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Sun, 9 Jan 2011 22:16:13 +0000
-Subject: [PATCH] omap3: clocks: Fix build error 'CK_3430ES2' undeclared here
-
-At latest mainline commit 0c21e3aaf6a,  omap2plus build is broken. This
-patch is trivial fix for the missed usb clock node for CK_3430ES2PLUS
-flag update.
-
- CHK     include/generated/compile.h
-  CC      arch/arm/mach-omap2/clock3xxx_data.o
-arch/arm/mach-omap2/clock3xxx_data.c:3289: error: 'CK_3430ES2' undeclared
-here (not in a function)
-make[1]: *** [arch/arm/mach-omap2/clock3xxx_data.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Anand Gadiyar <gadiyar@ti.com>
-Acked-by: Paul Walmsley <paul@pwsan.com>
-[tony at atomide.com: updated mask to include CK_36XX]
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -3286,7 +3286,7 @@ static struct omap_clk omap3xxx_clks[] = {
- 	CLK(NULL,	"cpefuse_fck",	&cpefuse_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
- 	CLK(NULL,	"ts_fck",	&ts_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
- 	CLK(NULL,	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("ehci-omap.0",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2 | CK_AM35XX),
-+	CLK("ehci-omap.0",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
- 	CLK("omap-mcbsp.1",	"prcm_fck",	&core_96m_fck,	CK_3XXX),
- 	CLK("omap-mcbsp.5",	"prcm_fck",	&core_96m_fck,	CK_3XXX),
- 	CLK(NULL,	"core_96m_fck",	&core_96m_fck,	CK_3XXX),
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
