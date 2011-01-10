@@ -1,34 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Jan 2011 22:25:24 +0000
-Subject: [PATCH] spi: tegra: don't treat NULL clk as an error
-In-Reply-To: <20110110221802.GD12552@n2100.arm.linux.org.uk>
-References: <1294657506-27510-1-git-send-email-jamie@jamieiles.com>
-	<AANLkTikd7AZv+-aVf4=jwF+xjvq+1k_kAwLPz-+yP6=Q@mail.gmail.com>
-	<20110110221802.GD12552@n2100.arm.linux.org.uk>
-Message-ID: <20110110222524.GE12552@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Jan 2011 14:30:44 -0800
+Subject: [PATCH] omap3: clocks: Fix build error 'CK_3430ES2' undeclared
+	here
+In-Reply-To: <20110110190718.GF4957@atomide.com>
+References: <1294611373-1992-1-git-send-email-santosh.shilimkar@ti.com>
+	<4D2B0B86.3010201@ti.com>
+	<32cc9f4ba82187480f1e4d15d4e93dc0@mail.gmail.com>
+	<alpine.DEB.2.00.1101101156220.5731@utopia.booyaka.com>
+	<alpine.DEB.2.00.1101101158360.5731@utopia.booyaka.com>
+	<20110110190718.GF4957@atomide.com>
+Message-ID: <20110110223044.GN4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 10, 2011 at 10:18:02PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 10, 2011 at 01:58:12PM -0700, Grant Likely wrote:
-> > On Mon, Jan 10, 2011 at 4:05 AM, Jamie Iles <jamie@jamieiles.com> wrote:
-> > > Some platforms have been known to return NULL from clk_get() if they
-> > > support only a single struct clk. ?Whilst tegra doesn't do this, make
-> > > the drivers consistent with others.
-> > >
-> > > Cc: Erik Gilling <konkers@android.com>
-> > > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+* Tony Lindgren <tony@atomide.com> [110110 11:06]:
+> * Paul Walmsley <paul@pwsan.com> [110110 10:58]:
+> > On Mon, 10 Jan 2011, Paul Walmsley wrote:
 > > 
-> > Hi James,
+> > > Looks good to me.  Tony, do you want to merge this one as part of the -rc 
+> > > series?  If so then it is:
+> > > 
+> > > Acked-by: Paul Walmsley <paul@pwsan.com>
 > > 
-> > If NULL does get returned, say due to a future change to the clock
-> > code, then this change causes the driver to oops.  I'm not going to
-> > apply this patch.
+> > (once Santosh reposts the updated fix, that is)
 > 
-> Please apply it - the clock API just defines struct clk as a cookie
-> where errors are IS_ERR/PTR_ERR.  Other values must be considered by
-> drivers as perfectly valid, including NULL.
+> OK thanks will queue.
 
-Also note that drivers have no business ever dereferencing struct clks.
-So if they oops, that's their own fault for dereferencing something
-that they shouldn't.
+I've queued the following updated version.
+
+Regards,
+
+Tony
+
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Sun, 9 Jan 2011 22:16:13 +0000
+Subject: [PATCH] omap3: clocks: Fix build error 'CK_3430ES2' undeclared here
+
+At latest mainline commit 0c21e3aaf6a,  omap2plus build is broken. This
+patch is trivial fix for the missed usb clock node for CK_3430ES2PLUS
+flag update.
+
+ CHK     include/generated/compile.h
+  CC      arch/arm/mach-omap2/clock3xxx_data.o
+arch/arm/mach-omap2/clock3xxx_data.c:3289: error: 'CK_3430ES2' undeclared
+here (not in a function)
+make[1]: *** [arch/arm/mach-omap2/clock3xxx_data.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Anand Gadiyar <gadiyar@ti.com>
+Acked-by: Paul Walmsley <paul@pwsan.com>
+[tony at atomide.com: updated mask to include CK_36XX]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -3286,7 +3286,7 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"cpefuse_fck",	&cpefuse_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"ts_fck",	&ts_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+-	CLK("ehci-omap.0",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2 | CK_AM35XX),
++	CLK("ehci-omap.0",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK("omap-mcbsp.1",	"prcm_fck",	&core_96m_fck,	CK_3XXX),
+ 	CLK("omap-mcbsp.5",	"prcm_fck",	&core_96m_fck,	CK_3XXX),
+ 	CLK(NULL,	"core_96m_fck",	&core_96m_fck,	CK_3XXX),
