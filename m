@@ -1,44 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jan 2011 07:41:34 +0900
-Subject: [PATCH] mmc, ARM: Add zboot from MMC support for SuperH Mobile ARM
-In-Reply-To: <20110110154514.GC3760@linux-sh.org>
-References: <20110109124928.GC25591@verge.net.au>
-	<1294589548.8897.1.camel@rojo>
-	<20110109225042.GB29257@verge.net.au>
-	<c1e9db480d82d1804930ddcc7bb0db02@rootnode.net>
-	<20110110154514.GC3760@linux-sh.org>
-Message-ID: <20110110224134.GA7420@verge.net.au>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 10 Jan 2011 16:42:05 -0600
+Subject: [PATCH 2/5] pxa: Remove unused variable in clock-pxa3xx.c
+In-Reply-To: <1294615746-27668-2-git-send-email-marek.vasut@gmail.com>
+References: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
+	<1294615746-27668-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTi=_WubkAyMgf41WH+_meMHhTp_39jxriy1KBw9O@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 12:45:14AM +0900, Paul Mundt wrote:
-> On Mon, Jan 10, 2011 at 10:10:19AM +0000, Pawel Moll wrote:
-> > On Mon, 10 Jan 2011 07:50:42 +0900, Simon Horman <horms@verge.net.au> 
-> > wrote:
-> > >>>  Documentation/arm/SH-Mobile/Makefile              |    8 +
-> > >>>  Documentation/arm/SH-Mobile/vrl4.c                |  169 
-> > >>+++++++++++++++++++++
-> > >>How about putting those two into "tools" (in particular "tools/arm")
-> > >>instead of "Documentation"?
-> > >>Just a thought... ;-)
-> > >
-> > >Thats fine by me except that tools/arm doesn't exist yet.
-> > >It would be good to get some consensus before creating it.
-> > 
-> > I think there is consensus regarding "tools" as a place for user-space 
-> > tools - eg. perf tools used to live in "Documentation/..." and then were 
-> > moved to "tools/perf".
-> > 
-> > Now, whether your stuff should be in "tools/SH-Mobile" or 
-> > "tools/arm/SH-Mobile", I have no opinion ;-)
-> > 
-> I agree that this is a worthwhile direction to move to, but we're a long
-> way from a consensus. x86 has traditionally littered scripts/ and others
-> have sunk to arch/<foo>/tools hostprogs abuse and so forth. perf is a bit
-> of a special case in that it's fairly architecture agnostic. 
+On Sun, Jan 9, 2011 at 5:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-I would prefer to leave the code in Documentation/arm/SH-Mobile/ as
-it complements the document that is in the same directory - weather
-its more code or documentation is debatable IMHO.
+Applied.
 
-I'm happy to move things later if a consensus is reached.
+> ---
+> ?arch/arm/mach-pxa/clock-pxa3xx.c | ? ?1 -
+> ?1 files changed, 0 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/clock-pxa3xx.c b/arch/arm/mach-pxa/clock-pxa3xx.c
+> index 1b08a34..3f864cd 100644
+> --- a/arch/arm/mach-pxa/clock-pxa3xx.c
+> +++ b/arch/arm/mach-pxa/clock-pxa3xx.c
+> @@ -115,7 +115,6 @@ static unsigned long clk_pxa3xx_smemc_getrate(struct clk *clk)
+> ?{
+> ? ? ? ?unsigned long acsr = ACSR;
+> ? ? ? ?unsigned long memclkcfg = __raw_readl(MEMCLKCFG);
+> - ? ? ? unsigned int smcfs = (acsr >> 23) & 0x7;
+>
+> ? ? ? ?return BASE_CLK * smcfs_mult[(acsr >> 23) & 0x7] /
+> ? ? ? ? ? ? ? ? ? ? ? ?df_clkdiv[(memclkcfg >> 16) & 0x3];
+> --
+> 1.7.2.3
+>
+>
