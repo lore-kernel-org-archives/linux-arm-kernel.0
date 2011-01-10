@@ -1,20 +1,26 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 10 Jan 2011 11:34:09 -0600
-Subject: [PATCH] Fix ep93xx-fb init/exit annotations
-In-Reply-To: <4D2A4AFD.4050008@bluewatersys.com>
-References: <4D2A4AFD.4050008@bluewatersys.com>
-Message-ID: <0D753D10438DA54287A00B027084269764CD96B69E@AUSP01VMBX24.collaborationhost.net>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 10 Jan 2011 19:00:00 +0100
+Subject: [GIT PULL] ux500-core leftovers
+Message-ID: <AANLkTimHzjRLxGLabXgh7bvoD+f9jOC8CRS0YFeKzMDz@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sunday, January 09, 2011 4:56 PM, Ryan Mallon wrote:
->
-> Fix section mismatch errors in the ep93xx-fb driver resulting from
-> incorrect init/exit annotations.
->
-> Reported-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+Linus, could you please pull:
 
-That fixed it.
+      git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+for-torvalds
 
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+This is based on commit 0c21e3a and contains
+the following patches that couldn't be merged through
+Russell's ARM tree due to cross-branch dependencies
+now sorted out in your tree:
+
+Rabin Vincent (5):
+      ux500: remove build-time changing macros
+      ux500: rename MOP board Kconfig
+      ux500: dynamic SOC detection
+      ux500: modem_irq is only for 5500
+      ux500: allow 5500 and 8500 to be built together
+
+Yours,
+Linus Walleij
