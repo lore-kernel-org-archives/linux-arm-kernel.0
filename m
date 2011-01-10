@@ -1,118 +1,43 @@
-From: pratyush.anand@st.com (pratyush)
-Date: Mon, 10 Jan 2011 16:50:36 +0530
-Subject: [PATCH V2] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <201101072332.16985.arnd@arndb.de>
-References: <137dfad4a093ea0ac80396f5eb7fbf0c382be698.1294314772.git.viresh.kumar@st.com>
-	<201101072332.16985.arnd@arndb.de>
-Message-ID: <4D2AEB84.6060804@st.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 10 Jan 2011 15:04:58 +0300
+Subject: [PATCH 5/5] ARM: pxa: Fix recursive call of
+	pxa_(un)mask_low_gpio()
+In-Reply-To: <1294615746-27668-5-git-send-email-marek.vasut@gmail.com>
+References: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
+	<1294615746-27668-5-git-send-email-marek.vasut@gmail.com>
+Message-ID: <4D2AF5EA.6050104@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+Hello.
 
-Thanks for the comments!!!
+On 10-01-2011 2:29, Marek Vasut wrote:
 
-On 1/8/2011 4:02 AM, Arnd Bergmann wrote:
-> On Thursday 06 January 2011, Viresh Kumar wrote:
->> From: Pratyush Anand <pratyush.anand@st.com>
->>
->> This is a configurable gadget. can be configured by sysfs interface. Any
->> IP available at PCIE bus can be programmed to be used by host
->> controller.It supoorts both INTX and MSI.
->> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
->> with size 0x1000
-> 
-> The code looks reasonably clean, but I don't yet understand how you would
-> use this device for the interesting case of communicating with the host
-> side. I've put a lot of thought into similar hardware designs before, but
-> never got an implementation done myself.
+> Signed-off-by: Marek Vasut<marek.vasut@gmail.com>
+[...]
 
-This driver has been developed just to show spear's capability to work as dual
-mode pcie controller.
+> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> index 81edf97..96571fe 100644
+> --- a/arch/arm/mach-pxa/irq.c
+> +++ b/arch/arm/mach-pxa/irq.c
+> @@ -112,14 +112,14 @@ static void pxa_mask_low_gpio(unsigned int irq)
+>   {
+>   	struct irq_desc *desc = irq_to_desc(irq);
 
-> 
-> Forwarding devices that don't need interrupts with your driver seems to
-> be the only case that will easily work, but that is also rather limited
-> in what you can use it for.
-> 
+    You should have removed that variable too as it's not unused.
 
-Off-course, it will work best with non interrupting devices. One can use
-INTA assertion/de-assertion by software, but it would be very slow.
+> -	desc->chip->mask(irq);
+> +	pxa_mask_irq(irq);
+>   }
+>
+>   static void pxa_unmask_low_gpio(unsigned int irq)
+>   {
+>   	struct irq_desc *desc = irq_to_desc(irq);
 
-> One concept that people have played with before is to export a virtio
-> channel through PCI that you can use with e.g. virtio-net  or virtfs.
-> This is very powerful and has  a lot of possible applications because
-> we have support for virtio drivers across a number of operating systems
-> and platforms already.
-> 
->>  Documentation/misc-devices/spear-pcie-gadget.txt |  125 ++++
->>  drivers/misc/Kconfig                             |   10 +
->>  drivers/misc/Makefile                            |    1 +
->>  drivers/misc/spear13xx_pcie_gadget.c             |  856 ++++++++++++++++++++++
-> 
-> Why would you put this under drivers/misc?
-> 
-> I think drivers/pci/gadget/ would be a better place. I would also
-> recommend splitting the user interface from the hardware dependent
-> parts, so someone else can easily do another gadget driver for
-> different hardware.
-> 
+    Same here...
 
-Yes, can be done, if the interfaces which I have made is
-acceptable to community. 
+> -	desc->chip->unmask(irq);
+> +	pxa_unmask_irq(irq);
+>   }
 
->> +/*wait till link is up*/
->> +# cat sys/devices/platform/pcie-gadget-spear.0/link
->> +wait till it returns UP.
-> 
-> A blocking sysfs read is not a nice interface. This is probably where
-> the sysfs abstraction for your hardware stops making sense.
-> 
-
-This call is not blocking. User will have to recheck link status till he
-finds it UP. He may put some delay between two successive read. I will
-modify documentation to be more explicit.
-
->> +To assert INTA
->> +# echo 1 >> sys/devices/platform/pcie-gadget-spear.0/inta
->> +
->> +To de-assert INTA
->> +# echo 0 >> sys/devices/platform/pcie-gadget-spear.0/inta
-> 
-> And this looks somewhat impractical and slow. 
-> 
-
-Yes, it will be slow.
-
->> +to send msi vector 2
->> +# echo 2 >> sys/devices/platform/pcie-gadget-spear.0/send_msi
-> 
-> Using a sysfs file only for its side-effect is not very nice either.
-> 
-> The user interface for the interrupts looks to me like it should really
-> be based around a character device and either read/write/poll or
-> ioctl and poll. Using an eventfd might be cool here, because  then you
-> can combine this with other devices by passing the event file to
-> an interface that operates on eventfd. This would e.g. make it possible
-> to combine a UIO device generating interrupts with a PCIe gadget
-> sending the interrupts somewhere else, without leaving kernel
-> space.
-> 
-
-I do not have much idea about eventfd mechanism. But if we decide to
-split it in two layers (generic pcie gadget and HW specific) then I
-might try to do it in this way.
-
-Regards
-Pratyush
-
-> For setting up the basic parameters, sysfs (or configfs, as Greg suggested)
-> is a reasonable choice, so there is no need to change that.
-> 
-> I don't know what the rules for configfs are though, i.e. if eventfd
-> files or ioctls are ok or not.
-> 
-> 	Arnd
-> 
-> .
-> 
+WBR, Sergei
