@@ -1,66 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 10 Jan 2011 20:37:25 +0100
-Subject: [PATCH] ARM: imx/mx27_3ds: Add debug board support
-In-Reply-To: <1294677761-11971-1-git-send-email-fabio.estevam@freescale.com>
-References: <1294677761-11971-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110110193725.GH24920@pengutronix.de>
+From: Trond.Myklebust@netapp.com (Trond Myklebust)
+Date: Mon, 10 Jan 2011 15:15:07 -0500
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <AANLkTinFenq3BEiUQRsxDy6EKwqSM33RcwFG4fs-sXLJ@mail.gmail.com>
+References: <AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
+	<1294426405.2929.23.camel@heimdal.trondhjem.org>
+	<20110107190229.GX31708@n2100.arm.linux.org.uk>
+	<1294427467.4895.66.camel@mulgrave.site>
+	<1294505384.4181.14.camel@heimdal.trondhjem.org>
+	<1294528551.4181.19.camel@heimdal.trondhjem.org>
+	<20110110105019.GC24920@pengutronix.de>
+	<1294676734.3349.10.camel@heimdal.trondhjem.org>
+	<4D2B3D03.8050504@pengutronix.de>
+	<1294680035.3349.19.camel@heimdal.trondhjem.org>
+	<20110110192552.GG24920@pengutronix.de>
+	<1294687767.3349.28.camel@heimdal.trondhjem.org>
+	<AANLkTinFenq3BEiUQRsxDy6EKwqSM33RcwFG4fs-sXLJ@mail.gmail.com>
+Message-ID: <1294690507.3349.31.camel@heimdal.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
-
-On Mon, Jan 10, 2011 at 02:42:41PM -0200, Fabio Estevam wrote:
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/Kconfig         |    1 +
->  arch/arm/mach-imx/mach-mx27_3ds.c |    7 +++++++
->  2 files changed, 8 insertions(+), 0 deletions(-)
+On Mon, 2011-01-10 at 11:34 -0800, Linus Torvalds wrote: 
+> 2011/1/10 Trond Myklebust <Trond.Myklebust@netapp.com>:
+> >
+> > I usually do this, but there is a slight problem with that approach:
+> > Greg gets to do all the work of figuring out to which stable kernels
+> > this particular patch applies. In this case, since we're only talking
+> > about the 2.6.37 kernel, I prefer to use the mailing lists.
 > 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 17d2e60..56684b5 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -243,6 +243,7 @@ config MACH_MX27_3DS
->  	select IMX_HAVE_PLATFORM_MXC_EHCI
->  	select IMX_HAVE_PLATFORM_MXC_MMC
->  	select IMX_HAVE_PLATFORM_SPI_IMX
-> +	select MXC_DEBUG_BOARD
->  	select MXC_ULPI if USB_ULPI
->  	help
->  	  Include support for MX27PDK platform. This includes specific
-> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-> index 83f8e2b..4d72891 100644
-> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-> @@ -37,12 +37,15 @@
->  #include <mach/common.h>
->  #include <mach/iomux-mx27.h>
->  #include <mach/ulpi.h>
-> +#include <mach/irqs.h>
-> +#include <mach/3ds_debugboard.h>
->  
->  #include "devices-imx27.h"
->  
->  #define SD1_EN_GPIO (GPIO_PORTB + 25)
->  #define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
->  #define SPI2_SS0 (GPIO_PORTD + 21)
-> +#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTC + 28)
->  
->  static const int mx27pdk_pins[] __initconst = {
->  	/* UART1 */
-> @@ -276,6 +279,10 @@ static void __init mx27pdk_init(void)
->  	imx27_add_spi_imx1(&spi2_pdata);
->  	spi_register_board_info(mx27_3ds_spi_devs,
->  						ARRAY_SIZE(mx27_3ds_spi_devs));
-> +
-> +	if (mxc_expio_init(MX27_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-> +		pr_warn("Init of the debugboard failed, all "
-> +				"devices on the debugboard are unusable.\n");
-You don't need to break this.  In fact it's better when you don't.
+> Just do
+> 
+>   Cc: stable at kernel.org  [2.6.37]
+> 
+> or similar. It's quite common.
+> 
+> So EVEN IF you want to email people around about the patch separately,
+> do add the "Cc: stable" marker. It's worthwhile information about the
+> patch for everybody involved.
 
-Best regards
-Uwe
+OK. Patch description amended and recommitted in git. Thanks to all for
+the tips...
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Trond Myklebust
+Linux NFS client maintainer
+
+NetApp
+Trond.Myklebust at netapp.com
+www.netapp.com
