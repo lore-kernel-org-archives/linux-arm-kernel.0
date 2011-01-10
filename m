@@ -1,45 +1,39 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 10 Jan 2011 18:26:12 +0100
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <1294680035.3349.19.camel@heimdal.trondhjem.org>
-References: <1294268808.2952.18.camel@heimdal.trondhjem.org>	
-	<1294270104.16957.73.camel@mulgrave.site>	
-	<1294335614.22825.154.camel@mulgrave.site>	
-	<1294336054.2905.1.camel@heimdal.trondhjem.org>	
-	<AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>	
-	<1294426405.2929.23.camel@heimdal.trondhjem.org>	
-	<20110107190229.GX31708@n2100.arm.linux.org.uk>	
-	<1294427467.4895.66.camel@mulgrave.site>	
-	<1294505384.4181.14.camel@heimdal.trondhjem.org>	
-	<1294528551.4181.19.camel@heimdal.trondhjem.org>	
-	<20110110105019.GC24920@pengutronix.de>	
-	<1294676734.3349.10.camel@heimdal.trondhjem.org>	
-	<4D2B3D03.8050504@pengutronix.de>
-	<1294680035.3349.19.camel@heimdal.trondhjem.org>
-Message-ID: <4D2B4134.8050508@pengutronix.de>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 10 Jan 2011 09:33:30 -0800
+Subject: [PATCH 4/5 v4] msm: convert 7x30 to gpiomux.
+In-Reply-To: <AANLkTikrLnGxNSJgv3KDNAQ5kvjNd8aPrOEBwftiiyrQ@mail.gmail.com>
+References: <1283015148-10747-1-git-send-email-gbean@codeaurora.org>
+	<1283015148-10747-4-git-send-email-gbean@codeaurora.org>
+	<AANLkTikrLnGxNSJgv3KDNAQ5kvjNd8aPrOEBwftiiyrQ@mail.gmail.com>
+Message-ID: <1294680810.12298.2.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2011 06:20 PM, Trond Myklebust wrote:
->> Is this patch a candidate for stable?
+On Sun, 2011-01-09 at 14:53 -0800, Dima Zavin wrote:
+> Greg,
 > 
-> Yes. I'm planning on sending it to the stable list after Linus merges it
-> into mainline.
+> Just rebased on top of 2.6.37 and this patch is totally the wrong way
+> to go about this.
+> 
+> I should have commented at the appropriate time, so sorry for the late reply.
+> 
+> Having this  msm_gpiomux_configs be always compiled in for all msm7x30
+> devices makes this entire system completely inflexible since you have
+> to modify common code to provide board specific initialization. The
+> definition of "msm_gpiomux_configs" belongs in the board file, not in
+> gpiomux-7x30.c. I think we need to delete this new file and move the
+> definition back into board-msm7x30.c, but just use the new gpiomux
+> APIs.
+> 
+> I can provide a patch if you like.
 
-Fine!
+I would just provide the patch .. It would be easier to understand what
+your talking about.
 
-regards, Marc
+Daniel
+
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110110/110762ce/attachment.sig>
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
