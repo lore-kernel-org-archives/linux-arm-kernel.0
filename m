@@ -1,58 +1,29 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 10 Jan 2011 16:49:07 -0600
-Subject: [PATCH 4/5] ARM: pxa: Fix suspend/resume array index
-	miscalculation
-In-Reply-To: <1294615746-27668-4-git-send-email-marek.vasut@gmail.com>
-References: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
-	<1294615746-27668-4-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTi=fdTkrdysefE-Wnv0UXN1Wa9j61opAT-GGGwsh@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 10 Jan 2011 23:53:09 +0100
+Subject: [PATCH 1/5 resend] pxa: Fix warning in zeus.c
+Message-ID: <1294699993-4712-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 9, 2011 at 5:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
-> ?arch/arm/mach-pxa/irq.c | ? 10 +++++-----
-> ?1 files changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-> index 78f0e0c..81edf97 100644
-> --- a/arch/arm/mach-pxa/irq.c
-> +++ b/arch/arm/mach-pxa/irq.c
-> @@ -194,14 +194,14 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
->
-> ?#ifdef CONFIG_PM
-> ?static unsigned long saved_icmr[MAX_INTERNAL_IRQS/32];
-> -static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
-> +static unsigned long saved_ipr[MAX_INTERNAL_IRQS/32];
->
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/zeus.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-This isn't right I'm afraid. Unlike other IRQ registers, each interrupt
-line has its own IPR register. So the changes below are also invalid.
-
-> ?static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
-> ?{
-> ? ? ? ?int i;
->
-> - ? ? ? for (i = 0; i < pxa_internal_irq_nr; i += 32) {
-> - ? ? ? ? ? ? ? void __iomem *base = irq_base(i);
-> + ? ? ? for (i = 0; i < pxa_internal_irq_nr; i++) {
-> + ? ? ? ? ? ? ? void __iomem *base = irq_base(i << 5);
->
-> ? ? ? ? ? ? ? ?saved_icmr[i] = __raw_readl(base + ICMR);
-> ? ? ? ? ? ? ? ?__raw_writel(0, base + ICMR);
-> @@ -219,8 +219,8 @@ static int pxa_irq_resume(struct sys_device *dev)
-> ?{
-> ? ? ? ?int i;
->
-> - ? ? ? for (i = 0; i < pxa_internal_irq_nr; i += 32) {
-> - ? ? ? ? ? ? ? void __iomem *base = irq_base(i);
-> + ? ? ? for (i = 0; i < pxa_internal_irq_nr; i++) {
-> + ? ? ? ? ? ? ? void __iomem *base = irq_base(i << 5);
->
-> ? ? ? ? ? ? ? ?__raw_writel(saved_icmr[i], base + ICMR);
-> ? ? ? ? ? ? ? ?__raw_writel(0, base + ICLR);
-> --
-> 1.7.2.3
->
->
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index c87f2b3..29830a3 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -830,8 +830,8 @@ static void __init zeus_init(void)
+ 	pr_info("Zeus CPLD V%dI%d\n", (system_rev & 0xf0) >> 4, (system_rev & 0x0f));
+ 
+ 	/* Fix timings for dm9000s (CS1/CS2)*/
+-	msc0 = __raw_readl(MSC0) & 0x0000ffff | (dm9000_msc << 16);
+-	msc1 = __raw_readl(MSC1) & 0xffff0000 | dm9000_msc;
++	msc0 = (__raw_readl(MSC0) & 0x0000ffff) | (dm9000_msc << 16);
++	msc1 = (__raw_readl(MSC1) & 0xffff0000) | dm9000_msc;
+ 	__raw_writel(msc0, MSC0);
+ 	__raw_writel(msc1, MSC1);
+ 
+-- 
+1.7.2.3
