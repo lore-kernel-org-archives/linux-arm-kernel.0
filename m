@@ -1,88 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Jan 2011 13:03:36 +0900
-Subject: [PATCH V2] ARM: S5PV310: Implement kernel timers using MCT
-In-Reply-To: <20110107121121.GR31708@n2100.arm.linux.org.uk>
-References: <1294107527-27915-1-git-send-email-kgene.kim@samsung.com>
-	<20110106155358.GH31708@n2100.arm.linux.org.uk>
-	<019e01cbae63$2511a5e0$6f34f1a0$%kim@samsung.com>
-	<20110107121121.GR31708@n2100.arm.linux.org.uk>
-Message-ID: <00af01cbb07b$5e9f1120$1bdd3360$%kim@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 09 Jan 2011 22:55:04 -0500 (EST)
+Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with high
+	frequency clocks
+In-Reply-To: <20110109105200.GC31708@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
+	<20101221105149.GO28157@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1012291703300.10437@xanadu.home>
+	<20110103003718.GF17727@n2100.arm.linux.org.uk>
+	<1294084049.2571.30.camel@work-vm>
+	<20110109105200.GC31708@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101092224320.3455@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+On Sun, 9 Jan 2011, Russell King - ARM Linux wrote:
+
+> Now, a Caesium fountain frequency standard may have an accuracy of
+> approx. 1 part in 10^-14.  Rubidium frequency standards are around
+> 1 part in 10^-12.
 > 
-> On Fri, Jan 07, 2011 at 09:05:11PM +0900, Kukjin Kim wrote:
-> > Russell King - ARM Linux wrote:
-> > >
-> > > On Tue, Jan 04, 2011 at 11:18:47AM +0900, Kukjin Kim wrote:
-> > > > From: Changhwan Youn <chaos.youn@samsung.com>
-> > > >
-> > > > The Multi-Core Timer(MCT) of S5PV310 is designed for implementing
-> > > > clock source timer and clock event timers. This patch implements
-> > > > 1 clock source timer with 64 bit free running counter of MCT and
-> > > > 2 clock event timers with two of 31-bit tick counters.
-> > >
-> > > I want to wait until after this merge window before commenting too
-much
-> > > on this; some of this patch will be impacted by changes in this merge
-> > > window.
-> > >
-> > Hmmm...Ok, I understood.
+> A standard crystal oscillator is around 1 part in 10^-6 to 10^-7.  If
+> you really care about accuracy, you might use an ovened crystal
+> oscillator (OXCO) which'll get you to around 1 part in 10^-7..10^-9,
+> still well short of the calculation inaccuracy.  You wouldn't use an
+> OXCO in a battery operated device though due to power consumption.
 > 
-> That stuff is now in mainline - not only the new sched_clock() support
-> but also the SMP changes (which impact on your MCT code.)  Please rebase
-> on latest mainline and re-send.
+> We're generally don't have a Caesium or Rubidium frequency standard, not
+> even a OXCO providing the clock source for the counter, so the accuracy
+> of the counters clock is much more significant than the conversion
+> factors by a factor of about one million.
 > 
-I found it in mainline...thanks...ok, will do it.
+> What I'm saying is that there becomes a time where it really doesn't
+> matter if the conversion isn't accurate, provided it's accurate enough,
+> and it would appear to be accurate enough.
 
-> > > > +static void s5pv310_frc_suspend(struct clocksource *cs)
-> > > > +{
-> > > > +	time_suspended = s5pv310_frc_read(cs);
-> > > > +};
-> > > > +
-> > > > +static void s5pv310_frc_resume(struct clocksource *cs)
-> > > > +{
-> > > > +	s5pv310_mct_frc_start((u32)(time_suspended >> 32),
-> > > (u32)time_suspended);
-> > > > +};
-> > >
-> > > Is this something which other clocksource drivers need to do, or does
-the
-> > > core automatically deal with the clocksource being irregular across a
-> > > suspend/resume event?
-> > >
-> > Normally this is not necessary because core deals with the irregularity
-of
-> > clocksource, but for sched_clock() implementation, clocksource had
-better
-> be
-> > regular across a suspend/resume event. One example is "Show timing
-> > information on printks" kernel configuration. Without this code, timing
-> > information resets after suspend/resume event.
-> >
-> > Following is not submitted but will be submitted :-)
-> >
-> > unsigned long long sched_clock(void)
-> > {
-> > 	struct clocksource *cs = &mct_frc;
-> >
-> > 	return clocksource_cyc2ns(cs->read(NULL), sched_mult, sched_shift);
-> > }
-> 
-> Please use the new sched_clock stuff which guarantees to return a 64-bit
-> cycle count (which is what sched_clock() is required to do.)
+It sure is, thanks for the demonstration.
 
-Ok.
+However this begs the question about the actual meaning of the value for 
+the minsec argument to clocks_calc_mult_shift() (which IMHO should be 
+renamed to maxsec instead).  In the ARM sched_clock code the value of 60 
+is totally arbitrary and may happen to be good enough, but a value of 0 
+would also be totally arbitrary and also work fine.  But at least a 0 
+value wouldn't imply any false meaning.  And in the case of the 
+sched_clock support code, we know the value we need: 90% 
+of the actual hardware clock period, so using that would at least make 
+the code self consistent even if in practice this doesn't change the 
+final results.
 
-Russell one more,
-Is it possible that I send 'pull request' to you for 38 merge window on this
-Wednesday?
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Nicolas
