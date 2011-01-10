@@ -1,38 +1,41 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 10 Jan 2011 16:43:07 +0100
-Subject: AT91: Fix power-saving in idle-mode on 926T processors
-In-Reply-To: <1294673540l.26200l.0l@i-dmzi_al.realan.de> (Anders Larsen's
-	message of "Mon, 10 Jan 2011 16:32:20 +0100")
-References: <AANLkTimGTVybe4LmspxWj6vkM_zNnPcaUbk6sqvpJ032@mail.gmail.com>
-	<1294673540l.26200l.0l@i-dmzi_al.realan.de>
-Message-ID: <87fwt069ys.fsf@macbook.be.48ers.dk>
+From: Trond.Myklebust@netapp.com (Trond Myklebust)
+Date: Mon, 10 Jan 2011 11:25:34 -0500
+Subject: still nfs problems [Was: Linux 2.6.37-rc8]
+In-Reply-To: <20110110105019.GC24920@pengutronix.de>
+References: <1294268808.2952.18.camel@heimdal.trondhjem.org>
+	<1294270104.16957.73.camel@mulgrave.site>
+	<1294335614.22825.154.camel@mulgrave.site>
+	<1294336054.2905.1.camel@heimdal.trondhjem.org>
+	<AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
+	<1294426405.2929.23.camel@heimdal.trondhjem.org>
+	<20110107190229.GX31708@n2100.arm.linux.org.uk>
+	<1294427467.4895.66.camel@mulgrave.site>
+	<1294505384.4181.14.camel@heimdal.trondhjem.org>
+	<1294528551.4181.19.camel@heimdal.trondhjem.org>
+	<20110110105019.GC24920@pengutronix.de>
+Message-ID: <1294676734.3349.10.camel@heimdal.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Anders" == Anders Larsen <al@alarsen.net> writes:
+On Mon, 2011-01-10 at 11:50 +0100, Uwe Kleine-K?nig wrote: 
+> Hi Trond,
+> 
+> On Sat, Jan 08, 2011 at 06:15:51PM -0500, Trond Myklebust wrote:
+> > ----------------------------------------------------------------------------------- 
+> It would be great if you could add a "8<" in the line above next time.
+> Then git-am -c does the right thing (at least I think so).
 
-Hi,
+Sorry. I wasn't aware of that particular idiom. So something like
 
- >> Is there a known interaction with this and the JTAG controller?
+8<------------------------------------------------------------
+From: Trond Myklebust <Trond.Myklebust@netapp.com>
+Subject: .....
 
- Anders> indeed there is - disabling the processor clock blocks JTAG debugging.
-
-Ok - And apparently it completely blocks the JTAG controller, so you
-cannot even put it in bypass mode and access other devices on the same
-JTAG chain.
-
- >> I haven't had time to look closer into it yet, but with this applied
- >> I can no longer access an Altera FPGA on a chain shared with a 9G45
- >> through Quartus.
-
- Anders> If you boot with the kernel parameter "nohlt", arch_idle() is
- Anders> not called, and JTAG should work again (but of course power
- Anders> consumption will be substantially higher).
-
- Anders> This was noted by Uwe Kleine-K?nig in
- Anders> https://lkml.org/lkml/2010/5/5/342
-
-Thanks.
 
 -- 
-Bye, Peter Korsgaard
+Trond Myklebust
+Linux NFS client maintainer
+
+NetApp
+Trond.Myklebust at netapp.com
+www.netapp.com
