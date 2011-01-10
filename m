@@ -1,29 +1,62 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Mon, 10 Jan 2011 14:52:22 -0800
-Subject: [GIT PULL] ux500-core leftovers
-In-Reply-To: <AANLkTimHzjRLxGLabXgh7bvoD+f9jOC8CRS0YFeKzMDz@mail.gmail.com>
-References: <AANLkTimHzjRLxGLabXgh7bvoD+f9jOC8CRS0YFeKzMDz@mail.gmail.com>
-Message-ID: <AANLkTimsHh7gX3ECmsHYorUSwE2xRipvhixYqhnp5MR=@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 11 Jan 2011 00:13:05 +0100
+Subject: [PATCH 4/5] ARM: pxa: Fix suspend/resume array index
+	miscalculation
+In-Reply-To: <AANLkTi=fdTkrdysefE-Wnv0UXN1Wa9j61opAT-GGGwsh@mail.gmail.com>
+References: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
+	<1294615746-27668-4-git-send-email-marek.vasut@gmail.com>
+	<AANLkTi=fdTkrdysefE-Wnv0UXN1Wa9j61opAT-GGGwsh@mail.gmail.com>
+Message-ID: <201101110013.05845.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 10, 2011 at 10:00 AM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> Linus, could you please pull:
->
-> ? ? ?git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> for-torvalds
->
-> This is based on commit 0c21e3a and contains
-> the following patches that couldn't be merged through
-> Russell's ARM tree due to cross-branch dependencies
-> now sorted out in your tree:
+On Monday 10 January 2011 23:49:07 Eric Miao wrote:
+> On Sun, Jan 9, 2011 at 5:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > ---
+> >  arch/arm/mach-pxa/irq.c |   10 +++++-----
+> >  1 files changed, 5 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> > index 78f0e0c..81edf97 100644
+> > --- a/arch/arm/mach-pxa/irq.c
+> > +++ b/arch/arm/mach-pxa/irq.c
+> > @@ -194,14 +194,14 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+> > 
+> >  #ifdef CONFIG_PM
+> >  static unsigned long saved_icmr[MAX_INTERNAL_IRQS/32];
+> > -static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
+> > +static unsigned long saved_ipr[MAX_INTERNAL_IRQS/32];
+> 
+> This isn't right I'm afraid. Unlike other IRQ registers, each interrupt
+> line has its own IPR register. So the changes below are also invalid.
 
-Please do also include a diffstat ("git diff -M --stat --summary
-origin...") with the pull, so that I see what I'm pulling before I
-pull, and to make it easier to verify that I'm getting what you
-intend.
+You're right, stupid me ... I just noticed it too (unlike your email). Can you 
+check v2 please ?
 
-I pulled, but next time I might not.
-
-              Linus
+Cheers
+> 
+> >  static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+> >  {
+> >        int i;
+> > 
+> > -       for (i = 0; i < pxa_internal_irq_nr; i += 32) {
+> > -               void __iomem *base = irq_base(i);
+> > +       for (i = 0; i < pxa_internal_irq_nr; i++) {
+> > +               void __iomem *base = irq_base(i << 5);
+> > 
+> >                saved_icmr[i] = __raw_readl(base + ICMR);
+> >                __raw_writel(0, base + ICMR);
+> > @@ -219,8 +219,8 @@ static int pxa_irq_resume(struct sys_device *dev)
+> >  {
+> >        int i;
+> > 
+> > -       for (i = 0; i < pxa_internal_irq_nr; i += 32) {
+> > -               void __iomem *base = irq_base(i);
+> > +       for (i = 0; i < pxa_internal_irq_nr; i++) {
+> > +               void __iomem *base = irq_base(i << 5);
+> > 
+> >                __raw_writel(saved_icmr[i], base + ICMR);
+> >                __raw_writel(0, base + ICLR);
+> > --
+> > 1.7.2.3
