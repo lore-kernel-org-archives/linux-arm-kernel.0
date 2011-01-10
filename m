@@ -1,62 +1,48 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 11 Jan 2011 00:13:05 +0100
-Subject: [PATCH 4/5] ARM: pxa: Fix suspend/resume array index
-	miscalculation
-In-Reply-To: <AANLkTi=fdTkrdysefE-Wnv0UXN1Wa9j61opAT-GGGwsh@mail.gmail.com>
-References: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
-	<1294615746-27668-4-git-send-email-marek.vasut@gmail.com>
-	<AANLkTi=fdTkrdysefE-Wnv0UXN1Wa9j61opAT-GGGwsh@mail.gmail.com>
-Message-ID: <201101110013.05845.marek.vasut@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 10 Jan 2011 16:24:17 -0700
+Subject: [PATCH] spi: tegra: don't treat NULL clk as an error
+In-Reply-To: <20110110222524.GE12552@n2100.arm.linux.org.uk>
+References: <1294657506-27510-1-git-send-email-jamie@jamieiles.com>
+	<AANLkTikd7AZv+-aVf4=jwF+xjvq+1k_kAwLPz-+yP6=Q@mail.gmail.com>
+	<20110110221802.GD12552@n2100.arm.linux.org.uk>
+	<20110110222524.GE12552@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinOWvu5TNMtsrw19-ERc1JpopvQkyp0QH3sQpkL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 January 2011 23:49:07 Eric Miao wrote:
-> On Sun, Jan 9, 2011 at 5:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
-> >  arch/arm/mach-pxa/irq.c |   10 +++++-----
-> >  1 files changed, 5 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-> > index 78f0e0c..81edf97 100644
-> > --- a/arch/arm/mach-pxa/irq.c
-> > +++ b/arch/arm/mach-pxa/irq.c
-> > @@ -194,14 +194,14 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
-> > 
-> >  #ifdef CONFIG_PM
-> >  static unsigned long saved_icmr[MAX_INTERNAL_IRQS/32];
-> > -static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
-> > +static unsigned long saved_ipr[MAX_INTERNAL_IRQS/32];
-> 
-> This isn't right I'm afraid. Unlike other IRQ registers, each interrupt
-> line has its own IPR register. So the changes below are also invalid.
+On Mon, Jan 10, 2011 at 3:25 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jan 10, 2011 at 10:18:02PM +0000, Russell King - ARM Linux wrote:
+>> On Mon, Jan 10, 2011 at 01:58:12PM -0700, Grant Likely wrote:
+>> > On Mon, Jan 10, 2011 at 4:05 AM, Jamie Iles <jamie@jamieiles.com> wrote:
+>> > > Some platforms have been known to return NULL from clk_get() if they
+>> > > support only a single struct clk. ?Whilst tegra doesn't do this, make
+>> > > the drivers consistent with others.
+>> > >
+>> > > Cc: Erik Gilling <konkers@android.com>
+>> > > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+>> >
+>> > Hi James,
+>> >
+>> > If NULL does get returned, say due to a future change to the clock
+>> > code, then this change causes the driver to oops. ?I'm not going to
+>> > apply this patch.
+>>
+>> Please apply it - the clock API just defines struct clk as a cookie
+>> where errors are IS_ERR/PTR_ERR. ?Other values must be considered by
+>> drivers as perfectly valid, including NULL.
+>
+> Also note that drivers have no business ever dereferencing struct clks.
+> So if they oops, that's their own fault for dereferencing something
+> that they shouldn't.
 
-You're right, stupid me ... I just noticed it too (unlike your email). Can you 
-check v2 please ?
+I was actually looking at the implementation of clk_enable() which is
+called by the driver and doesn't do any NULL checking.  But I suppose
+that it then becomes the clock-code's own fault if it returns NULL and
+then oopses on a NULL being passed to it.  Okay, I'll apply it.
 
-Cheers
-> 
-> >  static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
-> >  {
-> >        int i;
-> > 
-> > -       for (i = 0; i < pxa_internal_irq_nr; i += 32) {
-> > -               void __iomem *base = irq_base(i);
-> > +       for (i = 0; i < pxa_internal_irq_nr; i++) {
-> > +               void __iomem *base = irq_base(i << 5);
-> > 
-> >                saved_icmr[i] = __raw_readl(base + ICMR);
-> >                __raw_writel(0, base + ICMR);
-> > @@ -219,8 +219,8 @@ static int pxa_irq_resume(struct sys_device *dev)
-> >  {
-> >        int i;
-> > 
-> > -       for (i = 0; i < pxa_internal_irq_nr; i += 32) {
-> > -               void __iomem *base = irq_base(i);
-> > +       for (i = 0; i < pxa_internal_irq_nr; i++) {
-> > +               void __iomem *base = irq_base(i << 5);
-> > 
-> >                __raw_writel(saved_icmr[i], base + ICMR);
-> >                __raw_writel(0, base + ICLR);
-> > --
-> > 1.7.2.3
+g.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
