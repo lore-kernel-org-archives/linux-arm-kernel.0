@@ -1,58 +1,34 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 10 Jan 2011 13:58:12 -0700
-Subject: [PATCH] spi: tegra: don't treat NULL clk as an error
-In-Reply-To: <1294657506-27510-1-git-send-email-jamie@jamieiles.com>
-References: <1294657506-27510-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <AANLkTikd7AZv+-aVf4=jwF+xjvq+1k_kAwLPz-+yP6=Q@mail.gmail.com>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Mon, 10 Jan 2011 16:16:22 -0500
+Subject: [PATCH] ARM: vexpress: register platform PATA device.
+In-Reply-To: <20110107224348.GZ31708@n2100.arm.linux.org.uk>
+References: <1294435445-2020-1-git-send-email-nbowler@elliptictech.com>
+	<20110107224348.GZ31708@n2100.arm.linux.org.uk>
+Message-ID: <20110110211622.GA10381@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 10, 2011 at 4:05 AM, Jamie Iles <jamie@jamieiles.com> wrote:
-> Some platforms have been known to return NULL from clk_get() if they
-> support only a single struct clk. ?Whilst tegra doesn't do this, make
-> the drivers consistent with others.
->
-> Cc: Erik Gilling <konkers@android.com>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+On 2011-01-07 22:43 +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 07, 2011 at 04:24:05PM -0500, Nick Bowler wrote:
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index d56d21c..ee61039 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -264,6 +264,7 @@ config ARCH_VEXPRESS
+> >  	select HAVE_CLK
+> >  	select ICST
+> >  	select PLAT_VERSATILE
+> > +	select HAVE_PATA_PLATFORM
+> 
+> To avoid the Kconfig warning, this should be:
+> 
+> 	select HAVE_PATA_PLATFORM if ATA
+> 
+> or it needs to be moved outside of the if ATA ... endif block in
+> drivers/ata/Kconfig.
 
-Hi James,
-
-If NULL does get returned, say due to a future change to the clock
-code, then this change causes the driver to oops.  I'm not going to
-apply this patch.
-
-g.
-
-> ---
->
-> ?drivers/spi/spi_tegra.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/spi/spi_tegra.c b/drivers/spi/spi_tegra.c
-> index bb7df02..891e590 100644
-> --- a/drivers/spi/spi_tegra.c
-> +++ b/drivers/spi/spi_tegra.c
-> @@ -513,7 +513,7 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
-> ? ? ? ?}
->
-> ? ? ? ?tspi->clk = clk_get(&pdev->dev, NULL);
-> - ? ? ? if (IS_ERR_OR_NULL(tspi->clk)) {
-> + ? ? ? if (IS_ERR(tspi->clk)) {
-> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "can not get clock\n");
-> ? ? ? ? ? ? ? ?ret = PTR_ERR(tspi->clk);
-> ? ? ? ? ? ? ? ?goto err2;
-> --
-> 1.7.3.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
+The Kconfig dependency fix was merged into mainline today, so this patch
+should no longer trigger the aforementioned warning.
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
