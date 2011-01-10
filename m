@@ -1,58 +1,59 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 10 Jan 2011 14:42:41 -0200
-Subject: [PATCH] ARM: imx/mx27_3ds: Add debug board support
-Message-ID: <1294677761-11971-1-git-send-email-fabio.estevam@freescale.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 10 Jan 2011 10:59:26 -0600
+Subject: [PATCH] ep93xx: add framebuffer support to edb93xx boards
+In-Reply-To: <AANLkTi=uw2sxizgDBSnDQVMaokikirDQgxt1w6sP4C05@mail.gmail.com>
+References: <0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
+	<AANLkTi=uw2sxizgDBSnDQVMaokikirDQgxt1w6sP4C05@mail.gmail.com>
+Message-ID: <0D753D10438DA54287A00B027084269764CD96B587@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig         |    1 +
- arch/arm/mach-imx/mach-mx27_3ds.c |    7 +++++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+On Saturday, January 08, 2011 12:53 PM, Martin Guy wrote:
+> On Fri, Jan 7, 2011 at 11:38 PM, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+>> The ep9307, ep9312, and ep9315 variants of the ep93xx processor include the
+>> raster engine needed for framebuffer support.
+>>
+>> This allows the EDB93xx boards with those processors to use the framebuffer
+>> driver.
+>>
+>> Tested on an EDB9307A with the following kernel parameters:
+>> ? ? ? ?video=640x480-16 at 60
+>> ? ? ? ?video=1024x768-16 at 60
+>>
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>
+> The code looks good, but there are hardware bugs in the EP93XX that
+> make the screen image jump a few pixels to the right once every few
+> seconds.  We found that 800x600-16 and 1024x768-8 were the highest
+> modes that are stable.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 17d2e60..56684b5 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -243,6 +243,7 @@ config MACH_MX27_3DS
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
- 	select IMX_HAVE_PLATFORM_MXC_MMC
- 	select IMX_HAVE_PLATFORM_SPI_IMX
-+	select MXC_DEBUG_BOARD
- 	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for MX27PDK platform. This includes specific
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 83f8e2b..4d72891 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -37,12 +37,15 @@
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
- #include <mach/ulpi.h>
-+#include <mach/irqs.h>
-+#include <mach/3ds_debugboard.h>
- 
- #include "devices-imx27.h"
- 
- #define SD1_EN_GPIO (GPIO_PORTB + 25)
- #define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
- #define SPI2_SS0 (GPIO_PORTD + 21)
-+#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTC + 28)
- 
- static const int mx27pdk_pins[] __initconst = {
- 	/* UART1 */
-@@ -276,6 +279,10 @@ static void __init mx27pdk_init(void)
- 	imx27_add_spi_imx1(&spi2_pdata);
- 	spi_register_board_info(mx27_3ds_spi_devs,
- 						ARRAY_SIZE(mx27_3ds_spi_devs));
-+
-+	if (mxc_expio_init(MX27_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+		pr_warn("Init of the debugboard failed, all "
-+				"devices on the debugboard are unusable.\n");
- }
- 
- static void __init mx27pdk_timer_init(void)
--- 
-1.6.0.4
+Hardware bugs in the EP93XX... No... ;-)
+
+> Did you find 1024x768-16 to be stable, say when running X and moving a
+> window? The effect was most visible on a phosphor CRT, less noticeable
+> on an LCD.
+
+I don't have any use for X on the EP93XX so, no I have not tested that.
+My app uses the SDL library and has very little actual "motion" going on
+so the screen looks pretty stable in my tests.
+
+I have noticed some timing issues with the framebuffer driver, the requested
+60Hz refresh is being reported as either 59 or 61Hz on the display, but I
+haven't taken the time to look into it yet.
+
+Could the problem you are seeing just be a bandwidth limitation?  Have you
+tried changing the AHB master priority order with the SysCon BysMstrArb
+register (0x8093_0054)?  The default priority (00) has the following order:
+
+1 - Raster Cursor
+2 - MAC
+3 - USB
+4 - DMA
+5 - ARM920T
+6 - Raster
+
+The other priority's put the Raster first and shuffle the others around
+various ways.
+
+Regards,
+Hartley
