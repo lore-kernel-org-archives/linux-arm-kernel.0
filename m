@@ -1,18 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 10 Jan 2011 22:39:49 +0100
-Subject: [PATCH] ARM AT91SAM9M10G45: Remove duplicate inclusion of
-	mach/hardware.h
-In-Reply-To: <alpine.LNX.2.00.1101102225550.32164@swampdragon.chaosbits.net>
-References: <alpine.LNX.2.00.1101102225550.32164@swampdragon.chaosbits.net>
-Message-ID: <20110110213949.GL11726@game.jcrosoft.org>
+From: r64343@freescale.com (Jason Liu)
+Date: Tue, 11 Jan 2011 05:44:29 +0800
+Subject: [PATCH 1/1] ARM i.MX50: Rename devices-mx50.h
+Message-ID: <1294695869-6653-1-git-send-email-r64343@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:29 Mon 10 Jan     , Jesper Juhl wrote:
-> Remove duplicate inclusion of mach/hardware.h
-> 
-> Signed-off-by: Jesper Juhl <jj@chaosbits.net>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+There are devices-imx51.h and devices-imx53.h under
+arch/arm/mach-mx5 directory. So, had better rename
+devices-mx50.h to devices-imx50.h to follow the same
+naming convention with imx51 and imx53 part.
 
-Best Regards,
-J.
+Signed-off-by: Jason Liu <r64343@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx50_rdp.c                 |    2 +-
+ .../mach-mx5/{devices-mx50.h => devices-imx50.h}   |    0
+ 2 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
+index fd32e4c..e5bb600 100644
+--- a/arch/arm/mach-mx5/board-mx50_rdp.c
++++ b/arch/arm/mach-mx5/board-mx50_rdp.c
+@@ -35,7 +35,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ 
+-#include "devices-mx50.h"
++#include "devices-imx50.h"
+ 
+ static iomux_v3_cfg_t mx50_rdp_pads[] __initdata = {
+ 	/* SD1 */
+diff --git a/arch/arm/mach-mx5/devices-mx50.h b/arch/arm/mach-mx5/devices-imx50.h
+similarity index 100%
+rename from arch/arm/mach-mx5/devices-mx50.h
+rename to arch/arm/mach-mx5/devices-imx50.h
+-- 
+1.7.0.4
