@@ -1,41 +1,58 @@
-From: Trond.Myklebust@netapp.com (Trond Myklebust)
-Date: Mon, 10 Jan 2011 11:25:34 -0500
-Subject: still nfs problems [Was: Linux 2.6.37-rc8]
-In-Reply-To: <20110110105019.GC24920@pengutronix.de>
-References: <1294268808.2952.18.camel@heimdal.trondhjem.org>
-	<1294270104.16957.73.camel@mulgrave.site>
-	<1294335614.22825.154.camel@mulgrave.site>
-	<1294336054.2905.1.camel@heimdal.trondhjem.org>
-	<AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
-	<1294426405.2929.23.camel@heimdal.trondhjem.org>
-	<20110107190229.GX31708@n2100.arm.linux.org.uk>
-	<1294427467.4895.66.camel@mulgrave.site>
-	<1294505384.4181.14.camel@heimdal.trondhjem.org>
-	<1294528551.4181.19.camel@heimdal.trondhjem.org>
-	<20110110105019.GC24920@pengutronix.de>
-Message-ID: <1294676734.3349.10.camel@heimdal.trondhjem.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 10 Jan 2011 14:42:41 -0200
+Subject: [PATCH] ARM: imx/mx27_3ds: Add debug board support
+Message-ID: <1294677761-11971-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-10 at 11:50 +0100, Uwe Kleine-K?nig wrote: 
-> Hi Trond,
-> 
-> On Sat, Jan 08, 2011 at 06:15:51PM -0500, Trond Myklebust wrote:
-> > ----------------------------------------------------------------------------------- 
-> It would be great if you could add a "8<" in the line above next time.
-> Then git-am -c does the right thing (at least I think so).
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig         |    1 +
+ arch/arm/mach-imx/mach-mx27_3ds.c |    7 +++++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-Sorry. I wasn't aware of that particular idiom. So something like
-
-8<------------------------------------------------------------
-From: Trond Myklebust <Trond.Myklebust@netapp.com>
-Subject: .....
-
-
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 17d2e60..56684b5 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -243,6 +243,7 @@ config MACH_MX27_3DS
+ 	select IMX_HAVE_PLATFORM_MXC_EHCI
+ 	select IMX_HAVE_PLATFORM_MXC_MMC
+ 	select IMX_HAVE_PLATFORM_SPI_IMX
++	select MXC_DEBUG_BOARD
+ 	select MXC_ULPI if USB_ULPI
+ 	help
+ 	  Include support for MX27PDK platform. This includes specific
+diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+index 83f8e2b..4d72891 100644
+--- a/arch/arm/mach-imx/mach-mx27_3ds.c
++++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+@@ -37,12 +37,15 @@
+ #include <mach/common.h>
+ #include <mach/iomux-mx27.h>
+ #include <mach/ulpi.h>
++#include <mach/irqs.h>
++#include <mach/3ds_debugboard.h>
+ 
+ #include "devices-imx27.h"
+ 
+ #define SD1_EN_GPIO (GPIO_PORTB + 25)
+ #define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
+ #define SPI2_SS0 (GPIO_PORTD + 21)
++#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTC + 28)
+ 
+ static const int mx27pdk_pins[] __initconst = {
+ 	/* UART1 */
+@@ -276,6 +279,10 @@ static void __init mx27pdk_init(void)
+ 	imx27_add_spi_imx1(&spi2_pdata);
+ 	spi_register_board_info(mx27_3ds_spi_devs,
+ 						ARRAY_SIZE(mx27_3ds_spi_devs));
++
++	if (mxc_expio_init(MX27_CS5_BASE_ADDR, EXPIO_PARENT_INT))
++		pr_warn("Init of the debugboard failed, all "
++				"devices on the debugboard are unusable.\n");
+ }
+ 
+ static void __init mx27pdk_timer_init(void)
 -- 
-Trond Myklebust
-Linux NFS client maintainer
-
-NetApp
-Trond.Myklebust at netapp.com
-www.netapp.com
+1.6.0.4
