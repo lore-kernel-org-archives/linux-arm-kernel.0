@@ -1,34 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 10 Jan 2011 08:34:50 -0600
-Subject: [PATCH v4 3/3] omap3: beaglexm: fix power on of DVI
-In-Reply-To: <alpine.DEB.1.10.1101101445080.18906@esdhcp041196.research.nokia.com>
-References: <[PATCH v3 0/3] OMAP3: beaglexm: GPIO fixes>
-	<1294441282-17986-4-git-send-email-nm@ti.com>
-	<alpine.DEB.1.10.1101101445080.18906@esdhcp041196.research.nokia.com>
-Message-ID: <4D2B190A.4020504@ti.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Mon, 10 Jan 2011 16:05:36 +0100
+Subject: AT91: Fix power-saving in idle-mode on 926T processors
+In-Reply-To: <20101007194415.GA24709@alarsen.net>
+References: <20101007194415.GA24709@alarsen.net>
+Message-ID: <AANLkTimGTVybe4LmspxWj6vkM_zNnPcaUbk6sqvpJ032@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen had written, on 01/10/2011 06:51 AM, the following:
-[..]
->> +    if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
->> +        gpio_request(gpio + 1, "nDVI_PWR_EN");
->> +        gpio_direction_output(gpio + 1, 0);
->> +        gpio_request(gpio + 2, "DVI_LDO_EN");
->> +        gpio_direction_output(gpio + 2, 1);
-> 
-> FYI, gpiolib provides gpio_request_one() and gpio_request_array() calls
-> which make code simpler. I think any new code should use those _and_
-> do proper error checking.
-Thanks for pointing this out. Funny why it is in 
-include/asm-generic/gpio.h instead of in include/linux/gpio.h 
-considering it implemented in drivers/gpio/gpiolib.c :(
+On Thu, Oct 7, 2010 at 9:44 PM, Anders Larsen <al@alarsen.net> wrote:
+> According to Atmel, their 926T processors (AT91 post RM9200) requires
+> 'Wait for Interrupt' mode be entered right after disabling the processor clock
+> in order to minimise current consumption when idle, so do both provided we're
+> not running on a 920T (an RM9200).
+>
+> Furthermore, get rid of the #ifndef CONFIG_DEBUG_KERNEL, since arch_idle()
+> can be turned off completely with the kernel parameter 'nohlt'.
+>
+> Signed-off-by: Anders Larsen <al@alarsen.net>
+> Cc: Andrew Victor <avictor.za@gmail.com>
 
-Am I right in understanding that you are mentioning about DVI gpios 
-alone? in that case, the LDO gpio is used for other functions as well in 
-addition to driving DVI. I suppose we dont want to loose that function 
-because dvi pwr_en gpio failed.
+
+Is there a known interaction with this and the JTAG controller? I
+haven't had time to look closer into it yet, but with this applied I
+can no longer access an Altera FPGA on a chain shared with a 9G45
+through Quartus.
+
+
+> +++ b/arch/arm/mach-at91/include/mach/system.h
+> @@ -28,17 +28,16 @@
+>
+> ?static inline void arch_idle(void)
+> ?{
+> -#ifndef CONFIG_DEBUG_KERNEL
+> ? ? ? ?/*
+> ? ? ? ? * Disable the processor clock. ?The processor will be automatically
+> ? ? ? ? * re-enabled by an interrupt or by a reset.
+> ? ? ? ? */
+> ? ? ? ?at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+> -#else
+> +#ifndef CONFIG_CPU_ARM920T
+> ? ? ? ?/*
+> ? ? ? ? * Set the processor (CP15) into 'Wait for Interrupt' mode.
+> - ? ? ? ?* Unlike disabling the processor clock via the PMC (above)
+> - ? ? ? ?* ?this allows the processor to be woken via JTAG.
+> + ? ? ? ?* Post-RM9200 processors need this in conjunction with the above
+> + ? ? ? ?* to save power when idle.
+> ? ? ? ? */
+> ? ? ? ?cpu_do_idle();
+> ?#endif
 
 -- 
-Regards,
-Nishanth Menon
+Bye, Peter Korsgaard
