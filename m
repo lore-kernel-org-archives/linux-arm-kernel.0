@@ -1,60 +1,30 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Tue, 11 Jan 2011 07:52:12 +0800
-Subject: [PATCH 1/1] ARM i.MX50: Rename devices-mx50.h
-In-Reply-To: <1294695869-6653-1-git-send-email-r64343@freescale.com>
-References: <1294695869-6653-1-git-send-email-r64343@freescale.com>
-Message-ID: <AANLkTikfGxgGz-ZrFmkYhrFBh6-W3nzmymwHJE7tN0sN@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 10 Jan 2011 18:57:43 -0500 (EST)
+Subject: [PATCH 4/4] ARM: support for Thumb-2 instructions with
+	CONFIG_ARM_PATCH_PHYS_VIRT
+In-Reply-To: <20110110232435.GF12552@n2100.arm.linux.org.uk>
+References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
+	<1294129208-15201-5-git-send-email-nico@fluxnic.net>
+	<AANLkTi=g+Wf7T60=nLeCpuPtYebZhE5URr4t2T6zzsCC@mail.gmail.com>
+	<alpine.LFD.2.00.1101101740280.9794@xanadu.home>
+	<20110110232435.GF12552@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101101856320.9794@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 5:44 AM, Jason Liu <r64343@freescale.com> wrote:
-> There are devices-imx51.h and devices-imx53.h under
-> arch/arm/mach-mx5 directory. So, had better rename
-> devices-mx50.h to devices-imx50.h to follow the same
-> naming convention with imx51 and imx53 part.
-I noticed that too. Sometimes we use imx as part of file name or macro
-name, but other times we use mx . We'd better make some rule that when
-and where we suppose to use what.
-I suggest we move all to mx for short. Reasons:
-- For freescale internal, starting from mx5, we all use mx.
-- macros in soc header files all use mx.
-- soc header file name all use mx too.
-- mach-types all use mx. (count in freescale board only)
+On Mon, 10 Jan 2011, Russell King - ARM Linux wrote:
 
-Thanks
-Richard
+> On Mon, Jan 10, 2011 at 05:45:44PM -0500, Nicolas Pitre wrote:
+> > I need to rework this part entirely now anyway to go on top of Russell's 
+> > latest version.
+> 
+> I've made a few changes recently to it to fix a few quirks.  Once the
+> merge window is over, I'll push out new patches and tree.  Until then
+> it wouldn't be fair on SFR/linux-next to push new code stuff out during
+> the merge window.
 
->
-> Signed-off-by: Jason Liu <r64343@freescale.com>
-> ---
-> ?arch/arm/mach-mx5/board-mx50_rdp.c ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?.../mach-mx5/{devices-mx50.h => devices-imx50.h} ? | ? ?0
-> ?2 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
-> index fd32e4c..e5bb600 100644
-> --- a/arch/arm/mach-mx5/board-mx50_rdp.c
-> +++ b/arch/arm/mach-mx5/board-mx50_rdp.c
-> @@ -35,7 +35,7 @@
-> ?#include <asm/mach/arch.h>
-> ?#include <asm/mach/time.h>
->
-> -#include "devices-mx50.h"
-> +#include "devices-imx50.h"
->
-> ?static iomux_v3_cfg_t mx50_rdp_pads[] __initdata = {
-> ? ? ? ?/* SD1 */
-> diff --git a/arch/arm/mach-mx5/devices-mx50.h b/arch/arm/mach-mx5/devices-imx50.h
-> similarity index 100%
-> rename from arch/arm/mach-mx5/devices-mx50.h
-> rename to arch/arm/mach-mx5/devices-imx50.h
-> --
-> 1.7.0.4
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Maybe you could push those into a branch which is not pulled into 
+linux-next?
+
+
+Nicolas
