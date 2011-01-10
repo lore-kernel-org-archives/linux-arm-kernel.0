@@ -1,117 +1,30 @@
-From: dima@android.com (Dima Zavin)
-Date: Mon, 10 Jan 2011 11:00:30 -0800
-Subject: [PATCH] ARM: msm: 7x30: don't force a gpiomux table for the whole arch
-In-Reply-To: <1294680810.12298.2.camel@c-dwalke-linux.qualcomm.com>
-References: <1294680810.12298.2.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <1294686030-9817-1-git-send-email-dima@android.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Jan 2011 11:04:37 -0800
+Subject: [PATCH v4 0/3] OMAP3: beaglexm: GPIO fixes
+In-Reply-To: <1294441282-17986-1-git-send-email-nm@ti.com>
+References: <1294441282-17986-1-git-send-email-nm@ti.com>
+Message-ID: <20110110190436.GE4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is completely board specific and therefore must be provided
-on a per-board basis.
+* Nishanth Menon <nm@ti.com> [110107 15:00]:
+> Hi,
+> As discussed in the threads:
+> http://thread.gmane.org/gmane.linux.ports.arm.omap/47807/
+> http://marc.info/?t=121540030800004&r=1&w=2
+> 
+> here is the split up series with commit message after discussion:
+> http://www.beagleboard.org/irclogs/index.php?date=2011-01-06#T19:12:21
+> 
+> Koen Kooi (3):
+>   omap3: beaglexm: fix EHCI power up GPIO dir
+>   omap3: beaglexm: fix DVI reset GPIO
+>   omap3: beaglexm: fix power on of DVI
 
-Change-Id: I96f922ad9bb9cbce7874c5ae6ac0d7479b7a2124
-Signed-off-by: Dima Zavin <dima@android.com>
----
- arch/arm/mach-msm/Makefile        |    2 +-
- arch/arm/mach-msm/board-msm7x30.c |   22 +++++++++++++++++++++
- arch/arm/mach-msm/gpiomux-7x30.c  |   38 -------------------------------------
- 3 files changed, 23 insertions(+), 39 deletions(-)
- delete mode 100644 arch/arm/mach-msm/gpiomux-7x30.c
+Dropping the earlier versions from omap-fixes, I want to get the
+build fixes in ASAP. These can wait a bit until Aaro's comments
+are addressed.
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index b5a7b07..b5695ce 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -25,7 +25,7 @@ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
- obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
- obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
- 
--obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
-+obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-v1.o gpiomux.o
- obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
- obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
- ifndef CONFIG_MSM_V2_TLMM
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index 05241df..431be40 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -35,10 +35,32 @@
- 
- #include <mach/vreg.h>
- #include "devices.h"
-+#include "gpiomux.h"
- #include "proc_comm.h"
- 
- extern struct sys_timer msm_timer;
- 
-+struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
-+#ifdef CONFIG_SERIAL_MSM_CONSOLE
-+	[49] = { /* UART2 RFR */
-+		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-+			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-+	},
-+	[50] = { /* UART2 CTS */
-+		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-+			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-+	},
-+	[51] = { /* UART2 RX */
-+		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-+			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-+	},
-+	[52] = { /* UART2 TX */
-+		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-+			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
-+	},
-+#endif
-+};
-+
- static struct platform_device *devices[] __initdata = {
- #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
-         &msm_device_uart2,
-diff --git a/arch/arm/mach-msm/gpiomux-7x30.c b/arch/arm/mach-msm/gpiomux-7x30.c
-deleted file mode 100644
-index 6ce41c5..0000000
---- a/arch/arm/mach-msm/gpiomux-7x30.c
-+++ /dev/null
-@@ -1,38 +0,0 @@
--/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-- * 02110-1301, USA.
-- */
--#include "gpiomux.h"
--
--struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
--#ifdef CONFIG_SERIAL_MSM_CONSOLE
--	[49] = { /* UART2 RFR */
--		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
--			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
--	},
--	[50] = { /* UART2 CTS */
--		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
--			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
--	},
--	[51] = { /* UART2 RX */
--		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
--			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
--	},
--	[52] = { /* UART2 TX */
--		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
--			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
--	},
--#endif
--};
--- 
-1.7.3.1
+Regards,
+
+Tony
