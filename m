@@ -1,37 +1,44 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 10 Jan 2011 16:40:30 -0600
-Subject: [PATCH 1/5] pxa: Fix warning in zeus.c
-In-Reply-To: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
-References: <1294615746-27668-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTikMgo4uZXs5y3GH_VYsdG6Y2NGmx5D-nikzfZBf@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jan 2011 07:41:34 +0900
+Subject: [PATCH] mmc, ARM: Add zboot from MMC support for SuperH Mobile ARM
+In-Reply-To: <20110110154514.GC3760@linux-sh.org>
+References: <20110109124928.GC25591@verge.net.au>
+	<1294589548.8897.1.camel@rojo>
+	<20110109225042.GB29257@verge.net.au>
+	<c1e9db480d82d1804930ddcc7bb0db02@rootnode.net>
+	<20110110154514.GC3760@linux-sh.org>
+Message-ID: <20110110224134.GA7420@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 9, 2011 at 5:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+On Tue, Jan 11, 2011 at 12:45:14AM +0900, Paul Mundt wrote:
+> On Mon, Jan 10, 2011 at 10:10:19AM +0000, Pawel Moll wrote:
+> > On Mon, 10 Jan 2011 07:50:42 +0900, Simon Horman <horms@verge.net.au> 
+> > wrote:
+> > >>>  Documentation/arm/SH-Mobile/Makefile              |    8 +
+> > >>>  Documentation/arm/SH-Mobile/vrl4.c                |  169 
+> > >>+++++++++++++++++++++
+> > >>How about putting those two into "tools" (in particular "tools/arm")
+> > >>instead of "Documentation"?
+> > >>Just a thought... ;-)
+> > >
+> > >Thats fine by me except that tools/arm doesn't exist yet.
+> > >It would be good to get some consensus before creating it.
+> > 
+> > I think there is consensus regarding "tools" as a place for user-space 
+> > tools - eg. perf tools used to live in "Documentation/..." and then were 
+> > moved to "tools/perf".
+> > 
+> > Now, whether your stuff should be in "tools/SH-Mobile" or 
+> > "tools/arm/SH-Mobile", I have no opinion ;-)
+> > 
+> I agree that this is a worthwhile direction to move to, but we're a long
+> way from a consensus. x86 has traditionally littered scripts/ and others
+> have sunk to arch/<foo>/tools hostprogs abuse and so forth. perf is a bit
+> of a special case in that it's fairly architecture agnostic. 
 
-Applied.
+I would prefer to leave the code in Documentation/arm/SH-Mobile/ as
+it complements the document that is in the same directory - weather
+its more code or documentation is debatable IMHO.
 
-> ---
-> ?arch/arm/mach-pxa/zeus.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-> index c87f2b3..29830a3 100644
-> --- a/arch/arm/mach-pxa/zeus.c
-> +++ b/arch/arm/mach-pxa/zeus.c
-> @@ -830,8 +830,8 @@ static void __init zeus_init(void)
-> ? ? ? ?pr_info("Zeus CPLD V%dI%d\n", (system_rev & 0xf0) >> 4, (system_rev & 0x0f));
->
-> ? ? ? ?/* Fix timings for dm9000s (CS1/CS2)*/
-> - ? ? ? msc0 = __raw_readl(MSC0) & 0x0000ffff | (dm9000_msc << 16);
-> - ? ? ? msc1 = __raw_readl(MSC1) & 0xffff0000 | dm9000_msc;
-> + ? ? ? msc0 = (__raw_readl(MSC0) & 0x0000ffff) | (dm9000_msc << 16);
-> + ? ? ? msc1 = (__raw_readl(MSC1) & 0xffff0000) | dm9000_msc;
-> ? ? ? ?__raw_writel(msc0, MSC0);
-> ? ? ? ?__raw_writel(msc1, MSC1);
->
-> --
-> 1.7.2.3
->
->
+I'm happy to move things later if a consensus is reached.
