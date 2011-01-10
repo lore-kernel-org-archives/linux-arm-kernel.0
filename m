@@ -1,90 +1,46 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 10 Jan 2011 10:43:04 +0800
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <20110108131520.GE26617@pengutronix.de>
-References: <1294199462.347935.472473715866.0.gpush@pororo>
-	<1294199462.348449.192344022926.1.gpush@pororo>
-	<20110108131520.GE26617@pengutronix.de>
-Message-ID: <201101101043.05406.jeremy.kerr@canonical.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 10 Jan 2011 11:08:12 +0800
+Subject: [PATCH v4 00/10] net/fec: add dual fec support for i.MX28
+In-Reply-To: <20110109.154409.242134862.davem@davemloft.net>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<20110109.154409.242134862.davem@davemloft.net>
+Message-ID: <20110110030811.GA415@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Sun, Jan 09, 2011 at 03:44:09PM -0800, David Miller wrote:
+> From: Shawn Guo <shawn.guo@freescale.com>
+> Date: Thu, 6 Jan 2011 15:13:08 +0800
+> 
+> > This patch series is to add dual fec support for mx28, which is
+> > a mxs-based soc. Some code changes related to the following commits
+> > are also made in this patch set for some reasons.
+> > 
+> >  e6b043d512fa8d9a3801bf5d72bfa3b8fc3b3cc8
+> >  netdev/fec.c: add phylib supporting to enable carrier detection (v2)
+> > 
+> >  e3fe8558c7fc182972c3d947d88744482111f304
+> >  net/fec: fix pm to survive to suspend/resume
+> > 
+> > It's been tested on mx28 evk and mx51 babbage. For mx28, it has
+> > to work against the tree
+> > 
+> >  git://git.pengutronix.de/git/imx/linux-2.6.git imx-for-2.6.38
+> > 
+> > plus patch
+> > 
+> >  [PATCH v4] ARM: mxs: Change duart device to use amba-pl011
+> > 
+> > The 3 patches below preceding with * have changes since v3, and
+> > the detailed change log can be found in individual patch.
+> 
+> I've applied all of the "net/fec:" patches (#1 to #5) to net-2.6,
+> please push the ARM changes via the appropriate ARM tree.
+> 
+> Thanks.
+> 
+Thanks, David.  I will ping Sascha for ARM changes.
 
-> I'm currently thinking about how to get the locking right with this
-> approach. In the current i.MX implementation we have a global lock which
-> protects the clock enable counter and also the register accesses in the
-> clock code. With the common struct clock we have a lock per clock which
-> only protects the enable counter, so we have to introduce a second lock
-> to protect the register accesses.
-
-Are the registers shared between clocks? If not, you can just use the existing 
-per-clk lock. Otherwise it'd be reasonable to add a global register lock, 
-protecting accesses to the shared register set (and *only* protecting these 
-registers).
-
-> The problem comes with nested calls to for example clk_enable which
-> happens when the parent clock gets enabled. currently we do this with
-> clk->enable(clk->parent) which results in an unlocked clk_enable of the
-> parent. With common struct clk we would have to call
-> clk_enable(clk_get_parent(clk) which results in taking the lock a second
-> time.
-> Any ideas how to solve this?
-
-With the shared register lock, you just need to make sure that you don't 
-recurse to the parent while holding the lock.
-
-For clocks with a shared register set, the general pattern would be something 
-like:
-
-struct clk_foo {
-	struct clk clk;
-	u32        enable_reg;
-	u32        enable_mask;
-	struct clk *parent;
-};
-
-static DEFINE_SPINLOCK(clk_foo_register_lock);
-
-/* called with _clk->lock held */
-static int clk_foo_enable(struct clk *_clk)
-{
-	struct clk_foo *clk = to_clk_foo(_clk);
-	int reg, rc;
-
-	/* enable parent - will acquire and release the parent's per-clk lock */
-	rc = clk_enable(clk->parent);
-	if (rc)
-		return rc;
-
-	/* do register update, under global register lock */
-	spin_lock(&clk_foo_register_lock);
-
-	reg = __raw_readl(clk->reg);
-	__raw_writel(clk->reg, reg | clk->enable_mask);
-
-	spin_unlock(&clk_foo_register_lock);
-
-	return 0;
-}
-
-struct clk_foo_ops = {
-	.enable = clk_foo_enable;
-	[...]
-};
-
-However, because clk_mxc introduces its own set of abstractions, there may be 
-some merging to do here. For my work on mx51, I've done a very basic port:
-
- * changed plat-mxc's struct clk to struct clk_mxc
- * embedded struct clk into struct clk_mxc (ie, making it use the common API)
- * separated some of the simpler clocks to separate types (eg clk_fixed,
-   clk_pll, clk_ccgr).
-
-The goal here is to separate all of the clocks into their most basic types, 
-leaving no clk_mxc clocks remaining, then the locking should be much simpler.
-
-Cheers,
-
-
-Jeremy
+-- 
+Regards,
+Shawn
