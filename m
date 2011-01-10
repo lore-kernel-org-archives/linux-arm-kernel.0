@@ -1,5 +1,5 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Mon, 10 Jan 2011 22:31:49 +0300
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 10 Jan 2011 11:34:49 -0800
 Subject: still nfs problems [Was: Linux 2.6.37-rc8]
 In-Reply-To: <1294687767.3349.28.camel@heimdal.trondhjem.org>
 References: <AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
@@ -14,18 +14,25 @@ References: <AANLkTimusF4KCJ4vHPn+T1dUiKxapXaT0QTtFvh8Ykdd@mail.gmail.com>
 	<1294680035.3349.19.camel@heimdal.trondhjem.org>
 	<20110110192552.GG24920@pengutronix.de>
 	<1294687767.3349.28.camel@heimdal.trondhjem.org>
-Message-ID: <1294687909.6706.885.camel@mulgrave.site>
+Message-ID: <AANLkTinFenq3BEiUQRsxDy6EKwqSM33RcwFG4fs-sXLJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-10 at 14:29 -0500, Trond Myklebust wrote:
+2011/1/10 Trond Myklebust <Trond.Myklebust@netapp.com>:
+>
 > I usually do this, but there is a slight problem with that approach:
 > Greg gets to do all the work of figuring out to which stable kernels
 > this particular patch applies. In this case, since we're only talking
 > about the 2.6.37 kernel, I prefer to use the mailing lists.
 
-So the non-standard, but accepted way of doing this is
+Just do
 
-Cc: Stable Tree <stable@kernel.org>	[2.6.37]
+  Cc: stable at kernel.org  [2.6.37]
 
-James
+or similar. It's quite common.
+
+So EVEN IF you want to email people around about the patch separately,
+do add the "Cc: stable" marker. It's worthwhile information about the
+patch for everybody involved.
+
+                     Linus
