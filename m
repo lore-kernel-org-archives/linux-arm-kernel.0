@@ -1,27 +1,23 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 10 Jan 2011 08:53:14 -0500 (EST)
-Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with high
-	frequency clocks
-In-Reply-To: <20110110105120.GA12552@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
-	<20101221105149.GO28157@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1012291703300.10437@xanadu.home>
-	<20110103003718.GF17727@n2100.arm.linux.org.uk>
-	<1294084049.2571.30.camel@work-vm>
-	<20110109105200.GC31708@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101092224320.3455@xanadu.home>
-	<20110110105120.GA12552@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101100851300.6883@xanadu.home>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Mon, 10 Jan 2011 14:58:10 +0100
+Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
+In-Reply-To: <1294656906-24239-1-git-send-email-jamie@jamieiles.com>
+References: <1294656906-24239-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110110135810.GN3801@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jan 2011, Russell King - ARM Linux wrote:
+Hi Jamie,
 
-> With a 32-bit or smaller cyclecounter, as 32-bit x 32-bit can never
-> overflow a 64-bit destination, so if anything zero should be passed in
-> this case.
+> +config DW_WATCHDOG
+> +	tristate "Synopsys DesignWare watchdog"
+> +        select WATCHDOG_NOWAYOUT
 
-That's the alternative suggestion I made as well.
+I overlooked something: If your watchdog driver cannot be stopped once it's started,
+then it's best to add a comment about that in your code. Selecting the WATCHDOG_NOWAYOUT
+feauture (which is overall for all drivers) is not the way to do it properly.
+What you should do is add a timer that ticks the watchdog if /dev/watchdog is closed.
+Examples for this functionality can be found in at91sam9_wdt.c, pika_wdt.c, ...
 
-
-Nicolas
+Sorry,
+Wim.
