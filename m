@@ -1,58 +1,177 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 Jan 2011 16:10:28 +0100
-Subject: [PATCH 16/16] w1: mxc_w1: don't treat NULL clk as an error
-In-Reply-To: <1294749833-32019-17-git-send-email-jamie@jamieiles.com>
-References: <1294749833-32019-1-git-send-email-jamie@jamieiles.com>
-	<1294749833-32019-17-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110111151028.GT12078@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 11 Jan 2011 16:17:25 +0100
+Subject: [PATCH 2/2] ARM i.MXS: Add auart platform support for i.MX28
+In-Reply-To: <1294758545-9445-3-git-send-email-s.hauer@pengutronix.de>
+References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
+	<1294758545-9445-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110111151725.GT24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 12:43:53PM +0000, Jamie Iles wrote:
-> clk_get() returns a struct clk cookie to the driver and some platforms
-> may return NULL if they only support a single clock.  clk_get() has only
-> failed if it returns a ERR_PTR() encoded pointer.
-> 
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+Hello Sascha,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
+On Tue, Jan 11, 2011 at 04:09:05PM +0100, Sascha Hauer wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  drivers/w1/masters/mxc_w1.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
+>  arch/arm/mach-mxs/clock-mx28.c                  |    5 ++
+>  arch/arm/mach-mxs/devices-mx28.h                |    8 +++
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-auart.c      |   54 +++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++++
+>  6 files changed, 81 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-auart.c
 > 
-> diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
-> index a3b6a74..67ea082 100644
-> --- a/drivers/w1/masters/mxc_w1.c
-> +++ b/drivers/w1/masters/mxc_w1.c
-> @@ -21,6 +21,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/platform_device.h>
->  #include <linux/clk.h>
-> +#include <linux/err.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
->  #include <linux/io.h>
-> @@ -118,8 +119,8 @@ static int __devinit mxc_w1_probe(struct platform_device *pdev)
->  		return -ENOMEM;
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 74e2103..9f65934 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -603,6 +603,11 @@ _DEFINE_CLOCK(fec_clk, ENET, DISABLE, &hbus_clk);
 >  
->  	mdev->clk = clk_get(&pdev->dev, "owire");
-> -	if (!mdev->clk) {
-> -		err = -ENODEV;
-> +	if (IS_ERR(mdev->clk)) {
-> +		err = PTR_ERR(mdev->clk);
->  		goto failed_clk;
->  	}
+>  static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("mxs-duart.0", NULL, uart_clk)
+> +	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+> +	_REGISTER_CLOCK("mxs-auart.1", NULL, uart_clk)
+> +	_REGISTER_CLOCK("mxs-auart.2", NULL, uart_clk)
+> +	_REGISTER_CLOCK("mxs-auart.3", NULL, uart_clk)
+> +	_REGISTER_CLOCK("mxs-auart.4", NULL, uart_clk)
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+>  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+>  	_REGISTER_CLOCK("pll2", NULL, pll2_clk)
+> diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+> index 00b736c..a0b70df 100644
+> --- a/arch/arm/mach-mxs/devices-mx28.h
+> +++ b/arch/arm/mach-mxs/devices-mx28.h
+> @@ -15,6 +15,14 @@ extern const struct mxs_duart_data mx28_duart_data __initconst;
+>  #define mx28_add_duart() \
+>  	mxs_add_duart(&mx28_duart_data)
 >  
-> -- 
-> 1.7.3.4
-> 
-> 
+> +extern const struct mxs_auart_data mx28_auart_data[] __initconst;
+> +#define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
+> +#define mx28_add_auart0()		mx28_add_auart(0)
+> +#define mx28_add_auart1()		mx28_add_auart(1)
+> +#define mx28_add_auart2()		mx28_add_auart(2)
+> +#define mx28_add_auart3()		mx28_add_auart(3)
+> +#define mx28_add_auart4()		mx28_add_auart(4)
+I wouldn't add the mx28_add_auartX macros, only mx28_add_auart.  The
+former are a relict of the time when we didn't use an array to get the
+data from.
+
+> +
+>  extern const struct mxs_fec_data mx28_fec_data[] __initconst;
+>  #define mx28_add_fec(id, pdata) \
+>  	mxs_add_fec(&mx28_fec_data[id], pdata)
+> diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+> index a35a2dc..9d16540 100644
+> --- a/arch/arm/mach-mxs/devices/Kconfig
+> +++ b/arch/arm/mach-mxs/devices/Kconfig
+> @@ -1,5 +1,8 @@
+>  config MXS_HAVE_PLATFORM_DUART
+>  	bool
+>  
+> +config MXS_HAVE_PLATFORM_AUART
+> +	bool
+> +
+This doesn't happen to be an amba device, too?
+
+>  config MXS_HAVE_PLATFORM_FEC
+>  	bool
+> diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+> index 4b5266a..b46d18d 100644
+> --- a/arch/arm/mach-mxs/devices/Makefile
+> +++ b/arch/arm/mach-mxs/devices/Makefile
+> @@ -1,2 +1,3 @@
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_DUART) += platform-duart.o
+> +obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
+this conflicts with the "make duart use amba-pl011 driver" patch.
+Also can you please keep the file sorted alphabetically?
+
+> diff --git a/arch/arm/mach-mxs/devices/platform-auart.c b/arch/arm/mach-mxs/devices/platform-auart.c
+> new file mode 100644
+> index 0000000..d5e6cb2
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/devices/platform-auart.c
+> @@ -0,0 +1,54 @@
+> +/*
+> + * Copyright (C) 2010 Pengutronix
+> + * Sascha Hauer <s.hauer@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <asm/sizes.h>
+> +#include <mach/mx28.h>
+> +#include <mach/devices-common.h>
+> +
+> +#define mxs_auart_data_entry_single(soc, _id)				\
+> +	{								\
+> +		.id = _id,						\
+> +		.iobase = soc ## _AUART ## _id ## _BASE_ADDR,		\
+> +		.irq = soc ## _INT_AUART ## _id,			\
+> +	}
+> +
+> +#define mxs_auart_data_entry(soc, _id)					\
+> +	[_id] = mxs_auart_data_entry_single(soc, _id)
+> +
+> +#ifdef CONFIG_SOC_IMX28
+> +const struct mxs_auart_data mx28_auart_data[] __initconst = {
+> +#define mx28_auart_data_entry(_id)					\
+> +	mxs_auart_data_entry(MX28, _id)
+> +	mx28_auart_data_entry(0),
+> +	mx28_auart_data_entry(1),
+> +	mx28_auart_data_entry(2),
+> +	mx28_auart_data_entry(3),
+> +	mx28_auart_data_entry(4),
+> +};
+> +#endif
+> +
+> +struct platform_device *__init mxs_add_auart(
+> +		const struct mxs_auart_data *data)
+> +{
+> +	struct resource res[] = {
+> +		{
+> +			.start = data->iobase,
+> +			.end = data->iobase + SZ_4K - 1,
+> +			.flags = IORESOURCE_MEM,
+> +		}, {
+> +			.start = data->irq,
+> +			.end = data->irq,
+> +			.flags = IORESOURCE_IRQ,
+> +		},
+> +	};
+> +
+> +	return mxs_add_platform_device_dmamask("mxs-auart", data->id,
+> +					res, ARRAY_SIZE(res), NULL, 0,
+> +					DMA_BIT_MASK(32));
+> +}
+> +
+> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+> index 3da48d4..b8ab332 100644
+> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
+> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+> @@ -33,6 +33,16 @@ struct mxs_duart_data {
+>  struct platform_device *__init mxs_add_duart(
+>  		const struct mxs_duart_data *data);
+>  
+> +/* auart */
+> +struct mxs_auart_data {
+> +	int id;
+> +	resource_size_t iobase;
+> +	resource_size_t iosize;
+> +	resource_size_t irq;
+> +};
+> +struct platform_device *__init mxs_add_auart(
+> +		const struct mxs_auart_data *data);
+> +
+>  /* fec */
+>  #include <linux/fec.h>
+>  struct mxs_fec_data {
+
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
