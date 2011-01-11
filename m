@@ -1,35 +1,40 @@
-From: valentin.longchamp@keymile.com (Valentin Longchamp)
-Date: Tue, 11 Jan 2011 14:50:15 +0100
-Subject: Change SUEN3 MACH to KM_KIRKWOOD
-In-Reply-To: <20110111134525.GE11039@n2100.arm.linux.org.uk>
-References: <4D2C1595.50705@keymile.com> <4D2C1721.3040000@keymile.com>
-	<20110111134525.GE11039@n2100.arm.linux.org.uk>
-Message-ID: <4D2C6017.50007@keymile.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 11 Jan 2011 14:52:14 +0100
+Subject: Locking in the clk API
+In-Reply-To: <20110111121816.GB774@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111101314.GA774@linux-sh.org>
+	<201101111830.18597.jeremy.kerr@canonical.com>
+	<20110111121816.GB774@linux-sh.org>
+Message-ID: <20110111135214.GR24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Tue, Jan 11, 2011 at 09:38:57AM +0100, Valentin Longchamp wrote:
->> Sorry I made a typo in the subject of the previous mail.
->>
->> To avoid any confusion, the desired name definitely is KM_KIRKWOOD (and  
->> not KMKIRKWOOD as written in the subject of the previous mail).
-> 
-> Please confirm that that the update I've just done is correct.  Thanks.
+On Tue, Jan 11, 2011 at 09:18:16PM +0900, Paul Mundt wrote:
+> On Tue, Jan 11, 2011 at 06:30:18PM +0800, Jeremy Kerr wrote:
+> > Hi Paul,
+> > 
+> > > No, the sleeping clock case is and always will be a corner case, and I
+> > > have no interest in pretending otherwise. On SH we have hundreds of
+> > > clocks that are all usable in the atomic context and perhaps less than a
+> > > dozen that aren't (and even in those cases much of the PLL negotiation is
+> > > handled in hardware so there's never any visibility for the lock-down
+> > > from the software side, other architectures also have similar behaviour).
+> > 
+> > I'm not too worried about the corner-cases on the *implementation* side, more 
+> > the corner-cases on the API side: are we seeing more users of the API that 
+> > require an atomic clock, or more that don't care?
+> > 
+> Again, you are approaching it from the angle that an atomic clock is a
+> special requirement rather than the default behaviour. Sleeping for
+particularly if atomic behaviour is the common behaviour it's important
+to get it right, because the less common sleeping clocks don't get much
+test covering.
 
-Yes the current name in the database is correct. Thank you for the change.
+Best regards
+Uwe
 
 -- 
-Valentin Longchamp
-Embedded Software Engineer
-Hardware and Chip Integration
-______________________________________
-KEYMILE AG
-Schwarzenburgstr. 73
-CH-3097 Liebefeld
-Phone +41 31 377 1318
-Fax     +41 31 377 1212
-valentin.longchamp at keymile.com
-www.keymile.com
-______________________________________
- >>Be the FIRST on the LAST MILE<<
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
