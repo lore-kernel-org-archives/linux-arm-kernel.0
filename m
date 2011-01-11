@@ -1,50 +1,53 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 11 Jan 2011 23:18:39 +0000
-Subject: [PATCH] ARM: Change misleading warning when CONFIG_CMDLINE_FORCE
-	is used
-In-Reply-To: <1294766953-6889-1-git-send-email-holler@ahsoftware.de>
-References: <1294766953-6889-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <20110111231839.GD3181@pulham.picochip.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 11 Jan 2011 23:20:26 +0000
+Subject: [PATCH] MMCI: don't read command response when invalid
+In-Reply-To: <20110111163556.GA18746@n2100.arm.linux.org.uk>
+References: <20110111163502.GJ11039@n2100.arm.linux.org.uk>
+	<20110111163556.GA18746@n2100.arm.linux.org.uk>
+Message-ID: <20110111232025.GA25752@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+Hi,
 
-On Tue, Jan 11, 2011 at 06:29:13PM +0100, Alexander Holler wrote:
-> When CONFIG_CMDLINE_FORCE is used, the warning
+On Tue, Jan 11, 2011 at 04:35:56PM +0000, Russell King - ARM Linux wrote:
+> Don't read the command response from the registers when either the
+> command timed out (because there was no response from the card) or
+> the checksum on the response was invalid.
 > 
->   Ignoring unrecognised tag 0x54410009
-> 
-> was displayed. Change this to
-> 
->   Ignoring tag cmdline (using the default kernel command line)
-> 
-> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->  arch/arm/kernel/setup.c |    8 ++++++--
->  1 files changed, 6 insertions(+), 2 deletions(-)
+>  drivers/mmc/host/mmci.c |   10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 336f14e..19c0e96 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -649,15 +649,19 @@ static int __init parse_tag_revision(const struct tag *tag)
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 5630228..040de4f 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -394,15 +394,15 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 >  
->  __tagtable(ATAG_REVISION, parse_tag_revision);
+>  	host->cmd = NULL;
 >  
-> -#ifndef CONFIG_CMDLINE_FORCE
->  static int __init parse_tag_cmdline(const struct tag *tag)
->  {
-> +#ifndef CONFIG_CMDLINE_FORCE
->  	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
-> +#else
-> +	printk(KERN_WARNING
-> +		"Ignoring tag cmdline"
-> +		" (using the default kernel command line)\n");
-> +#endif /* CONFIG_CMDLINE_FORCE */
+> -	cmd->resp[0] = readl(base + MMCIRESPONSE0);
+> -	cmd->resp[1] = readl(base + MMCIRESPONSE1);
+> -	cmd->resp[2] = readl(base + MMCIRESPONSE2);
+> -	cmd->resp[3] = readl(base + MMCIRESPONSE3);
+> -
+>  	if (status & MCI_CMDTIMEOUT) {
+>  		cmd->error = -ETIMEDOUT;
+>  	} else if (status & MCI_CMDCRCFAIL && cmd->flags & MMC_RSP_CRC) {
+>  		cmd->error = -EILSEQ;
+> +	} else {
+> +		cmd->resp[0] = readl(base + MMCIRESPONSE0);
+> +		cmd->resp[1] = readl(base + MMCIRESPONSE1);
+> +		cmd->resp[2] = readl(base + MMCIRESPONSE2);
+> +		cmd->resp[3] = readl(base + MMCIRESPONSE3);
+>  	}
+>  
+>  	if (!cmd->data || cmd->error) {
 
-For strings in a printk() like this you don't need to split them to keep 
-them under 80 characters.  This makes it harder to grep for so it's fine 
-(and preferred) to keep this on a single line.
+Thanks, pushed to mmc-next and queued as a .38 fix.
 
-Jamie
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
