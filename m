@@ -1,40 +1,28 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 Jan 2011 11:29:09 +0100
-Subject: [PATCH v4 07/10] ARM: mx28: add the second fec device registration
-In-Reply-To: <1294297998-26930-8-git-send-email-shawn.guo@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-	<1294297998-26930-8-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110111102909.GH26617@pengutronix.de>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 11 Jan 2011 18:30:18 +0800
+Subject: Locking in the clk API
+In-Reply-To: <20110111101314.GA774@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111101314.GA774@linux-sh.org>
+Message-ID: <201101111830.18597.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 06, 2011 at 03:13:15PM +0800, Shawn Guo wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-mx28evk.c |   28 +++++++++++++++++++++++++---
->  1 files changed, 25 insertions(+), 3 deletions(-)
-> 
->  
->  static void __init mx28evk_init(void)
-> @@ -117,7 +136,10 @@ static void __init mx28evk_init(void)
->  	mx28_add_duart();
->  
->  	mx28evk_fec_reset();
-> -	mx28_add_fec(0, &mx28_fec_pdata);
-> +	mx28_add_fec(0, &mx28_fec_pdata[0]);
-> +#ifdef CONFIG_FEC2
-> +	mx28_add_fec(1, &mx28_fec_pdata[1]);
-> +#endif
+Hi Paul,
 
-Please don't do this. If you really want to make this configurable with
-kconfig use a board specific option, not a driver specific option. I
-think this should be made unconditional though.
+> No, the sleeping clock case is and always will be a corner case, and I
+> have no interest in pretending otherwise. On SH we have hundreds of
+> clocks that are all usable in the atomic context and perhaps less than a
+> dozen that aren't (and even in those cases much of the PLL negotiation is
+> handled in hardware so there's never any visibility for the lock-down
+> from the software side, other architectures also have similar behaviour).
 
-Sascha
+I'm not too worried about the corner-cases on the *implementation* side, more 
+the corner-cases on the API side: are we seeing more users of the API that 
+require an atomic clock, or more that don't care?
+
+Cheers,
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jeremy
