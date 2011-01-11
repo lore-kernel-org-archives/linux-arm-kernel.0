@@ -1,72 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 Jan 2011 16:26:30 +0100
-Subject: [PATCH 2/2] ARM i.MXS: Add auart platform support for i.MX28
-In-Reply-To: <20110111151725.GT24920@pengutronix.de>
-References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
-	<1294758545-9445-3-git-send-email-s.hauer@pengutronix.de>
-	<20110111151725.GT24920@pengutronix.de>
-Message-ID: <20110111152630.GU12078@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 11 Jan 2011 08:36:30 -0700
+Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
+	setup.c
+In-Reply-To: <20110111104051.GA11039@n2100.arm.linux.org.uk>
+References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
+	<20110111104051.GA11039@n2100.arm.linux.org.uk>
+Message-ID: <20110111153630.GB2707@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 04:17:25PM +0100, Uwe Kleine-K?nig wrote:
-> >  
-> > +extern const struct mxs_auart_data mx28_auart_data[] __initconst;
-> > +#define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
-> > +#define mx28_add_auart0()		mx28_add_auart(0)
-> > +#define mx28_add_auart1()		mx28_add_auart(1)
-> > +#define mx28_add_auart2()		mx28_add_auart(2)
-> > +#define mx28_add_auart3()		mx28_add_auart(3)
-> > +#define mx28_add_auart4()		mx28_add_auart(4)
-> I wouldn't add the mx28_add_auartX macros, only mx28_add_auart.  The
-> former are a relict of the time when we didn't use an array to get the
-> data from.
-
-With pleasure.
-
+On Tue, Jan 11, 2011 at 10:40:51AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 10, 2011 at 07:15:53PM -0700, Grant Likely wrote:
+> > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> > index 6bd82d2..9c0e938 100644
+> > --- a/arch/arm/kernel/head.S
+> > +++ b/arch/arm/kernel/head.S
+> > @@ -87,11 +87,6 @@ ENTRY(stext)
+> >  	movs	r10, r5				@ invalid processor (r5=0)?
+> >   THUMB( it	eq )		@ force fixup-able long branch encoding
+> >  	beq	__error_p			@ yes, error 'p'
+> > -	bl	__lookup_machine_type		@ r5=machinfo
+> > -	movs	r8, r5				@ invalid machine (r5=0)?
+> > - THUMB( it	eq )		@ force fixup-able long branch encoding
+> > -	beq	__error_a			@ yes, error 'a'
+> > -	bl	__vet_atags
+> >  #ifdef CONFIG_SMP_ON_UP
+> >  	bl	__fixup_smp
+> >  #endif
 > 
-> > +
-> >  extern const struct mxs_fec_data mx28_fec_data[] __initconst;
-> >  #define mx28_add_fec(id, pdata) \
-> >  	mxs_add_fec(&mx28_fec_data[id], pdata)
-> > diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
-> > index a35a2dc..9d16540 100644
-> > --- a/arch/arm/mach-mxs/devices/Kconfig
-> > +++ b/arch/arm/mach-mxs/devices/Kconfig
-> > @@ -1,5 +1,8 @@
-> >  config MXS_HAVE_PLATFORM_DUART
-> >  	bool
-> >  
-> > +config MXS_HAVE_PLATFORM_AUART
-> > +	bool
-> > +
-> This doesn't happen to be an amba device, too?
+> Don't forget to update the comments as well - there's two of them.
 
-no
+I'm not entirely clear on what you're referring to here.  Are you
+talking about the secondary cpu entry point?  I've fixed up that
+comment now as well as a s/__lookup_machine_type/__lookup_processor_type/
+typo right before the call to __enable_mmu.
 
-> 
-> >  config MXS_HAVE_PLATFORM_FEC
-> >  	bool
-> > diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-> > index 4b5266a..b46d18d 100644
-> > --- a/arch/arm/mach-mxs/devices/Makefile
-> > +++ b/arch/arm/mach-mxs/devices/Makefile
-> > @@ -1,2 +1,3 @@
-> >  obj-$(CONFIG_MXS_HAVE_PLATFORM_DUART) += platform-duart.o
-> > +obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
-> >  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
-> this conflicts with the "make duart use amba-pl011 driver" patch.
+I've also removed the machine type lookup from head-nommu.S and I'll
+repost the patch later today.
 
-Nah, let the maintainer deal with it...
-
-> Also can you please keep the file sorted alphabetically?
-
-ok
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks for the review,
+g.
