@@ -1,49 +1,38 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Tue, 11 Jan 2011 18:29:13 +0100
-Subject: [PATCH] ARM: Change misleading warning when CONFIG_CMDLINE_FORCE is
-	used
-Message-ID: <1294766953-6889-1-git-send-email-holler@ahsoftware.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 11 Jan 2011 18:57:04 +0100
+Subject: [PATCH 1/2] serial: Add auart driver for i.MX23/28
+In-Reply-To: <20110111171050.GA522@pengutronix.de>
+References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
+	<1294758545-9445-2-git-send-email-s.hauer@pengutronix.de>
+	<20110111171050.GA522@pengutronix.de>
+Message-ID: <20110111175704.GV12078@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_CMDLINE_FORCE is used, the warning
+On Tue, Jan 11, 2011 at 06:10:50PM +0100, Wolfram Sang wrote:
+> On Tue, Jan 11, 2011 at 04:09:04PM +0100, Sascha Hauer wrote:
+> [...]
+> > +#include <asm/cacheflush.h>
+> > +#include <mach/mx28.h>
+> 
+> What about MX23 and STMP3xxx?
 
-  Ignoring unrecognised tag 0x54410009
+This include is not needed, will remove. Instead we need linux/io.h.
 
-was displayed. Change this to
+> 
+> > +
+> > +#define MXS_AUART_PORTS 5
+> 
+> MX23 has just 2. We should better adapt to that depending on the type?
 
-  Ignoring tag cmdline (using the default kernel command line)
+This is just the maximum number the driver supports, it's safe to keep
+it as is.
 
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
----
- arch/arm/kernel/setup.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+Sascha
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 336f14e..19c0e96 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -649,15 +649,19 @@ static int __init parse_tag_revision(const struct tag *tag)
- 
- __tagtable(ATAG_REVISION, parse_tag_revision);
- 
--#ifndef CONFIG_CMDLINE_FORCE
- static int __init parse_tag_cmdline(const struct tag *tag)
- {
-+#ifndef CONFIG_CMDLINE_FORCE
- 	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
-+#else
-+	printk(KERN_WARNING
-+		"Ignoring tag cmdline"
-+		" (using the default kernel command line)\n");
-+#endif /* CONFIG_CMDLINE_FORCE */
- 	return 0;
- }
- 
- __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
--#endif /* CONFIG_CMDLINE_FORCE */
- 
- /*
-  * Scan the tag table for this tag, and call its parse function.
+
 -- 
-1.7.3.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
