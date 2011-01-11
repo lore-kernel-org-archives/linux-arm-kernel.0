@@ -1,33 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Jan 2011 12:39:31 -0200
-Subject: [PATCH 2/2] ARM i.MX53 enable LOCO board bootup
-In-Reply-To: <1294726998-20830-3-git-send-email-yong.shen@freescale.com>
-References: <1294726998-20830-1-git-send-email-yong.shen@freescale.com>
-	<1294726998-20830-3-git-send-email-yong.shen@freescale.com>
-Message-ID: <AANLkTimW54m2f+Z21F+9dLw78WOS24W4yc00D5rztM0C@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 11 Jan 2011 16:09:03 +0100
+Subject: Add i.MX23/28 auart support
+Message-ID: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+The following series adds support for the auart found on i.MX23/28
 
-On Tue, Jan 11, 2011 at 4:23 AM,  <yong.shen@freescale.com> wrote:
-> From: Yong Shen <yong.shen@freescale.com>
->
-> 1. Add Kconfig and Makefile entries
-> 2. Add board definition
-> 3. enable uart and fec for LOCO board
->
-> Signed-off-by: Yong Shen <yong.shen@freescale.com>
-> ---
-....
+Sascha Hauer (2):
+      serial: Add auart driver for i.MX23/28
+      ARM i.MXS: Add auart platform support for i.MX28
 
-> + ? ? ? }
-> + ? ? ? gpio_direction_output(LOCO_FEC_PHY_RST, 0);
-> + ? ? ? gpio_set_value(LOCO_FEC_PHY_RST, 0);
-
-As Baruch pointed out on a previous post, you can remove the
-gpio_set_value line here.
-
-Regards,
-
-Fabio Estevam
+ arch/arm/mach-mxs/clock-mx28.c                  |    5 +
+ arch/arm/mach-mxs/devices-mx28.h                |    8 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-auart.c      |   54 ++
+ arch/arm/mach-mxs/include/mach/devices-common.h |   10 +
+ drivers/serial/Kconfig                          |   15 +
+ drivers/serial/Makefile                         |    1 +
+ drivers/serial/mxs-auart.c                      |  763 +++++++++++++++++++++++
+ 9 files changed, 860 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-auart.c
+ create mode 100644 drivers/serial/mxs-auart.c
