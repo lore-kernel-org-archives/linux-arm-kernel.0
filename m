@@ -1,70 +1,49 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 11 Jan 2011 20:09:24 +0800
-Subject: [PATCH v5] ARM: mx28: add the second fec device registration
-In-Reply-To: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1294747764-4499-1-git-send-email-shawn.guo@freescale.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 11 Jan 2011 17:41:24 +0530
+Subject: Locking in the clk API
+In-Reply-To: <20110111091607.GI12552@n2100.arm.linux.org.uk>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikUT6ds6+omkmr2rgUipq=nmEd6GRPngK0+qUZ4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Changes for v5:
- - Do not use CONFIG_FEC2 which is a fec driver configration
+On Tue, Jan 11, 2011 at 2:46 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 11, 2011 at 10:16:42AM +0800, Jeremy Kerr wrote:
+>> At present, we can satisfy these with:
+>>
+>> * clk_enable: may sleep
+>
+> I object to this as one of the purposes behind the clk API is to allow
+> power savings to be made, and unless we can perform clk enable/disable
+> from atomic contexts, the best you can do is enable the clock when the
+> device is probed and disable it when it's released.
+>
+> For a lot of systems, modules are loaded at boot, and devices are probed
+> at boot time. ?They're never unloaded.
+>
+> This means that clocks will be enabled at boot time and never turned off.
+>
+> If you're lucky, there may be open/release methods which can be used to
+> enable/disable the clock, which reduces the 'clock on' period down to
+> the point where userspace opens/closes the device. ?That's still
+> insufficient and in some cases there aren't calls for this.
+>
+> Sometimes the only point that you know you need the clock enabled is when
+> your driver has already been called in an atomic context.
+>
+> If such a requirement is imposed, it means that a driver would either have
+> to leave the clock always on, or would have to drop such calls if the
+> clock wasn't already enabled.
 
- arch/arm/mach-mxs/mach-mx28evk.c |   26 +++++++++++++++++++++++---
- 1 files changed, 23 insertions(+), 3 deletions(-)
+Perhaps we should factor the conventional clk_enable into two parts (say) :-
+ a)  clk_setup  : Which does exactly what can't be done in atomic context.
+                         Like setting PLLs i.e, if that needs to sleep.
+b)  clk_enable : Everything else that gets the clock signals running.
 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index d162e95..8e2c597 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -57,6 +57,19 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
- 		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
- 	MX28_PAD_ENET_CLK__CLKCTRL_ENET |
- 		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	/* fec1 */
-+	MX28_PAD_ENET0_CRS__ENET1_RX_EN |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_ENET0_RXD2__ENET1_RXD0 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_ENET0_RXD3__ENET1_RXD1 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_ENET0_COL__ENET1_TX_EN |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_ENET0_TXD2__ENET1_TXD0 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_ENET0_TXD3__ENET1_TXD1 |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
- 	/* phy power line */
- 	MX28_PAD_SSP1_DATA3__GPIO_2_15 |
- 		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-@@ -106,8 +119,14 @@ static void __init mx28evk_fec_reset(void)
- 	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
- }
- 
--static const struct fec_platform_data mx28_fec_pdata __initconst = {
--	.phy = PHY_INTERFACE_MODE_RMII,
-+static struct fec_platform_data mx28_fec_pdata[] = {
-+	{
-+		/* fec0 */
-+		.phy = PHY_INTERFACE_MODE_RMII,
-+	}, {
-+		/* fec1 */
-+		.phy = PHY_INTERFACE_MODE_RMII,
-+	},
- };
- 
- static void __init mx28evk_init(void)
-@@ -117,7 +136,8 @@ static void __init mx28evk_init(void)
- 	mx28_add_duart();
- 
- 	mx28evk_fec_reset();
--	mx28_add_fec(0, &mx28_fec_pdata);
-+	mx28_add_fec(0, &mx28_fec_pdata[0]);
-+	mx28_add_fec(1, &mx28_fec_pdata[1]);
- }
- 
- static void __init mx28evk_timer_init(void)
--- 
-1.7.1
+The drivers could do clk_setup in probe/open and clk_enable right before the
+the actual need of the clock. That way, drivers don't have to bother
+with platform/clock
+peculiarities while trying their best to save power.
+Of course, power that can't be saved now, won't be saved then.
