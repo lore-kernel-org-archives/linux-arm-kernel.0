@@ -1,36 +1,52 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 11 Jan 2011 18:10:50 +0100
-Subject: [PATCH 1/2] serial: Add auart driver for i.MX23/28
-In-Reply-To: <1294758545-9445-2-git-send-email-s.hauer@pengutronix.de>
-References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
-	<1294758545-9445-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110111171050.GA522@pengutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 11 Jan 2011 11:13:36 -0600
+Subject: [PATCH v5 2/3] omap3: beaglexm: fix DVI reset GPIO
+In-Reply-To: <[PATCH v4 0/3] OMAP3: beaglexm: GPIO fixes>
+References: <[PATCH v4 0/3] OMAP3: beaglexm: GPIO fixes>
+Message-ID: <1294766017-12182-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 04:09:04PM +0100, Sascha Hauer wrote:
-[...]
-> +#include <asm/cacheflush.h>
-> +#include <mach/mx28.h>
+From: Koen Kooi <koen@beagleboard.org>
 
-What about MX23 and STMP3xxx?
+GPIO reset line for Beagle XM is different from vanilla beagle
+so we populate it as part of gpio update routine.
 
-> +
-> +#define MXS_AUART_PORTS 5
+This in part fixes the issue of display not functioning on beagle XM
+platform.
 
-MX23 has just 2. We should better adapt to that depending on the type?
+[nm at ti.com: split up, added descriptive changelogs]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Koen Kooi <koen@beagleboard.org>
+---
+ arch/arm/mach-omap2/board-omap3beagle.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-Bye,
-
-   Wolfram
-
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index af1166b..673deb9 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -199,7 +199,7 @@ static struct omap_dss_device beagle_dvi_device = {
+ 	.name = "dvi",
+ 	.driver_name = "generic_panel",
+ 	.phy.dpi.data_lines = 24,
+-	.reset_gpio = 170,
++	.reset_gpio = -EINVAL,
+ 	.platform_enable = beagle_enable_dvi,
+ 	.platform_disable = beagle_disable_dvi,
+ };
+@@ -307,6 +307,12 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	else
+ 		gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0);
+ 
++	/* DVI reset GPIO is different between beagle revisions */
++	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM)
++		beagle_dvi_device.reset_gpio = 129;
++	else
++		beagle_dvi_device.reset_gpio = 170;
++
+ 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+ 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+ 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110111/e2e6b8c3/attachment.sig>
+1.6.3.3
