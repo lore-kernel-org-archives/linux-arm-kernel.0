@@ -1,35 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Jan 2011 09:06:15 +0000
-Subject: [PATCH] arm: mm: Poison freed init memory
-In-Reply-To: <4D2BE3E1.5060706@codeaurora.org>
-References: <1294256845-29517-1-git-send-email-sboyd@codeaurora.org>
-	<20110105202645.GL8638@n2100.arm.linux.org.uk>
-	<4D255263.7040106@codeaurora.org>
-	<20110106090741.GQ8638@n2100.arm.linux.org.uk>
-	<4D2BE3E1.5060706@codeaurora.org>
-Message-ID: <20110111090615.GH12552@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 11 Jan 2011 10:06:43 +0100
+Subject: [PATCH 1/3] ARM i.MX SPI driver changes for i.MX53 support
+In-Reply-To: <1294661334-7826-1-git-send-email-yong.shen@freescale.com>
+References: <1294661334-7826-1-git-send-email-yong.shen@freescale.com>
+Message-ID: <20110111090643.GN12078@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 10, 2011 at 09:00:17PM -0800, Stephen Boyd wrote:
-> Ok it seems that 0xcc was chosen by Pavel since it's a breakpoint
-> instruction (sorry for not noticing that earlier [1]).
+On Mon, Jan 10, 2011 at 08:08:52PM +0800, yong.shen at freescale.com wrote:
+> From: Yong Shen <yong.shen@freescale.com>
+> 
+> 1. Change the Kconfig to include i.MX53
+> 2. add devtype entry for i.MX53
+> 
+> Signed-off-by: Yong Shen <yong.shen@freescale.com>
 
-It may be on x86, but on ARM:
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-   0:   cccccccc        stclgt  12, cr12, [ip], {204}
+You should send this to the spi-devel list.
 
-That's a co-processor #12 instruction which will only be executed of
-the processor condition codes satisfy 'gt'.
+Sascha
 
-> There was some discussion about handling initdata with Pavel's patch
-> but it seems that nothing came of it?
+> ---
+>  drivers/spi/Kconfig   |    4 ++--
+>  drivers/spi/spi_imx.c |    6 ++++++
+>  2 files changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index 78f9fd0..04965e2 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -153,10 +153,10 @@ config SPI_IMX_VER_0_4
+>  	def_bool y if ARCH_MX31
+>  
+>  config SPI_IMX_VER_0_7
+> -	def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51
+> +	def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51 || ARCH_MX53
+>  
+>  config SPI_IMX_VER_2_3
+> -	def_bool y if ARCH_MX51
+> +	def_bool y if ARCH_MX51 || ARCH_MX53
+>  
+>  config SPI_IMX
+>  	tristate "Freescale i.MX SPI controllers"
+> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+> index 55a38e2..9b8a733 100644
+> --- a/drivers/spi/spi_imx.c
+> +++ b/drivers/spi/spi_imx.c
+> @@ -747,6 +747,12 @@ static struct platform_device_id spi_imx_devtype[] = {
+>  		.name = "imx51-ecspi",
+>  		.driver_data = SPI_IMX_VER_2_3,
+>  	}, {
+> +		.name = "imx53-cspi",
+> +		.driver_data = SPI_IMX_VER_0_7,
+> +	}, {
+> +		.name = "imx53-ecspi",
+> +		.driver_data = SPI_IMX_VER_2_3,
+> +	}, {
+>  		/* sentinel */
+>  	}
+>  };
+> -- 
+> 1.7.1
+> 
+> 
+> 
 
-I'm not sure who this Pavel is who you keep referring to - the message
-you link to is a discussion between William Irvin and hpa.
-
-> How about we use 0xe7fddef0? This seems to satisfy at least your first
-> point for both ARM and Thumb mode (Thumb will branch to the 0xdef0
-> instruction).
-
-Yup.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
