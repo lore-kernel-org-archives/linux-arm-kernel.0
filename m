@@ -1,28 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Jan 2011 16:54:10 +0000
-Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with
-	high frequency clocks
-In-Reply-To: <alpine.LFD.2.00.1101100851300.6883@xanadu.home>
-References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
-	<20101221105149.GO28157@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1012291703300.10437@xanadu.home>
-	<20110103003718.GF17727@n2100.arm.linux.org.uk>
-	<1294084049.2571.30.camel@work-vm>
-	<20110109105200.GC31708@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101092224320.3455@xanadu.home>
-	<20110110105120.GA12552@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101100851300.6883@xanadu.home>
-Message-ID: <20110111165410.GK11039@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 11 Jan 2011 18:10:50 +0100
+Subject: [PATCH 1/2] serial: Add auart driver for i.MX23/28
+In-Reply-To: <1294758545-9445-2-git-send-email-s.hauer@pengutronix.de>
+References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
+	<1294758545-9445-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110111171050.GA522@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 10, 2011 at 08:53:14AM -0500, Nicolas Pitre wrote:
-> On Mon, 10 Jan 2011, Russell King - ARM Linux wrote:
-> 
-> > With a 32-bit or smaller cyclecounter, as 32-bit x 32-bit can never
-> > overflow a 64-bit destination, so if anything zero should be passed in
-> > this case.
-> 
-> That's the alternative suggestion I made as well.
+On Tue, Jan 11, 2011 at 04:09:04PM +0100, Sascha Hauer wrote:
+[...]
+> +#include <asm/cacheflush.h>
+> +#include <mach/mx28.h>
 
-I've just committed a patch which makes it zero.
+What about MX23 and STMP3xxx?
+
+> +
+> +#define MXS_AUART_PORTS 5
+
+MX23 has just 2. We should better adapt to that depending on the type?
+
+Bye,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110111/e2e6b8c3/attachment.sig>
