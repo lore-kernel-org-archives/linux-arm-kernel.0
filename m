@@ -1,36 +1,33 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 11 Jan 2011 22:35:42 +0800
-Subject: Locking in the clk API
-In-Reply-To: <20110111121816.GB774@linux-sh.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<201101111830.18597.jeremy.kerr@canonical.com>
-	<20110111121816.GB774@linux-sh.org>
-Message-ID: <201101112235.43061.jeremy.kerr@canonical.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 11 Jan 2011 12:39:31 -0200
+Subject: [PATCH 2/2] ARM i.MX53 enable LOCO board bootup
+In-Reply-To: <1294726998-20830-3-git-send-email-yong.shen@freescale.com>
+References: <1294726998-20830-1-git-send-email-yong.shen@freescale.com>
+	<1294726998-20830-3-git-send-email-yong.shen@freescale.com>
+Message-ID: <AANLkTimW54m2f+Z21F+9dLw78WOS24W4yc00D5rztM0C@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Yong,
 
-> Again, you are approaching it from the angle that an atomic clock is a
-> special requirement rather than the default behaviour.
+On Tue, Jan 11, 2011 at 4:23 AM,  <yong.shen@freescale.com> wrote:
+> From: Yong Shen <yong.shen@freescale.com>
+>
+> 1. Add Kconfig and Makefile entries
+> 2. Add board definition
+> 3. enable uart and fec for LOCO board
+>
+> Signed-off-by: Yong Shen <yong.shen@freescale.com>
+> ---
+....
 
-I'm not considering it a special requirement, but it's still a requirement 
-(that the called function does not sleep).
+> + ? ? ? }
+> + ? ? ? gpio_direction_output(LOCO_FEC_PHY_RST, 0);
+> + ? ? ? gpio_set_value(LOCO_FEC_PHY_RST, 0);
 
-The problem with the inverse logic (clk_enable/clk_enable_sleepable) is that 
-now you've made the caller need to know what kind of clock it has, or might 
-have one day.
+As Baruch pointed out on a previous post, you can remove the
+gpio_set_value line here.
 
- * For clk_enable/clk_enable_atomic, the decision is: is this call in an
-   atomic context?
+Regards,
 
- * For clk_enable/clk_enable_sleepable, the decision is: might the clock code
-   have given us a sleeping clock?
-
-Note that it's much easier to guarantee correctness for the first than it is 
-for the second.
-
-Cheers,
-
-
-Jeremy
+Fabio Estevam
