@@ -1,43 +1,81 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 11 Jan 2011 17:28:15 -0500 (EST)
-Subject: [PATCH] bitops: remove condition code clobber for CLZ
-In-Reply-To: <20110111185306.GM11039@n2100.arm.linux.org.uk>
-References: <1294767725-14814-1-git-send-email-rabin@rab.in>
-	<20110111183942.GL11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101111347320.17086@xanadu.home>
-	<20110111185306.GM11039@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101111721100.19340@xanadu.home>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 11 Jan 2011 16:45:44 -0600
+Subject: [PATCH 4/5 v2] ARM: pxa: Fix suspend/resume array index
+	miscalculation
+In-Reply-To: <201101110046.13141.marek.vasut@gmail.com>
+References: <1294699993-4712-1-git-send-email-marek.vasut@gmail.com>
+	<1294699993-4712-4-git-send-email-marek.vasut@gmail.com>
+	<AANLkTi=+0M_j0r8sy_RbVrJ3fufm7E-tREm8TepAwdzq@mail.gmail.com>
+	<201101110046.13141.marek.vasut@gmail.com>
+Message-ID: <AANLkTine866qa9joOx49=Y4PaLeg4CpD=8F2B=XHqZ==@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jan 2011, Russell King - ARM Linux wrote:
+On Mon, Jan 10, 2011 at 5:46 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> On Tuesday 11 January 2011 00:41:26 Eric Miao wrote:
+>> On Mon, Jan 10, 2011 at 4:53 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>> > ---
+>> > v2: Fix loop condition as proposed by Sergei
+>> >
+>> > ?arch/arm/mach-pxa/irq.c | ? ?8 ++++----
+>> > ?1 files changed, 4 insertions(+), 4 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+>> > index 78f0e0c..a7deff5 100644
+>> > --- a/arch/arm/mach-pxa/irq.c
+>> > +++ b/arch/arm/mach-pxa/irq.c
+>> > @@ -156,7 +156,7 @@ static inline void __iomem *irq_base(int i)
+>> > ? ? ? ? ? ? ? ?0x40d00130,
+>> > ? ? ? ?};
+>> >
+>> > - ? ? ? return (void __iomem *)io_p2v(phys_base[i >> 5]);
+>> > + ? ? ? return (void __iomem *)io_p2v(phys_base[i]);
+>> > ?}
+>> >
+>> > ?void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+>> > @@ -168,7 +168,7 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+>> > ? ? ? ?pxa_internal_irq_nr = irq_nr;
+>> >
+>> > ? ? ? ?for (n = 0; n < irq_nr; n += 32) {
+>> > - ? ? ? ? ? ? ? void __iomem *base = irq_base(n);
+>> > + ? ? ? ? ? ? ? void __iomem *base = irq_base(n >> 5);
+>> >
+>> > ? ? ? ? ? ? ? ?__raw_writel(0, base + ICMR); ? /* disable all IRQs */
+>> > ? ? ? ? ? ? ? ?__raw_writel(0, base + ICLR); ? /* all IRQs are IRQ, not
+>> > FIQ */ @@ -200,7 +200,7 @@ static int pxa_irq_suspend(struct sys_device
+>> > *dev, pm_message_t state) {
+>> > ? ? ? ?int i;
+>> >
+>> > - ? ? ? for (i = 0; i < pxa_internal_irq_nr; i += 32) {
+>> > + ? ? ? for (i = 0; i < pxa_internal_irq_nr / 32; i++) {
+>> > ? ? ? ? ? ? ? ?void __iomem *base = irq_base(i);
+>>
+>> I prefer it to be IRQ number based instead of IRQ bank based,
+>>
+>> in other word, I'd rather to change the statement below:
+>> > ? ? ? ? ? ? ? ?saved_icmr[i] = __raw_readl(base + ICMR);
+>>
+>> to something:
+>>
+>> saved_icmr[i / 32] = __raw_read(base + ICMR);
+>
+> Exactly what I wanted to avoid ... won't you be doing a division "# of bank"-
+> times instead of once there ?
+>
 
-> On Tue, Jan 11, 2011 at 01:51:19PM -0500, Nicolas Pitre wrote:
-> > On Tue, 11 Jan 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Tue, Jan 11, 2011 at 11:12:05PM +0530, Rabin Vincent wrote:
-> > > > The CLZ instruction does not alter the condition flags, so remove the
-> > > > "cc" clobber from the inline asm for fls().
-> > > 
-> > > Do you have any evidence that this changes anything, or is it just
-> > > subjective?
-> > 
-> > This probably doesn't change anything, as gcc has been presuming that 
-> > inline asms do clobber the condition code for years now, in order to 
-> > prevent issues caused by a lack of %? appended to instructions in order 
-> > to conditionally execute them otherwise.  So this would only make the 
-> > code self consistent.
-> 
-> So given that Linus complains about churn from ARM, what's the
-> justification to apply a patch which has no effect what so ever?
+I'm fine with either way. Applied.
 
-Code self documentation.
-
-If we know the inline asm is actually clobbering the condition code, 
-then it makes sense to list cc in the clobber list.  And conversely as 
-well, for the benefit of those reading that code.  Having cc in the 
-clobber list for some inline asm that does not actually clobber the 
-condition code is just confusing.
-
-
-Nicolas
+>>
+>> > @@ -219,7 +219,7 @@ static int pxa_irq_resume(struct sys_device *dev)
+>> > ?{
+>> > ? ? ? ?int i;
+>> >
+>> > - ? ? ? for (i = 0; i < pxa_internal_irq_nr; i += 32) {
+>> > + ? ? ? for (i = 0; i < pxa_internal_irq_nr / 32; i++) {
+>> > ? ? ? ? ? ? ? ?void __iomem *base = irq_base(i);
+>> >
+>> > ? ? ? ? ? ? ? ?__raw_writel(saved_icmr[i], base + ICMR);
+>> > --
+>> > 1.7.2.3
+>
