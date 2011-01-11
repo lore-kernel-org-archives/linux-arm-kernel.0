@@ -1,40 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Jan 2011 15:29:08 -0800
-Subject: [PATCH] omap3: igep3: Add omap_reserve functionality
-In-Reply-To: <1294760874-28088-1-git-send-email-eballetbo@gmail.com>
-References: <1294760874-28088-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <20110111232908.GZ4957@atomide.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 12 Jan 2011 00:45:56 +0100
+Subject: [PATCH v2] ARM: Change misleading warning when CONFIG_CMDLINE_FORCE
+	is used
+Message-ID: <1294789556-3870-1-git-send-email-holler@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enric Balletbo i Serra <eballetbo@gmail.com> [110111 07:47]:
-> This patch adds omap_reserve functionality to board-igep0030.c.
-> 
-> This patch is in similar lines to commit id 71ee7dad9b6991, from
-> Russell king
+When CONFIG_CMDLINE_FORCE is used, the warning
 
-Applying to devel-board.
+  Ignoring unrecognised tag 0x54410009
 
-Tony
+was displayed. Change this to
+
+  Ignoring tag cmdline (using the default kernel command line)
+
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+---
+ arch/arm/kernel/setup.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..eed2425 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -649,15 +649,17 @@ static int __init parse_tag_revision(const struct tag *tag)
  
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
-> ---
->  arch/arm/mach-omap2/board-igep0030.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-igep0030.c b/arch/arm/mach-omap2/board-igep0030.c
-> index 11b944f..4dc62a9 100644
-> --- a/arch/arm/mach-omap2/board-igep0030.c
-> +++ b/arch/arm/mach-omap2/board-igep0030.c
-> @@ -450,6 +450,7 @@ static void __init igep3_init(void)
->  
->  MACHINE_START(IGEP0030, "IGEP OMAP3 module")
->  	.boot_params	= 0x80000100,
-> +	.reserve	= omap_reserve,
->  	.map_io		= omap3_map_io,
->  	.init_irq	= igep3_init_irq,
->  	.init_machine	= igep3_init,
-> -- 
-> 1.7.0.4
-> 
+ __tagtable(ATAG_REVISION, parse_tag_revision);
+ 
+-#ifndef CONFIG_CMDLINE_FORCE
+ static int __init parse_tag_cmdline(const struct tag *tag)
+ {
++#ifndef CONFIG_CMDLINE_FORCE
+ 	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
++#else
++	pr_warning("Ignoring tag cmdline (using the default kernel command line)\n");
++#endif /* CONFIG_CMDLINE_FORCE */
+ 	return 0;
+ }
+ 
+ __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
+-#endif /* CONFIG_CMDLINE_FORCE */
+ 
+ /*
+  * Scan the tag table for this tag, and call its parse function.
+-- 
+1.7.3.4
