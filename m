@@ -1,29 +1,38 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 10 Jan 2011 22:19:02 -0500 (EST)
-Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
-	setup.c
-In-Reply-To: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
-References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
-Message-ID: <alpine.LFD.2.00.1101102211370.12076@xanadu.home>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 11 Jan 2011 12:11:29 +0800
+Subject: Locking in the clk API
+In-Reply-To: <20110111031552.GJ3760@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org>
+Message-ID: <201101111211.30172.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jan 2011, Grant Likely wrote:
+Hi Paul,
 
-> Since the debug macros no longer depend on the machine type
-> information, both the machine type lookup and the atags vetting can be
-> deferred to setup_arch() in setup.c which simplifies the code
-> somewhat.
-> 
-> This patch removes both __machine_type_lookup and __vet_atags() from
-> head.S.  The atags vetting is moved to setup_arch().  machine_type
-> lookup is already called from setup_machine() in addition to where it
-> was called from head.S.
+> This looks like a complete disaster, and is also completely inconsistent
+> with how the API is being used by the vast majority of users today.
 
-While at it, you could also remove the code for __lookup_machine_type, 
-lookup_machine_type and __error_a, replacing that with a C 
-implementation living in setup.c instead.  If this code is not called 
-from head.S anymore, there is no reason to keep it there any longer.
+I've been basing this on the mxc clock code, which acquires a mutex for all 
+clk_enable()s. This may not be representative of the majority of clock usage.
+
+>From a quick search there are a few other cases of non-atomic clock usage:
+
+tcc:		clk_enable() acquires a global clocks_mutex
+tegra:	has a clk_enable_cansleep()
+davinci: clk_set_parent() aquires a global clocks_mutex
+
+Excluding the davinci code (we won't worry about set_parent for now...), if we 
+can port mxc and tcc to a sleepable clk_enable, perhaps we could just go with 
+purely atomic operations.
+
+We'd still need some method of using sleeping clocks though. How about making 
+clk_enable() BUG if the clock is not atomic, and add clk_enable_cansleep() for 
+the cases where clk->ops.enable may sleep.
+
+Do we need something similar for other parts of the API? (clk_set_rate?)
+
+Cheers,
 
 
-Nicolas
+Jeremy
