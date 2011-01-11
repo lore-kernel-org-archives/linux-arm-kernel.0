@@ -1,36 +1,40 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 11 Jan 2011 18:27:11 +0800
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <20110111101636.GF26617@pengutronix.de>
-References: <1294199462.347935.472473715866.0.gpush@pororo>
-	<1294199462.348449.192344022926.1.gpush@pororo>
-	<20110111101636.GF26617@pengutronix.de>
-Message-ID: <201101111827.12291.jeremy.kerr@canonical.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 11 Jan 2011 11:29:09 +0100
+Subject: [PATCH v4 07/10] ARM: mx28: add the second fec device registration
+In-Reply-To: <1294297998-26930-8-git-send-email-shawn.guo@freescale.com>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<1294297998-26930-8-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110111102909.GH26617@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
- 
-> The i.MX clk implementation disables the old parent if clk is enabled
-> and enables the new parent if clk is enabled (modulo bugs). Shouldn't
-> we do this here aswell?
+On Thu, Jan 06, 2011 at 03:13:15PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mxs/mach-mx28evk.c |   28 +++++++++++++++++++++++++---
+>  1 files changed, 25 insertions(+), 3 deletions(-)
+> 
+>  
+>  static void __init mx28evk_init(void)
+> @@ -117,7 +136,10 @@ static void __init mx28evk_init(void)
+>  	mx28_add_duart();
+>  
+>  	mx28evk_fec_reset();
+> -	mx28_add_fec(0, &mx28_fec_pdata);
+> +	mx28_add_fec(0, &mx28_fec_pdata[0]);
+> +#ifdef CONFIG_FEC2
+> +	mx28_add_fec(1, &mx28_fec_pdata[1]);
+> +#endif
 
-Sounds reasonable, yes.
+Please don't do this. If you really want to make this configurable with
+kconfig use a board specific option, not a driver specific option. I
+think this should be made unconditional though.
 
-> I thought about returning -EBUSY if clk_set_parent is called for an
-> enabled clk, but this way we could never reparent the cpu clock which I
-> think is done in the Freescale BSP for power saving.
-
-I think that the possibility for changing the parent really depends on the 
-implementation; in some cases we may want to disallow it, in others it might 
-be fine.
-
-Related: do we really need globally-accessible clk_{get,set}_parent in the clk 
-API? For cases where we need to set the parent, we probably need details about 
-the platform clock configuration (eg, which clocks are possible parents). In 
-this case, we could just call into the clock driver directly.
-
-Cheers,
+Sascha
 
 
-Jeremy
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
