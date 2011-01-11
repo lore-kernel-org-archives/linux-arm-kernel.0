@@ -1,56 +1,32 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 11 Jan 2011 21:16:38 +0530
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <4D2BFA08.5030104@ahsoftware.de>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-Message-ID: <AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo i Serra)
+Date: Tue, 11 Jan 2011 16:47:54 +0100
+Subject: [PATCH] omap3: igep3: Add omap_reserve functionality
+Message-ID: <1294760874-28088-1-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 12:04, Alexander Holler <holler@ahsoftware.de> wrote:
-> Point is that I would like to understand why including an initramfs has such
-> consequences.
->
-> I have to search for some pictures which are explaining the memory layout
-> (never had any interested in that before).
->
-> I assume some memory near the kernel is reserved for the modules and an
-> initramfs will come inbetween the kernel and the reserved memory for
-> modules.
+This patch adds omap_reserve functionality to board-igep0030.c.
 
-Modules get placed 16MiB below PAGE_OFFSET, and when you add another
-~16MiB initramfs between them and the kernel symbols, you exceed the
-offset range of the branch instruction.
+This patch is in similar lines to commit id 71ee7dad9b6991, from
+Russell king
 
-It's possible to hack around this by placing the initramfs at the end of
-the kernel image rather than at the beginning with the rest of the init
-data.  Something like the below should work, although you should also
-probably take care of alignment and also have this section freed when
-the rest of the init data is freed.
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+---
+ arch/arm/mach-omap2/board-igep0030.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b16c079..05ad361 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -46,7 +46,6 @@ SECTIONS
- 		INIT_CALLS
- 		CON_INITCALL
- 		SECURITY_INITCALL
--		INIT_RAM_FS
-
- #ifndef CONFIG_XIP_KERNEL
- 		__init_begin = _stext;
-@@ -170,6 +169,11 @@ SECTIONS
-
- 		_edata = .;
- 	}
-+
-+	.initramfs : {
-+		INIT_RAM_FS
-+	}
-+
- 	_edata_loc = __data_loc + SIZEOF(.data);
-
- #ifdef CONFIG_HAVE_TCM
+diff --git a/arch/arm/mach-omap2/board-igep0030.c b/arch/arm/mach-omap2/board-igep0030.c
+index 11b944f..4dc62a9 100644
+--- a/arch/arm/mach-omap2/board-igep0030.c
++++ b/arch/arm/mach-omap2/board-igep0030.c
+@@ -450,6 +450,7 @@ static void __init igep3_init(void)
+ 
+ MACHINE_START(IGEP0030, "IGEP OMAP3 module")
+ 	.boot_params	= 0x80000100,
++	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_irq	= igep3_init_irq,
+ 	.init_machine	= igep3_init,
+-- 
+1.7.0.4
