@@ -1,30 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 10 Jan 2011 18:57:43 -0500 (EST)
-Subject: [PATCH 4/4] ARM: support for Thumb-2 instructions with
-	CONFIG_ARM_PATCH_PHYS_VIRT
-In-Reply-To: <20110110232435.GF12552@n2100.arm.linux.org.uk>
-References: <1294129208-15201-1-git-send-email-nico@fluxnic.net>
-	<1294129208-15201-5-git-send-email-nico@fluxnic.net>
-	<AANLkTi=g+Wf7T60=nLeCpuPtYebZhE5URr4t2T6zzsCC@mail.gmail.com>
-	<alpine.LFD.2.00.1101101740280.9794@xanadu.home>
-	<20110110232435.GF12552@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101101856320.9794@xanadu.home>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 11 Jan 2011 08:54:15 +0800
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <20110110110028.GB12552@n2100.arm.linux.org.uk>
+References: <1294199462.347935.472473715866.0.gpush@pororo>
+	<20110110104122.GI12078@pengutronix.de>
+	<20110110110028.GB12552@n2100.arm.linux.org.uk>
+Message-ID: <201101110854.15653.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jan 2011, Russell King - ARM Linux wrote:
+Hi Russell,
 
-> On Mon, Jan 10, 2011 at 05:45:44PM -0500, Nicolas Pitre wrote:
-> > I need to rework this part entirely now anyway to go on top of Russell's 
-> > latest version.
+> Unless the locking problems can be resolved, the patches aren't ready.
 > 
-> I've made a few changes recently to it to fix a few quirks.  Once the
-> merge window is over, I'll push out new patches and tree.  Until then
-> it wouldn't be fair on SFR/linux-next to push new code stuff out during
-> the merge window.
+> From what I've seen there's still quite a problem with what kind of
+> lock to use in the clock - mutex or spinlock.
 
-Maybe you could push those into a branch which is not pulled into 
-linux-next?
+Yes, the clock driver may either use a spinlock or mutex.
+
+However, this exactly the same as the current clock code, my patches do not 
+alter what we currently have.
+
+I do agree that we should define some specific semantics for the clock API 
+with regards to sleeping, and I'll start a new thread about that. But we 
+should definitely separate that issue from the problem of having multiple 
+definitions for struct clk, which is what these patches address.
+
+Cheers,
 
 
-Nicolas
+Jeremy
