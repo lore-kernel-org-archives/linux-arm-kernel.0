@@ -1,57 +1,46 @@
-From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Tue, 11 Jan 2011 17:21:53 +0800
-Subject: [PATCH] ARM i.MX SPI driver changes for i.MX53 support
-In-Reply-To: <1294737713-24015-1-git-send-email-yong.shen@freescale.com>
-References: <1294737713-24015-1-git-send-email-yong.shen@freescale.com>
-Message-ID: <1294737713-24015-2-git-send-email-yong.shen@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 Jan 2011 09:28:42 +0000
+Subject: Locking in the clk API
+In-Reply-To: <20110111090311.GM12078@pengutronix.de>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org>
+	<201101111211.30172.jeremy.kerr@canonical.com>
+	<20110111090311.GM12078@pengutronix.de>
+Message-ID: <20110111092842.GJ12552@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Shen <yong.shen@freescale.com>
+On Tue, Jan 11, 2011 at 10:03:11AM +0100, Sascha Hauer wrote:
+> Quoting Russell:
+> 
+> > I hate the GPIO APIs for doing this _cansleep crap as the decision of
+> > whether to use the _cansleep or normal APIs normally can't be made at
+> > the time when the API is used, but sometime later.  Many people just use
+> > the non-_cansleep versions irrespective of the context they're in -
+> > which is unnecessarily restrictive - consider what happens if you then
+> > have that driver use a GPIO on an I2C peripheral...
+> 
+> Sounds like we should rather have s sleeping clk_enable and a
+> clk_enable_atomic. This way people can use standard clk_enable until
+> a 'scheduling while atomic' gives a hint in the right direction.
 
-1. Change the Kconfig to include i.MX53
-2. add devtype entry for i.MX53
+Well, there's a problem lurking here - lets take the PL011 driver.  You
+convert the console write calls to use clk_enable_atomic(), leaving the
+rest.
 
-Signed-off-by: Yong Shen <yong.shen@freescale.com>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/spi/Kconfig   |    4 ++--
- drivers/spi/spi_imx.c |    6 ++++++
- 2 files changed, 8 insertions(+), 2 deletions(-)
+The driver will appear to work fine with a sleeping clk, until you get
+a console write.  Maybe your SoC developer never tried the console on
+the particular port you just tried to use?  Maybe such a driver should
+use the _atomic() versions throughout?
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 78f9fd0..04965e2 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -153,10 +153,10 @@ config SPI_IMX_VER_0_4
- 	def_bool y if ARCH_MX31
- 
- config SPI_IMX_VER_0_7
--	def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51
-+	def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51 || ARCH_MX53
- 
- config SPI_IMX_VER_2_3
--	def_bool y if ARCH_MX51
-+	def_bool y if ARCH_MX51 || ARCH_MX53
- 
- config SPI_IMX
- 	tristate "Freescale i.MX SPI controllers"
-diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-index 55a38e2..9b8a733 100644
---- a/drivers/spi/spi_imx.c
-+++ b/drivers/spi/spi_imx.c
-@@ -747,6 +747,12 @@ static struct platform_device_id spi_imx_devtype[] = {
- 		.name = "imx51-ecspi",
- 		.driver_data = SPI_IMX_VER_2_3,
- 	}, {
-+		.name = "imx53-cspi",
-+		.driver_data = SPI_IMX_VER_0_7,
-+	}, {
-+		.name = "imx53-ecspi",
-+		.driver_data = SPI_IMX_VER_2_3,
-+	}, {
- 		/* sentinel */
- 	}
- };
--- 
-1.7.1
+Another solution occurs to me: clk_enable() which returns -EAGAIN if
+it's called in an atomic context but needs to sleep, and let the driver
+deal with the clock not being enabled when it wants it.  The down side
+is it requires the driver to have additional code to sort out such a
+problem.
+
+Maybe another approach for the time being is to unify in two steps: first
+unify the implementations which use a spinlock - and those which can use
+a spinlock, and separately those which must use a mutex.
+
+Then this issue can be revisited in the future.
