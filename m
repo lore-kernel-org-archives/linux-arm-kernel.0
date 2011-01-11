@@ -1,60 +1,105 @@
-From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Tue, 11 Jan 2011 20:54:23 +0800
-Subject: [PATCH v2 3/4] ARM: i.MX53 EVK: add spi nor device
-In-Reply-To: <1294750464-8660-1-git-send-email-yong.shen@freescale.com>
-References: <1294750464-8660-1-git-send-email-yong.shen@freescale.com>
-Message-ID: <1294750464-8660-4-git-send-email-yong.shen@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 11 Jan 2011 14:00:57 +0100
+Subject: [PATCH 2/4] ARM: i.MX53 EVK: add spi device
+In-Reply-To: <1294749950-8571-2-git-send-email-yong.shen@freescale.com>
+References: <1294749950-8571-2-git-send-email-yong.shen@freescale.com>
+Message-ID: <20110111130057.GA10521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Shen <yong.shen@freescale.com>
+Hi Yong,
 
-add spi board information for spi nor device
+On Tue, Jan 11, 2011 at 08:45:48PM +0800, yong.shen at freescale.com wrote:
+> From: Yong Shen <yong.shen@freescale.com>
+> 
+> 1. add platform data for spi device
+> 2. Kconfig change
+> 
+> Signed-off-by: Yong Shen <yong.shen@freescale.com>
+> ---
+>  arch/arm/mach-mx5/Kconfig          |    1 +
+>  arch/arm/mach-mx5/board-mx53_evk.c |   21 +++++++++++++++++++++
+>  2 files changed, 22 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index 23b0e3f..777740b 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -126,6 +126,7 @@ config MACH_MX53_EVK
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+>  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+> +	select IMX_HAVE_PLATFORM_SPI_IMX
+>  	help
+>  	  Include support for MX53 EVK platform. This includes specific
+>  	  configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+> index 4043451..739bc62 100644
+> --- a/arch/arm/mach-mx5/board-mx53_evk.c
+> +++ b/arch/arm/mach-mx5/board-mx53_evk.c
+> @@ -33,6 +33,8 @@
+>  #include <mach/iomux-mx53.h>
+>  
+>  #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+> +#define EVK_ECSPI1_CS0		IMX_GPIO_NR(2, 30)
+> +#define EVK_ECSPI1_CS1		IMX_GPIO_NR(3, 19)
+>  
+>  #include "crm_regs.h"
+>  #include "devices-imx53.h"
+> @@ -52,6 +54,13 @@ static iomux_v3_cfg_t mx53_evk_pads[] = {
+>  	MX53_PAD_ATA_CS_1__UART3_RXD,
+>  	MX53_PAD_ATA_DA_1__UART3_CTS,
+>  	MX53_PAD_ATA_DA_2__UART3_RTS,
+> +
+> +	MX53_PAD_EIM_D16__GPIO_3_16,
+> +	MX53_PAD_EIM_D17__GPIO_3_17,
+> +	MX53_PAD_EIM_D18__GPIO_3_18,
+> +
+> +	MX53_PAD_EIM_EB2__GPIO_2_30,
+> +	MX53_PAD_EIM_D19__GPIO_3_19,
+It would be nice to document what the pins are used for.  For e.g.
+MX53_PAD_ATA_DA_1__UART3_CTS it's quite obvious, but just from looking
+at your patch I don't see what MX53_PAD_EIM_D1[678]__GPIO_3_1[678] are
+used for.
 
-Signed-off-by: Yong Shen <yong.shen@freescale.com>
----
- arch/arm/mach-mx5/board-mx53_evk.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+Best regards
+Uwe
 
-diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-index 739bc62..3b0d5ee 100644
---- a/arch/arm/mach-mx5/board-mx53_evk.c
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c
-@@ -24,6 +24,8 @@
- #include <linux/fec.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/spi.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -98,6 +100,17 @@ static struct fec_platform_data mx53_evk_fec_pdata = {
- 	.phy = PHY_INTERFACE_MODE_RMII,
- };
- 
-+static struct spi_board_info mx53_evk_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "mtd_dataflash",
-+		.max_speed_hz = 25000000,
-+		.bus_num = 0,
-+		.chip_select = 1,
-+		.mode = SPI_MODE_0,
-+		.platform_data = NULL,
-+	},
-+};
-+
- static int mx53_evk_spi_cs[] = {
- 	EVK_ECSPI1_CS0,
- 	EVK_ECSPI1_CS1,
-@@ -122,6 +135,8 @@ static void __init mx53_evk_board_init(void)
- 	imx53_add_sdhci_esdhc_imx(0, NULL);
- 	imx53_add_sdhci_esdhc_imx(1, NULL);
- 
-+	spi_register_board_info(mx53_evk_spi_board_info,
-+		ARRAY_SIZE(mx53_evk_spi_board_info));
- 	imx53_add_ecspi(0, &mx53_evk_spi_data);
- }
- 
+>  };
+>  
+>  static const struct imxuart_platform_data mx53_evk_uart_pdata __initconst = {
+> @@ -89,6 +98,16 @@ static struct fec_platform_data mx53_evk_fec_pdata = {
+>  	.phy = PHY_INTERFACE_MODE_RMII,
+>  };
+>  
+> +static int mx53_evk_spi_cs[] = {
+> +	EVK_ECSPI1_CS0,
+> +	EVK_ECSPI1_CS1,
+> +};
+> +
+> +static const struct spi_imx_master mx53_evk_spi_data __initconst = {
+> +	.chipselect     = mx53_evk_spi_cs,
+> +	.num_chipselect = ARRAY_SIZE(mx53_evk_spi_cs),
+> +};
+> +
+>  static void __init mx53_evk_board_init(void)
+>  {
+>  	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
+> @@ -102,6 +121,8 @@ static void __init mx53_evk_board_init(void)
+>  
+>  	imx53_add_sdhci_esdhc_imx(0, NULL);
+>  	imx53_add_sdhci_esdhc_imx(1, NULL);
+> +
+> +	imx53_add_ecspi(0, &mx53_evk_spi_data);
+>  }
+>  
+>  static void __init mx53_evk_timer_init(void)
+> -- 
+> 1.7.1
+> 
+> 
+> 
+
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
