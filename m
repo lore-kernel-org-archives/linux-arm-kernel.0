@@ -1,54 +1,50 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 11 Jan 2011 17:44:59 +0800
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 11 Jan 2011 19:13:14 +0900
 Subject: Locking in the clk API
-In-Reply-To: <20110111091607.GI12552@n2100.arm.linux.org.uk>
+In-Reply-To: <201101111744.59712.jeremy.kerr@canonical.com>
 References: <201101111016.42819.jeremy.kerr@canonical.com>
 	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-Message-ID: <201101111744.59712.jeremy.kerr@canonical.com>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+Message-ID: <20110111101314.GA774@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-> I object to this as one of the purposes behind the clk API is to allow
-> power savings to be made, and unless we can perform clk enable/disable
-> from atomic contexts, the best you can do is enable the clock when the
-> device is probed and disable it when it's released.
+On Tue, Jan 11, 2011 at 05:44:59PM +0800, Jeremy Kerr wrote:
+> So, it sounds like the best approach is to provide an atomic clk_enable. I 
+> agree with Sascha that the clk_enable and clk_enable_atomic polarity makes the 
+> most sense, so how about:
 > 
-> [...]
->
-> Sometimes the only point that you know you need the clock enabled is when
-> your driver has already been called in an atomic context.
+> int clk_enable(struct clk *clk)
+> {
+> 	might_sleep();
+> 
+> 	[...]
+> }
+> 
+> int clk_enable_atomic(struct clk *clk)
+> {
+> 	BUG_ON(!(clk->flags & CLK_ATOMIC));
+> 
+> 	[...]
+> }
+> 
+> Paul: even though you mention that the atomic clocks are the usual case, I 
+> think that this way around illustrates the atomic 'restriction' at the call 
+> site more clearly. When the drivers don't care about the atomicity, 
+> clk_enable() is fine. When drivers do need an atomic clock, 
+> clk_enable_atomic() shows this requirement.
+> 
+No, the sleeping clock case is and always will be a corner case, and I
+have no interest in pretending otherwise. On SH we have hundreds of
+clocks that are all usable in the atomic context and perhaps less than a
+dozen that aren't (and even in those cases much of the PLL negotiation is
+handled in hardware so there's never any visibility for the lock-down
+from the software side, other architectures also have similar behaviour).
 
-.. provided that the enable (and subsequent things that depend on the clock 
-signal to be valid) can't be deferred; I'm not sure how often this will be 
-possible.
+Keep in mind that all users except for the few that you cited were
+already quite content with the atomic context use, so this 'restriction'
+you speak of is just an artificial limitation introduced by a couple of
+new platforms that deviated from what everyone else was already doing.
 
-So, it sounds like the best approach is to provide an atomic clk_enable. I 
-agree with Sascha that the clk_enable and clk_enable_atomic polarity makes the 
-most sense, so how about:
-
-int clk_enable(struct clk *clk)
-{
-	might_sleep();
-
-	[...]
-}
-
-int clk_enable_atomic(struct clk *clk)
-{
-	BUG_ON(!(clk->flags & CLK_ATOMIC));
-
-	[...]
-}
-
-Paul: even though you mention that the atomic clocks are the usual case, I 
-think that this way around illustrates the atomic 'restriction' at the call 
-site more clearly. When the drivers don't care about the atomicity, 
-clk_enable() is fine. When drivers do need an atomic clock, 
-clk_enable_atomic() shows this requirement.
-
-Cheers,
-
-
-Jeremy
+If you want to go this route, then SH and ARM-based SH-Mobiles will at
+least not be making use of the generic struct clk.
