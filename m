@@ -1,114 +1,148 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 11 Jan 2011 12:05:39 +0100
-Subject: BUG: spinlock recursion (sys_chdir, user_path_at, do_path_lookup ...)
-Message-ID: <20110111110539.GP24920@pengutronix.de>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Tue, 11 Jan 2011 19:15:24 +0800
+Subject: Locking in the clk API
+In-Reply-To: <20110111103929.GN24920@pengutronix.de>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111103929.GN24920@pengutronix.de>
+Message-ID: <AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+2011/1/11 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hi,
+>
+> On Tue, Jan 11, 2011 at 05:44:59PM +0800, Jeremy Kerr wrote:
+>> > I object to this as one of the purposes behind the clk API is to allow
+>> > power savings to be made, and unless we can perform clk enable/disable
+>> > from atomic contexts, the best you can do is enable the clock when the
+>> > device is probed and disable it when it's released.
+>> >
+>> > [...]
+>> >
+>> > Sometimes the only point that you know you need the clock enabled is when
+>> > your driver has already been called in an atomic context.
+>>
+>> .. provided that the enable (and subsequent things that depend on the clock
+>> signal to be valid) can't be deferred; I'm not sure how often this will be
+>> possible.
+>>
+>> So, it sounds like the best approach is to provide an atomic clk_enable. I
+>> agree with Sascha that the clk_enable and clk_enable_atomic polarity makes the
+>> most sense, so how about:
+>>
+>> int clk_enable(struct clk *clk)
+>> {
+>> ? ? ? might_sleep();
+>>
+>> ? ? ? [...]
+>> }
+>>
+>> int clk_enable_atomic(struct clk *clk)
+>> {
+>> ? ? ? BUG_ON(!(clk->flags & CLK_ATOMIC));
+>>
+>> ? ? ? [...]
+>> }
+>>
+>> Paul: even though you mention that the atomic clocks are the usual case, I
+>> think that this way around illustrates the atomic 'restriction' at the call
+>> site more clearly. When the drivers don't care about the atomicity,
+>> clk_enable() is fine. When drivers do need an atomic clock,
+>> clk_enable_atomic() shows this requirement.
+> I agree that we should try to make the clk api easy and consistent. ?So
+> if we can go the atomic way we should in my opinion.
+>
+> On i.mx the roots in the clk hierarchy are plls, so it would be nice to
+> know how long it takes to enable these.
+>
+> Back when I implemented clk support for ns921x I had a clock that made
+> me think that a sleeping implementation would be the way to go. ?I don't
+> remember the exact details. ?(It was the rtc clk.)
+>
+> A quick look into Digi's BSP (digiEL-5.0) shows they implemented
+> something I suggested earlier here:
+>
+> ? ? ? ?static int clk_enable_haslocknchange(struct clk *clk)
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?int ret = 0;
+>
+> ? ? ? ? ? ? ? ?assert_spin_locked(&clk_lock);
+> ? ? ? ? ? ? ? ?BUG_ON(!test_bit(CLK_FLAG_CHANGESTATE, &clk->flags));
+>
+> ? ? ? ? ? ? ? ?if (clk->usage++ == 0) {
+> ? ? ? ? ? ? ? ? ? ? ? ?if (clk->parent) {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ret = clk_enable_haslock(clk->parent);
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?if (ret)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?goto err_enable_parent;
+> ? ? ? ? ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?spin_unlock(&clk_lock);
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?if (clk->endisable)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ret = clk->endisable(clk, 1);
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?spin_lock(&clk_lock);
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clk_disable_parent_haslock(clk);
+> ? ? ? ?err_enable_parent:
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clk->usage = 0;
+> ? ? ? ? ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ?return ret;
+> ? ? ? ?}
+>
+> ? ? ? ?static int clk_enable_haslock(struct clk *clk)
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?int ret;
+> ? ? ? ? ? ? ? ?assert_spin_locked(&clk_lock);
+> ? ? ? ? ? ? ? ?if (__test_and_set_bit(CLK_FLAG_CHANGESTATE, &clk->flags))
+> ? ? ? ? ? ? ? ? ? ? ? ?return -EBUSY;
+>
+> ? ? ? ? ? ? ? ?ret = clk_enable_haslocknchange(clk);
+>
+> ? ? ? ? ? ? ? ?clear_bit(CLK_FLAG_CHANGESTATE, &clk->flags);
+>
+> ? ? ? ? ? ? ? ?return ret;
+> ? ? ? ?}
+>
+> ? ? ? ?int clk_enable(struct clk *clk)
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ? ? ? ? ?spin_lock_irqsave(&clk_lock, flags);
+> ? ? ? ? ? ? ? ?ret = clk_enable_haslock(clk);
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&clk_lock, flags);
+> ? ? ? ? ? ? ? ?return ret;
+> ? ? ? ?}
+>
+>
+> I think the idea is nice. ?At least it allows with a single lock to
+> implement both, sleeping and atomic clks without the need to mark the
+> atomicity in a global flag.
+>
+> In the meantime Sascha checked on mx51 how long it takes to enable one
+> of the three PLLs: 50us. ?Is this fast enough to accept disabled irqs
+> that long?
+A well running board will not enable/disable PLLs frequently. It don't
+make sense. PLLs are normally disabled on request to enter low power
+mode, rather not because all their child clocks are disabled.   So we
+don't have to consider the time here.
 
-when testing yesterday's Linus' master branch
-(a08948812b30653eb2c536ae613b635a989feb6f + some arch support including
-Trond's latest nfsfix[1]) I hit the following reproducibly:
-
-[    5.580000] BUG: spinlock recursion on CPU#0, init/1
-[    5.580000]  lock: c7487e10, .magic: dead4ead, .owner: init/1, .owner_cpu: 0
-[    5.590000] Backtrace: 
-[    5.590000] [<c0037c2c>] (dump_backtrace+0x0/0x110) from [<c028240c>] (dump_stack+0x1c/0x20)
-[    5.600000]  r7:c7487e10 r6:c0321368 r5:c7487e10 r4:c7848000
-[    5.610000] [<c02823f0>] (dump_stack+0x0/0x20) from [<c01b516c>] (spin_bug+0x90/0xa4)
-[    5.620000] [<c01b50dc>] (spin_bug+0x0/0xa4) from [<c01b52d4>] (do_raw_spin_lock+0x50/0x154)
-[    5.620000]  r6:c7487e10 r5:c7487e10 r4:00000000
-[    5.630000] [<c01b5284>] (do_raw_spin_lock+0x0/0x154) from [<c028524c>] (_raw_spin_lock_nested+0x40/0x48)
-[    5.640000] [<c028520c>] (_raw_spin_lock_nested+0x0/0x48) from [<c00f436c>] (nameidata_dentry_drop_rcu+0x90/0x1a4)
-[    5.650000]  r5:c7843efc r4:c7487dc0
-[    5.650000] [<c00f42dc>] (nameidata_dentry_drop_rcu+0x0/0x1a4) from [<c00f44c0>] (d_revalidate+0x40/0x68)
-[    5.660000] [<c00f4480>] (d_revalidate+0x0/0x68) from [<c00f6ed4>] (link_path_walk+0xb84/0xbf0)
-[    5.670000]  r6:c7843efc r5:c7843efc r4:00000000
-[    5.680000] [<c00f6350>] (link_path_walk+0x0/0xbf0) from [<c00f7164>] (do_path_lookup+0x48/0xd4)
-[    5.680000] [<c00f711c>] (do_path_lookup+0x0/0xd4) from [<c00f7c08>] (user_path_at+0x64/0x9c)
-[    5.690000] [<c00f7ba4>] (user_path_at+0x0/0x9c) from [<c00e9614>] (sys_chdir+0x2c/0x78)
-[    5.700000]  r8:c0034108 r7:0000000c r6:be961ee4 r5:c7843f88 r4:00063015
-[    5.710000] [<c00e95e8>] (sys_chdir+0x0/0x78) from [<c0033e80>] (ret_fast_syscall+0x0/0x44)
-[    5.720000]  r5:be961ee4 r4:00063015
-[   11.720000] BUG: spinlock lockup on CPU#0, init/1, c7487e10
-[   11.730000] Backtrace: 
-[   11.730000] [<c0037c2c>] (dump_backtrace+0x0/0x110) from [<c028240c>] (dump_stack+0x1c/0x20)
-[   11.740000]  r7:c7842000 r6:c7487e10 r5:00000000 r4:00000000
-[   11.740000] [<c02823f0>] (dump_stack+0x0/0x20) from [<c01b539c>] (do_raw_spin_lock+0x118/0x154)
-[   11.750000] [<c01b5284>] (do_raw_spin_lock+0x0/0x154) from [<c028524c>] (_raw_spin_lock_nested+0x40/0x48)
-[   11.760000] [<c028520c>] (_raw_spin_lock_nested+0x0/0x48) from [<c00f436c>] (nameidata_dentry_drop_rcu+0x90/0x1a4)
-[   11.770000]  r5:c7843efc r4:c7487dc0
-[   11.780000] [<c00f42dc>] (nameidata_dentry_drop_rcu+0x0/0x1a4) from [<c00f44c0>] (d_revalidate+0x40/0x68)
-[   11.790000] [<c00f4480>] (d_revalidate+0x0/0x68) from [<c00f6ed4>] (link_path_walk+0xb84/0xbf0)
-[   11.790000]  r6:c7843efc r5:c7843efc r4:00000000
-[   11.800000] [<c00f6350>] (link_path_walk+0x0/0xbf0) from [<c00f7164>] (do_path_lookup+0x48/0xd4)
-[   11.810000] [<c00f711c>] (do_path_lookup+0x0/0xd4) from [<c00f7c08>] (user_path_at+0x64/0x9c)
-[   11.820000] [<c00f7ba4>] (user_path_at+0x0/0x9c) from [<c00e9614>] (sys_chdir+0x2c/0x78)
-[   11.820000]  r8:c0034108 r7:0000000c r6:be961ee4 r5:c7843f88 r4:00063015
-[   11.830000] [<c00e95e8>] (sys_chdir+0x0/0x78) from [<c0033e80>] (ret_fast_syscall+0x0/0x44)
-[   11.840000]  r5:be961ee4 r4:00063015
-[   75.280000] BUG: soft lockup - CPU#0 stuck for 64s! [init:1]
-[   75.280000] Modules linked in:
-[   75.280000] irq event stamp: 113662
-[   75.280000] hardirqs last  enabled at (113662): [<c0285a7c>] _raw_spin_unlock_irqrestore+0x48/0x50
-[   75.280000] hardirqs last disabled at (113661): [<c0285398>] _raw_spin_lock_irqsave+0x30/0x64
-[   75.280000] softirqs last  enabled at (113509): [<c026447c>] rpc_wake_up_next+0x1b0/0x1c4
-[   75.280000] softirqs last disabled at (113507): [<c02854f0>] _raw_spin_lock_bh+0x20/0x58
-[   75.280000] 
-[   75.280000] Pid: 1, comm:                 init
-[   75.280000] CPU: 0    Not tainted  (2.6.37-04021-gb8b018c-dirty #41)
-[   75.280000] PC is at do_raw_spin_lock+0xac/0x154
-[   75.280000] LR is at do_raw_spin_lock+0xc0/0x154
-[   75.280000] pc : [<c01b5330>]    lr : [<c01b5344>]    psr: 20000013
-[   75.280000] sp : c7843dd0  ip : c7843cd4  fp : c7843e04
-[   75.280000] r10: 06bd0000  r9 : 00000000  r8 : 00000000
-[   75.280000] r7 : c7842000  r6 : c7487e10  r5 : 00000000  r4 : 03dd5aca
-[   75.280000] r3 : 00000000  r2 : 00000001  r1 : c0285a74  r0 : 00000001
-[   75.280000] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   75.280000] Control: 0005317f  Table: 479a8000  DAC: 00000015
-[   75.280000] [<c00356c4>] (show_regs+0x0/0x54) from [<c0089dac>] (watchdog_timer_fn+0x13c/0x1a4)
-[   75.280000]  r4:c7842000
-[   75.280000] [<c0089c70>] (watchdog_timer_fn+0x0/0x1a4) from [<c006cb58>] (__run_hrtimer+0x114/0x1f0)
-[   75.280000] [<c006ca44>] (__run_hrtimer+0x0/0x1f0) from [<c006ced8>] (hrtimer_interrupt+0x154/0x338)
-[   75.280000] [<c006cd84>] (hrtimer_interrupt+0x0/0x338) from [<c003e36c>] (mxs_timer_interrupt+0x28/0x34)
-[   75.280000] [<c003e344>] (mxs_timer_interrupt+0x0/0x34) from [<c008a408>] (handle_IRQ_event+0x7c/0x1a8)
-[   75.280000] [<c008a38c>] (handle_IRQ_event+0x0/0x1a8) from [<c008c948>] (handle_level_irq+0xc8/0x148)
-[   75.280000] [<c008c880>] (handle_level_irq+0x0/0x148) from [<c002d320>] (asm_do_IRQ+0x80/0xa4)
-[   75.280000]  r7:c7842000 r6:c7487e10 r5:00000000 r4:00000030
-[   75.280000] [<c002d2a0>] (asm_do_IRQ+0x0/0xa4) from [<c0033ab8>] (__irq_svc+0x38/0x80)
-[   75.280000] Exception stack(0xc7843d88 to 0xc7843dd0)
-[   75.280000] 3d80:                   00000001 c0285a74 00000001 00000000 03dd5aca 00000000
-[   75.280000] 3da0: c7487e10 c7842000 00000000 00000000 06bd0000 c7843e04 c7843cd4 c7843dd0
-[   75.280000] 3dc0: c01b5344 c01b5330 20000013 ffffffff
-[   75.280000]  r5:f5000000 r4:ffffffff
-[   75.280000] [<c01b5284>] (do_raw_spin_lock+0x0/0x154) from [<c028524c>] (_raw_spin_lock_nested+0x40/0x48)
-[   75.280000] [<c028520c>] (_raw_spin_lock_nested+0x0/0x48) from [<c00f436c>] (nameidata_dentry_drop_rcu+0x90/0x1a4)
-[   75.280000]  r5:c7843efc r4:c7487dc0
-[   75.280000] [<c00f42dc>] (nameidata_dentry_drop_rcu+0x0/0x1a4) from [<c00f44c0>] (d_revalidate+0x40/0x68)
-[   75.280000] [<c00f4480>] (d_revalidate+0x0/0x68) from [<c00f6ed4>] (link_path_walk+0xb84/0xbf0)
-[   75.280000]  r6:c7843efc r5:c7843efc r4:00000000
-[   75.280000] [<c00f6350>] (link_path_walk+0x0/0xbf0) from [<c00f7164>] (do_path_lookup+0x48/0xd4)
-[   75.280000] [<c00f711c>] (do_path_lookup+0x0/0xd4) from [<c00f7c08>] (user_path_at+0x64/0x9c)
-[   75.280000] [<c00f7ba4>] (user_path_at+0x0/0x9c) from [<c00e9614>] (sys_chdir+0x2c/0x78)
-[   75.280000]  r8:c0034108 r7:0000000c r6:be961ee4 r5:c7843f88 r4:00063015
-[   75.280000] [<c00e95e8>] (sys_chdir+0x0/0x78) from [<c0033e80>] (ret_fast_syscall+0x0/0x44)
-[   75.280000]  r5:be961ee4 r4:00063015
-
-I started to bisect, but already the first test case showed a different
-error (my getty dying every few seconds).
-
-Does this ring a bell for someone?
-
-If you have questions don't hesitate to ask.
-
-Hardware: mxs-based arm9
-
-Best regards
-Uwe
-
-[1] http://mid.gmane.org/1294528551.4181.19.camel at heimdal.trondhjem.org
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+Richard
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
