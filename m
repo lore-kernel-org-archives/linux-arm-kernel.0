@@ -1,40 +1,39 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 11 Jan 2011 10:25:20 +0200
-Subject: [PATCH 0/2] ARM i.MX53 enable SMD and LOCO board bootup
-In-Reply-To: <AANLkTikhf7ReDZRt+CRuzupD_oQb7LMfTDa2fvpjayRB@mail.gmail.com>
-References: <1294726998-20830-1-git-send-email-yong.shen@freescale.com>
-	<20110111072301.GA19168@jasper.tkos.co.il>
-	<AANLkTikhf7ReDZRt+CRuzupD_oQb7LMfTDa2fvpjayRB@mail.gmail.com>
-Message-ID: <20110111082520.GB22418@jasper.tkos.co.il>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Tue, 11 Jan 2011 09:32:21 +0100
+Subject: Change SUEN3 MACH to KMKIRKWOOD
+Message-ID: <4D2C1595.50705@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hello Russel,
 
-On Tue, Jan 11, 2011 at 03:54:43PM +0800, Yong Shen wrote:
-> So far they are similar, but as more code and features are added in,
-> they are going to be different. We had registered different mach id to
-> distinguish these two boards.
+Denx developper Stefan Roese had registered the MACH_SUEN3 with number 
+2255 when they had ported u-boot for our SUEN3 board.
 
-Code for two (or more) different machines can be shared in the same file. See 
-for example the code in arch/arm/mach-at91/board-stamp9g20.c which supports 
-both taskit PortuxG20 and taskit Stamp9G20, and 
-arch/arm/mach-at91/board-pcontrol-g20.c which is reusing code from these 
-boards for a third board (PControl G20).
+Our company now has developped several boards with the same architecture 
+(and thus share quite a lot of code) and the MACH_SUEN3 really is board 
+specific and while it should define something generic. We have 
+disscussed with Stefan and have agreed that the best would be to keep 
+this MACH number but to change its name to something that is common to 
+all the boards and thus more logical for us.
 
-We should avoid code duplication as much as possible, IMO.
+Could you please change the MACH_SUEN3 (and all the corresponding suen3 
+occurences) to MACH_KM_KIRKWOOD (respectively km_kirkwood) in the 
+arch/arm/tools/mach-types file and the corresponding database ?
 
-baruch
-
-> On Tue, Jan 11, 2011 at 3:23 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> > On Tue, Jan 11, 2011 at 02:23:16PM +0800, yong.shen at freescale.com wrote:
-> >> SMD and LOCO are newly developed boards of i.MX53. LOCO means "low cost",
-> >> which is supposed to be widespread soon.
-> >
-> > These two patches seem almost identical. Can't both board support code share
-> > the same file?
+Thanks and best regards
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Valentin Longchamp
+Embedded Software Engineer
+Hardware and Chip Integration
+______________________________________
+KEYMILE AG
+Schwarzenburgstr. 73
+CH-3097 Liebefeld
+Phone +41 31 377 1318
+Fax     +41 31 377 1212
+valentin.longchamp at keymile.com
+www.keymile.com
+______________________________________
+ >>Be the FIRST on the LAST MILE<<
