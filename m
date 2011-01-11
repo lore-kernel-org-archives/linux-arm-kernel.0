@@ -1,43 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Jan 2011 16:35:56 +0000
-Subject: [PATCH] MMCI: don't read command response when invalid
-In-Reply-To: <20110111163502.GJ11039@n2100.arm.linux.org.uk>
-References: <20110111163502.GJ11039@n2100.arm.linux.org.uk>
-Message-ID: <20110111163556.GA18746@n2100.arm.linux.org.uk>
+Date: Tue, 11 Jan 2011 16:54:10 +0000
+Subject: [PATCH] ARM: sched_clock: improve mult/shift accuracy with
+	high frequency clocks
+In-Reply-To: <alpine.LFD.2.00.1101100851300.6883@xanadu.home>
+References: <alpine.LFD.2.00.1012202014500.10437@xanadu.home>
+	<20101221105149.GO28157@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1012291703300.10437@xanadu.home>
+	<20110103003718.GF17727@n2100.arm.linux.org.uk>
+	<1294084049.2571.30.camel@work-vm>
+	<20110109105200.GC31708@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101092224320.3455@xanadu.home>
+	<20110110105120.GA12552@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101100851300.6883@xanadu.home>
+Message-ID: <20110111165410.GK11039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't read the command response from the registers when either the
-command timed out (because there was no response from the card) or
-the checksum on the response was invalid.
+On Mon, Jan 10, 2011 at 08:53:14AM -0500, Nicolas Pitre wrote:
+> On Mon, 10 Jan 2011, Russell King - ARM Linux wrote:
+> 
+> > With a 32-bit or smaller cyclecounter, as 32-bit x 32-bit can never
+> > overflow a 64-bit destination, so if anything zero should be passed in
+> > this case.
+> 
+> That's the alternative suggestion I made as well.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/mmc/host/mmci.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5630228..040de4f 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -394,15 +394,15 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
- 
- 	host->cmd = NULL;
- 
--	cmd->resp[0] = readl(base + MMCIRESPONSE0);
--	cmd->resp[1] = readl(base + MMCIRESPONSE1);
--	cmd->resp[2] = readl(base + MMCIRESPONSE2);
--	cmd->resp[3] = readl(base + MMCIRESPONSE3);
--
- 	if (status & MCI_CMDTIMEOUT) {
- 		cmd->error = -ETIMEDOUT;
- 	} else if (status & MCI_CMDCRCFAIL && cmd->flags & MMC_RSP_CRC) {
- 		cmd->error = -EILSEQ;
-+	} else {
-+		cmd->resp[0] = readl(base + MMCIRESPONSE0);
-+		cmd->resp[1] = readl(base + MMCIRESPONSE1);
-+		cmd->resp[2] = readl(base + MMCIRESPONSE2);
-+		cmd->resp[3] = readl(base + MMCIRESPONSE3);
- 	}
- 
- 	if (!cmd->data || cmd->error) {
+I've just committed a patch which makes it zero.
