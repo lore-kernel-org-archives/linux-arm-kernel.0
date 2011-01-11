@@ -1,56 +1,56 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 11 Jan 2011 21:13:03 +0530
-Subject: [PATCH 1/2 v1] davinci: support disabling modem status
-	interrupts on	SOC UARTS
-In-Reply-To: <4D2C5031.30507@criticallink.com>
-References: <1294230392-29564-1-git-send-email-michael.williamson@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024829BCD4@dbde02.ent.ti.com>
-	<4D2C5031.30507@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024834972E@dbde02.ent.ti.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 11 Jan 2011 21:16:38 +0530
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <4D2BFA08.5030104@ahsoftware.de>
+References: <4D2B4CE4.9080309@ahsoftware.de>
+	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
+	<4D2BFA08.5030104@ahsoftware.de>
+Message-ID: <AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 18:12:25, Michael Williamson wrote:
-> [...]
-> This was pretty much what the original patch I had proposed did.  There are
-> actually two termios flags that cause MS interrupts to be enabled by the
-> driver, CLOCAL (disabled) or CRTSCTS (enabled).  I observed that some
-> process after the kernel had completed booting (getty, I think)
-> was calling set_termios with CLOCAL disabled (not CRTSCTS enabled).  I could
-> probably alter the getty args to work around it, but it's a bit of a hole to
-> not have something in the kernel to preclude sending the OS to "interrupt 
-> hell".
-> 
-> Is there another way to accomplish what you are suggesting that is different
-> from the original patch?
-> 
-> Thanks for the comments.
-> 
-> -Mike
-> 
-> Background: The original patch (not accepted) is here
-> https://patchwork.kernel.org/patch/442671/
-> 
-> This kicked a second email thread:
-> http://marc.info/?l=linux-serial&m=129409970003827&w=4
-> 
-> From that thread, it was suggested to add a port flag to the driver
-> flags structure for disabling MS interrupts.
-> 
-> Driver Tweak patch (not accepted):
-> https://patchwork.kernel.org/patch/450771/
-> 
-> From that thread, it was suggested to override the I/O methods and hide
-> the problem back in the platform code (this patch).
-> 
-> All three proposed patches work for me.  I'd gladly submit a fourth if
-> suggested -- this problem pretty much kills a couple of platform
-> configurations we are working on...
-> 
-> > Thanks,
-> > Prakash
-> > 
-Thanks for clarifying. Looks like this is what we can do as of now.
+On Tue, Jan 11, 2011 at 12:04, Alexander Holler <holler@ahsoftware.de> wrote:
+> Point is that I would like to understand why including an initramfs has such
+> consequences.
+>
+> I have to search for some pictures which are explaining the memory layout
+> (never had any interested in that before).
+>
+> I assume some memory near the kernel is reserved for the modules and an
+> initramfs will come inbetween the kernel and the reserved memory for
+> modules.
 
-Thanks,
-Prakash
+Modules get placed 16MiB below PAGE_OFFSET, and when you add another
+~16MiB initramfs between them and the kernel symbols, you exceed the
+offset range of the branch instruction.
+
+It's possible to hack around this by placing the initramfs at the end of
+the kernel image rather than at the beginning with the rest of the init
+data.  Something like the below should work, although you should also
+probably take care of alignment and also have this section freed when
+the rest of the init data is freed.
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index b16c079..05ad361 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -46,7 +46,6 @@ SECTIONS
+ 		INIT_CALLS
+ 		CON_INITCALL
+ 		SECURITY_INITCALL
+-		INIT_RAM_FS
+
+ #ifndef CONFIG_XIP_KERNEL
+ 		__init_begin = _stext;
+@@ -170,6 +169,11 @@ SECTIONS
+
+ 		_edata = .;
+ 	}
++
++	.initramfs : {
++		INIT_RAM_FS
++	}
++
+ 	_edata_loc = __data_loc + SIZEOF(.data);
+
+ #ifdef CONFIG_HAVE_TCM
