@@ -1,22 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Jan 2011 15:59:30 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-Message-ID: <20110111155930.GH11039@n2100.arm.linux.org.uk>
+Date: Tue, 11 Jan 2011 16:05:34 +0000
+Subject: [PATCH 1/2] serial: Add auart driver for i.MX23/28
+In-Reply-To: <1294758545-9445-2-git-send-email-s.hauer@pengutronix.de>
+References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
+	<1294758545-9445-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110111160534.GI11039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 09:16:38PM +0530, Rabin Vincent wrote:
-> It's possible to hack around this by placing the initramfs at the end of
-> the kernel image rather than at the beginning with the rest of the init
-> data.  Something like the below should work, although you should also
-> probably take care of alignment and also have this section freed when
-> the rest of the init data is freed.
+On Tue, Jan 11, 2011 at 04:09:04PM +0100, Sascha Hauer wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-You're then running into problems as _sdata.._edata is copied to RAM on
-XIP kernels, and you really don't want to waste time copying the
-initramfs to RAM.
+So you don't handle any of the termios settings at all in this driver
+such as ignoring parity, reading parity, framing errors, etc.
+
+There's a reason that you're provided with read_status_mask and
+ignore_status_mask.
+
+If you don't intend to support those termios modes, ensure that you
+force the termios structure to reflect what you actually do implement
+so that userspace can detect the capabilities of your driver.
+
+IOW, iflags INPCK, BRKINT, PARMRK, IGNPAR, IGNBRK and cflag CREAD.
