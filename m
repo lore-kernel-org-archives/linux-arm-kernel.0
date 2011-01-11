@@ -1,41 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 11 Jan 2011 14:07:50 +0100
-Subject: [PATCH v4 05/10] net/fec: add dual fec support for mx28
-In-Reply-To: <4D2C4BEC.1030003@snapgear.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-	<1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
-	<20110111102717.GG26617@pengutronix.de>
-	<4D2C4BEC.1030003@snapgear.com>
-Message-ID: <20110111130749.GQ24920@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Jan 2011 13:10:26 +0000
+Subject: [PATCH] ux500: Add Rohm BH1780GLI Light Sensor to i2c_board_info
+Message-ID: <1294751426-3472-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-On Tue, Jan 11, 2011 at 10:24:12PM +1000, Greg Ungerer wrote:
-> On 11/01/11 20:27, Sascha Hauer wrote:
-> >On Thu, Jan 06, 2011 at 03:13:13PM +0800, Shawn Guo wrote:
-> >This option is used nowhere and should be removed. Certainly it does not
-> >have the effect of enabling the second ethernet controller.
-> 
-> It does for a ColdFire platform...
-> 
-> grep -r CONFIG_FEC2 *
-> 
-> arch/m68knommu/configs/m5275evb_defconfig:CONFIG_FEC2=y
-> arch/m68knommu/platform/527x/config.c:#ifdef CONFIG_FEC2
-> arch/m68knommu/platform/527x/config.c:#ifdef CONFIG_FEC2
-IMHO Sascha's comment[1] applies here, too.
-
-And someone might want to do what he suggested soon or the patch
-removing CONFIG_FEC2[2] needs to be commented accordingly.
-
-Best regards
-Uwe
-
-[1] http://thread.gmane.org/gmane.linux.network/182929/focus=183378
-[2] http://mid.gmane.org/1294747672-4433-1-git-send-email-shawn.guo at freescale.com
-
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 2635bb7..ff67408 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -134,6 +134,15 @@ static struct i2c_board_info mop500_i2c0_devices[] = {
+ 	},
+ };
+ 
++static struct i2c_board_info mop500_i2c2_devices[] = {
++#if defined(CONFIG_SENSORS_BH1780)
++	{
++		/* Light sensor Rohm BH1780GLI */
++		I2C_BOARD_INFO("bh1780", 0x29),
++	},
++#endif
++};
++
+ #define U8500_I2C_CONTROLLER(id, _slsu, _tft, _rft, clk, _sm) \
+ static struct nmk_i2c_controller u8500_i2c##id##_data = { \
+ 	/*				\
+@@ -322,6 +331,8 @@ static void __init u8500_init_machine(void)
+ 
+ 	i2c_register_board_info(0, mop500_i2c0_devices,
+ 				ARRAY_SIZE(mop500_i2c0_devices));
++	i2c_register_board_info(2, mop500_i2c2_devices,
++				ARRAY_SIZE(mop500_i2c0_devices));
+ }
+ 
+ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.1
