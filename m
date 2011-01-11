@@ -1,26 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Jan 2011 13:38:05 -0200
-Subject: [PATCH v6 1/2] ARM: mx5: dynamically allocate pwm devices
-In-Reply-To: <20110104210529.GG25121@pengutronix.de>
-References: <1291209107-2256-1-git-send-email-fabio.estevam@freescale.com>
-	<AANLkTi=rTbL2SHCPtn5sGQ4O1x+DgOHfJOEi3fG7ZrZy@mail.gmail.com>
-	<AANLkTim_Ouees3GAejQuK6HLbjmxjMyFfuqfTc3i1koN@mail.gmail.com>
-	<20110104210529.GG25121@pengutronix.de>
-Message-ID: <AANLkTikrEtQRQcvLwX7X-hvjEXmiEdKzouUm7CxQFVG0@mail.gmail.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 11 Jan 2011 21:13:03 +0530
+Subject: [PATCH 1/2 v1] davinci: support disabling modem status
+	interrupts on	SOC UARTS
+In-Reply-To: <4D2C5031.30507@criticallink.com>
+References: <1294230392-29564-1-git-send-email-michael.williamson@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024829BCD4@dbde02.ent.ti.com>
+	<4D2C5031.30507@criticallink.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024834972E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Jan 11, 2011 at 18:12:25, Michael Williamson wrote:
+> [...]
+> This was pretty much what the original patch I had proposed did.  There are
+> actually two termios flags that cause MS interrupts to be enabled by the
+> driver, CLOCAL (disabled) or CRTSCTS (enabled).  I observed that some
+> process after the kernel had completed booting (getty, I think)
+> was calling set_termios with CLOCAL disabled (not CRTSCTS enabled).  I could
+> probably alter the getty args to work around it, but it's a bit of a hole to
+> not have something in the kernel to preclude sending the OS to "interrupt 
+> hell".
+> 
+> Is there another way to accomplish what you are suggesting that is different
+> from the original patch?
+> 
+> Thanks for the comments.
+> 
+> -Mike
+> 
+> Background: The original patch (not accepted) is here
+> https://patchwork.kernel.org/patch/442671/
+> 
+> This kicked a second email thread:
+> http://marc.info/?l=linux-serial&m=129409970003827&w=4
+> 
+> From that thread, it was suggested to add a port flag to the driver
+> flags structure for disabling MS interrupts.
+> 
+> Driver Tweak patch (not accepted):
+> https://patchwork.kernel.org/patch/450771/
+> 
+> From that thread, it was suggested to override the I/O methods and hide
+> the problem back in the platform code (this patch).
+> 
+> All three proposed patches work for me.  I'd gladly submit a fourth if
+> suggested -- this problem pretty much kills a couple of platform
+> configurations we are working on...
+> 
+> > Thanks,
+> > Prakash
+> > 
+Thanks for clarifying. Looks like this is what we can do as of now.
 
-2011/1/4 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Tue, Jan 04, 2011 at 03:26:01PM -0200, Fabio Estevam wrote:
->> Uwe/Sascha,
->>
->> Any comments about this series?
-> Looks good. ?Ack for both and sorry for not replying earlier.
-
-Any comments?
-
-Regards,
-
-Fabio Estevam
+Thanks,
+Prakash
