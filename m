@@ -1,36 +1,29 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 11 Jan 2011 12:15:52 +0900
-Subject: Locking in the clk API
-In-Reply-To: <201101111016.42819.jeremy.kerr@canonical.com>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-Message-ID: <20110111031552.GJ3760@linux-sh.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 10 Jan 2011 22:19:02 -0500 (EST)
+Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
+	setup.c
+In-Reply-To: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
+References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
+Message-ID: <alpine.LFD.2.00.1101102211370.12076@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 10:16:42AM +0800, Jeremy Kerr wrote:
-> * clk_enable: may sleep
-> 
-> * clk_disable: may not sleep, but it's possible to make the global
->   clk_disable() atomic and defer the actual disable (clk->ops.disable()) to a
->   non-atomic context.
-> 
-> * clk_get_rate: may not sleep
-> 
-> * clk_set_rate: may sleep
-> 
-> As we build up our requirements, we can adjust as suitable.
-> 
-This looks like a complete disaster, and is also completely inconsistent
-with how the API is being used by the vast majority of users today. You
-have an API that can or can not sleep with no indication as to which is
-which based off of the API naming, which is just asking for trouble.
+On Mon, 10 Jan 2011, Grant Likely wrote:
 
-As it is today, most users expect that these are all usable from atomic
-context, and as far as I can tell the only special case you have are for
-some crap busses with insane latencies. In this case you should simply
-pile on _cansleep() versions of the API and make it apparent that those
-drivers are the special cases, not the other way around.
+> Since the debug macros no longer depend on the machine type
+> information, both the machine type lookup and the atags vetting can be
+> deferred to setup_arch() in setup.c which simplifies the code
+> somewhat.
+> 
+> This patch removes both __machine_type_lookup and __vet_atags() from
+> head.S.  The atags vetting is moved to setup_arch().  machine_type
+> lookup is already called from setup_machine() in addition to where it
+> was called from head.S.
 
-Having half of the API sleepable and the other not with no indication of
-which is which simply makes it completely unusable and error prone for
-both atomic and non-atomic contexts.
+While at it, you could also remove the code for __lookup_machine_type, 
+lookup_machine_type and __error_a, replacing that with a C 
+implementation living in setup.c instead.  If this code is not called 
+from head.S anymore, there is no reason to keep it there any longer.
+
+
+Nicolas
