@@ -1,30 +1,20 @@
-From: koen@beagleboard.org (Koen Kooi)
-Date: Thu, 6 Jan 2011 13:29:18 -0600
-Subject: [PATCH v6 3/3] omap3: beaglexm: fix power on of DVI
-Message-ID: <mailman.116.1294790112.1530.linux-arm-kernel@lists.infradead.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 11 Jan 2011 17:51:47 -0600
+Subject: [PATCH] omap3: beagle: check gpio returns in gpio_setup
+Message-ID: <mailman.117.1294790112.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TFP410 DVI chip is used to provide display out.
-This chip is controlled by 2 lines:
-LDO which supplies the power is controlled over gpio + 2
-and the enable of the chip itself is done over gpio + 1
-NOTE: the LDO is necessary for LED, serial blocks as well.
+gpio request and set of directions need checks of return value
+to ensure that operation succeeded or not.
 
-gpio + 1 was used to sense USB overcurrent in vanilla beagle.
-
-Without this fix, the display would not function as the LDO
-remains shut down.
-
-[nm at ti.com: split up, added descriptive changelogs]
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Koen Kooi <koen@beagleboard.org>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |   42 ++++++++++++++++++++++++++++--
- 1 files changed, 39 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c |   49 ++++++++++++++++++++++++-------
+ 1 files changed, 38 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 673deb9..28dfe8e 100644
+index 458aee4..fc598d3 100644
 --- a/arch/arm/mach-omap2/board-omap3beagle.c
 +++ b/arch/arm/mach-omap2/board-omap3beagle.c
 @@ -273,6 +273,8 @@ static struct gpio_led gpio_leds[];
@@ -36,14 +26,12 @@ index 673deb9..28dfe8e 100644
  	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
  		mmc[0].gpio_wp = -EINVAL;
  	} else if ((omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C1_3) ||
-@@ -293,9 +295,16 @@ static int beagle_twl_gpio_setup(struct device *dev,
- 	/* REVISIT: need ehci-omap hooks for external VBUS
+@@ -294,19 +296,29 @@ static int beagle_twl_gpio_setup(struct device *dev,
  	 * power switch and overcurrent detect
  	 */
--
--	gpio_request(gpio + 1, "EHCI_nOC");
--	gpio_direction_input(gpio + 1);
-+	if (omap3_beagle_get_rev() != OMAP3BEAGLE_BOARD_XM) {
+ 	if (omap3_beagle_get_rev() != OMAP3BEAGLE_BOARD_XM) {
+-		gpio_request(gpio + 1, "EHCI_nOC");
+-		gpio_direction_input(gpio + 1);
 +		r = gpio_request(gpio + 1, "EHCI_nOC");
 +		if (!r) {
 +			r = gpio_direction_input(gpio + 1);
@@ -52,21 +40,37 @@ index 673deb9..28dfe8e 100644
 +		}
 +		if (r)
 +			pr_err("%s: unable to configure EHCI_nOC\n", __func__);
-+	}
+ 	}
  
  	/*
  	 * TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, XM active
-@@ -316,6 +325,33 @@ static int beagle_twl_gpio_setup(struct device *dev,
- 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
- 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+ 	 * high / others active low)
+ 	 */
+-	gpio_request(gpio + TWL4030_GPIO_MAX, "nEN_USB_PWR");
+-	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM)
+-		gpio_direction_output(gpio + TWL4030_GPIO_MAX, 1);
+-	else
+-		gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0);
++	r = gpio_request(gpio + TWL4030_GPIO_MAX, "nEN_USB_PWR");
++	if (!r) {
++		if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM)
++			r = gpio_direction_output(gpio + TWL4030_GPIO_MAX, 1);
++		else
++			r = gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0);
++	}
++	if (r)
++		pr_err("%s: unable to configure nEN_USB_PWR\n", __func__);
  
-+	/*
-+	 * gpio + 1 on Xm controls the TFP410's enable line (active low)
-+	 * gpio + 2 control varies depending on the board rev as follows:
-+	 * P7/P8 revisions(prototype): Camera EN
-+	 * A2+ revisions (production): LDO (supplies DVI, serial, led blocks)
-+	 */
-+	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+ 	/* DVI reset GPIO is different between beagle revisions */
+ 	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM)
+@@ -324,12 +336,27 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	 * A2+ revisions (production): LDO (supplies DVI, serial, led blocks)
+ 	 */
+ 	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+-		gpio_request(gpio + 1, "nDVI_PWR_EN");
+-		gpio_direction_output(gpio + 1, 0);
+-		gpio_request(gpio + 2, "DVI_LDO_EN");
+-		gpio_direction_output(gpio + 2, 1);
 +		r = gpio_request(gpio + 1, "nDVI_PWR_EN");
 +		if (!r) {
 +			r = gpio_direction_output(gpio + 1, 0);
@@ -85,7 +89,8 @@ index 673deb9..28dfe8e 100644
 +		if (r)
 +			pr_err("%s: unable to configure DVI_LDO_EN\n",
 +				__func__);
-+	}
+ 	}
+ 
 +
  	return 0;
  }
@@ -94,9 +99,4 @@ index 673deb9..28dfe8e 100644
 1.6.3.3
 
 
---------------030608000406040903000005
-Content-Type: text/x-patch;
- name="gpio-check.patch"
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline;
- filename="gpio-check.patch"
+--------------030608000406040903000005--
