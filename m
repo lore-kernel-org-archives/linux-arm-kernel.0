@@ -1,27 +1,36 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 11 Jan 2011 15:34:06 +0100
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 11 Jan 2011 22:35:42 +0800
 Subject: Locking in the clk API
-In-Reply-To: <20110111092842.GJ12552@n2100.arm.linux.org.uk>
+In-Reply-To: <20110111121816.GB774@linux-sh.org>
 References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org>
-	<201101111211.30172.jeremy.kerr@canonical.com>
-	<20110111090311.GM12078@pengutronix.de>
-	<20110111092842.GJ12552@n2100.arm.linux.org.uk>
-Message-ID: <20110111143406.GC22390@atrey.karlin.mff.cuni.cz>
+	<201101111830.18597.jeremy.kerr@canonical.com>
+	<20110111121816.GB774@linux-sh.org>
+Message-ID: <201101112235.43061.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Paul,
 
-> Another solution occurs to me: clk_enable() which returns -EAGAIN if
-> it's called in an atomic context but needs to sleep, and let the driver
-> deal with the clock not being enabled when it wants it.  The down side
-> is it requires the driver to have additional code to sort out such a
-> problem.
+> Again, you are approaching it from the angle that an atomic clock is a
+> special requirement rather than the default behaviour.
 
-I do not think that "atomic context" is possible to reliably detect
-inside a function like that.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I'm not considering it a special requirement, but it's still a requirement 
+(that the called function does not sleep).
+
+The problem with the inverse logic (clk_enable/clk_enable_sleepable) is that 
+now you've made the caller need to know what kind of clock it has, or might 
+have one day.
+
+ * For clk_enable/clk_enable_atomic, the decision is: is this call in an
+   atomic context?
+
+ * For clk_enable/clk_enable_sleepable, the decision is: might the clock code
+   have given us a sleeping clock?
+
+Note that it's much easier to guarantee correctness for the first than it is 
+for the second.
+
+Cheers,
+
+
+Jeremy
